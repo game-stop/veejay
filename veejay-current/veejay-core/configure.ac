@@ -762,7 +762,6 @@ fi
 if test "x$cflags_set" != "xyes" ; then
   if test "x$enable_debug" = "xyes" ; then
   	CFLAGS="$debugCFLAGS $warnCFLAGS $CFLAGS"
-	OP_CFLAGS=""
   else
  	CFLAGS="$CFLAGS $warnCFLAGS"
   fi
