@@ -411,14 +411,6 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	if( bw == expected_len) {
 	    srcfmt = PIX_FMT_GRAY8;
 	}
-	else if( bw == (expected_len + expected_len_uv)) {
-	    //ok
-	}
-	else {
-		veejay_msg(VEEJAY_MSG_ERROR, "Expected different amount of data to be received");
-		v->have_frame = 0;
-		return 0;
-	}
 
 	uint8_t *in = v->data_buffer;
 	
