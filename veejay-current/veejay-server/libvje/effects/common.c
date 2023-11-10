@@ -292,95 +292,106 @@ void frameborder_yuvdata(uint8_t * input_y, uint8_t * input_u,
 
     /* Y component TOP */
     for (line = 0; line < top; line++) {
-	for (x = 0; x < width; x++) {
-	    *(input_y + x) = *(putin_y + x);
-	}
-	input_y += width;
-	putin_y += width;
+#pragma omp simd
+		for (x = 0; x < width; x++) {
+	    	*(input_y + x) = *(putin_y + x);
+		}
+		input_y += width;
+		putin_y += width;
     }
     rightvector = input_y + left + input_active_width;
     /* Y component LEFT AND RIGHT */
     for (line = 0; line < input_active_height; line++) {
-	for (x = 0; x < left; x++) {
-	    *(input_y + x) = *(putin_y + x);
-	}
-	for (x = 0; x < right; x++) {
-	    *(rightvector + x) =
-		*(putin_y + left + input_active_width + x);
-	}
-	input_y += width;
-	rightvector += width;
-	putin_y += width;
+#pragma omp simd
+		for (x = 0; x < left; x++) {
+	    	*(input_y + x) = *(putin_y + x);
+		}
+#pragma omp simd
+		for (x = 0; x < right; x++) {
+		    *(rightvector + x) =
+			*(putin_y + left + input_active_width + x);
+		}
+		input_y += width;
+		rightvector += width;
+		putin_y += width;
     }
     /* Y component BOTTOM  */
     for (line = 0; line < bottom; line++) {
-	for (x = 0; x < width; x++)
-	    *(input_y + x) = *(putin_y + x);
+#pragma omp simd
+		for (x = 0; x < width; x++)
+	    	*(input_y + x) = *(putin_y + x);
 
-	input_y += width;
-	putin_y += width;
+		input_y += width;
+		putin_y += width;
     }
 
 
     /* U component TOP */
     for (line = 0; line < (top >> shift_v); line++) {
-	for (x = 0; x < (width >> shift_h); x++) {
-	    *(input_u + x) = *(putin_u + x);
-	}
-	input_u += width >> shift_h;
-	putin_u += width >> shift_h;
+#pragma omp simd
+		for (x = 0; x < (width >> shift_h); x++) {
+	    	*(input_u + x) = *(putin_u + x);
+		}
+		input_u += width >> shift_h;
+		putin_u += width >> shift_h;
     }
 
     rightvector = input_u + ((left + input_active_width) >> shift_h);
     for (line = 0; line < (input_active_height >> shift_v); line++) {
-	for (x = 0; x < (left >> shift_h); x++) {
-	    *(input_u + x) = *(putin_u + x);
-	}
-	for (x = 0; x < (right >> shift_h); x++) {
-	    *(rightvector + x) = *(putin_u +
+#pragma omp simd
+		for (x = 0; x < (left >> shift_h); x++) {
+	    	*(input_u + x) = *(putin_u + x);
+		}
+#pragma omp simd
+		for (x = 0; x < (right >> shift_h); x++) {
+	    	*(rightvector + x) = *(putin_u +
 				   ((left + input_active_width + x) >> shift_h));
 
-	}
-	input_u += width >> shift_h;
-	rightvector += width >> shift_h;
-	putin_u += width >> shift_h;
+		}
+		input_u += width >> shift_h;
+		rightvector += width >> shift_h;
+		putin_u += width >> shift_h;
     }
 
     for (line = 0; line < (bottom >> shift_v); line++) {
-	for (x = 0; x < (width >> shift_h); x++)
-	    *(input_u + x) = *(putin_u + x);
-	input_u += width >> shift_h;
-	putin_u += width >> shift_h;
+#pragma omp simd
+		for (x = 0; x < (width >> shift_h); x++)
+	    	*(input_u + x) = *(putin_u + x);
+		input_u += width >> shift_h;
+		putin_u += width >> shift_h;
     }
 
     /* V component Top */
     for (line = 0; line < (top >> shift_v); line++) {
-	for (x = 0; x < (width >> shift_h); x++) {
-	    *(input_v + x) = *(putin_v + x);
-	}
-	input_v += width >> shift_h;
-	putin_v += width >> shift_h;
+#pragma omp simd
+		for (x = 0; x < (width >> shift_h); x++) {
+	    	*(input_v + x) = *(putin_v + x);
+		}
+		input_v += width >> shift_h;
+		putin_v += width >> shift_h;
     }
     /* Left and Right */
     rightvector = input_v + ((left + input_active_width) >> shift_h);
     for (line = 0; line < (input_active_height >> shift_v); line++) {
-	for (x = 0; x < (left >> shift_h); x++)
-	    *(input_v + x) = *(putin_v + x);
+#pragma omp simd
+		for (x = 0; x < (left >> shift_h); x++)
+			*(input_v + x) = *(putin_v + x);
 
-	for (x = 0; x < (right >> shift_h); x++)
-	    *(rightvector + x) =
-		*(putin_v + ((left + input_active_width + x) >> shift_h));
+#pragma omp simd
+		for (x = 0; x < (right >> shift_h); x++)
+	    	*(rightvector + x) = *(putin_v + ((left + input_active_width + x) >> shift_h));
 
-	input_v += width >> shift_h;
-	rightvector += width >> shift_h;
-	putin_v += width >> shift_h;
+		input_v += width >> shift_h;
+		rightvector += width >> shift_h;
+		putin_v += width >> shift_h;
     }
     /* Bottom */
     for (line = 0; line < (bottom >> shift_v); line++) {
-	for (x = 0; x < (width >> shift_h); x++)
-	    *(input_v + x) = *(putin_v + x);
-	input_v += width >> shift_h;
-	putin_v += width >> shift_h;
+#pragma omp simd
+		for (x = 0; x < (width >> shift_h); x++)
+	    	*(input_v + x) = *(putin_v + x);
+		input_v += width >> shift_h;
+		putin_v += width >> shift_h;
     }
 
 }
@@ -1297,6 +1308,7 @@ void	binarify_1src( uint8_t *dst, uint8_t *src, uint8_t threshold,int reverse, i
 void vje_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, const int threshold, const int len )
 {	
 	unsigned int i;
+#pragma omp simd
 	for( i = 0; i < len; i ++ ) {
 	    if( abs( A[i] - B[i] ) < threshold )
 			O[i] = 0;
@@ -1472,6 +1484,7 @@ void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep
         }
     } else {
         int i;
+#pragma omp simd
         for (i = 0; i < w; i++) {
             dst[i * dstStep] = src[i * srcStep];
         }

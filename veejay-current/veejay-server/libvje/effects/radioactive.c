@@ -315,6 +315,7 @@ void radioactivetv_apply( void *ptr, VJFrame *frame, VJFrame *blue, int *args ) 
 	{
 		case 3:
 		case 0:
+#pragma omp simd
 			for( y = 0; y < len; y ++ ) {
 				diff[y] = abs( lum[y] - prev[y] );
 				diff[y] = (prev[y] + lum[y] + lum[y] + lum[y])>>2;

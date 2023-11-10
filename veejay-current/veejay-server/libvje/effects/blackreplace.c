@@ -70,8 +70,8 @@ void blackreplace_apply( void *ptr, VJFrame *frame, int *args ) {
 
     _rgb2yuv(red,green,blue,colorY,colorCb,colorCr);
 
-
-	for( i = 0; i < len; i ++ ) {
+#pragma omp simd
+    for( i = 0; i < len; i ++ ) {
         if( Y[i] < threshold && Cb[i] == 128 && Cr[i] == 128 ) {
             Y[i] = colorY;
             Cb[i] = colorCb;

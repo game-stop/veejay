@@ -277,6 +277,7 @@ void	waterrippletv_apply(void *ptr, VJFrame *frame, int *args)
 		q = rip->map2 + wi + 1;
 		r = rip->map3 + wi + 1;
 		for(y=hi-2; y>0; y--) {
+#pragma omp simd
 			for(x=wi-2; x>0; x--) {
 				h = *(p-wi-1) + *(p-wi+1) + *(p+wi-1) + *(p+wi+1)
 				  + *(p-wi) + *(p-1) + *(p+1) + *(p+wi) - (*p)*9;
@@ -297,6 +298,7 @@ void	waterrippletv_apply(void *ptr, VJFrame *frame, int *args)
 		p = rip->map3 + wi + 1;
 		q = rip->map2 + wi + 1;
 		for(y=hi-2; y>0; y--) {
+#pragma omp simd
 			for(x=wi-2; x>0; x--) {
 				h = *(p-wi) + *(p-1) + *(p+1) + *(p+wi) + (*p)*60;
 				*q = h >> 6;
