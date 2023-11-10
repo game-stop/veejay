@@ -554,6 +554,21 @@ static  int     midi_lsb(vmidi_t *v, int type, int param, int value )
     return lsb;   
 }
 
+static int vj_midi_cmp_timestamp(const snd_seq_timestamp_t *timestamp1, const snd_seq_timestamp_t *timestamp2) {
+    if (timestamp1->time.tv_sec < timestamp2->time.tv_sec) {
+        return -1;
+    } else if (timestamp1->time.tv_sec > timestamp2->time.tv_sec) {
+        return 1;
+    } else {
+        if (timestamp1->time.tv_nsec < timestamp2->time.tv_nsec) {
+            return -1;
+        } else if (timestamp1->time.tv_nsec > timestamp2->time.tv_nsec) {
+            return 1;
+    	}
+    }
+    return 0;
+}
+
 static  int     vj_dequeue_midi_event( vmidi_t *v )
 {
     int ret = 0;
@@ -568,7 +583,7 @@ static  int     vj_dequeue_midi_event( vmidi_t *v )
         if( err == -ENOSPC || err == -EAGAIN )
             return ret;
 
-        if( ev->time < v->last_time ) {
+        if( vj_midi_cmp_timestamp(&(ev->time) , &(v->last_time) ) < 0 ) {
             veejay_msg(VEEJAY_MSG_DEBUG, "Discard MIDI %d ( %d, %d ) , out of order", ev->type,ev->data.control.param,
                 ev->data.control.value );
             snd_seq_free_event(ev);
