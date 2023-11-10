@@ -291,7 +291,8 @@ mux(sample_t * dst, sample_t * src, unsigned long nsamples,
     unsigned long dst_skip)
 {
   /* ALERT: signed sign-extension portability !!! */
-  while(nsamples--)
+#pragma omp simd
+  for( int i = 0; i < nsamples; i ++ ) 
   {
     *dst = *src;
     dst += dst_skip;
@@ -340,9 +341,9 @@ sample_move_char_float(sample_t * dst, unsigned char *src, unsigned long nsample
 {
   /* ALERT: signed sign-extension portability !!! */
   unsigned long i;
+#pragma omp simd
   for(i = 0; i < nsamples; i++)
 		dst[i] = (sample_t) (src[i] * BIT8_MULT);
-					//dst[i] = (sample_t) (src[i]) / SAMPLE_MAX_8BIT;
 }
 
 /* convert from floating point to 8 bit */
@@ -351,6 +352,7 @@ sample_move_float_char(unsigned char *dst, sample_t * src, unsigned long nsample
 {
   /* ALERT: signed sign-extension portability !!! */
   unsigned long i;
+#pragma omp simd
   for(i = 0; i < nsamples; i++)
     dst[i] = (char) ((src[i]) * SAMPLE_MAX_8BIT);
 }
