@@ -41,6 +41,7 @@ static void displaywall_initVec(displaywall_t *wall, int w, int h)
 
 	i = 0;
 	for(y=0; y < h; y++) {
+#pragma omp simd
 		for(x=0; x < w; x++) {
 			vx = (double)(x - wall->cx) / w;
 			vy = (double)(y - wall->cy) / w;
