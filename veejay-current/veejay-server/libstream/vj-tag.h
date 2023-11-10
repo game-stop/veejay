@@ -215,12 +215,6 @@ int 	vj_tag_get_chain_status(int t1, int position);
 /* return -1 on error, otherwise set new status */
 int 	vj_tag_set_chain_status(int t1, int position, int new_status);
 
-/* return 0 on error, other value is trimmer (0 = no trim anyway) */
-int 	vj_tag_get_trimmer(int t1, int poisition);
-
-/* return -1 on error, or 1 on succes */
-int 	vj_tag_set_trimmer(int t1, int position, int value);
-
 //int vj_tag_get_video_palette(int t1);
 
 //int vj_tag_set_video_palette(int t1, int video_palette);
@@ -276,6 +270,8 @@ int 	vj_tag_get_offset(int t1, int entry);
 int 	vj_tag_set_offset(int t1, int entry, int offset);
 
 int     vj_tag_reset_offset(int t1);
+
+int     vj_tag_reset_chain_offset(int t1, int entry, int s1);
 
 int 	vj_tag_get_frame(int t1, VJFrame *dst, uint8_t *abuf);
 

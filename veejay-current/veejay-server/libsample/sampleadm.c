@@ -707,6 +707,27 @@ int sample_get_position(int s1)
     return si->offset;
 }
 
+int sample_reset_chain_offset(int s1, int chain_entry, int s2)
+{
+    sample_info *si1 = sample_get(s1);
+    sample_info *si2 = sample_get(s2);
+
+    if(!si1 || !si2)
+       return -1;
+
+    int has_marker = si2->marker_start >= 0 && si2->marker_end > 0;
+    int start_frame = ( has_marker ? si2->marker_start : si2->first_frame );
+    int end_frame = ( has_marker ? si2->marker_end : si2->last_frame );
+
+    int new_offset = start_frame;
+    if( si2->speed < 0 ) 
+	new_offset = end_frame;
+
+    si1->effect_chain[ chain_entry ]->frame_offset = new_offset;
+
+    return 1;
+}
+
 int sample_update_offset(int s1, int n_frame)
 {
     int len;
@@ -1165,22 +1186,6 @@ int sample_get_chain_status(int s1, int position)
     return sample->effect_chain[position]->e_flag;
 }
 
-int sample_get_first_mix_offset(int s1, int *parent, int look_for)
-{
-    sample_info *sample = sample_get(s1);
-    if(!sample)
-        return 0;
-    int p = 0;
-    for( p = 0; p < SAMPLE_MAX_EFFECTS; p ++ ) {
-      if( sample->effect_chain[p]->source_type == 0 && look_for == sample->effect_chain[p]->channel)
-      {  
-        return sample->effect_chain[p]->frame_offset;
-      }
-
-    }
-    return 0;
-}
-
 void	sample_update_ascociated_samples(int s1)
 {
     sample_info *sample = sample_get(s1);
@@ -1236,6 +1241,7 @@ int sample_set_resume(int s1,long position)
 
         if(sample->offset > 0) {
             sample->resume_pos = sample->offset;
+	    veejay_msg(VEEJAY_MSG_WARNING, "Check me, resume position set to offset %d", sample->resume_pos );
         }
 
         sample->loop_pp = 0;
@@ -1275,17 +1281,6 @@ int sample_get_offset(int s1, int position)
         return -1;
 
     return sample->effect_chain[position]->frame_offset;
-}
-
-int sample_get_trimmer(int s1, int position)
-{
-    sample_info *sample;
-    sample = sample_get(s1);
-    if (!sample)
-    return -1;
-    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
-    return -1;
-    return sample->effect_chain[position]->frame_trimmer;
 }
 
 int sample_get_chain_volume(int s1, int position)
@@ -1515,6 +1510,7 @@ int sample_get_all_effect_arg(int s1, int position, int *args, int arg_len, int 
     }
     else
     {
+#pragma omp simd
      for (i = 0; i < arg_len; i++) {
         args[i] = sample->effect_chain[position]->arg[i];
         }
@@ -2381,7 +2377,6 @@ int sample_chain_add(int s1, int c, int effect_nr)
 
     if (vje_get_extra_frame(effect_nr))
     {
-        sample->effect_chain[c]->frame_trimmer = 0;
         if(s1 > 1)
             s1 = s1 - 1;
         if(!sample_exists(s1)) s1 = s1 + 1;
@@ -2456,30 +2451,31 @@ int sample_reset_offset(int s1)
     return 1;
 }
 
+static int sample_calc_offset( sample_info *sample,int entry, int candidate_offset )
+{
+    int s1 = sample->effect_chain[ entry ]->channel;
+
+	for( int i = 0; i < SAMPLE_MAX_EFFECTS ; i ++ ) {
+		if( i > entry && 
+			sample->effect_chain[i]->source_type == 0 && 
+			sample->effect_chain[i]->channel == s1 ) {
+			return sample->effect_chain[ i ]->frame_offset;
+		}
+	}
+
+	return candidate_offset;
+}
+
 int sample_set_offset(int s1, int chain_entry, int frame_offset)
 {
     sample_info *sample = sample_get(s1);
     if (!sample)
-    return -1;
-    sample->effect_chain[chain_entry]->frame_offset = frame_offset;
-	return 1;
-}
-
-int sample_set_trimmer(int s1, int chain_entry, int trimmer)
-{
-    sample_info *sample = sample_get(s1);
-    if (!sample)
-    return -1;
-    /* set to zero if frame_offset is greater than sample length */
-    if (chain_entry < 0 || chain_entry >= SAMPLE_MAX_PARAMETERS)
-    return -1;
-    if (trimmer > (sample->last_frame - sample->first_frame))
-    trimmer = 0;
-    if (trimmer < 0 ) trimmer = 0;
-    sample->effect_chain[chain_entry]->frame_trimmer = trimmer;
-
+		return -1;
+    sample->effect_chain[chain_entry]->frame_offset = sample_calc_offset( sample, chain_entry, frame_offset );
+	
     return 1;
 }
+
 int sample_set_chain_audio(int s1, int chain_entry, int val)
 {
     sample_info *sample = sample_get(s1);
@@ -2529,7 +2525,6 @@ int sample_chain_clear(int s1)
 
         sample->effect_chain[i]->effect_id = -1;
         sample->effect_chain[i]->frame_offset = 0;
-        sample->effect_chain[i]->frame_trimmer = 0;
         sample->effect_chain[i]->volume = 0;
         sample->effect_chain[i]->a_flag = 0;
         sample->effect_chain[i]->is_rendering = 1;
@@ -2632,7 +2627,6 @@ int sample_chain_remove(int s1, int position)
 
     sample->effect_chain[position]->effect_id = -1;
     sample->effect_chain[position]->frame_offset = 0;
-    sample->effect_chain[position]->frame_trimmer = 0;
     sample->effect_chain[position]->volume = 0;
     sample->effect_chain[position]->a_flag = 0;
     sample->effect_chain[position]->is_rendering = 1;
@@ -2827,7 +2821,6 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at)
     int i;
     int source_type = 0;
     int channel = 0;
-    int frame_trimmer = 0;
     int frame_offset = 0;
     int e_flag = 0;
     int volume = 0;
@@ -2864,17 +2857,13 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at)
     }
     
 
-    /* add source,channel,trimmer,e_flag */
+    /* add source,channel,e_flag */
     if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTSOURCE)) {
         source_type = get_xml_int( doc, cur );
     }
 
     if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTCHANNEL)) {
         channel = get_xml_int( doc, cur );
-    }
-
-    if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTTRIMMER)) {
-        frame_trimmer = get_xml_int( doc, cur );
     }
 
     if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTOFFSET)) {
@@ -2927,7 +2916,6 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at)
             if( effect_id != -1 ) {
                 sample_set_chain_status(dst_sample, chain_index, e_flag);
                 sample_set_offset(dst_sample, chain_index, frame_offset);
-                sample_set_trimmer(dst_sample, chain_index, frame_trimmer);
             }
         
             sample_info *skel = sample_get(dst_sample);
@@ -3375,7 +3363,6 @@ void CreateEffect(xmlNodePtr node, sample_eff_chain * effect, int position)
     put_xml_int( node, XMLTAG_EFFECTSOURCE, effect->source_type );
     put_xml_int( node, XMLTAG_EFFECTCHANNEL, effect->channel );
     put_xml_int( node, XMLTAG_EFFECTOFFSET, effect->frame_offset );
-    put_xml_int( node, XMLTAG_EFFECTTRIMMER, effect->frame_trimmer );
     put_xml_int( node, XMLTAG_EFFECTAUDIOFLAG, effect->a_flag );
     put_xml_int( node, XMLTAG_EFFECTAUDIOVOLUME, effect->volume );
     put_xml_int( node, "kf_status", effect->kf_status );

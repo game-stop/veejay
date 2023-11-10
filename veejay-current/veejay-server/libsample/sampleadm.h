@@ -48,7 +48,6 @@
 #define XMLTAG_ARGUMENT   "argument"
 #define XMLTAG_EFFECTSOURCE "source"
 #define XMLTAG_EFFECTCHANNEL "channel"
-#define XMLTAG_EFFECTTRIMMER "trimmer"
 #define XMLTAG_EFFECTOFFSET "offset"
 #define XMLTAG_EFFECTACTIVE "active"
 #define XMLTAG_EFFECTAUDIOFLAG "use_audio"
@@ -98,7 +97,6 @@ typedef struct sample_eff_t {
     void *vje_instance;
     int arg[SAMPLE_MAX_PARAMETERS];	/* array of arguments */
     int frame_offset;
-    int frame_trimmer;		/* sub frame scratcher */
     int speed;			/* last known play speed */
     /* audio settings */
     int a_flag;			/* audio enabled/disabled */
@@ -189,6 +187,7 @@ typedef struct sample_info_t {
     int transition_shape;
     int transition_length;
     int transition_active;
+
 } sample_info;
 
 #define SAMPLE_YUV420_BUFSIZE 16
@@ -266,16 +265,12 @@ extern int sample_get_effect(int s1, int position);
 /* get effect any, even if effect is disabled (required for informational purposes)*/
 extern int sample_get_effect_any(int s1, int position);
 extern int sample_get_offset(int s1, int position);
-extern int sample_get_first_mix_offset(int s1, int *parent, int look_for );
-/* trimmer is usefull for underlying samples in the effect chain.
-   you can manual adjust the video/audio sync of the underlying sample */
-extern int sample_get_trimmer(int s1, int position);
-extern int sample_set_trimmer(int s1, int position, int trimmer);
 extern int sample_get_short_info(int sample_id, int *, int *, int *, int *) ;
 extern int sample_get_chain_volume(int s1, int position);
 extern void    sample_set_kf_type(int s1, int entry, int type );
 /* set volume of audio data coming to the chain */
 extern int sample_set_chain_volume(int s1, int position, int volume);
+extern int sample_reset_chain_offset(int s1, int chain_entry, int s2);
 
 /* whether to mix underlying sample's audio */
 extern int sample_get_chain_audio(int s1, int position);
