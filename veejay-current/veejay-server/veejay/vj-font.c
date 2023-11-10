@@ -1935,15 +1935,15 @@ static inline void draw_transparent_box(
 
   int p;
  
-#pragma omp simd 
   for (j = y; j < height; j++)
+#pragma omp simd
     for (i = x; i < width; i++) 
-      { 
-    p = (i + (j * w));
-    A[0][p] = (op0 * A[0][ p ] + op1 * yuv_color[0]) >> 8;
-    A[1][p] = (op0 * A[1][ p ] + op1 * yuv_color[1]) >> 8;
-    A[2][p] = (op0 * A[2][ p ] + op1 * yuv_color[2]) >> 8;  
-      }
+    { 
+      p = (i + (j * w));
+      A[0][p] = (op0 * A[0][ p ] + op1 * yuv_color[0]) >> 8;
+      A[1][p] = (op0 * A[1][ p ] + op1 * yuv_color[1]) >> 8;
+      A[2][p] = (op0 * A[2][ p ] + op1 * yuv_color[2]) >> 8;  
+    }
   
 }
 

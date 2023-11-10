@@ -229,7 +229,6 @@ char **vj_macro_pull(void *ptr, long frame_num, int at_dup, int at_loop)
 	char **messages = (char**) vj_calloc(sizeof(char*) * (m->num_msg + 1));
 	for( int i = 0; i < m->num_msg; i ++ ) {
 		messages[i] = m->msg[ i ];
-//		veejay_msg(VEEJAY_MSG_DEBUG, "playback VIMS [%s] at position %ld.%d, loop %d", messages[i], frame_num, at_dup, at_loop );
 	}
 
 	return messages;

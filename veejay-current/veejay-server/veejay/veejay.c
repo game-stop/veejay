@@ -406,7 +406,7 @@ static int set_option(const char *name, char *value)
 			nerr++;
 		}
 	} else if (strcmp(name, "bezerk") == 0 || strcmp(name, "b") == 0) {
-	info->no_bezerk = 0;
+	info->bezerk = 1;
 	} else if (strcmp(name, "qrcode-connection-info" ) == 0 ) {
 		info->qrcode = 1;
     } else if (strcmp(name, "timer") == 0 || strcmp(name, "t") == 0) {

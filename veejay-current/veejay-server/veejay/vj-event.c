@@ -1699,7 +1699,7 @@ static void vj_event_format_xml_settings( veejay_t *v, xmlNodePtr node  )
     put_xml_int( node, XML_CONFIG_SETTING_AUDIO, v->audio );
     put_xml_int( node, XML_CONFIG_SETTING_SYNC, v->sync_correction );
     put_xml_int( node, XML_CONFIG_SETTING_TIMER, v->uc->use_timer );
-    put_xml_int( node, XML_CONFIG_SETTING_BEZERK, v->no_bezerk );
+    put_xml_int( node, XML_CONFIG_SETTING_BEZERK, v->bezerk );
     put_xml_int( node, XML_CONFIG_SETTING_COLOR, veejay_is_colored() );
     put_xml_int( node, XML_CONFIG_SETTING_YCBCR, v->pixel_format );
     put_xml_float( node, XML_CONFIG_SETTING_DFPS, v->dummy->fps );
@@ -1739,7 +1739,7 @@ static void vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cu
         get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_TIMER, &(v->uc->use_timer) );
         get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_GEOX, &(v->uc->geox) );
         get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_GEOY, &(v->uc->geoy) );
-        get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_BEZERK, &(v->no_bezerk) );
+        get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_BEZERK, &(v->bezerk) );
         get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_COLOR, &c );
         get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_YCBCR, &(v->pixel_format) );
         get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_WIDTH, &(v->video_output_width) );
@@ -2386,11 +2386,11 @@ void    vj_event_sync_correction( void *ptr,const char format[], va_list ap )
 void vj_event_bezerk(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
-    if(v->no_bezerk) v->no_bezerk = 0; else v->no_bezerk = 1;
-    if(v->no_bezerk==1)
-        veejay_msg(VEEJAY_MSG_INFO,"Bezerk On  :No sample-restart when changing input channels");
+    if(v->bezerk) v->bezerk = 0; else v->bezerk = 1;
+    if(v->bezerk==0)
+        veejay_msg(VEEJAY_MSG_INFO,"Bezerk Off  :No sample-restart when changing input channels");
     else
-        veejay_msg(VEEJAY_MSG_INFO,"Bezerk Off :Sample-restart when changing input channels"); 
+        veejay_msg(VEEJAY_MSG_INFO,"Bezerk On :Sample-restart when changing input channels"); 
 }
 void vj_event_no_caching(void *ptr, const char format[], va_list ap)
 {
@@ -5629,10 +5629,8 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
         sample_set_chain_source(v->uc->sample_id,entry,src);
         sample_set_chain_channel(v->uc->sample_id,entry,cha);
         veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d", entry,(src==VJ_TAG_TYPE_NONE ? "Sample":"Stream"), cha);
-        if(v->no_bezerk)
-        {
-            veejay_set_frame(v, sample_get_resume(v->uc->sample_id));
-        }
+        if(v->bezerk)
+	    sample_reset_chain_offset( v->uc->sample_id, entry, cha );
     } 
 
     if(STREAM_PLAYING(v))
@@ -5670,7 +5668,9 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
         }
         vj_tag_set_chain_source(v->uc->sample_id,entry,src);
         vj_tag_set_chain_channel(v->uc->sample_id,entry,cha);
-
+		if(v->bezerk && src == VJ_TAG_TYPE_NONE) {
+	   		vj_tag_reset_chain_offset( v->uc->sample_id, entry, cha );
+		}
         vj_tag_get_descriptive(cha, description);
         veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d (%s)", entry,( src == 0 ? "Sample" : "Stream" ), cha,description);
     } 
@@ -5733,11 +5733,9 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
                    sample_speed = sample_get_speed(c);
                 veejay_msg(VEEJAY_MSG_INFO, "Mixing with source (%s %d) at speed %d position %d", 
                     src == VJ_TAG_TYPE_NONE ? "sample" : "stream",c,sample_speed,sample_offset);
-                if(v->no_bezerk)
-                {
-                    veejay_set_frame(v,
-                        sample_get_resume(args[0]));
-                }
+                if(v->bezerk && src==VJ_TAG_TYPE_NONE) {
+		     sample_reset_chain_offset(args[0], args[1], c );
+		}
             }
                 
         }
@@ -5788,8 +5786,12 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
             {
                vj_tag_set_chain_channel(args[0],args[1], c);
                vj_tag_set_chain_source (args[0],args[1],src);
+	   		   if(v->bezerk && src == VJ_TAG_TYPE_NONE) {
+	   		       vj_tag_reset_chain_offset( args[0], args[1], c );
+	    	   }	
+
                int sample_offset = vj_tag_get_offset(args[0],args[1]);
-               int sample_speed = 0;
+               int sample_speed = 1;
                if( src == VJ_TAG_TYPE_NONE )
                    sample_speed = sample_get_speed(c);
 
@@ -5850,8 +5852,8 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
         veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d",entry,
                 (src==VJ_TAG_TYPE_NONE ? "Sample" : "Stream"),cha);
              
-        if(v->no_bezerk) 
-            veejay_set_frame(v , sample_get_resume(v->uc->sample_id));
+        if(v->bezerk) 
+	    sample_reset_chain_offset( v->uc->sample_id, entry, cha );
     }
     if(STREAM_PLAYING(v))
     {
@@ -5894,6 +5896,9 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 
         vj_tag_set_chain_channel( v->uc->sample_id, entry, cha );
         vj_tag_get_descriptive( cha, description);
+		if(v->bezerk && src == VJ_TAG_TYPE_NONE) {
+		   vj_tag_reset_chain_offset( v->uc->sample_id, entry, cha );
+		}
 
         veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses Stream %d (%s)",entry,cha,description);
     }
@@ -5946,8 +5951,8 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
         sample_set_chain_channel( v->uc->sample_id, entry, cha );
         veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d",entry,
             (src==VJ_TAG_TYPE_NONE ? "Sample" : "Stream"),cha);
-//      if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
-        if(v->no_bezerk) veejay_set_frame(v,sample_get_resume(v->uc->sample_id));   
+        if(v->bezerk && src==VJ_TAG_TYPE_NONE)
+	    sample_reset_chain_offset( v->uc->sample_id, entry, cha );
              
     }
     if(STREAM_PLAYING(v))
@@ -5991,9 +5996,11 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 
         vj_tag_set_chain_channel( v->uc->sample_id, entry, cha );
         vj_tag_get_descriptive( cha, description);
-//      if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
+		if(v->bezerk && src == VJ_TAG_TYPE_NONE) {
+	   		vj_tag_reset_chain_offset( v->uc->sample_id, entry, cha );
+		}
 
-        veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses Stream %d (%s)",entry,
+        veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d (%s)",entry, (src == VJ_TAG_TYPE_NONE ? "Sample" : "Stream" ),
             vj_tag_get_chain_channel(v->uc->sample_id,entry),description);
     }
 }
@@ -6037,6 +6044,10 @@ void vj_event_chain_entry_channel(void *ptr, const char format[], va_list ap)
                 veejay_msg(VEEJAY_MSG_ERROR, "Invalid channel (%s %d) given",
                     (src ==VJ_TAG_TYPE_NONE ? "sample" : "stream") , args[2]);
             }
+
+	    if( v->bezerk && src == VJ_TAG_TYPE_NONE ) {
+		sample_reset_chain_offset( args[0], args[1], args[2] );
+	    }
         }
     }
     if(STREAM_PLAYING(v))
@@ -6058,6 +6069,10 @@ void vj_event_chain_entry_channel(void *ptr, const char format[], va_list ap)
                 err = 0;
             if( src != VJ_TAG_TYPE_NONE && vj_tag_exists( args[2] ))
                 err = 0;
+
+			if(v->bezerk && src == VJ_TAG_TYPE_NONE && err == 0) {
+	   			vj_tag_reset_chain_offset( args[0], args[1], args[2] );
+			}
 
             if( err == 0 && vj_tag_set_chain_channel(args[0],args[1],args[2])>=0)
             {
@@ -6114,6 +6129,9 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
                         veejay_msg(VEEJAY_MSG_DEBUG, "Using calibration data of stream %d",channel_id);
                     }
                 }
+				else if ( v->bezerk && source == VJ_TAG_TYPE_NONE ) {
+		    		sample_reset_chain_offset( args[0], args[1], channel_id );	
+				}
             }
             else
             {
@@ -6157,11 +6175,14 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
                 
                 if( source != VJ_TAG_TYPE_NONE ) {
                     int slot = vj_tag_has_cali_fx( args[0]);
-                        if( slot >= 0 ) {
+                    if( slot >= 0 ) {
                         vj_tag_cali_prepare( args[0],slot, channel_id);
                     }
                     
                 }
+				else if (v->bezerk) {
+					vj_tag_reset_chain_offset( args[0], args[1], channel_id );
+				}
             }
             else
             {
@@ -7663,10 +7684,6 @@ void vj_event_effect_add(void *ptr, const char format[], va_list ap)
                 vje_get_description(v->uc->key_effect),
                 c
             );
-            if(v->no_bezerk && vje_get_extra_frame(v->uc->key_effect) ) 
-            {
-                veejay_set_frame(v,sample_get_resume(v->uc->sample_id));
-            }
             v->uc->chain_changed = 1;
         }
     }

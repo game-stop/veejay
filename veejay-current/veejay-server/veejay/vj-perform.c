@@ -1646,9 +1646,10 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample, int chai
 
 {
     int sample[4];
-    int offset = sample_get_offset(sub_sample, chain_entry);    
+    //int offset = sample_get_offset(sub_sample, chain_entry);    
+    int offset = vj_tag_get_offset( info->uc->sample_id, chain_entry );
     int len;
-    
+   veejay_msg(VEEJAY_MSG_DEBUG, "Current offset for sample %d is %d", sub_sample, offset ); 
     if(sample_get_short_info(sub_sample,&sample[0],&sample[1],&sample[2],&sample[3])!=0) return -1;
     
     if( sample[3] == 0 ) 
@@ -1689,7 +1690,8 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample, int chai
                 //offset = sample_b[1] - sample_b[0];
                 offset = len;
                 sample_set_speed( sub_sample, (-1 * sample[3]) );
-                sample_set_offset( sub_sample,chain_entry,offset);
+		vj_tag_set_offset( info->uc->sample_id, chain_entry, offset );
+                //sample_set_offset( sub_sample,chain_entry,offset);
                 return sample[1];
             }
             if(sample[2] == 1)
@@ -1705,7 +1707,8 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample, int chai
                 offset = 0;
         }
 
-        sample_set_offset(sub_sample,chain_entry,offset);
+	vj_tag_set_offset( info->uc->sample_id, chain_entry, offset );
+        //sample_set_offset(sub_sample,chain_entry,offset);
         return (sample[0] + offset);
     }
     else
@@ -1723,7 +1726,8 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample, int chai
                 //offset = sample_b[1] - sample_b[0];
                 offset = 0;
                 sample_set_speed( sub_sample, (-1 * sample[3]));
-                sample_set_offset( sub_sample,chain_entry,offset);
+                vj_tag_set_offset( info->uc->sample_id, chain_entry, offset );
+		//sample_set_offset( sub_sample,chain_entry,offset);
                 return sample[0];
             }
             if(sample[2] == 1)
@@ -1739,7 +1743,9 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample, int chai
             if(sample[2] == 3 )
                 offset = 0;
         }
-        sample_set_offset(sub_sample, chain_entry, offset);
+        
+	vj_tag_set_offset( info->uc->sample_id, chain_entry, offset );
+	//sample_set_offset(sub_sample, chain_entry, offset);
     
         return (sample[0] + offset);
     }
@@ -2026,7 +2032,7 @@ static  int vj_perform_get_frame_( veejay_t *info, int s1, long nframe, VJFrame 
         const float frac = 1.0f / (float) N * n1;
 
         vj_frame_slow_single( p0_buffer, p1_buffer, dst->data, dst->len, uv_len, frac );
-        
+     
         if( (n1 + 1 ) == N ) {
             vj_perform_copy3( dst->data, p0_buffer, dst->len,uv_len,0);
         }

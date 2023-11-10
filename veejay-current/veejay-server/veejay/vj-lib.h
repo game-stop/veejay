@@ -337,7 +337,7 @@ typedef struct {
     int real_fps;
     int dump;
     int verbose;
-    int no_bezerk;
+    int bezerk;
     int pixel_format;
 	dummy_t *dummy;
 	int bes_width;

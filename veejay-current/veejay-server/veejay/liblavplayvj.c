@@ -2577,7 +2577,7 @@ static void Welcome(veejay_t *info)
 			info->current_edit_list->audio_bits);
 
 
-	veejay_msg(VEEJAY_MSG_INFO, "Bezeker: %s", (info->no_bezerk == 0 ? "Sample restart when switching mixing channels" : 
+	veejay_msg(VEEJAY_MSG_INFO, "Bezeker: %s", (info->bezerk == 1 ? "Sample restart when switching mixing channels" : 
 		"No sample restart when switching mixing channels" ));
   	veejay_msg(VEEJAY_MSG_INFO, "Log level: %s", (info->verbose == 0 ? "Normal" : "Verbose" ));
 
@@ -2891,7 +2891,7 @@ veejay_t *veejay_malloc()
     info->sync_ins_frames = 1;
     info->sync_skip_frames = 0;
     info->double_factor = 1;
-    info->no_bezerk = 1;
+    info->bezerk = 0;
     info->nstreams = 1;
     info->stream_outformat = -1;
     info->rlinks = (int*) vj_malloc(sizeof(int) * VJ_MAX_CONNECTIONS );

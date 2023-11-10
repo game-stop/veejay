@@ -642,6 +642,7 @@ int decode_jpeg_raw(unsigned char *jpeg_data, int len,
 		xs = xsl;
 
 		if (hdown == 0)
+#pragma omp simd
 		    for (x = 0; x < width; x++)
 			raw0[xd++] = row0[y][xs++];
 		else if (hdown == 1)
@@ -696,7 +697,7 @@ int decode_jpeg_raw(unsigned char *jpeg_data, int len,
 
 	    if (vsf[0] == 1) {
 		for (y = 0; y < 8 /*&& yc < height/2 */ ;
-		     y += 2, yc += numfields) {
+		    y += 2, yc += numfields) {
 		    xd = yc * width / 2;
 		    for (x = 0; x < width / 2; x++, xd++) {
 #ifdef STRICT_CHECKING
@@ -890,13 +891,14 @@ int decode_jpeg_gray_raw(unsigned char *jpeg_data, int len,
 		xs = xsl;
 
 		if (hdown == 0)	// no horiz downsampling
-		    for (x = 0; x < width; x++)
+#pragma omp simd
+    		for (x = 0; x < width; x++)
 			raw0[xd++] = row0[y][xs++];
 		else if (hdown == 1)	// half the res
-		    for (x = 0; x < width; x++, xs += 2)
+		for (x = 0; x < width; x++, xs += 2)
 			raw0[xd++] = (row0[y][xs] + row0[y][xs + 1]) >> 1;
 		else		// 2:3 downsampling
-		    for (x = 0; x < width / 2; x++, xd += 2, xs += 3) {
+		for (x = 0; x < width / 2; x++, xd += 2, xs += 3) {
 			raw0[xd] = (2 * row0[y][xs] + row0[y][xs + 1]) / 3;
 			raw0[xd + 1] =
 			    (2 * row0[y][xs + 2] + row0[y][xs + 1]) / 3;
