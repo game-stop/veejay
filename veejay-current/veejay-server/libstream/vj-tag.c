@@ -3332,7 +3332,7 @@ static void whiteframe_process( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h
     } else {
         int p;
         //@ should subtract dark current, TODO
-#pragma opm simd
+#pragma omp simd
 	for( i = 0; i < (w*h); i ++ ) {
             p = Y[i] - bf[i];
             if( p < 0 )

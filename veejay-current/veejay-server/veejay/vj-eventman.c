@@ -162,7 +162,7 @@ void	vj_event_vevo_inline_fire(void *super, int vims_id, const char *format, ...
 
 void		vj_event_vevo_inline_fire_default( void *super, int vims_id, const char *format )
 {
-	char key[16];
+	char key[20];
 	int i = 0;
 	int n = 0;
 	int dval[4] = {0,0,0,0};

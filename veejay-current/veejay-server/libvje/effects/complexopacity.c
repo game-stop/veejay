@@ -93,12 +93,11 @@ void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *bg, int *args) {
 
 
     uint8_t *fg_y, *fg_cb, *fg_cr;
-    uint8_t *bg_y, *bg_cb, *bg_cr;
-    int accept_angle_tg, accept_angle_ctg, one_over_kc;
-    int kfgy_scale, kg;
+    uint8_t *bg_y;
+    int accept_angle_tg;
 
     uint8_t cb, cr;
-    float kg1, tmp, aa = 255.0f, bb = 255.0f, _y = 0;
+    float kg1, tmp, aa = 255.0f, bb = 255.0f;
     float angle = (float) i_angle / 100.0f;
     unsigned int pos;
     int matrix[5];
@@ -108,10 +107,9 @@ void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *bg, int *args) {
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
     int width = frame->width;
-    int height = frame->height;
-	int	iy,iu,iv;
+	
+	int	iy,iu=128,iv=128;
 	_rgb2yuv(r,g,b,iy,iu,iv);
-	_y = (float) iy;
 	aa = (float) iu;
 	bb = (float) iv;  
     tmp = sqrt(((aa * aa) + (bb * bb)));
@@ -121,12 +119,8 @@ void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *bg, int *args) {
 
     /* obtain coordinate system for cb / cr */
     accept_angle_tg = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
-    accept_angle_ctg= (int)( 15.0f / tanf(M_PI * angle / 180.0f));
 
     tmp = 1 / kg1;
-    one_over_kc = 0xff * 2 * tmp - 0xff;
-    kfgy_scale = 0xf * (float) (_y) / kg1;
-    kg = kg1;
 
     /* intialize pointers */
     fg_y = frame->data[0];
@@ -134,8 +128,6 @@ void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *bg, int *args) {
     fg_cr = frame->data[2];
 
     bg_y = bg->data[0];
-    bg_cb = bg->data[1];
-    bg_cr = bg->data[2];
 
     for (pos = width + 1; pos < (len) - width - 1; pos++) {
 	int i = 0;

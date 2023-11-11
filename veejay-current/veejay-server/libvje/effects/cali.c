@@ -153,59 +153,38 @@ void cali_apply(void *ptr, VJFrame *frame, int *args ) {
 
 	//@ process master flat image
 	if( full ) {
-
 		for( i = 0; i < len; i ++ ) {
-			p = ( Y[i] - by[i] ); 
-			if( p < 0 )
-				p = 0;
-			if( wy[i] != 0 )
-				Y[i] = c->mean[0] * p / wy[i];
-			else
-				Y[i] = 0;
+			p = ( Y[i] - by[i] );
+		        p = ( p < 0 ) ? 0 : p;	
+			Y[i] = ( wy[i] != 0 ) ? c->mean[0] * p / wy[i]: 0;
 		}
 
 		for( i = 0; i < uv_len; i ++ ) {
 			p = chroma + ((U[i]-chroma)-(bu[i]-chroma));
-			if( p<0)
-				p = 0;
+			p = ( p < 0 ) ? 0: p;
 			
-			if( wu[i]==0 )
-				U[i] = chroma;
-			else
-				U[i] = (uint8_t) ( c->mean[1] * p / wu[i]);
+			U[i] = (wu[i] != 0 ) ? (uint8_t) ( c->mean[1] * p / wu[i]): chroma;
 		
-			p 	= chroma + ((V[i]-chroma)-(bv[i]-chroma));
-			if( p < 0 )
-				p = 0;
+			p = chroma + ((V[i]-chroma)-(bv[i]-chroma));
+			p = ( p < 0 ) ? 0: p;
 
-			if( wv[i] == 0 )
-				V[i] = chroma;
-			else
-				V[i] = (uint8_t) ( c->mean[2] * p / wv[i] );
+			V[i] = (wv[i] != 0 ) ? (uint8_t) ( c->mean[2] * p / wv[i]): chroma;
 		}
 
 	} else {
 		//@ just show result of frame - dark current
+#pragma omp simd
 		for( i = 0; i <(len); i ++ ) {
 			p = ( Y[i] - by[i] );
-			if( p < 0 )
-				Y[i] = pixel_Y_lo_;
-			else
-				Y[i] = p;
+			Y[i] = ( p < 0 ) ? pixel_Y_lo_ : p;
 		}
 #pragma omp simd
 		for( i = 0; i < uv_len; i ++ ) {
 			p = chroma + ( (U[i]-chroma) - (bu[i]-chroma));
-			if( p < 0 )
-				U[i] = chroma;
-			else
-				U[i] = p;
+			U[i] = ( p < 0 ) ? chroma: p;
 
 			p = chroma + ( (V[i]-chroma) - (bv[i]-chroma));
-			if( p < 0 )
-				V[i] = chroma;
-			else
-				V[i] = p;
+			V[i] = ( p < 0 ) ? chroma: p;
 		}
 	}
 

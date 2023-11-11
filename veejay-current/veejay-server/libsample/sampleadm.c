@@ -2209,7 +2209,6 @@ int sample_chain_free(int s1, int global)
 {
     sample_info *sample = sample_get(s1);
     int i=0;
-    int e_id = 0; 
     int sum = 0;
     if (!sample)
         return -1;

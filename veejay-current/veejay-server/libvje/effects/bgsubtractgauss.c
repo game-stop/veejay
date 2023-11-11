@@ -277,7 +277,7 @@ static void fg_erode( uint8_t *I, const int w, const int h, uint8_t *O )
 	{
 		for( x = 1; x < aw; x ++ )
 		{
-			if( I[x + y] == 0xff )
+			/*if( I[x + y] == 0xff )
 			{
 				if( I[ x - 1 + y - w ] == 0||
 				    I[ x + y - w ] == 0 ||
@@ -293,8 +293,19 @@ static void fg_erode( uint8_t *I, const int w, const int h, uint8_t *O )
 			}
 			else {
 				O[x+y] = 0;
-			}
+			} */
+            uint8_t isfg = (I[x + y] == 0xff);
 
+            isfg &= (I[x - 1 + y - w] &&
+                             I[x + y - w] &&
+                             I[x + 1 + y - w] &&
+                             I[x - 1 + y] &&
+                             I[x + 1 + y] &&
+                             I[x - 1 + y + w] &&
+                             I[x + y + w] &&
+                             I[x + 1 + y + w]);
+
+            O[x + y] = isfg ? 0xff : 0;
 		}
 	}
 }
@@ -309,7 +320,7 @@ static void fg_dilate( uint8_t *I, const int w, const int h, uint8_t *O )
 	{
 		for( x = 1; x < aw; x ++ )
 		{
-			if( I[x + y] == 0 )
+			/*if( I[x + y] == 0 )
 			{
 				if( I[ x - 1 + y - w ] ||
 				    I[ x + y - w ] ||
@@ -325,8 +336,18 @@ static void fg_dilate( uint8_t *I, const int w, const int h, uint8_t *O )
 			}
 			else {
 				O[x+y] = 0xff;
-			}
+			}*/
+            uint8_t isfg = (I[x + y] == 0);
+            isfg |= (I[x - 1 + y - w] ||
+                     I[x + y - w] ||
+                     I[x + 1 + y - w] ||
+                     I[x - 1 + y] ||
+                     I[x + 1 + y] ||
+                     I[x - 1 + y + w] ||
+                     I[x + y + w] ||
+                     I[x + 1 + y + w]);
 
+            O[x + y] = isfg ? 0xff : 0;
 		}
 	}
 }

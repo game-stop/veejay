@@ -69,7 +69,7 @@ void coloradjust_apply(void *ptr, VJFrame *frame, int *args) {
 
 	if( exposureValue > 0.0f ) {
     	float powValue = exposureValue / 256.0f; 
-#pragma opm simd
+#pragma omp simd
 		for( i = 0; i < len ; i ++ ) 
 		{
 			Y[i] = (uint8_t)(Y[i] * powValue > 255 ? 255 : (Y[i] * powValue));

@@ -72,7 +72,7 @@ void greyselect_apply( void *ptr, VJFrame *frame, int *args ) {
     uint8_t *fg_cb, *fg_cr;
     int accept_angle_tg;
     int cb, cr;
-    float kg1, tmp, aa = 255.0f, bb = 255.0f;
+    float tmp, aa = 255.0f, bb = 255.0f;
     float angle = (float) i_angle / 100.0f;
     unsigned int pos;
     uint8_t val;
@@ -86,7 +86,6 @@ void greyselect_apply( void *ptr, VJFrame *frame, int *args ) {
     tmp = sqrt(((aa * aa) + (bb * bb)));
     cb = 255 * (aa / tmp);
     cr = 255 * (bb / tmp);
-    kg1 = tmp;
    
     /* obtain coordinate system for cb / cr */
     accept_angle_tg = (int)( 15.0f * tanf(M_PI * angle / 180.0f));

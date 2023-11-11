@@ -79,18 +79,8 @@ vj_effect *alphaselect2_init(int w, int h)
 
 static inline double color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, const double dA, const double dB )
 {
-		//double tmp = 0.0; 
-		//fast_sqrt( tmp, (Cbk - Cb) * (Cbk-Cb) + (Crk - Cr) * (Crk - Cr) );
-
-		double tmp = sqrt_table_get_pixel( (Cbk-Cb), (Crk-Cr) );
-		
-		if( tmp < dA ) { /* near color key == bg */
-			return 0.0;
-		}
-		if( tmp < dB ) { /* middle region */
-			return (tmp - dA)/(dB - dA); /* distance to key color */
-		}
-		return 1.0; /* far from color key == fg */
+	double tmp = sqrt_table_get_pixel( (Cbk-Cb), (Crk-Cr) );
+	return (tmp < dA) ? 0.0 : ((tmp < dB) ? ((tmp - dA) / (dB - dA)) : 1.0);
 }
 
 void alphaselect2_apply(void *ptr, VJFrame *frame, int *args) {
