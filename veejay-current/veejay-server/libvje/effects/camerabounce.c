@@ -164,10 +164,10 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args) {
 
     // Blur, more towards the edges and less towards the centre
     for (int y = 0; y < height; ++y) {
+		int distanceY = ( height >> 1 ) - y;
         for (int x = 0; x < width; ++x) {
 
             int distanceX = ( width >> 1 ) - x;
-            int distanceY = ( height >> 1) - y;
 
             int distanceSquared = distanceX * distanceX + distanceY * distanceY;
 
@@ -178,8 +178,7 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args) {
                 normalizedDistance *= 100.0f;
 
                 float blurStrength = blurAmount * normalizedDistance;
-                if( blurStrength > 6.0f )
-                     blurStrength = 6.0f;
+                blurStrength = ( blurStrength > 6.0f ? 6.0f: blurStrength );
 
                 const int minX = MAX(0, x - blurStrength);
                 const int minY = MAX(0, y - blurStrength);
@@ -190,8 +189,9 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args) {
 
 #pragma omp simd
                 for (int blurY = minY; blurY <= maxY; ++blurY) {
-                    for (int blurX = minX; blurX <= maxX; ++blurX) {
-                        int blurIndex = blurY * width + blurX;
+					int bpos = blurY * width;
+  					for (int blurX = minX; blurX <= maxX; ++blurX) {
+                        int blurIndex = bpos + blurX;
                         tmpY += bY[blurIndex];
                         tmpU += (bU[blurIndex] - 128);
                         tmpV += (bV[blurIndex] - 128);
