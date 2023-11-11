@@ -71,10 +71,11 @@ static inline int _chroma_key( uint8_t fg_cb, uint8_t fg_cr, uint8_t cb, uint8_t
 	int yy = ((fg_cr * cb) - (fg_cb * cr)) >> 7;
 	int val = (xx * angle) >> 4;
 
-	if( abs(yy) < val ) 
+/*	if( abs(yy) < val ) 
 		return 1;
 	
-	return 0;
+	return 0; */
+	return ( yy >= 0 ? yy : -yy ) < val;
 }
 
 void chromapalette_apply(void *ptr, VJFrame *frame, int *args) {
