@@ -104,8 +104,7 @@ void rgbkeysmooth_free(void *ptr) {
 
 void dilate_and_smooth_matte(uint8_t *dilated_mask, const uint8_t *mask, int width, int height, int opacity) {
     for (int y = 1; y < height - 1; ++y) {
-#pragma omp simd
-	for (int x = 1; x < width - 1; ++x) {
+        for (int x = 1; x < width - 1; ++x) {
             int max_val = 0;
             for (int i = -1; i <= 1; ++i) {
                 for (int j = -1; j <= 1; ++j) {
@@ -126,8 +125,7 @@ void dilate_and_smooth_matte(uint8_t *dilated_mask, const uint8_t *mask, int wid
 
 void erode_and_smooth_matte(uint8_t *eroded_mask, const uint8_t *matte_mask, int width, int height, int opacity) {
     for (int y = 1; y < height - 1; ++y) {
-#pragma omp simd
-	    for (int x = 1; x < width - 1; ++x) {
+        for (int x = 1; x < width - 1; ++x) {
             int sum = 9 * matte_mask[y * width + x];
             sum -= matte_mask[(y - 1) * width + x - 1];
             sum -= matte_mask[(y - 1) * width + x];
@@ -144,8 +142,7 @@ void erode_and_smooth_matte(uint8_t *eroded_mask, const uint8_t *matte_mask, int
     }
 
     for (int y = 0; y < height; ++y) {
-#pragma omp simd
-	for (int x = 0; x < width; ++x) {
+        for (int x = 0; x < width; ++x) {
             eroded_mask[y * width + x] = (((matte_mask[y * width + x] * (255 - opacity) + eroded_mask[y * width + x] * opacity) >> 8));
         }
     }
@@ -200,7 +197,6 @@ void rgbkeysmooth_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
     uint8_t *fg = t->mask + frame->offset;
     uint8_t *dilated_matte = t->blurred_mask + frame->offset;
 
-#pragma omp simd
     for ( pos = 0; pos < len; pos++) {
         int Y_diff = abs(Y[pos] - iy);
         int Cb_diff = abs(Cb[pos] - iu);

@@ -269,12 +269,24 @@ void	motionmap_lerp_frame( void *ptr, VJFrame *cur, VJFrame *prev, int N, int n 
 	uint8_t *__restrict__ V0 = cur->data[2];
 	const uint8_t *__restrict__ V1 = prev->data[2];
 
+#ifndef NO_AUTOVECTORIZATION
+	for ( i = 0; i < len ; i ++ ) {
+		Y0[i] = Y1[i] + ( frac * (Y0[i] - Y1[i]));
+	}
+	for( i = 0; i < len; i ++ ) {
+		U0[i] = U1[i] + ( frac * (U0[i] - U1[i]));
+	}
+	for( i = 0; i < len; i ++ ) {	
+		V0[i] = V1[i] + ( frac * (V0[i] - V1[i]));
+	}
+#else
 #pragma omp simd
 	for ( i = 0; i < len ; i ++ ) {
 		Y0[i] = Y1[i] + ( frac * (Y0[i] - Y1[i]));
 		U0[i] = U1[i] + ( frac * (U0[i] - U1[i]));
 		V0[i] = V1[i] + ( frac * (V0[i] - V1[i]));
 	}
+#endif
 }
 
 void	motionmap_store_frame( void *ptr, VJFrame *fx )
@@ -336,7 +348,6 @@ static void motionmap_calc_diff( const uint8_t *bg, uint8_t *pimg, const uint8_t
 	uint8_t *I1 = pI1;
 	uint8_t *I2 = pI2;
 
-#pragma omp simd
 	for( i = 0; i < len; i ++ ) 
 	{
 		I1[i] = abs( bg[i] - img[i] );
@@ -354,7 +365,7 @@ static void motionmap_calc_diff( const uint8_t *bg, uint8_t *pimg, const uint8_t
 		I1[i] = abs( I1[i] - I2[i] );
 		I2[i] = bDst[i] >> 1;
 	}
-#pragma omp simd
+
 	for( i = 0; i < len; i ++ ) 
 	{
 		bDst[i] = I1[i] + I2[i];

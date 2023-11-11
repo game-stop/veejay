@@ -212,7 +212,6 @@ static void put_video( videowall_t *vw, uint8_t *dst_plane, uint8_t *video, int 
 
 	for( y = 0; y < box_h; y ++ )
 	{
-#pragma omp simd
 		for( x = 0; x < box_w; x ++ )
 		{
 			*(P+offset+x) = video[(y*box_w)+x];

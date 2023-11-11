@@ -394,7 +394,7 @@ static void halftone_apply_avg_black( VJFrame *frame, int radius, int orientatio
 
             // clip negative index (out of image) for colors pickup
             for( y1 = (y < 0) ? 0 : y ; y1 < (y + radius) && y1 < h; y1 ++ ) {
-				for( x1 = (x < 0) ? 0 : x ; x1 < (x + radius) && x1 < w; x1 ++ ) {
+                for( x1 = (x < 0) ? 0 : x ; x1 < (x + radius) && x1 < w; x1 ++ ) {
                     sum += Y[ y1 * w + x1 ]; 
                     hit ++;
                     Y[ y1 * w + x1 ] = pixel_Y_hi_;
@@ -471,7 +471,7 @@ static void halftone_apply_avg_white( VJFrame *frame, int radius, int orientatio
 
             // clip negative index (out of image) for colors pickup
             for( y1 = (y < 0) ? 0 : y ; y1 < (y + radius) && y1 < h; y1 ++ ) {
-				for( x1 = (x < 0) ? 0 : x ; x1 < (x + radius) && x1 < w; x1 ++ ) {
+                for( x1 = (x < 0) ? 0 : x ; x1 < (x + radius) && x1 < w; x1 ++ ) {
                     sum += Y[ y1 * w + x1 ]; 
                     hit ++;
                     Y[ y1 * w + x1 ] = pixel_Y_lo_;

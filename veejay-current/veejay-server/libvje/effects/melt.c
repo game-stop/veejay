@@ -40,7 +40,7 @@ vj_effect *melt_init(int w, int h)
 	ve->extra_frame = 1;
 	ve->sub_format = 1;
 	ve->has_user = 0;
-	ve->parallel = 0;
+	ve->parallel = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Speed", "Intensity" );
 
 	return ve;
@@ -82,15 +82,15 @@ void melt_apply(void *ptr, VJFrame *A, VJFrame *B, int *args ) {
     int speed = args[0];
     int intensity = args[1];
 
-    uint8_t *restrict srcAY = A->data[0];
-    uint8_t *restrict srcAU = A->data[1];
-    uint8_t *restrict srcAV = A->data[2];
+    uint8_t *srcAY = A->data[0];
+    uint8_t *srcAU = A->data[1];
+    uint8_t *srcAV = A->data[2];
 
-	uint8_t *restrict dstY = t->buf[0];
-	uint8_t *restrict dstU = t->buf[1];
-	uint8_t *restrict dstV = t->buf[2];
+	uint8_t *dstY = t->buf[0];
+	uint8_t *dstU = t->buf[1];
+	uint8_t *dstV = t->buf[2];
 
-    uint8_t *restrict srcBY = B->data[0];
+    uint8_t *srcBY = B->data[0];
 
     const unsigned int width = A->width;
     const unsigned int height = A->height;
@@ -103,9 +103,9 @@ void melt_apply(void *ptr, VJFrame *A, VJFrame *B, int *args ) {
 	 * it avoids reading and writing to the same memory location
 	 */
 
-	veejay_memcpy( dstY, srcAY, A->len );
-	veejay_memcpy( dstU, srcAU, A->len );
-	veejay_memcpy( dstV, srcAV, A->len );
+	veejay_memcpy( t->buf[0], srcAY, A->len );
+	veejay_memcpy( t->buf[1], srcAU, A->len );
+	veejay_memcpy( t->buf[2], srcAV, A->len );
 
 
     for (unsigned int y = 0; y < height; ++y) {
@@ -113,11 +113,14 @@ void melt_apply(void *ptr, VJFrame *A, VJFrame *B, int *args ) {
             unsigned int idx = y * width + x;
             
             unsigned int meltIdx = idx + speed;
-            int mask = -(srcBY[idx] > meltThreshold);
 
-            srcAY[idx] = (mask & dstY[meltIdx]) | (~mask & srcAY[idx]);
-            srcAU[idx] = (mask & dstU[meltIdx]) | (~mask & srcAU[idx]);
-            srcAV[idx] = (mask & dstV[meltIdx]) | (~mask & srcAV[idx]);
+            meltIdx = (meltIdx >= len) ? meltIdx - len : meltIdx;
+
+            if (srcBY[idx] > meltThreshold) {
+                srcAY[idx] = t->buf[0][meltIdx];
+                srcAU[idx] = t->buf[1][meltIdx];
+                srcAV[idx] = t->buf[2][meltIdx];
+            }
         }
     }
 

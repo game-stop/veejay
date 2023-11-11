@@ -188,8 +188,8 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args) {
 
                 int tmpY = 0; int tmpU = 0; int tmpV = 0; uint16_t totalPixels = 0;
 
-                for (int blurY = minY; blurY <= maxY; ++blurY) {
 #pragma omp simd
+                for (int blurY = minY; blurY <= maxY; ++blurY) {
                     for (int blurX = minX; blurX <= maxX; ++blurX) {
                         int blurIndex = blurY * width + blurX;
                         tmpY += bY[blurIndex];

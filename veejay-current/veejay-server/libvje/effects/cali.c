@@ -186,7 +186,6 @@ void cali_apply(void *ptr, VJFrame *frame, int *args ) {
 
 	} else {
 		//@ just show result of frame - dark current
-#pragma omp simd
 		for( i = 0; i <(len); i ++ ) {
 			p = ( Y[i] - by[i] );
 			if( p < 0 )
