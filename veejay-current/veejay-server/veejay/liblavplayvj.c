@@ -615,12 +615,6 @@ int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 
 	info->sfd = sample_get_framedup(sample_id);
 
-	if(!info->seq->active) {
-	    if( info->settings->sample_restart ) {
-		 	sample_reset_offset( sample_id );	/* reset mixing offsets */
-        }
-    }
-
 	sample_set_loop_stats( sample_id, 0 );
     sample_set_loops( sample_id, -1 ); /* reset loop count */
 
@@ -750,13 +744,13 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 			if( !info->seq->active ) {
 				if( info->settings->sample_restart)
 				{
-					sample_set_resume(cur_id,-1);
+					sample_set_resume_override(cur_id,-1);
 					long pos = sample_get_resume( cur_id );
 					veejay_set_frame(info, pos );
 					veejay_msg(VEEJAY_MSG_INFO, "Sample %d starts playing from frame %d",sample_id,pos);
 				} 
 				else {
-					veejay_msg(VEEJAY_MSG_INFO, "Already playing sample (continous mode is on)");
+					veejay_msg(VEEJAY_MSG_INFO, "Already playing sample %d (continous mode is on)", sample_id);
 				}
 				return;
 			}
@@ -840,7 +834,6 @@ void veejay_sample_set_initial_positions(veejay_t *info)
 			int id = info->seq->samples[i].sample_id;
 			int stats[4];
     
-    		sample_reset_offset(id);
     		sample_set_loops(id,-1);
     		sample_get_short_info( id, &stats[0],&stats[1],&stats[2],&stats[3]);
     		if( stats[2] == 2 ) {
@@ -868,7 +861,6 @@ void veejay_sample_set_initial_positions(veejay_t *info)
 void veejay_prepare_sample_positions(int id) {
     int stats[4] = { 0,0,0,0 };
     
-    sample_reset_offset(id);
     sample_set_loops(id,-1);
     sample_get_short_info( id, &stats[0],&stats[1],&stats[2],&stats[3]);
     if( stats[2] == 2 ) {
@@ -1955,7 +1947,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		return -1;
 	}
 
-	if(!sample_init( (info->video_output_width * info->video_output_height), info->font, info->plain_editlist ) ) {
+	if(!sample_init( (info->video_output_width * info->video_output_height), info->font, info->plain_editlist,info ) ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Internal error while initializing sample administrator");
 		return -1;
 	}

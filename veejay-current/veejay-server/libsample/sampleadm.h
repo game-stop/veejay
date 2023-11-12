@@ -48,7 +48,6 @@
 #define XMLTAG_ARGUMENT   "argument"
 #define XMLTAG_EFFECTSOURCE "source"
 #define XMLTAG_EFFECTCHANNEL "channel"
-#define XMLTAG_EFFECTOFFSET "offset"
 #define XMLTAG_EFFECTACTIVE "active"
 #define XMLTAG_EFFECTAUDIOFLAG "use_audio"
 #define XMLTAG_EFFECTAUDIOVOLUME "chain_volume"
@@ -96,7 +95,6 @@ typedef struct sample_eff_t {
     int e_flag;
     void *vje_instance;
     int arg[SAMPLE_MAX_PARAMETERS];	/* array of arguments */
-    int frame_offset;
     int speed;			/* last known play speed */
     /* audio settings */
     int a_flag;			/* audio enabled/disabled */
@@ -165,11 +163,11 @@ typedef struct sample_info_t {
     int encoder_width;
     int encoder_height;
     int encoder_max_size;
-    
+    int frame_tick;
+
     int auto_switch;	
     int selected_entry;
     int effect_toggle;
-    int offset;
     int play_length;
     editlist *edit_list;
     char     *edit_list_file;
@@ -199,13 +197,12 @@ extern unsigned int sample_size();
 extern int sample_highest();
 extern int sample_highest_valid_id();
 extern int sample_verify();
-extern int sample_init(int len, void *font, editlist *el);
+extern int sample_init(int len, void *font, editlist *el,void *info);
 extern int sample_update(sample_info *sample, int s1);
 #ifdef HAVE_XML2
 extern int sample_readFromFile(char *, void *vp, void *ptr, void *font, void *el, int *id, int *mode);
 extern int sample_writeToFile(char *, void *vp, void *ptr, void *font, int id, int mode);
 #endif
-extern int sample_update_offset(int s1, int nframe);
 extern int sample_get_position(int s1);
 extern int sample_set_state(int new_state);
 extern int sample_get_state();
@@ -264,13 +261,11 @@ void	*sample_get_plugin( int s1, int position, void *ptr );
 extern int sample_get_effect(int s1, int position);
 /* get effect any, even if effect is disabled (required for informational purposes)*/
 extern int sample_get_effect_any(int s1, int position);
-extern int sample_get_offset(int s1, int position);
 extern int sample_get_short_info(int sample_id, int *, int *, int *, int *) ;
 extern int sample_get_chain_volume(int s1, int position);
 extern void    sample_set_kf_type(int s1, int entry, int type );
 /* set volume of audio data coming to the chain */
 extern int sample_set_chain_volume(int s1, int position, int volume);
-extern int sample_reset_chain_offset(int s1, int chain_entry, int s2);
 
 /* whether to mix underlying sample's audio */
 extern int sample_get_chain_audio(int s1, int position);
@@ -281,7 +276,6 @@ extern int sample_set_chain_audio(int s1, int position, int flag);
 extern int sample_set_chain_status(int s1, int position, int status);
 extern int sample_get_chain_status(int s1, int position);
 
-extern int sample_set_offset(int s1, int position, int frame_offset);
 extern int sample_get_effect_arg(int s1, int position, int argnr);
 extern int sample_set_effect_arg(int s1, int position, int argnr, int value);
 
@@ -297,7 +291,7 @@ extern int sample_chain_add(int s1, int c, int effect_nr);
 extern int sample_get_chain_channel(int s1, int position);
 extern int sample_set_chain_channel(int s1, int position, int channel);
 
-//int sample_chain_replace(int s1, int position, int effect_id);
+extern void sample_frame_tick();
 
 extern int sample_chain_sprint_status(int s1,int tags,int cache,int sa,int ca, int r, int f, int m, int t,int sr,int curfps,uint32_t lo, uint32_t hi, int macro,char *s, int feedback ); 
 
@@ -327,7 +321,6 @@ extern int sample_reset_fader(int t1);
 extern int sample_get_fade_entry(int t1);
 extern void sample_set_fade_entry(int t1, int entry);
 extern void sample_set_fade_method(int t1, int method );
-extern int sample_reset_offset(int s1);
 extern int sample_get_fade_method(int t1);
 extern void sample_set_fade_alpha(int t1, int alpha);
 extern int sample_get_fade_alpha(int s1);
@@ -370,7 +363,8 @@ extern int sample_get_frame_length(int s1);
 extern int sample_loop_dec(int s1);
 extern int     sample_max_video_length(int s1);
 extern	long	sample_get_resume(int s1);
-extern	int		sample_set_resume(int s1, long pos );
+extern int sample_set_resume(int s1, long pos );
+extern int sample_set_resume_override(int s1, long pos);
 extern void	sample_update_ascociated_samples(int s1);
 
 extern void	sample_chain_alloc_kf( int s1, int entry );

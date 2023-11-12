@@ -1243,7 +1243,6 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
             (sample_eff_chain *) vj_calloc(sizeof(sample_eff_chain));
         tag->effect_chain[i]->effect_id = -1;
         tag->effect_chain[i]->e_flag = 0;
-        tag->effect_chain[i]->frame_offset = 0;
         tag->effect_chain[i]->speed = INT_MAX;
         tag->effect_chain[i]->volume = 0;
         tag->effect_chain[i]->a_flag = 0;
@@ -2940,98 +2939,6 @@ int vj_tag_by_type(int type)
     return 0;
 }
 
-int vj_tag_reset_offset(int t1)
-{
-    vj_tag *tag = vj_tag_get(t1);
-    if (!tag)
-        return -1;
-    int i;
-    for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
-    {
-        tag->effect_chain[i]->frame_offset = 0;
-    }
-    return 1;
-}
-
-int vj_tag_reset_chain_offset( int t1, int chain_entry, int s1 )
-{
-    sample_info *si = sample_get(s1);
-    vj_tag *tag = vj_tag_get(t1);
-    if(!si || !tag)
-        return -1;
-    
-    int has_marker = si->marker_start >= 0 && si->marker_end > 0;
-    int start_frame = ( has_marker ? si->marker_start : si->first_frame );
-    int end_frame = ( has_marker ? si->marker_end : si->last_frame );
-
-    int new_offset = start_frame;
-    if( si->speed < 0 ) 
-        new_offset = end_frame;
-
-    tag->effect_chain[ chain_entry ]->frame_offset = new_offset;
-
-    return 1;   
-}
-
-static int vj_tag_calc_offset( vj_tag *tag,int entry, int candidate_offset )
-{
-    int s1 = tag->effect_chain[ entry ]->channel;
-
-	for( int i = 0; i < SAMPLE_MAX_EFFECTS ; i ++ ) {
-		if( i > entry && 
-			tag->effect_chain[i]->source_type == 0 && 
-			tag->effect_chain[i]->channel == s1 ) {
-			return tag->effect_chain[ i ]->frame_offset;
-		}
-	}
-
-	return candidate_offset;
-}
-
-int vj_tag_set_offset(int t1, int chain_entry, int frame_offset)
-{
-    vj_tag *tag = vj_tag_get(t1);
-    if (!tag)
-    	return -1;
-    tag->effect_chain[chain_entry]->frame_offset = vj_tag_calc_offset(tag, chain_entry, frame_offset);
-    return 1;
-}
-
-int vj_tag_get_offset(int t1, int chain_entry)
-{
-    vj_tag *tag = vj_tag_get(t1);
-    if (!tag)
-    return -1;
-
-    return tag->effect_chain[chain_entry]->frame_offset;
-}
-
-
-void    vj_tag_update_ascociated_samples(int s1)
-{
-    vj_tag *sample = vj_tag_get(s1);
-    if(!sample) {
-        return;
-    }
-    
-    int p = 0;
-    for( p = 0; p < SAMPLE_MAX_EFFECTS; p ++ ) {
-        if( sample->effect_chain[p]->source_type != 0  ) 
-            continue;
-        if( !sample_exists(sample->effect_chain[p]->channel) )
-            continue;
-
-        int pos = sample->effect_chain[p]->frame_offset;
-        if(pos == 0 )
-            continue;   
-
-        sample_set_resume( sample->effect_chain[p]->channel, pos );
-        veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d will resume playback from position %d",
-                    sample->effect_chain[p]->channel, pos );
-    }
-}
-
-
 long vj_tag_get_encoded_frames(int s1) {
   vj_tag *si = vj_tag_get(s1);
   if(!si) return -1;
@@ -3917,7 +3824,6 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
     int arg[SAMPLE_MAX_PARAMETERS];
     int source_type = 0;
     int channel = 0;
-    int frame_offset = 0;
     int e_flag = 0;
     int anim= 0;
     int anim_type = 0;
@@ -3946,10 +3852,6 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
 
         if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTCHANNEL)) {
             channel = get_xml_int( doc, cur );
-        }
-
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTOFFSET)) {
-            frame_offset = get_xml_int( doc, cur );
         }
 
         if (!xmlStrcmp(cur->name, (const xmlChar *) "kf_status")) {
@@ -3989,8 +3891,6 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
             vj_tag_set_chain_source(dst_sample, chain_index, source_type);
     
             vj_tag_set_chain_status(dst_sample, chain_index, e_flag);
-    
-            vj_tag_set_offset(dst_sample, chain_index, frame_offset);
     
             j = 0;
             vj_tag *t = vj_tag_get( dst_sample );
@@ -4241,7 +4141,6 @@ static void tagCreateEffect(xmlNodePtr node, sample_eff_chain * effect, int posi
     put_xml_int( node, XMLTAG_EFFECTACTIVE, effect->e_flag );
     put_xml_int( node, XMLTAG_EFFECTSOURCE, effect->source_type );
     put_xml_int( node, XMLTAG_EFFECTCHANNEL, effect->channel );
-    put_xml_int( node, XMLTAG_EFFECTOFFSET, effect->frame_offset );
     put_xml_int( node, XMLTAG_EFFECTAUDIOFLAG, effect->a_flag );
     put_xml_int( node, XMLTAG_EFFECTAUDIOVOLUME, effect->volume );
     put_xml_int( node, "kf_status", effect->kf_status );

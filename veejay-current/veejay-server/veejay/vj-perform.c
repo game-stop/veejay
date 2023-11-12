@@ -529,11 +529,8 @@ static  int vj_perform_next_sequence( veejay_t *info, int *type, int *next_slot 
 
     *next_slot = next_current;
 
-    if( current_type == 0 ) {
-        sample_update_ascociated_samples( sample_id );
-    }
-    else {
-        vj_tag_update_ascociated_samples( sample_id );
+    if( info->bezerk && current_type == 0 ) {
+ 	sample_set_resume_override( sample_id, -1 );
     }
   
     return next_sample_id;
@@ -630,7 +627,6 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
     settings->current_frame_num += num;
 
     if( num == 0 ) {
-        sample_set_resume( info->uc->sample_id, settings->current_frame_num );
         return 0;
     }
 
@@ -710,9 +706,6 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
         }
     }
     
-    if(!info->seq->active) {
-        sample_set_resume( info->uc->sample_id, settings->current_frame_num );
-    }
     vj_perform_rand_update( info );
 
     return 0;
@@ -1539,7 +1532,7 @@ static int vj_perform_get_subframe(veejay_t * info, int this_sample_id, int sub_
     int sample_a[4];
     int sample_b[4];
 
-    int offset = sample_get_offset(a, chain_entry); 
+    int offset = sample_get_resume( b );
     int len_b;
 
     if(sample_get_short_info(b,&sample_b[0],&sample_b[1],&sample_b[2],&sample_b[3])!=0) return -1;
@@ -1586,7 +1579,7 @@ static int vj_perform_get_subframe(veejay_t * info, int this_sample_id, int sub_
                 //offset = sample_b[1] - sample_b[0];
                 offset = len_b;
                 sample_set_speed( b, (-1 * sample_b[3]) );
-                sample_set_offset(a,chain_entry,offset);
+                sample_set_resume( b, offset);
                 return sample_b[1];
             }
             if(sample_b[2] == 1)
@@ -1601,7 +1594,7 @@ static int vj_perform_get_subframe(veejay_t * info, int this_sample_id, int sub_
             else if(sample_b[2] == 3 )
                 offset = 0;
         }
-        sample_set_offset(a,chain_entry,offset);
+        sample_set_resume(b,offset);
         return (sample_b[0] + offset);
     }
     else
@@ -1619,7 +1612,7 @@ static int vj_perform_get_subframe(veejay_t * info, int this_sample_id, int sub_
                 //offset = sample_b[1] - sample_b[0];
                 offset = 0;
                 sample_set_speed( b, (-1 * sample_b[3]));
-                sample_set_offset(a,chain_entry,offset);
+                sample_set_resume(b,offset);
                 return sample_b[0];
             }
             if(sample_b[2] == 1)
@@ -1635,8 +1628,7 @@ static int vj_perform_get_subframe(veejay_t * info, int this_sample_id, int sub_
             else if(sample_b[2] == 3 )
                 offset = 0;
         }
-        sample_set_offset(a, chain_entry, offset);
-
+        sample_set_resume(b, offset);
         return (sample_b[0] + offset); //1
     }
     return 0;
@@ -1646,10 +1638,10 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample, int chai
 
 {
     int sample[4];
-    //int offset = sample_get_offset(sub_sample, chain_entry);    
-    int offset = vj_tag_get_offset( info->uc->sample_id, chain_entry );
     int len;
-   veejay_msg(VEEJAY_MSG_DEBUG, "Current offset for sample %d is %d", sub_sample, offset ); 
+
+    int offset = sample_get_resume( sub_sample );
+
     if(sample_get_short_info(sub_sample,&sample[0],&sample[1],&sample[2],&sample[3])!=0) return -1;
     
     if( sample[3] == 0 ) 
@@ -1690,7 +1682,7 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample, int chai
                 //offset = sample_b[1] - sample_b[0];
                 offset = len;
                 sample_set_speed( sub_sample, (-1 * sample[3]) );
-		vj_tag_set_offset( info->uc->sample_id, chain_entry, offset );
+		sample_set_resume( sub_sample, offset );
                 //sample_set_offset( sub_sample,chain_entry,offset);
                 return sample[1];
             }
@@ -1707,8 +1699,7 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample, int chai
                 offset = 0;
         }
 
-	vj_tag_set_offset( info->uc->sample_id, chain_entry, offset );
-        //sample_set_offset(sub_sample,chain_entry,offset);
+	sample_set_resume( sub_sample, offset );
         return (sample[0] + offset);
     }
     else
@@ -1726,8 +1717,7 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample, int chai
                 //offset = sample_b[1] - sample_b[0];
                 offset = 0;
                 sample_set_speed( sub_sample, (-1 * sample[3]));
-                vj_tag_set_offset( info->uc->sample_id, chain_entry, offset );
-		//sample_set_offset( sub_sample,chain_entry,offset);
+                sample_set_resume( sub_sample, offset );
                 return sample[0];
             }
             if(sample[2] == 1)
@@ -1743,10 +1733,8 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample, int chai
             if(sample[2] == 3 )
                 offset = 0;
         }
-        
-	vj_tag_set_offset( info->uc->sample_id, chain_entry, offset );
-	//sample_set_offset(sub_sample, chain_entry, offset);
-    
+       
+        sample_set_resume( sub_sample, offset );	
         return (sample[0] + offset);
     }
     return 0;
@@ -1915,8 +1903,6 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, performer_t *p, int s
     
    case VJ_TAG_TYPE_NONE:
         nframe = vj_perform_get_subframe_tag(info, sample_id, chain_entry);
-
-        sample_set_resume( sample_id, nframe );
 
         if(!subrender)
             cached_frame = vj_perform_sample_is_cached(info,sample_id);
@@ -2108,7 +2094,6 @@ static int vj_perform_apply_secundary(veejay_t * info,performer_t *p, int this_s
         
         case VJ_TAG_TYPE_NONE:
             nframe = vj_perform_get_subframe(info,this_sample_id, sample_id, chain_entry); // get exact frame number to decode
-            sample_set_resume( sample_id, nframe );
 
             if(!subrender)
                 cached_frame = vj_perform_sample_is_cached(info,sample_id);
@@ -3621,7 +3606,7 @@ static int vj_perform_transition_get_sample_position(int sample_id)
     if(sample_get_short_info(sample_id,&sample_b[0],&sample_b[1],&sample_b[2],&sample_b[3])!=0) {
         return 0;
     }
-    int position = sample_get_position( sample_id );
+    int position = sample_get_resume( sample_id );
 
     if( sample_b[3] == 0 ) {
         return sample_b[0] + position;
@@ -3661,7 +3646,7 @@ static int vj_perform_transition_get_sample_position(int sample_id)
                 //offset = sample_b[1] - sample_b[0];
                 position = len_b;
                 sample_set_speed( sample_id, (-1 * sample_b[3]) );
-                sample_update_offset( sample_id, position );
+                sample_set_resume( sample_id, position );
                 return sample_b[1];
             }
             if(sample_b[2] == 1)
@@ -3676,7 +3661,7 @@ static int vj_perform_transition_get_sample_position(int sample_id)
             if(sample_b[2] == 3 )
                 position = 0;
         }
-        sample_update_offset(sample_id, position);
+        sample_set_resume(sample_id, position);
         return (sample_b[0] + position);
     }
 
@@ -3693,7 +3678,7 @@ static int vj_perform_transition_get_sample_position(int sample_id)
         {
             position = 0;
             sample_set_speed( sample_id, (-1 * sample_b[3]));
-            sample_update_offset( sample_id, position );
+            sample_set_resume( sample_id, position );
             return sample_b[0];
         }
         if(sample_b[2] == 1)
@@ -3708,7 +3693,7 @@ static int vj_perform_transition_get_sample_position(int sample_id)
         if(sample_b[2] == 3 )
             position = 0;
     }
-    sample_update_offset(sample_id, position);
+    sample_set_resume(sample_id, position);
 
     return (sample_b[0] + position); //1
 }
@@ -4046,7 +4031,10 @@ int vj_perform_queue_frame(veejay_t * info, int skip )
     if(!skip)
     {
         int speed = settings->current_playback_speed;
-        if( settings->hold_status == 1 ) {
+
+	sample_frame_tick();
+
+	if( settings->hold_status == 1 ) {
             speed = 0;
             if(settings->hold_pos == 0 ) {
                 settings->hold_status = 0;
