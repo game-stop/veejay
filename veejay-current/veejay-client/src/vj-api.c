@@ -4437,7 +4437,7 @@ void reportbug ()
 //  if( prompt_dialog("Report a problem", "" )
 //       == GTK_RESPONSE_ACCEPT )
     snprintf(URL , sizeof(URL),
-             "firefox \"http://groups.google.com/group/veejay-discussion/post?hl=%s\" &",l );
+             "firefox \"https://github.com/game-stop/veejay/issues &" );
 
     puts(URL);
 
