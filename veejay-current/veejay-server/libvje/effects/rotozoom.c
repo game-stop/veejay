@@ -157,12 +157,19 @@ void rotozoom_apply( void *ptr, VJFrame *frame, int *args )
 	float *cos_lut = r->cos_lut;
 	float *sin_lut = r->sin_lut;
 
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
 
- 			int rotatedX = (int)((x - centerX) * cos_lut[(int)rotate % 360] - (y - centerY) * sin_lut[(int)rotate % 360] + centerX);
-            int rotatedY = (int)((x - centerX) * sin_lut[(int)rotate % 360] + (y - centerY) * cos_lut[(int)rotate % 360] + centerY);
-		
+    int rotate_angle = (int)rotate % 360;
+    float cos_val = cos_lut[rotate_angle];
+    float sin_val = sin_lut[rotate_angle];
+
+
+    for (int y = 0; y < height; ++y) {
+#pragma omp simd
+		for (int x = 0; x < width; ++x) {
+
+		 	int rotatedX = (int)((x - centerX) * cos_val - (y - centerY) * sin_val + centerX);
+            int rotatedY = (int)((x - centerX) * sin_val + (y - centerY) * cos_val + centerY);
+         
             int newX = (int)((rotatedX - centerX) * zoom + centerX);
             int newY = (int)((rotatedY - centerY) * zoom + centerY);
 
