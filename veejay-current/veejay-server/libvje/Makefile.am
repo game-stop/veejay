@@ -216,6 +216,8 @@ libvje_la_SOURCES =	libvje.c vjert.c \
 	effects/edgeglow.c \
 	effects/histomatch.c \
 	effects/gradientfield.c \
+	effects/tiler.c \
+	effects/rotate.c \
 	effects/blackreplace.c
 		
 
