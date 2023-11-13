@@ -1117,7 +1117,7 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 	(video_playback_setup *) info->settings;
 
 	if (info->uc->use_timer ) {
-		struct timespec now;
+		struct timespec now,before,after;
 		struct timespec nsecsleep;
 
 		int usec_since_lastframe=0;
@@ -1135,9 +1135,27 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 				break;	
 			}
 	
-			nsecsleep.tv_nsec = (settings->usec_per_frame - usec_since_lastframe -  1000000 / HZ) * 1000;    	
+			long remaining = (settings->usec_per_frame - usec_since_lastframe) * 1000;
+			remaining += (settings->slept_last_iteration > 0) ? -settings->slept_last_iteration : settings->slept_last_iteration;
+			if( remaining < 0 )
+				remaining = 0;
+
+			clock_gettime( CLOCK_MONOTONIC, &before );
+
+			nsecsleep.tv_nsec = remaining;    	
 	    	nsecsleep.tv_sec = 0;
 	    	clock_nanosleep(CLOCK_MONOTONIC,0, &nsecsleep, NULL);
+
+			clock_gettime( CLOCK_MONOTONIC, &after );
+
+			settings->slept_last_iteration = (after.tv_sec - before.tv_sec) * 1000000000 +
+                        (after.tv_nsec - before.tv_nsec);
+
+			long delta = remaining - settings->slept_last_iteration;
+
+			settings->slept_last_iteration = delta;
+
+			float slept_last_iteration_ms = delta / 1e6;
 		}
     }
 
@@ -2383,8 +2401,18 @@ static void veejay_playback_cycle(veejay_t * info)
 	}
 
 
-	while (settings->state != LAVPLAY_STATE_STOP)
+	while (1)
 	{
+
+	   pthread_mutex_lock(&(settings->valid_mutex));
+
+       if (settings->state == LAVPLAY_STATE_STOP)
+       {
+               pthread_mutex_unlock(&(settings->valid_mutex));
+               goto FINISH;
+       }
+
+        pthread_mutex_unlock(&(settings->valid_mutex));
 		int current_speed = settings->current_playback_speed;
 		tdiff1 = 0.;
 		tdiff2 = 0.;
