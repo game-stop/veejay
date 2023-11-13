@@ -140,6 +140,7 @@ typedef struct {
 	pthread_mutex_t syncinfo_mutex;
 	pthread_t signal_thread;
 	sigset_t signal_set;
+	long slept_last_iteration;
 	struct timespec lastframe_completion;	/* software sync variable */
 	long old_field_len;
 	uint64_t save_list_len;		/* for editing purposes */
