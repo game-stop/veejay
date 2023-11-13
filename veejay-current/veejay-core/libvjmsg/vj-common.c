@@ -276,93 +276,96 @@ char	*veejay_msg_ringfetch()
 	return line;
 }
 
-static inline void veejay_msg_prnt(const char *line, const char *format, FILE *out, 
-			          const char *prefix, const char *end )
+void veejay_msg_prnt(FILE *out, const char *buffer, size_t size)
 {
-	if( msg_ring_enabled == 0 ) {
-		if( end ) {
-			fprintf( out, format, prefix, line, end );
-		} else{
-			fprintf(out,format, prefix, line);
-		}
-	}
-	else {
-		veejay_msg_ringbuffer( vj_strdup(line) );
-	}
+    write(fileno(out), buffer, size);
 }
 
+// Updated veejay_msg function using write
 void veejay_msg(int type, const char format[], ...)
 {
-    char prefix[128];
+    if (type != VEEJAY_MSG_ERROR && _no_msg)
+        return;
+
+    if (!_debug_level && type == VEEJAY_MSG_DEBUG)
+        return; 
+
     char buf[1024];
     va_list args;
     int line = 0;
-    FILE *out = (_no_msg ? stderr: stdout );
-    if( type != VEEJAY_MSG_ERROR && _no_msg )
-		return;
+    FILE *out = (_no_msg ? stderr : stdout);
 
-    if( !_debug_level && type == VEEJAY_MSG_DEBUG )
-	return ; // bye
-
-    // parse arguments
     va_start(args, format);
     vsnprintf(buf, sizeof(buf) - 1, format, args);
+    va_end(args);
 
-    if(_color_level)
+    char temp_buffer[2048];
+    size_t temp_size = 0;
+
+    if (_color_level)
     {
-	  switch (type) {
-	    case 2: //info
-		sprintf(prefix, "%sI: ", TXT_GRE);
-		break;
-	    case 1: //warning
-		sprintf(prefix, "%sW: ", TXT_YEL);
-		break;
-	    case 0: // error
-		sprintf(prefix, "%sE: ", TXT_RED);
-		break;
-	    case 3:
-	        line = 1;
-		break;
-	    case 4: // debug
-		sprintf(prefix, "%sD: ", TXT_BLU);
-		break;
-	 }
+        switch (type)
+        {
+        case 2: //info
+            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%sI: ", TXT_GRE);
+            break;
+        case 1: //warning
+            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%sW: ", TXT_YEL);
+            break;
+        case 0: // error
+            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%sE: ", TXT_RED);
+            break;
+        case 3:
+            line = 1;
+            break;
+        case 4: // debug
+            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%sD: ", TXT_BLU);
+            break;
+        }
 
- 	 if(!line) {
-		veejay_msg_prnt( buf, "%s%s%s\n", out, prefix, TXT_END );
-	 }
-	 else {
-		veejay_msg_prnt( buf, "%s%s%s", out, TXT_GRE, TXT_END );
-	}
-     }
-     else
-     {
-	   switch (type) {
-	    case 2: //info
-		sprintf(prefix, "I: ");
-		break;
-	    case 1: //warning
-		sprintf(prefix, "W: ");
-		break;
-	    case 0: // error
-		sprintf(prefix, "E: ");
-		break;
-	    case 3:
-	        line = 1;
-		break;
-	    case 4: // debug
-		sprintf(prefix, "D: ");
-		break;
-	   }
+        if (!line)
+        {
+            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%s%s\n", buf, TXT_END);
+        }
+        else
+        {
+            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%s%s%s", buf, TXT_GRE, TXT_END);
+        }
+    }
+    else
+    {
+        switch (type)
+        {
+        case 2: //info
+            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "I: ");
+            break;
+        case 1: //warning
+            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "W: ");
+            break;
+        case 0: // error
+            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "E: ");
+            break;
+        case 3:
+            line = 1;
+            break;
+        case 4: // debug
+            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "D: ");
+            break;
+        }
 
-	   if(!line) {
-		veejay_msg_prnt( buf, "%s%s\n", out, prefix, NULL );
-	   } else {
-		veejay_msg_prnt( buf, "%s%s", out, prefix, NULL );
-	   }
-     }
-     va_end(args);
+        if (!line)
+        {
+            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%s\n", buf);
+        }
+        else
+        {
+            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%s", buf);
+        }
+    }
+
+    veejay_msg_prnt(out, temp_buffer, temp_size);
 }
+
 
 int	veejay_get_file_ext( char *file, char *dst, int dlen)
 {
