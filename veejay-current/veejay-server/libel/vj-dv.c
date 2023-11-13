@@ -249,7 +249,7 @@ int vj_dv_scan_frame( vj_dv_decoder *d, uint8_t * input_buf )
 
     veejay_msg( VEEJAY_MSG_DEBUG, "\tDetected DV sampling format %s", sampling );
 
-    if ( d->decoder->sampling == e_dv_sample_422 || d->decoder->sampling == e_dv_sample_411) {
+    if ( d->decoder->sampling == e_dv_sample_422 ) {
         d->src_pixfmt = PIX_FMT_YUV422P;
         return d->src_pixfmt;
     }
