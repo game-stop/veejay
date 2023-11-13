@@ -1154,8 +1154,6 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 			long delta = remaining - settings->slept_last_iteration;
 
 			settings->slept_last_iteration = delta;
-
-			float slept_last_iteration_ms = delta / 1e6;
 		}
     }
 
