@@ -2267,12 +2267,12 @@ inline void grid_getbounds_from_orientation(int radius, vj_effect_orientation or
 
     switch (parity) {
 	    case VJ_EFFECT_PARITY_EVEN:
-    		if ((dotqtt_h % 2) != 0) dotqtt_h++;
-            if ((dotqtt_w % 2) != 0) dotqtt_w++;
+    		if ((h % 2) != 0) dotqtt_h++;
+            if ((w % 2) != 0) dotqtt_w++;
             break;
         case VJ_EFFECT_PARITY_ODD:
-            if ((dotqtt_h % 2) == 0) dotqtt_h++;
-            if ((dotqtt_w % 2) == 0) dotqtt_w++;
+            if ((h % 2) == 0) dotqtt_h++;
+            if ((w % 2) == 0) dotqtt_w++;
             break;
         case VJ_EFFECT_PARITY_NO:
         default:
@@ -2341,8 +2341,10 @@ inline void grid_getbounds_from_orientation(int radius, vj_effect_orientation or
             break;
     }
 
-    if (*y_inf < 0) *y_inf = 0;
-    if (*x_inf < 0) *x_inf = 0;
     if (*y_inf > h - radius) *y_inf = h - radius;
     if (*x_inf > w - radius) *x_inf = w - radius;
+
+    if (*y_inf < 0) *y_inf = 0;
+    if (*x_inf < 0) *x_inf = 0;
+
 }
