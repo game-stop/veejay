@@ -53,7 +53,7 @@ int is_dv_resolution(int w, int h)
 vj_dv_decoder *vj_dv_decoder_init(int quality, int width, int height, int pixel_format)
 {
     int dv_q = DV_QUALITY_COLOR;
-    vj_dv_decoder *d = (vj_dv_decoder*)vj_malloc(sizeof(vj_dv_decoder));
+    vj_dv_decoder *d = (vj_dv_decoder*)vj_calloc(sizeof(vj_dv_decoder));
     if(!d) return NULL;
     d->decoder = dv_decoder_new( 1,1,0 );
     if( quality == 0 )
@@ -74,7 +74,7 @@ static  sws_template dv_templ;
 vj_dv_encoder *vj_dv_init_encoder(void *ptr, int ff_pixel_format)
 {
     VJFrame *frame = (VJFrame*) ptr;
-    vj_dv_encoder *e = (vj_dv_encoder*) vj_malloc(sizeof(vj_dv_encoder));
+    vj_dv_encoder *e = (vj_dv_encoder*) vj_calloc(sizeof(vj_dv_encoder));
     if(!e) return NULL;
     e->encoder = dv_encoder_new(0,0,0);
     e->encoder->isPAL = (frame->height == 480 ? 0 : 1 );
