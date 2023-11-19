@@ -33,8 +33,8 @@ vj_effect *strobo_init(int w, int h)
     ve->defaults[1] = 10;
     ve->defaults[2] = 150;
     ve->defaults[3] = 3;
-	ve->defaults[4] = 0;
-	ve->defaults[5] = 0;
+    ve->defaults[4] = 0;
+    ve->defaults[5] = 0;
 
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
@@ -44,10 +44,10 @@ vj_effect *strobo_init(int w, int h)
     ve->limits[1][2] = 255;
     ve->limits[0][3] = 1;
     ve->limits[1][3] = 100;
-	ve->limits[0][4] = 0;
-	ve->limits[1][4] = 1;
-	ve->limits[0][5] = 0;
-	ve->limits[1][5] = 1500;
+    ve->limits[0][4] = 0;
+    ve->limits[1][4] = 1;
+    ve->limits[0][5] = 0;
+    ve->limits[1][5] = 1500;
 
 
     ve->description = "Strobotsu";
@@ -132,11 +132,11 @@ static uint32_t strobo( uint32_t *H, const int N )
         mB = sumB / wB;
         mF = (sum - sumB) / wF;
         between = wB * wF * (mB - mF) * (mB - mF);
-		if( between > max ) {
+        if( between > max ) {
             max = between;
             threshold = i;
         }
-		sum += i * H[i];
+        sum += i * H[i];
     }
     return threshold;
 }
@@ -147,9 +147,9 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args) {
     const int duration = args[1];
     const int op0 = args[2];
     const int echoes = args[3];
-	const int mode = args[4];
+    const int mode = args[4];
     const int op1 = 0xff - op0;
-	const int delay = args[5];
+    const int delay = args[5];
 
     uint32_t Histogram[256];
     unsigned int i;
@@ -171,75 +171,75 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args) {
         Histogram[ Lookup[ Y[i] ] ] += 1;
     }   
     
-	// calculate a threshold using otsu's method
+    // calculate a threshold using otsu's method
     const uint32_t threshold = strobo( Histogram, len );
 
-	int color_count = 14;
-	if( duration < color_count )
-		color_count = duration;
+    int color_count = 14;
+    if( duration < color_count )
+        color_count = duration;
 
     const int color_index = (s->timestamp / (duration/color_count)) % color_count;
     const int decay = ((s->timestamp % echoes) * 255) / echoes;
 
-	int a,b,c,cy=0, cu=128,cv=128;
+    int a,b,c,cy=0, cu=128,cv=128;
 
-	// pick a color from the table
+    // pick a color from the table
     _rgb2yuv( rainbow_t[ color_index ].r,
               rainbow_t[ color_index ].g,
               rainbow_t[ color_index ].b,
               cy, cu, cv );   
 
-	if( delay == 0 || (s->timestamp % delay) == 0 ) {
+    if( delay == 0 || (s->timestamp % delay) == 0 ) {
 #pragma omp simd
-    	for( i = 0; i < len; i ++ )
-    	{
-			// create a mask
-			int mask = (Y[i] < threshold);
+        for( i = 0; i < len; i ++ )
+        {
+            // create a mask
+            int mask = (Y[i] < threshold);
 
-			// decay the current buffer if mask value is zero
-			// or blend-in the selected color using a + (( 2 * b ) - opacity )
-			a = bY[i] * decay >> 8;
- 			bY[i] = CLAMP_Y((1 - mask) * ((bY[i] * decay) >> 8) + mask * (a + ((2 * cy) - op0)));
+            // decay the current buffer if mask value is zero
+            // or blend-in the selected color using a + (( 2 * b ) - opacity )
+            a = bY[i] * decay >> 8;
+            bY[i] = CLAMP_Y((1 - mask) * ((bY[i] * decay) >> 8) + mask * (a + ((2 * cy) - op0)));
 
-			a = ((bU[i] - 128) * decay) >> 8;
-			bU[i] = CLAMP_UV((1 - mask) * (bU[i] - (((bU[i] - 128) * decay) >> 8)) + mask * (a + 2 * (cu - 128) + 128));
+            a = ((bU[i] - 128) * decay) >> 8;
+            bU[i] = CLAMP_UV((1 - mask) * (bU[i] - (((bU[i] - 128) * decay) >> 8)) + mask * (a + 2 * (cu - 128) + 128));
 
-			a = ((bV[i] - 128) * decay) >> 8;;
-			bV[i] = CLAMP_UV((1 - mask) * (bV[i] - (((bV[i] - 128) * decay) >> 8)) + mask * (a + 2 * (cv - 128) + 128));
-		}
-	}
+            a = ((bV[i] - 128) * decay) >> 8;;
+            bV[i] = CLAMP_UV((1 - mask) * (bV[i] - (((bV[i] - 128) * decay) >> 8)) + mask * (a + 2 * (cv - 128) + 128));
+        }
+    }
 
-	if( mode == 0 ) {
+    if( mode == 0 ) {
 #pragma omp simd
-		// copy back the strobo buffer for display
-		for( i = 0; i < len; i ++ ) 
-    	{
-        	Y[i] = bY[i];
-        	U[i] = bU[i];
-        	V[i] = bV[i];
-    	}
-	}
-	else {
+        // copy back the strobo buffer for display
+        for( i = 0; i < len; i ++ ) 
+        {
+            Y[i] = bY[i];
+            U[i] = bU[i];
+            V[i] = bV[i];
+        }
+    }
+    else {
 
 #pragma omp simd
-		for( i = 0; i < len; i ++ ) {
-			// create a mask from the strobo buffer
-			uint8_t mask = (bY[i] != 0);
-    		
-			// dont blend-in black
-			a = (mask * bY[i]) | (!mask * Y[i]);
-    		b = (mask * bU[i]) | (!mask * U[i]);
-    		c = (mask * bV[i]) | (!mask * V[i]);
+        for( i = 0; i < len; i ++ ) {
+            // create a mask from the strobo buffer
+            uint8_t mask = (bY[i] != 0);
+            
+            // dont blend-in black
+            a = (mask * bY[i]) | (!mask * Y[i]);
+            b = (mask * bU[i]) | (!mask * U[i]);
+            c = (mask * bV[i]) | (!mask * V[i]);
 
-			// opacity blend the strobo buffer with the original frame
-    		Y[i] = (mask * ((op0 * Y[i] + op1 * a) >> 8)) | (!mask * Y[i]);
-    		U[i] = (mask * ((op0 * U[i] + op1 * b) >> 8)) | (!mask * U[i]);
-    		V[i] = (mask * ((op0 * V[i] + op1 * c) >> 8)) | (!mask * V[i]);
-		}
-	}
+            // opacity blend the strobo buffer with the original frame
+            Y[i] = (mask * ((op0 * Y[i] + op1 * a) >> 8)) | (!mask * Y[i]);
+            U[i] = (mask * ((op0 * U[i] + op1 * b) >> 8)) | (!mask * U[i]);
+            V[i] = (mask * ((op0 * V[i] + op1 * c) >> 8)) | (!mask * V[i]);
+        }
+    }
 
 
-	s->timestamp ++;
+    s->timestamp ++;
 
 }
 
