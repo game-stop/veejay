@@ -500,10 +500,10 @@ int sample_copy(int sample_id)
     if (!sample_exists(sample_id))
         return 0;
     org = sample_get(sample_id);
-    copy = (sample_info*) vj_malloc(sizeof(sample_info));
+    copy = (sample_info*) vj_calloc(sizeof(sample_info));
     veejay_memcpy( copy,org,sizeof(sample_info));\
 
-    sample_eff_chain *b = vj_malloc(sizeof(sample_eff_chain) * SAMPLE_MAX_EFFECTS );
+    sample_eff_chain *b = vj_calloc(sizeof(sample_eff_chain) * SAMPLE_MAX_EFFECTS );
 
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
     {
@@ -515,6 +515,7 @@ int sample_copy(int sample_id)
             return 0;
         }
         veejay_memcpy( copy->effect_chain[i], org->effect_chain[i], sizeof( sample_eff_chain ) );
+	copy->effect_chain[i]->fx_instance = NULL;
     }
 
     copy->sample_id = _new_id();
