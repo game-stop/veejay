@@ -229,8 +229,9 @@
 #include "./effects/gradientfield.h"
 #include "./effects/tiler.h"
 #include "./effects/rotate.h"
+#include "./effects/strobo.h"
 
-#define VJ_IMAGE_EFFECT_MIN 60
+#define VJ_IMAGE_EFFECT_MIN 59
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -493,6 +494,7 @@ enum {
     VJ_IMAGE_EFFECT_GRADIENTFIELD = 62,
     VJ_IMAGE_EFFECT_TILER = 61,
     VJ_IMAGE_EFFECT_ROTATE = 60,
+    VJ_IMAGE_EFFECT_STROBOTSU = 59,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
