@@ -74,7 +74,7 @@ void sobel_free(void *ptr) {
 void sobel_apply( void *ptr, VJFrame *frame, int *args ) {
     sobel_t *s = (sobel_t*) ptr;
     const int t = args[0];
-    const int threshold = (args[0] * args[0]);
+    const int threshold = t * t;
     const int mode = args[1];
 
     const int len = frame->len;
