@@ -139,6 +139,7 @@ static struct {
     { neighbours4_init,neighbours4_malloc,neighbours4_free,NULL,NULL,neighbours4_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_NEIGHBOUR4 },
     { neighbours5_init,neighbours5_malloc,neighbours5_free,NULL,NULL,neighbours5_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_NEIGHBOUR5 },
     { tiler_init,tiler_malloc,tiler_free,NULL,NULL,tiler_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_TILER },
+    { boxfit_init,boxfit_malloc,boxfit_free,NULL,NULL,boxfit_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BOXFIT },
     { negation_init,NULL,NULL,NULL,NULL,negation_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_NEGATION },
     { glitch_init,glitch_malloc,glitch_free,NULL,NULL,glitch_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_GLITCH },
     { sobel_init, sobel_malloc,sobel_free,NULL,NULL,sobel_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SOBEL },
