@@ -1988,12 +1988,13 @@ editlist *vj_el_soft_clone_range(editlist *el, long n1, long n2)
     for (nframe = n1; nframe <= n2; nframe++) {
         uint64_t n = el->frame_list[nframe];
         int file_idx = N_EL_FILE(n);
-
+	int idx = file_idx;
+/*
         if (file_idx != last_file_idx) {
             last_file_idx = file_idx;
             idx++;
         }
-
+*/
         if (clone->video_file_list[idx] == NULL) {
             clone->video_file_list[idx] = vj_strdup(el->video_file_list[file_idx]);
         }
@@ -2001,7 +2002,7 @@ editlist *vj_el_soft_clone_range(editlist *el, long n1, long n2)
             clone->lav_fd[idx] = el->lav_fd[file_idx];
         }
 
-        file_frame_counts[file_idx]++;
+        file_frame_counts[file_idx]++; //file_idx
 
         if (clone->pixfmt[idx] == 0) {
             clone->pixfmt[idx] = el->pixfmt[file_idx];
