@@ -231,8 +231,10 @@
 #include "./effects/rotate.h"
 #include "./effects/strobo.h"
 #include "./effects/boxfit.h"
+#include "./effects/flower.h"
+#include "./effects/warppers.h"
 
-#define VJ_IMAGE_EFFECT_MIN 58
+#define VJ_IMAGE_EFFECT_MIN 56
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -497,6 +499,8 @@ enum {
     VJ_IMAGE_EFFECT_ROTATE = 60,
     VJ_IMAGE_EFFECT_STROBOTSU = 59,
     VJ_IMAGE_EFFECT_BOXFIT = 58,
+    VJ_IMAGE_EFFECT_FLOWER = 57,
+    VJ_IMAGE_EFFECT_WARPPERS = 56,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 

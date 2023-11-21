@@ -220,6 +220,8 @@ libvje_la_SOURCES =	libvje.c vjert.c \
 	effects/rotate.c \
 	effects/strobo.c \
 	effects/boxfit.c \
+	effects/flower.c \
+	effects/warppers.c \
 	effects/blackreplace.c
 		
 
