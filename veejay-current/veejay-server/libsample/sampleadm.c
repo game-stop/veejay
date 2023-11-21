@@ -402,10 +402,6 @@ int sample_store(sample_info * skel)
     if (!sample_node)
     return -1;
 
-    if(skel->edit_list)
-    {
-        skel->play_length = vj_el_bogus_length( skel->edit_list, 0 );
-    }
 #ifdef ARCH_X86_64
     uint64_t sid = (uint64_t) skel->sample_id;
 #else
@@ -548,16 +544,11 @@ int sample_get_longest(int sample_id)
     if(si)
     {
         int len;
-        int start,end;
         if( si->marker_start == 0 && si->marker_end == 0 ) {
            len =  (si->last_frame - si->first_frame );
-           start = si->first_frame;
-           end = si->last_frame;
         }
         else {
             len = (si->marker_end - si->marker_start );
-            start = si->marker_start;
-            end = si->marker_end;
         }
         int c = 0;
         int tmp = 0;
@@ -583,7 +574,7 @@ int sample_get_longest(int sample_id)
             _id = sample_get_chain_channel(sample_id,c);
             t   = sample_get_chain_source(sample_id,c);
     
-                        if(t==0 && sample_exists(_id))
+            if(t==0 && sample_exists(_id))
             {
                 tmp = sample_get_endFrame( _id) - sample_get_startFrame(_id);
                 if(tmp>0)
@@ -1227,7 +1218,7 @@ long    sample_get_resume(int s1)
     sample_info *sample = sample_get(s1);
     if(!sample)
         return -1;
-   
+ 
     return sample->resume_pos;
 }
 
@@ -1547,7 +1538,7 @@ int sample_set_chain_channel(int s1, int position, int input)
         {
             sample_info *new = sample_get(input);
             sample_info *old = sample_get( sample->effect_chain[position]->channel );
-            if(old)
+            if(old && old->soft_edl==0)
                 vj_el_break_cache( old->edit_list ); // no longer needed
             
             if(new)
@@ -1610,7 +1601,7 @@ int sample_stop_playing(int s1, int new_s1)
         }           
     }
 
-    if(destroy_s1)
+    if(destroy_s1 && sample->soft_edl==0)
         vj_el_break_cache( sample->edit_list ); // break the cache
 
     
@@ -1626,8 +1617,8 @@ int sample_stop_playing(int s1, int new_s1)
                 if( !sample_sample_used( newsample, id ))
                 {
                     sample_info *second = sample_get( id );
-                        if(second) //@ get and destroy its cache
-                        vj_el_break_cache( second->edit_list );
+                        if(second && second->soft_edl==0) //@ get and destroy its cache
+                        	vj_el_break_cache( second->edit_list );
                     }
             }
             }
@@ -1973,16 +1964,12 @@ int sample_set_startframe(int s1, long frame_num)
     if( frame_num < 0 )
     return 0;
 
-    if(sample->play_length )
-     return 1; //@ simpler to lie
-
-    if(sample->edit_list)
     if( frame_num > sample->edit_list->total_frames  )
         frame_num = sample->edit_list->total_frames;
   
     sample->first_frame = frame_num;
     if(sample->first_frame >= sample->last_frame )
-    sample->first_frame = sample->last_frame-1;
+    	sample->first_frame = sample->last_frame-1;
 
     if( sample->resume_pos < frame_num )
         sample->resume_pos = frame_num;
@@ -1995,8 +1982,6 @@ int sample_usable_edl( int s1 )
 {
     sample_info *sample = sample_get(s1);
     if(!sample) return 0;
-    if( sample->play_length )
-        return 0;
     if( sample->edit_list )
         return 1;
     return 0;
@@ -2005,57 +1990,26 @@ int sample_usable_edl( int s1 )
 int sample_max_video_length(int s1)
 {
     sample_info *sample = sample_get(s1);
-    float fps = 25.0;
     if(!sample) return 0;
-    if(sample->edit_list)
-        fps = sample->edit_list->video_fps;
 
-    if( sample->play_length )
-        return (60 * fps * 6); // 6 minutes
-    
-    if( sample->edit_list )
-        return (int) sample->edit_list->total_frames;
-    return 0;
+    return (int) sample->edit_list->total_frames;
 }
 
 int sample_video_length( int s1 )
 {
     sample_info *sample = sample_get(s1);
     if(!sample) return 0;
-    if( sample->play_length )
-        return sample->play_length;
-    if( sample->edit_list )
-        return sample->edit_list->total_frames;
-    return 0;
+    return sample->edit_list->total_frames;
 }
 
 int sample_set_endframe(int s1, long frame_num)
 {
     sample_info *sample = sample_get(s1);
     if (!sample)
-    return 0;
+    	return 0;
     if(frame_num < 0)
-    return 0;
+    	return 0;
 
-    if(sample->play_length)
-    {
-        int new_len = ( frame_num - sample->first_frame );
-        if( new_len <= 1 )
-            new_len = 1;
-        sample->last_frame = sample->first_frame + new_len;
-
-        if( sample->resume_pos > frame_num )
-            sample->resume_pos = frame_num;
-    
-        if( vj_el_set_bogus_length( sample->edit_list, 0, new_len ) )
-        {
-            sample->play_length = new_len;
-            return 1;
-        }
-        return 0;
-    }
-
-    if(sample->edit_list)
     if( frame_num > sample->edit_list->total_frames )
         frame_num = sample->edit_list->total_frames;
 
@@ -2403,9 +2357,10 @@ int sample_set_chain_volume(int s1, int chain_entry, int volume)
     if (!sample)
     	return -1;
     if (volume < 0)
-    	volume = 100;
-    if (volume > 100)
-    	volume = 0;
+		volume = 100;
+    
+	if (volume > 100)
+		volume = 0;
     
 	sample->effect_chain[chain_entry]->volume = volume;
     return 1;
@@ -2943,10 +2898,6 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
             sample_store(skel);
         }
     
-        if( !xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_BOGUSVIDEO ) ) {
-            skel->play_length = get_xml_int( doc, cur );
-        }
-    
         if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EDIT_LIST_FILE)) {
 
             skel->edit_list_file = get_xml_str( doc, cur );
@@ -3325,7 +3276,6 @@ void CreateSample(xmlNodePtr node, sample_info * sample, void *font)
     put_xml_str( node, XMLTAG_SAMPLEDESCR, sample->descr );
     put_xml_int( node, XMLTAG_FIRSTFRAME, sample->first_frame );
     put_xml_int( node, XMLTAG_LASTFRAME, sample->last_frame );
-    put_xml_int( node, XMLTAG_BOGUSVIDEO, sample->play_length );
     put_xml_int( node, XMLTAG_SPEED, sample->speed );
     put_xml_int( node, XMLTAG_FRAMEDUP, sample->dup );
     put_xml_int( node, XMLTAG_LOOPTYPE, sample->looptype );
