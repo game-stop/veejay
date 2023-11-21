@@ -222,6 +222,7 @@ libvje_la_SOURCES =	libvje.c vjert.c \
 	effects/boxfit.c \
 	effects/flower.c \
 	effects/warppers.c \
+	effects/spherize.c \
 	effects/blackreplace.c
 		
 

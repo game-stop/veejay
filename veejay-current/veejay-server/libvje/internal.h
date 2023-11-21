@@ -233,8 +233,9 @@
 #include "./effects/boxfit.h"
 #include "./effects/flower.h"
 #include "./effects/warppers.h"
+#include "./effects/spherize.h"
 
-#define VJ_IMAGE_EFFECT_MIN 56
+#define VJ_IMAGE_EFFECT_MIN 55
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -501,6 +502,7 @@ enum {
     VJ_IMAGE_EFFECT_BOXFIT = 58,
     VJ_IMAGE_EFFECT_FLOWER = 57,
     VJ_IMAGE_EFFECT_WARPPERS = 56,
+    VJ_IMAGE_EFFECT_SPHERIZE = 55,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 

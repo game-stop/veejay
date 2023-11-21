@@ -141,6 +141,7 @@ static struct {
     { tiler_init,tiler_malloc,tiler_free,NULL,NULL,tiler_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_TILER },
     { boxfit_init,boxfit_malloc,boxfit_free,NULL,NULL,boxfit_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BOXFIT },
     { warppers_init,warppers_malloc,warppers_free,NULL,NULL,warppers_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_WARPPERS },
+    { spherize_init,spherize_malloc,spherize_free,NULL,NULL,spherize_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SPHERIZE },
     { flower_init,flower_malloc,flower_free,NULL,NULL,flower_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_FLOWER },
     { negation_init,NULL,NULL,NULL,NULL,negation_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_NEGATION },
     { glitch_init,glitch_malloc,glitch_free,NULL,NULL,glitch_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_GLITCH },
