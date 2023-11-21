@@ -799,7 +799,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 	if(! in_cache )	
 	{
 		res = lav_set_video_position(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n));
-			if (res < 0)
+		if (res < 0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR,"Error setting video position: %s",
 				  lav_strerror());
@@ -1959,68 +1959,76 @@ editlist	*vj_el_soft_clone(editlist *el)
 	return clone;
 }
 
-editlist	*vj_el_soft_clone_range(editlist *el, long n1, long n2)
+editlist *vj_el_soft_clone_range(editlist *el, long n1, long n2)
 {
     editlist *clone = vj_el_soft_clone_base(el);
-    if(!clone) {
-        veejay_msg(0,"Failed to clone EDL (not enough memory)");
+    if (!clone) {
         return NULL;
     }
-    long nframe;
+
+    uint64_t nframe;
     long len = n2 - n1;
     uint64_t k = 0;
     int idx = -1;
     int last_file_idx = -1;
 
-    clone->frame_list = (uint64_t*) vj_calloc( sizeof(uint64_t) * (len+1));
-    if(!clone->frame_list) {
-        veejay_msg(0,"Failed to allocate enough memory to hold the frame list");
+    clone->frame_list = (uint64_t *)vj_calloc(sizeof(uint64_t) * (len + 1));
+    if (!clone->frame_list) {
         free(clone);
         return NULL;
     }
 
-    for( nframe = n1; nframe <= n2; nframe ++ ) {
-        uint64_t n  = el->frame_list[nframe];
-        int file_idx= N_EL_FILE(n);
-
-        if( file_idx != last_file_idx ) {
-            last_file_idx = file_idx;
-            idx ++;
-            veejay_msg(VEEJAY_MSG_DEBUG,"\tEDL position %ld is %s (%d)", nframe, el->video_file_list[ file_idx ], idx );
-        }
-
-        if( clone->video_file_list[ idx ] == NULL ) {
-            clone->video_file_list[ idx ] = vj_strdup( el->video_file_list[ file_idx ] );
-        }
-        if( clone->lav_fd[ idx ] == NULL ) {
-            clone->lav_fd[ idx ] = el->lav_fd[ file_idx ];
-        }
-        if( clone->num_frames[ idx ] == 0 ) {
-            clone->num_frames[ idx ] = ( len < el->num_frames[ file_idx ] ? len : el->num_frames[ file_idx ] );
-            len -= clone->num_frames[idx];
-            veejay_msg(VEEJAY_MSG_DEBUG,"\tEDL length is %ld, remaining length is %ld", clone->num_frames[idx], len );
-#ifdef STRICT_CHECKING
-            assert( len >= 0 );
-#endif            
-        }
-        if( clone->pixfmt[ idx ] == 0 ) {
-            clone->pixfmt[ idx ] = el->pixfmt[ file_idx ];
-        }
-        if( clone->decoders[ idx ] == NULL ) {
-            clone->decoders[ idx ] = el->decoders[ file_idx ];
-        }
-        if( clone->ctx[ idx ] == NULL ) {
-            clone->ctx[ idx ] = el->ctx[ file_idx ];
-        }
-
-        clone->frame_list[ k ++ ] = N_EL_FRAME( n );
+    long *file_frame_counts = (long *)vj_calloc(sizeof(long) * el->num_video_files);
+    if (!file_frame_counts) {
+        free(clone->frame_list);
+        free(clone);
+        return NULL;
     }
+
+    for (nframe = n1; nframe <= n2; nframe++) {
+        uint64_t n = el->frame_list[nframe];
+        int file_idx = N_EL_FILE(n);
+
+        if (file_idx != last_file_idx) {
+            last_file_idx = file_idx;
+            idx++;
+        }
+
+        if (clone->video_file_list[idx] == NULL) {
+            clone->video_file_list[idx] = vj_strdup(el->video_file_list[file_idx]);
+        }
+        if (clone->lav_fd[idx] == NULL) {
+            clone->lav_fd[idx] = el->lav_fd[file_idx];
+        }
+
+        file_frame_counts[file_idx]++;
+
+        if (clone->pixfmt[idx] == 0) {
+            clone->pixfmt[idx] = el->pixfmt[file_idx];
+        }
+        if (clone->decoders[idx] == NULL) {
+            clone->decoders[idx] = el->decoders[file_idx];
+        }
+        if (clone->ctx[idx] == NULL) {
+            clone->ctx[idx] = el->ctx[file_idx];
+        }
+
+        clone->frame_list[k++] = n;
+    }
+
+    for (int i = 0; i <= idx; i++) {
+        clone->num_frames[i] = file_frame_counts[N_EL_FILE(clone->frame_list[i])];
+    }
+
+    free(file_frame_counts);
 
     clone->video_frames = k;
     clone->total_frames = k - 1;
 
-	return clone;
+    return clone;
 }
+
+
 
 int		vj_el_framelist_clone( editlist *src, editlist *dst)
 {
