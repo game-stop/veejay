@@ -893,7 +893,7 @@ static int vj_server_update_get_msg_kf(vj_server *vje, int sock_fd, int link_id,
 static int vj_server_update_get_msg_vd(vj_server *vje, int sock_fd, int link_id, int *num_msg)
 {
 	vj_link **Link = (vj_link**) vje->link;
-    char v_hdr[VIMS_HEADER_LEN];
+    char v_hdr[VIMS_HEADER_LEN] = { 0 };
     int buf_size = vj_server_socket_consume( vje, sock_fd, link_id, v_hdr, VIMS_HEADER_LEN, 0 );
     if( buf_size <= 0)
         return -1;
