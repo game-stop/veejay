@@ -223,6 +223,7 @@ libvje_la_SOURCES =	libvje.c vjert.c \
 	effects/flower.c \
 	effects/warppers.c \
 	effects/spherize.c \
+	effects/aquatex.c \
 	effects/blackreplace.c
 		
 
