@@ -128,18 +128,15 @@ void luminouswave_apply(void *ptr, VJFrame *frame, int *args) {
 
     for(int i = 0; i < 360; i ++ ) {
     	sin_lut[i] = a_sin( i * (M_PI/180.0f) );
-	cos_lut[i] = a_cos( i * (M_PI/180.0f) );
+		cos_lut[i] = a_cos( i * (M_PI/180.0f) );
     }
 
     for (y = 0; y < height; y++) {
-        float offsetY = amplitude * a_sin(frequencyY * (x * sin_lut[waveAngleX] + y * cos_lut[waveAngleY]) + data->speed);
-	for (x = 0; x < width; x++) {
-
-	    float offsetX = amplitude * a_sin(frequencyX * (x * cos_lut[waveAngleX] + y * sin_lut[waveAngleY]) + data->speed);
-	
-	    int luma = Y[y * width + x] + offsetX + offsetY;
-	    
-	    Y[y*width+x] = (luma < pixel_Y_lo_) ? pixel_Y_lo_ : (luma > pixel_Y_hi_) ? pixel_Y_hi_ : luma;
+		for (x = 0; x < width; x++) {
+			float offsetY = amplitude * a_sin(frequencyY * (x * sin_lut[waveAngleX] + y * cos_lut[waveAngleY]) + data->speed);
+	    	float offsetX = amplitude * a_sin(frequencyX * (x * cos_lut[waveAngleX] + y * sin_lut[waveAngleY]) + data->speed);
+	    	int luma = Y[y * width + x] + offsetX + offsetY;
+	    	Y[y*width+x] = (luma < pixel_Y_lo_) ? pixel_Y_lo_ : (luma > pixel_Y_hi_) ? pixel_Y_hi_ : luma;
         }
     }
 
