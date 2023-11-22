@@ -17,7 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-
+#include <time.h>
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "boxfit.h"
@@ -102,6 +102,8 @@ void *boxfit_malloc(int w, int h)
     veejay_memset(s->buf[1], 128, (w*h));
     veejay_memset(s->buf[2], 128, (w*h));
 
+    srand((unsigned int) time(NULL));
+
     return (void *)s;
 }
 
@@ -112,7 +114,7 @@ void boxfit_free(void *ptr)
     free(s);
 }
 
-int contains(const int *arr, int length, int value)
+static int contains(const int *arr, int length, int value)
 {
     int i;
     for (i = 0; i < length && arr[i] != value; ++i) {}
@@ -178,7 +180,7 @@ static int boxfit_prepare(boxfit_t *boxfit, int min_size, int max_size)
 }
 
 // determine the local contrast within the specified box and keep a running average (to prevent jumpy behaviour)
-double calculateLocalContrast(uint8_t *srcY, int width, int height, int i, int j, int box_size, double *runavg, double weight)
+static double calculateLocalContrast(uint8_t *srcY, int width, int height, int i, int j, int box_size, double *runavg, double weight)
 {
     int sum = 0;
     for (int ii = 0; ii < box_size; ++ii)
