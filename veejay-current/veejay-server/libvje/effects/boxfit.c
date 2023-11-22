@@ -45,8 +45,8 @@ vj_effect *boxfit_init(int w, int h)
     ve->limits[0][3] = 1;
     ve->limits[1][3] = 100;
 
-    ve->defaults[0] = 4;
-    ve->defaults[1] = 32;
+    ve->defaults[0] = 6;
+    ve->defaults[1] = 33;
     ve->defaults[2] = 196;
     ve->defaults[3] = 25;
 
