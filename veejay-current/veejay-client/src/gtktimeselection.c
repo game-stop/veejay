@@ -488,6 +488,8 @@ void timeline_set_bind(GtkWidget *widget, gboolean active)
 void timeline_set_out_point( GtkWidget *widget, gdouble pos )
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
+  if(te->bind)
+    return;
   pos = snap_to_nearest_valid_position( pos, te->num_video_frames );
   g_object_set( G_OBJECT(te), "out", pos, NULL );
   g_signal_emit(te->widget, timeline_signals[OUT_CHANGED], 0);
@@ -499,7 +501,9 @@ void timeline_clear_points( GtkWidget *widget )
   gboolean cleared = TRUE;
   gdouble  pos = 0.0;
   gdouble  pos2 = 1.0;
+  gboolean bind = FALSE;
   TimelineSelection *te = TIMELINE_SELECTION(widget);
+  g_object_set( G_OBJECT(te), "bind", bind, NULL );
   g_object_set( G_OBJECT(te), "clear", cleared, NULL );
   g_object_set( G_OBJECT(te), "in", pos, NULL );
   g_object_set( G_OBJECT(te), "out", pos2,  NULL );
@@ -510,6 +514,8 @@ void timeline_clear_points( GtkWidget *widget )
 void timeline_set_in_point( GtkWidget *widget, gdouble pos )
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
+  if(te->bind)
+    return;
   pos = snap_to_nearest_valid_position( pos, te->num_video_frames );
   g_object_set( G_OBJECT(te), "in", pos, NULL );
   g_signal_emit(te->widget, timeline_signals[IN_CHANGED], 0);
@@ -605,9 +611,13 @@ static  void  move_selection( GtkWidget *widget, gdouble x, gdouble width )
     te->out = 1.0;
   }
   
-  timeline_set_out_point(widget, te->out );
-  timeline_set_in_point(widget, te->in );
+  //timeline_set_out_point(widget, te->out );
+  //timeline_set_in_point(widget, te->in );
+  timeline_set_in_and_out_point(widget,te->in,te->out);
   te->move_x = x;
+
+  g_signal_emit(te->widget, timeline_signals[IN_CHANGED], 0);
+  g_signal_emit(te->widget, timeline_signals[OUT_CHANGED], 0);
 
   on_timeline_move_selection();
 }
@@ -667,11 +677,12 @@ static  gboolean event_press(GtkWidget *widget, GdkEventButton *ev, gpointer use
     {
       te->current_location = MOUSE_SELECTION;
     }
-    if(!te->bind)
-    {
-      gdouble val = (1.0 / width) * ev->x;
-      timeline_set_in_point( widget, val );
-    }
+
+    gdouble val = (1.0 / width) * ev->x;
+
+    te->bind = FALSE;
+    timeline_set_in_point(widget,val);
+    
   }
   else if(te->grab_button == 3 && te->has_selection )
   {
@@ -679,11 +690,10 @@ static  gboolean event_press(GtkWidget *widget, GdkEventButton *ev, gpointer use
     {
       te->current_location = MOUSE_SELECTION;
     }
-    if(!te->bind)
-    {
-      gdouble val = (1.0/width) * ev->x;
-      timeline_set_out_point( widget, val );
-    }
+    gdouble val = (1.0/width) * ev->x;
+    te->bind = FALSE;
+    timeline_set_out_point(widget,val);
+    
   }
   else if(te->grab_button == 2 && te->has_selection)
   {
