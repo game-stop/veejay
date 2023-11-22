@@ -140,6 +140,7 @@ static struct {
     { neighbours5_init,neighbours5_malloc,neighbours5_free,NULL,NULL,neighbours5_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_NEIGHBOUR5 },
     { tiler_init,tiler_malloc,tiler_free,NULL,NULL,tiler_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_TILER },
     { boxfit_init,boxfit_malloc,boxfit_free,NULL,NULL,boxfit_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BOXFIT },
+    { circlefit_init,circlefit_malloc,circlefit_free,NULL,NULL,circlefit_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_CIRCLEFIT },
     { warppers_init,warppers_malloc,warppers_free,NULL,NULL,warppers_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_WARPPERS },
     { spherize_init,spherize_malloc,spherize_free,NULL,NULL,spherize_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SPHERIZE },
     { aquatex_init,aquatex_malloc,aquatex_free,NULL,NULL,aquatex_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_AQUATEX },
