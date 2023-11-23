@@ -404,7 +404,11 @@ extern void viewport_destroy(void *v);
 extern void vj_get_yuvgrey_template(VJFrame *src, int w, int h);
 extern int    yuv_use_auto_ccir_jpeg();
 
+void veejay_get_balloon_bbox(int cx, int cy, int bw, int bh, const int w, const int h, int radius, int *bbox);
+void veejay_draw_balloonUV( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value );
+void veejay_draw_balloon( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value );
 void veejay_draw_circle( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value );
+void veejay_draw_circle_border(uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value, int borderThickness, uint8_t borderValue);
 
 void veejay_histogram_analyze( void *his, VJFrame *f , int t);
 void veejay_histogram_del(void *his);

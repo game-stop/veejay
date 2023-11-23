@@ -1774,6 +1774,106 @@ void	veejay_histogram_analyze( void *his, VJFrame *f, int type )
 	build_histogram( h, f );
 }
 
+inline void veejay_draw_balloonUV(uint8_t *data, int cx, int cy, int bw, int bh, const int w, const int h, int radius, uint8_t value)
+{
+    const int scaledRadiusY = (int)(radius > 2 ? radius * 0.5 : radius);
+    const int radiusSquared = radius * radius;
+    const int scaledRadiusSquaredY = scaledRadiusY * scaledRadiusY;
+
+    const int minX = (cx - radius < 0) ? 0 : (cx - radius);
+    const int maxX = (cx + radius >= w) ? (w - 1) : (cx + radius);
+    const int minY = (cy - scaledRadiusY < 0) ? 0 : (cy - scaledRadiusY);
+    const int maxY = (cy + scaledRadiusY >= h) ? (h - 1) : (cy + scaledRadiusY);
+
+    for (int y = minY; y <= maxY; y++)
+    {
+        const int yOffset = (y - cy) * (y - cy);
+        int scaledY = cy + ((y - cy) * 1.5 + 0.5);
+	scaledY = (scaledY < 0) ? 0 : (scaledY >= h) ? (h - 1) : scaledY;
+	const int nextRow = (int) (scaledY + 1 >= h ? (h-1) : scaledY + 1);
+
+        for (int x = minX; x <= maxX; x++)
+        {
+            int xOffset = (x - cx) * (x - cx);
+            int distanceSquared = xOffset + yOffset;
+            if (distanceSquared <= scaledRadiusSquaredY)
+            {
+                data[scaledY * w + x] = value;
+                data[nextRow * w + x] = ( data[nextRow * w + x] + data[scaledY * w + x ]) >> 1;
+            }
+        }
+    }
+}
+
+inline void veejay_draw_balloon(uint8_t *data, int cx, int cy, int bw, int bh, const int w, const int h, int radius, uint8_t value)
+{
+    const int scaledRadiusY = (int)(radius > 2 ? radius * 0.5 : radius);
+    const int radiusSquared = radius * radius;
+    const int scaledRadiusSquaredY = scaledRadiusY * scaledRadiusY;
+
+    const int minX = (cx - radius < 0) ? 0 : (cx - radius);
+    const int maxX = (cx + radius >= w) ? (w - 1) : (cx + radius);
+    const int minY = (cy - scaledRadiusY < 0) ? 0 : (cy - scaledRadiusY);
+    const int maxY = (cy + scaledRadiusY >= h) ? (h - 1) : (cy + scaledRadiusY);
+
+    for (int y = minY; y <= maxY; y++)
+    {
+        const int yOffset = (y - cy) * (y - cy);
+        int scaledY = cy + ((y - cy) * 1.5 + 0.5);
+        scaledY = (scaledY < 0) ? 0 : (scaledY >= h) ? (h - 1) : scaledY;
+	const int nextRow = (scaledY +  1 >= h ? (h-1) : scaledY + 1);
+        for (int x = minX; x <= maxX; x++)
+        {
+            int xOffset = (x - cx) * (x - cx);
+            int distanceSquared = xOffset + yOffset;
+
+            if (distanceSquared <= scaledRadiusSquaredY)
+            {
+                int intensity = 255 - (255 * distanceSquared) / scaledRadiusSquaredY;
+                intensity = (intensity < 0) ? 0 : intensity;
+
+                data[scaledY * w + x] = (uint8_t)((value * intensity) >> 8);
+                data[nextRow * w + x] = ( data[nextRow * w + x] + data[scaledY * w + x ]) >> 1;
+            }
+        }
+    }
+}
+
+
+inline void veejay_draw_circle_border(uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value, int borderThickness, uint8_t borderValue)
+{
+    const int tx = bw >> 1;
+    const int ty = bh >> 1;
+    const int radiusSquared = radius * radius;
+    const int minX = (cx - tx < 0) ? 0 : (cx - tx);
+    const int minY = (cy - ty < 0) ? 0 : (cy - ty);
+    const int maxX = (cx + tx >= w) ? (w - 1) : (cx + tx);
+    const int maxY = (cy + ty >= h) ? (h - 1) : (cy + ty);
+
+    for (int y = minY; y <= maxY; y++)
+    {
+        int yOffset = (y - cy) * (y - cy);
+        for (int x = minX; x <= maxX; x++)
+        {
+            int xOffset = (x - cx) * (x - cx);
+            int distanceSquared = xOffset + yOffset;
+
+            if (distanceSquared <= radiusSquared)
+            {
+		if (distanceSquared >= (radius - borderThickness) * (radius - borderThickness) &&
+                    distanceSquared <= (radius + borderThickness) * (radius + borderThickness))
+                {
+                    data[y * w + x] = borderValue;
+                }
+                else
+                {
+                    data[y * w + x] = value;
+                }
+            }
+        }
+    }
+}
+
 inline void veejay_draw_circle(uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value)
 {
     const int tx = bw >> 1;
