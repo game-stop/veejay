@@ -58,7 +58,7 @@ vj_effect *boxfit_init(int w, int h)
      * https://gmic.eu/gallery/img/artistic_zelda_full_24.jpg
      */
 
-    ve->description = "Boxfitting";
+    ve->description = "Box Accumulator";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->parallel = 0;
@@ -112,13 +112,6 @@ void boxfit_free(void *ptr)
     boxfit_t *s = (boxfit_t *)ptr;
     free(s->buf[0]);
     free(s);
-}
-
-static int contains(const int *arr, int length, int value)
-{
-    int i;
-    for (i = 0; i < length && arr[i] != value; ++i) {}
-    return i < length;
 }
 
 // fisher yates shuffling
@@ -307,7 +300,7 @@ void boxfit_apply(void *ptr, VJFrame *frame, int *args)
 
                     if (ii == 0 || ii == box_size - 1 || jj == 0 || jj == box_size - 1)
                     {
-                        bufY[src_idx] = 0;
+                        bufY[src_idx] = pixel_Y_lo_;
                         bufU[src_idx] = 128;
                         bufV[src_idx] = 128;
                     }
