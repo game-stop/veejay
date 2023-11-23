@@ -236,8 +236,9 @@
 #include "./effects/spherize.h"
 #include "./effects/aquatex.h"
 #include "./effects/circlefit.h"
+#include "./effects/balloon.h"
 
-#define VJ_IMAGE_EFFECT_MIN 53
+#define VJ_IMAGE_EFFECT_MIN 52
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -507,6 +508,7 @@ enum {
     VJ_IMAGE_EFFECT_SPHERIZE = 55,
     VJ_IMAGE_EFFECT_AQUATEX = 54,
     VJ_IMAGE_EFFECT_CIRCLEFIT = 53,
+    VJ_IMAGE_EFFECT_BALLOONFIT = 52,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 

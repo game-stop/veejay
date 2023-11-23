@@ -225,6 +225,7 @@ libvje_la_SOURCES =	libvje.c vjert.c \
 	effects/spherize.c \
 	effects/aquatex.c \
 	effects/circlefit.c \
+	effects/balloon.c \
 	effects/blackreplace.c
 		
 
