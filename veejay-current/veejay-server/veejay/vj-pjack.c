@@ -188,9 +188,9 @@ int	vj_jack_get_space()
 	return JACK_GetBytesFreeSpace(driver);
 }
 
-long	vj_jack_get_status(long int *sec, long int *usec)
+long	vj_jack_get_status(long int *sec, long int *nsec)
 {
-	return JACK_OutputStatus( driver, sec, usec);
+	return JACK_OutputStatus( driver, sec, nsec);
 }
 
 void	vj_jack_reset()

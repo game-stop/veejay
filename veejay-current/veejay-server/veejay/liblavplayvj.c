@@ -2317,16 +2317,14 @@ static void veejay_playback_cycle(veejay_t * info)
 	stats.num_corrs_a = 0;
 	stats.num_corrs_b = 0;
 	stats.nsync = 0;
-	stats.audio = 0;
+	stats.audio = settings->audiostats;;
 	stats.norm = el->video_norm == 'n' ? 1 : 0;
 	nvcorr = 0;
-	stats.audio = 0;
 
 	if(info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
 	{
 #ifdef HAVE_JACK
 		info->audio_running = vj_perform_audio_start(info);
-		stats.audio = 1;
 #endif
 	}
 
@@ -2454,11 +2452,15 @@ static void veejay_playback_cycle(veejay_t * info)
 		{
 			struct timespec audio_tmstmp;
 			long num_audio_bytes_written = vj_jack_get_status( &(audio_tmstmp.tv_sec),&(audio_tmstmp.tv_nsec));
-			if( audio_tmstmp.tv_sec )
-			{
-				tdiff1 = settings->spvf * (stats.nsync - nvcorr) - settings->spas * num_audio_bytes_written;
-				tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec) + (bs.timestamp.tv_nsec - audio_tmstmp.tv_nsec) * 1.e-9;
+			tdiff1 = settings->spvf * (stats.nsync - nvcorr) - settings->spas * num_audio_bytes_written;
+			tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec) + (bs.timestamp.tv_nsec - audio_tmstmp.tv_nsec) * 1.e-9;
+	
+			if(stats.audio) {
+				veejay_msg(VEEJAY_MSG_DEBUG, 
+						"Audio Sync Stats: tdiff1=%f, tdiff2=%f, nsync=%d, nvcorr=%d, audio_bytes_written=%ld, audio_tmstmp_sec=%ld, audio_tmstmp_nsec=%ld, spas=%f, sample_rate=%d, bps=%d, spvf=%f",
+              			tdiff1, tdiff2, stats.nsync, nvcorr, num_audio_bytes_written, audio_tmstmp.tv_sec, audio_tmstmp.tv_nsec, settings->spas, el->audio_rate, el->audio_bps, settings->spvf);		
 			}
+
 		}
 #endif
 		stats.tdiff = (tdiff1 - tdiff2);
@@ -2561,7 +2563,7 @@ static void veejay_playback_cycle(veejay_t * info)
 		}
 		/* output statistics */
 		if (el->has_audio && (info->audio==AUDIO_PLAY))
-			stats.audio = settings->audio_mute ? 0 : 1;
+			stats.audio = settings->audio_mute ? 0 : settings->audiostats;
 	}
 
 FINISH:
@@ -3016,6 +3018,16 @@ veejay_t *veejay_malloc()
 		}
 	} else {
 		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_FULLSCREEN=[0|1] not set");
+	}
+
+
+	char *audiostats = getenv("VEEJAY_AUDIO_STATS");
+	if(audiostats) {
+		int val = 0;
+		if( sscanf( audiostats, "%d", &val ) ) {
+			veejay_msg(VEEJAY_MSG_WARNING, "Outputing audio synchronization statistics is %s", (val == 0 ? "disabled" : "enabled" ));
+			info->settings->audiostats = val;
+		}
 	}
 
 	if( best_performance) {

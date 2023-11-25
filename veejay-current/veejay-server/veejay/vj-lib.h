@@ -221,6 +221,7 @@ typedef struct {
 	int	splitscreen;
 	int clear_alpha;
 	int alpha_value;
+	int audiostats;
     transition_t transition;
 } video_playback_setup;
 
