@@ -2227,7 +2227,7 @@ long JACK_OutputStatus(int deviceID,long *sec, long *nsec)
 {
   	jack_driver_t *this = &outDev[deviceID];
 	*sec =	this->previousTime.tv_sec;
-	*usec = this->previousTime.tv_nsec;
+	*nsec = this->previousTime.tv_nsec;
 
 	//	return (this->ticks * this->chunk_size); 
 	return ( this->written_client_bytes / this->bytes_per_output_frame);
