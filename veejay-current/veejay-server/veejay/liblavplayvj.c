@@ -2277,7 +2277,7 @@ static	void	veejay_schedule_fifo(veejay_t *info, int pid )
 {
 	struct sched_param schp;
 	veejay_memset( &schp, 0, sizeof(schp));
-	schp.sched_priority = (int)( sched_get_priority_max( SCHED_FIFO ) * 0.85f);
+	schp.sched_priority = sched_get_priority_max( SCHED_FIFO );
 
 	if( sched_setscheduler( pid, SCHED_FIFO, &schp ) != 0 )
 	{
@@ -2321,12 +2321,7 @@ static void veejay_playback_cycle(veejay_t * info)
 	stats.norm = el->video_norm == 'n' ? 1 : 0;
 	nvcorr = 0;
 
-	if(info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
-	{
-#ifdef HAVE_JACK
-		info->audio_running = vj_perform_audio_start(info);
-#endif
-	}
+
 
 	veejay_set_speed(info,1);
 
@@ -2382,7 +2377,13 @@ static void veejay_playback_cycle(veejay_t * info)
 	veejay_msg(VEEJAY_MSG_INFO, "Output 1.0/%2.2f seconds per video frame: %4.4f",settings->output_fps,1.0 / settings->spvf);
 	veejay_msg(VEEJAY_MSG_INFO, "Output dimensions: %dx%d, backend scaler: %dx%d",
 	           info->video_output_width,info->video_output_height,info->bes_width,info->bes_height );
-
+	
+	if(info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
+	{
+#ifdef HAVE_JACK
+		info->audio_running = vj_perform_audio_start(info);
+#endif
+	}
 
 	vj_perform_queue_video_frame(info,0);
 	vj_perform_queue_audio_frame(info);
@@ -2403,7 +2404,7 @@ static void veejay_playback_cycle(veejay_t * info)
 	   pthread_mutex_lock(&(settings->valid_mutex));
 
        if (settings->state == LAVPLAY_STATE_STOP)
-       {
+	   {	
                pthread_mutex_unlock(&(settings->valid_mutex));
                goto FINISH;
        }
@@ -2428,8 +2429,6 @@ static void veejay_playback_cycle(veejay_t * info)
 				goto FINISH;
 			}
 
-//			veejay_event_handle(info);
-
 			frame = bs.frame;
 
 			stats.nsync++;
@@ -2444,8 +2443,6 @@ static void veejay_playback_cycle(veejay_t * info)
 
 		}
 		while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < (QUEUE_LEN-1));
-
-	//	veejay_event_handle(info);
 
 #ifdef HAVE_JACK
 		if ( info->audio==AUDIO_PLAY  ) 
@@ -2530,13 +2527,13 @@ static void veejay_playback_cycle(veejay_t * info)
 				info->real_fps += settings->pace_correction;
 			}
 
-			if( (fabs(stats.tdiff) > settings->spvf || info->real_fps > spvf_c) && info->real_fps && info->audio == AUDIO_PLAY)
+			if( fabs(stats.tdiff) > settings->spvf && info->audio == AUDIO_PLAY)
 			{
 				if( pace_warning == 0 )
 				{
-					veejay_msg(VEEJAY_MSG_WARNING, "Can't keep pace with audio! Rendering audio/video frame takes too long (measured %-4ld ms, out of sync by %-2.4f ms)",
-					           info->real_fps,
-					           (spvf_c - info->real_fps));
+					veejay_msg(VEEJAY_MSG_WARNING, "Can't keep pace with audio! Rendering audio/video frame takes too long (measured %2.4f , limit %2.4f)",
+					           stats.tdiff,
+						   settings->spvf );
 				}
 				pace_warning = (pace_warning + 1) % spvf_c;
 				if(!settings->auto_mute)

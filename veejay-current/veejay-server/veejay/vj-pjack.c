@@ -76,29 +76,21 @@ static int _vj_jack_start(int *dri)
 
 int vj_jack_init(editlist *el)
 {
-	int ret = 0;
-
-//	JACK_Init();
-//	JACK_SetClientName("veejay");
-
 	bits_per_sample = 16;
 	audio_channels = el->audio_chans;
 
 	if( !_vj_jack_start(&driver) )
-		return ret;
+		return 0;
 
 	long jack_rate = JACK_GetSampleRate(driver );
 
-	ret = 1;
-
 	if( jack_rate != el->audio_rate ) {
-		veejay_msg(1,"Jack is running with a different sample rate (%ld)! Really should use a rate of %d", jack_rate,el->audio_rate );
-		ret = 2;
+		veejay_msg(2,"May be wrong but bio2jack client reports a different sample rate: %ld instead of %d", jack_rate,el->audio_rate );
 	}
 
 	JACK_SetState(driver, PAUSED );
 
-	return ret;
+	return 1;
 }
 
 int	vj_jack_rate()

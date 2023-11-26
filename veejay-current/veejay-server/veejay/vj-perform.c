@@ -1474,14 +1474,13 @@ static void vj_perform_apply_first(veejay_t *info,performer_t *p, vjp_kf *todo_i
 static void vj_perform_reverse_audio_frame(veejay_t * info, int len,
                     uint8_t * buf)
 {
-    int i;
-    int bps = info->current_edit_list->audio_bps;
-    uint8_t sample[bps];
-    int x=len*bps;
-    for( i = 0; i < x/2 ; i += bps ) {
-        veejay_memcpy(sample,buf+i,bps);    
-        veejay_memcpy(buf+i ,buf+(x-i-bps),bps);
-        veejay_memcpy(buf+(x-i-bps), sample,bps);
+    const int bps = info->current_edit_list->audio_bps;
+    const int x = len * bps;
+#pragma omp simd
+    for (int i = 0; i < (x >> 1); ++i) {
+        uint8_t temp = buf[i];
+        buf[i] = buf[x - i];
+        buf[x - i] = temp;
     }
 }
 #endif
