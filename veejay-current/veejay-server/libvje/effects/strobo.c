@@ -38,7 +38,7 @@ vj_effect *strobo_init(int w, int h)
 
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
-    ve->limits[0][1] = 0;
+    ve->limits[0][1] = 1;
     ve->limits[1][1] = 1500;
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 255;
