@@ -147,6 +147,7 @@ static struct {
     { aquatex_init,aquatex_malloc,aquatex_free,NULL,NULL,aquatex_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_AQUATEX },
     { flower_init,flower_malloc,flower_free,NULL,NULL,flower_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_FLOWER },
     { negation_init,NULL,NULL,NULL,NULL,negation_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_NEGATION },
+    { scanline_init,scanline_malloc,scanline_free,NULL,NULL,scanline_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SCANLINE },
     { glitch_init,glitch_malloc,glitch_free,NULL,NULL,glitch_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_GLITCH },
     { sobel_init, sobel_malloc,sobel_free,NULL,NULL,sobel_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SOBEL },
     { edgeglow_init,edgeglow_malloc,edgeglow_free,NULL,NULL, edgeglow_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_EDGEGLOW },
