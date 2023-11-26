@@ -1660,7 +1660,7 @@ JACK_SetState(int deviceID, enum status_enum state)
     drv->state = STOPPED;
     break;
   default:
-    DEBUG("unknown state of %d", state);
+    //DEBUG("unknown state of %d", state);
   }
 
   if(drv->state == PAUSED  ||
