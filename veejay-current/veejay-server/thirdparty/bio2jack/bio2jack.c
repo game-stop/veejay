@@ -493,7 +493,7 @@ JACK_callback(nframes_t nframes, void *arg)
 
         //__sync_add_and_fetch( &(drv->written_client_bytes), read );
      // drv->written_client_bytes += read;
-     // drv->played_client_bytes += drv->clientBytesInJack;       /* move forward by the previous bytes we wrote since those must have finished by now */
+     // drv->played_client_bytes += drv->clientBytesInJack;       /* move forward by the previous bytes we wrote since those must have finished by now 
         drv->clientBytesInJack = read;    /* record the input bytes we wrote to jack */
   
       /* see if we still have jackBytesLeft here, if we do that means that we
@@ -502,10 +502,10 @@ JACK_callback(nframes_t nframes, void *arg)
       if(jackFramesAvailable)
       {
         DEBUG("Buffer underrun of %ld frames", jackFramesAvailable);    
-        for(i = 0; i < drv->num_output_channels; i++)
+        /*for(i = 0; i < drv->num_output_channels; i++)
           sample_silence_float(out_buffer[i] +
                                (nframes - jackFramesAvailable),
-                               jackFramesAvailable);
+                               jackFramesAvailable);*/
       }
 
       /*if(drv->output_sample_rate_ratio == 1.0)
