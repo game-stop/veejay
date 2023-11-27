@@ -157,6 +157,7 @@ static struct {
     { rainbowshift_init, NULL,NULL,NULL,NULL, rainbowshift_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_RAINBOWSHIFT },
     { vintagefilm_init,NULL,NULL,NULL,NULL, vintagefilm_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_VINTAGEFILM },
     { mirrordistortion_init,mirrordistortion_malloc,mirrordistortion_free,NULL,NULL,mirrordistortion_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_MIRRORDISTORTION },
+    { trimirror_init,trimirror_malloc,trimirror_free,NULL,NULL,trimirror_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_TRIMIRROR  },
     { shutterdrag_init,shutterdrag_malloc,shutterdrag_free,NULL,NULL,shutterdrag_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SHUTTERDRAG },
     { pointilism_init,pointilism_malloc,pointilism_free,NULL,NULL,pointilism_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_POINTILISM },
     { smartblur_init,smartblur_malloc,smartblur_free,NULL,NULL,smartblur_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_SMARTBLUR },
