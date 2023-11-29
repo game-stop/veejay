@@ -228,6 +228,7 @@ libvje_la_SOURCES =	libvje.c vjert.c \
 	effects/balloon.c \
 	effects/scanline.c \
 	effects/trimirror.c \
+	effects/hexmirror.c \
 	effects/blackreplace.c
 		
 

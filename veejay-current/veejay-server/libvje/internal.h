@@ -239,8 +239,9 @@
 #include "./effects/balloon.h"
 #include "./effects/scanline.h"
 #include "./effects/trimirror.h"
+#include "./effects/hexmirror.h"
 
-#define VJ_IMAGE_EFFECT_MIN 50
+#define VJ_IMAGE_EFFECT_MIN 49
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -513,6 +514,7 @@ enum {
     VJ_IMAGE_EFFECT_BALLOONFIT = 52,
     VJ_IMAGE_EFFECT_SCANLINE = 51,
     VJ_IMAGE_EFFECT_TRIMIRROR = 50,
+    VJ_IMAGE_EFFECT_HEXMIRROR = 49,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 

@@ -216,3 +216,4 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args) {
 
 }
 
+
