@@ -34,6 +34,7 @@ void vje_disable_parallel();
 
 // init all FX descriptors
 int vje_init(int w, int h);
+int vje_is_parallel_enabled();
 
 // FX calls
 void *vje_fx_malloc(int fx_id, int chain_id, int chain_pos, int w, int h, int *error );

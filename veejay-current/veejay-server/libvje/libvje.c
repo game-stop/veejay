@@ -338,6 +338,10 @@ unsigned int	get_pixel_range_min_UV() {
 	return pixel_U_lo_;
 }
 
+int vje_is_parallel_enabled() {
+	return parallel_enabled;
+}
+
 void    vje_enable_parallel() {
     parallel_enabled = 1;
 }
@@ -513,7 +517,7 @@ static int vje_fx_parallize( vj_effect *fx, void *instance, int idx, VJFrame *A,
         vj_task_set_param( args[i], 2 + i );
     }
 
-    vj_task_run( A->data, B->data, NULL, NULL, 4, (performer_job_routine) &vje_fx_parallel_apply );
+    vj_task_run( A->data, B->data, NULL, NULL, 4, (performer_job_routine) &vje_fx_parallel_apply, (fx->parallel == 2) );
 
     return 1;
 }
