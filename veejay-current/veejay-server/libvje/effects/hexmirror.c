@@ -62,7 +62,6 @@ static void put_pixel2(float angle, float theta, float r, int hheight, int hwidt
 static void put_pixel1(float angle, float theta, float r, int hheight, int hwidth, uint8_t *srcY, uint8_t *srcU, uint8_t *srcV, uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, int jj, int width, float *cos_lut, float *sin_lut);
 
 
-void (*put_pixel_ptr)(float, float, float, int, int, uint8_t*, uint8_t*, uint8_t*, uint8_t*, uint8_t*, uint8_t*, int, int, float*, float*);
 
 
 
@@ -88,10 +87,10 @@ vj_effect *hexmirror_init(int w, int h)
     ve->defaults[2] = 1;
     ve->defaults[3] = 0;
 
-    ve->description = "Salsaman's Kaleidoscope (slow)";
+    ve->description = "Salsaman's Kaleidoscope";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0; // TODO
+    ve->parallel = 2; // thread local buf mode
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Size (log)", "Offset Angle", "Anti clockwise", "Swap" );
     return ve;
@@ -111,8 +110,8 @@ typedef struct
 
 void hexmirror_free(void *ptr) {
     hexmirror_t *s = (hexmirror_t*) ptr;
-    free(s->buf[0]);
     free(s->lut);
+    free(s->buf[0]);
     free(s);
 }
 
@@ -150,6 +149,8 @@ static void init_sin_cos_lut(hexmirror_t *f) {
 void *hexmirror_malloc(int w, int h) {
     hexmirror_t *s = (hexmirror_t*) vj_calloc(sizeof(hexmirror_t));
     if(!s) return NULL;
+    
+    // required for non threading because of inplace operations
     s->buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 3 );
     if(!s->buf[0]) {
         free(s);
@@ -159,6 +160,11 @@ void *hexmirror_malloc(int w, int h) {
     s->buf[2] = s->buf[1] + ( w * h );
 
     s->lut = (float*) vj_malloc(sizeof(float) * ((w*h*4)) );
+    if(!s->lut) {
+        free(s->buf[0]);
+        free(s);
+        return NULL;
+    }
 
     s->atan_lut = s->lut;
     s->sqrt_lut = s->atan_lut + (w*h);
@@ -236,8 +242,10 @@ static inline void rotate(float r, float theta, float angle, float *x, float *y,
     theta += angle;
     theta = ( theta < 0. ? theta += TWO_PI : theta >= TWO_PI ? theta -= TWO_PI : theta );
 
-    *x = r * cos_lut[(int)(theta * LUT_DIVISOR) % LUT_SIZE];
-    *y = r * sin_lut[(int)(theta * LUT_DIVISOR) % LUT_SIZE];
+    int lut_pos =  ( (int) (theta * LUT_DIVISOR)) % LUT_SIZE;
+
+    *x = r * cos_lut[lut_pos];
+    *y = r * sin_lut[lut_pos];
 }
 
 static inline void put_pixel1(float angle, float theta, float r, int hheight,
@@ -306,8 +314,9 @@ static inline void put_pixel2(float angle, float theta, float r, int hheight,
     const int src_index = sx - sy * width; // original function, subtract
 
     if (sy < -hheight || sy >= hheight || sx < -hwidth || sx >= hwidth)
-        return;
-
+    {
+            return;
+    }
     dstY[jj] = srcY[src_index];
     dstU[jj] = srcU[src_index];
     dstV[jj] = srcV[src_index];
@@ -330,17 +339,20 @@ static inline float sqrt_approx(float x) {
 void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
     hexmirror_t *s = (hexmirror_t*)ptr;
 
-    const int len = frame->width * frame->height;
-    const int width = frame->width;
-    const int height = frame->height;
+    const int width = frame->out_width;
+    const int height = frame->out_height;
 
-    uint8_t *restrict srcY = frame->data[0];
-    uint8_t *restrict srcU = frame->data[1];
-    uint8_t *restrict srcV = frame->data[2];
+    uint8_t *restrict srcY = frame->data[0] - frame->offset;
+    uint8_t *restrict srcU = frame->data[1] - frame->offset;
+    uint8_t *restrict srcV = frame->data[2] - frame->offset;
 
     uint8_t *restrict bufY = s->buf[0];
     uint8_t *restrict bufU = s->buf[1];
     uint8_t *restrict bufV = s->buf[2];
+
+    uint8_t *outY;
+    uint8_t *outU;
+    uint8_t *outV;
 
     float *restrict sqrt_lut = s->sqrt_lut;
     float *restrict cos_lut = s->cos_lut;
@@ -365,6 +377,21 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
     const int centerX = width >> 1; 
     const int centerY = height >> 1;
 
+    if( vje_setup_local_bufs( 1, frame, &outY, &outU, &outV, NULL ) == 0 ) {
+        const int len = width * height;
+        veejay_memcpy( bufY, srcY, len );
+        veejay_memcpy( bufU, srcU, len );
+        veejay_memcpy( bufV, srcV, len );
+
+        srcY = bufY;
+        srcU = bufU;
+        srcV = bufV;    
+    }
+
+
+	void (*put_pixel_ptr)(float, float, float, int, int, uint8_t*, uint8_t*, uint8_t*, uint8_t*, uint8_t*, uint8_t*, int, int, float*, float*);
+
+
     put_pixel_ptr = &put_pixel1;
     if(swap) {
         put_pixel_ptr = &put_pixel2;
@@ -377,16 +404,12 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
 
     side *= sfac;
     
-    veejay_memcpy( bufY, srcY, len );
-    veejay_memcpy( bufU, srcU, len );
-    veejay_memcpy( bufV, srcV, len );
+    srcY += centerY * width + centerX;
+    srcU += centerY * width + centerX;
+    srcV += centerY * width + centerX;
 
-    bufY += centerY * width + centerX;
-    bufU += centerY * width + centerX;
-    bufV += centerY * width + centerX;
-
-    start = -centerY;
-    end = centerY;
+    start = -centerY + (frame->jobnum * frame->height);
+    end = start + frame->height;
 
     delta = xangle - ONE_PI2;
 
@@ -394,6 +417,8 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
     const int yEnd = centerY + end;
     const int xStart = -centerX;
     const int xEnd = centerX;
+
+    const int yOffset = (frame->jobnum * frame->height);
 
     for (i = yStart; i < yEnd; i++) {
         fi = (float)(i - centerY);
@@ -406,11 +431,12 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
           
                 fj = (float)j;
 
-                int lut_pos = (i - yStart) * (xEnd - xStart) + (j - xStart);
+                int lut_pos = (i - yStart + yOffset) * (xEnd - xStart) + (j - xStart);
                 // get angle of this point from origin
                 theta = atan_lut[ lut_pos ];
                 // get dist of point from origin
                 r = sqrt_lut[ lut_pos ];
+                
                 // rotate point around origin
                 rotate(r, theta, -delta, &a, &b, cos_lut, sin_lut);
                 // find nearest hex center and angle to it
@@ -447,7 +473,7 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
                     rotate(r, theta, delta, &a, &b, cos_lut, sin_lut);
                 }
 
-                put_pixel_ptr(xangle, theta, r, centerY, centerX, bufY, bufU, bufV, srcY, srcU, srcV, jj, width, cos_lut, sin_lut);
+                put_pixel_ptr(xangle, theta, r, centerY, centerX, srcY, srcU, srcV, outY, outU, outV, jj, width, cos_lut, sin_lut);
                 jj++;
          }
      }
