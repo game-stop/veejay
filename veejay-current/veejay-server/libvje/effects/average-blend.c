@@ -50,13 +50,24 @@ static inline void ac_average( uint8_t *dst, const uint8_t *src1, const uint8_t 
     }
 }
 
+static inline void ac_average_uv( uint8_t *dst, const uint8_t *src1, const uint8_t *src2, uint8_t *dstb, const uint8_t *src1b, const uint8_t *src2b,  const int len )
+{
+    unsigned int i;
+#pragma omp simd
+    for( i = 0; i < len; i ++ ) {
+        dst[i] = (src1[i] + src2[i]) >> 1;
+	dstb[i]= (src1b[i] + src2b[i]) >> 1;
+    }
+}
+
+
+
 static void average_blend_apply1( VJFrame *frame, VJFrame *frame2, int average_blend)
 {
     unsigned int i;
     for( i = 0; i < average_blend; i ++ ) {
         ac_average( frame->data[0], frame->data[0], frame2->data[0], frame->len );
-        ac_average( frame->data[1], frame->data[1], frame2->data[1], frame->uv_len );
-        ac_average( frame->data[2], frame->data[2], frame2->data[2], frame->uv_len );
+        ac_average_uv( frame->data[1], frame->data[1], frame2->data[1], frame->data[2], frame->data[2], frame2->data[2], frame->uv_len );
     }
 }
 
