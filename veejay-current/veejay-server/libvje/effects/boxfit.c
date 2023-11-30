@@ -178,6 +178,7 @@ static double calculateLocalContrast(uint8_t *srcY, int width, int height, int i
     int sum = 0;
     for (int ii = 0; ii < box_size; ++ii)
     {
+#pragma omp simd
         for (int jj = 0; jj < box_size; ++jj)
         {
             int row = i + ii;
@@ -197,6 +198,7 @@ static double calculateLocalContrast(uint8_t *srcY, int width, int height, int i
     
     for (int ii = 0; ii < box_size; ++ii)
     {
+#pragma omp simd
         for (int jj = 0; jj < box_size; ++jj)
         {
             int row = i + ii;
@@ -262,6 +264,8 @@ void boxfit_apply(void *ptr, VJFrame *frame, int *args)
     
             int avgY = 0, avgU = 128, avgV = 128;
 
+            const int box_size_squared = box_size * box_size;
+
             // determine the average color of the "selected" box
             for (int ii = 0; ii < box_size; ++ii)
             {
@@ -281,9 +285,9 @@ void boxfit_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
 
-            avgY /= (box_size * box_size);
-            avgU /= (box_size * box_size);
-            avgV /= (box_size * box_size); 
+            avgY /= box_size_squared;
+            avgU /= box_size_squared;
+            avgV /= box_size_squared; 
 
             // fill up and draw a border around it
             for (ii = 0; ii < box_size; ++ii)
