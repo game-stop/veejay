@@ -159,8 +159,6 @@ void vj_mem_init(void)
 	//find_best_memcpy();	
 	//find_best_memset();
 	vj_mem_set_defaults();
-
-	task_init();
 }
 
 void vj_mem_optimize() {
@@ -177,6 +175,8 @@ void	vj_mem_destroy()
 
 int	vj_mem_threaded_init(int w, int h)
 {
+	task_init( w , h );
+
 	init_parallel_tasks( 0 ); // sets functions pointer to single/multi threaded versions
 	
 	return 1;

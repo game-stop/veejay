@@ -458,6 +458,8 @@ VJFrame *yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
     f->data[2] = V;
     f->width   = w;
     f->height  = h;
+    f->out_width = w;
+    f->out_height = h;
     switch(fmt)
     {
         case PIX_FMT_YUV422P:
@@ -569,6 +571,8 @@ VJFrame *yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
     f->data[3] = NULL;
     f->width   = w;
     f->height  = h;
+    f->out_width = w;
+    f->out_height = h;
     switch( fmt )
     {
         case PIX_FMT_RGB24:

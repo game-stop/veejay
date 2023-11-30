@@ -2408,13 +2408,13 @@ static	void	vj_frame_clear_job( void *arg ) {
 
 static void	vj_frame_copyN( uint8_t **input, uint8_t **output, int *strides )
 {
-	vj_task_run( input, output, NULL, strides,4,(performer_job_routine) &vj_frame_copy_job );
+	vj_task_run( input, output, NULL, strides,4,(performer_job_routine) &vj_frame_copy_job,0 );
 }
 
 static void	vj_frame_clearN( uint8_t **input, int *strides, unsigned int val )
 {
 	vj_task_set_param( val,0 );
-	vj_task_run( input, input, NULL, strides,3, (performer_job_routine) &vj_frame_clear_job );
+	vj_task_run( input, input, NULL, strides,3, (performer_job_routine) &vj_frame_clear_job,0 );
 }
 
 static void	vj_frame_slow_job( void *arg )
@@ -2450,7 +2450,7 @@ void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t *
 	if( vj_task_get_workers() > 1 ) {
 		int strides[4] = { len, uv_len, uv_len, 0 };
 		vj_task_set_float( frac );
-		vj_task_run( p0_buffer, img, p1_buffer,strides, 4,(performer_job_routine) &vj_frame_slow_job );
+		vj_task_run( p0_buffer, img, p1_buffer,strides, 4,(performer_job_routine) &vj_frame_slow_job, 0 );
 	} 
 	else {
 		vj_frame_slow_single( p0_buffer, p1_buffer, img, len, uv_len, frac );

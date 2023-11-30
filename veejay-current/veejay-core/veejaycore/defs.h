@@ -62,6 +62,11 @@ typedef struct VJFrame_t
     int yuv_fmt;
     int range;
     int offset;
+    int jobnum;
+    int totaljobs;
+    uint8_t **local;
+    int out_width;
+    int out_height;
 } VJFrame __attribute__((aligned(16)));
 
 typedef struct VJFrameInfo_t
