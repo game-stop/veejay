@@ -39,10 +39,10 @@ vj_effect *trimirror_init(int w, int h)
     ve->defaults[0] = 1;
     ve->defaults[1] = 255;
 
-    ve->description = "Kaleidoscope (slow)";
+    ve->description = "Kaleidoscope";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
+    ve->parallel = 2; // thread local buf mode
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Segments", "Normalization Factor"  );
     return ve;
@@ -93,6 +93,8 @@ static void init_sin_cos_lut(trimirror_t *f, int w, int h ) {
 void *trimirror_malloc(int w, int h) {
     trimirror_t *s = (trimirror_t*) vj_calloc(sizeof(trimirror_t));
     if(!s) return NULL;
+
+    // required for non threading because of inplace operations
     s->buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 3 );
     if(!s->buf[0]) {
         free(s);
@@ -102,6 +104,11 @@ void *trimirror_malloc(int w, int h) {
     s->buf[2] = s->buf[1] + ( w * h );
 
     s->lut = (float*) vj_malloc(sizeof(float) * (w*h*4) );
+    if(!s->lut) {
+        free(s->buf[0]);
+        free(s);
+        return NULL;
+    }
 
     s->atan2_lut = s->lut;
     s->sqrt_lut = s->atan2_lut + (w*h);
@@ -117,8 +124,8 @@ void *trimirror_malloc(int w, int h) {
 
 void trimirror_free(void *ptr) {
     trimirror_t *s = (trimirror_t*) ptr;
-    free(s->buf[0]);
     free(s->lut);
+    free(s->buf[0]);
     free(s);
 }
 
@@ -127,14 +134,16 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args) {
     const int numSegments = args[0];
     const uint8_t normFactor = args[1];
 
-    const int len = frame->width * frame->height;
-    const int width = frame->width;
-    const int height = frame->height;
+    const int width = frame->out_width;
+    const int height = frame->out_height;
 
-    uint8_t *restrict srcY = frame->data[0];
-    uint8_t *restrict srcU = frame->data[1];
-    uint8_t *restrict srcV = frame->data[2];
+    const int w = frame->width;
+    const int h = frame->height;
 
+    uint8_t *restrict srcY = frame->data[0] - frame->offset;
+    uint8_t *restrict srcU = frame->data[1] - frame->offset;
+    uint8_t *restrict srcV = frame->data[2] - frame->offset;
+    
     uint8_t *restrict bufY = s->buf[0];
     uint8_t *restrict bufU = s->buf[1];
     uint8_t *restrict bufV = s->buf[2];
@@ -143,9 +152,6 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args) {
     float *restrict cos_lut = s->cos_lut;
     float *restrict sin_lut = s->sin_lut;
 
-    veejay_memcpy( bufY, srcY, len );
-    veejay_memcpy( bufU, srcU, len );
-    veejay_memcpy( bufV, srcV, len );
 
     const int centerX = width >> 1;
     const int centerY = height >> 1;
@@ -154,6 +160,21 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args) {
 
     float sinSegments[ numSegments ];
     float cosSegments[ numSegments ];
+    
+    uint8_t *outY;
+    uint8_t *outU;
+    uint8_t *outV;
+
+    if( vje_setup_local_bufs( 1, frame, &outY, &outU, &outV, NULL ) == 0 ) {
+        const int len = width * height;
+        veejay_memcpy( bufY, srcY, len );
+        veejay_memcpy( bufU, srcU, len );
+        veejay_memcpy( bufV, srcV, len );
+
+        srcY = bufY;
+        srcU = bufU;
+        srcV = bufV;
+    }
 
     for (int i = 0; i < numSegments; ++i) {
         float segmentAngle = i * (2 * M_PI) / numSegments;
@@ -164,15 +185,17 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args) {
     int mX[ numSegments ];
     int mY[ numSegments ];
 
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
+    int start = frame->jobnum * h;
+
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
             int mirroredValueY = 0;
             int mirroredValueU = 0;
             int mirroredValueV = 0;
 
-            const float distance = sqrt_lut[ y * width + x];
-            const float sinValue = sin_lut[y * width + x];
-            const float cosValue = cos_lut[y * width + x];
+            const float distance = sqrt_lut[ (start + y) * width + x];
+            const float sinValue = sin_lut[ (start + y) * width + x];
+            const float cosValue = cos_lut[ (start + y) * width + x];
 
             // start computing the contribution of each segment to the final pixel value
 
@@ -184,6 +207,8 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args) {
                 float cosSum = cosValue * cosSegment - sinValue * sinSegment;
                 int mirrorX = centerX + (int)(distance * cosSum);
                 int mirrorY = centerY + (int)(distance * sinSum); 
+
+                
                 mirrorX = (mirrorX >= 0 && mirrorX < width) ? mirrorX : centerX;
                 mirrorY = (mirrorY >= 0 && mirrorY < height) ? mirrorY : centerY;
 
@@ -196,9 +221,9 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args) {
                 int mirrorX = mX[i];
                 int mirrorY = mY[i];
 
-                mirroredValueY += bufY[mirrorY * width + mirrorX];
-                mirroredValueU += (bufU[mirrorY * width + mirrorX] - 128);
-                mirroredValueV += (bufV[mirrorY * width + mirrorX] - 128);
+                mirroredValueY += srcY[mirrorY * width + mirrorX];
+                mirroredValueU += (srcU[mirrorY * width + mirrorX] - 128);
+                mirroredValueV += (srcV[mirrorY * width + mirrorX] - 128);
             }
 
             // normalized additive blend
@@ -206,10 +231,9 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args) {
             mirroredValueU = (mirroredValueU * normFactor) / maxSum;
             mirroredValueV = (mirroredValueV * normFactor) / maxSum;
 
-            srcY[y * width + x] = mirroredValueY;
-            srcU[y * width + x] = 128 + mirroredValueU;
-            srcV[y * width + x] = 128 + mirroredValueV;
-
+            outY[y * w + x] = mirroredValueY;
+            outU[y * w + x] = 128 + mirroredValueU;
+            outV[y * w + x] = 128 + mirroredValueV;
         }
     }
 
