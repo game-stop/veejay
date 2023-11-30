@@ -63,7 +63,7 @@ vj_effect *warppers_init(int w, int h)
     ve->description = "Warp Perspective";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
+    ve->parallel = 2; //use thread local
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "X Angle", "Y Angle", "Zoom" , "X Center" , "Y Center", "Distance Falloff", "Perspective Strength" );
     return ve;
@@ -137,17 +137,15 @@ void warppers_free(void *ptr) {
 void warppers_apply(void *ptr, VJFrame *frame, int *args) {
     warppers_t *warp = (warppers_t*)ptr;
 
-    const int len = frame->width * frame->height;
-    const int width = frame->width;
-    const int height = frame->height;
+    const int width = frame->out_width;
+    const int height = frame->out_height;
 
-    uint8_t *restrict srcY = frame->data[0];
-    uint8_t *restrict srcU = frame->data[1];
-    uint8_t *restrict srcV = frame->data[2];
+	const int w = frame->width;
+	const int h = frame->height;
 
-    uint8_t *restrict bufY = warp->buf[0];
-    uint8_t *restrict bufU = warp->buf[1];
-    uint8_t *restrict bufV = warp->buf[2];
+    uint8_t *restrict srcY = frame->data[0] - frame->offset;
+    uint8_t *restrict srcU = frame->data[1] - frame->offset;
+    uint8_t *restrict srcV = frame->data[2] - frame->offset;
 
     double *restrict cos_lut = warp->cos_lut;
     double *restrict sin_lut = warp->sin_lut;
@@ -163,20 +161,39 @@ void warppers_apply(void *ptr, VJFrame *frame, int *args) {
     const int x_center = args[3];
     const int y_center = args[4];
 
-    veejay_memcpy(bufY, srcY, len);
-    veejay_memcpy(bufU, srcU, len);
-    veejay_memcpy(bufV, srcV, len);
+    uint8_t *outY;
+    uint8_t *outU;
+    uint8_t *outV;
 
-    const int max_dist = (width / 2) * (width / 2) + (height / 2) * (height / 2);
+    if( vje_setup_local_bufs( 1, frame, &outY, &outU, &outV, NULL ) == 0 ) {
+        const int len = width * height;
+    	uint8_t *restrict bufY = warp->buf[0];
+    	uint8_t *restrict bufU = warp->buf[1];
+    	uint8_t *restrict bufV = warp->buf[2];
+
+        veejay_memcpy( bufY, srcY, len );
+        veejay_memcpy( bufU, srcU, len );
+        veejay_memcpy( bufV, srcV, len );
+
+        srcY = bufY;
+        srcU = bufU;
+        srcV = bufV;
+    }
+
+    const int max_dist = (width >> 1) * (width >> 1) + (height >> 1) * (height >> 1);
     const double strength_factor = 1.0 - strength;
     const double cos_val = cos_lut[x_angle];
     const double sin_val = sin_lut[y_angle];
 
-    for (int y_pos = 0; y_pos < height; y_pos++) {
-        for (int x_pos = 0; x_pos < width; x_pos++) {
-            const int idx = y_pos * width + x_pos;
+	const int start = (frame->jobnum * h);	
+	const int end = start + h;
+
+    for (int y_pos = 0; y_pos < h; y_pos++) {
+        for (int x_pos = 0; x_pos < w; x_pos++) {
+            const int idx = y_pos * w + x_pos;
+
             const int dx = x_pos - x_center;
-            const int dy = y_pos - y_center;
+            const int dy = start + y_pos - y_center;
             const int dist = dx * dx + dy * dy;
             const double dmd = (double) dist / max_dist;
             const double factor = (1.0 - falloff * dmd) * (strength_factor + strength * dmd);
@@ -190,9 +207,9 @@ void warppers_apply(void *ptr, VJFrame *frame, int *args) {
             x += (x < 0) ? width : 0;
             y += (y < 0) ? height : 0;
 
-            srcY[idx] = bufY[ y * width + x ];
-            srcU[idx] = bufU[ y * width + x ];
-            srcV[idx] = bufV[ y * width + x ];
+            outY[idx] = srcY[ y * width + x ];
+            outU[idx] = srcU[ y * width + x ];
+            outV[idx] = srcV[ y * width + x ];
         }
     }
 }
