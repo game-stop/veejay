@@ -28,6 +28,37 @@
 #include <veejaycore/vjmem.h>
 #include "common.h"
 
+#define ONEQTR_PI (M_PI / 4.0f)
+#define THRQTR_PI (3.0f * M_PI / 4.0f)
+
+extern int vje_is_parallel_enabled();
+
+int	vje_setup_local_bufs( int use_thread_local, VJFrame *frame, uint8_t **outY, uint8_t **outU, uint8_t **outV, uint8_t **outA )
+{	
+	int utl = ( vje_is_parallel_enabled() && use_thread_local && frame->local != NULL );
+
+	// if parallization is enabled and initialized, we can write to the frame's thread local buffer directly
+	// some effects take a copy of the source data , this is no longer required when thread local is used 
+
+	if( utl ) {
+		*outY = frame->local[0];
+		*outU = frame->local[1];
+		*outV = frame->local[2];
+		if(outA)
+		   *outA = frame->local[3];
+		return 1;
+	}
+	else {
+		*outY = frame->data[0];
+		*outU = frame->data[1];
+		*outV = frame->data[2];
+		if(outA) 
+		  *outA = frame->data[3];
+	}
+
+	return 0; // hint the FX it can optionally use its internal buffer if a copy is required for inplace mode
+}
+
 char	**vje_build_param_list( int num, ... )
 {
 	va_list args;
@@ -1325,6 +1356,18 @@ double	m_get_radius( int x, int y )
 double	m_get_angle( int x, int y )
 {
 	return (atan2( (float)y,x));
+}
+
+float sqrt_approx_f(float x) {
+    return __builtin_sqrtf(x);
+}
+
+float atan2_approx_f(float y, float x) {
+    float fabs_y = y * (y < 0.0f ? -1.0f : 1.0f);
+    float r = (x < 0.0f) ? (x + fabs_y) / (fabs_y - x) : (x - fabs_y) / (x + fabs_y);
+    float angle = (x < 0.0f) ? THRQTR_PI : ONEQTR_PI;
+    angle += (0.1963f * r * r - 0.9817f) * r;
+    return (y < 0.0f) ? -angle : angle;
 }
 
 double atan2_approx(double y, double x) {

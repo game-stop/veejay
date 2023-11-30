@@ -94,22 +94,23 @@ static inline double a_fmod(double x, double m) {
   return x;
 }
 
-static const double __B = 4.0 / M_PI;
-static const double __C = -4.0 / (M_PI * M_PI);
-static const double __P = 0.225;
+static const float __B = 4.0 / M_PI;
+static const float __C = -4.0 / (M_PI * M_PI);
+static const float __P = 0.225;
 
-static inline double a_sin( double x ) {
+static inline float a_sin( double x ) {
 
 	x = a_fmod( x + M_PI, 2.0 * M_PI ) - M_PI;
 
-	double y = __B * x + __C * x * fabs(x);
+	float y = __B * x + __C * x * fabs(x);
 
 	return __P * (y * fabs(y) - y) + y;
 }
 
-static inline double a_cos( double x ) {
+static inline float a_cos( double x ) {
 	return a_sin( x + M_PI_2 );
 }
+
 
 #ifdef ARCH_X86_64
 #define sin_cos(si, co, x) asm ("fsincos" : "=t" (co), "=u" (si) : "0" (x))
@@ -320,6 +321,8 @@ void fx_shuffle_int_array( int *A, unsigned int n );
 int power_of(int size);
 int max_power(int w);
 
+int	vje_setup_local_bufs( int use_thread_local, VJFrame *frame, uint8_t **outY, uint8_t **outU, uint8_t **outV, uint8_t **outA );
+
 void frameborder_yuvdata(uint8_t * input_y, uint8_t * input_u,
 			 uint8_t * input_v, uint8_t * putin_y,
 			 uint8_t * putin_u, uint8_t * putin_v, int width,
@@ -456,6 +459,9 @@ typedef enum _vj_effect_parity{
 void grid_getbounds_from_orientation(int radius, vj_effect_orientation orientation, vj_effect_parity parity, int * x_inf, int * y_inf, int * x_sup, int * y_sup);
 
 double atan2_approx(double y, double x);
+float atan2_approx_f(float y, float x);
+
+float sqrt_approx_f(float x);
 
 #ifdef HAVE_ASM_MMX
 void vje_load_mask(uint8_t val);
