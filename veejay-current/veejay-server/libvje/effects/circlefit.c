@@ -172,6 +172,7 @@ static double calculateLocalContrast(uint8_t *srcY, int width, int height, int i
     int sum = 0;
     for (int ii = 0; ii < box_size; ++ii)
     {
+#pragma omp simd	   
         for (int jj = 0; jj < box_size; ++jj)
         {
             int row = i + ii;
@@ -191,6 +192,7 @@ static double calculateLocalContrast(uint8_t *srcY, int width, int height, int i
     
     for (int ii = 0; ii < box_size; ++ii)
     {
+#pragma omp simd
         for (int jj = 0; jj < box_size; ++jj)
         {
             int row = i + ii;
@@ -221,8 +223,8 @@ void circlefit_apply(void *ptr, VJFrame *frame, int *args)
     const uint8_t contrast = args[2];
     int border = args[4];
 
-	if( border > min_size )
-		border = min_size;
+    if( border > min_size )
+        border = min_size;
 
     const double weight = (double)args[3] * 0.01;
 
@@ -245,112 +247,116 @@ void circlefit_apply(void *ptr, VJFrame *frame, int *args)
     int numBoxes = s->numBoxes;
     int boxIndex = 0;
 
-	
-	if( border == 0 ) {
-    	for (int i = 0; i < height;)
-    	{
-        	for (int j = 0; j < width;)
-        	{
-            	const int box_index = boxIndices[boxIndex];
-            	int box_size = boxSizes[box_index];
+    
+    if( border == 0 ) {
+        for (int i = 0; i < height;)
+        {
+            for (int j = 0; j < width;)
+            {
+                const int box_index = boxIndices[boxIndex];
+                int box_size = boxSizes[box_index];
 
-            	const double localContrast = calculateLocalContrast(srcY, width, height, i, j, box_size, &(s->runningAvg), weight);
-            	const double sizeMultiplier = 1.0 - (localContrast / contrast);
+                const double localContrast = calculateLocalContrast(srcY, width, height, i, j, box_size, &(s->runningAvg), weight);
+                const double sizeMultiplier = 1.0 - (localContrast / contrast);
 
-            	box_size = CLAMP((int)(box_size * sizeMultiplier), min_size, max_size);
+                box_size = CLAMP((int)(box_size * sizeMultiplier), min_size, max_size);
 
-            	int avgY = 0, avgU = 128, avgV = 128;
+                const int box_size_squared = box_size * box_size;
 
-            	for (int ii = 0; ii < box_size; ++ii)
-            	{
-                	for (int jj = 0; jj < box_size; ++jj)
-                	{
-                    	int row = i + ii;
-                    	int col = j + jj;
+                int avgY = 0, avgU = 128, avgV = 128;
 
-                    	row = (row < height) ? row : (row - height);
-                    	col = (col < width) ? col : (col - width);
+                for (int ii = 0; ii < box_size; ++ii)
+                {
+                    for (int jj = 0; jj < box_size; ++jj)
+                    {
+                        int row = i + ii;
+                        int col = j + jj;
 
-                    	const int src_idx = row * width + col;
+                        row = (row < height) ? row : (row - height);
+                        col = (col < width) ? col : (col - width);
 
-                    	avgY += srcY[src_idx];
-                    	avgU += (srcU[src_idx] - 128);
-                    	avgV += (srcV[src_idx] - 128);
-               		}
-            	}
+                        const int src_idx = row * width + col;
 
-            	avgY /= (box_size * box_size);
-            	avgU /= (box_size * box_size);
-            	avgV /= (box_size * box_size);
+                        avgY += srcY[src_idx];
+                        avgU += (srcU[src_idx] - 128);
+                        avgV += (srcV[src_idx] - 128);
+                    }
+                }
 
-            	int cx = j + (box_size >> 1);
-            	int cy = i + (box_size >> 1);
-            	int radius = (box_size >> 1);
+                avgY /= box_size_squared;
+                avgU /= box_size_squared;
+                avgV /= box_size_squared;
 
-            	veejay_draw_circle(bufY, cx, cy,box_size,box_size, width, height, radius, avgY);
-            	veejay_draw_circle(bufU, cx, cy,box_size,box_size, width, height, radius, 128 + avgU);
-            	veejay_draw_circle(bufV, cx, cy,box_size,box_size, width, height, radius, 128 + avgV);
+                int cx = j + (box_size >> 1);
+                int cy = i + (box_size >> 1);
+                int radius = (box_size >> 1);
 
-            	boxIndex = (boxIndex + 1) % numBoxes;
-            	j += box_size;
-        	}
+                veejay_draw_circle(bufY, cx, cy,box_size,box_size, width, height, radius, avgY);
+                veejay_draw_circle(bufU, cx, cy,box_size,box_size, width, height, radius, 128 + avgU);
+                veejay_draw_circle(bufV, cx, cy,box_size,box_size, width, height, radius, 128 + avgV);
 
-        	i += boxSizes[boxIndices[boxIndex]];
-    	}
-	}
-	else {
-    	for (int i = 0; i < height;)
-    	{
-        	for (int j = 0; j < width;)
-        	{
-            	const int box_index = boxIndices[boxIndex];
-            	int box_size = boxSizes[box_index];
+                boxIndex = (boxIndex + 1) % numBoxes;
+                j += box_size;
+            }
 
-            	const double localContrast = calculateLocalContrast(srcY, width, height, i, j, box_size, &(s->runningAvg), weight);
-            	const double sizeMultiplier = 1.0 - (localContrast / contrast);
+            i += boxSizes[boxIndices[boxIndex]];
+        }
+    }
+    else {
+        for (int i = 0; i < height;)
+        {
+            for (int j = 0; j < width;)
+            {
+                const int box_index = boxIndices[boxIndex];
+                int box_size = boxSizes[box_index];
 
-            	box_size = CLAMP((int)(box_size * sizeMultiplier), min_size, max_size);
+                const double localContrast = calculateLocalContrast(srcY, width, height, i, j, box_size, &(s->runningAvg), weight);
+                const double sizeMultiplier = 1.0 - (localContrast / contrast);
 
-            	int avgY = 0, avgU = 128, avgV = 128;
+                box_size = CLAMP((int)(box_size * sizeMultiplier), min_size, max_size);
 
-            	for (int ii = 0; ii < box_size; ++ii)
-            	{
-                	for (int jj = 0; jj < box_size; ++jj)
-                	{
-                    	int row = i + ii;
-                    	int col = j + jj;
+                const int box_size_squared = box_size * box_size;
 
-                    	row = (row < height) ? row : (row - height);
-                    	col = (col < width) ? col : (col - width);
+                int avgY = 0, avgU = 128, avgV = 128;
 
-                    	const int src_idx = row * width + col;
+                for (int ii = 0; ii < box_size; ++ii)
+                {
+                    for (int jj = 0; jj < box_size; ++jj)
+                    {
+                        int row = i + ii;
+                        int col = j + jj;
 
-                    	avgY += srcY[src_idx];
-                    	avgU += (srcU[src_idx] - 128);
-                    	avgV += (srcV[src_idx] - 128);
-               		}
-            	}
+                        row = (row < height) ? row : (row - height);
+                        col = (col < width) ? col : (col - width);
 
-            	avgY /= (box_size * box_size);
-            	avgU /= (box_size * box_size);
-            	avgV /= (box_size * box_size);
+                        const int src_idx = row * width + col;
 
-            	int cx = j + (box_size >> 1);
-            	int cy = i + (box_size >> 1);
-            	int radius = (box_size >> 1);
+                        avgY += srcY[src_idx];
+                        avgU += (srcU[src_idx] - 128);
+                        avgV += (srcV[src_idx] - 128);
+                    }
+                }
 
-            	veejay_draw_circle_border(bufY, cx, cy,box_size,box_size, width, height, radius, avgY, border, pixel_Y_lo_);
-            	veejay_draw_circle_border(bufU, cx, cy,box_size,box_size, width, height, radius, 128 + avgU, border, 128);
-            	veejay_draw_circle_border(bufV, cx, cy,box_size,box_size, width, height, radius, 128 + avgV, border, 128);
+                avgY /= box_size_squared;
+                avgU /= box_size_squared;
+                avgV /= box_size_squared;
 
-            	boxIndex = (boxIndex + 1) % numBoxes;
-            	j += box_size;
-        	}
+                int cx = j + (box_size >> 1);
+                int cy = i + (box_size >> 1);
+                int radius = (box_size >> 1);
 
-        	i += boxSizes[boxIndices[boxIndex]];
-    	}
+                veejay_draw_circle_border(bufY, cx, cy,box_size,box_size, width, height, radius, avgY, border, pixel_Y_lo_);
+                veejay_draw_circle_border(bufU, cx, cy,box_size,box_size, width, height, radius, 128 + avgU, border, 128);
+                veejay_draw_circle_border(bufV, cx, cy,box_size,box_size, width, height, radius, 128 + avgV, border, 128);
 
-	}
+                boxIndex = (boxIndex + 1) % numBoxes;
+                j += box_size;
+            }
+
+            i += boxSizes[boxIndices[boxIndex]];
+        }
+
+    }
 
     veejay_memcpy(srcY, bufY, frame->len);
     veejay_memcpy(srcU, bufU, frame->len);
