@@ -68,7 +68,7 @@ static void put_pixel1(float angle, float theta, float r, int hheight, int hwidt
 vj_effect *hexmirror_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
+    ve->num_params = 5;
 
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
@@ -81,18 +81,21 @@ vj_effect *hexmirror_init(int w, int h)
     ve->limits[1][2] = 1;
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 1;
+    ve->limits[0][4] = 0;
+    ve->limits[1][4] = 100;
 
     ve->defaults[0] = 562;
     ve->defaults[1] = 0;
     ve->defaults[2] = 1;
     ve->defaults[3] = 0;
+    ve->defaults[4] = 0;
 
     ve->description = "Salsaman's Kaleidoscope";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->parallel = 2; // thread local buf mode
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Size (log)", "Offset Angle", "Anti clockwise", "Swap" );
+    ve->param_description = vje_build_param_list( ve->num_params, "Size (log)", "Offset Angle", "Anti clockwise", "Swap", "Rotation Speed" );
     return ve;
 }
 
@@ -368,6 +371,8 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
     float angleoffs = args[1] * 0.1f; // Angle offsets, rotation
     int cw = args[2]; // Clockwise TODO
     int swap = args[3];
+    float rotation = args[4] * 0.01f;
+    float rotationSpeed = rotation * frame->timecode;
 
     float xangle = s->xangle;
 
@@ -389,8 +394,11 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
     }
 
 
-	void (*put_pixel_ptr)(float, float, float, int, int, uint8_t*, uint8_t*, uint8_t*, uint8_t*, uint8_t*, uint8_t*, int, int, float*, float*);
+    void (*put_pixel_ptr)(float, float, float, int, int, uint8_t*, uint8_t*, uint8_t*, uint8_t*, uint8_t*, uint8_t*, int, int, float*, float*);
 
+    if(!cw) {
+        rotationSpeed *= -1.0f;
+    }
 
     put_pixel_ptr = &put_pixel1;
     if(swap) {
@@ -442,7 +450,6 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
                 // find nearest hex center and angle to it
                 calc_center(side, a, b, &x, &y);
 
-
                 //theta = atan2_approx1(y, x);
                 //r = sqrt_approx(x * x + y * y);
 
@@ -459,7 +466,7 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
                     last_r = r = sqrt_approx(x * x + y * y);
                 }
 
-                rotate(r, theta, delta, &a, &b, cos_lut, sin_lut);
+                rotate(r, theta, delta + rotationSpeed, &a, &b, cos_lut, sin_lut);
 
                 float bfi = b - fi;
                 float afj = a - fj;
