@@ -159,42 +159,45 @@ void fisheye_apply(void *ptr, VJFrame *frame, int *args) {
         pf = &__fisheye;
     }
 
-    if( v != f->_v )
+    if (v != f->_v)
     {
         const double curve = 0.001 * v;
-        const unsigned int R = height/2;
+        const unsigned int R = height / 2;
         const double coeef = R / log(curve * R + 1);
-        /* pre calculate */
-        int px,py;
+        const int w2 = width / 2;
+        const int h2 = height / 2;
         double co,si;
-        float a,r;
-        const int w2 = width/2;
-        const int h2 = height/2;
-        
-        for(i=0; i < len; i++)
+        for (int y = 0; y <= h2; y++)
         {
-            r = polar_map[i];
-            a = fish_angle[i];
-            if(r <= R)
+            for (int x = 0; x <= w2; x++)
             {
-                r = pf( r, coeef, curve );
-                sin_cos( si,co, a);
-                px =(int) ( r * co) + w2;
-                py =(int) ( r * si) + h2;
-                
-                px = (px < 0) ? 0 : (px >= width) ? (width - 1) : px;
-                py = (py < 0) ? 0 : (py >= height - 1) ? (height - 1) : py;
+                float r = polar_map[y * width + x];
+                float a = fish_angle[ y * width + x ];
+                if( r <= R ) {
+                    r = pf( r, coeef, curve );
 
-                cached_coords[i] = (py * width) + px;
-            }
-            else
-            {
-                cached_coords[i] = -1;
+                    sin_cos(si, co, a);
 
+                    int px = (int)(r * co) + w2;
+                    int py = (int)(r * si) + h2;
+
+                    px = (px < 0) ? 0 : (px >= width) ? (width - 1) : px;
+                    py = (py < 0) ? 0 : (py >= height) ? (height - 1) : py;
+
+                    cached_coords[y * width + x] = py * width + px;
+                    cached_coords[y * width + (width - x)] = py * width + (width - px);
+                    cached_coords[(height - y) * width + x] = (height - py) * width + px;
+                    cached_coords[(height - y) * width + (width - x)] = (height - py) * width + (width - px);
+                }
+                else {
+                    cached_coords[ y * width + x ] = -1;
+                }
             }
         }
+
         f->_v = v;
     }
+
 
     veejay_memcpy(buf[0], Y,(len));
     
