@@ -34,98 +34,40 @@ vj_effect *transform_init(int width,int height)
     ve->limits[1][0] = (height / 16);
 
     ve->description = "Transform Cubics";
-    ve->sub_format = -1;
+    ve->sub_format = 1;
     ve->extra_frame = 0;
    	ve->has_user = 0;
+	ve->parallel = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Cubics");
     return ve;
 }
 
 void transform_apply(void *ptr, VJFrame *frame, int *args)
 {
-    unsigned int ty, tx, y, x;
-    const unsigned int uv_height = frame->uv_height;
-    const unsigned int uv_width = frame->uv_width;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame->data[0];
- 	uint8_t *Cb2= frame->data[1];
-	uint8_t *Cr2= frame->data[2];
-    int size = args[0];
+	uint8_t *restrict Y = frame->data[0];
+	uint8_t *restrict Cb= frame->data[1];
+	uint8_t *restrict Cr= frame->data[2];
 
-    /* Luminance */
-    for (y = 1; y < height; y++)
+    const unsigned int size = args[0];
+	const unsigned int hsize = size >> 1;
+	for (unsigned int y = 1; y < height; y++)
 	{
-		ty = y % size - (size >> 1);
-		if ((y / size) % 2)
-		{
-	   		ty = y - ty;
-		}
-		else
-		{
-	    	ty = y + ty;
-		}
-		if (ty < 0)
-		    ty = 0;
+   		unsigned int ty_offset = y % size;
+    	unsigned int ty = (y / size) % 2 ? y - ty_offset + hsize : y + ty_offset - hsize;
+    	ty = (ty < 0) ? 0 : (ty >= (height - 1)) ? height - 1 : ty;
+    	for (unsigned int x = 1; x < width; x++)
+    	{
+        	unsigned int tx_offset = x % size;
+        	unsigned int tx = (x / size) % 2 ? x - tx_offset + hsize : x + tx_offset - hsize;
+        	tx = (tx < 0) ? 0 : (tx >= (width - 1)) ? width - 1 : tx;
 
-		if (ty >= height)
-		    ty = height - 1;
-
-		for (x = 1; x < width; x++)
-		{
-	   		tx = x % size - (size >> 1);
-	    	if ((x / size) % 2)
-			{
-				tx = x - tx;
-	    	}
-			else
-			{
-				tx = x + tx;
-		    }
-		    if (tx < 0)
-				tx = 0;
-		    if (tx >= width)
-				tx = width - 1;
-		    Y[x + (y * width)] = Y2[(ty * width) + tx];
+        	Y[x + (y * width)] = Y[(ty * width) + tx];
+        	Cb[x + (y * width)] = Cb[(ty * width) + tx];
+        	Cr[x + (y * width)] = Cr[(ty * width) + tx];
+    	}
 	}
-    }
-    /* Chroma */
-    for (y = 1; y < uv_height; y++)
-	{
-		ty = y % size - (size >> 1);
-		if ((y / size) % 2) {
-		    ty = y - ty;
-		}
-		else
-		{
-	   	 ty = y + ty;
-		}
-		if (ty < 0)
-		    ty = 0;
 
-		if (ty >= uv_height)
-		    ty = uv_height - 1;
 
-		for (x = 1; x < uv_width; x++)
-		{
-		    tx = x % size - (size >> 1);
-		    if ((x / size) % 2)
-			{
-				tx = x - tx;
-	   		}
-			else
-			{
-				tx = x + tx;
-		    }
-	   		if (tx < 0)
-				tx = 0;
-		    if (tx >= uv_width)
-				tx = uv_width - 1;
-	  	  	Cb[x + (y * uv_width)] = Cb2[(ty * uv_width) + tx];
-	    	Cr[x + (y * uv_width)] = Cr2[(ty * uv_width) + tx];
-		}
-    }
 }
