@@ -67,7 +67,6 @@ typedef struct {
     int deformY;
 } ripplewave_t;
 
-#define SIN_TABLE_SIZE 360
 void* ripplewave_malloc(int w, int h) {
     ripplewave_t *data = (ripplewave_t*) vj_malloc(sizeof(ripplewave_t));
     if (!data)
@@ -156,9 +155,15 @@ void ripplewave_apply(void *ptr, VJFrame *frame, int *args) {
         for (x = 0; x < width; x++) {
             float offset_x = amplitude * lut_x[x];
 
-            int srcX = (int) ( x + offset_x ) % width; 
-            int srcY = (int) ( y + offset_y ) % height;
+            int srcX = (int)(x + offset_x);
+            int srcY = (int)(y + offset_y);
 
+            srcX -= (srcX >= width) ? width : 0;
+            srcY -= (srcY >= height) ? height : 0;
+
+            srcX += (srcX < 0) ? width : 0;
+            srcY += (srcY < 0) ? height : 0;
+            
             srcX = (srcX < 0) ? (width + srcX) : srcX;
             srcY = (srcY < 0) ? (height + srcY) : srcY;
 
