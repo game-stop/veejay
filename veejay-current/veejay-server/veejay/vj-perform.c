@@ -283,6 +283,11 @@ static void vj_perform_supersample(video_playback_setup *settings,performer_t *p
                 p->frame_buffer[ chain_entry ]->ssm = 0;
             }
         }
+		else if( p->frame_buffer[ chain_entry ]->ssm == 1 && two->ssm == 0 ) {
+			chroma_supersample( settings->sample_mode, two, two->data );
+			vj_perform_set_444(two);
+			p->frame_buffer[ chain_entry ]->ssm = 1;
+		}
     }
 
 
@@ -2147,7 +2152,7 @@ static void vj_perform_tag_render_chain_entry(veejay_t *info,performer_t *p,vjp_
             frames[1]->ssm = vj_perform_preprocess_secundary( info,p, fx_entry->channel,fx_entry->source_type,sub_mode,chain_entry, frames, frameinfo );
         }
 
-        vj_perform_supersample(settings,p, NULL, frames[1], sub_mode, chain_entry); 
+       	vj_perform_supersample(settings,p, NULL, frames[1], sub_mode, chain_entry); 
     }
     
     if( p->pvar_.fade_entry == chain_entry && p->pvar_.fade_method == 1) {
@@ -2226,7 +2231,7 @@ static  int vj_perform_preprocess_secundary( veejay_t *info,performer_t *p, int 
                 if( ef ) {
                     subframes[1]->ssm = vj_perform_apply_secundary(info,p,id,fx_entry->channel,fx_entry->source_type,n,subframes[0],subframes[1],p0_ref, p1_ref, 1);
                 }   
-
+		
                 vj_perform_supersample( settings,p, subframes[0], subframes[1], sm, chain_entry );
 
                 vj_perform_apply_first(info,p,&setup,subframes,fx_entry,fx_id,n,(int) settings->current_frame_num,fx_entry->fx_instance, mode );
