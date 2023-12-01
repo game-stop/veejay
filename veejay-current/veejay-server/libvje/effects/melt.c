@@ -40,7 +40,7 @@ vj_effect *melt_init(int w, int h)
 	ve->extra_frame = 1;
 	ve->sub_format = 1;
 	ve->has_user = 0;
-	ve->parallel = 1;
+	ve->parallel = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Speed", "Intensity" );
 
 	return ve;
@@ -82,13 +82,17 @@ void melt_apply(void *ptr, VJFrame *A, VJFrame *B, int *args ) {
     int speed = args[0];
     int intensity = args[1];
 
-    uint8_t *srcAY = A->data[0];
-    uint8_t *srcAU = A->data[1];
-    uint8_t *srcAV = A->data[2];
+    uint8_t *srcY = A->data[0];
+    uint8_t *srcU = A->data[1];
+    uint8_t *srcV = A->data[2];
 
-	uint8_t *dstY = t->buf[0];
-	uint8_t *dstU = t->buf[1];
-	uint8_t *dstV = t->buf[2];
+	uint8_t *outY = srcY;
+	uint8_t *outU = srcU;
+	uint8_t *outV = srcV;
+
+	uint8_t *bufY = t->buf[0];
+	uint8_t *bufU = t->buf[1];
+	uint8_t *bufV = t->buf[2];
 
     uint8_t *srcBY = B->data[0];
 
@@ -97,16 +101,17 @@ void melt_apply(void *ptr, VJFrame *A, VJFrame *B, int *args ) {
     const unsigned int len = A->len;
 
     int meltThreshold = intensity; 
-   
 
-	/* taking a copy here improves the performance because
-	 * it avoids reading and writing to the same memory location
-	 */
+    if( vje_setup_local_bufs( 1, A, &outY, &outU, &outV, NULL ) == 0 ) {
+        const int len = width * height;
+        veejay_memcpy( bufY, srcY, len );
+        veejay_memcpy( bufU, srcU, len );
+        veejay_memcpy( bufV, srcV, len );
 
-	veejay_memcpy( t->buf[0], srcAY, A->len );
-	veejay_memcpy( t->buf[1], srcAU, A->len );
-	veejay_memcpy( t->buf[2], srcAV, A->len );
-
+        srcY = bufY;
+        srcU = bufU;
+        srcV = bufV;    
+    }
 
     for (unsigned int y = 0; y < height; ++y) {
         for (unsigned int x = 0; x < width; ++x) {
@@ -117,9 +122,9 @@ void melt_apply(void *ptr, VJFrame *A, VJFrame *B, int *args ) {
             meltIdx = (meltIdx >= len) ? meltIdx - len : meltIdx;
 
             if (srcBY[idx] > meltThreshold) {
-                srcAY[idx] = t->buf[0][meltIdx];
-                srcAU[idx] = t->buf[1][meltIdx];
-                srcAV[idx] = t->buf[2][meltIdx];
+                outY[idx] = srcY[meltIdx];
+                outU[idx] = srcU[meltIdx];
+                outV[idx] = srcV[meltIdx];
             }
         }
     }
