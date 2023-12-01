@@ -248,6 +248,8 @@ void balloonfit_apply(void *ptr, VJFrame *frame, int *args)
 
             box_size = CLAMP((int)(box_size * sizeMultiplier), min_size, max_size);
 
+			int box_size_squared = box_size * box_size;
+
             int avgY = 0, avgU = 128, avgV = 128;
 
             for (int ii = 0; ii < box_size; ++ii)
@@ -268,9 +270,9 @@ void balloonfit_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
 
-            avgY /= (box_size * box_size);
-            avgU /= (box_size * box_size);
-            avgV /= (box_size * box_size);
+            avgY /= box_size_squared;
+            avgU /= box_size_squared;
+            avgV /= box_size_squared;
 
             int cx = j + (box_size >> 1);
             int cy = i + (box_size >> 1);
