@@ -25,19 +25,22 @@
 vj_effect *swirl_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
+    ve->num_params = 2;
 
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 360;
+    ve->limits[0][1] = 0;
+    ve->limits[1][1] = 1;
     ve->defaults[0] = 250;
+    ve->defaults[1] = 0;
     ve->description = "Swirl";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Degrees" );
+    ve->param_description = vje_build_param_list( ve->num_params, "Degrees", "Mode" );
     return ve;
 }
 
@@ -47,6 +50,7 @@ typedef struct {
     int *cached_coords;
     uint8_t *buf[4];
     int v;
+    int mode;
 } swirl_t;
 
 void  *swirl_malloc(int w, int h)
@@ -122,38 +126,65 @@ void swirl_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *Cr= frame->data[2];
 
     int v = args[0];
+    int mode = args[1];
+
     swirl_t *s = (swirl_t*) ptr;
 
     double *polar_map = s->polar_map;
     double *fish_angle = s->fish_angle;
     int *cached_coords = s->cached_coords;
 
-    if( s->v != v )
-    {
+    if (s->v != v || s->mode != mode) {
         const unsigned int R = width;
         const double coeef = v;
-        
-        int px,py;
-        double r,a;
-        double si,co;
-        const int w2 = width/2;
-        const int h2 = height/2;
 
-        for (i = 0; i < len; i++) {
-            r = polar_map[i];
-            a = fish_angle[i];
+        int px, py;
+        double r, a;
+        double si, co;
+        const int w2 = width >> 1;
+        const int h2 = height >> 1;
 
-            sin_cos(co, si, (a + r / coeef));
+        if( mode ==  1 ) {
+            for (int y = 0; y <= h2; y++) {
+                for (int x = 0; x <= w2; x++) {
+                    int i = y * width + x;
 
-            px = (int)(r * co) + w2;
-            py = (int)(r * si) + h2;
+                    r = polar_map[i];
+                    a = fish_angle[i];
 
-            px = (px < 0) ? 0 : ((px >= width) ? (width - 1) : px);
-            py = (py < 0) ? 0 : ((py >= height) ? (height - 1) : py);
+                    sin_cos(co, si, (a + r / coeef));
 
-            cached_coords[i] = (py * width) + px;
+                    px = (int)(r * co) + w2;
+                    py = (int)(r * si) + h2;
+
+                    px = (px < 0) ? 0 : ((px >= width) ? (width - 1) : px);
+                    py = (py < 0) ? 0 : ((py >= height) ? (height - 1) : py);
+
+                    cached_coords[y * width + x] = py * width + px;
+                    cached_coords[y * width + (width - x)] = py * width + px;
+                    cached_coords[(height - y - 1) * width + x] = py * width + px;
+                    cached_coords[(height - y - 1) * width + (width - x)] = py * width + px;
+                }
+            }
         }
-        s->v = v;
+        else  {
+            for (i = 0; i < len; i++) {
+                r = polar_map[i];
+                a = fish_angle[i];
+
+                sin_cos(co, si, (a + r / coeef));
+
+                px = (int)(r * co) + w2;
+                py = (int)(r * si) + h2;
+
+                px = (px < 0) ? 0 : ((px >= width) ? (width - 1) : px);
+                py = (py < 0) ? 0 : ((py >= height) ? (height - 1) : py);
+
+                cached_coords[i] = (py * width) + px;
+            }
+        }
+	s->v = v;
+	s->mode = mode;
     }
 
     for(i=0; i < len; i++)
