@@ -27,40 +27,41 @@ vj_effect *solarize_init(int w,int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 1;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults[0] = 16;
 
-    ve->limits[0][0] = 1;	/* threshold */
+    ve->limits[0][0] = 1;   /* threshold */
     ve->limits[1][0] = 255;
     ve->description = "Solarize";
-	ve->parallel = 1;
+    ve->parallel = 1;
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Threshold");
+    ve->param_description = vje_build_param_list( ve->num_params, "Threshold");
     return ve;
 }
 
 void solarize_apply( void *ptr, VJFrame *frame, int *args )
 {
     unsigned int i;
-	const int len= frame->len;
-    uint8_t val;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
+    const int len= frame->len;
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb= frame->data[1];
+    uint8_t *Cr= frame->data[2];
 
     int threshold = args[0];
-
+    uint8_t threshold_mask = -(Y[0] >= threshold);
     for (i = 0; i < len; i++) {
-		val = Y[i];
-		if (val > threshold)
-		{
-			Y[i] = 255 - val;
-			Cb[i] = 255 - Cb[i];
-            Cr[i] = 255 - Cr[i];
-    	}
+        uint8_t val = Y[i];
+        uint8_t mask = -(val >= threshold);
+
+        Y[i] = (val & mask) | ((0xff - val) & ~mask);
+        Cb[i] = (Cb[i] & mask) | ((0xff - Cb[i]) & ~mask);
+        Cr[i] = (Cr[i] & mask) | ((0xff - Cr[i]) & ~mask);
+
+        threshold_mask = (threshold_mask | mask) & (-(val == threshold));
     }
+
 }
