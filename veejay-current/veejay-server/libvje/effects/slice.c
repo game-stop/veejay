@@ -108,12 +108,13 @@ void slice_recalc(slice_t *s, int width, int height, int val) {
   int *slice_xshift = s->slice_xshift;
   int *slice_yshift = s->slice_yshift;
 
+  const int hval = val >> 1;
   for(x = dx = 0; x < width; x++) 
   {
     if(dx==0)
 	{ 
-		r = ((rand() & val))-((val>>1)+1); 
-		dx = 8 + (rand() & ((val>>1)-1));
+		r = ((rand() & val))-( hval + 1); 
+		dx = 8 + (rand() & ( hval - 1));
 	}
 	else
 	{
@@ -123,8 +124,16 @@ void slice_recalc(slice_t *s, int width, int height, int val) {
   }
  
   for(y=dy=0; y < height; y++) {
-   if(dy==0) { r = (rand() & val)-((val>>1)+1); dy = 8 + (rand() & ((val>>1)-1)); } else dy--;
-   slice_xshift[y] = r;
+  	if(dy==0)
+  	{
+		r = (rand() & val)-(hval + 1);
+		dy = 8 + (rand() & (hval-1));
+  	}
+  	else
+  	{
+		dy--;
+  	}
+  	slice_xshift[y] = r;
   }
 }
 
@@ -193,21 +202,23 @@ void slice_apply(void *ptr, VJFrame *frame, int *args ) {
 		}
   }
 
-  int strides[4] = { len, len, len, len };
-  vj_frame_copy( frame->data, slice_frame, strides );  
+	int strides[4] = { len, len, len, 0 };
+	vj_frame_copy( frame->data, slice_frame, strides );  
 
-  for(y=0; y < height; y++){ 
-	 for(x=0; x < width; x++) {
-		dx = x + slice_xshift[y] ; dy = y + slice_yshift[x];
-		if(dx < width && dy < height && dx >= 0 && dy >= 0)
-		{
-			Y[(y*width)+x] = slice_frame[0][(dy*width)+dx];
-			Cb[(y*width)+x] = slice_frame[1][(dy*width)+dx];
-			Cr[(y*width)+x] = slice_frame[2][(dy*width)+dx];
-			A[(y*width)+x] = slice_frame[3][(dy*width)+dx];
+	for(y=0; y < height; y++){ 
+	 	for(x=0; x < width; x++) {
+			dx = x + slice_xshift[y];
+			dy = y + slice_yshift[x];
+			if(dx < width && dy < height && dx >= 0 && dy >= 0)
+			{
+				Y[(y*width)+x] = slice_frame[0][(dy*width)+dx];
+				Cb[(y*width)+x] = slice_frame[1][(dy*width)+dx];
+				Cr[(y*width)+x] = slice_frame[2][(dy*width)+dx];
+				//A[(y*width)+x] = slice_frame[3][(dy*width)+dx];
+			}
 		}
-     }
-  }
+	}
+
 
 	if( interpolate )
 		motionmap_interpolate_frame( s->motionmap, frame, s->N__, s->n__ );
