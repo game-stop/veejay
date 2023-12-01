@@ -49,11 +49,11 @@ vj_effect *flower_init(int w, int h)
 typedef struct 
 {
     uint8_t *buf[3];
-    double *lut;
-    double *atan2_lut;
-    double *cos_lut;
-    double *sqrt_lut;
-    double *exp_lut;
+    float *lut;
+    float *atan2_lut;
+    float *cos_lut;
+    float *sqrt_lut;
+    float *exp_lut;
     int last_petal_count;
     int last_petal_length;
 } flower_t;
@@ -62,7 +62,7 @@ static void init_atan2_lut(flower_t *f, int w, int h, int cx, int cy)
 {
     for(int x = 0; x < w; ++x ) {
         for(int y = 0; y < h; ++y ) {
-            double angle = atan2(y - cy,x - cx);
+            float angle = atan2f(y - cy,x - cx);
             f->atan2_lut[ y * w + x ] = angle;
         }
     }
@@ -70,12 +70,58 @@ static void init_atan2_lut(flower_t *f, int w, int h, int cx, int cy)
 
 static void init_cos_lut(flower_t *f, int w, int h, int petal_count)
 {
-    const int size = w * h;
-    for(int i = 0; i < size; ++i) {
-        f->cos_lut[i] = cos(petal_count * f->atan2_lut[i]);
-    }
-    f->last_petal_count = petal_count;
+    const int half_w = w >> 1;
+    const int half_h = h >> 1;
 
+    for (int x = 0; x < half_w; ++x)
+    {
+        for (int y = 0; y < half_h; ++y)
+        {
+            int index = y * w + x;
+            float cos_value = cosf(petal_count * f->atan2_lut[index]);
+
+            f->cos_lut[index] = cos_value;
+            f->cos_lut[y * w + (w - x - 1)] = cos_value;
+            f->cos_lut[(h - y - 1) * w + x] = cos_value;
+            f->cos_lut[(h - y - 1) * w + (w - x - 1)] = cos_value;
+        }
+    }
+
+    if (w % 2 != 0)
+    {
+        for (int y = 0; y < half_h; ++y)
+        {
+            int index = y * w + half_w;
+            float cos_value = cosf(petal_count * f->atan2_lut[index]);
+
+            f->cos_lut[index] = cos_value;
+            f->cos_lut[(h - y - 1) * w + half_w] = cos_value;
+        }
+    }
+
+    if (h % 2 != 0)
+    {
+        for (int x = 0; x < half_w; ++x)
+        {
+            int index = half_h * w + x;
+            float cos_value = cosf(petal_count * f->atan2_lut[index]);
+
+            f->cos_lut[index] = cos_value;
+            f->cos_lut[half_h * w + (w - x - 1)] = cos_value;
+        }
+    }
+
+    if (w % 2 != 0 && h % 2 != 0)
+    {
+        int index = half_h * w + half_w;
+        f->cos_lut[index] = cosf(petal_count * f->atan2_lut[index]);
+    }
+
+    f->last_petal_count = petal_count;
+}
+
+static inline float sqrt_approx(float x) {
+    return __builtin_sqrtf(x);
 }
 
 static void init_sqrt_lut(flower_t *f, int w, int h, int cx, int cy)
@@ -84,8 +130,7 @@ static void init_sqrt_lut(flower_t *f, int w, int h, int cx, int cy)
         for (int y = 0; y < h; ++y) {
             int dx = x - cx;
             int dy = y - cy;
-            double value;
-            fast_sqrt(value, dx * dx + dy * dy );
+            float value = sqrt_approx( dx * dx + dy * dy );
             f->sqrt_lut[y * w + x] = value;
         }
     }
@@ -93,16 +138,56 @@ static void init_sqrt_lut(flower_t *f, int w, int h, int cx, int cy)
 
 static void init_exp_lut(flower_t *f, int w, int h, int cx, int cy, int petal_length)
 {
-    for (int x = 0; x < w; ++x)
+    int half_w = w >> 1;
+    int half_h = h >> 1;
+
+    for (int x = 0; x < half_w; ++x)
     {
-        for (int y = 0; y < h; ++y)
+        for (int y = 0; y < half_h; ++y)
         {
-            double distance = f->sqrt_lut[ y * w + x ];
-            f->exp_lut[y * w + x] = exp(-distance / petal_length);
+            float distance = f->sqrt_lut[y * w + x];
+            float exp_value = expf(-distance / petal_length);
+
+            f->exp_lut[y * w + x] = exp_value;
+            f->exp_lut[y * w + (w - x - 1)] = exp_value;
+            f->exp_lut[(h - y - 1) * w + x] = exp_value;
+            f->exp_lut[(h - y - 1) * w + (w - x - 1)] = exp_value;
         }
     }
+
+    if (w % 2 != 0)
+    {
+        for (int y = 0; y < half_h; ++y)
+        {
+            float distance = f->sqrt_lut[y * w + half_w];
+            float exp_value = expf(-distance / petal_length);
+
+            f->exp_lut[y * w + half_w] = exp_value;
+            f->exp_lut[(h - y - 1) * w + half_w] = exp_value;
+        }
+    }
+
+    if (h % 2 != 0)
+    {
+        for (int x = 0; x < half_w; ++x)
+        {
+            float distance = f->sqrt_lut[half_h * w + x];
+            float exp_value = expf(-distance / petal_length);
+
+            f->exp_lut[half_h * w + x] = exp_value;
+            f->exp_lut[half_h * w + (w - x - 1)] = exp_value;
+        }
+    }
+
+    if (w % 2 != 0 && h % 2 != 0)
+    {
+        float distance = f->sqrt_lut[half_h * w + half_w];
+        f->exp_lut[half_h * w + half_w] = exp(-distance / petal_length);
+    }
+
     f->last_petal_length = petal_length;
 }
+
 
 
 void *flower_malloc(int w, int h) {
@@ -116,7 +201,7 @@ void *flower_malloc(int w, int h) {
     s->buf[1] = s->buf[0] + ( w * h );
     s->buf[2] = s->buf[1] + ( w * h );
 
-    s->lut = (double*) vj_malloc(sizeof(double) * (w * h * 4) );
+    s->lut = (float*) vj_malloc(sizeof(float) * (w * h * 4) );
     if(!s->lut) {
         free(s->buf[0]);
         free(s);
@@ -160,15 +245,15 @@ void flower_apply(void *ptr, VJFrame *frame, int *args) {
     uint8_t *restrict bufU = s->buf[1];
     uint8_t *restrict bufV = s->buf[2];
 
-    double *restrict cos_lut = s->cos_lut;
-    double *restrict exp_lut = s->exp_lut;
+    float *restrict cos_lut = s->cos_lut;
+    float *restrict exp_lut = s->exp_lut;
 
     veejay_memcpy( bufY, srcY, len );
     veejay_memcpy( bufU, srcU, len );
     veejay_memcpy( bufV, srcV, len );
 
-    int cx = width / 2;
-    int cy = height / 2;
+    int cx = width >> 1;
+    int cy = height >> 1;
  
     if (petalCount != s->last_petal_count) {
         init_cos_lut(s, width,height, petalCount);
@@ -184,7 +269,7 @@ void flower_apply(void *ptr, VJFrame *frame, int *args) {
             int dx = x_pos - cx;
             int dy = y_pos - cy;
             
-            double petalValue = (1.0 + cos_lut[y_pos * width + x_pos]) * exp_lut[y_pos * width + x_pos];
+            float petalValue = (1.0 + cos_lut[y_pos * width + x_pos]) * exp_lut[y_pos * width + x_pos];
 
             int mirroredX = cx + (int)(dx * petalValue);
             int mirroredY = cy + (int)(dy * petalValue);
