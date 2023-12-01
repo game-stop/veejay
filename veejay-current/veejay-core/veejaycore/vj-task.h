@@ -44,6 +44,7 @@ typedef struct
 	int out_width;
 	int out_height;
 	int offset;
+	double timecode;
 	uint8_t **local;
 } vj_task_arg_t;
 

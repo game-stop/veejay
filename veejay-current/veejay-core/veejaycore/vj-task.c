@@ -162,6 +162,7 @@ void    vj_task_set_to_frame( VJFrame *in, int i, int job )
     in->totaljobs = numThreads;
     in->out_width = first->out_width;
     in->out_height = first->out_height;
+    in->timecode = first->timecode;
     in->width = first->width;
     in->height= first->height;
     in->ssm   = first->ssm;
@@ -244,6 +245,7 @@ void    vj_task_set_from_frame( VJFrame *in )
             v->offset       = i * v->strides[0];
             v->out_width    = in->width;
             v->out_height   = in->height;
+	    v->timecode     = in->timecode;
         }
     }
     else
@@ -265,6 +267,7 @@ void    vj_task_set_from_frame( VJFrame *in )
             v->offset       = i * v->strides[0];
             v->out_width    = in->width;
             v->out_height   = in->height;
+	    v->timecode     = in->timecode;
             if( v->ssm == 1 ) { 
                 v->strides[1] = v->strides[0];
                 v->strides[2] = v->strides[1];
