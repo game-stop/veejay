@@ -245,7 +245,7 @@ void    vj_task_set_from_frame( VJFrame *in )
             v->offset       = i * v->strides[0];
             v->out_width    = in->width;
             v->out_height   = in->height;
-	    v->timecode     = in->timecode;
+            v->timecode     = in->timecode;
         }
     }
     else
@@ -267,7 +267,7 @@ void    vj_task_set_from_frame( VJFrame *in )
             v->offset       = i * v->strides[0];
             v->out_width    = in->width;
             v->out_height   = in->height;
-	    v->timecode     = in->timecode;
+            v->timecode     = in->timecode;
             if( v->ssm == 1 ) { 
                 v->strides[1] = v->strides[0];
                 v->strides[2] = v->strides[1];
@@ -480,7 +480,7 @@ int vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
     if( use_thread_local ) {
         for( i = 0; i < n; i ++ ) {
             for( j = 0; j < n_planes; j ++ ) {
-		 veejay_memcpy( f[i]->input[j], task_pool->thread_local_bufs[i][j], f[i]->strides[j] );
+                veejay_memcpy( f[i]->input[j], task_pool->thread_local_bufs[i][j], f[i]->strides[j] );
             }
         }
     }
@@ -495,9 +495,10 @@ void task_destroy()
 {
     pthread_key_delete( thread_buf_key );
 
-    free(task_pool->thread_local_bufs);
-
-    destroy_thread_pool( task_pool );
+    if( task_pool ) {
+        free(task_pool->thread_local_bufs);
+        destroy_thread_pool( task_pool );
+    }
 }
 
 
