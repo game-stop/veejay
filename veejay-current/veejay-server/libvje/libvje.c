@@ -74,6 +74,7 @@ static struct {
     { motionmap_init,motionmap_malloc,motionmap_free,motionmap_prepare,NULL,motionmap_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_MOTIONMAP },
     { zoom_init, zoom_malloc, zoom_free, NULL, NULL, zoom_apply, NULL, NULL,NULL,NULL,VJ_IMAGE_EFFECT_ZOOM },
     { widthmirror_init, NULL, NULL, NULL, NULL, widthmirror_apply, NULL, NULL, NULL,NULL,VJ_IMAGE_EFFECT_WIDTHMIRROR },
+    { mirror_init, mirror_malloc,mirror_free,NULL,NULL, mirror_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_MIRRORREFLECT },
     { whiteframe_init, NULL, NULL, NULL,NULL, NULL, whiteframe_apply,NULL, NULL,NULL,VJ_VIDEO_EFFECT_WHITEFRAME },
     { waterrippletv_init, waterrippletv_malloc, waterrippletv_free,NULL,NULL,waterrippletv_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_RIPPLETV },
     { water_init,water_malloc,water_free,NULL,NULL,NULL,water_apply, NULL,NULL,NULL, VJ_VIDEO_EFFECT_RIPPLETV },
