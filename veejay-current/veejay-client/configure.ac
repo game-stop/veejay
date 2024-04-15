@@ -188,17 +188,17 @@ fi
 
 dnl Check for Veejay Core
 have_veejaycore=false
-PKG_CHECK_MODULES( VEEJAYCORE, [veejaycore >= 1.5.65 ],
+PKG_CHECK_MODULES( VEEJAYCORE, [veejaycore >= 1.5.67 ],
 	[	
 		AC_SUBST(VEEJAYCORE_CFLAGS)
 		AC_SUBST(VEEJAYCORE_LIBS)
 		have_veejaycore=true
-		AC_DEFINE(HAVE_VEEJAYCORE,1, [Veejay Core 1.5.65 installed])]
+		AC_DEFINE(HAVE_VEEJAYCORE,1, [Veejay Core 1.5.67 installed])]
 		,
 		[have_veejaycore=false])
 
 if test x$have_veejaycore != xtrue ; then
-   AC_MSG_ERROR([Cannot find Veejay Core 1.5.65 or later])
+   AC_MSG_ERROR([Cannot find Veejay Core 1.5.67 or later])
 fi
 
 have_sdl=false
@@ -823,7 +823,7 @@ AC_MSG_NOTICE([      Good luck! You can be the first! ])
 fi
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
-AC_MSG_NOTICE([  - Veejay Core 1.5.65            : ${have_veejaycore}])
+AC_MSG_NOTICE([  - Veejay Core 1.5.67            : ${have_veejaycore}])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - Gtk3 support (gui)            : ${have_gtk3}])
 AC_MSG_NOTICE([  - Alsa support (midi sequencer) : ${have_alsa}])
