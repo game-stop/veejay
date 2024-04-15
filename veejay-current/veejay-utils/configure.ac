@@ -169,7 +169,7 @@ if test "$ac_cv_lib_dl_dlopen" = "yes"; then
  have_dl_dlopen=true
 fi
 
-PKG_CHECK_MODULES( VEEJAYCORE, [veejaycore >= 1.5.65],
+PKG_CHECK_MODULES( VEEJAYCORE, [veejaycore >= 1.5.67],
 		[	
 		AC_SUBST(VEEJAYCORE_CFLAGS)
 		AC_SUBST(VEEJAYCORE_LIBS)
@@ -178,7 +178,7 @@ PKG_CHECK_MODULES( VEEJAYCORE, [veejaycore >= 1.5.65],
 			[have_veejaycore=false])
 
 if test x$have_veejaycore != xtrue; then
-	AC_MSG_ERROR( [Cannot find Veejay Core >= 1.5.65])
+	AC_MSG_ERROR( [Cannot find Veejay Core >= 1.5.67])
 fi
 
 
