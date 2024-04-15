@@ -1040,16 +1040,16 @@ if test x$have_unwind = xtrue ; then
 fi
 
 have_veejaycore=false
-PKG_CHECK_MODULES( VEEJAYCORE, [veejaycore >= 1.5.63 ],
+PKG_CHECK_MODULES( VEEJAYCORE, [veejaycore >= 1.5.67 ],
                   [ AC_SUBST(VEEJAYCORE_CFLAGS)
                     AC_SUBST(VEEJAYCORE_LIBS)
                     have_veejaycore=true
-                    AC_DEFINE(HAVE_VEEJAYCORE,1,[Veejay 1.5.x installed])
+                    AC_DEFINE(HAVE_VEEJAYCORE,1,[Veejay 1.5.67 installed])
                     ],
                     [have_veejaycore=false])
 
 if test x$have_veejaycore != xtrue ; then
-    AC_MSG_ERROR([Cannot find libveejaycore 1.5.63 or later])
+    AC_MSG_ERROR([Cannot find libveejaycore 1.5.67 or later])
 fi
 
 dnl **********************************************************************
