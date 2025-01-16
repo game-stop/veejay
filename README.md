@@ -36,10 +36,12 @@ The video output server (Ffmpeg/libSDL), a 'visual' instrument and realtime vide
 
 First, make sure you system is up-to-date, and install the dependencies with:
 ```bash
-sudo apt-get install build-essential autoconf automake libtool m4 gcc libjpeg62-dev \
+sudo apt-get install build-essential autoconf automake libtool m4 gcc \
 libswscale-dev libavutil-dev libavcodec-dev libavformat-dev libx11-dev \
-libxml2-dev libsdl2-dev libjack0 libjack-dev jackd1 libgtk3-dev libgdk-pixbuf-2.0-dev
+libxml2-dev libsdl2-dev libjack0 libjack-dev jackd1 libgtk-3-dev libgdk-pixbuf-2.0-dev
 ```
+
+
 
 #### Build the veejay's applications
 
