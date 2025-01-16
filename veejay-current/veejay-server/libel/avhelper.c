@@ -157,28 +157,6 @@ static int key_compare(const void *key1, const void *key2)
     return ((const int) key1 == (const int) key2 ? 0 : 1);
 }
 
-#include <libavutil/hwcontext.h>
-int avhelper_hwaccel(AVCodecContext *codec_context) {
-	int i;
-
-	for( i = 0;; i++ ) {
-
-		AVCodecHWConfig *hw_config = avcodec_get_hw_config(codec_context->codec,i);
-		if(!hw_config) {
-			veejay_msg(0, "Decoder %s does not support hwaccel", codec_context->codec->name);
-			return 0;
-		}
-
-		if( hw_config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX ) {
-			veejay_msg(VEEJAY_MSG_INFO, "Codec supports hardware acceleration");
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-
 int avhelper_set_num_decoders() {
 	int n_threads = 0;
 
@@ -412,8 +390,6 @@ void	*avhelper_get_mjpeg_decoder(VJFrame *output) {
 #endif
 	x->output = yuv_yuv_template( NULL,NULL,NULL, output->width, output->height, alpha_fmt_to_yuv(output->format) );
 	//av_dict_free(&options);
-
-	//avhelper_hwaccel(x->codec_ctx);
 
 	return (void*) x;
 }
