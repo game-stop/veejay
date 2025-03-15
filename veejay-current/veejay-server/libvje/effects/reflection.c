@@ -46,8 +46,8 @@
 #include "reflection.h"
 
 typedef struct {
-    short reflect_aSin[2048];
-    int reflection_map[2048][256];
+    short *reflect_aSin;
+    int *reflection_map;
     int sin_index;
     int sin_index2; //  20
     uint8_t *reflection_buffer;
@@ -84,8 +84,23 @@ void *reflection_malloc(int width, int height)
         return NULL;
     }
 
-    r->reflection_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * (width));
+    r->reflection_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * width);
     if(!r->reflection_buffer) {
+        free(r);
+        return NULL;
+    }
+
+	r->reflect_aSin = (short*) vj_malloc(sizeof(short) * width);
+    if (!r->reflect_aSin) {
+        free(r->reflection_buffer);
+        free(r);
+        return NULL;
+    }
+
+    r->reflection_map = (int*) vj_malloc(sizeof(int) * width * height);
+    if (!r->reflection_map) {
+        free(r->reflect_aSin);
+        free(r->reflection_buffer);
         free(r);
         return NULL;
     }
@@ -101,14 +116,14 @@ void *reflection_malloc(int width, int height)
     }
     
 	for (x = 0; x < width; ++x) {
-		for (y = 0; y < 256; ++y) {
+		for (y = 0; y < height; ++y) {
 		    float xx = (x - 128) / 128.0;
 		    float yy = (y - 128) / 128.0;
 		    float zz = 1.0 - sqrt(xx * xx + yy * yy);
 		    zz *= 255.0;
 		    if (zz < 0.0)
 			zz = 0.0;
-		    r->reflection_map[x][y] = (int) zz;
+		    r->reflection_map[ y * width + x] = (int) zz;
 		}
     }
 
@@ -118,8 +133,11 @@ void *reflection_malloc(int width, int height)
 
 void reflection_free(void *ptr) {
     reflection_t *r = (reflection_t*) ptr;
-    free(r->reflection_buffer);
-    free(r);
+	if(r) {
+		free(r->reflection_map);
+    	free(r->reflection_buffer);
+   	 	free(r);
+	}
 }
 
 
@@ -172,17 +190,14 @@ void reflection_apply(void *ptr, VJFrame *frame, int *args)
 		    int i3 = (int) reflection_buffer[x];
 		    normalx = i2 - i1 + lightx - x;
 		    normaly = i1 - i3 + temp;
-		    if (normalx < 0)
-				normalx = 0;
-		    else if (normalx > 255)
-				normalx = 255;
-		    if (normaly < 0)
-				normaly = 0;
-		    else if (normaly > 255)
-				normaly = 255;
-		    *row++ = r->reflection_map[normalx][normaly];
-            *cbrow++ = ((r->reflection_map[normalx][normaly] * (Cb[x + 1 + (y * width)]-128)) >> 8) +128;
-			*crrow++ = ((r->reflection_map[normalx][normaly] * (Cr[x + 1 + (y * width)]-128)) >> 8) +128;
+			normalx = (normalx < 0) ? 0 : (normalx > 255 ? 255 : normalx);
+			normaly = (normaly < 0) ? 0 : (normaly > 255 ? 255 : normaly);
+		    
+			int pos = normaly * width + x;
+
+			*row++ = r->reflection_map[pos];
+            *cbrow++ = ((r->reflection_map[pos] * (Cb[x + 1 + (y * width)]-128)) >> 8) +128;
+			*crrow++ = ((r->reflection_map[pos] * (Cr[x + 1 + (y * width)]-128)) >> 8) +128;
 
 		    p = i2;
 		    reflection_buffer[x] = i2;
