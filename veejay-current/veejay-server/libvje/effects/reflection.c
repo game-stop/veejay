@@ -136,6 +136,7 @@ void reflection_free(void *ptr) {
 	if(r) {
 		free(r->reflection_map);
     	free(r->reflection_buffer);
+		free(r->reflect_aSin;
    	 	free(r);
 	}
 }
