@@ -311,7 +311,7 @@ int main(int argc, char **argv)
     }
     g_option_context_free(context);
 
-    vj_mem_init();
+    vj_mem_init(0,0);
     vevo_strict_init();
 
     status = g_application_run (G_APPLICATION (app), argc, argv);

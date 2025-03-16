@@ -146,7 +146,7 @@ int	mem_align_size()
 	return MEM_ALIGNMENT_SIZE;
 }
 
-void vj_mem_init(void)
+void vj_mem_init(int w, int h)
 {
 #if defined(ARCH_X86) || defined(ARCH_X86_X64) || defined(HAVE_ARM) 
 	CACHE_LINE_SIZE = get_cache_line_size();
@@ -158,7 +158,7 @@ void vj_mem_init(void)
 #endif
 	//find_best_memcpy();	
 	//find_best_memset();
-	vj_mem_set_defaults();
+	vj_mem_set_defaults(w,h);
 }
 
 void vj_mem_optimize() {

@@ -24,9 +24,9 @@
 
 extern void *(* veejay_memcpy)(void *to, const void *from, size_t len);
 extern void *(* veejay_memset)(void *to, uint8_t val, size_t len);
-extern void vj_mem_init(void);
+extern void vj_mem_init(int w, int h);
 extern void vj_mem_optimize();
-extern void vj_mem_set_defaults();
+extern void vj_mem_set_defaults(int w, int h);
 extern int vj_mem_threaded_init(int w, int h);
 extern void *vj_malloc_(size_t size);
 extern void *vj_calloc_(size_t size );

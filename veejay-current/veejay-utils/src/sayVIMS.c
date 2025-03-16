@@ -511,7 +511,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    vj_mem_init();
+    vj_mem_init(0,0);
 
     reconnect();
 
