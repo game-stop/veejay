@@ -169,15 +169,7 @@ void glitch_apply( void *ptr, VJFrame *frame, int *args ) {
 
     for ( i = 0; i < len; i ++ ) {
         noise = (lsfr_lut[i] % noiseQuantity - noiseQuantity / 2) * noiseStrength * nS;
-
-        int nY = Y[i] + masterAmplitude * noise;
-        int nU = 128 + ( U[i] - 128 + masterAmplitude * noise );
-        int nV = 128 + ( V[i] - 128 + masterAmplitude * noise );
-
-        Y[i] = CLAMP_Y( nY );
-        U[i] = CLAMP_UV( nU );
-        V[i] = CLAMP_UV( nV );
-
+        bY[i] = CLAMP_Y( Y[i] + masterAmplitude * noise );
     }
 
     if(randinterval > 0 ) {
@@ -194,15 +186,19 @@ void glitch_apply( void *ptr, VJFrame *frame, int *args ) {
     
     veejay_memcpy( bU, U, len );
     veejay_memcpy( bV, V, len );
-    veejay_memcpy( bY, Y, len );
 
     for( int y = 0; y < height; y ++ ) {
         int ny = (y + distortionY) % height;
         for( int x = 0; x < width; x ++ ) {
             int nx = (x + distortionX) % width;
-            U[ y * width + x ] = bU[ ny * width + nx ];
-            V[ y * width + x ] = bV[ ny * width + nx ];
-            Y[ y * width + x ] = (Y[y * width + x ] + bY[ ny * width + nx ]) >> 1;
+            int src = y * width + x;
+            int dst = ny * width + nx;
+            unsigned int alpha = Y[ dst ];
+
+            U[src] = (( alpha * U[src]) + (( 0xff - alpha ) * bU[ dst ] )) >> 8;
+            V[src] = (( alpha * V[src]) + (( 0xff - alpha ) * bV[ dst ] )) >> 8;
+
+            Y[ src ] = ( Y[src] + bY[ dst ] ) >> 1;
         }
 
     }
