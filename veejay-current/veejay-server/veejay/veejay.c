@@ -479,6 +479,7 @@ static int set_option(const char *name, char *value)
 		    	nerr++;
 		} 
 		if( n == 2 ) {
+		    vj_mem_init(w,h);
 		    benchmark_veejay(w,h);
 		    exit(0);
 		}
@@ -831,7 +832,7 @@ int main(int argc, char **argv)
 	g_type_init();
 #endif
 
-	vj_mem_init();
+	vj_mem_init(0,0);
 	vj_mem_optimize();
 
 	vevo_strict_init();
