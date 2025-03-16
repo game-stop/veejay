@@ -55,26 +55,29 @@ typedef struct {
 
 vj_effect *reflection_init(int width,int height)
 {
-	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    ve->num_params = 4;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
     ve->defaults[0] = 2;
     ve->defaults[1] = 5;
     ve->defaults[2] = 1;
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 256;
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 256;
+    ve->defaults[3] = 0;
+    ve->limits[0][0] = 0;
+    ve->limits[1][0] = (width/4) - 1;
+    ve->limits[0][1] = 0;
+    ve->limits[1][1] = (height/4) - 1;
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 1;
+    ve->limits[0][3] = 0;
+    ve->limits[1][3] = 1;
     ve->description = "Bump 2D";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Value 1", "Value 2", "Mode");
-	return ve;
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list( ve->num_params, "X", "Y", "Move", "Mode");
+    return ve;
 }
 
 void *reflection_malloc(int width, int height)
@@ -90,7 +93,7 @@ void *reflection_malloc(int width, int height)
         return NULL;
     }
 
-	r->reflect_aSin = (short*) vj_malloc(sizeof(short) * width);
+    r->reflect_aSin = (short*) vj_malloc(sizeof(short) * width);
     if (!r->reflect_aSin) {
         free(r->reflection_buffer);
         free(r);
@@ -105,26 +108,30 @@ void *reflection_malloc(int width, int height)
         return NULL;
     }
 
-    r->sin_index2 = 20;
+    r->sin_index2 = 0;
 
-	int i, x, y;
+    int i, x, y;
     float rad;
- 
+    float hw = (float) width / 4;
+    float hh = hw;
+    float m = ( width < height ? width : height ) / 8;
+    int hhw = width / 2;
     for (i = 0; i < width; i++) {
-		rad = (float) i * 0.0174532 * 0.703125;
-		r->reflect_aSin[i] = (short) ((a_sin(rad) * 100.0) + 256.0);
+        rad = (float) i * (M_PI / (float) width);
+        r->reflect_aSin[i] = (short) ((a_sin(rad) * hhw) + hhw);
     }
-    
-	for (x = 0; x < width; ++x) {
-		for (y = 0; y < height; ++y) {
-		    float xx = (x - 128) / 128.0;
-		    float yy = (y - 128) / 128.0;
-		    float zz = 1.0 - sqrt(xx * xx + yy * yy);
-		    zz *= 255.0;
-		    if (zz < 0.0)
-			zz = 0.0;
-		    r->reflection_map[ y * width + x] = (int) zz;
-		}
+
+    for (x = 0; x < width; ++x) {
+        for (y = 0; y < height; ++y) {
+
+            float xx = (x - hw) / hw;
+            float yy = (y - hh) / hh;
+            float zz = 1.0 - sqrt(xx * xx + yy * yy);
+            zz *= m;
+            if (zz < 0.0)
+                zz = 0.0;
+            r->reflection_map[ y * width + x] = (int) zz;
+        }
     }
 
     return (void*) r;
@@ -133,12 +140,12 @@ void *reflection_malloc(int width, int height)
 
 void reflection_free(void *ptr) {
     reflection_t *r = (reflection_t*) ptr;
-	if(r) {
-		free(r->reflection_map);
-    	free(r->reflection_buffer);
-		free(r->reflect_aSin;
-   	 	free(r);
-	}
+    if(r) {
+        free(r->reflection_map);
+        free(r->reflection_buffer);
+        free(r->reflect_aSin);
+        free(r);
+    }
 }
 
 
@@ -148,61 +155,61 @@ void reflection_apply(void *ptr, VJFrame *frame, int *args)
     int index1 = args[0];
     int index2 = args[1];
     int move = args[2];
-
-    unsigned int normalx, normaly, x, y;
-    unsigned int lightx, lighty, temp;
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
+    int mode = args[3];
+    int normalx, normaly, x, y;
+    int lightx, lighty, temp;
+    const int width = frame->width;
+    const int height = frame->height;
     uint8_t *row = frame->data[0] + width + 1;
     uint8_t *cbrow = frame->data[1] + width + 1;
-	uint8_t *crrow = frame->data[2] + width + 1;
+    uint8_t *crrow = frame->data[2] + width + 1;
     uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
+    uint8_t *Cb= frame->data[1];
+    uint8_t *Cr= frame->data[2];
     uint8_t *reflection_buffer = r->reflection_buffer;
 
-    lightx = r->reflect_aSin[r->sin_index];
-    lighty = r->reflect_aSin[r->sin_index2];
-
-
     if (!move) {
-		r->sin_index = index1;
-		r->sin_index2 = index2;
+        r->sin_index = index1;
+        r->sin_index2 = index2;
     } else {
-		r->sin_index += index1;
-		r->sin_index2 += index2;
+        r->sin_index += index1;
+        r->sin_index2 += index2;
     }
-    r->sin_index &= 511;
-    r->sin_index2 &= 511;
+
+    r->sin_index = (r->sin_index % width);
+    r->sin_index2 = (r->sin_index2 % height);
+    
+    lightx = r->reflect_aSin[r->sin_index];
+    lighty = r->reflect_aSin[r->sin_index2] - ( height / 4 );
 
 #pragma omp simd
     for (x = 0; x < width; x++) {
-		reflection_buffer[x]= Y[x];
+        reflection_buffer[x]= Y[x];
     }
 
     for (y = 1; y < height - 1; y++) {
-		uint8_t p;
-		temp = lighty - y;
-		p = Y[x + (y * width)];
+        uint8_t p;
+        temp = lighty - y;
+        p = Y[x + (y * width)];
 
-		for (x = 0; x < width; x++) {
-		    int i1 = (int) p;
-		    int i2 = Y[x + 1 + (y * width)];	/* deviate */
-		    int i3 = (int) reflection_buffer[x];
-		    normalx = i2 - i1 + lightx - x;
-		    normaly = i1 - i3 + temp;
-			normalx = (normalx < 0) ? 0 : (normalx > 255 ? 255 : normalx);
-			normaly = (normaly < 0) ? 0 : (normaly > 255 ? 255 : normaly);
-		    
-			int pos = normaly * width + x;
+        for (x = 0; x < width; x++) {
+            int i1 = (int) p;
+            int i2 = Y[x + 1 + (y * width)];    /* deviate */
+            int i3 = (int) reflection_buffer[x];
+            normalx = i2 - i1 + lightx - x;
+            normaly = i1 - i3 + temp;
+            normalx = (normalx < 0) ? 0 : (normalx > width - 1 ? width - 1 : normalx);
+            normaly = (normaly < 0) ? 0 : (normaly > height - 1 ? height - 1 : normaly);
+            
+            int pos = normaly * width + normalx;
 
-			*row++ = r->reflection_map[pos];
-            *cbrow++ = ((r->reflection_map[pos] * (Cb[x + 1 + (y * width)]-128)) >> 8) +128;
-			*crrow++ = ((r->reflection_map[pos] * (Cr[x + 1 + (y * width)]-128)) >> 8) +128;
+            *row++ = r->reflection_map[pos];
+            *cbrow++ = ((r->reflection_map[pos] * (Cb[x + mode + (y * width)]-128)) >> 8) +128;
+            *crrow++ = ((r->reflection_map[pos] * (Cr[x + mode + (y * width)]-128)) >> 8) +128;
 
-		    p = i2;
-		    reflection_buffer[x] = i2;
-		}
-		*row += 2;
+            p = i2;
+            reflection_buffer[x] = i2;
+        }
+        *row += 2;
     }
 }
