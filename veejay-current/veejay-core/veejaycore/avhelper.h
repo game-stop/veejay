@@ -31,7 +31,7 @@ int	avhelper_get_codec_by_key( int key );
 
 void	*avhelper_get_codec_ctx( void *ptr );
 
-void	*avhelper_get_codec( void *ptr );
+const void	*avhelper_get_codec( void *ptr );
 
 void	avhelper_close_decoder( void *ptr );
 
