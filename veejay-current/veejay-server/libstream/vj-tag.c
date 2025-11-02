@@ -240,7 +240,7 @@ int vj_tag_put(vj_tag * tag)
     if (!vj_tag_exists(tag->id)) {
         hash_insert(TagHash, tag_node, (void *)(uintptr_t) tid);
     } else {
-        hnode_put(tag_node, (void *) tid);
+        hnode_put(tag_node, (void *)(uintptr_t) tid);
     }
     return 1;
 }
