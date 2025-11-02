@@ -732,10 +732,10 @@ int AVI_set_audio(avi_t *AVI, int channels, long rate, int bits, int format)
 }
 
 #define OUT4CC(s) \
-   if(nhb<=HEADERBYTES-4) veejay_memcpy(AVI_header+nhb,s,4); nhb += 4
+   if(nhb<=HEADERBYTES-4) { veejay_memcpy(AVI_header+nhb,s,4); } nhb += 4
 
 #define OUTLONG(n) \
-   if(nhb<=HEADERBYTES-4) long2str(AVI_header+nhb,n); nhb += 4
+   if(nhb<=HEADERBYTES-4) { long2str(AVI_header+nhb,n); } nhb += 4
 
 #define OUTSHRT(n) \
    if(nhb<=HEADERBYTES-2) { \
