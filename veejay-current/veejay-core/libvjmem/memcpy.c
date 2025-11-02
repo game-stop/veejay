@@ -2187,8 +2187,12 @@ void memset_asimd_64(uint8_t *dst, uint8_t value, size_t size) {
         remaining_bytes -= 16;
     }
 
-    while (remaining_bytes >= 8) {
-        uint64x1_t value_u64 = vdup_n_u64(*((uint64_t*)&value));
+    if(remaining_bytes >= 8) {
+		uint64_t val64 = (uint64_t)value;
+    	val64 |= val64 << 8;
+        val64 |= val64 << 16;
+        val64 |= val64 << 32;	
+        uint64x1_t value_u64 = vdup_n_u64(val64);
         vst1_u8(dst, vreinterpret_u8_u64(value_u64));
         dst += 8;
         remaining_bytes -= 8;
@@ -2224,8 +2228,12 @@ void memset_asimd_32(uint8_t *dst, uint8_t value, size_t size) {
         remaining_bytes -= 16;
     }
 
-    while (remaining_bytes >= 8) {
-        uint64x1_t value_u64 = vdup_n_u64(*((uint64_t*)&value));
+    if(remaining_bytes >= 8) {
+		uint64_t val64 = (uint64_t) value;
+		val64 |= val64 << 8;
+		val64 |= val64 << 16;
+		val64 |= val64 << 32;
+        uint64x1_t value_u64 = vdup_n_u64(val64);
         vst1_u8(dst, vreinterpret_u8_u64(value_u64));
         dst += 8;
         remaining_bytes -= 8;
