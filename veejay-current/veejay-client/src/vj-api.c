@@ -79,18 +79,10 @@
 #include <assert.h>
 #endif
 
-#ifdef ARCH_X86_64
-static gpointer castIntToGpointer( int val )
+static gpointer castIntToGpointer(int val)
 {
-    int64_t g_int64_val = (int64_t) val;
-    return (gpointer) g_int64_val;
+    return GINT_TO_POINTER(val);
 }
-#else
-static gpointer castIntToGpointer( int val)
-{
-    return (gpointer) val;
-}
-#endif
 
 #define MAX_SLOW 25
 #define QUICKSELECT_SLOTS 10
