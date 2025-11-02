@@ -231,7 +231,7 @@ Print veejay's options to stdout and quit
 Selects a sampling method for up-and down sampling of UV data (drop,average,bilinear,mitchell)
 .TP
 .B VEEJAY_NUM_DECODE_THREADS
-Set the number of MJPEG decode threads you would like to spaw. 
+Set the number of MJPEG decode threads you would like to spawn. 
 .TP
 .B VEEJAY_MULTITHREAD_TASKS
 You can set this environment variable to the number of threads you would like to spawn for veejay's pixel tasks. This option is automatically enabled if you run high resolution video.
@@ -275,7 +275,7 @@ Delay key repeat in ms
 Fullscreen (1) or windowed (0) mode
 .TP
 .B VEEJAY_DESKTOP_GEOMETRY
-Specify the desktop geometry for veejay to position the video window. Use this feature to specificy where a video window appears in TwinView or One Big Desktop
+Specify the desktop geometry for veejay to position the video window. Use this feature to specify where a video window appears in TwinView or One Big Desktop
 .TP
 .B VEEJAY_VIDEO_SIZE
 Specify the size of the video window (inside VEEJAY_DESKTOP_GEOMETRY)
@@ -318,7 +318,7 @@ Set the maximum file size in bytes. This option influences the maximum file size
 Set a preferred memset method. A list of memset methods is printed when an invalid value is given.
 .TP
 .B VEEJAY_MEMCPY_METHOD
-Set a preferred memcpy method. A list of memcpy methods is printed when an invalid value is given.
+Set a preferred memcpy method. A list of memcpy methods is printed when an invalid value is given. Set to "glibc memcpy()" if you experience random crashes
 .TP
 .SH Home directory
 .TP
