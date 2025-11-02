@@ -187,6 +187,7 @@ void reflection_apply(void *ptr, VJFrame *frame, int *args)
         reflection_buffer[x]= Y[x];
     }
 
+    x = 0;
     for (y = 1; y < height - 1; y++) {
         uint8_t p;
         temp = lighty - y;
