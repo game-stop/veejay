@@ -3102,8 +3102,8 @@ void	on_timeline_value_changed( GtkWidget *widget, gpointer user_data )
 
 void	on_len_div_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gdouble pos1 = timeline_get_in_point( info->tl );
-	gdouble pos2 = timeline_get_out_point( info->tl );
+	gdouble pos1 = timeline_get_in_point( TIMELINE_SELECTION(info->tl) );
+	gdouble pos2 = timeline_get_out_point( TIMELINE_SELECTION(info->tl) );
 
 	gdouble npos1 = (pos1 + pos2) / 2 - (pos2 - pos1) / 4;
 	gdouble npos2 = (pos1 + pos2) / 2 + (pos2 - pos1) / 4;
@@ -3120,8 +3120,8 @@ void	on_len_div_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_len_mul_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gdouble pos1 = timeline_get_in_point( info->tl );
-	gdouble pos2 = timeline_get_out_point( info->tl );
+	gdouble pos1 = timeline_get_in_point( TIMELINE_SELECTION(info->tl) );
+	gdouble pos2 = timeline_get_out_point( TIMELINE_SELECTION(info->tl) );
 
 	gdouble npos1 = (pos1 + pos2) / 2 - ( pos2 - pos1 );
 	gdouble npos2 = (pos1 + pos2) / 2 + ( pos2 - pos1 );

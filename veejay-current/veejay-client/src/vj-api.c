@@ -4381,14 +4381,8 @@ gboolean capture_data   (GIOChannel *source, GIOCondition condition, gpointer da
 */
 void reportbug ()
 {
-    char l[3] = { 'e','n', '\0'};
-    char *lang = getenv("LANG");
     char URL[1024];
 
-    if(lang) {
-        l[0] = lang[0];
-        l[1] = lang[1];
-    }
 /*  char veejay_homedir[1024];
     char body[1024];
     char subj[100];
