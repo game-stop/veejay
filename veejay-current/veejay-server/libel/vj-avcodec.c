@@ -403,8 +403,11 @@ void		vj_avcodec_close_encoder( vj_encoder *av )
 	{
 		if(av->context)
 		{
+#if LIBAVCODEC_VERSION_MAJOR > 59
+			avcodec_free_context( &(av->context) );
+#else
 			avcodec_close( av->context );
-			avhelper_free_context( &(av->context) );
+#endif
 		}
 		if(av->data[0])
 			free(av->data[0]);

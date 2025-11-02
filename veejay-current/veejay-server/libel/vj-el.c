@@ -93,7 +93,7 @@ static	long mmap_size = 0;
 
 typedef struct
 {
-        AVCodec *codec;
+        const AVCodec *codec;
         AVCodecContext *codec_ctx;
         AVFormatContext *avformat_ctx;
         AVPacket pkt;
@@ -110,7 +110,7 @@ void	vj_el_set_mmap_size( long size )
 
 typedef struct
 {
-        AVCodec *codec;
+        const AVCodec *codec;
         AVFrame *frame;
         AVCodecContext  *context;
         uint8_t *tmp_buffer;
@@ -1974,7 +1974,6 @@ editlist *vj_el_soft_clone_range(editlist *el, long n1, long n2)
     long len = n2 - n1;
     uint64_t k = 0;
     int idx = -1;
-    int last_file_idx = -1;
 
     clone->frame_list = (uint64_t *)vj_calloc(sizeof(uint64_t) * (len + 1));
     if (!clone->frame_list) {

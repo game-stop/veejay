@@ -41,7 +41,7 @@
 
 typedef struct
 {
-	AVCodec *codec;
+	const AVCodec *codec;
 	AVCodec *audiocodec;
 	AVFrame *frame;
 	AVCodecContext	*context;
