@@ -1211,6 +1211,10 @@ void	vj_el_scan_video_file( char *filename,  int *dw, int *dh, float *dfps, long
 			*dfps = (float) c->time_base.den / c->time_base.num;
 		} else {
 			veejay_msg(VEEJAY_MSG_WARNING,"Unable to detect frame rate in %s", filename );
+		    veejay_msg(VEEJAY_MSG_WARNING,
+        		"AVCodecContext: codec_id=%d, codec_type=%d, pix_fmt=%d, width=%d, height=%d,time_base=%d/%d, framerate=%d/%d, sample_rate=%d, channels=%d",
+        		c->codec_id,c->codec_type,c->pix_fmt,c->width,c->height,c->time_base.num,c->time_base.den,c->framerate.num,c->framerate.den,c->sample_rate,c->channels
+    		);
 		}
 		*arate = c->sample_rate;
 		avhelper_close_decoder(tmp);
