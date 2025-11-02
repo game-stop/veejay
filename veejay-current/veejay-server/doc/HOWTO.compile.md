@@ -41,6 +41,9 @@ libswscale-dev libavutil-dev libavcodec-dev libavformat-dev libx11-dev  \
 gtk-3.0-dev libxml2-dev libsdl2-dev libjack0 libjack-dev jackd1
 ```
 
+On some systems, the gtk dependency may be called libgtk-3-dev
+
+
 ## Quick and dirty build instructions
 
 Normally, you can just run `./configure`.  

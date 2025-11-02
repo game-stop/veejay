@@ -11,6 +11,8 @@ First, make sure you system is up-to-date, and install (in debian like system) t
     gtk-3.0-dev libxml2-dev libsdl2-dev libjack0 libjack-dev jackd1
 
 
+Please note that on some debian like systems, package names for gtk may vary. If gtk-3.0-dev is missing, try libgtk-3-dev
+
 ## Build the veejay's applications
 
 Veejay is divided into multiple packages. Each must be build separately and in a specific order. 
