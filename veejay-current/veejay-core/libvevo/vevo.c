@@ -1481,14 +1481,11 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
 				if( idx >= N ) {
 					N *= 2;
 					vevo_storage_t **nlist = (vevo_storage_t**) realloc( list, sizeof(vevo_storage_t*) * N  );
-					if(nlist == NULL) {
-					    if( list ) free(list);
+					if(!nlist) {
+					    free(list);
 					    return NULL;
 					}
-					if( list != nlist ) {
-						if(list) free(list);
-						list = nlist;
-					}
+					list = nlist;
 				}
 			}
 		}
@@ -1515,14 +1512,11 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
 				if( idx >= N ) {
 					N *= 2;
 					vevo_storage_t **nlist = (vevo_storage_t**) realloc( list, sizeof(vevo_storage_t*) * N  );
-					if(nlist == NULL) {
-					    if( list ) free(list);
-					    return NULL;
+					if(!nlist) {
+					    free(list);
+				    	    return NULL;
 					}
-					if( list != nlist ) {
-						if(list) free(list);
-						list = nlist;
-					}
+			    		list = nlist;		
 				}
 			}
 		}
