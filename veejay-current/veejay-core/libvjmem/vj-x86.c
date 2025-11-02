@@ -86,14 +86,26 @@ static int has_cpuid(void)
 }
 
 #ifdef HAVE_ARM
-static int get_cache_line_size() {
-    int ctr_el0;
+static int int get_cache_line_size() {
+#if defined(__aarch64__)
+    uint64_t ctr_el0;
     asm volatile("mrs %0, ctr_el0" : "=r"(ctr_el0));
-    int cwgr_val = (ctr_el0 >> 32) & 0x7;
-    int cache_line_size = 64 << cwgr_val;
-    return cache_line_size;
+    // Bits 32-34: Log2(Number of 4-byte words per cache line)
+    int cwgr_val = (int)((ctr_el0 >> 32) & 0x7);
+#elif defined(__arm__)
+    uint32_t ctr_el0;
+    asm volatile("mrc p15, 0, %0, c0, c0, 1" : "=r"(ctr_el0));
+    // Bits 0-2: Log2(Number of 4-byte words per cache line)
+    int cwgr_val = (int)(ctr_el0 & 0x7);
+#else
+    //assume 64-byte cache line
+    int cwgr_val = 4;
+#endif
+
+    return WORD_SIZE << cwgr_val;
 }
 #endif
+
 #if defined(ARCH_X86_64) || defined(ARCH_X86)
 // copied from Mplayer (want to have cache line size detection ;) )
 static void do_cpuid(unsigned int ax, unsigned int *p)
