@@ -2060,21 +2060,36 @@ void *memset_asimd_v3(void *dst, uint8_t val, size_t n) {
     if (n >= 256) {
         size_t num_blocks = n >> 8;
         size_t remaining_bytes = n & 255;
-
+		uint8x16_t val_vec = vdupq_n_u8(val);
         uint8_t buffer[256];
-        for (int i = 0; i < 16; i++) {
-            buffer[i] = val;
-        }
+		uint8_t *p = buffer;
+
+		vst1q_u8(p, val_vec); p += 16;
+		vst1q_u8(p, val_vec); p += 16;
+		vst1q_u8(p, val_vec); p += 16;
+		vst1q_u8(p, val_vec); p += 16;
+		vst1q_u8(p, val_vec); p += 16;
+		vst1q_u8(p, val_vec); p += 16;
+		vst1q_u8(p, val_vec); p += 16;
+		vst1q_u8(p, val_vec); p += 16;
+
+		vst1q_u8(p, val_vec); p += 16;
+		vst1q_u8(p, val_vec); p += 16;
+		vst1q_u8(p, val_vec); p += 16;
+		vst1q_u8(p, val_vec); p += 16;
+		vst1q_u8(p, val_vec); p += 16;
+		vst1q_u8(p, val_vec); p += 16;
+		vst1q_u8(p, val_vec); p += 16;
+		vst1q_u8(p, val_vec); p += 16;
 
         for (; num_blocks > 0; num_blocks--) {
             memcpy_asimd_256v2(dst_bytes, buffer);
             dst_bytes += 256;
         }
 
-        if (remaining_bytes) {
-            memcpy_asimd_256v2(dst_bytes, buffer);
-            dst_bytes += remaining_bytes;
-        }
+		for( size_t i = 0; i < remaining_bytes; i ++ )
+			dst_bytes[i] = val;
+
     } else {
 		while (n >= 16) {
             vst1q_u8(dst_bytes, value);
