@@ -189,15 +189,15 @@ static hash_val_t int_tag_hash(const void *key)
 
 static int int_tag_compare(const void *key1, const void *key2)
 {
-#ifdef ARCH_X86_64
-    return ((uint64_t)key1 < (uint64_t) key2 ? -1 :
-            ((uint64_t)key1 < (uint64_t) key2 ? 1 : 0 )
-    );
-#else
-    return ((uint32_t) key1 < (uint32_t) key2 ? -1 :
-            ((uint32_t) key1 > (uint32_t) key2 ? 1 : 0)
-    );
-#endif
+    uintptr_t k1 = (uintptr_t)key1;
+    uintptr_t k2 = (uintptr_t)key2;
+
+    if (k1 < k2)
+        return -1;
+    else if (k1 > k2)
+        return 1;
+    else
+        return 0;
 }
 
 vj_tag *vj_tag_get(int id)
@@ -275,10 +275,9 @@ char *vj_tag_scan_devices( void )
     sprintf(n, "%06d", len );   
     for( i = 0; device_list[i] != NULL ;i++ )
     {
-        char tmp[1024];
-        snprintf( tmp, sizeof(tmp)-1, "%s", device_list[i] );
+        char *tmp = device_list[i];
         int str_len = strlen(tmp);
-        strncpy( p, tmp, str_len );
+		memcpy(p, tmp, str_len);
         p += str_len;
         free(device_list[i]);
     }
@@ -4008,13 +4007,14 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
         if (!xmlStrcmp(cur->name, (const xmlChar*) "calibration" ))
             cali = cur->xmlChildrenNode;
 
-    if (!xmlStrcmp(cur->name, (const xmlChar*) XMLTAG_MACRO ))
-        macro = cur->xmlChildrenNode;
+    	if (!xmlStrcmp(cur->name, (const xmlChar*) XMLTAG_MACRO ))
+        	macro = cur->xmlChildrenNode;
 
         if (!xmlStrcmp(cur->name, (const xmlChar*) "subrender" ))
             subrender = get_xml_int(doc,cur);
-    if( !xmlStrcmp(cur->name, (const xmlChar*) "loop_stat_stop"))
-        loop_stat_stop = get_xml_int(doc,cur);
+    
+		if( !xmlStrcmp(cur->name, (const xmlChar*) "loop_stat_stop"))
+        	loop_stat_stop = get_xml_int(doc,cur);
 
         if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTS)) {
             fx[k] = cur->xmlChildrenNode;
