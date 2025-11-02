@@ -1006,36 +1006,62 @@ static void * sse_memcpy(void * to, const void * from, size_t len)
 #endif
 
 #ifdef HAVE_ASM_AVX2
-void *avx2_memcpy(void *to, const void *from, size_t len) {
-    void *retval = to;
+void *avx2_memcpy(void *dst0, const void *src0, size_t len0) {
+    void *retval = dst0;
+
+    const char *src = (const char *)src0;
+    char *dst = (char *)dst0;
+    size_t len = len0;
+
+	// the avx2 memcpy is undefined if src or dst overlap
+    /*if ((dst < src + len) && (src < dst + len)) {
+        // use memmove for overlapping regions
+        memmove(dst, src, len);
+        return retval;
+    }*/
+
     if (len >= 128) {
-        uintptr_t delta = ((uintptr_t)to) & 31;
-        if (delta) {
-            delta = 32 - delta;
+        uintptr_t misalign = ((uintptr_t)dst) & 31;
+        if (misalign) {
+            size_t delta = 32 - misalign; // bytes to copy to reach 32-byte alignment
+            if (delta > len) delta = len; // defensive, though len >= 128 here
+            memcpy(dst, src, delta);
+            dst += delta;
+            src += delta;
             len -= delta;
-            __builtin_memcpy(to, from, delta);
         }
+
         size_t blocks = len / 128;
-        len %= 128;
+        len = len % 128;
+
         for (size_t i = 0; i < blocks; i++) {
-            _mm_prefetch((const char *)from + 320, _MM_HINT_NTA);
-            _mm_prefetch((const char *)from + 352, _MM_HINT_NTA);
-            __m256i ymm0 = _mm256_loadu_si256((__m256i *)from);
-            __m256i ymm1 = _mm256_loadu_si256((__m256i *)(from + 32));
-            __m256i ymm2 = _mm256_loadu_si256((__m256i *)(from + 64));
-            __m256i ymm3 = _mm256_loadu_si256((__m256i *)(from + 96));
-            _mm256_stream_si256((__m256i *)to, ymm0);
-            _mm256_stream_si256((__m256i *)(to + 32), ymm1);
-            _mm256_stream_si256((__m256i *)(to + 64), ymm2);
-            _mm256_stream_si256((__m256i *)(to + 96), ymm3);
-            from = (const void *)((const char *)from + 128);
-            to = (void *)((char *)to + 128);
+            // prefetch ahead relative to current src (tune offsets as needed)
+            _mm_prefetch((const char *)src + 128, _MM_HINT_NTA);
+            _mm_prefetch((const char *)src + 160, _MM_HINT_NTA);
+			// slightly increase prefetch distance to overlap better with memory latency
+			_mm_prefetch((const char *)src + 256, _MM_HINT_NTA);
+			_mm_prefetch((const char *)src + 320, _MM_HINT_NTA);
+
+            // load 4x 32 bytes (unaligned loads)
+            __m256i ymm0 = _mm256_loadu_si256((const __m256i *)(src + 0));
+            __m256i ymm1 = _mm256_loadu_si256((const __m256i *)(src + 32));
+            __m256i ymm2 = _mm256_loadu_si256((const __m256i *)(src + 64));
+            __m256i ymm3 = _mm256_loadu_si256((const __m256i *)(src + 96));
+
+            // stream/store to dst (dst is 32-byte aligned)
+            _mm256_stream_si256((__m256i *)(dst + 0), ymm0);
+            _mm256_stream_si256((__m256i *)(dst + 32), ymm1);
+            _mm256_stream_si256((__m256i *)(dst + 64), ymm2);
+            _mm256_stream_si256((__m256i *)(dst + 96), ymm3);
+
+            src += 128;
+            dst += 128;
         }
-        _mm_sfence();
+        _mm_sfence(); // ensure stores are visible
     }
 
     if (len) {
-        __builtin_memcpy(to, from, len);
+        memcpy(dst, src, len);
     }
 
     return retval;
@@ -2522,7 +2548,9 @@ void find_best_memcpy()
 	 mem_fill_block(validbuf, bufsize);
 	 
 	for( i = 1; memcpy_method[i].name != NULL; i ++ ) {
-		
+	
+		veejay_msg(VEEJAY_MSG_INFO, "Testing method %s", memcpy_method[i].name );
+
 		if( memcpy_method[i].cpu_require && !(cpu_flags & memcpy_method[i].cpu_require ) ) {
 			memcpy_method[i].t = 0.0;
 			continue;
@@ -2572,7 +2600,7 @@ set_best_memcpy_method:
 
 	selected_best_memcpy = best;
 
-	veejay_msg(VEEJAY_MSG_INFO, "Selected %s", memcpy_method[best].name);
+	veejay_msg(VEEJAY_MSG_INFO, "Selected best: %s", memcpy_method[best].name);
 	veejay_msg(VEEJAY_MSG_WARNING, "export VEEJAY_MEMCPY_METHOD=\"%s\"", memcpy_method[best].name );
 }
 
