@@ -101,14 +101,14 @@ void *ripple_malloc(int width, int height)
     r->ripple_sin = (double*) vj_malloc(sizeof(double) * RIPPLE_DEGREES);
     if(!r->ripple_sin) {
         free(r->ripple_table);
-        free(r->ripple_data);
+        free(r->ripple_data[0]);
         free(r);
         return NULL;
     }
     r->ripple_cos = (double*) vj_malloc(sizeof(double) * RIPPLE_DEGREES);
     if(!r->ripple_cos) {
         free(r->ripple_table);
-        free(r->ripple_data);
+        free(r->ripple_data[0]);
         free(r->ripple_sin);
         free(r);
         return NULL;
