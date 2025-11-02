@@ -1456,7 +1456,7 @@ void			viewport_destroy( void *data )
 		if( v->ui ) {
 			if( v->ui->scaler ) 
 				yuv_free_swscaler(v->ui->scaler);
-			if( v->ui->buf )
+			if( v->ui->buf[0] )
 				free(v->ui->buf[0]);
 			free(v->ui);
 		}	
