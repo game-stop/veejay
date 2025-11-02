@@ -8649,7 +8649,9 @@ void    vj_event_send_sample_stack      (   void *ptr,  const char format[],    
             else 
                 sample_len = vj_tag_get_n_frames( channel );
             snprintf( line, sizeof(line), "%02d%04d%02d%08d%08d", i, channel, source, offset, sample_len );
-            strncat( buffer, line, strlen(line));
+	    size_t space_left = sizeof(buffer) - strlen(buffer) - 1;
+	    if(space_left > 0)
+            	strncat( buffer, line, space_left);
         }
     } else if(STREAM_PLAYING(v))
     {
@@ -8671,7 +8673,9 @@ void    vj_event_send_sample_stack      (   void *ptr,  const char format[],    
                 sample_len = vj_tag_get_n_frames( channel );
 
             snprintf( line, sizeof(line), "%02d%04d%02d%08d%08d",i,channel,source, offset, sample_len );
-            strncat( buffer, line, strlen(line));
+            size_t space_left = sizeof(buffer) - strlen(buffer) - 1;
+	    if(space_left > 0)
+	    	strncat( buffer, line, space_left);
         }
     }   
 
