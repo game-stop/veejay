@@ -297,14 +297,15 @@ case $host_cpu in
 	fi
 	;;
    aarch64* |arm)
-     AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
-	 OP_CFLAGS="$OP_CFLAGS -fPIC -DPIC"
+     	 AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
+	 AC_DEFINE(ARCH_ARM64,1,[Compiling for ARM64 arch])
 	 have_arm=true
+	 have_arm64=true
 	 OP_CFLAGS="$OP_CFLAGS -O3 -ftree-vectorize -fPIC -DPIC"
 	 AC_MSG_RESULT([arm])
      ;;
-    arm7* )
-     AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
+    armv7* | arm7* )
+         AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
 	 AC_DEFINE(HAVE_ARMV7A,1,[Compiling for ARM7L CPU])
 	 OP_CFLAGS="$OP_CFLAGS -O3 -fPIC -DPIC"
 	

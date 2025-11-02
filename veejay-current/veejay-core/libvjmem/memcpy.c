@@ -262,6 +262,10 @@ void	yuyv_plane_clear( size_t len, void *to )
 }
 #endif
 
+static int BENCHMARK_WID = 1920;
+static int BENCHMARK_HEI = 1080;
+
+
 #if defined(ARCH_X86) || defined (ARCH_X86_64)
 static __inline__ void * __memcpy(void * to, const void * from, size_t n)
 {
@@ -338,10 +342,6 @@ static __inline__ void * __memcpy(void * to, const void * from, size_t n)
 //#else
 #define EMMS     "emms"
 //#endif
-
-
-static int BENCHMARK_WID = 1920;
-static int BENCHMARK_HEI = 1080;
 
 char	*veejay_strncpy( char *dest, const char *src, size_t n )
 {
