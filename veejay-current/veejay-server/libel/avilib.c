@@ -2077,19 +2077,33 @@ avi_t *AVI_open_indexfd(int fd, int getIndex, char *indexfile)
 
 static int AVI_mmap_file(avi_t *AVI, long mmap_size)
 {
-	off_t movi_end = lseek( AVI->fdes, 0, SEEK_END );
+	off_t file_end = lseek( AVI->fdes, 0, SEEK_END );
+	if(file_end <0) {
+		veejay_msg(0, "[avilib]Unable to determine file size");
+		return 0;
+	}
+
 	if( lseek( AVI->fdes, AVI->movi_start, SEEK_SET ) < 0 )
 	{
 		veejay_msg(0,"[avilib] Unable to seek to start position of AVI");
 		return 0;
 	}
 	
-	AVI->mmap_size = ( mmap_size > movi_end ? movi_end : mmap_size );
+	off_t max_size = file_end - AVI->movi_start;
+	AVI->mmap_size = ( mmap_size > max_size ? max_size : mmap_size );
 	
-	if(AVI->mmap_size > 0 )
+	if(AVI->mmap_size <= 0 )
 	{
-		AVI->mmap_region = mmap_file( AVI->fdes,0,AVI->mmap_size, movi_end );
+		veejay_msg(0, "[avilib] Invalid mmap size");
+		return 0;
 	}
+
+	AVI->mmap_region = mmap_file( AVI->fdes,AVI->movi_start,AVI->mmap_size, file_end);
+	if( AVI->mmap_region == MAP_FAILED || AVI->mmap_region == NULL ) {
+		veejay_msg(0, "[avilib] AVI_mmap_file failed");
+		return 0;
+	}
+	
 
 	return 1;
 }
@@ -2129,14 +2143,15 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, long mmap_size)
   }
 
   if (AVI_errno) {
+    free(AVI);
 	avierror(AVI_errno);
 	return NULL;
   }
   
-  if(!AVI_errno)
+  if(!AVI_errno && mmap_size > 0)
   {
 	if( AVI_mmap_file(AVI,mmap_size) == 0 ) {
-		return NULL;
+		veejay_msg(VEEJAY_MSG_WARNING, "[avilib] failed to mmap %s with a size of %ld", filename, mmap_size);
 	}
   }
 
@@ -2169,19 +2184,21 @@ avi_t *AVI_open_fd(int fd, int getIndex, long mmap_size)
   }
  
   
-  if(!AVI_errno)
+  if(!AVI_errno && mmap_size > 0)
   {
  	if( AVI_mmap_file(AVI,mmap_size) == 0 ) {
-		free(AVI);
-		return 0;
+		veejay_msg(VEEJAY_MSG_WARNING, "[avilib] failed to mmap with size of %ld", mmap_size);
 	}
   }
 
   
-  if (AVI_errno)
-      return AVI=NULL;
-  else
-      return AVI;
+  if (AVI_errno) {
+	  avierror(AVI_errno);
+	  free(AVI);
+	  return NULL;
+  }
+  
+  return AVI;
 }
 
 // transcode-0.6.8

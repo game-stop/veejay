@@ -139,9 +139,9 @@ void set_fourcc(lav_file_t *lav_file, const char *fourcc)
 
 	/* hash the string */
 	int hash = 5381;
-    	int c;
-    	while( (c = (int) *ptr++) != 0)
-    		hash = ((hash << 5) + hash) + c; /* hash * 33 + c */\
+		int c;
+		while( (c = (int) *ptr++) != 0)
+			hash = ((hash << 5) + hash) + c; /* hash * 33 + c */\
 
 	/* look up codec_id in hashtable by key (hash) */
 	lav_file->codec_id = avhelper_get_codec_by_key( hash );
@@ -1015,15 +1015,15 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 
     if( is_picture ) {
 #ifdef USE_GDK_PIXBUF
-    	lav_fd->picture = vj_picture_open( (const char*) filename, output_scale_width, output_scale_height, get_ffmpeg_pixfmt(output_yuv) );
-   		if(lav_fd->picture)
-    	{
-        	lav_fd->format = 'x';
-        	lav_fd->bogus_len = (int) output_fps;
-        	video_comp = pict;
-        	veejay_msg(VEEJAY_MSG_INFO,"\tFile %s is of type image", filename);
-        	return lav_fd;
-    	}
+		lav_fd->picture = vj_picture_open( (const char*) filename, output_scale_width, output_scale_height, get_ffmpeg_pixfmt(output_yuv) );
+		if(lav_fd->picture)
+		{
+			lav_fd->format = 'x';
+			lav_fd->bogus_len = (int) output_fps;
+			video_comp = pict;
+			veejay_msg(VEEJAY_MSG_INFO,"\tFile %s is of type image", filename);
+			return lav_fd;
+		}
 #endif
     }
     else
@@ -1040,6 +1040,9 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
         {
             ret = 1;
         }
+		else {
+			veejay_msg(VEEJAY_MSG_ERROR, "[avilib] unable to open AVI file %s", filename);
+		}
     }
    
     int alt = 0;
@@ -1078,13 +1081,13 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
                 return NULL;
             }
             
-	    	lav_fd->avi_fd = NULL;
+			lav_fd->avi_fd = NULL;
             lav_fd->format = 'q';
             video_comp = quicktime_video_compressor(lav_fd->qt_fd,0);
             
 			veejay_msg(VEEJAY_MSG_INFO, "\tFile %s is of type Quicktime, fourcc %s",filename, video_comp );
 
-	    	/* We want at least one video track */
+			/* We want at least one video track */
             if (quicktime_video_tracks(lav_fd->qt_fd) < 1)
             {
                 veejay_msg(VEEJAY_MSG_ERROR, "At least one video track required");
