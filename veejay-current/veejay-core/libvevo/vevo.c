@@ -122,11 +122,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 
-#ifdef ARCH_X86_64
-typedef uint64_t ukey_t;
-#else
-typedef uint32_t ukey_t;
-#endif
+typedef uintptr_t ukey_t;
 
 typedef	void (*vevo_set_func)(void *ctx, int32_t type, int32_t value );
 typedef int (*vevo_get_func)(void *ctx );
