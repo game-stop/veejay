@@ -82,10 +82,10 @@ static char *avi_error_list[] = {
 
 static void avierror(long AVI_errno) {
 	if(AVI_errno < 0 || AVI_errno > 14) {
-		veejay_msg(0, "AVI Error: %s", avi_error_list[0]);
+		veejay_msg(0, "[avilib] %s", avi_error_list[0]);
 	}
 	else
-		veejay_msg(0, "AVI Error: %s", avi_error_list[ AVI_errno ] );
+		veejay_msg(0, "[avilib] %s", avi_error_list[ AVI_errno ] );
 }
 
 
@@ -304,11 +304,10 @@ static int avi_init_super_index(avi_t *AVI, unsigned char *idxtag, avisuperindex
 
     avisuperindex_chunk *sil = NULL;
 
-    if ((sil = (avisuperindex_chunk *) vj_malloc (sizeof (avisuperindex_chunk))) == NULL) {
+    if ((sil = (avisuperindex_chunk *) vj_calloc (sizeof (avisuperindex_chunk))) == NULL) {
 	AVI_errno = AVI_ERR_NO_MEM;
 	return -1;
     }
-    veejay_memset(sil, 0, sizeof (avisuperindex_chunk));
     veejay_memcpy (sil->fcc, "indx", 4);
     sil->dwSize = 0; // size of this chunk
     sil->wLongsPerEntry = 4;
@@ -468,17 +467,16 @@ static int avi_add_odml_index_entry(avi_t *AVI, unsigned char *tag, long flags, 
     if (AVI->video_superindex && 
 	    (off_t)(AVI->pos+towrite) > (off_t)((off_t)NEW_RIFF_THRES*AVI->video_superindex->nEntriesInUse)) {
 
-//	fprintf(stderr, "Adding a new RIFF chunk: %d\n", AVI->video_superindex->nEntriesInUse);
-	veejay_msg( 2, "Adding a new RIFF chunk: %d", AVI->video_superindex->nEntriesInUse );
+	veejay_msg( VEEJAY_MSG_INFO, "[avilib] Adding a new RIFF chunk: %d", AVI->video_superindex->nEntriesInUse );
 
 	// rotate ALL indices
 	AVI->video_superindex->nEntriesInUse++;
 	cur_std_idx = AVI->video_superindex->nEntriesInUse-1;
 
 	if (AVI->video_superindex->nEntriesInUse > NR_IXNN_CHUNKS) {
-	    veejay_msg(0, "Internal error in avilib - redefine NR_IXNN_CHUNKS (needed=%d, current=%d)",
+	    veejay_msg(0, "[avilib] Internal error in avilib - redefine NR_IXNN_CHUNKS (needed=%d, current=%d)",
 		AVI->video_superindex->nEntriesInUse, NR_IXNN_CHUNKS);
-	    veejay_msg(0, "[avilib dump] cur_std_idx=%d NR_IXNN_CHUNKS=%d"
+	    veejay_msg(0, "[avilib] cur_std_idx=%d NR_IXNN_CHUNKS=%d"
 		    "POS=%lld towrite=%lld",
 		    cur_std_idx,NR_IXNN_CHUNKS, AVI->pos, towrite);
 	    return -1;
@@ -639,13 +637,12 @@ avi_t* AVI_open_output_file(char * filename)
 
    /* Allocate the avi_t struct and zero it */
 
-   AVI = (avi_t *) vj_malloc(sizeof(avi_t));
+   AVI = (avi_t *) vj_calloc(sizeof(avi_t));
    if(AVI==0)
    {
       AVI_errno = AVI_ERR_NO_MEM;
       return 0;
    }
-   veejay_memset((void *)AVI,0,sizeof(avi_t));
 
    /* Since Linux needs a long time when deleting big files,
       we do not truncate the file when we open it.
@@ -718,7 +715,7 @@ int AVI_set_audio(avi_t *AVI, int channels, long rate, int bits, int format)
    ++AVI->anum;
 
    if(AVI->anum > AVI_MAX_TRACKS) {
-     veejay_msg(0, "error - only %d audio tracks supported\n", AVI_MAX_TRACKS);
+     veejay_msg(0, "[avilib] Only %d audio tracks supported\n", AVI_MAX_TRACKS);
      return -1;
    }
 
@@ -975,8 +972,8 @@ int avi_update_header(avi_t *AVI)
    
    if(njunk<=0)
      {
-       veejay_msg(0, "%s: # of header bytes too small",__FUNCTION__);
-       veejay_msg(0, "Somebody has played with HEADERBYTES of this AVI without knowing what (s)he did");
+       veejay_msg(0, "[avilib] %s: # of header bytes too small",__FUNCTION__);
+       veejay_msg(0, "[avilib] Somebody has played with HEADERBYTES of this AVI without knowing what (s)he did");
        return -1;
      }
    
@@ -1053,15 +1050,13 @@ static int avi_parse_comments (int fd, unsigned char *buf, int space_left)
 		return -1;
     }
 
-    if ( !(data = vj_malloc(st.st_size*sizeof(char)+1)) ) {
-		fprintf(stderr, "vj_malloc failed\n"); 
+    if ( !(data = vj_calloc(st.st_size*sizeof(char)+1)) ) {
 		return -1;
     }
 
     int readlen = avi_read ( fd, data, st.st_size);
     if( readlen < 0 )
 	return -1;
-    //printf("Read %d bytes from %d\n", readlen, fd);
 
     c = data;
     space_left--;
@@ -1657,8 +1652,8 @@ static int avi_close_output_file(avi_t *AVI)
    
    if(njunk<=0)
    {
-      fprintf(stderr,"AVI_close_output_file: # of header bytes too small\n");
-      exit(1);
+      veejay_msg(VEEJAY_MSG_ERROR, "[avilib] AVI_close_output_file: # of header bytes too small");
+      return -1;
    }
 
    OUT4CC ("JUNK");
@@ -1985,6 +1980,7 @@ int AVI_close(avi_t *AVI)
 { \
    AVI_close(AVI); \
    AVI_errno = x; \
+   veejay_msg(VEEJAY_MSG_ERROR, "[avilib] error %d from %s:%d", x, __FUNCTION__, __LINE__ ); \
    return 0; \
 }
 
@@ -2053,13 +2049,12 @@ avi_t *AVI_open_indexfd(int fd, int getIndex, char *indexfile)
   
   /* Create avi_t structure */
   
-  AVI = (avi_t *) vj_malloc(sizeof(avi_t));
+  AVI = (avi_t *) vj_calloc(sizeof(avi_t));
   if(AVI==NULL)
     {
       AVI_errno = AVI_ERR_NO_MEM;
       return 0;
     }
-  veejay_memset((void *)AVI,0,sizeof(avi_t));
   
   AVI->mode = AVI_MODE_READ; /* open for reading */
   
@@ -2085,7 +2080,7 @@ static int AVI_mmap_file(avi_t *AVI, long mmap_size)
 	off_t movi_end = lseek( AVI->fdes, 0, SEEK_END );
 	if( lseek( AVI->fdes, AVI->movi_start, SEEK_SET ) < 0 )
 	{
-		veejay_msg(0,"Unable to seek to start position of AVI");
+		veejay_msg(0,"[avilib] Unable to seek to start position of AVI");
 		return 0;
 	}
 	
@@ -2110,7 +2105,7 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, long mmap_size)
     {
       AVI_errno = AVI_ERR_NO_MEM;
       avierror(AVI_errno);
-      return 0;
+      return NULL;
     }
   
   AVI->mode = AVI_MODE_READ; /* open for reading */
@@ -2123,7 +2118,7 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, long mmap_size)
       AVI_errno = AVI_ERR_OPEN;
       free(AVI);
       avierror(AVI_errno);
-      return 0;
+      return NULL;
     }
   
   AVI_errno = 0;
@@ -2135,13 +2130,13 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, long mmap_size)
 
   if (AVI_errno) {
 	avierror(AVI_errno);
-	return 0;
+	return NULL;
   }
   
   if(!AVI_errno)
   {
 	if( AVI_mmap_file(AVI,mmap_size) == 0 ) {
-		return 0;
+		return NULL;
 	}
   }
 
@@ -2154,17 +2149,16 @@ avi_t *AVI_open_fd(int fd, int getIndex, long mmap_size)
   
   /* Create avi_t structure */
   
-  AVI = (avi_t *) vj_malloc(sizeof(avi_t));
+  AVI = (avi_t *) vj_calloc(sizeof(avi_t));
   if(AVI==NULL)
     {
       AVI_errno = AVI_ERR_NO_MEM;
       return 0;
     }
-  veejay_memset((void *)AVI,0,sizeof(avi_t));
   
   AVI->mode = AVI_MODE_READ; /* open for reading */
   
-  // file alread open
+  // file already open
   AVI->fdes = fd;
   
   AVI_errno = 0;
@@ -2228,7 +2222,7 @@ int avi_parse_index_from_file(avi_t *AVI, char *filename)
 
     if ( strncasecmp(data, "AVIIDX1", 7) != 0) {
 	   fclose(fd);
-      fprintf(stderr, "%s: Not an AVI index file\n", filename);
+     	   veejay_msg(VEEJAY_MSG_ERROR, "[avilib] %s: Not an AVI index file", filename);
 	   return -1;
     }
 
@@ -2252,12 +2246,12 @@ int avi_parse_index_from_file(avi_t *AVI, char *filename)
     for(j=0; j<AVI->anum; ++j) AVI->track[j].audio_chunks = aud_chunks[j];
 
     if(AVI->video_frames==0) ERR_EXIT(AVI_ERR_NO_VIDS);
-    AVI->video_index = (video_index_entry *) vj_malloc(vid_chunks*sizeof(video_index_entry));
+    AVI->video_index = (video_index_entry *) vj_calloc(vid_chunks*sizeof(video_index_entry));
     if(AVI->video_index==0) ERR_EXIT(AVI_ERR_NO_MEM);
 
     for(j=0; j<AVI->anum; ++j) {
 	if(AVI->track[j].audio_chunks) {
-	    AVI->track[j].audio_index = (audio_index_entry *) vj_malloc(aud_chunks[j]*sizeof(audio_index_entry));
+	    AVI->track[j].audio_index = (audio_index_entry *) vj_calloc(aud_chunks[j]*sizeof(audio_index_entry));
 	    if(AVI->track[j].audio_index==0) ERR_EXIT(AVI_ERR_NO_MEM);
 	}
     }   
@@ -2348,6 +2342,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
       if( avi_read(AVI->fdes,data,8) != 8 ) break; /* We assume it's EOF */
       newpos=lseek(AVI->fdes,0,SEEK_CUR);
       if(oldpos==newpos) {
+	      veejay_msg(VEEJAY_MSG_WARNING, "[avilib] AVI stream is broken");
 	      /* This is a broken AVI stream... */
 	      return -1;
       }
@@ -2449,7 +2444,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 	   ++AVI->anum;
 	   
 	   if(AVI->anum > AVI_MAX_TRACKS) {
-	     fprintf(stderr, "error - only %d audio tracks supported\n", AVI_MAX_TRACKS);
+	     veejay_msg(VEEJAY_MSG_ERROR, "[avilib] Only %d audio tracks supported", AVI_MAX_TRACKS);
 		 if( AVI->idx )
 			 free(AVI->idx);
 	     return(-1);
@@ -2471,7 +2466,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 	   
          }
          else if (strncasecmp ((char*)hdrl_data+i,"iavs",4) ==0 && ! auds_strh_seen) {
-	     fprintf(stderr, "AVILIB: error - DV AVI Type 1 no supported\n");
+	     veejay_msg(VEEJAY_MSG_ERROR, "[avilib] DV AVI Type 1 no supported");
 		 if( AVI->idx )
 			 free(AVI->idx);
 	     return (-1);
@@ -2483,7 +2478,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
       else if(strncasecmp((char*)hdrl_data+i,"dmlh",4) == 0) {
 	  AVI->total_frames = str2ulong(hdrl_data+i+8);
 #ifdef DEBUG_ODML
-	 fprintf(stderr, "real number of frames %d\n", AVI->total_frames);
+	 //fprintf(stderr, "real number of frames %d\n", AVI->total_frames);
 #endif
 	 i += 8;
       }
@@ -2521,27 +2516,24 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
               wfes = hdrl_len - i;
             else
               wfes = sizeof(alWAVEFORMATEX);
-            wfe = (alWAVEFORMATEX *)vj_malloc(sizeof(alWAVEFORMATEX));
+            wfe = (alWAVEFORMATEX *)vj_calloc(sizeof(alWAVEFORMATEX));
             if (wfe != NULL) {
-              veejay_memset(wfe, 0, sizeof(alWAVEFORMATEX));
-	      veejay_memcpy(wfe, hdrl_data + i, wfes);
-	      if (str2ushort((unsigned char *)&wfe->cb_size) != 0) {
-			nwfe = (unsigned char *)
-                  realloc(wfe, sizeof(alWAVEFORMATEX) +
+	      		veejay_memcpy(wfe, hdrl_data + i, wfes);
+	      		if (str2ushort((unsigned char *)&wfe->cb_size) != 0) {
+					nwfe = (unsigned char *)
+                  		realloc(wfe, sizeof(alWAVEFORMATEX) +
                           str2ushort((unsigned char *)&wfe->cb_size));
-		if (nwfe != 0) {
-		  off_t lpos = lseek(AVI->fdes, 0, SEEK_CUR);
-		  lseek(AVI->fdes, header_offset + i + sizeof(alWAVEFORMATEX),
-			SEEK_SET);
-		  wfe = (alWAVEFORMATEX *)nwfe;
-		  nwfe = &nwfe[sizeof(alWAVEFORMATEX)];
-		  avi_read(AVI->fdes, nwfe,
-                           str2ushort((unsigned char *)&wfe->cb_size));
-		  lseek(AVI->fdes, lpos, SEEK_SET);
-		}
-	      }
-	      AVI->wave_format_ex[AVI->aptr] = wfe;
-	    }
+					if (nwfe != 0) {
+		  				off_t lpos = lseek(AVI->fdes, 0, SEEK_CUR);
+		  				lseek(AVI->fdes, header_offset + i + sizeof(alWAVEFORMATEX),SEEK_SET);
+		  				wfe = (alWAVEFORMATEX *)nwfe;
+		  				nwfe = &nwfe[sizeof(alWAVEFORMATEX)];
+		  				avi_read(AVI->fdes, nwfe,str2ushort((unsigned char *)&wfe->cb_size));
+		  				lseek(AVI->fdes, lpos, SEEK_SET);
+					}
+	      		}
+	      		AVI->wave_format_ex[AVI->aptr] = wfe;
+	    	}
 
             AVI->track[AVI->aptr].a_fmt   = str2ushort(hdrl_data+i  );
 
@@ -2577,7 +2569,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 	    // 3 * reserved
 	    a += 4; a += 4; a += 4;
 
-	    if (AVI->video_superindex->bIndexSubType != 0) {fprintf(stderr, "Invalid Header, bIndexSubType != 0\n"); }
+	    if (AVI->video_superindex->bIndexSubType != 0) {veejay_msg(VEEJAY_MSG_ERROR, "[avilib] Invalid Header, bIndexSubType != 0"); }
 	    
 	    AVI->video_superindex->aIndex = 
 	       vj_malloc (AVI->video_superindex->wLongsPerEntry * AVI->video_superindex->nEntriesInUse * sizeof (uint32_t));
@@ -2630,7 +2622,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 	    // 3 * reserved
 	    a += 4; a += 4; a += 4;
 
-	    if (AVI->track[AVI->aptr].audio_superindex->bIndexSubType != 0) {fprintf(stderr, "Invalid Header, bIndexSubType != 0\n"); }
+	    if (AVI->track[AVI->aptr].audio_superindex->bIndexSubType != 0) {veejay_msg(VEEJAY_MSG_ERROR, "[avilib] Invalid Header, bIndexSubType != 0"); }
 	    
 	    AVI->track[AVI->aptr].audio_superindex->aIndex = 
 	       vj_malloc (AVI->track[AVI->aptr].audio_superindex->wLongsPerEntry * 
@@ -2823,14 +2815,14 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 	 chunk_start = en = vj_malloc (AVI->video_superindex->aIndex[j].dwSize+hdrl_len);
 
 	 if (lseek(AVI->fdes, AVI->video_superindex->aIndex[j].qwOffset, SEEK_SET) == (off_t)-1) {
-	    fprintf(stderr, "(%s) cannot seek to 0x%llx\n", __FILE__, 
+	    veejay_msg(VEEJAY_MSG_ERROR, "[avilib] (%s) cannot seek to 0x%llx", __FILE__, 
 		    (unsigned long long)AVI->video_superindex->aIndex[j].qwOffset);
 	    free(chunk_start);
 	    continue;
 	 }
 
 	 if (avi_read(AVI->fdes, en, AVI->video_superindex->aIndex[j].dwSize+hdrl_len) <= 0) {
-	    fprintf(stderr, "(%s) cannot read from offset 0x%llx %ld bytes; broken (incomplete) file?\n", 
+	    veejay_msg(VEEJAY_MSG_ERROR, "[avilib] (%s) cannot read from offset 0x%llx %ld bytes; broken (incomplete) file?", 
 		  __FILE__, (unsigned long long)AVI->video_superindex->aIndex[j].qwOffset,
 		  (unsigned long)AVI->video_superindex->aIndex[j].dwSize+hdrl_len);
 	    free(chunk_start);
@@ -2848,7 +2840,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 	 nvi += nrEntries;
 	 AVI->video_index = (video_index_entry *) realloc (AVI->video_index, nvi * sizeof (video_index_entry));
 	 if (!AVI->video_index) {
-		 fprintf(stderr, "AVILIB: out of mem (size = %ld)\n", nvi * sizeof (video_index_entry));
+		 veejay_msg(VEEJAY_MSG_ERROR, "[avilib] out of mem (size = %ld)", nvi * sizeof (video_index_entry));
 		 exit(1);
 	 }
 
@@ -2896,7 +2888,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 
 	 k = 0;
 	 if (!AVI->track[audtr].audio_superindex) {
-	       fprintf(stderr, "(%s) cannot read audio index for track %d\n", __FILE__, audtr);
+	       veejay_msg(VEEJAY_MSG_ERROR, "[avilib] (%s) cannot read audio index for track %d", __FILE__, audtr);
 	       continue;
 	 }
 	 for (j=0; j<AVI->track[audtr].audio_superindex->nEntriesInUse; j++) {
@@ -2905,13 +2897,13 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 	    chunk_start = en = vj_malloc (AVI->track[audtr].audio_superindex->aIndex[j].dwSize+hdrl_len);
 
 	    if (lseek(AVI->fdes, AVI->track[audtr].audio_superindex->aIndex[j].qwOffset, SEEK_SET) == (off_t)-1) {
-	       fprintf(stderr, "(%s) cannot seek to 0x%llx\n", __FILE__, (unsigned long long)AVI->track[audtr].audio_superindex->aIndex[j].qwOffset);
+	       veejay_msg(VEEJAY_MSG_ERROR, "[avilib] (%s) cannot seek to 0x%llx", __FILE__, (unsigned long long)AVI->track[audtr].audio_superindex->aIndex[j].qwOffset);
 	       free(chunk_start);
 	       continue;
 	    }
 
 	    if (avi_read(AVI->fdes, en, AVI->track[audtr].audio_superindex->aIndex[j].dwSize+hdrl_len) <= 0) {
-	       fprintf(stderr, "(%s) cannot read from offset 0x%llx; broken (incomplete) file?\n", 
+	       veejay_msg(VEEJAY_MSG_ERROR, "[avilib] (%s) cannot read from offset 0x%llx; broken (incomplete) file?", 
 		     __FILE__,(unsigned long long) AVI->track[audtr].audio_superindex->aIndex[j].qwOffset);
 	       free(chunk_start);
 	       continue;
@@ -2969,7 +2961,7 @@ multiple_riff:
 
       AVI->n_idx = 0;
 
-      fprintf(stderr, "[avilib] Reconstructing index...");
+      veejay_msg(VEEJAY_MSG_INFO, "[avilib] Reconstructing index...");
 
       // Number of frames; only one audio track supported
       nvi = AVI->video_frames = AVI->total_frames;
@@ -2982,8 +2974,7 @@ multiple_riff:
 
       for(j=0; j<AVI->anum; ++j) {
 	  if(AVI->track[j].audio_chunks) {
-	      AVI->track[j].audio_index = (audio_index_entry *) vj_malloc((nai[j]+1)*sizeof(audio_index_entry));
-	      veejay_memset(AVI->track[j].audio_index, 0, (nai[j]+1)*(sizeof(audio_index_entry)));
+	      AVI->track[j].audio_index = (audio_index_entry *) vj_calloc((nai[j]+1)*sizeof(audio_index_entry));
 	      if(AVI->track[j].audio_index==0) ERR_EXIT(AVI_ERR_NO_MEM);
 	  }
       }   
@@ -3008,7 +2999,7 @@ multiple_riff:
 	     AVI->track[j].audio_index = (audio_index_entry *) 
 		 realloc( AVI->track[j].audio_index, (aud_chunks+1)*sizeof(audio_index_entry));
 	     if (!AVI->track[j].audio_index) {
-		 fprintf(stderr, "Internal error in avilib -- no mem\n");
+		 veejay_msg(VEEJAY_MSG_ERROR, "[avilib] Internal error in avilib -- no mem");
 		 AVI_errno = AVI_ERR_NO_MEM;
 		 return -1;
 	     }
@@ -3055,7 +3046,7 @@ multiple_riff:
 
       }
       if (nvi < AVI->total_frames) {
-	  fprintf(stderr, "\n[avilib] Uh? Some frames seems missing (%ld/%d)\n", 
+	   veejay_msg(VEEJAY_MSG_ERROR, "[avilib] Uh? Some frames seems missing (%ld/%d)", 
 		  nvi,  AVI->total_frames);
       }
 
@@ -3065,7 +3056,7 @@ multiple_riff:
 
       for(j=0; j<AVI->anum; ++j) AVI->track[j].audio_bytes = tot[j];
       idx_type = 1;
-      fprintf(stderr, "done. nvi=%ld nai=%ld tot=%ld\n", nvi, nai[0], tot[0]);
+      veejay_msg(VEEJAY_MSG_INFO, "[avilib] Index reconstruction done: nvi=%ld nai=%ld tot=%ld\n", nvi, nai[0], tot[0]);
 
    } // total_frames but no indx chunk (xawtv does this)
 
@@ -3093,13 +3084,12 @@ multiple_riff:
   
 
    if(AVI->video_frames==0) ERR_EXIT(AVI_ERR_NO_VIDS);
-   AVI->video_index = (video_index_entry *) vj_malloc(nvi*sizeof(video_index_entry));
+   AVI->video_index = (video_index_entry *) vj_calloc(nvi*sizeof(video_index_entry));
    if(AVI->video_index==0) ERR_EXIT(AVI_ERR_NO_MEM);
    
    for(j=0; j<AVI->anum; ++j) {
        if(AVI->track[j].audio_chunks) {
-	   AVI->track[j].audio_index = (audio_index_entry *) vj_malloc((nai[j]+1)*sizeof(audio_index_entry));
-	   veejay_memset(AVI->track[j].audio_index, 0, (nai[j]+1)*(sizeof(audio_index_entry)));
+	   AVI->track[j].audio_index = (audio_index_entry *) vj_calloc((nai[j]+1)*sizeof(audio_index_entry));
 	   if(AVI->track[j].audio_index==0) ERR_EXIT(AVI_ERR_NO_MEM);
        }
    }   
@@ -3577,9 +3567,7 @@ void AVI_print_error(char *str)
    aerrno = (AVI_errno>=0 && AVI_errno<num_avi_errors) ? AVI_errno : num_avi_errors-1;
 
    if (aerrno != 0)
-       fprintf(stderr,"%s: %s\n",str,avi_errors[aerrno]);
-
-   /* for the following errors, perror should report a more detailed reason: */
+       veejay_msg(VEEJAY_MSG_ERROR, "[avilib] %s: %s",str,avi_errors[aerrno]);
 
    if(AVI_errno == AVI_ERR_OPEN ||
       AVI_errno == AVI_ERR_READ ||

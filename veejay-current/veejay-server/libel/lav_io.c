@@ -978,26 +978,14 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 
    lav_file_t *lav_fd = (lav_file_t*) vj_calloc(sizeof(lav_file_t));
 
-   if(lav_fd==0) { internal_error=ERROR_MALLOC; return 0; }
+   if(lav_fd==0) { internal_error=ERROR_MALLOC; return NULL; }
 
    /* Set lav_fd */
 
 #ifdef  HAVE_LIBQUICKTIME
    char *audio_comp;
 #endif
-   lav_fd->avi_fd      = 0;
-#ifdef SUPPORT_READ_DV2
-   lav_fd->dv_fd    = 0;
-#endif
-#ifdef USE_GDK_PIXBUF
-   lav_fd->picture  = NULL;
-#endif
-   lav_fd->format      = 0;
    lav_fd->interlacing = LAV_INTER_UNKNOWN;
-   lav_fd->sar_w       = 0; /* (0,0) == unknown */
-   lav_fd->sar_h       = 0; 
-   lav_fd->has_audio   = 0;
-   lav_fd->bps         = 0;
    lav_fd->MJPG_chroma = CHROMAUNKNOWN;
    lav_fd->mmap_size   = mmap_size;
 
@@ -1028,12 +1016,12 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
     if( is_picture ) {
 #ifdef USE_GDK_PIXBUF
     	lav_fd->picture = vj_picture_open( (const char*) filename, output_scale_width, output_scale_height, get_ffmpeg_pixfmt(output_yuv) );
-   	if(lav_fd->picture)
+   		if(lav_fd->picture)
     	{
         	lav_fd->format = 'x';
         	lav_fd->bogus_len = (int) output_fps;
         	video_comp = pict;
-        	veejay_msg(VEEJAY_MSG_DEBUG,"\tLoaded image file");
+        	veejay_msg(VEEJAY_MSG_INFO,"\tFile %s is of type image", filename);
         	return lav_fd;
     	}
 #endif
@@ -1044,14 +1032,13 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
         
         if( lav_fd->avi_fd && AVI_errno == AVI_ERR_EMPTY )
         {
-            veejay_msg(VEEJAY_MSG_ERROR, "Empty AVI file");
+            veejay_msg(VEEJAY_MSG_ERROR, "\tEmpty AVI file: ", filename);
             if(lav_fd) free(lav_fd);
             return NULL;
         }
         else if ( lav_fd->avi_fd && AVI_errno == 0 )
         {
-            veejay_msg(VEEJAY_MSG_DEBUG,"\tFile is AVI" );
-            ret =1;
+            ret = 1;
         }
     }
    
@@ -1059,48 +1046,52 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
     
     if(lav_fd->avi_fd)
     {
-        ret = 1;
-        alt = 1;
         lav_fd->format = 'a';
-        lav_fd->has_audio = (AVI_audio_bits(lav_fd->avi_fd)>0 &&
-                           AVI_audio_format(lav_fd->avi_fd)==WAVE_FORMAT_PCM);
+        lav_fd->has_audio = (AVI_audio_bits(lav_fd->avi_fd)>0 && AVI_audio_format(lav_fd->avi_fd)==WAVE_FORMAT_PCM);
         video_comp = AVI_video_compressor(lav_fd->avi_fd);
         if(video_comp == NULL || strlen(video_comp) <= 0)
         {
             veejay_msg(VEEJAY_MSG_ERROR, "Unable to read FOURCC from AVI");
-                if(lav_fd) free(lav_fd);
-                return NULL;
+            if(lav_fd) free(lav_fd);
+            return NULL;
         }
+
+		veejay_msg(VEEJAY_MSG_INFO, "\tFile %s is of type AVI , fourcc %s, audio %d",filename, video_comp, lav_fd->has_audio );
+
+		ret = 1;
+		alt = 1;
     }
     else if( AVI_errno==AVI_ERR_NO_AVI || (!lav_fd->avi_fd && !ret) )
     {
 #ifdef HAVE_LIBQUICKTIME
         if(quicktime_check_sig(filename))
         {
-            veejay_msg(VEEJAY_MSG_DEBUG, "Opening quicktime file ...");
+            veejay_msg(VEEJAY_MSG_DEBUG, "Opening as quicktime file ...");
             quicktime_pasp_t pasp;
             int nfields, detail;
             lav_fd->qt_fd = quicktime_open(filename,1,0);
             video_format = 'q'; /* for error messages */
             if (!lav_fd->qt_fd)
-                {
-                veejay_msg(VEEJAY_MSG_ERROR, "Unable to open quicktime file");
+            {
+                veejay_msg(VEEJAY_MSG_ERROR, "Unable to open as quicktime file");
                 free(lav_fd);
-                    return NULL;
-                }
-            else
-                veejay_msg(VEEJAY_MSG_DEBUG, "\tOpening Quicktime file");
-            lav_fd->avi_fd = NULL;
+                return NULL;
+            }
+            
+	    	lav_fd->avi_fd = NULL;
             lav_fd->format = 'q';
             video_comp = quicktime_video_compressor(lav_fd->qt_fd,0);
-            /* We want at least one video track */
+            
+			veejay_msg(VEEJAY_MSG_INFO, "\tFile %s is of type Quicktime, fourcc %s",filename, video_comp );
+
+	    	/* We want at least one video track */
             if (quicktime_video_tracks(lav_fd->qt_fd) < 1)
-                {
+            {
                 veejay_msg(VEEJAY_MSG_ERROR, "At least one video track required");
-                    lav_close(lav_fd);
-                    internal_error = ERROR_FORMAT;
-                    return NULL;
-                }
+                lav_close(lav_fd);
+                internal_error = ERROR_FORMAT;
+                return NULL;
+            }
             /*
             * If the quicktime file has the sample aspect atom then use it to set
             * the sar values in the lav_fd structure.  Hardwired (like everywhere else)
@@ -1108,17 +1099,17 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
             */
      
             if (lqt_get_pasp(lav_fd->qt_fd, 0, &pasp) != 0)
-                {
+            {
                 lav_fd->sar_w = pasp.hSpacing;
                 lav_fd->sar_h = pasp.vSpacing;
-                }
+            }
             /*
              * If a 'fiel' atom is present (not guaranteed) then use it to set the
              * interlacing type.
              */
         
             if (lqt_get_fiel(lav_fd->qt_fd, 0, &nfields, &detail) != 0)
-                {
+            {
                     if (nfields == 2)
                     {
                     if (detail == 14 || detail == 6)
@@ -1126,28 +1117,26 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
                     else if (detail == 9 || detail == 1)
                         lav_fd->interlacing = LAV_INTER_TOP_FIRST;
                     else
-                        veejay_msg(VEEJAY_MSG_DEBUG, "Unknown 'detail' in 'fiel' atom: %d", detail);
+                        veejay_msg(VEEJAY_MSG_DEBUG, "Unknown 'detail' in 'field' atom: %d", detail);
                     }
                     else
                         lav_fd->interlacing = LAV_NOT_INTERLACED;
-                 }
+            }
             /* Check for audio tracks */
             lav_fd->has_audio = 0;
             if (quicktime_audio_tracks(lav_fd->qt_fd))
-                {
+            {
                 audio_comp = quicktime_audio_compressor(lav_fd->qt_fd,0);
                 if (strncasecmp(audio_comp, QUICKTIME_TWOS,4)==0)
                     lav_fd->has_audio = 1;
                 else
-                    veejay_msg(VEEJAY_MSG_WARNING, "Audio compressor '%s' not supported",
+                    veejay_msg(VEEJAY_MSG_WARNING, "Audio compressor '%s' not supported, ignoring audio",
                             audio_comp );
-                }
+            }
 
             alt = 1;
             ret = 1;
         }
-        else
-            veejay_msg(VEEJAY_MSG_DEBUG, "\tNot a Quicktime file");
 #endif
 
 
@@ -1164,12 +1153,9 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
                 lav_fd->has_audio = 0;
                 ret = 1;
                 alt = 1;
-                veejay_msg(VEEJAY_MSG_DEBUG,
-                        "RAW DV file '%s'",
-                        video_comp );
+                veejay_msg(VEEJAY_MSG_INFO,
+                        "\tFile %s is of type RAW DV with fourcc '%s'",filename, video_comp );
             }
-            else
-                veejay_msg(VEEJAY_MSG_DEBUG, "\tNot a raw dv file");
         }
 #endif
     }
@@ -1183,7 +1169,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 
 	set_fourcc(lav_fd, video_comp);
     
-   lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;
+    lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;
 
    if(lav_fd->bps==0) lav_fd->bps=1; /* make it save since we will divide by that value */
  /*     if(strlen(video_comp) == 1 ) {
@@ -1327,14 +1313,14 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
     }
     
     ierr = ERROR_FORMAT;
-    veejay_msg(VEEJAY_MSG_ERROR, "Unrecognized format '%s' in %s", video_comp, filename);
+    veejay_msg(VEEJAY_MSG_ERROR, "Unrecognized fourcc '%s' in %s", video_comp, filename);
 
 ERREXIT:
    lav_close(lav_fd);
    if(frame) free(frame);
    internal_error = ierr;
-    veejay_msg(VEEJAY_MSG_ERROR, "%s", lav_strerror());
-   return 0;
+   veejay_msg(VEEJAY_MSG_ERROR, "%s", lav_strerror());
+   return NULL;
 }
 
 const char *lav_strerror(void)
