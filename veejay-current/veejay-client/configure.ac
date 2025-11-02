@@ -495,7 +495,7 @@ then
 	    fi
 
 	    AC_CACHE_CHECK(for 3DNOW on processor(s), ac_cv_flag_3dnow, [
-	    	if grep "^flags.* 3dnow" /proc/cpuinfo > /dev/null; then
+	    	if grep "^flags.*\b3dnow\b" /proc/cpuinfo > /dev/null; then
 	    		ac_cv_flag_3dnow=yes
 	    	else
 	    		ac_cv_flag_3dnow=no
