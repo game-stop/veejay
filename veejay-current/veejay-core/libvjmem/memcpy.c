@@ -1968,8 +1968,6 @@ static void *memcpy_asimd_v3(void *to, const void *from, size_t n) {
         size_t i = n >> 8;
         size_t r = n & 255;
 
-        uint8x16_t data = vld1q_u8(src);
-
         for (; i > 0; i--) {
             memcpy_asimd_256_v3(dst, src);
             src += 256;
