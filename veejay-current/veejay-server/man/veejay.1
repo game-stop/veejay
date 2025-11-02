@@ -227,6 +227,12 @@ Print veejay's options to stdout and quit
 .TP
 .SH Environment variables
 .TP
+.B VEEJAY_SUBSAMPLE_MODE
+Selects a sampling method for up-and down sampling of UV data (drop,average,bilinear,mitchell)
+.TP
+.B VEEJAY_NUM_DECODE_THREADS
+Set the number of MJPEG decode threads you would like to spaw. 
+.TP
 .B VEEJAY_MULTITHREAD_TASKS
 You can set this environment variable to the number of threads you would like to spawn for veejay's pixel tasks. This option is automatically enabled if you run high resolution video.
 .TP
@@ -250,23 +256,32 @@ Set to 1 if you wish to interpolate every chroma sample when scaling (default=0)
 .B VEEJAY_SDL_KEY_REPEAT_INTERVAL
 Interval of key pressed to repeat while pressed down.
 .TP
+.B VEEJAY_SDL_DRIVER
+Tells SDL which video driver to use
+.TP
+.B VEEJAY_SDL_HINT_RENDER_DRIVER
+Set a hint before creating the SDL driver (e.g: opengl)
+.TP
+.B VEEJAY_SDL_HINT_FRAMEBUFFER_ACCELERATION
+Enable or disable SDL hardware acceleration (0,1,2)
+.TP
 .B VEEJAY_PLAYBACK_CACHE   
 Sample cache size in MB - by default, veejay will consume up to 30% of your total RAM to cache video samples.
 .TP
-.B VEEJAY_SDL_KEY_REPEAT_DELAY     
+.B VEEJAY_SDL_KEY_REPEAT_DELAY
 Delay key repeat in ms
 .TP
 .B VEEJAY_FULLSCREEN 
 Fullscreen (1) or windowed (0) mode
 .TP
 .B VEEJAY_DESKTOP_GEOMETRY
-Specifiy the desktop geometry for veejay to position the video window. Use this feature to specificy where a video window appears in TwinView or One Big Desktop
+Specify the desktop geometry for veejay to position the video window. Use this feature to specificy where a video window appears in TwinView or One Big Desktop
 .TP
 .B VEEJAY_VIDEO_SIZE
-Specifiy the size of the video window (inside VEEJAY_DESKTOP_GEOMETRY)
+Specify the size of the video window (inside VEEJAY_DESKTOP_GEOMETRY)
 .TP
 .B VEEJAY_VIDEO_POSITION
-Specificy the position of the video window (inside VEEJAY_DESKTOP_GEOMETRY)
+Specify the position of the video window (inside VEEJAY_DESKTOP_GEOMETRY)
 .TP
 .B VEEJAY_DEFAULT_CHANNEL
 Specify the default video4linux channel id
