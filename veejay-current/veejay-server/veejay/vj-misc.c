@@ -104,14 +104,19 @@ static 	int	is_it_usable(const char *file)
 	return 0;
 }
 
-static	char	*relative_path(filelist_t *filelist, const char *node)
+static char *relative_path(filelist_t *filelist, const char *node)
 {
-	int len = strlen(filelist->working_dir);
-	if( node + len + 1 ) {
-		char *tmp = vj_strdup( node + len + 1);
-		return tmp;
-	}
-	return vj_strdup(node);
+    int len = strlen(filelist->working_dir);
+    
+    if (strncmp(node, filelist->working_dir, len) == 0) {
+        const char *rel = node + len;
+        if (*rel == '/' || *rel == '\\') {
+            rel++;
+        }
+        return vj_strdup(rel);
+    }
+
+    return vj_strdup(node);
 }
 
 static int	is_usable_file( filelist_t *filelist, const char *node, const char *filename )
