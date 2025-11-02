@@ -316,7 +316,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 			 av_frame_free(&(e->frame));
 			 free(e);
 		
-			return av_ret;
+			return NULL;
 		}
 
 		e->context->framerate = (AVRational) { 1, frame->fps };
@@ -731,7 +731,9 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 		d.height = av->height;
 		d.width = av->width;
 	
-	    qoi_encode( src, &d, &res, buf, buf_len );
+	
+		const unsigned char *tmp[4] = { src[0], src[1], src[2], src[3] };
+	    	qoi_encode( tmp, &d, &res, buf, buf_len );
 
 		return res;
 	}
