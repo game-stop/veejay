@@ -606,11 +606,7 @@ int vj_event_bundle_update( vj_msg_bundle *bundle, int bundle_id )
     if(bundle) {
         hnode_t *n = hnode_create(bundle);
         if(!n) return 0;
-#ifdef ARCH_X86_64
-        uint64_t tid = (uint64_t) bundle_id;
-#else
-        uint32_t tid = (uint32_t) bundle_id;
-#endif
+	uintptr_t tid = (uintptr_t) bundle_id;
 
         hnode_put( n, (void*) tid);
         hnode_destroy(n);
@@ -638,11 +634,7 @@ static  void    constrain_stream( veejay_t *v, int n, long hi )
 vj_msg_bundle *vj_event_bundle_get(int event_id)
 {
     vj_msg_bundle *m;
-#ifdef ARCH_X86_64
-    uint64_t tid = (uint64_t) event_id;
-#else
-    uint32_t tid = (uint32_t) event_id;
-#endif
+    uintptr_t tid = (uintptr_t) event_id;
 
     hnode_t *n = hash_lookup(BundleHash, (void*) tid);
     if(n) 
@@ -662,11 +654,7 @@ int         del_keyboard_event(int id )
     vj_keyboard_event *ev = get_keyboard_event( id );
 
     keyboard_event_map_[ id ] = NULL;
-#ifdef ARCH_X86_64
-    uint64_t tid = (uint64_t) id;
-#else
-    uint32_t tid = (uint32_t) id;
-#endif
+    uintptr_t tid = (uintptr_t) id;
 
     if(ev == NULL)
         return 0;
@@ -694,11 +682,7 @@ vj_keyboard_event   *get_keyboard_event(int id)
 
 int     keyboard_event_exists(int id)
 {
-#ifdef ARCH_X86_64
-    uint64_t tid = (uint64_t) id;
-#else
-    uint32_t tid = (uint32_t) id;
-#endif
+    uintptr_t tid = (uintptr_t) id;
 
     hnode_t *node = hash_lookup( keyboard_events, (void*) tid );
     if(node)
@@ -790,11 +774,7 @@ vj_keyboard_event *new_keyboard_event(
 
 int vj_event_bundle_exists(int event_id)
 {
-#ifdef ARCH_X86_64
-    uint64_t tid = (uint64_t) event_id;
-#else
-    uint32_t tid = (uint32_t) event_id;
-#endif
+    uintptr_t tid = (uintptr_t) event_id;
 
     hnode_t *n = hash_lookup( BundleHash,(void*) tid );
     if(!n)
@@ -819,11 +799,7 @@ int vj_event_bundle_store( vj_msg_bundle *m )
     if(!m) return 0;
     n = hnode_create(m);
     if(!n) return 0;
-#ifdef ARCH_X86_64
-    uint64_t tid = (uint64_t) m->event_id;
-#else
-    uint32_t tid = (uint32_t) m->event_id;
-#endif
+    uintptr_t tid = (uintptr_t) m->event_id;
     if(!vj_event_bundle_exists(m->event_id))
     {
         hash_insert( BundleHash, n, (void*) tid);
@@ -847,12 +823,7 @@ int vj_event_bundle_del( int event_id )
     hnode_t *n;
     vj_msg_bundle *m = vj_event_bundle_get( event_id );
     if(!m) return -1;
-#ifdef ARCH_X86_64
-    uint64_t tid = (uint64_t) event_id;
-#else
-    uint32_t tid = (uint32_t) event_id;
-#endif
-
+    uintptr_t tid = (uintptr_t) event_id;
     n = hash_lookup( BundleHash, (void*) tid );
     if(!n)
         return -1;
@@ -1992,11 +1963,8 @@ vims_key_list   *vj_event_get_keys( int event_id )
                 }
         return list;
     }
-#ifdef ARCH_X86_64
-    uint64_t eid = (uint64_t) event_id;
-#else
-    uint32_t eid = (uint32_t) event_id;
-#endif    
+    uintptr_t eid = (uintptr_t) event_id;
+
     hnode_t *node = hash_lookup(keyboard_eventid_map, (void*) eid);
     if(node == NULL) {
         return list;
@@ -2052,13 +2020,8 @@ static int vj_event_update_key_collection(vj_keyboard_event *ev, int index)
         return 0;
     }
 
-#ifdef ARCH_X86_64
-    uint64_t tid = (uint64_t) index;
-    uint64_t eid = (uint64_t) ev->event_id;
-#else
-    uint32_t tid = (uint32_t) index;
-    uint32_t eid = (uint32_t) ev->event_id;
-#endif
+    uintptr_t tid = (uintptr_t) index;
+    uintptr_t eid = (uintptr_t) ev->event_id;
 
     hnode_t *old = hash_lookup( keyboard_events, (void*) tid );
     if(old) {
