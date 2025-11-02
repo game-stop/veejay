@@ -533,15 +533,17 @@ static hash_val_t int_bundle_hash(const void *key)
     return (hash_val_t) key;
 }
 
-static int int_bundle_compare(const void *key1,const void *key2)
+static int int_bundle_compare(const void *key1, const void *key2)
 {
-#ifdef ARCH_X86_64
-    return ((uint64_t) key1 < (uint64_t) key2 ? -1 :
-            ((uint64_t) key1 < (uint64_t) key2 ? 1: 0 ));
-#else
-    return ((uint32_t)key1 < (uint32_t) key2 ? -1 : 
-        ((uint32_t) key1 > (uint32_t) key2 ? +1 : 0));
-#endif
+    uintptr_t k1 = (uintptr_t)key1;
+    uintptr_t k2 = (uintptr_t)key2;
+
+    if (k1 < k2)
+        return -1;
+    else if (k1 > k2)
+        return 1;
+    else
+        return 0;
 }
 
 typedef struct {
