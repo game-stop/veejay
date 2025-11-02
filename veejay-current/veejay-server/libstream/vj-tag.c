@@ -214,7 +214,7 @@ vj_tag *vj_tag_get(int id)
     if( tag_cache[ id ] != NULL )
         return (vj_tag*) tag_cache[id];
 
-    hnode_t *tag_node = hash_lookup(TagHash, (void *) tid);
+    hnode_t *tag_node = hash_lookup(TagHash, (void *)(uintptr_t) tid);
     if (!tag_node) {
         return NULL;
     }
@@ -238,7 +238,7 @@ int vj_tag_put(vj_tag * tag)
 #endif
 
     if (!vj_tag_exists(tag->id)) {
-        hash_insert(TagHash, tag_node, (void *) tid);
+        hash_insert(TagHash, tag_node, (void *)(uintptr_t) tid);
     } else {
         hnode_put(tag_node, (void *) tid);
     }
@@ -936,7 +936,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
           }
           id = avail_tag[i];
           avail_tag[i] = 0;
-          hash_insert(TagHash, tag_node, (void *) tid);
+          hash_insert(TagHash, tag_node, (void *)(uintptr_t) tid);
           break;
         }
     }
@@ -1477,7 +1477,7 @@ int vj_tag_del(int id)
 #else
     uint32_t tid = (uint32_t) tag->id;
 #endif
-    tag_node = hash_lookup(TagHash, (void *) tid);
+    tag_node = hash_lookup(TagHash, (void *)(uintptr_t) tid);
 
     if(tag_node)
     {
