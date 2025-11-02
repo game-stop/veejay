@@ -87,7 +87,7 @@ static int has_cpuid(void)
 
 #ifdef HAVE_ARM
 #define WORD_SIZE 4
-static int int get_cache_line_size() {
+static int get_cache_line_size() {
 #if defined(__aarch64__)
     uint64_t ctr_el0;
     asm volatile("mrs %0, ctr_el0" : "=r"(ctr_el0));
