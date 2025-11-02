@@ -1417,9 +1417,8 @@ static int  configure(vj_font_t *f, int size, int font)
         return 0;
     }
 
-    veejay_memset( selected_default_font, 0, sizeof(selected_default_font));
-    strncpy( selected_default_font, (char*)f->font,strlen((char*)f->font)) ;
-
+	snprintf(selected_default_font, sizeof(selected_default_font), "%s", f->font);
+    
     f->use_kerning  =   FT_HAS_KERNING(f->face);
     
     yMax = -32000;
