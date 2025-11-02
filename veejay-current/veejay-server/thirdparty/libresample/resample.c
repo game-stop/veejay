@@ -301,14 +301,13 @@ void *vj_av_audio_resample_init(int output_channels, int input_channels,
 
 /* resample audio. 'nb_samples' is the number of input samples */
 /* XXX: optimize it ! */
+#define FF_MAX_CHAN 8
 int vj_audio_resample(void *ptr, short *output, short *input, int nb_samples)
 {
 	ReSampleContext *s = (ReSampleContext*) ptr;
     int i, nb_samples1;
 	short **bufin = s->bufin;
 	short **bufout = s->bufout;
-//    short *bufin[MAX_CHANNELS];
-//    short *bufout[MAX_CHANNELS];
     short *buftmp2[MAX_CHANNELS], *buftmp3[MAX_CHANNELS];
     short *output_bak = NULL;
     int lenout;
@@ -320,14 +319,16 @@ int vj_audio_resample(void *ptr, short *output, short *input, int nb_samples)
     }
 
     if (s->sample_fmt[0] != AV_SAMPLE_FMT_S16) {
-        int istride[1] = { s->sample_size[0] };
-        int ostride[1] = { 2 };
-        const void *ibuf[1] = { input };
-        void       *obuf[1];
-        unsigned input_size = nb_samples * s->input_channels * 2;
+        int istride[FF_MAX_CHAN] = {0};
+        int ostride[FF_MAX_CHAN] = {0};
+        const void *ibuf[FF_MAX_CHAN] = {0};
+        void       *obuf[FF_MAX_CHAN] = {0};
+        
+		unsigned input_size = nb_samples * s->input_channels * 2;
 
         if (!s->buffer_size[0] || s->buffer_size[0] < input_size) {
-            av_free(s->buffer[0]);
+            if(s->buffer[0]) 
+					av_free(s->buffer[0]);
             s->buffer_size[0] = input_size;
             s->buffer[0] = av_malloc(s->buffer_size[0]);
             if (!s->buffer[0]) {
@@ -336,7 +337,12 @@ int vj_audio_resample(void *ptr, short *output, short *input, int nb_samples)
             }
         }
 
-        obuf[0] = s->buffer[0];
+		for(i = 0; i < s->input_channels; i ++ ) {
+			ibuf[i] = input + i;
+			istride[i] = s->sample_size[i];
+			obuf[i] = s->buffer[0] + i;
+			ostride[i] = 2;
+		}
 
         if (av_audio_convert(s->convert_ctx[0], obuf, ostride,
                              ibuf, istride, nb_samples * s->input_channels) < 0) {
@@ -356,7 +362,8 @@ int vj_audio_resample(void *ptr, short *output, short *input, int nb_samples)
         output_bak = output;
 
         if (!s->buffer_size[1] || s->buffer_size[1] < out_size) {
-            av_free(s->buffer[1]);
+            if(s->buffer[1])
+				av_free(s->buffer[1]);
             s->buffer_size[1] = out_size;
             s->buffer[1] = av_malloc(s->buffer_size[1]);
             if (!s->buffer[1]) {
@@ -368,11 +375,7 @@ int vj_audio_resample(void *ptr, short *output, short *input, int nb_samples)
         output = s->buffer[1];
     }
 
-    /* XXX: move those malloc to resample init code */
     for (i = 0; i < s->filter_channels; i++) {
-        //bufin[i] = av_malloc_array((nb_samples + s->temp_len), sizeof(short));
-        //bufout[i] = av_malloc_array(lenout, sizeof(short));
-
         if (!bufin[i] || !bufout[i]) {
             av_log(s->resample_context, AV_LOG_ERROR, "Could not allocate buffer\n");
             nb_samples1 = 0;
@@ -428,10 +431,17 @@ int vj_audio_resample(void *ptr, short *output, short *input, int nb_samples)
     }
 
     if (s->sample_fmt[1] != AV_SAMPLE_FMT_S16) {
-        int istride[1] = { 2 };
-        int ostride[1] = { s->sample_size[1] };
-        const void *ibuf[1] = { output };
-        void       *obuf[1] = { output_bak };
+        int istride[FF_MAX_CHAN] = {0};
+        int ostride[FF_MAX_CHAN] = {0};
+        const void *ibuf[FF_MAX_CHAN] = {0};
+        void       *obuf[FF_MAX_CHAN] = {0};
+
+		for( i = 0; i < s->output_channels; i ++ ) {
+				ibuf[i] = output + i;
+				istride[i] = 2;
+				obuf[i] = output_bak + i;
+				ostride[i] = s->sample_size[1];
+		}
 
         if (av_audio_convert(s->convert_ctx[1], obuf, ostride,
                              ibuf, istride, nb_samples1 * s->output_channels) < 0) {
@@ -439,6 +449,8 @@ int vj_audio_resample(void *ptr, short *output, short *input, int nb_samples)
                    "Audio sample format conversion failed\n");
             return 0;
         }
+
+		output = output_bak;
     }
 
 fail:
