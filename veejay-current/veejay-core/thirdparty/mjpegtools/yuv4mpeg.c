@@ -83,7 +83,7 @@ ssize_t y4m_read(int fd, void *buf, size_t len)
        /* return amount left to read */
        if (n == 0)
 	 return len;  /* n == 0 --> eof */
-       else
+      else
 	 return -len; /* n < 0 --> error */
      }
      ptr += n;
@@ -185,7 +185,8 @@ void y4m_copy_xtag_list(y4m_xtag_list_t *dest, const y4m_xtag_list_t *src)
   for (i = 0; i < src->count; i++) {
     if (dest->tags[i] == NULL) 
       dest->tags[i] = y4m_new_xtag();
-    strncpy(dest->tags[i], src->tags[i], Y4M_MAX_XTAG_SIZE);
+    strncpy(dest->tags[i], src->tags[i], Y4M_MAX_XTAG_SIZE - 1);
+    dest->tags[i][Y4M_MAX_XTAG_SIZE -1 ] = '\0';
   }
   dest->count = src->count;
 }
@@ -223,7 +224,9 @@ int y4m_xtag_add(y4m_xtag_list_t *xtags, const char *tag)
   if (xtags->count >= Y4M_MAX_XTAGS) return Y4M_ERR_XXTAGS;
   if (xtags->tags[xtags->count] == NULL) 
     xtags->tags[xtags->count] = y4m_new_xtag();
-  strncpy(xtags->tags[xtags->count], tag, Y4M_MAX_XTAG_SIZE);
+  strncpy(xtags->tags[xtags->count], tag, Y4M_MAX_XTAG_SIZE - 1);
+  xtags->tags[xtags->count][Y4M_MAX_XTAG_SIZE - 1] = '\0';
+
   (xtags->count)++;
   return Y4M_OK;
 }
