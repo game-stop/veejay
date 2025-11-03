@@ -132,7 +132,7 @@ typedef struct
 //this collection is never freed and initialized on first access
 static hash_t *fourccTable = NULL;
 
-static inline void *avhelper_get_decoder_intra( const char *filename, int dst_pixfmt, int dst_width, int dst_height, int force_intra_frame_only );
+static void *avhelper_get_decoder_intra( const char *filename, int dst_pixfmt, int dst_width, int dst_height, int force_intra_frame_only );
 
 typedef struct {
 	int codec_id;
@@ -519,7 +519,7 @@ int avhelper_recv_decode( void *decoder, int *got_picture )
     return result;
 }
 
-static inline void	*avhelper_get_decoder_intra( const char *filename, int dst_pixfmt, int dst_width, int dst_height, int force_intra_frame_only ) {
+static void	*avhelper_get_decoder_intra( const char *filename, int dst_pixfmt, int dst_width, int dst_height, int force_intra_frame_only ) {
 	char errbuf[512];
 	el_decoder_t *x = (el_decoder_t*) vj_calloc( sizeof( el_decoder_t ));
 	int ret;
@@ -548,9 +548,6 @@ static inline void	*avhelper_get_decoder_intra( const char *filename, int dst_pi
 	if( err < 0 ) {
 		av_strerror( err, errbuf, sizeof(errbuf));
 		veejay_msg(VEEJAY_MSG_ERROR, "Error getting stream info from %s: %s" ,filename,errbuf );
-	}
-
-	if(err < 0 ) {
 		avhelper_close_input_file( x->avformat_ctx );
 		free(x);
 		return NULL;
@@ -653,7 +650,7 @@ further:
         if (!x->codec) {
             veejay_msg(VEEJAY_MSG_ERROR, "Failed to find %s codec\n",
                     av_get_media_type_string(AVMEDIA_TYPE_VIDEO));
-					avhelper_close_input_file( x->avformat_ctx );
+			avhelper_close_input_file( x->avformat_ctx );
 			free(x);
             return NULL;
         }
@@ -674,7 +671,6 @@ further:
 	AVCodecContext *dec_ctx = avcodec_alloc_context3(x->codec);
 	if(!dec_ctx) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Failed to allocate the codec context");
-		avhelper_codec_close(dec_ctx);
 		avhelper_close_input_file( x->avformat_ctx );
 		free(x);
 		return NULL;
@@ -696,7 +692,10 @@ further:
 
 #if LIBAVCODECBUILD > 5400
 	int n_threads = avhelper_set_num_decoders();
-
+	if( n_threads <= 0 ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "Fallback to 1 decoding thread");
+		n_threads = 1;
+	}
 	if (x->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
 		x->codec_ctx->thread_type = FF_THREAD_FRAME;
 		x->codec_ctx->thread_count = n_threads;	
@@ -705,7 +704,7 @@ further:
 		x->codec_ctx->thread_type = FF_THREAD_SLICE;
 		x->codec_ctx->thread_count = n_threads;	
 	}
-
+	veejay_msg(VEEJAY_MSG_DEBUG, "Using %d ffmpeg decoding threads", x->codec_ctx->thread_count );
 #endif
 
 #if LIBAVCODEC_VERSION_MAJOR >= 60
@@ -729,6 +728,20 @@ further:
 	x->codec_ctx = dec_ctx;
 	for(j = 0; j < MAX_PACKETS; j ++ ) {
 		x->packets[j] = av_packet_alloc();
+		if(!x->packets[j]) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Failed to allocate packet %d", j );
+			for( int k = 0; k < j ; k ++ ) {
+				av_packet_free(&(x->packets[k]));
+			}
+#if LIBAVCODEC_VERSION_MAJOR >= 60
+			avcodec_free_context( &(x->codec_ctx ));
+#else
+			avcodec_close(x->codec_ctx);
+#endif
+			avhelper_close_input_file(x->avformat_ctx);
+			free(x);
+			return NULL;
+		}
 	}
 
 #endif
@@ -739,8 +752,11 @@ further:
 	veejay_memset( &(x->packets[0]), 0, sizeof(AVPacket));
 	AVFrame *f = avhelper_alloc_frame();
 	x->output = yuv_yuv_template( NULL,NULL,NULL, wid, hei, dst_pixfmt );
-	x->spvf = ( (double) x->codec_ctx->framerate.den ) / ( (double) x->codec_ctx->framerate.num);
-	
+	if( x->codec_ctx->framerate.num > 0 )
+		x->spvf = ( (double) x->codec_ctx->framerate.den ) / ( (double) x->codec_ctx->framerate.num);
+	else
+		x->spvf = 0.04f;
+
 	while(1) {
 	    int ret = av_read_frame(x->avformat_ctx, &(x->packets[0]));
 		if( ret < 0 ) {
@@ -768,7 +784,12 @@ further:
 #else
 	AVFrame *f = avhelper_alloc_frame();
 	x->output = yuv_yuv_template( NULL,NULL,NULL, wid, hei, dst_pixfmt );
-	x->spvf = ( (double) x->codec_ctx->framerate.den ) / ( (double) x->codec_ctx->framerate.num);
+	if( x->codec_ctx->framerate.num > 0 ) {
+		x->spvf = ( (double) x->codec_ctx->framerate.den ) / ( (double) x->codec_ctx->framerate.num);
+	}
+	else {
+		x->spvf = 0.04f; // 0.04 seconds per video frame = 25 fps
+	}
 	
 	while(1) {
 	    int ret = av_read_frame(x->avformat_ctx, x->packets[0]);
