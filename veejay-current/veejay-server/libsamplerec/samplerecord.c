@@ -255,6 +255,8 @@ int sample_continue_record( int s1 )
 
 	if( si->encoder_total_frames_recorded >= si->encoder_frames_to_record ) {
 		veejay_msg(VEEJAY_MSG_INFO, "Recorded %ld frames", si->encoder_total_frames_recorded );
+
+		vj_avcodec_flush_frame(si->encoder, vj_avcodec_get_buf(si->encoder), si->encoder_max_size );
 		return 1;
 	}
 
