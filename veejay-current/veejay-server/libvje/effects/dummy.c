@@ -66,7 +66,7 @@ void dummy_rgb_apply( VJFrame *frame, int r,int g, int b)
 {
 	const int len = frame->len;
 	const int uv_len = frame->uv_len;
-	int colorCb=128, colorCr=128, colorY=0;
+	int colorCb=128, colorCr=128, colorY=pixel_Y_lo_;
 
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
@@ -82,7 +82,7 @@ void dummy_rgb_apply( VJFrame *frame, int r,int g, int b)
 static void	dummy_apply_job( void *arg )
 {
 	vj_task_arg_t *t = (vj_task_arg_t*) arg;
-	int colorCb=128, colorCr=128, colorY=0;
+	int colorCb=128, colorCr=128, colorY=pixel_Y_lo_;
 
 	uint8_t *Y = t->input[0];
 	uint8_t *Cb = t->input[1];
