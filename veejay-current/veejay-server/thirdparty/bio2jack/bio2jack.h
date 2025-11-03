@@ -25,7 +25,9 @@
 #ifdef __cplusplus
 extern "C" {
 #else
-#define bool long
+#ifndef bool 
+  #define bool int
+#endif
 #endif
 
 #ifndef TRUE

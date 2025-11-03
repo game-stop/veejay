@@ -423,7 +423,6 @@ static int
 JACK_callback(nframes_t nframes, void *arg)
 {
   jack_driver_t *drv = (jack_driver_t *) arg;
-  struct timespec tmp_tp;
   unsigned int i;
 
 //  clock_gettime(CLOCK_MONOTONIC, &tmp_tp );

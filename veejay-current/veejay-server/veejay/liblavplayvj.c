@@ -1340,20 +1340,28 @@ static	int	veejay_create_homedir(char *path)
 	free(font_dir);
 	return 1;
 }
+
+#define PATH_TMP_SIZE 1024
+#define PATH_SUFFIX_SIZE 64
 void	veejay_check_homedir(void *arg)
 {
 	veejay_t *info = (veejay_t *) arg;
-	char path[1024];
-	char tmp[1024];
+	char path[ PATH_TMP_SIZE - PATH_SUFFIX_SIZE ];
+	char tmp[ PATH_TMP_SIZE ];
 	char *home = getenv("HOME");
 	if(!home)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,
-				"HOME environment variable not set");
+		veejay_msg(VEEJAY_MSG_ERROR, "HOME environment variable not set");
 		return;
 	}
-	snprintf(path,sizeof(path), "%s/.veejay", home );
-	info->homedir = vj_strndup( path, 1024 );
+	
+	int n = snprintf(path,sizeof(path), "%s/.veejay", home );
+	if( n < 0 || n >= (int) sizeof(path)) {
+		veejay_msg(VEEJAY_MSG_ERROR, "HOME path too long: %s", home );
+		return;
+	}
+
+	info->homedir = vj_strndup( path, sizeof(path) );
 
 	if( veejay_valid_homedir(path) == 0)
 	{
@@ -1365,13 +1373,24 @@ void	veejay_check_homedir(void *arg)
 		}
 	}
 
-	snprintf(tmp,sizeof(tmp), "%s/plugins.cfg", path );
+	n = snprintf(tmp,sizeof(tmp), "%s/plugins.cfg", path );
+	if(n < 0 || n >= (int) sizeof(tmp)) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Path too long for plugins.cfg: %s", path );
+		return;
+	}
+
 	struct statfs ts;
 	if( statfs( tmp, &ts ) != 0 )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING,"No plugin configuration file found in [%s] (see DOC/HowtoPlugins)",tmp);
 	}
-	snprintf(tmp,sizeof(tmp), "%s/viewport.cfg", path);
+	
+	n = snprintf(tmp,sizeof(tmp), "%s/viewport.cfg", path);
+	if( n < 0 || n >= (int) sizeof(tmp)) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Path too long for viewport.cfg: %s",path);
+		return;
+	}
+
 	if( statfs( tmp, &ts ) != 0 )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING,"No projection mapping file found in [%s]", tmp);
