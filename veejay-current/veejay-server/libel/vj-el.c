@@ -300,8 +300,9 @@ int	vj_el_cache_size()
 static vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, float fps, int pixel_format, int out_fmt, long max_frame_size)
 {
    vj_decoder *d = (vj_decoder*) vj_calloc(sizeof(vj_decoder));
-   if(!d)
-	  return NULL;
+   if(!d) {
+		return NULL;
+   }
 #ifdef SUPPORT_READ_DV2
 	if( id == CODEC_ID_DVVIDEO )
 		d->dv_decoder = vj_dv_decoder_init(1, width, height, out_fmt );
@@ -378,7 +379,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
  	if( filename == NULL ) 
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "No files to open!");
+		veejay_msg(VEEJAY_MSG_ERROR, "No files give to open");
 		return -1;
 	}
 
@@ -397,7 +398,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	{
 		if (strncmp(realname, el->video_file_list[i], strlen( el->video_file_list[i])) == 0)
 		{
-		    veejay_msg(VEEJAY_MSG_ERROR, "File %s already in editlist", realname);
+		    veejay_msg(VEEJAY_MSG_ERROR, "File %s is already in editlist", realname);
 		    if(realname) free(realname);
 		    return -1;
 		}
@@ -405,7 +406,6 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
 	if (el->num_video_files >= MAX_EDIT_LIST_FILES)
 	{
-		// mjpeg_error_exit1("Maximum number of video files exceeded");
 		veejay_msg(VEEJAY_MSG_ERROR,"Maximum number of video files exceeded\n");
         	if(realname) free(realname);
 		return -1; 
@@ -422,8 +422,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	el->lav_fd[n] = NULL;
 	if (elfd == NULL)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Error loading videofile '%s'", realname);
-	        veejay_msg(VEEJAY_MSG_ERROR,"%s",lav_strerror());
+		veejay_msg(VEEJAY_MSG_ERROR,"Unable to load video '%s'", realname);
+	        veejay_msg(VEEJAY_MSG_ERROR,"\t%s",lav_strerror());
 	 	if(realname) free(realname);
 		return -1;
 	}
@@ -539,8 +539,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		{
 			el->audio_chans = lav_audio_channels(el->lav_fd[n]);
 			if (el->audio_chans > 2) {
-		  	  veejay_msg(VEEJAY_MSG_ERROR, "File %s has %d audio channels - cant play that!",
-			              filename,el->audio_chans);
+		  	  veejay_msg(VEEJAY_MSG_ERROR, "File has %d audio channels - cant play that!",
+			              el->audio_chans);
 			   nerr++;
 			}
 	
@@ -554,7 +554,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 			if(lav_audio_channels(el->lav_fd[n]) != el->audio_chans ||
 			   lav_audio_rate(el->lav_fd[n]) != el->audio_rate ||
 			   lav_audio_bits(el->lav_fd[n]) != el->audio_bits ) {
-				veejay_msg(VEEJAY_MSG_ERROR,"File %s has different audio properties - cant play that!");
+				veejay_msg(VEEJAY_MSG_ERROR,"Different audio properties detected - cant play that!");
 				veejay_msg(VEEJAY_MSG_DEBUG,"Audio rate %ld, source is %ld", el->audio_rate, lav_audio_rate(el->lav_fd[n]));
 				veejay_msg(VEEJAY_MSG_DEBUG,"Audio bits %d, source is %d", el->audio_bits, lav_audio_bits(el->lav_fd[n]));
 				veejay_msg(VEEJAY_MSG_DEBUG,"Audio channels %d, source is %d", el->audio_chans, lav_audio_channels(el->lav_fd[n]) );
@@ -568,8 +568,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		if (el->video_height != lav_video_height(el->lav_fd[n]) ||
 		    el->video_width != lav_video_width(el->lav_fd[n])) {
 		    veejay_msg( (require_same_resolution ? VEEJAY_MSG_ERROR: VEEJAY_MSG_WARNING),
-				"File %s: Geometry %dx%d does not match %dx%d (performance penalty).",
-				filename, lav_video_width(el->lav_fd[n]),
+				"Geometry %dx%d does not match %dx%d (performance penalty).",
+				lav_video_width(el->lav_fd[n]),
 				lav_video_height(el->lav_fd[n]), el->video_width,
 				el->video_height);
 		    if( require_same_resolution )
@@ -580,7 +580,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	   for live performances */
 	if (fabs(el->video_fps - lav_frame_rate(el->lav_fd[n])) >
 	    0.0000001) {
-	    veejay_msg(VEEJAY_MSG_WARNING,"File %s: fps is %3.2f , but playing at %3.2f", filename,
+	    veejay_msg(VEEJAY_MSG_WARNING, "FPS is %3.2f , but playing at %3.2f", filename,
 		       lav_frame_rate(el->lav_fd[n]), el->video_fps);
 	}
 	/* If first file has no audio, we don't care about audio */
@@ -588,7 +588,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	if (el->has_audio) {
 	    if( el->audio_rate < 44000 )
 	    {
-		veejay_msg(VEEJAY_MSG_ERROR, "File %s: Cannot play %d Hz audio. Use at least 44100 Hz or start with -a0", filename, el->audio_rate);
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot play %d Hz audio. Use at least 44100 Hz or start with -a0", el->audio_rate);
 		nerr++;
 	    }
         else {
@@ -600,8 +600,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 			if( lav_audio_rate(el->lav_fd[n]) == 0 )
 				err_level = VEEJAY_MSG_WARNING;
 
-			veejay_msg(err_level,"File %s: Mismatched audio properties: %d channels , %d bit %ld Hz",
-			   filename, lav_audio_channels(el->lav_fd[n]),
+			veejay_msg(err_level,"Mismatched audio properties: %d channels , %d bit %ld Hz",
+			   lav_audio_channels(el->lav_fd[n]),
 			   lav_audio_bits(el->lav_fd[n]),
 			   lav_audio_rate(el->lav_fd[n]) );
 			   if( err_level == VEEJAY_MSG_ERROR )
@@ -612,8 +612,9 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
 
 	if (nerr) {
+	    veejay_msg(VEEJAY_MSG_ERROR, "Too many errors in %s, refusing to load", filename);
 	    if(el->lav_fd[n]) 
-			lav_close( el->lav_fd[n] );
+		lav_close( el->lav_fd[n] );
 	    el->lav_fd[n] = NULL;
 	    if(realname) free(realname);
 	    if(el->video_file_list[n]) 
@@ -625,12 +626,10 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
     }
 
 	compr_type = (const char*) lav_video_compressor(el->lav_fd[n]);
-
-	set_fourcc(el->lav_fd[n], compr_type );
-
-	if(!compr_type)
+	
+	if(compr_type==NULL)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to read codec information from file");
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to read fourcc from %s", filename);
 		if(el->lav_fd[n])
 		 lav_close( el->lav_fd[n] );
 		el->lav_fd[n] = NULL;
@@ -642,6 +641,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
 		return -1;
 	}
+
+	set_fourcc(el->lav_fd[n], compr_type);
 
 	if( el->decoders[n] == NULL ) {
 		
@@ -698,7 +699,8 @@ static int	vj_el_dummy_frame( uint8_t *dst[3], editlist *el ,int pix_fmt)
 {
 	const int uv_len = (el->video_width * el->video_height) / ( ( (pix_fmt==FMT_422||pix_fmt==FMT_422F) ? 2 : 4));
 	const int len = el->video_width * el->video_height;
-	veejay_memset( dst[0], 16, len );
+	const uint8_t black = (el_switch_jpeg_ || pix_fmt == FMT_422F ) ? 0 : 16;
+	veejay_memset( dst[0], black, len );
 	veejay_memset( dst[1],128, uv_len );
 	veejay_memset( dst[2],128, uv_len );
 	return 1;
@@ -1411,6 +1413,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	
 					if(index_list[i]< 0)
 					{
+						veejay_msg(VEEJAY_MSG_ERROR, "File %s not added to EDL", line );
 						fclose(fd);
 						vj_el_free(el);
 						return NULL;
