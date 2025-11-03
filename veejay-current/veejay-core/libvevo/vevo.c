@@ -825,7 +825,7 @@ int vevo_property_atom_type(vevo_port_t * p, const char *key)
 }
 
 
-static	int	vevo_storage_size( vevo_storage_t *stor ) {
+/*static	int	vevo_storage_size( vevo_storage_t *stor ) {
     int i;
     if( stor->num_elements == 0 ) 
 	    return 0;
@@ -837,7 +837,8 @@ static	int	vevo_storage_size( vevo_storage_t *stor ) {
     }
     return msize;
 }
-
+*/
+/*
 static int vevo_property_atom_size(vevo_port_t * p, const char *key)
 {
     __vevo_port_t *port = (__vevo_port_t *) p;
@@ -860,7 +861,7 @@ static int vevo_property_atom_size(vevo_port_t * p, const char *key)
 	}
     return -1;
 }
-
+*/
 
 //! Return size of an Atom at a given index
 /*!
@@ -2204,7 +2205,7 @@ char  *vevo_sprintf_property( vevo_port_t *port, const char *key  )
 	int	size = PROP_MAX_LEN;	
 
 	void	*vport = NULL;
-	char tmp[1024];
+	char tmp[PROP_MAX_LEN];
 
 	snprintf(res, PROP_MAX_LEN, "%s=", key );
 	
@@ -2282,8 +2283,10 @@ char  *vevo_sprintf_property( vevo_port_t *port, const char *key  )
 							
 						    for( k = 0; pstr[k] != NULL; k ++ )
 						    {
-								size_t pklen = strlen( pstr[k] );
-							    strncat(tmp, pstr[k], pklen);
+							    size_t space_left = sizeof(tmp) - strlen(tmp) - 1;
+							    if(space_left == 0)
+								break;
+							    strncat(tmp, pstr[k], space_left);
 							    free(pstr[k]);
 						    }
 							free(pstr);
