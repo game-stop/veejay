@@ -261,7 +261,8 @@ int y4m_xtag_addlist(y4m_xtag_list_t *dest, const y4m_xtag_list_t *src)
        i++, j++) {
     if (dest->tags[i] == NULL) 
       dest->tags[i] = y4m_new_xtag();
-    strncpy(dest->tags[i], src->tags[i], Y4M_MAX_XTAG_SIZE);
+    strncpy(dest->tags[i], src->tags[i], Y4M_MAX_XTAG_SIZE - 1);
+    dest->tags[i][Y4M_MAX_XTAG_SIZE - 1] = '\0';
   }
   dest->count += src->count;
   return Y4M_OK;
