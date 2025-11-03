@@ -43,7 +43,8 @@ dnl enable auto vectorization for libvjmem, libvje and libyuv
 
 AC_ARG_ENABLE([strict],
 		AS_HELP_STRING([--enable-strict],[Compile in paranoia assertion checking]))
-
+AC_ARG_ENABLE([threadsanitizer],
+	      	AS_HELP_STRING([--enable-threadsanitizer],[Compile with -fsanitize=thread]))
 AC_ARG_ENABLE([sanitizer],
         AS_HELP_STRING([--enable-sanitizer],[Enable AddressSanitizer]))
 
@@ -1143,6 +1144,13 @@ fi
 
 if test "x$enable_debug" != "xyes" ; then
    CFLAGS="$CFLAGS -fno-stack-protector"
+fi
+AC_MSG_CHECKING([whether to compile in thread sanitizer])
+if test "x$enable_threadsanitizer" = "xyes" ; then
+ CFLAGS="$CFLAGS -fsanitize=thread"
+ AC_MSG_RESULT([yes])
+else
+ AC_MSG_RESULT([no])
 fi
 
 if test x"$with_extra_cflags" != "x"; then
