@@ -335,7 +335,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 
    if(endFrame <= startFrame ) 
    {
-    veejay_msg(VEEJAY_MSG_ERROR,"End frame %ld must be greater then start frame %ld", endFrame, startFrame);
+    veejay_msg(VEEJAY_MSG_ERROR,"End frame %ld must be greater than start frame %ld", endFrame, startFrame);
     return NULL;
     }
 

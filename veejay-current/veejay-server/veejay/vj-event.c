@@ -2192,7 +2192,7 @@ void vj_event_init(void *ptr)
         return;
     }
     if( !(keyboard_eventid_map = hash_create( MAX_KEY_MNE, int_bundle_compare, int_bundle_hash))) {
-        veejay_msg(VEEJAY_MSG_ERROR, "Cannot creating mapping between keyboard events and VIMS event identifiers");
+        veejay_msg(VEEJAY_MSG_ERROR, "Cannot create mapping between keyboard events and VIMS event identifiers");
         return;
     }
 #endif
@@ -2382,7 +2382,7 @@ void vj_event_no_caching(void *ptr, const char format[], va_list ap)
     else
     {
         vj_el_setup_cache( v->current_edit_list );
-        veejay_msg(VEEJAY_MSG_INFO,"Sample FX Cache enabled : Recycling identicial samples in FX chain (default)"); 
+        veejay_msg(VEEJAY_MSG_INFO,"Sample FX Cache enabled : Recycling identical samples in FX chain (default)"); 
     }
 
     vj_el_set_caching(v->no_caching);
@@ -4365,7 +4365,7 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
     
     if(args[0] <= 1 )
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Cowardly refusing to record less then 2 frames");
+        veejay_msg(VEEJAY_MSG_ERROR, "Cowardly refusing to record less than 2 frames");
         return;
     }
 
@@ -4518,7 +4518,7 @@ void vj_event_sample_set_start(void *ptr, const char format[], va_list ap)
     }
     else 
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Sample %d 's starting position %d must be greater than ending position %d",
+        veejay_msg(VEEJAY_MSG_ERROR, "Sample %d's starting position %d must be greater than ending position %d",
             args[0],args[1], sample_get_endFrame(args[0]));
     }
 }
@@ -4560,7 +4560,7 @@ void vj_event_sample_set_end(void *ptr, const char format[] , va_list ap)
     }
     else
     {
-        veejay_msg(0, "Ending position must be greater then start position");
+        veejay_msg(0, "Ending position must be greater than start position");
     }
 }
 
@@ -4671,7 +4671,7 @@ void    vj_event_stream_set_length( void *ptr, const char format[], va_list ap)
             constrain_stream( v, v->uc->sample_id, (long) args[0]);
         }
         else
-          veejay_msg(VEEJAY_MSG_ERROR, "Ficticious length must be 0 - 2160000");
+          veejay_msg(VEEJAY_MSG_ERROR, "Fictitious length must be 0 - 2160000");
     }
     else
         p_invalid_mode();
@@ -7132,7 +7132,7 @@ void    vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
         composite_set_ui( v->composite, 2 );
         v->settings->composite = 2;
         v->use_osd=3;
-        veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera, press CTRL-s again to save and exit");
+        veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera, Press CTRL-s again to save and exit");
     }
 }
 
@@ -7370,7 +7370,7 @@ static void _vj_event_tag_record( veejay_t *v , int *args )
 
     if(args[0] <= 1 )
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Cowardly refusing to record less then 2 frames");
+        veejay_msg(VEEJAY_MSG_ERROR, "Cowardly refusing to record less than 2 frames");
         return;
     }
 
@@ -7465,7 +7465,7 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
     
     if( v->settings->tag_record && STREAM_PLAYING(v) && v->uc->sample_id == v->settings->offline_tag_id)
     {
-        veejay_msg(VEEJAY_MSG_ERROR ,"Please stop the stream recorder on stream %d first", v->uc->sample_id);
+        veejay_msg(VEEJAY_MSG_ERROR ,"Please stop the stream recorder for stream %d first", v->uc->sample_id);
         return;
     }
     

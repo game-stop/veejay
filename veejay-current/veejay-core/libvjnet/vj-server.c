@@ -288,7 +288,7 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 
 	if( setsockopt( vjs->handle, SOL_SOCKET, SO_RCVBUF, (const char*) &send_size, sizeof(send_size)) == 1 )
 	{
-		veejay_msg(0, "Cannot set recv buffer sze:%s", strerror(errno));
+		veejay_msg(0, "Cannot set recv buffer size:%s", strerror(errno));
 		return 0;
 	}
 	if( getsockopt( vjs->handle, SOL_SOCKET, SO_RCVBUF, (unsigned char*) &(vjs->recv_size), &tmp) == -1 )

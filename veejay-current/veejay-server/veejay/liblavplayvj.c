@@ -750,7 +750,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 					veejay_msg(VEEJAY_MSG_INFO, "Sample %d starts playing from frame %d",sample_id,pos);
 				} 
 				else {
-					veejay_msg(VEEJAY_MSG_INFO, "Already playing sample %d (continous mode is on)", sample_id);
+					veejay_msg(VEEJAY_MSG_INFO, "Already playing sample %d (continuous mode is on)", sample_id);
 				}
 				return;
 			}
@@ -1464,7 +1464,7 @@ void vj_unlock(veejay_t *info)
 }	 
 static void donothing2(int sig)
 {
-	veejay_msg(VEEJAY_MSG_WARNING,"Catched signal %x (ignored)",sig );
+	veejay_msg(VEEJAY_MSG_WARNING,"Caught signal %x (ignored)",sig );
 }
 
 static	void	veejay_event_handle(veejay_t *info)

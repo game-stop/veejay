@@ -669,7 +669,7 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 		if( supported ) {
 			veejay_msg(VEEJAY_MSG_DEBUG,"v4l2: Capture device supports JPEG format" );
 			if( v4l2_setup_avcodec_capture( v, wid,hei, CODEC_ID_MJPEG ) == 0 )  {
-				veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder");
+				veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to initialize MJPEG decoder");
 			return 0;
 			}
 			return 1;
@@ -679,7 +679,7 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 		if( supported ) {
 			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports MJPEG format");
 			if( v4l2_setup_avcodec_capture( v, wid,hei, CODEC_ID_MJPEG ) == 0 )  {
-				veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder");
+				veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to initialize MJPEG decoder");
 				return 0;
 			}
 			return 1;
@@ -710,7 +710,7 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 	if( supported ) {
 		veejay_msg(VEEJAY_MSG_DEBUG,"v4l2: Capture device supports JPEG format" );
 		if( v4l2_setup_avcodec_capture( v, wid,hei, CODEC_ID_MJPEG ) == 0 )  {
-			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder");
+			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to initialize MJPEG decoder");
 			return 0;
 		}
 		return 1;
@@ -720,7 +720,7 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 	if( supported ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports MJPEG format");
 		if( v4l2_setup_avcodec_capture( v, wid,hei, CODEC_ID_MJPEG ) == 0 )  {
-			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder");
+			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to initialize MJPEG decoder");
 			return 0;
 		}
 		return 1;
@@ -1805,7 +1805,7 @@ void	v4l2_set_control( void *d, uint32_t type,  int32_t value )
 			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: property type %s not supported",v4l2_get_property_name(type) );
 		}
 	} else if ( queryctrl.flags & V4L2_CTRL_FLAG_DISABLED || queryctrl.flags & V4L2_CTRL_FLAG_INACTIVE ) {
-		veejay_msg( VEEJAY_MSG_DEBUG, "v4l2: property type %s not supported (disabld)",v4l2_get_property_name(type) );
+		veejay_msg( VEEJAY_MSG_DEBUG, "v4l2: property type %s not supported (disabled)",v4l2_get_property_name(type) );
 	} else {
 		memset(&control,0,sizeof(control));
 		control.id = type;

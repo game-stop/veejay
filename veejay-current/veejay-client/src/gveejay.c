@@ -227,7 +227,7 @@ gint vj_gui_command_line (GApplication            *app,
         n_tracks = 1 + arg_tracks;
         if( n_tracks < 1 || n_tracks > mt_get_max_tracks() )
             n_tracks = 1;
-        if(verbosity) veejay_msg(VEEJAY_MSG_INFO, "TracXs parameted at %d", n_tracks);
+        if(verbosity) veejay_msg(VEEJAY_MSG_INFO, "Tracks parameted at %d", n_tracks);
     }
 
     if( arg_style ) {

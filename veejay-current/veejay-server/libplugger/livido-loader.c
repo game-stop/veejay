@@ -675,7 +675,7 @@ static	int	init_ports_from_template( livido_port_t *filter_instance, livido_port
 		{
 			if(!init_channel_port( ptr,in_channels[i],w,h))
 			{
-				   veejay_msg(0,"Unable to intialize output channel %d ",i );
+				   veejay_msg(0,"Unable to initialize output channel %d ",i );
 			       return -1;	
 			}
 		}

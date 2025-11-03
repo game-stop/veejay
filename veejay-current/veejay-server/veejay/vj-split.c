@@ -236,7 +236,7 @@ void	*vj_split_new_from_file(char *filename, int out_w, int out_h, int vfmt)
 					&row,&col,&port,hostname) ) {
 
 			if(!split) {
-				veejay_msg(VEEJAY_MSG_ERROR,"Screen not intialized");
+				veejay_msg(VEEJAY_MSG_ERROR,"Screen not initialized");
 				fclose(f);
 				return NULL;
 			}

@@ -101,7 +101,7 @@ int32_t			vj_share_pull_master( void *shm, char *master_host, int master_port )
 
 	int32_t	key = strtol( (char*)tmp, (char**) NULL, 10);
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Veejay sister at port %d says shared resoure ID is %d",master_port,key);
+	veejay_msg(VEEJAY_MSG_DEBUG, "Veejay sister at port %d says shared resource ID is %d",master_port,key);
 
 
 	vj_client_send( c, V_CMD, (unsigned char*) "025:1;" ); //@ master starts writing frames to shm

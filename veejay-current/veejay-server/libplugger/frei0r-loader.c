@@ -758,7 +758,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	//@ cheap check for insane frei0r plugins
 	if( (finfo.plugin_type == F0R_PLUGIN_TYPE_FILTER && processf == NULL) ||
 	     (finfo.plugin_type == F0R_PLUGIN_TYPE_MIXER2 && processm == NULL) ) {
-		veejay_msg(0, "Frei0r plugin %s behaves badly",name);
+		veejay_msg(0, "Frei0r plugin %s misbehaves",name);
 		(*f0r_deinit_func)();
 		vpf(port);
 		return NULL;
