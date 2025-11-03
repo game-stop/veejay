@@ -1055,7 +1055,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
         if(video_comp == NULL || strlen(video_comp) <= 0)
         {
             veejay_msg(VEEJAY_MSG_ERROR, "Unable to read FOURCC from AVI");
-            if(lav_fd) free(lav_fd);
+            lav_close(lav_fd);
             return NULL;
         }
 
@@ -1090,7 +1090,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 			/* We want at least one video track */
             if (quicktime_video_tracks(lav_fd->qt_fd) < 1)
             {
-                veejay_msg(VEEJAY_MSG_ERROR, "At least one video track required");
+                veejay_msg(VEEJAY_MSG_ERROR, "At least one video track required, but none found");
                 lav_close(lav_fd);
                 internal_error = ERROR_FORMAT;
                 return NULL;
@@ -1165,6 +1165,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 
     if(ret == 0 || video_comp == NULL || alt == 0)
     {
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to open %s: unsupported or unrecognized video format", filename);
         free(lav_fd);
         internal_error = ERROR_FORMAT;
         return NULL;
