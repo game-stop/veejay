@@ -71,8 +71,7 @@ typedef struct
 
 static void init_sin_lut(aquatex_t *f)
 {
-    const int size = LUT_SIZE;
-    for(int i = 0; i < size; ++i) {
+    for(int i = 0; i < LUT_SIZE; ++i) {
         f->sin_lut[i] = sin( 2 * M_PI * i / LUT_SIZE );
     }
 }
@@ -96,7 +95,13 @@ void *aquatex_malloc(int w, int h) {
         return NULL;
     }
 
-    s->sin_lut = s->lut;
+    s->sin_lut = (double*) vj_malloc(sizeof(double) * LUT_SIZE);
+    if (!s->sin_lut) {
+        free(s->lut);
+        free(s->buf[0]);
+        free(s);
+        return NULL;
+    }
 
 	init_sin_lut(s);
 
@@ -107,6 +112,7 @@ void aquatex_free(void *ptr) {
     aquatex_t *s = (aquatex_t*) ptr;
     free(s->buf[0]);
     free(s->lut);
+	free(s->sin_lut);
     free(s);
 }
 
@@ -116,8 +122,11 @@ void aquatex_apply(void *ptr, VJFrame *frame, int *args) {
     const double intensity = (double)args[0] * 0.01;
     const double frequency = (double)args[1] * 0.1;
     const double phase_shift = (double)args[2] * LUT_SIZE / 360.0;
-    const int neighborhood_size = args[3];
+    int neighborhood_size = args[3];
     const double turbulence = (double)args[4] * 0.01;
+
+	if(neighborhood_size <= 0) neighborhood_size = 1;
+	if(neighborhood_size > NB_SIZE) neighborhood_size = NB_SIZE;
 
     const int width = frame->out_width;
     const int height = frame->out_height;
@@ -156,60 +165,55 @@ void aquatex_apply(void *ptr, VJFrame *frame, int *args) {
     }
 
     if( turbulence > 0 ) {
-		for (int i = 0; i < RAND_LUT_SIZE; ++i) {
+		for (int i = 0; i < LUT_SIZE; ++i) {
         	rand_lut[i] = (rand() / (double)RAND_MAX - 0.5) * turbulence;
     	}
 	}
+	else {
+		veejay_memset( rand_lut, 0, sizeof( rand_lut ) );
+	}
+
+	double phase = -frequency * LUT_SIZE + phase_shift;
+	double step  = (frequency * LUT_SIZE) / (double) neighborhood_size;
 
 	for (int i = 0; i < nb; i++) {
-    	const int index = (int)(frequency * (i - neighborhood_size) / neighborhood_size * LUT_SIZE + phase_shift) % LUT_SIZE;
-    	offset_y_lut[i] = intensity * sin_lut[(index + LUT_SIZE) % LUT_SIZE];
-    	offset_x_lut[i] = intensity * sin_lut[(index + LUT_SIZE) % LUT_SIZE];
+    	int index = ((int)phase % LUT_SIZE + LUT_SIZE) % LUT_SIZE;
+		double value = intensity * sin_lut[index];
+    	offset_y_lut[i] = value;
+    	offset_x_lut[i] = value;
+		phase += step;
 	}
 
-	int offset = (frame->jobnum * h );
-
-	if( turbulence > 0 ) {
-		for (int y_pos = 0; y_pos < h; y_pos++) {
-				for (int x_pos = 0; x_pos < width; x_pos++) {
-					const int pixel_index = y_pos * width + x_pos;
-					const float offset_y = offset_y_lut[y_pos % (2 * neighborhood_size + 1)] + rand_lut[ pixel_index % RAND_LUT_SIZE];
-					const float offset_x = offset_x_lut[x_pos % (2 * neighborhood_size + 1)] + rand_lut[ pixel_index % RAND_LUT_SIZE];
-					
-					int new_y = (int)( y_pos + offset_y * height);
-					int new_x = (int)( x_pos + offset_x * width);
-					
-					new_y = (new_y < 0) ? 0 : ((new_y >= height) ? height - 1 : new_y);
-					new_x = (new_x < 0) ? 0 : ((new_x >= width) ? width - 1 : new_x);
-					
-					const int src_idx = new_y * width + new_x;
-					
-					outY[pixel_index] = srcY[src_idx];
-					outU[pixel_index] = srcU[src_idx];
-					outV[pixel_index] = srcV[src_idx];
-				}
-		}
-	} 
-	else {
-		for (int y_pos = 0; y_pos < h; y_pos++) {
+	int rand_idx = 0;
+	for (int y_pos = 0; y_pos < h; y_pos++) {
+			int lut_y_idx = y_pos % nb;
+			int lut_x_idx = 0;
 			for (int x_pos = 0; x_pos < width; x_pos++) {
-					const int pixel_index = y_pos * width + x_pos;
-					const float offset_y = offset_y_lut[y_pos % (2 * neighborhood_size + 1)];
-					const float offset_x = offset_x_lut[x_pos % (2 * neighborhood_size + 1)];
+				const int pixel_index = y_pos * width + x_pos;
+				const double r = rand_lut[ pixel_index % RAND_LUT_SIZE ];
+				
+				rand_idx += 1;
+				rand_idx -= (rand_idx >= RAND_LUT_SIZE) * RAND_LUT_SIZE;
 
-					int new_y = (int)(y_pos + offset_y * height);
-					int new_x = (int)(x_pos + offset_x * width);
+				const float offset_y = offset_y_lut[lut_y_idx] + r;
+				const float offset_x = offset_x_lut[lut_x_idx] + r;
 
-					new_y = (new_y < 0) ? 0 : ((new_y >= height) ? height - 1 : new_y);
-					new_x = (new_x < 0) ? 0 : ((new_x >= width) ? width - 1 : new_x);
+				int new_y = (int)( (double) y_pos + offset_y * (double) height);
+				int new_x = (int)( (double) x_pos + offset_x * (double) width);
 
-					const int src_idx = new_y * width + new_x;
+        		new_y = (new_y & -(new_y >= 0)) | ((height - 1) & -(new_y >= height));
+        		new_x = (new_x & -(new_x >= 0)) | ((width - 1) & -(new_x >= width));
 
-					outY[pixel_index] = srcY[src_idx];
-					outU[pixel_index] = srcU[src_idx];
-					outV[pixel_index] = srcV[src_idx];
-        	}
-    	}
+				const int src_idx = new_y * width + new_x;
+					
+				outY[pixel_index] = srcY[src_idx];
+				outU[pixel_index] = srcU[src_idx];
+				outV[pixel_index] = srcV[src_idx];
+
+				lut_x_idx += 1;
+				lut_x_idx -= (lut_x_idx == nb) * nb;
+			}
 	}
 }
+
 
