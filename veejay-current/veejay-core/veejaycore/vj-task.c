@@ -493,12 +493,21 @@ int vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 
 void task_destroy()
 {
+	if(!task_pool)
+		return;
+
+	atomic_store( &task_pool->stop_flag , 1 );
+
+	pthread_mutex_lock(&task_pool->lock);
+	pthread_cond_broadcast(&task_pool->start_signal);
+	pthread_mutex_unlock(&task_pool->lock);
+	
+	destroy_thread_pool(task_pool);
+
+	free(task_pool->thread_local_bufs);
+
     pthread_key_delete( thread_buf_key );
 
-    if( task_pool ) {
-        free(task_pool->thread_local_bufs);
-        destroy_thread_pool( task_pool );
-    }
 }
 
 
