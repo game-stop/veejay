@@ -74,7 +74,7 @@ int 			vj_avcodec_get_buf_size( vj_encoder *av );
 const char		*vj_avcodec_get_encoder_name(int encoder);
 int		vj_avcodec_free();
 void vj_libav_ffmpeg_version();
-
+void	vj_avcodec_flush_frame(void *encoder, uint8_t *buf, int buf_len ); 
 /* color space conversion routines, should go somewhere else someday
    together with subsample.c/colorspace.c into some lib
  */

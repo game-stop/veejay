@@ -325,7 +325,7 @@ static vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, f
 	
 	size_t safe_max_frame_size = ( AV_INPUT_BUFFER_PADDING_SIZE  + max_frame_size + GREMLIN_GUARDIAN );
 	
-	veejay_msg(VEEJAY_MSG_DEBUG, "Decoder buffer is %d bytes" , safe_max_frame_size);
+	veejay_msg(VEEJAY_MSG_DEBUG, "\tDecoder buffer:   %d bytes" , safe_max_frame_size);
 	
 
 	d->tmp_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * safe_max_frame_size );
@@ -1205,34 +1205,42 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 void	vj_el_scan_video_file( char *filename,  int *dw, int *dh, float *dfps, long *arate )
 {
 	void *tmp = avhelper_get_decoder( filename, PIX_FMT_YUVJ422P, -1, -1 );
+	float p_fps = 0.0f;
+	int p_wid = 0.0f;
+	int p_hei = 0.0f;
+	long p_rate = 0;
+
+	float p2_fps = 0.0f;
+	int p2_wid = 0;
+	int p2_hei = 0;
+	long p2_rate = 0;
+
 	if( tmp ) {
 		AVCodecContext *c = avhelper_get_codec_ctx( tmp );
-		*dw = c->width;
-		*dh = c->height;
+		p_wid = c->width;
+		p_hei = c->height;
 		if( c->time_base.num > 0 ) {
-			*dfps = (float) c->time_base.den / c->time_base.num;
-		} else {
-			veejay_msg(VEEJAY_MSG_WARNING,"Unable to detect frame rate in %s", filename );
-		    veejay_msg(VEEJAY_MSG_WARNING,
-        		"AVCodecContext: codec_id=%d, codec_type=%d, pix_fmt=%d, width=%d, height=%d,time_base=%d/%d, framerate=%d/%d, sample_rate=%d",
-        		c->codec_id,c->codec_type,c->pix_fmt,c->width,c->height,c->time_base.num,c->time_base.den,c->framerate.num,c->framerate.den,c->sample_rate
-    		);
-		}
-		*arate = c->sample_rate;
+			p_fps = (float) c->time_base.den / c->time_base.num;
+		} 
+		p_rate = c->sample_rate;
 		avhelper_close_decoder(tmp);
-	} else {
-		lav_file_t *fd = lav_open_input_file( filename, mmap_size );
-		if( fd ) {
-			*dw = lav_video_width( fd );
-			*dh = lav_video_height( fd );
-			*dfps = lav_frame_rate( fd );
-			*arate = lav_audio_rate( fd );
-			lav_close(fd);
-		}
-		
+	} 
+	
+	lav_file_t *fd = lav_open_input_file( filename, mmap_size );
+	if( fd ) {
+		p2_wid = lav_video_width( fd );
+		p2_hei = lav_video_height( fd );
+		p2_fps = lav_frame_rate( fd );
+		p2_rate = lav_audio_rate( fd );
+		lav_close(fd);
 	}
 	
-	veejay_msg(VEEJAY_MSG_DEBUG, "Using video settings from first loaded video %s: %dx%d@%2.2f", filename,*dw,*dh,*dfps);
+	*dw = (p_wid > 0) ? p_wid : p2_wid;
+    	*dh = (p_hei > 0) ? p_hei : p2_hei;
+    	*dfps = (p_fps > 0.0f) ? p_fps : p2_fps;
+    	*arate = (p_rate > 0) ? p_rate : p2_rate;
+	
+	veejay_msg(VEEJAY_MSG_DEBUG, "Using video settings from first loaded video %s: %dx%d@%2.2f R=%ld", filename,*dw,*dh,*dfps, *arate);
 }
 
 
@@ -1545,8 +1553,6 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	/* Help for audio positioning */
 
 	el->last_afile = -1;
-	veejay_msg(VEEJAY_MSG_DEBUG, "\tThere are %" PRIu64 " video frames", el->total_frames );
-
 	el->auto_deinter = 0;
 
 	return el;

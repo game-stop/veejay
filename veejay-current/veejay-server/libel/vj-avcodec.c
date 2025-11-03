@@ -116,10 +116,10 @@ int 			vj_avcodec_get_buf_size( vj_encoder *av )
 static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filename)
 {
 	vj_encoder *e = (vj_encoder*) vj_calloc(sizeof(vj_encoder));
-	char errbuf[512];
 
 	if(!e) return NULL;
 
+	char errbuf[512];
 	int selected_out_pixfmt = out_pixel_format;
 	int chroma_val = -1;
 	
@@ -553,7 +553,7 @@ int		vj_avcodec_stop( void *encoder , int fmt)
 	}
 
 #if LIBAVCODEC_MAJOR >= 60 
-
+	
 #endif
 
 	vj_avcodec_close_encoder( env );
@@ -670,14 +670,15 @@ static int vj_avcodec_encode_video( AVPacket *pkt, AVCodecContext *ctx, uint8_t 
 		return avcodec_encode_video(ctx,buf,len,frame);
 	}
 #else
-
-	int ret = av_frame_make_writable(frame);
-	if(ret < 0) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to make buffer writable");
+/*	AVFrame *enc_frame = av_frame_clone(frame);
+	if(!enc_frame) {
+		veejay_msg(0, "Failed to clone frame");
 		return -1;
-	}
+	} */
 
-	ret = avcodec_send_frame( ctx, frame );
+	int ret = avcodec_send_frame( ctx, frame );
+	//av_frame_free(&enc_frame);
+
 	if( ret < 0 ) {
 		veejay_msg(0, "Error sending frame to decoder: %s", av_err2str(ret));
 		return -1;
@@ -686,39 +687,78 @@ static int vj_avcodec_encode_video( AVPacket *pkt, AVCodecContext *ctx, uint8_t 
 	pkt->data = buf;
 	pkt->size = len;
 
+
+	 int total_bytes = 0;
 	 while (ret >= 0)
      {
-         ret = avcodec_receive_packet(ctx, pkt);
-
-         if (ret == AVERROR(EAGAIN) || ret == 0) {  // need new input, we are ready
-		 	ret = pkt->size;
-		 	break;
-		 }
-         if (ret < 0) {
-			veejay_msg( VEEJAY_MSG_ERROR, "Encoding failed: %s", av_err2str(ret));
+        ret = avcodec_receive_packet(ctx, pkt);
+     	if( ret == AVERROR(EAGAIN)) {
 			break;
-		 }
+		}
+		else if( ret == AVERROR_EOF) {
+			break;
+		}
+		else if( ret < 0 ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Encoding failed: %s",av_err2str(ret));
+		}
+	 
+	 	int copy_size = pkt->size;
+		if( total_bytes + copy_size > len ) {
+			veejay_msg(VEEJAY_MSG_WARNING,"Output buffer too small (%d < %d), truncating", len, total_bytes + copy_size );
+			copy_size = len - total_bytes;
+		}
 
-		
-     }
+		veejay_memcpy(buf + total_bytes, pkt->data, copy_size );
+		total_bytes += copy_size;
 
-	 if(pkt->size > 0)
-	   ret = pkt->size;
- 
-	av_packet_unref(pkt);
-	if( ret > 0 ) {
-		char name[256];
-		sprintf(name, "frame-%d.jpg", ret);
-		FILE *f = fopen( name, "wb");
-		fwrite( buf, ret, 1, f);
-		fclose(f);
-	} 
+		av_packet_unref(pkt);
 
-	return ret;
+	 }
+
+	 return total_bytes;
 
 #endif
 
 	return -1;
+}
+
+void	vj_avcodec_flush_frame(void *encoder, uint8_t *buf, int buf_len ) 
+{
+#if LIBAVCODEC_VERSION_MAJOR >= 60
+	vj_encoder *av = (vj_encoder*) encoder;
+	int total_bytes = 0;
+
+	avcodec_send_frame(av->context, NULL);
+
+	AVPacket *pkt = av_packet_alloc();
+	if(!pkt) {
+		return;
+	}
+
+	while( 1 ) {
+		int ret = avcodec_receive_packet(av->context, pkt);
+		if( ret == AVERROR(EAGAIN) || ret == AVERROR_EOF ) {
+			break;
+		}
+		else if (ret < 0) {
+			veejay_msg(0, "Error receiving packet during flush: %s", av_err2str(ret));
+			break;
+		}
+
+		int copy_size = pkt->size;
+		if( total_bytes + copy_size > buf_len ) {
+			veejay_msg(0, "Flush buffer too small (%d < %d), truncating", buf_len, total_bytes + copy_size );
+			copy_size = buf_len - total_bytes;
+		}
+
+		veejay_memcpy( buf + total_bytes, pkt->data, copy_size );
+		total_bytes += copy_size;
+
+		av_packet_unref(pkt);
+	}
+
+	av_packet_free(&pkt);
+#endif
 }
 
 int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src[4], uint8_t *buf, int buf_len,
@@ -754,7 +794,7 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 			} else {
 					yuv_scale_pixels_from_yuv( src,av->data,av->len, av->uv_len);
 					vj_yuv_put_frame(av->y4m, av->data );
-					return ( av->width * av->height ) * 2;
+					return ( av->width * av->height * 3 / 2);
 			}
 	}
 
