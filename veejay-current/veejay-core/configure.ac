@@ -52,6 +52,8 @@ AC_ARG_ENABLE([portleak],
 
 AC_ARG_ENABLE([debug],
 		AS_HELP_STRING([--enable-debug],[Compile in debugging information]))
+AC_ARG_ENABLE([threadsanitizer],
+	      	AS_HELP_STRING([--enable-threadsanitizer],[Compile with -fsanitize=thread]))
 AC_ARG_ENABLE([profile],
 		AS_HELP_STRING([--enable-profiling],[Compile in profiling information]))
 AC_ARG_ENABLE([strict],
@@ -165,6 +167,13 @@ debugCFLAGS=""
 if test "x$enable_debug" = "xyes" ; then
  debugCFLAGS="-g -Wall"
  CFLAGS="$CFLAGS $debugCFLAGS"
+ AC_MSG_RESULT([yes])
+else
+ AC_MSG_RESULT([no])
+fi
+AC_MSG_CHECKING([whether to compile in thread sanitizer])
+if test "x$enable_threadsanitizer" = "xyes" ; then
+ CFLAGS="$CFLAGS -fsanitize=thread"
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])
