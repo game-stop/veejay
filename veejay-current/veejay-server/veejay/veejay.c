@@ -772,8 +772,6 @@ static void print_license()
 	veejay_msg(VEEJAY_MSG_INFO,
 	    "The license must be included in the (source) package (COPYING)");
 
-	veejay_msg(VEEJAY_MSG_INFO,
-		"Veejay's PayPal donation address: veejayhq@gmail.com" );
 }
 
 static void donothing(int sig)
