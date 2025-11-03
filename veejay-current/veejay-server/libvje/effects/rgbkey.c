@@ -71,7 +71,7 @@ vj_effect *rgbkey_init(int w,int h)
     ve->extra_frame = 1;
     ve->sub_format = 1;
 	ve->rgb_conv = 1;
-    ve->parallel = 1;
+    ve->parallel = 0;
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][5],5, 
 			

@@ -36,7 +36,7 @@ vj_effect *pixelate_init(int width, int height)
 	ve->sub_format = -1;
 	ve->extra_frame = 0;
 	ve->has_user =0;
-	ve->parallel = 1;
+	ve->parallel = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Pixel Size");
 	return ve;
 }
@@ -48,6 +48,10 @@ void pixelate_apply( void *ptr, VJFrame *frame, int *args )
     int width = frame->width;
     int height = frame->height;
 
+	uint8_t *dstY = frame->data[0];
+	uint8_t *dstU = frame->data[1];
+	uint8_t *dstV = frame->data[2];
+
     for (int i = 0; i < height; i += pixelSize) {
         for (int j = 0; j < width; j += pixelSize) {
             int totalY = 0;
@@ -58,9 +62,9 @@ void pixelate_apply( void *ptr, VJFrame *frame, int *args )
             for (int y = i; y < i + pixelSize && y < height; ++y) {
                 for (int x = j; x < j + pixelSize && x < width; ++x) {
                     int index = y * width + x;
-                    totalY += frame->data[0][index];
-                    totalU += frame->data[1][index];
-                    totalV += frame->data[2][index];
+                    totalY += dstY[index];
+                    totalU += dstU[index];
+                    totalV += dstV[index];
                     count++;
                 }
             }
@@ -72,9 +76,9 @@ void pixelate_apply( void *ptr, VJFrame *frame, int *args )
             for (int y = i; y < i + pixelSize && y < height; ++y) {
                 for (int x = j; x < j + pixelSize && x < width; ++x) {
                     int index = y * width + x;
-                    frame->data[0][index] = (uint8_t)averageY;
-                    frame->data[1][index] = (uint8_t)averageU;
-                    frame->data[2][index] = (uint8_t)averageV;
+                    dstY[index] = (uint8_t)averageY;
+                    dstU[index] = (uint8_t)averageU;
+                    dstV[index] = (uint8_t)averageV;
                 }
             }
         }

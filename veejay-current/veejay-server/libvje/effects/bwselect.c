@@ -52,7 +52,7 @@ vj_effect *bwselect_init(int w, int h)
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user =0;
-    ve->parallel = 1;
+    ve->parallel = 0;
     
     ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
 
@@ -84,7 +84,7 @@ void *bwselect_malloc(int w, int h)
     if(!b) {
         return NULL;
     }
-    
+    gamma_setup(b, 4.0 ); 
     return (void*) b;
 }
 

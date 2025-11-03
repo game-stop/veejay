@@ -43,7 +43,7 @@ vj_effect *gamma_init(int w, int h)
     ve->sub_format = -1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Gamma");
-    ve->parallel = 1;
+    ve->parallel = 0;
 	return ve;
 }
 
