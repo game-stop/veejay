@@ -425,7 +425,6 @@ void gradientfield_apply( void *ptr, VJFrame *frame, int *args ) {
     const int hei1 = height - 1;
 
     for (int y = 1; y < hei1; ++y) {
-#pragma omp simd
         for (int x = 1; x < wid1; ++x) {
             const int index = y * width + x;
 
@@ -449,20 +448,20 @@ void gradientfield_apply( void *ptr, VJFrame *frame, int *args ) {
             gx *= magnitudeScaling;
             gy *= magnitudeScaling;
 
-            const int abs_gx = (gx ^ (gx >> 31)) - (gx >> 31);
-            const int abs_gy = (gy ^ (gy >> 31)) - (gy >> 31);
+            //const int abs_gx = (gx ^ (gx >> 31)) - (gx >> 31);
+            //const int abs_gy = (gy ^ (gy >> 31)) - (gy >> 31);
+			const int abs_gx = __builtin_abs(gx);
+			const int abs_gy = __builtin_abs(gy);
 
             const int gradientMagnitudeSquared = gx * gx + gy * gy;
-            float direction = (abs_gx != 0) ? lut[(abs_gy << 8) / (abs_gx + 1)] + directionalBias: 0.0f;
+            //float direction = (abs_gx != 0) ? lut[(abs_gy << 8) / (abs_gx + 1)] + directionalBias: 0.0f;
+			int idx = (abs_gy << 8) / (abs_gx + 1);
+		    idx &= -(idx < LUT_SIZE);
+			idx |= (idx >= LUT_SIZE) * (LUT_SIZE - 1);
+			float direction = lut[idx] + directionalBias;
 
-         /*   if (gx < 0) {
-                direction = M_PI - direction;
-            }
-            if (direction < 0) {
-                direction += M_PI;
-            } */
-
-            direction += M_PI * (direction < 0 );
+			direction = direction + (M_PI - 2 * direction) * (gx < 0);
+			direction += M_PI * (direction < 0);
 
             vectorField[x][y].mag = gradientMagnitudeSquared;
             vectorField[x][y].dir = direction;
