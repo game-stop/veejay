@@ -1025,24 +1025,24 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 			return lav_fd;
 		}
 #endif
+		veejay_msg(VEEJAY_MSG_WARNING, "File %s is not an image", filename );
     }
-    else
+    
+    
+    lav_fd->avi_fd = AVI_open_input_file(filename,1,mmap_size);
+    if( lav_fd->avi_fd && AVI_errno == AVI_ERR_EMPTY )
     {
-        lav_fd->avi_fd = AVI_open_input_file(filename,1,mmap_size);
-        
-        if( lav_fd->avi_fd && AVI_errno == AVI_ERR_EMPTY )
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "\tEmpty AVI file: ", filename);
-            if(lav_fd) free(lav_fd);
-            return NULL;
-        }
-        else if ( lav_fd->avi_fd && AVI_errno == 0 )
-        {
-            ret = 1;
-        }
-		else {
-			veejay_msg(VEEJAY_MSG_ERROR, "[avilib] unable to open AVI file %s", filename);
-		}
+       veejay_msg(VEEJAY_MSG_ERROR, "\tEmpty AVI file: ", filename);
+       if(lav_fd) free(lav_fd);
+       return NULL;
+    }
+    else if ( lav_fd->avi_fd && AVI_errno == 0 )
+    {
+       veejay_msg(VEEJAY_MSG_INFO, "[avilib] opening %s as AVI file", filename );
+       ret = 1;
+    }
+    else {
+       veejay_msg(VEEJAY_MSG_WARNING, "[avilib] unable to open AVI file %s", filename);
     }
    
     int alt = 0;
@@ -1059,10 +1059,10 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
             return NULL;
         }
 
-		veejay_msg(VEEJAY_MSG_INFO, "\tFile %s is of type AVI , fourcc %s, audio %d",filename, video_comp, lav_fd->has_audio );
+	veejay_msg(VEEJAY_MSG_INFO, "\tFile %s is of type AVI , fourcc %s, audio %d",filename, video_comp, lav_fd->has_audio );
 
-		ret = 1;
-		alt = 1;
+	ret = 1;
+	alt = 1;
     }
     else if( AVI_errno==AVI_ERR_NO_AVI || (!lav_fd->avi_fd && !ret) )
     {
@@ -1165,13 +1165,13 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 
     if(ret == 0 || video_comp == NULL || alt == 0)
     {
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to open %s: unsupported or unrecognized video format", filename);
+	veejay_msg(VEEJAY_MSG_ERROR, "Unable to open %s: unsupported or unrecognized video format", filename);
         free(lav_fd);
         internal_error = ERROR_FORMAT;
         return NULL;
     }
 
-	set_fourcc(lav_fd, video_comp);
+    set_fourcc(lav_fd, video_comp);
     
     lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;
 
