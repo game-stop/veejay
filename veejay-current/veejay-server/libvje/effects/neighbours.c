@@ -91,9 +91,10 @@ void *neighbours_malloc(int w, int h )
 
 void        neighbours_free(void *ptr)
 {
-    nb_t *n = (nb_t*) vj_calloc(sizeof(nb_t));
-    free(n->tmp_buf[0]);
-    free(n->chromacity[0]);
+    nb_t *n = (nb_t*) ptr;
+    if(!n) return;
+    if(n->tmp_buf[0]) free(n->tmp_buf[0]);
+    if(n->chromacity[0]) free(n->chromacity[0]);
     free(n);
 }
 
