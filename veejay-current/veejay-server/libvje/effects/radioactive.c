@@ -85,28 +85,25 @@ typedef struct {
 	float ratio_; // 0.95;
 } radioactive_t;
 
-#define VIDEO_HWIDTH (buf_width/2)
-#define VIDEO_HHEIGHT (buf_height/2)
-
-
-/* this table assumes that video_width is multiple of 32 */
 static void setTable(radioactive_t *r)
 {
 	unsigned int bits;
-	int x, y, tx, ty, xx;
-	int ptr, prevptr;
+	int x, y, ptr, xx;
     int *blurzoomx = r->blurzoomx;
     int *blurzoomy = r->blurzoomy;
     int buf_width_blocks = r->buf_width_blocks;
     float ratio_ = r->ratio_;
     int buf_width = r->buf_width;
     int buf_height = r->buf_height;
+    
+    const int HWIDTH = buf_width / 2;
+    const int HHEIGHT = buf_height / 2;
 
-	prevptr = (int)(0.5+ratio_*(-VIDEO_HWIDTH)+VIDEO_HWIDTH);
+	int prevptr = (int)(0.5+ratio_*(-HWIDTH)+HWIDTH);
 	for(xx=0; xx<(buf_width_blocks); xx++){
 		bits = 0;
 		for(x=0; x<32; x++){
-			ptr= (int)(0.5+ratio_*(xx*32+x-VIDEO_HWIDTH)+VIDEO_HWIDTH);
+			ptr= (int)(0.5+ratio_*(xx*32+x-HWIDTH)+HWIDTH);
 			bits = bits>>1;
 			if(ptr != prevptr)
 				bits |= 0x80000000;
@@ -115,17 +112,23 @@ static void setTable(radioactive_t *r)
 		blurzoomx[xx] = bits;
 	}
 
-	ty = (int)(0.5+ratio_*(-VIDEO_HHEIGHT)+VIDEO_HHEIGHT);
-	tx = (int)(0.5+ratio_*(-VIDEO_HWIDTH)+VIDEO_HWIDTH);
-	xx=(int)(0.5+ratio_*(buf_width-1-VIDEO_HWIDTH)+VIDEO_HWIDTH);
-	blurzoomy[0] = ty * buf_width + tx;
-	prevptr = ty * buf_width + xx;
+	int ty = (int)(0.5+ratio_*(-HHEIGHT)+HHEIGHT);
+	int tx = (int)(0.5+ratio_*(-HWIDTH)+HWIDTH);
+	xx=(int)(0.5+ratio_*(buf_width-1-HWIDTH)+HWIDTH);
+	
+	// blurzoomy[0] stores an absolute index offset
+	blurzoomy[0] = ty * buf_width + tx; 
+	
+	// prevptr stores the index of the last pixel in the row
+	prevptr = ty * buf_width + xx; 
+	
 	for(y=1; y<buf_height; y++){
-		ty = (int)(0.5+ratio_*(y-VIDEO_HHEIGHT)+VIDEO_HHEIGHT);
+		ty = (int)(0.5+ratio_*(y-HHEIGHT)+HHEIGHT);
+		// blurzoomy[y] stores the index jump from the end of row y-1 to the start of row y
 		blurzoomy[y] = ty * buf_width + tx - prevptr;
 		prevptr = ty * buf_width + xx;
 	}
-}		
+}
 
 static void kentaro_blur(radioactive_t *r)
 {
@@ -248,7 +251,6 @@ void	radioactivetv_free(void *ptr)
             free(r->diffbuf);
     }
 }
-
 void radioactivetv_apply( void *ptr, VJFrame *frame, VJFrame *blue, int *args ) {
     int mode = args[0];
     int snapRatio = args[1];
@@ -261,14 +263,15 @@ void radioactivetv_apply( void *ptr, VJFrame *frame, VJFrame *blue, int *args ) 
 	const int len = frame->len;
 
     radioactive_t *r = (radioactive_t*) ptr;
+	if (!r) return;
 
-	uint8_t *diff = r->diffbuf;
+	uint8_t *diff = r->diffbuf; 
 	uint8_t *prev = diff + len;
 	uint8_t *lum = frame->data[0];
 	uint8_t *dstY = lum;
 	uint8_t *dstU = frame->data[1];
 	uint8_t *dstV = frame->data[2];
-	uint8_t *p;
+	uint8_t *p_blur;
 	uint8_t *blueY = blue->data[0];
 	uint8_t *blueU = blue->data[1];
 	uint8_t *blueV = blue->data[2];
@@ -283,7 +286,7 @@ void radioactivetv_apply( void *ptr, VJFrame *frame, VJFrame *blue, int *args ) 
 	veejay_memcpy( &smooth, frame, sizeof(VJFrame));
 	smooth.data[0] = prev;
 
-	//@ set new zoom ratio 
+	//@ set new zoom ratio	
 	new_ratio = (snapRatio * 0.01);
 	if ( r->ratio_ != new_ratio )
 	{
@@ -291,40 +294,48 @@ void radioactivetv_apply( void *ptr, VJFrame *frame, VJFrame *blue, int *args ) 
 		setTable(r);
 	}
 
-	if( !r->first_frame )
-	{	//@ take current
-		veejay_memcpy( prev, lum, len );
-		softblur_apply_internal( &smooth, 0);
-		r->first_frame++;
-		return;
-	}
-
 	if( r->last_mode != mode )
 	{
-//@ mode changed, reset
-		veejay_memset( r->blurzoombuf, 0, 2*r->buf_area);
+		//@ mode changed, reset all buffers
+		veejay_memset( r->blurzoombuf, 0, 2*r->buf_area); 
 		veejay_memset( diff, 0, len );
 		veejay_memset( prev, 0, len );
 		r->last_mode = mode;
 	}
+
+    // manual reset
+    if (snapInterval == 0) {
+        veejay_memset(r->blurzoombuf, 0, 2 * r->buf_area);
+    }
+    
+    // decay motion mask before accumulation
+    {
+        uint8_t *p_decay = r->blurzoombuf;
+        for (y = 0; y < r->buf_area; y++) {
+            if (*p_decay > 0) {
+                *p_decay -= 1; 
+            }
+            p_decay++;
+        }
+    }
 
 	uint8_t *d = diff;
 
 //@ varying diff methods (strobe, normal, average, etc)
 	switch( mode )
 	{
-		case 3:
-		case 0:
+		case 3: // Spill (greyscale)
+		case 0: // Average
 			for( y = 0; y < len; y ++ ) {
 				diff[y] = abs( lum[y] - prev[y] );
-				diff[y] = (prev[y] + lum[y] + lum[y] + lum[y])>>2;
+				diff[y] = (prev[y] + lum[y] + lum[y] + lum[y])>>2; 
 				if( diff[y] < threshold )
 					diff[y] = 0;
 				prev[y] = diff[y];
 			}
 			break;
-		case 4:
-		case 1:
+		case 4: // Flood (greyscale)
+		case 1: // Normal
 #pragma omp simd
 			for( y = 0; y < len; y ++ ) {
 				diff[y] = abs( lum[y] - prev[y] );
@@ -333,74 +344,80 @@ void radioactivetv_apply( void *ptr, VJFrame *frame, VJFrame *blue, int *args ) 
 				{
 					if(diff[y]) diff[y]--;
 				}
-				prev[y] = lum[y];
 			}
 			break;
-		case 5:
-		case 2:
+		case 5: // Frontal (greyscale)
+		case 2: // Strobe
 #pragma omp simd
 			for( y = 0; y < len; y ++ ) {
 				diff[y] = abs(lum[y] - prev[y]);
 				if(diff[y] < threshold )
 					diff[y] = 0;
-				prev[y] = lum[y];
 			}
 			break;
-		case 6:
+		case 6: // Low (greyscale)
 #pragma omp simd
 			for( y = 0; y < len; y ++ ){
 				if( abs( lum[y] - prev[y]) > threshold )
 					diff[y] = lum[y]>>2;
 				else
 					diff[y] = 0;
-				prev[y] = lum[y];
 			}
-
 			break;
 	}
 //@ end of diff
 
+	p_blur = r->blurzoombuf;
+	d = diff + r->buf_margin_left;
 
-	p = r->blurzoombuf;
-	d += r->buf_margin_left;
 	for( y = 0; y < buf_height; y++ ) {
 #pragma omp simd
 		for( x = 0; x< buf_width; x ++ ) {
-			p[x] |= ( (d[x] * snapInterval)>>7);
+			p_blur[x] |= ( (d[x] * snapInterval)>>7); 
 		}
 		d += width;
-		p += buf_width;
+		p_blur += buf_width;
 	}
+	
 	//@ prepare frame for next difference take
+	veejay_memcpy( prev, lum, len );
 	softblur_apply_internal( &smooth, 0);
 
-	blurzoomcore(r);
-	p = r->blurzoombuf;
+	blurzoomcore(r); 
+	p_blur = r->blurzoombuf;
 
 	if(mode >= 3 )
 	{
 		veejay_memset( dstU,128,len);
 		veejay_memset( dstV,128,len);
-		veejay_memcpy( dstY, r->blurzoombuf, len );
+		
+		p_blur = r->blurzoombuf;
+		uint8_t *dstY_current = dstY;
+		for( y = 0; y < buf_height; y ++ ) {
+			dstY_current += buf_margin_left;
+			veejay_memcpy( dstY_current, p_blur, buf_width );
+			dstY_current += buf_width + buf_margin_right;
+			p_blur += buf_width;
+		}
 		return;
 	}
 
-	
-	uint32_t k =0;
+	unsigned int i = 0;
 	for( y = 0; y < height; y ++ )
 	{
-		k += buf_margin_left;
+		i = y * width + buf_margin_left; 
+		p_blur = r->blurzoombuf + y * buf_width;
+
 		for( x = 0; x  < buf_width; x ++ )
 		{
-			uint8_t op0 = (*p ++);
+			uint8_t op0 = (*p_blur ++);
 			uint8_t op1 = 0xff - op0;
 
-			dstY[k] = (op0 * blueY[k] + op1 * dstY[k])>>8; 
-			dstU[k] = (op0 * blueU[k] + op1 * dstU[k])>>8;
-			dstV[k] = (op0 * blueV[k] + op1 * dstV[k])>>8;
+			dstY[i] = (uint8_t) ((op0 * blueY[i] + op1 * dstY[i])>>8);	
+			dstU[i] = (uint8_t) ((op0 * blueU[i] + op1 * dstU[i])>>8);
+			dstV[i] = (uint8_t) ((op0 * blueV[i] + op1 * dstV[i])>>8);
 
-			k ++;
+			i ++;
 		}
-		k += buf_margin_right;
 	}
 }
