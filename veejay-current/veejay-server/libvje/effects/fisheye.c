@@ -135,7 +135,6 @@ void fisheye_apply(void *ptr, VJFrame *frame, int *args) {
 
     fisheye_t *f = (fisheye_t*) ptr;
 
-    int i;
     double (*pf)(double a, double b, double c);
     const unsigned int width = frame->width;
     const unsigned int height = frame->height;
@@ -149,13 +148,12 @@ void fisheye_apply(void *ptr, VJFrame *frame, int *args) {
     int *cached_coords = f->cached_coords;
     uint8_t **buf = f->buf;
 
-    if( v==0) v =1;
+    if(v == 0) v = 1;
 
-    if( v < 0 ) {
+    if(v < 0) {
         pf = &__fisheye_i;
         v = v * -1;
-    }
-    else  {
+    } else {
         pf = &__fisheye;
     }
 
@@ -166,63 +164,61 @@ void fisheye_apply(void *ptr, VJFrame *frame, int *args) {
         const double coeef = R / log(curve * R + 1);
         const int w2 = width / 2;
         const int h2 = height / 2;
-        double co,si;
-        for (int y = 0; y <= h2; y++)
+        double co, si;
+
+        for (int i = 0; i < len; i++)
         {
-            for (int x = 0; x <= w2; x++)
-            {
-                float r = polar_map[y * width + x];
-                float a = fish_angle[ y * width + x ];
-                if( r <= R ) {
-                    r = pf( r, coeef, curve );
+            float r = polar_map[i];
+            float a = fish_angle[i];
+            
+            int in_circle = (r <= R);
+            
+            double r_dist = pf(r, coeef, curve);
 
-                    sin_cos(si, co, a);
+            sin_cos(si, co, a);
 
-                    int px = (int)(r * co) + w2;
-                    int py = (int)(r * si) + h2;
+            int px_potential = (int)(r_dist * co) + w2;
+            int py_potential = (int)(r_dist * si) + h2;
 
-                    px = (px < 0) ? 0 : (px >= width) ? (width - 1) : px;
-                    py = (py < 0) ? 0 : (py >= height) ? (height - 1) : py;
+            int px_clamped = (px_potential < 0) ? 0 : (px_potential >= width) ? (width - 1) : px_potential;
+            int py_clamped = (py_potential < 0) ? 0 : (py_potential >= height) ? (height - 1) : py_potential;
 
-                    cached_coords[y * width + x] = py * width + px;
-                    cached_coords[y * width + (width - x)] = py * width + (width - px);
-                    cached_coords[(height - y) * width + x] = (height - py) * width + px;
-                    cached_coords[(height - y) * width + (width - x)] = (height - py) * width + (width - px);
-                }
-                else {
-                    cached_coords[ y * width + x ] = -1;
-                }
-            }
+            cached_coords[i] = (in_circle) ? (py_clamped * width + px_clamped) : -1;
         }
 
         f->_v = v;
     }
 
-
-    veejay_memcpy(buf[0], Y,(len));
+    veejay_memcpy(buf[0], Y, len);
     
-    if( alpha == 0 ) {
-        veejay_memcpy(buf[1], Cb,(len));
-        veejay_memcpy(buf[2], Cr,(len));
+    if(alpha == 0) {
+        veejay_memcpy(buf[1], Cb, len);
+        veejay_memcpy(buf[2], Cr, len);
 
-        for(i=0; i < len; i++)
+        for(int i = 0; i < len; i++)
         {
-            int idx = (cached_coords[i] == -1) ? 0 : cached_coords[i];
+            int coord = cached_coords[i];
 
-            Y[i] = buf[0][ idx ];
-            Cb[i] = buf[1][ idx ];
-            Cr[i] = buf[2][ idx ];
-            
+            if (coord == -1) {
+                Y[i] = 16;
+                Cb[i] = 128;
+                Cr[i] = 128;
+            } else {
+                Y[i] = buf[0][coord];
+                Cb[i] = buf[1][coord];
+                Cr[i] = buf[2][coord];
+            }
         }
-    }
-    else 
-    {
+    } else {
         uint8_t *A = frame->data[3];
-        for(i=0; i < len; i++)
+        for(int i = 0; i < len; i++)
         {
-            int idx = (cached_coords[i] == -1) ? 0 : cached_coords[i];
-            A[i] = buf[0][ idx];
+            int coord = cached_coords[i];
+            if (coord == -1) {
+                 A[i] = 0;
+ 	    } else {
+                 A[i] = buf[0][coord];
+            }
         }
-
     }
 }
