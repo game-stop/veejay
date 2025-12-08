@@ -401,10 +401,10 @@ static void wait_all_tasks_completed(thread_pool_t *pool) {
 
 static void destroy_thread_pool(thread_pool_t *pool) {
     //pthread_mutex_lock(&pool->lock);
-    atomic_store(&pool->stop_flag, 1);
+    //atomic_store(&pool->stop_flag, 1);
     //pthread_mutex_unlock(&pool->lock);
 
-    start_all_threads( pool );
+    //start_all_threads( pool );
 
     for (int i = 0; i < numThreads; i++) {
         pthread_join(pool->threads[i], NULL);
@@ -412,6 +412,7 @@ static void destroy_thread_pool(thread_pool_t *pool) {
 
     pthread_mutex_destroy(&pool->lock);
     pthread_cond_destroy(&pool->task_completed);
+	pthread_cond_destroy(&pool->start_signal);
 
     free(pool->queue);
     free(pool);
@@ -496,9 +497,9 @@ void task_destroy()
 	if(!task_pool)
 		return;
 
-	atomic_store( &task_pool->stop_flag , 1 );
-
 	pthread_mutex_lock(&task_pool->lock);
+	atomic_store( &task_pool->stop_flag , 1 );
+	//pthread_mutex_lock(&task_pool->lock);
 	pthread_cond_broadcast(&task_pool->start_signal);
 	pthread_mutex_unlock(&task_pool->lock);
 	
