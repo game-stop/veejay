@@ -71,6 +71,7 @@
 #define CODEC_ID_YUV422F 997
 #define CODEC_ID_YUV420F 996
 #define CODEC_ID_QOIY 993
+#define CODEC_ID_ANYTHING 990
 #define CODEC_ID_YUVLZO 900
 #define DUMMY_FRAMES 2
 
@@ -312,7 +313,7 @@ static vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, f
 	{
 		d->lzo_decoder = lzo_new( el_pixel_format_, el_width_, el_height_ , 1);
 	}
-	else if ( id == CODEC_ID_YUV422 || id == CODEC_ID_YUV420 || id == CODEC_ID_YUV420F || id == CODEC_ID_YUV422F || id == CODEC_ID_QOIY ) {
+	else if ( id == CODEC_ID_YUV422 || id == CODEC_ID_YUV420 || id == CODEC_ID_YUV420F || id == CODEC_ID_YUV422F || id == CODEC_ID_QOIY || id == CODEC_ID_ANYTHING ) {
 		
 	}
 	else if( ctx )
@@ -329,7 +330,7 @@ static vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, f
 	
 
 	d->tmp_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * safe_max_frame_size );
-    d->fmt = id;
+   	d->fmt = id;
 
 	return d;
 }

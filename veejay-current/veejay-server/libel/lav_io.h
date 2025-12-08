@@ -28,7 +28,7 @@
 #include <veejaycore/mjpeg_types.h>
 #include <veejaycore/mjpeg_logging.h>
 #include <veejaycore/yuv4mpeg.h>
-
+#include <libel/anything.h>
 #define LAV_INTER_UNKNOWN       Y4M_UNKNOWN
 #define LAV_NOT_INTERLACED      Y4M_ILACE_NONE
 #define LAV_INTER_TOP_FIRST     Y4M_ILACE_TOP_FIRST
@@ -58,7 +58,8 @@ typedef struct
 #ifdef SUPPORT_READ_DV2
    dv_t		*dv_fd;
 #endif
-	void	*qt_fd;
+   void	*qt_fd;
+   void *rawio;
    int         jpeg_fd;
    char        *jpeg_filename;
 #ifdef USE_GDK_PIXBUF

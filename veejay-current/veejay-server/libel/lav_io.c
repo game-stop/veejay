@@ -368,7 +368,10 @@ int lav_close(lav_file_t *lav_file)
                     ret = quicktime_close( lav_file->qt_fd );
             }
             break;
-#endif          
+#endif        
+	case 'G':
+	    if( lav_file->rawio ) 
+		  raw_io_close(lav_file->rawio);  
         default:
             if( lav_file->avi_fd )
             {
@@ -423,7 +426,8 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
     if(video_format == 'x')
         return -1;//picture
 #endif
-   
+    if(video_format == 'G')
+	return -1;
     for(n=0;n<count;n++)
    {
       switch(lav_file->format)
@@ -561,6 +565,8 @@ long lav_video_frames(lav_file_t *lav_file)
       case 'Q':
          return quicktime_video_length(lav_file->qt_fd,0);
 #endif
+     case 'G':
+	 return 1000;
 
       default:
         return AVI_video_frames( lav_file->avi_fd );
@@ -581,7 +587,8 @@ int lav_video_width(lav_file_t *lav_file)
 #endif
 #ifdef HAVE_LIBQUICKTIME
         case 'q': case 'Q': return quicktime_video_width(lav_file->qt_fd,0);
-#endif          
+#endif
+	case 'G': return output_scale_width;	    
         default:
              return AVI_video_width( lav_file->avi_fd);
     }
@@ -602,6 +609,7 @@ int lav_video_height(lav_file_t *lav_file)
 #ifdef HAVE_LIBQUICKTIME
     case 'q': case 'Q': return quicktime_video_height(lav_file->qt_fd,0);
 #endif
+    case 'G': return output_scale_height;
     default:
           return AVI_video_height(lav_file->avi_fd);
    }
@@ -625,6 +633,7 @@ double lav_frame_rate(lav_file_t *lav_file)
         case 'q': case 'Q':
               return quicktime_frame_rate(lav_file->qt_fd,0);
 #endif     
+       case 'G': return output_fps;
        default:
         return AVI_frame_rate( lav_file->avi_fd ); 
   }
@@ -641,6 +650,8 @@ int lav_video_interlacing(lav_file_t *lav_file)
     if(video_format == 'x')
         return LAV_NOT_INTERLACED;
 #endif
+    if(video_format == 'G')
+	return LAV_NOT_INTERLACED;
    return lav_file->interlacing;
 }
 
@@ -709,6 +720,8 @@ int lav_audio_channels(lav_file_t *lav_file)
     if(video_format == 'q' || video_format =='Q')
          return quicktime_track_channels(lav_file->qt_fd,0);
 #endif
+    if(video_format == 'G')
+        return 0;
    return AVI_audio_channels(lav_file->avi_fd);
 }
 
@@ -724,6 +737,8 @@ int lav_audio_bits(lav_file_t *lav_file)
     if(video_format == 'x' )
         return 0;
 #endif
+    if(video_format == 'G')
+        return 0;
 #ifdef HAVE_LIBQUICKTIME
       if(video_format == 'q'|| video_format =='Q')
          return quicktime_audio_bits(lav_file->qt_fd,0);
@@ -743,6 +758,8 @@ long lav_audio_rate(lav_file_t *lav_file)
     if(video_format == 'x')
         return 0;
 #endif
+    if(video_format == 'G')
+	return 0;
 #ifdef HAVE_LIBQUICKTIME
     if( video_format == 'q'|| video_format =='Q')
         return quicktime_sample_rate(lav_file->qt_fd,0);
@@ -762,6 +779,8 @@ long lav_audio_clips(lav_file_t *lav_file)
     if(video_format == 'x')
         return 0;
 #endif
+    if(video_format == 'G')
+	return 0;
 #ifdef HAVE_LIBQUICKTIME
     if(video_format == 'q'|| video_format == 'Q')
         return quicktime_audio_length(lav_file->qt_fd,0);
@@ -780,6 +799,8 @@ long lav_frame_size(lav_file_t *lav_file, long frame)
     if(video_format == 'x')
         return output_scale_width * output_scale_height * 3;
 #endif
+    if(video_format == 'G')
+	return output_scale_width * output_scale_height * 3;
 #ifdef HAVE_LIBQUICKTIME
     if( video_format == 'q' || video_format == 'Q')
         return quicktime_frame_size(lav_file->qt_fd,frame,0);
@@ -798,6 +819,8 @@ int lav_seek_start(lav_file_t *lav_file)
    if(video_format == 'x')
     return 1;
 #endif
+   if(video_format == 'G')
+      return 1;
 #ifdef HAVE_LIBQUICKTIME
   return quicktime_seek_start(lav_file->qt_fd);
 #endif
@@ -815,6 +838,8 @@ int lav_set_video_position(lav_file_t *lav_file, long frame)
    if(video_format == 'x')
     return 1;
 #endif
+    if(video_format == 'G')
+	return 1;
 #ifdef HAVE_LIBQUICKTIME
     if(video_format == 'q' || video_format == 'Q')
         return quicktime_set_video_position(lav_file->qt_fd,(int64_t)frame,0);
@@ -831,6 +856,9 @@ int lav_read_frame(lav_file_t *lav_file, uint8_t *vidbuf)
         return rawdv_read_frame( lav_file->dv_fd, vidbuf );
     }
 #endif
+    if(lav_file->format == 'G') {
+	return raw_io_read_frame( lav_file->rawio, vidbuf );
+    }
 #ifdef USE_GDK_PIXBUF
     if(lav_file->format == 'x')
     return -1;
@@ -888,6 +916,8 @@ int lav_set_audio_position(lav_file_t *lav_file, long clip)
    if(video_format == 'x')
     return 0;
 #endif
+   if(video_format == 'G') 
+      return 0;
 #ifdef HAVE_LIBQUICKTIME
     if(video_format =='q'|| video_format == 'Q' ) {
         quicktime_set_audio_position(lav_file->qt_fd,clip,0);
@@ -912,6 +942,8 @@ int lav_read_audio(lav_file_t *lav_file, uint8_t *audbuf, long samps)
     if(video_format == 'x')
         return 0;
 #endif
+    if(video_format == 'G')
+	return 0;
     video_format = lav_file->format; internal_error = 0; /* for error messages */
 #ifdef HAVE_LIBQUICKTIME
     if( video_format == 'q' || video_format == 'Q')
@@ -1058,6 +1090,10 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
             lav_close(lav_fd);
             return NULL;
         }
+    	
+	set_fourcc(lav_fd, video_comp);
+    
+	lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;
 
 	veejay_msg(VEEJAY_MSG_INFO, "\tFile %s is of type AVI , fourcc %s, audio %d",filename, video_comp, lav_fd->has_audio );
 
@@ -1165,15 +1201,22 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 
     if(ret == 0 || video_comp == NULL || alt == 0)
     {
-	veejay_msg(VEEJAY_MSG_ERROR, "Unable to open %s: unsupported or unrecognized video format", filename);
-        free(lav_fd);
-        internal_error = ERROR_FORMAT;
-        return NULL;
+        veejay_msg(VEEJAY_MSG_WARNING, "Unable to open %s: unsupported or unrecognized video format", filename);
+        
+	lav_fd->rawio = raw_io_open( filename, output_scale_width, output_scale_height, get_ffmpeg_pixfmt(output_yuv));
+	if(lav_fd->rawio == NULL ) {
+		free(lav_fd);
+        	internal_error = ERROR_FORMAT;
+        	return NULL;
+	}
+	lav_fd->MJPG_chroma = CHROMAUNKNOWN;
+	lav_fd->has_audio = 0;
+	lav_fd->format = 'G';
+	video_comp = pict;
+	ret = 1;
+	alt = 1;
     }
 
-    set_fourcc(lav_fd, video_comp);
-    
-    lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;
 
    if(lav_fd->bps==0) lav_fd->bps=1; /* make it save since we will divide by that value */
  /*     if(strlen(video_comp) == 1 ) {
