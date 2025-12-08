@@ -2751,32 +2751,6 @@ void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t *
 	else {
 		vj_frame_slow_single( p0_buffer, p1_buffer, img, len, uv_len, frac );
 	}
-   
-#ifdef HAVE_ASM_MMX
-	__asm __volatile(_EMMS"       \n\t"
-					 SFENCE"     \n\t"
-					:::"memory");	
-	
-#endif
-/*
-		int i;
-		if( uv_len != len ) { 
-			for( i  = 0; i < len ; i ++ ) {
-				img[0][i] = p0_buffer[0][i] + ( frac * (p1_buffer[0][i] - p0_buffer[0][i]));
-			}
-			for( i  = 0; i < uv_len ; i ++ ) {
-				img[1][i] = p0_buffer[1][i] + ( frac * (p1_buffer[1][i] - p0_buffer[1][i]));
-				img[2][i] = p0_buffer[2][i] + ( frac * (p1_buffer[2][i] - p0_buffer[2][i]));
-			}
-		} else {
-			for( i  = 0; i < len ; i ++ ) {
-				img[0][i] = p0_buffer[0][i] + ( frac * (p1_buffer[0][i] - p0_buffer[0][i]));
-				img[1][i] = p0_buffer[1][i] + ( frac * (p1_buffer[1][i] - p0_buffer[1][i]));
-				img[2][i] = p0_buffer[2][i] + ( frac * (p1_buffer[2][i] - p0_buffer[2][i]));
-			}
-		}
-	*/
-
 }
 
 static void	vj_frame_simple_clear(  uint8_t **input, int *strides, int v )
@@ -2979,8 +2953,8 @@ static void benchmark_tasks(unsigned int n_tasks, long n_frames, int w, int h)
 	run_benchmark_test( n_tasks, benchmark_single_copy, "single-threaded memory copy", n_frames, dest, source, planes );
 	run_benchmark_test( n_tasks, benchmark_single_slow, "single-threaded slow frame", n_frames, dest, source, planes );
 
-//	run_benchmark_test( n_tasks, benchmark_threaded_slow, "multi-threaded slow frame", n_frames, dest, source, planes );
-//	run_benchmark_test( n_tasks, benchmark_threaded_copy, "multi-threaded memory copy", n_frames, dest, source, planes );
+	run_benchmark_test( n_tasks, benchmark_threaded_slow, "multi-threaded slow frame", n_frames, dest, source, planes );
+	//run_benchmark_test( n_tasks, benchmark_threaded_copy, "multi-threaded memory copy", n_frames, dest, source, planes );
 	
 
 	free(src);
