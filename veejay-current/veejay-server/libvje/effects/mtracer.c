@@ -200,9 +200,11 @@ void overlaymagic1_additive(VJFrame *frame, VJFrame *frame2 )
 #pragma omp simd
 	for(i=0;i<len;i++)
 	{
-		Y[len] = CLAMP_Y(Y[len] + (2 * Y2[len]) - 255);
+		Y[i] = CLAMP_Y(Y[i] + (2 * Y2[i]) - 255);
 	}
 }
+
+
 
 
 void overlaymagic1_substractive(VJFrame *frame, VJFrame *frame2 )
@@ -794,19 +796,20 @@ void mtracer_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 		veejay_memcpy( frame->data[0], m->mtrace_buffer[0], len );
 	}
 	else {
+		m->mtrace_counter = (m->mtrace_counter % n);
+
 		if (m->mtrace_counter == 0) {
 			overlaymagic_apply(NULL, frame, frame2, om_args);
-			vj_frame_copy1( m->mtrace_buffer[0], frame->data[0], len );
-    	} else {
+			veejay_memcpy( m->mtrace_buffer[0], frame->data[0], len );
+		} else {
 			overlaymagic_apply(NULL, frame, frame2, om_args);
 			mt.data[0] = m->mtrace_buffer[0];
 			mt.data[1] = frame->data[1];
 			mt.data[2] = frame->data[2];
 			mt.data[3] = frame->data[3];
 			overlaymagic_apply(NULL, &mt, frame2, om_args );
-			vj_frame_copy1( m->mtrace_buffer[0],frame->data[0], len );
-    	}
+    		veejay_memcpy( m->mtrace_buffer[0], frame->data[0], len );
+		}
 
-    	m->mtrace_counter = (m->mtrace_counter % n);
 	}
 }
