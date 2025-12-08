@@ -39,6 +39,15 @@
 #include <assert.h>
 #endif
 
+#if defined(HAVE_ASM_SSE2) || defined(HAVE_ASM_SSE4_1) || defined(HAVE_ASM_AVX) || defined(HAVE_ASM_AVX2)
+#include <emmintrin.h> // SSE2
+#include <tmmintrin.h> // SSSE3 (for _mm_srai_epi16)
+#include <smmintrin.h> // SSE4.1
+#include <immintrin.h> // AVX
+#define Q_SHIFT 15
+#define Q_MAX 32767
+#endif
+
 #define Y4M_CHROMA_420JPEG     0  /* 4:2:0, H/V centered, for JPEG/MPEG-1 */
 #define Y4M_CHROMA_420MPEG2    1  /* 4:2:0, H cosited, for MPEG-2         */
 #define Y4M_CHROMA_420PALDV    2  /* 4:2:0, alternating Cb/Cr, for PAL-DV */
@@ -1013,42 +1022,35 @@ void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
 #ifdef HAVE_ARM
 void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h) {
     int x, y;
-    uint8_t *Y = yuv422[0];
-    uint8_t *U = yuv422[1];
-    uint8_t *V = yuv422[2];
+    uint8_t *Y_plane = yuv422[0];
+    uint8_t *U_plane = yuv422[1];
+    uint8_t *V_plane = yuv422[2];
 
     for (y = 0; y < h; y++) {
-        Y = yuv422[0] + y * w;
-        U = yuv422[1] + (y >> 1) * w;
-        V = yuv422[2] + (y >> 1) * w;
+        uint8_t *Y = Y_plane + y * w;
+        uint8_t *U = U_plane + (y >> 1) * w;
+        uint8_t *V = V_plane + (y >> 1) * w;
+        uint8_t *dst = pixels + y * w * 2;
 
-        for (x = 0; x < w; x += 16) {  
-            uint8x8_t y0 = vld1_u8(Y);
-            uint8x8_t u0 = vld1_u8(U);
-            uint8x8_t y1 = vld1_u8(Y + 8);
-            uint8x8_t v0 = vld1_u8(V);
+        for (x = 0; x < w; x += 16) {
+            uint8x16_t y_data = vld1q_u8(Y);
+            uint8x8_t u_data = vld1_u8(U);
+            uint8x8_t v_data = vld1_u8(V);
 
-            uint8x8x2_t yuyv0;
-            yuyv0.val[0] = y0;
-            yuyv0.val[1] = u0;
-            yuyv0.val[0] = vext_u8(y0, v0, 1);  
+            uint8x8x2_t uv_pair = vzip_u8(u_data, v_data);
             
-            uint8x8x2_t yuyv1;
-            yuyv1.val[0] = y1;
-            yuyv1.val[1] = vext_u8(u0, y1, 7);  
-            yuyv1.val[0] = v0;
-
-            vst2_u8(pixels, yuyv0);
-            vst2_u8(pixels + 16, yuyv1);
-
-            pixels += 32; 
+            uint8x16x2_t yuyv_pair = vzipq_u8(y_data, vcombine_u8(uv_pair.val[0], uv_pair.val[1]));
+            
+            vst1q_u8(dst, yuyv_pair.val[0]);
+            vst1q_u8(dst + 16, yuyv_pair.val[1]);
+            
+            dst += 32;
             Y += 16;
             U += 8;
             V += 8;
         }
     }
 }
-
 #endif
 
 
@@ -1571,21 +1573,36 @@ void yuv420to422planar(uint8_t *src[3], uint8_t *dst[3], int w, int h) {
     const int wid = w >> 1;
     const int hei = h >> 1;
 
-    uint8_t *u_dst = dst[1];
-    uint8_t *v_dst = dst[2];
     uint8_t *u_src = src[1];
     uint8_t *v_src = src[2];
+    uint8_t *u_dst = dst[1];
+    uint8_t *v_dst = dst[2];
 
     for (int y = 0; y < hei; y++) {
-        uint8x8_t u_values = vdup_n_u8(u_src[y * wid]);
-        uint8x8_t v_values = vdup_n_u8(v_src[y * wid]);
+        uint8_t *a = u_src + y * wid;
+        uint8_t *b = v_src + y * wid;
+
+        uint8_t *u_even = u_dst + (y << 1) * wid;
+        uint8_t *u_odd = u_dst + ((y << 1) + 1) * wid;
+        uint8_t *v_even = v_dst + (y << 1) * wid;
+        uint8_t *v_odd = v_dst + ((y << 1) + 1) * wid;
 
         for (int x = 0; x < wid; x += 8) {
-            vst1_u8(u_dst, u_values);
-            vst1_u8(v_dst, v_values);
+            uint8x8_t u_values = vld1_u8(a);
+            uint8x8_t v_values = vld1_u8(b);
 
-            u_dst += 8;
-            v_dst += 8;
+            vst1_u8(u_even, u_values);
+            vst1_u8(v_even, v_values);
+            
+            vst1_u8(u_odd, u_values);
+            vst1_u8(v_odd, v_values);
+
+            a += 8;
+            b += 8;
+            u_even += 8;
+            u_odd += 8;
+            v_even += 8;
+            v_odd += 8;
         }
     }
 }
@@ -1615,7 +1632,7 @@ void    yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
     uint8_t *v2 = dst[2];
     for( y = 0; y < hei;  y ++ ) {
         u = dst[1] + ( (y << 1 ) * wid );
-        u2 = dst[1] + (( (y+1)<<1) * wid);
+        u2 = dst[1] + ( ((y << 1) + 1) * wid );
         a = src[1] + ( y * wid );
         for( x = 0; x < work; x ++ ) {
             copy8( u,u2, a );
@@ -1626,7 +1643,7 @@ void    yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
     }   
     for( y = 0; y < hei;  y ++ ) {
         v = dst[2] + ( (y << 1 ) * wid );
-        v2 = dst[2] + (( (y+1)<<1) * wid );
+        v2 = dst[2] + ( (( y << 1 ) + 1 ) * wid );
         b = src[2] + ( y * wid );
         for( x = 0; x < work; x ++ ) {
             copy8( v,v2, b );
@@ -1828,12 +1845,91 @@ void yuv444_yvu444_1plane(
     
 }
 
+#ifdef HAVE_ARM_NEON
 void yuv_interpolate_frames( uint8_t *dst, uint8_t *a, uint8_t *b, const int len, const float frac )
 {
     int i;
-#pragma omp simd
-    for( i = 0; i < len; i ++  ) {
-        dst[i] = a[i] + ( frac * ( b[i] - a[i] ) ); 
+    const int step = 16;
+    const int16_t fixed_frac = (int16_t)(frac * 32767.0f);
+    
+    int16x8_t v_frac = vdupq_n_s16(fixed_frac);
+    
+    for( i = 0; i < len - step; i += step ) 
+    {
+        uint8x16_t va_u8 = vld1q_u8(a + i);
+        uint8x16_t vb_u8 = vld1q_u8(b + i);
+
+        int16x8_t va_low  = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(va_u8)));
+        int16x8_t va_high = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(va_u8)));
+        int16x8_t vb_low  = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(vb_u8)));
+        int16x8_t vb_high = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(vb_u8)));
+
+        int16x8_t diff_low = vsubq_s16(vb_low, va_low);
+        int16x8_t diff_high = vsubq_s16(vb_high, va_high);
+        
+        int16x8_t term_low = vshrq_n_s16(vmulq_s16(diff_low, v_frac), 15);
+        int16x8_t term_high = vshrq_n_s16(vmulq_s16(diff_high, v_frac), 15);
+        
+        int16x8_t result_low = vaddq_s16(va_low, term_low);
+        int16x8_t result_high = vaddq_s16(va_high, term_high);
+        
+        uint8x16_t vdst_u8 = vcombine_u8(vmovnq_u16(vreinterpretq_u16_s16(result_low)), 
+                                        vmovnq_u16(vreinterpretq_u16_s16(result_high)));
+
+        vst1q_u8(dst + i, vdst_u8);
+    }
+    for( ; i < len; i++ ) {
+        dst[i] = a[i] + ( frac * ( b[i] - a[i] ) );
     }
 }
 
+#elif defined(HAVE_ASM_SSE2) || defined(HAVE_ASM_SSE4_1) || defined(HAVE_ASM_AVX) || defined(HAVE_ASM_AVX2)
+void yuv_interpolate_frames( uint8_t *dst, uint8_t *a, uint8_t *b, const int len, const float frac )
+{
+    int i;
+    const int step = 16;
+    const int16_t fixed_frac = (int16_t)(frac * (float)Q_MAX);
+    
+    __m128i v_frac = _mm_set1_epi16(fixed_frac);
+    __m128i v_zero = _mm_setzero_si128();
+
+    for( i = 0; i < len - step; i += step ) 
+    {
+        __m128i va_u8 = _mm_loadu_si128((__m128i const*)(a + i));
+        __m128i vb_u8 = _mm_loadu_si128((__m128i const*)(b + i));
+
+        __m128i va_low  = _mm_unpacklo_epi8(va_u8, v_zero);
+        __m128i va_high = _mm_unpackhi_epi8(va_u8, v_zero);
+        __m128i vb_low  = _mm_unpacklo_epi8(vb_u8, v_zero);
+        __m128i vb_high = _mm_unpackhi_epi8(vb_u8, v_zero);
+
+        __m128i diff_low  = _mm_sub_epi16(vb_low, va_low);
+        __m128i diff_high = _mm_sub_epi16(vb_high, va_high);
+        
+        __m128i term_mul_low  = _mm_mullo_epi16(diff_low, v_frac);
+        __m128i term_mul_high = _mm_mullo_epi16(diff_high, v_frac);
+        
+        __m128i term_low  = _mm_srai_epi16(term_mul_low, Q_SHIFT);
+        __m128i term_high = _mm_srai_epi16(term_mul_high, Q_SHIFT);
+        
+        __m128i result_low = _mm_add_epi16(va_low, term_low);
+        __m128i result_high = _mm_add_epi16(va_high, term_high);
+        
+        __m128i vdst_u8 = _mm_packus_epi16(result_low, result_high);
+
+        _mm_storeu_si128((__m128i *)(dst + i), vdst_u8);
+    }
+    for( ; i < len; i++ ) {
+        dst[i] = a[i] + ( frac * ( b[i] - a[i] ) );
+    }
+}
+
+#else
+void yuv_interpolate_frames( uint8_t *dst, uint8_t *a, uint8_t *b, const int len, const float frac )
+{
+    int i;
+    for( i = 0; i < len; i ++) {
+        dst[i] = a[i] + ( frac * ( b[i] - a[i] ) );
+    }
+}
+#endif
