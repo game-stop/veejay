@@ -29,7 +29,7 @@
  * This program has been obtained from http://nomis80.org/ctmf.html. No patent
  * covers this program, although it is subject to the following license:
  */
-
+#include <config.h>
 #include <unistd.h>
 #include "common.h"
 #include <veejaycore/vjmem.h>

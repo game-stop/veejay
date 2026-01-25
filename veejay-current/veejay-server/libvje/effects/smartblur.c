@@ -87,75 +87,101 @@ void smartblur_free(void *ptr) {
     free(s);
 }
 
+
 void smartblur_apply(void *ptr, VJFrame *frame, int *args) {
     smartblur_t *s = (smartblur_t*) ptr;
+    if (!s || !frame || !args) return;
 
     const int w = frame->width;
     const int h = frame->height;
     const int radius = args[0];
     const int threshold = args[1];
-    const int show = args[3];
     const int swap = args[2];
+    const int show = args[3];
+
     uint8_t *restrict srcY = frame->data[0];
     uint8_t *restrict srcU = frame->data[1];
     uint8_t *restrict srcV = frame->data[2];
+
     uint8_t *restrict dstY = s->buf[0];
     uint8_t *restrict dstU = s->buf[1];
     uint8_t *restrict dstV = s->buf[2];
-    uint8_t *restrict mask = s->mask;        
+    uint8_t *restrict mask = s->mask;
 
-    const int minMaskValue = (swap ? 0xff: 0);
-    const int maxMaskValue = (swap ? 0: 0xff);
+    const int minMaskValue = swap ? 0xFF : 0x00;
+    const int maxMaskValue = swap ? 0x00 : 0xFF;
 
-    for (int y = radius; y < h - radius; y++) {
-        for (int x = radius; x < w - radius; x++) {
+    // --- Build mask safely ---
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
             uint8_t maskValue = minMaskValue;
+
             for (int ky = -radius; ky <= radius; ky++) {
+                int yy = y + ky;
+                if (yy < 0) yy = 0;
+                if (yy >= h) yy = h - 1;
+
 #pragma omp simd
                 for (int kx = -radius; kx <= radius; kx++) {
-                    const int intensity_diff = srcY[y * w + x] - srcY[ky * w + kx];
+                    int xx = x + kx;
+                    if (xx < 0) xx = 0;
+                    if (xx >= w) xx = w - 1;
+
+                    const int intensity_diff = srcY[y * w + x] - srcY[yy * w + xx];
                     const int abs_diff = (intensity_diff >= 0) ? intensity_diff : -intensity_diff;
                     maskValue |= (maxMaskValue & ((threshold - abs_diff) >> 8));
                 }
             }
+
             mask[y * w + x] = maskValue;
         }
     }
 
-    if(show) {
-        veejay_memcpy( srcY, mask, frame->len );
-        veejay_memset( srcU, 128, frame->len );
-        veejay_memset( srcV, 128, frame->len );
+    // --- Show mask mode ---
+    if (show) {
+        veejay_memcpy(srcY, mask, frame->len);
+        veejay_memset(srcU, 128, frame->len);
+        veejay_memset(srcV, 128, frame->len);
         return;
     }
 
-    for (int y = radius; y < h - radius; y++) {
-        for (int x = radius; x < w - radius; x++) {
-            int ySum = 0;
-            int uSum = 0;
-            int vSum = 0;
+    // --- Apply blur using mask safely ---
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            int ySum = 0, uSum = 0, vSum = 0;
             int pixelCount = 0;
+
             for (int ky = -radius; ky <= radius; ky++) {
+                int yy = y + ky;
+                if (yy < 0) yy = 0;
+                if (yy >= h) yy = h - 1;
+
 #pragma omp simd
-                for( int kx = -radius; kx <= radius; kx ++ ) {
-                    const int maskValue = mask[(y + ky) * w + (x + kx)];
+                for (int kx = -radius; kx <= radius; kx++) {
+                    int xx = x + kx;
+                    if (xx < 0) xx = 0;
+                    if (xx >= w) xx = w - 1;
+
+                    const int maskValue = mask[yy * w + xx];
                     const int maskMultiplier = maskValue & 1;
 
-                    ySum += maskMultiplier * srcY[(y + ky) * w + (x + kx)];
-                    uSum += maskMultiplier * (srcU[(y + ky) * w + (x + kx)]);
-                    vSum += maskMultiplier * (srcV[(y + ky) * w + (x + kx)]);
+                    ySum += maskMultiplier * srcY[yy * w + xx];
+                    uSum += maskMultiplier * srcU[yy * w + xx];
+                    vSum += maskMultiplier * srcV[yy * w + xx];
                     pixelCount += maskMultiplier;
                 }
             }
-           
-            dstY[y * w + x] = (pixelCount == 0 ? srcY[ y * w + x ] : (uint8_t)( ySum / pixelCount ));
-            dstU[y * w + x] = (pixelCount == 0 ? srcU[ y * w + x ] : (uint8_t)( uSum / pixelCount ));
-            dstV[y * w + x] = (pixelCount == 0 ? srcV[ y * w + x ] : (uint8_t)( vSum / pixelCount ));
-            
+
+            dstY[y * w + x] = (pixelCount == 0 ? srcY[y * w + x] : (uint8_t)(ySum / pixelCount));
+            dstU[y * w + x] = (pixelCount == 0 ? srcU[y * w + x] : (uint8_t)(uSum / pixelCount));
+            dstV[y * w + x] = (pixelCount == 0 ? srcV[y * w + x] : (uint8_t)(vSum / pixelCount));
         }
     }
+
+    // --- Copy back safely ---
     veejay_memcpy(srcY, dstY, frame->len);
     veejay_memcpy(srcU, dstU, frame->len);
     veejay_memcpy(srcV, dstV, frame->len);
 }
+
 

@@ -111,21 +111,19 @@ static inline float a_cos( double x ) {
 	return a_sin( x + M_PI_2 );
 }
 
-
 #ifdef ARCH_X86_64
-#define sin_cos(si, co, x) asm ("fsincos" : "=t" (co), "=u" (si) : "0" (x))
-#define fast_sin(res__,x) asm ("fsin" : "=t" (res__) : "0" (x))
-#define fast_cos(res__,x) asm ("fcos" : "=t" (res__) : "0" (x))
-#define fast_abs(res__,x) asm ("fabs" : "=t" (res__) : "0" (x))
-#define fast_exp(res__,x) asm ("fexp" : "=t" (res__) : "0" (x))
+#define sin_cos(si, co, x) __asm__ ("fsincos" : "=t" (co), "=u" (si) : "0" (x))
+#define fast_sin(res__,x)  __asm__ ("fsin" : "=t" (res__) : "0" (x))
+#define fast_cos(res__,x)  __asm__ ("fcos" : "=t" (res__) : "0" (x))
+#define fast_abs(res__,x)  __asm__ ("fabs" : "=t" (res__) : "0" (x))
+#define fast_exp(res__,x)  __asm__ ("fexp" : "=t" (res__) : "0" (x))
 #else
-#define sin_cos(si, co, x)     si = sin(x); co = cos(x)
-#define fast_sin(res,x ) res = a_sin(x)
-#define fast_cos(res,x ) res = a_cos(x)
-#define fast_abs(res,x ) res = abs(x)
-#define fast_exp(res,x ) res = exp(x)
+#define sin_cos(si, co, x)      do { si = sin(x); co = cos(x); } while(0)
+#define fast_sin(res,x )        res = a_sin(x)
+#define fast_cos(res,x )        res = a_cos(x)
+#define fast_abs(res,x )        res = abs(x)
+#define fast_exp(res,x )        res = exp(x)
 #endif
-
 
 #if defined(HAVE_ASM_SSE2)
 #include <emmintrin.h>

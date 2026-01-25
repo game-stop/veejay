@@ -52,116 +52,122 @@ vj_effect *softblur_init(int w,int h)
     return ve;
 }
 
-static void softblur5_apply(VJFrame *frame)
+static void softblur1_apply(VJFrame *frame)
 {
-    int r, c, i, j;
-    uint8_t *restrict Y = frame->data[0];
-    const int len = frame->len;
     const int width = frame->width;
+    const int height = frame->len / width;
+    uint8_t *restrict Y = frame->data[0];
 
-    for (r = 2 * width; r < len - 2 * width; r += width) {
-        #pragma omp simd
-        for (c = 2; c < width - 2; c++) {
-            int sum = 0;
-            for (i = -2; i <= 2; i++) {
-                for (j = -2; j <= 2; j++) {
-                    sum += Y[r + i * width + c + j];
-                }
-            }
-            Y[r + c] = sum / 25;
+    #pragma omp parallel for simd
+    for (int r = 0; r < height; r++) {
+        int row_offset = r * width;
+
+        Y[row_offset] = (Y[row_offset] + Y[row_offset + 1]) / 2;
+
+        for (int c = 1; c < width - 1; c++) {
+            Y[row_offset + c] =
+                (Y[row_offset + c - 1] +
+                 Y[row_offset + c] +
+                 Y[row_offset + c + 1]) / 3;
         }
+
+        Y[row_offset + width - 1] =
+            (Y[row_offset + width - 2] + Y[row_offset + width - 1]) / 2;
     }
 }
 
-
-static void softblur3_apply(VJFrame *frame )
+static void softblur3_apply(VJFrame *frame)
 {
-	int r,c;
-	uint8_t *restrict Y = frame->data[0];
-	const int len = frame->len;
-	const int width = frame->width;
+    const int width = frame->width;
+    const int height = frame->len / width;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *tmp = (uint8_t *) malloc(frame->len);
+    if (!tmp) return;
 
-	for(c = 1; c < width - 1; c ++ )
-	   Y[c ] = (Y[c - 1] +
-	      Y[c ] +
-	      Y[c + 1]
-		) / 3;
+    for (int i = 0; i < frame->len; i++)
+        tmp[i] = Y[i];
 
-	for(r=width; r < (len-width); r+=width) {
-#pragma omp simd
-		for(c=1; c < (width-1); c++) {
-			Y[r+c] = ( 	Y[r - width + c - 1] +
-				   	Y[r - width + c ] +
-					Y[r + c + 1] +
-					Y[r - width + c] +
-					Y[r + c] + 
-					Y[r + c + 1] +
-					Y[r + width + c - 1] +
-					Y[r + width + c] +
-					Y[r + width + c + 1]  ) / 9;
+    for (int r = 0; r < height; r++) {
+        int row_offset = r * width;
+        for (int c = 0; c < width; c++) {
+            int sum = 0;
+            int count = 0;
 
-		}
-	}
+            for (int i = -1; i <= 1; i++) {
+                int rr = r + i;
+                if (rr < 0 || rr >= height) continue;
 
-	for( c = (len-width) ; c < len; c ++ )
-	  Y[c ] = (Y[c - 1] +
-	      Y[c] +
-	      Y[c + 1]
-		) / 3;
-}
-    	
-static void softblur1_apply( VJFrame *frame)
-{
-    int r, c;
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	const int width = frame->width;
+                for (int j = -1; j <= 1; j++) {
+                    int cc = c + j;
+                    if (cc < 0 || cc >= width) continue;
 
-#pragma omp simd
-	for(r=0; r < len; r+=width) {
-		for(c=1; c < (width-1); c++) {
-			Y[r+c] = ( 	
-					Y[r + c + 1] +
-					Y[r + c] + 
-					Y[r + c + 1] ) /3;
+                    sum += tmp[rr * width + cc];
+                    count++;
+                }
+            }
+            Y[row_offset + c] = sum / count;
+        }
+    }
 
-		}
-	}
-
+    free(tmp);
 }
 
+static void softblur5_apply(VJFrame *frame)
+{
+    const int width = frame->width;
+    const int height = frame->len / width;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *tmp = (uint8_t *) malloc(frame->len);
+    if (!tmp) return;
 
+    for (int i = 0; i < frame->len; i++)
+        tmp[i] = Y[i];
+
+    // apply 5x5 kernel safely
+    #pragma omp parallel for
+    for (int r = 0; r < height; r++) {
+        for (int c = 0; c < width; c++) {
+            int sum = 0;
+            int count = 0;
+
+            // iterate over kernel
+            for (int i = -2; i <= 2; i++) {
+                int rr = r + i;
+                if (rr < 0 || rr >= height) continue;  // clip row
+
+                for (int j = -2; j <= 2; j++) {
+                    int cc = c + j;
+                    if (cc < 0 || cc >= width) continue;  // clip col
+
+                    sum += tmp[rr * width + cc];
+                    count++;
+                }
+            }
+
+            Y[r * width + c] = sum / count;
+        }
+    }
+
+    free(tmp);
+}
 
 
 void softblur_apply(void *ptr, VJFrame *frame, int *args)
 {
-   
     int type = args[0];
 
     switch (type) {
- 	   case 0:
-			softblur1_apply(frame);
-		break;
-	    case 1:
-			softblur3_apply(frame);
-		break;
-		case 2:
-			softblur5_apply(frame);
-			break;
+        case 0: softblur1_apply(frame); break;
+        case 1: softblur3_apply(frame); break;
+        case 2: softblur5_apply(frame); break;
     }
 }
 
 void softblur_apply_internal(VJFrame *frame, int type)
 {
     switch (type) {
- 	   case 0:
-			softblur1_apply(frame);
-		break;
-	    case 1:
-			softblur3_apply(frame);
-		break;
-		case 2:
-			softblur5_apply(frame);
-			break;
+        case 0: softblur1_apply(frame); break;
+        case 1: softblur3_apply(frame); break;
+        case 2: softblur5_apply(frame); break;
     }
 }

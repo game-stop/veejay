@@ -44,37 +44,36 @@ vj_effect *widthmirror_init(int max_width,int h)
 
 void widthmirror_apply(void *ptr, VJFrame *frame, int *args)
 {
-    unsigned int r, c;
+    if (!frame || !args) return;
+
     int width_div = args[0];
     const unsigned int width = frame->width;
     const int len = frame->len;
-    int p1;
-    uint8_t x1, x2, x3;
 
     uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Cb= frame->data[1];
-    uint8_t *restrict Cr= frame->data[2];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
     if (width_div >= frame->width || width_div < 2)
         width_div = 2;
 
     unsigned int divisor = width / width_div;
+    if (divisor == 0) divisor = 1; // safety
 
-    for (r = 0; r < len; r += width) {
-        for (c = 0; c < width; c++) {
-            p1 = ( divisor - c < 0 ? c - divisor + r : divisor - c + r );
+    for (unsigned int r = 0; r < len; r += width) {
+        #pragma omp simd
+        for (unsigned int c = 0; c < width; c++) {
+            int p1 = r + (divisor - c < 0 ? 0 : (divisor - c >= (int)width ? width - 1 : divisor - c));
+            int p2 = r + (width - c - 1 < 0 ? 0 : (width - c - 1 >= (int)width ? width - 1 : width - c - 1));
 
-            x1 = Y[c + r];
-            Y[p1] = x1;
-            Y[width - c + r] = x1;
+            Y[p1] = Y[r + c];
+            Y[p2] = Y[r + c];
 
-            x2 = Cb[c + r];
-            Cb[p1] = x2;
-            Cb[width - c + r] = x2;
+            Cb[p1] = Cb[r + c];
+            Cb[p2] = Cb[r + c];
 
-            x3 = Cr[c + r];
-            Cr[p1] = x3;
-            Cr[width - c + r] = x3;
+            Cr[p1] = Cr[r + c];
+            Cr[p2] = Cr[r + c];
         }
     }
 }

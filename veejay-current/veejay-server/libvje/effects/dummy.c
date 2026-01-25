@@ -56,7 +56,6 @@ void dummy_apply( VJFrame *frame, int color)
     colorY = bl_pix_get_color_y(color);
     colorCb = bl_pix_get_color_cb(color);
     colorCr = bl_pix_get_color_cr(color);
-
     veejay_memset( Y, colorY, len);
     veejay_memset( Cb,colorCb,uv_len);
     veejay_memset( Cr,colorCr,uv_len);

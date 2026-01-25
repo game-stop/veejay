@@ -17,6 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+#include <config.h>
 #include <limits.h>
 #include "common.h"
 #include <veejaycore/vjmem.h>
@@ -62,9 +63,11 @@ vj_effect *fragmenttv_init(int w, int h)
     return ve;
 }
 
+#define SIN_LUT_SCALE 1024 
+
 typedef struct {
-    float *sin_lut;
-    float *cos_lut;
+    int16_t *sin_lut;
+    int16_t *cos_lut_int;
     float distortion;
     uint8_t *buf[3];
     int *randbuf;
@@ -72,54 +75,43 @@ typedef struct {
 } fragmenttv_t;
 
 static void init_sin_lut(fragmenttv_t *m) {
-    for(int i = 0; i < LUT_SIZE; i ++ ) {               
+    for (int i = 0; i < LUT_SIZE; i++) {
         float angle = i * (TWO_PI / LUT_SIZE);
-        m->sin_lut[i] = sinf(angle);
-        m->cos_lut[i] = cosf(angle);
+        m->sin_lut[i] = (int16_t)(sinf(angle));
+        m->cos_lut_int[i] = (int16_t)(cosf(angle));
     }
 }
 
 static void init_rand_lut(fragmenttv_t *m) {
-    for( int i = 0; i < MAX_FRAGMENTS; i ++ ) {
+    for (int i = 0; i < MAX_FRAGMENTS; i++) {
         m->randbuf[i] = rand();
     }
-
 }
 
-void *fragmenttv_malloc(int w, int h)
-{
+void *fragmenttv_malloc(int w, int h) {
     fragmenttv_t *m = (fragmenttv_t*) vj_malloc(sizeof(fragmenttv_t));
-    if(!m) {
-        return NULL;
-    }
-    m->sin_lut = (float*) vj_malloc( sizeof(float) * LUT_SIZE * 2 );
-    if(!m->sin_lut) {
-        free(m);
-        return NULL;
-    }
-    m->cos_lut = m->sin_lut + LUT_SIZE;
+    if (!m) return NULL;
 
-    m->buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 3 );
-    if(!m->buf[0]) {
-        free(m->sin_lut);
-        free(m);
-        return NULL;
-    }
+    // Allocate integer LUT
+    m->sin_lut = (int16_t*) vj_malloc(sizeof(int16_t) * LUT_SIZE);
+    if (!m->sin_lut) { free(m); return NULL; }
 
-    m->randbuf = (int*) vj_malloc(sizeof(int) * MAX_FRAGMENTS );
-    if(!m->randbuf) {
-        free(m->buf[0]);
-        free(m->sin_lut);
-        free(m);
-        return NULL;
-    }
+    m->cos_lut_int = (int16_t*) vj_malloc(sizeof(int16_t) * LUT_SIZE);
+    if (!m->cos_lut_int) { free(m->sin_lut); free(m); return NULL; }
 
-    m->buf[1] = m->buf[0] + (w*h);
-    m->buf[2] = m->buf[1] + (w*h);
+    // Allocate pixel buffers
+    m->buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 3);
+    if (!m->buf[0]) { free(m->sin_lut); free(m->cos_lut_int); free(m); return NULL; }
+    m->buf[1] = m->buf[0] + (w * h);
+    m->buf[2] = m->buf[1] + (w * h);
+
+    // Allocate random buffer
+    m->randbuf = (int*) vj_malloc(sizeof(int) * MAX_FRAGMENTS);
+    if (!m->randbuf) { free(m->buf[0]); free(m->sin_lut); free(m->cos_lut_int); free(m); return NULL; }
 
     m->count = 0;
 
-
+    // Initialize LUT and random buffer
     init_sin_lut(m);
     init_rand_lut(m);
 
@@ -128,15 +120,13 @@ void *fragmenttv_malloc(int w, int h)
 
 void fragmenttv_free(void *ptr) {
     fragmenttv_t *m = (fragmenttv_t*) ptr;
-    if(m) {
-        if(m->sin_lut)
-            free(m->sin_lut);
-        if(m->buf[0])
-            free(m->buf[0]);
-        if(m->randbuf)
-            free(m->randbuf);
-        free(m);
-    }
+    if (!m) return;
+
+    if (m->sin_lut) free(m->sin_lut);
+    if (m->cos_lut_int) free(m->cos_lut_int);
+    if (m->buf[0]) free(m->buf[0]);
+    if (m->randbuf) free(m->randbuf);
+    free(m);
 }
 
 typedef struct {
@@ -146,13 +136,17 @@ typedef struct {
 static inline void rotatePoint(int x, int y, int cx, int cy, float theta, int *newX, int *newY, fragmenttv_t *m) {
     int lutpos = (int)(theta * LUT_SIZE / TWO_PI) % LUT_SIZE;
 
-    float cosTheta = m->cos_lut[ lutpos ];
+    float cosTheta = m->cos_lut_int[ lutpos ];
     float sinTheta = m->sin_lut[ lutpos ];
 
-    *newX = cx + (x - cx) * cosTheta - (y - cy) * sinTheta;
-    *newY = cy + (x - cx) * sinTheta + (y - cy) * cosTheta;
-}
+    //*newX = cx + (x - cx) * cosTheta - (y - cy) * sinTheta;
+    //*newY = cy + (x - cx) * sinTheta + (y - cy) * cosTheta;
 
+    *newX = (int)(cx + (x - cx) * cosTheta - (y - cy) * sinTheta + 0.5f);
+    *newY = (int)(cy + (x - cx) * sinTheta + (y - cy) * cosTheta + 0.5f);
+
+}
+/*
 void drawGridTriangles(fragmenttv_t *m, uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, uint8_t *srcY, uint8_t *srcU, uint8_t *srcV, int width, int height, const int gridSize, const int minSize, const int maxSize, const float displacementWeight) {
     const int numTrianglesX = width / gridSize;
     const int numTrianglesY = height / gridSize;
@@ -184,7 +178,7 @@ void drawGridTriangles(fragmenttv_t *m, uint8_t *dstY, uint8_t *dstU, uint8_t *d
 
             for (int y = p1.y; y <= p3.y; ++y) {
                 for (int x = p1.x; x <= p2.x; ++x) {
-                    if (x <= width && y <= height) {
+                    if (x < width && y < height) {
                         int sign1 = (p2.x - p1.x) * (y - p1.y) - (x - p1.x) * (p2.y - p1.y);
                         int sign2 = (p3.x - p2.x) * (y - p2.y) - (x - p2.x) * (p3.y - p2.y);
                         int sign3 = (p1.x - p3.x) * (y - p3.y) - (x - p3.x) * (p1.y - p3.y);
@@ -216,7 +210,111 @@ void drawGridTriangles(fragmenttv_t *m, uint8_t *dstY, uint8_t *dstU, uint8_t *d
         }
     }
 
+}*/
+
+void drawGridTriangles(fragmenttv_t *m,
+                       uint8_t *dstY, uint8_t *dstU, uint8_t *dstV,
+                       uint8_t *srcY, uint8_t *srcU, uint8_t *srcV,
+                       int width, int height,
+                       const int gridSize, const int minSize, const int maxSize,
+                       const float displacementWeight) {
+
+    const int numTrianglesX = width / gridSize;
+    const int numTrianglesY = height / gridSize;
+
+    int *restrict rand_lut = m->randbuf;
+    int rand_lut_pos = 0;
+    int rotatedX, rotatedY;
+    int triangleSize;
+    float angle;
+
+    for (int i = 0; i < numTrianglesX; ++i) {
+        for (int j = 0; j < numTrianglesY; ++j) {
+
+            // triangle size
+            triangleSize = minSize + rand_lut[rand_lut_pos] % (maxSize - minSize);
+            rand_lut_pos++;
+            if (rand_lut_pos >= MAX_FRAGMENTS) rand_lut_pos = 0;
+
+            // points
+            Point p1 = { i * gridSize, j * gridSize };
+            Point p2 = { p1.x + triangleSize, p1.y };
+            Point p3 = { p1.x, p1.y + triangleSize };
+
+            // rotation
+            angle = (float)rand_lut[rand_lut_pos] / RAND_MAX * TWO_PI;
+            rand_lut_pos++;
+            if (rand_lut_pos >= MAX_FRAGMENTS) rand_lut_pos = 0;
+
+            rotatePoint(p1.x, p1.y, p2.x, p2.y, angle, &rotatedX, &rotatedY, m);
+            p2.x = rotatedX; p2.y = rotatedY;
+
+            rotatePoint(p1.x, p1.y, p3.x, p3.y, angle, &rotatedX, &rotatedY, m);
+            p3.x = rotatedX; p3.y = rotatedY;
+
+            // clamp triangle coordinates to image bounds
+            if (p1.x < 0) p1.x = 0;
+            if (p1.y < 0) p1.y = 0;
+            if (p2.x >= width) p2.x = width - 1;
+            if (p2.y >= height) p2.y = height - 1;
+            if (p3.x >= width) p3.x = width - 1;
+            if (p3.y >= height) p3.y = height - 1;
+
+            // precompute triangle deltas for barycentric test
+            int dx21 = p2.x - p1.x;
+            int dy21 = p2.y - p1.y;
+            int dx32 = p3.x - p2.x;
+            int dy32 = p3.y - p2.y;
+            int dx13 = p1.x - p3.x;
+            int dy13 = p1.y - p3.y;
+
+            int heightY = p3.y - p1.y;
+            int idxY = 0;
+            int idxY_inc = (heightY > 0) ? LUT_SIZE / heightY : 0;
+
+            for (int y = p1.y; y <= p3.y; ++y) {
+                float displacementY = (heightY > 0) ? m->sin_lut[idxY < LUT_SIZE ? idxY : LUT_SIZE - 1] * displacementWeight : 0;
+                idxY += idxY_inc;
+
+                uint8_t *rowY = dstY + y * width;
+                uint8_t *rowU = dstU + y * width;
+                uint8_t *rowV = dstV + y * width;
+
+                int widthX = p2.x - p1.x;
+                int idxX = 0;
+                int idxX_inc = (widthX > 0) ? LUT_SIZE / widthX : 0;
+
+                for (int x = p1.x; x <= p2.x; ++x) {
+                    // barycentric signs
+                    int sign1 = dx21 * (y - p1.y) - (x - p1.x) * dy21;
+                    int sign2 = dx32 * (y - p2.y) - (x - p2.x) * dy32;
+                    int sign3 = dx13 * (y - p3.y) - (x - p3.x) * dy13;
+
+                    if (sign1 >= 0 && sign2 >= 0 && sign3 >= 0) {
+                        float displacementX = (widthX > 0) ? m->sin_lut[idxX < LUT_SIZE ? idxX : LUT_SIZE - 1] * displacementWeight : 0;
+                        idxX += idxX_inc;
+
+                        int mirroredX = width - x - 1 + (int)(displacementX + 0.5f);
+                        int mirroredY = y + (int)(displacementY + 0.5f);
+
+                        // clamp mirrored coordinates
+                        if (mirroredX < 0) mirroredX = 0;
+                        if (mirroredX >= width) mirroredX = width - 1;
+                        if (mirroredY < 0) mirroredY = 0;
+                        if (mirroredY >= height) mirroredY = height - 1;
+
+                        int mirroredIndex = mirroredY * width + mirroredX;
+
+                        rowY[x] = (rowY[x] + srcY[mirroredIndex]) >> 1;
+                        rowU[x] = (rowU[x] + srcU[mirroredIndex]) >> 1;
+                        rowV[x] = (rowV[x] + srcV[mirroredIndex]) >> 1;
+                    }
+                }
+            }
+        }
+    }
 }
+
 
 
 void fragmenttv_apply(void *ptr, VJFrame *frame, int *args) {
