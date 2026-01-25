@@ -84,6 +84,7 @@ static struct
 	{ "svq3", CODEC_ID_SVQ3		},
 	{ "rpza", CODEC_ID_RPZA		},
 	{ "y42b", CODEC_ID_YUV422F  },
+	{ "y42x", CODEC_ID_YUV422F  }, 
 	{ "pict", 0xffff			},
 
 	{ NULL  , 0,				},
@@ -256,39 +257,60 @@ void	avhelper_codec_close( AVCodecContext *ctx ) {
 
 
 #if LIBAVCODEC_VERSION_MAJOR > 54 && LIBAVCODEC_VERSION_MAJOR < 60
-static int avcodec_decode_video( AVCodecContext *avctx, AVFrame *picture, int *got_picture, uint8_t *data, int pktsize ) {
-	AVPacket pkt;
-	veejay_memset( &pkt, 0, sizeof(AVPacket));
-	pkt.data = data;
-	pkt.size = pktsize;
-	return avcodec_decode_video2( avctx, picture, got_picture, &pkt );
+
+static int avcodec_decode_video(
+    AVCodecContext *avctx,
+    AVFrame *picture,
+    int *got_picture,
+    uint8_t *data,
+    int pktsize)
+{
+    AVPacket pkt;
+    veejay_memset(&pkt, 0, sizeof(pkt));
+    pkt.data = data;
+    pkt.size = pktsize;
+    return avcodec_decode_video2(avctx, picture, got_picture, &pkt);
 }
+
 #else
-static int avcodec_decode_video( AVPacket *pkt, AVCodecContext *avctx, AVFrame *picture, int *got_picture, uint8_t *data, int pktsize ) {
-	pkt->data = data;
-	pkt->size = pktsize;
 
-	int ret = avcodec_send_packet( avctx, pkt );
-	if( ret < 0 ) {
-		veejay_msg(0, "Error submitting a packet to the decoder: %s", av_err2str(ret));
-		return ret;
-	}
+static int avcodec_decode_video(
+    AVPacket *pkt,
+    AVCodecContext *avctx,
+    AVFrame *picture,
+    int *got_picture,
+    uint8_t *data,
+    int pktsize)
+{
+    pkt->data = data;
+    pkt->size = pktsize;
+    pkt->pts  = AV_NOPTS_VALUE;
+    pkt->dts  = AV_NOPTS_VALUE;
+    pkt->side_data = NULL;
+    pkt->side_data_elems = 0;
+    pkt->flags = 0;
 
-	ret = avcodec_receive_frame( avctx, picture );
-	if( ret < 0 ) {
-		if( ret == AVERROR_EOF ) {
-			veejay_msg(VEEJAY_MSG_WARNING, "There is no output");
-			*got_picture = 0;
-			return ret;
-		}
-	}
+    int ret = avcodec_send_packet(avctx, pkt);
+    if (ret < 0) {
+        if (ret == AVERROR_INVALIDDATA)
+            avcodec_flush_buffers(avctx);
+        return ret;
+    }
 
-	*got_picture = 1;
+    ret = avcodec_receive_frame(avctx, picture);
+    if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+        *got_picture = 0;
+        return 0;
+    }
+    if (ret < 0) {
+        *got_picture = 0;
+        return ret;
+    }
 
-	av_packet_unref(pkt);
-
-	return ret;
+    *got_picture = 1;
+    return 1;
 }
+
 #endif
 
 int avhelper_decode_video3( AVCodecContext *avctx, AVFrame *frame, int *got_picture, AVPacket *pkt ) {
@@ -339,61 +361,65 @@ void avhelper_free_packet(AVPacket *pkt) {
 	av_packet_unref( pkt );
 #endif
 }
+void    *avhelper_get_mjpeg_decoder(VJFrame *output) {
+    el_decoder_t *x = (el_decoder_t*) vj_calloc( sizeof( el_decoder_t ));
+    int j;
+    if(!x) {
+        return NULL;
+    }
 
-
-void	*avhelper_get_mjpeg_decoder(VJFrame *output) {
-	el_decoder_t *x = (el_decoder_t*) vj_calloc( sizeof( el_decoder_t ));
-	int j;
-	if(!x) {
-		return NULL;
-	}
-
-	x->codec = avcodec_find_decoder( CODEC_ID_MJPEG );
-	if(x->codec == NULL) {
-		veejay_msg(0,"Unable to find MJPEG decoder");
-		return NULL;
-	}
+    x->codec = avcodec_find_decoder( AV_CODEC_ID_MJPEG );
+    if(x->codec == NULL) {
+        veejay_msg(0,"Unable to find MJPEG decoder");
+        free(x); // Fix: added free here to prevent leak
+        return NULL;
+    }
 
 #if LIBAVCODEC_VERSION_MAJOR > 54
-	x->codec_ctx = avcodec_alloc_context3(x->codec);
+    x->codec_ctx = avcodec_alloc_context3(x->codec);
 
-	int n_threads = avhelper_set_num_decoders();
-	if (x->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
-		x->codec_ctx->thread_type = FF_THREAD_FRAME;
-		x->codec_ctx->thread_count = n_threads;	
-	}
-	else if (x->codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
-		x->codec_ctx->thread_type = FF_THREAD_SLICE;
-		x->codec_ctx->thread_count = n_threads;	
-	}
+    x->codec_ctx->lowres = 0;
+    x->codec_ctx->idct_algo = FF_IDCT_INT;
+    x->codec_ctx->workaround_bugs = FF_BUG_AUTODETECT;
+    x->codec_ctx->err_recognition = AV_EF_CAREFUL;
+    
+    // for MJPEG, this ensures the decoder doesn't cut corners on color
+    #ifdef AV_CODEC_FLAG2_FAST
+    x->codec_ctx->flags2 &= ~AV_CODEC_FLAG2_FAST; 
+    #endif
 
-	//AVDictionary *options = NULL;
-	//av_dict_set(&options, "hwaccel", "auto", 0);
+    int n_threads = avhelper_set_num_decoders();
+    if (x->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
+        x->codec_ctx->thread_type = FF_THREAD_FRAME;
+        x->codec_ctx->thread_count = n_threads; 
+    }
+    else if (x->codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
+        x->codec_ctx->thread_type = FF_THREAD_SLICE;
+        x->codec_ctx->thread_count = n_threads; 
+    }
 
-	if ( avcodec_open2( x->codec_ctx, x->codec, NULL ) < 0 )
+    if ( avcodec_open2( x->codec_ctx, x->codec, NULL ) < 0 )
 #else
-	x->codec_ctx = avcodec_alloc_context();
-	if ( avcodec_open( x->codec_ctx, x->codec ) < 0 ) 
+    x->codec_ctx = avcodec_alloc_context();
+    x->codec_ctx->idct_algo = FF_IDCT_INT; 
+    if ( avcodec_open( x->codec_ctx, x->codec ) < 0 ) 
 #endif
-	{
-		free(x);
-		//av_dict_free(&options);
-		return NULL;
-	}
+    {
+        free(x);
+        return NULL;
+    }
 
-	x->frames[0] = avhelper_alloc_frame();
-	x->frames[1] = avhelper_alloc_frame();
+    x->frames[0] = avhelper_alloc_frame();
+    x->frames[1] = avhelper_alloc_frame();
 #if LIBAVCODEC_VERSION_MAJOR >= 60
-	for(j = 0; j < MAX_PACKETS; j ++ ) {
-		x->packets[j] = av_packet_alloc();
-	}
+    for(j = 0; j < MAX_PACKETS; j ++ ) {
+        x->packets[j] = av_packet_alloc();
+    }
 #endif
-	x->output = yuv_yuv_template( NULL,NULL,NULL, output->width, output->height, alpha_fmt_to_yuv(output->format) );
-	//av_dict_free(&options);
+    x->output = yuv_yuv_template( NULL,NULL,NULL, output->width, output->height, alpha_fmt_to_yuv(output->format) );
 
-	return (void*) x;
+    return (void*) x;
 }
-
 void	*avhelper_get_decoder( const char *filename, int dst_pixfmt, int dst_width, int dst_height ) {
         return avhelper_get_decoder_intra(filename, dst_pixfmt,dst_width,dst_height,1);
 }
@@ -452,7 +478,7 @@ int avhelper_recv_frame_packet( void *decoder )
     return -1; // error
 }
 
-int	avhelper_decode_video_buffer( void *ptr, uint8_t *data, int len )  //FIXME callers
+int	avhelper_decode_video_buffer( void *ptr, uint8_t *data, int len )
 {
 	int got_picture = 0;
 	el_decoder_t * e = (el_decoder_t*) ptr;
@@ -462,11 +488,10 @@ int	avhelper_decode_video_buffer( void *ptr, uint8_t *data, int len )  //FIXME c
 	avcodec_decode_video( e->packets[e->frame_index], e->codec_ctx, e->frames[e->frame_index], &got_picture, data, len );
 #endif
 
-	//avhelper_frame_unref(e->frames[e->frame_index]);
 
 	if(got_picture) {
-		e->frameinfo[e->frame_index] = 1; /* we have a full picture at this index */
-		e->frame_index = (e->frame_index + 1) % 2; /* use next available buffer */
+		e->frameinfo[e->frame_index] = 1;
+		e->frame_index = (e->frame_index + 1) % 2;
 		return 1;
 	}
 
@@ -482,11 +507,10 @@ int avhelper_recv_decode( void *decoder, int *got_picture )
 
     while(1) {
 
-        // only decode video
 #if LIBAVCODEC_VERSION_MAJOR < 60
         if( x->packets[ x->read_index ].stream_index != x->video_stream_id )
             break;
-		// poor man 'double buffering'; when the decode is successful, decode next frame into its own buffer and increment frame_index.
+	// poor man 'double buffering'; when the decode is successful, decode next frame into its own buffer and increment frame_index.
         // this function, is the only function, that may manipulate frame_index, as it is used together with avhelper_get_decoded_video
         // other functions in this source file, assume an index of 0 
         result = avcodec_decode_video( x->codec_ctx, x->frames[x->frame_index], &gp, x->packets[ x->read_index ].data, x->packets[ x->read_index ].size );
@@ -495,7 +519,7 @@ int avhelper_recv_decode( void *decoder, int *got_picture )
 #else
         if( x->packets[ x->read_index ]->stream_index != x->video_stream_id )
             break;
-		// poor man 'double buffering'; when the decode is successful, decode next frame into its own buffer and increment frame_index.
+	// poor man 'double buffering'; when the decode is successful, decode next frame into its own buffer and increment frame_index.
         // this function, is the only function, that may manipulate frame_index, as it is used together with avhelper_get_decoded_video
         // other functions in this source file, assume an index of 0 
         result = avcodec_decode_video( x->packets[x->read_index], x->codec_ctx, x->frames[x->frame_index], &gp, x->packets[ x->read_index ]->data, x->packets[ x->read_index ]->size );
@@ -510,9 +534,9 @@ int avhelper_recv_decode( void *decoder, int *got_picture )
     }
     *got_picture = gp;
 
-	if(gp) { //FIXME callers and finish decode to increment frame
-		x->frameinfo[x->frame_index] = 1; /* we have a full picture at this index */
-		x->frame_index = (x->frame_index + 1) % 2; /* use next available buffer */
+    if(gp) { 
+        x->frameinfo[x->frame_index] = 1;
+        x->frame_index = (x->frame_index + 1) % 2;
         x->frameinfo[x->frame_index] = 0;
     }
 
@@ -676,7 +700,6 @@ further:
 		return NULL;
 	}
 
-	/* Copy codec parameters from input stream to output codec context */
 	if ((ret = avcodec_parameters_to_context(dec_ctx, st->codecpar)) < 0) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Failed to copy %s codec parameters to decoder context");
 		avhelper_codec_close(dec_ctx);
@@ -684,6 +707,17 @@ further:
 		free(x);
 		return NULL;
 	}
+
+	dec_ctx->skip_loop_filter = AVDISCARD_NONE;
+    dec_ctx->skip_idct        = AVDISCARD_NONE;
+    dec_ctx->skip_frame       = AVDISCARD_NONE;
+    dec_ctx->err_recognition  = AV_EF_CAREFUL;
+    dec_ctx->bits_per_raw_sample = st->codecpar->bits_per_raw_sample; 
+
+#ifdef AV_CODEC_FLAG2_SHOW_ALL
+    dec_ctx->flags2 |= AV_CODEC_FLAG2_SHOW_ALL; 
+#endif
+
 	if( wid == -1 && hei == -1 ) {
 		wid = dec_ctx->width;
 		hei = dec_ctx->height;
@@ -708,7 +742,6 @@ further:
 #endif
 
 #if LIBAVCODEC_VERSION_MAJOR >= 60
-	/* Init the decoders */
 	if ((ret = avcodec_open2(dec_ctx, x->codec, NULL)) < 0) 
 #endif
 #if LIBAVCODEC_VERSION_MAJOR > 54 && LIBAVCODEC_VERSION_MAJOR < 60
@@ -790,17 +823,25 @@ further:
 	else {
 		x->spvf = 0.04f; // 0.04 seconds per video frame = 25 fps
 	}
+
+#if LIBAVCODEC_VERSION_MAJOR >= 60
+    AVPacket *hunt_pkt = av_packet_alloc();
+#else
+    AVPacket hunt_pkt_stack;
+    AVPacket *hunt_pkt = &hunt_pkt_stack;
+    av_init_packet(hunt_pkt);
+#endif
 	
 	while(1) {
-	    int ret = av_read_frame(x->avformat_ctx, x->packets[0]);
+	    int ret = av_read_frame(x->avformat_ctx, hunt_pkt);
 		if( ret < 0 ) {
 			av_strerror( err, errbuf, sizeof(errbuf));
 			veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: read error: %s", errbuf);
 			break;
 		}
 
-		if ( x->packets[0]->stream_index == x->video_stream_id ) {
-			ret = avcodec_decode_video( x->packets[0], x->codec_ctx,f,&got_picture, x->packets[0]->data, x->packets[0]->size );
+		if ( hunt_pkt->stream_index == x->video_stream_id ) {
+			ret = avcodec_decode_video( hunt_pkt, x->codec_ctx,f,&got_picture, hunt_pkt->data, hunt_pkt->size );
 
 			avhelper_frame_unref( f );
 			if( ret < 0 ) {
@@ -809,12 +850,12 @@ further:
 			}
 		}
 				
-		avhelper_free_packet( x->packets[0] );	
+		avhelper_free_packet( hunt_pkt);	
 
 		if( got_picture )
 			break;
 	}
-	av_packet_free( &(x->packets[0]));
+	av_packet_free( &hunt_pkt);
 	av_free(f);
 #endif
 
@@ -919,64 +960,73 @@ VJFrame *avhelper_get_output_frame( void *ptr)
 	return e->output;
 }
 
-int avhelper_decode_video_direct( void *ptr, uint8_t *data, int len, uint8_t *dst[4], int pf, int w, int h ) {
-	el_decoder_t *e = (el_decoder_t*) ptr;
+int avhelper_decode_video_direct(
+    void *ptr,
+    uint8_t *data,
+    int len,
+    uint8_t *dst[4],
+    int pf,
+    int w,
+    int h)
+{
+    el_decoder_t *e = (el_decoder_t*)ptr;
+
 #if LIBAVCODEC_VERSION_MAJOR >= 60
-	if(e->packets[0] == NULL) {
-		for( int i = 0; i < MAX_PACKETS; i ++ ) {
-			e->packets[i] = av_packet_alloc();
-		}
-	}
+    if (!e->packets[0]) {
+        for (int i = 0; i < MAX_PACKETS; i++)
+            e->packets[i] = av_packet_alloc();
+    }
 #endif
 
-	int ret = avhelper_decode_video(ptr, data, len );
-	if( ret < 0 ) {
-		return ret;
-	}
-	return avhelper_rescale_video(ptr, dst );
+    int ret = avhelper_decode_video(ptr, data, len);
+    if (ret == 1) {
+        if (avhelper_rescale_video(ptr, dst))
+            return 1;
+    }
+    return ret;
 }
 
-void avhelper_decode_finish( void *ptr )
+
+void avhelper_decode_finish(void *ptr)
 {
-	el_decoder_t * e = (el_decoder_t*) ptr;
+    el_decoder_t *e = (el_decoder_t*)ptr;
+    int idx = e->frame_index;
 
+    e->frameinfo[idx] = 1;
+    e->frame_index = (idx + 1) % 2;
 
-#if LIBAVCODEC_VERSION_MAJOR >= 60	
-	av_frame_unref( e->frames[e->frame_index] );
+#if LIBAVCODEC_VERSION_MAJOR >= 60
+    if (e->frameinfo[e->frame_index]) {
+        if (e->frames[e->frame_index])
+            av_frame_unref(e->frames[e->frame_index]);
+        e->frameinfo[e->frame_index] = 0;
+    }
 #endif
-
-    e->frameinfo[e->frame_index] = 1;
-    e->frame_index = (e->frame_index +1) %2;
-    e->frameinfo[e->frame_index] = 0;
-
 }
 
-int	avhelper_decode_video( void *ptr, uint8_t *data, int len ) //FIXME: decoding with ffmpeg 4 crashes because of bad packet / frame (data) handling
+
+int avhelper_decode_video(void *ptr, uint8_t *data, int len)
 {
-	int got_picture = 0;
-	el_decoder_t * e = (el_decoder_t*) ptr;
+    el_decoder_t *e = (el_decoder_t*)ptr;
+    int got_picture = 0;
+
 #if LIBAVCODEC_VERSION_MAJOR < 60
-	int result = avcodec_decode_video( e->codec_ctx, e->frames[e->frame_index], &got_picture, data, len );
+    avcodec_decode_video(
+        e->codec_ctx,
+        e->frames[e->frame_index],
+        &got_picture,
+        data,
+        len);
+    return got_picture ? 1 : 0;
 #else
-	int result = avcodec_decode_video( e->packets[0], e->codec_ctx, e->frames[e->frame_index], &got_picture, data, len );
+    return avcodec_decode_video(
+        e->packets[0],
+        e->codec_ctx,
+        e->frames[e->frame_index],
+        &got_picture,
+        data,
+        len);
 #endif
-
-	if(!got_picture || result < 0) {
-//#if LIBAVCODEC_BUILD >= 6000
-//		av_frame_unref( e->frames[e->frame_index] );
-//#endif	
-		return 0;
-	}
-
-/*
-    e->frameinfo[e->frame_index] = 1;
-    e->frame_index = (e->frame_index +1) %2;
-    e->frameinfo[e->frame_index] = 0;
-*/
-//#if LIBAVCODEC_BUILD >= 6000
-//	av_frame_unref( e->frames[e->frame_index] );
-//#endif	
-	return 1;
 }
 
 VJFrame	*avhelper_get_decoded_video(void *ptr) {
@@ -987,7 +1037,7 @@ VJFrame	*avhelper_get_decoded_video(void *ptr) {
 	}
 
 	int idx = 0;
-	if( e->frameinfo[1] == 1 ) // find best frame
+	if( e->frameinfo[1] == 1 )
 		idx = 1;
 	
 	e->input->data[0] = e->frames[idx]->data[0];
@@ -1003,39 +1053,48 @@ VJFrame	*avhelper_get_decoded_video(void *ptr) {
 	return e->input;
 }
 
-int	avhelper_rescale_video(void *ptr, uint8_t *dst[4])
+int avhelper_rescale_video(void *ptr, uint8_t *dst[4])
 {
-	el_decoder_t * e = (el_decoder_t*) ptr;
+    el_decoder_t *e = (el_decoder_t*)ptr;
+    AVFrame *src = e->frames[e->frame_index];
 
-	if(e->input == NULL) {
-		e->input = yuv_yuv_template( NULL,NULL,NULL, e->codec_ctx->width,e->codec_ctx->height, e->codec_ctx->pix_fmt );
-	}
+    if (!src || !src->data[0])
+        return 0;
 
-	if(e->scaler == NULL ) {
-		sws_template sws_tem;
-  		veejay_memset(&sws_tem, 0,sizeof(sws_template));
-    		sws_tem.flags = yuv_which_scaler();
-    		e->scaler = yuv_init_swscaler( e->input,e->output, &sws_tem, yuv_sws_get_cpu_flags());
-		if(e->scaler == NULL) {
-			free(e->input);
-			veejay_msg(VEEJAY_MSG_DEBUG, "Unable to initialize scaler context for [%d,%d, @%d %p,%p,%p ] -> [%d,%d, @%d, %p,%p,%p ]",
-				e->input->width,e->input->height,e->input->format,e->input->data[0],e->input->data[1],e->input->data[2],
-				e->output->width,e->output->height,e->output->format,e->output->data[0],e->output->data[1],e->output->data[2]);
-			
-			return 0;
-		}
-	}
+    if (!e->input) {
+        e->input = yuv_yuv_template(
+            NULL, NULL, NULL,
+            e->codec_ctx->width,
+            e->codec_ctx->height,
+            e->codec_ctx->pix_fmt);
+    }
 
-	e->input->data[0] = e->frames[e->frame_index]->data[0];
-	e->input->data[1] = e->frames[e->frame_index]->data[1];
-	e->input->data[2] = e->frames[e->frame_index]->data[2];
-	e->input->data[3] = e->frames[e->frame_index]->data[3];
+    if (!e->scaler) {
+        sws_template sws_tem;
+        veejay_memset(&sws_tem, 0, sizeof(sws_tem));
+        sws_tem.flags = yuv_which_scaler();
+        e->scaler = yuv_init_swscaler(
+            e->input, e->output,
+            &sws_tem,
+            yuv_sws_get_cpu_flags());
+        if (!e->scaler)
+            return 0;
+    }
 
-	e->output->data[0] = dst[0];
-	e->output->data[1] = dst[1];
-	e->output->data[2] = dst[2];
+    for (int i = 0; i < 4; i++) {
+        e->input->data[i]   = src->data[i];
+        e->input->stride[i] = src->linesize[i];
+    }
 
-	yuv_convert_any3( e->scaler, e->input, e->frames[e->frame_index]->linesize, e->output);
+    e->output->data[0] = dst[0];
+    e->output->data[1] = dst[1];
+    e->output->data[2] = dst[2];
 
-	return 1;
+    yuv_convert_any3(
+        e->scaler,
+        e->input,
+        e->input->stride,
+        e->output);
+
+    return 1;
 }
