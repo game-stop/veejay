@@ -16,35 +16,20 @@
 #include <libvjmem/vjmem.h>
 #include "pool.h"
 
-//! \typedef space_t structure
-/*! The space_t structure is a linked list of spaces.
-   Each space has a magazine that can hold up to ROUNDS_PER_MAG rounds.
-   The magazine is a stack. 
-   Each round in the magazine is of a fixed size
- */
 typedef struct
 {
-	unsigned char *area;		/*!< Pointer to memory space containing ROUNDS_PER_MAG objects */
-	unsigned char **mag;		/*!< A magazine is a ROUNDS_PER_MAG-element array of pointers to objects */
-	unsigned int	rounds;		/*!< Available rounds*/
-	void	*next;		/*!< Pointer to next space */
+	unsigned char *area;
+	unsigned char **mag;
+	unsigned int rounds;
+	void	*next;
 } space_t;
 
-//! \typedef pool_t structure
-/*! The pool_t structure is a pool of spaces
- *  Each pool has 1 or more spaces.
- */
 typedef struct
 {
 	space_t **spaces;	/*!<  array of spaces */
 	space_t *space;		/*!<  single space */
 } pool_t;
 
-//!Allocate a new space of a fixed size
-/*!
- \param bs size in bytes
- \return New space that holds ROUNDS_PER_MAG rounds
- */
 static space_t	*alloc_space( size_t bs )
 {
 	int k;
@@ -70,14 +55,6 @@ int	vevo_pool_size( void *p )
 	return 0;
 }
 
-//! Allocate a new pool with spaces of various fixed sizes
-/*!
- \param prop_size size in bytes of vevo_property_t
- \param stor_size size in bytes of vevo_storage_t
- \param atom_size size in bytes of atom_t
- \param index_size size in bytes of prop_node_t
- \return A new pool that holds various fixed sized Spaces
- */
 void	*vevo_pool_init(size_t prop_size,size_t stor_size, size_t atom_size, size_t index_size)
 {
 	unsigned int Msize = Mend + 1;
@@ -96,34 +73,21 @@ void	*vevo_pool_init(size_t prop_size,size_t stor_size, size_t atom_size, size_t
 	return (void*)p;
 }
 
-//! Get a pointer to the starting address of an unused block. Pops a round from the magazine and creates a new space if magazine is empty. 
-/*!
- \param p pointer to pool_t structure
- \param bs size of block to allocate
- \param k base type of block to allocate
- \return pointer to free block
- */
 void	*vevo_pool_alloc( void *p, size_t bs, unsigned int k )
 {
 	pool_t *pool = (pool_t*) p;
 	space_t *space = pool->spaces[k];
-	if( space->rounds == 0 )
-	{ // no more rounds to fire, create a new magazine and add it to the list
+	if( !space || space->rounds == 0 )
+	{
 		space_t *m = alloc_space( bs );
 		m->next = space;
 		pool->spaces[k] = m;
 		space = m;
 	}
-	void **mag = (void**)pool->spaces[k]->mag;
-	return mag[ --space->rounds ];
+    unsigned char *block = space->mag[--space->rounds];
+    return (void*) block;
 }
 
-//! Pushes a round to a magazine that is not full
-/*!
- \param p pointer to pool_t structure
- \param ptr pointer to address of block
- \param k base type of block to allocate
- */
 void	vevo_pool_free( void *p, void *ptr, unsigned int k )
 {
 	pool_t *pool = (pool_t*) p;
@@ -147,10 +111,6 @@ void	vevo_pool_free( void *p, void *ptr, unsigned int k )
 	mag[  space->rounds++ ] = ptr;
 }
 
-//! Destroy a pool and all spaces. Frees all used memory
-/*!
- \param p pointer to pool_t structure
- */
 void	vevo_pool_destroy( void *p )
 {
 	pool_t *pool = (pool_t*) p;
@@ -179,40 +139,33 @@ void	vevo_pool_destroy( void *p )
 	pool = NULL;
 }
 
-//! Destroy a pool and the space it holds. Frees all used memory
-/*!
- \param p pointer to pool_t structure
- */
-void	vevo_pool_slice_destroy( void *p )
+void vevo_pool_slice_destroy( void *p )
 {
-	pool_t *pool = (pool_t*) p;
-	space_t *s = pool->space;
-	space_t *n = NULL;
-	while( s != NULL )
-	{
-		n = s;
-		free( n->area );
-		free( n->mag );
-		s = n->next;
-		free( n );
-	}	
-	//free( pool->space );
-	free( pool );
-	p = NULL;
+    if (!p) return;
+
+    pool_t *pool = (pool_t*) p;
+    space_t *s = pool->space;
+    space_t *n = NULL;
+
+    while( s != NULL )
+    {
+        n = s;
+        s = n->next; 
+        
+        if(n->area) free( n->area );
+        if(n->mag)  free( n->mag );
+        free( n );
+    }   
+    
+    free( pool );
 }
 
-//! Get a pointer to the starting address of an unused block. Pops a round from the magazine and creates a new space if magazine is empty. 
-/*!
- \param p pointer to pool_t structure
- \param bs size of block to allocate
- \return pointer to free block
- */
 void	*vevo_pool_slice_alloc( void *p, size_t bs )
 {
 	pool_t *pool = (pool_t*) p;
 	space_t *space = pool->space;
 	if( space->rounds == 0 )
-	{ // no more rounds to fire, create a new magazine and add it to the list
+	{ 
 		space_t *m = alloc_space( bs );
 		m->next = space;
 		pool->space = m;
@@ -222,30 +175,31 @@ void	*vevo_pool_slice_alloc( void *p, size_t bs )
 	return mag[ --space->rounds ];
 }
 
-//! Pushes a round to a magazine that is not full
-/*!
- \param p pointer to pool_t structure
- \param ptr pointer to address of block
- */
-void	vevo_pool_slice_free( void *p, void *ptr )
+void vevo_pool_slice_free( void *p, void *ptr )
 {
-	pool_t *pool = (pool_t*) p;
-	unsigned int n = pool->space->rounds;
-	space_t *space = pool->space;
-	void **mag = (void**)space->mag;
-	if( n == ROUNDS_PER_MAG )
-	{ 
-		space_t *l = space;
-		while( l != NULL )
-		{
-			if( l->rounds < ROUNDS_PER_MAG )
-			{
-				mag = (void**)l->mag;
-				mag[ l->rounds ++ ] = ptr;
-				return;
-			}
-			l = l->next;
-		}
-	}
-	mag[ space->rounds++ ] = ptr;
+    pool_t *pool = (pool_t*) p;
+    space_t *space = pool->space;
+    
+    if( space->rounds < ROUNDS_PER_MAG )
+    {
+        void **mag = (void**)space->mag;
+        mag[ space->rounds++ ] = ptr;
+        return;
+    }
+
+    space_t *l = space->next; // start at next, we already checked head
+    while( l != NULL )
+    {
+        if( l->rounds < ROUNDS_PER_MAG )
+        {
+            void **mag = (void**)l->mag;
+            mag[ l->rounds ++ ] = ptr;
+            return;
+        }
+        l = l->next;
+    }
+
+#ifdef STRICT_CHECKING 
+     assert(0 && "Pool Overflow: Double free detected or invalid pointer")
+#endif
 }
