@@ -1393,80 +1393,33 @@ double	m_get_polar_y( double r, double a)
 	return ( r * sin(a) );
 }
 
-// originally copied from xine
-void veejay_blur(uint8_t *dst, uint8_t *src, int w, int qradius, int dstStep, int srcStep){
-	unsigned int x;
-	const int radius = ( qradius % 2 == 0 ? qradius + 1 : qradius );
-	const unsigned int length= radius*2 + 1;
-	const int64_t inv= ((1LL<<16) + length/2)/length;
-	int64_t sum= 0;
 
-	if( radius == 1 ) {
-		for( x = 1; x < w - 1; x ++ ) {
-			dst[x * dstStep] = (src[(x - 1) * srcStep] + src[x * srcStep] + src[(x + 1) * srcStep]) / 3;
-		}
-		return;
-	}
-
-	if( radius == 2 ) {
-		for( x = radius; x < w - radius; x ++ ) {
-            sum = src[(x - 2) * srcStep] + src[(x - 1) * srcStep] +
-                  src[x * srcStep] + src[(x + 1) * srcStep] +
-                  src[(x + 2) * srcStep];
-            dst[x * dstStep] = (sum + 2) / 5; // Add 2 for proper rounding
-		}
-		return;
-	}
-
-	for(x=0; x<radius; x++){
-		sum+= src[x*srcStep]<<1;
-	}
-	if( radius & srcStep )
-		sum+= src[radius*srcStep];
-
-	for(x=0; x<=radius; x++){
-		sum+= src[(radius+x)*srcStep] - src[(radius-x)*srcStep];
-		dst[x*dstStep]= (sum*inv + (1LL<<15))>>16;
-	}
-
-	for(; x<w-radius; x++){
-		sum+= src[(radius+x)*srcStep] - src[(x-radius-1)*srcStep];
-		dst[x*dstStep]= (sum*inv + (1LL<<15))>>16;
-	}
-
-	for(; x<w; x++){
-       		sum += src[(radius + x) * srcStep] - src[(x-radius-1) * srcStep];
-        	dst[x * dstStep] = (sum * inv + (1LL << 15)) >> 16;
-	}
-	
- /*   for (x = 0; x <= radius; x++) {
-        int leftIndex = (radius - x) * srcStep;
-        int rightIndex = (radius + x) * srcStep;
-        if (leftIndex >= 0 && leftIndex < w * srcStep && rightIndex >= 0 && rightIndex < w * srcStep) {
-            sum += src[rightIndex] - src[leftIndex];
-        }
-        dst[x * dstStep] = (sum * inv + (1 << 15)) >> 16;
+void veejay_blur(uint8_t *dst, const uint8_t *src, int w, int qradius, int dstStep, int srcStep)
+{
+    if (qradius <= 0) {
+        for (int x = 0; x < w; x++) dst[x * dstStep] = src[x * srcStep];
+        return;
     }
 
-    for (; x < w - radius; x++) {
-        int leftIndex = (x - radius) * srcStep;
-        int rightIndex = (x + radius) * srcStep;
-        if (leftIndex >= 0 && leftIndex < w * srcStep && rightIndex >= 0 && rightIndex < w * srcStep) {
-            sum += src[rightIndex] - src[leftIndex];
-        }
-        dst[x * dstStep] = (sum * inv + (1 << 15)) >> 16;
-    }
+    const int radius = qradius;
+    const int length = radius * 2 + 1;
+    
+    const uint32_t inv = (uint32_t)(((1ULL << 24) + (length / 2)) / length);
 
-    for (; x < w; x++) {
-        int leftIndex = (x - radius - 1) * srcStep;
-        int rightIndex = (x + radius) * srcStep;
-        if (leftIndex >= 0 && leftIndex < w * srcStep && rightIndex >= 0 && rightIndex < w * srcStep) {
-            sum += src[rightIndex] - src[leftIndex];
-        }
-        dst[x * dstStep] = (sum * inv + (1 << 15)) >> 16;
-    } */
-	
+    uint32_t sum = (uint32_t)src[0] * (radius + 1);
+    for (int i = 1; i <= radius; i++)
+        sum += src[(i < w ? i : w - 1) * srcStep];
+
+    for (int x = 0; x < w; x++) {
+        dst[x * dstStep] = (uint8_t)((sum * inv + (1 << 23)) >> 24);
+
+        int out_idx = (x - radius < 0) ? 0 : (x - radius);
+        int in_idx  = (x + radius + 1 >= w) ? (w - 1) : (x + radius + 1);
+
+        sum += src[in_idx * srcStep] - src[out_idx * srcStep];
+    }
 }
+
 void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep) {
     uint8_t temp[2][4096];
     uint8_t *a = temp[0], *b = temp[1];
@@ -2402,92 +2355,61 @@ void	sqrt_table_pixels_free() {
  *
  ****************************************************************************************************/
 inline void grid_getbounds_from_orientation(int radius, vj_effect_orientation orientation, vj_effect_parity parity, int *x_inf, int *y_inf, int *x_sup, int *y_sup) {
-    int w, h;
-    int dotqtt_h, dotqtt_w;
+    int w = *x_sup;
+    int h = *y_sup;
+    int dotqtt_w, dotqtt_h;
 
-    w = *x_sup;
-    h = *y_sup;
-
-    switch (parity) {
-	    case VJ_EFFECT_PARITY_EVEN:
-    		if ((h % 2) != 0) dotqtt_h++;
-            if ((w % 2) != 0) dotqtt_w++;
-            break;
-        case VJ_EFFECT_PARITY_ODD:
-            if ((h % 2) == 0) dotqtt_h++;
-            if ((w % 2) == 0) dotqtt_w++;
-            break;
-        case VJ_EFFECT_PARITY_NO:
-        default:
-           break;
-    }
+    dotqtt_w = w / radius;
+    dotqtt_h = h / radius;
 
     switch (orientation) {
         case VJ_EFFECT_ORIENTATION_CENTER:
-            dotqtt_h = (int) h / radius;
-            if (dotqtt_h * radius != h) dotqtt_h++;
-            dotqtt_w = (int) w / radius;
-            if (dotqtt_w * radius != w) dotqtt_w++;
-
             *x_inf = (w - (dotqtt_w * radius)) / 2;
             *y_inf = (h - (dotqtt_h * radius)) / 2;
             break;
-        case VJ_EFFECT_ORIENTATION_NORTHEAST:
-            dotqtt_h = (int) h / radius;
-            dotqtt_w = (int) w / radius;
-            *x_inf = 0;
-            *y_inf = 0;
-            break;
         case VJ_EFFECT_ORIENTATION_NORTH:
-            dotqtt_h = (int) h / radius;
-            dotqtt_w = (int) w / radius;
             *x_inf = (w - (dotqtt_w * radius)) / 2;
             *y_inf = 0;
             break;
+        case VJ_EFFECT_ORIENTATION_NORTHEAST:
+            *x_inf = 0;
+            *y_inf = 0;
+            break;
         case VJ_EFFECT_ORIENTATION_EAST:
-            dotqtt_h = (int) h / radius;
-            dotqtt_w = (int) w / radius;
             *x_inf = 0;
             *y_inf = (h - (dotqtt_h * radius)) / 2;
             break;
         case VJ_EFFECT_ORIENTATION_SOUTHEAST:
-            dotqtt_h = (int) h / radius;
-            dotqtt_w = (int) w / radius;
             *x_inf = 0;
             *y_inf = h - (dotqtt_h * radius);
             break;
         case VJ_EFFECT_ORIENTATION_SOUTH:
-            dotqtt_h = (int) h / radius;
-            dotqtt_w = (int) w / radius;
             *x_inf = (w - (dotqtt_w * radius)) / 2;
             *y_inf = h - (dotqtt_h * radius);
             break;
         case VJ_EFFECT_ORIENTATION_SOUTHWEST:
-            dotqtt_h = (int) h / radius;
-            dotqtt_w = (int) w / radius;
             *x_inf = w - (dotqtt_w * radius);
             *y_inf = h - (dotqtt_h * radius);
             break;
         case VJ_EFFECT_ORIENTATION_WEST:
-            dotqtt_h = (int) h / radius;
-            dotqtt_w = (int) w / radius;
             *x_inf = w - (dotqtt_w * radius);
             *y_inf = (h - (dotqtt_h * radius)) / 2;
             break;
         case VJ_EFFECT_ORIENTATION_NORTHWEST:
-            dotqtt_h = (int) h / radius;
-            dotqtt_w = (int) w / radius;
             *x_inf = w - (dotqtt_w * radius);
             *y_inf = 0;
             break;
         default:
+            *x_inf = 0;
+            *y_inf = 0;
             break;
     }
 
-    if (*y_inf > h - radius) *y_inf = h - radius;
-    if (*x_inf > w - radius) *x_inf = w - radius;
+    if (parity == VJ_EFFECT_PARITY_ODD) {
+        *x_inf += (radius / 2);
+        *y_inf += (radius / 2);
+    }
 
     if (*y_inf < 0) *y_inf = 0;
     if (*x_inf < 0) *x_inf = 0;
-
 }

@@ -399,7 +399,14 @@ int calculate_cbcr_value(uint8_t *Cb,uint8_t *Cr, int w, int h);
 uint32_t veejay_component_labeling(int w, int h, uint32_t *I , uint32_t *M);
 int i_cmp( const void *a, const void *b );
 int compare_l8( const void *a, const void *b );
-void veejay_blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep);
+void veejay_blur(
+    uint8_t *dst,
+    const uint8_t *src,
+    int w,
+    int qradius,
+    int dstStep,
+    int srcStep
+);
 void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep);
 extern void viewport_destroy(void *v);
 extern void vj_get_yuvgrey_template(VJFrame *src, int w, int h);
