@@ -18,99 +18,128 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
+
+ /* 
+    Linux VeeJay - Effectv's SmuckTV
+ */
+
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "smuck.h"
 
-vj_effect *smuck_init(int w,int h)
+#ifndef CLAMP
+#define CLAMP(x, low, high) (((x) > (high)) ? (high) : (((x) < (low)) ? (low) : (x)))
+#endif
+
+vj_effect *smuck_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 1;
-	ve->defaults[1] = 0;
+    ve->num_params = 4; 
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    ve->defaults[0] = 12;
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 18;
+    ve->limits[1][0] = 17;
 
-	ve->limits[0][1] = 0;
-	ve->limits[1][1] = 1;
+    ve->defaults[1] = 0;
+    ve->limits[0][1] = 0;
+    ve->limits[1][1] = 1;
 
-    ve->description = "SmuckTV (EffectTV)";
-    ve->sub_format = 1;
-    ve->extra_frame = 0;
-	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Smuck", "Mode");
+    ve->defaults[2] = 1;
+    ve->limits[0][2] = 0;
+    ve->limits[1][2] = 1;
+
+    ve->defaults[3] = 2;
+    ve->limits[0][3] = 0;
+    ve->limits[1][3] = 2;
+
+    ve->description = "SmuckTV (Pro)";
+    ve->param_description = vje_build_param_list(ve->num_params,
+        "Shimmer",
+        "Full color",
+        "Static seed",
+        "Direction");
+        
+    ve->sub_format = 1; 
     return ve;
 }
 
 typedef struct {
-    int rand_val;
+    unsigned int rand_val;
 } smuck_t;
 
 void* smuck_malloc(int w, int h) {
-    return (void*) vj_calloc( sizeof(smuck_t) );
+    return (void*) vj_calloc(sizeof(smuck_t));
 }
 
 void smuck_free(void *ptr) {
-    free(ptr);
+    if(ptr) free(ptr);
 }
 
 static inline unsigned int smuck_fastrand(smuck_t *s)
 {
-    return (s->rand_val = s->rand_val * 1103516245 + 12345);
+    s->rand_val = s->rand_val * 1103516245 + 12345;
+    return s->rand_val;
 }
 
-/* this effect comes from Effect TV as well; the code for this one is in Transform 
-   different is the smuck table containing some values. 
-   This effect was originally created by Buddy Smith, one of EffecTV's developers from the USA
-*/
-void smuck_apply( void *ptr, VJFrame *frame, int *args)
+void smuck_apply(void *ptr, VJFrame *frame, int *args)
 {
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-    unsigned int yd, xd, x, y;
     smuck_t *s = (smuck_t*) ptr;
-    int n = args[0];
-	int mode = args[1];
+    const int w = frame->width;
+    const int h = frame->height;
+    const int n = CLAMP(args[0], 0, 17);
+    const int mode = args[1];
+    const int static_mode = args[2];
+    const int bias = args[3];
 
-    VJFrame *frame2 = frame;
+    const unsigned int smuck_table[18] = {
+        10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27
+    };
+    const unsigned int shift = smuck_table[n];
 
-	// different table ...
-    const unsigned int smuck[18] =
-	{ 12, 21, 30, 60, 58, 59, 57, 56, 55, 54, 53, 89, 90, 88, 87, 86, 85, 114 };
-	uint8_t *Y = frame->data[0];
-	uint8_t *Y2 = frame2->data[0];
+    const int mx = (bias == 0 || bias == 2) ? 1 : 0;
+    const int my = (bias == 1 || bias == 2) ? 1 : 0;
 
-	if( mode == 0 ) {
-    	for (y = 0; y < height; y++) {
-			for (x = 0; x < width; x++) {
-				yd = (y + (smuck_fastrand(s) >> smuck[n]) - 2) % height;
-            	xd = (x + (smuck_fastrand(s) >> smuck[n]) - 2) % width;
+    if (static_mode) {
+        s->rand_val = 0x1337BEEF;
+    }
 
-			    Y[x + y * width] = Y2[xd + yd * width];
-			}
-    	}
+    uint8_t *restrict Y = frame->data[0];
 
-	} else {
-		uint8_t *U = frame->data[1];
-		uint8_t *V = frame->data[2];
-		uint8_t *U2 = frame->data[1];
-		uint8_t *V2 = frame->data[2];
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            unsigned int r = smuck_fastrand(s);
+            
+            int dx = ((int)((r >> shift) & 0x7) - 3) * mx;
+            int dy = ((int)((r >> (shift + 3)) & 0x7) - 3) * my;
 
-    	for (y = 0; y < height; y++) {
-			for (x = 0; x < width; x++) {
-				yd = (y + (smuck_fastrand(s) >> smuck[n]) - 2) % height;
-            	xd = (x + (smuck_fastrand(s) >> smuck[n]) - 2) % width;
-					
-			    Y[x + y * width] = Y2[xd + yd * width];
-				U[x + y * width] = U2[xd + yd * width];
-				V[x + y * width] = V2[xd + yd * width];
-			}
-    	}
+            int xd = CLAMP(x + dx, 0, w - 1);
+            int yd = CLAMP(y + dy, 0, h - 1);
 
+            Y[y * w + x] = Y[yd * w + xd];
+        }
+    }
 
-	}
+    if (mode == 1) {
+        const int cw = w >> 1;
+        const int ch = h >> 1;
+        uint8_t *restrict U = frame->data[1];
+        uint8_t *restrict V = frame->data[2];
+
+        for (int y = 0; y < ch; y++) {
+            for (int x = 0; x < cw; x++) {
+                unsigned int r = smuck_fastrand(s);
+                int dx = ((int)((r >> shift) & 0x3) - 1) * mx;
+                int dy = ((int)((r >> (shift + 2)) & 0x3) - 1) * my;
+
+                int xd = CLAMP(x + dx, 0, cw - 1);
+                int yd = CLAMP(y + dy, 0, ch - 1);
+
+                U[y * cw + x] = U[yd * cw + xd];
+                V[y * cw + x] = V[yd * cw + xd];
+            }
+        }
+    }
 }
