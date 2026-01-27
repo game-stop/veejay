@@ -22,4 +22,6 @@
 #define VINTAGEFILM_H
 vj_effect *vintagefilm_init(int w, int h);
 void vintagefilm_apply(void *ptr, VJFrame *frame, int *args);
+void* vintagefilm_malloc(int w, int h);
+void vintagefilm_free(void *ptr);
 #endif
