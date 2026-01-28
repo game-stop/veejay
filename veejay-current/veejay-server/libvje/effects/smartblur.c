@@ -27,182 +27,258 @@
 #endif
 
 typedef struct {
-    uint8_t *small_src;
-    uint8_t *small_tmp;
+    uint8_t *tmp;
+    int w;
+    int h;
     int ds_w;
     int ds_h;
 } smartblur_t;
 
 vj_effect *smartblur_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
+    vj_effect *ve = vj_calloc(sizeof(vj_effect));
+    ve->num_params = 2;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->defaults = vj_calloc(sizeof(int)*3);
+    ve->limits[0] = vj_calloc(sizeof(int)*3);
+    ve->limits[1] = vj_calloc(sizeof(int)*3);
 
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 64;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 1;
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 1; 
+    ve->limits[0][0]=1;   ve->limits[1][0]=64;
+    ve->limits[0][1]=0;   ve->limits[1][1]=255;
+    
+    ve->defaults[0]=10;
+    ve->defaults[1]=20;
+    
+    ve->description="Smart Blur";
+    ve->param_description=vje_build_param_list(3,"Radius","Threshold");
 
-    ve->defaults[0] = 10;
-    ve->defaults[1] = 20;
-    ve->defaults[2] = 0;
-    ve->defaults[3] = 0;
-
-    ve->description = "Smart Blur (DS)";
-    ve->param_description =
-        vje_build_param_list(ve->num_params, "Radius", "Threshold", "Swap", "Show Mask");
-
-    ve->sub_format = -1;
+    ve->sub_format=-1;
     return ve;
 }
 
-void *smartblur_malloc(int w, int h) {
-    smartblur_t *s = (smartblur_t*) vj_malloc(sizeof(smartblur_t));
-    if(!s) return NULL;
-    
-    s->ds_w = w / 2;
-    s->ds_h = h / 2;
 
-    size_t ds_size = s->ds_w * s->ds_h;
-    s->small_src = (uint8_t*) vj_calloc(ds_size * 2);
+void *smartblur_malloc(int w, int h)
+{
+    smartblur_t *s = vj_malloc(sizeof(*s));
+    s->w = w;
+    s->h = h;
+
+    // Downsample size: half resolution
+    s->ds_w = (w + 1) / 2;
+    s->ds_h = (h + 1) / 2;
+
+    // tmp buffer must fit the full image + downsampled
+    s->tmp = vj_malloc(w * h); 
     
-    if(!s->small_src) {
-        free(s);
-        return NULL;
-    }
-    
-    s->small_tmp = s->small_src + ds_size;
-    return (void*) s;
+     // TODO:  allocate buffer for down/up sampling + s->ds_w * s->ds_h);
+    return s;
 }
 
-void smartblur_free(void *ptr) {
-    smartblur_t *s = (smartblur_t*) ptr;
-    if(s && s->small_src) free(s->small_src);
-    if(s) free(s);
+
+void smartblur_free(void *ptr)
+{
+    smartblur_t *s = ptr;
+    if(s){ free(s->tmp); free(s); }
 }
 
-static inline void downsample(const uint8_t *src, uint8_t *dst, int w, int h, int dst_w) {
-    #pragma omp parallel for
-    for (int y = 0; y < h / 2; y++) {
-        for (int x = 0; x < w / 2; x++) {
-            int p1 = src[(y * 2) * w + (x * 2)];
-            int p2 = src[(y * 2) * w + (x * 2 + 1)];
-            int p3 = src[(y * 2 + 1) * w + (x * 2)];
-            int p4 = src[(y * 2 + 1) * w + (x * 2 + 1)];
-            dst[y * dst_w + x] = (uint8_t)((p1 + p2 + p3 + p4 + 2) >> 2);
-        }
-    }
-}
+static inline int iabs(int v)
+{
+    int m = v >> 31;
+    return (v ^ m) - m;
+} 
 
-static inline void upsample(uint8_t *dst, const uint8_t *src, int w, int h, int src_w) {
-    #pragma omp parallel for
-    for (int y = 0; y < h; y++) {
-        int sy = y >> 1;
+
+static void horizontal_blur_Y(uint8_t *dst, const uint8_t *src, uint8_t *tmp, int w, int h, int radius, int threshold)
+{
+    int y;
+    #pragma omp parallel for schedule(static) default(none) shared(src,tmp,w,h,radius,threshold) private(y)
+    for (y = 0; y < h; y++) {
+        const uint8_t *restrict in = src + y * w;
+        uint8_t *restrict out = tmp + y * w;
+
         for (int x = 0; x < w; x++) {
-            int sx = x >> 1;
-            dst[y * w + x] = src[sy * src_w + sx];
+            int sum = 0, cnt = 0;
+            int center = in[x];
+
+            int start = x - radius;
+            int end   = x + radius;
+
+            if (start < 0) start = 0;
+            if (end >= w) end = w - 1;
+
+            for (int k = start; k <= end; k++) {
+                int diff = iabs(in[k] - center);
+                int include = (diff <= threshold) ? 1 : 0;
+                sum += in[k] * include;
+                cnt += include;
+            }
+
+            out[x] = cnt ? sum / cnt : center;
         }
     }
 }
 
-void smartblur_apply(void *ptr, VJFrame *frame, int *args) {
-    smartblur_t *s = (smartblur_t*) ptr;
-    if (!s || !frame || !args) return;
+static void vertical_blur_Y(uint8_t *dst, uint8_t *tmp, int w, int h, int radius, int threshold)
+{
+    int x,y;
+    #pragma omp parallel for schedule(static) default(none) shared(dst,tmp,w,h,radius,threshold) private(y)    
+    for (x = 0; x < w; x++) {
+        for (y = 0; y < h; y++) {
+            int sum = 0, cnt = 0;
+            int center = tmp[y * w + x];
 
-    const int w = frame->width;
-    const int h = frame->height;
+            int start = y - radius;
+            int end   = y + radius;
 
-    const int radius    = CLAMP(args[0] >> 1, 1, 64);
-    const int threshold = args[1];
-    const int swap      = args[2];
-    const int show      = args[3];
+            if (start < 0) start = 0;
+            if (end >= h) end = h - 1;
 
-    uint8_t *restrict src = frame->data[0];
-    uint8_t *restrict ds_src = s->small_src;
-    uint8_t *restrict ds_tmp = s->small_tmp;
-    
-    const int dw = s->ds_w;
-    const int dh = s->ds_h;
+            for (int k = start; k <= end; k++) {
+                int diff = iabs(tmp[k * w + x] - center);
+                int include = (diff <= threshold) ? 1 : 0;
+                sum += tmp[k * w + x] * include;
+                cnt += include;
+            }
+
+            dst[y * w + x] = cnt ? sum / cnt : center;
+        }
+    }
+}
 
 
-    downsample(src, ds_src, w, h, dw);
+static void horizontal_blur_plane(uint8_t *dst, const uint8_t *src, uint8_t *tmp, int w, int h, int radius)
+{
+    int y;
+    #pragma omp parallel for schedule(static) default(none) shared(src,tmp,w,h,radius) private(y)
+
+    for (y = 0; y < h; y++) {
+
+        const uint8_t *restrict in  = src + y * w;
+        uint8_t *restrict out = tmp + y * w;
+
+        int sum = 0;
+        int x = 0;
+
+        int hi = (radius < w) ? radius : (w - 1);
+        for (int k = 0; k <= hi; k++)
+            sum += in[k];
+
+        out[0] = sum / (hi + 1);
+
+        for (x = 1; x <= radius && x < w; x++) {
+            int add = x + radius;
+            if (add < w)
+                sum += in[add];
+
+            out[x] = sum / (x + radius + 1);
+        }
+
+        for (; x + radius < w; x++) {
+            sum += in[x + radius];
+            sum -= in[x - radius - 1];
+            out[x] = sum / (2 * radius + 1);
+        }
+
+        for (; x < w; x++) {
+            sum -= in[x - radius - 1];
+            out[x] = sum / (w - (x - radius - 1));
+        }
+    }
+}
+
+
+// This is still slow because of cache misses & non continous pixels as we are skipping <width> pixels each iteration
+static void vertical_blur_plane1(uint8_t *dst, uint8_t *tmp, int w, int h, int radius)
+{
+    int x,y;
+    #pragma omp parallel for schedule(static) default(none) shared(dst,tmp,w,h,radius) private(x,y)
+
+    for (x = 0; x < w; x++) {
+
+        int sum = 0;
+        y = 0;
+        int hi = (radius < h) ? radius : (h - 1);
+        for (int k = 0; k <= hi; k++)
+            sum += tmp[k * w + x];
+
+        dst[x] = sum / (hi + 1);
+
+        for (y = 1; y <= radius && y < h; y++) {
+            sum += tmp[(y + radius < h ? y + radius : h - 1) * w + x];
+            dst[y * w + x] = sum / (y + radius + 1);
+        }
+
+        for (; y + radius < h; y++) {
+            sum += tmp[(y + radius) * w + x];
+            sum -= tmp[(y - radius - 1) * w + x];
+            dst[y * w + x] = sum / (2 * radius + 1);
+        }
+
+        for (; y < h; y++) {
+            sum -= tmp[(y - radius - 1) * w + x];
+            dst[y * w + x] = sum / (h - (y - radius - 1));
+        }
+    }
+}
+
+// This is faster, because memory is now continuous
+static void vertical_blur_plane(uint8_t *dst, uint8_t *tmp, int w, int h, int radius)
+{
+    #pragma omp parallel for schedule(static)
+    for (int y = 0; y < h; y++) {
+        int y_w = y * w;
+        for (int x = 0; x < w; x++) {
+            tmp[x*h + y] = dst[y_w + x];
+        }
+    }
+
+    horizontal_blur_plane(tmp, tmp, dst, h, w, radius);
 
     #pragma omp parallel for schedule(static)
-    for (int y = 0; y < dh; y++) {
-        uint8_t *row_src = ds_src + (y * dw);
-        uint8_t *row_tmp = ds_tmp + (y * dw);
-
-        for (int x = 0; x < dw; x++) {
-            const int center = row_src[x];
-            int sum = 0;
-            int count = 0;
-
-            #pragma omp simd reduction(+:sum,count)
-            for (int k = -radius; k <= radius; k++) {
-                int ix = x + k;
-                ix = (ix < 0) ? 0 : (ix >= dw ? dw - 1 : ix);
-                
-                const int val = row_src[ix];
-                const int diff = abs(val - center);
-
-                int condition = swap ? (diff > threshold) : (diff <= threshold);
-                int weight = condition * (swap ? diff : (threshold - diff));
-
-                sum   += val * weight;
-                count += weight;
-            }
-            row_tmp[x] = (count > 0) ? (uint8_t)(sum / count) : (uint8_t)center;
+    for (int y = 0; y < w; y++) {
+        int y_h = y * h;
+        for (int x = 0; x < h; x++) {
+            dst[x*w + y] = tmp[y_h + x];
         }
-    }
-
-    const int TILE_WIDTH = 16;
-    #pragma omp parallel for schedule(dynamic)
-    for (int tx = 0; tx < dw; tx += TILE_WIDTH) {
-        int tile_w = (tx + TILE_WIDTH > dw) ? (dw - tx) : TILE_WIDTH;
-
-        for (int y = 0; y < dh; y++) {
-            #pragma omp simd
-            for (int x = tx; x < tx + tile_w; x++) {
-                const int center = ds_tmp[y * dw + x];
-                int sum = 0;
-                int count = 0;
-
-                for (int k = -radius; k <= radius; k++) {
-                    int iy = y + k;
-                    iy = (iy < 0) ? 0 : (iy >= dh ? dh - 1 : iy);
-                    
-                    const int val = ds_tmp[iy * dw + x];
-                    const int diff = abs(val - center);
-
-                    int condition = swap ? (diff > threshold) : (diff <= threshold);
-                    int weight = condition * (swap ? diff : (threshold - diff));
-
-                    sum   += val * weight;
-                    count += weight;
-                }
-                ds_src[y * dw + x] = (count > 0) ? (uint8_t)(sum / count) : (uint8_t)center;
-            }
-        }
-    }
-
-    if (show) {
-        upsample(src, ds_src, w, h, dw);
-        
-        #pragma omp parallel for
-        for (int i = 0; i < w * h; i++) {
-             if (src[i] > 10) src[i] = 255; else src[i] = 0;
-        }
-        veejay_memset(frame->data[1], 128, frame->len/4);
-        veejay_memset(frame->data[2], 128, frame->len/4);
-    } else {
-        upsample(src, ds_src, w, h, dw);
     }
 }
+
+
+
+void smartblur_apply(void *ptr, VJFrame *frame, int *args)
+{
+    smartblur_t *s = ptr;
+    if(!s || !frame) return;
+
+    const int w = s->w;
+    const int h = s->h;
+    const int radius = args[0];
+    const int threshold = args[1];
+
+    uint8_t *tmp_full = s->tmp;
+    uint8_t *tmp_ds = s->tmp + (s->w * s->h);
+
+    int use_ds = 0; // (radius > 16);
+    int ds_radius = radius / 2;
+
+    if(use_ds) {
+        int ds_w = s->ds_w;
+        int ds_h = s->ds_h;
+        uint8_t *tmp_ds = s->tmp + w * h;
+
+        // TODO: downsample/upsample or scale to half resolution
+
+    }
+    else {
+        // fallback: full-resolution blur
+        horizontal_blur_Y(tmp_full, frame->data[0], tmp_full, w, h, radius, threshold);
+        vertical_blur_Y(frame->data[0], tmp_full, w, h, radius, threshold);
+
+        horizontal_blur_plane(tmp_full, frame->data[1], tmp_full, w, h, radius);
+        vertical_blur_plane(frame->data[1], tmp_full, w, h, radius);
+
+        horizontal_blur_plane(tmp_full, frame->data[2], tmp_full, w, h, radius);
+        vertical_blur_plane(frame->data[2], tmp_full, w, h, radius);
+    }
+}
+
