@@ -4243,7 +4243,7 @@ void vj_event_sample_set_descr(void *ptr, const char format[], va_list ap)
 
     SAMPLE_DEFAULTS(args[0]);
 
-    if(sample_set_description(args[0],str) == 0)
+    if(sample_set_description(args[0],str) == 1)
         veejay_msg(VEEJAY_MSG_INFO, "Changed sample title to %s",str);
     else
         veejay_msg(VEEJAY_MSG_ERROR, "Cannot change title of sample %d to '%s'", args[0],str );
