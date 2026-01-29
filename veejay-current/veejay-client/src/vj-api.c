@@ -5376,7 +5376,7 @@ void setup_effectlist_info()
         gtk_tree_selection_set_select_function(selection, view_fx_selection_func, NULL, NULL);
         gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 
-        g_signal_connect( G_OBJECT(trees[i]), "key_press_event", G_CALLBACK( on_effectlist_row_key_pressed ), NULL ); //FIXME key-press-event ?
+        g_signal_connect( G_OBJECT(trees[i]), "key-press-event", G_CALLBACK( on_effectlist_row_key_pressed ), NULL );
         g_signal_connect( G_OBJECT(trees[i]), "key-release-event", G_CALLBACK( on_effectlist_row_key_released ), NULL );
     }
 
