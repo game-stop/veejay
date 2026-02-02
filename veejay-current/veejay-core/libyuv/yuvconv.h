@@ -96,9 +96,6 @@ void	yuv_deinterlace(
 		int shift,
 		uint8_t *Y,uint8_t *U, uint8_t *V );
 
-
-void	yuv_init_lib();
-
 void	yuv_free_lib();
 
 void	yuv_convert_ac( VJFrame *src, VJFrame *dst, int a, int b );
