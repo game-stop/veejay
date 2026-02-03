@@ -203,6 +203,22 @@ void	on_button_251_clicked( GtkWidget *widget, gpointer user_data)
 	vj_msg(VEEJAY_MSG_INFO, "Bezerk mode toggled");
 }	
 
+static gboolean on_entry_samplename_key_pressed (GtkWidget *widget, GdkEventKey *event)
+{
+    switch (event->keyval)
+    {
+    case GDK_KEY_Return:
+    case GDK_KEY_KP_Enter:
+      break;
+
+    default:
+      return FALSE;
+    }
+
+    on_entry_samplename_button_clicked( widget, NULL );
+    return FALSE; //fixme TRUE ?
+}
+
 void	on_entry_samplename_button_clicked( GtkWidget *widget, gpointer user_data )
 {
 	gchar *title = get_text( "entry_samplename" );
@@ -219,6 +235,7 @@ void	on_entry_samplename_button_clicked( GtkWidget *widget, gpointer user_data )
 			    info->status_tokens[CURRENT_ID]) ) 
 			{
                 gtk_label_set_text( GTK_LABEL( info->sample_banks[i]->gui_slot[j]->title ), title );
+                vj_msg(VEEJAY_MSG_INFO, "Sample %d name updated", info->sample_banks[i]->slot[j]->sample_id );
 				return;
 			}
 		}
