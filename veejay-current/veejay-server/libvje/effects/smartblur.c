@@ -17,228 +17,223 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+#include <math.h>
+#include <omp.h>
 #include "common.h"
 #include <veejaycore/vjmem.h>
-#include <math.h>
 #include "smartblur.h"
 
-#ifndef CLAMP
-#define CLAMP(x, low, high) (((x) > (high)) ? (high) : (((x) < (low)) ? (low) : (x)))
-#endif
-
 typedef struct {
-    uint8_t *tmp;
-    int w;
-    int h;
-    int ds_w;
-    int ds_h;
+    uint8_t *small_src;
+    float *a_buf;
+    float *b_buf;
+    float *tmp_mu;
+    float *tmp_var;
+    float *mI;
+    float *mII;
+    float *inv_counts;
+    int w, h, sw, sh;
 } smartblur_t;
 
 vj_effect *smartblur_init(int w, int h)
 {
     vj_effect *ve = vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
+    ve->num_params = 3;
+    ve->defaults = vj_calloc(sizeof(int) * 3);
+    ve->limits[0] = vj_calloc(sizeof(int) * 3);
+    ve->limits[1] = vj_calloc(sizeof(int) * 3);
 
-    ve->defaults = vj_calloc(sizeof(int)*3);
-    ve->limits[0] = vj_calloc(sizeof(int)*3);
-    ve->limits[1] = vj_calloc(sizeof(int)*3);
+    ve->limits[0][0] = 1;
+    ve->limits[1][0] = 100;
+    ve->limits[0][1] = 1;
+    ve->limits[1][1] = 1000;
+    ve->limits[0][2] = 0;
+    ve->limits[1][2] = 100;
 
-    ve->limits[0][0]=1;   ve->limits[1][0]=64;
-    ve->limits[0][1]=0;   ve->limits[1][1]=255;
-    
-    ve->defaults[0]=10;
-    ve->defaults[1]=20;
-    
-    ve->description="Smart Blur";
-    ve->param_description=vje_build_param_list(3,"Radius","Threshold");
+    ve->defaults[0] = 8;
+    ve->defaults[1] = 200;
+    ve->defaults[2] = 50;
 
-    ve->sub_format=-1;
+    ve->description = "Smart Blur";
+    ve->param_description = vje_build_param_list(3, "Radius", "Sharpness", "Chroma");
     return ve;
 }
-
 
 void *smartblur_malloc(int w, int h)
 {
     smartblur_t *s = vj_malloc(sizeof(*s));
-    s->w = w;
-    s->h = h;
+    if (!s) return NULL;
 
-    // Downsample size: half resolution
-    s->ds_w = (w + 1) / 2;
-    s->ds_h = (h + 1) / 2;
+    s->w = w;  s->h = h;
+    s->sw = w >> 1;
+    s->sh = h >> 1;
 
-    // tmp buffer must fit the full image + downsampled
-    s->tmp = vj_malloc(w * h); 
-    
-     // TODO:  allocate buffer for down/up sampling + s->ds_w * s->ds_h);
+    const int nt = omp_get_max_threads();
+    const int max_sdim = (s->sw > s->sh) ? s->sw : s->sh;
+
+    s->small_src = vj_malloc((size_t)s->sw * s->sh);
+    s->a_buf     = vj_malloc((size_t)s->sw * s->sh * sizeof(float));
+    s->b_buf     = vj_malloc((size_t)s->sw * s->sh * sizeof(float));
+    s->tmp_mu    = vj_malloc((size_t)s->sw * s->sh * sizeof(float));
+    s->tmp_var   = vj_malloc((size_t)s->sw * s->sh * sizeof(float));
+    s->mI        = vj_malloc((size_t)nt * (max_sdim + 1) * sizeof(float));
+    s->mII       = vj_malloc((size_t)nt * (max_sdim + 1) * sizeof(float));
+    s->inv_counts = vj_malloc((size_t)(max_sdim * 2 + 2) * sizeof(float));
+
+    if (!s->small_src || !s->a_buf || !s->b_buf || !s->tmp_mu || !s->tmp_var)
+        return NULL;
+
+    for (int i = 0; i < max_sdim * 2 + 2; i++)
+        s->inv_counts[i] = (i > 0) ? (1.0f / (float)i) : 1.0f;
+
     return s;
 }
 
-
 void smartblur_free(void *ptr)
 {
-    smartblur_t *s = ptr;
-    if(s){ free(s->tmp); free(s); }
+    smartblur_t *s = (smartblur_t *)ptr;
+    if (!s) return;
+    free(s->small_src); free(s->a_buf); free(s->b_buf);
+    free(s->tmp_mu); free(s->tmp_var);
+    free(s->mI); free(s->mII); free(s->inv_counts);
+    free(s);
 }
 
-static inline int iabs(int v)
+static inline uint8_t clamp_u8(float v)
 {
-    int m = v >> 31;
-    return (v ^ m) - m;
-} 
+    return (uint8_t)__builtin_fmaxf(0.0f, __builtin_fminf(255.0f, v));
+}
 
-
-static void horizontal_blur_Y(uint8_t *dst, const uint8_t *src, uint8_t *tmp, int w, int h, int radius, int threshold)
+#pragma GCC optimize ("unroll-loops","tree-vectorize")
+static void apply_nuclear_plane_tiled(smartblur_t *s, uint8_t * restrict data,
+                               int r, float eps, float offset, float strength, int luma_only)
 {
-    int y;
-    #pragma omp parallel for schedule(static) default(none) shared(src,tmp,w,h,radius,threshold) private(y)
-    for (y = 0; y < h; y++) {
-        const uint8_t *restrict in = src + y * w;
-        uint8_t *restrict out = tmp + y * w;
+    if (strength <= 0.001f) return;
 
-        for (int x = 0; x < w; x++) {
-            int sum = 0, cnt = 0;
-            int center = in[x];
+    const int w = s->w, h = s->h, sw = s->sw, sh = s->sh;
+    const float * restrict inv = s->inv_counts;
+    const int max_sdim = (sw > sh) ? sw : sh;
+    const int tile_w = cpu_cache_size();
 
-            int start = x - radius;
-            int end   = x + radius;
+    // downsample
+    for (int y = 0; y < sh; y++) {
+        uint8_t * restrict s_line = s->small_src + y * sw;
+        uint8_t * restrict d1 = data + (y * 2 * w);
+        uint8_t * restrict d2 = d1 + w;
+        for (int x = 0; x < sw; x++) {
+            int x2 = x << 1;
+            s_line[x] = (d1[x2] + d1[x2 + 1] + d2[x2] + d2[x2 + 1]) >> 2;
+        }
+    }
 
-            if (start < 0) start = 0;
-            if (end >= w) end = w - 1;
+    // horizontal pass
+    {
+        const int tid = 0; 
+        float * restrict rowI  = s->mI  + tid * (max_sdim + 1);
+        float * restrict rowII = s->mII + tid * (max_sdim + 1);
 
-            for (int k = start; k <= end; k++) {
-                int diff = iabs(in[k] - center);
-                int include = (diff <= threshold) ? 1 : 0;
-                sum += in[k] * include;
-                cnt += include;
+        for (int y = 0; y < sh; y++) {
+            uint8_t * restrict line = s->small_src + y * sw;
+            float * restrict tmu   = s->tmp_mu  + y * sw;
+            float * restrict tvar  = s->tmp_var + y * sw;
+            float accI = 0.0f, accII = 0.0f;
+
+            for (int x = 0; x < sw; x++) {
+                float v = (float)line[x] - offset;
+                accI += v; accII += v * v;
+                rowI[x]  = accI; rowII[x] = accII;
             }
 
-            out[x] = cnt ? sum / cnt : center;
-        }
-    }
-}
-
-static void vertical_blur_Y(uint8_t *dst, uint8_t *tmp, int w, int h, int radius, int threshold)
-{
-    int x,y;
-    #pragma omp parallel for schedule(static) default(none) shared(dst,tmp,w,h,radius,threshold) private(y)    
-    for (x = 0; x < w; x++) {
-        for (y = 0; y < h; y++) {
-            int sum = 0, cnt = 0;
-            int center = tmp[y * w + x];
-
-            int start = y - radius;
-            int end   = y + radius;
-
-            if (start < 0) start = 0;
-            if (end >= h) end = h - 1;
-
-            for (int k = start; k <= end; k++) {
-                int diff = iabs(tmp[k * w + x] - center);
-                int include = (diff <= threshold) ? 1 : 0;
-                sum += tmp[k * w + x] * include;
-                cnt += include;
+            for (int x = 0; x < sw; x++) {
+                int r1 = (x - r < 0) ? 0 : x - r;
+                int r2 = (x + r >= sw) ? sw - 1 : x + r;
+                float ic = inv[r2 - r1 + 1];
+                float sumI  = rowI[r2]; float sumII = rowII[r2];
+                if (r1 > 0) { sumI -= rowI[r1 - 1]; sumII -= rowII[r1 - 1]; }
+                tmu[x] = sumI * ic; tvar[x] = sumII * ic;
             }
-
-            dst[y * w + x] = cnt ? sum / cnt : center;
-        }
-    }
-}
-
-
-static void horizontal_blur_plane(uint8_t *dst, const uint8_t *src, uint8_t *tmp, int w, int h, int radius)
-{
-    int y;
-    #pragma omp parallel for schedule(static) default(none) shared(src,tmp,w,h,radius) private(y)
-
-    for (y = 0; y < h; y++) {
-
-        const uint8_t *restrict in  = src + y * w;
-        uint8_t *restrict out = tmp + y * w;
-
-        int sum = 0;
-        int x = 0;
-
-        int hi = (radius < w) ? radius : (w - 1);
-        for (int k = 0; k <= hi; k++)
-            sum += in[k];
-
-        out[0] = sum / (hi + 1);
-
-        for (x = 1; x <= radius && x < w; x++) {
-            int add = x + radius;
-            if (add < w)
-                sum += in[add];
-
-            out[x] = sum / (x + radius + 1);
-        }
-
-        for (; x + radius < w; x++) {
-            sum += in[x + radius];
-            sum -= in[x - radius - 1];
-            out[x] = sum / (2 * radius + 1);
-        }
-
-        for (; x < w; x++) {
-            sum -= in[x - radius - 1];
-            out[x] = sum / (w - (x - radius - 1));
-        }
-    }
-}
-
-
-// This is still slow because of cache misses & non continous pixels as we are skipping <width> pixels each iteration
-static void vertical_blur_plane1(uint8_t *dst, uint8_t *tmp, int w, int h, int radius)
-{
-    int x,y;
-    #pragma omp parallel for schedule(static) default(none) shared(dst,tmp,w,h,radius) private(x,y)
-
-    for (x = 0; x < w; x++) {
-
-        int sum = 0;
-        y = 0;
-        int hi = (radius < h) ? radius : (h - 1);
-        for (int k = 0; k <= hi; k++)
-            sum += tmp[k * w + x];
-
-        dst[x] = sum / (hi + 1);
-
-        for (y = 1; y <= radius && y < h; y++) {
-            sum += tmp[(y + radius < h ? y + radius : h - 1) * w + x];
-            dst[y * w + x] = sum / (y + radius + 1);
-        }
-
-        for (; y + radius < h; y++) {
-            sum += tmp[(y + radius) * w + x];
-            sum -= tmp[(y - radius - 1) * w + x];
-            dst[y * w + x] = sum / (2 * radius + 1);
-        }
-
-        for (; y < h; y++) {
-            sum -= tmp[(y - radius - 1) * w + x];
-            dst[y * w + x] = sum / (h - (y - radius - 1));
-        }
-    }
-}
-
-// This is faster, because memory is now continuous
-static void vertical_blur_plane(uint8_t *dst, uint8_t *tmp, int w, int h, int radius)
-{
-    #pragma omp parallel for schedule(static)
-    for (int y = 0; y < h; y++) {
-        int y_w = y * w;
-        for (int x = 0; x < w; x++) {
-            tmp[x*h + y] = dst[y_w + x];
         }
     }
 
-    horizontal_blur_plane(tmp, tmp, dst, h, w, radius);
+    // vertical pass
+    {
+        const int tid = 0;
+        float * restrict colI  = s->mI  + tid * (max_sdim + 1);
+        float * restrict colII = s->mII + tid * (max_sdim + 1);
 
-    #pragma omp parallel for schedule(static)
-    for (int y = 0; y < w; y++) {
-        int y_h = y * h;
-        for (int x = 0; x < h; x++) {
-            dst[x*w + y] = tmp[y_h + x];
+        for (int tx = 0; tx < sw; tx += tile_w) {
+            int tw = (tx + tile_w > sw) ? sw - tx : tile_w;
+            for (int x = tx; x < tx + tw; x++) {
+                float accI = 0.0f, accII = 0.0f;
+                for (int y = 0; y < sh; y++) {
+                    int idx = y * sw + x;
+                    accI += s->tmp_mu[idx]; accII += s->tmp_var[idx];
+                    colI[y]  = accI; colII[y] = accII;
+                }
+                for (int y = 0; y < sh; y++) {
+                    int r1 = (y - r < 0) ? 0 : y - r;
+                    int r2 = (y + r >= sh) ? sh - 1 : y + r;
+                    float ic = inv[r2 - r1 + 1];
+                    float sumI  = colI[r2]; float sumII = colII[r2];
+                    if (r1 > 0) { sumI -= colI[r1 - 1]; sumII -= colII[r1 - 1]; }
+                    float mu  = sumI * ic;
+                    float var = (sumII * ic) - mu * mu;
+                    float a   = var / (var + eps);
+                    int idx = y * sw + x;
+                    s->a_buf[idx] = a;
+                    s->b_buf[idx] = (1.0f - a) * mu;
+                }
+            }
+        }
+    }
+
+    // midpoint
+    if (luma_only) {
+        // full strength luma
+        for (int y = 0; y < h; y++) {
+            int ys = y >> 1;
+            const float * restrict a_ptr = s->a_buf + ys * sw;
+            const float * restrict b_ptr = s->b_buf + ys * sw;
+            uint8_t * restrict out = data + y * w;
+
+            for (int x = 0; x < (w & ~1); x += 2) {
+                const float a = *a_ptr++;
+                const float b = *b_ptr++;
+                out[x]   = clamp_u8((float)out[x] * a + b);
+                out[x+1] = clamp_u8((float)out[x+1] * a + b);
+            }
+            if (w & 1) {
+                int x = w - 1;
+                float a = s->a_buf[ys * sw + (x >> 1)];
+                float b = s->b_buf[ys * sw + (x >> 1)];
+                out[x] = clamp_u8((float)out[x] * a + b);
+            }
+        }
+    } else {
+        const float s_val = strength;
+        for (int y = 0; y < h; y++) {
+            int ys = y >> 1;
+            const float * restrict a_ptr = s->a_buf + ys * sw;
+            const float * restrict b_ptr = s->b_buf + ys * sw;
+            uint8_t * restrict out = data + y * w;
+
+            for (int x = 0; x < (w & ~1); x += 2) {
+                const float av = *a_ptr++;
+                const float bv = *b_ptr++;
+                const float v_coeff = 1.0f + s_val * (av - 1.0f);
+                const float sb_off  = s_val * (bv + offset * (1.0f - av));
+
+                out[x]   = clamp_u8((float)out[x] * v_coeff + sb_off);
+                out[x+1] = clamp_u8((float)out[x+1] * v_coeff + sb_off);
+            }
+            if (w & 1) {
+                int x = w - 1;
+                float av = s->a_buf[ys * sw + (x >> 1)];
+                float bv = s->b_buf[ys * sw + (x >> 1)];
+                float v_coeff = 1.0f + s_val * (av - 1.0f);
+                float sb_off  = s_val * (bv + offset * (1.0f - av));
+                out[x] = clamp_u8((float)out[x] * v_coeff + sb_off);
+            }
         }
     }
 }
@@ -247,38 +242,15 @@ static void vertical_blur_plane(uint8_t *dst, uint8_t *tmp, int w, int h, int ra
 
 void smartblur_apply(void *ptr, VJFrame *frame, int *args)
 {
-    smartblur_t *s = ptr;
-    if(!s || !frame) return;
+    smartblur_t *s = (smartblur_t *)ptr;
 
-    const int w = s->w;
-    const int h = s->h;
-    const int radius = args[0];
-    const int threshold = args[1];
+    int r = args[0]; 
+    float eps = ((float)args[1] * 0.1f);
+    eps *= eps;
 
-    uint8_t *tmp_full = s->tmp;
-    uint8_t *tmp_ds = s->tmp + (s->w * s->h);
+    float c_strength = (float)args[2] / 100.0f;
 
-    int use_ds = 0; // (radius > 16);
-    int ds_radius = radius / 2;
-
-    if(use_ds) {
-        int ds_w = s->ds_w;
-        int ds_h = s->ds_h;
-        uint8_t *tmp_ds = s->tmp + w * h;
-
-        // TODO: downsample/upsample or scale to half resolution
-
-    }
-    else {
-        // fallback: full-resolution blur
-        horizontal_blur_Y(tmp_full, frame->data[0], tmp_full, w, h, radius, threshold);
-        vertical_blur_Y(frame->data[0], tmp_full, w, h, radius, threshold);
-
-        horizontal_blur_plane(tmp_full, frame->data[1], tmp_full, w, h, radius);
-        vertical_blur_plane(frame->data[1], tmp_full, w, h, radius);
-
-        horizontal_blur_plane(tmp_full, frame->data[2], tmp_full, w, h, radius);
-        vertical_blur_plane(frame->data[2], tmp_full, w, h, radius);
-    }
+    apply_nuclear_plane_tiled(s, frame->data[0], r, eps, 0.0f,   1.0f,1);
+    apply_nuclear_plane_tiled(s, frame->data[1], r, eps, 128.0f, c_strength,0);
+    apply_nuclear_plane_tiled(s, frame->data[2], r, eps, 128.0f, c_strength,0);
 }
-
