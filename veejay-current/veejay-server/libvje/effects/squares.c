@@ -87,7 +87,7 @@ static void squares_apply_max( VJFrame *frame, int radius, int orientation, int 
     x_sup = w;
     y_sup = h;
 
-    grid_getbounds_from_orientation(radius, orientation, parity, &x_inf, &y_inf, &x_sup, &y_sup);
+    grid_getbounds_from_orientation(radius, orientation, parity, &x_inf, &y_inf, &x_sup, &y_sup,w,h);
 
     for( y =  y_inf ; y < h; y += radius ) {
         for( x =  x_inf ; x < w; x += radius ) {
@@ -192,7 +192,7 @@ static void squares_apply_min( VJFrame *frame, int radius, int orientation, int 
     x_sup = w;
     y_sup = h;
 
-    grid_getbounds_from_orientation(radius, orientation, parity, &x_inf, &y_inf, &x_sup, &y_sup);
+    grid_getbounds_from_orientation(radius, orientation, parity, &x_inf, &y_inf, &x_sup, &y_sup,w,h);
 
     for( y =  y_inf ; y < h; y += radius ) {
         for( x =  x_inf ; x < w; x += radius ) {
@@ -295,7 +295,7 @@ static void squares_apply_average( VJFrame *frame, int radius, int orientation, 
     x_sup = w;
     y_sup = h;
 
-    grid_getbounds_from_orientation(radius, orientation, parity, &x_inf, &y_inf, &x_sup, &y_sup);
+    grid_getbounds_from_orientation(radius, orientation, parity, &x_inf, &y_inf, &x_sup, &y_sup,w,h);
 
     for( y =  y_inf ; y < h; y += radius ) {
         for( x =  x_inf ; x < w; x += radius ) {
