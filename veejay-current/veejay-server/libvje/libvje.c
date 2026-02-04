@@ -156,7 +156,7 @@ static struct {
     { colortemp_init,NULL,NULL,NULL,NULL,colortemp_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_COLORTEMP },
     { cosmichue_init,NULL,NULL,NULL,NULL,cosmichue_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_COSMICHUE },
     { rainbowshift_init, NULL,NULL,NULL,NULL, rainbowshift_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_RAINBOWSHIFT },
-    { vintagefilm_init,NULL,NULL,NULL,NULL, vintagefilm_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_VINTAGEFILM },
+    { vintagefilm_init,vintagefilm_malloc,vintagefilm_free,NULL,NULL, vintagefilm_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_VINTAGEFILM },
     { fragmenttv_init,fragmenttv_malloc,fragmenttv_free,NULL,NULL,fragmenttv_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_FRAGMENTTV },
     { mirrordistortion_init,mirrordistortion_malloc,mirrordistortion_free,NULL,NULL,mirrordistortion_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_MIRRORDISTORTION },
     { trimirror_init,trimirror_malloc,trimirror_free,NULL,NULL,trimirror_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_TRIMIRROR  },
