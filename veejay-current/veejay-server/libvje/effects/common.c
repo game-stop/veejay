@@ -2354,21 +2354,21 @@ void	sqrt_table_pixels_free() {
  * \param y_sup IN/OUT ; caller must initialize with height
  *
  ****************************************************************************************************/
-inline void grid_getbounds_from_orientation(int radius, vj_effect_orientation orientation, vj_effect_parity parity, int *x_inf, int *y_inf, int *x_sup, int *y_sup) {
-    int w = *x_sup;
-    int h = *y_sup;
-    int dotqtt_w, dotqtt_h;
+inline void grid_getbounds_from_orientation(int radius, vj_effect_orientation orientation, vj_effect_parity parity, int *x_inf, int *y_inf, int *x_sup, int *y_sup, int w, int h) {
 
-    dotqtt_w = w / radius;
-    dotqtt_h = h / radius;
+    int nx = (w + radius - 1) / radius;
+    int ny = (h + radius - 1) / radius;
+
+    int grid_w = nx * radius;
+    int grid_h = ny * radius;
 
     switch (orientation) {
         case VJ_EFFECT_ORIENTATION_CENTER:
-            *x_inf = (w - (dotqtt_w * radius)) / 2;
-            *y_inf = (h - (dotqtt_h * radius)) / 2;
+            *x_inf = (w - grid_w) / 2;
+            *y_inf = (h - grid_h) / 2;
             break;
         case VJ_EFFECT_ORIENTATION_NORTH:
-            *x_inf = (w - (dotqtt_w * radius)) / 2;
+            *x_inf = (w - grid_w) / 2;
             *y_inf = 0;
             break;
         case VJ_EFFECT_ORIENTATION_NORTHEAST:
@@ -2377,26 +2377,26 @@ inline void grid_getbounds_from_orientation(int radius, vj_effect_orientation or
             break;
         case VJ_EFFECT_ORIENTATION_EAST:
             *x_inf = 0;
-            *y_inf = (h - (dotqtt_h * radius)) / 2;
+            *y_inf = (h - grid_h) / 2;
             break;
         case VJ_EFFECT_ORIENTATION_SOUTHEAST:
             *x_inf = 0;
-            *y_inf = h - (dotqtt_h * radius);
+            *y_inf = h - grid_h;
             break;
         case VJ_EFFECT_ORIENTATION_SOUTH:
-            *x_inf = (w - (dotqtt_w * radius)) / 2;
-            *y_inf = h - (dotqtt_h * radius);
+            *x_inf = (w - grid_w) / 2;
+            *y_inf = h - grid_h;
             break;
         case VJ_EFFECT_ORIENTATION_SOUTHWEST:
-            *x_inf = w - (dotqtt_w * radius);
-            *y_inf = h - (dotqtt_h * radius);
+            *x_inf = w - grid_w;
+            *y_inf = h - grid_h;
             break;
         case VJ_EFFECT_ORIENTATION_WEST:
-            *x_inf = w - (dotqtt_w * radius);
-            *y_inf = (h - (dotqtt_h * radius)) / 2;
+            *x_inf = w - grid_w;
+            *y_inf = (h - grid_h) / 2;
             break;
         case VJ_EFFECT_ORIENTATION_NORTHWEST:
-            *x_inf = w - (dotqtt_w * radius);
+            *x_inf = w - grid_w;
             *y_inf = 0;
             break;
         default:
@@ -2406,10 +2406,13 @@ inline void grid_getbounds_from_orientation(int radius, vj_effect_orientation or
     }
 
     if (parity == VJ_EFFECT_PARITY_ODD) {
-        *x_inf += (radius / 2);
-        *y_inf += (radius / 2);
+        *x_inf += radius / 2;
+        *y_inf += radius / 2;
     }
 
-    if (*y_inf < 0) *y_inf = 0;
     if (*x_inf < 0) *x_inf = 0;
+    if (*y_inf < 0) *y_inf = 0;
+
+    *x_sup = w;
+    *y_sup = h;
 }
