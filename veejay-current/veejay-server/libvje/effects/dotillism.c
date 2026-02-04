@@ -52,7 +52,7 @@ vj_effect *dotillism_init(int w, int h)
     ve->defaults[4] = 0;
     ve->defaults[5] = 0;
     ve->defaults[6] = 0;
-    ve->description = "Dotillism";
+    ve->description = "Dotillism"; // TODO: optimize for large radii
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->parallel = 0;
@@ -95,26 +95,33 @@ void dotillism_free(void *ptr)
 
 static void dotillism_posterize_input(uint8_t *map, uint8_t *Y, const int len, const int levels, const int invert)
 {
-    const unsigned int factor = (256 / levels);
-    unsigned int i;
+    const unsigned int factor = 256 / levels;
+    uint8_t *restrict src = Y;
+    uint8_t *restrict dst = map;
 
-    if(!invert) {
-        for( i = 0; i < len; i ++ ) {
-            map[i] = Y[i] - ( Y[i] % factor );
+    if (!invert) {
+#pragma omp simd
+        for (int i = 0; i < len; i++) {
+            *dst = *src - (*src % factor);
+            src++;
+            dst++;
         }
-    }
-    else {
-        for( i = 0; i < len; i ++ ) {
-            map[i] = (0xff-Y[i]) - ( (0xff-Y[i]) % factor );
+    } else {
+#pragma omp simd
+        for (int i = 0; i < len; i++) {
+            uint8_t y_inv = 0xff - *src;
+            *dst = y_inv - (y_inv % factor);
+            src++;
+            dst++;
         }
     }
 }
 
-static inline void draw_circle_add_Y( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value )
+// use bresenham for larger radius
+static inline void draw_circle_add_Y( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radiusSquared, uint8_t value )
 {
     const int tx = bw >> 1;
     const int ty = bh >> 1;
-    const int radiusSquared = radius * radius;
     const int minX = (cx - tx < 0) ? 0 : (cx - tx);
     const int minY = (cy - ty < 0) ? 0 : (cy - ty);
     const int maxX = (cx + tx >= w) ? (w - 1) : (cx + tx);
@@ -136,11 +143,10 @@ static inline void draw_circle_add_Y( uint8_t *data, int cx, int cy, const int b
     }
 	
 }
-static inline void draw_circle_add_UV( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value )
+static inline void draw_circle_add_UV( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radiusSquared, uint8_t value )
 {
     const int tx = bw >> 1;
     const int ty = bh >> 1;
-    const int radiusSquared = radius * radius;
     const int minX = (cx - tx < 0) ? 0 : (cx - tx);
     const int minY = (cy - ty < 0) ? 0 : (cy - ty);
     const int maxX = (cx + tx >= w) ? (w - 1) : (cx + tx);
@@ -177,43 +183,46 @@ static void dotillism_apply_stage1(uint8_t *map, VJFrame *frame, int radius, int
 
     int x, y, x1, y1, x_inf, y_inf, x_sup, y_sup;
 
-    grid_getbounds_from_orientation(radius, orientation, parity, &x_inf, &y_inf, &x_sup, &y_sup);
+    grid_getbounds_from_orientation(radius, orientation, parity, &x_inf, &y_inf, &x_sup, &y_sup,w,h);
 
-
+#pragma omp simd
 	for (y = 0; y < y_inf; y++) {
-#pragma omp simd
+        const int y_offset = y * w;
 		for (x = 0; x < w; x++) {
-        	int index = y * w + x;
+            int index = y_offset + x;
         	Y[index] = pixel_Y_lo_;
         	U[index] = 128;
         	V[index] = 128;
     	}
 	}
 
+#pragma omp simd
 	for (y = (h - radius); y < h; y++) {
-#pragma omp simd
+        const int y_offset = y * w;
 		for (x = 0; x < w; x++) {
-        	int index = y * w + x;
+            int index = y_offset + x;
         	Y[index] = pixel_Y_lo_;
         	U[index] = 128;
         	V[index] = 128;
     	}
 	}
 
-	for (y = y_inf; y < (h - radius); y++) {
 #pragma omp simd
+	for (y = y_inf; y < (h - radius); y++) {
+        const int y_offset = y * w;
 		for (x = 0; x < x_inf; x++) {
-        	int index = y * w + x;
+            int index = y_offset + x;
         	Y[index] = pixel_Y_lo_;
         	U[index] = 128;
         	V[index] = 128;
     	}
 	}
 
-	for (y = y_inf; y < (h - radius); y++) {
 #pragma omp simd
+	for (y = y_inf; y < (h - radius); y++) {
+        const int y_offset = y * w;
 		for (x = (w - radius); x < w; x++) {
-        	int index = y * w + x;
+            int index = y_offset + x;
         	Y[index] = pixel_Y_lo_;
         	U[index] = 128;
         	V[index] = 128;
@@ -229,10 +238,11 @@ static void dotillism_apply_stage1(uint8_t *map, VJFrame *frame, int radius, int
             int lim_y = y + radius;
 
             uint32_t val = map[y * w + x];
-            int wrad = 1 + (int)(((double)val / 255.0) * rad);
+            //int wrad = 1 + (int)(((double)val / 255.0) * rad);
+            int wrad = 1 + (val * rad / 255);
 
+            #pragma omp simd
             for (y1 = y; y1 < lim_y; y1++) {
-#pragma omp simd
 				for (x1 = x; x1 < lim_x; x1++) {
                     int index = y1 * w + x1;
                     Y[index] = pixel_Y_lo_;
@@ -272,7 +282,7 @@ static void dotillism_apply_stage2( uint8_t *map, VJFrame *frame, int radius, in
     x_sup = w;
     y_sup = h;
 
-    grid_getbounds_from_orientation(radius, orientation, parity, &x_inf, &y_inf, &x_sup, &y_sup);
+    grid_getbounds_from_orientation(radius, orientation, parity, &x_inf, &y_inf, &x_sup, &y_sup,w,h);
 
     for( y = y_inf; y < h; y += incr_y ) {
         for( x = x_inf; x < w; x += incr_x ) {
@@ -280,13 +290,15 @@ static void dotillism_apply_stage2( uint8_t *map, VJFrame *frame, int radius, in
             uint8_t u = U[ y * w + x ];
             uint8_t v = V[ y * w + x ];
 
-            incr_x = radius + space_x + ( map[ y * w + x ] % rad );
+            //incr_x = radius + space_x + ( map[ y * w + x ] % rad );
+            incr_x = radius + space_x + ( map[y*w+x] * rad / 255 );
             uint32_t val = map[ y * w + x ];
-            int wrad = 1 + (int) ( ((double) val / 255.0  ) * rad);
-               
-            draw_circle_add_Y( Y , x,y, bw, bh, w, h, wrad, val );
-            draw_circle_add_UV( U , x,y, bw, bh, w, h, wrad, u );
-            draw_circle_add_UV( V , x,y, bw, bh, w, h, wrad, v );
+            //int wrad = 1 + (int) ( ((double) val / 255.0  ) * rad);
+            int wrad = 1 + (val * rad / 255);
+            int wradsq = wrad * wrad;
+            draw_circle_add_Y( Y , x,y, bw, bh, w, h, wradsq, val );
+            draw_circle_add_UV( U , x,y, bw, bh, w, h, wradsq, u );
+            draw_circle_add_UV( V , x,y, bw, bh, w, h, wradsq, v );
         }
     }
 
