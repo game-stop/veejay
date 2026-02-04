@@ -178,7 +178,7 @@ static void free_shapelist_hints(char **hints, int num )
     free(hints);
 }
 
-static void shape_find_min_max(uint8_t *data, const int len, int *min, int *max )
+static void shape_find_min_max(uint8_t *restrict data, const int len, int *min, int *max )
 {
     int a=256,b=0;
     int i;
@@ -194,29 +194,37 @@ static void shape_find_min_max(uint8_t *data, const int len, int *min, int *max 
 
 static void shape_wipe_1( uint8_t *dst[4], uint8_t *src[4], uint8_t *pattern, const int len, const int threshold)
 {
-    int i;
-    for( i = 0; i < len; i ++ ) 
+    uint8_t * __restrict__ d0 = dst[0];
+    uint8_t * __restrict__ d1 = dst[1];
+    uint8_t * __restrict__ d2 = dst[2];
+    uint8_t * __restrict__ s0 = src[0];
+    uint8_t * __restrict__ s1 = src[1];
+    uint8_t * __restrict__ s2 = src[2];
+
+    for(int i = 0; i < len; i++) 
     {
-        if( pattern[i] < threshold)
-        {
-            dst[0][i] = src[0][i];
-            dst[1][i] = src[1][i];
-            dst[2][i] = src[2][i];
-        }
+        int mask = (pattern[i] < threshold);
+        d0[i] = mask ? s0[i] : d0[i];
+        d1[i] = mask ? s1[i] : d1[i];
+        d2[i] = mask ? s2[i] : d2[i];
     }
 }
 
 static void shape_wipe_2( uint8_t *dst[4], uint8_t *src[4], uint8_t *pattern, const int len, const int threshold)
 {
-    int i;
-    for( i = 0; i < len; i ++ ) 
+    uint8_t * __restrict__ d0 = dst[0];
+    uint8_t * __restrict__ d1 = dst[1];
+    uint8_t * __restrict__ d2 = dst[2];
+    uint8_t * __restrict__ s0 = src[0];
+    uint8_t * __restrict__ s1 = src[1];
+    uint8_t * __restrict__ s2 = src[2];
+
+    for(int i = 0; i < len; i++) 
     {
-        if( pattern[i] > threshold )
-        {
-            dst[0][i] = src[0][i];
-            dst[1][i] = src[1][i];
-            dst[2][i] = src[2][i];
-        }
+        int mask = (pattern[i] > threshold);
+        d0[i] = mask ? s0[i] : d0[i];
+        d1[i] = mask ? s1[i] : d1[i];
+        d2[i] = mask ? s2[i] : d2[i];
     }
 }
 
