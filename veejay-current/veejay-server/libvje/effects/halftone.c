@@ -114,11 +114,11 @@ static void halftone_apply_avg_col2( VJFrame *frame, int radius, int orientation
     const int w = frame->width, h = frame->height;
     int x,y,x1,y1,x_inf=0,y_inf=0, x_sup=w, y_sup=h;
 
-    grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
+    grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup,w,h);
     clear_margins(Y, U, V, w, h, x_inf, y_inf, radius, 1);
 
-    for( y = y_inf; y <= (h - radius); y += radius ) {
-        for( x = x_inf; x <= (w - radius); x += radius ) {
+    for( y = y_inf; y < y_sup; y += radius ) {
+        for( x = x_inf; x < x_sup; x += radius ) {
             uint32_t sum = 0, hit = 0;
             int32_t  sumU = 0, sumV = 0;
 
@@ -148,11 +148,11 @@ static void halftone_apply_avg_col( VJFrame *frame, int radius, int orientation,
     const int w = frame->width, h = frame->height;
     int x,y,x1,y1,x_inf=0,y_inf=0, x_sup=w, y_sup=h;
 
-    grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
+    grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup,w,h);
     clear_margins(Y, U, V, w, h, x_inf, y_inf, radius, 1);
 
-    for( y = y_inf; y <= (h - radius); y += radius ) {
-        for( x = x_inf; x <= (w - radius); x += radius ) {
+    for( y = y_inf; y < y_sup; y += radius ) {
+        for( x = x_inf; x < x_sup; x += radius ) {
             uint32_t sum = 0, hit = 0;
             uint8_t u = U[ y * w + x ], v = V[ y * w + x ];
 
@@ -178,11 +178,11 @@ static void halftone_apply_avg_gray( VJFrame *frame, int radius, int orientation
     const int w = frame->width, h = frame->height;
     int x,y,x1,y1,x_inf=0,y_inf=0, x_sup=w, y_sup=h;
 
-    grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
+    grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup,w,h);
     clear_margins(Y, NULL, NULL, w, h, x_inf, y_inf, radius, 0);
 
-    for( y = y_inf; y <= (h - radius); y += radius ) {
-        for( x = x_inf; x <= (w - radius); x += radius ) {
+    for( y = y_inf; y < y_sup; y += radius ) {
+        for( x = x_inf; x < x_sup; x += radius ) {
             uint32_t sum = 0, hit = 0;
             for( y1 = y ; y1 < (y + radius) && y1 < h; y1 ++ ) {
                 for( x1 = x ; x1 < (x + radius) && x1 < w; x1 ++ ) {
@@ -206,12 +206,12 @@ static void halftone_apply_avg_black( VJFrame *frame, int radius, int orientatio
     const int w = frame->width, h = frame->height;
     int x,y,x1,y1,x_inf=0,y_inf=0, x_sup=w, y_sup=h;
 
-    grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
+    grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup,w,h);
     
     veejay_memset(Y, pixel_Y_hi_, w * h);
 
-    for( y = y_inf; y <= (h - radius); y += radius ) {
-        for( x = x_inf; x <= (w - radius); x += radius ) {
+    for( y = y_inf; y < y_sup; y += radius ) {
+        for( x = x_inf; x < x_sup; x += radius ) {
             uint32_t sum = 0, hit = 0;
             for( y1 = y ; y1 < (y + radius) && y1 < h; y1 ++ ) {
                 for( x1 = x ; x1 < (x + radius) && x1 < w; x1 ++ ) {
@@ -234,11 +234,11 @@ static void halftone_apply_avg_white( VJFrame *frame, int radius, int orientatio
     const int w = frame->width, h = frame->height;
     int x,y,x1,y1,x_inf=0,y_inf=0, x_sup=w, y_sup=h;
 
-    grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
+    grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup,w, h);
     clear_margins(Y, NULL, NULL, w, h, x_inf, y_inf, radius, 0);
 
-    for( y = y_inf; y <= (h - radius); y += radius ) {
-        for( x = x_inf; x <= (w - radius); x += radius ) {
+    for( y = y_inf; y < y_sup; y += radius ) {
+        for( x = x_inf; x < x_sup; x += radius ) {
             uint32_t sum = 0, hit = 0;
             for( y1 = y ; y1 < (y + radius) && y1 < h; y1 ++ ) {
                 for( x1 = x ; x1 < (x + radius) && x1 < w; x1 ++ ) {
