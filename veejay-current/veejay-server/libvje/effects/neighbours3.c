@@ -36,8 +36,8 @@ vj_effect *neighbours3_init(int w, int h)
     ve->limits[1][1] = 255;     /* smoothness */
     ve->limits[0][2] = 0; 	/* luma only / include chroma */
     ve->limits[1][2] = 1;
-    ve->defaults[0] = 9;
-    ve->defaults[1] = 7;
+    ve->defaults[0] = 4;
+    ve->defaults[1] = 4;
     ve->defaults[2] = 1;
     ve->description = "ZArtistic Filter (Horizontal strokes)";
     ve->sub_format = 1;
@@ -52,270 +52,178 @@ vj_effect *neighbours3_init(int w, int h)
     return ve;
 }
 
+
 typedef struct {
-    int pixel_histogram[256];
-	int y_map[256];
-    int cb_map[256];
-    int cr_map[256];
+    int *row_hist[256];
+    int *row_y_map[256];
+    int *row_cb_map[256];
+    int *row_cr_map[256];
     uint8_t *tmp_buf[2];
     uint8_t *chromacity[2];
+    int width;
+    int height;
 } nb_t;
 
 void *neighbours3_malloc(int w, int h )
 {
     nb_t *n = (nb_t*) vj_calloc(sizeof(nb_t));
-    if(!n) {
-        return NULL;
-    }
+    if(!n) return NULL;
 
-	n->tmp_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w * h * 2));
-	if(!n->tmp_buf[0] ) {
-        free(n);
-        return NULL;
-    }
+    n->width = w; n->height = h;
 
-	n->tmp_buf[1] = n->tmp_buf[0] + (w*h);
-	
-    n->chromacity[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w * h *2));
-	if(!n->chromacity[0]) {
-        free(n->tmp_buf[0]);
-        free(n);
-		return NULL;
-    }
+    n->tmp_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w*h*2);
+    if(!n->tmp_buf[0]) { free(n); return NULL; }
+    n->tmp_buf[1] = n->tmp_buf[0] + (w*h);
 
-	n->chromacity[1] = n->chromacity[0] + (w*h);
-	return (void*) n;
+    n->chromacity[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w*h*2);
+    if(!n->chromacity[0]) { free(n->tmp_buf[0]); free(n); return NULL; }
+    n->chromacity[1] = n->chromacity[0] + (w*h);
+
+    for(int i=0;i<256;i++){
+        n->row_hist[i] = (int*) vj_calloc(sizeof(int)*w);
+        n->row_y_map[i] = (int*) vj_calloc(sizeof(int)*w);
+        n->row_cb_map[i] = (int*) vj_calloc(sizeof(int)*w);
+        n->row_cr_map[i] = (int*) vj_calloc(sizeof(int)*w);
+        if(!n->row_hist[i]||!n->row_y_map[i]||!n->row_cb_map[i]||!n->row_cr_map[i]){
+            for(int j=0;j<=i;j++){
+                if(n->row_hist[j]) free(n->row_hist[j]);
+                if(n->row_y_map[j]) free(n->row_y_map[j]);
+                if(n->row_cb_map[j]) free(n->row_cb_map[j]);
+                if(n->row_cr_map[j]) free(n->row_cr_map[j]);
+            }
+            free(n->chromacity[0]); free(n->tmp_buf[0]); free(n);
+            return NULL;
+        }
+    }
+    return n;
 }
 
-void		neighbours3_free(void *ptr)
+void neighbours3_free(void *ptr)
 {
     nb_t *n = (nb_t*) ptr;
+    if(!n) return;
 
-	free(n->tmp_buf[0]);
-	free(n->chromacity[0]);
+    for(int i=0;i<256;i++){
+        if(n->row_hist[i]) free(n->row_hist[i]);
+        if(n->row_y_map[i]) free(n->row_y_map[i]);
+        if(n->row_cb_map[i]) free(n->row_cb_map[i]);
+        if(n->row_cr_map[i]) free(n->row_cr_map[i]);
+    }
+    if(n->tmp_buf[0]) free(n->tmp_buf[0]);
+    if(n->chromacity[0]) free(n->chromacity[0]);
     free(n);
 }
 
-typedef struct
-{
-	uint8_t y;
-	uint8_t u;
-	uint8_t v;
-} pixel_t;
+typedef struct { uint8_t y,u,v; } pixel_t;
 
-static inline pixel_t evaluate_pixel_bc(
-		int x, int y,			/* center pixel */
-		const int brush_size,		/* brush size (works like equal sized rectangle) */
-		const double intensity,		/* Luma value * scaling factor */
-		const int w,			/* width of image */
-		const int h,			/* height of image */
-		const uint8_t *premul,		/* map data */
-		const uint8_t *image,		/* image data */
-		const uint8_t *image_cb,
-		const uint8_t *image_cr,
-        int *pixel_histogram,
-        int *y_map,
-        int *cb_map,
-        int *cr_map
-)
-{
-	unsigned int 	brightness;		/* scaled brightnes */
-	int 		peak_value = 0;
-	int 		peak_index = 0;
-	int		i,j;
-	int 		x0 = x - brush_size;
-	int 		x1 = x + brush_size;
-	int 		y0 = y - brush_size;
-	int 		y1 = y + brush_size;
-	const int 	max_ = (int) ( 0xff * intensity );
+static inline int clamp(int val,int min,int max){return val<min?min:(val>max?max:val);}
 
-	if( x0 < 0 ) x0 = 0;			
-	if( x1 > w ) x1 = w;
-	if( y0 < 0 ) y0 = 0;
-	if( y1 >= h ) y1 = h-1;
+static inline uint8_t evaluate_pixel_row(
+    int x,int y,int brush_size,int max_intensity,
+    uint8_t *premul,uint8_t *Y,int *row_hist,int *row_y_map,int width,int height
+){
+    int left=clamp(x-brush_size,0,width-1);
+    int right=clamp(x+brush_size,0,width-1);
+    int peak_val=0,peak_idx=0;
 
-	veejay_memset( pixel_histogram, 0, max_ * sizeof(int));
-	veejay_memset( y_map, 0, max_ * sizeof(int));
-	veejay_memset( cb_map, 0, max_ * sizeof(int));
-	veejay_memset( cr_map, 0, max_ * sizeof(int));
+    veejay_memset(row_hist, 0, max_intensity * sizeof(int));
+    veejay_memset(row_y_map, 0, max_intensity * sizeof(int));
 
-	/* fill histogram, cummulative add of luma values */
-	/* this innerloop is executed w * h * brush_size and counts
-           many loads and stores. */
-	i = y;
-	for( j = x0; j < x1; j ++ )
-	{
-		brightness = premul[ i * w + j];
-		pixel_histogram[ brightness ] ++;
-		y_map[ brightness ] += image[ i * w + j];
-		cb_map[ brightness ] += image_cb[ i * w + j ];
-		cr_map[ brightness ] += image_cr[ i * w + j ];
-	}
-	
 
-	/* find most occuring value */
-	for( i = 0; i < max_ ; i ++ )
-	{
-		if( pixel_histogram[i] >= peak_value )
-		{
-			peak_value = pixel_histogram[i];
-			peak_index = i;
-		}
-	}
-	pixel_t val;
+    for(int j=left;j<=right;j++){
+        int bright=premul[y*width+j];
+        row_hist[bright]++;
+        row_y_map[bright]+=Y[y*width+j];
+    }
 
-	if( peak_value > 0 )
-	{
-		val.y = y_map[peak_index] / peak_value;
-		val.u = cb_map[peak_index] / peak_value;
-		val.v = cr_map[peak_index] / peak_value;
-	}
-	else
-	{
-		val.y = image[y * w + x];
-		val.u = image_cb[y * w + x];
-		val.v = image_cr[y * w + x];
-	}	
-	return val;	
+    for(int i=0;i<max_intensity;i++)
+        if(row_hist[i]>peak_val){ peak_val=row_hist[i]; peak_idx=i; }
 
+    return peak_val>15 ? (uint8_t)(row_y_map[peak_idx]/peak_val) : Y[y*width+x];
 }
 
+static inline pixel_t evaluate_pixel_row_c(
+    int x,int y,int brush_size,int max_intensity,
+    uint8_t *premul,uint8_t *Y,uint8_t *Cb,uint8_t *Cr,
+    int *row_hist,int *row_y_map,int *row_cb_map,int *row_cr_map,
+    int width,int height
+){
+    pixel_t val;
+    int left=clamp(x-brush_size,0,width-1);
+    int right=clamp(x+brush_size,0,width-1);
+    int peak_val=0,peak_idx=0;
 
-static inline uint8_t evaluate_pixel_b(
-		int x, int y,			/* center pixel */
-		const int brush_size,		/* brush size (works like equal sized rectangle) */
-		const double intensity,		/* Luma value * scaling factor */
-		const int w,			/* width of image */
-		const int h,			/* height of image */
-		const uint8_t *premul,		/* map data */
-		const uint8_t *image,		/* image data */
-        int *pixel_histogram,
-        int *y_map
-)
-{
-	unsigned int 	brightness;		/* scaled brightnes */
-	int 		peak_value = 0;
-	int 		peak_index = 0;
-	int		i,j;
-	int 		x0 = x - brush_size;
-	int 		x1 = x + brush_size;
-	int 		y0 = y - brush_size;
-	int 		y1 = y + brush_size;
-	const int 	max_ = (int) ( 0xff * intensity );
+    veejay_memset(row_hist, 0, max_intensity * sizeof(int));
+    veejay_memset(row_y_map, 0, max_intensity * sizeof(int));
+    veejay_memset(row_cb_map, 0, max_intensity * sizeof(int));
+    veejay_memset(row_cr_map, 0, max_intensity * sizeof(int));
 
-	if( x0 < 0 ) x0 = 0;			
-	if( x1 > w ) x1 = w;
-	if( y0 < 0 ) y0 = 0;
-	if( y1 >= h ) y1 = h-1;
 
-	veejay_memset( pixel_histogram, 0, max_ * sizeof(int));
-	veejay_memset( y_map, 0, max_ * sizeof(int));
+    for(int j=left;j<=right;j++){
+        int bright=premul[y*width+j];
+        row_hist[bright]++;
+        row_y_map[bright]+=Y[y*width+j];
+        row_cb_map[bright]+=Cb[y*width+j];
+        row_cr_map[bright]+=Cr[y*width+j];
+    }
 
-	i = y;
-	for( j = x0; j < x1; j ++ )
-	{
-		// average while adding
-		brightness = premul[ i * w + j];
-		pixel_histogram[ brightness ] ++;
-		y_map[ brightness ] += image[ i * w + j];
-	}
+    for(int i=0;i<max_intensity;i++)
+        if(row_hist[i]>peak_val){ peak_val=row_hist[i]; peak_idx=i; }
 
-	/* find most occuring value */
-	for( i = 0; i < max_ ; i ++ )
-	{
-		if( pixel_histogram[i] >= peak_value )
-		{
-			peak_value = pixel_histogram[i];
-			peak_index = i;
-		}
-	}
-	if( peak_value < 16)
-		return image[ y * w + x];
-
-	return( (uint8_t) (  y_map[ peak_index] / peak_value ));
+    if(peak_val>0){
+        val.y=row_y_map[peak_idx]/peak_val;
+        val.u=row_cb_map[peak_idx]/peak_val;
+        val.v=row_cr_map[peak_idx]/peak_val;
+    }else{
+        val.y=Y[y*width+x];
+        val.u=Cb[y*width+x];
+        val.v=Cr[y*width+x];
+    }
+    return val;
 }
 
-void neighbours3_apply( void *ptr, VJFrame *frame, int *args ) {
-    int brush_size = args[0];
-    int intensity_level = args[1];
-    int mode = args[2];
+void neighbours3_apply(void *ptr,VJFrame *frame,int *args){
+    int brush_size=args[0], intensity_level=args[1], mode=args[2];
+    nb_t *n=(nb_t*)ptr;
+    int width=frame->width,height=frame->height,len=frame->len;
 
-    nb_t *n = (nb_t*) ptr;
+    double intensity = intensity_level/255.0;
+    int max_intensity=(int)(0xff*intensity);
 
-	int x,y; 
-	const double intensity = intensity_level / 255.0;
-	uint8_t *Y = n->tmp_buf[0];
-	uint8_t *Y2 = n->tmp_buf[1];
+    uint8_t *Y=n->tmp_buf[0],*Y2=n->tmp_buf[1];
+    uint8_t *dstY=frame->data[0],*dstCb=frame->data[1],*dstCr=frame->data[2];
 
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-	const int len = frame->len;
-	uint8_t *dstY = frame->data[0];
-	uint8_t *dstCb = frame->data[1];
-	uint8_t *dstCr = frame->data[2];
-	// keep luma
-	vj_frame_copy1( frame->data[0],Y2, len );
+    vj_frame_copy1(frame->data[0],Y2,len);
+    if(mode){
+        int strides[4]={0,len,len,0};
+        uint8_t *dest[4]={NULL,n->chromacity[0],n->chromacity[1],NULL};
+        vj_frame_copy(frame->data,dest,strides);
+    }
 
-	if(mode)
-	{
-		int strides[4] = { 0, len, len, 0 };
-		uint8_t *dest[4] = { NULL, n->chromacity[0], n->chromacity[1], NULL };
-		vj_frame_copy( frame->data, dest, strides );
-	}
-
-	// premultiply intensity map
 #pragma omp simd
-	for( y = 0 ; y < len ; y ++ )
-		Y[y] = (uint8_t) ( (double)Y2[y] * intensity );
+    for(int i=0;i<len;i++) Y[i]=(uint8_t)(Y2[i]*intensity);
 
-	if(!mode)
-	{
-		for( y = 0; y < height; y ++ )
-		{
-			for( x = 0; x < width; x ++ )
-			{
-				*(dstY)++ = evaluate_pixel_b(
-						x,y,
-						brush_size,
-						intensity,
-						width,
-						height,
-						Y,
-						Y2,
-                        n->pixel_histogram,
-                        n->y_map
-				);
-			}
-		}
-		veejay_memset( frame->data[1], 128, len );
-		veejay_memset( frame->data[2], 128, len );
-	} 
-	else
-	{
-		pixel_t tmp;
-		for( y = 0; y < height; y ++ )
-		{
-			for( x = 0; x < width; x ++ )
-			{
-				tmp = evaluate_pixel_bc(
-						x,y,
-						brush_size,
-						intensity,
-						width,
-						height,
-						Y,
-						Y2,
-						n->chromacity[0],
-						n->chromacity[1],
-                        n->pixel_histogram,
-                        n->y_map,
-                        n->cb_map,
-                        n->cr_map
-					);
-				*(dstY++) = tmp.y;
-				*(dstCb++) = tmp.u;
-				*(dstCr++) = tmp.v;
-			}
-		}
-	}
+    if(!mode){
+        for(int y=0;y<height;y++)
+            for(int x=0;x<width;x++)
+                *(dstY++)=evaluate_pixel_row(x,y,brush_size,max_intensity,Y,Y2,n->row_hist[0],n->row_y_map[0],width,height);
+
+        veejay_memset(frame->data[1],128,len);
+        veejay_memset(frame->data[2],128,len);
+    }else{
+        pixel_t tmp;
+        for(int y=0;y<height;y++)
+            for(int x=0;x<width;x++){
+                tmp=evaluate_pixel_row_c(
+                    x,y,brush_size,max_intensity,
+                    Y,Y2,n->chromacity[0],n->chromacity[1],
+                    n->row_hist[0],n->row_y_map[0],
+                    n->row_cb_map[0],n->row_cr_map[0],
+                    width,height
+                );
+                *(dstY++)=tmp.y;
+                *(dstCb++)=tmp.u;
+                *(dstCr++)=tmp.v;
+            }
+    }
 }
