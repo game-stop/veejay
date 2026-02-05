@@ -248,7 +248,7 @@ void circlefit_apply(void *ptr, VJFrame *frame, int *args)
     int numBoxes = s->numBoxes;
     int boxIndex = 0;
 
-    
+    const uint8_t safe_min_size = (min_size < 1) ? 1 : min_size;
     if( border == 0 ) {
         for (int i = 0; i < height;)
         {
@@ -260,7 +260,7 @@ void circlefit_apply(void *ptr, VJFrame *frame, int *args)
                 const double localContrast = calculateLocalContrast(srcY, width, height, i, j, box_size, &(s->runningAvg), weight);
                 const double sizeMultiplier = 1.0 - (localContrast / contrast);
 
-                box_size = CLAMP((int)(box_size * sizeMultiplier), min_size, max_size);
+                box_size = CLAMP((int)(box_size * sizeMultiplier), safe_min_size, max_size);
 
                 const int box_size_squared = box_size * box_size;
 
@@ -314,7 +314,7 @@ void circlefit_apply(void *ptr, VJFrame *frame, int *args)
                 const double localContrast = calculateLocalContrast(srcY, width, height, i, j, box_size, &(s->runningAvg), weight);
                 const double sizeMultiplier = 1.0 - (localContrast / contrast);
 
-                box_size = CLAMP((int)(box_size * sizeMultiplier), min_size, max_size);
+                box_size = CLAMP((int)(box_size * sizeMultiplier), safe_min_size, max_size);
 
                 const int box_size_squared = box_size * box_size;
 
