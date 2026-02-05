@@ -221,14 +221,17 @@ const char *y4m_xtag_get(const y4m_xtag_list_t *xtags, int n)
 
 int y4m_xtag_add(y4m_xtag_list_t *xtags, const char *tag)
 {
-  if (xtags->count >= Y4M_MAX_XTAGS) return Y4M_ERR_XXTAGS;
-  if (xtags->tags[xtags->count] == NULL) 
-    xtags->tags[xtags->count] = y4m_new_xtag();
-  strncpy(xtags->tags[xtags->count], tag, Y4M_MAX_XTAG_SIZE - 1);
-  xtags->tags[xtags->count][Y4M_MAX_XTAG_SIZE - 1] = '\0';
-
-  (xtags->count)++;
-  return Y4M_OK;
+    if (xtags->count >= Y4M_MAX_XTAGS)
+        return Y4M_ERR_XXTAGS;
+    if (xtags->tags[xtags->count] == NULL) {
+        xtags->tags[xtags->count] = y4m_new_xtag();
+        if (xtags->tags[xtags->count] == NULL)
+            return Y4M_ERR_SYSTEM;
+    }
+    strncpy(xtags->tags[xtags->count], tag, Y4M_MAX_XTAG_SIZE - 1);
+    xtags->tags[xtags->count][Y4M_MAX_XTAG_SIZE - 1] = '\0';
+    xtags->count++;
+    return Y4M_OK;
 }
 
 int y4m_xtag_remove(y4m_xtag_list_t *xtags, int n)
