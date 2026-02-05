@@ -17,6 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+#include <config.h>
+#include <time.h>
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "motionblur.h"
@@ -110,10 +112,10 @@ void pointilism_free(void *ptr)
     free(s);
 }
 
-static inline uint8_t clamp(int v) {
-    v = v & -(v >= 0);
-    v = (v & -(v <= 255)) | (255 & -(v > 255));
-    return (uint8_t)v;
+static inline int clamp(int v, int min, int max) {
+    if (v < min) return min;
+    if (v > max) return max;
+    return v;
 }
 
 void pointilism_apply(void *ptr, VJFrame *frame, int *args)
