@@ -8619,69 +8619,65 @@ void    vj_event_send_sample_list       (   void *ptr,  const char format[],    
     free(s_print_buf);
 }
 
-void    vj_event_send_sample_stack      (   void *ptr,  const char format[],    va_list ap )
-{
-    char line[64];
+void vj_event_send_sample_stack(void *ptr, const char format[], va_list ap) {
+    if (!ptr) return;
+
+    veejay_t *v = (veejay_t *)ptr;
     int args[4];
-    char    buffer[2000];
-    char    message[2048];  
-    veejay_t *v = (veejay_t*)ptr;
-    P_A(args,sizeof(args),NULL,0,format,ap);
+    char buffer[2000];
+    char message[2048];
 
     buffer[0] = '\0';
     message[0] = '\0';
 
-    int channel, source,fx_id,i, offset,sample_len;
+    P_A(args, sizeof(args), NULL, 0, format, ap);
 
-    if( SAMPLE_PLAYING(v)  ) {
-        if(args[0] == 0) 
-            args[0] = v->uc->sample_id;
+    if (args[0] == 0 && v->uc) {
+        args[0] = v->uc->sample_id;
+    }
 
-        for( i = 0; i < SAMPLE_MAX_EFFECTS ;i ++ ) {
-            fx_id = sample_get_effect_any( args[0], i );
-            if( fx_id <= 0 )
-                continue;
-            channel = sample_get_chain_channel( args[0], i );
-            source  = sample_get_chain_source( args[0], i );
-            offset  = sample_get_resume( args[0] );
-            if( source == 0 )
-                sample_len= sample_video_length( channel );
-            else 
-                sample_len = vj_tag_get_n_frames( channel );
-            snprintf( line, sizeof(line), "%02d%04d%02d%08d%08d", i, channel, source, offset, sample_len );
-	    size_t space_left = sizeof(buffer) - strlen(buffer) - 1;
-	    if(space_left > 0)
-            	strncat( buffer, line, space_left);
+    size_t offset = 0;
+    const size_t buf_size = sizeof(buffer);
+
+    int is_sample = SAMPLE_PLAYING(v);
+    int is_stream = STREAM_PLAYING(v);
+
+    if (is_sample || is_stream) {
+        for (int i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
+            int fx_id, channel, source, sample_len;
+            int resume_offset = 0;
+
+            if (is_sample) {
+                fx_id   = sample_get_effect_any(args[0], i);
+                if (fx_id <= 0) continue;
+                channel = sample_get_chain_channel(args[0], i);
+                source  = sample_get_chain_source(args[0], i);
+                resume_offset = sample_get_resume(args[0]);
+                sample_len = (source == 0) ? sample_video_length(channel) : vj_tag_get_n_frames(channel);
+            } else {
+                fx_id   = vj_tag_get_effect_any(args[0], i);
+                if (fx_id <= 0) continue;
+                channel = vj_tag_get_chain_channel(args[0], i);
+                source  = vj_tag_get_chain_source(args[0], i);
+                sample_len = (source == 0) ? sample_video_length(channel) : vj_tag_get_n_frames(channel);
+                if (source == 0) resume_offset = sample_get_resume(channel);
+            }
+
+            int written = snprintf(buffer + offset, buf_size - offset,
+                                   "%02d%04d%02d%08d%08d",
+                                   i, channel, source, resume_offset, sample_len);
+
+            if (written > 0 && (size_t)written < (buf_size - offset)) {
+                offset += written;
+            } else {
+                // buffer full
+                break;
+            }
         }
-    } else if(STREAM_PLAYING(v))
-    {
-        if(args[0] == 0) 
-            args[0] = v->uc->sample_id;
-    
-        for(i = 0; i < SAMPLE_MAX_EFFECTS ; i ++ ) {
-            fx_id = vj_tag_get_effect_any( args[0], i );
-            if( fx_id <= 0 )
-                continue;
-            channel = vj_tag_get_chain_channel( args[0], i );
-            source  = vj_tag_get_chain_source( args[0], i );
-            int offset = 0;
-            if( source == 0 ) {
-                sample_len= sample_video_length( channel );
-		offset = sample_get_resume( channel );
-	    }
-            else 
-                sample_len = vj_tag_get_n_frames( channel );
+    }
 
-            snprintf( line, sizeof(line), "%02d%04d%02d%08d%08d",i,channel,source, offset, sample_len );
-            size_t space_left = sizeof(buffer) - strlen(buffer) - 1;
-	    if(space_left > 0)
-	    	strncat( buffer, line, space_left);
-        }
-    }   
-
-    FORMAT_MSG( message, buffer );
-    SEND_MSG(   v, message );
-
+    FORMAT_MSG(message, buffer);
+    SEND_MSG(v, message);
 }
 
 void    vj_event_send_stream_args       (   void *ptr, const char format[],     va_list ap )
