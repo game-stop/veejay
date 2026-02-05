@@ -399,28 +399,6 @@ static void wait_all_tasks_completed(thread_pool_t *pool) {
     pthread_mutex_unlock(&pool->lock);
 }
 
-static void destroy_thread_pool(thread_pool_t *pool) {
-    //pthread_mutex_lock(&pool->lock);
-    //atomic_store(&pool->stop_flag, 1);
-    //pthread_mutex_unlock(&pool->lock);
-
-    //start_all_threads( pool );
-
-    for (int i = 0; i < numThreads; i++) {
-        pthread_join(pool->threads[i], NULL);
-    }
-
-    pthread_mutex_destroy(&pool->lock);
-    pthread_cond_destroy(&pool->task_completed);
-	pthread_cond_destroy(&pool->start_signal);
-
-    free(pool->queue);
-    free(pool);
-}
-
-
-
-
 int vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int n_planes, performer_job_routine func, int use_thread_local )
 {
     const uint8_t n = vj_task_get_workers();
@@ -489,26 +467,31 @@ int vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
     return 1;
 }
 
-
-
-
 void task_destroy()
 {
-	if(!task_pool)
-		return;
+    if(!task_pool)
+        return;
 
-	pthread_mutex_lock(&task_pool->lock);
-	atomic_store( &task_pool->stop_flag , 1 );
-	//pthread_mutex_lock(&task_pool->lock);
-	pthread_cond_broadcast(&task_pool->start_signal);
-	pthread_mutex_unlock(&task_pool->lock);
-	
-	destroy_thread_pool(task_pool);
+    pthread_mutex_lock(&task_pool->lock);
+    atomic_store(&task_pool->stop_flag, 1);
+    pthread_cond_broadcast(&task_pool->start_signal);
+    pthread_mutex_unlock(&task_pool->lock);
 
-	free(task_pool->thread_local_bufs);
+    for (int i = 0; i < numThreads; i++) {
+        pthread_join(task_pool->threads[i], NULL);
+    }
 
-    pthread_key_delete( thread_buf_key );
+    free(task_pool->queue);
+    free(task_pool->thread_local_bufs);
 
+    pthread_mutex_destroy(&task_pool->lock);
+    pthread_cond_destroy(&task_pool->task_completed);
+    pthread_cond_destroy(&task_pool->start_signal);
+
+    pthread_key_delete(thread_buf_key);
+
+    free(task_pool);
+    task_pool = NULL;
 }
 
 
