@@ -464,25 +464,26 @@ static int processLine(FILE *infile, FILE *outfile, char *tmp, size_t len)
     return 1;
 }
 
-
 static void do_work(int stdin_fd, FILE *std_out)
 {
     FILE *instd = stdin;
+    FILE *to_close = NULL;
+    char *tmp = NULL;
     const size_t len = 1024;
 
     if (in_file) {
-        instd = fdopen(stdin_fd, "r");
-        if (!instd) {
+        to_close = fdopen(stdin_fd, "r");
+        if (!to_close) {
             fprintf(stderr, "Failed to open stdin_fd\n");
-            return;
+            return; 
         }
+        instd = to_close;
     }
 
-    char *tmp = (char *) vj_calloc(len);
+    tmp = (char *) vj_calloc(len);
     if (!tmp) {
-        if(in_file) fclose(instd);
         fprintf(stderr, "Memory allocation failed\n");
-        return;
+        goto cleanup;
     }
 
     for (;;) {
@@ -491,14 +492,16 @@ static void do_work(int stdin_fd, FILE *std_out)
             fprintf(stderr, "Session ends, bye!\n");
             break;
         }
-
         memset(tmp, 0, len);
     }
 
-    if(in_file) 
-        fclose(instd);
-
-    free(tmp);
+cleanup:
+    if (to_close) {
+        fclose(to_close);
+    }
+    if (tmp) {
+        free(tmp);
+    }
 }
 
 
