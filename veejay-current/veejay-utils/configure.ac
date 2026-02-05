@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay-utils],[1.1.8],[veejay-users@lists.sourceforge.net])
+AC_INIT([veejay-utils],[1.2.0],[])
 AC_PREREQ([2.69])
 AC_CONFIG_SRCDIR([src/sayVIMS.c])
 
