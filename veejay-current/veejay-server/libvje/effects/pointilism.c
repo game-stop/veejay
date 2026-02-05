@@ -60,6 +60,15 @@ vj_effect *pointilism_init(int w, int h)
     return ve;
 }
 
+static inline uint32_t xorshift32(uint32_t *state) {
+	uint32_t x = *state;
+	x ^= x << 13;
+	x ^= x >> 17;
+	x ^= x << 5;
+	*state = x;
+	return x;
+}
+
 void *pointilism_malloc(int w, int h)
 {
     pointilism_t *s = (pointilism_t*) vj_calloc(sizeof(pointilism_t));
@@ -81,7 +90,14 @@ void *pointilism_malloc(int w, int h)
     veejay_memset(s->buf[0], 0, w*h);
     veejay_memset(s->buf[1], 128, w*h*2);
 
-    for(int i=0; i<w*h; i++) s->rand_lut[i] = rand();
+//    unsigned int seed = (unsigned int) time(NULL) ^ (unsigned int)(uintptr_t)s;
+//    for(int i=0; i<w*h; i++) s->rand_lut[i] = rand_r(&seed);
+
+	uint32_t r_state = (uint32_t) time(NULL) + (uint32_t)(uintptr_t)s;
+	if( r_state == 0 ) r_state = 1;
+	for( int i = 0; i < w * h; i ++ ) {
+		s->rand_lut[i] = (int) ( xorshift32( &r_state ) & 0x7FFFFFFF );
+	}
 
     return (void*) s;
 }
@@ -94,74 +110,17 @@ void pointilism_free(void *ptr)
     free(s);
 }
 
-static inline int clamp(int v, int min, int max) {
-    if (v < min) return min;
-    if (v > max) return max;
-    return v;
+static inline uint8_t clamp(int v) {
+    v = v & -(v >= 0);
+    v = (v & -(v <= 255)) | (255 & -(v > 255));
+    return (uint8_t)v;
 }
- 
-static inline void process_corners(
-    int x, int y, int kernelRadius, int minRadius, int maxRadius,
-    int w, int h,
-    const uint8_t *srcY, const uint8_t *srcU, const uint8_t *srcV,
-    uint8_t *dstY, uint8_t *dstU, uint8_t *dstV,
-    int *lut,
-    uint8_t *tmpY, uint8_t *tmpU, uint8_t *tmpV)
-{
-    int x_start = (x - kernelRadius < 0) ? 0 : x - kernelRadius;
-    int y_start = (y - kernelRadius < 0) ? 0 : y - kernelRadius;
-    int x_end   = (x + kernelRadius >= w) ? w - 1 : x + kernelRadius;
-    int y_end   = (y + kernelRadius >= h) ? h - 1 : y + kernelRadius;
 
-    uint8_t minL=0xFF, maxL=0;
-    uint8_t minU=0xFF, maxU=0;
-    uint8_t minV=0xFF, maxV=0;
-
-    for (int wy = y_start; wy <= y_end; wy++) {
-        for (int wx = x_start; wx <= x_end; wx++) {
-            int idx = wy * w + wx;
-            uint8_t L = srcY[idx];
-            uint8_t U = srcU[idx];
-            uint8_t V = srcV[idx];
-            
-            if (L < minL) minL = L;
-            if (L > maxL) maxL = L;
-            if (U < minU) minU = U;
-            if (U > maxU) maxU = U;
-            if (V < minV) minV = V;
-            if (V > maxV) maxV = V;
-        }
-    }
-
-    int radius = minRadius + lut[y*w + x] % (maxRadius - minRadius + 1);
-    if (radius < 1) radius = 1;
-    int r2 = radius*radius;
-    int fixedR2 = r2 << FIXED_POINT_BITS;
-
-    int startX = (x-radius<0)? -x : -radius;
-    int startY = (y-radius<0)? -y : -radius;
-    int endX = (x+radius>=w)? w-x-1 : radius;
-    int endY = (y+radius>=h)? h-y-1 : radius;
-
-    for(int dx=startX; dx<=endX; dx++){
-        for(int dy=startY; dy<=endY; dy++){
-            int nx=x+dx, ny=y+dy;
-            int dist2 = dx*dx + dy*dy;
-            
-            if (dist2 <= r2) {
-                int gradient = ((r2 - dist2) << FIXED_POINT_BITS) / r2;
-
-                dstY[ny*w + nx] = (uint8_t)((maxL*(FIXED_POINT_ONE - gradient) + minL*gradient) >> FIXED_POINT_BITS);
-                dstU[ny*w + nx] = (uint8_t)((maxU*(FIXED_POINT_ONE - gradient) + minU*gradient) >> FIXED_POINT_BITS);
-                dstV[ny*w + nx] = (uint8_t)((maxV*(FIXED_POINT_ONE - gradient) + minV*gradient) >> FIXED_POINT_BITS);
-            }
-        }
-    }
-}
 void pointilism_apply(void *ptr, VJFrame *frame, int *args)
 {
     pointilism_t *p = (pointilism_t*) ptr;
     const int w = frame->width, h = frame->height;
+    const int total_pixels = w * h;
 
     int minRadius = args[0], maxRadius = args[1], kernelRadius = args[2];
     if(minRadius > maxRadius) { int tmp = maxRadius; maxRadius = minRadius; minRadius = tmp; }
@@ -173,48 +132,54 @@ void pointilism_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict dstY = p->buf[0];
     uint8_t *restrict dstU = p->buf[1];
     uint8_t *restrict dstV = p->buf[2];
-    int *lut = p->rand_lut;
+    int *restrict lut = p->rand_lut;
 
-    if (args[3] == 1) { 
-        // loop on,do nothing to the buffers. 
-    } else if (args[4] == 1) { 
-        veejay_memcpy(p->buf[0], srcY, w * h);
-        veejay_memcpy(p->buf[1], srcU, w * h);
-        veejay_memcpy(p->buf[2], srcV, w * h);
-    } else {
-        veejay_memset(p->buf[0], 0, w * h);
-        veejay_memset(p->buf[1], 128, w * h);
-        veejay_memset(p->buf[2], 128, w * h);
+    if (args[3] != 1) {
+        if (args[4] == 1) {
+            veejay_memcpy(dstY, srcY, total_pixels);
+            veejay_memcpy(dstU, srcU, total_pixels);
+            veejay_memcpy(dstV, srcV, total_pixels);
+        } else {
+            veejay_memset(dstY, 0, total_pixels);
+            veejay_memset(dstU, 128, total_pixels);
+            veejay_memset(dstV, 128, total_pixels);
+        }
     }
     
-    for (int y = 0; y < h; y += step) {
+    const int row_step = step * w;
+    for (int y = 0, y_offset = 0; y < h; y += step, y_offset += row_step) {
+        if (y_offset >= total_pixels) break;
+
         for (int x = 0; x < w; x += step) {
+            int current_idx = y_offset + x;
             
-            int jitterX = lut[(y * w + x) % (w * h)] % step;
-            int jitterY = lut[((y * w + x) + 1) % (w * h)] % step;
+            int jitterX = lut[current_idx % total_pixels] % step;
+            int jitterY = lut[(current_idx + 1) % total_pixels] % step;
             
             int centerX = clamp(x + jitterX, 0, w - 1);
             int centerY = clamp(y + jitterY, 0, h - 1);
+            int center_idx = centerY * w + centerX;
 
             uint8_t minL = 0xFF, maxL = 0;
-            uint8_t minU = 0xFF, maxU = 0;
-            uint8_t minV = 0xFF, maxV = 0;
 
             for (int ky = -kernelRadius; ky <= kernelRadius; ky++) {
                 int ny = clamp(centerY + ky, 0, h - 1);
+                const uint8_t *kRow = &srcY[ny * w];
                 for (int kx = -kernelRadius; kx <= kernelRadius; kx++) {
                     int nx = clamp(centerX + kx, 0, w - 1);
-                    int idx = ny * w + nx;
-                    if (srcY[idx] < minL) minL = srcY[idx];
-                    if (srcY[idx] > maxL) maxL = srcY[idx];
+                    uint8_t val = kRow[nx];
+                    if (val < minL) minL = val;
+                    if (val > maxL) maxL = val;
                 }
             }
             
-            minU = srcU[centerY * w + centerX];
-            minV = srcV[centerY * w + centerX];
+            uint8_t minU = srcU[center_idx];
+            uint8_t minV = srcV[center_idx];
+            int rangeL = maxL - minL;
 
-            int radius = minRadius + (lut[centerY * w + centerX] % (maxRadius - minRadius + 1));
-            int r2 = radius * radius;
+            int radius = minRadius + (lut[center_idx % total_pixels] % (maxRadius - minRadius + 1));
+            int r2 = (radius * radius > 0) ? radius * radius : 1;
+            int invR2 = (FIXED_POINT_ONE << 16) / r2;
 
             int startY = clamp(centerY - radius, 0, h - 1);
             int endY   = clamp(centerY + radius, 0, h - 1);
@@ -223,15 +188,18 @@ void pointilism_apply(void *ptr, VJFrame *frame, int *args)
 
             for (int py = startY; py <= endY; py++) {
                 int dy = py - centerY;
+                int dy2 = dy * dy;
+                int py_offset = py * w;
+
                 for (int px = startX; px <= endX; px++) {
                     int dx = px - centerX;
-                    int dist2 = dx * dx + dy * dy;
+                    int dist2 = dx * dx + dy2;
 
                     if (dist2 <= r2) {
-                        int gradient = ((r2 - dist2) << FIXED_POINT_BITS) / r2;
-                        int out_idx = py * w + px;
+                        int gradient = (( r2 - dist2 ) * invR2) >> 16;
+                        int out_idx = py_offset + px;
                         
-                        dstY[out_idx] = (uint8_t)((maxL * (FIXED_POINT_ONE - gradient) + minL * gradient) >> FIXED_POINT_BITS);
+                        dstY[out_idx] = maxL - ((gradient * rangeL) >> 16);
                         dstU[out_idx] = minU;
                         dstV[out_idx] = minV;
                     }
@@ -240,7 +208,7 @@ void pointilism_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    veejay_memcpy(frame->data[0], dstY, w * h);
-    veejay_memcpy(frame->data[1], dstU, w * h);
-    veejay_memcpy(frame->data[2], dstV, w * h);
+    veejay_memcpy(frame->data[0], dstY, total_pixels);
+    veejay_memcpy(frame->data[1], dstU, total_pixels);
+    veejay_memcpy(frame->data[2], dstV, total_pixels);
 }
