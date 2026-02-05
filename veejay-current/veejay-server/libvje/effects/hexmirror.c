@@ -149,6 +149,25 @@ static void init_sin_cos_lut(hexmirror_t *f) {
     }
 }
 
+static inline float atan2_approx1(float y, float x) {
+    float fabs_y = y * (y < 0.0f ? -1.0f : 1.0f);
+    float r = (x < 0.0f) ? (x + fabs_y) / (fabs_y - x) : (x - fabs_y) / (x + fabs_y);
+    float angle = (x < 0.0f) ? THRQTR_PI : ONEQTR_PI;
+    angle += (0.1963f * r * r - 0.9817f) * r;
+    return (y < 0.0f) ? -angle : angle;
+}
+
+static inline float sqrt_approx(float x) {
+    return __builtin_sqrtf(x);
+}
+
+static inline float wrap_angle(float a) {
+    while (a < 0.0f) a += TWO_PI;
+    while (a >= TWO_PI) a -= TWO_PI;
+    return a;
+}
+
+
 void *hexmirror_malloc(int w, int h) {
     hexmirror_t *s = (hexmirror_t*) vj_calloc(sizeof(hexmirror_t));
     if(!s) return NULL;
@@ -242,9 +261,7 @@ static void calc_center(float side, float j, float i, float *x, float *y) {
 }
 
 static inline void rotate(float r, float theta, float angle, float *x, float *y, float *cos_lut, float *sin_lut) {
-    theta += angle;
-    theta = ( theta < 0. ? theta += TWO_PI : theta >= TWO_PI ? theta -= TWO_PI : theta );
-
+    theta = wrap_angle(theta + angle);
     int lut_pos =  ( (int) (theta * LUT_DIVISOR)) % LUT_SIZE;
 
     *x = r * cos_lut[lut_pos];
@@ -252,18 +269,13 @@ static inline void rotate(float r, float theta, float angle, float *x, float *y,
 }
 
 static inline void put_pixel1(float angle, float theta, float r, int hheight,
-                     int hwidth, uint8_t *srcY, uint8_t *srcU, uint8_t *srcV, uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, int jj, int width, float *cos_lut, float *sin_lut) {
-    // dest point is at i,j; r tells us which point to copy, and theta related to angle gives us the transform
+                              int hwidth, uint8_t *srcY, uint8_t *srcU, uint8_t *srcV,
+                              uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, int jj,
+                              int width, float *cos_lut, float *sin_lut) {
 
     float adif = theta - angle;
-
-    if (adif < 0.0) adif += TWO_PI;
-    if (adif >= TWO_PI) adif -= TWO_PI;
-
-    theta -= angle;
-
-    if (theta < 0.0) theta += TWO_PI;
-    if (theta >= TWO_PI) theta -= TWO_PI;
+    if (adif < 0.0f) adif += TWO_PI;
+    else if (adif >= TWO_PI) adif -= TWO_PI;
 
     float stheta = (adif < ONE_PI3) ? theta :
                    (adif < TWO_PI3) ? TWO_PI3 - theta :
@@ -274,13 +286,17 @@ static inline void put_pixel1(float angle, float theta, float r, int hheight,
 
     stheta += angle;
 
-    const int lut_pos = (int) (stheta * LUT_DIVISOR) % LUT_SIZE;
-    const int sx = r * cos_lut[ lut_pos ] + 0.5;
-    const int sy = r * sin_lut[ lut_pos ] + 0.5;
+    int sx = (int)(r * cos_lut[(int)(stheta * LUT_DIVISOR) % LUT_SIZE] + 0.5f);
+    int sy = (int)(r * sin_lut[(int)(stheta * LUT_DIVISOR) % LUT_SIZE] + 0.5f);
 
-    const int src_index = sx + sy * width; // here, lets add
-    if (sy < -hheight || sy >= hheight || sx < -hwidth || sx >= hwidth)
+    if (sx < -hwidth || sx >= hwidth || sy < -hheight || sy >= hheight) {
+        dstY[jj] = pixel_Y_lo_;
+        dstU[jj] = 128;
+        dstV[jj] = 128;
         return;
+    }
+
+    int src_index = sx + sy * width;
 
     dstY[jj] = srcY[src_index];
     dstU[jj] = srcU[src_index];
@@ -288,18 +304,17 @@ static inline void put_pixel1(float angle, float theta, float r, int hheight,
 }
 
 static inline void put_pixel2(float angle, float theta, float r, int hheight,
-                     int hwidth, uint8_t *srcY, uint8_t *srcU, uint8_t *srcV, uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, int jj, int width, float *cos_lut, float *sin_lut) {
-    // dest point is at i,j; r tells us which point to copy, and theta related to angle gives us the transform
+                              int hwidth, uint8_t *srcY, uint8_t *srcU, uint8_t *srcV,
+                              uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, int jj,
+                              int width, float *cos_lut, float *sin_lut) {
 
     float adif = theta - angle;
-
-    if (adif < 0.0) adif += TWO_PI;
-    if (adif >= TWO_PI) adif -= TWO_PI;
+    if (adif < 0.0f) adif += TWO_PI;
+    else if (adif >= TWO_PI) adif -= TWO_PI;
 
     theta -= angle;
-
-    if (theta < 0.0) theta += TWO_PI;
-    if (theta >= TWO_PI) theta -= TWO_PI;
+    if (theta < 0.0f) theta += TWO_PI;
+    else if (theta >= TWO_PI) theta -= TWO_PI;
 
     float stheta = (adif < ONE_PI3) ? theta :
                    (adif < TWO_PI3) ? TWO_PI3 - theta :
@@ -310,34 +325,23 @@ static inline void put_pixel2(float angle, float theta, float r, int hheight,
 
     stheta += angle;
 
-    const int lut_pos = (int) (stheta * LUT_DIVISOR) % LUT_SIZE;
-    const int sx = r * cos_lut[ lut_pos ] + 0.5;
-    const int sy = r * sin_lut[ lut_pos ] + 0.5;
+    int sx = (int)(r * cos_lut[(int)(stheta * LUT_DIVISOR) % LUT_SIZE] + 0.5f);
+    int sy = (int)(r * sin_lut[(int)(stheta * LUT_DIVISOR) % LUT_SIZE] + 0.5f);
 
-    const int src_index = sx - sy * width; // original function, subtract
-
-    if (sy < -hheight || sy >= hheight || sx < -hwidth || sx >= hwidth)
-    {
-            return;
+    if (sx < -hwidth || sx >= hwidth || sy < -hheight || sy >= hheight) {
+        dstY[jj] = pixel_Y_lo_;
+        dstU[jj] = 128;
+        dstV[jj] = 128;
+        return;
     }
+
+    int src_index = sx - sy * width;
+
     dstY[jj] = srcY[src_index];
     dstU[jj] = srcU[src_index];
     dstV[jj] = srcV[src_index];
 }
 
-
-
-static inline float atan2_approx1(float y, float x) {
-    float fabs_y = y * (y < 0.0f ? -1.0f : 1.0f);
-    float r = (x < 0.0f) ? (x + fabs_y) / (fabs_y - x) : (x - fabs_y) / (x + fabs_y);
-    float angle = (x < 0.0f) ? THRQTR_PI : ONEQTR_PI;
-    angle += (0.1963f * r * r - 0.9817f) * r;
-    return (y < 0.0f) ? -angle : angle;
-}
-
-static inline float sqrt_approx(float x) {
-    return __builtin_sqrtf(x);
-}
 
 void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
     hexmirror_t *s = (hexmirror_t*)ptr;
@@ -363,8 +367,9 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
     float *restrict atan_lut = s->atan_lut;
 
     float theta, r, delta, last_theta = 0., last_r = 0.;
-    float x, y, a, b, last_x = 0., last_y = 0.;
+    float x, y, a, b;
     float side, fi, fj;
+    int last_ix = -9999, last_iy = -9999;
 
     float ifac = args[0] * 0.01f; // Zoom
     float sfac = log(ifac) / 2.0f; // Size (log)
@@ -408,7 +413,7 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
     side = ( width < height ? centerX / RT32 : centerY );
 
     xangle += (float)angleoffs / 360. * TWO_PI;
-    xangle = ( xangle >= TWO_PI ? xangle -= TWO_PI : xangle );
+    xangle = ( xangle >= TWO_PI ? ( xangle - TWO_PI ) : xangle );
 
     side *= sfac;
     
@@ -455,16 +460,19 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
 
                 // the hexes turn as they orbit, so calculating the angle to the center, we add the
                 // rotation amount to get the final mapping
-                if (x == last_x && y == last_y) {
+                int ix = (int)(x + 0.5f);
+                int iy = (int)(y + 0.5f);
+
+                if (ix == last_ix && iy == last_iy) {
                     theta = last_theta;
                     r = last_r;
-                }
-                else {
-                    last_x = x;
-                    last_y = y;
+                } else {
+                    last_ix = ix;
+                    last_iy = iy;
                     last_theta = theta = atan2_approx1(y, x);
                     last_r = r = sqrt_approx(x * x + y * y);
                 }
+
 
                 rotate(r, theta, delta + rotationSpeed, &a, &b, cos_lut, sin_lut);
 
