@@ -54,9 +54,9 @@ typedef UINT32 uint32_t;
 /* Intrinsic declarations */
 #if defined(HAVE_ASM_SSE2) || defined(HAVE_ASM_MMX)
 #if defined(HAVE_ASM_SSE2)
-#include <emmintrin.h>
+#include <immintrin.h>
 #elif defined(HAVE_ASM_MMX)
-#include <mmintrin.h>
+#include <mimintrin.h>
 #endif
 #if defined(__GNUC__)
 #include <mm_malloc.h>
@@ -80,13 +80,8 @@ typedef UINT32 uint32_t;
 #define align(x)
 #endif
 
-#ifndef MIN
-#define MIN(a,b) ((a) > (b) ? (b) : (a))
-#endif
-
-#ifndef MAX
-#define MAX(a,b) ((a) < (b) ? (b) : (a))
-#endif
+static inline int imin(int a, int b) { return a < b ? a : b; }
+static inline int imax(int a, int b) { return a > b ? a : b; }
 
 #include <ctmf/ctmf.h>
 
@@ -186,17 +181,30 @@ static inline void histogram_sub( const uint16_t x[16], uint16_t y[16] )
 }
 #endif
 
-static inline void histogram_muladd( const uint16_t a, const uint16_t x[16],
-        uint16_t y[16] )
+static inline void histogram_muladd(
+    const uint16_t *restrict x,
+    uint16_t *restrict y,
+    int k)
 {
-    int i;
-    for ( i = 0; i < 16; ++i ) {
-        y[i] += a * x[i];
+    if (k <= 0) return;
+
+    if (__builtin_expect(k > 2, 1)) {
+        for (int i = 0; i < 16; i++) {
+            y[i] += (uint16_t)(k * x[i]);
+        }
+    } else if (k == 1) {
+        for (int i = 0; i < 16; i++) {
+            y[i] += x[i];
+        }
+    } else { /* k == 2 */
+        for (int i = 0; i < 16; i++) {
+            y[i] += x[i] << 1;
+        }
     }
 }
 
 static void ctmf_helper(
-        const unsigned char* const src, unsigned char* const dst,
+        const unsigned char* restrict src, unsigned char* restrict dst,
         const int width, const int height,
         const int src_step, const int dst_step,
         const int r, const int cn,
@@ -247,7 +255,7 @@ static void ctmf_helper(
     for ( i = 0; i < m; ++i ) {
 
         /* Update column histograms for entire row. */
-        p = src + src_step * MAX( 0, i-r-1 );
+        p = src + src_step * imax( 0, i-r-1 );
         q = p + cn * n;
         for ( j = 0; p != q; ++j ) {
             for ( c = 0; c < cn; ++c, ++p ) {
@@ -255,7 +263,7 @@ static void ctmf_helper(
             }
         }
 
-        p = src + src_step * MIN( m-1, i+r );
+        p = src + src_step * imin( m-1, i+r );
         q = p + cn * n;
         for ( j = 0; p != q; ++j ) {
             for ( c = 0; c < cn; ++c, ++p ) {
@@ -268,7 +276,7 @@ static void ctmf_helper(
         memset( luc, 0, cn*sizeof(luc[0]) );
         if ( pad_left ) {
             for ( c = 0; c < cn; ++c ) {
-                histogram_muladd( r, &h_coarse[16*n*c], H[c].coarse );
+                histogram_muladd( &h_coarse[16*n*c], H[c].coarse, r );
             }
         }
         for ( j = 0; j < (pad_left ? r : 2*r); ++j ) {
@@ -278,22 +286,25 @@ static void ctmf_helper(
         }
         for ( c = 0; c < cn; ++c ) {
             for ( k = 0; k < 16; ++k ) {
-                histogram_muladd( 2*r+1, &h_fine[16*n*(16*c+k)], &H[c].fine[k][0] );
+                histogram_muladd(
+                    &h_fine[16*n*(16*c+k)],
+                    &H[c].fine[k][0],
+                    2*r+1 );
             }
         }
 
         for ( j = pad_left ? 0 : r; j < (pad_right ? n : n-r); ++j ) {
             for ( c = 0; c < cn; ++c ) {
-                const uint16_t t = 2*r*r + 2*r;
+                const uint16_t t = (uint16_t)(2*r*(r+1));
                 uint16_t sum = 0, *segment;
                 int b;
 
-                histogram_add( &h_coarse[16*(n*c + MIN(j+r,n-1))], H[c].coarse );
+                histogram_add( &h_coarse[16*(n*c + imin(j+r,n-1))], H[c].coarse );
 
                 /* Find median at coarse level */
                 for ( k = 0; k < 16 ; ++k ) {
                     sum += H[c].coarse[k];
-                    if ( sum > t ) {
+                    if (__builtin_expect(sum > t, 0)) {
                         sum -= H[c].coarse[k];
                         break;
                     }
@@ -303,23 +314,31 @@ static void ctmf_helper(
 
                 /* Update corresponding histogram segment */
                 if ( luc[c][k] <= j-r ) {
-                    memset( &H[c].fine[k], 0, 16 * sizeof(uint16_t) );
-                    for ( luc[c][k] = j-r; luc[c][k] < MIN(j+r+1,n); ++luc[c][k] ) {
+                    //memset( &H[c].fine[k], 0, 16 * sizeof(uint16_t) );
+                    uint16_t *f = H[c].fine[k];
+                    #pragma GCC unroll 16
+                    for (int z = 0; z < 16; z++) f[z] = 0;
+
+                    for ( luc[c][k] = j-r; luc[c][k] < imin(j+r+1,n); ++luc[c][k] ) {
                         histogram_add( &h_fine[16*(n*(16*c+k)+luc[c][k])], H[c].fine[k] );
                     }
                     if ( luc[c][k] < j+r+1 ) {
-                        histogram_muladd( j+r+1 - n, &h_fine[16*(n*(16*c+k)+(n-1))], &H[c].fine[k][0] );
+                        histogram_muladd(
+                            &h_fine[16*(n*(16*c+k)+(n-1))],
+                            &H[c].fine[k][0],
+                            j + r + 1 - n
+                        );
                         luc[c][k] = j+r+1;
                     }
                 }
                 else {
                     for ( ; luc[c][k] < j+r+1; ++luc[c][k] ) {
-                        histogram_sub( &h_fine[16*(n*(16*c+k)+MAX(luc[c][k]-2*r-1,0))], H[c].fine[k] );
-                        histogram_add( &h_fine[16*(n*(16*c+k)+MIN(luc[c][k],n-1))], H[c].fine[k] );
+                        histogram_sub( &h_fine[16*(n*(16*c+k)+imax(luc[c][k]-2*r-1,0))], H[c].fine[k] );
+                        histogram_add( &h_fine[16*(n*(16*c+k)+imin(luc[c][k],n-1))], H[c].fine[k] );
                     }
                 }
 
-                histogram_sub( &h_coarse[16*(n*c+MAX(j-r,0))], H[c].coarse );
+                histogram_sub( &h_coarse[16*(n*c+imax(j-r,0))], H[c].coarse );
 
                 /* Find median in segment */
                 segment = H[c].fine[k];
@@ -335,8 +354,10 @@ static void ctmf_helper(
         }
     }
 
-#if defined(HAVE_ASM_SSE2) || defined(HAVE_ASM_MMX)
+#if defined(HAVE_ASM_MMX)
     _mm_empty();
+#endif
+#if defined(HAVE_ASM_SSE2)
     _mm_free(h_coarse);
     _mm_free(h_fine);
 #else
@@ -376,7 +397,7 @@ static void ctmf_helper(
  *                      2*r+1 square.
  * \param cn            Number of channels. For example, a grayscale image would
  *                      have cn=1 while an RGB image would have cn=3.
- * \param memsize       Maximum amount of memory to use, in bytes. Set this to
+ * \param memsize       imaximum amount of memory to use, in bytes. Set this to
  *                      the size of the L2 cache, then vary it slightly and
  *                      measure the processing time to find the optimal value.
  *                      For example, a 512 kB L2 cache would have
@@ -401,8 +422,8 @@ void ctmf(
      * row's histograms. If there are too many histograms to fit in the cache,
      * thrashing to RAM happens.
      *
-     * To solve this problem, I figure out the maximum number of histograms
-     * that can fit in cache. From this is determined the number of stripes in
+     * To solve this problem, I figure out the imaximum number of histograms
+     * that can fit in cache. From this is deterimined the number of stripes in
      * an image. The formulas below make the stripes all the same size and use
      * as few stripes as possible.
      *
