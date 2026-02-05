@@ -2188,139 +2188,112 @@ char	*vevo_sprintf_property_value( vevo_port_t *port, const char *key)
 
 #define PROP_MAX_LEN 1024
 #define PROP_ARG_LEN 256
-char  *vevo_sprintf_property( vevo_port_t *port, const char *key  )
-{
-	char *format = vevo_format_property( port, key );
-	if( format == NULL )
-		return NULL;
-	char *res = (char*) calloc( 1, sizeof(char) * PROP_MAX_LEN );
-	int  n_elems = 0;
+char *vevo_sprintf_property(vevo_port_t *port, const char *key) {
+    char *format = vevo_format_property(port, key);
+    if (!format) return NULL;
 
-	int32_t i32_val = 0;
-	uint64_t i64_val = 0;
-	double dbl_val = 0.0;
-	char	*str_val = NULL;	
-	int	error = 0;
-	int 	nerr  = 0;
-	int	size = PROP_MAX_LEN;	
+    char *res = (char *)calloc(1, PROP_MAX_LEN);
+    if (!res) {
+        free(format);
+        return NULL;
+    }
 
-	void	*vport = NULL;
-	char tmp[PROP_MAX_LEN];
+    size_t offset = 0;
+    int n_elems = 0;
+    int nerr = 0;
 
-	snprintf(res, PROP_MAX_LEN, "%s=", key );
-	
-	while( format[n_elems] && nerr == 0)
-	{
-		veejay_memset(tmp,0,sizeof(tmp));
-		switch(format[n_elems])
-		{
-			case 'd':
-				error = vevo_property_get(port,key,n_elems,&i32_val);
-				if( error == VEVO_NO_ERROR ) {
-					sprintf(tmp, "%d:", i32_val );
-				} else if (error == VEVO_ERROR_PROPERTY_EMPTY ) {
-					tmp[0] = ':';
-				} else
-					nerr ++;
-				break;
-			case 'D':
-				error = vevo_property_get(port,key,n_elems,&i64_val);
-				if( error == VEVO_NO_ERROR ) {
-					sprintf(tmp, "%" PRId64 ":", i64_val );
-				} else if( error == VEVO_ERROR_PROPERTY_EMPTY ) {
-					tmp[0] = ':';
-				} else
-					nerr ++;
-				break;
-			case 'g':
-				error = vevo_property_get(port,key,n_elems,&dbl_val);
-				if( error == VEVO_NO_ERROR ) {
-					sprintf(tmp, "%g:", dbl_val );
-				} else if ( error == VEVO_ERROR_PROPERTY_EMPTY ) {
-					tmp[0] = ':';
-				} else
-					nerr ++;
-				break;
-			case 's':
-			case 'S':
-				str_val = vevo_property_get_str( port, key );
-				if(str_val)
-				{
-					tmp[0] = '\"';
-					strncat(tmp+1,str_val,250);
-					int n = strlen(tmp);
-					tmp[n] = '\"';
-					tmp[n+1] = ':';
-				}
-				else
-				{
-					tmp[0] = '\"';
-					tmp[1] = '\"';
-					tmp[2] = ':';
-				}
-				str_val = NULL;
-				break;
-			case 'x':
-				break;
-			case 'p':
-				{
-					int num = 0;
-					if(n_elems == 0 )
-					{
-						error = vevo_property_get(port,key,0,&vport );
-						if(error == VEVO_NO_ERROR )
-						num  = vevo_num_properties(vport);
-					}
-
-					if( num > 0 )
-					{
-						char **pstr = vevo_sprintf_port( vport );
-						if(pstr)
-						{
-							int k;
-
-							sprintf(tmp, "[%s",key);	
-							
-						    for( k = 0; pstr[k] != NULL; k ++ )
-						    {
-							    size_t space_left = sizeof(tmp) - strlen(tmp) - 1;
-							    if(space_left == 0)
-								break;
-							    strncat(tmp, pstr[k], space_left);
-							    free(pstr[k]);
-						    }
-							free(pstr);
-
-							int n = strlen(tmp);
-							tmp[n] =']';
-							tmp[n+1] = ':';
-						}
-					}
-				}
-				break;
-		}
-		n_elems++;
-		
-		if( nerr )
-			break;
-
-		size -= strlen(tmp);
-		if(size > 0)		
-			strcat(res, tmp  );
-		else
-			nerr++;
+    int written = snprintf(res + offset, PROP_MAX_LEN - offset, "%s=", key);
+    if (written > 0 && (size_t)written < (PROP_MAX_LEN - offset)) {
+        offset += written;
+    } else {
+        nerr++; 
 	}
 
-	if( nerr )
-	{
-		if( res ) free(res);
-		res = NULL;
-	}
+    while (format[n_elems] && nerr == 0) {
+        size_t remaining = PROP_MAX_LEN - offset;
+        if (remaining <= 1) { nerr++; break; }
 
-	free(format);
+        int step = 0;
+        switch (format[n_elems]) {
+            case 'd': {
+                int32_t i32_val = 0;
+                int error = vevo_property_get(port, key, n_elems, &i32_val);
+                if (error == VEVO_NO_ERROR)
+                    step = snprintf(res + offset, remaining, "%d:", i32_val);
+                else if (error == VEVO_ERROR_PROPERTY_EMPTY)
+                    step = snprintf(res + offset, remaining, ":");
+                else nerr++;
+                break;
+            }
+            case 'D': {
+                uint64_t i64_val = 0;
+                int error = vevo_property_get(port, key, n_elems, &i64_val);
+                if (error == VEVO_NO_ERROR)
+                    step = snprintf(res + offset, remaining, "%" PRId64 ":", i64_val);
+                else if (error == VEVO_ERROR_PROPERTY_EMPTY)
+                    step = snprintf(res + offset, remaining, ":");
+                else nerr++;
+                break;
+            }
+            case 'g': {
+                double dbl_val = 0.0;
+                int error = vevo_property_get(port, key, n_elems, &dbl_val);
+                if (error == VEVO_NO_ERROR)
+                    step = snprintf(res + offset, remaining, "%g:", dbl_val);
+                else if (error == VEVO_ERROR_PROPERTY_EMPTY)
+                    step = snprintf(res + offset, remaining, ":");
+                else nerr++;
+                break;
+            }
+            case 's':
+            case 'S': {
+                char *str_val = vevo_property_get_str(port, key);
+                step = snprintf(res + offset, remaining, "\"%s\":", str_val ? str_val : "");
+                free(str_val);
+                break;
+            }
+            case 'p': {
+                void *vport = NULL;
+                if (n_elems == 0 && vevo_property_get(port, key, 0, &vport) == VEVO_NO_ERROR) {
+                    char **pstr = vevo_sprintf_port(vport);
+                    if (pstr) {
+                        step = snprintf(res + offset, remaining, "[%s", key);
+                        if (step > 0 && (size_t)step < remaining) {
+                            offset += step;
+                            for (int k = 0; pstr[k] != NULL; k++) {
+                                remaining = PROP_MAX_LEN - offset;
+                                step = snprintf(res + offset, remaining, "%s", pstr[k]);
+                                if (step > 0 && (size_t)step < remaining) offset += step;
+                                free(pstr[k]);
+                            }
+                            remaining = PROP_MAX_LEN - offset;
+                            step = snprintf(res + offset, remaining, "]:");
+                        }
+                        free(pstr);
+                    }
+                }
+                break;
+            }
+        }
 
-	return res;
+        if (step > 0 && (size_t)step < remaining) {
+            offset += step;
+        } else if (step >= (int)remaining) {
+            nerr++;
+        }
+
+        n_elems++;
+    }
+
+    free(format);
+    if (nerr) {
+        free(res);
+        return NULL;
+    }
+    return res;
 }
+
+
 int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key, int n_elem, int type)
 {
 	int done = 0;
