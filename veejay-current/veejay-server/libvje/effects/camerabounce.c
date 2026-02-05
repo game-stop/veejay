@@ -111,16 +111,14 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args) {
         else {
             interpolationFactor = (double)( zoomDuration - currentFrame)  / (zoomDuration/2);
         }
-    }
-    else {
-        // Nothing to do!
+    } else {
         return;
     }
 
     zoomFactor = 1.0 + interpolationFactor * ( zoomFactor - 1.0 );  
+    const double invZoomFactor = 1.0 / zoomFactor;
 
     const double blurAmount = (args[2] / 100.0f);
-
     const int width = frame->width;
     const int height = frame->height;
 
@@ -138,74 +136,71 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args) {
     uint8_t *restrict bU = c->blurred[1];
     uint8_t *restrict bV = c->blurred[2];
 
-
-    int newX, newY;
-
-    // Zoom
     for (int y = 0; y < height; ++y) {
-        newY = (int)(y - offsetY) / zoomFactor;
+        int newY = (int)((y - offsetY) * invZoomFactor);
         newY = (newY < 0) ? 0 : ((newY > height - 1) ? height - 1 : newY);
 
-        for (int x = 0; x < width; ++x) {
-                newX = (int)(x - offsetX) / zoomFactor;
-                newX = (newX < 0) ? 0 : ((newX > width - 1) ? width - 1 : newX);
+        uint8_t *dstRowY = bY + y * width;
+        uint8_t *dstRowU = bU + y * width;
+        uint8_t *dstRowV = bV + y * width;
+        uint8_t *srcRowY = srcY + newY * width;
+        uint8_t *srcRowU = srcU + newY * width;
+        uint8_t *srcRowV = srcV + newY * width;
 
-                int srcIndex = newY * width + newX;
-                int dstIndex = y * width + x;
-                
-                bY[dstIndex] = srcY[srcIndex];
-                bU[dstIndex] = srcU[srcIndex];
-                bV[dstIndex] = srcV[srcIndex];
-            }
+        for (int x = 0; x < width; ++x) {
+            int newX = (int)((x - offsetX) * invZoomFactor);
+            newX = (newX < 0) ? 0 : ((newX > width - 1) ? width - 1 : newX);
+
+            dstRowY[x] = srcRowY[newX];
+            dstRowU[x] = srcRowU[newX];
+            dstRowV[x] = srcRowV[newX];
+        }
     }
 
-    const float maxDistanceSquared = pow( width / 2 , 2 ) + pow( height / 2, 2 );
+    const int halfWidth = width >> 1;
+    const int halfHeight = height >> 1;
+    const int maxDistanceSquared = halfWidth*halfWidth + halfHeight*halfHeight;
 
-
-    // Blur, more towards the edges and less towards the centre
     for (int y = 0; y < height; ++y) {
-		int distanceY = ( height >> 1 ) - y;
+        int distanceY = halfHeight - y;
+        int bpos = y * width;
+
         for (int x = 0; x < width; ++x) {
-
-            int distanceX = ( width >> 1 ) - x;
-
+            int distanceX = halfWidth - x;
             int distanceSquared = distanceX * distanceX + distanceY * distanceY;
 
-            if( distanceSquared <= maxDistanceSquared ) {
-                
+            if (distanceSquared <= maxDistanceSquared) {
                 float normalizedDistance = (float) distanceSquared / maxDistanceSquared;
                 normalizedDistance = normalizedDistance * normalizedDistance;
                 normalizedDistance *= 100.0f;
 
                 float blurStrength = blurAmount * normalizedDistance;
-                blurStrength = ( blurStrength > 6.0f ? 6.0f: blurStrength );
+                if (blurStrength > 6.0f) blurStrength = 6.0f;
 
-                const int minX = MAX(0, x - blurStrength);
-                const int minY = MAX(0, y - blurStrength);
-                const int maxX = MIN(width - 1, x + blurStrength);
-                const int maxY = MIN(height - 1, y + blurStrength);
+                int minX = (x - blurStrength > 0) ? x - blurStrength : 0;
+                int minY = (y - blurStrength > 0) ? y - blurStrength : 0;
+                int maxX = (x + blurStrength < width - 1) ? x + blurStrength : width - 1;
+                int maxY = (y + blurStrength < height - 1) ? y + blurStrength : height - 1;
 
-                int tmpY = 0; int tmpU = 0; int tmpV = 0; uint16_t totalPixels = 0;
+                int tmpY = 0, tmpU = 0, tmpV = 0;
+                uint16_t totalPixels = 0;
 
-#pragma omp simd
                 for (int blurY = minY; blurY <= maxY; ++blurY) {
-					int bpos = blurY * width;
-  					for (int blurX = minX; blurX <= maxX; ++blurX) {
-                        int blurIndex = bpos + blurX;
-                        tmpY += bY[blurIndex];
-                        tmpU += (bU[blurIndex] - 128);
-                        tmpV += (bV[blurIndex] - 128);
+                    int rowPos = blurY * width;
+                    for (int blurX = minX; blurX <= maxX; ++blurX) {
+                        int idx = rowPos + blurX;
+                        tmpY += bY[idx];
+                        tmpU += (bU[idx] - 128);
+                        tmpV += (bV[idx] - 128);
                         totalPixels++;
                     }
                 }
 
-                const int dstIndex = y * width + x;
+                int dstIndex = bpos + x;
                 srcY[dstIndex] = tmpY / totalPixels;
                 srcU[dstIndex] = 128 + (tmpU / totalPixels);
                 srcV[dstIndex] = 128 + (tmpV / totalPixels);
             }
         }
-    } 
-
+    }
 }
-
