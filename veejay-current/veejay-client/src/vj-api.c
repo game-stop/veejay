@@ -6560,7 +6560,7 @@ static void reload_vimslist()
             veejay_msg(0,"Expected exactly 4 tokens: [%s]", line);
         }
 
-        if( val[0] < 0 || val[0] > 1024 ) {
+        if( val[0] < 0 || val[0] > VIMS_MAX ) {
             veejay_msg(0,"Invalid ID at position %d", offset );
         }
 
