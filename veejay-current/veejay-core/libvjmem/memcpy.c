@@ -2604,6 +2604,14 @@ set_best_memcpy_method:
 	veejay_msg(VEEJAY_MSG_WARNING, "export VEEJAY_MEMCPY_METHOD=\"%s\"", memcpy_method[best].name );
 }
 
+static volatile unsigned char sink;
+
+static inline void consume_buffer(const unsigned char *buf, size_t n)
+{
+    for (size_t i = 0; i < n; i += 4096)
+        sink ^= buf[i];
+}
+
 void find_best_memset()
 {
 	int best = set_user_selected_memset();
@@ -2629,6 +2637,9 @@ void find_best_memset()
 
 	memset( buf1, 0, bufsize * sizeof(char));
 	memset( buf2, 0, bufsize * sizeof(char));
+
+	consume_buffer((unsigned char *)buf1, bufsize);
+	consume_buffer((unsigned char *)buf2, bufsize);
 
 	for (i=1; memset_method[i].name != NULL; i++)
 	{
@@ -2949,6 +2960,9 @@ static void benchmark_tasks(unsigned int n_tasks, long n_frames, int w, int h)
 
 	memset( src, 16, sizeof(uint8_t) * total );
 	memset( dst, 240, sizeof(uint8_t) * total );
+
+  consume_buffer(src, total);
+	consume_buffer(dst, total);
 
 	run_benchmark_test( n_tasks, benchmark_single_copy, "single-threaded memory copy", n_frames, dest, source, planes );
 	run_benchmark_test( n_tasks, benchmark_single_slow, "single-threaded slow frame", n_frames, dest, source, planes );
