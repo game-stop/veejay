@@ -248,6 +248,8 @@ have_asm_sse=false
 have_asm_sse2=false
 have_asm_mmx2=false
 have_asm_3dnow=false
+have_asm_avx=false
+have_asm_avx2=false
 have_cmov=false
 have_x86cpu=false
 have_x86_64cpu=false
@@ -595,6 +597,20 @@ then
 	if test $ac_cv_flag_avx = yes; then
 		AC_DEFINE(HAVE_ASM_AVX,1,[Compiling in AVX])
 		have_asm_avx=true
+	fi
+
+	dnl check for AVX2
+	AC_CACHE_CHECK([for AVX2 on processor(s)], [ac_cv_flag_avx2], [
+	    if grep "^flags.* avx2" /proc/cpuinfo > /dev/null; then
+	        ac_cv_flag_avx2=yes
+	    else
+	        ac_cv_flag_avx2=no
+	    fi
+	])
+
+	if test "$ac_cv_flag_avx2" = yes; then
+				AC_DEFINE([HAVE_ASM_AVX2], [1], [Compiling with AVX2 support])
+				have_asm_avx2=true
 	fi
 
 fi
@@ -1227,6 +1243,7 @@ AC_MSG_NOTICE([    SSE4_1  enabled     : ${ac_cv_flag_sse4_1}])
 AC_MSG_NOTICE([    3DNOW   enabled     : ${ac_cv_flag_3dnow}])
 AC_MSG_NOTICE([    CMOV    enabled     : ${ac_cv_flag_cmov}])
 AC_MSG_NOTICE([    AVX     enabled     : ${ac_cv_flag_avx}])
+AC_MSG_NOTICE([    AVX2    enabled     : ${ac_cv_flag_avx2}])
 fi
 
 if test "$have_ppccpu" = "true" ; then
