@@ -1,5 +1,5 @@
 /*
-Copyright © 1998. The Regents of the University of California (Regents). 
+Copyright (C) 1998. The Regents of the University of California (Regents).
 All Rights Reserved.
 
 Written by Matt Wright, The Center for New Music and Audio Technologies,
@@ -225,12 +225,11 @@ static OSCMethod AllocMethod(void) {
 /**************************** Containers  ****************************/    
 
 /* Managing the tree of containers and subcontainers, with aliases */
-
+#define MAX_CHILDREN_ARRAY 32
 void AddSubContainer(OSCcontainer parent, OSCcontainer child, Name name) {
-    if (parent->numChildren >= MAX_CHILDREN_PER_CONTAINER) {
-	fatal_error("AddSubContainer: exceeded MAX_CHILDREN_PER_CONTAINER (%d)\n"
-		    "Increase the value in OSC-address-space.c and recompile.",
-		    MAX_CHILDREN_PER_CONTAINER);
+    if (parent->numChildren >= MAX_CHILDREN_PER_CONTAINER || parent->numChildren >= MAX_CHILDREN_ARRAY) {
+        fatal_error("AddSubContainer: exceeded limits (array size %d, configured MAX_CHILDREN_PER_CONTAINER %d)\n",
+                    MAX_CHILDREN_ARRAY, MAX_CHILDREN_PER_CONTAINER);
     }
 
     parent->childrenNames[parent->numChildren] = name;
@@ -362,30 +361,53 @@ Boolean OSCGetAddressString(char *target, int maxLength, OSCcontainer c) {
 }
 
 static int gasHelp(char *target, int maxLength, OSCcontainer c) {
-    int sublength, length;
-    const char *myName;
-
-/*     printf("*** gasHelp %s %d %p %s\n", target, maxLength, c, c->name); */
-
     if (c == OSCTopLevelContainer) {
-	target[0] = '/';
-	target[1] = '\0';
-	return 1;
+        if (maxLength > 1) {
+            target[0] = '/';
+            target[1] = '\0';
+        } else if (maxLength > 0) {
+            target[0] = '\0';
+        }
+        return 1;
     }
 
-    myName = ContainerName(c);
-    sublength = gasHelp(target, maxLength, c->parent);
-    length = sublength + strlen(myName) + 1;  /* +1 is for trailing slash */
-    if (length > maxLength) {
-	return length;
-    }
-    
-    strcpy(target+sublength, myName);
-    target[length-1] = '/';
-    target[length] = '\0';
+    const char *myName = ContainerName(c);
+    int nameLen = strlen(myName);
 
-    return length;
+    int sublength = gasHelp(target, maxLength, c->parent);
+
+    int totalLength = sublength + nameLen + 1;// +1 for trailing slash
+
+    if (sublength >= maxLength) {
+        // parent already overflowed buffer
+        return totalLength;
+    }
+
+    // compute how much we can safely copy
+    int copyLen = nameLen;
+    if (sublength + copyLen + 1 >= maxLength) {
+        copyLen = maxLength - sublength - 1;// leave room for slash or null
+        if (copyLen < 0) copyLen = 0;
+    }
+
+    if (copyLen > 0) {
+        memcpy(target + sublength, myName, copyLen);
+    }
+
+    // add trailing slash if it fits
+    if (sublength + copyLen < maxLength) {
+        target[sublength + copyLen] = '/';
+    }
+
+    if (sublength + copyLen + 1 < maxLength) {
+        target[sublength + copyLen + 1] = '\0';
+    } else if (maxLength > 0) {
+        target[maxLength - 1] = '\0';
+    }
+
+    return totalLength;
 }
+
 
 
 /**************************** Methods  ****************************/
