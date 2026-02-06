@@ -156,27 +156,40 @@ static void reconnect(void)
     }
 }
 
-static int vjsend(int cmd, unsigned char *buf) {
-    if (!sayvims) return 0;
+static int vjsend(int cmd, unsigned char *buf, size_t buflen)
+{
+    if (!sayvims || !buf || buflen == 0)
+        return 0;
 
-    if (!sayvims->mcast && vj_client_poll(sayvims, V_CMD) && vj_client_link_can_read(sayvims, V_CMD)) {
+    if (!sayvims->mcast &&
+        vj_client_poll(sayvims, V_CMD) &&
+        vj_client_link_can_read(sayvims, V_CMD)) {
+
         unsigned char dummy[1];
         if (vj_client_read(sayvims, V_CMD, dummy, 1) <= 0)
             reconnect();
     }
 
-    size_t index = strcspn((char*)buf, "\n\r");
-    buf[index] = '\0';
-    if (buf[0] == '\0') return 0;
+    /* find end-of-line safely */
+    size_t index = strcspn((char *)buf, "\n\r");
+    if (index >= buflen)
+        return 0;
 
-    if (send_full(sayvims, cmd, buf, strlen((char*)buf)) <= 0) {
+    buf[index] = '\0';
+    if (index == 0)
+        return 0;
+
+    if (send_full(sayvims, cmd, buf, (int)index) <= 0) {
         fprintf(stderr, "Unable to send message '%s'\n", buf);
         return 0;
     }
 
-    if (verbose) fprintf(stdout, "%s\n", buf);
+    if (verbose)
+        fprintf(stdout, "%s\n", buf);
+
     return 1;
 }
+
 
 static int vimsReplyLength(int vims_id)
 {
@@ -421,8 +434,9 @@ static int processLine(FILE *infile, FILE *outfile, char *tmp, size_t len)
         int vims_id = 0;
         int mustRead = vimsMustReadReply(tmp, &vims_id);
 
-        if (vjsend(V_CMD, (unsigned char *)tmp) == 0)
+        if (vjsend(V_CMD, (unsigned char *)tmp, len) == 0)
             return 0;
+
 
         if (mustRead) {
             if (vims_id == VIMS_GET_SHM) {
@@ -563,7 +577,8 @@ int main(int argc, char *argv[])
 
     if(single_msg)  /* single message send */
     {
-        ret = vjsend( V_CMD, (unsigned char*)msg );
+        ret = vjsend( V_CMD, (unsigned char*)msg, strlen(msg) + 1 );
+
         free(msg);
     }
     else
