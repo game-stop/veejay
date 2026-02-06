@@ -457,9 +457,13 @@ static int processLine(FILE *infile, FILE *outfile, char *tmp, size_t len)
 #ifdef BASE64_AVUTIL
                             int b64len = AV_BASE64_SIZE(dataLength);
                             char *out = (char *) vj_calloc(b64len);
+                            if (!out) return;
+
                             char *b64str = av_base64_encode(out, b64len, data, dataLength);
-                            if (b64str != NULL)
-                                fwrite(b64str, sizeof(char), strlen(b64str), outfile);
+                            if (b64str && b64len > 0) {
+                                size_t writeLen = strnlen(b64str, b64len);
+                                fwrite(b64str, sizeof(char), writeLen, outfile);
+                            }
                             free(out);
 #else
                             fwrite(data, sizeof(char), dataLength, outfile);
@@ -534,7 +538,7 @@ int main(int argc, char *argv[])
     // parse commandline parameters
     while( ( n = getopt(argc,argv, "h:g:p:f:m:idbv?")) != EOF)
     {
-        sprintf(option,"%c",n);
+        snprintf(option, sizeof(option), "%c", n);
         err += set_option( option,optarg);
     }
 
@@ -577,9 +581,12 @@ int main(int argc, char *argv[])
 
     if(single_msg)  /* single message send */
     {
-        ret = vjsend( V_CMD, (unsigned char*)msg, strlen(msg) + 1 );
-
-        free(msg);
+        if (msg) {
+            ret = vjsend(V_CMD, (unsigned char*)msg, strlen(msg) + 1);
+            free(msg);
+        } else {
+            ret = -1;
+        }
     }
     else
     {
