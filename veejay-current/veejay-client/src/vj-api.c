@@ -6526,6 +6526,7 @@ static void reload_bundles()
     free( eltext );
 }
 
+#define VJ_EVENT_LIST_SIZE 602
 static void reload_vimslist()
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_vims");
@@ -6560,8 +6561,10 @@ static void reload_vimslist()
             veejay_msg(0,"Expected exactly 4 tokens: [%s]", line);
         }
 
-        if( val[0] < 0 || val[0] > VIMS_MAX ) {
+        if( val[0] < 0 || val[0] > VJ_EVENT_LIST_SIZE ) {
             veejay_msg(0,"Invalid ID at position %d", offset );
+            offset += 12 + val[2] + val[3];
+            continue;
         }
 
         if( val[1] < 0 || val[1] > 99 ) {
@@ -6574,6 +6577,11 @@ static void reload_vimslist()
 
         if( val[3] < 0 || val[3] > 999 ) {
             veejay_msg(0, "Invalid name length at position %d", offset );
+        }
+
+        if (offset + val[2] > len || offset + val[3] > len) {
+            veejay_msg(0, "Entry at offset %d goes past buffer length", offset);
+            break;
         }
 
         char vimsid[5];
@@ -7200,12 +7208,14 @@ static void init_recorder(int total_frames, gint mode)
     if(mode == MODE_STREAM)
     {
         info->streamrecording = g_timeout_add(300, update_stream_record_timeout, (gpointer*) info );
+        info->uc.recording[MODE_STREAM] = 1;
     }
-    if(mode == MODE_SAMPLE)
+    else if(mode == MODE_SAMPLE)
     {
         info->samplerecording = g_timeout_add(300, update_sample_record_timeout, (gpointer*) info );
+        info->uc.recording[MODE_SAMPLE] = 1;
     }
-    info->uc.recording[mode] = 1;
+
 }
 
 static char glade_path[1024];
