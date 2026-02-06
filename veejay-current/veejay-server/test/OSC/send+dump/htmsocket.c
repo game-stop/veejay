@@ -152,21 +152,23 @@ void *OpenHTMSocket(char *host, int portnumber)
 	       so that host can be either an Internet host name (e.g.,
 	       "les") or an Internet address in standard dot notation 
 	       (e.g., "128.32.122.13") */
-	    {
-		struct hostent *hostsEntry;
-		unsigned long address;
+		{
+			struct hostent he_buf;
+			struct hostent *hostsEntry = NULL;
+			char he_data[1024];
+			int herrno;
 
-		hostsEntry = gethostbyname(host);
-		if (hostsEntry == NULL) {
-		    fprintf(stderr, "Couldn't decipher host name \"%s\"\n",host);
-		    herror(NULL);
-			free(o);
-		    return 0;
+			int ret = gethostbyname_r(host, &he_buf, he_data, sizeof(he_data), &hostsEntry, &herrno);
+			if (ret != 0 || hostsEntry == NULL) {
+				fprintf(stderr, "Couldn't decipher host name \"%s\"\n", host);
+				if (ret != 0)
+					fprintf(stderr, "Error code: %d\n", ret);
+				free(o);
+				return 0;
+			}
+			o->serv_addr.sin_addr.s_addr = *((unsigned long *)hostsEntry->h_addr_list[0]);
 		}
-		
-		address = *((unsigned long *) hostsEntry->h_addr_list[0]);
-		o->serv_addr.sin_addr.s_addr = address;
-	    }
+
 
 	    /* was: o->serv_addr.sin_addr.s_addr = inet_addr(host); */
 

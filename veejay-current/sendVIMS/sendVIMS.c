@@ -297,14 +297,29 @@ pd_msg_t  *sendVIMS_pq_read(sendVIMS_t *x){ return (pd_msg_t *)queue_read(&x->pq
 
 
 // connect a veejay port
-static int vj_connect(veejay_t *v, char *name, int port_id ) {
-    v->he = gethostbyname(name);
-    v->handle = socket( AF_INET, SOCK_STREAM, 0);
+static int vj_connect(veejay_t *v, const char *name, int port_id) {
+    struct hostent he_buf;
+    struct hostent *he_result = NULL;
+    char he_data[1024];
+    int herrno;
+
+    if (gethostbyname_r(name, &he_buf, he_data, sizeof(he_data), &he_result, &herrno) != 0 || he_result == NULL) {
+        return -1;
+    }
+
+    v->handle = socket(AF_INET, SOCK_STREAM, 0);
+    if (v->handle < 0) return -1;
+
+    memset(&v->server_addr, 0, sizeof(v->server_addr));
     v->server_addr.sin_family = AF_INET;
     v->server_addr.sin_port = htons(port_id);
-    v->server_addr.sin_addr = *( (struct in_addr*) v->he->h_addr);
-    if(connect(v->handle, (struct sockaddr*)
-	       &v->server_addr,sizeof(struct sockaddr))==-1) return -1; /* error */
+    v->server_addr.sin_addr = *(struct in_addr *)he_result->h_addr;
+
+    if (connect(v->handle, (struct sockaddr *)&v->server_addr, sizeof(v->server_addr)) == -1) {
+        close(v->handle);
+        return -1;
+    }
+
     return 0;
 }
 

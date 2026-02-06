@@ -6564,6 +6564,8 @@ static void reload_vimslist()
         if( val[0] < 0 || val[0] > VJ_EVENT_LIST_SIZE ) {
             veejay_msg(0,"Invalid ID at position %d", offset );
             offset += 12 + val[2] + val[3];
+            free(line);
+            free(eltext);
             continue;
         }
 
