@@ -241,70 +241,59 @@ Y4MTHREADEXIT:
 	return NULL;
 }
 
-int vj_yuv_stream_start_write(vj_yuv * yuv4mpeg,VJFrame *frame, char *filename, int outchroma)
+int vj_yuv_stream_start_write(vj_yuv *yuv4mpeg, VJFrame *frame, char *filename, int outchroma)
 {
-    //if(mkfifo( filename, 0600)!=0) return -1;
-    /* if the file exists gamble and simply append,
-       if it does not exist write header 
+    struct stat st;
 
-     */
-    struct stat sstat;
- 
-    if(strncasecmp( filename, "stdout", 6) == 0)
-    {
-		yuv4mpeg->fd = 1;
-    }  
-    else 
-    {
-    	if(strncasecmp(filename, "stderr", 6) == 0)
-		{
-			yuv4mpeg->fd = 2;
-		}
-        else
-		{
-	    	if (stat(filename, &sstat) == 0)
-	   		{
-				if (S_ISREG(sstat.st_mode))
-				{
-		   	 		/* the file is a regular file */
-		   	 		yuv4mpeg->fd = open(filename, O_APPEND | O_WRONLY, 0600);
-		  			if (yuv4mpeg->fd < 0)
-						return -1;
-				}
-	    		else
-	    		{
-					if (S_ISFIFO(sstat.st_mode))
-			  			veejay_msg(VEEJAY_MSG_INFO, "Waiting for a program to open %s", filename);
-		       			yuv4mpeg->fd = open(filename,O_WRONLY,0600);
-   			     		if(yuv4mpeg->fd <= 0) return 0;
-				}
-	   		}
-	    	else
-	    	{
-				veejay_msg(VEEJAY_MSG_INFO, "Creating YUV4MPEG regular file '%s'",filename);
-				yuv4mpeg->fd = open(filename, O_CREAT | O_WRONLY, 0600);
-  				if (yuv4mpeg->fd < 0)
- 					return -1;
-   	    	 }
-		}
+    if (strncasecmp(filename, "stdout", 6) == 0) {
+        yuv4mpeg->fd = 1;
+    } else if (strncasecmp(filename, "stderr", 6) == 0) {
+        yuv4mpeg->fd = 2;
+    } else {
+        int fd = open(filename, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0600);
+        if (fd < 0) {
+            veejay_msg(VEEJAY_MSG_ERROR, "Cannot open/create file '%s': %s", filename, strerror(errno));
+            return -1;
+        }
+
+        if (fstat(fd, &st) < 0) {
+            veejay_msg(VEEJAY_MSG_ERROR, "Cannot stat '%s': %s", filename, strerror(errno));
+            close(fd);
+            return -1;
+        }
+
+        if (!S_ISREG(st.st_mode) && !S_ISFIFO(st.st_mode)) {
+            veejay_msg(VEEJAY_MSG_ERROR, "'%s' is not a regular file or FIFO", filename);
+            close(fd);
+            return -1;
+        }
+
+        yuv4mpeg->fd = fd;
+
+        if (S_ISFIFO(st.st_mode)) {
+            veejay_msg(VEEJAY_MSG_INFO, "FIFO '%s' is open, waiting for reader", filename);
+        } else {
+            veejay_msg(VEEJAY_MSG_INFO, "Opened YUV4MPEG regular file '%s'", filename);
+        }
     }
 
-    if( vj_yuv_stream_write_header(yuv4mpeg, frame, outchroma) < 0 ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Error while writing y4m header");
-		return -1;
+    if (vj_yuv_stream_write_header(yuv4mpeg, frame, outchroma) < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Error while writing y4m header");
+        if (yuv4mpeg->fd > 2) close(yuv4mpeg->fd);
+        return -1;
     }
 
     yuv4mpeg->has_audio = 0;
+    pthread_mutex_init(&(yuv4mpeg->mutex), NULL);
 
-	pthread_mutex_init( &(yuv4mpeg->mutex), NULL );
-
-	int p_err = pthread_create( &(yuv4mpeg->thread), NULL, y4m_writer_thread, (void*) yuv4mpeg );
-	if( p_err == 0 ) {
-		veejay_msg(VEEJAY_MSG_INFO, "Created new Y4M writer thread" );
-	}
+    int p_err = pthread_create(&(yuv4mpeg->thread), NULL, y4m_writer_thread, (void *)yuv4mpeg);
+    if (p_err == 0) {
+        veejay_msg(VEEJAY_MSG_INFO, "Created new Y4M writer thread");
+    }
 
     return 0;
 }
+
 
 void vj_yuv_stream_stop_write(vj_yuv * yuv4mpeg)
 {

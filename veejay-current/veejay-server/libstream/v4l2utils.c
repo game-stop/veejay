@@ -867,29 +867,33 @@ static	int	v4l2_channel_choose( v4l2info *v, const int pref_channel )
 	return other;
 }
 
-static	int	v4l2_verify_file( const char *file )
+static int v4l2_verify_file(const char *file)
 {
 	struct stat st;
-	if( -1 == stat( file, &st )) {
-		veejay_msg(0, "v4l2: Cannot identify '%s':%d, %s",file,errno,strerror(errno));
-		return 0;
-	}
-	if( !S_ISCHR(st.st_mode)) {
-		veejay_msg(0, "v4l2: '%s' is not a device", file);
+	int fd;
+
+	fd = open(file, O_RDWR | O_NONBLOCK | O_CLOEXEC);
+	if (fd == -1) {
+		veejay_msg(0,"v4l2: Cannot open '%s': %d, %s",file, errno, strerror(errno));
 		return 0;
 	}
 
-	int fd = open( file, O_RDWR | O_NONBLOCK );
+	if (fstat(fd, &st) == -1) {
+		veejay_msg(0,"v4l2: Cannot stat '%s': %d, %s",file, errno, strerror(errno));
+		close(fd);
+		return 0;
+	}
 
-	if( -1 == fd ) {
-		veejay_msg(0, "v4l2: Cannot open '%s': %d, %s", file, errno, strerror(errno));
+	if (!S_ISCHR(st.st_mode)) {
+		veejay_msg(0,"v4l2: '%s' is not a character device",file);
+		close(fd);
 		return 0;
 	}
 
 	close(fd);
-
 	return 1;
 }
+
 
 int	v4l2_poll( void *d , int nfds, int timeout )
 {
