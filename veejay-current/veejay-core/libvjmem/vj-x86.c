@@ -169,15 +169,15 @@ void vj_mem_init(int w, int h)
 #if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE)
 	yuyv_plane_init();
 #endif
-	//find_best_memcpy();	
+	//find_best_memcpy();
 	//find_best_memset();
 	vj_mem_set_defaults(w,h);
 }
 
 void vj_mem_optimize() {
 #ifndef STRICT_CHECKING
-	//find_best_memcpy();	
-	//find_best_memset();
+	find_best_memcpy();
+	find_best_memset();
 #endif
 }
 

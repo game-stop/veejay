@@ -1034,34 +1034,140 @@ void *avx2_memcpy(void *dst0, const void *src0, size_t len0) {
         size_t blocks = len / 128;
         len = len % 128;
 
-        for (size_t i = 0; i < blocks; i++) {
-            // prefetch ahead relative to current src (tune offsets as needed)
-            _mm_prefetch((const char *)src + 128, _MM_HINT_NTA);
-            _mm_prefetch((const char *)src + 160, _MM_HINT_NTA);
-			// slightly increase prefetch distance to overlap better with memory latency
-			_mm_prefetch((const char *)src + 256, _MM_HINT_NTA);
-			_mm_prefetch((const char *)src + 320, _MM_HINT_NTA);
+        int src_aligned = (((uintptr_t)src) & 31) == 0;
+        if(src_aligned) {
+          for (size_t i = 0; i < blocks; i++) {
+              // prefetch next 256-512 bytes
+              _mm_prefetch((const char *)src + 256, _MM_HINT_NTA);
+              _mm_prefetch((const char *)src + 512, _MM_HINT_NTA);
+              __m256i ymm0, ymm1, ymm2, ymm3;
+              ymm0 = _mm256_load_si256((const __m256i *)(src + 0));
+              ymm1 = _mm256_load_si256((const __m256i *)(src + 32));
+              ymm2 = _mm256_load_si256((const __m256i *)(src + 64));
+              ymm3 = _mm256_load_si256((const __m256i *)(src + 96));
+              _mm256_stream_si256((__m256i *)(dst + 0), ymm0);
+              _mm256_stream_si256((__m256i *)(dst + 32), ymm1);
+              _mm256_stream_si256((__m256i *)(dst + 64), ymm2);
+              _mm256_stream_si256((__m256i *)(dst + 96), ymm3);
 
-            // load 4x 32 bytes (unaligned loads)
-            __m256i ymm0 = _mm256_loadu_si256((const __m256i *)(src + 0));
-            __m256i ymm1 = _mm256_loadu_si256((const __m256i *)(src + 32));
-            __m256i ymm2 = _mm256_loadu_si256((const __m256i *)(src + 64));
-            __m256i ymm3 = _mm256_loadu_si256((const __m256i *)(src + 96));
-
-            // stream/store to dst (dst is 32-byte aligned)
-            _mm256_stream_si256((__m256i *)(dst + 0), ymm0);
-            _mm256_stream_si256((__m256i *)(dst + 32), ymm1);
-            _mm256_stream_si256((__m256i *)(dst + 64), ymm2);
-            _mm256_stream_si256((__m256i *)(dst + 96), ymm3);
-
-            src += 128;
-            dst += 128;
+              src += 128;
+              dst += 128;
+          }
+        } else {
+            for (size_t i = 0; i < blocks; i++) {
+                _mm_prefetch((const char *)src + 256, _MM_HINT_NTA);
+                _mm_prefetch((const char *)src + 512, _MM_HINT_NTA);
+                __m256i ymm0, ymm1, ymm2, ymm3;
+                ymm0 = _mm256_loadu_si256((const __m256i *)(src + 0));
+                ymm1 = _mm256_loadu_si256((const __m256i *)(src + 32));
+                ymm2 = _mm256_loadu_si256((const __m256i *)(src + 64));
+                ymm3 = _mm256_loadu_si256((const __m256i *)(src + 96));
+                _mm256_stream_si256((__m256i *)(dst + 0), ymm0);
+                _mm256_stream_si256((__m256i *)(dst + 32), ymm1);
+                _mm256_stream_si256((__m256i *)(dst + 64), ymm2);
+                _mm256_stream_si256((__m256i *)(dst + 96), ymm3);
+                src += 128;
+                dst += 128;
+            }
         }
+
         _mm_sfence(); // ensure stores are visible
     }
 
     if (len) {
         memcpy(dst, src, len);
+    }
+
+    return retval;
+}
+
+void *avx2_memset(void *dst0, int c, size_t len0) {
+    void *retval = dst0;
+    uint8_t *dst = (uint8_t *)dst0;
+    size_t len = len0;
+
+    if (len == 0) return retval;
+
+    if (len < 128) {
+        small_memset(dst, c, len);
+        return retval;
+    }
+
+    uintptr_t misalign = (uintptr_t)dst & 31;
+    if (misalign) {
+        size_t delta = 32 - misalign;
+        if (delta > len) delta = len;
+        memset(dst, c, delta);
+        dst += delta;
+        len -= delta;
+    }
+
+    __m256i ymm_val = _mm256_set1_epi8((char)c);
+
+    size_t blocks = len / 128;
+    size_t remaining = len % 128;
+
+    for (size_t i = 0; i < blocks; i++) {
+        _mm_prefetch((const char *)(dst + 256), _MM_HINT_NTA);
+        _mm_prefetch((const char *)(dst + 512), _MM_HINT_NTA);
+
+        _mm256_stream_si256((__m256i *)(dst + 0), ymm_val);
+        _mm256_stream_si256((__m256i *)(dst + 32), ymm_val);
+        _mm256_stream_si256((__m256i *)(dst + 64), ymm_val);
+        _mm256_stream_si256((__m256i *)(dst + 96), ymm_val);
+
+        dst += 128;
+    }
+
+    _mm_sfence();
+    if (remaining) {
+        small_memset(dst, c, remaining);
+    }
+
+    return retval;
+}
+#endif
+
+#ifdef HAVE_ASM_AVX
+void *avx_memset(void *dst0, int c, size_t len0) {
+    void *retval = dst0;
+    uint8_t *dst = (uint8_t *)dst0;
+    size_t len = len0;
+
+    if (len == 0) return retval;
+
+    if (len < 128) {
+        small_memset(dst, c, len);
+        return retval;
+    }
+
+    uintptr_t misalign = (uintptr_t)dst & 31;
+    if (misalign) {
+        size_t delta = 32 - misalign;
+        if (delta > len) delta = len;
+        memset(dst, c, delta);
+        dst += delta;
+        len -= delta;
+    }
+
+    __m256i ymm_val = _mm256_set1_epi8((char)c);
+
+    size_t blocks = len / 128;
+    size_t remaining = len % 128;
+
+    for (size_t i = 0; i < blocks; i++) {
+        _mm_prefetch((const char *)(dst + 256), _MM_HINT_NTA);
+        _mm_prefetch((const char *)(dst + 512), _MM_HINT_NTA);
+        _mm256_store_si256((__m256i *)(dst + 0), ymm_val);
+        _mm256_store_si256((__m256i *)(dst + 32), ymm_val);
+        _mm256_store_si256((__m256i *)(dst + 64), ymm_val);
+        _mm256_store_si256((__m256i *)(dst + 96), ymm_val);
+
+        dst += 128;
+    }
+
+    if (remaining) {
+        small_memset(dst, c, remaining);
     }
 
     return retval;
@@ -2316,119 +2422,108 @@ void *memset_64(void *ptr, int value, size_t num) {
 }
 
 static struct {
-     const char	*name;
-     void *(*function)(void *to, const void *from, size_t len);
-     double t;
-     uint32_t cpu_require;
-} memcpy_method[] =
-{
-     { NULL, NULL, 0},
-	 /* standard memcpy */
-     { "glibc memcpy()",  (void*) memcpy, 0,0 },
-	 /* xine-lib memcpy: */
+    const char *name;
+    void *(*function)(void *to, const void *from, size_t len);
+    double t;
+    uint32_t cpu_require;
+} memcpy_method[] = {
+    { NULL, NULL, 0 },
+    { "glibc memcpy()",  (void*) memcpy, 0, 0 },
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
-     { "linux kernel memcpy()", (void*)  linux_kernel_memcpy,0, 0},
-#endif
-#ifdef HAVE_ASM_AVX
-     { "AVX optimized memcpy()", (void*) avx_memcpy, 0,AV_CPU_FLAG_AVX },
-	 { "AVX simple memcpy()", (void*) avx_memcpy2, 0, AV_CPU_FLAG_AVX },
-#endif
-#ifdef HAVE_ASM_AVX2
-     { "AVX2 optimized memcpy()", (void*) avx2_memcpy, 0, AV_CPU_FLAG_AVX2 },
+    { "linux kernel memcpy()", (void*) linux_kernel_memcpy, 0, 0 },
 #endif
 #ifdef HAVE_ASM_AVX512
     { "AVX-512 optimized memcpy()", (void*) avx512_memcpy, 0, AV_CPU_FLAG_AVX512 },
 #endif
-#ifdef HAVE_ASM_MMX
-     { "MMX optimized memcpy()", (void*) mmx_memcpy, 0,AV_CPU_FLAG_MMX },
+#ifdef HAVE_ASM_AVX2
+    { "AVX2 optimized memcpy()", (void*) avx2_memcpy, 0, AV_CPU_FLAG_AVX2 },
 #endif
-#ifdef HAVE_ASM_MMX2
-     { "MMX2 optimized memcpy()", (void*) mmx2_memcpy, 0,AV_CPU_FLAG_MMX2 },
+#ifdef HAVE_ASM_AVX
+    { "AVX optimized memcpy()", (void*) avx_memcpy, 0, AV_CPU_FLAG_AVX },
+    { "AVX simple memcpy()", (void*) avx_memcpy2, 0, AV_CPU_FLAG_AVX },
+#endif
+#if defined (__SSE4_1__)
+    { "SSE4_1 optimized memcpy()", (void*) sse41_memcpy, 0, AV_CPU_FLAG_SSE4 },
+#endif
+#if defined (__SSE4_2__)
+    { "SSE4_2 optimized memcpy()", (void*) sse42_memcpy, 0, AV_CPU_FLAG_SSE42 },
+#endif
+#if defined (__SSE2__)
+    { "SSE2 optimized memcpy() (128)", (void*) sse2_memcpy, 0, AV_CPU_FLAG_SSE2 },
+    { "SSE2 optimized memcpy() (128) v2", (void*) sse2_memcpy_unaligned, 0, AV_CPU_FLAG_SSE2 },
 #endif
 #ifdef HAVE_ASM_SSE
-	 { "SSE optimized memcpy() (64)", (void*) sse_memcpy, 0,AV_CPU_FLAG_MMXEXT | AV_CPU_FLAG_SSE },
-	 { "SSE optimized memcpy() (128)", (void*) sse_memcpy2, 0,AV_CPU_FLAG_MMXEXT | AV_CPU_FLAG_SSE },
+    { "SSE optimized memcpy() (64)", (void*) sse_memcpy, 0, AV_CPU_FLAG_MMXEXT | AV_CPU_FLAG_SSE },
+    { "SSE optimized memcpy() (128)", (void*) sse_memcpy2, 0, AV_CPU_FLAG_MMXEXT | AV_CPU_FLAG_SSE },
 #endif
-  /* based on xine-lib + William Chan + other */
-#if defined (__SSE2__)
-	 { "SSE2 optimized memcpy() (128)", (void*) sse2_memcpy, 0,AV_CPU_FLAG_SSE2},
-	 { "SSE2 optimized memcpy() (128) v2" , (void*) sse2_memcpy_unaligned, 0, AV_CPU_FLAG_SSE2},
+#ifdef HAVE_ASM_MMX
+    { "MMX optimized memcpy()", (void*) mmx_memcpy, 0, AV_CPU_FLAG_MMX },
 #endif
-#ifdef HAVE_ASM_SSE4_1
-	{ "SSE4_1 optimized memcpy()" , (void*) sse41_memcpy, 0, AV_CPU_FLAG_SSE4},
+#ifdef HAVE_ASM_MMX2
+    { "MMX2 optimized memcpy()", (void*) mmx2_memcpy, 0, AV_CPU_FLAG_MMX2 },
 #endif
-#ifdef HAVE_ASM_SSE4_2
-	{ "SSE4_2 optimized memcpy()" , (void*) sse42_memcpy, 0, AV_CPU_FLAG_SSE42},
+#if defined (HAVE_ASM_MMX) || defined(HAVE_ASM_SSE) || defined(HAVE_ASM_MMX2)
+    { "MMX/MMX2/SSE optimized memcpy() v1", (void*) fast_memcpy, 0, AV_CPU_FLAG_MMX | AV_CPU_FLAG_SSE | AV_CPU_FLAG_MMX2 },
 #endif
-	/* aclib_template.c: */
-#if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE ) || defined( HAVE_ASM_MMX2)
-     { "MMX/MMX2/SSE optimized memcpy() v1", (void*) fast_memcpy, 0,AV_CPU_FLAG_MMX |AV_CPU_FLAG_SSE |AV_CPU_FLAG_MMX2 },
-#endif  
-#if defined (HAVE_ARM_NEON) 
-	{ "NEON optimized memcpy()", (void*) memcpy_neon, 0, AV_CPU_FLAG_NEON },
+#if defined(HAVE_ARM_NEON)
+    { "NEON optimized memcpy()", (void*) memcpy_neon, 0, AV_CPU_FLAG_NEON },
+    { "new memcpy for cortex using NEON with line size of 32, preload offset of 192", (void*) memcpy_new_neon_line_size_32, 0, AV_CPU_FLAG_NEON },
+    { "new memcpy for cortex using NEON with line size of 64, preload offset of 192", (void*) memcpy_new_neon_line_size_64, 0, AV_CPU_FLAG_NEON },
+    { "new memcpy for cortex using NEON line 32 auto-prefetch", (void*) memcpy_new_neon_line_size_32_auto, 0, AV_CPU_FLAG_NEON },
 #endif
-#if defined (HAVE_ARM_ASIMD) 
-	{ "NEON optimized memcpy()", (void*) memcpy_neon, 0, AV_CPU_FLAG_ARMV8 },
-#endif
-
 #ifdef HAVE_ARM_ASIMD
-	{ "Advanced SIMD ARMv8-A memcpy()", (void*) memcpy_asimd, 0, AV_CPU_FLAG_ARMV8 },
-//	{ "Advanced SIMD ARMv8-A memcpy() v3", (void*) memcpy_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },	
-//	{ "Advanced SIMD ARMv8-A memcpy v2()", (void*) memcpy_asimdv2, 0, AV_CPU_FLAG_ARMV8 },
+    { "Advanced SIMD ARMv8-A memcpy()", (void*) memcpy_asimd, 0, AV_CPU_FLAG_ARMV8 },
 #endif
 #ifdef HAVE_ARMV7A
-	{ "new mempcy for cortex with line size of 32, preload offset of 192 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memcpy_new_line_size_32_preload_192,0,0 },
-	{ "new memcpy for cortex with line size of 64, preload offset of 192 (C) Harm Hanemaaijer <fgenfb@yahoo.com>" ,(void*) memcpy_new_line_size_64_preload_192, 0, 0 },
-    { "new memcpy for cortex with line size of 64, preload offset of 192, aligned access (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memcpy_new_line_size_64_preload_192_aligned_access, 0, 0 },
-	{ "new memcpy for cortex with line size of 32, preload offset of 192, align 32", (void*) memcpy_new_line_size_32_preload_192_align_32,0,0},
-	{ "new memcpy for cortex with line size of 32, preload offset of 96", (void*) memcpy_new_line_size_32_preload_96,0,0},
-	{ "new memcpy for cortex with line size of 32, preload offset of 96, aligned access", (void*) memcpy_new_line_size_32_preload_96_aligned_access,0,0},
+    { "new memcpy cortex line 32, preload 192", (void*) memcpy_new_line_size_32_preload_192, 0, 0 },
+    { "new memcpy cortex line 64, preload 192", (void*) memcpy_new_line_size_64_preload_192, 0, 0 },
+    { "new memcpy cortex line 64, preload 192 aligned", (void*) memcpy_new_line_size_64_preload_192_aligned_access, 0, 0 },
+    { "new memcpy cortex line 32, preload 192 align32", (void*) memcpy_new_line_size_32_preload_192_align_32, 0, 0 },
+    { "new memcpy cortex line 32, preload 96", (void*) memcpy_new_line_size_32_preload_96, 0, 0 },
+    { "new memcpy cortex line 32, preload 96 aligned", (void*) memcpy_new_line_size_32_preload_96_aligned_access, 0, 0 },
 #endif
-#ifdef HAVE_ARM_NEON
-	{ "new memcpy for cortex using NEON with line size of 32, preload offset of 192 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memcpy_new_neon_line_size_32,0,AV_CPU_FLAG_NEON},
-	{ "new memcpy for cortex using NEON with line size of 64, preload offset of 192 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memcpy_new_neon_line_size_64,0,AV_CPU_FLAG_NEON},
-	{ "new mempcy for cortex using NEON with line size of 32, automatic prefetcher (C) Harm Hanemaaijer <fgenfb@yayhoo.com>", (void*) memcpy_new_neon_line_size_32_auto,0,AV_CPU_FLAG_NEON},
-#endif
-     { NULL, NULL, 0},
+    { NULL, NULL, 0 }
 };
 
 static struct {
-	const char *name;
-	void *(*function)(void *to, uint8_t c, size_t len);
-	uint32_t cpu_require;
-	double t;
-} memset_method[] =
-{
-	{ NULL, NULL, 0,0},
-	{ "glibc memset()",(void*)memset,0,0},
+    const char *name;
+    void *(*function)(void *to, uint8_t c, size_t len);
+    uint32_t cpu_require;
+    double t;
+} memset_method[] = {
+    { NULL, NULL, 0, 0 },
+    { "glibc memset()", (void*) memset, 0, 0},
+#ifdef HAVE_ASM_AVX2
+    { "AVX2 optimized memset()", (void*) avx2_memset, 0, AV_CPU_FLAG_AVX2 },
+#endif
+#ifdef HAVE_ASM_AVX
+    { "AVX optimized memset()", (void*) avx_memset, 0, AV_CPU_FLAG_AVX },
+#endif
+#if defined (__SSE4_1__)
+    { "SSE4_1 memset()", (void*) sse41_memset, 0, AV_CPU_FLAG_SSE4 },
+    { "SSE4_1 memset() v2", (void*) sse41_memset_v2, 0, AV_CPU_FLAG_SSE4 },
+#endif
+#if defined (__SSE4_2__)
+    { "SSE4_2 unaligned memset()", (void*) sse42_memset, 0, AV_CPU_FLAG_SSE42 },
+    { "SSE4_2 aligned memset()", (void*) sse42_aligned_memset, 0, AV_CPU_FLAG_SSE42 },
+#endif
 #ifdef HAVE_ARM_NEON
-	{ "memset_neon (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_neon,0, AV_CPU_FLAG_NEON },
+    { "memset_neon", (void*) memset_neon, 0, AV_CPU_FLAG_NEON },
 #endif
 #ifdef HAVE_ARM_ASIMD
-	{ "Advanced SIMD memset()", (void*) memset_asimd, 0, AV_CPU_FLAG_ARMV8 },
-	{ "Advanced SIMD memset() v4", (void*) memset_asimd_v4, 0, AV_CPU_FLAG_ARMV8 },	
-	{ "Advanced SIMD memset() with line size of 64", (void*) memset_asimd_64, 0, AV_CPU_FLAG_ARMV8 },	
-	{ "Advanced SIMD memset() with line size of 32", (void*) memset_asimd_32, 0, AV_CPU_FLAG_ARMV8 },	
-	{ "Advanced SIMD memset() v3", (void*) memset_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },	
-//	{ "Advanced SIMD memset() v2", (void*) memset_asimd_v2, 0, AV_CPU_FLAG_ARMV8 },
-	
+    { "Advanced SIMD memset()", (void*) memset_asimd, 0, AV_CPU_FLAG_ARMV8 },
+    { "Advanced SIMD memset() v4", (void*) memset_asimd_v4, 0, AV_CPU_FLAG_ARMV8 },
+    { "Advanced SIMD memset() 64-line", (void*) memset_asimd_64, 0, AV_CPU_FLAG_ARMV8 },
+    { "Advanced SIMD memset() 32-line", (void*) memset_asimd_32, 0, AV_CPU_FLAG_ARMV8 },
+    { "Advanced SIMD memset() v3", (void*) memset_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },
 #endif
 #ifdef HAVE_ARM7A
-	{ "memset align 0 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_new_align_0,0,0 },
-	{ "memset align 8 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_new_align_8,0,0 },
-	{ "memset align 32 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_new_align_32,0,0 },
+    { "memset align 0", (void*) memset_new_align_0, 0, 0 },
+    { "memset align 8", (void*) memset_new_align_8, 0, 0 },
+    { "memset align 32", (void*) memset_new_align_32, 0, 0 },
 #endif
-#ifdef HAVE_ASM_SSE4_1
-    	{ "SSE4_1 memset()", (void*) sse41_memset,0, AV_CPU_FLAG_SSE4},
-	{ "SSE4_1 memset() v2", (void*) sse41_memset_v2,0, AV_CPU_FLAG_SSE4},
-#endif
-#ifdef HAVE_ASM_SSE4_2
-	{ "SSE4_2 unaligned memset()", (void*) sse42_memset,0, AV_CPU_FLAG_SSE42},
-	{ "SSE4_2 aligned memset()", (void*) sse42_aligned_memset, 0, AV_CPU_FLAG_SSE42 },
-#endif
-    	{ "64-bit word memset()", (void*) memset_64, 0, 0},
-
-	{ NULL, NULL, 0, 0},
+    { "64-bit word memset()", (void*) memset_64, 0, 0 },
+    { NULL, NULL, 0, 0 } 
 };
 
 
@@ -2506,46 +2601,57 @@ static int mem_validate( uint8_t *buffer, uint8_t *validation_buffer, size_t len
 	return 1;
 }
 
+
+#define TIMING_TOLERANCE 0.005  // 0.5% tolerance
+
+static void lock_buffers(void *buf, size_t size) {
+    if (mlock(buf, size) != 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Failed to lock memory (!)");
+    }
+}
+
 void find_best_memcpy()
 {
 	int best = set_user_selected_memcpy();
 	if( best > 0 )
 		goto set_best_memcpy_method;
 
-     double t;
-     uint8_t *buf1, *buf2, *validbuf;
-     int i, k;
-     int bufsize = (BENCHMARK_WID * BENCHMARK_HEI * 3);
+  double t;
+  uint8_t *buf1, *buf2, *validbuf;
+  int i, k;
+  int bufsize = (BENCHMARK_WID * BENCHMARK_HEI * 3);
+  if (!(buf1 = (uint8_t*) vj_malloc( bufsize * sizeof(uint8_t))))
+       return;
 
-     if (!(buf1 = (uint8_t*) vj_malloc( bufsize * sizeof(uint8_t))))
-          return;
+  if (!(buf2 = (uint8_t*) vj_malloc( bufsize * sizeof(uint8_t)))) {
+       free( buf1 );
+       return;
+  }
 
-     if (!(buf2 = (uint8_t*) vj_malloc( bufsize * sizeof(uint8_t)))) {
-          free( buf1 );
-          return;
-     }
+  if (!(validbuf = (uint8_t*) vj_malloc( bufsize * sizeof(uint8_t)))) {
+      free( buf1 );
+      free( buf2 );
+      return;
+  }
 
-	 if (!(validbuf = (uint8_t*) vj_malloc( bufsize * sizeof(uint8_t)))) {
-          free( buf1 );
-		  free( buf2 );
-          return;
-     }
+  lock_buffers(buf1, bufsize);
+  lock_buffers(buf2, bufsize);
+  lock_buffers(validbuf, bufsize);
 
-     int cpu_flags = av_get_cpu_flags();
-	
-	 veejay_msg(VEEJAY_MSG_INFO, "Finding best memcpy ... (copy %ld blocks of %2.2f Mb)",FIND_BEST_MAX_ITERATIONS, bufsize / 1048576.0f );	
+  int cpu_flags = av_get_cpu_flags();
+  veejay_msg(VEEJAY_MSG_INFO, "Finding best memcpy ... (copy %ld blocks of %2.2f Mb)",FIND_BEST_MAX_ITERATIONS, bufsize / 1048576.0f );
 
-     memset(buf1,0, bufsize);
-     memset(buf2,0, bufsize);
+  memset(buf1,0, bufsize);
+  memset(buf2,0, bufsize);
 	 
-     /* make sure buffers are present on physical memory */
-     memcpy( buf1, buf2, bufsize);
-     memcpy( buf2, buf1, bufsize );
+  /* make sure buffers are present on physical memory */
+  memcpy( buf1, buf2, bufsize);
+  memcpy( buf2, buf1, bufsize );
 
-	 /* fill */
-	 mem_fill_block(buf1, bufsize);
-	 memset(buf2, 0, bufsize);
-	 mem_fill_block(validbuf, bufsize);
+  /* fill */
+  mem_fill_block(buf1, bufsize);
+  memset(buf2, 0, bufsize);
+  mem_fill_block(validbuf, bufsize);
 	 
 	for( i = 1; memcpy_method[i].name != NULL; i ++ ) {
 	
@@ -2574,21 +2680,21 @@ void find_best_memcpy()
 		memcpy_method[i].t = t;
 	}
 
-	for( i = 1; memcpy_method[i].name != NULL; i ++ ) {
-		if(best == 0 ) { 
-			best = i;
-			t = memcpy_method[i].t;	
-			continue;
-		}
+  best = 0;
+  double best_time = 0.0;
+  for (i = 1; memcpy_method[i].name != NULL; i++) {
+      if (memcpy_method[i].t <= 0.0) continue;
+      if (best == 0) {
+          best = i;
+          best_time = memcpy_method[i].t;
+      } else if (memcpy_method[i].t + (best_time * TIMING_TOLERANCE) < best_time) {
+          best = i;
+          best_time = memcpy_method[i].t;
+      }
+  }
 
-		if( memcpy_method[i].t < t && memcpy_method[i].t > 0 ) {
-			t = memcpy_method[i].t;
-			best = i;
-		}
-	}
-
-    free( buf1 );
-    free( buf2 );
+  free( buf1 );
+  free( buf2 );
 	free( validbuf );
 
 set_best_memcpy_method:
@@ -2633,6 +2739,9 @@ void find_best_memset()
 		return;
 	}
 
+  lock_buffers(buf1, bufsize);
+  lock_buffers(buf2, bufsize);
+
 	veejay_msg(VEEJAY_MSG_INFO, "Finding best memset... (clear %d blocks of %2.2f Mb)", FIND_BEST_MAX_ITERATIONS, bufsize / 1048576.0f );
 
 	memset( buf1, 0, bufsize * sizeof(char));
@@ -2641,26 +2750,37 @@ void find_best_memset()
 	consume_buffer((unsigned char *)buf1, bufsize);
 	consume_buffer((unsigned char *)buf2, bufsize);
 
-	for (i=1; memset_method[i].name != NULL; i++)
-	{
-		if( memset_method[i].cpu_require && !(cpu_flags & memset_method[i].cpu_require ) ) {
-			memset_method[i].t= 0;
-			continue;
-	}
+  for (i = 1; memset_method[i].name != NULL; i++) {
+      if (memset_method[i].cpu_require && !(cpu_flags & memset_method[i].cpu_require)) {
+          memset_method[i].t = 0.0;
+          continue;
+      }
 
-	t = get_time();
-	for( k = 0; k < FIND_BEST_MAX_ITERATIONS; k ++ ) {
-		memset_method[i].function( buf1 , 0 , bufsize );
-	}
-	t = get_time() - t;
+      t = get_time();
+      for (k = 0; k < FIND_BEST_MAX_ITERATIONS; k++) {
+          memset_method[i].function(buf1, 0, bufsize);
+      }
+      t = get_time() - t;
 
-	veejay_msg(VEEJAY_MSG_INFO, "method '%s' completed in %g seconds", memset_method[i].name, t );
+      if (t <= 0.0) continue;
 
-	memset_method[i].t = t;
+      memset_method[i].t = t;
+      veejay_msg(VEEJAY_MSG_INFO, "method '%s' completed in %g seconds", memset_method[i].name, t);
+  }
 
-	if (best == 0 || t < memset_method[best].t)
-		best = i;
-	}	
+  best = 0;
+  double best_time = 0.0;
+  for (i = 1; memset_method[i].name != NULL; i++) {
+      if (memset_method[i].t <= 0.0) continue;
+
+      if (best == 0) {
+          best = i;
+          best_time = memset_method[i].t;
+      } else if (memset_method[i].t + (best_time * TIMING_TOLERANCE) < best_time) {
+          best = i;
+          best_time = memset_method[i].t;
+      }
+  }
 
 	free( buf1 );
 	free( buf2 );
@@ -2964,7 +3084,7 @@ static void benchmark_tasks(unsigned int n_tasks, long n_frames, int w, int h)
   consume_buffer(src, total);
 	consume_buffer(dst, total);
 
-	run_benchmark_test( n_tasks, benchmark_single_copy, "single-threaded memory copy", n_frames, dest, source, planes );
+  run_benchmark_test( n_tasks, benchmark_single_copy, "single-threaded memory copy", n_frames, dest, source, planes );
 	run_benchmark_test( n_tasks, benchmark_single_slow, "single-threaded slow frame", n_frames, dest, source, planes );
 
 	run_benchmark_test( n_tasks, benchmark_threaded_slow, "multi-threaded slow frame", n_frames, dest, source, planes );
@@ -2995,14 +3115,14 @@ void	benchmark_veejay(int w, int h)
 		h = 64;
 
 	veejay_msg(VEEJAY_MSG_INFO, "Starting benchmark %dx%d YUVP 4:2:2 (100 frames)", w,h);
+  veejay_msg(VEEJAY_MSG_INFO, "   you can set envvar VEEJAY_MEMCPY_METHOD or VEEJAY_MEMSET_METHOD to skip this");
+
 
 	find_best_memcpy();
-
 	find_best_memset();
 
-	init_parallel_tasks( 0 );
-
-	benchmark_tasks( 0,100,w,h );
+	//init_parallel_tasks( 0 );
+	//benchmark_tasks( 0,100,w,h );
 }
 
 void	*vj_hmalloc(size_t sze, const char *name)
