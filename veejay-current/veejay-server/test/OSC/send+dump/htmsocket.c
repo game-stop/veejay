@@ -158,9 +158,9 @@ void *OpenHTMSocket(char *host, int portnumber)
 
 		hostsEntry = gethostbyname(host);
 		if (hostsEntry == NULL) {
-		    fprintf(stderr, "Couldn't decipher host name \"%s\"\n",
-			    host);
+		    fprintf(stderr, "Couldn't decipher host name \"%s\"\n",host);
 		    herror(NULL);
+			free(o);
 		    return 0;
 		}
 		
