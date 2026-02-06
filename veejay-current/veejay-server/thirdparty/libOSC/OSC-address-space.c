@@ -372,9 +372,8 @@ static int gasHelp(char *target, int maxLength, OSCcontainer c) {
     }
 
     const char *myName = ContainerName(c);
-    if (!myName) myName = "";
 
-    int nameLen = strlen(myName);
+    int nameLen = (myName == NULL ? 0 : strlen(myName));
 
     int sublength = gasHelp(target, maxLength, c->parent);
 
