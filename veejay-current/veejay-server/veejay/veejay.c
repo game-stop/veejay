@@ -614,6 +614,10 @@ static int set_option(const char *name, char *value)
     return nerr;
 }
 
+
+
+
+
 static int check_command_line_options(int argc, char *argv[])
 {
     int nerr, n, option_index = 0;
@@ -831,7 +835,7 @@ int main(int argc, char **argv)
 #endif
 
 	vj_mem_init(0,0);
-	vj_mem_optimize();
+	benchmark_veejay(1920,1080);
 
 	vevo_strict_init();
 	
