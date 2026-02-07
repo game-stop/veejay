@@ -71,61 +71,85 @@ void bar_free(void *ptr) {
     free(ptr);
 }
 
-
 void bar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
     int divider = args[0];
-    int top_y = args[1];
-    int bot_y = args[2];
-    int top_x = args[3];
-    int bot_x = args[4];
+    int top_y   = args[1];
+    int bot_y   = args[2];
+    int top_x   = args[3];
+    int bot_x   = args[4];
 
-    bar_t *bar = (bar_t*) ptr;
+    bar_t *bar = (bar_t *)ptr;
 
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-	unsigned int top_width = width;		   /* frame in frame destination area */
-	unsigned int top_height = height/(divider);
+    const unsigned int width  = frame->width;
+    const unsigned int height = frame->height;
 
-	unsigned int bottom_width = width;	  /* frame in frame destionation area */
-	unsigned int bottom_height = (height - top_height);
-	int y,x;
-	int yy=0;
-	int y2 = bar->bar_top_auto + top_y;  /* destination */
-	int x2 = bar->bar_top_vert + top_x;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
+    const unsigned int top_height    = height / divider;
+    const unsigned int bottom_height = height - top_height;
+    const unsigned int top_width     = width;
+    const unsigned int bottom_width  = width;
 
-	if(y2 > width) { y2 = 0; bar->bar_top_auto = 0; }
-	if(x2 > (bottom_height)) {x2 = 0; bar->bar_top_vert = 0; }
-	/* start with top frame in a frame */
-	for( y = 0; y < top_height; y++ ) {
-		for ( x = 0; x < top_width; x++ ) {
-			Y[ (y*width + x)] = Y2[ ( (y+x2) *width + x +y2)];
-			Cb[ (y*width + x)] = Cb2[ ( (y+x2) *width + x +y2)];
-			Cr[ (y*width + x)] = Cr2[ ( (y+x2) *width + x +y2)];
-		}
-	}
-	/* do bottom part */
-	y2 = bar->bar_bot_auto + bot_y;
-	x2 = bar->bar_bot_vert + bot_x;
-	if(y2 > width) { y2 = 0; bar->bar_bot_auto = 0; }
-	if(x2 > (bottom_height)) { x2 = 0; bar->bar_bot_vert = 0; }
-	/* start with bottom frame in a frame */
-	for ( y = bottom_height; y < height; y++) {
-		yy++;
-		for(x=0; x < bottom_width; x++ ) {
-			Y[ (y*width + x)] = Y2[((yy+x2)*width+x+y2)];
-			Cb[ (y*width + x)] = Cb2[((yy+x2)*width+x+y2)];
-			Cr[ (y*width + x)] = Cr2[((yy+x2)*width+x+y2)];
-		}
-	}
+    uint8_t *Y  = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
 
-	bar->bar_top_auto += top_y;
-	bar->bar_bot_auto += bot_y;
-	bar->bar_top_vert += top_x;
-	bar->bar_bot_vert += bot_x;
+    uint8_t *Y2  = frame2->data[0];
+    uint8_t *Cb2 = frame2->data[1];
+    uint8_t *Cr2 = frame2->data[2];
+
+    int dst_y_offset = bar->bar_top_auto + top_y;
+    int dst_x_offset = bar->bar_top_vert + top_x;
+
+    if (dst_y_offset >= width) {
+        dst_y_offset = 0;
+        bar->bar_top_auto = 0;
+    }
+    if (dst_x_offset >= top_height) {
+        dst_x_offset = 0;
+        bar->bar_top_vert = 0;
+    }
+
+    for (unsigned int y = 0; y < top_height; y++) {
+        unsigned int src_y = y + dst_x_offset;
+        for (unsigned int x = 0; x < top_width; x++) {
+            unsigned int src_x = x + dst_y_offset;
+            unsigned int dst_idx = y * width + x;
+            unsigned int src_idx = src_y * width + src_x;
+
+            Y[dst_idx]  = Y2[src_idx];
+            Cb[dst_idx] = Cb2[src_idx];
+            Cr[dst_idx] = Cr2[src_idx];
+        }
+    }
+
+    dst_y_offset = bar->bar_bot_auto + bot_y;
+    dst_x_offset = bar->bar_bot_vert + bot_x;
+
+    if (dst_y_offset >= width) {
+        dst_y_offset = 0;
+        bar->bar_bot_auto = 0;
+    }
+    if (dst_x_offset >= bottom_height) {
+        dst_x_offset = 0;
+        bar->bar_bot_vert = 0;
+    }
+
+    for (unsigned int y = 0; y < bottom_height; y++) {
+        unsigned int src_y = y + dst_x_offset;
+        for (unsigned int x = 0; x < bottom_width; x++) {
+            unsigned int src_x = x + dst_y_offset;
+            unsigned int dst_idx = (y + top_height) * width + x;
+            unsigned int src_idx = src_y * width + src_x;
+
+            Y[dst_idx]  = Y2[src_idx];
+            Cb[dst_idx] = Cb2[src_idx];
+            Cr[dst_idx] = Cr2[src_idx];
+        }
+    }
+
+    /* update bars */
+    bar->bar_top_auto  += top_y;
+    bar->bar_bot_auto  += bot_y;
+    bar->bar_top_vert  += top_x;
+    bar->bar_bot_vert  += bot_x;
 }
+
