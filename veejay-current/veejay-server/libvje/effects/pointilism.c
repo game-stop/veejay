@@ -181,7 +181,7 @@ void pointilism_apply(void *ptr, VJFrame *frame, int *args)
 
             int radius = minRadius + (lut[center_idx % total_pixels] % (maxRadius - minRadius + 1));
             int r2 = (radius * radius > 0) ? radius * radius : 1;
-            int invR2 = (FIXED_POINT_ONE << 16) / r2;
+            int64_t invR2 = (FIXED_POINT_ONE << 16) / r2;
 
             int startY = clamp(centerY - radius, 0, h - 1);
             int endY   = clamp(centerY + radius, 0, h - 1);
