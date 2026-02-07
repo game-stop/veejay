@@ -170,7 +170,6 @@ static void vj_event_sample_next1( veejay_t *v );
 
 extern void veejay_pipe_write_status(veejay_t *info);
 extern int  _vj_server_del_client(vj_server * vje, int link_id);
-extern int       vj_event_exists( int id );
 
 // forward decl
 int vj_event_get_video_format(void)
