@@ -31,6 +31,7 @@
 #include "effects/common.h"
 #include <libplugger/plugload.h>
 #include <veejaycore/vims.h>
+#include <libvje/libvje.h>
 
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -67,7 +68,7 @@ static struct {
     void  (*fx_filter)(void *ptr, VJFrame *frame, int *args);
     void  (*fx_process)(void *ptr, VJFrame *A, VJFrame *B, int *args);
     int   (*fx_transition_ready)(void *ptr, int w, int h );
-    int   (*fx_request_fx)(void);
+    int   (*fx_request_fx)();
     void  (*fx_request_set_private)(void *ptr, void *priv);
     int   fx_id;
 } vj_fx[] = {
@@ -75,6 +76,7 @@ static struct {
     { zoom_init, zoom_malloc, zoom_free, NULL, NULL, zoom_apply, NULL, NULL,NULL,NULL,VJ_IMAGE_EFFECT_ZOOM },
     { widthmirror_init, NULL, NULL, NULL, NULL, widthmirror_apply, NULL, NULL, NULL,NULL,VJ_IMAGE_EFFECT_WIDTHMIRROR },
     { mirror_init, mirror_malloc,mirror_free,NULL,NULL, mirror_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_MIRRORREFLECT },
+    { bathroom_init, bathroom_malloc, bathroom_free, NULL, NULL, bathroom_apply, NULL, NULL, NULL, NULL, VJ_IMAGE_EFFECT_BATHROOM },
     { whiteframe_init, NULL, NULL, NULL,NULL, NULL, whiteframe_apply,NULL, NULL,NULL,VJ_VIDEO_EFFECT_WHITEFRAME },
     { waterrippletv_init, waterrippletv_malloc, waterrippletv_free,NULL,NULL,waterrippletv_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_RIPPLETV },
     { water_init,water_malloc,water_free,NULL,NULL,NULL,water_apply, NULL,NULL,NULL, VJ_VIDEO_EFFECT_RIPPLETV },
