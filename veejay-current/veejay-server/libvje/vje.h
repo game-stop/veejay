@@ -50,7 +50,7 @@ typedef struct {
 #define FLAG_ALPHA_IN_OPERATOR (1<<5) /* logical operator */
 #define FLAG_ALPHA_IN_BLEND (1<<6) /* blend operator */
 
-typedef int (*is_transition_ready_func)(int width, int height);
+typedef int (*is_transition_ready_func)(void *ptr,int width, int height);
 
 typedef struct vj_effect_t {
 	char *description;			
@@ -74,7 +74,7 @@ typedef struct vj_effect_t {
 	int global;
 	int is_gen;
 	int is_plugin;
-	int (*is_transition_ready_func)(); //FIXME pass in private data
+	int (*is_transition_ready_func)(void *ptr, int w, int h); //FIXME pass in private data
     int (*prepare)(void *fx_instance, VJFrame *frame);
     int (*apply)(void *fx_instance, VJFrame *frame, int *parameter_values);
     int (*apply2)(void *fx_instance, VJFrame *frame, VJFrame *frame2, int *parameter_values);
