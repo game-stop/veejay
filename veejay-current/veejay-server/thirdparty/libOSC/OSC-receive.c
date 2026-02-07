@@ -26,6 +26,8 @@ The OpenSound Control WWW page is
     http://www.cnmat.berkeley.edu/OpenSoundControl
 */
 
+#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
 
 #define PARANOID 0
 /*
