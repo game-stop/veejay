@@ -1896,43 +1896,46 @@ inline void veejay_draw_circle(uint8_t *data, int cx, int cy, const int bw, cons
     }
 }
 
-#define max4(a,b,c,d) MAX(MAX(MAX(a,b),c),d)
-
-void	veejay_distance_transform8( uint8_t *plane, int w, int h, uint32_t *output)
+#define DT_MIN(a,b) ((a) < (b) ? (a) : (b))
+#define DT_MIN4(a,b,c,d) (DT_MIN(DT_MIN(a,b), DT_MIN(c,d)))
+#define DT_MIN5(a,b,c,d,e) (DT_MIN(DT_MIN4(a,b,c,d), e))
+void veejay_distance_transform8(uint8_t *plane, int w, int h, uint32_t *output)
 {
-	register unsigned int x,y;
-	const uint8_t *I = plane;
-	uint32_t *Id = output;
-	const uint32_t wid = w - 1;
-	const uint32_t hei = h - 2;
+    const int wid = w - 1;
+    const int hei = h - 2;
 
-	for( y = 1; y < hei; y ++ )
-	{
-		for( x = 1; x < wid; x ++ )
-		{
-			if( I[ y * w + x ] )
-				Id[ y * w + x ] = min4(
-					(Id[ (y-1) * w + (x-1) ]) + 1,
-					(Id[ (y-1) * w + x ]) + 1,
-					(Id[ (y-1) * w + (x+1) ]) + 1,
-					(Id[ y * w + (x-1) ]) + 1 );
-		}
-	}
-	
-	for( y = hei; y > 1; y -- )
-	{
-		for( x = wid; x > 1; x -- )
-		{
-			if( I[ y * w + x ] )	
-				Id[ y * w + x ] = min5(
-					(Id[ (y+1) * w + (x-1) ]) + 1,
-					Id[ y * w + x ],
-					(Id[ (y+1) * w + x ]) + 1,
-					(Id[ y * w + (x + 1) ]) + 1,
-					(Id[ (y+1) * w + (x+1) ]) + 1	
-			);
-		}
-	}
+    for (int y = 1; y < hei; y++) {
+        int y_idx = y * w;
+        int y_prev_idx = (y - 1) * w;
+
+        for (int x = 1; x < wid; x++) {
+            uint32_t mask = -(uint32_t)(!!plane[y_idx + x]);
+            uint32_t val = DT_MIN4(
+                output[y_prev_idx + x - 1] + 1,
+                output[y_prev_idx + x] + 1,
+                output[y_prev_idx + x + 1] + 1,
+                output[y_idx + x - 1] + 1
+            );
+            output[y_idx + x] = val & mask;
+        }
+    }
+
+    for (int y = hei; y > 1; y--) {
+        int y_idx = y * w;
+        int y_next_idx = (y + 1) * w;
+
+        for (int x = wid; x > 1; x--) {
+            uint32_t mask = -(uint32_t)(!!plane[y_idx + x]);
+            uint32_t val = DT_MIN5(
+                output[y_next_idx + x - 1] + 1,
+                output[y_idx + x],
+                output[y_next_idx + x] + 1,
+                output[y_idx + x + 1] + 1,
+                output[y_next_idx + x + 1] + 1
+            );
+            output[y_idx + x] = val & mask;
+        }
+    }
 }
 
 

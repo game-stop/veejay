@@ -54,7 +54,7 @@ vj_effect *diff_init(int width, int height)
 	ve->defaults[2] = 2;
 	ve->defaults[3] = 5;
 
-	ve->description = "Map B to A (substract background mask)";
+	ve->description = "Map B to A (subtract background mask)";
 	ve->extra_frame = 1;
 	ve->sub_format = 1;
 	ve->has_user = 1;
@@ -127,42 +127,59 @@ int diff_prepare(void *ptr, VJFrame *frame )
 	return 1;
 }
 
+// Frame difference binarify, SIMD-friendly
+static inline void diff_binarify_mask(uint8_t *dst,
+                                      const uint8_t *frameA,
+                                      const uint8_t *frameB,
+                                      int threshold,
+                                      int reverse,
+                                      size_t len)
+{
+#pragma omp simd
+    for (size_t i = 0; i < len; i++) {
+        int diff = (int)frameA[i] - (int)frameB[i];
+        diff = diff < 0 ? -diff : diff;  // absolute difference
+        uint8_t mask = (uint8_t)(-(diff > threshold)); // 0xFF if diff > threshold, else 0x00
+        dst[i] = reverse ? ~mask : mask;
+    }
+}
+
 void diff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
     int threshold = args[0];
-    int reverse = args[1];
-    int mode = args[2];
-    int feather = args[3];
+    int reverse   = args[1];
+    int mode      = args[2];
+    int feather   = args[3];
 
     diff_t *d = (diff_t*) ptr;
     const size_t len = (size_t)frame->len;
-    const uint8_t *Y2 = frame2->data[0];
-    const uint8_t *Cb2 = frame2->data[1];
-    const uint8_t *Cr2 = frame2->data[2];
 
-    uint8_t *Y = frame->data[0];
+    uint8_t *Y  = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
-    uint8_t *static_bg = d->static_bg;
-    uint8_t *data = d->data;
+    const uint8_t *Y2  = frame2->data[0];
+    const uint8_t *Cb2 = frame2->data[1];
+    const uint8_t *Cr2 = frame2->data[2];
+
+    uint8_t *data   = d->data;
     uint32_t *dt_map = d->dt_map;
 
     vj_frame_clear1((uint8_t*)dt_map, 0, len * sizeof(uint32_t));
 
-    binarify(data, static_bg, Y, threshold, reverse, len);
+    diff_binarify_mask(data, Y, Y2, threshold, reverse, len);
 
     veejay_distance_transform8(data, frame->width, frame->height, dt_map);
 
     if (mode == 1) {
-        veejay_memcpy( Y, data, len );
-		veejay_memset( Cb, 128, len );
-		veejay_memset( Cr, 128, len );
+        veejay_memcpy(Y, data, len);
+        veejay_memset(Cb, 128, len);
+        veejay_memset(Cr, 128, len);
         return;
-    } else if (mode == 2) {
+    } 
+    else if (mode == 2) {
 #pragma omp simd
         for (size_t i = 0; i < len; i++) {
             uint32_t dt = dt_map[i];
-
             uint8_t val_gt = 128 + (uint8_t)(dt % 128);
             uint8_t val = 0;
             uint8_t mask_feather = (dt == (uint32_t)feather);
@@ -179,6 +196,7 @@ void diff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
         }
         return;
     }
+
 #pragma omp simd
     for (size_t i = 0; i < len; i++) {
         uint32_t dt = dt_map[i];
@@ -189,8 +207,6 @@ void diff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
         Cr[i] = (Cr2[i] & mask) | (128 & ~mask);
     }
 }
-
-
 
 
 
