@@ -137,7 +137,6 @@ static inline void linearBlend(unsigned char *src, int stride)
 
      src++;
   }
-//#endif
 }
 
 matrix_t matrix_placementA(int photoindex, int size, int w , int h)
