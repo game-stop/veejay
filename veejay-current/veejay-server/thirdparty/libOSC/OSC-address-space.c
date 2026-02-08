@@ -227,10 +227,20 @@ static OSCMethod AllocMethod(void) {
 /* Managing the tree of containers and subcontainers, with aliases */
 #define MAX_CHILDREN_ARRAY 32
 void AddSubContainer(OSCcontainer parent, OSCcontainer child, Name name) {
-    if (parent->numChildren >= MAX_CHILDREN_PER_CONTAINER || parent->numChildren >= MAX_CHILDREN_ARRAY) {
-        fatal_error("AddSubContainer: exceeded limits (array size %d, configured MAX_CHILDREN_PER_CONTAINER %d)\n",
-                    MAX_CHILDREN_ARRAY, MAX_CHILDREN_PER_CONTAINER);
+    if (parent->numChildren >= MAX_CHILDREN_ARRAY) {
+        fatal_error(
+            "AddSubContainer: children array overflow (max %d)\n",
+            MAX_CHILDREN_ARRAY
+        );
     }
+
+    if (parent->numChildren >= MAX_CHILDREN_PER_CONTAINER) {
+        fatal_error(
+            "AddSubContainer: exceeded MAX_CHILDREN_PER_CONTAINER (%d)\n",
+            MAX_CHILDREN_PER_CONTAINER
+        );
+    }
+
 
     parent->childrenNames[parent->numChildren] = name;
     parent->children[parent->numChildren] = child;
