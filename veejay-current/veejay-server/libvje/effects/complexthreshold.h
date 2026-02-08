@@ -20,6 +20,6 @@
 
 #ifndef COMPLEXTHRESHOLD_H
 #define COMPLEXTHRESHOLD_H
-vj_effect *complexthreshold_init();
+vj_effect *complexthreshold_init(int w, int h);
 void complexthreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2,int *args);
 #endif

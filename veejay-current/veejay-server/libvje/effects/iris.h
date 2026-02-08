@@ -20,6 +20,6 @@
 
 #ifndef IRIS_H
 #define IRIS_H
-vj_effect *iris_init();
+vj_effect *iris_init(int w, int h);
 void iris_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args );
 #endif

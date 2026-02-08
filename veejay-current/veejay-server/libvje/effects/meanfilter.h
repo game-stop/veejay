@@ -21,8 +21,8 @@
 #ifndef MEANFILTER_H
 #define MEANFILTER_H
 vj_effect *meanfilter_init(int w, int h);
-void meanfilter_apply( VJFrame *frame );
-int meanfilter_malloc(int w, int h);
-void meanfilter_free();
+void meanfilter_apply( void *ptr, VJFrame *frame, int *args );
+void *meanfilter_malloc(int w, int h);
+void meanfilter_free(void *ptr);
 
 #endif

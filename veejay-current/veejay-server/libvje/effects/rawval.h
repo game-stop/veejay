@@ -20,6 +20,6 @@
 
 #ifndef RAWVAL_H
 #define RAWVAL_H
-vj_effect *rawval_init();
+vj_effect *rawval_init(int w, int h);
 void rawval_apply(void *ptr, VJFrame *frame, int *args);
 #endif

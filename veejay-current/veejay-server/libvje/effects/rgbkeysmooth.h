@@ -20,7 +20,7 @@
 
 #ifndef RGBKEYSMOOTH_H
 #define RGBKEYSMOOTH_H
-vj_effect *rgbkeysmooth_init();
+vj_effect *rgbkeysmooth_init(int w, int h);
 void *rgbkeysmooth_malloc(int w, int h);
 void rgbkeysmooth_free(void *ptr);
 void rgbkeysmooth_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args );

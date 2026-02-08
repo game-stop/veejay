@@ -20,6 +20,6 @@
 
 #ifndef COMPLEXINVERT_H
 #define COMPLEXINVERT_H
-vj_effect *complexinvert_init();
+vj_effect *complexinvert_init(int w, int h);
 void complexinvert_apply(void *ptr, VJFrame *frame, int *args);
 #endif

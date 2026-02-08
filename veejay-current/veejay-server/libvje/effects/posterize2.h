@@ -20,6 +20,6 @@
 
 #ifndef POSTERIZE2_H
 #define POSTERIZE2_H
-vj_effect *posterize2_init();
+vj_effect *posterize2_init(int w, int h);
 void posterize2_apply(void *ptr, VJFrame *frame, int *args);
 #endif

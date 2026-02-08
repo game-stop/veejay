@@ -20,6 +20,6 @@
 
 #ifndef WHITEFRAME_H
 #define WHITEFRAME_H
-vj_effect *whiteframe_init();
+vj_effect *whiteframe_init(int w, int h);
 void whiteframe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

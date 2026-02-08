@@ -20,7 +20,7 @@
 
 #ifndef COLFLASH_H
 #define COLFLASH_H
-vj_effect *colflash_init();
+vj_effect *colflash_init(int w, int h);
 void *colflash_malloc(int w, int h);
 void colflash_free(void *ptr);
 void colflash_apply(void *ptr, VJFrame *frame, int *arsg);

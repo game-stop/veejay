@@ -20,7 +20,7 @@
 
 #ifndef SLICER_H
 #define SLICER_H
-vj_effect *slicer_init();
+vj_effect *slicer_init(int w, int h);
 void slicer_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args );
 void *slicer_malloc (int w, int h );
 void slicer_free(void *ptr);

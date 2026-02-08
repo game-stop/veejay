@@ -20,7 +20,7 @@
 
 #ifndef DITHER_H
 #define DITHER_H
-vj_effect *dither_init();
+vj_effect *dither_init(int w, int h);
 void dither_apply(void *ptr, VJFrame *frame, int *args);
 void *dither_malloc(int w, int h);
 void dither_free(void *ptr);

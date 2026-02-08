@@ -20,7 +20,7 @@
 
 #ifndef FADECOLORRGB_H
 #define FADECOLORRGB_H
-vj_effect *fadecolorrgb_init();
+vj_effect *fadecolorrgb_init(int w, int h);
 void fadecolorrgb_apply(void *ptr, VJFrame *frame, int *args);
 void *fadecolorrgb_malloc(int w, int h);
 void fadecolorrgb_free(void *ptr);

@@ -20,7 +20,7 @@
 
 #ifndef BWSELECT_H
 #define BWSELECT_H
-vj_effect *bwselect_init();
+vj_effect *bwselect_init(int w, int h);
 void *bwselect_malloc(int w, int h);
 void bwselect_free(void *ptr);
 void bwselect_apply(void *ptr,VJFrame *frame, int *args);

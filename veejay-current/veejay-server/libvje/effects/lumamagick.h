@@ -20,6 +20,6 @@
 
 #ifndef LUMAMAGIC_H
 #define LUMAMAGIC_H
-vj_effect *lumamagick_init();
+vj_effect *lumamagick_init(int w, int h);
 void lumamagick_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

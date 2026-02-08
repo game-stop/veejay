@@ -20,6 +20,6 @@
 
 #ifndef ALPHASELECT_H
 #define ALPHASELECT_H
-vj_effect *alphaselect_init();
+vj_effect *alphaselect_init(int w, int h);
 void alphaselect_apply(void *ptr, VJFrame *frame, int *args );
 #endif

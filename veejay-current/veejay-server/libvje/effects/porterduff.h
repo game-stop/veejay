@@ -20,6 +20,6 @@
 
 #ifndef PORTERDUFF_H
 #define PORTERUDFF_H
-vj_effect *porterduff_init();
+vj_effect *porterduff_init(int w, int h);
 void porterduff_apply( void *ptr, VJFrame *frame, VJFrame *frame2,int *args );
 #endif

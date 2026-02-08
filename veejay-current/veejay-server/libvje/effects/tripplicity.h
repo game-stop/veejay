@@ -20,6 +20,6 @@
 
 #ifndef TRCITY_H
 #define TRCITY_H
-vj_effect *tripplicity_init();
+vj_effect *tripplicity_init(int w, int h);
 void tripplicity_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

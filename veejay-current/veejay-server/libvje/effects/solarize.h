@@ -20,6 +20,6 @@
 
 #ifndef SOLARIZE_H
 #define SOLARIZE_H
-vj_effect *solarize_init();
+vj_effect *solarize_init(int w, int h);
 void solarize_apply(void *ptr, VJFrame *frame, int *args);
 #endif

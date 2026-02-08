@@ -20,6 +20,6 @@
 
 #ifndef ISOLATE_H
 #define ISOLATE_H
-vj_effect *isolate_init();
+vj_effect *isolate_init(int w, int h);
 void isolate_apply( void *ptr, VJFrame *frame, int *args );
 #endif

@@ -20,6 +20,6 @@
 
 #ifndef DUPMAGIC_H
 #define DUPMAGIC_H
-vj_effect *dupmagic_init();
+vj_effect *dupmagic_init(int w, int h);
 void dupmagic_apply(void *ptr, VJFrame *frame, VJFrame *frame2,int *args);
 #endif

@@ -20,6 +20,6 @@
 
 #ifndef CONTRAST_H
 #define CONTRAST_H
-vj_effect *contrast_init();
+vj_effect *contrast_init(int w, int h);
 void contrast_apply(void *ptr, VJFrame *frame, int *t);
 #endif

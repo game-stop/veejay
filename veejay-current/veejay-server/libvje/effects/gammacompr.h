@@ -20,7 +20,7 @@
 
 #ifndef GAMMACOMPR_H
 #define GAMMACOMPR_H
-vj_effect *gammacompr_init();
+vj_effect *gammacompr_init(int w, int h);
 void gammacompr_apply(void *ptr, VJFrame *frame, int *args );
 void *gammacompr_malloc(int w, int h);
 void gammacompr_free(void *ptr);

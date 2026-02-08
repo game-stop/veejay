@@ -20,6 +20,6 @@
 
 #ifndef DIFFIMGEFFECT_H
 #define DIFFIMGEFFECT_H
-vj_effect *diffimg_init();
+vj_effect *diffimg_init(int w, int h);
 void diffimg_apply(void *ptr, VJFrame *frame, int *args);
 #endif

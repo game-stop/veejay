@@ -20,7 +20,7 @@
 
 #ifndef FADECOLOR_H
 #define FADECOLOR_H
-vj_effect *fadecolor_init();
+vj_effect *fadecolor_init(int w, int h);
 void *fadecolor_malloc(int w, int h);
 void fadecolor_free(void *ptr);
 void fadecolor_apply(void *ptr, VJFrame *frame, int *args);

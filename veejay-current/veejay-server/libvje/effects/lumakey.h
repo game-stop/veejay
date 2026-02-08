@@ -20,6 +20,6 @@
 
 #ifndef LUMAKEY_H
 #define LUMAKEY_H
-vj_effect *lumakey_init();
+vj_effect *lumakey_init(int w, int h);
 void lumakey_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

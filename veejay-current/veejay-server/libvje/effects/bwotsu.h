@@ -20,6 +20,6 @@
 
 #ifndef BWOTSU_H
 #define BWOTSU_H
-vj_effect *bwotsu_init();
+vj_effect *bwotsu_init(int w, int h);
 void bwotsu_apply(void *ptr, VJFrame *frame, int *args);
 #endif

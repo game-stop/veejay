@@ -20,6 +20,6 @@
 
 #ifndef FLIP_H
 #define FLIP_H
-vj_effect *flip_init();
+vj_effect *flip_init(int w, int h);
 void flip_apply(void *ptr, VJFrame *frame, int *args );
 #endif

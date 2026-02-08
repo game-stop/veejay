@@ -20,6 +20,6 @@
 
 #ifndef PENCILSKETCH_EFFECT_H
 #define PENCILSKETCH_EFFECT_H
-vj_effect *pencilsketch_init();
+vj_effect *pencilsketch_init(int w, int h);
 void pencilsketch_apply(void *ptr, VJFrame *frame, int *args);
 #endif

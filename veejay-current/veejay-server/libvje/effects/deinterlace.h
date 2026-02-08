@@ -20,6 +20,6 @@
 
 #ifndef DEINTERLACE_H
 #define DEINTERLACE_H
-vj_effect *deinterlace_init();
+vj_effect *deinterlace_init(int w , int h);
 void deinterlace_apply(void *ptr, VJFrame *frame, int *args);
 #endif

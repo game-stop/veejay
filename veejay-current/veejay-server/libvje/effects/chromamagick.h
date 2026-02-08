@@ -20,6 +20,6 @@
 
 #ifndef CHROMAMAGICK_H
 #define CHROMAMAGICK_H
-vj_effect *chromamagick_init();
+vj_effect *chromamagick_init(int w, int h);
 void chromamagick_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

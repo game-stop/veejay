@@ -20,7 +20,7 @@
 
 #ifndef GAMMA_H
 #define GAMMA_H
-vj_effect *gamma_init();
+vj_effect *gamma_init(int w, int h);
 void gamma_apply(void *ptr, VJFrame *frame, int *args);
 void gamma_free(void *ptr);
 void *gamma_malloc(int w, int h);

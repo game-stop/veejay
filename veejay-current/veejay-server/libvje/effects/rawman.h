@@ -20,6 +20,6 @@
 
 #ifndef RAWMAN_H
 #define RAWMAN_H
-vj_effect *rawman_init();
+vj_effect *rawman_init(int w, int h);
 void rawman_apply(void *ptr, VJFrame *frame, int *args);
 #endif

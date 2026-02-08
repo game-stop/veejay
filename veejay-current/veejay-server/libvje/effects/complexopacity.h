@@ -20,6 +20,6 @@
 
 #ifndef COMPLEXOP_H
 #define COMPLEXOP_H
-vj_effect *complexopacity_init();
+vj_effect *complexopacity_init(int w, int h);
 void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *bg, int *args);
 #endif

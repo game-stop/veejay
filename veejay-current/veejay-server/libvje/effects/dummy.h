@@ -20,7 +20,7 @@
 
 #ifndef DUMMY_H
 #define DUMMY_H
-vj_effect *dummy_init();
+vj_effect *dummy_init(int w, int h);
 void dummy_apply(VJFrame *frame, int n);
 void dummy_rgb_apply(VJFrame *frame, int r, int g, int b);
 #endif

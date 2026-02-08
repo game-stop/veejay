@@ -20,7 +20,7 @@
 
 #ifndef WIPE_H
 #define WIPE_H
-vj_effect *wipe_init();
+vj_effect *wipe_init(int w, int h);
 int  wipe_ready(void *ptr, int wid, int hei);
 void *wipe_malloc(int w, int h);
 void wipe_free(void *ptr);

@@ -20,6 +20,6 @@
 
 #ifndef MIRRORS2_H
 #define MIRRORS2_H
-vj_effect *mirrors2_init();
+vj_effect *mirrors2_init(int w, int h);
 void mirrors2_apply( void *ptr, VJFrame *frame, int *args );
 #endif

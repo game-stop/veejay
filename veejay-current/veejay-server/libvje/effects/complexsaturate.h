@@ -20,6 +20,6 @@
 
 #ifndef COMPLEXSATURATE_H
 #define COMPLEXSATURATE_H
-vj_effect *complexsaturation_init();
+vj_effect *complexsaturation_init(int w, int h);
 void complexsaturation_apply(void *ptr, VJFrame *frame, int *args);
 #endif

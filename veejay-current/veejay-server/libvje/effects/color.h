@@ -20,6 +20,6 @@
 
 #ifndef COLORVAL_H
 #define COLORVAL_H
-vj_effect *color_init();
+vj_effect *color_init(int w, int h);
 void color_apply(void *ptr, VJFrame *frame, int *args);
 #endif

@@ -20,6 +20,6 @@
 
 #ifndef CHROMAMAGICKALPHA_H
 #define CHROMAMAGICKALPHA_H
-vj_effect *chromamagickalpha_init();
+vj_effect *chromamagickalpha_init(int w, int h);
 void chromamagickalpha_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

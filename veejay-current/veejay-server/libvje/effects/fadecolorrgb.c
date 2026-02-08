@@ -57,6 +57,7 @@ vj_effect *fadecolorrgb_init(int w,int h)
     ve->extra_frame = 0;
 	ve->rgb_conv = 1;
 	ve->parallel = 1;
+    ve->sub_format = -1;
 	ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Red","Green", "Blue", "Mode", "Frame length");
     return ve;
 }

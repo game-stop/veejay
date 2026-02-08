@@ -20,6 +20,6 @@
 
 #ifndef GREYSELECT_H
 #define GREYSELECT_H
-vj_effect *greyselect_init();
+vj_effect *greyselect_init(int w, int h);
 void greyselect_apply( void *ptr, VJFrame *frame, int *args );
 #endif

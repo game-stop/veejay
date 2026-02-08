@@ -20,6 +20,6 @@
 
 #ifndef SIMPLEMASK_H
 #define SIMPLEMASK_H
-vj_effect *simplemask_init();
+vj_effect *simplemask_init(int w, int h);
 void simplemask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

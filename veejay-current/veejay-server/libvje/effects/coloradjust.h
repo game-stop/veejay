@@ -20,6 +20,6 @@
 
 #ifndef COLORADJUST_H
 #define COLORADJUST_H
-vj_effect *coloradjust_init();
+vj_effect *coloradjust_init(int w, int h);
 void coloradjust_apply(void *ptr, VJFrame *frame, int *args);
 #endif
