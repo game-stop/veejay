@@ -83,56 +83,61 @@ static inline double color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, c
 	return (tmp < dA) ? 0.0 : ((tmp < dB) ? ((tmp - dA) / (dB - dA)) : 1.0);
 }
 
-void alphaselect2_apply(void *ptr, VJFrame *frame, int *args) {
-    int tola = args[0];
-    int r = args[1];
-    int g = args[2];
-	int b = args[3];
-    int tolb = args[4];
-    int alpha = args[5];
 
-    unsigned int pos;
-	const int len = frame->len;
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *A  = frame->data[3];
-	int iy=0,iu=128,iv=128;
-	_rgb2yuv(r,g,b,iy,iu,iv);
+void alphaselect2_apply(void *ptr, VJFrame *frame, int *args)
+{
+    const int tola  = args[0];
+    const int r     = args[1];
+    const int g     = args[2];
+    const int b     = args[3];
+    const int tolb  = args[4];
+    const int alpha = args[5];
 
-	const double dtola = tola * 0.1f;
-	const double dtolb = tolb * 0.1f;
+    const int len = frame->len;
+    uint8_t * restrict Cb = frame->data[1];
+    uint8_t * restrict Cr = frame->data[2];
+    uint8_t * restrict A  = frame->data[3];
 
-	switch(alpha)
-	{
-		case 0:
-			for (pos = len; pos != 0; pos--) {
-				double d = color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb );
-				A[pos] = (uint8_t) (d*255.0); /* overwrite alpha regardless */
-			}
-			break;
+    int iy = 0, iu = 128, iv = 128;
+    _rgb2yuv(r, g, b, iy, iu, iv);
+
+    const double dtola = tola * 0.1;
+    const double dtolb = tolb * 0.1;
+    const int key_cb = iu;
+    const int key_cr = iv;
+
+    switch (alpha) {
+        case 0:
+            for (int pos = 0; pos < len; pos++) {
+                double d = color_distance(Cb[pos], Cr[pos], key_cb, key_cr, dtola, dtolb);
+                A[pos] = (uint8_t)(d * 255.0);
+            }
+            break;
+
 		case 1:
-			for (pos = len; pos != 0; pos--) {
-				double d = color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb );
-				if( A[pos] == 0 ) {
-					A[pos] = (uint8_t) (d * 255.0);
-				}
+			for (int pos = 0; pos < len; pos++) {
+				double d = color_distance(Cb[pos], Cr[pos], key_cb, key_cr, dtola, dtolb);
+				int new_alpha = (int)(d * 255.0);
+				int mask = -(A[pos] == 0);
+				A[pos] = (uint8_t)((new_alpha & mask) | (A[pos] & ~mask));
 			}
-			break;
-		case 2:
-			for (pos = len; pos != 0; pos--) {
-				double d = color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb );
-				uint8_t tmp = (uint8_t) (d * 255.0);
-				A[pos] = (A[pos] + tmp ) >> 1;
-			}
-			break;
-		case 3:
-			for (pos = len; pos != 0; pos--) {
-				double d = color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb );
-				int tmp = A[pos] + (uint8_t) (d * 255.0);    
-				A[pos] = ( tmp > 0xff ? 0xff: tmp );
-			}
-			break;
 
-	}
+
+        case 2:
+		    for (int pos = 0; pos < len; pos++) {
+                double d = color_distance(Cb[pos], Cr[pos], key_cb, key_cr, dtola, dtolb);
+                const uint8_t tmp = (uint8_t)(d * 255.0);
+                A[pos] = (uint8_t)((A[pos] + tmp) >> 1);
+            }
+            break;
+
+        case 3:
+		    for (int pos = 0; pos < len; pos++) {
+                double d = color_distance(Cb[pos], Cr[pos], key_cb, key_cr, dtola, dtolb);
+                int tmp = A[pos] + (uint8_t)(d * 255.0);
+                tmp = 255 + ((tmp - 255) & ((tmp - 255) >> 31));
+                A[pos] = (uint8_t)tmp;
+            }
+            break;
+    }
 }
-

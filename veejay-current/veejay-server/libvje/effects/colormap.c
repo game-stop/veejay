@@ -50,29 +50,33 @@ vj_effect *colormap_init(int w, int h)
     return ve;
 }
 
-void colormap_apply( void *ptr, VJFrame *frame, int *args ) {
+void colormap_apply(void *ptr, VJFrame *frame, int *args) {
     int r = args[0];
     int g = args[1];
     int b = args[2];
 
-    unsigned int i;
     const int uv_len = frame->uv_len;
-	
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
-	
-	uint8_t u_[256];
-	uint8_t v_[256];
 
-	for(i = 0; i < 256; i ++ )
-	{
-		u_[i] = ( i + b - g ) > 255 ? 255 : (( i + b - g) < 0 ? 0 : (  i + b - g ));
-		v_[i] = ( i + r -g ) > 255 ? 255 : (( i + r - g ) < 0 ? 0 : ( i + r - g ));
-	}
-    
-    for (i = 0; i < uv_len; i++)
-	{
-		Cb[i] = u_[ Cb[i] ];
-		Cr[i] = v_[ Cr[i] ];
-	}
+    uint8_t u_table[256];
+    uint8_t v_table[256];
+
+    for (int i = 0; i < 256; i++) {
+        int u = i + b - g;
+        int v = i + r - g;
+
+        u &= ~(u >> 31);
+        v &= ~(v >> 31);
+        int diff_u = u - 255;
+        int diff_v = v - 255;
+        u_table[i] = (uint8_t)(255 + (diff_u & (diff_u >> 31)));
+        v_table[i] = (uint8_t)(255 + (diff_v & (diff_v >> 31)));
+    }
+
+#pragma omp simd
+    for (int i = 0; i < uv_len; i++) {
+        Cb[i] = u_table[Cb[i]];
+        Cr[i] = v_table[Cr[i]];
+    }
 }

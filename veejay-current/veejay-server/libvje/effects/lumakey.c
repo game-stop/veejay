@@ -58,32 +58,37 @@ vj_effect *lumakey_init(int width, int height)
 	return ve;
 }
 
-static void lumakey_simple(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
-			int height, int threshold, int threshold2, int opacity)
+static void lumakey_simple(uint8_t *yuv1[3], uint8_t *yuv2[3], int width,
+                           int height, int threshold, int threshold2, int opacity)
 {
+    const unsigned int len = width * height;
+    unsigned int op1 = (opacity > 255) ? 255 : opacity;
+    unsigned int op0 = 255 - op1;
 
-	unsigned int x, y, len = width * height;
-	uint8_t a1, a2;
-	unsigned int op0, op1;
-	uint8_t Y, Cb, Cr;
-	op1 = (opacity > 255) ? 255 : opacity;
-	op0 = 255 - op1;
+    uint8_t *Y1  = yuv1[0];
+    uint8_t *Cb1 = yuv1[1];
+    uint8_t *Cr1 = yuv1[2];
 
-	for (y = 0; y < len; y += width) {
-		for (x = 0; x < width; x++) {
-			a1 = yuv1[0][x + y];
-			a2 = yuv2[0][x + y];
-			if (a1 >= threshold && a1 <= threshold2)
-			{
-				Y = (op0 * a1 + op1 * a2) >> 8;
-				Cb = ((op0 * yuv1[1][x + y]) + (op1 * yuv2[1][x + y]) ) >> 8;
-				Cr = ((op0 * yuv1[2][x + y]) + ( op1 * yuv2[2][x + y]) ) >> 8;
-				yuv1[0][x + y] = Y;		// < 16 ? 16 : Y > 235 ? 235 : Y;
-				yuv1[1][x + y] = Cb;	//	< 16 ? 16 : Cb > 240 ? 240 : Cb;
-				yuv1[2][x + y] = Cr;	//	< 16 ? 16 : Cr > 240 ? 240 : Cr;
-			}
-		}
-	}
+    uint8_t *Y2  = yuv2[0];
+    uint8_t *Cb2 = yuv2[1];
+    uint8_t *Cr2 = yuv2[2];
+
+#pragma omp simd
+    for (unsigned int pos = 0; pos < len; pos++) {
+        uint8_t a1 = Y1[pos];
+        uint8_t a2 = Y2[pos];
+
+        int mask = -((a1 - threshold) >> 31 ^ ((threshold2 - a1) >> 31 ^ 1));
+
+        // branchless blend
+        uint8_t Y  = (uint8_t)(((op0 * a1 + op1 * a2) & mask) | (a1 & ~mask));
+        uint8_t Cb = (uint8_t)(((op0 * Cb1[pos] + op1 * Cb2[pos]) & mask) | (Cb1[pos] & ~mask));
+        uint8_t Cr = (uint8_t)(((op0 * Cr1[pos] + op1 * Cr2[pos]) & mask) | (Cr1[pos] & ~mask));
+
+        Y1[pos]  = Y;
+        Cb1[pos] = Cb;
+        Cr1[pos] = Cr;
+    }
 }
 
 static void lumakey_smooth(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,

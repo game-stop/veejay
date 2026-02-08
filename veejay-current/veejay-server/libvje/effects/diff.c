@@ -127,84 +127,69 @@ int diff_prepare(void *ptr, VJFrame *frame )
 	return 1;
 }
 
-
-void diff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+void diff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
     int threshold = args[0];
     int reverse = args[1];
     int mode = args[2];
     int feather = args[3];
 
-	unsigned int i;
-	const int len = frame->len;
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
-	diff_t *d = (diff_t*) ptr;
+    diff_t *d = (diff_t*) ptr;
+    const size_t len = (size_t)frame->len;
+    const uint8_t *Y2 = frame2->data[0];
+    const uint8_t *Cb2 = frame2->data[1];
+    const uint8_t *Cr2 = frame2->data[2];
 
-    uint32_t *dt_map = d->dt_map;
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+
     uint8_t *static_bg = d->static_bg;
+    uint8_t *data = d->data;
+    uint32_t *dt_map = d->dt_map;
 
-	//@ clear distance transform map
-	vj_frame_clear1( (uint8_t*) dt_map, 0 , len * sizeof(uint32_t) );
+    vj_frame_clear1((uint8_t*)dt_map, 0, len * sizeof(uint32_t));
 
-	binarify( d->data, static_bg, frame->data[0], threshold, reverse,len );
+    binarify(data, static_bg, Y, threshold, reverse, len);
 
-	//@ calculate distance map
-	veejay_distance_transform8( d->data, width, height, dt_map );
-	
-	if(mode==1)
-	{
-		//@ show difference image in grayscale
-		vj_frame_copy1( d->data, Y, len );
-		vj_frame_clear1( Cb, 128, len );
-		vj_frame_clear1( Cr, 128, len );
+    veejay_distance_transform8(data, frame->width, frame->height, dt_map);
 
-		return;
-	} 
-	else if (mode == 2 )
-	{
-		//@ show dt map as grayscale image, intensity starts at 128
+    if (mode == 1) {
+        veejay_memcpy( Y, data, len );
+		veejay_memset( Cb, 128, len );
+		veejay_memset( Cr, 128, len );
+        return;
+    } else if (mode == 2) {
 #pragma omp simd
-		for( i = 0; i  < len ; i ++ )
-		{
-			if( dt_map[i] == feather )	
-				Y[i] = 0xff; //@ border white
-			else if( dt_map[i] > feather )	{
-				Y[i] = 128 + (dt_map[i] % 128); //grayscale value
-			} else if ( dt_map[i] == 1 ) {
-				Y[i] = 0xff;
-			} else {
-				Y[i] = 0;
-			}
-			Cb[i] = 128;	
-			Cr[i] = 128;
-		}
-		return;
-	}
+        for (size_t i = 0; i < len; i++) {
+            uint32_t dt = dt_map[i];
 
+            uint8_t val_gt = 128 + (uint8_t)(dt % 128);
+            uint8_t val = 0;
+            uint8_t mask_feather = (dt == (uint32_t)feather);
+            uint8_t mask_gt_feather = (dt > (uint32_t)feather);
+            uint8_t mask_one = (dt == 1);
+
+            val = mask_gt_feather ? val_gt : val;
+            val = mask_feather ? 0xFF : val;
+            val = mask_one ? 0xFF : val;
+
+            Y[i] = val;
+            Cb[i] = 128;
+            Cr[i] = 128;
+        }
+        return;
+    }
 #pragma omp simd
-	//@ process dt map
-	for( i = 0; i < len ;i ++ )
-	{
-		if( dt_map[ i ] >= feather )
-		{
-			Y[i] = Y2[i];
-			Cb[i] = Cb2[i];
-			Cr[i] = Cr2[i];
-		}
-		else
-		{
-			Y[i] = pixel_Y_lo_;
-			Cb[i] = 128;
-			Cr[i] = 128;
-		}
-	}
+    for (size_t i = 0; i < len; i++) {
+        uint32_t dt = dt_map[i];
+        uint32_t mask = -(dt >= (uint32_t)feather);
+
+        Y[i]  = (Y2[i] & mask) | (pixel_Y_lo_ & ~mask);
+        Cb[i] = (Cb2[i] & mask) | (128 & ~mask);
+        Cr[i] = (Cr2[i] & mask) | (128 & ~mask);
+    }
 }
+
 
 
 

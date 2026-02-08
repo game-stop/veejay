@@ -95,22 +95,23 @@ void isolate_apply( void *ptr, VJFrame *frame, int *args ) {
     fg_cb = Cb;
     fg_cr = Cr;
 
-#pragma omp simd
-    for (pos = len; pos != 0; pos--) {
-		short xx, yy;
-		xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
-		yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
-		val = (xx * accept_angle_tg) >> 4;
+    #pragma omp simd
+    for (pos = 0; pos < len; pos++) {
+        short xx = ((fg_cb[pos] * cb) + (fg_cr[pos] * cr)) >> 7;
+        short yy = ((fg_cr[pos] * cb) - (fg_cb[pos] * cr)) >> 7;
+        uint8_t val = (xx * accept_angle_tg) >> 4;
 
-		if (abs(yy) >= val) {
-			Y[pos]=opacity;
-			Cb[pos]=128;
-			Cr[pos]=128;
-		}
-		else {
-			Y[pos] = pixel_Y_lo_;
-			Cb[pos] = 128;
-			Cr[pos] = 128;
-		}
+        // branchless abs for yy
+        int abs_yy = (yy ^ (yy >> 15)) - (yy >> 15);
+
+        // mask = 0xFF if abs_yy >= val, 0 otherwise
+        int mask = -((abs_yy - val) >> 31 ^ 1);
+
+        // branchless Y assignment
+        Y[pos]  = (Y[pos] & ~mask) | (opacity & mask);
+        // Cb/Cr are always 128
+        Cb[pos] = 128;
+        Cr[pos] = 128;
     }
+
 }

@@ -50,44 +50,42 @@ vj_effect *cartonize_init(int w, int h)
     return ve;
 }
 
-void cartonize_apply( void *ptr, VJFrame *frame, int *args) {
+void cartonize_apply(void *ptr, VJFrame *frame, int *args) {
     int b1 = args[0];
     int b2 = args[1];
     int b3 = args[2];
 
-    unsigned int i;
     const int len = frame->len;
-    int uv_len = (frame->ssm ? len : frame->uv_len);
-	uint8_t tmp;
-	int p;
-    uint8_t *Y = frame->data[0];
+    const int uv_len = frame->ssm ? len : frame->uv_len;
+
+    uint8_t *Y  = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
-	const int base = (const int) b1;
-	int	ubase= (const int) b2 - 128;
-	int vbase= (const int) b3 - 128;
-	// ubase/vbase cannot be 0
-	if(ubase==0) ubase=1;
-	if(vbase==0) vbase=1;
-	for( i = 0 ; i < len ; i ++ )
-	{
-		tmp = Y[i];
-		Y[i] = (tmp / base) * base; // loose fractional part
-	}
+    int ubase = b2 - 128;
+    int vbase = b3 - 128;
 
-	if(b2 > 0)
-	for( i = 0; i < uv_len; i ++ )
-	{
-		p = Cb[i] - 128;
-		Cb[i] = (p / ubase) * ubase + 128;
-	}
+    if (ubase == 0) ubase = 1;
+    if (vbase == 0) vbase = 1;
 
-	if(b3> 0 )
-	for( i = 0; i < uv_len; i ++ )
-	{
-		p = Cr[i] - 128;
-		Cr[i] = (p / vbase) * vbase + 128;
-	}
+#pragma omp simd
+    for (int i = 0; i < len; i++) {
+        Y[i] = (Y[i] / b1) * b1;
+    }
 
+    if (b2 > 0) {
+#pragma omp simd
+        for (int i = 0; i < uv_len; i++) {
+            int p = Cb[i] - 128;
+            Cb[i] = (p / ubase) * ubase + 128;
+        }
+    }
+
+    if (b3 > 0) {
+#pragma omp simd
+        for (int i = 0; i < uv_len; i++) {
+            int p = Cr[i] - 128;
+            Cr[i] = (p / vbase) * vbase + 128;
+        }
+    }
 }

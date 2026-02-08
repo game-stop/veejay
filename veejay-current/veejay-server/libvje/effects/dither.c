@@ -105,35 +105,29 @@ void dither_apply(void *ptr, VJFrame *frame, int *args) {
     int random_on = args[1];
 
     dither_t *dh = (dither_t*) ptr;
-
-	int w_, h_;
-	int i, j, d, v, l, m;
-	uint8_t *Y = frame->data[0];
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
+    const unsigned int width = frame->width;
+    const unsigned int height = frame->height;
+    uint8_t *Y = frame->data[0];
     int **dith = dh->dith;
 
-	if( dh->last_size != size || random_on )
-	{
-		for (l = 0; l < size; l++)
-		{
-			for (m = 0; m < size; m++)
-			{
-				dith[l][m] = (int) ((double) (size) * rand() / (RAND_MAX + 1.0));
-			}
-		}
-		dh->last_size = size;
-	}
+    if(dh->last_size != size || random_on) {
+        for(int j = 0; j < size; j++) {
+            for(int i = 0; i < size; i++) {
+                dith[i][j] = (int)((double)size * rand() / (RAND_MAX + 1.0));
+            }
+        }
+        dh->last_size = size;
+    }
 
-	for (h_ = 0; h_ < height; h_++)
-	{
-		j = h_ % size;
-		for (w_ = 0; w_ < width; w_++)
-		{
-			i = w_ % size;
-			d = dith[i][j] << 4;
-			v = ((long) Y[((h_ * width) + w_)] + d);
-			Y[(h_ * width) + w_] = (uint8_t) ((v >> 7) << 7);
-		}
-	}
+    for(size_t y = 0; y < height; y++) {
+        int j = y % size;
+        size_t row_base = y * width;
+#pragma omp simd
+        for(size_t x = 0; x < width; x++) {
+            int i = x % size;
+            int d = dith[i][j] << 4;
+            int v = Y[row_base + x] + d;
+            Y[row_base + x] = (uint8_t)((v >> 7) << 7);
+        }
+    }
 }

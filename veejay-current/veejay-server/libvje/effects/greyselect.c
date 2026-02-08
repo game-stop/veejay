@@ -61,7 +61,7 @@ vj_effect *greyselect_init(int w, int h)
     return ve;
 }
 
-void greyselect_apply( void *ptr, VJFrame *frame, int *args ) {
+void greyselect_apply(void *ptr, VJFrame *frame, int *args) {
     int i_angle = args[0];
     int r = args[1];
     int g = args[2];
@@ -69,56 +69,33 @@ void greyselect_apply( void *ptr, VJFrame *frame, int *args ) {
     int swap = args[4];
 
     const int len = frame->len;
-    uint8_t *fg_cb, *fg_cr;
-    int accept_angle_tg;
-    int cb, cr;
-    float tmp, aa = 255.0f, bb = 255.0f;
-    float angle = (float) i_angle / 100.0f;
-    unsigned int pos;
-    uint8_t val;
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
-    int iy=0,iu=128,iv=128;
-    _rgb2yuv(r,g,b,iy,iu,iv);
-    aa = (float) iu;
-    bb = (float) iv;
 
-    tmp = sqrt(((aa * aa) + (bb * bb)));
-    cb = 255 * (aa / tmp);
-    cr = 255 * (bb / tmp);
-   
-    /* obtain coordinate system for cb / cr */
-    accept_angle_tg = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
+    int iy=0, iu=128, iv=128;
+    _rgb2yuv(r, g, b, iy, iu, iv);
 
-    /* intialize pointers */
-    fg_cb = Cb;
-    fg_cr = Cr;
+    float aa = (float) iu;
+    float bb = (float) iv;
 
-    if( swap == 0 ) {
-        for (pos = len; pos != 0; pos--) {
-            short xx, yy;
-            xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
-            yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
-            val = (xx * accept_angle_tg) >> 4;
+    float tmp = sqrtf(aa * aa + bb * bb);
+    const int cb = 255 * (aa / tmp);
+    const int cr = 255 * (bb / tmp);
 
-            if (abs(yy) > val) {
-                Cb[pos]=128;
-                Cr[pos]=128;
-            }
-        }
-    }
-    else {
-        for (pos = len; pos != 0; pos--) {
-            short xx, yy;
-            xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
-            yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
-            val = (xx * accept_angle_tg) >> 4;
+    int accept_angle_tg = (int)(15.0f * tanf(M_PI * ((float)i_angle / 100.0f)));
 
-            if (abs(yy) <= val) {
-                Cb[pos]=128;
-                Cr[pos]=128;
-            }
-        }
+#pragma omp simd
+    for (unsigned int pos = 0; pos < len; pos++) {
+        short xx = ((Cb[pos] * cb) + (Cr[pos] * cr)) >> 7;
+        short yy = ((Cr[pos] * cb) - (Cb[pos] * cr)) >> 7;
+        int val = (xx * accept_angle_tg) >> 4;
+
+        int abs_yy = (yy ^ (yy >> 15)) - (yy >> 15);
+
+        int mask = swap ? -((abs_yy - val) >> 31) : -((abs_yy - val) >> 31 ^ 1);
+
+        Cb[pos] = (Cb[pos] & ~mask) | (128 & mask);
+        Cr[pos] = (Cr[pos] & ~mask) | (128 & mask);
     }
 }
 

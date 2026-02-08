@@ -54,65 +54,63 @@ vj_effect *contrast_init(int w, int h)
     return ve;
 }
 
-/* also from yuvdenoise */
-static void contrast_cb_apply(VJFrame *frame, int *s) {
-	unsigned int r;
-	register int cb;
-	register int cr;
-	const int uv_len = (frame->ssm ? frame->len: frame->uv_len);
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
 
-#pragma omp simd
-	for(r=0; r < uv_len; r++) {
-		cb = Cb[r];
-		cb -= 128;
-		cb *= s[2];
-		cb = (cb + 50)/100;
-		cb += 128;
-
-		cr = Cr[r];
-		cr -= 128;
-		cr *= s[2];
-		cr = (cr + 50)/100;
-		cr += 128;
-
-		Cb[r] = CLAMP_UV(cb);
-		Cr[r] = CLAMP_UV(cr);
-	}
-}
-
-static void contrast_y_apply(VJFrame *frame, int *s) {
-	unsigned int r;
-	register int m;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-#pragma omp simd
-	for(r=0; r < len; r++) {
-		m = Y[r];
-		m -= 128;
-		m *= s[1];
-		m = (m + 50)/100;
-		m += 128;
-		Y[r] = CLAMP_Y(m);
-    }
-
-}
-
-void contrast_apply(void *ptr, VJFrame *frame,int *s )
+static void contrast_y_apply(VJFrame *frame, int *s)
 {
-	switch(s[0])
-	{
-		case 0:
-			contrast_y_apply(frame, s);
-			break;
-		case 1:
-			contrast_cb_apply(frame, s);
-			break;
-		case 2:
-			contrast_y_apply(frame, s);
-			contrast_cb_apply(frame, s);
-			break;
-	}
+    const int len = frame->len;
+    uint8_t *Y = frame->data[0];
+
+    const int scale_fp = (s[1] << 8) / 100;
+
+#pragma omp simd
+    for (int r = 0; r < len; r++) {
+        int m = Y[r] - 128;
+        m = (m * scale_fp) >> 8;
+        m += 128;
+
+		int tmp = m & ~(m >> 31);
+		Y[r] = 255 + ((tmp - 255) & ((tmp - 255) >> 31));
+    }
 }
 
+static void contrast_cb_apply(VJFrame *frame, int *s)
+{
+    const int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+
+    const int scale_fp = (s[2] << 8) / 100;
+
+#pragma omp simd
+    for (int r = 0; r < uv_len; r++) {
+        int cb = (Cb[r] - 128) * scale_fp >> 8;
+        int cr = (Cr[r] - 128) * scale_fp >> 8;
+        cb += 128;
+        cr += 128;
+
+		int tmp_cb = cb & ~(cb >> 31);
+		Cb[r] = 255 + ((tmp_cb - 255) & ((tmp_cb - 255) >> 31));
+
+		int tmp_cr = cr & ~(cr >> 31);
+		Cr[r] = 255 + ((tmp_cr - 255) & ((tmp_cr - 255) >> 31));
+
+
+    }
+}
+
+void contrast_apply(void *ptr, VJFrame *frame, int *s)
+{
+    switch (s[0])
+    {
+        case 0:
+            contrast_y_apply(frame, s);
+            break;
+        case 1:
+            contrast_cb_apply(frame, s);
+            break;
+        case 2:
+            contrast_y_apply(frame, s);
+            contrast_cb_apply(frame, s);
+            break;
+    }
+}

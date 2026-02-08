@@ -315,6 +315,7 @@ static const uint8_t esses_table[768] =
   "\211\211\206\211\206\206\202\202\202\200\200~~~|||yyywywuuusssqqqqqqnonn"
   "lljljhhhghgeeececbcb``b___]]]\\\\\\ZZZZZYWYYVVWTVTTTSSQQ";
 
+
 vj_effect *colortap_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -337,7 +338,7 @@ vj_effect *colortap_init(int w, int h)
     ve->hints = vje_init_value_hint_list( ve->num_params );
 
     vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
-		"Sepia", "Heat", "Red-Green", "Old Photo", "XRay", "Esses", "Yellow-Blue", "XPro" );
+		"Sepia", "Heat", "Red-Green", "Old Photo", "XRay", "Esses", "Yellow-Blue", "XPro");
 
 
 
@@ -416,10 +417,12 @@ void colortap_apply( void *ptr, VJFrame *frame, int *args ) {
 
 	}
 
+#pragma omp simd
 	for( int i = 0; i < len; i ++ ) {
 		Y[i] = tY[ Y[i] ];
 	}
 	
+#pragma omp simd    
 	for( int i = 0; i < uv_len; i ++ ) {
 		U[i] = tU[ U[i] ];
 		V[i] = tV[ V[i] ];

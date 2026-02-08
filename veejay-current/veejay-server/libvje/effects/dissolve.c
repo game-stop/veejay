@@ -41,38 +41,31 @@ vj_effect *dissolve_init(int w, int h)
     return ve;
 }
 
-void dissolve_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+void dissolve_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
     int opacity = args[0];
 
-    unsigned int i;
-    const int len = frame->len;
+    const size_t len = (size_t)frame->len;
     const int op1 = (opacity > 255) ? 255 : opacity;
     const int op0 = 255 - op1;
 
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
 
-    for (i = 0; i < len; i++)
-    {
-	// set pixel as completely transparent or completely solid
+    uint8_t *Y2 = frame2->data[0];
+    uint8_t *Cb2 = frame2->data[1];
+    uint8_t *Cr2 = frame2->data[2];
 
-	if(Y[i] > opacity) // completely transparent
-	{
-		Y[i] = (op0 * Y[i] + op1 * Y2[i]) >> 8;
-		Cb[i] = (op0 * Cb[i] + op1 * Cb2[i]) >> 8;
-		Cr[i] = (op0 * Cr[i] + op1 * Cr2[i]) >> 8;
-	}
-	else // pixel is solid
-	{
-		Y[i] = Y2[i];
-		Cb[i] = Cb2[i];
-		Cr[i] = Cr2[i];
-	}
+#pragma omp simd
+    for (size_t i = 0; i < len; i++) {
+        uint32_t mask = -(Y[i] > opacity);
 
+        uint32_t y_blend  = (op0 * Y[i] + op1 * Y2[i]) >> 8;
+        uint32_t cb_blend = (op0 * Cb[i] + op1 * Cb2[i]) >> 8;
+        uint32_t cr_blend = (op0 * Cr[i] + op1 * Cr2[i]) >> 8;
+
+        Y[i]  = (y_blend & mask) | (Y2[i] & ~mask);
+        Cb[i] = (cb_blend & mask) | (Cb2[i] & ~mask);
+        Cr[i] = (cr_blend & mask) | (Cr2[i] & ~mask);
     }
 }
-

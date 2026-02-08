@@ -22,7 +22,10 @@
 #include <veejaycore/vjmem.h>
 #include "meanfilter.h"
 
-static uint8_t *mean = NULL;
+typedef struct {
+	uint8_t *mean;
+} mean_t;
+
 
 vj_effect *meanfilter_init(int w, int h)
 {
@@ -36,29 +39,37 @@ vj_effect *meanfilter_init(int w, int h)
     return ve;
 }
 
-int meanfilter_malloc(int w, int h)
+void *meanfilter_malloc(int w, int h)
 {
-	if( mean == NULL ) {
-		mean =  (uint8_t*) vj_calloc( (w*h) );
-		if( mean == NULL )
-			return 0;
+	mean_t *m = (mean_t*) vj_malloc(sizeof(mean_t));
+	if(!m) 
+		return NULL;
+	m->mean = (uint8_t*) vj_calloc( (w*h) );
+	
+	if(m->mean == NULL ) {
+		free(m);
+		return NULL;
 	}
 
-	return 1;
+	return (void*) m;
 }
 
-void meanfilter_free()
+void meanfilter_free(void *ptr)
 {
-	if( mean ) {
-		free(mean);
-		mean = NULL;
-	}
+	if(!ptr) return;
+
+	mean_t *m = (mean_t*) ptr;
+	if(m->mean)
+	  free(m->mean);
+	free(m);
+	m = NULL;
 }
 
 
-void meanfilter_apply( VJFrame *frame )
+void meanfilter_apply( void *ptr, VJFrame *frame, int *args )
 {
-	vje_mean_filter( frame->data[0], mean, frame->width, frame->height );
+	mean_t *m = (mean_t*) ptr;
+	vje_mean_filter( frame->data[0], m->mean, frame->width, frame->height );
 
-	veejay_memcpy( frame->data[0], mean, frame->len );
+	veejay_memcpy( frame->data[0], m->mean, frame->len );
 }

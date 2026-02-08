@@ -61,24 +61,23 @@ vj_effect *constantblend_init(int w, int h)
     return ve;
 }
 
-void constantblend_apply( void *ptr, VJFrame *frame, int *args ) {
+void constantblend_apply(void *ptr, VJFrame *frame, int *args) {
     int type = args[0];
     int scale = args[1];
     int valY = args[2];
 
-	unsigned int i;
-	const int len = frame->len;
-	const uint8_t y = (uint8_t) valY;
-	const float   s = ((float) scale / 100.0 );
+    const int len = frame->len;
+    const uint8_t y = (uint8_t) valY;
 
-	pix_func_Y	blend_y    = get_pix_func_Y( type );
+    const int s_fp = (scale * 256) / 100;
 
-	uint8_t *Y = frame->data[0];
+    pix_func_Y blend_y = get_pix_func_Y(type);
+    uint8_t *Y = frame->data[0];
 
-	for (i = 0; i < len; i++)
-	{
-		int tmp_val =(int)( ((float) *(Y)) * s);
-		*(Y)++ = blend_y( (uint8_t) ( (uint8_t) tmp_val ) , y ); 
-   	}
-
+    for (int i = 0; i < len; i++) {
+        int tmp_val = (*Y * s_fp) >> 8;
+        *Y = blend_y((uint8_t)tmp_val, y);
+        Y++;
+    }
 }
+

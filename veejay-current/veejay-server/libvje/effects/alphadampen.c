@@ -24,37 +24,45 @@
 
 vj_effect *alphadampen_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *)vj_calloc(sizeof(vj_effect));
     ve->num_params = 1;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults  = (int *)vj_calloc(sizeof(int) * ve->num_params); /* default values */
+    ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params); /* min */
+    ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params); /* max */
+
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 255;
     ve->defaults[0] = 64;
-    ve->description = "Alpha: Dampen";
-    ve->sub_format = -1;
-    ve->extra_frame = 0;
-	ve->has_user = 0;
-	ve->parallel = 1;
-	ve->param_description = vje_build_param_list( ve->num_params, "Dampening value" );
-	ve->alpha = FLAG_ALPHA_OUT;
-	return ve;
+
+    ve->description       = "Alpha: Dampen";
+    ve->sub_format        = -1;
+    ve->extra_frame       = 0;
+    ve->has_user          = 0;
+    ve->parallel          = 1;
+    ve->param_description = vje_build_param_list(ve->num_params, "Dampening value");
+    ve->alpha             = FLAG_ALPHA_OUT;
+
+    return ve;
 }
 
-void alphadampen_apply( void *ptr, VJFrame *frame, int *args ) {
-    int b1 = args[0];
+void alphadampen_apply(void *ptr, VJFrame *frame, int *args)
+{
+    int base = args[0];
+    if (base <= 0) base = 1; /* safety guard */
 
-	size_t i;
-	const int len = frame->len;
-	uint8_t tmp;
-	uint8_t *A = frame->data[3];
+    uint8_t *A = frame->data[3];
+    const int len = frame->len;
 
-	const int base = (const int) b1;
-	for( i = 0 ; i < len ; i ++ )
-	{
-		tmp = A[i];
-		A[i] = (tmp / base) * base; // drop fractional part
-	}
+    /* if base is power-of-2, replace division with mask for speed */
+    if ((base & (base - 1)) == 0) {
+        const uint8_t mask = ~(base - 1);
+        for (int i = 0; i < len; i++) {
+            A[i] &= mask;
+		 }
+    } else {
+        for (int i = 0; i < len; i++) {
+            A[i] = (A[i] / base) * base;
+        }
+    }
 }

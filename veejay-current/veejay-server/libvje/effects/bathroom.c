@@ -101,133 +101,144 @@ void bathroom_free(void *ptr) {
     free(b);
 }
 
-static void bathroom_verti_apply(bathroom_t *b, VJFrame *frame, int val, int x0, int x1 )
+static void bathroom_verti_apply(bathroom_t *b, VJFrame *frame, int val, int x0, int x1)
 {
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
+    const unsigned int width  = frame->width;
+    const unsigned int height = frame->height;
     const int len = frame->len;
-    unsigned int y_val = val;
-    unsigned int x,y;
-    uint8_t *Y = frame->data[0];
+
+    if (val <= 0) val = 1;
+    const int half_val = val >> 1;
+
+    uint8_t *Y  = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
-	int strides[4] = { len, len, len, 0 };
-	int i;
 
     uint8_t **bathroom_frame = b->bathroom_frame;
-    
-	vj_frame_copy( frame->data, bathroom_frame, strides );
 
-    if( y_val <= 0 )
-		y_val = 1;
+    vj_frame_copy(frame->data, bathroom_frame, NULL);
 
-    for(y=0; y < height;y++) {
-        for(x=x0; x < x1; x++) {
-	        i = (x + (x % y_val) - (y_val>>1)) + (y*width);
-	        if( i < 0 ) i = 0; else if ( i > len ) i = len;
-	        Y[y*width+x] = bathroom_frame[0][i];
-	        Cb[y*width+x] = bathroom_frame[1][i];
-	        Cr[y*width+x] = bathroom_frame[2][i];
+    for (unsigned int y = 0; y < height; y++) {
+        for (unsigned int x = x0; x < x1; x++) {
+            int src_idx = x + (x % val) - half_val + y * width;
+
+            src_idx &= ~(src_idx >> 31);
+            int diff = src_idx - (len - 1);
+            src_idx = (len - 1) + (diff & (diff >> 31));
+
+            Y[y*width + x]  = bathroom_frame[0][src_idx];
+            Cb[y*width + x] = bathroom_frame[1][src_idx];
+            Cr[y*width + x] = bathroom_frame[2][src_idx];
         }
     }
 }
 
-static void	bathroom_alpha_verti_apply(bathroom_t *b, VJFrame *frame, int val, int x0, int x1)
+static void bathroom_alpha_verti_apply(bathroom_t *b, VJFrame *frame, int val, int x0, int x1)
 {
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
+    const unsigned int width  = frame->width;
+    const unsigned int height = frame->height;
     const int len = frame->len;
-    unsigned int y_val = val;
-    unsigned int x,y;
-    uint8_t *Y = frame->data[0];
+
+    if (val <= 0) val = 1;
+    const int half_val = val >> 1;
+
+    uint8_t *Y  = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
-	uint8_t *A = frame->data[3];
-	int strides[4] = { len, len, len, len };
-	int i;
+    uint8_t *A  = frame->data[3];
 
     uint8_t **bathroom_frame = b->bathroom_frame;
 
-	vj_frame_copy( frame->data, bathroom_frame, strides );
+    int strides[4] = {len, len, len, len};
+    vj_frame_copy(frame->data, bathroom_frame, strides);
 
-    if( y_val <= 0 )
-		y_val = 1;
+    for (unsigned int y = 0; y < height; y++) {
+        for (unsigned int x = x0; x < x1; x++) {
+            int src_idx = x + (x % val) - half_val + y * width;
 
-    for(y=0; y < height;y++) {
-     for(x=x0; x < x1; x++) {
-		i = (x + (x % y_val) - (y_val>>1)) + (y*width);
-		if( i < 0 ) i = 0; else if ( i > len ) i = len;
+            src_idx &= ~(src_idx >> 31);
+            int diff = src_idx - (len - 1);
+            src_idx = (len - 1) + (diff & (diff >> 31));
 
-		Y[y*width+x] = bathroom_frame[0][i];
-		Cb[y*width+x] = bathroom_frame[1][i];
-		Cr[y*width+x] = bathroom_frame[2][i];
-		A[y*width+x] = bathroom_frame[3][i];
-     }
+            Y[y*width + x]  = bathroom_frame[0][src_idx];
+            Cb[y*width + x] = bathroom_frame[1][src_idx];
+            Cr[y*width + x] = bathroom_frame[2][src_idx];
+            A[y*width + x]  = bathroom_frame[3][src_idx];
+        }
     }
 }
 
+
 static void bathroom_hori_apply(bathroom_t *b, VJFrame *frame, int val, int x0, int x1)
 {
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
+    const unsigned int width  = frame->width;
+    const unsigned int height = frame->height;
     const int len = frame->len;
-    unsigned int y_val = val;
-    uint8_t *Y = frame->data[0];
+
+    if (val <= 0) val = 1;
+    const int half_val = val >> 1;
+
+    uint8_t *Y  = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
-    unsigned int x,y;
-	int i;
-	int strides[4] = { len, len, len, 0 };
-
     uint8_t **bathroom_frame = b->bathroom_frame;
 
-	vj_frame_copy( frame->data, bathroom_frame, strides );
+    int strides[4] = {len, len, len, 0};
+    vj_frame_copy(frame->data, bathroom_frame, strides);
 
-    for(y=0; y < height;y++) {
-     for(x=x0; x < x1; x++) {
-		i = ((y*width) + (y % y_val) - (y_val>>1)) + x;
-		if( i < 0 ) i = 0; else if ( i > len ) i = len;
+    for (unsigned int y = 0; y < height; y++) {
+        int y_offset = (y % val) - half_val;
+        for (unsigned int x = x0; x < x1; x++) {
+            int src_idx = (y * width) + y_offset + x;
 
-		Y[(y*width)+x] = bathroom_frame[0][i];
-		Cb[(y*width)+x] = bathroom_frame[1][i];
-		Cr[(y*width)+x] = bathroom_frame[2][i];
-     }
+            src_idx &= ~(src_idx >> 31);
+            int diff = src_idx - (len - 1);
+            src_idx = (len - 1) + (diff & (diff >> 31));
+
+            Y[y*width + x]  = bathroom_frame[0][src_idx];
+            Cb[y*width + x] = bathroom_frame[1][src_idx];
+            Cr[y*width + x] = bathroom_frame[2][src_idx];
+        }
     }
 }
 
 static void bathroom_alpha_hori_apply(bathroom_t *b, VJFrame *frame, int val, int x0, int x1)
 {
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
+    const unsigned int width  = frame->width;
+    const unsigned int height = frame->height;
     const int len = frame->len;
-    unsigned int y_val = val;
-    uint8_t *Y = frame->data[0];
+
+    if (val <= 0) val = 1;
+    const int half_val = val >> 1;
+
+    uint8_t *Y  = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
-	uint8_t *A = frame->data[3];
-	
-    unsigned int x,y;
-	int strides[4] = { len, len, len, len };
-	int i;
+    uint8_t *A  = frame->data[3];
 
     uint8_t **bathroom_frame = b->bathroom_frame;
 
-	vj_frame_copy( frame->data, bathroom_frame, strides );
+    int strides[4] = {len, len, len, len};
+    vj_frame_copy(frame->data, bathroom_frame, strides);
 
-    for(y=0; y < height;y++) {
-     for(x=x0; x < x1; x++) {
-		i = ((y*width) + (y % y_val) - (y_val>>1)) + x;
-		if( i < 0 ) i = 0; else if ( i > len ) i = len;
+    for (unsigned int y = 0; y < height; y++) {
+        int y_offset = (y % val) - half_val;
 
-		Y[(y*width)+x] = bathroom_frame[0][i];
-		Cb[(y*width)+x] = bathroom_frame[1][i];
-		Cr[(y*width)+x] = bathroom_frame[2][i];
-		A[(y*width)+x] = bathroom_frame[3][i];
-     }
+        for (unsigned int x = x0; x < x1; x++) {
+            int src_idx = (y * width) + y_offset + x;
+
+            src_idx &= ~(src_idx >> 31);
+            int diff = src_idx - (len - 1);
+            src_idx = (len - 1) + (diff & (diff >> 31));
+
+            Y[y*width + x]  = bathroom_frame[0][src_idx];
+            Cb[y*width + x] = bathroom_frame[1][src_idx];
+            Cr[y*width + x] = bathroom_frame[2][src_idx];
+            A[y*width + x]  = bathroom_frame[3][src_idx];
+        }
     }
 }
-
 
 void bathroom_apply(void *ptr, VJFrame *frame, int *args) {
     int mode = args[0];

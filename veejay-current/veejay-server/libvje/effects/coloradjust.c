@@ -51,43 +51,49 @@ vj_effect *coloradjust_init(int w, int h)
 }
 
 void coloradjust_apply(void *ptr, VJFrame *frame, int *args) {
-	int val = args[0];
+    int val = args[0];
     int _degrees = args[1];
     int exposureValue = args[2];
 
-    unsigned int i;
     const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
-    float hue = (float) ( (val/180.0) * M_PI);
-    float sat = (float) ( _degrees * 0.01 );
-    
-    const int s = (int) rint( a_sin(hue) * (1<<16) * sat );
-    const int c = (int) rint( a_cos(hue) * (1<<16) * sat );
+    float hue = ((float)val / 180.0f) * (float)M_PI;
+    float sat = ((float)_degrees * 0.01f);
 
-	if( exposureValue > 0.0f ) {
-    	float powValue = exposureValue / 256.0f; 
+    const int s = (int)rintf(a_sin(hue) * (1 << 16) * sat);
+    const int c = (int)rintf(a_cos(hue) * (1 << 16) * sat);
+
+    if (exposureValue > 0) {
+        float powValue = (float)exposureValue / 256.0f;
 #pragma omp simd
-		for( i = 0; i < len ; i ++ ) 
-		{
-			Y[i] = (uint8_t)(Y[i] * powValue > 255 ? 255 : (Y[i] * powValue));
-		}	
-	}
-
-#pragma omp simd
-    for( i = 0 ; i < len ;i ++ )
-    {
-        const int u = Cb[i] - 128;
-        const int v = Cr[i] - 128;
-        int new_u = (c * u - s * v + (1<<15) + (128<<16)) >> 16;
-        int new_v = (s * u + c * v + (1<<15) + (128<<16)) >> 16;
-        if( new_u & 768 ) new_u = (-new_u) >> 31;
-        if( new_v & 768 ) new_v = (-new_v) >> 31;
-
-        Cb[i] = new_u;
-        Cr[i] = new_v;
+        for (int i = 0; i < len; i++) {
+            int y = (int)(Y[i] * powValue);
+            y &= ~(y >> 31);
+            int diff = y - 255;
+            y = 255 + (diff & (diff >> 31));
+            Y[i] = (uint8_t)y;
+        }
     }
 
+#pragma omp simd
+    for (int i = 0; i < len; i++) {
+        int u = (int)Cb[i] - 128;
+        int v = (int)Cr[i] - 128;
+
+        int new_u = (c * u - s * v + (1 << 15) + (128 << 16)) >> 16;
+        int new_v = (s * u + c * v + (1 << 15) + (128 << 16)) >> 16;
+
+        new_u &= ~(new_u >> 31);
+        new_v &= ~(new_v >> 31);
+        int diff_u = new_u - 255;
+        int diff_v = new_v - 255;
+        new_u = 255 + (diff_u & (diff_u >> 31));
+        new_v = 255 + (diff_v & (diff_v >> 31));
+
+        Cb[i] = (uint8_t)new_u;
+        Cr[i] = (uint8_t)new_v;
+    }
 }

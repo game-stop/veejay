@@ -73,81 +73,100 @@ vj_effect *alphaselect_init(int w, int h)
 	return ve;
 }
 
-void alphaselect_apply(void *ptr, VJFrame *frame, int *args) {
-    int i_angle = args[0];
-    int r = args[1];
-    int g = args[2];
-    int b = args[3];
-    int swap = args[4];
+void alphaselect_apply(void *ptr, VJFrame *frame, int *args)
+{
+    const int i_angle = args[0];
+    const int r = args[1];
+    const int g = args[2];
+    const int b = args[3];
+    const int swap = args[4];
 
-    uint8_t *fg_cb, *fg_cr;
-    int accept_angle_tg;
-    int cb, cr;
-    float kg1, tmp, aa = 255.0f, bb = 255.0f;
-    float angle = (float) i_angle / 100.0f;
-    unsigned int pos;
-    uint8_t val;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *A  = frame->data[3];
-	int iy=0,iu=128,iv=128;
-	
-	_rgb2yuv(r,g,b,iy,iu,iv);
-	aa = (float) iu;
-	bb = (float) iv;
+    const int len = frame->len;
 
-    tmp = sqrt(((aa * aa) + (bb * bb)));
-    cb = 255 * (aa / tmp);
-    cr = 255 * (bb / tmp);
-    kg1 = tmp;
-   
-    /* obtain coordinate system for cb / cr */
-    accept_angle_tg = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
-	
-    /* intialize pointers */
-    fg_cb = Cb;
-    fg_cr = Cr;
+    uint8_t *Y  = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+    uint8_t *A  = frame->data[3];
 
-	if( swap == 0 ) {
-		for (pos = len; pos != 0; pos--) {
-			short xx, yy;
-			xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
-			yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
+    int iy = 0, iu = 128, iv = 128;
+    _rgb2yuv(r, g, b, iy, iu, iv);
 
-			val = (xx * accept_angle_tg) >> 4;
-			if(A[pos] == 0 )
-				continue;
+    const float aa = (float)iu;
+    const float bb = (float)iv;
 
-			if (abs(yy) > val) {
-				A[pos] = 0;
-				Y[pos] = pixel_Y_lo_;
-				Cb[pos] = 128;
-				Cr[pos] = 128;
-			} else {
-				A[pos] = val;
-			}
-		}
-	}
-	else {
-		for (pos = len; pos != 0; pos--) {
-			short xx, yy;
-			xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
-			yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
-			val = (xx * accept_angle_tg) >> 4;
-			if( A[pos] == 0 )
-				continue;
+    float tmp = sqrtf((aa * aa) + (bb * bb));
+    if (tmp < 1e-6f)
+        return;
 
-			if (abs(yy) <= val) {
-				A[pos] = 0;
-				Y[pos] = pixel_Y_lo_;
-				Cb[pos] = 128;
-				Cr[pos] = 128;
-			}
-			else {
-				A[pos] = val;
-			}
-		}
-	}
+    const int cb = (int)(255.0f * (aa / tmp));
+    const int cr = (int)(255.0f * (bb / tmp));
+
+    const float angle = (float)i_angle * (1.0f / 100.0f);
+    const float tanv  = tanf((float)M_PI * angle / 180.0f);
+    if (!isfinite(tanv))
+        return;
+
+    const int accept_angle_tg = (int)(15.0f * tanv);
+
+    if (swap == 0) {
+
+        #pragma omp simd
+        for (int pos = 0; pos < len; pos++) {
+
+            const int a0 = A[pos];
+            const int a_mask = -(a0 != 0);
+
+            const int xx =
+                ((Cb[pos] * cb) + (Cr[pos] * cr)) >> 7;
+            const int yy =
+                ((Cr[pos] * cb) - (Cb[pos] * cr)) >> 7;
+
+            int val = (xx * accept_angle_tg) >> 4;
+
+			val &= ~(val >> 31);
+			val = 255 + ((val - 255) & ((val - 255) >> 31));
+
+            const int s = yy >> 31;
+            const int abs_yy = (yy ^ s) - s;
+
+            const int reject = (abs_yy > val);
+
+            const int kill = reject & (a_mask & 1);
+
+            A[pos]  = kill ? 0 : (uint8_t)(val & a_mask);
+            Y[pos]  = kill ? pixel_Y_lo_ : Y[pos];
+            Cb[pos] = kill ? 128 : Cb[pos];
+            Cr[pos] = kill ? 128 : Cr[pos];
+        }
+    }
+    else {
+
+        #pragma omp simd
+        for (int pos = 0; pos < len; pos++) {
+
+            const int a0 = A[pos];
+            const int a_mask = -(a0 != 0);
+
+            const int xx =
+                ((Cb[pos] * cb) + (Cr[pos] * cr)) >> 7;
+            const int yy =
+                ((Cr[pos] * cb) - (Cb[pos] * cr)) >> 7;
+
+            int val = (xx * accept_angle_tg) >> 4;
+
+			val &= ~(val >> 31);
+			val = 255 + ((val - 255) & ((val - 255) >> 31));
+
+            const int s = yy >> 31;
+            const int abs_yy = (yy ^ s) - s;
+
+            const int reject = (abs_yy <= val);
+            const int kill   = reject & (a_mask & 1);
+
+            A[pos]  = kill ? 0 : (uint8_t)(val & a_mask);
+            Y[pos]  = kill ? pixel_Y_lo_ : Y[pos];
+            Cb[pos] = kill ? 128 : Cb[pos];
+            Cr[pos] = kill ? 128 : Cr[pos];
+        }
+    }
 }

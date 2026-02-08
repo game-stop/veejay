@@ -64,39 +64,34 @@ void diffimg_apply(void *ptr, VJFrame *frame, int *args) {
     int threshold_min = args[1];
     int threshold_max = args[2];
 
-    unsigned int i;
     const int width = frame->width;
     const int len = frame->len - width - 1;
-    int d,m;
-    uint8_t y,yb;
     uint8_t *Y = frame->data[0];
 
     _pf _pff = _get_pf(type);
 
-    uint8_t lo = pixel_Y_lo_;
-    if( lo == 0 )
-        lo = 1;
+    uint8_t lo = pixel_Y_lo_ ? pixel_Y_lo_ : 1;
+#pragma omp simd
+    for (size_t i = 0; i < len; i++) {
+        uint8_t y = Y[i];
+        uint8_t yb = y;
 
-    for(i=0; i < len; i++)
-    {
-        y = Y[i];
-        yb = y;
-        if(y >= threshold_min && y <= threshold_max)
-        {
-            m = (Y[i+1] + Y[i+width] + Y[i+width+1]+2) >> 2;
-            d = Y[i] - m;
-            d *= 500;
-            d /= 100;
-            m = m + d;
-            y = ((((y << 1) - (255 - m))>>1) + Y[i])>>1;
-            if(y < lo) y = lo; else if (y > pixel_Y_hi_) y = pixel_Y_hi_;
-            Y[i] = _pff(y,yb);
-        }
+        uint8_t in_range = (y >= threshold_min && y <= threshold_max);
 
+        int m = (Y[i + 1] + Y[i + width] + Y[i + width + 1] + 2) >> 2;
+
+        int d = (y - m) * 5;
+        m += d;
+
+        int y_calc = ((((y << 1) - (255 - m)) >> 1) + y) >> 1;
+
+        y_calc = (y_calc < lo) ? lo : (y_calc > pixel_Y_hi_ ? pixel_Y_hi_ : y_calc);
+
+        Y[i] = in_range ? _pff((uint8_t)y_calc, yb) : y;
     }
 
-    for(i = len; i < (len + width); i ++ ) {
-	Y[i] = Y[i - width];
+#pragma omp simd
+    for (size_t i = len; i < (len + width); i++) {
+        Y[i] = Y[i - width];
     }
-
 }

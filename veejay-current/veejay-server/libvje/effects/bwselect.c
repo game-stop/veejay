@@ -94,92 +94,42 @@ void bwselect_free(void *ptr)
     free(b);
 }
 
+
 void bwselect_apply(void *ptr, VJFrame *frame, int *args) {
     int min_threshold = args[0];
     int max_threshold = args[1];
     int gamma = args[2];
-    int mode = args[3];
+    int mode  = args[3];
 
     bwselect_t *b = (bwselect_t*) ptr;
+    uint8_t *table = b->table;
 
-    int r,c;
-    const unsigned int width = frame->width;
     const int len = frame->len;
-    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict A  = frame->data[3];
 
-    if( gamma == 0 ) 
-    {
-        if( mode == 0 ) {
-            for(r=0; r < len; r+=width) {
-#pragma omp simd
-                for(c=0; c < width; c++) {
-                    uint8_t p = Y[r+c];
-                    if( p > min_threshold && p < max_threshold) {
-                        Y[r+c] = pixel_Y_hi_;
-                    }
-                    else {
-                        Y[r+c] = pixel_Y_lo_;
-                    }
-                }
-            }
-            veejay_memset(Cb, 128, (frame->ssm ? len : frame->uv_len));
-            veejay_memset(Cr, 128, (frame->ssm ? len : frame->uv_len));
-        }
-        else {
-            uint8_t *aA = frame->data[3];
-            for(r=0; r < len; r+=width) {
-#pragma omp simd
-                for(c=0; c < width; c++) {
-                uint8_t p = Y[r+c];
-                    if( p > min_threshold && p < max_threshold) {
-                        aA[r+c] = 0xff;
-                    }
-                    else {
-                        aA[r+c] = 0;
-                    }
-                }
-            }
-        }
+    if (gamma != 0 && gamma != b->last_gamma) {
+        gamma_setup(b, (double)gamma / 100.0);
+        b->last_gamma = gamma;
     }
-    else
-    {
-        uint8_t *table = b->table;
-        if( gamma != b->last_gamma ) {
-            gamma_setup( b, (double) gamma / 100.0 );
-            b->last_gamma = gamma;
-        }
-    
-        if( mode == 0 ) {
+
+    if (mode == 0) {
 #pragma omp simd
-            for(r=0; r < len; r+=width) {
-                for(c=0; c < width; c++) {
-                    uint8_t p = table[ Y[r+c] ];
-                    if( p > min_threshold && p < max_threshold) {
-                        Y[r+c] = pixel_Y_hi_;
-                    }
-                    else {
-                        Y[r+c] = pixel_Y_lo_;
-                    }
-                }
-            }
-            veejay_memset(Cb, 128, (frame->ssm ? len : frame->uv_len));
-            veejay_memset(Cr, 128, (frame->ssm ? len : frame->uv_len));
+        for (int i = 0; i < len; i++) {
+            uint8_t p = (gamma == 0) ? Y[i] : table[Y[i]];
+            uint8_t cond = (p > min_threshold) & (p < max_threshold);
+            Y[i] = (cond * pixel_Y_hi_) | ((1 - cond) * pixel_Y_lo_);
         }
-        else {
-            uint8_t *aA = frame->data[3];
-            for(r=0; r < len; r+=width) {
-                for(c=0; c < width; c++) {
-                    uint8_t p = table[ Y[r+c] ];
-                    if( p > min_threshold && p < max_threshold) {
-                        aA[r+c] = 0xff;
-                    }
-                    else {
-                        aA[r+c] = 0;
-                    }
-                }
-            }
+        veejay_memset(Cb, 128, (frame->ssm ? len : frame->uv_len));
+        veejay_memset(Cr, 128, (frame->ssm ? len : frame->uv_len));
+    } else {
+#pragma omp simd
+        for (int i = 0; i < len; i++) {
+            uint8_t p = (gamma == 0) ? Y[i] : table[Y[i]];
+            uint8_t cond = (p > min_threshold) & (p < max_threshold);
+            A[i] = cond * 0xff;
         }
     }
 }

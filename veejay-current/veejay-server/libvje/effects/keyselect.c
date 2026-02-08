@@ -138,57 +138,59 @@ static blend_func get_blend_func(const int mode) {
 Originally from:
 http://www.cs.utah.edu/~michael/chroma/
 */
-void keyselect_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+void keyselect_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
     int i_angle = args[0];
     int r = args[1];
     int g = args[2];
     int b = args[3];
     int mode = args[4];
 
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-    float tmp, aa = 255.0f, bb = 255.0f, _y = 0;
-    float angle = (float) i_angle / 100.0f;
-    unsigned int pos;
-    uint8_t val;
-    uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-	
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *U2 = frame2->data[1];
-	uint8_t *V2 = frame2->data[2];
+    const unsigned int width = frame->width;
+    const unsigned int height = frame->height;
+    const unsigned int len = width * height;
 
-	int	iy=pixel_Y_lo_,iu=128,iv=128;
-	_rgb2yuv( r,g,b, iy,iu,iv );
-	_y = (float) iy;
-	aa = (float) iu;
-	bb = (float) iv;
+    float aa = 255.0f, bb = 255.0f;
+    float angle = (float)i_angle / 100.0f;
 
-	tmp = sqrt(((aa * aa) + (bb * bb)));
-    const int cb =255 * (aa / tmp);
-    const int cr =255 * (bb / tmp);
+    uint8_t *Y  = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+
+    uint8_t *Y2 = frame2->data[0];
+    uint8_t *U2 = frame2->data[1];
+    uint8_t *V2 = frame2->data[2];
+
+    int iy = pixel_Y_lo_, iu = 128, iv = 128;
+    _rgb2yuv(r, g, b, iy, iu, iv);
+    aa = (float)iu;
+    bb = (float)iv;
+
+    float tmp = sqrtf((aa * aa) + (bb * bb));
+    const int cb = 255 * (aa / tmp);
+    const int cr = 255 * (bb / tmp);
 
     blend_func blend_pixel = get_blend_func(mode);
-    
-	const int accept_angle_tg = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
 
-    for (pos = (width * height); pos != 0; pos--) {
-		short xx, yy;
+    const int accept_angle_tg = (int)(15.0f * tanf(M_PI * angle / 180.0f));
 
-		xx = (((Cb[pos]) * cb) + ((Cr[pos]) * cr)) >> 7;
-		yy = (((Cr[pos]) * cb) - ((Cb[pos]) * cr)) >> 7;
+#pragma omp simd
+    for (unsigned int pos = 0; pos < len; pos++) {
+        short xx = ((Cb[pos] * cb) + (Cr[pos] * cr)) >> 7;
+        short yy = ((Cr[pos] * cb) - (Cb[pos] * cr)) >> 7;
 
-		val = (xx * accept_angle_tg) >> 4;
+        uint8_t val = (xx * accept_angle_tg) >> 4;
 
-		if (abs(yy) >= val) {
-		
-			Y[pos] = blend_pixel( Y[pos], Y2[pos ] );
+        int abs_yy = (yy ^ (yy >> 15)) - (yy >> 15);
 
-			Cb[pos] = ((Y2[pos] * (Cb[pos] - U2[pos])) >> 8) + Cb[pos];
-			Cr[pos] = ((Y2[pos] * (Cr[pos] - V2[pos])) >> 8) + Cr[pos];
-		}
+        int mask = -((abs_yy - val) >> 31 ^ 1);
+
+        uint8_t blended_Y = blend_pixel(Y[pos], Y2[pos]);
+        Y[pos] = (Y[pos] & ~mask) | (blended_Y & mask);
+
+        uint8_t new_Cb = ((Y2[pos] * (Cb[pos] - U2[pos])) >> 8) + Cb[pos];
+        uint8_t new_Cr = ((Y2[pos] * (Cr[pos] - V2[pos])) >> 8) + Cr[pos];
+        Cb[pos] = (Cb[pos] & ~mask) | (new_Cb & mask);
+        Cr[pos] = (Cr[pos] & ~mask) | (new_Cr & mask);
     }
-
 }
 

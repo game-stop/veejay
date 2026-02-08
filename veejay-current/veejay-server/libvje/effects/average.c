@@ -74,29 +74,27 @@ void average_free(void *ptr)
 
 void average_apply(void *ptr, VJFrame *frame, int *args) {
     int max_sum = args[0];
-    double weight = 1.0 / max_sum;
-
     const int len = frame->len;
-    uint8_t *Y = frame->data[0];
+    uint8_t *Y  = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
     average_t *a = (average_t *)ptr;
+
     double *running_sum[3];
     running_sum[0] = a->running_sum[0] + frame->offset;
     running_sum[1] = a->running_sum[1] + frame->offset;
     running_sum[2] = a->running_sum[2] + frame->offset;
 
-    for (int i = 0; i < len; i++) {
-        running_sum[0][i] = (1 - weight) * running_sum[0][i] + weight * Y[i];
-        running_sum[1][i] = (1 - weight) * running_sum[1][i] + weight * (Cb[i] - 128);
-        running_sum[2][i] = (1 - weight) * running_sum[2][i] + weight * (Cr[i] - 128);
-    }
+    const double w  = 1.0 / max_sum;
+    const double iw = 1.0 - w;
 
     for (int i = 0; i < len; i++) {
-        Y[i] = (uint8_t)running_sum[0][i];
+        running_sum[0][i] = iw * running_sum[0][i] + w * Y[i];
+        running_sum[1][i] = iw * running_sum[1][i] + w * (Cb[i] - 128);
+        running_sum[2][i] = iw * running_sum[2][i] + w * (Cr[i] - 128);
+        Y[i]  = (uint8_t)running_sum[0][i];
         Cb[i] = (uint8_t)(128 + running_sum[1][i]);
         Cr[i] = (uint8_t)(128 + running_sum[2][i]);
     }
 }
-

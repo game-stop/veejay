@@ -55,65 +55,65 @@ vj_effect *cosmichue_init(int w, int h)
     return ve;
 }
   
-void cosmichue_apply( void *ptr, VJFrame *frame, int *args ) {
-    const int opacity = args[2];
 
-    int i;
-    uint8_t *Y = frame->data[0];    
+void cosmichue_apply(void *ptr, VJFrame *frame, int *args)
+{
+    const int opacity = args[2];
+    const int len = frame->len;
+
+    uint8_t *Y = frame->data[0];
     uint8_t *U = frame->data[1];
     uint8_t *V = frame->data[2];
 
     const float amplitude = args[0] * 0.1f;
     const float frequency = args[1] * 0.1f;
+
     float hue_shift = args[3] * 0.1f;
+    hue_shift *= (float)(M_PI / 180.0);
+    hue_shift = fmodf(hue_shift, (float)(2.0 * M_PI));
+    if (hue_shift < 0.0f)
+        hue_shift += (float)(2.0 * M_PI);
 
     float sin_lut[256];
     float cos_lut[256];
-
     float hsin_lut[256];
     float hcos_lut[256];
 
-    float angle_step = (2*M_PI/256.0f);
-    
-    hue_shift = hue_shift * (M_PI/180.0f);
-    hue_shift = fmod(hue_shift, 2 * M_PI);
-    if (hue_shift < 0) {
-            hue_shift += 2 * M_PI;
-    }
+    const float angle_step = (float)(2.0 * M_PI / 256.0);
 
-    for (i = 0; i < 256; i ++ ) {
+    for (int i = 0; i < 256; i++) {
         float luminance = i / 255.0f;
         float angle = i * angle_step;
-        sin_lut[i] = amplitude * a_sin( frequency * luminance );
-        cos_lut[i] = amplitude * a_cos( frequency * luminance );
-        hsin_lut[i] = a_sin( angle );
-        hcos_lut[i] = a_cos( angle );
+
+        sin_lut[i]  = amplitude * a_sin(frequency * luminance);
+        cos_lut[i]  = amplitude * a_cos(frequency * luminance);
+        hsin_lut[i] = a_sin(angle);
+        hcos_lut[i] = a_cos(angle);
     }
 
-    const int angle_index = (int)((hue_shift / (2 * M_PI)) * 256) % 256;
-    
-    for (i = 0; i < frame->len; i++) {
+    const int angle_index =
+        (int)((hue_shift / (float)(2.0 * M_PI)) * 256.0f) & 0xFF;
 
-        int u = U[i] - 128;
-        int v = V[i] - 128;
+    const float cos_val = hcos_lut[angle_index];
+    const float sin_val = hsin_lut[angle_index];
 
-        float u_offset = sin_lut[ Y[i] ]; 
-        float v_offset = cos_lut[ Y[i] ];
+    for (int i = 0; i < len; i++) {
+        int u = (int)U[i] - 128;
+        int v = (int)V[i] - 128;
 
-        u = (int)(u_offset + u);
-        v = (int)(v_offset + v);
+        float u_offset = sin_lut[Y[i]];
+        float v_offset = cos_lut[Y[i]];
 
-        float cos_val = hcos_lut[angle_index];
-        float sin_val = hsin_lut[angle_index];
+        u = (int)(u + u_offset);
+        v = (int)(v + v_offset);
 
-        int u_rotated = 128 + (int)(u * cos_val - v * sin_val);
-        int v_rotated = 128 + (int)(u * sin_val + v * cos_val);
+        int u_rot = 128 + (int)(u * cos_val - v * sin_val);
+        int v_rot = 128 + (int)(u * sin_val + v * cos_val);
 
-        u_rotated = (u_rotated + (u_rotated >> 31)) ^ (u_rotated >> 31);
-        v_rotated = (v_rotated + (v_rotated >> 31)) ^ (v_rotated >> 31);
+        u_rot = (u_rot + (u_rot >> 31)) ^ (u_rot >> 31);
+        v_rot = (v_rot + (v_rot >> 31)) ^ (v_rot >> 31);
 
-        U[i] = (uint8_t)((opacity * u_rotated + (0xff - opacity) * U[i]) >> 8);
-        V[i] = (uint8_t)((opacity * v_rotated + (0xff - opacity) * V[i]) >> 8);
+        U[i] = (uint8_t)((opacity * u_rot + (255 - opacity) * U[i]) >> 8);
+        V[i] = (uint8_t)((opacity * v_rot + (255 - opacity) * V[i]) >> 8);
     }
 }
-

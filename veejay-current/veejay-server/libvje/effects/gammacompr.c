@@ -121,21 +121,15 @@ void gammacompr_apply(void *ptr, VJFrame *frame, int *args ) {
 		Y[i] = (uint8_t) gamma_table[Y[i]];
     }
 
-    if(white_threshold > 0) {
-        for ( i = 0; i < len; i ++ ) {
-            if( Y[i] > white_threshold ) {
-                U[i] = 128;
-                V[i] = 128;
-            }
-        }
-    }
+    if (white_threshold > 0 || black_threshold > 0) {
+        for (i = 0; i < len; i++) {
+            int y = Y[i];
 
-    if( black_threshold > 0 ) {
-        for( i = 0; i < len; i ++ ) {
-            if( Y[i] < black_threshold) {
-                U[i] = 128;
-                V[i] = 128;
-            }
+            int white_mask = -(y > white_threshold);
+            int black_mask = -(y < black_threshold);
+
+            U[i] = (U[i] & ~(white_mask | black_mask)) | (128 & (white_mask | black_mask));
+            V[i] = (V[i] & ~(white_mask | black_mask)) | (128 & (white_mask | black_mask));
         }
     }
 }
