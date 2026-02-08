@@ -1188,35 +1188,6 @@ _pf	_get_pf(int type)
 	return &_pf_none;
 }
 
-int calculate_luma_value(uint8_t *Y, int w , int h) {
-	unsigned int len = (w * h);
-	unsigned int sum = 0;
-	unsigned int i = len;
-	while( i ) {
-		sum += *(Y++);	
-		i--;
-	}
-	if( sum == 0 )
-		return pixel_Y_lo_;
-
-	return (sum/len);
-}
-
-int calculate_cbcr_value(uint8_t *Cb,uint8_t *Cr, int w, int h) {
-	unsigned int len = (w * h) >> 1;
-	unsigned int sum = 0;
-	unsigned int i = len;
-	while( i ) {
-		sum += 	( Cb[i] + Cr[i] ) >> 1;
-		i--;
-	}
-	if( sum == 0 )
-		return pixel_U_lo_;
-
-	return (sum/len);
-
-}
-
 #ifdef HAVE_ASM_MMX
 void     vje_load_mask(uint8_t val)
 {
@@ -1785,8 +1756,8 @@ inline void veejay_draw_balloonUV(uint8_t *data, int cx, int cy, int bw, int bh,
     {
         const int yOffset = (y - cy) * (y - cy);
         int scaledY = cy + ((y - cy) * 1.5 + 0.5);
-	scaledY = (scaledY < 0) ? 0 : (scaledY >= h) ? (h - 1) : scaledY;
-	const int nextRow = (int) (scaledY + 1 >= h ? (h-1) : scaledY + 1);
+		scaledY = (scaledY < 0) ? 0 : (scaledY >= h) ? (h - 1) : scaledY;
+		const int nextRow = (int) (scaledY + 1 >= h ? (h-1) : scaledY + 1);
 
         for (int x = minX; x <= maxX; x++)
         {
@@ -1817,7 +1788,7 @@ inline void veejay_draw_balloon(uint8_t *data, int cx, int cy, int bw, int bh, c
         const int yOffset = (y - cy) * (y - cy);
         int scaledY = cy + ((y - cy) * 1.5 + 0.5);
         scaledY = (scaledY < 0) ? 0 : (scaledY >= h) ? (h - 1) : scaledY;
-	const int nextRow = (scaledY +  1 >= h ? (h-1) : scaledY + 1);
+		const int nextRow = (scaledY +  1 >= h ? (h-1) : scaledY + 1);
         for (int x = minX; x <= maxX; x++)
         {
             int xOffset = (x - cx) * (x - cx);
@@ -1936,45 +1907,6 @@ void veejay_distance_transform8(uint8_t *plane, int w, int h, uint32_t *output)
             output[y_idx + x] = val & mask;
         }
     }
-}
-
-
-
-void	veejay_distance_transform( uint32_t *plane, int w, int h, uint32_t *output)
-{
-	register unsigned int x,y;
-	const uint32_t *I = plane;
-	uint32_t *Id = output;
-	const uint32_t wid = w - 1;
-	const uint32_t hei = h - 2;
-
-	for( y = 1; y < hei; y ++ )
-	{
-		for( x = 1; x < wid; x ++ )
-		{
-			if( I[ y * w + x ] )
-				Id[ y * w + x ] = min4(
-					(Id[ (y-1) * w + (x-1) ]) + 1,
-					(Id[ (y-1) * w + x ]) + 1,
-					(Id[ (y-1) * w + (x+1) ]) + 1,
-					(Id[ y * w + (x-1) ]) + 1 );
-		}
-	}
-	
-	for( y = hei; y > 1; y -- )
-	{
-		for( x = wid; x > 1; x -- )
-		{
-			if( I[ y * w + x ] )	
-				Id[ y * w + x ] = min5(
-					(Id[ (y+1) * w + (x-1) ]) + 1,
-					Id[ y * w + x ],
-					(Id[ (y+1) * w + x ]) + 1,
-					(Id[ y * w + (x + 1) ]) + 1,
-					(Id[ (y+1) * w + (x+1) ]) + 1	
-			);
-		}
-	}
 }
 
 uint32_t 	veejay_component_labeling(int w, int h, uint32_t *I , uint32_t *M)
@@ -2263,45 +2195,9 @@ void	vje_mean_filter( const uint8_t *src, uint8_t *dst, const int w, const int h
 	}
 }
 
-void	vje_weighted_average_bin( const uint8_t *src, uint8_t *dst, const int w, const int h )
-{
-	const int len = w * h;
-	unsigned int x,y;
-	const int aw = w - 1;
-
-	/* 1 2 1 
-	 * 2 4 2
-	 * 1 2 1
-	 */
-
-	for( y = w; y < len; y += w )
-	{
-		for(x = 1; x < aw; x++ )
-		{
-			if( src[x+y] > 0 ) {
-				dst[x+y] = (
-					src[x - 1 + y - w ] +
-					(2* src[x + y - w ]) +
-					src[x + 1 + y - w ] +
-					(2*src[x - 1 + y ]) +
-					(4*src[x + y]) +
-					(2*src[x + 1 + y ]) +
-					src[x - 1 + y + w ] +
-					(2*src[x + y + w]) +
-					src[x + 1 + y + w ] ) / 16;
-			}
-			else {
-				dst[x+y] = 0;
-			}
-		}
-	}
-
-}
 
 
 // temporary fix for fast_sqrt, use lookup table 
-// todo: intialization can be divided over n cpu cores, see vj-task
-
 double **sqrt_map_pixel_values = NULL;
 
 void init_sqrt_map_pixel_values() {
@@ -2342,21 +2238,7 @@ void	sqrt_table_pixels_free() {
 	free(sqrt_map_pixel_values);
 }
 
-/****************************************************************************************************
- *
- * grid_getbounds_from_orientation(int radius, int orientation, int odd, int * x_inf, int * y_inf, int * x_sup, int * y_sup)
- *
- * Adjust the given screen bounds depending the given orentation and parity of the grid
- *
- * \param radius
- * \param orientation type vj_effect_orientation
- * \param parity type vj_effect_parity
- * \param x_inf OUT
- * \param y_inf OUT
- * \param x_sup IN/OUT ; caller must initialize with with
- * \param y_sup IN/OUT ; caller must initialize with height
- *
- ****************************************************************************************************/
+
 inline void grid_getbounds_from_orientation(int radius, vj_effect_orientation orientation, vj_effect_parity parity, int *x_inf, int *y_inf, int *x_sup, int *y_sup, int w, int h) {
 
     int nx = (w + radius - 1) / radius;
