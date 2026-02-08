@@ -6580,9 +6580,10 @@ static void reload_vimslist()
             veejay_msg(0, "Invalid name length at position %d", offset );
         }
 
-        if (offset + val[2] > len || offset + val[3] > len) {
+       if (offset + val[2] + val[3] > len) {
             veejay_msg(0, "Entry at offset %d goes past buffer length", offset);
-            break;
+            free(line);
+            goto vims_reload_err_out;
         }
 
         char vimsid[5];
@@ -6620,7 +6621,7 @@ static void reload_vimslist()
 
         free( line );
     }
-
+vims_reload_err_out:
     gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
     free( eltext );
 }
