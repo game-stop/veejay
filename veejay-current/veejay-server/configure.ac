@@ -202,10 +202,11 @@ fi
 AC_MSG_CHECKING(whether to compile in debugging information)
 debugCFLAGS=""
 if test "x$enable_debug" = "xyes" ; then
- debugCFLAGS="-g"
+ debugCFLAGS="-g -Werror=incompatible-pointer-types -std=c11"
  CFLAGS="$CFLAGS $debugCFLAGS"
  AC_MSG_RESULT([yes])
 else
+ CFLAGS="$CFLAGS -flto -fno-plt -fuse-linker-plugin"
  AC_MSG_RESULT([no])
 fi
 AC_MSG_CHECKING(whether to compile in profiling information)
@@ -274,7 +275,7 @@ case $host_cpu in
 
 	if test "x$enable_debug" != "xyes" ; then
 		SUBSAMPLE_CFLAGS=""
-		VJE_CFLAGS="-O3 -ftree-vectorize -ffast-math -fopenmp"
+		VJE_CFLAGS="-O3 -fno-math-errno -funsafe-math-optimizations -fno-trapping-math -fopenmp"
 	fi
 
 	AC_MSG_RESULT([x86])
@@ -285,8 +286,8 @@ case $host_cpu in
     	have_x86cpu=true
     	have_x86_64cpu=true
 	if test "x$enable_debug" != "xyes" ; then
-		VJE_CFLAGS="-ffast-math -m64 -fPIC -DPIC"
-		SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC -ftree-vectorize"
+		VJE_CFLAGS="-O3 -fno-math-errno -funsafe-math-optimizations -fno-trapping-math  -m64 -fPIC -DPIC -ftree-vectorize -flto -fuse-linker-plugin -fno-plt"
+		SUBSAMPLE_CFLAGS="-O3 -m64 -fPIC -DPIC -ftree-vectorize -flto -fuse-linker-plugin -fno-plt"
 	else
 		VJE_CFLAGS="-O3 -ftree-vectorize -fopt-info-vec-optimized -m64 -fPIC -DPIC -g"
 	fi
@@ -339,7 +340,7 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 	if test "x$enable_debug" != "xyes" ; then
 	    CFLAGS="-O3 -ffast-math -fPIC -DPIC -fopenmp"
 	    SUBSAMPLE_CFLAGS="O3 -fPIC -DPIC"
-		VJE_CFLAGS="-O3 -ftree-vectorize -fPIC -DPIC -g -ffast-math"
+   	    VJE_CFLAGS="-O3 -ftree-vectorize -fPIC -DPIC -g -ffast-math -fsimdmath"
 	else
 	    CFLAGS="-O3 -ffast-math -fPIC -DPIC -g -fopenmp"
 	    SUBSAMPLE_CFLAGS="-O3 -fPIC -DPIC -g"
@@ -421,6 +422,7 @@ then
 
 	OP_CFLAGS="$USER_CFLAGS"
 	SUBSAMPLE_CFLAGS="$SUBSAMPLE $USER_CFLAGS"
+	VJE_CFLAGS="$VJE_CFLAGS $USER_CFLAGS"
 	CFLAGS="$CFLAGS $USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 
 	AC_SUBST(FASTARM_CFLAGS)
@@ -448,6 +450,7 @@ then
 
 	OP_CFLAGS="$USER_CFLAGS"
 	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
+	VJE_CFKAGS="$USER_CFLAGS"
 	CFLAGS="$CFLAGS $USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 	AC_SUBST(FASTARM_CFLAGS)
 fi
@@ -515,7 +518,6 @@ then
 		AC_DEFINE(HAVE_ASM_SSE4_2,1,[Compiling in SSE4_2 support])
 		AC_DEFINE(HAVE_SSE4_2,1,[Compiling in SSE4_2 support])
 		have_asm_sse4_2=true
-		VJE_CFLAGS="$VJE_CFLAGS -msse4.2"
 	fi
 
 	AC_CACHE_CHECK(for SSE4_1 on processor(s), ac_cv_flag_sse4_1, [
@@ -530,7 +532,6 @@ then
 		AC_DEFINE(HAVE_ASM_SSE4_1,1,[Compiling in SSE4_1 support])
 		AC_DEFINE(HAVE_SSE4_1,1,[Compiling in SSE4_1 support])
 		have_asm_sse4_1=true
-		VJE_CFLAGS="$VJE_CFLAGS -msse4.1"
 	fi
 
 	AC_CACHE_CHECK(for 3DNOW on processor(s), ac_cv_flag_3dnow, [
