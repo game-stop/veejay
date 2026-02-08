@@ -87,65 +87,47 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args) {
     int skew = args[1];
     int invert = args[2];
 
-	uint32_t Histogram[256];
-	unsigned int i;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	uint8_t *A = frame->data[3];
+    uint32_t histogram[256] = {0};
+    const int len = frame->len;
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+    uint8_t *A  = frame->data[3];
 
-	veejay_memset( Histogram, 0, sizeof( Histogram ) );
+    if (skew != 0xff) {
+        uint8_t Lookup[256];
+        __init_lookup_table(Lookup, 256, 0.0f, 255.0f, 0.0f, (float)skew);
+        for (int i = 0; i < len; i++) {
+            histogram[Lookup[Y[i]]]++;
+        }
+    } else {
+        for (int i = 0; i < len; i++) {
+            histogram[Y[i]]++;
+        }
+    }
 
-	if( skew != 0xff )
-	{
-		uint8_t Lookup[256];
-		__init_lookup_table( Lookup, 256, 0.0f, 255.0f, 0.0f, (float)skew ); 
-		for( i = 0; i < len; i ++ )
-		{
-			Histogram[ Lookup[ Y[i] ] ] += 1;
-		}	
-	}
-	else
-	{
-		for( i = 0; i < len; i++ ) 
-		{
-			Histogram[ Y[i] ] += 1;
-		}
-	}
-	
-	uint32_t threshold = bwotsu( Histogram, len );
+    uint32_t threshold = bwotsu(histogram, len);
 
-	uint8_t l = 0;
-	uint8_t h = 0xff;
+    uint8_t low  = invert ? 0xff : 0x00;
+    uint8_t high = invert ? 0x00 : 0xff;
 
-	if( invert ) {
-			l = 0xff;
-			h = 0;
-	}
-
-	switch( mode ) {
-		case 0:
+    switch(mode) {
+        case 0:
 #pragma omp simd
-			for( i = 0; i < len; i ++ )
-			{
-				if( Y[i] < threshold )
-					Y[i] = l;
-				else
-					Y[i] = h;
-			}
-			veejay_memset( frame->data[1], 128, (frame->ssm ? len : frame->uv_len) );
-			veejay_memset( frame->data[2], 128, (frame->ssm ? len : frame->uv_len) );
+            for (int i = 0; i < len; i++) {
+                uint8_t cond = (Y[i] >= threshold);
+                Y[i] = (cond * high) | ((1 - cond) * low);
+            }
+            veejay_memset(Cb, 128, (frame->ssm ? len : frame->uv_len));
+            veejay_memset(Cr, 128, (frame->ssm ? len : frame->uv_len));
+            break;
 
-			break;
-		case 1:
+        case 1:
 #pragma omp simd
-			for( i = 0; i < len; i ++ )
-			{
-				if( Y[i] < threshold )
-					A[i] = l;
-				else
-					A[i] = h;
-			}
-			break;
-	}
+            for (int i = 0; i < len; i++) {
+                uint8_t cond = (Y[i] >= threshold);
+                A[i] = (cond * high) | ((1 - cond) * low);
+            }
+            break;
+    }
 }
-
