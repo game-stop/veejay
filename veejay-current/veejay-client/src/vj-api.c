@@ -6565,7 +6565,6 @@ static void reload_vimslist()
             veejay_msg(0,"Invalid ID at position %d", offset );
             offset += 12 + val[2] + val[3];
             free(line);
-            free(eltext);
             continue;
         }
 
