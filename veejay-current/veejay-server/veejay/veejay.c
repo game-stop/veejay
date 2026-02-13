@@ -835,7 +835,6 @@ int main(int argc, char **argv)
 #endif
 
 	vj_mem_init(0,0);
-	benchmark_veejay(1920,1080);
 
 	vevo_strict_init();
 	
@@ -849,7 +848,7 @@ int main(int argc, char **argv)
 	if(!check_command_line_options(argc, argv))
 	{
 		veejay_free(info);
-        return 0;
+        	return 0;
  	}
 
 	print_license();
@@ -873,6 +872,8 @@ int main(int argc, char **argv)
 	}
 
 	veejay_check_homedir( info );
+
+	benchmark_veejay(1920,1080);
 
 	sigsegfault_handler();
 
