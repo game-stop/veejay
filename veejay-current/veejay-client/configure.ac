@@ -256,7 +256,7 @@ fi
 
 AC_MSG_CHECKING(whether to compile in debug symbols)
 if test "x$enable_debug" = "xyes" ; then
- debugCFLAGS="$debugCFLAGS -g"
+ debugCFLAGS="$debugCFLAGS -g -Werror=incompatible-pointer-types -Werror=old-style-definition"
  debug_or_profiling="debug"
  AC_MSG_RESULT([yes])
 else

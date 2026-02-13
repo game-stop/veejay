@@ -400,7 +400,7 @@ static gboolean gtk3_curve_mouse_scroll(GtkWidget *widget, GdkEventScroll *ev, g
 
 
 GtkWidget *
-gtk3_curve_new()
+gtk3_curve_new(void)
 {
   GtkWidget *widget = g_object_new (GTK3_TYPE_CURVE, NULL);
 

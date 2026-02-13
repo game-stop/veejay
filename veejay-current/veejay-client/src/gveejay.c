@@ -85,7 +85,7 @@ extern void reloaded_launcher( char *h, int p );
 
 static volatile gulong g_trap_free_size = 0;
 
-static void usage ()
+static void usage(void)
 {
     g_printerr ("%s\n", help_text);  //FIXME why program name is (null) ???
 }

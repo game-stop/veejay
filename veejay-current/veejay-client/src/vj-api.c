@@ -1273,8 +1273,8 @@ static effectlist_data fxlist_data;
 static guint macro_line[4] = { 0,0,0,0 };
 
 static vj_gui_t *info = NULL;
-void *get_ui_info() { return (void*) info; }
-void reloaded_schedule_restart();
+void *get_ui_info(void) { return (void*) info; }
+void reloaded_schedule_restart(void);
 /* global pointer to the sample-bank */
 
 /* global pointer to the effects-source-list */
@@ -1321,16 +1321,16 @@ static void update_label_i(const char *name, int num, int prefix);
 static void update_label_f(const char *name, float val);
 static void update_label_str(const char *name, gchar *text);
 static void update_globalinfo(int *his, int p, int k);
-static gint load_parameter_info();
-static void load_v4l_info();
-static void reload_editlist_contents();
-static void load_effectchain_info();
-static void set_feedback_status();
-static void load_effectlist_info();
-static void load_sequence_list();
-static void load_generator_info();
+static gint load_parameter_info(void);
+static void load_v4l_info(void);
+static void reload_editlist_contents(void);
+static void load_effectchain_info(void);
+static void set_feedback_status(void);
+static void load_effectlist_info(void);
+static void load_sequence_list(void);
+static void load_generator_info(void);
 static void load_samplelist_info(gboolean with_reset_slotselection);
-static void load_editlist_info();
+static void load_editlist_info(void);
 static void set_pm_page_label(int sample_id, int type);
 static void notebook_set_page(const char *name, int page);
 static void hide_widget(const char *name);
@@ -1343,14 +1343,14 @@ static gchar *recv_vims(int len, int *bytes_written);
 static gchar *recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1, int *arg2);
 static GdkPixbuf *update_pixmap_entry( int status );
 static gboolean chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,gpointer data);
-int resize_primary_ratio_y();
-int resize_primary_ratio_x();
-static void update_rgbkey();
+int resize_primary_ratio_y(void);
+int resize_primary_ratio_x(void);
+static void update_rgbkey(void);
 static int count_textview_buffer(const char *name);
 static void clear_textview_buffer(const char *name);
 static void init_recorder(int total_frames, gint mode);
-static void reload_bundles();
-static void update_rgbkey_from_slider();
+static void reload_bundles(void);
+static void update_rgbkey_from_slider(void);
 static gchar *get_textview_buffer(const char *name);
 static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h);
 static void setup_samplebank(gint c, gint r, GtkAllocation *allocation, gint *image_w, gint *image_h);
@@ -1366,7 +1366,7 @@ static void set_selection_of_slot_in_samplebank(gboolean active);
 static void remove_sample_from_slot();
 static void create_ref_slots(int envelope_size);
 static void create_sequencer_slots(int x, int y);
-void clear_samplebank_pages();
+void clear_samplebank_pages(void);
 void free_samplebank(void);
 void reset_samplebank(void);
 int verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_type );
@@ -1374,8 +1374,8 @@ static void widget_get_rect_in_screen (GtkWidget *widget, GdkRectangle *r);
 static void update_curve_widget( GtkWidget *curve );
 /* not used */ /* static void update_curve_accessibility(const char *name); */
 static void reset_tree(const char *name);
-static void reload_srt();
-static void reload_fontlist();
+static void reload_srt(void);
+static void reload_fontlist(void);
 static void indicate_sequence( gboolean active, sequence_gui_slot_t *slot );
 static void set_textview_buffer(const char *name, gchar *utf8text);
 void interrupt_cb();
@@ -1383,10 +1383,10 @@ int get_and_draw_frame(int type, char *wid_name);
 GdkPixbuf *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
 static void vj_kf_select_parameter(int id);
 static void vj_kf_refresh(gboolean force);
-static void vj_kf_reset();
+static void vj_kf_reset(void);
 static void veejay_stop_connecting(vj_gui_t *gui);
-void reload_macros();
-void reportbug();
+void reload_macros(void);
+void reportbug(void);
 void select_chain_entry(int entry);
 
 GtkWidget *glade_xml_get_widget_( GtkBuilder *m, const char *name );
@@ -1413,7 +1413,7 @@ gboolean gveejay_idle(gpointer data)
 }
 
 
-static void init_widget_cache()
+static void init_widget_cache(void)
 {
     // TODO: add more mappings to reduce the number of times we need to call glade_xml_get_widget_ from update_gui() 
     memset(widget_cache, 0, sizeof(widget_cache));
@@ -1439,7 +1439,7 @@ static void identify_widget(GtkWidget *w)
 }
 */
 
-static gboolean is_edl_displayed()
+static gboolean is_edl_displayed(void)
 {
     int panel_page = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK18 ] ));
     int sample_page = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK15] ));
@@ -1449,7 +1449,7 @@ static gboolean is_edl_displayed()
     return FALSE;
 }
 
-static gboolean is_fxanim_displayed()
+static gboolean is_fxanim_displayed(void)
 {
     int fxanim_page = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK18 ] ));
     if( fxanim_page == 1)
@@ -1632,12 +1632,12 @@ static int preview_box_h_ = MAX_PREVIEW_HEIGHT;
 
 static void *bankport_ = NULL;
 
-int vj_get_preview_box_w()
+int vj_get_preview_box_w(void)
 {
     return preview_box_w_;
 }
 
-int vj_get_preview_box_h()
+int vj_get_preview_box_h(void)
 {
     return preview_box_h_;
 }
@@ -1918,7 +1918,7 @@ gboolean device_selection_func( GtkTreeSelection *sel,
     return TRUE;
 }
 
-static void setup_v4l_devices()
+static void setup_v4l_devices(void)
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_v4ldevices");
     GtkListStore *store = gtk_list_store_new( 4, G_TYPE_INT, G_TYPE_STRING, G_TYPE_FLOAT,
@@ -1972,7 +1972,7 @@ gboolean vims_macro_selection_func( GtkTreeSelection *sel, GtkTreeModel *model, 
 	return TRUE;
 }
 
-static void setup_macros()
+static void setup_macros(void)
 {
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "macro_macros" );
 	GtkListStore *store = gtk_list_store_new( 6, G_TYPE_INT, G_TYPE_INT, G_TYPE_INT, G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING );
@@ -2107,7 +2107,7 @@ void _el_entry_free( el_constr *entry )
     }
 }
 
-void _el_entry_reset( )
+void _el_entry_reset(void)
 {
     if(info->editlist != NULL)
     {
@@ -2150,7 +2150,7 @@ void _el_ref_free( el_ref *entry )
     if(entry) free(entry);
 }
 
-void _el_ref_reset()
+void _el_ref_reset(void)
 {
     if(info->elref != NULL)
     {
@@ -2477,7 +2477,7 @@ gchar *dialog_open_file(const char *title, file_filter_t type)
     return file;
 }
 
-static char *produce_os_str()
+static char *produce_os_str(void)
 {
     char os_str[512];
     char cpu_type[32];
@@ -2528,7 +2528,7 @@ static char *produce_os_str()
     return strdup( os_str );
 }
 
-void about_dialog()
+void about_dialog(void)
 {
     const gchar *artists[] =
     {
@@ -2879,7 +2879,7 @@ error_dialog(const char *title, char *msg)
     return n;
 }
 
-void veejay_quit( )
+void veejay_quit(void)
 {
     if( prompt_dialog("Quit veejay", "Close Veejay ? All unsaved work will be lost." )
          == GTK_RESPONSE_REJECT )
@@ -2897,19 +2897,19 @@ void veejay_quit( )
 static int running_g_ = 1;
 static int restart_   = 0;
 
-int gveejay_restart()
+int gveejay_restart(void)
 {
     return restart_;
 }
 
-gboolean gveejay_running()
+gboolean gveejay_running(void)
 {
     if(!running_g_)
         return FALSE;
     return TRUE;
 }
 
-gboolean gveejay_relaunch()
+gboolean gveejay_relaunch(void)
 {
     return (info->watch.state == STATE_QUIT ? FALSE: TRUE);
 }
@@ -3133,7 +3133,7 @@ void msg_vims(char *message)
         reloaded_schedule_restart();
 }
 
-int get_loop_value()
+int get_loop_value(void)
 {
     if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_LOOP_NONE]) ) )
        return 0; 
@@ -3250,7 +3250,7 @@ static int get_slider_val(const char *name)
     return (int) gtk_adjustment_get_value (a);
 }
 
-static void vj_kf_reset()
+static void vj_kf_reset(void)
 {
     int osl = info->status_lock;
 
@@ -3788,7 +3788,7 @@ GSList *gui_tree_selection_get_paths(GtkTreeView *view)
     return paths;
 }
 
-static void update_colorselection()
+static void update_colorselection(void)
 {
     GtkWidget *colorsel = glade_xml_get_widget_(info->main_window,
                                                 "colorselection");
@@ -3802,21 +3802,21 @@ static void update_colorselection()
                                           &color );
 }
 
-int resize_primary_ratio_y()
+int resize_primary_ratio_y(void)
 {
     float ratio = (float)info->el.width / (float)info->el.height;
     float result = (float) get_nums( "priout_width" ) / ratio;
     return (int) result;
 }
 
-int resize_primary_ratio_x()
+int resize_primary_ratio_x(void)
 {
     float ratio = (float)info->el.height / (float)info->el.width;
     float result = (float) get_nums( "priout_height" ) / ratio;
     return (int) result;
 }
 
-static void update_rgbkey()
+static void update_rgbkey(void)
 {
     if(!info->entry_lock)
     {
@@ -3837,7 +3837,7 @@ static void update_rgbkey()
     }
 }
 
-static void update_rgbkey_from_slider()
+static void update_rgbkey_from_slider(void)
 {
     if(!info->entry_lock)
     {
@@ -4340,7 +4340,7 @@ static void on_vims_messenger(void)
 
 static int total_frames_ = 0;
 
-int get_total_frames()
+int get_total_frames(void)
 {
     return total_frames_;
 }
@@ -4371,7 +4371,7 @@ gboolean capture_data   (GIOChannel *source, GIOCondition condition, gpointer da
     return TRUE;
 }
 */
-void reportbug ()
+void reportbug(void)
 {
     char URL[1024];
 
@@ -4432,7 +4432,7 @@ void reportbug ()
     }
 }
 
-void donatenow()
+void donatenow(void)
 {
     char URL[512];
     snprintf(URL , sizeof(URL),
@@ -4443,7 +4443,7 @@ void donatenow()
     }
 }
 
-static void reset_fxtree()
+static void reset_fxtree(void)
 {
     int i;
     for(i = 0; i < 3; i ++ )
@@ -4730,7 +4730,7 @@ void    generators_selection_func(GtkTreeView *treeview,
     }
 }
 
-static void setup_generators()
+static void setup_generators(void)
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "generators");
     GtkListStore *store = gtk_list_store_new( 1,  G_TYPE_STRING );
@@ -4754,7 +4754,7 @@ static void setup_server_files(void)
     g_signal_connect( tree, "row-activated", (GCallback) server_files_selection_func, NULL);
 }
 
-static void load_v4l_info()
+static void load_v4l_info(void)
 {
     int values[21];
     int len = 0;
@@ -4805,7 +4805,7 @@ static void load_v4l_info()
     }
 }
 
-static gint load_parameter_info()
+static gint load_parameter_info(void)
 {
     int *p = &(info->uc.entry_tokens[0]);
     int len = 0;
@@ -4892,7 +4892,7 @@ static gint load_parameter_info()
     return 1;
 }
 
-static void load_generator_info()
+static void load_generator_info(void)
 {
     int args[GENERATOR_PARAMS+1];
     gint fxlen = 0;
@@ -4992,7 +4992,7 @@ static void setup_effectchain_info( void )
  *   to the fx chain tree view
  *
  ******************************************************/
-static void load_effectchain_info()
+static void load_effectchain_info(void)
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
 
@@ -5327,7 +5327,7 @@ static gboolean effect_row_visible (GtkTreeModel *model, GtkTreeIter *iter, gpoi
  * Three treeview : fxlist mixlist, alphalist
  *
  ******************************************************/
-void setup_effectlist_info()
+void setup_effectlist_info(void)
 {
     int i;
     GtkWidget *trees[3];
@@ -5389,7 +5389,7 @@ void setup_effectlist_info()
 
 }
 
-void set_feedback_status()
+void set_feedback_status(void)
 {
 	int len = 0;
 	single_vims(VIMS_GET_FEEDBACK);
@@ -5410,7 +5410,7 @@ void set_feedback_status()
  *   (VIMS transmission) to the treeviews
  *
  ******************************************************/
-void load_effectlist_info()
+void load_effectlist_info(void)
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_effectlist");
     GtkWidget *tree2 = glade_xml_get_widget_( info->main_window, "tree_effectmixlist");
@@ -5587,7 +5587,7 @@ int verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_
     return 1;
 }
 
-void setup_samplelist_info()
+void setup_samplelist_info(void)
 {
     effect_sources_tree = glade_xml_get_widget_( info->main_window, "tree_sources");
     effect_sources_store = gtk_list_store_new( 3, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING );
@@ -5761,7 +5761,7 @@ static void select_slot( int pm )
     }
 }
 
-static void load_sequence_list()
+static void load_sequence_list(void)
 {
     single_vims( VIMS_SEQUENCE_LIST );
     gint len = 0;
@@ -6188,7 +6188,7 @@ void on_stream_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 
 }
 
-static void setup_colorselection()
+static void setup_colorselection(void)
 {
     GtkWidget *sel = glade_xml_get_widget_(info->main_window, "colorselection");
     g_signal_connect(sel,
@@ -6239,14 +6239,14 @@ void on_rgbkey_color_changed(GtkColorSelection *colorsel, gpointer user_data)
     }
 }
 
-static void setup_rgbkey()
+static void setup_rgbkey(void)
 {
     GtkWidget *sel = widget_cache[ WIDGET_RGBKEY ];
     g_signal_connect( sel, "color-changed",
     (GCallback) on_rgbkey_color_changed, NULL );
 }
 
-static void setup_vimslist()
+static void setup_vimslist(void)
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_vims");
     GtkListStore *store = gtk_list_store_new( 2,G_TYPE_STRING, G_TYPE_STRING);
@@ -6268,7 +6268,7 @@ static void setup_vimslist()
                                          VIMS_ID, GTK_SORT_ASCENDING);
 }
 
-static void setup_bundles()
+static void setup_bundles(void)
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_bundles");
     GtkListStore *store = gtk_list_store_new( 7,G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING ,G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING);
@@ -6305,7 +6305,7 @@ static void setup_bundles()
     gtk_text_view_set_wrap_mode( GTK_TEXT_VIEW(tv), GTK_WRAP_WORD_CHAR );
 }
 
-static void setup_editlist_info()
+static void setup_editlist_info(void)
 {
     editlist_tree = glade_xml_get_widget_( info->main_window, "editlisttree");
     editlist_store = gtk_list_store_new( 5,G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING ,G_TYPE_STRING);
@@ -6328,7 +6328,7 @@ static void setup_editlist_info()
     gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 }
 
-static void reload_keys()
+static void reload_keys(void)
 {
     gint len = 0;
     single_vims( VIMS_KEYLIST );
@@ -6390,7 +6390,7 @@ static void reload_keys()
     free(text);
 }
 
-static void reload_bundles()
+static void reload_bundles(void)
 {
     reload_keys();
 
@@ -6527,7 +6527,7 @@ static void reload_bundles()
 }
 
 #define VJ_EVENT_LIST_SIZE 602
-static void reload_vimslist()
+static void reload_vimslist(void)
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_vims");
     GtkListStore *store;
@@ -6645,7 +6645,7 @@ static char *tokenize_on_space( char *q )
 
 static int have_srt_ = 0;
 
-static void init_srt_editor()
+static void init_srt_editor(void)
 {
     reload_fontlist();
     update_spin_range( "spin_text_x", 0, info->el.width-1 , 0 );
@@ -6654,7 +6654,7 @@ static void init_srt_editor()
     update_spin_range( "spin_text_start", 0, total_frames_, 0 );
 }
 
-static void reload_fontlist()
+static void reload_fontlist(void)
 {
     GtkWidget *box = glade_xml_get_widget_( info->main_window, "combobox_fonts");
     gtk_combo_box_text_remove_all (GTK_COMBO_BOX_TEXT( box ) );
@@ -6681,7 +6681,7 @@ static void reload_fontlist()
     free(srts);
 }
 
-static void reload_srt()
+static void reload_srt(void)
 {
     if(!have_srt_)
     {
@@ -6741,7 +6741,7 @@ void _edl_reset(void)
     }
 }
 
-void	reload_macros()
+void	reload_macros(void)
 {
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "macro_macros" );
 	GtkListStore *store;
@@ -6824,7 +6824,7 @@ void	reload_macros()
 	info->uc.reload_hint[HINT_MACRO] = 0;
 }
 
-static void reload_editlist_contents()
+static void reload_editlist_contents(void)
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "editlisttree");
     GtkListStore *store;
@@ -6989,7 +6989,7 @@ static void reload_editlist_contents()
 }
 
 // execute after el change:
-static void load_editlist_info()
+static void load_editlist_info(void)
 {
     char norm;
     float fps;
@@ -7222,12 +7222,12 @@ static void init_recorder(int total_frames, gint mode)
 
 static char glade_path[1024];
 
-char *get_glade_path()
+char *get_glade_path(void)
 {
     return glade_path;
 }
 
-char *get_gveejay_dir()
+char *get_gveejay_dir(void)
 {
     return RELOADED_DATADIR;
 }
@@ -7831,7 +7831,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     update_current_slot(history, pm, last_pm);
 }
 
-static void disable_fx_entry() {
+static void disable_fx_entry(void) {
     int i;
     gint min=0,max=1,value=0;
 
@@ -7883,7 +7883,7 @@ static void disable_fx_entry() {
     }
 }
 
-static void enable_fx_entry() {
+static void enable_fx_entry(void) {
 
     int *entry_tokens = &(info->uc.entry_tokens[0]);
     int i;
@@ -8136,7 +8136,7 @@ static void process_reload_hints(int *history, int pm)
     }*/
 }
 
-void update_gui()
+void update_gui(void)
 {
     int pm = info->status_tokens[PLAY_MODE];
     int last_pm = info->prev_mode;
@@ -8183,7 +8183,7 @@ void update_gui()
     update_cachemeter_timeout(NULL);
 }
 
-void vj_gui_free()
+void vj_gui_free(void)
 {
     if(info)
     {
@@ -8204,7 +8204,7 @@ void vj_gui_free()
     vpf( bankport_ );
 }
 
-void vj_gui_style_setup()
+void vj_gui_style_setup(void)
 {
     if(!info) return;
     info->color_map = gdk_screen_get_system_visual (gdk_screen_get_default ());
@@ -8375,7 +8375,7 @@ static void sigsegfault_handler(void) {
         veejay_msg(VEEJAY_MSG_ERROR,"%s", strerror(errno));
 }
 
-void register_signals()
+void register_signals(void)
 {
     signal( SIGINT,  reloaded_sighandler );
     signal( SIGPIPE, reloaded_sighandler );
@@ -8386,7 +8386,7 @@ void register_signals()
     sigsegfault_handler();
 }
 
-void vj_gui_wipe()
+void vj_gui_wipe(void)
 {
     int i;
     veejay_memset( info->status_tokens, 0, sizeof(int) * STATUS_TOKENS );
@@ -8453,7 +8453,7 @@ void vj_gui_set_geom( int x, int y )
     geo_pos_[1] = y;
 }
 
-void vj_event_list_free()
+void vj_event_list_free(void)
 {
     int i;
     for( i = 0; i < VIMS_MAX; i ++ ) {
@@ -8957,7 +8957,7 @@ void gveejay_preview( int p )
     user_preview = p;
 }
 
-int gveejay_user_preview()
+int gveejay_user_preview(void)
 {
     return user_preview;
 }
@@ -9088,12 +9088,12 @@ static void veejay_stop_connecting(vj_gui_t *gui)
         gtk_window_move( GTK_WINDOW(mw), geo_pos_[0], geo_pos_[1] );
 }
 
-void reloaded_launcher()
+void reloaded_launcher(void)
 {
     info->watch.state = STATE_RECONNECT;
 }
 
-void reloaded_show_launcher()
+void reloaded_show_launcher(void)
 {
     info->watch.state = STATE_WAIT_FOR_USER;
     info->launch_sensitive = TRUE;
@@ -9104,12 +9104,12 @@ void reloaded_show_launcher()
     gtk_widget_show(veejay_connection);
 }
 
-void reloaded_schedule_restart()
+void reloaded_schedule_restart(void)
 {
     info->watch.state = STATE_STOPPED;
 }
 
-void reloaded_restart()
+void reloaded_restart(void)
 {
     GtkWidget *mw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
     // disable and hide mainwindow
@@ -9225,7 +9225,7 @@ void vj_gui_disconnect(int restart_schedule)
     info->key_id = 0;
 }
 
-void vj_gui_disable()
+void vj_gui_disable(void)
 {
     if(gtk_widget_is_sensitive( GTK_WIDGET(widget_cache[WIDGET_VEEJAY_BOX] ))) {
         gtk_widget_set_sensitive( GTK_WIDGET(widget_cache[WIDGET_VEEJAY_BOX] ), FALSE );
@@ -9234,7 +9234,7 @@ void vj_gui_disable()
     info->sensitive = 0;
 }
 
-void vj_gui_enable()
+void vj_gui_enable(void)
 {
     if(!gtk_widget_is_sensitive( GTK_WIDGET(widget_cache[WIDGET_VEEJAY_BOX] ))) {
         gtk_widget_set_sensitive( GTK_WIDGET(widget_cache[WIDGET_VEEJAY_BOX] ), TRUE );
@@ -9360,7 +9360,7 @@ void reset_samplebank(void)
     }
 }
 
-void clear_samplebank_pages()
+void clear_samplebank_pages(void)
 {
     while( gtk_notebook_get_n_pages(GTK_NOTEBOOK(info->sample_bank_pad) ) > 0 )
         gtk_notebook_remove_page( GTK_NOTEBOOK(info->sample_bank_pad), -1 );
@@ -9967,7 +9967,7 @@ static int add_sample_to_sample_banks(int bank_page,sample_slot_t *slot)
 /* --------------------------------------------------------------------------------------------------------------------------
  *  Removes a selected sample from the specific sample-bank-slot and update the free_slots-GList as well as
    -------------------------------------------------------------------------------------------------------------------------- */
-static void remove_sample_from_slot()
+static void remove_sample_from_slot(void)
 {
     gint bank_nr = -1;
     gint slot_nr = -1;

@@ -28,7 +28,7 @@
 
 static int curve_is_empty = 1;
 
-int     is_curve_empty() {
+int     is_curve_empty(void) {
     return curve_is_empty;
 }
 

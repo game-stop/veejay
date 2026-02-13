@@ -120,7 +120,7 @@ int mt_set_max_tracks(int mt)
 	return 1;
 }
 
-int	mt_get_max_tracks()
+int	mt_get_max_tracks(void)
 {
 	return  __MAX_TRACKS;
 }

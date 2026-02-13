@@ -38,7 +38,7 @@ static int sample_calctime_mulloop();
 
 static	void change_box_color_rgb( GtkWidget *box, int r, int g, int b,int a, int fill );
 
-void	text_defaults()
+void	text_defaults(void)
 {
 	bg_[0] = 255; bg_[1] = 255; bg_[2] = 255; bg_[3] = 0;
 	fg_[0] = 0;   fg_[1] = 0;   fg_[2] = 0;   fg_[3] = 0;
@@ -203,22 +203,6 @@ void	on_button_251_clicked( GtkWidget *widget, gpointer user_data)
 	vj_msg(VEEJAY_MSG_INFO, "Bezerk mode toggled");
 }	
 
-static gboolean on_entry_samplename_key_pressed (GtkWidget *widget, GdkEventKey *event)
-{
-    switch (event->keyval)
-    {
-    case GDK_KEY_Return:
-    case GDK_KEY_KP_Enter:
-      break;
-
-    default:
-      return FALSE;
-    }
-
-    on_entry_samplename_button_clicked( widget, NULL );
-    return FALSE; //fixme TRUE ?
-}
-
 void	on_entry_samplename_button_clicked( GtkWidget *widget, gpointer user_data )
 {
 	gchar *title = get_text( "entry_samplename" );
@@ -241,6 +225,23 @@ void	on_entry_samplename_button_clicked( GtkWidget *widget, gpointer user_data )
 		}
 	}
 }
+
+static gboolean on_entry_samplename_key_pressed (GtkWidget *widget, GdkEventKey *event)
+{
+    switch (event->keyval)
+    {
+    case GDK_KEY_Return:
+    case GDK_KEY_KP_Enter:
+      break;
+
+    default:
+      return FALSE;
+    }
+
+    on_entry_samplename_button_clicked( widget, NULL );
+    return FALSE; //fixme TRUE ?
+}
+
 
 void	on_button_054_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -425,7 +426,7 @@ void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
 	vj_msg(VEEJAY_MSG_INFO, "FX Opacity set to %1.2f", val ); 
 }
 
-static void	el_selection_update()
+static void	el_selection_update(void)
 {
 	gchar *text = format_selection_time(info->selection[0], info->selection[1]);
 	update_label_str( "label_el_selection", text );
@@ -456,7 +457,7 @@ void	on_button_el_selend_value_changed(GtkWidget *w, gpointer user_data)
 	el_selection_update();
 }
 
-static	gboolean verify_selection()
+static	gboolean verify_selection(void)
 {
 	if( (info->selection[1] - info->selection[0] ) <= 0)
 	{
@@ -1710,7 +1711,7 @@ static inline int sample_calctime (int nframes)
     return nframes;
 }
 
-static int sample_calctime_selection()
+static int sample_calctime_selection(void)
 {
     int n_frames = info->status_tokens[SAMPLE_MARKER_END] - info->status_tokens[SAMPLE_MARKER_START];
     if (n_frames == 0 )
@@ -1719,7 +1720,7 @@ static int sample_calctime_selection()
     return sample_calctime(n_frames);
 }
 
-static int sample_calctime_mulloop()
+static int sample_calctime_mulloop(void)
 {
     int n_frames = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
 
@@ -2760,7 +2761,7 @@ void	on_stream_length_value_changed( GtkWidget *widget, gpointer user_data)
 	multi_vims( VIMS_STREAM_SET_LENGTH, "%d", (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON( widget ) ) );
 }
 
-int	on_curve_buttontime_clicked()
+int	on_curve_buttontime_clicked(void)
 {
 	return 1;
 }
@@ -3089,7 +3090,7 @@ void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 				page_needed );
 }
 
-void	on_timeline_move_selection() {
+void	on_timeline_move_selection(void) {
 	vj_midi_learning_vims_msg2_extra( info->midi, VIMS_SAMPLE_MOVE_MARKER, 0, 4);
 }
 
@@ -3683,7 +3684,7 @@ typedef struct
 	int	 enabled;
 } clipboard_t;
 
-static clipboard_t	*get_new_clipboard()
+static clipboard_t	*get_new_clipboard(void)
 {
 	clipboard_t *c = (clipboard_t*) vj_calloc( sizeof(clipboard_t) );
 	
