@@ -53,7 +53,7 @@
 extern int lav_detect_endian (void);
 /* The following variable indicates the kind of error */
 
-long AVI_errno = 0;
+int AVI_errno = 0;
 
 #define MAX_INFO_STRLEN 64
 static char id_str[MAX_INFO_STRLEN];
@@ -80,7 +80,7 @@ static char *avi_error_list[] = {
 	NULL
 };
 
-static void avierror(long AVI_errno) {
+static void avierror(int AVI_errno) {
 	if(AVI_errno < 0 || AVI_errno > 14) {
 		veejay_msg(0, "[avilib] %s", avi_error_list[0]);
 	}
@@ -2234,18 +2234,27 @@ int avi_parse_index_from_file(avi_t *AVI, char *filename)
     if (!(fd = fopen(filename, "r"))) { perror ("avi_parse_index_from_file: fopen"); return -1; }
 
     // read header
-    fgets(data, 100, fd);
+   if (!fgets(data, sizeof(data), fd)) {
+      fclose(fd);
+      veejay_msg(VEEJAY_MSG_ERROR, "[avilib] %s: Failed to read header", filename);
+      return -1;
+   }
 
-    if ( strncasecmp(data, "AVIIDX1", 7) != 0) {
+   if ( strncasecmp(data, "AVIIDX1", 7) != 0) {
 	   fclose(fd);
-     	   veejay_msg(VEEJAY_MSG_ERROR, "[avilib] %s: Not an AVI index file", filename);
+     	veejay_msg(VEEJAY_MSG_ERROR, "[avilib] %s: Not an AVI index file", filename);
 	   return -1;
     }
 
     // read comment
-    fgets(data, 100, fd);
-    f_pos = ftell(fd);
-    while (fgets(data, 100, fd)) {
+   if (!fgets(data, sizeof(data), fd)) {
+      fclose(fd);
+      veejay_msg(VEEJAY_MSG_ERROR, "[avilib] %s: Failed to read comment line", filename);
+      return -1;
+   }
+   
+   f_pos = ftell(fd);
+   while (fgets(data, 100, fd)) {
 	d = data[5] - '1';
 	if        (d == 0) {
 	    vid_chunks++;
