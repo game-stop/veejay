@@ -374,7 +374,7 @@ int vj_split_configure_screen( void *ptr, int screen_id, int edge_x, int edge_y,
 	return 1;
 }
 
-static char *get_self()
+static char *get_self(void)
 {
 	char *path = vj_malloc( 1024 );
 	if( path == NULL )

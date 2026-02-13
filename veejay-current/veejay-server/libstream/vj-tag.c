@@ -1496,7 +1496,7 @@ int vj_tag_del(int id)
     return 1;
 }
 
-void vj_tag_close_all() {
+void vj_tag_close_all(void) {
    int n=vj_tag_highest();
    int i;
    vj_tag *tag;

@@ -2230,7 +2230,7 @@ static void vj_font_text_osd_render(vj_font_t *f, void *_picture, int x, int y )
         }
 }
 
-char    *vj_font_default()
+char    *vj_font_default(void)
 {
     int n = strlen( selected_default_font );
     if( n <= 0 )

@@ -2081,7 +2081,7 @@ int     vj_event_register_keyb_event(int event_id, int symbol, int modifier, con
     return vj_event_update_key_collection(ff, index);
 }
 #endif
-static void vj_event_init_network_events()
+static void vj_event_init_network_events(void)
 {
     int i;
     int net_id = 0;

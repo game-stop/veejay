@@ -39,7 +39,7 @@ static  CARD16  state_;
 static  BOOL    onoff_;
 #endif
 
-void	x11_misc_init()
+void	x11_misc_init(void)
 {
 	memset(&screen_saver_,0, sizeof(screen_saver_));
 #ifdef HAVE_XDPMS

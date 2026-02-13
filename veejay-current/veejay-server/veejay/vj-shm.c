@@ -70,15 +70,15 @@ static	int	just_a_shmid = 0;
 static  int simply_my_shmkey  = 0;
 static	key_t	simply_my_shmid = 0;
 
-int		vj_shm_get_my_shmid() {
+int		vj_shm_get_my_shmid(void) {
 	return simply_my_shmkey;
 }
 
-int		vj_shm_get_my_id() {
+int		vj_shm_get_my_id(void) {
 	return simply_my_shmid;
 }
 
-int		vj_shm_get_id(){ 
+int		vj_shm_get_id(void){ 
 	return just_a_shmid;
 }
 

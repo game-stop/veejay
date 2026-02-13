@@ -2867,12 +2867,12 @@ int	prepare_cache_line(int perc, int n_slots)
 	return 1;
 }
 
-static int smp_check()
+static int smp_check(void)
 {
 	return get_nprocs();
 }
 
-veejay_t *veejay_malloc()
+veejay_t *veejay_malloc(void)
 {
     
     veejay_t *info;

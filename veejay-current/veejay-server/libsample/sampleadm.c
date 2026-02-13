@@ -112,7 +112,7 @@ int sample_highest_valid_id(void)
 }
 
 
-int sample_verify() {
+int sample_verify(void) {
    return hash_verify( SampleHash );
 }
 

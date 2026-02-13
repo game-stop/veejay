@@ -1452,7 +1452,7 @@ typedef struct
 	uint32_t hB[256];
 } histogram_t;
 
-void	*veejay_histogram_new()
+void	*veejay_histogram_new(void)
 {
 	histogram_t *h = (histogram_t*) vj_calloc(sizeof(histogram_t));
 	if(!h) return NULL;

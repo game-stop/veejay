@@ -142,7 +142,7 @@ uint64_t AVI_set_MAX_LEN( uint64_t n )
 	return n;
 }
 
-uint64_t AVI_get_MAX_LEN()
+uint64_t AVI_get_MAX_LEN(void)
 {
 	return AVI_MAX_LEN;
 }

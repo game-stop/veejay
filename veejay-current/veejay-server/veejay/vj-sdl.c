@@ -279,7 +279,7 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
  	return 1;
 }
 
-void    vj_sdl_enable_screensaver()
+void    vj_sdl_enable_screensaver(void)
 {
     SDL_EnableScreenSaver();
 }
@@ -331,7 +331,7 @@ uint8_t* vj_sdl_get_buffer( void *ptr ) {
     return vjsdl->pixels;
 }
 
-void	vj_sdl_quit()
+void	vj_sdl_quit(void)
 {
 	SDL_Quit();
 }
