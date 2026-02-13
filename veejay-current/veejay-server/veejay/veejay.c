@@ -849,7 +849,6 @@ int main(int argc, char **argv)
 	if(!check_command_line_options(argc, argv))
 	{
 		veejay_free(info);
-		vj_mem_destroy();
         return 0;
  	}
 
@@ -961,7 +960,6 @@ VEEJAY_MAIN_EXIT:
 	veejay_busy(info);			
 	veejay_free(info);
 	veejay_destroy_msg_ring();
-	vj_mem_destroy();
 
 	return main_ret;
 }

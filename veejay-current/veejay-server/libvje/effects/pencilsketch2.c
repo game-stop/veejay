@@ -74,7 +74,6 @@ vj_effect *pencilsketch2_init(int w, int h)
     return ve;
 }
 #define GAMMA_MAX 256
-static void gammacompr_setup();
 
 typedef struct {
     uint8_t *pencilbuf;
@@ -84,6 +83,19 @@ typedef struct {
     double *gamma_table;
     double gamma_value;
 } pencilsketch_t;
+
+static void gammacompr_setup(pencilsketch_t *p)
+{
+    int i;
+    double val;
+    double gm = (double) GAMMA_MAX;
+    for (i = 0; i < GAMMA_MAX; i++) {
+         val = i / gm;
+         val = pow(val, p->gamma_value + ((double) i * 0.01));
+         val = gm * val;
+         p->gamma_table[i] = (val < 0.0 ? 0.0 : val > 255.0 ? 255.0 : val);
+    }
+}
 
 void *pencilsketch2_malloc(int w, int h) {
     
@@ -132,20 +144,6 @@ void pencilsketch2_free(void *ptr) {
     free(p->gamma_table);
     free(p);
 }
-
-static void gammacompr_setup(pencilsketch_t *p)
-{
-    int i;
-    double val;
-    double gm = (double) GAMMA_MAX;
-    for (i = 0; i < GAMMA_MAX; i++) {
-         val = i / gm;
-         val = pow(val, p->gamma_value + ((double) i * 0.01));
-         val = gm * val;
-         p->gamma_table[i] = (val < 0.0 ? 0.0 : val > 255.0 ? 255.0 : val);
-    }
-}
-
 
 static void rhblur_apply( uint8_t *dst , uint8_t *src, int w, int h, int r)
 {
