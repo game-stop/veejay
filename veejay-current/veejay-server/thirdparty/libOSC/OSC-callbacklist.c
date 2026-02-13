@@ -85,7 +85,7 @@ callbackList AllocCallbackListNode(methodCallback callback, void *context,
     return result;
 }
     
-void	OSCDestroyCallbackListNodes()
+void	OSCDestroyCallbackListNodes(void)
 {
 	if( allNodes )
 		free( allNodes );

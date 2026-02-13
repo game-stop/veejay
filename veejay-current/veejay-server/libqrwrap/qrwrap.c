@@ -235,7 +235,7 @@ void	qrwrap_draw( VJFrame *out, int port_num, const char *homedir, int qr_w, int
 	
 }
 
-void	qrwrap_free()
+void	qrwrap_free(void)
 {
 	if( pic_ != NULL ) {
 		vj_picture_cleanup( pic_ );
