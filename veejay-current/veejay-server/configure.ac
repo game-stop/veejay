@@ -286,10 +286,10 @@ case $host_cpu in
     	have_x86cpu=true
     	have_x86_64cpu=true
 	if test "x$enable_debug" != "xyes" ; then
-		VJE_CFLAGS="-O3 -fno-math-errno -funsafe-math-optimizations -fno-trapping-math  -m64 -fPIC -DPIC -ftree-vectorize -flto -fuse-linker-plugin -fno-plt"
+		VJE_CFLAGS="-O3 -fno-math-errno -funsafe-math-optimizations -fno-trapping-math -fopenmp  -m64 -fPIC -DPIC -ftree-vectorize -flto -fuse-linker-plugin -fno-plt"
 		SUBSAMPLE_CFLAGS="-O3 -m64 -fPIC -DPIC -ftree-vectorize -flto -fuse-linker-plugin -fno-plt"
 	else
-		VJE_CFLAGS="-O3 -ftree-vectorize -fopt-info-vec-optimized -m64 -fPIC -DPIC -g"
+		VJE_CFLAGS="-O3 -ftree-vectorize -fopenmp -fopt-info-vec-optimized -m64 -fPIC -DPIC -g"
 	fi
 	CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
 
@@ -340,11 +340,11 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 	if test "x$enable_debug" != "xyes" ; then
 	    CFLAGS="-O3 -ffast-math -fPIC -DPIC -fopenmp"
 	    SUBSAMPLE_CFLAGS="O3 -fPIC -DPIC"
-   	    VJE_CFLAGS="-O3 -ftree-vectorize -fPIC -DPIC -g -ffast-math -fsimdmath"
+   	    VJE_CFLAGS="-O3 -ftree-vectorize -fopenmp -fPIC -DPIC -ffast-math -fsimdmath"
 	else
 	    CFLAGS="-O3 -ffast-math -fPIC -DPIC -g -fopenmp"
 	    SUBSAMPLE_CFLAGS="-O3 -fPIC -DPIC -g"
-	    VJE_CFLAGS="-O3 -ftree-vectorize -fopt-info-vec-optimized -ffast-math -fPIC -DPIC -g"
+	    VJE_CFLAGS="-O3 -ftree-vectorize -fopenfp -fopt-info-vec-optimized -ffast-math -fPIC -DPIC -g"
 	fi
 	have_arm=true
 	AC_MSG_RESULT(aarch64)
