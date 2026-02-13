@@ -2214,7 +2214,7 @@ JACK_SetClientName(char *name)
 }
 
 void
-JACK_FreeClientName()
+JACK_FreeClientName(void)
 {
   if( client_name ) {
     free(client_name);
