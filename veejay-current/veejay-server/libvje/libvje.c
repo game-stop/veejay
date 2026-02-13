@@ -335,21 +335,21 @@ void    vje_set_bg(VJFrame *bg)
     veejay_msg(VEEJAY_MSG_DEBUG, "Frame stored in FX process chain as background frame");
 }
 
-unsigned int	get_pixel_range_min_Y() {
+unsigned int	get_pixel_range_min_Y(void) {
 	return pixel_Y_lo_;
 }
-unsigned int	get_pixel_range_min_UV() {
+unsigned int	get_pixel_range_min_UV(void) {
 	return pixel_U_lo_;
 }
 
-int vje_is_parallel_enabled() {
+int vje_is_parallel_enabled(void) {
 	return parallel_enabled;
 }
 
-void    vje_enable_parallel() {
+void    vje_enable_parallel(void) {
     parallel_enabled = 1;
 }
-void    vje_disable_parallel() {
+void    vje_disable_parallel(void) {
     parallel_enabled = 0;
 }
 
@@ -628,16 +628,16 @@ uint8_t *vje_fx_get_bg( int fx_id, void *ptr, unsigned int plane)
     return vj_fx[ idx ].get_bg( ptr, plane );
 }
 
-int vje_get_last_id() {
+int vje_get_last_id(void) {
     return LAST_ID;
 }
 
-int vje_max_effects()
+int vje_max_effects(void)
 {
     return num_fx;
 }
 
-int vje_max_space()
+int vje_max_space(void)
 {
     return MAX_EFFECTS;
 }
@@ -938,7 +938,7 @@ static int vje_global_couple(int chain_id, int ref_id, int fx_id, void *ptr)
     return 0;
 }
 
-void vje_dump() {
+void vje_dump(void) {
 	veejay_msg(VEEJAY_MSG_INFO, "Below follow all effects in Veejay,");
 	veejay_msg(VEEJAY_MSG_INFO, "Effect numbers starting with 2xx are effects that use");
 	veejay_msg(VEEJAY_MSG_INFO, "*two* sources (by default a copy of itself)");
