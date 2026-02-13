@@ -2429,7 +2429,7 @@ static struct {
     double t;
     uint32_t cpu_require;
 } memcpy_method[] = {
-    { NULL, NULL, 0 },
+    { NULL, NULL, 0,0 },
     { "glibc memcpy()",  (void*) memcpy, 0, 0 },
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
     { "linux kernel memcpy()", (void*) linux_kernel_memcpy, 0, 0 },
