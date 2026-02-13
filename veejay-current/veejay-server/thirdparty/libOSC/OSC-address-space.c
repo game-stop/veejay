@@ -108,7 +108,7 @@ static void MakeFreeMethodsList(int n) {
     freeMethods[n-1].next = 0;
 }
 
-void	OSCDestroyAddressSpace()
+void	OSCDestroyAddressSpace(void)
 {
 	if( safePtrFreeContainers != 0) { 
 		free( safePtrFreeContainers );
