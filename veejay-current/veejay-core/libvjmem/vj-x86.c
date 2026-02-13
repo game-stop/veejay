@@ -30,7 +30,7 @@
 #include <veejaycore/veejaycore.h>
 extern void find_best_memcpy(void);
 extern void find_best_memset(void);
-extern void yuyv_plane_init();
+extern void yuyv_plane_init(void);
 extern void benchmark_tasks(int n_tasks, long n_frames, int w, int h);
 extern void init_parallel_tasks(int n_tasks);
 
@@ -87,7 +87,7 @@ static int has_cpuid(void)
 
 #ifdef HAVE_ARM
 #define WORD_SIZE 4
-static int get_cache_line_size() {
+static int get_cache_line_size(void) {
 #if defined(__aarch64__)
     uint64_t ctr_el0;
     asm volatile("mrs %0, ctr_el0" : "=r"(ctr_el0));
@@ -121,7 +121,7 @@ static void do_cpuid(unsigned int ax, unsigned int *p)
          : "0" (ax));
 }
 
-static int	get_cache_line_size()
+static int	get_cache_line_size(void)
 {
 	unsigned int regs[4];
 	unsigned int regs2[4];
@@ -149,12 +149,12 @@ static int	get_cache_line_size()
 }
 #endif
 
-int	cpu_cache_size()
+int	cpu_cache_size(void)
 {
 	return CACHE_LINE_SIZE;
 }
 
-int	mem_align_size()
+int	mem_align_size(void)
 {
 	return MEM_ALIGNMENT_SIZE;
 }
@@ -174,16 +174,11 @@ void vj_mem_init(int w, int h)
 	vj_mem_set_defaults(w,h);
 }
 
-void vj_mem_optimize() {
+void vj_mem_optimize(void) {
 #ifndef STRICT_CHECKING
 	find_best_memcpy();
 	find_best_memset();
 #endif
-}
-
-
-void	vj_mem_destroy()
-{
 }
 
 int	vj_mem_threaded_init(int w, int h)

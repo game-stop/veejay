@@ -181,7 +181,7 @@
 static int selected_best_memcpy = 1;
 static int selected_best_memset = 1;
 
-static double get_time()
+static double get_time(void)
 {
 	struct timespec ts;
 	clock_gettime( CLOCK_MONOTONIC, &ts );
@@ -364,7 +364,7 @@ static uint8_t ppmask[16] = { 0,128,128,0, 128,128,0,128, 128,0,128,128,0,128,12
 static uint8_t yuyv_mmreg_[AC_MMREG_SIZE];
 #endif
 
-void	yuyv_plane_init()
+void	yuyv_plane_init(void)
 {
 #if defined ( HAVE_ASM_MMX ) || defined ( HAVE_ASM_SSE )
 	unsigned int i;
@@ -2527,7 +2527,7 @@ static struct {
 };
 
 
-void	memcpy_report()
+void	memcpy_report(void)
 {
 	int i;
 	fprintf(stdout,"\n\nSIMD benchmark results:\n");
@@ -2547,7 +2547,7 @@ void	memcpy_report()
 void *(* veejay_memcpy)(void *to, const void *from, size_t len) = 0;
 void *(* veejay_memset)(void *what, uint8_t val, size_t len ) = 0;
 
-static int set_user_selected_memcpy()
+static int set_user_selected_memcpy(void)
 {
 	char *mm = getenv( "VEEJAY_MEMCPY_METHOD" );
 	if( mm ) {
@@ -2563,7 +2563,7 @@ static int set_user_selected_memcpy()
 	}
 	return 0;
 }
-static int set_user_selected_memset()
+static int set_user_selected_memset(void)
 {
 	char *mm = getenv( "VEEJAY_MEMSET_METHOD" );
 	if( mm ) {
@@ -2610,7 +2610,7 @@ static void lock_buffers(void *buf, size_t size) {
     }
 }
 
-void find_best_memcpy()
+void find_best_memcpy(void)
 {
 	int best = set_user_selected_memcpy();
 	if( best > 0 )
@@ -2718,7 +2718,7 @@ static inline void consume_buffer(const unsigned char *buf, size_t n)
         sink ^= buf[i];
 }
 
-void find_best_memset()
+void find_best_memset(void)
 {
 	int best = set_user_selected_memset();
 	if( best > 0 )

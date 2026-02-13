@@ -50,7 +50,7 @@
 
 extern int get_ffmpeg_pixfmt( int p);
 
-vj_client *vj_client_alloc( )
+vj_client *vj_client_alloc(void)
 {
 	vj_client *v = (vj_client*) vj_calloc(sizeof(vj_client));
 	if(!v)

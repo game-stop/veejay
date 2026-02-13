@@ -927,7 +927,7 @@ vevo_port_t *vevo_port_new(int port_type)
 }
 
 //! Initialize VeVo. Set up bookkeeping information to track Port construction and destruction
-void	vevo_strict_init()
+void	vevo_strict_init(void)
 {
 	memset( atom_sizes_,0,sizeof(atom_sizes_) );
 	atom_sizes_[1] = sizeof(int32_t);
@@ -1526,11 +1526,6 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
 	list[idx] = NULL;
     }
     return list;
-}
-
-//! Report statistics and free bookkeeping information
-void	vevo_report_stats()
-{
 }
 
 static	int	vevo_port_get_port( void *port, vevo_storage_t *item, void *res )

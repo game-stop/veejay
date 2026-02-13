@@ -84,19 +84,19 @@ static unsigned int n_cpu = 0;
 static uint8_t numThreads = 0;
 static thread_pool_t *task_pool = NULL;
 
-uint8_t  vj_task_get_workers()
+uint8_t  vj_task_get_workers(void)
 {
         return numThreads;
 }
 
-void    vj_task_lock() {
+void    vj_task_lock(void) {
     pthread_mutex_lock(&task_pool->lock);
 }
-void    vj_task_unlock() {
+void    vj_task_unlock(void) {
     pthread_mutex_unlock(&task_pool->lock);
 }
 
-int vj_task_get_num_cpus()
+int vj_task_get_num_cpus(void)
 {
     if( n_cpu > 0 )
         return n_cpu;
@@ -467,7 +467,7 @@ int vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
     return 1;
 }
 
-void task_destroy()
+void task_destroy(void)
 {
     if(!task_pool)
         return;

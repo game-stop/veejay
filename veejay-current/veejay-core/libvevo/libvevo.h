@@ -104,7 +104,7 @@ int	vevo_property_protect( vevo_port_t *p, const char *key  );
 
 void	vevo_port_dump( void *p, int lvl );
 
-int	vevo_property_set_f(vevo_port_t * p, const char *key,  int atom_type, int num_elements, void (*set_func)() , int (*get_func)() );
+int	vevo_property_set_f(vevo_port_t * p, const char *key,  int atom_type, int num_elements, void (*set_func)(void *, int32_t) , int (*get_func)(void *) );
 
 int	vevo_property_softref( void *port, const char *key );
 

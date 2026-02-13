@@ -181,7 +181,7 @@ void    verify_CCIR_auto(int a, int b, VJFrame *dst )
     }
 }
 
-int yuv_use_auto_ccir_jpeg()
+int yuv_use_auto_ccir_jpeg(void)
 {
     return auto_conversion_ccir_jpeg_;
 }
@@ -266,7 +266,7 @@ int pixfmt_is_full_range(int pixfmt) {
 
 static int  global_scaler_ = SWS_FAST_BILINEAR;
 static int  full_chroma_interpolation_ = 0;
-int yuv_which_scaler()
+int yuv_which_scaler(void)
 {
     return global_scaler_;
 }
@@ -422,7 +422,7 @@ void            yuv_set_pixel_range(int full_range)
     full_range_pixel_value_ = full_range;
 }
 
-int             yuv_get_pixel_range()
+int             yuv_get_pixel_range(void)
 {
     return full_range_pixel_value_;
 }
