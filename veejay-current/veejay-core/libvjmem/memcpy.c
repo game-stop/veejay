@@ -1006,6 +1006,7 @@ static void * sse_memcpy(void * to, const void * from, size_t len)
 #endif
 
 #ifdef HAVE_ASM_AVX2
+__attribute__((target("avx2")))
 void *avx2_memcpy(void *dst0, const void *src0, size_t len0) {
     void *retval = dst0;
 
@@ -1080,7 +1081,7 @@ void *avx2_memcpy(void *dst0, const void *src0, size_t len0) {
 
     return retval;
 }
-
+__attribute__((target("avx2")))
 void *avx2_memset(void *dst0, int c, size_t len0) {
     void *retval = dst0;
     uint8_t *dst = (uint8_t *)dst0;
@@ -1129,6 +1130,7 @@ void *avx2_memset(void *dst0, int c, size_t len0) {
 #endif
 
 #ifdef HAVE_ASM_AVX
+__attribute__((target("avx")))
 void *avx_memset(void *dst0, int c, size_t len0) {
     void *retval = dst0;
     uint8_t *dst = (uint8_t *)dst0;
@@ -1263,7 +1265,7 @@ static void * avx512_memcpy(void *to, const void *from, size_t len) {
 #endif
 
 #ifdef HAVE_ASM_AVX
-
+__attribute__((target("avx")))
 static void* avx_memcpy(void *destination, const void *source, size_t size)
 {
 	unsigned char *dst = (unsigned char*)destination;
