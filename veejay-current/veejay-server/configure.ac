@@ -206,7 +206,7 @@ if test "x$enable_debug" = "xyes" ; then
  CFLAGS="$CFLAGS $debugCFLAGS"
  AC_MSG_RESULT([yes])
 else
- CFLAGS="$CFLAGS -flto -fno-plt -fuse-linker-plugin"
+ CFLAGS="$CFLAGS -flto=auto -fno-plt -fuse-linker-plugin"
  AC_MSG_RESULT([no])
 fi
 AC_MSG_CHECKING(whether to compile in profiling information)
@@ -286,8 +286,8 @@ case $host_cpu in
     	have_x86cpu=true
     	have_x86_64cpu=true
 	if test "x$enable_debug" != "xyes" ; then
-		VJE_CFLAGS="-O3 -fno-math-errno -funsafe-math-optimizations -fno-trapping-math -fopenmp  -m64 -fPIC -DPIC -ftree-vectorize -flto -fuse-linker-plugin -fno-plt"
-		SUBSAMPLE_CFLAGS="-O3 -m64 -fPIC -DPIC -ftree-vectorize -flto -fuse-linker-plugin -fno-plt"
+		VJE_CFLAGS="-O3 -fno-math-errno -funsafe-math-optimizations -fno-trapping-math -fopenmp  -m64 -fPIC -DPIC -ftree-vectorize -flto=auto -fuse-linker-plugin -fno-plt"
+		SUBSAMPLE_CFLAGS="-O3 -m64 -fPIC -DPIC -ftree-vectorize -flto=auto -fuse-linker-plugin -fno-plt"
 	else
 		VJE_CFLAGS="-O3 -ftree-vectorize -fopenmp -fopt-info-vec-optimized -m64 -fPIC -DPIC -g"
 	fi
