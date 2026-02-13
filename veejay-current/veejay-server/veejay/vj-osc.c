@@ -432,7 +432,7 @@ static	int	osc_client_status_send( lo_address t, char *cmd )
 	return 1;
 }
 
-static	void	osc_iterate_clients()
+static	void	osc_iterate_clients(void)
 {
 	int i;
 	for( i = 0; i < 32; i ++ ){
@@ -905,7 +905,7 @@ void* vj_osc_allocate(int port_id) {
 }	
 
 
-void vj_osc_dump()
+void vj_osc_dump(void)
 {
 
 	OSCPrintWholeAddressSpace();

@@ -292,7 +292,7 @@ void chameleonblend_apply( void *ptr, VJFrame *frame,VJFrame *source, int *args 
 
 }
 
-int chameleonblend_request_fx() {
+int chameleonblend_request_fx(void) {
     return VJ_IMAGE_EFFECT_MOTIONMAP_ID;
 }
 

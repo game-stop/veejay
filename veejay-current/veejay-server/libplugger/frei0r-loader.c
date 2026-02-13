@@ -869,7 +869,7 @@ void	frei0r_plug_deinit( void *plugin )
 	plugin = NULL;
 }
 
-void	frei0r_destroy()
+void	frei0r_destroy(void)
 {
 	if( out_scaler__ )
 		yuv_free_swscaler( out_scaler__ );

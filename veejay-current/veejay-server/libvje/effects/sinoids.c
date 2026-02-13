@@ -186,7 +186,7 @@ void sinoids_apply(void *ptr, VJFrame *frame, int *args)
 
 }
 
-int sinoids_request_fx() {
+int sinoids_request_fx(void) {
     return VJ_IMAGE_EFFECT_MOTIONMAP_ID;
 }
 

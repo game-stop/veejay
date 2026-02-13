@@ -152,7 +152,7 @@ void mirrors_free(void *ptr)
     free(m);
 }
 
-int mirrors_request_fx() {
+int mirrors_request_fx(void) {
     return VJ_IMAGE_EFFECT_MOTIONMAP_ID;
 }
 

@@ -365,7 +365,7 @@ void vje_set_rgb_parameter_conversion_type( int full_range )
     }
 }
 
-int vje_get_rgb_parameter_conversion_type() {
+int vje_get_rgb_parameter_conversion_type(void) {
     return rgb_parameter_conversion_type_;
 }
 

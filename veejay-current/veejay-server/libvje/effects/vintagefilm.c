@@ -97,7 +97,7 @@ static inline uint8_t clamp(int v) {
 }
 
 static uint32_t rng_state = 123456789;
-static inline uint32_t fast_rng() {
+static inline uint32_t fast_rng(void) {
     rng_state ^= rng_state << 13;
     rng_state ^= rng_state >> 17;
     rng_state ^= rng_state << 5;

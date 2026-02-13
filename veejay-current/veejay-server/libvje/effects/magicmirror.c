@@ -316,7 +316,7 @@ void magicmirror_apply( void *ptr, VJFrame *frame, int *args) {
 
 }
 
-int magicmirror_request_fx() {
+int magicmirror_request_fx(void) {
     return VJ_IMAGE_EFFECT_MOTIONMAP_ID;
 }
 

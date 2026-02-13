@@ -234,7 +234,7 @@ matrix_f	get_matrix_func(int type)
 	return &matrix_placementD;		
 }
 
-int			get_matrix_func_n()
+int			get_matrix_func_n(void)
 {
 	return 7;
 }
@@ -2199,7 +2199,7 @@ void	vje_mean_filter( const uint8_t *src, uint8_t *dst, const int w, const int h
 // temporary fix for fast_sqrt, use lookup table 
 double **sqrt_map_pixel_values = NULL;
 
-void init_sqrt_map_pixel_values() {
+void init_sqrt_map_pixel_values(void) {
 
 	int i;
 	
@@ -2227,7 +2227,7 @@ double sqrt_table_get_pixel( int x, int y ) {
 	return sqrt_map_pixel_values[(255+y)][(255+x)];
 }
 
-void	sqrt_table_pixels_free() {
+void	sqrt_table_pixels_free(void) {
 	int i;
 	if(sqrt_map_pixel_values == NULL)
 	  return;

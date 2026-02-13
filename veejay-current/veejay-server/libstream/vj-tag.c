@@ -147,17 +147,17 @@ void    vj_tag_free(void)
 
 
 
-int vj_tag_get_last_tag() {
+int vj_tag_get_last_tag(void) {
     return last_added_tag;
 }
 
-int vj_tag_highest()
+int vj_tag_highest(void)
 {
     return this_tag_id;
 // - next_avail_tag);
 }
 
-int vj_tag_highest_valid_id()
+int vj_tag_highest_valid_id(void)
 {
     int id = this_tag_id;
     while(!vj_tag_exists(id) ) {
@@ -169,7 +169,7 @@ int vj_tag_highest_valid_id()
     return id;
 }
 
-unsigned int vj_tag_size()
+unsigned int vj_tag_size(void)
 {
     if(recount_hash) {
         sample_count = (unsigned int) hash_count( TagHash );
@@ -245,7 +245,7 @@ int vj_tag_put(vj_tag * tag)
     return 1;
 }
 
-int vj_tag_num_devices()
+int vj_tag_num_devices(void)
 {
 #ifdef HAVE_V4L2
     return v4l2_num_devices();
@@ -285,13 +285,13 @@ char *vj_tag_scan_devices( void )
     return n;
 }
 
-int vj_tag_get_width() {
+int vj_tag_get_width(void) {
     return vj_tag_input->width;
 }
-int vj_tag_get_height() {
+int vj_tag_get_height(void) {
     return vj_tag_input->height;
 }
-int vj_tag_get_uvlen() {
+int vj_tag_get_uvlen(void) {
     return vj_tag_input->uv_len;
 }
 

@@ -37,7 +37,7 @@ int sample_record_init(int len)
 	return 1;
 }
 
-void	sample_record_free()
+void	sample_record_free(void)
 {
 }
 

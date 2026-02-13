@@ -1943,12 +1943,12 @@ int		v4l2_get_currentscaling_factor_and_pixel_aspect(void *d, int *dwidth, int *
 }
 
 
-int	v4l2_num_devices()
+int	v4l2_num_devices(void)
 {
 	return 4;
 }
 
-static	char **v4l2_dummy_list()
+static	char **v4l2_dummy_list(void)
 {
 
 	const char *list[] = {
@@ -1970,7 +1970,7 @@ static	char **v4l2_dummy_list()
 	return dup;
 }
 
-char **v4l2_get_device_list()
+char **v4l2_get_device_list(void)
 {
 
 	DIR *dir;

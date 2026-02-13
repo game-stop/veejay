@@ -89,7 +89,7 @@ static char*	vj_avcodec_get_codec_name(int codec_id )
 	return vj_strdup(name);
 }
 
-void			vj_libav_ffmpeg_version()
+void			vj_libav_ffmpeg_version(void)
 {
 	veejay_msg( VEEJAY_MSG_INFO, "libav versions:");
 	veejay_msg( VEEJAY_MSG_INFO, "\tavcodec-%d.%d.%d (%d)", LIBAVCODEC_VERSION_MAJOR, LIBAVCODEC_VERSION_MINOR, LIBAVCODEC_VERSION_MICRO, LIBAVCODEC_BUILD );
@@ -615,7 +615,7 @@ int		vj_avcodec_init( int pixel_format, int verbose)
 	return 1;
 }
 
-int		vj_avcodec_free()
+int		vj_avcodec_free(void)
 {
 	return 1;
 }

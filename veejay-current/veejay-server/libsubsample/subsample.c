@@ -985,7 +985,7 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
 
 static subsample_444_to_422 subsample_444_to_422_in;
 
-void chroma_subsample_init()
+void chroma_subsample_init(void)
 {
     char *mode = getenv( "VEEJAY_SUBSAMPLE_MODE" );
     subsample_444_to_422 f = ss_444_to_422_drop;

@@ -273,7 +273,7 @@ static	void	free_plugin(void *plugin)
 	plugin = NULL;
 }
 
-char		*list_plugins()
+char		*list_plugins(void)
 {
 	int i = 0;
 	int len = 0;
@@ -306,7 +306,7 @@ char		*list_plugins()
 	return res;
 }
 
-static	void	free_plugins()
+static	void	free_plugins(void)
 {
 	int i;
 	for( i = 0; i < index_ ; i ++ )
@@ -375,7 +375,7 @@ void	*plug_get( int fx_id ) {
 
 #define CONFIG_FILE_LEN 65535
 
-static	char	*get_livido_plug_path()
+static	char	*get_livido_plug_path(void)
 { //@ quick & dirty
 	char location[1024];
 	snprintf( location, sizeof(location)-1, "/proc/%d/exe", getpid() );
@@ -409,7 +409,7 @@ static	char	*get_livido_plug_path()
 }
 
 
-static	int	scan_plugins()
+static	int	scan_plugins(void)
 {
 	char *home = getenv( "HOME" );
 	char path[PATH_MAX];
@@ -864,7 +864,7 @@ void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_
 }
 
 
-void	plug_print_all()
+void	plug_print_all(void)
 {
 	/*for(n = 0; n < index_ ; n ++ )
 	{

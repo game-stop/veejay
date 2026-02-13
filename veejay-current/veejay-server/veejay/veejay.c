@@ -100,7 +100,7 @@ static void report_bug(void)
 
 }
 
-static void CompiledWith()
+static void CompiledWith(void)
 {
 	fprintf(stdout,"This is Veejay %s\n\n", VERSION);
 
@@ -753,7 +753,7 @@ static int check_command_line_options(int argc, char *argv[])
 	return 0;
 }
 
-static void print_license()
+static void print_license(void)
 {
 	veejay_msg(VEEJAY_MSG_INFO,
 	    "Veejay -<|Classic +|>- %s Copyright (C) Niels Elburg and others",VERSION);

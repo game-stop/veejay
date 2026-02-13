@@ -85,7 +85,7 @@ extern void   tag_writeStream( char *file, int n, xmlNodePtr node, void *font, v
 extern int vj_tag_highest_valid_id();
 extern int    veejay_sprintf( char *s, size_t size, const char *format, ... );
 
-unsigned int sample_size()
+unsigned int sample_size(void)
 {
     if(recount_hash) {
         sample_count = (unsigned int) hash_count( SampleHash );
@@ -94,12 +94,12 @@ unsigned int sample_size()
     return sample_count;
 }
 
-int sample_highest()
+int sample_highest(void)
 {
     return this_sample_id;
 }
 
-int sample_highest_valid_id()
+int sample_highest_valid_id(void)
 {
     int id = this_sample_id;
     while( !sample_exists( id ) ) {
@@ -284,12 +284,12 @@ int sample_set_state(int new_state)
     return sampleadm_state;
 }
 
-int sample_get_state()
+int sample_get_state(void)
 {
     return sampleadm_state;
 }
 
-static int _new_id()
+static int _new_id(void)
 {
   /* perhaps we can reclaim a sample id */
     int n;
@@ -1120,7 +1120,7 @@ int sample_get_chain_status(int s1, int position)
     return sample->effect_chain[position]->e_flag;
 }
 
-void sample_frame_tick()
+void sample_frame_tick(void)
 {
 	int end = sample_highest();
     int i;

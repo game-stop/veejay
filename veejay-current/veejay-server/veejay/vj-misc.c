@@ -61,18 +61,18 @@ long vj_get_timer()
     return ((tv.tv_sec & 1000000) + tv.tv_usec);
 }
 
-unsigned	int	vj_stamp()
+unsigned	int	vj_stamp(void)
 {
 	vj_stamp_ ++;
 	return vj_stamp_;
 }
 
-void	vj_stamp_clear()
+void	vj_stamp_clear(void)
 {
 	vj_stamp_ = 0;
 }
 
-long vj_get_relative_time()
+long vj_get_relative_time(void)
 {
     long time, relative;
     time = vj_get_timer();
@@ -465,7 +465,7 @@ static int	try_file( char *path )
 	return 0;
 }
 
-int	verify_working_dir()
+int	verify_working_dir(void)
 {
 	char path[1024];
 	if(getcwd( path, sizeof(path))== NULL )

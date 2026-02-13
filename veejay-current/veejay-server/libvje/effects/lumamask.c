@@ -68,7 +68,7 @@ vj_effect *lumamask_init(int width, int height)
     return ve;
 }
 
-int lumamask_requests_fx() {
+int lumamask_requests_fx(void) {
     return VJ_IMAGE_EFFECT_MOTIONMAP_ID;
 }
 

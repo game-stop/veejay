@@ -146,7 +146,7 @@ void	timedistort_free(void *ptr)
     free(td);
 }
 
-int timedistort_request_fx() {
+int timedistort_request_fx(void) {
     return VJ_IMAGE_EFFECT_MOTIONMAP;
 }
 

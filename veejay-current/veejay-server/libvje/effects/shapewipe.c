@@ -118,7 +118,7 @@ typedef struct {
     int shape_completed;
 } shape_t;
 
-static shape_t *init_shape_loader()
+static shape_t *init_shape_loader(void)
 {
     shape_t *s = (shape_t*) vj_calloc(sizeof(shape_t));
     if(!s) {

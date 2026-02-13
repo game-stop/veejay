@@ -432,7 +432,7 @@ int vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
     return ret;
 }
 
-void        vj_picture_free()
+void        vj_picture_free(void)
 {
     if(pic_scaler_) {
         yuv_free_swscaler( pic_scaler_ );

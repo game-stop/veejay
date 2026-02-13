@@ -187,7 +187,7 @@ static int el_switch_jpeg_ = 0;
 
 static VJFrame *el_out_ = NULL;
 
-long	vj_el_get_mem_size()
+long	vj_el_get_mem_size(void)
 {
 	return mem_chunk_;
 }
@@ -243,7 +243,7 @@ int	vj_el_is_dv(editlist *el)
 }
 
 
-void	vj_el_prepare()
+void	vj_el_prepare(void)
 {
 //	reset_cache( el->cache );
 }
@@ -285,11 +285,11 @@ void	vj_el_clear_cache( editlist *el )
 	}
 }
 
-void	vj_el_deinit()
+void	vj_el_deinit(void)
 {
 }
 
-int	vj_el_cache_size()
+int	vj_el_cache_size(void)
 {
 	return cache_avail_mb();
 }

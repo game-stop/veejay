@@ -73,7 +73,7 @@ static void *yuv_conv_ = NULL;
 static void 		freeframe_copy_parameters( void *srcPort, void *dst, int n_params );
 
 
-void	freeframe_destroy( ) {
+void	freeframe_destroy(void) {
 	int i;
 	yuv_free_swscaler( rgb_conv_ );
 	yuv_free_swscaler( yuv_conv_ );

@@ -164,7 +164,7 @@ static void _smear_apply_y(VJFrame *frame, int width, int height, int val)
 }
 
 
-int smear_request_fx() {
+int smear_request_fx(void) {
     return VJ_IMAGE_EFFECT_MOTIONMAP_ID;
 }
 

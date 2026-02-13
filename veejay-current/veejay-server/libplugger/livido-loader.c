@@ -53,7 +53,7 @@
 
 #define IS_RGB_PALETTE( p ) ( p < 512 ? 1 : 0 )
 
-static void    livido_dummy_function()
+static void    livido_dummy_function(void)
 {	
 }
    

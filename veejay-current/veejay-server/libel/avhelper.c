@@ -158,7 +158,7 @@ static int key_compare(const void *key1, const void *key2)
     return ((uintptr_t) key1 == (uintptr_t) key2 ? 0 : 1);
 }
 
-int avhelper_set_num_decoders() {
+int avhelper_set_num_decoders(void) {
 	int n_threads = 0;
 
 	char *num_decode_threads = getenv( "VEEJAY_NUM_DECODE_THREADS" );
@@ -191,7 +191,7 @@ int 	avhelper_get_codec_by_id(int id)
 	return -1;
 }
 
-static int		avhelper_build_table()
+static int		avhelper_build_table(void)
 {
 	fourccTable = hash_create( 100, key_compare, key_hash );
 	if(!fourccTable) {

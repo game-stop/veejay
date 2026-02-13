@@ -972,7 +972,7 @@ void vj_event_parse_bundle(veejay_t *v, char *msg )
     }
 }
 
-void vj_event_dump()
+void vj_event_dump(void)
 {
     vj_event_vevo_dump();
     
@@ -2154,7 +2154,7 @@ static void vj_event_load_keyboard_configuration(veejay_t *info)
     fclose(f);
 }
 
-static void vj_event_init_keyboard_defaults()
+static void vj_event_init_keyboard_defaults(void)
 {
     int i;
     int keyb_events = 0;
