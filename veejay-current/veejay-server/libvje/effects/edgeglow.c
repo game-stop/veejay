@@ -140,11 +140,11 @@ void edgeglow_apply( void *ptr, VJFrame *frame, int *args ) {
 
             const int abs_gx = (gx ^ (gx >> 31)) - (gx >> 31);
             const int abs_gy = (gy ^ (gy >> 31)) - (gy >> 31);
+
             const int gradientMagnitude = abs_gx + abs_gy;
+            const int normMagnitude = (gradientMagnitude * 255) / 1020;
 
-            const int normMagnitude = (int) (((float) gradientMagnitude / 1020) * 255.0);
-
-            B[index] = (normMagnitude > t) ? gradientMagnitude : 0;
+            B[index] = (normMagnitude > t) ? gradientMagnitude: 0;
         }
 		B[ y * width + width ] = 0;
     }
@@ -153,33 +153,36 @@ void edgeglow_apply( void *ptr, VJFrame *frame, int *args ) {
 	for (int y = 1; y < height - 1; ++y) {
     	#pragma omp simd
     	for (int x = 1; x < width - 1; ++x) {
-        	const int index = y * width + x;
-       		const int blurredValue = (B[index - width - 1] + B[index - width] + B[index - width + 1] +
-                                  B[index - 1] + B[index] + B[index + 1] +
-                                  B[index + width - 1] + B[index + width] + B[index + width + 1]) / 9;
-
-    	    C[index] = blurredValue;
+            const int index = y*width + x;
+            const int sum = B[index - width - 1] + B[index - width] + B[index - width + 1]
+                          + B[index - 1] + B[index] + B[index + 1]
+                          + B[index + width - 1] + B[index + width] + B[index + width + 1];
+            C[index] = sum / 9;
     	}
 	}
 
 
+    #pragma omp simd
     for( int i = 0; i < len; i ++ ) {
-		const int edgeIntensity = (int) ((float) C[i] * scalingFactor );
-	
-		if( edgeIntensity > 0 ) {
-			int L1 = (Y[i] * 100) >> 8;
-			int a1 = (((Cb[i] - 128) * 127) >> 8);
-			int b1 = (((Cr[i] - 128) * 127) >> 8);
+        
+        const int edgeIntensity = (int)(C[i] * scalingFactor);
 
- 
-            L1 = L1 + ((L2 - L1) * edgeIntensity) / 255;
-            a1 = a1 + ((a2 - a1) * edgeIntensity) / 255;
-            b1 = b1 + ((b2 - b1) * edgeIntensity) / 255;
+        int L1 = (Y[i] * 100) >> 8;
+        int a1 = (((Cb[i] - 128) * 127) >> 8);
+        int b1 = (((Cr[i] - 128) * 127) >> 8);
 
-			Y[i]  = CLAMP_Y( (L1 * 255) / 100 );
-			Cb[i] = CLAMP_UV( a1 + 128 );
-			Cr[i] = CLAMP_UV( b1 + 128 );
-		}
+        L1 += ((L2 - L1) * edgeIntensity) / 255;
+        a1 += ((a2 - a1) * edgeIntensity) / 255;
+        b1 += ((b2 - b1) * edgeIntensity) / 255;
+
+        const int L_out  = CLAMP_Y((L1*255)/100);
+        const int a_out  = CLAMP_UV(a1 + 128);
+        const int b_out  = CLAMP_UV(b1 + 128);
+
+        Y[i]  = (uint8_t)(edgeIntensity > 0 ? L_out : Y[i]);
+        Cb[i] = (uint8_t)(edgeIntensity > 0 ? a_out : Cb[i]);
+        Cr[i] = (uint8_t)(edgeIntensity > 0 ? b_out : Cr[i]);
+		
     }
 
 }
