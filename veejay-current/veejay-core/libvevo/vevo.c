@@ -1130,7 +1130,7 @@ vevo_property_set(vevo_port_t * p,
 int
 vevo_property_set_f(vevo_port_t * p,
 		    const char *key,
-		    int atom_type, int num_elements, void (*set_func)(), int (*get_func)() )
+		    int atom_type, int num_elements, void (*set_func)(void *, int32_t), int (*get_func)(void *) )
 {
     __vevo_port_t *port = (__vevo_port_t *) p;
     ukey_t hash_key = hash_key_code(key);
