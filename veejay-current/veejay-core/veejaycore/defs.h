@@ -67,6 +67,8 @@ typedef struct VJFrame_t
     uint8_t **local;
     int out_width;
     int out_height;
+    long frame_num;
+    int queue_index;
 } VJFrame __attribute__((aligned(16)));
 
 typedef struct VJFrameInfo_t
