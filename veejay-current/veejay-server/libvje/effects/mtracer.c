@@ -74,8 +74,11 @@ vj_effect *mtracer_init(int w, int h)
 }
 void mtracer_free(void *ptr) {
     m_tracer_t *m = (m_tracer_t*) ptr;
-    free(m->mtrace_buffer[0]);
-    free(m);
+	if(m) {
+		if(m->mtrace_buffer[0])
+			free(m->mtrace_buffer[0]);
+    	free(m);
+	}
 }
 
 void *mtracer_malloc(int w, int h)
@@ -86,7 +89,7 @@ void *mtracer_malloc(int w, int h)
     }
 
 	size_t buflen = ( (w*h+w)) * sizeof(uint8_t);
-	m->mtrace_buffer[0] = (uint8_t*) vj_malloc( buflen );
+	m->mtrace_buffer[0] = (uint8_t*) vj_calloc( buflen );
 	if(!m->mtrace_buffer[0]) {
         free(m);
 		return NULL;
@@ -790,7 +793,7 @@ void mtracer_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 		mt.data[1] = frame->data[1];
 		mt.data[2] = frame->data[2];
 		mt.data[3] = frame->data[3];
-
+		
 		overlaymagic_apply(NULL, &mt, frame, om_args );
 		overlaymagic_apply(NULL, &mt, frame2, om_args );
 		veejay_memcpy( frame->data[0], m->mtrace_buffer[0], len );
