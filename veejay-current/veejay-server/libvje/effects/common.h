@@ -49,8 +49,20 @@
 #define ALPHA_IN_A_AND_B_STR "Alpha-IN A and B"
 #define ALPHA_IN_A_AND_B 4
 
-#define CLAMP_Y( a ) ( a < pixel_Y_lo_ ? pixel_Y_lo_ : (a > pixel_Y_hi_ ? pixel_Y_hi_ : a ) )
-#define CLAMP_UV( a )( a < pixel_U_lo_ ? pixel_U_lo_ : (a > pixel_U_hi_ ? pixel_U_hi_ : a ) )
+static inline uint8_t __clamp8YUV(int a, int lo, int hi) {
+    int t = a;
+    t = t - lo;
+    t = t & ~(-(t >> 31));
+    t = t + lo;
+    t = t - hi;
+    t = t | -(t >> 31);
+    t = t + hi;
+    return (uint8_t)t;
+}
+
+#define CLAMP_Y(a)  __clamp8YUV((a), pixel_Y_lo_, pixel_Y_hi_)
+#define CLAMP_UV(a) __clamp8YUV((a), pixel_U_lo_, pixel_U_hi_)
+
 #define CLAMP_LAB( a )( a < 0 ? 0 : (a > 255 ? 255: a ) )
 
 #ifndef MIN
