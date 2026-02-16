@@ -68,6 +68,7 @@ vj_effect *spherize_init(int w, int h)
 typedef struct 
 {
     uint8_t *buf[3];
+    uint8_t *buf_alloc;
 
     float *lut;
     float *atan2_lut;
@@ -146,6 +147,7 @@ void *spherize_malloc(int w, int h)
         free(s);
         return NULL;
     }
+    s->buf_alloc = s->buf[0];
 
     s->buf[1] = s->buf[0] + padded_pixels;
     s->buf[2] = s->buf[1] + padded_pixels;
@@ -157,7 +159,7 @@ void *spherize_malloc(int w, int h)
     const int pixels = w * h;
     s->lut = (float*) vj_malloc(sizeof(float) * pixels * 4);
     if (!s->lut) {
-        free(s->buf[0] - (padded_w + 1));
+        free(s->buf_alloc);
         free(s);
         return NULL;
     }
@@ -176,11 +178,17 @@ void spherize_free(void *ptr)
 {
     if (!ptr) return;
     spherize_t *s = (spherize_t*) ptr;
-    int padded_w = 0;
-    free(s->buf[0] - (padded_w + 1));
-    free(s->lut);
+
+    if(s->buf_alloc) {
+        free(s->buf_alloc);
+    }
+    // Free LUT allocation
+    if(s->lut)
+        free(s->lut);
+
     free(s);
 }
+
 void spherize_apply(void *ptr, VJFrame *frame, int *args) {
     spherize_t *s = (spherize_t*)ptr;
 
