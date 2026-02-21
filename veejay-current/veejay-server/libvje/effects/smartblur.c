@@ -55,6 +55,7 @@ vj_effect *smartblur_init(int w, int h)
     ve->defaults[1] = 200;
     ve->defaults[2] = 50;
 
+    ve->sub_format = 1;
     ve->description = "Smart Blur";
     ve->param_description = vje_build_param_list(3, "Radius", "Sharpness", "Chroma");
     return ve;
