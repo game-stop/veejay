@@ -107,6 +107,10 @@ void *neighbours4_malloc(int w, int h)
                 if(n->row_y_map[j]) free(n->row_y_map[j]);
                 if(n->row_cb_map[j]) free(n->row_cb_map[j]);
                 if(n->row_cr_map[j]) free(n->row_cr_map[j]);
+                n->row_hist[i] = NULL;
+                n->row_y_map[i] = NULL;
+                n->row_cb_map[i] = NULL;
+                n->row_cr_map[i] = NULL;
             }
             free(n->chromacity[0]); free(n->tmp_buf[0]); free(n);
             return NULL;
@@ -121,13 +125,13 @@ void neighbours4_free(void *ptr)
     nb_t *n=(nb_t*)ptr;
     if(!n) return;
     for(int i=0;i<256;i++){
-        if(n->row_hist[i]) free(n->row_hist[i]);
-        if(n->row_y_map[i]) free(n->row_y_map[i]);
-        if(n->row_cb_map[i]) free(n->row_cb_map[i]);
-        if(n->row_cr_map[i]) free(n->row_cr_map[i]);
+        if(n->row_hist[i]) { free(n->row_hist[i]); n->row_hist[i]=NULL; }
+        if(n->row_y_map[i]) { free(n->row_y_map[i]); n->row_y_map[i]=NULL; }
+        if(n->row_cb_map[i]) { free(n->row_cb_map[i]); n->row_cb_map[i]=NULL; }
+        if(n->row_cr_map[i]) { free(n->row_cr_map[i]); n->row_cr_map[i]=NULL; }
     }
-    if(n->tmp_buf[0]) free(n->tmp_buf[0]);
-    if(n->chromacity[0]) free(n->chromacity[0]);
+    if(n->tmp_buf[0]) { free(n->tmp_buf[0]); n->tmp_buf[0]=NULL; }
+    if(n->chromacity[0]) { free(n->chromacity[0]); n->chromacity[0]=NULL; }
     free(n);
 }
 
