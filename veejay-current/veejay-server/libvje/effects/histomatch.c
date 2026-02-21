@@ -125,12 +125,18 @@ static void histomatch_calc_histogram(uint8_t *data, const int len, int *hist) {
 	}
 }
 
-static void histomatch_calc_distribution(int *hist, const int len, float *cdf) {
-    const float invLen = 1.0f / len;
-    float sum = 0.0f;
+static void histomatch_calc_distribution(int *hist, int num_pixels, float *cdf)
+{
+    int total = 0;
+    for (int i = 0; i < HIST_SIZE; i++) total += hist[i];
+
+    if (total == 0) total = 1;
+
+    float invTotal = 1.0f / total;
+    float acc = 0.0f;
     for (int i = 0; i < HIST_SIZE; i++) {
-        sum += hist[i];
-        cdf[i] = sum * invLen;
+        acc += hist[i];
+        cdf[i] = acc * invTotal;
     }
 }
 
