@@ -84,19 +84,19 @@ static unsigned int n_cpu = 0;
 static uint8_t numThreads = 0;
 static thread_pool_t *task_pool = NULL;
 
-uint8_t  vj_task_get_workers(void)
+uint8_t  vj_task_get_workers()
 {
         return numThreads;
 }
 
-void    vj_task_lock(void) {
+void    vj_task_lock() {
     pthread_mutex_lock(&task_pool->lock);
 }
-void    vj_task_unlock(void) {
+void    vj_task_unlock() {
     pthread_mutex_unlock(&task_pool->lock);
 }
 
-int vj_task_get_num_cpus(void)
+int vj_task_get_num_cpus()
 {
     if( n_cpu > 0 )
         return n_cpu;
@@ -298,9 +298,8 @@ static void* task_worker(void *arg) {
     thread_pool_t *pool = (thread_pool_t *)ptr->pool;
     int job_num = ptr->job_num;
 
-    init_thread_local_bufs( thread_buf_size );
-
-    uint8_t **tlbuf = (uint8_t**) pthread_getspecific( thread_buf_key );
+    init_thread_local_bufs(thread_buf_size);
+    uint8_t **tlbuf = (uint8_t**) pthread_getspecific(thread_buf_key);
 
     pthread_mutex_lock( &(pool->lock) );
     pool->thread_local_bufs[ job_num ] = tlbuf;
@@ -309,33 +308,31 @@ static void* task_worker(void *arg) {
 
     while (1) {
         pthread_mutex_lock(&pool->lock);
-        while( pool->queue[ job_num ].job == NULL) {
+        while (!pool->queue[job_num].job && !atomic_load(&pool->stop_flag)) {
             pthread_cond_wait(&pool->start_signal, &pool->lock);
-            if (atomic_load(&pool->stop_flag)) {
-                pthread_mutex_unlock(&pool->lock);
-                pthread_exit(NULL);
-            }   
         }
-        pthread_mutex_unlock(&pool->lock);
 
         if (atomic_load(&pool->stop_flag)) {
+            pthread_mutex_unlock(&pool->lock);
             pthread_exit(NULL);
         }
 
         pjob_t task = pool->queue[ job_num ];
-        task.job(task.arg);
+        pool->queue[job_num].job = NULL;
+        pool->queue[job_num].arg = NULL;
+        pthread_mutex_unlock(&pool->lock);
+
+        if(task.job)
+            task.job(task.arg);
 
         
         pthread_mutex_lock(&pool->lock);
-        
-        pool->num_completed_tasks ++;
-        if( pool->num_completed_tasks == pool->num_submitted_tasks ) {
-            pthread_cond_signal( &pool->task_completed );
+        pool->num_completed_tasks++;
+        if (pool->num_completed_tasks == pool->num_submitted_tasks) {
             pool->num_completed_tasks = 0;
             pool->num_submitted_tasks = 0;
+            pthread_cond_signal(&pool->task_completed);
         }
-        pool->queue[ job_num ].job = NULL;
-        pool->queue[ job_num ].arg = NULL;
         pthread_mutex_unlock(&pool->lock);
     }
 
@@ -344,32 +341,36 @@ static void* task_worker(void *arg) {
 
 
 static void free_thread_local_bufs(void *buf) {
-
+    if (!buf) return;
     uint8_t **tlbuf = (uint8_t**) buf;
-    free( tlbuf[0] );
-
-    free( tlbuf );
+    if (tlbuf[0]) free(tlbuf[0]);
+    free(tlbuf);
 }
 
+
 static thread_pool_t* create_thread_pool(int num_threads) {
-    thread_pool_t *pool = (thread_pool_t *)vj_calloc(sizeof(thread_pool_t));
-    pool->queue = (pjob_t *)vj_calloc(sizeof(pjob_t) * num_threads);
+    if (num_threads <= 0) return NULL;
+
+    thread_pool_t *pool = (thread_pool_t*) calloc(1, sizeof(thread_pool_t));
+    pool->queue = (pjob_t*) calloc(num_threads, sizeof(pjob_t));
     pool->queue_size = num_threads;
+
     pthread_mutex_init(&pool->lock, NULL);
     pthread_cond_init(&pool->task_completed, NULL);
     pthread_cond_init(&pool->start_signal, NULL);
-
     atomic_init(&pool->stop_flag, 0);
 
-    pthread_key_create( &thread_buf_key, free_thread_local_bufs );
-
-    pool->thread_local_bufs = (uint8_t***) vj_malloc( sizeof(uint8_t**) * num_threads );
-    
+    pthread_key_create(&thread_buf_key, free_thread_local_bufs);
+    pool->thread_local_bufs = (uint8_t***) vj_malloc(sizeof(uint8_t**) * num_threads);
     for (int i = 0; i < num_threads; i++) {
-        task_thread_args_t *args = thread_args[i];
-        args->pool = pool;
-        args->job_num = i;
-        pthread_create(&(pool->threads[i]), NULL, task_worker, args);
+        pool->thread_local_bufs[i] = NULL;
+    }
+
+    // Launch threads
+    for (int i = 0; i < num_threads; i++) {
+        thread_args[i]->pool = pool;
+        thread_args[i]->job_num = i;
+        pthread_create(&pool->threads[i], NULL, task_worker, thread_args[i]);
     }
 
     return pool;
@@ -398,6 +399,32 @@ static void wait_all_tasks_completed(thread_pool_t *pool) {
     }
     pthread_mutex_unlock(&pool->lock);
 }
+
+static void destroy_thread_pool(thread_pool_t *pool) {
+    if (!pool) return;
+
+    for (int i = 0; i < numThreads; i++) {
+        pthread_join(pool->threads[i], NULL);
+    }
+
+    for (int i = 0; i < numThreads; i++) {
+        if (pool->thread_local_bufs[i]) {
+            free_thread_local_bufs(pool->thread_local_bufs[i]);
+        }
+    }
+
+    free(pool->thread_local_bufs);
+    free(pool->queue);
+
+    pthread_mutex_destroy(&pool->lock);
+    pthread_cond_destroy(&pool->task_completed);
+    pthread_cond_destroy(&pool->start_signal);
+
+    free(pool);
+}
+
+
+
 
 int vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int n_planes, performer_job_routine func, int use_thread_local )
 {
@@ -467,57 +494,41 @@ int vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
     return 1;
 }
 
-void task_destroy(void)
+
+
+
+void task_destroy()
 {
-    if(!task_pool)
-        return;
+    if (!task_pool) return;
 
     pthread_mutex_lock(&task_pool->lock);
     atomic_store(&task_pool->stop_flag, 1);
     pthread_cond_broadcast(&task_pool->start_signal);
     pthread_mutex_unlock(&task_pool->lock);
 
-    for (int i = 0; i < numThreads; i++) {
-        pthread_join(task_pool->threads[i], NULL);
-    }
-
-    free(task_pool->queue);
-    free(task_pool->thread_local_bufs);
-
-    pthread_mutex_destroy(&task_pool->lock);
-    pthread_cond_destroy(&task_pool->task_completed);
-    pthread_cond_destroy(&task_pool->start_signal);
+    destroy_thread_pool(task_pool);
 
     pthread_key_delete(thread_buf_key);
-
-    free(task_pool);
     task_pool = NULL;
 }
 
 
 
-void task_init(int w, int h) 
-{
+void task_init(int w, int h) {
     thread_buf_size = w * h;
 
     vj_task_get_num_cpus();
+    numThreads = n_cpu / 2;
 
-    numThreads = n_cpu/2;
+    char *task_cfg = getenv("VEEJAY_MULTITHREAD_TASKS");
+    if (task_cfg != NULL) numThreads = atoi(task_cfg);
 
-    char *task_cfg = getenv( "VEEJAY_MULTITHREAD_TASKS" );
-    if( task_cfg != NULL ) {
-        numThreads = atoi( task_cfg );  
+    if (numThreads <= 0 || numThreads > MAX_WORKERS) numThreads = n_cpu / 2;
+
+    for (int i = 0; i < MAX_WORKERS; i++) {
+        vj_task_args[i] = (vj_task_arg_t*) calloc(1, sizeof(vj_task_arg_t));
+        thread_args[i] = (task_thread_args_t*) calloc(1, sizeof(task_thread_args_t));
     }
 
-    if( numThreads < 0 || numThreads > MAX_WORKERS ) {
-        numThreads = n_cpu/2;
-    }
-
-    int i;
-    for( i = 0; i < MAX_WORKERS ; i ++ ) {
-        vj_task_args[i] = vj_calloc( sizeof(vj_task_arg_t) );
-        thread_args[i] = vj_calloc(sizeof(task_thread_args_t));
-    }
-
-    task_pool = create_thread_pool( numThreads );
+    task_pool = create_thread_pool(numThreads);
 }
