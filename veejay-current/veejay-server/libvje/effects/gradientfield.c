@@ -95,30 +95,53 @@ typedef struct
 void *gradientfield_malloc(int w, int h) {
     gradientfield_t *s = (gradientfield_t*) vj_malloc(sizeof(gradientfield_t));
     if(!s) return NULL;
+
     s->buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 4 );
     if(!s->buf) {
         free(s);
         return NULL;
     }
-    s->vectorField = (gvector_t**) vj_calloc( sizeof(gvector_t*) * w );
-    for( int i = 0; i < w; i ++ ) {
-        s->vectorField[i] = (gvector_t*) vj_calloc( sizeof( gvector_t) * h );
-    }
-    s->w = w;
-    s->h = h;
-    
-    for( int i = 0; i < LUT_SIZE; i ++ ) {
-        s->atan_lut[i] = atanf( (float) i );
+
+    s->vectorField = (gvector_t**) vj_calloc(sizeof(gvector_t*) * w);
+    if(!s->vectorField) {
+        free(s->buf);
+        free(s);
+        return NULL;
     }
 
-    s->gradientX = (int*) vj_calloc( sizeof(int) * w  * 2 );
+    for( int i = 0; i < w; i++ ) {
+        s->vectorField[i] = (gvector_t*) vj_calloc(sizeof(gvector_t) * h);
+        if(!s->vectorField[i]) {
+            for(int j = 0; j < i; j++)
+                free(s->vectorField[j]);
+            free(s->vectorField);
+            free(s->buf);
+            free(s);
+            return NULL;
+        }
+    }
+
+    s->w = w;
+    s->h = h;
+
+    for( int i = 0; i < LUT_SIZE; i++ )
+        s->atan_lut[i] = atanf((float)i);
+
+    s->gradientX = (int*) vj_calloc(sizeof(int) * w * 2);
+    if(!s->gradientX) {
+        for(int i = 0; i < w; i++) free(s->vectorField[i]);
+        free(s->vectorField);
+        free(s->buf);
+        free(s);
+        return NULL;
+    }
     s->gradientY = s->gradientX + w;
 
     s->Y = s->buf + (w * h);
     s->U = s->Y + (w * h);
     s->V = s->U + (w * h);
 
-    for( int i = 0; i < LUT_SIZE2; i ++ ) {
+    for(int i = 0; i < LUT_SIZE2; i++) {
         float angle = i * (2 * M_PI) / LUT_SIZE2;
         s->sin_lut[i] = a_sin(angle);
         s->cos_lut[i] = a_cos(angle);
@@ -129,11 +152,11 @@ void *gradientfield_malloc(int w, int h) {
 
 void gradientfield_free(void *ptr) {
     gradientfield_t *s = (gradientfield_t*) ptr;
-    for( int i = 0; i < s->w; i ++ ) {
-        free( s->vectorField[i] );
-    }
-    free(s->gradientX);
+    if(!s) return;
+    for(int i = 0; i < s->w; i++)
+        free(s->vectorField[i]);
     free(s->vectorField);
+    free(s->gradientX);
     free(s->buf);
     free(s);
 }
@@ -149,7 +172,9 @@ static void gradientfield_style0(int width, int height, gvector_t **vectorField,
     for (int y = 1; y < hei1; ++y) {
         for (int x = 1; x < wid1; ++x) {
             const int index = y * width + x;
-            const int angleIndex = (int)((vectorField[x][y].dir * divisor) + 0.5) & lut_mask;
+            int angleIndex = (int)((vectorField[x][y].dir * divisor) + 0.5f);
+            angleIndex = angleIndex % LUT_SIZE2;
+            if (angleIndex < 0) angleIndex += LUT_SIZE2;
 
             const float dx = vectorField[x][y].mag * cos_lut[angleIndex] * param1;
             const float dy = vectorField[x][y].mag * sin_lut[angleIndex] * param1;
@@ -187,7 +212,9 @@ static void gradientfield_style2(int width, int height, gvector_t **vectorField,
                 const int curX = x + i;
                 for (int j = 0; j < blockSize; ++j) {
                     const int curY = y + j;
-                    const int angleIndex = (int)((vectorField[curX][curY].dir * divisor) + 0.5) & lut_mask;
+                    int angleIndex = (int)((vectorField[x][y].dir * divisor) + 0.5f);
+                    angleIndex = angleIndex % LUT_SIZE2;
+                    if (angleIndex < 0) angleIndex += LUT_SIZE2;
                     avgX += vectorField[curX][curY].mag * cos_lut[angleIndex];
                     avgY += vectorField[curX][curY].mag * sin_lut[angleIndex];
                 }
@@ -235,7 +262,9 @@ static void gradientfield_style3(int width, int height, gvector_t **vectorField,
                 const int curX = x + i;
                 for (int j = 0; j < blockSize; ++j) {
                     const int curY = y + j;
-                    const int angleIndex = (int)((vectorField[curX][curY].dir * divisor) + 0.5) & lut_mask;
+                    int angleIndex = (int)((vectorField[curX][curY].dir * divisor) + 0.5f);
+                    angleIndex = angleIndex % LUT_SIZE2;
+                    if (angleIndex < 0) angleIndex += LUT_SIZE2;
                     const int magnitude = vectorField[curX][curY].mag;
                     avgX += magnitude * cos_lut[angleIndex];
                     avgY += magnitude * sin_lut[angleIndex];
