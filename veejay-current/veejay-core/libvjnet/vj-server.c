@@ -105,40 +105,6 @@ int		_vj_server_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 static  void _vj_put_kf_msg(vj_server *vje, int link_id, char *buf, int buf_len, int num_msg);
 
 static void		_vj_server_empty_queue(vj_server *vje, int link_id);
-/*
-static		int geo_stat_ = 0;
-
-static void		vj_server_geo_stats_(char *request)
-{
-	if(geo_stat_)
-		return;
-
-	//@ send 1 time http request
-	vj_sock_t *dyne = alloc_sock_t();
-	if(dyne) {
-		sock_t_connect_and_send_http( dyne, "www.veejayhq.net",80, request,strlen(request));
-		sock_t_close( dyne );
-		free(dyne);
-	}
-
-	geo_stat_ = 1;
-}
-
-void	vj_server_geo_stats()
-{
-	// Inactive
-	char request[128];
-	snprintf(request,sizeof(request),"GET /veejay-15 HTTP/1.1\nHost: www.veejayhq.net\nReferrer: http://");
-
-	//@ knock veejay.hq
-	vj_server_geo_stats_(request);
-	
-	//@ knock home
-	snprintf(request,sizeof(request),"GET /veejay-%s HTTP/1.1\nHost: c0ntrol.dyndns.org\n",VERSION );
-	vj_server_geo_stats_(request);
-
-}
-*/
 
 void		vj_server_set_mcast_mode( vj_server *v , int mode )
 {
@@ -893,11 +859,18 @@ static int vj_server_update_get_msg_vd(vj_server *vje, int sock_fd, int link_id,
     int buf_size = vj_server_socket_consume( vje, sock_fd, link_id, v_hdr, VIMS_HEADER_LEN, 0 );
     if( buf_size <= 0)
         return -1;
+	if (buf_size < VIMS_HEADER_LEN)
+		v_hdr[buf_size] = '\0';
+	else
+		v_hdr[VIMS_HEADER_LEN] = '\0';
 
-    if( sscanf(v_hdr, "%3dD", &buf_size) != 1 ) {
-        veejay_msg(VEEJAY_MSG_ERROR, "VIMS V-message is corrupted");
-        return -1;
-    }
+	int parsed_size = 0;
+	if (sscanf(v_hdr, "%3dD", &parsed_size) != 1) {
+		veejay_msg(VEEJAY_MSG_ERROR, "VIMS V-message is corrupted");
+		return -1;
+	}
+
+	buf_size = parsed_size;
 
     int msg_buf_size = buf_size + 1; // messages are null terminated but not sent with null termination
 
@@ -1100,7 +1073,7 @@ char *vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
 }
 
 
-char *vj_server_my_ip(void)
+char *vj_server_my_ip()
 {
 	struct addrinfo h;
 
