@@ -151,66 +151,73 @@ void lumamask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 	int strides[4] = { len, len, len ,( alpha ? len : 0 )};
 	vj_frame_copy( frame->data, l->buf, strides );
 
+
+	const double w_mul = -w_ratio;
+	const double h_mul = -h_ratio;
+	
+
 	if( alpha == 0 )
 	{
   	  if( border )
 	  {
 		for(y=0; y < height; y++)
 		{
+			const int row_offset = y * width;
 			for(x=0; x < width ; x++)
 			{
 				// calculate new location of pixel
 				tmp = Y2[(y*width+x)] - 128;
 				// new x offset 
-				dx = -w_ratio * tmp;
+				dx = w_mul * tmp;
 				// new y offset 
-				dy = -h_ratio * tmp;
+				dy = h_mul * tmp;
 				// new pixel coordinates
 				nx = x + dx;
 				ny = y + dy;
 
 				if( nx < 0 || ny < 0 || nx >= width || ny >= height )
         	    {
-                	Y[y*width+x] = 16;
-                	Cb[y*width+x] = 128;
-                   	Cr[y*width+x] = 128;
+                	Y[row_offset+x] = pixel_Y_lo_;
+                	Cb[row_offset+x] = 128;
+                   	Cr[row_offset+x] = 128;
                 }
                 else
                 {
-                    Y[y*width+x] = Y2[ny * width + nx];
-                   	Cb[y*width+x] = Cb2[ny * width + nx];
-                   	Cr[y*width+x] = Cr2[ny * width + nx];
+					const int dy = ny * width;
+                    Y[row_offset+x] = Y2[dy + nx];
+                   	Cb[row_offset+x] = Cb2[dy + nx];
+                   	Cr[row_offset+x] = Cr2[dy + nx];
                 }
 			}
 		}
 	  }
 	  else
 	  {
-		for(y=0; y < height; y++)
+		for (y = 0; y < height; y++)
 		{
-			for(x=0; x < width ; x++)
+			const int row_offset = y * width;
+
+			for (x = 0; x < width; x++)
 			{
-				tmp = Y2[(y*width+x)] - 128;
-				dx = -w_ratio * tmp;
-				dy = -h_ratio * tmp;
-				nx = x + dx;
-				ny = y + dy;
-				while( nx < 0 )
-					nx += width;
-				while( ny < 0 )
-					ny += height;
-				if( nx < 0 || ny < 0 || nx >= width || ny >= height )
-        	    {
-					Y[y*width+x] = 16;
-                    Cb[y*width+x] = 128;
-                    Cr[y*width+x] = 128;
-                }
-                else
-				{
-					Y[y*width+x] = Y2[ny * width + nx];
-                    Cb[y*width+x] = Cb2[ny * width + nx];
-                    Cr[y*width+x] = Cr2[ny * width + nx];
-                }
+				int tmp = Y2[row_offset + x] - 128;
+				int dx = w_mul * tmp;
+				int dy = h_mul * tmp;
+
+				int nx = x + dx;
+				int ny = y + dy;
+
+				// wrap negative coordinates
+				while (nx < 0) nx += width;
+				while (ny < 0) ny += height;
+
+				// clamp to edges
+				nx = (unsigned int)nx < (unsigned int)width  ? nx  : width - 1;
+				ny = (unsigned int)ny < (unsigned int)height ? ny : height - 1;
+
+				const int idx = ny * width + nx;
+				Y[row_offset + x]  = Y2[idx];
+				Cb[row_offset + x] = Cb2[idx];
+				Cr[row_offset + x] = Cr2[idx];
 			}
 		}
 	  }
@@ -221,64 +228,65 @@ void lumamask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 	  {
 		for(y=0; y < height; y++)
 		{
+			const int row_offset = y * width;
 			for(x=0; x < width ; x++)
 			{
 				// calculate new location of pixel
 				tmp = Y2[(y*width+x)] - 128;
 				// new x offset 
-				dx = -w_ratio * tmp;
+				dx = w_mul * tmp;
 				// new y offset 
-				dy = -h_ratio * tmp;
+				dy = h_mul * tmp;
 				// new pixel coordinates
 				nx = x + dx;
 				ny = y + dy;
 
 				if( nx < 0 || ny < 0 || nx >= width || ny >= height )
         	    {
-                	Y[y*width+x] = 16;
-                	Cb[y*width+x] = 128;
-                   	Cr[y*width+x] = 128;
-					aA[y*width+x] = 0;
+                	Y[row_offset+x] = pixel_Y_lo_;
+                	Cb[row_offset+x] = 128;
+                   	Cr[row_offset+x] = 128;
+					aA[row_offset+x] = 0;
                 }
                 else
                 {
-                    Y[y*width+x] = Y2[ny * width + nx];
-                   	Cb[y*width+x] = Cb2[ny * width + nx];
-                   	Cr[y*width+x] = Cr2[ny * width + nx];
-					aA[y*width+x] = aB[ny * width + nx];
+					const int dy = ny * width;
+                    Y[row_offset+x] = Y2[dy + nx];
+                   	Cb[row_offset+x] = Cb2[dy + nx];
+                   	Cr[row_offset+x] = Cr2[dy + nx];
+					aA[row_offset+x] = aB[dy + nx];
                 }
 			}
 		}
 	  }
 	  else
-	   {
-		for(y=0; y < height; y++)
+	  {
+		for (y = 0; y < height; y++)
 		{
-			for(x=0; x < width ; x++)
+			const int row_offset = y * width;
+
+			for (x = 0; x < width; x++)
 			{
-				tmp = Y2[(y*width+x)] - 128;
-				dx = -w_ratio * tmp;
-				dy = -h_ratio * tmp;
-				nx = x + dx;
-				ny = y + dy;
-				while( nx < 0 )
-					nx += width;
-				while( ny < 0 )
-					ny += height;
-				if( nx < 0 || ny < 0 || nx >= width || ny >= height )
-        	    {
-					Y[y*width+x] = 16;
-                    Cb[y*width+x] = 128;
-                    Cr[y*width+x] = 128;
-					aA[y*width+x] = 0;
-                }
-                else
-				{
-					Y[y*width+x] = Y2[ny * width + nx];
-                    Cb[y*width+x] = Cb2[ny * width + nx];
-                    Cr[y*width+x] = Cr2[ny * width + nx];
-					aA[y*width+x] = aB[ny*width+nx];
-                }
+				int tmp = Y2[row_offset + x] - 128;
+				int dx = w_mul * tmp;
+				int dy = h_mul * tmp;
+
+				int nx = x + dx;
+				int ny = y + dy;
+
+				// wrap negative coordinates
+				while (nx < 0) nx += width;
+				while (ny < 0) ny += height;
+
+				// clamp to edges
+				nx = (unsigned int)nx < (unsigned int)width  ? nx  : width - 1;
+				ny = (unsigned int)ny < (unsigned int)height ? ny : height - 1;
+
+				const int idx = ny * width + nx;
+				Y[row_offset + x]  = Y2[idx];
+				Cb[row_offset + x] = Cb2[idx];
+				Cr[row_offset + x] = Cr2[idx];
+				aA[row_offset + x ] = aB[idx];
 			}
 		}
 	  }
