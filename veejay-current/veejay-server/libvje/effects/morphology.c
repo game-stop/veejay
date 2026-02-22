@@ -199,43 +199,67 @@ void morphology_apply( void *ptr, VJFrame *frame, int *args ) {
 	len -= width;
 
 	if( mode == 0 ) {
-		for(y = width; y < len; y += width  )
-		{	
-			for(x = 1; x < width-1; x ++)
-			{	
-				if(binary_img[x+y] == 0)
+		for (y = width; y < len - width; y += width)
+		{
+			const int y_m1 = y - width;
+			const int y_p1 = y + width;
+
+			for (x = 1; x < width - 1; x++)
+			{
+				const int idx = x + y;
+
+				if (binary_img[idx] == 0)
 				{
-					uint8_t mt[9] = {
-						binary_img[x-1+y-width], binary_img[x+y-width], binary_img[x+1+y-width],
-						binary_img[x-1+y],binary_img[x+y], binary_img[x+1+y],
-						binary_img[x-1+y+width], binary_img[x+y+width], binary_img[x+1+y+width]
-						};
-					I[x+y] = p( kernels[convolution_kernel], mt );
+					const uint8_t t0 = binary_img[x - 1 + y_m1];
+					const uint8_t t1 = binary_img[x     + y_m1];
+					const uint8_t t2 = binary_img[x + 1 + y_m1];
+
+					const uint8_t t3 = binary_img[x - 1 + y];
+					const uint8_t t4 = binary_img[idx];
+					const uint8_t t5 = binary_img[x + 1 + y];
+
+					const uint8_t t6 = binary_img[x - 1 + y_p1];
+					const uint8_t t7 = binary_img[x     + y_p1];
+					const uint8_t t8 = binary_img[x + 1 + y_p1];
+
+					I[idx] = p(kernels[convolution_kernel], (uint8_t[]){t0,t1,t2,t3,t4,t5,t6,t7,t8});
 				}
 				else
 				{
-					I[x+y] = 0xff;
+					I[idx] = 0xff;
 				}
 			}
 		}
 	}
 	else {
-		for(y = width; y < len; y += width  )
-		{	
-			for(x = 1; x < width-1; x ++)
-			{	
-				if(binary_img[x+y] == 0xff)
+		for (y = width; y < len - width; y += width)
+		{
+			const int y_m1 = y - width;
+			const int y_p1 = y + width;
+
+			for (x = 1; x < width - 1; x++)
+			{
+				const int idx = x + y;
+
+				if (binary_img[idx] == 0xff)
 				{
-					uint8_t mt[9] = {
-						binary_img[x-1+y-width], binary_img[x+y-width], binary_img[x+1+y-width],
-						binary_img[x-1+y], binary_img[x+y],binary_img[x+1+y],
-						binary_img[x-1+y+width], binary_img[x+y+width], binary_img[x+1+y+width]
-						};
-					I[x+y] = p( kernels[convolution_kernel], mt );
+					const uint8_t t0 = binary_img[x - 1 + y_m1];
+					const uint8_t t1 = binary_img[x     + y_m1];
+					const uint8_t t2 = binary_img[x + 1 + y_m1];
+
+					const uint8_t t3 = binary_img[x - 1 + y];
+					const uint8_t t4 = binary_img[idx];
+					const uint8_t t5 = binary_img[x + 1 + y];
+
+					const uint8_t t6 = binary_img[x - 1 + y_p1];
+					const uint8_t t7 = binary_img[x     + y_p1];
+					const uint8_t t8 = binary_img[x + 1 + y_p1];
+
+					I[idx] = p(kernels[convolution_kernel], (uint8_t[]){t0,t1,t2,t3,t4,t5,t6,t7,t8});
 				}
-				else 
+				else
 				{
-					I[x+y] = 0;
+					I[idx] = 0;
 				}
 			}
 		}
