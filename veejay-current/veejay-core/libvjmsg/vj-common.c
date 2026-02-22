@@ -67,6 +67,7 @@
 
 static int _debug_level = 0;
 static int _color_level = 1;
+static int _timestamp   = 1;
 static int _no_msg = 0;
 
 #define MAX_LINES 100 
@@ -80,7 +81,8 @@ typedef struct
 typedef struct {
 	sem_t *semaphore;
 	char **dommel;
-	uint64_t pos;
+	uint64_t read_pos;
+	uint64_t write_pos;
 	size_t size;
 } message_ring_t;
 
@@ -123,7 +125,7 @@ static void addr2line_unw( unw_word_t addr, char*file, size_t len, int *line )
 	pclose( fd );
 }
 
-void 	veejay_print_backtrace(void)
+void 	veejay_print_backtrace()
 {
 	char name[512];
 	unw_cursor_t cursor; 
@@ -151,7 +153,7 @@ void 	veejay_print_backtrace(void)
 	}
 }
 #else
-void	veejay_print_backtrace(void)
+void	veejay_print_backtrace()
 {
 	void *space[100];
 	int i,s;
@@ -172,9 +174,42 @@ void	veejay_print_backtrace(void)
 }
 #endif
 
-int	veejay_get_debug_level(void)
+
+static inline void veejay_msg_timestamp(char *out)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+
+    time_t sec = ts.tv_sec;
+    struct tm tm;
+    localtime_r(&sec, &tm);
+
+    int ms = ts.tv_nsec / 1000000;
+
+    // Format: HH:MM:SS.mmm
+    out[0]  = '0' + (tm.tm_hour / 10);
+    out[1]  = '0' + (tm.tm_hour % 10);
+    out[2]  = ':';
+    out[3]  = '0' + (tm.tm_min / 10);
+    out[4]  = '0' + (tm.tm_min % 10);
+    out[5]  = ':';
+    out[6]  = '0' + (tm.tm_sec / 10);
+    out[7]  = '0' + (tm.tm_sec % 10);
+    out[8]  = '.';
+    out[9]  = '0' + (ms / 100);
+    out[10] = '0' + ((ms / 10) % 10);
+    out[11] = '0' + (ms % 10);
+    out[12] = '\0';
+}
+
+int	veejay_get_debug_level()
 {
 	return _debug_level;
+}
+
+int	veejay_is_timestamped()
+{
+	return _timestamp;
 }
 
 void veejay_set_debug_level(int level)
@@ -191,23 +226,27 @@ void veejay_set_debug_level(int level)
     	mjpeg_default_handler_verbosity( _debug_level ? 1:0);
 }
 
+void veejay_set_timestamp(int status) {
+	_timestamp = status;
+}
+
 void veejay_set_colors(int l)
 {
 	if(l) _color_level = 1;
 	else _color_level = 0;
 }
 
-int	veejay_is_colored(void)
+int	veejay_is_colored()
 {
 	return _color_level;
 }
 
-void veejay_silent(void)
+void veejay_silent()
 {
 	_no_msg = 1;
 }
 
-int veejay_is_silent(void)
+int veejay_is_silent()
 {
 	if(_no_msg) return 1;          
 	return 0;
@@ -216,16 +255,18 @@ int veejay_is_silent(void)
 #define MESSAGE_RING_SIZE 5000
 static message_ring_t *msg_ring = NULL;
 static int msg_ring_enabled = 0;
-void	veejay_init_msg_ring(void)
+void	veejay_init_msg_ring()
 {
 	msg_ring = vj_calloc( sizeof(message_ring_t));
 	msg_ring->dommel = vj_calloc( sizeof(char*) * MESSAGE_RING_SIZE );
 	msg_ring->semaphore = vj_malloc(sizeof(sem_t));
 	msg_ring->size = MESSAGE_RING_SIZE;
+	msg_ring->write_pos = 0;
+	msg_ring->read_pos = 0;
 	sem_init( msg_ring->semaphore, 0, 0 );
 }
 
-void	veejay_destroy_msg_ring(void)
+void	veejay_destroy_msg_ring()
 {
 	if(msg_ring) {
 		int i;
@@ -235,60 +276,72 @@ void	veejay_destroy_msg_ring(void)
 			}
 		}
 		free(msg_ring->dommel);
-		free(msg_ring->semaphore);
-		sem_destroy( msg_ring->semaphore );
+		if(msg_ring->semaphore) {
+			sem_destroy( msg_ring->semaphore );
+			free(msg_ring->semaphore);
+		}
 		free(msg_ring);
+		msg_ring = NULL;
 	}
 }
 
-static void veejay_msg_ringbuffer( char *line )
+static void veejay_msg_ringbuffer(char *line)
 {
-	uint64_t pos = __sync_fetch_and_add( &msg_ring->pos, 1) % MESSAGE_RING_SIZE;
-	//using gcc atomic built-ins
-	while(!__sync_bool_compare_and_swap( &(msg_ring->dommel[pos]), NULL, line ));
-	sem_post( msg_ring->semaphore );
+    if (!msg_ring || !line) return;
+
+    uint64_t current_pos = __sync_fetch_and_add(&msg_ring->write_pos, 1) % MESSAGE_RING_SIZE;
+
+    if (__sync_bool_compare_and_swap(&(msg_ring->dommel[current_pos]), NULL, line)) {
+        sem_post(msg_ring->semaphore);
+    } else {
+		// buffer full
+        free(line); 
+    }
 }
 
-int	veejay_log_to_ringbuffer(void)
+int	veejay_log_to_ringbuffer()
 {
 	return ( msg_ring == NULL ? 0 : msg_ring_enabled );
 }
 
-void	veejay_toggle_osl(void)
+void	veejay_toggle_osl()
 {
 	msg_ring_enabled = (msg_ring_enabled == 0 ? 1: 0);
 }
 
-static uint64_t pos = 0;
-char	*veejay_msg_ringfetch(void)
+char *veejay_msg_ringfetch()
 {
-	char *line = NULL;
-	if( sem_trywait( msg_ring->semaphore ) != 0 )
-		return NULL;
+    if (!msg_ring) return NULL;
 
-	if( msg_ring->dommel[pos] == NULL )
-		return NULL;
+    char *line = NULL;
+    
+    if (sem_trywait(msg_ring->semaphore) != 0)
+        return NULL;
 
-	line = vj_strdup( msg_ring->dommel[pos]);
-	free(msg_ring->dommel[ pos ]);
-	msg_ring->dommel[ pos ] = NULL;
-	pos = (pos + 1) % MESSAGE_RING_SIZE;
-	return line;
+
+    uint64_t r_pos = msg_ring->read_pos % MESSAGE_RING_SIZE;
+
+    line = __sync_lock_test_and_set(&(msg_ring->dommel[r_pos]), NULL);
+
+    if (line) {
+        msg_ring->read_pos++;
+    }
+
+    return line; 
 }
 
 void veejay_msg_prnt(FILE *out, const char *buffer, size_t size)
 {
-    write(fileno(out), buffer, size);
+    if(out) write(fileno(out), buffer, size);
 }
-
-// Updated veejay_msg function using write
+// Updated veejay_msg function with log level before timestamp
 void veejay_msg(int type, const char format[], ...)
 {
     if (type != VEEJAY_MSG_ERROR && _no_msg)
         return;
 
     if (!_debug_level && type == VEEJAY_MSG_DEBUG)
-        return; 
+        return;
 
     char buf[1024];
     va_list args;
@@ -302,65 +355,68 @@ void veejay_msg(int type, const char format[], ...)
     char temp_buffer[2048];
     size_t temp_size = 0;
 
+    // --- log level prefix first ---
     if (_color_level)
     {
         switch (type)
         {
-        case 2: //info
-            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%sI: ", TXT_GRE);
+        case 2: // info
+            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%sI: %s", TXT_GRE, TXT_END);
             break;
-        case 1: //warning
-            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%sW: ", TXT_YEL);
+        case 1: // warning
+            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%sW: %s", TXT_YEL, TXT_END);
             break;
         case 0: // error
-            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%sE: ", TXT_RED);
+            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%sE: %s", TXT_RED, TXT_END);
             break;
         case 3:
             line = 1;
             break;
         case 4: // debug
-            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%sD: ", TXT_BLU);
+            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%sD: %s", TXT_BLU, TXT_END);
             break;
-        }
-
-        if (!line)
-        {
-            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%s%s\n", buf, TXT_END);
-        }
-        else
-        {
-            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%s%s%s", buf, TXT_GRE, TXT_END);
         }
     }
     else
     {
         switch (type)
         {
-        case 2: //info
-            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "I: ");
-            break;
-        case 1: //warning
-            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "W: ");
-            break;
-        case 0: // error
-            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "E: ");
-            break;
-        case 3:
-            line = 1;
-            break;
-        case 4: // debug
-            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "D: ");
-            break;
+        case 2: temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "I: "); break;
+        case 1: temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "W: "); break;
+        case 0: temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "E: "); break;
+        case 3: line = 1; break;
+        case 4: temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "D: "); break;
         }
+    }
 
-        if (!line)
-        {
-            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%s\n", buf);
-        }
-        else
-        {
-            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%s", buf);
-        }
+	if(_timestamp) {
+		char time_buf[13];
+		veejay_msg_timestamp(time_buf);
+
+		temp_size += snprintf(
+			temp_buffer + temp_size,
+			sizeof(temp_buffer) - temp_size,
+			"[%s] ",
+			time_buf
+		);
+	}
+
+    // --- finally the message ---
+    if (_color_level && !line)
+    {
+        temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%s%s\n", buf, TXT_END);
+    }
+    else if (_color_level && line)
+    {
+        temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%s%s%s", buf, TXT_GRE, TXT_END);
+    }
+    else if (!line)
+    {
+        temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%s\n", buf);
+    }
+    else
+    {
+        temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%s", buf);
     }
 
     veejay_msg_prnt(out, temp_buffer, temp_size);
