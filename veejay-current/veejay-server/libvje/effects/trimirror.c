@@ -17,34 +17,34 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-
+#include <config.h>
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "trimirror.h"
 
 #define MAX_SEGMENTS 256
 
+#define CLAMP_Y( a ) ( a < pixel_Y_lo_ ? pixel_Y_lo_ : (a > pixel_Y_hi_ ? pixel_Y_hi_ : a ) )
+#define CLAMP_UV( a )( a < pixel_U_lo_ ? pixel_U_lo_ : (a > pixel_U_hi_ ? pixel_U_hi_ : a ) )
+
 vj_effect *trimirror_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
+    ve->num_params = 1;
 
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
     ve->limits[0][0] = 1;
-    ve->limits[1][0] = MAX_SEGMENTS;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
+    ve->limits[1][0] = 48;
     ve->defaults[0] = 1;
-    ve->defaults[1] = 255;
-
+    
     ve->description = "Kaleidoscope";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->parallel = 2; // thread local buf mode
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Segments", "Normalization Factor"  );
+    ve->param_description = vje_build_param_list( ve->num_params, "Segments" );
     return ve;
 }
 
@@ -132,8 +132,7 @@ void trimirror_free(void *ptr) {
 void trimirror_apply(void *ptr, VJFrame *frame, int *args) {
     trimirror_t *s = (trimirror_t*)ptr;
     const int numSegments = args[0];
-    const uint8_t normFactor = args[1];
-
+    
     const int width = frame->out_width;
     const int height = frame->out_height;
 
@@ -161,9 +160,9 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args) {
     float sinSegments[ numSegments ];
     float cosSegments[ numSegments ];
     
-    uint8_t *outY;
-    uint8_t *outU;
-    uint8_t *outV;
+    uint8_t *restrict outY;
+    uint8_t *restrict outU;
+    uint8_t *restrict outV;
 
     if( vje_setup_local_bufs( 1, frame, &outY, &outU, &outV, NULL ) == 0 ) {
         const int len = width * height;
@@ -175,65 +174,61 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args) {
         srcU = bufU;
         srcV = bufV;
     }
-
+  
+    const float angleStep = (2.0f * M_PI) / numSegments;
     for (int i = 0; i < numSegments; ++i) {
-        float segmentAngle = i * (2 * M_PI) / numSegments;
+        float segmentAngle = i * angleStep;
         sinSegments[i] = a_sin(segmentAngle);
         cosSegments[i] = a_cos(segmentAngle);
     }
 
-    int mX[ numSegments ];
-    int mY[ numSegments ];
-
     int start = frame->jobnum * h;
+    const float invSegments = 1.0f / numSegments;
 
     for (int y = 0; y < h; y++) {
+        int row_offset = (start + y) * width;
         for (int x = 0; x < w; x++) {
             int mirroredValueY = 0;
             int mirroredValueU = 0;
             int mirroredValueV = 0;
 
-            const float distance = sqrt_lut[ (start + y) * width + x];
-            const float sinValue = sin_lut[ (start + y) * width + x];
-            const float cosValue = cos_lut[ (start + y) * width + x];
+            const float distance = sqrt_lut[ row_offset + x];
+            const float sinValue = sin_lut[ row_offset + x];
+            const float cosValue = cos_lut[ row_offset + x];
 
-            // start computing the contribution of each segment to the final pixel value
+            const float dsin = distance * sinValue;
+            const float dcos = distance * cosValue;
 
-            // cache the coordinates in an auto-vectorizable loop
+
             for (int i = 0; i < numSegments; i++) {
-                float sinSegment = sinSegments[i];
-                float cosSegment = cosSegments[i];
-                float sinSum = sinValue * cosSegment + cosValue * sinSegment;
-                float cosSum = cosValue * cosSegment - sinValue * sinSegment;
-                int mirrorX = centerX + (int)(distance * cosSum);
-                int mirrorY = centerY + (int)(distance * sinSum); 
+                const float cosSeg = cosSegments[i];
+                const float sinSeg = sinSegments[i];
 
-                
-                mirrorX = (mirrorX >= 0 && mirrorX < width) ? mirrorX : centerX;
-                mirrorY = (mirrorY >= 0 && mirrorY < height) ? mirrorY : centerY;
+                const float sx = dcos * cosSeg - dsin * sinSeg;
+                const float sy = dcos * sinSeg + dsin * cosSeg;
 
-                mX[i] = mirrorX;
-                mY[i] = mirrorY;
+                int mirrorX = centerX + (int)sx;
+                int mirrorY = centerY + (int)sy;
+
+                mirrorX = (unsigned int)mirrorX < (unsigned int)width ? mirrorX : centerX;
+                mirrorY = (unsigned int)mirrorY < (unsigned int)height ? mirrorY : centerY;
+
+                int idx = mirrorY * width + mirrorX;
+                mirroredValueY += srcY[idx];
+                mirroredValueU += srcU[idx] - 128;
+                mirroredValueV += srcV[idx] - 128;
             }
 
-            // memory access is not continious
-            for (int i = 0; i < numSegments; i++) {
-                int mirrorX = mX[i];
-                int mirrorY = mY[i];
+            mirroredValueY = (int)(mirroredValueY * invSegments);
+            mirroredValueU = (int)(mirroredValueU * invSegments);
+            mirroredValueV = (int)(mirroredValueV * invSegments);
 
-                mirroredValueY += srcY[mirrorY * width + mirrorX];
-                mirroredValueU += (srcU[mirrorY * width + mirrorX] - 128);
-                mirroredValueV += (srcV[mirrorY * width + mirrorX] - 128);
-            }
+            const int p = y * w + x;
+            outY[p] = CLAMP_Y(mirroredValueY);
+            outU[p] = CLAMP_UV(128 + mirroredValueU);
+            outV[p] = CLAMP_UV(128 + mirroredValueV);
 
-            // normalized additive blend
-            mirroredValueY = (mirroredValueY * normFactor) / maxSum;
-            mirroredValueU = (mirroredValueU * normFactor) / maxSum;
-            mirroredValueV = (mirroredValueV * normFactor) / maxSum;
-
-            outY[y * w + x] = mirroredValueY;
-            outU[y * w + x] = 128 + mirroredValueU;
-            outV[y * w + x] = 128 + mirroredValueV;
+            
         }
     }
 
