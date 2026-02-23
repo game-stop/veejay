@@ -130,8 +130,10 @@ typedef struct {
     char    *add;
     char    *prev;
     pthread_mutex_t mutex;
-//  srt_cycle_t *text_buffer;
-//  uint32_t     text_max_size;
+
+    srt_seq_t  *osd_sub;
+    int         osd_prepared;
+
 } vj_font_t;
 
 static int  configure(vj_font_t *f, int size, int font);
@@ -168,6 +170,7 @@ static char *make_key(int id)
 }
 
 
+
 int vj_font_prepare( void *font, long s1, long s2 )
 {
     vj_font_t *f = (vj_font_t*) font;
@@ -189,25 +192,6 @@ int vj_font_prepare( void *font, long s1, long s2 )
 
     for( i = 0; list[i] != NULL ; i ++ ) 
         N++;
-/*
-    long min = s1;
-    long max = s2;
-    for( i = 0; list[i] != NULL ; i ++ ) {
-        void *srt = NULL;
-        int error = vevo_property_get( f->dictionary, list[i], 0, &srt );
-        if( error != VEVO_NO_ERROR )
-            continue;
-
-        srt_seq_t *s = (srt_seq_t*) srt;
-        if( s->start < min )
-            min = start;
-        if( s->end > max )
-            max = s->end;
-    }
-
-    s1 = min;
-    s2 = max;*/
-
 
     if( N == 0 )    
         return 0;
@@ -1040,24 +1024,6 @@ static  int try_deepen( vj_font_t *f , char *path )
                 } else {
                    free(try_font);
                   }
-                /*
-                if( fnname ) {
-                    veejay_msg(VEEJAY_MSG_INFO, "FontName ='%s'",fnname );
-
-                }else {
-                    veejay_msg(0, "Error '%s'",try_font);
-                }
-                
-                
-                if( test_font (f, try_font, f->font_index) )
-                {
-                    f->font_table[ f->font_index ] = try_font;
-                    f->font_index ++;
-                }
-                else
-                {
-                    free(try_font);
-                }*/
             }
         }
     }
@@ -1357,7 +1323,6 @@ void    vj_font_destroy(void *ctx)
     if(f->add)
         free(f->add);   
 
-//  free( f->text_buffer ); 
     free( f->font_table );
     free( f->font_list );
     free( f );
@@ -1469,7 +1434,7 @@ void    *vj_font_get_plain_dict( void *font )
     return f->plain;
 }
 
-void    vj_font_set_osd_text(void *font, char *text )
+void    vj_font_set_osd_text(void *font, const char *text )
 {
     vj_font_t *f = (vj_font_t*) font;
     if(f->add)  
@@ -1527,6 +1492,15 @@ static  int get_default_font( vj_font_t *f )
     return 0;
 }
 
+int calc_osd_font_size(int screen_width, int is_osd)
+{
+    if (!is_osd) return 40;
+    int tmp = (int)(screen_width * 0.08);
+    if (tmp > 48) tmp = 48;
+    if (tmp < 12) tmp = 12;
+    return tmp;
+}
+
 void    *vj_font_init( int w, int h, float fps, int is_osd )
 {
     int error=0;
@@ -1553,10 +1527,7 @@ void    *vj_font_init( int w, int h, float fps, int is_osd )
     f->bg = 0;
     f->outline = 0;
     f->text_height = 0;
-    int tmp = ((w / 100) * 3) -1;
-    if(tmp>15) tmp = 14;
-    if(tmp<9) tmp = 9;
-    f->current_size = (is_osd ? (tmp): 40);
+    f->current_size = calc_osd_font_size(w, is_osd);
 
     f->fps  = fps;
     f->index = NULL;
@@ -1608,10 +1579,6 @@ void    *vj_font_init( int w, int h, float fps, int is_osd )
             return NULL;
         }       
     }
-
-//  f->text_buffer = (srt_cycle_t*)
-//      vj_calloc(sizeof(srt_cycle_t) * (sizeof(srt_cycle_t)*22500));
-//  f->text_max_size = 22500;
 
     pthread_mutex_init( &(f->mutex), NULL );
     
@@ -1699,10 +1666,6 @@ void    *vj_font_single_init( int w, int h, float fps,char *path )
         }       
     }
 
-//  f->text_buffer = (srt_cycle_t*)
-//      vj_calloc(sizeof(srt_cycle_t) * (sizeof(srt_cycle_t)*22500));
-//  f->text_max_size = 22500;
-
     pthread_mutex_init( &(f->mutex), NULL );
     
     return f;
@@ -1755,8 +1718,6 @@ static void draw_glyph(
             dpixel[2] = V[ p ];
 
             pos = r * bitmap_pitch + (c >> 3 );
-
-       //           spixel = bitmap->buffer[r*bitmap->pitch +c/8] & (0x80>>(c%8)); 
          
             spixel = bitbuffer[ pos ] & ( 0x80 >> ( c % 8 ));
  
@@ -1918,183 +1879,156 @@ static inline void draw_transparent_box(
         unsigned int y,
         unsigned int width,
         unsigned int height,
-            uint8_t *yuv_color,
+        uint8_t *yuv_color,
         uint8_t opacity)
 {
-  const int op1 = opacity;
-  const int op0 = 255 - op1;
-  const int w = picture->width;
-  int i, j;
- 
-  uint8_t *A[3] = {
-      picture->data[0],
-      picture->data[1],
-      picture->data[2]
-  };
+    const int op1 = opacity;
+    const int op0 = 255 - op1;
+    const int w = picture->width;
+    int i, j;
+    uint8_t *A[3] = { picture->data[0], picture->data[1], picture->data[2] };
 
-  int p;
- 
-  for (j = y; j < height; j++)
+    unsigned int x_end = x + width;
+    unsigned int y_end = y + height;
+
+    if (x_end > picture->width) x_end = picture->width;
+    if (y_end > picture->height) y_end = picture->height;
+
+    for (j = y; j < y_end; j++)
 #pragma omp simd
-    for (i = x; i < width; i++) 
-    { 
-      p = (i + (j * w));
-      A[0][p] = (op0 * A[0][ p ] + op1 * yuv_color[0]) >> 8;
-      A[1][p] = (op0 * A[1][ p ] + op1 * yuv_color[1]) >> 8;
-      A[2][p] = (op0 * A[2][ p ] + op1 * yuv_color[2]) >> 8;  
-    }
-  
+        for (i = x; i < x_end; i++) {
+            int p = i + (j * w);
+            A[0][p] = (op0 * A[0][p] + op1 * yuv_color[0]) >> 8;
+            A[1][p] = (op0 * A[1][p] + op1 * yuv_color[1]) >> 8;
+            A[2][p] = (op0 * A[2][p] + op1 * yuv_color[2]) >> 8;
+        }
 }
 
-static inline void draw_box(VJFrame *picture, unsigned int x, unsigned int y, unsigned int width, unsigned int height, uint8_t *yuv_color)
-{
-  int i, j;
 
-  for (j = y; j < height; j++)
-    for (i = x; i < width; i++) 
-      { 
-    picture->data[0][ i + (j * picture->width ) ] = yuv_color[0];   
-    picture->data[1][ i + (j * picture->width ) ] = yuv_color[1];
-    picture->data[2][ i + (j * picture->width ) ] = yuv_color[2]; 
-      }
-  
+static inline void draw_box(VJFrame *picture,
+                            unsigned int x,
+                            unsigned int y,
+                            unsigned int width,
+                            unsigned int height,
+                            uint8_t *yuv_color)
+{
+    int i, j;
+    unsigned int x_end = x + width;
+    unsigned int y_end = y + height;
+
+    if (x_end > picture->width) x_end = picture->width;
+    if (y_end > picture->height) y_end = picture->height;
+
+    for (j = y; j < y_end; j++)
+        for (i = x; i < x_end; i++) {
+            int p = i + (j * picture->width);
+            picture->data[0][p] = yuv_color[0];
+            picture->data[1][p] = yuv_color[1];
+            picture->data[2][p] = yuv_color[2];
+        }
 }
 
 #define MAXSIZE_TEXT 1024
-
-static void vj_font_text_render(vj_font_t *f, srt_seq_t *seq, void *_picture )
+static void vj_font_text_render(vj_font_t *f, srt_seq_t *seq, void *_picture)
 {
+    if (!f || !seq || !_picture || !seq->text || strlen(seq->text) == 0)
+        return;
+
     int size = strlen(seq->text);
     FT_Face face = f->face;
-    FT_GlyphSlot  slot = face->glyph;
-    FT_Vector pos[MAXSIZE_TEXT];  
+    FT_GlyphSlot slot = face->glyph;
+    FT_Vector pos[MAXSIZE_TEXT];
     FT_Vector delta;
-  
     unsigned char c;
-    int x = 0, y = 0, i=0;
-    int str_w, str_w_max;
+    int i;
 
     VJFrame *picture = (VJFrame*) _picture;
-    int width = picture->width;
-    int height = picture->height;
+    int pic_width = picture->width;
+    int pic_height = picture->height;
 
     int x1 = f->x;
     int y1 = f->y;
-    
-    str_w = str_w_max = 0;
-
-    x = f->x; 
-    y = f->y;
+    int line_start_idx = 0;
+    int last_space_idx = -1;
+    int max_line_width = 0;
+    int x_cursor = x1;
+    int y_cursor = y1;
 
     char *text = seq->text;
 
-    for (i=0; i < size; i++)
-    {
+    for (i = 0; i < size; i++) {
         c = text[i];
-        if ( (f->use_kerning) && (i > 0) && (f->glyphs_index[c]) )
-        {
-            FT_Get_Kerning(
-                f->face, 
-                f->glyphs_index[c],
-                //  f->glyphs_index[ text[i-1] ], 
-                f->glyphs_index[c],
-                ft_kerning_default, 
-                &delta
-                );
-     
-            x += delta.x >> 6;
+
+        if (f->use_kerning && i > 0 && f->glyphs_index[c]) {
+            FT_Get_Kerning(face, f->glyphs_index[c], f->glyphs_index[c],
+                           ft_kerning_default, &delta);
+            x_cursor += delta.x >> 6;
         }
-    
-            if( isblank( c ) || c == 20 )
-        {
-            f->advance[c] = f->current_size;
-            if( (x + f->current_size) >= width )
-            {
-                str_w = width = f->x - 1;
-                y += f->text_height;
-                x = f->x;
+        if (c == ' ' || c == '\t')
+            last_space_idx = i;
+
+        int advance = (isblank(c) || c == 20) ? f->current_size : f->advance[c];
+
+        if ((x_cursor + advance) >= pic_width || c == '\n') {
+            int wrap_idx = i;
+            if (x_cursor + advance >= pic_width && last_space_idx > line_start_idx) {
+                wrap_idx = last_space_idx;
             }
-        }
-        else
-        if (( (x + f->advance[ c ]) >= width ) || ( c == '\n' ))
-        {
-            str_w = width - f->x - 1;
-            y += f->text_height;
-            x = f->x;
-        }
 
-        pos[i].x = x + f->bitmap_left[c];
-            pos[i].y = y - f->bitmap_top[c] + f->baseline;
-            x += f->advance[c];
+            int j;
+            int line_x = x1;
+            for (j = line_start_idx; j <= wrap_idx; j++) {
+                unsigned char cc = text[j];
+                pos[j].x = line_x + f->bitmap_left[cc];
+                pos[j].y = y_cursor - f->bitmap_top[cc] + f->baseline;
+                line_x += (isblank(cc) || cc == 20) ? f->current_size : f->advance[cc];
+            }
 
-        if (str_w > str_w_max)
-            str_w_max = str_w;
+            if (line_x - x1 > max_line_width)
+                max_line_width = line_x - x1;
+
+            y_cursor += f->text_height;
+            x_cursor = x1;
+            line_start_idx = wrap_idx + 1;
+            last_space_idx = -1;
+        } else {
+            x_cursor += advance;
+        }
     }
-    
-    if (f->bg)
-    {
-        if ( str_w_max + f->x >= width )
-            str_w_max = width - f->x - 1;
-        if ( y >= height )
-            y = height - 1 - 2*f->y;
 
-        if( str_w_max == 0 )
-            str_w_max = x1 + (x - x1);
-    
-        int bw = str_w_max;
-        int bh = y - y1;
-            if(bh <= 0 )
-            bh = y1 + f->current_size;
-        
-        if( f->alpha[1] == 0 )
-        {
-            draw_box(
-                picture,
-                x1,
-                y1,
-                bw,
-                bh,
-                f->bgcolor
-            );
-        }
-        else
-        {
-            draw_transparent_box(
-                picture,
-                x1,
-                y1,
-                bw,
-                bh,
-                f->bgcolor,
-                f->alpha[1] );
-        }   
+    int line_x = x1;
+    for (i = line_start_idx; i < size; i++) {
+        unsigned char cc = text[i];
+        pos[i].x = line_x + f->bitmap_left[cc];
+        pos[i].y = y_cursor - f->bitmap_top[cc] + f->baseline;
+        line_x += (isblank(cc) || cc == 20) ? f->current_size : f->advance[cc];
     }
-    
-    for (i=0; i < size; i++)
-        {
+    if (line_x - x1 > max_line_width)
+        max_line_width = line_x - x1;
+
+    int total_lines = (y_cursor - y1) / f->text_height + 1;
+    int bh = total_lines * f->text_height + 4; // vertical padding
+
+    if (f->bg) {
+        if (f->alpha[1] == 0)
+            draw_box(picture, x1, y1, max_line_width, bh, f->bgcolor);
+        else
+            draw_transparent_box(picture, x1, y1, max_line_width, bh, f->bgcolor, f->alpha[1]);
+    }
+
+    for (i = 0; i < size; i++) {
         c = text[i];
-        if (  ((c == '_') && ((char*)text == (char*)f->text) ) || /* skip '_' (consider as space) 
-                         IF text was specified in cmd line 
-                         (which doesn't like neasted quotes)  */
-             ( c == '\n' )) /* Skip new line char, just go to new line */
+
+        if ((c == (unsigned char) '_') && (text == f->text))
+            continue;
+        if (c == '\n')
             continue;
 
-        if( f->alpha[0] || f->alpha[2] )
-        {
-            draw_transparent_glyph( f, picture, &(f->bitmaps[c]),
-                    pos[i].x,pos[i].y,width,height,
-                    f->fgcolor,f->lncolor, f->outline,
-                    f->alpha[0],f->alpha[2] );
-        }
-        else
-        {
-            draw_glyph( f,picture, &(f->bitmaps[ c ]),
-                    pos[i].x,pos[i].y,width, height,
-                    f->fgcolor,f->lncolor,f->outline );
-            }
-            x += slot->advance.x >> 6;
-        }
-
+        draw_glyph(f, picture, &(f->bitmaps[c]),
+                   pos[i].x, pos[i].y,
+                   pic_width, pic_height,
+                   f->fgcolor, f->lncolor, f->outline);
+    }
 }
 
 static   int    num_nl( char *str , int len ) {
@@ -2106,131 +2040,8 @@ static   int    num_nl( char *str , int len ) {
     return sum;
 }
 
-static void vj_font_text_osd_render(vj_font_t *f, void *_picture, int x, int y )
-{
-    FT_Face face = f->face;
-    FT_GlyphSlot  slot = face->glyph;
-    FT_Vector pos[MAXSIZE_TEXT];  
-    FT_Vector delta;
-    unsigned char c;
-    int i=0;
-    int str_w, str_w_max;
-    VJFrame *picture = (VJFrame*) _picture;
-    int width = picture->width;
-    int height = picture->height;
-    int x1,y1;
-    str_w = str_w_max = 0;
 
-    if(!f->add)
-        return;
-
-    int size = strlen( f->add );
-    if( size <= 0 ) 
-        return;
-    
-    if( y == -1 )
-    {
-        int n = num_nl(f->add,size);
-        if( n > 4 )
-            y = 0;
-        else
-            y = picture->height - (f->current_size * n ) - f->current_size - 8;
-        if( width < 512 )
-            y -=  (f->current_size * n ) - f->current_size - 8;
-        if ( y < 0 ) 
-            y = 0;
-    }
-
-
-    x1 = x;
-    y1 = y; 
-
-    unsigned int str_wi = 0;
-    unsigned char *text = (unsigned char*) f->add;
-
-    for (i=0; i < size; i++)
-    {
-        c = text[i];
-        if ( (f->use_kerning) && (i > 0) && (f->glyphs_index[c]) )
-        {
-            FT_Get_Kerning(
-                f->face, 
-                f->glyphs_index[c],
-                f->glyphs_index[c],
-                ft_kerning_default, 
-                &delta
-                );
-     
-            x += delta.x >> 6;
-        }
-    
-            if( isblank( c ) || c == 20 )
-        {
-            f->advance[c] = f->current_size;
-            if( (x + f->current_size) >= width )
-            {
-                str_w = width = f->x - 1;
-                y += f->text_height;
-                x = f->x;
-            }
-        }
-        else
-        if (( (x + f->advance[ c ]) >= width ) || ( c == '\n' ))
-        {
-            str_w = width - f->x - 1;
-            y += f->text_height;
-            if( str_wi < x )
-                str_wi = x;
-            x = f->x;
-        }
-
-        pos[i].x = x + f->bitmap_left[c];
-            pos[i].y = y - f->bitmap_top[c] + f->baseline;
-            x += f->advance[c];
-
-        if (str_w > str_w_max)
-            str_w_max = str_w;
-    }
-    
-//  if ( str_w_max + f->x >= width )
-//      str_w_max = width - f->x - 1;
-
-    if ( y >= height )
-        y = height - 1 - 2*f->y;
-
-//  if( str_w_max == 0 )
-    str_w_max = (x - x1);
-    
-    int bh = y - y1;
-    if(bh <= 0 )
-        bh = y1 + f->current_size + 4;
-
-    draw_transparent_box(
-            picture,
-            x1,
-            y1,
-            str_wi,//picture->width,
-            bh,
-            f->bgcolor,
-            80 );
-    
-    for (i=0; i < size; i++)
-        {
-        c = text[i];
-        if (  ((c == (unsigned char) '_') && (text == f->text) ) || /* skip '_' (consider as space) 
-                         IF text was specified in cmd line 
-                         (which doesn't like neasted quotes)  */
-             ( c == '\n' )) /* Skip new line char, just go to new line */
-            continue;
-        draw_glyph( f,picture, &(f->bitmaps[ c ]),
-                pos[i].x,pos[i].y,width, height,
-                f->fgcolor,f->lncolor,f->outline );
-            
-            x += slot->advance.x >> 6;
-        }
-}
-
-char    *vj_font_default(void)
+char    *vj_font_default()
 {
     int n = strlen( selected_default_font );
     if( n <= 0 )
@@ -2262,64 +2073,199 @@ int vj_font_norender(void *ctx, long position)
 
     return jobs;
 }
-
-void    vj_font_render_osd_status( void *ctx, void *_picture, char *status_str, int placement )
-{
-    vj_font_set_osd_text(ctx,status_str);
-    if(placement == 1) {
-        vj_font_text_osd_render( ctx, _picture, 5, 5 );
-    }
-    else
-    {
-        vj_font_text_osd_render( ctx, _picture, 5, -1 );
-    }
-
-}
+ 
 
 void vj_font_render(void *ctx, void *_picture, long position)
 {
+    if (!ctx || !_picture)
+        return;
+
     vj_font_t *f = (vj_font_t *) ctx;
-    font_lock( f );
-    int i;
-    for( i = 0; i < f->index_len; i ++ ) {
-        srt_seq_t *s = f->index[i]; 
-        if(!s)
-            continue;
-    
-        if( position < s->start || position > s->end )
+    font_lock(f);
+
+    for (int i = 0; i < f->index_len; i++) {
+        srt_seq_t *s = f->index[i];
+        if (!s)
             continue;
 
-        int   old_font = f->current_font;
-        int   old_size = f->current_size;
+        if (position < s->start || position > s->end)
+            continue;
 
-        if( old_font != s->font || old_size != s->size )
-            if(!configure( f, s->size, s->font ))
-                if(!configure( f, old_size, old_font ))
+        int old_font = f->current_font;
+        int old_size = f->current_size;
+
+        if (old_font != s->font || old_size != s->size) {
+            if (!configure(f, s->size, s->font))
+                if (!configure(f, old_size, old_font))
                     break;
-        
+        }
+
         f->x = s->x;
         f->y = s->y;
         f->bg = s->use_bg;
         f->outline = s->outline;
-        
-        if(f->outline)
-            _rgb2yuv( s->ln[0],s->ln[1],s->ln[2], f->lncolor[0],f->lncolor[1],f->lncolor[2]);   
 
-        _rgb2yuv( s->fg[0],s->fg[1],s->fg[2], f->fgcolor[0],f->fgcolor[1],f->fgcolor[2] );
-        if(f->bg)
-            _rgb2yuv( s->bg[0],s->bg[1],s->bg[2], f->bgcolor[0],f->bgcolor[1],f->bgcolor[2] );
+        if (f->outline)
+            _rgb2yuv(s->ln[0], s->ln[1], s->ln[2], f->lncolor[0], f->lncolor[1], f->lncolor[2]);
+
+        _rgb2yuv(s->fg[0], s->fg[1], s->fg[2], f->fgcolor[0], f->fgcolor[1], f->fgcolor[2]);
+        if (f->bg)
+            _rgb2yuv(s->bg[0], s->bg[1], s->bg[2], f->bgcolor[0], f->bgcolor[1], f->bgcolor[2]);
 
         f->alpha[0] = s->alpha[0];
         f->alpha[1] = s->alpha[1];
         f->alpha[2] = s->alpha[2];
-            
-        vj_font_text_render( f,s, _picture );
 
-    }   
+        vj_font_text_render(f, s, _picture);
+    }
 
     font_unlock(f);
 }
 
+
+static void vj_font_prepare_osd(vj_font_t *f, int w)
+{
+    if (!f || f->osd_prepared)
+        return;
+
+    f->osd_sub = (srt_seq_t*) calloc(1, sizeof(srt_seq_t));
+    if (!f->osd_sub)
+        return;
+
+
+    f->osd_sub->x = 5; // left margin
+    f->osd_sub->y = -1;// auto vertical
+    f->osd_sub->size = f->current_size;
+    f->osd_sub->font = f->current_font;
+    f->osd_sub->use_bg = 1;
+    f->osd_sub->outline = 0;
+
+    _rgb2yuv(255, 255, 255, f->fgcolor[0], f->fgcolor[1], f->fgcolor[2]);
+    _rgb2yuv(0, 0, 0, f->bgcolor[0], f->bgcolor[1], f->bgcolor[2]);
+
+    int tmp = ((f->current_size * 100) / w);
+    if (tmp < 12) tmp = 12;
+    if (tmp > 28) tmp = 28;
+    f->current_size = tmp;
+
+    f->osd_prepared = 1;
+}
+static void vj_font_text_osd_render(vj_font_t *f, void *_picture, int x, int y)
+{
+    if (!f || !_picture || !f->add || strlen(f->add) == 0)
+        return;
+
+    VJFrame *picture = (VJFrame*) _picture;
+    FT_Face face = f->face;
+    unsigned char *text = (unsigned char*) f->add;
+    int size = strlen(text);
+    int width = picture->width;
+    int height = picture->height;
+
+    int line_count = 1;
+    int cur_x = 0;
+    int max_line_width = 0;
+    unsigned char prev_c = 0;
+
+    for (int i = 0; i < size; i++) {
+        unsigned char c = text[i];
+        if (c == '\n') {
+            if (cur_x > max_line_width) max_line_width = cur_x;
+            cur_x = 0;
+            line_count++;
+            prev_c = 0;
+            continue;
+        }
+        if (f->use_kerning && prev_c > 0 && f->glyphs_index[c]) {
+            FT_Vector delta;
+            FT_Get_Kerning(face, f->glyphs_index[prev_c], f->glyphs_index[c], ft_kerning_default, &delta);
+            cur_x += delta.x >> 6;
+        }
+
+        int adv = (isblank(c) || c == 20) ? f->current_size : f->advance[c];
+        if ((cur_x + adv) > (width - x)) {
+            if (cur_x > max_line_width) max_line_width = cur_x;
+            cur_x = 0;
+            line_count++;
+            prev_c = 0;
+        }
+
+        cur_x += adv;
+        prev_c = c;
+    }
+    if (cur_x > max_line_width) max_line_width = cur_x;
+
+    int total_text_height = (line_count * f->text_height); 
+    
+    int bh = total_text_height + 12; // Increased padding
+    int bw = max_line_width + 12;
+
+    if (y == -1) {
+        y = picture->height - bh - 10; 
+        if (y < 0) y = 0;
+    }
+
+    draw_transparent_box(picture, x, y, bw, bh, f->bgcolor, 160);
+
+    int draw_x = x + 4; // Start with slight padding inside box
+    int draw_y = y + 4;
+    cur_x = 0;
+    prev_c = 0;
+
+    for (int i = 0; i < size; i++) {
+        unsigned char c = text[i];
+        int adv = (isblank(c) || c == 20) ? f->current_size : f->advance[c];
+
+        if (c == '\n' || (cur_x + adv) > (width - x)) {
+            draw_y += f->text_height;
+            draw_x = x + 4;
+            cur_x = 0;
+            prev_c = 0;
+            if (c == '\n') continue;
+        }
+
+        if (f->use_kerning && prev_c > 0 && f->glyphs_index[c]) {
+            FT_Vector delta;
+            FT_Get_Kerning(face, f->glyphs_index[prev_c], f->glyphs_index[c], ft_kerning_default, &delta);
+            draw_x += delta.x >> 6;
+        }
+
+        int gx = draw_x + f->bitmap_left[c];
+        int gy = draw_y + f->baseline - f->bitmap_top[c];
+
+        if (c != '_' || text != f->text) {
+             draw_glyph(f, picture, &(f->bitmaps[c]),
+                       gx, gy,
+                       width, height,
+                       f->fgcolor, f->lncolor, f->outline);
+        }
+
+        draw_x += adv;
+        cur_x += adv;
+        prev_c = c;
+    }
+}
+
+void vj_font_render_osd_status(void *ctx, void *_picture, char *status_str, int placement)
+{
+    if (!ctx || !_picture || !status_str)
+        return;
+
+    vj_font_t *f = (vj_font_t *) ctx;
+    VJFrame *pic = (VJFrame*) _picture;
+
+    if (!f->osd_prepared)
+        vj_font_prepare_osd(f, pic->width);
+
+    vj_font_set_osd_text(f, status_str);
+
+    int x = 5;
+    int y = (placement == 1) ? f->baseline : f->h - (f->baseline*2);
+
+    font_lock(f);
+    vj_font_text_osd_render(f, _picture, x, y);
+    font_unlock(f);
+}
 
 
 #endif
