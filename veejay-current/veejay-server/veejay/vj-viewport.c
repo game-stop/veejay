@@ -135,7 +135,6 @@ typedef struct
 	int32_t tx1,tx2,ty1,ty2;
 	int32_t ttx1,ttx2,tty1,tty2;
 	int	mode;
-//	int32_t 	*buf;
 	void *sender;
 	uint32_t	seq_id;
 	ui_t	*ui;
@@ -171,9 +170,7 @@ static int		viewport_configure(
 
 static matrix_t		*viewport_transform(float x1,float y1,float x2,float y2,float *coord );
 static inline void	point_map( matrix_t *M, float x, float y, float *nx, float *ny);
-static matrix_t *	viewport_invert_matrix( matrix_t *M, matrix_t *D );
-static	matrix_t 	*viewport_adjoint_matrix(matrix_t *M);
-static double		viewport_matrix_determinant( matrix_t *M );
+static matrix_t *	viewport_invert_matrix( matrix_t *M);
 static matrix_t 	*viewport_multiply_matrix( matrix_t *A, matrix_t *B );
 static	void		viewport_copy_from( matrix_t *A, matrix_t *B );
 static void		viewport_scale_matrix( matrix_t *M, float sx, float sy );
@@ -347,25 +344,6 @@ void viewport_line (uint8_t *plane,
   }
 }
 
-/*static	void	draw_dot( uint8_t *plane, int x, int y, int w, int h, int size, int col )
-{
-	int x1 = x - size *2;
-	int y1 = y - size*2;
-	int x2 = x + size*2;
-	int y2 = y + size*2;
-
-	if( x1 < 0 ) x1 = 0; else if ( x1 > w ) x1 = w;
-	if( y1 < 0 ) y1 = 0; else if ( y1 > h ) y1 = h;
-	if( x2 < 0 ) x2 = 0; else if ( x2 > w ) x2 = w;
-	if( y2 < 0 ) y2 = 0; else if ( y2 > h ) y2 = h;
-
-	unsigned int i,j;
-	for( i = y; i < y2; i ++ ) 
-	{
-		for( j = x1; j < x2 ; j ++ )
-			plane[ y * w + x ] = col;
-	}
-}*/
 
 static	void	draw_point( uint8_t *plane, int x, int y, int w, int h, int size, int col )
 {
@@ -418,6 +396,17 @@ static void		viewport_find_transform( float *coord, matrix_t *M )
 	{
 		det1 = dx3 * dy2 - dy3 * dx2;
 		det2 = dx1 * dy2 - dy1 * dx2;
+
+		// prevent division by zero if points are collinear
+		if (fabs(det2) < 1e-10) {
+            M->m[2][0] = 0.0;
+            M->m[2][1] = 0.0;
+        } else {
+            M->m[2][0] = det1 / det2;
+            det1 = dx1 * dy3 - dy1 * dx3;
+            M->m[2][1] = det1 / det2;
+        }
+
 		M->m[2][0] = det1/det2;
 	
 		det1 = dx1 * dy3 - dy1 * dx3;
@@ -585,55 +574,37 @@ static matrix_t 	*viewport_multiply_matrix( matrix_t *A, matrix_t *B )
 	return R;
 }
 
-static double		viewport_matrix_determinant( matrix_t *M )
+
+static matrix_t *viewport_invert_matrix(matrix_t *M)
 {
-	double D = M->m[0][0] * M->m[1][1] * M->m[2][2] + 
-		    M->m[0][1] * M->m[1][2] * M->m[2][0] +
-		    M->m[2][0] * M->m[1][1] * M->m[0][2] -
-		    M->m[1][0] * M->m[0][1] * M->m[2][2] -
-		    M->m[2][1] * M->m[1][2] * M->m[0][0];
-	 	     
-	return D;
-}
+    double det = M->m[0][0] * (M->m[1][1] * M->m[2][2] - M->m[1][2] * M->m[2][1]) -
+                 M->m[0][1] * (M->m[1][0] * M->m[2][2] - M->m[1][2] * M->m[2][0]) +
+                 M->m[0][2] * (M->m[1][0] * M->m[2][1] - M->m[1][1] * M->m[2][0]);
 
-static	matrix_t 	*viewport_adjoint_matrix(matrix_t *M)
-{
-	matrix_t *A = viewport_matrix();
-	A->m[0][0] = M->m[0][0];
-	A->m[0][1] = -M->m[0][1];
-	A->m[0][2] = M->m[0][2];
-	A->m[1][0] = -M->m[1][0];
-	A->m[1][1] = M->m[1][1];
-	A->m[1][2] = -M->m[1][2];
-	A->m[2][0] = M->m[2][0];
-	A->m[2][1] = -M->m[2][1];
-	A->m[2][2] = M->m[2][2];
-	return A;
-}
+    if (det == 0.0)
+    {
+        veejay_msg(0, "Determinant is 0.0, inverse of matrix not possible");
+        return NULL;
+    }
 
-static matrix_t *		viewport_invert_matrix( matrix_t *M, matrix_t *D )
-{
-	double det = viewport_matrix_determinant( M );
-	if( det == 0.0 )
-	{
-		veejay_msg(0, "det = %f, inverse of matrix not possible");
-		return NULL;
-	}
-	det = 1.0 / det;
+    matrix_t *R = (matrix_t*) vj_malloc(sizeof(matrix_t));
+    if (!R) return NULL;
 
-	D->m[0][0] = (M->m[1][1] * M->m[2][2] - M->m[1][2] * M->m[2][1] ) * det;
-	D->m[1][0] = (M->m[1][0] * M->m[2][2] - M->m[1][2] * M->m[2][0] ) * det;
-	D->m[2][0] = (M->m[1][0] * M->m[2][1] - M->m[1][1] * M->m[2][0] ) * det;
-	D->m[0][1] = (M->m[0][1] * M->m[2][2] - M->m[0][2] * M->m[2][1] ) * det;
-	D->m[1][1] = (M->m[0][0] * M->m[2][2] - M->m[0][2] * M->m[2][0] ) * det;
-	D->m[2][1] = (M->m[0][0] * M->m[2][1] - M->m[0][1] * M->m[2][0] ) * det;
-	D->m[0][2] = (M->m[0][1] * M->m[1][2] - M->m[0][2] * M->m[1][1] ) * det;
-	D->m[1][2] = (M->m[0][0] * M->m[1][2] - M->m[0][2] * M->m[1][0] ) * det;
-	D->m[2][2] = (M->m[0][0] * M->m[1][1] - M->m[0][1] * M->m[1][0] ) * det;
+    double inv_det = 1.0 / det;
 
-	matrix_t *A = viewport_adjoint_matrix( D );
+    R->m[0][0] =  (M->m[1][1] * M->m[2][2] - M->m[1][2] * M->m[2][1]) * inv_det;
+    R->m[0][1] = -(M->m[0][1] * M->m[2][2] - M->m[0][2] * M->m[2][1]) * inv_det;
+    R->m[0][2] =  (M->m[0][1] * M->m[1][2] - M->m[0][2] * M->m[1][1]) * inv_det;
 
-	return A;
+    R->m[1][0] = -(M->m[1][0] * M->m[2][2] - M->m[1][2] * M->m[2][0]) * inv_det;
+    R->m[1][1] =  (M->m[0][0] * M->m[2][2] - M->m[0][2] * M->m[2][0]) * inv_det;
+    R->m[1][2] = -(M->m[0][0] * M->m[1][2] - M->m[0][2] * M->m[1][0]) * inv_det;
+
+    R->m[2][0] =  (M->m[1][0] * M->m[2][1] - M->m[1][1] * M->m[2][0]) * inv_det;
+    R->m[2][1] = -(M->m[0][0] * M->m[2][1] - M->m[0][1] * M->m[2][0]) * inv_det;
+    R->m[2][2] =  (M->m[0][0] * M->m[1][1] - M->m[0][1] * M->m[1][0]) * inv_det;
+
+    return R;
 }
 
 static	inline void		point_map( matrix_t *M, float x, float y, float *nx, float *ny)
@@ -659,8 +630,8 @@ static	inline void		point_map_int( matrix_t *M, float x, float y, int *nx, int *
 	else
 		w = 1.0 / w;
 
-	*nx = ceilf( (M->m[0][0] * x + M->m[0][1] * y + M->m[0][2] ) * w);
-	*ny = ceilf( (M->m[1][0] * x + M->m[1][1] * y + M->m[1][2] ) * w);
+	*nx = round1( (M->m[0][0] * x + M->m[0][1] * y + M->m[0][2] ) * w);
+	*ny = round1( (M->m[1][0] * x + M->m[1][1] * y + M->m[1][2] ) * w);
 
 }
 
@@ -692,50 +663,7 @@ static matrix_t	*viewport_transform(
 	free(H);
 	return R;
 }
-
-
-/*
-void	viewport_get_projection_coords( 
-	void *data, int32_t *x0, int32_t *y0, int32_t *w0, int32_t *h0 )
-{
-	viewport_t *v = (viewport_t*) data;
-
-	*x0 = v->x0;
-	*y0 = v->y0;
-	*w0 = v->w0;
-	*h0 = v->h0;
-}
-
-float	*viewport_get_projection_points( void *data )
-{
-	viewport_t *v = (viewport_t*) data;
-	float *res = vj_malloc( sizeof(float) * 8 );
-
-	res[0] = v->x0;
-	res[1] = v->y0;
-	res[2] = v->x0 + v->w0;
-	res[3] = v->y0;
-	res[4] = v->x0;
-	res[5] = v->y0 + v->h0;
-	res[6] = v->x0 + v->w0;
-	res[7] = v->y0 + v->h0;
-
-	return res;
-}
-
-void	viewport_set_projection( void *data, float *res )
-{
-	viewport_t *v = (viewport_t*) data;
-	v->x1 = res[0];
-	v->y1 = res[1];
-	v->x2 = res[2];
-	v->y2 = res[3];
-	v->x3 = res[4];
-	v->y3 = res[5];
-	v->x4 = res[6];
-	v->y4 = res[7];
-	
-}*/
+ 
 static	float		msy(viewport_t *v, float y)
 {
 	if( v->ui->scale == 1.0f ) { 
@@ -874,17 +802,14 @@ static int		viewport_configure(
 	{
 		v->m = viewport_matrix();
 		viewport_copy_from( v->m, m );
-		matrix_t *im = viewport_matrix();
-		v->M = viewport_invert_matrix( v->m, im );
+		v->M = viewport_invert_matrix( v->m );
 		if(!v->M)
 		{
 			free(m);
-			free(im);
 			free(v->m);
 			v->m = NULL;
 			return 0;
 		}
-		free(im);
 		free(m);
 		viewport_prepare_process( v );
 		return 1;
@@ -892,9 +817,7 @@ static int		viewport_configure(
 	}
 	else
 	{
-		matrix_t *mtmp = viewport_matrix();
-		matrix_t *im = viewport_invert_matrix( m, mtmp );
-		free(mtmp);
+		matrix_t *im = viewport_invert_matrix( m );
 		if(!im)
 		{
 			free(m);
@@ -909,73 +832,51 @@ static int		viewport_configure(
 	return 0;
 }
 
-static void		viewport_process( viewport_t *p )
+static void viewport_process(viewport_t *p)
 {
-	const int32_t w = p->w;
-	const int32_t h = p->h;
-	const int32_t X = p->x0;
-	const int32_t Y = p->y0;
+    const int32_t w = p->w;
+    const int32_t h = p->h;
+    const int32_t X = p->x0;
+    const int32_t Y = p->y0;
 
-	matrix_t *m = p->m;
+    matrix_t *m = p->m;
 
-	const int len = w * h;
-	const float xinc = m->m[0][0];
-	const float yinc = m->m[1][0];
-	const float winc = m->m[2][0];
-
-	const	int32_t	tx1 = p->ttx1;
-	const	int32_t tx2 = p->ttx2;
-	const	int32_t	ty1 = p->tty1;
-	const	int32_t ty2 = p->tty2;
-
-	const	float	m01 = m->m[0][1];
-	const	float	m11 = m->m[1][1];
-	const	float	m21 = m->m[2][1];
-	const	float	m02 = m->m[0][2];
-	const 	float	m12 = m->m[1][2];
-	const 	float	m22 = m->m[2][2];
-
-	float tx,ty,tw;
-	float ttx,tty;
-	int32_t x,y;
-	int32_t itx,ity;
-
-	int32_t *map = p->map;
-
-	for( y = ty1; y < ty2; y ++ )
-	{
-		tx = xinc * ( tx1 + 0.5 ) + m01 * ( y + 0.5) + m02;
-		ty = yinc * ( tx1 + 0.5 ) + m11 * ( y + 0.5) + m12;
-		tw = winc * ( tx1 + 0.5 ) + m21 * ( y + 0.5) + m22;
-
-		for( x = tx1; x < tx2 ; x ++ )
-		{
-			if( tw == 0.0 )	{
-				ttx = 0.0;
-				tty = 0.0;
-			} else if ( tw != 1.0 ) {
-				ttx = tx / tw;
-				tty = ty / tw;
-			} else	{
-				ttx = tx;
-				tty = ty;
-			}
-
-			itx = (int32_t) ttx;
-			ity = (int32_t) tty;
-
-			if( itx >= X && itx <= w && ity >= Y && ity < h )
-				map[ (y * w + x) ] = (ity * w + itx);
-			else
-				map[ (y * w + x) ] = (len+1);
-				
-			tx += xinc;
-			ty += yinc;
-			tw += winc;
-		}
-	}
-
+    const int32_t len = w * h;
+    const int32_t sentinel_idx = len + 1;
 	
+    const float xinc = m->m[0][0], yinc = m->m[1][0], winc = m->m[2][0];
+    const float m01  = m->m[0][1], m11  = m->m[1][1], m21  = m->m[2][1];
+    const float m02  = m->m[0][2], m12  = m->m[1][2], m22  = m->m[2][2];
+
+    const int32_t tx1 = p->ttx1, tx2 = p->ttx2;
+    const int32_t ty1 = p->tty1, ty2 = p->tty2;
+
+    int32_t *restrict map = p->map;
+
+    for (int32_t y = ty1; y < ty2; y++)
+    {
+        float tx = xinc * (tx1 + 0.5f) + m01 * (y + 0.5f) + m02;
+        float ty = yinc * (tx1 + 0.5f) + m11 * (y + 0.5f) + m12;
+        float tw = winc * (tx1 + 0.5f) + m21 * (y + 0.5f) + m22;
+
+        int32_t *restrict row_map = &map[y * w + tx1];
+
+        #pragma GCC ivdep
+        for (int32_t x = tx1; x < tx2; x++)
+        {
+            float inv_w = (tw != 0.0f) ? (1.0f / tw) : 0.0f;
+            int32_t itx = (int32_t)(tx * inv_w);
+            int32_t ity = (int32_t)(ty * inv_w);
+
+            int isValid = (itx >= X && itx < w && ity >= Y && ity < h);
+            
+            *row_map++ = isValid ? (ity * w + itx) : sentinel_idx;
+
+            tx += xinc;
+            ty += yinc;
+            tw += winc;
+        }
+    }
 }
 
 static	void	viewport_prepare_process( viewport_t *v )
@@ -1010,437 +911,162 @@ static	void	viewport_prepare_process( viewport_t *v )
 	clamp1( v->tty2,0, v->h );
 	clamp1( v->ttx1,0, v->w );	
 	clamp1( v->tty1,0, v->h );
+}
 
+void viewport_process_dynamic(void *data, uint8_t *restrict in[3], uint8_t *restrict out[3])
+{
+    viewport_t *v = (viewport_t*) data;
+    if (v->disable) return;
+
+    const int32_t w = v->w;
+    const int32_t h = v->h;
+    const int32_t tx1 = v->ttx1, tx2 = v->ttx2;
+    const int32_t ty1 = v->tty1, ty2 = v->tty2;
+    const int32_t sentinel_idx = w * h; // The "safe" black pixel
+
+    matrix_t *m = v->m;
+    const float xinc = m->m[0][0], yinc = m->m[1][0], winc = m->m[2][0];
+    const float m01  = m->m[0][1], m11  = m->m[1][1], m21  = m->m[2][1];
+    const float m02  = m->m[0][2], m12  = m->m[1][2], m22  = m->m[2][2];
+
+    const uint8_t *restrict inY = in[0];
+    const uint8_t *restrict inU = in[1];
+    const uint8_t *restrict inV = in[2];
+
+    ((uint8_t*)inY)[sentinel_idx] = 0;
+    ((uint8_t*)inU)[sentinel_idx] = 128;
+    ((uint8_t*)inV)[sentinel_idx] = 128;
+
+    size_t plane_sz = (size_t)w * h;
+    veejay_memset(out[0], 0, ty1 * w);
+    veejay_memset(out[1], 128, ty1 * w);
+    veejay_memset(out[2], 128, ty1 * w);
+
+    for (int32_t y = ty1; y < ty2; y++)
+    {
+        uint8_t *restrict oY = out[0] + (y * w);
+        uint8_t *restrict oU = out[1] + (y * w);
+        uint8_t *restrict oV = out[2] + (y * w);
+
+        float tx = xinc * (tx1 + 0.5f) + m01 * (y + 0.5f) + m02;
+        float ty = yinc * (tx1 + 0.5f) + m11 * (y + 0.5f) + m12;
+        float tw = winc * (tx1 + 0.5f) + m21 * (y + 0.5f) + m22;
+
+        for (int32_t x = 0; x < tx1; x++) {
+            oY[x] = 0; oU[x] = 128; oV[x] = 128;
+        }
+
+        #pragma GCC ivdep
+        for (int32_t x = tx1; x < tx2; x++)
+        {
+            float inv_w = (tw != 0.0f) ? (1.0f / tw) : 0.0f;
+            int32_t itx = (int32_t)(tx * inv_w);
+            int32_t ity = (int32_t)(ty * inv_w);
+
+            int isValid = (itx >= 0 && itx < w && ity >= 0 && ity < h);
+            int32_t src_idx = isValid ? (ity * w + itx) : sentinel_idx;
+
+            oY[x] = inY[src_idx];
+            oU[x] = inU[src_idx];
+            oV[x] = inV[src_idx];
+
+            tx += xinc;
+            ty += yinc;
+            tw += winc;
+        }
+
+        for (int32_t x = tx2; x < w; x++) {
+            oY[x] = 0; oU[x] = 128; oV[x] = 128;
+        }
+    }
+
+    int32_t rest = h - ty2;
+    if (rest > 0) {
+        veejay_memset(out[0] + (ty2 * w), 0, rest * w);
+        veejay_memset(out[1] + (ty2 * w), 128, rest * w);
+        veejay_memset(out[2] + (ty2 * w), 128, rest * w);
+    }
 }
 
 
-void		viewport_process_dynamic_map( void *data, uint8_t *in[3], uint8_t *out[3], uint32_t *map, int feather )
+void viewport_process_dynamic_alpha(void *data, uint8_t *restrict in[4], uint8_t *restrict out[4])
 {
-	viewport_t *v = (viewport_t*) data;
-	const int32_t w = v->w;
-	const int32_t h = v->h;
-	const int32_t X = v->x0;
-	const int32_t Y = v->y0;
-	matrix_t *m = v->m;
+    viewport_t *v = (viewport_t*) data;
+    if (v->disable) return;
 
-	const 	float xinc = m->m[0][0];
-	const 	float yinc = m->m[1][0];
-	const 	float winc = m->m[2][0];
-	const	int32_t	tx1 = v->ttx1;
-	const	int32_t tx2 = v->ttx2;
-	const	int32_t	ty1 = v->tty1;
-	const	int32_t ty2 = v->tty2;
+    const int32_t w = v->w;
+    const int32_t h = v->h;
+    const int32_t tx1 = v->ttx1, tx2 = v->ttx2;
+    const int32_t ty1 = v->tty1, ty2 = v->tty2;
+    const int32_t sentinel_idx = w * h; // Safe black pixel
 
-	const	float	m01 = m->m[0][1];
-	const	float	m11 = m->m[1][1];
-	const	float	m21 = m->m[2][1];
-	const	float	m02 = m->m[0][2];
-	const 	float	m12 = m->m[1][2];
-	const 	float	m22 = m->m[2][2];
+    matrix_t *m = v->m;
+    const float xinc = m->m[0][0], yinc = m->m[1][0], winc = m->m[2][0];
+    const float m01  = m->m[0][1], m11  = m->m[1][1], m21  = m->m[2][1];
+    const float m02  = m->m[0][2], m12  = m->m[1][2], m22  = m->m[2][2];
 
-	const	uint8_t	*inY	= in[0];
-	const	uint8_t *inU	= in[1];
-	const	uint8_t *inV	= in[2];
+    const uint8_t *restrict inY = in[0];
+    const uint8_t *restrict inU = in[1];
+    const uint8_t *restrict inV = in[2];
+    const uint8_t *restrict inA = in[3];
 
-	uint8_t		*outY	= out[0];
-	uint8_t		*outU	= out[1];
-	uint8_t		*outV	= out[2];
+  	((uint8_t*)inY)[sentinel_idx] = 0;
+    ((uint8_t*)inU)[sentinel_idx] = 128;
+    ((uint8_t*)inV)[sentinel_idx] = 128;
+    ((uint8_t*)inA)[sentinel_idx] = 0;
 
-	float tx,ty,tw;
-	float ttx,tty;
-	int32_t x,y;
-	int32_t itx,ity;
+    veejay_memset(out[0], 0, ty1 * w);
+    veejay_memset(out[1], 128, ty1 * w);
+    veejay_memset(out[2], 128, ty1 * w);
+    veejay_memset(out[3], 0, ty1 * w);
 
-	outY[ w * h + 1 ] = 0;
-	outU[ w * h + 1 ] = 128;
-	outV[ w * h + 1 ] = 128;
+    for (int32_t y = ty1; y < ty2; y++)
+    {
+        uint8_t *restrict oY = out[0] + (y * w);
+        uint8_t *restrict oU = out[1] + (y * w);
+        uint8_t *restrict oV = out[2] + (y * w);
+        uint8_t *restrict oA = out[3] + (y * w);
 
-/*
-#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
+        float tx = xinc * (tx1 + 0.5f) + m01 * (y + 0.5f) + m02;
+        float ty = yinc * (tx1 + 0.5f) + m11 * (y + 0.5f) + m12;
+        float tw = winc * (tx1 + 0.5f) + m21 * (y + 0.5f) + m22;
 
-	fast_memset_dirty( outY , 0, ty1 * v->w );
-	fast_memset_dirty( outU , 128, ty1 * v->w );
-	fast_memset_dirty( outV , 128, ty1 * v->w );
-	fast_memset_finish();
-#else
+        for (int32_t x = 0; x < tx1; x++) {
+            oY[x] = 0; oU[x] = 128; oV[x] = 128; oA[x] = 0;
+        }
 
-	for( y =0 ; y < ty1; y ++ )
-	{
-		for( x = 0 ; x < w ; x ++ )
-		{
-			outY[ (y * w +x ) ] = 0;
-			outU[ (y * w +x ) ] = 128;
-			outV[ (y * w +x ) ] = 128;
-		}
-	}
-#endif
-*/
-	for( y = ty1; y < ty2; y ++ )
-	{
-		tx = xinc * ( tx1 + 0.5 ) + m01 * ( y + 0.5) + m02;
-		ty = yinc * ( tx1 + 0.5 ) + m11 * ( y + 0.5) + m12;
-		tw = winc * ( tx1 + 0.5 ) + m21 * ( y + 0.5) + m22;
-	/*	for( x = 0; x < tx1; x ++ )
-		{
-			outY[(y*w+x)] = 0;	
-			outU[(y*w+x)] = 128;
-			outV[(y*w+x)] = 128;
-		}*/
+        #pragma GCC ivdep
+        for (int32_t x = tx1; x < tx2; x++)
+        {
+            float inv_w = (tw != 0.0f) ? (1.0f / tw) : 0.0f;
+            int32_t itx = (int32_t)(tx * inv_w);
+            int32_t ity = (int32_t)(ty * inv_w);
 
-		for( x = tx1; x < tx2 ; x ++ )
-		{
-			if( tw == 0.0 )	{
-				ttx = 0.0;
-				tty = 0.0;
-			} else if ( tw != 1.0 ) {	
-				ttx = tx / tw;
-				tty = ty / tw;
-			} else	{
-				ttx = tx;
-				tty = ty;
-			}
+            int isValid = (itx >= 0 && itx < w && ity >= 0 && ity < h);
+            int32_t src_idx = isValid ? (ity * w + itx) : sentinel_idx;
 
-			itx = (int32_t) ttx;
-			ity = (int32_t) tty;
+            oY[x] = inY[src_idx];
+            oU[x] = inU[src_idx];
+            oV[x] = inV[src_idx];
+            oA[x] = inA[src_idx];
 
-			if( itx >= X && itx <= w && ity >= Y && ity < h 
-				&&
-					map[( y * w + x)] >= feather )
-			{
-				outY[(y*w+x)] = inY[(ity*w+itx)];
-				outU[(y*w+x)] = inU[(ity*w+itx)];
-				outV[(y*w+x)] = inV[(ity*w+itx)];
-			}
-			/*else
-			{
-				outY[(y*w+x)] = 0;
-				outU[(y*w+x)] = 128;
-				outV[(y*w+x)] = 128;
+            tx += xinc;
+            ty += yinc;
+            tw += winc;
+        }
 
-			}*/
+        for (int32_t x = tx2; x < w; x++) {
+            oY[x] = 0; oU[x] = 128; oV[x] = 128; oA[x] = 0;
+        }
+    }
 
-			tx += xinc;
-			ty += yinc;
-			tw += winc;
-		}
-		/*
-		for( x = tx2; x < w; x ++ )
-		{
-			outY[(y*w+x)] = 0;	
-			outU[(y*w+x)] = 128;
-			outV[(y*w+x)] = 128;
-		}*/
-
-	}
-/*
-#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
-	int rest = h - ty2;
-	fast_memset_dirty( outY + (ty2 * v->w),0, rest * v->w );
-	fast_memset_dirty( outU + (ty2 * v->w), 128, rest * v->w );
-	fast_memset_dirty( outV + (ty2 * v->w), 128, rest * v->w );
-	fast_memset_finish();
-#else
-	for( y = ty2 ; y < h; y ++ )
-	{
-		for( x = 0; x < w; x ++ )
-		{
-			outY[(y*w+x)] = 0;	
-			outU[(y*w+x)] = 128;
-			outV[(y*w+x)] = 128;
-		}			
-	}
-#endif	
-*/
-	
-}
-void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
-{
-	viewport_t *v = (viewport_t*) data;
-	const int32_t w = v->w;
-	const int32_t h = v->h;
-	const int32_t X = v->x0;
-	const int32_t Y = v->y0;
-	matrix_t *m = v->m;
-
-	const 	float xinc = m->m[0][0];
-	const 	float yinc = m->m[1][0];
-	const 	float winc = m->m[2][0];
-	const	int32_t	tx1 = v->ttx1;
-	const	int32_t tx2 = v->ttx2;
-	const	int32_t	ty1 = v->tty1;
-	const	int32_t ty2 = v->tty2;
-
-	const	float	m01 = m->m[0][1];
-	const	float	m11 = m->m[1][1];
-	const	float	m21 = m->m[2][1];
-	const	float	m02 = m->m[0][2];
-	const 	float	m12 = m->m[1][2];
-	const 	float	m22 = m->m[2][2];
-
-	const	uint8_t	*inY	= in[0];
-	const	uint8_t *inU	= in[1];
-	const	uint8_t *inV	= in[2];
-
-	uint8_t		*outY	= out[0];
-	uint8_t		*outU	= out[1];
-	uint8_t		*outV	= out[2];
-
-	float tx,ty,tw;
-	float ttx,tty;
-	int32_t x,y;
-	int32_t itx,ity;
-/*
-#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
-
-	fast_memset_dirty( outY , 0, ty1 * v->w );
-	fast_memset_dirty( outU , 128, ty1 * v->w );
-	fast_memset_dirty( outV , 128, ty1 * v->w );
-	fast_memset_finish();
-#else
-	
-	for( y =0 ; y < ty1; y ++ )
-	{
-		for( x = 0 ; x < w ; x ++ )
-		{
-			outY[ (y * w +x ) ] = 0;
-			outU[ (y * w +x ) ] = 128;
-			outV[ (y * w +x ) ] = 128;
-		}
-	}
-#endif
-*/
-	veejay_memset( outY, 0, ty1 * v->w );
-	veejay_memset( outU, 128, ty1 * v->w );
-	veejay_memset( outV, 128, ty1 * v->w );
-	
-	for( y = ty1; y < ty2; y ++ )
-	{
-		tx = xinc * ( tx1 + 0.5 ) + m01 * ( y + 0.5) + m02;
-		ty = yinc * ( tx1 + 0.5 ) + m11 * ( y + 0.5) + m12;
-		tw = winc * ( tx1 + 0.5 ) + m21 * ( y + 0.5) + m22;
-		for( x = 0; x < tx1; x ++ )
-		{
-			outY[(y*w+x)] = 0;	
-			outU[(y*w+x)] = 128;
-			outV[(y*w+x)] = 128;
-		}
-
-		for( x = tx1; x < tx2 ; x ++ )
-		{
-			if( tw == 0.0 )	{
-				ttx = 0.0;
-				tty = 0.0;
-			} else if ( tw != 1.0 ) {	
-				ttx = tx / tw;
-				tty = ty / tw;
-			} else	{
-				ttx = tx;
-				tty = ty;
-			}
-
-			itx = (int32_t) ttx;
-			ity = (int32_t) tty;
-
-			if( itx >= X && itx <= w && ity >= Y && ity < h )
-			{
-				outY[(y*w+x)] = inY[(ity*w+itx)];
-				outU[(y*w+x)] = inU[(ity*w+itx)];
-				outV[(y*w+x)] = inV[(ity*w+itx)];
-			}
-			else
-			{
-				outY[(y*w+x)] = 0;
-				outU[(y*w+x)] = 128;
-				outV[(y*w+x)] = 128;
-
-			}
-
-			tx += xinc;
-			ty += yinc;
-			tw += winc;
-		}
-		for( x = tx2; x < w; x ++ )
-		{
-			outY[(y*w+x)] = 0;	
-			outU[(y*w+x)] = 128;
-			outV[(y*w+x)] = 128;
-		}
-
-	}
-/*
-#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
-	int rest = h - ty2;
-	fast_memset_dirty( outY + (ty2 * v->w),0, rest * v->w );
-	fast_memset_dirty( outU + (ty2 * v->w), 128, rest * v->w );
-	fast_memset_dirty( outV + (ty2 * v->w), 128, rest * v->w );
-	fast_memset_finish();
-#else
-	for( y = ty2 ; y < h; y ++ )
-	{
-		for( x = 0; x < w; x ++ )
-		{
-			outY[(y*w+x)] = 0;	
-			outU[(y*w+x)] = 128;
-			outV[(y*w+x)] = 128;
-		}			
-	}
-#endif	
-*/
-	const int rest = h - ty2;
-	veejay_memset( outY + (ty2 * v->w),0, rest * v->w );
-	veejay_memset( outU + (ty2 * v->w), 128, rest * v->w );
-	veejay_memset( outV + (ty2 * v->w), 128, rest * v->w );
-}
-
-void		viewport_process_dynamic_alpha( void *data, uint8_t *in[4], uint8_t *out[4] )
-{
-	viewport_t *v = (viewport_t*) data;
-	const int32_t w = v->w;
-	const int32_t h = v->h;
-	const int32_t X = v->x0;
-	const int32_t Y = v->y0;
-	matrix_t *m = v->m;
-
-	const 	float xinc = m->m[0][0];
-	const 	float yinc = m->m[1][0];
-	const 	float winc = m->m[2][0];
-	const	int32_t	tx1 = v->ttx1;
-	const	int32_t tx2 = v->ttx2;
-	const	int32_t	ty1 = v->tty1;
-	const	int32_t ty2 = v->tty2;
-
-	const	float	m01 = m->m[0][1];
-	const	float	m11 = m->m[1][1];
-	const	float	m21 = m->m[2][1];
-	const	float	m02 = m->m[0][2];
-	const 	float	m12 = m->m[1][2];
-	const 	float	m22 = m->m[2][2];
-
-	const	uint8_t	*inY	= in[0];
-	const	uint8_t *inU	= in[1];
-	const	uint8_t *inV	= in[2];
-	const	uint8_t *inA	= in[3];
-
-	uint8_t		*outY	= out[0];
-	uint8_t		*outU	= out[1];
-	uint8_t		*outV	= out[2];
-	uint8_t		*outA	= out[3];
-
-	float tx,ty,tw;
-	float ttx,tty;
-	int32_t x,y;
-	int32_t itx,ity;
-/*
-#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
-
-	fast_memset_dirty( outY , 0, ty1 * v->w );
-	fast_memset_dirty( outU , 128, ty1 * v->w );
-	fast_memset_dirty( outV , 128, ty1 * v->w );
-	fast_memset_dirty( outA,0, ty1*v->w);
-	fast_memset_finish();
-#else
-	
-	for( y =0 ; y < ty1; y ++ )
-	{
-		for( x = 0 ; x < w ; x ++ )
-		{
-			outY[ (y * w +x ) ] = 0;
-			outU[ (y * w +x ) ] = 128;
-			outV[ (y * w +x ) ] = 128;
-			outA[ (y*w +x) ] = 0;
-		}
-	}
-#endif
-*/
-	veejay_memset( outY , 0, ty1 * v->w );
-	veejay_memset( outU , 128, ty1 * v->w );
-	veejay_memset( outV , 128, ty1 * v->w );
-	veejay_memset( outA,0, ty1*v->w);
-	
-	for( y = ty1; y < ty2; y ++ )
-	{
-		tx = xinc * ( tx1 + 0.5 ) + m01 * ( y + 0.5) + m02;
-		ty = yinc * ( tx1 + 0.5 ) + m11 * ( y + 0.5) + m12;
-		tw = winc * ( tx1 + 0.5 ) + m21 * ( y + 0.5) + m22;
-		for( x = 0; x < tx1; x ++ )
-		{
-			outY[(y*w+x)] = 0;	
-			outU[(y*w+x)] = 128;
-			outV[(y*w+x)] = 128;
-			outA[(y*w+x)] = 0;
-
-		}
-
-		for( x = tx1; x < tx2 ; x ++ )
-		{
-			if( tw == 0.0 )	{
-				ttx = 0.0;
-				tty = 0.0;
-			} else if ( tw != 1.0 ) {	
-				ttx = tx / tw;
-				tty = ty / tw;
-			} else	{
-				ttx = tx;
-				tty = ty;
-			}
-
-			itx = (int32_t) ttx;
-			ity = (int32_t) tty;
-
-			if( itx >= X && itx <= w && ity >= Y && ity < h )
-			{
-				outY[(y*w+x)] = inY[(ity*w+itx)];
-				outU[(y*w+x)] = inU[(ity*w+itx)];
-				outV[(y*w+x)] = inV[(ity*w+itx)];
-				outA[(y*w+x)] = inA[(ity*w+itx)];
-			}
-			else
-			{
-				outY[(y*w+x)] = 0;
-				outU[(y*w+x)] = 128;
-				outV[(y*w+x)] = 128;
-				outA[(y*w+x)] = 0;
-			}
-
-			tx += xinc;
-			ty += yinc;
-			tw += winc;
-		}
-		for( x = tx2; x < w; x ++ )
-		{
-			outY[(y*w+x)] = 0;	
-			outU[(y*w+x)] = 128;
-			outV[(y*w+x)] = 128;
-			outA[(y*w+x)] = 0;
-		}
-
-	}
-/*
-#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
-	int rest = h - ty2;
-	fast_memset_dirty( outY + (ty2 * v->w),0, rest * v->w );
-	fast_memset_dirty( outU + (ty2 * v->w), 128, rest * v->w );
-	fast_memset_dirty( outV + (ty2 * v->w), 128, rest * v->w );
-	fast_memset_dirty( outA + (ty2 * v->w), 0, rest * v->w );
-	fast_memset_finish();
-#else
-	for( y = ty2 ; y < h; y ++ )
-	{
-		for( x = 0; x < w; x ++ )
-		{
-			outY[(y*w+x)] = 0;	
-			outU[(y*w+x)] = 128;
-			outV[(y*w+x)] = 128;
-			outA[(y*w+x)] = 0;
-		}			
-	}
-#endif	
-*/
-	const int rest = h - ty2;
-	veejay_memset( outY + (ty2 * v->w),0, rest * v->w );
-	veejay_memset( outU + (ty2 * v->w), 128, rest * v->w );
-	veejay_memset( outV + (ty2 * v->w), 128, rest * v->w );
-	veejay_memset( outA + (ty2 * v->w), 0, rest * v->w );
+    const int rest = h - ty2;
+    if (rest > 0) {
+        veejay_memset(out[0] + (ty2 * w), 0, rest * w);
+        veejay_memset(out[1] + (ty2 * w), 128, rest * w);
+        veejay_memset(out[2] + (ty2 * w), 128, rest * w);
+        veejay_memset(out[3] + (ty2 * w), 0, rest * w);
+    }
 }
 
 void			viewport_destroy( void *data )
@@ -1518,21 +1144,7 @@ static int      nearest_div(int val )
                 val--;
         return val;
 }
-/*static int      nearest_div4(int val )
-{
-        int r = val % 4;
-        while(r--)
-                val--;
-        return val;
-}
-static int      nearest_div16(int val )
-{
-        int r = val % 16;
-        while(r--)
-                val--;
-        return val;
-}
-*/
+
 static	void	*viewport_init_swscaler(ui_t *u, int w, int h)
 {
 	uint8_t *dummy[3] = { NULL,NULL,NULL };
@@ -1645,22 +1257,6 @@ int	viewport_reconfigure_from_config(void *vv, void *config, char *filename)
 
 	veejay_msg(0,"Configuration saved %dx%d, have %dx%d",
 			c->saved_w, c->saved_h,v->saved_w,v->saved_h );
-/*
-	if( c->saved_w != v->saved_w || c->saved_h != v->saved_h ) {
-		float sx=1.0f;
-		float sy=1.0f;	
-		if( c->saved_w > 0 && c->saved_h > 0 ) { 
-			sx = (float) c->saved_w / (float) v->saved_w;
-			sy = (float) c->saved_h / (float) v->saved_h;
-		}
-		o->x0 = c->x0 * sx;
-		o->y0 = c->y0 * sy;
-		o->w0 = c->w0 * sx;
-		o->h0 = c->h0 * sy;
-
-		veejay_msg(VEEJAY_MSG_WARNING, "Correcting geometry for current setup");
-	}
-*/
 
 	// Clear map
 	const int len = v->w * v->h;
@@ -2094,495 +1690,6 @@ void	viewport_save_settings( void *ptr, int frontback, char *path )
 
 	veejay_msg(VEEJAY_MSG_INFO, "Saved viewport settings to %s. Press CTRL-p to enable/disable", path);
 }
-/*
-static int	viewport_locate_marker( viewport_t *v, uint8_t *img, float fx, float fy , float *dx, float *dy )
-{
-	uint32_t x  = fx / 100.0f * v->w;
-	uint32_t y  = fy / 100.0f * v->h;
-
-	uint32_t x1 = x - v->marker_size;
-	uint32_t y1 = y - v->marker_size;
-	uint32_t x2 = x + v->marker_size;
-	uint32_t y2 = y + v->marker_size;
-
-	if( x1 < 0 ) x1 = 0; else if ( x1 > v->w ) x1 = v->w;
-	if( y1 < 0 ) y1 = 0; else if ( y1 > v->h ) y1 = v->h;
-	if( x2 < 0 ) x2 = 0; else if ( x2 > v->w ) x2 = v->w;
-	if( y2 < 0 ) y2 = 0; else if ( y2 > v->h ) y2 = v->h;
-
-	unsigned int i,j;
-	uint32_t product_row = 0;
-	uint32_t pixels_row = 0;
-	uint32_t product_col = 0;
-	uint32_t pixels_col = 0;
-	uint32_t pixels_row_c = 0;
-	uint32_t product_col_c = 0;
-
-	unsigned long nc = 0, it  =0;
-	uint8_t hist[256];
-	uint8_t p0 = 0;
-	int32_t ii=0,ji=0;
-	veejay_memset(hist,0,sizeof(hist));
-
-	// find average and most occuring pixel
-	for( i = y1; i < y2; i ++ ) 
-	{
-		for( j = x1; j < x2 ; j ++ )
-		{
-			p0 = (img[i*v->w+j] >= 255 ? 0: img[i * v->w + j]);
-			nc += p0;
-			hist[ p0 ] ++;
-			it ++;
-		}
-	}
-
-	for( i =0 ;i < 256; i ++ )
-	{
-		if( hist[i] > ji )
-		{
-			ii = i;
-			ji = hist[i];
-		}
-	}
-
-	unsigned int avg = 0;
-	if( nc > 0 )
-		avg = (nc / it);
-
-	int diff = abs( ii - avg );
-	for( i = y1; i < y2; i ++ ) 
-	{
-		pixels_row = 0;
-		for( j = x1; j < x2 ; j ++ )
-		{
-			if (abs(img[i * v->w + j] - diff)>= avg)
-			{
-				pixels_row++; 
-			}
-		}
-		product_row += (i * pixels_row);
-		pixels_row_c += pixels_row;
-	}
-
-	for( i = x1; i < x2; i ++ )
-	{
-		pixels_col = 0;
-		for( j = y1; j < y2; j ++ )
-		{
-			if (abs(img[i * v->w + j] - diff)>= avg)
-			{
-				pixels_col ++;
-			}
-		}
-		product_col += (i * pixels_col);
-		product_col_c += pixels_col;	
-	}
-
-	if( pixels_row_c == 0 || product_col_c == 0 )
-		return 0;
-
-
-	uint32_t cy = ( product_row / pixels_row_c );
-	uint32_t cx = ( product_col / product_col_c );
-
-	*dx = (float) cx / (v->w / 100.0f);
-	*dy = (float) cy / (v->h / 100.0f);
-
-	return 1;
-}*/
-
-void	viewport_projection_inc( void *data, int incr, int screen_width, int screen_height )
-{
-}
-/*
-#define ANIMAX
-
-#ifdef ANIMAX
-#include <veejaycore/mcastsender.h>
-#define GROUP "227.0.0.17"
-#define PORT_NUM 1234
-#endif
-
-typedef struct
-{
-	int x;
-	int y;
-} point_t;
-
-inline int is_left( point_t *p0, point_t *p1, point_t *p2 )
-{
-	return ( 
-		(p1->x - p0->x) * (p2->y - p0->y) -
-		(p2->x - p0->x) * (p1->y - p0->y) 
-	       );
-}
-
-//@ chainhull 2D (C) 2001 softSurfer (www.softsurfer.com)
-//@ http://geometryalgorithms.com/Archive/algorithm_0109/algorithm_0109.htm
-point_t **chainhull_2d( point_t **p , int n, int *res )
-{
-	point_t **H = (point_t**) vj_malloc( n * sizeof(point_t));
-	int i;
-
-	int bot=0, top=-1;
-
-	int xmin = p[0]->x;
-	for( i = 1; i < n; i++)
-		if( p[i]->x != xmin ) break;
-	int minmax = i-1;
-	int minmin = 0;
-	if( minmax == (n-1)) {
-		H[++top] = p[minmin];
-		if( p[minmax]->y != p[minmin]->y )
-			H[++top] = p[minmax];
-		H[++top] = p[minmin];
-		*res = top + 1;
-	}
-
-	int maxmin,maxmax = n-1;
-	int xmax = p[n-1]->x;
-	for( i = n-2; i >= 0; i -- )
-		if( p[i]->x != xmax ) break;
-	maxmin = i+1;
-
-	H[++top] = p[minmin];
-	i= minmax;
-	while( ++i <= maxmin )
-	{
-		if ( is_left( p[minmin], p[maxmin], p[i]) >= 0 && i < maxmin )
-			continue;
-		while( top > 0 )
-		{
-			if ( is_left( H[top-1], H[top], p[i] ) > 0 )
-				break;
-			else
-				top--;
-		}
-		H[++top] = p[i];
-	}
-
-
-	if( maxmax != maxmin )
-		H[++top] = p[maxmax];
-	bot = top;
-	i = maxmin;
-	while( --i >= minmax )
-	{
-		if( is_left( p[maxmax], p[minmax], p[i] ) >= 0 && i > minmax )
-			continue;
-		while( top > bot )
-		{
-			if( is_left( H[top-1], H[top], p[i] ) > 0 )
-				break;
-			else
-				top--;
-		}
-		H[++top] = p[i];
-	}
-	if( minmax != minmin )
-		H[++top] = p[minmin];
-
-	*res = top + 1;
-	
-	return H;
-}
-
-static	void	shell_sort_points_by_degree( double *a , point_t **p, int n )
-{
-	int i,j,increment=3;
-	double temp;
-	int dx,dy;
-	while( increment > 0 )
-	{
-		for( i = 0; i < n; i ++ )
-		{
-			j=i;
-			temp = a[i];
-			dx = p[i]->x;
-			dy = p[i]->y;
-			while(( j>= increment) && (a[j-increment] > temp ))
-			{
-				a[j] = a[j-increment];
-				p[j]->x = p[j-increment]->x;
-				p[j]->y = p[j-increment]->y;
-				j = j - increment;
-			}
-			a[j] = temp;
-			p[j]->x = dx;
-			p[j]->y = dy;
-		}
-		if( increment / 2 != 0 )
-			increment = increment / 2;
-		else if (increment ==1 )
-			increment = 0;
-		else 
-			increment = 1;
-	}
-
-}
-
-static void sort_points_by_degree( double *a, point_t **p, int n )
-{
-        int i;
-        for( i = 2; i <= n; i ++ )
-        {
-                float sentinel = a[i];
-		point_t point;
-		point.x = p[i]->x;
-		point.y = p[i]->y;
-		int k = i;
-                while( sentinel < a[k-1] && k > 0)
-		{
-		       int j = k;
-                       a[k] = a[--k];
-		       p[j]->x = p[k]->x;
-		       p[j]->y = p[k]->y;
-	        }	       
-	        a[k] = sentinel;
-		p[k]->x = point.x;
-		p[k]->y = point.y;
-        }
-}
-
-#define VEEJAY_PACKET_SIZE 16384
-
-void	viewport_dummy_send( void *data )
-{
-	viewport_t *v = (viewport_t*) data;
-#ifdef ANIMAX
-	unsigned char empty_buf[VEEJAY_PACKET_SIZE];
-	veejay_memset( empty_buf, 0, VEEJAY_PACKET_SIZE );
-
-	if(! v->sender )
-	{
-		v->sender = mcast_new_sender( GROUP );
-		v->seq_id = 0;
-	}
-	if(!v->sender)
-		return;
-
-	int result = mcast_send( v->sender, empty_buf,VEEJAY_PACKET_SIZE, PORT_NUM );
-	if(result<=0)
-	{
-		veejay_msg(0, "Cannot send empty packet over mcast %s:%d", GROUP,PORT_NUM );
-		mcast_close_sender( v->sender );
-		v->sender = NULL;
-	}
-#endif
-}
-
-void	viewport_transform_coords( 
-		void *data, 
-		void *input,
-		int n, 
-		int blob_id,
-		int center_x,
-		int center_y,
-		int wid, 
-		int hei, 
-		int num_objects,
-		uint8_t *plane )
-{
-	int i, res = 0;
-	viewport_t *v = (viewport_t*) data;
-#ifdef ANIMAX	
-	if(! v->sender )
-	{
-		v->sender = mcast_new_sender( GROUP );
-		v->seq_id = 0;
-		veejay_memset( v->buf, 0, VEEJAY_PACKET_SIZE );
-	}
-	if(!v->sender)
-		return;
-#endif
-
-	if( n <= 0 )
-	{
-		viewport_dummy_send( data );
-		return;
-	}
-	
-	if( !v->T )
-	{
-		matrix_t *tmp = viewport_matrix();
-		v->T = viewport_invert_matrix( v->M, tmp );
-		free(tmp);
-	}
-
-	point_t **points = (point_t**) input;
-	double  *array   = (double*) vj_malloc( (n+3) * sizeof(double));
-
-	for( i = 0; i < n; i ++ )
-		array[i] = atan2( (points[i]->x - center_x), (points[i]->y - center_y) ) * (180.0/M_PI );
-
-	//@ convex hull 
-	point_t **contour = chainhull_2d( points, n, &res );
-
-	if( res > 256 )
-	{
-		veejay_msg(1, "Convex Hull has %d points, Maximum allowed is 256", res );
-		res = 256;
-	}
-
-	if ( plane )
-	{
-		for( i = 0; i < (res-1); i ++ )
-		{
-			//@ draw polygon 
-			viewport_line( plane, 
-				contour[i]->x,
-				contour[i]->y,
-				contour[i+1]->x,
-				contour[i+1]->y,
-				wid,
-				hei,
-				200 );
-		}
-
-		plane[ center_y * wid + center_x ] = 0xff; //@ display centroid
-	}
-
-	shell_sort_points_by_degree( array, points, n );
-	
-	//@ Protocol: 
-	//@ bytes 0 ...  4 : blob id
-	//        4 ...  8 : number of points in convex hull
-	//        8 ... 12 : header symbol
-	//       12 ... 16 : sequence number
-	//       16 ... 20 : total number of blobs
-	//       20 ... 24 : number of points in contour
-	//       24 ... N1 : convex hull points
-	//       N1 ... N2 : contour hull points
-	//
-	//       packet size: 16 Kbytes
-	
-	v->buf[0] = blob_id;		
-	v->buf[1] = res*2;	
-	v->buf[2] = -1;
-	v->buf[3] = v->seq_id ++;
-	v->buf[4] = num_objects;
-	v->buf[5] = n*2;
-	int j = 6;
-	for( i = 0; i < res; i ++ )
-	{
-		float dx1,dy1;
-		point_map( v->T, contour[i]->x, contour[i]->y, &dx1, &dy1 );
-		v->buf[j + 0] = (int)((dx1/ (float) v->w) * 1000.0f );
-		v->buf[j + 1] = (int)((dy1/ (float) v->h) * 1000.0f );
-		j+=2;
-	}
-	
-	for( i = 0; i < n; i ++ )
-	{
-		float dx1,dy1;
-		point_map( v->T, points[i]->x, points[i]->y, &dx1,&dy1 );
-		v->buf[j + 0] = (int) ( ( dx1/(float) v->w) * 1000.0f );
-		v->buf[j + 1] = (int) ( ( dy1/(float) v->h) * 1000.0f );
-		j += 2;
-	}
-	int payload = ((n*2)+(res * 2) + 6) * sizeof(int);
-	int left = VEEJAY_PACKET_SIZE - payload;
-
-	int *ptr = &(v->buf[j]);
-	
-	if(left > 0)
-		veejay_memset( ptr,0, left );
-
-	if( payload > VEEJAY_PACKET_SIZE )
-		veejay_msg(1, "Contours and convex hull too large for packet");
-
-#ifdef ANIMAX	
-	int result = mcast_send( v->sender, v->buf,VEEJAY_PACKET_SIZE, PORT_NUM );
-	if(result<=0)
-	{
-		veejay_msg(0, "Cannot send contour/convex hull over mcast %s:%d", GROUP,PORT_NUM );
-		mcast_close_sender( v->sender );
-		v->sender = NULL;
-	}
-#endif
-
-	free(contour);
-	free(array);
-	
-}
-
-int	*viewport_event_get_projection(void *data, int scale) {
-	viewport_t *v = (viewport_t*) data;
-	float fscale = 1.0f;
-	float set[9];	
-	if( scale == 100 ) {
-		set[0] = v->x1;// * sw;
-		set[1] = v->y1;// * sh;
-		set[2] = v->x2;// * sw;
-		set[3] = v->y2;// * sh;
-		set[4] = v->x3;// * sw;
-		set[5] = v->y3;// * sh;
-		set[6] = v->x4;// * sw;
-		set[7] = v->y4;// * sh;
-	} else {
-		float sw = (float) scale / 100.0;
-		float sh = (float) scale / 100.0;	
-		fscale   = sw;
-		set[0] = v->x1 * sw;
-		set[1] = v->y1 * sh;
-		set[2] = v->x2 * sw;
-		set[3] = v->y2 * sh;
-		set[4] = v->x3 * sw;
-		set[5] = v->y3 * sh;
-		set[6] = v->x4 * sw;
-		set[7] = v->y4 * sh;
-	}
-
-	int *res = (int*) vj_malloc(sizeof(int) * 8 );
-	int i;
-
-	for( i = 0; i < 8 ; i ++ ) {
-		res[i] = (int) ( set[i]);
-	}
-	return res;
-}
-
-int	viewport_event_set_projection(void *data, float x, float y, int num, int frontback) {
-	
-
-	viewport_t *v = (viewport_t*) data;
-	switch(num) {
-		case 1:
-			v->x1 = x;
-			v->y1 = y;
-			break;
-		case 2:
-			v->x2 = x;
-			v->y2 = y;
-			break;
-		case 3:
-			v->x3 = x;
-			v->y3 = y;
-			break;
-		case 4:
-			v->x4 = x;
-			v->y4 = y;
-			break;
-	}
-	float p[8];
-	p[0] = v->x1;
-	p[2] = v->x2;
-	p[4] = v->x3;
-	p[6] = v->x4;
-	p[1] = v->y1;
-	p[3] = v->y2;
-	p[5] = v->y3;	
-	p[7] = v->y4;
-
-	if(	viewport_update_perspective( v, p ) )  {
-		veejay_msg(VEEJAY_MSG_INFO, "Accepted viewport configuration from remote");
-	} else {
-		veejay_msg(0, "Error updating points");
-	}
-
-	return 1;
-}*/
-
 
 int	viewport_finetune_coord(void *data, int screen_width, int screen_height,int inc_x, int inc_y)
 {
@@ -2667,251 +1774,227 @@ int	viewport_finetune_coord(void *data, int screen_width, int screen_height,int 
 	return 1;
 }
 
-int	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int button, int frontback, int screen_width, int screen_height, char *homedir, int mode, int id )
+int viewport_external_mouse(void *data, uint8_t *img[3], int sx, int sy, int button, int frontback, int screen_width, int screen_height, char *homedir, int mode, int id)
 {
-	viewport_t *v = (viewport_t*) data;
-	if( sx == 0 && sy == 0 && button == 0 )
-		return 0;
-	if( button == 3 && v->user_ui == 0 )
-		return 0;
+    viewport_t *v = (viewport_t*)data;
+    
+    if (sx == 0 && sy == 0 && button == 0)
+        return 0;
+    
+    if (button == 3 && v->user_ui == 0)
+        return 0;
 
-	int ch = 0;
-	int point = -1;
-	int i;
+    int ch = 0;
+    int point = -1;
+    int i;
 
-	//@ use screen width/height
-	float x = (float)sx / ( screen_width / 100.0f );
-	float y = (float)sy / ( screen_height / 100.0f );
-	double dist = 100.0;
-	int	    cx = v->w / 2;
-	int	    cy = v->h / 2;
-	int	    dx = cx - ( v->ui->sw / 2 );
-	int	    dy = cy - ( v->ui->sh / 2 );
-	float		scx  = (float) v->w / (float) v->ui->sw;
-	float		scy = (float) v->h / (float) v->ui->sh;
-	int 	nsx = (sx - dx) * scx;
-	int     nsy = (sy - dy) * scy;
+    float x = (float)sx / (screen_width / 100.0f);
+    float y = (float)sy / (screen_height / 100.0f);
+    
+    double dist = 100.0;
+    int cx = v->w / 2;
+    int cy = v->h / 2;
+    int dx = cx - (v->ui->sw / 2);
+    int dy = cy - (v->ui->sh / 2);
+    
+    float scx = (float)v->w / (float)v->ui->sw;
+    float scy = (float)v->h / (float)v->ui->sh;
+    
+    int nsx = (sx - dx) * scx;
+    int nsy = (sy - dy) * scy;
 
-	v->usermouse[2] = (float) nsx;
-	v->usermouse[3] = (float) nsy;
-	v->usermouse[4] = x;
-	v->usermouse[5] = y;
+    v->usermouse[2] = (float)nsx;
+    v->usermouse[3] = (float)nsy;
+    v->usermouse[4] = x;
+    v->usermouse[5] = y;
 
-	float p_cpy[9];
-	float p[9];
-	// make a copy of the parameters
-	
-	p[0] = v->x1;
-	p[2] = v->x2;
-	p[4] = v->x3;
-	p[6] = v->x4;
-	p[1] = v->y1;
-	p[3] = v->y2;
-	p[5] = v->y3;	
-	p[7] = v->y4;
+    float p_cpy[9];
+    float p[9];
+    
+    // Make a copy of the parameters
+    p[0] = v->x1; p[1] = v->y1;
+    p[2] = v->x2; p[3] = v->y2;
+    p[4] = v->x3; p[5] = v->y3;
+    p[6] = v->x4; p[7] = v->y4;
 
-	int j;
-	for  ( j = 0 ; j < 8 ; j += 2 ) {
-		p_cpy[j] = p[j];
-		p_cpy[j+1]=p[j+1];
-		p[j]  =  msx(v, p[j] );
-		p[j+1]=  msy(v, p[j+1] );
-	}	
+    int j;
+    for (j = 0; j < 8; j += 2) {
+        p_cpy[j] = p[j];
+        p_cpy[j + 1] = p[j + 1];
+        p[j] = msx(v, p[j]);
+        p[j + 1] = msy(v, p[j + 1]);
+    }
 
-	float tx = vsx(v,v->usermouse[4]);
-	float ty = vsy(v,v->usermouse[5]);
+    float tx = vsx(v, v->usermouse[4]);
+    float ty = vsy(v, v->usermouse[5]);
 
-	for( i = 0; i < 4 ; i ++ )
-		v->users[ i ]  = 1;
+    for (i = 0; i < 4; i++)
+        v->users[i] = 1;
 
-	if( v->user_ui )
-	{
-		double dt[4];
-		dt[0] = sqrt( (p[0] - x) * (p[0] - x) + ( p[1] - y ) * (p[1] -y ) );
-		dt[1] = sqrt( (p[2] - x) * (p[2] - x) + ( p[3] - y ) * (p[3] -y ) );
-		dt[2] = sqrt( (p[4] - x) * (p[4] - x) + ( p[5] - y ) * (p[5] -y ) );
-		dt[3] = sqrt( (p[6] - x) * (p[6] - x) + ( p[7] - y ) * (p[7] -y ) );
-	
-		for ( i = 0; i < 4;  i ++ )
-		{
-			if( dt[i] < dist )
-			{
-				dist = dt[i];
-				point = i;
-			}	
-		}
-	}
-	
-	v->save = 0;
+    if (v->user_ui)
+    {
+        double dt[4];
+        dt[0] = sqrt((p[0] - x) * (p[0] - x) + (p[1] - y) * (p[1] - y));
+        dt[1] = sqrt((p[2] - x) * (p[2] - x) + (p[3] - y) * (p[3] - y));
+        dt[2] = sqrt((p[4] - x) * (p[4] - x) + (p[5] - y) * (p[5] - y));
+        dt[3] = sqrt((p[6] - x) * (p[6] - x) + (p[7] - y) * (p[7] - y));
 
-	if( ( button == 6 || button == 1 || button == 12) && point >= 0 )
-		v->save = 1;
+        for (i = 0; i < 4; i++)
+        {
+            if (dt[i] < dist)
+            {
+                dist = dt[i];
+                point = i;
+            }
+        }
+    }
 
-	if( button == 0 && point >= 0)
-		v->users[ point ] = 2;
+    v->save = 0;
 
-	if( button == 0 )
-	{
-		v->usermouse[0] = x;
-		v->usermouse[1] = y;
-	}
+    if ((button == 6 || button == 1 || button == 12) && point >= 0)
+        v->save = 1;
 
-	if( button == 2 )
-	{
-		if(v->user_reverse) v->user_reverse = 0; else v->user_reverse = 1;
-		ch  = 1;
-	}
+    if (button == 0 && point >= 0)
+        v->users[point] = 2;
 
-	if( button == 3 )
-	{
-		if(v->user_ui) v->user_ui = 0; else v->user_ui = 1;
+    if (button == 0)
+    {
+        v->usermouse[0] = x;
+        v->usermouse[1] = y;
+    }
 
-		if( v->user_ui == 0 )
-		{
-			char filename[1024];
-			switch(mode) {
-				case 1:
-					snprintf(filename,sizeof(filename), "%s/viewport-stream-%d.cfg", homedir,id );
-					break;
-				case 0:
-					snprintf(filename,sizeof(filename), "%s/viewport-sample-%d.cfg", homedir,id );
-					break;
-				default:
-					snprintf(filename,sizeof(filename),"%s/viewport.cfg", homedir);
-					break;
-			}
+    if (button == 2)
+    {
+        v->user_reverse = !v->user_reverse;
+        ch = 1;
+    }
 
-			viewport_save_settings(v, frontback, filename);
-		}
-	}
+    if (button == 3)
+    {
+        v->user_ui = !v->user_ui;
 
-	
+        if (v->user_ui == 0)
+        {
+            char filename[1024];
+            switch (mode) {
+                case 1:
+                    snprintf(filename, sizeof(filename), "%s/viewport-stream-%d.cfg", homedir, id);
+                    break;
+                case 0:
+                    snprintf(filename, sizeof(filename), "%s/viewport-sample-%d.cfg", homedir, id);
+                    break;
+                default:
+                    snprintf(filename, sizeof(filename), "%s/viewport.cfg", homedir);
+                    break;
+            }
+            viewport_save_settings(v, frontback, filename);
+        }
+    }
+
 	if( button == 6 && point >= 0)
 	{
+		int32_t right = v->x0 + v->w0;
+		int32_t bottom = v->y0 + v->h0;
+
 		switch( point )
 		{
-			case 0:	
-				v->x0 = (int32_t)nsx;
-				v->y0 = (int32_t)nsy;
-				clamp1(v->x0, 0, v->w );
-				clamp1(v->y0, 0, v->h );
+			case 0:
+				v->x0 = nsx; v->y0 = nsy;
+				v->w0 = right - v->x0;
+				v->h0 = bottom - v->y0;
 				break;
 			case 1:
+				v->y0 = nsy;
 				v->w0 = nsx - v->x0;
-				v->y0 = nsy;		
-				clamp1(v->w0, 0,v->w );
-				clamp1(v->y0, 0,v->h );
+				v->h0 = bottom - v->y0;
 				break;
 			case 2:
-				v->w0 = nsx - v->x0;	
+				v->w0 = nsx - v->x0;    
 				v->h0 = nsy - v->y0;
-				clamp1(v->w0, 0,v->w );
-				clamp1(v->h0, 0,v->h );
 				break;
-			case 3:	
-				v->w0 = ( v->x0 - nsx ) + v->w0;
+			case 3:
 				v->x0 = nsx;
+				v->w0 = right - v->x0;
 				v->h0 = nsy - v->y0;
-				clamp1(v->x0, 0,v->w );
-				clamp1(v->h0, 0,v->h );
-				clamp1(v->w0, 0,v->w );
-			break;
-		}
-		ch = 1;
-	}
-
-	if( button == 15 ) {
-		v->grid_mode --;
-		if(v->grid_mode < 0 ) 
-			v->grid_mode = 2;
-	} 
-
-	if( button == 5 ) // wheel up
-	{
-		if(v->grid_mode == 0 ) {
-			v->marker_size --;
-			if(v->marker_size < 2 )
-				v->marker_size = 4;
-		} else {
-			v->grid_resolution -= GRID_STEP;	
-			if(v->grid_resolution < 2 )	
-				v->grid_resolution = 2;
-			viewport_compute_grid(v);
-		}
-	}
-
-	if( button == 16 )
-	{
-		v->grid_mode ++;
-		if(v->grid_mode > 2 )
-			v->grid_mode = 0;
-	}
-
-	if (button == 4 ) // wheel down
-	{	
-		if(v->grid_mode == 0 ) {
-			v->marker_size ++;
-			if(v->marker_size > v->w/16)	
-				v->marker_size = 4;
-		} else {
-			v->grid_resolution += GRID_STEP;	
-			if(v->grid_resolution > v->w )	
-				v->grid_resolution = v->w;
-			viewport_compute_grid(v);
-		}
-	}
-	if( button == 7 )
-	{
-		if( v->grid_val == 0xff )
-			v->grid_val = 0;
-		else
-			v->grid_val = 0xff;
-	}
-
-
-	if(v->save)
-	{
-		if( button == 12 )
-		{
-		}
-		else if( button == 1 )
-		{
-			switch( point ) 
-			{
-				case 0:
-					v->x1 = tx;
-					v->y1 = ty;
-					break;
-				case 1:
-					v->x2 = tx;
-					v->y2 = ty;
-					break;
-				case 2:
-					v->x3 = tx;
-					v->y3 = ty;
-					break;
-				case 3:
-					v->x4 = tx;
-					v->y4 = ty;
 				break;
-				
-			}
 		}
+
+		if (v->w0 < 10) v->w0 = 10;
+		if (v->h0 < 10) v->h0 = 10;
+		
+		clamp1(v->x0, 0, v->w - v->w0);
+		clamp1(v->y0, 0, v->h - v->h0);
 		ch = 1;
-
 	}
 
-	if( ch )
-	{
-		viewport_update_perspective( v, p_cpy );
-		if(v->grid)
-			viewport_compute_grid(v);
+    if (button == 15) {
+        v->grid_mode--;
+        if (v->grid_mode < 0)
+            v->grid_mode = 2;
+    }
 
-		return 1;
-	}
-	return 0;
+    if (button == 5) // Wheel Up
+    {
+        if (v->grid_mode == 0) {
+            v->marker_size--;
+            if (v->marker_size < 2) v->marker_size = 4;
+        } else {
+            v->grid_resolution -= GRID_STEP;
+            if (v->grid_resolution < 2) v->grid_resolution = 2;
+            viewport_compute_grid(v);
+        }
+    }
+
+    if (button == 16)
+    {
+        v->grid_mode++;
+        if (v->grid_mode > 2)
+            v->grid_mode = 0;
+    }
+
+    if (button == 4) // Wheel Down
+    {
+        if (v->grid_mode == 0) {
+            v->marker_size++;
+            if (v->marker_size > v->w / 16) v->marker_size = 4;
+        } else {
+            v->grid_resolution += GRID_STEP;
+            if (v->grid_resolution > v->w) v->grid_resolution = v->w;
+            viewport_compute_grid(v);
+        }
+    }
+
+    if (button == 7)
+    {
+        v->grid_val = (v->grid_val == 0xff) ? 0 : 0xff;
+    }
+
+    if (v->save)
+    {
+        if (button == 1)
+        {
+            switch (point)
+            {
+                case 0: v->x1 = tx; v->y1 = ty; break;
+                case 1: v->x2 = tx; v->y2 = ty; break;
+                case 2: v->x3 = tx; v->y3 = ty; break;
+                case 3: v->x4 = tx; v->y4 = ty; break;
+            }
+        }
+        ch = 1;
+    }
+
+    if (ch)
+    {
+        viewport_update_perspective(v, p_cpy);
+        if (v->grid)
+            viewport_compute_grid(v);
+
+        return 1;
+    }
+
+    return 0;
 }
-
 
 void		viewport_push_frame(void *data, int w, int h, uint8_t *Y, uint8_t *U, uint8_t *V )
 {
@@ -3226,140 +2309,47 @@ void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3],
 }
 
 #define pack_yuyv_pixel( y0,u0,u1,y1,v0,v1 )\
-   		( y0 ) +\
-        ( ((u0+u1)>>1)<< 8) +\
-        ( (y1 << 16 )) +\
-        ( ((v0+v1)>>1)<< 24 )
+        ( (uint32_t)(y0) ) +\
+        ( (uint32_t)((u0+u1)>>1) << 8) +\
+        ( (uint32_t)(y1) << 16 ) +\
+        ( (uint32_t)((v0+v1)>>1) << 24 )
 
-void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_img )
+void viewport_produce_full_img_yuyv(void *vdata, uint8_t *restrict img[3], uint8_t *restrict out_img)
 {
-	viewport_t *v = (viewport_t*) vdata;
-	const int32_t *map = v->map;
-	const uint8_t *inY  = (const uint8_t*) img[0];
-	const uint8_t *inU  = (const uint8_t*) img[1];
-	const uint8_t *inV  = (const uint8_t*) img[2];
-	const int32_t tx1 = v->ttx1;
-	const int32_t tx2 = v->ttx2;
-	const int32_t ty1 = v->tty1;
-	const int32_t ty2 = v->tty2;
-	const int w = v->w;
-	const int uw = v->w >> 1;
-	
-	uint32_t *plane_yuyv = (uint32_t*)out_img;
-	uint32_t i,x,y;
-	int32_t n,m;
+    viewport_t *v = (viewport_t*) vdata;
+    
+	const int32_t *restrict map = v->map;
+    const uint8_t *restrict inY  = img[0];
+    const uint8_t *restrict inU  = img[1];
+    const uint8_t *restrict inV  = img[2];
+    
+    const int32_t tx1 = v->ttx1;
+    const int32_t tx2 = v->ttx2;
+    const int32_t ty1 = v->tty1;
+    const int32_t ty2 = v->tty2;
+    const int w = v->w;
+    const int uw = w >> 1;
 
-	img[0][v->w * v->h +1] = 0;		// "out of range" pixel value 
-	img[1][v->w * v->h +1] = 128;
-	img[2][v->w * v->h+1] = 128;
+    img[0][w * v->h + 1] = 0;
+    img[1][w * v->h + 1] = 128;
+    img[2][w * v->h + 1] = 128;
 
-	yuyv_plane_clear( v->w * v->h * 2, plane_yuyv); 
+    yuyv_plane_clear(w * v->h * 2, (uint32_t*)out_img); 
 
-	for( y = ty1 ; y < ty2; y ++ )
-	{
-		for( x = tx1; x < tx2; x += 2 )
-		{ // 2 YUYV pixels out, 2 Y in, 4 UV in
-			i = y * w ;
-			n = map[ i + x ];
-			m = map[ i + x + 1];
+    for (int y = ty1; y < ty2; y++)
+    {
+        const int32_t *restrict row_map = &map[y * w];
+        uint32_t *restrict row_out = (uint32_t*)out_img + (y * uw);
 
-			plane_yuyv[y * uw + ( (x+1)>>1)] = pack_yuyv_pixel( inY[n],inU[n],inU[m],inY[m],inV[n],inV[m] );
-		}
-	}
-}
+        #pragma GCC ivdep
+        for (int x = tx1; x < tx2; x += 2)
+        {
+            int32_t n = row_map[x];
+            int32_t m = row_map[x + 1];
 
-void	viewport_produce_full_img_packed( void *vdata, uint8_t *img[3], uint8_t *out_img )
-{
-	viewport_t *v = (viewport_t*) vdata;
-	const int len = v->w * v->h;
-	const int32_t *map = v->map;
-	uint8_t *inY  = img[0];
-	uint8_t *inU  = img[1];
-	uint8_t *inV  = img[2];
-	uint8_t       *outYUYV = out_img;
-
-	inY[len+1] = 0;
-	inU[len+1] = 128;
-	inV[len+1] = 128;
-
-	register const	int32_t	tx1 = v->ttx1;
-	register const	int32_t tx2 = v->ttx2;
-	register const	int32_t	ty1 = v->tty1;
-	register const	int32_t ty2 = v->tty2;
-	register const int w = v->w;
-	register uint32_t n,i,x,y;
-
-	// clear the yuyv plane (black)
-	yuyv_plane_clear( len*2, out_img); 
-
-	for( y = ty1 ; y < ty2; y ++ )
-	{
-		for( x = tx1; x < tx2; x ++ )
-		{
-			i = y * w + x;
-			n = map[ i ];
-			outYUYV[3  * i  ] = inY[n];
-			outYUYV[3  * i + 1 ] = inV[n];
-			outYUYV[3  * i + 3 ] = inU[n];
-		}
-	}
-}
-
-
-void viewport_render( void *vdata, uint8_t *in[3], uint8_t *out[3],int width, int height, int uv_len )
-{
-	viewport_t *v = (viewport_t*) vdata;
-
-	if( v->disable ) 
-		return;
-
-	if(! v->user_ui )
-	{
-		const int len = v->w * v->h;
-		const int w = v->w;
-		register uint32_t i,j,n;
-		const int32_t *map = v->map;
-		uint8_t *inY  = in[0];
-		uint8_t *inU  = in[1];
-		uint8_t *inV  = in[2];
-		uint8_t *outY = out[0];
-		uint8_t	*outU = out[1];
-	    uint8_t	*outV = out[2];
-
-		inY[len+1] = 0;
-		inU[len+1] = 128;
-		inV[len+1] = 128;
-
-		for( i = 0; i < len ; i += v->w )
-		{
-			for( j = 0; j < w; j += 4 )
-			{
-				n = map[i + j];
-				outY[i + j ] = inY[n];
-				outU[i + j ] = inU[n];
-				outV[i + j ] = inV[n];
-				n = map[ i + j + 1 ];
-				outY[ i + 1 + j ] = inY[n];
-				outU[ i + 1 + j ] = inU[n];
-				outV[ i + 1 + j ] = inV[n];
-				n = map[ i + j + 2 ];
-				outY[ i + 2 + j ] = inY[n];
-				outU[ i + 2 + j ] = inU[n];
-				outV[ i + 2 + j ] = inV[n];
-				n = map[ i + j + 3 ];
-				outY[ i + 3 + j ] = inY[n];
-				outU[ i + 3 + j ] = inU[n];
-				outV[ i + 3 + j ] = inV[n]; 
-			}
-			for( ; j < w; j ++ )
-			{
-				n = map[i+j];
-				outY[i+j] = inY[n];
-				outU[i+j] = inU[n];
-				outV[i+j] = inV[n];
-			}
-		}
-	}
+            row_out[x >> 1] = pack_yuyv_pixel(inY[n], inU[n], inU[m], inY[m], inV[n], inV[m]);
+        }
+    }
 }
 
 void viewport_render_dynamic( void *vdata, uint8_t *in[3], uint8_t *out[3],int width, int height )

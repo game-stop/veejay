@@ -22,9 +22,8 @@
 
 /* Viewport component for FX */
 #define	VP_QUADZOOM 1
-void	viewport_process_dynamic_alpha( void *data, uint8_t *in[4], uint8_t *out[4] );
-void	viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] );
-void	viewport_process_dynamic_map( void *data, uint8_t *in[3], uint8_t *out[3], uint32_t *map, int feather );
+void viewport_process_dynamic_alpha(void *data, uint8_t *restrict in[4], uint8_t *restrict out[4]);
+void viewport_process_dynamic(void *data, uint8_t *restrict in[3], uint8_t *restrict out[3]);
 void	*viewport_fx_init_map( int wid, int hei, int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4, int reverse);
 void	*viewport_fx_zoom_init(int type, int wid, int hei, int x, int y, int zoom, int dir);
 void	viewport_update_from(void *vv, void *bb);
@@ -43,10 +42,9 @@ int	viewport_active( void *data );
 void	viewport_destroy( void *data );
 void	vewport_draw_interface_color( void *vdata, uint8_t *img[3] );
 void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3], int Yonly);
-void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_img );
+void viewport_produce_full_img_yuyv(void *vdata, uint8_t *restrict img[3], uint8_t *restrict out_img);
 void      viewport_draw_interface_color( void *vdata, uint8_t *img[3] );
 void	viewport_set_marker( void *vdata, int status );
-void	viewport_projection_inc( void *data, int incr , int w, int h );
 void	viewport_transform_coords( void *data, void *coords, int n, int blob_id, int cx, int cy ,int w, int h, int num_objects,uint8_t *plane);
 void	viewport_dummy_send( void *data );
 int	*viewport_event_get_projection(void *data, int scale);
