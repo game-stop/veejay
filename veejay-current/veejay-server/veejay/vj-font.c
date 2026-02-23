@@ -1671,104 +1671,102 @@ void    *vj_font_single_init( int w, int h, float fps,char *path )
     return f;
 }
 
-static void draw_glyph( 
+static void draw_glyph(
     vj_font_t *f,
     VJFrame *picture,
     FT_Bitmap *bitmap,
     unsigned int x,
     unsigned int y,
     unsigned int width,
-    unsigned int height,    
+    unsigned int height,
     uint8_t *yuv_fgcolor,
     uint8_t *yuv_lncolor,
     int outline)
 {
-    int r, c;
-    int spixel, dpixel[3], in_glyph=0;
-    dpixel[2] = 128; dpixel[1] = 128;
-
-    if( x < 0 ) x = 0; else if ( x > width ) x = width;
-    if( y < 0 ) y = 0; else if ( y > height ) y = height;
-
     uint8_t *Y = picture->data[0];
     uint8_t *U = picture->data[1];
     uint8_t *V = picture->data[2];
 
-    uint8_t *bitbuffer = bitmap->buffer;
-    uint32_t bitmap_rows = bitmap->rows;
-    uint32_t bitmap_wid  = bitmap->width;
-    uint32_t bitmap_pitch = bitmap->pitch;
+    const uint32_t bitmap_rows  = bitmap->rows;
+    const uint32_t bitmap_wid   = bitmap->width;
+    const int      bitmap_pitch = bitmap->pitch;
+    uint8_t *bitbuffer          = bitmap->buffer;
 
-    int p,left,top,bot,pos;
+    const uint32_t max_r = (y + bitmap_rows > height)
+                         ? (height - y)
+                         : bitmap_rows;
 
-    if (bitmap->pixel_mode == ft_pixel_mode_mono)
+    const uint32_t max_c = (x + bitmap_wid > width)
+                         ? (width - x)
+                         : bitmap_wid;
+
+    for (uint32_t r = 0; r < max_r; r++)
     {
-        in_glyph = 0;
-    for (r=0; (r < bitmap_rows) && (r+y < height); r++)
-    {
-        for (c=0; (c < bitmap_wid) && (c+x < width); c++)
+        const uint32_t dst_row_offset = (y + r) * width;
+        uint8_t *src_row = bitbuffer + r * bitmap_pitch;
+
+        for (uint32_t c = 0; c < max_c; c++)
         {
-            p  = (c+x) + ((y+r)*width);
-            left  = (c+x-1) + ((y+r)*width);    
-            top   = (c+x) + ((y+r-1)*width);
-                bot   = (c+x) + ((y+r+1)*width);
-            
-            dpixel[0] = Y[ p ];
-            dpixel[1] = U[ p ];
-            dpixel[2] = V[ p ];
+            if (!(src_row[c >> 3] & (0x80 >> (c & 7))))
+                continue;
 
-            pos = r * bitmap_pitch + (c >> 3 );
-         
-            spixel = bitbuffer[ pos ] & ( 0x80 >> ( c % 8 ));
- 
-                if (spixel) 
-                {
-                    dpixel[0] = yuv_fgcolor[0];
-                dpixel[1] = yuv_fgcolor[1];
-                dpixel[2] = yuv_fgcolor[2];
-                } 
-                if (outline)
+            const uint32_t dst_index = dst_row_offset + x + c;
+
+            Y[dst_index] = yuv_fgcolor[0];
+            U[dst_index] = yuv_fgcolor[1];
+            V[dst_index] = yuv_fgcolor[2];
+
+            if (!outline)
+                continue;
+
+            if (c > 0)
             {
-                if ( (!in_glyph) && (spixel) )
+                if (!(src_row[(c - 1) >> 3] & (0x80 >> ((c - 1) & 7))))
                 {
-                        in_glyph = 1;
-                        if (c-1 >= 0)
-                        {
-                        Y[ left ] = yuv_lncolor[0]; 
-                        U[ left ] = yuv_lncolor[1];
-                        V[ left ] = yuv_lncolor[2]; 
-                        }
-                    }
-                else if ( (in_glyph) && (!spixel) )
-                    {
-                        in_glyph = 0;
-                        dpixel[0] = yuv_lncolor[0];
-                        dpixel[1] = yuv_lncolor[1];
-                        dpixel[2] = yuv_lncolor[2];
-                    }
-         
-                if (in_glyph) 
-                    {
-                        if ( (r-1 >= 0) && (! bitbuffer[(r-1)*bitmap->pitch +c/8] & (0x80>>(c%8))) )
-                    {
-                        Y[ top ] = yuv_lncolor[0];  
-                        U[ top ] = yuv_lncolor[1];
-                        V[ top ] = yuv_lncolor[2]; 
-                    }
-            
-                    if ( (r+1 < height) && (! bitbuffer[(r+1)*bitmap->pitch +c/8] & (0x80>>(c%8))) )
-                    {
-                        Y[ bot  ] = yuv_lncolor[0]; 
-                        U[ bot ] = yuv_lncolor[1];
-                        V[ bot ] = yuv_lncolor[2]; 
-                        }
-                    }
+                    uint32_t idx = dst_index - 1;
+                    Y[idx] = yuv_lncolor[0];
+                    U[idx] = yuv_lncolor[1];
+                    V[idx] = yuv_lncolor[2];
+                }
             }
-            Y[ p ] = dpixel[0]; 
-            U[ p ] = dpixel[1];
-            V[ p ] = dpixel[2]; 
+
+            if (c < max_c - 1)
+            {
+                if (!(src_row[(c + 1) >> 3] & (0x80 >> ((c + 1) & 7))))
+                {
+                    uint32_t idx = dst_index + 1;
+                    Y[idx] = yuv_lncolor[0];
+                    U[idx] = yuv_lncolor[1];
+                    V[idx] = yuv_lncolor[2];
+                }
             }
-    }
+
+            if (r > 0)
+            {
+                uint8_t *prev_row = bitbuffer + (r - 1) * bitmap_pitch;
+
+                if (!(prev_row[c >> 3] & (0x80 >> (c & 7))))
+                {
+                    uint32_t idx = dst_index - width;
+                    Y[idx] = yuv_lncolor[0];
+                    U[idx] = yuv_lncolor[1];
+                    V[idx] = yuv_lncolor[2];
+                }
+            }
+
+            if (r < max_r - 1)
+            {
+                uint8_t *next_row = bitbuffer + (r + 1) * bitmap_pitch;
+
+                if (!(next_row[c >> 3] & (0x80 >> (c & 7))))
+                {
+                    uint32_t idx = dst_index + width;
+                    Y[idx] = yuv_lncolor[0];
+                    U[idx] = yuv_lncolor[1];
+                    V[idx] = yuv_lncolor[2];
+                }
+            }
+        }
     }
 }
 
