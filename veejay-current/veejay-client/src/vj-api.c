@@ -10076,7 +10076,7 @@ static void update_sample_slot_data(int page_num,
     {
         if(sample_id > 0 )
         {
-            char hotkey[16];
+            char hotkey[25];
             if( sample_type == MODE_SAMPLE ) {
                 snprintf(hotkey, sizeof(hotkey), "[F%d] Sample %d", (sample_id % 12), sample_id);
             }
