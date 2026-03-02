@@ -1302,7 +1302,7 @@ static void single_vims(int id);
 static gdouble get_numd(const char *name);
 static int get_nums(const char *name);
 static gchar *get_text(const char *name);
-static void put_text(const char *name, char *text);
+static void put_text(const char *name, const char *text);
 static void set_toggle_button(const char *name, int status);
 static void update_slider_gvalue(const char *name, gdouble value );
 static void update_slider_value2(GtkWidget *w, gint value, gint scale);
@@ -3505,7 +3505,7 @@ static gchar *get_text(const char *name)
     return (gchar*) gtk_entry_get_text( GTK_ENTRY(w));
 }
 
-static void put_text(const char *name, char *text)
+static void put_text(const char *name, const char *text)
 {
     GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
     if(!w) {
