@@ -2321,17 +2321,15 @@ void _effect_free( effect_constr *effect )
         for( p = 0; p < effect->num_arg; p ++ ) {
             free( effect->param_description[p] );
         }
-        if( effect->hints ) {
-            for( p = 0; p < effect->num_arg; p ++ ) {
-                if( effect->hints[p] == NULL )
-                    continue;
-                int q;
-                for( q = 0; effect->hints[p]->description[q] != NULL; q ++ ) {
-                    free( effect->hints[p]->description[q] );
-                }
-                free( effect->hints[p]->description );
-                free( effect->hints[p] );
+        for( p = 0; p < effect->num_arg; p ++ ) {
+            if( effect->hints[p] == NULL )
+                continue;
+            int q;
+            for( q = 0; effect->hints[p]->description[q] != NULL; q ++ ) {
+                free( effect->hints[p]->description[q] );
             }
+            free( effect->hints[p]->description );
+            free( effect->hints[p] );
         }
 
         free(effect);
