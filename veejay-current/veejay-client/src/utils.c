@@ -82,7 +82,7 @@ void	generator_to_arr( char *line, int *array)
 			break;
 
 		while(*end == ' ' && end != NULL) {
-			*end++;
+			end++;
 		}
 
 		p = end;
