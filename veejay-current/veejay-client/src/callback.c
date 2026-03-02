@@ -1181,7 +1181,7 @@ void	on_button_samplelist_save_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		multi_vims( VIMS_SAMPLE_SAVE_SAMPLELIST, "%s", filename );
 		vj_msg(VEEJAY_MSG_INFO, "Saved samples to %s", filename);
-		strncpy( samplelist_name, filename,strlen(filename));
+		strlcpy( samplelist_name, filename,strlen(filename));
 		as_samplelist_name = 1;
 		g_free(filename);
 	}
@@ -1200,7 +1200,7 @@ gboolean	on_button_samplelist_qsave_clicked(GtkWidget *widget, GdkEvent *event, 
 		{
 			multi_vims( VIMS_SAMPLE_SAVE_SAMPLELIST, "%s", filename );
 			vj_msg(VEEJAY_MSG_INFO, "Saved samples to %s", filename);
-			strncpy( samplelist_name, filename, strlen(filename));
+			strlcpy( samplelist_name, filename, strlen(filename));
 			g_free(filename);
 			as_samplelist_name = 1;
 		}
@@ -2875,7 +2875,7 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
     size_t bufsize = tr_len + payload;
 
 	unsigned char *buf = (unsigned char*) vj_malloc( sizeof(unsigned char) * bufsize );
-	strncpy( (char*) buf, header, hdr_len);
+    memcpy((char*) buf, header, hdr_len);
 	
 	unsigned char *ptr = buf + hdr_len;
 	int k;
