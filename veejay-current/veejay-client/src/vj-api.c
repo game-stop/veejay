@@ -9279,7 +9279,7 @@ static void samplebank_size_allocate(GtkWidget *widget, GtkAllocation *allocatio
 /* Add a page to the notebook and initialize slots */
 static int add_bank( gint bank_num )
 {
-    gchar str_label[5];
+    gchar str_label[12];
     gchar frame_label[20];
     sprintf(str_label, "%d", bank_num );
     sprintf(frame_label, "Slots %d to %d",
