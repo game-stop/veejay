@@ -404,7 +404,7 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	}
 
 	int expected_len = (v->width * v->height);
-	int expected_len_uv = expected_len/2;
+	//~ int expected_len_uv = expected_len/2; unused
 	int srcfmt = (v->full_range ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P );
    
 
