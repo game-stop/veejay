@@ -91,14 +91,14 @@ void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data )
 
 	gtk_list_store_clear( GTK_LIST_STORE( model ) );
 
-	int i;
+	unsigned short i;
 	int id = multitrack_get_sequence_view_id( user_data ); 
 	for( i = 0; i < n_tracks; i ++ )
 	{
 		if(id != i)
 		{
-			char name[12];
-			snprintf(name,sizeof(name),"Track %d", i);
+			char name[16];
+			snprintf(name,sizeof(name),"Track %uh", i);
 			gchar *uname = _utf8str( name );
 			gtk_list_store_append( store, &iter );
 			gtk_list_store_set(
@@ -167,13 +167,13 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data, void *mt)
 	GtkTreeIter iter;
 
 	store = gtk_list_store_new( 2, G_TYPE_STRING, G_TYPE_BOOLEAN );
-	int i;
+	unsigned short i;
 	for( i = 0; i < ref_tracks ; i ++ )
 	{
 		if( i != track_id )
 		{
 			char str[16];
-			snprintf(str,sizeof(str),"Track %d",i);
+			snprintf(str,sizeof(str),"Track %uh",i);
 			gchar *ustr = _utf8str( str );
 			gtk_list_store_append( store, &iter );
 			gtk_list_store_set( store, &iter,

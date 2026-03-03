@@ -1302,7 +1302,7 @@ static void single_vims(int id);
 static gdouble get_numd(const char *name);
 static int get_nums(const char *name);
 static gchar *get_text(const char *name);
-static void put_text(const char *name, char *text);
+static void put_text(const char *name, const char *text);
 static void set_toggle_button(const char *name, int status);
 static void update_slider_gvalue(const char *name, gdouble value );
 static void update_slider_value2(GtkWidget *w, gint value, gint scale);
@@ -2321,17 +2321,15 @@ void _effect_free( effect_constr *effect )
         for( p = 0; p < effect->num_arg; p ++ ) {
             free( effect->param_description[p] );
         }
-        if( effect->hints ) {
-            for( p = 0; p < effect->num_arg; p ++ ) {
-                if( effect->hints[p] == NULL )
-                    continue;
-                int q;
-                for( q = 0; effect->hints[p]->description[q] != NULL; q ++ ) {
-                    free( effect->hints[p]->description[q] );
-                }
-                free( effect->hints[p]->description );
-                free( effect->hints[p] );
+        for( p = 0; p < effect->num_arg; p ++ ) {
+            if( effect->hints[p] == NULL )
+                continue;
+            int q;
+            for( q = 0; effect->hints[p]->description[q] != NULL; q ++ ) {
+                free( effect->hints[p]->description[q] );
             }
+            free( effect->hints[p]->description );
+            free( effect->hints[p] );
         }
 
         free(effect);
@@ -3507,7 +3505,7 @@ static gchar *get_text(const char *name)
     return (gchar*) gtk_entry_get_text( GTK_ENTRY(w));
 }
 
-static void put_text(const char *name, char *text)
+static void put_text(const char *name, const char *text)
 {
     GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
     if(!w) {
@@ -9281,7 +9279,7 @@ static void samplebank_size_allocate(GtkWidget *widget, GtkAllocation *allocatio
 /* Add a page to the notebook and initialize slots */
 static int add_bank( gint bank_num )
 {
-    gchar str_label[5];
+    gchar str_label[12];
     gchar frame_label[20];
     sprintf(str_label, "%d", bank_num );
     sprintf(frame_label, "Slots %d to %d",
@@ -10078,7 +10076,7 @@ static void update_sample_slot_data(int page_num,
     {
         if(sample_id > 0 )
         {
-            char hotkey[16];
+            char hotkey[25];
             if( sample_type == MODE_SAMPLE ) {
                 snprintf(hotkey, sizeof(hotkey), "[F%d] Sample %d", (sample_id % 12), sample_id);
             }
