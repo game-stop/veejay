@@ -29,7 +29,7 @@ static unsigned long audio_rate = 0;
 static int audio_channels = 0;
 extern void veejay_msg(int type, const char format[], ...);
 
-int vj_jack_initialize()
+int vj_jack_initialize(void)
 {
 	JACK_Init();
 	JACK_SetClientName("veejay");
@@ -93,7 +93,7 @@ int vj_jack_init(editlist *el)
 	return 1;
 }
 
-int	vj_jack_rate()
+int vj_jack_rate(void)
 {
 	return JACK_GetSampleRate(driver);
 }
@@ -119,7 +119,7 @@ int	vj_jack_continue(int speed)
 }
 
 
-int	vj_jack_stop()
+int vj_jack_stop(void)
 {
 	JACK_Reset( driver );
 
@@ -131,13 +131,13 @@ int	vj_jack_stop()
 	return 1;
 }
 
-void	vj_jack_enable()
+void vj_jack_enable(void)
 {
 	if( JACK_GetState(driver) == STOPPED )
 		JACK_SetState(driver, PLAYING );
 }
 
-void	vj_jack_disable()
+void vj_jack_disable(void)
 {
 	JACK_SetState( driver, STOPPED );
 }
@@ -163,19 +163,19 @@ int	vj_jack_set_volume(int volume)
 	return 0;
 }
 
-int	vj_jack_pause()
+int vj_jack_pause(void)
 {
 	JACK_SetState(driver,PAUSED);
 	return 1;
 }
 
-int	vj_jack_resume()
+int vj_jack_resume(void)
 {
 	JACK_SetState(driver,PLAYING);
 	return 1;
 }
 
-int	vj_jack_get_space()
+int vj_jack_get_space(void)
 {
 	return JACK_GetBytesFreeSpace(driver);
 }
@@ -185,7 +185,7 @@ long	vj_jack_get_status(long int *sec, long int *nsec)
 	return JACK_OutputStatus( driver, sec, nsec);
 }
 
-void	vj_jack_reset()
+void vj_jack_reset(void)
 {
 	JACK_ResetBuffer( driver );
 }

@@ -2029,7 +2029,7 @@ static void vj_font_text_render(vj_font_t *f, srt_seq_t *seq, void *_picture)
     }
 }
 
-static   int    num_nl( char *str , int len ) {
+static int num_nl( char *str , int len ) {
     int i;
     int sum = 0;
     for( i = 0; i < len ; i ++ )
@@ -2039,7 +2039,7 @@ static   int    num_nl( char *str , int len ) {
 }
 
 
-char    *vj_font_default()
+char *vj_font_default(void)
 {
     int n = strlen( selected_default_font );
     if( n <= 0 )
