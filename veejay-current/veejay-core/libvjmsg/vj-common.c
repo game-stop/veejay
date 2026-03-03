@@ -125,7 +125,7 @@ static void addr2line_unw( unw_word_t addr, char*file, size_t len, int *line )
 	pclose( fd );
 }
 
-void 	veejay_print_backtrace()
+void veejay_print_backtrace(void)
 {
 	char name[512];
 	unw_cursor_t cursor; 
@@ -153,7 +153,7 @@ void 	veejay_print_backtrace()
 	}
 }
 #else
-void	veejay_print_backtrace()
+void veejay_print_backtrace(void)
 {
 	void *space[100];
 	int i,s;
@@ -202,12 +202,12 @@ static inline void veejay_msg_timestamp(char *out)
     out[12] = '\0';
 }
 
-int	veejay_get_debug_level()
+int	veejay_get_debug_level(void)
 {
 	return _debug_level;
 }
 
-int	veejay_is_timestamped()
+int	veejay_is_timestamped(void)
 {
 	return _timestamp;
 }
@@ -236,17 +236,17 @@ void veejay_set_colors(int l)
 	else _color_level = 0;
 }
 
-int	veejay_is_colored()
+int	veejay_is_colored(void)
 {
 	return _color_level;
 }
 
-void veejay_silent()
+void veejay_silent(void)
 {
 	_no_msg = 1;
 }
 
-int veejay_is_silent()
+int veejay_is_silent(void)
 {
 	if(_no_msg) return 1;          
 	return 0;
@@ -255,7 +255,7 @@ int veejay_is_silent()
 #define MESSAGE_RING_SIZE 5000
 static message_ring_t *msg_ring = NULL;
 static int msg_ring_enabled = 0;
-void	veejay_init_msg_ring()
+void veejay_init_msg_ring(void)
 {
 	msg_ring = vj_calloc( sizeof(message_ring_t));
 	msg_ring->dommel = vj_calloc( sizeof(char*) * MESSAGE_RING_SIZE );
@@ -266,7 +266,7 @@ void	veejay_init_msg_ring()
 	sem_init( msg_ring->semaphore, 0, 0 );
 }
 
-void	veejay_destroy_msg_ring()
+void veejay_destroy_msg_ring(void)
 {
 	if(msg_ring) {
 		int i;
@@ -299,17 +299,17 @@ static void veejay_msg_ringbuffer(char *line)
     }
 }
 
-int	veejay_log_to_ringbuffer()
+int	veejay_log_to_ringbuffer(void)
 {
 	return ( msg_ring == NULL ? 0 : msg_ring_enabled );
 }
 
-void	veejay_toggle_osl()
+void veejay_toggle_osl(void)
 {
 	msg_ring_enabled = (msg_ring_enabled == 0 ? 1: 0);
 }
 
-char *veejay_msg_ringfetch()
+char *veejay_msg_ringfetch(void)
 {
     if (!msg_ring) return NULL;
 
@@ -463,7 +463,7 @@ void veejay_strrep(char *s, char delim, char tok)
   }
 }
 
-void	veejay_chomp_str( char *msg, int *nlen )
+void veejay_chomp_str( char *msg, int *nlen )
 {
 	int len = strlen( msg ) - 1;
 	if(len > 0 )

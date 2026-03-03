@@ -1073,7 +1073,7 @@ char *vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
 }
 
 
-char *vj_server_my_ip()
+char *vj_server_my_ip(void)
 {
 	struct addrinfo h;
 
