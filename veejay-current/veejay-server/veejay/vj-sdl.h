@@ -23,14 +23,18 @@
 #ifdef HAVE_SDL
 void *vj_sdl_allocate(VJFrame *frame, int k, int m, int s, int borderless);
 void vj_sdl_resize( void *ptr ,int x, int y, int scaled_width, int scaled_height, int fs );
-int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, char *caption, int show, int fs,int vjfmt, float fps);
+int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, char *caption, int show, int fs,int vjfmt, float fps, double *vsync);
 void vj_sdl_grab(void *ptr, int status);
 void vj_sdl_get_position(void *ptr, int *dst_x, int *dst_y );
-void vj_sdl_update_screen(void *ptr);
 void vj_sdl_convert_and_update_screen(void *ptr, uint8_t ** yuv420);
+void vj_sdl_put_to_screen(void *ptr, uint8_t *pixels_to_render);
+void vj_sdl_convert_to_screen(void *ptr, VJFrame *frame_to_dsplay, uint8_t *pixels);
 void vj_sdl_quit();
 void vj_sdl_free(void *ptr);
-uint8_t *vj_sdl_get_buffer(void *ptr);
+uint8_t* vj_sdl_get_buffer( void *ptr, int index );
 void vj_sdl_enable_screensaver();
+void vj_sdl_preroll(void *ptr, int frame_count);
+void vj_sdl_set_fullscreen(void *ptr, int enabled);
+void vj_sdl_set_window_size(void *ptr, int w, int h, int x, int y);
 #endif
 #endif

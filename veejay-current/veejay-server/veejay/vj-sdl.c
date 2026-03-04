@@ -23,6 +23,7 @@
 
 #include <config.h>
 #include <stdint.h>
+#include <signal.h>
 #include <veejaycore/defs.h>
 #ifdef HAVE_SDL
 #include <veejay/vj-sdl.h>
@@ -63,7 +64,24 @@ typedef struct vj_sdl_t {
     int x;
     int y;
     uint8_t *pixels;
+    uint8_t *buf[VIDEO_QUEUE_LEN];
 } vj_sdl;
+
+
+static void fill_yuyv_black(uint8_t *buf, int width, int height)
+{
+    uint8_t *p = buf;
+    int pixels = width * height;
+
+    for (int i = 0; i < pixels; i += 2) {
+        p[0] = 0x00; // Y0
+        p[1] = 0x80; // U
+        p[2] = 0x00; // Y1
+        p[3] = 0x80; // V
+        p += 4;
+    }
+}
+
 
 void *vj_sdl_allocate(VJFrame *frame, int use_key, int use_mouse, int show_cursor, int borderless)
 {
@@ -90,7 +108,16 @@ void *vj_sdl_allocate(VJFrame *frame, int use_key, int use_mouse, int show_curso
 
     vjsdl->src_frame = (void*) src;
     vjsdl->dst_frame = (void*) dst;
-    vjsdl->pixels = (uint8_t*) vj_calloc(sizeof(uint8_t) * ( frame->len * 2 ) );
+
+    size_t bufsize = frame->len * 2;
+
+    vjsdl->pixels = (uint8_t*) vj_calloc(sizeof(uint8_t) * bufsize * 2); // continous dubblebuffer
+
+    vjsdl->buf[0] = vjsdl->pixels;
+    vjsdl->buf[1] = vjsdl->pixels + bufsize;
+
+    fill_yuyv_black( vjsdl->buf[0], vjsdl->width, vjsdl->height);
+    fill_yuyv_black( vjsdl->buf[1], vjsdl->width, vjsdl->height);
 
     return (void*) vjsdl;
 }
@@ -121,7 +148,7 @@ void vj_sdl_resize( void *ptr ,int x, int y, int scaled_width, int scaled_height
             (vjsdl->y >= 0 ? vjsdl->y : SDL_WINDOWPOS_UNDEFINED ),
             vjsdl->sw_scale_width, vjsdl->sw_scale_height, flags );
 
-	veejay_msg(VEEJAY_MSG_INFO, "Changed video window to size %d x %d, position x=%d, y=%d",
+	veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Changed video window to size %d x %d, position x=%d, y=%d",
 			vjsdl->sw_scale_width,vjsdl->sw_scale_height, vjsdl->x, vjsdl->y);
 }
 
@@ -132,14 +159,14 @@ void vj_sdl_get_position( void *ptr, int *x, int *y )
     *y = vjsdl->y;
 }
 
-int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, char *caption, int show, int fs, int vjfmt, float fps)
+int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, char *caption, int show, int fs, int vjfmt, float fps, double *vsync)
 {
     vj_sdl *vjsdl = (vj_sdl*) ptr;
 	int i = 0;
 
 	if (SDL_Init(SDL_INIT_VIDEO) < 0)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "%s", SDL_GetError());
+		veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] %s", SDL_GetError());
 		return 0;
 	}
 
@@ -169,7 +196,7 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
 
     if(!vjsdl->screen)
     {
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create SDL window: %s", SDL_GetError());
+		veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] Unable to create SDL window: %s", SDL_GetError());
 		return 0;
     }
 
@@ -203,7 +230,7 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
         } else if (strcasecmp("vsync", sdl_driver) == 0 ) {
             vjsdl->renderer = SDL_CreateRenderer(vjsdl->screen, -1, SDL_RENDERER_PRESENTVSYNC );
         } else {
-            veejay_msg(VEEJAY_MSG_ERROR, "Valid values for VEEJAY_SDL_DRIVER are: \"software\", \"accelerated\", \"vsync\"");
+            veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] Valid values for VEEJAY_SDL_DRIVER are: \"software\", \"accelerated\", \"vsync\"");
             SDL_DestroyWindow(vjsdl->screen);
             return 0;
         }
@@ -217,10 +244,10 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
     
     SDL_RendererInfo info;
     if(SDL_GetRenderDriverInfo(i, &info) == 0 ) {
-        veejay_msg(VEEJAY_MSG_INFO, "Using SDL driver %s", info.name);
-        veejay_msg(VEEJAY_MSG_DEBUG, "The renderer uses hardware acceleration: %s", (info.flags & SDL_RENDERER_ACCELERATED) ? "yes" : "no");
-        veejay_msg(VEEJAY_MSG_DEBUG, "Present is synchronized with the refresh rate: %s", (info.flags & SDL_RENDERER_PRESENTVSYNC) ? "yes": "no" );
-        veejay_msg(VEEJAY_MSG_DEBUG, "Set VEEJAY_SDL_DRIVER to select another driver");
+        veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Using SDL driver %s", info.name);
+        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] The renderer uses hardware acceleration: %s", (info.flags & SDL_RENDERER_ACCELERATED) ? "yes" : "no");
+        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] Present is synchronized with the refresh rate: %s", (info.flags & SDL_RENDERER_PRESENTVSYNC) ? "yes": "no" );
+        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] Set VEEJAY_SDL_DRIVER to select another driver");
     }
 
     SDL_SetHint( SDL_HINT_RENDER_SCALE_QUALITY, "linear" );
@@ -229,11 +256,11 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
 
     vjsdl->texture = SDL_CreateTexture( vjsdl->renderer, SDL_PIXELFORMAT_YUY2, SDL_TEXTUREACCESS_STREAMING, vjsdl->width,vjsdl->height);
     if(!vjsdl->texture) {
-        veejay_msg(VEEJAY_MSG_ERROR, "Unable to create SDL texture: %s", SDL_GetError());
+        veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] Unable to create SDL texture: %s", SDL_GetError());
         return 0;
     }
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "SDL Output dimensions: %d x %d @ %d,%d", vjsdl->sw_scale_width, vjsdl->sw_scale_height,vjsdl->x,vjsdl->y );
+	veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] SDL Output dimensions: %d x %d @ %d,%d", vjsdl->sw_scale_width, vjsdl->sw_scale_height,vjsdl->x,vjsdl->y );
 
 	if (vjsdl->use_keyboard == 1) 
 		SDL_EventState(SDL_KEYDOWN, SDL_ENABLE);
@@ -256,15 +283,15 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
     int sdlmode = (vj_is_full_range(vjfmt) ? SDL_YUV_CONVERSION_JPEG : SDL_YUV_CONVERSION_BT601 );
 
     if(sdlmode == SDL_YUV_CONVERSION_JPEG) {
-        veejay_msg(VEEJAY_MSG_DEBUG, "SDL YUV conversion mode: JPEG");
+        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] SDL YUV conversion mode: JPEG (full range)");
     }
     if(sdlmode == SDL_YUV_CONVERSION_BT601) {
-        veejay_msg(VEEJAY_MSG_DEBUG, "SDL YUV conversion mode: BT601");
+        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY]  SDL YUV conversion mode: BT601 (limited range)");
     }
 
     SDL_SetYUVConversionMode( sdlmode );
 #else
-    veejay_msg(VEEJAY_MSG_WARNING, "Please update SDL2 to a more recent version. Alternativly, see the -Y commandline option if you have color issues");
+    veejay_msg(VEEJAY_MSG_WARNING, "[DISPLAY] Please update SDL2 to a more recent version.");
 #endif
     SDL_DisableScreenSaver();
 
@@ -274,9 +301,47 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
 
     vjsdl->fs = fs;
 
-	//SDL_EnableKeyRepeat( SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL );
+    SDL_DisplayMode mode;
+    int display_index = SDL_GetWindowDisplayIndex(vjsdl->screen);
+    double vsync_interval = 1.0 / 60.0;
+    if(SDL_GetDisplayMode(display_index,0,&mode)) {
+        int hz = (mode.refresh_rate > 0) ? mode.refresh_rate : 60;
+        vsync_interval = 1.0 / (double) hz;
+        *vsync = vsync_interval;
+        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] SDL V-Sync refresh rate is %f", vsync_interval);
+    }
 
- 	return 1;
+	return 1;
+}
+
+void vj_sdl_set_fullscreen(void *ptr, int enabled) {
+    uint32_t flags = enabled ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
+    vj_sdl *vjsdl = (vj_sdl*) ptr;
+
+    if (SDL_SetWindowFullscreen(vjsdl->screen, flags) == 0) {
+        vjsdl->fs = enabled;
+            
+        if(enabled)
+            vj_sdl_grab( vjsdl, 0 );
+    } else {
+        veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] Fullscreen failed: %s", SDL_GetError());
+    }
+}
+
+void vj_sdl_set_window_size(void *ptr, int w, int h, int x, int y) {
+    vj_sdl *vjsdl = (vj_sdl*) ptr;
+    if (!vjsdl || !vjsdl->screen) return;
+
+    SDL_SetWindowSize(vjsdl->screen, w, h);
+    
+    SDL_SetWindowPosition(vjsdl->screen, x, y);
+
+    SDL_RenderSetLogicalSize(vjsdl->renderer, vjsdl->width, vjsdl->height);
+
+    vjsdl->sw_scale_width = w;
+    vjsdl->sw_scale_height = h;
+    
+    veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Window resized to %dx%d", w, h);
 }
 
 void    vj_sdl_enable_screensaver(void)
@@ -287,48 +352,61 @@ void    vj_sdl_enable_screensaver(void)
 void	vj_sdl_grab(void *ptr, int status)
 {
 	SDL_SetRelativeMouseMode( (status==1? SDL_TRUE : SDL_FALSE) );
-	veejay_msg(VEEJAY_MSG_DEBUG, "%s", status == 1 ? "Released mouse focus": "Grabbed mouse focus");
+	veejay_msg(VEEJAY_MSG_DEBUG, "%s", status == 1 ? "[DISPLAY] Released mouse focus": "[DISPLAY] Grabbed mouse focus");
 }
 
-void vj_sdl_update_screen(void *ptr)
+void vj_sdl_put_to_screen(void *ptr, uint8_t *pixels_to_render)
 {
     vj_sdl *vjsdl = (vj_sdl*) ptr;
 
-    if( SDL_UpdateTexture( vjsdl->texture, NULL, vjsdl->pixels, vjsdl->width * 2 ) != 0 ) {
+    if( SDL_UpdateTexture( vjsdl->texture, NULL, pixels_to_render, vjsdl->width * 2 ) != 0 ) {
         veejay_msg(0, "%s" , SDL_GetError());
     }
 
     SDL_RenderClear( vjsdl->renderer );
     SDL_RenderCopy( vjsdl->renderer, vjsdl->texture, NULL,NULL );
-    SDL_RenderPresent( vjsdl->renderer );
+    SDL_RenderPresent( vjsdl->renderer );   
+}
+
+void vj_sdl_preroll(void *ptr, int frame_count) {
+        vj_sdl *vjsdl = (vj_sdl*) ptr;
+    
+    veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Initializing GPU pipeline (Preroll %d frames)", frame_count);
+    
+    memset(vjsdl->pixels, 0x80, vjsdl->width * vjsdl->height * 2);
+
+    for (int i = 0; i < frame_count; i++) {
+        SDL_UpdateTexture(vjsdl->texture, NULL, vjsdl->pixels, vjsdl->width * 2);
+        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] Pushed warm-up frame %d", i);
+        SDL_RenderClear(vjsdl->renderer);
+        SDL_RenderCopy(vjsdl->renderer, vjsdl->texture, NULL, NULL);
+
+        SDL_RenderPresent(vjsdl->renderer);
+        
+        SDL_Delay(10); 
+    }
+    veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] GPU Warm-up complete.");
 }
 
 void vj_sdl_convert_and_update_screen(void *ptr, uint8_t ** yuv420)
 {
-    vj_sdl *vjsdl = (vj_sdl*) ptr;
 
-	VJFrame *src_frame = (VJFrame*) vjsdl->src_frame;
-	VJFrame *dst_frame = (VJFrame*) vjsdl->dst_frame;
-
-	src_frame->data[0] = yuv420[0];
-	src_frame->data[1] = yuv420[1];
-	src_frame->data[2] = yuv420[2];
-    dst_frame->data[0] = vjsdl->pixels;
-
-	yuv_convert_and_scale_packed( vjsdl->scaler, src_frame,dst_frame );
-
-    if( SDL_UpdateTexture( vjsdl->texture, NULL, vjsdl->pixels, dst_frame->stride[0] ) != 0 ) {
-        veejay_msg(0, "%s", SDL_GetError());
-    }
-
-    SDL_RenderClear( vjsdl->renderer );
-    SDL_RenderCopy( vjsdl->renderer, vjsdl->texture, NULL,NULL );
-    SDL_RenderPresent( vjsdl->renderer );
 }
 
-uint8_t* vj_sdl_get_buffer( void *ptr ) {
+void vj_sdl_convert_to_screen(void *ptr, VJFrame *frame_to_dsplay, uint8_t *pixels)
+{
     vj_sdl *vjsdl = (vj_sdl*) ptr;
-    return vjsdl->pixels;
+
+	VJFrame *dst_frame = (VJFrame*) vjsdl->dst_frame;
+    dst_frame->data[0] = pixels;
+	yuv_convert_and_scale_packed( vjsdl->scaler, frame_to_dsplay,dst_frame );
+
+
+}
+
+uint8_t* vj_sdl_get_buffer( void *ptr, int index ) {
+    vj_sdl *vjsdl = (vj_sdl*) ptr;
+    return vjsdl->buf[index];
 }
 
 void	vj_sdl_quit(void)
