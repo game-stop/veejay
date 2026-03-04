@@ -23,10 +23,11 @@
 #include <jack/jack.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #else
-#ifndef bool 
-  #define bool int
+#ifndef bool
+#define bool int
 #endif
 #endif
 
@@ -38,113 +39,115 @@ extern "C" {
 #define FALSE 0
 #endif
 
-#define ERR_SUCCESS                           0
-#define ERR_OPENING_JACK                      1
-#define ERR_RATE_MISMATCH                     2
-#define ERR_BYTES_PER_OUTPUT_FRAME_INVALID    3
-#define ERR_BYTES_PER_INPUT_FRAME_INVALID     4
-#define ERR_TOO_MANY_OUTPUT_CHANNELS          5
+#define ERR_SUCCESS 0
+#define ERR_OPENING_JACK 1
+#define ERR_RATE_MISMATCH 2
+#define ERR_BYTES_PER_OUTPUT_FRAME_INVALID 3
+#define ERR_BYTES_PER_INPUT_FRAME_INVALID 4
+#define ERR_TOO_MANY_OUTPUT_CHANNELS 5
 #define ERR_PORT_NAME_OUTPUT_CHANNEL_MISMATCH 6
-#define ERR_PORT_NOT_FOUND                    7
-#define ERR_TOO_MANY_INPUT_CHANNELS           8
-#define ERR_PORT_NAME_INPUT_CHANNEL_MISMATCH  9
+#define ERR_PORT_NOT_FOUND 7
+#define ERR_TOO_MANY_INPUT_CHANNELS 8
+#define ERR_PORT_NAME_INPUT_CHANNEL_MISMATCH 9
+#define ERR_TOO_MANY_CHANNELS 10
 
-enum status_enum { PLAYING, PAUSED, STOPPED, CLOSED, RESET };
-enum pos_enum    { BYTES, MILLISECONDS };
+#define BYTES 0
+#define MILLISECONDS 1
 
-#define PLAYED          1 /* played out of the speakers(estimated value but should be close */
+#define PLAYING 0
+#define PAUSED 1
+#define STOPPED 2
+#define CLOSED 3
+#define RESET 4
+
+#define PLAYED 1          /* played out of the speakers(estimated value but should be close */
 #define WRITTEN_TO_JACK 2 /* amount written out to jack */
-#define WRITTEN         3 /* amount written to the bio2jack device */
+#define WRITTEN 3         /* amount written to the bio2jack device */
+#define FRAMES_WRITTEN_TO_JACK 4
 
-/**********************/
-/* External functions */
-void JACK_Init(void); /* call this before any other bio2jack calls */
-void JACK_DoSampleRateConversion(bool value); /* whether the next device that's Open()d should do
-                                                 sample rate conversion if necessary */
-void JACK_SetSampleRateConversionFunction(int converter); /* which SRC converter function should be used
-                                                             for the next Open()d device */
-int  JACK_Open(int *deviceID, unsigned int bits_per_sample, unsigned long *rate, int channels); /* Note: defaults to 0 input channels
-												   if you need input (record) use OpenEx
-												   instead */
-int  JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
-                 unsigned long *rate,
-                 unsigned int input_channels, unsigned int output_channels,
-                 const char **jack_port_name, unsigned int jack_port_name_count,
-                 unsigned long jack_port_flags);
-int  JACK_Close(int deviceID); /* return 0 for success */
-void JACK_Reset(int deviceID); /* free all buffered data and reset several values in the device */
-long JACK_Write(int deviceID, unsigned char *data, unsigned long bytes); /* returns the number of bytes written */
-long JACK_Read(int deviceID, unsigned char *data, unsigned long bytes); /* returns the number of bytes read */
+#define LINEAR 0
+#define DBATTENUATION 1
 
-/* state setting values */
-/* set/get the written/played/buffered value based on a byte or millisecond input value */
-long JACK_GetPosition(int deviceID, enum pos_enum position, int type);
-void JACK_SetPosition(int deviceID, enum pos_enum position, long value);
+  /**********************/
+  /* External functions */
+  void JACK_Init(void); /* call this before any other bio2jack calls */
 
-long JACK_GetJackLatency(int deviceID); /* deprectated, you probably want JACK_GetJackOutputLatency */
-long JACK_GetJackOutputLatency(int deviceID); /* return the output latency in frames */
-long JACK_GetJackInputLatency(int deviceID); /* return the input latency in frames */
+  int JACK_Open(int *deviceID, unsigned int bits_per_sample, unsigned long *rate, int channels, double SPVF);
+  int JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
+                  unsigned long *rate,
+                  unsigned int input_channels, unsigned int output_channels,
+                  const char **jack_port_name, unsigned int jack_port_name_count,
+                  unsigned long jack_port_flags, double SPVF);
+  int JACK_Close(int deviceID);                                            /* return 0 for success */
+  void JACK_Reset(int deviceID);                                           /* free all buffered data and reset several values in the device */
+  long JACK_Write(int deviceID, unsigned char *data, unsigned long bytes); /* returns the number of bytes written */
+  long JACK_Read(int deviceID, unsigned char *data, unsigned long bytes);  /* returns the number of bytes read */
 
-int JACK_SetState(int deviceID, enum status_enum state); /* playing, paused, stopped */
-enum status_enum JACK_GetState(int deviceID);
+  /* state setting values */
+  /* set/get the written/played/buffered value based on a byte or millisecond input value */
+  long JACK_GetPosition(int deviceID, int position, int type);
+  long JACK_GetUnderruns(int deviceID);
+  long JACK_GetJackLatency(int deviceID); /* deprectated, you probably want JACK_GetJackOutputLatency */
 
-long JACK_GetMaxOutputBufferedBytes(int deviceID);
-long JACK_GetMaxInputBufferedBytes(int deviceID);
+  int JACK_SetState(int deviceID, int state); /* playing, paused, stopped */
+  int JACK_GetState(int deviceID);
 
-/* bytes that jack requests during each callback */
-unsigned long JACK_GetJackBufferedBytes(int deviceID);
+  int JACK_SetVolumeEffectType(int deviceID, int type);
 
-/* Properties of the jack driver */
+  int JACK_SetAllVolume(int deviceID, unsigned int volume); /* returns 0 on success */
+  int JACK_SetVolumeForChannel(int deviceID, unsigned int channel, unsigned int volume);
+  void JACK_GetVolumeForChannel(int deviceID, unsigned int channel, unsigned int *volume);
 
-/* linear means 0 volume is silence, 100 is full volume */
-/* dbAttenuation means 0 volume is 0dB attenuation */
-/* Bio2jack defaults to linear */
-/* Note: volume controls only effect output channels for now */
-enum JACK_VOLUME_TYPE { linear, dbAttenuation };
-enum JACK_VOLUME_TYPE JACK_SetVolumeEffectType(int deviceID,
-                                               enum JACK_VOLUME_TYPE type);
+  void JACK_FreeClientName();
 
-int  JACK_SetAllVolume(int deviceID, unsigned int volume); /* returns 0 on success */
-int  JACK_SetVolumeForChannel(int deviceID, unsigned int channel, unsigned int volume);
-void JACK_GetVolumeForChannel(int deviceID, unsigned int channel, unsigned int *volume);
+  unsigned long JACK_GetOutputBytesPerSecond(int deviceID); /* bytes_per_output_frame * sample_rate */
+  unsigned long JACK_GetInputBytesPerSecond(int deviceID);  /* bytes_per_input_frame * sample_rate */
+  unsigned long JACK_GetBytesStored(int deviceID);          /* bytes currently buffered in the output buffer */
+  unsigned long JACK_GetBytesFreeSpace(int deviceID);       /* bytes of free space in the output buffer */
+  unsigned long JACK_GetBytesPerOutputFrame(int deviceID);
+  unsigned long JACK_GetPlayedFramesFromDriver(int deviceID);
 
-void JACK_FreeClientName();
+  void JACK_ResetBuffer(int deviceID);
+  long JACK_GetSampleRateJack(int deviceID);
+  long JACK_GetSampleRate(int deviceID); /* samples per second */
+  long JACK_GetPeriodSize(int deviceID);
+  int JACK_GetRingBufferFreeFrames(int deviceID);
+  int JACK_GetRingBufferSize(int deviceID);
+  void JACK_SetClientName(char *name); /* sets the name that bio2jack will use when
+                                          creating a new jack client.  name_%pid%_%deviceID%%counter%
+                                          will be used
+                                          NOTE: this defaults to name = bio2jack
+                                          NOTE: we limit the size of the client name to
+                                             jack_client_name_size() */
 
-unsigned long JACK_GetOutputBytesPerSecond(int deviceID); /* bytes_per_output_frame * sample_rate */
-unsigned long JACK_GetInputBytesPerSecond(int deviceID);  /* bytes_per_input_frame * sample_rate */
-unsigned long JACK_GetBytesStored(int deviceID);          /* bytes currently buffered in the output buffer */
-unsigned long JACK_GetBytesFreeSpace(int deviceID);       /* bytes of free space in the output buffer */
-unsigned long JACK_GetBytesUsedSpace(int deviceID);       /* bytes of space used in the input buffer */
-unsigned long JACK_GetBytesPerOutputFrame(int deviceID);
-unsigned long JACK_GetBytesPerInputFrame(int deviceID);
-
-/* Note: these will probably be removed in a future release */
-int  JACK_GetNumInputChannels(int deviceID);
-int  JACK_GetNumOutputChannels(int deviceID);
-
-void JACK_ResetBuffer(int deviceID);
-
-long JACK_GetSampleRate(int deviceID); /* samples per second */
-
-void JACK_SetClientName(char *name); /* sets the name that bio2jack will use when
-                                        creating a new jack client.  name_%pid%_%deviceID%%counter%
-                                        will be used
-                                        NOTE: this defaults to name = bio2jack
-                                        NOTE: we limit the size of the client name to
-                                           jack_client_name_size() */
-
-enum JACK_PORT_CONNECTION_MODE
-{
+  enum JACK_PORT_CONNECTION_MODE
+  {
     CONNECT_ALL,    /* connect to all avaliable ports */
     CONNECT_OUTPUT, /* connect only to the ports we need for output */
     CONNECT_NONE    /* don't connect to any ports */
-};
+  };
 
-/* set the mode for port connections */
-/* defaults to CONNECT_ALL */ 
-void JACK_SetPortConnectionMode(enum JACK_PORT_CONNECTION_MODE mode);
+  /* set the mode for port connections */
+  /* defaults to CONNECT_ALL */
+  void JACK_SetPortConnectionMode(enum JACK_PORT_CONNECTION_MODE mode);
 
-long JACK_OutputStatus(int deviceID,long *sec, long *usec);
+  long JACK_OutputStatus(int deviceID, long *sec, long *usec);
+
+  double JACK_GetPlayedPosition(int deviceID);
+
+  int JACK_BufferIsStarving(int deviceID);
+
+  long JACK_GetRequiredFreeFrames(int deviceID, int client_frames);
+
+  void JACK_getringbuffer(int deviceID, int skipv, int skipa);
+
+  double JACK_SetInitialOffset(int deviceID, double target_pts);
+
+  void JACK_Flush(int deviceID);
+
+  double JACK_GetTotalLatency(int deviceID);
+
+  int JACK_GetCallbackActive(int deviceID);
 
 #ifdef __cplusplus
 }
