@@ -60,6 +60,7 @@ typedef struct {
     uint8_t *buf[3];
     uint8_t *blurred[3];
     int frameNumber;
+    int n_threads;
 } camera_t;
 
 void *camerabounce_malloc(int w, int h)
@@ -83,6 +84,8 @@ void *camerabounce_malloc(int w, int h)
 
     c->frameNumber = 0;
 
+    c->n_threads = vje_advise_num_threads(w*h);
+
     return (void*) c;
 }
 
@@ -92,37 +95,38 @@ void camerabounce_free(void *ptr) {
     free(c);
 }
 
-void camerabounce_apply(void *ptr, VJFrame* frame, int *args) {
+void camerabounce_apply(void *ptr, VJFrame* frame, int *args)
+{
     camera_t *c = (camera_t*) ptr;
+
     const int zoomInterval = args[0];
     const int zoomDuration = args[1];
-    const int currentFrame = c->frameNumber % zoomInterval;
-    const double zoom = ( args[3] / 10.0f ) * M_PI / 180.0f;
-    
-    double zoomFactor = 1.0 / ( 1.0 - 2.0 * tan( zoom / 2.0 ));
-    double interpolationFactor;
+    const int shutterAngle = args[2];
+    const double zoomAngle = (args[3] / 10.0) * M_PI / 180.0;
 
-    c->frameNumber ++;
-
-    if( currentFrame <= zoomDuration ) {
-        if( currentFrame <= zoomDuration/2) {
-            interpolationFactor = (double) currentFrame / (zoomDuration/2);
-        }
-        else {
-            interpolationFactor = (double)( zoomDuration - currentFrame)  / (zoomDuration/2);
-        }
-    } else {
-        return;
-    }
-
-    zoomFactor = 1.0 + interpolationFactor * ( zoomFactor - 1.0 );  
-    const double invZoomFactor = 1.0 / zoomFactor;
-
-    const double blurAmount = (args[2] / 100.0f);
-    const int width = frame->width;
+    const int width  = frame->width;
     const int height = frame->height;
 
-    const int newWidth = width * zoomFactor;
+    const int currentFrame = c->frameNumber % zoomInterval;
+    c->frameNumber++;
+
+    if (currentFrame > zoomDuration)
+        return;
+
+    /* Compute interpolation for zoom */
+    double interpolationFactor;
+    if (currentFrame <= zoomDuration / 2)
+        interpolationFactor = (double)currentFrame / (zoomDuration / 2);
+    else
+        interpolationFactor = (double)(zoomDuration - currentFrame) / (zoomDuration / 2);
+
+    double zoomFactor = 1.0 / (1.0 - 2.0 * tan(zoomAngle / 2.0));
+    zoomFactor = 1.0 + interpolationFactor * (zoomFactor - 1.0);
+    const double invZoom = 1.0 / zoomFactor;
+
+    const double blurAmount = shutterAngle / 100.0;
+
+    const int newWidth  = width * zoomFactor;
     const int newHeight = height * zoomFactor;
 
     const int offsetX = (width - newWidth) >> 1;
@@ -136,9 +140,11 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args) {
     uint8_t *restrict bU = c->blurred[1];
     uint8_t *restrict bV = c->blurred[2];
 
+    /* ---------------- Zoom Sampling ---------------- */
+#pragma omp parallel for num_threads(c->n_threads) schedule(static)
     for (int y = 0; y < height; ++y) {
-        int newY = (int)((y - offsetY) * invZoomFactor);
-        newY = (newY < 0) ? 0 : ((newY > height - 1) ? height - 1 : newY);
+        int newY = (int)((y - offsetY) * invZoom);
+        newY = (newY < 0) ? 0 : (newY >= height ? height - 1 : newY);
 
         uint8_t *dstRowY = bY + y * width;
         uint8_t *dstRowU = bU + y * width;
@@ -147,9 +153,10 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args) {
         uint8_t *srcRowU = srcU + newY * width;
         uint8_t *srcRowV = srcV + newY * width;
 
+#pragma omp simd
         for (int x = 0; x < width; ++x) {
-            int newX = (int)((x - offsetX) * invZoomFactor);
-            newX = (newX < 0) ? 0 : ((newX > width - 1) ? width - 1 : newX);
+            int newX = (int)((x - offsetX) * invZoom);
+            newX = (newX < 0) ? 0 : (newX >= width ? width - 1 : newX);
 
             dstRowY[x] = srcRowY[newX];
             dstRowU[x] = srcRowU[newX];
@@ -157,24 +164,24 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args) {
         }
     }
 
-    const int halfWidth = width >> 1;
+    const int halfWidth  = width >> 1;
     const int halfHeight = height >> 1;
-    const int maxDistanceSquared = halfWidth*halfWidth + halfHeight*halfHeight;
+    const int maxDistSq  = halfWidth*halfWidth + halfHeight*halfHeight;
 
+#pragma omp parallel for num_threads(c->n_threads) schedule(static)
     for (int y = 0; y < height; ++y) {
         int distanceY = halfHeight - y;
-        int bpos = y * width;
+        int rowPos = y * width;
 
         for (int x = 0; x < width; ++x) {
             int distanceX = halfWidth - x;
-            int distanceSquared = distanceX * distanceX + distanceY * distanceY;
+            int distSq = distanceX * distanceX + distanceY * distanceY;
 
-            if (distanceSquared <= maxDistanceSquared) {
-                float normalizedDistance = (float) distanceSquared / maxDistanceSquared;
-                normalizedDistance = normalizedDistance * normalizedDistance;
-                normalizedDistance *= 100.0f;
+            if (distSq <= maxDistSq) {
+                float norm = (float)distSq / maxDistSq;
+                norm = norm * norm * 100.0f;
 
-                float blurStrength = blurAmount * normalizedDistance;
+                float blurStrength = blurAmount * norm;
                 if (blurStrength > 6.0f) blurStrength = 6.0f;
 
                 int minX = (x - blurStrength > 0) ? x - blurStrength : 0;
@@ -186,20 +193,21 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args) {
                 uint16_t totalPixels = 0;
 
                 for (int blurY = minY; blurY <= maxY; ++blurY) {
-                    int rowPos = blurY * width;
+                    int blurRow = blurY * width;
+#pragma omp simd reduction(+:tmpY,tmpU,tmpV,totalPixels) for num_threads(c->n_threads)
                     for (int blurX = minX; blurX <= maxX; ++blurX) {
-                        int idx = rowPos + blurX;
+                        int idx = blurRow + blurX;
                         tmpY += bY[idx];
-                        tmpU += (bU[idx] - 128);
-                        tmpV += (bV[idx] - 128);
+                        tmpU += bU[idx] - 128;
+                        tmpV += bV[idx] - 128;
                         totalPixels++;
                     }
                 }
 
-                int dstIndex = bpos + x;
-                srcY[dstIndex] = tmpY / totalPixels;
-                srcU[dstIndex] = 128 + (tmpU / totalPixels);
-                srcV[dstIndex] = 128 + (tmpV / totalPixels);
+                int dstIdx = rowPos + x;
+                srcY[dstIdx] = tmpY / totalPixels;
+                srcU[dstIdx] = 128 + (tmpU / totalPixels);
+                srcV[dstIdx] = 128 + (tmpV / totalPixels);
             }
         }
     }
