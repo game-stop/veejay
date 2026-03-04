@@ -77,9 +77,9 @@ vj_effect *alphaselect2_init(int w, int h)
     return ve;
 }
 
-static inline double color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, const double dA, const double dB )
+static inline float color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, const float dA, const float dB )
 {
-	double tmp = sqrt_table_get_pixel( (Cbk-Cb), (Crk-Cr) );
+	float tmp = sqrt_table_get_pixel( (Cbk-Cb), (Crk-Cr) );
 	return (tmp < dA) ? 0.0 : ((tmp < dB) ? ((tmp - dA) / (dB - dA)) : 1.0);
 }
 
@@ -101,22 +101,22 @@ void alphaselect2_apply(void *ptr, VJFrame *frame, int *args)
     int iy = 0, iu = 128, iv = 128;
     _rgb2yuv(r, g, b, iy, iu, iv);
 
-    const double dtola = tola * 0.1;
-    const double dtolb = tolb * 0.1;
+    const float dtola = tola * 0.1;
+    const float dtolb = tolb * 0.1;
     const int key_cb = iu;
     const int key_cr = iv;
 
     switch (alpha) {
         case 0:
             for (int pos = 0; pos < len; pos++) {
-                double d = color_distance(Cb[pos], Cr[pos], key_cb, key_cr, dtola, dtolb);
+                float d = color_distance(Cb[pos], Cr[pos], key_cb, key_cr, dtola, dtolb);
                 A[pos] = (uint8_t)(d * 255.0);
             }
             break;
 
 		case 1:
 			for (int pos = 0; pos < len; pos++) {
-				double d = color_distance(Cb[pos], Cr[pos], key_cb, key_cr, dtola, dtolb);
+				float d = color_distance(Cb[pos], Cr[pos], key_cb, key_cr, dtola, dtolb);
 				int new_alpha = (int)(d * 255.0);
 				int mask = -(A[pos] == 0);
 				A[pos] = (uint8_t)((new_alpha & mask) | (A[pos] & ~mask));
@@ -125,7 +125,7 @@ void alphaselect2_apply(void *ptr, VJFrame *frame, int *args)
 
         case 2:
 		    for (int pos = 0; pos < len; pos++) {
-                double d = color_distance(Cb[pos], Cr[pos], key_cb, key_cr, dtola, dtolb);
+                float d = color_distance(Cb[pos], Cr[pos], key_cb, key_cr, dtola, dtolb);
                 const uint8_t tmp = (uint8_t)(d * 255.0);
                 A[pos] = (uint8_t)((A[pos] + tmp) >> 1);
             }
@@ -133,7 +133,7 @@ void alphaselect2_apply(void *ptr, VJFrame *frame, int *args)
 
         case 3:
 		    for (int pos = 0; pos < len; pos++) {
-                double d = color_distance(Cb[pos], Cr[pos], key_cb, key_cr, dtola, dtolb);
+                float d = color_distance(Cb[pos], Cr[pos], key_cb, key_cr, dtola, dtolb);
                 int tmp = A[pos] + (uint8_t)(d * 255.0);
                 tmp = 255 + ((tmp - 255) & ((tmp - 255) >> 31));
                 A[pos] = (uint8_t)tmp;
