@@ -116,7 +116,7 @@ static void closeudp(int sockfd) {
 
 static int time_to_quit;
 
-static void catch_sigint()  {
+static void catch_sigint(void)  {
    time_to_quit = 1;
 }
 

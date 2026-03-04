@@ -230,7 +230,7 @@ int RegisterPollingDevice(int fd, void (*callbackfunction)(int , void *), void *
 
 static int caught_sigint;
 
-static void catch_sigint()  {
+static void catch_sigint(void)  {
    caught_sigint = 1;
 }
 static int sockfd, usockfd;
