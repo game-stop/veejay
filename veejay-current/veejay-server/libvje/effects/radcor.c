@@ -62,6 +62,7 @@ typedef struct {
     uint8_t *badbuf;
     uint32_t *Map;
     int map_upd[4];
+	float *x_lut;
 } radcor_t;
 
 void *radcor_malloc( int w, int h )
@@ -86,6 +87,14 @@ void *radcor_malloc( int w, int h )
         free(r);
 		return NULL;
     }
+
+	r->x_lut = (float*) vj_calloc(sizeof(float) * w);
+	if(!r->x_lut) {
+	    free(r->badbuf);
+        free(r->Map);
+		free(r);
+		return NULL;
+    }
 	return (void*) r;
 }
 
@@ -94,6 +103,7 @@ void radcor_free(void *ptr)
     radcor_t *r = (radcor_t*) ptr;
     free(r->badbuf);
     free(r->Map);
+	free(r->x_lut);
     free(r);
 }
 
@@ -104,112 +114,129 @@ typedef struct
 	uint32_t u;
 } pixel_t;
 
-
-void radcor_apply( void *ptr, VJFrame *frame, int *args )
+void radcor_apply(void *ptr, VJFrame *frame, int *args)
 {
     int alpaX = args[0];
     int alpaY = args[1];
-    int dir = args[2];
+    int dir   = args[2];
     int alpha = args[3];
 
     radcor_t *radcor = (radcor_t*) ptr;
 
-	int i,j;
-	int i2,j2;
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-	const int len = frame->len;
-	double x,y,x2,x3,y2,y3,r;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *A = frame->data[3];
-	int nx = width;
-	int ny = height;
-	int nxout = nx;
-	int nyout = ny;
+    const int width  = frame->width;
+    const int height = frame->height;
+    const int len    = frame->len;
 
-	//@ copy source image to internal buffer 
-	uint8_t *dest[4] = { radcor->badbuf, radcor->badbuf + len, radcor->badbuf + len + len, radcor->badbuf + len + len + len };
-	int strides[4] = { len, len, len, 0 };
-	if( alpha )
-		strides[3] = len;
+    uint8_t * restrict Y  = frame->data[0];
+    uint8_t * restrict Cb = frame->data[1];
+    uint8_t * restrict Cr = frame->data[2];
+    uint8_t * restrict A  = frame->data[3];
 
-	vj_frame_copy( frame->data, dest, strides );
+    uint8_t * restrict Yi  = radcor->badbuf;
+    uint8_t * restrict Cbi = radcor->badbuf + len;
+    uint8_t * restrict Cri = radcor->badbuf + len + len;
+    uint8_t * restrict Ai  = radcor->badbuf + len + len + len;
 
-	uint8_t *Yi = radcor->badbuf;
-	uint8_t *Cbi = radcor->badbuf + len;
-	uint8_t *Cri = radcor->badbuf + len + len;
-	uint8_t *Ai = radcor->badbuf + len + len + len;
+    uint32_t * restrict Map = radcor->Map;
+	float *restrict x_lut = radcor->x_lut;
 
-    uint32_t *Map = radcor->Map;
+    uint8_t *dest[4] = { Yi, Cbi, Cri, Ai };
+    int strides[4] = { len, len, len, alpha ? len : 0 };
+    vj_frame_copy(frame->data, dest, strides);
 
-	double alphax = alpaX / (double) 1000.0;
-	double alphay = alpaY / (double) 1000.0;
+    double alphax = alpaX * (1.0 / 1000.0);
+    double alphay = alpaY * (1.0 / 1000.0);
 
-	if(!dir)
+    if (!dir) {
+        alphax = -alphax;
+        alphay = -alphay;
+    }
+
+    vj_frame_clear1(Y,  0,   len);
+    vj_frame_clear1(Cb, 128, len);
+    vj_frame_clear1(Cr, 128, len);
+    if (alpha)
+        vj_frame_clear1(A, 0, len);
+
+    int update_map = 0;
+
+    if (radcor->map_upd[0] != alpaX ||
+        radcor->map_upd[1] != alpaY ||
+        radcor->map_upd[2] != dir)
+    {
+        radcor->map_upd[0] = alpaX;
+        radcor->map_upd[1] = alpaY;
+        radcor->map_upd[2] = dir;
+        update_map = 1;
+    }
+
+	if (update_map)
 	{
-		alphax *= -1.0; // inward, outward, change sign
-		alphay *= -1.0;
-	}
+		const float inv_w = 1.0f / (float)width;
+		const float inv_h = 1.0f / (float)height;
 
-	vj_frame_clear1( Y, 0, len );
-	vj_frame_clear1( Cb, 128, len );
-	vj_frame_clear1( Cr, 128, len );
-	if( alpha )
-		vj_frame_clear1( A, 0, len );
+		const float half_w = 0.5f * (float)width;
+		const float half_h = 0.5f * (float)height;
 
-	int update_map = 0;
+		const float ax = (float)alphax;
+		const float ay = (float)alphay;
 
-	if( radcor->map_upd[0] != alpaX || radcor->map_upd[1] != alpaY || radcor->map_upd[2] != dir )
-	{
-		radcor->map_upd[0] = alpaX;
-		radcor->map_upd[1] = alpaY;
-		radcor->map_upd[2] = dir;
-		update_map = 1;
-	}
+		for (int j = 0; j < width; ++j)
+			x_lut[j] = ((2.0f * j) - width) * inv_w;
 
-	if( update_map )
-	{
-		for( i = 0; i < nyout; i ++ )
+		for (int i = 0; i < height; ++i)
 		{
-			for( j = 0; j < nxout; j ++ )
-			{	
-				x = ( 2 * j - nxout ) / (double) nxout;
-				y = ( 2 * i - nyout ) / (double) nyout;
+			const float y = ((2.0f * (float)i) - (float)height) * inv_h;
 
-				r = x*x + y*y;
-				x3 = x / (1 - alphax * r);
-				y3 = y / (1 - alphay * r); 
-				x2 = x / (1 - alphax * (x3*x3+y3*y3));
-				y2 = y / (1 - alphay * (x3*x3+y3*y3));
-				i2 = (y2 + 1) * ny / 2;
-				j2 = (x2 + 1) * nx / 2;
-	
-				if( i2 >= 0 && i2 < ny && j2 >= 0 && j2 < nx )
-					Map[ i * nxout + j ] = i2 * nx + j2;
+			for (int j = 0; j < width; ++j)
+			{
+				const float x = x_lut[j];
+
+				const float r  = x * x + y * y;
+
+				const float inv1x = 1.0f / (1.0f - ax * r);
+				const float inv1y = 1.0f / (1.0f - ay * r);
+
+				const float x3 = x * inv1x;
+				const float y3 = y * inv1y;
+
+				const float r2 = x3 * x3 + y3 * y3;
+
+				const float inv2x = 1.0f / (1.0f - ax * r2);
+				const float inv2y = 1.0f / (1.0f - ay * r2);
+
+				const float x2 = x * inv2x;
+				const float y2 = y * inv2y;
+
+				const int i2 = (int)((y2 + 1.0f) * half_h);
+				const int j2 = (int)((x2 + 1.0f) * half_w);
+
+				const int pos = i * width + j;
+
+				if ((unsigned)i2 < (unsigned)height &&
+					(unsigned)j2 < (unsigned)width)
+				{
+					Map[pos] = (uint32_t)(i2 * width + j2);
+				}
 				else
-					Map[ i * nxout + j ] = 0;
+				{
+					Map[pos] = 0;
+				}
 			}
 		}
 	}
 
-	// process
-	for( i = 0; i < height; i ++ )
-	{
-		for( j = 0; j < width ; j ++ )
-		{
-			Y[ i * width + j ] = Yi[ Map[i * width + j] ];
-			Cb[ i * width + j ] = Cbi[ Map[i * width + j] ];
-			Cr[ i * width + j ] = Cri[ Map[i * width + j] ];
-		}
-	}
+    for (int i = 0; i < len; ++i)
+    {
+        uint32_t idx = Map[i];
+        Y[i]  = Yi[idx];
+        Cb[i] = Cbi[idx];
+        Cr[i] = Cri[idx];
+    }
 
-	if( alpha)
-	{
-		for( i = 0; i < len; i ++ )
-		{
-			A[i] = Ai[ Map[i] ];
-		}
-	}
+    if (alpha)
+    {
+        for (int i = 0; i < len; ++i)
+            A[i] = Ai[ Map[i] ];
+    }
 }
