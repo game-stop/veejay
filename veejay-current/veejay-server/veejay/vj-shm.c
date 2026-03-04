@@ -42,6 +42,8 @@
 #include <libplugger/specs/livido.h>
 #include <veejaycore/avcommon.h>
 #include <veejay/vj-shm.h>
+#include <dirent.h>
+#include <signal.h>
 #define HEADER_LENGTH 4096
 #ifndef PATH_MAX
 #define PATH_MAX 1024
@@ -86,30 +88,106 @@ void	vj_shm_set_id(int v) {
 	just_a_shmid = v;
 }
 
-void	vj_shm_free(void *vv)
-{
-	vj_shm_t *v = (vj_shm_t*) vv;
-	
-	vj_shared_data *data = (vj_shared_data*) v->sms;
+static void vj_shm_cleanup_stale_files(const char *dirpath) {
+    DIR *dir = opendir(dirpath);
+    if (!dir) return;
 
-	int res     = pthread_rwlock_destroy( &data->rwlock );
+    struct dirent *entry;
+    char full_path[PATH_MAX];
 
-	res = shmctl( v->shm_id, IPC_RMID, NULL );
-	if( res==-1 ) {
-		veejay_msg(0, "Failed to remove shared memory %d: %s", v->shm_id, strerror(errno));
-	}
-
-	if( v->file ) {
-		res = remove(v->file);
-		if( res == -1 ) {
-			veejay_msg(VEEJAY_MSG_WARNING, "Unable to remove file %s", v->file);
-		}
-		free(v->file);
-	}
-
-	free(v);
+    while ((entry = readdir(dir)) != NULL) {
+        if (strncmp(entry->d_name, "shm_", 4) == 0 && strstr(entry->d_name, ".dat")) {
+            int pid_to_check = 0;
+            if (sscanf(entry->d_name, "shm_%d.dat", &pid_to_check) == 1) {
+                if (kill(pid_to_check, 0) == -1 && errno == ESRCH) {
+                    snprintf(full_path, sizeof(full_path), "%s/%s", dirpath, entry->d_name);
+                    
+                    FILE *f = fopen(full_path, "r");
+                    if (f) {
+                        int key_val = -1;
+                        if (fscanf(f, "pid=%*d\nkey=%d", &key_val) == 1) {
+                            int shm_id = shmget(key_val, 0, 0);
+                            if (shm_id != -1) {
+                                shmctl(shm_id, IPC_RMID, NULL);
+                            }
+                        }
+                        fclose(f);
+                    }
+                    
+                    veejay_msg(VEEJAY_MSG_DEBUG, "Cleaning up stale SHM file: %s", full_path);
+                    remove(full_path);
+                }
+            }
+        }
+    }
+    closedir(dir);
 }
 
+static int vj_shm_file_ref_use_this(char *path) {
+    struct stat inf;
+    
+    if (stat(path, &inf) != 0) {
+        return 1; 
+    }
+
+    int pid_in_file = -1;
+    int key_in_file = -1;
+    
+    FILE *f = fopen(path, "r");
+    if (f) {
+        if (fscanf(f, "pid=%d\nkey=%d", &pid_in_file, &key_in_file) == 2) {
+            
+            if (kill(pid_in_file, 0) == -1 && errno == ESRCH) {
+                veejay_msg(VEEJAY_MSG_DEBUG, "SHM: Reclaiming stale discovery file for dead PID %d", pid_in_file);
+                
+                int shm_id = shmget(key_in_file, 0, 0);
+                if (shm_id != -1) {
+                    shmctl(shm_id, IPC_RMID, NULL);
+                }
+                
+                fclose(f);
+                remove(path);
+                return 1;
+            }
+        }
+        fclose(f);
+    }
+
+    return 0; 
+}
+
+void vj_shm_free(void *vv)
+{
+    vj_shm_t *v = (vj_shm_t*) vv;
+    if (!v) return;
+
+    vj_shared_data *data = (vj_shared_data*) v->sms;
+    if (data) {
+        pthread_rwlock_destroy(&data->rwlock);
+        shmdt(v->sms);
+    }
+
+    if (v->shm_id > 0) {
+        shmctl(v->shm_id, IPC_RMID, NULL);
+    }
+
+    if (v->file) {
+        char *dir_ptr = strdup(v->file);
+        char *last_slash = strrchr(dir_ptr, '/');
+        
+        remove(v->file);
+
+        if (last_slash) {
+            *last_slash = '\0';
+            vj_shm_cleanup_stale_files(dir_ptr);
+        }
+
+        free(dir_ptr);
+        free(v->file);
+    }
+
+    free(v);
+}
 
 void	vj_shm_set_status( void *vv, int status )
 {
@@ -152,9 +230,9 @@ int		vj_shm_read( void *vv , uint8_t *dst[4] )
 	vj_shm_t *v         = (vj_shm_t*) vv;
 	vj_shared_data *data = (vj_shared_data*) v->sms;
 	int res = pthread_rwlock_rdlock( &data->rwlock );
-	if( res == -1 ) {
+	if( res != 0 ) {
 		veejay_msg(0, "Unable to acquire lock: %s",strerror(errno));
-		return 0;
+		return -1;
 	}
 	uint8_t *ptr = ( (uint8_t*) v->sms ) + HEADER_LENGTH;
 	
@@ -171,9 +249,9 @@ int		vj_shm_read( void *vv , uint8_t *dst[4] )
 	vj_frame_copy( in, dst, strides );
 
 	res = pthread_rwlock_unlock( &data->rwlock );
-	if( res == -1 ) {
+	if( res != 0 ) {
 		veejay_msg(0, "Unable to release lock: %s",strerror(errno));
-		return 0;
+		return -1;
 	}
 
 	return 0;
@@ -244,7 +322,7 @@ void	*vj_shm_new_slave(int shm_id)
 		return NULL;
 	}
 
-	vj_shm_t *v = (vj_shm_t*) vj_calloc(sizeof( vj_shm_t*));
+	vj_shm_t *v = (vj_shm_t*) vj_calloc(sizeof(vj_shm_t));
 	v->sms = ptr;
 	vj_shared_data *data = (vj_shared_data*) &(ptr[0]);
 
@@ -261,52 +339,59 @@ void	*vj_shm_new_slave(int shm_id)
 	return v;
 }
 
-static	int		vj_shm_file_ref_use_this( char *path ) {
-	struct stat inf;
-	int res = stat( path, &inf );
-	if( res == 0 ) {
-		return 0; //@ no
-	}
-	return 1; //@ try anyway
+void *vj_shm_new_slave_by_pid(const char *homedir, int pid) 
+{
+    char filepath[PATH_MAX];
+    snprintf(filepath, sizeof(filepath), "%s/.veejay_shm/shm_%d.dat", homedir, pid);
+    
+    FILE *f = fopen(filepath, "r");
+    if (!f) return NULL;
+
+    int key_val;
+    if (fscanf(f, "pid=%*d\nkey=%d", &key_val) != 1) {
+        fclose(f);
+        return NULL;
+    }
+    fclose(f);
+
+    int shm_id = shmget(key_val, 0, 0400);
+    return vj_shm_new_slave(shm_id);
 }
 
-static	int		vj_shm_file_ref( vj_shm_t *v, const char *homedir )
+static int vj_shm_file_ref(vj_shm_t *v, const char *homedir)
 {
-	char path[PATH_MAX];
-	int  tries = 0;
-	while( tries < 0xff ) {
-		snprintf(path, sizeof(path) - 1, "%s/veejay_shm_out-%d.shm_id", homedir, tries );
-		if( vj_shm_file_ref_use_this( path ) )	
-			break;
+    char dirpath[PATH_MAX];
+    char filepath[PATH_MAX + 64];
+    
+    snprintf(dirpath, sizeof(dirpath), "%s/.veejay_shm", homedir);
+	if (mkdir(dirpath, 0700) == -1 && errno != EEXIST) {
+        veejay_msg(0, "SHM: Failed to create directory %s", dirpath);
+        return 0;
+    }
 
-		tries ++;
-	}
+    pid_t my_pid = getpid();
+    snprintf(filepath, sizeof(filepath), "%s/shm_%d.dat", dirpath, my_pid);
 
-	if(tries == 0xff) {
-		veejay_msg(0,"Ran out of veejay_shm_out files, please remove them from %s", homedir);
-		return 0;
-	}
+    FILE *f = fopen(filepath, "w");
+    if (!f) {
+        veejay_msg(0, "SHM Error: Could not create discovery file %s", filepath);
+        return 0;
+    }
 
-	FILE *f = fopen( path,"w+" );
-	if(!f ) {
-		veejay_msg(0, "I used to be able to write here but can't anymore: %s", homedir );
-		return 0;
-	}
+    key_t key = ftok(filepath, 64);
+    if (key == -1) {
+        fclose(f);
+        return 0;
+    }
 
-	key_t key = ftok( path, 128 );
-	if( key == -1 ) {
-		return 0;
-	}
+    fprintf(f, "pid=%d\nkey=%d\n", my_pid, key);
+    fclose(f);
 
-	fprintf( f, "veejay_shm_out-%d: shm_id=%d\n", tries,key );
-	fclose(f );
-
-	v->key = key;
-	v->file = strdup( path );
-	
-	veejay_msg(VEEJAY_MSG_DEBUG, "SHM resource file written to %s ", path );
-
-	return 1;
+    v->key = key;
+    v->file = strdup(filepath);
+    
+    veejay_msg(VEEJAY_MSG_INFO, "SHM Discovery file created: %s", filepath);
+    return 1;
 }
 
 static 	void	failed_init_cleanup( vj_shm_t *v )
@@ -323,33 +408,25 @@ static 	void	failed_init_cleanup( vj_shm_t *v )
 	free(v);
 }
 
-static	int	ffmpeg_to_lvd(int fmt)
-{
-	int res;
-	switch(fmt) {
-		case PIX_FMT_YUVA422P: res = LIVIDO_PALETTE_YUV422P; break;
-		case PIX_FMT_YUVA444P: res = LIVIDO_PALETTE_YUV444P; break;
-		case PIX_FMT_YUVJ422P: 
-		case PIX_FMT_YUV422P: res = LIVIDO_PALETTE_YUV422P; break;
-		case PIX_FMT_YUVJ444P: 
-		case PIX_FMT_YUV444P: res = LIVIDO_PALETTE_YUV444P; break;
-		default:
-			res = LIVIDO_PALETTE_YUV422P;
-			break;
-	}
-	return res;
-}
-
-//@ new producer, puts frame in shm
 void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 {
+	char dirpath[PATH_MAX];
+    snprintf(dirpath, sizeof(dirpath), "%s/.veejay_shm", homedir);
+
+    if (mkdir(dirpath, 0700) == -1 && errno != EEXIST) {
+        veejay_msg(0, "SHM: Failed to create directory %s", dirpath);
+        return NULL;
+    }
+
+    vj_shm_cleanup_stale_files(dirpath);	
+
 	vj_shm_t *v = (vj_shm_t*) vj_calloc(sizeof(vj_shm_t));
 	v->parent   = 1;
 
-	if( vj_shm_file_ref( v, homedir ) == -1 ) {
-		free(v);
-		return NULL;
-	}
+	if( vj_shm_file_ref( v, homedir ) == 0 ) {
+        free(v);
+        return NULL;
+    }
 
 	size_t size = (HEADER_LENGTH + (frame->width * frame->height * 4));
 
@@ -398,7 +475,7 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	veejay_msg(VEEJAY_MSG_DEBUG,"Shared Resource:  Planes {%d,%d,%d,X} LVD pixel format %d",
 			data->header[2],data->header[3],data->header[4],data->header[5]);
 */
-	v->alpha = 0;
+	//v->alpha = 0;
 
 	if(v->alpha) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "Shared Resource: includes alpha channel information");

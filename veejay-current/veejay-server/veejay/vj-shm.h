@@ -23,6 +23,7 @@
 #define VJ_SHM
 int		vj_shm_write( void *vv, uint8_t *frame[4], int plane_sizes[4] );
 void	*vj_shm_new_slave(int shm_id);
+void *vj_shm_new_slave_by_pid(const char *homedir, int pid);
 void	vj_shm_free_slave(void *vv);
 void	*vj_shm_new_master(const char *homedir, VJFrame *frame);
 int		vj_shm_read( void *vv, uint8_t *dst[4] );
