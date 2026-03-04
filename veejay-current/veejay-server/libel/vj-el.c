@@ -90,8 +90,6 @@ static struct
 };
 
 
-static	long mmap_size = 0;
-
 typedef struct
 {
         const AVCodec *codec;
@@ -103,11 +101,6 @@ typedef struct
 } el_decoder_t;
 
 extern void sample_new_simple( void *el, long start, long end );
-
-void	vj_el_set_mmap_size( long size )
-{
-	mmap_size = size;
-}
 
 typedef struct
 {
@@ -182,20 +175,9 @@ static int el_pixel_format_ = 1;
 static int el_width_ = 0;
 static float el_fps_ = 30;
 static int el_height_ = 0;
-static long mem_chunk_ = 0;
 static int el_switch_jpeg_ = 0;
 
 static VJFrame *el_out_ = NULL;
-
-long	vj_el_get_mem_size(void)
-{
-	return mem_chunk_;
-}
-void	vj_el_init_chunk(int size)
-{
-//@@ chunk size per editlist
-	mem_chunk_ = 1024 * size;
-}
 
 static int require_same_resolution = 0;
 
@@ -242,57 +224,6 @@ int	vj_el_is_dv(editlist *el)
 #endif
 }
 
-
-void	vj_el_prepare(void)
-{
-//	reset_cache( el->cache );
-}
-
-void	vj_el_break_cache( editlist *el )
-{
-	if(el) {
-		if( el->cache )
-			free_cache( el->cache );
-		el->cache = NULL;
-	}
-}
-
-static int never_cache_ = 0;
-void	vj_el_set_caching(int status)
-{
-	never_cache_ = status;
-}
-
-void	vj_el_setup_cache( editlist *el )
-{
-	if(!el->cache && !never_cache_)
-	{
-		int n_slots = mem_chunk_ / el->max_frame_size;
-		if( el->video_frames < n_slots)
-		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Good, can load this sample entirely into memory... (%d slots, chunk=%d, framesize=%d)", n_slots, mem_chunk_, el->max_frame_size ); 
-			el->cache = init_cache( n_slots );
-		}
-	}
-}
-
-void	vj_el_clear_cache( editlist *el )
-{
-	if( el != NULL ) {
-		if(el->cache) {
-			reset_cache(el->cache);
-		}
-	}
-}
-
-void	vj_el_deinit(void)
-{
-}
-
-int	vj_el_cache_size(void)
-{
-	return cache_avail_mb();
-}
 
 #ifndef GREMLIN_GUARDIAN
 #define GREMLIN_GUARDIAN (128*1024)-1
@@ -419,7 +350,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	
 	int pixfmt = -1;
 
-	lav_file_t *elfd = lav_open_input_file(filename,mmap_size );
+	size_t suggested_map_len = mmap_file_suggest_size(filename, NULL);
+	lav_file_t *elfd = lav_open_input_file(filename,suggested_map_len );
 	el->lav_fd[n] = NULL;
 	if (elfd == NULL)
 	{
@@ -777,38 +709,29 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 
 	int res = 0;
    	uint64_t n;
-	int out_pix_fmt = el->pixel_format;
-	int in_pix_fmt  = out_pix_fmt;
-
+	
 	if (nframe < 0) {
-	    veejay_msg(VEEJAY_MSG_DEBUG, "Oops, veejay requested frame %d",nframe);
+	    veejay_msg(VEEJAY_MSG_DEBUG, "Oops, veejay requested frame %d < 0 ",nframe);
         nframe = 0;
     }
 	if (nframe > el->total_frames) {
-	    veejay_msg(VEEJAY_MSG_DEBUG, "Oops, veejay requested frame %d", nframe);
+	    veejay_msg(VEEJAY_MSG_DEBUG, "Oops, veejay requested frame %d > %ld ", nframe, el->total_frames);
         nframe = el->total_frames;
     }
 
-	n = el->frame_list[nframe];
-
-	in_pix_fmt = el->pixfmt[N_EL_FILE(n)];
-
-	uint8_t *in_cache = NULL;
-	if(el->cache)
-		in_cache = get_cached_frame( el->cache, nframe, &res, &in_pix_fmt );
+	n = el->frame_list[nframe];;
 
 	int decoder_id = lav_video_compressor_type( el->lav_fd[N_EL_FILE(n)] );
 
-	if(! in_cache )	
+
+	res = lav_set_video_position(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n));
+	if (res < 0)
 	{
-		res = lav_set_video_position(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n));
-		if (res < 0)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR,"Error setting video position: %s",
-				  lav_strerror());
-			return -1;
- 		}
+		veejay_msg(VEEJAY_MSG_ERROR,"Error setting video position: %s",
+				lav_strerror());
+		return -1;
 	}
+
 
 	if( decoder_id == 0xffff )
 	{
@@ -825,18 +748,12 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 	}
 
 	vj_decoder *d = (vj_decoder*) el->decoders[ N_EL_FILE(n) ];
-
-	if(!in_cache)
+	if(lav_filetype( el->lav_fd[N_EL_FILE(n)] ) != 'x')
 	{
-		if(lav_filetype( el->lav_fd[N_EL_FILE(n)] ) != 'x')
-		{
-		    res = lav_read_frame(el->lav_fd[N_EL_FILE(n)], d->tmp_buffer);
-		    if(res > 0 && el->cache)
-			cache_frame( el->cache, d->tmp_buffer, res, nframe, decoder_id );
-		}
+		res = lav_read_frame(el->lav_fd[N_EL_FILE(n)], d->tmp_buffer);
 	}
 
-	uint8_t *data = ( in_cache == NULL ? d->tmp_buffer: in_cache );
+	uint8_t *data = d->tmp_buffer;
 	uint8_t *in[3] = { NULL,NULL,NULL };
 	int strides[4] = { el_out_->len, el_out_->uv_len, el_out_->uv_len ,0};
 	uint8_t *dataplanes[4] = { data , data + el_out_->len, data + el_out_->len + el_out_->uv_len,0 };
@@ -931,7 +848,7 @@ int	test_video_frame( editlist *el, int n, lav_file_t *lav,int out_pix_fmt)
 		return -1;
 	}
 
-	if(lav_filetype( lav ) == 'x')
+	if(lav_filetype( lav ) == 'x' || lav_filetype(lav) == 'G')
 	{
 		return out_pix_fmt;
 	}
@@ -948,7 +865,7 @@ int	test_video_frame( editlist *el, int n, lav_file_t *lav,int out_pix_fmt)
 		case CHROMA411:
 			in_pix_fmt = PIX_FMT_YUV422P; break;
 		default:
-			veejay_msg(0 ,"Unsupported pixel format");
+			veejay_msg(0 ,"Unsupported pixel format %d (format=%d)", lav->MJPG_chroma, lav_filetype(lav));
 			break;			
 	}
 	long max_frame_size = get_max_frame_size( lav );
@@ -1031,9 +948,7 @@ int	test_video_frame( editlist *el, int n, lav_file_t *lav,int out_pix_fmt)
 
 	
 	return ret;  
-}
-
-
+} 
 
 int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
 {
@@ -1198,7 +1113,6 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 	el->last_apos = 0;
 	el->frame_list = NULL;
 	el->has_video = 0;
-	el->cache = NULL;
 
 	return el;
 }
@@ -1227,7 +1141,7 @@ void	vj_el_scan_video_file( char *filename,  int *dw, int *dh, float *dfps, long
 		avhelper_close_decoder(tmp);
 	} 
 	
-	lav_file_t *fd = lav_open_input_file( filename, mmap_size );
+	lav_file_t *fd = lav_open_input_file( filename, 0 );
 	if( fd ) {
 		p2_wid = lav_video_width( fd );
 		p2_hei = lav_video_height( fd );
@@ -1589,10 +1503,6 @@ void	vj_el_free(editlist *el)
 		}
 	}
 
-	if( el->cache ) {
-		free_cache( el->cache );
-		el->cache = NULL;
-	}
 	if( el->frame_list ) {
 		free(el->frame_list );
 		el->frame_list = NULL;
