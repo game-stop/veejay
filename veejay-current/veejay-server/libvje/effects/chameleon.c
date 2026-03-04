@@ -63,6 +63,7 @@ typedef struct {
     uint8_t *tmpimage[4];
     int plane;
     uint8_t	*bgimage[4];
+	int n_threads;
 } chameleon_t;
 
 #define PLANES_DEPTH 6
@@ -141,6 +142,7 @@ void *chameleon_malloc(int w, int h)
     }
 
 	c->last_mode_ = -1;
+	c->n_threads = vje_advise_num_threads(len);
 
 	return (void*) c;
 }
@@ -156,108 +158,80 @@ void	chameleon_free(void *ptr)
     free(c);
 }
 
-static void drawAppearing(chameleon_t *cb, VJFrame *src, VJFrame *dest )
+static void drawAppearing(chameleon_t *cb, VJFrame *src, VJFrame *dest)
 {
-	int i;
-	unsigned int Y;
-	uint8_t *p, *qy, *qu, *qv;
-	int32_t *s;
-	const int video_area = src->len;
+    const int video_area = src->len;
+    uint8_t *restrict p = cb->timebuffer + (cb->plane * video_area);
+    int32_t *restrict s = cb->sum;
 
-	p = cb->timebuffer + cb->plane * video_area;
-	qy = cb->bgimage[0];
-	qu = cb->bgimage[1];
-	qv = cb->bgimage[2];
+    uint8_t *restrict qy = cb->bgimage[0];
+    uint8_t *restrict qu = cb->bgimage[1];
+    uint8_t *restrict qv = cb->bgimage[2];
 
-	uint8_t *lum = src->data[0];
-	uint8_t *u0  = src->data[1];
-	uint8_t *v0  = src->data[2];
+    uint8_t *restrict lum = src->data[0];
+    uint8_t *restrict u0  = src->data[1];
+    uint8_t *restrict v0  = src->data[2];
 
-	uint8_t *Y1 = dest->data[0];
-	uint8_t *U1 = dest->data[1];
-	uint8_t *V1 = dest->data[2];
+    uint8_t *restrict Y1 = dest->data[0];
+    uint8_t *restrict U1 = dest->data[1];
+    uint8_t *restrict V1 = dest->data[2];
 
-	s = cb->sum;
-	uint8_t a,b,c;
-	for(i=0; i<video_area; i++)
-	{
-		Y = lum[i];
-		*s -= *p;
-		*s += Y;
-		*p = Y;
-		Y = (abs(((int)Y<<PLANES_DEPTH) - (int)(*s)) * 8)>>PLANES_DEPTH;
-		if(Y>255) Y = 255;
-		a = lum[i];
-		b = u0[i]; 
-		c = v0[i];
-		a += (( qy[i]  - a ) * Y )>>8;
-		Y1[i] = a;
-		b += (( qu[i] - b ) * Y )>>8;
-		U1[i] = b;
-		c += (( qv[i] - c ) * Y )>>8;
-		V1[i] = c;
-		p++;
-		s++;
-	}
+    #pragma omp parallel for simd num_threads(cb->n_threads)
+    for(int i = 0; i < video_area; i++)
+    {
+        int Y = lum[i];
+        int current_sum = s[i] - p[i] + Y;
+        s[i] = current_sum;
+        p[i] = Y;
 
-	cb->plane++;
-	cb->plane = cb->plane & (PLANES-1);
+        int diff = (Y << PLANES_DEPTH) - current_sum;
+        int mask = diff >> 31;
+        uint32_t dist = ((diff ^ mask) - mask) << 3; 
+        uint8_t alpha = (uint8_t)((dist >> PLANES_DEPTH) | -(dist >> (PLANES_DEPTH + 8))); 
+
+        Y1[i] = lum[i] + (((qy[i] - lum[i]) * alpha) >> 8);
+        U1[i] = u0[i]  + (((qu[i] - u0[i])  * alpha) >> 8);
+        V1[i] = v0[i]  + (((qv[i] - v0[i])  * alpha) >> 8);
+    }
+    cb->plane = (cb->plane + 1) & (PLANES - 1);
 }
 
-
-static	void	drawDisappearing(chameleon_t *cb, VJFrame *src, VJFrame *dest)
+static void drawDisappearing(chameleon_t *cb, VJFrame *src, VJFrame *dest)
 {
-	int i;
-	unsigned int Y;
-	uint8_t *p, *qu, *qv, *qy;
-	int32_t *s;
-	const int video_area = src->len;
+    const int video_area = src->len;
+    uint8_t *restrict p = cb->timebuffer + (cb->plane * video_area);
+    int32_t *restrict s = cb->sum;
+    
+    uint8_t *restrict qy = cb->bgimage[0];
+    uint8_t *restrict qu = cb->bgimage[1];
+    uint8_t *restrict qv = cb->bgimage[2];
 
-	uint8_t *Y1 = dest->data[0];
-	uint8_t *U1 = dest->data[1];
-	uint8_t *V1 = dest->data[2];
-	uint8_t *lum = src->data[0];
-	uint8_t *u0  = src->data[1];
-	uint8_t *v0  = src->data[2];
+    uint8_t *restrict lum = src->data[0];
+    uint8_t *restrict u0  = src->data[1];
+    uint8_t *restrict v0  = src->data[2];
 
-	p = cb->timebuffer + (cb->plane * video_area);
-	qy = cb->bgimage[0];
-	qu = cb->bgimage[1];
-	qv = cb->bgimage[2];
-	s = cb->sum;
+    uint8_t *restrict Y1 = dest->data[0];
+    uint8_t *restrict U1 = dest->data[1];
+    uint8_t *restrict V1 = dest->data[2];
 
-	uint8_t a,b,c,A,B,C;
+    #pragma omp parallel for simd num_threads(cb->n_threads)
+    for(int i = 0; i < video_area; i++)
+    {
+        int Y = lum[i];
+        int current_sum = s[i] - p[i] + Y;
+        s[i] = current_sum;
+        p[i] = Y;
 
-	for(i=0; i < video_area; i++)
-	{
-		Y = a = lum[i]; 
-		b = u0[i]; 
-		c = v0[i];
-	
-		A = qy[i];
-		B = qu[i];
-		C = qv[i];
+        int diff = (Y << PLANES_DEPTH) - current_sum;
+        int mask = diff >> 31;
+        uint32_t dist = ((diff ^ mask) - mask) << 3; 
+        uint8_t alpha = (uint8_t)((dist >> PLANES_DEPTH) | -(dist >> (PLANES_DEPTH + 8))); 
 
-		*s -= *p;
-		*s += Y;
-		*p = Y;
-
-		Y = (abs(((int)Y<<PLANES_DEPTH) - (int)(*s)) * 8)>>PLANES_DEPTH;
-		if(Y>255) Y = 255;
-
-		A += (( a - A ) * Y )>> 8;
-		Y1[i] = A;	
-		B += (( b - B ) * Y ) >> 8;
-		U1[i] = B;
-		C += (( c - C ) * Y ) >> 8;
-		V1[i] = C;
-
-		p++;
-		s++;
-	}
-
-	cb->plane++;
-	cb->plane = cb->plane & (PLANES-1);
+        Y1[i] = qy[i] + (((lum[i] - qy[i]) * alpha) >> 8);
+        U1[i] = qu[i] + (((u0[i]  - qu[i]) * alpha) >> 8);
+        V1[i] = qv[i] + (((v0[i]  - qv[i]) * alpha) >> 8);
+    }
+    cb->plane = (cb->plane + 1) & (PLANES - 1);
 }
 
 void chameleon_apply( void *ptr, VJFrame *frame, int *args ){
