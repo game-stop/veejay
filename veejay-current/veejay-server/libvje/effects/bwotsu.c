@@ -55,67 +55,68 @@ vj_effect *bwotsu_init(int w, int h)
 }
 
 //@see https://en.wikipedia.org/wiki/Otsu's_method
-static uint32_t	bwotsu( uint32_t *H, const int N )
-{
-	uint32_t threshold = 0;
-	double wF, wB=0.0, mB, mF, between, max = 0.0;
-	double sum = 0.0, sumB=0.0;
-	uint32_t i;
+static inline uint32_t bwotsu(uint32_t *H, const int N) {
+    uint32_t threshold = 0;
+    double wF, wB = 0.0, mB, mF, between, max = 0.0;
+    double sum = 0.0, sumB = 0.0;
 
-	for( i = 0; i < 256; i++ ) 
-	{
-		wB += H[i];
-		if( wB == 0 )
-			continue;
-		wF = N - wB;
-		if( wF == 0 )
-			break;
-		sumB += ( i * H[i] );
-		mB = sumB / wB;
-		mF = (sum - sumB) / wF;
-		between = wB * wF * pow( mB - mF , 2 );
-		if( between > max ) {
-			max = between;
-			threshold = i;
-		}
-	}
-	return threshold;
+    for (int i = 0; i < 256; i++)
+        sum += i * H[i];
+
+    for (int i = 0; i < 256; i++) {
+        wB += H[i];
+        if (wB == 0) continue;
+        wF = N - wB;
+        if (wF == 0) break;
+
+        sumB += i * H[i];
+        mB = sumB / wB;
+        mF = (sum - sumB) / wF;
+
+        between = wB * wF * (mB - mF) * (mB - mF);
+        if (between > max) {
+            max = between;
+            threshold = i;
+        }
+    }
+    return threshold;
 }
 
-void bwotsu_apply(void *ptr, VJFrame *frame, int *args) {
-    int mode = args[0];
-    int skew = args[1];
+void bwotsu_apply(void *ptr, VJFrame *frame, int *args) { //FIXME banding
+    int mode   = args[0];
+    int skew   = args[1];
     int invert = args[2];
 
-    uint32_t histogram[256] = {0};
     const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
-    uint8_t *A  = frame->data[3];
+    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict A  = frame->data[3];
+
+    uint32_t histogram[256] = {0};
 
     if (skew != 0xff) {
         uint8_t Lookup[256];
         __init_lookup_table(Lookup, 256, 0.0f, 255.0f, 0.0f, (float)skew);
+
         for (int i = 0; i < len; i++) {
             histogram[Lookup[Y[i]]]++;
         }
     } else {
-        for (int i = 0; i < len; i++) {
+        for (int i = 0; i < len; i++)
             histogram[Y[i]]++;
-        }
     }
 
-    uint32_t threshold = bwotsu(histogram, len);
+    const uint32_t threshold = bwotsu(histogram, len);
 
-    uint8_t low  = invert ? 0xff : 0x00;
-    uint8_t high = invert ? 0x00 : 0xff;
+    const uint8_t low  = invert ? 0xff : 0x00;
+    const uint8_t high = invert ? 0x00 : 0xff;
 
-    switch(mode) {
+    switch (mode) {
         case 0:
 #pragma omp simd
             for (int i = 0; i < len; i++) {
-                uint8_t cond = (Y[i] >= threshold);
+                const uint8_t cond = (Y[i] >= threshold);
                 Y[i] = (cond * high) | ((1 - cond) * low);
             }
             veejay_memset(Cb, 128, (frame->ssm ? len : frame->uv_len));
@@ -123,9 +124,10 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args) {
             break;
 
         case 1:
+            
 #pragma omp simd
             for (int i = 0; i < len; i++) {
-                uint8_t cond = (Y[i] >= threshold);
+                const uint8_t cond = (Y[i] >= threshold);
                 A[i] = (cond * high) | ((1 - cond) * low);
             }
             break;
