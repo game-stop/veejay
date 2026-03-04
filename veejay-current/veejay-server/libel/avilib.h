@@ -1,8 +1,8 @@
 /*
  *  avilib.h
  *
- *  Copyright (C) Thomas Östreich - June 2001
- *  multiple audio track support Copyright (C) 2002 Thomas Östreich
+ *  Copyright (C) Thomas ï¿½streich - June 2001
+ *  multiple audio track support Copyright (C) 2002 Thomas ï¿½streich
  *
  *  Original code:
  *  Copyright (C) 1999 Rainer Johanni <Rainer@Johanni.de> 
@@ -333,7 +333,7 @@ long AVI_bytes_remain(avi_t *AVI);
 int  AVI_close(avi_t *AVI);
 long AVI_bytes_written(avi_t *AVI);
 
-avi_t *AVI_open_input_file(char *filename, int getIndex, long mmap_size);
+avi_t *AVI_open_input_file(char *filename, int getIndex, size_t mmap_size);
 avi_t *AVI_open_input_indexfile(char *filename, int getIndex, char *indexfile);
 avi_t *AVI_open_fd(int fd, int getIndex, long mmap_size);
 avi_t *AVI_open_indexfd(int fd, int getIndex, char *indexfile);
