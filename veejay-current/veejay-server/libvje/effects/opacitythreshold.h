@@ -22,4 +22,6 @@
 #define OPACITYTHRESHOLD_H
 vj_effect *opacitythreshold_init(int w, int h);
 void opacitythreshold_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
+void *opacitythreshold_malloc(int w, int h);
+void opacitythreshold_free(void *ptr);
 #endif
