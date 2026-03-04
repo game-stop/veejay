@@ -1,4 +1,4 @@
-/* 
+/*
  * Linux VeeJay
  *
  * Copyright(C)2002-2004 Niels Elburg <nwelburg@gmail.com>
@@ -24,131 +24,206 @@
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <sys/stat.h>
+
 #include <libel/vj-mmap.h>
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/vjmem.h>
 
-#define PADDED(a,m) ( a > 0 ? (a / m->page_size) * m->page_size  : 0)
-
-void		mmap_free(mmap_region_t *map)
+void mmap_free(mmap_region_t *map)
 {
-	if(map)
+	if (map)
 	{
-		if(map->map_start) 
+		if (map->map_start)
 			munmap_file(map);
 		free(map);
 	}
-	map = NULL;
 }
 
-mmap_region_t *	mmap_file(int fd, long offset, long length, long fs)
+mmap_region_t *mmap_file(int fd, off_t offset, size_t length, off_t fs)
 {
-	mmap_region_t *map = (mmap_region_t*) vj_malloc(sizeof( mmap_region_t ));
-	veejay_memset( map, 0, sizeof( mmap_region_t ));
+	mmap_region_t *map = (mmap_region_t *)vj_malloc(sizeof(mmap_region_t));
+	veejay_memset(map, 0, sizeof(mmap_region_t));
 
-	map->fd		= fd;
-	map->page_size  = getpagesize();
+	map->fd = fd;
+	map->page_size = getpagesize();
 	map->map_length = length;
-	map->map_start  = NULL;
+	map->map_start = NULL;
 	map->eof = fs;
-	map->mem_offset = offset;
-	remap_file( map, offset );
+	if (!remap_file(map, offset))
+	{
+		free(map);
+		return NULL;
+	}
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "\tmemory map region is %f Mb",( (float) length / 1048576.0f ) );
+	veejay_msg(VEEJAY_MSG_DEBUG, "\tmemory map region is %.2f Mb", ((float)length / 1048576.0f));
 	return map;
 }
 
 
-int	is_mapped( mmap_region_t *map, long offset, long size )
-{
-	// check if memory is in mapped region
-	off_t real_offset = PADDED( offset, map );
-	long rel_o = (map->mem_offset > 0 ? offset - map->mem_offset : offset );
+#define VEEJAY_SMALL_MAP 0 /* map entire file if small */
+#define VEEJAY_MEDIUM_MAP (4*1024*1024) /* 4 MB */
+#define VEEJAY_LARGE_MAP  (8*1024*1024) /* 16 MB */
 
-	if( (rel_o + size) > map->map_length )
+size_t mmap_file_suggest_size(const char *filename, off_t *file_size_out)
+{
+    struct stat st;
+    if (stat(filename, &st) != 0) {
+        perror("stat failed");
+        return 0;
+    }
+
+    off_t fsize = st.st_size;
+    if (file_size_out)
+        *file_size_out = fsize;
+
+    if (fsize <= (4*1024*1024)) {
+        return (size_t)fsize;
+    } else if (fsize <= (64*1024*1024)) {
+        return VEEJAY_MEDIUM_MAP;
+    }
+	return VEEJAY_LARGE_MAP;
+}
+
+int is_mapped(mmap_region_t *map, off_t offset, size_t size)
+{
+	if (!map || !map->map_start || size == 0 || offset < 0)
+		return 0;
+
+	if (offset >= map->eof)
+		return 0;
+
+	if ((off_t)size > (map->eof - offset))
+		return 0;
+
+	off_t end = offset + (off_t)size;
+
+	return (offset >= map->start_region &&
+			end <= map->end_region);
+}
+
+int remap_file(mmap_region_t *map, off_t offset)
+{
+	if (!map || offset < 0)
+		return 0;
+
+	off_t real_offset = (offset / map->page_size) * map->page_size;
+	size_t padding = (size_t)(offset - real_offset);
+
+	if (real_offset >= map->eof)
+		return 0;
+
+	off_t max_available = map->eof - real_offset;
+	if (max_available <= 0)
 	{
 		return 0;
 	}
 
-	if( real_offset >= map->start_region && 
-		real_offset + size <= map->end_region )
-		return 1;
-
-
-	return 0;
-}
-
-int	remap_file( mmap_region_t *map, long offset )
-{
-	size_t padding = offset % map->page_size;
-	size_t new_length = map->map_length;
-	size_t real_length = 0;
-	off_t	real_offset = PADDED( offset, map );
-	
-	real_length = (padding + new_length);
-        if( real_length > map->eof )
+	if (map->map_length > SIZE_MAX - padding)
 	{
-		real_length = PADDED(map->eof ,map);
-	}
-	if(map->map_start != NULL)
-	{
-		munmap_file( map );
+		return 0;
 	}
 
-	map->mem_offset = offset;
-	map->map_start = mmap( 0, real_length, PROT_READ, MAP_SHARED, map->fd, real_offset );
-	if( map->map_start == MAP_FAILED)
+	size_t real_length = padding + map->map_length;
+	if ((off_t)real_length > max_available)
+	{
+		real_length = (size_t)max_available;
+	}
+
+	if (real_length == 0)
+	{
+		return 0;
+	}
+
+	if (map->map_start)
+		munmap_file(map);
+
+	int adv = posix_fadvise(map->fd,
+							real_offset,
+							real_length,
+							POSIX_FADV_RANDOM);
+	if (adv != 0)
+	{
+		veejay_msg(VEEJAY_MSG_WARNING, "posix_fadvise(POSIX_FADV_RANDOM) failed: %s", strerror(adv));
+	}
+
+	void *ptr = mmap(NULL, real_length, PROT_READ, MAP_SHARED,
+					 map->fd, real_offset);
+
+	if (ptr == MAP_FAILED)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to map memory: %s", strerror(errno));
 		return 0;
 	}
 
-	map->data_start = map->map_start + padding;
+	if (madvise(ptr, real_length, MADV_RANDOM) == -1)
+	{
+		veejay_msg(VEEJAY_MSG_WARNING,
+				   "madvise(MADV_SEQUENTIAL) failed: %s",
+				   strerror(errno));
+	}
 
+	map->map_start = ptr;
+	map->mapped_length = real_length;
+	map->data_start = (uint8_t *)ptr + padding;
 	map->start_region = real_offset;
-	map->end_region   = real_length + real_offset;
+	map->end_region = real_offset + real_length;
 
 	return 1;
 }
 
-int	munmap_file( mmap_region_t *map )
+int munmap_file(mmap_region_t *map)
 {
-	if(map->map_start == NULL)
-		return 1;
+	if (!map || !map->map_start)
+		return 0;
 
-	int n = munmap( map->map_start, map->map_length );
-	if(n==-1)
+	int r = munmap(map->map_start, map->mapped_length);
+	if (r == -1)
 	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Unable to unmap memory: %s",strerror(errno));
-	}
-	map->map_start = NULL;
-	return n;
-}
-
-long	mmap_read( mmap_region_t *map,long offset, long bytes, uint8_t *buf )
-{
-	if( !is_mapped( map, offset, bytes ))
-	{
-		if(remap_file( map, offset ) == 0 ) {
-			return -1;
-		}
-		if(!is_mapped(map, offset, bytes)) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to map %ld bytes from position %ld" , bytes, offset );
-			return -1;
-		}
-	}
-
-	//check if read beyond
-	if( (offset + bytes) > map->eof ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to read beyond EOF at position %ld (bad movie file?)", offset );
+		veejay_msg(VEEJAY_MSG_WARNING, "Unable to unmap memory: %s", strerror(errno));
 		return -1;
 	}
 
-	long rel_offset = (map->mem_offset > 0 ? offset - map->mem_offset : offset );
+	map->map_start = NULL;
+	map->mapped_length = 0;
+	return 0;
+}
 
-	uint8_t *d1 = map->data_start + rel_offset;
+off_t mmap_read(mmap_region_t *map, off_t offset, size_t bytes, uint8_t *buf)
+{
+	if (!map || !buf || bytes <= 0 || offset < 0)
+		return -1;
 
-	veejay_memcpy( buf, d1, bytes );
-	
+	if (offset >= map->eof)
+		return -1;
+
+	if (bytes > (map->eof - offset))
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to read beyond EOF at position %jd", (intmax_t)offset);
+		return -1;
+	}
+
+	if (!is_mapped(map, offset, bytes))
+	{
+		if (!remap_file(map, offset))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to remap at position %jd", (intmax_t)offset);
+			return -1;
+		}
+
+		if (!is_mapped(map, offset, bytes))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Mapping insufficient for %jd bytes at %jd", (intmax_t)bytes, (intmax_t)offset);
+			return -1;
+		}
+	}
+
+	off_t rel_offset = offset - map->start_region;
+	uint8_t *src = (uint8_t *)map->map_start + rel_offset;
+
+	veejay_memcpy(buf, src, bytes);
+
 	return bytes;
 }

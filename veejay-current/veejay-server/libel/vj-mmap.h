@@ -23,31 +23,38 @@
 #include <stdint.h>
 typedef struct
 {
-	unsigned char  *map_start;	/* result of mmap() */
-	unsigned char *data_start;	/* start of data */
-	uint64_t	start_region;
-	uint64_t	end_region;
-	off_t	mem_offset;	/* start of image */
-	int	fd;		/* file descriptor */
-	size_t	page_size;	/* page size */
-	size_t	map_length;	/* requested map size */
-	long  eof;		/* file size */
+    void   *map_start;       /* result of mmap() */
+    uint8_t *data_start;     /* pointer to logical data start */
+
+    off_t  start_region;     /* file offset where mapping starts */
+    off_t  end_region;       /* file offset where mapping ends */
+
+    off_t  eof;              /* file size */
+
+    int    fd;               /* file descriptor */
+
+    size_t page_size;        /* system page size */
+    size_t map_length;       /* requested mapping window */
+    size_t mapped_length;    /* actual mapped length */
+
 } mmap_region_t;
 
 // map file portion to memory, return mapped region
-mmap_region_t *	mmap_file(int fd, long offset, long length, long fs);
+mmap_region_t *	mmap_file(int fd, off_t offset, size_t length, off_t fs);
+
+size_t mmap_file_suggest_size(const char *filename, off_t *file_size_out);
 
 // see if requested boundaries is mapped in memory  
-int	is_mapped( mmap_region_t *map, long offset, long size );
+int	is_mapped( mmap_region_t *map, off_t offset, size_t size );
 
 // remap a portion of a file in memory
-int	remap_file( mmap_region_t *map, long offset );
+int	remap_file( mmap_region_t *map, off_t offset );
 
 // unmap memory
 int	munmap_file( mmap_region_t *map );
 
 void	mmap_free(mmap_region_t *map );
 
-long	mmap_read( mmap_region_t *map, long offset, long bytes, uint8_t *buf);
+off_t	mmap_read( mmap_region_t *map, off_t offset, size_t bytes, uint8_t *buf);
 
 #endif
