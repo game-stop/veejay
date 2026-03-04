@@ -22,6 +22,15 @@
 #include <veejaycore/vjmem.h>
 #include "photoplay.h"
 
+
+// FIXME waterfall should be mode like in 
+//       if (waterfall) {
+//            display_idx = (i + p->frame_counter) % p->num_photos;
+//        } else {
+//            display_idx = i;
+//		}
+
+
 vj_effect *photoplay_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -157,138 +166,108 @@ void	photoplay_free(void *ptr)
     free(p);
 }
 
-static void	take_photo( photoplay_t *p, uint8_t *plane, uint8_t *dst_plane, int w, int h, int index )
+static void take_photo(photoplay_t *p, uint8_t *src_plane, uint8_t *dst_plane, int src_w, int src_h, int index)
 {
+    const int box_w = p->photo_list[index]->w;
+    const int box_h = p->photo_list[index]->h;
 
-	int x,y,dx,dy;
-	int sum;
-	int dst_x, dst_y;
-	int step_y;
-	int step_x;
-	int box_width = p->photo_list[index]->w;
-	int box_height = p->photo_list[index]->h;
+    const int step_x = (src_w << 16) / box_w;
+    const int step_y = (src_h << 16) / box_h;
 
-	step_x = w / box_width;
-	step_y = h / box_height;
+    for (int dst_y = 0; dst_y < box_h; dst_y++)
+    {
+        int src_y = (dst_y * step_y) >> 16;
+        uint8_t *src_row = src_plane + (src_y * src_w);
+        uint8_t *dst_row = dst_plane + (dst_y * box_w);
 
-	for( y = 0 ,dst_y = 0; y < h && dst_y < box_height; y += step_y )
-	{
-		for( x = 0, dst_x = 0; x < w && dst_x < box_width; x+= step_x )
-		{
-			sum = 0;
-			for( dy = 0; dy < step_y; dy ++ )
-			{
-				for( dx = 0; dx < step_x; dx++)	
-				{
-					sum += plane[ ((y+dy)*w+(dx+x)) ];	
-				}
-			}
-			// still problem here!
-		//	if(sum > 0)
-			  dst_plane[(dst_y*box_width)+dst_x] = sum / (step_y*step_x);
-		//	else
-		//	  dst_plane[(dst_y*box_width)+dst_x] = pixel_Y_lo_;
-
-			dst_x++;
-		}
-		dst_y++;
-	}
+        for (int dst_x = 0; dst_x < box_w; dst_x++)
+        {
+            int src_x = (dst_x * step_x) >> 16;
+            dst_row[dst_x] = src_row[src_x];
+        }
+    }
 }
 
-static void put_photo( photoplay_t *p, uint8_t *dst_plane, uint8_t *photo, int dst_w, int dst_h, int index , matrix_t matrix)
+static void put_photo(photoplay_t *p, uint8_t *dst_plane, uint8_t *photo, int dst_w, int dst_h, int index, matrix_t matrix)
 {
-	int box_w = p->photo_list[index]->w;
-	int box_h = p->photo_list[index]->h;
-	int x,y;
+    const int box_w = p->photo_list[index]->w;
+    const int box_h = p->photo_list[index]->h;
+    uint8_t *dst_ptr = dst_plane + (matrix.h * dst_w) + matrix.w;
+    uint8_t *src_ptr = photo;
 
-	uint8_t *restrict P = dst_plane + (matrix.h*dst_w);
-	int	offset = matrix.w;
-
-	for( y = 0; y < box_h; y ++ )
-	{
-#pragma omp simd
-		for( x = 0; x < box_w; x ++ )
-		{
-			*(P+offset+x) = photo[(y*box_w)+x];
-		}
-		P += dst_w;
-	}
+    for (int y = 0; y < box_h; y++)
+    {
+        memcpy(dst_ptr, src_ptr, box_w);
+        dst_ptr += dst_w;
+        src_ptr += box_w;
+    }
 }
 
-void photoplay_apply(  void *ptr, VJFrame *frame, int *args ) {
-    int size = args[0];
+
+void photoplay_apply(void *ptr, VJFrame *frame, int *args)
+{
+    int size  = args[0];
     int delay = args[1];
-    int mode = args[2];
+    int mode  = args[2];
 
-	unsigned int i;
+    const int width  = frame->width;
+    const int height = frame->height;
 
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-	uint8_t *dstY = frame->data[0];
-	uint8_t *dstU = frame->data[1];
-	uint8_t *dstV = frame->data[2];
+    uint8_t *dstY = frame->data[0];
+    uint8_t *dstU = frame->data[1];
+    uint8_t *dstV = frame->data[2];
 
-    photoplay_t *p = (photoplay_t*) ptr;
+    photoplay_t *p = (photoplay_t *)ptr;
 
-	if( (size*size) != p->num_photos || p->num_photos == 0)
-	{
-		destroy_filmstrip(p);
-		if(!prepare_filmstrip(p,size*size, width,height))
-		{
-            destroy_filmstrip(p);
-			return;
-		}
-		p->frame_delay = 0;
+    if ((size * size) != p->num_photos || p->num_photos == 0)
+    {
+        destroy_filmstrip(p);
+        if (!prepare_filmstrip(p, size * size, width, height))
+            return;
 
-		for( i = 0; i < p->num_photos; i ++ )
-			p->rt[i] = i;
+        p->frame_delay = 0;
+        for (unsigned int i = 0; i < p->num_photos; i++)
+            p->rt[i] = i;
 
-		if( mode == 0)
-			fx_shuffle_int_array( p->rt, p->num_photos );
-	}
+        if (mode == 0)
+            fx_shuffle_int_array(p->rt, p->num_photos);
+    }
 
-	if(p->last_mode != mode)
-	{
-		for( i = 0; i < p->num_photos; i ++ )
-			p->rt[i] = i;
+    if (p->last_mode != mode)
+    {
+        for (unsigned int i = 0; i < p->num_photos; i++)
+            p->rt[i] = i;
 
-		if( mode == 0)
-			fx_shuffle_int_array( p->rt, p->num_photos );
+        if (mode == 0)
+            fx_shuffle_int_array(p->rt, p->num_photos);
+    }
+    p->last_mode = mode;
 
-	}
+    if (p->frame_delay)
+        p->frame_delay--;
 
-	p->last_mode = mode;
+    if (p->frame_delay == 0)
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            take_photo(p, frame->data[i],
+                       p->photo_list[p->frame_counter % p->num_photos]->data[i],
+                       width, height,
+                       p->frame_counter % p->num_photos);
+        }
+        p->frame_delay = delay;
+    }
 
-	if( p->frame_delay )
-		p->frame_delay --;
+    matrix_f matrix_placement = (mode == 0) ? get_matrix_func(0) : get_matrix_func(mode - 1);
 
-	if( p->frame_delay == 0)
-	{	
-		for( i = 0; i < 3; i ++ )
-		{
-			take_photo(p, frame->data[i], p->photo_list[(p->frame_counter%p->num_photos)]->data[i], width, height , p->frame_counter % p->num_photos);
-		}
-		p->frame_delay = delay;
-	}
+    for (unsigned int i = 0; i < p->num_photos; i++)
+    {
+        matrix_t m = matrix_placement(p->rt[i], size, width, height);
+        put_photo(p, dstY, p->photo_list[i]->data[0], width, height, i, m);
+        put_photo(p, dstU, p->photo_list[i]->data[1], width, height, i, m);
+        put_photo(p, dstV, p->photo_list[i]->data[2], width, height, i, m);
+    }
 
-
-	matrix_f matrix_placement;
-	if( mode == 0 ) {
-		matrix_placement = get_matrix_func(0); // !important in random mode
-	}
-	else {
-		matrix_placement = get_matrix_func(mode-1);
-	}
-
-	for( i = 0; i < p->num_photos; i ++ ) 
-	{
-		matrix_t m = matrix_placement( p->rt[i], size,width,height );
-		put_photo(p, dstY, p->photo_list[i]->data[0],width,height,i,m);
-		put_photo(p, dstU, p->photo_list[i]->data[1],width,height,i,m);
-		put_photo(p, dstV, p->photo_list[i]->data[2],width,height,i,m);
-	}
-
-	if(p->frame_delay == delay)
-		p->frame_counter ++;
+    if (p->frame_delay == delay)
+        p->frame_counter++;
 }
-
