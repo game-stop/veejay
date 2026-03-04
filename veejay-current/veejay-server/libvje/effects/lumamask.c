@@ -104,6 +104,135 @@ void *lumamask_malloc(int width, int height)
     return (void*) l;
 }
 
+static inline void lumamask_inner_noalpha_noborder(
+    uint8_t *restrict Y, uint8_t *restrict Cb, uint8_t *restrict Cr,
+    uint8_t *restrict Y2, uint8_t *restrict Cb2, uint8_t *restrict Cr2,
+    int width, int height, int w_mul_q8, int h_mul_q8)
+{
+    for (int y = 0; y < height; y++) {
+        uint8_t *Y_row  = Y  + y*width;
+        uint8_t *Cb_row = Cb + y*width;
+        uint8_t *Cr_row = Cr + y*width;
+
+        for (int x = 0; x < width; x++) {
+            int tmp = Y2[y*width + x] - 128;
+            int dx = (w_mul_q8 * tmp) >> 8;
+            int dy = (h_mul_q8 * tmp) >> 8;
+
+            int nx = x + dx;
+            int ny = y + dy;
+
+            nx = nx < 0 ? 0 : (nx >= width ? width - 1 : nx);
+            ny = ny < 0 ? 0 : (ny >= height ? height - 1 : ny);
+
+            int idx = ny*width + nx;
+
+            Y_row[x]  = Y2[idx];
+            Cb_row[x] = Cb2[idx];
+            Cr_row[x] = Cr2[idx];
+        }
+    }
+}
+
+static inline void lumamask_inner_noalpha_border(
+    uint8_t *restrict Y, uint8_t *restrict Cb, uint8_t *restrict Cr,
+    uint8_t *restrict Y2, uint8_t *restrict Cb2, uint8_t *restrict Cr2,
+    int width, int height, int w_mul_q8, int h_mul_q8,
+    int pixel_Y_lo_)
+{
+    for (int y = 0; y < height; y++) {
+        uint8_t *Y_row  = Y  + y*width;
+        uint8_t *Cb_row = Cb + y*width;
+        uint8_t *Cr_row = Cr + y*width;
+
+        for (int x = 0; x < width; x++) {
+            int tmp = Y2[y*width + x] - 128;
+            int dx = (w_mul_q8 * tmp) >> 8;
+            int dy = (h_mul_q8 * tmp) >> 8;
+
+            int nx = x + dx;
+            int ny = y + dy;
+
+            int mask = (nx < 0 || nx >= width || ny < 0 || ny >= height);
+
+            int clamped_nx = nx < 0 ? 0 : (nx >= width ? width-1 : nx);
+            int clamped_ny = ny < 0 ? 0 : (ny >= height ? height-1 : ny);
+
+            int idx = clamped_ny * width + clamped_nx;
+
+            Y_row[x]  = (uint8_t)(mask ? pixel_Y_lo_ : Y2[idx]);
+            Cb_row[x] = (uint8_t)(mask ? 128         : Cb2[idx]);
+            Cr_row[x] = (uint8_t)(mask ? 128         : Cr2[idx]);
+        }
+    }
+}
+
+static inline void lumamask_inner_alpha_noborder(
+    uint8_t *restrict Y, uint8_t *restrict Cb, uint8_t *restrict Cr, uint8_t *restrict *aA,
+    uint8_t *restrict Y2, uint8_t *restrict Cb2, uint8_t *restrict Cr2, uint8_t *restrict *aB,
+    int width, int height, int w_mul_q8, int h_mul_q8)
+{
+    for (int y = 0; y < height; y++) {
+        uint8_t *Y_row = Y + y*width;
+        uint8_t *Cb_row = Cb + y*width;
+        uint8_t *Cr_row = Cr + y*width;
+        uint8_t *aA_row = aA + y*width;
+
+        for (int x = 0; x < width; x++) {
+            int tmp = Y2[y*width + x] - 128;
+            int dx = (w_mul_q8 * tmp) >> 8;
+            int dy = (h_mul_q8 * tmp) >> 8;
+
+            int nx = x + dx;
+            int ny = y + dy;
+
+            nx = nx < 0 ? 0 : (nx >= width ? width-1 : nx);
+            ny = ny < 0 ? 0 : (ny >= height ? height-1 : ny);
+
+            int idx = ny*width + nx;
+            Y_row[x]  = Y2[idx];
+            Cb_row[x] = Cb2[idx];
+            Cr_row[x] = Cr2[idx];
+            aA_row[x] = aB[idx];
+        }
+    }
+}
+
+static inline void lumamask_inner_alpha_border(
+    uint8_t *restrict Y, uint8_t *restrict Cb, uint8_t *restrict Cr, uint8_t *restrict *aA,
+    uint8_t *restrict Y2, uint8_t *restrict Cb2, uint8_t *restrict Cr2, uint8_t *restrict *aB,
+    int width, int height, int w_mul_q8, int h_mul_q8,
+    int pixel_Y_lo_)
+{
+    for (int y = 0; y < height; y++) {
+        uint8_t *Y_row  = Y  + y*width;
+        uint8_t *Cb_row = Cb + y*width;
+        uint8_t *Cr_row = Cr + y*width;
+        uint8_t *aA_row = aA + y*width;
+#pragma omp simd
+        for (int x = 0; x < width; x++) {
+            int tmp = Y2[y*width + x] - 128;
+            int dx = (w_mul_q8 * tmp) >> 8;
+            int dy = (h_mul_q8 * tmp) >> 8;
+
+            int nx = x + dx;
+            int ny = y + dy;
+
+            int clamped_nx = nx < 0 ? 0 : (nx >= width ? width - 1 : nx);
+            int clamped_ny = ny < 0 ? 0 : (ny >= height ? height - 1 : ny);
+
+            int idx = clamped_ny * width + clamped_nx;
+
+            int mask = (nx < 0 || nx >= width || ny < 0 || ny >= height);
+
+            Y_row[x]  = (uint8_t)((mask ? pixel_Y_lo_ : Y2[idx]));
+            Cb_row[x] = (uint8_t)((mask ? 128         : Cb2[idx]));
+            Cr_row[x] = (uint8_t)((mask ? 128         : Cr2[idx]));
+            aA_row[x] = (uint8_t)((mask ? 0           : aB[idx]));
+        }
+    }
+}
+
 void lumamask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
     int v_scale = args[0];
     int h_scale = args[1];
@@ -139,164 +268,44 @@ void lumamask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 
 	double w_ratio = (double) tmp1 / 128.0;
 	double h_ratio = (double) tmp2 / 128.0;
-  	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
-	uint8_t *aA = frame->data[3];
-	uint8_t *aB = frame2->data[3];
+  	uint8_t *restrict Y = frame->data[0];
+	uint8_t *restrict Cb= frame->data[1];
+	uint8_t *restrict Cr= frame->data[2];
+	uint8_t *restrict Y2 = frame2->data[0];
+	uint8_t *restrict Cb2 = frame2->data[1];
+	uint8_t *restrict Cr2 = frame2->data[2];
+	uint8_t *restrict aA = frame->data[3];
+	uint8_t *restrict aB = frame2->data[3];
 
 	int strides[4] = { len, len, len ,( alpha ? len : 0 )};
 	vj_frame_copy( frame->data, l->buf, strides );
 
-
+    int w_mul_q8 = (int)(-((double)tmp1 / 128.0) * 256.0);
+    int h_mul_q8 = (int)(-((double)tmp2 / 128.0) * 256.0);
 	const double w_mul = -w_ratio;
 	const double h_mul = -h_ratio;
 	
+    if (!alpha) {
+        if (!border) {
+            lumamask_inner_noalpha_noborder(Y, Cb, Cr, Y2, Cb2, Cr2, width, height, w_mul_q8, h_mul_q8);
+        } else {
+            lumamask_inner_noalpha_border(Y, Cb, Cr, Y2, Cb2, Cr2, width, height, w_mul_q8, h_mul_q8, pixel_Y_lo_);
+        }
+    } else {
+        if (!border) {
+            lumamask_inner_alpha_noborder(Y, Cb, Cr, aA, Y2, Cb2, Cr2, aB, width, height, w_mul_q8, h_mul_q8);
+        } else {
+            lumamask_inner_alpha_border(Y, Cb, Cr, aA, Y2, Cb2, Cr2, aB, width, height, w_mul_q8, h_mul_q8, pixel_Y_lo_);
+        }
+    }
 
-	if( alpha == 0 )
-	{
-  	  if( border )
-	  {
-		for(y=0; y < height; y++)
-		{
-			const int row_offset = y * width;
-			for(x=0; x < width ; x++)
-			{
-				// calculate new location of pixel
-				tmp = Y2[(y*width+x)] - 128;
-				// new x offset 
-				dx = w_mul * tmp;
-				// new y offset 
-				dy = h_mul * tmp;
-				// new pixel coordinates
-				nx = x + dx;
-				ny = y + dy;
-
-				if( nx < 0 || ny < 0 || nx >= width || ny >= height )
-        	    {
-                	Y[row_offset+x] = pixel_Y_lo_;
-                	Cb[row_offset+x] = 128;
-                   	Cr[row_offset+x] = 128;
-                }
-                else
-                {
-					const int dy = ny * width;
-                    Y[row_offset+x] = Y2[dy + nx];
-                   	Cb[row_offset+x] = Cb2[dy + nx];
-                   	Cr[row_offset+x] = Cr2[dy + nx];
-                }
-			}
-		}
-	  }
-	  else
-	  {
-		for (y = 0; y < height; y++)
-		{
-			const int row_offset = y * width;
-
-			for (x = 0; x < width; x++)
-			{
-				int tmp = Y2[row_offset + x] - 128;
-				int dx = w_mul * tmp;
-				int dy = h_mul * tmp;
-
-				int nx = x + dx;
-				int ny = y + dy;
-
-				// wrap negative coordinates
-				while (nx < 0) nx += width;
-				while (ny < 0) ny += height;
-
-				// clamp to edges
-				nx = (unsigned int)nx < (unsigned int)width  ? nx  : width - 1;
-				ny = (unsigned int)ny < (unsigned int)height ? ny : height - 1;
-
-				const int idx = ny * width + nx;
-				Y[row_offset + x]  = Y2[idx];
-				Cb[row_offset + x] = Cb2[idx];
-				Cr[row_offset + x] = Cr2[idx];
-			}
-		}
-	  }
-	}
-	else /* write alpha */
-	{
-  	  if( border )
-	  {
-		for(y=0; y < height; y++)
-		{
-			const int row_offset = y * width;
-			for(x=0; x < width ; x++)
-			{
-				// calculate new location of pixel
-				tmp = Y2[(y*width+x)] - 128;
-				// new x offset 
-				dx = w_mul * tmp;
-				// new y offset 
-				dy = h_mul * tmp;
-				// new pixel coordinates
-				nx = x + dx;
-				ny = y + dy;
-
-				if( nx < 0 || ny < 0 || nx >= width || ny >= height )
-        	    {
-                	Y[row_offset+x] = pixel_Y_lo_;
-                	Cb[row_offset+x] = 128;
-                   	Cr[row_offset+x] = 128;
-					aA[row_offset+x] = 0;
-                }
-                else
-                {
-					const int dy = ny * width;
-                    Y[row_offset+x] = Y2[dy + nx];
-                   	Cb[row_offset+x] = Cb2[dy + nx];
-                   	Cr[row_offset+x] = Cr2[dy + nx];
-					aA[row_offset+x] = aB[dy + nx];
-                }
-			}
-		}
-	  }
-	  else
-	  {
-		for (y = 0; y < height; y++)
-		{
-			const int row_offset = y * width;
-
-			for (x = 0; x < width; x++)
-			{
-				int tmp = Y2[row_offset + x] - 128;
-				int dx = w_mul * tmp;
-				int dy = h_mul * tmp;
-
-				int nx = x + dx;
-				int ny = y + dy;
-
-				// wrap negative coordinates
-				while (nx < 0) nx += width;
-				while (ny < 0) ny += height;
-
-				// clamp to edges
-				nx = (unsigned int)nx < (unsigned int)width  ? nx  : width - 1;
-				ny = (unsigned int)ny < (unsigned int)height ? ny : height - 1;
-
-				const int idx = ny * width + nx;
-				Y[row_offset + x]  = Y2[idx];
-				Cb[row_offset + x] = Cb2[idx];
-				Cr[row_offset + x] = Cr2[idx];
-				aA[row_offset + x ] = aB[idx];
-			}
-		}
-	  }
-	}
-
-	if( interpolate )
+	if( interpolate ) {
 		motionmap_interpolate_frame( l->motionmap, frame, l->N__, l->n__ );
-	
-	if( motion )
+	}
+
+	if( motion ) {
 		motionmap_store_frame( l->motionmap, frame );
+	}
 
 }
 
