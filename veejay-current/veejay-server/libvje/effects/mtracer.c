@@ -29,74 +29,42 @@ typedef struct {
     int mtrace_counter;
 	int started;
 	int prev_n;
+	int mode_transition;      // current transition progress
+	int mode_transition_len;  // total frames to blend
+	uint8_t *mode_buffer;     // temp buffer for old mode
+	int prev_mode;
 } m_tracer_t;
 
-vj_effect *mtracer_init(int w, int h)
-{
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 32;
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 500;
-    ve->limits[0][2] = 0;
-	ve->limits[1][2] = 1;
-	ve->limits[0][3] = 0;
-	ve->limits[1][3] = 1;
-	
-	ve->defaults[0] = 150;
-    ve->defaults[1] = 8;
-
-	ve->defaults[2] = 0;
-	ve->defaults[3] = 0;
-
-    ve->description = "Magic Tracer";
-    ve->sub_format = -1;
-    ve->extra_frame = 1;
-    ve->has_user = 0;	
-    ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Length", "Classic" , "Grayscale");
-
-	ve->hints = vje_init_value_hint_list( ve->num_params );
-
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
-		"Additive", "Subtractive","Multiply","Divide","Lighten","Hardlight",
-		"Difference","Difference Negate","Exclusive","Base","Freeze",
-		"Unfreeze","Relative Add","Relative Subtract","Max select", "Min select",
-		"Relative Luma Add", "Relative Luma Subtract", "Min Subselect", "Max Subselect",
-		"Add Subselect", "Add Average", "Experimental 1","Experimental 2", "Experimental 3",
-		"Multisub", "Softburn", "Inverse Burn", "Dodge", "Distorted Add", "Distorted Subtract", "Experimental 4", "Negation Divide");
+#define DIV255(x) (((x) + 128 + (((x) + 128) >> 8)) >> 8)
+#define BLEND_SM(a, b) (uint8_t)((a * b) / 255)
+#define BLEND_SCR(a, b) (uint8_t)(255 - (((255 - a) * (255 - b)) / 255))
 
 
-    return ve;
-}
-void mtracer_free(void *ptr) {
-    m_tracer_t *m = (m_tracer_t*) ptr;
-	if(m) {
-		if(m->mtrace_buffer[0])
-			free(m->mtrace_buffer[0]);
-    	free(m);
-	}
-}
-
-void *mtracer_malloc(int w, int h)
-{
-    m_tracer_t *m = (m_tracer_t*) vj_calloc(sizeof(m_tracer_t));
-    if(!m) {
-        return NULL;
+static inline void overlaymagic1_decay(uint8_t *restrict buffer, int len, int decay_val) {
+    if (decay_val >= 255) return;
+    if (decay_val <= 0) {
+        veejay_memset(buffer, 0, len);
+        return;
     }
-
-	size_t buflen = ( (w*h+w)) * sizeof(uint8_t);
-	m->mtrace_buffer[0] = (uint8_t*) vj_calloc( buflen );
-	if(!m->mtrace_buffer[0]) {
-        free(m);
-		return NULL;
-	}
-	return (void*) m;
+#pragma omp simd
+    for (int i = 0; i < len; i++) {
+        buffer[i] = (uint8_t)((buffer[i] * decay_val) >> 8); 
+    }
 }
 
+static inline void overlaymagic1_motion_mask(
+    uint8_t *cur,
+    uint8_t *prev,
+    uint8_t *out,
+    int len
+) {
+#pragma omp simd
+    for (int i = 0; i < len; i++) {
+        int diff = (int)cur[i] - (int)prev[i];
+        int abs_diff = (diff < 0) ? -diff : diff;
+        out[i] = (abs_diff > 255) ? 255 : (uint8_t)abs_diff;
+    }
+}
 // copied back from old version, buggy overlay modes that clip/saturate pixels
 void overlaymagic1_adddistorted(VJFrame *frame, VJFrame *frame2 )
 {
@@ -112,17 +80,15 @@ void overlaymagic1_adddistorted(VJFrame *frame, VJFrame *frame2 )
 	}
 }
 
-void overlaymagic1_add_distorted(VJFrame *frame, VJFrame *frame2 )
+void overlaymagic1_add_distorted(VJFrame *frame, VJFrame *frame2)
 {
-	int i;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Y2 = frame2->data[0];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Y2 = frame2->data[0];
 #pragma omp simd
-	for (i = 0; i < len; i++)
-	{
-		Y[i] = CLAMP_Y(Y[i] + Y2[i]);
-	}
+    for (int i = 0; i < len; i++) {
+        Y[i] = (Y[i] + Y2[i]) >> 1;
+    }
 }
 
 void overlaymagic1_subdistorted(VJFrame *frame, VJFrame *frame2 )
@@ -151,15 +117,15 @@ void overlaymagic1_sub_distorted(VJFrame *frame, VJFrame *frame2 )
 	}
 }
 
-void overlaymagic1_multiply(VJFrame *frame, VJFrame *frame2 )
+void overlaymagic1_multiply(VJFrame *frame, VJFrame *frame2)
 {
-	int i;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Y2 = frame2->data[0];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Y2 = frame2->data[0];
 #pragma omp simd
-	for (i = 0; i < len; i++)
-		Y[i] = (Y[i] * Y2[i]) >> 8;
+    for (int i = 0; i < len; i++) {
+        Y[i] = (Y[i] * Y2[i]) / 255;
+    }
 }
 
 void overlaymagic1_simpledivide(VJFrame *frame, VJFrame *frame2 )
@@ -178,37 +144,28 @@ void overlaymagic1_simpledivide(VJFrame *frame, VJFrame *frame2 )
 
 void overlaymagic1_divide(VJFrame *frame, VJFrame *frame2 )
 {
-	int i;
-	int a, b, c;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Y2 = frame2->data[0];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Y2 = frame2->data[0];
 #pragma omp simd
-	for (i = 0; i < len; i++)
-	{
-		b = Y[i] * Y[i];
-		c = 255 - Y2[i];
-		if (c == 0)
-			c = 1;
-		a = b / c;
-		Y[i] = a;
-	}
+    for (int i = 0; i < len; i++) {
+        Y[i] = BLEND_SCR(Y[i], Y2[i]);
+    }
 }
 
-void overlaymagic1_additive(VJFrame *frame, VJFrame *frame2 )
+
+
+void overlaymagic1_additive(VJFrame *frame, VJFrame *frame2)
 {
-	int i,len = frame->len;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Y2 = frame2->data[0];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Y2 = frame2->data[0];
 #pragma omp simd
-	for(i=0;i<len;i++)
-	{
-		Y[i] = CLAMP_Y(Y[i] + (2 * Y2[i]) - 255);
-	}
+    for(int i = 0; i < len; i++) {
+        int res = Y[i] + Y2[i];
+        Y[i] = (res > 255) ? 255 : res;
+    }
 }
-
-
-
 
 void overlaymagic1_substractive(VJFrame *frame, VJFrame *frame2 )
 {
@@ -221,38 +178,22 @@ void overlaymagic1_substractive(VJFrame *frame, VJFrame *frame2 )
 		Y[i] = CLAMP_Y( Y[i] - Y2[i] );
 }
 
-void overlaymagic1_softburn(VJFrame *frame, VJFrame *frame2 )
+void overlaymagic1_softburn(VJFrame *frame, VJFrame *frame2)
 {
-	int i;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Y2 = frame2->data[0];
-
-	int a, b, c;
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Y2 = frame2->data[0];
 #pragma omp simd
-	for (i = 0; i < len; i++)
-	{
-		a = Y[i];
-		b = Y2[i];
-
-		if ( (a + b) <= pixel_Y_hi_)
-		{
-			if (a == pixel_Y_hi_)
-			c = a;
-			else
-			c = (b >> 7) / (256 - a);
-		} else
-		{
-			if (b <= pixel_Y_lo_)
-			{
-				b = 255;
-			}
-			c = 255 - (((255 - a) >> 7) / b);
-		}
-		Y[i] = c;
-	}
+    for (int i = 0; i < len; i++) {
+        int base = Y[i];
+        int blend = Y2[i];
+        if (blend == 0) Y[i] = 0;
+        else {
+            int res = 255 - (((255 - base) << 8) / blend);
+            Y[i] = (res < 0) ? 0 : res;
+        }
+    }
 }
-
 void overlaymagic1_inverseburn(VJFrame *frame, VJFrame *frame2 )
 {
 	int i;
@@ -273,29 +214,21 @@ void overlaymagic1_inverseburn(VJFrame *frame, VJFrame *frame2 )
 	}
 }
 
-void overlaymagic1_colordodge(VJFrame *frame, VJFrame *frame2 )
+void overlaymagic1_colordodge(VJFrame *frame, VJFrame *frame2)
 {
-	int i;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Y2 = frame2->data[0];
-
-	int a, b, c;
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Y2 = frame2->data[0];
 #pragma omp simd
-	for (i = 0; i < len; i++)
-	{
-		a = Y[i];
-		b = Y2[i];
-		if (a >= pixel_Y_hi_)
-
-			c = pixel_Y_hi_;
-		else
-			c = (b >> 8) / (256 - a);
-
-		if (c >= pixel_Y_hi_)
-			c = pixel_Y_hi_;
-		Y[i] = c;
-	}
+    for (int i = 0; i < len; i++) {
+        int base = Y[i];
+        int blend = Y2[i];
+        if (blend == 255) Y[i] = 255;
+        else {
+            int res = (base << 8) / (255 - blend);
+            Y[i] = (res > 255) ? 255 : res;
+        }
+    }
 }
 
 void overlaymagic1_mulsub(VJFrame *frame, VJFrame *frame2 )
@@ -328,17 +261,16 @@ void overlaymagic1_lighten(VJFrame *frame, VJFrame *frame2 )
 	}
 }
 
-void overlaymagic1_difference(VJFrame *frame, VJFrame *frame2 )
+void overlaymagic1_difference(VJFrame *frame, VJFrame *frame2)
 {
-	int i;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Y2 = frame2->data[0];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Y2 = frame2->data[0];
 #pragma omp simd
-	for (i = 0; i < len; i++)
-	{
-		Y[i] = abs(Y[i] - Y2[i]);
-	}
+    for (int i = 0; i < len; i++) {
+        int res = Y[i] - Y2[i];
+        Y[i] = (res < 0) ? -res : res;
+    }
 }
 
 void overlaymagic1_diffnegate(VJFrame *frame, VJFrame *frame2 )
@@ -354,20 +286,17 @@ void overlaymagic1_diffnegate(VJFrame *frame, VJFrame *frame2 )
 	}
 }
 
-void overlaymagic1_exclusive(VJFrame *frame, VJFrame *frame2 )
+void overlaymagic1_exclusive(VJFrame *frame, VJFrame *frame2)
 {
-	int i;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Y2 = frame2->data[0];
-
-	int c;
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Y2 = frame2->data[0];
 #pragma omp simd
-	for (i = 0; i < len; i++)
-	{
-		c = Y[i] + (2 * Y2[i]) - 255;
-		Y[i] = CLAMP_Y(c - (( Y[i] * Y2[i] ) >> 8 ));
-	}
+    for (int i = 0; i < len; i++) {
+        int a = Y[i];
+        int b = Y2[i];
+        Y[i] = a + b - (2 * a * b / 255);
+    }
 }
 
 void overlaymagic1_basecolor(VJFrame *frame, VJFrame *frame2 )
@@ -425,26 +354,18 @@ void overlaymagic1_unfreeze(VJFrame *frame, VJFrame *frame2 )
 	}
 }
 
-void overlaymagic1_hardlight(VJFrame *frame, VJFrame *frame2 )
+void overlaymagic1_hardlight(VJFrame *frame, VJFrame *frame2)
 {
-	int i;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Y2 = frame2->data[0];
-
-	int a, b, c;
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Y2 = frame2->data[0];
 #pragma omp simd
-	for (i = 0; i < len; i++)
-	{
-		a = Y[i];
-		b = Y2[i];
-
-		if (b < 128)
-			c = (a * b) >> 7;
-		else
-			c = 255 - ((255 - b) * (255 - a) >> 7);
-		Y[i] = c;
-	}
+    for (int i = 0; i < len; i++) {
+        int a = Y[i];
+        int b = Y2[i];
+        if (b < 128) Y[i] = (2 * a * b) / 255;
+        else Y[i] = 255 - (2 * (255 - a) * (255 - b) / 255);
+    }
 }
 
 void overlaymagic1_relativeaddlum(VJFrame *frame, VJFrame *frame2 )
@@ -610,6 +531,30 @@ void overlaymagic1_addtest4(VJFrame *frame, VJFrame *frame2 )
 	}
 }
 
+void overlaymagic1_screen(VJFrame *frame, VJFrame *frame2)
+{
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Y2 = frame2->data[0];
+#pragma omp simd
+    for (int i = 0; i < len; i++) {
+        Y[i] = 255 - (((255 - Y[i]) * (255 - Y2[i])) / 255);
+    }
+}
+
+void overlaymagic1_overlay(VJFrame *frame, VJFrame *frame2)
+{
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Y2 = frame2->data[0];
+#pragma omp simd
+    for (int i = 0; i < len; i++) {
+        int a = Y[i];
+        int b = Y2[i];
+        Y[i] = (a < 128) ? (2 * a * b / 255) : (255 - 2 * (255 - a) * (255 - b) / 255);
+    }
+}
+
 void overlaymagic1_try(VJFrame *frame, VJFrame *frame2)
 {
 	int i;
@@ -651,7 +596,7 @@ void overlaymagic1_try(VJFrame *frame, VJFrame *frame2)
 	}
 }
 
-void overlaymagic1_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int n, int clearchroma ) {
+void overlaymagic1_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int n ) {
 
 	switch (n)
 	{
@@ -749,70 +694,207 @@ void overlaymagic1_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int n, int 
 			overlaymagic1_try(frame, frame2 );
 			break;
 		case VJ_EFFECT_BLEND_NEGDIV:
-			overlaymagic1_divide(frame,frame2 );
+			overlaymagic1_divide(frame,frame2);
 			break;
+		case VJ_EFFECT_BLEND_SCREEN:
+			overlaymagic1_screen(frame,frame2 );
+			break;
+		default:
+            overlaymagic1_overlay(frame, frame2);
+            break;
 	}
 
-	if(clearchroma)
-	{
-		veejay_memset( frame->data[1], 128, (frame->ssm ? frame->len : frame->uv_len) );
-		veejay_memset( frame->data[2], 128, (frame->ssm ? frame->len : frame->uv_len) );
-	}
+
 }
 
+vj_effect *mtracer_init(int w, int h)
+{
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    ve->num_params = 7;
+
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params); // min
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params); // max
 
 
+    ve->limits[0][0] = 0;   ve->limits[1][0] = 34;   // Mode
+    ve->limits[0][1] = 1;   ve->limits[1][1] = 255;  // Strength (Opacity)
+    ve->limits[0][2] = 0;   ve->limits[1][2] = 1;    // Use Classic Blend
+    ve->limits[0][3] = 0;   ve->limits[1][3] = 255;  // Softness (Curve)
+    ve->limits[0][4] = 1;   ve->limits[1][4] = 255;  // Decay Strength
+    ve->limits[0][5] = 0;   ve->limits[1][5] = 1;    // Motion Only
+	ve->limits[0][6] = 0;   ve->limits[1][6] = 255;  // Frame2 Opacity
 
-void mtracer_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    ve->defaults[0] = 0;    // Mode
+    ve->defaults[1] = 200;  // Strength
+    ve->defaults[2] = 0;    // Classic
+    ve->defaults[3] = 128;  // Character
+    ve->defaults[4] = 11;  // Decay Strength
+    ve->defaults[5] = 0;    // Motion Only
+	ve->defaults[6] = 128;  // Frame2 Opacity (50%)
+
+    ve->description = "Magic Tracer";
+    ve->sub_format = -1;
+    ve->extra_frame = 1;
+    ve->has_user = 0;
+
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Mode",
+        "Strength",
+        "Use Classic Blend",
+        "Character",
+        "Decay Strength",
+        "Motion Only",
+		"Frame2 Opacity"
+    );
+
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+    vje_build_value_hint_list(ve->hints, ve->limits[1][0], 0,
+        "Additive","Subtractive","Multiply","Divide","Lighten","Hardlight",
+        "Difference","Difference Negate","Exclusive","Base","Freeze",
+        "Unfreeze","Relative Add","Relative Subtract","Max select","Min select",
+        "Relative Luma Add","Relative Luma Subtract","Min Subselect","Max Subselect",
+        "Add Subselect","Add Average","Experimental 1","Experimental 2","Experimental 3",
+        "Multisub","Softburn","Inverse Burn","Dodge","Distorted Add","Distorted Subtract",
+        "Experimental 4","Negation Divide","Screen","Overlay"
+    );
+
+    return ve;
+}
+
+void *mtracer_malloc(int w, int h)
+{
+    const size_t buflen = (size_t) w * h;
+    const size_t total_buffers = 5;
+    const size_t total_size = buflen * total_buffers;
+
+    m_tracer_t *m = (m_tracer_t*) vj_calloc(sizeof(m_tracer_t));
+    if (!m)
+        return NULL;
+
+    uint8_t *block = (uint8_t*) vj_malloc(total_size);
+    if (!block) {
+        free(m);
+        return NULL;
+    }
+
+    for (int i = 0; i < 4; i++) {
+        m->mtrace_buffer[i] = block + (i * buflen);
+
+        if (i == 0 || i == 3)
+            veejay_memset(m->mtrace_buffer[i], pixel_Y_lo_, buflen);
+    }
+
+    m->mode_buffer = block + (4 * buflen);
+	m->mode_transition = 0;
+	m->mode_transition_len = 12;
+    return (void*) m;
+}
+
+void mtracer_free(void *ptr)
+{
+    if (!ptr)
+        return;
 
     m_tracer_t *m = (m_tracer_t*) ptr;
+    if (m->mtrace_buffer[0])
+        free(m->mtrace_buffer[0]);
 
-	int mode = args[0];
-    int n = args[1];
-	int classic = args[2];
-	int clearchroma = args[3];
-
-	const int len = frame->len;
-    VJFrame mt;
-    veejay_memcpy( &mt, frame, sizeof(VJFrame ));
-
-    int om_args[2] = { mode, clearchroma };
-
-	if(!classic) {
-   		m->mtrace_counter = (m->mtrace_counter+1) % n;
-
-		if(m->started == 0 || n != m->prev_n || m->mtrace_counter == 0) {
-			m->started = 1;
-			m->prev_n = n;
-			overlaymagic_apply(NULL, frame, frame2, om_args);
-			veejay_memcpy( m->mtrace_buffer[0], frame->data[0], len );
-			return;
-		}
-
-		mt.data[0] = m->mtrace_buffer[0];
-		mt.data[1] = frame->data[1];
-		mt.data[2] = frame->data[2];
-		mt.data[3] = frame->data[3];
-		
-		overlaymagic_apply(NULL, &mt, frame, om_args );
-		overlaymagic_apply(NULL, &mt, frame2, om_args );
-		veejay_memcpy( frame->data[0], m->mtrace_buffer[0], len );
-	}
-	else {
-		m->mtrace_counter = (m->mtrace_counter % n);
-
-		if (m->mtrace_counter == 0) {
-			overlaymagic_apply(NULL, frame, frame2, om_args);
-			veejay_memcpy( m->mtrace_buffer[0], frame->data[0], len );
-		} else {
-			overlaymagic_apply(NULL, frame, frame2, om_args);
-			mt.data[0] = m->mtrace_buffer[0];
-			mt.data[1] = frame->data[1];
-			mt.data[2] = frame->data[2];
-			mt.data[3] = frame->data[3];
-			overlaymagic_apply(NULL, &mt, frame2, om_args );
-    		veejay_memcpy( m->mtrace_buffer[0], frame->data[0], len );
-		}
-
-	}
+    free(m);
 }
+
+void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
+{
+    m_tracer_t *m = (m_tracer_t*) ptr;
+    int mode = args[0], length = args[1], classic = args[2], character = args[3];
+    int decay_val = args[4], motion_only = args[5], frame2_opacity = args[6];
+
+    const int len = frame->len;
+    uint8_t *feedback_buf   = m->mtrace_buffer[0];
+    uint8_t *blended_result = m->mtrace_buffer[1];
+    uint8_t *prev_frame     = m->mtrace_buffer[2];
+
+    VJFrame tmp_frame;
+    veejay_memcpy(&tmp_frame, frame, sizeof(VJFrame));
+    tmp_frame.data[0] = blended_result;
+
+    if (!m->started)
+    {
+        veejay_memcpy(feedback_buf, frame->data[0], len);
+        veejay_memcpy(prev_frame, frame->data[0], len);
+        m->prev_mode = mode;
+        m->mode_transition = 0;
+        m->started = 1;
+    }
+
+    if (mode != m->prev_mode)
+    {
+        veejay_memcpy(m->mode_buffer, feedback_buf, len);
+        m->mode_transition = m->mode_transition_len;
+        m->prev_mode = mode;
+    }
+
+    veejay_memcpy(blended_result, frame->data[0], len);
+    overlaymagic1_apply(NULL, &tmp_frame, frame2, mode);
+
+    if (frame2_opacity < 255)
+    {
+        uint8_t *f1 = frame->data[0];
+        #pragma omp simd
+        for (int i = 0; i < len; i++)
+        {
+            int b = blended_result[i];
+            blended_result[i] = (uint8_t)(((f1[i] * (255 - frame2_opacity)) + (b * frame2_opacity)) >> 8);
+        }
+    }
+
+    if (m->mode_transition > 0)
+    {
+        int t = m->mode_transition_len - m->mode_transition;
+        int x = (t << 8) / m->mode_transition_len;
+        int alpha = (x * x * (768 - (x << 1))) >> 16;
+        uint8_t *mode_buf = m->mode_buffer;
+        #pragma omp simd
+        for (int i = 0; i < len; i++)
+        {
+            int b = blended_result[i];
+            blended_result[i] = (uint8_t)((mode_buf[i] * (255 - alpha) + b * alpha) >> 8);
+        }
+        m->mode_transition--;
+    }
+
+    if (motion_only)
+        overlaymagic1_motion_mask(blended_result, prev_frame, blended_result, len);
+
+    int combined_scale = (length * character) / 255;
+    combined_scale = combined_scale < 1 ? 1 : (combined_scale > 255 ? 255 : combined_scale);
+
+    int decay = 256 - (256 / (decay_val ? decay_val : 1));
+    int blend = 256 - decay;
+
+    #pragma omp simd
+    for (int i = 0; i < len; i++)
+    {
+        int f = feedback_buf[i];
+        int b = blended_result[i];
+        int accum = ((f * decay) + ((b * combined_scale * blend) >> 8)) >> 8;
+        feedback_buf[i] = (uint8_t)(accum < 0 ? 0 : (accum > 255 ? 255 : accum));
+    }
+
+    veejay_memcpy(prev_frame, frame->data[0], len);
+
+    if (classic)
+    {
+        tmp_frame.data[0] = feedback_buf;
+        overlaymagic1_apply(NULL, frame, &tmp_frame, mode);
+    }
+    else
+    {
+        veejay_memcpy(frame->data[0], feedback_buf, len);
+    }
+
+    veejay_memset(frame->data[1], 128, frame->uv_len);
+    veejay_memset(frame->data[2], 128, frame->uv_len);
+}
+
