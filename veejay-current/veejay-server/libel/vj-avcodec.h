@@ -66,34 +66,22 @@ typedef struct
 	void *scaler;
 } vj_encoder;
 
-int		vj_avcodec_init(int pix, int verbose);
-char		vj_avcodec_find_lav(int format);
-int		vj_avcodec_encode_frame(void *encoder,long nframe, int format, uint8_t *src[4], uint8_t *dst, int dst_len, int pixel_format);
-uint8_t 		*vj_avcodec_get_buf( vj_encoder *av );
-int 			vj_avcodec_get_buf_size( vj_encoder *av );
-const char		*vj_avcodec_get_encoder_name(int encoder);
-int		vj_avcodec_free();
-void vj_libav_ffmpeg_version();
-void	vj_avcodec_flush_frame(void *encoder, uint8_t *buf, int buf_len ); 
-/* color space conversion routines, should go somewhere else someday
-   together with subsample.c/colorspace.c into some lib
- */
-
-void	yuv_planar_to_rgb24(uint8_t *src[3], int fmt, uint8_t *dst, int w, int h );
-
-// from yuv 4:2:0 planar to yuv 4:2:2 planar
-int		yuv420p_to_yuv422p( uint8_t *Y, uint8_t *Cb, uint8_t *Cr, uint8_t *dst[3], int w, int h );
-
-void	yuv422p_to_yuv420p2( uint8_t *src[3], uint8_t *dst[3], int w, int h, int f );
-
-int		yuv420p_to_yuv422p2( uint8_t *sY,uint8_t *sCb, uint8_t *sCr, uint8_t *dst[3], int w, int h );
-
-void	yuv422p_to_yuv420p3( uint8_t *src, uint8_t *dst[3], int w, int h);
-
-void 		*vj_avcodec_start( VJFrame *frame, int encoder, char *filename );
-
-int		vj_avcodec_stop( void *encoder , int fmt);
-
-void               vj_avcodec_close_encoder( vj_encoder *av );
+int	vj_avcodec_init(int pix, int verbose);
+char vj_avcodec_find_lav(int format);
+int vj_avcodec_encode_frame(void *encoder,long nframe, int format, uint8_t *src[4], uint8_t *dst, int dst_len, int pixel_format);
+uint8_t	*vj_avcodec_get_buf( vj_encoder *av );
+int	vj_avcodec_get_buf_size( vj_encoder *av );
+const char *vj_avcodec_get_encoder_name(int encoder);
+int	vj_avcodec_is_internal(int format);
+int	vj_avcodec_print_version(void);
+void vj_avcodec_flush_frame(void *encoder, uint8_t *buf, int buf_len ); 
+void yuv_planar_to_rgb24(uint8_t *src[3], int fmt, uint8_t *dst, int w, int h );
+int	 yuv420p_to_yuv422p( uint8_t *Y, uint8_t *Cb, uint8_t *Cr, uint8_t *dst[3], int w, int h );
+void yuv422p_to_yuv420p2( uint8_t *src[3], uint8_t *dst[3], int w, int h, int f );
+int	yuv420p_to_yuv422p2( uint8_t *sY,uint8_t *sCb, uint8_t *sCr, uint8_t *dst[3], int w, int h );
+void yuv422p_to_yuv420p3( uint8_t *src, uint8_t *dst[3], int w, int h);
+void *vj_avcodec_start( VJFrame *frame, int encoder, char *filename );
+int	vj_avcodec_stop( void *encoder , int fmt);
+void vj_avcodec_close_encoder( vj_encoder *av );
 
 #endif
