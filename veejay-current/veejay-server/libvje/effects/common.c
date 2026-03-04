@@ -2169,72 +2169,39 @@ uint8_t 	veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M,
 	return n_labels;
 }
 
-
-void	vje_mean_filter( const uint8_t *src, uint8_t *dst, const int w, const int h )
-{
-	const int len = w * h;
-	unsigned int x,y;
-	const int aw = w - 1;
-
-	for( y = w; y < len; y += w )
-	{
-		for(x = 1; x < aw; x++ )
-		{
-			dst[x+y] = (
-				src[x - 1 + y - w ] +
-				src[x + y - w ] +
-				src[x + 1 + y - w ] +
-				src[x - 1 + y ] +
-				src[x + y] +
-				src[x + 1 + y ] +
-				src[x - 1 + y + w ] +
-				src[x + y + w] +
-				src[x + 1 + y + w ] ) / 9;
-		}
-	}
-}
-
-
-
-// temporary fix for fast_sqrt, use lookup table 
-double **sqrt_map_pixel_values = NULL;
+#define SQRT_LUT_SIZE 256
+static float *sqrt_dist_table = NULL;
 
 void init_sqrt_map_pixel_values(void) {
+    if (sqrt_dist_table != NULL) return;
 
-	int i;
-	
-	sqrt_map_pixel_values = (double**) vj_calloc( sizeof(double*) * 512 );
-	for( i = 0; i < 512; i ++ ) {
-		sqrt_map_pixel_values[i] = (double*) vj_calloc( sizeof(double) * 512 );
-	}	
-	
-	
-	int dx,dy,x,y;
-	double r;
-	for( y = -255; y < 255; y ++ ) {
-		for( x = -255; x < 255; x ++ ) {
-			fast_sqrt(r, (y * y) + (x * x) );
+    sqrt_dist_table = (float *) vj_malloc(SQRT_LUT_SIZE * SQRT_LUT_SIZE * sizeof(float));
+    if (!sqrt_dist_table) return;
 
-			dy = 255 + y;
-			dx = 255 + x;
+    for (int dy = 0; dy < SQRT_LUT_SIZE; dy++) {
+        for (int dx = 0; dx < SQRT_LUT_SIZE; dx++) {
+            // dy and dx are raw differences |target - key|
+            float fy = (float)dy;
+            float fx = (float)dx;
+            sqrt_dist_table[(dy << 8) + dx] = sqrtf(fy*fy + fx*fx);
+        }
+    }
+}
+float sqrt_table_get_pixel(int x, int y) {
+    if (x < 0) x = -x;
+    if (y < 0) y = -y;
+    
+    if (x > 255) x = 255;
+    if (y > 255) y = 255;
 
-			sqrt_map_pixel_values[dy][dx] = r;
-		}
-	}
-} 
-
-double sqrt_table_get_pixel( int x, int y ) {
-	return sqrt_map_pixel_values[(255+y)][(255+x)];
+    return sqrt_dist_table[(y << 8) + x];
 }
 
-void	sqrt_table_pixels_free(void) {
-	int i;
-	if(sqrt_map_pixel_values == NULL)
-	  return;
-	for( i = 0; i < 512; i ++ ) {
-		free( sqrt_map_pixel_values[i] );
-	}
-	free(sqrt_map_pixel_values);
+void sqrt_table_pixels_free(void) {
+    if (sqrt_dist_table != NULL) {
+        free(sqrt_dist_table);
+        sqrt_dist_table = NULL;
+    }
 }
 
 
