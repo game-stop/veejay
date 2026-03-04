@@ -59,106 +59,87 @@ livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 	return LIVIDO_NO_ERROR;
 }
 
-static inline void stroboscope( 
-		uint8_t *O1, uint8_t *O2, uint8_t *O0,
-		const uint8_t *A1, uint8_t *A2,
-		const uint8_t *B1, uint8_t *B2,
-		const uint8_t *Y1,
-		const uint8_t *Y2, 
-		const int w, 
-		const int h,
-		const int feather,
-		const int shift )
+static inline void stroboscope(
+        uint8_t *restrict O1, uint8_t *restrict O2, uint8_t *restrict O0,
+        const uint8_t *restrict A1, const uint8_t *restrict A2,
+        const uint8_t *restrict B1, const uint8_t *restrict B2,
+        const uint8_t *restrict Y1,
+        const uint8_t *restrict Y2, 
+        const int w, 
+        const int h,
+        const int feather,
+        const int shift)
 {
-	const int len = (w*h);
-	const int uv_len = (w*h) >> shift;
-	unsigned int i;
-	
-#pragma omp simd
-	for( i = 0; i < uv_len; i ++ )
-	{
-		if( Y1[(i<<shift)] > Y2[(i<<shift)] ) {
-			O1[i] = A1[i];
-			O2[i] = A2[i];
-		}
-		else {
-			O1[i] = B1[i];
-			O2[i] = B2[i];
-		}
-	}
+    const int len    = w * h;
+    const int uv_len = len >> shift;
 
 #pragma omp simd
-	for( i = 0; i < len; i ++ )
-	{
-		if( Y1[i] > Y2[i] ) {
-			O0[i] = Y1[i];
-		} else {
-			O0[i] = Y2[i];
-		}
-	}
+    for (int i = 0; i < uv_len; i++) {
+        const int idx = i << shift;
+        const int y1v = Y1[idx];
+        const int y2v = Y2[idx];
 
+        int diff = y1v - y2v;
+        int abs_diff = diff >= 0 ? diff : -diff;
 
-	// post process
-	if( feather > 0 )
-	{
+        const uint8_t feather_mask = -(abs_diff < feather);
+        const uint8_t y1_mask      = -(diff > 0);
+        const uint8_t y2_mask      = ~y1_mask;
+
+        uint8_t blended1 = (A1[i] + B1[i]) >> 1;
+        uint8_t blended2 = (A2[i] + B2[i]) >> 1;
+
+        O1[i] = (feather_mask & blended1) | (~feather_mask & ((y1_mask & A1[i]) | (y2_mask & B1[i])));
+        O2[i] = (feather_mask & blended2) | (~feather_mask & ((y1_mask & A2[i]) | (y2_mask & B2[i])));
+    }
+
 #pragma omp simd
-		for( i = 0; i < uv_len; i ++ ) {
-			if( abs( Y1[(i<<shift)] - Y2[(i<<shift)] ) < feather ) {
-				O1[i] = ( A1[i] + B1[i] ) >> 1;
-				O2[i] = ( A2[i] + B2[i] ) >> 1;
-			}
-		}
-
-	}
+    for (int i = 0; i < len; i++) {
+        const uint8_t y1v = Y1[i];
+        const uint8_t y2v = Y2[i];
+        O0[i] = y1v - ((y1v - y2v) & ((y1v - y2v) >> 7));
+    }
 }
 
-static inline void fading_stroboscope( uint8_t *O, uint8_t *A, uint8_t *B, uint8_t *Op, const int len )
+static inline void fading_stroboscope(uint8_t *O, uint8_t *A, uint8_t *B, uint8_t *Op, const int len)
 {
-	unsigned int i;
-#pragma omp simd
-	for( i = 0; i < len; i ++ )
-	{
-		O[i] = ( ( 0xff - Op[i]) * A[i] + (Op[i]) * B[i] ) >> 8;
-	}
+    #pragma omp simd
+    for(int i = 0; i < len; i++) {
+        O[i] = A[i] + (((int)Op[i] * ((int)B[i] - (int)A[i])) >> 8);
+    }
 }
 
 static inline void fading_stroboscopeUV( 
-		uint8_t *O1, uint8_t *O2,
-		const uint8_t *A1, uint8_t *A2,
-		const uint8_t *B1, uint8_t *B2,
-		const uint8_t *Y1,
-		const uint8_t *Y2, 
-		const int w, 
-		const int h,
-		const int feather,
-		const int shift )
+        uint8_t *restrict O1, uint8_t *restrict O2,
+        const uint8_t *restrict A1, const uint8_t *restrict A2,
+        const uint8_t *restrict B1, const uint8_t *restrict B2,
+        const uint8_t *restrict Y1,
+        const uint8_t *restrict Y2, 
+        const int w, 
+        const int h,
+        const int feather,
+        const int shift )
 {
-	const int uv_len = (w*h) >> shift;
-	unsigned int i;
+    const int uv_len = (w*h) >> shift;
 
 #pragma omp simd
-	for( i = 0; i < uv_len; i ++ )
-	{
-		if( Y1[(i<<shift)] > Y2[(i<<shift)] ) {
-			O1[i] = A1[i];
-			O2[i] = A2[i];
-		}
-		else {
-			O1[i] = B1[i];
-			O2[i] = B2[i];
-		}
-	}
+    for (int i = 0; i < uv_len; i++) {
+        const int y_idx = i << shift;
+        const int y1v = Y1[y_idx];
+        const int y2v = Y2[y_idx];
 
-	if( feather > 0 )
-	{
-#pragma omp simd
-		for( i = 0; i < uv_len; i ++ ) {
-			if( abs( Y1[(i<<shift)] - Y2[(i<<shift)] ) < feather ) {
-				O1[i] = ( A1[i] + B1[i] ) >> 1;
-				O2[i] = ( A2[i] + B2[i] ) >> 1;
-			}
-		}
-	}
+        const uint8_t mask = -(y1v > y2v);  
+
+        O1[i] = (mask & A1[i]) | (~mask & B1[i]);
+        O2[i] = (mask & A2[i]) | (~mask & B2[i]);
+
+        if (feather > 0) {
+            const int diff = y1v - y2v;
+            const uint8_t feather_mask = (uint8_t)(-(abs(diff) < feather));
+            O1[i] = (feather_mask & ((A1[i]+B1[i])>>1)) | (~feather_mask & O1[i]);
+            O2[i] = (feather_mask & ((A2[i]+B2[i])>>1)) | (~feather_mask & O2[i]);
+        }
+    }
 }
 
 int		process_instance( livido_port_t *my_instance, double timecode )
