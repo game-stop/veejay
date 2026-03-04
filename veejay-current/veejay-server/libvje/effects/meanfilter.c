@@ -69,7 +69,7 @@ void meanfilter_free(void *ptr)
 
 static void vje_mean_filter(const uint8_t *restrict src, uint8_t *restrict dst, int w, int h)
 {
-    int num_threads = vje_advise_num_threads();
+    int n = vje_advise_num_threads(w*h);
     #pragma omp parallel for num_threads(n)
     for (int y = 1; y < h - 1; y++) {
         int row_idx  = y * w;
