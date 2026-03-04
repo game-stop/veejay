@@ -47,6 +47,10 @@
 #include <libvje/vje.h>
 #include <veejaycore/yuvconv.h>
 
+#ifdef HAVE_ASM_AVX2
+#include <immintrin.h>
+#endif
+
 #define BLANK_CRB in0[1]
 #define BLANK_CRB_2 (in0[1] << 1)
 
@@ -75,6 +79,7 @@ const char *ssm_description[SSM_COUNT] = {
 #define B1 4461
 
 typedef void (*subsample_444_to_422)( uint8_t *restrict U, uint8_t *restrict V, const int width, const int height );
+typedef void (*supersample_422_to_444)( uint8_t *restrict chroma, const int width, const int height );
 
 /*************************************************************************
  * Chroma Subsampling
@@ -743,6 +748,44 @@ void ss_444_to_422_drop(uint8_t *restrict U, uint8_t *restrict V, int width, int
     }
 }
 
+#ifdef HAVE_ASM_AVX2
+void ss_444_to_422_drop_avx2(uint8_t *restrict U, uint8_t *restrict V, int width, int height) {
+    const int stride = width >> 1;
+
+    __m256i shuffle_mask = _mm256_setr_epi8(
+        0, 2, 4, 6, 8, 10, 12, 14, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        0, 2, 4, 6, 8, 10, 12, 14, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
+    );
+
+    for (int y = 0; y < height; y++) {
+        uint8_t *row_u = &U[y * width];
+        uint8_t *row_v = &V[y * width];
+        uint8_t *dst_u = &U[y * stride];
+        uint8_t *dst_v = &V[y * stride];
+
+        int x = 0;
+
+        for (; x <= width - 32; x += 32) {
+            __m256i u_data = _mm256_loadu_si256((__m256i*)&row_u[x]);
+            __m256i u_shuf = _mm256_shuffle_epi8(u_data, shuffle_mask);
+
+            __m256i u_packed = _mm256_permute4x64_epi64(u_shuf, _MM_SHUFFLE(3, 1, 2, 0));
+            _mm_storeu_si128((__m128i*)&dst_u[x >> 1], _mm256_castsi256_si128(u_packed));
+
+            __m256i v_data = _mm256_loadu_si256((__m256i*)&row_v[x]);
+            __m256i v_shuf = _mm256_shuffle_epi8(v_data, shuffle_mask);
+            __m256i v_packed = _mm256_permute4x64_epi64(v_shuf, _MM_SHUFFLE(3, 1, 2, 0));
+            _mm_storeu_si128((__m128i*)&dst_v[x >> 1], _mm256_castsi256_si128(v_packed));
+        }
+
+        for (; x < width - 1; x += 2) {
+            dst_u[x >> 1] = row_u[x];
+            dst_v[x >> 1] = row_v[x];
+        }
+    }
+}
+#endif
+
 /*
  * subsample YUV 4:4:4 to YUV 4:2:2 using average method
  */
@@ -759,6 +802,53 @@ void ss_444_to_422_average(uint8_t *restrict U, uint8_t *restrict V, int width, 
         }
     }
 }
+
+#ifdef HAVE_ASM_AVX2
+void ss_444_to_422_average_avx2(uint8_t *restrict U, uint8_t *restrict V, int width, int height) {
+    const int dest_width = width >> 1;
+    const int stride = width >> 1;
+
+    __m256i shuf_mask = _mm256_setr_epi8(
+        0, 2, 4, 6, 8, 10, 12, 14,  // Even indices (lane 0)
+        1, 3, 5, 7, 9, 11, 13, 15,  // Odd indices  (lane 0)
+        0, 2, 4, 6, 8, 10, 12, 14,  // Even indices (lane 1)
+        1, 3, 5, 7, 9, 11, 13, 15   // Odd indices  (lane 1)
+    );
+
+    for (int y = 0; y < height; y++) {
+
+        uint8_t *src_u = &U[y * width];
+        uint8_t *src_v = &V[y * width];
+        uint8_t *dst_u = &U[y * stride];
+        uint8_t *dst_v = &V[y * stride];
+
+        int x = 0;
+
+        for (; x <= dest_width - 16; x += 16) {
+
+            __m256i u_data = _mm256_loadu_si256((__m256i*)(src_u + (x * 2)));
+
+            __m256i u_shuf = _mm256_shuffle_epi8(u_data, shuf_mask);
+
+            __m256i u_avg = _mm256_avg_epu8(u_shuf, _mm256_srli_si256(u_shuf, 8));
+
+            __m256i u_final = _mm256_permute4x64_epi64(u_avg, _MM_SHUFFLE(3, 1, 2, 0));
+            _mm_storeu_si128((__m128i*)(dst_u + x), _mm256_castsi256_si128(u_final));
+
+            __m256i v_data = _mm256_loadu_si256((__m256i*)(src_v + (x * 2)));
+            __m256i v_shuf = _mm256_shuffle_epi8(v_data, shuf_mask);
+            __m256i v_avg  = _mm256_avg_epu8(v_shuf, _mm256_srli_si256(v_shuf, 8));
+            __m256i v_final = _mm256_permute4x64_epi64(v_avg, _MM_SHUFFLE(3, 1, 2, 0));
+            _mm_storeu_si128((__m128i*)(dst_v + x), _mm256_castsi256_si128(v_final));
+        }
+
+        for (; x < dest_width; x++) {
+            dst_u[x] = (src_u[x * 2] + src_u[x * 2 + 1] + 1) >> 1;
+            dst_v[x] = (src_v[x * 2] + src_v[x * 2 + 1] + 1) >> 1;
+        }
+    }
+}
+#endif
 
 /*
  * subsample YUV 4:4:4 to YUV 4:2:2 by bilinear interpolation
@@ -803,7 +893,7 @@ static void ss_444_to_422_bilinear(uint8_t *restrict U, uint8_t *restrict V, con
  * subsample YUV 4:4:4 to YUV 4:2:2 using mitchell netravali
  *
 */
-static void ss_444_to_422_in_mitchell_netravali(uint8_t *restrict U, uint8_t *restrict V, const int width, const int height) {
+static void ss_444_to_422_in_mitchell_netravali_old(uint8_t *restrict U, uint8_t *restrict V, const int width, const int height) {
     const int output_width = width >> 1;
     int i,j;
 
@@ -852,7 +942,11 @@ static void ss_444_to_422_in_mitchell_netravali(uint8_t *restrict U, uint8_t *re
     }
 }
 
-void tr_422_to_444_dup(uint8_t *chromaChannel, int width, int height) {
+static inline uint8_t clamp_u8(int v) {
+    return (v < 0) ? 0 : ((v > 255) ? 255 : (uint8_t)v);
+}
+
+void tr_422_to_444_dup(uint8_t *restrict chromaChannel, const int width,const int height) {
   const int src_width = width >> 1;
   const int hei = height - 1;
   const int wid = src_width - 1;
@@ -862,7 +956,7 @@ void tr_422_to_444_dup(uint8_t *chromaChannel, int width, int height) {
 
   for (int y = hei; y >= 0; y--) {
     int x = wid - 1;
-    // upsample the pixels using a bilinear filter.
+    // upsample the pixels using a nearest-neighbour filter.
     chromaChannel[y * width + 2 * wid + 1] = (chromaChannel[y * src_width + wid] + chromaChannel[y * src_width + wid + 1]) >> 1;
     chromaChannel[y * width + 2 * wid] = (chromaChannel[y * src_width + wid] + chromaChannel[y * src_width + wid - 1]) >> 1;
 
@@ -890,6 +984,109 @@ void tr_422_to_444_dup(uint8_t *chromaChannel, int width, int height) {
       chromaChannel[y * width + 2 * x] = pixel;
     }
   }
+}
+
+#ifdef HAVE_ASM_AVX2
+void tr_422_to_444_dup_avx2(uint8_t *restrict chromaChannel, const int width, const int height) {
+    const int src_width = width >> 1;
+    const int hei = height - 1;
+    const int wid = src_width - 1;
+
+    chromaChannel[hei * width + 1] = chromaChannel[hei * src_width + wid];
+
+    __m256i dup_mask = _mm256_setr_epi8(
+        0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7,
+        8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15
+    );
+
+    for (int y = hei; y >= 0; y--) {
+        uint8_t *row_src = &chromaChannel[y * src_width];
+        uint8_t *row_dst = &chromaChannel[y * width];
+
+        row_dst[2 * wid + 1] = (row_src[wid] + row_src[wid + 1]) >> 1;
+        row_dst[2 * wid] = (row_src[wid] + row_src[wid - 1]) >> 1;
+
+        int x = wid - 1;
+
+        for (; x >= 15; x -= 16) {
+
+            __m128i pixels128 = _mm_loadu_si128((__m128i*)&row_src[x - 15]);
+
+            __m256i pixels256 = _mm256_broadcastsi128_si256(pixels128);
+            
+            __m256i duplicated = _mm256_shuffle_epi8(pixels256, dup_mask);
+            
+            _mm256_storeu_si256((__m256i*)&row_dst[2 * (x - 15)], duplicated);
+        }
+        for (; x >= 0; x--) {
+            const uint8_t pixel = row_src[x];
+            row_dst[2 * x + 1] = pixel;
+            row_dst[2 * x] = pixel;
+        }
+    }
+}
+#endif
+
+
+#define UTAP_0 -9
+#define UTAP_1 111
+#define UTAP_2 29
+#define UTAP_3 -3
+
+void ss_422_to_444_mitchell(uint8_t *restrict chroma, const int in_w, const int h)  // FIXME
+{
+//#if defined(__GNUC__) || defined(__clang__)
+//    chroma = __builtin_assume_aligned(chroma, 32);
+//#endif
+
+    const int out_w = in_w * 2;
+
+    for (int i = 0; i < h; i++) {
+        uint8_t *row = &chroma[i * out_w];
+        uint8_t *src = row;
+
+
+        {
+            int j = in_w - 1;
+            row[2 * j] = src[j]; // even sample
+
+            int j0 = (j >= 2) ? j - 2 : 0;
+            int j1 = (j >= 1) ? j - 1 : 0;
+            int j2 = j;
+            int j3 = j; // clamp
+            int val = (UTAP_0 * src[j0] + UTAP_1 * src[j1] +
+                       UTAP_2 * src[j2] + UTAP_3 * src[j3] + 64) >> 7;
+            row[2 * j + 1] = clamp_u8(val);
+        }
+
+        for (int j = in_w - 2; j >= 1; j--) {
+            row[2 * j] = src[j]; // even sample
+
+            int j0 = j - 1;
+            int j1 = j;
+            int j2 = j + 1;
+            int j3 = j + 2;
+            if (j3 >= in_w) j3 = in_w - 1; // clamp right boundary
+
+            int val = (UTAP_0 * src[j0] + UTAP_1 * src[j1] +
+                       UTAP_2 * src[j2] + UTAP_3 * src[j3] + 64) >> 7;
+            row[2 * j + 1] = clamp_u8(val);
+        }
+
+
+        {
+            int j = 0;
+            row[0] = src[0]; // even sample
+
+            int j0 = 0;
+            int j1 = 0;
+            int j2 = 1;
+            int j3 = 2;
+            int val = (UTAP_0 * src[j0] + UTAP_1 * src[j1] +
+                       UTAP_2 * src[j2] + UTAP_3 * src[j3] + 64) >> 7;
+            row[1] = clamp_u8(val);
+        }
+    }
 }
 
 /* vertical intersitial siting; horizontal cositing
@@ -984,43 +1181,89 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
 
 
 static subsample_444_to_422 subsample_444_to_422_in;
+static supersample_422_to_444 supersample_422_to_444_out;
 
-void chroma_subsample_init(void)
-{
-    char *mode = getenv( "VEEJAY_SUBSAMPLE_MODE" );
+void chroma_subsample_init(void) {
+    const char *mode = getenv("VEEJAY_SUBSAMPLE_MODE");
     subsample_444_to_422 f = ss_444_to_422_drop;
+    const char *selected = "drop";
 
-    veejay_msg(VEEJAY_MSG_DEBUG, "Use VEEJAY_SUBSAMPLE_MODE=drop|average|bilinear|mitchell to select a subsampling method");
-
-    if( mode != NULL ) {
-        if(strcmp(mode, "drop") == 0 ) {
-            f = ss_444_to_422_drop;
-            veejay_msg(VEEJAY_MSG_INFO, "Subsampling using drop method");
-        }
-        else if (strcmp(mode, "average") == 0 ) { 
-            f = ss_444_to_422_average;
-            veejay_msg(VEEJAY_MSG_INFO, "Subsampling using average method");
-        }
-        else if (strcmp(mode, "bilinear") == 0 ) {
-            f = ss_444_to_422_bilinear;
-            veejay_msg(VEEJAY_MSG_INFO, "Subsampling using bilinear method");
-        }
-        else if (strcmp(mode, "mitchell") == 0 ) {
-            f = ss_444_to_422_in_mitchell_netravali;
-            veejay_msg(VEEJAY_MSG_DEBUG, "Subsampling using mitchell-netravali method");
-        }
-        else {
-            veejay_msg(VEEJAY_MSG_WARNING, "Invalid VEEJAY_SUBSAMPLE_MODE, using drop method" );
-            f = ss_444_to_422_drop;
-        }
+    if (mode == NULL) {
+        veejay_msg(VEEJAY_MSG_INFO, "Chroma subsampling: defaulting to 'drop' (set VEEJAY_SUBSAMPLE_MODE=drop|average|bilinear|mitchell)");
+#ifdef HAVE_ASM_AVX2
+        veejay_msg(VEEJAY_MSG_DEBUG, "AVX2 available for subsampling");
+#endif
+    }
+    else if (strcmp(mode, "drop") == 0) {
+        selected = "drop";
+#ifdef HAVE_ASM_AVX2
+        f = ss_444_to_422_drop_avx2;
+#else
+        f = ss_444_to_422_drop;
+#endif
+    }
+    else if (strcmp(mode, "average") == 0) {
+        selected = "average";
+#ifdef HAVE_ASM_AVX2
+        f = ss_444_to_422_average_avx2;
+#else
+        f = ss_444_to_422_average;
+#endif
+    }
+    else if (strcmp(mode, "bilinear") == 0) {
+        f = ss_444_to_422_bilinear;
+        selected = "bilinear";
+    }
+    else if (strcmp(mode, "mitchell") == 0) {
+        f = ss_444_to_422_in_mitchell_netravali_old;
+        selected = "mitchell";
+    }
+    else {
+        veejay_msg(VEEJAY_MSG_WARNING, "Invalid VEEJAY_SUBSAMPLE_MODE='%s', falling back to 'drop'", mode);
     }
 
     subsample_444_to_422_in = f;
+
+    veejay_msg(VEEJAY_MSG_INFO, "Chroma subsampling method: %s", selected);
+}
+
+void chroma_supersample_init(void)
+{
+    const char *mode = getenv("VEEJAY_SUPERSAMPLE_MODE");
+    supersample_422_to_444 f = tr_422_to_444_dup;
+    const char *selected = "dup";   // default
+
+    if (mode == NULL) {
+        veejay_msg(VEEJAY_MSG_INFO, "Chroma supersampling: defaulting to 'dup' (set VEEJAY_SUPERSAMPLE_MODE=dup|mitchell)");
+#ifdef HAVE_ASM_AVX2
+        veejay_msg(VEEJAY_MSG_DEBUG, "AVX2 available for subsampling");
+#endif
+    }
+    else if (strcmp(mode, "dup") == 0) {
+        selected = "dup";
+#ifdef HAVE_ASM_AVX2
+        f = tr_422_to_444_dup_avx2;
+#else
+        f = tr_422_to_444_dup;
+#endif
+    }
+    else if (strcmp(mode, "mitchell") == 0) {
+        f = ss_422_to_444_mitchell;
+        selected = "mitchell";
+    }
+    else {
+        veejay_msg(VEEJAY_MSG_WARNING, "Invalid VEEJAY_SUPERSAMPLE_MODE='%s', falling back to 'dup'", mode);
+    }
+
+    supersample_422_to_444_out = f;
+
+    veejay_msg(VEEJAY_MSG_INFO, "Chroma supersampling method: %s", selected);
 }
 
 void chroma_subsample(subsample_mode_t mode, VJFrame *frame, uint8_t *ycbcr[] )
 {
     switch (mode) {
+        // optimized path
         case SSM_422_444:
             subsample_444_to_422_in(ycbcr[1],ycbcr[2],frame->width,frame->height);
             break;
@@ -1048,11 +1291,12 @@ void chroma_supersample(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[] )
         _chroma_supersample_data = (uint8_t*) vj_calloc( sizeof(uint8_t) * (frame->width * 2) );
     }
 
+
     switch (mode) {
+        // optimized path
         case SSM_422_444:
-            //tr_422_to_444_dup(ycbcr[1],ycbcr[2],ycbcr[0],frame->width,frame->height);
-            tr_422_to_444_dup(ycbcr[1], frame->width,frame->height);
-            tr_422_to_444_dup(ycbcr[2],frame->width,frame->height);
+            supersample_422_to_444_out(ycbcr[1], frame->width,frame->height);
+            supersample_422_to_444_out(ycbcr[2],frame->width,frame->height);
         break;
         case SSM_420_JPEG_BOX:
             ss_420jpeg_to_444(ycbcr[1], frame->width, frame->height);

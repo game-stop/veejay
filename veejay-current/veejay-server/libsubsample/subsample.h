@@ -37,6 +37,7 @@ extern const char *ssm_id[SSM_COUNT];
 extern const char *ssm_description[SSM_COUNT];
 
 void chroma_subsample_init();
+void chroma_supersample_init();
 void chroma_subsample(subsample_mode_t mode, VJFrame *frame, uint8_t * ycbcr[] );
 void chroma_supersample(subsample_mode_t mode, VJFrame *frame, uint8_t * ycbcr[] );
 #endif
