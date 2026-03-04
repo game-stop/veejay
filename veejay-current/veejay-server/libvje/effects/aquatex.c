@@ -63,21 +63,20 @@ vj_effect *aquatex_init(int w, int h)
 typedef struct  
 {
     uint8_t *buf[3];
-    double *lut;
-    double *sin_lut;
-    double *rand_lut;
-    double *offset_y_lut; 
-    double *offset_x_lut;
+    float *lut;
+    float *sin_lut;
+    float *rand_lut;
+    float *offset_y_lut; 
+    float *offset_x_lut;
     int nb_size_current;
 } aquatex_t;
 
 static void init_sin_lut(aquatex_t *f)
 {
     for(int i = 0; i < LUT_SIZE; ++i) {
-        f->sin_lut[i] = sin( 2 * M_PI * i / LUT_SIZE );
+        f->sin_lut[i] = sinf( 2.0f * M_PI * i / LUT_SIZE );
     }
 }
-
 void *aquatex_malloc(int w, int h) {
     aquatex_t *s = (aquatex_t*) vj_calloc(sizeof(aquatex_t));
     if(!s) return NULL;
@@ -93,14 +92,14 @@ void *aquatex_malloc(int w, int h) {
     const int nb = NB_SIZE * 2 + 1;
     s->nb_size_current = nb;
 
-    s->lut = (double*) vj_malloc(sizeof(double) * (3 * nb) ); 
+    s->lut = (float*) vj_malloc(sizeof(float) * (3 * nb) ); 
     if(!s->lut) {
         free(s->buf[0]);
         free(s);
         return NULL;
     }
 
-    s->sin_lut = (double*) vj_malloc(sizeof(double) * LUT_SIZE);
+    s->sin_lut = (float*) vj_malloc(sizeof(float) * LUT_SIZE);
     if (!s->sin_lut) {
         free(s->lut);
         free(s->buf[0]);
@@ -108,9 +107,9 @@ void *aquatex_malloc(int w, int h) {
         return NULL;
     }
     
-    s->rand_lut = (double*) vj_malloc(sizeof(double) * RAND_LUT_SIZE);
-    s->offset_y_lut = (double*) vj_malloc(sizeof(double) * RAND_LUT_SIZE);
-    s->offset_x_lut = (double*) vj_malloc(sizeof(double) * RAND_LUT_SIZE);
+    s->rand_lut = (float*) vj_malloc(sizeof(float) * RAND_LUT_SIZE);
+    s->offset_y_lut = (float*) vj_malloc(sizeof(float) * RAND_LUT_SIZE);
+    s->offset_x_lut = (float*) vj_malloc(sizeof(float) * RAND_LUT_SIZE);
     
     if (!s->rand_lut || !s->offset_y_lut || !s->offset_x_lut) {
         aquatex_free(s);
@@ -137,11 +136,11 @@ void aquatex_apply(void *ptr, VJFrame *frame, int *args) {
     aquatex_t *s = (aquatex_t*)ptr;
     if (!s) return;
 
-    const double intensity = (double)args[0] * 0.01;
-    const double frequency = (double)args[1] * 0.1;
-    const double phase_shift = (double)args[2] * LUT_SIZE / 360.0;
+    const float intensity   = (float)args[0] * 0.01f;
+    const float frequency   = (float)args[1] * 0.1f;
+    const float phase_shift = (float)args[2] * LUT_SIZE / 360.0f;
     int neighborhood_size = args[3];
-    const double turbulence = (double)args[4] * 0.01;
+    const float turbulence  = (float)args[4] * 0.01f;
 
     if(neighborhood_size <= 0) neighborhood_size = 1;
     if(neighborhood_size > NB_SIZE) neighborhood_size = NB_SIZE;
@@ -163,10 +162,10 @@ void aquatex_apply(void *ptr, VJFrame *frame, int *args) {
     uint8_t *outU;
     uint8_t *outV;
 
-    double *restrict sin_lut = s->sin_lut;
-    double *restrict rand_lut = s->rand_lut;
-    double *restrict offset_y_lut = s->offset_y_lut;
-    double *restrict offset_x_lut = s->offset_x_lut;
+    float *restrict sin_lut = s->sin_lut;
+    float *restrict rand_lut = s->rand_lut;
+    float *restrict offset_y_lut = s->offset_y_lut;
+    float *restrict offset_x_lut = s->offset_x_lut;
 
     const int nb = neighborhood_size * 2 + 1;
 
@@ -183,19 +182,22 @@ void aquatex_apply(void *ptr, VJFrame *frame, int *args) {
 
     if( turbulence > 0 ) {
         for (int i = 0; i < RAND_LUT_SIZE; ++i) {
-            rand_lut[i] = (rand() / (double)RAND_MAX - 0.5) * turbulence;
+            rand_lut[i] = (rand() / (float)RAND_MAX - 0.5) * turbulence;
         }
     }
     else {
-        veejay_memset( rand_lut, 0, sizeof(double) * RAND_LUT_SIZE );
+        veejay_memset( rand_lut, 0, sizeof(float) * RAND_LUT_SIZE );
     }
 
-    double phase = -frequency * LUT_SIZE + phase_shift;
-    double step  = (frequency * LUT_SIZE) / (double) neighborhood_size;
+    float phase = -frequency * LUT_SIZE + phase_shift;
+    float step  = (frequency * LUT_SIZE) / (float) neighborhood_size;
 
     for (int i = 0; i < nb; i++) {
-        int index = ((int)phase % LUT_SIZE + LUT_SIZE) % LUT_SIZE;
-        double value = intensity * sin_lut[index];
+        int index = (int)phase;
+        if (index < 0) index += LUT_SIZE;
+        else if (index >= LUT_SIZE) index -= LUT_SIZE;
+
+        float value = intensity * sin_lut[index];
         offset_y_lut[i] = value;
         offset_x_lut[i] = value;
         phase += step;
@@ -208,7 +210,7 @@ void aquatex_apply(void *ptr, VJFrame *frame, int *args) {
         
         for (int x_pos = 0; x_pos < width; x_pos++) {
             const int pixel_index = y_pos * width + x_pos;
-            const double r = rand_lut[ pixel_index % RAND_LUT_SIZE ];
+            const float r = rand_lut[ pixel_index % RAND_LUT_SIZE ];
 
             rand_idx += 1;
             rand_idx -= (rand_idx >= RAND_LUT_SIZE) * RAND_LUT_SIZE;
@@ -216,8 +218,8 @@ void aquatex_apply(void *ptr, VJFrame *frame, int *args) {
             const float offset_y = offset_y_lut[lut_y_idx] + r;
             const float offset_x = offset_x_lut[lut_x_idx] + r;
 
-            int new_y = (int)( (double) y_pos + offset_y * (double) height);
-            int new_x = (int)( (double) x_pos + offset_x * (double) width);
+            int new_y = (int)(y_pos + offset_y * height);
+            int new_x = (int)(x_pos + offset_x * width);
 
             new_y = (new_y & -(new_y >= 0)) | ((height - 1) & -(new_y >= height));
             new_x = (new_x & -(new_x >= 0)) | ((width - 1) & -(new_x >= width));
