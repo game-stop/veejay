@@ -25,32 +25,32 @@
 extern void *(* veejay_memcpy)(void *to, const void *from, size_t len);
 extern void *(* veejay_memset)(void *to, uint8_t val, size_t len);
 extern void vj_mem_init(int w, int h);
-extern void vj_mem_optimize();
+extern void vj_mem_optimize(void);
 extern void vj_mem_set_defaults(int w, int h);
 extern int vj_mem_threaded_init(int w, int h);
 extern void *vj_malloc_(size_t size);
 extern void *vj_calloc_(size_t size );
-extern void memcpy_report();
+extern void memcpy_report(void);
 extern void init_parallel_tasks(int n_tasks);
 
 #define vj_malloc(i) vj_malloc_(i)
 #define vj_calloc(i) vj_calloc_(i)
-extern void find_best_memset();
-extern void find_best_memcpy();
+extern void find_best_memset(void);
+extern void find_best_memcpy(void);
 extern void packed_plane_clear( size_t len, void *to );
 extern void yuyv_plane_clear( size_t len, void *to );
-extern int cpu_cache_size();
-extern int mem_align_size();
+extern int cpu_get_cacheline_size(void);
+extern int mem_align_size(void);
 extern char *veejay_strncat( char *s1, char *s2, size_t n );
 extern char *veejay_strncpy( char *s1, const char *s2, size_t n );
-extern void yuyv_plane_init();
+extern void yuyv_plane_init(void);
 extern void yuyv_plane_clear( size_t len, void *to );
 extern char **vje_build_param_list( int num, ... );
 extern void *(*vj_frame_copy)( uint8_t **input, uint8_t **output, int *strides );
 extern void *(*vj_frame_clear)( uint8_t **input, int *strides, unsigned int val );
 extern void vj_frame_copy1( uint8_t *input, uint8_t *output, int size );
 extern void vj_frame_clear1( uint8_t *input, unsigned int value, int size );
-extern uint8_t num_threaded_tasks();
+extern uint8_t num_threaded_tasks(void);
 extern void vj_frame_slow_single( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac );
 extern void vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac );
 extern void benchmark_veejay(int w, int h);
@@ -62,11 +62,11 @@ extern void vj_simple_pool_free( void *ptr );
 extern void *vj_simple_pool_alloc( void *ptr, size_t s );
 extern void *vj_simple_pool_init( size_t s );
 extern void vj_simple_pool_reset( void *ptr );
-extern void vj_mem_destroy();
+extern void vj_mem_destroy(void);
 extern int check_desired_alignment( void *ptr );
 extern uint8_t *realign_buffer(uint8_t *ptr, size_t offset);
 #ifdef STRICT_CHECKING
-extern void *get_malloc_refs();
+extern void *get_malloc_refs(void);
 #endif
 
 #endif
