@@ -85,10 +85,6 @@ void	x11_enable_screensaver( void *display )
 #endif
 }
 
-void	x11_misc_set_border( void *display, void *window, int status )
-{
-	
-}
 
 static	int	xinerama_x_ = 0;
 static	int	xinerama_y_ = 0;
