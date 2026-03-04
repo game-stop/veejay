@@ -79,135 +79,149 @@ vj_effect *wave_init(int w, int h) {
     return ve;
 }
 
+
 typedef struct {
     uint8_t *buf[3];
-    float *lut_x;
-    float *lut_y;
+    int16_t *lut_x;
+    int16_t *lut_y;
     int width;
     int height;
     float factor;
     float speed;
     int deformX;
     int deformY;
+
+    float lut_factor;
+    float lut_speed;
+    int lut_deformX;
+    int lut_deformY;
 } wave_t;
 
+
 #define SIN_TABLE_SIZE 360
+
+
+static inline int clamp(int v, int min, int max) {
+    return (v < min) ? min : ((v > max) ? max : v);
+}
+
 void* wave_malloc(int w, int h) {
     wave_t *data = (wave_t*) vj_malloc(sizeof(wave_t));
-    if (!data)
-        return NULL;
+    if (!data) return NULL;
+
     data->buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 3);
-    if(!data->buf[0]) {
-        free(data);
-        return NULL;
-    }
-    data->lut_x = (float*) vj_malloc(sizeof(float) * w);
-    if(!data->lut_x) {
-        free(data->buf[0]);
-        free(data);
-        return NULL;
-    }
-    data->lut_y = (float*) vj_malloc(sizeof(float) * h);
-    if(!data->lut_y) {
-        free(data->buf[0]);
-        free(data->lut_x);
-        free(data);
-        return NULL;
-    }
+    if (!data->buf[0]) { free(data); return NULL; }
+
+    data->lut_x = (int16_t*) vj_malloc(sizeof(int16_t) * w);
+    if (!data->lut_x) { free(data->buf[0]); free(data); return NULL; }
+
+    data->lut_y = (int16_t*) vj_malloc(sizeof(int16_t) * h);
+    if (!data->lut_y) { free(data->buf[0]); free(data->lut_x); free(data); return NULL; }
 
     data->buf[1] = data->buf[0] + (w*h);
     data->buf[2] = data->buf[1] + (w*h);
 
     data->width = w;
     data->height = h;
-    data->factor = 10.0;
-    data->speed = 1.0;
+    data->factor = 10.0f;
+    data->speed = 1.0f;
     data->deformX = 1;
     data->deformY = 1;
-    
+
     return data;
 }
 
 void wave_free(void *ptr) {
     wave_t *data = (wave_t*) ptr;
-    if (data != NULL) {
-        free(data->buf[0]);
-        free(data->lut_x);
-        free(data->lut_y);
-        free(data);
+    if (!data) return;
+
+    free(data->buf[0]);
+    free(data->lut_x);
+    free(data->lut_y);
+    free(data);
+}
+
+static void wave_build_luts(wave_t *data, int width, int height, float factor, float speed, int deformX, int deformY) {
+    if (factor == data->lut_factor &&
+        speed == data->lut_speed &&
+        deformX == data->lut_deformX &&
+        deformY == data->lut_deformY)
+        return;
+
+    const float amplitude = factor;
+    const float pulsation = 0.5f / factor;
+    const float phase = factor * pulsation * speed / 10.0f;
+    const float offsetX = phase + speed;
+    const float offsetY = phase + speed;
+
+    if (deformX) {
+        for (int y = 0; y < height; y++) {
+            data->lut_y[y] = (int16_t)(a_sin(pulsation * y + offsetY) * amplitude);
+        }
+    } else {
+        veejay_memset(data->lut_y, 0, sizeof(int16_t) * height);
     }
+
+    if (deformY) {
+        for (int x = 0; x < width; x++) {
+            data->lut_x[x] = (int16_t)(a_sin(pulsation * x * 2 + offsetX) * amplitude);
+        }
+    } else {
+        veejay_memset(data->lut_x, 0, sizeof(int16_t) * width);
+    }
+
+    data->lut_factor = factor;
+    data->lut_speed = speed;
+    data->lut_deformX = deformX;
+    data->lut_deformY = deformY;
 }
 
 void wave_apply(void *ptr, VJFrame *frame, int *args) {
     wave_t *data = (wave_t*)ptr;
 
-    int width = frame->width;
-    int height = frame->height;
+    const int width = frame->width;
+    const int height = frame->height;
 
-    int x, y;
-    int decalY, decalX;
-    float amplitude, phase, pulsation;
+    const float factor = args[0] * 0.1f;
+    const float speed_limit = args[1] * 0.1f;
+    const int deformX = args[2];
+    const int deformY = args[3];
 
-    float factor = args[0] * 0.1f;
-    float speed = args[1] * 0.1f;
-    
-    int deformX = args[2];
-    int deformY = args[3];
+    float speed = data->speed + 0.1f;
+    data->speed = (speed > speed_limit) ? 1.0f : speed;
 
-    amplitude = factor;
-    pulsation = 0.5 / factor;
+    uint8_t *restrict Y = frame->data[0] + frame->offset;
+    uint8_t *restrict U = frame->data[1] + frame->offset;
+    uint8_t *restrict V = frame->data[2] + frame->offset;
 
-    data->speed += 0.1f;
-    if( data->speed > speed ) {
-           data->speed = 1.0f;
-    }
+    uint8_t *restrict dstY = data->buf[0] + frame->offset;
+    uint8_t *restrict dstU = data->buf[1] + frame->offset;
+    uint8_t *restrict dstV = data->buf[2] + frame->offset;
 
-    phase = factor * pulsation * data->speed / 10;
+    wave_build_luts(data, width, height, factor, speed, deformX, deformY);
 
-    uint8_t *Y = frame->data[0];
-    uint8_t *U = frame->data[1];
-    uint8_t *V = frame->data[2];
+    for (int y = 0; y < height; y++) {
+        const int srcY_base = clamp(y + data->lut_y[y], 0, height - 1);
+        const int src_row = srcY_base * width;
+        const int dst_row = y * width;
 
-    uint8_t *dstY = data->buf[0] + frame->offset;
-    uint8_t *dstU = data->buf[1] + frame->offset;
-    uint8_t *dstV = data->buf[2] + frame->offset;
+        uint8_t *restrict pDstY = dstY + dst_row;
+        uint8_t *restrict pDstU = dstU + dst_row;
+        uint8_t *restrict pDstV = dstV + dst_row;
 
-    float *lut_x = data->lut_x;
-    float *lut_y = data->lut_y;
+        const int16_t *restrict pLutX = data->lut_x;
+        #pragma omp simd
+        for (int x = 0; x < width; x++) {
+            const int srcX = clamp(x + pLutX[x], 0, width - 1);
+            const int srcIndex = src_row + srcX;
 
-    for( y = 0; y < height; y ++ ) {
-        lut_y[y] = deformX ? a_sin( pulsation * y + phase + data->speed ) * amplitude : 0.0f;
-    }
-
-    for( x = 0; x < width; x ++ ) {
-        lut_x[x] = deformY ? a_sin( pulsation * x * 2 + phase + data->speed ) * amplitude : 0.0f;
-    }
-
-    for (y = 0; y < height; y++) {
-        decalX = lut_y[y];
-        for (x = 0; x < width; x++) {
-            decalY = lut_x[x];
-
-            int srcX = ( x + decalX ); 
-            int srcY = ( y + decalY );
-
-            srcX = (srcX < 0) ? 0 : ((srcX >= width) ? width - 1 : srcX);
-            srcY = (srcY < 0) ? 0 : ((srcY >= height) ? height - 1 : srcY);
-
-            int srcIndex = srcY * width + srcX;
-
-            int dstIndex = y * width + x;
-
-            dstY[dstIndex] = Y[srcIndex];
-            dstU[dstIndex] = U[srcIndex];
-            dstV[dstIndex] = V[srcIndex];
+            pDstY[x] = Y[srcIndex];
+            pDstU[x] = U[srcIndex];
+            pDstV[x] = V[srcIndex];
         }
     }
 
-    veejay_memcpy( Y, dstY, frame->len );
-    veejay_memcpy( U, dstU, frame->len );
-    veejay_memcpy( V, dstV, frame->len );
-
+    veejay_memcpy(Y, dstY, frame->len);
+    veejay_memcpy(U, dstU, frame->len);
+    veejay_memcpy(V, dstV, frame->len);
 }
-
-
