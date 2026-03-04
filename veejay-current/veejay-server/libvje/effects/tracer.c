@@ -26,8 +26,9 @@
 
 typedef struct {
     uint8_t *trace_buffer[4];
-    int trace_counter;
 } tracer_t;
+
+#define MAX_OLD_FRAMES 128
 
 vj_effect *tracer_init(int w, int h)
 {
@@ -39,7 +40,7 @@ vj_effect *tracer_init(int w, int h)
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
     ve->limits[0][1] = 1;
-    ve->limits[1][1] = 25;
+    ve->limits[1][1] = MAX_OLD_FRAMES;
     ve->defaults[0] = 150;
     ve->defaults[1] = 8;
     ve->description = "Tracer (Frame Echo)";
@@ -66,6 +67,11 @@ void *tracer_malloc(int w, int h)
     }
     t->trace_buffer[1] = t->trace_buffer[0] + len;
     t->trace_buffer[2] = t->trace_buffer[1] + len;
+
+    veejay_memset(t->trace_buffer[0], pixel_Y_lo_, len );
+    veejay_memset(t->trace_buffer[1], 128, len );
+    veejay_memset(t->trace_buffer[2], 128, len );
+
     return (void*) t;
 }
 
@@ -76,61 +82,57 @@ void tracer_free(void *ptr) {
     free(t);
 }
 
-void tracer_apply(void *ptr,VJFrame *frame, VJFrame *frame2, int *args )
+void tracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    unsigned int x;
-    const int len = frame->len;
-    unsigned int uv_len = frame->uv_len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Cb= frame->data[1];
-    uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
-    uint8_t *Cb2= frame2->data[1];
-    uint8_t *Cr2= frame2->data[2];
-    int opacity = args[0];
-    int n = args[1];
     tracer_t *t = (tracer_t*) ptr;
-    unsigned int op1 = (opacity > 255) ? 255 : opacity;
-    unsigned int op0 = 255 - op1;
+    
+    const int len = frame->len;
+    const int uv_len = frame->uv_len;
+    const int opacity = args[0];
+    const int buffer_len = args[1];
 
-    uint8_t **trace_buffer = t->trace_buffer;
-        
-    if (t->trace_counter == 0)
+    const int decay = 256 - (256 / buffer_len);
+    const int blend = 256 - decay;
+    const int op_scale = (opacity > 255) ? 255 : opacity;
+
+    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+
+    uint8_t *restrict Y2  = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
+
+    uint8_t *restrict t0 = t->trace_buffer[0];
+    uint8_t *restrict t1 = t->trace_buffer[1];
+    uint8_t *restrict t2 = t->trace_buffer[2];
+  
+#pragma omp simd
+    for (int x = 0; x < len; x++)
     {
-#pragma omp simd
-        for (x = 0; x < len; x++)
-        {
-            Y[x] = func_opacity(Y[x], Y2[x], op0, op1);
-        }
-#pragma omp simd
-        for (x = 0; x < uv_len; x++)
-        {
-            Cb[x] = func_opacity(Cb[x], Cb2[x], op0, op1);
-            Cr[x] = func_opacity(Cr[x], Cr2[x], op0, op1);
-        }
-        int strides[4] = { len, uv_len, uv_len, 0 };
-        vj_frame_copy( frame->data, trace_buffer, strides );
-    }
-    else
-    {
-#pragma omp simd
-        for (x = 0; x < len; x++)
-        {
-            Y[x] = ((op0 * Y[x]) + (op1 * trace_buffer[0][x])) >> 8;
-        }
-#pragma omp simd
-        for (x = 0; x < uv_len; x++)
-        {
-            Cb[x] = ((op0 * Cb[x]) + (op1 * trace_buffer[1][x])) >> 8;
-            Cr[x] = ((op0 * Cr[x]) + (op1 * trace_buffer[2][x])) >> 8;
-        }
-        int strides[4] = { len, uv_len, uv_len, 0 };
-        vj_frame_copy( frame->data, trace_buffer, strides );
+        int mixed = (Y[x] + Y2[x]) * op_scale >> 9;
+        int accum = (t0[x] * decay + mixed * blend) >> 8;
+
+        t0[x] = (uint8_t)accum;
+        Y[x]  = (uint8_t)accum;
     }
 
-    t->trace_counter++;
-    if (t->trace_counter >= n)
-        t->trace_counter = 0;
+#pragma omp simd
+    for (int x = 0; x < uv_len; x++)
+    {
+        int cb_acc = t1[x] - 128;
+        int cr_acc = t2[x] - 128;
 
+        int mixed_cb = (Cb[x] + Cb2[x] - 256) * op_scale >> 9;
+        int mixed_cr = (Cr[x] + Cr2[x] - 256) * op_scale >> 9;
 
+        cb_acc = (cb_acc * decay + mixed_cb * blend) >> 8;
+        cr_acc = (cr_acc * decay + mixed_cr * blend) >> 8;
+
+        t1[x] = CLAMP_UV(cb_acc + 128);
+        t2[x] = CLAMP_UV(cr_acc + 128);
+
+        Cb[x] = t1[x];
+        Cr[x] = t2[x];
+    }
 }
