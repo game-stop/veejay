@@ -54,7 +54,7 @@ int vj_client_send( vj_client *v, int sock_type,unsigned char *buf);
 
 int vj_client_send_buf( vj_client *v, int sock_type,unsigned char *buf, int len);
 
-vj_client *vj_client_alloc();
+vj_client *vj_client_alloc(void);
 
 vj_client *vj_client_alloc_stream(VJFrame *info);
 
