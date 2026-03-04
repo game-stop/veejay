@@ -23,9 +23,7 @@
 #include "average.h"
 
 typedef struct {
-    double *running_sum[4];
-    int last_params[2];
-    int frame_count;
+    float *running_sum[3];
 } average_t;
 
 vj_effect *average_init(int w, int h)
@@ -38,12 +36,12 @@ vj_effect *average_init(int w, int h)
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 1000;
     ve->defaults[0] = 1;
-	ve->parallel = 1; 
-    ve->description = "Running Average";
+	ve->parallel = 0; 
+    ve->description = "Exponential Moving Average";
     ve->sub_format = 1; 
     ve->extra_frame = 0;
 	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Number of frames" );
+	ve->param_description = vje_build_param_list( ve->num_params, "Smoothing factor" );
 
 	return ve;
 }
@@ -54,47 +52,58 @@ void *average_malloc(int width, int height)
     if(!a) {
         return NULL;
     }
-	a->running_sum[0] = (double*) vj_calloc( sizeof(double) * (width * height * 3 ));
+	a->running_sum[0] = (float*) vj_calloc( sizeof(float) * (width * height * 3 ));
 	if(!a->running_sum[0]) {
 		free(a);
         return NULL;
     }
 	a->running_sum[1] = a->running_sum[0] + (width*height);
 	a->running_sum[2] = a->running_sum[1] + (width*height);
-	a->frame_count = 1;
+
     return (void*) a;
 }
 
 void average_free(void *ptr) 
 {
     average_t *a = (average_t*) ptr;
-	free(a->running_sum[0]);
+    if(!a)
+        return;
+    if(a->running_sum[0])
+	    free(a->running_sum[0]);
     free(a);
 }	
+
+static inline uint8_t clamp_u8(double v)
+{
+    if (v <= 0.0)   return 0;
+    if (v >= 255.0) return 255;
+    return (uint8_t)v;
+}
+
 
 void average_apply(void *ptr, VJFrame *frame, int *args) {
     int max_sum = args[0];
     const int len = frame->len;
-    uint8_t *Y  = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
+    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
     average_t *a = (average_t *)ptr;
 
-    double *running_sum[3];
+    float *restrict running_sum[3];
     running_sum[0] = a->running_sum[0] + frame->offset;
     running_sum[1] = a->running_sum[1] + frame->offset;
     running_sum[2] = a->running_sum[2] + frame->offset;
 
-    const double w  = 1.0 / max_sum;
-    const double iw = 1.0 - w;
+    const float w  = 1.0 / max_sum;
+    const float iw = 1.0 - w;
 
     for (int i = 0; i < len; i++) {
         running_sum[0][i] = iw * running_sum[0][i] + w * Y[i];
         running_sum[1][i] = iw * running_sum[1][i] + w * (Cb[i] - 128);
         running_sum[2][i] = iw * running_sum[2][i] + w * (Cr[i] - 128);
-        Y[i]  = (uint8_t)running_sum[0][i];
-        Cb[i] = (uint8_t)(128 + running_sum[1][i]);
-        Cr[i] = (uint8_t)(128 + running_sum[2][i]);
+        Y[i]  = clamp_u8(running_sum[0][i]);
+        Cb[i] = clamp_u8(128.0 + running_sum[1][i]);
+        Cr[i] = clamp_u8(128.0 + running_sum[2][i]);
     }
 }
