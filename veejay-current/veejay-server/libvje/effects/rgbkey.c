@@ -24,7 +24,10 @@
 #include <libswscale/swscale.h>
 #include "rgbkey.h"
 
-extern int yuv_sws_get_cpu_flags();
+
+#define LUT_SIZE 256
+#define LUT_MAX 255  // max index
+
 
 vj_effect *rgbkey_init(int w,int h)
 {
@@ -74,108 +77,83 @@ vj_effect *rgbkey_init(int w,int h)
     ve->parallel = 0;
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][5],5, 
-			
 			"Ignore Alpha-IN", "Alpha-IN A", "Alpha-IN B", "Alpha-IN A or B", "Alpha-In A and B" );
 
 	return ve;
 }
 
-/*
- * originally from http://gc-films.com/chromakey.html
- */
-static inline double color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, double dA, double dB )
+static inline float color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, const float dA, const float dB )
 {
-//		double tmp = 0.0; 
-//		fast_sqrt( tmp, (Cbk - Cb) * (Cbk-Cb) + (Crk - Cr) * (Crk - Cr) );
-
-		double tmp = sqrt_table_get_pixel( (Cbk-Cb), (Crk-Cr) );
-	
-		if( tmp < dA ) { /* near color key == bg */
-			return 0.0; /* near */
-		}
-		if( tmp < dB ) { /* middle region */
-			return (tmp - dA)/(dB - dA); /* distance to key color */
-		}
-		return 1.0; /* far from color key == fg */
+	float tmp = sqrt_table_get_pixel( (Cbk-Cb), (Crk-Cr) );
+	return (tmp < dA) ? 0.0 : ((tmp < dB) ? ((tmp - dA) / (dB - dA)) : 1.0);
 }
 
 void rgbkey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
-    
     int tola = args[0];
     int r = args[1];
     int g = args[2];
     int b = args[3];
     int tolb = args[4];
     int operator = args[5];
-	unsigned int pos;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
-	uint8_t *A = frame->data[3];
-	uint8_t *B = frame2->data[3];
-	const int len = frame->len;
-	int iy=0,iu=128,iv=128;
-	uint8_t op0,op1;
+    unsigned int pos;
+    
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2= frame2->data[1];
+    uint8_t *restrict Cr2= frame2->data[2];
+    uint8_t *restrict A = frame->data[3];
+    uint8_t *restrict B = frame2->data[3];
+    
+    const int len = frame->len;
+    int iy=0, iu=128, iv=128;
+    uint8_t op0, op1;
 
-	double dtola = (double) tola + 0.5f;
-	double dtolb = (double) tolb + 0.5f;
+    float dtola = (float) tola + 0.5f;
+    float dtolb = (float) tolb + 0.5f;
+    
+    if (dtolb <= dtola) dtolb = dtola + 0.001f;
 
-	/* get key color */
-	_rgb2yuv(r,g,b,iy,iu,iv);
+    _rgb2yuv(r, g, b, iy, iu, iv);
 
-	/* euclidean distance between key color and chroma */
-	// introduces spill 
-	switch( operator ) {
-		case ALPHA_IGNORE:	
-			//ignore alpha-in
-			for (pos = len; pos != 0; pos--) {
-				A[pos] = (uint8_t)( 255.0 * color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb ) );
-			}
-			break;
-		case ALPHA_IN_A:
-			for (pos = len; pos != 0; pos--) {
-				if(A[pos] == 0)
-					continue;
-				A[pos] = (uint8_t)( 255.0 * color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb ) );
-			}
-			break;
-		case ALPHA_IN_A_OR_B:
-			for (pos = len; pos != 0; pos--) {
-				if(A[pos] == 0 || B[pos] == 0)
-					continue;
-				A[pos] = (uint8_t)( 255.0 * color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb ) );
-			}
-			break;
-		case ALPHA_IN_A_AND_B:
-			for (pos = len; pos != 0; pos--) {
-				if(A[pos] == 0 && B[pos] == 0)
-					continue;
-				A[pos] = (uint8_t)( 255.0 * color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb ) );
-			}
-			break;
-		case ALPHA_IN_B:
-			for (pos = len; pos != 0; pos--) {
-				if(B[pos] == 0)
-					continue;
-				A[pos] = (uint8_t)( 255.0 * color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb ) );
-			}
-			break;
-	}
+	switch(operator) {
+        case ALPHA_IGNORE:
+            for (pos = 0; pos < len; pos++) {
+                A[pos] = (uint8_t)(255.0f * color_distance(Cb[pos], Cr[pos], iu, iv, dtola, dtolb));
+            }
+            break;
+        case ALPHA_IN_A:
+            for (pos = 0; pos < len; pos++) {
+                if (A[pos] != 0)
+                    A[pos] = (uint8_t)(255.0f * color_distance(Cb[pos], Cr[pos], iu, iv, dtola, dtolb));
+            }
+            break;
+        case ALPHA_IN_A_OR_B:
+            for (pos = 0; pos < len; pos++) {
+                if (A[pos] != 0 || B[pos] != 0)
+                    A[pos] = (uint8_t)(255.0f * color_distance(Cb[pos], Cr[pos], iu, iv, dtola, dtolb));
+            }
+            break;
+        case ALPHA_IN_A_AND_B:
+            for (pos = 0; pos < len; pos++) {
+                if (A[pos] != 0 && B[pos] != 0)
+                    A[pos] = (uint8_t)(255.0f * color_distance(Cb[pos], Cr[pos], iu, iv, dtola, dtolb));
+            }
+            break;
+        case ALPHA_IN_B:
+            for (pos = 0; pos < len; pos++) {
+                if (B[pos] != 0)
+                    A[pos] = (uint8_t)(255.0f * color_distance(Cb[pos], Cr[pos], iu, iv, dtola, dtolb));
+            }
+            break;
+    }
 
-	/* composite bg onto fg */
-	for( pos = 0; pos < len; pos ++ ) {
-		op0     = A[pos];
-		op1     = 0xff - op0;
-		Y[pos]  = ((op0 * Y[pos]) + (op1 * Y2[pos]))>> 8;
-	    Cb[pos] = ((op0 * Cb[pos]) + (op1 * Cb2[pos]))>> 8;
-		Cr[pos] = ((op0 * Cr[pos]) + (op1 * Cr2[pos]))>>8;
-	}
-
-	/* Set by color key
-       Gaussblur on alpha channel
-       Mixdown */
-
+    for (pos = 0; pos < len; pos++) {
+        op0     = A[pos];
+        op1     = 0xff - op0;
+        Y[pos]  = ((op0 * Y[pos]) + (op1 * Y2[pos])) >> 8;
+        Cb[pos] = ((op0 * Cb[pos]) + (op1 * Cb2[pos])) >> 8;
+        Cr[pos] = ((op0 * Cr[pos]) + (op1 * Cr2[pos])) >> 8;
+    }
 }
