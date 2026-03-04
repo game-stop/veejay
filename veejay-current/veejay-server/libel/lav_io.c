@@ -79,27 +79,55 @@ char *get_filename_ext(char *filename) {
 	return dot + 1;
 }
 
-int	lav_is_supported_image_file(char *filename)
+int lav_is_supported_image_file(const char *filename)
 {
-	GSList *list = gdk_pixbuf_get_formats();
-	GSList *iter;
-	int i;
+    GSList *list, *iter;
+    char *ext;
+    int result = 0;
 
-	char *ext = get_filename_ext(filename);
-	if(!ext)
-		return 0;
+    if (!filename)
+        return 0;
 
-	for( iter = list; iter->next != NULL; iter = iter->next ) {
-		gchar **extensions = gdk_pixbuf_format_get_extensions (iter->data);
-		for( i = 0; extensions[i] != NULL; i ++ ) {
-			if( strncasecmp(ext, extensions[i], strlen(ext)) == 0 ) {
-				g_strfreev(extensions);
-				return 1;	
-			}
-		}	
-		g_strfreev (extensions);
-	}
-	return 0;
+    ext = get_filename_ext(filename);
+    if (!ext)
+        return 0;
+
+    list = gdk_pixbuf_get_formats();
+
+    for (iter = list; iter != NULL; iter = iter->next) {
+        GdkPixbufFormat *format = (GdkPixbufFormat *) iter->data;
+        gchar **extensions = gdk_pixbuf_format_get_extensions(format);
+        gchar **mimes = gdk_pixbuf_format_get_mime_types(format);
+
+        int i;
+
+        int is_image_format = 0;
+        for (i = 0; mimes[i] != NULL; i++) {
+            if (g_str_has_prefix(mimes[i], "image/")) {
+                is_image_format = 1;
+                break;
+            }
+        }
+
+        if (is_image_format) {
+            for (i = 0; extensions[i] != NULL; i++) {
+                if (g_ascii_strcasecmp(ext, extensions[i]) == 0) {
+                    result = 1;
+                    break;
+                }
+            }
+        }
+
+        g_strfreev(extensions);
+        g_strfreev(mimes);
+
+        if (result)
+            break;
+    }
+
+    g_slist_free(list);
+
+    return result;
 }
 
 void    lav_set_project(int w, int h, float f, int fmt)
@@ -216,59 +244,59 @@ lav_file_t *lav_open_output_file(char *filename, char format,
     case 'a':
     case 'A':
              /* Open AVI output file */
-        veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI MJPEG");
+        veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI MJPEG");
         sprintf(fourcc, "MJPG" );
         break;
     case 'H':
-        veejay_msg(VEEJAY_MSG_DEBUG,"\tWriting output file in AVI HFYU");
+        veejay_msg(VEEJAY_MSG_DEBUG,"[lavio] Writing output file in AVI HFYU");
         sprintf(fourcc, "HFYU");
         break;
     case 'l':
-        veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI LJPEG");
+        veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI LJPEG");
         sprintf(fourcc, "JPGL");
         break;
     case 'L':
-        veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI LZO (veejay's fourcc)");
+        veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI LZO (veejay's fourcc)");
         sprintf(fourcc, "MLZO" );
         break;
     case 'o':
     case 'O':
-        veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI QOI");
+        veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI QOI");
         sprintf(fourcc, "QOIY");
         break;
     case 'v':
-        veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI VJ20 (veejay's fourcc)");
+        veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI VJ20 (veejay's fourcc)");
         sprintf(fourcc,"VJ20");
         break;  
     case 'V':
-        veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI VJ22 (veejay's fourcc)");
+        veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI VJ22 (veejay's fourcc)");
         sprintf(fourcc,"VJ22");
         break;
     case 'Y':
-        veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI IYUV");
+        veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI IYUV");
         sprintf(fourcc, "IYUV" );
         break;
     case 'P':
-        veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI YV16");  
+        veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI YV16");  
         sprintf(fourcc, "YV16");
         break;
     case 'D':
-        veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI DIV3");
+        veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI DIV3");
         sprintf(fourcc, "DIV3");
         break;
     case 'M':
-        veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI MP4V");
+        veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI MP4V");
         sprintf(fourcc,"MP4V");
         break;
     case 'b':
     case 'd':
-        veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI DVSD");
+        veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI DVSD");
         sprintf(fourcc, "DVSD");
         break;
 
     case 'q':
     case 'Q':
-        veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in Quicktime MJPA/JPEG");
+        veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in Quicktime MJPA/JPEG");
         is_avi = 0;
         break;
     case 'x':
@@ -289,7 +317,7 @@ lav_file_t *lav_open_output_file(char *filename, char format,
         {
             if(AVI_set_audio(lav_fd->avi_fd, achans, arate, asize, WAVE_FORMAT_PCM)==-1)
             {
-                veejay_msg(0, "Too many channels or invalid AVI file");
+                veejay_msg(0, "[lavio] Too many channels or invalid AVI file");
                 lav_close( lav_fd );
                 return NULL;
             }
@@ -306,7 +334,7 @@ lav_file_t *lav_open_output_file(char *filename, char format,
             lav_fd->qt_fd = quicktime_open(filename, 0, 1);
             if(!lav_fd->qt_fd)
         {
-            veejay_msg(VEEJAY_MSG_ERROR, "\tCannot open '%s' for writing", filename);
+            veejay_msg(VEEJAY_MSG_ERROR, "[lavio] Cannot open '%s' for writing", filename);
             free(lav_fd);
             return NULL;
         }
@@ -327,11 +355,11 @@ lav_file_t *lav_open_output_file(char *filename, char format,
         char *info      = quicktime_get_info( lav_fd->qt_fd );
         
         veejay_msg(VEEJAY_MSG_DEBUG,
-                "(C) %s by %s, %s, has keyframes = %d", copyright,name,info,has_kf );
+                "[lavio] (C) %s by %s, %s, has keyframes = %d", copyright,name,info,has_kf );
                 
         return lav_fd;
 #else
-        veejay_msg(0,"Quicktime not compiled in, cannot use Quicktime");
+        veejay_msg(0,"[lavio] Quicktime not compiled in, cannot use Quicktime");
         internal_error = ERROR_FORMAT;
         return NULL;
 #endif
@@ -370,8 +398,8 @@ int lav_close(lav_file_t *lav_file)
             break;
 #endif        
 	case 'G':
-	    if( lav_file->rawio ) 
-		  raw_io_close(lav_file->rawio);  
+	    //if( lav_file->rawio ) 
+		  //raw_io_close(lav_file->rawio);  
         default:
             if( lav_file->avi_fd )
             {
@@ -672,6 +700,7 @@ int lav_video_compressor_type(lav_file_t *lav_file)
     return lav_file->codec_id;
 }
 
+#define FOURCC_Y42X "y42x"
 #define FOURCC_DV "dvsd"
 #define FOURCC_PIC "pict"
 #define FOURCC_LZO "mlzo" 
@@ -700,6 +729,8 @@ const char *lav_video_compressor(lav_file_t *lav_file)
    if(lav_file->format == 'q' || lav_file->format == 'Q')
     return quicktime_video_compressor(lav_file->qt_fd,0);
 #endif
+   if( video_format == 'G')
+      return FOURCC_Y42X;
 
    return AVI_video_compressor(lav_file->avi_fd);
 }
@@ -720,8 +751,8 @@ int lav_audio_channels(lav_file_t *lav_file)
     if(video_format == 'q' || video_format =='Q')
          return quicktime_track_channels(lav_file->qt_fd,0);
 #endif
-    if(video_format == 'G')
-        return 0;
+    //if(video_format == 'G')
+    //    return raw_io_audio_channels(lav_file->rawio);
    return AVI_audio_channels(lav_file->avi_fd);
 }
 
@@ -737,8 +768,8 @@ int lav_audio_bits(lav_file_t *lav_file)
     if(video_format == 'x' )
         return 0;
 #endif
-    if(video_format == 'G')
-        return 0;
+    //if(video_format == 'G')
+    //    return raw_io_audio_bits(lav_file->rawio);
 #ifdef HAVE_LIBQUICKTIME
       if(video_format == 'q'|| video_format =='Q')
          return quicktime_audio_bits(lav_file->qt_fd,0);
@@ -758,8 +789,8 @@ long lav_audio_rate(lav_file_t *lav_file)
     if(video_format == 'x')
         return 0;
 #endif
-    if(video_format == 'G')
-	return 0;
+    //if(video_format == 'G')
+	//    return raw_io_audio_rate(lav_file->rawio);
 #ifdef HAVE_LIBQUICKTIME
     if( video_format == 'q'|| video_format =='Q')
         return quicktime_sample_rate(lav_file->qt_fd,0);
@@ -779,8 +810,8 @@ long lav_audio_clips(lav_file_t *lav_file)
     if(video_format == 'x')
         return 0;
 #endif
-    if(video_format == 'G')
-	return 0;
+    //if(video_format == 'G')
+	//    return raw_io_audio_bits(lav_file->rawio); //FIXME
 #ifdef HAVE_LIBQUICKTIME
     if(video_format == 'q'|| video_format == 'Q')
         return quicktime_audio_length(lav_file->qt_fd,0);
@@ -838,8 +869,10 @@ int lav_set_video_position(lav_file_t *lav_file, long frame)
    if(video_format == 'x')
     return 1;
 #endif
-    if(video_format == 'G')
-	return 1;
+    //if(video_format == 'G') {
+	//raw_io_set_video_position( lav_file->rawio, frame );
+    //    return 1;
+    //}
 #ifdef HAVE_LIBQUICKTIME
     if(video_format == 'q' || video_format == 'Q')
         return quicktime_set_video_position(lav_file->qt_fd,(int64_t)frame,0);
@@ -856,9 +889,9 @@ int lav_read_frame(lav_file_t *lav_file, uint8_t *vidbuf)
         return rawdv_read_frame( lav_file->dv_fd, vidbuf );
     }
 #endif
-    if(lav_file->format == 'G') {
-	return raw_io_read_frame( lav_file->rawio, vidbuf );
-    }
+    //if(lav_file->format == 'G') {
+	//    return raw_io_read_frame( lav_file->rawio, vidbuf );
+    //}
 #ifdef USE_GDK_PIXBUF
     if(lav_file->format == 'x')
     return -1;
@@ -873,7 +906,7 @@ int lav_read_frame(lav_file_t *lav_file, uint8_t *vidbuf)
 #ifdef STRICT_CHECKING
    if(!kf)
    {
-    veejay_msg(VEEJAY_MSG_DEBUG, "Requested frame is not a keyframe");
+    veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Requested frame is not a keyframe");
     return ret;
    }
 #endif
@@ -942,8 +975,9 @@ int lav_read_audio(lav_file_t *lav_file, uint8_t *audbuf, long samps)
     if(video_format == 'x')
         return 0;
 #endif
-    if(video_format == 'G')
-	return 0;
+    //if(video_format == 'G')
+	//     return raw_io_read_audio( lav_file->rawio, audbuf, samps );
+
     video_format = lav_file->format; internal_error = 0; /* for error messages */
 #ifdef HAVE_LIBQUICKTIME
     if( video_format == 'q' || video_format == 'Q')
@@ -1001,9 +1035,10 @@ int lav_filetype(lav_file_t *lav_file)
    return lav_file->format;
 }
 
-lav_file_t *lav_open_input_file(char *filename, long mmap_size)
+lav_file_t *lav_open_input_file(char *filename, size_t mmap_size)
 {
    static char pict[5] = "PICT\0";
+   static char y42x[5] = "y42x\0";
    char *video_comp = NULL;
    unsigned char *frame = NULL; 
    int ierr;
@@ -1028,16 +1063,25 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
     if( stat(filename, &s ) != 0 )
     {
         if(lav_fd) free(lav_fd);
-        veejay_msg(VEEJAY_MSG_ERROR, "Invalid file '%s'. %s",filename, strerror(errno));
+        veejay_msg(VEEJAY_MSG_ERROR, "[lavio] Invalid file '%s'. %s",filename, strerror(errno));
         return NULL;
     }
 
     if(!S_ISREG( s.st_mode) )
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "'%s' is not a regular file",filename);
-        if(lav_fd) free(lav_fd);
-        return NULL;
+        // check if its some weird stuff we wanna play
+        if (S_ISCHR(s.st_mode) || S_ISBLK(s.st_mode)) {
+            int fd2 = open(filename, O_RDONLY);
+            if (fd2 < 0) {
+                veejay_msg(VEEJAY_MSG_ERROR, "[lavio] Cannot read from this character or block device");
+                if(lav_fd) free(lav_fd);
+                return NULL;
+            }
+            close(fd2);
+        }
+
     }
+      
 
 #ifdef USE_GDK_PIXBUF
     int is_picture = lav_is_supported_image_file( filename );
@@ -1053,28 +1097,27 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 			lav_fd->format = 'x';
 			lav_fd->bogus_len = (int) output_fps;
 			video_comp = pict;
-			veejay_msg(VEEJAY_MSG_INFO,"\tFile %s is of type image", filename);
+			veejay_msg(VEEJAY_MSG_INFO,"[lavio] File %s is of type image", filename);
 			return lav_fd;
 		}
 #endif
-		veejay_msg(VEEJAY_MSG_WARNING, "File %s is not an image", filename );
     }
     
     
     lav_fd->avi_fd = AVI_open_input_file(filename,1,mmap_size);
     if( lav_fd->avi_fd && AVI_errno == AVI_ERR_EMPTY )
     {
-       veejay_msg(VEEJAY_MSG_ERROR, "\tEmpty AVI file: ", filename);
+       veejay_msg(VEEJAY_MSG_ERROR, "[lavio] Empty AVI file: ", filename);
        if(lav_fd) free(lav_fd);
        return NULL;
     }
     else if ( lav_fd->avi_fd && AVI_errno == 0 )
     {
-       veejay_msg(VEEJAY_MSG_INFO, "[avilib] opening %s as AVI file", filename );
+       veejay_msg(VEEJAY_MSG_INFO, "[lavio] opening %s as AVI file", filename );
        ret = 1;
     }
     else {
-       veejay_msg(VEEJAY_MSG_WARNING, "[avilib] unable to open AVI file %s", filename);
+       veejay_msg(VEEJAY_MSG_WARNING, "[lavio] unable to open AVI file %s", filename);
     }
    
     int alt = 0;
@@ -1086,7 +1129,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
         video_comp = AVI_video_compressor(lav_fd->avi_fd);
         if(video_comp == NULL || strlen(video_comp) <= 0)
         {
-            veejay_msg(VEEJAY_MSG_ERROR, "Unable to read FOURCC from AVI");
+            veejay_msg(VEEJAY_MSG_ERROR, "[lavio] Unable to read FOURCC from AVI");
             lav_close(lav_fd);
             return NULL;
         }
@@ -1094,8 +1137,6 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 	set_fourcc(lav_fd, video_comp);
     
 	lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;
-
-	veejay_msg(VEEJAY_MSG_INFO, "\tFile %s is of type AVI , fourcc %s, audio %d",filename, video_comp, lav_fd->has_audio );
 
 	ret = 1;
 	alt = 1;
@@ -1105,14 +1146,14 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 #ifdef HAVE_LIBQUICKTIME
         if(quicktime_check_sig(filename))
         {
-            veejay_msg(VEEJAY_MSG_DEBUG, "Opening as quicktime file ...");
+            veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Opening as quicktime file");
             quicktime_pasp_t pasp;
             int nfields, detail;
             lav_fd->qt_fd = quicktime_open(filename,1,0);
             video_format = 'q'; /* for error messages */
             if (!lav_fd->qt_fd)
             {
-                veejay_msg(VEEJAY_MSG_ERROR, "Unable to open as quicktime file");
+                veejay_msg(VEEJAY_MSG_ERROR, "[lavio] Unable to open as quicktime file");
                 free(lav_fd);
                 return NULL;
             }
@@ -1121,12 +1162,12 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
             lav_fd->format = 'q';
             video_comp = quicktime_video_compressor(lav_fd->qt_fd,0);
             
-			veejay_msg(VEEJAY_MSG_INFO, "\tFile %s is of type Quicktime, fourcc %s",filename, video_comp );
+			veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] File %s is of type Quicktime, fourcc %s",filename, video_comp );
 
 			/* We want at least one video track */
             if (quicktime_video_tracks(lav_fd->qt_fd) < 1)
             {
-                veejay_msg(VEEJAY_MSG_ERROR, "At least one video track required, but none found");
+                veejay_msg(VEEJAY_MSG_ERROR, "[lavio] At least one video track required, but none found");
                 lav_close(lav_fd);
                 internal_error = ERROR_FORMAT;
                 return NULL;
@@ -1156,7 +1197,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
                     else if (detail == 9 || detail == 1)
                         lav_fd->interlacing = LAV_INTER_TOP_FIRST;
                     else
-                        veejay_msg(VEEJAY_MSG_DEBUG, "Unknown 'detail' in 'field' atom: %d", detail);
+                        veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Unknown 'detail' in 'field' atom: %d", detail);
                     }
                     else
                         lav_fd->interlacing = LAV_NOT_INTERLACED;
@@ -1169,7 +1210,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
                 if (strncasecmp(audio_comp, QUICKTIME_TWOS,4)==0)
                     lav_fd->has_audio = 1;
                 else
-                    veejay_msg(VEEJAY_MSG_WARNING, "Audio compressor '%s' not supported, ignoring audio",
+                    veejay_msg(VEEJAY_MSG_WARNING, "[lavio] Audio compressor '%s' not supported, ignoring audio",
                             audio_comp );
             }
 
@@ -1192,8 +1233,8 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
                 lav_fd->has_audio = 0;
                 ret = 1;
                 alt = 1;
-                veejay_msg(VEEJAY_MSG_INFO,
-                        "\tFile %s is of type RAW DV with fourcc '%s'",filename, video_comp );
+                veejay_msg(VEEJAY_MSG_DEBUG,
+                        "[lavio] File %s is of type RAW DV with fourcc '%s'",filename, video_comp );
             }
         }
 #endif
@@ -1201,21 +1242,22 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 
     if(ret == 0 || video_comp == NULL || alt == 0)
     {
-        veejay_msg(VEEJAY_MSG_WARNING, "Unable to open %s: unsupported or unrecognized video format", filename);
+        veejay_msg(VEEJAY_MSG_WARNING, "[lavio] Unable to open %s: unsupported or unrecognized video format", filename);
         
-	lav_fd->rawio = raw_io_open( filename, output_scale_width, output_scale_height, get_ffmpeg_pixfmt(output_yuv));
+	/*lav_fd->rawio = raw_io_open( filename, output_scale_width, output_scale_height, get_ffmpeg_pixfmt(output_yuv));
 	if(lav_fd->rawio == NULL ) {
 		free(lav_fd);
         	internal_error = ERROR_FORMAT;
         	return NULL;
 	}
-	lav_fd->MJPG_chroma = CHROMAUNKNOWN;
-	lav_fd->has_audio = 0;
+	lav_fd->has_audio = 1;
 	lav_fd->format = 'G';
-	video_comp = pict;
+	lav_fd->bogus_len = 1000;
+	video_comp = y42x;
+	set_fourcc( lav_fd, video_comp );  
 	ret = 1;
 	alt = 1;
-    }
+    }*/
 
 
    if(lav_fd->bps==0) lav_fd->bps=1; /* make it save since we will divide by that value */
@@ -1275,10 +1317,18 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
         return lav_fd; 
     }
 
+    if(strncasecmp(video_comp, "y42x",4) == 0) {
+        lav_fd->MJPG_chroma = CHROMAUNKNOWN;
+        lav_fd->format = 'G';
+        lav_fd->interlacing = LAV_NOT_INTERLACED;
+        veejay_msg(VEEJAY_MSG_WARNING, "[lavio] Opening as static");
+    	return lav_fd;
+    }
+
     if (strncasecmp(video_comp,"yv16",4)==0 ||
         strncasecmp(video_comp,"i422",4)==0)
     {
-        lav_fd->MJPG_chroma = CHROMA422;
+        lav_fd->MJPG_chroma = CHROMAUNKNOWN;
         lav_fd->format = 'P';
         lav_fd->interlacing = LAV_NOT_INTERLACED;
         return lav_fd; 
@@ -1360,7 +1410,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
     }
     
     ierr = ERROR_FORMAT;
-    veejay_msg(VEEJAY_MSG_ERROR, "Unrecognized fourcc '%s' in %s", video_comp, filename);
+    veejay_msg(VEEJAY_MSG_ERROR, "[lavio] Unrecognized fourcc '%s' in %s", video_comp, filename);
 
 ERREXIT:
    lav_close(lav_fd);
@@ -1415,67 +1465,6 @@ const char *lav_strerror(void)
          return error_string;
    }
 }
-
-
-/*
-static int check_DV2_input(lav_file_t *lav_fd)
-{
-   int ierr = 0;
-   double len = 0;
-   unsigned char *frame = NULL;
-
-   lav_fd->is_MJPG = 0;
-
-
-   if ( lav_set_video_position(lav_fd,0) ) goto ERREXIT;
-   if ( (len = lav_frame_size(lav_fd,0)) <=0 ) goto ERREXIT;
-   if ( (frame = (unsigned char*) malloc(len)) == 0 ) { ierr=ERROR_MALLOC; goto ERREXIT; }
-
-   if ( lav_read_frame(lav_fd,frame) <= 0 ) goto ERREXIT;
-   {
-     dv_decoder_t *decoder = dv_decoder_new(0,0,0);
-     dv_parse_header(decoder, frame);
-
-     switch (decoder->system) {
-     case e_dv_system_525_60:
-       if (dv_format_wide(decoder)) {
-     lav_fd->sar_w = 40;
-     lav_fd->sar_h = 33;
-       } else {
-     lav_fd->sar_w = 10;
-     lav_fd->sar_h = 11;
-       } 
-       break;
-     case e_dv_system_625_50:
-       if (dv_format_wide(decoder)) {
-     lav_fd->sar_w = 118;
-     lav_fd->sar_h = 81;
-       } else {
-     lav_fd->sar_w = 59;
-     lav_fd->sar_h = 54;
-       } 
-       break;
-     default:
-       lav_fd->sar_w = 0; 
-       lav_fd->sar_h = 0;
-       break;
-     }
-     veejay_msg(VEEJAY_MSG_DEBUG, "DV System %s (sar w %d sar h %d)",
-    (decoder->system == e_dv_system_525_60 ? "525-60" : ( decoder->system == e_dv_system_625_50 ? "625-50" : "unknown!")),lav_fd->sar_w,lav_fd->sar_h);
-     dv_decoder_free(decoder);
-   }
-
-   if ( lav_set_video_position(lav_fd,0) ) goto ERREXIT;
-   return 0;
-
-ERREXIT:
-   lav_close(lav_fd);
-   if(frame) free(frame);
-   if (ierr) internal_error = ierr;
-   return 1;
-}
-
-*/
 
 int lav_fileno(lav_file_t *lav_file)
 {
