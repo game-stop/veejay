@@ -17,7 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-
+#include <config.h>
+#include <unistd.h>
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "meanfilter.h"
@@ -65,6 +66,31 @@ void meanfilter_free(void *ptr)
 	m = NULL;
 }
 
+
+static void vje_mean_filter(const uint8_t *restrict src, uint8_t *restrict dst, int w, int h)
+{
+    int num_threads = vje_advise_num_threads();
+    #pragma omp parallel for num_threads(n)
+    for (int y = 1; y < h - 1; y++) {
+        int row_idx  = y * w;
+        int prev_row = (y - 1) * w;
+        int next_row = (y + 1) * w;
+
+        int sum = src[prev_row + 0] + src[prev_row + 1] + src[prev_row + 2]
+                + src[row_idx + 0] + src[row_idx + 1] + src[row_idx + 2]
+                + src[next_row + 0] + src[next_row + 1] + src[next_row + 2];
+
+        dst[row_idx + 1] = sum / 9;
+
+        for (int x = 2; x < w - 1; x++) {
+            int lcol = src[prev_row + x - 2] + src[row_idx + x - 2] + src[next_row + x - 2];
+            int rcol = src[prev_row + x + 1] + src[row_idx + x + 1] + src[next_row + x + 1];
+
+            sum = sum - lcol + rcol;
+            dst[row_idx + x] = sum / 9;
+        }
+    }
+}
 
 void meanfilter_apply( void *ptr, VJFrame *frame, int *args )
 {
