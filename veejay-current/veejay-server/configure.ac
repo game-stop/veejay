@@ -1,12 +1,15 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.67],[http://www.veejayhq.net])
+AC_INIT([veejay],[1.6.0],[http://www.veejayhq.net])
 AC_PREREQ([2.69])
+
+AC_USE_SYSTEM_EXTENSIONS
+
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
-VEEJAY_MINOR_VERSION=5
-VEEJAY_MICRO_VERSION=67
+VEEJAY_MINOR_VERSION=6
+VEEJAY_MICRO_VERSION=0
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -36,9 +39,7 @@ dnl Options
 dnl AC_CONFIG_MACRO_DIR([m4])
 
 
-dnl kill CFLAGS
 USER_CFLAGS="$CFLAGS"
-CFLAGS=""
 dnl enable auto vectorization for libvjmem, libvje and libyuv
 
 AC_ARG_ENABLE([strict],
@@ -123,9 +124,57 @@ AC_SYS_LARGEFILE
 dnl configure AS and ASFLAGS...
 AM_PROG_AS
 
-AC_CHECK_HEADERS([fenv.h stdint.h inttypes.h sys/types.h alloca.h sys/time.h sys/times.h])
-dnl AX_PREFIXED_DEFINE([VEEJAY], [HAVE_STDINT_H])
-dnl AX_PREFIXED_DEFINE([VEEJAY], [HAVE_INTTYPES_H])
+CFLAGS=""
+
+AC_CHECK_HEADERS([stdatomic.h fenv.h stdint.h inttypes.h sys/types.h alloca.h sys/time.h sys/times.h])
+
+AC_MSG_CHECKING([for C11 standard support (mandatory for atomics)])
+AC_CACHE_VAL([ac_cv_c_c11], [
+  _VEEJAY_CFLAGS_SAVE="$CFLAGS"
+  
+  # Try C11 first, testing with stdatomic.h to ensure header is present
+  CFLAGS="$CFLAGS -std=c11"
+  AC_COMPILE_IFELSE([AC_LANG_SOURCE([[#include <stdatomic.h>]])], [
+    ac_cv_c_c11="yes_c11"
+  ], [
+    # C11 failed, try GNU11 (common fallback for GCC/Clang)
+    CFLAGS="$_VEEJAY_CFLAGS_SAVE -std=gnu11"
+    AC_COMPILE_IFELSE([AC_LANG_SOURCE([[#include <stdatomic.h>]])], [
+      ac_cv_c_c11="yes_gnu11"
+    ], [
+      # Both failed, restore original CFLAGS and flag failure
+      CFLAGS="$_VEEJAY_CFLAGS_SAVE"
+      ac_cv_c_c11="no"
+    ])
+  ])
+])
+
+AC_MSG_RESULT([$ac_cv_c_c11])
+
+if test "x$ac_cv_c_c11" = xno; then
+  AC_MSG_ERROR([C11 compiler support is mandatory for this project. Please use GCC >= 4.9 or Clang >= 3.8.])
+elif test "x$ac_cv_c_c11" = xyes_c11; then
+  CFLAGS="$CFLAGS -std=c11"
+  AC_DEFINE([HAVE_C11_ATOMICS], [1], [Define to 1 if C11 atomics are available.])
+  AC_MSG_NOTICE([Using -std=c11])
+elif test "x$ac_cv_c_c11" = xyes_gnu11; then
+  CFLAGS="$CFLAGS -std=gnu11"
+  AC_DEFINE([HAVE_C11_ATOMICS], [1], [Define to 1 if C11 atomics are available.])
+  AC_MSG_NOTICE([Using -std=gnu11])
+fi
+
+AC_MSG_CHECKING([for usable GNU built-in atomics])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <stdatomic.h> // Keep for compatibility, or remove if conflict persists
+]], [[
+  long test_val = 0;
+  __atomic_store_n(&test_val, 1, __ATOMIC_RELEASE);
+]])], [
+  AC_MSG_RESULT([yes])
+  AC_DEFINE([HAVE_GNU_ATOMICS], [1], [Define to 1 if GNU built-in atomics are available.])
+], [
+  AC_MSG_ERROR([GNU built-in atomics are mandatory.])
+])
 
 AC_CHECK_FUNCS([posix_memalign memalign fmax lround pow bzero gettimeofday memset mmap strndup strstr strncasecmp])
 AC_CHECK_FUNCS([sched_get_priority_max])
@@ -150,20 +199,9 @@ AC_SEARCH_LIBS([clock_gettime], [rt],
 
 
 AC_SUBST(LIBGETOPT_LIB)
-
-
 AC_MSG_NOTICE([The host is $host  $host_cpu  $host_vendor  $host_os .])
 
 
-
-dnl e_xdpms=no
-dnl ACCHECK_HEADER(X11/extensions/dpms.h,
-dnl	AC_DEFINE( HAVE_XDPMS, 1, [If we have xpdms] ) have_xdpms=yes,,
-dnl	[])
-
-dnl *********************************************************************
-dnl Test whether we're linux or not. If so, define HAVE_V4L and build the
-dnl video4linux/hardware dependent tools. Else, undefine HAVE_V4L
 have_v4l2=false
 have_linux=false
 have_darwin=false
@@ -202,11 +240,10 @@ fi
 AC_MSG_CHECKING(whether to compile in debugging information)
 debugCFLAGS=""
 if test "x$enable_debug" = "xyes" ; then
- debugCFLAGS="-g -Werror=incompatible-pointer-types -Werror=old-style-definition -std=c11"
+ debugCFLAGS="-g -O0"
  CFLAGS="$CFLAGS $debugCFLAGS"
  AC_MSG_RESULT([yes])
 else
- CFLAGS="$CFLAGS -flto=auto -fno-plt -fuse-linker-plugin"
  AC_MSG_RESULT([no])
 fi
 AC_MSG_CHECKING(whether to compile in profiling information)
@@ -249,8 +286,6 @@ have_asm_sse=false
 have_asm_sse2=false
 have_asm_mmx2=false
 have_asm_3dnow=false
-have_asm_avx=false
-have_asm_avx2=false
 have_cmov=false
 have_x86cpu=false
 have_x86_64cpu=false
@@ -275,7 +310,7 @@ case $host_cpu in
 
 	if test "x$enable_debug" != "xyes" ; then
 		SUBSAMPLE_CFLAGS=""
-		VJE_CFLAGS="-O3 -fno-math-errno -funsafe-math-optimizations -fno-trapping-math -fopenmp"
+		VJE_CFLAGS="-O3 -ftree-vectorize -ffast-math -fopenmp"
 	fi
 
 	AC_MSG_RESULT([x86])
@@ -286,10 +321,11 @@ case $host_cpu in
     	have_x86cpu=true
     	have_x86_64cpu=true
 	if test "x$enable_debug" != "xyes" ; then
-		VJE_CFLAGS="-O3 -fno-math-errno -funsafe-math-optimizations -fno-trapping-math -fopenmp  -m64 -fPIC -DPIC -ftree-vectorize -flto=auto -fuse-linker-plugin -fno-plt"
-		SUBSAMPLE_CFLAGS="-O3 -m64 -fPIC -DPIC -ftree-vectorize -flto=auto -fuse-linker-plugin -fno-plt"
+		VJE_CFLAGS="-ffast-math -m64 -fPIC -DPIC"
+		SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC -ftree-vectorize"
 	else
-		VJE_CFLAGS="-O3 -ftree-vectorize -fopenmp -fopt-info-vec-optimized -m64 -fPIC -DPIC -g"
+		VJE_CFLAGS="-fPIC -dPIC"
+		#VJE_CFLAGS="-O3 -ftree-vectorize -fopt-info-vec-optimized -m64 -fPIC -DPIC -g"
 	fi
 	CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
 
@@ -340,11 +376,11 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 	if test "x$enable_debug" != "xyes" ; then
 	    CFLAGS="-O3 -ffast-math -fPIC -DPIC -fopenmp"
 	    SUBSAMPLE_CFLAGS="O3 -fPIC -DPIC"
-   	    VJE_CFLAGS="-O3 -ftree-vectorize -fopenmp -fPIC -DPIC -ffast-math -fsimdmath"
+		VJE_CFLAGS="-O3 -ftree-vectorize -fPIC -DPIC -g -ffast-math"
 	else
 	    CFLAGS="-O3 -ffast-math -fPIC -DPIC -g -fopenmp"
 	    SUBSAMPLE_CFLAGS="-O3 -fPIC -DPIC -g"
-	    VJE_CFLAGS="-O3 -ftree-vectorize -fopenfp -fopt-info-vec-optimized -ffast-math -fPIC -DPIC -g"
+	    VJE_CFLAGS="-O3 -ftree-vectorize -fopt-info-vec-optimized -ffast-math -fPIC -DPIC -g"
 	fi
 	have_arm=true
 	AC_MSG_RESULT(aarch64)
@@ -422,7 +458,6 @@ then
 
 	OP_CFLAGS="$USER_CFLAGS"
 	SUBSAMPLE_CFLAGS="$SUBSAMPLE $USER_CFLAGS"
-	VJE_CFLAGS="$VJE_CFLAGS $USER_CFLAGS"
 	CFLAGS="$CFLAGS $USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 
 	AC_SUBST(FASTARM_CFLAGS)
@@ -450,7 +485,6 @@ then
 
 	OP_CFLAGS="$USER_CFLAGS"
 	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
-	VJE_CFKAGS="$USER_CFLAGS"
 	CFLAGS="$CFLAGS $USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 	AC_SUBST(FASTARM_CFLAGS)
 fi
@@ -518,6 +552,7 @@ then
 		AC_DEFINE(HAVE_ASM_SSE4_2,1,[Compiling in SSE4_2 support])
 		AC_DEFINE(HAVE_SSE4_2,1,[Compiling in SSE4_2 support])
 		have_asm_sse4_2=true
+		VJE_CFLAGS="$VJE_CFLAGS -msse4.2"
 	fi
 
 	AC_CACHE_CHECK(for SSE4_1 on processor(s), ac_cv_flag_sse4_1, [
@@ -532,6 +567,7 @@ then
 		AC_DEFINE(HAVE_ASM_SSE4_1,1,[Compiling in SSE4_1 support])
 		AC_DEFINE(HAVE_SSE4_1,1,[Compiling in SSE4_1 support])
 		have_asm_sse4_1=true
+		VJE_CFLAGS="$VJE_CFLAGS -msse4.1"
 	fi
 
 	AC_CACHE_CHECK(for 3DNOW on processor(s), ac_cv_flag_3dnow, [
@@ -599,21 +635,19 @@ then
 		AC_DEFINE(HAVE_ASM_AVX,1,[Compiling in AVX])
 		have_asm_avx=true
 	fi
-
-	dnl check for AVX2
-	AC_CACHE_CHECK([for AVX2 on processor(s)], [ac_cv_flag_avx2], [
-	    if grep "^flags.* avx2" /proc/cpuinfo > /dev/null; then
-	        ac_cv_flag_avx2=yes
-	    else
-	        ac_cv_flag_avx2=no
-	    fi
+	dnl check for AVX
+	AC_CACHE_CHECK(for AVX2 on processor(s), ac_cv_flag_avx2, [
+		if grep "^flags.* avx2" /proc/cpuinfo > /dev/null; then
+			ac_cv_flag_avx2=yes
+		else
+			ac_cv_flag_avx2=no
+		fi
 	])
 
-	if test "$ac_cv_flag_avx2" = yes; then
-				AC_DEFINE([HAVE_ASM_AVX2], [1], [Compiling with AVX2 support])
-				have_asm_avx2=true
+	if test $ac_cv_flag_avx2 = yes; then
+		AC_DEFINE(HAVE_ASM_AVX2,1,[Compiling in AVX2])
+		have_asm_avx2=true
 	fi
-
 fi
 
 if test x$have_ppccpu = xtrue
@@ -690,6 +724,8 @@ PKG_CHECK_MODULES(LIBAVUTIL, [libavutil >= 49.7.0],have_avutil=true,have_avutil=
 PKG_CHECK_MODULES(LIBAVCODEC,[libavcodec >= 51.35.2],have_avcodec=true,have_avcodec=false)
 PKG_CHECK_MODULES(LIBAVFORMAT,[libavformat >= 52.14.0],have_avformat=true,have_avformat=false)
 PKG_CHECK_MODULES(LIBSWSCALE,[libswscale >= 0.7.1],have_swscale=true,have_swscale=false)
+PKG_CHECK_MODULES(LIBSWRESAMPLE,[libswresample >= 0.7.1],have_swresample=true,have_swresample=false)
+
 if test x$have_swscale = xfalse;
 then
 	AC_MSG_ERROR([libswscale not found.])
@@ -706,9 +742,13 @@ if test x$have_avcodec = xfalse;
 then
 	AC_MSG_ERROR([libavcodec >= 51.57 not found.])
 fi
+if test x$have_swresample = xfalse;
+then
+	AC_MSG_ERROR([libswresample >= not found.])
+fi
 
-FFMPEG_CFLAGS="${LIBAVFORMAT_CFLAGS} ${LIBAVCODEC_CFLAGS} ${LIBAVUTIL_CFLAGS} ${LIBSWSCALE_CFLAGS}"
-FFMPEG_LIBS="${LIBAVFORMAT_LIBS} ${LIBAVCODEC_LIBS} ${LIBAVUTIL_LIBS} ${LIBSWSCALE_LIBS}"
+FFMPEG_CFLAGS="${LIBAVFORMAT_CFLAGS} ${LIBAVCODEC_CFLAGS} ${LIBAVUTIL_CFLAGS} ${LIBSWSCALE_CFLAGS} ${LIBSWRESAMPLE_CFLAGS}"
+FFMPEG_LIBS="${LIBAVFORMAT_LIBS} ${LIBAVCODEC_LIBS} ${LIBAVUTIL_LIBS} ${LIBSWSCALE_LIBS} ${LIBSWRESAMPLE_LIBS}"
 AC_SUBST(FFMPEG_CFLAGS)
 AC_SUBST(FFMPEG_LIBS)
 
@@ -994,39 +1034,26 @@ if test x$have_xml2 != xtrue ; then
 fi
 
 have_freetype=false
-have_freetype2=false
-PKG_CHECK_MODULES( FREETYPE2, [freetype2], [
-		AC_SUBST(FREETYPE2_CFLAGS)
-        AC_SUBST(FREETYPE2_LIBS)
-	    AC_DEFINE(HAVE_FREETYPE,,[compiling with freetype])
-		have_freetype2=true],
-		[have_freetype2=false] )
+have_fontconfig=false
 
-if test x$have_freetype2 != xtrue; then
-	AC_CHECK_PROG(FREETYPE_CONFIG, freetype-config,yes,no)
-	if test $FREETYPE_CONFIG = yes; then
-		FT_CFLAGS="`freetype-config --cflags`" 
-		FT_WORD="`freetype-config --libs`"
-		FT_LIBS=""
-		for word in $FT_WORD; do	
-			beginning=`echo $word |cut -c -2` 
-			if test ".$beginning" = ".-L"; then
-				FT_LDFLAGS="$FT_LDFLAGS $word"
-			else
-				FT_LIBS="$FT_LIBS $word"
-			fi
-		done
-		AC_DEFINE(HAVE_FREETYPE,1,[compiling with freetype])
-		FTPATHTOKENS=${FT_CFLAGS##*/}
-		AC_SUBST(FT_LIBS)
-		AC_SUBST(FT_LDFLAGS)
-		AC_SUBST(FT_CFLAGS)
-		have_freetype=true
-		AC_MSG_NOTICE([Compiling with FreeType])
-	else
-		AC_MSG_ERROR([Cannot find the freetype-config program])
-	fi
-fi
+PKG_CHECK_MODULES([FREETYPE], [freetype2 >= 2.0], [
+    AC_DEFINE([HAVE_FREETYPE], [1], [Compiling with FreeType2])
+    AC_SUBST([FREETYPE_CFLAGS])
+    AC_SUBST([FREETYPE_LIBS])
+    have_freetype=true
+], [
+    AC_MSG_WARN([FreeType2 not found; some features may be disabled])
+])
+
+PKG_CHECK_MODULES([FONTCONFIG], [fontconfig >= 2.0], [
+    AC_DEFINE([HAVE_FONTCONFIG], [1], [Compiling with Fontconfig])
+    AC_SUBST([FONTCONFIG_CFLAGS])
+    AC_SUBST([FONTCONFIG_LIBS])
+    have_fontconfig=true
+], [
+    AC_MSG_WARN([Fontconfig not found; some features may be disabled])
+])
+
 
 AC_MSG_CHECKING(if libunwind is installed)
 have_unwind=false
@@ -1058,16 +1085,16 @@ if test x$have_unwind = xtrue ; then
 fi
 
 have_veejaycore=false
-PKG_CHECK_MODULES( VEEJAYCORE, [veejaycore >= 1.5.67 ],
+PKG_CHECK_MODULES( VEEJAYCORE, [veejaycore >= 1.6.0 ],
                   [ AC_SUBST(VEEJAYCORE_CFLAGS)
                     AC_SUBST(VEEJAYCORE_LIBS)
                     have_veejaycore=true
-                    AC_DEFINE(HAVE_VEEJAYCORE,1,[Veejay 1.5.67 installed])
+                    AC_DEFINE(HAVE_VEEJAYCORE,1,[Veejay 1.6.0 installed])
                     ],
                     [have_veejaycore=false])
 
 if test x$have_veejaycore != xtrue ; then
-    AC_MSG_ERROR([Cannot find libveejaycore 1.5.67 or later])
+    AC_MSG_ERROR([Cannot find libveejaycore 1.6.0 or later])
 fi
 
 dnl **********************************************************************
@@ -1084,6 +1111,8 @@ AM_CONDITIONAL(HAVE_ASM_SSE, test x$have_asm_sse = xtrue)
 AM_CONDITIONAL(HAVE_ASM_SSE2, test x$have_asm_sse2 = xtrue)
 AM_CONDITIONAL(HAVE_ASM_SSE4_2, test x$have_asm_sse4_2 = xtrue)
 AM_CONDITIONAL(HAVE_ASM_SSE4_1, test x$have_asm_sse4_1 = xtrue)
+AM_CONDITIONAL(HAVE_ASM_AVX, test x$have_asm_avx = xtrue)
+AM_CONDITIONAL(HAVE_ASM_AVX2, test x$have_asm_avx2 = xtrue)
 AM_CONDITIONAL(HAVE_ASM_NASM, test x$have_asm_nasm = xtrue)
 AM_CONDITIONAL(HAVE_MMX, test x$have_asm_mmx = xtrue)
 AM_CONDITIONAL(HAVE_SSE, test x$have_asm_sse = xtrue)
@@ -1098,7 +1127,6 @@ AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
 AM_CONDITIONAL(HAVE_LIBLO,test x$have_liblo = xtrue)
-AM_CONDITIONAL(HAVE_FREETYPE2, test x$have_freetype2 = xtrue)
 AM_CONDITIONAL(HAVE_ARM, test x$have_arm = xtrue )
 AM_CONDITIONAL(HAVE_ARM_NEON, test x$ac_cv_flag_neon = xtrue )
 AM_CONDITIONAL(HAVE_ARM_ASIMD, test x$ac_cv_flag_asimd = xtrue )
@@ -1203,7 +1231,6 @@ AC_CONFIG_FILES([
 thirdparty/Makefile
 thirdparty/bio2jack/Makefile
 thirdparty/libOSC/Makefile
-thirdparty/libresample/Makefile
 libvjxml/Makefile
 libvje/Makefile
 libplugger/Makefile
@@ -1226,6 +1253,9 @@ AC_DEFINE(VERSION, ${VERSION})
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Veejay ${VERSION} build configuration :])
 AC_MSG_NOTICE([])
+
+dnl FIXME cflags
+
 AC_MSG_NOTICE([ Compiler flags: $CFLAGS])
 AC_MSG_NOTICE([         libvje: $VJE_CFLAGS])
 AC_MSG_NOTICE([   libsubsample: $SUBSAMPLE_CFLAGS])
@@ -1282,16 +1312,10 @@ AC_MSG_NOTICE([  - FFmpeg/AV AVFormat            : ${have_avformat} ])
 AC_MSG_NOTICE([  - FFmpeg/AV AVCodec             : ${have_avcodec} ])
 AC_MSG_NOTICE([  - FFmpeg/AV Swscaler            : ${have_swscale} ])
 AC_MSG_NOTICE([  - FFmpeg/AV AVUtil              : ${have_avutil} ])
+AC_MSG_NOTICE([  - FFmpeg/AV SwResample          : ${have_swresample} ])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
-
-if test "$have_freetype" = "true"; then
-	AC_MSG_NOTICE([  - Freetype support              : ${have_freetype}])
-fi
-
-if test "$have_freetype2" = "true"; then
-	AC_MSG_NOTICE([  - FreeType 2 support            : ${have_freetype2}])
-fi
-
+AC_MSG_NOTICE([  - Freetype support              : ${have_freetype}])
+AC_MSG_NOTICE([  - Fontconfig                    : ${have_fontconfig}])
 AC_MSG_NOTICE([  - XML c library for Gnome       : ${have_xml2}])
 AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
