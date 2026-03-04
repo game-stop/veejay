@@ -160,7 +160,7 @@ static void *change_shape(shape_t *s, void *oldshape, int shape, int w, int h)
 
 static char **get_shapelist_hints(char **shapelist, int num )
 {
-    char **result = (char**) vj_calloc(sizeof(char*) * num );
+    char **result = (char**) vj_calloc(sizeof(char*) * (num+1) );
     int i;
     for( i = 0; i <= num; i ++ ) {
         char *ptr = basename( shapelist[i] );
@@ -194,12 +194,12 @@ static void shape_find_min_max(uint8_t *restrict data, const int len, int *min, 
 
 static void shape_wipe_1( uint8_t *dst[4], uint8_t *src[4], uint8_t *pattern, const int len, const int threshold)
 {
-    uint8_t * __restrict__ d0 = dst[0];
-    uint8_t * __restrict__ d1 = dst[1];
-    uint8_t * __restrict__ d2 = dst[2];
-    uint8_t * __restrict__ s0 = src[0];
-    uint8_t * __restrict__ s1 = src[1];
-    uint8_t * __restrict__ s2 = src[2];
+    uint8_t *restrict d0 = dst[0];
+    uint8_t *restrict d1 = dst[1];
+    uint8_t *restrict d2 = dst[2];
+    uint8_t *restrict s0 = src[0];
+    uint8_t *restrict s1 = src[1];
+    uint8_t *restrict s2 = src[2];
 
     for(int i = 0; i < len; i++) 
     {
@@ -212,12 +212,12 @@ static void shape_wipe_1( uint8_t *dst[4], uint8_t *src[4], uint8_t *pattern, co
 
 static void shape_wipe_2( uint8_t *dst[4], uint8_t *src[4], uint8_t *pattern, const int len, const int threshold)
 {
-    uint8_t * __restrict__ d0 = dst[0];
-    uint8_t * __restrict__ d1 = dst[1];
-    uint8_t * __restrict__ d2 = dst[2];
-    uint8_t * __restrict__ s0 = src[0];
-    uint8_t * __restrict__ s1 = src[1];
-    uint8_t * __restrict__ s2 = src[2];
+    uint8_t *restrict d0 = dst[0];
+    uint8_t *restrict d1 = dst[1];
+    uint8_t *restrict d2 = dst[2];
+    uint8_t *restrict s0 = src[0];
+    uint8_t *restrict s1 = src[1];
+    uint8_t *restrict s2 = src[2];
 
     for(int i = 0; i < len; i++) 
     {
@@ -272,13 +272,11 @@ vj_effect *shapewipe_init(int w, int h)
 
     ve->hints = vje_init_value_hint_list( ve->num_params );
 
-    if(ve->limits[1][0] > 0) {
-        char **hints = get_shapelist_hints( s->shapelist, ve->limits[1][0] );
-        vje_build_value_hint_list_array( ve->hints, ve->limits[1][0], 0, hints );
-        free_shapelist_hints(hints, ve->limits[1][0]);
-    }
-    else {
-        veejay_msg(0, "You didn't put any shape transitions in $HOME/.veejay/shapes, I have nothing to do!");
+
+    if(s->shapeidx > 0 ) { 
+        char **hints = get_shapelist_hints( s->shapelist, s->shapeidx );
+        vje_build_value_hint_list_array( ve->hints, s->shapeidx, 0, hints );
+        free_shapelist_hints(hints, s->shapeidx);
     }
 
     vje_build_value_hint_list( ve->hints, ve->limits[1][2], 2, "White to Black", "Black to White" );
