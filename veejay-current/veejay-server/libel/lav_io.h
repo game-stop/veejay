@@ -72,7 +72,7 @@ typedef struct
    int         has_audio;
    int         bps;
    int         MJPG_chroma;
-   long	       mmap_size;
+   size_t	       mmap_size;
    int	       bogus_len;
    int	       codec_id;
 } lav_file_t;
@@ -82,9 +82,7 @@ int lav_detect_endian (void);
 int  lav_query_APP_marker(char format);
 int  lav_query_APP_length(char format);
 int  lav_query_polarity(char format);
-lav_file_t *lav_open_output_file(char *filename, char format,
-                    int width, int height, int interlaced, double fps,
-                    int asize, int achans, long arate);
+lav_file_t *lav_open_output_file(char *filename, char format,int width, int height, int interlaced, double fps,int asize, int achans, long arate);
 int  lav_close(lav_file_t *lav_file);
 int  lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count);
 int  lav_write_audio(lav_file_t *lav_file, uint8_t *buff, long samps);
@@ -109,7 +107,7 @@ int  lav_read_frame(lav_file_t *lav_file, uint8_t *vidbuf);
 int  lav_set_audio_position(lav_file_t *lav_file, long clip);
 int  lav_read_audio(lav_file_t *lav_file, uint8_t *audbuf, long samps);
 int  lav_filetype(lav_file_t *lav_file);
-lav_file_t *lav_open_input_file(char *filename, long mmap_size);
+lav_file_t *lav_open_input_file(char *filename, size_t mmap_size);
 int  lav_get_field_size(uint8_t * jpegdata, long jpeglen);
 const char *lav_strerror(void);
 int  lav_fileno( lav_file_t *lav_file );
@@ -120,6 +118,6 @@ void    lav_bogus_set_length( lav_file_t *lav_file , int len );
 #ifdef USE_GDK_PIXBUF
 VJFrame *lav_get_frame_ptr( lav_file_t *lav_file );
 void	lav_set_project( int w, int h, float fps, int shift );
-int	lav_is_supported_image_file(char *filename);
+int	lav_is_supported_image_file(const char *filename);
 #endif
 #endif
