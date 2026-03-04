@@ -26,8 +26,6 @@ The OpenSound Control WWW page is
     http://www.cnmat.berkeley.edu/OpenSoundControl
 */
 
-#define _DEFAULT_SOURCE
-#define _BSD_SOURCE
 
 #define PARANOID 0
 /*
@@ -37,6 +35,7 @@ The OpenSound Control WWW page is
   Adapted from OSC-addressability.c (and seriously cleaned up!)
 
 */
+#include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -47,6 +46,7 @@ The OpenSound Control WWW page is
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdint.h>
+#include <sys/socket.h>
 #include <sys/time.h>
 #include <libOSC/OSC-common.h>
 #include <libOSC/OSC-timetag.h>
