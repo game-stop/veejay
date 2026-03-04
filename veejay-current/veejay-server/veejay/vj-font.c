@@ -20,8 +20,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-
-
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -55,6 +53,7 @@ extern  int vj_tag_size();
 #ifdef HAVE_FREETYPE
 #include <fcntl.h>
 #include <ft2build.h>
+#include <fontconfig/fontconfig.h>
 #include FT_SFNT_NAMES_H
 #include FT_TRUETYPE_IDS_H
 #include FT_FREETYPE_H
@@ -127,12 +126,14 @@ typedef struct {
     float       fps;
     void    *dictionary;
     void    *plain;
-    char    *add;
     char    *prev;
     pthread_mutex_t mutex;
 
     srt_seq_t  *osd_sub;
     int         osd_prepared;
+
+    int  text_buflen;
+    char text_buffer[2048];
 
 } vj_font_t;
 
@@ -143,7 +144,6 @@ static long vj_font_timecode_to_pos( vj_font_t *font, const char *tc );
 static srt_seq_t    *vj_font_new_srt_sequence(vj_font_t *font, int id,unsigned char *text, long lo, long hi );
 static void vj_font_del_srt_sequence( vj_font_t *f, int seq_id );
 static void vj_font_store_srt_sequence( vj_font_t *f, srt_seq_t *s );
-static int find_fonts(vj_font_t *ec, char *path);
 static unsigned char *select_font( vj_font_t *ec, int id );
 static void vj_font_substract_timecodes( vj_font_t *font, unsigned char *tc_srt, long *lo, long *hi );
 static unsigned char *vj_font_split_strd( unsigned char *str );
@@ -902,7 +902,6 @@ void    vj_font_update_text( void *font, long s1, long s2, int seq, char *text)
         }
     }
 
-
     s = (srt_seq_t*) srt;
     font_lock( ff );
     if( s->text )
@@ -960,7 +959,7 @@ char **vj_font_get_sequences( void *font )
     return res;
 }
 
-#define MAX_FONTS 250
+#define MAX_FONTS 512
 
 char    **vj_font_get_all_fonts( void *font )
 {
@@ -978,85 +977,6 @@ char    **vj_font_get_all_fonts( void *font )
     return res;
 }
 
-static int  dir_selector( const struct dirent *dir )
-{   
-    return 1;
-}
-
-static  int is_ttf( const char *file )
-{
-    if(strstr( file, ".ttf" ) || strstr( file, ".TTF" ) || strstr( file, "PFA" ) ||
-            strstr(file, "pfa" ) || strstr( file, "pcf" ) || strstr( file, "PCF" ) )
-        return 1;
-    return 0;
-}
-
-static  int try_deepen( vj_font_t *f , char *path )
-{
-    if(!path) return 0;
-
-    struct stat l;
-    memset( &l, 0, sizeof(struct stat) );
-    if( lstat( path, &l ) < 0 )
-        return 0;
-
-    if( S_ISLNK( l.st_mode ) )
-    {
-        memset(&l,0,sizeof(struct stat));
-        stat( path, &l );
-    }
-
-    if( S_ISDIR( l.st_mode ))
-    {
-        return 1;
-    }
-
-    if( S_ISREG( l.st_mode ))
-    {
-        if( is_ttf( path ) )
-        {
-            if( f->font_index < MAX_FONTS )
-            {
-                unsigned char *try_font = (unsigned char*) vj_strdup(path);
-                if( get_font_name( f,try_font, f->font_index ) ) {
-                    f->font_table[f->font_index] = try_font;
-                    f->font_index ++;
-                } else {
-                   free(try_font);
-                  }
-            }
-        }
-    }
-    return 0;
-}
-
-static int  find_fonts(vj_font_t *ec, char *path)
-{
-    struct dirent **files;
-    int n = scandir(path, &files, dir_selector,alphasort);
-
-    if(n < 0)
-    {
-        veejay_msg(VEEJAY_MSG_DEBUG, "Error reading %s: %s", path, strerror(errno));
-        return 0;
-    }
-    while( n -- )
-    {
-        char tmp[1024];
-        snprintf( tmp, 1024, "%s/%s", path, files[n]->d_name );
-        if( strcmp( files[n]->d_name , "." ) != 0 &&
-                strcmp( files[n]->d_name, ".." ) != 0 )
-        {
-            if(try_deepen( ec, tmp ))
-                find_fonts( ec, tmp );
-        }
-        free( files[n] );
-    }
-    free(files);
-    return 1;
-}
-
-
 static unsigned char    *select_font( vj_font_t *ec, int id )
 {
     if( id < 0 || id >= ec->font_index )
@@ -1064,7 +984,6 @@ static unsigned char    *select_font( vj_font_t *ec, int id )
 
     return ec->font_table[id];   
 }
-
 
 static  unsigned char   *get_font_name( vj_font_t *f,unsigned char *font, int id )
 {
@@ -1082,11 +1001,13 @@ static  unsigned char   *get_font_name( vj_font_t *f,unsigned char *font, int id
         return NULL;
     }
     
+    int face_index = 0;
+
     FT_SfntName sn,qn,zn;   
     FT_UInt     snamei,snamec;
 
     FT_Face face;
-    if ( (error = FT_New_Face( f->library, (char*)font, 0, &face )) != 0)
+    if ( (error = FT_New_Face( f->library, (char*)font, face_index, &face )) != 0)
     {
         return 0;
     }
@@ -1319,10 +1240,7 @@ void    vj_font_destroy(void *ctx)
         if( f->font_table[i] )
             free(f->font_table[i]);
     }
-
-    if(f->add)
-        free(f->add);   
-
+  
     free( f->font_table );
     free( f->font_list );
     free( f );
@@ -1367,8 +1285,9 @@ static int  configure(vj_font_t *f, int size, int font)
         }
         FT_Done_Face( f->face );
     }
+    int face_index = 0;
 
-    if ( (error = FT_New_Face( f->library, (char*)f->font, 0, &(f->face) )) != 0)
+    if ( (error = FT_New_Face( f->library, (char*)f->font, face_index, &(f->face) )) != 0)
     {
         veejay_msg(VEEJAY_MSG_ERROR,"Cannot load face: %s (error #%d)\n ", f->font, error);
         return 0;
@@ -1437,9 +1356,11 @@ void    *vj_font_get_plain_dict( void *font )
 void    vj_font_set_osd_text(void *font, const char *text )
 {
     vj_font_t *f = (vj_font_t*) font;
-    if(f->add)  
-        free(f->add);
-    f->add = vj_strdup( text );
+    if(!f) 
+        return;
+
+    snprintf(f->text_buffer, sizeof(f->text_buffer)-1, "%s", text);
+    f->text_buflen = strlen(f->text_buffer);
 }
 
 void    vj_font_set_dict( void *font, void *dict )
@@ -1458,37 +1379,50 @@ void    *vj_font_get_dict(void *font)
     return f->dictionary;
 }
 
-static  int compare_strings( const void *p1, const void *p2 )
+static int get_default_font(vj_font_t *f)
 {
+    if (!f || f->font_index == 0)
+        return 0;
 
-    return strcoll( (const char *) p1, (const char *) p2 );
-}
-
-static  int get_default_font( vj_font_t *f )
-{
-    static struct
-    {
-        char *name;
-    } default_fonts[] = {
-        { "DejaVu Sans (Bold)" },
-        { "FreeMono" },
-        { NULL },   
+    static const char *prefer[] = {
+        "Mono",
+        "Code",
+        "Courier",
+        "Console",
+        NULL
     };
-    int i,j;
-    for( i = 0; i < f->font_index; i ++ )
-    {
-        for( j = 0; default_fonts[j].name != NULL ; j ++ )
-        {   
-            if( f->font_list[i])
-            {
-                if( strcasecmp( default_fonts[j].name, (char*) f->font_list[i] ) == 0 )
-                {
-                    veejay_msg(VEEJAY_MSG_DEBUG,"Using default font '%s'", default_fonts[j].name );
-                    return i;
-                }
+
+    for (int p = 0; prefer[p] != NULL; ++p) {
+        for (int i = 0; i < f->font_index; ++i) {
+            if (!f->font_list[i])
+                continue;
+
+            if (strcasestr((char*)f->font_list[i], prefer[p])) {
+                veejay_msg(VEEJAY_MSG_DEBUG,
+                           "Using monospaced default font '%s'",
+                           f->font_list[i]);
+                return i;
             }
         }
     }
+
+    for (int i = 0; i < f->font_index; ++i) {
+        if (!f->font_list[i])
+            continue;
+
+        if (strcasestr((char*)f->font_list[i], "Sans") &&
+            strcasestr((char*)f->font_list[i], "Mono")) {
+            veejay_msg(VEEJAY_MSG_DEBUG,
+                       "Using fallback mono font '%s'",
+                       f->font_list[i]);
+            return i;
+        }
+    }
+
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "No monospaced font found, using first available '%s'",
+               f->font_list[0] ? (char*)f->font_list[0] : "unknown");
+
     return 0;
 }
 
@@ -1499,6 +1433,79 @@ int calc_osd_font_size(int screen_width, int is_osd)
     if (tmp > 48) tmp = 48;
     if (tmp < 12) tmp = 12;
     return tmp;
+}
+
+static int vj_font_list_truetype(vj_font_t *f)
+{
+    if (!FcInit()) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Fontconfig initialization failed");
+        return 0;
+    }
+
+    FcPattern *pat = FcPatternCreate();
+    if (!pat)
+        return 0;
+
+    FcPatternAddBool(pat, FC_SCALABLE, FcTrue);
+
+    FcObjectSet *os = FcObjectSetBuild(FC_FILE, FC_FAMILY, FC_FONTFORMAT, FC_INDEX, NULL);
+    if (!os) {
+        FcPatternDestroy(pat);
+        return 0;
+    }
+
+    FcFontSet *fs = FcFontList(NULL, pat, os);
+    if (!fs) {
+        FcObjectSetDestroy(os);
+        FcPatternDestroy(pat);
+        return 0;
+    }
+
+    int count = 0;
+
+    for (int i = 0; i < fs->nfont && count < MAX_FONTS; i++) {
+        FcPattern *font = fs->fonts[i];
+
+        FcChar8 *file = NULL;
+        FcChar8 *family = NULL;
+        FcChar8 *format = NULL;
+
+        if (FcPatternGetString(font, FC_FILE, 0, &file) != FcResultMatch)
+            continue;
+
+        if (FcPatternGetString(font, FC_FONTFORMAT, 0, &format) != FcResultMatch)
+            continue;
+
+        if (strcmp((char*)format, "TrueType") != 0 &&
+            strcmp((char*)format, "CFF") != 0)
+            continue;
+
+        FcPatternGetString(font, FC_FAMILY, 0, &family);
+
+        f->font_table[count] = (unsigned char*) strdup((char*)file);
+        f->font_list[count]  = family
+                                ? (unsigned char*) strdup((char*)family)
+                                : (unsigned char*) strdup((char*)file);
+
+        count++;
+    }
+
+    f->font_index = count;
+
+    FcFontSetDestroy(fs);
+    FcObjectSetDestroy(os);
+    FcPatternDestroy(pat);
+
+    return count;
+}
+
+int      vj_font_init_once() {
+    if(!FcInit()) {
+        veejay_msg(0, "FontConfig intitialization failed");
+        return -1;
+    }
+
+    return 0;
 }
 
 void    *vj_font_init( int w, int h, float fps, int is_osd )
@@ -1545,27 +1552,16 @@ void    *vj_font_init( int w, int h, float fps, int is_osd )
         return NULL;
     }
 
-    char *home = getenv("HOME");
-    char path[1024];
-    snprintf(path,1024,"%s/.veejay/fonts",home);
+    if (!vj_font_list_truetype(f) || f->font_index == 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "No usable TrueType fonts found via Fontconfig");
+        vj_font_destroy(f);
+        return NULL;
+    }
 
-    find_fonts(f,path);
-    if( f->font_index <= 0 )
-    {
-        veejay_msg(VEEJAY_MSG_WARNING, "No TrueType fonts found in $HOME/.veejay/fonts");
-    } 
-
-    find_fonts(f,"/usr/X11R6/lib/X11/fonts/TTF");
-    find_fonts(f,"/usr/X11R6/lib/X11/fonts/Type1");
-    find_fonts(f,"/usr/X11R6/lib/X11/truetype");
-    find_fonts(f,"/usr/X11R6/lib/X11/TrueType");
-    find_fonts(f,"/usr/share/fonts/truetype");
-    find_fonts(f, "/usr/share/fonts/TTF");
-    
-    veejay_msg(VEEJAY_MSG_DEBUG, "Loaded %d TrueType fonts", f->font_index );
-
-    qsort( f->font_table, f->font_index, sizeof(char*), compare_strings );
-    qsort( f->font_list,  f->font_index, sizeof(char*), compare_strings );
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "Loaded %d TrueType fonts (Fontconfig)",
+               f->font_index);
 
     f->current_font = get_default_font( f );
     
@@ -1584,6 +1580,7 @@ void    *vj_font_init( int w, int h, float fps, int is_osd )
     
     return f;
 }
+
 void    *vj_font_single_init( int w, int h, float fps,char *path )
 {
     int error=0;
@@ -1632,26 +1629,12 @@ void    *vj_font_single_init( int w, int h, float fps,char *path )
         return NULL;
     }
 
-    char fontpath[1024];    
-    snprintf(fontpath,1024,"%s/fonts",path);
-
-    find_fonts(f,fontpath);
-    if( f->font_index <= 0 )
-    {
-        veejay_msg(VEEJAY_MSG_WARNING, "Please put a TrueType font file for the OSD in %s",fontpath);
-        find_fonts( f, "/usr/share/fonts/truetype/freefont" );
-        if( f->font_index <= 0 )
-            find_fonts( f, "/usr/share/fonts/TTF");
-
-        if( f->font_index <= 0 ) {
-            veejay_msg(VEEJAY_MSG_ERROR, "Can't read default truetype font path /usr/share/fonts/truetype/freefont");
-            return NULL;
-        }
+    if (!vj_font_list_truetype(f) || f->font_index == 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "No usable TrueType fonts found via Fontconfig");
+        vj_font_destroy(f);
+        return NULL;
     }
-
-    veejay_msg(VEEJAY_MSG_INFO, "Loaded %d TrueType fonts", f->font_index );
-    qsort( f->font_table, f->font_index, sizeof(char*), compare_strings );
-    qsort( f->font_list,  f->font_index, sizeof(char*), compare_strings );
 
     f->current_font = get_default_font( f );
     
@@ -2005,7 +1988,7 @@ static void vj_font_text_render(vj_font_t *f, srt_seq_t *seq, void *_picture)
         max_line_width = line_x - x1;
 
     int total_lines = (y_cursor - y1) / f->text_height + 1;
-    int bh = total_lines * f->text_height + 4; // vertical padding
+    int bh = total_lines * f->text_height + 4;
 
     if (f->bg) {
         if (f->alpha[1] == 0)
@@ -2120,7 +2103,6 @@ void vj_font_render(void *ctx, void *_picture, long position)
     font_unlock(f);
 }
 
-
 static void vj_font_prepare_osd(vj_font_t *f, int w)
 {
     if (!f || f->osd_prepared)
@@ -2130,9 +2112,21 @@ static void vj_font_prepare_osd(vj_font_t *f, int w)
     if (!f->osd_sub)
         return;
 
+    const double BASE_AT_1920 = 24.0;
+    int MIN_SIZE = 8;
+    int MAX_SIZE = 48;
 
-    f->osd_sub->x = 5; // left margin
-    f->osd_sub->y = -1;// auto vertical
+    if (w <= 480) MIN_SIZE = 12;
+
+    double sizef = (double)w * (BASE_AT_1920 / 1920.0);
+    int size = (int)floor(sizef + 0.5);
+
+    if (size < MIN_SIZE) size = MIN_SIZE;
+    if (size > MAX_SIZE) size = MAX_SIZE;
+
+    f->current_size = size;
+    f->osd_sub->x = 5;
+    f->osd_sub->y = -1;
     f->osd_sub->size = f->current_size;
     f->osd_sub->font = f->current_font;
     f->osd_sub->use_bg = 1;
@@ -2141,21 +2135,17 @@ static void vj_font_prepare_osd(vj_font_t *f, int w)
     _rgb2yuv(255, 255, 255, f->fgcolor[0], f->fgcolor[1], f->fgcolor[2]);
     _rgb2yuv(0, 0, 0, f->bgcolor[0], f->bgcolor[1], f->bgcolor[2]);
 
-    int tmp = ((f->current_size * 100) / w);
-    if (tmp < 12) tmp = 12;
-    if (tmp > 28) tmp = 28;
-    f->current_size = tmp;
-
     f->osd_prepared = 1;
 }
+
 static void vj_font_text_osd_render(vj_font_t *f, void *_picture, int x, int y)
 {
-    if (!f || !_picture || !f->add || strlen(f->add) == 0)
+    if (!f || !_picture || f->text_buflen <= 0)
         return;
 
     VJFrame *picture = (VJFrame*) _picture;
     FT_Face face = f->face;
-    unsigned char *text = (unsigned char*) f->add;
+    unsigned char *text = (unsigned char*) f->text_buffer;
     int size = strlen(text);
     int width = picture->width;
     int height = picture->height;
@@ -2195,17 +2185,17 @@ static void vj_font_text_osd_render(vj_font_t *f, void *_picture, int x, int y)
 
     int total_text_height = (line_count * f->text_height); 
     
-    int bh = total_text_height + 12; // Increased padding
+    int bh = total_text_height + 12;
     int bw = max_line_width + 12;
 
     if (y == -1) {
-        y = picture->height - bh - 10; 
+        y = picture->height - bh - 12; 
         if (y < 0) y = 0;
     }
 
     draw_transparent_box(picture, x, y, bw, bh, f->bgcolor, 160);
 
-    int draw_x = x + 4; // Start with slight padding inside box
+    int draw_x = x + 4;
     int draw_y = y + 4;
     cur_x = 0;
     prev_c = 0;
@@ -2258,7 +2248,7 @@ void vj_font_render_osd_status(void *ctx, void *_picture, char *status_str, int 
     vj_font_set_osd_text(f, status_str);
 
     int x = 5;
-    int y = (placement == 1) ? f->baseline : f->h - (f->baseline*2);
+    int y = (placement == 1) ? f->baseline : -1;
 
     font_lock(f);
     vj_font_text_osd_render(f, _picture, x, y);
