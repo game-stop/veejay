@@ -325,7 +325,7 @@ void *  vj_picture_prepare_save(const char *filename, char *type, int out_w, int
 #ifdef USE_GDK_PIXBUF
     if(!type || !filename )
     {
-        veejay_msg(0, "Missing filename or file extension");
+        veejay_msg(0, "[pixbuf] Missing filename or file extension");
         return NULL;
     }
 
@@ -394,7 +394,7 @@ int vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 
     if(!img_)
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Unable to allocate buffer for RGB");
+        veejay_msg(VEEJAY_MSG_ERROR, "[pixbuf] Unable to allocate buffer for RGB");
         return 0;
     }
     
@@ -411,14 +411,14 @@ int vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 
     if( gdk_pixbuf_savev( img_, pic->filename, pic->type, NULL,NULL,NULL))
     {
-        veejay_msg(VEEJAY_MSG_INFO, "Save frame as %s of type %s",
+        veejay_msg(VEEJAY_MSG_INFO, "[pixbuf] Save frame as %s of type %s",
             pic->filename, pic->type );
         ret = 1;
     }
     else
     {
         veejay_msg(VEEJAY_MSG_ERROR,
-            "Cant save file as %s (%s) size %d x %d", pic->filename,pic->type, pic->out_w, pic->out_h);
+            "[pixbuf] Unable to save file as %s (%s) size %d x %d", pic->filename,pic->type, pic->out_w, pic->out_h);
     }
 
     if( img_ ) 
@@ -451,9 +451,6 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, uint8_t 
     VJFrame *src1 = &src;
 
     dest[0] = dst;
-//    dest[1] = dest[0] + (out_w * out_h);
-//    dest[2] = dest[1] + (out_w * out_h)/4;
-
     dest[1] = realign_buffer( dest[0], out_w * out_h );
     dest[2] = realign_buffer( dest[1], (out_w*out_h)/4);
 
