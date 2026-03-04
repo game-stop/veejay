@@ -243,7 +243,7 @@
 #include "./effects/fragmenttv.h"
 #include "./effects/mirror.h"
 
-#define VJ_IMAGE_EFFECT_MIN 47
+#define VJ_IMAGE_EFFECT_MIN 46
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -359,9 +359,8 @@ enum {
     VJ_VIDEO_EFFECT_ALPHATRANSITION = 258,
     VJ_VIDEO_EFFECT_SHAPEWIPE = 259,
     VJ_VIDEO_EFFECT_COMPLEXOPACITY = 260,
-    VJ_VIDEO_EFFECT_MELT = 261,
-    VJ_VIDEO_EFFECT_FLASHOPACITY = 262,
-    VJ_VIDEO_EFFECT_HISTOMATCH = 263,
+    VJ_VIDEO_EFFECT_FLASHOPACITY = 261,
+    VJ_VIDEO_EFFECT_HISTOMATCH = 262,
 };
 
 enum {
@@ -466,6 +465,7 @@ enum {
     VJ_IMAGE_EFFECT_ALPHAFEATHERMASK = 197,
     VJ_IMAGE_EFFECT_ALPHASELECT = 198,
     VJ_IMAGE_EFFECT_ALPHASELECT2 = 199,
+
     VJ_IMAGE_EFFECT_ALPHANEGATE = 99,
     VJ_IMAGE_EFFECT_CHOKEMATTE = 98,
     VJ_IMAGE_EFFECT_LEVELCORRECTION = 97,
@@ -519,6 +519,7 @@ enum {
     VJ_IMAGE_EFFECT_HEXMIRROR = 49,
     VJ_IMAGE_EFFECT_FRAGMENTTV = 48,
     VJ_IMAGE_EFFECT_MIRRORREFLECT = 47,
+    VJ_IMAGE_EFFECT_MELT = 46,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
@@ -564,10 +565,11 @@ enum {
     VJ_EFFECT_BLEND_ADDTEST5 = 31,
     VJ_EFFECT_BLEND_NEGDIV = 32,
     VJ_EFFECT_BLEND_ADDLUM = 33, 
-    VJ_EFFECT_BLEND_ADDTEST6 = 34,
-    VJ_EFFECT_BLEND_ADDTEST7 = 35,
-    VJ_EFFECT_BLEND_SUBSTRACTIVE2 = 36,
-    VJ_EFFECT_BLEND_SWAP = 37,
+    VJ_EFFECT_BLEND_SCREEN = 34,
+    VJ_EFFECT_BLEND_ADDTEST6 = 35,
+    VJ_EFFECT_BLEND_ADDTEST7 = 36,
+    VJ_EFFECT_BLEND_SUBSTRACTIVE2 = 37,
+    VJ_EFFECT_BLEND_SWAP = 38,
     VJ_EFFECT_BLEND_COUNT = VJ_EFFECT_BLEND_SWAP,
 };
 
@@ -578,8 +580,6 @@ enum {
         "Add Subselect", "Add Average", "Experimental 1","Experimental 2", "Experimental 3",                \
         "Multisub", "Softburn", "Inverse Burn", "Dodge", "Distorted Add",                                   \
         "Distorted Subtract", "Experimental 4", "Negation Divide", "Additive Luma",                         \
-        "Experimental Add6", "Experimental Add7", "Subtractive Clamped", "Swap"
-
-#define VJ_NUM_BLEND_EFFECTS VJ_EFFECT_BLEND_ADDTEST7
+        "Screen", "Experimental Add6", "Experimental Add7", "Subtractive Clamped", "Swap"
 
 #endif
