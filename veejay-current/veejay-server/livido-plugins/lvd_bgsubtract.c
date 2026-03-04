@@ -60,25 +60,25 @@ livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 	return LIVIDO_NO_ERROR;
 }
 
-void	lvd_vje_diff_plane( uint8_t *__restrict__ A, uint8_t *__restrict__ B, uint8_t *__restrict__ O, int threshold, const int len )
+void lvd_vje_diff_plane(uint8_t *__restrict__ A,
+                        uint8_t *__restrict__ B,
+                        uint8_t *__restrict__ O,
+                        int threshold,
+                        const int len)
 {
-	unsigned int i;
-	for( i = 0; i < len; i ++ ) {
-		O[i] = abs( A[i] - B[i] );
-		if( O[i] < threshold ) 
-			O[i] = 0;
-		else 
-			O[i] = 0xff;
-	}
+    #pragma omp simd
+    for (int i = 0; i < len; i++) {
+        int diff = (int)A[i] - (int)B[i];
+        int absdiff = (diff ^ (diff >> 31)) - (diff >> 31);
+        O[i] = (uint8_t)(-((unsigned int)(absdiff - threshold) >> 31));
+    }
 }
-
-void	lvd_avg_frame( uint8_t *__restrict__ A, uint8_t *__restrict__ O, const int len )
+void lvd_avg_frame(uint8_t *__restrict__ A, uint8_t *__restrict__ O, const int len)
 {
-	unsigned int i;
-	for( i = 0; i < len; i ++ )
-	{
-		O[i] = (O[i] + A[i]) >> 1;
-	}
+    #pragma omp simd
+    for (size_t i = 0; i < len; i++) {
+        O[i] = (O[i] + A[i] + 1) >> 1;
+    }
 }
 
 int	process_instance( livido_port_t *my_instance, double timecode )
