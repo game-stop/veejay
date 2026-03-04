@@ -19,6 +19,7 @@
  */
 
 #include <config.h>
+#include <omp.h>
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "shutterdrag.h"
@@ -106,6 +107,8 @@ typedef struct {
     int32_t history_mix;
 
     int8_t first_frame;
+
+    int n_threads;
 } shutterdrag_t;
 
 void *shutterdrag_malloc(int width, int height)
@@ -127,6 +130,8 @@ void *shutterdrag_malloc(int width, int height)
     sb->historyY = vj_malloc(pixels * hlen);
     sb->historyU = vj_malloc(pixels * hlen);
     sb->historyV = vj_malloc(pixels * hlen);
+
+    sb->n_threads = vje_advise_num_threads(pixels);
 
     if (!sb->feedbackY || !sb->historyY || !sb->historyU || !sb->historyV)
         goto fail;
@@ -151,10 +156,7 @@ void shutterdrag_free(void *ptr)
     if (sb->historyU)  free(sb->historyU);
     if (sb->historyV)  free(sb->historyV);
     free(sb);
-}
-
-//
-void shutterdrag_apply(void *ptr, VJFrame *frame, int *args)
+}void shutterdrag_apply(void *ptr, VJFrame *frame, int *args) // fixme banding
 {
     shutterdrag_t *sb = (shutterdrag_t*)ptr;
     const int w = sb->width, h = sb->height, hlen = 3;
@@ -164,7 +166,6 @@ void shutterdrag_apply(void *ptr, VJFrame *frame, int *args)
     const int32_t alpha = (int32_t)((args[1] * FIXED_ONE * inv100) >> 32);
     const int32_t ialpha = FIXED_ONE - alpha;
     const int64_t decay_factor = args[2] ? FIXED_ONE : ((95 * FIXED_ONE * inv100) >> 32);
-    //const int64_t inv_hlen_fp = (FIXED_ONE << FIXED_BITS) / hlen;
     const int64_t inv_hlen_fp = FIXED_ONE / hlen;
     const int64_t lock_limit = (args[6] > 0) ? ((int64_t)args[6] << FIXED_BITS) : 0;
     const int64_t uv_limit = (int64_t)127 << FIXED_BITS;
@@ -180,7 +181,6 @@ void shutterdrag_apply(void *ptr, VJFrame *frame, int *args)
     int32_t *restrict fbY = sb->feedbackY, *restrict fbU = sb->feedbackU, *restrict fbV = sb->feedbackV;
     uint8_t *restrict hY = sb->historyY, *restrict hU = sb->historyU, *restrict hV = sb->historyV;
 
-    // reset
     if (sb->first_frame || args[7]) {
         for (int i = 0; i < (w * h); i++) {
             fbY[i] = (int32_t)Y[i] << FIXED_BITS;
@@ -197,12 +197,14 @@ void shutterdrag_apply(void *ptr, VJFrame *frame, int *args)
     const int tiles_x = (w + TILE_W - 1) / TILE_W;
     const int tiles_y = (h + TILE_H - 1) / TILE_H;
 
+    #pragma omp parallel for collapse(2) num_threads(sb->n_threads) schedule(static)
     for (int ty = 0; ty < tiles_y; ty++) {
-        const int y_start = ty * TILE_H, y_end = (y_start + TILE_H > h) ? h : y_start + TILE_H;
-        const int ty_start = (y_start == 0) ? 1 : y_start;
-        const int ty_end   = (y_end == h) ? h - 1 : y_end;
-
         for (int tx = 0; tx < tiles_x; tx++) {
+
+            const int y_start = ty * TILE_H, y_end = (y_start + TILE_H > h) ? h : y_start + TILE_H;
+            const int ty_start = (y_start == 0) ? 1 : y_start;
+            const int ty_end   = (y_end == h) ? h - 1 : y_end;
+
             const int x_start = tx * TILE_W, x_end = (x_start + TILE_W > w) ? w : x_start + TILE_W;
             const int ax_start = (x_start == 0) ? 1 : x_start;
             const int ax_end   = (x_end == w) ? w - 1 : x_end;
@@ -225,7 +227,8 @@ void shutterdrag_apply(void *ptr, VJFrame *frame, int *args)
                             fb = (fb > lock_limit) ? lock_limit : fb;
                             fb = (fb * decay_factor) >> FIXED_BITS;
 
-                            const int gx = (int)(*pY_next) - (int)(*pY_prev), gy = (int)(*pY_down) - (int)(*pY_up);
+                            const int gx = (int)(*pY_next) - (int)(*pY_prev);
+                            const int gy = (int)(*pY_down) - (int)(*pY_up);
                             const int sx = (gx >> 31) | 1, sy_w = (gy >> 31) ? -w : w;
                             const int agx = (gx ^ (gx >> 31)) - (gx >> 31), agy = (gy ^ (gy >> 31)) - (gy >> 31);
                             const int mask = (agy - agx) >> 31;
@@ -256,7 +259,8 @@ void shutterdrag_apply(void *ptr, VJFrame *frame, int *args)
                             fb += (fb * y_boost_scaled) >> 32;
                             fb = (fb * decay_factor) >> FIXED_BITS;
 
-                            const int gx = (int)(*pY_next) - (int)(*pY_prev), gy = (int)(*pY_down) - (int)(*pY_up);
+                            const int gx = (int)(*pY_next) - (int)(*pY_prev);
+                            const int gy = (int)(*pY_down) - (int)(*pY_up);
                             const int sx = (gx >> 31) | 1, sy_w = (gy >> 31) ? -w : w;
                             const int agx = (gx ^ (gx >> 31)) - (gx >> 31), agy = (gy ^ (gy >> 31)) - (gy >> 31);
                             const int mask = (agy - agx) >> 31;
