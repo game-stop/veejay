@@ -219,29 +219,11 @@ void	on_entry_samplename_button_clicked( GtkWidget *widget, gpointer user_data )
 			    info->status_tokens[CURRENT_ID]) ) 
 			{
                 gtk_label_set_text( GTK_LABEL( info->sample_banks[i]->gui_slot[j]->title ), title );
-                vj_msg(VEEJAY_MSG_INFO, "Sample %d name updated", info->sample_banks[i]->slot[j]->sample_id );
 				return;
 			}
 		}
 	}
 }
-
-static gboolean on_entry_samplename_key_pressed (GtkWidget *widget, GdkEventKey *event)
-{
-    switch (event->keyval)
-    {
-    case GDK_KEY_Return:
-    case GDK_KEY_KP_Enter:
-      break;
-
-    default:
-      return FALSE;
-    }
-
-    on_entry_samplename_button_clicked( widget, NULL );
-    return FALSE; //fixme TRUE ?
-}
-
 
 void	on_button_054_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -2288,7 +2270,7 @@ void on_button_offline_start_clicked(GtkWidget *widget, gpointer user_data)
 	}
 
 	if( stream_id > 0 ) {
-		multi_vims( VIMS_STREAM_OFFLINE_REC_START, "%d %d %d", stream_id, get_nums("spin_offlineduration1" ), is_button_toggled("button_offline_autoplay1"));
+		multi_vims( VIMS_STREAM_OFFLINE_REC_START, "%d %d %d %d", stream_id, get_nums("spin_offlineduration1" ), is_button_toggled("button_offline_autoplay1"),-1);
 	    vj_msg(VEEJAY_MSG_INFO, "Started offline recording from stream %d", stream_id );
     }	
 	else {
@@ -2875,7 +2857,7 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
     size_t bufsize = tr_len + payload;
 
 	unsigned char *buf = (unsigned char*) vj_malloc( sizeof(unsigned char) * bufsize );
-    memcpy((char*) buf, header, hdr_len);
+	strncpy( (char*) buf, header, hdr_len);
 	
 	unsigned char *ptr = buf + hdr_len;
 	int k;
