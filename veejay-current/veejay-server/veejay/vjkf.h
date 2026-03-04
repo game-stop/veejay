@@ -33,7 +33,7 @@ int keyframe_xml_pack( xmlNodePtr node, void *port, int parameter_id  );
 
 int keyframe_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *port );
 
-int get_keyframe_value(void *port, int n_frame, int parameter_id, int *result );
+int get_keyframe_value(void *port, long long n_frame, int parameter_id, int *result );
 
 int keyframe_get_param_status( int lookup, int fx_entry, int parameter_id, int is_sample );
 
