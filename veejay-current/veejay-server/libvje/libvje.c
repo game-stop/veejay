@@ -130,7 +130,7 @@ static struct {
     { pencilsketch_init,NULL,NULL,NULL,NULL,pencilsketch_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_PENCILSKETCH },
     { pencilsketch2_init,pencilsketch2_malloc,pencilsketch2_free,NULL,NULL,pencilsketch2_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_PENCILSKETCH2 },
     { overclock_init,overclock_malloc,overclock_free,NULL,NULL,overclock_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_OVERCLOCK },
-    { opacitythreshold_init,NULL,NULL,NULL,NULL,NULL,opacitythreshold_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_THRESHOLDSMOOTH },
+    { opacitythreshold_init,opacitythreshold_malloc,opacitythreshold_free,NULL,NULL,NULL,opacitythreshold_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_THRESHOLDSMOOTH },
     { opacity_init,NULL,NULL,NULL,NULL,NULL,opacity_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_OPACITY },
     { opacityadv_init,NULL,NULL,NULL,NULL,NULL,opacityadv_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_THRESHOLD },
     { noisepencil_init,noisepencil_malloc,noisepencil_free,NULL,NULL,noisepencil_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_NOISEPENCIL },
@@ -172,7 +172,8 @@ static struct {
     { negatechannel_init,NULL,NULL,NULL,NULL,negatechannel_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_NEGATECHANNEL },
     { mtracer_init,mtracer_malloc,mtracer_free,NULL,NULL,NULL,mtracer_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_MTRACER },
     { overlaymagic_init,NULL,NULL,NULL,NULL,NULL,overlaymagic_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_OVERLAYMAGIC },
-    { melt_init, melt_malloc,melt_free,NULL,NULL,NULL, melt_apply, NULL, NULL, NULL, VJ_VIDEO_EFFECT_MELT },
+    { melt_init, melt_malloc,melt_free,NULL,NULL, melt_apply, NULL, NULL, NULL, NULL,VJ_IMAGE_EFFECT_MELT },
+    { meanfilter_init,meanfilter_malloc,meanfilter_free,NULL,NULL, meanfilter_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_MEANFILTER},
     { motionblur_init,motionblur_malloc,motionblur_free,NULL,NULL,motionblur_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_MOTIONBLUR },
     { camerabounce_init,camerabounce_malloc,camerabounce_free,NULL,NULL,camerabounce_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_CAMERABOUNCE },
     { morphology_init,morphology_malloc,morphology_free,NULL,NULL,morphology_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_MORPHOLOGY },
@@ -393,9 +394,13 @@ int vje_init(int w, int h)
     for( i = 0; i < MAX_EFFECTS; i ++ )
         vj_fx_map[i] = -1;
 
+    int parallel_fx = 0;
+
     for( i = 0; vj_fx[i].fx_id != 0; i ++ ) {
         vj_fx_map[ vj_fx[i].fx_id ] = i;
         vj_effect_map[ i ] = vj_fx[i].fx_init(w,h);
+        if(vj_effect_map[i]->parallel > 0)
+            parallel_fx ++;
         num_fx ++;
         if( vj_fx[i].fx_id > LAST_ID ) {
             LAST_ID = vj_fx[i].fx_id;
@@ -422,6 +427,8 @@ int vje_init(int w, int h)
     init_sqrt_map_pixel_values();
 
     plug_sys_init( PIX_FMT_YUVA444P, w,h, 0 );
+
+    veejay_msg(VEEJAY_MSG_DEBUG, "[PRODUCER] Have %d FX (%d support parallelization)", num_fx, parallel_fx);
 
     return 1;
 }
