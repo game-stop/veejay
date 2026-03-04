@@ -49,27 +49,31 @@ vj_effect *posterize_init(int w, int h)
     return ve;	
 }
 
-static void _posterize_y_simple(uint8_t *src[3], int len, int value, int threshold_min,int threshold_max)
+static void _posterize_y_simple(uint8_t * restrict src[3],
+                                const int len,
+                                const int value,
+                                const int threshold_min,
+                                const int threshold_max)
 {
-	int i;
-	uint8_t Y;
-	uint8_t *y = src[0];
-	const unsigned int factor = (256 / value);
-	for( i = 0; i < len ; i++ ) 
-	{
-		Y = y[i];
-		Y = Y - ( Y % factor );
+    uint8_t * restrict y = src[0];
 
-		if( Y >= threshold_min && Y <= threshold_max)
-		{
-			y[i] = Y;
+    const int factor = 256 / value;
+    const uint8_t lo = pixel_Y_lo_;
+    const uint8_t hi = pixel_Y_hi_;
 
-		}
-		else
-		{
-			if( Y < threshold_min) Y = pixel_Y_lo_; else Y = pixel_Y_hi_;
-		}
-	}
+    for (int i = 0; i < len; ++i)
+    {
+        uint8_t Y = y[i];
+
+        Y = (Y / factor) * factor;
+
+        if (Y < threshold_min)
+            Y = lo;
+        else if (Y > threshold_max)
+            Y = hi;
+
+        y[i] = Y;
+    }
 }
 
 void posterize_apply(void *ptr, VJFrame *frame, int *args )
