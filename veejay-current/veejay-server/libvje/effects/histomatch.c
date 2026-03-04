@@ -40,11 +40,6 @@ vj_effect *histomatch_init(int w, int h)
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Opacity"); 
 
-	/* Color information is transferred from a reference image based on the similarity
-	 * of their histograms. It works in any colorspace
-	 */
-
-
     return ve;
 }
 
@@ -60,6 +55,7 @@ typedef struct {
 	int *histv1; //V
 	int *histv2; //V2
 
+	float *cdf;
 	float *cdf1; // cummulative distribution
 	float *cdf2;
 
@@ -69,163 +65,173 @@ typedef struct {
 	float *cdfv1;
 	float *cdfv2;
 
+	uint8_t *lutY;
+    uint8_t *lutU;
+    uint8_t *lutV;
+
 } histomatch_t;
 
 void *histomatch_malloc(int wid, int hei)
 {
-	histomatch_t *h = (histomatch_t*) vj_malloc(sizeof(histomatch_t));
-	if(!h) return NULL;
+    histomatch_t *h = (histomatch_t*) vj_calloc(sizeof(histomatch_t));
+    if(!h) return NULL;
 
-	h->hist = (int*) vj_malloc(sizeof(int) * HIST_SIZE * 6 );
-	if(!h->hist) {
-		free(h);
-		return NULL;
-	}
-	h->hist2 = h->hist + HIST_SIZE;
-	h->histu1 = h->hist2 + HIST_SIZE;
-	h->histu2 = h->histu1 + HIST_SIZE;
-	h->histv1 = h->histu2 + HIST_SIZE;
-	h->histv2 = h->histv1 + HIST_SIZE;
+    h->hist = (int*) vj_malloc(sizeof(int) * HIST_SIZE * 6);
+    h->hist2 = h->hist + HIST_SIZE;
+    h->histu1 = h->hist2 + HIST_SIZE;
+    h->histu2 = h->histu1 + HIST_SIZE;
+    h->histv1 = h->histu2 + HIST_SIZE;
+    h->histv2 = h->histv1 + HIST_SIZE;
 
-	h->cdf1 = (float*) vj_malloc(sizeof(float) * HIST_SIZE * 6 );
-	if(!h->cdf1) {
-		free(h->hist);
-		free(h);
-		return NULL;
-	}
+    h->cdf = (float*) vj_malloc(sizeof(float) * HIST_SIZE * 6);
+    h->cdf1 = h->cdf;
+    h->cdf2 = h->cdf1 + HIST_SIZE;
+    h->cdfu1 = h->cdf2 + HIST_SIZE;
+    h->cdfu2 = h->cdfu1 + HIST_SIZE;
+    h->cdfv1 = h->cdfu2 + HIST_SIZE;
+    h->cdfv2 = h->cdfv1 + HIST_SIZE;
 
-	h->cdf2 = h->cdf1 + HIST_SIZE;
-	h->cdfu1 = h->cdf2 + HIST_SIZE;
-	h->cdfu2 = h->cdfu1 + HIST_SIZE;
-	h->cdfv1 = h->cdfu2 + HIST_SIZE;
-	h->cdfv2 = h->cdfv1 + HIST_SIZE;
+    h->lutY = (uint8_t*) vj_malloc(HIST_SIZE * 3);
+    h->lutU = h->lutY + HIST_SIZE;
+    h->lutV = h->lutU + HIST_SIZE;
 
-	return (void*) h;
+    if(!h->hist || !h->cdf || !h->lutY) {
+        histomatch_free(h);
+        return NULL;
+    }
+
+    return (void*) h;
 }
 
 void histomatch_free(void *ptr)
 {
-	histomatch_t *h = (histomatch_t*) ptr;
-	free(h->hist);
-	free(h->cdf1);
-	free(h);
+    histomatch_t *h = (histomatch_t*) ptr;
+    if (h) {
+        if (h->hist) free(h->hist);
+        if (h->cdf)  free(h->cdf);
+        if (h->lutY) free(h->lutY);
+        free(h);
+    }
 }
 
-static void histomatch_reset( int *hist, float *cdf )
+static void histomatch_reset(histomatch_t *h)
 {
-	veejay_memset( hist, 0, sizeof(int) * HIST_SIZE * 6 );
-	veejay_memset( cdf,  0, sizeof(float) * HIST_SIZE * 6 );
+    veejay_memset(h->hist, 0, sizeof(int) * HIST_SIZE * 6);
+    veejay_memset(h->cdf,  0, sizeof(float) * HIST_SIZE * 6);
 }
 
-
-// Calculating the histogram itself is the most costly part ... 
-static void histomatch_calc_histogram(uint8_t *data, const int len, int *hist) {
-	for( int i = 0; i < len; i ++ ) {
-		hist[ data[i] ] ++;
-	}
-}
-
-static void histomatch_calc_distribution(int *hist, int num_pixels, float *cdf)
+static void histomatch_calc_histogram(uint8_t *restrict data, const int len, int *restrict hist) 
 {
+    int bank0[HIST_SIZE] = {0};
+    int bank1[HIST_SIZE] = {0};
+    int bank2[HIST_SIZE] = {0};
+    int bank3[HIST_SIZE] = {0};
+
+    int i = 0;
+    
+    for(; i <= len - 4; i += 4) {
+        bank0[data[i + 0]]++;
+        bank1[data[i + 1]]++;
+        bank2[data[i + 2]]++;
+        bank3[data[i + 3]]++;
+    }
+
+    for(; i < len; i++) {
+        bank0[data[i]]++;
+    }
+
+#pragma GCC ivdep
+    for(int j = 0; j < HIST_SIZE; j++) {
+        hist[j] = bank0[j] + bank1[j] + bank2[j] + bank3[j];
+    }
+}
+
+static void histomatch_calc_distribution(int *restrict hist, float *restrict cdf) {
     int total = 0;
-    for (int i = 0; i < HIST_SIZE; i++) total += hist[i];
-
-    if (total == 0) total = 1;
-
-    float invTotal = 1.0f / total;
-    float acc = 0.0f;
-    for (int i = 0; i < HIST_SIZE; i++) {
-        acc += hist[i];
-        cdf[i] = acc * invTotal;
+    
+#pragma GCC ivdep
+	for (int i = 0; i < HIST_SIZE; i++) {
+        total += hist[i];
     }
+
+    float invTotal = (total > 0) ? 1.0f / (float)total : 0.0f;
+    
+    double acc = 0.0;
+    for (int i = 0; i < HIST_SIZE; i++) {
+        acc += (double)hist[i];
+        cdf[i] = (float)(acc * (double)invTotal);
+    }
+    
+    if (total > 0) cdf[255] = 1.0f;
 }
 
-static void histomatch_map_table(float *cdf1, float *cdf2, int *mapping_table)
-{
-    const float epsilon = 1e-12;
+static void histomatch_map_and_blend(float *restrict c1, float *restrict c2, uint8_t *restrict lut, int opacity) {
+    int j = 0;
+    uint8_t map[HIST_SIZE];
+    const uint32_t inv_op = (uint32_t)(255 - opacity);
+    const uint32_t op = (uint32_t)opacity;
 
     for (int i = 0; i < HIST_SIZE; i++) {
-        const float target = cdf1[i];
-        int closest_match = 0;
-		
-		float minDiffSquared = (target - cdf2[0]) * (target - cdf2[0]);
-
-        for (int j = 1; j < HIST_SIZE; j++) {
-            float diff = target - cdf2[j];
-            float diffSquared = diff * diff;
-
-            if (diffSquared < minDiffSquared - epsilon) {
-                minDiffSquared = diffSquared;
-                closest_match = j;
-            }
+        float target = c1[i];
+        while (j < 255 && c2[j+1] < target) {
+            j++;
         }
-        mapping_table[i] = closest_match;
+        
+        int next_j = (j < 255) ? j + 1 : j;
+        float dist_curr = target - c2[j];
+        float dist_next = c2[next_j] - target;
+        
+        map[i] = (dist_next < dist_curr) ? next_j : j;
+    }
+
+    #pragma GCC ivdep
+    for (int i = 0; i < HIST_SIZE; i++) {
+        uint32_t val = (uint32_t)i * inv_op + (uint32_t)map[i] * op;
+        lut[i] = (uint8_t)((val * 32897) >> 23);
     }
 }
 
-void histomatch_apply( void *ptr,  VJFrame *frame, VJFrame *frame2, int *args )
+void histomatch_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-	histomatch_t *h = (histomatch_t*) ptr;
-	int mapping_tableY[HIST_SIZE];
-	int mapping_tableU[HIST_SIZE];
-	int mapping_tableV[HIST_SIZE];
-	
-	const int len = frame->len;
-	const int uv_len = frame->uv_len;
-	const int opacity = args[0];
-	const int op1 = 0xff - opacity;
+    histomatch_t *h = (histomatch_t*) ptr;
+    const int opacity = args[0];
 
-	int i;
+    histomatch_reset(h);
 
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict U = frame->data[1];
-	uint8_t *restrict V = frame->data[2];
+    histomatch_calc_histogram(frame->data[0], frame->len, h->hist);
+    histomatch_calc_histogram(frame2->data[0], frame->len, h->hist2);
+    histomatch_calc_histogram(frame->data[1], frame->uv_len, h->histu1);
+    histomatch_calc_histogram(frame2->data[1], frame->uv_len, h->histu2);
+    histomatch_calc_histogram(frame->data[2], frame->uv_len, h->histv1);
+    histomatch_calc_histogram(frame2->data[2], frame->uv_len, h->histv2);
 
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict U2 = frame2->data[1];
-	uint8_t *restrict V2 = frame2->data[2];
 
-	float *restrict cdf1 = h->cdf1;
-	float *restrict cdf2 = h->cdf2;
+    histomatch_calc_distribution(h->hist,   h->cdf1);
+    histomatch_calc_distribution(h->hist2,  h->cdf2);
+    histomatch_calc_distribution(h->histu1, h->cdfu1);
+    histomatch_calc_distribution(h->histu2, h->cdfu2);
+    histomatch_calc_distribution(h->histv1, h->cdfv1);
+    histomatch_calc_distribution(h->histv2, h->cdfv2);
 
-	float *restrict cdfu1 = h->cdfu1;
-	float *restrict cdfv1 = h->cdfv1;
+    histomatch_map_and_blend(h->cdf1,  h->cdf2,  h->lutY, opacity);
+    histomatch_map_and_blend(h->cdfu1, h->cdfu2, h->lutU, opacity);
+    histomatch_map_and_blend(h->cdfv1, h->cdfv2, h->lutV, opacity);
 
-	float *restrict cdfu2 = h->cdfu2;
-	float *restrict cdfv2 = h->cdfv2;
+    uint8_t *restrict Y = (uint8_t*) frame->data[0];
+    uint8_t *restrict U = (uint8_t*) frame->data[1];
+    uint8_t *restrict V = (uint8_t*) frame->data[2];
+    uint8_t *restrict lY = (uint8_t*) h->lutY;
+    uint8_t *restrict lU = (uint8_t*) h->lutU;
+    uint8_t *restrict lV = (uint8_t*) h->lutV;
 
-	histomatch_reset( h->hist, h->cdf1 );
+    #pragma GCC ivdep
+    for(int i = 0; i < frame->len; i++) {
+        Y[i] = lY[Y[i]];
+    }
 
-	histomatch_calc_histogram( Y, len, h->hist );
-	histomatch_calc_histogram( Y2, len, h->hist2 );
-
-	histomatch_calc_histogram( U, uv_len, h->histu1 );
-	histomatch_calc_histogram( U2, uv_len, h->histu2 );
-
-	histomatch_calc_histogram( V, uv_len, h->histv1 );
-	histomatch_calc_histogram( V2, uv_len, h->histv2 );
-
-	histomatch_calc_distribution( h->hist,  len, cdf1 );
-	histomatch_calc_distribution( h->hist2, len, cdf2 );
-
-	histomatch_calc_distribution( h->histu1, uv_len, cdfu1 );
-	histomatch_calc_distribution( h->histu2, uv_len, cdfu2 );
-
-	histomatch_calc_distribution( h->histv1, uv_len, cdfv1 );
-	histomatch_calc_distribution( h->histv2, uv_len, cdfv2 );
-
-	histomatch_map_table( cdf1,  cdf2,  mapping_tableY );
-	histomatch_map_table( cdfu1, cdfu2, mapping_tableU );
-	histomatch_map_table( cdfv1, cdfv2, mapping_tableV );
-
-	for( i = 0; i < len; i ++ ) {
-		Y[i] = (Y[i] * op1 + mapping_tableY[ Y[i] ] * opacity) >> 8;
-	}
-
-	for( i = 0; i < uv_len; i ++ ) {
-		U[i] = (U[i] * op1 + mapping_tableU[ U[i] ] * opacity) >> 8;
-		V[i] = (V[i] * op1 + mapping_tableV[ V[i] ] * opacity) >> 8;
-	}
-
+    #pragma GCC ivdep
+    for(int i = 0; i < frame->uv_len; i++) {
+        U[i] = lU[U[i]];
+        V[i] = lV[V[i]];
+    }
 }
-
