@@ -25,9 +25,13 @@
 #ifndef MIN
 #define MIN(a,b) ( (a)>(b) ? (b) : (a) )
 #endif
-/*
- * This is a port of the gegl blend operators to veejay
- */
+
+static inline uint8_t DIV255(int x) {
+    int v = x + 128;
+    return (uint8_t)((v + (v >> 8)) >> 8);
+}
+
+//FIXME too slow, blend operators still wrong
 
 vj_effect *porterduff_init(int w,int h)
 {
@@ -39,7 +43,7 @@ vj_effect *porterduff_init(int w,int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 0;	/* operator */
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 13;
+    ve->limits[1][0] = 15;
 
 	ve->param_description = vje_build_param_list(ve->num_params, "Operator");
 	ve->has_user = 0;
@@ -52,308 +56,259 @@ vj_effect *porterduff_init(int w,int h)
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, 
-		"Dest", "Dest Atop", "Dest In", "Dest Over", "Dest Out", "Src Over", "Src Atop", "Src In", "Src Out", "SVG Multiply", "XOR", "ADD", "SUBTRACT", "DIVIDE" );
+		"Dest", "Dest Atop", "Dest In", "Dest Over", "Dest Out", "Src Over", "Src Atop", "Src In", "Src Out", "Multiply", "Xor", "Add", "Subtract", "Divide", "Screen" , "Overlay" );
 
 	return ve;
 } 
 
 static void porterduff_dst( uint8_t *A, uint8_t *B, int n_pixels)
 {
-	int i,j;
-	uint8_t *aA = A;
-	uint8_t *bB = B;
-#pragma omp simd
-	for( i = 0; i < n_pixels; i ++ ) 
-	{
-		for( j = 0; j < 3; j ++ )
-		{
-			aA[j] = bB[j];
-		}
-		aA[3] = bB[3];
-		aA += 4;
-		bB += 4;
-	}	
+	veejay_memcpy(A, B, n_pixels * 4);	
 }
 
 static void porterduff_atop( uint8_t *A, uint8_t *B, int n_pixels )
 {
-	int i,j;
-	uint8_t *aA = A;
-	uint8_t *bB = B;
+    int i, j;
 #pragma omp simd
-	for( i = 0; i < n_pixels ; i ++ ) 
-	{
-		for( j = 0; j < 3; j ++ ) 
-		{
-			aA[j] = ( (aA[j] * bB[3]) + bB[j] * ( 255 - aA[3] ) ) >> 8;
-		}
-		aA[3] = bB[3];
-		aA += 4;
-		bB += 4;
-	}
+    for( i = 0; i < n_pixels ; i ++ ) 
+    {
+        int idx = i * 4;
+        uint8_t a_s = B[idx + 3];
+        uint8_t a_d = A[idx + 3];
+        for( j = 0; j < 3; j ++ ) 
+        {
+            A[idx + j] = DIV255( (B[idx + j] * a_d) + (A[idx + j] * (255 - a_s)) );
+        }
+        A[idx + 3] = a_d; 
+    }
 }
 static void porterduff_dst_in( uint8_t *A, uint8_t *B, int n_pixels)
 {
-	int i,j;
-	uint8_t *aA = A;
-	uint8_t *bB = B;
+    int i, j;
 #pragma omp simd
-	for( i = 0; i < n_pixels; i++ ) 
-	{
-		for( j = 0; j < 3; j ++ ) 
-		{
-			aA[j] = ( (aA[j] * bB[3]) >> 8 );
-		}
-		aA[3] = (aA[3] * bB[3]) >> 8;
-		aA += 4;
-		bB += 4;
-	}
+    for( i = 0; i < n_pixels; i++ ) 
+    {
+        int idx = i * 4;
+        uint8_t a_s = B[idx + 3];
+        for( j = 0; j < 4; j ++ ) // Apply to RGB and Alpha
+        {
+            A[idx + j] = DIV255( A[idx + j] * a_s );
+        }
+    }
 }
 static void porterduff_dst_out( uint8_t *A, uint8_t *B, int n_pixels)
 {
-	int i,j;
-	uint8_t *aA = A;
-	uint8_t *bB = B;
+    int i, j;
 #pragma omp simd
-	for( i = 0; i < n_pixels; i ++ )
-	{
-		uint8_t aD = (aA[3] * ( 0xff - bB[3] )) >> 8;
-		for( j = 0; j < 3 ; j ++ )
-		{
-			aA[j] = ( aA[j] * ( 0xff - bB[3] ) ) >> 8;
-		}
-		aA[3] = aD;
-		aA += 4;
-		bB += 4;
-	}
+    for( i = 0; i < n_pixels; i ++ )
+    {
+        int idx = i * 4;
+        uint8_t inv_a_s = 255 - B[idx + 3];
+        for( j = 0; j < 4 ; j ++ )
+        {
+            A[idx + j] = DIV255( A[idx + j] * inv_a_s );
+        }
+    }
 }
 
 static void porterduff_dst_over( uint8_t *A, uint8_t *B, int n_pixels )
 {
-	int i,j;
-	uint8_t *aA = A;
-	uint8_t *bB = B;
+    int i, j;
 #pragma omp simd
-	for( i = 0; i < n_pixels; i ++ )
-	{
-		uint8_t aD = ((bB[3] + aA[3]) - (bB[3] * aA[3]))>>8;
-		for( j = 0; j < 3 ; j ++ )
-		{
-			aA[j] = (aA[j] + bB[j]) * (0xff - aA[j]) >> 8; 
-		}
-		aA[3] = aD;
-		aA += 4;
-		bB += 4;
-	}
+    for( i = 0; i < n_pixels; i ++ )
+    {
+        int idx = i * 4;
+        uint8_t a_s = B[idx + 3];
+        uint8_t a_d = A[idx + 3];
+        A[idx + 3] = a_d + DIV255(a_s * (255 - a_d));
+        for( j = 0; j < 3 ; j ++ )
+        {
+            A[idx + j] = A[idx + j] + DIV255(B[idx + j] * (255 - a_d)); 
+        }
+    }
 }
-
 static void porterduff_src_over( uint8_t *A, uint8_t *B, int n_pixels )
 {
-	int i,j;
-	uint8_t *aA = A;
-	uint8_t *bB = B;
+    int i, j;
 #pragma omp simd
-	for( i = 0; i < n_pixels; i ++ )
-	{
-		for( j = 0; j < 3 ; j ++ )
-		{
-			aA[j] = ( ( bB[j] * aA[3]) + aA[j] * ( 0xff - bB[j]) ) >> 8;
-		}
-		aA += 4;
-		bB += 4;
-	}
+    for( i = 0; i < n_pixels; i ++ )
+    {
+        int idx = i * 4;
+        uint8_t a_s = B[idx + 3];
+        uint8_t a_d = A[idx + 3];
+        uint8_t out_a = a_s + DIV255(a_d * (255 - a_s));
+        for( j = 0; j < 3 ; j ++ )
+        {
+            A[idx + j] = B[idx + j] + DIV255(A[idx + j] * (255 - a_s));
+        }
+        A[idx + 3] = out_a;
+    }
 }
 
 static void porterduff_src_atop( uint8_t *A, uint8_t *B, int n_pixels )
 {
-	int i,j;
-	uint8_t *aA = A;
-	uint8_t *bB = B;
+    int i, j;
 #pragma omp simd
-	for( i = 0; i < n_pixels; i ++ )
-	{
-		uint8_t aD = ( (aA[3] * bB[3] ) >> 8 );
-		for( j = 0; j < 3 ; j ++ )
-		{
-			aA[j] = (bB[j] * aA[j]) >> 8;
-		}
-		aA[3] = aD;
-		aA += 4;
-		bB += 4;
-	}
+    for( i = 0; i < n_pixels; i ++ )
+    {
+        int idx = i * 4;
+        uint8_t a_s = B[idx + 3];
+        uint8_t a_d = A[idx + 3];
+        for( j = 0; j < 3 ; j ++ )
+        {
+            A[idx + j] = DIV255(B[idx + j] * a_d + A[idx + j] * (255 - a_s));
+        }
+        A[idx + 3] = a_s;
+    }
 }
 
 static void porterduff_src_in( uint8_t *A, uint8_t *B, int n_pixels)
 {
-	int i,j;
-	uint8_t *aA = A;
-	uint8_t *bB = B;
+    int i, j;
 #pragma omp simd
-	for( i = 0; i < n_pixels; i ++ )
-	{
-		uint8_t aD = ( (aA[3] * bB[3] ) >> 8 );
-		for( j = 0; j < 3 ; j ++ )
-		{
-			aA[j] = (bB[j] * aA[3]) >> 8;
-		}
-		aA[3] = aD;
-		aA += 4;
-		bB += 4;
-	}
+    for( i = 0; i < n_pixels; i ++ )
+    {
+        int idx = i * 4;
+        uint8_t a_d = A[idx + 3];
+        for( j = 0; j < 4 ; j ++ )
+        {
+            A[idx + j] = DIV255(B[idx + j] * a_d);
+        }
+    }
 }
 
 static void porterduff_src_out( uint8_t *A, uint8_t *B, int n_pixels )
 {
-	int i,j;
-	uint8_t *aA = A;
-	uint8_t *bB = B;
+    int i, j;
 #pragma omp simd
-	for( i = 0; i < n_pixels; i ++ )
-	{
-		uint8_t aD = ( bB[3] * ( 0xff - aA[3])) >> 8;
-		for( j = 0; j < 3 ; j ++ )
-		{
-			aA[j] = (bB[j] * ( 0xff - aA[3] ) ) >> 8;
-		}
-		aA[3] = aD;
-		aA += 4;
-		bB += 4;
-	}
+    for( i = 0; i < n_pixels; i ++ )
+    {
+        int idx = i * 4;
+        uint8_t inv_a_d = 255 - A[idx + 3];
+        for( j = 0; j < 4 ; j ++ )
+        {
+            A[idx + j] = DIV255(B[idx + j] * inv_a_d);
+        }
+    }
 }
 
 static void svg_multiply( uint8_t *A, uint8_t *B, int n_pixels )
-{	
-	int i,j;
-	uint8_t *aA = A;
-	uint8_t *bB = B;
+{   
+    int i, j;
 #pragma omp simd
-	for( i = 0; i < n_pixels; i ++ )
-	{
-		uint8_t aD = ( bB[3] + aA[3] - bB[3] * aA[3]) >> 8;
-		for( j = 0; j < 3 ; j ++ )
-		{
-			aA[j] = _CLAMP( (( bB[j] * aA[j] + bB[3] * ( 0xff - aA[3]) + aA[j]  * (0xff - bB[3]) ) >> 8), 0, aD );
-		}
-		aA[3] = aD;
-		aA += 4;
-		bB += 4;
-	}
+    for( i = 0; i < n_pixels; i ++ )
+    {
+        int idx = i * 4;
+        for( j = 0; j < 3 ; j ++ )
+        {
+            uint8_t s = B[idx + j];
+            uint8_t d = A[idx + j];
+            uint8_t sa = B[idx + 3];
+            uint8_t da = A[idx + 3];
+            A[idx + j] = DIV255(s * d + s * (255 - da) + d * (255 - sa));
+        }
+        A[idx + 3] = B[idx + 3] + DIV255(A[idx + 3] * (255 - B[idx + 3]));
+    }
 }
 
 static void xor( uint8_t *A, uint8_t *B, int n_pixels )
 {
-	int i,j;
-	uint8_t *aA = A;
-	uint8_t *bB = B;
+    int i, j;
 #pragma omp simd
-	for( i = 0; i < n_pixels; i ++ )
-	{
-		uint8_t aD = CLAMP_Y(( bB[3] + aA[3] - 2 * bB[3] * aA[3]) >> 8);
-		for( j = 0; j < 3; j ++ ) 
-		{
-			aA[j] = CLAMP_Y( (bB[j] * ( 0xff - aA[3]) + aA[j] * ( 0xff - bB[3]) ) >> 8 );
-		}
-		aA[3] = aD;
-		aA += 4;
-		bB += 4;
-	}
+    for( i = 0; i < n_pixels; i ++ )
+    {
+        int idx = i * 4;
+        uint8_t sa = B[idx + 3];
+        uint8_t da = A[idx + 3];
+        for( j = 0; j < 3; j ++ ) 
+        {
+            A[idx + j] = DIV255(B[idx + j] * (255 - da) + A[idx + j] * (255 - sa));
+        }
+        A[idx + 3] = DIV255(sa * (255 - da) + da * (255 - sa));
+    }
 }
 static void add( uint8_t *A, uint8_t *B, int n_pixels )
 {
-	int i,j;
-	uint8_t *aA = A;
-	uint8_t *bB = B;
+    int i, j;
 #pragma omp simd
-	for( i = 0; i < n_pixels; i ++ )
-	{
-		for( j = 0; j < 3; j ++ ) 
-		{
-			unsigned int sum = aA[j] + bB[j];
-			aA[j] = ( sum > 255 ? 255: sum );
-		}
-		aA[3] = (aA[3] < bB[3] ? aA[3] : bB[3]);
-		aA += 4;
-		bB += 4;
-	}
+    for( i = 0; i < n_pixels; i ++ )
+    {
+        int idx = i * 4;
+        for( j = 0; j < 4; j ++ ) 
+        {
+            int sum = A[idx + j] + B[idx + j];
+            A[idx + j] = (sum > 255) ? 255 : sum;
+        }
+    }
 }
 static void subtract( uint8_t *A, uint8_t *B, int n_pixels )
 {
-	int i,j;
-	uint8_t *aA = A;
-	uint8_t *bB = B;
+    int i, j;
 #pragma omp simd
-	for( i = 0; i < n_pixels; i ++ )
-	{
-		for( j = 0; j < 3; j ++ ) 
-		{
-			int sum = aA[j] - bB[j];
-			aA[j] = ( sum < 0 ? 0: sum );
-		}
-		aA[3] = ( (aA[3] - bB[3]) < 0 ? 0 : aA[3] - bB[3]);
-		aA += 4;
-		bB += 4;
-	}
+    for( i = 0; i < n_pixels; i ++ )
+    {
+        int idx = i * 4;
+        for( j = 0; j < 4; j ++ ) 
+        {
+            int res = A[idx + j] - B[idx + j];
+            A[idx + j] = (res < 0) ? 0 : res;
+        }
+    }
 }
-/* 
- * FIXME: test
-static void screen( uint8_t *A, uint8_t *B, int n_pixels )
-{
-	int i,j;
-	uint8_t *aA = A;
-	uint8_t *bB = B;
-
-	for( i = 0; i < n_pixels; i ++ )
-	{
-		uint8_t aD = _CLAMP( bB[3] + aA[3] - ((bB[3] * aA[3]) >> 8), 0 , 255);
-
-		for( j = 0; j < 3; j ++ ) 
-		{
-			aA[j] = _CLAMP( (bB[j] + aA[j] - bB[j] * aA[j]) >>8,0, aD );
-		}
-		aA[3] = aD;
-		aA += 4;
-		bB += 4;
-	}
-}
-
-
-
-static void difference( uint8_t *A, uint8_t *B, int n_pixels )
-{
-	int i,j;
-	uint8_t *aA = A;
-	uint8_t *bB = B;
-
-	for( i = 0; i < n_pixels; i ++ )
-	{
-		uint8_t aD = ( bB[3] + aA[3] - bB[3] * aA[3] ) >> 8;
-		for( j = 0; j < 3; j ++ ) 
-		{
-			aA[j] = _CLAMP( bB[j] + aA[j] - 2 * ( MIN( bB[j] * aA[3], aA[j] * bB[3])),0, aD);
-		}
-		aA[3] = aD;
-		aA += 4;
-		bB += 4;
-	}
-}
-*/
 
 static void divide( uint8_t *A, uint8_t *B, int n_pixels )
 {
-	int i,j;
-	uint8_t *aA = A;
-	uint8_t *bB = B;
+    int i, j;
 #pragma omp simd
-	for( i = 0; i < n_pixels; i ++ )
-	{
-		for( j = 0; j < 3; j ++ ) 
-		{
-			float d = ( bB[j] == 0 ? 0.0f : aA[j] / bB[j]);
-			aA[j] = (uint8_t)CLAMP_Y( d * 0xff );
-		}
-		aA += 4;
-		bB += 4;
-	}
+    for( i = 0; i < n_pixels; i ++ )
+    {
+        int idx = i * 4;
+        for( j = 0; j < 3; j ++ ) 
+        {
+            if (B[idx + j] == 0) {
+                A[idx + j] = 255; 
+            } else {
+                float res = ((float)A[idx + j] / (float)B[idx + j]) * 255.0f;
+                A[idx + j] = (res > 255.0f) ? 255 : (uint8_t)res;
+            }
+        }
+    }
+}
+
+static void screen( uint8_t *A, uint8_t *B, int n_pixels )
+{
+    int i, j;
+#pragma omp simd
+    for( i = 0; i < n_pixels; i ++ )
+    {
+        int idx = i * 4;
+        for( j = 0; j < 3; j ++ ) 
+        {
+            A[idx + j] = 255 - DIV255((255 - A[idx + j]) * (255 - B[idx + j]));
+        }
+        A[idx + 3] = A[idx + 3] + DIV255(B[idx + 3] * (255 - A[idx + 3]));
+    }
+}
+
+static void overlay( uint8_t *A, uint8_t *B, int n_pixels )
+{
+    int i, j;
+#pragma omp simd
+    for( i = 0; i < n_pixels; i ++ )
+    {
+        int idx = i * 4;
+        for( j = 0; j < 3; j ++ ) 
+        {
+            uint8_t d = A[idx + j];
+            uint8_t s = B[idx + j];
+            if (d < 128) {
+                A[idx + j] = DIV255(2 * d * s);
+            } else {
+                A[idx + j] = 255 - DIV255(2 * (255 - d) * (255 - s));
+            }
+        }
+        A[idx + 3] = A[idx + 3] + DIV255(B[idx + 3] * (255 - A[idx + 3]));
+    }
 }
 
 void porterduff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args ){
@@ -405,5 +360,10 @@ void porterduff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args ){
 		case 13:
 			divide(frame->data[0],frame2->data[0],len);
 			break;
+		case 14:
+			screen(frame->data[0],frame2->data[0], len);
+			break;
+		case 15:
+			overlay(frame->data[0], frame2->data[0], len );
 	}
 }
