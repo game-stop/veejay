@@ -30,6 +30,9 @@
 #include <veejaycore/vj-msg.h>
 #include <libel/elcache.h>
 
+
+//FIXME: move to core and use as cache for samples and v4l2 devices 
+
 typedef struct
 {
 	int	size;
@@ -43,149 +46,145 @@ typedef struct
 	cache_slot_t	**cache;
 	int		len;
 	long		*index;
+	long total_mem_used;
 } cache_t;
 
-static	int	cache_free_slot(cache_t *v)
-{
-	int i;
-	for( i = 0; i < v->len; i ++ )
-	 if( v->index[i] == -1 ) return i;
-	return -1;
+
+static void free_single_slot(cache_t *v, int slot_index) {
+    if (v->cache[slot_index]) {
+        v->total_mem_used -= v->cache[slot_index]->size;
+        if (v->cache[slot_index]->buffer) {
+            free(v->cache[slot_index]->buffer);
+        }
+        free(v->cache[slot_index]);
+        v->cache[slot_index] = NULL;
+    }
+    v->index[slot_index] = -1;
 }
 
-static	long	total_mem_used_ = 0;
-
-static	void	cache_claim_slot(cache_t *v, int free_slot, uint8_t *linbuf, long frame_num,int buf_len,int format)
-{
-	// create new node
-	cache_slot_t *data = (cache_slot_t*) vj_malloc(sizeof(cache_slot_t));
-	data->size = buf_len;
-	data->num  = frame_num;
-	data->fmt  = format;
-	data->buffer = vj_malloc( buf_len );
-	// clear old buffer
-	if( v->index[free_slot] >= 0 )
-	{
-		cache_slot_t *del_slot = v->cache[free_slot];
-		total_mem_used_ -= del_slot->size;
-		free( del_slot->buffer );
-		free( del_slot );
-		v->cache[free_slot] = NULL;
-	}
-
-	veejay_memcpy( data->buffer, linbuf, buf_len );
-	v->index[ free_slot ] = frame_num;
-	v->cache[ free_slot ] = data;
-	total_mem_used_ += buf_len;
+static int cache_free_slot(cache_t *v) {
+    for (int i = 0; i < v->len; i++) {
+        if (v->index[i] == -1) return i;
+    }
+    return -1;
 }
 
-static	int	cache_find_slot( cache_t *v, long frame_num )
-{
-	int i;
-	int k = 0;
-	long n = 0;
-	for( i = 0; i < v->len ; i ++ )
-	{
-		long d = abs( v->index[i] - frame_num );
-		if( d > n )
-		{	n = d;	k = i ; }
-	}
-	return k;
+static int cache_find_slot(cache_t *v, long frame_num) {
+    int k = 0;
+    long max_score = -1;
+    for (int i = 0; i < v->len; i++) {
+        long diff = v->index[i] - frame_num;
+
+        long score = (diff < 0) ? labs(diff) * 2 : labs(diff); 
+        
+        if (score > max_score) {
+            max_score = score;
+            k = i;
+        }
+    }
+    return k;
 }
 
-static	int	cache_locate_slot( cache_t *v, long frame_num)
-{
-	int i;
-	for( i = 0; i < v->len ; i ++ )
-		if( v->index[i] == frame_num ) 
-			return i;
-	return -1;
+static int cache_locate_slot(cache_t *v, long frame_num) {
+    for (int i = 0; i < v->len; i++) {
+        if (v->index[i] == frame_num) return i;
+    }
+    return -1;
 }
 
+static void cache_claim_slot(cache_t *v, int slot, uint8_t *linbuf, long frame_num, int buf_len, int format) {
 
-void	*init_cache( unsigned int n_slots )
-{
-	if(n_slots == 0)
-		return NULL;
-	cache_t *v = (cache_t*) vj_calloc(sizeof(cache_t));
-	v->len = n_slots;
-	v->cache = (cache_slot_t**) vj_calloc(sizeof(cache_slot_t*) * v->len );
-	if(!v->cache)
-	{
-		free(v);
-		return NULL;
-	}
-	v->index = (long*) vj_malloc(sizeof(long) * v->len );
-	int n;
-	for( n = 0; n < v->len ; n ++ )
-		v->index[n] = -1;
-	return (void*) v;
+    cache_slot_t *new_data = (cache_slot_t*) vj_malloc(sizeof(cache_slot_t));
+    if (!new_data) return;
+
+    new_data->buffer = vj_malloc(buf_len);
+    if (!new_data->buffer) {
+        free(new_data);
+        return;
+    }
+
+    free_single_slot(v, slot);
+
+    new_data->size = buf_len;
+    new_data->num = frame_num;
+    new_data->fmt = format;
+    veejay_memcpy(new_data->buffer, linbuf, buf_len);
+
+    v->index[slot] = frame_num;
+    v->cache[slot] = new_data;
+    v->total_mem_used += buf_len;
+}
+void *init_cache(unsigned int n_slots) {
+    if (n_slots == 0) return NULL;
+
+    cache_t *v = (cache_t*) vj_calloc(sizeof(cache_t));
+    if (!v) return NULL;
+
+    v->len = n_slots;
+    v->cache = (cache_slot_t**) vj_calloc(v->len * sizeof(cache_slot_t*));
+    v->index = (long*) vj_malloc(sizeof(long) * v->len);
+
+    if (!v->cache || !v->index) {
+        if (v->cache) free(v->cache);
+        if (v->index) free(v->index);
+        free(v);
+        return NULL;
+    }
+
+    for (int n = 0; n < v->len; n++) {
+        v->index[n] = -1;
+        v->cache[n] = NULL;
+    }
+    v->total_mem_used = 0;
+    return (void*) v;
 }
 
-void	reset_cache(void *cache)
-{
-	int i = 0;
-	cache_t *v = (cache_t*) cache;
-
-	for( i = 0; i < v->len; i ++ )
-	{
-		v->index[i] = -1;
-		if( v->cache[i] )
-		{
-			total_mem_used_ -= v->cache[i]->size;
-			if(v->cache[i]->buffer)
-			 free(v->cache[i]->buffer);
-			free(v->cache[i]);
-			v->cache[i] = NULL;
-		}
-	}
+void reset_cache(void *cache) {
+    if (!cache) return;
+    cache_t *v = (cache_t*) cache;
+    for (int i = 0; i < v->len; i++) {
+        free_single_slot(v, i);
+    }
 }
 
-long	cache_avail_mb(void)
-{
-	return ( total_mem_used_ == 0 ? 0 : total_mem_used_ / (1024 * 1024 ));
+long cache_avail_mb(void *cache) { //FIXME callers
+    if (!cache) return 0;
+    cache_t *v = (cache_t*) cache;
+    return v->total_mem_used / (1024 * 1024);
 }
 
+void free_cache(void *cache) {
+    if (!cache) return;
+    cache_t *v = (cache_t*) cache;
+    
+    reset_cache(v);
 
-void	free_cache(void *cache)
-{
-	cache_t *v = (cache_t*) cache;	
-	if(v->cache) {
-		free(v->cache);
-		v->cache = NULL;
-	}
-	if(v->index) {
-		free(v->index);
-		v->index = NULL;
-	}
-	if(v) {
-		free(v);
-	}
-	v = NULL;
+    if (v->cache) free(v->cache);
+    if (v->index) free(v->index);
+    free(v);
 }
 
-void	cache_frame( void *cache, uint8_t *linbuf, int buflen, long frame_num , int format)
-{
-	cache_t *v = (cache_t*) cache;
-	if( buflen <= 0 )
-		return;
-	int slot_num = cache_free_slot( cache );
-	if( slot_num == -1 )
-		slot_num = cache_find_slot( v, frame_num );
+void cache_frame(void *cache, uint8_t *linbuf, int buflen, long frame_num, int format) { // take VJFrame* and another function to take buf
+    if (!cache || buflen <= 0 || !linbuf) return;
+    cache_t *v = (cache_t*) cache;
 
-	cache_claim_slot(v, slot_num, linbuf, frame_num, buflen, format);
-} 
+    int slot_num = cache_free_slot(v);
+    if (slot_num == -1) {
+        slot_num = cache_find_slot(v, frame_num);
+    }
 
-uint8_t *get_cached_frame( void *cache, long frame_num, int *buf_len, int *format )
-{
-	cache_t *v = (cache_t*) cache;
-	int slot = cache_locate_slot( v, frame_num );
-	if( slot == -1 )
-		return NULL;
+    cache_claim_slot(v, slot_num, linbuf, frame_num, buflen, format);
+}
 
-	cache_slot_t *data = v->cache[ slot ];
+uint8_t *get_cached_frame(void *cache, long frame_num, int *buf_len, int *format) {
+    if (!cache) return NULL;
+    cache_t *v = (cache_t*) cache;
+    int slot = cache_locate_slot(v, frame_num);
+    
+    if (slot == -1 || v->cache[slot] == NULL) return NULL;
 
-	*buf_len 	= data->size;
-	*format		= data->fmt;
-	return (uint8_t*) data->buffer;
+    cache_slot_t *data = v->cache[slot];
+    if (buf_len) *buf_len = data->size;
+    if (format) *format = data->fmt;
+    return (uint8_t*) data->buffer;
 }
