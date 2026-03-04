@@ -72,14 +72,7 @@ void	vj_stamp_clear(void)
 	vj_stamp_ = 0;
 }
 
-long vj_get_relative_time(void)
-{
-    long time, relative;
-    time = vj_get_timer();
-    relative = time - vj_relative_time;
-    vj_relative_time = time;
-    return relative;
-}
+
 
 static struct
 {
@@ -119,41 +112,59 @@ static char *relative_path(filelist_t *filelist, const char *node)
     return vj_strdup(node);
 }
 
-static int	is_usable_file( filelist_t *filelist, const char *node, const char *filename )
+static int is_usable_file(filelist_t *filelist, const char *node, const char *filename)
 {
-	if(!node) 
-		return 0;
+    if (!node)
+        return 0;
 
-	struct stat l;
-	veejay_memset(&l,0,sizeof(struct stat));
-	if( lstat( node, &l) < 0 )
-		return 0;
-	
-	if( S_ISLNK( l.st_mode )) {
-		veejay_memset(&l,0,sizeof(struct stat));
-		stat(node, &l);
-		return 1;
-	}
-	
-	if( S_ISDIR( l.st_mode ) ) {
-		return 1;
-	}
+    struct stat st;
+    veejay_memset(&st, 0, sizeof(struct stat));
 
-	if( S_ISREG( l.st_mode ) ) {
-		if( is_it_usable(node)
+    if (lstat(node, &st) < 0)
+        return 0;
+
+    // Handle symlink
+    if (S_ISLNK(st.st_mode)) {
+        veejay_memset(&st, 0, sizeof(struct stat));
+        if (stat(node, &st) < 0)
+            return 0;
+        return 1;
+    }
+
+    // Directory
+    if (S_ISDIR(st.st_mode))
+        return 1;
+
+    // Regular file
+    if (S_ISREG(st.st_mode)) {
+        if (is_it_usable(node)
 #ifdef USE_GDK_PIX_BUF
             || lav_is_supported_image_file(node)
-#endif               
-            ) {
-			if( filelist->num_files < filelist->max_files ) {
-				filelist->files[ filelist->num_files ] =
-					relative_path(filelist,node);
-				filelist->num_files ++;
-			}
-		}
-	}
-	return 0;
+#endif
+        ) {
+            if (filelist->num_files < filelist->max_files) {
+                filelist->files[filelist->num_files] = relative_path(filelist, node);
+                filelist->num_files++;
+            }
+            return 1;
+        }
+        return 0;
+    }
+
+    // Character or block device (e.g., /dev/random, /dev/zero)
+    if (S_ISCHR(st.st_mode) || S_ISBLK(st.st_mode)) {
+        int fd = open(node, O_RDONLY);
+        if (fd >= 0) {
+            close(fd);
+            return 1;
+        }
+        return 0;
+    }
+
+    // Other special types (FIFO, socket, etc.) → not usable
+    return 0;
 }
+
 
 static int	dir_selector( const struct dirent *dir )
 {	
@@ -232,127 +243,69 @@ filelist_t *find_media_files( veejay_t *info )
 	return fl;
 }
 
-/* TODO: veejaycoresample
- * fx state is currently global, damage control is to check fx chain of current playing sample
- * for FX that needs a background frame.
- * before: apply on all FX
- */
-int vj_perform_take_bg(veejay_t *info, VJFrame *frame)
-{
-/*	int i;
-	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
-	{
-		for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
-			int fx_id = sample_get_effect_any( info->uc->sample_id, i );
-			if( fx_id == VJ_VIDEO_EFFECT_CHAMBLEND ||
-			    fx_id == VJ_IMAGE_EFFECT_CHAMELEON ||
-			    fx_id == VJ_VIDEO_EFFECT_DIFF ||
-			    fx_id == VJ_IMAGE_EFFECT_MOTIONMAP ||
-			    fx_id == VJ_IMAGE_EFFECT_CONTOUR ||
-			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACT ||
-			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS ||
-			    fx_id == VJ_IMAGE_EFFECT_BGPUSH )
-			{
-				vj_effect_prepare( frame, fx_id );
-				veejay_msg(VEEJAY_MSG_INFO,
-					"Sample %d FX entry %d takes BG for FX %d",
-					info->uc->sample_id,i, fx_id );
-			}
-		}		
-	}
-	else if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
-	{
-		for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
-			int fx_id = vj_tag_get_effect_any( info->uc->sample_id, i );
-			if( fx_id == VJ_VIDEO_EFFECT_CHAMBLEND ||
-			    fx_id == VJ_IMAGE_EFFECT_CHAMELEON ||
-			    fx_id == VJ_VIDEO_EFFECT_DIFF ||
-			    fx_id == VJ_IMAGE_EFFECT_MOTIONMAP ||
-			    fx_id == VJ_IMAGE_EFFECT_CONTOUR ||
-			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACT ||
-			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS ||
-			    fx_id == VJ_IMAGE_EFFECT_BGPUSH )
-			{
-				vj_effect_prepare( frame, fx_id );
-				veejay_msg(VEEJAY_MSG_INFO,
-					"Stream %d FX entry %d takes BG for FX %d",
-					info->uc->sample_id,i, fx_id );
-			}
-		}		
-	}
-	*/
-
-    //FIXME: take bg
-    veejay_msg(0,"NOT IMPLEMENTED: %s", __FUNCTION__);    
-        
-	return 0;
-}
-
 #ifdef HAVE_JPEG
-int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
+#define MAX_JPEG_BUFFER (65535 * 24)
+
+int vj_perform_screenshot2(veejay_t *info, VJFrame *frame)
 {
-    FILE *frame;
+    FILE *frame_file = NULL;
     int res = 0;
-    uint8_t *jpeg_buff;
+    int jpeg_size = 0;
+
+    uint8_t *jpeg_buff = vj_malloc(MAX_JPEG_BUFFER);
+    if (!jpeg_buff) return -1;
+
     VJFrame tmp;
-    int jpeg_size;
+    vj_get_yuv_template(&tmp,
+                        info->video_output_width,
+                        info->video_output_height,
+                        info->pixel_format);
 
-    video_playback_setup *settings = info->settings;
+    tmp.data[0] = vj_malloc(tmp.len * 3);
+    if (!tmp.data[0]) {
+        free(jpeg_buff);
+        return -1;
+    }
+    tmp.data[1] = tmp.data[0] + tmp.len;
+    tmp.data[2] = tmp.data[1] + tmp.len + tmp.uv_len;
+    tmp.format = PIX_FMT_YUVJ420P;
 
-    jpeg_buff = (uint8_t *) malloc( 65535 * 10 );
-    if (!jpeg_buff)
-		return -1;
+    yuv_convert_any_ac(frame, &tmp);
 
-    vj_get_yuv_template( &tmp,
-				info->video_output_width,
-				info->video_output_height,
-				info->pixel_format );
-
-	tmp.data[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * tmp.len * 3);
-	tmp.data[1] = tmp.data[0] + tmp.len;
-	tmp.data[2] = tmp.data[1] + tmp.len + tmp.uv_len;
-	tmp.format = PIX_FMT_YUVJ420P;
-	
-	VJFrame *srci = yuv_yuv_template( src[0],src[1],src[2], info->video_output_width,
-	     			info->video_output_height , (yuv_get_pixel_range() ? PIX_FMT_YUVJ422P: PIX_FMT_YUV422P ));
-
-	yuv_convert_any_ac( srci,&tmp );
-
-    free(srci);
-
-	if(info->uc->filename == NULL) 
-	{
-		info->uc->filename = (char*) malloc(sizeof(char) * 12); 
-		sprintf(info->uc->filename, "%06d.jpg", info->settings->current_frame_num );
-	}
-    frame = fopen(info->uc->filename, "wb");
-
-    if (frame)
-    {	
-    	jpeg_size = encode_jpeg_raw(jpeg_buff, (65535*10), 100,
-				settings->dct_method,  
-				info->current_edit_list->video_inter,0,
-				info->video_output_width,
-				info->video_output_height,
-				tmp.data[0],
-				tmp.data[1], tmp.data[2]);
-
-   	 res = fwrite(jpeg_buff, jpeg_size, 1, frame);
-   	 fclose(frame);
-    	 if(res) 
-		veejay_msg(VEEJAY_MSG_INFO, "Dumped frame to %s", info->uc->filename);
+    if (!info->uc->filename) {
+        info->uc->filename = vj_malloc(32);
+        if (!info->uc->filename) {
+            free(tmp.data[0]);
+            free(jpeg_buff);
+            return -1;
+        }
+        snprintf(info->uc->filename, 32, "%020lld.jpg", frame->frame_num);
     }
 
-    if (jpeg_buff)
-	free(jpeg_buff);
+    frame_file = fopen(info->uc->filename, "wb");
+    if (frame_file) {
+        jpeg_size = encode_jpeg_raw(jpeg_buff, MAX_JPEG_BUFFER, 100,
+                                    info->settings->dct_method,
+                                    info->current_edit_list->video_inter,
+                                    0,
+                                    info->video_output_width,
+                                    info->video_output_height,
+                                    tmp.data[0], tmp.data[1], tmp.data[2]);
 
-    if( tmp.shift_v == 0 )
-    {
-	free(tmp.data[0]);
+        if (jpeg_size > 0) {
+            res = fwrite(jpeg_buff, jpeg_size, 1, frame_file);
+            if (res)
+                veejay_msg(VEEJAY_MSG_INFO, "Wrote video frame %lld to %s", frame->frame_num, info->uc->filename);
+        }
+        fclose(frame_file);
     }
+
+    free(jpeg_buff);
+    free(tmp.data[0]);
 
     return res;
 }
+
 
 #endif
 
@@ -527,150 +480,35 @@ int	verify_working_dir(void)
 })
 #endif
 
-#if defined(ARCH_X86) || defined(ARCH_X86_64)
-static char * kern_number(char * buf, char * end, long long num, int base, int type)
+
+int vj_get_sample_display_name(char **destination, const char *filename)
 {
-	char sign=0,tmp[66];
-	static const char small_digits[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-	int i=0;
-	const char *digits = small_digits;
+    if (!destination || !filename)
+        return 0;
 
-	if (type & SIGN) {
-		if (num < 0) {
-			sign = '-';
-			num = -num;
-		}
-	}
+    *destination = NULL;
 
-	if (num == 0)
-		tmp[i++]='0';
-	else while (num != 0)
-		tmp[i++] = digits[do_div(num,base)];
+    const char *start = strrchr(filename, '/');
+    start = (start) ? start + 1 : filename;
 
-	if (sign) {
-		if (buf <= end)
-			*buf = sign;
-		++buf;
-	}
+    const char *end = strrchr(start, '.');
+    size_t len = (end && end > start) ? (size_t)(end - start)
+                                      : strlen(start);
 
-	while (i-- > 0) {
-		if (buf <= end)
-			*buf = tmp[i];
-		++buf;
-	}
+    if (len > 12) {
+        *destination = malloc(13);
+        if (!*destination)
+            return 0;
 
-	return buf;
-}
-
-static	int	kern_vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
-{
-	int num,flags,base;
-	char *str, *end;
-	str = buf;
-	end = buf + size - 1;
-
-	if( end < buf - 1 ) {
-		end = ((void*)-1);
-		size = end - buf + 1;
-	}
-
-	for( ; *fmt; ++fmt ) {
-		if( *fmt != '%' ) {
-			if( str <= end )
-				*str = *fmt;
-			++str;
-			continue;
-		}
-
-		flags = 0;
-		repeat:
-			++ fmt;
-			switch( *fmt ) {
-				case ' ': flags |= SPACE; goto repeat;
-			}
-
-			base = 10;
-
-			switch( *fmt ) {
-				case 'd':
-					flags |= SIGN;
-					break;
-			}
-
-			num = va_arg(args, unsigned int);
-			if (flags & SIGN)
-				num = (signed int) num;
-
-			str = kern_number(str, end, num, base, flags);
-	}
-	if( str <= end )
-		*str = '\0';
-	else if ( size > 0 )
-		*end = '\0';
-
-	return str-buf;
-}
-
-/*
- * veejay_sprintf can only deal with format 'd' ... it is used to produce
- * status lines.
- *
- *
- */
-
-int	veejay_sprintf( char *s, size_t size, const char *format, ... )
-{
-	va_list arg;
-	int done;
-	va_start( arg, format );
-	done = kern_vsnprintf( s, size, format, arg );
-	va_end(arg);
-	return done;
-}
-#else
-int	veejay_sprintf( char *s, size_t size, const char *format, ... )
-{
-	va_list arg;
-	int done;
-	va_start(arg,format);
-	done = vsnprintf( s,size, format, arg );
-	va_end(arg);
-	return done;
-}
-#endif
-
-/*
- *
- * find basename of new sample, remove any directory prefix and
- * file extension. Reduce the name to 10 char max.
- *
- * caller responsible de free dest pointer
- *
- * return 0 on error.
- */
-int vj_get_sample_display_name(char **destination, char *filename)
-{
-  char *start;
-  if ((start = strrchr(filename, '/')) != NULL) {
-    start = start + 1;
-  } else {
-    start = filename;
-  }
-
-  *destination = NULL;
-  char *end;
-  if ((end = strrchr(start, '.')) != NULL) {
-    if((end - start) > 12) {
-      *destination = strndup(start, 12);
-      strncpy ( (*destination)+9, end-3, 3);
-      (*destination)[8] = '~';
+        memcpy(*destination, start, 8);
+        (*destination)[8] = '~';
+        memcpy(*destination + 9, start + len - 3, 3);
+        (*destination)[12] = '\0';
     } else {
-    *destination = strndup(start,(end - start));
+        *destination = strndup(start, len);
+        if (!*destination)
+            return 0;
     }
-  }
-  if (*destination == NULL) {
-    *destination = strdup (start);
-  }
 
-  return 1;
+    return 1;
 }

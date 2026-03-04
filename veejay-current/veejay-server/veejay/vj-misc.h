@@ -37,21 +37,12 @@ filelist_t *find_media_files( veejay_t *info );
 #else
 #define VEEJAY_FILE_LIMIT LLONG_MAX
 #endif
-int vj_perform_screenshot2(veejay_t * info, uint8_t ** src);
-#ifdef ARCH_X86
-int	veejay_sprintf( char *s, size_t size, const char *format, ... );
-#define	veejay_snprintf	veejay_sprintf
-#else
-#define	veejay_snprintf snprintf
-#endif
-long	vj_get_timer(void);
+int vj_perform_screenshot2(veejay_t * info, VJFrame *src);
 
-long	vj_get_relative_time(void);
+long	vj_get_timer(void);
 
 void	vj_stamp_clear();
 unsigned int vj_stamp();
-
-int	vj_perform_take_bg( veejay_t *info, VJFrame *src);
 
 int	veejay_create_temp_file(const char *prefix, char *dst);
 
@@ -67,6 +58,6 @@ int	verify_working_dir();
 
 void	free_media_files( veejay_t *info, filelist_t *fl );
 
-int vj_get_sample_display_name(char **dest, char *filename);
+int vj_get_sample_display_name(char **dest, const char *filename);
 
 #endif
