@@ -107,6 +107,7 @@ typedef struct sample_eff_t {
     int kf_type;		/* store type used */
     void *fx_instance;		/* lib plugger instance */
 	int clear;
+    float audio_opacity;
 } sample_eff_chain;
 
 typedef struct sample_off_rec_t {
@@ -290,6 +291,7 @@ extern int sample_chain_add(int s1, int c, int effect_nr);
 /* channel depends on source , it select a channel of a certain video source */
 extern int sample_get_chain_channel(int s1, int position);
 extern int sample_set_chain_channel(int s1, int position, int channel);
+extern int sample_get_long_info(int sample_id, int *start, int *end, int *loop, int *speed, int *cur_sfd, int *max_sfd);
 
 extern void sample_frame_tick();
 

@@ -43,6 +43,7 @@
 #include <libvje/vje.h>
 #include <libvje/libvje.h>
 #include <libsubsample/subsample.h>
+#include <veejay/vj-lib.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vevo.h>
 #include <veejaycore/libvevo.h>
@@ -50,7 +51,6 @@
 #include <veejay/vj-font.h>
 #include <assert.h>
 #include <libel/elcache.h>
-#include <veejay/vj-misc.h>
 #include <veejay/vj-misc.h>
 #include <libstream/vj-tag.h>
 #include <libvjxml/vj-xml.h>
@@ -83,7 +83,6 @@ static veejay_t *veejay_info = NULL;
 extern void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font, void *vp);
 extern void   tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp );
 extern int vj_tag_highest_valid_id();
-extern int    veejay_sprintf( char *s, size_t size, const char *format, ... );
 
 unsigned int sample_size(void)
 {
@@ -347,7 +346,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     snprintf(si->descr,SAMPLE_MAX_DESCR_LEN, "Sample %4d", si->sample_id);
     si->first_frame = startFrame;
     si->last_frame = endFrame;
-    si->resume_pos = -1;
+    si->resume_pos = 0;
     si->edit_list = NULL;   // clone later
     si->soft_edl = 1;
     si->speed = 1;
@@ -374,6 +373,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
         }
         si->effect_chain[i]->effect_id = -1;
         si->effect_chain[i]->volume = 50;
+        si->effect_chain[i]->audio_opacity = 0.5f;
 	    si->effect_chain[i]->speed = INT_MAX;
         si->effect_chain[i]->is_rendering = 1;
         si->effect_chain[i]->channel = ( sample_highest_valid_id() <= 0 ? si->sample_id : sample_highest_valid_id());
@@ -511,7 +511,7 @@ int sample_copy(int sample_id)
             return 0;
         }
         veejay_memcpy( copy->effect_chain[i], org->effect_chain[i], sizeof( sample_eff_chain ) );
-	copy->effect_chain[i]->fx_instance = NULL;
+	    copy->effect_chain[i]->fx_instance = NULL;
     }
 
     copy->sample_id = _new_id();
@@ -646,6 +646,29 @@ int sample_get_el_position( int sample_id, int *start, int *end )
     return -1;
 }
 
+
+
+
+int sample_get_long_info(int sample_id, int *start, int *end, int *loop, int *speed, int *cur_sfd, int *max_sfd) {
+    sample_info *si = sample_get(sample_id);
+    if(si) {
+        if(si->marker_start >= 0 && si->marker_end > 0) {
+        *start = si->marker_start;
+        *end = si->marker_end;
+        } 
+        else {
+        *start = si->first_frame;
+        *end = si->last_frame;
+        }
+        *speed = si->speed;
+        *loop = si->looptype;
+        *cur_sfd = si->dups;
+        *max_sfd = si->dup;
+        return 0;
+    }
+    
+    return -1;
+}
 
 
 
@@ -996,9 +1019,6 @@ int sample_del(int sample_id)
 
         sample_chain_free( sample_id,1 );
 
-        if(si->soft_edl == 0 && si->edit_list != NULL)
-           vj_el_break_cache( si->edit_list ); //@ destroy cache, if any
-
         for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
         {
         if( si->effect_chain[i]->kf )
@@ -1079,8 +1099,8 @@ int sample_get_effect(int s1, int position)
     sample_info *sample = sample_get(s1);
     if(position >= SAMPLE_MAX_EFFECTS || position < 0 ) return -1;
     if(sample) {
-    if(sample->effect_chain[position]->e_flag==0) return -1;
-    return sample->effect_chain[position]->effect_id;
+        if(sample->effect_chain[position]->e_flag==0) return -1;
+        return sample->effect_chain[position]->effect_id;
     }
     return -1;
 }
@@ -1177,6 +1197,8 @@ int sample_set_resume(int s1,long position)
     if(!sample)
         return -1;
 
+    veejay_msg(VEEJAY_MSG_DEBUG, "Sample B position %ld, already ticked: %d", position, sample->frame_tick);
+
     if( sample->frame_tick )
 		return 1; // already incremented for this time period
 
@@ -1230,14 +1252,14 @@ int sample_get_chain_volume(int s1, int position)
     return -1;
     if (position >= SAMPLE_MAX_EFFECTS)
     return -1;
-    return sample->effect_chain[position]->volume;
+    return sample->effect_chain[position]->volume; //FIXME drop or refactor
 }
 
 int sample_get_chain_audio(int s1, int position)
 {
     sample_info *sample = sample_get(s1);
     if (sample) {
-     return sample->effect_chain[position]->a_flag;
+     return sample->effect_chain[position]->a_flag; //FIXME ignored currently
     }
     return -1;
 }
@@ -1531,21 +1553,7 @@ int sample_set_chain_channel(int s1, int position, int input)
  
     //sample->effect_chain[position]->channel = input;
     int src_type =  sample->effect_chain[position]->source_type;
-    // now, reset cache and setup
-    if( src_type == 0)
-    {
-        if( sample->effect_chain[position]->channel != input && sample->effect_chain[position]->effect_id > 0)
-        {
-            sample_info *new = sample_get(input);
-            sample_info *old = sample_get( sample->effect_chain[position]->channel );
-            if(old && old->soft_edl==0)
-                vj_el_break_cache( old->edit_list ); // no longer needed
-            
-            if(new)
-                vj_el_setup_cache( new->edit_list ); // setup new cache
-            
-        }
-    }
+
     if( src_type == 1 && 
         vj_tag_get_active( sample->effect_chain[position]->channel ) &&
         vj_tag_get_type( sample->effect_chain[position]->channel ) == VJ_TAG_TYPE_NET ) {
@@ -1555,105 +1563,27 @@ int sample_set_chain_channel(int s1, int position, int input)
     sample->effect_chain[position]->channel = input;
     sample->effect_chain[position]->clear = 1;
 
-    return 1;
-}
+    //FIXME audio chain
+    sample->effect_chain[position]->audio_opacity = 0.5f;
 
-static  int sample_sample_used(sample_info *a, int b )
-{
-    int i;
-    for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ )
-    {
-        int src_type =  a->effect_chain[i]->source_type;
-        int id       =  a->effect_chain[i]->channel;
-        if( src_type == 0 && id == b )
-            return 1;
-    }
-    return 0;
+    return 1;
 }
 
 int sample_stop_playing(int s1, int new_s1)
 {
-    sample_info *sample = sample_get(s1);
-    sample_info *newsample = NULL;
-    if( new_s1 )
-        newsample = sample_get(new_s1);
-    if (!sample)
-        return 0;
-    if (new_s1 && !newsample)
-        return 0;
-    unsigned int i;
-    
-    //@ stop playing, if new_s1
 
-    if( new_s1 == s1 )
-        return 1;
-
-    int destroy_s1 = 1;
-
-    if( new_s1 )
-    {
-        for( i = 0; i < SAMPLE_MAX_EFFECTS ; i ++ )
-        {
-            int src_type =  newsample->effect_chain[i]->source_type;
-            int id       =  newsample->effect_chain[i]->channel;
-            if( src_type == 0 && id == s1 )
-                destroy_s1 = 0; // no need to destroy cache, used by newsample
-        }           
-    }
-
-    if(destroy_s1 && sample->soft_edl==0)
-        vj_el_break_cache( sample->edit_list ); // break the cache
-
-    
-    if( new_s1 )
-    {
-        for( i = 0; i < SAMPLE_MAX_EFFECTS;i++ )
-        {
-            int src_type =  sample->effect_chain[i]->source_type;
-            int id       =   sample->effect_chain[i]->channel;
-            if( src_type == 0 && id > 0 )
-            {
-                //@ if ID is not in newsample,
-                if( !sample_sample_used( newsample, id ))
-                {
-                    sample_info *second = sample_get( id );
-                        if(second && second->soft_edl==0) //@ get and destroy its cache
-                        	vj_el_break_cache( second->edit_list );
-                    }
-            }
-            }
-    }
 
     return 1;
 }
 
+// called with zero
 int sample_cache_used( int s1 )
 {
-    return cache_avail_mb();
+    return 0;
 }
 
 int sample_start_playing(int s1, int no_cache)
 {
-    sample_info *sample = sample_get(s1);
-    if (!sample)
-    return -1;
-    int i;
-
-    if(!no_cache)
-        vj_el_setup_cache( sample->edit_list );
-
-    for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ )
-    {
-        int src_type =  sample->effect_chain[i]->source_type;
-        int id       =   sample->effect_chain[i]->channel;
-        if( src_type == 0 && id > 0 && sample->effect_chain[i]->effect_id > 0 )
-        {
-            sample_info *second = sample_get( id );
-                if(second)
-                vj_el_setup_cache( second->edit_list );
-            }
-        }
-
     return 1;
 }
 
@@ -1666,26 +1596,6 @@ int sample_set_chain_source(int s1, int position, int input)
     
     if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
         return -1;
-
-    if( sample->effect_chain[position]->source_type == 0 &&
-            sample->effect_chain[position]->channel > 0 &&
-            sample->effect_chain[position]->effect_id > 0 &&
-            input != sample->effect_chain[position]->source_type )
-    {
-        sample_info *second = sample_get( sample->effect_chain[position]->channel );
-        if(second && second->edit_list)
-            vj_el_clear_cache( second->edit_list );
-    }
-
-    if( sample->effect_chain[position]->source_type == 0 &&
-        sample->effect_chain[position]->effect_id > 0 &&
-        sample->effect_chain[position]->channel > 0 &&
-        input != sample->effect_chain[position]->source_type)
-    {
-        sample_info *new = sample_get( input );
-        if(new)
-            vj_el_setup_cache( new->edit_list );
-    }
 
     if( sample->effect_chain[position]->source_type == 1 && 
             vj_tag_get_active( sample->effect_chain[position]->channel ) &&
@@ -2392,17 +2302,7 @@ int sample_chain_clear(int s1)
         sample->effect_chain[i]->volume = 0;
         sample->effect_chain[i]->a_flag = 0;
         sample->effect_chain[i]->is_rendering = 1;
-    
-        int src_type = sample->effect_chain[i]->source_type;
-        int id       = sample->effect_chain[i]->channel;
-        if( src_type == 0 && id > 0 )
-        {
-            sample_info *old = sample_get( id );
-            if(old && old->edit_list)
-            {
-                vj_el_clear_cache(old->edit_list);
-            }
-        }
+
         if( sample->effect_chain[i]->source_type == 1 && 
             vj_tag_get_active( sample->effect_chain[i]->channel ) &&
             vj_tag_get_type( sample->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) {
@@ -2493,15 +2393,6 @@ int sample_chain_remove(int s1, int position)
     sample->effect_chain[position]->volume = 0;
     sample->effect_chain[position]->a_flag = 0;
     sample->effect_chain[position]->is_rendering = 1;
-
-    int src_type = sample->effect_chain[position]->source_type;
-    int id       = sample->effect_chain[position]->channel;
-    if( src_type == 0 && id > 0 )
-    {
-        sample_info *old = sample_get( id );
-        if(old)
-            vj_el_clear_cache(old->edit_list);
-    }
 
     if( sample->effect_chain[position]->source_type == 1 && 
         vj_tag_get_active( sample->effect_chain[position]->channel ) &&
@@ -2628,7 +2519,7 @@ int sample_chain_sprint_status( int s1,int tags,int cache,int sa,int ca, int pfp
     ptr = vj_sprintf( ptr, sample->transition_shape);
     ptr = vj_sprintf( ptr, feedback);
     ptr = vj_sprintf( ptr, tags );
-    
+
     return 0;
 }
 
