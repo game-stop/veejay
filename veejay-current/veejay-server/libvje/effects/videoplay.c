@@ -148,8 +148,6 @@ static void destroy_filmstrip(videowall_t *vw)
     vw->frame_delay = 0;
 }
 
-
-
 void *videoplay_malloc(int w, int h )
 {
     videowall_t *vw = (videowall_t*) vj_calloc(sizeof(videowall_t));
@@ -163,61 +161,42 @@ void	videoplay_free(void *ptr)
     free(ptr);
 }
 
-static void	take_video( videowall_t *vw, uint8_t *plane, uint8_t *dst_plane, int w, int h, int index )
+static void take_video(videowall_t *vw, uint8_t *src_plane, uint8_t *dst_plane, int src_w, int src_h, int index)
 {
+    const int box_w  = vw->video_list[index]->w;
+    const int box_h  = vw->video_list[index]->h;
 
-	int x,y,dx,dy;
-	int sum;
-	int dst_x, dst_y;
-	int step_y;
-	int step_x;
-	int box_width = vw->video_list[index]->w;
-	int box_height = vw->video_list[index]->h;
+    const int step_x = (src_w << 16) / box_w;
+    const int step_y = (src_h << 16) / box_h;
+    
+    for (int dst_y = 0; dst_y < box_h; dst_y++)
+    {
+        int src_y = (dst_y * step_y) >> 16;
+        uint8_t *src_row = src_plane + (src_y * src_w);
+        uint8_t *dst_row = dst_plane + (dst_y * box_w);
 
-	step_x = w / box_width;
-	step_y = h / box_height;
-
-	for( y = 0 ,dst_y = 0; y < h && dst_y < box_height; y += step_y )
-	{
-		for( x = 0, dst_x = 0; x < w && dst_x < box_width; x+= step_x )
-		{
-			sum = 0;
-			for( dy = 0; dy < step_y; dy ++ )
-			{
-				for( dx = 0; dx < step_x; dx++)	
-				{
-					sum += plane[ ((y+dy)*w+(dx+x)) ];	
-				}
-			}
-			// still problem here!
-			if(sum > 0)
-			  dst_plane[(dst_y*box_width)+dst_x] = sum / (step_y*step_x);
-			else
-			  dst_plane[(dst_y*box_width)+dst_x] = pixel_Y_lo_;
-
-			dst_x++;
-		}
-		dst_y++;
-	}
+        for (int dst_x = 0; dst_x < box_w; dst_x++)
+        {
+            int src_x = (dst_x * step_x) >> 16;
+            dst_row[dst_x] = src_row[src_x];
+        }
+    }
 }
 
-static void put_video( videowall_t *vw, uint8_t *dst_plane, uint8_t *video, int dst_w, int dst_h, int index , matrix_t matrix)
+static void put_video(videowall_t *vw, uint8_t *dst_plane, uint8_t *video, int dst_w, int dst_h, int index, matrix_t matrix)
 {
-	int box_w = vw->video_list[index]->w;
-	int box_h = vw->video_list[index]->h;
-	int x,y;
+    const int box_w = vw->video_list[index]->w;
+    const int box_h = vw->video_list[index]->h;
 
-	uint8_t *P = dst_plane + (matrix.h*dst_w);
-	int	offset = matrix.w;
+    uint8_t *dst_ptr = dst_plane + (matrix.h * dst_w) + matrix.w;
+    uint8_t *src_ptr = video;
 
-	for( y = 0; y < box_h; y ++ )
-	{
-		for( x = 0; x < box_w; x ++ )
-		{
-			*(P+offset+x) = video[(y*box_w)+x];
-		}
-		P += dst_w;
-	}
+    for (int y = 0; y < box_h; y++)
+    {
+        memcpy(dst_ptr, src_ptr, box_w);
+        dst_ptr += dst_w;
+        src_ptr += box_w;
+    }
 }
 
 void videoplay_apply( void *ptr, VJFrame *frame, VJFrame *B, int *args)
