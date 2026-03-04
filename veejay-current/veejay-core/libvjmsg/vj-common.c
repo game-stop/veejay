@@ -86,74 +86,74 @@ typedef struct {
 	size_t size;
 } message_ring_t;
 
-/*
-static	vj_msg_hist	_message_history;
-static	int		_message_his_status = 0;
-*/
-
 #ifdef HAVE_LIBUNWIND
-static void addr2line_unw( unw_word_t addr, char*file, size_t len, int *line )
+static void addr2line_unw(unw_word_t addr, char *file, size_t len, int *line_out)
 {
-	static char buf[512];
-	snprintf(buf, sizeof(buf), "addr2line -C -e /usr/local/bin/veejay -f -i %lx", addr );
-	FILE *fd = popen( buf, "r" );
-	if( fd == NULL ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "failed: %s", buf );
-		return;
-	}
+    char buf[512];
+    snprintf(buf, sizeof(buf), "addr2line -C -e /proc/self/exe -f -i %p", (void *)addr);
 
-	fgets( buf, sizeof(buf), fd );
-	fgets( buf, sizeof(buf), fd );
+    FILE *fd = popen(buf, "r");
+    if (!fd) return;
 
-	if( buf[0] != '?' ) {
-		int line = -1;
-		char *p = buf;
+    char temp[512];
+    if (fgets(temp, sizeof(temp), fd) != NULL) {
+        if (fgets(temp, sizeof(temp), fd) != NULL) {
+            if (temp[0] != '?') {
+                char *p = strchr(temp, ':');
+                if (p) {
+                    *p = '\0';
+                    strncpy(file, temp, len - 1);
+                    file[len - 1] = '\0';
+                    *line_out = atoi(p + 1);
+                    pclose(fd);
+                    return;
+                }
+            }
+        }
+    }
 
-		while( *p != ':' ) {
-			p++;
-		}
-
-		*p++ = 0;
-		strncpy( file, buf, len );
-		sscanf( p, "%d", &line );
-	}
-	else {
-		strcpy( file, "optimized out" );
-		*line = 0;
-	}
-
-	pclose( fd );
+    strncpy(file, "optimized out", len - 1);
+    file[len - 1] = '\0';
+    *line_out = 0;
+    pclose(fd);
 }
 
-void 	veejay_print_backtrace()
+void 	veejay_print_backtrace(void)
 {
-	char name[512];
-	unw_cursor_t cursor; 
-	unw_context_t uc;
-	unw_word_t ip, sp, offp;
-	
-	unw_getcontext( &uc );
-	unw_init_local( &cursor, &uc );
+    unw_cursor_t cursor;
+    unw_context_t uc;
+    unw_word_t ip, offp;
+    char name[512];
+    char file[512];
 
-	while( unw_step( &cursor ) > 0 )
-	{
-		char file[512];
-		int line = 0;
-		veejay_memset(name,0,sizeof(name));
-		veejay_memset(file, 0,sizeof(file));
-		unw_get_proc_name( &cursor, name, sizeof(name), &offp );
-		unw_get_reg( &cursor, UNW_REG_IP, &ip );
-		unw_get_reg( &cursor, UNW_REG_SP, &sp );
+    unw_getcontext(&uc);
+    unw_init_local(&cursor, &uc);
 
-		addr2line_unw( (long) ip, file, sizeof(file), &line );
-		if( line >= 0 )
-			veejay_msg(VEEJAY_MSG_ERROR, "\t at %s (%s:%d)", name, file, line );
-		else
-			veejay_msg(VEEJAY_MSG_ERROR, "\t at %s", name );
-	}
+    veejay_msg(VEEJAY_MSG_ERROR, "Stack Trace:");
+
+    while (unw_step(&cursor) > 0)
+    {
+        int line = -1;
+
+        unw_get_reg(&cursor, UNW_REG_IP, &ip);
+        
+        if (unw_get_proc_name(&cursor, name, sizeof(name), &offp) != 0) {
+            strncpy(name, "<unknown>", sizeof(name));
+        }
+
+        file[0] = '\0';
+
+        addr2line_unw((unw_word_t)(ip - 1), file, sizeof(file), &line);
+
+        if (line > 0) {
+            veejay_msg(VEEJAY_MSG_ERROR, "\t at %s (%s:%d)", name, file, line);
+        } else {
+            veejay_msg(VEEJAY_MSG_ERROR, "\t at %s (offset 0x%lx)", name, (long)offp);
+        }
+    }
 }
 #else
-void	veejay_print_backtrace()
+void	veejay_print_backtrace(void)
 {
 	void *space[100];
 	int i,s;
@@ -174,40 +174,56 @@ void	veejay_print_backtrace()
 }
 #endif
 
+static const char digits[100][2] = {
+        {'0','0'},{'0','1'},{'0','2'},{'0','3'},{'0','4'},{'0','5'},{'0','6'},{'0','7'},{'0','8'},{'0','9'},
+        {'1','0'},{'1','1'},{'1','2'},{'1','3'},{'1','4'},{'1','5'},{'1','6'},{'1','7'},{'1','8'},{'1','9'},
+        {'2','0'},{'2','1'},{'2','2'},{'2','3'},{'2','4'},{'2','5'},{'2','6'},{'2','7'},{'2','8'},{'2','9'},
+        {'3','0'},{'3','1'},{'3','2'},{'3','3'},{'3','4'},{'3','5'},{'3','6'},{'3','7'},{'3','8'},{'3','9'},
+        {'4','0'},{'4','1'},{'4','2'},{'4','3'},{'4','4'},{'4','5'},{'4','6'},{'4','7'},{'4','8'},{'4','9'},
+        {'5','0'},{'5','1'},{'5','2'},{'5','3'},{'5','4'},{'5','5'},{'5','6'},{'5','7'},{'5','8'},{'5','9'},
+        {'6','0'},{'6','1'},{'6','2'},{'6','3'},{'6','4'},{'6','5'},{'6','6'},{'6','7'},{'6','8'},{'6','9'},
+        {'7','0'},{'7','1'},{'7','2'},{'7','3'},{'7','4'},{'7','5'},{'7','6'},{'7','7'},{'7','8'},{'7','9'},
+        {'8','0'},{'8','1'},{'8','2'},{'8','3'},{'8','4'},{'8','5'},{'8','6'},{'8','7'},{'8','8'},{'8','9'},
+        {'9','0'},{'9','1'},{'9','2'},{'9','3'},{'9','4'},{'9','5'},{'9','6'},{'9','7'},{'9','8'},{'9','9'}
+    };
 
 static inline void veejay_msg_timestamp(char *out)
 {
     struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
 
-    time_t sec = ts.tv_sec;
     struct tm tm;
-    localtime_r(&sec, &tm);
+    localtime_r(&ts.tv_sec, &tm);
 
-    int ms = ts.tv_nsec / 1000000;
+    out[0] = digits[tm.tm_hour][0];
+    out[1] = digits[tm.tm_hour][1];
+    out[2] = ':';
+    out[3] = digits[tm.tm_min][0];
+    out[4] = digits[tm.tm_min][1];
+    out[5] = ':';
+    out[6] = digits[tm.tm_sec][0];
+    out[7] = digits[tm.tm_sec][1];
+    out[8] = '.';
 
-    // Format: HH:MM:SS.mmm
-    out[0]  = '0' + (tm.tm_hour / 10);
-    out[1]  = '0' + (tm.tm_hour % 10);
-    out[2]  = ':';
-    out[3]  = '0' + (tm.tm_min / 10);
-    out[4]  = '0' + (tm.tm_min % 10);
-    out[5]  = ':';
-    out[6]  = '0' + (tm.tm_sec / 10);
-    out[7]  = '0' + (tm.tm_sec % 10);
-    out[8]  = '.';
-    out[9]  = '0' + (ms / 100);
-    out[10] = '0' + ((ms / 10) % 10);
-    out[11] = '0' + (ms % 10);
-    out[12] = '\0';
+    long ns = ts.tv_nsec;
+    out[ 9] = '0' + (ns / 100000000); ns %= 100000000;
+    out[10] = '0' + (ns / 10000000);  ns %= 10000000;
+    out[11] = '0' + (ns / 1000000);   ns %= 1000000;
+    out[12] = '0' + (ns / 100000);    ns %= 100000;
+    out[13] = '0' + (ns / 10000);     ns %= 10000;
+    out[14] = '0' + (ns / 1000);      ns %= 1000;
+    out[15] = '0' + (ns / 100);       ns %= 100;
+    out[16] = '0' + (ns / 10);        ns %= 10;
+    out[17] = '0' + ns;
+    out[18] = '\0';
 }
 
-int	veejay_get_debug_level()
+int	veejay_get_debug_level(void)
 {
 	return _debug_level;
 }
 
-int	veejay_is_timestamped()
+int	veejay_is_timestamped(void)
 {
 	return _timestamp;
 }
@@ -236,17 +252,17 @@ void veejay_set_colors(int l)
 	else _color_level = 0;
 }
 
-int	veejay_is_colored()
+int	veejay_is_colored(void)
 {
 	return _color_level;
 }
 
-void veejay_silent()
+void veejay_silent(void)
 {
 	_no_msg = 1;
 }
 
-int veejay_is_silent()
+int veejay_is_silent(void)
 {
 	if(_no_msg) return 1;          
 	return 0;
@@ -255,7 +271,7 @@ int veejay_is_silent()
 #define MESSAGE_RING_SIZE 5000
 static message_ring_t *msg_ring = NULL;
 static int msg_ring_enabled = 0;
-void	veejay_init_msg_ring()
+void	veejay_init_msg_ring(void)
 {
 	msg_ring = vj_calloc( sizeof(message_ring_t));
 	msg_ring->dommel = vj_calloc( sizeof(char*) * MESSAGE_RING_SIZE );
@@ -266,7 +282,7 @@ void	veejay_init_msg_ring()
 	sem_init( msg_ring->semaphore, 0, 0 );
 }
 
-void	veejay_destroy_msg_ring()
+void	veejay_destroy_msg_ring(void)
 {
 	if(msg_ring) {
 		int i;
@@ -285,31 +301,17 @@ void	veejay_destroy_msg_ring()
 	}
 }
 
-static void veejay_msg_ringbuffer(char *line)
-{
-    if (!msg_ring || !line) return;
-
-    uint64_t current_pos = __sync_fetch_and_add(&msg_ring->write_pos, 1) % MESSAGE_RING_SIZE;
-
-    if (__sync_bool_compare_and_swap(&(msg_ring->dommel[current_pos]), NULL, line)) {
-        sem_post(msg_ring->semaphore);
-    } else {
-		// buffer full
-        free(line); 
-    }
-}
-
-int	veejay_log_to_ringbuffer()
+int	veejay_log_to_ringbuffer(void)
 {
 	return ( msg_ring == NULL ? 0 : msg_ring_enabled );
 }
 
-void	veejay_toggle_osl()
+void	veejay_toggle_osl(void)
 {
 	msg_ring_enabled = (msg_ring_enabled == 0 ? 1: 0);
 }
 
-char *veejay_msg_ringfetch()
+char *veejay_msg_ringfetch(void)
 {
     if (!msg_ring) return NULL;
 
@@ -334,94 +336,77 @@ void veejay_msg_prnt(FILE *out, const char *buffer, size_t size)
 {
     if(out) write(fileno(out), buffer, size);
 }
-// Updated veejay_msg function with log level before timestamp
+
+
+void veejay_print_banner(void) {
+    const char* banner =
+    "                                  ██                        \n"
+    "                                  ██                        \n"
+    "                                  ██                        \n"
+    "                                                            \n"
+    " ██▒  ▒██   ░████▒    ░████▒    ████      ▒████▓   ██▓  ▓██ \n"
+    " ▓██  ██▓  ░██████▒  ░██████▒   ████      ██████▓  ▒██  ██▓ \n"
+    " ▒██  ██▒  ██▒  ▒██  ██▒  ▒██     ██      █▒  ▒██   ██▒ ██░ \n"
+    "  ██░░██   ████████  ████████     ██       ▒█████   ███▒██  \n"
+    "  ██▒▒██   ████████  ████████     ██     ░███████   ░██▓█▓  \n"
+    "  ▒████▒   ██        ██           ██     ██▓░  ██    ████░  \n"
+    "   ████    ███░  ▒█  ███░  ▒█     ██     ██▒  ███    ▒███   \n"
+    "   ████    ░███████  ░███████     ██     ████████     ██▓   \n"
+    "   ▒██▒     ░█████▒   ░█████▒     ██      ▓███░██     ██░   \n"
+    "                                 ▒██                 ▒██    \n"
+    "                               █████                ███▒    \n"
+    "                               ████░                ███     \n\n";
+
+    if (_color_level) {
+        printf("%s%s%s%s", TXT_GRE, banner,PACKAGE_VERSION, TXT_END);
+    } else {
+        printf("%s%s", banner, PACKAGE_VERSION) ;
+    }
+}
+
+
 void veejay_msg(int type, const char format[], ...)
 {
-    if (type != VEEJAY_MSG_ERROR && _no_msg)
+    if ((type != VEEJAY_MSG_ERROR && _no_msg) || (!_debug_level && type == VEEJAY_MSG_DEBUG))
         return;
+    static const char *labels[] = { "E: ", "W: ", "I: ", "", "D: " };
+    static const char *colors[] = { TXT_RED, TXT_YEL, TXT_GRE, "", TXT_BLU };
 
-    if (!_debug_level && type == VEEJAY_MSG_DEBUG)
-        return;
+    int idx = (type >= 0 && type <= 4) ? type : 2;
+    int is_continuation = (type == 3);
 
     char buf[1024];
     va_list args;
-    int line = 0;
-    FILE *out = (_no_msg ? stderr : stdout);
-
     va_start(args, format);
-    vsnprintf(buf, sizeof(buf) - 1, format, args);
+    vsnprintf(buf, sizeof(buf), format, args);
     va_end(args);
 
-    char temp_buffer[2048];
-    size_t temp_size = 0;
+    char out_buf[2048];
+    char *p = out_buf;
+    char *end = out_buf + sizeof(out_buf);
 
-    // --- log level prefix first ---
+    if (_color_level && !is_continuation)
+        p += snprintf(p, end - p, "%s", colors[idx]);
+
+    if (!is_continuation)
+        p += snprintf(p, end - p, "%s", labels[idx]);
+
+    if (_timestamp && !is_continuation) {
+        char time_buf[19];
+        veejay_msg_timestamp(time_buf);
+        p += snprintf(p, end - p, "[%s] ", time_buf);
+    }
+
+    p += snprintf(p, end - p, "%s", buf);
+
     if (_color_level)
-    {
-        switch (type)
-        {
-        case 2: // info
-            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%sI: %s", TXT_GRE, TXT_END);
-            break;
-        case 1: // warning
-            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%sW: %s", TXT_YEL, TXT_END);
-            break;
-        case 0: // error
-            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%sE: %s", TXT_RED, TXT_END);
-            break;
-        case 3:
-            line = 1;
-            break;
-        case 4: // debug
-            temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%sD: %s", TXT_BLU, TXT_END);
-            break;
-        }
-    }
-    else
-    {
-        switch (type)
-        {
-        case 2: temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "I: "); break;
-        case 1: temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "W: "); break;
-        case 0: temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "E: "); break;
-        case 3: line = 1; break;
-        case 4: temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "D: "); break;
-        }
-    }
+        p += snprintf(p, end - p, "%s", TXT_END);
 
-	if(_timestamp) {
-		char time_buf[13];
-		veejay_msg_timestamp(time_buf);
+    if (!is_continuation)
+        p += snprintf(p, end - p, "\n");
 
-		temp_size += snprintf(
-			temp_buffer + temp_size,
-			sizeof(temp_buffer) - temp_size,
-			"[%s] ",
-			time_buf
-		);
-	}
-
-    // --- finally the message ---
-    if (_color_level && !line)
-    {
-        temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%s%s\n", buf, TXT_END);
-    }
-    else if (_color_level && line)
-    {
-        temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%s%s%s", buf, TXT_GRE, TXT_END);
-    }
-    else if (!line)
-    {
-        temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%s\n", buf);
-    }
-    else
-    {
-        temp_size += snprintf(temp_buffer + temp_size, sizeof(temp_buffer) - temp_size, "%s", buf);
-    }
-
-    veejay_msg_prnt(out, temp_buffer, temp_size);
+    veejay_msg_prnt(_no_msg ? stderr : stdout, out_buf, (size_t)(p - out_buf));
 }
-
 
 int	veejay_get_file_ext( char *file, char *dst, int dlen)
 {
