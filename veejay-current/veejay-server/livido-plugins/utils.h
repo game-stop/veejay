@@ -277,6 +277,13 @@ static	int	lvd_extract_channel_values( livido_port_t *instance,
 }
 
 
-#define CLAMP( v, min, max ) ( v < min ? min :  (v > max ? max :v ))
+static inline int CLAMP(int v, int min, int max)
+{
+    int t = v - min;
+    t &= ~(t >> 31);
+    int u = t - (max - min);
+    u &= (u >> 31);
+    return u + min;
+}
 
 #endif
