@@ -82,7 +82,7 @@ void mirror_free(void *ptr) {
     }
 }
 
-void mirror_apply(void *ptr, VJFrame *frame, int *args) {
+void mirror_apply(void *ptr, VJFrame *frame, int *args) { //FIXME
 
     mirror_t *m = (mirror_t*) ptr;
 
