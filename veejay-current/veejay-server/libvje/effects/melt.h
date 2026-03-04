@@ -21,7 +21,7 @@
 #ifndef MELT_H
 #define MELT_H
 vj_effect *melt_init(int w, int h);
-void melt_apply(void *ptr, VJFrame *frame, VJFrame *frame2,int *args);
+void melt_apply(void *ptr, VJFrame *frame, int *args);
 void *melt_malloc(int w, int h);
 void melt_free(void *ptr);
 #endif
