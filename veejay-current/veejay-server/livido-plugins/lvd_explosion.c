@@ -50,12 +50,10 @@ typedef struct
 
 void init_particle(PARTICLE* particle, int w, int h)
 {
-  /* randomly init particles, generate them in the center of the screen */
-
   particle->xpos =  (w >> 1) - 20 + (int)(40.0 * (rand()/(RAND_MAX+1.0)));
   particle->ypos =  (h >> 1) - 20 + (int)(40.0 * (rand()/(RAND_MAX+1.0)));
-  particle->xdir =   -10 + (int)(20.0 * (rand()/(RAND_MAX+1.0)));
-  particle->ydir =   -17 + (int)(19.0 * (rand()/(RAND_MAX+1.0)));
+  particle->xdir = -(w / 20) + (int)((w / 10.0) * (rand()/(RAND_MAX+1.0)));
+  particle->ydir = -(h / 20) + (int)((h / 10.0) * (rand()/(RAND_MAX+1.0)));
   particle->colorindex = 255;
   particle->dead = 0;
 }
