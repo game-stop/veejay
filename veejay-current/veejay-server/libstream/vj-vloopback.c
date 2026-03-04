@@ -385,10 +385,12 @@ int	vj_vloopback_write( void *vloop  )
 	return 1;
 }
 
-int	vj_vloopback_fill_buffer( void *vloop, uint8_t **data )
+int	vj_vloopback_fill_buffer( void *vloop, VJFrame *src )
 {
 	vj_vloopback_t *v = (vj_vloopback_t*) vloop;
 	if(!v) return 0;
+
+	uint8_t **data = src->data;
 
 	uint8_t *planes[4];
 
@@ -413,7 +415,7 @@ int	vj_vloopback_fill_buffer( void *vloop, uint8_t **data )
 		v->src1->data[2] = planes[2];
 		v->src1->data[3] = planes[3];
 
-		yuv_convert_and_scale( v->scaler, v->src1, v->dst1 );
+		yuv_convert_and_scale( v->scaler, src, v->dst1 );
 	}
 	else
 	{
