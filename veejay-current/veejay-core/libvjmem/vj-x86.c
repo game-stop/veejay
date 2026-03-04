@@ -36,16 +36,16 @@ extern void init_parallel_tasks(int n_tasks);
 
 static int CACHE_LINE_SIZE = 64;
 
-#if defined(HAVE_ASM_SSE) || defined(HAVE_ASM_SSE2) || defined(__SSE4_2__) || defined(__SSE4_1__)
-#define MEM_ALIGNMENT_SIZE 16
-#elif defined (HAVE_ASM_AVX2)
+#if defined(HAVE_ASM_AVX2)
 #define MEM_ALIGNMENT_SIZE 64
-#elif defined (HAVE_ASM_AVX)
+#elif defined(HAVE_ASM_AVX)
 #define MEM_ALIGNMENT_SIZE 32
-#elif defined (__ARM_ARCH_7A__)
-#define MEM_ALIGNMENT_SIZE 8
-#elif defined (__ARM_ARCH_8A__ )
+#elif defined(HAVE_ASM_SSE) || defined(HAVE_ASM_SSE2) || defined(__SSE4_2__) || defined(__SSE4_1__)
 #define MEM_ALIGNMENT_SIZE 16
+#elif defined(__ARM_ARCH_8A__)
+#define MEM_ALIGNMENT_SIZE 16
+#elif defined(__ARM_ARCH_7A__)
+#define MEM_ALIGNMENT_SIZE 8
 #else
 #define MEM_ALIGNMENT_SIZE 8
 #endif
@@ -149,7 +149,7 @@ static int	get_cache_line_size(void)
 }
 #endif
 
-int	cpu_cache_size(void)
+int	cpu_get_cacheline_size(void)
 {
 	return CACHE_LINE_SIZE;
 }
@@ -161,23 +161,31 @@ int	mem_align_size(void)
 
 void vj_mem_init(int w, int h)
 {
-#if defined(ARCH_X86) || defined(ARCH_X86_X64) || defined(HAVE_ARM) 
-	CACHE_LINE_SIZE = get_cache_line_size();
+#if defined(ARCH_X86) || defined(ARCH_X86_64) || defined(HAVE_ARM)
+    int detected_size = get_cache_line_size();
+
+    if (detected_size > 0) {
+        CACHE_LINE_SIZE = detected_size;
+    } else {
+        // Fallback to 64, which is standard for almost all modern x86_64
+        CACHE_LINE_SIZE = 64;
+        veejay_msg(VEEJAY_MSG_DEBUG, "CPU Cache line detection failed, defaulting to 64");
+    }
 #endif
 
-	
+
 #if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE)
 	yuyv_plane_init();
 #endif
-	//find_best_memcpy();
+	//find_best_memcpy();	
 	//find_best_memset();
 	vj_mem_set_defaults(w,h);
 }
 
 void vj_mem_optimize(void) {
 #ifndef STRICT_CHECKING
-	find_best_memcpy();
-	find_best_memset();
+	//find_best_memcpy();
+	//find_best_memset();
 #endif
 }
 
