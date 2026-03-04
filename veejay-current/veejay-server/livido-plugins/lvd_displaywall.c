@@ -24,184 +24,184 @@ LIVIDO_PLUGIN
 
 typedef struct 
 {
-	int *vecx;
-	int *vecy;
-	int scale;
-	int dx, dy;
-	int bx, by;
-	int speed;
-	int speedi;
-	int cx, cy;	
+    int *vecx;
+    int *vecy;
+    int scale;
+    int dx, dy;
+    int bx, by;
+    int speed;
+    int speedi;
+    int cx, cy;	
 } displaywall_t;
 
 static void displaywall_initVec(displaywall_t *wall, int w, int h)
 {
-	int x, y, i;
-	double vx, vy;
+    for(int y = 0; y < h; y++) {
+        int row = y * w;
 
-	i = 0;
-	for(y=0; y < h; y++) {
+        double fy = (double)(y - wall->cy) / w;
+        fy *= 1.0 - fy * fy * 0.8;
+        fy *= 1.0 - (double)y / h * 0.15;
+
 #pragma omp simd
-		for(x=0; x < w; x++) {
-			vx = (double)(x - wall->cx) / w;
-			vy = (double)(y - wall->cy) / w;
+        for(int x = 0; x < w; x++) {
+            int i = row + x;
 
-			vx *= 1.0 - vx * vx * 0.4;
-			vy *= 1.0 - vx * vx * 0.8;
-			vx *= 1.0 - (double)y / h * 0.15;
-			wall->vecx[i] = vx * w;
-			wall->vecy[i] = vy * w;
+            double fx = (double)(x - wall->cx) / w;
+            fx *= 1.0 - fx * fx * 0.4;
 
-			i++;
-		}
-	}
+            wall->vecx[i] = (int)(fx * w);
+            wall->vecy[i] = (int)(fy * w);
+        }
+    }
 }
 
-static void displaywall_tick( displaywall_t *wall, int video_width, int video_height )
+static inline int wrap_mod(int v, int max)
 {
-	wall->speed += wall->speedi;
-	if(wall->speed < 0) wall->speed = 0;
-
-	wall->bx += wall->dx * wall->speed;
-	wall->by += wall->dy * wall->speed;
-	while(wall->bx < 0) wall->bx += video_width;
-	while(wall->bx >= video_width) wall->bx -= video_width;
-	while(wall->by < 0) wall->by += video_height;
-	while(wall->by >= video_height) wall->by -= video_height;
-
-	if(wall->scale == 1) {
-		wall->bx = wall->cx;
-		wall->by = wall->cy;
-	}
+    int r = v % max; // or replace by LUT
+    return r + ((r >> 31) & max);
 }
 
-static int displaywall_draw(displaywall_t *wall, uint8_t *src, uint8_t *dst, int video_width, int video_height)
+static void displaywall_tick(displaywall_t *wall, int w, int h)
 {
-	int x, y, i;
-	int px, py;
+    wall->speed += wall->speedi;
+    if (wall->speed < 0) wall->speed = 0;
 
-	i = 0;
-	for(y=0; y<video_height; y++) {
-		for(x=0; x<video_width; x++) {
-			px = wall->bx + wall->vecx[i] * wall->scale;
-			py = wall->by + wall->vecy[i] * wall->scale;
-			while(px < 0) px += video_width;
-			while(px >= video_width) px -= video_width;
-			while(py < 0) py += video_height;
-			while(py >= video_height) py -= video_height;
+    wall->bx += wall->dx * wall->speed;
+    wall->by += wall->dy * wall->speed;
 
-			dst[i++] = src[py * video_width + px];
-		}
-	}
+    wall->bx = wrap_mod(wall->bx, w);
+    wall->by = wrap_mod(wall->by, h);
 
-	return 0;
+    if (wall->scale == 1) {
+        wall->bx = wall->cx;
+        wall->by = wall->cy;
+    }
 }
 
-int	init_instance( livido_port_t *my_instance )
+static int displaywall_draw(
+    displaywall_t *wall,
+    uint8_t *restrict src,
+    uint8_t *restrict dst,
+    int w,
+    int h)
 {
-	int w = 0, h = 0;
-        lvd_extract_dimensions( my_instance, "out_channels", &w, &h );
+    const int bx = wall->bx;
+    const int by = wall->by;
+    const int scale = wall->scale;
 
-	int video_area = w * h * 3;
+    int area = w * h;
 
-	displaywall_t *entry = (displaywall_t*) livido_malloc(sizeof(displaywall_t));
-	if(entry == NULL) {
+    for(int i = 0; i < area; i++) {
+
+        int px = bx + wall->vecx[i] * scale;
+        int py = by + wall->vecy[i] * scale;
+
+        px = wrap_mod(px, w);
+        py = wrap_mod(py, h);
+
+        dst[i] = src[py * w + px];
+    }
+
+    return 0;
+}
+
+int init_instance(livido_port_t *my_instance)
+{
+    int w = 0, h = 0;
+    lvd_extract_dimensions(my_instance, "out_channels", &w, &h);
+
+    int video_area = w * h;
+
+    displaywall_t *entry = livido_malloc(sizeof(displaywall_t));
+    if (!entry)
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+
+    livido_memset(entry, 0, sizeof(displaywall_t));
+
+    entry->vecx = livido_malloc(sizeof(int) * video_area);
+    entry->vecy = livido_malloc(sizeof(int) * video_area);
+
+    if (!entry->vecx || !entry->vecy) {
+        if (entry->vecx) free(entry->vecx);
+        if (entry->vecy) free(entry->vecy);
+        free(entry);
         return LIVIDO_ERROR_MEMORY_ALLOCATION;
     }
 
-    livido_memset( entry, 0, sizeof(displaywall_t));
+    entry->scale = 3;
+    entry->speed = 10;
+    entry->cx = w >> 1;
+    entry->cy = h >> 1;
 
-	entry->vecx = (int *)livido_malloc(sizeof(int) * video_area);
-	entry->vecy = (int *)livido_malloc(sizeof(int) * video_area);
-	
-    if(entry->vecx == NULL || entry->vecy == NULL) {
-        if(entry->vecx) free(entry->vecx);
-        if(entry->vecy) free(entry->vecy);
-		free(entry);
-		return LIVIDO_ERROR_MEMORY_ALLOCATION;
-	}
+    displaywall_initVec(entry, w, h);
 
-	entry->scale = 3;
-	entry->dx = 0;
-	entry->dy = 0;
-	entry->speed = 10;
-	entry->cx = w / 2;
-	entry->cy = h / 2;
+    livido_property_set(my_instance, "PLUGIN_private",
+                        LIVIDO_ATOM_TYPE_VOIDPTR, 1, &entry);
 
-	displaywall_initVec(entry, w, h);
-
-	livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR,1, &entry);
-
-	return LIVIDO_NO_ERROR;
+    return LIVIDO_NO_ERROR;
 }
 
-
-int	deinit_instance( livido_port_t *my_instance )
+livido_deinit_f deinit_instance(livido_port_t *my_instance)
 {
-	displaywall_t *wall = NULL;
-	livido_property_get( my_instance, "PLUGIN_private", 0, &wall );
+    displaywall_t *wall = NULL;
+    livido_property_get(my_instance, "PLUGIN_private", 0, &wall);
 
-	if( wall ) {
-		if( wall->vecx ) free(wall->vecx);
-		if( wall->vecy ) free(wall->vecy);
-		free(wall);
-	}		
+    if (wall) {
+        free(wall->vecx);
+        free(wall->vecy);
+        free(wall);
+    }
 
-	return LIVIDO_NO_ERROR;
+    return LIVIDO_NO_ERROR;
 }
 
-
-int		process_instance( livido_port_t *my_instance, double timecode )
+static inline int wrap_fast(int v, int max)
 {
-	uint8_t *A[4] = {NULL,NULL,NULL,NULL};
-	uint8_t *O[4]= {NULL,NULL,NULL,NULL};
+    if (v >= max) return v - max;
+    if (v < 0)    return v + max;
+    return v;
+}
 
-	int palette;
-	int w;
-	int h;
-	
-	int error	  = lvd_extract_channel_values( my_instance, "out_channels", 0, &w,&h, O,&palette );
-	if( error != LIVIDO_NO_ERROR )
-		return LIVIDO_ERROR_NO_OUTPUT_CHANNELS;
+int process_instance(livido_port_t *my_instance, double timecode)
+{
+    uint8_t *A[4] = {0};
+    uint8_t *O[4] = {0};
 
-    error = lvd_extract_channel_values( my_instance, "in_channels" , 0, &w, &h, A, &palette );
-	if( error != LIVIDO_NO_ERROR )
-		return LIVIDO_ERROR_NO_INPUT_CHANNELS;
+    int palette, w, h;
 
-	int		scale =  lvd_extract_param_index( my_instance,"in_parameters", 0 );
-	int		mode  =  lvd_extract_param_index( my_instance,"in_parameters", 1 );
-	int		shift = 1;
+    if (lvd_extract_channel_values(my_instance, "out_channels", 0,
+                                   &w, &h, O, &palette)
+        != LIVIDO_NO_ERROR)
+        return LIVIDO_ERROR_NO_OUTPUT_CHANNELS;
 
-	if( palette == LIVIDO_PALETTE_YUV444P )
-	    shift = 0;
+    if (lvd_extract_channel_values(my_instance, "in_channels", 0,
+                                   &w, &h, A, &palette)
+        != LIVIDO_NO_ERROR)
+        return LIVIDO_ERROR_NO_INPUT_CHANNELS;
 
-	displaywall_t *wall = NULL;
-	livido_property_get( my_instance, "PLUGIN_private", 0, &wall );
+    int scale = lvd_extract_param_index(my_instance,"in_parameters",0);
+    int mode  = lvd_extract_param_index(my_instance,"in_parameters",1);
 
-	switch( mode ) {
-		case 0:
-			wall->dx = 0; wall->dy = 1; 
-			break;
-		case 1:
-			wall->dy = 1; wall->dx = 0;
-			break;
-		case 2:
-			wall->dy = -1; wall->dx = 0;		
-			break;
-		case 3:
-			wall->dy = 0; wall->dx = -1;
-			break;
-	}
+    int shift = (palette != LIVIDO_PALETTE_YUV444P);
 
-	wall->scale = scale;
+    displaywall_t *wall = NULL;
+    livido_property_get(my_instance, "PLUGIN_private", 0, &wall);
 
-	displaywall_tick( wall, w, h );
+    static const int dx_table[4] = { 0,  0,  0, -1 };
+    static const int dy_table[4] = { 1,  1, -1,  0 };
 
-	displaywall_draw( wall, A[0], O[0], w, h);
-	displaywall_draw( wall, A[1], O[1], w >> shift, h );
-	displaywall_draw( wall, A[2], O[2], w >> shift, h );
+    wall->dx = dx_table[mode & 3];
+    wall->dy = dy_table[mode & 3];
+    wall->scale = scale;
 
-	return LIVIDO_NO_ERROR;
+    displaywall_tick(wall, w, h);
+
+    displaywall_draw(wall, A[0], O[0], w, h);
+    displaywall_draw(wall, A[1], O[1], w >> shift, h);
+    displaywall_draw(wall, A[2], O[2], w >> shift, h);
+
+    return LIVIDO_NO_ERROR;
 }
 
 livido_port_t	*livido_setup(livido_setup_t list[], int version)
