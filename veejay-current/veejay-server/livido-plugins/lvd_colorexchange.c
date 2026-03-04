@@ -79,26 +79,26 @@ int	process_instance( livido_port_t *my_instance, double timecode )
 
 	int i;
 
-	if( black_incl ) {
-		for( i = 0; i < len; i ++ )
-		{
-			o0[i] = CLAMP( ch0[i] + dy - sy,minY,maxY );
-			o1[i] = CLAMP( ch1[i] + du - su,minUV,maxUV );
-			o2[i] = CLAMP( ch2[i] + dv - sv,minUV,maxUV );
-		}
-	}
-	else {
-		for( i = 0; i < len; i ++ )
-		{
-			if(ch0[i] != 0 ) {
-				o0[i] = CLAMP( ch0[i] + dy - sy,minY,maxY );
-				o1[i] = CLAMP( ch1[i] + du - su,minUV,maxUV );
-				o2[i] = CLAMP( ch2[i] + dv - sv,minUV,maxUV );
-			}
-		}
+	int delta_y = dy - sy;
+    int delta_u = du - su;
+    int delta_v = dv - sv;
 
-	}	
-
+    if (black_incl) {
+        #pragma omp simd
+        for(int i = 0; i < len; i++) {
+            o0[i] = CLAMP(ch0[i] + delta_y, minY, maxY);
+            o1[i] = CLAMP(ch1[i] + delta_u, minUV, maxUV);
+            o2[i] = CLAMP(ch2[i] + delta_v, minUV, maxUV);
+        }
+    } else {
+        #pragma omp simd
+        for(int i = 0; i < len; i++) {
+            int mask = -(ch0[i] != 0); // 0xFFFFFFFF if ch0!=0, else 0
+            o0[i] = (CLAMP(ch0[i] + delta_y, minY, maxY) & mask) | (o0[i] & ~mask);
+            o1[i] = (CLAMP(ch1[i] + delta_u, minUV, maxUV) & mask) | (o1[i] & ~mask);
+            o2[i] = (CLAMP(ch2[i] + delta_v, minUV, maxUV) & mask) | (o2[i] & ~mask);
+        }
+    }
 
 	return LIVIDO_NO_ERROR;
 }
