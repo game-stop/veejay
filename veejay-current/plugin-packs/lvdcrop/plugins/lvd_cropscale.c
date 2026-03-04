@@ -79,63 +79,24 @@ livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 	return LIVIDO_NO_ERROR;
 }
 
-static int	lvd_zcrop_plane( uint8_t *D, uint8_t *S, int left, int right, int top, int bottom, int w, int h, uint8_t B )
+static int lvd_crop_plane(uint8_t *restrict D, uint8_t *restrict S, int left, int right, int top, int bottom, int w, int h)
 {
-	int x,y;
-	uint8_t *src = S;
-	uint8_t *dst = D;
-	
-	for( y = 0; y < top; y ++ ) {
-		livido_memset( dst, B, w );
-		dst += w;
-		src += w;
-	}
+    const int dst_width = w - left - right;
+    const int dst_height = h - top - bottom;
 
-	for( y = top; y < bottom; y ++ ) {
-		for( x = 0; x < left; x ++ ) {
-			*(dst++) = B;
-		}
+    if (dst_width <= 0 || dst_height <= 0)
+        return 0;
 
-		src += left;
+    const uint8_t *src_ptr = S + (top * w) + left;
+    uint8_t *dst_ptr = D;
 
-		for( x = left; x < right; x++ ) {
-			*(dst++) = *(src++);
-		}
+    for (int y = 0; y < dst_height; y++) {
+        livido_memcpy(dst_ptr, src_ptr, dst_width);
+        dst_ptr += dst_width;
+        src_ptr += w;
+    }
 
-		for( x = right; x < w; x ++ ) {
-			*(dst++) = B;
-			src += 1;
-		}
-	}
-
-	for( y = bottom; y < h; y ++ ) {
-		livido_memset( dst,B, w );
-		dst += w;
-		src += w;
-	}
-
-	return 1;
-}
-
-
-static int	lvd_crop_plane( uint8_t *D, uint8_t *S, int left, int right, int top, int bottom, int w, int h )
-{
-	int dst_width = ( w - left - right);
-	int	y		   = h - top - bottom + 1;
-
-	if( dst_width < 1 || y < 1)
-		return 0;
-
-	uint8_t *src = S;
-	uint8_t *dst = D;
-
-	while( --y ) {
-		livido_memcpy( dst, src, dst_width);
-		dst += dst_width;
-		src += w;
-	}
-
-	return 1;
+    return 1;
 }
 
 int		process_instance( livido_port_t *my_instance, double timecode )
@@ -165,7 +126,6 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 	int	right = lvd_extract_param_index( my_instance,"in_parameters", 1 );
 	int	top = lvd_extract_param_index( my_instance, "in_parameters", 2 );
 	int	bottom = lvd_extract_param_index( my_instance, "in_parameters", 3);
-	int scale = lvd_extract_param_index( my_instance, "in_parameters", 4);
 
 	int tmp_w = ( w - left - right);
 	int tmp_h = h - top - bottom;
