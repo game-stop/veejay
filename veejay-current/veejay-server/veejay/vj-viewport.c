@@ -1224,7 +1224,7 @@ void	*viewport_get_configuration(void *vv, char *filename )
 	} 
 
 	viewport_t *v = (viewport_t*) vv;
-	viewport_config_t *o = (viewport_config_t*) vj_calloc(sizeof(viewport_config_t)); //FIXME not always freed?
+	viewport_config_t *o = (viewport_config_t*) vj_calloc(sizeof(viewport_config_t));
 	o->saved_w = v->saved_w;
 	o->saved_h = v->saved_h;
 	o->reverse = v->user_reverse;
@@ -1290,8 +1290,6 @@ int	viewport_reconfigure_from_config(void *vv, void *config, char *filename)
 						o->reverse,
 						o->grid_color,
 						o->grid_resolution );
-
-
 	}
 
 	if(!res) {	
@@ -1640,7 +1638,7 @@ static	viewport_config_t 	*viewport_load_settings( char *path )
 	free(buf);
 	veejay_msg(VEEJAY_MSG_INFO, "Projection mapping configuration [%s]", path);
 	veejay_msg(VEEJAY_MSG_INFO, "\tBehaviour:\t%s", (vc->reverse ? "Forward" : "Projection") );
-	veejay_msg(VEEJAY_MSG_INFO, "\tPoints     :\t(1) %fx%f (2) %fx%f", vc->x1,vc->y1,vc->x2,vc->y2);
+	veejay_msg(VEEJAY_MSG_INFO, "\tPoints   :\t(1) %fx%f (2) %fx%f", vc->x1,vc->y1,vc->x2,vc->y2);
 	veejay_msg(VEEJAY_MSG_INFO, "\t         :\t(3) %fx%f (4) %fx%f", vc->x2,vc->y2,vc->x3,vc->y3);
 	veejay_msg(VEEJAY_MSG_INFO, "\tPencil   :\t%s", (vc->grid_color == 0xff ? "white" : "black" ) );
 	veejay_msg(VEEJAY_MSG_INFO, "\tEnabled  :\t%s",
