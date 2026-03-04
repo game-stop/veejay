@@ -845,7 +845,7 @@ livido_port_t   *livido_setup(livido_setup_t list[], int version)
 
     //@ meta information
     livido_set_string_value( port, "name", "AsciiArt"); 
-    livido_set_string_value( port, "description", "AsciiAart with AAlib");
+    livido_set_string_value( port, "description", "AsciiArt with AAlib");
     livido_set_string_value( port, "author", "Alexander Tumin"); 
         
     livido_set_int_value( port, "flags", 0);
