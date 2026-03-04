@@ -934,7 +934,7 @@ int vj_osc_setup_addr_space(void *d) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot get address space of OSC");
 		return -1;
 	}
-	veejay_msg(VEEJAY_MSG_DEBUG, "Address of top level container [%s]",addr);
+
 	return 0;
 }
 
