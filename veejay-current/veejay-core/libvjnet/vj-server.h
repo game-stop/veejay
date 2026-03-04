@@ -84,8 +84,6 @@ int	vj_server_link_can_write( vj_server *vje, int link_id );
 
 int	vj_server_link_can_read( vj_server *vje, int link_id);
 
-void	vj_server_geo_stats();
-
 char   *vj_server_my_ip();
 
 #endif
