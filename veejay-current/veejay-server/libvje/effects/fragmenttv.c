@@ -66,12 +66,14 @@ vj_effect *fragmenttv_init(int w, int h)
 #define SIN_LUT_SCALE 1024 
 
 typedef struct {
-    uint8_t *buf[3];
-    int *randbuf;
+    uint8_t *buf[3];      // big buffers first
+    int *randbuf;          // large random table
     int count;
-    int16_t *sin_lut;
+
+    int16_t *sin_lut;      // LUTs at the end
     int16_t *cos_lut_int;
-    float distortion;
+    float distortion;      // any other small fields
+    uint8_t *reserved[1024]; // safety heap
 } fragmenttv_t;
 
 static void init_sin_lut(fragmenttv_t *m) {
@@ -297,7 +299,7 @@ void fragmenttv_apply(void *ptr, VJFrame *frame, int *args) {
         veejay_memcpy( outV, srcV, frame->len );
     }
 
-    if( minSize == maxSize )
+    if( minSize >= maxSize )
         maxSize = minSize + 1;
 
     drawGridTriangles(m, outY, outU, outV, srcY, srcU, srcV, width, height, numFragments, minSize, maxSize, displacementWeight);
