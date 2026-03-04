@@ -129,8 +129,6 @@ typedef struct
 } el_decoder_t;
 
 
-//instead of iterating _supported_codecs and using a strncasecmp on every entry to find the codec_id, use a hash table that returns the codec identifier on hashed fourcc key
-//this collection is never freed and initialized on first access
 static hash_t *fourccTable = NULL;
 
 static void *avhelper_get_decoder_intra( const char *filename, int dst_pixfmt, int dst_width, int dst_height, int force_intra_frame_only );
@@ -139,13 +137,12 @@ typedef struct {
 	int codec_id;
 } fourcc_node;
 
-//from veejaycore/vevo.c
 static inline int hash_key_code( const char *str )           
 {
 	int hash = 5381;
     int c;
     while( (c = (int) *str++) != 0)
-    	hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+    	hash = ((hash << 5) + hash) + c;
 
     return hash;
 }
@@ -166,7 +163,7 @@ int avhelper_set_num_decoders(void) {
         n_threads = atoi(num_decode_threads);
     }
     else {
-        veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_NUM_DECODE_THREADS not set!");
+        veejay_msg(VEEJAY_MSG_DEBUG, "[FFMPEG] env VEEJAY_NUM_DECODE_THREADS not set!");
 		int n = vj_task_get_num_cpus();
 		if( n > 1 )
 			n_threads = 2;
@@ -174,7 +171,7 @@ int avhelper_set_num_decoders(void) {
 			n_threads = 4;
     }
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Using %d decoding threads (ffmpeg)", n_threads);
+	veejay_msg(VEEJAY_MSG_DEBUG, "[FFMPEG] Using %d decoding threads", n_threads);
 	return n_threads;
 }
 
@@ -217,7 +214,6 @@ int	avhelper_get_codec_by_key( int key )
 	int k = key;
 #endif
 	if( fourccTable == NULL ) {
-		/* lets initialize the hash of fourcc/codec_id pairs now */
 		if(avhelper_build_table() != 0)
 			return -1;
 	}
@@ -370,8 +366,8 @@ void    *avhelper_get_mjpeg_decoder(VJFrame *output) {
 
     x->codec = avcodec_find_decoder( AV_CODEC_ID_MJPEG );
     if(x->codec == NULL) {
-        veejay_msg(0,"Unable to find MJPEG decoder");
-        free(x); // Fix: added free here to prevent leak
+        veejay_msg(0,"[FFMPEG] Unable to find MJPEG decoder");
+        free(x);
         return NULL;
     }
 
@@ -383,7 +379,6 @@ void    *avhelper_get_mjpeg_decoder(VJFrame *output) {
     x->codec_ctx->workaround_bugs = FF_BUG_AUTODETECT;
     x->codec_ctx->err_recognition = AV_EF_CAREFUL;
     
-    // for MJPEG, this ensures the decoder doesn't cut corners on color
     #ifdef AV_CODEC_FLAG2_FAST
     x->codec_ctx->flags2 &= ~AV_CODEC_FLAG2_FAST; 
     #endif
@@ -487,8 +482,6 @@ int	avhelper_decode_video_buffer( void *ptr, uint8_t *data, int len )
 #else
 	avcodec_decode_video( e->packets[e->frame_index], e->codec_ctx, e->frames[e->frame_index], &got_picture, data, len );
 #endif
-
-
 	if(got_picture) {
 		e->frameinfo[e->frame_index] = 1;
 		e->frame_index = (e->frame_index + 1) % 2;
@@ -507,10 +500,11 @@ int avhelper_recv_decode( void *decoder, int *got_picture )
 
     while(1) {
 
+        // only decode video
 #if LIBAVCODEC_VERSION_MAJOR < 60
         if( x->packets[ x->read_index ].stream_index != x->video_stream_id )
             break;
-	// poor man 'double buffering'; when the decode is successful, decode next frame into its own buffer and increment frame_index.
+		// poor man 'double buffering'; when the decode is successful, decode next frame into its own buffer and increment frame_index.
         // this function, is the only function, that may manipulate frame_index, as it is used together with avhelper_get_decoded_video
         // other functions in this source file, assume an index of 0 
         result = avcodec_decode_video( x->codec_ctx, x->frames[x->frame_index], &gp, x->packets[ x->read_index ].data, x->packets[ x->read_index ].size );
@@ -519,7 +513,7 @@ int avhelper_recv_decode( void *decoder, int *got_picture )
 #else
         if( x->packets[ x->read_index ]->stream_index != x->video_stream_id )
             break;
-	// poor man 'double buffering'; when the decode is successful, decode next frame into its own buffer and increment frame_index.
+		// poor man 'double buffering'; when the decode is successful, decode next frame into its own buffer and increment frame_index.
         // this function, is the only function, that may manipulate frame_index, as it is used together with avhelper_get_decoded_video
         // other functions in this source file, assume an index of 0 
         result = avcodec_decode_video( x->packets[x->read_index], x->codec_ctx, x->frames[x->frame_index], &gp, x->packets[ x->read_index ]->data, x->packets[ x->read_index ]->size );
@@ -534,9 +528,9 @@ int avhelper_recv_decode( void *decoder, int *got_picture )
     }
     *got_picture = gp;
 
-    if(gp) { 
-        x->frameinfo[x->frame_index] = 1;
-        x->frame_index = (x->frame_index + 1) % 2;
+	if(gp) {
+		x->frameinfo[x->frame_index] = 1;
+		x->frame_index = (x->frame_index + 1) % 2;
         x->frameinfo[x->frame_index] = 0;
     }
 
@@ -559,7 +553,7 @@ static void	*avhelper_get_decoder_intra( const char *filename, int dst_pixfmt, i
 
 	if(err < 0 ) {
 		av_strerror( err, errbuf, sizeof(errbuf));
-		veejay_msg(VEEJAY_MSG_ERROR, "Error opening %s: %s", filename,errbuf );
+		veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] Error opening %s: %s", filename,errbuf );
 		free(x);
 		return NULL;
 	}
@@ -571,7 +565,7 @@ static void	*avhelper_get_decoder_intra( const char *filename, int dst_pixfmt, i
 #endif
 	if( err < 0 ) {
 		av_strerror( err, errbuf, sizeof(errbuf));
-		veejay_msg(VEEJAY_MSG_ERROR, "Error getting stream info from %s: %s" ,filename,errbuf );
+		veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] Error getting stream info from %s: %s" ,filename,errbuf );
 		avhelper_close_input_file( x->avformat_ctx );
 		free(x);
 		return NULL;
@@ -604,7 +598,7 @@ static void	*avhelper_get_decoder_intra( const char *filename, int dst_pixfmt, i
                                 }
 further:
 				if( !sup_codec ) {
-					veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: Not a supported codec %d", 
+					veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] Not a supported codec %d", 
 						x->avformat_ctx->streams[i]->codec->codec_id);
 					avhelper_close_input_file( x->avformat_ctx );
 					free(x);
@@ -614,21 +608,21 @@ further:
 				x->codec = avcodec_find_decoder( x->avformat_ctx->streams[i]->codec->codec_id );
 				if(x->codec == NULL ) 
 				{
-					veejay_msg(VEEJAY_MSG_ERROR,"FFmpeg: Unable to find decoder" );
+					veejay_msg(VEEJAY_MSG_ERROR,"[FFMPEG] Unable to find decoder" );
 					avhelper_close_input_file( x->avformat_ctx );
 					free(x);
 					return NULL;
 				}
 				x->video_stream_id = i;
 
-				veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: video stream %d, codec_id %d", x->video_stream_id, x->avformat_ctx->streams[i]->codec->codec_id);
+				veejay_msg(VEEJAY_MSG_DEBUG, "[FFMPEG] video stream %d, codec_id %d", x->video_stream_id, x->avformat_ctx->streams[i]->codec->codec_id);
 
 				break;
 		}
 	}
 
 	if( x->video_stream_id == -1 ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: No video streams found");
+		veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] No video streams found");
 		avhelper_close_input_file( x->avformat_ctx );
 		free(x);
 		return NULL;
@@ -641,7 +635,7 @@ further:
    
     ret = av_find_best_stream(x->avformat_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
     if (ret < 0) {
-        veejay_msg(VEEJAY_MSG_ERROR, "Could not find %s stream in input file '%s'\n",
+        veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] Could not find %s stream in input file '%s'\n",
                 av_get_media_type_string(AVMEDIA_TYPE_VIDEO), filename);
 		avhelper_close_input_file( x->avformat_ctx );
 		free(x);
@@ -661,8 +655,8 @@ further:
 		
 			if( !sup_codec ) {
 				if(st->codecpar->codec_id == 0) 
-					veejay_msg(VEEJAY_MSG_DEBUG, "Continue, file is not recognized by ffmpeg (codec not found)");
-				veejay_msg(VEEJAY_MSG_DEBUG, "The codec %d is not supportedr ", st->codecpar->codec_id);
+					veejay_msg(VEEJAY_MSG_DEBUG, "[FFMPEG] Continue, file is not recognized by ffmpeg (codec not found)");
+				veejay_msg(VEEJAY_MSG_DEBUG, "[FFMPEG] Codec %d is not supportedr ", st->codecpar->codec_id);
 				avhelper_close_input_file( x->avformat_ctx );
 				free(x);
 				return NULL;
@@ -672,7 +666,7 @@ further:
         /* find decoder for the stream */
         x->codec = avcodec_find_decoder(st->codecpar->codec_id);
         if (!x->codec) {
-            veejay_msg(VEEJAY_MSG_ERROR, "Failed to find %s codec\n",
+            veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] Failed to find %s codec\n",
                     av_get_media_type_string(AVMEDIA_TYPE_VIDEO));
 			avhelper_close_input_file( x->avformat_ctx );
 			free(x);
@@ -694,24 +688,24 @@ further:
 #else
 	AVCodecContext *dec_ctx = avcodec_alloc_context3(x->codec);
 	if(!dec_ctx) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Failed to allocate the codec context");
+		veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] Failed to allocate the codec context");
 		avhelper_close_input_file( x->avformat_ctx );
 		free(x);
 		return NULL;
 	}
 
 	if ((ret = avcodec_parameters_to_context(dec_ctx, st->codecpar)) < 0) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Failed to copy %s codec parameters to decoder context");
+		veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] Failed to copy %s codec parameters to decoder context");
 		avhelper_codec_close(dec_ctx);
 		avhelper_close_input_file( x->avformat_ctx );
 		free(x);
 		return NULL;
 	}
 
-	dec_ctx->skip_loop_filter = AVDISCARD_NONE;
-    dec_ctx->skip_idct        = AVDISCARD_NONE;
-    dec_ctx->skip_frame       = AVDISCARD_NONE;
-    dec_ctx->err_recognition  = AV_EF_CAREFUL;
+	dec_ctx->skip_loop_filter = AVDISCARD_NONE; // never skip deblocking
+    dec_ctx->skip_idct        = AVDISCARD_NONE; // never skip inverse discrete cosine transform
+    dec_ctx->skip_frame       = AVDISCARD_NONE; // never skip frames
+    dec_ctx->err_recognition  = AV_EF_CAREFUL;  // be strict about errors
     dec_ctx->bits_per_raw_sample = st->codecpar->bits_per_raw_sample; 
 
 #ifdef AV_CODEC_FLAG2_SHOW_ALL
@@ -727,7 +721,7 @@ further:
 #if LIBAVCODECBUILD > 5400
 	int n_threads = avhelper_set_num_decoders();
 	if( n_threads <= 0 ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Fallback to 1 decoding thread");
+		veejay_msg(VEEJAY_MSG_WARNING, "[FFMPEG] Fallback to 1 decoding thread");
 		n_threads = 1;
 	}
 	if (x->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
@@ -738,7 +732,7 @@ further:
 		x->codec_ctx->thread_type = FF_THREAD_SLICE;
 		x->codec_ctx->thread_count = n_threads;	
 	}
-	veejay_msg(VEEJAY_MSG_DEBUG, "Using %d ffmpeg decoding threads", x->codec_ctx->thread_count );
+	veejay_msg(VEEJAY_MSG_DEBUG, "[FFMPEG] Using %d decoding threads", x->codec_ctx->thread_count );
 #endif
 
 #if LIBAVCODEC_VERSION_MAJOR >= 60
@@ -751,7 +745,7 @@ further:
 	if ((ret = avcodec_open( x->codec_ctx, x->codec )) < 0 ) 
 #endif
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, " FFmpeg: Unable to open codec");
+		veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] Unable to open codec");
 		avhelper_close_input_file( x->avformat_ctx );
 		free(x);
 		return NULL;
@@ -762,7 +756,7 @@ further:
 	for(j = 0; j < MAX_PACKETS; j ++ ) {
 		x->packets[j] = av_packet_alloc();
 		if(!x->packets[j]) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Failed to allocate packet %d", j );
+			veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] Failed to allocate packet %d", j );
 			for( int k = 0; k < j ; k ++ ) {
 				av_packet_free(&(x->packets[k]));
 			}
@@ -794,7 +788,7 @@ further:
 	    int ret = av_read_frame(x->avformat_ctx, &(x->packets[0]));
 		if( ret < 0 ) {
 			av_strerror( err, errbuf, sizeof(errbuf));
-			veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: read error: %s", errbuf);
+			veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] read error: %s", errbuf);
 			break;
 		}
 
@@ -804,7 +798,7 @@ further:
 			avhelper_frame_unref( f );
 			if( ret < 0 ) {
 				av_strerror( err, errbuf, sizeof(errbuf));
-				veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: decode error: %s", errbuf);
+				veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] decode error: %s", errbuf);
 			}
 		}
 				
@@ -821,7 +815,7 @@ further:
 		x->spvf = ( (double) x->codec_ctx->framerate.den ) / ( (double) x->codec_ctx->framerate.num);
 	}
 	else {
-		x->spvf = 0.04f; // 0.04 seconds per video frame = 25 fps
+		x->spvf = 0.04f;
 	}
 
 #if LIBAVCODEC_VERSION_MAJOR >= 60
@@ -836,7 +830,7 @@ further:
 	    int ret = av_read_frame(x->avformat_ctx, hunt_pkt);
 		if( ret < 0 ) {
 			av_strerror( err, errbuf, sizeof(errbuf));
-			veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: read error: %s", errbuf);
+			veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] read error: %s", errbuf);
 			break;
 		}
 
@@ -846,7 +840,7 @@ further:
 			avhelper_frame_unref( f );
 			if( ret < 0 ) {
 				av_strerror( err, errbuf, sizeof(errbuf));
-				veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: decode error: %s", errbuf);
+				veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] decode error: %s", errbuf);
 			}
 		}
 				
@@ -862,7 +856,7 @@ further:
 
 
 	if(!got_picture) {
-		veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: Unable to get whole picture from %s", filename );
+		veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] Unable to get whole picture from %s", filename );
 #if LIBAVCODEC_VERSION_MAJOR >= 60
 		avcodec_free_context(&(x->codec_ctx));
 #else
@@ -879,8 +873,6 @@ further:
 	x->frames[0] = avhelper_alloc_frame();
 	x->frames[1] = avhelper_alloc_frame();
 	x->input = yuv_yuv_template( NULL,NULL,NULL, x->codec_ctx->width,x->codec_ctx->height, x->pixfmt );
-
-
 
 	return (void*) x;
 }
@@ -1037,7 +1029,7 @@ VJFrame	*avhelper_get_decoded_video(void *ptr) {
 	}
 
 	int idx = 0;
-	if( e->frameinfo[1] == 1 )
+	if( e->frameinfo[1] == 1 ) // find best frame
 		idx = 1;
 	
 	e->input->data[0] = e->frames[idx]->data[0];
