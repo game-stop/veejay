@@ -20,9 +20,9 @@
 #ifndef COMPOSITEHVJ
 #define COMPOSITEHVJ
 
-void	*composite_get_draw_buffer( void *compiz );
+void *composite_get_draw_buffer( void *compiz );
 
-void	composite_set_colormode( void *compiz, int mode );
+void composite_set_colormode( void *compiz, int mode );
 
 int	composite_get_colormode(void *compiz);
 
@@ -34,28 +34,24 @@ int	composite_processX(  void *compiz, void *back1,uint8_t *tmp_data[4], VJFrame
 
 int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_vp, int pixfmt );
 
-void	composite_blit_ycbcr( void *compiz,uint8_t *in[4], int which_vp, void *gl );
+void composite_process_divert( void *compiz, uint8_t *in[4], VJFrame *out, void *splitter, int setting );
 
-void	composite_process_divert( void *compiz, uint8_t *in[4], VJFrame *out, void *splitter, int setting );
-
-void	composite_blit_yuyv( void *compiz,uint8_t *in[4], uint8_t *yuyv, int which_vp );
+void composite_blit_yuyv( void *compiz,uint8_t *in[4], uint8_t *yuyv, int which_vp );
 
 int	composite_event( void *compiz, uint8_t *in[4], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y, char *homedir, int mode, int id );
 
-void	*composite_get_config(void *compiz);
+void composite_destroy( void *compiz );
 
-void	composite_destroy( void *compiz );
+void *composite_init( int pw, int ph, int iw, int ih, char *homedir, int sample_mode, int zoom_type, int pf, int *vp1_enabled );
 
-void	*composite_init( int pw, int ph, int iw, int ih, char *homedir, int sample_mode, int zoom_type, int pf, int *vp1_enabled );
+void *composite_clone( void *compiz );
 
-void	*composite_clone( void *compiz );
+void composite_set_file_mode(void *data, const char *homedir, int mode, int id);
 
-void	composite_set_file_mode(void *data, const char *homedir, int mode, int id);
-
-void	*composite_get_vp( void *data );
-void	composite_set_ui(void *compiz, int status );
+void *composite_get_vp( void *data );
+void composite_set_ui(void *compiz, int status );
 int	composite_get_ui(void *compiz );
-void	composite_add_to_config( void *compiz, void *vc, int which_vp );
-int		composite_get_status(void *compiz );
-void	composite_set_status(void *compiz, int mode);
+void composite_add_to_config( void *compiz, void *vc, int which_vp );
+int	 composite_get_status(void *compiz );
+void composite_set_status(void *compiz, int mode);
 #endif

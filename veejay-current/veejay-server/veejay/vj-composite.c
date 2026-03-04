@@ -317,20 +317,6 @@ void	composite_process_divert( void *compiz,uint8_t *in[4], VJFrame *out, void *
 	}
 }
 
-//@OBSOLETE
-void	composite_blit_ycbcr( void *compiz, 
-			      uint8_t *in[4], 
-                              int which_vp,
-			      void *gl )
-{
-}
-
-void	*composite_get_config(void *compiz)
-{
-	composite_t *c = (composite_t*) compiz;
-	return viewport_get_configuration( c->vp1, c->tmp_path );
-}
-
 /* Top frame */
 int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_vp, int pff )
 {
