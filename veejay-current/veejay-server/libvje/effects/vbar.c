@@ -29,28 +29,22 @@ vj_effect *vbar_init(int width, int height)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 4;
+
+	ve->defaults[0] = 4;
     ve->defaults[1] = 1;
     ve->defaults[2] = 3;
     ve->defaults[3] = 0;
     ve->defaults[4] = 0;
+
+    for(int i=0; i<5; i++) {
+        ve->limits[0][i] = 0;
+        ve->limits[1][i] = (i == 0) ? width : (i < 3 ? height : width);
+    }
     ve->limits[0][0] = 1;
-    ve->limits[1][0] = height;
-
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = height;
-
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = height;
-
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = height;
-    ve->limits[0][4] = 0;
-    ve->limits[1][4] = height;
 
     ve->description = "Vertical Sliding Bars";
     ve->sub_format = 1;
-
+	ve->parallel = 0;
     ve->extra_frame = 1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Divider", "Top Y", "Bot Y", "Top X", "Bot X" ); 
@@ -72,72 +66,65 @@ void vbar_free(void *ptr) {
     free(ptr);
 }
 
-
-void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
-    int divider = args[0];
-    int top_y = args[1];
-    int bot_y = args[2];
-    int top_x = args[3];
-    int bot_x = args[4];
+void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+    int divider = args[0] > 0 ? args[0] : 1;
+    int top_y_delta = args[1];
+    int bot_y_delta = args[2];
+    int top_x_delta = args[3];
+    int bot_x_delta = args[4];
 
     vbar_t *vbar = (vbar_t*) ptr;
 
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-	const int len = frame->len;
-	//int top_width = width;		   /* frame in frame destination area */
-	int top_width = width/divider;
-	int bottom_width = width - top_width;
+    const unsigned int width = frame->width;
+    const unsigned int height = frame->height;
+    
+    int left_width = width / divider;
 
-	//int bottom_width = width;	  /* frame in frame destionation area */
-	
-	int x,y;
-	int yy=0;
+    vbar->bar_top_auto = (vbar->bar_top_auto + top_y_delta) % height;
+    vbar->bar_top_vert = (vbar->bar_top_vert + top_x_delta) % width;
+    vbar->bar_bot_auto = (vbar->bar_bot_auto + bot_y_delta) % height;
+    vbar->bar_bot_vert = (vbar->bar_bot_vert + bot_x_delta) % width;
 
-	int y2 = vbar->bar_top_auto + top_y;  /* destination */
-	int x2 = vbar->bar_top_vert + top_x;
-  	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
+    int y_off_left = vbar->bar_top_auto;
+    int x_off_left = vbar->bar_top_vert;
+    int y_off_right = vbar->bar_bot_auto;
+    int x_off_right = vbar->bar_bot_vert;
 
-	if(y2 > height) { y2 = 0; vbar->bar_top_auto = 0; }
-	if(x2 > width)  { x2 = 0; vbar->bar_top_vert = 0; }
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+    
+    uint8_t *Y2 = frame2->data[0];
+    uint8_t *Cb2 = frame2->data[1];
+    uint8_t *Cr2 = frame2->data[2];
 
-	/* start with top frame in a frame */
-	for( y = 0; y < height-y2; y++ ) {
-		for ( x = 0; x < top_width; x++ ) {
-			Y[ (y*width + x)] = Y2[ ( (y+y2) *width + x +x2)];
-			Cb[ (y*width + x)] = Cb2[ ( (y+y2) *width + x +x2)];
-			Cr[ (y*width + x)] = Cr2[ ( (y+y2) *width + x +x2)];
-		}
-	}
+    for (unsigned int y = 0; y < height; y++) {
+        unsigned int src_y = (y + y_off_left) % height;
+        
+        for (unsigned int x = 0; x < (unsigned int)left_width; x++) {
+            unsigned int src_x = (x + x_off_left) % width;
+            
+            unsigned int dst_pos = y * width + x;
+            unsigned int src_pos = src_y * width + src_x;
 
-	/* do bottom part */
-	y2 = vbar->bar_bot_auto + bot_y;
-	x2 = vbar->bar_bot_vert + bot_x;
+            Y[dst_pos]  = Y2[src_pos];
+            Cb[dst_pos] = Cb2[src_pos];
+            Cr[dst_pos] = Cr2[src_pos];
+        }
+    }
 
-	if(y2 > height) { y2 = 0; vbar->bar_bot_auto = 0; }
-	if(x2 > width)  { x2 = 0; vbar->bar_bot_vert = 0; }
+    for (unsigned int y = 0; y < height; y++) {
+        unsigned int src_y = (y + y_off_right) % height;
+        
+        for (unsigned int x = left_width; x < width; x++) {
+            unsigned int src_x = (x + x_off_right) % width;
+            
+            unsigned int dst_pos = y * width + x;
+            unsigned int src_pos = src_y * width + src_x;
 
-	/* start with bottom frame in a frame */
-	for ( y = 0; (yy+y2) < height; y++) {
-		yy++;
-		for(x=bottom_width; (x+x2) < width; x++ ) {
-			int pos = (yy+y2) * width +x + x2 ;
-			if(pos<len)
-			{
-			Y[ (y*width + x)] = Y2[((yy+y2)*width+x+x2)];
-			Cb[ (y*width + x)] = Cb2[((yy+y2)*width+x+x2)];
-			Cr[ (y*width + x)] = Cr2[((yy+y2)*width+x+x2)];
-			}
-		}
-	}
-
-	vbar->bar_top_auto += top_y;
-	vbar->bar_bot_auto += bot_y;
-	vbar->bar_top_vert += top_x;
-	vbar->bar_bot_vert += bot_x;
+            Y[dst_pos]  = Y2[src_pos];
+            Cb[dst_pos] = Cb2[src_pos];
+            Cr[dst_pos] = Cr2[src_pos];
+        }
+    }
 }
