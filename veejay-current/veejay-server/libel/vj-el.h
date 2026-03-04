@@ -70,8 +70,6 @@ typedef struct
 	int		auto_deinter;
 	
 	int		pixel_format;	
-	void		*cache;
-
 	int		is_clone;
 	void		*scaler;
 } editlist;  
@@ -82,17 +80,9 @@ void	vj_el_scan_video_file( char *filename,  int *dw, int *dh, float *dfps, long
 
 editlist *vj_el_init_with_args(char **filenames, int n, int flags, int deinter, int force, char norm, int fmt, int w, int h);
 
-int	vj_el_cache_size();
-
-void	vj_el_prepare(void); // reset cache
-
 void	vj_el_init(int out, int sj, int dw, int dh, float fps); 
 
-void	vj_el_init_chunk(int n);
-
 int	vj_el_is_dv(editlist *el);
-
-void	vj_el_set_mmap_size( long size );
 
 void	vj_el_free(editlist *el);
 
@@ -104,10 +94,6 @@ int	vj_el_write_editlist( char *filename, long start, long end, editlist *el );
 
 int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4]);
 
-void    vj_el_break_cache( editlist *el );
-
-void    vj_el_setup_cache( editlist *el );
-
 int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst);
 
 int	vj_el_get_file_fourcc(editlist *el, int num, char *buf);
@@ -116,8 +102,6 @@ void	vj_el_print(editlist *el);
 
 int     vj_el_init_420_frame(editlist *el, VJFrame *frame);
 int     vj_el_init_422_frame(editlist *el, VJFrame *frame);
-
-void	vj_el_frame_cache(int n);
 
 void	vj_el_show_formats(void);
 
@@ -134,10 +118,6 @@ editlist *vj_el_soft_clone_range(editlist *el, long n1, long n2);
 int		vj_el_framelist_clone( editlist *src, editlist *dst);
 
 char *vj_el_write_line_ascii( editlist *el, int *bytes_written );
-
-void		vj_el_deinit();
-
-void	vj_el_clear_cache( editlist *el );
 
 int     get_ffmpeg_pixfmt( int pf );
 
@@ -156,8 +136,6 @@ int	vj_el_get_usec_per_frame( float video_fps );
 float	vj_el_get_default_framerate( int norm );
 
 char	vj_el_get_default_norm( float fps );
-
-long      vj_el_get_mem_size();
 
 int	vj_el_auto_detect_scenes( editlist *el, uint8_t *tmp[4], int w, int h, int dl_threshold );
 
