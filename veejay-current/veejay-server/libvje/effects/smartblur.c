@@ -72,12 +72,13 @@ void *smartblur_malloc(int w, int h)
 
     const int nt = omp_get_max_threads();
     const int max_sdim = (s->sw > s->sh) ? s->sw : s->sh;
+    const int len = (s->sw*s->sh) + (2*s->sw); // overallocate
 
-    s->small_src = vj_malloc((size_t)s->sw * s->sh);
-    s->a_buf     = vj_malloc((size_t)s->sw * s->sh * sizeof(float));
-    s->b_buf     = vj_malloc((size_t)s->sw * s->sh * sizeof(float));
-    s->tmp_mu    = vj_malloc((size_t)s->sw * s->sh * sizeof(float));
-    s->tmp_var   = vj_malloc((size_t)s->sw * s->sh * sizeof(float));
+    s->small_src = vj_malloc((size_t)len);
+    s->a_buf     = vj_malloc((size_t)len * sizeof(float));
+    s->b_buf     = vj_malloc((size_t)len * sizeof(float));
+    s->tmp_mu    = vj_malloc((size_t)len * sizeof(float));
+    s->tmp_var   = vj_malloc((size_t)len * sizeof(float));
     s->mI        = vj_malloc((size_t)nt * (max_sdim + 1) * sizeof(float));
     s->mII       = vj_malloc((size_t)nt * (max_sdim + 1) * sizeof(float));
     s->inv_counts = vj_malloc((size_t)(max_sdim * 2 + 2) * sizeof(float));
@@ -115,7 +116,7 @@ static void apply_nuclear_plane_tiled(smartblur_t *s, uint8_t * restrict data,
     const int w = s->w, h = s->h, sw = s->sw, sh = s->sh;
     const float * restrict inv = s->inv_counts;
     const int max_sdim = (sw > sh) ? sw : sh;
-    const int tile_w = cpu_cache_size();
+    const int tile_w = cpu_get_cacheline_size();
 
     // downsample
     for (int y = 0; y < sh; y++) {
