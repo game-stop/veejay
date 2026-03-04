@@ -20,7 +20,7 @@
 #define VV_VLOOPBACK_H
 void *vj_vloopback_open(const char *device_name, VJFrame *src, int dw, int dh, int df);
 int vj_vloopback_write( void *vloop );
-int vj_vloopback_fill_buffer( void *vloop, uint8_t **image );
+int vj_vloopback_fill_buffer( void *vloop,VJFrame *src );
 void vj_vloopback_close( void *vloop );
 int vj_vloopback_get_pixfmt( int v );
 #endif
