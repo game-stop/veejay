@@ -2108,7 +2108,7 @@ static int AVI_mmap_file(avi_t *AVI, long mmap_size)
 	return 1;
 }
 
-avi_t *AVI_open_input_file(char *filename, int getIndex, long mmap_size)
+avi_t *AVI_open_input_file(char *filename, int getIndex, size_t mmap_size)
 {
   avi_t *AVI=NULL;
   
