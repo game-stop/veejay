@@ -64,15 +64,14 @@ int	rawdv_sampling(dv_t *dv)
 }
 
 #define DV_HEADER_SIZE 120000
-dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
+dv_t	*rawdv_open_input_file(const char *filename, size_t mmap_size)
 {
-	dv_t *dv = (dv_t*) vj_malloc(sizeof(dv_t));
+	dv_t *dv = (dv_t*) vj_calloc(sizeof(dv_t));
 	if(!dv) return NULL;
-	memset(dv, 0, sizeof(dv_t));
+	
 	dv_decoder_t *decoder = NULL;
 
-	uint8_t *tmp = (uint8_t*) vj_malloc(sizeof(uint8_t) * DV_HEADER_SIZE);
-	memset( tmp, 0, sizeof(uint8_t) * DV_HEADER_SIZE);
+	uint8_t *tmp = (uint8_t*) vj_calloc(sizeof(uint8_t) * DV_HEADER_SIZE);
 	off_t file_size = 0;
 	int n = 0;
 
@@ -83,7 +82,7 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 	{
 		dv_decoder_free(decoder); 
 		rawdv_free(dv);
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to open file '%s'",filename);
+		veejay_msg(VEEJAY_MSG_ERROR, "[rawdv] Unable to open file '%s'",filename);
 		if(tmp)free(tmp);
 		return NULL;
 	}
@@ -92,7 +91,7 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 	if( file_size < DV_HEADER_SIZE)
 	{
 		dv_decoder_free(decoder);
-		veejay_msg(VEEJAY_MSG_ERROR, "File %s is not a DV file", filename);
+		veejay_msg(VEEJAY_MSG_ERROR, "[rawdv] File %s is not a DV file", filename);
 		rawdv_free(dv);
 		if(tmp) free(tmp);
 		return NULL;
@@ -101,7 +100,7 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 	if( lseek(dv->fd,0, SEEK_SET ) < 0)
 	{
 		dv_decoder_free(decoder);
-		veejay_msg(VEEJAY_MSG_ERROR, "Seek error in %s", filename);
+		veejay_msg(VEEJAY_MSG_ERROR, "[rawdv] Seek error in %s", filename);
 		rawdv_free(dv);
 		if(tmp) free(tmp);
 		return NULL;
@@ -117,7 +116,7 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 	if( dv->mmap_region == NULL )
 	{
 		if(mmap_size>0)
-			veejay_msg(VEEJAY_MSG_DEBUG, "Mmap of DV file failed - fallback to read");
+			veejay_msg(VEEJAY_MSG_DEBUG, "[rawdv] Mmap of DV file failed - fallback to read");
 		n = read( dv->fd, tmp, DV_HEADER_SIZE );
 	}
 	else
@@ -130,7 +129,7 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 		dv_decoder_free(decoder);
 		rawdv_free(dv);
 		if(tmp) free(tmp);
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot read from '%s'", filename);
+		veejay_msg(VEEJAY_MSG_ERROR, "[rawdv] Cannot read from '%s'", filename);
 		return NULL;
 	}
 
@@ -139,7 +138,7 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 		dv_decoder_free( decoder );
 		rawdv_free(dv);
 		if(tmp) free(tmp);
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot parse header of file %s", filename);
+		veejay_msg(VEEJAY_MSG_ERROR, "[rawdv] Cannot parse header of file %s", filename);
 		return NULL;
 	}
 /*	if(decoder->sampling == e_dv_sample_411)
@@ -170,7 +169,7 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 	dv->offset = 0;
 
 	veejay_msg(VEEJAY_MSG_DEBUG,
-			"DV properties %d x %d, %f, %d frames, %d sampling",
+			"[rawdv] DV properties %d x %d, %f, %d frames, %d sampling",
 			dv->width,dv->height, dv->fps, dv->num_frames,
 			dv->fmt );
 	
