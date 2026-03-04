@@ -48,20 +48,6 @@ typedef struct {
 	unsigned int wfastrand_val;
 } water_t;
 
-/*static uint8_t *ripple_data[3];
-static int stat;
-static signed char *vtable;
-static int *map;
-static int *map1, *map2, *map3;
-static int map_h, map_w;
-static uint8_t *diff_img = NULL;
-static int have_img = 0;
-static int sqrtable[256];
-static const int point = 16;
-static const int impact = 2;
-//static const int loopnum = 2;
-static int bgIsSet = 0;
-*/
 
 /* from EffecTV:
  * fastrand - fast fake random number generator
@@ -71,22 +57,19 @@ static int bgIsSet = 0;
  *          You should use high-order bits.
  */
 
-static unsigned int wfastrand(water_t *w)
+static inline unsigned int wfastrand(water_t *w)
 {
 	return (w->wfastrand_val=w->wfastrand_val*1103515245+12345);
 }
 
 static void setTable(water_t *w)
 {
-	int i;
-
-	for(i=0; i<128; i++) {
-		w->sqrtable[i] = i*i;
-	}
-
-	for(i=1; i<=128; i++) {
-		w->sqrtable[256-i] = -i*i;
-	}
+    #pragma omp simd
+    for (int i = 0; i < 128; i++) {
+        int sq = i * i;
+        w->sqrtable[i] = sq;           // positive half
+        w->sqrtable[255 - i] = -sq;    // negative half
+    }
 }
 //easy/calm: 10,2,32
 //flimmerin: 10,2,3
@@ -114,7 +97,7 @@ vj_effect *water_init(int width, int height)
     ve->defaults[0] = 10;
     ve->defaults[1] = 1;
     ve->defaults[2] = 10;
-    ve->defaults[3] = 1;
+    ve->defaults[3] = 0;
     ve->defaults[4] = 45;
     ve->description = "Water ripples";
     ve->sub_format = -1;
@@ -197,22 +180,30 @@ void water_free(void *ptr) {
 	w = NULL;
 }
 
+static inline int clamp(int val, int min, int max) {
+    return val < min ? min : (val > max ? max : val);
+}
 
-static inline void drop(water_t *w,int power)
+static inline void drop(water_t *w, int power)
 {
-	int x, y;
-	int *p, *q;
+    int x = wfastrand(w) % (w->map_w - 4) + 2;
+    int y = wfastrand(w) % (w->map_h - 4) + 2;
 
-	x = wfastrand(w)%(w->map_w-4)+2;
-	y = wfastrand(w)%(w->map_h-4)+2;
-	p = w->map1 + y*w->map_w + x;
-	q = w->map2 + y*w->map_w + x;
-	*p = power;
-	*q = power;
-	*(p-w->map_w) = *(p-1) = *(p+1) = *(p+w->map_w) = power/2;
-	*(p-w->map_w-1) = *(p-w->map_w+1) = *(p+w->map_w-1) = *(p+w->map_w+1) = power/4;
-	*(q-w->map_w) = *(q-1) = *(q+1) = *(q+w->map_w) = power/2;
-	*(q-w->map_w-1) = *(q-w->map_w+1) = *(q+w->map_w-1) = *(p+w->map_w+1) = power/4;
+    int *maps[] = { w->map1, w->map2 };
+
+    for (int m = 0; m < 2; m++) {
+        int *p = maps[m] + y * w->map_w + x;
+
+        // center
+        *p = power;
+
+        // cross
+        *(p - w->map_w) = *(p - 1) = *(p + 1) = *(p + w->map_w) = power >> 1;
+
+        // corners
+        *(p - w->map_w - 1) = *(p - w->map_w + 1) =
+        *(p + w->map_w - 1) = *(p + w->map_w + 1) = power >> 2;
+    }
 }
 
 static	void	drawmotionframe( VJFrame *f , water_t *w )
@@ -221,218 +212,132 @@ static	void	drawmotionframe( VJFrame *f , water_t *w )
 	vj_frame_clear( f->data, strides, 128 );
 	vj_frame_clear( f->data, strides, 128 );
 	vj_frame_copy1( w->diff_img, f->data[0], f->width * f->height );
-//	veejay_memcpy( f->data[0], w->diff_img, f->width * f->height );
 }
 
-/* globalactivity not used */
-/*
-
-#define HIS_LEN (8*25)
-#define HIS_DEFAULT 2
-
-static uint32_t histogram_[HIS_LEN];
-
-static int n__ = 0;
-static uint32_t keyv_ = 0;
-static uint32_t keyp_ = 0;
-static	int	globalactivity(VJFrame *f2, water_t *w, int in)
+static void motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 {
-	int len = (f2->width * f2->height)/4;
-	uint32_t sum = 0,min=0xffff,max=0;
-	uint64_t activity_level1 = 0;
-	uint64_t activity_level2 = 0;
-	uint64_t activity_level3 = 0;
-	uint64_t activity_level4 = 0;
-	uint8_t *binary_img = w->diff_img;
-	int i = 0;
-	for( i = 0; i < len; i += 4 )
-	{
-		
-		activity_level1 += binary_img[i];
-		activity_level2 += binary_img[i+1];
-		activity_level3 += binary_img[i+2];
-		activity_level4 += binary_img[i+3];
-	}
-	uint32_t activity_level = ( (activity_level1>>8) + (activity_level2>>8) + (activity_level3>>8) + (activity_level4>>8));
+    const int len = f->len;
+    uint8_t *bg = w->diff_img + len;
+    uint8_t *in = f2->data[0];
 
-	int current_his_len = 8;
-	
-	histogram_[ (n__%current_his_len) ] = activity_level;
+    if (!w->have_img) {
+        vj_frame_copy1(f2->data[0], bg, len);
+        w->have_img = 1;
+        return;
+    }
 
-	for( i = 0; i < current_his_len; i ++ )
-	{
-		sum += histogram_[i];
-		if(histogram_[i] > max ) max = histogram_[i];
-		if(histogram_[i] < min ) min = histogram_[i];
-	}	
-	if( (n__ % current_his_len)==0 )
-	{
-		keyp_ = keyv_;
-		keyv_ = (sum > 0 ? (sum/current_his_len):0 );
-	}
+    for (int i = 0; i < len; i++) {
+        int diff = bg[i] - in[i];
+        int pp1 = (diff >= 0) ? diff : -diff;
+        w->diff_img[i] = (pp1 > threshold) ? pp1 : 0;
+    }
 
-	if( n__ <= 1 )
-		return in;
+    const int width = f->width;
+    uint8_t *d = w->diff_img + width + 2;
+    int *p = w->map1 + w->map_w + 1;
+    int *q = w->map2 + w->map_w + 1;
 
-	int tmp = (( n__ - 1) % current_his_len) + 1;
-	float q = 1.0f/(float) current_his_len * tmp;
-	float diff = (float) keyv_ - (float) keyp_;
-	float pu = keyp_ + ( q* diff);
-	float wu = 1.0f/31;
-	float pw = wu * pu;
-
-	int res = (30 * pw);
-	if( res < 1 )
-		return 1;
-	return res;
-}
-*/
-
-static  void    motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
-{
-        const int len = f->len;
-        uint8_t *bg = w->diff_img + len;
-        uint8_t *in = f2->data[0];
-        if(!w->have_img)
-        {
-                //softblur_apply( f2, 0);
-                //veejay_memcpy(bg, f2->data[0], len );
-                vj_frame_copy1( f2->data[0],bg, len );
-		        w->have_img = 1;
-                return;
+    for (int y = w->map_h - 2; y > 0; y--) {
+        for (int x = w->map_w - 2; x > 0; x--) {
+            int h = d[0] + d[1] + d[width] + d[width + 1];
+            if (h > 0) {
+                int val = h << (w->point + w->impact - 8);
+                *p = val;
+                *q = val;
+            } else {
+                *p = 0;
+                *q = 0;
+            }
+            p++;
+            q++;
+            d += 2;
         }
-
-        int i;
-        uint8_t pp1;
-        for(i = 0; i < len ; i ++ ) {
-                pp1 = abs(bg[i] - in[i]);
-                if(pp1 > threshold ) {
-                        w->diff_img[i] = pp1;
-                } else {
-                        w->diff_img[i] = 0;
-// (w->diff_img[i] + 0)>>1;
-                } 
-        }
-
-        int *p = w->map1 + w->map_w + 1;
-        int *q = w->map2 + w->map_w + 1;        
-        const unsigned int width = f->width;
-        int x,y,h;
-        uint8_t *d = w->diff_img + width + 2;
-        for( y = w->map_h - 2; y > 0 ; y -- ) { 
-                for( x = w->map_w - 2 ; x > 0 ; x -- ) {
-                        h = (int) *d + (int) *(d+1) + (int) *(d+width) + (int) *(d+width+1);
-                        if(h>0) {
-                                *p = h << ( w->point + w->impact - 8 );
-                                *q = *p;                        
-                        }
-                        p ++; q ++;
-                        d += 2;
-                }
-                d += width + 2;
-                p += 2;
-                q += 2; 
-        }
-        
+        d += width + 2;
+        p += 2;
+        q += 2;
+    }
 }
 
-
-static	void	motiondetect2(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
+static void motiondetect2(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 {
-	const int len = f->len;
-	uint8_t *bg = w->diff_img + len;
-	uint8_t *in = f2->data[0];
-	if(!w->have_img)
-	{
-		softblur_apply_internal( f2, 0);
-		//	veejay_memcpy(bg, f2->data[0], len );
-		vj_frame_copy1( f2->data[0], bg, len );
-		w->have_img = 1;
-		return;
-	}
+    const int len = f->len;
+    uint8_t *bg = w->diff_img + len;
+    uint8_t *in = f2->data[0];
 
-	int i;
-	uint8_t pp1;
-	for(i = 0; i < len ; i ++ ) {
-		pp1 = abs(bg[i] - in[i]);
-		if(pp1 > threshold ) {
-			w->diff_img[i] = 0xff-pp1;
-		} else {
-			w->diff_img[i] = 0;
-// (w->diff_img[i] + 0)>>1;
-		} 
-	}
+    if (!w->have_img) {
+        softblur_apply_internal(f2, 0);
+        vj_frame_copy1(f2->data[0], bg, len);
+        w->have_img = 1;
+        return;
+    }
 
-	int *p = w->map1 + w->map_w + 1;
-	int *q = w->map2 + w->map_w + 1;	
-	const unsigned int width = f->width;
-	int x,y,h;
-	uint8_t *d = w->diff_img + width + 2;
-	for( y = w->map_h - 2; y > 0 ; y -- ) {	
-		for( x = w->map_w - 2 ; x > 0 ; x -- ) {
-			h = (int) *d + (int) *(d+1) + (int) *(d+width) + (int) *(d+width+1);
-			if(h>0) {
-				*p = h << ( w->point + w->impact - 8 );
-				*q = *p;			
-			}
-			p ++; q ++;
-			d += 2;
-		}
-		d += width + 2;
-		p += 2;
-		q += 2;	
-	}
-	
+    for (int i = 0; i < len; i++) {
+        int diff = bg[i] - in[i];
+        int pp1 = (diff >= 0) ? diff : -diff;
+        w->diff_img[i] = (pp1 > threshold) ? (0xff - pp1) : 0;
+    }
+
+    const int width = f->width;
+    uint8_t *d = w->diff_img + width + 2;
+    int *p = w->map1 + w->map_w + 1;
+    int *q = w->map2 + w->map_w + 1;
+
+    for (int y = w->map_h - 2; y > 0; y--) {
+        for (int x = w->map_w - 2; x > 0; x--) {
+            int h = d[0] + d[1] + d[width] + d[width + 1];
+            int val = (h > 0) ? h << (w->point + w->impact - 8) : 0;
+            *p = val;
+            *q = val;
+            p++;
+            q++;
+            d += 2;
+        }
+        d += width + 2;
+        p += 2;
+        q += 2;
+    }
 }
 
-
-static	void	motiondetect3(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
+static void motiondetect3(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 {
-	const int len= f->len;
-	uint8_t *bg = w->diff_img + len;
-	uint8_t *in = f2->data[0];
-	if(!w->have_img)
-	{
-		softblur_apply_internal( f2, 0);
-	//	veejay_memcpy(bg, f2->data[0], len );
-		vj_frame_copy1( f2->data[0], bg, len );
-		w->have_img = 1;
-		return;
-	}
+    const int len = f->len;
+    uint8_t *bg = w->diff_img + len;
+    uint8_t *in = f2->data[0];
 
-	int i;
-	uint8_t pp1;
-	for(i = 0; i < len ; i ++ ) {
-		pp1 = abs(bg[i] - in[i]);
-		if(pp1 < threshold ) {
-			w->diff_img[i] = pp1;
-		} else {
-			w->diff_img[i] = 0;
-	// (w->diff_img[i] + 0)>>1;
-		} 
-	}
+    if (!w->have_img) {
+        softblur_apply_internal(f2, 0);
+        vj_frame_copy1(f2->data[0], bg, len);
+        w->have_img = 1;
+        return;
+    }
 
-	int *p = w->map1 + w->map_w + 1;
-	int *q = w->map2 + w->map_w + 1;	
-	const unsigned int width = f->width;
-	int x,y,h;
-	uint8_t *d = w->diff_img + width + 2;
-	for( y = w->map_h - 2; y > 0 ; y -- ) {	
-		for( x = w->map_w - 2 ; x > 0 ; x -- ) {
-			h = (int) *d + (int) *(d+1) + (int) *(d+width) + (int) *(d+width+1);
-			if(h>0) {
-				*p = h << ( w->point + w->impact - 8 );
-				*q = *p;			
-			}
-			p ++; q ++;
-			d += 2;
-		}
-		d += width + 2;
-		p += 2;
-		q += 2;	
-	}
-	
-}	
+    // only keep small differences below threshold
+    for (int i = 0; i < len; i++) {
+        int diff = bg[i] - in[i];
+        int pp1 = (diff >= 0) ? diff : -diff;
+        w->diff_img[i] = (pp1 < threshold) ? pp1 : 0;
+    }
+
+    const int width = f->width;
+    uint8_t *d = w->diff_img + width + 2;
+    int *p = w->map1 + w->map_w + 1;
+    int *q = w->map2 + w->map_w + 1;
+
+    for (int y = w->map_h - 2; y > 0; y--) {
+        for (int x = w->map_w - 2; x > 0; x--) {
+            int h = d[0] + d[1] + d[width] + d[width + 1];
+            int val = (h > 0) ? h << (w->point + w->impact - 8) : 0;
+            *p = val;
+            *q = val;
+            p++;
+            q++;
+            d += 2;
+        }
+        d += width + 2;
+        p += 2;
+        q += 2;
+    }
+}
 	
 
 static void raindrop(water_t *w)
@@ -512,165 +417,138 @@ static void raindrop(water_t *w)
 
 void water_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) 
 {
-	int x, y, i;
-	int dx, dy;
-	int h, v;
-	int wi, hi;
-	int *p, *q, *r;
-	signed char *vp;
-	uint8_t *src,*dest;
-	const int len = frame->len;
-	water_t *w = (water_t*) ptr;
+    int x, y, i, dx, dy, h, v;
+    int wi, hi;
+    int *p, *q, *r;
+    signed char *vp;
+    uint8_t *src, *dest;
+    const int len = frame->len;
+    water_t *w = (water_t*) ptr;
     int fresh_rate = args[0];
     int loopnum = args[1];
     int decay = args[2];
     int mode = args[3];
     int threshold = args[4];
 
-	if(w->last_fresh_rate != fresh_rate)
-	{
-		w->last_fresh_rate = fresh_rate;
-		veejay_memset( w->map, 0, (w->map_h*w->map_w*2*sizeof(int)));
-	}
-	if(w->lastmode != mode )
-	{
-		veejay_memset( w->map, 0, (w->map_h*w->map_w*2*sizeof(int)));
-		w->have_img = 0;
-		w->lastmode = mode;
-	}
-	vj_frame_copy1( frame->data[0], w->ripple_data[0],len);
+    // reset map on fresh_rate or mode change
+    if(w->last_fresh_rate != fresh_rate) {
+        w->last_fresh_rate = fresh_rate;
+        veejay_memset(w->map, 0, w->map_h * w->map_w * 2 * sizeof(int));
+    }
+    if(w->lastmode != mode) {
+        veejay_memset(w->map, 0, w->map_h * w->map_w * 2 * sizeof(int));
+        w->have_img = 0;
+        w->lastmode = mode;
+    }
 
-	dest = frame->data[0];
-	src = w->ripple_data[0];
+    // copy current frame to ripple buffer
+    vj_frame_copy1(frame->data[0], w->ripple_data[0], len);
+    dest = frame->data[0];
+    src = w->ripple_data[0];
+    w->loopnum = loopnum;
 
-	w->loopnum = loopnum;
-
-	switch(mode) {
-		case 0: raindrop(w); w->have_img = 0; break;
-		case 1: 
-			motiondetect(frame,frame2,threshold,w);	
-			drawmotionframe(frame,w);
-			return; 
-		case 2: motiondetect(frame,frame2,threshold,w);
-			break;
-		case 3:
-			motiondetect2(frame,frame2,threshold,w);
-			drawmotionframe(frame,w);
-			return;
-			break;
-		case 4:
-			motiondetect2(frame,frame2,threshold,w);
-			break;
-		case 5:
-			motiondetect3(frame,frame2,threshold,w);
-			drawmotionframe(frame,w);
-			return;	
-		case 6:
-			motiondetect3(frame,frame2,threshold,w);
-			break;
-		default:
-		break;
+	if (mode == 0 && !w->have_img) {
+		vj_frame_copy1(frame->data[0], w->diff_img + frame->len, frame->len);
+		w->have_img = 1;
+		return;
 	}
 
-	/* simulate surface wave */
-	wi = w->map_w;
-	hi = w->map_h;
-	
-	/* This function is called only 30 times per second. To increase a speed
-	 * of wave, iterates this loop several times. */
-	for(i=w->loopnum; i>0; i--) {
-		/* wave simulation */
-		p = w->map1 + wi + 1;
-		q = w->map2 + wi + 1;
-		r = w->map3 + wi + 1;
-		for(y=hi-2; y>0; y--) {
+
+    // apply motion or raindrops
+    switch(mode) {
+        case 0: raindrop(w);vj_frame_copy1(frame->data[0], w->diff_img + frame->len, frame->len); break;
+        case 1: motiondetect(frame, frame2, threshold, w); drawmotionframe(frame, w); return;
+        case 2: motiondetect(frame, frame2, threshold, w); break;
+        case 3: motiondetect2(frame, frame2, threshold, w); drawmotionframe(frame, w); return;
+        case 4: motiondetect2(frame, frame2, threshold, w); break;
+        case 5: motiondetect3(frame, frame2, threshold, w); drawmotionframe(frame, w); return;
+        case 6: motiondetect3(frame, frame2, threshold, w); break;
+        default: break;
+    }
+
+    wi = w->map_w;
+    hi = w->map_h;
+
+    // wave simulation
+    for(i = w->loopnum; i > 0; i--) {
+        p = w->map1 + wi + 1;
+        q = w->map2 + wi + 1;
+        r = w->map3 + wi + 1;
+
+        for(y = 1; y < hi - 1; y++) {
 #pragma omp simd
-			for(x=wi-2; x>0; x--) {
-				h = *(p-wi-1) + *(p-wi+1) + *(p+wi-1) + *(p+wi+1)
-				  + *(p-wi) + *(p-1) + *(p+1) + *(p+wi) - (*p)*9;
-				h = h >> 3;
-				v = *p - *q;
-				v += h - (v >> decay);
-				*r = v + *p;
-				p++;
-				q++;
-				r++;
-			}
-			p += 2;
-			q += 2;
-			r += 2;
-		}
+            for(x = 1; x < wi - 1; x++) {
+                h = *(p - wi - 1) + *(p - wi + 1) + *(p + wi - 1) + *(p + wi + 1)
+                  + *(p - wi) + *(p - 1) + *(p + 1) + *(p + wi) - (*p) * 9;
+                h >>= 3;
+                v = *p - *q;
+                v += h - (v >> decay);
+                *r = v + *p;
+                p++; q++; r++;
+            }
+            p += 2; q += 2; r += 2;
+        }
 
-		/* low pass filter */
-		p = w->map3 + wi + 1;
-		q = w->map2 + wi + 1;
-		for(y=hi-2; y>0; y--) {
+        // low-pass filter
+        p = w->map3 + wi + 1;
+        q = w->map2 + wi + 1;
+        for(y = 1; y < hi - 1; y++) {
 #pragma omp simd
-			for(x=wi-2; x>0; x--) {
-				h = *(p-wi) + *(p-1) + *(p+1) + *(p+wi) + (*p)*60;
-				*q = h >> 6;
-				p++;
-				q++;
-			}
-			p+=2;
-			q+=2;
-		}
+            for(x = 1; x < wi - 1; x++) {
+                h = *(p - wi) + *(p - 1) + *(p + 1) + *(p + wi) + (*p) * 60;
+                *q = h >> 6;
+                p++; q++;
+            }
+            p += 2; q += 2;
+        }
 
-		p = w->map1;
-		w->map1 = w->map2;
-		w->map2 = p;
-	}
+        // swap buffers
+        int *tmp = w->map1;
+        w->map1 = w->map2;
+        w->map2 = tmp;
+    }
 
-	vp = w->vtable;
-	p = w->map1;
-	for(y=hi-1; y>0; y--) {
-		for(x=wi-1; x>0; x--) {
-			/* difference of the height between two voxel. They are twiced to
-			 * emphasise the wave. */
-			vp[0] = w->sqrtable[((p[0] - p[1])>>(w->point-1))&0xff]; 
-			vp[1] = w->sqrtable[((p[0] - p[wi])>>(w->point-1))&0xff]; 
-			p++;
-			vp+=2;
-		}
-		p++;
-		vp+=2;
-	}
+    // vtable calculation
+    vp = w->vtable;
+    p = w->map1;
+    for(y = 0; y < hi - 1; y++) {
+        for(x = 0; x < wi - 1; x++) {
+            vp[0] = w->sqrtable[((p[0] - p[1]) >> (w->point - 1)) & 0xff];
+            vp[1] = w->sqrtable[((p[0] - p[wi]) >> (w->point - 1)) & 0xff];
+            p++;
+            vp += 2;
+        }
+        p++;
+        vp += 2;
+    }
 
+	// final frame sampling
 	hi = frame->height;
 	wi = frame->width;
 	vp = w->vtable;
 
-	for(y=0; y<hi; y+=2) {
-		for(x=0; x<wi; x+=2) {
+	for (y = 0; y < hi; y += 2) {
+		for (x = 0; x < wi; x += 2) {
 			h = (int)vp[0];
 			v = (int)vp[1];
-			dx = x + h;
-			dy = y + v;
-			if(dx<0) dx=0;
-			if(dy<0) dy=0;
-			if(dx>=wi) dx=wi-1;
-			if(dy>=hi) dy=hi-1;
-			dest[0] = src[dy*wi+dx];
+
+			dx = clamp(x + h, 0, wi - 1);
+			dy = clamp(y + v, 0, hi - 1);
+			dest[0] = src[dy * wi + dx];
 
 			i = dx;
 
-			dx = x + 1 + (h+(int)vp[2])/2;
-			if(dx<0) dx=0;
-			if(dx>=wi) dx=wi-1;
-			dest[1] = src[dy*wi+dx];
+			dx = clamp(x + 1 + ((h + (int)vp[2]) >> 1), 0, wi - 1);
+			dest[1] = src[dy * wi + dx];
 
-			dy = y + 1 + (v+(int)vp[w->map_w*2+1])/2;
-			if(dy<0) dy=0;
-			if(dy>=hi) dy=hi-1;
-			dest[wi] = src[dy*wi+i];
+			dy = clamp(y + 1 + ((v + (int)vp[wi*2 + 1]) >> 1), 0, hi - 1);
+			dest[wi] = src[dy * wi + i];
+			dest[wi + 1] = src[dy * wi + dx];
 
-			dest[wi+1] = src[dy*wi+dx];
-			dest+=2;
-			vp+=2;
+			dest += 2;
+			vp += 2;
 		}
 		dest += wi;
 		vp += 2;
 	}
-
-
 }
