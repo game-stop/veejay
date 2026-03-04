@@ -87,12 +87,9 @@ void *picinpic_malloc(int w, int h)
 	return (void*) my;	
 }
 
-static int	nearest_div(int val )
+static int nearest_div(int val)
 {
-	int r = val % 8;
-	while(r--)
-		val--;
-	return val;
+    return val - (val % 8);
 }
 
 void picinpic_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
@@ -177,15 +174,25 @@ void picinpic_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 	uint8_t *dCb = frame->data[1];
 	uint8_t *dCr = frame->data[2]; 
 	
-	/* Copy the scaled image to output */
-	for( y = 0 ; y < picture->h-1; y ++ )
+	for (int y = 0; y < view_height; y++)
 	{
-		for( x = 0 ; x < picture->w-1; x ++ )
-		{
-			dY[ (dy + y ) * width + dx + x ] =  sY[ y * picture->w + x];
-			dCb[(dy + y ) * width + dx + x ] =  sCb[ y * picture->w + x];
-			dCr[ (dy + y ) * width + dx + x ] = sCr[ y * picture->w + x];
-		}
+		uint8_t *src_row = sY  + y * view_width;
+		uint8_t *dst_row = dY  + (dy + y) * width + dx;
+	#pragma omp simd
+		for (int x = 0; x < view_width; x++)
+			dst_row[x] = src_row[x];
+
+		src_row = sCb + y * view_width;
+		dst_row = dCb + (dy + y) * width + dx;
+	#pragma omp simd
+		for (int x = 0; x < view_width; x++)
+			dst_row[x] = src_row[x];
+
+		src_row = sCr + y * view_width;
+		dst_row = dCr + (dy + y) * width + dx;
+	#pragma omp simd
+		for (int x = 0; x < view_width; x++)
+			dst_row[x] = src_row[x];
 	}
 
 }
