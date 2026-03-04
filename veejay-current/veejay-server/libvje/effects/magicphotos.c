@@ -17,45 +17,55 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+#include <config.h>
 #include "common.h"
+#include <veejaycore/vjmem.h>
 #include "magicphotos.h"
 
 vj_effect *photoplay_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    if (!ve) return NULL;
+
     ve->num_params = 3;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 2; // divider
-    ve->limits[1][0] = max_power(w);
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 1; // waterfall
-	ve->limits[0][2] = 0;
-	ve->limits[1][2] = get_matrix_func_n(); // mode
+    ve->defaults = (int *) vj_calloc(sizeof(int), ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int), ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int), ve->num_params);
+
+    ve->limits[0][0] = 2;
+    ve->limits[1][0] = 32;
     ve->defaults[0] = 2;
-	ve->defaults[1] = 0;
-	ve->defaults[2] = 1;  
+
+    ve->limits[0][1] = 0;
+    ve->limits[1][1] = 1;
+    ve->defaults[1] = 0;
+
+    int num_modes = get_matrix_func_n();
+    ve->limits[0][2] = 0;
+    ve->limits[1][2] = num_modes - 1; 
+    ve->defaults[2] = 1;  
+
     ve->description = "Photoplay (timestretched mosaic)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Photos", "Waterfall", "Mode" );
+    ve->param_description = vje_build_param_list(ve->num_params, "Photos", "Waterfall", "Mode");
 
-	ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->hints = vje_init_value_hint_list(ve->num_params);
 
-	vje_build_value_hint_list (ve->hints, ve->limits[1][2],2,
-	                           "Random",								//0
-	                           "TopLeft to BottomRight : Horizontal",	//1
-	                           "TopLeft to BottomRight : Vertical",		//2
-	                           "BottomRight to TopLeft : Horizontal",	//3
-	                           "BottomRight to TopLeft : Vertical",		//4
-	                           "BottomLeft to TopRight : Horizontal",	//5
-	                           "TopRight to BottomLeft : Vertical",		//6
-	                           "TopRight to BottomLeft : Horizontal",	//7
-	                           "BottomLeft to TopRight : Vertical");	//8
+    vje_build_value_hint_list(ve->hints, 1, 1, "Off", "On");
 
+    vje_build_value_hint_list(ve->hints, ve->limits[1][2], 2,
+                               "Random",                                // 0
+                               "TopLeft to BottomRight : Horizontal",   // 1
+                               "TopLeft to BottomRight : Vertical",     // 2
+                               "BottomRight to TopLeft : Horizontal",   // 3
+                               "BottomRight to TopLeft : Vertical",     // 4
+                               "BottomLeft to TopRight : Horizontal",   // 5
+                               "TopRight to BottomLeft : Vertical",     // 6
+                               "TopRight to BottomLeft : Horizontal",   // 7
+                               "BottomLeft to TopRight : Vertical");    // 8
 
     return ve;
 }
@@ -147,67 +157,10 @@ void	photoplay_free(void *ptr)
     free(p);
 }
 
-static void	take_photo(photoplay_t *p, uint8_t *plane, uint8_t *dst_plane, int w, int h, int index )
-{
-
-	int x,y,dx,dy;
-	int sum;
-	int dst_x, dst_y;
-	int step_y;
-	int step_x;
-	int box_width = p->photo_list[index]->w;
-	int box_height = p->photo_list[index]->h;
-
-	step_x = w / box_width;
-	step_y = h / box_height;
-
-	for( y = 0 ,dst_y = 0; y < h && dst_y < box_height; y += step_y )
-	{
-		for( x = 0, dst_x = 0; x < w && dst_x < box_width; x+= step_x )
-		{
-			sum = 0;
-			for( dy = 0; dy < step_y; dy ++ )
-			{
-				for( dx = 0; dx < step_x; dx++)	
-				{
-					sum += plane[ ((y+dy)*w+(dx+x)) ];	
-				}
-			}
-			// still problem here!
-			if(sum > 0)
-			  dst_plane[(dst_y*box_width)+dst_x] = sum / (step_y*step_x);
-			else
-			  dst_plane[(dst_y*box_width)+dst_x] = 16;
-
-			dst_x++;
-		}
-		dst_y++;
-	}
-}
-
-static void put_photo( photoplay_t *p, uint8_t *dst_plane, uint8_t *photo, int dst_w, int dst_h, int index , matrix_t matrix)
-{
-	int box_w = p->photo_list[index]->w;
-	int box_h = p->photo_list[index]->h;
-	int x,y;
-
-	uint8_t *P = dst_plane + (matrix.h*dst_w);
-	int	offset = matrix.w;
-
-	for( y = 0; y < box_h; y ++ )
-	{
-		for( x = 0; x < box_w; x ++ )
-		{
-			*(P+offset+x) = photo[(y*box_w)+x];
-		}
-		P += dst_w;
-	}
-}
-
 void photoplay_apply( void *ptr, VJFrame *frame, int *args ) {
     int size = args[0];
-    int delay = args[1];
-    int mode = args[2]
+    int waterfall = args[1];
+    int mode = args[2];
 
 	unsigned int i;
 	uint8_t *dstY = frame->data[0];
@@ -238,14 +191,22 @@ void photoplay_apply( void *ptr, VJFrame *frame, int *args ) {
 		return;
 	}
 
-	for( i = 0; i < 3; i ++ )
-	{
-		take_photo(p, frame->data[i], photo_list[(frame_counter%num_photos)]->data[i], width, height , frame_counter % num_photos);
-	}
+	int current_slot = p->frame_counter % p->num_photos;
+    for (int i = 0; i < 3; i++)
+    {
+        take_photo(p, frame->data[i], p->photo_list[current_slot]->data[i], width, height, current_slot);
+    }
 
 	for ( i = 0; i < num_photos; i ++ )
 	{
-		matrix_t m = matrix_placement(i, size,width,height );
+		int display_idx;
+        if (waterfall) {
+            display_idx = (i + p->frame_counter) % p->num_photos;
+        } else {
+            display_idx = i;
+		}
+
+		matrix_t m = matrix_placement(display_idx, size,width,height );
 		put_photo( p, dstY, photo_list[i]->data[0],width,height,i, m);
 		put_photo( p, dstU, photo_list[i]->data[1],width,height,i, m);
 		put_photo( p, dstV, photo_list[i]->data[2],width,height,i, m);
