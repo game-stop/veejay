@@ -46,7 +46,7 @@ typedef struct
 
 int	rawdv_sampling(dv_t *dv);
 int	rawdv_close(dv_t *dv);
-dv_t	*rawdv_open_input_file(const char *filename, int mmap_size);
+dv_t	*rawdv_open_input_file(const char *filename, size_t mmap_size);
 int	rawdv_set_position(dv_t *dv, long nframe);
 int	rawdv_read_frame(dv_t *dv, uint8_t *buf );
 int	rawdv_read_audio_frame(dv_t *dv, uint8_t *buf);
