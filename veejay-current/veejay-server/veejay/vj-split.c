@@ -232,16 +232,17 @@ void	*vj_split_new_from_file(char *filename, int out_w, int out_h, int vfmt)
 			}
 		}
 
-		if (fscanf(f, "row=%d col=%d port=%d hostname=%1023s\n",&row, &col, &port, hostname) == 4) {
+		if( fscanf(f,"row=%d col=%d port=%d hostname=%s\n",
+					&row,&col,&port,hostname) ) {
 
-            if (!split) {
-                veejay_msg(VEEJAY_MSG_ERROR, "Screen not initialized");
-                fclose(f);
-                return NULL;
-            }
+			if(!split) {
+				veejay_msg(VEEJAY_MSG_ERROR,"Screen not initialized");
+				fclose(f);
+				return NULL;
+			}
 
-            vj_split_add_screen(split, hostname, port, row, col, out_w, out_h, vfmt);
-		}
+			vj_split_add_screen( split, hostname, port, row,col, out_w, out_h, vfmt );
+		}	
 	}
 
 	fclose(f);
@@ -374,7 +375,7 @@ int vj_split_configure_screen( void *ptr, int screen_id, int edge_x, int edge_y,
 	return 1;
 }
 
-static char *get_self(void)
+static char *get_self()
 {
 	char *path = vj_malloc( 1024 );
 	if( path == NULL )
