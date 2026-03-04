@@ -424,7 +424,7 @@ static struct
     {  FB_WIDGET_MARKERFRAME, WIDGET_MARKERFRAME },
     {  FB_WIDGET_VBOX633, WIDGET_VBOX633 },
     {  FB_WIDGET_HBOX910, WIDGET_HBOX910 },
-    {  FB_WIDGET_HBOX27, WIDGET_HBOX27 },
+  //  {  FB_WIDGET_HBOX27, WIDGET_HBOX27 },
     {  FB_WIDGET_SAMPLE_BANK_HBOX, WIDGET_SAMPLE_BANK_HBOX },
     {  FB_WIDGET_BUTTON_SAMPLEBANK_PREV, WIDGET_BUTTON_SAMPLEBANK_PREV },
     {  FB_WIDGET_BUTTON_SAMPLEBANK_NEXT, WIDGET_BUTTON_SAMPLEBANK_NEXT },
@@ -1302,7 +1302,7 @@ static void single_vims(int id);
 static gdouble get_numd(const char *name);
 static int get_nums(const char *name);
 static gchar *get_text(const char *name);
-static void put_text(const char *name, const char *text);
+static void put_text(const char *name, char *text);
 static void set_toggle_button(const char *name, int status);
 static void update_slider_gvalue(const char *name, gdouble value );
 static void update_slider_value2(GtkWidget *w, gint value, gint scale);
@@ -1322,6 +1322,7 @@ static void update_label_f(const char *name, float val);
 static void update_label_str(const char *name, gchar *text);
 static void update_globalinfo(int *his, int p, int k);
 static gint load_parameter_info(void);
+#include <veejay/resample.h>
 static void load_v4l_info(void);
 static void reload_editlist_contents(void);
 static void load_effectchain_info(void);
@@ -1363,7 +1364,7 @@ static int bank_exists( int bank_page, int slot_num );
 static int find_bank_by_sample(int sample_id, int sample_type, int *slot );
 static int add_bank( gint bank_num  );
 static void set_selection_of_slot_in_samplebank(gboolean active);
-static void remove_sample_from_slot();
+static void remove_sample_from_slot(void);
 static void create_ref_slots(int envelope_size);
 static void create_sequencer_slots(int x, int y);
 void clear_samplebank_pages(void);
@@ -1378,7 +1379,7 @@ static void reload_srt(void);
 static void reload_fontlist(void);
 static void indicate_sequence( gboolean active, sequence_gui_slot_t *slot );
 static void set_textview_buffer(const char *name, gchar *utf8text);
-void interrupt_cb();
+void interrupt_cb(void);
 int get_and_draw_frame(int type, char *wid_name);
 GdkPixbuf *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
 static void vj_kf_select_parameter(int id);
@@ -2321,15 +2322,17 @@ void _effect_free( effect_constr *effect )
         for( p = 0; p < effect->num_arg; p ++ ) {
             free( effect->param_description[p] );
         }
-        for( p = 0; p < effect->num_arg; p ++ ) {
-            if( effect->hints[p] == NULL )
-                continue;
-            int q;
-            for( q = 0; effect->hints[p]->description[q] != NULL; q ++ ) {
-                free( effect->hints[p]->description[q] );
+        if( effect->hints ) {
+            for( p = 0; p < effect->num_arg; p ++ ) {
+                if( effect->hints[p] == NULL )
+                    continue;
+                int q;
+                for( q = 0; effect->hints[p]->description[q] != NULL; q ++ ) {
+                    free( effect->hints[p]->description[q] );
+                }
+                free( effect->hints[p]->description );
+                free( effect->hints[p] );
             }
-            free( effect->hints[p]->description );
-            free( effect->hints[p] );
         }
 
         free(effect);
@@ -2967,8 +2970,8 @@ void gveejay_popup_err( const char *type, char *msg )
     message_dialog( type, msg );
 }
 
-void donatenow();
-void update_gui();
+void donatenow(void);
+void update_gui(void);
 
 int veejay_get_sample_image(int id, int type, int wid, int hei)
 {
@@ -3505,7 +3508,7 @@ static gchar *get_text(const char *name)
     return (gchar*) gtk_entry_get_text( GTK_ENTRY(w));
 }
 
-static void put_text(const char *name, const char *text)
+static void put_text(const char *name, char *text)
 {
     GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
     if(!w) {
@@ -4369,7 +4372,7 @@ gboolean capture_data   (GIOChannel *source, GIOCondition condition, gpointer da
     return TRUE;
 }
 */
-void reportbug(void)
+void reportbug (void)
 {
     char URL[1024];
 
@@ -5374,7 +5377,7 @@ void setup_effectlist_info(void)
         gtk_tree_selection_set_select_function(selection, view_fx_selection_func, NULL, NULL);
         gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 
-        g_signal_connect( G_OBJECT(trees[i]), "key-press-event", G_CALLBACK( on_effectlist_row_key_pressed ), NULL );
+        g_signal_connect( G_OBJECT(trees[i]), "key_press_event", G_CALLBACK( on_effectlist_row_key_pressed ), NULL );
         g_signal_connect( G_OBJECT(trees[i]), "key-release-event", G_CALLBACK( on_effectlist_row_key_released ), NULL );
     }
 
@@ -6524,7 +6527,6 @@ static void reload_bundles(void)
     free( eltext );
 }
 
-#define VJ_EVENT_LIST_SIZE 602
 static void reload_vimslist(void)
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_vims");
@@ -6559,11 +6561,8 @@ static void reload_vimslist(void)
             veejay_msg(0,"Expected exactly 4 tokens: [%s]", line);
         }
 
-        if( val[0] < 0 || val[0] > VJ_EVENT_LIST_SIZE ) {
+        if( val[0] < 0 || val[0] > 1024 ) {
             veejay_msg(0,"Invalid ID at position %d", offset );
-            offset += 12 + val[2] + val[3];
-            free(line);
-            continue;
         }
 
         if( val[1] < 0 || val[1] > 99 ) {
@@ -6576,12 +6575,6 @@ static void reload_vimslist(void)
 
         if( val[3] < 0 || val[3] > 999 ) {
             veejay_msg(0, "Invalid name length at position %d", offset );
-        }
-
-       if (offset + val[2] + val[3] > len) {
-            veejay_msg(0, "Entry at offset %d goes past buffer length", offset);
-            free(line);
-            goto vims_reload_err_out;
         }
 
         char vimsid[5];
@@ -6619,7 +6612,7 @@ static void reload_vimslist(void)
 
         free( line );
     }
-vims_reload_err_out:
+
     gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
     free( eltext );
 }
@@ -7208,14 +7201,12 @@ static void init_recorder(int total_frames, gint mode)
     if(mode == MODE_STREAM)
     {
         info->streamrecording = g_timeout_add(300, update_stream_record_timeout, (gpointer*) info );
-        info->uc.recording[MODE_STREAM] = 1;
     }
-    else if(mode == MODE_SAMPLE)
+    if(mode == MODE_SAMPLE)
     {
         info->samplerecording = g_timeout_add(300, update_sample_record_timeout, (gpointer*) info );
-        info->uc.recording[MODE_SAMPLE] = 1;
     }
-
+    info->uc.recording[mode] = 1;
 }
 
 static char glade_path[1024];
@@ -8778,10 +8769,6 @@ void vj_gui_init(const char *glade_file,
 
     text_defaults();
 
-    GtkWidget *sne = glade_xml_get_widget_(info->main_window, "entry_samplename" );
-    g_signal_connect (G_OBJECT (sne), "key-press-event",
-                    G_CALLBACK (on_entry_samplename_key_pressed), NULL);
-
     GtkWidget *fgb = glade_xml_get_widget_(info->main_window, "boxtext" );
     GtkWidget *bgb = glade_xml_get_widget_(info->main_window, "boxbg" );
     GtkWidget *rb = glade_xml_get_widget_(info->main_window, "boxred" );
@@ -9279,7 +9266,7 @@ static void samplebank_size_allocate(GtkWidget *widget, GtkAllocation *allocatio
 /* Add a page to the notebook and initialize slots */
 static int add_bank( gint bank_num )
 {
-    gchar str_label[12];
+    gchar str_label[5];
     gchar frame_label[20];
     sprintf(str_label, "%d", bank_num );
     sprintf(frame_label, "Slots %d to %d",
@@ -10076,7 +10063,7 @@ static void update_sample_slot_data(int page_num,
     {
         if(sample_id > 0 )
         {
-            char hotkey[25];
+            char hotkey[16];
             if( sample_type == MODE_SAMPLE ) {
                 snprintf(hotkey, sizeof(hotkey), "[F%d] Sample %d", (sample_id % 12), sample_id);
             }
