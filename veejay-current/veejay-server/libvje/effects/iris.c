@@ -51,63 +51,67 @@ vj_effect *iris_init(int w, int h)
 }
 
 
-void iris_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
-    int val = args[0];
+void iris_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+    int val = args[0];    // 0..100
     int shape = args[1];
 
-    int i,j,k=0;
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-	const int len = frame->len;
+    const unsigned int width  = frame->width;
+    const unsigned int height = frame->height;
+    const int len = frame->len;
 
     uint8_t *Y0 = frame->data[0];
     uint8_t *Cb0 = frame->data[1];
     uint8_t *Cr0 = frame->data[2];
 
-	uint8_t *Y1 = frame2->data[0];
+    uint8_t *Y1 = frame2->data[0];
     uint8_t *Cb1 = frame2->data[1];
     uint8_t *Cr1 = frame2->data[2];
 
-	int half_wid = width >> 1;
-	int half_hei = height >> 1;
+    int half_wid = width >> 1;
+    int half_hei = height >> 1;
 
-	float 	val0 = (val * 0.01f );
-	float 	val1 = 1.0f - val0;
-	if( shape == 0 ) {
-		float	x1,y1;
-		double	rad	= (double) ( (half_hei * half_hei) + (half_wid * half_wid ) ); 
-		double  sval=0;
+    if (shape == 0) { // circle
+        long long max_dist_sq = (long long)half_hei * half_hei + (long long)half_wid * half_wid;
+        long long threshold_sq = (max_dist_sq * val * val) / 10000; 
+        int k = 0;
 
-		for( i = 0; i < len; i += width ) {
-		 for( j = 0; j < width; j ++ ) {
-			//@ todo: extend this with feather for smoothness
-			x1 = (float)( k - half_hei );
-			y1 = (float)( j - half_wid );
-			fast_sqrt( sval, (x1*x1+y1*y1)/rad);
-			if( sval > val0 ) {	
-		//	if( sqrt( (x1 * x1 + y1 * y1 )/ rad)  > val0 ) {
-				Y0[ i + j] = Y1[ i + j ];
-				Cb0[i + j] = Cb1[ i + j ];
-				Cr0[i + j] = Cr1[ i + j ];
-			}	
-		 }
-		 k ++;
-		}
-	} else if( shape == 1 ) {
-		float x1,y1;
-		for( i = 0; i < len; i += width ) {
-			for( j = 0; j < width; j ++ ){
-				//@ todo: extend this with feather for smoothness
-				x1 = (float)half_wid * val1 + 0.5f;
-				y1 = (float)half_hei * val1 + 0.5f;
+        for (int i = 0; i < len; i += width, k++) {
+            int dy = k - half_hei;
+            long long dy_sq = (long long)dy * dy;
+            for (int j = 0; j < width; j++) {
+                int dx = j - half_wid;
+                long long dist_sq = dy_sq + (long long)dx * dx;
 
-				if( j < x1 || j>=(width-x1) || k < y1 || k >= ( height-y1 )) {
-					Y0[ i + j] = Y1[ i + j ];
-					Cb0[i + j] = Cb1[ i + j ];
-					Cr0[i + j] = Cr1[ i + j ];
-				}	
-			}
-			k++;
-		}
-	} 
+                uint8_t mask = -(dist_sq > threshold_sq);
+
+                int idx = i + j;
+                Y0[idx]  = (Y1[idx] & mask) | (Y0[idx] & ~mask);
+                Cb0[idx] = (Cb1[idx] & mask) | (Cb0[idx] & ~mask);
+                Cr0[idx] = (Cr1[idx] & mask) | (Cr0[idx] & ~mask);
+            }
+        }
+    } else { // rectangle
+        int val1 = 100 - val;
+        int x_bound = (half_wid * val1) / 100;
+        int y_bound = (half_hei * val1) / 100;
+
+        int k = 0;
+        for (int i = 0; i < len; i += width, k++) {
+            uint8_t *pY0 = Y0 + i;
+            uint8_t *pCb0 = Cb0 + i;
+            uint8_t *pCr0 = Cr0 + i;
+
+            uint8_t *pY1 = Y1 + i;
+            uint8_t *pCb1 = Cb1 + i;
+            uint8_t *pCr1 = Cr1 + i;
+
+            for (int j = 0; j < width; j++) {
+                uint8_t mask = -((j < x_bound) | (j >= width - x_bound) | (k < y_bound) | (k >= height - y_bound));
+
+                pY0[j]  = (pY1[j] & mask) | (pY0[j] & ~mask);
+                pCb0[j] = (pCb1[j] & mask) | (pCb0[j] & ~mask);
+                pCr0[j] = (pCr1[j] & mask) | (pCr0[j] & ~mask);
+            }
+        }
+    }
 }
