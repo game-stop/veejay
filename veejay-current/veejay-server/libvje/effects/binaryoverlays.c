@@ -31,7 +31,7 @@ vj_effect *binaryoverlay_init(int w, int h)
     ve->defaults[0] = 0;
     ve->description = "Binary Overlays";
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 10;
+    ve->limits[1][0] = 14;
     ve->parallel = 1;
     ve->extra_frame = 1;
     ve->sub_format = -1;
@@ -40,11 +40,24 @@ vj_effect *binaryoverlay_init(int w, int h)
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,"Not A and not B",
-		   "Not A or not B", "Not A xor not B", "A and not B", "A or not B",
-	   "A xor not B", "A and not B", "A or not B", "A or B" , "A and B", "A xor B"   );
-
-
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+		"Not A and Not B", // 0
+		"Not A or Not B",  // 1
+		"Not A xor Not B", // 2
+		"A and Not B",     // 3
+		"A or Not B",      // 4
+		"A xor Not B",     // 5
+		"Not A and B",     // 6
+		"Not A or B",      // 7
+		"Not A xor B",     // 8 
+		"A or B",          // 9
+		"A and B",         // 10
+		"A xor B",         // 11
+		"Not (A and B)",   // 12 (NAND)
+		"Not (A or B)",    // 13 (NOR)
+		"Not (A xor B)"    // 14 (NXOR/Equivalence)
+	);
+    
     return ve;
 }
 
@@ -54,12 +67,12 @@ static void _binary_not_and( VJFrame *frame, VJFrame *frame2, int w, int h )
 {
 	const int len = frame->len;
 	const int uv_len = frame->uv_len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
+ 	uint8_t *restrict Y = frame->data[0];
+	uint8_t *restrict Cb = frame->data[1];
+	uint8_t *restrict Cr = frame->data[2];
+	uint8_t *restrict Y2 = frame2->data[0];
+	uint8_t *restrict Cb2 = frame2->data[1];
+	uint8_t *restrict Cr2 = frame2->data[2];
 
 	int i;
 #pragma omp simd
@@ -74,16 +87,38 @@ static void _binary_not_and( VJFrame *frame, VJFrame *frame2, int w, int h )
 		Cr[i] = 128 + (~(Cr[i]-128) & ~(Cr2[i]-128));
 	}
 }
+
+static void _binary_xor( VJFrame *frame, VJFrame *frame2, int w, int h )
+{
+    const int len = frame->len;
+    const int uv_len = frame->uv_len;
+    uint8_t *restrict Y = frame->data[0],  *Y2 = frame2->data[0];
+    uint8_t *restrict Cb = frame->data[1], *Cb2 = frame2->data[1];
+    uint8_t *restrict Cr = frame->data[2], *Cr2 = frame2->data[2];
+
+    int i;
+#pragma omp simd
+    for(i=0; i < len; i++)
+        Y[i] = Y[i] ^ Y2[i];
+
+#pragma omp simd
+    for(i=0; i < uv_len; i++)
+    {
+        Cb[i] = 128 + ( (Cb[i] - 128) ^ (Cb2[i] - 128) );
+        Cr[i] = 128 + ( (Cr[i] - 128) ^ (Cr2[i] - 128) );
+    }
+}
+
 static void _binary_not_xor( VJFrame *frame, VJFrame *frame2, int w, int h )
 {
 	const int len = frame->len;
 	const int uv_len = frame->uv_len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
+ 	uint8_t *restrict Y = frame->data[0];
+	uint8_t *restrict Cb = frame->data[1];
+	uint8_t *restrict Cr = frame->data[2];
+	uint8_t *restrict Y2 = frame2->data[0];
+	uint8_t *restrict Cb2 = frame2->data[1];
+	uint8_t *restrict Cr2 = frame2->data[2];
 
 	int i;
 #pragma omp simd
@@ -103,12 +138,12 @@ static void _binary_not_or( VJFrame *frame, VJFrame *frame2, int w, int h )
 {
 	const int len = frame->len;
 	const int uv_len = frame->uv_len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
+ 	uint8_t *restrict Y = frame->data[0];
+	uint8_t *restrict Cb = frame->data[1];
+	uint8_t *restrict Cr = frame->data[2];
+	uint8_t *restrict Y2 = frame2->data[0];
+	uint8_t *restrict Cb2 = frame2->data[1];
+	uint8_t *restrict Cr2 = frame2->data[2];
 
 	int i;
 #pragma omp simd
@@ -124,41 +159,37 @@ static void _binary_not_or( VJFrame *frame, VJFrame *frame2, int w, int h )
 	}
 }
 
-// this is also sub, sub = A & ~(B)
 static void _binary_not_and_lh( VJFrame *frame, VJFrame *frame2, int w, int h )
 {
-	int i;
-	const int len = frame->len;
-	const int uv_len = frame->uv_len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
+    const int len = frame->len;
+    const int uv_len = frame->uv_len;
+    uint8_t *restrict Y = frame->data[0],  *Y2 = frame2->data[0];
+    uint8_t *restrict Cb = frame->data[1], *Cb2 = frame2->data[1];
+    uint8_t *restrict Cr = frame->data[2], *Cr2 = frame2->data[2];
+
+    int i;
+#pragma omp simd
+    for(i=0; i < len; i++)
+        Y[i] = Y[i] & ~(Y2[i]);
 
 #pragma omp simd
-	for(i=0; i < len; i++)
-	{
-		Y[i] = Y[i] & ~(Y2[i]);
-	}
-#pragma omp simd
-	for(i=0; i < uv_len; i++)
-	{
-		Cb[i] = 128 + ( (Cb[i]-128) & ~(Cb2[i]));
-		Cr[i] = 128 + (Cr[i] & ~(Cr2[i]));
-	}
+    for(i=0; i < uv_len; i++)
+    {
+        Cb[i] = 128 + ( (Cb[i] - 128) & ~(Cb2[i] - 128) );
+        Cr[i] = 128 + ( (Cr[i] - 128) & ~(Cr2[i] - 128) );
+    }
 }
+
 static void _binary_not_xor_lh( VJFrame *frame, VJFrame *frame2, int w, int h )
 {
 	const int len = frame->len;
 	const int uv_len = frame->uv_len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
+ 	uint8_t *restrict Y = frame->data[0];
+	uint8_t *restrict Cb = frame->data[1];
+	uint8_t *restrict Cr = frame->data[2];
+	uint8_t *restrict Y2 = frame2->data[0];
+	uint8_t *restrict Cb2 = frame2->data[1];
+	uint8_t *restrict Cr2 = frame2->data[2];
 
 	int i;
 #pragma omp simd
@@ -178,12 +209,12 @@ static void _binary_not_or_lh( VJFrame *frame, VJFrame *frame2, int w, int h )
 {
 	const int len = frame->len;
 	const int uv_len = frame->uv_len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
+ 	uint8_t *restrict Y = frame->data[0];
+	uint8_t *restrict Cb = frame->data[1];
+	uint8_t *restrict Cr = frame->data[2];
+	uint8_t *restrict Y2 = frame2->data[0];
+	uint8_t *restrict Cb2 = frame2->data[1];
+	uint8_t *restrict Cr2 = frame2->data[2];
 
 	int i;
 #pragma omp simd
@@ -200,38 +231,34 @@ static void _binary_not_or_lh( VJFrame *frame, VJFrame *frame2, int w, int h )
 }
 static void _binary_not_and_rh( VJFrame *frame, VJFrame *frame2, int w, int h )
 {
-	const int len = frame->len;
-	const int uv_len = frame->uv_len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
+    const int len = frame->len;
+    const int uv_len = frame->uv_len;
+    uint8_t *restrict Y = frame->data[0],  *Y2 = frame2->data[0];
+    uint8_t *restrict Cb = frame->data[1], *Cb2 = frame2->data[1];
+    uint8_t *restrict Cr = frame->data[2], *Cr2 = frame2->data[2];
 
-	int i;
+    int i;
 #pragma omp simd
-	for(i=0; i < len; i++)
-	{
-		Y[i] = ~(Y[i]) & Y2[i];
-	}
+    for(i=0; i < len; i++)
+        Y[i] = ~(Y[i]) & Y2[i];
+
 #pragma omp simd
-	for(i=0; i < uv_len; i++)
-	{
-		Cb[i] = 128 + ( ~(Cb[i]-128) & (Cb2[i]-128));
-		Cr[i] = 128 + ( ~(Cr[i]-128) & (Cr2[i]-128));
-	}
+    for(i=0; i < uv_len; i++)
+    {
+        Cb[i] = 128 + ( ~(Cb[i] - 128) & (Cb2[i] - 128) );
+        Cr[i] = 128 + ( ~(Cr[i] - 128) & (Cr2[i] - 128) );
+    }
 }
 static void _binary_not_xor_rh( VJFrame *frame, VJFrame *frame2, int w, int h )
 {
 	const int len = frame->len;
 	const int uv_len = frame->uv_len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
+ 	uint8_t *restrict Y = frame->data[0];
+	uint8_t *restrict Cb = frame->data[1];
+	uint8_t *restrict Cr = frame->data[2];
+	uint8_t *restrict Y2 = frame2->data[0];
+	uint8_t *restrict Cb2 = frame2->data[1];
+	uint8_t *restrict Cr2 = frame2->data[2];
 
 	int i;
 #pragma omp simd
@@ -251,12 +278,12 @@ static void _binary_not_or_rh( VJFrame *frame, VJFrame *frame2, int w, int h )
 {
 	const int len = frame->len;
 	const int uv_len = frame->uv_len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
+ 	uint8_t *restrict Y = frame->data[0];
+	uint8_t *restrict Cb = frame->data[1];
+	uint8_t *restrict Cr = frame->data[2];
+	uint8_t *restrict Y2 = frame2->data[0];
+	uint8_t *restrict Cb2 = frame2->data[1];
+	uint8_t *restrict Cr2 = frame2->data[2];
 
 	int i;
 #pragma omp simd
@@ -279,12 +306,12 @@ static void _binary_or( VJFrame *frame, VJFrame *frame2, int w, int h )
 {
 	const int len = frame->len;
 	const int uv_len = frame->uv_len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
+ 	uint8_t *restrict Y = frame->data[0];
+	uint8_t *restrict Cb = frame->data[1];
+	uint8_t *restrict Cr = frame->data[2];
+	uint8_t *restrict Y2 = frame2->data[0];
+	uint8_t *restrict Cb2 = frame2->data[1];
+	uint8_t *restrict Cr2 = frame2->data[2];
 
 
 	int i;
@@ -292,22 +319,21 @@ static void _binary_or( VJFrame *frame, VJFrame *frame2, int w, int h )
 	for(i=0; i < len; i++)
 		Y[i] = Y[i] | Y2[i];
 #pragma omp simd
-	for(i=0; i < uv_len; i++)
-	{
-		Cb[i] = Cb[i] | Cb2[i];
-		Cr[i] = Cr[i] | Cr2[i];
-	}
+    for(i=0; i < uv_len; i++) {
+        Cb[i] = 128 + ( (Cb[i] - 128) | (Cb2[i] - 128) );
+        Cr[i] = 128 + ( (Cr[i] - 128) | (Cr2[i] - 128) );
+    }
 }
 static void _binary_and( VJFrame *frame, VJFrame *frame2, int w, int h )
 {
 	const int len = frame->len;
 	const int uv_len = frame->uv_len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
+ 	uint8_t *restrict Y = frame->data[0];
+	uint8_t *restrict Cb = frame->data[1];
+	uint8_t *restrict Cr = frame->data[2];
+	uint8_t *restrict Y2 = frame2->data[0];
+	uint8_t *restrict Cb2 = frame2->data[1];
+	uint8_t *restrict Cr2 = frame2->data[2];
 
 
 	int i;
@@ -317,32 +343,93 @@ static void _binary_and( VJFrame *frame, VJFrame *frame2, int w, int h )
 #pragma omp simd
 	for(i=0; i < uv_len; i++)
 	{
-		Cb[i] = Cb[i] & Cb2[i];
-		Cr[i] = Cr[i] & Cr2[i];
+		Cb[i] = 128 + ( (Cb[i] - 128) & (Cb2[i] - 128) );
+		Cr[i] = 128 + ( (Cr[i] - 128) & (Cr2[i] - 128) );
 	}
 }
 
+static void _binary_nand( VJFrame *frame, VJFrame *frame2, int w, int h )
+{
+    const int len = frame->len;
+    const int uv_len = frame->uv_len;
+    uint8_t *restrict Y = frame->data[0],  *Y2 = frame2->data[0];
+    uint8_t *restrict Cb = frame->data[1], *Cb2 = frame2->data[1];
+    uint8_t *restrict Cr = frame->data[2], *Cr2 = frame2->data[2];
+
+    int i;
+#pragma omp simd
+    for(i=0; i < len; i++)
+        Y[i] = ~(Y[i] & Y2[i]);
+
+#pragma omp simd
+    for(i=0; i < uv_len; i++) {
+        Cb[i] = 128 + ( ~((Cb[i] - 128) & (Cb2[i] - 128)) );
+        Cr[i] = 128 + ( ~((Cr[i] - 128) & (Cr2[i] - 128)) );
+    }
+}
+
+static void _binary_nor( VJFrame *frame, VJFrame *frame2, int w, int h )
+{
+    const int len = frame->len;
+    const int uv_len = frame->uv_len;
+    uint8_t *restrict Y = frame->data[0],  *Y2 = frame2->data[0];
+    uint8_t *restrict Cb = frame->data[1], *Cb2 = frame2->data[1];
+    uint8_t *restrict Cr = frame->data[2], *Cr2 = frame2->data[2];
+
+    int i;
+#pragma omp simd
+    for(i=0; i < len; i++)
+        Y[i] = ~(Y[i] | Y2[i]);
+
+#pragma omp simd
+    for(i=0; i < uv_len; i++) {
+        Cb[i] = 128 + ( ~((Cb[i] - 128) | (Cb2[i] - 128)) );
+        Cr[i] = 128 + ( ~((Cr[i] - 128) | (Cr2[i] - 128)) );
+    }
+}
+
+static void _binary_nxor( VJFrame *frame, VJFrame *frame2, int w, int h )
+{
+    const int len = frame->len;
+    const int uv_len = frame->uv_len;
+    uint8_t *restrict Y = frame->data[0],  *Y2 = frame2->data[0];
+    uint8_t *restrict Cb = frame->data[1], *Cb2 = frame2->data[1];
+    uint8_t *restrict Cr = frame->data[2], *Cr2 = frame2->data[2];
+
+    int i;
+#pragma omp simd
+    for(i=0; i < len; i++)
+        Y[i] = ~(Y[i] ^ Y2[i]);
+
+#pragma omp simd
+    for(i=0; i < uv_len; i++) {
+        Cb[i] = 128 + ( ~((Cb[i] - 128) ^ (Cb2[i] - 128)) );
+        Cr[i] = 128 + ( ~((Cr[i] - 128) ^ (Cr2[i] - 128)) );
+    }
+}
 
 
 void binaryoverlay_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
-    int mode = args[0];
 
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
+	int mode = args[0];
+	const int width = frame->width;
+	const int height = frame->height;
 
-	switch(mode)
-	{
-		case 0:	_binary_not_and( frame,frame2,width, height ); break;// not a and not b
-		case 1: _binary_not_or( frame,frame2,width, height); break; // not a or not b
-		case 2: _binary_not_xor( frame,frame2,width, height); break; // not a xor not b
-		case 3:	_binary_not_and_lh( frame,frame2,width, height ); break; // a and not b 
-		case 4: _binary_not_or_lh( frame,frame2,width, height); break; // a or not b 
-		case 5: _binary_not_xor_lh( frame,frame2,width, height); break; // a xor not b 
-		case 6: _binary_not_and_rh (frame,frame2,width, height); break; // a and not b
-		case 7: _binary_not_or_rh( frame,frame2,width, height); break; // a or not b
-		case 8: _binary_or( frame,frame2,width, height); break; // a or b
-		case 9: _binary_and( frame,frame2,width, height); break; // a and b
-		case 10: _binary_not_xor_rh(frame,frame2,width, height); break; 
-	}
+    switch(mode) {
+        case 0:  _binary_not_and(frame, frame2, width, height);    break; // ~A & ~B
+        case 1:  _binary_not_or(frame, frame2, width, height);     break; // ~A | ~B
+        case 2:  _binary_not_xor(frame, frame2, width, height);    break; // ~A ^ ~B
+        case 3:  _binary_not_and_lh(frame, frame2, width, height); break; //  A & ~B
+        case 4:  _binary_not_or_lh(frame, frame2, width, height);  break; //  A | ~B
+        case 5:  _binary_not_xor_lh(frame, frame2, width, height); break; //  A ^ ~B
+        case 6:  _binary_not_and_rh(frame, frame2, width, height); break; // ~A &  B
+        case 7:  _binary_not_or_rh(frame, frame2, width, height);  break; // ~A |  B
+        case 8:  _binary_not_xor_rh(frame, frame2, width, height); break; // ~A ^  B
+        case 9:  _binary_or(frame, frame2, width, height);         break; //  A |  B
+        case 10: _binary_and(frame, frame2, width, height);        break; //  A &  B
+        case 11: _binary_xor(frame, frame2, width, height);        break; //  A ^  B
+        case 12: _binary_nand(frame, frame2, width, height);       break; // !(A & B)
+        case 13: _binary_nor(frame, frame2, width, height);        break; // !(A | B)
+        case 14: _binary_nxor(frame, frame2, width, height);       break; // !(A ^ B)
+    }
 }
-
