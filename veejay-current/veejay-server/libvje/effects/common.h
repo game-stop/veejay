@@ -23,6 +23,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <stdint.h>
 #include <math.h>
 #include <sys/types.h>
@@ -49,20 +50,8 @@
 #define ALPHA_IN_A_AND_B_STR "Alpha-IN A and B"
 #define ALPHA_IN_A_AND_B 4
 
-static inline uint8_t __clamp8YUV(int a, int lo, int hi) {
-    int t = a;
-    t = t - lo;
-    t = t & ~(-(t >> 31));
-    t = t + lo;
-    t = t - hi;
-    t = t | -(t >> 31);
-    t = t + hi;
-    return (uint8_t)t;
-}
-
-#define CLAMP_Y(a)  __clamp8YUV((a), pixel_Y_lo_, pixel_Y_hi_)
-#define CLAMP_UV(a) __clamp8YUV((a), pixel_U_lo_, pixel_U_hi_)
-
+#define CLAMP_Y( a ) ( a < pixel_Y_lo_ ? pixel_Y_lo_ : (a > pixel_Y_hi_ ? pixel_Y_hi_ : a ) )
+#define CLAMP_UV( a )( a < pixel_U_lo_ ? pixel_U_lo_ : (a > pixel_U_hi_ ? pixel_U_hi_ : a ) )
 #define CLAMP_LAB( a )( a < 0 ? 0 : (a > 255 ? 255: a ) )
 
 #ifndef MIN
@@ -94,6 +83,19 @@ extern int vje_get_rgb_parameter_conversion_type();
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
 #define do_emms __asm__ __volatile__ ( "emms":::"memory" )
 #endif
+
+static inline int vje_advise_num_threads(const int len) {
+
+	int ncores = (int) sysconf(_SC_NPROCESSORS_ONLN);
+	int nthreads = ncores; 
+
+	// if not in HD mode, reduce cores by / 2
+    if (len < (1920*1080)) nthreads = ncores / 2;
+    if (nthreads < 1) nthreads = 1;
+    if (nthreads > 6) nthreads = 6; // overhead
+
+	return nthreads;
+}
 
 static inline double a_fmod(double x, double m) {
   while (x >= m) {
@@ -448,10 +450,9 @@ uint8_t veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M, uint
 void vj_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, int threshold, int len );
 void binarify_1src( uint8_t *dst, uint8_t *src, uint8_t threshold,int reverse, int w, int h );
 void binarify( uint8_t *bm, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len);
-void vje_mean_filter( const uint8_t *src, uint8_t *dst, const int w, const int h );
 
 void init_sqrt_map_pixel_values();
-double sqrt_table_get_pixel( int x, int h );
+float sqrt_table_get_pixel( int x, int h );
 void sqrt_table_pixels_free();
 
 
