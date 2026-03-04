@@ -9,7 +9,7 @@ AM_CFLAGS = $(OP_CFLAGS)
 AM_CPPFLAGS += $(FFMPEG_CFLAGS)
 
 VJMEM_LIB_FILE = libvjmem.la
-pkginclude_HEADERS = vjmem.h
+pkginclude_HEADERS = vjmem.h atomic.h
 
 noinst_LTLIBRARIES = $(VJMEM_LIB_FILE)
 libvjmem_la_SOURCES =	memcpy.c vj-x86.c 
