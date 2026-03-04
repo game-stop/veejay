@@ -32,22 +32,19 @@
 
 #define FIVE_PI3 5.23598775598f
 #define FOUR_PI3 4.18879020479f
-
 #define THREE_PI2 4.71238898038f
-
 #define TWO_PI 6.28318530718f
 #define TWO_PI3 2.09439510239f
-
 #define ONE_PI2 1.57079632679f
 #define ONE_PI3 1.0471975512f
-
-#define RT2 1.41421356237f
-#define RT3 1.73205080757f //sqrt(3)
-#define RT32 0.86602540378f //sqrt(3)/2
-
+#define RT3 1.73205080757f 
+#define RT32 0.86602540378f 
 #define RT322 0.43301270189f
 
-#define LUT_SIZE 3600
+#define LUT_SIZE 4096
+#define LUT_DIVISOR (LUT_SIZE / TWO_PI)
+#define LUT_MASK (LUT_SIZE - 1)
+#define LUT_SIZE 4096
 #define LUT_DIVISOR (LUT_SIZE / TWO_PI)
 
 #define ONEQTR_PI (M_PI / 4.0f)
@@ -55,14 +52,6 @@
 
 #define calc_angle(y, x) ((x) > 0. ? ((y) >= 0. ? atanf((y) / (x)) : TWO_PI + atanf((y) / (x))) \
                           : ((x) < 0. ? atanf((y) / (x)) + M_PI : ((y) > 0. ? ONE_PI2 : THREE_PI2)))
-
-
-static void put_pixel2(float angle, float theta, float r, int hheight, int hwidth, uint8_t *srcY, uint8_t *srcU, uint8_t *srcV, uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, int jj, int width, float *cos_lut, float *sin_lut);
-
-static void put_pixel1(float angle, float theta, float r, int hheight, int hwidth, uint8_t *srcY, uint8_t *srcU, uint8_t *srcV, uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, int jj, int width, float *cos_lut, float *sin_lut);
-
-
-
 
 
 vj_effect *hexmirror_init(int w, int h)
@@ -148,22 +137,15 @@ static void init_sin_cos_lut(hexmirror_t *f) {
         f->cos_lut[i] = cosf(angle);
     }
 }
-
-static inline float atan2_approx1(float y, float x) {
-    float fabs_y = y * (y < 0.0f ? -1.0f : 1.0f);
-    float r = (x < 0.0f) ? (x + fabs_y) / (fabs_y - x) : (x - fabs_y) / (x + fabs_y);
-    float angle = (x < 0.0f) ? THRQTR_PI : ONEQTR_PI;
-    angle += (0.1963f * r * r - 0.9817f) * r;
-    return (y < 0.0f) ? -angle : angle;
-}
+ 
 
 static inline float sqrt_approx(float x) {
     return __builtin_sqrtf(x);
 }
 
 static inline float wrap_angle(float a) {
-    while (a < 0.0f) a += TWO_PI;
-    while (a >= TWO_PI) a -= TWO_PI;
+    if (a < 0.0f) a += TWO_PI;
+    if (a >= TWO_PI) a -= TWO_PI;
     return a;
 }
 
@@ -201,50 +183,32 @@ void *hexmirror_malloc(int w, int h) {
 }
 
 
-static void calc_center(float side, float j, float i, float *x, float *y) {
-    // find nearest hex center
-    int gridx, gridy;
+static inline void calc_center(float j, float i, float sidex, float sidey, 
+                                   float hsidex, float hsidey, float inv_sidex, 
+                                   float inv_sidey, float side_off, float *x, float *y) {
+    i -= side_off;
+    i += (i > 0.0f) ? hsidey : -hsidey;
+    j += (j > 0.0f) ? hsidex : -hsidex;
 
-    float secx, secy;
+    int gridy = (int)(i * inv_sidey);
+    int gridx = (int)(j * inv_sidex);
 
-    float sidex = side * RT3; // 2 * side * cos(30)
-    float sidey = side * 1.5; // side + side * sin(30)
+    float yy = (float)gridy * sidey;
+    float xx = (float)gridx * sidex;
 
-    float hsidex = sidex / 2., hsidey = sidey / 2.;
+    float secy = i - yy;
+    float secx = j - xx;
 
-    i -= side / FIVE_PI3;
-//  j -= hsidex;
-
-    i += (i > 0.0) ? hsidey : -hsidey;
-    j += (j > 0.0) ? hsidex : -hsidex;
-
-
-    // find the square first
-    gridy = i / sidey;
-    gridx = j / sidex;
-
-
-    // center
-    float yy = gridy * sidey;
-    float xx = gridx * sidex;
-
-    secy = i - yy;
-    secx = j - xx;
-
-    secy += (secy < 0.0) ? sidey : 0.0;
-    secx += (secx < 0.0) ? sidex : 0.0;
+    if (secy < 0.0f) secy += sidey;
+    if (secx < 0.0f) secx += sidex;
 
     if (!(gridy & 1)) {
-        // even row (inverted Y)
         if (secy > (sidey - (hsidex - secx) * RT322)) {
-            yy += sidey;
-            xx -= hsidex;
+            yy += sidey; xx -= hsidex;
         } else if (secy > sidey - (secx - hsidex) * RT322) {
-            yy += sidey;
-            xx += hsidex;
+            yy += sidey; xx += hsidex;
         }
     } else {
-        // odd row, center is left or right (Y)
         if (secx <= hsidex) {
             if (secy < (sidey - secx * RT322)) {
                 xx -= hsidex;
@@ -255,9 +219,7 @@ static void calc_center(float side, float j, float i, float *x, float *y) {
             } else yy += sidey;
         }
     }
-
-    *x = xx;
-    *y = yy;
+    *x = xx; *y = yy;
 }
 
 static inline void rotate(float r, float theta, float angle, float *x, float *y, float *cos_lut, float *sin_lut) {
@@ -268,229 +230,123 @@ static inline void rotate(float r, float theta, float angle, float *x, float *y,
     *y = r * sin_lut[lut_pos];
 }
 
-static inline void put_pixel1(float angle, float theta, float r, int hheight,
-                              int hwidth, uint8_t *srcY, uint8_t *srcU, uint8_t *srcV,
-                              uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, int jj,
-                              int width, float *cos_lut, float *sin_lut) {
+static inline float atan2_approx1(float y, float x) {
+    if (x == 0.0f && y == 0.0f) return 0.0f;
+    float fabs_y = fabsf(y);
+    float r = (x < 0.0f) ? (x + fabs_y) / (fabs_y - x) : (x - fabs_y) / (x + fabs_y);
+    float angle = (x < 0.0f) ? (3.0f * M_PI / 4.0f) : (M_PI / 4.0f);
+    angle += (0.1963f * r * r - 0.9817f) * r;
+    return (y < 0.0f) ? -angle : angle;
+}
 
-    float adif = theta - angle;
-    if (adif < 0.0f) adif += TWO_PI;
-    else if (adif >= TWO_PI) adif -= TWO_PI;
+static inline void process_pixel(int swap, float angle, float theta, float r, int hheight, int hwidth,
+                                 uint8_t *srcY, uint8_t *srcU, uint8_t *srcV,
+                                 uint8_t *pOutY, uint8_t *pOutU, uint8_t *pOutV, 
+                                 int width, float *cos_lut, float *sin_lut) {
+    
+    float adif = wrap_angle(theta - angle);
+    float fold_theta = swap ? wrap_angle(theta - angle) : theta;
 
-    float stheta = (adif < ONE_PI3) ? theta :
-                   (adif < TWO_PI3) ? TWO_PI3 - theta :
-                   (adif < M_PI) ? theta - TWO_PI3 :
-                   (adif < FOUR_PI3) ? FOUR_PI3 - theta :
-                   (adif < FIVE_PI3) ? theta - FOUR_PI3 :
-                   TWO_PI - theta;
+    float stheta = (adif < ONE_PI3) ? fold_theta :
+                   (adif < TWO_PI3) ? TWO_PI3 - fold_theta :
+                   (adif < M_PI)    ? fold_theta - TWO_PI3 :
+                   (adif < FOUR_PI3)? FOUR_PI3 - fold_theta :
+                   (adif < FIVE_PI3)? fold_theta - FOUR_PI3 :
+                   TWO_PI - fold_theta;
 
     stheta += angle;
 
-    int sx = (int)(r * cos_lut[(int)(stheta * LUT_DIVISOR) % LUT_SIZE] + 0.5f);
-    int sy = (int)(r * sin_lut[(int)(stheta * LUT_DIVISOR) % LUT_SIZE] + 0.5f);
+    int lut_idx = (int)(stheta * LUT_DIVISOR) & LUT_MASK;
+
+    int sx = (int)(r * cos_lut[lut_idx] + 0.5f);
+    int sy = (int)(r * sin_lut[lut_idx] + 0.5f);
 
     if (sx < -hwidth || sx >= hwidth || sy < -hheight || sy >= hheight) {
-        dstY[jj] = pixel_Y_lo_;
-        dstU[jj] = 128;
-        dstV[jj] = 128;
+        *pOutY = pixel_Y_lo_;
+        *pOutU = 128;
+        *pOutV = 128;
         return;
     }
 
-    int src_index = sx + sy * width;
-
-    dstY[jj] = srcY[src_index];
-    dstU[jj] = srcU[src_index];
-    dstV[jj] = srcV[src_index];
+    int src_idx = swap ? (sx - sy * width) : (sx + sy * width);
+    *pOutY = srcY[src_idx];
+    *pOutU = srcU[src_idx];
+    *pOutV = srcV[src_idx];
 }
-
-static inline void put_pixel2(float angle, float theta, float r, int hheight,
-                              int hwidth, uint8_t *srcY, uint8_t *srcU, uint8_t *srcV,
-                              uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, int jj,
-                              int width, float *cos_lut, float *sin_lut) {
-
-    float adif = theta - angle;
-    if (adif < 0.0f) adif += TWO_PI;
-    else if (adif >= TWO_PI) adif -= TWO_PI;
-
-    theta -= angle;
-    if (theta < 0.0f) theta += TWO_PI;
-    else if (theta >= TWO_PI) theta -= TWO_PI;
-
-    float stheta = (adif < ONE_PI3) ? theta :
-                   (adif < TWO_PI3) ? TWO_PI3 - theta :
-                   (adif < M_PI) ? theta - TWO_PI3 :
-                   (adif < FOUR_PI3) ? FOUR_PI3 - theta :
-                   (adif < FIVE_PI3) ? theta - FOUR_PI3 :
-                   TWO_PI - theta;
-
-    stheta += angle;
-
-    int sx = (int)(r * cos_lut[(int)(stheta * LUT_DIVISOR) % LUT_SIZE] + 0.5f);
-    int sy = (int)(r * sin_lut[(int)(stheta * LUT_DIVISOR) % LUT_SIZE] + 0.5f);
-
-    if (sx < -hwidth || sx >= hwidth || sy < -hheight || sy >= hheight) {
-        dstY[jj] = pixel_Y_lo_;
-        dstU[jj] = 128;
-        dstV[jj] = 128;
-        return;
-    }
-
-    int src_index = sx - sy * width;
-
-    dstY[jj] = srcY[src_index];
-    dstU[jj] = srcU[src_index];
-    dstV[jj] = srcV[src_index];
-}
-
 
 void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
     hexmirror_t *s = (hexmirror_t*)ptr;
-
     const int width = frame->out_width;
     const int height = frame->out_height;
-
-    uint8_t *restrict srcY = frame->data[0] - frame->offset;
-    uint8_t *restrict srcU = frame->data[1] - frame->offset;
-    uint8_t *restrict srcV = frame->data[2] - frame->offset;
-
-    uint8_t *restrict bufY = s->buf[0];
-    uint8_t *restrict bufU = s->buf[1];
-    uint8_t *restrict bufV = s->buf[2];
-
-    uint8_t *outY;
-    uint8_t *outU;
-    uint8_t *outV;
-
-    float *restrict sqrt_lut = s->sqrt_lut;
-    float *restrict cos_lut = s->cos_lut;
-    float *restrict sin_lut = s->sin_lut;
-    float *restrict atan_lut = s->atan_lut;
-
-    float theta, r, delta, last_theta = 0., last_r = 0.;
-    float x, y, a, b;
-    float side, fi, fj;
-    int last_ix = -9999, last_iy = -9999;
-
-    float ifac = args[0] * 0.01f; // Zoom
-    float sfac = log(ifac) / 2.0f; // Size (log)
-    float angleoffs = args[1] * 0.1f; // Angle offsets, rotation
-    int cw = args[2]; // Clockwise TODO
-    int swap = args[3];
-    float rotation = args[4] * 0.01f;
-    float rotationSpeed = rotation * frame->timecode;
-
-    float xangle = s->xangle;
-
-    int start, end;
-    int i, j, jj;
-
     const int centerX = width >> 1; 
     const int centerY = height >> 1;
 
+    uint8_t *outY, *outU, *outV;
+    uint8_t *srcY = frame->data[0] - frame->offset;
+    uint8_t *srcU = frame->data[1] - frame->offset;
+    uint8_t *srcV = frame->data[2] - frame->offset;
+
     if( vje_setup_local_bufs( 1, frame, &outY, &outU, &outV, NULL ) == 0 ) {
-        const int len = width * height;
-        veejay_memcpy( bufY, srcY, len );
-        veejay_memcpy( bufU, srcU, len );
-        veejay_memcpy( bufV, srcV, len );
-
-        srcY = bufY;
-        srcU = bufU;
-        srcV = bufV;    
+        veejay_memcpy( s->buf[0], srcY, width * height * 3 );
+        srcY = s->buf[0];
+        srcU = s->buf[0] + (width * height);
+        srcV = s->buf[0] + (width * height * 2);    
     }
+    const float sfac = logf(args[0] * 0.01f) * 0.5f; 
+    const float side = (width < height ? centerX / RT32 : centerY) * sfac;
+    const float sidex = side * RT3, sidey = side * 1.5f;
+    const float hsidex = sidex * 0.5f, hsidey = sidey * 0.5f;
+    const float inv_sidex = 1.0f / sidex, inv_sidey = 1.0f / sidey;
+    const float side_off = side / FIVE_PI3;
 
+    const float norm_speed = args[4] * 0.01f;
+    s->xangle = wrap_angle(s->xangle + (norm_speed * norm_speed * 0.02f * (args[2] ? 1 : -1)));
+    const float render_angle = wrap_angle(s->xangle + (args[1] / 360.0f) * TWO_PI);
+    const float delta = render_angle - ONE_PI2;
 
-    void (*put_pixel_ptr)(float, float, float, int, int, uint8_t*, uint8_t*, uint8_t*, uint8_t*, uint8_t*, uint8_t*, int, int, float*, float*);
+    const uint8_t *restrict relY = srcY + (centerY * width) + centerX;
+    const uint8_t *restrict relU = srcU + (centerY * width) + centerX;
+    const uint8_t *restrict relV = srcV + (centerY * width) + centerX;
 
-    if(!cw) {
-        rotationSpeed *= -1.0f;
-    }
+    const int start_y = centerY + (-centerY + (frame->jobnum * frame->height));
+    const int end_y = start_y + frame->height;
+    const float *restrict atan_ptr = s->atan_lut + (start_y * width);
+    const float *restrict sqrt_ptr = s->sqrt_lut + (start_y * width);
 
-    put_pixel_ptr = &put_pixel1;
-    if(swap) {
-        put_pixel_ptr = &put_pixel2;
-    }
+    for (int i = start_y; i < end_y; i++) {
+        const float fi = (float)(i - centerY);
+        uint8_t *pOutY = outY + (width * (i - start_y));
+        uint8_t *pOutU = outU + (width * (i - start_y));
+        uint8_t *pOutV = outV + (width * (i - start_y));
 
-    side = ( width < height ? centerX / RT32 : centerY );
+        for (int j = -centerX; j < centerX; j++) {
+            const float theta_base = *atan_ptr++;
+            const float r_base = *sqrt_ptr++;
+            
+            const int l_idx_rot = (int)(wrap_angle(theta_base - delta) * LUT_DIVISOR) & LUT_MASK;
+            const float a_hex = r_base * s->cos_lut[l_idx_rot];
+            const float b_hex = r_base * s->sin_lut[l_idx_rot];
 
-    xangle += (float)angleoffs / 360. * TWO_PI;
-    xangle = ( xangle >= TWO_PI ? ( xangle - TWO_PI ) : xangle );
+            float h_x, h_y;
+            calc_center(a_hex, b_hex, sidex, sidey, hsidex, hsidey, inv_sidex, inv_sidey, side_off, &h_x, &h_y);
 
-    side *= sfac;
+            float theta = atan2_approx1(h_y, h_x);
+            float r = __builtin_sqrtf(h_x * h_x + h_y * h_y);
+
+            const int l_idx_f = (int)(wrap_angle(theta + delta) * LUT_DIVISOR) & LUT_MASK;
+            const float bfi = (r * s->sin_lut[l_idx_f]) - fi;
+            const float afj = (r * s->cos_lut[l_idx_f]) - (float)j;
     
-    srcY += centerY * width + centerX;
-    srcU += centerY * width + centerX;
-    srcV += centerY * width + centerX;
+            theta = atan2_approx1(bfi, afj);
+            r = __builtin_sqrtf(bfi * bfi + afj * afj);
+            if (r < 10.0f) r = 10.0f;
 
-    start = -centerY + (frame->jobnum * frame->height);
-    end = start + frame->height;
-
-    delta = xangle - ONE_PI2;
-
-    const int yStart = centerY + start;
-    const int yEnd = centerY + end;
-    const int xStart = -centerX;
-    const int xEnd = centerX;
-
-    const int yOffset = (frame->jobnum * frame->height);
-
-    for (i = yStart; i < yEnd; i++) {
-        fi = (float)(i - centerY);
-        jj = width * (i - yStart);
-
-        for (j = xStart; j < xEnd; j++) {
-                // first find the nearest hex center to our input point
-                // hexes are rotating about the origin, this is equivalent to the point rotating
-                // in the opposite sense
-          
-                fj = (float)j;
-
-                int lut_pos = (i - yStart + yOffset) * (xEnd - xStart) + (j - xStart);
-                // get angle of this point from origin
-                theta = atan_lut[ lut_pos ];
-                // get dist of point from origin
-                r = sqrt_lut[ lut_pos ];
-                
-                // rotate point around origin
-                rotate(r, theta, -delta, &a, &b, cos_lut, sin_lut);
-                // find nearest hex center and angle to it
-                calc_center(side, a, b, &x, &y);
-
-                //theta = atan2_approx1(y, x);
-                //r = sqrt_approx(x * x + y * y);
-
-                // the hexes turn as they orbit, so calculating the angle to the center, we add the
-                // rotation amount to get the final mapping
-                int ix = (int)(x + 0.5f);
-                int iy = (int)(y + 0.5f);
-
-                if (ix == last_ix && iy == last_iy) {
-                    theta = last_theta;
-                    r = last_r;
-                } else {
-                    last_ix = ix;
-                    last_iy = iy;
-                    last_theta = theta = atan2_approx1(y, x);
-                    last_r = r = sqrt_approx(x * x + y * y);
-                }
-
-
-                rotate(r, theta, delta + rotationSpeed, &a, &b, cos_lut, sin_lut);
-
-                float bfi = b - fi;
-                float afj = a - fj;
-        
-                theta = atan2_approx1(bfi, afj);
-                r = sqrt_approx( bfi * bfi + afj * afj );
-
-                if (r < 10.0f) {
-                    r = 10.0f;
-                    theta = atan2_approx1(bfi, afj);
-                    rotate(r, theta, delta, &a, &b, cos_lut, sin_lut);
-                }
-
-                put_pixel_ptr(xangle, theta, r, centerY, centerX, srcY, srcU, srcV, outY, outU, outV, jj, width, cos_lut, sin_lut);
-                jj++;
-         }
-     }
+            process_pixel(args[3], render_angle, theta, r, centerY, centerX, 
+                        (uint8_t*)relY, (uint8_t*)relU, (uint8_t*)relV, 
+                        pOutY, pOutU, pOutV, width, s->cos_lut, s->sin_lut);
+            pOutY++; 
+            pOutU++; 
+            pOutV++;
+        }
+    }
 }
-
