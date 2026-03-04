@@ -47,6 +47,5 @@ typedef struct
 
 extern void	composite_add_to_config( void *compiz, void *vc, int which_vp );
 extern void	*composite_load_config( void *compiz, void *vc, void *backing, int *result );
-extern void *composite_get_config( void *compiz );
 extern void *composite_clone( void *compiz );
 #endif
