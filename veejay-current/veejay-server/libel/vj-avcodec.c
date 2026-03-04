@@ -89,13 +89,6 @@ static char*	vj_avcodec_get_codec_name(int codec_id )
 	return vj_strdup(name);
 }
 
-void			vj_libav_ffmpeg_version(void)
-{
-	veejay_msg( VEEJAY_MSG_INFO, "libav versions:");
-	veejay_msg( VEEJAY_MSG_INFO, "\tavcodec-%d.%d.%d (%d)", LIBAVCODEC_VERSION_MAJOR, LIBAVCODEC_VERSION_MINOR, LIBAVCODEC_VERSION_MICRO, LIBAVCODEC_BUILD );
-}
-
-
 uint8_t 		*vj_avcodec_get_buf( vj_encoder *av )
 {
 #ifdef SUPPORT_READ_DV2
@@ -180,7 +173,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 	e->in_frame->format = vj_to_pixfmt( out_pixel_format );
 	e->in_frame->stride[3] = 0;
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Selected output pixel format: %s (internal out fmt %d, chroma %d). Source is %s", yuv_get_pixfmt_description(pf), selected_out_pixfmt, chroma_val,
+	veejay_msg(VEEJAY_MSG_DEBUG, "[AV] Selected output pixel format: %s (internal out fmt %d, chroma %d). Source is %s", yuv_get_pixfmt_description(pf), selected_out_pixfmt, chroma_val,
 	 	yuv_get_pixfmt_description(e->in_frame->format));
 
 
@@ -189,7 +182,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 		tmpl.flags = 1;
 		e->scaler = yuv_init_swscaler( e->in_frame,e->out_frame, &tmpl, yuv_sws_get_cpu_flags());
 		if(e->scaler == NULL) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Failed to initialize scaler context");
+			veejay_msg(VEEJAY_MSG_ERROR, "[AV] Failed to initialize scaler context");
 			free(e->out_frame);
 			free(e->in_frame);
 			free(e->data[0]);
@@ -203,7 +196,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 	{
 		if(!is_dv_resolution(frame->width, frame->height ))
 		{	
-			veejay_msg(VEEJAY_MSG_ERROR,"\tSource video is not in DV resolution");
+			veejay_msg(VEEJAY_MSG_ERROR,"[AV] Source video is not in DV resolution");
 			free(e->out_frame);
 			free(e->in_frame);
 			free(e->data[0]);
@@ -230,7 +223,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 	if( id == 995 || id == 994) {
 		e->y4m = vj_yuv4mpeg_alloc(frame->width,frame->height,frame->fps, selected_out_pixfmt );
 		if( !e->y4m) {
-			veejay_msg(0, "Error while trying to setup Y4M stream, abort");
+			veejay_msg(0, "[AV] Error while trying to setup Y4M stream, abort");
 			free(e->out_frame);
 			free(e->in_frame);
 			free(e->data[0]);
@@ -243,7 +236,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 
 		if( vj_yuv_stream_start_write( e->y4m, frame,filename,chroma_val )== -1 )
 		{
-			veejay_msg(0, "Unable to write header to  YUV4MPEG stream");
+			veejay_msg(0, "[AV] Unable to write header to  YUV4MPEG stream");
 			vj_yuv4mpeg_free( e->y4m );
 			free(e->out_frame);
 			free(e->in_frame);
@@ -265,7 +258,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 			if(!e->codec)
 			{
 			 char *descr = vj_avcodec_get_codec_name(id);
-			 veejay_msg(VEEJAY_MSG_ERROR, "Unable to find encoder '%s'", 	descr );
+			 veejay_msg(VEEJAY_MSG_ERROR, "[AV] Unable to find encoder '%s'", 	descr );
 			 free(e->out_frame);
 			 free(e->in_frame);
 			 free(e->data[0]);
@@ -308,7 +301,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 
 	    int av_ret = av_frame_get_buffer(e->frame, 0);
 		if( av_ret < 0 ) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to allocate buffers for encoder");
+			veejay_msg(VEEJAY_MSG_ERROR, "[AV] Unable to allocate buffers for encoder");
 			 free(e->out_frame);
 			 free(e->in_frame);
 			 free(e->data[0]);
@@ -357,7 +350,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 #endif
 		if( ret < 0 ) {
 			av_strerror( ret, errbuf, sizeof(errbuf));
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to open codec '%s': %s" , descr, errbuf );
+			veejay_msg(VEEJAY_MSG_ERROR, "[AV] Unable to open codec '%s': %s" , descr, errbuf );
 			avhelper_free_context( &(e->context) );
 			free(e->out_frame);
 			free(e->in_frame);
@@ -368,16 +361,16 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "\tOpened codec %s [in pixfmt=%d]", descr, e->context->pix_fmt );
+			veejay_msg(VEEJAY_MSG_DEBUG, "[AV] Opened codec %s [in pixfmt=%d]", descr, e->context->pix_fmt );
 			if(e->context->color_range == AVCOL_RANGE_JPEG ) {
-				veejay_msg(VEEJAY_MSG_INFO, "color range is jpeg");
+				veejay_msg(VEEJAY_MSG_DEBUG, "[AV] Full pixel range (0-255)");
 			}
 			if(e->context->color_range == AVCOL_RANGE_UNSPECIFIED) {
-				veejay_msg(VEEJAY_MSG_WARNING, "Color range not specified" );
+				veejay_msg(VEEJAY_MSG_WARNING, "[AV] Limited range (not specified)" );
 			}
 
 			if(e->context->color_range == AVCOL_RANGE_MPEG ) {
-				veejay_msg(VEEJAY_MSG_INFO, "color range is mpeg");
+				veejay_msg(VEEJAY_MSG_INFO, "[AV] Limited pixel range (16-240)");
 			}
 
 			free(descr);
@@ -432,6 +425,13 @@ void		vj_avcodec_close_encoder( vj_encoder *av )
 	av = NULL;
 }
 
+int		vj_avcodec_is_internal(int format) {
+	if( format == ENCODER_MJPEG || format == ENCODER_QUICKTIME_MJPEG || format == ENCODER_DVVIDEO || format == ENCODER_QUICKTIME_DV ||
+		format == ENCODER_HUFFYUV || format == ENCODER_LJPEG )
+		return 0;
+	return 1;
+}
+
 int		vj_avcodec_find_codec( int encoder )
 {
 	switch( encoder)
@@ -463,7 +463,7 @@ int		vj_avcodec_find_codec( int encoder )
 		case ENCODER_YUV4MPEG420:
 			return 994;
 		default:
-			veejay_msg(VEEJAY_MSG_DEBUG, "Unknown format %d selected", encoder );
+			veejay_msg(VEEJAY_MSG_DEBUG, "[AV] Unknown format %d selected", encoder );
 			return 0;
 	}
 	return 0;
@@ -501,7 +501,7 @@ char		vj_avcodec_find_lav( int encoder )
 		case ENCODER_YUV4MPEG420:
 			return 'S';
 		default:
-			veejay_msg(VEEJAY_MSG_DEBUG, "Unknown format %d selected", encoder );
+			veejay_msg(VEEJAY_MSG_DEBUG, "[AV] Unknown format %d selected", encoder );
 			return 0;
 	}
 	return 0;
@@ -573,14 +573,14 @@ void 		*vj_avcodec_start( VJFrame *frame, int encoder, char *filename )
 	void *ee = NULL;
 #ifndef SUPPORT_READ_DV2
 	if( codec_id == CODEC_ID_DVVIDEO ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "No support for DV encoding built in");
+		veejay_msg(VEEJAY_MSG_ERROR, "[AV] No support for DV encoding built in");
 		return NULL;
 	}
 #endif	
 	ee = vj_avcodec_new_encoder( codec_id, frame ,filename);
 	if(!ee)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "\tFailed to start encoder %x",encoder);
+		veejay_msg(VEEJAY_MSG_ERROR, "[AV] Failed to start encoder %x",encoder);
 		return NULL;
 	}
 	return ee;
@@ -594,15 +594,13 @@ int		vj_avcodec_init( int pixel_format, int verbose)
 	char *av_log_setting = getenv("VEEJAY_AV_LOG");
 	if(av_log_setting != NULL) {
 		int level = atoi(av_log_setting);
-		veejay_msg(VEEJAY_MSG_DEBUG, "ffmpeg/libav log level set to %d", level);
+		veejay_msg(VEEJAY_MSG_DEBUG, "[AV] ffmpeg/libav log level set to %d", level);
 		av_log_set_level(level);
 	}
 	else {
-		veejay_msg(VEEJAY_MSG_DEBUG, "ffmpeg/libav log level not set (use VEEJAY_AV_LOG=level)");
+		veejay_msg(VEEJAY_MSG_DEBUG, "[AV] ffmpeg/libav log level not set (use VEEJAY_AV_LOG=level)");
 		av_log_set_level( AV_LOG_QUIET);
 	}
-
-	veejay_msg(VEEJAY_MSG_INFO, "ffmpeg/libav library version %d.%d.%d", LIBAVCODEC_VERSION_MAJOR, LIBAVCODEC_VERSION_MINOR, LIBAVCODEC_VERSION_MICRO);
 
 #if LIBAVCODEC_VERSION_MAJOR < 54
 	avcodec_register_all();
@@ -615,11 +613,9 @@ int		vj_avcodec_init( int pixel_format, int verbose)
 	return 1;
 }
 
-int		vj_avcodec_free(void)
-{
-	return 1;
+int	    vj_avcodec_print_version(void) {
+	veejay_msg(VEEJAY_MSG_INFO, "[AV] ffmpeg/libav library version %d.%d.%d", LIBAVCODEC_VERSION_MAJOR, LIBAVCODEC_VERSION_MINOR, LIBAVCODEC_VERSION_MICRO);
 }
-
 
 static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[4], uint8_t *dst)
 {
@@ -638,8 +634,6 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[4], uint8_t *dst
 
 	yuv_convert_and_scale( av->scaler, A, B);
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "From %s -> %s (%d, %d)",  yuv_get_pixfmt_description(A->format), yuv_get_pixfmt_description(B->format), B->len, B->uv_len);
-	
 	return (B->len + B->uv_len + B->uv_len);
 }
 
@@ -655,12 +649,12 @@ static int vj_avcodec_encode_video( AVPacket *pkt, AVCodecContext *ctx, uint8_t 
 		int res = avcodec_encode_video2( ctx, pkt, frame, &got_packet_ptr);
 		if( res < 0) {
 			av_strerror( res, errbuf, sizeof(errbuf));
-			veejay_msg(0, "Unable to encode frame: %s", errbuf);
+			veejay_msg(0, "[AV] Unable to encode frame: %s", errbuf);
 			return -1;
 		}
 
 		if( res == 0 ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Encoded frame to %d bytes", pkt->size);
+			veejay_msg(VEEJAY_MSG_DEBUG, "[AV] Encoded frame to %d bytes", pkt->size);
 			return pkt->size;
 		}
 
@@ -670,17 +664,12 @@ static int vj_avcodec_encode_video( AVPacket *pkt, AVCodecContext *ctx, uint8_t 
 		return avcodec_encode_video(ctx,buf,len,frame);
 	}
 #else
-/*	AVFrame *enc_frame = av_frame_clone(frame);
-	if(!enc_frame) {
-		veejay_msg(0, "Failed to clone frame");
-		return -1;
-	} */
 
 	int ret = avcodec_send_frame( ctx, frame );
 	//av_frame_free(&enc_frame);
 
 	if( ret < 0 ) {
-		veejay_msg(0, "Error sending frame to decoder: %s", av_err2str(ret));
+		veejay_msg(0, "[AV] Error sending frame to decoder: %s", av_err2str(ret));
 		return -1;
 	}
 
@@ -699,12 +688,12 @@ static int vj_avcodec_encode_video( AVPacket *pkt, AVCodecContext *ctx, uint8_t 
 			break;
 		}
 		else if( ret < 0 ) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Encoding failed: %s",av_err2str(ret));
+			veejay_msg(VEEJAY_MSG_ERROR, "[AV] Encoding failed: %s",av_err2str(ret));
 		}
 	 
 	 	int copy_size = pkt->size;
 		if( total_bytes + copy_size > len ) {
-			veejay_msg(VEEJAY_MSG_WARNING,"Output buffer too small (%d < %d), truncating", len, total_bytes + copy_size );
+			veejay_msg(VEEJAY_MSG_WARNING,"[AV] Output buffer too small (%d < %d), truncating", len, total_bytes + copy_size );
 			copy_size = len - total_bytes;
 		}
 
@@ -724,8 +713,9 @@ static int vj_avcodec_encode_video( AVPacket *pkt, AVCodecContext *ctx, uint8_t 
 
 void	vj_avcodec_flush_frame(void *encoder, uint8_t *buf, int buf_len ) 
 {
-#if LIBAVCODEC_VERSION_MAJOR >= 60
 	vj_encoder *av = (vj_encoder*) encoder;
+#if LIBAVCODEC_VERSION_MAJOR >= 60
+
 	int total_bytes = 0;
 
 	avcodec_send_frame(av->context, NULL);
@@ -741,13 +731,13 @@ void	vj_avcodec_flush_frame(void *encoder, uint8_t *buf, int buf_len )
 			break;
 		}
 		else if (ret < 0) {
-			veejay_msg(0, "Error receiving packet during flush: %s", av_err2str(ret));
+			veejay_msg(0, "[AV] Error receiving packet during flush: %s", av_err2str(ret));
 			break;
 		}
 
 		int copy_size = pkt->size;
 		if( total_bytes + copy_size > buf_len ) {
-			veejay_msg(0, "Flush buffer too small (%d < %d), truncating", buf_len, total_bytes + copy_size );
+			veejay_msg(0, "[AV] Flush buffer too small (%d < %d), truncating", buf_len, total_bytes + copy_size );
 			copy_size = buf_len - total_bytes;
 		}
 
@@ -848,7 +838,7 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 	//av->frame->quality = 1;
 	int ret = vj_avcodec_encode_video( av->packet, av->context, buf, buf_len, av->frame );
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Encoded frame %ld to %d bytes" ,nframe, ret );
+	veejay_msg(VEEJAY_MSG_DEBUG, "[AV] Encoded frame %ld to %d bytes" ,nframe, ret );
 
 	return ret;
 #endif
