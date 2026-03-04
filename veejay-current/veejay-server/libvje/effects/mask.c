@@ -32,7 +32,7 @@ vj_effect *simplemask_init(int w, int h )
 	ve->limits[0][0] = 0;
 	ve->limits[1][0] = 255;
 	ve->limits[0][1] = 0;
-	ve->limits[1][1] = 2;
+	ve->limits[1][1] = 1;
 	ve->defaults[0] = 128;
 	ve->defaults[1] = 0;
 	ve->description = "Binary Threshold Mask";
@@ -45,70 +45,61 @@ vj_effect *simplemask_init(int w, int h )
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 1,
-			"Normal", "Threshold Black", "Threshold White" );
+			"Threshold Black", "Threshold White" );
 
  	return ve;
 }
 
-static void mask_replace_black(uint8_t *yuv1[3], uint8_t *yuv2[3],
-                               const int w, const int h, const int len, int threshold) {
-  unsigned int i=0;
-  for(i=0; i < len; i++) {
-    if (yuv1[0][i] > threshold) {
-      yuv1[0][i] = yuv2[0][i];
-      yuv1[1][i] = yuv2[1][i];
-      yuv1[2][i] = yuv2[2][i];
-    } 
-  }
-}
+static void mask_replace_black_fill(uint8_t **restrict yuv1, uint8_t **restrict yuv2,
+                                    const size_t len, const int threshold)
+{
+    uint8_t *restrict Y  = yuv1[0];
+    uint8_t *restrict Cb = yuv1[1];
+    uint8_t *restrict Cr = yuv1[2];
 
-static void mask_replace_black_fill(uint8_t *yuv1[3], uint8_t *yuv2[3],
-                                    const int w, const int h, const int len, int threshold) {
-  unsigned int i=0;
-  for(i=0; i < len; i++) {
-    if (yuv1[0][i] > threshold) {
-      yuv1[0][i] = yuv2[0][i];
-      yuv1[1][i] = yuv2[1][i];
-      yuv1[2][i] = yuv2[2][i];
-    } 
-    else {
-      yuv1[0][i] = 16;
-      yuv1[1][i] = 128;
-      yuv1[2][i] = 128;
+    const uint8_t *restrict Y2  = yuv2[0];
+    const uint8_t *restrict Cb2 = yuv2[1];
+    const uint8_t *restrict Cr2 = yuv2[2];
+
+#pragma omp simd
+    for (size_t i = 0; i < len; i++)
+    {
+        const uint8_t mask = -(Y[i] < (uint8_t)threshold);
+        Y[i]  = (Y2[i] & mask)  | (Y[i]  & ~mask);
+        Cb[i] = (Cb2[i] & mask) | (Cb[i] & ~mask);
+        Cr[i] = (Cr2[i] & mask) | (Cr[i] & ~mask);
     }
-  }
 }
 
-static void mask_replace_white_fill(uint8_t *yuv1[3], uint8_t *yuv2[3],
-                                    const int w, const int h, const int len, int threshold) {
-  unsigned int i=0;
-  for(i=0; i < len; i++) {
-    if (yuv1[0][i] > threshold) {
-      yuv1[0][i] = yuv2[0][i];
-      yuv1[1][i] = yuv2[1][i];
-      yuv1[2][i] = yuv2[2][i];
-    } 
-    else {
-      yuv1[0][i] = pixel_Y_hi_;
-      yuv1[1][i] = 128;
-      yuv1[2][i] = 128;
+static void mask_replace_white_fill(uint8_t **restrict yuv1, uint8_t **restrict yuv2,
+                                    const size_t len, const int threshold)
+{
+    uint8_t *restrict Y  = yuv1[0];
+    uint8_t *restrict Cb = yuv1[1];
+    uint8_t *restrict Cr = yuv1[2];
+
+    const uint8_t *restrict Y2  = yuv2[0];
+    const uint8_t *restrict Cb2 = yuv2[1];
+    const uint8_t *restrict Cr2 = yuv2[2];
+
+#pragma omp simd
+    for (size_t i = 0; i < len; i++)
+    {
+        const uint8_t mask = -(Y[i] > (uint8_t)threshold);
+        Y[i]  = (Y2[i] & mask)  | (Y[i]  & ~mask);
+        Cb[i] = (Cb2[i] & mask) | (Cb[i] & ~mask);
+        Cr[i] = (Cr2[i] & mask) | (Cr[i] & ~mask);
     }
-  }
 }
-
 void simplemask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
-    int threshold = args[0];
-    int invert = args[1];
+  const int threshold = args[0];
+  const int invert = args[1];
 
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-	const int len = frame->len;
+	const size_t len = (size_t) frame->len;
 	switch(invert) {
-		case 0 : mask_replace_black(frame->data,frame2->data,width,height,len,threshold);
+		case 0: mask_replace_black_fill(frame->data,frame2->data,len,threshold);
 			break;
-		case 1 : mask_replace_black_fill(frame->data,frame2->data,width,height,len,threshold);
-			break;
-		case 2: mask_replace_white_fill(frame->data,frame2->data,width,height,len,threshold);
+		case 1: mask_replace_white_fill(frame->data,frame2->data,len,threshold);
 			break;
     	}  
 }
