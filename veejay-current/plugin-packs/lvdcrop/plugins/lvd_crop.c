@@ -44,6 +44,7 @@ int	init_instance( livido_port_t *my_instance )
 
     c->buf[1]     = c->buf[0] + (w*h);
 	c->buf[2]     = c->buf[1] + (w*h);
+	c->buf[3]     = c->buf[2] + (w*h);
 
 	c->w		  = -1;
 	c->h		  = -1; 
@@ -71,75 +72,76 @@ livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 	return LIVIDO_NO_ERROR;
 }
 
-static int	lvd_zcrop_plane_z( uint8_t *D, int left, int right, int top, int bottom, int w, int h, uint8_t B, uint8_t alpha )
+static int lvd_zcrop_plane_z(uint8_t *D, int left, int right, int top, int bottom, int w, int h, uint8_t B, uint8_t alpha)
 {
-	int x,y;
-	uint8_t *dst = D;
-	
-	for( y = 0; y < top; y ++ ) {
-		livido_memset( dst, B, w );
-		dst += w;
-	}
+    uint8_t *dst = D;
+    int y;
 
-	for( y = top; y < bottom; y ++ ) {
-		for( x = 0; x < left; x ++ ) {
-			*(dst++) = B;
-		}
+    if (top > 0) {
+        livido_memset(dst, B, (size_t)top * w);
+        dst += (top * w);
+    }
 
-		for( x = left; x < right; x++ ) {
-			*(dst++) = alpha;
-		}
+    int mid_h    = bottom - top;
+    int mid_w    = right - left;
+    int right_w  = w - right;
 
-		for( x = right; x < w; x ++ ) {
-			*(dst++) = B;
-		}
-	}
+    for (y = 0; y < mid_h; y++) {
+        if (left > 0)    livido_memset(dst, B, left);
+        if (mid_w > 0)   livido_memset(dst + left, alpha, mid_w);
+        if (right_w > 0) livido_memset(dst + right, B, right_w);
+        dst += w;
+    }
 
-	for( y = bottom; y < h; y ++ ) {
-		livido_memset( dst,B, w );
-		dst += w;
-	}
+    int remaining_h = h - bottom;
+    if (remaining_h > 0) {
+        livido_memset(dst, B, (size_t)remaining_h * w);
+    }
 
-	return 1;
+    return 1;
 }
 
-
-static int	lvd_zcrop_plane( uint8_t *D, uint8_t *S, int left, int right, int top, int bottom, int w, int h, uint8_t B )
+static int lvd_zcrop_plane(uint8_t *D, uint8_t *S, int left, int right, int top, int bottom, int w, int h, uint8_t B)
 {
-	int x,y;
-	uint8_t *src = S;
-	uint8_t *dst = D;
-	
-	for( y = 0; y < top; y ++ ) {
-		livido_memset( dst, B, w );
-		dst += w;
-		src += w;
-	}
+    uint8_t *src = S;
+    uint8_t *dst = D;
+    int y;
 
-	for( y = top; y < bottom; y ++ ) {
-		for( x = 0; x < left; x ++ ) {
-			*(dst++) = B;
-		}
+    if (top > 0) {
+        livido_memset(dst, B, (size_t)top * w);
+        dst += (top * w);
+        src += (top * w);
+    }
 
-		src += left;
 
-		for( x = left; x < right; x++ ) {
-			*(dst++) = *(src++);
-		}
+    int mid_h    = bottom - top;
+    int mid_w    = right - left;
+    int right_w  = w - right;
 
-		for( x = right; x < w; x ++ ) {
-			*(dst++) = B;
-			src += 1;
-		}
-	}
+    for (y = 0; y < mid_h; y++) {
 
-	for( y = bottom; y < h; y ++ ) {
-		livido_memset( dst,B, w );
-		dst += w;
-		src += w;
-	}
+        if (left > 0) {
+            livido_memset(dst, B, left);
+        }
+        
+        if (mid_w > 0) {
+            livido_memcpy(dst + left, src + left, mid_w);
+        }
 
-	return 1;
+        if (right_w > 0) {
+            livido_memset(dst + right, B, right_w);
+        }
+
+        dst += w;
+        src += w;
+    }
+
+    int remaining_h = h - bottom;
+    if (remaining_h > 0) {
+        livido_memset(dst, B, (size_t)remaining_h * w);
+    }
+
+    return 1;
 }
 
 int		process_instance( livido_port_t *my_instance, double timecode )
