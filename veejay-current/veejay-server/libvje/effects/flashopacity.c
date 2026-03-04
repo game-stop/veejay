@@ -40,7 +40,7 @@ vj_effect *flashopacity_init(int w, int h)
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 255;
 
-    ve->limits[0][3] = 0;
+    ve->limits[0][3] = 1;
     ve->limits[1][3] = 500;
 
     ve->limits[0][4] = 0;
@@ -88,6 +88,15 @@ void flashopacity_free(void *ptr) {
     free(f);
 }
 
+
+static inline int32_t min_int(int32_t a, int32_t b) {
+    return b + ((a - b) & ((a - b) >> 31));
+}
+
+static inline int32_t max_int(int32_t a, int32_t b) {
+    return a - ((a - b) & ((a - b) >> 31));
+}
+
 void flashopacity_apply( void *ptr,  VJFrame *frame, VJFrame *frame2, int *args )
 {
     flash_t *f = (flash_t*) ptr;
@@ -101,67 +110,71 @@ void flashopacity_apply( void *ptr,  VJFrame *frame, VJFrame *frame2, int *args 
     const int mode = args[4];
 
     const int hInterval = interval / 2;
-    const int width = frame->width;
-
     int currentFrame = f->currentFrame;
 
-    int i;
-
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict U = frame->data[1];
-    uint8_t *restrict V = frame->data[2];
-    
-    uint8_t *restrict Y2 = frame2->data[0];
-    uint8_t *restrict U2 = frame2->data[1];
-    uint8_t *restrict V2 = frame2->data[2];
-
-    if(f->maxExposure != exposureValue) {
-        int i;
-        for( i = 0; i < TABLE_SIZE; i ++ ) {
+    if (f->maxExposure != exposureValue) {
+        for (int i = 0; i < TABLE_SIZE; i++) {
             float exposureFactor = (float)i / (float)(TABLE_SIZE - 1) * exposureValue;
-            f->explut[i] = powf(2, exposureFactor);
+            f->explut[i] = (int)(powf(2, exposureFactor) * 256.0f);
         }
         f->maxExposure = exposureValue;
     }
 
-    if( currentFrame < hInterval ) {
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict U = frame->data[1];
+    uint8_t *restrict V = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict U2 = frame2->data[1];
+    uint8_t *restrict V2 = frame2->data[2];
 
-        float exposureFactor = exposureValue * (currentFrame / (float)hInterval);
-    
-        int index = (int)(exposureFactor / exposureValue * (TABLE_SIZE - 1));
-        float powValue = f->explut[index];
+    if (currentFrame < hInterval) {
+        float ratio = (float)currentFrame / (float)hInterval;
+        int index = (int)(ratio * (TABLE_SIZE - 1));
+        int fp_multiplier = (int)f->explut[index];
         
+        #pragma omp simd
         for (int i = 0; i < len; i++) {
-              Y[i] = (uint8_t)(Y[i] * powValue > 255 ? 255 : (Y[i] * powValue));
+            int val = (Y[i] * fp_multiplier) >> 8;
+            Y[i] = (uint8_t)min_int(val, 255);
         }
 
         if (mode == 1) {
+            int lerp_fp = (currentFrame << 8) / hInterval; 
+           
+#pragma omp simd
             for (int i = 0; i < uv_len; i++) {
-                int distanceToInitialU = abs(U2[i] - U[i]);
-                int uValue = U[i] + (distanceToInitialU * currentFrame) / hInterval;
-                U[i] = (uValue > 128 ? 128 : uValue);
- 
-                int distanceToInitialV = abs(V2[i] - V[i]);
-                int vValue = V[i] + (distanceToInitialV * currentFrame) / hInterval;
-                V[i] = (vValue > 128 ? 128 : vValue);
+                // 1. Load as signed to avoid unsigned underflow wrap-around
+                int u1 = (int)U[i];
+                int v1 = (int)V[i];
+                int u2 = (int)U2[i];
+                int v2 = (int)V2[i];
+
+                // 2. Linear interpolation: start + ((end - start) * factor) >> 8
+                int resU = u1 + (((u2 - u1) * lerp_fp) >> 8);
+                int resV = v1 + (((v2 - v1) * lerp_fp) >> 8);
+
+                // 3. Branchless saturation to [0, 255]
+                U[i] = (uint8_t)max_int(0, min_int(resU, 255));
+                V[i] = (uint8_t)max_int(0, min_int(resV, 255));
             }
         }
-    }
-    else if ( currentFrame >= hInterval && currentFrame < interval) {
-        int opacity = opacityStart + (currentFrame - hInterval) * (opacityEnd - opacityStart) / hInterval;
-#pragma omp simd
-        for (i = 0; i < len; i++)
-        {
-            Y[i] = (Y[i] * (0xff - opacity) + Y2[i] * opacity) / 0xff;
+    } 
+    else {
+        int t = currentFrame - hInterval;
+        int opacity = opacityStart + (t * (opacityEnd - opacityStart)) / (interval - hInterval);
+        int inv_opacity = 0xff - opacity;
+
+        #pragma omp simd
+        for (int i = 0; i < len; i++) {
+            Y[i] = (Y[i] * inv_opacity + Y2[i] * opacity) >> 8;
         }
-#pragma omp simd
-        for( i = 0; i < uv_len; i ++ ) 
-        {
-            U[i] = (U[i] * (0xff - opacity) + U2[i] * opacity) / 0xff;
-            V[i] = (V[i] * (0xff - opacity) + V2[i] * opacity) / 0xff;
+        #pragma omp simd
+        for (int i = 0; i < uv_len; i++) {
+            U[i] = (U[i] * inv_opacity + U2[i] * opacity) >> 8;
+            V[i] = (V[i] * inv_opacity + V2[i] * opacity) >> 8;
         }
     }
 
-    f->currentFrame = (f->currentFrame + 1) % interval;
+    f->currentFrame = (currentFrame + 1) % interval;
 }
 
