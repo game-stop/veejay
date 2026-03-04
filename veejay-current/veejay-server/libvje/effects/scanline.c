@@ -86,104 +86,157 @@ void scanline_free(void *ptr) {
     free(s);
 }
 
-void scanline_apply(void *ptr, VJFrame *frame, int *args) {
-    scanline_t *s = (scanline_t*)ptr;
-    const int mode = args[0];
-    const int speed = args[1];
+void scanline_apply(void *ptr, VJFrame *frame, int *args)
+{
+    scanline_t *s = (scanline_t*) ptr;
+
+    const int mode     = args[0];
+    const int speed    = args[1];
     const int duration = args[2];
 
-    const int len = frame->width * frame->height;
-    const int width = frame->width;
+    const int width  = frame->width;
     const int height = frame->height;
+    const int len    = width * height;
 
-    uint8_t *restrict srcY = frame->data[0];
-    uint8_t *restrict srcU = frame->data[1];
-    uint8_t *restrict srcV = frame->data[2];
+    uint8_t *restrict dstY = frame->data[0];
+    uint8_t *restrict dstU = frame->data[1];
+    uint8_t *restrict dstV = frame->data[2];
 
     uint8_t *restrict bufY = s->buf[0];
     uint8_t *restrict bufU = s->buf[1];
     uint8_t *restrict bufV = s->buf[2];
 
-    int stop;
-
-    if (s->stopCount == duration) {
-        switch (mode) {
-            case 0: 
-                stop = s->prevRow + speed;
-                stop = (stop > height) ? height : stop;
-                for (int row = s->prevRow; row < stop; row++) {
-                    for (int col = 0; col < width; col++) {
-                        bufY[row * width + col] = srcY[row * width + col];
-                        bufU[row * width + col] = srcU[row * width + col];
-                        bufV[row * width + col] = srcV[row * width + col];
-                    }
-                }
-                if(stop == height )
-                    s->stopCount --;
-                s->prevRow = (s->prevRow + speed) % height;
-                break;
-            case 1:
-                stop = height - s->prevRow;
-                stop = (stop < speed) ? 0 : stop;
-                for (int row = height - 1 - s->prevRow; row >= stop; row--) {
-                    for (int col = 0; col < width; col++) {
-                        bufY[row * width + col] = srcY[row * width + col];
-                        bufU[row * width + col] = srcU[row * width + col];
-                        bufV[row * width + col] = srcV[row * width + col];
-                    }
-                }
-                s->prevRow = (s->prevRow + speed) % height;
-                if(stop == 0)
-                    s->stopCount--;
-                break;
-            case 2: 
-                stop = s->prevCol + speed;
-                stop = (stop > width) ? width : stop;
-                for (int col = s->prevCol; col < stop; col++) {
-                    for (int row = 0; row < height; row++) {
-                        bufY[row * width + col] = srcY[row * width + col];
-                        bufU[row * width + col] = srcU[row * width + col];
-                        bufV[row * width + col] = srcV[row * width + col];
-                    }
-                }
-                if(stop == width)
-                    s->stopCount--;
-                s->prevCol = (s->prevCol + speed) % width;
-                break;
-            case 3:
-                stop = width - s->prevCol;
-                stop = (stop < speed) ? 0 : stop;
-                for (int col = width - 1 - s->prevCol; col >= stop; col--) {
-                    for (int row = 0; row < height; row++) {
-                        bufY[row * width + col] = srcY[row * width + col];
-                        bufU[row * width + col] = srcU[row * width + col];
-                        bufV[row * width + col] = srcV[row * width + col];
-                    }
-                }
-                if( stop == 0 )
-                    s->stopCount--;
-                s->prevCol = (s->prevCol + speed) % width;
-                break;
-
-            default:
-                break;
-        }
-     }
-     else {
-        s->stopCount--;
-        if (s->stopCount <= 0) {
-            s->prevRow = 0; 
-            s->prevCol = 0;
+    if (s->stopCount != duration)
+    {
+        if (--s->stopCount <= 0)
+        {
+            s->prevRow   = 0;
+            s->prevCol   = 0;
             s->stopCount = duration;
-            veejay_memset( bufY, pixel_Y_lo_, width * height );
-            veejay_memset( bufU, 128, width * height );
-            veejay_memset( bufV, 128, width * height );
+
+            veejay_memset(bufY, pixel_Y_lo_, len);
+            veejay_memset(bufU, 128, len);
+            veejay_memset(bufV, 128, len);
         }
-     }
+        veejay_memcpy(dstY, bufY, len);
+        veejay_memcpy(dstU, bufU, len);
+        veejay_memcpy(dstV, bufV, len);
+        return;
+    }
 
-    veejay_memcpy( srcY, bufY, len );
-    veejay_memcpy( srcU, bufU, len );
-    veejay_memcpy( srcV, bufV, len );
+    switch (mode)
+    {
+        case 0:
+        {
+            int start = s->prevRow;
+            int stop  = start + speed;
+            if (stop > height) stop = height;
 
+            for (int row = start; row < stop; ++row)
+            {
+                const int offset = row * width;
+
+                /* write directly into buffer */
+                veejay_memcpy(bufY + offset, dstY + offset, width);
+                veejay_memcpy(bufU + offset, dstU + offset, width);
+                veejay_memcpy(bufV + offset, dstV + offset, width);
+
+                /* and immediately reflect into output */
+                veejay_memcpy(dstY + offset, bufY + offset, width);
+                veejay_memcpy(dstU + offset, bufU + offset, width);
+                veejay_memcpy(dstV + offset, bufV + offset, width);
+            }
+
+            if (stop == height)
+                s->stopCount--;
+
+            s->prevRow = (start + speed) % height;
+            break;
+        }
+        case 1:
+        {
+            int start = height - 1 - s->prevRow;
+            int stop  = height - s->prevRow - speed;
+            if (stop < 0) stop = 0;
+
+            for (int row = start; row >= stop; --row)
+            {
+                const int offset = row * width;
+
+                veejay_memcpy(bufY + offset, dstY + offset, width);
+                veejay_memcpy(bufU + offset, dstU + offset, width);
+                veejay_memcpy(bufV + offset, dstV + offset, width);
+
+                veejay_memcpy(dstY + offset, bufY + offset, width);
+                veejay_memcpy(dstU + offset, bufU + offset, width);
+                veejay_memcpy(dstV + offset, bufV + offset, width);
+            }
+
+            if (stop == 0)
+                s->stopCount--;
+
+            s->prevRow = (s->prevRow + speed) % height;
+            break;
+        }
+        case 2:
+        {
+            int start = s->prevCol;
+            int stop  = start + speed;
+            if (stop > width) stop = width;
+
+            for (int row = 0; row < height; ++row)
+            {
+                const int base = row * width;
+
+                for (int col = start; col < stop; ++col)
+                {
+                    const int idx = base + col;
+
+                    bufY[idx] = dstY[idx];
+                    bufU[idx] = dstU[idx];
+                    bufV[idx] = dstV[idx];
+
+                    dstY[idx] = bufY[idx];
+                    dstU[idx] = bufU[idx];
+                    dstV[idx] = bufV[idx];
+                }
+            }
+
+            if (stop == width)
+                s->stopCount--;
+
+            s->prevCol = (start + speed) % width;
+            break;
+        }
+        case 3:
+        {
+            int start = width - 1 - s->prevCol;
+            int stop  = width - s->prevCol - speed;
+            if (stop < 0) stop = 0;
+
+            for (int row = 0; row < height; ++row)
+            {
+                const int base = row * width;
+
+                for (int col = start; col >= stop; --col)
+                {
+                    const int idx = base + col;
+
+                    bufY[idx] = dstY[idx];
+                    bufU[idx] = dstU[idx];
+                    bufV[idx] = dstV[idx];
+
+                    dstY[idx] = bufY[idx];
+                    dstU[idx] = bufU[idx];
+                    dstV[idx] = bufV[idx];
+                }
+            }
+
+            if (stop == 0)
+                s->stopCount--;
+
+            s->prevCol = (s->prevCol + speed) % width;
+            break;
+        }
+    }
 }
-
