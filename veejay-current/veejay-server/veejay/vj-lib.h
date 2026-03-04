@@ -49,6 +49,9 @@ enum {
 #define MJPEG_MAX_BUF 2
 #define VJ_AUDIO_BUF_SIZE 16384
 
+#define AUDIO_MODE_SILENCE_FILL 0
+#define AUDIO_MODE_CONTENT 1
+
 //classic vars
 #define DUMMY_DEFAULT_WIDTH 352
 #define DUMMY_DEFAULT_HEIGHT 288
@@ -79,7 +82,7 @@ typedef struct {
 #define RANDTYPE_MIXED 3 
 #define RANDTIMER_FRAME 1
 #define RANDTIMER_LENGTH 0
-
+#define VIDEO_QUEUE_LEN 2
 typedef struct
 {
 	int mode;
@@ -87,6 +90,9 @@ typedef struct
 	int timer;
 	int min_delay;
 	int max_delay;
+	unsigned long long seed;
+	int next_id;
+	int next_mode;
 } vj_rand_player;
 
 typedef struct
@@ -117,55 +123,157 @@ typedef struct
 
 typedef struct
 {
-    int active;
+    volatile int active;
     int shape;
     int next_id;
     int next_type;
     double timecode;
-    long start;
-    long end;
-    int ready;
+    volatile long long start;
+    volatile long long end;
+	volatile long long pos_sample_b;
     void *ptr;
+    int ready;
     int global_state;
+	int skip_audio_edge;
 } transition_t;
 
+typedef enum {
+    AUDIO_EDGE_NONE = 0,
+    AUDIO_EDGE_DIRECTION, //1
+    AUDIO_EDGE_JUMP, // 2
+    AUDIO_EDGE_RESET,     // frame 0 / start
+    AUDIO_EDGE_SILENCE,   // crossfade from zero
+} audio_edge_type_t;
+
+
 typedef struct {
-	pthread_t software_playback_thread;
-	pthread_t playback_thread;
+	int    buflen;
+	int16_t *fwdL;
+	int16_t *fwdR;
+
+
+	int16_t *silenceR;
+	int16_t *silenceL;
+
+	int16_t *history;
+	int history_len;
+
+	int heuristic_applied;
+
+	volatile int    last_direction;
+	int    xfade_active;
+	
+	audio_edge_type_t pending_edge;
+	int edge_linger;
+	
+	volatile int	fwd_history_valid;
+	volatile int	rev_history_valid;
+
+	float *fade_lut;
+
+	int16_t last_sample[8];
+	int16_t last_output_sample[8];
+	int16_t prev_output_sample[8];
+
+	int     last_sample_valid;
+	int		last_best_offset;
+	long long		ticks_since_last_flip;
+
+} audio_edge_t; // FIXME delete this whole thing
+
+typedef enum {
+	BUFFER_FREE = 0,
+	BUFFER_RESERVED,
+	BUFFER_FILLED,
+	BUFFER_IN_RENDER
+} buffer_state_t;
+
+typedef struct {
+	uint8_t *pixels[VIDEO_QUEUE_LEN];
+	volatile long long seq;
+	volatile int current_write;
+} display_frame_t;
+
+typedef struct {
 	pthread_attr_t playback_attr;
-	pthread_t geo_stat;
-	pthread_mutex_t valid_mutex;
-	pthread_cond_t buffer_filled[MJPEG_MAX_BUF];
-	pthread_cond_t buffer_done[MJPEG_MAX_BUF];
-	pthread_mutex_t syncinfo_mutex;
 	pthread_t signal_thread;
+
+	VJFrame *buffers[VIDEO_QUEUE_LEN];
+	buffer_state_t states[VIDEO_QUEUE_LEN];
+	uint64_t frame_seq[VIDEO_QUEUE_LEN];
+	uint64_t next_seq;
+	pthread_mutex_t mutex;
+	pthread_mutex_t control_mutex;
+	pthread_mutex_t start_mutex;
+	pthread_cond_t start_cond;
+	int video_out_ready;
+
+	pthread_cond_t producer_wait_cv;
+	pthread_cond_t renderer_wait_cv;
+	pthread_cond_t data_ready_cv;
+	pthread_t producer_thread;
+	pthread_t renderer_thread;
+	pthread_t audio_playback_thread;
+
+	display_frame_t display_frame;
+
+	int producer_index;
+	int renderer_index;
+	volatile int warmup_active;
+	int warmup_frames;
+	volatile int frames_available;
+
+	volatile int audio_mode;
+	volatile int state;
+	volatile double audio_master_s;
+	volatile double audio_start_offset;
+	volatile long long anchor_frame;
+	
+	volatile int audio_producer_mode;
+	volatile int first_audio_frame_ready;
+	volatile int audio_slice;
+	volatile int audio_slice_len;
+	volatile int audio_needs_refill;
+	volatile int audio_pending_fade_in;
+	volatile int audio_direction_changed;
+	volatile int audio_flush_request;
+	volatile int audio_mute;
+	volatile int audio_last_stretched_samples;
+	volatile long long audio_wrap_offset;
+	int audio_needs_fade_in;
+
+	double vsync_interval_s;
+	double smoothed_drift_us;
+
 	sigset_t signal_set;
 	long slept_last_iteration;
-	struct timespec lastframe_completion;	/* software sync variable */
+	struct timespec lastframe_completion;
 	long old_field_len;
-	uint64_t save_list_len;		/* for editing purposes */
-	double spvf;		/* seconds per video frame */
-	int usec_per_frame;		/* milliseconds per frame */
-	int min_frame_num;		/* the lowest frame to be played back - normally 0 */
-	int max_frame_num;		/* the latest frame to be played back - normally num_frames - 1 */
-	int current_frame_num;	/* the current frame */
-	int current_playback_speed;	/* current playback speed */
-	int previous_playback_speed;	/* previous playback speed */
-	int currently_processed_frame;	/* changes constantly */
-	int currently_synced_frame;	/* changes constantly */
-	int first_frame;		/* software sync variable */
-	int valid[MJPEG_MAX_BUF];	/* num of frames to be played */
+	uint64_t save_list_len;
+	double spvf;
+	int usec_per_frame;
+	long long min_frame_num;
+	long long max_frame_num;
+	volatile long long current_frame_num;
+	volatile long long master_frame_num;
+	volatile long long audio_target_frame;
+	volatile int xruns;
+	int current_playback_speed;
+	int previous_playback_speed;
+	int currently_processed_frame;
+	int currently_synced_frame; // FIXME cleanup
+	int first_frame;
+	int valid[MJPEG_MAX_BUF];
 	long buffer_entry[MJPEG_MAX_BUF];
 	int render_entry;
 	int render_list;
 	int last_rendered_frame;
+	int sfd;
 	long rendered_frames;
 	long currently_processed_entry;
 	struct mjpeg_sync syncinfo[MJPEG_MAX_BUF];	/* synchronization info */
 	uint64_t *save_list;	/* for editing purposes */
 	double spas;		/* seconds per audio sample */
-	int audio_mute;		/* controls whether to currently play audio or not */
-	int state;			/* playing, paused or stoppped */
 	int offline_ready;
 	int offline_record;
 	int offline_tag_id;
@@ -208,7 +316,6 @@ typedef struct {
 	int	fxdepth;
 	int	repeat_delay;
 	int	repeat_interval;
-	int	simple_frame_dup;
 	uint32_t cycle_count[2]; //@ required for veejay-radar 
 	int	sample_restart;
 	int	feedback;
@@ -218,46 +325,57 @@ typedef struct {
 	int hold_status;
 	int auto_mute;
 	int pace_correction;
+	long pace_correction_us;
 	int	splitscreen;
 	int clear_alpha;
 	int alpha_value;
 	int audiostats;
     transition_t transition;
+	int is_rt_kernel;
+	long long clock_overshoot;
+	double pause_cost_ns;
 } video_playback_setup;
 
 typedef struct {
-    unsigned int frame;		/* current frame which is being played back          */
-    unsigned int num_corrs_a;	/* Number of corrections because video ahead audio   */
-    unsigned int num_corrs_b;	/* Number of corrections because video behind audio  */
-    unsigned int num_aerr;	/* Number of audio buffers in error                  */
-    unsigned int num_asamps;
-    unsigned int nsync;		/* Number of syncs                                   */
-    unsigned int nqueue;	/* Number of frames queued                           */
-    int play_speed;		/* current playback speed                            */
-    int audio;			/* whether audio is currently turned on              */
-    int norm;			/* [0-2] playback norm: 0 = PAL, 1 = NTSC, 2 = SECAM */
-    double tdiff;		/* video/audio time difference (sync debug purposes) */
+    long long current_frame;
+    long long skipped_frames;
+	long long dropped_frames;
+    long long queued_frames;
+    double audio_anchor_s;
+    double last_audio_master_s;
+    double last_pts_s;
+    double delta_s;
+
+    double playback_speed;
+    long long total_frames_produced;
+    long long total_frames_skipped;
+    long long warmup_frames_done;
+	double render_duration;
+
+    int underruns;
+    int overruns;
+	int xruns;
 } video_playback_stats;
 
-/* User Control , it keeps track of user's actions */
+
 typedef struct {
-    int playback_mode;		/* playing plain,sample,tag or pattern */
-    int sample_id;		/* which sample or tag is beeing played */
+    int playback_mode;
+    int sample_id;
     char *filename;
-    int hackme;
+    int take_screenshot;
     int take_bg;
-    int direction;		/* forward, reverse or pause */
-    int looptype;		/* loop setting depending on playmode */
-    long sample_end;		/* end of sample */
-    long sample_start;		/* start of sample */
-    int play_sample;		/* playing sample or not */
-    int key_effect;		/* selected effect */
-    int effect_id;		/* current effect id */
+    int direction;
+    int looptype;
+    long sample_end;
+    long sample_start;
+    int play_sample;
+    int key_effect;
+    int effect_id;
     int loops;
     int next;
-    int sample_key;		/* sample by key */
-    int sample_select;		/* selected sample */
-    int sample_pressed;		/* which sample key was pressed */
+    int sample_key;
+    int sample_select;
+    int sample_pressed;
     int chain_changed;
     int use_timer;
     int rtc_fd;
@@ -280,22 +398,34 @@ typedef struct {
 } user_control;
 
 typedef struct {
-    int video_output_width;		/* width of the SDL playback window in case of software playback */
-    int video_output_height;		/* height of the SDL playback window in case of software playback */
-    int double_factor;		/* while playing, duplicate each frame double_factor times */
+	sample_eff_chain *fx_chain[SAMPLE_MAX_EFFECTS];
+	int enabled;
+	int origin_id;
+	int origin_mode;
+ } global_chain_t;
+
+#define VIDEO_OUT_SDL 0 
+#define VIDEO_OUT_DFB 1
+#define VIDEO_OUT_Y4M 3
+#define VIDEO_OUT_NONE 4
+
+typedef struct {
+    int video_output_width;
+    int video_output_height;
+    int double_factor;
     int preserve_pathnames;
-    int audio;			/* [0-1] Whether to play audio, 0 = no, 1 = yes */
-    int continuous;		/* [0-1] 0 = quit when the video has been played, 1 = continue cycle */
-    int sync_correction;	/* [0-1] Whether to enable sync correction, 0 = no, 1 = yes */
-    int sync_skip_frames;	/* [0-1] If video is behind audio: 1 = skip video, 0 = insert audio */
-    int sync_ins_frames;	/* [0-1] If video is ahead of audio: 1 = insert video, 0 = skip audio */
+    int audio;
+    int continuous;
+    int sync_correction; // FIXME remove
+    int sync_skip_frames;
+    int sync_ins_frames;
     int auto_deinterlace;
     int load_action_file;
     int load_sample_file;
     editlist *current_edit_list;
-    editlist *edit_list;		/* the playing editlist */
-    editlist *plain_editlist;	/* editlist loaded from command line */
-	user_control *uc;		/* user control */
+    editlist *edit_list;
+    editlist *plain_editlist;
+	user_control *uc;
     void *osc;
     VJFrame *plugin_frame;
     VJFrameInfo *plugin_frame_info; 
@@ -318,7 +448,7 @@ typedef struct {
 #ifdef HAVE_SDL
     void *sdl;
 #endif
-    vj_yuv *output_stream;	/* output stream for dumping video */
+    vj_yuv *output_stream;
     void *vloopback; // vloopback output
     void *video_out_scaler;
     int render_now;	        /* write RGB */
@@ -335,7 +465,8 @@ typedef struct {
     int net;
     int render_entry;
     int render_continue;
-    video_playback_setup *settings;	/* private info - don't touch :-) (type UNKNOWN) */
+    video_playback_setup *settings;
+	video_playback_stats stats;
     int real_fps;
     int dump;
     int verbose;
@@ -366,7 +497,7 @@ typedef struct {
 	unsigned long *cpumask;
 	int	ncpus;
 	int	sz;
-	int	audio_running;
+	volatile int audio_running;
 	int	*rlinks;
 	int *splitted_screens;
 	int	*rmodes;
@@ -378,8 +509,8 @@ typedef struct {
     int borderless;
 	int 	qrcode;
     int read_plug_cfg;
-
     void *performer;
+	global_chain_t *global_chain;
 } veejay_t;
 
 typedef struct {

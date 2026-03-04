@@ -28,11 +28,13 @@
 #include <SDL2/SDL.h>
 #endif
 #include <stdarg.h>
+#include <signal.h>
 #include <veejaycore/defs.h>
 #include <veejaycore/hash.h>
 #include <libvje/vje.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vj-msg.h>
+#include <veejaycore/atomic.h>
 #include <libsubsample/subsample.h>
 #include <veejay/vj-lib.h>
 #include <veejay/vj-perform.h>
@@ -170,6 +172,7 @@ static void vj_event_sample_next1( veejay_t *v );
 
 extern void veejay_pipe_write_status(veejay_t *info);
 extern int  _vj_server_del_client(vj_server * vje, int link_id);
+extern int       vj_event_exists( int id );
 
 // forward decl
 int vj_event_get_video_format(void)
@@ -202,6 +205,18 @@ typedef enum { //WARNING ; on change this think to update keyboard_event_map_[] 
 #define VIMS_MOD_CTRL_ALT_SHIFT   VIMS_MOD_CTRL|VIMS_MOD_ALT|VIMS_MOD_SHIFT
 
 static int vims_logging = 0;
+
+
+#define EVENT_QUEUE_SIZE 384
+typedef struct {
+    SDL_Event events[EVENT_QUEUE_SIZE];
+	int mod_state;
+    volatile int head;
+    volatile int tail;
+} sdl_event_t;
+
+static sdl_event_t EVENT_QUEUE;
+static int EVENT_MOD_STATE = 0;
 
 static struct {                 /* hardcoded keyboard layout (the default keys) */
     int event_id;           
@@ -522,7 +537,7 @@ static  void    vj_event_macro_get_loop_dup( veejay_t *v, int *at_dup, int *at_l
         *at_loop = vj_tag_get_loop_stats( v->uc->sample_id );
     }
     else if ( PLAIN_PLAYING(v)) {
-        *at_dup = v->settings->simple_frame_dup;
+        *at_dup = 0;
         *at_loop = 0;
     }
 }
@@ -972,7 +987,7 @@ void vj_event_parse_bundle(veejay_t *v, char *msg )
     }
 }
 
-void vj_event_dump(void)
+void vj_event_dump()
 {
     vj_event_vevo_dump();
     
@@ -1357,7 +1372,8 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
             int at_dup = 0;
             int at_loop = 0;
             vj_event_macro_get_loop_dup(v, &at_dup, &at_loop );
-            if(vj_macro_put( macro, msg, v->settings->current_frame_num, at_dup, at_loop ) == 0 ) {
+            if(vj_macro_put(macro, msg, atomic_load_long_long(&v->settings->current_frame_num), at_dup, at_loop) == 0) {
+
                 veejay_msg(0, "[Macro] max number of VIMS messages for this position reached");
             } else {
                 vj_macro_set_loop_stat_stop( macro, loop_stat_stop );
@@ -1484,7 +1500,7 @@ void vj_event_update_remote(void *ptr)
         vj_event_macro_get_loop_dup(v, &at_dup, &at_loop );
 
         char key[32];
-        vj_macro_get_key(v->settings->current_frame_num, at_dup, at_loop , key, sizeof(key));
+        vj_macro_get_key(atomic_load_long_long(&v->settings->current_frame_num), at_dup, at_loop, key, sizeof(key));
 
         char **vims_messages = vj_macro_play_event( macro, key );
 
@@ -1503,6 +1519,42 @@ void    vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod)
 {
     char bundle[4096];
     vj_event_create_effect_bundle(v, bundle, key_num, key_mod );
+}
+
+int     vj_event_push(void *eptr, int mod )
+{
+    int tail = atomic_load_int(&EVENT_QUEUE.tail);
+    int next = (tail + 1) % EVENT_QUEUE_SIZE;
+
+    int head = atomic_load_int(&EVENT_QUEUE.head);
+    if( next == head ) {
+        veejay_msg(VEEJAY_MSG_DEBUG, "Event queue is full");
+        return 0;
+    }
+
+    SDL_Event *e = (SDL_Event*) eptr;
+
+    EVENT_MOD_STATE = mod;
+    EVENT_QUEUE.events[tail] = *e;
+
+    atomic_store_int(&EVENT_QUEUE.tail, next );
+    return 1;
+}
+
+int     vj_event_pop(void *eptr, int *mod_state)
+{
+    int head = atomic_load_int(&EVENT_QUEUE.head);
+    int tail = atomic_load_int(&EVENT_QUEUE.tail);
+
+    if(head == tail)
+        return 0;
+    SDL_Event *e = (SDL_Event*) eptr;
+
+    *e = EVENT_QUEUE.events[head];
+    *mod_state = EVENT_MOD_STATE;
+
+    atomic_store_int(&EVENT_QUEUE.head, (head+1) % EVENT_QUEUE_SIZE);
+    return 1;
 }
 
 #ifdef HAVE_SDL
@@ -2081,7 +2133,7 @@ int     vj_event_register_keyb_event(int event_id, int symbol, int modifier, con
     return vj_event_update_key_collection(ff, index);
 }
 #endif
-static void vj_event_init_network_events(void)
+static void vj_event_init_network_events()
 {
     int i;
     int net_id = 0;
@@ -2154,7 +2206,7 @@ static void vj_event_load_keyboard_configuration(veejay_t *info)
     fclose(f);
 }
 
-static void vj_event_init_keyboard_defaults(void)
+static void vj_event_init_keyboard_defaults()
 {
     int i;
     int keyb_events = 0;
@@ -2182,6 +2234,7 @@ void vj_event_init(void *ptr)
     int i;
 #ifdef HAVE_SDL 
     veejay_memset( keyboard_event_map_, 0, sizeof(keyboard_event_map_));
+    veejay_memset( &EVENT_QUEUE, 0, sizeof(EVENT_QUEUE));
 #endif
     vj_init_vevo_events();
 #ifdef HAVE_SDL
@@ -2364,27 +2417,7 @@ void vj_event_no_caching(void *ptr, const char format[], va_list ap)
     else
         v->no_caching = 1;
 
-    if(v->no_caching==1)
-    {
-        int i = 0;
-        int k = 0;
-        int n = sample_highest();
-        vj_el_break_cache( v->edit_list );
-        for( i = 1; i <= n; i ++ ) {
-            editlist *e = sample_get_editlist(i);
-            if(e) {
-                vj_el_break_cache(e); k++;
-            }
-        }
-        veejay_msg(VEEJAY_MSG_INFO,"Cleared %d samples from cache", k );
-    }
-    else
-    {
-        vj_el_setup_cache( v->current_edit_list );
-        veejay_msg(VEEJAY_MSG_INFO,"Sample FX Cache enabled : Recycling identical samples in FX chain (default)"); 
-    }
-
-    vj_el_set_caching(v->no_caching);
+    
 }
 
 void vj_event_debug_level(void *ptr, const char format[], va_list ap)
@@ -2419,7 +2452,6 @@ void    vj_event_play_norestart( void *ptr, const char format[], va_list ap )
     P_A(args,sizeof(args),NULL,0,format,ap);
 
     //@ change mode so veejay does not restart samples at all
-
     if( args[0] == 0 ) {    
         //@ off
         v->settings->sample_restart = 0;
@@ -2972,9 +3004,27 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 
 }
 
+static int vj_event_lock(veejay_t *v) {
+    video_playback_setup *settings = v->settings;
+    
+    pthread_mutex_lock(&settings->mutex);
+
+    return atomic_exchange_int(&settings->state, LAVPLAY_STATE_PAUSED);
+}
+
+static void vj_event_unlock(veejay_t *v, int old_state) {
+    video_playback_setup *settings = v->settings;
+    atomic_store_int(&settings->state, old_state);
+    pthread_cond_broadcast(&settings->producer_wait_cv);
+    pthread_cond_broadcast(&settings->renderer_wait_cv);
+
+    pthread_mutex_unlock(&settings->mutex);
+}
+
 void    vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
+
     int args[2];
     P_A(args,sizeof(args),NULL,0,format,ap);
 
@@ -2982,49 +3032,22 @@ void    vj_event_fullscreen(void *ptr, const char format[], va_list ap )
         args[0] = (v->settings->full_screen ? 0 : 1);
     }
 
-    switch(v->video_out)
-    {
-        case 0:
-        case 2:
-#ifdef HAVE_SDL
-        {
-            char *caption = veejay_title(v);
-
-            void *tmpsdl = vj_sdl_allocate( v->effect_frame1,v->use_keyb,v->use_mouse,v->show_cursor, v->borderless );
-           
-            int x = -1, y = -1;
-            vj_sdl_get_position( v->sdl, &x, &y );
-
-            if(vj_sdl_init(
-                tmpsdl,
-                x,
-                y,
-                v->bes_width,
-                v->bes_height,
-                caption,
-                1,
-                args[0],
-                v->pixel_format,
-                v->current_edit_list->video_fps
-            ) ) {
-                if( v->sdl ) {
-                    vj_sdl_free(v->sdl);
-                }
-                v->sdl = tmpsdl;        
-                if(args[0])
-                    vj_sdl_grab( v->sdl, 0 );
-                v->settings->full_screen = args[0];
-            }
-            else {
-                vj_sdl_free(tmpsdl);
-            }
-            free(caption);
-        }
-#endif
-        break;
-        default:
-        break;
+    if (v->video_out != 0 && v->video_out != 2) {
+        return; 
     }
+    
+    if (v->sdl == NULL) {
+        return;
+    }
+
+    int state = vj_event_lock(v);
+
+    vj_sdl_set_fullscreen(v->sdl, args[0]);
+
+    vj_event_unlock(v, state);
+
+    v->settings->full_screen = args[0];
+
     veejay_msg(VEEJAY_MSG_INFO,"Video screen is %s",
         (v->settings->full_screen ? "full screen" : "windowed"));
 
@@ -3048,93 +3071,20 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
         return;
     }
 
-    if( w == 0 && h == 0 )
-    {
-        switch( v->video_out )
-        {
-            case 0:
-            case 2:
-#ifdef HAVE_SDL
-                if( v->sdl) {
-                    vj_sdl_free(v->sdl);
-                    vj_sdl_quit();
-                    v->sdl = NULL;
-                    veejay_msg(VEEJAY_MSG_INFO, "Closed SDL window");
-                }
-                v->video_out = 5;
-#endif
-                break;
-            default:
-                break;
-        }
+    if (v->video_out != 0 && v->video_out != 2) {
+        return; 
     }
-    else
-    {
-        char *title = veejay_title(v);
-        
-        switch( v->video_out )
-        {
-            case 5:
-#ifdef HAVE_SDL
-                if(!v->sdl) {
-                    v->sdl = vj_sdl_allocate( v->effect_frame1, v->use_keyb, v->use_mouse, v->show_cursor, v->borderless );
-                    veejay_msg(VEEJAY_MSG_INFO, "Allocated SDL window");
-                
-                    if(vj_sdl_init(
-                        v->sdl,
-                        x,
-                        y,
-                        w,
-                        h,
-                        title,
-                        1,
-                        v->settings->full_screen,
-                        v->pixel_format,
-                        v->current_edit_list->video_fps )
-                    ) {
-                        veejay_msg(VEEJAY_MSG_INFO, "Opened SDL Video Window of size %d x %d", w, h );
-                        v->video_out = 0;
-                        v->bes_width = w;
-                        v->bes_height = h;
-                    }
-                }
-#endif
-            case 0:
-#ifdef HAVE_SDL  
-                if(v->sdl) {
-                    vj_sdl_free(v->sdl);
-                    vj_sdl_quit();
-                    v->sdl = NULL;
-                }           
-                if(!v->sdl) {
-                    v->sdl = vj_sdl_allocate( v->effect_frame1, v->use_keyb, v->use_mouse, v->show_cursor, v->borderless );
-                    veejay_msg(VEEJAY_MSG_INFO, "Allocated SDL window");
-                
-                    if(vj_sdl_init(
-                        v->sdl,
-                        x,
-                        y,
-                        w,
-                        h,
-                        title,
-                        1,
-                        v->settings->full_screen,
-                        v->pixel_format,
-                        v->current_edit_list->video_fps )
-                    ) {
-                        veejay_msg(VEEJAY_MSG_INFO, "Opened SDL Video Window of size %d x %d", w, h );
-                        v->video_out = 0;
-                        v->bes_width = w;
-                        v->bes_height = h;
-                    }
-                }
-#endif              
-                break;
-            default:
-                break;
-        }
-        free(title);
+    
+    if (v->sdl == NULL) {
+        return;
     }
+
+    int state = vj_event_lock(v);
+
+    
+    vj_sdl_set_window_size(v->sdl, w,h,x,y);
+
+    vj_event_unlock(v,state);
 }
 
 void    vj_event_promote_me( void *ptr, const char format[], va_list ap )
@@ -3154,12 +3104,12 @@ void vj_event_play_stop(void *ptr, const char format[], va_list ap)
         if(speed != 0)
         {
             v->settings->previous_playback_speed = speed;
-            veejay_set_speed(v, 0 );
+            veejay_set_speed(v, 0,0 );
             veejay_msg(VEEJAY_MSG_INFO,"Video is paused");
         }
         else
         {
-            veejay_set_speed(v, v->settings->previous_playback_speed );
+            veejay_set_speed(v, v->settings->previous_playback_speed,0 );
             veejay_msg(VEEJAY_MSG_INFO,"Video is playing (resumed at speed %d)", v->settings->previous_playback_speed);
         }
     }
@@ -3183,7 +3133,7 @@ void vj_event_play_stop_all(void *ptr, const char format[], va_list ap)
         if(speed != 0)
         {
             v->settings->previous_playback_speed = speed;
-            veejay_set_speed(v, 0 );
+            veejay_set_speed(v, 0,0 );
         
         sample_set_chain_paused( v->uc->sample_id, 1);
 
@@ -3191,7 +3141,7 @@ void vj_event_play_stop_all(void *ptr, const char format[], va_list ap)
         }
         else
         {
-            veejay_set_speed(v, v->settings->previous_playback_speed );
+            veejay_set_speed(v, v->settings->previous_playback_speed,0 );
         
         sample_set_chain_paused( v->uc->sample_id, 0);
 
@@ -3253,21 +3203,43 @@ void    vj_event_viewport_composition( void *ptr, const char format[], va_list a
 {
 }
 
-void vj_event_play_reverse(void *ptr,const char format[],va_list ap) 
+void vj_event_play_reverse(void *ptr, const char format[], va_list ap)
 {
+    (void)format;
+    (void)ap;
+
+    if (!ptr)
+        return;
+
     veejay_t *v = (veejay_t*)ptr;
-    if(!STREAM_PLAYING(v))
+
+    if (!v->settings)
+        return;
+
+    if (!STREAM_PLAYING(v))
     {
         int speed = v->settings->current_playback_speed;
-        if( speed == 0 ) {
-            speed = -1; 
+
+        if (speed == 0)
+        {
+            speed = -1;
         }
-        else if(speed > 0) {
-            speed = -(speed);
-        } 
-        veejay_set_speed(v,speed );
+        else if (speed > 0)
+        {
+            speed = -speed;
+        }
 
-        veejay_msg(VEEJAY_MSG_INFO, "Video is playing in reverse at speed %d", speed);
+        veejay_set_speed(v, speed, 0);
+
+        int sfd = v->settings->sfd;
+        if (sfd <= 0)
+            sfd = 1;
+
+        veejay_msg(
+            VEEJAY_MSG_INFO,
+            "Video is playing in reverse at speed %.2fx",
+            (float)speed / (float)sfd
+        );
     }
     else
     {
@@ -3275,24 +3247,46 @@ void vj_event_play_reverse(void *ptr,const char format[],va_list ap)
     }
 }
 
-void vj_event_play_forward(void *ptr, const char format[],va_list ap) 
+void vj_event_play_forward(void *ptr, const char format[], va_list ap)
 {
+    (void)format;
+    (void)ap;
+
+    if (!ptr)
+        return;
+
     veejay_t *v = (veejay_t*)ptr;
-    if(!STREAM_PLAYING(v))
+
+    if (!v->settings)
+        return;
+
+    if (!STREAM_PLAYING(v))
     {
         int speed = v->settings->current_playback_speed;
-        if(speed == 0) speed = 1;
-        else if(speed < 0 ) speed = -1 * speed;
 
-        veejay_set_speed(v,speed );  
+        if (speed == 0)
+            speed = 1;
+        else if (speed < 0)
+            speed = -speed;
 
-        veejay_msg(VEEJAY_MSG_INFO, "Video is playing forward at speed %d" ,speed);
+        veejay_set_speed(v, speed, 0);
+
+        int sfd = v->settings->sfd;
+        if (sfd <= 0)
+            sfd = 1;
+
+        veejay_msg(
+            VEEJAY_MSG_INFO,
+            "Video is playing forward at speed %.2fx",
+            (float)speed / (float)sfd
+        );
     }
     else
     {
         p_invalid_mode();
     }
 }
+
 
 void vj_event_play_speed(void *ptr, const char format[], va_list ap)
 {
@@ -3302,7 +3296,7 @@ void vj_event_play_speed(void *ptr, const char format[], va_list ap)
     {
         int speed = 0;
         P_A(args,sizeof(args),NULL,0,format,ap);
-        veejay_set_speed(v, args[0] );
+        veejay_set_speed(v, args[0],0 );
         speed = v->settings->current_playback_speed;
         veejay_msg(VEEJAY_MSG_INFO, "Video is playing at speed %d now (%s)",
             speed, speed == 0 ? "paused" : speed < 0 ? "reverse" : "forward" );
@@ -3342,9 +3336,9 @@ void vj_event_play_speed_kb(void *ptr, const char format[], va_list ap)
     
         int speed = abs(args[0]);
         if( v->settings->current_playback_speed <  0 )
-            veejay_set_speed( v, -1 * speed );
+            veejay_set_speed( v, -1 * speed,0 );
         else
-            veejay_set_speed(v, speed );
+            veejay_set_speed(v, speed,0 );
         speed = v->settings->current_playback_speed;
         veejay_msg(VEEJAY_MSG_INFO, "Video is playing at speed %d now (%s)",
             speed, speed == 0 ? "paused" : speed < 0 ? "reverse" : "forward" );
@@ -3411,8 +3405,8 @@ void vj_event_set_frame_percentage(void *ptr, const char format[], va_list ap)
         P_A(args,sizeof(args),NULL,0,format,ap);
         
         int len = sample_get_endFrame(v->uc->sample_id) - sample_get_startFrame(v->uc->sample_id);
-        float p = fabs( ( (float)args[0] * 0.01f)); // absolute values
-        int perc = (int) ((len * p) + 0.5f); // round to nearest integer
+        float p = fabs( ( (float)args[0] * 0.01f));
+        int perc = (int) ((len * p) + 0.5f);
         veejay_set_frame(v, perc);
     }
     else
@@ -3460,12 +3454,11 @@ void vj_event_inc_frame(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[1];
-    P_A( args,sizeof(args),NULL,0,format, ap );
-    if(!STREAM_PLAYING(v))
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if (!STREAM_PLAYING(v))
     {
-        video_playback_setup *s = v->settings;
-        veejay_set_frame(v, (s->current_frame_num + args[0]));
-        veejay_msg(VEEJAY_MSG_INFO, "Skip to frame %d", s->current_frame_num);
+        veejay_increase_frame(v, args[0]);
     }
     else
     {
@@ -3473,34 +3466,39 @@ void vj_event_inc_frame(void *ptr, const char format[], va_list ap)
     }
 }
 
+
 void vj_event_dec_frame(void *ptr, const char format[], va_list ap)
 {
-    veejay_t *v = (veejay_t *) ptr;
+    veejay_t *v = (veejay_t *)ptr;
     int args[1];
-    P_A( args,sizeof(args),NULL,0,format, ap );
-    if(!STREAM_PLAYING(v))
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if (!STREAM_PLAYING(v))
     {
-        video_playback_setup *s = v->settings;
-        veejay_set_frame(v, (s->current_frame_num - args[0]));
-        veejay_msg(VEEJAY_MSG_INFO, "Skip to frame %d", s->current_frame_num);
+        veejay_increase_frame(v, -args[0]);
     }
     else
     {
         p_invalid_mode();
     }
 }
+
 
 void vj_event_prev_second(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t *)ptr;  
     int args[1];
-    P_A( args,sizeof(args),NULL,0,format, ap );
-    if(!STREAM_PLAYING(v))
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if (!STREAM_PLAYING(v))
     {
         video_playback_setup *s = v->settings;
-        veejay_set_frame(v, (s->current_frame_num - (int) 
-                (args[0] * v->current_edit_list->video_fps)));
-        veejay_msg(VEEJAY_MSG_INFO, "Skip to frame %d", s->current_frame_num );
+
+        long long cur_frame = atomic_load_long_long(&s->current_frame_num);
+
+        long long new_frame = cur_frame - (long long)(args[0] * v->current_edit_list->video_fps);
+
+        veejay_set_frame(v, new_frame);
     }
     else
     {
@@ -3508,33 +3506,42 @@ void vj_event_prev_second(void *ptr, const char format[], va_list ap)
     }
 }
 
+
 void vj_event_next_second(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t *)ptr;
     int args[1];
-    P_A( args,sizeof(args),NULL,0,format, ap );
-    if(!STREAM_PLAYING(v))
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if (!STREAM_PLAYING(v))
     {
         video_playback_setup *s = v->settings;
-        veejay_set_frame(v, (s->current_frame_num + (int)
-                     ( args[0] * v->current_edit_list->video_fps)));
-        veejay_msg(VEEJAY_MSG_INFO, "Skip to frame %d", s->current_frame_num );
+
+        long long cur_frame = atomic_load_long_long(&s->current_frame_num);
+
+        long long new_frame = cur_frame + (long long)(args[0] * v->current_edit_list->video_fps);
+
+        veejay_set_frame(v, new_frame);
     }
     else
     {
         p_invalid_mode();
     }
 }
+
 
 
 void vj_event_sample_start(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t *)ptr;
     video_playback_setup *s = v->settings;
-    if(SAMPLE_PLAYING(v) || PLAIN_PLAYING(v)) 
+
+    if (SAMPLE_PLAYING(v) || PLAIN_PLAYING(v)) 
     {
-        v->uc->sample_start = s->current_frame_num;
-        veejay_msg(VEEJAY_MSG_INFO, "Change sample starting position to %ld", v->uc->sample_start);
+        v->uc->sample_start = atomic_load_long_long(&s->current_frame_num);
+
+        veejay_msg(VEEJAY_MSG_INFO, "Change sample starting position to %lld", 
+                   v->uc->sample_start);
     }   
     else
     {
@@ -3542,46 +3549,44 @@ void vj_event_sample_start(void *ptr, const char format[], va_list ap)
     }
 }
 
-
-
-void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
+void vj_event_sample_end(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t *)ptr;
     video_playback_setup *s = v->settings;
 
     if(PLAIN_PLAYING(v) || SAMPLE_PLAYING(v))
     {
-        v->uc->sample_end = s->current_frame_num;
-        
-        if( v->uc->sample_end < v->uc->sample_start) {
-            int se = v->uc->sample_end;
+        v->uc->sample_end = atomic_load_long_long(&s->current_frame_num);
+
+        if(v->uc->sample_end < v->uc->sample_start)
+        {
+            long se = v->uc->sample_end;
             v->uc->sample_end = v->uc->sample_start;
-            v->uc->sample_start = se;   
-            veejay_msg(VEEJAY_MSG_WARNING, "Swapped starting and ending positions: %ld - %ld, please set a new starting position", v->uc->sample_start,v->uc->sample_end );
+            v->uc->sample_start = se;
+            veejay_msg(VEEJAY_MSG_WARNING, "Swapped starting and ending positions: %ld - %ld, please set a new starting position", v->uc->sample_start, v->uc->sample_end);
         }
-        
-        if( v->uc->sample_end > v->uc->sample_start) {
 
+        if(v->uc->sample_end > v->uc->sample_start)
+        {
             long vstart = v->uc->sample_start;
-            long vend   = v->uc->sample_end;
+            long vend = v->uc->sample_end;
 
-            if(v->settings->current_playback_speed < 0) {
+            if(v->settings->current_playback_speed < 0)
+            {
                 long tmp = vend;
                 vend = vstart;
                 vstart = tmp;
             }
 
-            if(vstart < 0 ) {
-                vstart=0; 
-            }
-            if(vend > v->current_edit_list->total_frames) {
+            if(vstart < 0)
+                vstart = 0;
+            if(vend > v->current_edit_list->total_frames)
                 vend = v->current_edit_list->total_frames;
-            }
 
             editlist *E = v->edit_list;
-            if( SAMPLE_PLAYING(v))
+            if(SAMPLE_PLAYING(v))
                 E = v->current_edit_list;
-            editlist *el = veejay_edit_copy_to_new( v, E, vstart, vend );
+            editlist *el = veejay_edit_copy_to_new(v, E, vstart, vend);
             if(!el)
             {
                 veejay_msg(VEEJAY_MSG_ERROR, "Unable to clone current editlist");
@@ -3589,21 +3594,22 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
             }
 
             long start = 0;
-            long end   = el->total_frames;
-    
-            sample_info *skel = sample_skeleton_new(start,end);
+            long end = el->total_frames;
+
+            sample_info *skel = sample_skeleton_new(start, end);
             if(!skel)
             {
                 veejay_msg(VEEJAY_MSG_ERROR, "Unable to create a new sample");
                 return;
-            }   
+            }
 
-            v->uc->sample_start = v->uc->sample_end; // set new starting position (repeat ']')
+            v->uc->sample_start = v->uc->sample_end;
 
             skel->edit_list = el;
 
-            if(sample_store(skel)==0) {
-                veejay_msg(VEEJAY_MSG_INFO,"Created new Sample %d\t [%ld] | %ld-%ld | [%ld]",
+            if(sample_store(skel) == 0)
+            {
+                veejay_msg(VEEJAY_MSG_INFO, "Created new Sample %d\t [%ld] | %ld-%ld | [%ld]",
                     skel->sample_id,
                     0,
                     start,
@@ -3612,7 +3618,7 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
             }
             else
             {
-                veejay_msg(VEEJAY_MSG_ERROR,"Unable to create a new sample");
+                veejay_msg(VEEJAY_MSG_ERROR, "Unable to create a new sample");
             }
         }
     }
@@ -3620,8 +3626,8 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
     {
         p_invalid_mode();
     }
-
 }
+
  
 void vj_event_goto_end(void *ptr, const char format[], va_list ap)
 {
@@ -3893,7 +3899,6 @@ void vj_event_set_transition(void *ptr, const char format[], va_list ap)
         vj_tag_set_transition_active( sample_id, transition_active );
     }
 
-
     veejay_msg(VEEJAY_MSG_DEBUG,"%s %d set transition active %d, shape %d, length %d",
             (playmode == VJ_PLAYBACK_MODE_SAMPLE ? "Sample"  : "Stream"),
             sample_id, transition_active, transition_shape, transition_length );
@@ -4144,8 +4149,7 @@ void vj_event_sample_set_dup(void *ptr, const char format[], va_list ap)
             {
                 if(veejay_set_framedup(v, args[1]))
                         {
-                             veejay_msg(VEEJAY_MSG_INFO,
-                    "Video frame will be duplicated %d to output",args[1]);
+                             veejay_msg(VEEJAY_MSG_INFO, "Video frame will be duplicated %d to output",args[1]);
                         }
             }
         }
@@ -4242,7 +4246,7 @@ void vj_event_sample_set_descr(void *ptr, const char format[], va_list ap)
 
     SAMPLE_DEFAULTS(args[0]);
 
-    if(sample_set_description(args[0],str) == 1)
+    if(sample_set_description(args[0],str) == 0)
         veejay_msg(VEEJAY_MSG_INFO, "Changed sample title to %s",str);
     else
         veejay_msg(VEEJAY_MSG_ERROR, "Cannot change title of sample %d to '%s'", args[0],str );
@@ -4878,6 +4882,8 @@ void vj_event_chain_entry_video_toggle(void *ptr, const char format[], va_list a
     }
 }
 
+
+
 void enable_chain_entry_video(void *ptr, const char format[], va_list ap, int enable_chain)
 {
     veejay_t *v = (veejay_t*)ptr;
@@ -4928,6 +4934,72 @@ void vj_event_chain_entry_disable_video(void *ptr, const char format[], va_list 
 {
     enable_chain_entry_video(ptr, format, ap, 0);
     return;
+}
+
+// clean up and stop mixing inputs from playing
+static void vj_event_chain_global_reset(sample_eff_chain **fx_chain) {
+    for(int i=0; i < SAMPLE_MAX_EFFECTS; i++)
+    {
+        if(fx_chain[i]->fx_instance)
+            vjert_del_fx( fx_chain[i] ,0,i,0);
+
+       
+        if( fx_chain[i]->source_type == 1 && 
+            vj_tag_get_active( fx_chain[i]->channel ) &&
+            vj_tag_get_type( fx_chain[i]->channel ) == VJ_TAG_TYPE_NET ) {
+                 vj_tag_disable( fx_chain[i]->channel );
+        }
+    }
+
+}
+
+void vj_event_chain_global(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*) ptr;
+    int args[2];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+
+    SAMPLE_DEFAULTS(args[0]);
+    int enabled = args[1];
+
+    if(enabled < 0) enabled = 0;
+    if(enabled > 2) enabled = 1; // sample renders before global chain
+
+    v->global_chain->enabled = enabled;
+    
+
+    sample_eff_chain **src = NULL;
+    if(SAMPLE_PLAYING(v)) {
+        src = sample_get_effect_chain( args[0] );
+    } else if (STREAM_PLAYING(v)) {
+        src = vj_tag_get_effect_chain( args[0] );
+    }
+
+    if(src == NULL && enabled) {
+        veejay_msg(0, "Global FX chain only available in Sample or Stream mode");
+        return;
+    }
+
+    v->global_chain->origin_id = args[0];
+    v->global_chain->origin_mode = SAMPLE_PLAYING(v) ? VJ_PLAYBACK_MODE_SAMPLE : STREAM_PLAYING(v) ? VJ_PLAYBACK_MODE_TAG : VJ_PLAYBACK_MODE_PLAIN;
+    
+    if(enabled > 0) {
+        for( int i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
+            if( src[i]->effect_id <= 0 )
+                continue;
+            veejay_memcpy(v->global_chain->fx_chain[i], src[i], sizeof(sample_eff_chain));
+            v->global_chain->fx_chain[i]->fx_instance = NULL;
+            v->global_chain->fx_chain[i]->kf = NULL;
+        }
+        veejay_msg(VEEJAY_MSG_INFO, "Copied FX chain of sample %d to render as global FX chain",args[0]);
+    }
+    else {
+        for( int i  = 0 ; i < SAMPLE_MAX_EFFECTS; i ++ ) {
+            vj_event_chain_global_reset(v->global_chain->fx_chain);
+            veejay_memset(v->global_chain->fx_chain[i], 0, sizeof(sample_eff_chain));
+        }
+        veejay_msg(VEEJAY_MSG_INFO, "Copied FX chain of stream %d to render as global FX chain",args[1]);
+    }
 }
 
 void    vj_event_chain_fade_follow(void *ptr, const char format[], va_list ap )
@@ -7177,6 +7249,7 @@ void    vj_event_toggle_transitions( void *ptr, const char format[], va_list ap 
 
     veejay_msg(VEEJAY_MSG_INFO, "Transitions between samples %s",
             (v->settings->transition.global_state == 0 ? "disabled" : "enabled" ));
+
 }
 
 void    vj_event_toggle_osl( void *ptr, const char format[], va_list ap )
@@ -7189,11 +7262,11 @@ void    vj_event_toggle_osd( void *ptr, const char format[], va_list ap )
     if(v->use_osd == 0 )
     {
         v->use_osd = 1;
-        veejay_msg(VEEJAY_MSG_INFO, "OSD on");
+        veejay_msg(VEEJAY_MSG_INFO, "[PRODUCER] Displaying OSD status text");
     }
     else
     {
-        veejay_msg(VEEJAY_MSG_INFO, "OSD off");
+        veejay_msg(VEEJAY_MSG_INFO, "[PRODUCER] Hide OSD status text]");
         v->use_osd = 0;
     }
 }
@@ -7238,19 +7311,12 @@ static struct {
     { "y422", ENCODER_YUV422 },
     { "i420", ENCODER_YUV420 },
     { "y420", ENCODER_YUV420 },
-    { "huffyuv", ENCODER_HUFFYUV },
 #ifdef SUPPORT_READ_DV2
     { "dvvideo", ENCODER_DVVIDEO },
 #endif
     { "dvsd", ENCODER_DVVIDEO },
     { "mjpeg", ENCODER_MJPEG },
     { "ljpeg", ENCODER_LJPEG },
-#ifdef HAVE_LIBQUICKTIME
-    { "quicktime-mjpeg", ENCODER_QUICKTIME_MJPEG },
-#ifdef SUPPORT_READ_DV2
-    { "quicktime-dv", ENCODER_QUICKTIME_DV },
-#endif
-#endif
     { "vj20", ENCODER_YUV420F },
     { "vj22", ENCODER_YUV422F },
     { NULL , -1 }
@@ -7534,13 +7600,13 @@ void vj_event_enable_audio(void *ptr, const char format[], va_list ap)
 {
 #ifdef HAVE_JACK
     veejay_t *v = (veejay_t*)ptr;
-    if (!v->audio_running )
+    if (!atomic_load_int(&v->audio_running))
     {
         veejay_msg(0,"Veejay was started without audio");
         return;
     }
 
-    v->settings->audio_mute = 0;
+    atomic_store_int(&v->settings->audio_mute, 0);
 #endif  
 }
 
@@ -7548,12 +7614,12 @@ void vj_event_disable_audio(void *ptr, const char format[], va_list ap)
 {
 #ifdef HAVE_JACK
     veejay_t *v = (veejay_t *)ptr;
-    if (!v->audio_running )
+    if (!atomic_load_int(&v->audio_running))
     {
         veejay_msg(0,"Veejay was started without audio");
         return;
     }
-    v->settings->audio_mute = 1;
+    atomic_store_int(&v->settings->audio_mute, 1);
 #endif
 }
 
@@ -8019,20 +8085,20 @@ void vj_event_print_sample_info(veejay_t *v, int id)
     mpeg_timecode(&tc, len, mpeg_framerate_code( ratio ),v->current_edit_list->video_fps);
     snprintf(timecode,sizeof(timecode), "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
 
-    mpeg_timecode(&tc,  s->current_frame_num, mpeg_framerate_code(ratio),v->current_edit_list->video_fps);
+    mpeg_timecode(&tc, atomic_load_long_long(&s->current_frame_num), mpeg_framerate_code(ratio), v->current_edit_list->video_fps);
     snprintf(curtime, sizeof(curtime), "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
     sample_get_description( id, sampletitle );
 
     veejay_msg(VEEJAY_MSG_INFO, 
-        "Sample %s [%4d]/[%4d]\t[duration: %s | %8ld] @%8ld %s",
-        sampletitle,id,sample_size(),timecode,len, (long)v->settings->current_frame_num,
+        "Sample %s [%4d]/[%4d]\t[duration: %s | %8ld] @%8lld %s",
+        sampletitle,id,sample_size(),timecode,len, atomic_load_long_long(&s->current_frame_num),
         curtime);
     
     if(sample_encoder_active(v->uc->sample_id))
     {
-        veejay_msg(VEEJAY_MSG_INFO, "REC %09d\t[timecode: %s | %8ld ]",
+        veejay_msg(VEEJAY_MSG_INFO, "REC %09d\t[timecode: %s | %8lld ]",
             sample_get_frames_left(v->uc->sample_id),
-            curtime,(long)v->settings->current_frame_num);
+            curtime,atomic_load_long_long(&s->current_frame_num));
 
     }
     
@@ -8107,10 +8173,6 @@ void vj_event_print_info(void *ptr, const char format[], va_list ap)
     {
         args[0] = v->uc->sample_id;
     }
-
-    veejay_msg(VEEJAY_MSG_INFO, "%d / %d Mb used in cache",
-        get_total_mem(),
-        vj_el_cache_size() );
 
     vj_event_print_plain_info(v,args[0]);
 
@@ -8618,65 +8680,69 @@ void    vj_event_send_sample_list       (   void *ptr,  const char format[],    
     free(s_print_buf);
 }
 
-void vj_event_send_sample_stack(void *ptr, const char format[], va_list ap) {
-    if (!ptr) return;
-
-    veejay_t *v = (veejay_t *)ptr;
+void    vj_event_send_sample_stack      (   void *ptr,  const char format[],    va_list ap )
+{
+    char line[64];
     int args[4];
-    char buffer[2000];
-    char message[2048];
+    char    buffer[2000];
+    char    message[2048];  
+    veejay_t *v = (veejay_t*)ptr;
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     buffer[0] = '\0';
     message[0] = '\0';
 
-    P_A(args, sizeof(args), NULL, 0, format, ap);
+    int channel, source,fx_id,i, offset,sample_len;
 
-    if (args[0] == 0 && v->uc) {
-        args[0] = v->uc->sample_id;
-    }
+    if( SAMPLE_PLAYING(v)  ) {
+        if(args[0] == 0) 
+            args[0] = v->uc->sample_id;
 
-    size_t offset = 0;
-    const size_t buf_size = sizeof(buffer);
-
-    int is_sample = SAMPLE_PLAYING(v);
-    int is_stream = STREAM_PLAYING(v);
-
-    if (is_sample || is_stream) {
-        for (int i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
-            int fx_id, channel, source, sample_len;
-            int resume_offset = 0;
-
-            if (is_sample) {
-                fx_id   = sample_get_effect_any(args[0], i);
-                if (fx_id <= 0) continue;
-                channel = sample_get_chain_channel(args[0], i);
-                source  = sample_get_chain_source(args[0], i);
-                resume_offset = sample_get_resume(args[0]);
-                sample_len = (source == 0) ? sample_video_length(channel) : vj_tag_get_n_frames(channel);
-            } else {
-                fx_id   = vj_tag_get_effect_any(args[0], i);
-                if (fx_id <= 0) continue;
-                channel = vj_tag_get_chain_channel(args[0], i);
-                source  = vj_tag_get_chain_source(args[0], i);
-                sample_len = (source == 0) ? sample_video_length(channel) : vj_tag_get_n_frames(channel);
-                if (source == 0) resume_offset = sample_get_resume(channel);
-            }
-
-            int written = snprintf(buffer + offset, buf_size - offset,
-                                   "%02d%04d%02d%08d%08d",
-                                   i, channel, source, resume_offset, sample_len);
-
-            if (written > 0 && (size_t)written < (buf_size - offset)) {
-                offset += written;
-            } else {
-                // buffer full
-                break;
-            }
+        for( i = 0; i < SAMPLE_MAX_EFFECTS ;i ++ ) {
+            fx_id = sample_get_effect_any( args[0], i );
+            if( fx_id <= 0 )
+                continue;
+            channel = sample_get_chain_channel( args[0], i );
+            source  = sample_get_chain_source( args[0], i );
+            offset  = sample_get_resume( args[0] );
+            if( source == 0 )
+                sample_len= sample_video_length( channel );
+            else 
+                sample_len = vj_tag_get_n_frames( channel );
+            snprintf( line, sizeof(line), "%02d%04d%02d%08d%08d", i, channel, source, offset, sample_len );
+	    size_t space_left = sizeof(buffer) - strlen(buffer) - 1;
+	    if(space_left > 0)
+            	strncat( buffer, line, space_left);
         }
-    }
+    } else if(STREAM_PLAYING(v))
+    {
+        if(args[0] == 0) 
+            args[0] = v->uc->sample_id;
+    
+        for(i = 0; i < SAMPLE_MAX_EFFECTS ; i ++ ) {
+            fx_id = vj_tag_get_effect_any( args[0], i );
+            if( fx_id <= 0 )
+                continue;
+            channel = vj_tag_get_chain_channel( args[0], i );
+            source  = vj_tag_get_chain_source( args[0], i );
+            int offset = 0;
+            if( source == 0 ) {
+                sample_len= sample_video_length( channel );
+		offset = sample_get_resume( channel );
+	    }
+            else 
+                sample_len = vj_tag_get_n_frames( channel );
 
-    FORMAT_MSG(message, buffer);
-    SEND_MSG(v, message);
+            snprintf( line, sizeof(line), "%02d%04d%02d%08d%08d",i,channel,source, offset, sample_len );
+            size_t space_left = sizeof(buffer) - strlen(buffer) - 1;
+	    if(space_left > 0)
+	    	strncat( buffer, line, space_left);
+        }
+    }   
+
+    FORMAT_MSG( message, buffer );
+    SEND_MSG(   v, message );
+
 }
 
 void    vj_event_send_stream_args       (   void *ptr, const char format[],     va_list ap )
@@ -9535,7 +9601,7 @@ void vj_event_screenshot(void *ptr, const char format[], va_list ap)
     v->settings->export_image = 
         vj_picture_prepare_save( filename , type, args[0], args[1] );
     if(v->settings->export_image)
-      v->uc->hackme = 1;
+      v->uc->take_screenshot = 1;
 }
 #else
 #ifdef HAVE_JPEG
@@ -9546,7 +9612,7 @@ void vj_event_screenshot(void *ptr, const char format[], va_list ap)
     P_A(args,sizeof(args), filename,sizeof(filename), format, ap );
     veejay_t *v = (veejay_t*) ptr;
 
-    v->uc->hackme = 1;
+    v->uc->take_screenshot = 1;
     v->uc->filename = vj_strdup( filename );
 }
 #endif

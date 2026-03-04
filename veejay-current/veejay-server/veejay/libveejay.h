@@ -49,13 +49,13 @@ int veejay_dummy_open(veejay_t * info,int ofps, char *file, int pixfmt);
 
 int veejay_close(veejay_t *info);
 
-int      get_total_mem(void);
-
 char     *veejay_title(veejay_t *info);
 
 void veejay_sample_set_initial_positions(veejay_t *info);
 
 void veejay_prepare_sample_positions(int id);
+
+int veejay_setup_video_out(veejay_t *info);
 
 void veejay_reset_sample_positions(veejay_t *info, int sample_id);
 
@@ -67,7 +67,7 @@ int veejay_set_frame(veejay_t *info, long frame_num);
 
 void veejay_change_state(veejay_t *info, int new_state);
 
-int veejay_set_speed(veejay_t *info , int speed);
+int veejay_set_speed(veejay_t *info , int speed, int force_seek);
 
 int veejay_hold_frame(veejay_t *info, int rrp, int pos);
 
@@ -126,7 +126,7 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 
 void veejay_change_state_save(veejay_t * info, int new_state);
 
-void veejay_handle_signal(void *arg, int sig);
+void veejay_handle_signal(int sig, siginfo_t *si, void *unused);
 
 void     veejay_check_homedir(void *arg);
 
@@ -137,5 +137,9 @@ int      prepare_cache_line(int perc, int n_slots);
 int	veejay_set_yuv_range( veejay_t *info );
 
 int	veejay_start_playing_sample( veejay_t *info, int sample_id );
+
+void usleep_accurate(long long usec, video_playback_setup *settings);
+
+void	veejay_event_handle(veejay_t *info);
 
 #endif

@@ -18,12 +18,14 @@
  */
 #include <config.h>
 #include <string.h>
-#define VJ_PROMPT "$> "
+
 #include <stdio.h>
 #include <stdint.h>
 #include <sysexits.h>
 #include <veejaycore/defs.h>
 #include <veejaycore/vjmem.h>
+#include <veejaycore/atomic.h>
+#include <veejay/vj-sdl.h>
 #include <veejaycore/vj-msg.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -53,14 +55,14 @@
 #include <glib-2.0/glib-object.h>
 #include <libvje/libvje.h>
 
-extern void vj_libav_ffmpeg_version();
+extern void vj_avcodec_print_version();
 static veejay_t *info = NULL;
 static float override_fps = 0.0;
 static int default_geometry_x = -1;
 static int default_geometry_y = -1;
-static	int	use_keyb = 1;
-static	int	use_mouse = 1;
-static	int	show_cursor = 0;
+static int use_keyb = 1;
+static int use_mouse = 1;
+static int show_cursor = 0;
 static int borderless = 0;
 static int force_video_file = 0; // unused
 static int override_pix_fmt = 0;
@@ -74,30 +76,10 @@ static int ta = -1;
 
 static void report_bug(void)
 {
-    veejay_msg(VEEJAY_MSG_WARNING, "Please report this error to http://groups.google.com/group/veejay-discussion?hl=en");
+    veejay_msg(VEEJAY_MSG_WARNING, "Please report this error to veejay's issue tracker");
     veejay_msg(VEEJAY_MSG_WARNING, "Send at least veejay's output and include the command(s) you have used to start it");
 	veejay_msg(VEEJAY_MSG_WARNING, "Also, please consider sending in the recovery files if any have been created");
 	veejay_msg(VEEJAY_MSG_WARNING, "If you compiled it yourself, please include information about your system");
-/*
-	veejay_msg(VEEJAY_MSG_WARNING, "Dumping core file to: core.%d",getpid() );
-	
-	char cmd[128];
-	memset(cmd,0,sizeof(cmd));
-	sprintf(cmd, "generate-core-file");
-	int fd = open( "veejay.cmd", O_RDWR|O_CREAT );
-	if(!fd) {
-		veejay_msg(VEEJAY_MSG_ERROR,"Unable to write gdb batch commands, no core dump written. ");
-	} else {
-		int res = write( fd , cmd, strlen(cmd));
-		close(fd);
-		sprintf(cmd, "gdb -p %d -batch -x veejay.cmd", getpid());
-		veejay_msg(VEEJAY_MSG_WARNING,"Please wait! Running command '%s'", cmd);
-		system(cmd);
-		veejay_msg(VEEJAY_MSG_WARNING, "Done!");
-		veejay_msg(VEEJAY_MSG_INFO, "Please bzip2 and upload the coredump somewhere and tell us where to find it!");
-	}
-	*/	
-
 }
 
 static void CompiledWith(void)
@@ -112,7 +94,7 @@ static void CompiledWith(void)
 	    BUILD_DATE );
 
 	fprintf(stdout,
-		"Detected cpu cache line size: %d\n", cpu_cache_size());
+		"Detected cpu cache line size: %d\n", cpu_get_cacheline_size());
 	fprintf(stdout,
 		"Memory alignment size: %d\n" , mem_align_size());
 
@@ -180,6 +162,9 @@ static void CompiledWith(void)
 #endif
 #ifdef HAVE_ASM_AVX
 	fprintf(stdout,"\tAVX\n");
+#endif
+#ifdef HAVEW_ASM_AVX2
+    fprintf(stdout,"\tAVX2\n");
 #endif
 	
 	memcpy_report();
@@ -385,8 +370,9 @@ static int set_option(const char *name, char *value)
     if (strcmp(name, "port") == 0 || strcmp(name, "p") == 0) {
 	info->uc->port = atoi(optarg);
     } else if (strcmp(name, "verbose") == 0 || strcmp(name, "v") == 0) {
-	info->verbose = 1;
-	veejay_set_debug_level(info->verbose);
+		info->verbose = 1;
+		veejay_set_debug_level(info->verbose);
+		veejay_set_timestamp(1);
     } else if (strcmp(name, "no-color") == 0 || strcmp(name,"n") == 0)
 	{
 	 veejay_set_colors(0);
@@ -614,10 +600,6 @@ static int set_option(const char *name, char *value)
     return nerr;
 }
 
-
-
-
-
 static int check_command_line_options(int argc, char *argv[])
 {
     int nerr, n, option_index = 0;
@@ -693,7 +675,6 @@ static int check_command_line_options(int argc, char *argv[])
 	return 0;
     }
     
-/* Get options */
     nerr = 0;
 #ifdef HAVE_GETOPT_LONG
     while ((n =
@@ -709,13 +690,11 @@ static int check_command_line_options(int argc, char *argv[])
     {
 	switch (n) {
 #ifdef HAVE_GETOPT_LONG
-	    /* getopt_long values */
 	case 0:
 	    nerr += set_option(long_options[option_index].name, optarg);
 	    break;
 #endif
 
-	    /* These are the old getopt-values (non-long) */
 	default:
 	    sprintf(option, "%c", n);
 	    nerr += set_option(option, optarg);
@@ -730,23 +709,6 @@ static int check_command_line_options(int argc, char *argv[])
         Usage(argv[0]);
         return 0;
     }
-
-    if(!info->dump)
-	{
-       if(veejay_open_files(
-			info,
-			argv + optind,
-			argc - optind,
-			override_fps,
-			force_video_file,
-			override_pix_fmt,
-			override_norm,
-			switch_jpeg )<=0)
-       {
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to open video file(s)");
-			nerr++;
-       }
-	}
 
     if(!nerr) 
 		return 1;
@@ -767,22 +729,8 @@ static void print_license(void)
 	veejay_msg(VEEJAY_MSG_INFO,
 	    "This software is subject to the GNU GENERAL PUBLIC LICENSE");
 
-	veejay_msg(VEEJAY_MSG_INFO,    
-		"Veejay comes with ABSOLUTELY NO WARRANTY; this is free software and");
-	
-	veejay_msg(VEEJAY_MSG_INFO,
-		"you are welcome to redistribute it under certain conditions");
-	
-	veejay_msg(VEEJAY_MSG_INFO,
-	    "The license must be included in the (source) package (COPYING)");
+	vj_avcodec_print_version();
 
-}
-
-static void donothing(int sig)
-{
-//	vj_lock(info);
-	veejay_handle_signal( info, sig );	
-//	vj_unlock(info);
 }
 
 static void	veejay_backtrace_handler(int n , siginfo_t *si, void *ptr)
@@ -821,146 +769,170 @@ static void	sigsegfault_handler(void) {
 
 int main(int argc, char **argv)
 {
-	video_playback_setup *settings;
-	 
-   	sigset_t allsignals;
-   	struct sigaction action;
-	struct timespec req;
-	int i;
-	int main_ret = 0;
-	fflush(stdout);
+    video_playback_setup *settings;
+    int main_ret = 0;
+    
+    fflush(stdout);
 
 #if !GLIB_CHECK_VERSION(2,36,0)
-	g_type_init();
+    g_type_init();
 #endif
 
-	vj_mem_init(0,0);
+    vj_mem_init(0, 0);
+    vj_mem_optimize();
+    vevo_strict_init();
 
-	vevo_strict_init();
+    info = veejay_malloc();
+    if (!info) {
+        return 1;
+    }
+
+    settings = (video_playback_setup *)info->settings;
+
+    if (!check_command_line_options(argc, argv)) {
+        veejay_free(info);
+        return 0;
+    }
+
+	veejay_print_banner();
+    print_license();
+
+    if (info->dump) {
+        veejay_set_colors(0);
+        vj_event_init(NULL);
+        vje_init(720, 576); // FIXME default values
+        vj_osc_allocate(VJ_PORT + 2);
+        vj_event_dump();
+        vje_dump();
+        fprintf(stdout,
+			"Environment variables:\n"
+			"\tSDL_VIDEO_HWACCEL\t\tSet to 1 to use SDL video hardware accel (default=on)\n"
+			"\tVEEJAY_PERFORMANCE\t\tSet to \"quality\" or \"fastest\" (default is fastest)\n"
+			"\tVEEJAY_AUTO_SCALE_PIXELS\tSet to 1 to convert between CCIR 601 and JPEG automatically (default=dont care)\n"
+			"\tVEEJAY_INTERPOLATE_CHROMA\tSet to 1 if you wish to interpolate every chroma sample when scaling (default=0)\n"
+			"\tVEEJAY_SDL_KEY_REPEAT_INTERVAL\tInterval of key press to repeat while pressed down\n"
+			"\tVEEJAY_PLAYBACK_CACHE\t\tSample cache size in MB\n"
+			"\tVEEJAY_SDL_KEY_REPEAT_DELAY\tDelay key repeat in ms\n"
+			"\tVEEJAY_FULLSCREEN\t\tStart in fullscreen (1) or windowed (0) mode\n"
+			"\tVEEJAY_DESKTOP_GEOMETRY\tSpecify a geometry for Veejay to position the video window\n"
+			"\tVEEJAY_VIDEO_POSITION\t\tPosition of video window\n"
+			"\tVEEJAY_VIDEO_SIZE\t\tSize of video window, defaults to full screen size\n"
+			"\tVEEJAY_RUN_MODE\t\t\tRun in \"classic\" (352x288 Dummy) or default (720x576)\n"
+			"\tVEEJAY_V4L2_NO_THREADING\tSet to 1 to query frame in main-loop\n"
+			"\tVEEJAY_MULTITHREAD_TASKS\tSet number of parallel tasks (default = number of CPU cores)\n"
+			"\tVEEJAY_PAUSE_EVERYTHING\t\tIf 1, video is paused but rendering continues; if 0, rendering pauses as well\n\n"
+			"\tExample for bash:\n"
+			"\t\t$ export VEEJAY_AUTO_SCALE_PIXEL=1\n"
+		);
+
+        return 0;
+    }
 	
-	info = veejay_malloc();
-	if (!info) {
-		return 1;
+
+    veejay_check_homedir(info);
+
+    sigsegfault_handler();
+    
+	signal(SIGPIPE, SIG_IGN);
+
+	struct { int signo; } safe_signals[] = {
+		{ SIGINT }, { SIGQUIT }, { SIGFPE },
+		{ SIGTERM }, { SIGABRT }, { SIGILL }, { SIGPWR }
+	};
+
+	for (int i = 0; i < sizeof(safe_signals)/sizeof(safe_signals[0]); i++) {
+		struct sigaction sa = {0};
+		sa.sa_sigaction = veejay_handle_signal;
+		sa.sa_flags = SA_SIGINFO | SA_ONESHOT;
+		sigemptyset(&sa.sa_mask);
+		sigaction(safe_signals[i].signo, &sa, NULL);
 	}
-	
-   	settings = (video_playback_setup *) info->settings;
 
-	if(!check_command_line_options(argc, argv))
-	{
-		veejay_free(info);
-        	return 0;
- 	}
+    veejay_msg(VEEJAY_MSG_INFO, "CPU cache line size: %d bytes", cpu_get_cacheline_size());
+    veejay_msg(VEEJAY_MSG_INFO, "Memory page size: %d bytes", mem_align_size());
 
-	print_license();
-	
-   	if(info->dump)
- 	{
-		veejay_set_colors(0);
-		vj_event_init(NULL);
-		vje_init(720,576); //FIXME custom deafult values ,0,info->read_plug_cfg);
-		vj_osc_allocate(VJ_PORT+2);	
-		vj_event_dump();
-		vje_dump();
-			fprintf(stdout, "Environment variables:\n\tSDL_VIDEO_HWACCEL\t\tSet to 1 to use SDL video hardware accel (default=on)\n\tVEEJAY_PERFORMANCE\t\tSet to \"quality\" or \"fastest\" (default is fastest)\n\tVEEJAY_AUTO_SCALE_PIXELS\tSet to 1 to convert between CCIR 601 and JPEG automatically (default=dont care)\n\tVEEJAY_INTERPOLATE_CHROMA\tSet to 1 if you wish to interpolate every chroma sample when scaling (default=0)\n\tVEEJAY_SDL_KEY_REPEAT_INTERVAL\tinterval of key pressed to repeat while pressed down.\n\tVEEJAY_PLAYBACK_CACHE\t\tSample cache size in MB\n\tVEEJAY_SDL_KEY_REPEAT_DELAY\tDelay key repeat in ms\n\tVEEJAY_FULLSCREEN\t\tStart in fullscreen (1) or windowed (0) mode\n\tVEEJAY_DESKTOP_GEOMETRY\t\tSpecifiy a geometry for veejay to position the video window.\n\tVEEJAY_VIDEO_POSITION\t\tPosition of video window\n\tVEEJAY_VIDEO_SIZE\t\tSize of video window, defaults to full screen size.\n\tVEEJAY_RUN_MODE\t\t\tRun in \"classic\" (352x288 Dummy) or default (720x576). \n");
-			fprintf(stdout,"\tVEEJAY_V4L2_NO_THREADING\tSet to 1 to query frame in main-loop\n");
-			fprintf(stdout,"\tVEEJAY_MULTITHREAD_TASKS\tSet the number of parallel tasks (multithreading) to use (default is equal to the number of cpu-cores)\n");
-			fprintf(stdout,"\tVEEJAY_PAUSE_EVERYTHING\t\tIf set to 1, video is paused but rendering continues. If set to 0, rendering pauses as well\n");
-			fprintf(stdout, "\n\n\tExample for bash:\n\t\t\t$ export VEEJAY_AUTO_SCALE_PIXEL=1\n");
-
-
-		return 0;
-	}
-
-	veejay_check_homedir( info );
-
-	benchmark_veejay(1920,1080);
-
-	sigsegfault_handler();
-
-   	sigemptyset(&(settings->signal_set));
-	sigaddset(&(settings->signal_set), SIGINT);
-	sigaddset(&(settings->signal_set), SIGPIPE);
-	sigaddset(&(settings->signal_set), SIGILL);
-//	sigaddset(&(settings->signal_set), SIGSEGV);
-	sigaddset(&(settings->signal_set), SIGFPE );
-	sigaddset(&(settings->signal_set), SIGTERM );
-	sigaddset(&(settings->signal_set), SIGABRT);
-	sigaddset(&(settings->signal_set), SIGPWR );
-	sigaddset(&(settings->signal_set), SIGQUIT );
-
-	sigfillset( &allsignals );
-	action.sa_handler = donothing;
-	action.sa_mask = allsignals;
-	action.sa_flags = SA_SIGINFO | SA_ONESHOT ; //SA_RESTART | SA_RESETHAND;
-
-	signal( SIGPIPE, SIG_IGN );
-
-	for( i = 1; i < NSIG; i ++ )
-		if( sigismember( &(settings->signal_set), i ))
-			sigaction( i, &action, 0 );
-	
-	veejay_msg(VEEJAY_MSG_INFO,
-		"CPU cache line size: %d bytes", cpu_cache_size());
-
-	veejay_msg(VEEJAY_MSG_INFO,
-		"Memory page size: %d bytes",mem_align_size());
-
-	info->use_keyb = use_keyb;
-	info->use_mouse = use_mouse;
-	info->show_cursor = show_cursor;
+    info->use_keyb = use_keyb;
+    info->use_mouse = use_mouse;
+    info->show_cursor = show_cursor;
     info->borderless = borderless;
 
-	if(veejay_init(
-		info,
-		default_geometry_x,
-		default_geometry_y,
-		NULL,
-		live,
-	    	ta )< 0)
-	{	
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot start veejay");
-		main_ret = 1;
-		return main_ret;
-	}
 
-	if(auto_loop)
-		veejay_auto_loop(info);
+	if(!info->dump) {
 
-
-	veejay_init_msg_ring();  // rest of logging to screen
-
-   	if(!veejay_main(info))
-	{
-	    veejay_msg(VEEJAY_MSG_ERROR, "Cannot start main playback cycle");
-		main_ret = 1;
-		goto VEEJAY_MAIN_EXIT;
-	}
-
+       if(veejay_open_files(
+			info,
+			argv + optind,
+			argc - optind,
+			override_fps,
+			force_video_file,
+			override_pix_fmt,
+			override_norm,
+			switch_jpeg )<=0)
+       {
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to open video file(s)");
+			main_ret = 1;
+			goto VEEJAY_MAIN_EXIT;
+       }
 	
-	veejay_msg(VEEJAY_MSG_DEBUG, "Started playback");
-
-	int current_state = LAVPLAY_STATE_PLAYING;
-
-	req.tv_sec = 0;
-	req.tv_nsec = 4000 * 1000; 
-
-	while( 1 ) { //@ until your PC stops working
-		
-		clock_nanosleep( CLOCK_MONOTONIC, 0, &req, NULL );
-
-		current_state = veejay_get_state(info);
-		
-		if( current_state == LAVPLAY_STATE_STOP )
-			break;
 	}
 
-	veejay_msg(VEEJAY_MSG_INFO, "Thank you for using Veejay");
+    if (veejay_init(info, default_geometry_x, default_geometry_y, NULL, live, ta) < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Cannot start Veejay");
+        main_ret = 1;
+        goto VEEJAY_MAIN_EXIT;
+    }
 
+    if (auto_loop) veejay_auto_loop(info);
+
+    veejay_init_msg_ring();  // logging
+
+    if (veejay_setup_video_out(info) != 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Failed to setup output driver");
+        main_ret = 1;
+		goto VEEJAY_MAIN_EXIT;
+    }
+	
+    if (!veejay_main(info)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Cannot start main playback cycle");
+        main_ret = 1;
+        goto VEEJAY_MAIN_EXIT;
+    }
+
+	settings->display_frame.pixels[0] = vj_sdl_get_buffer(info->sdl,0);
+	settings->display_frame.pixels[1] = vj_sdl_get_buffer(info->sdl,1);
+
+    while (atomic_load_int(&settings->first_audio_frame_ready) == 0) {
+        usleep_accurate(100, settings);
+    }
+
+	long long last_seq = -1;
+
+    while (veejay_get_state(info) != LAVPLAY_STATE_STOP) {
+        
+		veejay_event_handle(info);
+
+		long long seq = atomic_consume(&settings->display_frame.seq);
+		if( seq != last_seq ) {
+			display_frame_t *df = &settings->display_frame;
+
+			int read_index = df->current_write;
+			uint8_t *pixels_to_render = df->pixels[read_index];
+
+			vj_sdl_put_to_screen(info->sdl, pixels_to_render);
+		}
+
+   		usleep_accurate(5000,settings);
+
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO, "Thank you for using Veejay");
+
+    veejay_close(info);
 
 VEEJAY_MAIN_EXIT:
-	veejay_busy(info);			
-	veejay_free(info);
-	veejay_destroy_msg_ring();
+    veejay_busy(info);
+    veejay_free(info);
+    veejay_destroy_msg_ring();
 
-	return main_ret;
+    return main_ret;
 }
