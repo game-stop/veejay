@@ -53,112 +53,122 @@ vj_effect *posterize2_init(int w, int h)
 	return ve;	
 }
 
-void posterize2_apply(void *ptr, VJFrame *frame, int *args )
+void posterize2_apply(void *ptr, VJFrame *frame, int *args)
 {
-    int vfactor = args[0];
-    int t1 = args[1];
-    int t2 = args[2];
-    int mode = args[3];
+    const int vfactor = args[0];
+    const int t1 = args[1];
+    const int t2 = args[2];
+    const int mode = args[3];
 
-	const int len = frame->len;
-	const unsigned int factor = (256 / vfactor);
-	int i;
-	uint8_t v;
+    const int len = frame->len;
+    const int factor = 256 / vfactor;
 
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-	uint8_t *A = frame->data[3];
+    uint8_t * restrict Y  = frame->data[0];
+    uint8_t * restrict Cb = frame->data[1];
+    uint8_t * restrict Cr = frame->data[2];
+    uint8_t * restrict A  = frame->data[3];
 
-	switch(mode) {
+    const uint8_t lo = pixel_Y_lo_;
+    const uint8_t hi = pixel_Y_hi_;
+    const uint8_t neutral = 128;
 
-		case 0:
-			for( i = 0; i < len; i ++ ) {
-				v = Y[i];
-				v = v - ( v % factor );
-	
-				if( v >= t1 && v <= t2 ) {
-					Y[i] = v;
-				}
-				else {
-					Y[i] = pixel_Y_lo_;
-					Cb[i] = 128;
-					Cr[i] = 128;
-				}
-			}
-			break;
-		case 1:
-			for( i = 0; i < len; i ++ ) {
-				v = Y[i];
-				v = v - (v % factor);
+    uint8_t lutY[256];
+    uint8_t lutA[256];
+    uint8_t mask[256];
 
-				if( v >= t1 && v <= t2 ) {
-					Y[i] = v;
-					Cb[i] = 128;
-					Cr[i] = 128;
-				}
-			}
-			break;
-		case 2:
-			for( i = 0; i < len; i ++) {
-				v = Y[i];
-				v = v - (v % factor);
 
-				if( v >= t1 && v <= t2 ) {
-					Y[i] = v;
-				}
-				else if( v < t1) {
-					Y[i] = pixel_Y_lo_;
-					Cb[i] = 128;
-					Cr[i] = 128;
-				}
-				else if( v > t2) {
-					Y[i] = pixel_Y_hi_;
-					Cb[i] = 128;
-					Cr[i] = 128;
-				}
-			}
-			break;
-		case 3:
-			for( i = 0; i < len; i ++ ) {
-				v = Y[i];
-				v = v - ( v % factor );
-	
-				if( v >= t1 && v <= t2 ) {
-					A[i] = v;
-				}
-				else {
-					A[i] = pixel_Y_lo_;
-				}
-			}
-			break;
-		case 4:
-			for( i = 0; i < len; i ++ ) {
-				v = Y[i];
-				v = v - (v % factor);
+    for (int i = 0; i < 256; ++i)
+    {
+        uint8_t v = (i / factor) * factor;
 
-				if( v >= t1 && v <= t2 ) {
-					A[i] = v;
-				}
-			}
-			break;
-		case 5:
-			for( i = 0; i < len; i ++) {
-				v = Y[i];
-				v = v - (v % factor);
+        lutY[i] = v;
+        lutA[i] = v;
+        mask[i] = 0;
 
-				if( v >= t1 && v <= t2 ) {
-					A[i] = v;
-				}
-				else if( v < t1) {
-					A[i] = pixel_Y_lo_;
-				}
-				else if( v > t2) {
-					A[i] = pixel_Y_hi_;
-				}
-			}
+        switch (mode)
+        {
+            case 0:
+                if (v < t1 || v > t2)
+                {
+                    lutY[i] = lo;
+                    mask[i] = 1;
+                }
+                break;
 
-		default:
-			break;
-	}
+            case 1:
+                if (v >= t1 && v <= t2)
+                {
+                    mask[i] = 1;
+                }
+                break;
+
+            case 2:
+                if (v < t1)
+                {
+                    lutY[i] = lo;
+                    mask[i] = 1;
+                }
+                else if (v > t2)
+                {
+                    lutY[i] = hi;
+                    mask[i] = 1;
+                }
+                break;
+
+            case 3:
+                if (v < t1 || v > t2)
+                    lutA[i] = lo;
+                break;
+
+            case 4:
+                if (v < t1 || v > t2)
+                    lutA[i] = A[0];
+                break;
+
+            case 5:
+                if (v < t1)
+                    lutA[i] = lo;
+                else if (v > t2)
+                    lutA[i] = hi;
+                break;
+        }
+    }
+
+    switch (mode)
+    {
+        case 0:
+        case 1:
+        case 2:
+        {
+            for (int i = 0; i < len; ++i)
+            {
+                uint8_t y = Y[i];
+                uint8_t newY = lutY[y];
+
+                Y[i] = newY;
+
+                if (mask[y])
+                {
+                    Cb[i] = neutral;
+                    Cr[i] = neutral;
+                }
+            }
+            break;
+        }
+
+        case 3:
+        case 4:
+        case 5:
+        {
+            for (int i = 0; i < len; ++i)
+            {
+                uint8_t y = Y[i];
+                A[i] = lutA[y];
+            }
+            break;
+        }
+
+        default:
+            break;
+    }
 }
