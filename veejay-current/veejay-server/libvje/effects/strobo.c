@@ -65,6 +65,7 @@ vj_effect *strobo_init(int w, int h)
 typedef struct {
     uint8_t *buf[3];
     int timestamp;
+    int n_threads;
 } strobo_t;
 
 static struct {
@@ -104,7 +105,9 @@ void *strobo_malloc(int w, int h)
     veejay_memset( s->buf[1], 128, (w*h));
     veejay_memset( s->buf[2], 128, (w*h));
 
-    return s;
+    s->n_threads = vje_advise_num_threads(w*h);
+
+    return (void*) s;
 }
 
 void strobo_free(void *ptr) {
@@ -183,21 +186,17 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args) {
 
     int a,b,c,cy=0, cu=128,cv=128;
 
-    // pick a color from the table
     _rgb2yuv( rainbow_t[ color_index ].r,
               rainbow_t[ color_index ].g,
               rainbow_t[ color_index ].b,
               cy, cu, cv );   
 
     if( delay == 0 || (s->timestamp % delay) == 0 ) {
-#pragma omp simd
+#pragma omp parallel for num_threads(s->n_threads)
         for( i = 0; i < len; i ++ )
         {
-            // create a mask
             int mask = (Y[i] < threshold);
 
-            // decay the current buffer if mask value is zero
-            // or blend-in the selected color using a + (( 2 * b ) - opacity )
             a = bY[i] * decay >> 8;
             bY[i] = CLAMP_Y((1 - mask) * ((bY[i] * decay) >> 8) + mask * (a + ((2 * cy) - op0)));
 
@@ -210,8 +209,7 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args) {
     }
 
     if( mode == 0 ) {
-#pragma omp simd
-        // copy back the strobo buffer for display
+#pragma omp parallel for num_threads(s->n_threads)
         for( i = 0; i < len; i ++ ) 
         {
             Y[i] = bY[i];
@@ -220,25 +218,19 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args) {
         }
     }
     else {
-
-#pragma omp simd
+#pragma omp parallel for num_threads(s->n_threads)
         for( i = 0; i < len; i ++ ) {
-            // create a mask from the strobo buffer
             uint8_t mask = (bY[i] != 0);
             
-            // dont blend-in black
             a = (mask * bY[i]) | (!mask * Y[i]);
             b = (mask * bU[i]) | (!mask * U[i]);
             c = (mask * bV[i]) | (!mask * V[i]);
 
-            // opacity blend the strobo buffer with the original frame
             Y[i] = (mask * ((op0 * Y[i] + op1 * a) >> 8)) | (!mask * Y[i]);
             U[i] = (mask * ((op0 * U[i] + op1 * b) >> 8)) | (!mask * U[i]);
             V[i] = (mask * ((op0 * V[i] + op1 * c) >> 8)) | (!mask * V[i]);
         }
     }
-
-
     s->timestamp ++;
 
 }
