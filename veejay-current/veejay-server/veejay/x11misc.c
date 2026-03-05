@@ -20,129 +20,48 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef X_DISPLAY_MISSING
 #include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xatom.h>
-#include <veejaycore/vj-msg.h>
+#include <X11/extensions/dpms.h>
 
-#ifdef HAVE_XINERAMA
-#include <X11/extensions/Xinerama.h>
-#endif
+static int   ss_timeout, ss_interval, ss_prefer_blank, ss_allow_exposures;
+static BOOL  dpms_was_enabled = False;
 
-#define DECO (1L << 1)
+void x11_disable_screensaver(void *display)
+{
+    Display *d = (Display *)display;
+    if (!d) return;
 
-static	int	screen_saver_[4];
+    XGetScreenSaver(d, &ss_timeout, &ss_interval, &ss_prefer_blank, &ss_allow_exposures);
+    
+	XSetScreenSaver(d, 0, ss_interval, ss_prefer_blank, ss_allow_exposures);
 
 #ifdef HAVE_XDPMS
-static  CARD16  state_;
-static  BOOL    onoff_;
+    int dummy;
+    CARD16 state;
+    if (DPMSQueryExtension(d, &dummy, &dummy)) {
+        DPMSInfo(d, &state, &dpms_was_enabled);
+        if (dpms_was_enabled) {
+            DPMSDisable(d);
+        }
+    }
 #endif
-
-void	x11_misc_init(void)
-{
-	memset(&screen_saver_,0, sizeof(screen_saver_));
-#ifdef HAVE_XDPMS
-	memset(&state_, 0,sizeof(state_));
-	memset(&onoff_, 0,sizeof(onoff_));
-#endif
+    XFlush(d);
 }
 
-void	x11_disable_screensaver( void *display )
+void x11_enable_screensaver(void *display)
 {
-//	XGetScreenSaver( d, &screen_saver_[0], &screen_saver_[1],
-//			&screen_saver_[2], &screen_saver_[3] );
+    Display *d = (Display *)display;
+    if (!d) return;
 
-	if( screen_saver_[0] )
-	{
-		//XSetScreenSaver( d, 0, screen_saver_[1], screen_saver_[2],screen_saver_[3] );
-	}
+    XSetScreenSaver(d, ss_timeout, ss_interval, ss_prefer_blank, ss_allow_exposures);
 
 #ifdef HAVE_XDPMS
-	int n = 0;
-	if( DPMSQueryExtension( d, &n, &n ) )
-	{
-		DPMSInfo( d, &state_, &ononff_ );
-		DPMSDisable( d );
-	}
+    int dummy;
+    if (DPMSQueryExtension(d, &dummy, &dummy)) {
+        if (dpms_was_enabled) {
+            DPMSEnable(d);
+        }
+    }
 #endif
+    XFlush(d);
 }
-
-void	x11_enable_screensaver( void *display )
-{
-	if( screen_saver_[0] )
-	{
-	//	XSetScreenSaver( d, screen_saver_[0],screen_saver_[1],
-	//			screen_saver_[2],screen_saver_[3] );
-	}
-#ifdef HAVE_XDPMS
-	int n = 0;
-	if( DPMSQueryExtension( d, &n, &n ) )
-	{
-		if( onoff_ )
-			DPMSEnable( d );
-	}
-#endif
-}
-
-
-static	int	xinerama_x_ = 0;
-static	int	xinerama_y_ = 0;
-static  int	xinerama_user_selected_ = 0;
-static	int	screen_w_ = 0;
-static	int	screen_h_ = 0;
-
-void	x11_move( void *display, void *window )
-{
-	Display *d = (Display*) display;
-#ifdef HAVE_XINERAMA
-	if( XineramaIsActive( d ) )
-	{
-		//XMoveWindow( d, w, xinerama_x_, xinerama_y_ );
-	}
-#endif
-}
-
-void	x11_user_select( int n )
-{
-	xinerama_user_selected_ = n;
-}
-
-void	x11_info(void *display)
-{
-	Display *d = (Display*) display;
-#ifdef HAVE_XINERAMA
-
-	int dis1,dis2;
-	
-	if( XineramaIsActive( d ) &&
-	    XineramaQueryExtension( d, &dis1,&dis2) )
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "\tUsing XFree Xinerama extension");
-		
-		int n = 0;
-		XineramaScreenInfo *screens =
-			XineramaQueryScreens( d, &n );
-		
-		if( xinerama_user_selected_ < 0 ||
-		    xinerama_user_selected_ >= n )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "\tRequested screen number invalid");
-			xinerama_user_selected_ = 0;
-		}
-				
-
-		xinerama_x_ = screens[ xinerama_user_selected_ ].x_org;
-		xinerama_y_ = screens[ xinerama_user_selected_ ].y_org;
-		screen_w_   = screens[ xinerama_user_selected_ ].width;
-		screen_h_   = screens[ xinerama_user_selected_ ].height;
-
-		veejay_msg(VEEJAY_MSG_INFO, "\tUsing screen %d : %dx%d+%dx%d", 
-				xinerama_user_selected_, screen_w_, screen_h_, xinerama_x_, xinerama_y_ );
-
-	//	XFree( screens );
-	}
-#endif
-}
-
-#endif

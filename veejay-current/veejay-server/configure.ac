@@ -773,6 +773,15 @@ fi
 AC_SUBST(HAVE_X)
 AM_CONDITIONAL(HAVE_X, test "x$HAVE_X" = "xyes")
 
+have_xdpms=false
+AC_CHECK_HEADERS([X11/extensions/dpms.h], [
+    AC_CHECK_LIB([Xext], [DPMSQueryExtension], [
+        AC_DEFINE([HAVE_XDPMS], [1], [Define if you have the XDPMS extension])
+        have_xdpms=true
+        X_EXTRA_LIBS="$X_EXTRA_LIBS -lXext"
+    ], [], [$X_LIBS -lX11])
+], [], [#include <X11/Xlib.h>])
+
 dnl the check doesnt work on ubuntu, so just fake it.
 RT_LIBS="-lrt"
 AC_CHECK_LIB( rt, clock_gettime, [
@@ -1130,7 +1139,8 @@ AM_CONDITIONAL(HAVE_LIBLO,test x$have_liblo = xtrue)
 AM_CONDITIONAL(HAVE_ARM, test x$have_arm = xtrue )
 AM_CONDITIONAL(HAVE_ARM_NEON, test x$ac_cv_flag_neon = xtrue )
 AM_CONDITIONAL(HAVE_ARM_ASIMD, test x$ac_cv_flag_asimd = xtrue )
-AM_CONDITIONAL(HAVE_ARMV7A, test x$have_armv7a = xtrue )
+AM_CONDITIONAL(HAVE_ARMV7A, test x$have_armv7a = xtrue)
+AM_CONDITIONAL(HAVE_XDPMS, test x$have_xdpms = xtrue)
 
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS

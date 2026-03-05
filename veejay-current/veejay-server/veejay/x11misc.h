@@ -20,12 +20,5 @@
 #define X11MISC
 void	x11_enable_screensaver( void *display );
 void	x11_disable_screensaver( void *display );
-void	x11_misc_init();
-
-void	x11_move( void *display, void *window );
-void	x11_info(void *display);
-
-void	x11_user_select( int n );
-
 #endif
 
