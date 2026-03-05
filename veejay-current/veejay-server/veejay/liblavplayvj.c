@@ -594,7 +594,7 @@ int veejay_free(veejay_t * info)
 	if( info->plain_editlist )
 		vj_el_free(info->plain_editlist);
 
-	task_destroy();
+	//task_destroy(); FIXME
 
 	if( info->composite )
 		composite_destroy( info->composite );
