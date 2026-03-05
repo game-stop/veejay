@@ -2881,7 +2881,7 @@ void *veejay_audio_producer_thread(void *arg)
             usleep_accurate(100, settings);
         }
 
-        double anchor_s = (double)vj_jack_get_played_frames() / JACK_RATE;
+        anchor_s = (double)vj_jack_get_played_frames() / JACK_RATE;
 
         atomic_store_double(&settings->audio_master_s, anchor_s);
         atomic_store_double(&settings->audio_start_offset, anchor_s);
@@ -2889,13 +2889,15 @@ void *veejay_audio_producer_thread(void *arg)
         veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] Audio anchor established at %fs", anchor_s);
         atomic_store_long_long(&settings->current_frame_num, 0);
     } else {
-#else	    
+#endif    
         // fallback anchor for monotonic clock
 		anchor_s = monotonic_now_s();
         atomic_store_double(&settings->audio_start_offset, anchor_s);
         atomic_store_double(&settings->audio_master_s, anchor_s);
         atomic_store_long_long(&settings->current_frame_num, 0);
-#endif
+
+        veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] Monotonic clock anchor established at %fs", anchor_s);
+
 #ifdef HAVE_JACK
     }
 #endif
@@ -2914,11 +2916,11 @@ void *veejay_audio_producer_thread(void *arg)
 
         long long media_frame = atomic_load_long_long(&settings->current_frame_num);
 
+#ifdef HAVE_JACK
         if (has_audio) {
             int needed = (int)(SPVF * CLIENT_RATE + 0.5);
             
 			int decoded;
-#ifdef HAVE_JACK
 			if(vj_jack_xrun_flag()) {
 		
 				atomic_add_fetch_old_int(&settings->xruns, 1);
@@ -2934,7 +2936,7 @@ void *veejay_audio_producer_thread(void *arg)
 					veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Audio master clock resynced after xrun by %.6fs (~1 video frame)", delta);
 				}
 			}
-#endif	
+
 			int tx_active = atomic_load_int(&settings->transition.active);
 			if(!tx_active) {
 				decoded = vj_perform_queue_audio_chunk_ext(info, needed, media_frame, 0, audio_chunk);
@@ -2955,7 +2957,6 @@ void *veejay_audio_producer_thread(void *arg)
 				decoded = vj_perform_queue_audio_chunk_crossfade(info, needed, media_frame, b_frame, audio_chunk, settings->transition.next_id,start,end);
 			}
 
-#ifdef HAVE_JACK
             const int jack_frames_needed = (int)((double)decoded * JACK_RATE / CLIENT_RATE + 1);
 
          	vj_audio_wait_for_jack_space( jack_frames_needed, settings);
@@ -2976,8 +2977,8 @@ void *veejay_audio_producer_thread(void *arg)
             if (sleep_s > 0.001) { 
                 usleep_accurate((long long)(sleep_s * 1e6 * 0.9), settings);
             }
-#endif
         } else {
+#endif
 			const double next_frame_target = anchor_s + ((double)(loop_count + 1) * SPVF);
 				
 			double now = monotonic_now_s();
@@ -2988,12 +2989,15 @@ void *veejay_audio_producer_thread(void *arg)
 			}
 
 			now = monotonic_now_s();
+			
 			atomic_store_double(&settings->audio_master_s, now );
-			//atomic_store_double(&settings->audio_master_s, next_frame_target - (SPVF * 0.5));
 			vj_perform_inc_frame(info, settings->current_playback_speed);
 			loop_count++;
-			}
-    }
+
+		}
+#ifdef HAVE_JACK
+	}
+#endif
 
 	atomic_store_int(&info->audio_running, 0);
 
@@ -3061,10 +3065,14 @@ static void *veejay_producer_thread_loop(void *ptr)
     atomic_store_long_long(&settings->current_frame_num, -1);
     atomic_store_int(&settings->audio_mode, AUDIO_MODE_SILENCE_FILL);
 
-    veejay_msg(VEEJAY_MSG_DEBUG, "[PRODUCER] waiting for audio anchor");
-    while (atomic_load_double(&settings->audio_start_offset) <= 0.0) {
-        usleep_accurate(100, settings);
-    }
+	if(info->audio) {
+#ifdef HAVE_JACK
+    	veejay_msg(VEEJAY_MSG_DEBUG, "[PRODUCER] waiting for audio anchor");
+    	while (atomic_load_double(&settings->audio_start_offset) <= 0.0) {
+        	usleep_accurate(100, settings);
+    	}
+#endif
+	}
 
     veejay_msg(VEEJAY_MSG_DEBUG, "[PRODUCER] waiting for first audio frame ready");
     while (atomic_load_int(&settings->first_audio_frame_ready) == 0) {
@@ -3145,7 +3153,7 @@ static void *veejay_producer_thread_loop(void *ptr)
         info->stats.last_pts_s = pts;
         info->stats.delta_s = diff;
 		info->stats.xruns = atomic_load_int(&settings->xruns);
-        
+
 		veejay_consume_events(info);
     }
 
