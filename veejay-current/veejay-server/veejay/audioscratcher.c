@@ -178,14 +178,7 @@ int vj_scratch_process(void *ptr,
 {
     vj_scratch_t *s = (vj_scratch_t*)ptr;
 
-    static int debug_counter = 0;
-    int debug_this_call = 0;
     int direction = (speed >= 0.0) ? 1 : -1;
-    if (direction < 0 && debug_counter < 20) {
-        debug_this_call = 1;
-        debug_counter++;
-    }
-    
     int ch = s->channels;
 
     if (input && src_frames > 0) {
@@ -232,9 +225,11 @@ int vj_scratch_process(void *ptr,
     double max_read = (double)(s->write_pos - 1);
     double min_read = fmax(0.0, (double)(s->write_pos - s->buffer_frames));
 
+    // FIXME change buffer mechanism
+    // change to incoming audio -> sliding buffer -> continous read head -> interpolate -> output
     for (int i = 0; i < expected_out_frames; i++) {
 
-        if (s->read_pos > max_read) s->read_pos = max_read;
+        if (s->read_pos > max_read) s->read_pos = max_read; // clamping -> repeats sample FIXME
         if (s->read_pos < min_read) s->read_pos = min_read;
 
         int base = (int)floor(s->read_pos);
