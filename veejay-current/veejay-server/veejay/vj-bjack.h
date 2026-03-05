@@ -18,15 +18,15 @@
  */
 #ifndef VJ_BIOJACK_H
 #define VJ_BIOJACK_H
-int	vj_jack_initialize();
+int	vj_jack_initialize(void);
 int 	vj_jack_init(int rate_hz, int channels, int bps);
-int	vj_jack_stop();
-int	vj_jack_reset();
+int	vj_jack_stop(void);
+int	vj_jack_reset(void);
 int	vj_jack_play(void *data, int len);
-int	vj_jack_pause();
-int	vj_jack_resume();
-int	vj_jack_rate();
-int	vj_jack_get_space();
+int	vj_jack_pause(void);
+int	vj_jack_resume(void);
+int	vj_jack_rate(void);
+int	vj_jack_get_space(void);
 long 	vj_jack_get_status(long int *sec, long int *usec);
 int	vj_jack_set_volume(int v);
 int	vj_jack_c_play(void *data, int len, int entry);

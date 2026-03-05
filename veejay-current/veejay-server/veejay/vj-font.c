@@ -2022,7 +2022,7 @@ static   int    num_nl( char *str , int len ) {
 }
 
 
-char    *vj_font_default()
+char    *vj_font_default(void)
 {
     int n = strlen( selected_default_font );
     if( n <= 0 )
