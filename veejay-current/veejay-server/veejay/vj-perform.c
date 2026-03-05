@@ -25,6 +25,7 @@
 #include <string.h>
 #include <signal.h>
 #include <time.h>
+#include <stdbool.h>
 #include <veejaycore/defs.h>
 #include <libsample/sampleadm.h>  
 #include <libstream/vj-tag.h>
