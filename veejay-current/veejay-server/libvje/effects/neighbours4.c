@@ -206,7 +206,7 @@ static inline pixel_t evaluate_pixel_row_c(
     return val;
 }
 
-void neighbours4_apply(void *ptr,VJFrame *frame,int *args){
+void neighbours4_apply(void *ptr,VJFrame *frame,int *args){ //FIXME find issue
     int radius=args[0],brush_size=args[1],intensity_level=args[2],mode=args[3];
     nb_t *n=(nb_t*)ptr;
     int width=frame->width,height=frame->height,len=frame->len;
