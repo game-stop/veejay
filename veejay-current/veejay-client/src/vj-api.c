@@ -1322,7 +1322,6 @@ static void update_label_f(const char *name, float val);
 static void update_label_str(const char *name, gchar *text);
 static void update_globalinfo(int *his, int p, int k);
 static gint load_parameter_info(void);
-#include <veejay/resample.h>
 static void load_v4l_info(void);
 static void reload_editlist_contents(void);
 static void load_effectchain_info(void);
@@ -8969,7 +8968,7 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
     if(!info->client)
     {
-        info->client = vj_client_alloc(0,0,0);
+        info->client = vj_client_alloc();
         if(!info->client)
         {
             return 0;
