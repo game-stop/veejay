@@ -282,12 +282,12 @@ vj_effect *shapewipe_init(int w, int h)
     vje_build_value_hint_list( ve->hints, ve->limits[1][2], 2, "White to Black", "Black to White" );
 
     char *home = getenv("HOME");
-    veejay_msg(VEEJAY_MSG_INFO, "Put your shape transition files (png, pgm, tiff) in %s/.veejay/shapes", home ); 
+    veejay_msg(VEEJAY_MSG_DEBUG, "Put your shape transition files (png, pgm, tiff) in %s/.veejay/shapes", home ); 
 
     ve->is_transition_ready_func = shapewipe_ready;
     ve->limits[1][0] = s->shapeidx - 1;
     
-    veejay_msg(VEEJAY_MSG_INFO, "Loaded %d shape transitions from storage", s->shapeidx - 1);
+    veejay_msg(VEEJAY_MSG_DEBUG, "Loaded %d shape transitions from storage", s->shapeidx - 1);
 
 
     free_shape_loader(s);
