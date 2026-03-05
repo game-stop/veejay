@@ -73,7 +73,7 @@ uint8_t	*vj_avcodec_get_buf( vj_encoder *av );
 int	vj_avcodec_get_buf_size( vj_encoder *av );
 const char *vj_avcodec_get_encoder_name(int encoder);
 int	vj_avcodec_is_internal(int format);
-int	vj_avcodec_print_version(void);
+void	vj_avcodec_print_version(void);
 void vj_avcodec_flush_frame(void *encoder, uint8_t *buf, int buf_len ); 
 void yuv_planar_to_rgb24(uint8_t *src[3], int fmt, uint8_t *dst, int w, int h );
 int	 yuv420p_to_yuv422p( uint8_t *Y, uint8_t *Cb, uint8_t *Cr, uint8_t *dst[3], int w, int h );

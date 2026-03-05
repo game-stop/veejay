@@ -613,8 +613,9 @@ int		vj_avcodec_init( int pixel_format, int verbose)
 	return 1;
 }
 
-int	    vj_avcodec_print_version(void) {
+void	    vj_avcodec_print_version(void) {
 	veejay_msg(VEEJAY_MSG_INFO, "[AV] ffmpeg/libav library version %d.%d.%d", LIBAVCODEC_VERSION_MAJOR, LIBAVCODEC_VERSION_MINOR, LIBAVCODEC_VERSION_MICRO);
+
 }
 
 static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[4], uint8_t *dst)
