@@ -346,11 +346,14 @@ int		vj_event_vevo_get_vims_id( int id )
 void		vj_event_vevo_dump(void)
 {
 	int i;
-	veejay_msg(VEEJAY_MSG_INFO, "VIMS  Syntax: '<selector>:<arguments>;'");
+	veejay_msg(VEEJAY_MSG_INFO, "\n\n" );
+	veejay_msg(VEEJAY_MSG_INFO, "VIMS Syntax: '<selector>:<arguments>;'");
 	veejay_msg(VEEJAY_MSG_INFO, "Use arguments according to FORMAT");
+	veejay_msg(VEEJAY_MSG_INFO, "\n\n" );
 	veejay_msg(VEEJAY_MSG_INFO, "FORMAT controls the arguments as in C printf. Interpreted sequences are:");
 	veejay_msg(VEEJAY_MSG_INFO, "\t%%d\tinteger");
 	veejay_msg(VEEJAY_MSG_INFO, "\t%%s\tstring");
+	veejay_msg(VEEJAY_MSG_INFO, "\n\n" );
 	
 	for( i = 0; i < MAX_INDEX; i ++ )
 	{
