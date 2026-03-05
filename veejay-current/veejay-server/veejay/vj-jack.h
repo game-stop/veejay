@@ -59,8 +59,6 @@ int  vj_jack_get_rate(void);
 
 void	vj_jack_reset(void);
 
-void vj_jack_debug(int skipv, int skipa);
-
 double vj_jack_get_played_position(void);
 
 int     vj_jack_get_ringbuffer_frames_free(void);
