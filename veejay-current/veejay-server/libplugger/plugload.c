@@ -540,11 +540,11 @@ int	plug_sys_detect_plugins(void)
 
 	if(!scan_plugins())
 	{
-		veejay_msg(VEEJAY_MSG_WARNING,
+		veejay_msg(VEEJAY_MSG_DEBUG,
 				"No plugins found in $HOME/.veejay/plugins.cfg" );
 	}
 
-	veejay_msg(VEEJAY_MSG_INFO, "Looking for plugins in common locations ...");
+	veejay_msg(VEEJAY_MSG_DEBUG, "Looking for plugins in common locations ...");
 	
 	int i;
 	for( i = 0; plugger_paths[i].path != NULL; i ++ ) {
