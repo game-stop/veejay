@@ -143,7 +143,7 @@ typedef struct {
     int consumed_samples;
     int  sample_id;
     int  sample_type;
-    int  direction
+    int  direction;
     int  max_sfd;
     int  cur_sfd;
     int  direction_changed;
