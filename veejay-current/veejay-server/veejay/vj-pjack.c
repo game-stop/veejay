@@ -194,7 +194,7 @@ long	vj_jack_get_status(long int *sec, long int *nsec)
 
 double	vj_jack_get_played_position(void) {
 
-	return JACK_GetPlayedPosition(driver);
+	return (driver);
 }
 
 unsigned long vj_jack_get_played_frames(void) {
