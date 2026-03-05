@@ -570,7 +570,6 @@ int veejay_increase_frame(veejay_t *info, long num)
     if(edge_type != AUDIO_EDGE_NONE) {
         int prev_dir = settings->current_playback_speed >= 0 ? 1 : -1;
         int cur_dir  = num >= 0 ? 1 : -1;
-		veejay_msg(VEEJAY_MSG_DEBUG, "%s", __FUNCTION__);
 		
         vj_perform_initiate_edge_change(info, edge_type, prev_dir, cur_dir);
     }
@@ -2539,8 +2538,6 @@ static double vj_measure_pause_cost_once(void)
     const int iterations = 10000000; // 10M
     struct timespec start, end;
 
-    /* prevent compiler from removing the loop */
-    volatile int sink = 0;
 
     /* warmup */
     for (int i = 0; i < 10000; ++i) {
@@ -2557,9 +2554,8 @@ static double vj_measure_pause_cost_once(void)
 #if defined(__i386__) || defined(__x86_64__)
         __builtin_ia32_pause();
 #elif defined(__arm__) || defined(__aarch64__)
-        __asm__ volatile("yield");
+        __asm__ volatile("yield" ::: "memory");
 #endif
-        sink++;
     }
 
     clock_gettime(CLOCK_MONOTONIC, &end);
@@ -3106,7 +3102,7 @@ static void *veejay_producer_thread_loop(void *ptr)
             if (frames_to_skip > 0) {
                  if( frame > 0 ) {
                     veejay_msg(VEEJAY_MSG_WARNING,
-                        "[PRODUCER] CPU overload: Skipping %lld frames", frames_to_skip);
+                        "[PRODUCER] Performance lag: Dropping %lld frames to maintain A/V sync", frames_to_skip);
                  }
                  atomic_add_fetch_old_long_long(&settings->master_frame_num, frames_to_skip);
                  info->stats.skipped_frames = frames_to_skip;
