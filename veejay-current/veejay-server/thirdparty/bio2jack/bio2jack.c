@@ -118,11 +118,10 @@ typedef struct jack_driver_s
   volatile unsigned long played_client_bytes;
   volatile long position_byte_offset;
 
-  volatile long jack_buffer_size;
+  long jack_buffer_size;
   volatile jack_nframes_t last_callback_frame;
 
   struct timespec previousTime;
-  volatile double audio_time_offset;
   double prefill_duration;
 
   volatile int state;
@@ -1552,26 +1551,6 @@ static unsigned long JACK_get_played_frames_from_driver(jack_driver_t *drv)
   return atomic_load_ulong(&drv->last_hw_frame_count);
 }
 
-static double JACK_GetPlayedPositionFromDriver(jack_driver_t *drv)
-{
-  if (!drv)
-    return 0.0;
-
-  unsigned long hw_frames = atomic_load_ulong(&drv->last_hw_frame_count);
-
-  double absolute_time_s = (double)hw_frames / (double)drv->jack_sample_rate;
-
-  jack_latency_range_t range;
-  jack_port_get_latency_range(drv->output_port[0], JackPlaybackLatency, &range);
-  double latency_s = (double)range.max / (double)drv->jack_sample_rate;
-
-  double start_offset = atomic_load_double(&drv->audio_time_offset);
-
-  double final_time = absolute_time_s - latency_s - start_offset;
-
-  return (final_time < 0.0) ? 0.0 : final_time;
-}
-
 long JACK_GetPosition(int deviceID, int position, int type)
 {
   jack_driver_t *drv = getDriver(deviceID);
@@ -1587,16 +1566,6 @@ JACK_GetPlayedFramesFromDriver(int deviceID)
 {
   jack_driver_t *drv = getDriver(deviceID);
   return JACK_get_played_frames_from_driver(drv);
-}
-
-double
-JACK_GetPlayedPosition(int deviceID)
-{
-  jack_driver_t *drv = getDriver(deviceID);
-  double return_val;
-  return_val = JACK_GetPlayedPositionFromDriver(drv);
-
-  return return_val;
 }
 
 long JACK_GetUnderruns(int deviceID)
@@ -1740,7 +1709,7 @@ long JACK_GetPeriodSize(int deviceID)
   if (!drv)
     return 0;
 
-  return atomic_load_long(&drv->jack_buffer_size);
+  return drv->jack_buffer_size;
 }
 
 int JACK_GetClientToJackFrames(int deviceID, int client_frames)
@@ -1798,8 +1767,6 @@ void JACK_CleanupDriver(jack_driver_t *drv)
 
   drv->jack_sample_rate = 0;
   drv->jackd_died = FALSE;
-
-  atomic_store_double(&drv->audio_time_offset, 0.0);
 
   drv->output_sample_rate_ratio = 1.0;
   drv->input_sample_rate_ratio = 1.0;

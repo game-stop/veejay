@@ -133,8 +133,6 @@ extern "C"
 
   long JACK_OutputStatus(int deviceID, long *sec, long *usec);
 
-  double JACK_GetPlayedPosition(int deviceID);
-
   int JACK_BufferIsStarving(int deviceID);
 
   long JACK_GetRequiredFreeFrames(int deviceID, int client_frames);
