@@ -1494,3 +1494,19 @@ int lav_fileno(lav_file_t *lav_file)
    return res;
 }
 
+
+int lav_detect_endian (void)
+{
+    unsigned int fred;
+    char     *pfred;
+
+  fred = 2 | (1 << (sizeof(int)*8-8));
+  pfred = (char *)&fred;
+
+  if  (*pfred == 1)
+      return 1;
+  else if(*pfred == 2)
+      return 0;
+  else
+      return -1;
+}
