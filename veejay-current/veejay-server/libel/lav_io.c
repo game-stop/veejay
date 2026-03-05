@@ -454,8 +454,8 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
     if(video_format == 'x')
         return -1;//picture
 #endif
-    if(video_format == 'G')
-	return -1;
+    //if(video_format == 'G')
+	//return -1;
     for(n=0;n<count;n++)
    {
       switch(lav_file->format)
@@ -678,8 +678,8 @@ int lav_video_interlacing(lav_file_t *lav_file)
     if(video_format == 'x')
         return LAV_NOT_INTERLACED;
 #endif
-    if(video_format == 'G')
-	return LAV_NOT_INTERLACED;
+    //if(video_format == 'G')
+	//return LAV_NOT_INTERLACED;
    return lav_file->interlacing;
 }
 
@@ -729,8 +729,8 @@ const char *lav_video_compressor(lav_file_t *lav_file)
    if(lav_file->format == 'q' || lav_file->format == 'Q')
     return quicktime_video_compressor(lav_file->qt_fd,0);
 #endif
-   if( video_format == 'G')
-      return FOURCC_Y42X;
+   //if( video_format == 'G')
+   //   return FOURCC_Y42X;
 
    return AVI_video_compressor(lav_file->avi_fd);
 }
@@ -830,8 +830,8 @@ long lav_frame_size(lav_file_t *lav_file, long frame)
     if(video_format == 'x')
         return output_scale_width * output_scale_height * 3;
 #endif
-    if(video_format == 'G')
-	return output_scale_width * output_scale_height * 3;
+    //if(video_format == 'G')
+	//return output_scale_width * output_scale_height * 3;
 #ifdef HAVE_LIBQUICKTIME
     if( video_format == 'q' || video_format == 'Q')
         return quicktime_frame_size(lav_file->qt_fd,frame,0);
@@ -850,8 +850,8 @@ int lav_seek_start(lav_file_t *lav_file)
    if(video_format == 'x')
     return 1;
 #endif
-   if(video_format == 'G')
-      return 1;
+   //if(video_format == 'G')
+   //   return 1;
 #ifdef HAVE_LIBQUICKTIME
   return quicktime_seek_start(lav_file->qt_fd);
 #endif
@@ -949,8 +949,8 @@ int lav_set_audio_position(lav_file_t *lav_file, long clip)
    if(video_format == 'x')
     return 0;
 #endif
-   if(video_format == 'G') 
-      return 0;
+   //if(video_format == 'G') 
+   //   return 0;
 #ifdef HAVE_LIBQUICKTIME
     if(video_format =='q'|| video_format == 'Q' ) {
         quicktime_set_audio_position(lav_file->qt_fd,clip,0);
@@ -1258,7 +1258,7 @@ lav_file_t *lav_open_input_file(char *filename, size_t mmap_size)
 	ret = 1;
 	alt = 1;
     }*/
-
+    }
 
    if(lav_fd->bps==0) lav_fd->bps=1; /* make it save since we will divide by that value */
  /*     if(strlen(video_comp) == 1 ) {
@@ -1493,29 +1493,4 @@ int lav_fileno(lav_file_t *lav_file)
 
    return res;
 }
-
-int lav_detect_endian (void)
-{
-    unsigned int fred;
-    char     *pfred;
-
-  fred = 2 | (1 << (sizeof(int)*8-8));
-  pfred = (char *)&fred;
-
-  if  (*pfred == 1)
-      return 1;
-  else if(*pfred == 2)
-      return 0;
-  else
-      return -1;
-}
-
-
-
-
-
-
-
-
-
 
