@@ -26,7 +26,7 @@
 
 int veejay_tick(void);
 void veejay_preview(int p);
-int veejay_update_multitrack(void);
+int veejay_update_multitrack(void *);
 void veejay_sleep( void *ui );
 void reloaded_restart(void);
 void *get_ui_info(void);

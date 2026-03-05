@@ -574,7 +574,7 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_tr
 		veejay_msg(VEEJAY_MSG_DEBUG, "Veejay '%s':%d already in track %d", hostname, port_num, *new_track );
 		return 0;
 	}
-	vj_client *fd = vj_client_alloc(0,0,0);
+	vj_client *fd = vj_client_alloc();
 	if(!vj_client_connect( fd, hostname, NULL, port_num ) )
 	{
 		vj_msg(VEEJAY_MSG_ERROR, "Unable to connect to %s:%d", hostname, port_num );
