@@ -2918,7 +2918,7 @@ void *veejay_audio_producer_thread(void *arg)
             int needed = (int)(SPVF * CLIENT_RATE + 0.5);
             
 			int decoded;
-#ifdef JAVE_JACK
+#ifdef HAVE_JACK
 			if(vj_jack_xrun_flag()) {
 		
 				atomic_add_fetch_old_int(&settings->xruns, 1);
@@ -2955,7 +2955,7 @@ void *veejay_audio_producer_thread(void *arg)
 				decoded = vj_perform_queue_audio_chunk_crossfade(info, needed, media_frame, b_frame, audio_chunk, settings->transition.next_id,start,end);
 			}
 
-#ifdef JAVE_JACK
+#ifdef HAVE_JACK
             const int jack_frames_needed = (int)((double)decoded * JACK_RATE / CLIENT_RATE + 1);
 
          	vj_audio_wait_for_jack_space( jack_frames_needed, settings);
@@ -3010,7 +3010,7 @@ static void veejay_producer_thread_audio_startup(veejay_t *info)
     video_playback_setup *settings = info->settings;
 
 	int has_audio = (info->audio == AUDIO_PLAY);
-#ifndef JAVE_JACK
+#ifndef HAVE_JACK
 	has_audio = 0;
 #endif
 
