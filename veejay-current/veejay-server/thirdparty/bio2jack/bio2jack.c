@@ -87,8 +87,8 @@ typedef struct jack_driver_s
   unsigned long jack_output_port_flags;
   unsigned long jack_input_port_flags;
 
-  volatile long jack_sample_rate;   /* server rate (e.g., 48000) */
-  volatile long client_sample_rate; /* veejay rate (e.g., 44100) */
+  long jack_sample_rate;   /* server rate (e.g., 48000) */
+  long client_sample_rate; /* veejay rate (e.g., 44100) */
 
   double SPVF;
 
@@ -99,10 +99,10 @@ typedef struct jack_driver_s
   unsigned long num_input_channels;
   unsigned long num_output_channels;
 
-  volatile unsigned long bytes_per_output_frame;
-  volatile unsigned long bytes_per_input_frame;
-  volatile unsigned long bytes_per_jack_output_frame;
-  volatile unsigned long bytes_per_jack_input_frame;
+  unsigned long bytes_per_output_frame;
+  unsigned long bytes_per_input_frame;
+  unsigned long bytes_per_jack_output_frame;
+  unsigned long bytes_per_jack_input_frame;
 
   volatile int xrun_pending;
   volatile int xrun_flag;
@@ -175,8 +175,8 @@ JACK_RecalculateRatios(jack_driver_t *drv)
   if (!drv)
     return;
 
-  long jack_rate = atomic_load_long(&drv->jack_sample_rate);
-  long client_rate = atomic_load_long(&drv->client_sample_rate);
+  long jack_rate = drv->jack_sample_rate;
+  long client_rate = drv->client_sample_rate;
 
   double new_output_ratio;
   double new_input_ratio;
@@ -1340,8 +1340,8 @@ JACK_GetOutputBytesPerSecondFromDriver(jack_driver_t *drv)
   if (!drv)
     return 0;
 
-  unsigned long bytes_per_frame = atomic_load_ulong(&drv->bytes_per_output_frame);
-  long sample_rate = atomic_load_long(&drv->client_sample_rate);
+  unsigned long bytes_per_frame = drv->bytes_per_output_frame;
+  long sample_rate = drv->client_sample_rate;
 
   return bytes_per_frame * sample_rate;
 }
@@ -1363,8 +1363,8 @@ JACK_GetInputBytesPerSecondFromDriver(jack_driver_t *drv)
   if (!drv)
     return 0;
 
-  unsigned long bytes_per_frame = atomic_load_ulong(&drv->bytes_per_input_frame);
-  long sample_rate = atomic_load_long(&drv->client_sample_rate);
+  unsigned long bytes_per_frame = drv->bytes_per_input_frame;
+  long sample_rate = drv->client_sample_rate;
 
   return (long)(bytes_per_frame * sample_rate);
 }
@@ -1387,8 +1387,8 @@ JACK_GetBytesStoredFromDriver(jack_driver_t *drv)
   if (drv->pPlayPtr == 0)
     return 0;
 
-  unsigned long jack_frame_size = atomic_load_ulong(&drv->bytes_per_jack_output_frame);
-  unsigned long client_frame_size = atomic_load_ulong(&drv->bytes_per_output_frame);
+  unsigned long jack_frame_size = drv->bytes_per_jack_output_frame;
+  unsigned long client_frame_size = drv->bytes_per_output_frame;
 
   if (jack_frame_size == 0)
     return 0;
@@ -1422,8 +1422,8 @@ JACK_GetBytesFreeSpaceFromDriver(jack_driver_t *drv)
   if (drv->pPlayPtr == 0)
     return 0;
 
-  unsigned long jack_frame_size = atomic_load_ulong(&drv->bytes_per_jack_output_frame);
-  unsigned long client_frame_size = atomic_load_ulong(&drv->bytes_per_output_frame);
+  unsigned long jack_frame_size = drv->bytes_per_jack_output_frame;
+  unsigned long client_frame_size = drv->bytes_per_output_frame;
 
   if (jack_frame_size == 0)
     return 0;
@@ -1629,7 +1629,7 @@ int JACK_get_ringbuffer_free_frames(jack_driver_t *drv)
   if (!drv || drv->pPlayPtr == NULL)
     return 0;
 
-  unsigned long jack_frame_size = atomic_load_ulong(&drv->bytes_per_jack_output_frame);
+  unsigned long jack_frame_size = drv->bytes_per_jack_output_frame;
   if (jack_frame_size == 0)
     return 0;
 
@@ -1663,8 +1663,8 @@ int JACK_get_client_to_jack_frames(jack_driver_t *drv, int client_frames)
   if (!drv)
     return 0;
 
-  long client_rate = atomic_load_long(&drv->client_sample_rate);
-  long jack_rate = atomic_load_long(&drv->jack_sample_rate);
+  long client_rate = drv->client_sample_rate;
+  long jack_rate = drv->jack_sample_rate;
 
   if (client_rate <= 0 || jack_rate <= 0)
     return client_frames;
@@ -1693,7 +1693,7 @@ JACK_GetBytesPerOutputFrame(int deviceID)
   if (!drv)
     return 0;
 
-  unsigned long return_val = (unsigned long)atomic_load_ulong(&drv->bytes_per_output_frame);
+  unsigned long return_val = (unsigned long)drv->bytes_per_output_frame;
 
   return return_val;
 }
@@ -1714,7 +1714,7 @@ long JACK_GetSampleRate(int deviceID)
   if (!drv)
     return 0;
 
-  return atomic_load_long(&drv->client_sample_rate);
+  return drv->client_sample_rate;
 }
 
 int JACK_GetRingBufferFreeFrames(int deviceID)
@@ -1731,7 +1731,7 @@ long JACK_GetSampleRateJack(int deviceID)
   if (!drv)
     return 0;
 
-  return atomic_load_long(&drv->jack_sample_rate);
+  return drv->jack_sample_rate;
 }
 
 long JACK_GetPeriodSize(int deviceID)
@@ -1899,7 +1899,7 @@ long JACK_OutputStatus(int deviceID, long *sec, long *nsec)
   *nsec = drv->previousTime.tv_nsec;
 
   unsigned long current_bytes = atomic_load_ulong(&drv->written_client_bytes);
-  unsigned long client_frame_size = atomic_load_ulong(&drv->bytes_per_output_frame);
+  unsigned long client_frame_size = drv->bytes_per_output_frame;
 
   if (client_frame_size != 0)
   {
