@@ -483,13 +483,6 @@ static int set_option(const char *name, char *value)
 		nerr++;
 	}
      }
-//~ #ifdef HAVE_XINERAMA
-//~ #ifndef X_DISPLAY_MISSING
-    //~ else if (strcmp(name, "xinerama") == 0 || strcmp(name, "X") == 0 ) {
-	//~ x11_user_select( atoi(optarg) );
-    //~ }
-//~ #endif
-//~ #endif
     else if (strcmp(name, "action-file")==0 || strcmp(name,"F")==0) {
 	check_val(optarg,name);
 	veejay_strncpy(info->action_file[0],(char*) optarg, strlen( (char*) optarg));
@@ -674,7 +667,7 @@ static int check_command_line_options(int argc, char *argv[])
 	Usage(argv[0]);
 	return 0;
     }
-    
+	
     nerr = 0;
 #ifdef HAVE_GETOPT_LONG
     while ((n =
@@ -794,41 +787,61 @@ int main(int argc, char **argv)
         return 0;
     }
 
-	veejay_print_banner();
-    print_license();
+
 
     if (info->dump) {
         veejay_set_colors(0);
+		veejay_set_timestamp(0);
+		veejay_set_label(0);
         vj_event_init(NULL);
-        vje_init(720, 576); // FIXME default values
-        vj_osc_allocate(VJ_PORT + 2);
+        vje_init(info->video_output_width <= 0 ? 720 : info->video_output_width, info->video_output_height <= 0 ? 576 : info->video_output_width);
+		vj_osc_allocate(VJ_PORT + 2);
         vj_event_dump();
         vje_dump();
-        fprintf(stdout,
-			"Environment variables:\n"
-			"\tSDL_VIDEO_HWACCEL\t\tSet to 1 to use SDL video hardware accel (default=on)\n"
-			"\tVEEJAY_PERFORMANCE\t\tSet to \"quality\" or \"fastest\" (default is fastest)\n"
-			"\tVEEJAY_AUTO_SCALE_PIXELS\tSet to 1 to convert between CCIR 601 and JPEG automatically (default=dont care)\n"
-			"\tVEEJAY_INTERPOLATE_CHROMA\tSet to 1 if you wish to interpolate every chroma sample when scaling (default=0)\n"
-			"\tVEEJAY_SDL_KEY_REPEAT_INTERVAL\tInterval of key press to repeat while pressed down\n"
-			"\tVEEJAY_PLAYBACK_CACHE\t\tSample cache size in MB\n"
-			"\tVEEJAY_SDL_KEY_REPEAT_DELAY\tDelay key repeat in ms\n"
-			"\tVEEJAY_FULLSCREEN\t\tStart in fullscreen (1) or windowed (0) mode\n"
-			"\tVEEJAY_DESKTOP_GEOMETRY\tSpecify a geometry for Veejay to position the video window\n"
-			"\tVEEJAY_VIDEO_POSITION\t\tPosition of video window\n"
-			"\tVEEJAY_VIDEO_SIZE\t\tSize of video window, defaults to full screen size\n"
-			"\tVEEJAY_RUN_MODE\t\t\tRun in \"classic\" (352x288 Dummy) or default (720x576)\n"
-			"\tVEEJAY_V4L2_NO_THREADING\tSet to 1 to query frame in main-loop\n"
-			"\tVEEJAY_MULTITHREAD_TASKS\tSet number of parallel tasks (default = number of CPU cores)\n"
-			"\tVEEJAY_PAUSE_EVERYTHING\t\tIf 1, video is paused but rendering continues; if 0, rendering pauses as well\n\n"
-			"\tExample for bash:\n"
-			"\t\t$ export VEEJAY_AUTO_SCALE_PIXEL=1\n"
-		);
+		fprintf(stdout,
+            "\n\nEnvironment variables:\n"
+            "  [ Video & Rendering ]\n"
+            "\tSDL_VIDEO_HWACCEL\t\tSet to 1 to use SDL video hardware accel (default=on)\n"
+            "\tVEEJAY_PERFORMANCE\t\tSet to \"quality\" or \"fastest\" (default=fastest)\n"
+            "\tVEEJAY_AUTO_SCALE_PIXELS\tSet to 1 to convert CCIR 601 / JPEG automatically\n"
+            "\tVEEJAY_INTERPOLATE_CHROMA\tSet to 1 to interpolate chroma samples when scaling\n"
+            "\tVEEJAY_ORIGINAL_FRAME\t\tForce use of original frame in composition\n"
+            "\tVEEJAY_SUBSAMPLE_MODE\t\tSet subsampling algorithm mode\n"
+            "\tVEEJAY_SUPERSAMPLE_MODE\t\tSet supersampling algorithm mode\n"
+            "\tVEEJAY_BG_AUTO_HISTOGRAM_EQ\tEnable auto histogram equalization for bg-subtraction\n"
+            "\n"
+            "  [ Display & UI ]\n"
+            "\tVEEJAY_FULLSCREEN\t\tStart in fullscreen (1) or windowed (0) mode\n"
+            "\tVEEJAY_VIDEO_POSITION\t\tPosition of video window\n"
+            "\tVEEJAY_VIDEO_SIZE\t\tSize of video window\n"
+            "\tVEEJAY_DESKTOP_GEOMETRY\tSpecify geometry for video window positioning\n"
+            "\tVEEJAY_SDL_DRIVER\t\tSpecify SDL video driver to use\n"
+            "\tVEEJAY_SDL_HINT_RENDER_DRIVER\tSet SDL_HINT_RENDER_DRIVER\n"
+            "\tVEEJAY_SDL_KEY_REPEAT_DELAY\tDelay key repeat in ms\n"
+            "\tVEEJAY_SDL_KEY_REPEAT_INTERVAL\tInterval of key repeat while pressed down\n"
+            "\n"
+            "  [ System & Streaming ]\n"
+            "\tVEEJAY_MAX_FILESIZE\t\tMaximum allowed file size for processing\n"
+            "\tVEEJAY_NUM_DECODE_THREADS\tNumber of threads for avcodec decoding\n"
+            "\tVEEJAY_MULTITHREAD_TASKS\tNumber of parallel tasks (default=CPU cores)\n"
+            "\tVEEJAY_AV_LOG\t\t\tSet libavcodec logging level\n"
+            "\tVEEJAY_LOG_NET_IO\t\tIf set, enable network I/O logging\n"
+            "\tVEEJAY_MMAP_PER_FILE\t\tEnable mmap allocation per file (in Kb)\n"
+            "\tVEEJAY_VLOOPBACK_PIXELFORMAT\tSet pixel format for vloopback streaming\n"
+            "\tVEEJAY_V4L2_CAPTURE_METHOD\tSpecify V4L2 capture method\n"
+            "\tVEEJAY_V4L2_NO_THREADING\tSet to 1 to query frame in main-loop\n"
+            "\n"
+            "  Example for bash:\n"
+            "\t$ export VEEJAY_AUTO_SCALE_PIXELS=1\n"
+            "\t$ export VEEJAY_NUM_DECODE_THREADS=4\n\n"
+        );
 
         return 0;
     }
 	
-
+	veejay_print_banner();
+    print_license();
+	
     veejay_check_homedir(info);
 
     sigsegfault_handler();
