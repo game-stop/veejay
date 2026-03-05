@@ -237,7 +237,7 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
     }
 
     if(!vjsdl->renderer) {
-        veejay_msg(VEEJAY_MSG_ERROR, "%s", SDL_GetError());
+        veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] %s", SDL_GetError());
         SDL_DestroyWindow( vjsdl->screen );
         return 0;
     }
@@ -360,7 +360,7 @@ void vj_sdl_put_to_screen(void *ptr, uint8_t *pixels_to_render)
     vj_sdl *vjsdl = (vj_sdl*) ptr;
 
     if( SDL_UpdateTexture( vjsdl->texture, NULL, pixels_to_render, vjsdl->width * 2 ) != 0 ) {
-        veejay_msg(0, "%s" , SDL_GetError());
+        veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] %s" , SDL_GetError());
     }
 
     SDL_RenderClear( vjsdl->renderer );
