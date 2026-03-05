@@ -48,36 +48,39 @@ static vj_client	*vj_share_connect(char *hostname, int port)
 
 	return c;
 }
-static void vj_flush(vj_client *sayvims,int frames) { 
-        unsigned char status[128];
-        memset(status,0,sizeof(status));
 
-        while(frames>0) {
-                if( vj_client_poll(sayvims, V_STATUS ))
-                {
-                        uint8_t sta_len[6];
-                        memset(sta_len,0,sizeof(sta_len));
-                        int nb = vj_client_read( sayvims, V_STATUS, sta_len, 5 );
-                        if( nb <= 0 )
-							break;
-						if(sta_len[0] == 'V' )
-                        {
-                                int bytes = 0;
-                                sscanf( (char*) sta_len + 1, "%03d", &bytes );
-                                if(bytes > 0 )
-                                {
-                                        memset(status,0,sizeof(status));
-                                        int n = vj_client_read(sayvims,V_STATUS,status,bytes);
-                                        if( n )
-                                        {
-                                                frames -- ;
-                                        }
-										if( n<= 0)
-											break;
-								}
-                        }
+static void vj_flush(vj_client *sayvims, int frames) { 
+    unsigned char status[128];
+    memset(status, 0, sizeof(status));
+
+    while(frames > 0) {
+        if(vj_client_poll(sayvims, V_STATUS)) {
+            uint8_t sta_len[6];
+            memset(sta_len, 0, sizeof(sta_len));
+            int nb = vj_client_read(sayvims, V_STATUS, sta_len, 5);
+            
+            if(nb <= 0)
+                break;
+
+            if(sta_len[0] == 'V') {
+                int bytes = 0;
+                sscanf((char*) sta_len + 1, "%03d", &bytes);
+
+                if(bytes > 0 && bytes < (int)sizeof(status)) {
+                    memset(status, 0, sizeof(status));
+                    int n = vj_client_read(sayvims, V_STATUS, status, bytes);
+                    
+                    if(n > 0) {
+                        frames--;
+                    }
+                    if(n <= 0)
+                        break;
+                } else if (bytes >= (int)sizeof(status)) {
+                    break; 
                 }
+            }
         }
+    }
 }
 
 int32_t			vj_share_pull_master( void *shm, char *master_host, int master_port )
