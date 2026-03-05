@@ -689,7 +689,10 @@ storage_put_atom_value(__vevo_port_t * port, void *src, int n,
 }
 
 static void
-storage_put_atom_func(__vevo_port_t * port, void (*set_func)(),int (*get_func)(), vevo_storage_t * d, int v)
+storage_put_atom_func(__vevo_port_t * port,
+	void (*set_func)(void *, int32_t),
+	int (*get_func)(void *),
+	vevo_storage_t * d, int v)
 {
     if( set_func == NULL && get_func == NULL )
     {
@@ -703,9 +706,6 @@ storage_put_atom_func(__vevo_port_t * port, void (*set_func)(),int (*get_func)()
   
 	d->elements.atom->set_func = set_func;
 	d->elements.atom->get_func = get_func;
-
-  	//memcpy(set_func,d->elements.atom->set_func, sizeof( vevo_set_func ));
-	//memcpy(get_func,d->elements.atom->get_func, sizeof( vevo_get_func ));
 }
 
 
