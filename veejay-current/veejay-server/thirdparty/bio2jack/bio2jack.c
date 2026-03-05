@@ -419,64 +419,65 @@ static void JACK_flush(jack_driver_t *drv)
 
 static int JACK_callback(jack_nframes_t nframes, void *arg)
 {
-  jack_driver_t *drv = (jack_driver_t *)arg;
-  if (!drv || !drv->pPlayPtr)
-    return 0;
+    jack_driver_t *drv = (jack_driver_t *)arg;
+    if (!drv || !drv->pPlayPtr)
+        return 0;
 
-  if (atomic_exchange_int(&drv->xrun_pending, 0)) {
-    atomic_store_int(&drv->xrun_flag, 1);
-    JACK_flush(drv);
-  }
-
-  atomic_add_fetch_ulong(&drv->last_hw_frame_count, (unsigned long)nframes);
-
-  float *jack_out[MAX_OUTPUT_PORTS];
-  for (int i = 0; i < drv->num_output_channels; i++)
-  {
-    jack_out[i] = (float *)jack_port_get_buffer(drv->output_port[i], nframes);
-  }
-
-  const size_t rb_read_bytes = jack_ringbuffer_read_space(drv->pPlayPtr);
-
-  jack_ringbuffer_data_t vec[2];
-  jack_ringbuffer_get_read_vector(drv->pPlayPtr, vec);
-
-  long frames_done = 0;
-  const int chs = drv->num_output_channels;
-
-  for (int v = 0; v < 2 && frames_done < nframes; v++)
-  {
-    const float *src = (const float *)vec[v].buf;
-    const long vec_frames = vec[v].len / drv->bytes_per_jack_output_frame;
-    const long to_copy = (vec_frames < (nframes - frames_done)) ? vec_frames : (nframes - frames_done);
-
-    if (to_copy <= 0)
-      continue;
-
-    for (long f = 0; f < to_copy; f++)
-    {
-      for (int ch = 0; ch < chs; ch++)
-      {
-        jack_out[ch][frames_done + f] = src[f * chs + ch];
-      }
+    if (atomic_exchange_int(&drv->xrun_pending, 0)) {
+        atomic_store_int(&drv->xrun_flag, 1);
+        JACK_flush(drv);
     }
 
-    frames_done += to_copy;
-  }
+    atomic_add_fetch_ulong(&drv->last_hw_frame_count, (unsigned long)nframes);
 
-  if (frames_done < nframes)
-  {
-    atomic_exchange_long(&drv->underrun_count, 1);
+    const int chs = drv->num_output_channels;
+    const size_t frame_bytes = drv->bytes_per_jack_output_frame;
 
+    float *jack_out[MAX_OUTPUT_PORTS];
     for (int ch = 0; ch < chs; ch++)
+        jack_out[ch] = (float *)jack_port_get_buffer(drv->output_port[ch], nframes);
+
+    jack_ringbuffer_data_t vec[2];
+    jack_ringbuffer_get_read_vector(drv->pPlayPtr, vec);
+
+    long frames_done = 0;
+
+    for (int v = 0; v < 2 && frames_done < (long)nframes; v++)
     {
-      memset(&jack_out[ch][frames_done], 0, (nframes - frames_done) * sizeof(float));
+        const float *src = (const float *)vec[v].buf;
+        long vec_frames = vec[v].len / frame_bytes;
+        long remaining  = (long)nframes - frames_done;
+        long to_copy    = (vec_frames < remaining) ? vec_frames : remaining;
+
+        if (to_copy <= 0)
+            continue;
+
+        for (int ch = 0; ch < chs; ch++)
+        {
+            float *dst = jack_out[ch] + frames_done;
+            const float *s = src + ch;
+
+            for (long f = 0; f < to_copy; f++)
+            {
+                dst[f] = s[f * chs];
+            }
+        }
+
+        frames_done += to_copy;
     }
-  }
 
-  jack_ringbuffer_read_advance(drv->pPlayPtr, frames_done * drv->bytes_per_jack_output_frame);
+    if (frames_done < (long)nframes)
+    {
+        atomic_exchange_long(&drv->underrun_count, 1);
 
-  return 0;
+        long zero_frames = (long)nframes - frames_done;
+        for (int ch = 0; ch < chs; ch++)
+            memset(jack_out[ch] + frames_done, 0, zero_frames * sizeof(float));
+    }
+
+    jack_ringbuffer_read_advance(drv->pPlayPtr, frames_done * frame_bytes);
+
+    return 0;
 }
 
 int JACK_srate(nframes_t nframes, void *arg)
@@ -602,7 +603,7 @@ JACK_OpenDevice(jack_driver_t *drv)
   drv->jack_buffer_size =
       jack_get_buffer_size(drv->client);
 
-  drv->swr_ctx = swr_alloc_set_opts(
+   drv->swr_ctx = swr_alloc_set_opts(
       NULL,
       av_get_default_channel_layout(drv->num_output_channels),
       AV_SAMPLE_FMT_FLT,
