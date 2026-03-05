@@ -47,5 +47,6 @@ extern void veejay_toggle_osl(void);
 extern void veejay_init_msg_ring(void);
 extern void veejay_destroy_msg_ring(void);
 extern void veejay_set_timestamp(int status);
+void veejay_set_label(int status);
 #endif
 

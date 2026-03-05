@@ -68,6 +68,7 @@
 static int _debug_level = 0;
 static int _color_level = 1;
 static int _timestamp   = 1;
+static int _label = 1;
 static int _no_msg = 0;
 
 #define MAX_LINES 100 
@@ -242,6 +243,10 @@ void veejay_set_debug_level(int level)
     	mjpeg_default_handler_verbosity( _debug_level ? 1:0);
 }
 
+void veejay_set_label(int status) {
+	_label = status;
+}
+
 void veejay_set_timestamp(int status) {
 	_timestamp = status;
 }
@@ -388,7 +393,7 @@ void veejay_msg(int type, const char format[], ...)
     if (_color_level && !is_continuation)
         p += snprintf(p, end - p, "%s", colors[idx]);
 
-    if (!is_continuation)
+    if (_label && !is_continuation)
         p += snprintf(p, end - p, "%s", labels[idx]);
 
     if (_timestamp && !is_continuation) {
