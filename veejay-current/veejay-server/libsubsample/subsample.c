@@ -1236,7 +1236,7 @@ void chroma_supersample_init(void)
     if (mode == NULL) {
         veejay_msg(VEEJAY_MSG_INFO, "Chroma supersampling: defaulting to 'dup' (set VEEJAY_SUPERSAMPLE_MODE=dup|mitchell)");
 #ifdef HAVE_ASM_AVX2
-        veejay_msg(VEEJAY_MSG_DEBUG, "AVX2 available for subsampling");
+        veejay_msg(VEEJAY_MSG_DEBUG, "AVX2 available for supersampling");
 #endif
     }
     else if (strcmp(mode, "dup") == 0) {
