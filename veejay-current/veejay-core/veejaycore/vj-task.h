@@ -48,10 +48,10 @@ typedef struct
 	uint8_t **local;
 } vj_task_arg_t;
 
-uint8_t vj_task_get_workers();
+uint8_t vj_task_get_workers(void);
 int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int n_planes, performer_job_routine func, int use_thread_local );
-void	vj_task_lock();
-void	vj_task_unlock();
+void	vj_task_lock(void);
+void	vj_task_unlock(void);
 void	vj_task_set_float( float f );
 void	vj_task_set_ptr( void *ptr );
 void	vj_task_set_to_frame( VJFrame *frame, int pos, int job );
@@ -61,11 +61,11 @@ void	vj_task_set_param( int v, int idx );
 int	task_start(unsigned int max_workers);
 void	task_stop(unsigned int max_workers);
 void	task_init(int w, int h);
-void	task_destroy();
-int     vj_task_get_num_cpus();
+void	task_destroy(void);
+int     vj_task_get_num_cpus(void);
 void	vj_task_set_overlap( int val );
 void	performer_job( uint8_t job_num );
-uint8_t	num_threaded_tasks();
+uint8_t	num_threaded_tasks(void);
 
 #endif
 
