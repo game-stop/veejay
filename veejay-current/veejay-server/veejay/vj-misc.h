@@ -39,11 +39,6 @@ filelist_t *find_media_files( veejay_t *info );
 #endif
 int vj_perform_screenshot2(veejay_t * info, VJFrame *src);
 
-long	vj_get_timer(void);
-
-void	vj_stamp_clear();
-unsigned int vj_stamp();
-
 int	veejay_create_temp_file(const char *prefix, char *dst);
 
 void	vj_get_yuv_template(VJFrame *src, int w, int h, int fmt);

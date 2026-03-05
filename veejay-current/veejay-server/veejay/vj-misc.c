@@ -45,34 +45,14 @@
 #include <veejaycore/yuvconv.h>
 #include <libavutil/pixfmt.h>
 #include <veejaycore/avcommon.h>
+#ifdef HAVE_XML2
 #include <libxml/xmlmemory.h>
 #include <libxml/parser.h>
+#endif
 #include <pthread.h>
 #ifdef USE_GDK_PIXBUF
 #include <libel/lav_io.h>
 #endif
-
-static unsigned int vj_relative_time = 0;
-static unsigned int vj_stamp_ = 0;
-long vj_get_timer(void)
-{
-    struct timeval tv;
-    gettimeofday(&tv, 0);
-    return ((tv.tv_sec & 1000000) + tv.tv_usec);
-}
-
-unsigned	int	vj_stamp(void)
-{
-	vj_stamp_ ++;
-	return vj_stamp_;
-}
-
-void	vj_stamp_clear(void)
-{
-	vj_stamp_ = 0;
-}
-
-
 
 static struct
 {
@@ -123,7 +103,6 @@ static int is_usable_file(filelist_t *filelist, const char *node, const char *fi
     if (lstat(node, &st) < 0)
         return 0;
 
-    // Handle symlink
     if (S_ISLNK(st.st_mode)) {
         veejay_memset(&st, 0, sizeof(struct stat));
         if (stat(node, &st) < 0)
@@ -131,11 +110,9 @@ static int is_usable_file(filelist_t *filelist, const char *node, const char *fi
         return 1;
     }
 
-    // Directory
     if (S_ISDIR(st.st_mode))
         return 1;
 
-    // Regular file
     if (S_ISREG(st.st_mode)) {
         if (is_it_usable(node)
 #ifdef USE_GDK_PIX_BUF
@@ -151,7 +128,6 @@ static int is_usable_file(filelist_t *filelist, const char *node, const char *fi
         return 0;
     }
 
-    // Character or block device (e.g., /dev/random, /dev/zero)
     if (S_ISCHR(st.st_mode) || S_ISBLK(st.st_mode)) {
         int fd = open(node, O_RDONLY);
         if (fd >= 0) {
@@ -161,7 +137,6 @@ static int is_usable_file(filelist_t *filelist, const char *node, const char *fi
         return 0;
     }
 
-    // Other special types (FIFO, socket, etc.) → not usable
     return 0;
 }
 
@@ -440,46 +415,6 @@ int	verify_working_dir(void)
 	free(files);
 	return c;
 }
-
-
-#define ZEROPAD	1		/* pad with zero */
-#define SIGN	2		/* unsigned/signed long */
-#define PLUS	4		/* show plus */
-#define SPACE	8		/* space if plus */
-#define LEFT	16		/* left justified */
-#define SPECIAL	32		/* 0x */
-#define LARGE	64		/* use 'ABCDEF' instead of 'abcdef' */
-
-
-/* the sprintf functions below was stolen and stripped from linux 2.4.33
- * from files:
- *  linux/lib/vsprintf.c
- *  asm-i386/div64.h
- */
-#ifdef ARCH_X86
-#define do_div(n,base) ({ \
-	unsigned long __upper, __low, __high, __mod; \
-	asm("":"=a" (__low), "=d" (__high):"A" (n)); \
-	__upper = __high; \
-	if (__high) { \
-		__upper = __high % (base); \
-		__high = __high / (base); \
-	} \
-	asm("divl %2":"=a" (__low), "=d" (__mod):"rm" (base), "0" (__low), "1" (__upper)); \
-	asm("":"=A" (n):"a" (__low),"d" (__high)); \
-	__mod; \
-})
-#endif
-#ifdef ARCH_X86_64
-#define do_div(n,base)						\
-({								\
-	int _res;						\
-	_res = ((unsigned long) (n)) % (unsigned) (base);	\
-	(n) = ((unsigned long) (n)) / (unsigned) (base);	\
-	_res;							\
-})
-#endif
-
 
 int vj_get_sample_display_name(char **destination, const char *filename)
 {
