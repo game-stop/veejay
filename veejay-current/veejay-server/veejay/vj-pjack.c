@@ -39,8 +39,6 @@ static int _vj_jack_start(int *dri, int bits_per_sample, long audio_rate, int au
 	int err = JACK_Open(dri, (bits_per_sample * 8) / audio_channels,&audio_rate,audio_channels, SPVF);
 	if(err == ERR_RATE_MISMATCH)
 	{
-		veejay_msg(1, "(Jackd) Sample rate mismatch (Retrying)");
-
 		JACK_Close( *dri );
 
 		err = JACK_Open(dri, (bits_per_sample * 8) / audio_channels,&audio_rate, audio_channels, SPVF);
@@ -51,22 +49,21 @@ static int _vj_jack_start(int *dri, int bits_per_sample, long audio_rate, int au
 		switch(err)
 		{
 			case ERR_OPENING_JACK:
-			  veejay_msg(0, "Unable to make a connection with Jack" );
+			  veejay_msg(0, "[AUDIO] Unable to connect with jack" );
 			  break;
 			case ERR_RATE_MISMATCH:
-			  veejay_msg(0, "Jackd cannot handle samplerate of %d Hz", audio_rate);
+			  veejay_msg(0, "[AUDIO] Samplerate mismatch %d Hz",audio_rate);
 			  break;
 			case ERR_TOO_MANY_OUTPUT_CHANNELS:	
-			  veejay_msg(0, "Cannot connect to jackd, Too many output channels: %d",
-				audio_channels );
+			  veejay_msg(0, "[AUDIO] Too many output channels: %d",audio_channels );
 			  break;
 			case ERR_PORT_NOT_FOUND:
-			   veejay_msg(0, "Unable to find jack port");
+			   veejay_msg(0, "[AUDIO] Unable to find jack port");
 			   break;
 		}
 		
 		JACK_Close( *dri );
-//		veejay_msg(0, "To run veejay without audio, use -a0");
+
 		return 0;
 	}
 
@@ -78,12 +75,6 @@ int vj_jack_init(editlist *el)
 {
 	if( !_vj_jack_start(&driver, el->audio_bps, el->audio_rate, el->audio_chans,1.0 / (double) el->video_fps) )
 		return 0;
-
-	long jack_rate = JACK_GetSampleRate(driver );
-
-	if( jack_rate != el->audio_rate ) {
-		veejay_msg(2,"May be wrong but bio2jack client reports a different sample rate: %ld instead of %d", jack_rate,el->audio_rate );
-	}
 
 	return 1;
 }
@@ -102,8 +93,7 @@ int	vj_jack_stop(void)
 
 	if(JACK_Close(driver))
 	{
-		veejay_msg(2,
-			"(Jack) Error closing device");
+		veejay_msg(2,"[AUDIO] Error closing jack device");
 	}
 	return 1;
 }
@@ -138,7 +128,7 @@ int vj_jack_play(void *data, int len)
     // Original error-handling logic
     if( frames == 0 && JACK_GetState(driver) == PLAYING ) {
         vj_jack_disable();
-		veejay_msg(0, "Error writing to JACK!");
+		veejay_msg(0, "[AUDIO] Error writing to JACK!");
     }
     return frames;
 }
@@ -154,10 +144,6 @@ int	vj_jack_play2(void *data, int len)
 		vj_jack_disable();
 	}
 	return res;
-}
-
-void vj_jack_debug(int skipv, int skipa) {
-	
 }
 
 int	vj_jack_set_volume(int volume)
