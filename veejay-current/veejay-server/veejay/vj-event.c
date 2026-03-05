@@ -7267,7 +7267,7 @@ void    vj_event_toggle_osd( void *ptr, const char format[], va_list ap )
     }
     else
     {
-        veejay_msg(VEEJAY_MSG_INFO, "[PRODUCER] Hide OSD status text]");
+        veejay_msg(VEEJAY_MSG_INFO, "[PRODUCER] Hide OSD status text");
         v->use_osd = 0;
     }
 }
