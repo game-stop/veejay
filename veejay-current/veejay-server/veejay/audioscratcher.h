@@ -4,9 +4,6 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 void* vj_scratch_init(int channels, int buffer_frames, float fps);
 int vj_scratch_process(void *ptr,
                        short *output,
@@ -15,8 +12,4 @@ int vj_scratch_process(void *ptr,
                        int src_frames,
                        double speed);
                        
-#ifdef __cplusplus
-}
-#endif
-
 #endif // VJ_SCRATCH_H

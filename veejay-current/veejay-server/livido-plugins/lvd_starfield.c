@@ -31,7 +31,7 @@ LIVIDO_PLUGIN
 #include	"livido-utils.c"
 
 #include 	"lvd_common.h"
-
+#include <time.h>
 #define MAX_STARS 2000
 
 typedef struct 

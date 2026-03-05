@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <stdint.h>
+#include <pthread.h>
 #ifdef HAVE_SDL
 #include <SDL2/SDL.h>
 #endif

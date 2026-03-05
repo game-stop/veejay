@@ -2753,7 +2753,7 @@ static void veejay_producer_initialize_playmode(veejay_t *info) {
     }
 }  
 
-
+#ifdef HAVE_JACK
 static inline void vj_audio_wait_for_jack_space(
     int jack_frames_needed,
     video_playback_setup *settings
@@ -2788,6 +2788,8 @@ static inline void vj_audio_wait_for_jack_space(
     }
 }
  
+#endif
+
 void *veejay_audio_producer_thread(void *arg)
 {
     veejay_t *info = (veejay_t *)arg;
@@ -2800,11 +2802,20 @@ void *veejay_audio_producer_thread(void *arg)
                      vj_perform_init_audio(info,0) &&
 					 vj_perform_init_audio(info, 1) &&
                      info->audio == AUDIO_PLAY); 
+#ifndef HAVE_JACK
+	has_audio = 0;
+#endif
 
+#ifdef HAVE_JACK
     const long CLIENT_RATE = vj_jack_get_client_samplerate();
     const long JACK_RATE   = vj_jack_get_rate();
+#else
+    const long CLIENT_RATE = el->audio_rate;
+    const long JACK_RATE = el->audio_rate;
+#endif
+
     const double SPVF      = settings->spvf;
-	double anchor_s = 0;
+    double anchor_s = 0;
     unsigned long long loop_count = 0; // 19.5 billion years playing 29fps/44.1Khz
     const int BPS = el->audio_bps;
 	const double half_frame_s = 0.5 / (double)el->video_fps;
@@ -2837,6 +2848,7 @@ void *veejay_audio_producer_thread(void *arg)
     atomic_store_int(&info->audio_running, 1);
     atomic_store_long_long(&settings->current_frame_num, -1);
 
+#ifdef HAVE_JACK
     if (has_audio) {
 		const int seed_frames = el->video_fps * 2;
 		const long seed_client_frames = (long)(CLIENT_RATE * seed_frames / el->video_fps);
@@ -2877,12 +2889,16 @@ void *veejay_audio_producer_thread(void *arg)
         veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] Audio anchor established at %fs", anchor_s);
         atomic_store_long_long(&settings->current_frame_num, 0);
     } else {
+#else	    
         // fallback anchor for monotonic clock
 		anchor_s = monotonic_now_s();
         atomic_store_double(&settings->audio_start_offset, anchor_s);
         atomic_store_double(&settings->audio_master_s, anchor_s);
         atomic_store_long_long(&settings->current_frame_num, 0);
+#endif
+#ifdef HAVE_JACK
     }
+#endif
 
 	if (loop_count == 0) {
 		atomic_store_int(&settings->first_audio_frame_ready, 1);
@@ -2902,7 +2918,7 @@ void *veejay_audio_producer_thread(void *arg)
             int needed = (int)(SPVF * CLIENT_RATE + 0.5);
             
 			int decoded;
-
+#ifdef JAVE_JACK
 			if(vj_jack_xrun_flag()) {
 		
 				atomic_add_fetch_old_int(&settings->xruns, 1);
@@ -2918,7 +2934,7 @@ void *veejay_audio_producer_thread(void *arg)
 					veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Audio master clock resynced after xrun by %.6fs (~1 video frame)", delta);
 				}
 			}
-			
+#endif	
 			int tx_active = atomic_load_int(&settings->transition.active);
 			if(!tx_active) {
 				decoded = vj_perform_queue_audio_chunk_ext(info, needed, media_frame, 0, audio_chunk);
@@ -2939,6 +2955,7 @@ void *veejay_audio_producer_thread(void *arg)
 				decoded = vj_perform_queue_audio_chunk_crossfade(info, needed, media_frame, b_frame, audio_chunk, settings->transition.next_id,start,end);
 			}
 
+#ifdef JAVE_JACK
             const int jack_frames_needed = (int)((double)decoded * JACK_RATE / CLIENT_RATE + 1);
 
          	vj_audio_wait_for_jack_space( jack_frames_needed, settings);
@@ -2959,7 +2976,7 @@ void *veejay_audio_producer_thread(void *arg)
             if (sleep_s > 0.001) { 
                 usleep_accurate((long long)(sleep_s * 1e6 * 0.9), settings);
             }
-
+#endif
         } else {
 			const double next_frame_target = anchor_s + ((double)(loop_count + 1) * SPVF);
 				
@@ -2993,11 +3010,15 @@ static void veejay_producer_thread_audio_startup(veejay_t *info)
     video_playback_setup *settings = info->settings;
 
 	int has_audio = (info->audio == AUDIO_PLAY);
+#ifndef JAVE_JACK
+	has_audio = 0;
+#endif
 
     if (has_audio) {
+#ifdef HAVE_JACK	    
         vj_perform_audio_start(info);
-		vj_jack_enable();
-
+	vj_jack_enable();
+#endif
     } else {
         info->audio = NO_AUDIO;
         veejay_msg(VEEJAY_MSG_WARNING, "[AUDIO] Audio playback not enabled; using monotonic fallback");

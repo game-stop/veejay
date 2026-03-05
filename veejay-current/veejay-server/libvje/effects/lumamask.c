@@ -168,15 +168,15 @@ static inline void lumamask_inner_noalpha_border(
 }
 
 static inline void lumamask_inner_alpha_noborder(
-    uint8_t *restrict Y, uint8_t *restrict Cb, uint8_t *restrict Cr, uint8_t *restrict *aA,
-    uint8_t *restrict Y2, uint8_t *restrict Cb2, uint8_t *restrict Cr2, uint8_t *restrict *aB,
+    uint8_t *restrict Y, uint8_t *restrict Cb, uint8_t *restrict Cr, uint8_t *restrict aA,
+    uint8_t *restrict Y2, uint8_t *restrict Cb2, uint8_t *restrict Cr2, uint8_t *restrict aB,
     int width, int height, int w_mul_q8, int h_mul_q8)
 {
     for (int y = 0; y < height; y++) {
-        uint8_t *Y_row = Y + y*width;
-        uint8_t *Cb_row = Cb + y*width;
-        uint8_t *Cr_row = Cr + y*width;
-        uint8_t *aA_row = aA + y*width;
+        uint8_t *restrict Y_row = Y + y*width;
+        uint8_t *restrict Cb_row = Cb + y*width;
+        uint8_t *restrict Cr_row = Cr + y*width;
+        uint8_t *restrict aA_row = aA + y*width;
 
         for (int x = 0; x < width; x++) {
             int tmp = Y2[y*width + x] - 128;
@@ -199,16 +199,16 @@ static inline void lumamask_inner_alpha_noborder(
 }
 
 static inline void lumamask_inner_alpha_border(
-    uint8_t *restrict Y, uint8_t *restrict Cb, uint8_t *restrict Cr, uint8_t *restrict *aA,
-    uint8_t *restrict Y2, uint8_t *restrict Cb2, uint8_t *restrict Cr2, uint8_t *restrict *aB,
+    uint8_t *restrict Y, uint8_t *restrict Cb, uint8_t *restrict Cr, uint8_t *restrict aA,
+    uint8_t *restrict Y2, uint8_t *restrict Cb2, uint8_t *restrict Cr2, uint8_t *restrict aB,
     int width, int height, int w_mul_q8, int h_mul_q8,
     int pixel_Y_lo_)
 {
     for (int y = 0; y < height; y++) {
-        uint8_t *Y_row  = Y  + y*width;
-        uint8_t *Cb_row = Cb + y*width;
-        uint8_t *Cr_row = Cr + y*width;
-        uint8_t *aA_row = aA + y*width;
+        uint8_t *restrict Y_row  = Y  + y*width;
+        uint8_t *restrict Cb_row = Cb + y*width;
+        uint8_t *restrict Cr_row = Cr + y*width;
+        uint8_t *restrict aA_row = aA + y*width;
 #pragma omp simd
         for (int x = 0; x < width; x++) {
             int tmp = Y2[y*width + x] - 128;

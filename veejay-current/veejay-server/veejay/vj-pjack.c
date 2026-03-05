@@ -73,6 +73,7 @@ static int _vj_jack_start(int *dri, int bits_per_sample, long audio_rate, int au
 	return 1;
 }
 
+
 int vj_jack_init(editlist *el)
 {
 	if( !_vj_jack_start(&driver, el->audio_bps, el->audio_rate, el->audio_chans,1.0 / (double) el->video_fps) )

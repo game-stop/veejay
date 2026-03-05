@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <time.h>
 #include <veejaycore/defs.h>
 #include <libsample/sampleadm.h>  
 #include <libstream/vj-tag.h>
@@ -66,7 +67,10 @@
 #include <libqrwrap/qrwrapper.h>
 #include <veejay/vj-split.h>
 #include <libvje/libvje.h>
+#ifdef HAVE_JACK
 #include <veejay/audioscratcher.h>
+#include <veejay/vj-jack.h>
+#endif
 #define PERFORM_AUDIO_SIZE 16384
 #define PSLOW_A 3
 #define PSLOW_B 4
@@ -1067,9 +1071,9 @@ int init_audio_resampler(veejay_t *info, performer_t *p) {
     const int chans = info->edit_list->audio_chans;
     const int rate  = info->edit_list->audio_rate;
     const float fps = info->edit_list->video_fps;
-
+#ifdef HAVE_JACK
     p->audio_scratcher = vj_scratch_init( chans, rate, info->edit_list->video_fps );
-
+#endif
     return 1;
 }
 
@@ -1952,6 +1956,7 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample) // FIXME
     return 0;
 }
 
+#ifdef HAVE_JACK
 static int get_audio_frame_safe(
     veejay_t *info,
     editlist *el,
@@ -2036,7 +2041,7 @@ static int perform_normal_playback(
         int max_dst_samples = p->audio_render_buffer_capacity;
         int consumed = 0;
 
-        total_samples = vj_scratch_process(p->audio_scratcher, audio_buf,max_dst_samples, temporary_buffer, total_samples, (float) speed * cur_dir);
+        total_samples = vj_scratch_process(p->audio_scratcher, (short*) audio_buf,max_dst_samples, (short*) temporary_buffer, total_samples, (float) speed * cur_dir);
 
     } else {
         int a_len = vj_el_get_audio_frame(el, cur_frame, audio_buf);
@@ -2104,7 +2109,7 @@ static int perform_slow_motion_fetch_resample(
         int consumed = 0;
         int max_dst_samples = (512 * 1024) / (el->audio_chans * sizeof(short));
 
-        posdata->audio_last_stretched_samples = vj_scratch_process(p->audio_scratcher, downsample_buffer,max_dst_samples, audio_buf, audio_samples, 1.0f / (float) sc * direction);
+        posdata->audio_last_stretched_samples = vj_scratch_process(p->audio_scratcher, (short*) downsample_buffer,max_dst_samples, (short*) audio_buf, audio_samples, 1.0f / (float) sc * direction);
 
     } else {
         posdata->audio_last_stretched_samples = 0;
@@ -2205,6 +2210,8 @@ int perform_slow_motion(
 
     return copied;
 }
+
+#endif
 
 int vj_perform_fill_audio_buffers(
     veejay_t *info,
@@ -4403,11 +4410,13 @@ static char *vj_perform_osd_status(veejay_t *info)
     if(info->sfd) {
         speed = 1.0 / info->sfd;
     }
-    char *audio_info = osd_xrun_indicator( 
 
-        (info->audio == AUDIO_PLAY ? vj_jack_underruns() : 
-        0
-     ),stats->xruns);
+    long ur = 0;
+#ifdef HAVE_JACK
+    ur = (info->audio == AUDIO_PLAY ? vj_jack_underruns() : 0);
+#endif
+
+    char *audio_info = osd_xrun_indicator( ur,stats->xruns);
 
     const char *mode_str = "Plain";
     switch (info->uc->playback_mode) {

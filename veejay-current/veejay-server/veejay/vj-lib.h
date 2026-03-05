@@ -163,7 +163,7 @@ typedef struct {
 	volatile int    last_direction;
 	int    xfade_active;
 	
-	audio_edge_type_t pending_edge;
+	volatile int pending_edge;
 	int edge_linger;
 	
 	volatile int	fwd_history_valid;
