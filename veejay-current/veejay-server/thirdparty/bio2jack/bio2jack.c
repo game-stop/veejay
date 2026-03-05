@@ -1171,11 +1171,7 @@ long JACK_Write(int deviceID, unsigned char *data, unsigned long bytes)
     return 0;
 
   int64_t delay = swr_get_delay(drv->swr_ctx, drv->client_sample_rate);
-  int out_frames_needed = av_rescale_rnd(
-      delay + in_frames,
-      drv->jack_sample_rate,
-      drv->client_sample_rate,
-      AV_ROUND_UP);
+  int out_frames_needed = swr_get_out_samples(drv->swr_ctx, in_frames);
 
   const size_t rb_write_space = jack_ringbuffer_write_space(drv->pPlayPtr);
   const long rb_frames_capacity = rb_write_space / drv->bytes_per_jack_output_frame;
