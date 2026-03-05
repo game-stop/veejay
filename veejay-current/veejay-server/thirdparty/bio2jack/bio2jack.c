@@ -44,7 +44,7 @@
 #include "bio2jack.h"
 
 /* set to 1 to enable debug messages */
-#define DEBUG_OUTPUT 1
+#define DEBUG_OUTPUT 0
 #define RESERVE_PERIODS 1
 
 #define OUTFILE stderr
