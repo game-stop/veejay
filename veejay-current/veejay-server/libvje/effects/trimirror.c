@@ -160,9 +160,9 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args) {
     float sinSegments[ numSegments ];
     float cosSegments[ numSegments ];
     
-    uint8_t *restrict outY;
-    uint8_t *restrict outU;
-    uint8_t *restrict outV;
+    uint8_t *outY;
+    uint8_t *outU;
+    uint8_t *outV;
 
     if( vje_setup_local_bufs( 1, frame, &outY, &outU, &outV, NULL ) == 0 ) {
         const int len = width * height;

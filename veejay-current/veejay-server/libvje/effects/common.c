@@ -33,7 +33,7 @@
 
 extern int vje_is_parallel_enabled();
 
-int	vje_setup_local_bufs( int use_thread_local, VJFrame *frame, uint8_t **outY, uint8_t **outU, uint8_t **outV, uint8_t **outA )
+int	vje_setup_local_bufs( int use_thread_local, VJFrame *frame, uint8_t **restrict outY, uint8_t **restrict outU, uint8_t **restrict outV, uint8_t **restrict outA )
 {	
 	int utl = ( vje_is_parallel_enabled() && use_thread_local && frame->local != NULL );
 
@@ -1470,14 +1470,6 @@ int		i_cmp( const void *a, const void *b )
 	return ( *(uint32_t*) a - *(uint32_t*) b );
 }
 
-static	uint32_t	veejay_histogram_median( uint32_t *h )
-{
-	uint32_t list[256];
-	veejay_memcpy( h, list, sizeof(list));
-	qsort( list, 256, sizeof(uint32_t), i_cmp);
-	return ( list[128] );
-}
-
 static	void	build_histogram_rgb( uint8_t *rgb, histogram_t *h, VJFrame *f)
 {
 	unsigned int i,j;
@@ -1565,19 +1557,16 @@ static inline void veejay_histogram_qdraw(
 
     veejay_blit_histogram(lut, histi, f->len);
 
-    const int w = f->width;
+    const int w   = f->width;
     const int hgt = f->height;
 
     const int his_height = hgt / 5;
     const int his_width  = w / 5;
 
-	int dx = (j * his_width) >> 8;
-	int dy = (i * his_height) >> 8;
+    const int sy = (his_height << 8) / 256;
+    const int sx = (his_width  << 8) / 256;
 
     int dy_acc = 0;
-	
-	const int sy = (his_height << 8) >> 8;
-	const int sx = (his_width << 8) >> 8;
 
     for (i = 0; i < 256; i++)
     {
@@ -1585,15 +1574,19 @@ static inline void veejay_histogram_qdraw(
         dy_acc += sy;
 
         int row = (hgt - dy - 1 - down) * w + left;
+
         int dx_acc = 0;
 
         for (j = 0; j < 256; j++)
         {
             int dx = dx_acc >> 8;
             dx_acc += sx;
+
             int pos = row + dx;
+
             uint8_t draw = (uint8_t)-(lut[j] >= i);
             uint8_t p = plane[pos];
+
             plane[pos] = (p == 0xff) ? p : draw;
         }
     }

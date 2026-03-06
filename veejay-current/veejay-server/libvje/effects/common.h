@@ -333,7 +333,7 @@ void fx_shuffle_int_array( int *A, unsigned int n );
 int power_of(int size);
 int max_power(int w);
 
-int	vje_setup_local_bufs( int use_thread_local, VJFrame *frame, uint8_t **outY, uint8_t **outU, uint8_t **outV, uint8_t **outA );
+int	vje_setup_local_bufs( int use_thread_local, VJFrame *frame, uint8_t **restrict outY, uint8_t **restrict outU, uint8_t **restrict outV, uint8_t **restrict outA );
 
 void frameborder_yuvdata(uint8_t * input_y, uint8_t * input_u,
 			 uint8_t * input_v, uint8_t * putin_y,
