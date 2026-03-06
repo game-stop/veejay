@@ -55,7 +55,7 @@ AC_ARG_ENABLE([profile],
 AC_ARG_ENABLE([compile-warnings],     
               AS_HELP_STRING([--enable-compile-warnings],[Turn on compiler warnings.]))
 AC_ARG_ENABLE([warnings_as_errors],   
-              AS_HELP_STRING([--enable-warnings_as_errors],[Compiler warnings are errors.]))
+              AS_HELP_STRING([--enable-warnings-as-errors],[Compiler warnings are errors.]))
 AC_ARG_WITH([extra-cflags],
             AS_HELP_STRING([--with-extra-cflags=flags],[Options to be added to CFLAGS (optional)]))
 AC_ARG_WITH([libdv],
@@ -240,27 +240,41 @@ if test "x${GCC}" != "xyes" ; then
   enable_compile_warnings=no
 fi
 
-AC_MSG_CHECKING(what warning flags to pass to the C compiler)
-warnCFLAGS=
-warnCXXFLAGS=
-if test "x$enable_compile_warnings" != "xno" ; then
- if test "x$GCC" = "xyes" ; then
-    case "$CFLAGS" in
-     *-Wall*) ;;
-     *) warnCFLAGS="-Wall -Wunused " ;;
-    esac
-  if test "x$enable_compile_warnings" = "xyes" ; then
-    warnCFLAGS="$warnCFLAGS -Wundef -Wshadow -Wbad-function-cast -Wunreachable-code -Wmissing-declarations -Wpointer-arith -Wcast-align -Wwrite-strings -Wall"
-    warnCXXFLAGS="$warnCXXFLAGS -Wpointer-arith -Wcast-align -Wwrite-strings "
-  fi
-  if test "x$enable_warnings_as_errors" = "xyes" ; then
-    warnCFLAGS="$warnCFLAGS -Werror"
-    warnCXXFLAGS="$warnCXXFLAGS -Werror"
-  fi
- fi
-fi
-
 VEEJAY_CFLAGS=""
+VEEJAY_CXXFLAGS=""
+warnCFLAGS=""
+warnCXXFLAGS=""
+
+
+enable_debug=${enable_debug:-no}
+enable_compile_warnings=${enable_compile_warnings:-no}
+enable_warnings_as_errors=${enable_warnings_as_errors:-no}
+
+AC_MSG_CHECKING([whether we are using GCC])
+GCC=no
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],[])],
+                  [GCC=yes], [GCC=no])
+AC_MSG_RESULT([$GCC])
+
+
+AC_MSG_CHECKING([what warning flags to pass to the C compiler])
+if test "x$enable_compile_warnings" = "xyes"; then
+    if test "x$GCC" = "xyes"; then
+        case "$CFLAGS" in
+            *-Wall*) ;;
+            *) warnCFLAGS="-Wall -Wunused" ;;
+        esac
+
+        warnCFLAGS="$warnCFLAGS -Wundef -Wshadow -Wbad-function-cast -Wunreachable-code -Wmissing-declarations -Wpointer-arith -Wcast-align -Wwrite-strings"
+        warnCXXFLAGS="$warnCXXFLAGS -Wpointer-arith -Wcast-align -Wwrite-strings"
+
+        if test "x$enable_warnings_as_errors" = "xyes"; then
+            warnCFLAGS="$warnCFLAGS -Werror"
+            warnCXXFLAGS="$warnCXXFLAGS -Werror"
+        fi
+    fi
+fi
+AC_MSG_RESULT([done])
 
 AC_MSG_CHECKING([whether to enable debug build])
 if test "x$enable_debug" = "xyes"; then
@@ -269,17 +283,13 @@ if test "x$enable_debug" = "xyes"; then
     VEEJAY_CFLAGS="$VEEJAY_CFLAGS -Wall -Wextra -Wshadow -Wpointer-arith -Wcast-align"
     VEEJAY_CFLAGS="$VEEJAY_CFLAGS -Wstrict-prototypes -Wmissing-prototypes"
     VEEJAY_CFLAGS="$VEEJAY_CFLAGS -Wformat=2 -Wundef -Wwrite-strings"
-
 else
     AC_MSG_RESULT([no])
 fi
 
+
 if test "x$enable_debug" != "xyes" ; then
    VEEJAY_CFLAGS="$VEEJAY_CFLAGS -fno-stack-protector"
-fi
-
-if test "x$enable_warnings_as_errors" = "xyes"; then
-    VEEJAY_CFLAGS="$VEEJAY_CFLAGS -Werror"
 fi
 
 if test "x$enable_sanitizer" = "xyes"; then
@@ -290,11 +300,11 @@ if test "x$enable_threadsanitizer" = "xyes"; then
     VEEJAY_CFLAGS="$VEEJAY_CFLAGS -fsanitize=thread"
 fi
 
-if test x"$with_extra_cflags" != "x"; then
-   CFLAGS="$CFLAGS $with_extra_cflags"
-   CXXFLAGS="$CXXFLAGS $with_extra_cflags"
-fi
 
+# Optional extra user-provided CFLAGS
+if test "x$with_extra_cflags" != "x"; then
+    VEEJAY_CFLAGS="$VEEJAY_CFLAGS $with_extra_cflags"
+fi
 
 have_asm_nasm=false
 have_asm_mmx=false
@@ -688,7 +698,13 @@ EOF
 
 fi
 
-VEEJAY_CFLAGS="$VEEJAY_CFLAGS $ARCHFLAGS"
+
+VEEJAY_CFLAGS="$VEEJAY_CFLAGS $ARCHFLAGS $warnCFLAGS"
+VEEJAY_CXXFLAGS="$VEEJAY_CFLAGS $ARCHFLAGS $warnCXXFLAGS"
+
+AC_MSG_NOTICE([Final VEEJAY_CFLAGS: $VEEJAY_CFLAGS])
+AC_MSG_NOTICE([Final VEEJAY_CXXFLAGS: $VEEJAY_CXXFLAGS])
+
 
 AC_SUBST(VEEJAY_CFLAGS)
 AC_SUBST(PROGRAM_NOPIC)
