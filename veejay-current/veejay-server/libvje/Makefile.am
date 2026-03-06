@@ -8,7 +8,7 @@ AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
 
 AM_CPPFLAGS += $(FFMPEG_CFLAGS) $(GLIB_CFLAGS) $(XML2_CFLAGS)
 
-AM_CFLAGS = $(VJE_CFLAGS) 
+AM_CFLAGS = $(VEEJAY_CFLAGS) 
 
 VJE_LIB_FILE = libvje.la
 noinst_LTLIBRARIES = $(VJE_LIB_FILE)

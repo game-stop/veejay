@@ -1,6 +1,6 @@
 # Makefile for veejay
 
-AM_CFLAGS = $(OP_CFLAGS)
+AM_CFLAGS = $(VEEJAY_CFLAGS)
 
 MAINTAINERCLEANFILES = Makefile.in
 
