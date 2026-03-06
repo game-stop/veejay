@@ -289,7 +289,10 @@ static __inline__ void * __memcpy(void * to, const void * from, size_t n)
 #endif
 
 #undef HAVE_ONLY_MMX1
-#if HAVE_ASM_MMX && !HAVE_ASM_MMX2 && !HAVE_ASM_3DNOW && !HAVE_ASM_SSE
+#if defined(HAVE_ASM_MMX) && HAVE_ASM_MMX && \
+   (!defined(HAVE_ASM_MMX2) || !HAVE_ASM_MMX2) && \
+   (!defined(HAVE_ASM_3DNOW) || !HAVE_ASM_3DNOW) && \
+   (!defined(HAVE_ASM_SSE) || !HAVE_ASM_SSE)
 /*  means: mmx v.1. Note: Since we added alignment of destinition it speedups
     of memory copying on PentMMX, Celeron-1 and P2 upto 12% versus
     standard (non MMX-optimized) version.
@@ -310,7 +313,7 @@ static __inline__ void * __memcpy(void * to, const void * from, size_t n)
 #endif
 
 #undef MOVNTQ
-#if HAVE_ASM_MMX2
+#ifdef HAVE_ASM_MMX2
 #define MOVNTQ "movntq"
 #else
 #define MOVNTQ "movq"
@@ -1530,7 +1533,7 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
            perform reading and writing to be multiple to a number of
            processor's decoders, but it's not always possible.
         */
-#if HAVE_ASM_SSE /* Only P3 (may be Cyrix3) */
+#ifdef HAVE_ASM_SSE /* Only P3 (may be Cyrix3) */
 		if(((intptr_t)from) & 15)
 		/* if SRC is misaligned */
 		for(; i>0; i--)
