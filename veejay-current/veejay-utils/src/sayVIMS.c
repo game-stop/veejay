@@ -121,7 +121,7 @@ static int send_full(vj_client *client, int channel, const unsigned char *buf, i
 
 static vj_client *sayvims_connect(void)
 {
-    vj_client *client = vj_client_alloc(0, 0, 0);
+    vj_client *client = vj_client_alloc();
     if (!client) return NULL;
 
     if (!host_name) {
@@ -457,7 +457,7 @@ static int processLine(FILE *infile, FILE *outfile, char *tmp, size_t len)
 #ifdef BASE64_AVUTIL
                             int b64len = AV_BASE64_SIZE(dataLength);
                             char *out = (char *) vj_calloc(b64len);
-                            if (!out) return;
+                            if (!out) return 0;
 
                             char *b64str = av_base64_encode(out, b64len, data, dataLength);
                             if (b64str && b64len > 0) {
