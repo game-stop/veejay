@@ -1947,7 +1947,7 @@ int vj_tag_set_brightness(int t1, int value)
         return 0;
     }
 #ifdef HAVE_V4L2
-    v4l2_set_brightness( vj_tag_input->v4l2[tag->index],value);
+    v4l2_set_brightness( vj_tag_input->v4l2[tag->index],0,value);
 #endif
     return 1;
 }
@@ -1961,7 +1961,7 @@ int vj_tag_set_white(int t1, int value)
         return -1;
     }
 #ifdef HAVE_V4L2
-    v4l2_set_gamma( vj_tag_input->v4l2[tag->index],value);
+    v4l2_set_gamma( vj_tag_input->v4l2[tag->index],0,value);
 #endif
     return 1;
 }
@@ -1976,7 +1976,7 @@ int vj_tag_set_hue(int t1, int value)
         return -1;
     }
 #ifdef HAVE_V4L2
-    v4l2_set_hue( vj_tag_input->v4l2[tag->index],value );     
+    v4l2_set_hue( vj_tag_input->v4l2[tag->index],0,value );     
 #endif
     return 1;
 }
@@ -1990,7 +1990,7 @@ int vj_tag_set_contrast(int t1,int value)
         return -1;
     }
 #ifdef HAVE_V4L2
-    v4l2_set_contrast( vj_tag_input->v4l2[tag->index], value );
+    v4l2_set_contrast( vj_tag_input->v4l2[tag->index], 0,value );
 #endif
     return 1;
 }
@@ -2005,7 +2005,7 @@ int vj_tag_set_color(int t1, int value)
         return -1;
     }
 #ifdef HAVE_V4L2
-    v4l2_set_whiteness( vj_tag_input->v4l2[tag->index], value );
+    v4l2_set_whiteness( vj_tag_input->v4l2[tag->index], 0,value );
 #endif
     return 1;
 }

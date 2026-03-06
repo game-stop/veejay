@@ -179,7 +179,7 @@ static	struct
 	uint32_t id;
 	const char *key;
 	const int  atom;
-	void (*set_func)(void *ctx, int32_t value);
+	void (*set_func)(void *ctx, int32_t type, int32_t value);
 	int32_t (*get_func)(void *ctx);
 } property_list[] = {
  {	V4L2_CID_BRIGHTNESS,		"brightness",	VEVO_ATOM_TYPE_INT, v4l2_set_brightness, 	v4l2_get_brightness },
@@ -1513,14 +1513,14 @@ void	v4l2_close( void *d )
 }
 
 
-void	v4l2_set_hue( void *d, int32_t value ) {
+void	v4l2_set_hue( void *d, int32_t type, int32_t value ) {
 	v4l2_set_control( d, V4L2_CID_HUE, value );
 }
 int32_t	v4l2_get_hue( void *d ) {
 	return v4l2_get_control(d, V4L2_CID_HUE );
 }
 
-void	v4l2_set_contrast( void *d,int32_t value ) {
+void	v4l2_set_contrast( void *d,int32_t type, int32_t value ) {
 	v4l2_set_control( d, V4L2_CID_CONTRAST, value );
 }
 int32_t v4l2_get_contrast( void *d ) {
@@ -1534,7 +1534,7 @@ void	v4l2_set_input_channel( void *d, int num )
 }
 
 // brightness
-void	v4l2_set_brightness( void *d, int32_t value ) {
+void	v4l2_set_brightness( void *d, int32_t type, int32_t value ) {
 	v4l2_set_control( d, V4L2_CID_BRIGHTNESS, value );
 }
 int32_t v4l2_get_brightness( void *d ) {
@@ -1542,7 +1542,7 @@ int32_t v4l2_get_brightness( void *d ) {
 }
 
 // saturation
-void	v4l2_set_saturation( void *d, int32_t value ) {
+void	v4l2_set_saturation( void *d, int32_t type, int32_t value ) {
 	v4l2_set_control( d, V4L2_CID_SATURATION, value );
 }
 int32_t	v4l2_get_saturation( void *d ) {
@@ -1551,7 +1551,7 @@ int32_t	v4l2_get_saturation( void *d ) {
 
 
 // gamma
-void	v4l2_set_gamma( void *d, int32_t value ) {
+void	v4l2_set_gamma( void *d, int32_t type, int32_t value ) {
 	v4l2_set_control( d, V4L2_CID_GAMMA, value );
 }
 int32_t v4l2_get_gamma( void *d ) {
@@ -1560,7 +1560,7 @@ int32_t v4l2_get_gamma( void *d ) {
 
 
 // sharpness
-void	v4l2_set_sharpness( void *d, int32_t value ) {
+void	v4l2_set_sharpness( void *d, int32_t type, int32_t value ) {
 	v4l2_set_control( d, V4L2_CID_SHARPNESS , value );
 }
 int32_t v4l2_get_sharpness( void *d ) {
@@ -1568,7 +1568,7 @@ int32_t v4l2_get_sharpness( void *d ) {
 }
 
 // gain
-void	v4l2_set_gain( void *d, int32_t value ) {
+void	v4l2_set_gain( void *d, int32_t type, int32_t value ) {
 	v4l2_set_control( d, V4L2_CID_GAIN, value );
 }
 int32_t v4l2_get_gain( void *d ) {
@@ -1576,14 +1576,14 @@ int32_t v4l2_get_gain( void *d ) {
 }
 
 // red balance
-void	v4l2_set_red_balance( void *d,int32_t value ) {
+void	v4l2_set_red_balance( void *d,int32_t type, int32_t value ) {
 	v4l2_set_control( d, V4L2_CID_RED_BALANCE, value );
 }
 int32_t v4l2_get_red_balance( void *d ) {
 	return v4l2_get_control( d, V4L2_CID_RED_BALANCE );
 }
 // green balance does not exist
-void	v4l2_set_green_balance( void *d,int32_t value ) {
+void	v4l2_set_green_balance( void *d,int32_t type, int32_t value ) {
 //	v4l2_set_control( d, V4L2_CID_GREEN_BALANCE, value );
 }
 int32_t v4l2_get_green_balance( void *d ) {
@@ -1592,7 +1592,7 @@ int32_t v4l2_get_green_balance( void *d ) {
 }
 
 // auto white balance
-void	v4l2_set_auto_white_balance( void *d, int32_t value ) {
+void	v4l2_set_auto_white_balance( void *d,int32_t type, int32_t value ) {
 	v4l2_set_control( d, V4L2_CID_AUTO_WHITE_BALANCE , value );
 }
 int32_t  v4l2_get_auto_white_balance( void *d ) {
@@ -1600,7 +1600,7 @@ int32_t  v4l2_get_auto_white_balance( void *d ) {
 }
 
 // blue balance
-void	v4l2_set_blue_balance( void *d, int32_t value ) {
+void	v4l2_set_blue_balance( void *d,int32_t type, int32_t value ) {
 	v4l2_set_control( d, V4L2_CID_BLUE_BALANCE, value );
 }
 int32_t	v4l2_get_blue_balance( void *d ) {
@@ -1608,7 +1608,7 @@ int32_t	v4l2_get_blue_balance( void *d ) {
 }
 
 // backlight compensation
-void 	v4l2_set_backlight_compensation( void *d,int32_t value ) {
+void 	v4l2_set_backlight_compensation( void *d,int32_t type, int32_t value ) {
 	v4l2_set_control( d, V4L2_CID_BACKLIGHT_COMPENSATION, value );
 }
 int32_t v4l2_get_backlight_compensation( void *d ) {
@@ -1616,7 +1616,7 @@ int32_t v4l2_get_backlight_compensation( void *d ) {
 }
 
 // auto gain
-void	v4l2_set_autogain( void *d,int32_t value ) {	
+void	v4l2_set_autogain( void *d,int32_t type, int32_t value ) {	
 	v4l2_set_control( d, V4L2_CID_AUTOGAIN , value );
 }
 int32_t v4l2_get_autogain( void *d ) {
@@ -1624,7 +1624,7 @@ int32_t v4l2_get_autogain( void *d ) {
 }
 
 // auto hue
-void	v4l2_set_hue_auto( void *d,int32_t value ) {
+void	v4l2_set_hue_auto( void *d,int32_t type, int32_t value ) {
 	v4l2_set_control( d, V4L2_CID_HUE_AUTO , value );
 }
 int32_t	v4l2_get_hue_auto( void *d ) {
@@ -1632,7 +1632,7 @@ int32_t	v4l2_get_hue_auto( void *d ) {
 }
 
 // hflip
-void	v4l2_set_hflip( void *d,int32_t value ) {
+void	v4l2_set_hflip( void *d,int32_t type, int32_t value ) {
 	v4l2_set_control(d, V4L2_CID_HFLIP, value );
 }
 int32_t v4l2_get_hflip( void *d ) {
@@ -1640,7 +1640,7 @@ int32_t v4l2_get_hflip( void *d ) {
 }
 
 // white balance temperature
-void	v4l2_set_temperature( void *d,int32_t value ) {
+void	v4l2_set_temperature( void *d,int32_t type, int32_t value ) {
 	v4l2_set_control(d, V4L2_CID_WHITE_BALANCE_TEMPERATURE,value );
 }
 int32_t	v4l2_get_temperature( void *d ) {
@@ -1648,7 +1648,7 @@ int32_t	v4l2_get_temperature( void *d ) {
 }
 
 // exposure
-void	v4l2_set_exposure( void *d ,int32_t value )
+void	v4l2_set_exposure( void *d ,int32_t type, int32_t value )
 {
 	v4l2_set_control( d, V4L2_CID_EXPOSURE, value );
 } 
@@ -1656,7 +1656,7 @@ void	v4l2_set_exposure( void *d ,int32_t value )
 int32_t v4l2_get_exposure( void *d ) {
 	return v4l2_get_control( d, V4L2_CID_EXPOSURE );
 }
-void	v4l2_set_black_level( void *d ,int32_t value )
+void	v4l2_set_black_level( void *d ,int32_t type, int32_t value )
 {
 	v4l2_set_control( d, V4L2_CID_BLACK_LEVEL, value );
 } 
@@ -1664,14 +1664,14 @@ void	v4l2_set_black_level( void *d ,int32_t value )
 int32_t v4l2_get_black_level( void *d ) {
 	return v4l2_get_control( d, V4L2_CID_BLACK_LEVEL );
 }
-void	v4l2_set_whiteness(void *d, int32_t value) {
+void	v4l2_set_whiteness(void *d,int32_t type, int32_t value) {
 	v4l2_set_control( d, V4L2_CID_WHITENESS, value );
 }
 
 int32_t v4l2_get_whiteness(void *d) {
 	return v4l2_get_control( d, V4L2_CID_WHITENESS);
 }
-void	v4l2_set_vflip(void *d, int32_t value) {
+void	v4l2_set_vflip(void *d, int32_t type, int32_t value) {
 	v4l2_set_control( d, V4L2_CID_VFLIP, value );
 }
 
