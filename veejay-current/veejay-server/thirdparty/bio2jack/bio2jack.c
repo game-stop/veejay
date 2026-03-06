@@ -40,7 +40,7 @@
 #include <libswresample/swresample.h>
 #include <libavutil/channel_layout.h>
 #include <libavutil/samplefmt.h>
-
+#include <libavutil/version.h>
 #include "bio2jack.h"
 
 /* set to 1 to enable debug messages */
@@ -72,10 +72,10 @@
 #define DEFAULT_VOLUME 100
 typedef struct jack_driver_s
 {
-  bool allocated;
+  int allocated;
   int deviceID;
   int clientCtr;
-  bool in_use;
+  int in_use;
   int cb_active;
 
   jack_client_t *volatile client;
@@ -125,7 +125,7 @@ typedef struct jack_driver_s
   double prefill_duration;
 
   volatile int state;
-  volatile bool jackd_died;
+  volatile int jackd_died;
   struct timespec last_reconnect_attempt;
 
   volatile unsigned int volume[MAX_OUTPUT_PORTS];
@@ -142,7 +142,7 @@ typedef struct jack_driver_s
 
 static char *client_name = NULL;
 
-static bool init_done = 0;
+static int init_done = 0;
 
 static enum JACK_PORT_CONNECTION_MODE port_connection_mode = CONNECT_ALL;
 
@@ -602,17 +602,46 @@ JACK_OpenDevice(jack_driver_t *drv)
   drv->jack_buffer_size =
       jack_get_buffer_size(drv->client);
 
-   drv->swr_ctx = swr_alloc_set_opts(
-      NULL,
-      av_get_default_channel_layout(drv->num_output_channels),
-      AV_SAMPLE_FMT_FLT,
-      drv->jack_sample_rate,
-      av_get_default_channel_layout(drv->num_output_channels),
-      (drv->bits_per_channel == 16)
-          ? AV_SAMPLE_FMT_S16
-          : AV_SAMPLE_FMT_U8,
-      drv->client_sample_rate,
-      0, NULL);
+
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+    AVChannelLayout in_layout;
+    AVChannelLayout out_layout;
+
+    av_channel_layout_default(&out_layout, drv->num_output_channels);
+    av_channel_layout_default(&in_layout, drv->num_output_channels);
+
+    drv->swr_ctx = NULL;
+
+    swr_alloc_set_opts2(
+        &drv->swr_ctx,
+        &out_layout,
+        AV_SAMPLE_FMT_FLT,
+        drv->jack_sample_rate,
+        &in_layout,
+        (drv->bits_per_channel == 16)
+            ? AV_SAMPLE_FMT_S16
+            : AV_SAMPLE_FMT_U8,
+        drv->client_sample_rate,
+        0,
+        NULL
+    );
+
+#else
+    drv->swr_ctx = swr_alloc_set_opts(
+        NULL,
+        av_get_default_channel_layout(drv->num_output_channels),
+        AV_SAMPLE_FMT_FLT,
+        drv->jack_sample_rate,
+        av_get_default_channel_layout(drv->num_output_channels),
+        (drv->bits_per_channel == 16)
+            ? AV_SAMPLE_FMT_S16
+            : AV_SAMPLE_FMT_U8,
+        drv->client_sample_rate,
+        0,
+        NULL
+    );
+
+#endif
 
   if (!drv->swr_ctx || swr_init(drv->swr_ctx) < 0)
   {
