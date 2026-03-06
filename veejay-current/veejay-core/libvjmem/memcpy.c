@@ -474,8 +474,10 @@ void	packed_plane_clear( size_t len, void *to )
 }
 
 #if defined (__SSE4_1__)
-static void *sse41_memcpy(void *to, const void *from, size_t len) {
-  void *retval = to;
+static void *sse41_memcpy(void *dst, const void *src, size_t len) {
+  void *retval = dst;
+  unsigned char *to = (unsigned char*) dst;
+  unsigned char *from = (unsigned char*) src;
 
   if (len >= 128) {
 	if(!is_aligned__(from,SSE_MMREG_SIZE)) {
@@ -536,8 +538,10 @@ static void *sse41_memcpy(void *to, const void *from, size_t len) {
 #endif
 
 #if defined (__SSE4_2__ )
-static void *sse42_memcpy(void *to, const void *from, size_t len) {
-  void *retval = to;
+static void *sse42_memcpy(void *dst, const void *src, size_t len) {
+  void *retval = dst;
+  unsigned char *to = (unsigned char*) dst;
+  unsigned char *from = (unsigned char*) src;
 
   if (len >= 128) {
 	if(!is_aligned__(from,SSE_MMREG_SIZE)) {
@@ -678,8 +682,11 @@ static void *sse2_memcpy(void * to, const void * from, size_t len)
     return retval;
 }
 
-static void *sse2_memcpy_unaligned(void *to, const void *from, size_t len) {
-  void *retval = to;
+static void *sse2_memcpy_unaligned(void *dst, const void *ptr, size_t len) {
+  void *retval = dst;
+
+  unsigned char *from = (unsigned char*) ptr;
+  unsigned char *to = (unsigned char*) dst;
 
   if (len >= 128) {
     register uintptr_t delta;
