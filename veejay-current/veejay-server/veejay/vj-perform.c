@@ -2226,7 +2226,7 @@ int vj_perform_fill_audio_buffers(
     video_playback_setup *settings = info->settings;
     uint8_t *temporary_buffer = p->audio_render_buffer;
     uint8_t *downsample_buffer = p->down_sample_buffer;
-    performer_global_t *g = (performer_t*) info->performer;
+    performer_global_t *g = (performer_global_t*) info->performer;
     sample_b_t *sample_ptrB = &(g->A->sample_b);
     sample_b_t *sample_ptrA = &(g->A->sample_a);
     
