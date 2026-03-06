@@ -1522,54 +1522,81 @@ static	void	build_histogram( histogram_t *h, VJFrame *f )
 
 }
 
-static	void	veejay_lut_calc( uint32_t *h, uint32_t *lut, int intensity, int strength, int len )
+static inline void veejay_lut_calc(
+    const uint32_t *restrict h,
+    uint32_t *restrict lut,
+    int intensity,
+    int strength,
+    int len)
 {
-	unsigned int i;
-	unsigned int op0 = 255 - strength;
-	unsigned int op1 = strength;
-	lut[0] = h[0];
-	for( i = 1; i < 256; i ++ )
-		lut[i] = lut[i-1] + h[i];
-	for( i = 0; i < 256; i ++ )
-		lut[i] = (lut[i] * intensity ) / len;
-	for( i = 0; i < 256; i ++ )
-		lut[i] = (op1 * lut[i] + op0 * i ) >> 8;
+    const uint32_t op0 = 255 - strength;
+    const uint32_t op1 = strength;
+    const uint64_t inv_len = ((uint64_t)1 << 32) / len;
+    uint32_t acc = 0;
+
+    for (unsigned int i = 0; i < 256; i++)
+    {
+        acc += h[i];
+
+        uint32_t v = (uint32_t)(((uint64_t)acc * intensity * inv_len) >> 32);
+        lut[i] = (op1 * v + op0 * i) >> 8;
+    }
 }
 
-static	void	veejay_blit_histogram( uint8_t *D, uint32_t *h, int len )
+static inline void veejay_blit_histogram(uint8_t *restrict D, const uint32_t *restrict h, int len)
 {
-	unsigned int i;
-	for( i = 0; i < 256; i ++ )
-		D[i] = (h[i] > 0 ? (len / h[i]) : 0 );
+    for (unsigned int i = 0; i < 256; i++)
+    {
+        uint32_t v = h[i];
+        uint32_t nz = (v != 0);
+        D[i] = (uint8_t)(nz * (len / (v | !nz)));
+    }
 }
 
-static	inline	void	veejay_histogram_qdraw( uint32_t *histi, histogram_t *h, VJFrame *f, uint8_t *plane, int left, int down)
+static inline void veejay_histogram_qdraw(
+    uint32_t *restrict histi,
+    histogram_t *restrict h,
+    VJFrame *restrict f,
+    uint8_t *restrict plane,
+    int left, int down)
 {
-	uint8_t lut[256];
-	unsigned int i,j,len;
+    uint8_t lut[256];
+    unsigned int i, j;
 
-	len = f->len;
-	veejay_blit_histogram( lut, histi, len );
+    veejay_blit_histogram(lut, histi, f->len);
+
+    const int w = f->width;
+    const int hgt = f->height;
+
+    const int his_height = hgt / 5;
+    const int his_width  = w / 5;
+
+	int dx = (j * his_width) >> 8;
+	int dy = (i * his_height) >> 8;
+
+    int dy_acc = 0;
 	
-	int his_height = f->height/5;
-	int his_width = f->width/5;
+	const int sy = (his_height << 8) >> 8;
+	const int sx = (his_width << 8) >> 8;
 
-	float sx = his_width/256.0f;
-	float sy = his_height/256.0f;
+    for (i = 0; i < 256; i++)
+    {
+        int dy = dy_acc >> 8;
+        dy_acc += sy;
 
-//@ slow!
-	for ( i = 0; i < 256; i ++ )
-	{
-		for( j = 0; j < 256 ; j ++ )
-		{
-			int dx = j * sx;
-			int dy = i * sy;
-		
-			int pos = (f->height - dy - 1 - down) * f->width + dx + left;
-			if( plane[pos] != 0xff)
-				plane[pos] = (lut[j] >= i ? 0xff: 0);
-		}
-	}
+        int row = (hgt - dy - 1 - down) * w + left;
+        int dx_acc = 0;
+
+        for (j = 0; j < 256; j++)
+        {
+            int dx = dx_acc >> 8;
+            dx_acc += sx;
+            int pos = row + dx;
+            uint8_t draw = (uint8_t)-(lut[j] >= i);
+            uint8_t p = plane[pos];
+            plane[pos] = (p == 0xff) ? p : draw;
+        }
+    }
 }
 
 void	veejay_histogram_draw( void *his, VJFrame *org, VJFrame *f, int intensity, int strength )
@@ -1648,24 +1675,27 @@ void	veejay_histogram_equalize_rgb( void *his, VJFrame *f, uint8_t *rgb, int int
 			veejay_lut_calc( h->hR, LUTr, intensity , strength , len );
 			for( i = 0; i < H; i ++ )
 			{
+				int row = i * r;
 				for( j = 0; j < r ; j +=3 )
-					rgb[i*r+j] = LUTr[ rgb[i*r+j] ];
+					rgb[row+j] = LUTr[ rgb[row+j] ];
 			}
 			break;	
 		case 1:
 			veejay_lut_calc( h->hG, LUTg, intensity , strength , len );
 			for( i = 0; i < H; i ++ )
 			{
+				int row = i * r;
 				for( j = 0; j < r; j += 3 )
-					rgb[ i*r+j+1 ] = LUTg[rgb[i*r+j+1]];
+					rgb[ row+j+1 ] = LUTg[rgb[row+j+1]];
 			}
 			break;
 		case 2:
 			veejay_lut_calc( h->hB, LUTb, intensity , strength , len );
 			for( i = 0; i < H; i ++ )
 			{
+				int row = i * r;
 				for( j = 0; j < r; j += 3 )
-					rgb[i*r+j+2] = LUTb[ rgb[i*r+j+2]];
+					rgb[row+j+2] = LUTb[ rgb[row+j+2]];
 			}
 			break;
 		case 3:
@@ -1675,11 +1705,12 @@ void	veejay_histogram_equalize_rgb( void *his, VJFrame *f, uint8_t *rgb, int int
 	
 			for( i = 0; i  < H; i ++ )
 			{
+				int row = i * r;
 				for( j = 0; j < r ; j +=3 )
 				{
-					rgb[i*r+j] = LUTr[ rgb[i*r+j] ];
-					rgb[i*r+j+1] = LUTg[rgb[i*r+j+1]];
-					rgb[i*r+j+2] = LUTb[ rgb[i*r+j+2]];
+					rgb[row+j] = LUTr[ rgb[row+j] ];
+					rgb[row+j+1] = LUTg[rgb[row+j+1]];
+					rgb[row+j+2] = LUTb[ rgb[row+j+2]];
 				}	
 			}
 			break;	
