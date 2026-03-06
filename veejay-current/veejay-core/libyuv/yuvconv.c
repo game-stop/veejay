@@ -1656,21 +1656,6 @@ void    yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
 }
 #endif
 
-static void yuy2_scale_pixels_from_yuv_job( void *arg )
-{
-    vj_task_arg_t *v = (vj_task_arg_t*) arg;
-    uint8_t *plane = v->input[0];
-    int  len   = v->strides[0];
-
-    unsigned int i;
-    for( i = 0; i < len; i += 4 ) {
-        plane[i+0] = jpeg_to_CCIR_tableY[ plane[i+0] ];
-        plane[i+1] = jpeg_to_CCIR_tableUV[plane[i+1] ];
-        plane[i+2] = jpeg_to_CCIR_tableY[ plane[i+2] ];
-        plane[i+3] = jpeg_to_CCIR_tableUV[ plane[i+3] ];
-    }
-}
-
 void    yuy2_scale_pixels_from_yuv( uint8_t *plane, int len )
 {
     unsigned int rlen = 2 * len ;
@@ -1683,20 +1668,6 @@ void    yuy2_scale_pixels_from_yuv( uint8_t *plane, int len )
     }
 }
 
-static void yuy2_scale_pixels_from_ycbcr_job( void *arg )
-{
-    vj_task_arg_t *v = (vj_task_arg_t*) arg;
-    uint8_t *plane = v->input[0];
-    int len = v->strides[0];
-    unsigned int i;
-    for( i = 0; i < len; i += 4 ) {
-        plane[i+0] = CCIR_to_jpeg_tableY[ plane[i+0] ];
-        plane[i+1] = CCIR_to_jpeg_tableUV[plane[i+1] ];
-        plane[i+2] = CCIR_to_jpeg_tableY[ plane[i+2] ];
-        plane[i+3] = CCIR_to_jpeg_tableUV[ plane[i+3] ];
-    }
-}
-
 void    yuy2_scale_pixels_from_ycbcr( uint8_t *plane, int len )
 {
     unsigned int rlen = 2 * len ;
@@ -1706,27 +1677,6 @@ void    yuy2_scale_pixels_from_ycbcr( uint8_t *plane, int len )
         plane[i+1] = CCIR_to_jpeg_tableUV[plane[i+1] ];
         plane[i+2] = CCIR_to_jpeg_tableY[ plane[i+2] ];
         plane[i+3] = CCIR_to_jpeg_tableUV[ plane[i+3] ];
-    }
-}
-
-static void yuy_scale_pixels_from_yuv_job( void *arg)
-{
-    vj_task_arg_t *t = (vj_task_arg_t*) arg;
-    
-    unsigned int i;
-    uint8_t *y = t->input[0];
-    uint8_t *u = t->input[1];
-    uint8_t *v = t->input[2];
-    uint8_t *dY = t->output[0];
-    uint8_t *dU = t->output[1];
-    uint8_t *dV = t->output[2];
-    
-    for( i = 0; i < t->strides[0] ; i ++ ) {
-        dY[i] = jpeg_to_CCIR_tableY[ y[i] ];
-    }
-    for( i = 0; i < t->strides[1] ; i ++ ) {
-        dU[i] = jpeg_to_CCIR_tableUV[ u[i] ];
-        dV[i] = jpeg_to_CCIR_tableUV[ v[i] ];
     }
 }
 
