@@ -130,8 +130,8 @@ typedef int (*vevo_get_func)(void *ctx );
 typedef struct {
     int type;
    	void *value;
-	int	(*get_func)();
-	void(*set_func)();
+	int	(*get_func)(void *ptr);
+	void(*set_func)(void *ptr, int32_t type, int32_t v);
     size_t size;
 } atom_t;
 
@@ -690,7 +690,7 @@ storage_put_atom_value(__vevo_port_t * port, void *src, int n,
 
 static void
 storage_put_atom_func(__vevo_port_t * port,
-	void (*set_func)(void *, int32_t),
+	void (*set_func)(void *, int32_t, int32_t),
 	int (*get_func)(void *),
 	vevo_storage_t * d, int v)
 {
@@ -1130,7 +1130,7 @@ vevo_property_set(vevo_port_t * p,
 int
 vevo_property_set_f(vevo_port_t * p,
 		    const char *key,
-		    int atom_type, int num_elements, void (*set_func)(void *, int32_t), int (*get_func)(void *) )
+		    int atom_type, int num_elements, void (*set_func)(void *, int32_t, int32_t), int (*get_func)(void *) )
 {
     __vevo_port_t *port = (__vevo_port_t *) p;
     ukey_t hash_key = hash_key_code(key);
