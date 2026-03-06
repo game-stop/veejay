@@ -189,9 +189,9 @@ static inline void gradientfield_apply_mode0(
     int w, int h, int stride, int a,
     uint8_t *restrict copyY, uint8_t *restrict copyU, uint8_t *restrict copyV,
     uint8_t *restrict outY, uint8_t *restrict outU, uint8_t *restrict outV,
-    uint32_t *restrict intY_sum, uint32_t *restrict intY_sq,
-    uint32_t *restrict intU_sum, uint32_t *restrict intU_sq,
-    uint32_t *restrict intV_sum, uint32_t *restrict intV_sq,
+    uint32_t *restrict intY_sum, uint64_t *restrict intY_sq,
+    uint32_t *restrict intU_sum, uint64_t *restrict intU_sq,
+    uint32_t *restrict intV_sum, uint64_t *restrict intV_sq,
     uint32_t *restrict inv_area_lut,
     uint32_t fb, uint32_t inv_fb,
     int y)
