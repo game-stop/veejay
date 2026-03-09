@@ -2805,6 +2805,7 @@ void *veejay_audio_producer_thread(void *arg)
 #ifdef HAVE_JACK
     const long CLIENT_RATE = vj_jack_get_client_samplerate();
     const long JACK_RATE   = vj_jack_get_rate();
+    const double half_frame_s = 0.5 / (double) el->video_fps;
 #else
     const long CLIENT_RATE = el->audio_rate;
 #endif
@@ -2909,7 +2910,7 @@ void *veejay_audio_producer_thread(void *arg)
 #ifdef HAVE_JACK
         if (has_audio) {
             int needed = (int)(SPVF * CLIENT_RATE + 0.5);
-            
+            long long media_frame = atomic_load_long_long(&settings->current_frame_num); 
 			int decoded;
 			if(vj_jack_xrun_flag()) {
 		
