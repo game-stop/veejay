@@ -359,8 +359,6 @@ void pixelsort_apply( void *ptr, VJFrame *frame, int *args) {
 
     pixelsort_t *p = (pixelsort_t*) ptr;
 
-    uint8_t pixel_Y_hi_ = pixel_Y_hi_;
-    uint8_t pixel_Y_lo_ = pixel_Y_lo_;
     unsigned int x=0,y=0;
     unsigned int wid = frame->width;
     unsigned int hei = frame->height;

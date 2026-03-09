@@ -61,7 +61,7 @@ void* vj_scratch_init(int channels, int sample_rate, float fps)
     s->channels = channels;
     s->sample_rate = sample_rate;
 
-    s->buffer_frames = (int)ceil(sample_rate * MAX_SCRATCH_HISTORY_SEC * MAX_SPEED_AV * 1.1);
+    s->buffer_frames = ceil(sample_rate * MAX_SCRATCH_HISTORY_SEC * MAX_SPEED_AV * 1.1);
     s->buffer = vj_calloc(s->buffer_frames * channels * sizeof(short));
 
     if (!s->buffer) {
@@ -188,7 +188,7 @@ int vj_scratch_process(void *ptr,
     double abs_speed = fabs(speed);
     int expected_out_frames;
       if (abs_speed < 1.0)
-        expected_out_frames = (int)ceil(src_frames * (1.0 / abs_speed));
+        expected_out_frames = ceil(src_frames * (1.0 / abs_speed));
     else
         expected_out_frames = (int)floor(src_frames / abs_speed);
     float tension = 0.5f + 0.5f * (abs_speed / (abs_speed + 1.0));

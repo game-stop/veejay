@@ -36,7 +36,7 @@ vj_effect *spherize_init(int w, int h)
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 360;
     ve->limits[0][2] = 1;
-    ve->limits[1][2] = (int)sqrtf(w*w/4.0f + h*h/4.0f);
+    ve->limits[1][2] = sqrtf(w*w/4.0f + h*h/4.0f);
     ve->limits[0][3] = 10;
     ve->limits[1][3] = 200;
     ve->limits[0][4] = 10;

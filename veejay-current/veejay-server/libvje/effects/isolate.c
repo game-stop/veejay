@@ -75,7 +75,7 @@ void isolate_apply( void *ptr, VJFrame *frame, int *args ) {
     float kg1, tmp, aa = 255, bb = 255;
     float angle = (float) i_angle / 100.0f;
     unsigned int pos;
-    uint8_t val;
+
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

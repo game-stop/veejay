@@ -1108,11 +1108,10 @@ int vj_perform_init_audio(veejay_t * info, int AorB)
         return 1;
     }
 
-    int i;
     performer_global_t *global = (performer_global_t*) info->performer;
     
     double samples_per_frame = (double)el->audio_rate / (double)el->video_fps;
-    const uint32_t sample_len = (uint32_t)ceil(samples_per_frame) * el->audio_bps;
+    const uint32_t sample_len = ceil(samples_per_frame) * el->audio_bps;
 
 
     p->top_audio_buffer =
@@ -1151,7 +1150,7 @@ int vj_perform_init_audio(veejay_t * info, int AorB)
     if(!p->lin_audio_buffer_)
         return 0;
 
-    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
+    for (int i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
         p->audio_buffer[i] = p->lin_audio_buffer_ + (sample_len * i);
     }
  

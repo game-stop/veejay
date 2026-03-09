@@ -128,7 +128,7 @@ void flower_apply(void *ptr, VJFrame *frame, int *args) {
     const int petalLength = args[1];
     const int width = frame->width;
     const int height = frame->height;
-    const int len = width * height;
+    const int len = frame->len;
     const int w_limit = width - 1;
     const int h_limit = height - 1;
     int needs_update = 0;
@@ -164,9 +164,7 @@ void flower_apply(void *ptr, VJFrame *frame, int *args) {
     if (needs_update) {
         const int cx = width >> 1;
         const int cy = height >> 1;
-        const int w_limit = width - 1;
-        const int h_limit = height - 1;
-
+        
         for (int dy_val = -cy; dy_val < (height - cy); dy_val++) {
             const int y_curr = cy + dy_val;
             const int row_base = y_curr * width;

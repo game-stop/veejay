@@ -117,7 +117,6 @@ void    swirl_free(void *ptr)
 
 void swirl_apply(void *ptr, VJFrame *frame, int *args)
 {
-    int i;
     const unsigned int width = frame->width;
     const unsigned int height = frame->height;
     const int len = frame->len;
@@ -168,7 +167,7 @@ void swirl_apply(void *ptr, VJFrame *frame, int *args)
             }
         }
         else  {
-            for (i = 0; i < len; i++) {
+            for (int i = 0; i < len; i++) {
                 r = polar_map[i];
                 a = fish_angle[i];
 
@@ -183,11 +182,11 @@ void swirl_apply(void *ptr, VJFrame *frame, int *args)
                 cached_coords[i] = (py * width) + px;
             }
         }
-	s->v = v;
-	s->mode = mode;
+        s->v = v;
+        s->mode = mode;
     }
 
-    for(i=0; i < len; i++)
+    for(int i=0; i < len; i++)
     {
         int idx = cached_coords[i];
 

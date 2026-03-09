@@ -121,8 +121,6 @@ void mirrordistortion_apply(void *ptr, VJFrame *frame, int *args ) {
     const int w = frame->width;
     const int h = frame->height;
 
-    int i;
-
     uint8_t *srcY = m->buf[0];
     uint8_t *srcU = m->buf[1];
     uint8_t *srcV = m->buf[2];
@@ -133,10 +131,10 @@ void mirrordistortion_apply(void *ptr, VJFrame *frame, int *args ) {
 
 
     if( distortionFactor != m->distortion ) {
-        for( i = 0; i < w; i ++ ) {
+        for( int i = 0; i < w; i ++ ) {
             m->cos_lut[i] = a_cos( i * distortionFactor );
         }   
-        for( i = 0; i < h; i ++ ) {
+        for( int i = 0; i < h; i ++ ) {
             m->sin_lut[i] = a_sin( i * distortionFactor );
         }
         m->distortion = distortionFactor;

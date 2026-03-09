@@ -895,10 +895,9 @@ static void ss_444_to_422_bilinear(uint8_t *restrict U, uint8_t *restrict V, con
 */
 static void ss_444_to_422_in_mitchell_netravali_old(uint8_t *restrict U, uint8_t *restrict V, const int width, const int height) {
     const int output_width = width >> 1;
-    int i,j;
-
+    int i;
     for( i = 0; i < 1; i ++ ) {
-        for (j = 0; j < output_width; j++) {
+        for (int j = 0; j < output_width; j++) {
             const int src_index = i * width + j * 2;
 
             U[i * output_width + j] = U[src_index];

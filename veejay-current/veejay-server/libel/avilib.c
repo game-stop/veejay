@@ -80,12 +80,12 @@ static char *avi_error_list[] = {
 	NULL
 };
 
-static void avierror(int AVI_errno) {
-	if(AVI_errno < 0 || AVI_errno > 14) {
+static void avierror(int errcode) {
+	if(errcode < 0 || errcode > 14) {
 		veejay_msg(0, "[avilib] %s", avi_error_list[0]);
 	}
 	else
-		veejay_msg(0, "[avilib] %s", avi_error_list[ AVI_errno ] );
+		veejay_msg(0, "[avilib] %s", avi_error_list[ errcode ] );
 }
 
 

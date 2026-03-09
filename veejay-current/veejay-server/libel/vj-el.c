@@ -804,12 +804,12 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 			break;
 		case CODEC_ID_QOIY:
 			{
-				qoi_desc d;
-				d.channels = 1;
-				d.colorspace = QOI_LINEAR;
-				d.height = el_height_;
-				d.width = el_width_;
-		    	qoi_decode( data,res, &d, 1, dst, el_out_->len );
+				qoi_desc qd;
+				qd.channels = 1;
+				qd.colorspace = QOI_LINEAR;
+				qd.height = el_height_;
+				qd.width = el_width_;
+		    	qoi_decode( data,res, &qd, 1, dst, el_out_->len );
 			
 				return 1;
 			}
@@ -1650,9 +1650,9 @@ char *vj_el_write_line_ascii(editlist *el, int *bytes_written)
 
     for (uint64_t j = 1; j <= (uint64_t)el->total_frames; j++)
     {
-        uint64_t n = el->frame_list[j];
-        uint64_t file_idx = index[N_EL_FILE(n)];
-        uint64_t frame_idx = N_EL_FRAME(n);
+        uint64_t nframe = el->frame_list[j];
+        uint64_t file_idx = index[N_EL_FILE(nframe)];
+        uint64_t frame_idx = N_EL_FRAME(nframe);
 
         if (file_idx != oldfile || frame_idx != oldframe + 1)
         {
@@ -1848,7 +1848,8 @@ editlist *vj_el_soft_clone_range(editlist *el, long n1, long n2)
     uint64_t nframe;
     long len = n2 - n1;
     uint64_t k = 0;
-    int idx = -1;
+    
+	int idx = -1;
 
     clone->frame_list = (uint64_t *)vj_calloc(sizeof(uint64_t) * (len + 1));
     if (!clone->frame_list) {
@@ -1866,7 +1867,8 @@ editlist *vj_el_soft_clone_range(editlist *el, long n1, long n2)
     for (nframe = n1; nframe <= n2; nframe++) {
         uint64_t n = el->frame_list[nframe];
         int file_idx = N_EL_FILE(n);
-	int idx = file_idx;
+		
+		idx = file_idx;
 /*
         if (file_idx != last_file_idx) {
             last_file_idx = file_idx;

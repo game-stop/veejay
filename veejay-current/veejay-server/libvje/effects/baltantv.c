@@ -118,7 +118,7 @@ void baltantv_apply( void *ptr, VJFrame *frame, int *args) {
     int stride = args[0];
     int shift = args[1];
 
-	unsigned int i,cf;
+	unsigned int cf;
 	const int len = frame->len;
     const int uv_len = frame->uv_len;
 	uint8_t *Y = frame->data[0];
@@ -144,12 +144,12 @@ void baltantv_apply( void *ptr, VJFrame *frame, int *args) {
 		b->stride = stride;
 	}
 #pragma omp simd
-	for( i = 0; i < len ; i ++ ) {
+	for( int i = 0; i < len ; i ++ ) {
 		pDstY[i] = Y[i];
 		cY[i] = Y[i];
     }
 #pragma omp simd
-    for( i = 0; i < uv_len; i ++ ) {
+    for( int i = 0; i < uv_len; i ++ ) {
         pDstU[i] = (U[i]-128);
         pDstV[i] = (V[i]-128);
     }

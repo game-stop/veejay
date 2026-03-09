@@ -162,7 +162,6 @@ void melt_apply(void *ptr, VJFrame *A, int *args) {
         veejay_memcpy(bufV, srcV, len);
         t->first_frame = 0;
     } else if (alpha_perc > 0) {
-    	const int32_t alpha_inv = 255 - alpha_perc;
     	#pragma omp simd
 		for (uint32_t i = 0; i < len; ++i) {
 			bufY[i] = (uint8_t)((bufY[i] * alpha_inv + srcY[i] * alpha_perc + 127) >> 8);

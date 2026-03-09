@@ -102,9 +102,11 @@ void smartblur_free(void *ptr)
     free(s);
 }
 
-static inline uint8_t clamp_u8(float v)
+static inline uint8_t clamp_u8(int v)
 {
-    return (uint8_t)__builtin_fmaxf(0.0f, __builtin_fminf(255.0f, v));
+    v = v & -(v >= 0);
+    v = v | ((255 - v) & -(v > 255));
+    return (uint8_t)v;
 }
 
 #pragma GCC optimize ("unroll-loops","tree-vectorize")

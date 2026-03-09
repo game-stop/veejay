@@ -579,13 +579,13 @@ static void chromamagic_quilt( VJFrame *frame, VJFrame *frame2, int op_a ) {
         blendFactorX = (float)x / width * alpha;
         blendFactorY = (float)y / height * alpha;
 
-        uint8_t y = Y[i] * (1 - blendFactorX) + Y2[i] * blendFactorX;
-        uint8_t u = Cb[i] * (1 - blendFactorY) + Cb2[i] * blendFactorY;
-        uint8_t v = Cr[i] * (1 - blendFactorX) + Cr2[i] * blendFactorX;
+        uint8_t y0 = Y[i] * (1 - blendFactorX) + Y2[i] * blendFactorX;
+        uint8_t u0 = Cb[i] * (1 - blendFactorY) + Cb2[i] * blendFactorY;
+        uint8_t v0 = Cr[i] * (1 - blendFactorX) + Cr2[i] * blendFactorX;
 
-        Y[i] = y;
-        Cb[i] = u;
-        Cr[i] = v;	
+        Y[i] = y0;
+        Cb[i] = u0;
+        Cr[i] = v0;	
 	}
 
 }

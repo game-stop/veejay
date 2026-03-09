@@ -100,8 +100,8 @@ void complexsaturation_apply(void *ptr, VJFrame *frame,int *args ) {
     float angle = (float) (i_angle * 0.01) * (M_PI / 180.0f);
     int accept_angle_tg = (int)(15.0f * tanf(angle));
 
-    const int s = (int) rint( a_sin(hue) * (1<<16) * sat );
-    const int c = (int) rint( a_cos(hue) * (1<<16) * sat );
+    const int s = rint( a_sin(hue) * (1<<16) * sat );
+    const int c = rint( a_cos(hue) * (1<<16) * sat );
     
     for (pos = 0; pos < len; pos++)
     {

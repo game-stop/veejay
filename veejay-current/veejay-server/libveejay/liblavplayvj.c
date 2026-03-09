@@ -931,7 +931,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 
 		settings->transition.shape = (transition_shape != -1)
 										? transition_shape
-										: (int)((double)shapewipe_get_num_shapes(settings->transition.ptr) * rand() / (RAND_MAX));
+										: (int)(shapewipe_get_num_shapes(settings->transition.ptr) * rand() / (RAND_MAX));
 
 		int active = (current_pm == VJ_PLAYBACK_MODE_SAMPLE)
 										? sample_get_transition_active(info->uc->sample_id)
@@ -985,7 +985,6 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 			veejay_stop_playing_sample( info,  info->uc->sample_id );
 		info->uc->playback_mode = new_pm;
 		info->current_edit_list = info->edit_list;
-		video_playback_setup *settings = info->settings;
 		settings->min_frame_num = 0;
 		settings->max_frame_num = info->edit_list->total_frames;
 
@@ -2875,7 +2874,7 @@ void *veejay_audio_producer_thread(void *arg)
             usleep_accurate(100, settings);
         }
 
-        anchor_s = (double)vj_jack_get_played_frames() / JACK_RATE;
+        anchor_s = vj_jack_get_played_frames() / JACK_RATE;
 
         atomic_store_double(&settings->audio_master_s, anchor_s);
         atomic_store_double(&settings->audio_start_offset, anchor_s);
@@ -2918,7 +2917,7 @@ void *veejay_audio_producer_thread(void *arg)
 				veejay_msg(VEEJAY_MSG_WARNING, "[AUDIO] JACK xrun detected!");
 				
 				//resync
-				double played_hw = (double)vj_jack_get_played_frames() / JACK_RATE;
+				double played_hw = vj_jack_get_played_frames() / JACK_RATE;
 				double master = atomic_load_double(&settings->audio_master_s);
 
 				double delta = played_hw - master;
@@ -2954,7 +2953,7 @@ void *veejay_audio_producer_thread(void *arg)
 
             const int frames_written = vj_perform_play_audio(settings, audio_chunk, decoded * BPS, silenced);
           
-            double played_hw = (double)vj_jack_get_played_frames() / JACK_RATE;
+            double played_hw = vj_jack_get_played_frames() / JACK_RATE;
             double predicted = played_hw + (double)frames_written / JACK_RATE;
             atomic_store_double(&settings->audio_master_s, predicted);
 
@@ -3326,10 +3325,7 @@ static int smp_check(void)
 veejay_t *veejay_malloc()
 {
     
-    veejay_t *info;
-    int i;
-
-      info = (veejay_t *) vj_calloc(sizeof(veejay_t));
+    veejay_t *info = (veejay_t *) vj_calloc(sizeof(veejay_t));
     if (!info)
 		return NULL;
 
@@ -3378,7 +3374,6 @@ veejay_t *veejay_malloc()
     if(!info->dummy)
 		return NULL;
 	
-	
 	info->seq = (sequencer_t*) vj_calloc(sizeof( sequencer_t) );
     info->audio = AUDIO_PLAY;
     info->continuous = 1;
@@ -3406,7 +3401,7 @@ veejay_t *veejay_malloc()
 	info->net = 1;
 	info->status_line = (char*) vj_calloc(sizeof(char) * MESSAGE_SIZE );
 	info->status_line_len = 0;
-    for( i =0; i < VJ_MAX_CONNECTIONS ; i ++ ) {
+    for( int i =0; i < VJ_MAX_CONNECTIONS ; i ++ ) {
 		info->rlinks[i] = -1;
 		info->rmodes[i] = -1;
 		info->splitted_screens[i] = -1;

@@ -99,7 +99,6 @@ void picinpic_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
     int x1 = args[2];
     int y1 = args[3];
 
-	int x, y;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 	pic_t	*picture = (pic_t*) ptr;
@@ -128,7 +127,7 @@ void picinpic_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 	if( picture->w != view_width || picture->h != view_height || picture->w == 0 || picture->h == 0)
 	{
 		if(picture->frame) {
-			for( x = 0; x < 3; x ++ ) {
+			for( int x = 0; x < 3; x ++ ) {
 				if(picture->frame->data[x])
 					free(picture->frame->data[x]);
 				picture->frame->data[x] = NULL;

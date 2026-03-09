@@ -418,8 +418,8 @@ void ctmf(
      * A flag is passed to ctmf_helper() so that it treats these cases as if the
      * image was zero-padded.
      */
-    int stripes = (int) ceil( (double) (width - 2*r) / (memsize / sizeof(Histogram) - 2*r) );
-    int stripe_size = (int) ceil( (double) ( width + stripes*2*r - 2*r ) / stripes );
+    int stripes = ceil( (double) (width - 2*r) / (memsize / sizeof(Histogram) - 2*r) );
+    int stripe_size = ceil( (double) ( width + stripes*2*r - 2*r ) / stripes );
 
     int i;
 

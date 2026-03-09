@@ -68,7 +68,6 @@ vj_effect *chromamagickalpha_init(int w, int h)
 
 static void chromamagicalpha_selectmin(VJFrame *frame, VJFrame *frame2, int op_a)
 {
-    unsigned int i;
 	const int len = frame->len;
  	uint8_t *restrict Y = frame->data[0];
 	uint8_t *restrict Cb = frame->data[1];

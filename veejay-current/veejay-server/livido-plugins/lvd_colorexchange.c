@@ -77,8 +77,6 @@ int	process_instance( livido_port_t *my_instance, double timecode )
 	const int minUV= ( mode == 1 ? 16: 0 );
 	const int maxUV= ( mode == 1 ? 240: 255 );
 
-	int i;
-
 	int delta_y = dy - sy;
     int delta_u = du - su;
     int delta_v = dv - sv;

@@ -249,7 +249,6 @@ void boxfit_apply(void *ptr, VJFrame *frame, int *args)
     int *restrict boxIndices = s->boxIndices;
     int numBoxes = s->numBoxes;
     int boxIndex = 0;
-    int ii=0,jj=0;
 
     for (int i = 0; i < height;)
     {
@@ -291,9 +290,9 @@ void boxfit_apply(void *ptr, VJFrame *frame, int *args)
             avgV /= box_size_squared; 
 
             // fill up and draw a border around it
-            for (ii = 0; ii < box_size; ++ii)
+            for (int ii = 0; ii < box_size; ++ii)
             {
-                for (jj = 0; jj < box_size; ++jj)
+                for (int jj = 0; jj < box_size; ++jj)
                 {
                     int row = i + ii;
                     int col = j + jj;

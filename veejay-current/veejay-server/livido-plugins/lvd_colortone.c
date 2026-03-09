@@ -70,8 +70,7 @@ int	process_instance( livido_port_t *my_instance, double timecode )
 		livido_memset( O[2], v, uv_len );
 	}
 	else {
-		int i;
-		for( i = 0; i < len; i ++ ) {
+		for( int i = 0; i < len; i ++ ) {
 			if( O[0][i] > 0 ) {
 				O[1][(i>>shift)] = u;
 				O[2][(i>>shift)] = v;

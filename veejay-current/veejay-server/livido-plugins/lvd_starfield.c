@@ -63,11 +63,11 @@ static inline uint32_t fastrand_lcg(uint32_t *state) {
 
 static inline float get_rand_float(uint32_t *seed, int mode) {
     if (mode == 0)
-        return (float)rand() / (float)RAND_MAX;
+        return rand() / (float)RAND_MAX;
     else if (mode == 1)
         return (float)(xorshift32(seed) & 0xFFFFFF) / 16777216.0f;
     else
-        return (float)fastrand_lcg(seed) / 2147483648.0f;
+        return fastrand_lcg(seed) / 2147483648.0f;
 }
 
 static void init_star(STAR* star, int speed, int initial_z, int mode)
@@ -154,8 +154,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 
 	int center_x = w >> 1;
 	int center_y = h >> 1;
-	int i;
-
+	
 	STAR *s = starfield->stars;
 
 	for(int i = 0; i < n; i++) {

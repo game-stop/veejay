@@ -137,8 +137,7 @@ static inline void lumamask_inner_noalpha_noborder(
 static inline void lumamask_inner_noalpha_border(
     uint8_t *restrict Y, uint8_t *restrict Cb, uint8_t *restrict Cr,
     uint8_t *restrict Y2, uint8_t *restrict Cb2, uint8_t *restrict Cr2,
-    int width, int height, int w_mul_q8, int h_mul_q8,
-    int pixel_Y_lo_)
+    int width, int height, int w_mul_q8, int h_mul_q8)
 {
     for (int y = 0; y < height; y++) {
         uint8_t *Y_row  = Y  + y*width;
@@ -201,8 +200,7 @@ static inline void lumamask_inner_alpha_noborder(
 static inline void lumamask_inner_alpha_border(
     uint8_t *restrict Y, uint8_t *restrict Cb, uint8_t *restrict Cr, uint8_t *restrict aA,
     uint8_t *restrict Y2, uint8_t *restrict Cb2, uint8_t *restrict Cr2, uint8_t *restrict aB,
-    int width, int height, int w_mul_q8, int h_mul_q8,
-    int pixel_Y_lo_)
+    int width, int height, int w_mul_q8, int h_mul_q8)
 {
     for (int y = 0; y < height; y++) {
         uint8_t *restrict Y_row  = Y  + y*width;
@@ -289,13 +287,13 @@ void lumamask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
         if (!border) {
             lumamask_inner_noalpha_noborder(Y, Cb, Cr, Y2, Cb2, Cr2, width, height, w_mul_q8, h_mul_q8);
         } else {
-            lumamask_inner_noalpha_border(Y, Cb, Cr, Y2, Cb2, Cr2, width, height, w_mul_q8, h_mul_q8, pixel_Y_lo_);
+            lumamask_inner_noalpha_border(Y, Cb, Cr, Y2, Cb2, Cr2, width, height, w_mul_q8, h_mul_q8);
         }
     } else {
         if (!border) {
             lumamask_inner_alpha_noborder(Y, Cb, Cr, aA, Y2, Cb2, Cr2, aB, width, height, w_mul_q8, h_mul_q8);
         } else {
-            lumamask_inner_alpha_border(Y, Cb, Cr, aA, Y2, Cb2, Cr2, aB, width, height, w_mul_q8, h_mul_q8, pixel_Y_lo_);
+            lumamask_inner_alpha_border(Y, Cb, Cr, aA, Y2, Cb2, Cr2, aB, width, height, w_mul_q8, h_mul_q8);
         }
     }
 

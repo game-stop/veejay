@@ -827,7 +827,7 @@ further:
 #endif
 	
 	while(1) {
-	    int ret = av_read_frame(x->avformat_ctx, hunt_pkt);
+	    ret = av_read_frame(x->avformat_ctx, hunt_pkt);
 		if( ret < 0 ) {
 			av_strerror( err, errbuf, sizeof(errbuf));
 			veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] read error: %s", errbuf);
