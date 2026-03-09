@@ -25,12 +25,12 @@
 #include <pthread.h>
 #include <veejaycore/defs.h>
 #include <libvje/vje.h>
-#include <veejay/vj-split.h>
+#include <libveejay/vj-split.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/vj-server.h>
 #include <veejaycore/yuvconv.h>
-#include <veejay/vj-share.h>
+#include <libveejay/vj-share.h>
 #include <veejaycore/libvevo.h>
 #include <libplugger/defs.h>
 #include <libplugger/ldefs.h>

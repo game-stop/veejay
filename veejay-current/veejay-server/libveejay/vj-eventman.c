@@ -18,9 +18,9 @@
  */
 #include <string.h>
 #include <veejaycore/vevo.h>
-#include <veejay/vj-event.h>
+#include <libveejay/vj-event.h>
 #include <veejaycore/vims.h>
-#include <veejay/vevo.h>
+#include <libveejay/vevo.h>
 #include <veejaycore/libvevo.h>
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/vjmem.h>

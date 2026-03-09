@@ -41,7 +41,7 @@
 #include <libavutil/avutil.h>
 #include <libplugger/specs/livido.h>
 #include <veejaycore/avcommon.h>
-#include <veejay/vj-shm.h>
+#include <libveejay/vj-shm.h>
 #include <dirent.h>
 #include <signal.h>
 #define HEADER_LENGTH 4096

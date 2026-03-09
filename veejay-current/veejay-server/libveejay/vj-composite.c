@@ -31,16 +31,16 @@
 #include <veejaycore/vj-msg.h>
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
-#include <veejay/vj-viewport.h>
-#include <veejay/vj-composite.h>
-#include <veejay/vj-misc.h>
+#include <libveejay/vj-viewport.h>
+#include <libveejay/vj-composite.h>
+#include <libveejay/vj-misc.h>
 #include <libavutil/pixfmt.h>
 #include <libsubsample/subsample.h>
-#include <veejay/vj-split.h>
+#include <libveejay/vj-split.h>
 #include <veejaycore/yuvconv.h>
 #include <veejaycore/vims.h>
 #ifdef HAVE_GL
-#include <veejay/gl.h>
+#include <libveejay/gl.h>
 #endif
 #include <veejaycore/avcommon.h>
 

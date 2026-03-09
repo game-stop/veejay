@@ -26,7 +26,7 @@
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vims.h>
-#include <veejay/audioscratcher.h>
+#include <libveejay/audioscratcher.h>
 #include <math.h>
 
 #define MAX_CHANNELS 8

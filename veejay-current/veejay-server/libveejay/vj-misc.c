@@ -33,12 +33,12 @@
 #include <libsubsample/subsample.h>
 #include <libsample/sampleadm.h>
 #include <libstream/vj-tag.h>
-#include <veejay/vj-misc.h>
-#include <veejay/vj-lib.h>
+#include <libveejay/vj-misc.h>
+#include <libveejay/vj-lib.h>
 #include <veejaycore/vjmem.h>
 #include <libvje/internal.h>
 #ifdef HAVE_JPEG
-#include <veejay/jpegutils.h>
+#include <libveejay/jpegutils.h>
 #endif
 #include <veejaycore/vj-msg.h>
 #include <libvje/vje.h>

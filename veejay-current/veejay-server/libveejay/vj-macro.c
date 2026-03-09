@@ -33,7 +33,7 @@
 #include <libxml/parser.h>
 #include <libvjxml/vj-xml.h>
 #endif
-#include <veejay/vj-macro.h>
+#include <libveejay/vj-macro.h>
 
 #define MAX_MACROS 16
 #define MAX_MACRO_BANKS 12

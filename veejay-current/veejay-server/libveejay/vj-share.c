@@ -30,8 +30,8 @@
 #include <veejaycore/vims.h>
 #include <libvje/vje.h>
 #include <veejaycore/vj-client.h>
-#include <veejay/vj-share.h>
-#include <veejay/vj-shm.h>
+#include <libveejay/vj-share.h>
+#include <libveejay/vj-shm.h>
 static vj_client	*vj_share_connect(char *hostname, int port)
 {
 	vj_client *c = vj_client_alloc();

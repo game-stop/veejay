@@ -35,18 +35,18 @@
 #include <veejaycore/defs.h>
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
-#include <veejay/vj-lib.h>
+#include <libveejay/vj-lib.h>
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/vjmem.h>
-#include <veejay/vj-OSC.h>
-#include <veejay/vj-macro.h>
+#include <libveejay/vj-OSC.h>
+#include <libveejay/vj-macro.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <netinet/in.h>
-#include <veejay/vj-lib.h>
-#include <veejay/vj-event.h>
-#include <veejay/vj-OSC.h>
+#include <libveejay/vj-lib.h>
+#include <libveejay/vj-event.h>
+#include <libveejay/vj-OSC.h>
 #include <veejaycore/libvevo.h>
 #include <veejaycore/vevo.h>
 static veejay_t *osc_info;

@@ -51,6 +51,8 @@
 #include <unistd.h>
 #include <libveejay/vj-OSC.h>
 #include <build.h>
+#include <glib-2.0/glib.h>
+#include <glib-2.0/glib-object.h>
 #include <libvje/libvje.h>
 
 extern void vj_avcodec_print_version();
@@ -764,6 +766,10 @@ int main(int argc, char **argv)
     int main_ret = 0;
     
     fflush(stdout);
+
+#if !GLIB_CHECK_VERSION(2,36,0)
+    g_type_init();
+#endif
 
     vj_mem_init(0, 0);
     vj_mem_optimize();

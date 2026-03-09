@@ -35,13 +35,13 @@
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vj-msg.h>
 #include <libvje/vje.h>
-#include <veejay/vj-viewport.h>
+#include <libveejay/vj-viewport.h>
 #include <libvje/effects/opacity.h>
 #include <veejaycore/yuvconv.h>
 #include <libavutil/pixfmt.h>
 #include <veejaycore/vjmem.h>
-#include <veejay/vj-viewport-cfg.h>
-#include <veejay/vj-viewport.h>
+#include <libveejay/vj-viewport-cfg.h>
+#include <libveejay/vj-viewport.h>
 #include <math.h>
 #include <veejaycore/avcommon.h>
 

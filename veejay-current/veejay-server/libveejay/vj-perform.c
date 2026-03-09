@@ -32,33 +32,33 @@
 #include <veejaycore/vj-server.h>
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
-#include <veejay/vj-lib.h>
+#include <libveejay/vj-lib.h>
 #include <libel/vj-el.h>
 #include <math.h>
 #include <libel/vj-avcodec.h>
-#include <veejay/vj-event.h>
+#include <libveejay/vj-event.h>
 #include <veejaycore/mpegconsts.h>
 #include <veejaycore/mpegtimecode.h>
 #include <veejaycore/yuvconv.h>
 #include <veejaycore/atomic.h>
 #include <veejaycore/vj-msg.h>
-#include <veejay/vj-perform.h>
-#include <veejay/libveejay.h>
-#include <veejay/vj-sdl.h>
+#include <libveejay/vj-perform.h>
+#include <libveejay/libveejay.h>
+#include <libveejay/vj-sdl.h>
 #include <libsamplerec/samplerecord.h>
 #include <libel/pixbuf.h>
 #include <veejaycore/avcommon.h>
-#include <veejay/vj-misc.h>
+#include <libveejay/vj-misc.h>
 #include <veejaycore/vj-task.h>
 #include <veejaycore/lzo.h>
-#include <veejay/vj-viewport.h>
-#include <veejay/vj-composite.h>
+#include <libveejay/vj-viewport.h>
+#include <libveejay/vj-composite.h>
 #ifdef HAVE_FREETYPE
-#include <veejay/vj-font.h>
+#include <libveejay/vj-font.h>
 #endif
 #define RECORDERS 1
 #ifdef HAVE_JACK
-#include <veejay/vj-jack.h>
+#include <libveejay/vj-jack.h>
 #endif
 #include <libvje/internal.h>
 #include <veejaycore/vjmem.h>
@@ -66,11 +66,11 @@
 #include <libvje/effects/masktransition.h>
 #include <libvje/effects/shapewipe.h>
 #include <libqrwrap/qrwrapper.h>
-#include <veejay/vj-split.h>
+#include <libveejay/vj-split.h>
 #include <libvje/libvje.h>
 #ifdef HAVE_JACK
-#include <veejay/audioscratcher.h>
-#include <veejay/vj-jack.h>
+#include <libveejay/audioscratcher.h>
+#include <libveejay/vj-jack.h>
 #endif
 #define PERFORM_AUDIO_SIZE 16384
 #define PSLOW_A 3
@@ -266,7 +266,6 @@ typedef struct
     float *gain_lut[2];
 } performer_global_t;
 
-static int MAX_STRETCHED_SAMPLES = 0;
 static const char *intro = 
     "A visual instrument for GNU/Linux\n";
 
@@ -284,12 +283,9 @@ static int vj_perform_post_chain_tag(veejay_t *info,performer_t*p, VJFrame *fram
 static int vj_perform_next_sequence( veejay_t *info, int *type, int *new_current );
 static void vj_perform_plain_fill_buffer(veejay_t * info,performer_t *p,VJFrame *dst,int sample_id, int mode, long frame_num);
 static void vj_perform_tag_fill_buffer(veejay_t * info, performer_t *p, VJFrame *dst, int sample_id);
-static void vj_perform_increase_tag_frame(veejay_t * info, long num);
-static void vj_perform_increase_plain_frame(veejay_t * info, long num);
 static int vj_perform_apply_secundary_tag(veejay_t * info, performer_t *p, int sample_id,int type, int chain_entry, VJFrame *src, VJFrame *dst,uint8_t *p0, uint8_t *p1, int subrender);
 static int vj_perform_apply_secundary(veejay_t * info, performer_t *p, int this_sample_id,int sample_id,int type, int chain_entry, VJFrame *src, VJFrame *dst,uint8_t *p0, uint8_t *p1, int subrender);
 static void vj_perform_tag_complete_buffers(veejay_t * info, performer_t *p, vjp_kf *effect_info, int *h, VJFrame *f0, VJFrame *f1, int sample_id, int pm, vjp_kf *setup, sample_eff_chain **chain, vj_tag *tag);
-static void vj_perform_increase_sample_frame(veejay_t * info, long num);
 static void vj_perform_sample_complete_buffers(veejay_t * info, performer_t *p, vjp_kf *effect_info, int *h, VJFrame *f0, VJFrame *f2, int sample_id, int pm, vjp_kf *setup, sample_eff_chain **chain, sample_info *si);
 static int vj_perform_use_cached_frame(ycbcr_frame *cached_frame, VJFrame *dst);
 static void vj_perform_apply_first(veejay_t *info, performer_t *p, vjp_kf *todo_info, VJFrame **frames, sample_eff_chain *entry, int e, int c, long long n_frames, void *ptr, int playmode );
@@ -1118,8 +1114,6 @@ int vj_perform_init_audio(veejay_t * info, int AorB)
     double samples_per_frame = (double)el->audio_rate / (double)el->video_fps;
     const uint32_t sample_len = (uint32_t)ceil(samples_per_frame) * el->audio_bps;
 
-    if(!MAX_STRETCHED_SAMPLES)
-        MAX_STRETCHED_SAMPLES = sample_len * MAX_SPEED_AV  + 128 + 1024;
 
     p->top_audio_buffer =
         (uint8_t *) vj_calloc(sizeof(uint8_t) * 8 * PERFORM_AUDIO_SIZE);
@@ -4400,11 +4394,11 @@ static char *vj_perform_osd_status(veejay_t *info)
     int n = mpeg_framerate_code(ratio);
 
     mpeg_timecode(&tc, stats->current_frame, n, info->current_edit_list->video_fps);
-    char timecode[16];
+    char timecode[20];
     snprintf(timecode, sizeof(timecode), "%02d:%02d:%02d:%02d", tc.h, tc.m, tc.s, tc.f);
 
     mpeg_timecode(&tc, stats->total_frames_produced, n, info->current_edit_list->video_fps);
-    char master_timecode[16];
+    char master_timecode[20];
     snprintf(master_timecode, sizeof(master_timecode), "%02d:%02d:%02d:%02d", tc.h, tc.m, tc.s, tc.f);
 
     float speed = settings->current_playback_speed;

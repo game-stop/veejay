@@ -58,10 +58,10 @@
 #include <X11/Xutil.h>
 #endif
 #ifdef HAVE_FREETYPE
-#include <veejay/vj-font.h>
+#include <libveejay/vj-font.h>
 #endif
 #ifndef X_DISPLAY_MISSING
-#include <veejay/x11misc.h>
+#include <libveejay/x11misc.h>
 #endif
 #ifdef HAVE_SYS_SOUNDCARD_H
 #include <sys/soundcard.h>
@@ -72,31 +72,31 @@
 #include <veejaycore/atomic.h>
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
-#include <veejay/vj-misc.h>
-#include <veejay/vj-perform.h>
-#include <veejay/vj-plug.h>
-#include <veejay/vj-lib.h>
-#include <veejay/vj-sdl.h>
+#include <libveejay/vj-misc.h>
+#include <libveejay/vj-perform.h>
+#include <libveejay/vj-plug.h>
+#include <libveejay/vj-lib.h>
+#include <libveejay/vj-sdl.h>
 #include <libel/vj-avcodec.h>
 #include <libel/pixbuf.h>
 #include <veejaycore/avcommon.h>
 #include <veejaycore/vj-client.h>
 #ifdef HAVE_JACK
-#include <veejay/vj-jack.h>
+#include <libveejay/vj-jack.h>
 #endif
 #include <veejaycore/yuvconv.h>
-#include <veejay/vj-composite.h>
-#include <veejay/vj-viewport.h>
-#include <veejay/vj-OSC.h>
+#include <libveejay/vj-composite.h>
+#include <libveejay/vj-viewport.h>
+#include <libveejay/vj-OSC.h>
 #include <veejaycore/vj-task.h>
-#include <veejay/vj-split.h>
-#include <veejay/vj-macro.h>
+#include <libveejay/vj-split.h>
+#include <libveejay/vj-macro.h>
 #include <libplugger/plugload.h>
 #include <libstream/vj-vloopback.h>
 #include <veejaycore/vims.h>
 #include <libqrwrap/qrwrapper.h>
 #include <sched.h>
-#include <veejay/vj-shm.h>
+#include <libveejay/vj-shm.h>
 #include <pthread.h>
 #include <signal.h>
 #include <veejaycore/mpegconsts.h>
@@ -110,7 +110,7 @@
 #include <SDL2/SDL.h>
 #endif
 #ifdef HAVE_DIRECTFB
-#include <veejay/vj-dfb.h>
+#include <libveejay/vj-dfb.h>
 #endif
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -2807,15 +2807,12 @@ void *veejay_audio_producer_thread(void *arg)
     const long JACK_RATE   = vj_jack_get_rate();
 #else
     const long CLIENT_RATE = el->audio_rate;
-    const long JACK_RATE = el->audio_rate;
 #endif
 
     const double SPVF      = settings->spvf;
     double anchor_s = 0;
     unsigned long long loop_count = 0; // 19.5 billion years playing 29fps/44.1Khz
     const int BPS = el->audio_bps;
-	const double half_frame_s = 0.5 / (double)el->video_fps;
-
     const int MAX_CLIENT_FRAMES = (int)(SPVF * CLIENT_RATE + 8);
 
     uint8_t *audio_chunk = NULL;
@@ -2908,9 +2905,6 @@ void *veejay_audio_producer_thread(void *arg)
     while (atomic_load_int(&info->audio_running) &&
            atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP)
     {
-
-
-        long long media_frame = atomic_load_long_long(&settings->current_frame_num);
 
 #ifdef HAVE_JACK
         if (has_audio) {

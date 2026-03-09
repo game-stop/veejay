@@ -29,7 +29,7 @@
 #include <string.h>
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/vevo.h>
-#include <veejay/vevo.h>
+#include <libveejay/vevo.h>
 #include <veejaycore/libvevo.h>
 #include <libsample/sampleadm.h>
 #include <libstream/vj-tag.h>
@@ -49,7 +49,7 @@
  *
  */
 
-#include <veejay/vjkf.h>
+#include <libveejay/vjkf.h>
 
 //FIXME fx anim parameter packing/unpacking
 
