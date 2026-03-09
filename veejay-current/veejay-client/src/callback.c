@@ -2856,8 +2856,8 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
     int tr_len = 9; //K00000000 transport header
     size_t bufsize = tr_len + payload;
 
-	unsigned char *buf = (unsigned char*) vj_malloc( sizeof(unsigned char) * bufsize );
-	strncpy( (char*) buf, header, hdr_len);
+	unsigned char *buf = vj_malloc( sizeof(unsigned char) * bufsize );
+	memcpy( buf, header, hdr_len);
 	
 	unsigned char *ptr = buf + hdr_len;
 	int k;

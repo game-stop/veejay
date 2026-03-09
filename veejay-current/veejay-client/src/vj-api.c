@@ -2321,7 +2321,6 @@ void _effect_free( effect_constr *effect )
         for( p = 0; p < effect->num_arg; p ++ ) {
             free( effect->param_description[p] );
         }
-        if( effect->hints ) {
             for( p = 0; p < effect->num_arg; p ++ ) {
                 if( effect->hints[p] == NULL )
                     continue;
@@ -2332,7 +2331,7 @@ void _effect_free( effect_constr *effect )
                 free( effect->hints[p]->description );
                 free( effect->hints[p] );
             }
-        }
+        
 
         free(effect);
     }
@@ -9265,10 +9264,10 @@ static void samplebank_size_allocate(GtkWidget *widget, GtkAllocation *allocatio
 /* Add a page to the notebook and initialize slots */
 static int add_bank( gint bank_num )
 {
-    gchar str_label[5];
-    gchar frame_label[20];
-    sprintf(str_label, "%d", bank_num );
-    sprintf(frame_label, "Slots %d to %d",
+    gchar str_label[16];
+    gchar frame_label[32];
+    snprintf(str_label,sizeof(str_label), "%d", bank_num );
+    snprintf(frame_label,sizeof(frame_label), "Slots %d to %d",
         (bank_num * NUM_SAMPLES_PER_PAGE), (bank_num * NUM_SAMPLES_PER_PAGE) + NUM_SAMPLES_PER_PAGE  );
 
     info->sample_banks[bank_num] = (sample_bank_t*) vj_calloc(sizeof(sample_bank_t));
@@ -10062,7 +10061,7 @@ static void update_sample_slot_data(int page_num,
     {
         if(sample_id > 0 )
         {
-            char hotkey[16];
+            char hotkey[32];
             if( sample_type == MODE_SAMPLE ) {
                 snprintf(hotkey, sizeof(hotkey), "[F%d] Sample %d", (sample_id % 12), sample_id);
             }
