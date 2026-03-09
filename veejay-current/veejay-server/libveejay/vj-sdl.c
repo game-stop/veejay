@@ -214,9 +214,9 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
 
     if(sdl_driver == NULL) {
         int num_renderers = SDL_GetNumRenderDrivers();
-        int flags[3] = { SDL_RENDERER_PRESENTVSYNC, SDL_RENDERER_ACCELERATED, SDL_RENDERER_SOFTWARE };
-        for( i = 0; i < num_renderers; i ++ ) {
-            vjsdl->flags = flags[i];
+        int render_flags[3] = { SDL_RENDERER_PRESENTVSYNC, SDL_RENDERER_ACCELERATED, SDL_RENDERER_SOFTWARE };
+        for( i = 0; i < num_renderers && i < 3; i ++ ) {
+            vjsdl->flags = render_flags[i];
             vjsdl->renderer = SDL_CreateRenderer( vjsdl->screen, -1, vjsdl->flags );
             if(vjsdl->renderer)
                 break;
