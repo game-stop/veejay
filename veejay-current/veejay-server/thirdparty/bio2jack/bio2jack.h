@@ -108,7 +108,9 @@ extern "C"
   long JACK_GetSampleRate(int deviceID); /* samples per second */
   long JACK_GetPeriodSize(int deviceID);
   int JACK_GetRingBufferFreeFrames(int deviceID);
+  int JACK_GetClientToJackFrames(int deviceID, int client_frames);
   int JACK_GetRingBufferSize(int deviceID);
+  long JACK_GetRingBufferUsed(int deviceID);
   void JACK_SetClientName(char *name); /* sets the name that bio2jack will use when
                                           creating a new jack client.  name_%pid%_%deviceID%%counter%
                                           will be used
@@ -142,6 +144,8 @@ extern "C"
   double JACK_GetTotalLatency(int deviceID);
 
   int JACK_GetCallbackActive(int deviceID);
+
+  int JACK_XRUNHandled(int deviceID);
 
 #ifdef __cplusplus
 }

@@ -266,22 +266,6 @@ static inline jack_driver_t *getDriver(int deviceID)
   return drv;
 }
 
-char *DEBUGSTATE(int state)
-{
-  if (state == PLAYING)
-    return "PLAYING";
-  else if (state == PAUSED)
-    return "PAUSED";
-  else if (state == STOPPED)
-    return "STOPPED";
-  else if (state == CLOSED)
-    return "CLOSED";
-  else if (state == RESET)
-    return "RESET";
-  else
-    return "unknown state";
-}
-
 #define SAMPLE_MAX_16BIT 32767.0f
 #define SAMPLE_MAX_8BIT 255.0f
 
@@ -653,7 +637,7 @@ JACK_OpenDevice(jack_driver_t *drv)
 
   const long max_client_frames = 8192;
   const long max_out_frames =
-      (long)ceil(
+      ceil(
           (double)max_client_frames *
           drv->jack_sample_rate /
           drv->client_sample_rate) +
@@ -1842,7 +1826,7 @@ void JACK_Init(void)
   }
 
   client_name = NULL;
-  JACK_SetClientName("bio2jack");
+  JACK_SetClientName((char*)"bio2jack");
 
   DEBUG("JACK System Initialized (Lock-Free Mode)");
 }
