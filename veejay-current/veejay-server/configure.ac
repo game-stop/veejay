@@ -1199,6 +1199,7 @@ libsubsample/Makefile
 libel/Makefile
 libstream/Makefile
 libsamplerec/Makefile
+libveejay/Makefile
 veejay/Makefile
 man/Makefile
 livido-plugins/Makefile

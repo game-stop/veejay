@@ -3,6 +3,7 @@
 SUBDIRS = thirdparty
 SUBDIRS += libvjxml libqrwrap
 SUBDIRS += libvje libplugger libsample libsubsample libel libstream libsamplerec
+SUBDIRS += libveejay
 SUBDIRS += veejay 
 SUBDIRS += livido-plugins
 SUBDIRS += man
