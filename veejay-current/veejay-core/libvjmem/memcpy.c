@@ -2832,22 +2832,34 @@ void	*vj_hmalloc(size_t sze, const char *name)
 	return data;
 }
 
-char	*vj_strdup( const char *s )
+char *vj_strdup(const char *s)
 {
-	/*size_t sl  = strlen(s);
-	size_t len = sl + 1;
-	char *ptr  = vj_malloc( len );
-	ptr[sl] = '\0';
-	return ptr ? memcpy( ptr, s, sl ) : NULL;*/
-    return strdup(s);
+    if (!s) return NULL;
+
+    size_t len = strlen(s) + 1;
+    unsigned char *uptr = (unsigned char *)vj_malloc(len);
+    if (!uptr) return NULL;
+
+    veejay_memcpy(uptr, (const unsigned char *)s, len);  // safe for signed/unsigned chars
+    uptr[len] = '\0';
+    return (char *)uptr;
 }
 
-char	*vj_strndup( const char *s, size_t n )
+
+char *vj_strndup(const char *s, size_t n)
 {
-	size_t len = n + 1;
-	char *ptr = vj_malloc( len );
-	ptr[n] = '\0';
-	return ptr ? memcpy( ptr,s,n ) : NULL;
+    if (!s) return NULL;
+
+    size_t sl = strnlen(s, n);
+    size_t len = sl + 1;
+    
+    unsigned char *uptr = (unsigned char *)vj_malloc(len);
+    if (!uptr) return NULL;
+
+    veejay_memcpy(uptr, (const unsigned char *)s, sl);
+    uptr[sl] = '\0';
+    
+    return (char *)uptr;
 }
 
 // https://stackoverflow.com/questions/4351371/c-performance-challenge-integer-to-stdstring-conversion
