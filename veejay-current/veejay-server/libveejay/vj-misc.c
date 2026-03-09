@@ -254,7 +254,7 @@ int vj_perform_screenshot2(veejay_t *info, VJFrame *frame)
             free(jpeg_buff);
             return -1;
         }
-        snprintf(info->uc->filename, 32, "%020lld.jpg", frame->frame_num);
+        snprintf(info->uc->filename, 32, "%020ld.jpg", frame->frame_num);
     }
 
     frame_file = fopen(info->uc->filename, "wb");
@@ -270,7 +270,7 @@ int vj_perform_screenshot2(veejay_t *info, VJFrame *frame)
         if (jpeg_size > 0) {
             res = fwrite(jpeg_buff, jpeg_size, 1, frame_file);
             if (res)
-                veejay_msg(VEEJAY_MSG_INFO, "Wrote video frame %lld to %s", frame->frame_num, info->uc->filename);
+                veejay_msg(VEEJAY_MSG_INFO, "Wrote video frame %ld to %s", frame->frame_num, info->uc->filename);
         }
         fclose(frame_file);
     }
