@@ -24,8 +24,8 @@ char 	*get_xml_str( xmlDocPtr doc, xmlNodePtr node );
 void	get_xml_str_n( xmlDocPtr doc, xmlNodePtr node, char *val, size_t len );
 float	get_xml_float( xmlDocPtr doc, xmlNodePtr node );
 void 	get_xml_3int( xmlDocPtr doc, xmlNodePtr node, int *first , int *second, int *third );
-int	get_xml_2int( xmlDocPtr doc, xmlNodePtr node, int *second );
-void	put_xml_int( xmlNodePtr node, char *name, int value );
-void	put_xml_str( xmlNodePtr node, char *name, char *value );
-void	put_xml_float( xmlNodePtr node, char *name, float value );
+int	    get_xml_2int( xmlDocPtr doc, xmlNodePtr node, int *second );
+void	put_xml_int( xmlNodePtr node, const char *name, int value );
+void	put_xml_str( xmlNodePtr node, const char *name, char *value );
+void	put_xml_float( xmlNodePtr node, const char *name, float value );
 #endif

@@ -74,7 +74,7 @@
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/yuvconv.h>
-#include <veejay/jpegutils.h>
+#include <libveejay/jpegutils.h>
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 #include <veejaycore/av.h>

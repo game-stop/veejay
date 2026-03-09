@@ -20,7 +20,7 @@
 
 #include "common.h"
 #include <veejaycore/vjmem.h>
-#include <veejay/vj-viewport.h>
+#include <libveejay/vj-viewport.h>
 #include "perspective.h"
 
 vj_effect *perspective_init(int width , int height)

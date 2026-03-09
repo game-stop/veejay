@@ -24,7 +24,7 @@
 #include <veejaycore/vj-msg.h>
 #include <libsubsample/subsample.h>
 #include <libsamplerec/samplerecord.h>
-#include <veejay/vj-misc.h>
+#include <libveejay/vj-misc.h>
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 #include <libel/vj-avcodec.h>

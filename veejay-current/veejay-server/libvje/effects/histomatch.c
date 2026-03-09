@@ -76,14 +76,14 @@ void *histomatch_malloc(int wid, int hei)
     histomatch_t *h = (histomatch_t*) vj_calloc(sizeof(histomatch_t));
     if(!h) return NULL;
 
-    h->hist = (int*) vj_malloc(sizeof(int) * HIST_SIZE * 6);
+    h->hist = (int*) vj_malloc(sizeof(int) * (HIST_SIZE+1) * 6);
     h->hist2 = h->hist + HIST_SIZE;
     h->histu1 = h->hist2 + HIST_SIZE;
     h->histu2 = h->histu1 + HIST_SIZE;
     h->histv1 = h->histu2 + HIST_SIZE;
     h->histv2 = h->histv1 + HIST_SIZE;
 
-    h->cdf = (float*) vj_malloc(sizeof(float) * HIST_SIZE * 6);
+    h->cdf = (float*) vj_malloc(sizeof(float) * (HIST_SIZE+1) * 6);
     h->cdf1 = h->cdf;
     h->cdf2 = h->cdf1 + HIST_SIZE;
     h->cdfu1 = h->cdf2 + HIST_SIZE;
@@ -91,7 +91,7 @@ void *histomatch_malloc(int wid, int hei)
     h->cdfv1 = h->cdfu2 + HIST_SIZE;
     h->cdfv2 = h->cdfv1 + HIST_SIZE;
 
-    h->lutY = (uint8_t*) vj_malloc(HIST_SIZE * 3);
+    h->lutY = (uint8_t*) vj_malloc((HIST_SIZE+1) * 3);
     h->lutU = h->lutY + HIST_SIZE;
     h->lutV = h->lutU + HIST_SIZE;
 
@@ -122,10 +122,10 @@ static void histomatch_reset(histomatch_t *h)
 
 static void histomatch_calc_histogram(uint8_t *restrict data, const int len, int *restrict hist) 
 {
-    int bank0[HIST_SIZE] = {0};
-    int bank1[HIST_SIZE] = {0};
-    int bank2[HIST_SIZE] = {0};
-    int bank3[HIST_SIZE] = {0};
+    int bank0[HIST_SIZE+1] = {0};
+    int bank1[HIST_SIZE+1] = {0};
+    int bank2[HIST_SIZE+1] = {0};
+    int bank3[HIST_SIZE+1] = {0};
 
     int i = 0;
     
@@ -167,7 +167,7 @@ static void histomatch_calc_distribution(int *restrict hist, float *restrict cdf
 
 static void histomatch_map_and_blend(float *restrict c1, float *restrict c2, uint8_t *restrict lut, int opacity) {
     int j = 0;
-    uint8_t map[HIST_SIZE];
+    uint8_t map[HIST_SIZE+1];
     const uint32_t inv_op = (uint32_t)(255 - opacity);
     const uint32_t op = (uint32_t)opacity;
 

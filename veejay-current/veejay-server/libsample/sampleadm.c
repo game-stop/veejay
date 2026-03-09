@@ -43,18 +43,18 @@
 #include <libvje/vje.h>
 #include <libvje/libvje.h>
 #include <libsubsample/subsample.h>
-#include <veejay/vj-lib.h>
+#include <libveejay/vj-lib.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vevo.h>
 #include <veejaycore/libvevo.h>
-#include <veejay/vjkf.h>
-#include <veejay/vj-font.h>
+#include <libveejay/vjkf.h>
+#include <libveejay/vj-font.h>
 #include <assert.h>
 #include <libel/elcache.h>
-#include <veejay/vj-misc.h>
+#include <libveejay/vj-misc.h>
 #include <libstream/vj-tag.h>
 #include <libvjxml/vj-xml.h>
-#include <veejay/vj-macro.h>
+#include <libveejay/vj-macro.h>
 #include <libvje/internal.h>
 
 #ifdef HAVE_XML2

@@ -119,25 +119,24 @@ int	get_xml_2int( xmlDocPtr doc, xmlNodePtr node, int *second )
 	return res;
 }
 
-void	put_xml_int( xmlNodePtr node, char *key, int value )
+void	put_xml_int( xmlNodePtr node, const char *key, int value )
 {
 	const xmlChar *name = (const xmlChar*) key;
 	char buffer[64];
-	snprintf(buffer,sizeof(buffer),"%d", value );
+	snprintf(buffer,sizeof(buffer)-1,"%d", value );
 	xmlNewChild( node, NULL, name, (const xmlChar*) buffer );
 }
 
-void	put_xml_str( xmlNodePtr node, char *key, char *value )
+void	put_xml_str( xmlNodePtr node, const char *key, char *value )
 {
 	const xmlChar *name = (const xmlChar*) key;
 	xmlNewChild( node, NULL, name, (const xmlChar*) value );
 }
 
-void	put_xml_float( xmlNodePtr node, char *key, float value )
+void	put_xml_float( xmlNodePtr node,const char *key, float value )
 {
 	const xmlChar *name = (const xmlChar*) key;
 	char buffer[64];
-	snprintf(buffer,sizeof(buffer),"%f", value );
+	snprintf(buffer,sizeof(buffer)-1,"%f", value );
 	xmlNewChild( node, NULL, name, (const xmlChar*) buffer );
 }
-

@@ -1581,142 +1581,97 @@ int	vj_el_get_file_entry(editlist *el, long *start_pos, long *end_pos, long entr
 	return 1;
 }
 
-char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
+char *vj_el_write_line_ascii(editlist *el, int *bytes_written)
 {
-	if(el == NULL || el->is_empty)
-		return NULL;
-
-	int num_files	= 0;
-	uint64_t oldfile=0, oldframe=0, of1=0,ofr=0;
-	uint64_t n=0,n1=0;
-	char 	*result = NULL;
-	uint64_t j = 0;
-	uint64_t n2 = (uint64_t) el->total_frames;
-	char	filename[2048];		    
-	char	fourcc[6];              
-
-    uint64_t *index = (uint64_t*) vj_calloc(sizeof(int64_t) * MAX_EDIT_LIST_FILES );
-    
-    if(!index) {
+    if (!el || el->is_empty)
         return NULL;
+
+    uint64_t *index = (uint64_t *)vj_calloc(sizeof(uint64_t) * MAX_EDIT_LIST_FILES);
+    if (!index)
+        return NULL;
+
+    for (uint64_t j = 0; j <= (uint64_t)el->total_frames; j++)
+        index[N_EL_FILE(el->frame_list[j])] = 1;
+
+    int num_files = 0;
+    int nnf = 0;
+    size_t len = 0;
+    for (uint64_t j = 0; j < MAX_EDIT_LIST_FILES; j++)
+    {
+        if (index[j] && el->video_file_list[j] != NULL)
+        {
+            index[j] = num_files++;
+            nnf++;
+            len += strlen(el->video_file_list[j]) + 64; // rough estimate
+        }
+        else
+            index[j] = -1;
     }
 
-	int est_len = 0;
-   	for (j = n1; j <= n2; j++)
-	{
-		n = el->frame_list[j];
-		index[N_EL_FILE(n)] = 1;
-	}
-   
-	num_files = 0;
-	int nnf   = 0;
-	size_t len  = 0;
-    size_t fl_len = 0;
+    // estimate frame list length
+    size_t fl_len = 32 + (num_files + 1) * 64; // rough initial
+    len += fl_len;
 
-   	for (j = 0; j < MAX_EDIT_LIST_FILES; j++)
-	{
-		if (index[j] >= 0 && el->video_file_list[j] != NULL )
-		{
-			index[j] = num_files;
-			nnf ++;
-			len     += (strlen(el->video_file_list[j]));
-            len     += 64; /* more than needed */
-			num_files ++;
-		}
-	}
-
-
-	n = el->frame_list[n1];
-	oldfile = index[ N_EL_FILE(n) ];
-   	oldframe = N_EL_FRAME(n);
-
-	n1 = n;
-	of1 = oldfile;
-	ofr = oldframe;
-
-    fl_len += 32;
-	for (j = n1+1; j <= n2; j++)
-	{
-		n = el->frame_list[j];
-		if ( index[ N_EL_FILE(n) ] != oldfile ||
-			N_EL_FRAME(n) != oldframe + 1 )	{
-				fl_len += 48;
-			}
-		oldfile = index[N_EL_FILE(n)];
-		oldframe = N_EL_FRAME(n);
-	}
-    fl_len += 16;
-    fl_len += 64; /* more than needed */
-
-	n = n1;
-	oldfile = of1;
-	oldframe = ofr;
-	
-	n1 = 0;
-
-    len += ( (num_files+1) * fl_len);
- 
-	est_len = 2 * len;
-
-	result = (char*) vj_calloc(sizeof(char) * est_len );
-    if( result == NULL ) {
+    size_t est_len = len * 2;
+    char *result = (char *)vj_calloc(est_len);
+    if (!result)
+    {
         free(index);
         return NULL;
     }
-	sprintf(result, "%04d",nnf );
 
-	for (j = 0; j < MAX_EDIT_LIST_FILES; j++)
-	{
-		if (index[j] >= 0 && el->video_file_list[j] != NULL)
-		{
-			snprintf(fourcc,sizeof(fourcc),"%s", "????");
-			vj_el_get_file_fourcc( el, j, fourcc );
-			snprintf(filename,sizeof(filename),"%04zu%s%04lu%010lu%02zu%s",
-				strlen( el->video_file_list[j]  ),
-				el->video_file_list[j],
-				(long unsigned int) j,
-				el->num_frames[j],
-				strlen(fourcc),
-				fourcc 
-			);
-			strncat ( result, filename, strlen(filename));
-		}
-	}
+    char *p = result;
 
+    int n = snprintf(p, 5, "%04d", nnf);
+    p += n;
 
-	char first[128];
-	char tmpbuf[128];
-	snprintf(first,sizeof(first), "%016" PRId64 "%016" PRId64 ,oldfile, oldframe);
-	strncat( result, first, strlen(first) );
+    for (uint64_t j = 0; j < MAX_EDIT_LIST_FILES; j++)
+    {
+        if (index[j] >= 0 && el->video_file_list[j])
+        {
+            char fourcc[6] = "????";
+            vj_el_get_file_fourcc(el, j, fourcc);
 
-  	for (j = n1+1; j <= n2; j++)
-	{
-		n = el->frame_list[j];
-		if ( index[ N_EL_FILE(n) ] != oldfile ||
-			N_EL_FRAME(n) != oldframe + 1 )	
-		{
-			snprintf( tmpbuf,sizeof(tmpbuf), "%016" PRId64 "%016" PRId64 "%016llu",
-				 oldframe,
-				 index[N_EL_FILE(n)],
-				 N_EL_FRAME(n) );
-			strncat( result, tmpbuf, strlen(tmpbuf) );
-		}
-		oldfile = index[N_EL_FILE(n)];
-		oldframe = N_EL_FRAME(n);
+            n = snprintf(p, 2048, "%04zu%s%04lu%010lu%02zu%s",
+                         strlen(el->video_file_list[j]),
+                         el->video_file_list[j],
+                         (unsigned long)j,
+                         el->num_frames[j],
+                         strlen(fourcc),
+                         fourcc);
+            p += n;
+        }
     }
 
-	char last_word[64];
-	snprintf(last_word,sizeof(last_word),"%016" PRId64, oldframe);
-	strncat( result, last_word, strlen(last_word) );
+    uint64_t oldfile = index[N_EL_FILE(el->frame_list[0])];
+    uint64_t oldframe = N_EL_FRAME(el->frame_list[0]);
+    n = snprintf(p, 128, "%016" PRId64 "%016" PRId64, oldfile, oldframe);
+    p += n;
 
-	int datalen = strlen(result);
-	*bytes_written =  datalen;
+    for (uint64_t j = 1; j <= (uint64_t)el->total_frames; j++)
+    {
+        uint64_t n = el->frame_list[j];
+        uint64_t file_idx = index[N_EL_FILE(n)];
+        uint64_t frame_idx = N_EL_FRAME(n);
 
+        if (file_idx != oldfile || frame_idx != oldframe + 1)
+        {
+            n = snprintf(p, 128, "%016" PRId64 "%016" PRId64 "%016" PRIu64,
+                         oldframe, file_idx, frame_idx);
+            p += n;
+        }
+        oldfile = file_idx;
+        oldframe = frame_idx;
+    }
 
+    n = snprintf(p, 64, "%016" PRId64, oldframe);
+    p += n;
+
+    *bytes_written = p - result;
     free(index);
-
-	return result;
+    return result;
 }
+
 
 int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
 {
@@ -1808,7 +1763,6 @@ int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
     
     n = fprintf(fd, "%" PRId64 "\n", oldframe);
 
-    /* We did not check if all our prints succeeded, so check at least the last one */
     if (n <= 0)
     {
 	   	veejay_msg(VEEJAY_MSG_ERROR,"Error writing edit list: ");
@@ -1822,6 +1776,7 @@ int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
 
 	return 1;
 }
+
 
 static editlist *vj_el_soft_clone_base(editlist *el)
 {

@@ -33,7 +33,7 @@
 #include <stdint.h>
 #include <veejaycore/defs.h>
 #include <libel/lav_io.h>
-//#include <veejay/vj-lib.h>
+//#include <libveejay/vj-lib.h>
 #include <veejaycore/vj-msg.h>
 #ifdef USE_GDK_PIXBUF
 #include <gmodule.h>

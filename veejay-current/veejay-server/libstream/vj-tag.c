@@ -23,8 +23,8 @@
 #include <libstream/vj-tag.h>
 #include <veejaycore/hash.h>
 #include <libvje/vje.h>
-#include <veejay/vjkf.h>
-#include <veejay/vj-shm.h>
+#include <libveejay/vjkf.h>
+#include <libveejay/vj-shm.h>
 #define VIDEO_PALETTE_YUV420P 15
 #define VIDEO_PALETTE_YUV422P 13
 
@@ -40,8 +40,8 @@
 #include <libel/vj-avcodec.h>
 #include <veejaycore/vj-client.h>
 #include <veejaycore/vims.h>
-#include <veejay/vj-lib.h>
-#include <veejay/vj-misc.h>
+#include <libveejay/vj-lib.h>
+#include <libveejay/vj-misc.h>
 #include <veejaycore/vjmem.h>
 #include <libvje/internal.h>
 #include <libvje/ctmf/ctmf.h>
@@ -52,12 +52,12 @@
 #include <libstream/v4l2utils.h>
 #endif
 #include <veejaycore/libvevo.h>
-#include <veejay/vj-misc.h>
+#include <libveejay/vj-misc.h>
 #ifdef HAVE_FREETYPE
-#include <veejay/vj-font.h>
+#include <libveejay/vj-font.h>
 #endif
 #include <libvjxml/vj-xml.h>
-#include <veejay/vj-macro.h>
+#include <libveejay/vj-macro.h>
 #define SOURCE_NAME_LEN 255
 
 #include <libplugger/plugload.h>
