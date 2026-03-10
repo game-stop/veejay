@@ -4754,14 +4754,10 @@ void    vj_perform_reset_transition(veejay_t *info)
     atomic_store_long_long(&settings->transition.start,0);
     atomic_store_long_long(&settings->transition.end, 0);
 
-    atomic_store_int(&A->audio_edge->fwd_history_valid, 0);
-    atomic_store_int(&A->audio_edge->fwd_history_valid, 0);
-
-    atomic_store_int(&B->audio_edge->rev_history_valid, 0);
-    atomic_store_int(&B->audio_edge->rev_history_valid, 0);
-
-    atomic_store_int(&A->audio_edge->pending_edge, AUDIO_EDGE_NONE );
-    atomic_store_int(&B->audio_edge->pending_edge, AUDIO_EDGE_NONE );
+    if( info->audio != NO_AUDIO ) {
+        atomic_store_int(&A->audio_edge->pending_edge, AUDIO_EDGE_NONE );
+        atomic_store_int(&B->audio_edge->pending_edge, AUDIO_EDGE_NONE );
+    }
 
     sample_b_t *sb = &A->sample_b;
     long long sample_b_pos = atomic_load_long_long(&sb->offset);

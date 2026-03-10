@@ -1583,95 +1583,85 @@ int	vj_el_get_file_entry(editlist *el, long *start_pos, long *end_pos, long entr
 
 char *vj_el_write_line_ascii(editlist *el, int *bytes_written)
 {
-    if (!el || el->is_empty)
-        return NULL;
+    if (!el || el->is_empty) return NULL;
 
-    uint64_t *index = (uint64_t *)vj_calloc(sizeof(uint64_t) * MAX_EDIT_LIST_FILES);
-    if (!index)
-        return NULL;
+    int64_t *index = (int64_t *)vj_malloc(sizeof(int64_t) * MAX_EDIT_LIST_FILES);
+    if (!index) return NULL;
 
-    for (uint64_t j = 0; j <= (uint64_t)el->total_frames; j++)
+    for (int i = 0; i < MAX_EDIT_LIST_FILES; i++) index[i] = -1;
+
+    for (uint64_t j = 0; j <= (uint64_t)el->total_frames; j++) {
         index[N_EL_FILE(el->frame_list[j])] = 1;
-
-    int num_files = 0;
-    int nnf = 0;
-    size_t len = 0;
-    for (uint64_t j = 0; j < MAX_EDIT_LIST_FILES; j++)
-    {
-        if (index[j] && el->video_file_list[j] != NULL)
-        {
-            index[j] = num_files++;
-            nnf++;
-            len += strlen(el->video_file_list[j]) + 64; // rough estimate
-        }
-        else
-            index[j] = -1;
     }
 
-    // estimate frame list length
-    size_t fl_len = 32 + (num_files + 1) * 64; // rough initial
-    len += fl_len;
+    int nnf = 0;
+    size_t total_len_estimate = 128;
 
-    size_t est_len = len * 2;
-    char *result = (char *)vj_calloc(est_len);
-    if (!result)
-    {
+    for (int j = 0; j < MAX_EDIT_LIST_FILES; j++) {
+        if (index[j] == 1 && el->video_file_list[j] != NULL) {
+            index[j] = nnf++; 
+            total_len_estimate += strlen(el->video_file_list[j]) + 64;
+        } else {
+            index[j] = -1;
+        }
+    }
+
+    total_len_estimate += (el->total_frames * 48); 
+
+    char *result = (char *)vj_calloc(total_len_estimate);
+    if (!result) {
         free(index);
         return NULL;
     }
 
     char *p = result;
+    char *end = result + total_len_estimate;
 
-    int n = snprintf(p, 5, "%04d", nnf);
-    p += n;
+    // number of files
+    p += sprintf(p, "%04d", nnf);
 
-    for (uint64_t j = 0; j < MAX_EDIT_LIST_FILES; j++)
-    {
-        if (index[j] >= 0 && el->video_file_list[j])
-        {
+    for (int j = 0; j < MAX_EDIT_LIST_FILES; j++) {
+        if (index[j] != -1 && el->video_file_list[j]) {
             char fourcc[6] = "????";
             vj_el_get_file_fourcc(el, j, fourcc);
-
-            n = snprintf(p, 2048, "%04zu%s%04lu%010lu%02zu%s",
+            
+            p += sprintf(p, "%04zu%s%04d%010lu%02zu%s",
                          strlen(el->video_file_list[j]),
                          el->video_file_list[j],
-                         (unsigned long)j,
-                         el->num_frames[j],
+                         j, // the original physical index
+                         (unsigned long)el->num_frames[j],
                          strlen(fourcc),
                          fourcc);
-            p += n;
         }
     }
 
-    uint64_t oldfile = index[N_EL_FILE(el->frame_list[0])];
-    uint64_t oldframe = N_EL_FRAME(el->frame_list[0]);
-    n = snprintf(p, 128, "%016" PRId64 "%016" PRId64, oldfile, oldframe);
-    p += n;
+    uint64_t first_raw = el->frame_list[0];
+    uint64_t oldfile = index[N_EL_FILE(first_raw)];
+    uint64_t oldframe = N_EL_FRAME(first_raw);
 
-    for (uint64_t j = 1; j <= (uint64_t)el->total_frames; j++)
-    {
+    p += sprintf(p, "%016" PRId64 "%016" PRId64, oldfile, oldframe);
+
+    for (uint64_t j = 1; j <= (uint64_t)el->total_frames; j++) {
         uint64_t nframe = el->frame_list[j];
-        uint64_t file_idx = index[N_EL_FILE(nframe)];
-        uint64_t frame_idx = N_EL_FRAME(nframe);
+        int64_t cur_file_idx = index[N_EL_FILE(nframe)];
+        uint64_t cur_frame_idx = N_EL_FRAME(nframe);
 
-        if (file_idx != oldfile || frame_idx != oldframe + 1)
-        {
-            n = snprintf(p, 128, "%016" PRId64 "%016" PRId64 "%016" PRIu64,
-                         oldframe, file_idx, frame_idx);
-            p += n;
+        // check for discontinuity
+        if (cur_file_idx != (int64_t)oldfile || cur_frame_idx != oldframe + 1) {
+            // format: [end_prev][new_file][new_start]
+            p += sprintf(p, "%016" PRId64 "%016" PRId64 "%016" PRIu64,
+                         oldframe, (uint64_t)cur_file_idx, cur_frame_idx);
         }
-        oldfile = file_idx;
-        oldframe = frame_idx;
+        oldfile = (uint64_t)cur_file_idx;
+        oldframe = cur_frame_idx;
     }
 
-    n = snprintf(p, 64, "%016" PRId64, oldframe);
-    p += n;
+    p += sprintf(p, "%016" PRId64, oldframe);
 
-    *bytes_written = p - result;
+    *bytes_written = (int)(p - result);
     free(index);
     return result;
 }
-
 
 int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
 {

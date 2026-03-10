@@ -254,33 +254,48 @@ int vj_tag_num_devices(void)
 #endif
 }
 
-char *vj_tag_scan_devices( void )
+char *vj_tag_scan_devices(void)
 {
     const char *default_str = "000000";
     int i;
-    int len = 0;
+    int total_len = 0;
     char **device_list = NULL;
+
 #ifdef HAVE_V4L2
     device_list = v4l2_get_device_list();
 #endif
-    if(device_list==NULL)
+
+    if (device_list == NULL)
         return strdup(default_str);
 
-    for( i = 0; device_list[i] != NULL ;i++ )
-        len += strlen( device_list[i] );
+    for (i = 0; device_list[i] != NULL; i++)
+        total_len += strlen(device_list[i]);
 
-    char *n = (char*) vj_calloc(sizeof(char) * (16 + len) );
+    char *n = (char *)vj_calloc(total_len + 6 + 1); // plus null terminate
+    if (!n) {
+        for (i = 0; device_list[i] != NULL; i++) 
+            free(device_list[i]);
+        free(device_list);
+        return strdup(default_str);
+    }
+
+    char header[7];
+    snprintf(header, sizeof(header), "%06d", total_len);
+
+    memcpy(n, header, 6);
+
     char *p = n + 6;
-
-    sprintf(n, "%06d", len );   
-    for( i = 0; device_list[i] != NULL ;i++ )
+    for (i = 0; device_list[i] != NULL; i++)
     {
-        char *tmp = device_list[i];
-        int str_len = strlen(tmp);
-		memcpy(p, tmp, str_len);
+        int str_len = strlen(device_list[i]);
+        memcpy(p, device_list[i], str_len);
         p += str_len;
+        
         free(device_list[i]);
     }
+    
+    *p = '\0';
+
     free(device_list);
     return n;
 }

@@ -783,106 +783,92 @@ int vje_get_subformat( int fx_id )
 int vje_get_summarylen(int fx_id)
 {
     CHECK_BOUNDS(fx_id)
+    int idx = vj_fx_map[fx_id];
+    if (idx == -1 || vj_effect_map[idx] == NULL) return 0;
 
-    int idx = vj_fx_map [ fx_id ];
-    if( idx == -1 ) {
-        return 0;
+    vj_effect *fx = vj_effect_map[idx];
+    int p = fx->num_params;
+    int total = 0;
+
+    // header length
+    total += snprintf(NULL, 0, "%03zu%s%03d%1d%1d%1d%02d",
+                      strlen(fx->description), fx->description, fx_id,
+                      fx->extra_frame, fx->rgb_conv, fx->is_gen, p);
+
+    // parameters loop
+    for (int i = 0; i < p; i++) {
+        total += snprintf(NULL, 0, "%06d%06d%06d%03zu%s",
+                          fx->limits[0][i], fx->limits[1][i], fx->defaults[i],
+                          strlen(fx->param_description[i]), fx->param_description[i]);
     }
 
-    vj_effect *fx = vj_effect_map[ idx ];
+    // hints loop
+    for (int i = 0; i < p; i++) {
+        int limit = fx->limits[1][i];
+        int vlen = vje_get_param_hints_length(fx_id, i, limit);
+        total += snprintf(NULL, 0, "%06d", vlen);
 
-    if( fx == NULL ) {
-        return 0;
-    }
-
-	int p = fx->num_params;
-	int len = 0;
-	len += 3; // "%03d%s" name length, name
-    len += strlen( fx->description );
-	len += 3; // "%03d" fx_id
-	len += 1; // "%01d" is_video
-	len += 1; // "%01d" has_rgb
-	len += 1; // "%01d" is_gen
-	len += 2; // "%02d" num_arg
-	int i;
-	for( i = 0; i < p; i ++ ) {
-	    len += 3;
-        len += (strlen(fx->param_description[i]));
-        len += 6;
-        len += 6;
-        len += 6;
-    }
-
-	for( i = 0; i < p; i ++ ) {
-        int lim =  fx->limits[1][i];
-        int hints_len =vje_get_param_hints_length( fx_id, i, lim );
-        len += 6;
-		len += hints_len;
-	}
-
-    len += 4;
-
-	return len;
-}
-
-#define MAX_TEMP_SIZE 4096 
-int vje_get_summary(int fx_id, char *dst)
-{
-    CHECK_BOUNDS(fx_id)
-
-    int idx = vj_fx_map [ fx_id ];
-    if( idx == -1 ) {
-        return 0;
-    }
-
-    vj_effect *fx = vj_effect_map[ idx ];
-    if( fx == NULL ) {
-        return 0;
-    }
-
-	int p = fx->num_params;
-	int i,j;		
-	char tmp[MAX_TEMP_SIZE];
-
-	snprintf(dst,MAX_TEMP_SIZE, "%03zu%s%03d%1d%1d%1d%02d",
-		strlen( fx->description),
-		fx->description,
-		fx_id,
-		fx->extra_frame,
-		fx->rgb_conv,
-		fx->is_gen,
-		p
-		);
-	for(i=0; i < p; i++)
-	{
-		snprintf(tmp,MAX_TEMP_SIZE,
-			"%06d%06d%06d%03zu%s",
-			fx->limits[0][i],
-			fx->limits[1][i],
-			fx->defaults[i],
-			strlen(fx->param_description[i]),
-			fx->param_description[i]
-		
-		);
-		strncat( dst, tmp,MAX_TEMP_SIZE - strlen(tmp) - 1 );
-	}
-	for (i = 0; i < p; i++) {
-    	int limit = fx->limits[1][i];
-		int vlen = vje_get_param_hints_length(fx_id, i, limit);
- 		snprintf(tmp, MAX_TEMP_SIZE, "%06d", vlen);
-
- 		strncat(dst, tmp, MAX_TEMP_SIZE - strlen(dst) - 1);
-
-  		if (vlen > 0) {
-    		for (j = 0; j <= limit; j++) {
-            	int slen = strlen(fx->hints[i]->description[j]);
-                snprintf(tmp, MAX_TEMP_SIZE, "%03d%s", slen, fx->hints[i]->description[j]);
-                strncat(dst, tmp, MAX_TEMP_SIZE - strlen(dst) - 1);
+        if (vlen > 0 && fx->hints[i]) {
+            for (int j = 0; j <= limit; j++) {
+                total += snprintf(NULL, 0, "%03zu%s", 
+                                  strlen(fx->hints[i]->description[j]), 
+                                  fx->hints[i]->description[j]);
             }
         }
     }
 
-	return 1;
+    return total;
+}
+int vje_get_summary(int fx_id, char *dst, size_t dst_max_len)
+{
+    CHECK_BOUNDS(fx_id)
+    int idx = vj_fx_map[fx_id];
+    if (idx == -1 || vj_effect_map[idx] == NULL) return 0;
+
+    vj_effect *fx = vj_effect_map[idx];
+    int p = fx->num_params;
+    
+    char *ptr = dst;
+    size_t rem = dst_max_len;
+    int n;
+
+    n = snprintf(ptr, rem, "%03zu%s%03d%1d%1d%1d%02d",
+                 strlen(fx->description), fx->description, fx_id,
+                 fx->extra_frame, fx->rgb_conv, fx->is_gen, p);
+    if (n < 0 || (size_t)n >= rem) goto overflow; 
+    ptr += n; rem -= n;
+
+    for (int i = 0; i < p; i++) {
+        n = snprintf(ptr, rem, "%06d%06d%06d%03zu%s",
+                     fx->limits[0][i], fx->limits[1][i], fx->defaults[i],
+                     strlen(fx->param_description[i]), fx->param_description[i]);
+        if (n < 0 || (size_t)n >= rem) goto overflow;
+        ptr += n; rem -= n;
+    }
+
+    for (int i = 0; i < p; i++) {
+        int limit = fx->limits[1][i];
+        int vlen = vje_get_param_hints_length(fx_id, i, limit);
+        
+        n = snprintf(ptr, rem, "%06d", vlen);
+        if (n < 0 || (size_t)n >= rem) goto overflow;
+        ptr += n; rem -= n;
+
+        if (vlen > 0 && fx->hints[i]) {
+            for (int j = 0; j <= limit; j++) {
+                n = snprintf(ptr, rem, "%03zu%s", 
+                             strlen(fx->hints[i]->description[j]), 
+                             fx->hints[i]->description[j]);
+                if (n < 0 || (size_t)n >= rem) goto overflow;
+                ptr += n; rem -= n;
+            }
+        }
+    }
+
+    return (int)(ptr - dst);
+
+overflow:
+    return -1;
 }
 
 static void vje_global_store(int chain_id, int entry, int fx_id, void *ptr)
