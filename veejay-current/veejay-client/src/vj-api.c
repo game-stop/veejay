@@ -6426,6 +6426,9 @@ static void reload_bundles(void)
 
     while( offset < len )
     {
+        if(offset + 13 > len)
+            break;
+
         char *message = NULL;
         char *format  = NULL;
         char *args    = NULL;
@@ -6439,9 +6442,17 @@ static void reload_bundles(void)
 
         offset += 14;
 
+        if(offset + val[3] > len) {
+            veejay_msg(VEEJAY_MSG_DEBUG,"%s: message overflow",__FUNCTION__);
+            break;
+        }
+
         message = strndup( ptr + offset , val[3] );
 
         offset += val[3];
+
+        if(offset + 6 > len)
+            break;
 
         if( sscanf( ptr + offset, "%03d%03d", &val[4], &val[5] ) != 2 ) {
             veejay_msg(VEEJAY_MSG_DEBUG,"%s: Unexpected input at byte %d",__FUNCTION__, offset );
@@ -6473,9 +6484,9 @@ static void reload_bundles(void)
         gchar *g_keyname = "N/A";
         gchar *g_keymod = "";
 #endif
-        gchar *g_vims[5];
+        gchar g_vims[5];
 
-        snprintf( (char*) g_vims,sizeof(g_vims), "%03d", val[0] );
+        snprintf(g_vims, sizeof(g_vims), "%03d", val[0]);
 
         if( val[0] >= VIMS_BUNDLE_START && val[0] < VIMS_BUNDLE_END )
         {
