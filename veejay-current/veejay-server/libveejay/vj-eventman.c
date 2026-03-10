@@ -17,6 +17,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #include <string.h>
+#include <stdlib.h> // added by NiVofHiR MAR, 07 2026 <--- added this to get bye free() errors.
 #include <veejaycore/vevo.h>
 #include <libveejay/vj-event.h>
 #include <veejaycore/vims.h>
