@@ -465,7 +465,7 @@ veejay_msg(VEEJAY_MSG_INFO, "---------------------------------------------------
 
 #define SEND_MSG(v,str)\
 {\
-int bf_len = strlen(str);\
+    int bf_len = strlen(str);\
     if(bf_len && vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, (uint8_t*) str, bf_len) < 0) { \
     _vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], v->uc->current_link); \
     _vj_server_del_client( v->vjs[VEEJAY_PORT_STA], v->uc->current_link); \
@@ -2730,7 +2730,6 @@ void vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 
     for (int i = 0; i <= 600; i++)
     {
-        // Handle bundles
         if (i >= VIMS_BUNDLE_START && i < VIMS_BUNDLE_END)
         {
             if (!vj_event_bundle_exists(i))
@@ -2740,16 +2739,18 @@ void vj_event_send_bundles(void *ptr, const char format[], va_list ap)
             if (!m || !m->bundle)
                 continue;
 
-            int bun_len = (int)strlen(m->bundle);
+            int bun_len = strlen(m->bundle);
             if (bun_len <= 0)
                 continue;
 
             int n = snprintf(tmp, sizeof(tmp),
                              "%04d%03d%03d%04d%s%03d%03d",
-                             i, m->accelerator, m->modifier, bun_len,
-                             m->bundle, 0, 0);
+                             i, m->accelerator, m->modifier,
+                             bun_len, m->bundle, 0, 0);
+
             if (n > 0)
             {
+                memcpy(p, tmp, n);
                 p += n;
             }
         }
@@ -2760,29 +2761,34 @@ void vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 
             char *name = vj_event_vevo_get_event_name(i);
             char *form = vj_event_vevo_get_event_format(i);
-            int name_len = name ? (int)strlen(name) : 0;
-            int form_len = form ? (int)strlen(form) : 0;
+
+            int name_len = name ? strlen(name) : 0;
+            int form_len = form ? strlen(form) : 0;
 
 #ifdef HAVE_SDL
             vims_key_list *tree = vj_event_get_keys(i);
             while (tree)
             {
-                int n = snprintf(tmp, sizeof(tmp),
-                                 "%04d%03d%03d%04d%s%03d%03d",
-                                 i, tree->key_symbol, tree->key_mod,
-                                 name_len, name ? name : "",
+                int n = snprintf(tmp, sizeof(tmp),"%04d%03d%03d%04d%s%03d%03d",
+                                 i, tree->key_symbol, tree->key_mod, name_len, name ? name : "",
                                  form_len, tree->arg_len);
                 if (n > 0)
+                {
+                    memcpy(p, tmp, n);
                     p += n;
-
-                if (name_len)
-                    memcpy(p, name, name_len), p += name_len;
+                }
 
                 if (form_len)
-                    memcpy(p, form, form_len), p += form_len;
+                {
+                    memcpy(p, form, form_len);
+                    p += form_len;
+                }
 
                 if (tree->arg_len)
-                    memcpy(p, tree->args, tree->arg_len), p += tree->arg_len;
+                {
+                    memcpy(p, tree->args, tree->arg_len);
+                    p += tree->arg_len;
+                }
 
                 vims_key_list *next = tree->next;
                 free(tree);
@@ -2796,8 +2802,9 @@ void vj_event_send_bundles(void *ptr, const char format[], va_list ap)
         }
     }
 
-    int pack_len = (int)(p - buf);
+    int pack_len = (int) (p - buf);
     char header[7];
+
     snprintf(header, sizeof(header), "%06d", pack_len);
 
     SEND_MSG(v, header);
@@ -9208,35 +9215,27 @@ void vj_event_send_video_information(void *ptr, const char format[], va_list ap)
         n_frames = sample_max_video_length(v->uc->sample_id);
 
     char info_msg[150];
-    int len = snprintf(info_msg, sizeof(info_msg),
-                       "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld %1d %d",
-                       el->video_width,
-                       el->video_height,
-                       el->video_inter,
-                       el->video_norm,
-                       el->video_fps,
-                       el->has_audio,
-                       el->audio_bits,
-                       el->audio_rate,
-                       el->audio_chans,
-                       el->num_video_files,
-                       n_frames,
-                       v->audio,
-                       v->settings->use_vims_mcast);
+    snprintf(info_msg, sizeof(info_msg),
+             "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld %1d %d",
+             el->video_width,
+             el->video_height,
+             el->video_inter,
+             el->video_norm,
+             el->video_fps,
+             el->has_audio,
+             el->audio_bits,
+             el->audio_rate,
+             el->audio_chans,
+             el->num_video_files,
+             n_frames,
+             v->audio,
+             v->settings->use_vims_mcast);
 
-    char *s_print_buf = get_print_buf(len + 4);
-    char *p = s_print_buf;
-
-    p[0] = '0' + (len / 100) % 10;
-    p[1] = '0' + (len / 10) % 10;
-    p[2] = '0' + (len % 10);
-
-    memcpy(p + 3, info_msg, len);
-
+    char *s_print_buf = get_print_buf(strlen(info_msg) + 4);
+    sprintf(s_print_buf, "%03zu%s", strlen(info_msg), info_msg);
     SEND_MSG(v, s_print_buf);
     free(s_print_buf);
 }
-
 
 void vj_event_send_chain_entry(void *ptr, const char format[], va_list ap)
 {
