@@ -221,8 +221,11 @@ void aquatex_apply(void *ptr, VJFrame *frame, int *args) {
             int new_y = (int)(y_pos + offset_y * height);
             int new_x = (int)(x_pos + offset_x * width);
 
-            new_y = (new_y & -(new_y >= 0)) | ((height - 1) & -(new_y >= height));
-            new_x = (new_x & -(new_x >= 0)) | ((width - 1) & -(new_x >= width));
+            new_y = new_y < 0 ? 0 : new_y;
+            new_y = new_y > height - 1 ? height - 1 : new_y;
+
+            new_x = new_x < 0 ? 0 : new_x;
+            new_x = new_x > width - 1 ? width - 1 : new_x;
 
             const int src_idx = new_y * width + new_x;
                 
