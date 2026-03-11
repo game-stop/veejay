@@ -942,7 +942,7 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
 
         settings->transition.shape = (transition_shape != -1)
                                         ? transition_shape
-                                        : (int)(shapewipe_get_num_shapes(settings->transition.ptr) * rand() / (RAND_MAX));
+                                        : (int)(  ((double) shapewipe_get_num_shapes(settings->transition.ptr)) * rand() / (RAND_MAX));
 
         int active = (current_pm == VJ_PLAYBACK_MODE_SAMPLE)
                                         ? sample_get_transition_active(cur_id)
@@ -2889,7 +2889,7 @@ void *veejay_audio_producer_thread(void *arg)
             usleep_accurate(100, settings);
         }
 
-        anchor_s = vj_jack_get_played_frames() / JACK_RATE;
+        anchor_s = (double) vj_jack_get_played_frames() / JACK_RATE;
 
         atomic_store_double(&settings->audio_master_s, anchor_s);
         atomic_store_double(&settings->audio_start_offset, anchor_s);
@@ -2932,7 +2932,7 @@ void *veejay_audio_producer_thread(void *arg)
 				veejay_msg(VEEJAY_MSG_WARNING, "[AUDIO] JACK xrun detected!");
 				
 				//resync
-				double played_hw = vj_jack_get_played_frames() / JACK_RATE;
+				double played_hw = (double) vj_jack_get_played_frames() / JACK_RATE;
 				double master = atomic_load_double(&settings->audio_master_s);
 
 				double delta = played_hw - master;
@@ -2968,7 +2968,7 @@ void *veejay_audio_producer_thread(void *arg)
 
             const int frames_written = vj_perform_play_audio(settings, audio_chunk, decoded * BPS, silenced);
           
-            double played_hw = vj_jack_get_played_frames() / JACK_RATE;
+            double played_hw = (double) vj_jack_get_played_frames() / JACK_RATE;
             double predicted = played_hw + (double)frames_written / JACK_RATE;
             atomic_store_double(&settings->audio_master_s, predicted);
 
