@@ -95,7 +95,7 @@ static struct {
     { squares_init,NULL,NULL,NULL,NULL,squares_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SQUARES},
     { split_init,split_malloc,split_free,NULL,NULL,NULL,split_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_SPLIT},
     { solarize_init,NULL,NULL,NULL,NULL,solarize_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SOLARIZE},
-    { softblur_init,NULL,NULL,NULL,NULL,softblur_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SOFTBLUR },
+    { softblur_init,softblur_malloc,softblur_free,NULL,NULL,softblur_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SOFTBLUR },
     { smuck_init,smuck_malloc,smuck_free,NULL,NULL,smuck_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SMUCK },
     { smear_init,smear_malloc,smear_free,NULL,NULL,smear_apply,NULL,NULL,smear_request_fx,smear_set_motionmap, VJ_IMAGE_EFFECT_PIXELSMEAR },
     { slicer_init,slicer_malloc,slicer_free,NULL,NULL,NULL,slicer_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_SLICER },
@@ -306,9 +306,26 @@ uint8_t  pixel_U_hi_ = 240;
 uint8_t  pixel_Y_lo_ = 16;
 uint8_t  pixel_U_lo_ = 16;
 
+static int  vje_quality_ = 0;
+
 static void vje_global_store(int chain_id, int entry, int fx_id, void *ptr);
 static int vje_global_couple(int chain_id, int ref_id, int fx_id, void *ptr);
 static void vje_global_clear(int chain_id, int entry);
+
+void    vje_set_quality(int quality) {
+    switch( quality ) {
+        case 0:
+            vje_quality_ = quality;
+        break;
+        case 1:
+            vje_quality_ = quality;
+        break;
+    }
+}
+
+int     vje_get_quality(void) {
+    return vje_quality_;
+}
 
 void    vje_set_bg(VJFrame *bg)
 {

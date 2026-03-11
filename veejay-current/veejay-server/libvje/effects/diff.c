@@ -121,7 +121,7 @@ int diff_prepare(void *ptr, VJFrame *frame )
     tmp.len = frame->len;
     tmp.width = frame->width;
     tmp.height = frame->height;
-	softblur_apply_internal( &tmp, 0);
+	softblur_apply_internal( &tmp );
 	veejay_msg(2 , "Map B to A: Snapped background frame");
 
 	return 1;

@@ -68,6 +68,9 @@ int vje_get_plugin_id(int fx_id);
 int vje_get_summarylen(int fx_id);
 int vje_get_summary(int fx_id, char *dst, size_t max_len);
 
+void vje_set_quality(int quality);
+int vje_get_quality(void);
+
 void vje_dump();
 
 // processing

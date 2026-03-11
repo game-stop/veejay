@@ -22,5 +22,7 @@
 #define SOFTBLUR_H
 vj_effect *softblur_init(int w, int h);
 void softblur_apply(void *ptr, VJFrame *frame, int *args);
-void softblur_apply_internal(VJFrame *frame, int type);
+void softblur_apply_internal(VJFrame *frame);
+void *softblur_malloc(int w, int h);
+void softblur_free(void *ptr);
 #endif

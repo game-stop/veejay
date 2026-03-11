@@ -81,7 +81,7 @@ int	chameleonblend_prepare( void *ptr, VJFrame *frame )
 	tmp.height = frame->height;
     tmp.len = frame->len;
 	//@ 3x3 blur
-	softblur_apply_internal( &tmp, 0);
+	softblur_apply_internal( &tmp );
 
 	veejay_msg(2, "ChameleonTV: Snapped background frame");
 	return 1;

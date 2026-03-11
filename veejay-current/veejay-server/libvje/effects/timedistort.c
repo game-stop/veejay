@@ -194,7 +194,7 @@ void timedistort_apply( void *ptr,  VJFrame *frame, int *args )
 			VJFrame smooth;
 			veejay_memcpy(&smooth,frame, sizeof(VJFrame));
 			smooth.data[0] = prev;
-			softblur_apply_internal(&smooth, 0 );
+			softblur_apply_internal(&smooth);
 			veejay_memset( diff, 0, len );
 			td->have_bg = 1;
 			return;
@@ -210,7 +210,7 @@ void timedistort_apply( void *ptr,  VJFrame *frame, int *args )
 			VJFrame smooth;
 			veejay_memcpy(&smooth,frame, sizeof(VJFrame));
 			smooth.data[0] = prev;
-			softblur_apply_internal(&smooth, 0 );
+			softblur_apply_internal(&smooth);
 		}
 	}
 	
