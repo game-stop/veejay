@@ -231,6 +231,8 @@ libvje_la_SOURCES =	libvje.c vjert.c \
 	effects/hexmirror.c \
 	effects/fragmenttv.c \
     effects/mirror.c \
-	effects/blackreplace.c
+	effects/blackreplace.c \
+    effects/darkreplacemix.c
+
 		
 

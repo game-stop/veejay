@@ -242,6 +242,7 @@
 #include "./effects/hexmirror.h"
 #include "./effects/fragmenttv.h"
 #include "./effects/mirror.h"
+#include "./effects/darkreplacemix.h"
 
 #define VJ_IMAGE_EFFECT_MIN 46
 #define VJ_IMAGE_EFFECT_MAX 199
@@ -361,6 +362,7 @@ enum {
     VJ_VIDEO_EFFECT_COMPLEXOPACITY = 260,
     VJ_VIDEO_EFFECT_FLASHOPACITY = 261,
     VJ_VIDEO_EFFECT_HISTOMATCH = 262,
+    VJ_VIDEO_EFFECT_DARKREPLACEMIX = 263,
 };
 
 enum {

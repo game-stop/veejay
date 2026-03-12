@@ -284,8 +284,8 @@ static struct {
     { flashopacity_init,flashopacity_malloc,flashopacity_free,NULL,NULL,NULL,flashopacity_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_FLASHOPACITY },
     { buffer_init,buffer_malloc,buffer_free,NULL,NULL,buffer_apply,NULL, NULL,NULL,NULL,VJ_IMAGE_EFFECT_BUFFER },
     { blackreplace_init,NULL,NULL,NULL,NULL,blackreplace_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BLACKREPLACE },
+    { darkreplace_init,NULL,NULL,NULL,NULL,NULL,darkreplace_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_DARKREPLACEMIX },
     { NULL,NULL,NULL,NULL,NULL, NULL,NULL,NULL,NULL, 0},
-
 
     // FIXME: global tagged FX : motionmap, bgsubtract, bgsubtractgauss, bgpush
     //        1 motionmap per FX (set of FX that can request motionmap)
@@ -515,7 +515,7 @@ static void vje_fx_parallel_apply( void *arg )
 #ifdef STRICT_CHECKING
         assert( vj_fx[ idx ].fx_process != NULL );
 #endif
-	vj_task_set_to_frame( &b, 1, v->jobnum );
+	    vj_task_set_to_frame( &b, 1, v->jobnum );
         vj_fx[ idx ].fx_process( v->ptr, &a, &b, param_values );
     }
     else {
