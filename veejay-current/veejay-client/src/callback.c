@@ -3882,6 +3882,25 @@ on_transition_active_toggled( GtkWidget *widget, gpointer user_data)
 }
 
 void
+on_toggle_transitions_toggled( GtkWidget *widget, gpointer user_data )
+{
+	if(info->status_lock)
+		return;
+
+	int active = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) );
+
+	multi_vims( VIMS_TOGGLE_TRANSITIONS, "%d", active );
+
+	if(active) {
+		vj_msg(VEEJAY_MSG_INFO, "Shape transition on sample switch enabled. Setup your transition in the properties panel");
+	}
+	else {
+		vj_msg(VEEJAY_MSG_INFO, "Shape transition on sample switch disabled.");
+	}
+
+}
+
+void
 on_vims_messenger_single_clicked( void )
 {
 	GtkTextView *t= GTK_TEXT_VIEW(GTK_WIDGET(

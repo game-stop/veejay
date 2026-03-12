@@ -344,8 +344,8 @@ enum {
   WIDGET_OFFLINE_STOP_SAMPLE = 244,
   WIDGET_OFFLINE_START_SAMPLE = 245,
   WIDGET_BUFFEREDSTREAMID = 246,
-  WIDGET_BUFFEREDSTREAMLENGTH = 247
-
+  WIDGET_BUFFEREDSTREAMLENGTH = 247,
+  WIDGET_GLOBAL_TRANSITIONS_TOGGLE = 248
 };
 
 
@@ -745,7 +745,7 @@ static struct
     { "button_offline_start_sample",    WIDGET_OFFLINE_START_SAMPLE },
     { "spin_bufferedstreamid",       WIDGET_BUFFEREDSTREAMID },
     { "spin_bufferedstreamlength",   WIDGET_BUFFEREDSTREAMLENGTH },
-
+    { "toggle_transitions", WIDGET_GLOBAL_TRANSITIONS_TOGGLE},
     { NULL, -1 },
 };
 
@@ -6998,6 +6998,7 @@ static void load_editlist_info(void)
     long dum[2];
     char tmp[16];
     int len = 0;
+    int global_transition_state = 0;
 
     single_vims( VIMS_VIDEO_INFORMATION );
     gchar *res = recv_vims(3,&len);
@@ -7008,10 +7009,10 @@ static void load_editlist_info(void)
 #endif
         return;
     }
-    sscanf(res, "%d %d %d %c %f %d %d %ld %d %ld %ld %d %d",
+    int got_n = sscanf(res, "%04d %04d %d %c %f %1d %04d %06ld %02d %03ld %08ld %1d %1d %1d",
            &values[0], &values[1], &values[2], &norm,&fps,
            &values[4], &values[5], &rate, &values[7],
-           &dum[0], &dum[1], &values[8], &use_vims_mcast);
+           &dum[0], &dum[1], &values[8], &use_vims_mcast, &global_transition_state);
     snprintf( tmp, sizeof(tmp)-1, "%dx%d", values[0],values[1]);
 
     info->el.width = values[0];
@@ -7058,6 +7059,11 @@ static void load_editlist_info(void)
     else {
          if(gtk_widget_is_sensitive(widget_cache[ WIDGET_TOGGLE_MULTICAST ] ))
             gtk_widget_set_sensitive(widget_cache[ WIDGET_TOGGLE_MULTICAST ], FALSE);
+    }
+
+    int button_global_state = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_GLOBAL_TRANSITIONS_TOGGLE ]));
+    if( button_global_state != global_transition_state ) {
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_GLOBAL_TRANSITIONS_TOGGLE ]), global_transition_state );
     }
 
     free(res);
@@ -8536,7 +8542,7 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
         data = g_strconcat(css_in_mem, "\n* { font-size:98%; }\nframe,box,scale,spinbutton,button,radiobutton,checkbutton,entry, .vertical { padding-left:0px; padding-right: 0px }\nbutton,checkbutton,radiobutton,spinbutton { padding-top:1px; padding-bottom:1px;}\n", NULL );
     }
     else {
-        data = g_strconcat(css_in_mem, "\n* { font-size:98%; }", NULL);
+        data = g_strconcat(css_in_mem, "\n* { font-size:100%; }", NULL);
     }
 
     gtk_css_provider_load_from_data(css, data,-1, NULL);

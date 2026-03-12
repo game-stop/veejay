@@ -11465,6 +11465,19 @@
                                           </packing>
                                         </child>
                                         <child>
+                                          <object class="GtkLabel" id="label_transitions">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="tooltip_text" translatable="yes">Enable Transitions</property>
+                                            <property name="label" translatable="yes">Transitions</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">0</property>
+                                            <property name="top_attach">4</property>
+                                          </packing>
+                                        </child>
+                                        <child>
                                           <object class="GtkSpinButton" id="spin_framedelay">
                                             <property name="visible">True</property>
                                             <property name="can_focus">True</property>
@@ -16936,13 +16949,37 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                           <object class="GtkBox" id="hbox898">
                                                             <property name="visible">True</property>
                                                             <property name="can_focus">False</property>
+                                                            
                                                             <child>
-                                                            <object class="GtkButton" id="button_001">
-                                                            <property name="visible">True</property>
-                                                            <property name="can_focus">True</property>
-                                                            <property name="receives_default">False</property>
-                                                            <property name="tooltip_text" translatable="yes">Change Playback Mode</property>
-                                                            <signal name="clicked" handler="on_button_001_clicked" swapped="no"/>
+                                                              <object class="GtkToggleButton" id="toggle_transitions">
+                                                                <property name="visible">True</property>
+                                                                <property name="can_focus">True</property>
+                                                                <property name="receives_default">True</property>
+                                                                <property name="active">False</property>
+                                                                <property name="tooltip_text" translatable="yes">Enable Transitions</property>
+                                                                <signal name="toggled" handler="on_toggle_transitions_toggled" swapped="no"/>
+                                                                <child>
+                                                                  <object class="GtkImage" id="image_transitions">
+                                                                    <property name="visible">True</property>
+                                                                    <property name="can_focus">False</property>
+                                                                    <property name="pixbuf">icon_globaltransition.png</property>
+                                                                  </object>
+                                                                </child>
+                                                              </object>
+                                                              <packing>
+                                                                <property name="expand">False</property>
+                                                                <property name="fill">False</property>
+                                                                <property name="position">0</property>
+                                                              </packing>
+                                                            </child>
+
+                                                            <child>
+                                                              <object class="GtkButton" id="button_001">
+                                                              <property name="visible">True</property>
+                                                              <property name="can_focus">True</property>
+                                                              <property name="receives_default">False</property>
+                                                              <property name="tooltip_text" translatable="yes">Change Playback Mode</property>
+                                                              <signal name="clicked" handler="on_button_001_clicked" swapped="no"/>
                                                             <child>
                                                             <object class="GtkImage" id="image2143">
                                                             <property name="visible">True</property>
@@ -16954,7 +16991,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                             <packing>
                                                             <property name="expand">False</property>
                                                             <property name="fill">False</property>
-                                                            <property name="position">0</property>
+                                                            <property name="position">1</property>
                                                             </packing>
                                                             </child>
                                                             <child>
@@ -16970,7 +17007,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                             <packing>
                                                             <property name="expand">False</property>
                                                             <property name="fill">False</property>
-                                                            <property name="position">1</property>
+                                                            <property name="position">2</property>
                                                             </packing>
                                                             </child>
                                                             <child>
@@ -16986,7 +17023,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                             <packing>
                                                             <property name="expand">False</property>
                                                             <property name="fill">False</property>
-                                                            <property name="position">2</property>
+                                                            <property name="position">3</property>
                                                             </packing>
                                                             </child>
                                                           </object>
