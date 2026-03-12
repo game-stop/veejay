@@ -826,7 +826,7 @@ void vj_tag_set_transition_active(int t1, int status)
     tag->transition_active = status;
 
     if( tag->transition_active == 1 ) {
-        if( tag->transition_length <= 0 ) {
+        if( tag->transition_length <= 0 || tag->transition_length > tag->n_frames ) {
             vj_tag_set_transition_length( t1, tag->n_frames );
         }
     }

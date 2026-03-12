@@ -3162,7 +3162,7 @@ void    vj_event_promote_me( void *ptr, const char format[], va_list ap )
     veejay_t *v = (veejay_t*) ptr;
     vj_server_client_promote( v->vjs[VEEJAY_PORT_CMD], v->uc->current_link );
     v->rmodes[ v->uc->current_link ] = -1000;
-    veejay_msg(VEEJAY_MSG_DEBUG, "Promoted link %d", v->uc->current_link ); 
+    //veejay_msg(VEEJAY_MSG_DEBUG, "Promoted link %d", v->uc->current_link ); 
 }
 
 void vj_event_play_stop(void *ptr, const char format[], va_list ap) 
@@ -7279,46 +7279,21 @@ void    vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 void    vj_event_toggle_transitions( void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
-    int i;
-    if(v->settings->transition.global_state == 0) {
+    video_playback_setup *settings = v->settings;
+    int args[2];
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
-        int n = sample_highest();
-        for( i = 1; i <= n; i ++ ) {
-            if(!sample_exists(i))
-                continue;
-           // sample_set_transition_shape( i, -1 );
-            sample_set_transition_active( i, 1 );
-        }
-        n = vj_tag_highest_valid_id();
-        for( i = 1; i <= n; i ++ ) {
-            if(!vj_tag_exists(i))
-                continue;
-           // vj_tag_set_transition_shape(i, -1);
-            vj_tag_set_transition_active( i, 1 );
-        }
+    int cur_state = atomic_load_int(&settings->transition.global_state);
+    if( args[0] < 0 )
+        args[0] = 0;
+    if( args[0] > 1)
+        args[0] = 1;
 
-        v->settings->transition.global_state = 1;
-    }
-    else {
-        int n = sample_highest();
-        for( i = 1; i <= n; i ++ ) {
-            if(!sample_exists(i))
-                continue;
-            sample_set_transition_active( i, 0 );
-        }
-        n = vj_tag_highest_valid_id();
-        for( i = 0; i <= n; i ++ ) {
-            if(!vj_tag_exists(i))
-                continue;
-            vj_tag_set_transition_active(i, 0 );
-        }
-        
-        v->settings->transition.global_state = 0;
+    if(args[0] != cur_state) {
+        atomic_store_int(&settings->transition.global_state, args[0]);
     }
 
-    veejay_msg(VEEJAY_MSG_INFO, "Transitions between samples %s",
-            (v->settings->transition.global_state == 0 ? "disabled" : "enabled" ));
-
+    veejay_msg(VEEJAY_MSG_INFO, "Shape transitions between sample switches are %s", (args[0] == 0 ? "disabled" : "enabled" ));
 }
 
 void    vj_event_toggle_osl( void *ptr, const char format[], va_list ap )
@@ -9210,6 +9185,7 @@ void vj_event_send_video_information(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     editlist *el = v->current_edit_list;
+    video_playback_setup *settings = v->settings;
 
     long n_frames = el->total_frames;
     if (SAMPLE_PLAYING(v))
@@ -9217,7 +9193,7 @@ void vj_event_send_video_information(void *ptr, const char format[], va_list ap)
 
     char info_msg[150];
     snprintf(info_msg, sizeof(info_msg),
-             "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld %1d %d",
+             "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld %1d %1d %1d",
              el->video_width,
              el->video_height,
              el->video_inter,
@@ -9230,7 +9206,8 @@ void vj_event_send_video_information(void *ptr, const char format[], va_list ap)
              el->num_video_files,
              n_frames,
              v->audio,
-             v->settings->use_vims_mcast);
+             v->settings->use_vims_mcast,
+             atomic_load_int(&settings->transition.global_state));
 
     char *s_print_buf = get_print_buf(strlen(info_msg) + 4);
     sprintf(s_print_buf, "%03zu%s", strlen(info_msg), info_msg);

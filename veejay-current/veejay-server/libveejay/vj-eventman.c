@@ -2023,13 +2023,15 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				NULL );
     index_map_[VIMS_TOGGLE_TRANSITIONS]         =   _new_event(
-                NULL,
+                "%d",
                 VIMS_TOGGLE_TRANSITIONS,
-                "Toggle transitions between samples",
+                "Toggle global sample/stream transitioning",
                 vj_event_toggle_transitions,
-                0,
+                1,
                 VIMS_ALLOW_ANY,
-                NULL );
+                SAMPLE_STREAM_ID_HELP,
+				0,
+				NULL );
 #ifdef HAVE_SDL
 	index_map_[VIMS_RESIZE_SDL_SCREEN]			=	_new_event(
 				"%d %d %d %d",

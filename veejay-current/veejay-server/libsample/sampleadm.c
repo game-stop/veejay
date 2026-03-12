@@ -360,6 +360,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->fade_entry = -1;
     si->subrender = 1;
     si->transition_length = 25;
+    si->loop_stat_stop = 1;
     si->edit_list_file = sample_default_edl_name(si->sample_id);
 
     sample_eff_chain *sec = (sample_eff_chain*) vj_calloc(sizeof(sample_eff_chain) * SAMPLE_MAX_EFFECTS );
@@ -1197,8 +1198,6 @@ int sample_set_resume(int s1,long position)
     if(!sample)
         return -1;
 
-    veejay_msg(VEEJAY_MSG_DEBUG, "Sample B position %ld, already ticked: %d", position, sample->frame_tick);
-
     if( sample->frame_tick )
 		return 1; // already incremented for this time period
 
@@ -1764,7 +1763,12 @@ void sample_set_transition_active(int s1, int status) {
     sample->transition_active = status;
 
     if( sample->transition_length <= 0 ) {
-        sample_set_transition_length( s1, DEFAULT_TRANSITION_LENGTH);
+        int len = DEFAULT_TRANSITION_LENGTH;
+        long delta = sample->last_frame - sample->first_frame;
+        if( len > delta )
+           len = (int) delta;
+
+        sample_set_transition_length( s1, len);
     }
 }
 
@@ -2482,39 +2486,39 @@ int sample_chain_sprint_status( int s1,int tags,int cache,int sa,int ca, int pfp
     }
 
     char *ptr = str;
-    ptr = vj_sprintf( ptr, pfps ); 
+    ptr = vj_sprintf( ptr, pfps ); //0
     ptr = vj_sprintf( ptr, frame );
     ptr = vj_sprintf( ptr, mode ); 
     ptr = vj_sprintf( ptr, s1 ); 
-    ptr = vj_sprintf( ptr, sample->effect_toggle );
+    ptr = vj_sprintf( ptr, sample->effect_toggle ); //4
     ptr = vj_sprintf( ptr, sample->first_frame ); 
     ptr = vj_sprintf( ptr, sample->last_frame ); 
     ptr = vj_sprintf( ptr, sample->speed ); 
-    ptr = vj_sprintf( ptr, sample->looptype );
+    ptr = vj_sprintf( ptr, sample->looptype ); //8
     ptr = vj_sprintf( ptr, e_a);
     ptr = vj_sprintf( ptr, e_d );
     ptr = vj_sprintf( ptr, e_s );
-    ptr = vj_sprintf( ptr, sample_size() );
+    ptr = vj_sprintf( ptr, sample_size() ); // 12
     ptr = vj_sprintf( ptr, sample->marker_start );
     ptr = vj_sprintf( ptr, sample->marker_end );
     ptr = vj_sprintf( ptr, sample->selected_entry );
-    ptr = vj_sprintf( ptr, total_slots );
+    ptr = vj_sprintf( ptr, total_slots ); //16
     ptr = vj_sprintf( ptr, cache );
     ptr = vj_sprintf( ptr, curfps );
     ptr = vj_sprintf( ptr, lo );
-    ptr = vj_sprintf( ptr, hi );
+    ptr = vj_sprintf( ptr, hi ); //20
     ptr = vj_sprintf( ptr, sa );
     ptr = vj_sprintf( ptr, ca );
     ptr = vj_sprintf( ptr, (int) sample->fader_val );
-    ptr = vj_sprintf( ptr, sample->dup );
+    ptr = vj_sprintf( ptr, sample->dup ); //24
     ptr = vj_sprintf( ptr, macro );
     ptr = vj_sprintf( ptr, sample->subrender );
     ptr = vj_sprintf( ptr, sample->fade_method );
-    ptr = vj_sprintf( ptr, sample->fade_entry );
+    ptr = vj_sprintf( ptr, sample->fade_entry ); //28
     ptr = vj_sprintf( ptr, sample->fade_alpha );
     ptr = vj_sprintf( ptr, sample->loop_stat);
     ptr = vj_sprintf( ptr, sample->loop_stat_stop);
-    ptr = vj_sprintf( ptr, sample->transition_active);
+    ptr = vj_sprintf( ptr, sample->transition_active); // 32
     ptr = vj_sprintf( ptr, sample->transition_length);
     ptr = vj_sprintf( ptr, sample->transition_shape);
     ptr = vj_sprintf( ptr, feedback);

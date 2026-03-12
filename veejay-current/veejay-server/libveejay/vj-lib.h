@@ -133,8 +133,9 @@ typedef struct
 	volatile long long pos_sample_b;
     void *ptr;
     int ready;
-    int global_state;
+    volatile int global_state;
 	int skip_audio_edge;
+	int seq_index;
 } transition_t;
 
 typedef enum {

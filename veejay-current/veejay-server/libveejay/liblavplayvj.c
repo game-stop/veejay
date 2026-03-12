@@ -888,9 +888,6 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
     int current_pm = info->uc->playback_mode;
     int cur_id     = info->uc->sample_id;
 
-    veejay_msg(VEEJAY_MSG_INFO, "[Playback] %s(%d) -> %s(%d)", 
-               _pm_to_str(current_pm), cur_id, _pm_to_str(new_pm), sample_id);
-
     if (new_pm == VJ_PLAYBACK_MODE_SAMPLE) {
         if (!sample_exists(sample_id)) {
             veejay_msg(VEEJAY_MSG_ERROR, "[Playback] Sample %d does not exist", sample_id);
@@ -908,10 +905,12 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
         }
     }
 
-    if (!info->seq->active &&
+    if (!info->seq->active && // transitions from current position in the timeline
         settings->transition.ready == 0 &&
         new_pm != VJ_PLAYBACK_MODE_PLAIN &&
-        (sample_id != cur_id || new_pm != current_pm)) 
+        (sample_id != cur_id || new_pm != current_pm) &&
+		atomic_load_int(&settings->transition.global_state)
+	) 
     {
         settings->transition.next_type = new_pm;
         settings->transition.next_id = sample_id;
@@ -996,9 +995,7 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
         info->current_edit_list = info->edit_list;
         settings->min_frame_num = 0;
         settings->max_frame_num = info->edit_list->total_frames;
-
-        veejay_msg(VEEJAY_MSG_INFO, "[Playback] PLAIN mode active: 0 - %lld", settings->max_frame_num);
-    }
+	}
     else if (new_pm == VJ_PLAYBACK_MODE_TAG)
     {
         info->uc->playback_mode = new_pm;
@@ -1007,33 +1004,23 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
         settings->max_frame_num = vj_tag_get_n_frames(sample_id);
         atomic_store_long_long(&settings->current_frame_num, 0);
 
-        veejay_msg(VEEJAY_MSG_INFO, "[Playback] TAG mode active: Stream %d (Frames: 0-%lld)", 
-                   sample_id, settings->max_frame_num);
         veejay_start_playing_stream(info, sample_id);
     }
     else if (new_pm == VJ_PLAYBACK_MODE_SAMPLE) 
     {
         info->uc->playback_mode = new_pm;
-        veejay_msg(VEEJAY_MSG_INFO, "[Playback] SAMPLE mode active: Sample %d", sample_id);
         veejay_start_playing_sample(info, sample_id);
     }
     
     if (info->seq->active) {
-        sample_set_resume(sample_id, -1);
+		sample_set_resume(sample_id, -1);
         long pos = sample_get_resume(sample_id);
         veejay_set_frame(info, pos);
-
-        int lss = sample_get_loop_stat_stop(sample_id);
-        veejay_msg(VEEJAY_MSG_INFO, "[Sequencer] Sample %d at frame %ld (LSS: %d)", sample_id, pos, lss);
-
-        if (lss == 0) {
-            if (vj_perform_seq_setup_transition(info) == 0) {
-                veejay_msg(VEEJAY_MSG_ERROR, "[Sequencer] End of sequence reached.");
-                info->seq->active = 0;
-                info->seq->current = 0;
-                veejay_reset_sample_positions(info, -1);
-            }
-        }
+  		int next_id = sample_id;
+		int next_slot = info->seq->current;
+        int next_mode = new_pm;
+		next_id = vj_perform_next_sequence( info, &next_mode,&next_slot );
+        vj_perform_setup_transition( info, next_id, next_mode, sample_id, new_pm, next_slot );
     }
     else if (new_pm == VJ_PLAYBACK_MODE_SAMPLE) {
         veejay_sample_resume_at(info, sample_id);
@@ -2942,7 +2929,7 @@ void *veejay_audio_producer_thread(void *arg)
 				}
 			}
 
-			int tx_active = atomic_load_int(&settings->transition.active);
+			int tx_active = atomic_load_int(&settings->transition.active) && atomic_load_int(&settings->transition.global_state);
 			if(!tx_active) {
 				decoded = vj_perform_queue_audio_chunk_ext(info, needed, media_frame, 0, audio_chunk);
 				
