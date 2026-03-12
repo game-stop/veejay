@@ -740,7 +740,7 @@ int	vj_server_new_connection(vj_server *vje)
 			return 0;
 		}
 
-		veejay_msg(VEEJAY_MSG_INFO, "Link: %d connected with %s on port %d", n,host,vje->remote.sin_port);		
+		//veejay_msg(VEEJAY_MSG_INFO, "Link %d connected with %s on port %d", n,host,vje->remote.sin_port);
 
 		if( vje->logfd ) {
 			fprintf(vje->logfd, "new connection, socket=%d, max connections=%d\n",
@@ -804,11 +804,11 @@ static int vj_server_socket_consume(vj_server *vje, int sock_fd, int link_id, ch
 		if( errno == EAGAIN ) {
             return 0;
         }
-	    veejay_msg( 0, "Error: %s", strerror(errno) );
+	    veejay_msg( VEEJAY_MSG_ERROR, "Error: %s", strerror(errno) );
 	    return -1;
     }
     else if ( n == 0 ) {
-        veejay_msg( 0, "Remote has disconnected");
+        veejay_msg( VEEJAY_MSG_WARNING, "Remote has disconnected");
         return -1;
     }
 
