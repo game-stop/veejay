@@ -33,6 +33,7 @@ typedef struct {
 	int mode_transition_len;  // total frames to blend
 	uint8_t *mode_buffer;     // temp buffer for old mode
 	int prev_mode;
+	int n_threads;
 } m_tracer_t;
 
 #define DIV255(x) (((x) + 128 + (((x) + 128) >> 8)) >> 8)
@@ -789,6 +790,7 @@ void *mtracer_malloc(int w, int h)
     m->mode_buffer = block + (4 * buflen);
 	m->mode_transition = 0;
 	m->mode_transition_len = 12;
+	m->n_threads = vje_advise_num_threads(w*h);
     return (void*) m;
 }
 
@@ -815,6 +817,8 @@ void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     uint8_t *blended_result = m->mtrace_buffer[1];
     uint8_t *prev_frame     = m->mtrace_buffer[2];
 
+	const int n_threads = m->n_threads;
+
     VJFrame tmp_frame;
     veejay_memcpy(&tmp_frame, frame, sizeof(VJFrame));
     tmp_frame.data[0] = blended_result;
@@ -838,10 +842,12 @@ void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     veejay_memcpy(blended_result, frame->data[0], len);
     overlaymagic1_apply(NULL, &tmp_frame, frame2, mode);
 
+	#pragma omp parallel num_threads(n_threads)
+	{
     if (frame2_opacity < 255)
     {
         uint8_t *f1 = frame->data[0];
-        #pragma omp simd
+		#pragma omp for simd schedule(static)
         for (int i = 0; i < len; i++)
         {
             int b = blended_result[i];
@@ -855,7 +861,7 @@ void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         int x = (t << 8) / m->mode_transition_len;
         int alpha = (x * x * (768 - (x << 1))) >> 16;
         uint8_t *mode_buf = m->mode_buffer;
-        #pragma omp simd
+        #pragma omp for simd schedule(static)
         for (int i = 0; i < len; i++)
         {
             int b = blended_result[i];
@@ -873,7 +879,7 @@ void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     int decay = 256 - (256 / (decay_val ? decay_val : 1));
     int blend = 256 - decay;
 
-    #pragma omp simd
+    #pragma omp for simd schedule(static)
     for (int i = 0; i < len; i++)
     {
         int f = feedback_buf[i];
@@ -881,6 +887,7 @@ void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         int accum = ((f * decay) + ((b * combined_scale * blend) >> 8)) >> 8;
         feedback_buf[i] = (uint8_t)(accum < 0 ? 0 : (accum > 255 ? 255 : accum));
     }
+	}
 
     veejay_memcpy(prev_frame, frame->data[0], len);
 
