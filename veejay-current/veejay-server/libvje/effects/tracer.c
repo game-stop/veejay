@@ -26,6 +26,7 @@
 
 typedef struct {
     uint8_t *trace_buffer[4];
+    int n_threads;
 } tracer_t;
 
 #define MAX_OLD_FRAMES 128
@@ -68,6 +69,8 @@ void *tracer_malloc(int w, int h)
     t->trace_buffer[1] = t->trace_buffer[0] + len;
     t->trace_buffer[2] = t->trace_buffer[1] + len;
 
+    t->n_threads = vje_advise_num_threads(len);
+
     veejay_memset(t->trace_buffer[0], pixel_Y_lo_, len );
     veejay_memset(t->trace_buffer[1], 128, len );
     veejay_memset(t->trace_buffer[2], 128, len );
@@ -90,6 +93,7 @@ void tracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int uv_len = frame->uv_len;
     const int opacity = args[0];
     const int buffer_len = args[1];
+    const int n_threads = t->n_threads;
 
     const int decay = 256 - (256 / buffer_len);
     const int blend = 256 - decay;
@@ -107,7 +111,7 @@ void tracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     uint8_t *restrict t1 = t->trace_buffer[1];
     uint8_t *restrict t2 = t->trace_buffer[2];
   
-#pragma omp simd
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
     for (int x = 0; x < len; x++)
     {
         int mixed = (Y[x] + Y2[x]) * op_scale >> 9;
@@ -117,7 +121,7 @@ void tracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         Y[x]  = (uint8_t)accum;
     }
 
-#pragma omp simd
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
     for (int x = 0; x < uv_len; x++)
     {
         int cb_acc = t1[x] - 128;
