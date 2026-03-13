@@ -77,7 +77,7 @@ static struct {
     { widthmirror_init, NULL, NULL, NULL, NULL, widthmirror_apply, NULL, NULL, NULL,NULL,VJ_IMAGE_EFFECT_WIDTHMIRROR },
     { mirror_init, mirror_malloc,mirror_free,NULL,NULL, mirror_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_MIRRORREFLECT },
     { bathroom_init, bathroom_malloc, bathroom_free, NULL, NULL, bathroom_apply, NULL, NULL, NULL, NULL, VJ_IMAGE_EFFECT_BATHROOM },
-    { whiteframe_init, NULL, NULL, NULL,NULL, NULL, whiteframe_apply,NULL, NULL,NULL,VJ_VIDEO_EFFECT_WHITEFRAME },
+    { whiteframe_init, whiteframe_malloc, whiteframe_free, NULL,NULL, NULL, whiteframe_apply,NULL, NULL,NULL,VJ_VIDEO_EFFECT_WHITEFRAME },
     { waterrippletv_init, waterrippletv_malloc, waterrippletv_free,NULL,NULL,waterrippletv_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_RIPPLETV },
     { water_init,water_malloc,water_free,NULL,NULL,NULL,water_apply, NULL,NULL,NULL, VJ_VIDEO_EFFECT_RIPPLETV },
     { videowall_init,videowall_malloc,videowall_free,NULL,NULL,NULL,videowall_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_VIDEOWALL },
@@ -283,8 +283,8 @@ static struct {
     { bar_init,bar_malloc,bar_free,NULL,NULL,NULL,bar_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_3BAR },
     { flashopacity_init,flashopacity_malloc,flashopacity_free,NULL,NULL,NULL,flashopacity_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_FLASHOPACITY },
     { buffer_init,buffer_malloc,buffer_free,NULL,NULL,buffer_apply,NULL, NULL,NULL,NULL,VJ_IMAGE_EFFECT_BUFFER },
-    { blackreplace_init,NULL,NULL,NULL,NULL,blackreplace_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BLACKREPLACE },
-    { darkreplace_init,NULL,NULL,NULL,NULL,NULL,darkreplace_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_DARKREPLACEMIX },
+    { blackreplace_init,blackreplace_malloc,blackreplace_free,NULL,NULL,blackreplace_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BLACKREPLACE },
+    { darkreplace_init,darkreplace_malloc,darkreplace_free,NULL,NULL,NULL,darkreplace_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_DARKREPLACEMIX },
     { NULL,NULL,NULL,NULL,NULL, NULL,NULL,NULL,NULL, 0},
 
     // FIXME: global tagged FX : motionmap, bgsubtract, bgsubtractgauss, bgpush
