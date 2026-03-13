@@ -133,13 +133,14 @@ static uint32_t strobo( uint32_t *H, const int N )
             break;
         sumB += ( i * H[i] );
         mB = sumB / wB;
+        sum += i * H[i];
         mF = (sum - sumB) / wF;
         between = wB * wF * (mB - mF) * (mB - mF);
         if( between > max ) {
             max = between;
             threshold = i;
         }
-        sum += i * H[i];
+        
     }
     return threshold;
 }
@@ -192,24 +193,28 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args) {
               cy, cu, cv );   
 
     if( delay == 0 || (s->timestamp % delay) == 0 ) {
+        int cy_s = (2 * cy - op0);
+        int cu_s = 2 * (cu - 128) + 128;
+        int cv_s = 2 * (cv - 128) + 128;
+
 #pragma omp parallel for num_threads(s->n_threads)
         for( i = 0; i < len; i ++ )
         {
             int mask = (Y[i] < threshold);
 
             a = bY[i] * decay >> 8;
-            bY[i] = CLAMP_Y((1 - mask) * ((bY[i] * decay) >> 8) + mask * (a + ((2 * cy) - op0)));
+            bY[i] = CLAMP_Y((1 - mask) * ((bY[i] * decay) >> 8) + mask * (a + cy_s));
 
             a = ((bU[i] - 128) * decay) >> 8;
-            bU[i] = CLAMP_UV((1 - mask) * (bU[i] - (((bU[i] - 128) * decay) >> 8)) + mask * (a + 2 * (cu - 128) + 128));
+            bU[i] = CLAMP_UV((1 - mask) * (bU[i] - (((bU[i] - 128) * decay) >> 8)) + mask * (a + cu_s));
 
             a = ((bV[i] - 128) * decay) >> 8;;
-            bV[i] = CLAMP_UV((1 - mask) * (bV[i] - (((bV[i] - 128) * decay) >> 8)) + mask * (a + 2 * (cv - 128) + 128));
+            bV[i] = CLAMP_UV((1 - mask) * (bV[i] - (((bV[i] - 128) * decay) >> 8)) + mask * (a + cv_s));
         }
     }
 
     if( mode == 0 ) {
-#pragma omp parallel for num_threads(s->n_threads)
+#pragma omp parallel for simd
         for( i = 0; i < len; i ++ ) 
         {
             Y[i] = bY[i];
