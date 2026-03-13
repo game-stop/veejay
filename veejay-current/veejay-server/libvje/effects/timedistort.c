@@ -240,7 +240,7 @@ void timedistort_apply(void *ptr, VJFrame *frame, int *args)
 
     uint8_t *restrict warptime0 = td->warptime[td->warptimeFrame];
     uint8_t *restrict warptime1 = td->warptime[td->warptimeFrame ^ 1];
-    int nthreads = td->n_threads > 0 ? td->n_threads : omp_get_max_threads();
+    int nthreads = td->n_threads;
     const int width_i = (int) width;
     const int height_i = (int) height;
 
