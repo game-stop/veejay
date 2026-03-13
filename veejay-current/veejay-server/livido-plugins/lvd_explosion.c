@@ -24,7 +24,8 @@
 #ifndef IS_LIVIDO_PLUGIN
 #define IS_LIVIDO_PLUGIN
 #endif
-
+#include <omp.h>
+#include <unistd.h> 
 #include 	"../libplugger/specs/livido.h"
 LIVIDO_PLUGIN
 #include	"utils.h"
@@ -46,7 +47,20 @@ typedef struct
 	PARTICLE **particles;
 	uint8_t *fire;
 	int	last_n;
+	int n_threads;
 } particles_t;
+
+static inline int __advise_num_threads(const int len) {
+	static int ncores = -1;
+    if (ncores == -1) {
+        ncores = (int) sysconf(_SC_NPROCESSORS_ONLN);
+    }
+    int nthreads = ncores;
+    if(len < (1920*1080)) nthreads = ncores / 2;
+    if(nthreads < 1) nthreads = 1;
+    if(nthreads > 6) nthreads = 6;
+    return nthreads;
+}
 
 void init_particle(PARTICLE* particle, int w, int h)
 {
@@ -99,6 +113,8 @@ int	init_instance( livido_port_t *my_instance )
         init_particle( particles->particles[i], w,h );
 	}
 
+	particles->n_threads = __advise_num_threads(w*h);
+
 	livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR,1, &particles);
 
 	return LIVIDO_NO_ERROR;
@@ -146,7 +162,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 
 	//@ get parameter values
 	int		number_of_particles =  lvd_extract_param_index( my_instance,"in_parameters", 0 );
-
+	const int n_threads = parts->n_threads;
 	int all_dead = 1;
 	PARTICLE **particles = parts->particles;
 
@@ -183,7 +199,6 @@ int		process_instance( livido_port_t *my_instance, double timecode )
     const int lim = w * h;
 	uint32_t temp,index,buf;
 	uint8_t *fire = parts->fire;
-
 	for( i = 0; i < number_of_particles; i ++ ) {
 	
 		if(!particles[i]->dead) {
@@ -219,6 +234,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 		}
 	}
 
+	#pragma omp parallel for num_threads(n_threads) schedule(static) private(i,j,temp,index,buf)
 	for( i = 1; i < (h-2); i ++ ) {
 		index = ( i - 1 ) * w;
 		for( j = 1; j < (w-2); j ++ ) {
@@ -253,7 +269,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 	}
 
 	uint8_t *image = O[0];
-
+	#pragma omp parallel for num_threads(n_threads) schedule(static) private(i,j,temp)
 	for( i = h - 1; i >= 0; -- i ) {
 		temp = i * w;
 		for( j = w - 1; j >= 0; --j ) {

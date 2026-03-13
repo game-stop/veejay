@@ -8,6 +8,7 @@
 #ifndef IS_LIVIDO_PLUGIN
 #define IS_LIVIDO_PLUGIN
 #endif
+#include <unistd.h>
 
 #include 	"../libplugger/specs/livido.h"
 LIVIDO_PLUGIN
@@ -16,14 +17,52 @@ LIVIDO_PLUGIN
 
 #include 	"lvd_common.h"
 
+
+typedef struct {
+	int n_threads;
+} colorexchange_t;
+
+static inline int __advise_num_threads(const int len) {
+	static int ncores = -1;
+    if (ncores == -1) {
+        ncores = (int) sysconf(_SC_NPROCESSORS_ONLN);
+    }
+    int nthreads = ncores;
+
+    if (len < (1920*1080)) nthreads = ncores / 2;
+    if (nthreads < 1) nthreads = 1;
+    if (nthreads > 6) nthreads = 6; // avoid too much overhead
+
+    return nthreads;
+}
+
 livido_init_f	init_instance( livido_port_t *my_instance )
 {
+	int w = 0, h = 0;
+	lvd_extract_dimensions( my_instance, "out_channels", &w, &h );
+
+	colorexchange_t *ce = (colorexchange_t*) livido_malloc( sizeof( colorexchange_t ));
+    if(!ce) {
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
+
+	ce->n_threads = __advise_num_threads(w*h);
+
+	livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR,1, &ce);
+
 	return LIVIDO_NO_ERROR;
 }
 
 
 livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 {
+	void *ptr = NULL;
+	if ( livido_property_get( my_instance, "PLUGIN_private", 0, &ptr ) == LIVIDO_NO_ERROR )
+	{
+		colorexchange_t *hb = (colorexchange_t*) ptr;
+		livido_free(hb);
+	}
+
 	return LIVIDO_NO_ERROR;
 }
 
@@ -37,7 +76,13 @@ int	process_instance( livido_port_t *my_instance, double timecode )
 	int w;
 	int h;
 	
-	int error = lvd_extract_channel_values( my_instance, "out_channels", 0, &w,&h, O,&palette );
+	colorexchange_t *ptr = NULL;
+
+	int error = livido_property_get( my_instance, "PLUGIN_private", 0, &ptr );
+	if( error != LIVIDO_NO_ERROR )
+		return LIVIDO_ERROR_INTERNAL;
+
+	error = lvd_extract_channel_values( my_instance, "out_channels", 0, &w,&h, O,&palette );
 	if( error != LIVIDO_NO_ERROR )
 		return LIVIDO_ERROR_NO_OUTPUT_CHANNELS;
 
@@ -82,14 +127,14 @@ int	process_instance( livido_port_t *my_instance, double timecode )
     int delta_v = dv - sv;
 
     if (black_incl) {
-        #pragma omp simd
+		#pragma omp parallel for num_threads(ptr->n_threads) schedule(static)
         for(int i = 0; i < len; i++) {
             o0[i] = CLAMP(ch0[i] + delta_y, minY, maxY);
             o1[i] = CLAMP(ch1[i] + delta_u, minUV, maxUV);
             o2[i] = CLAMP(ch2[i] + delta_v, minUV, maxUV);
         }
     } else {
-        #pragma omp simd
+		#pragma omp parallel for num_threads(ptr->n_threads) schedule(static)
         for(int i = 0; i < len; i++) {
             int mask = -(ch0[i] != 0); // 0xFFFFFFFF if ch0!=0, else 0
             o0[i] = (CLAMP(ch0[i] + delta_y, minY, maxY) & mask) | (o0[i] & ~mask);

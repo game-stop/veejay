@@ -8,7 +8,7 @@
 #ifndef IS_LIVIDO_PLUGIN
 #define IS_LIVIDO_PLUGIN
 #endif
-
+#include <unistd.h>
 #include 	"../libplugger/specs/livido.h"
 LIVIDO_PLUGIN
 #include	"utils.h"
@@ -20,7 +20,22 @@ typedef struct
 {
 	uint8_t *bg;
 	int      frame_no;
+	int		 n_threads;
 } bgsubtract_t;
+
+static inline int __advise_num_threads(const int len) {
+	static int ncores = -1;
+    if (ncores == -1) {
+        ncores = (int) sysconf(_SC_NPROCESSORS_ONLN);
+    }
+    int nthreads = ncores;
+
+    if (len < (1920*1080)) nthreads = ncores / 2;
+    if (nthreads < 1) nthreads = 1;
+    if (nthreads > 6) nthreads = 6; // avoid too much overhead
+
+    return nthreads;
+}
 
 int	init_instance( livido_port_t *my_instance )
 {
@@ -36,6 +51,8 @@ int	init_instance( livido_port_t *my_instance )
         free(b);
         return LIVIDO_ERROR_MEMORY_ALLOCATION;
     }
+
+	b->n_threads = __advise_num_threads(w*h);
 
 	livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR,1, &b);
 
@@ -64,18 +81,19 @@ void lvd_vje_diff_plane(uint8_t *__restrict__ A,
                         uint8_t *__restrict__ B,
                         uint8_t *__restrict__ O,
                         int threshold,
-                        const int len)
+                        const int len,
+						int n_threads)
 {
-    #pragma omp simd
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
     for (int i = 0; i < len; i++) {
         int diff = (int)A[i] - (int)B[i];
         int absdiff = (diff ^ (diff >> 31)) - (diff >> 31);
         O[i] = (uint8_t)(-((unsigned int)(absdiff - threshold) >> 31));
     }
 }
-void lvd_avg_frame(uint8_t *__restrict__ A, uint8_t *__restrict__ O, const int len)
+void lvd_avg_frame(uint8_t *__restrict__ A, uint8_t *__restrict__ O, const int len, int n_threads)
 {
-    #pragma omp simd
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
     for (size_t i = 0; i < len; i++) {
         O[i] = (O[i] + A[i] + 1) >> 1;
     }
@@ -116,7 +134,7 @@ int	process_instance( livido_port_t *my_instance, double timecode )
 		}
 		else {
 			/* average frames (assumes that background is static) */
-			lvd_avg_frame( A[0], ptr->bg, len );
+			lvd_avg_frame( A[0], ptr->bg, len, ptr->n_threads );
 		}
 		ptr->frame_no ++;
 
@@ -127,12 +145,12 @@ int	process_instance( livido_port_t *my_instance, double timecode )
 	}
 	else {
 		if( mode == 0 ) {
-			lvd_vje_diff_plane( ptr->bg, A[0], O[0], threshold, len );
+			lvd_vje_diff_plane( ptr->bg, A[0], O[0], threshold, len, ptr->n_threads );
 			livido_memset( O[1], 128, uv_len );
 			livido_memset( O[2], 128, uv_len );
 		}
 		else {
-			lvd_vje_diff_plane( ptr->bg, A[0], O[3], threshold, len );
+			lvd_vje_diff_plane( ptr->bg, A[0], O[3], threshold, len, ptr->n_threads );
 		}
 
 		ptr->frame_no = 0;

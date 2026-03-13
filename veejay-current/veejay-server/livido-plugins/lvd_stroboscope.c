@@ -7,11 +7,13 @@
 #ifndef IS_LIVIDO_PLUGIN
 #define IS_LIVIDO_PLUGIN
 #endif
-
+#include <stdlib.h>
+#include <unistd.h>
 #include 	"../libplugger/specs/livido.h"
 LIVIDO_PLUGIN
 #include	"utils.h"
 #include	"livido-utils.c"
+#include <omp.h>
 
 typedef struct
 {
@@ -19,7 +21,22 @@ typedef struct
 	uint8_t *map;
 	uint8_t *planes[3];
 	int current;
+	int n_threads;
 } hold_buffer_t;
+
+static inline int __advise_num_threads(const int len) {
+	static int ncores = -1;
+    if (ncores == -1) {
+        ncores = (int) sysconf(_SC_NPROCESSORS_ONLN);
+    }
+    int nthreads = ncores;
+
+    if (len < (1920*1080)) nthreads = ncores / 2;
+    if (nthreads < 1) nthreads = 1;
+    if (nthreads > 6) nthreads = 6; // avoid too much overhead
+
+    return nthreads;
+}
 
 int	init_instance( livido_port_t *my_instance )
 {
@@ -40,7 +57,11 @@ int	init_instance( livido_port_t *my_instance )
 	hb->planes[1] = hb->planes[0] + (w*h);
 	hb->planes[2] = hb->planes[1] + (w*h);
 	hb->current   = 0;
+	
+	hb->n_threads = __advise_num_threads(w*h);
+
 	livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR,1, &hb);
+
 
 	return LIVIDO_NO_ERROR;
 }
@@ -68,12 +89,13 @@ static inline void stroboscope(
         const int w, 
         const int h,
         const int feather,
-        const int shift)
+        const int shift,
+		const int n_threads)
 {
     const int len    = w * h;
     const int uv_len = len >> shift;
 
-#pragma omp simd
+	#pragma omp parallel for num_threads(n_threads) schedule(static)
     for (int i = 0; i < uv_len; i++) {
         const int idx = i << shift;
         const int y1v = Y1[idx];
@@ -93,7 +115,7 @@ static inline void stroboscope(
         O2[i] = (feather_mask & blended2) | (~feather_mask & ((y1_mask & A2[i]) | (y2_mask & B2[i])));
     }
 
-#pragma omp simd
+	#pragma omp parallel for num_threads(n_threads) schedule(static)
     for (int i = 0; i < len; i++) {
         const uint8_t y1v = Y1[i];
         const uint8_t y2v = Y2[i];
@@ -101,10 +123,10 @@ static inline void stroboscope(
     }
 }
 
-static inline void fading_stroboscope(uint8_t *O, uint8_t *A, uint8_t *B, uint8_t *Op, const int len)
-{
-    #pragma omp simd
-    for(int i = 0; i < len; i++) {
+static inline void fading_stroboscope(uint8_t *O, const uint8_t *A, const uint8_t *B, const uint8_t *Op, const int len, const int n_threads)
+{    
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int i = 0; i < len; i++) {
         O[i] = A[i] + (((int)Op[i] * ((int)B[i] - (int)A[i])) >> 8);
     }
 }
@@ -118,11 +140,12 @@ static inline void fading_stroboscopeUV(
         const int w, 
         const int h,
         const int feather,
-        const int shift )
+        const int shift,
+		const int n_threads )
 {
     const int uv_len = (w*h) >> shift;
 
-#pragma omp simd
+	#pragma omp parallel for num_threads(n_threads) schedule(static)
     for (int i = 0; i < uv_len; i++) {
         const int y_idx = i << shift;
         const int y1v = Y1[y_idx];
@@ -192,13 +215,13 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 	else 
 	{
 		if( mode == 0 ) {
-			fading_stroboscope( O[0], ptr->planes[0], A[0], A[0],len );
+			fading_stroboscope( O[0], ptr->planes[0], A[0], A[0],len, ptr->n_threads );
 			fading_stroboscopeUV( 
 				O[1],O[2],
 				ptr->planes[1],ptr->planes[2],
 				A[1],A[2],
 				ptr->planes[0],A[0],
-				w,h, feather, shift );
+				w,h, feather, shift, ptr->n_threads );
 
 		} else if ( mode == 1) {
 			stroboscope( 
@@ -206,18 +229,18 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 				ptr->planes[1],ptr->planes[2],
 				A[1],A[2],
 				ptr->planes[0],A[0],
-				w,h, feather, shift );
+				w,h, feather, shift, ptr->n_threads );
 			ptr->current ++;
 		}
 		else if( mode == 2 ) {
-			fading_stroboscope( O[0], ptr->planes[0], A[0], A[0],len );
-			fading_stroboscope( O[1], ptr->planes[1], A[1], A[1],uv_len );
-			fading_stroboscope( O[2], ptr->planes[2], A[2], A[2],uv_len );
+			fading_stroboscope( O[0], ptr->planes[0], A[0], A[0],len, ptr->n_threads);
+			fading_stroboscope( O[1], ptr->planes[1], A[1], A[1],uv_len, ptr->n_threads );
+			fading_stroboscope( O[2], ptr->planes[2], A[2], A[2],uv_len, ptr->n_threads );
 		}
 		else if ( mode == 3 ) {
-			fading_stroboscope( O[0], ptr->planes[0], A[0], ptr->planes[0], len );
-			fading_stroboscope( O[1], ptr->planes[1], A[1], ptr->planes[1], uv_len );
-			fading_stroboscope( O[2], ptr->planes[2], A[2], ptr->planes[2], uv_len );
+			fading_stroboscope( O[0], ptr->planes[0], A[0], ptr->planes[0], len, ptr->n_threads );
+			fading_stroboscope( O[1], ptr->planes[1], A[1], ptr->planes[1], uv_len, ptr->n_threads );
+			fading_stroboscope( O[2], ptr->planes[2], A[2], ptr->planes[2], uv_len, ptr->n_threads );
 		}
 
 		livido_memcpy( ptr->planes[0], O[0], len );

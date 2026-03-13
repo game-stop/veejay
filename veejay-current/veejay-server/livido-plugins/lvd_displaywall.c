@@ -91,7 +91,6 @@ static int displaywall_draw(
     const int scale = wall->scale;
 
     int area = w * h;
-
     for(int i = 0; i < area; i++) {
 
         int px = bx + wall->vecx[i] * scale;
