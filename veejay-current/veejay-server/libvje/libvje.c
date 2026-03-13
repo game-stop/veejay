@@ -120,7 +120,7 @@ static struct {
     { radcor_init,radcor_malloc,radcor_free,NULL,NULL,radcor_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_LENSCORRECTION },
     { posterize_init,NULL,NULL,NULL,NULL,posterize_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_POSTERIZE },
     { posterize2_init,NULL,NULL,NULL,NULL,posterize2_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_POSTERIZE2 },
-    { porterduff_init,NULL,NULL,NULL,NULL,NULL,porterduff_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_PORTERDUFF },
+    { porterduff_init,porterduff_malloc,porterduff_free,NULL,NULL,NULL,porterduff_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_PORTERDUFF },
     { pixelsort_init,pixelsort_malloc,pixelsort_free,NULL,NULL,pixelsort_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_PIXELSORT },
     { pixelsortalpha_init,NULL,NULL,NULL,NULL,pixelsortalpha_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_PIXELSORTALPHA },
     { pixelate_init,NULL,NULL,NULL,NULL,pixelate_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_PIXELATE },
