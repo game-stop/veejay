@@ -178,7 +178,7 @@ void melt_apply(void *ptr, VJFrame *A, int *args) {
     #pragma omp parallel for num_threads(t->n_threads)
 	for (uint32_t y = 0; y < height; ++y) {
 		uint32_t row = y * width;
-		#pragma omp simd
+
 		for (uint32_t x = 0; x < width; ++x) {
 			uint32_t i = row + x;
 			int32_t vx_i = vx[i], vy_i = vy[i];
@@ -206,6 +206,7 @@ void melt_apply(void *ptr, VJFrame *A, int *args) {
     #pragma omp parallel for num_threads(t->n_threads)
     for (uint32_t y = 0; y < height; ++y) {
         uint32_t row = y * width;
+
         #pragma omp simd
         for (uint32_t x = 0; x < width; ++x) {
             uint32_t i = row + x;

@@ -152,8 +152,7 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args)
         uint8_t *srcRowY = srcY + newY * width;
         uint8_t *srcRowU = srcU + newY * width;
         uint8_t *srcRowV = srcV + newY * width;
-
-#pragma omp simd
+        #pragma omp simd
         for (int x = 0; x < width; ++x) {
             int newX = (int)((x - offsetX) * invZoom);
             newX = (newX < 0) ? 0 : (newX >= width ? width - 1 : newX);

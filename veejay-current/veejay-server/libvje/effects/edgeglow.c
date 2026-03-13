@@ -130,7 +130,6 @@ void edgeglow_apply(void *ptr, VJFrame *frame, int *args)
         const int row = y * width;
         B[row] = 0;
 
-#pragma omp simd
         for (int x = 1; x < width - 1; ++x) {
 
             const int idx = row + x;
@@ -162,8 +161,6 @@ void edgeglow_apply(void *ptr, VJFrame *frame, int *args)
     for (int y = 1; y < height - 1; ++y) {
 
         const int row = y * width;
-
-#pragma omp simd
         for (int x = 1; x < width - 1; ++x) {
 
             const int idx = row + x;
