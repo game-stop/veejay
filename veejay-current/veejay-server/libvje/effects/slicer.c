@@ -25,16 +25,18 @@
 typedef struct {
     int *slice_xshift;
     int *slice_yshift;
+    int *prev_slice_xshift;
+    int *prev_slice_yshift;
     int last_period;
     int current_period;
-	uint32_t seed;
+    uint32_t seed;
 } slicer_t;
 
 
 vj_effect *slicer_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 5;
+    ve->num_params = 6;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
@@ -48,16 +50,19 @@ vj_effect *slicer_init(int w, int h)
 	ve->limits[1][3] = 500;
 	ve->limits[0][4] = 0;
 	ve->limits[1][4] = 1;
+    ve->limits[0][5] = 0;
+    ve->limits[1][5] = 100;
     ve->defaults[0] = 16;
     ve->defaults[1] = 16;
 	ve->defaults[2] = 8;
 	ve->defaults[3] = 0;
 	ve->defaults[4] = 0;
+    ve->defaults[5] = 0;
     ve->description = "Slicer";
     ve->sub_format = 1;
     ve->extra_frame = 1;
 	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Width", "Height", "Shatter", "Period", "Mode"); 
+	ve->param_description = vje_build_param_list( ve->num_params, "Width", "Height", "Shatter", "Period", "Mode", "Smoothness"); 
  
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
@@ -109,45 +114,55 @@ static void recalc(slicer_t *s, int w, int h, uint8_t *Yinp, int v1, int v2, con
 void *slicer_malloc(int width, int height)
 {
     slicer_t *s = (slicer_t*) vj_calloc(sizeof(slicer_t));
+    if (!s) return NULL;
+
+    size_t total_ints = height*2 + width*2;
+    int *all_shifts = (int*) vj_malloc(sizeof(int) * total_ints);
+    if (!all_shifts) {
+        free(s);
+        return NULL;
+    }
+
+    s->slice_xshift      = all_shifts;
+    s->slice_yshift      = all_shifts + height;
+    s->prev_slice_xshift = all_shifts + height + width;
+    s->prev_slice_yshift = all_shifts + height + width + height;
+
     s->last_period = -1;
     s->current_period = 1;
 
-    s->slice_xshift = (int*) vj_malloc(sizeof(int) * height);
-    if(!s->slice_xshift) {
-        free(s);
-        return NULL;
-    }
-
-    s->slice_yshift = (int*) vj_malloc(sizeof(int) * width);
-    if(!s->slice_yshift) {
-        free(s->slice_xshift);
-        free(s);
-        return NULL;
-    }
-
-    return (void*) s;
+    return s;
 }
-
 
 void slicer_free(void *ptr)
 {
     slicer_t *s = (slicer_t*) ptr;
-    free( s->slice_xshift );
-    free( s->slice_yshift );
-    free(s);
+    if(s) {
+        free(s->slice_xshift);
+        free(s);
+    }
 }
 
 void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
     slicer_t *s = (slicer_t*) ptr;
     const int width = frame->width;
     const int height = frame->height;
-    const int len = frame->len;
 
     int val1 = args[0], val2 = args[1], shatter = args[2], period = args[3], mode = args[4];
+    int smoothness = args[5];
 
     if (s->current_period <= 0) {
+        veejay_memcpy(s->prev_slice_xshift, s->slice_xshift, sizeof(int)*height);
+        veejay_memcpy(s->prev_slice_yshift, s->slice_yshift, sizeof(int)*width);
+
         uint32_t frame_seed = (uint32_t)(frame->timecode * 1000.0) ^ (val1 * 0x12345678);
         recalc(s, width, height, frame2->data[0], val1, val2, shatter, frame_seed);
+
+        for (int y = 0; y < height; y++)
+            s->slice_xshift[y] = (s->slice_xshift[y] * (100 - smoothness) + s->prev_slice_xshift[y] * smoothness) / 100;
+        for (int x = 0; x < width; x++)
+            s->slice_yshift[x] = (s->slice_yshift[x] * (100 - smoothness) + s->prev_slice_yshift[x] * smoothness) / 100;
+
         s->current_period = (period > 0) ? period : 1;
     }
     s->current_period--;
@@ -157,7 +172,7 @@ void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
     uint8_t *srcCr_base = frame2->data[2];
     uint8_t *srcA_base  = frame2->data[3];
 
-	for (int y = 0; y < height; y++) {
+    for (int y = 0; y < height; y++) {
         const int x_shift = s->slice_xshift[y];
         const int row_offset = y * width;
 
@@ -172,7 +187,6 @@ void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
 
             int out = (src_x < 0) | (src_x >= width) | (src_y < 0) | (src_y >= height);
             int mask = -(out == 0);
-
             int p = ((src_y * width) + src_x) & mask;
 
             *destY  = (srcY_base[p]  & mask) | (16  & ~mask);
