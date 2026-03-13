@@ -1106,51 +1106,29 @@ int luminance_mean(uint8_t * frame[], int w, int h)
     return sum / count;
 }
 
-
-
 void*   yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int swscale_flagss)
 {
     vj_sws *s = (vj_sws*) vj_calloc(sizeof(vj_sws));
+
     if(!s)
         return NULL;
 
     int     swscale_flags = 0;
-    switch(tmpl->flags)
-    {
-        case 1:
-            swscale_flags = swscale_flags|SWS_FAST_BILINEAR;
-            break;
-        case 2:
-            swscale_flags = swscale_flags|SWS_BILINEAR;
-            break;
-        case 4:
-            swscale_flags = swscale_flags|SWS_BICUBIC;
-            break;
-        case 3:
-            swscale_flags = swscale_flags |SWS_POINT;
-            break;
-        case 5:
-            swscale_flags = swscale_flags|SWS_X;
-            break;
-        case 6:
-            swscale_flags = swscale_flags | SWS_AREA;
-            break;
-        case 7:
-            swscale_flags = swscale_flags | SWS_BICUBLIN;
-            break;
-        case 8: 
-            swscale_flags = swscale_flags | SWS_GAUSS;
-            break;
-        case 9:
-            swscale_flags = swscale_flags | SWS_SINC;
-            break;
-        case 10:
-            swscale_flags = swscale_flags |SWS_LANCZOS;
-            break;
-        case 11:
-            swscale_flags = swscale_flags | SWS_SPLINE;
-            break;
-    }   
+    const int len = src->len > dst->len ? src->len : dst->len;
+    
+    switch(tmpl->flags) {
+        case 1:  swscale_flags |= SWS_FAST_BILINEAR; break;
+        case 2:  swscale_flags |= SWS_BILINEAR;      break;
+        case 4:  swscale_flags |= SWS_BICUBIC;       break;
+        case 3:  swscale_flags |= SWS_POINT;         break;
+        case 5:  swscale_flags |= SWS_X;             break;
+        case 6:  swscale_flags |= SWS_AREA;          break;
+        case 7:  swscale_flags |= SWS_BICUBLIN;      break;
+        case 8:  swscale_flags |= SWS_GAUSS;         break;
+        case 9:  swscale_flags |= SWS_SINC;          break;
+        case 10: swscale_flags |= SWS_LANCZOS;       break;
+        case 11: swscale_flags |= SWS_SPLINE;        break;
+    }
 
     if( full_chroma_interpolation_ ) 
         swscale_flags = swscale_flags |  SWS_FULL_CHR_H_INT;
@@ -1171,24 +1149,29 @@ void*   yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int sw
             NULL
         );
 
-    int dummy[4];
-    int srcRange, dstRange;
-    int brightness,contrast,saturation;
+    if(!s->sws) {
+        veejay_msg(VEEJAY_MSG_DEBUG, "sws context initialization failed");
+        if(s->src_filter) sws_freeFilter(s->src_filter);
+        if(s->dst_filter) sws_freeFilter(s->dst_filter);
+        free(s);
+        return NULL;
+    }
 
-    sws_getColorspaceDetails( s->sws, (int**) &dummy, &srcRange, (int**) &dummy, &dstRange, &brightness,&contrast,&saturation );
+    int *dummy1, *dummy2;
+    int srcRange, dstRange, brightness, contrast, saturation;
+
+    sws_getColorspaceDetails(s->sws, &dummy1, &srcRange, &dummy2, &dstRange, &brightness, &contrast, &saturation);
     const int *coefs = sws_getCoefficients(SWS_CS_DEFAULT);
 
     srcRange = src->range;
     dstRange = dst->range;
 
     sws_setColorspaceDetails( s->sws, coefs, srcRange, coefs, dstRange, brightness, contrast, saturation );
-  
 #ifdef STRICT_CHECKING
-    veejay_msg(VEEJAY_MSG_DEBUG, "Initialized scaler context %dx%d@%d (%s) [%d] -> %dx%d@%d (%s) [%d]",
-            src->width,src->height,src->yuv_fmt,yuv_get_pixfmt_description(src->yuv_fmt), src->range,
-            dst->width,dst->height,dst->yuv_fmt,yuv_get_pixfmt_description(dst->yuv_fmt), dst->range);
+    veejay_msg(VEEJAY_MSG_DEBUG, "Initialized %s scaler: %dx%d -> %dx%d (Threads: %d) Limited %d - %d",
+            (LIBSWSCALE_VERSION_MAJOR >= 5 ? "Modern" : "Legacy"),
+            src->width, src->height, dst->width, dst->height, n_threads, srcRange, dstRange);
 #endif
-
     if(!s->sws)
     {
         veejay_msg(VEEJAY_MSG_DEBUG,"sws_getContext failed");
@@ -1197,128 +1180,7 @@ void*   yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int sw
     }   
     
     return ((void*)s);
-
 }
-
-static void *yuv_init_sws_cached_context(vj_sws *s, VJFrame *src, VJFrame *dst, sws_template *tmpl, int swscale_flagss)
-{
-    int     swscale_flags = 0;
-    switch(tmpl->flags)
-    {
-        case 1:
-            swscale_flags = swscale_flags|SWS_FAST_BILINEAR;
-            break;
-        case 2:
-            swscale_flags = swscale_flags|SWS_BILINEAR;
-            break;
-        case 4:
-            swscale_flags = swscale_flags|SWS_BICUBIC;
-            break;
-        case 3:
-            swscale_flags = swscale_flags |SWS_POINT;
-            break;
-        case 5:
-            swscale_flags = swscale_flags|SWS_X;
-            break;
-        case 6:
-            swscale_flags = swscale_flags | SWS_AREA;
-            break;
-        case 7:
-            swscale_flags = swscale_flags | SWS_BICUBLIN;
-            break;
-        case 8: 
-            swscale_flags = swscale_flags | SWS_GAUSS;
-            break;
-        case 9:
-            swscale_flags = swscale_flags | SWS_SINC;
-            break;
-        case 10:
-            swscale_flags = swscale_flags |SWS_LANCZOS;
-            break;
-        case 11:
-            swscale_flags = swscale_flags | SWS_SPLINE;
-            break;
-    }   
-
-    if( full_chroma_interpolation_ ) 
-        swscale_flags = swscale_flags |  SWS_FULL_CHR_H_INT;
-
-    if( !sws_isSupportedInput( src->format ) ) {
-        veejay_msg(VEEJAY_MSG_DEBUG, "No support for input format");
-    }
-    if( !sws_isSupportedOutput( dst->format ) ) {
-        veejay_msg(VEEJAY_MSG_DEBUG, "No support for output format");
-    }
-
-    if( s->sws != NULL ) {
-        if( s->width != src->width || s->format != src->format || s->height != src->height ) {
-            sws_freeContext( s->sws );
-            s->sws = NULL;
-        }
-    }
-
-    s->src_filter = sws_getDefaultFilter( 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1 );
-    s->dst_filter = sws_getDefaultFilter( 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1 );
-
-    if( s->sws == NULL ) {
-        s->sws = sws_getContext(
-            src->width,
-            src->height,
-            src->format,
-            dst->width,
-            dst->height,
-            dst->format,
-            swscale_flags,
-            s->src_filter,
-            s->dst_filter,
-            NULL
-        );
-        s->width = src->width;
-        s->height = src->height;
-        s->format = src->format;
-    }
-
-    int dummy[4];
-    int srcRange, dstRange;
-    int brightness,contrast,saturation;
-
-    sws_getColorspaceDetails( s->sws, (int**) &dummy, &srcRange, (int**) &dummy, &dstRange, &brightness,&contrast,&saturation );
-    const int *coefs = sws_getCoefficients(SWS_CS_DEFAULT);
-
-    srcRange = src->range;
-    dstRange = dst->range;
-
-    sws_setColorspaceDetails( s->sws, coefs, srcRange, coefs, dstRange, brightness, contrast, saturation );
-#ifdef STRICT_CHECKING
-    veejay_msg(VEEJAY_MSG_DEBUG, "Initialized scaler context %dx%d@%d (%s) [%d] -> %dx%d@%d (%s) [%d]",
-            src->width,src->height,src->yuv_fmt,yuv_get_pixfmt_description(src->yuv_fmt), src->range,
-            dst->width,dst->height,dst->yuv_fmt,yuv_get_pixfmt_description(dst->yuv_fmt), dst->range );
-#endif
-    if( s->sws == NULL )
-    {
-        veejay_msg(VEEJAY_MSG_ERROR,"Failed to get scaler context for %dx%d in %d -> %dx%d in %d",
-            src->width,src->height,src->format, dst->width,dst->height,dst->format );
-
-        return NULL;
-    }
-
-    
-    return (void*) s;
-}
-
-
-void*   yuv_init_cached_swscaler(void *cache,VJFrame *src, VJFrame *dst, sws_template *tmpl, int swscale_flags)
-{
-    vj_sws *ctx = (vj_sws*) cache;
-    if( ctx == NULL )
-    {
-        ctx = (vj_sws*) vj_calloc(sizeof(vj_sws));
-        return yuv_init_sws_cached_context(ctx,src, dst, tmpl, swscale_flags);
-    }
-    
-    return yuv_init_sws_cached_context( ctx, src, dst, tmpl, swscale_flags);
-}
-
 
 void  yuv_crop(VJFrame *src, VJFrame *dst, VJRectangle *rect )
 {
