@@ -65,6 +65,7 @@ typedef struct {
     float speed;
     int deformX;
     int deformY;
+    int n_threads;
 } ripplewave_t;
 
 void* ripplewave_malloc(int w, int h) {
@@ -99,6 +100,8 @@ void* ripplewave_malloc(int w, int h) {
     data->speed = 1.0;
     data->deformX = 1;
     data->deformY = 1;
+
+    data->n_threads = vje_advise_num_threads(w * h);
     
     return data;
 }
@@ -115,12 +118,11 @@ void ripplewave_free(void *ptr) {
 
 void ripplewave_apply(void *ptr, VJFrame *frame, int *args) {
     ripplewave_t *data = (ripplewave_t*)ptr;
-
+    
     int width = frame->width;
     int height = frame->height;
+    int y, x;
 
-    int x, y;
-    
     float frequencyX = args[0] * 0.01f;
     float frequencyY = args[1] * 0.01f;
     float amplitude  = args[2];
@@ -150,25 +152,25 @@ void ripplewave_apply(void *ptr, VJFrame *frame, int *args) {
         lut_x[x] = a_cos( frequencyX * x + data->speed );
     }
 
+
+
+    #pragma omp parallel for schedule(static) num_threads(data->n_threads) private(x)
     for (y = 0; y < height; y++) {
-        float offset_y = amplitude * lut_y[y];
+        int rowOffset = y * width;
+        int offsetY = (int)(amplitude * lut_y[y]);
+
+        #pragma omp simd
         for (x = 0; x < width; x++) {
-            float offset_x = amplitude * lut_x[x];
+            int offsetX = (int)(amplitude * lut_x[x]);
 
-            int srcX = (int)(x + offset_x);
-            int srcY = (int)(y + offset_y);
+            int srcX = x + offsetX;
+            int srcY = y + offsetY;
 
-            srcX -= (srcX >= width) ? width : 0;
-            srcY -= (srcY >= height) ? height : 0;
-
-            srcX += (srcX < 0) ? width : 0;
-            srcY += (srcY < 0) ? height : 0;
-            
-            srcX = (srcX < 0) ? (width + srcX) : srcX;
-            srcY = (srcY < 0) ? (height + srcY) : srcY;
+            srcX = (srcX < 0) ? 0 : ((srcX >= width) ? width - 1 : srcX);
+            srcY = (srcY < 0) ? 0 : ((srcY >= height) ? height - 1 : srcY);
 
             int srcIndex = srcY * width + srcX;
-            int dstIndex = y * width + x;
+            int dstIndex = rowOffset + x;
 
             dstY[dstIndex] = Y[srcIndex];
             dstU[dstIndex] = U[srcIndex];
