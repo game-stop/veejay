@@ -22,4 +22,6 @@
 #define DARKREPLACEMIX_H
 vj_effect *darkreplace_init(int w, int h);
 void darkreplace_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
+void *darkreplace_malloc(int w, int h);
+void darkreplace_free(void *ptr);
 #endif
