@@ -50,6 +50,7 @@ vj_effect *sobel_init(int w, int h)
 typedef struct 
 {
     uint8_t *buf;
+    int n_threads;
 } sobel_t;
 
 void *sobel_malloc(int w, int h) {
@@ -60,7 +61,7 @@ void *sobel_malloc(int w, int h) {
         free(s);
         return NULL;
     }
-
+    s->n_threads = vje_advise_num_threads(w*h);
     return (void*) s;
 }
 
@@ -86,64 +87,95 @@ void sobel_apply( void *ptr, VJFrame *frame, int *args ) {
     uint8_t *restrict Cr = frame->data[2];
     uint8_t *restrict B = s->buf;
 
-    veejay_memcpy( B, Y, len );
+    veejay_memcpy(B, Y, len);
 
-    if( mode == 0 ) {
-        for (int y = 1; y < height - 1; ++y) {
-#pragma omp simd
-            for (int x = 1; x < width - 1; ++x) {
-                const int index = y * width + x;
+    if (mode == 0) {
+        #pragma omp parallel for schedule(static) num_threads(s->n_threads)
+        for (int y = 1; y < height - 1; y++) {
+            int rowOffset = y * width;
+            #pragma omp simd
+            for (int x = 1; x < width - 1; x++) {
+                int index = rowOffset + x;
 
-                const int gx = B[index - width - 1] - B[index - width + 1] + 2 * (B[index - 1] - B[index + 1]) + B[index + width - 1] - B[index + width + 1];
-                const int gy = B[index - width - 1] + 2 * B[index - width] + B[index - width + 1] - B[index + width - 1] - 2 * B[index + width] - B[index + width + 1];
+                int idx_nw = index - width - 1;
+                int idx_n  = index - width;
+                int idx_ne = index - width + 1;
+                int idx_w  = index - 1;
+                int idx_e  = index + 1;
+                int idx_sw = index + width - 1;
+                int idx_s  = index + width;
+                int idx_se = index + width + 1;
 
-                const int gradientMagnitude = gx * gx + gy * gy;
+                int gx = B[idx_nw] - B[idx_ne] + 2 * (B[idx_w] - B[idx_e]) + B[idx_sw] - B[idx_se];
+                int gy = B[idx_nw] + 2 * B[idx_n] + B[idx_ne] - B[idx_sw] - 2 * B[idx_s] - B[idx_se];
 
-                Y[index] = (gradientMagnitude > threshold) ? pixel_Y_hi_ : pixel_Y_lo_;
+                int gradSq = gx * gx + gy * gy;
+
+                Y[index] = (gradSq > threshold) ? pixel_Y_hi_ : pixel_Y_lo_;
             }
         }
     } else if (mode == 1) {
-        for (int y = 1; y < height - 1; ++y) {
-#pragma omp simd
-            for (int x = 1; x < width - 1; ++x) {
-                const int index = y * width + x;
+        #pragma omp parallel for schedule(static) num_threads(s->n_threads)
+        for (int y = 1; y < height - 1; y++) {
+            int rowOffset = y * width;
+            #pragma omp simd
+            for (int x = 1; x < width - 1; x++) {
+                int index = rowOffset + x;
 
-                const int gx = B[index - width - 1] - B[index - width + 1] + 2 * (B[index - 1] - B[index + 1]) + B[index + width - 1] - B[index + width + 1];
-                const int gy = B[index - width - 1] + 2 * B[index - width] + B[index - width + 1] - B[index + width - 1] - 2 * B[index + width] - B[index + width + 1];
+                int idx_nw = index - width - 1;
+                int idx_n  = index - width;
+                int idx_ne = index - width + 1;
+                int idx_w  = index - 1;
+                int idx_e  = index + 1;
+                int idx_sw = index + width - 1;
+                int idx_s  = index + width;
+                int idx_se = index + width + 1;
 
-                const int abs_gx = (gx ^ (gx >> 31)) - (gx >> 31);
-                const int abs_gy = (gy ^ (gy >> 31)) - (gy >> 31);
-                const int gradientMagnitude = abs_gx + abs_gy;
+                int gx = B[idx_nw] - B[idx_ne] + 2 * (B[idx_w] - B[idx_e]) + B[idx_sw] - B[idx_se];
+                int gy = B[idx_nw] + 2 * B[idx_n] + B[idx_ne] - B[idx_sw] - 2 * B[idx_s] - B[idx_se];
 
-                const int normMagnitude = (int) (((float) gradientMagnitude / 1020) * 255.0);
+                int abs_gx = (gx ^ (gx >> 31)) - (gx >> 31);
+                int abs_gy = (gy ^ (gy >> 31)) - (gy >> 31);
+                int grad = abs_gx + abs_gy;
 
-                Y[index] = (normMagnitude > t) ? gradientMagnitude : 0;
+                int norm = (grad * 255) / 1020;
+
+                Y[index] = (norm > t) ? grad : 0;
             }
         }
     } else if (mode == 2) {
-        for (int y = 2; y < height - 2; ++y) {
-#pragma omp simd
-            for (int x = 2; x < width - 2; ++x) {
-                const int index = y * width + x;
+        #pragma omp parallel for schedule(static) num_threads(s->n_threads)
+        for (int y = 2; y < height - 2; y++) {
+            int rowOffset = y * width;
+            #pragma omp simd
+            for (int x = 2; x < width - 2; x++) {
+                int index = rowOffset + x;
 
-                const int gx = -B[index - width * 2 - 2] - 2 * B[index - width * 2] - B[index - width * 2 + 2]
-                    + B[index + width * 2 - 2] + 2 * B[index + width * 2] + B[index + width * 2 + 2];
+                int idx_nw = index - 2 * width - 2;
+                int idx_n  = index - 2 * width;
+                int idx_ne = index - 2 * width + 2;
+                int idx_w  = index - width - 2;
+                int idx_e  = index - width + 2;
+                int idx_sw = index + 2 * width - 2;
+                int idx_s  = index + 2 * width;
+                int idx_se = index + 2 * width + 2;
 
-                const int gy = -B[index - width * 2 - 2] - 2 * B[index - width] - B[index - width * 2 + 2]
-                    + B[index + width * 2 - 2] + 2 * B[index + width] + B[index + width * 2 + 2];
+                int gx = -B[idx_nw] - 2*B[idx_n] - B[idx_ne] + B[idx_sw] + 2*B[idx_s] + B[idx_se];
+                int gy = -B[idx_nw] - 2*B[idx_w] - B[idx_ne] + B[idx_sw] + 2*B[idx_e] + B[idx_se];
 
-                const int abs_gx = (gx ^ (gx >> 31)) - (gx >> 31);
-                const int abs_gy = (gy ^ (gy >> 31)) - (gy >> 31);
-                const int gradientMagnitude = abs_gx + abs_gy;
+                int abs_gx = (gx ^ (gx >> 31)) - (gx >> 31);
+                int abs_gy = (gy ^ (gy >> 31)) - (gy >> 31);
+                int grad = abs_gx + abs_gy;
 
-                const int normMagnitude = (int)(((float)gradientMagnitude / 2040.0) * 255.0);
+                int norm = (grad * 255) / 2040;
 
-                Y[index] = (normMagnitude > t) ? gradientMagnitude : 0;
+                Y[index] = (norm > t) ? grad : 0;
             }
         }
     }
 
-    veejay_memset( Cb, 128, frame->uv_len );
-    veejay_memset( Cr, 128, frame->uv_len );
+    veejay_memset(Cb, 128, frame->uv_len);
+    veejay_memset(Cr, 128, frame->uv_len);
+
 
 }
