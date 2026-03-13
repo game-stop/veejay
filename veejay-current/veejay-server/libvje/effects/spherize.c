@@ -55,6 +55,7 @@ vj_effect *spherize_init(int w, int h)
     ve->defaults[4] = 100;
     ve->defaults[5] = w / 2;
     ve->defaults[6] = h / 2;
+    ve->defaults[7] = 2;
 
     ve->description = "Spherize";
     ve->sub_format = 1;
@@ -80,6 +81,8 @@ typedef struct
     int last_cy;
     int last_radius;
     float last_angle;
+
+    int n_threads;
 } spherize_t;
 
 static void init_atan2_lut(spherize_t *f, int w, int h, int cx, int cy)
@@ -171,6 +174,8 @@ void *spherize_malloc(int w, int h)
 
     init_sqrt_lut(s, w, h, w/2, h/2);
 
+    s->n_threads = vje_advise_num_threads(pixels);
+
     return s;
 }
 
@@ -191,7 +196,7 @@ void spherize_free(void *ptr)
 
 void spherize_apply(void *ptr, VJFrame *frame, int *args) {
     spherize_t *s = (spherize_t*)ptr;
-
+    const int n_threads = s->n_threads;
     const float strength = args[0] * 0.01f;
     const float angle    = args[1] * (M_PI/180.0f);
     const float ratio_x  = args[3] * 0.01f;
@@ -231,10 +236,12 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args) {
 
     switch(mode) {
         case 0:
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
             for (int y = 0; y < height; ++y) {
                 const int row = y * width;
                 const float dy_scaled = (y - center_y) * ratio_y;
 
+                #pragma omp simd
                 for (int x = 0; x < width; ++x) {
                     const float dx_scaled = (x - center_x) * ratio_x;
                     const float ratio = 1.0f + strength * sin_lut[row + x] * exp_lut[row + x];
@@ -242,20 +249,22 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args) {
                     int new_x = (int)(center_x + dx_scaled * ratio);
                     int new_y = (int)(center_y + dy_scaled * ratio);
 
-                    if (new_x >= 0 && new_x < width && new_y >= 0 && new_y < height) {
-                        int idx = row + x;
-                        srcY[idx] = bufY[new_y * width + new_x];
-                        srcU[idx] = bufU[new_y * width + new_x];
-                        srcV[idx] = bufV[new_y * width + new_x];
-                    }
+                    new_x = (new_x < 0) ? 0 : ((new_x >= width) ? width - 1 : new_x);
+                    new_y = (new_y < 0) ? 0 : ((new_y >= height) ? height - 1 : new_y);
+
+                    int idx = row + x;
+                    srcY[idx] = bufY[new_y * width + new_x];
+                    srcU[idx] = bufU[new_y * width + new_x];
+                    srcV[idx] = bufV[new_y * width + new_x];
                 }
             }
             break;
         case 1:
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
             for (int y = 0; y < height; ++y) {
                 const int row = y * width;
                 const float dy_scaled = (y - center_y) * ratio_y;
-
+                #pragma omp simd
                 for (int x = 0; x < width; ++x) {
                     const float dx_scaled = (x - center_x) * ratio_x;
                     const float ratio = 1.0f + strength * sin_lut[row + x] * exp_lut[row + x];
@@ -272,20 +281,20 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args) {
             }
             break;
         case 2:
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
             for (int y = 0; y < height; ++y) {
                 const int row = y * width;
                 const float dy_scaled = (y - center_y) * ratio_y;
 
+                #pragma omp simd
                 for (int x = 0; x < width; ++x) {
                     const float dx_scaled = (x - center_x) * ratio_x;
                     const float ratio = 1.0f + strength * sin_lut[row + x] * exp_lut[row + x];
 
                     int new_x = (int)(center_x + dx_scaled * ratio);
                     int new_y = (int)(center_y + dy_scaled * ratio);
-                    if(new_x < 0) new_x = -new_x;
-                    if(new_x >= width) new_x = 2*width - new_x - 2;
-                    if(new_y < 0) new_y = -new_y;
-                    if(new_y >= height) new_y = 2*height - new_y - 2;
+                    new_x = (new_x < 0) ? -new_x : ((new_x >= width) ? 2*width - new_x - 2 : new_x);
+                    new_y = (new_y < 0) ? -new_y : ((new_y >= height) ? 2*height - new_y - 2 : new_y);
                     int idx = row + x;
                     srcY[idx] = bufY[new_y * width + new_x];
                     srcU[idx] = bufU[new_y * width + new_x];
