@@ -34,6 +34,7 @@ typedef struct {
     float *mII;
     float *inv_counts;
     int w, h, sw, sh;
+    int n_threads;
 } smartblur_t;
 
 vj_effect *smartblur_init(int w, int h)
@@ -57,6 +58,7 @@ vj_effect *smartblur_init(int w, int h)
 
     ve->sub_format = 1;
     ve->description = "Smart Blur";
+
     ve->param_description = vje_build_param_list(3, "Radius", "Sharpness", "Chroma");
     return ve;
 }
@@ -69,8 +71,8 @@ void *smartblur_malloc(int w, int h)
     s->w = w;  s->h = h;
     s->sw = w >> 1;
     s->sh = h >> 1;
+    s->n_threads = vje_advise_num_threads(w*h);
 
-    const int nt = omp_get_max_threads();
     const int max_sdim = (s->sw > s->sh) ? s->sw : s->sh;
     const int len = (s->sw*s->sh) + (2*s->sw); // overallocate
 
@@ -79,8 +81,8 @@ void *smartblur_malloc(int w, int h)
     s->b_buf     = vj_malloc((size_t)len * sizeof(float));
     s->tmp_mu    = vj_malloc((size_t)len * sizeof(float));
     s->tmp_var   = vj_malloc((size_t)len * sizeof(float));
-    s->mI        = vj_malloc((size_t)nt * (max_sdim + 1) * sizeof(float));
-    s->mII       = vj_malloc((size_t)nt * (max_sdim + 1) * sizeof(float));
+    s->mI        = vj_malloc((size_t)s->n_threads * (max_sdim + 1) * sizeof(float));
+    s->mII       = vj_malloc((size_t)s->n_threads * (max_sdim + 1) * sizeof(float));
     s->inv_counts = vj_malloc((size_t)(max_sdim * 2 + 2) * sizeof(float));
 
     if (!s->small_src || !s->a_buf || !s->b_buf || !s->tmp_mu || !s->tmp_var)
@@ -110,8 +112,8 @@ static inline uint8_t clamp_u8(int v)
 }
 
 #pragma GCC optimize ("unroll-loops","tree-vectorize")
-static void apply_nuclear_plane_tiled(smartblur_t *s, uint8_t * restrict data,
-                               int r, float eps, float offset, float strength, int luma_only)
+static void apply_nuclear_plane_tiledxx(smartblur_t *s, uint8_t * restrict data,
+                               int r, float eps, float offset, float strength, int luma_only, int n_threads)
 {
     if (strength <= 0.001f) return;
 
@@ -136,7 +138,7 @@ static void apply_nuclear_plane_tiled(smartblur_t *s, uint8_t * restrict data,
         const int tid = 0; 
         float * restrict rowI  = s->mI  + tid * (max_sdim + 1);
         float * restrict rowII = s->mII + tid * (max_sdim + 1);
-
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
         for (int y = 0; y < sh; y++) {
             uint8_t * restrict line = s->small_src + y * sw;
             float * restrict tmu   = s->tmp_mu  + y * sw;
@@ -165,7 +167,7 @@ static void apply_nuclear_plane_tiled(smartblur_t *s, uint8_t * restrict data,
         const int tid = 0;
         float * restrict colI  = s->mI  + tid * (max_sdim + 1);
         float * restrict colII = s->mII + tid * (max_sdim + 1);
-
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
         for (int tx = 0; tx < sw; tx += tile_w) {
             int tw = (tx + tile_w > sw) ? sw - tx : tile_w;
             for (int x = tx; x < tx + tw; x++) {
@@ -243,6 +245,133 @@ static void apply_nuclear_plane_tiled(smartblur_t *s, uint8_t * restrict data,
     }
 }
 
+#pragma GCC optimize ("unroll-loops","tree-vectorize")
+static void apply_nuclear_plane_tiled(smartblur_t *s, uint8_t * restrict data,
+                               int r, float eps, float offset, float strength,
+                               int luma_only, int n_threads)
+{
+    if (strength <= 0.001f) return;
+
+    const int w = s->w, h = s->h, sw = s->sw, sh = s->sh;
+    const float * restrict inv = s->inv_counts;
+    const int max_sdim = (sw > sh) ? sw : sh;
+    const int tile_w = cpu_get_cacheline_size();
+
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int y = 0; y < sh; y++) {
+        uint8_t * restrict s_line = s->small_src + y * sw;
+        uint8_t * restrict d1 = data + (y * 2 * w);
+        uint8_t * restrict d2 = d1 + w;
+        for (int x = 0; x < sw; x++) {
+            int x2 = x << 1;
+            s_line[x] = (d1[x2] + d1[x2 + 1] + d2[x2] + d2[x2 + 1]) >> 2;
+        }
+    }
+
+    #pragma omp parallel num_threads(n_threads)
+    {
+        const int tid = omp_get_thread_num();
+        float * restrict rowI  = s->mI  + tid * (max_sdim + 1);
+        float * restrict rowII = s->mII + tid * (max_sdim + 1);
+
+        #pragma omp for schedule(static)
+        for (int y = 0; y < sh; y++) {
+            uint8_t * restrict line = s->small_src + y * sw;
+            float * restrict tmu   = s->tmp_mu  + y * sw;
+            float * restrict tvar  = s->tmp_var + y * sw;
+            float accI = 0.0f, accII = 0.0f;
+
+            for (int x = 0; x < sw; x++) {
+                float v = (float)line[x] - offset;
+                accI += v; accII += v * v;
+                rowI[x]  = accI; rowII[x] = accII;
+            }
+
+            for (int x = 0; x < sw; x++) {
+                int r1 = (x - r < 0) ? 0 : x - r;
+                int r2 = (x + r >= sw) ? sw - 1 : x + r;
+                float ic = inv[r2 - r1 + 1];
+                float sumI  = rowI[r2]; float sumII = rowII[r2];
+                if (r1 > 0) { sumI -= rowI[r1 - 1]; sumII -= rowII[r1 - 1]; }
+                tmu[x] = sumI * ic; tvar[x] = sumII * ic;
+            }
+        }
+    }
+
+    #pragma omp parallel num_threads(n_threads)
+    {
+        const int tid = omp_get_thread_num();
+        float * restrict colI  = s->mI  + tid * (max_sdim + 1);
+        float * restrict colII = s->mII + tid * (max_sdim + 1);
+        
+        #pragma omp for schedule(static)
+        for (int tx = 0; tx < sw; tx += tile_w) {
+            int tw = (tx + tile_w > sw) ? sw - tx : tile_w;
+            for (int x = tx; x < tx + tw; x++) {
+                float accI = 0.0f, accII = 0.0f;
+                for (int y = 0; y < sh; y++) {
+                    int idx = y * sw + x;
+                    accI += s->tmp_mu[idx]; accII += s->tmp_var[idx];
+                    colI[y]  = accI; colII[y] = accII;
+                }
+                for (int y = 0; y < sh; y++) {
+                    int r1 = (y - r < 0) ? 0 : y - r;
+                    int r2 = (y + r >= sh) ? sh - 1 : y + r;
+                    float ic = inv[r2 - r1 + 1];
+                    float sumI  = colI[r2]; float sumII = colII[r2];
+                    if (r1 > 0) { sumI -= colI[r1 - 1]; sumII -= colII[r1 - 1]; }
+                    float mu  = sumI * ic;
+                    float var = (sumII * ic) - mu * mu;
+                    float a   = var / (var + eps);
+                    int idx = y * sw + x;
+                    s->a_buf[idx] = a;
+                    s->b_buf[idx] = (1.0f - a) * mu;
+                }
+            }
+        }
+    }
+
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int y = 0; y < h; y++) {
+        int ys = y >> 1;
+        const float * restrict a_ptr = s->a_buf + ys * sw;
+        const float * restrict b_ptr = s->b_buf + ys * sw;
+        uint8_t * restrict out = data + y * w;
+
+        if (luma_only) {
+            for (int x = 0; x < (w & ~1); x += 2) {
+                const float a = *a_ptr++;
+                const float b = *b_ptr++;
+                out[x]   = clamp_u8((float)out[x] * a + b);
+                out[x+1] = clamp_u8((float)out[x+1] * a + b);
+            }
+        } else {
+            const float s_val = strength;
+            for (int x = 0; x < (w & ~1); x += 2) {
+                const float av = *a_ptr++;
+                const float bv = *b_ptr++;
+                const float v_coeff = 1.0f + s_val * (av - 1.0f);
+                const float sb_off  = s_val * (bv + offset * (1.0f - av));
+                out[x]   = clamp_u8((float)out[x] * v_coeff + sb_off);
+                out[x+1] = clamp_u8((float)out[x+1] * v_coeff + sb_off);
+            }
+        }
+        
+        if (w & 1) {
+            int x = w - 1;
+            float av = s->a_buf[ys * sw + (x >> 1)];
+            float bv = s->b_buf[ys * sw + (x >> 1)];
+            if (luma_only) {
+                out[x] = clamp_u8((float)out[x] * av + bv);
+            } else {
+                float v_coeff = 1.0f + strength * (av - 1.0f);
+                float sb_off  = strength * (bv + offset * (1.0f - av));
+                out[x] = clamp_u8((float)out[x] * v_coeff + sb_off);
+            }
+        }
+    }
+}
+
 
 
 void smartblur_apply(void *ptr, VJFrame *frame, int *args)
@@ -255,7 +384,10 @@ void smartblur_apply(void *ptr, VJFrame *frame, int *args)
 
     float c_strength = (float)args[2] / 100.0f;
 
-    apply_nuclear_plane_tiled(s, frame->data[0], r, eps, 0.0f,   1.0f,1);
-    apply_nuclear_plane_tiled(s, frame->data[1], r, eps, 128.0f, c_strength,0);
-    apply_nuclear_plane_tiled(s, frame->data[2], r, eps, 128.0f, c_strength,0);
+    apply_nuclear_plane_tiled(s, frame->data[0], r, eps, 0.0f,   1.0f, 1, s->n_threads);
+
+    apply_nuclear_plane_tiled(s, frame->data[1], r, eps, 128.0f, c_strength, 0, s->n_threads);
+
+    apply_nuclear_plane_tiled(s, frame->data[2], r, eps, 128.0f, c_strength, 0, s->n_threads);
+    
 }
