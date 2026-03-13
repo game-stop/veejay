@@ -29,6 +29,7 @@ typedef struct {
     double rotate;
     int frameCount;
     int direction;
+    int n_threads;
 } rotate_t;
 
 vj_effect *rotate_init(int width, int height)
@@ -80,6 +81,8 @@ void *rotate_malloc(int width, int height)
         r->sin_lut[i] = a_sin( i * M_PI / 180.0 );
         r->cos_lut[i] = a_cos( i * M_PI / 180.0 );
     }
+
+    r->n_threads = vje_advise_num_threads(width * height);
 
     return (void*) r;
 }
@@ -143,22 +146,22 @@ void rotate_apply( void *ptr, VJFrame *frame, int *args )
     float sin_val = sin_lut[rotate_angle];
 
 
+#pragma omp parallel for schedule(static) num_threads(r->n_threads)
     for (int y = 0; y < height; ++y) {
+        int dy = y - centerY;
+
 #pragma omp simd
         for (int x = 0; x < width; ++x) {
+            int dx = x - centerX;
 
-            int rotatedX = (int)((x - centerX) * cos_val - (y - centerY) * sin_val + centerX);
-            int rotatedY = (int)((x - centerX) * sin_val + (y - centerY) * cos_val + centerY);
+            int rotatedX = (int)(dx * cos_val - dy * sin_val + centerX);
+            int rotatedY = (int)(dx * sin_val + dy * cos_val + centerY);
 
-            int newX = (int)((rotatedX - centerX) + centerX);
-            int newY = (int)((rotatedY - centerY) + centerY);
-
-            newX = (newX < 0) ? 0 : ((newX > width - 1) ? width - 1 : newX);
-            newY = (newY < 0) ? 0 : ((newY > height - 1) ? height - 1 : newY);
+            int newX = (rotatedX < 0) ? 0 : ((rotatedX >= width) ? width - 1 : rotatedX);
+            int newY = (rotatedY < 0) ? 0 : ((rotatedY >= height) ? height - 1 : rotatedY);
 
             int srcIndex = newY * width + newX;
             int dstIndex = y * width + x;
-
             dstY[dstIndex] = srcY[srcIndex];
             dstU[dstIndex] = srcU[srcIndex];
             dstV[dstIndex] = srcV[srcIndex];
