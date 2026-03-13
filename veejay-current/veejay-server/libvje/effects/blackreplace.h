@@ -22,4 +22,6 @@
 #define BLACKREPLACE_H
 vj_effect *blackreplace_init(int w, int h);
 void blackreplace_apply(void *ptr, VJFrame *frame, int *args);
+void *blackreplace_malloc(int w, int h);
+void blackreplace_free(void *ptr);
 #endif
