@@ -22,4 +22,6 @@
 #define WHITEFRAME_H
 vj_effect *whiteframe_init(int w, int h);
 void whiteframe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
+void *whiteframe_malloc(int w, int h);
+void whiteframe_free(void *ptr);
 #endif
