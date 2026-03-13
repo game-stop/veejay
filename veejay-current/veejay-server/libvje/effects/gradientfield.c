@@ -86,8 +86,8 @@ void *gradientfield_malloc(int w, int h) {
     gradientfield_t *s = (gradientfield_t*)vj_malloc(sizeof(gradientfield_t));
     if (!s) return NULL;
 
-    s->n_threads = omp_get_max_threads();
     s->width = w; s->height = h;
+    s->n_threads = vje_advise_num_threads(w*h);
 
     size_t sz_orig = (size_t)w * h;
     size_t stride = w + 1;
