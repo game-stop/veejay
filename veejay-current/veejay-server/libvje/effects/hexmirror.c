@@ -98,6 +98,7 @@ typedef struct
     float *sin_lut;
 
     float xangle;
+    int n_threads;
 } hexmirror_t;
 
 void hexmirror_free(void *ptr) {
@@ -178,6 +179,8 @@ void *hexmirror_malloc(int w, int h) {
     init_atan_lut( s, w, h, w/2, h/2 );
     init_sqrt_lut( s, w, h,w/2, h/2 );
     init_sin_cos_lut( s );
+
+    s->n_threads = vje_advise_num_threads(w*h);
 
     return (void*) s;
 }
@@ -310,18 +313,21 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
 
     const int start_y = centerY + (-centerY + (frame->jobnum * frame->height));
     const int end_y = start_y + frame->height;
-    const float *restrict atan_ptr = s->atan_lut + (start_y * width);
-    const float *restrict sqrt_ptr = s->sqrt_lut + (start_y * width);
 
+    #pragma omp parallel for schedule(static) num_threads(s->n_threads)
     for (int i = start_y; i < end_y; i++) {
         const float fi = (float)(i - centerY);
         uint8_t *pOutY = outY + (width * (i - start_y));
         uint8_t *pOutU = outU + (width * (i - start_y));
         uint8_t *pOutV = outV + (width * (i - start_y));
 
+        const float *restrict atan_row = s->atan_lut + i * width;
+        const float *restrict sqrt_row = s->sqrt_lut + i * width;
+
+        #pragma omp simd
         for (int j = -centerX; j < centerX; j++) {
-            const float theta_base = *atan_ptr++;
-            const float r_base = *sqrt_ptr++;
+            const float theta_base = *atan_row++;
+            const float r_base = *sqrt_row++;
             
             const int l_idx_rot = (int)(wrap_angle(theta_base - delta) * LUT_DIVISOR) & LUT_MASK;
             const float a_hex = r_base * s->cos_lut[l_idx_rot];
