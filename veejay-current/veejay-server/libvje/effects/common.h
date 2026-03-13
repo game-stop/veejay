@@ -85,9 +85,24 @@ extern int vje_get_rgb_parameter_conversion_type();
 #endif
 
 static inline int vje_advise_num_threads(const int len) {
+    static int ncores = -1; // the result doesnt change during a run
+    static int user_threads = -1;
 
-	int ncores = (int) sysconf(_SC_NPROCESSORS_ONLN);
-	int nthreads = ncores; 
+	int nthreads = 1;
+	if (ncores == -1) {
+		ncores = (int) sysconf(_SC_NPROCESSORS_ONLN);
+	}
+
+	if(user_threads == -1) {
+		char *veejay_tasks = getenv("VEEJAY_MULTITHREAD_TASKS");
+	    if (veejay_tasks != NULL)
+			user_threads = atoi(veejay_tasks);
+
+		if(user_threads <= 0)  user_threads = ncores;
+		if(user_threads > ncores) user_threads = ncores;
+    }
+
+	nthreads = ncores;
 
 	// if not in HD mode, reduce cores by / 2
     if (len < (1920*1080)) nthreads = ncores / 2;
