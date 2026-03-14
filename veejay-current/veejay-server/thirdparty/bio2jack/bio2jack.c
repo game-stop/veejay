@@ -409,7 +409,6 @@ static int JACK_callback(jack_nframes_t nframes, void *arg)
 
     if (atomic_exchange_int(&drv->xrun_pending, 0)) {
         atomic_store_int(&drv->xrun_flag, 1);
-        JACK_flush(drv);
     }
 
     atomic_add_fetch_ulong(&drv->last_hw_frame_count, (unsigned long)nframes);
@@ -1140,6 +1139,7 @@ void JACK_Flush(int deviceID)
   jack_driver_t *drv = getDriver(deviceID);
   JACK_flush(drv);
 }
+
 static long JACK_RingbufferWriteFrames( jack_driver_t *drv, const float *src, long frames)
 {
   jack_ringbuffer_data_t vec[2];
@@ -1182,6 +1182,10 @@ long JACK_Write(int deviceID, unsigned char *data, unsigned long bytes)
 
   if (in_frames <= 0)
     return 0;
+
+  if (atomic_exchange_int(&drv->xrun_pending, 0)) {
+    JACK_flush(drv);
+  }
 
   int64_t delay = swr_get_delay(drv->swr_ctx, drv->client_sample_rate);
   int out_frames_needed = swr_get_out_samples(drv->swr_ctx, in_frames);
