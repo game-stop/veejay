@@ -84,7 +84,6 @@ void darkreplace_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int threshold = args[0];
     const int softness  = args[1];
     const int len    = frame->len;
-    const int uv_len = (frame->ssm ? len : frame->uv_len);
     const int n_threads = dr->n_threads;
 
     uint8_t *Y  = frame->data[0];
