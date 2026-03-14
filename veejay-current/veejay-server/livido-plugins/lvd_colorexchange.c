@@ -36,7 +36,7 @@ static inline int __advise_num_threads(const int len) {
     return nthreads;
 }
 
-livido_init_f	init_instance( livido_port_t *my_instance )
+int	init_instance( livido_port_t *my_instance )
 {
 	int w = 0, h = 0;
 	lvd_extract_dimensions( my_instance, "out_channels", &w, &h );
@@ -54,7 +54,7 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 }
 
 
-livido_deinit_f	deinit_instance( livido_port_t *my_instance )
+int	deinit_instance( livido_port_t *my_instance )
 {
 	void *ptr = NULL;
 	if ( livido_property_get( my_instance, "PLUGIN_private", 0, &ptr ) == LIVIDO_NO_ERROR )

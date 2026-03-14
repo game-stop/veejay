@@ -28,13 +28,13 @@ LIVIDO_PLUGIN
 
 #include 	"lvd_common.h"
 
-livido_init_f	init_instance( livido_port_t *my_instance )
+int	init_instance( livido_port_t *my_instance )
 {
 	return LIVIDO_NO_ERROR;
 }
 
 
-livido_deinit_f	deinit_instance( livido_port_t *my_instance )
+int	deinit_instance( livido_port_t *my_instance )
 {
 	return LIVIDO_NO_ERROR;
 }

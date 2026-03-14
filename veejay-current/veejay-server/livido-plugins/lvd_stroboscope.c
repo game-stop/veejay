@@ -66,8 +66,7 @@ int	init_instance( livido_port_t *my_instance )
 	return LIVIDO_NO_ERROR;
 }
 
-
-livido_deinit_f	deinit_instance( livido_port_t *my_instance )
+int	deinit_instance( livido_port_t *my_instance )
 {
 	void *ptr = NULL;
 	if ( livido_property_get( my_instance, "PLUGIN_private", 0, &ptr ) == LIVIDO_NO_ERROR )
