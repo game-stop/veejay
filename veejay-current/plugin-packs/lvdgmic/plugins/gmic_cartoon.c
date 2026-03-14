@@ -30,7 +30,7 @@ int init_instance( livido_port_t *my_instance )
 }
 
 
-livido_deinit_f	deinit_instance( livido_port_t *my_instance )
+int	deinit_instance( livido_port_t *my_instance )
 {
 	Clvdgmic *gmic = NULL;
     if( livido_property_get( my_instance, "PLUGIN_private",0, &gmic) == LIVIDO_NO_ERROR ) {

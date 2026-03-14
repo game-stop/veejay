@@ -55,7 +55,7 @@ int	init_instance( livido_port_t *my_instance )
 }
 
 
-livido_deinit_f	deinit_instance( livido_port_t *my_instance )
+int	deinit_instance( livido_port_t *my_instance )
 {
 	lvd_crop_t *crop = NULL;
 	if( livido_property_get( my_instance, "PLUGIN_private", 0, &crop ) == LIVIDO_NO_ERROR ) {
