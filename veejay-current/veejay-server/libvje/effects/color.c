@@ -25,77 +25,83 @@
 vj_effect *color_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
     ve->num_params = 3;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 150;
-    ve->defaults[1] = 150;
-    ve->defaults[2] = 150;
+
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    ve->defaults[0] = 128;
+    ve->defaults[1] = 128;
+    ve->defaults[2] = 128;
 
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
+
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
+
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 255;
+
     ve->sub_format = -1;
-    ve->description = "Color Enhance";
-	ve->param_description = vje_build_param_list( ve->num_params, "Intensity Y", "Intensity U", "Intensity V" ); 
-	ve->has_user = 0;
+
+    ve->description = "Color Vibrance";
+
+    ve->param_description =
+        vje_build_param_list(
+            ve->num_params,
+            "Vibrance",
+            "Blue/Yellow Bias",
+            "Red/Green Bias"
+        );
+
+    ve->has_user = 0;
     ve->extra_frame = 0;
-	ve->parallel = 1;
+    ve->parallel = 1;
+
     return ve;
 }
 
+void color_apply(void *ptr, VJFrame *frame, int *args)
+{
+    const int vibrance = args[0];
+    const int bias_u   = args[1];
+    const int bias_v   = args[2];
 
-void color_apply(void *ptr, VJFrame *frame, int *args) {
-    int opacity_a = args[0];
-    int opacity_b = args[1];
-    int opacity_c = args[2];
+    const int uv_len = (frame->ssm ? frame->len : frame->uv_len);
 
-	unsigned int i;
-	const unsigned int op_a0 = 255 - opacity_a; 
-	const unsigned int op_b0 = 255 - opacity_b;
-	const unsigned int op_c0 = 255- opacity_c;
-
-	const unsigned int cb_a = opacity_a * 100;
-	const unsigned int cb_c = opacity_c * 212;
-	const unsigned int cb_b = opacity_b * 72;
-
-	const unsigned int cr_a = opacity_a * 212;
-	const unsigned int cr_b = opacity_b * 58;
-	const unsigned int cr_c = opacity_c * 114;
-
-	int p1,p2,q1,q2;
-
-	const int uv_len = (frame->ssm ? frame->len : frame->uv_len);
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
 
 #pragma omp simd
-	for (i = 0; i < uv_len; i++) {
-		p1 = Cb[i];
-		p2 = Cr[i];
-	
-		q1 = (
-			((op_a0 * p1 + cb_a)>>8) +
-			((op_b0 * p1 + cb_b)>>8) +
-			((op_c0 * p1 + cb_c)>>8)) ;
-		q2 = (
-			((op_a0 * p2 + cr_a)>>8) +
-			((op_b0 * p2 + cr_b)>>8) +
-			((op_c0 * p2 + cr_c)>>8)) ;
+    for(unsigned int i = 0; i < uv_len; i++)
+    {
+        int cb = Cb[i] - 128;
+        int cr = Cr[i] - 128;
 
-		if( q1 > 512) q1 = q1 / 3;
-		else if( q1 > 255) q1 = q1 >> 1;
+        int mag = abs(cb) + abs(cr);
+        int norm = mag >> 1;
+        int curve = 255 - ((norm * norm) >> 8);
 
-		if( q2 > 512) q2 = q2 / 3;
-		else if (q2 > 255) q1 = q2 >> 1;
+        int boost = (vibrance * curve) >> 8;
 
- 		Cb[i] = q1;
-		Cr[i] = q2;
+        cb += (cb * boost) >> 8;
+        cr += (cr * boost) >> 8;
 
-	}
+        cb = (cb * bias_u) >> 8;
+        cr = (cr * bias_v) >> 8;
 
+        cb += 128;
+        cr += 128;
+
+        if(cb < 0) cb = 0;
+        if(cb > 255) cb = 255;
+        if(cr < 0) cr = 0;
+        if(cr > 255) cr = 255;
+
+        Cb[i] = cb;
+        Cr[i] = cr;
+    }
 }
