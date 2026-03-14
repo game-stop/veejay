@@ -77,23 +77,23 @@ int	deinit_instance( livido_port_t *my_instance )
 	return LIVIDO_NO_ERROR;
 }
 
-void lvd_vje_diff_plane(uint8_t *__restrict__ A,
-                        uint8_t *__restrict__ B,
-                        uint8_t *__restrict__ O,
+void lvd_vje_diff_plane(uint8_t *restrict A,
+                        uint8_t *restrict B,
+                        uint8_t *restrict O,
                         int threshold,
                         const int len,
 						int n_threads)
 {
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
+    #pragma omp parallel for simd num_threads(n_threads) schedule(static)
     for (int i = 0; i < len; i++) {
         int diff = (int)A[i] - (int)B[i];
         int absdiff = (diff ^ (diff >> 31)) - (diff >> 31);
         O[i] = (uint8_t)(-((unsigned int)(absdiff - threshold) >> 31));
     }
 }
-void lvd_avg_frame(uint8_t *__restrict__ A, uint8_t *__restrict__ O, const int len, int n_threads)
+void lvd_avg_frame(uint8_t *restrict A, uint8_t *restrict O, const int len, int n_threads)
 {
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
+    #pragma omp parallel for simd num_threads(n_threads) schedule(static)
     for (size_t i = 0; i < len; i++) {
         O[i] = (O[i] + A[i] + 1) >> 1;
     }

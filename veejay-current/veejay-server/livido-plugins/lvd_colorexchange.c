@@ -127,14 +127,14 @@ int	process_instance( livido_port_t *my_instance, double timecode )
     int delta_v = dv - sv;
 
     if (black_incl) {
-		#pragma omp parallel for num_threads(ptr->n_threads) schedule(static)
+		#pragma omp parallel for simd num_threads(ptr->n_threads) schedule(static)
         for(int i = 0; i < len; i++) {
             o0[i] = CLAMP(ch0[i] + delta_y, minY, maxY);
             o1[i] = CLAMP(ch1[i] + delta_u, minUV, maxUV);
             o2[i] = CLAMP(ch2[i] + delta_v, minUV, maxUV);
         }
     } else {
-		#pragma omp parallel for num_threads(ptr->n_threads) schedule(static)
+		#pragma omp parallel for simd num_threads(ptr->n_threads) schedule(static)
         for(int i = 0; i < len; i++) {
             int mask = -(ch0[i] != 0); // 0xFFFFFFFF if ch0!=0, else 0
             o0[i] = (CLAMP(ch0[i] + delta_y, minY, maxY) & mask) | (o0[i] & ~mask);

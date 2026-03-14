@@ -114,7 +114,7 @@ static inline void stroboscope(
         O2[i] = (feather_mask & blended2) | (~feather_mask & ((y1_mask & A2[i]) | (y2_mask & B2[i])));
     }
 
-	#pragma omp parallel for num_threads(n_threads) schedule(static)
+	#pragma omp parallel for simd num_threads(n_threads) schedule(static)
     for (int i = 0; i < len; i++) {
         const uint8_t y1v = Y1[i];
         const uint8_t y2v = Y2[i];
@@ -122,9 +122,14 @@ static inline void stroboscope(
     }
 }
 
-static inline void fading_stroboscope(uint8_t *O, const uint8_t *A, const uint8_t *B, const uint8_t *Op, const int len, const int n_threads)
-{    
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
+static inline void fading_stroboscope(uint8_t * restrict O,
+                                      const uint8_t * restrict A,
+                                      const uint8_t * restrict B,
+                                      const uint8_t * restrict Op,
+                                      const int len,
+                                      const int n_threads)
+{
+    #pragma omp parallel for simd num_threads(n_threads) schedule(static)
     for (int i = 0; i < len; i++) {
         O[i] = A[i] + (((int)Op[i] * ((int)B[i] - (int)A[i])) >> 8);
     }
