@@ -87,13 +87,13 @@ void whiteframe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     if(k < 0.5f) k = 0.5f;
     if(k > 2.5f) k = 2.5f;
 
-    uint8_t *Y  = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
+    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
-    uint8_t *Y2  = frame2->data[0];
-    uint8_t *Cb2 = frame2->data[1];
-    uint8_t *Cr2 = frame2->data[2];
+    uint8_t *restrict Y2  = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
 #pragma omp parallel for num_threads(n_threads) schedule(static)
     for(int i = 0; i < len; i++)
