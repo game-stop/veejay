@@ -304,6 +304,7 @@ static struct {                 /* hardcoded keyboard layout (the default keys) 
     { VIMS_CHAIN_ENTRY_DEC_ARG,     SDL_SCANCODE_O,         VIMS_MOD_NONE,  "7 -1"  },
     { VIMS_TOGGLE_TRANSITIONS,      SDL_SCANCODE_T,         VIMS_MOD_SHIFT, NULL    },
     { VIMS_OSD,                     SDL_SCANCODE_O,         VIMS_MOD_CTRL,  NULL    },
+    { VIMS_AUDIO_TOGGLE_MUTE,       SDL_SCANCODE_M,         VIMS_MOD_CTRL,  NULL    },
     { VIMS_COPYRIGHT,               SDL_SCANCODE_C,         VIMS_MOD_CTRL,  NULL    },
     { VIMS_COMPOSITE,               SDL_SCANCODE_I,         VIMS_MOD_CTRL,  NULL    },
     { VIMS_OSD_EXTRA,               SDL_SCANCODE_H,         VIMS_MOD_CTRL,  NULL    },
@@ -7658,12 +7659,23 @@ void vj_event_disable_audio(void *ptr, const char format[], va_list ap)
 {
 #ifdef HAVE_JACK
     veejay_t *v = (veejay_t *)ptr;
+
+    atomic_store_int(&v->settings->audio_mute, 1);
+#endif
+}
+
+void vj_event_toggle_audio_mute(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t *)ptr;
     if (!atomic_load_int(&v->audio_running))
     {
         veejay_msg(0,"Veejay was started without audio");
         return;
     }
-    atomic_store_int(&v->settings->audio_mute, 1);
+    int new = !atomic_load_int(&v->settings->audio_mute);
+    atomic_exchange_int(&v->settings->audio_mute, new);
+    veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Audio is now %s", (new == 1 ? "muted" : "unmuted"));
 #endif
 }
 

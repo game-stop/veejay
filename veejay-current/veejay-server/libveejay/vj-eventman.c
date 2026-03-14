@@ -2088,6 +2088,15 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY ,
 				NULL );
 
+	index_map_[VIMS_AUDIO_TOGGLE_MUTE]				=	_new_event(
+				NULL,
+				VIMS_AUDIO_TOGGLE_MUTE,
+				"Mute/Unmute Audio",
+				vj_event_toggle_audio_mute,
+				0,
+				VIMS_ALLOW_ANY ,
+				NULL );
+
 	index_map_[VIMS_AUDIO_ENABLE]				=	_new_event(
 				NULL,
 				VIMS_AUDIO_ENABLE,
