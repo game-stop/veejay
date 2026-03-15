@@ -48,8 +48,8 @@ vj_effect *spherize_init(int w, int h)
     ve->limits[0][7] = 0;
     ve->limits[1][7] = 2;
 
-    ve->defaults[0] = 50;
-    ve->defaults[1] = 0;
+    ve->defaults[0] = 33;
+    ve->defaults[1] = 340;
     ve->defaults[2] = ve->limits[1][2] / 2;
     ve->defaults[3] = 100;
     ve->defaults[4] = 100;
@@ -241,7 +241,6 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args) {
                 const int row = y * width;
                 const float dy_scaled = (y - center_y) * ratio_y;
 
-                #pragma omp simd
                 for (int x = 0; x < width; ++x) {
                     const float dx_scaled = (x - center_x) * ratio_x;
                     const float ratio = 1.0f + strength * sin_lut[row + x] * exp_lut[row + x];
@@ -264,7 +263,7 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args) {
             for (int y = 0; y < height; ++y) {
                 const int row = y * width;
                 const float dy_scaled = (y - center_y) * ratio_y;
-                #pragma omp simd
+
                 for (int x = 0; x < width; ++x) {
                     const float dx_scaled = (x - center_x) * ratio_x;
                     const float ratio = 1.0f + strength * sin_lut[row + x] * exp_lut[row + x];
@@ -286,7 +285,6 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args) {
                 const int row = y * width;
                 const float dy_scaled = (y - center_y) * ratio_y;
 
-                #pragma omp simd
                 for (int x = 0; x < width; ++x) {
                     const float dx_scaled = (x - center_x) * ratio_x;
                     const float ratio = 1.0f + strength * sin_lut[row + x] * exp_lut[row + x];
