@@ -111,7 +111,7 @@ void tracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     uint8_t *restrict t1 = t->trace_buffer[1];
     uint8_t *restrict t2 = t->trace_buffer[2];
   
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
+    #pragma omp parallel for simd num_threads(n_threads) schedule(static)
     for (int x = 0; x < len; x++)
     {
         int mixed = (Y[x] + Y2[x]) * op_scale >> 9;
@@ -121,7 +121,7 @@ void tracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         Y[x]  = (uint8_t)accum;
     }
 
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
+    #pragma omp parallel for simd num_threads(n_threads) schedule(static)
     for (int x = 0; x < uv_len; x++)
     {
         int cb_acc = t1[x] - 128;
