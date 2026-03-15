@@ -17,7 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-
+#pragma GCC optimize ("unroll-loops","tree-vectorize")
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "average-blend.h"
@@ -41,45 +41,47 @@ vj_effect *average_blend_init(int w, int h)
     return ve;
 }
 
-static inline void ac_average( uint8_t *dst, const uint8_t *src1, const uint8_t *src2, const int len )
+static inline void ac_average( uint8_t *dst, const uint8_t *src1, const uint8_t *src2, const int len, const int n_threads )
 {
     unsigned int i;
-#pragma omp simd
+#pragma omp parallel for num_threads(n_threads) schedule(static)
     for( i = 0; i < len; i ++ ) {
         dst[i] = (src1[i] + src2[i]) >> 1;
     }
 }
 
-static inline void ac_average_uv( uint8_t *dst, const uint8_t *src1, const uint8_t *src2, uint8_t *dstb, const uint8_t *src1b, const uint8_t *src2b,  const int len )
+static inline void ac_average_uv(uint8_t *dst_u, const uint8_t *src2_u, 
+                                 uint8_t *dst_v, const uint8_t *src2_v, 
+                                 const int len, int n_threads)
 {
-    unsigned int i;
-#pragma omp simd
-    for( i = 0; i < len; i ++ ) {
-        dst[i] = (src1[i] + src2[i]) >> 1;
-	dstb[i]= (src1b[i] + src2b[i]) >> 1;
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
+    for(int i = 0; i < len; i++) {
+        dst_u[i] = (dst_u[i] + src2_u[i]) >> 1;
+        dst_v[i] = (dst_v[i] + src2_v[i]) >> 1;
     }
 }
 
-
-
-static void average_blend_apply1( VJFrame *frame, VJFrame *frame2, int average_blend)
+static void average_blend_apply1( VJFrame *frame, VJFrame *frame2, int average_blend, const int n_threads)
 {
     unsigned int i;
     for( i = 0; i < average_blend; i ++ ) {
-        ac_average( frame->data[0], frame->data[0], frame2->data[0], frame->len );
-        ac_average_uv( frame->data[1], frame->data[1], frame2->data[1], frame->data[2], frame->data[2], frame2->data[2], frame->uv_len );
-    }
+        ac_average( frame->data[0], frame->data[0],
+            frame2->data[0], frame->len, n_threads );
+        ac_average_uv(frame->data[1], frame2->data[1], 
+                      frame->data[2], frame2->data[2], 
+                      frame->uv_len, n_threads);
+        }
 }
 
 void average_blend_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    average_blend_apply1( frame,frame2,args[0] );
+    average_blend_apply1( frame,frame2,args[0], vje_advise_num_threads(frame->len) );
 }
 
 void average_blend_applyN( void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
     int average_blend = args[0];
 
-    average_blend_apply1( frame,frame2,average_blend );
+    average_blend_apply1( frame,frame2,average_blend, vje_advise_num_threads(frame->len) );
     
 }
 
