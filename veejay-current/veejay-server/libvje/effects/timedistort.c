@@ -266,7 +266,7 @@ void timedistort_apply(void *ptr, VJFrame *frame, int *args)
     const int plane_now = td->plane;
     const int populated = td->plane_populated;
 
-    #pragma omp parallel for simd num_threads(td->n_threads) schedule(static)
+    #pragma omp parallel for num_threads(td->n_threads) schedule(static)
     for (int i = 0; i < len; i++) {
         int age = q[i];
         if (populated < PLANES && age >= populated)
