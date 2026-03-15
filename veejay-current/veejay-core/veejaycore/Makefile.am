@@ -28,7 +28,7 @@ libveejaycore_la_SOURCES = core.c vj-task.c
 
 libveejaycore_la_LDFLAGS = -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) \
 		       -release $(LT_RELEASE) -no-undefined -export-dynamic $(DEBUGLIBS)
-
+libveejaycore_la_LDFLAGS += -rpath $(libdir)
 
 libveejaycore_la_LIBADD = \
 			$(top_builddir)/thirdparty/libhash/libhash.la \

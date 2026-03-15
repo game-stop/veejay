@@ -66,6 +66,7 @@ libveejay_la_LDFLAGS = \
     -no-undefined \
     -export-dynamic \
     $(DEBUGLIBS)
+libveejay_la_LDFLAGS += -rpath $(libdir)
 
 libveejay_la_LIBADD = \
     $(top_builddir)/thirdparty/bio2jack/libbio2jack4vj.la \
