@@ -22,237 +22,255 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include <libvje/internal.h>
+#include <omp.h>
 #include "fragmenttv.h"
 
 #define MAX_FRAGMENTS 16384
-#define LUT_SIZE 3600
-#define TWO_PI 6.28318530718f
+
+#define MAX_TILES 4096
+#define RANDBUF_SIZE 512
+
+typedef struct {
+    int dx, dy;
+    int size;
+    int srcX, srcYpos;
+    float alphaX[MAX_FRAGMENTS];
+    float alphaY[MAX_FRAGMENTS];
+} tile_info_t;
+
+typedef struct {
+    uint8_t *buf[3];
+    int count;
+    int *tile_pos_x;
+    int *tile_pos_y;
+    int *tile_size;
+    uint8_t *mask;
+    int n_threads;
+    uint32_t randbuf[RANDBUF_SIZE];
+    tile_info_t tiles[MAX_TILES];
+    int tile_count;
+    int first_frame;
+    int prev_tileSize;
+    int prev_variation;
+    int prev_jitter;
+    int prev_scatter;
+    int prev_density;
+} fragmenttv_t;
+
+
 
 vj_effect *fragmenttv_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 5;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
-    ve->defaults[0] = 14;
-    ve->defaults[1] = 2;
-    ve->defaults[2] = 45;
-    ve->defaults[3] = 220;
+    vj_effect *ve = (vj_effect*) vj_calloc(sizeof(vj_effect));
+
+    ve->num_params = 7;
+
+    ve->defaults = (int*) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int*) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int*) vj_calloc(sizeof(int) * ve->num_params);
+
+    ve->defaults[0] = 28;
+    ve->defaults[1] = 0;
+    ve->defaults[2] = 8;
+    ve->defaults[3] = 4;
     ve->defaults[4] = 0;
-    ve->description = "FragmentTV";
-    ve->limits[0][0] = 10;
-    ve->limits[1][0] = 100;
+    ve->defaults[5] = 1;
+    ve->defaults[6] = 100;
+
+    ve->limits[0][0] = 8;
+    ve->limits[1][0] = 128;
+
     ve->limits[0][1] = 0;
-    ve->limits[1][1] = (w < h ? w : h) / 4;
+    ve->limits[1][1] = 128;
+
     ve->limits[0][2] = 0;
-    ve->limits[1][2] = (w < h ? w : h) / 4;
+    ve->limits[1][2] = 256;
+
     ve->limits[0][3] = 0;
-    ve->limits[1][3] = 1000;
+    ve->limits[1][3] = 64;
+
     ve->limits[0][4] = 0;
     ve->limits[1][4] = 500;
-    
+
+    ve->limits[0][5] = 0;
+    ve->limits[1][5] = 1;
+
+    ve->limits[0][6] = 0;
+    ve->limits[1][6] = 100;
+
+    ve->description = "Stable Fragment TV";
+
     ve->extra_frame = 0;
     ve->sub_format = 1;
     ve->has_user = 0;
     ve->parallel = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Grid Size", "Minimum Size", "Maximum Size", "Displacement", "Interval" );
 
-    ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->param_description =
+        vje_build_param_list(ve->num_params,
+            "Tile Size",
+            "Size Variation",
+            "Scatter",
+            "Grid Jitter",
+            "Interval",
+            "Black Background",
+            "Tile Density");
+
+    ve->hints = vje_init_value_hint_list(ve->num_params);
 
     return ve;
 }
 
-#define SIN_LUT_SCALE 1024 
-
-typedef struct {
-    uint8_t *buf[3];      // big buffers first
-    int *randbuf;          // large random table
-    int count;
-
-    int16_t *sin_lut;      // LUTs at the end
-    int16_t *cos_lut_int;
-    float distortion;      // any other small fields
-    uint8_t *reserved[1024]; // safety heap
-} fragmenttv_t;
-
-static void init_sin_lut(fragmenttv_t *m) {
-    for (int i = 0; i < LUT_SIZE; i++) {
-        float angle = i * (TWO_PI / LUT_SIZE);
-        m->sin_lut[i] = (int16_t)(sinf(angle));
-        m->cos_lut_int[i] = (int16_t)(cosf(angle));
-    }
-}
-
-static void init_rand_lut(fragmenttv_t *m) {
-    for (int i = 0; i < MAX_FRAGMENTS; i++) {
-        m->randbuf[i] = rand();
-    }
-}
-
-void *fragmenttv_malloc(int w, int h) {
-    fragmenttv_t *m = (fragmenttv_t*) vj_malloc(sizeof(fragmenttv_t));
-    if (!m) return NULL;
-
-    m->sin_lut = (int16_t*) vj_malloc(sizeof(int16_t) * LUT_SIZE);
-    if (!m->sin_lut) { free(m); return NULL; }
-
-    m->cos_lut_int = (int16_t*) vj_malloc(sizeof(int16_t) * LUT_SIZE);
-    if (!m->cos_lut_int) { free(m->sin_lut); free(m); return NULL; }
-
-    m->buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h);
-    m->buf[1] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h);
-    m->buf[2] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h);
-    if (!m->buf[0] || !m->buf[1] || !m->buf[2]) {
-        if (m->buf[0]) free(m->buf[0]);
-        if (m->buf[1]) free(m->buf[1]);
-        if (m->buf[2]) free(m->buf[2]);
-        free(m->cos_lut_int);
-        free(m->sin_lut);
-        free(m);
-        return NULL;
-    }
-
-    m->randbuf = (int*) vj_malloc(sizeof(int) * MAX_FRAGMENTS);
-    if (!m->randbuf) {
-        free(m->buf[0]);
-        free(m->buf[1]);
-        free(m->buf[2]);
-        free(m->cos_lut_int);
-        free(m->sin_lut);
-        free(m);
-        return NULL;
-    }
-
-    m->count = 0;
-
-    init_sin_lut(m);
-    init_rand_lut(m);
-
-    return (void*) m;
-}
-
-void fragmenttv_free(void *ptr) {
-    if (!ptr) return;
-
-    fragmenttv_t *m = (fragmenttv_t*) ptr;
-
-    if (m->sin_lut) free(m->sin_lut);
-    if (m->cos_lut_int) free(m->cos_lut_int);
-
-    if (m->buf[0]) free(m->buf[0]);
-    if (m->buf[1]) free(m->buf[1]);
-    if (m->buf[2]) free(m->buf[2]);
-
-    if (m->randbuf) free(m->randbuf);
-
-    free(m);
-}
-
-typedef struct {
-    int x, y;
-} Point;
-
-static inline void rotatePoint(int x, int y, int cx, int cy, float theta, int *newX, int *newY, fragmenttv_t *m) {
-    int lutpos = (int)(theta * LUT_SIZE / TWO_PI);
-
-    if (lutpos < 0) lutpos = (lutpos % LUT_SIZE + LUT_SIZE) % LUT_SIZE;
-    else if (lutpos >= LUT_SIZE) lutpos = lutpos % LUT_SIZE;
-
-    float cosTheta = m->cos_lut_int[lutpos];
-    float sinTheta = m->sin_lut[lutpos];
-
-    *newX = (int)(cx + (x - cx) * cosTheta - (y - cy) * sinTheta + 0.5f);
-    *newY = (int)(cy + (x - cx) * sinTheta + (y - cy) * cosTheta + 0.5f);
-}
-
-void drawGridTriangles(fragmenttv_t *m,
-                       uint8_t *dstY, uint8_t *dstU, uint8_t *dstV,
-                       uint8_t *srcY, uint8_t *srcU, uint8_t *srcV,
-                       int width, int height,
-                       const int gridSize, const int minSize, const int maxSize,
-                       const float displacementWeight) 
+static void init_rand_lut(fragmenttv_t *m, uint32_t seed)
 {
-    const int numTrianglesX = width / gridSize;
-    const int numTrianglesY = height / gridSize;
+    uint32_t s = seed;
+    for(int i=0;i<RANDBUF_SIZE;i++){
+        s = s * 1664525u + 1013904223u;
+        m->randbuf[i] = s;
+    }
+}
 
-    int *restrict rand_lut = m->randbuf;
-    int rand_lut_pos = 0;
+static inline int randbuf_val(fragmenttv_t *m, int pos, int min, int max) {
+    return min + (int)(m->randbuf[pos % RANDBUF_SIZE] % (max - min + 1));
+}
 
-    for (int i = 0; i < numTrianglesX; ++i) {
-        for (int j = 0; j < numTrianglesY; ++j) {
-            int triangleSize = minSize + rand_lut[rand_lut_pos] % (maxSize - minSize + 1);
-            rand_lut_pos = (rand_lut_pos + 1) % MAX_FRAGMENTS;
+void *fragmenttv_malloc(int w, int h)
+{
+    size_t buf_size   = w * h;
+    size_t tile_size  = sizeof(int) * MAX_TILES;
+    size_t total_size = sizeof(fragmenttv_t) + 3 * buf_size + buf_size + 3 * tile_size;
 
-            Point p1 = { i * gridSize, j * gridSize };
-            Point p2 = { p1.x + triangleSize, p1.y };
-            Point p3 = { p1.x, p1.y + triangleSize };
+    uint8_t *block = (uint8_t*) vj_malloc(total_size);
+    if (!block) return NULL;
 
-            float angle = (float)rand_lut[rand_lut_pos] / RAND_MAX * TWO_PI;
-            rand_lut_pos = (rand_lut_pos + 1) % MAX_FRAGMENTS;
+    fragmenttv_t *m = (fragmenttv_t*) block;
+    uint8_t *ptr = block + sizeof(fragmenttv_t);
 
-            int rotatedX, rotatedY;
-            rotatePoint(p1.x, p1.y, p2.x, p2.y, angle, &rotatedX, &rotatedY, m);
-            p2.x = rotatedX; p2.y = rotatedY;
+    m->buf[0] = ptr; ptr += buf_size;
+    m->buf[1] = ptr; ptr += buf_size;
+    m->buf[2] = ptr; ptr += buf_size;
+    m->mask   = ptr; ptr += buf_size;
 
-            rotatePoint(p1.x, p1.y, p3.x, p3.y, angle, &rotatedX, &rotatedY, m);
-            p3.x = rotatedX; p3.y = rotatedY;
+    m->tile_pos_x = (int*) ptr; ptr += tile_size;
+    m->tile_pos_y = (int*) ptr; ptr += tile_size;
+    m->tile_size  = (int*) ptr; ptr += tile_size;
 
-            if (p1.x < 0) p1.x = 0; if (p1.y < 0) p1.y = 0;
-            if (p2.x < 0) p2.x = 0; if (p2.y < 0) p2.y = 0;
-            if (p3.x < 0) p3.x = 0; if (p3.y < 0) p3.y = 0;
-            if (p1.x >= width) p1.x = width - 1; if (p1.y >= height) p1.y = height - 1;
-            if (p2.x >= width) p2.x = width - 1; if (p2.y >= height) p2.y = height - 1;
-            if (p3.x >= width) p3.x = width - 1; if (p3.y >= height) p3.y = height - 1;
+    veejay_memset(m->tile_pos_x, 0, tile_size);
+    veejay_memset(m->tile_pos_y, 0, tile_size);
+    veejay_memset(m->tile_size,  0, tile_size);
 
-            int dx21 = p2.x - p1.x, dy21 = p2.y - p1.y;
-            int dx32 = p3.x - p2.x, dy32 = p3.y - p2.y;
-            int dx13 = p1.x - p3.x, dy13 = p1.y - p3.y;
+    m->n_threads = vje_advise_num_threads(w*h);
+    m->count = 0;
+    m->first_frame = 1;
+    init_rand_lut(m, 12345); // initial seed
 
-            int heightY = p3.y - p1.y;
+    return m;
+}
 
-            for (int y = p1.y; y <= p3.y; ++y) {
 
-                float displacementY = 0.0f;
-                if(heightY != 0){
-                    int lutY = (y - p1.y) * LUT_SIZE / heightY;
-                    if(lutY >= LUT_SIZE) lutY = LUT_SIZE - 1;
-                    displacementY = m->sin_lut[lutY] * displacementWeight;
+void fragmenttv_free(void *ptr)
+{
+    if(ptr)
+        free(ptr);
+}
+
+static inline uint32_t lcg_rand(uint32_t *state) {
+    *state = *state * 1664525u + 1013904223u;
+    return *state;
+}
+
+static inline int clampi(int v,int min,int max) {
+    if(v < min) return min;
+    if(v > max) return max;
+    return v;
+}
+
+static inline void blendPixel(uint8_t *dstY, uint8_t *dstU, uint8_t *dstV,
+                              int idx, float alpha)
+{
+    if(alpha <= 0.0f) return;
+    dstY[idx] = (uint8_t)(dstY[idx]*(1.0f - alpha));
+    dstU[idx] = (uint8_t)(dstU[idx]*(1.0f - alpha) + 128*alpha);
+    dstV[idx] = (uint8_t)(dstV[idx]*(1.0f - alpha) + 128*alpha);
+}
+
+static inline int randbuf_next(fragmenttv_t *m, int *rpos, int min, int max){
+    uint32_t val = m->randbuf[*rpos];
+    (*rpos)++;
+    if(*rpos>=RANDBUF_SIZE) *rpos=0;
+    return min + (int)(val % (max - min + 1));
+}
+
+static void drawTileBorders_parallel(fragmenttv_t *m,
+                                     uint8_t *dstY, uint8_t *dstU, uint8_t *dstV,
+                                     int width, int height,
+                                     int requested_border,
+                                     uint8_t *mask)
+{
+    const float alpha_factor = 1.0f / 3.0f; // for edges
+
+    #pragma omp parallel for schedule(dynamic) num_threads(m->n_threads)
+    for(int t = 0; t < MAX_TILES; t++){
+        int size = m->tile_size[t];
+        if(size <= 0) continue;
+
+        int dx = m->tile_pos_x[t];
+        int dy = m->tile_pos_y[t];
+        int border = clampi(requested_border, 1, size/2);
+
+        float alphaBorder[3];
+        for(int i=0;i<3;i++) alphaBorder[i] = (i+1)*alpha_factor;
+
+        for(int y=0; y<border; y++){
+            float ay = (y<3) ? alphaBorder[y] : 1.0f;
+            int yy_top = dy + y;
+            int yy_bot = dy + size - 1 - y;
+
+            for(int x=0; x<size; x++){
+                float ax;
+                if(x < 3) ax = alphaBorder[x];
+                else if(x >= size-3) ax = alphaBorder[size-1-x];
+                else ax = 1.0f;
+                float alpha = ax * ay;
+
+                int xx = dx + x;
+
+                if(xx < 0 || xx >= width) continue;
+
+                if(yy_top >= 0 && yy_top < height){
+                    int idx = yy_top*width + xx;
+                    if(mask[idx]==0) blendPixel(dstY,dstU,dstV, idx, alpha);
                 }
 
-                uint8_t *rowY = dstY + y * width;
-                uint8_t *rowU = dstU + y * width;
-                uint8_t *rowV = dstV + y * width;
+                if(yy_bot >= 0 && yy_bot < height){
+                    int idx = yy_bot*width + xx;
+                    if(mask[idx]==0) blendPixel(dstY,dstU,dstV, idx, alpha);
+                }
+            }
+        }
 
-                int widthX = p2.x - p1.x;
-                for (int x = p1.x; x <= p2.x; ++x) {
+        for(int x=0; x<border; x++){
+            float ax = (x<3) ? alphaBorder[x] : 1.0f;
+            int xx_left = dx + x;
+            int xx_right = dx + size - 1 - x;
 
-                    float displacementX = 0.0f;
-                    if(widthX != 0){
-                        int lutX = (x - p1.x) * LUT_SIZE / widthX;
-                        if(lutX >= LUT_SIZE) lutX = LUT_SIZE - 1;
-                        displacementX = m->sin_lut[lutX] * displacementWeight;
-                    }
+            for(int y=0; y<size; y++){
+                float ay;
+                if(y<3) ay = alphaBorder[y];
+                else if(y >= size-3) ay = alphaBorder[size-1-y];
+                else ay = 1.0f;
+                float alpha = ax * ay;
 
-                    int sign1 = dx21 * (y - p1.y) - (x - p1.x) * dy21;
-                    int sign2 = dx32 * (y - p2.y) - (x - p2.x) * dy32;
-                    int sign3 = dx13 * (y - p3.y) - (x - p3.x) * dy13;
+                int yy = dy + y;
+                if(yy < 0 || yy >= height) continue;
 
-                    if(sign1 >= 0 && sign2 >= 0 && sign3 >= 0){
-                        int mirroredX = width - x - 1 + (int)(displacementX + 0.5f);
-                        int mirroredY = y + (int)(displacementY + 0.5f);
+                if(xx_left >=0 && xx_left < width){
+                    int idx = yy*width + xx_left;
+                    if(mask[idx]==0) blendPixel(dstY,dstU,dstV, idx, alpha);
+                }
 
-                        if(mirroredX < 0) mirroredX = 0;
-                        if(mirroredX >= width) mirroredX = width - 1;
-                        if(mirroredY < 0) mirroredY = 0;
-                        if(mirroredY >= height) mirroredY = height - 1;
-
-                        int mirroredIndex = mirroredY * width + mirroredX;
-
-                        rowY[x] = (rowY[x] + srcY[mirroredIndex]) >> 1;
-                        rowU[x] = (rowU[x] + srcU[mirroredIndex]) >> 1;
-                        rowV[x] = (rowV[x] + srcV[mirroredIndex]) >> 1;
-                    }
+                if(xx_right >=0 && xx_right < width){
+                    int idx = yy*width + xx_right;
+                    if(mask[idx]==0) blendPixel(dstY,dstU,dstV, idx, alpha);
                 }
             }
         }
@@ -260,57 +278,151 @@ void drawGridTriangles(fragmenttv_t *m,
 }
 
 
-void fragmenttv_apply(void *ptr, VJFrame *frame, int *args) {
-    fragmenttv_t *m = (fragmenttv_t *)ptr;
+static void generateTiles(fragmenttv_t *m,
+                          int width, int height,
+                          int tileSize, int variation, int jitter, int scatter,
+                          int density)
+{
+    int rpos = 0;
+    m->tile_count = 0;
 
-    const int width = frame->width;
-    const int height = frame->height;
+    const float alpha_factor = 0.6f / 3.0f;
+    const float alpha_base   = 0.4f;
 
-    const int numFragments = args[0];
-    int minSize = args[1];
-    int maxSize = args[2];
-    const float displacementWeight = args[3] * 0.1f;
-    const int interval = args[4];   
+    for(int gy = 0; gy < height; gy += tileSize){
+        for(int gx = 0; gx < width; gx += tileSize){
+            if(randbuf_next(m, &rpos, 0, 99) > density) continue;
 
-    uint8_t *restrict srcY = frame->data[0];
-    uint8_t *restrict srcU = frame->data[1];
-    uint8_t *restrict srcV = frame->data[2];
+            int size = tileSize + (variation > 0 ? randbuf_next(m, &rpos, 0, variation) : 0);
+            int dx = gx + randbuf_next(m, &rpos, -jitter, jitter);
+            int dy = gy + randbuf_next(m, &rpos, -jitter, jitter);
 
-    uint8_t *restrict bufY = m->buf[0];
-    uint8_t *restrict bufU = m->buf[1];
-    uint8_t *restrict bufV = m->buf[2];
+            if(dx < 0) { size += dx; dx = 0; }
+            if(dy < 0) { size += dy; dy = 0; }
+            if(dx + size > width) size = width - dx;
+            if(dy + size > height) size = height - dy;
+            if(size <= 0) continue;
 
-    uint8_t *outY;
-    uint8_t *outU;
-    uint8_t *outV;
+            if(m->tile_count >= MAX_TILES) continue;
 
-    if( vje_setup_local_bufs( 1, frame, &outY, &outU, &outV, NULL ) == 0 ) {
-        veejay_memcpy( bufY, srcY, frame->len );
-        veejay_memcpy( bufU, srcU, frame->len );
-        veejay_memcpy( bufV, srcV, frame->len );
+            tile_info_t *t = &m->tiles[m->tile_count++];
+            t->dx = dx;
+            t->dy = dy;
+            t->size = size;
+            t->srcX = clampi(gx + randbuf_next(m, &rpos, -scatter, scatter), 0, width - 1);
+            t->srcYpos = clampi(gy + randbuf_next(m, &rpos, -scatter, scatter), 0, height - 1);
 
-        srcY = bufY;
-        srcU = bufU;
-        srcV = bufV;
+            for(int y=0; y<size; y++){
+                if(y<3) t->alphaY[y] = (y+1)*alpha_factor + alpha_base;
+                else if(y >= size-3) t->alphaY[y] = (size - y)*alpha_factor + alpha_base;
+                else t->alphaY[y] = 1.0f;
+            }
+            for(int x=0; x<size; x++){
+                if(x<3) t->alphaX[x] = (x+1)*alpha_factor + alpha_base;
+                else if(x >= size-3) t->alphaX[x] = (size - x)*alpha_factor + alpha_base;
+                else t->alphaX[x] = 1.0f;
+            }
+        }
     }
-    else {
-        veejay_memcpy( outY, srcY, frame->len );
-        veejay_memcpy( outU, srcU, frame->len );
-        veejay_memcpy( outV, srcV, frame->len );
-    }
-
-    if( minSize >= maxSize )
-        maxSize = minSize + 1;
-
-    drawGridTriangles(m, outY, outU, outV, srcY, srcU, srcV, width, height, numFragments, minSize, maxSize, displacementWeight);
-
-    if(interval == 0)
-        return;
-
-    m->count = (m->count + 1) % interval;
-    if(m->count == 0) {
-        init_rand_lut(m);
-    }
-    
 }
 
+static void drawTiles_parallel(fragmenttv_t *m,
+                               uint8_t *dstY, uint8_t *dstU, uint8_t *dstV,
+                               uint8_t *srcY, uint8_t *srcU, uint8_t *srcV,
+                               int width)
+{
+    #pragma omp parallel for schedule(static) num_threads(m->n_threads)
+    for(int t = 0; t < m->tile_count; t++){
+        tile_info_t *tile = &m->tiles[t];
+
+        for(int y=0; y<tile->size; y++){
+            int yy = tile->dy + y;
+            int sy = tile->srcYpos + y;
+            int drow = yy * width;
+            int srow = sy * width;
+            float ay = tile->alphaY[y];
+
+            for(int x=0; x<tile->size; x++){
+                int xx = tile->dx + x;
+                int sx = tile->srcX + x;
+                int di = drow + xx;
+                int si = srow + sx;
+
+                float alpha = tile->alphaX[x] * ay;
+
+                dstY[di] = (uint8_t)(dstY[di]*(1.0f - alpha) + srcY[si]*alpha);
+                dstU[di] = (uint8_t)(dstU[di]*(1.0f - alpha) + srcU[si]*alpha);
+                dstV[di] = (uint8_t)(dstV[di]*(1.0f - alpha) + srcV[si]*alpha);
+            }
+        }
+    }
+}
+
+void fragmenttv_apply(void *ptr, VJFrame *frame, int *args)
+{
+    fragmenttv_t *m = (fragmenttv_t*) ptr;
+
+    const int width  = frame->width;
+    const int height = frame->height;
+
+    int tileSize  = args[0];
+    int variation = args[1];
+    int scatter   = args[2];
+    int jitter    = args[3];
+    int interval  = args[4];
+    int black_bg  = args[5];
+    int density   = args[6];
+
+    uint8_t *srcY = frame->data[0];
+    uint8_t *srcU = frame->data[1];
+    uint8_t *srcV = frame->data[2];
+
+    uint8_t *outY, *outU, *outV;
+    if(vje_setup_local_bufs(1, frame, &outY, &outU, &outV, NULL)==0){
+        veejay_memcpy(m->buf[0], srcY, frame->len);
+        veejay_memcpy(m->buf[1], srcU, frame->len);
+        veejay_memcpy(m->buf[2], srcV, frame->len);
+        srcY = m->buf[0];
+        srcU = m->buf[1];
+        srcV = m->buf[2];
+    } else {
+        veejay_memcpy(outY, srcY, frame->len);
+        veejay_memcpy(outU, srcU, frame->len);
+        veejay_memcpy(outV, srcV, frame->len);
+    }
+
+    if(black_bg){
+        veejay_memset(outY, 0, frame->len);
+        veejay_memset(outU, 128, frame->len);
+        veejay_memset(outV, 128, frame->len);
+    }
+
+    veejay_memset(m->mask, 0, width*height);
+
+    if(m->first_frame ||
+       (interval>0 && (m->count % interval)==0) ||
+       tileSize  != m->prev_tileSize ||
+       variation != m->prev_variation ||
+       jitter    != m->prev_jitter ||
+       scatter   != m->prev_scatter ||
+       density   != m->prev_density)
+    {
+        generateTiles(m, width, height, tileSize, variation, jitter, scatter, density);
+
+        m->prev_tileSize  = tileSize;
+        m->prev_variation = variation;
+        m->prev_jitter    = jitter;
+        m->prev_scatter   = scatter;
+        m->prev_density   = density;
+    }
+
+
+    drawTiles_parallel(m, outY, outU, outV, srcY, srcU, srcV, width);
+
+    drawTileBorders_parallel(m, outY, outU, outV, width, height, 1, m->mask);
+
+    if(interval>0)
+        m->count = (m->count + 1) % interval;
+
+    m->first_frame = 0;
+}
