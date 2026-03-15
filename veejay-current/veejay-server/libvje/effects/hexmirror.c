@@ -82,7 +82,7 @@ vj_effect *hexmirror_init(int w, int h)
     ve->description = "Salsaman's Kaleidoscope";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 2; // thread local buf mode
+    ve->parallel = 2;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Size (log)", "Offset Angle", "Anti clockwise", "Swap", "Rotation Speed" );
     return ve;
@@ -108,45 +108,52 @@ void hexmirror_free(void *ptr) {
     free(s);
 }
 
-static void init_atan_lut(hexmirror_t *f, int w, int h, int cx, int cy)
+static void init_atan_lut(hexmirror_t *f, int w, int h, int cx, int cy, int n_threads)
 {
-    for (int i = 0; i < h; ++i) {
-        for (int j = 0; j < w; ++j) {
-            float x = j - cx;
-            float y = i - cy;
-            f->atan_lut[i * w + j] = calc_angle(y, x);
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int y = 0; y < h; ++y) {
+
+        float fy = y - cy;
+        int row = y * w;
+
+        for (int x = 0; x < w; ++x) {
+            float fx = x - cx;
+            f->atan_lut[row + x] = calc_angle(fy, fx);
         }
     }
 }
 
-static void init_sqrt_lut(hexmirror_t *f, int w, int h, int cx, int cy)
+static void init_sqrt_lut(hexmirror_t *f, int w, int h, int cx, int cy, int n_threads)
 {
-    for (int x = 0; x < w; ++x) {
-        for (int y = 0; y < h; ++y) {
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int y = 0; y < h; ++y) {
+
+        int dy = y - cy;
+        int dy2 = dy * dy;
+        int row = y * w;
+
+        for (int x = 0; x < w; ++x) {
             int dx = x - cx;
-            int dy = y - cy;
-            f->sqrt_lut[y * w + x] = sqrtf( dx * dx + dy * dy );
+            f->sqrt_lut[row + x] = sqrtf((float)(dx * dx + dy2));
         }
     }
 }
 
-static void init_sin_cos_lut(hexmirror_t *f) {
-      
-    for(int i = 0; i < LUT_SIZE; i ++ ) {               
-        float angle = i * (TWO_PI / LUT_SIZE);
-        f->sin_lut[i] = sinf(angle);
-        f->cos_lut[i] = cosf(angle);
+static void init_sin_cos_lut(hexmirror_t *f, int n_threads)
+{
+    const float step = TWO_PI / LUT_SIZE;
+
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int i = 0; i < LUT_SIZE; i++) {
+        float a = i * step;
+        f->sin_lut[i] = sinf(a);
+        f->cos_lut[i] = cosf(a);
     }
 }
  
-
-static inline float sqrt_approx(float x) {
-    return __builtin_sqrtf(x);
-}
-
 static inline float wrap_angle(float a) {
     if (a < 0.0f) a += TWO_PI;
-    if (a >= TWO_PI) a -= TWO_PI;
+    else if (a >= TWO_PI) a -= TWO_PI;
     return a;
 }
 
@@ -164,7 +171,8 @@ void *hexmirror_malloc(int w, int h) {
     s->buf[1] = s->buf[0] + ( w * h );
     s->buf[2] = s->buf[1] + ( w * h );
 
-    s->lut = (float*) vj_malloc(sizeof(float) * ((w*h*4)) );
+    size_t total = (w*h*2) + (LUT_SIZE*2);
+    s->lut = (float*) vj_malloc(sizeof(float) * total );
     if(!s->lut) {
         free(s->buf[0]);
         free(s);
@@ -173,18 +181,17 @@ void *hexmirror_malloc(int w, int h) {
 
     s->atan_lut = s->lut;
     s->sqrt_lut = s->atan_lut + (w*h);
-    s->cos_lut = s->sqrt_lut + (w*h);
-    s->sin_lut = s->cos_lut + (w*h);
+    s->cos_lut  = s->sqrt_lut + (w*h);
+    s->sin_lut  = s->cos_lut + LUT_SIZE;
 
-    init_atan_lut( s, w, h, w/2, h/2 );
-    init_sqrt_lut( s, w, h,w/2, h/2 );
-    init_sin_cos_lut( s );
+    s->n_threads = vje_advise_num_parallel_threads(w*h, vj_task_get_workers());
 
-    s->n_threads = vje_advise_num_threads(w*h);
+    init_atan_lut( s, w, h, w/2, h/2, s->n_threads );
+    init_sqrt_lut( s, w, h,w/2, h/2, s->n_threads );
+    init_sin_cos_lut( s, s->n_threads );
 
     return (void*) s;
 }
-
 
 static inline void calc_center(float j, float i, float sidex, float sidey, 
                                    float hsidex, float hsidey, float inv_sidex, 
@@ -227,7 +234,8 @@ static inline void calc_center(float j, float i, float sidex, float sidey,
 
 static inline void rotate(float r, float theta, float angle, float *x, float *y, float *cos_lut, float *sin_lut) {
     theta = wrap_angle(theta + angle);
-    int lut_pos =  ( (int) (theta * LUT_DIVISOR)) % LUT_SIZE;
+    //int lut_pos =  ( (int) (theta * LUT_DIVISOR)) % LUT_SIZE;
+    int lut_pos = (int)(theta * LUT_DIVISOR) & (LUT_SIZE - 1);
 
     *x = r * cos_lut[lut_pos];
     *y = r * sin_lut[lut_pos];
@@ -235,11 +243,23 @@ static inline void rotate(float r, float theta, float angle, float *x, float *y,
 
 static inline float atan2_approx1(float y, float x) {
     if (x == 0.0f && y == 0.0f) return 0.0f;
-    float fabs_y = fabsf(y);
-    float r = (x < 0.0f) ? (x + fabs_y) / (fabs_y - x) : (x - fabs_y) / (x + fabs_y);
-    float angle = (x < 0.0f) ? (3.0f * M_PI / 4.0f) : (M_PI / 4.0f);
+
+    float ay = y >= 0.0f ? y : -y;
+    float r = (x < 0.0f) ? (x + ay) / (ay - x) : (x - ay) / (x + ay);
+    float angle = (x < 0.0f) ? (3.0f * M_PI_4) : (M_PI_4);
+
     angle += (0.1963f * r * r - 0.9817f) * r;
+
     return (y < 0.0f) ? -angle : angle;
+}
+
+static inline float sqrt_approx1(float x) {
+    union { float f; uint32_t i; } u;
+    u.f = x;
+    u.i = 0x5f3759df - (u.i >> 1);
+    float y = u.f;
+    y = y * (1.5f - 0.5f * x * y * y);
+    return x * y;
 }
 
 static inline void process_pixel(int swap, float angle, float theta, float r, int hheight, int hwidth,
@@ -264,7 +284,8 @@ static inline void process_pixel(int swap, float angle, float theta, float r, in
     int sx = (int)(r * cos_lut[lut_idx] + 0.5f);
     int sy = (int)(r * sin_lut[lut_idx] + 0.5f);
 
-    if (sx < -hwidth || sx >= hwidth || sy < -hheight || sy >= hheight) {
+    if ((unsigned)(sx + hwidth) >= (unsigned)(hwidth * 2) ||
+        (unsigned)(sy + hheight) >= (unsigned)(hheight * 2)) {
         *pOutY = pixel_Y_lo_;
         *pOutU = 128;
         *pOutV = 128;
@@ -279,9 +300,9 @@ static inline void process_pixel(int swap, float angle, float theta, float r, in
 
 void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
     hexmirror_t *s = (hexmirror_t*)ptr;
-    const int width = frame->out_width;
+    const int width  = frame->out_width;
     const int height = frame->out_height;
-    const int centerX = width >> 1; 
+    const int centerX = width >> 1;
     const int centerY = height >> 1;
 
     uint8_t *outY, *outU, *outV;
@@ -289,13 +310,17 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
     uint8_t *srcU = frame->data[1] - frame->offset;
     uint8_t *srcV = frame->data[2] - frame->offset;
 
-    if( vje_setup_local_bufs( 1, frame, &outY, &outU, &outV, NULL ) == 0 ) {
-        veejay_memcpy( s->buf[0], srcY, width * height * 3 );
+    if(vje_setup_local_bufs(1, frame, &outY, &outU, &outV, NULL) == 0) {
+        veejay_memcpy(s->buf[0], srcY, frame->len);
+        veejay_memcpy(s->buf[1], srcU, frame->len);
+        veejay_memcpy(s->buf[2], srcV, frame->len);
+
         srcY = s->buf[0];
-        srcU = s->buf[0] + (width * height);
-        srcV = s->buf[0] + (width * height * 2);    
+        srcU = s->buf[0] + width * height;
+        srcV = s->buf[0] + width * height * 2;
     }
-    const float sfac = logf(args[0] * 0.01f) * 0.5f; 
+
+    const float sfac = logf(args[0] * 0.01f) * 0.5f;
     const float side = (width < height ? centerX / RT32 : centerY) * sfac;
     const float sidex = side * RT3, sidey = side * 1.5f;
     const float hsidex = sidex * 0.5f, hsidey = sidey * 0.5f;
@@ -307,52 +332,58 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args) {
     const float render_angle = wrap_angle(s->xangle + (args[1] / 360.0f) * TWO_PI);
     const float delta = render_angle - ONE_PI2;
 
-    const uint8_t *restrict relY = srcY + (centerY * width) + centerX;
-    const uint8_t *restrict relU = srcU + (centerY * width) + centerX;
-    const uint8_t *restrict relV = srcV + (centerY * width) + centerX;
+    const uint8_t *restrict relY = srcY + centerY * width + centerX;
+    const uint8_t *restrict relU = srcU + centerY * width + centerX;
+    const uint8_t *restrict relV = srcV + centerY * width + centerX;
 
-    const int start_y = centerY + (-centerY + (frame->jobnum * frame->height));
-    const int end_y = start_y + frame->height;
+    const int start_y = centerY + (-centerY + frame->jobnum * frame->height);
+    const int end_y   = start_y + frame->height;
 
-    #pragma omp parallel for schedule(static) num_threads(s->n_threads)
-    for (int i = start_y; i < end_y; i++) {
+    const float *restrict cos_lut = s->cos_lut;
+    const float *restrict sin_lut = s->sin_lut;
+
+    #pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int i = start_y; i < end_y; i++) {
         const float fi = (float)(i - centerY);
-        uint8_t *pOutY = outY + (width * (i - start_y));
-        uint8_t *pOutU = outU + (width * (i - start_y));
-        uint8_t *pOutV = outV + (width * (i - start_y));
+        uint8_t *pOutY = outY + width * (i - start_y);
+        uint8_t *pOutU = outU + width * (i - start_y);
+        uint8_t *pOutV = outV + width * (i - start_y);
 
         const float *restrict atan_row = s->atan_lut + i * width;
         const float *restrict sqrt_row = s->sqrt_lut + i * width;
 
-        #pragma omp simd
-        for (int j = -centerX; j < centerX; j++) {
+        for(int j = -centerX; j < centerX; j++) {
             const float theta_base = *atan_row++;
-            const float r_base = *sqrt_row++;
-            
-            const int l_idx_rot = (int)(wrap_angle(theta_base - delta) * LUT_DIVISOR) & LUT_MASK;
-            const float a_hex = r_base * s->cos_lut[l_idx_rot];
-            const float b_hex = r_base * s->sin_lut[l_idx_rot];
+            const float r_base     = *sqrt_row++;
+
+            float angle_rot = theta_base - delta;
+            int l_idx_rot = ((int)(angle_rot * LUT_DIVISOR)) & LUT_MASK;
+            float cos_rot = cos_lut[l_idx_rot];
+            float sin_rot = sin_lut[l_idx_rot];
+
+            float a_hex = r_base * cos_rot;
+            float b_hex = r_base * sin_rot;
 
             float h_x, h_y;
             calc_center(a_hex, b_hex, sidex, sidey, hsidex, hsidey, inv_sidex, inv_sidey, side_off, &h_x, &h_y);
 
             float theta = atan2_approx1(h_y, h_x);
-            float r = __builtin_sqrtf(h_x * h_x + h_y * h_y);
+            float r     = sqrt_approx1(h_x * h_x + h_y * h_y);
 
-            const int l_idx_f = (int)(wrap_angle(theta + delta) * LUT_DIVISOR) & LUT_MASK;
-            const float bfi = (r * s->sin_lut[l_idx_f]) - fi;
-            const float afj = (r * s->cos_lut[l_idx_f]) - (float)j;
-    
+            float angle_f = theta + delta;
+            int l_idx_f = ((int)(angle_f * LUT_DIVISOR)) & LUT_MASK;
+
+            float bfi = r * sin_lut[l_idx_f] - fi;
+            float afj = r * cos_lut[l_idx_f] - (float)j;
+
             theta = atan2_approx1(bfi, afj);
-            r = __builtin_sqrtf(bfi * bfi + afj * afj);
-            if (r < 10.0f) r = 10.0f;
+            r     = sqrt_approx1(bfi * bfi + afj * afj);
+            if(r < 10.0f) r = 10.0f;
 
-            process_pixel(args[3], render_angle, theta, r, centerY, centerX, 
-                        (uint8_t*)relY, (uint8_t*)relU, (uint8_t*)relV, 
-                        pOutY, pOutU, pOutV, width, s->cos_lut, s->sin_lut);
-            pOutY++; 
-            pOutU++; 
-            pOutV++;
+            process_pixel(args[3], render_angle, theta, r, centerY, centerX,
+                          relY, relU, relV, pOutY, pOutU, pOutV, width, cos_lut, sin_lut);
+
+            pOutY++; pOutU++; pOutV++;
         }
     }
 }
