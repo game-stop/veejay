@@ -22,4 +22,6 @@
 #define AVERAGEBLEND_H
 vj_effect *average_blend_init(int w, int h);
 void average_blend_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args );
+void *average_blend_malloc(int w, int h);
+void average_blend_free(void *ptr);
 #endif

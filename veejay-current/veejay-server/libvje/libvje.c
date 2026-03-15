@@ -261,7 +261,7 @@ static struct {
     { bgpush_init,bgpush_malloc,bgpush_free,bgpush_prepare,bgpush_get_bg_frame,bgpush_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BGPUSH},
     { baltantv_init,baltantv_malloc,baltantv_free,NULL,NULL,baltantv_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BALTANTV},
     { average_init,average_malloc,average_free,NULL,NULL,average_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_AVERAGE},
-    { average_blend_init,NULL,NULL,NULL,NULL,NULL,average_blend_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_AVERAGEBLEND },
+    { average_blend_init,average_blend_malloc,average_blend_free,NULL,NULL,NULL,average_blend_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_AVERAGEBLEND },
     { autoeq_init,autoeq_malloc,autoeq_free,NULL,NULL,autoeq_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_AUTOEQ },
     { alphatransition_init, NULL,NULL,NULL,NULL,NULL,alphatransition_apply, NULL,NULL,NULL,VJ_VIDEO_EFFECT_ALPHATRANSITION },
     { alphaselect_init,NULL,NULL,NULL,NULL,alphaselect_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_ALPHASELECT },
