@@ -85,7 +85,6 @@ void scanline_free(void *ptr) {
     free(s->buf[0]);
     free(s);
 }
-
 void scanline_apply(void *ptr, VJFrame *frame, int *args)
 {
     scanline_t *s = (scanline_t*) ptr;
@@ -106,18 +105,21 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict bufU = s->buf[1];
     uint8_t *restrict bufV = s->buf[2];
 
-    if (s->stopCount != duration)
+    // pause phase
+    if (s->stopCount > 0)
     {
-        if (--s->stopCount <= 0)
+        s->stopCount--;
+
+        if (s->stopCount == 0)
         {
-            s->prevRow   = 0;
-            s->prevCol   = 0;
-            s->stopCount = duration;
+            s->prevRow = 0;
+            s->prevCol = 0;
 
             veejay_memset(bufY, pixel_Y_lo_, len);
             veejay_memset(bufU, 128, len);
             veejay_memset(bufV, 128, len);
         }
+
         veejay_memcpy(dstY, bufY, len);
         veejay_memcpy(dstU, bufU, len);
         veejay_memcpy(dstV, bufV, len);
@@ -126,6 +128,7 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
 
     switch (mode)
     {
+        // top to bottom
         case 0:
         {
             int start = s->prevRow;
@@ -134,25 +137,21 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
 
             for (int row = start; row < stop; ++row)
             {
-                const int offset = row * width;
+                int offset = row * width;
 
-                /* write directly into buffer */
                 veejay_memcpy(bufY + offset, dstY + offset, width);
                 veejay_memcpy(bufU + offset, dstU + offset, width);
                 veejay_memcpy(bufV + offset, dstV + offset, width);
-
-                /* and immediately reflect into output */
-                veejay_memcpy(dstY + offset, bufY + offset, width);
-                veejay_memcpy(dstU + offset, bufU + offset, width);
-                veejay_memcpy(dstV + offset, bufV + offset, width);
             }
 
             if (stop == height)
-                s->stopCount--;
+                s->stopCount = duration;
 
             s->prevRow = (start + speed) % height;
             break;
         }
+
+        // bottom to top
         case 1:
         {
             int start = height - 1 - s->prevRow;
@@ -161,23 +160,21 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
 
             for (int row = start; row >= stop; --row)
             {
-                const int offset = row * width;
+                int offset = row * width;
 
                 veejay_memcpy(bufY + offset, dstY + offset, width);
                 veejay_memcpy(bufU + offset, dstU + offset, width);
                 veejay_memcpy(bufV + offset, dstV + offset, width);
-
-                veejay_memcpy(dstY + offset, bufY + offset, width);
-                veejay_memcpy(dstU + offset, bufU + offset, width);
-                veejay_memcpy(dstV + offset, bufV + offset, width);
             }
 
             if (stop == 0)
-                s->stopCount--;
+                s->stopCount = duration;
 
             s->prevRow = (s->prevRow + speed) % height;
             break;
         }
+
+        // left to right
         case 2:
         {
             int start = s->prevCol;
@@ -186,28 +183,26 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
 
             for (int row = 0; row < height; ++row)
             {
-                const int base = row * width;
+                int base = row * width;
 
                 for (int col = start; col < stop; ++col)
                 {
-                    const int idx = base + col;
+                    int idx = base + col;
 
                     bufY[idx] = dstY[idx];
                     bufU[idx] = dstU[idx];
                     bufV[idx] = dstV[idx];
-
-                    dstY[idx] = bufY[idx];
-                    dstU[idx] = bufU[idx];
-                    dstV[idx] = bufV[idx];
                 }
             }
 
             if (stop == width)
-                s->stopCount--;
+                s->stopCount = duration;
 
             s->prevCol = (start + speed) % width;
             break;
         }
+
+        // right to left
         case 3:
         {
             int start = width - 1 - s->prevCol;
@@ -216,27 +211,27 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
 
             for (int row = 0; row < height; ++row)
             {
-                const int base = row * width;
+                int base = row * width;
 
                 for (int col = start; col >= stop; --col)
                 {
-                    const int idx = base + col;
+                    int idx = base + col;
 
                     bufY[idx] = dstY[idx];
                     bufU[idx] = dstU[idx];
                     bufV[idx] = dstV[idx];
-
-                    dstY[idx] = bufY[idx];
-                    dstU[idx] = bufU[idx];
-                    dstV[idx] = bufV[idx];
                 }
             }
 
             if (stop == 0)
-                s->stopCount--;
+                s->stopCount = duration;
 
             s->prevCol = (s->prevCol + speed) % width;
             break;
         }
     }
+
+    veejay_memcpy(dstY, bufY, len);
+    veejay_memcpy(dstU, bufU, len);
+    veejay_memcpy(dstV, bufV, len);
 }
