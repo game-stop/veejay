@@ -175,10 +175,9 @@ void melt_apply(void *ptr, VJFrame *A, int *args) {
     const int32_t w_minus1 = (int32_t)width - 1;
     const int32_t h_minus1 = (int32_t)height - 1;
 
-    #pragma omp parallel for num_threads(t->n_threads)
+    #pragma omp parallel for num_threads(t->n_threads) schedule(static)
 	for (uint32_t y = 0; y < height; ++y) {
-		uint32_t row = y * width;
-
+		const uint32_t row = y * width;
 		for (uint32_t x = 0; x < width; ++x) {
 			uint32_t i = row + x;
 			int32_t vx_i = vx[i], vy_i = vy[i];
@@ -203,7 +202,7 @@ void melt_apply(void *ptr, VJFrame *A, int *args) {
 
 	t->time_q16 += 1966 * (curl_amt != 0);
 
-    #pragma omp parallel for num_threads(t->n_threads)
+    #pragma omp parallel for num_threads(t->n_threads) schedule(static)
     for (uint32_t y = 0; y < height; ++y) {
         uint32_t row = y * width;
 
