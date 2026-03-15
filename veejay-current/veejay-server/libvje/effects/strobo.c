@@ -197,7 +197,7 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args) {
         int cu_s = 2 * (cu - 128) + 128;
         int cv_s = 2 * (cv - 128) + 128;
 
-#pragma omp parallel for num_threads(s->n_threads)
+#pragma omp parallel for simd num_threads(s->n_threads) schedule(static)
         for( i = 0; i < len; i ++ )
         {
             int mask = (Y[i] < threshold);
@@ -214,7 +214,7 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args) {
     }
 
     if( mode == 0 ) {
-#pragma omp parallel for simd
+#pragma omp parallel for simd num_threads(s->n_threads) schedule(static)
         for( i = 0; i < len; i ++ ) 
         {
             Y[i] = bY[i];
@@ -223,7 +223,7 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args) {
         }
     }
     else {
-#pragma omp parallel for num_threads(s->n_threads)
+#pragma omp parallel for simd num_threads(s->n_threads) schedule(static)
         for( i = 0; i < len; i ++ ) {
             uint8_t mask = (bY[i] != 0);
             
