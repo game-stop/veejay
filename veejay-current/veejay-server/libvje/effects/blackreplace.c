@@ -116,7 +116,7 @@ void blackreplace_apply(void *ptr, VJFrame *frame, int *args)
     const int denom = edge - full;
     const int mul = (255 << 16) / denom;
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp parallel for simd num_threads(n_threads) schedule(static)
     for (int i = 0; i < len; ++i) {
         int y  = Y[i];
         int cb = Cb[i];
