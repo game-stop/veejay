@@ -101,6 +101,7 @@ static void softblur1_core(const uint8_t *src, uint8_t *dst, int w, int h, int n
         out[0] = (row[0]*2 + row[1]) / 3;
 
         // middle pixels
+        #pragma omp simd
         for(int x = 1; x < w-1; x++) {
             out[x] = (row[x-1] + row[x] + row[x+1]) / 3;
         }
@@ -124,6 +125,8 @@ static void softblur3_core(const uint8_t *src, uint8_t *tmp_buf, uint8_t *dst, i
         }
 
         trow[0] = (row[0]*2 + row[1]) / 3;
+
+        #pragma omp simd
         for(int x = 1; x < w-1; x++) {
             trow[x] = (row[x-1] + row[x] + row[x+1]) / 3;
         }
@@ -142,6 +145,7 @@ static void softblur3_core(const uint8_t *src, uint8_t *tmp_buf, uint8_t *dst, i
         const uint8_t *r1 = tmp_buf + y*w;
         const uint8_t *r2 = tmp_buf + yp*w;
 
+        #pragma omp simd
         for(int x = 0; x < w; x++) {
             drow[x] = (r0[x] + r1[x] + r2[x]) / 3;
         }
@@ -151,16 +155,14 @@ static void softblur3_core(const uint8_t *src, uint8_t *tmp_buf, uint8_t *dst, i
 static void softblur_inplace_1x3(uint8_t *plane, int width, int height, int n_threads)
 {
     #pragma omp parallel for num_threads(n_threads) schedule(static)
-    for(int y=0; y<height; y++) {
+    for(int y = 0; y < height; y++) {
         uint8_t *row = plane + y*width;
-        uint8_t prev = row[0];
-        uint8_t curr = row[0];
-        for(int x=0; x<width; x++) {
-            uint8_t next = (x < width-1) ? row[x+1] : row[x];
-            row[x] = (prev + curr + next)/3;
-            prev = curr;
-            curr = next;
+        row[0] = (row[0]*2 + row[1])/3;
+        #pragma omp simd
+        for(int x = 1; x < width-1; x++) {
+            row[x] = (row[x-1] + row[x] + row[x+1])/3;
         }
+        row[width-1] = (row[width-2] + row[width-1]*2)/3;
     }
 }
 
