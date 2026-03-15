@@ -133,6 +133,7 @@ static inline void compute_integral_padded(uint8_t *restrict src, uint32_t *rest
         uint32_t *row_sum = &int_sum[(y + 1) * stride + 1];
         uint64_t *row_sq_ptr = &int_sq[(y + 1) * stride + 1];
 
+        #pragma omp simd
         for (int x = 0; x < w; x++) {
             uint8_t val = row_src[x];
             row_s += val;
@@ -152,6 +153,7 @@ static inline void compute_integral_padded(uint8_t *restrict src, uint32_t *rest
             uint64_t *restrict prev_sq  = &int_sq[y * stride];
             uint64_t *restrict curr_sq  = &int_sq[(y + 1) * stride];
 
+            #pragma omp simd
             for (int x = xx; x < x_end; x++) {
                 curr_row[x] += prev_row[x];
                 curr_sq[x]  += prev_sq[x];
