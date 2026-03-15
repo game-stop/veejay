@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
 AC_INIT([reloaded],[1.5.63],[nwelburg@gmail.com])
-AC_PREREQ(2.57)
+AC_PREREQ([2.71])
 AC_CONFIG_SRCDIR([src/gveejay.c])
 
 RELOADED_MAJOR_VERSION=1
@@ -33,11 +33,9 @@ dnl AC_CONFIG_MACRO_DIR([m4])
 dnl kill CFLAGS
 CFLAGS=""
 AC_ARG_ENABLE([strict],
-		AC_HELP_STRING([--enable-strict],
-			     [Compile in paranoia assertion checking]))
+		AS_HELP_STRING([--enable-strict],[Compile in paranoia assertion checking]))
 AC_ARG_ENABLE([debug],
-		AC_HELP_STRING([--enable-debug],
-			     [Compile in debugging information]))
+		AS_HELP_STRING([--enable-debug],[Compile in debugging information]))
 AC_ARG_ENABLE([profiling],
               [AS_HELP_STRING([--enable-profiling=gprof|gcov],
                               [Compile in profiling information, when no value given, gprof is selected. default: no])],
@@ -49,35 +47,27 @@ AC_ARG_ENABLE([profiling],
                esac],
               [profiling=false])
 AC_ARG_ENABLE([compile-warnings],
-              AC_HELP_STRING([--enable-compile-warnings],
-                             [Turn on compiler warnings.]))
+              AS_HELP_STRING([--enable-compile-warnings],[Turn on compiler warnings.]))
 AC_ARG_ENABLE([warnings_as_errors],
-              AC_HELP_STRING([--enable-warnings_as_errors],
-                             [Compiler warnings are errors.]))
+              AS_HELP_STRING([--enable-warnings_as_errors],[Compiler warnings are errors.]))
 AC_ARG_ENABLE([simd-accel],
-              AC_HELP_STRING([--enable-simd-accel],
-                             [use SIMD multimedia instructions such as MMX, AltiVec, etc.if possible]))
+              AS_HELP_STRING([--enable-simd-accel],[use SIMD multimedia instructions such as MMX, AltiVec, etc.if possible]))
 AC_ARG_WITH([extra-cflags],
-            AC_HELP_STRING([--with-extra-cflags=flags],
-                           [Options to be added to CFLAGS (optional)]))
+            AS_HELP_STRING([--with-extra-cflags=flags],[Options to be added to CFLAGS (optional)]))
 
 arch_target="auto"
 AC_ARG_WITH([arch-target], AS_HELP_STRING( [--with-arch-target=generic or auto],
 					[Build a generic binary or auto-detect current cpu type (defaults to auto-detect)]),
 					[ arch_target="$withval"])
 
-AC_GNU_SOURCE
+AC_USE_SYSTEM_EXTENSIONS
 
 dnl Initialize libtool
-AC_PROG_LIBTOOL
+LT_INIT
 
 dnl Checks for programs.
 AC_PROG_AWK
 AC_PROG_CC
-AM_PROG_CC_STDC
-AC_PROG_YACC
-AM_PROG_LEX
-AC_PROG_CXX
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_C_BIGENDIAN
@@ -114,8 +104,6 @@ AC_CHECK_SIZEOF([float])
 
 
 AC_SUBST(LIBGETOPT_LIB)
-
-AC_TYPE_SIGNAL
 
 AC_MSG_NOTICE([The host is $host  $host_cpu  $host_vendor  $host_os .])
 
@@ -257,6 +245,15 @@ fi
 AC_MSG_CHECKING(whether to compile in debug symbols)
 if test "x$enable_debug" = "xyes" ; then
  debugCFLAGS="$debugCFLAGS -g -Werror=incompatible-pointer-types -Werror=old-style-definition"
+ debug_or_profiling="debug"
+ AC_MSG_RESULT([yes])
+else
+ AC_MSG_RESULT([no])
+fi
+
+AC_MSG_CHECKING(whether to compile with address sanitizer)
+if test "x$enable_sanitizer" = "xyes" ; then
+ debugCFLAGS="$debugCFLAGS -fsanitize=address -g -O1"
  debug_or_profiling="debug"
  AC_MSG_RESULT([yes])
 else
