@@ -29,6 +29,7 @@ typedef struct {
     uint8_t *buf[3];
     uint8_t *tmp_buf[3];
     int *rand_lut;
+    int n_threads;
 } pointilism_t;
 
 vj_effect *pointilism_init(int w, int h)
@@ -101,6 +102,8 @@ void *pointilism_malloc(int w, int h)
 		s->rand_lut[i] = (int) ( xorshift32( &r_state ) & 0x7FFFFFFF );
 	}
 
+    s->n_threads = vje_advise_num_threads(w*h);
+
     return (void*) s;
 }
 
@@ -118,6 +121,8 @@ static inline int clamp(int v, int min, int max) {
     return v;
 }
 
+#include <omp.h>
+
 void pointilism_apply(void *ptr, VJFrame *frame, int *args)
 {
     pointilism_t *p = (pointilism_t*) ptr;
@@ -130,7 +135,9 @@ void pointilism_apply(void *ptr, VJFrame *frame, int *args)
     int step = maxRadius; 
     if (step < 1) step = 1;
 
-    const uint8_t *srcY = frame->data[0], *srcU = frame->data[1], *srcV = frame->data[2];
+    const uint8_t *restrict srcY = frame->data[0];
+    const uint8_t *restrict srcU = frame->data[1];
+    const uint8_t *restrict srcV = frame->data[2];
     uint8_t *restrict dstY = p->buf[0];
     uint8_t *restrict dstU = p->buf[1];
     uint8_t *restrict dstV = p->buf[2];
@@ -147,64 +154,72 @@ void pointilism_apply(void *ptr, VJFrame *frame, int *args)
             veejay_memset(dstV, 128, total_pixels);
         }
     }
-    
-    const int row_step = step * w;
-    for (int y = 0, y_offset = 0; y < h; y += step, y_offset += row_step) {
-        if (y_offset >= total_pixels) break;
 
-        for (int x = 0; x < w; x += step) {
-            int current_idx = y_offset + x;
-            
-            int jitterX = lut[current_idx % total_pixels] % step;
-            int jitterY = lut[(current_idx + 1) % total_pixels] % step;
-            
-            int centerX = clamp(x + jitterX, 0, w - 1);
-            int centerY = clamp(y + jitterY, 0, h - 1);
-            int center_idx = centerY * w + centerX;
+    int rad_range = (maxRadius - minRadius) + 1;
+    if (rad_range < 1) rad_range = 1;
 
-            uint8_t minL = 0xFF, maxL = 0;
+    for (int pass = 0; pass < 2; pass++) {
+        #pragma omp parallel num_threads(p->n_threads)
+        {
+            int tid = omp_get_thread_num();
+            if (tid % 2 == pass) {
+                int num_t = omp_get_num_threads();
+                int strip_h = h / num_t;
+                int thread_startY = tid * strip_h;
+                int thread_endY = (tid == num_t - 1) ? h : (tid + 1) * strip_h;
 
-            for (int ky = -kernelRadius; ky <= kernelRadius; ky++) {
-                int ny = clamp(centerY + ky, 0, h - 1);
-                const uint8_t *kRow = &srcY[ny * w];
-                for (int kx = -kernelRadius; kx <= kernelRadius; kx++) {
-                    int nx = clamp(centerX + kx, 0, w - 1);
-                    uint8_t val = kRow[nx];
-                    if (val < minL) minL = val;
-                    if (val > maxL) maxL = val;
-                }
-            }
-            
-            uint8_t minU = srcU[center_idx];
-            uint8_t minV = srcV[center_idx];
-            int rangeL = maxL - minL;
-
-            int radius = minRadius + (lut[center_idx % total_pixels] % (maxRadius - minRadius + 1));
-            int r2 = (radius * radius > 0) ? radius * radius : 1;
-            int64_t invR2 = ((int64_t)FIXED_POINT_ONE << 16) / r2;
-
-
-            int startY = clamp(centerY - radius, 0, h - 1);
-            int endY   = clamp(centerY + radius, 0, h - 1);
-            int startX = clamp(centerX - radius, 0, w - 1);
-            int endX   = clamp(centerX + radius, 0, w - 1);
-
-            for (int py = startY; py <= endY; py++) {
-                int dy = py - centerY;
-                int dy2 = dy * dy;
-                int py_offset = py * w;
-
-                for (int px = startX; px <= endX; px++) {
-                    int dx = px - centerX;
-                    int dist2 = dx * dx + dy2;
-
-                    if (dist2 <= r2) {
-                        int gradient = (( r2 - dist2 ) * invR2) >> 16;
-                        int out_idx = py_offset + px;
+                for (int y = thread_startY; y < thread_endY; y += step) {
+                    int y_offset = y * w;
+                    for (int x = 0; x < w - step; x += step) {
+                        int current_idx = y_offset + x;
+                        uint32_t rnd = (uint32_t)lut[current_idx % total_pixels];
                         
-                        dstY[out_idx] = maxL - ((gradient * rangeL) >> 16);
-                        dstU[out_idx] = minU;
-                        dstV[out_idx] = minV;
+                        int centerX = x + (rnd % step);
+                        int centerY = y + ((rnd >> 8) % step);
+                        
+                        if (centerY < thread_startY || centerY >= thread_endY) continue;
+
+                        int center_idx = centerY * w + centerX;
+
+                        uint8_t minL = 255, maxL = 0;
+                        for (int ky = -kernelRadius; ky <= kernelRadius; ky++) {
+                            int ny = clamp(centerY + ky, 0, h - 1);
+                            const uint8_t *kRow = &srcY[ny * w];
+                            for (int kx = -kernelRadius; kx <= kernelRadius; kx++) {
+                                int nx = clamp(centerX + kx, 0, w - 1);
+                                uint8_t val = kRow[nx];
+                                if (val < minL) minL = val;
+                                if (val > maxL) maxL = val;
+                            }
+                        }
+                        
+                        uint8_t minU = srcU[center_idx], minV = srcV[center_idx];
+                        int rangeL = maxL - minL;
+                        int radius = minRadius + (rnd % rad_range);
+                        int r2 = radius * radius;
+                        if (r2 < 1) r2 = 1;
+                        uint32_t invR2 = (1 << 16) / r2;
+
+                        int drawStartY = clamp(centerY - radius, 0, h - 1);
+                        int drawEndY   = clamp(centerY + radius, 0, h - 1);
+                        int drawStartX = clamp(centerX - radius, 0, w - 1);
+                        int drawEndX   = clamp(centerX + radius, 0, w - 1);
+
+                        for (int py = drawStartY; py <= drawEndY; py++) {
+                            int dy2 = (py - centerY) * (py - centerY);
+                            int py_off = py * w;
+                            for (int px = drawStartX; px <= drawEndX; px++) {
+                                int dx = px - centerX;
+                                int dist2 = dx * dx + dy2;
+                                if (dist2 <= r2) {
+                                    int weight = ((r2 - dist2) * invR2) >> 8;
+                                    int out_idx = py_off + px;
+                                    dstY[out_idx] = maxL - ((weight * rangeL) >> 8);
+                                    dstU[out_idx] = minU;
+                                    dstV[out_idx] = minV;
+                                }
+                            }
+                        }
                     }
                 }
             }
