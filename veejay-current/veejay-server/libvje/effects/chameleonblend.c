@@ -41,7 +41,7 @@ vj_effect *chameleonblend_init(int w, int h)
 	ve->limits[0][0] = 0;
 	ve->limits[1][0] = 1;
 	ve->defaults[0] = 0;
-	ve->description = "ChameleonTV (EffectTV)";
+	ve->description = "ChameleonMixTV (EffectTV)";
 	ve->sub_format = 1;
     ve->static_bg = 1;
 	ve->extra_frame = 1;
@@ -50,7 +50,6 @@ vj_effect *chameleonblend_init(int w, int h)
 	ve->param_description = vje_build_param_list(ve->num_params, "Appearing/Dissapearing");
 	return ve;
 }
-
 
 typedef struct {
     int last_mode_;
@@ -62,6 +61,7 @@ typedef struct {
     uint8_t *timebuffer;
     int plane;
     uint8_t	*bgimage[4];
+	int n_threads;
 } chameleonblend_t;
 
 #define PLANES_DEPTH 6
@@ -81,6 +81,7 @@ int	chameleonblend_prepare( void *ptr, VJFrame *frame )
 	tmp.height = frame->height;
     tmp.len = frame->len;
 	//@ 3x3 blur
+
 	softblur_apply_internal( &tmp );
 
 	veejay_msg(2, "ChameleonTV: Snapped background frame");
@@ -127,6 +128,7 @@ void *chameleonblend_malloc(int w, int h)
         return NULL;
     }
 
+	c->n_threads = vje_advise_num_threads(len);
 	c->last_mode_ = -1;
 
 	return (void*) c;
@@ -142,108 +144,89 @@ void	chameleonblend_free(void *ptr)
     free(c);
 }
 
-static void drawAppearing(chameleonblend_t *cb, VJFrame *src, VJFrame *dest )
+static void drawAppearing(chameleonblend_t *cb, VJFrame *src, VJFrame *dest)
 {
-	int i;
-	unsigned int Y;
-	uint8_t *p, *qy, *qu, *qv;
-	int32_t *s;
-	const int video_area = src->len;
+    const int video_area = src->len;
+    
+    uint8_t *restrict p_buf = cb->timebuffer + (cb->plane * video_area);
+    int32_t *restrict s_buf = cb->sum;
 
-	p = cb->timebuffer + cb->plane * video_area;
-	qy = cb->bgimage[0];
-	qu = cb->bgimage[1];
-	qv = cb->bgimage[2];
+    uint8_t *restrict bgY = cb->bgimage[0];
+    uint8_t *restrict bgU = cb->bgimage[1];
+    uint8_t *restrict bgV = cb->bgimage[2];
 
-	uint8_t *lum = src->data[0];
-	uint8_t *u0  = src->data[1];
-	uint8_t *v0  = src->data[2];
+    uint8_t *restrict srcY = src->data[0];
+    uint8_t *restrict srcU = src->data[1];
+    uint8_t *restrict srcV = src->data[2];
 
-	uint8_t *Y1 = dest->data[0];
-	uint8_t *U1 = dest->data[1];
-	uint8_t *V1 = dest->data[2];
+    uint8_t *restrict dstY = dest->data[0];
+    uint8_t *restrict dstU = dest->data[1];
+    uint8_t *restrict dstV = dest->data[2];
 
-	s = cb->sum;
-	uint8_t a,b,c;
-	for(i=0; i<video_area; i++)
-	{
-		Y = lum[i];
-		*s -= *p;
-		*s += Y;
-		*p = Y;
-		Y = (abs(((int)Y<<PLANES_DEPTH) - (int)(*s)) * 8)>>PLANES_DEPTH;
-		if(Y>255) Y = 255;
-		a = lum[i];
-		b = u0[i]; 
-		c = v0[i];
-		a += (( qy[i]  - a ) * Y )>>8;
-		Y1[i] = a;
-		b += (( qu[i] - b ) * Y )>>8;
-		U1[i] = b;
-		c += (( qv[i] - c ) * Y )>>8;
-		V1[i] = c;
-		p++;
-		s++;
-	}
+    #pragma omp parallel for simd num_threads(cb->n_threads) schedule(static)
+    for(int i = 0; i < video_area; i++)
+    {
+        const int Y_curr = srcY[i];
 
-	cb->plane++;
-	cb->plane = cb->plane & (PLANES-1);
+        int current_sum = s_buf[i] - p_buf[i] + Y_curr;
+        s_buf[i] = current_sum;
+        p_buf[i] = (uint8_t)Y_curr;
+
+        int diff = (Y_curr << PLANES_DEPTH) - current_sum;
+        if (diff < 0) diff = -diff;
+        
+        int alpha_calc = (diff << 3) >> PLANES_DEPTH;
+        uint8_t alpha = (alpha_calc > 255) ? 255 : (uint8_t)alpha_calc;
+
+		dstY[i] = (uint8_t)(srcY[i] + (((bgY[i] - srcY[i]) * alpha) >> 8));
+		dstU[i] = (uint8_t)(srcU[i] + (((bgU[i] - srcU[i]) * alpha) >> 8));
+		dstV[i] = (uint8_t)(srcV[i] + (((bgV[i] - srcV[i]) * alpha) >> 8));
+    }
+
+    cb->plane = (cb->plane + 1) & (PLANES - 1);
 }
 
-
-static	void	drawDisappearing(chameleonblend_t *cb, VJFrame *src, VJFrame *dest)
+static void drawDisappearing(chameleonblend_t *cb, VJFrame *src, VJFrame *dest)
 {
-	int i;
-	unsigned int Y;
-	uint8_t *p, *qu, *qv, *qy;
-	int32_t *s;
-	const int video_area = src->len;
+    const int video_area = src->len;
+    
+    uint8_t *restrict p_buf = cb->timebuffer + (cb->plane * video_area);
+    int32_t *restrict s_buf = cb->sum;
 
-	uint8_t *Y1 = dest->data[0];
-	uint8_t *U1 = dest->data[1];
-	uint8_t *V1 = dest->data[2];
-	uint8_t *lum = src->data[0];
-	uint8_t *u0  = src->data[1];
-	uint8_t *v0  = src->data[2];
+    uint8_t *restrict bgY = cb->bgimage[0];
+    uint8_t *restrict bgU = cb->bgimage[1];
+    uint8_t *restrict bgV = cb->bgimage[2];
 
-	p = cb->timebuffer + (cb->plane * video_area);
-	qy = cb->bgimage[0];
-	qu = cb->bgimage[1];
-	qv = cb->bgimage[2];
-	s = cb->sum;
+    uint8_t *restrict srcY = src->data[0];
+    uint8_t *restrict srcU = src->data[1];
+    uint8_t *restrict srcV = src->data[2];
 
-	uint8_t a,b,c,A,B,C;
+    uint8_t *restrict dstY = dest->data[0];
+    uint8_t *restrict dstU = dest->data[1];
+    uint8_t *restrict dstV = dest->data[2];
 
-	for(i=0; i < video_area; i++)
-	{
-		Y = a = lum[i]; 
-		b = u0[i]; 
-		c = v0[i];
-	
-		A = qy[i];
-		B = qu[i];
-		C = qv[i];
+    #pragma omp parallel for simd num_threads(cb->n_threads) schedule(static)
+    for(int i = 0; i < video_area; i++)
+    {
+        const int Y_curr = srcY[i];
+        
+        int current_sum = s_buf[i] - p_buf[i] + Y_curr;
+        s_buf[i] = current_sum;
+        p_buf[i] = (uint8_t)Y_curr;
 
-		*s -= *p;
-		*s += Y;
-		*p = Y;
+        int diff = (Y_curr << PLANES_DEPTH) - current_sum;
+        if (diff < 0) diff = -diff;
+        
+        int alpha_calc = (diff << 3) >> PLANES_DEPTH;
+        uint8_t alpha = (alpha_calc > 255) ? 255 : (uint8_t)alpha_calc;
 
-		Y = (abs(((int)Y<<PLANES_DEPTH) - (int)(*s)) * 8)>>PLANES_DEPTH;
-		if(Y>255) Y = 255;
+		dstY[i] = (uint8_t)(bgY[i] + (((srcY[i] - bgY[i]) * alpha) >> 8));
+		dstU[i] = (uint8_t)(bgU[i] + (((srcU[i] - bgU[i]) * alpha) >> 8));
+		dstV[i] = (uint8_t)(bgV[i] + (((srcV[i] - bgV[i]) * alpha) >> 8));
+        
+    }
 
-		A += (( a - A ) * Y )>> 8;
-		Y1[i] = A;	
-		B += (( b - B ) * Y ) >> 8;
-		U1[i] = B;
-		C += (( c - C ) * Y ) >> 8;
-		V1[i] = C;
-
-		p++;
-		s++;
-	}
-
-	cb->plane++;
-	cb->plane = cb->plane & (PLANES-1);
+    cb->plane = (cb->plane + 1) & (PLANES - 1);
 }
 
 void chameleonblend_apply( void *ptr, VJFrame *frame,VJFrame *source, int *args ){
