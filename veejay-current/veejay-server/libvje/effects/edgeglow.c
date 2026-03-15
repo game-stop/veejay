@@ -130,6 +130,7 @@ void edgeglow_apply(void *ptr, VJFrame *frame, int *args)
         const int row = y * width;
         B[row] = 0;
 
+        #pragma omp simd
         for (int x = 1; x < width - 1; ++x) {
 
             const int idx = row + x;
@@ -161,6 +162,7 @@ void edgeglow_apply(void *ptr, VJFrame *frame, int *args)
     for (int y = 1; y < height - 1; ++y) {
 
         const int row = y * width;
+        #pragma omp simd
         for (int x = 1; x < width - 1; ++x) {
 
             const int idx = row + x;
@@ -174,7 +176,7 @@ void edgeglow_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+#pragma omp parallel for simd num_threads(s->n_threads) schedule(static)
     for (int i = 0; i < len; ++i) {
 
         const int edgeIntensity = (int)(C[i] * scalingFactor);
