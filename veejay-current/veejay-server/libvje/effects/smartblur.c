@@ -112,140 +112,6 @@ static inline uint8_t clamp_u8(int v)
 }
 
 #pragma GCC optimize ("unroll-loops","tree-vectorize")
-static void apply_nuclear_plane_tiledxx(smartblur_t *s, uint8_t * restrict data,
-                               int r, float eps, float offset, float strength, int luma_only, int n_threads)
-{
-    if (strength <= 0.001f) return;
-
-    const int w = s->w, h = s->h, sw = s->sw, sh = s->sh;
-    const float * restrict inv = s->inv_counts;
-    const int max_sdim = (sw > sh) ? sw : sh;
-    const int tile_w = cpu_get_cacheline_size();
-
-    // downsample
-    for (int y = 0; y < sh; y++) {
-        uint8_t * restrict s_line = s->small_src + y * sw;
-        uint8_t * restrict d1 = data + (y * 2 * w);
-        uint8_t * restrict d2 = d1 + w;
-        for (int x = 0; x < sw; x++) {
-            int x2 = x << 1;
-            s_line[x] = (d1[x2] + d1[x2 + 1] + d2[x2] + d2[x2 + 1]) >> 2;
-        }
-    }
-
-    // horizontal pass
-    {
-        const int tid = 0; 
-        float * restrict rowI  = s->mI  + tid * (max_sdim + 1);
-        float * restrict rowII = s->mII + tid * (max_sdim + 1);
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
-        for (int y = 0; y < sh; y++) {
-            uint8_t * restrict line = s->small_src + y * sw;
-            float * restrict tmu   = s->tmp_mu  + y * sw;
-            float * restrict tvar  = s->tmp_var + y * sw;
-            float accI = 0.0f, accII = 0.0f;
-
-            for (int x = 0; x < sw; x++) {
-                float v = (float)line[x] - offset;
-                accI += v; accII += v * v;
-                rowI[x]  = accI; rowII[x] = accII;
-            }
-
-            for (int x = 0; x < sw; x++) {
-                int r1 = (x - r < 0) ? 0 : x - r;
-                int r2 = (x + r >= sw) ? sw - 1 : x + r;
-                float ic = inv[r2 - r1 + 1];
-                float sumI  = rowI[r2]; float sumII = rowII[r2];
-                if (r1 > 0) { sumI -= rowI[r1 - 1]; sumII -= rowII[r1 - 1]; }
-                tmu[x] = sumI * ic; tvar[x] = sumII * ic;
-            }
-        }
-    }
-
-    // vertical pass
-    {
-        const int tid = 0;
-        float * restrict colI  = s->mI  + tid * (max_sdim + 1);
-        float * restrict colII = s->mII + tid * (max_sdim + 1);
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
-        for (int tx = 0; tx < sw; tx += tile_w) {
-            int tw = (tx + tile_w > sw) ? sw - tx : tile_w;
-            for (int x = tx; x < tx + tw; x++) {
-                float accI = 0.0f, accII = 0.0f;
-                for (int y = 0; y < sh; y++) {
-                    int idx = y * sw + x;
-                    accI += s->tmp_mu[idx]; accII += s->tmp_var[idx];
-                    colI[y]  = accI; colII[y] = accII;
-                }
-                for (int y = 0; y < sh; y++) {
-                    int r1 = (y - r < 0) ? 0 : y - r;
-                    int r2 = (y + r >= sh) ? sh - 1 : y + r;
-                    float ic = inv[r2 - r1 + 1];
-                    float sumI  = colI[r2]; float sumII = colII[r2];
-                    if (r1 > 0) { sumI -= colI[r1 - 1]; sumII -= colII[r1 - 1]; }
-                    float mu  = sumI * ic;
-                    float var = (sumII * ic) - mu * mu;
-                    float a   = var / (var + eps);
-                    int idx = y * sw + x;
-                    s->a_buf[idx] = a;
-                    s->b_buf[idx] = (1.0f - a) * mu;
-                }
-            }
-        }
-    }
-
-    // midpoint
-    if (luma_only) {
-        // full strength luma
-        for (int y = 0; y < h; y++) {
-            int ys = y >> 1;
-            const float * restrict a_ptr = s->a_buf + ys * sw;
-            const float * restrict b_ptr = s->b_buf + ys * sw;
-            uint8_t * restrict out = data + y * w;
-
-            for (int x = 0; x < (w & ~1); x += 2) {
-                const float a = *a_ptr++;
-                const float b = *b_ptr++;
-                out[x]   = clamp_u8((float)out[x] * a + b);
-                out[x+1] = clamp_u8((float)out[x+1] * a + b);
-            }
-            if (w & 1) {
-                int x = w - 1;
-                float a = s->a_buf[ys * sw + (x >> 1)];
-                float b = s->b_buf[ys * sw + (x >> 1)];
-                out[x] = clamp_u8((float)out[x] * a + b);
-            }
-        }
-    } else {
-        const float s_val = strength;
-        for (int y = 0; y < h; y++) {
-            int ys = y >> 1;
-            const float * restrict a_ptr = s->a_buf + ys * sw;
-            const float * restrict b_ptr = s->b_buf + ys * sw;
-            uint8_t * restrict out = data + y * w;
-
-            for (int x = 0; x < (w & ~1); x += 2) {
-                const float av = *a_ptr++;
-                const float bv = *b_ptr++;
-                const float v_coeff = 1.0f + s_val * (av - 1.0f);
-                const float sb_off  = s_val * (bv + offset * (1.0f - av));
-
-                out[x]   = clamp_u8((float)out[x] * v_coeff + sb_off);
-                out[x+1] = clamp_u8((float)out[x+1] * v_coeff + sb_off);
-            }
-            if (w & 1) {
-                int x = w - 1;
-                float av = s->a_buf[ys * sw + (x >> 1)];
-                float bv = s->b_buf[ys * sw + (x >> 1)];
-                float v_coeff = 1.0f + s_val * (av - 1.0f);
-                float sb_off  = s_val * (bv + offset * (1.0f - av));
-                out[x] = clamp_u8((float)out[x] * v_coeff + sb_off);
-            }
-        }
-    }
-}
-
-#pragma GCC optimize ("unroll-loops","tree-vectorize")
 static void apply_nuclear_plane_tiled(smartblur_t *s, uint8_t * restrict data,
                                int r, float eps, float offset, float strength,
                                int luma_only, int n_threads)
@@ -262,39 +128,40 @@ static void apply_nuclear_plane_tiled(smartblur_t *s, uint8_t * restrict data,
         uint8_t * restrict s_line = s->small_src + y * sw;
         uint8_t * restrict d1 = data + (y * 2 * w);
         uint8_t * restrict d2 = d1 + w;
+
         for (int x = 0; x < sw; x++) {
             int x2 = x << 1;
             s_line[x] = (d1[x2] + d1[x2 + 1] + d2[x2] + d2[x2 + 1]) >> 2;
         }
     }
 
-    #pragma omp parallel num_threads(n_threads)
-    {
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int y = 0; y < sh; y++) {
         const int tid = omp_get_thread_num();
         float * restrict rowI  = s->mI  + tid * (max_sdim + 1);
         float * restrict rowII = s->mII + tid * (max_sdim + 1);
 
-        #pragma omp for schedule(static)
-        for (int y = 0; y < sh; y++) {
-            uint8_t * restrict line = s->small_src + y * sw;
-            float * restrict tmu   = s->tmp_mu  + y * sw;
-            float * restrict tvar  = s->tmp_var + y * sw;
-            float accI = 0.0f, accII = 0.0f;
+        uint8_t * restrict line = s->small_src + y * sw;
+        float * restrict tmu   = s->tmp_mu  + y * sw;
+        float * restrict tvar  = s->tmp_var + y * sw;
+        float accI = 0.0f, accII = 0.0f;
 
-            for (int x = 0; x < sw; x++) {
-                float v = (float)line[x] - offset;
-                accI += v; accII += v * v;
-                rowI[x]  = accI; rowII[x] = accII;
-            }
+        for (int x = 0; x < sw; x++) {
+            float v = (float)line[x] - offset;
+            accI += v; accII += v * v;
+            rowI[x]  = accI; rowII[x] = accII;
+        }
 
-            for (int x = 0; x < sw; x++) {
-                int r1 = (x - r < 0) ? 0 : x - r;
-                int r2 = (x + r >= sw) ? sw - 1 : x + r;
-                float ic = inv[r2 - r1 + 1];
-                float sumI  = rowI[r2]; float sumII = rowII[r2];
-                if (r1 > 0) { sumI -= rowI[r1 - 1]; sumII -= rowII[r1 - 1]; }
-                tmu[x] = sumI * ic; tvar[x] = sumII * ic;
-            }
+        for (int x = 0; x < sw; x++) {
+            int r1 = x - r;
+            int r2 = x + r;
+
+            if (r1 < 0) r1 = 0;
+            if (r2 >= sw) r2 = sw - 1;
+            float ic = inv[r2 - r1 + 1];
+            float sumI  = rowI[r2]  - (r1 ? rowI[r1 - 1]  : 0.0f);
+            float sumII = rowII[r2] - (r1 ? rowII[r1 - 1] : 0.0f);
+            tmu[x] = sumI * ic; tvar[x] = sumII * ic;
         }
     }
 
@@ -371,8 +238,6 @@ static void apply_nuclear_plane_tiled(smartblur_t *s, uint8_t * restrict data,
         }
     }
 }
-
-
 
 void smartblur_apply(void *ptr, VJFrame *frame, int *args)
 {
