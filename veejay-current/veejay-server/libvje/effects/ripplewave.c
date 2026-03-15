@@ -154,7 +154,7 @@ void ripplewave_apply(void *ptr, VJFrame *frame, int *args) {
 
 
 
-    #pragma omp parallel for schedule(static) num_threads(data->n_threads) private(x)
+    #pragma omp parallel for schedule(static) num_threads(data->n_threads)
     for (y = 0; y < height; y++) {
         int rowOffset = y * width;
         int offsetY = (int)(amplitude * lut_y[y]);
