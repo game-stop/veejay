@@ -243,8 +243,9 @@
 #include "./effects/fragmenttv.h"
 #include "./effects/mirror.h"
 #include "./effects/darkreplacemix.h"
+#include "./effects/echotrace.h"
 
-#define VJ_IMAGE_EFFECT_MIN 46
+#define VJ_IMAGE_EFFECT_MIN 45
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -522,6 +523,7 @@ enum {
     VJ_IMAGE_EFFECT_FRAGMENTTV = 48,
     VJ_IMAGE_EFFECT_MIRRORREFLECT = 47,
     VJ_IMAGE_EFFECT_MELT = 46,
+    VJ_IMAGE_EFFECT_ECHOTRACE = 45,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
