@@ -365,7 +365,7 @@ static struct
 	const char *name;
 	int vims_id;
 	const char *file;
-	void (*f)();
+	void (*f)(GtkWidget *, gpointer);
 } button_template_t[] =
 {
 	{ "button_gotostart", VIMS_VIDEO_GOTO_START, "button_gotostart.png", seq_gotostart },
