@@ -99,9 +99,9 @@ static void setTable(radioactive_t *r)
     const int HHEIGHT = buf_height / 2;
 
     int tx = (int)(0.5 + ratio_ * (-HWIDTH) + HWIDTH);
-    for(x = 0; x < buf_width; x++) {
-        int ptr = (int)(0.5 + ratio_ * (x - HWIDTH) + HWIDTH);
-        r->zoom_offset_x[x] = ptr - tx; 
+    float rHW = ratio_ * -HWIDTH + HWIDTH;
+    for(int x = 0; x < buf_width; x++){
+        r->zoom_offset_x[x] = (int)(0.5 + rHW + ratio_ * x) - tx;
     }
 
     int ty = (int)(0.5 + ratio_ * (-HHEIGHT) + HHEIGHT);
@@ -116,6 +116,7 @@ static void setTable(radioactive_t *r)
         prev_row_end_ptr = ty * buf_width + xx;
     }
 }
+
 static void kentaro_blur(radioactive_t *r)
 {
     const int width  = r->buf_width;
@@ -123,7 +124,7 @@ static void kentaro_blur(radioactive_t *r)
     uint8_t *restrict src = r->blurzoombuf;
     uint8_t *restrict dst = r->blurzoombuf + r->buf_area;
 
-    #pragma omp parallel for num_threads(r->n_threads)
+    #pragma omp parallel for num_threads(r->n_threads) schedule(static)
     for (int y = 1; y < height - 1; y++) {
         const uint8_t *restrict top = src + (y - 1) * width;
         const uint8_t *restrict mid = src + y * width;
@@ -133,7 +134,7 @@ static void kentaro_blur(radioactive_t *r)
         #pragma omp simd
         for (int x = 1; x < width - 1; x++) {
             uint32_t v = (top[x] + mid[x - 1] + mid[x + 1] + bot[x]) >> 2;
-            out[x] = (uint8_t)(v - !!v);
+            out[x] = (uint8_t)((v - 1) & 0xFF);
         }
     }
 }
@@ -165,7 +166,7 @@ static void zoom(radioactive_t *r)
         current_p_offset += row_dx;
     }
 
-    #pragma omp parallel for num_threads(r->n_threads)
+    #pragma omp parallel for num_threads(r->n_threads) schedule(static)
     for (int y = 0; y < height; y++) {
         uint8_t *p_row = base_in + p_start_offsets[y];
         uint8_t *q_row = base_out + y * width;
@@ -234,36 +235,78 @@ static inline int radioactive_abs(int v) {
     return (v ^ mask) - mask;
 }
 
-static inline void inject_motion_core(radioactive_t *r, uint8_t *lum, uint8_t *prev, 
-                                      int width, int threshold, int snapInterval, int mode) 
+static inline void inject_motion_core(radioactive_t *r, uint8_t *lum, uint8_t *prev,
+                                      int width, int threshold, int snapInterval, int mode)
 {
-    #pragma omp parallel for num_threads(r->n_threads)
-    for (int y = 0; y < r->buf_height; y++) {
-        int offset = y * width + r->buf_margin_left;
-        uint8_t *restrict l_ptr = lum + offset;
-        uint8_t *restrict p_ptr = prev + offset;
-        uint8_t *restrict b_ptr = r->blurzoombuf + y * r->buf_width;
+    const int buf_width = r->buf_width;
+    const int buf_height = r->buf_height;
+    const int margin = r->buf_margin_left;
 
-        #pragma omp simd
-        for (int x = 0; x < r->buf_width; x++) {
-            int d_val;
-            
-            // gcc inline magic optimizes the ifs away ...
-            if (mode == 0 || mode == 3) {
-                d_val = (p_ptr[x] + (l_ptr[x] * 3)) >> 2;
-            } else if (mode == 1 || mode == 4) {
-                int diff = l_ptr[x] - p_ptr[x];
-                d_val = (diff < 0) ? 0 : (diff >> 1);
-            } else if (mode == 6) {
-                int delta = radioactive_abs(l_ptr[x] - p_ptr[x]);
-                d_val = (delta > threshold) ? (l_ptr[x] >> 2) : 0;
-            } else {
-                d_val = radioactive_abs(l_ptr[x] - p_ptr[x]);
+    if (mode == 0 || mode == 3) {
+        #pragma omp parallel for num_threads(r->n_threads) schedule(static)
+        for (int y = 0; y < buf_height; y++) {
+            int offset = y * width + margin;
+            uint8_t *restrict l_ptr = lum + offset;
+            uint8_t *restrict p_ptr = prev + offset;
+            uint8_t *restrict b_ptr = r->blurzoombuf + y * buf_width;
+
+            #pragma omp simd
+            for (int x = 0; x < buf_width; x++) {
+                int d_val = (p_ptr[x] + (l_ptr[x] * 3)) >> 2;
+                int motion_val = d_val * (d_val >= threshold);
+                uint8_t existing = b_ptr[x] - (b_ptr[x] != 0);
+                b_ptr[x] = existing | ((uint8_t)((motion_val * snapInterval) >> 7));
             }
+        }
+    } else if (mode == 1 || mode == 4) {
+        #pragma omp parallel for num_threads(r->n_threads) schedule(static)
+        for (int y = 0; y < buf_height; y++) {
+            int offset = y * width + margin;
+            uint8_t *restrict l_ptr = lum + offset;
+            uint8_t *restrict p_ptr = prev + offset;
+            uint8_t *restrict b_ptr = r->blurzoombuf + y * buf_width;
 
-            uint8_t motion = (uint8_t)(d_val * (d_val >= threshold));
-            uint8_t existing = b_ptr[x] - !!b_ptr[x];
-            b_ptr[x] = existing | ((motion * snapInterval) >> 7);
+            #pragma omp simd
+            for (int x = 0; x < buf_width; x++) {
+                int diff = l_ptr[x] - p_ptr[x];
+                int d_val = (diff < 0) ? 0 : (diff >> 1);
+                int motion_val = d_val * (d_val >= threshold);
+                uint8_t existing = b_ptr[x] - (b_ptr[x] != 0);
+                b_ptr[x] = existing | ((uint8_t)((motion_val * snapInterval) >> 7));
+            }
+        }
+    } else if (mode == 6) {
+        #pragma omp parallel for num_threads(r->n_threads) schedule(static)
+        for (int y = 0; y < buf_height; y++) {
+            int offset = y * width + margin;
+            uint8_t *restrict l_ptr = lum + offset;
+            uint8_t *restrict p_ptr = prev + offset;
+            uint8_t *restrict b_ptr = r->blurzoombuf + y * buf_width;
+
+            #pragma omp simd
+            for (int x = 0; x < buf_width; x++) {
+                int delta = radioactive_abs(l_ptr[x] - p_ptr[x]);
+                int d_val = (delta > threshold) ? (l_ptr[x] >> 2) : 0;
+                int motion_val = d_val * (d_val >= threshold);
+                uint8_t existing = b_ptr[x] - (b_ptr[x] != 0);
+                b_ptr[x] = existing | ((uint8_t)((motion_val * snapInterval) >> 7));
+            }
+        }
+    } else {
+        #pragma omp parallel for num_threads(r->n_threads) schedule(static, 4)
+        for (int y = 0; y < buf_height; y++) {
+            int offset = y * width + margin;
+            uint8_t *restrict l_ptr = lum + offset;
+            uint8_t *restrict p_ptr = prev + offset;
+            uint8_t *restrict b_ptr = r->blurzoombuf + y * buf_width;
+
+            #pragma omp simd
+            for (int x = 0; x < buf_width; x++) {
+                int d_val = radioactive_abs(l_ptr[x] - p_ptr[x]);
+                int motion_val = d_val * (d_val >= threshold);
+                uint8_t existing = b_ptr[x] - (b_ptr[x] != 0);
+                b_ptr[x] = existing | ((uint8_t)((motion_val * snapInterval) >> 7));
+            }
         }
     }
 }
@@ -318,15 +361,23 @@ void radioactivetv_apply(void *ptr, VJFrame *frame, VJFrame *blue, int *args) {
 
     // Final Output Pass
     if (mode >= 3) {
-        veejay_memset(frame->data[1], 128, len);
-        veejay_memset(frame->data[2], 128, len);
-        #pragma omp parallel for num_threads(r->n_threads)
+        #pragma omp parallel for num_threads(r->n_threads) schedule(static)
+        for (int i = 0; i < len; i++) {
+            frame->data[1][i] = 128;
+            frame->data[2][i] = 128;
+        }
+
+        #pragma omp parallel for num_threads(r->n_threads) schedule(static)
         for (int y = 0; y < r->buf_height; y++) {
-            veejay_memcpy(lum + (y * width) + r->buf_margin_left, 
-                          r->blurzoombuf + (y * r->buf_width), r->buf_width);
+            uint8_t *src_row = r->blurzoombuf + y * r->buf_width;
+            uint8_t *dst_row = lum + y * width + r->buf_margin_left;
+            #pragma omp simd
+            for (int x = 0; x < r->buf_width; x++) {
+                dst_row[x] = src_row[x];
+            }
         }
     } else { 
-        #pragma omp parallel for num_threads(r->n_threads)
+        #pragma omp parallel for num_threads(r->n_threads) schedule(static)
         for (int y = 0; y < r->buf_height; y++) {
             int frame_offset = (y * width) + r->buf_margin_left;
             uint8_t *restrict mask_row = r->blurzoombuf + (y * r->buf_width);
