@@ -60,6 +60,7 @@ typedef struct {
     float distortion;
     uint8_t *buf[3];
     int strides[4];
+    int n_threads;
 } mirror_distortion_t;
 
 void *mirrordistortion_malloc(int w, int h)
@@ -94,6 +95,8 @@ void *mirrordistortion_malloc(int w, int h)
     m->strides[1] = m->strides[0];
     m->strides[2] = m->strides[1];
     m->strides[3] = 0;
+
+    m->n_threads = vje_advise_num_threads(w*h);
 
     return (void*) m;
 }
@@ -144,17 +147,24 @@ void mirrordistortion_apply(void *ptr, VJFrame *frame, int *args ) {
     veejay_memcpy( m->buf[1], frame->data[1], frame->len );
     veejay_memcpy( m->buf[2], frame->data[2], frame->len );
 
-    for (int i = 0; i < frame->height; ++i) {
-        for (int j = 0; j < frame->width; ++j) {
-            int sourceX = j + offsetX * m->sin_lut[i];
-            int sourceY = i + offsetY * m->cos_lut[j];
+    #pragma omp parallel for num_threads(m->n_threads) schedule(static) collapse(2)
+    for (int i = 0; i < h; ++i) {
+        for (int j = 0; j < w; ++j) {
+            int sourceX = j + (int)(offsetX * m->sin_lut[i]);
+            int sourceY = i + (int)(offsetY * m->cos_lut[j]);
 
-            sourceX = (sourceX < 0) ? 0 : ((sourceX >= frame->width) ? frame->width - 1 : sourceX);
-            sourceY = (sourceY < 0) ? 0 : ((sourceY >= frame->height) ? frame->height - 1 : sourceY);
+            if (sourceX < 0) sourceX = 0;
+            else if (sourceX >= w) sourceX = w - 1;
 
-            outY[i * frame->width + j] = srcY[sourceY * frame->width + sourceX];
-            outU[i * frame->width + j] = srcU[sourceY * frame->width + sourceX];
-            outV[i * frame->width + j] = srcV[sourceY * frame->width + sourceX];
+            if (sourceY < 0) sourceY = 0;
+            else if (sourceY >= h) sourceY = h - 1;
+
+            int destIdx = i * w + j;
+            int srcIdx = sourceY * w + sourceX;
+
+            outY[destIdx] = srcY[srcIdx];
+            outU[destIdx] = srcU[srcIdx];
+            outV[destIdx] = srcV[srcIdx];
         }
     }
 }
