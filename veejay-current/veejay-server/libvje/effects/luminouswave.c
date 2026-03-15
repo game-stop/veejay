@@ -69,29 +69,31 @@ vj_effect *luminouswave_init(int w, int h) {
 }
 
 typedef struct {
-    float cos_lut[384] __attribute__((aligned(64)));
-    float sin_lut[384] __attribute__((aligned(64)));
+    float sin_lut[1024] __attribute__((aligned(64)));
+    float cos_lut[1024] __attribute__((aligned(64)));
     int width;
     int height;
     int speed;
     int update;
+    int n_threads;
 } luminouswave_t;
 
 #define SIN_TABLE_SIZE 360
 void* luminouswave_malloc(int w, int h) {
     luminouswave_t *data = (luminouswave_t*) vj_malloc(sizeof(luminouswave_t));
-    if (!data)
-        return NULL;
+    if (!data) return NULL;
 
     data->width = w;
     data->height = h;
     data->speed = 0;
 
-    for(int i = 0; i < 360; i ++ ) {
-        float val = i * (M_PI/180.0f);
-        data->sin_lut[i] = a_sin( val );
-        data->cos_lut[i] = a_cos( val );
+    for(int i = 0; i < 1024; i++) {
+        float val = (i / 1024.0f) * (2.0f * M_PI);
+        data->sin_lut[i] = a_sin(val);
+        data->cos_lut[i] = a_cos(val);
     }
+
+    data->n_threads = vje_advise_num_threads(w*h);
 
     return data;
 }
@@ -102,58 +104,58 @@ void luminouswave_free(void *ptr) {
         free(data);
     }
 }
-
 void luminouswave_apply(void *ptr, VJFrame *frame, int *args) {
     luminouswave_t *data = (luminouswave_t*)ptr;
-
     const int width = frame->width;
     const int height = frame->height;
-
-    int x = 0, y;
-    
-    const float frequencyX = args[0] * 0.01f;
-    const float frequencyY = args[1] * 0.01f;
-    const float amplitude  = args[2];
-    const int min_speed      = args[3];
-    const int waveAngleX = args[4];
-    const int waveAngleY = args[5];
-    const int break_speed = args[6];
-
-    const float *sin_lut = data->sin_lut;
-    const float *cos_lut = data->cos_lut;
-
-    const int max_speed = (args[0] * width > args[1] * height) ? (args[0] * width) : (args[1] * height);
-
     uint8_t *Y = frame->data[0];
 
-    const int cur_speed = data->speed;
-    int new_speed = cur_speed + (max_speed / (break_speed * 10));
-    if (new_speed > max_speed) {
-        new_speed = min_speed;
-    }
+    const float freqX = args[0] * 0.01f;
+    const float freqY = args[1] * 0.01f;
+    const float amplitude = (float)args[2];
+    const int min_speed = args[3];
+    const int break_speed = args[6];
 
-    const float f_speed = (min_speed + cur_speed) * 0.01f;
+    const float sX = data->sin_lut[(args[4] * 1024 / 360) & 1023];
+    const float cX = data->cos_lut[(args[4] * 1024 / 360) & 1023];
+    const float sY = data->sin_lut[(args[5] * 1024 / 360) & 1023];
+    const float cY = data->cos_lut[(args[5] * 1024 / 360) & 1023];
 
-    int current_count = atomic_fetch_add_explicit(&data->update, 1, memory_order_relaxed);
+    const int max_speed = (args[0] * width > args[1] * height) ? (args[0] * width) : (args[1] * height);
+    int next_speed = data->speed + (max_speed / (break_speed * 10));
+    if (next_speed > max_speed) next_speed = min_speed;
+    data->speed = next_speed;
 
-    if (frame->totaljobs == 0 || current_count % frame->totaljobs == 0) {
-        data->speed = new_speed;
-    }
+    const float f_speed = (min_speed + next_speed) * 0.01f;
+    const float rad_to_idx = 1024.0f / (2.0f * M_PI);
 
+    const float stepY = freqY * sX;
+    const float stepX = freqX * cX;
     const int offset = (frame->jobnum * height);
 
-    for (y = 0; y < height; y++) {
-        const float cos_y = cos_lut[ waveAngleY ];
-        const float sin_y = sin_lut[ waveAngleY ];
-        const int offset_y = y + offset;
 
-        for (x = 0; x < width; x++) {
-            float offsetY = amplitude * a_sin(frequencyY * (x * sin_lut[waveAngleX] + offset_y * cos_y) + f_speed);
-            float offsetX = amplitude * a_sin(frequencyX * (x * cos_lut[waveAngleX] + offset_y * sin_y) + f_speed);
-            int luma = Y[y * width + x] + offsetX + offsetY;
-            Y[y*width+x] = (luma < pixel_Y_lo_) ? pixel_Y_lo_ : (luma > pixel_Y_hi_) ? pixel_Y_hi_ : luma;
+    #pragma omp parallel for num_threads(data->n_threads) schedule(static)
+
+    for (int y = 0; y < height; y++) {
+        uint8_t *restrict row = &Y[y * width];
+        const int actual_y = y + offset;
+        
+        const float base_Y = (freqY * actual_y * cY + f_speed) * rad_to_idx;
+        const float base_X = (freqX * actual_y * sY + f_speed) * rad_to_idx;
+        const float sY_inc = stepY * rad_to_idx;
+        const float sX_inc = stepX * rad_to_idx;
+
+        for (int x = 0; x < width; x++) {
+            int idxY = (int)(x * sY_inc + base_Y) & 1023;
+            int idxX = (int)(x * sX_inc + base_X) & 1023;
+            
+            float off = amplitude * (data->sin_lut[idxY] + data->sin_lut[idxX]);
+            int luma = row[x] + (int)off;
+            
+            if (luma < pixel_Y_lo_) luma = pixel_Y_lo_;
+            else if (luma > pixel_Y_hi_) luma = pixel_Y_hi_;
+            
+            row[x] = (uint8_t)luma;
         }
     }
 }
-
-
