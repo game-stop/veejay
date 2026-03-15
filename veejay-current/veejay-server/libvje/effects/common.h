@@ -112,6 +112,51 @@ static inline int vje_advise_num_threads(const int len) {
 	return nthreads;
 }
 
+static inline int vje_advise_num_parallel_threads(const int len, int n_workers)
+{
+    static int ncores = -1;
+    static int user_threads = -1;
+
+    if (ncores == -1) {
+        ncores = (int) sysconf(_SC_NPROCESSORS_ONLN);
+        if (ncores < 1)
+            ncores = 1;
+    }
+
+    if (user_threads == -1) {
+        char *veejay_tasks = getenv("VEEJAY_MULTITHREAD_TASKS");
+        if (veejay_tasks != NULL)
+            user_threads = atoi(veejay_tasks);
+
+        if (user_threads <= 0)
+            user_threads = ncores;
+
+        if (user_threads > ncores)
+            user_threads = ncores;
+    }
+
+    int total_threads = user_threads;
+
+    if (len < (1920 * 1080))
+        total_threads /= 2;
+
+    if (total_threads < 1)
+        total_threads = 1;
+
+    if (n_workers < 1)
+        n_workers = 1;
+
+    int threads = total_threads / n_workers;
+
+    if (threads < 1)
+        threads = 1;
+
+    if (threads > 2)
+        threads = 2;
+
+    return threads;
+}
+
 static inline double a_fmod(double x, double m) {
   while (x >= m) {
     x -= m;
