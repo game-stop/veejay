@@ -512,10 +512,10 @@ VJFrame *yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
             break;
         case PIX_FMT_YUV420P:
         case PIX_FMT_YUVJ420P:
-            f->uv_width = w>>1;
-            f->uv_height=f->height>>1;
+            f->uv_width = (w + 1) >> 1;
+            f->uv_height= (h + 1) >> 1;
             f->stride[0] = w;
-            f->stride[1] = f->stride[2] = f->stride[0]>>1;
+            f->stride[1] = f->stride[2] = f->uv_width;
             f->shift_v = 1;
             f->shift_h = 1;
             f->yuv_fmt = PIX_FMT_YUV420P;
@@ -597,6 +597,61 @@ VJFrame *yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
     f->len = w * h;
     f->yuv_fmt = fmt;
     return f;
+}
+
+size_t yuv_frame_bytes(VJFrame *f)
+{
+    size_t total = 0;
+
+    switch(f->yuv_fmt)
+    {
+        case PIX_FMT_YUV420P:
+        case PIX_FMT_YUVJ420P:
+        case PIX_FMT_YUVA420P:
+            total += f->stride[0] * f->height;
+            total += f->stride[1] * f->uv_height;
+            total += f->stride[2] * f->uv_height;
+            break;
+        case PIX_FMT_YUV422P:
+        case PIX_FMT_YUVJ422P:
+        case PIX_FMT_YUVA422P:
+            total += f->stride[0] * f->height;
+            total += f->stride[1] * f->uv_height;
+            total += f->stride[2] * f->uv_height;
+            break;
+        case PIX_FMT_YUV444P:
+        case PIX_FMT_YUVJ444P:
+        case PIX_FMT_YUVA444P:
+            total += f->stride[0] * f->height;
+            total += f->stride[1] * f->height;
+            total += f->stride[2] * f->height;
+            break;
+        case PIX_FMT_GRAY8:
+            total += f->stride[0] * f->height;
+            break;
+        case PIX_FMT_RGB24:
+        case PIX_FMT_BGR24:
+        case PIX_FMT_RGB32:
+        case PIX_FMT_BGR32:
+        case PIX_FMT_ARGB:
+        case PIX_FMT_ABGR:
+            total += f->stride[0] * f->height;
+            break;
+
+        case PIX_FMT_YUYV422:
+        case PIX_FMT_UYVY422:
+            total += f->stride[0] * f->height;
+            break;
+
+        default:
+            veejay_msg(VEEJAY_MSG_DEBUG, "Hitting fallback in %s", __FUNCTION__);
+            total += f->stride[0] * f->height;
+            if(f->data[1]) total += f->stride[1] * (f->uv_height ? f->uv_height : f->height);
+            if(f->data[2]) total += f->stride[2] * (f->uv_height ? f->uv_height : f->height);
+            break;
+    }
+
+    return total;
 }
 
 void    yuv_convert_any_ac( VJFrame *src, VJFrame *dst )
@@ -1306,15 +1361,11 @@ void    yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
         dst->format == PIX_FMT_BGR32 ) 
         n = 4;
 
-    const int src_stride[4] = { src->width,src->uv_width,src->uv_width,src->stride[3] };
-    const int dst_stride[4] = { dst->width*n,0,0,0 };
-#ifdef STRICT_CHECKING
-    check_desired_alignment( src->data[0] );
-    check_desired_alignment( src->data[1] );
-    check_desired_alignment( src->data[2] );
-    check_desired_alignment( dst->data[0] );
-#endif
-    sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height,(uint8_t * const*) dst->data, dst_stride );
+    veejay_msg(VEEJAY_MSG_DEBUG, "src %d x %d strides [%d,%d,%d] to rgb %d x %d strides %d %d %d",
+        src->width,src->height,src->stride[0],src->stride[1],src->stride[2], 
+        dst->width,dst->height,dst->stride[0],dst->stride[1],dst->stride[2]);
+
+    sws_scale( s->sws,(const uint8_t * const*) src->data, src->stride, 0, src->height,(uint8_t * const*) dst->data, dst->stride );
 }
 void    yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 {
