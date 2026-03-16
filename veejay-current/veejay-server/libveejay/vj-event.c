@@ -8617,36 +8617,33 @@ void    vj_event_get_scaled_image       (   void *ptr,  const char format[],    
         return;
     }
 
-    int dstlen = 0;
+    size_t dstlen = 0;
     VJFrame frame;
     veejay_memcpy(&frame, v->effect_frame1, sizeof(VJFrame));
     vj_perform_get_primary_frame( v, frame.data );
 
     if( alpha ) {
-        vj_fast_alpha_picture_save_to_mem( &frame, w,h, vj_perform_get_preview_buffer(v));
-        dstlen = w * h;
+        dstlen = vj_fast_alpha_picture_save_to_mem( &frame, w,h, vj_perform_get_preview_buffer(v));
     }
     else if( use_bw_preview_ ) {
-        vj_fastbw_picture_save_to_mem(
+        dstlen = vj_fastbw_picture_save_to_mem(
                 &frame,
                 w,
                 h,
                 vj_perform_get_preview_buffer(v));
-        dstlen = w * h;
     }
     else {
-        vj_fast_picture_save_to_mem(
+        dstlen = vj_fast_picture_save_to_mem(
                 &frame,
                 w,
                 h,
-                vj_perform_get_preview_buffer(v));
-        dstlen = (w * h) + ((w*h)/4) + ((w*h)/4);
+                vj_perform_get_preview_buffer(v) );
     }
 
-    char header[16];
-    snprintf( header,sizeof(header), "%06d%1d%1d", dstlen, use_bw_preview_, yuv_get_pixel_range() );
-    SEND_DATA(v, header, 8 );
-    SEND_DATA(v, vj_perform_get_preview_buffer(v), dstlen );
+    char header[32];
+    snprintf(header, sizeof(header), "%06zu%04d%02d%1d", dstlen, args[0], args[1], yuv_get_pixel_range());
+    SEND_DATA(v, header, 13);
+    SEND_DATA(v, vj_perform_get_preview_buffer(v), dstlen);
 }
 
 void    vj_event_get_cali_image     (   void *ptr,  const char format[],    va_list ap  )
@@ -10850,7 +10847,7 @@ void    vj_event_get_sample_image       (   void *ptr,  const char format[],    
         return;
     }
 
-    int dstlen = 0;
+    size_t dstlen = 0;
     
     editlist *el = ( type == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_editlist(id) : v->edit_list );
     if( el == NULL && type == VJ_PLAYBACK_MODE_SAMPLE ) {
@@ -10890,26 +10887,24 @@ void    vj_event_get_sample_image       (   void *ptr,  const char format[],    
             get_ffmpeg_pixfmt( v->pixel_format ));
 
     if( use_bw_preview_ ) {
-        vj_fastbw_picture_save_to_mem(
+        dstlen = vj_fastbw_picture_save_to_mem(
                 frame,
                 w,
                 h,
                 vj_perform_get_preview_buffer(v));
-        dstlen = w * h;
     }
     else {
-        vj_fast_picture_save_to_mem(
+        dstlen = vj_fast_picture_save_to_mem(
                 frame,
                 w,
                 h,
                 vj_perform_get_preview_buffer(v) );
-        dstlen = (w * h) + ((w*h)/4) + ((w*h)/4);
     }
 
     char header[32];
-    snprintf( header,sizeof(header), "%06d%04d%2d%1d", dstlen, args[0],args[1], yuv_get_pixel_range() );
-    SEND_DATA(v, header, 13 );
-    SEND_DATA(v, vj_perform_get_preview_buffer(v), dstlen );
+    snprintf(header, sizeof(header), "%06zu%04d%02d%1d", dstlen, args[0], args[1], yuv_get_pixel_range());
+    SEND_DATA(v, header, 13);
+    SEND_DATA(v, vj_perform_get_preview_buffer(v), dstlen);
 
     free(frame);
 
