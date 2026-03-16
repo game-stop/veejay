@@ -4365,7 +4365,7 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t *)ptr;
     int args[2];
     int result = 0;
-    char prefix[150];
+    char prefix[SAMPLE_MAX_DESCR_LEN];
     P_A(args,sizeof(args),NULL,0,format,ap);
 
     if( !SAMPLE_PLAYING(v))
@@ -4403,7 +4403,7 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
         }
         else
         {
-            sprintf( prefix, "sequence_");
+            snprintf( prefix,sizeof(prefix), "sequence_");
         }
     }
 
@@ -7979,11 +7979,11 @@ void vj_event_print_tag_info(veejay_t *v, int id)
 {
     int i, y, j, value;
     char description[100];
-    char source[150];
+    char source[255];
     char title[150];
     vj_tag_get_descriptive(id,description);
     vj_tag_get_description(id, title);
-    vj_tag_get_source_name(id, source);
+    vj_tag_get_source_name(id, source, sizeof(source));
 
     if(v->settings->tag_record) {
         veejay_msg(VEEJAY_MSG_INFO, "Stream '%s' [%d]/[%d] [%s] [transition%sactive (shape n°%02d>%d frames)] [recorded: %06ld frames]",
@@ -8129,7 +8129,7 @@ void vj_event_print_sample_info(veejay_t *v, int id)
     long value;
     char timecode[48];
     char curtime[48];
-    char sampletitle[200];
+    char sampletitle[SAMPLE_MAX_DESCR_LEN];
     MPEG_timecode_t tc;
     y4m_ratio_t ratio = mpeg_conform_framerate( (double)v->current_edit_list->video_fps );
     long start = sample_get_startFrame( id );
@@ -8326,7 +8326,7 @@ void vj_event_send_tag_list(void *ptr, const char format[], va_list ap)
             {
                 vj_tag *tag = vj_tag_get(i);
                 char source_name[255];
-                vj_tag_get_source_name(i, source_name);
+                vj_tag_get_source_name(i, source_name, sizeof(source_name));
 
                 char line[512];
                 int line_len = snprintf(line, sizeof(line), "%05d%02d%03d%03d%03d%03d%03zu%s",
@@ -8420,7 +8420,7 @@ static char * _vj_event_gatter_stream_info(veejay_t *v, int id)
     char source[255];
     int  stream_type = vj_tag_get_type(id);
     
-    vj_tag_get_source_name(id, source);
+    vj_tag_get_source_name(id, source, sizeof(source));
     vj_tag_get_description(id, description);
     
     size_t dlen = strlen(description);
