@@ -443,18 +443,18 @@ void        vj_picture_free(void)
 #define pic_has_changed(a,b,c) ( (a == pic_data_[0] && b == pic_data_[1] && c == pic_data_[2] ) ? 0: 1)
 #define update_pic_data(a,b,c) { pic_data_[0] = a; pic_data_[1] = b; pic_data_[2] = c;}
 
-uint8_t val = 0;
-void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, uint8_t *dst )
+size_t vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, uint8_t *dst )
 {
     uint8_t *dest[4];   
     VJFrame src;
     VJFrame *src1 = &src;
+    size_t alignment = mem_align_size();
 
     dest[0] = dst;
-    dest[1] = realign_buffer( dest[0], out_w * out_h );
-    dest[2] = realign_buffer( dest[1], (out_w*out_h)/4);
-
+    dest[1] = dest[0] + out_w*out_h;
+    dest[2] = dest[1] + (out_w*out_h)/4;
     dest[3] = NULL;
+
     
     veejay_memcpy( src1, frame,sizeof(VJFrame));
 
@@ -472,10 +472,14 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, uint8_t 
 
     yuv_convert_and_scale( pic_scaler_, src1,dst1);
 
+    size_t result = yuv_frame_bytes(dst1);
+
     free(dst1);
+
+    return result;
 }
 
-void    vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, uint8_t *dst )
+size_t    vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, uint8_t *dst )
 {
     uint8_t *planes[4]; 
     VJFrame src;
@@ -499,10 +503,14 @@ void    vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, uin
 
     yuv_convert_and_scale( pic_scaler_, src1, dst1);
 
+    size_t result = yuv_frame_bytes( dst1 );
+
     free(dst1);
+
+    return result;
 }
 
-void    vj_fast_alpha_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, uint8_t *dst )
+size_t    vj_fast_alpha_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, uint8_t *dst )
 {
     uint8_t *planes[4]; 
     VJFrame src;
@@ -527,5 +535,9 @@ void    vj_fast_alpha_picture_save_to_mem( VJFrame *frame, int out_w, int out_h,
 
     yuv_convert_and_scale( pic_scaler_, src1, dst1);
 
+    size_t result = yuv_frame_bytes(dst1);
+
     free(dst1);
+
+    return result;
 }
