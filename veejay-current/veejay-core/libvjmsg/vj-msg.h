@@ -48,5 +48,6 @@ extern void veejay_init_msg_ring(void);
 extern void veejay_destroy_msg_ring(void);
 extern void veejay_set_timestamp(int status);
 extern void veejay_set_label(int status);
+extern void veejay_msg_buffer(const uint8_t *buffer, size_t len, size_t max_bytes_to_log, const char *prefix);
 #endif
 

@@ -306,6 +306,37 @@ void	veejay_destroy_msg_ring(void)
 	}
 }
 
+void veejay_msg_buffer(const uint8_t *buffer, size_t len, size_t max_bytes_to_log, const char *prefix)
+{
+    if (!buffer || len == 0)
+        return;
+
+    size_t dump_len = (len < max_bytes_to_log) ? len : max_bytes_to_log;
+    size_t line_width = 16;
+
+    for (size_t offset = 0; offset < dump_len; offset += line_width) {
+        size_t line_len = ((offset + line_width) <= dump_len) ? line_width : (dump_len - offset);
+
+        char hexbuf[line_width * 3 + 1];
+        char asciibuf[line_width + 1];
+        char *hp = hexbuf;
+        char *ap = asciibuf;
+
+        for (size_t i = 0; i < line_len; i++) {
+            uint8_t b = buffer[offset + i];
+            hp += snprintf(hp, 4, "%02X ", b);
+            *ap++ = (b >= 32 && b <= 126) ? b : '.';
+        }
+        *hp = '\0';
+        *ap = '\0';
+
+        if (prefix)
+            veejay_msg(VEEJAY_MSG_WARNING, "%s [%04zu]: %-48s |%s|", prefix, offset, hexbuf, asciibuf);
+        else
+            veejay_msg(VEEJAY_MSG_WARNING, "[%04zu]: %-48s |%s|", offset, hexbuf, asciibuf);
+    }
+}
+
 int	veejay_log_to_ringbuffer(void)
 {
 	return ( msg_ring == NULL ? 0 : msg_ring_enabled );
