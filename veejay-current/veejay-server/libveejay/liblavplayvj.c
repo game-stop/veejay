@@ -2815,7 +2815,7 @@ void *veejay_audio_producer_thread(void *arg)
     double anchor_s = 0;
     unsigned long long loop_count = 0; // 19.5 billion years playing 29fps/44.1Khz
     const int BPS = el->audio_bps;
-    const int MAX_CLIENT_FRAMES = (int)(SPVF * CLIENT_RATE + 8);
+    const int MAX_CLIENT_FRAMES = (int)(SPVF * CLIENT_RATE * 2 + 1024);
 
     uint8_t *audio_chunk = NULL;
     uint8_t *silenced    = NULL;
@@ -2849,7 +2849,7 @@ void *veejay_audio_producer_thread(void *arg)
 		const long seed_client_frames = (long)(CLIENT_RATE * seed_frames / el->video_fps);
         long seeded = 0;
 
-        veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Seeding Jack ringbuffers with %ld client frames (~%d video frames)", seed_client_frames, seed_frames);
+        /*veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Seeding Jack ringbuffers with %ld client frames (~%d video frames)", seed_client_frames, seed_frames);
 
         while (seeded < seed_client_frames && atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
             long frames_free = vj_jack_get_ringbuffer_frames_free();
@@ -2866,7 +2866,7 @@ void *veejay_audio_producer_thread(void *arg)
             seeded += written;
         }
 
-		veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Done seeding JACK buffers");
+		veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Done seeding JACK buffers");*/
 
         unsigned long start_hw = vj_jack_get_played_frames();
         unsigned long frames_to_wait = (unsigned long)seed_client_frames * JACK_RATE / CLIENT_RATE;
