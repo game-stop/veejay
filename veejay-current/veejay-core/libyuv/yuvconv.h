@@ -52,6 +52,8 @@ int luminance_mean(uint8_t * frame[], int w, int h);
 
 void yuv_plane_sizes( VJFrame *src, int *p1, int *p2, int *p3, int *p4 );
 
+size_t yuv_frame_bytes(VJFrame *f);
+
 /* software scaler from ffmpeg project: */
 
 typedef struct
