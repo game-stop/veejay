@@ -28,115 +28,148 @@
 #include <veejaycore/vjmem.h>
 static char *UTF8toLAT1(unsigned char *in)
 {
-	if (in == NULL)
-		return NULL;
+    if (!in)
+        return NULL;
 
-	int in_size = strlen( (char*) in ) + 1;
-	int out_size = in_size;
-	unsigned char *out = vj_calloc((size_t) out_size);
+    int in_size = strlen((char*)in);
+    unsigned char *out = vj_calloc((size_t)in_size + 1);
+    if (!out)
+        return NULL;
 
-	if (out == NULL) {
-		return NULL;
-	}
+    int out_size = in_size;
+    int tmp_in   = in_size;
 
-	if (UTF8Toisolat1(out, &out_size, in, &in_size) != 0)
-		veejay_memcpy( out, in, out_size );
+    if (UTF8Toisolat1(out, &out_size, in, &tmp_in) != 0) {
+        veejay_memcpy(out, in, in_size);
+        out_size = in_size;
+    }
 
-	return realloc(out, out_size + 1);
+    out[out_size] = '\0';
+    return (char*)out;
+}
+
+char *get_xml_str(xmlDocPtr doc, xmlNodePtr node)
+{
+    if (!node)
+        return NULL;
+
+    xmlChar *tmp = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
+    if (!tmp)
+        return NULL;
+
+    char *out = UTF8toLAT1(tmp);
+    xmlFree(tmp);
+
+    return out;
+}
+
+int get_xml_int(xmlDocPtr doc, xmlNodePtr node)
+{
+    char *ch = get_xml_str(doc, node);
+    int res = 0;
+
+    if (ch) {
+        res = atoi(ch);
+        free(ch);
+    }
+
+    return res;
 }
 
 
-int    get_xml_int( xmlDocPtr doc, xmlNodePtr node )
+void get_xml_str_n(xmlDocPtr doc, xmlNodePtr node, char *val, size_t len)
 {
-        xmlChar *tmp = xmlNodeListGetString( doc, node->xmlChildrenNode, 1 );
-        char *ch = UTF8toLAT1( tmp );
-        int res = 0;
-        if( ch )
-        {
-                res = atoi( ch );
-                free(ch);
-        }
-        if(tmp)
-                free(tmp);
-        return res;
+    if (!val || len == 0 || !node)
+        return;
+
+    val[0] = '\0';
+
+    xmlChar *xmlTemp = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
+    if (!xmlTemp)
+        return;
+
+    char *chTemp = UTF8toLAT1(xmlTemp);
+    xmlFree(xmlTemp);
+
+    if (!chTemp)
+        return;
+
+    snprintf(val, len, "%s", chTemp);
+
+    free(chTemp);
 }
 
-char 	*get_xml_str( xmlDocPtr doc, xmlNodePtr node )
+float get_xml_float(xmlDocPtr doc, xmlNodePtr node)
 {
-	xmlChar *xmlTemp = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
-	char *chTemp = UTF8toLAT1(xmlTemp);
-	return chTemp;
+    char *ch = get_xml_str(doc, node);
+    float val = 0.0f;
+
+    if (ch) {
+        sscanf(ch, "%f", &val);
+        free(ch);
+    }
+
+    return val;
 }
 
-void	get_xml_str_n( xmlDocPtr doc, xmlNodePtr node, char *val, size_t len )
+void get_xml_3int(xmlDocPtr doc, xmlNodePtr node, int *first, int *second, int *third)
 {
-	xmlChar *xmlTemp = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
-	char *chTemp = UTF8toLAT1(xmlTemp);
-	strncpy( val, chTemp, len );
-	free(chTemp);
+    if (first)  *first  = 0;
+    if (second) *second = 0;
+    if (third)  *third  = 0;
+
+    char *ch = get_xml_str(doc, node);
+    if (!ch)
+        return;
+
+    sscanf(ch, "%d %d %d", first ? first : &(int){0}, second ? second : &(int){0}, third ? third : &(int){0});
+    
+    free(ch);
 }
 
-float	get_xml_float( xmlDocPtr doc, xmlNodePtr node )
+int get_xml_2int(xmlDocPtr doc, xmlNodePtr node, int *second)
 {
-	xmlChar *tmp = xmlNodeListGetString( doc, node->xmlChildrenNode, 1 );
-        char *ch = UTF8toLAT1( tmp );
-        float val = 0.0f;
-        if( ch )
-        {
-		sscanf( ch, "%f", &val );
-                free(ch);
-        }
-        if(tmp)
-                free(tmp);
-        return val;
+    int first = 0;
+    if (second)
+        *second = 0;
+
+    char *ch = get_xml_str(doc, node);
+    if (!ch)
+        return 0;
+
+    sscanf(ch, "%d %d", &first, second ? second : &(int){0});
+    free(ch);
+
+    return first;
 }
 
-void 	get_xml_3int( xmlDocPtr doc, xmlNodePtr node, int *first , int *second, int *third )
+void put_xml_int(xmlNodePtr node, const char *key, int value)
 {
-        xmlChar *tmp = xmlNodeListGetString( doc, node->xmlChildrenNode, 1 );
-        char *ch = UTF8toLAT1( tmp );
-        if( ch )
-        {
-                sscanf( ch, "%d %d %d" , first, second, third );
-                free(ch);
-        }
-        if(tmp)
-                free(tmp);
+    if (!node || !key)
+        return;
+
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer), "%d", value);
+
+    xmlNewChild(node, NULL, (const xmlChar*)key, (const xmlChar*)buffer);
 }
 
-int	get_xml_2int( xmlDocPtr doc, xmlNodePtr node, int *second )
+void put_xml_str(xmlNodePtr node, const char *key, char *value)
 {
-	xmlChar *tmp = xmlNodeListGetString( doc, node->xmlChildrenNode, 1 );
-	char *ch = UTF8toLAT1( tmp );
-	int res = 0;
-	if( ch )
-	{
-		sscanf( ch, "%d %d", &res, second );
-		free(ch);
-	}
-	if(tmp)
-		free(tmp);
-	return res;
+    if (!node || !key || !value)
+        return;
+
+    xmlNewChild(node, NULL, (const xmlChar*)key, (const xmlChar*)value);
 }
 
-void	put_xml_int( xmlNodePtr node, const char *key, int value )
-{
-	const xmlChar *name = (const xmlChar*) key;
-	char buffer[64];
-	snprintf(buffer,sizeof(buffer)-1,"%d", value );
-	xmlNewChild( node, NULL, name, (const xmlChar*) buffer );
-}
 
-void	put_xml_str( xmlNodePtr node, const char *key, char *value )
+void put_xml_float(xmlNodePtr node, const char *key, float value)
 {
-	const xmlChar *name = (const xmlChar*) key;
-	xmlNewChild( node, NULL, name, (const xmlChar*) value );
-}
+    if (!node || !key)
+        return;
 
-void	put_xml_float( xmlNodePtr node,const char *key, float value )
-{
-	const xmlChar *name = (const xmlChar*) key;
-	char buffer[64];
-	snprintf(buffer,sizeof(buffer)-1,"%f", value );
-	xmlNewChild( node, NULL, name, (const xmlChar*) buffer );
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer), "%f", value);
+
+    xmlNewChild(node, NULL, (const xmlChar*)key, (const xmlChar*)buffer);
 }
