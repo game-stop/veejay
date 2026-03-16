@@ -182,11 +182,13 @@ static	int	sendvims( veejay_track_t *v, int vims_id, const char format[], ... )
 	return 1;
 }
 
-static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *buffer )
+static int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *buffer )
 {
 	gint tmp_len = header_len + 1;
 	unsigned char *tmp = vj_calloc( tmp_len );
-	gint len = 0;
+	size_t len = 0;
+	int wid = 0;
+	int hei = 0;
 	gint n = vj_client_read_no_wait( v->fd, V_CMD, tmp, header_len );
 
 	if( n<= 0 )
@@ -198,7 +200,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 		return n;
 	}
 
-	if( sscanf( (char*)tmp, "%6d%1d%d", &len,&(v->grey_scale),&(v->full_range) )!=3 )
+	if( sscanf( (char*)tmp, "%06zu%04d%02d%1d", &len,&wid, &hei, &(v->full_range) ) != 4 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Can't parse header (datastream polluted)");
 		free(tmp);
@@ -212,7 +214,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 		return 0;
 	}
 	
-	gint bw = 0;
+	size_t bw = 0;
 	gint bytes_read = len;
 	unsigned char *buf_ptr = buffer;
 
@@ -235,7 +237,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 		bytes_read -= n;
 		buf_ptr += bw;
 	}
-	*payload = bw;
+	*payload = (gint) bw;
 
 	free(tmp);
 	return 1;
@@ -382,62 +384,70 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 
 extern int     is_button_toggled(const char *name);
 
-static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
+static int veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v)
 {
-	if(!v->have_frame && (v->width <= 0 || v->height <= 0) )
-		return 0;
+    if (!v->have_frame && (v->width <= 0 || v->height <= 0))
+        return 0;
 
-	gint res = sendvims( v, VIMS_RGB24_IMAGE, "%d %d %d", v->width,v->height, alphaonly_view );
-	if( res <= 0 )
-	{
-		v->have_frame = 0;
-		return res;
-	}
-	gint bw = 0;
+    gint res = sendvims(v, VIMS_RGB24_IMAGE, "%d %d %d", v->width, v->height, alphaonly_view);
+    if (res <= 0) {
+        v->have_frame = 0;
+        return res;
+    }
 
-	res = recvvims( v, 8, &bw, v->data_buffer );
-	if( res <= 0 || bw <= 0 )
-	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Can't get a preview image! Only got %d bytes", bw);
-		v->have_frame = 0;
-		return res;
-	}
+    gint bw = 0;
+    res = recvvims(v, 13, &bw, v->data_buffer);
+    if (res <= 0 || bw <= 0) {
+        veejay_msg(VEEJAY_MSG_WARNING, "Can't get a preview image! Only got %d bytes", bw);
+        v->have_frame = 0;
+        return res;
+    }
 
-	int expected_len = (v->width * v->height);
-	//~ int expected_len_uv = expected_len/2; unused
-	int srcfmt = (v->full_range ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P );
-   
+    int y_size = v->width * v->height;
+    int srcfmt;
+    size_t total_needed;
 
-	if( bw == expected_len) {
-	    srcfmt = PIX_FMT_GRAY8;
-	}
+    if (bw == y_size) {
+        // GRAY8 image
+        srcfmt = PIX_FMT_GRAY8;
+        total_needed = y_size;
+    } else {
+        // YUV420 image
+        srcfmt = (v->full_range ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P);
+        int uv_size = y_size / 4;
+        total_needed = y_size + uv_size * 2;
 
-	uint8_t *in = v->data_buffer;
-	
-	v->bw = 0;
+        if (bw < total_needed) {
+            veejay_msg(VEEJAY_MSG_WARNING, "Received only %d bytes, expected %zu for YUV420", bw, total_needed);
+			veejay_msg_buffer(v->data_buffer, bw,64, "veejay_get_image_data");
+            v->have_frame = 0;
+            return 0;
+        }
+    }
 
-	uint8_t *buf_u = realign_buffer( in, v->width * v->height );
-	uint8_t *buf_v = realign_buffer( buf_u , (v->width * v->height) / 4 );
+    uint8_t *in = v->data_buffer;
+    v->bw = 0;
 
-#ifdef STRICT_CHECKING
-	check_desired_alignment( buf_u );
-	check_desired_alignment( buf_v );
-	check_desired_alignment( v->tmp_buffer );
-#endif
+    uint8_t *buf_u = NULL;
+    uint8_t *buf_v = NULL;
 
-	VJFrame *src1 = yuv_yuv_template( in, buf_u, buf_v,v->width,v->height, srcfmt );
-	VJFrame *dst1 = yuv_rgb_template( v->tmp_buffer, v->width,v->height, PIX_FMT_RGB24 );
+    if (srcfmt != PIX_FMT_GRAY8) {
+        buf_u = in + y_size;
+        buf_v = buf_u + (y_size / 4);
+    }
 
-	yuv_convert_any_ac( src1, dst1 );
+    VJFrame *src1 = yuv_yuv_template(in, buf_u, buf_v, v->width, v->height, srcfmt);
+    VJFrame *dst1 = yuv_rgb_template(v->tmp_buffer, v->width, v->height, PIX_FMT_RGB24);
 
-	v->have_frame = 1;
+    yuv_convert_any_ac(src1, dst1);
 
-	free(src1);
-	free(dst1);
+    v->have_frame = 1;
 
-	return bw;
+    free(src1);
+    free(dst1);
+
+    return total_needed;
 }
-
 
 static int	gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v )
 {
@@ -594,7 +604,7 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_tr
 		return 0;
 	}
 
-	vt->data_buffer = (uint8_t*) vj_calloc( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 3);
+	vt->data_buffer = (uint8_t*) vj_malloc( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 3);
 	if(vt->data_buffer == NULL ) {
 		vj_client_free( fd );
 		return 0;
@@ -606,12 +616,9 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_tr
 		return 0;
 	}
 
-#ifdef STRICT_CHECKING
-	check_desired_alignment( vt->data_buffer );
-	check_desired_alignment( vt->tmp_buffer );
-#endif
-
 	*new_track = track_num;
+
+	veejay_memset(vt->data_buffer, 128,MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 3 );
 
 	vp->tracks[ track_num ] = vt;
 	vp->track_sync->active_list[ track_num ] = 1;
@@ -805,9 +812,15 @@ int		gvr_track_configure( void *preview, int track_num, int wid, int hei )
 		vp->tracks[ track_num ]->height = h;
 	}
 
-	vp->track_sync->widths[track_num] = w;
-	vp->track_sync->heights[track_num] = h;
+	if( vp->track_sync ) {
+		vp->track_sync->widths[track_num] = w;
+		vp->track_sync->heights[track_num] = h;
+	}
 
+	if( vp->tracks[track_num]) {
+		veejay_memset(vp->tracks[track_num]->data_buffer , 0, w * h );
+		veejay_memset(vp->tracks[track_num]->data_buffer + (w*h), 128, (w * h * 2) );
+	}
 	return 1;	
 }
 
