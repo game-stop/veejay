@@ -2680,7 +2680,7 @@ static void vj_perform_render_chain_entry(veejay_t *info,performer_t *p, vjp_kf 
     }
 
     vj_perform_apply_first(info,p,setup,frames,fx_entry,effect_id,chain_entry,
-            info->stats.total_frames_produced, fx_entry->fx_instance,pm  );
+            atomic_load_long_long(&settings->current_frame_num), fx_entry->fx_instance,pm  );
     
     if( p->pvar_.fade_entry == chain_entry && p->pvar_.fade_method == 2) {
         vj_perform_pre_chain( p, frames[0] );
