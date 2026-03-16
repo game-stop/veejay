@@ -255,7 +255,7 @@ int 	vj_tag_set_chain_channel(int t1, int position, int channel);
 
 int 	vj_tag_get_chain_channel(int t1, int position);
 
-void 	vj_tag_get_source_name(int t1, char *dst);
+void 	vj_tag_get_source_name(int t1, char *dst, size_t dst_size);
 
 int 	vj_tag_get_chain_source(int t1, int position);
 

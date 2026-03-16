@@ -1608,12 +1608,15 @@ void vj_tag_set_fade_entry(int t1, int entry)
 
 int vj_tag_set_description(int t1, char *description)
 {
+    if(!description)
+        return 0;
+    description = '\0';
+
     vj_tag *tag = vj_tag_get(t1);
     if(!tag) return 0;
-    if(!description || strlen(description) <= 0 )
-        snprintf( tag->descr, TAG_MAX_DESCR_LEN, "%s","Untitled"); 
-    else
-        snprintf( tag->descr, TAG_MAX_DESCR_LEN, "%s", description );
+
+    snprintf( tag->descr, TAG_MAX_DESCR_LEN, "%s","Untitled");
+
     return 1;
 }
 
@@ -2871,13 +2874,15 @@ int     vj_tag_at_next_loop(int t1)
     return (lo == 0 ? 1: 0);
 }
 
-// very old code, 2 callers; 150 and 255 size of dst
-void vj_tag_get_source_name(int t1, char *dst)
+void vj_tag_get_source_name(int t1, char *dst, size_t dst_size)
 {
+    if (!dst || dst_size == 0) return;
+
+    dst[0] = '\0';
     vj_tag *tag = vj_tag_get(t1);
     if (tag) {
-        snprintf(dst,150, "%s", tag->source_name);
-    } 
+        snprintf(dst, dst_size, "%s", tag->source_name);
+    }
 }
 
 void    vj_tag_get_by_type(int id,int type, char *description )

@@ -922,11 +922,17 @@ int sample_set_description(int sample_id, char *description)
 
 int sample_get_description(int sample_id, char *description)
 {
-    sample_info *si;
-    si = sample_get(sample_id);
+    if (!description)
+        return -1;
+
+    description[0] = '\0'; // description is now always valid, regardless of callers ignoring return value
+
+    sample_info *si = sample_get(sample_id);
     if (!si)
-    return -1;
-    snprintf(description, SAMPLE_MAX_DESCR_LEN,"%s", si->descr);
+        return -1;
+
+    snprintf(description, SAMPLE_MAX_DESCR_LEN, "%s", si->descr);
+
     return 0;
 }
 
@@ -2796,6 +2802,10 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
         if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EDIT_LIST_FILE)) {
 
             skel->edit_list_file = get_xml_str( doc, cur );
+            if(!skel->edit_list_file) {
+                veejay_msg(VEEJAY_MSG_ERROR, "No video file specified");
+                skel->edit_list_file = sample_default_edl_name( original_id );
+            }
             if( start_at > 0 ) {
                 free(skel->edit_list_file);
                 skel->edit_list_file = sample_default_edl_name( original_id );

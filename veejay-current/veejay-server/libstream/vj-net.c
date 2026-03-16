@@ -401,30 +401,40 @@ void	net_thread_stop(vj_tag *tag)
 	veejay_msg(VEEJAY_MSG_INFO, "Disconnected from Veejay host %s:%d", tag->source_name,tag->video_channel);
 }
 
-int	net_already_opened(const char *filename, int n, int channel)
+int net_already_opened(const char *filename, int n, int channel)
 {
-	char sourcename[255];
-	int i;
-	for (i = 1; i < n; i++)
-	{	
-		if (vj_tag_exists(i) )
-		{
-			vj_tag_get_source_name(i, sourcename);
-			if (strcasecmp(sourcename, filename) == 0)
-			{
-				vj_tag *tt = vj_tag_get( i );
-				if( tt->source_type == VJ_TAG_TYPE_NET || tt->source_type == VJ_TAG_TYPE_MCAST )
-				{
-					if( tt->video_channel == channel )
-					{
-						veejay_msg(VEEJAY_MSG_WARNING, "Already streaming from %s:%p in stream %d",
-							filename,channel, tt->id);
-						return 1;
-					}
-				}
-			}
-		}
-	}
-	return 0;
-}
+    if (!filename || n <= 0)
+        return 0;
 
+    char sourcename[255];
+    int i;
+
+    for (i = 1; i < n; i++)
+    {
+        if (!vj_tag_exists(i))
+            continue;
+
+        vj_tag_get_source_name(i, sourcename, sizeof(sourcename));
+
+        if (sourcename[0] == '\0')
+            continue;
+
+        if (strcasecmp(sourcename, filename) != 0)
+            continue;
+
+        vj_tag *tt = vj_tag_get(i);
+        if (!tt)
+            continue;
+
+        if (tt->source_type == VJ_TAG_TYPE_NET || tt->source_type == VJ_TAG_TYPE_MCAST)
+        {
+            if (tt->video_channel == channel)
+            {
+                veejay_msg(VEEJAY_MSG_WARNING, "Already streaming from %s:%d in stream %d", filename, channel, tt->id);
+                return 1;
+            }
+        }
+    }
+
+    return 0;
+}
