@@ -4226,7 +4226,7 @@ void    tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *v
          veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist", n);
          return;
     }
-    char tmp[512];
+    char tmp[2048];
     void *d = vj_font_get_dict( font );
     snprintf(tmp,sizeof(tmp), "%s-SUB-s%d.srt", file,tag->id );
 

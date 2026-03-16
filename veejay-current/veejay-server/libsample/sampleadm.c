@@ -1030,15 +1030,21 @@ int sample_del(int sample_id)
         {
         if( si->effect_chain[i]->kf )
             vpf( si->effect_chain[i]->kf );
+            si->effect_chain[i]->kf = NULL;
         }
-        if( si->effect_chain[0] )
-            free(si->effect_chain[0]);
+        if( si->effect_chain ) {
+            free(si->effect_chain);
+        }
   
-        if(si->encoder_destination )
+        if(si->encoder_destination ) {
             free(si->encoder_destination );
+            si->encoder_destination = NULL;
+        }
         
-        if(si->edit_list_file)
+        if(si->edit_list_file) {
             free( si->edit_list_file );
+            si->edit_list_file = NULL;
+        }
 #ifdef HAVE_FREETYPE
         if( si->dict )
             vj_font_dictionary_destroy( sample_font_,si->dict );
@@ -3293,6 +3299,7 @@ int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id,
     i = 0; 
     for( i = 1; i <= max; i ++ )
     {
+        if (!vj_tag_exists(i)) continue;
         childnode = xmlNewChild(rootnode,NULL,(const xmlChar*) "stream", NULL );
         tag_writeStream( sampleFile, i, childnode, font ,vp);
     }
