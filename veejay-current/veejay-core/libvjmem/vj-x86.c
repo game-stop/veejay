@@ -316,7 +316,7 @@ int	check_desired_alignment( void *ptr ) {
 
 uint8_t *realign_buffer( uint8_t *ptr, size_t offset ) {
 	size_t alignment = mem_align_size();
-	size_t misalignment = (size_t)( ptr + offset ) % alignment;
+	uintptr_t misalignment = ((uintptr_t)ptr + offset) % alignment;
 	size_t padding = ( misalignment != 0 ) ? ( alignment - misalignment ) : 0;
 	return ptr + offset + padding;
 }
