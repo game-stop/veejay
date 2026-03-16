@@ -117,7 +117,7 @@ typedef struct {
 extern uint8_t pixel_Y_lo_;
 
 
-static int vj_frame_rand(long long frame_num, long start, long end, unsigned long long seed) {
+static long vj_frame_rand(long long frame_num, long start, long end, unsigned long long seed) {
     if (start >= end) return (int)start;
 
     unsigned long long x = ((unsigned long long)frame_num ^ seed);
@@ -127,7 +127,7 @@ static int vj_frame_rand(long long frame_num, long start, long end, unsigned lon
     x = x ^ (x >> 31);
 
     long long range = (end - start) + 1;
-    return (int)(start + (x % (unsigned long long)range));
+    return (start + (x % (unsigned long long)range));
 }
 
 #define CACHE_TOP 0
@@ -5162,6 +5162,15 @@ void vj_perform_inc_frame(veejay_t *info, int num)
     int edge_type = AUDIO_EDGE_NONE;
     int next_dir = cur_dir;
 
+    if(looptype == 3) { //option: either do this here or at the sample boundary
+        if( speed >= 0 ) {
+            next_frame = vj_frame_rand(cur_frame,start,end, settings->master_frame_num );
+        }
+        else if(speed < 0) {
+            next_frame = vj_frame_rand(cur_frame, end,start, settings->master_frame_num);
+        }
+    }
+
     if (next_frame > end) {
         switch (looptype) {
             case 2: // bounce loop
@@ -5176,7 +5185,8 @@ void vj_perform_inc_frame(veejay_t *info, int num)
                 edge_type = AUDIO_EDGE_DIRECTION;
                 break;
             case 3:
-                next_frame = vj_frame_rand(cur_frame,start,end, settings->master_frame_num );
+                //option:
+                //next_frame = vj_frame_rand(cur_frame,start,end, settings->master_frame_num );
                 edge_type = AUDIO_EDGE_JUMP;
                 break;
             default: // stop at end
@@ -5200,7 +5210,8 @@ void vj_perform_inc_frame(veejay_t *info, int num)
                 edge_type = AUDIO_EDGE_DIRECTION;
                 break;
             case 3:
-                next_frame = vj_frame_rand(cur_frame,start,end, settings->master_frame_num );
+                //option:
+                //next_frame = vj_frame_rand(cur_frame,start,end, settings->master_frame_num );
                 edge_type = AUDIO_EDGE_JUMP;
                 break;
             default: // stop at start
