@@ -2836,12 +2836,13 @@ char *vj_strdup(const char *s)
 {
     if (!s) return NULL;
 
-    size_t len = strlen(s) + 1;
-    unsigned char *uptr = (unsigned char *)vj_malloc(len);
+    size_t len = strlen(s);
+    unsigned char *uptr = (unsigned char *)vj_malloc(len + 1);
     if (!uptr) return NULL;
 
-    veejay_memcpy(uptr, (const unsigned char *)s, len);  // safe for signed/unsigned chars
+    veejay_memcpy(uptr, (const unsigned char *)s, len);
     uptr[len] = '\0';
+
     return (char *)uptr;
 }
 
