@@ -48,6 +48,7 @@
 
 typedef struct {
     uint8_t *radial_src[4];
+	int n_threads;
 } radialblur_t;
 
 vj_effect *radialblur_init(int w,int h)
@@ -91,17 +92,19 @@ void *radialblur_malloc(int w, int h)
     r->radial_src[1] = r->radial_src[0] + (w*h);
     r->radial_src[2] = r->radial_src[1] + (w*h);
 	
+	r->n_threads = vje_advise_num_threads(w*h);
+
     return (void*) r;
 }
 
 
-static void rhblur_apply( uint8_t *dst , uint8_t *src, int w, int h, int r , int p)
+static void rhblur_apply( uint8_t *dst , uint8_t *src, int w, int h, int r , int p, int max_threads)
 {
 	int y;
 	
 	if( r == 0 && dst == src )
 		return;
-
+	#pragma omp parallel for num_threads(max_threads) default(none) shared(dst, src, w, h, r, p)
 	for(y = 0; y < h ; y ++ )
 	{
 		blur2( dst + y * w, src + y *w , w, r,p, 1, 1);
@@ -109,13 +112,13 @@ static void rhblur_apply( uint8_t *dst , uint8_t *src, int w, int h, int r , int
 
 }
 
-static void rvblur_apply( uint8_t *dst, uint8_t *src, int w, int h, int r , int p)
+static void rvblur_apply( uint8_t *dst, uint8_t *src, int w, int h, int r , int p, int max_threads)
 {
 	int x;
 
 	if( r == 0 && dst == src )
 		return;
-
+	#pragma omp parallel for num_threads(max_threads) default(none) shared(dst, src, w, h, r, p)
 	for(x=0; x < w; x++)
 	{
 		blur2( dst + x, src + x , h, r, p, w, w );
@@ -148,23 +151,23 @@ void radialblur_apply(void *ptr, VJFrame *frame, int *args ) {
 	switch(direction)
 	{
 		case 0: 
-			rhblur_apply( Y, r->radial_src[0],width, height, radius, power );
-			rhblur_apply( Cb, r->radial_src[1],frame->uv_width, frame->uv_height, radius, power );
-			rhblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power );
+			rhblur_apply( Y, r->radial_src[0],width, height, radius, power,r->n_threads);
+			rhblur_apply( Cb, r->radial_src[1],frame->uv_width, frame->uv_height, radius, power,r->n_threads );
+			rhblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power,r->n_threads );
 			break;
 		case 1: 
-			rvblur_apply( Y, r->radial_src[0],width, height, radius, power ); 
-			rvblur_apply( Cb, r->radial_src[1],frame->uv_width, frame->uv_height, radius, power );
-			rvblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power );
+			rvblur_apply( Y, r->radial_src[0],width, height, radius, power,r->n_threads ); 
+			rvblur_apply( Cb, r->radial_src[1],frame->uv_width, frame->uv_height, radius, power,r->n_threads );
+			rvblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power,r->n_threads );
 			break;
 		case 2:
-			rvblur_apply( Y, r->radial_src[0],width, height, radius, power ); 
-			rvblur_apply( Cb, r->radial_src[1],frame->uv_width, frame->uv_height, radius, power );
-			rvblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power );
-			rhblur_apply( Y, r->radial_src[0],width, height, radius, power );
-			rhblur_apply( Cb, r->radial_src[1],frame->uv_width, frame->uv_height, radius, power );
-			rhblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power );
-
+			rvblur_apply( Y, r->radial_src[0],width, height, radius, power,r->n_threads ); 
+            rvblur_apply( Cb, r->radial_src[1],frame->uv_width, frame->uv_height, radius, power,r->n_threads );
+            rvblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power,r->n_threads );
+            
+            rhblur_apply( Y, Y, width, height, radius, power,r->n_threads );
+            rhblur_apply( Cb, Cb, frame->uv_width, frame->uv_height, radius, power,r->n_threads );
+            rhblur_apply( Cr, Cr, frame->uv_width, frame->uv_height, radius, power,r->n_threads );
 			break;
 		
 	}

@@ -1394,48 +1394,32 @@ void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep
     uint8_t temp[2][4096];
     uint8_t *a = temp[0], *b = temp[1];
     if (radius) {
-		// mirror pad the temporary buffer to avoid artifacts
-		for (int i = 0; i <= radius; i++) {
-            a[w + i] = src[w - radius + i];
-			b[w + i] = a[w + i];
-        }
+
+		for (int i = 0; i < w; i++) a[i] = src[i*srcStep];
+
+		for (int i = 0; i < radius; i++) {
+			a[-i + radius] = a[i];
+			a[w + i] = a[w - 1 - i];
+		}
+
 		veejay_blur(a, src, w, radius, 1, srcStep);
 
-        for (; power > 2; power--) {
-            uint8_t *c;
-            veejay_blur(b, a, w, radius, 1, 1);
-            c = a; a = b; b = c;
-        }
+		for (; power > 2; power--) {
+			veejay_blur(b, a, w, radius, 1, 1);
+			uint8_t *tmp = a; a = b; b = tmp;
+		}
 
-        if (power > 1) {
-            veejay_blur(dst, a, w, radius, dstStep, 1);
-        } else {
-			// swapping between a and b for arbitrary radius and power == 0 introduces artifacts
-			//	int i;
-			//  for(i=0; i<w; i++)
-			//	   dst[i*dstStep]= a[i];	
-
-
-			// this also introduces artifacts, but they are pixels copied from the original source and not uninitialized bytes as before
-            if (radius & srcStep) {
-                b[0] = (src[0] + src[1]) / 2;
-            } else {
-                b[0] = src[0];
-            }
-
-            for (int x = 1; x < w - 1; x++) {
-                b[x] = (src[(x - 1) * srcStep] + src[x * srcStep] + src[(x + 1) * srcStep]) / 3;
-            }
-
-            if (radius & srcStep) {
-                b[w - 1] = (src[(w - 2) * srcStep] + src[(w - 1) * srcStep]) / 2;
-            } else {
-                b[w - 1] = src[(w - 1) * srcStep];
-            }
-
-            veejay_blur(dst, b, w, radius, dstStep, 1);
-			veejay_memcpy(&dst[(w - radius) * dstStep], &b[w - radius], radius); 
-        }
+		if (power > 1)
+			veejay_blur(dst, a, w, radius, dstStep, 1);
+		else {
+			for (int x = 0; x < w; x++) {
+				int left = (x==0) ? src[0] : src[(x-1)*srcStep];
+				int center = src[x*srcStep];
+				int right = (x==w-1) ? src[(w-1)*srcStep] : src[(x+1)*srcStep];
+				b[x] = (left + center + right)/3;
+			}
+			veejay_blur(dst, b, w, radius, dstStep, 1);
+		}
     } else {
         int i;
         for (i = 0; i < w; i++) {
