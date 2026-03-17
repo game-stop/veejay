@@ -339,7 +339,12 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     }
 
     if (!si) {
-    return NULL;
+        return NULL;
+    }
+
+    sample_eff_chain *sec = (sample_eff_chain*) vj_calloc(sizeof(sample_eff_chain) * SAMPLE_MAX_EFFECTS );
+    if(!sec) {
+        return NULL;
     }
 
     si->sample_id = _new_id();
@@ -363,7 +368,8 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->loop_stat_stop = 1;
     si->edit_list_file = sample_default_edl_name(si->sample_id);
 
-    sample_eff_chain *sec = (sample_eff_chain*) vj_calloc(sizeof(sample_eff_chain) * SAMPLE_MAX_EFFECTS );
+    si->main_fx = sec;
+
 
     /* the effect chain is initially empty ! */
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
@@ -1014,63 +1020,67 @@ int sample_del(int sample_id)
     si = sample_get(sample_id);
     if (!si)
         return 0;
+
 #ifdef ARCH_X86_64
     uint64_t sid = (uint64_t) sample_id;
 #else
     uint32_t sid = (uint32_t) sample_id;
 #endif
 
-    sample_node = hash_lookup(SampleHash, (void *) sid);
-    if (sample_node) {
-        int i;
+    sample_chain_free( sample_id,1 );
 
-        sample_chain_free( sample_id,1 );
-
-        for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
-        {
-        if( si->effect_chain[i]->kf )
+    for(int i=0; i < SAMPLE_MAX_EFFECTS; i++) 
+    {
+        if( si->effect_chain[i]->kf ) {
             vpf( si->effect_chain[i]->kf );
             si->effect_chain[i]->kf = NULL;
         }
-        if( si->effect_chain ) {
-            free(si->effect_chain);
-        }
-  
-        if(si->encoder_destination ) {
-            free(si->encoder_destination );
-            si->encoder_destination = NULL;
-        }
-        
-        if(si->edit_list_file) {
-            free( si->edit_list_file );
-            si->edit_list_file = NULL;
-        }
-#ifdef HAVE_FREETYPE
-        if( si->dict )
-            vj_font_dictionary_destroy( sample_font_,si->dict );
-#endif
-        if(si->edit_list) {
-                /* check if another sample has same EDL */
-                sample_close_edl( sample_id, si->edit_list );
-        }
-
-        /* store freed sample_id */
-        avail_num[next_avail_num] = sample_id;
-        next_avail_num++;
-        hash_delete_free(SampleHash, sample_node);
-
-        sample_cache[ sample_id ] = NULL;
-    
-		vj_macro_free( si->macro );
-
-        free(si);
-
-        recount_hash = 1;
-
-        return 1;
     }
 
-    return 0;
+    if(si->encoder_destination ) {
+        free(si->encoder_destination );
+        si->encoder_destination = NULL;
+    }
+    
+    if(si->edit_list_file) {
+        free( si->edit_list_file );
+        si->edit_list_file = NULL;
+    }
+#ifdef HAVE_FREETYPE
+    if( si->dict )
+        vj_font_dictionary_destroy( sample_font_,si->dict );
+#endif
+    if(si->edit_list) {
+        /* check if another sample has same EDL */
+        sample_close_edl( sample_id, si->edit_list );
+    }
+
+
+    if( si->main_fx ) {
+        free(si->main_fx);
+        si->main_fx = NULL;
+    }
+
+    sample_node = hash_lookup(SampleHash, (void *)(uintptr_t) sample_id);
+
+    if(sample_node)
+    {
+        hash_delete(SampleHash, sample_node);
+        hnode_destroy(sample_node);
+    }
+
+
+    vj_macro_free( si->macro );
+
+    sample_cache[ sample_id ] = NULL;
+    avail_num[next_avail_num] = sample_id;
+    next_avail_num++;
+
+    free(si);
+
+    recount_hash = 1;
+
+    return 1;
 }
 
 void sample_del_all(void *edl)

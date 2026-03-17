@@ -118,6 +118,7 @@ typedef struct sample_off_rec_t {
 
 typedef struct sample_info_t {
     int sample_id;		/* identifies a unique sample */
+    sample_eff_chain *main_fx;
     sample_eff_chain *effect_chain[SAMPLE_MAX_EFFECTS];	/* effect chain */
     sample_offline_recorder offline_record; /* buffered stream */
     long first_frame;		/* start of sample */
