@@ -1092,6 +1092,9 @@ void vj_font_set_fgcolor( void *font, int r, int g, int b, int a)
 
 void    vj_font_dictionary_destroy( void *font, void *dict )
 {
+    if(!dict)
+        return;
+        
     char **items = vevo_list_properties(dict );
     if(!items) {
         vpf(dict);
