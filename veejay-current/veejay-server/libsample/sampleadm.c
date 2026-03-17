@@ -115,43 +115,24 @@ int sample_verify(void) {
    return hash_verify( SampleHash );
 }
 
-
-
-/****************************************************************************************************
- *
- * int_hash (key )
- * \param key TODO
- * \return
- *
- * internal usage. returns hash_val_t for key
- *
- ****************************************************************************************************/
-static hash_val_t int_hash(const void *key)
+static inline void *sample_key(int id)
 {
-    return (hash_val_t) key;
+    return (void *)(uintptr_t) id;
 }
 
+static hash_val_t int_hash(const void *key)
+{
+    return (hash_val_t)(uintptr_t) key;
+}
 
-
-/****************************************************************************************************
- *
- * int_compare (key1, key2)
- * \param key1 TODO
- * \param key2
- * \return
- *
- * internal usage. compares keys for hash.
- *
- ****************************************************************************************************/
 static int int_compare(const void *key1, const void *key2)
 {
-#ifdef ARCH_X86_64
-    return ((uint64_t) key1 < (uint64_t) key2 ? -1 :
-        ((uint64_t) key1 < (uint64_t) key2 ? + 1 : 0 ));
-#else
-    return ((uint32_t) key1 < (uint32_t) key2 ? -1 :
-        ((uint32_t) key1 > (uint32_t) key2 ? +1 : 0));
-#endif
+    uintptr_t a = (uintptr_t) key1;
+    uintptr_t b = (uintptr_t) key2;
+
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
 }
 
 /****************************************************************************************************
@@ -272,6 +253,8 @@ void    sample_free(void *edl)
     sample_del_all(edl);
 
     hash_destroy( SampleHash );
+
+    SampleHash = NULL;
 }
 
 int sample_set_state(int new_state)
@@ -400,26 +383,23 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 
 
 
-int sample_store(sample_info * skel)
+int sample_store(sample_info *skel)
 {
-    hnode_t *sample_node;
     if (!skel)
-    return -1;
-    sample_node = hnode_create(skel);
-    if (!sample_node)
-    return -1;
+        return -1;
 
-#ifdef ARCH_X86_64
-    uint64_t sid = (uint64_t) skel->sample_id;
-#else
-    uint32_t sid = (uint32_t) skel->sample_id;
-#endif
+    hnode_t *node = hash_lookup(SampleHash, sample_key(skel->sample_id));
 
-    if (!sample_exists(skel->sample_id)) {
-        hash_insert(SampleHash, sample_node, (const void*) sid);
+    if (!node) {
+        node = hnode_create(skel);
+        if (!node)
+            return -1;
+
+        hash_insert(SampleHash, node, sample_key(skel->sample_id));
     } else {
-        hnode_put(sample_node, (void *) sid);
+        hnode_put(node, skel);
     }
+
     return 0;
 }
 
@@ -433,54 +413,37 @@ void    sample_new_simple( void *el, long start, long end )
     }
 }
 
-/****************************************************************************************************
- *
- * sample_get(int sample_id)
- * \param sample_id TODO
- * \return sample information struct or NULL on error.
- *
- ****************************************************************************************************/
 sample_info *sample_get(int sample_id)
 {
-    if( sample_id < 0 || sample_id > SAMPLE_MAX_SAMPLES)
+    if (sample_id < 0 || sample_id > SAMPLE_MAX_SAMPLES)
         return NULL;
-#ifdef ARCH_X86_64
-    uint64_t sid = (uint64_t) sample_id;
-#else
-    uint32_t sid = (uint32_t) sample_id;
-#endif
 
-    if( sample_cache[sample_id] == NULL ) {
-        
-        hnode_t *sample_node = hash_lookup(SampleHash, (const void *) sid);
-        if(!sample_node)
-            return NULL;
-        sample_cache[sample_id] = hnode_get(sample_node);
+    sample_info *si = sample_cache[sample_id];
+
+    if (si && si->sample_id != sample_id) {
+        // silently fix stale cache
+        sample_cache[sample_id] = NULL;
+        si = NULL;
     }
 
-    return (sample_info*) sample_cache[sample_id];
+    if (!si) {
+        hnode_t *node = hash_lookup(SampleHash, sample_key(sample_id));
+        if (!node)
+            return NULL;
+
+        si = hnode_get(node);
+        sample_cache[sample_id] = si;
+    }
+
+    return si;
 }
-
-/****************************************************************************************************
- *
- * sample_exists(int sample_id)
- *
- * returns 1 if a sample exists in samplehash, or 0 if not.
- *
- ****************************************************************************************************/
-
 
 int sample_exists(int sample_id) {
     
     hnode_t *sample_node;
     if (!sample_id) return 0;
-#ifdef ARCH_X86_64
-    uint64_t sid = (uint64_t) sample_id;
-#else
-    uint32_t sid = (uint32_t) sample_id;
-#endif
 
-    sample_node = hash_lookup(SampleHash, (void*) sid);
+    sample_node = hash_lookup(SampleHash,sample_key(sample_id));
     if (!sample_node) {
         return 0;
     }
@@ -1013,70 +976,63 @@ int sample_verify_delete( int sample_id, int sample_type )
     return 1;
 }
 
-int sample_del(int sample_id)
+static void sample_del_internal(sample_info *si)
 {
-    hnode_t *sample_node;
-    sample_info *si;
-    si = sample_get(sample_id);
-    if (!si)
-        return 0;
+    if (!si) return;
 
-#ifdef ARCH_X86_64
-    uint64_t sid = (uint64_t) sample_id;
-#else
-    uint32_t sid = (uint32_t) sample_id;
-#endif
+    sample_chain_free(si->sample_id, 1);
 
-    sample_chain_free( sample_id,1 );
-
-    for(int i=0; i < SAMPLE_MAX_EFFECTS; i++) 
-    {
-        if( si->effect_chain[i]->kf ) {
-            vpf( si->effect_chain[i]->kf );
-            si->effect_chain[i]->kf = NULL;
+    for (int i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
+        if (si->effect_chain[i] && si->effect_chain[i]->kf) {
+            vpf(si->effect_chain[i]->kf);
         }
     }
 
-    if(si->encoder_destination ) {
-        free(si->encoder_destination );
+    if (si->encoder_destination) {
+        free(si->encoder_destination);
         si->encoder_destination = NULL;
     }
-    
-    if(si->edit_list_file) {
-        free( si->edit_list_file );
+
+    if (si->edit_list_file) {
+        free(si->edit_list_file);
         si->edit_list_file = NULL;
     }
+
 #ifdef HAVE_FREETYPE
-    if( si->dict )
-        vj_font_dictionary_destroy( sample_font_,si->dict );
+    if (si->dict)
+        vj_font_dictionary_destroy(sample_font_, si->dict);
 #endif
-    if(si->edit_list) {
-        /* check if another sample has same EDL */
-        sample_close_edl( sample_id, si->edit_list );
+
+    if (si->edit_list) {
+        sample_close_edl(si->sample_id, si->edit_list);
     }
 
-
-    if( si->main_fx ) {
+    if (si->main_fx) {
         free(si->main_fx);
         si->main_fx = NULL;
     }
 
-    sample_node = hash_lookup(SampleHash, (void *)(uintptr_t) sample_id);
+    vj_macro_free(si->macro);
 
-    if(sample_node)
-    {
-        hash_delete(SampleHash, sample_node);
-        hnode_destroy(sample_node);
-    }
+    if (si->sample_id >= 0 && si->sample_id <= SAMPLE_MAX_SAMPLES)
+        sample_cache[si->sample_id] = NULL;
 
-
-    vj_macro_free( si->macro );
-
-    sample_cache[ sample_id ] = NULL;
-    avail_num[next_avail_num] = sample_id;
-    next_avail_num++;
+    avail_num[next_avail_num++] = si->sample_id;
 
     free(si);
+}
+int sample_del(int sample_id)
+{
+    sample_info *si = sample_get(sample_id);
+    if (!si) return 0;
+
+    hnode_t *node = hash_lookup(SampleHash, sample_key(sample_id));
+    if (node) {
+        hash_delete(SampleHash, node);
+        hnode_destroy(node);
+    }
+
+    sample_del_internal(si);
 
     recount_hash = 1;
 
@@ -1085,23 +1041,28 @@ int sample_del(int sample_id)
 
 void sample_del_all(void *edl)
 {
-    int end = sample_highest();
-    int i;
+    hscan_t hs;
+    hnode_t *node;
 
-    for (i = 1; i <= end; i++) {
-        if (!sample_exists(i))
-            continue;
-    
-        sample_chain_clear(i);
-        sample_del(i);
+    hash_scan_begin(&hs, SampleHash);
+
+    while ((node = hash_scan_next(&hs))) {
+        sample_info *si = (sample_info *) hnode_get(node);
+        hash_scan_delete(SampleHash, node);
+
+        sample_del_internal(si);
+
+        hnode_destroy(node);
     }
-     
+
     veejay_memset( avail_num, 0, sizeof(avail_num) );
     next_avail_num = 0;
     this_sample_id = 0;
 
     hash_free_nodes( SampleHash );
+    recount_hash = 1;
 }
+
 sample_eff_chain **sample_get_effect_chain(int s1)
 {
     sample_info *sample = sample_get(s1);
