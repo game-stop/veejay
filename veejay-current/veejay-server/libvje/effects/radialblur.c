@@ -65,7 +65,7 @@ vj_effect *radialblur_init(int w,int h)
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 90; // radius
     ve->limits[0][1] = 0; // power
-    ve->limits[1][1] = 100;
+    ve->limits[1][1] = 8;
     ve->limits[0][2] = 0; // direction
     ve->limits[1][2] = 2; // 2 = both
     ve->description = "Radial Blur";
