@@ -144,7 +144,9 @@ void    vj_tag_free(void)
     }
 }
 
-
+static inline void *tag_key(int id) {
+    return (void*)(uintptr_t) id;
+}
 
 
 int vj_tag_get_last_tag(void) {
@@ -184,20 +186,18 @@ void vj_tag_set_veejay_t(void *info) {
 
 static hash_val_t int_tag_hash(const void *key)
 {
-    return (hash_val_t) key;
+    return (hash_val_t)(uintptr_t) key;
 }
 
 static int int_tag_compare(const void *key1, const void *key2)
 {
-    uintptr_t k1 = (uintptr_t)key1;
-    uintptr_t k2 = (uintptr_t)key2;
+    uintptr_t a = (uintptr_t)key1;
+    uintptr_t b = (uintptr_t)key2;
 
-    if (k1 < k2)
-        return -1;
-    else if (k1 > k2)
-        return 1;
-    else
-        return 0;
+    if( a < b ) return -1;
+    if( a > b ) return 1;
+
+    return 0;
 }
 
 vj_tag *vj_tag_get(int id)
@@ -205,43 +205,45 @@ vj_tag *vj_tag_get(int id)
     if (id <= 0 || id > this_tag_id) {
         return NULL;
     }
-#ifdef ARCH_X86_64
-    uint64_t tid = (uint64_t) id;
-#else
-    uint32_t tid = (uint32_t) id;
-#endif
 
-    if( tag_cache[ id ] != NULL )
-        return (vj_tag*) tag_cache[id];
+    vj_tag *tag = (vj_tag *) tag_cache[id];
 
-    hnode_t *tag_node = hash_lookup(TagHash, (void *)(uintptr_t) tid);
-    if (!tag_node) {
-        return NULL;
+    if (tag && tag->id != id) {
+        // silently fix stale cache
+        tag_cache[id] = NULL;
+        tag = NULL;
     }
-    tag_cache[ id ] = hnode_get(tag_node);
-    
-    return (vj_tag*) tag_cache[id];
+
+    if (!tag) {
+        hnode_t *node = hash_lookup(TagHash, tag_key(id));
+        if (!node)
+            return NULL;
+
+        tag = (vj_tag *) hnode_get(node);
+
+        tag_cache[id] = tag;
+    }
+
+    return tag;
 }
 
-int vj_tag_put(vj_tag * tag)
+int vj_tag_put(vj_tag *tag)
 {
-    hnode_t *tag_node;
     if (!tag)
         return 0;
-    tag_node = hnode_create(tag);
-    if (!tag_node)
-        return 0;
-#ifdef ARCH_X86_64
-    uint64_t tid = (uint64_t) tag->id;
-#else
-    uint32_t tid = (uint32_t) tag->id;
-#endif
 
-    if (!vj_tag_exists(tag->id)) {
-        hash_insert(TagHash, tag_node, (void *)(uintptr_t) tid);
+    hnode_t *node = hash_lookup(TagHash, tag_key(tag->id));
+
+    if (!node) {
+        node = hnode_create(tag);
+        if (!node)
+            return -1;
+
+        hash_insert(TagHash, node, tag_key(tag->id));
     } else {
-        hnode_put(tag_node, (void *)(uintptr_t) tid);
+        hnode_put(node, tag);
     }
+
     return 1;
 }
 
@@ -932,11 +934,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
         veejay_msg(0, "Memory allocation error");
         return -1;
     }
-#ifdef ARCH_X86_64
-    uint64_t tid = (uint64_t) id;
-#else
-    uint32_t tid = (uint32_t) id;
-#endif
+
      /* see if we can reclaim some id */
     for(i=0; i <= next_avail_tag; i++) {
         if(avail_tag[i] != 0) {
@@ -951,7 +949,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
           }
           id = avail_tag[i];
           avail_tag[i] = 0;
-          hash_insert(TagHash, tag_node, (void *)(uintptr_t) tid);
+          hash_insert(TagHash, tag_node, tag_key(id));
           break;
         }
     }
@@ -1368,12 +1366,8 @@ int vj_tag_verify_delete(int id, int type )
     return 1;
 }
 
-int vj_tag_del(int id)
+int vj_tag_del_internal(vj_tag *tag)
 {
-    hnode_t *tag_node;
-    vj_tag *tag;
-    int i;
-    tag = vj_tag_get(id);
     if(!tag)
         return 0;
 #ifdef HAVE_FREETYPE
@@ -1406,7 +1400,7 @@ int vj_tag_del(int id)
         break;
      case VJ_TAG_TYPE_YUV4MPEG: 
         veejay_msg(VEEJAY_MSG_INFO,"Closing yuv4mpeg file %s (Stream %d)",
-            tag->source_name,id);
+            tag->source_name,tag->id);
         vj_yuv_stream_stop_read(vj_tag_input->stream[tag->index]);
 //      vj_yuv4mpeg_free( vj_tag_input->stream[tag->index]);
      break;
@@ -1476,7 +1470,7 @@ int vj_tag_del(int id)
         tag->method_filename = NULL;
     }
 
-    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)  {
+    for (int i = 0; i < SAMPLE_MAX_EFFECTS; i++)  {
         if (tag->effect_chain[i]) {
             if( tag->effect_chain[i]->kf )
                 vpf(tag->effect_chain[i]->kf);
@@ -1486,47 +1480,63 @@ int vj_tag_del(int id)
     }
 
     vj_macro_free( tag->macro );
-
-#ifdef ARCH_X86_64
-    uint64_t tid = (uint64_t) tag->id;
-#else
-    uint32_t tid = (uint32_t) tag->id;
-#endif
-    tag_node = hash_lookup(TagHash, (void *)(uintptr_t) tid);
-
-    if(tag_node)
-    {
-        hash_delete(TagHash, tag_node);
-        hnode_destroy(tag_node);
-    }
     
     free(tag);
     tag = NULL;
-    avail_tag[ next_avail_tag] = id;
-    next_avail_tag++;
+   
 
-    tag_cache[ id ] = NULL;
+    return 1;
+}
+
+int vj_tag_del(int id)
+{
+    vj_tag *tag = vj_tag_get(id);
+    if (!tag)
+        return 0;
+
+    hnode_t *node = hash_lookup(TagHash, tag_key(id));
+    if (node) {
+        hash_delete(TagHash, node);
+        hnode_destroy(node);
+    }
+
+    tag_cache[id] = NULL;
+
+    vj_tag_del_internal(tag);
+
+    avail_tag[next_avail_tag++] = id;
+
     recount_hash = 1;
 
     return 1;
 }
 
-void vj_tag_close_all(void) {
-   int n=vj_tag_highest();
-   int i;
-   vj_tag *tag;
+void vj_tag_close_all(void)
+{
+    if (!TagHash)
+        return;
 
-   for(i=1; i <= n; i++) {
-    tag = vj_tag_get(i);
-    if(tag) {
-        if(vj_tag_del(i)) veejay_msg(VEEJAY_MSG_DEBUG, "Deleted stream %d", i);
+    hscan_t hs;
+    hnode_t *node;
+
+    hash_scan_begin(&hs, TagHash);
+
+    while ((node = hash_scan_next(&hs))) {
+        vj_tag *tag = (vj_tag *) hnode_get(node);
+        hash_scan_delete(TagHash, node);
+
+        vj_tag_del_internal(tag);
+
+        hnode_destroy(node);
     }
-   }
-    
-   if( TagHash ) {
-       hash_free_nodes( TagHash );
-       TagHash = NULL;
-   }
+
+    veejay_memset(avail_tag, 0, sizeof(avail_tag));
+    next_avail_tag = 0;
+    this_tag_id = 0;
+
+    hash_free_nodes(TagHash);
+
+    recount_hash = 1;
 }
 
 int vj_tag_get_n_frames(int t1)
