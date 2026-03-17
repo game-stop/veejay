@@ -1622,15 +1622,14 @@ char *vj_el_write_line_ascii(editlist *el, int *bytes_written)
 
     for (int j = 0; j < MAX_EDIT_LIST_FILES; j++) {
         if (index[j] != -1 && el->video_file_list[j]) {
-            char fourcc[6] = "????";
+            char fourcc[5] = "????";
             vj_el_get_file_fourcc(el, j, fourcc);
             
-            p += sprintf(p, "%04zu%s%04d%010lu%02zu%s",
+            p += sprintf(p, "%04zu%s%04d%010lu%s",
                          strlen(el->video_file_list[j]),
                          el->video_file_list[j],
-                         j, // the original physical index
+                         j,
                          (unsigned long)el->num_frames[j],
-                         strlen(fourcc),
                          fourcc);
         }
     }
