@@ -448,7 +448,6 @@ size_t vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, uint8_
     uint8_t *dest[4];   
     VJFrame src;
     VJFrame *src1 = &src;
-    size_t alignment = mem_align_size();
 
     dest[0] = dst;
     dest[1] = dest[0] + out_w*out_h;
