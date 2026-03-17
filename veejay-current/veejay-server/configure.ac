@@ -283,6 +283,8 @@ if test "x$enable_debug" = "xyes"; then
     VEEJAY_CFLAGS="$VEEJAY_CFLAGS -Wall -Wextra -Wshadow -Wpointer-arith -Wcast-align"
     VEEJAY_CFLAGS="$VEEJAY_CFLAGS -Wstrict-prototypes -Wmissing-prototypes"
     VEEJAY_CFLAGS="$VEEJAY_CFLAGS -Wformat=2 -Wundef -Wwrite-strings"
+
+    AC_DEFINE([VALIDATE_VIMS], [1], [Enable VIMS buffer validation in debug builds])
 else
     AC_MSG_RESULT([no])
 fi
