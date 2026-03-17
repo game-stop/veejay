@@ -251,6 +251,15 @@ else
  AC_MSG_RESULT([no])
 fi
 
+AC_MSG_CHECKING(whether to compile with stack-protector)
+if test "x$enable_stack_protector" = "xyes" ; then
+ debugCFLAGS="$debugCFLAGS -g -fstack-protector-all -O0 -Wall -Wextra"
+ debug_or_profiling="debug"
+ AC_MSG_RESULT([yes])
+else
+ AC_MSG_RESULT([no])
+fi
+
 AC_MSG_CHECKING(whether to compile with address sanitizer)
 if test "x$enable_sanitizer" = "xyes" ; then
  debugCFLAGS="$debugCFLAGS -fsanitize=address -g -O1"
