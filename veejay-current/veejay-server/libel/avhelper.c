@@ -243,11 +243,13 @@ const void	*avhelper_get_codec( void *ptr )
 	return e->codec;
 }
 
-void	avhelper_codec_close( AVCodecContext *ctx ) {
+void    avhelper_codec_close( AVCodecContext **ctx ) {
 #if LIBAVCODEC_VERSION_MAJOR >= 60
-	avcodec_free_context(&ctx);
+    avcodec_free_context(ctx);
 #else
-	avcodec_close(ctx);
+    if (ctx && *ctx) {
+        avcodec_close(*ctx);
+    }
 #endif
 }
 
@@ -320,6 +322,7 @@ int avhelper_decode_video3( AVCodecContext *avctx, AVFrame *frame, int *got_pict
 
 void avhelper_frame_unref(AVFrame *ptr)
 {
+	/*
 #if (LIBAVCODEC_VERSION_MAJOR > 55 && LIBAVCODEC_VERSION_MINOR > 40) || (LIBAVCODEC_VERSION_MAJOR == 56 && LIBAVCODEC_VERSION_MINOR > 0)
 	av_frame_unref( ptr );
 #endif
@@ -327,7 +330,8 @@ void avhelper_frame_unref(AVFrame *ptr)
 #if LIBAVCODEC_VERSION_MAJOR >= 60
 	//av_frame_free(&ptr);
 #endif
-
+ */
+  if (ptr) av_frame_unref(ptr);
 
 }
 
@@ -406,6 +410,10 @@ void    *avhelper_get_mjpeg_decoder(VJFrame *output) {
 
     x->frames[0] = avhelper_alloc_frame();
     x->frames[1] = avhelper_alloc_frame();
+	if (!x->frames[0] || !x->frames[1]) {
+         avhelper_close_decoder(x);
+         return NULL;
+    }
 #if LIBAVCODEC_VERSION_MAJOR >= 60
     for(j = 0; j < MAX_PACKETS; j ++ ) {
         x->packets[j] = av_packet_alloc();
@@ -696,7 +704,7 @@ further:
 
 	if ((ret = avcodec_parameters_to_context(dec_ctx, st->codecpar)) < 0) {
 		veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] Failed to copy %s codec parameters to decoder context");
-		avhelper_codec_close(dec_ctx);
+		avhelper_codec_close(&dec_ctx);
 		avhelper_close_input_file( x->avformat_ctx );
 		free(x);
 		return NULL;
@@ -818,13 +826,7 @@ further:
 		x->spvf = 0.04f;
 	}
 
-#if LIBAVCODEC_VERSION_MAJOR >= 60
     AVPacket *hunt_pkt = av_packet_alloc();
-#else
-    AVPacket hunt_pkt_stack;
-    AVPacket *hunt_pkt = &hunt_pkt_stack;
-    av_init_packet(hunt_pkt);
-#endif
 	
 	while(1) {
 	    ret = av_read_frame(x->avformat_ctx, hunt_pkt);
@@ -858,6 +860,9 @@ further:
 	if(!got_picture) {
 		veejay_msg(VEEJAY_MSG_ERROR, "[FFMPEG] Unable to get whole picture from %s", filename );
 #if LIBAVCODEC_VERSION_MAJOR >= 60
+		for( int k = 0; k < MAX_PACKETS ; k ++ ) {
+            av_packet_free(&(x->packets[k]));
+        }
 		avcodec_free_context(&(x->codec_ctx));
 #else
 		avcodec_close( x->codec_ctx );
@@ -893,7 +898,7 @@ void	*avhelper_alloc_frame()
 void	avhelper_close_decoder( void *ptr ) 
 {
 	el_decoder_t *e = (el_decoder_t*) ptr;
-	avhelper_codec_close( e->codec_ctx );
+	avhelper_codec_close( &e->codec_ctx );
 
 #if LIBAVCODEC_VERSION_MAJOR < 60
 	for( int i = 0; i < MAX_PACKETS ; i ++ ) {
