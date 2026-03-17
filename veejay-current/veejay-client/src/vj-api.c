@@ -3203,7 +3203,7 @@ static gchar *recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1,
 }
 
 
-static gchar *recv_vims(int slen, int *bytes_written)
+static gchar *recv_vims1(int slen, int *bytes_written)
 {
     int tmp_len = slen+1;
     unsigned char tmp[tmp_len];
@@ -3226,6 +3226,47 @@ static gchar *recv_vims(int slen, int *bytes_written)
         reloaded_schedule_restart();
 
     return (gchar*) result;
+}
+
+static gchar *recv_vims(int slen, int *bytes_written)
+{
+    int tmp_len = slen + 1;
+    unsigned char tmp[tmp_len];
+    veejay_memset(tmp, 0, sizeof(tmp));
+
+    int ret = vj_client_read(info->client, V_CMD, tmp, slen);
+
+    if (ret == -1) {
+        veejay_msg(VEEJAY_MSG_DEBUG, "Client read failed, scheduling restart");
+        reloaded_schedule_restart();
+    }
+
+    //veejay_msg_buffer(tmp, ret > 0 ? (size_t)ret : 0, 64, "recv_vims header buffer:");
+
+    int len = 0;
+    if (sscanf((char *)tmp, "%d", &len) != 1) {
+        veejay_msg(VEEJAY_MSG_DEBUG, "Failed to parse length from header buffer");
+        return NULL;
+    }
+
+    if (ret <= 0 || len <= 0 || slen <= 0) {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "Nothing to read: ret=%d, len=%d, slen=%d", ret, len, slen);
+        return NULL;
+    }
+
+    unsigned char *result = (unsigned char *)vj_calloc(sizeof(unsigned char) * (len + 1));
+    
+    *bytes_written = vj_client_read(info->client, V_CMD, result, len);
+    if (*bytes_written == -1) {
+        veejay_msg(VEEJAY_MSG_DEBUG, "Client read of data failed, scheduling restart");
+        reloaded_schedule_restart();
+    }
+
+    //veejay_msg_buffer(result, *bytes_written > 0 ? (size_t)*bytes_written : 0, 128,
+    //                  "recv_vims data buffer:");
+
+    return (gchar *)result;
 }
 
 static gdouble  get_numd(const char *name)
@@ -4454,28 +4495,34 @@ static void reset_fxtree(void)
 
 static void reset_tree(const char *name)
 {
-    GtkWidget *tree_widget = glade_xml_get_widget_( info->main_window,name );
-    GtkTreeModel *tree_model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree_widget) );
+    if (!info || !info->main_window || !name)
+        return;
 
+    GtkWidget *tree_widget = glade_xml_get_widget_(info->main_window, name);
+    if (!GTK_IS_TREE_VIEW(tree_widget))
+        return;
 
-    if(GTK_IS_TREE_MODEL_SORT(tree_model)) {
-        GtkTreeModel *child_model = gtk_tree_model_sort_get_model( GTK_TREE_MODEL_SORT(tree_model) );
+    GtkTreeModel *tree_model = gtk_tree_view_get_model(GTK_TREE_VIEW(tree_widget));
+    if (!tree_model)
+        return;
 
-        gtk_list_store_clear( GTK_LIST_STORE( child_model ) );
+    if (GTK_IS_TREE_MODEL_SORT(tree_model)) {
+        GtkTreeModel *child_model = gtk_tree_model_sort_get_model(GTK_TREE_MODEL_SORT(tree_model));
+        if (GTK_IS_LIST_STORE(child_model))
+            gtk_list_store_clear(GTK_LIST_STORE(child_model));
     }
-    else {
-        if( GTK_IS_LIST_STORE(tree_model) ) {
-/*!
- * invalidate selection callback to prevent undesirable calls, clear the list
- * and finally restore selection callback.
- */
-            GtkTreeSelection *selection;
-            GtkTreeSelectionFunc selection_func;
-            selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree_widget));
-            selection_func = gtk_tree_selection_get_select_function(selection);
+    else if (GTK_IS_LIST_STORE(tree_model)) {
+        GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree_widget));
+        if (selection) {
+            GtkTreeSelectionFunc old_func = gtk_tree_selection_get_select_function(selection);
+            gpointer old_data = gtk_tree_selection_get_user_data(selection);
+
             gtk_tree_selection_set_select_function(selection, NULL, NULL, NULL);
             gtk_list_store_clear(GTK_LIST_STORE(tree_model));
-            gtk_tree_selection_set_select_function(selection, selection_func, NULL, NULL);
+
+            gtk_tree_selection_set_select_function(selection, old_func, old_data, NULL);
+        } else {
+            gtk_list_store_clear(GTK_LIST_STORE(tree_model));
         }
     }
 }
@@ -6823,169 +6870,132 @@ void	reload_macros(void)
 
 	info->uc.reload_hint[HINT_MACRO] = 0;
 }
-
 static void reload_editlist_contents(void)
 {
-    GtkWidget *tree = glade_xml_get_widget_( info->main_window, "editlisttree");
+    GtkWidget *tree = glade_xml_get_widget_(info->main_window, "editlisttree");
     GtkListStore *store;
     GtkTreeIter iter;
 
-    gint i;
     gint len = 0;
-    single_vims( VIMS_EDITLIST_LIST );
-    gchar *eltext = recv_vims(6,&len); // msg len
+    single_vims(VIMS_EDITLIST_LIST);
+    gchar *eltext = recv_vims(6, &len); // msg len
     gint offset = 0;
-    gint num_files=0;
+    gint num_files = 0;
+
     reset_tree("editlisttree");
     _el_ref_reset();
     _el_entry_reset();
     _edl_reset();
 
-    if( eltext == NULL || len < 0 )
-    {
+    if (!eltext || len <= 0)
         return;
-    }
 
-    el_constr *el;
-
-    char *tmp = strndup( eltext + offset, 4 );
-    if( sscanf( tmp,"%d",&num_files ) != 1 )
-    {
-        free(tmp);
-        free(eltext);
-        return;
-    }
-    free(tmp);
-
+    if (len - offset < 4) goto cleanup;
+    char tmp[5] = {0};
+    strncpy(tmp, eltext + offset, 4);
+    if (sscanf(tmp, "%d", &num_files) != 1) goto cleanup;
     offset += 4;
 
-    for( i = 0; i < num_files ; i ++ )
+    for (int i = 0; i < num_files; i++)
     {
         int name_len = 0;
-        tmp = strndup( eltext + offset, 4 );
-        if( sscanf( tmp,"%d", &name_len ) != 1 )
-        {
-            free(tmp);
-            free(eltext);
-            return;
-        }
+        if (len - offset < 4) goto cleanup;
+        strncpy(tmp, eltext + offset, 4);
+        tmp[4] = 0;
+        if (sscanf(tmp, "%d", &name_len) != 1) goto cleanup;
         offset += 4;
-        free(tmp);
-        char *file = strndup( eltext + offset, name_len );
 
+        if (len - offset < name_len) goto cleanup;
+        char *file = strndup(eltext + offset, name_len);
         offset += name_len;
+
+        if (len - offset < 4) { free(file); goto cleanup; }
+        strncpy(tmp, eltext + offset, 4);
+        tmp[4] = 0;
         int iter = 0;
-        tmp = strndup( eltext + offset, 4 );
-        if( sscanf( tmp, "%d", &iter ) != 1 )
-        {
-            free(tmp);
-            free(file);
-            free(eltext);
-            return;
-        }
-        free(tmp);
+        if (sscanf(tmp, "%d", &iter) != 1) { free(file); goto cleanup; }
         offset += 4;
 
+        if (len - offset < 10) { free(file); goto cleanup; }
+        strncpy(tmp, eltext + offset, 10);
+        tmp[10] = 0;
         long num_frames = 0;
-        tmp = strndup( eltext + offset, 10 );
-        if( sscanf(tmp, "%ld", &num_frames ) != 1 )
-        {
-            free(tmp);
-            free(file);
-            free(eltext);
-            return;
-        }
-        free(tmp);
+        if (sscanf(tmp, "%ld", &num_frames) != 1) { free(file); goto cleanup; }
         offset += 10;
 
-        int fourcc_len = 0;
-        tmp = strndup( eltext + offset, 2 );
-        if( sscanf( tmp, "%d", &fourcc_len) != 1 )
-        {
-            free(tmp);
-            free(file);
-            free(eltext);
-            return;
-        }
-        offset += fourcc_len;
-        char *fourcc = strndup( eltext + offset - 1, fourcc_len );
+        if (len - offset < 4) { free(file); goto cleanup; }
+        char *fourcc = strndup(eltext + offset, 4);
+        offset += 4;
 
-        el = _el_entry_new( iter, file, num_frames, fourcc );
-        info->editlist = g_list_append( info->editlist, el );
-
-        offset += 2;
+        el_constr *el = _el_entry_new(iter, file, num_frames, fourcc);
+        info->editlist = g_list_append(info->editlist, el);
 
         free(file);
         free(fourcc);
-        free(tmp);
     }
-    GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));
+
+    GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(tree));
+    if (!GTK_IS_LIST_STORE(model)) goto cleanup;
     store = GTK_LIST_STORE(model);
 
-    int total_frames = 0; // running total of frames
+    int total_frames = 0;
     int row_num = 0;
-    while( offset < len )
+
+    while (offset < len)
     {
-        tmp = (char*)strndup( eltext + offset, (3*16) );
-        offset += (3*16);
-        long nl=0, n1=0,n2=0;
+        char seqbuf[49] = {0};
+        strncpy(seqbuf, eltext + offset, 48);
+        offset += 48;
 
-        sscanf( tmp, "%016ld%016ld%016ld",
-            &nl,&n1,&n2 );
+        long nl = 0, n1 = 0, n2 = 0;
+        if (sscanf(seqbuf, "%016ld%016ld%016ld", &nl, &n1, &n2) != 3) break;
 
-        if(nl < 0 || nl >= num_files)
-        {
-            free(tmp);
-            free(eltext);
-            return;
-        }
-        int file_len = _el_get_nframes( nl );
-        if(file_len <= 0)
-        {
-            free(tmp);
-            row_num++;
-            continue;
-        }
-        if(n1 < 0 )
-            n1 = 0;
-        if(n2 >= file_len)
-            n2 = file_len;
+        if (nl < 0 || nl >= num_files) break;
 
-        if(n2 <= n1 )
-        {
-            free(tmp);
+        int file_len = _el_get_nframes(nl);
+        if (file_len <= 0) {
             row_num++;
             continue;
         }
 
-        info->elref = g_list_append( info->elref, _el_ref_new( row_num,(int) nl,n1,n2,total_frames ) ) ;
+        if (n1 < 0) n1 = 0;
+        if (n2 >= file_len) n2 = file_len - 1;
+        if (n2 < n1) { row_num++; continue; }
+
+        info->elref = g_list_append(info->elref,
+                                    _el_ref_new(row_num, (int)nl, n1, n2, total_frames));
+
         char *tmpname = _el_get_filename(nl);
         gchar *fname = get_relative_path(tmpname);
-        char *timecode = format_selection_time( n1,n2 );
-        gchar *gfourcc = _utf8str( _el_get_fourcc(nl) );
-        gchar *timeline = format_selection_time( 0, total_frames );
+        char *timecode = format_selection_time(n1, n2);
+        gchar *gfourcc = _utf8str(_el_get_fourcc(nl));
+        gchar *timeline = format_selection_time(0, total_frames);
 
-        gtk_list_store_append( store, &iter );
+        gtk_list_store_append(store, &iter);
         gtk_list_store_set(store, &iter,
-                           COLUMN_INT, (guint) row_num,
+                           COLUMN_INT, (guint)row_num,
                            COLUMN_STRING0, timeline,
                            COLUMN_STRINGA, fname,
                            COLUMN_STRINGB, timecode,
-                           COLUMN_STRINGC, gfourcc,-1 );
+                           COLUMN_STRINGC, gfourcc, -1);
 
         free(timecode);
         g_free(gfourcc);
         g_free(fname);
         free(timeline);
-        free(tmp);
 
-        total_frames = total_frames + (n2-n1) + 1;
-        row_num ++;
+        total_frames += (n2 - n1 + 1);
+        row_num++;
     }
 
-    gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
+    gtk_tree_view_set_model(GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 
-    free( eltext );
+    free(eltext);
+
+    return;
+cleanup:
+    veejay_msg(VEEJAY_MSG_DEBUG, "Failed to load editlist");
+    free(eltext);
 }
 
 // execute after el change:
