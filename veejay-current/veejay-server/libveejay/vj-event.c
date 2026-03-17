@@ -411,12 +411,11 @@ static struct {                 /* hardcoded keyboard layout (the default keys) 
 #define VIMS_LONG_PARAMS (1<<3)             /* long string arguments (bundle, plugin) */
 #define VIMS_ALLOW_ANY (1<<4)               /* use defaults when optional arguments are not given */            
 
-
 static inline char *format_msg(char *dst, const char *str)
 {
     size_t len = strlen(str);
+    if(len > 999) len = 999;
 
-    /* write 3-digit length */
     dst[0] = '0' + (len / 100) % 10;
     dst[1] = '0' + (len / 10)  % 10;
     dst[2] = '0' + (len % 10);
@@ -473,6 +472,30 @@ veejay_msg(VEEJAY_MSG_INFO, "---------------------------------------------------
     }\
 }
 
+static inline void validate_send_buffer(const char *buf, const char *label)
+{
+    size_t maxlen = strlen(buf);
+    for (size_t i = 0; i < maxlen; i++)
+    {
+        unsigned char c = (unsigned char)buf[i];
+        if ((c < 32 || c > 126) && c != '\n' && c != '\r' && c != '\t')
+        {
+            veejay_msg(0," %s non-printable at offset %zu: 0x%02x\n", label, i, c);
+        }
+    }
+}
+
+#ifdef VALIDATE_VIMS
+#define SEND_MSG(v,str)\
+{\
+    validate_send_buffer(str,#str); \
+    int bf_len = strlen(str);\
+    if(bf_len && vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, (uint8_t*) str, bf_len) < 0) { \
+    _vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], v->uc->current_link); \
+    _vj_server_del_client( v->vjs[VEEJAY_PORT_STA], v->uc->current_link); \
+    _vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], v->uc->current_link);} \
+}
+#else
 #define SEND_MSG(v,str)\
 {\
     int bf_len = strlen(str);\
@@ -481,7 +504,7 @@ veejay_msg(VEEJAY_MSG_INFO, "---------------------------------------------------
     _vj_server_del_client( v->vjs[VEEJAY_PORT_STA], v->uc->current_link); \
     _vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], v->uc->current_link);} \
 }
-
+#endif
 
 /* some macros for commonly used checks */
 #define SAMPLE_PLAYING(v) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) || (v->rmodes[v->uc->current_link] == VJ_PLAYBACK_MODE_SAMPLE) )
@@ -8782,11 +8805,11 @@ void vj_event_send_sample_list(void *ptr, const char format[], va_list ap)
             size_t dlen = strlen(description);
 
             char cmd[5 + 9 + 9 + 3 + SAMPLE_MAX_DESCR_LEN];
-            int cmd_len = snprintf(cmd, sizeof(cmd), "%05d%09d%09d%03zu%s", i, start_frame, end_frame, dlen, description);
+            int cmd_len = snprintf(cmd, sizeof(cmd), "%05d%09d%09d%03zu%.*s", i, start_frame, end_frame, dlen,(int) dlen, description);
             if (cmd_len <= 0 || cmd_len >= (int)sizeof(cmd))
                 continue;
 
-            char line[sizeof(cmd)];
+            char line[sizeof(cmd) + 16];
             FORMAT_MSG(line, cmd);
             q = APPEND_MSG(q, line);
         }
