@@ -1374,9 +1374,6 @@ int vj_tag_del_internal(vj_tag *tag)
     vj_font_dictionary_destroy(_tag_info->font ,tag->dict);
 #endif
     
-    if(tag->extra)
-        free(tag->extra);
-
     /* stop streaming in first */
     switch(tag->source_type) {
     case VJ_TAG_TYPE_CLONE:
@@ -1458,6 +1455,7 @@ int vj_tag_del_internal(vj_tag *tag)
     if( tag->lf ) free(tag->lf);
     if( tag->lfu ) free(tag->lfu);
     if( tag->lfv ) free(tag->lfv);
+    if(tag->extra) free(tag->extra);
 
     if(tag->encoder_active)
         vj_tag_stop_encoder( tag->id ); 
@@ -1526,8 +1524,6 @@ void vj_tag_close_all(void)
         hash_scan_delete(TagHash, node);
 
         vj_tag_del_internal(tag);
-
-        hnode_destroy(node);
     }
 
     veejay_memset(avail_tag, 0, sizeof(avail_tag));
@@ -2101,6 +2097,10 @@ int vj_tag_get_effect_any(int t1, int position) {
 int vj_tag_chain_free(int t1, int global)
 {
     vj_tag *tag = vj_tag_get(t1);
+    if(!tag) {
+        return 0;
+    }
+
     int i=0;
     int sum = 0;
    
