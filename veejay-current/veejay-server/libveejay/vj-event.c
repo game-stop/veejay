@@ -1119,6 +1119,9 @@ void    vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *arg
     int fmt_offset = 1; 
     vims_arg_t  vims_arguments[MAX_VIMS_ARGUMENTS];
 
+#ifdef VALIDATE_VIMS
+    veejay_msg(VEEJAY_MSG_DEBUG, "Received VIMS event %d", net_id);
+#endif
     veejay_memset(vims_arguments, 0, sizeof(vims_arguments));
 
     if(!vj_event_verify_args(args , net_id, arglen, np, prefixed, fmt ))
