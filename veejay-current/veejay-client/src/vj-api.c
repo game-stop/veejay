@@ -3241,7 +3241,9 @@ static gchar *recv_vims(int slen, int *bytes_written)
         reloaded_schedule_restart();
     }
 
-    //veejay_msg_buffer(tmp, ret > 0 ? (size_t)ret : 0, 64, "recv_vims header buffer:");
+#ifdef VALIDATE_VIMS
+    veejay_msg_buffer(tmp, ret > 0 ? (size_t)ret : 0, 64, "recv_vims header:");
+#endif
 
     int len = 0;
     if (sscanf((char *)tmp, "%d", &len) != 1) {
@@ -3263,8 +3265,10 @@ static gchar *recv_vims(int slen, int *bytes_written)
         reloaded_schedule_restart();
     }
 
-    //veejay_msg_buffer(result, *bytes_written > 0 ? (size_t)*bytes_written : 0, 128,
-    //                  "recv_vims data buffer:");
+#ifdef VALIDATE_VIMS
+    veejay_msg_buffer(result, *bytes_written > 0 ? (size_t)*bytes_written : 0, 128,
+                      "recv_vims data:  ");
+#endif
 
     return (gchar *)result;
 }
@@ -6891,7 +6895,7 @@ static void reload_editlist_contents(void)
         return;
 
     if (len - offset < 4) goto cleanup;
-    char tmp[5] = {0};
+    char tmp[64] = {0};
     strncpy(tmp, eltext + offset, 4);
     if (sscanf(tmp, "%d", &num_files) != 1) goto cleanup;
     offset += 4;
