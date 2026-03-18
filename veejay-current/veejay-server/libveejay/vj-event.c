@@ -421,6 +421,7 @@ static inline char *format_msg(char *dst, const char *str)
     dst[2] = '0' + (len % 10);
 
     memcpy(dst + 3, str, len);
+    dst[ 3 + len ] = '\0';
     return dst + 3 + len;
 }
 
@@ -437,6 +438,7 @@ static inline char *append_msg(char *dst, const char *str)
 {
     size_t len = strlen(str);
     memcpy(dst, str, len);
+    dst[len] = '\0';
     return dst + len;
 }
 
@@ -472,7 +474,7 @@ veejay_msg(VEEJAY_MSG_INFO, "---------------------------------------------------
     }\
 }
 
-static inline void validate_send_buffer(const char *buf, const char *label)
+static inline void validate_send_buffer(const char *buf, const char *label, const char *caller, const int line)
 {
     size_t maxlen = strlen(buf);
     for (size_t i = 0; i < maxlen; i++)
@@ -480,7 +482,7 @@ static inline void validate_send_buffer(const char *buf, const char *label)
         unsigned char c = (unsigned char)buf[i];
         if ((c < 32 || c > 126) && c != '\n' && c != '\r' && c != '\t')
         {
-            veejay_msg(0," %s non-printable at offset %zu: 0x%02x\n", label, i, c);
+            veejay_msg(0,"%s:%d %s non-printable at offset %zu: 0x%02x\n",caller, line, label, i, c);
         }
     }
 }
@@ -488,7 +490,7 @@ static inline void validate_send_buffer(const char *buf, const char *label)
 #ifdef VALIDATE_VIMS
 #define SEND_MSG(v,str)\
 {\
-    validate_send_buffer(str,#str); \
+    validate_send_buffer(str,#str,__FUNCTION__, __LINE__); \
     int bf_len = strlen(str);\
     if(bf_len && vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, (uint8_t*) str, bf_len) < 0) { \
     _vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], v->uc->current_link); \
@@ -8782,6 +8784,7 @@ void vj_event_send_sample_list(void *ptr, const char format[], va_list ap)
         start_from_sample = args[0];
 
     char *s_print_buf = get_print_buf(0);
+    memset(s_print_buf, 0, 9 );
     char *p = s_print_buf;
 
     p += 8;
@@ -8815,7 +8818,10 @@ void vj_event_send_sample_list(void *ptr, const char format[], va_list ap)
         }
 
         size_t total_len = q - print_buf;
-        snprintf(p - 8, 9, "%08zu", total_len);
+        char temp_h[10];
+        snprintf(temp_h, 10, "%08zu", total_len);
+        memcpy(s_print_buf, temp_h, 8);
+        p = s_print_buf + 8;
         p = APPEND_MSG(p, print_buf);
 
         free(print_buf);
