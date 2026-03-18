@@ -82,6 +82,7 @@ unsigned char *keyframe_pack(void *port, int parameter_id, int entry_id, int *rl
         vevo_property_get(port,k_dn,0,&values_len)!=VEVO_NO_ERROR)
     {
         free(k_s); free(k_e); free(k_t); free(k_x); free(k_d); free(k_dn);
+        veejay_msg(VEEJAY_MSG_ERROR, "Failed to set required property for KF %d", parameter_id);
         return NULL;
     }
 
@@ -390,43 +391,45 @@ int keyframe_xml_unpack(xmlDocPtr doc, xmlNodePtr node, void *port)
 
     /* pass 1: find datalen */
     for (xmlNodePtr n=node; n; n=n->next) {
-        if (!xmlStrcmp(n->name,(xmlChar*)"datalen")) {
+        if (!xmlStrncmp(n->name, (xmlChar*)"datalen_p", 9)) {
             values_len = get_xml_int(doc,n);
             if (values_len <= 0)
                 return 0;
             values = vj_calloc(sizeof(int)*values_len);
+            if(!values) {
+                return 0;
+            }
+            parameter_id = atoi((char*)(n->name + 9));
         }
     }
 
-    if (!values)
+    if (!values) {
         return 0;
+    }
 
     /* pass 2: parse */
     for (; node; node=node->next) {
 
-        if (!xmlStrcmp(node->name,(xmlChar*)"start"))
+        if (!xmlStrncmp(node->name,(xmlChar*)"start",5))
             start = get_xml_int(doc,node);
 
-        else if (!xmlStrcmp(node->name,(xmlChar*)"end"))
+        else if (!xmlStrncmp(node->name,(xmlChar*)"end",3))
             end = get_xml_int(doc,node);
 
-        else if (!xmlStrcmp(node->name,(xmlChar*)"type"))
+        else if (!xmlStrncmp(node->name,(xmlChar*)"type",4))
             type = get_xml_int(doc,node);
 
-        else if (!xmlStrcmp(node->name,(xmlChar*)"status"))
+        else if (!xmlStrncmp(node->name,(xmlChar*)"status",6))
             status = get_xml_int(doc,node);
 
-        else if (!xmlStrcmp(node->name,(xmlChar*)"value")) {
+        else if (!xmlStrncmp(node->name,(xmlChar*)"value",5)) {
             int val=0;
             int pid = get_xml_2int(doc,node,&val);
-
-            if (parameter_id < 0)
-                parameter_id = pid;
 
             if (frame >= values_len)
                 break;
 
-            values[frame++] = val;
+            values[frame++] = val; //every frame has a parameter value
         }
     }
 
