@@ -54,33 +54,6 @@ vj_effect *bwotsu_init(int w, int h)
 	return ve;
 }
 
-//@see https://en.wikipedia.org/wiki/Otsu's_method
-static inline uint32_t bwotsu(uint32_t *H, const int N) {
-    uint32_t threshold = 0;
-    double wF, wB = 0.0, mB, mF, between, max = 0.0;
-    double sum = 0.0, sumB = 0.0;
-
-    for (int i = 0; i < 256; i++)
-        sum += i * H[i];
-
-    for (int i = 0; i < 256; i++) {
-        wB += H[i];
-        if (wB == 0) continue;
-        wF = N - wB;
-        if (wF == 0) break;
-
-        sumB += i * H[i];
-        mB = sumB / wB;
-        mF = (sum - sumB) / wF;
-
-        between = wB * wF * (mB - mF) * (mB - mF);
-        if (between > max) {
-            max = between;
-            threshold = i;
-        }
-    }
-    return threshold;
-}
 
 void bwotsu_apply(void *ptr, VJFrame *frame, int *args) { //FIXME banding
     int mode   = args[0];
@@ -107,7 +80,7 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args) { //FIXME banding
             histogram[Y[i]]++;
     }
 
-    const uint32_t threshold = bwotsu(histogram, len);
+    const uint32_t threshold = otsu_method(histogram);
 
     const uint8_t low  = invert ? 0xff : 0x00;
     const uint8_t high = invert ? 0x00 : 0xff;

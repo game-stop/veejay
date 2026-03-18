@@ -139,6 +139,49 @@ static inline void linearBlend(unsigned char *src, int stride)
   }
 }
 
+//@see https://en.wikipedia.org/wiki/Otsu's_method
+uint32_t otsu_method(uint32_t *H) {
+    uint32_t threshold = 0;
+    float sumT = 0, sumB = 0;
+    uint32_t N = 0;
+
+	// skip first few entries as it is noise
+    const int noise_floor = 2;
+    for (int i = noise_floor; i < 256; i++) {
+        sumT += (float)i * H[i];
+        N += H[i];
+    }
+
+    if (N == 0) return 0;
+
+    float wB = 0;
+    float max_var = -1.0f;
+
+    for (int i = noise_floor; i < 256; i++) {
+        wB += (float)H[i];
+        if (wB == 0) continue;
+
+        float wF = (float)N - wB;
+        if (wF <= 0) break;
+
+        sumB += (float)i * H[i];
+
+        float mB = sumB / wB;
+        float mF = (sumT - sumB) / wF;
+
+        float diff = mB - mF;
+        float var_between = wB * wF * diff * diff;
+
+        if (var_between > max_var) {
+            max_var = var_between;
+            threshold = i;
+        }
+    }
+
+    return threshold;
+}
+
+
 matrix_t matrix_placementA(int photoindex, int size, int w , int h)
 {
 	matrix_t m;

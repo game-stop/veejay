@@ -107,6 +107,7 @@ static struct {
     { rotate_init,rotate_malloc,rotate_free,NULL,NULL,rotate_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_ROTATE },
     { ripple_init,ripple_malloc,ripple_free,NULL,NULL,ripple_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_RIPPLE },
     { strobo_init,strobo_malloc,strobo_free,NULL,NULL,strobo_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_STROBOTSU },
+    { spectralmotion_init,spectralmotion_malloc,spectralmotion_free,NULL,NULL,spectralmotion_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SPECTRALMOTION},
     { rgbkeysmooth_init,rgbkeysmooth_malloc,rgbkeysmooth_free,NULL,NULL,NULL,rgbkeysmooth_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_RGBKEYSMOOTH },
     { rgbkey_init,NULL,NULL,NULL,NULL,NULL,rgbkey_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_RGBKEY },
     { rgbchannel_init,NULL,NULL,NULL,NULL,rgbchannel_apply,NULL, NULL,NULL,NULL, VJ_IMAGE_EFFECT_RGBCHANNEL},

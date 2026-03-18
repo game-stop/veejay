@@ -48,8 +48,6 @@ vj_effect *strobo_init(int w, int h)
     ve->limits[1][4] = 1;
     ve->limits[0][5] = 0;
     ve->limits[1][5] = 1500;
-
-
     ve->description = "Strobotsu";
     
     ve->sub_format = 1;
@@ -116,35 +114,6 @@ void strobo_free(void *ptr) {
     free(s);
 }
 
-static uint32_t strobo( uint32_t *H, const int N )
-{
-    uint32_t threshold = 0;
-    double wF, wB=0.0, mB, mF, between, max = 0.0;
-    double sum = 0.0, sumB=0.0;
-    uint32_t i;
-
-    for( i = 0; i < 256; i++ ) 
-    {
-        wB += H[i];
-        if( wB == 0 )
-            continue;
-        wF = N - wB;
-        if( wF == 0 )
-            break;
-        sumB += ( i * H[i] );
-        mB = sumB / wB;
-        sum += i * H[i];
-        mF = (sum - sumB) / wF;
-        between = wB * wF * (mB - mF) * (mB - mF);
-        if( between > max ) {
-            max = between;
-            threshold = i;
-        }
-        
-    }
-    return threshold;
-}
-
 void strobo_apply(void *ptr, VJFrame *frame, int *args) {
     strobo_t *s = (strobo_t*) ptr;
     const int skew = args[0];
@@ -175,8 +144,7 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args) {
         Histogram[ Lookup[ Y[i] ] ] += 1;
     }   
     
-    // calculate a threshold using otsu's method
-    const uint32_t threshold = strobo( Histogram, len );
+    const uint32_t threshold = otsu_method( Histogram );
 
     int color_count = 14;
     if( duration < color_count )

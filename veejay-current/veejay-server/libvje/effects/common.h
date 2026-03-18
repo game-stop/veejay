@@ -377,6 +377,8 @@ typedef struct
 
 typedef	matrix_t (*matrix_f)(int i, int s, int w, int h);
 
+uint32_t otsu_method(uint32_t *H);
+
 matrix_t matrix_placementA(int photoindex, int size, int w , int h);
 matrix_t matrix_placementB(int photoindex, int size, int w , int h);
 matrix_t matrix_placementC(int photoindex, int size, int w , int h);
