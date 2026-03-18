@@ -246,6 +246,7 @@ AC_MSG_CHECKING(whether to compile in debug symbols)
 if test "x$enable_debug" = "xyes" ; then
  debugCFLAGS="$debugCFLAGS -g -Werror=incompatible-pointer-types -Werror=old-style-definition"
  debug_or_profiling="debug"
+ AC_DEFINE([VALIDATE_VIMS], [1], [Enable VIMS buffer validation in debug builds])
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])
