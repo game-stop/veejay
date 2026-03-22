@@ -1243,7 +1243,7 @@ lav_file_t *lav_open_input_file(char *filename, size_t mmap_size)
     if(ret == 0 || video_comp == NULL || alt == 0)
     {
         veejay_msg(VEEJAY_MSG_WARNING, "[lavio] Unable to open %s: unsupported or unrecognized video format", filename);
-        
+        goto ERREXIT;
 	/*lav_fd->rawio = raw_io_open( filename, output_scale_width, output_scale_height, get_ffmpeg_pixfmt(output_yuv));
 	if(lav_fd->rawio == NULL ) {
 		free(lav_fd);
