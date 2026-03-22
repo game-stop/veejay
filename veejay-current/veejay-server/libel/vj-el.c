@@ -1621,7 +1621,7 @@ char *vj_el_write_line_ascii(editlist *el, int *bytes_written)
     p += sprintf(p, "%04d", nnf);
 
     for (int j = 0; j < MAX_EDIT_LIST_FILES; j++) {
-        if (index[j] != -1 && el->video_file_list[j]) {
+        if (el->video_file_list[j]) {
             char fourcc[5] = "????";
             vj_el_get_file_fourcc(el, j, fourcc);
             
@@ -1640,7 +1640,7 @@ char *vj_el_write_line_ascii(editlist *el, int *bytes_written)
 
     p += sprintf(p, "%016" PRId64 "%016" PRId64, oldfile, oldframe);
 
-    for (uint64_t j = 1; j <= (uint64_t)el->total_frames; j++) {
+    for (uint64_t j = 0; j <= (uint64_t)el->total_frames; j++) {
         uint64_t nframe = el->frame_list[j];
         int64_t cur_file_idx = index[N_EL_FILE(nframe)];
         uint64_t cur_frame_idx = N_EL_FRAME(nframe);
@@ -1657,8 +1657,10 @@ char *vj_el_write_line_ascii(editlist *el, int *bytes_written)
 
     p += sprintf(p, "%016" PRId64, oldframe);
 
-    *bytes_written = (int)(p - result);
-    free(index);
+    //*bytes_written = strlen(result);
+    *bytes_written = (int) ( p - result );
+
+	free(index);
     return result;
 }
 
