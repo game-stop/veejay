@@ -49,3 +49,6 @@ release:
 
 snapshot:
 	$(MAKE) dist distdir=$(PACKAGE)-`date +%Y-%m-%d`
+
+install-exec-hook:
+	@echo "You may need to run 'ldconfig' as root to update the shared library cache."
