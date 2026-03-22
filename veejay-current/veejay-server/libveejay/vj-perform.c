@@ -1079,7 +1079,6 @@ int vj_perform_init_audio(veejay_t * info, int AorB)
 {
 #ifndef HAVE_JACK
     veejay_msg(VEEJAY_MSG_DEBUG, "Jack was not enabled during build, no support for audio");
-    return 0;
 #else
 
     if(info->audio == NO_AUDIO) {
@@ -1088,7 +1087,8 @@ int vj_perform_init_audio(veejay_t * info, int AorB)
     }
 
     performer_global_t *global = (performer_global_t*) info->performer;
-    
+    editlist *el = info->edit_list;
+    performer_t *p = (AorB ? global->A : global->B);
     double samples_per_frame = (double)el->audio_rate / (double)el->video_fps;
     const uint32_t sample_len = ceil(samples_per_frame) * el->audio_bps;
 
@@ -1120,9 +1120,9 @@ int vj_perform_init_audio(veejay_t * info, int AorB)
     if(!p->audio_downmix_buffer)
         return 0;
 
-    if(AorB == 0) {
+    /*if(AorB == 0) {
        vj_audio_chain_init(g, p, sample_len);
-    }    
+    }*/   
     
     p->lin_audio_buffer_ = (uint8_t*) vj_calloc( sizeof(uint8_t) * sample_len * SAMPLE_MAX_EFFECTS );
     if(!p->lin_audio_buffer_)
@@ -1162,6 +1162,7 @@ int vj_perform_init_audio(veejay_t * info, int AorB)
     return init_audio_resampler(info, p );
     
 #endif
+    return 0;
 }
 
 static void vj_perform_free_performer(performer_t *p)
@@ -1703,6 +1704,65 @@ static int get_audio_frame_safe(
     }
 
     return n_samples;
+}
+
+// not necessary any more via audioscratcher, FIXME
+static void reverse_audio_buffer(uint8_t *buf, int n_samples, int bps) 
+{
+    if (n_samples <= 1 || bps <= 0) return;
+
+    int i = 0;
+    int j = n_samples - 1;
+
+    switch (bps) {
+        case 2: { // 16-bit
+            uint16_t *p = (uint16_t *)buf;
+            while (i < j) {
+                uint16_t tmp = p[i]; 
+                p[i] = p[j]; 
+                p[j] = tmp; 
+                i++; j--;
+            }
+            break;
+        }
+        case 4: { // 32-bit (or 16-bit stereo)
+            uint32_t *p = (uint32_t *)buf;
+            while (i < j) {
+                uint32_t tmp = p[i]; 
+                p[i] = p[j]; 
+                p[j] = tmp; 
+                i++; j--;
+            }
+            break;
+        }
+        case 8: { // 64-bit (or 32-bit stereo)
+            uint64_t *p = (uint64_t *)buf;
+            while (i < j) {
+                uint64_t tmp = p[i]; 
+                p[i] = p[j]; 
+                p[j] = tmp; 
+                i++; j--;
+            }
+            break;
+        }
+        default: { // generic
+
+            uint8_t tmp[16]; 
+            if (bps > 16) return;
+            
+            while (i < j) {
+                uint8_t *a = buf + (i * bps);
+                uint8_t *b = buf + (j * bps);
+                
+                memcpy(tmp, a, bps);
+                memcpy(a, b, bps);
+                memcpy(b, tmp, bps);
+                
+                i++; j--;
+            }
+            break;
+        }
+    }
 }
 
 static int perform_normal_playback(
