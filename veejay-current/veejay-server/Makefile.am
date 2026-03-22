@@ -79,3 +79,6 @@ deb: Makefile dist
 	rm -rf $(PACKAGE)-$(VERSION)
 	tar xzf $(PACKAGE)-$(VERSION).tar.gz
 	cd $(PACKAGE)-$(VERSION); dpkg-buildpackage -rfakeroot
+
+install-exec-hook:
+	@echo "You may need to run 'ldconfig' as root to update the shared library cache."
