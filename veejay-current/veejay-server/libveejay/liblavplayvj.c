@@ -873,15 +873,6 @@ static int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 	return 1;
 }
 
-static const char* _pm_to_str(int pm) {
-    switch (pm) {
-        case VJ_PLAYBACK_MODE_SAMPLE: return "SAMPLE";
-        case VJ_PLAYBACK_MODE_TAG:    return "TAG/STREAM";
-        case VJ_PLAYBACK_MODE_PLAIN:  return "PLAIN";
-        default:                      return "UNKNOWN";
-    }
-}
-
 void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
 {
     video_playback_setup *settings = info->settings;

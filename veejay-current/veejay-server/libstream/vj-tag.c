@@ -315,8 +315,14 @@ int vj_tag_get_uvlen(void) {
 int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
 {
     TagHash = hash_create(HASHCOUNT_T_MAX, int_tag_compare, int_tag_hash);
-    if (!TagHash || width <= 0 || height <= 0)
+    if(!TagHash) {
         return -1;
+    }
+
+    if (width <= 0 || height <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "No video dimensions setup");
+        return -1;
+    }
     
     vj_tag_input = (vj_tag_data *) vj_malloc(sizeof(vj_tag_data));
 

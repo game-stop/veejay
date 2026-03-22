@@ -165,7 +165,6 @@ typedef struct sample_info_t {
     int encoder_width;
     int encoder_height;
     int encoder_max_size;
-    int frame_tick;
 
     int auto_switch;	
     int selected_entry;
@@ -293,8 +292,6 @@ extern int sample_chain_add(int s1, int c, int effect_nr);
 extern int sample_get_chain_channel(int s1, int position);
 extern int sample_set_chain_channel(int s1, int position, int channel);
 extern int sample_get_long_info(int sample_id, int *start, int *end, int *loop, int *speed, int *cur_sfd, int *max_sfd);
-
-extern void sample_frame_tick();
 
 extern int sample_chain_sprint_status(int s1,int tags,int cache,int sa,int ca, int r, int f, int m, int t,int sr,int curfps,uint32_t lo, uint32_t hi, int macro,char *s, int feedback ); 
 

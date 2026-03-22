@@ -831,8 +831,8 @@ int sample_set_marker_start(int sample_id, int marker)
 
     if( marker < si->first_frame )
         marker = si->first_frame;
-    else if( marker >= si->last_frame )
-        marker = si->last_frame - 1;
+    else if( marker > si->last_frame )
+        marker = si->last_frame;
 
     si->marker_start = marker;
     
@@ -1124,19 +1124,6 @@ int sample_get_chain_status(int s1, int position)
     return sample->effect_chain[position]->e_flag;
 }
 
-void sample_frame_tick(void)
-{
-	int end = sample_highest();
-    int i;
-
-    for (i = 1; i <= end; i++) {
-		sample_info *sample = sample_get(i);
-		if(sample) {
-	   		sample->frame_tick = 0;
-		}
-	}
-}
-
 int sample_set_resume_override(int s1, long position)
 {
     sample_info *sample = sample_get(s1);
@@ -1148,20 +1135,20 @@ int sample_set_resume_override(int s1, long position)
         int end = sample_get_endFrame(s1);
 
         if( sample->speed < 0) {
-            if(sample->resume_pos <= start) {
-                sample->speed = sample->speed * -1;
+            if(sample->resume_pos < start) {
+                //sample->speed = sample->speed * -1;
                 sample->resume_pos = start;
             }
-            else {
+            else if(sample->resume_pos > end) {
                 sample->resume_pos = end;
             }
         }
         else if(sample->speed >= 0) {
-            if(sample->resume_pos >= end) {
-                sample->speed = sample->speed * -1;
+            if(sample->resume_pos > end) {
+                //sample->speed = sample->speed * -1;
                 sample->resume_pos = end;
             }
-            else {
+            else if ( sample->resume_pos < start ) {
                 sample->resume_pos = start;
             }
         }
@@ -1181,9 +1168,6 @@ int sample_set_resume(int s1,long position)
     if(!sample)
         return -1;
 
-    if( sample->frame_tick )
-		return 1; // already incremented for this time period
-
     if(position == -1) {
         int start = sample_get_startFrame(s1);
         int end = sample_get_endFrame(s1);
@@ -1212,8 +1196,6 @@ int sample_set_resume(int s1,long position)
     else {
         sample->resume_pos = position;
     }
-
-	sample->frame_tick = 1;
 
     return 1;
 }
