@@ -753,8 +753,8 @@ int veejay_init_editlist(veejay_t * info)
 
     editlist *el = info->edit_list;
 
-    settings->min_frame_num = 0;
-    settings->max_frame_num = (long long) el->total_frames;
+	atomic_store_long_long(&settings->min_frame_num, 0);
+	atomic_store_long_long(&settings->max_frame_num, (long long) el->total_frames);
 
     if (info->audio==AUDIO_PLAY && info->dummy->arate > 0)
     {
@@ -822,10 +822,10 @@ int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 
    	sample_get_short_info( sample_id , &start,&end,&looptype,&speed);
 
-	settings->min_frame_num = 0;
-	settings->max_frame_num = sample_video_length( sample_id );
 	settings->first_frame = 1;
  
+	atomic_store_long_long(&settings->min_frame_num, 0);
+	atomic_store_long_long(&settings->max_frame_num, (long long) sample_video_length(sample_id));
 
 	info->uc->sample_id = sample_id;
 	info->last_sample_id = sample_id;
@@ -858,9 +858,10 @@ static int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 
 	if( settings->current_playback_speed == 0 )
 		settings->current_playback_speed = 1;
-	settings->min_frame_num = 1;
-	settings->max_frame_num = vj_tag_get_n_frames( stream_id );
-	
+
+	atomic_store_long_long(&settings->min_frame_num, 0);
+	atomic_store_long_long(&settings->max_frame_num, (long long) vj_tag_get_n_frames(stream_id));
+
     info->last_tag_id = stream_id;
 	info->uc->sample_id = stream_id;
 
@@ -987,15 +988,17 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
             
         info->uc->playback_mode = new_pm;
         info->current_edit_list = info->edit_list;
-        settings->min_frame_num = 0;
-        settings->max_frame_num = info->edit_list->total_frames;
+
+		atomic_store_long_long(&settings->min_frame_num, 0 );
+		atomic_store_long_long(&settings->max_frame_num, (long long) info->edit_list->total_frames);
+		atomic_store_long_long(&settings->current_frame_num, 0);
 	}
     else if (new_pm == VJ_PLAYBACK_MODE_TAG)
     {
         info->uc->playback_mode = new_pm;
         
-        settings->min_frame_num = 0;
-        settings->max_frame_num = vj_tag_get_n_frames(sample_id);
+		atomic_store_long_long(&settings->min_frame_num, 0 );
+        atomic_store_long_long(&settings->max_frame_num, (long long) vj_tag_get_n_frames(sample_id));
         atomic_store_long_long(&settings->current_frame_num, 0);
 
         veejay_start_playing_stream(info, sample_id);
@@ -2747,9 +2750,10 @@ static void veejay_producer_initialize_playmode(veejay_t *info) {
     {
         case VJ_PLAYBACK_MODE_PLAIN:
             info->current_edit_list = info->edit_list;
-            settings->min_frame_num = 0;
-            settings->max_frame_num = info->edit_list->total_frames;
-            veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %lld - %lld", settings->min_frame_num, settings->max_frame_num );
+
+			atomic_store_long_long(&settings->min_frame_num, 0);
+			atomic_store_long_long(&settings->max_frame_num, info->edit_list->total_frames);
+			veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %lld - %lld", settings->min_frame_num, settings->max_frame_num );
             settings->current_playback_speed = 1;
         break;
 
@@ -3719,19 +3723,25 @@ int veejay_edit_delete(veejay_t *info, editlist *el, long start, long end)
     for (i = n2 + 1; i < el->video_frames; i++)
         el->frame_list[i - (n2 - n1 + 1)] = el->frame_list[i];
 
-    if (n1 - 1 < settings->min_frame_num) {
-        if (n2 < settings->min_frame_num)
-            settings->min_frame_num -= (n2 - n1 + 1);
+	long long min_fn = atomic_load_long_long(&settings->min_frame_num);
+	long long max_fn = atomic_load_long_long(&settings->max_frame_num);
+
+    if (n1 - 1 < min_fn) {
+        if (n2 < min_fn)
+            min_fn -= (n2 - n1 + 1);
         else
-            settings->min_frame_num = n1;
+            min_fn = n1;
     }
 
-    if (n1 - 1 < settings->max_frame_num) {
-        if (n2 <= settings->max_frame_num)
-            settings->max_frame_num -= (n2 - n1 + 1);
+    if (n1 - 1 < max_fn) {
+        if (n2 <= max_fn)
+            max_fn -= (n2 - n1 + 1);
         else
-            settings->max_frame_num = n1 - 1;
+            max_fn = n1 - 1;
     }
+
+	atomic_store_long_long(&settings->min_frame_num, min_fn);
+	atomic_store_long_long(&settings->max_frame_num, max_fn);
 
     long long cur = atomic_load_long_long(&settings->current_frame_num);
     if (n1 <= cur) {
@@ -3823,8 +3833,9 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 
 	el->total_frames += settings->save_list_len;
 
-    if( el->total_frames < settings->max_frame_num ) {
-        settings->max_frame_num = (long long) el->total_frames;
+	long long max_fn = atomic_load_long_long(&settings->max_frame_num);
+    if( el->total_frames < max_fn ) {
+        atomic_store_long_long(&settings->max_frame_num, (long long) el->total_frames);
     }
 
     atomic_store_long_long(&settings->current_frame_num, destination);
@@ -4012,8 +4023,8 @@ int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start 
  
 	el->video_frames = c;
     el->total_frames = el->video_frames - 1;
-	settings->max_frame_num = (long long) el->total_frames;
-	settings->min_frame_num = 0;
+	atomic_store_long_long(&settings->min_frame_num, 0);
+	atomic_store_long_long(&settings->max_frame_num, (long long) el->total_frames);
 
 	return 1;
 }
