@@ -2136,7 +2136,7 @@ int _el_get_nframes( int pos )
 
 el_ref *_el_ref_new( int row_num,int nl, long n1, long n2, int tf)
 {
-    el_ref *el = vj_malloc(sizeof(el_ref));
+    el_ref *el = vj_calloc(sizeof(el_ref));
     el->id = row_num;
     el->nl = nl;
     el->n1 = n1;
@@ -2156,7 +2156,7 @@ void _el_ref_reset(void)
     {
         int n = g_list_length( info->elref );
         int i;
-        for(i = 0; i < n; i ++ )
+        for(i = 0; i <= n; i ++ )
         {
             el_ref *edl = g_list_nth_data(info->elref, i );
             if(edl)
@@ -2191,7 +2191,7 @@ int _el_ref_start_frame( int row_num )
     for ( i = 0 ; i <= n; i ++ )
     {
         el_ref *el  = g_list_nth_data( info->elref, i );
-        if(el->id == row_num )
+        if(el != NULL && el->id == row_num )
         {
 //          int offset = info->el.offsets[ el->nl ];
 //          return (offset + el->n1 );
@@ -2210,6 +2210,9 @@ char *_el_get_fourcc( int pos )
     for( i = 0; i <= n; i ++ )
     {
         el_constr *el = g_list_nth_data( info->editlist, i );
+        if(el == NULL) {
+            return NULL;
+        }
         if(el->pos == pos)
             return el->fourcc;
     }
@@ -2224,7 +2227,7 @@ char *_el_get_filename( int pos )
     for( i = 0; i <= n; i ++ )
     {
         el_constr *el = g_list_nth_data( info->editlist, i );
-        if(el->pos == pos)
+        if(el != NULL && el->pos == pos)
             return el->filename;
     }
     return NULL;
@@ -6874,6 +6877,7 @@ void	reload_macros(void)
 
 	info->uc.reload_hint[HINT_MACRO] = 0;
 }
+
 static void reload_editlist_contents(void)
 {
     GtkWidget *tree = glade_xml_get_widget_(info->main_window, "editlisttree");
@@ -6891,11 +6895,14 @@ static void reload_editlist_contents(void)
     _el_entry_reset();
     _edl_reset();
 
-    if (!eltext || len <= 0)
+    if (!eltext || len <= 0) {
         return;
+    }
 
     if (len - offset < 4) goto cleanup;
-    char tmp[64] = {0};
+    char tmp[2048] = {0};
+
+    // num_files 
     strncpy(tmp, eltext + offset, 4);
     if (sscanf(tmp, "%d", &num_files) != 1) goto cleanup;
     offset += 4;
@@ -6905,24 +6912,21 @@ static void reload_editlist_contents(void)
         int name_len = 0;
         if (len - offset < 4) goto cleanup;
         strncpy(tmp, eltext + offset, 4);
-        tmp[4] = 0;
         if (sscanf(tmp, "%d", &name_len) != 1) goto cleanup;
         offset += 4;
-
+        
         if (len - offset < name_len) goto cleanup;
         char *file = strndup(eltext + offset, name_len);
         offset += name_len;
 
         if (len - offset < 4) { free(file); goto cleanup; }
         strncpy(tmp, eltext + offset, 4);
-        tmp[4] = 0;
-        int iter = 0;
-        if (sscanf(tmp, "%d", &iter) != 1) { free(file); goto cleanup; }
+        int iterv = 0;
+        if (sscanf(tmp, "%d", &iterv) != 1) { free(file); goto cleanup; }
         offset += 4;
 
         if (len - offset < 10) { free(file); goto cleanup; }
         strncpy(tmp, eltext + offset, 10);
-        tmp[10] = 0;
         long num_frames = 0;
         if (sscanf(tmp, "%ld", &num_frames) != 1) { free(file); goto cleanup; }
         offset += 10;
@@ -6931,7 +6935,7 @@ static void reload_editlist_contents(void)
         char *fourcc = strndup(eltext + offset, 4);
         offset += 4;
 
-        el_constr *el = _el_entry_new(iter, file, num_frames, fourcc);
+        el_constr *el = _el_entry_new(iterv, file, num_frames, fourcc);
         info->editlist = g_list_append(info->editlist, el);
 
         free(file);
@@ -6945,51 +6949,61 @@ static void reload_editlist_contents(void)
     int total_frames = 0;
     int row_num = 0;
 
-    while (offset < len)
-    {
-        char seqbuf[49] = {0};
-        strncpy(seqbuf, eltext + offset, 48);
-        offset += 48;
+    
+    if (offset + 32 > len) goto cleanup;
 
-        long nl = 0, n1 = 0, n2 = 0;
-        if (sscanf(seqbuf, "%016ld%016ld%016ld", &nl, &n1, &n2) != 3) break;
+    char firstbuf[33] = {0};
+    memcpy(firstbuf, eltext + offset, 32);
+    offset += 32;
 
-        if (nl < 0 || nl >= num_files) break;
+    long oldfile = 0;
+    long oldframe = 0;
 
-        int file_len = _el_get_nframes(nl);
-        if (file_len <= 0) {
-            row_num++;
-            continue;
-        }
+    if (sscanf(firstbuf, "%016ld%016ld", &oldfile, &oldframe) != 2)
+        goto cleanup;
 
-        if (n1 < 0) n1 = 0;
-        if (n2 >= file_len) n2 = file_len - 1;
-        if (n2 < n1) { row_num++; continue; }
+    while(offset + 48 < len ) {
+        long cur_file_idx = 0;
+        long cur_frame_idx = 0;
+
+        if( sscanf(eltext + offset, "%16ld%16ld%16ld",&oldframe, &cur_file_idx,
+            &cur_frame_idx) != 3) 
+            goto cleanup;
+            
+        total_frames += (cur_frame_idx - oldframe + 1);
 
         info->elref = g_list_append(info->elref,
-                                    _el_ref_new(row_num, (int)nl, n1, n2, total_frames));
+                        _el_ref_new(row_num, (int)cur_file_idx, oldframe, cur_frame_idx, total_frames));
 
-        char *tmpname = _el_get_filename(nl);
+        char *tmpname = _el_get_filename(cur_file_idx);
         gchar *fname = get_relative_path(tmpname);
-        char *timecode = format_selection_time(n1, n2);
-        gchar *gfourcc = _utf8str(_el_get_fourcc(nl));
+        char *timecode = format_selection_time(oldframe, cur_frame_idx);
+        gchar *gfourcc = _utf8str(_el_get_fourcc(oldframe));
         gchar *timeline = format_selection_time(0, total_frames);
 
         gtk_list_store_append(store, &iter);
         gtk_list_store_set(store, &iter,
-                           COLUMN_INT, (guint)row_num,
-                           COLUMN_STRING0, timeline,
-                           COLUMN_STRINGA, fname,
-                           COLUMN_STRINGB, timecode,
-                           COLUMN_STRINGC, gfourcc, -1);
+                        COLUMN_INT, (guint)row_num,
+                        COLUMN_STRING0, timeline,
+                        COLUMN_STRINGA, fname,
+                        COLUMN_STRINGB, timecode,
+                        COLUMN_STRINGC, gfourcc, -1);
 
         free(timecode);
         g_free(gfourcc);
         g_free(fname);
         free(timeline);
 
-        total_frames += (n2 - n1 + 1);
         row_num++;
+        offset += 48;
+
+    }
+
+    while(offset + 16 < len ) {
+        if( sscanf(eltext + offset, "%16ld", &oldframe) != 1)
+            goto cleanup;
+
+        offset += 16;
     }
 
     gtk_tree_view_set_model(GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
@@ -7027,6 +7041,10 @@ static void load_editlist_info(void)
            &values[0], &values[1], &values[2], &norm,&fps,
            &values[4], &values[5], &rate, &values[7],
            &dum[0], &dum[1], &values[8], &use_vims_mcast, &global_transition_state);
+    if( got_n != 14 ) {
+        veejay_msg(VEEJAY_MSG_ERROR,"Failed to load all tokens from VIDEO_INFORMATION");
+    }
+
     snprintf( tmp, sizeof(tmp)-1, "%dx%d", values[0],values[1]);
 
     info->el.width = values[0];
