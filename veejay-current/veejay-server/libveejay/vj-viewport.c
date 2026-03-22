@@ -937,7 +937,6 @@ void viewport_process_dynamic(void *data, uint8_t *restrict in[3], uint8_t *rest
     ((uint8_t*)inU)[sentinel_idx] = 128;
     ((uint8_t*)inV)[sentinel_idx] = 128;
 
-    size_t plane_sz = (size_t)w * h;
     veejay_memset(out[0], 0, ty1 * w);
     veejay_memset(out[1], 128, ty1 * w);
     veejay_memset(out[2], 128, ty1 * w);
