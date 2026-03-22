@@ -726,17 +726,20 @@ void	veejay_auto_loop(veejay_t *info)
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN)
 	{
 		char sam[32];
-		sprintf(sam, "%03d:0 -1;", VIMS_SAMPLE_NEW);
-		vj_event_parse_msg(info, sam,strlen(sam));
-		sprintf(sam, "%03d:-1;", VIMS_SAMPLE_SELECT);
-		vj_event_parse_msg(info,sam,strlen(sam));
+		int len;
+
+		len = sprintf(sam, "%03d:0 -1;", VIMS_SAMPLE_NEW);
+		vj_event_parse_msg(info, sam, len);
+
+		len = sprintf(sam, "%03d:-1;", VIMS_SAMPLE_SELECT);
+		vj_event_parse_msg(info,sam,len);
 	}
 }
 
 void	veejay_set_framerate( veejay_t *info , float fps )
 {
 	video_playback_setup *settings = (video_playback_setup*) info->settings;
-	settings->spvf = 1.0 / fps;
+	settings->spvf = 1.0 / (double) fps;
 
     settings->usec_per_frame = vj_el_get_usec_per_frame(fps);
 	veejay_msg(VEEJAY_MSG_DEBUG, "Playing at %f FPS, usec_per_frame set to %d" , fps, settings->usec_per_frame);
@@ -751,7 +754,7 @@ int veejay_init_editlist(veejay_t * info)
     editlist *el = info->edit_list;
 
     settings->min_frame_num = 0;
-    settings->max_frame_num = el->total_frames;
+    settings->max_frame_num = (long long) el->total_frames;
 
     if (info->audio==AUDIO_PLAY && info->dummy->arate > 0)
     {
@@ -1411,12 +1414,36 @@ static void veejay_pipe_write_status(veejay_t * info)
     if (info->uc->chain_changed == 1)
 		info->uc->chain_changed = 0;
 }
-static	inline char	*veejay_concat_paths(char *path, const char *suffix)
+
+static inline char *veejay_concat_paths(const char *path, const char *suffix)
 {
-	int n = strlen(path) + strlen(suffix) + 2;
-	char *str = vj_calloc( n * sizeof(char));
-	sprintf(str, "%s/%s", path,suffix);
-	return str;
+    size_t len1 = strlen(path);
+    size_t len2 = strlen(suffix);
+
+    int need_slash = (len1 > 0 && path[len1 - 1] != '/');
+
+    size_t total = len1 + len2 + (need_slash ? 1 : 0) + 1;
+
+    char *str = vj_calloc(total);
+	if(!str) {
+		return NULL;
+	}
+
+    char *p = str;
+
+    memcpy(p, path, len1);
+    p += len1;
+
+    if (need_slash) {
+        *p++ = '/';
+    }
+
+    memcpy(p, suffix, len2);
+    p += len2;
+
+    *p = '\0';
+
+    return str;
 }
 
 static inline int	veejay_is_dir(char *path)
@@ -3797,7 +3824,7 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 	el->total_frames += settings->save_list_len;
 
     if( el->total_frames < settings->max_frame_num ) {
-        settings->max_frame_num = el->total_frames;
+        settings->max_frame_num = (long long) el->total_frames;
     }
 
     atomic_store_long_long(&settings->current_frame_num, destination);
@@ -3985,7 +4012,7 @@ int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start 
  
 	el->video_frames = c;
     el->total_frames = el->video_frames - 1;
-	settings->max_frame_num = el->total_frames;
+	settings->max_frame_num = (long long) el->total_frames;
 	settings->min_frame_num = 0;
 
 	return 1;
