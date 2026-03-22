@@ -4774,7 +4774,7 @@ void    vj_event_stream_set_length( void *ptr, const char format[], va_list ap)
         if(args[0] > 0 && args[0] < 2160000 ) //fictious length is maximum 1 day
         {
             vj_tag_set_n_frames(v->uc->sample_id, args[0]);
-            v->settings->max_frame_num = args[0];
+            atomic_store_long_long(&v->settings->max_frame_num, (long long) args[0]);
             constrain_stream( v, v->uc->sample_id, (long) args[0]);
         }
         else
