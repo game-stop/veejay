@@ -24,16 +24,16 @@
 static inline int myround(float n) 
 {
   if (n >= 0) 
-    return (int)(n + 0.5);
+    return (int)(n + 0.5f);
   else
-    return (int)(n - 0.5);
+    return (int)(n - 0.5f);
 }
 
 #define _rgb2yuv(r,g,b,y,u,v)\
  {\
-        float Ey = (0.299 * (float)r) + (0.587 * (float)g) + (0.114 * (float) b);\
-        float Eu = (-0.168736 * (float)r) - (0.331264 * (float)g) + (0.500 * (float)b) + 128.0;\
-        float Ev = (0.500 * (float)r) - (0.418688 * (float)g) - (0.081312 * (float)b)+ 128.0;\
+        float Ey = (0.299f * (float)r) + (0.587f * (float)g) + (0.114f * (float) b);\
+        float Eu = (-0.168736f * (float)r) - (0.331264f * (float)g) + (0.500f * (float)b) + 128.0f;\
+        float Ev = (0.500f * (float)r) - (0.418688f * (float)g) - (0.081312f * (float)b)+ 128.0f;\
         y = myround(Ey);\
         u = myround(Eu);\
         v = myround(Ev);\
