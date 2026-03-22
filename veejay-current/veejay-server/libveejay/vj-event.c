@@ -1013,11 +1013,12 @@ void vj_event_parse_bundle(veejay_t *v, char *msg )
 
         offset += 1;    /* skip # */
 
+        int total_msg_len = strlen(msg);
+
         for( i = 1; i <= num_msg ; i ++ )
         {               
             int found_end_of_msg = 0;
-            int total_msg_len = strlen(msg);
-
+    
             veejay_memset( atomic_msg, 0 , sizeof(atomic_msg) ); /* clear */
 
             while( (offset+j) < total_msg_len)
@@ -1038,7 +1039,9 @@ void vj_event_parse_bundle(veejay_t *v, char *msg )
                     atomic_msg[ (found_end_of_msg-offset) ] ='\0';
                     offset += j + 1;
                     j = 0;
-                    vj_event_parse_msg( v, atomic_msg, strlen(atomic_msg) );
+
+                    int len = (found_end_of_msg - offset);
+                    vj_event_parse_msg(v, atomic_msg, len);
                 }
                 j++;
             }
@@ -1654,13 +1657,13 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
     {
         if(event.type == SDL_MOUSEWHEEL && event.wheel.y >0 && v->use_osd != 3 ) {
             char msg[8];
-            snprintf(msg,sizeof(msg),"%03d:;", VIMS_VIDEO_SKIP_SECOND );
-            vj_event_parse_msg( (veejay_t*) ptr, msg, strlen(msg) );
+            int len = snprintf(msg,sizeof(msg),"%03d:;", VIMS_VIDEO_SKIP_SECOND );
+            vj_event_parse_msg( (veejay_t*) ptr, msg, len );
             return 1;
         } else if (event.type == SDL_MOUSEWHEEL && event.wheel.y < 0 && v->use_osd != 3) {
             char msg[8];
-            snprintf(msg,sizeof(msg), "%03d:;", VIMS_VIDEO_PREV_SECOND );
-            vj_event_parse_msg( (veejay_t*) ptr, msg, strlen(msg) );
+            int len = snprintf(msg,sizeof(msg), "%03d:;", VIMS_VIDEO_PREV_SECOND );
+            vj_event_parse_msg( (veejay_t*) ptr, msg, len );
             return 1;
         }   
         return 0;
@@ -1680,13 +1683,15 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
     else
     {
         char msg[100];
+        int len;
         if( ev->arg_len > 0 )
         {
-            sprintf(msg,"%03d:%s;", event_id, ev->arguments );
+            len = snprintf(msg,sizeof(msg), "%03d:%s;", event_id, ev->arguments );
         }
         else
-            sprintf(msg,"%03d:;", event_id );
-        vj_event_parse_msg( (veejay_t*) ptr, msg, strlen(msg) );
+            len = snprintf(msg,sizeof(msg), "%03d:;", event_id );
+
+        vj_event_parse_msg( (veejay_t*) ptr, msg, len );
     }
     return 1;
 }
