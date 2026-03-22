@@ -253,8 +253,8 @@ typedef struct {
 	uint64_t save_list_len;
 	double spvf;
 	int usec_per_frame;
-	long long min_frame_num;
-	long long max_frame_num;
+	volatile long long min_frame_num;
+	volatile long long max_frame_num;
 	volatile long long current_frame_num;
 	volatile long long master_frame_num;
 	volatile long long audio_target_frame;
