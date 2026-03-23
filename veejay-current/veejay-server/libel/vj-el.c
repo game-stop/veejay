@@ -1141,6 +1141,35 @@ void	vj_el_scan_video_file( char *filename,  int *dw, int *dh, float *dfps, long
 		avhelper_close_decoder(tmp);
 	} 
 	
+	
+	char *files[1];
+    files[0] = filename;
+
+    editlist *el = vj_el_init_with_args(
+        files,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+    );
+
+    if (el) {
+		
+		if (el->num_video_files > 0) {
+            p2_wid  = el->video_width;
+            p2_hei  = el->video_height;
+            p2_fps  = el->video_fps;
+            p2_rate = el->audio_rate;
+        }
+
+        vj_el_free(el);
+	}
+
+	/*
 	lav_file_t *fd = lav_open_input_file( filename, 0 );
 	if( fd ) {
 		p2_wid = lav_video_width( fd );
@@ -1148,12 +1177,12 @@ void	vj_el_scan_video_file( char *filename,  int *dw, int *dh, float *dfps, long
 		p2_fps = lav_frame_rate( fd );
 		p2_rate = lav_audio_rate( fd );
 		lav_close(fd);
-	}
+	}*/
 	
 	*dw = (p_wid > 0) ? p_wid : p2_wid;
-    	*dh = (p_hei > 0) ? p_hei : p2_hei;
-    	*dfps = (p_fps > 0.0f) ? p_fps : p2_fps;
-    	*arate = (p_rate > 0) ? p_rate : p2_rate;
+    *dh = (p_hei > 0) ? p_hei : p2_hei;
+    *dfps = (p_fps > 0.0f) ? p_fps : p2_fps;
+    *arate = (p_rate > 0) ? p_rate : p2_rate;
 	
 	veejay_msg(VEEJAY_MSG_DEBUG, "Using video settings from first loaded video %s: %dx%d@%2.2f R=%ld", filename,*dw,*dh,*dfps, *arate);
 }
