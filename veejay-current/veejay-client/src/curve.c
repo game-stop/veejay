@@ -69,8 +69,9 @@ void   set_initial_curve( GtkWidget *curve, int fx_id, int parameter_id, int sta
 	}
 
     gtk3_curve_set_vector( curve , len, vec );
-    gtk3_curve_set_xaxis_range( curve, (gfloat) start, (gfloat) end );
-    gtk3_curve_set_yaxis_range( curve, (gfloat) min, (gfloat) max );
+    //~ gtk3_curve_set_xaxis_range( curve, (gfloat) start, (gfloat) end );
+    //~ gtk3_curve_set_yaxis_range( curve, (gfloat) min, (gfloat) max );
+    gtk3_curve_set_range( curve,  (gfloat) start, (gfloat) end, (gfloat) min, (gfloat) max );
     gtk3_curve_set_grid_resolution(curve, 16); // default grid resolution
     gtk3_curve_set_curve_type( curve, GTK3_CURVE_TYPE_LINEAR );
 
@@ -118,9 +119,8 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 		k++;
 	}
     gtk3_curve_reset( curve );
-    gtk3_curve_set_xaxis_range( curve, (gfloat) start, (gfloat) end );
-    gtk3_curve_set_yaxis_range( curve, (gfloat) min, (gfloat) max );
-    gtk3_curve_set_grid_resolution(curve, 16); // default grid resolution
+    gtk3_curve_set_range( curve, (gfloat) start, (gfloat) end, (gfloat) min, (gfloat) max );
+    gtk3_curve_set_grid_resolution( curve, 16 ); // default grid resolution
 
     gtk3_curve_set_vector( curve , len, vec );
 

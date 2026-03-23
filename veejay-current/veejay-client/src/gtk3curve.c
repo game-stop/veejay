@@ -24,8 +24,10 @@
 #include <math.h>
 
 #include <gtk/gtk.h>
+#include <vj-api.h> /* VEEJAY NEEDS to format timecode string */
 
 #include "gtk3curve.h"
+#include "utils-gtk.h" /* VEEJAY NEEDS */
 
 #ifdef DEBUG
 #define DEBUG_INFO g_print
@@ -88,6 +90,17 @@ struct _Gtk3CurvePrivate
 
   guint state                 : 1;
   guint in_curve              : 1;
+
+  gfloat yaxis_lo; /* VEEJAY NEEDS */
+  gfloat yaxis_hi; /* VEEJAY NEEDS */
+
+  gfloat xaxis_lo; /* VEEJAY NEEDS */
+  gfloat xaxis_hi; /* VEEJAY NEEDS */
+
+  gfloat last_x; /* VEEJAY NEEDS */
+  gfloat last_y; /* VEEJAY NEEDS */
+
+  gdouble  grid_resolution; /* VEEJAY NEEDS */
 };
 
 enum
@@ -353,7 +366,8 @@ gtk3_curve_init (Gtk3Curve* self)
   /* Misc */
   priv->use_bg_theme = TRUE;
   priv->cursor_type = GDK_TOP_LEFT_ARROW;
-  priv->grid_size = GTK3_CURVE_GRID_LARGE;
+  priv->grid_size = GTK3_CURVE_GRID_MICRO; /* VEEJAY NEEDS */
+  //~ priv->grid_size = GTK3_CURVE_GRID_LARGE;
   priv->height = 0;
   priv->grab_point = -1;
 
@@ -362,6 +376,15 @@ gtk3_curve_init (Gtk3Curve* self)
   priv->max_x = 1.0;
   priv->min_y = 0.0;
   priv->max_y = 1.0;
+
+  priv->last_x = 0.0f; /* VEEJAY NEEDS */
+  priv->last_y = 0.0f; /* VEEJAY NEEDS */
+  priv->xaxis_lo = 0.0f; /* VEEJAY NEEDS */
+  priv->xaxis_hi = 0.0f; /* VEEJAY NEEDS */
+  priv->yaxis_lo = 0.0f; /* VEEJAY NEEDS */
+  priv->yaxis_hi = 0.0f; /* VEEJAY NEEDS */
+
+  priv->grid_resolution = 0.0f; /* VEEJAY NEEDS */
 
   /* Default Colors */
   gtk3_curve_set_color_background_rgba (GTK_WIDGET(self), 1.0, 1.0, 1.0, 1.0);
@@ -374,10 +397,57 @@ gtk3_curve_init (Gtk3Curve* self)
   DEBUG_INFO("init [E]\n");
 }
 
+/* VEEJAY NEEDS */
+static gboolean
+gtk3_curve_mouse_scroll(GtkWidget *widget, GdkEventScroll *ev, gpointer user_data) {
+    Gtk3CurvePrivate *priv = GTK3_CURVE (widget)->priv;
+
+    GdkScrollDirection direction;
+    gboolean scroll_status = gdk_event_get_scroll_direction((GdkEvent*)ev, &direction);
+    if(scroll_status) {
+        if(direction == GDK_SCROLL_UP) {
+            priv->grid_resolution ++;
+        }
+
+        if(direction == GDK_SCROLL_DOWN) {
+            priv->grid_resolution --;
+        }
+
+        if(priv->grid_resolution < 2)
+            priv->grid_resolution = 2;
+    }
+
+    return TRUE;
+}
+
 GtkWidget *
-gtk3_curve_new()
+gtk3_curve_new(void)
 {
-  return g_object_new (GTK3_TYPE_CURVE, NULL);
+  GtkWidget *widget = g_object_new (GTK3_TYPE_CURVE, NULL);
+
+  /* VEEJAY NEEDS ---> */
+  gtk_widget_set_events( widget,
+      GDK_EXPOSURE_MASK | GDK_POINTER_MOTION_HINT_MASK | GDK_POINTER_MOTION_MASK |
+      GDK_BUTTON1_MOTION_MASK | GDK_BUTTON2_MOTION_MASK |
+      GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
+      GDK_BUTTON3_MOTION_MASK | GDK_2BUTTON_PRESS | GDK_SCROLL_MASK );
+
+  g_signal_connect(widget,"scroll-event", G_CALLBACK(gtk3_curve_mouse_scroll), NULL);
+  /* <----- VEEJAY NEEDS */
+  return widget;
+}
+
+/* VEEJAY NEEDS */
+static gfloat scale_param_value(Gtk3CurvePrivate *priv, gfloat y, gfloat hei) {
+    gfloat distance = (priv->yaxis_hi - priv->yaxis_lo);
+    gfloat r_hei = hei - (RADIUS * 2);
+    return ( distance / r_hei ) * (r_hei - y);
+}
+
+/* VEEJAY NEEDS */
+static gfloat scale_pos_value(Gtk3CurvePrivate *priv, gfloat x, gfloat wid) {
+    gfloat distance = (priv->xaxis_hi - priv->xaxis_lo) + 1;
+    return ( distance / wid ) * x;
 }
 
 static void
@@ -539,6 +609,73 @@ static void gtk3_curve_draw_line (cairo_t   *cr,
   cairo_stroke (cr);
 }
 
+/* VEEJAY NEEDS */
+static void
+gtk3_curve_draw_labels(GtkWidget *widget, cairo_t *cr, gint hei, gint wid)
+{
+  gchar text[100];
+  Gtk3CurvePrivate *priv;
+  gint              i,incr;
+  Gtk3Curve        *curve;
+  gfloat            grid;
+  cairo_text_extents_t extents;
+
+  curve = GTK3_CURVE (widget);
+  priv = curve->priv;
+  grid = priv->grid_resolution;
+
+  cairo_set_source_rgba( cr, priv->grid.red, priv->grid.green, priv->grid.blue, priv->grid.alpha);
+  cairo_select_font_face( cr, "Sans", CAIRO_FONT_SLANT_NORMAL ,CAIRO_FONT_WEIGHT_NORMAL );
+  cairo_set_font_size(cr,11);
+
+  incr = 1;
+
+  snprintf(text,sizeof(text),"%d", incr );
+  cairo_text_extents(cr,text,&extents);
+  while( ((extents.height * 2 * grid)/incr) > hei ) {
+    incr ++;
+  }
+
+  gfloat wm = wid - (RADIUS * 2);
+  gfloat hm = hei - (RADIUS * 2);
+
+  for( i = 0; i <= grid; i += incr ) {
+    gdouble x1 = i * (wm  / grid);
+    gdouble y1 = hei;
+    snprintf(text,sizeof(text),"%d",(int) (priv->xaxis_lo + scale_pos_value(priv,(gfloat)x1,(gfloat) wid)));
+    cairo_text_extents(cr,text,&extents);
+    cairo_move_to(cr, x1 - (extents.width/2), y1 );
+    cairo_show_text(cr, text);
+  }
+
+  incr = 1;
+  sprintf(text,"%d", (int)priv->xaxis_hi );
+  cairo_text_extents(cr,text,&extents);
+  while( ((extents.width * grid)/incr) > wid ) {
+    incr ++;
+  }
+
+  for( i = 0; i <= grid; i += incr ) {
+    gdouble x1 = 0.0;
+    gdouble y1 = hei - (i * (hm / grid));
+    snprintf(text,sizeof(text),"%d",(int) scale_param_value(priv,(gfloat)y1,(gfloat) hei));
+    cairo_text_extents(cr,text,&extents);
+    cairo_move_to(cr, x1, y1 + (extents.height/2) );
+    cairo_show_text(cr, text);
+  }
+
+  gfloat value = scale_param_value(priv, priv->last_y, hei);
+  gfloat position = scale_pos_value(priv, priv->last_x, wid);
+
+  char *timecode = format_selection_time( priv->xaxis_lo, priv->xaxis_lo + position );
+  snprintf(text,sizeof(text), "Value %d at position %d (%s)",(int) value, (int) position, timecode );
+  free(timecode);
+
+  cairo_move_to(cr, 36.0, 20.0 );
+  cairo_show_text(cr, text);
+
+}
+
 static gboolean
 gtk3_curve_draw (GtkWidget *widget,
                  cairo_t   *cr)
@@ -557,6 +694,7 @@ gtk3_curve_draw (GtkWidget *widget,
   priv = curve->priv;
 
   DEBUG_INFO("draw [S]\n");
+//FIXME Should not be drawn is not visible ... only widget visible test ? or draw called too often?
 
   if (!cr)
     {
@@ -583,9 +721,14 @@ gtk3_curve_draw (GtkWidget *widget,
                             0, 0,
                             allocation.width + RADIUS * 2,
                             allocation.height + RADIUS * 2);
-      gtk_style_context_get_color (style_context,
-                                   gtk_style_context_get_state (style_context),
-                                   &color);
+      /* VEEJAY NEEDS */
+      vj_gtk_context_get_color (style_context,
+                                "background-color",
+                                gtk_style_context_get_state (style_context),
+                                &color);
+      //~ gtk_style_context_get_color (style_context,
+                                   //~ gtk_style_context_get_state (style_context),
+                                   //~ &color);
       gdk_cairo_set_source_rgba (cr, &color);
     }
   else
@@ -599,24 +742,25 @@ gtk3_curve_draw (GtkWidget *widget,
   cairo_paint(cr);
 
   cairo_set_line_cap (cr, CAIRO_LINE_CAP_ROUND);
-
-  switch (priv->grid_size)
-    {
-      default:
-      case GTK3_CURVE_GRID_MICRO:
-        grid = 10.0;
-        break;
-      case GTK3_CURVE_GRID_SMALL:
-        grid = 8.0;
-        break;
-      case GTK3_CURVE_GRID_MEDIUM:
-        grid = 6.0;
-        break;
-      case GTK3_CURVE_GRID_LARGE:
-        grid = 4.0;
-      case GTK3_CURVE_GRID_XLARGE:
-        grid = 2.0;
-    }
+  /* VEEJAY NEEDS */
+  grid = priv->grid_resolution;
+  //~ switch (priv->grid_size)
+    //~ {
+      //~ default:
+      //~ case GTK3_CURVE_GRID_MICRO:
+        //~ grid = 10.0;
+        //~ break;
+      //~ case GTK3_CURVE_GRID_SMALL:
+        //~ grid = 8.0;
+        //~ break;
+      //~ case GTK3_CURVE_GRID_MEDIUM:
+        //~ grid = 6.0;
+        //~ break;
+      //~ case GTK3_CURVE_GRID_LARGE:
+        //~ grid = 4.0;
+      //~ case GTK3_CURVE_GRID_XLARGE:
+        //~ grid = 2.0;
+    //~ }
 
   gfloat wm = allocation.width - (RADIUS * 2);
   gfloat hm = allocation.height - (RADIUS * 2);
@@ -644,7 +788,12 @@ gtk3_curve_draw (GtkWidget *widget,
     }
 
   /* Draw a curve or line or set of lines */
-  for (int i=0; i<priv->curve_data.n_points; i++)
+  /* VEEJAY NEEDS --->*/
+  if(priv->grid_resolution > 0 ) {
+    /* Draw labels */
+    gtk3_curve_draw_labels(widget ,cr, allocation.height, allocation.width );
+  /* <--- VEEJAY NEEDS*/
+    for (int i=0; i<priv->curve_data.n_points; i++)
     {
       gdouble x = priv->curve_data.d_point[i].x;
       gdouble y = priv->curve_data.d_point[i].y;
@@ -663,6 +812,7 @@ gtk3_curve_draw (GtkWidget *widget,
       last_x = x;
       last_y = y;
     }
+  }  /* VEEJAY NEEDS */
 
   if (priv->curve_data.curve_type != GTK3_CURVE_TYPE_FREE)
     for (i = 0; i < priv->curve_data.n_cpoints; ++i)
@@ -766,14 +916,17 @@ gtk3_curve_leave (GtkWidget        *widget,
 static
 void gtk3_curve_get_cursor_coord(GtkWidget *widget, gint *tx, gint *ty)
 {
-  GdkSeat            *user_seat;
+  GdkDeviceManager *device_manager;
+  //~ GdkSeat            *user_seat;
   GdkDevice        *device_pointer;
   GdkDisplay       *display;
 
   /*  get the pointer position  */
   display = gtk_widget_get_display (widget);
-  user_seat = gdk_display_get_default_seat (gdk_display_get_default ());
- device_pointer = gdk_seat_get_pointer (user_seat);
+  device_manager = gdk_display_get_device_manager (display);
+  device_pointer = gdk_device_manager_get_client_pointer (device_manager);
+  //~ user_seat = gdk_display_get_default_seat (gdk_display_get_default ());
+ //~ device_pointer = gdk_seat_get_pointer (user_seat);
   gdk_window_get_device_position (gtk_widget_get_window (widget),
                                   device_pointer,
                                   tx, ty, NULL);
@@ -1023,6 +1176,9 @@ gtk3_curve_motion_notify (GtkWidget        *widget,
         }
     }
 
+  priv->last_x = (gfloat) x;
+  priv->last_y = (gfloat) y;
+
   switch (priv->curve_data.curve_type)
     {
     default:
@@ -1133,6 +1289,8 @@ gtk3_curve_motion_notify (GtkWidget        *widget,
     }
 
   DEBUG_INFO("motion_notify [E]\n");
+
+  return TRUE;
 }
 
 static void
@@ -1255,22 +1413,28 @@ gtk3_curve_size_graph (Gtk3Curve *curve)
   GdkRectangle geom;
   gint width, height;
   gfloat aspect;
-  
-  GdkWindow *gdk_window = gtk_widget_get_window(GTK_WIDGET (curve));
-  GdkDisplay *gdk_display = gdk_window_get_display(gdk_window);
-  GdkMonitor *monitor = gdk_display_get_primary_monitor(gdk_display);
-  gdk_monitor_get_geometry(monitor, &geom);
+
+  GdkScreen *screen = gtk_widget_get_screen (GTK_WIDGET (curve));
+
+  //~ GdkWindow *gdk_window = gtk_widget_get_window(GTK_WIDGET (curve)); // assertion 'GDK_IS_WINDOW (window)' failed
+  //~ GdkDisplay *gdk_display = gdk_window_get_display(gdk_window); // assertion 'GDK_IS_display (window)' failed
+  //~ GdkMonitor *monitor = gdk_display_get_primary_monitor(gdk_display); // assertion 'GDK_IS_monitor (window)' failed
+  //~ gdk_monitor_get_geometry(monitor, &geom);
 
   width  = (priv->max_x - priv->min_x);
   height = (priv->max_y - priv->min_y);
   aspect = width / (gfloat) height;
-  if (width > geom.width / 4)
+  if (width > gdk_screen_get_width (screen) / 4)
+  //~ if (width > geom.width / 4)
     {
-      width  = geom.width / 4;
+      width  = gdk_screen_get_width (screen) / 4;
+      //~ width  = geom.width / 4;
     }
-  if (height > geom.height / 4)
+  if (height > gdk_screen_get_height (screen) / 4)
+  //~ if (height > geom.height / 4)
     {
-      height = geom.height / 4;
+      height = gdk_screen_get_height (screen) / 4;
+      //~ height = geom.height / 4;
     }
 
   if (aspect < 1.0)
@@ -1485,6 +1649,36 @@ gtk3_curve_set_gamma (GtkWidget *widget, gfloat gamma)
     }
 }
 
+/* VEEJAY NEEDS */
+void
+gtk3_curve_set_x_lo (GtkWidget *widget,
+                      gfloat    min_x)
+{
+    Gtk3Curve *curve = GTK3_CURVE(widget);
+    Gtk3CurvePrivate *priv = curve->priv;
+    priv->xaxis_lo = min_x;
+    //~ if (gtk_widget_is_visible (widget))
+    //~ {
+      //~ gtk_widget_queue_draw (widget);
+    //~ }
+    gtk3_curve_set_range (widget, min_x, priv->max_x, priv->min_y, priv->max_y);
+}
+
+/* VEEJAY NEEDS */
+void
+gtk3_curve_set_x_hi (GtkWidget *widget,
+                      gfloat    max_x)
+{
+    Gtk3Curve *curve = GTK3_CURVE(widget);
+    Gtk3CurvePrivate *priv = curve->priv;
+    priv->xaxis_hi = max_x;
+    //~ if (gtk_widget_is_visible (widget))
+    //~ {
+      //~ gtk_widget_queue_draw (widget);
+    //~ }
+    gtk3_curve_set_range (widget, priv->min_x, max_x, priv->min_y, priv->max_y);
+}
+
 void
 gtk3_curve_set_range (GtkWidget *widget,
                       gfloat    min_x,
@@ -1663,10 +1857,13 @@ gtk3_curve_set_vector (GtkWidget *widget, int veclen, gfloat vector[])
   GdkRectangle geom;
   gfloat rx, dx, ry;
   gint i, height;
-  GdkWindow *gdk_window = gtk_widget_get_window(GTK_WIDGET (curve));
-  GdkDisplay *gdk_display = gdk_window_get_display(gdk_window);
-  GdkMonitor *monitor = gdk_display_get_primary_monitor(gdk_display);
-  gdk_monitor_get_geometry(monitor, &geom);
+
+  GdkScreen *screen = gtk_widget_get_screen (GTK_WIDGET (curve));
+
+  //~ GdkWindow *gdk_window = gtk_widget_get_window(GTK_WIDGET (curve)); // assertion 'GDK_IS_WINDOW (window)' failed
+  //~ GdkDisplay *gdk_display = gdk_window_get_display(gdk_window); //assertion 'GDK_IS_DISPLAY ' failed
+  //~ GdkMonitor *monitor = gdk_display_get_primary_monitor(gdk_display); //assertion 'GDK_IS_MONITOR ' failed
+  //~ gdk_monitor_get_geometry(monitor, &geom);
 
 
   old_type = priv->curve_data.curve_type;
@@ -1677,8 +1874,10 @@ gtk3_curve_set_vector (GtkWidget *widget, int veclen, gfloat vector[])
   else
     {
       height = (priv->max_y - priv->min_y);
-      if (height >geom.height / 4)
-        height = geom.height / 4;
+      if (height > gdk_screen_get_height (screen) / 4)
+        height = gdk_screen_get_height (screen) / 4;
+      //~ if (height >geom.height / 4)
+        //~ height = geom.height / 4;
 
       priv->height = height;
       priv->curve_data.n_points = veclen;
@@ -1771,6 +1970,16 @@ gtk3_curve_set_curve_type (GtkWidget *widget, Gtk3CurveType new_type)
           DEBUG_INFO("queue draw\n");
           gtk_widget_queue_draw (GTK_WIDGET (curve));
         }
+    }
+}
+
+void gtk3_curve_set_grid_resolution(GtkWidget *widget, gint grid_resolution) {
+    Gtk3Curve *curve = GTK3_CURVE(widget);
+    Gtk3CurvePrivate *priv = curve->priv;
+    priv->grid_resolution = grid_resolution;
+    if (gtk_widget_is_visible (widget))
+    {
+      gtk_widget_queue_draw (widget);
     }
 }
 
@@ -1972,6 +2181,13 @@ gtk3_curve_reset (GtkWidget *widget)
 
   old_type = priv->curve_data.curve_type;
   priv->curve_data.curve_type = GTK3_CURVE_TYPE_SPLINE;
+/* VEEJAY NEEDS ---> */
+  priv->grid_resolution = 0;
+  priv->xaxis_lo = 0.0f;
+  priv->xaxis_hi = 1.0f;
+  priv->yaxis_lo = 0.0f;
+  priv->yaxis_hi = 1.0f;
+ /* <--- VEEJAY NEEDS */
   gtk3_curve_reset_vector (widget);
 
   if (old_type != GTK3_CURVE_TYPE_SPLINE)
