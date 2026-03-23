@@ -176,7 +176,7 @@ static void veejay_free_frame_buffer(VJFrame *f) {
 }
 
 static	VJFrame *veejay_allocate_frame_buffer(veejay_t *info) {
-	VJFrame *buf = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
+	VJFrame *buf = yuv_yuv_template( NULL,NULL,NULL, info->video_output_width, info->video_output_height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
 	buf->fps = info->settings->output_fps;
 	
 	size_t len = sizeof(uint8_t) * ( buf->len + buf->uv_len + buf->uv_len);
@@ -764,6 +764,13 @@ int veejay_init_editlist(veejay_t * info)
     {
  		settings->spas = 0.0;
     }
+
+	if(info->video_output_height == 0 && info->video_output_width == 0) {
+		info->video_output_width = el->video_width;
+		info->video_output_height = el->video_height;
+		veejay_msg(VEEJAY_MSG_WARNING, "Output dimensions not setup, using video resolution %dx%d", el->video_width, el->video_height);
+	}
+
     return 0;
 }
 
@@ -1828,7 +1835,7 @@ int veejay_setup_video_out(veejay_t *info) {
 
 			title = veejay_title( info );
 
-			if (!vj_sdl_init(info->sdl, x,y,info->bes_width, info->bes_height, title,1,info->settings->full_screen,info->pixel_format,el->video_fps, &settings->vsync_interval_s))
+			if (!vj_sdl_init(info->sdl, x,y,info->video_output_width, info->video_output_height, info->bes_width, info->bes_height, title,1,info->settings->full_screen,info->pixel_format,el->video_fps, &settings->vsync_interval_s))
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "Error initializing SDL");
 				free(title);
@@ -1859,7 +1866,7 @@ int veejay_setup_video_out(veejay_t *info) {
 				return -1;
 
 			title = veejay_title(info);	
-			if (!vj_sdl_init(info->sdl,x,y, info->bes_width, info->bes_height,title,1,info->settings->full_screen,info->pixel_format, el->video_fps, &settings->vsync_interval_s)) {
+			if (!vj_sdl_init(info->sdl,x,y,info->video_output_width, info->video_output_height, info->bes_width, info->bes_height,title,1,info->settings->full_screen,info->pixel_format, el->video_fps, &settings->vsync_interval_s)) {
 				free(title);
 				return -1;
 			}
@@ -2362,7 +2369,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		if(sample_readFromFile( info->settings->action_scheduler.sl,
 		                       info->composite,
 		                       info->seq, info->font, el, &(info->uc->sample_id), &(info->uc->playback_mode) ) )
-			veejay_msg(VEEJAY_MSG_INFO, "Loaded sample list %s from actionfile - ",
+			veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s from actionfile - ",
 			           info->settings->action_scheduler.sl );
 	}
 
@@ -4180,10 +4187,16 @@ static int configure_dummy_defaults(veejay_t *info, char override_norm, float fp
 			dh = in_h;
 
 		default_norm = (override_norm == '\0' ? veejay_get_norm(vj_el_get_default_norm(tmp_fps)) : veejay_get_norm(override_norm));
-        	dw = (dw / 8) * 8;
-        	dh = (dh / 8) * 8;
+        
+		//dw = (dw / 8) * 8;
+        //dh = (dh / 8) * 8;
 
 		veejay_msg(VEEJAY_MSG_DEBUG, "Video input source is: %dx%d %2.2f fps norm %d",in_w,in_h,tmp_fps, default_norm);
+
+		if( in_w <= 0 || in_h <= 0) {
+			return 0;
+		}
+
 	} 
 
 	if( info->video_output_width <= 0 ) 
@@ -4269,21 +4282,23 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	else
 		veejay_msg(VEEJAY_MSG_DEBUG, "Processing set to YUV %s", text );
 
-	if(!configure_dummy_defaults(info,override_norm, ofps,files,num_files))
+	if(!configure_dummy_defaults(info,override_norm, ofps,files,num_files)) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Failed to setup video dimensions (did we load any video file ?)");
 		return 0;
+	}
 
-	vj_el_init( info->pixel_format, switch_jpeg, info->dummy->width,info->dummy->height, info->dummy->fps );
+	vj_el_init( info->pixel_format, switch_jpeg, info->video_output_width,info->video_output_height, info->dummy->fps );
 #ifdef USE_GDK_PIXBUF	
     vj_picture_init( &(info->settings->sws_templ));
 #endif
 
-	info->effect_frame1 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
+	info->effect_frame1 = yuv_yuv_template( NULL,NULL,NULL, info->video_output_width, info->video_output_height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
 	info->effect_frame1->fps = info->settings->output_fps;
-	info->effect_frame2 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
+	info->effect_frame2 = yuv_yuv_template( NULL,NULL,NULL, info->video_output_width, info->video_output_height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
 	info->effect_frame2->fps = info->settings->output_fps;
-	info->effect_frame3 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
+	info->effect_frame3 = yuv_yuv_template( NULL,NULL,NULL, info->video_output_width, info->video_output_height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
 	info->effect_frame3->fps = info->settings->output_fps;
-	info->effect_frame4 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
+	info->effect_frame4 = yuv_yuv_template( NULL,NULL,NULL, info->video_output_width, info->video_output_height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
 	info->effect_frame4->fps = info->settings->output_fps;
 
 	veejay_msg(VEEJAY_MSG_DEBUG,"Performer is working in %s (%d)", yuv_get_pixfmt_description(info->effect_frame1->format), info->effect_frame1->format);

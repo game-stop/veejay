@@ -1121,10 +1121,11 @@ void    vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *arg
     int flags = vj_event_vevo_get_flags( net_id );
     int fmt_offset = 1; 
     vims_arg_t  vims_arguments[MAX_VIMS_ARGUMENTS];
-
+/*
 #ifdef VALIDATE_VIMS
     veejay_msg(VEEJAY_MSG_DEBUG, "Received VIMS event %d", net_id);
 #endif
+*/
     veejay_memset(vims_arguments, 0, sizeof(vims_arguments));
 
     if(!vj_event_verify_args(args , net_id, arglen, np, prefixed, fmt ))
@@ -4383,7 +4384,7 @@ void vj_event_sample_load_list(void *ptr, const char format[], va_list ap)
     
     if( sample_readFromFile( str, v->composite,v->seq, v->font, v->edit_list,&id, &mode ) ) 
     {
-        veejay_msg(VEEJAY_MSG_INFO, "Loaded sample list from file '%s'", str);
+        veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist from file '%s'", str);
     }
     else
     {

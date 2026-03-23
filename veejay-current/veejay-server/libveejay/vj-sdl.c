@@ -159,7 +159,7 @@ void vj_sdl_get_position( void *ptr, int *x, int *y )
     *y = vjsdl->y;
 }
 
-int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, char *caption, int show, int fs, int vjfmt, float fps, double *vsync)
+int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int scaled_width, int scaled_height, char *caption, int show, int fs, int vjfmt, float fps, double *vsync)
 {
     vj_sdl *vjsdl = (vj_sdl*) ptr;
 	int i = 0;
@@ -180,6 +180,10 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
     if( y >=0 ) {
         vjsdl->y = y;
     }
+
+    vjsdl->width = input_width;
+    vjsdl->height = input_height;
+
 
     if( caption )
         vjsdl->caption = strdup(caption);
@@ -358,6 +362,8 @@ void	vj_sdl_grab(void *ptr, int status)
 void vj_sdl_put_to_screen(void *ptr, uint8_t *pixels_to_render)
 {
     vj_sdl *vjsdl = (vj_sdl*) ptr;
+    if(!vjsdl)
+        return;
 
     if( SDL_UpdateTexture( vjsdl->texture, NULL, pixels_to_render, vjsdl->width * 2 ) != 0 ) {
         veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] %s" , SDL_GetError());
@@ -406,6 +412,8 @@ void vj_sdl_convert_to_screen(void *ptr, VJFrame *frame_to_dsplay, uint8_t *pixe
 
 uint8_t* vj_sdl_get_buffer( void *ptr, int index ) {
     vj_sdl *vjsdl = (vj_sdl*) ptr;
+    if(!vjsdl)
+        return NULL;
     return vjsdl->buf[index];
 }
 

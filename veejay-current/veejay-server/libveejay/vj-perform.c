@@ -2520,7 +2520,8 @@ static void vj_perform_render_chain_entry(veejay_t *info,performer_t *p, vjp_kf 
 
 }
 
-static void vj_perform_sample_complete_buffers(veejay_t * info,performer_t *p, vjp_kf *effect_info, int *hint444, VJFrame *f0, VJFrame *f1, int sample_id, int pm, vjp_kf *setup, sample_eff_chain **chain, sample_info *si)
+static void vj_perform_sample_complete_buffers(veejay_t * info,performer_t *p, vjp_kf *effect_info, int *hint444, 
+    VJFrame *f0, VJFrame *f1, int sample_id, int pm, vjp_kf *setup, sample_eff_chain **chain, sample_info *si)
 {
     if(info->uc->sample_id == info->global_chain->origin_id && info->uc->playback_mode == info->global_chain->origin_mode && chain == info->global_chain->fx_chain)
         return; // already rendered
@@ -4880,7 +4881,6 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
     if(!transition_enabled) {
         vj_perform_render_video_frames(info, g->A, info->effect_info, info->uc->sample_id, info->uc->playback_mode, info->effect_frame1, info->effect_frame2, info->effect_frame_info, info->effect_info );
         vj_perform_try_sequence(info);
-        
     }
     else
     {
@@ -5040,7 +5040,6 @@ void vj_perform_inc_frame(veejay_t *info, int num)
     }
 
     if (cur_dir != prev_dir) {
-        veejay_msg(0, "Direction changed from %d → %d", prev_dir, next_dir);
         atomic_store_int(&settings->audio_direction_changed, 1);
     }
 
