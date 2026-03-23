@@ -544,7 +544,7 @@ JACK_OpenDevice(jack_driver_t *drv)
   if ((drv->client = jack_client_open(our_client_name, JackNullOption | JackNoStartServer, &status)) == 0)
 #endif
   {
-    DEBUG("trying once more to jack_client_new");
+    /*DEBUG("trying once more to jack_client_new");
 #ifndef HAVE_JACK2
     if ((drv->client = jack_client_new(our_client_name)) == 0)
 #else
@@ -553,9 +553,10 @@ JACK_OpenDevice(jack_driver_t *drv)
     {
       veejay_msg(0, "[AUDIO] Failed to connect with jack, status: %d", status);
 
-      free(our_client_name);
-      return ERR_OPENING_JACK;
-    }
+      
+    }*/
+    free(our_client_name);
+    return ERR_OPENING_JACK;
   }
 
   free(our_client_name);
