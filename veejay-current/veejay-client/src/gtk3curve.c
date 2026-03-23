@@ -245,7 +245,6 @@ gtk3_curve_type_get_type (void)
 static void
 gtk3_curve_class_init (Gtk3CurveClass* klass)
 {
-  GtkContainerClass *container_class;
   GObjectClass *gobject_class;
   GtkWidgetClass *widget_class;
 
@@ -468,7 +467,6 @@ static void
 gtk3_curve_realize (GtkWidget *widget)
 {
   GtkAllocation allocation;
-  GdkWindow *window;
   GdkWindow *parent_window;
   GdkWindowAttr attributes;
   gint attributes_mask;
@@ -682,7 +680,6 @@ gtk3_curve_draw (GtkWidget *widget,
 {
   Gtk3CurvePrivate *priv;
   GtkStyleContext  *style_context;
-  GtkStyle         *style;
   GdkRGBA           color;
   gint              last_x, last_y;
   gint              i;
@@ -941,7 +938,7 @@ gtk3_curve_button_press (GtkWidget        *widget,
   GtkAllocation     allocation;
   gint              cx, x, y, width, height, i;
   gint              closest_point = 0;
-  gfloat            rx, ry, min_x;
+  gfloat            min_x;
   gint              tx, ty;
   guint             distance;
 
@@ -1037,11 +1034,11 @@ gtk3_curve_button_release (GtkWidget        *widget,
   Gtk3CurvePrivate *priv = GTK3_CURVE (widget)->priv;
   GtkAllocation     allocation;
   GdkCursorType     new_type = priv->cursor_type;
-  gint              src, dst, cx, x, y, width, height, i;
-  gfloat            rx, ry, min_x;
-  gint              closest_point = 0;
-  guint             distance;
-  gint              tx, ty;
+  gint              src, dst, width, height;
+  gfloat            min_x;
+  //~ gint              closest_point = 0; # not used
+  //~ guint             distance; # not used
+  //~ gint              tx, ty; # not used
 
   DEBUG_INFO("button release [S]\n");
 
@@ -1056,27 +1053,27 @@ gtk3_curve_button_release (GtkWidget        *widget,
     return FALSE;
 
   /*  get the pointer position  */
-  gtk3_curve_get_cursor_coord (widget, &tx, &ty);
-  x = CLAMP ((tx - RADIUS), 0, width - 1);
-  y = CLAMP ((ty - RADIUS), 0, height - 1);
+  //~ gtk3_curve_get_cursor_coord (widget, &tx, &ty);
+  //~ x = CLAMP ((tx - RADIUS), 0, width - 1);
+  //~ y = CLAMP ((ty - RADIUS), 0, height - 1);
 
-  DEBUG_INFO("release : xy[%dx%d] txy[%dx%d]\n",
-              x, y,
-              tx, ty);
+  //~ DEBUG_INFO("release : xy[%dx%d] txy[%dx%d]\n",
+              //~ x, y,
+              //~ tx, ty);
 
   min_x = priv->min_x;
 
-  distance = ~0U;
-  for (i = 0; i < priv->curve_data.n_cpoints; ++i)
-    {
-      cx = project (priv->curve_data.d_cpoints[i].x,
-                    min_x, priv->max_x, width);
-      if ((guint) abs (x - cx) < distance)
-        {
-          distance = abs (x - cx);
-          closest_point = i;
-        }
-    }
+  //~ distance = ~0U; # not used
+  //~ for (i = 0; i < priv->curve_data.n_cpoints; ++i)
+    //~ {
+      //~ cx = project (priv->curve_data.d_cpoints[i].x,
+                    //~ min_x, priv->max_x, width);
+      //~ if ((guint) abs (x - cx) < distance)
+        //~ {
+          //~ distance = abs (x - cx); ##
+          //~ closest_point = i; ## ALL THAT PROCESS BUT distance and closest_point are not used after this part
+        //~ }
+    //~ }
 
   /* delete inactive points: */
   if (priv->curve_data.curve_type != GTK3_CURVE_TYPE_FREE)
@@ -1132,15 +1129,14 @@ gtk3_curve_motion_notify (GtkWidget        *widget,
   Gtk3CurvePrivate *priv = GTK3_CURVE (widget)->priv;
   GtkAllocation     allocation;
   GdkCursorType     new_type = priv->cursor_type;
-  gint              i, src, dst, leftbound, rightbound;
+  gint              i, leftbound, rightbound;
   GdkEventMotion   *mevent;
-  gint              tx, ty, h,w;
+  gint              tx, ty;
   gint              cx, x, y, width, height;
-  gint              closest_point = 0;
+  //~ gint              closest_point = 0; # not used
   gfloat            rx, ry, min_x;
   guint             distance;
   gint              x1, x2, y1, y2;
-  gint              retval = FALSE;
 
   DEBUG_INFO("motion_notify [S]\n");
   mevent = (GdkEventMotion *) event;
@@ -1172,7 +1168,7 @@ gtk3_curve_motion_notify (GtkWidget        *widget,
       if ((guint) abs (x - cx) < distance)
         {
           distance = abs (x - cx);
-          closest_point = i;
+          //~ closest_point = i;  # not used
         }
     }
 
@@ -1305,7 +1301,6 @@ gtk3_curve_screen_changed (GtkWidget *widget,
 static void
 gtk3_curve_dispose (GObject *object)
 {
-  Gtk3CurvePrivate *priv = GTK3_CURVE (object)->priv;
   G_OBJECT_CLASS (gtk3_curve_parent_class)->dispose (object);
 }
 
@@ -1410,7 +1405,7 @@ static void
 gtk3_curve_size_graph (Gtk3Curve *curve)
 {
   Gtk3CurvePrivate *priv = curve->priv;
-  GdkRectangle geom;
+  //~ GdkRectangle geom;
   gint width, height;
   gfloat aspect;
 
@@ -1454,8 +1449,6 @@ gtk3_curve_size_graph (Gtk3Curve *curve)
 static void
 gtk3_curve_create_layouts (GtkWidget *widget)
 {
-  Gtk3Curve *curve = GTK3_CURVE (widget);
-  Gtk3CurvePrivate *priv = curve->priv;
   DEBUG_INFO("create pango [S]\n");
   DEBUG_INFO("create pango [E]\n");
 }
@@ -1854,7 +1847,7 @@ gtk3_curve_set_vector (GtkWidget *widget, int veclen, gfloat vector[])
   Gtk3Curve *curve = GTK3_CURVE (widget);
   Gtk3CurvePrivate *priv = curve->priv;
   Gtk3CurveType old_type;
-  GdkRectangle geom;
+  //~ GdkRectangle geom;
   gfloat rx, dx, ry;
   gint i, height;
 
@@ -2206,4 +2199,6 @@ gtk3_curve_save(Gtk3CurveData *data, gchar *filename) {
 Gtk3CurveData
 gtk3_curve_load(gchar *filename) {
   // TODO - add code here
+  Gtk3CurveData empty={};
+  return empty;
 }
