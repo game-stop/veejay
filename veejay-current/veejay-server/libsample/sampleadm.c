@@ -976,6 +976,73 @@ int sample_verify_delete( int sample_id, int sample_type )
     return 1;
 }
 
+
+void sample_sanity_scan(void) {
+    
+    hscan_t hs;
+    hnode_t *node;
+
+    hash_scan_begin(&hs, SampleHash);
+
+    while ((node = hash_scan_next(&hs))) {
+        sample_info *sample = (sample_info*) hnode_get(node);
+        if(!sample)
+            continue;
+
+        for(int i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
+            if (!sample->effect_chain[i])
+                continue;
+            int pm = sample->effect_chain[i]->source_type;
+            int using_id = sample->effect_chain[i]->channel;
+            
+            if( pm == 0 ) {
+                if(!sample_exists(using_id)) {
+                    sample->effect_chain[i]->channel = sample->sample_id;
+                }
+            }
+            else {
+                if(!vj_tag_exists(using_id)) {
+                    int any_tag = vj_tag_get_last_tag();
+                    if(any_tag == 0) {
+                        sample->effect_chain[i]->source_type = 0;
+                        sample->effect_chain[i]->channel = sample->sample_id;
+                    }
+                    else {
+                        sample->effect_chain[i]->channel = any_tag;
+                    }
+                }
+            }
+
+        }    
+    }
+}
+
+
+int sample_find_refs_and_delete(int source_type, int id) {
+    
+    hscan_t hs;
+    hnode_t *node;
+
+    hash_scan_begin(&hs, SampleHash);
+
+    while ((node = hash_scan_next(&hs))) {
+        sample_info *sample = (sample_info*) hnode_get(node);
+        if(!sample)
+            continue;
+
+        for(int i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
+            if (!sample->effect_chain[i])
+                continue;
+            int pm = sample->effect_chain[i]->source_type;
+            int using_id = sample->effect_chain[i]->channel; // FIXME
+            if( source_type == pm && using_id == id ) {
+                sample->effect_chain[i]->channel = sample->sample_id; // point to self!
+            }
+        }
+    }
+}
+
+
 static void sample_del_internal(sample_info *si)
 {
     if (!si) return;
@@ -1025,6 +1092,9 @@ int sample_del(int sample_id)
 {
     sample_info *si = sample_get(sample_id);
     if (!si) return 0;
+
+    vj_tag_find_refs_and_delete(0, sample_id);
+    sample_find_refs_and_delete(0, sample_id);
 
     hnode_t *node = hash_lookup(SampleHash, sample_key(sample_id));
     if (node) {
@@ -3013,6 +3083,10 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
     }
 
     cur = cur->xmlChildrenNode;
+
+    int desired_pm = -1;
+    int desired_id = -1;
+
     while (cur != NULL)
     {
         if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLE)) {
@@ -3033,7 +3107,7 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
         }
 
         if( !xmlStrcmp( cur->name, (const xmlChar*) "CURRENT" )) {
-            LoadCurrentPlaying( doc, cur->xmlChildrenNode, id, mode );
+            LoadCurrentPlaying( doc, cur->xmlChildrenNode, &desired_id, &desired_pm );
         }
 
         if( !xmlStrcmp( cur->name, (const xmlChar *) "SEQUENCE" )) {
@@ -3044,10 +3118,26 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
             tagParseStreamFX( sampleFile, doc, cur->xmlChildrenNode, font,vp );
         }
 
-	cur = cur->next;
+	    cur = cur->next;
+    }
+
+    if(desired_id > 0 && desired_pm >= 0) {
+        if(desired_pm == 0 && sample_exists(desired_id)) {
+            *id = desired_id;
+            *mode = desired_pm;
+        }
+        else if ( desired_pm > 0 && vj_tag_exists(desired_id)) {
+            *id = desired_id;
+            *mode = desired_pm;
+        }
+        //TODO: Error some error message
     }
 
     xmlFreeDoc(doc);
+
+    sample_sanity_scan();
+    vj_tag_sanity_scan();
+
 
     return 1;
 }

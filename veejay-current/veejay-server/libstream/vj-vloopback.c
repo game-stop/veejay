@@ -78,6 +78,21 @@ static struct {
 	{ 0, NULL },
 };
 
+static const char *v4l2_pixfmt_to_string(uint32_t fmt)
+{
+	switch(fmt) {
+		case V4L2_PIX_FMT_YUYV: return "YUYV";
+		case V4L2_PIX_FMT_UYVY: return "UYVY";
+		case V4L2_PIX_FMT_RGB24: return "RGB24";
+		case V4L2_PIX_FMT_BGR24: return "BGR24";
+		case V4L2_PIX_FMT_RGB32: return "RGB32";
+		case V4L2_PIX_FMT_BGR32: return "BGR32";
+		case V4L2_PIX_FMT_YUV420: return "YUV420";
+		case V4L2_PIX_FMT_YUV422P: return "YUV422P";
+		default: return "UNKNOWN";
+	}
+}
+
 int vj_vloopback_get_pixfmt( int v ) 
 {
 	if( v >= 0 && v <= 11 )
@@ -120,9 +135,16 @@ static int vj_vloopback_set_format( vj_vloopback_t *v, int dst_w, int dst_h, int
 	format.fmt.pix.height= dst_h;
 	format.fmt.pix.pixelformat = dst_v4l2_format;
 	format.fmt.pix.field = V4L2_FIELD_NONE;
-	format.fmt.pix.bytesperline = dst_stride;
+	format.fmt.pix.bytesperline = 0; // let driver decide
 	format.fmt.pix.colorspace = (v->jfif == 1 ? V4L2_COLORSPACE_JPEG : V4L2_COLORSPACE_SMPTE170M );
 	
+	veejay_msg(VEEJAY_MSG_DEBUG,
+		"vloop: VIDIOC_S_FMT request: %dx%d %s stride=%d",
+		dst_w,
+		dst_h,
+		v4l2_pixfmt_to_string(dst_v4l2_format),
+		dst_stride);
+
 	int res = ioctl( v->fd, VIDIOC_S_FMT, &format );
 	if( res < 0 )
 	{
@@ -145,11 +167,13 @@ static int vj_vloopback_set_format( vj_vloopback_t *v, int dst_w, int dst_h, int
 	}
 
 	v->size = format.fmt.pix.sizeimage; 
+	if (v->size <= 0)
+		v->size = dst_stride * dst_h;  // fallback
 
 	struct v4l2_streamparm sfps;
 	veejay_memset(&sfps,0,sizeof(sfps));
 
-	sfps.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	sfps.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
 	sfps.parm.capture.timeperframe.numerator= ( v->fps == 29.97f ? 1001 : 1 );
 	sfps.parm.capture.timeperframe.denominator=( v->fps == 29.97f ? 30000 : (int)(v->fps));
 
@@ -158,6 +182,21 @@ static int vj_vloopback_set_format( vj_vloopback_t *v, int dst_w, int dst_h, int
 		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: VIDIOC_S_PARM fails with:%s", strerror(errno) );
 		return -1;
 	}
+
+	veejay_msg(VEEJAY_MSG_INFO,
+		"vloop: negotiated format: %dx%d %s sizeimage=%u bytesperline=%u",
+		format.fmt.pix.width,
+		format.fmt.pix.height,
+		v4l2_pixfmt_to_string(format.fmt.pix.pixelformat),
+		format.fmt.pix.sizeimage,
+		format.fmt.pix.bytesperline);
+
+	if (format.fmt.pix.pixelformat != dst_v4l2_format) {
+		veejay_msg(VEEJAY_MSG_WARNING,
+			"vloop: driver changed pixel format from %s to %s",
+			v4l2_pixfmt_to_string(dst_v4l2_format),
+			v4l2_pixfmt_to_string(format.fmt.pix.pixelformat));
+}
 
 	return 1;
 #else
@@ -204,7 +243,12 @@ static void vj_vloopback_setup_ptrs( uint8_t *buf, uint8_t *planes[4], int pixfm
 	if( uv_width > 0 && uv_height > 0 ) {
 		planes[1] = planes[0] + (w * h);
 		planes[2] = planes[1] + (uv_width * uv_height);
-		planes[3] = planes[2] + (uv_width * uv_height);
+		if (pixfmt == PIX_FMT_YUVA420P ||
+			pixfmt == PIX_FMT_YUVA422P ||
+			pixfmt == PIX_FMT_YUVA444P)
+		{
+			planes[3] = planes[2] + (uv_width * uv_height);
+		}
 	}		
 }
 
@@ -302,8 +346,16 @@ void *vj_vloopback_open(const char *device_name, VJFrame *src, int dst_w, int ds
 		}
 	}
 
-
 	VJFrame *tmp = yuv_yuv_template( NULL,NULL,NULL, dst_v4l2_w, dst_v4l2_h, v4l2_pixelformat2ffmpeg(dst_v4l2_format) );
+
+	veejay_msg(VEEJAY_MSG_DEBUG,
+		"vloop: Request format %dx%d %s (0x%x), fps=%.3f",
+		dst_v4l2_w,
+		dst_v4l2_h,
+		v4l2_pixfmt_to_string(dst_v4l2_format),
+		dst_v4l2_format,
+		v->fps);
+
 	if( vj_vloopback_set_format(v, dst_v4l2_w, dst_v4l2_h, dst_v4l2_format, tmp->stride[0] ) == 0 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "vloop: Unable to set video format to %dx%d in %d", dst_v4l2_w,dst_v4l2_h, dst_v4l2_format );
 		vj_vloopback_close(v);
@@ -344,9 +396,13 @@ void *vj_vloopback_open(const char *device_name, VJFrame *src, int dst_w, int ds
 		no_conv = 1;
 
 	if( no_conv ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "vloop: direct write (no colorspace conversion)");
+		veejay_msg(VEEJAY_MSG_DEBUG, "vloop: direct path (no conversion)");
+	} else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "vloop: enabling scaler %dx%d (%x) -> %dx%d (%x)",
+			src->width, src->height, src->format,
+			dst_v4l2_w, dst_v4l2_h,
+			v4l2_pixelformat2ffmpeg(dst_v4l2_format));
 	}
-
 	
 	if( no_conv == 0 ) {
 		v->scaler = yuv_init_swscaler( v->src1,v->dst1,&tmpl,yuv_sws_get_cpu_flags() );
@@ -360,6 +416,14 @@ void *vj_vloopback_open(const char *device_name, VJFrame *src, int dst_w, int ds
 		}
 	}
 
+	veejay_msg(VEEJAY_MSG_DEBUG,
+		"vloop: ready -> %s %dx%d %s @ %.3f fps",
+		v->dev_name,
+		dst_v4l2_w,
+		dst_v4l2_h,
+		v4l2_pixfmt_to_string(dst_v4l2_format),
+		v->fps);
+
 	return (void*) v;
 #else
 	return NULL;
@@ -372,15 +436,15 @@ int	vj_vloopback_write( void *vloop  )
 	if(!v) 
 		return 0;
 
-	int res = write( v->fd, v->dst1->data[0],v->size );
-	if( res < 0 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to write to vloopback device: %s", strerror(errno));
-		return 0;
+	ssize_t total = 0;
+	while (total < v->size) {
+		ssize_t n = write(v->fd, v->dst1->data[0] + total, v->size - total);
+		if (n <= 0) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to write to vloopback device: %s", strerror(errno));
+			return 0;
+		}
+		total += n;
 	}
- 
-	if(res <= 0) 
-		return 0;
 	
 	return 1;
 }

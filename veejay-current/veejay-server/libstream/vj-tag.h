@@ -182,6 +182,8 @@ int 	vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 
 /* return 1 if tag exists , 0 otherwise*/
 int 	vj_tag_exists(int id);
+void vj_tag_sanity_scan(void);
+int vj_tag_find_refs_and_delete(int source_type, int id);
 
 /* return 1 if tag gets deleted, 0 on error */
 int 	vj_tag_del(int id);

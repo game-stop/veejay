@@ -361,12 +361,11 @@ int	v4l2_ffmpeg2v4l2( int pf)
 		case PIX_FMT_YUVJ444P:
 		case PIX_FMT_YUV444P:
 		case PIX_FMT_YUVA444P:
-			return V4L2_PIX_FMT_YUV32;
+			return V4L2_PIX_FMT_YUV444;
 
 		default:
 			return V4L2_PIX_FMT_BGR24;
 	}
-	return V4L2_PIX_FMT_BGR24;
 }
 
 static	int	v4l2_set_framerate( v4l2info *v , float fps ) 
@@ -517,6 +516,7 @@ static	int	v4l2_tryout_pixel_format( v4l2info *v, int pf, int w, int h, int *src
 */
 	if( vioctl( v->fd, VIDIOC_G_FMT, &format ) == -1 ) {
 		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: VIDIOC_G_FMT failed with %s", strerror(errno));
+		format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	}
 
 	format.fmt.pix.width = w;
@@ -662,6 +662,11 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 			prefer_jpeg = val;
 		}
 	}
+
+	if( strstr(v->capability.driver, "uvcvideo")) {
+		veejay_msg(VEEJAY_MSG_INFO, "v4l2: Defaulting to MJPEG for UVC webcams");
+		prefer_jpeg = 1;
+	}
 	
 	if( prefer_jpeg ) {
 		//@ try to set JPEG/MJPEG format first
@@ -766,42 +771,49 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 	return 0;
 }
 
-static	int	v4l2_configure_format( v4l2info *v, int host_fmt, int wid, int hei )
+static int v4l2_configure_format(v4l2info *v, int host_fmt, int wid, int hei)
 {
-	struct v4l2_format format;
+    int cap_pf = 0;
+    int src_wid = 0;
+    int src_hei = 0;
 
-	int cap_pf = 0;
-	int src_wid = 0;
-	int src_hei = 0;
+    int res = v4l2_negotiate_pixel_format(v, host_fmt, wid, hei,
+                                          &cap_pf, &src_wid, &src_hei);
 
-	memset( &format, 0, sizeof(format));
-	
-	int res = v4l2_negotiate_pixel_format(v, host_fmt, wid, hei, &cap_pf, &src_wid, &src_hei );
+    if (res == 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Unsupported capture format/device");
+        return 0;
+    }
 
-	if( res == 0 ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "v4l2: sorry but I don't know how to handle your capture device just yet!");
-		return 0;
-	}
+    if (src_wid <= 0 || src_hei <= 0) {
+        src_wid = wid;
+        src_hei = hei;
+    }
 
-	if( src_wid == 0 || src_hei == 0 ) {
-		src_wid = wid;
-		src_hei = hei;
-	}
+    if (cap_pf == 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Invalid pixel format returned");
+        return 0;
+    }
 
-	if( res == 1 ) {
-		v->format.fmt.pix.pixelformat = cap_pf;
-		v->format.fmt.pix.width = (uint32_t) src_wid;
-		v->format.fmt.pix.height = (uint32_t) src_hei;	
+    memset(&v->format, 0, sizeof(struct v4l2_format));
+    v->format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
-		v->info = yuv_yuv_template( NULL,NULL,NULL,src_wid, src_hei, v4l2_pixelformat2ffmpeg( cap_pf ) );
+    v->format.fmt.pix.pixelformat = cap_pf;
+    v->format.fmt.pix.width  = (uint32_t) src_wid;
+    v->format.fmt.pix.height = (uint32_t) src_hei;
 
-		yuv_plane_sizes( v->info, &(v->planes[0]),&(v->planes[1]),&(v->planes[2]),&(v->planes[3]) );
+    v->info = yuv_yuv_template(NULL, NULL, NULL, src_wid, src_hei, v4l2_pixelformat2ffmpeg(cap_pf));
 
-		veejay_msg(VEEJAY_MSG_INFO, "v4l2: output in %dx%d, source in %dx%d %x", wid,hei,src_wid,src_hei, cap_pf );
-		return 1;
-	}
+    if (!v->info) {
+        veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to allocate YUV template");
+        return 0;
+    }
 
-	return 0;
+    yuv_plane_sizes(v->info, &(v->planes[0]),&(v->planes[1]),&(v->planes[2]),&(v->planes[3]));
+
+    veejay_msg(VEEJAY_MSG_INFO,"v4l2: output %dx%d, source %dx%d, fmt=0x%x", wid, hei, src_wid, src_hei, cap_pf);
+
+    return 1;
 }
 
 static void	v4l2_set_output_pointers( v4l2info *v, void *src )
@@ -1892,52 +1904,67 @@ int		v4l2_reset_roi( void *d )
 	return 1;
 }
 
-int		v4l2_get_currentscaling_factor_and_pixel_aspect(void *d, int *dwidth, int *dheight, double *daspect)
+int v4l2_get_currentscaling_factor_and_pixel_aspect(void *d, int *dwidth, int *dheight, double *daspect)
 {
-	v4l2info *v = (v4l2info*)d;
-	struct v4l2_cropcap cropcap;
-	struct v4l2_crop crop;
-	struct v4l2_format format;
-	double hscale, vscale;
-	double aspect;
+    v4l2info *v = (v4l2info*) d;
+    struct v4l2_cropcap cropcap;
+    struct v4l2_crop crop;
+    struct v4l2_format format;
 
-	memset (&cropcap, 0, sizeof (cropcap));
-	cropcap.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    double hscale, vscale;
+    double aspect;
 
-	if (-1 == vioctl (v->fd, VIDIOC_CROPCAP, &cropcap)) {
-		return 0;
-	}
+    memset(&cropcap, 0, sizeof(cropcap));
+    cropcap.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
-	memset (&crop, 0, sizeof (crop));
-	crop.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    if (-1 == vioctl(v->fd, VIDIOC_CROPCAP, &cropcap)) {
+        return 0;
+    }
 
-	if (-1 == vioctl (v->fd, VIDIOC_G_CROP, &crop)) {
+    memset(&crop, 0, sizeof(crop));
+    crop.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
+    if (-1 == vioctl(v->fd, VIDIOC_G_CROP, &crop)) {
+        // fallback
         crop.c = cropcap.defrect;
-	}
+    }
 
-	memset (&format, 0, sizeof (format));
-	//format.fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    memset(&format, 0, sizeof(format));
+    format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
-	if (-1 == vioctl (v->fd, VIDIOC_G_FMT, &format)) {
-		return 0;
-	}
+    if (-1 == vioctl(v->fd, VIDIOC_G_FMT, &format)) {
+        return 0;
+    }
 
-	hscale = format.fmt.pix.width / (double) crop.c.width;
-	vscale = format.fmt.pix.height / (double) crop.c.height;
+	// guard against broken drivers
+    if (crop.c.width == 0 || crop.c.height == 0) {
+        crop.c = cropcap.defrect;
+    }
 
-	aspect = cropcap.pixelaspect.numerator / (double) cropcap.pixelaspect.denominator;
-	*daspect = aspect * hscale / vscale;
+    if (crop.c.width == 0 || crop.c.height == 0) {
+        return 0;
+    }
 
-	/* Devices following ITU-R BT.601 do not capture
-   	   square pixels. For playback on a computer monitor
-   	   we should scale the images to this size. */
+    hscale = format.fmt.pix.width  / (double) crop.c.width;
+    vscale = format.fmt.pix.height / (double) crop.c.height;
 
-	*dwidth = format.fmt.pix.width / aspect;
-	*dheight = format.fmt.pix.height;
+    if (cropcap.pixelaspect.denominator == 0) {
+        aspect = 1.0;
+    } else {
+        aspect = cropcap.pixelaspect.numerator / (double) cropcap.pixelaspect.denominator;
+    }
 
-	return 1;
+    if (aspect <= 0.0) {
+        aspect = 1.0;
+    }
+
+    *daspect = aspect * hscale / vscale;
+
+    *dwidth  = (int)(format.fmt.pix.width / aspect);
+    *dheight = (int)(format.fmt.pix.height);
+
+    return 1;
 }
-
 
 int	v4l2_num_devices(void)
 {

@@ -214,6 +214,8 @@ extern int sample_store(sample_info * skel);
 extern int sample_is_deleted(int s1);
 extern int sample_exists(int sample_id);
 extern int sample_verify_delete( int sample_id, int sample_type );
+extern void sample_sanity_scan(void);
+extern int sample_find_refs_and_delete(int source_type, int id);
 extern int sample_del(int sample_id);
 extern void sample_del_all(void *edl);
 extern int sample_get_startFrame(int sample_id);

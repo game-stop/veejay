@@ -963,6 +963,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
          
     if(id==0) { 
         tag->id = this_tag_id;
+        id = tag->id;
     }
     else {
         tag->id = id;
@@ -1026,35 +1027,21 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
                      video_driver_ ))
             {
                 veejay_msg(0, "Unable to open capture stream '%dx%d' (norm=%c,format=%x,device=%d,channel=%d)", w,h,el->video_norm, pix_fmt, extra,channel );
-                free(tag->source_name);
-                if(tag->method_filename) 
-                  free(tag->method_filename);
-                free(tag);
-                
-                return -1;
+                goto TAG_NEW_FAILED;
             }
             break;
         case VJ_TAG_TYPE_MCAST:
         case VJ_TAG_TYPE_NET:
             snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename );
             if( _vj_tag_new_net( tag,stream_nr, w,h,pix_fmt, filename, channel ,palette,type) != 1 ) {
-                free(tag->source_name);
-                if(tag->method_filename) 
-                  free(tag->method_filename);
-                free(tag);
-                
-                return -1;
+                goto TAG_NEW_FAILED;
             }
     break;
     case VJ_TAG_TYPE_AVFORMAT:
         snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename );
         if(!avformat_thread_start(tag, _tag_info->effect_frame1)) {
             veejay_msg(VEEJAY_MSG_ERROR, "Unable to start thread");
-            free(tag->source_name);
-            if(tag->method_filename) 
-                  free(tag->method_filename);
-            free(tag);
-            return -1;
+            goto TAG_NEW_FAILED;
         }
         break;
     case VJ_TAG_TYPE_DV1394:
@@ -1063,51 +1050,33 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     if( _vj_tag_new_dv1394( tag, stream_nr,channel,1,el ) == 0 )
     {
         veejay_msg(VEEJAY_MSG_ERROR, "error opening dv1394 %d", channel);
-        free(tag->source_name);
-        free(tag);
-        return -1;
+        goto TAG_NEW_FAILED;
     }
     tag->active = 1;
     break;
 #else
     veejay_msg(VEEJAY_MSG_DEBUG, "libdv not enabled at compile time");
-    free(tag->source_name);
-    if(tag->method_filename) 
-        free(tag->method_filename);
-    free(tag);
-    return -1;
+    goto TAG_NEW_FAILED;
 #endif
 #ifdef USE_GDK_PIXBUF
     case VJ_TAG_TYPE_PICTURE:
     snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename);
     if( _vj_tag_new_picture(tag, stream_nr, w, h, fps) != 1 ) {
-        free(tag->source_name);
-        if(tag->method_filename) 
-            free(tag->method_filename);
-        free(tag);
-        return -1;
+        goto TAG_NEW_FAILED;
     }
     break;
 #endif
     case VJ_TAG_TYPE_CALI:
     snprintf(tag->source_name,SOURCE_NAME_LEN,"%s",filename);
     if(_vj_tag_new_cali( tag,stream_nr,w,h) != 1 ) {
-        free(tag->source_name);
-        if(tag->method_filename) 
-            free(tag->method_filename);
-        free(tag);
-        return -1;
+        goto TAG_NEW_FAILED;
     }
     break;
     case VJ_TAG_TYPE_YUV4MPEG:
     snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename);
     if (_vj_tag_new_yuv4mpeg(tag, stream_nr, w,h,fps) != 1)
     {
-        free(tag->source_name);
-        if(tag->method_filename) 
-            free(tag->method_filename);
-        free(tag);
-        return -1;
+        goto TAG_NEW_FAILED;
     }
     tag->active = 1;
     break;
@@ -1131,11 +1100,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
                 channel = plug_get_idx_by_name( filename );
                 if( channel == - 1) {
                     veejay_msg(0, "'%s' not found",filename );
-                    free(tag->source_name);
-                    if(tag->method_filename) 
-                        free(tag->method_filename);
-                    free(tag);
-                    return -1;
+                    goto TAG_NEW_FAILED;
                 }
             }
         }
@@ -1148,11 +1113,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
         tag->generator = plug_activate(channel);
         if( tag->generator == NULL ) {
             veejay_msg(0, "Unable to load selected generator");
-            free(tag->source_name);
-            if(tag->method_filename) 
-                free(tag->method_filename);
-            free(tag);
-            return -1;
+            goto TAG_NEW_FAILED;
         }
 
         int vj_plug_id = 500 + channel; 
@@ -1179,11 +1140,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
                 strcpy( tag->source_name, filename );
         }
         else {
-            free(tag->source_name);
-            if(tag->method_filename) 
-                free(tag->method_filename);
-            free(tag);
-            return -1;
+            goto TAG_NEW_FAILED;
         }
     }
     break;
@@ -1236,20 +1193,12 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
         snprintf(tag->source_name, SOURCE_NAME_LEN, "[clone %d]", tag->id );
 
         if( _vj_tag_new_clone(tag,channel) == 0 ) {
-            free(tag->source_name);
-            if(tag->method_filename) 
-                free(tag->method_filename);
-            free(tag);
-            return -1;
+            goto TAG_NEW_FAILED;
         }
         break;
     default:
         veejay_msg(0, "Stream type %d invalid", type );
-        free(tag->source_name);
-        if(tag->method_filename) 
-            free(tag->method_filename);
-        free(tag);
-        return -1;
+        goto TAG_NEW_FAILED;
     }
 
     vj_tag_get_by_type( tag->id, tag->source_type, tag->descr);
@@ -1278,11 +1227,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     if (!vj_tag_put(tag))   
     {
         veejay_msg(0, "Unable to store stream %d - Internal Error", tag->id);
-        free(tag->source_name);
-        if(tag->method_filename) 
-            free(tag->method_filename);
-        free(tag);
-        return -1;
+        goto TAG_NEW_FAILED;
     }
     last_added_tag = tag->id; 
     this_tag_id++;
@@ -1297,6 +1242,28 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     recount_hash = 1;
 
    return (int)(tag->id);
+
+TAG_NEW_FAILED:
+    if(tag->source_name)
+        free(tag->source_name);
+    if(tag->method_filename) 
+        free(tag->method_filename);
+    
+    // TODO: add guards on close path/refactor streams and merge into libsample            
+    // the tag node was created before and now, creating the stream failed ...
+    // should actually use vj_tag_del, but that needs a bunch of NULL guards on the various stream types
+    hnode_t *node = hash_lookup(TagHash, tag_key(id));
+    if (node) {
+        hash_delete(TagHash, node);
+        hnode_destroy(node);
+    }
+
+    tag_cache[id] = NULL;
+    avail_tag[next_avail_tag++] = id;
+
+    free(tag);
+                
+    return -1;
 }
 
 
@@ -1492,11 +1459,78 @@ int vj_tag_del_internal(vj_tag *tag)
     return 1;
 }
 
+void vj_tag_sanity_scan(void) {
+    
+    hscan_t hs;
+    hnode_t *node;
+
+    hash_scan_begin(&hs, TagHash);
+
+    while ((node = hash_scan_next(&hs))) {
+        vj_tag *tag = (vj_tag*) hnode_get(node);
+        if(!tag)
+            continue;
+
+        for(int i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
+            if (!tag->effect_chain[i])
+                continue;
+            int pm = tag->effect_chain[i]->source_type;
+            int using_id = tag->effect_chain[i]->channel;
+            
+            if( pm == 0 ) {
+                if(!sample_exists(using_id)) {
+                    tag->effect_chain[i]->channel = tag->id;
+                }
+            }
+            else {
+                if(!vj_tag_exists(using_id)) {
+                    int any_tag = vj_tag_get_last_tag();
+                    if(any_tag == 0) {
+                        tag->effect_chain[i]->source_type = 0;
+                        tag->effect_chain[i]->channel = tag->id;
+                    }
+                    else {
+                        tag->effect_chain[i]->channel = any_tag;
+                    }
+                }
+            }
+
+        }    
+    }
+}
+
+int vj_tag_find_refs_and_delete(int source_type, int id) {
+    
+    hscan_t hs;
+    hnode_t *node;
+
+    hash_scan_begin(&hs, TagHash);
+
+    while ((node = hash_scan_next(&hs))) {
+        vj_tag *tag = (vj_tag *) hnode_get(node);
+        if(!tag)
+           continue; // safety
+
+        for(int i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
+            if (!tag->effect_chain[i])
+                continue;
+            int pm = tag->effect_chain[i]->source_type;
+            int using_id = tag->effect_chain[i]->channel; // FIXME
+            if( pm == source_type && using_id == id ) {
+                tag->effect_chain[i]->channel = tag->id; // point to self!
+            }
+        }
+    }
+}
+
 int vj_tag_del(int id)
 {
     vj_tag *tag = vj_tag_get(id);
     if (!tag)
         return 0;
+    
+    vj_tag_find_refs_and_delete(1, id);
+    sample_find_refs_and_delete(1, id);
 
     hnode_t *node = hash_lookup(TagHash, tag_key(id));
     if (node) {
@@ -4078,7 +4112,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
             int   type = cur_tag->source_type;
             if(cur_src_file && source_file) {
                 if(strncasecmp(cur_tag->method_filename, source_file,strlen(cur_tag->method_filename)) == 0 && type == source_type) {
-                    identity = 1;
+                    identity = 1; // do we have it already
                 }
             }
         }
@@ -4086,6 +4120,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
         if(!identity) {
             if(cur_tag)
                 vj_tag_del(id);
+
             n_id = vj_tag_new( source_type, source_file, _tag_info->nstreams,_tag_info->current_edit_list,
                 _tag_info->pixel_format, source_id,zer, _tag_info->settings->composite );
         }
@@ -4104,7 +4139,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
             tag->opacity = opacity;
             tag->nframes = nframes;
             tag->subrender = subrender;
-        tag->loop_stat_stop = loop_stat_stop;
+            tag->loop_stat_stop = loop_stat_stop;
 
             switch( source_type )
             {
@@ -4116,7 +4151,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
             if( subs )
             {
                 char tmp[512];
-                sprintf(tmp, "%s-SUB-s%d.srt", sampleFile, id );
+                sprintf(tmp, "%s-SUB-s%d.srt", sampleFile, id ); //FIXME or DELETEME
                 vj_font_set_dict( font, tag->dict );
 
                 vj_font_load_srt( font, tmp );
@@ -4129,14 +4164,14 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
                 tagParseCalibration( doc, cali, id, vp );
             }
 
-        if( macro ) 
-        {
-        vj_macro_load( tag->macro, doc, macro );
-            int lss = vj_macro_get_loop_stat_stop(tag->macro);
-        if( lss > tag->loop_stat_stop ) {
-            tag->loop_stat_stop = lss;
-        }
-        }
+            if( macro ) 
+            {
+                vj_macro_load( tag->macro, doc, macro );
+                int lss = vj_macro_get_loop_stat_stop(tag->macro);
+                if( lss > tag->loop_stat_stop ) {
+                    tag->loop_stat_stop = lss;
+                }
+            }
             
             int q;
             for( q = 0; q < k ; q ++ )
@@ -4144,6 +4179,11 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
                 if(fx[q] )
                     tagParseEffects(doc, fx[q], id );
             }
+        }
+        else {
+            // entity is invalid, scan for usage
+            vj_tag_find_refs_and_delete(1, id);
+            sample_find_refs_and_delete(1, id);
         }
     }
 
