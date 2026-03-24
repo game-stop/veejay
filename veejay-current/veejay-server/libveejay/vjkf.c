@@ -494,7 +494,7 @@ int get_keyframe_value(void *port, long long n_frame,
 
     int idx = (int)(n_frame - start);
     int max_idx = end - start + 1;
-    if (!values || idx < 0 || idx > max_idx) {
+    if (!values || idx < 0 || idx >= max_idx) {
         free(k_x); free(k_s); free(k_e); free(k_d);
         return 0;
     }
