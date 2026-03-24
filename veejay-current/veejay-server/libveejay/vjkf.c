@@ -62,6 +62,9 @@ static	char	*extract_( const char *prefix , int p_id )
 
 unsigned char *keyframe_pack(void *port, int parameter_id, int entry_id, int *rlen)
 {
+    if(!rlen)
+        return NULL;
+
     int i;
     unsigned char *result = NULL;
     int start = 0, end = 0, type = 0, status = 0, values_len = 0;
@@ -74,15 +77,23 @@ unsigned char *keyframe_pack(void *port, int parameter_id, int entry_id, int *rl
     char *k_d  = extract_("data",   parameter_id);
     char *k_dn = extract_("datalen",parameter_id);
 
-    if (vevo_property_get(port,k_s,0,&start) != VEVO_NO_ERROR ||
-        vevo_property_get(port,k_e,0,&end)   != VEVO_NO_ERROR ||
-        vevo_property_get(port,k_t,0,&type)  != VEVO_NO_ERROR ||
-        vevo_property_get(port,k_x,0,&status)!= VEVO_NO_ERROR ||
-        vevo_property_get(port,k_d,0,&values)!= VEVO_NO_ERROR ||
-        vevo_property_get(port,k_dn,0,&values_len)!=VEVO_NO_ERROR)
-    {
+    int err = 0;
+
+    if(vevo_property_get(port,k_s,0,&start) != VEVO_NO_ERROR) err = 1;
+    if(vevo_property_get(port,k_e,0,&end) != VEVO_NO_ERROR) err = 1;
+    if(vevo_property_get(port,k_t,0,&type) != VEVO_NO_ERROR) err = 1;
+    if(vevo_property_get(port,k_x,0,&status) != VEVO_NO_ERROR) err = 1;
+    if(vevo_property_get(port,k_d,0,&values) != VEVO_NO_ERROR) err = 1;
+    if(vevo_property_get(port,k_dn,0,&values_len) != VEVO_NO_ERROR) err = 1;
+
+    if(err) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Failed to get KF %d properties: start=%d, end=%d, type=%d, status=%d, values_len=%d%s",
+                   parameter_id, start, end, type, status, values_len,
+                   values && values_len > 0 ? ", values[0]=%d" : "",
+                   values && values_len > 0 ? values[0] : 0);
+
         free(k_s); free(k_e); free(k_t); free(k_x); free(k_d); free(k_dn);
-        veejay_msg(VEEJAY_MSG_ERROR, "Failed to set required property for KF %d", parameter_id);
         return NULL;
     }
 
@@ -96,9 +107,10 @@ unsigned char *keyframe_pack(void *port, int parameter_id, int entry_id, int *rl
     if (!result)
         return NULL;
 
-    snprintf((char*)result, 28,
-             "key%02d%02d%08d%08d%02d%02d",
+    unsigned char *p = result;
+    snprintf((char*)p, 28, "key%02d%02d%08d%08d%02d%02d",
              entry_id, parameter_id, start, end, type, status);
+    p[27] = 0;
 
     unsigned char *out = result + 27;
 
@@ -190,13 +202,18 @@ void	keyframe_clear_entry( int lookup, int fx_entry, int parameter_id, int is_sa
 	char *k_x = extract_ ( "status", parameter_id );
 	char *k_d = extract_ ( "data", parameter_id );
 	char *k_dn= extract_ ( "datalen", parameter_id );
+
+    if (vevo_property_get(port, k_s, 0, &start) != VEVO_NO_ERROR) start = 0;
+    if (vevo_property_get(port, k_e, 0, &end) != VEVO_NO_ERROR) end = 0;
+    if (vevo_property_get(port, k_t, 0, &type) != VEVO_NO_ERROR) type = 0;
+    if (vevo_property_get(port, k_x, 0, &status) != VEVO_NO_ERROR) status = 0;
 	
-	vevo_property_get( port, k_s,0, &start );
-	vevo_property_get( port, k_e,0, &end );
-	vevo_property_get( port, k_t,0, &type );
-	vevo_property_get( port, k_x,0, &status );   
-	vevo_property_get( port, k_d,0, &values );
-	vevo_property_get( port, k_dn,0,&values_len);
+    if (vevo_property_get(port, k_d, 0, &values) == VEVO_NO_ERROR && values != NULL) {
+        free(values);
+        values = NULL;
+    }
+
+    if (vevo_property_get(port, k_dn, 0, &values_len) != VEVO_NO_ERROR) values_len = 0;
 
 	if( values != NULL ) {
 		free(values);
@@ -488,7 +505,8 @@ int get_keyframe_value(void *port, long long n_frame,
     }
 
     int idx = (int)(n_frame - start);
-    if (!values || idx < 0 || idx > (end-start)) {
+    int max_idx = end - start;
+    if (!values || idx < 0 || idx > max_idx) {
         free(k_x); free(k_s); free(k_e); free(k_d);
         return 0;
     }
