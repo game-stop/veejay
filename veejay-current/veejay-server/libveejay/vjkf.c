@@ -39,19 +39,7 @@
 #include <libxml/parser.h>
 #endif
 #include <libvjxml/vj-xml.h>
-/* veejay server stores keyframes 
- *
- *
- *
- * keyframe format:
- *       ( [frame_num1][value1][frame_num2][value2][status] ... [frame_numN][valueN] )
- *
- *
- */
-
 #include <libveejay/vjkf.h>
-
-//FIXME fx anim parameter packing/unpacking
 
 static	char	*extract_( const char *prefix , int p_id )
 {
@@ -505,7 +493,7 @@ int get_keyframe_value(void *port, long long n_frame,
     }
 
     int idx = (int)(n_frame - start);
-    int max_idx = end - start;
+    int max_idx = end - start + 1;
     if (!values || idx < 0 || idx > max_idx) {
         free(k_x); free(k_s); free(k_e); free(k_d);
         return 0;
