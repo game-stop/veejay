@@ -29,6 +29,8 @@
 #include "gtk3curve.h"
 #include "utils-gtk.h" /* VEEJAY NEEDS */
 
+#define DEBUG
+
 #ifdef DEBUG
 #define DEBUG_INFO g_print
 #define DEBUG_ERROR g_printerr
@@ -438,14 +440,16 @@ gtk3_curve_new(void)
 
 /* VEEJAY NEEDS */
 static gfloat scale_param_value(Gtk3CurvePrivate *priv, gfloat y, gfloat hei) {
-    gfloat distance = (priv->yaxis_hi - priv->yaxis_lo);
+    //~ gfloat distance = (priv->yaxis_hi - priv->yaxis_lo);
+    gfloat distance = (priv->max_y - priv->min_y);
     gfloat r_hei = hei - (RADIUS * 2);
     return ( distance / r_hei ) * (r_hei - y);
 }
 
 /* VEEJAY NEEDS */
 static gfloat scale_pos_value(Gtk3CurvePrivate *priv, gfloat x, gfloat wid) {
-    gfloat distance = (priv->xaxis_hi - priv->xaxis_lo) + 1;
+    //~ gfloat distance = (priv->xaxis_hi - priv->xaxis_lo) + 1;
+    gfloat distance = (priv->max_x - priv->min_x) + 1;
     return ( distance / wid ) * x;
 }
 
@@ -618,6 +622,7 @@ gtk3_curve_draw_labels(GtkWidget *widget, cairo_t *cr, gint hei, gint wid)
   gfloat            grid;
   cairo_text_extents_t extents;
 
+  DEBUG_INFO("draw_labels [S]\n");
   curve = GTK3_CURVE (widget);
   priv = curve->priv;
   grid = priv->grid_resolution;
@@ -662,15 +667,21 @@ gtk3_curve_draw_labels(GtkWidget *widget, cairo_t *cr, gint hei, gint wid)
     cairo_show_text(cr, text);
   }
 
+  DEBUG_INFO("lastxy : %f - %f\n", priv->last_x, priv->last_y);
+
   gfloat value = scale_param_value(priv, priv->last_y, hei);
   gfloat position = scale_pos_value(priv, priv->last_x, wid);
 
-  char *timecode = format_selection_time( priv->xaxis_lo, priv->xaxis_lo + position );
+  DEBUG_INFO("position %f xaxis_lo %f\n", position, priv->min_x);
+
+  //~ char *timecode = format_selection_time( priv->xaxis_lo, priv->xaxis_lo + position );
+  char *timecode = format_selection_time( priv->min_x, priv->min_x + position );
   snprintf(text,sizeof(text), "Value %d at position %d (%s)",(int) value, (int) position, timecode );
   free(timecode);
 
   cairo_move_to(cr, 36.0, 20.0 );
   cairo_show_text(cr, text);
+  DEBUG_INFO("draw_labels [E]\n");
 
 }
 
@@ -1172,8 +1183,14 @@ gtk3_curve_motion_notify (GtkWidget        *widget,
         }
     }
 
+  DEBUG_INFO("motion : privlastxy[%fx%f] xy[%dx%d]\n",
+              priv->last_x, priv->last_y,
+              x, y);
   priv->last_x = (gfloat) x;
   priv->last_y = (gfloat) y;
+  DEBUG_INFO("motion : privlastxy[%fx%f] xy[%dx%d]\n",
+              priv->last_x, priv->last_y,
+              x, y);
 
   switch (priv->curve_data.curve_type)
     {
@@ -1654,6 +1671,8 @@ gtk3_curve_set_x_lo (GtkWidget *widget,
     //~ {
       //~ gtk_widget_queue_draw (widget);
     //~ }
+    DEBUG_INFO("set_x_lo %f\n", priv->xaxis_lo);
+
     gtk3_curve_set_range (widget, min_x, priv->max_x, priv->min_y, priv->max_y);
 }
 
@@ -1669,6 +1688,8 @@ gtk3_curve_set_x_hi (GtkWidget *widget,
     //~ {
       //~ gtk_widget_queue_draw (widget);
     //~ }
+
+    DEBUG_INFO("set_x_hi %f\n", priv->xaxis_hi);
     gtk3_curve_set_range (widget, priv->min_x, max_x, priv->min_y, priv->max_y);
 }
 
