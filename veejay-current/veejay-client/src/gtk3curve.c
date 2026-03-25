@@ -1872,6 +1872,9 @@ gtk3_curve_set_vector (GtkWidget *widget, int veclen, gfloat vector[])
   gfloat rx, dx, ry;
   gint i, height;
 
+  DEBUG_INFO("set vector [S]\n");
+  DEBUG_INFO("vector len [%d]\n", veclen);
+
   GdkScreen *screen = gtk_widget_get_screen (GTK_WIDGET (curve));
 
   //~ GdkWindow *gdk_window = gtk_widget_get_window(GTK_WIDGET (curve)); // assertion 'GDK_IS_WINDOW (window)' failed
@@ -1903,19 +1906,19 @@ gtk3_curve_set_vector (GtkWidget *widget, int veclen, gfloat vector[])
   for (i = 0; i < priv->curve_data.n_points; ++i, rx += dx)
     {
       ry = vector[(int) (rx + 0.5)];
+      //~ DEBUG_INFO("curve data rx, vector[rx] - ry [%f %f]\n", rx, ry);
       if (ry > priv->max_y) ry = priv->max_y;
       if (ry < priv->min_y) ry = priv->min_y;
       priv->curve_data.d_point[i].x = RADIUS + i;
       priv->curve_data.d_point[i].y =
         RADIUS + height - project (ry, priv->min_y, priv->max_y, height);
+      //~ DEBUG_INFO("vector data : curve_data [%d - %d]\n", priv->curve_data.d_point[i].x, priv->curve_data.d_point[i].y );
     }
   if (old_type != GTK3_CURVE_TYPE_FREE)
     {
       g_signal_emit (curve, curve_type_changed_signal, 0);
       g_object_notify (G_OBJECT (curve), "curve-type");
     }
-
-  DEBUG_INFO("set vector \n");
 
   priv->width = priv->curve_data.n_points;
 
@@ -1924,6 +1927,8 @@ gtk3_curve_set_vector (GtkWidget *widget, int veclen, gfloat vector[])
       DEBUG_INFO("queue draw\n");
       gtk_widget_queue_draw (GTK_WIDGET (curve));
     }
+
+  DEBUG_INFO("set vector [E]\n");
 }
 
 void
