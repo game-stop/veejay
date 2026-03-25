@@ -115,9 +115,10 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 
 		// val = ((Input - InputLow) / (InputHigh - InputLow)) * (OutputHigh - OutputLow) + OutputLow;
 		// with OutputLow==0 and OutputHigh==1 in gtkcurve range
-		float val = ((float)(value - min) / (diff));
 
-		vec[k] = val;
+		//~ float val = ((float)(value - min) / (diff)); // # BYPASS [0-1] NORMALISATION
+		//~ vec[k] = val;
+		vec[k] = (float)value;
 		k++;
 	}
     gtk3_curve_reset( curve );
