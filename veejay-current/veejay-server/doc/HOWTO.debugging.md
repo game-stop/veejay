@@ -1,11 +1,11 @@
 # Debugging veejay
 
-Please report any issues here: https://github.com/c0ntrol/veejay/issues
+Please report any issues here: https://github.com/game-stop/veejay/issues
 
 Open a new bug report for each issue, so an effective bugfix workflow will be completed for each issue.
 
 Other details you should heed
-* Make sure your software is up to date. Ideally, test an in-development version (https://github.com/c0ntrol/veejay)
+* Make sure your software is up to date. Ideally, test an in-development version (https://github.com/game-stop/veejay)
 * Figure out the steps to reproduce a bug:
 ** If you have precise steps to reproduce — great! — you're on your way to reporting a useful bug report.
 ** If you can reproduce occasionally, but not after following specific steps, you must provide additional information for the bug to be useful.

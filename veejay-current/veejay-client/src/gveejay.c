@@ -44,7 +44,7 @@ Reloaded is a client for veejay. As long as veejay \
 
 #define RELOADED_DESCRIPTION "-------------------------------------\n\
 The veejay website is over http://veejayhq.net\n\n\
-If you found a bug, please use the ticket system on https://github.com/c0ntrol/veejay/issues\n\
+If you found a bug, please use the ticket system on https://github.com/game-stop/veejay/issues\n\
 -------------------------------------"
 
 extern int mt_get_max_tracks();

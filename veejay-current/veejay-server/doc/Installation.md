@@ -17,11 +17,11 @@ Please note that on some debian like systems, package names for gtk may vary. If
 
 Veejay is divided into multiple packages. Each must be build separately and in a specific order. 
 
-1. [veejay-core](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-core) (__required__)
-2. [veejay-server](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-server) (__required__)
-3. [veejay-client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client) (*optional*)
-4. [veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils) (*optional*)
-5. [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs) (*optional*)
+1. [veejay-core](https://github.com/game-stop/veejay/tree/master/veejay-current/veejay-core) (__required__)
+2. [veejay-server](https://github.com/game-stop/veejay/tree/master/veejay-current/veejay-server) (__required__)
+3. [veejay-client](https://github.com/game-stop/veejay/tree/master/veejay-current/veejay-client) (*optional*)
+4. [veejay-utils](https://github.com/game-stop/veejay/tree/master/veejay-current/veejay-utils) (*optional*)
+5. [plugin-packs](https://github.com/game-stop/veejay/tree/master/veejay-current/plugin-packs) (*optional*)
 
 For __each package__, run the triptich commands of the *GNU build system* (for a quick start you can build the first two):
 
@@ -76,7 +76,7 @@ You can list more location in the file `$HOME/.veejay/plugins.cfg`
 
 ### plugin-packs
 
-There are several plugin-packs available for veejay: [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs)
+There are several plugin-packs available for veejay: [plugin-packs](https://github.com/game-stop/veejay/tree/master/veejay-current/plugin-packs)
 
 * **lvdcrop** ; a couple of crop filters and a port of frei0r's scale0tilt
 * **lvdshared** ; a couple of plugins that implement a producer/consumer mechanism for shared video resources

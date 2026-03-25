@@ -3,11 +3,11 @@
 
 Veejay is divided into multiple packages. Each must be build separately and in a specific order. 
 
-1. [veejay-core](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-core) (__required__)
-2. [veejay-server](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-server) (__required__)
-3. [veejay_client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client) (*optional*)
-4. [veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils) (*optional*)
-5. [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs) (*optional*)
+1. [veejay-core](https://github.com/game-stop/veejay/tree/master/veejay-current/veejay-core) (__required__)
+2. [veejay-server](https://github.com/game-stop/veejay/tree/master/veejay-current/veejay-server) (__required__)
+3. [veejay_client](https://github.com/game-stop/veejay/tree/master/veejay-current/veejay-client) (*optional*)
+4. [veejay-utils](https://github.com/game-stop/veejay/tree/master/veejay-current/veejay-utils) (*optional*)
+5. [plugin-packs](https://github.com/game-stop/veejay/tree/master/veejay-current/plugin-packs) (*optional*)
 
 ## Prerequisities
 
@@ -84,7 +84,7 @@ export CFLAGS="-mcpu=cortex-a72 -mtune=cortex-a72"
 
 1. Get the last sources from Veejay's repository:
 ```
-  $ git clone git://github.com/c0ntrol/veejay.git veejay
+  $ git clone git://github.com/game-stop/veejay.git veejay
 ```
 2. Enter the source directory
 ```

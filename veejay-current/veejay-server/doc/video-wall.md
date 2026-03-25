@@ -8,7 +8,7 @@
 
 Videowall in veejay
 
-Requires:  lvdshared from pluginpack (https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs/lvdshared)
+Requires:  lvdshared from pluginpack (https://github.com/game-stop/veejay/tree/master/veejay-current/plugin-packs/lvdshared)
 
 You can setup a video wall by starting multiple veejays. One of the veejays must be the master veejay, responsible for deciding which veejay renders what part of the image. Only the master requires a special command-line option and a file to read its configuration from. The other veejays can be started normally. 
 

@@ -6,7 +6,7 @@ But you can have more !
 
 Plugin-packs available with veejay
 -----------------
-There are several [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs) available with veejay:
+There are several [plugin-packs](https://github.com/game-stop/veejay/tree/master/veejay-current/plugin-packs) available with veejay:
 
 * **lvdcrop** ; a couple of crop filters and a port of frei0r's scale0tilt
 * **lvdshared** ; a couple of plugins that implement a producer/consumer mechanism for shared video resources
