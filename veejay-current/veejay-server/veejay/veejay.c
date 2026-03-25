@@ -909,6 +909,8 @@ int main(int argc, char **argv)
 	settings->display_frame.pixels[1] = vj_sdl_get_buffer(info->sdl,1);
 
     while (atomic_load_int(&settings->first_audio_frame_ready) == 0) {
+        if (atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP)
+            break;
         usleep_accurate(100, settings);
     }
 
