@@ -1208,15 +1208,23 @@ livido-plugins/Makefile
 share/Makefile
 veejay.pc
 ])
-AC_OUTPUT
 
 AC_DEFINE_UNQUOTED([VERSION], ["$VERSION"], [Veejay version number])
+
+AC_MSG_CHECKING([for git commit hash])
+GIT_HASH=`git rev-parse --short HEAD 2>/dev/null || echo "unknown"`
+AC_MSG_RESULT([$GIT_HASH])
+AH_TEMPLATE([GIT_HASH_VEEJAY], [git commit hash libveejay])
+AC_DEFINE_UNQUOTED([GIT_HASH_VEEJAY], ["$GIT_HASH"], [git commit hash libveejay])
+
+
+
+AC_OUTPUT
 
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Veejay ${VERSION} build configuration :])
 AC_MSG_NOTICE([])
 
-dnl FIXME cflags
 
 AC_MSG_NOTICE([ Compiler flags: $VEEJAY_CFLAGS])
 AC_MSG_NOTICE([   architecture: $arch_target])
