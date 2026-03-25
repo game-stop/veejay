@@ -21,5 +21,7 @@
 #ifndef RGBKEY_H
 #define RGBKEY_H
 vj_effect *rgbkey_init(int w, int h);
+void *rgbkey_malloc(int w, int h);
+void rgbkey_free(void *ptr);
 void rgbkey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

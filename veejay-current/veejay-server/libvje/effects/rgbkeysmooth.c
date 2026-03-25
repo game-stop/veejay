@@ -21,47 +21,60 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include <math.h>
+#pragma GCC optimize ("unroll-loops")
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+#define DIV255(x) (((x) + 1 + ((x) >> 8)) >> 8)
+#define CLAMP(x, low, high)  (((x) > (high)) ? (high) : (((x) < (low)) ? (low) : (x)))
+#define SMOOTHSTEP(edge0, edge1, x) \
+    ({ float t = CLAMP(((x) - (edge0)) / ((edge1) - (edge0)), 0.0f, 1.0f); \
+       t * t * (3.0f - 2.0f * t); })
 
 typedef struct
 {
     int n_threads;
+    float mag_lut[32769];
+    float inv_mag_lut[32769];
+    uint8_t *alpha_map;
+    uint8_t *alpha_temp;
 } rgbkey_t;
 
 vj_effect *rgbkeysmooth_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 8;
+    ve->num_params = 12; // yay
+
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->defaults[0] = 4500;
-    ve->defaults[1] = 0;
-    ve->defaults[2] = 255;
-    ve->defaults[3] = 0;
-    ve->defaults[4] = 40;
-    ve->defaults[5] = 160;
-    ve->defaults[6] = 200;
-    ve->defaults[7] = 0;
-    
-    ve->limits[0][0] = 500;  ve->limits[1][0] = 8500;
-    ve->limits[0][1] = 0;    ve->limits[1][1] = 255;
-    ve->limits[0][2] = 0;    ve->limits[1][2] = 255;
-    ve->limits[0][3] = 0;    ve->limits[1][3] = 255;
-    ve->limits[0][4] = 0;    ve->limits[1][4] = 255;
-    ve->limits[0][5] = 1;    ve->limits[1][5] = 255;
-    ve->limits[0][6] = 0;    ve->limits[1][6] = 255;
-    ve->limits[0][7] = 0;    ve->limits[1][7] = 1;
+    ve->defaults[0] = 4500; ve->defaults[1] = 0;   ve->defaults[2] = 255;
+    ve->defaults[3] = 0;    ve->defaults[4] = 20;  ve->defaults[5] = 180;
+    ve->defaults[6] = 20;   ve->defaults[7] = 235; ve->defaults[8] = 160;
+    ve->defaults[9] = 100;  ve->defaults[10] = 0;  ve->defaults[11] = 60;
 
-    ve->description = "Advanced Chroma Key";
-    
+    for(int i=0; i<12; i++)
+    {
+        ve->limits[0][i] = 0;
+        ve->limits[1][i] = 255;
+    }
+
+    ve->limits[1][0]  = 8500;
+    ve->limits[1][10] = 2;
+    ve->limits[1][11] = 255;
+
+    ve->description = "Master Chroma Key";
     ve->param_description = vje_build_param_list(ve->num_params, 
-        "Hue Angle", "Red", "Green", "Blue", "Threshold", "Solidity", "Spill Kill", "Mode");
+        "Hue Angle", "Red", "Green", "Blue", "Matte Min", "Matte Max",
+        "Luma Min", "Luma Max", "Spill Amount", "Spill Recovery", "View Mode", "Softness");
 
-    ve->has_user = 0;
     ve->extra_frame = 1;
-    ve->sub_format = 1; 
-	ve->rgb_conv = 1;
+    ve->sub_format   = 1;
+    ve->rgb_conv     = 1;
+
     return ve;
 }
 
@@ -69,104 +82,217 @@ void *rgbkeysmooth_malloc(int w, int h) {
     rgbkey_t *r = (rgbkey_t*) vj_malloc(sizeof(rgbkey_t));
     if(!r) return NULL;
     r->n_threads = vje_advise_num_threads(w * h);
+    r->alpha_map = (uint8_t*) vj_malloc(w * h);
+    r->alpha_temp = (uint8_t*) vj_malloc(w * h);
+    for (int i = 0; i <= 32768; i++) {
+        float m = sqrtf((float)i);
+        r->mag_lut[i] = (m < 0.0001f) ? 0.0001f : m;
+        r->inv_mag_lut[i] = 1.0f / r->mag_lut[i];
+    }
     return (void*) r;
 }
 
 void rgbkeysmooth_free(void *ptr) {
-    if(ptr) free(ptr);
+    if(ptr) {
+        rgbkey_t *r = (rgbkey_t*)ptr;
+        if(r->alpha_map) free(r->alpha_map);
+        if(r->alpha_temp) free(r->alpha_temp);
+        free(r);
+    }
 }
-
-#define DIV255(x) (((x) + 1 + ((x) >> 8)) >> 8)
 
 void rgbkeysmooth_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
     rgbkey_t *rgbkey = (rgbkey_t*) ptr;
     int iy, iu, iv;
-
     _rgb2yuv(args[1], args[2], args[3], iy, iu, iv);
 
-    const int SCALE = 4096;
+    const int kU_int = iu - 128;
+    const int kV_int = iv - 128;
+    const float kInvMag = rgbkey->inv_mag_lut[kU_int * kU_int + kV_int * kV_int];
+    const float kU = (float)kU_int * kInvMag;
+    const float kV = (float)kV_int * kInvMag;
     
-    float ut_f = (float)iu - 128.0f;
-    float vt_f = (float)iv - 128.0f;
-    float mag_f = sqrtf(ut_f * ut_f + vt_f * vt_f);
-    if (mag_f < 1.0f) mag_f = 1.0f;
-
-    int mag_fp   = (int)(mag_f * SCALE);
-    int cos_q_fp = (int)((ut_f / mag_f) * SCALE);
-    int sin_q_fp = (int)((vt_f / mag_f) * SCALE);
+    const float wedge_cos = cosf(((float)args[0] / 100.0f) * (M_PI / 180.0f));
+    const float hue_denom = 1.0f / ((1.0f - wedge_cos) * 128.0f);
     
-    float angle_rad = ((float)args[0] / 100.0f) * (3.14159265f / 180.0f);
-    int inv_wedge_slope_fp = (int)((1.0f / tanf(angle_rad)) * SCALE);
+    const float m_min = (float)args[4] / 255.0f;
+    const float m_max = ((float)args[5] / 255.0f <= m_min) ? m_min + 0.01f : (float)args[5] / 255.0f;
+    const float m_range_inv = 1.0f / (m_max - m_min);
 
-    float diff = (float)args[5] - (float)args[4];
-
-    int inv_range_fp = (int)((255.0f / (diff < 1.0f ? 1.0f : diff)) * (1 << 8));
-    int black_clip_fp = (int)(args[4] * SCALE);
-    int spill_factor_fp = (int)((((float)args[6] / 255.0f) / mag_f) * SCALE);
+    const float l_min = (float)args[6];
+    const float l_max = (float)args[7];
+    const float s_amt = (float)args[8] / 255.0f;
+    const float l_rec_half = (float)args[9] / 510.0f;
     
-    int ut = (int)ut_f;
-    int vt = (int)vt_f;
-    int mode = args[7];
+    const int mode = args[10];
+    const int soft = args[11];
+
+    const int w = frame->width;
+    const int h = frame->height;
+    const int len = w * h;
+
+    const float l_min_inv = 1.0f / (l_min + 0.001f);
+    const float l_max_inv = 1.0f / (255.0f - l_max + 0.001f);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
-    uint8_t *restrict Y2 = frame2->data[0];
-    uint8_t *restrict Cb2 = frame2->data[1];
-    uint8_t *restrict Cr2 = frame2->data[2];
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
+    uint8_t *restrict AM = rgbkey->alpha_map;
+    uint8_t *restrict AT = rgbkey->alpha_temp;
 
-    const int len = frame->len;
+    const float *restrict l_mag = rgbkey->mag_lut;
+    const float *restrict l_inv = rgbkey->inv_mag_lut;
 
     #pragma omp parallel num_threads(rgbkey->n_threads)
-
-    if (mode != 0) {
+    {
         #pragma omp for schedule(static)
-        for (int pos = 0; pos < len; pos++) {
-            int uc = (int)Cb[pos] - 128;
-            int vc = (int)Cr[pos] - 128;
-            int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
-            int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
-            int abs_yy = (yy < 0) ? -yy : yy;
+        /*
+        // the vectorized loop is slower, because no math is the fastest math
+        for (int i = 0; i < len; i++) {
+            int u_int = (int)Cb[i] - 128;
+            int v_int = (int)Cr[i] - 128;
+            int d = u_int * u_int + v_int * v_int;
             
-            int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
-            int a = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
+            float fU = (float)u_int;
+            float fV = (float)v_int;
+            float fY = (float)Y[i];
             
-            Y[pos] = (a < 0) ? 0 : (a > 255 ? 255 : (uint8_t)a);
-            Cb[pos] = 128; Cr[pos] = 128;
-        }
-    } else {
-        #pragma omp for schedule(static)
-        for (int pos = 0; pos < len; pos++) {
-            int uc = (int)Cb[pos] - 128;
-            int vc = (int)Cr[pos] - 128;
-
-            int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
-            int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
-
-            int abs_yy = (yy < 0) ? -yy : yy;
-            int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
+            float invM = l_inv[d];
+            float mag  = l_mag[d];
+            float dot  = (fU * kU + fV * kV) * invM;
             
-            int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
-            alpha = (alpha < 0) ? 0 : (alpha > 255 ? 255 : alpha);
-            int invA = 255 - alpha;
+            float lw_low  = CLAMP(fY * l_min_inv, 0.0f, 1.0f);
+            float lw_high = CLAMP((255.0f - fY) * l_max_inv, 0.0f, 1.0f);
+            float lw = lw_low * lw_high;
 
-            int cb_c = Cb[pos];
-            int cr_c = Cr[pos];
+            float raw = (dot - wedge_cos) * hue_denom * mag * lw;
+            float t = CLAMP((raw - m_min) * m_range_inv, 0.0f, 1.0f);
+            float smooth_alpha = 1.0f - (t * t * (3.0f - 2.0f * t));
 
-            if (xx > 0) {
-                int suppress_fp = (xx * spill_factor_fp);
-                if (suppress_fp > SCALE) suppress_fp = SCALE;
+            AM[i] = (uint8_t)(smooth_alpha * 255.0f);
+        }*/
 
-                cb_c -= (suppress_fp * ut) >> 12;
-                cr_c -= (suppress_fp * vt) >> 12;
-                
-                cb_c = (cb_c < 0) ? 0 : (cb_c > 255 ? 255 : cb_c);
-                cr_c = (cr_c < 0) ? 0 : (cr_c > 255 ? 255 : cr_c);
+        for (int i = 0; i < len; i++) {
+            int u_int = (int)Cb[i] - 128;
+            int v_int = (int)Cr[i] - 128;
+            int d = u_int * u_int + v_int * v_int;
+
+            if (d < 16) { // fast path
+                AM[i] = 255;
+                continue;
             }
 
-            Y[pos]  = DIV255(Y[pos]  * alpha + Y2[pos]  * invA);
-            Cb[pos] = DIV255(cb_c    * alpha + Cb2[pos] * invA);
-            Cr[pos] = DIV255(cr_c    * alpha + Cr2[pos] * invA);
+            float invM = l_inv[d];
+            float dot  = ((float)u_int * kU + (float)v_int * kV) * invM;
+
+            if (dot <= wedge_cos) { // fast path
+                AM[i] = 255;
+                continue;
+            }
+
+            float fY = (float)Y[i];
+            float lw = CLAMP(fY * l_min_inv, 0.0f, 1.0f) * CLAMP((255.0f - fY) * l_max_inv, 0.0f, 1.0f);
+            float raw = (dot - wedge_cos) * hue_denom * l_mag[d] * lw;
+            float t = CLAMP((raw - m_min) * m_range_inv, 0.0f, 1.0f);
+
+            AM[i] = (uint8_t)((1.0f - (t * t * (3.0f - 2.0f * t))) * 255.0f);
+        }
+
+        if (soft > 0) {
+            #pragma omp for schedule(static)
+            for (int y = 0; y < h; y++) {
+                uint8_t *restrict row_in  = &AM[y * w];
+                uint8_t *restrict row_out = &AT[y * w];
+                row_out[0] = row_in[0];
+                row_out[w-1] = row_in[w-1];
+                for (int x = 1; x < w-1; x++) {
+                    int sum = row_in[x-1] + row_in[x] + row_in[x+1];
+                    int avg = (sum * 21846) >> 16;
+                    row_out[x] = row_in[x] + (((avg - row_in[x]) * soft + 128) >> 8);
+                }
+            }
+
+            #pragma omp for schedule(static)
+            for (int y = 1; y < h-1; y++) {
+                uint8_t *restrict r_top  = &AT[(y-1)*w];
+                uint8_t *restrict r_mid  = &AT[y*w];
+                uint8_t *restrict r_bot  = &AT[(y+1)*w];
+                uint8_t *restrict r_dest = &AM[y*w];
+                for (int x = 0; x < w; x++) {
+                    int sum = (r_top[x] + r_mid[x] + r_bot[x]);
+                    int avg = (sum * 21846) >> 16;
+                    r_dest[x] = r_mid[x] + (((avg - r_mid[x]) * soft + 128) >> 8);
+                }
+            }
+        }
+
+        if (mode == 1) {
+            #pragma omp for schedule(static)
+            for (int i = 0; i < len; i++) {
+                Y[i] = AM[i];
+                Cb[i] = 128;
+                Cr[i] = 128;
+            }
+        }
+        else if (mode == 2) {
+            #pragma omp for schedule(static)
+            for (int i = 0; i < len; i++) {
+                int u = (int)Cb[i]-128;
+                int v = (int)Cr[i]-128;
+                int d = u*u + v*v;
+
+                float invM = l_inv[d];
+                float dot = ((float)u * kU + (float)v * kV) * invM;
+                
+                float pos_dot = dot > 0.0f ? dot : 0.0f;
+                float s = pos_dot * s_amt * l_mag[d];
+
+                Y[i]  = (uint8_t)CLAMP((float)Y[i] + (s * l_rec_half), 0.0f, 255.0f);
+                Cb[i] = (uint8_t)CLAMP(((float)u - kU * s) + 128.0f, 0.0f, 255.0f);
+                Cr[i] = (uint8_t)CLAMP(((float)v - kV * s) + 128.0f, 0.0f, 255.0f);
+            }
+        }
+        else {
+            if (s_amt > 0.0f) {
+                #pragma omp for schedule(static)
+                for (int i = 0; i < len; i++) {
+                    int a = AM[i];
+                    if(LIKELY(a == 0)) { // fast path
+                        Y[i] = Y2[i]; Cb[i] = Cb2[i]; Cr[i] = Cr2[i];
+                        continue;
+                    }
+
+                    float fU = (float)Cb[i] - 128.0f;
+                    float fV = (float)Cr[i] - 128.0f;
+                    float fY = (float)Y[i];
+
+                    int d = (int)(fU * fU + fV * fV);
+                    float dot = fmaxf((fU * kU + fV * kV) * l_inv[d], 0.0f);
+                    float s = dot * s_amt * l_mag[d];
+
+                    fU -= kU * s;
+                    fV -= kV * s;
+                    fY += s * l_rec_half;
+
+                    int ia = 255 - a;
+                    Y[i]  = DIV255((int)CLAMP(fY, 0.0f, 255.0f) * a + Y2[i] * ia);
+                    Cb[i] = DIV255((int)CLAMP(fU + 128.0f, 0.0f, 255.0f) * a + Cb2[i] * ia);
+                    Cr[i] = DIV255((int)CLAMP(fV + 128.0f, 0.0f, 255.0f) * a + Cr2[i] * ia);
+                }
+            } else {
+                #pragma omp for schedule(static)
+                for (int i = 0; i < len; i++) {
+                    const uint8_t a = AM[i];
+                    const uint8_t ia = 255 - a;
+
+                    Y[i]  = DIV255((int)Y[i] * a + (int)Y2[i] * ia);
+                    Cb[i] = DIV255((int)Cb[i] * a + (int)Cb2[i] * ia);
+                    Cr[i] = DIV255((int)Cr[i] * a + (int)Cr2[i] * ia);
+                }
+            }
         }
     }
 }
