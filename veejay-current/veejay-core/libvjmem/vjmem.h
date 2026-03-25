@@ -30,7 +30,6 @@ extern void vj_mem_set_defaults(int w, int h);
 extern int vj_mem_threaded_init(int w, int h);
 extern void *vj_malloc_(size_t size);
 extern void *vj_calloc_(size_t size );
-extern void memcpy_report(void);
 extern void init_parallel_tasks(int n_tasks);
 
 #define vj_malloc(i) vj_malloc_(i)

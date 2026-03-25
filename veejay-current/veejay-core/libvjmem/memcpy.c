@@ -183,9 +183,9 @@ static int selected_best_memset = 1;
 
 static double get_time(void)
 {
-	struct timespec ts;
-	clock_gettime( CLOCK_MONOTONIC, &ts );
-	return (double) ts.tv_sec + (double) ts.tv_nsec / 1000000000.0;
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec + ts.tv_nsec * 1e-9;
 }
 
 #if defined(ARCH_X86) || defined (ARCH_X86_64)
@@ -2335,59 +2335,59 @@ static struct {
     uint32_t cpu_require;
 } memcpy_method[] = {
     { NULL, NULL, 0,0 },
-    { "glibc memcpy()",  (void*) memcpy, 0, 0 },
+    { "glibc memcpy()",  memcpy, 0, 0 },
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
-    { "linux kernel memcpy()", (void*) linux_kernel_memcpy, 0, 0 },
+    { "linux kernel memcpy()", linux_kernel_memcpy, 0, 0 },
 #endif
 #ifdef HAVE_ASM_AVX512
-    { "AVX-512 optimized memcpy()", (void*) avx512_memcpy, 0, AV_CPU_FLAG_AVX512 },
+    { "AVX-512 optimized memcpy()", avx512_memcpy, 0, AV_CPU_FLAG_AVX512 },
 #endif
 #ifdef HAVE_ASM_AVX2
-    { "AVX2 optimized memcpy()", (void*) avx2_memcpy, 0, AV_CPU_FLAG_AVX2 },
+    { "AVX2 optimized memcpy()", avx2_memcpy, 0, AV_CPU_FLAG_AVX2 },
 #endif
 #ifdef HAVE_ASM_AVX
-    { "AVX optimized memcpy()", (void*) avx_memcpy, 0, AV_CPU_FLAG_AVX },
-    { "AVX simple memcpy()", (void*) avx_memcpy2, 0, AV_CPU_FLAG_AVX },
+    { "AVX optimized memcpy()", avx_memcpy, 0, AV_CPU_FLAG_AVX },
+    { "AVX simple memcpy()", avx_memcpy2, 0, AV_CPU_FLAG_AVX },
 #endif
 #if defined (__SSE4_1__)
-    { "SSE4_1 optimized memcpy()", (void*) sse41_memcpy, 0, AV_CPU_FLAG_SSE4 },
+    { "SSE4_1 optimized memcpy()", sse41_memcpy, 0, AV_CPU_FLAG_SSE4 },
 #endif
 #if defined (__SSE4_2__)
-    { "SSE4_2 optimized memcpy()", (void*) sse42_memcpy, 0, AV_CPU_FLAG_SSE42 },
+    { "SSE4_2 optimized memcpy()", sse42_memcpy, 0, AV_CPU_FLAG_SSE42 },
 #endif
 #if defined (__SSE2__)
-    { "SSE2 optimized memcpy() (128)", (void*) sse2_memcpy, 0, AV_CPU_FLAG_SSE2 },
-    { "SSE2 optimized memcpy() (128) v2", (void*) sse2_memcpy_unaligned, 0, AV_CPU_FLAG_SSE2 },
+    { "SSE2 optimized memcpy() (128)", sse2_memcpy, 0, AV_CPU_FLAG_SSE2 },
+    { "SSE2 optimized memcpy() (128) v2", sse2_memcpy_unaligned, 0, AV_CPU_FLAG_SSE2 },
 #endif
 #ifdef HAVE_ASM_SSE
-    { "SSE optimized memcpy() (64)", (void*) sse_memcpy, 0, AV_CPU_FLAG_MMXEXT | AV_CPU_FLAG_SSE },
-    { "SSE optimized memcpy() (128)", (void*) sse_memcpy2, 0, AV_CPU_FLAG_MMXEXT | AV_CPU_FLAG_SSE },
+    { "SSE optimized memcpy() (64)", sse_memcpy, 0, AV_CPU_FLAG_MMXEXT | AV_CPU_FLAG_SSE },
+    { "SSE optimized memcpy() (128)", sse_memcpy2, 0, AV_CPU_FLAG_MMXEXT | AV_CPU_FLAG_SSE },
 #endif
 #ifdef HAVE_ASM_MMX
-    { "MMX optimized memcpy()", (void*) mmx_memcpy, 0, AV_CPU_FLAG_MMX },
+    { "MMX optimized memcpy()", mmx_memcpy, 0, AV_CPU_FLAG_MMX },
 #endif
 #ifdef HAVE_ASM_MMX2
-    { "MMX2 optimized memcpy()", (void*) mmx2_memcpy, 0, AV_CPU_FLAG_MMX2 },
+    { "MMX2 optimized memcpy()", mmx2_memcpy, 0, AV_CPU_FLAG_MMX2 },
 #endif
 #if defined (HAVE_ASM_MMX) || defined(HAVE_ASM_SSE) || defined(HAVE_ASM_MMX2)
-    { "MMX/MMX2/SSE optimized memcpy() v1", (void*) fast_memcpy, 0, AV_CPU_FLAG_MMX | AV_CPU_FLAG_SSE | AV_CPU_FLAG_MMX2 },
+    { "MMX/MMX2/SSE optimized memcpy() v1", fast_memcpy, 0, AV_CPU_FLAG_MMX | AV_CPU_FLAG_SSE | AV_CPU_FLAG_MMX2 },
 #endif
 #if defined(HAVE_ARM_NEON)
-    { "NEON optimized memcpy()", (void*) memcpy_neon, 0, AV_CPU_FLAG_NEON },
-    { "new memcpy for cortex using NEON with line size of 32, preload offset of 192", (void*) memcpy_new_neon_line_size_32, 0, AV_CPU_FLAG_NEON },
-    { "new memcpy for cortex using NEON with line size of 64, preload offset of 192", (void*) memcpy_new_neon_line_size_64, 0, AV_CPU_FLAG_NEON },
-    { "new memcpy for cortex using NEON line 32 auto-prefetch", (void*) memcpy_new_neon_line_size_32_auto, 0, AV_CPU_FLAG_NEON },
+    { "NEON optimized memcpy()", memcpy_neon, 0, AV_CPU_FLAG_NEON },
+    { "new memcpy for cortex using NEON with line size of 32, preload offset of 192", memcpy_new_neon_line_size_32, 0, AV_CPU_FLAG_NEON },
+    { "new memcpy for cortex using NEON with line size of 64, preload offset of 192", memcpy_new_neon_line_size_64, 0, AV_CPU_FLAG_NEON },
+    { "new memcpy for cortex using NEON line 32 auto-prefetch", memcpy_new_neon_line_size_32_auto, 0, AV_CPU_FLAG_NEON },
 #endif
 #ifdef HAVE_ARM_ASIMD
-    { "Advanced SIMD ARMv8-A memcpy()", (void*) memcpy_asimd, 0, AV_CPU_FLAG_ARMV8 },
+    { "Advanced SIMD ARMv8-A memcpy()", memcpy_asimd, 0, AV_CPU_FLAG_ARMV8 },
 #endif
 #ifdef HAVE_ARMV7A
-    { "new memcpy cortex line 32, preload 192", (void*) memcpy_new_line_size_32_preload_192, 0, 0 },
-    { "new memcpy cortex line 64, preload 192", (void*) memcpy_new_line_size_64_preload_192, 0, 0 },
-    { "new memcpy cortex line 64, preload 192 aligned", (void*) memcpy_new_line_size_64_preload_192_aligned_access, 0, 0 },
-    { "new memcpy cortex line 32, preload 192 align32", (void*) memcpy_new_line_size_32_preload_192_align_32, 0, 0 },
-    { "new memcpy cortex line 32, preload 96", (void*) memcpy_new_line_size_32_preload_96, 0, 0 },
-    { "new memcpy cortex line 32, preload 96 aligned", (void*) memcpy_new_line_size_32_preload_96_aligned_access, 0, 0 },
+    { "new memcpy cortex line 32, preload 192", memcpy_new_line_size_32_preload_192, 0, 0 },
+    { "new memcpy cortex line 64, preload 192", memcpy_new_line_size_64_preload_192, 0, 0 },
+    { "new memcpy cortex line 64, preload 192 aligned", memcpy_new_line_size_64_preload_192_aligned_access, 0, 0 },
+    { "new memcpy cortex line 32, preload 192 align32", memcpy_new_line_size_32_preload_192_align_32, 0, 0 },
+    { "new memcpy cortex line 32, preload 96", memcpy_new_line_size_32_preload_96, 0, 0 },
+    { "new memcpy cortex line 32, preload 96 aligned", memcpy_new_line_size_32_preload_96_aligned_access, 0, 0 },
 #endif
     { NULL, NULL, 0 }
 };
@@ -2399,57 +2399,39 @@ static struct {
     double t;
 } memset_method[] = {
     { NULL, NULL, 0, 0 },
-    { "glibc memset()", (void*) memset, 0, 0},
+    { "glibc memset()", memset, 0, 0},
 #ifdef HAVE_ASM_AVX2
-    { "AVX2 optimized memset()", (void*) avx2_memset, 0, AV_CPU_FLAG_AVX2 },
+    { "AVX2 optimized memset()", avx2_memset, 0, AV_CPU_FLAG_AVX2 },
 #endif
 #ifdef HAVE_ASM_AVX
-    { "AVX optimized memset()", (void*) avx_memset, 0, AV_CPU_FLAG_AVX },
+    { "AVX optimized memset()", avx_memset, 0, AV_CPU_FLAG_AVX },
 #endif
 #if defined (__SSE4_1__)
-    { "SSE4_1 memset()", (void*) sse41_memset, 0, AV_CPU_FLAG_SSE4 },
-    { "SSE4_1 memset() v2", (void*) sse41_memset_v2, 0, AV_CPU_FLAG_SSE4 },
+    { "SSE4_1 memset()", sse41_memset, 0, AV_CPU_FLAG_SSE4 },
+    { "SSE4_1 memset() v2", sse41_memset_v2, 0, AV_CPU_FLAG_SSE4 },
 #endif
 #if defined (__SSE4_2__)
-    { "SSE4_2 unaligned memset()", (void*) sse42_memset, 0, AV_CPU_FLAG_SSE42 },
-    { "SSE4_2 aligned memset()", (void*) sse42_aligned_memset, 0, AV_CPU_FLAG_SSE42 },
+    { "SSE4_2 unaligned memset()", sse42_memset, 0, AV_CPU_FLAG_SSE42 },
+    { "SSE4_2 aligned memset()", sse42_aligned_memset, 0, AV_CPU_FLAG_SSE42 },
 #endif
 #ifdef HAVE_ARM_NEON
-    { "memset_neon", (void*) memset_neon, 0, AV_CPU_FLAG_NEON },
+    { "memset_neon", memset_neon, 0, AV_CPU_FLAG_NEON },
 #endif
 #ifdef HAVE_ARM_ASIMD
-    { "Advanced SIMD memset()", (void*) memset_asimd, 0, AV_CPU_FLAG_ARMV8 },
-    { "Advanced SIMD memset() v4", (void*) memset_asimd_v4, 0, AV_CPU_FLAG_ARMV8 },
-    { "Advanced SIMD memset() 64-line", (void*) memset_asimd_64, 0, AV_CPU_FLAG_ARMV8 },
-    { "Advanced SIMD memset() 32-line", (void*) memset_asimd_32, 0, AV_CPU_FLAG_ARMV8 },
-    { "Advanced SIMD memset() v3", (void*) memset_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },
+    { "Advanced SIMD memset()", memset_asimd, 0, AV_CPU_FLAG_ARMV8 },
+    { "Advanced SIMD memset() v4", memset_asimd_v4, 0, AV_CPU_FLAG_ARMV8 },
+    { "Advanced SIMD memset() 64-line", memset_asimd_64, 0, AV_CPU_FLAG_ARMV8 },
+    { "Advanced SIMD memset() 32-line", memset_asimd_32, 0, AV_CPU_FLAG_ARMV8 },
+    { "Advanced SIMD memset() v3", memset_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },
 #endif
 #ifdef HAVE_ARM7A
-    { "memset align 0", (void*) memset_new_align_0, 0, 0 },
-    { "memset align 8", (void*) memset_new_align_8, 0, 0 },
-    { "memset align 32", (void*) memset_new_align_32, 0, 0 },
+    { "memset align 0", memset_new_align_0, 0, 0 },
+    { "memset align 8", memset_new_align_8, 0, 0 },
+    { "memset align 32", memset_new_align_32, 0, 0 },
 #endif
-    { "64-bit word memset()", (void*) memset_64, 0, 0 },
+    { "64-bit word memset()", memset_64, 0, 0 },
     { NULL, NULL, 0, 0 } 
 };
-
-
-void	memcpy_report(void)
-{
-	int i;
-	fprintf(stdout,"\n\nSIMD benchmark results:\n");
-	for( i = 1; memset_method[i].name; i ++ ) {
-		fprintf(stdout,"\t%g : %s\n",memset_method[i].t,  memset_method[i].name );
-	}
-	for( i = 1; memcpy_method[i].name; i ++ ) {
-		fprintf(stdout,"\t%g : %s\n",memcpy_method[i].t,  memcpy_method[i].name );
-	}
-
-	fprintf(stdout, "\n");
-	fprintf(stdout, "best memcpy(): %s\n", memcpy_method[ selected_best_memcpy ].name );
-	fprintf(stdout, "best memset(): %s\n" ,memset_method[ selected_best_memset ].name );
-
-}
 
 void *(* veejay_memcpy)(void *to, const void *from, size_t len) = 0;
 void *(* veejay_memset)(void *what, uint8_t val, size_t len ) = 0;
@@ -2568,7 +2550,8 @@ void find_best_memcpy(void)
 		t = get_time() - t;
 		
 		if(!mem_verify(buf2,validbuf, bufsize)) {
-			t = 0;			
+            veejay_msg(VEEJAY_MSG_WARNING, "Validation failed for %s", memcpy_method[i].name);
+			continue;
 		}
 
 		if( t > 0 )
@@ -2646,8 +2629,8 @@ void find_best_memset(void)
 	memset( buf1, 0, bufsize * sizeof(char));
 	memset( buf2, 0, bufsize * sizeof(char));
 
-	consume_buffer((unsigned char *)buf1, bufsize);
-	consume_buffer((unsigned char *)buf2, bufsize);
+  consume_buffer((unsigned char *)buf1, bufsize);
+  consume_buffer((unsigned char *)buf2, bufsize);
 
   for (i = 1; memset_method[i].name != NULL; i++) {
       if (memset_method[i].cpu_require && !(cpu_flags & memset_method[i].cpu_require)) {
@@ -2666,6 +2649,10 @@ void find_best_memset(void)
       memset_method[i].t = t;
       veejay_msg(VEEJAY_MSG_INFO, "method '%s' completed in %g seconds", memset_method[i].name, t);
   }
+
+  consume_buffer((unsigned char *)buf1, bufsize);
+  consume_buffer((unsigned char *)buf2, bufsize);
+
 
   best = 0;
   double best_time = 0.0;
