@@ -1,5 +1,5 @@
 /* Gveejay Reloaded - graphical interface for VeeJay
- * 	     (C) 2002-2005 Niels Elburg <nwelburg@gmail.com> 
+ * 	     (C) 2002-2005 Niels Elburg <nwelburg@gmail.com>
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -58,22 +58,24 @@ void   set_initial_curve( GtkWidget *curve, int fx_id, int parameter_id, int sta
 	_effect_get_minmax(fx_id, &min, &max, parameter_id );
     int len = end - start;
 	int i,k=0;
-    float	*vec = (float*) vj_calloc(sizeof(float) * len );
+    float	*vec = (float*) vj_calloc(sizeof(float) * len ); // FIXME less values len/step?
 
 	int diff = max - min;
-	for(i = start ; i < end; i ++ )
+	for(i = start ; i < end; i ++ ) //FIXME less values ? i+=step
 	{
-		float val = ((float)(value - min) / (diff));
-		vec[k] = val;
+		//~ float val = ((float)(value - min) / (diff)); # BYPASS [0-1] NORMALISATION
+		//~ vec[k] = val;  # BYPASS [0-1] NORMALISATION
+		vec[k] = value;
 		k++;
 	}
 
-    gtk3_curve_set_vector( curve , len, vec );
     //~ gtk3_curve_set_xaxis_range( curve, (gfloat) start, (gfloat) end );
     //~ gtk3_curve_set_yaxis_range( curve, (gfloat) min, (gfloat) max );
     gtk3_curve_set_range( curve,  (gfloat) start, (gfloat) end, (gfloat) min, (gfloat) max );
     gtk3_curve_set_grid_resolution(curve, 16); // default grid resolution
+    gtk3_curve_set_vector( curve , len, vec );
     gtk3_curve_set_curve_type( curve, GTK3_CURVE_TYPE_LINEAR );
+
 
     free(vec);
 
@@ -90,7 +92,7 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 	int i;
 	int min = 0, max = 0;
 
-	if(n != 6 || len <= 0 )	
+	if(n != 6 || len <= 0 )
 	{
 		return -1;
 	}
@@ -108,7 +110,7 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 	for(i = start ; i < end; i ++ )
 	{
 		unsigned char *ptr = in + (k * 4);
-		int value = 
+		int value =
 		  ( ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24) );
 
 		// val = ((Input - InputLow) / (InputHigh - InputLow)) * (OutputHigh - OutputLow) + OutputLow;
