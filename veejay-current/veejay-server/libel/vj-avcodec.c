@@ -655,7 +655,6 @@ static int vj_avcodec_encode_video( AVPacket *pkt, AVCodecContext *ctx, uint8_t 
 		}
 
 		if( res == 0 ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "[AV] Encoded frame to %d bytes", pkt->size);
 			return pkt->size;
 		}
 
@@ -837,11 +836,7 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 	av->frame->pict_type = AV_PICTURE_TYPE_I;
 
 	//av->frame->quality = 1;
-	int ret = vj_avcodec_encode_video( av->packet, av->context, buf, buf_len, av->frame );
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "[AV] Encoded frame %ld to %d bytes" ,nframe, ret );
-
-	return ret;
+	return vj_avcodec_encode_video( av->packet, av->context, buf, buf_len, av->frame );
 #endif
 }
 
