@@ -246,7 +246,7 @@
 #include "./effects/echotrace.h"
 #include "./effects/spectralmotion.h"
 #include "./effects/falsecolors.h"
-#include "./effects/tunnel.h"
+//#include "./effects/tunnel.h"
 
 #define VJ_IMAGE_EFFECT_MIN 42
 #define VJ_IMAGE_EFFECT_MAX 199
