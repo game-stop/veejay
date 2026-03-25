@@ -292,6 +292,9 @@ int vj_client_read_frame_hdr( vj_client *v )
 
 int vj_client_read_frame_data( vj_client *v, int datalen)
 {
+	if( v == NULL )
+		return 0;
+		
 	if(v->space_len < datalen || v->space == NULL) {
 		v->space_len = datalen;
 		v->space = (uint8_t*) realloc( v->space, v->space_len );
