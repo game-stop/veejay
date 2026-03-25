@@ -18,13 +18,13 @@
  */
 #include <config.h>
 #include <string.h>
-
 #include <stdio.h>
 #include <stdint.h>
 #include <sysexits.h>
 #include <veejaycore/defs.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/atomic.h>
+#include <veejaycore/core.h>
 #include <libveejay/vj-sdl.h>
 #include <veejaycore/vj-msg.h>
 #include <sys/stat.h>
@@ -85,18 +85,23 @@ static void CompiledWith(void)
 	fprintf(stdout,"This is Veejay %s\n\n", VERSION);
 
 	fprintf(stdout,    
-		"Build for %s/%s arch %s on %s\n",
+		"Build for %s/%s arch %s on %s\n\n",
 	    BUILD_OS,
 	    BUILD_KERNEL,
 	    BUILD_MACHINE,
 	    BUILD_DATE );
 
 	fprintf(stdout,
+		"libveejaycore is build from git commit hash %s\n", veejay_core_build());
+	fprintf(stdout,
+		"libveejay is build from git commit hash %s\n\n", GIT_HASH_VEEJAY);
+
+	fprintf(stdout,
 		"Detected cpu cache line size: %d\n", cpu_get_cacheline_size());
 	fprintf(stdout,
 		"Memory alignment size: %d\n" , mem_align_size());
 
-	fprintf(stdout,"\nArchitecture:\n");
+	fprintf(stdout,"\nArchitecture:\n\n");
 #ifdef ARCH_MIPS
 	fprintf(stdout, "\tMIPS\n");
 #endif
@@ -127,15 +132,18 @@ static void CompiledWith(void)
 #ifdef HAVE_PS2
 	fprintf(stdout, "\tSony Playstation 2 (TM)\n");
 #endif
-	fprintf(stdout, "\n\nCompiled in support for:\n");
+	fprintf(stdout, "\n\nCompiled in support for:\n\n");
 #ifdef HAVE_ALTIVEC
 	fprintf(stdout,"\tAltivec\n");
 #endif
-#ifdef HAVE_ASM_SSE
-	fprintf(stdout,"\tSSE\n");
-#endif
 #ifdef HAVE_CMOV
 	fprintf(stdout,"\tCMOV\n");
+#endif
+#ifdef HAVE_ASM_3DNOW
+    fprintf(stdout, "\t3DNOW\n");
+#endif
+#ifdef HAVE_ASM_SSE
+	fprintf(stdout,"\tSSE\n");
 #endif
 #ifdef HAVE_ASM_SSE2
 	fprintf(stdout,"\tSSE2\n");
@@ -149,6 +157,9 @@ static void CompiledWith(void)
 #ifdef HAVE_ASM_MMX
 	fprintf(stdout,"\tMMX\n");
 #endif
+#ifdef HAVE_ASM_MMX2
+    fprintf(stdout,"\tMMX2\n");
+#endif
 #ifdef HAVE_ASM_MMXEXT
 	fprintf(stdout,"\tMMXEXT\n");
 #endif
@@ -161,11 +172,12 @@ static void CompiledWith(void)
 #ifdef HAVE_ASM_AVX
 	fprintf(stdout,"\tAVX\n");
 #endif
-#ifdef HAVEW_ASM_AVX2
+#ifdef HAVE_ASM_AVX2
     fprintf(stdout,"\tAVX2\n");
 #endif
-	
-	memcpy_report();
+#ifdef HAVE_ASM_AVX512
+    fprintf(stdout, "\tAVX512\n");
+#endif
 
 	fprintf(stdout,"\n\nDependencies:\n");
 
@@ -196,11 +208,12 @@ static void CompiledWith(void)
 #ifdef HAVE_V4L2
 	fprintf(stdout, "\tSupport for Capture Devices\n");
 #endif
-	/*
-#ifdef HAVE_GL
-	veejay_msg( VEEJAY_MSG_INFO,  "\tUsing  openGL ");
+#ifdef HAVE_FREETYPE
+	fprintf(stdout, "\tSupport for TrueType Fonts\n");
 #endif
-	*/
+#ifdef HAVE_LIBUNWIND
+    fprintf(stdout, "\tSupport for stack unwinding\n");
+#endif
 #ifdef HAVE_DIRECTFB
 	fprintf(stdout,"\tSupport for Direct Framebuffer\n");
 #endif
@@ -210,6 +223,8 @@ static void CompiledWith(void)
 #ifdef HAVE_QRCODE
 	fprintf(stdout,"\tSupport for QR code\n");
 #endif
+
+    fprintf(stdout, "\n\n");
 
 	exit(0);
 }
