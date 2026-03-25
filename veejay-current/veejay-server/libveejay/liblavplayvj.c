@@ -149,7 +149,7 @@ static void veejay_playback_close(veejay_t *info);
 int veejay_get_state(veejay_t *info) {
 	video_playback_setup *settings = (video_playback_setup*)info->settings;
 
-	return settings->state;
+	return atomic_load_int(&settings->state);
 }
 
 int	veejay_set_yuv_range(veejay_t *info) {
