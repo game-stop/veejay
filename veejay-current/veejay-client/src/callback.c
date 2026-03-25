@@ -2841,7 +2841,7 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	}
 	
 	int min=0,max=0;
-	float *data = (float*) vj_calloc( sizeof(float) * length );
+	float *data = (float*) vj_calloc( sizeof(float) * length ); // FIXME int *data ? because no more normalisation
 
 	_effect_get_minmax( id, &min, &max,j );
 
@@ -2863,7 +2863,8 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	int k;
 	int diff = max - min;
 	for( k = 0 ; k < length ; k++ ) {
-		int pval = ((data[k]) * ((float)diff)) + min;
+		//~ int pval = ((data[k]) * ((float)diff)) + min; // # BYPASS [0-1] NORMALISATION
+		int pval = (int) data[k];
 		ptr[0] = pval & 0xff;
 		ptr[1] = (pval >> 8) & 0xff;
 		ptr[2] = (pval >> 16) & 0xff;
