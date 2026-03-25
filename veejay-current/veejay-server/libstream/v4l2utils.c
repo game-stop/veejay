@@ -811,7 +811,12 @@ static int v4l2_configure_format(v4l2info *v, int host_fmt, int wid, int hei)
 
     yuv_plane_sizes(v->info, &(v->planes[0]),&(v->planes[1]),&(v->planes[2]),&(v->planes[3]));
 
-    veejay_msg(VEEJAY_MSG_INFO,"v4l2: output %dx%d, source %dx%d, fmt=0x%x", wid, hei, src_wid, src_hei, cap_pf);
+    veejay_msg(VEEJAY_MSG_INFO,"v4l2: output %dx%d, source %dx%d", wid, hei, src_wid, src_hei);
+	veejay_msg(VEEJAY_MSG_INFO, "v4l2: final negotiated pixel format: %c%c%c%c",
+            cap_pf & 0xff,
+            (cap_pf >> 8) & 0xff,
+            (cap_pf >> 16) & 0xff,
+            (cap_pf >> 24) & 0xff);
 
     return 1;
 }
