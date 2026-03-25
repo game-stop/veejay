@@ -29,7 +29,7 @@
 #include "gtk3curve.h"
 #include "utils-gtk.h" /* VEEJAY NEEDS */
 
-#define DEBUG
+//~ #define DEBUG
 
 #ifdef DEBUG
 #define DEBUG_INFO g_print
