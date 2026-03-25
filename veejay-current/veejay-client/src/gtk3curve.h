@@ -112,6 +112,8 @@ GtkWidget*  gtk3_curve_new (void);
 void gtk3_curve_reset                             (GtkWidget         *widget);
 void gtk3_curve_set_gamma                         (GtkWidget         *widget,
                                                    gfloat             gamma_);
+void gtk3_curve_set_grid_resolution               (GtkWidget         *widget,
+                                                   gint               grid_resolution);/* VEEJAY NEEDS */
 void gtk3_curve_set_x_lo                          (GtkWidget         *widget, /* VEEJAY NEEDS */
                                                    gfloat             min_x);
 void gtk3_curve_set_x_hi                          (GtkWidget         *widget, /* VEEJAY NEEDS */
@@ -159,10 +161,6 @@ void gtk3_curve_set_color_cpoint_rgba             (GtkWidget         *widget,
                                                    gfloat             g,
                                                    gfloat             b,
                                                    gfloat             a);
-
-void gtk3_curve_set_grid_resolution(GtkWidget *widget, gint grid_resolution);/* VEEJAY NEEDS */
-void gtk3_curve_set_x_lo( GtkWidget *widget, gfloat lo );/* VEEJAY NEEDS */
-void gtk3_curve_set_x_hi( GtkWidget *widget, gfloat hi );/* VEEJAY NEEDS */
 
 Gtk3CurveType  gtk3_curve_get_curve_type          (GtkWidget         *widget);
 Gtk3CurveColor gtk3_curve_get_color_background    (GtkWidget          *widget);
