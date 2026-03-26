@@ -44,7 +44,6 @@ typedef struct
 	int state;
 	vj_client *v;
 	VJFrame *info;
-	VJFrame *dest; // there is no full range YUV + alpha in PIX_FMT family
 	void *scaler;
 } threaded_t;
 
@@ -328,7 +327,7 @@ int	net_thread_get_frame( vj_tag *tag, VJFrame *dst )
 		sws_template sws_templ;
 		memset( &sws_templ, 0, sizeof(sws_template));
 		sws_templ.flags = yuv_which_scaler();
-		t->scaler = yuv_init_swscaler( src,t->dest, &sws_templ, yuv_sws_get_cpu_flags() );
+		t->scaler = yuv_init_swscaler( src,dst, &sws_templ, yuv_sws_get_cpu_flags() );
 	}
 	
 	yuv_convert_and_scale( t->scaler, src,dst );
@@ -345,12 +344,6 @@ int	net_thread_start(vj_tag *tag, VJFrame *info)
     }
 
     int p_err = 0;
-
-	t->dest = yuv_yuv_template(NULL,NULL,NULL, info->width,info->height, alpha_fmt_to_yuv(info->format));
-	if(t->dest == NULL) {
-        free(t);
-		return 0;
-	}
 
 	pthread_mutex_init( &(t->mutex), NULL );
 	
@@ -390,10 +383,6 @@ void	net_thread_stop(vj_tag *tag)
 	unlock(t);
     pthread_join(t->thread, NULL);
 	pthread_mutex_destroy( &(t->mutex));
-	if(t->dest) {
-		free(t->dest);
-		t->dest = NULL;
-	}
 
 	free(t);
 	tag->priv = NULL;
