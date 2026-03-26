@@ -3379,6 +3379,7 @@ static void vj_kf_select_parameter(int num)
 
     info->uc.selected_parameter_id = num;
     reset_curve( info->curve );
+    info->uc.reload_hint_checksums[HINT_KF] = -1;
     update_curve_widget( info->curve );
 }
 
