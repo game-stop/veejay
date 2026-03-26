@@ -1030,6 +1030,7 @@ VJFrame	*avhelper_get_decoded_video(void *ptr) {
 	el_decoder_t * e = (el_decoder_t*) ptr;
 
 	if(e->input == NULL) {
+		veejay_msg(VEEJAY_MSG_INFO, "Network data is in %s", yuv_get_pixfmt_description(e->codec_ctx->pix_fmt));
 		e->input = yuv_yuv_template( NULL,NULL,NULL, e->codec_ctx->width,e->codec_ctx->height, e->codec_ctx->pix_fmt );
 	}
 
