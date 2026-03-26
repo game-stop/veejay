@@ -171,22 +171,22 @@ int			sock_t_recv( vj_sock_t *s, void *dst, int len )
 	char *addr = (char*) dst;
 
 	while( bytes_left > 0 )
-	{	
-sock_t_recv_lbl:		
+	{
+sock_t_recv_lbl:
 		n = recv( s->sock_fd, addr + bytes_done, bytes_left, MSG_WAITALL );
 		if ( n <= 0 ) {
 			if( n == -1 ) {
-				if( errno == EAGAIN ) { 
-					veejay_msg(VEEJAY_MSG_ERROR, "Strange things happen in strange places. EAGAIN but socket is MSG_WAITALL");
-					goto sock_t_recv_lbl;
-
-				}
-				veejay_msg(0, "Error while receiving from network: %s", strerror(errno));
-			} 
-			
-			return n;
-		} 
-	
+                if( errno == EINTR ) goto sock_t_recv_lbl;
+                if( errno == EAGAIN || errno == EWOULDBLOCK ) {
+                    veejay_msg(VEEJAY_MSG_ERROR, "Strange things happen: EAGAIN with MSG_WAITALL");
+                    usleep(1000);
+                    goto sock_t_recv_lbl;
+                }
+                veejay_msg(0, "Error while receiving from network: %s", strerror(errno));
+                return -1;
+            }
+            return 0;
+        }
 		bytes_done += n;
 		bytes_left -= n;
 	}
@@ -215,33 +215,30 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 	return done;
 }
 
-int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
-{
-	int n; 
-	unsigned int length = len;
-	unsigned int done = 0;
-	unsigned char *ptr = buf;
-	while( length > 0 ) {
-		n = send( fd, ptr, length , MSG_NOSIGNAL );
-		if( n == -1 ) {
-            if(errno == EPIPE ) {
-                veejay_msg(VEEJAY_MSG_DEBUG, "The local end has been shut down,someone just hang up");
+int sock_t_send_fd(int fd, int send_size, unsigned char *buf, int len) {
+    int n;
+    int done = 0;
+
+    while (done < len) {
+        n = send(fd, buf + done, len - done, MSG_NOSIGNAL);
+
+        if (n < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                usleep(1000);
+                continue;
+            }
+            if (errno == EPIPE) {
+                veejay_msg(VEEJAY_MSG_DEBUG, "Socket Pipe Broken (Remote hangup)");
                 return -1;
             }
-			veejay_msg(0, "Error sending buffer:%s", strerror(errno));
+            veejay_msg(0, "Socket Error: %s", strerror(errno));
+            return -1;
+        }
+        if (n == 0)
 			return -1;
-		}
-
-		if( n == 0 ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection");
-			return -1;
-		}
-
-		ptr += n; //@ advance ptr by bytes send
-		length -= n; //@ decrement length by bytes send
-		done += n; //@ keep count of bytes done
-	}
-	return done;
+        done += n;
+    }
+    return done;
 }
 
 void			sock_t_close( vj_sock_t *s )
