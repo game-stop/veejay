@@ -924,17 +924,12 @@ gtk3_curve_leave (GtkWidget        *widget,
 static
 void gtk3_curve_get_cursor_coord(GtkWidget *widget, gint *tx, gint *ty)
 {
-  GdkDeviceManager *device_manager;
-  //~ GdkSeat            *user_seat;
+  GdkSeat          *user_seat;
   GdkDevice        *device_pointer;
-  GdkDisplay       *display;
 
   /*  get the pointer position  */
-  display = gtk_widget_get_display (widget);
-  device_manager = gdk_display_get_device_manager (display);
-  device_pointer = gdk_device_manager_get_client_pointer (device_manager);
-  //~ user_seat = gdk_display_get_default_seat (gdk_display_get_default ());
- //~ device_pointer = gdk_seat_get_pointer (user_seat);
+  user_seat = gdk_display_get_default_seat (gtk_widget_get_display (widget));
+  device_pointer = gdk_seat_get_pointer (user_seat);
   gdk_window_get_device_position (gtk_widget_get_window (widget),
                                   device_pointer,
                                   tx, ty, NULL);
@@ -1422,32 +1417,21 @@ static void
 gtk3_curve_size_graph (Gtk3Curve *curve)
 {
   Gtk3CurvePrivate *priv = curve->priv;
-  //~ GdkRectangle geom;
+  GdkRectangle geom;
   gint width, height;
   gfloat aspect;
 
-  GdkScreen *screen = gtk_widget_get_screen (GTK_WIDGET (curve));
-
-  //~ GdkWindow *gdk_window = gtk_widget_get_window(GTK_WIDGET (curve)); // assertion 'GDK_IS_WINDOW (window)' failed
-  //~ GdkDisplay *gdk_display = gdk_window_get_display(gdk_window); // assertion 'GDK_IS_display (window)' failed
-  //~ GdkMonitor *monitor = gdk_display_get_primary_monitor(gdk_display); // assertion 'GDK_IS_monitor (window)' failed
-  //~ gdk_monitor_get_geometry(monitor, &geom);
+  GdkMonitor *monitor = gdk_display_get_primary_monitor(gtk_widget_get_display ((GtkWidget*)curve));
+  gdk_monitor_get_geometry(monitor, &geom);
 
   width  = (priv->max_x - priv->min_x);
   height = (priv->max_y - priv->min_y);
   aspect = width / (gfloat) height;
-  if (width > gdk_screen_get_width (screen) / 4)
-  //~ if (width > geom.width / 4)
-    {
-      width  = gdk_screen_get_width (screen) / 4;
-      //~ width  = geom.width / 4;
-    }
-  if (height > gdk_screen_get_height (screen) / 4)
-  //~ if (height > geom.height / 4)
-    {
-      height = gdk_screen_get_height (screen) / 4;
-      //~ height = geom.height / 4;
-    }
+
+  if (width > geom.width / 4)
+      width  = geom.width / 4;
+  if (height > geom.height / 4)
+      height = geom.height / 4;
 
   if (aspect < 1.0)
     {
@@ -1868,19 +1852,15 @@ gtk3_curve_set_vector (GtkWidget *widget, int veclen, gfloat vector[])
   Gtk3Curve *curve = GTK3_CURVE (widget);
   Gtk3CurvePrivate *priv = curve->priv;
   Gtk3CurveType old_type;
-  //~ GdkRectangle geom;
+  GdkRectangle geom;
   gfloat rx, dx, ry;
   gint i, height;
 
   DEBUG_INFO("set vector [S]\n");
   DEBUG_INFO("vector len [%d]\n", veclen);
 
-  GdkScreen *screen = gtk_widget_get_screen (GTK_WIDGET (curve));
-
-  //~ GdkWindow *gdk_window = gtk_widget_get_window(GTK_WIDGET (curve)); // assertion 'GDK_IS_WINDOW (window)' failed
-  //~ GdkDisplay *gdk_display = gdk_window_get_display(gdk_window); //assertion 'GDK_IS_DISPLAY ' failed
-  //~ GdkMonitor *monitor = gdk_display_get_primary_monitor(gdk_display); //assertion 'GDK_IS_MONITOR ' failed
-  //~ gdk_monitor_get_geometry(monitor, &geom);
+  GdkMonitor *monitor = gdk_display_get_primary_monitor(gtk_widget_get_display (widget)); //assertion 'GDK_IS_MONITOR ' failed
+  gdk_monitor_get_geometry(monitor, &geom);
 
 
   old_type = priv->curve_data.curve_type;
@@ -1891,10 +1871,8 @@ gtk3_curve_set_vector (GtkWidget *widget, int veclen, gfloat vector[])
   else
     {
       height = (priv->max_y - priv->min_y);
-      if (height > gdk_screen_get_height (screen) / 4)
-        height = gdk_screen_get_height (screen) / 4;
-      //~ if (height >geom.height / 4)
-        //~ height = geom.height / 4;
+      if (height >geom.height / 4)
+        height = geom.height / 4;
 
       priv->height = height;
       priv->curve_data.n_points = veclen;
