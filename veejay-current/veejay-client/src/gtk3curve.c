@@ -1428,10 +1428,8 @@ gtk3_curve_size_graph (Gtk3Curve *curve)
   height = (priv->max_y - priv->min_y);
   aspect = width / (gfloat) height;
 
-  if (width > geom.width / 4)
-      width  = geom.width / 4;
-  if (height > geom.height / 4)
-      height = geom.height / 4;
+  width > geom.width >> 2 ? width  = geom.width >> 2 : width;
+  height > geom.height >> 2 ? height = geom.height >> 2 : height;
 
   if (aspect < 1.0)
     {
@@ -1871,8 +1869,7 @@ gtk3_curve_set_vector (GtkWidget *widget, int veclen, gfloat vector[])
   else
     {
       height = (priv->max_y - priv->min_y);
-      if (height >geom.height / 4)
-        height = geom.height / 4;
+      height > geom.height >> 2 ? height = geom.height >> 2 : height;
 
       priv->height = height;
       priv->curve_data.n_points = veclen;
