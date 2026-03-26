@@ -112,6 +112,8 @@ GtkWidget*  gtk3_curve_new (void);
 void gtk3_curve_reset                             (GtkWidget         *widget);
 void gtk3_curve_set_gamma                         (GtkWidget         *widget,
                                                    gfloat             gamma_);
+void gtk3_curve_set_position                      (GtkWidget         *widget,
+                                                   gdouble            position);/* VEEJAY NEEDS */
 void gtk3_curve_set_grid_resolution               (GtkWidget         *widget,
                                                    gint               grid_resolution);/* VEEJAY NEEDS */
 void gtk3_curve_set_x_lo                          (GtkWidget         *widget, /* VEEJAY NEEDS */

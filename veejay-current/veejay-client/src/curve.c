@@ -142,3 +142,8 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 
 	return parameter_id;
 }
+
+void curve_set_position( GtkWidget *curve, double pos)
+{
+    gtk3_curve_set_position( curve, pos);
+}

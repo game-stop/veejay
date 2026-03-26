@@ -7613,6 +7613,8 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     info->status_frame = info->status_tokens[FRAME_NUM];
     
     timeline_set_pos( info->tl, (gdouble) info->status_frame );
+    curve_set_position(info->curve, (gdouble) info->status_frame);
+
     char *current_time_ = format_time( info->status_frame, (double) info->el.fps );
     char *mouse_at_time = format_time( 
             timeline_get_point(TIMELINE_SELECTION(info->tl)),
