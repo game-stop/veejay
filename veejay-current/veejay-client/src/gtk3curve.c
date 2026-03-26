@@ -1419,7 +1419,7 @@ gtk3_curve_size_graph (Gtk3Curve *curve)
   Gtk3CurvePrivate *priv = curve->priv;
   GdkRectangle geom;
   gint width, height;
-  gfloat aspect;
+  //~ gfloat aspect;
 
   GdkMonitor *monitor = gdk_display_get_primary_monitor(gtk_widget_get_display ((GtkWidget*)curve));
   gdk_monitor_get_geometry(monitor, &geom);
@@ -1431,14 +1431,15 @@ gtk3_curve_size_graph (Gtk3Curve *curve)
   width > geom.width >> 2 ? width  = geom.width >> 2 : width;
   height > geom.height >> 2 ? height = geom.height >> 2 : height;
 
-  if (aspect < 1.0)
-    {
-      width  = height * aspect;
-    }
-  else
-    {
-      height = width / aspect;
-    }
+  //~ Do Nothing code? appart possible rouding mistake. Also, why this is done after possible change of w and h values? 
+  //~ if (aspect < 1.0)
+    //~ {
+      //~ width  = height * aspect;
+    //~ }
+  //~ else
+    //~ {
+      //~ height = width / aspect;
+    //~ }
 
   DEBUG_INFO("Set requested size to [%dx%d]\n", width, height);
 
