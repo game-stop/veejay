@@ -1710,7 +1710,7 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 #endif
 
 #ifdef HAVE_ASM_SSE4_2
-void *sse42_memset(void *ptr, uint8_t value, size_t num) {
+void *sse42_memset(void *ptr, int value, size_t num) {
     uint8_t *dest = (uint8_t *)ptr;
     uint8_t byte_value = (uint8_t)value;
 
@@ -1742,7 +1742,7 @@ void *sse42_memset(void *ptr, uint8_t value, size_t num) {
 
     return ptr;
 }
-void *sse42_aligned_memset(void *to, uint8_t value, size_t len) {
+void *sse42_aligned_memset(void *to, int value, size_t len) {
 
     if (len < 128) {
         return memset(to, value, len);
@@ -1770,7 +1770,7 @@ void *sse42_aligned_memset(void *to, uint8_t value, size_t len) {
 }
 #endif
 #ifdef HAVE_ASM_SSE4_1
-void *sse41_memset_v2(void *to, uint8_t value, size_t len) {
+void *sse41_memset_v2(void *to, int value, size_t len) {
   void *retval = to;
   size_t remainder = (uintptr_t)to % 16;
 
@@ -1801,7 +1801,7 @@ void *sse41_memset_v2(void *to, uint8_t value, size_t len) {
   return retval;
 }
 
-void *sse41_memset(void *to, uint8_t value, size_t len) {
+void *sse41_memset(void *to, int value, size_t len) {
 
 	if (len < 128) {
         return memset(to, value, len);
@@ -2394,7 +2394,7 @@ static struct {
 
 static struct {
     const char *name;
-    void *(*function)(void *to, uint8_t c, size_t len);
+    void *(*function)(void *to, int c, size_t len);
     uint32_t cpu_require;
     double t;
 } memset_method[] = {
@@ -2434,7 +2434,7 @@ static struct {
 };
 
 void *(* veejay_memcpy)(void *to, const void *from, size_t len) = 0;
-void *(* veejay_memset)(void *what, uint8_t val, size_t len ) = 0;
+void *(* veejay_memset)(void *what, int val, size_t len ) = 0;
 
 static int set_user_selected_memcpy(void)
 {
