@@ -69,8 +69,6 @@ void   set_initial_curve( GtkWidget *curve, int fx_id, int parameter_id, int sta
 		k++;
 	}
 
-    //~ gtk3_curve_set_xaxis_range( curve, (gfloat) start, (gfloat) end );
-    //~ gtk3_curve_set_yaxis_range( curve, (gfloat) min, (gfloat) max );
     gtk3_curve_set_range( curve,  (gfloat) start, (gfloat) end, (gfloat) min, (gfloat) max );
     gtk3_curve_set_grid_resolution(curve, 16); // default grid resolution
     gtk3_curve_set_vector( curve , len, vec );

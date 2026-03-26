@@ -1426,12 +1426,12 @@ gtk3_curve_size_graph (Gtk3Curve *curve)
 
   width  = (priv->max_x - priv->min_x);
   height = (priv->max_y - priv->min_y);
-  aspect = width / (gfloat) height;
+  //~ aspect = width / (gfloat) height;
 
   width > geom.width >> 2 ? width  = geom.width >> 2 : width;
   height > geom.height >> 2 ? height = geom.height >> 2 : height;
 
-  //~ Do Nothing code? appart possible rouding mistake. Also, why this is done after possible change of w and h values? 
+  //~ Do Nothing code? appart possible rouding mistake. Also, why this is done after possible change of w and h values?
   //~ if (aspect < 1.0)
     //~ {
       //~ width  = height * aspect;
@@ -1650,12 +1650,8 @@ gtk3_curve_set_x_lo (GtkWidget *widget,
     Gtk3Curve *curve = GTK3_CURVE(widget);
     Gtk3CurvePrivate *priv = curve->priv;
     priv->xaxis_lo = min_x;
-    //~ if (gtk_widget_is_visible (widget))
-    //~ {
-      //~ gtk_widget_queue_draw (widget);
-    //~ }
-    DEBUG_INFO("set_x_lo %f\n", priv->xaxis_lo);
 
+    DEBUG_INFO("set_x_lo %f\n", priv->xaxis_lo);
     gtk3_curve_set_range (widget, min_x, priv->max_x, priv->min_y, priv->max_y);
 }
 
@@ -1667,10 +1663,6 @@ gtk3_curve_set_x_hi (GtkWidget *widget,
     Gtk3Curve *curve = GTK3_CURVE(widget);
     Gtk3CurvePrivate *priv = curve->priv;
     priv->xaxis_hi = max_x;
-    //~ if (gtk_widget_is_visible (widget))
-    //~ {
-      //~ gtk_widget_queue_draw (widget);
-    //~ }
 
     DEBUG_INFO("set_x_hi %f\n", priv->xaxis_hi);
     gtk3_curve_set_range (widget, priv->min_x, max_x, priv->min_y, priv->max_y);
@@ -1858,7 +1850,7 @@ gtk3_curve_set_vector (GtkWidget *widget, int veclen, gfloat vector[])
   DEBUG_INFO("set vector [S]\n");
   DEBUG_INFO("vector len [%d]\n", veclen);
 
-  GdkMonitor *monitor = gdk_display_get_primary_monitor(gtk_widget_get_display (widget)); //assertion 'GDK_IS_MONITOR ' failed
+  GdkMonitor *monitor = gdk_display_get_primary_monitor(gtk_widget_get_display (widget));
   gdk_monitor_get_geometry(monitor, &geom);
 
 
