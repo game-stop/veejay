@@ -1389,7 +1389,7 @@ void    vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast
             }
         }
 
-        info->settings->unicast_frame_sender = 0;
+        atomic_store_int(&info->settings->unicast_frame_sender, 0);
     }
     else {
 
@@ -1412,7 +1412,7 @@ void    vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast
                 }   
             }
 
-            info->settings->unicast_frame_sender = 0;
+            atomic_store_int(&info->settings->unicast_frame_sender ,0);
         }
         else
         {       
@@ -2359,6 +2359,7 @@ static void vj_perform_tag_render_chain_entry(veejay_t *info,performer_t *p,vjp_
             frames[1]->ssm = vj_perform_preprocess_secundary( info,p, fx_entry->channel,fx_entry->source_type,sub_mode,chain_entry, frames, frameinfo );
         }
 
+        //if(sub_mode && frames[1]->ssm == 0) FIXME! cached frames dont follow sampling mode
        	vj_perform_supersample(settings,p, NULL, frames[1], sub_mode, chain_entry); 
     }
     
@@ -2503,6 +2504,7 @@ static void vj_perform_render_chain_entry(veejay_t *info,performer_t *p, vjp_kf 
             frames[1]->ssm = vj_perform_preprocess_secundary(info,p,fx_entry->channel,fx_entry->source_type,sub_mode,chain_entry,frames,frameinfo );
         }
 
+        //if(sub_mode && frames[1]->ssm == 0) FIXME! cached frames dont follow sampling mo
         vj_perform_supersample(settings,p, NULL, frames[1], sub_mode, chain_entry);
      
     }

@@ -1286,7 +1286,7 @@ static void veejay_screen_update(veejay_t *info, VJFrame *frame_to_display) {
 		vj_split_render( info->splitter );
 	}
 	
-	if( info->settings->unicast_frame_sender ) {
+	if( atomic_load_int(&info->settings->unicast_frame_sender) ) {
 		vj_perform_send_primary_frame_s2(info, 0, info->uc->current_link, frame_to_display );
 	}
 

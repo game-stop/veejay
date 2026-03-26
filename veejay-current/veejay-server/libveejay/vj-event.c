@@ -9402,7 +9402,7 @@ void    vj_event_send_frame             (   void *ptr, const char format[], va_l
         return;
     }
 
-    v->settings->unicast_frame_sender = 1;
+    atomic_store_int(&v->settings->unicast_frame_sender, 1);
 }
 
 
