@@ -23,7 +23,7 @@
 #define MAX_WORKERS 256 
 
 extern void *(* veejay_memcpy)(void *to, const void *from, size_t len);
-extern void *(* veejay_memset)(void *to, uint8_t val, size_t len);
+extern void *(* veejay_memset)(void *to, int val, size_t len);
 extern void vj_mem_init(int w, int h);
 extern void vj_mem_optimize(void);
 extern void vj_mem_set_defaults(int w, int h);
