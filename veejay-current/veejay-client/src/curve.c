@@ -133,7 +133,7 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 
     gtk3_curve_set_curve_type( curve, *curve_type );
 
-	*lo = start;
+	*lo = start; //FIXME , why affected ?
 	*hi = end;
 
 	free(vec);
@@ -146,4 +146,79 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 void curve_set_position( GtkWidget *curve, double pos)
 {
     gtk3_curve_set_position( curve, pos);
+}
+
+void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_id, int start, int end, int animation)
+{
+
+    int min=0, max=0;
+	_effect_get_minmax(fx_id, &min, &max, parameter_id );
+    int veclen = end - start;
+	//~ int i,k=0;
+	int i,k;
+    float rx, ry, dx, dy, min_x, delta_x;
+
+    float	*vec = (float*) vj_calloc(sizeof(float) * veclen ); // FIXME less values len/step?
+
+	int diff = max - min;
+
+    //~ ry = min;
+    dy = (diff) / (float)(veclen - 1);
+    switch(animation)
+    {
+        case 0: //Up
+            for(i = start, k = 0, ry = min; i < end; i ++ , ry+=dy) //FIXME less values ? i+=step
+            {
+                //~ float val = ((float)(value - min) / (diff)); # BYPASS [0-1] NORMALISATION
+                //~ vec[k] = val;  # BYPASS [0-1] NORMALISATION
+                vec[k] = ry;
+                k++;
+            }
+
+        break;
+        case 1: //Down
+            for(i = start, k = 0, ry = max; i < end; i ++ , ry-=dy) //FIXME less values ? i+=step
+            {
+                //~ float val = ((float)(value - min) / (diff)); # BYPASS [0-1] NORMALISATION
+                //~ vec[k] = val;  # BYPASS [0-1] NORMALISATION
+                vec[k] = ry;
+                k++;
+            }
+        break;
+        case 2: //Moutain
+            for(i = start, k = 0, ry = min; i < end/2; i ++ , ry+=2*dy) //FIXME less values ? i+=step
+            {
+                //~ float val = ((float)(value - min) / (diff)); # BYPASS [0-1] NORMALISATION
+                //~ vec[k] = val;  # BYPASS [0-1] NORMALISATION
+                vec[k] = ry;
+                vec[end-k] = ry;
+                k++;
+            }
+            if (k != end-k) //fill last points (in the middle) if end is odd
+            {
+                vec[k] = max;
+                vec[k+1] = max;
+            }
+        break;
+        case 3: //Valley
+            for(i = start, k = 0, ry = max; i < end/2; i ++ , ry-=2*dy) //FIXME less values ? i+=step
+            {
+                //~ float val = ((float)(value - min) / (diff)); # BYPASS [0-1] NORMALISATION
+                //~ vec[k] = val;  # BYPASS [0-1] NORMALISATION
+                vec[k] = ry;
+                vec[end-k] = ry;
+                k++;
+            }
+            if (k != end-k) //fill last points (in the middle)
+            {
+                vec[k] = min;
+                vec[k+1] = min;
+            }
+        break;
+        default: break;
+    }
+
+    gtk3_curve_set_vector( curve , veclen, vec );
+    curve_is_empty = 0;
+    free(vec);
 }

@@ -2892,6 +2892,30 @@ void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
     info->uc.reload_hint[HINT_KF] = 1;
 }
 
+void    on_curve_animation_changed(GtkWidget *widget, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
+
+    gint selected_anim = gtk_combo_box_get_active( GTK_COMBO_BOX( widget ) );
+
+    int lo = 0, hi = 0;
+    /* update the time bounds accordingly the sample marker*/
+    if( lo == hi && hi == 0 )
+    {
+        if( info->status_tokens[PLAY_MODE] == MODE_SAMPLE ) {
+            lo = info->status_tokens[SAMPLE_START];
+            hi = info->status_tokens[SAMPLE_END];
+        } else {
+            lo = 0;
+            hi = info->status_tokens[SAMPLE_MARKER_END];
+        }
+    }
+    curve_set_predifined_animation( info->curve, info->uc.entry_tokens[ENTRY_FXID],
+                                    info->uc.selected_parameter_id,
+                                    lo, hi, selected_anim);
+}
+
 void	on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
