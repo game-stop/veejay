@@ -169,8 +169,6 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
         case 0: //Up
             for(i = start, k = 0, ry = min; i < end; i ++ , ry+=dy) //FIXME less values ? i+=step
             {
-                //~ float val = ((float)(value - min) / (diff)); # BYPASS [0-1] NORMALISATION
-                //~ vec[k] = val;  # BYPASS [0-1] NORMALISATION
                 vec[k] = ry;
                 k++;
             }
@@ -179,8 +177,6 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
         case 1: //Down
             for(i = start, k = 0, ry = max; i < end; i ++ , ry-=dy) //FIXME less values ? i+=step
             {
-                //~ float val = ((float)(value - min) / (diff)); # BYPASS [0-1] NORMALISATION
-                //~ vec[k] = val;  # BYPASS [0-1] NORMALISATION
                 vec[k] = ry;
                 k++;
             }
@@ -188,8 +184,6 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
         case 2: //Moutain
             for(i = start, k = 0, ry = min; i < end/2; i ++ , ry+=2*dy) //FIXME less values ? i+=step
             {
-                //~ float val = ((float)(value - min) / (diff)); # BYPASS [0-1] NORMALISATION
-                //~ vec[k] = val;  # BYPASS [0-1] NORMALISATION
                 vec[k] = ry;
                 vec[end-k] = ry;
                 k++;
@@ -203,8 +197,6 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
         case 3: //Valley
             for(i = start, k = 0, ry = max; i < end/2; i ++ , ry-=2*dy) //FIXME less values ? i+=step
             {
-                //~ float val = ((float)(value - min) / (diff)); # BYPASS [0-1] NORMALISATION
-                //~ vec[k] = val;  # BYPASS [0-1] NORMALISATION
                 vec[k] = ry;
                 vec[end-k] = ry;
                 k++;
