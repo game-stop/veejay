@@ -239,22 +239,20 @@ typedef struct {
 typedef struct
 {
     int sample_id;
+    int mode;
     int entry;
     ycbcr_frame *frame;
 } performer_cache_t;
 
 typedef struct
 {
-    performer_cache_t cached_tag_frames[CACHE_SIZE];   /* cache a frame into the buffer only once */
-    performer_cache_t cached_sample_frames[CACHE_SIZE];
+    performer_cache_t cached_frames[CACHE_SIZE];
     audio_chain_buffer_t audio_chain_buffers[VIDEO_QUEUE_LEN];
     int played_sample_ids[SAMPLE_MAX_EFFECTS];
     long long played_sample_positions[SAMPLE_MAX_EFFECTS];
-
     float *accum[VIDEO_QUEUE_LEN];
     volatile int audio_chain_index;
-    int n_cached_tag_frames;
-    int n_cached_sample_frames;
+    int n_cached_frames;
     void *encoder_;
     ycbcr_frame *preview_buffer;
     int preview_max_w;
@@ -289,7 +287,6 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, performer_t *p, int s
 static int vj_perform_apply_secundary(veejay_t * info, performer_t *p, int this_sample_id,int sample_id,int type, int chain_entry, VJFrame *src, VJFrame *dst,uint8_t *p0, uint8_t *p1, int subrender);
 static void vj_perform_tag_complete_buffers(veejay_t * info, performer_t *p, vjp_kf *effect_info, int *h, VJFrame *f0, VJFrame *f1, int sample_id, int pm, vjp_kf *setup, sample_eff_chain **chain, vj_tag *tag);
 static void vj_perform_sample_complete_buffers(veejay_t * info, performer_t *p, vjp_kf *effect_info, int *h, VJFrame *f0, VJFrame *f2, int sample_id, int pm, vjp_kf *setup, sample_eff_chain **chain, sample_info *si);
-static int vj_perform_use_cached_frame(ycbcr_frame *cached_frame, VJFrame *dst);
 static void vj_perform_apply_first(veejay_t *info, performer_t *p, vjp_kf *todo_info, VJFrame **frames, sample_eff_chain *entry, int e, int c, long long n_frames, void *ptr, int playmode );
 static int vj_perform_render_sample_frame(veejay_t *info, performer_t *p, uint8_t *frame[4], int sample, int type);
 static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4]);
@@ -328,6 +325,8 @@ static void vj_perform_set_422__( VJFrame *frame)
 static void vj_perform_sample_tick_reset(performer_global_t *g) {
     veejay_memset( g->played_sample_ids, 0 , sizeof(g->played_sample_ids));
     veejay_memset( g->played_sample_positions, 0, sizeof(g->played_sample_positions));
+    veejay_memset( g->cached_frames, 0, sizeof(g->cached_frames));
+    g->n_cached_frames = 0;
 }
 
 static long long vj_perform_sample_already_ticked(performer_global_t *g, int target_id, int chain_id) {
@@ -436,56 +435,55 @@ int vj_perform_play_audio( video_playback_setup *settings, uint8_t *source, int 
 }
 #endif
 
-static ycbcr_frame *vj_perform_tag_is_cached(veejay_t *info,int tag_id)
+static ycbcr_frame *vj_perform_cache_get_frame(veejay_t *info,int id, int mode)
 {
     int c;
     performer_global_t *g = (performer_global_t*) info->performer;    
 
-    for(c=0; c < g->n_cached_tag_frames; c++)
+    for(c=0; c < g->n_cached_frames; c++)
     {
-        if(g->cached_tag_frames[c].sample_id == tag_id) 
+        if(g->cached_frames[c].sample_id == id && g->cached_frames[c].mode == mode) 
         {
-            if( info->settings->feedback && info->uc->sample_id == tag_id &&
+            if( info->settings->feedback && info->uc->sample_id == id &&
                         info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG ) {
                 return NULL; //@ feedback cannot be cached source
             }
-            return g->cached_tag_frames[c].frame;
+            return g->cached_frames[c].frame;
         }
     }
 
     return NULL;
 }
 
-static ycbcr_frame *vj_perform_sample_is_cached(veejay_t *info,int sample_id)
-{
-    int c;
-    performer_global_t *g = (performer_global_t*) info->performer;    
+static void vj_perform_cache_put_frame(performer_global_t *g, int id, int mode, ycbcr_frame *frame) {
+    
+    if( mode != VJ_PLAYBACK_MODE_SAMPLE && mode != VJ_PLAYBACK_MODE_TAG )
+        return;
 
-    for(c=0; c < g->n_cached_sample_frames; c++)
+    for(int c=0; c < CACHE_SIZE; c++)
     {
-        if(g->cached_sample_frames[c].sample_id == sample_id) 
-        {
-            if( info->settings->feedback && info->uc->sample_id == sample_id  &&
-                    info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG ) {
-                return NULL;
-            }
-            return g->cached_sample_frames[c].frame;
+        if( g->cached_frames[c].sample_id == 0 || ( g->cached_frames[c].sample_id == id && g->cached_frames[c].mode == mode) ) {
+            g->cached_frames[c].sample_id = id;
+            g->cached_frames[c].mode = mode;
+            g->cached_frames[c].frame = frame;
+            g->n_cached_frames ++;
+            return;
         }
     }
-
-    return NULL;
 }
 
-static void vj_perform_sample_cache_tick(performer_global_t *g) {
-    if( g->n_cached_sample_frames < CACHE_SIZE-1)
-        g->n_cached_sample_frames ++;
-}
+static inline int vj_perform_cache_use_frame(ycbcr_frame *cached_frame, VJFrame *dst) {
 
-static void vj_perform_tag_cache_tick(performer_global_t *g) {
-    if( g->n_cached_tag_frames < CACHE_SIZE-1)
-        g->n_cached_tag_frames ++;
-}
+    const int cached_in_ssm = cached_frame->ssm;
+    const int len = (cached_in_ssm ? dst->len : dst->uv_len );
 
+    veejay_memcpy( dst->data[0], cached_frame->Y, dst->len);
+    veejay_memcpy( dst->data[1], cached_frame->Cb, len);
+    veejay_memcpy( dst->data[2], cached_frame->Cr, len );
+
+    //veejay_memcpy( dst->data[3], cached_frame->data[3], cached_frame->stride[3] * cached_frame->height );
+    return cached_frame->ssm;
+}
 
 void vj_perform_initiate_edge_change(
     veejay_t *info,
@@ -1498,44 +1496,6 @@ static void vj_perform_apply_first(veejay_t *info,performer_t *p, vjp_kf *todo_i
 
 }
 
-static int vj_perform_use_cached_frame(ycbcr_frame *cached_frame, VJFrame *dst)
-{
-    const int cached_in_ssm = cached_frame->ssm;
-    const int len = (cached_in_ssm ? dst->len : dst->uv_len );
-
-    // cached frame is a pointer to frame_buffer (previous chain entry) 
-    // possibly, the previous frame_buffer is already supersampled
-
-    veejay_memcpy( dst->data[0], cached_frame->Y, dst->len);
-    veejay_memcpy( dst->data[1], cached_frame->Cb, len);
-    veejay_memcpy( dst->data[2], cached_frame->Cr, len );
-
-    //veejay_memcpy( dst->data[3], cached_frame->data[3], cached_frame->stride[3] * cached_frame->height );
-    return cached_frame->ssm; 
-}
-
-static int vj_perform_find_cache_sample_slot(performer_global_t *p, ycbcr_frame *frame, int sample_id, int chain_entry) {
-    int c;
-    for( c = 0; c < p->n_cached_sample_frames; c ++ ) {
-        if( p->cached_sample_frames[c].sample_id == 0 || p->cached_sample_frames[c].sample_id == sample_id ) {
-            p->cached_sample_frames[c].frame = frame;
-            p->cached_sample_frames[c].entry = chain_entry;
-        }
-    }
-    return -1;
-}
-
-static int vj_perform_find_cache_tag_slot(performer_global_t *p, ycbcr_frame *frame, int sample_id, int chain_entry) {
-    int c;
-    for( c = 0; c < p->n_cached_tag_frames; c ++ ) {
-        if( p->cached_tag_frames[c].sample_id == 0 || p->cached_tag_frames[c].sample_id == sample_id ) {
-            p->cached_tag_frames[c].frame = frame;
-            p->cached_tag_frames[c].entry = chain_entry;
-        }
-    }
-    return -1;
-}
-
 static long vj_calc_next_sample_offset(
     sample_b_t *sb,
     int *advance_out
@@ -2080,10 +2040,9 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, performer_t *p, int s
         case VJ_TAG_TYPE_PICTURE:
         case VJ_TAG_TYPE_COLOR:
     
-        if(!subrender)  
-            cached_frame = vj_perform_tag_is_cached(info,sample_id);
+        cached_frame = vj_perform_cache_get_frame(info,sample_id, VJ_PLAYBACK_MODE_TAG);
     
-        if (cached_frame == NULL || subrender)
+        if (cached_frame == NULL)
         {
             if(! vj_tag_get_active( sample_id ) )
             {
@@ -2092,13 +2051,12 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, performer_t *p, int s
         
             int res = vj_tag_get_frame(sample_id, dst,p->audio_buffer[chain_entry]);
             if(res==1)  {
-                 vj_perform_find_cache_tag_slot(global, p->frame_buffer[ chain_entry ], sample_id, chain_entry);
-                 vj_perform_tag_cache_tick(global);
+                vj_perform_cache_put_frame( global, sample_id, VJ_PLAYBACK_MODE_TAG, p->frame_buffer[ chain_entry ]);
             }
         }
         else
         {   
-            ssm = vj_perform_use_cached_frame(cached_frame, dst);
+            ssm = vj_perform_cache_use_frame(cached_frame, dst);
         }
 
         break;
@@ -2111,20 +2069,18 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, performer_t *p, int s
             vj_perform_sample_ticked(info->performer, sample_id, chain_entry, nframe );
         }
 
-        if(!subrender)
-            cached_frame = vj_perform_sample_is_cached(info,sample_id);
+        cached_frame = vj_perform_cache_get_frame(info,sample_id, VJ_PLAYBACK_MODE_SAMPLE);
 
-        if(cached_frame == NULL || subrender )
+        if(cached_frame == NULL)
         {
             len = vj_perform_get_frame_fx( info, sample_id, nframe, src,dst,p0_ref,p1_ref );    
             if(len > 0 ) {
-               vj_perform_find_cache_sample_slot(global, p->frame_buffer[ chain_entry] , sample_id, chain_entry );
-               vj_perform_sample_cache_tick(global);
+               vj_perform_cache_put_frame(global,sample_id, VJ_PLAYBACK_MODE_SAMPLE, p->frame_buffer[ chain_entry]);
             }
         }
         else
         {
-            ssm = vj_perform_use_cached_frame(cached_frame, dst );
+            ssm = vj_perform_cache_use_frame(cached_frame, dst );
         }
 
         break;
@@ -2275,10 +2231,8 @@ static int vj_perform_apply_secundary(veejay_t * info,performer_t *p, int this_s
         case VJ_TAG_TYPE_PICTURE:
         case VJ_TAG_TYPE_GENERATOR:
     
-            if( !subrender )
-                cached_frame = vj_perform_tag_is_cached(info,sample_id); // is it cached?
-            //@ not cached
-            if (cached_frame == NULL || subrender)
+            cached_frame = vj_perform_cache_get_frame(info,sample_id, VJ_PLAYBACK_MODE_TAG);
+            if (cached_frame == NULL)
             {
                 if(! vj_tag_get_active( sample_id ) )
                 {
@@ -2287,13 +2241,12 @@ static int vj_perform_apply_secundary(veejay_t * info,performer_t *p, int this_s
         
                 res = vj_tag_get_frame(sample_id, dst,p->audio_buffer[chain_entry]);
                 if(res) {
-                    vj_perform_find_cache_tag_slot(g, p->frame_buffer[ chain_entry ], sample_id, chain_entry );
-                    vj_perform_tag_cache_tick(g);
+                    vj_perform_cache_put_frame(g, sample_id, VJ_PLAYBACK_MODE_TAG, p->frame_buffer[ chain_entry ]);
                 }                   
             }
             else
             {
-                ssm = vj_perform_use_cached_frame(cached_frame, dst);
+                ssm = vj_perform_cache_use_frame(cached_frame, dst);
             }
             
             break;
@@ -2306,20 +2259,18 @@ static int vj_perform_apply_secundary(veejay_t * info,performer_t *p, int this_s
                 vj_perform_sample_ticked(info->performer, sample_id, chain_entry, nframe );
             }
 
-            if(!subrender)
-                cached_frame = vj_perform_sample_is_cached(info,sample_id);
+            cached_frame = vj_perform_cache_get_frame(info,sample_id, VJ_PLAYBACK_MODE_SAMPLE);
 
-            if(cached_frame == NULL || subrender) {
+            if(cached_frame == NULL) {
                 len = vj_perform_get_frame_fx( info, sample_id, nframe, src, dst, p0_ref, p1_ref ); 
                
                 if(len > 0 ) {
-                    vj_perform_find_cache_sample_slot(g, p->frame_buffer[ chain_entry] , sample_id, chain_entry );
-                    vj_perform_tag_cache_tick(g);
+                    vj_perform_cache_put_frame(g, sample_id, VJ_PLAYBACK_MODE_SAMPLE, p->frame_buffer[ chain_entry]);
                 }
             }
             else
             {
-                ssm = vj_perform_use_cached_frame(cached_frame,dst);  
+                ssm = vj_perform_cache_use_frame(cached_frame,dst);  
             }   
             
             break;
@@ -2348,8 +2299,7 @@ static void vj_perform_tag_render_chain_entry(veejay_t *info,performer_t *p,vjp_
 
     vj_perform_supersample(settings,p, frames[0], (ef ? frames[1] : NULL), sub_mode, chain_entry );
 
-
-    p->frame_buffer[chain_entry]->ssm = frames[0]->ssm;
+    //p->frame_buffer[chain_entry]->ssm = frames[0]->ssm;
 
     if(ef)
     {
@@ -2359,8 +2309,7 @@ static void vj_perform_tag_render_chain_entry(veejay_t *info,performer_t *p,vjp_
             frames[1]->ssm = vj_perform_preprocess_secundary( info,p, fx_entry->channel,fx_entry->source_type,sub_mode,chain_entry, frames, frameinfo );
         }
 
-        //if(sub_mode && frames[1]->ssm == 0) FIXME! cached frames dont follow sampling mode
-       	vj_perform_supersample(settings,p, NULL, frames[1], sub_mode, chain_entry); 
+        vj_perform_supersample(settings,p, NULL, frames[1], sub_mode, chain_entry); 
     }
     
     if( p->pvar_.fade_entry == chain_entry && p->pvar_.fade_method == 1) {
@@ -2474,7 +2423,8 @@ static  int vj_perform_preprocess_secundary( veejay_t *info,performer_t *p, int 
     return top.ssm;
 }
 
-static void vj_perform_render_chain_entry(veejay_t *info,performer_t *p, vjp_kf *setup, int sample_id, int pm, sample_eff_chain *fx_entry, int chain_entry, VJFrame *frames[2], int subrender)
+static void vj_perform_render_chain_entry(veejay_t *info,performer_t *p, vjp_kf *setup, int sample_id, int pm, sample_eff_chain *fx_entry,
+     int chain_entry, VJFrame *frames[2], int subrender)
 {
     VJFrameInfo *frameinfo;
     video_playback_setup *settings = info->settings;
@@ -2494,8 +2444,6 @@ static void vj_perform_render_chain_entry(veejay_t *info,performer_t *p, vjp_kf 
 
     vj_perform_supersample(settings,p, frames[0], NULL, sub_mode, chain_entry);
 
-    p->frame_buffer[chain_entry]->ssm = frames[0]->ssm;
-
     if(ef)
     {
         frames[1]->ssm = vj_perform_apply_secundary(info,p,sample_id,fx_entry->channel,fx_entry->source_type,chain_entry,frames[0],frames[1],p->frame_buffer[chain_entry]->P0, p->frame_buffer[chain_entry]->P1, 0);
@@ -2504,9 +2452,7 @@ static void vj_perform_render_chain_entry(veejay_t *info,performer_t *p, vjp_kf 
             frames[1]->ssm = vj_perform_preprocess_secundary(info,p,fx_entry->channel,fx_entry->source_type,sub_mode,chain_entry,frames,frameinfo );
         }
 
-        //if(sub_mode && frames[1]->ssm == 0) FIXME! cached frames dont follow sampling mo
-        vj_perform_supersample(settings,p, NULL, frames[1], sub_mode, chain_entry);
-     
+        vj_perform_supersample(settings,p, NULL, frames[1], sub_mode, chain_entry);     
     }
 
     if( p->pvar_.fade_entry == chain_entry && p->pvar_.fade_method == 1) {
@@ -2619,11 +2565,8 @@ static void vj_perform_plain_fill_buffer(veejay_t * info, performer_t *p,VJFrame
     if(mode == VJ_PLAYBACK_MODE_SAMPLE)
     {
         vj_perform_get_frame_(info, sample_id, frame_num,&frame,&frame, p0_buffer,p1_buffer,0 );
-
-        vj_perform_find_cache_sample_slot(g, p->primary_buffer[ 0] , sample_id, -1 );
-        vj_perform_sample_cache_tick(g);
-
-    } else if ( mode == VJ_PLAYBACK_MODE_PLAIN ) {
+    } 
+    else if ( mode == VJ_PLAYBACK_MODE_PLAIN ) {
         vj_perform_get_frame_(info, 0, frame_num,&frame,&frame, p0_buffer, p1_buffer,0 );
     }
 
@@ -3130,8 +3073,6 @@ static void vj_perform_tag_fill_buffer(veejay_t * info, performer_t *p, VJFrame 
         if (vj_tag_get_frame(sample_id, dst,NULL))
         {
             error = 0;
-            vj_perform_find_cache_sample_slot(g, p->primary_buffer[0], sample_id, -1);
-            vj_perform_tag_cache_tick(g);
         }
     }         
 
@@ -4753,6 +4694,8 @@ void vj_perform_render_video_frames(veejay_t *info, performer_t *p, vjp_kf *effe
     a->data[1] = p->primary_buffer[0]->Cb;
     a->data[2] = p->primary_buffer[0]->Cr;
     a->data[3] = p->primary_buffer[0]->alpha;
+
+    vj_perform_cache_put_frame( g, info->uc->sample_id, info->uc->playback_mode, p->primary_buffer[0]);
 
     switch (info->uc->playback_mode)
     {
