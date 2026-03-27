@@ -218,7 +218,18 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
         default: break;
     }
 
+    int curve_type = GTK3_CURVE_TYPE_LINEAR;
+    if( is_button_toggled("curve_typespline")) {
+        curve_type = GTK3_CURVE_TYPE_SPLINE;
+    } else if ( is_button_toggled("curve_typefreehand")) {
+        curve_type = GTK3_CURVE_TYPE_FREE;
+    } else if (is_button_toggled("curve_typelinear")) {
+        curve_type = GTK3_CURVE_TYPE_LINEAR;
+    }
+
     gtk3_curve_set_vector( curve , veclen, vec );
+    gtk3_curve_set_curve_type( curve, curve_type );
+
     curve_is_empty = 0;
     free(vec);
 }
