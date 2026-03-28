@@ -295,7 +295,7 @@ void gradientfield_apply(void *ptr, VJFrame *frame, int *args) {
     
     switch(mode ) {
         case 0:
-    #pragma omp parallel for schedule(static) num_threads(s->n_threads)
+    #pragma omp parallel for num_threads(s->n_threads) schedule(static) 
             for (int y = 0; y < h - 1; y += 2) {
                 gradientfield_apply_mode0(
                     w, h, stride, a,
