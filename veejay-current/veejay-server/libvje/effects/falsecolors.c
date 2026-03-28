@@ -177,7 +177,7 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args){
     }
 
     int global_min = 255, global_max = 0;
-    const int scale_fp = 0; // placeholder, will compute after min/max
+    const int scale_fp = 0;
 
     #pragma omp parallel num_threads(s->n_threads) reduction(min:global_min) reduction(max:global_max)
     {
@@ -186,14 +186,12 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args){
         uint8_t *col_tmp = tmp;
         uint8_t *col_out = tmp + max_dim;
 
-        // --- Row blur ---
         #pragma omp for schedule(static)
         for(int y = 0; y < h; y++){
             blur2(tmp, Y + (y * w), w, 2, 2, 1, 1);
             memcpy(b2 + (y * w), tmp, w);
         }
 
-        // --- Column blur ---
         #pragma omp for schedule(static)
         for(int x = 0; x < w; x++){
             for(int y = 0; y < h; y++)
@@ -205,14 +203,13 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args){
                 b2[y*w + x] = col_out[y];
         }
 
-        // --- Compute min/max ---
         #pragma omp for schedule(static)
         for(int i = 0; i < len; i++){
             int v = b2[i];
             if(v < global_min) global_min = v;
             if(v > global_max) global_max = v;
         }
-    } // end of parallel region for min/max
+    }
 
     int range = global_max - global_min;
     if (range < 64) range = 64;
