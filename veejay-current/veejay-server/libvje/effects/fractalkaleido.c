@@ -210,6 +210,11 @@ static void fractalkaleido_apply1(void *ptr, VJFrame *frame, int *args, float ba
     const int w = frame->out_width;
     const int h = frame->out_height;
 
+    const int hw = w >> 1;
+    const int hh = h >> 1;
+    const int cx = w >> 1;
+    const int cy = h >> 1;
+
     const int segments = args[0];
     const float seg_angle = TWO_PI / segments;
 
@@ -224,22 +229,24 @@ static void fractalkaleido_apply1(void *ptr, VJFrame *frame, int *args, float ba
     const float inv_w = 1.0f / (float)w;
     const float inv_h = 1.0f / (float)h;
     const float inv_seg = 1.0f / seg_angle;
+
     const float twist = args[7] * 0.0005f;
     const float offxw = offx * w;
     const float offyh = offy * h;
     const float half_seg = seg_angle * 0.5f;
-    
+
     int *map = s->map;
 
     #pragma omp parallel for num_threads(s->n_threads) schedule(static)
-    for(int y = 0; y < h; y++) {
+    for(int y = 0; y <= hh; y++)
+    {
         const int row_offset = y * w;
 
         const float *restrict atan_row = s->atan_lut + row_offset;
         const float *restrict sqrt_row = s->sqrt_lut + row_offset;
 
-        for(int x = 0; x < w; x++) {
-
+        for(int x = 0; x <= hw; x++)
+        {
             float theta = atan_row[x];
             float r     = sqrt_row[x];
 
@@ -247,15 +254,17 @@ static void fractalkaleido_apply1(void *ptr, VJFrame *frame, int *args, float ba
 
             float dither = ((x ^ y) & 1) ? 0.001f : -0.001f;
             float a = theta + base_angle + dither;
-            if (a < 0.0f) a += TWO_PI * 100.0f;
+
+            if (a < 0.0f)
+                a += TWO_PI * 100.0f;
 
             float f = a * inv_seg;
             int seg_i = (int)f;
             float seg = (f - seg_i) * seg_angle;
 
             float t = seg - half_seg;
-            float at = (t < 0.0f) ? -t : t;
-            seg = seg_angle - at;
+            seg = (t < 0.0f) ? -t : t;
+            seg = seg_angle - seg;
 
             int lut = (int)(seg * LUT_DIVISOR) & LUT_MASK;
 
@@ -277,7 +286,8 @@ static void fractalkaleido_apply1(void *ptr, VJFrame *frame, int *args, float ba
             if (tx < 0.0f && fx != 0.0f) { tilex--; fx += 1.0f; }
             if (ty < 0.0f && fy != 0.0f) { tiley--; fy += 1.0f; }
 
-            if(mirror) {
+            if(mirror)
+            {
                 fx = (tilex & 1) ? (1.0f - fx) : fx;
                 fy = (tiley & 1) ? (1.0f - fy) : fy;
             }
@@ -285,10 +295,27 @@ static void fractalkaleido_apply1(void *ptr, VJFrame *frame, int *args, float ba
             int sx = (int)(fx * (float)(w - 1) + 0.5f);
             int sy = (int)(fy * (float)(h - 1) + 0.5f);
 
-            sx = (sx < 0) ? 0 : (sx >= w ? w-1 : sx);
-            sy = (sy < 0) ? 0 : (sy >= h ? h-1 : sy);
+            if ((unsigned)sx >= (unsigned)w) sx = 0;
+            if ((unsigned)sy >= (unsigned)h) sy = 0;
 
-            map[ row_offset + x ] = sy * w + sx;
+            int src_idx = sy * w + sx;
+
+            int x1 = x;
+            int y1 = y;
+
+            int x2 = w - x - 1;
+            int y2 = y;
+
+            int x3 = x;
+            int y3 = h - y - 1;
+
+            int x4 = w - x - 1;
+            int y4 = h - y - 1;
+
+            map[y1 * w + x1] = src_idx;
+            map[y2 * w + x2] = src_idx;
+            map[y3 * w + x3] = src_idx;
+            map[y4 * w + x4] = src_idx;
         }
     }
 }
