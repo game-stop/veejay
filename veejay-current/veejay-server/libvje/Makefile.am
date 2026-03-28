@@ -235,4 +235,5 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/darkreplacemix.c \
     effects/echotrace.c \
     effects/spectralmotion.c \
-    effects/falsecolors.c
+    effects/falsecolors.c \
+    effects/fractalkaleido.c

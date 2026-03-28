@@ -246,6 +246,7 @@
 #include "./effects/echotrace.h"
 #include "./effects/spectralmotion.h"
 #include "./effects/falsecolors.h"
+#include "./effects/fractalkaleido.h"
 //#include "./effects/tunnel.h"
 
 #define VJ_IMAGE_EFFECT_MIN 42
@@ -529,7 +530,8 @@ enum {
     VJ_IMAGE_EFFECT_ECHOTRACE = 45,
     VJ_IMAGE_EFFECT_SPECTRALMOTION = 44,
     VJ_IMAGE_EFFECT_FALSECOLORS = 43,
-    VJ_IMAGE_EFFECT_TUNNEL = 42,
+    VJ_IMAGE_EFFECT_FRACTALKALEIDO = 42,
+    //VJ_IMAGE_EFFECT_TUNNEL = 42,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 

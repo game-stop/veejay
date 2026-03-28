@@ -106,6 +106,7 @@ static struct {
     { rotozoom_init,rotozoom_malloc,rotozoom_free,NULL,NULL,rotozoom_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_ROTOZOOM },
     { rotate_init,rotate_malloc,rotate_free,NULL,NULL,rotate_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_ROTATE },
     { ripple_init,ripple_malloc,ripple_free,NULL,NULL,ripple_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_RIPPLE },
+    { fractalkaleido_init, fractalkaleido_malloc, fractalkaleido_free, NULL, NULL, fractalkaleido_apply, NULL, NULL, NULL, NULL, VJ_IMAGE_EFFECT_FRACTALKALEIDO},
    // { tunnel_init,tunnel_malloc,tunnel_free,NULL,NULL,tunnel_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_TUNNEL },
     { strobo_init,strobo_malloc,strobo_free,NULL,NULL,strobo_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_STROBOTSU },
     { spectralmotion_init,spectralmotion_malloc,spectralmotion_free,NULL,NULL,spectralmotion_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SPECTRALMOTION},
