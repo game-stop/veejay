@@ -84,6 +84,9 @@ mcast_sender	*mcast_new_sender( const char *group_name )
 		return NULL;
 	}
 
+	uint8_t loop = 1;
+	setsockopt(v->sock_fd, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop));
+
 	char *eth = getenv("VEEJAY_MCAST_INTERFACE");
 	if( eth != NULL ) {
 		mcast_set_interface(v, eth );
@@ -93,13 +96,10 @@ mcast_sender	*mcast_new_sender( const char *group_name )
 
 void		mcast_set_interface( mcast_sender *v, const char *interface )
 {
-	struct sockaddr_in	if_addr;
-	memset( &if_addr, 0, sizeof(if_addr) );
-	
-	v->addr.sin_addr.s_addr = inet_addr( interface );
-	v->addr.sin_family = AF_INET;
+    struct in_addr addr;
+    addr.s_addr = inet_addr(interface);
 
-	if( setsockopt( v->sock_fd, IPPROTO_IP, IP_MULTICAST_IF, &if_addr, sizeof(if_addr) ) < 0 )
+	if( setsockopt( v->sock_fd, IPPROTO_IP, IP_MULTICAST_IF, &addr, sizeof(addr) ) < 0 )
 		print_error("IP_MULTICAST_IF");
 	else
 		veejay_msg(VEEJAY_MSG_INFO, "Multicast interface set to %s", interface );
