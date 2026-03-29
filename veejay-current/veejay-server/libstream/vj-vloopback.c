@@ -55,7 +55,6 @@ typedef struct
 	int v4l2_pixfmt;	
 	void *scaler;
 	float fps;
-	VJFrame	*src1;
 	VJFrame *dst1;
 } vj_vloopback_t;
 
@@ -367,11 +366,6 @@ void *vj_vloopback_open(const char *device_name, VJFrame *src, int dst_w, int ds
 	
 	veejay_msg(VEEJAY_MSG_DEBUG, "vloop: video is %dx%d, @%d", dst_v4l2_w, dst_v4l2_h, dst_v4l2_format );
 
-        sws_template tmpl;
-        tmpl.flags = 1;
-
-	v->src1 = yuv_yuv_template( NULL, NULL, NULL, src->width, src->height, src->format );  
-
 	long min_size = dst_v4l2_w * dst_v4l2_h;
     if (dst_v4l2_format == V4L2_PIX_FMT_BGR24 || dst_v4l2_format == V4L2_PIX_FMT_RGB24)
         min_size *= 3;
@@ -402,12 +396,11 @@ void *vj_vloopback_open(const char *device_name, VJFrame *src, int dst_w, int ds
 		return NULL;
 	}
 
-	if( v->src1->width == dst_v4l2_w && v->src1->height == dst_v4l2_h &&
-	   v4l2_ffmpeg2v4l2( v->src1->format ) == dst_v4l2_format )
+	if( src->width == dst_v4l2_w && src->height == dst_v4l2_h && v4l2_ffmpeg2v4l2( src->format ) == dst_v4l2_format )
 		no_conv = 1;
 
 	if( no_conv ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "vloop: direct path (no conversion)");
+		veejay_msg(VEEJAY_MSG_DEBUG, "vloop: direct path (no color space conversion)");
 	} else {
 		veejay_msg(VEEJAY_MSG_DEBUG, "vloop: enabling scaler %dx%d (%d %s) -> %dx%d (%d <- %d %s)",
 			src->width, src->height, src->format, yuv_get_pixfmt_description(src->format),
@@ -476,7 +469,7 @@ int	vj_vloopback_fill_buffer( void *vloop, VJFrame *src )
 				src->width,src->height,src->format,
 				v->dst1->width, v->dst1->height, v->dst1->format );
 			vj_vloopback_close( v );
-			return NULL;
+			return 0;
 		}
 	}
 	
@@ -492,8 +485,6 @@ void	vj_vloopback_close( void *vloop )
 	{
 		if( v->scaler )
 			yuv_free_swscaler( v->scaler );
-		if( v->src1 )
-			free(v->src1);
 		if( v->dst1 )
 			free(v->dst1);
 		if( v->fd )
