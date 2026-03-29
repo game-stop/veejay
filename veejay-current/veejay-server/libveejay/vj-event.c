@@ -235,6 +235,7 @@ static struct {                 /* hardcoded keyboard layout (the default keys) 
     { VIMS_VIDEO_PLAY_FORWARD,      SDL_SCANCODE_KP_6,       VIMS_MOD_NONE,  NULL    },
     { VIMS_VIDEO_PLAY_BACKWARD,     SDL_SCANCODE_KP_4,       VIMS_MOD_NONE,  NULL    },
     { VIMS_VIDEO_PLAY_STOP,         SDL_SCANCODE_KP_5,       VIMS_MOD_NONE,  NULL    },
+    { VIMS_VIDEO_SET_FREEZE,         SDL_SCANCODE_Z,      VIMS_MOD_NONE, NULL },
     { VIMS_VIDEO_PLAY_STOP_ALL,     SDL_SCANCODE_KP_5,      VIMS_MOD_SHIFT, NULL    },
     { VIMS_VIDEO_SKIP_FRAME,        SDL_SCANCODE_KP_9,       VIMS_MOD_NONE,  "1" },
     { VIMS_VIDEO_PREV_FRAME,        SDL_SCANCODE_KP_7,       VIMS_MOD_NONE,  "1" },
