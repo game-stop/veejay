@@ -643,29 +643,24 @@ int veejay_free(veejay_t * info)
     return 1;
 }
 
+static inline void safe_join(pthread_t *t, const char *name)
+{
+    if (t && *t) {
+        pthread_join(*t, NULL);
+        veejay_msg(VEEJAY_MSG_DEBUG, "%s thread finished.", name);
+        *t = 0;
+    }
+}
+
 void veejay_busy(veejay_t * info)
 {
     video_playback_setup *settings = (video_playback_setup*)(info->settings);
 
     veejay_msg(VEEJAY_MSG_DEBUG, "Waiting for threads to finish...");
     
-	// audio master clock
-    if (settings->audio_playback_thread) {
-        pthread_join(settings->audio_playback_thread, NULL);
-        veejay_msg(VEEJAY_MSG_DEBUG, "Producer thread finished.");
-    }
-
-	// display render thread
-    if (settings->renderer_thread) {
-        pthread_join(settings->renderer_thread, NULL);
-        veejay_msg(VEEJAY_MSG_DEBUG, "Renderer thread finished.");
-    }
-    
-	// producer
-    if (settings->producer_thread) {
-        pthread_join(settings->producer_thread, NULL);
-        veejay_msg(VEEJAY_MSG_DEBUG, "Producer thread finished.");
-    }
+    safe_join(&settings->audio_playback_thread, "Audio playback");
+    safe_join(&settings->renderer_thread, "Renderer");
+    safe_join(&settings->producer_thread, "Producer");
     
     veejay_msg(VEEJAY_MSG_INFO, "Playback engine terminated.");
 }
