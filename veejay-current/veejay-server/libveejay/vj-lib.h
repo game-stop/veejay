@@ -289,7 +289,7 @@ typedef struct {
 	int dct_method;
 	subsample_mode_t sample_mode;
 	int unicast_link_id;
-	int unicast_frame_sender;
+	volatile int unicast_frame_sender;
 	int is_dat;
 	int mcast_mode;
 	int mcast_frame_sender;
