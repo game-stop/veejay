@@ -83,7 +83,7 @@
 #define SAMPLE_FMT_S16 AV_SAMPLE_FMT_S16
 #endif
 
-#define PRIMARY_FRAMES 5
+#define PRIMARY_FRAMES 6
 #define FADE_LUT_SIZE 256
 
 #include <libvje/effects/shapewipe.h>
@@ -4227,6 +4227,45 @@ static  void    vj_perform_render_osd( veejay_t *info, video_playback_setup *set
     }
 }
 
+static inline void vj_fx_hold_update(veejay_t *info, VJFrame *current_fx)
+{
+    performer_global_t *g = (performer_global_t*) info->performer;
+    performer_t *p = g->A;
+
+    video_playback_setup *s = info->settings;
+
+    uint8_t slot = 5; // fx latch buffer index in primary_buffers
+
+    if (!s->hold_fx) {
+        s->hold_fx_prev = 0;
+        return;
+    }
+
+    int plane_sizes[4] = {
+        current_fx->len, current_fx->uv_len, current_fx->uv_len, current_fx->stride[3] * current_fx->height
+    };
+
+    if (!s->hold_fx_prev && s->hold_fx) {
+        
+        uint8_t *pri5[4] = {
+            p->primary_buffer[slot]->Y,
+            p->primary_buffer[slot]->Cb,
+            p->primary_buffer[slot]->Cr,
+            p->primary_buffer[slot]->alpha
+        };
+
+        vj_frame_copy(current_fx->data, pri5, plane_sizes);
+        if(current_fx->ssm) {
+            chroma_subsample(info->settings->sample_mode, current_fx, pri5);
+        }
+    }
+
+    // steady hold
+    //vj_frame_copy(p->primary_buffer[slot], p->primary_buffer[info->out_buf],plane_sizes );
+
+    s->hold_fx_prev = 1;
+}
+
 static  void    vj_perform_finish_chain( veejay_t *info,performer_t *p,VJFrame *frame, int sample_id, int source_type )
 {
     int result = 0;
@@ -4728,6 +4767,8 @@ void vj_perform_render_video_frames(veejay_t *info, performer_t *p, vjp_kf *effe
         
             vj_perform_finish_chain( info,p,a,sample_id,source_type );
 
+            vj_fx_hold_update(info, a);
+
             break;
             
         case VJ_PLAYBACK_MODE_PLAIN:
@@ -4765,7 +4806,10 @@ void vj_perform_render_video_frames(veejay_t *info, performer_t *p, vjp_kf *effe
                 }
             }
             
-            vj_perform_finish_chain( info,p,a,sample_id,source_type ); 
+            vj_perform_finish_chain( info,p,a,sample_id,source_type );
+
+            vj_fx_hold_update(info, a);
+
             break;
         default:
             break;
@@ -4794,6 +4838,32 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
     performer_global_t *g = (performer_global_t*) info->performer;
     video_playback_setup *settings = info->settings;
     performer_t *p = g->A;
+
+    if (info->settings->hold_fx && info->settings->hold_fx_prev)
+    {
+        performer_global_t *g = (performer_global_t*) info->performer;
+        performer_t *p = g->A;
+
+        uint8_t slot = 5;
+
+        uint8_t *fx_hold_data[4] = {
+            p->primary_buffer[slot]->Y,
+            p->primary_buffer[slot]->Cb,
+            p->primary_buffer[slot]->Cr,
+            p->primary_buffer[slot]->alpha
+        };
+
+        int plane_sizes[4] = {
+            dst->len,
+            dst->uv_len,
+            dst->uv_len,
+            0,
+        };
+
+        vj_frame_copy( fx_hold_data, dst->data, plane_sizes);
+
+        return 1;
+    }
 
     vj_perform_sample_tick_reset(g);
 

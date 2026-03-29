@@ -3224,6 +3224,21 @@ void vj_event_play_stop(void *ptr, const char format[], va_list ap)
     }
 }
 
+void vj_event_set_freeze(void *ptr, const char format[], va_list ap) 
+{
+    veejay_t *v = (veejay_t*) ptr;
+
+    int fx_hold = v->settings->hold_fx;
+    if( fx_hold == 0 ) {
+        fx_hold = 1;
+    }
+    else {
+        fx_hold = 0;
+    }
+    v->settings->hold_fx = fx_hold;
+    veejay_msg(VEEJAY_MSG_INFO, "%s FX Chain", (fx_hold == 0 ? "Unfreeze" : "Freeze"));
+}
+
 void vj_event_play_stop_all(void *ptr, const char format[], va_list ap) 
 {
     veejay_t *v = (veejay_t*) ptr;

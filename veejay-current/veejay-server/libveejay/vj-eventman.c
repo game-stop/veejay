@@ -519,6 +519,16 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				NULL );
 
+	index_map_[VIMS_VIDEO_SET_FREEZE]    =   _new_event(
+				NULL,
+				VIMS_VIDEO_SET_FREEZE,
+				"Pause and hold FX chain (freeze)",
+				vj_event_set_freeze,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+	
+
 	index_map_[VIMS_VIDEO_PLAY_STOP_ALL]	=	_new_event(
 				NULL,
 				VIMS_VIDEO_PLAY_STOP,
