@@ -1278,8 +1278,8 @@ static void veejay_screen_update(veejay_t *info, VJFrame *frame_to_display) {
 
 	if( info->vloopback )
 	{
-		vj_vloopback_fill_buffer( info->vloopback , frame_to_display );		
-		vj_vloopback_write( info->vloopback );
+		if(vj_vloopback_fill_buffer( info->vloopback , frame_to_display ))
+			vj_vloopback_write( info->vloopback );
 	}
 
 	if( info->splitter ) {
@@ -2896,10 +2896,10 @@ void *veejay_audio_producer_thread(void *arg)
     if (has_audio) {
 		const int seed_frames = el->video_fps * 2;
 		const long seed_client_frames = (long)(CLIENT_RATE * seed_frames / el->video_fps);
-        long seeded = 0;
+
 
         /*veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Seeding Jack ringbuffers with %ld client frames (~%d video frames)", seed_client_frames, seed_frames);
-
+        long seeded = 0;
         while (seeded < seed_client_frames && atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
             long frames_free = vj_jack_get_ringbuffer_frames_free();
             if (frames_free <= 0) { usleep_accurate(100,settings); continue; }
@@ -3747,8 +3747,9 @@ int veejay_edit_delete(veejay_t *info, editlist *el, long start, long end)
         return 0;
     }
 
-    for (i = n2 + 1; i < el->video_frames; i++)
+    for (i = n2 + 1; i < el->video_frames; i++) {
         el->frame_list[i - (n2 - n1 + 1)] = el->frame_list[i];
+	}
 
 	long long min_fn = atomic_load_long_long(&settings->min_frame_num);
 	long long max_fn = atomic_load_long_long(&settings->max_frame_num);
