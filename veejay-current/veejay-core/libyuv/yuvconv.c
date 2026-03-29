@@ -314,105 +314,65 @@ void    yuv_init_lib(int extra_flags, int auto_ccir_jpeg, int default_zoomer)
     }
 }
 
-void    yuv_plane_sizes( VJFrame *src, int *p1, int *p2, int *p3, int *p4 )
-{
+void yuv_plane_sizes(VJFrame *src, int *p1, int *p2, int *p3, int *p4) {
+
+    if (p1) *p1 = 0;
+    if (p2) *p2 = 0;
+    if (p3) *p3 = 0;
+    if (p4) *p4 = 0;
+
+    if (!src) return;
+
+    int w = src->width;
+    int h = src->height;
+    int area = w * h;
 
     switch(src->format) {
         case PIX_FMT_YUV420P:
         case PIX_FMT_YUVJ420P:
-            *p1 = src->len;
-            *p2 = src->len / 4;
-            *p3 = src->len / 4;
-            *p4 = 0;
+            if (p1) *p1 = area;
+            if (p2) *p2 = area / 4;
+            if (p3) *p3 = area / 4;
             break;
+
         case PIX_FMT_YUV422P:
         case PIX_FMT_YUVJ422P:
-        case PIX_FMT_YUVJ444P:
-        case PIX_FMT_YUV444P:
-            
-            if(p1 != NULL) {
-                *p1 = src->len;
-            }
-            if(p2 != NULL) {
-                *p2 = src->uv_len;
-            }
-            if(p3 != NULL) {
-                *p3 = src->uv_len;
-            }
+            if (p1) *p1 = area;
+            if (p2) *p2 = area / 2;
+            if (p3) *p3 = area / 2;
+            break;
 
-            if(p4 != NULL) {
-                *p4 = 0;
-            }
+        case PIX_FMT_YUV444P:
+        case PIX_FMT_YUVJ444P:
+            if (p1) *p1 = area;
+            if (p2) *p2 = area;
+            if (p3) *p3 = area;
             break;
+
         case PIX_FMT_YUVA420P:
-        case PIX_FMT_YUVA422P:
-            if(p1 != NULL) {
-                *p1 = src->len;
-            }
-            if(p2 != NULL) {
-                *p2 = src->uv_len;
-            }
-            if(p3 != NULL) {
-                *p3 = src->uv_len;
-            }
-            if(p4 != NULL) {
-                *p4 = src->len;
-            }
+            if (p1) *p1 = area;
+            if (p2) *p2 = area / 4;
+            if (p3) *p3 = area / 4;
+            if (p4) *p4 = area;
             break;
-        case PIX_FMT_YUVA444P:
-            if(p1 != NULL) {
-                *p1 = src->len;
-            }
-            if(p2 != NULL) {
-                *p2 = src->len;
-            }
-            if(p3 != NULL) {
-                *p3 = src->len;
-            }
-            if(p4 != NULL) {
-                *p4 = src->len;
-            }
-            break;
+
         case PIX_FMT_RGB24:
         case PIX_FMT_BGR24:
-            if( p1 != NULL ) 
-                *p1 = src->len * 3;
-            *p2 = 0;
-            *p3 = 0;
-            *p4 = 0;
+            if (p1) *p1 = area * 3;
             break;
+
         case PIX_FMT_RGBA:
         case PIX_FMT_BGRA:
-        case PIX_FMT_ARGB:
-        case PIX_FMT_ABGR:
-            if( p1 != NULL )
-                *p1 = src->len * 4;
-            *p2 = 0;
-            *p3 = 0;
-            *p4 = 0;
+            if (p1) *p1 = area * 4;
             break;
+
         case PIX_FMT_YUYV422:
-            if( p1 != NULL )
-                *p1 = src->len * 2;
-            *p2 = 0;
-            *p3 = 0;
-            *p4 = 0;
+        case PIX_FMT_UYVY422:
+            if (p1) *p1 = area * 2;
             break;
-        default:    
-            if(p1 != NULL) {
-                *p1 = src->len;
-            }
-            if(p2 != NULL) {
-                *p2 = 0;
-            }
-            if(p3 != NULL) {
-                *p3 = 0;
-            }
 
-            if(p4 != NULL) {
-                *p4 = 0;
-            }
-
+        default:
+            if (p1) *p1 = src->len;
             break;
     }
 }
@@ -548,6 +508,8 @@ VJFrame *yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
         case PIX_FMT_RGB24:
         case PIX_FMT_BGR24:
             f->stride[0] = w * 3;
+            f->stride[1] = 0;
+            f->stride[2] = 0;
             f->uv_width = 0; f->uv_height=0;
             f->data[1] = NULL;f->data[2] = NULL;
             f->yuv_fmt = fmt;
@@ -1223,9 +1185,9 @@ void*   yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int sw
 
     sws_setColorspaceDetails( s->sws, coefs, srcRange, coefs, dstRange, brightness, contrast, saturation );
 #ifdef STRICT_CHECKING
-    veejay_msg(VEEJAY_MSG_DEBUG, "Initialized %s scaler: %dx%d -> %dx%d (Threads: %d) Limited %d - %d",
+    veejay_msg(VEEJAY_MSG_DEBUG, "Initialized %s scaler: %dx%d @%d -> %dx%d @%d Limited %d - %d",
             (LIBSWSCALE_VERSION_MAJOR >= 5 ? "Modern" : "Legacy"),
-            src->width, src->height, dst->width, dst->height, n_threads, srcRange, dstRange);
+            src->width, src->height,src->format, dst->width, dst->height, dst->format, srcRange, dstRange);
 #endif
     if(!s->sws)
     {
