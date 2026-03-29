@@ -1244,6 +1244,9 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
    return (int)(tag->id);
 
 TAG_NEW_FAILED:
+
+    veejay_msg(0, "Failed to open stream");
+
     if(tag->source_name)
         free(tag->source_name);
     if(tag->method_filename) 
@@ -2528,7 +2531,7 @@ int vj_tag_disable(int t1) {
 
 int vj_tag_enable(int t1) {
     vj_tag *tag = vj_tag_get(t1);
-    if( tag->source_type == VJ_TAG_TYPE_V4L )
+    if( tag->source_type == VJ_TAG_TYPE_V4L && !tag->active)
     {
 #ifdef HAVE_V4L2
         if( no_v4l2_threads_ ) {
@@ -2541,7 +2544,7 @@ int vj_tag_enable(int t1) {
         return 1;
     }
 
-    if(tag->source_type == VJ_TAG_TYPE_NET || tag->source_type == VJ_TAG_TYPE_MCAST )
+    if( (tag->source_type == VJ_TAG_TYPE_NET || tag->source_type == VJ_TAG_TYPE_MCAST) && !tag->active )
     {
         if(!net_thread_start(tag, _tag_info->effect_frame1))
         {
@@ -2551,16 +2554,17 @@ int vj_tag_enable(int t1) {
         }
     }
 
-    if(tag->source_type == VJ_TAG_TYPE_AVFORMAT )
+    if(tag->source_type == VJ_TAG_TYPE_AVFORMAT && !tag->active)
     {
         if(!avformat_thread_set_state(tag,1)) {
             veejay_msg(VEEJAY_MSG_ERROR, "Stream is not yet ready to start playing");
             return -1;
         }
+        tag->active = 1;
     }
 
 #ifdef USE_GDK_PIXBUF
-    if( tag->source_type == VJ_TAG_TYPE_PICTURE )
+    if( tag->source_type == VJ_TAG_TYPE_PICTURE && !tag->active )
     {
         vj_picture *p = vj_tag_input->picture[ tag->index ];
         p->pic = vj_picture_open( tag->source_name, 
@@ -2571,10 +2575,10 @@ int vj_tag_enable(int t1) {
             return -1;
 
         vj_tag_input->picture[tag->index] = p;
+        tag->active = 1;
         veejay_msg(VEEJAY_MSG_DEBUG, "Streaming from picture '%s'", tag->source_name );
     }
 #endif
-    tag->active = 1;
 
     return 1;
 }
@@ -3626,10 +3630,12 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
     case VJ_TAG_TYPE_V4L:
 #ifdef HAVE_V4L2
         if( no_v4l2_threads_ ) {
-            res = v4l2_pull_frame( vj_tag_input->v4l2[tag->index],v4l2_get_dst(vj_tag_input->v4l2[tag->index],buffer[0],buffer[1],buffer[2],buffer[3]) );
+            res = v4l2_pull_frame( vj_tag_input->v4l2[tag->index], dst);
+                //v4l2_get_dst(vj_tag_input->v4l2[tag->index],buffer[0],buffer[1],buffer[2],buffer[3]) );
         } else {
-            res = v4l2_thread_pull( v4l2_thread_info_get( vj_tag_input->v4l2[tag->index]),
-                        v4l2_get_dst( vj_tag_input->v4l2[tag->index], buffer[0],buffer[1],buffer[2],buffer[3]));
+            res = v4l2_thread_pull( v4l2_thread_info_get( vj_tag_input->v4l2[tag->index]), dst );
+
+            //            v4l2_get_dst( vj_tag_input->v4l2[tag->index], buffer[0],buffer[1],buffer[2],buffer[3]));
         }
 #endif
          break;

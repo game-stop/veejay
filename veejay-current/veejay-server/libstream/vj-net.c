@@ -362,6 +362,7 @@ int	net_thread_start(vj_tag *tag, VJFrame *info)
 			tag->id,
 			tag->source_type == VJ_TAG_TYPE_MCAST ? 
 			"multicast" : "unicast", tag->source_name,tag->video_channel);
+		tag->active = 1;
 	}
 
 	return 1; 

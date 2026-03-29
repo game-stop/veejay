@@ -305,9 +305,14 @@ static void Usage(char *progname)
 	fprintf(stderr,
 			"\t\t\t\t4 = Y4M Stream 4:2:0 (requires -o <filename>)\n");
 	fprintf(stderr,
-			"\t\t\t\t5 = Vloopback device (requires -o <filename>)\n");
+			"\t\t\t\t5 = Vloopback device (native) (requires -o <filename>)\n");
 	fprintf(stderr,
 			"\t\t\t\t6 = Y4M Stream 4:2:2 (requires -o <filename>)\n");
+	fprintf(stderr,
+			"\t\t\t\t7 = Vloopback device YUV 4:2:0 (requires -o <filename>)\n");
+	fprintf(stderr,
+			"\t\t\t\t8 = Vloopback device BGR (requires -o <filename>)\n");
+
 	fprintf(stderr,
 			"  -o/--output-file [file]\tWrite to file (for use with -O/--output)\n");
 #ifdef HAVE_SDL
@@ -456,7 +461,7 @@ static int set_option(const char *name, char *value)
 	    }
 #endif
 */
-	    if( info->video_out < 0 || info->video_out > 6 ) {
+	    if( info->video_out < 0 || info->video_out > 8 ) {
 		    fprintf(stderr, "Select a valid output display driver\n");
 		    exit(-1);
 		   }

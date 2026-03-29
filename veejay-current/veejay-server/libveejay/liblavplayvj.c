@@ -176,7 +176,7 @@ static void veejay_free_frame_buffer(VJFrame *f) {
 }
 
 static	VJFrame *veejay_allocate_frame_buffer(veejay_t *info) {
-	VJFrame *buf = yuv_yuv_template( NULL,NULL,NULL, info->video_output_width, info->video_output_height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
+	VJFrame *buf = yuv_yuv_template( NULL,NULL,NULL, info->video_output_width, info->video_output_height, vj_to_pixfmt(info->pixel_format) );
 	buf->fps = info->settings->output_fps;
 	
 	size_t len = sizeof(uint8_t) * ( buf->len + buf->uv_len + buf->uv_len);
@@ -1884,9 +1884,12 @@ int veejay_setup_video_out(veejay_t *info) {
 		case 3:
 	    case 4:
 		case 5:
+		case 6:
+		case 7:
+		case 8:
 			break;
 		default:
-			veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode. Use -O [012345]");
+			veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode. Use -O [012345678]");
 			return -1;
 	}
 
@@ -2434,7 +2437,24 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 				return -1;
 			}
 		break;
-
+		case 7:
+			veejay_msg(VEEJAY_MSG_INFO, "Entering vloopback streaming mode. ");
+			info->vloopback = vj_vloopback_open( info->y4m_file, info->effect_frame1, info->video_output_width, info->video_output_height, PIX_FMT_YUV420P );
+			if( info->vloopback == NULL )
+			{
+				veejay_msg(0, "Cannot open %s as vloopback", info->y4m_file);
+				return -1;
+			}
+		break;
+		case 8:
+			veejay_msg(VEEJAY_MSG_INFO, "Entering vloopback streaming mode. ");
+			info->vloopback = vj_vloopback_open( info->y4m_file, info->effect_frame1, info->video_output_width, info->video_output_height, PIX_FMT_BGR24);
+			if( info->vloopback == NULL )
+			{
+				veejay_msg(0, "Cannot open %s as vloopback", info->y4m_file);
+				return -1;
+			}
+		break;		
 		default:
 			break;
 	}

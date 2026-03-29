@@ -80,8 +80,18 @@ Specify video output width
 .B \-h/--output-height <num>
 Specify video output height
 .TP
-.B \-p/--port <num>
-TCP port offset for communication with clients like 'reloaded' , 'sayVIMS' or sendVIMS for PD (default 3490)
+.B \-O/--output [0..8]
+Specify video output:
+0 = SDL (default)
+1 = DirectFB
+2 = SDL and DirectFB
+3 = OpenGL (requires ARB fragment shader)
+4 = Y4M Stream 4:2:0
+5 = VLOOPBACK (native)
+6 = Y4M Stream 4:2:2
+7 = VLOOPBACK (YUV 4:2:0)
+8 = VLOOPBACK (BGR24)
+Options 4, 5, 6, 7 and 8 require --output-file.
 .TP
 .B \-O/--output [0..6]
 Specify video output 0 = SDL (default) 1 = DirectFB 2 = SDL and DirectFB 3 = Open GL (requires ARB fragment shader), 4 = Y4M Stream 4:2:0, 5 = VLOOPBACK, 6 = Y4M Stream 4:2:2

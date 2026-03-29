@@ -2299,8 +2299,6 @@ static void vj_perform_tag_render_chain_entry(veejay_t *info,performer_t *p,vjp_
 
     vj_perform_supersample(settings,p, frames[0], (ef ? frames[1] : NULL), sub_mode, chain_entry );
 
-    //p->frame_buffer[chain_entry]->ssm = frames[0]->ssm;
-
     if(ef)
     {
         frames[1]->ssm = vj_perform_apply_secundary_tag(info,p,fx_entry->channel,fx_entry->source_type,chain_entry,frames[0],frames[1],p->frame_buffer[chain_entry]->P0, p->frame_buffer[chain_entry]->P1, 0 );

@@ -204,7 +204,6 @@ static int vj_vloopback_set_format( vj_vloopback_t *v, int dst_w, int dst_h, int
 #endif
 }
 
-// TODO: refactor yuv_yuv_template to take 4 planes and setup pointers correctly --> vj_frame_alloc(...)
 static void vj_vloopback_setup_ptrs( uint8_t *buf, uint8_t *planes[4], int pixfmt, int w, int h )
 {
 	int uv_width = 0;
@@ -234,7 +233,7 @@ static void vj_vloopback_setup_ptrs( uint8_t *buf, uint8_t *planes[4], int pixfm
 		case PIX_FMT_YUVA420P:		
 			uv_width = w>>1;
 			uv_height= h>>1;
-			break;
+			break;	
 		default:
 			/* non planar formats */
 			break;
@@ -247,6 +246,7 @@ static void vj_vloopback_setup_ptrs( uint8_t *buf, uint8_t *planes[4], int pixfm
 			pixfmt == PIX_FMT_YUVA422P ||
 			pixfmt == PIX_FMT_YUVA444P)
 		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "vloop: setting alpha plane size by format %d",pixfmt);
 			planes[3] = planes[2] + (uv_width * uv_height);
 		}
 	}		
@@ -372,7 +372,18 @@ void *vj_vloopback_open(const char *device_name, VJFrame *src, int dst_w, int ds
 
 	v->src1 = yuv_yuv_template( NULL, NULL, NULL, src->width, src->height, src->format );  
 
-	uint8_t *buf = (uint8_t*) vj_malloc( sizeof(uint8_t) * v->size );
+	long min_size = dst_v4l2_w * dst_v4l2_h;
+    if (dst_v4l2_format == V4L2_PIX_FMT_BGR24 || dst_v4l2_format == V4L2_PIX_FMT_RGB24)
+        min_size *= 3;
+    else if (dst_v4l2_format == V4L2_PIX_FMT_BGR32 || dst_v4l2_format == V4L2_PIX_FMT_RGB32)
+        min_size *= 4;
+
+    if (v->size < min_size) {
+        veejay_msg(VEEJAY_MSG_WARNING, "vloop: Driver reported size %ld too small, forcing %ld", v->size, min_size);
+        v->size = min_size;
+    }
+
+	uint8_t *buf = (uint8_t*) vj_calloc( sizeof(uint8_t) * v->size ); //FIXME: no need to clear
 	if(buf == NULL) {
 		veejay_msg(VEEJAY_MSG_ERROR, "vloop: unable to allocate %ld bytes", v->size );
 		vj_vloopback_close( v );
@@ -398,31 +409,21 @@ void *vj_vloopback_open(const char *device_name, VJFrame *src, int dst_w, int ds
 	if( no_conv ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "vloop: direct path (no conversion)");
 	} else {
-		veejay_msg(VEEJAY_MSG_DEBUG, "vloop: enabling scaler %dx%d (%x) -> %dx%d (%x)",
-			src->width, src->height, src->format,
+		veejay_msg(VEEJAY_MSG_DEBUG, "vloop: enabling scaler %dx%d (%d %s) -> %dx%d (%d <- %d %s)",
+			src->width, src->height, src->format, yuv_get_pixfmt_description(src->format),
 			dst_v4l2_w, dst_v4l2_h,
-			v4l2_pixelformat2ffmpeg(dst_v4l2_format));
-	}
-	
-	if( no_conv == 0 ) {
-		v->scaler = yuv_init_swscaler( v->src1,v->dst1,&tmpl,yuv_sws_get_cpu_flags() );
-
-		if( v->scaler == NULL ) {
-			veejay_msg(0, "vloop: Unable to initialize video scaler %dx%d in %x to %dx%d in %x",	
-				src->width,src->height,src->format,
-				dst_v4l2_w, dst_v4l2_h,  v4l2_pixelformat2ffmpeg( dst_v4l2_format ) );
-			vj_vloopback_close( v );
-			return NULL;
-		}
+			v4l2_pixelformat2ffmpeg(dst_v4l2_format), dst_v4l2_format,v4l2_pixfmt_to_string(dst_v4l2_format));
 	}
 
 	veejay_msg(VEEJAY_MSG_DEBUG,
-		"vloop: ready -> %s %dx%d %s @ %.3f fps",
+		"vloop: ready -> %s %dx%d %s @ %.3f fps. strides: %d,%d,%d,%d  buffer size: %d",
 		v->dev_name,
 		dst_v4l2_w,
 		dst_v4l2_h,
 		v4l2_pixfmt_to_string(dst_v4l2_format),
-		v->fps);
+		v->fps,
+		v->dst1->stride[0], v->dst1->stride[1], v->dst1->stride[2], v->dst1->stride[3],
+		v->size);
 
 	return (void*) v;
 #else
@@ -455,41 +456,31 @@ int	vj_vloopback_fill_buffer( void *vloop, VJFrame *src )
 	if(!v) return 0;
 
 	uint8_t **data = src->data;
-
 	uint8_t *planes[4];
 
-	planes[0] = data[0];
 	if( v->swap )
 	{
 		planes[1] = data[2];
 		planes[2] = data[1];
-		planes[3] = data[3];
-	}
-	else
-	{
-		planes[1] = data[1];
-		planes[2] = data[2];
-		planes[3] = data[3];
+		src->data[1] = planes[1];
+		src->data[2] = planes[2];
 	}
 
-	if( v->scaler )
-	{
-		v->src1->data[0] = planes[0];
-		v->src1->data[1] = planes[1];
-		v->src1->data[2] = planes[2];
-		v->src1->data[3] = planes[3];
+	if(!v->scaler) {
+		sws_template tmpl;
+        tmpl.flags = 1;
+		v->scaler = yuv_init_swscaler( src,v->dst1,&tmpl,yuv_sws_get_cpu_flags() );
 
-		yuv_convert_and_scale( v->scaler, src, v->dst1 );
-	}
-	else
-	{
-		veejay_memcpy( v->dst1->data[0], planes[0], v->dst1->len );
-		if( v->dst1->data[1] )
-		{
-			veejay_memcpy( v->dst1->data[1], planes[1], v->dst1->uv_len );
-			veejay_memcpy( v->dst1->data[2], planes[2], v->dst1->uv_len );
+		if( v->scaler == NULL ) {
+			veejay_msg(0, "vloop: Unable to initialize video scaler %dx%d in %x to %dx%d in %x",	
+				src->width,src->height,src->format,
+				v->dst1->width, v->dst1->height, v->dst1->format );
+			vj_vloopback_close( v );
+			return NULL;
 		}
 	}
+	
+	yuv_convert_and_scale( v->scaler, src, v->dst1 );
 
 	return 1;
 }
