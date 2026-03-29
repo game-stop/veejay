@@ -202,7 +202,6 @@ void fractalkaleido_free(void *ptr)
     }
 }
 
-
 static void fractalkaleido_apply1(void *ptr, VJFrame *frame, int *args, float base_angle)
 {
     fractalkaleido_t *s = (fractalkaleido_t*) ptr;
@@ -212,30 +211,34 @@ static void fractalkaleido_apply1(void *ptr, VJFrame *frame, int *args, float ba
 
     const int hw = w >> 1;
     const int hh = h >> 1;
-    const int cx = w >> 1;
-    const int cy = h >> 1;
 
-    const int segments = args[0];
-    const float seg_angle = TWO_PI / segments;
+    int segments_i = args[0];
+    if (segments_i < 2) segments_i = 2;
+
+    const float seg_angle = TWO_PI / (float)segments_i;
+    const float inv_seg = 1.0f / seg_angle;
 
     const float scale = args[2] * 0.01f;
     const float offx = args[3] * 0.01f;
     const float offy = args[4] * 0.01f;
     const int mirror = args[5];
 
-    const float *cos_lut = s->cos_lut;
-    const float *sin_lut = s->sin_lut;
+    const float twist = args[7] * 0.0005f;
+
+    const float offxw = offx * w;
+    const float offyh = offy * h;
 
     const float inv_w = 1.0f / (float)w;
     const float inv_h = 1.0f / (float)h;
-    const float inv_seg = 1.0f / seg_angle;
 
-    const float twist = args[7] * 0.0005f;
-    const float offxw = offx * w;
-    const float offyh = offy * h;
-    const float half_seg = seg_angle * 0.5f;
+    const float *cos_lut = s->cos_lut;
+    const float *sin_lut = s->sin_lut;
+
+    const float twist_amt = args[7] * 0.0025f;
 
     int *map = s->map;
+
+    const float inv_radius_norm = 1.0f / (float)(w + h);
 
     #pragma omp parallel for num_threads(s->n_threads) schedule(static)
     for(int y = 0; y <= hh; y++)
@@ -250,26 +253,40 @@ static void fractalkaleido_apply1(void *ptr, VJFrame *frame, int *args, float ba
             float theta = atan_row[x];
             float r     = sqrt_row[x];
 
-            theta += r * twist;
+            float rn = r * inv_radius_norm;
 
-            float dither = ((x ^ y) & 1) ? 0.001f : -0.001f;
-            float a = theta + base_angle + dither;
+            float falloff = 0.5f * rn + 0.5f * (rn * rn);
+
+            theta += falloff * twist_amt * (w + h);
+
+            float a = theta + base_angle;
 
             if (a < 0.0f)
                 a += TWO_PI * 100.0f;
 
             float f = a * inv_seg;
             int seg_i = (int)f;
-            float seg = (f - seg_i) * seg_angle;
 
-            float t = seg - half_seg;
-            seg = (t < 0.0f) ? -t : t;
-            seg = seg_angle - seg;
+            float u = f - seg_i;
 
-            int lut = (int)(seg * LUT_DIVISOR) & LUT_MASK;
+            float tri = 1.0f - fabsf(2.0f * u - 1.0f);
 
-            float nx = r * cos_lut[lut];
-            float ny = r * sin_lut[lut];
+            tri = tri * tri * (3.0f - 2.0f * tri);
+
+            float seg = tri * seg_angle;
+
+            float lut_f = seg * LUT_DIVISOR;
+            int lut_i = (int)lut_f;
+            float frac = lut_f - lut_i;
+
+            int i0 = lut_i & LUT_MASK;
+            int i1 = (lut_i + 1) & LUT_MASK;
+
+            float cosv = cos_lut[i0] + (cos_lut[i1] - cos_lut[i0]) * frac;
+            float sinv = sin_lut[i0] + (sin_lut[i1] - sin_lut[i0]) * frac;
+
+            float nx = r * cosv;
+            float ny = r * sinv;
 
             nx = nx * scale + offxw;
             ny = ny * scale + offyh;
