@@ -275,6 +275,7 @@ enum {
   WIDGET_DEC_P14 = 159,
   WIDGET_DEC_P15 = 160,
   WIDGET_FRAME_FXTREE2 = 161,
+  WIDGET_CURVE_ANIMATION_LIST = 162,
   WIDGET_CURVE_TOGGLEENTRY_PARAM = 163,
   WIDGET_CURVE_SPINSTART = 164,
   WIDGET_CURVE_SPINEND = 165,
@@ -668,6 +669,7 @@ static struct
     { "curve_spinend",          WIDGET_CURVE_SPINEND },
     { "curve_chain_toggleentry",WIDGET_CURVE_CHAIN_TOGGLEENTRY },
     { "frame_fxtree3",          WIDGET_FRAME_FXTREE3 },
+    { "curve_combo_animation",  WIDGET_CURVE_ANIMATION_LIST },
     { "curve_typespline",       WIDGET_CURVE_TYPESPLINE },
     { "curve_typefreehand",     WIDGET_CURVE_TYPEFREEHAND },
     { "curve_typelinear",       WIDGET_CURVE_TYPELINEAR },
@@ -3379,6 +3381,7 @@ static void vj_kf_select_parameter(int num)
 
     info->uc.selected_parameter_id = num;
     reset_curve( info->curve );
+    info->uc.reload_hint_checksums[HINT_KF] = -1;
     update_curve_widget( info->curve );
 }
 
@@ -7613,6 +7616,8 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     info->status_frame = info->status_tokens[FRAME_NUM];
     
     timeline_set_pos( info->tl, (gdouble) info->status_frame );
+    curve_set_position(info->curve, (gdouble) info->status_frame);
+
     char *current_time_ = format_time( info->status_frame, (double) info->el.fps );
     char *mouse_at_time = format_time( 
             timeline_get_point(TIMELINE_SELECTION(info->tl)),

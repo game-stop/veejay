@@ -1,5 +1,5 @@
 /* Gveejay Reloaded - graphical interface for VeeJay
- * 	     (C) 2002-2005 Niels Elburg <nwelburg@gmail.com> 
+ * 	     (C) 2002-2005 Niels Elburg <nwelburg@gmail.com>
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -58,21 +58,22 @@ void   set_initial_curve( GtkWidget *curve, int fx_id, int parameter_id, int sta
 	_effect_get_minmax(fx_id, &min, &max, parameter_id );
     int len = end - start;
 	int i,k=0;
-    float	*vec = (float*) vj_calloc(sizeof(float) * len );
+    float	*vec = (float*) vj_calloc(sizeof(float) * len ); // FIXME less values len/step?
 
 	int diff = max - min;
-	for(i = start ; i < end; i ++ )
+	for(i = start ; i < end; i ++ ) //FIXME less values ? i+=step
 	{
-		float val = ((float)(value - min) / (diff));
-		vec[k] = val;
+		//~ float val = ((float)(value - min) / (diff)); # BYPASS [0-1] NORMALISATION
+		//~ vec[k] = val;  # BYPASS [0-1] NORMALISATION
+		vec[k] = value;
 		k++;
 	}
 
-    gtk3_curve_set_vector( curve , len, vec );
-    gtk3_curve_set_xaxis_range( curve, (gfloat) start, (gfloat) end );
-    gtk3_curve_set_yaxis_range( curve, (gfloat) min, (gfloat) max );
+    gtk3_curve_set_range( curve,  (gfloat) start, (gfloat) end, (gfloat) min, (gfloat) max );
     gtk3_curve_set_grid_resolution(curve, 16); // default grid resolution
+    gtk3_curve_set_vector( curve , len, vec );
     gtk3_curve_set_curve_type( curve, GTK3_CURVE_TYPE_LINEAR );
+
 
     free(vec);
 
@@ -89,7 +90,7 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 	int i;
 	int min = 0, max = 0;
 
-	if(n != 6 || len <= 0 )	
+	if(n != 6 || len <= 0 )
 	{
 		return -1;
 	}
@@ -107,20 +108,20 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 	for(i = start ; i < end; i ++ )
 	{
 		unsigned char *ptr = in + (k * 4);
-		int value = 
+		int value =
 		  ( ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24) );
 
 		// val = ((Input - InputLow) / (InputHigh - InputLow)) * (OutputHigh - OutputLow) + OutputLow;
 		// with OutputLow==0 and OutputHigh==1 in gtkcurve range
-		float val = ((float)(value - min) / (diff));
 
-		vec[k] = val;
+		//~ float val = ((float)(value - min) / (diff)); // # BYPASS [0-1] NORMALISATION
+		//~ vec[k] = val;
+		vec[k] = (float)value;
 		k++;
 	}
     gtk3_curve_reset( curve );
-    gtk3_curve_set_xaxis_range( curve, (gfloat) start, (gfloat) end );
-    gtk3_curve_set_yaxis_range( curve, (gfloat) min, (gfloat) max );
-    gtk3_curve_set_grid_resolution(curve, 16); // default grid resolution
+    gtk3_curve_set_range( curve, (gfloat) start, (gfloat) end, (gfloat) min, (gfloat) max );
+    gtk3_curve_set_grid_resolution( curve, 16 ); // default grid resolution
 
     gtk3_curve_set_vector( curve , len, vec );
 
@@ -132,7 +133,7 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 
     gtk3_curve_set_curve_type( curve, *curve_type );
 
-	*lo = start;
+	*lo = start; //FIXME , why affected ?
 	*hi = end;
 
 	free(vec);
@@ -140,4 +141,87 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
     curve_is_empty = 0;
 
 	return parameter_id;
+}
+
+void curve_set_position( GtkWidget *curve, double pos)
+{
+    gtk3_curve_set_position( curve, pos);
+}
+
+void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_id, int start, int end, int animation)
+{
+
+    int min=0, max=0;
+	_effect_get_minmax(fx_id, &min, &max, parameter_id );
+    int veclen = end - start;
+	//~ int i,k=0;
+	int i,k;
+    float rx, ry, dx, dy, min_x, delta_x;
+
+    float	*vec = (float*) vj_calloc(sizeof(float) * veclen ); // FIXME less values len/step?
+
+	int diff = max - min;
+
+    //~ ry = min;
+    dy = (diff) / (float)(veclen - 1);
+    switch(animation)
+    {
+        case 0: //Up
+            for(i = start, k = 0, ry = min; i < end; i ++ , ry+=dy) //FIXME less values ? i+=step
+            {
+                vec[k] = ry;
+                k++;
+            }
+
+        break;
+        case 1: //Down
+            for(i = start, k = 0, ry = max; i < end; i ++ , ry-=dy) //FIXME less values ? i+=step
+            {
+                vec[k] = ry;
+                k++;
+            }
+        break;
+        case 2: //Moutain
+            for(i = start, k = 0, ry = min; i < end/2; i ++ , ry+=2*dy) //FIXME less values ? i+=step
+            {
+                vec[k] = ry;
+                vec[end-k] = ry;
+                k++;
+            }
+            if (k != end-k) //fill last points (in the middle) if end is odd
+            {
+                vec[k] = max;
+                vec[k+1] = max;
+            }
+        break;
+        case 3: //Valley
+            for(i = start, k = 0, ry = max; i < end/2; i ++ , ry-=2*dy) //FIXME less values ? i+=step
+            {
+                vec[k] = ry;
+                vec[end-k] = ry;
+                k++;
+            }
+            if (k != end-k) //fill last points (in the middle)
+            {
+                vec[k] = min;
+                vec[k+1] = min;
+            }
+        break;
+        default: break;
+    }
+
+    int curve_type = GTK3_CURVE_TYPE_LINEAR;
+    if( is_button_toggled("curve_typespline")) {
+        curve_type = GTK3_CURVE_TYPE_SPLINE;
+    } else if ( is_button_toggled("curve_typefreehand")) {
+        curve_type = GTK3_CURVE_TYPE_FREE;
+    } else if (is_button_toggled("curve_typelinear")) {
+        curve_type = GTK3_CURVE_TYPE_LINEAR;
+    }
+
+    gtk3_curve_set_vector( curve , veclen, vec );
+    gtk3_curve_set_curve_type( curve, curve_type );
+
+    curve_is_empty = 0;
+    free(vec);
 }
