@@ -1690,6 +1690,12 @@
                       <placeholder/>
                     </child>
                     <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
                       <object class="GtkButton" id="generators_close">
                         <property name="visible">True</property>
                         <property name="can-focus">True</property>
@@ -8932,12 +8938,6 @@
                           <object class="GtkComboBoxText" id="curve_combo_animation">
                             <property name="visible">True</property>
                             <property name="can-focus">False</property>
-                            <items>
-                              <item id="1" translatable="yes">Up</item>
-                              <item id="2" translatable="yes">Down</item>
-                              <item id="3" translatable="yes">Mountain</item>
-                              <item id="4" translatable="yes">Valley</item>
-                            </items>
                             <signal name="changed" handler="on_curve_animation_changed" swapped="no"/>
                           </object>
                           <packing>

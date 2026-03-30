@@ -8864,6 +8864,13 @@ void vj_gui_init(const char *glade_file,
     add_class(gui->curve, "curve");
 
     gtk_container_add(GTK_CONTAINER(curve_container), gui->curve);
+
+    GtkWidget *shape_list = glade_xml_get_widget_(info->main_window,"curve_combo_animation" );
+    for (int i = 0; i < FX_ANIM_SHAPE_MAX; i++)
+    {
+        gtk_combo_box_text_insert_text (GTK_COMBO_BOX_TEXT(shape_list),i ,fx_anim_shape_map[i].description);
+    }
+
     gtk_widget_show_all(curve_container);
 
     veejay_memset( &info->watch, 0, sizeof(watchdog_t));

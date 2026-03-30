@@ -152,21 +152,18 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
 {
 
     int min=0, max=0;
-	_effect_get_minmax(fx_id, &min, &max, parameter_id );
+    _effect_get_minmax(fx_id, &min, &max, parameter_id );
     int veclen = end - start;
-	//~ int i,k=0;
 	int i,k;
     float rx, ry, dx, dy, min_x, delta_x;
 
     float	*vec = (float*) vj_calloc(sizeof(float) * veclen ); // FIXME less values len/step?
-
-	int diff = max - min;
-
-    //~ ry = min;
+    int diff = max - min;
     dy = (diff) / (float)(veclen - 1);
+
     switch(animation)
     {
-        case 0: //Up
+        case FX_ANIM_SHAPE_UP:
             for(i = start, k = 0, ry = min; i < end; i ++ , ry+=dy) //FIXME less values ? i+=step
             {
                 vec[k] = ry;
@@ -174,14 +171,14 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
             }
 
         break;
-        case 1: //Down
+        case FX_ANIM_SHAPE_DOWN:
             for(i = start, k = 0, ry = max; i < end; i ++ , ry-=dy) //FIXME less values ? i+=step
             {
                 vec[k] = ry;
                 k++;
             }
         break;
-        case 2: //Moutain
+        case FX_ANIM_SHAPE_MONTAIN:
             for(i = start, k = 0, ry = min; i < end/2; i ++ , ry+=2*dy) //FIXME less values ? i+=step
             {
                 vec[k] = ry;
@@ -194,7 +191,7 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
                 vec[k+1] = max;
             }
         break;
-        case 3: //Valley
+        case FX_ANIM_SHAPE_VALLEY:
             for(i = start, k = 0, ry = max; i < end/2; i ++ , ry-=2*dy) //FIXME less values ? i+=step
             {
                 vec[k] = ry;
