@@ -2911,9 +2911,12 @@ void    on_curve_animation_changed(GtkWidget *widget, gpointer user_data)
             hi = info->status_tokens[SAMPLE_MARKER_END];
         }
     }
+    int amplitude, steps;
+    amplitude = 10; //pourcents
+    steps = 8;
     curve_set_predifined_animation( info->curve, info->uc.entry_tokens[ENTRY_FXID],
                                     info->uc.selected_parameter_id,
-                                    lo, hi, selected_anim);
+                                    lo, hi, selected_anim, amplitude, steps);
 }
 
 void	on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)

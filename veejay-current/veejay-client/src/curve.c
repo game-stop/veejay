@@ -17,6 +17,13 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+//ISSUE : change sample bound start end nothing happen?
+//ISSUE : memory issue allocating GTK3curve / priv->curve_data.d_point width devrait etre  largeur du clip!???
+//ISSUE : ZIGZag not well shaped
+//ISSUE : are we force to init gtk3curve / set curve vector with full vector witdh or what?
+//NEED TO reset before setting new curve ?
+
+
 #include <config.h>
 #include <glib.h>
 #include <gtk/gtk.h>
@@ -40,7 +47,10 @@ void	get_points_from_curve( GtkWidget *curve, int len, float *vec )
 void	reset_curve( GtkWidget *curve )
 {
   gtk_widget_set_sensitive( curve, TRUE );
-  gtk3_curve_reset( curve );
+  if (!curve_is_empty)
+  {
+    gtk3_curve_reset( curve );
+  }
   curve_is_empty = 0;
 }
 
@@ -148,18 +158,37 @@ void curve_set_position( GtkWidget *curve, double pos)
     gtk3_curve_set_position( curve, pos);
 }
 
-void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_id, int start, int end, int animation)
+void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_id,
+                                      int start, int end, int animation, int amplitude, int steps)
 {
 
     int min=0, max=0;
     _effect_get_minmax(fx_id, &min, &max, parameter_id );
-    int veclen = end - start;
-	int i,k;
-    float rx, ry, dx, dy, min_x, delta_x;
+    int veclen = -1;
+    int i,k;
+    float j, rx, ry, dx, dy, min_x, delta_x, complement;
+
+    int diff = max - min;
+
+    amplitude = 100; //FIXME missing ui ?
+    complement = 100 - amplitude;
+
+    switch(animation)
+    {
+        case FX_ANIM_SHAPE_ZAGZIG:
+        case FX_ANIM_SHAPE_ZIGZAG:
+            veclen = steps;
+            dy = ((int)((max / 100.0) * complement + 0.5 )) >> 1;
+            delta_x = ((end - start)/(float)steps);
+            break;
+
+        default:
+            veclen = end - start;
+            dy = (diff) / (float)(veclen - 1);
+            break;
+    }
 
     float	*vec = (float*) vj_calloc(sizeof(float) * veclen ); // FIXME less values len/step?
-    int diff = max - min;
-    dy = (diff) / (float)(veclen - 1);
 
     switch(animation)
     {
@@ -202,6 +231,23 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
             {
                 vec[k] = min;
                 vec[k+1] = min;
+            }
+        break;
+        case FX_ANIM_SHAPE_ZIGZAG:
+            for(j = start, k = 0; j <= end; j += delta_x)
+            {
+                ry = k%2 == 0 ? dy : max-dy;
+                vec[k] = ry;
+                k++;
+            }
+
+        break;
+        case FX_ANIM_SHAPE_ZAGZIG:
+            for(i = start, k = 0; i < end; i += delta_x)
+            {
+                ry = k%2 == 1 ? dy : max-dy;
+                vec[k] = ry;
+                k++;
             }
         break;
         default: break;
