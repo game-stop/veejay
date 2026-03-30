@@ -18,13 +18,13 @@ see also : [README whatis](./veejay-current/veejay-server/doc/README.whatis.md)
 
 ### Veejay Applications:
 * __Reloaded__
-    A GUI developed in GLADE/GTK3 ([veejay-client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client))
+    A GUI developed in GLADE/GTK3 ([veejay-client](https://github.com/game-stop/veejay/tree/master/veejay-current/veejay-client))
 * __sendVIMS__
-    A PureData object allowing direct communications with the server ([sendVIMS](https://github.com/c0ntrol/veejay/tree/master/veejay-current/sendVIMS)) (_a bit outdated_)
+    A PureData object allowing direct communications with the server ([sendVIMS](https://github.com/game-stop/veejay/tree/master/veejay-current/sendVIMS)) (_a bit outdated_)
 * __sayVIMS__
-    A console based utility for quick'n'dirty scripting ([veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils))
+    A console based utility for quick'n'dirty scripting ([veejay-utils](https://github.com/game-stop/veejay/tree/master/veejay-current/veejay-utils))
 
-And of course [__Veejay__](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-server) himself !  
+And of course [__Veejay__](https://github.com/game-stop/veejay/tree/master/veejay-current/veejay-server) himself !  
 The video output server (Ffmpeg/libSDL), a 'visual' instrument and realtime video sampler for live video improvisation such as live cinema, vjing, art installation ...
 
 [//]: # ( comment : installation section duplicated in /veejay-server/doc/Instalation)
@@ -47,11 +47,11 @@ libxml2-dev libsdl2-dev libjack0 libjack-dev jackd1 libgtk-3-dev libgdk-pixbuf-2
 
 Veejay is divided into multiple packages. Each must be build separately and in a specific order. 
 
-1. [veejay-core](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-core) (__required__)
-2. [veejay-server](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-server) (__required__)
-3. [veejay_client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client) (*optional*)
-4. [veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils) (*optional*)
-5. [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs) (*optional*)
+1. [veejay-core](https://github.com/game-stop/veejay/tree/master/veejay-current/veejay-core) (__required__)
+2. [veejay-server](https://github.com/game-stop/veejay/tree/master/veejay-current/veejay-server) (__required__)
+3. [veejay_client](https://github.com/game-stop/veejay/tree/master/veejay-current/veejay-client) (*optional*)
+4. [veejay-utils](https://github.com/game-stop/veejay/tree/master/veejay-current/veejay-utils) (*optional*)
+5. [plugin-packs](https://github.com/game-stop/veejay/tree/master/veejay-current/plugin-packs) (*optional*)
 
 For __each package__, run the triptich commands of the *GNU build system* (for a quick start you can build the first two):
 
@@ -107,7 +107,7 @@ You can list more location in the file `$HOME/.veejay/plugins.cfg`
 
 ### plugin-packs
 
-There are several plugin-packs available for veejay: [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs)
+There are several plugin-packs available for veejay: [plugin-packs](https://github.com/game-stop/veejay/tree/master/veejay-current/plugin-packs)
 
 * **lvdcrop** ; a couple of crop filters and a port of frei0r's scale0tilt
 * **lvdshared** ; a couple of plugins that implement a producer/consumer mechanism for shared video resources
@@ -259,7 +259,7 @@ Please join our mailing list on http://groups.google.com/group/veejay-discussion
 
 ## Bug Reporting
 
-Please use the ticket system on https://github.com/c0ntrol/veejay/issues or simply write a mail to the veejay-discussion group!
+Please use the ticket system on https://github.com/game-stop/veejay/issues or simply write a mail to the veejay-discussion group!
 
 ENJOY! And let us know about your performances/installations with veejay!
 
