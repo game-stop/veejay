@@ -1683,16 +1683,18 @@ void yuv_interpolate_frames(uint8_t *dst,
         int32_t A = a[i];
         int32_t B = b[i];
         int32_t diff = B - A;
-        int32_t ad = (diff ^ (diff >> 31)) - (diff >> 31);
-        int32_t w = 32768 - (ad << 4);
+        int32_t absd = diff;
+        absd = (absd ^ (absd >> 31)) - (absd >> 31);
 
-        w &= ~(w >> 31);
+        int32_t w = 32768 - (absd << 3);
+        w = w < 0 ? 0 : w;
 
         int32_t local_f = (f * w) >> 15;
         int32_t val = (diff * local_f) >> 15;
+
         int32_t res = A + val;
 
-        res = (res & ~(res >> 31));
+        res = res < 0 ? 0 : res;
         res = res > 255 ? 255 : res;
 
         dst[i] = (uint8_t)res;
@@ -1710,7 +1712,7 @@ void yuv_interpolate_frames_uv(uint8_t *dst,
     for (int i = 0; i < len; i++)
     {
         int32_t diff = (int32_t)b[i] - (int32_t)a[i];
-        int32_t val = (diff * f) >> 15;
+        int32_t val  = (diff * f + 16384) >> 15;
         int32_t res = (int32_t)a[i] + val;
 
         res = res < 0 ? 0 : res;

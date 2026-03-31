@@ -144,5 +144,6 @@ void yuv444_yvu444_1plane(
 
 void	verify_CCIR_auto(int a, int b, VJFrame *dst );
 int	yuv_which_scaler();
-void yuv_interpolate_frames( uint8_t *dst, uint8_t *a, uint8_t *b, const int len, const float frac );
+void yuv_interpolate_frames( uint8_t *dst, const uint8_t *a, const uint8_t *b, const int len, const float frac );
+void yuv_interpolate_frames_uv( uint8_t *dst, const uint8_t *a, const uint8_t *b, const int len, const float frac );
 #endif
