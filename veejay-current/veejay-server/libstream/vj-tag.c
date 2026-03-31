@@ -2580,6 +2580,14 @@ int vj_tag_enable(int t1) {
     }
 #endif
 
+    if( tag->source_type == VJ_TAG_TYPE_GENERATOR || tag->source_type == VJ_TAG_TYPE_COLOR ||
+        tag->source_type == VJ_TAG_TYPE_CALI || tag->source_type == VJ_TAG_TYPE_CLONE ) {
+        tag->active = 1;
+    }
+
+    if( tag->source_type == VJ_TAG_TYPE_YUV4MPEG || tag->source_type == VJ_TAG_TYPE_DV1394 )
+        tag->active = 1;
+
     return 1;
 }
 
