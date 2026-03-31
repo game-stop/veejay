@@ -4724,11 +4724,13 @@ void vj_perform_render_video_frames(veejay_t *info, performer_t *p, vjp_kf *effe
     int cur_out = info->out_buf;
 
     long long cur_frame = atomic_load_long_long(&settings->current_frame_num);
+    long long max_frame = atomic_load_long_long(&settings->max_frame_num);
+    long long min_frame = atomic_load_long_long(&settings->min_frame_num);
 
     topinfo->timecode = cur_frame;
     a->ssm = 0;
     b->ssm = 0;
-    a->timecode = cur_frame / (double)(settings->max_frame_num - settings->min_frame_num);
+    a->timecode = cur_frame / (double)(max_frame - min_frame);
 
     for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
         p->frame_buffer[i]->ssm = 0;
@@ -4960,8 +4962,8 @@ void vj_perform_inc_frame(veejay_t *info, int num)
     int looptype = 1;
     int speed = settings->current_playback_speed;
 
-    long start = settings->min_frame_num;
-    long end   = settings->max_frame_num;
+    long long end = atomic_load_long_long(&settings->max_frame_num);
+    long long start = atomic_load_long_long(&settings->min_frame_num);
 
     int prev_dir = (settings->current_playback_speed < 0 ? -1 :
                     settings->current_playback_speed > 0 ? 1 : 0);

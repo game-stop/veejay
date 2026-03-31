@@ -543,11 +543,13 @@ int veejay_increase_frame(veejay_t *info, long num)
 {
     video_playback_setup *settings = info->settings;
     long long current_frame_num = atomic_load_long_long(&settings->current_frame_num);
+	long long min_frame_num = atomic_load_long_long(&settings->min_frame_num);
+	long long max_frame_num = atomic_load_long_long(&settings->max_frame_num);
     long long next_frame = current_frame_num + num;
 
     if(info->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN) {
-        if(next_frame < settings->min_frame_num) return 0;
-        if(next_frame > settings->max_frame_num) return 0;
+        if(next_frame < min_frame_num) return 0;
+        if(next_frame > max_frame_num) return 0;
     } else if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
         if(next_frame < sample_get_startFrame(info->uc->sample_id)) return 0;
         if(next_frame > sample_get_endFrame(info->uc->sample_id)) return 0;
