@@ -2179,7 +2179,8 @@ static  int vj_perform_get_frame_( veejay_t *info, int s1, long long nframe, VJF
     } else {
         const uint32_t N = max_sfd;
         const uint32_t n1 = cur_sfd;
-        const float frac = 1.0f / (float) N * n1;
+        //const float frac = 1.0f / (float) N * n1;
+        const float frac = (float)n1 / (float)(N - 1);
 
         vj_frame_slow_single( p0_buffer, p1_buffer, dst->data, dst->len, uv_len, frac );
      
