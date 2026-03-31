@@ -2717,24 +2717,47 @@ static void	vj_frame_slow_job( void *arg )
 	}
 }
 
-void	vj_frame_slow_single( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
+static inline void	vj_frame_slow_single1( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
 {
-	yuv_interpolate_frames(img[0],p0_buffer[0],p1_buffer[0],len,frac );	
-	yuv_interpolate_frames(img[1],p0_buffer[1],p1_buffer[1],uv_len,frac );	
-	yuv_interpolate_frames(img[2],p0_buffer[2],p1_buffer[2],uv_len,frac );	
+	yuv_interpolate_frames(img[0],p0_buffer[0],p1_buffer[0],len,frac );
+	yuv_interpolate_frames_uv(img[1],p0_buffer[1],p1_buffer[1],uv_len,frac );
+	yuv_interpolate_frames_uv(img[2],p0_buffer[2],p1_buffer[2],uv_len,frac );
 }
 
+void vj_frame_slow_single(uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len, const float frac)
+{
+    // if the resolution is less, its not worth it
+    if( len <= (1024*768) ) {
+        vj_frame_slow_single1(p0_buffer,p1_buffer,img,len,uv_len,frac);
+        return;
+    }
+
+    #pragma omp parallel num_threads(2)
+    {
+        int tid = omp_get_thread_num();
+        if (tid == 0)
+        {
+            yuv_interpolate_frames(img[0],p0_buffer[0],p1_buffer[0],len,frac);
+        }
+        else if (tid == 1)
+        {
+            yuv_interpolate_frames_uv(img[1],p0_buffer[1],p1_buffer[1],uv_len,frac);
+            yuv_interpolate_frames_uv(img[2],p0_buffer[2],p1_buffer[2],uv_len,frac);
+        }
+    }
+}
 
 void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
 {
-	if( vj_task_get_workers() > 1 ) {
+	/*if( vj_task_get_workers() > 1 ) {
 		int input_sizes[4] = { len, uv_len, uv_len, 0 };
 		vj_task_set_float( frac );
 		vj_task_run( p0_buffer, img, p1_buffer,input_sizes, 4,(performer_job_routine) &vj_frame_slow_job, 0 );
 	} 
 	else {
 		vj_frame_slow_single( p0_buffer, p1_buffer, img, len, uv_len, frac );
-	}
+	}*/
+    vj_frame_slow_single( p0_buffer, p1_buffer, img, len, uv_len, frac );
 }
 
 static void	vj_frame_simple_clear(  uint8_t **input, int *strides, int v )
