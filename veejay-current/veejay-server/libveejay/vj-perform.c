@@ -1981,6 +1981,7 @@ int vj_perform_fill_audio_buffers(
         sample_ptr->max_sfd = atomic_load_int(&settings->audio_slice_len);
         sample_ptr->cur_sfd = atomic_load_int(&settings->audio_slice);
         sample_ptr->speed = settings->current_playback_speed;
+
       //  veejay_msg(VEEJAY_MSG_DEBUG, "Sample A : cur_sfd=%d,max_sfd=%d,start=%lld,end=%lld,offset=%lld", 
       //      sample_ptr->cur_sfd, sample_ptr->max_sfd, sample_ptr->start, sample_ptr->end, sample_ptr->offset);
 
@@ -2187,6 +2188,12 @@ static  int vj_perform_get_frame_( veejay_t *info, int s1, long long nframe, VJF
         }
     }
     
+    cur_sfd ++;
+    if( cur_sfd == max_sfd)
+        cur_sfd = 0;
+    
+    sample_set_framedups(s1, cur_sfd);
+
     return 1;
 }
 
