@@ -1670,91 +1670,52 @@ void yuv444_yvu444_1plane(
     
 }
 
-#ifdef HAVE_ARM_NEON
-void yuv_interpolate_frames( uint8_t *dst, uint8_t *a, uint8_t *b, const int len, const float frac )
+void yuv_interpolate_frames(uint8_t *dst,
+                            const uint8_t *a,
+                            const uint8_t *b,
+                            const int len,
+                            const float frac)
 {
-    int i;
-    const int step = 16;
-    const int16_t fixed_frac = (int16_t)(frac * 32767.0f);
-    
-    int16x8_t v_frac = vdupq_n_s16(fixed_frac);
-    
-    for( i = 0; i < len - step; i += step ) 
+    const int32_t f = (int32_t)(frac * 32768.0f);
+
+    for (int i = 0; i < len; i++)
     {
-        uint8x16_t va_u8 = vld1q_u8(a + i);
-        uint8x16_t vb_u8 = vld1q_u8(b + i);
+        int32_t A = a[i];
+        int32_t B = b[i];
+        int32_t diff = B - A;
+        int32_t ad = (diff ^ (diff >> 31)) - (diff >> 31);
+        int32_t w = 32768 - (ad << 4);
 
-        int16x8_t va_low  = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(va_u8)));
-        int16x8_t va_high = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(va_u8)));
-        int16x8_t vb_low  = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(vb_u8)));
-        int16x8_t vb_high = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(vb_u8)));
+        w &= ~(w >> 31);
 
-        int16x8_t diff_low = vsubq_s16(vb_low, va_low);
-        int16x8_t diff_high = vsubq_s16(vb_high, va_high);
-        
-        int16x8_t term_low = vshrq_n_s16(vmulq_s16(diff_low, v_frac), 15);
-        int16x8_t term_high = vshrq_n_s16(vmulq_s16(diff_high, v_frac), 15);
-        
-        int16x8_t result_low = vaddq_s16(va_low, term_low);
-        int16x8_t result_high = vaddq_s16(va_high, term_high);
-        
-        uint8x16_t vdst_u8 = vcombine_u8(vmovnq_u16(vreinterpretq_u16_s16(result_low)), 
-                                        vmovnq_u16(vreinterpretq_u16_s16(result_high)));
+        int32_t local_f = (f * w) >> 15;
+        int32_t val = (diff * local_f) >> 15;
+        int32_t res = A + val;
 
-        vst1q_u8(dst + i, vdst_u8);
-    }
-    for( ; i < len; i++ ) {
-        dst[i] = a[i] + ( frac * ( b[i] - a[i] ) );
+        res = (res & ~(res >> 31));
+        res = res > 255 ? 255 : res;
+
+        dst[i] = (uint8_t)res;
     }
 }
 
-#elif defined(HAVE_ASM_SSE2) || defined(HAVE_ASM_SSE4_1) || defined(HAVE_ASM_AVX) || defined(HAVE_ASM_AVX2)
-void yuv_interpolate_frames( uint8_t *dst, uint8_t *a, uint8_t *b, const int len, const float frac )
+void yuv_interpolate_frames_uv(uint8_t *dst,
+                            const uint8_t *a,
+                            const uint8_t *b,
+                            const int len,
+                            const float frac)
 {
-    int i;
-    const int step = 16;
-    const int16_t fixed_frac = (int16_t)(frac * (float)Q_MAX);
-    
-    __m128i v_frac = _mm_set1_epi16(fixed_frac);
-    __m128i v_zero = _mm_setzero_si128();
+    const int32_t f = (int32_t)(frac * 32768.0f);
 
-    for( i = 0; i < len - step; i += step ) 
+    for (int i = 0; i < len; i++)
     {
-        __m128i va_u8 = _mm_loadu_si128((__m128i const*)(a + i));
-        __m128i vb_u8 = _mm_loadu_si128((__m128i const*)(b + i));
+        int32_t diff = (int32_t)b[i] - (int32_t)a[i];
+        int32_t val = (diff * f) >> 15;
+        int32_t res = (int32_t)a[i] + val;
 
-        __m128i va_low  = _mm_unpacklo_epi8(va_u8, v_zero);
-        __m128i va_high = _mm_unpackhi_epi8(va_u8, v_zero);
-        __m128i vb_low  = _mm_unpacklo_epi8(vb_u8, v_zero);
-        __m128i vb_high = _mm_unpackhi_epi8(vb_u8, v_zero);
+        res = res < 0 ? 0 : res;
+        res = res > 255 ? 255 : res;
 
-        __m128i diff_low  = _mm_sub_epi16(vb_low, va_low);
-        __m128i diff_high = _mm_sub_epi16(vb_high, va_high);
-        
-        __m128i term_mul_low  = _mm_mullo_epi16(diff_low, v_frac);
-        __m128i term_mul_high = _mm_mullo_epi16(diff_high, v_frac);
-        
-        __m128i term_low  = _mm_srai_epi16(term_mul_low, Q_SHIFT);
-        __m128i term_high = _mm_srai_epi16(term_mul_high, Q_SHIFT);
-        
-        __m128i result_low = _mm_add_epi16(va_low, term_low);
-        __m128i result_high = _mm_add_epi16(va_high, term_high);
-        
-        __m128i vdst_u8 = _mm_packus_epi16(result_low, result_high);
-
-        _mm_storeu_si128((__m128i *)(dst + i), vdst_u8);
-    }
-    for( ; i < len; i++ ) {
-        dst[i] = a[i] + ( frac * ( b[i] - a[i] ) );
+        dst[i] = (uint8_t)res;
     }
 }
-
-#else
-void yuv_interpolate_frames( uint8_t *dst, uint8_t *a, uint8_t *b, const int len, const float frac )
-{
-    int i;
-    for( i = 0; i < len; i ++) {
-        dst[i] = a[i] + ( frac * ( b[i] - a[i] ) );
-    }
-}
-#endif
