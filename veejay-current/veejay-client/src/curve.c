@@ -165,11 +165,13 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
     int min=0, max=0;
     _effect_get_minmax(fx_id, &min, &max, parameter_id );
     int veclen = -1;
-    int i,k;
+    int i,k, loop = 0;
     float j, rx, ry, dx, dy, min_x, delta_x, complement;
 
     int diff = max - min;
 
+    if (end - start <= 1) return; // FIXME (guard again div0)
+    if (steps < 1) steps = 1; //(guard again div0)
     amplitude = 100; //FIXME missing ui ?
     complement = 100 - amplitude;
 
@@ -177,8 +179,11 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
     {
         case FX_ANIM_SHAPE_ZAGZIG:
         case FX_ANIM_SHAPE_ZIGZAG:
-            veclen = steps;
-            dy = ((int)((max / 100.0) * complement + 0.5 )) >> 1;
+            //~ veclen = steps; //only needed point in vector, need to fix gtk3curve?
+            //~ dy = ((int)((max / 100.0) * complement + 0.5 )) >> 1;
+            veclen = end - start;
+            dy = (diff) / (float)(veclen - 1);
+            dy = dy * ((float)(steps<<1)); //
             delta_x = ((end - start)/(float)steps);
             break;
 
@@ -188,12 +193,12 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
             break;
     }
 
-    float	*vec = (float*) vj_calloc(sizeof(float) * veclen ); // FIXME less values len/step?
+    float   *vec = (float*) vj_calloc(sizeof(float) * veclen );
 
     switch(animation)
     {
         case FX_ANIM_SHAPE_UP:
-            for(i = start, k = 0, ry = min; i < end; i ++ , ry+=dy) //FIXME less values ? i+=step
+            for(i = start, k = 0, ry = min; i <= end; i ++ , ry+=dy)
             {
                 vec[k] = ry;
                 k++;
@@ -201,14 +206,14 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
 
         break;
         case FX_ANIM_SHAPE_DOWN:
-            for(i = start, k = 0, ry = max; i < end; i ++ , ry-=dy) //FIXME less values ? i+=step
+            for(i = start, k = 0, ry = max; i <= end; i ++ , ry-=dy)
             {
                 vec[k] = ry;
                 k++;
             }
         break;
         case FX_ANIM_SHAPE_MONTAIN:
-            for(i = start, k = 0, ry = min; i < end/2; i ++ , ry+=2*dy) //FIXME less values ? i+=step
+            for(i = start, k = 0, ry = min; i < end/2; i ++ , ry+=2*dy)
             {
                 vec[k] = ry;
                 vec[end-k] = ry;
@@ -221,7 +226,7 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
             }
         break;
         case FX_ANIM_SHAPE_VALLEY:
-            for(i = start, k = 0, ry = max; i < end/2; i ++ , ry-=2*dy) //FIXME less values ? i+=step
+            for(i = start, k = 0, ry = max; i < end/2; i ++ , ry-=2*dy)
             {
                 vec[k] = ry;
                 vec[end-k] = ry;
@@ -234,21 +239,53 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
             }
         break;
         case FX_ANIM_SHAPE_ZIGZAG:
-            for(j = start, k = 0; j <= end; j += delta_x)
+            for(i = start, k = 0, ry = min; i < end; i++, ry+=dy)
             {
-                ry = k%2 == 0 ? dy : max-dy;
                 vec[k] = ry;
+                if (loop == (int) ((delta_x / 2.0)))
+                {
+                    ry = max+dy;
+                    dy = -dy;
+                }
+
+                if (loop == (int) (delta_x))
+                {
+                    loop = 0;
+                    ry = min-dy;
+                    dy = -dy;
+                }
+
+                loop++;
                 k++;
             }
 
         break;
         case FX_ANIM_SHAPE_ZAGZIG:
-            for(i = start, k = 0; i < end; i += delta_x)
+            for(i = start, k = 0, ry = max; i < end; i++, ry-=dy)
             {
-                ry = k%2 == 1 ? dy : max-dy;
                 vec[k] = ry;
+                if (loop == (int) ((delta_x / 2.0)))
+                {
+                    ry = min-dy;
+                    dy = -dy;
+                }
+
+                if (loop == (int) (delta_x))
+                {
+                    loop = 0;
+                    ry = max+dy;
+                    dy = -dy;
+                }
+
+                loop++;
                 k++;
             }
+            //~ for(i = start, k = 0; i < end; i += delta_x)
+            //~ {
+                //~ ry = k%2 == 1 ? dy : max-dy;
+                //~ vec[k] = ry;
+                //~ k++;
+            //~ }
         break;
         default: break;
     }
