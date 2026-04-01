@@ -159,6 +159,52 @@ void vj_sdl_get_position( void *ptr, int *x, int *y )
     *y = vjsdl->y;
 }
 
+
+static int vj_get_sdl_yuv_mode(int vjfmt)
+{
+    const char *env = getenv("VJ_SDL_YUV_MODE");
+
+    int mode = (vj_is_full_range(vjfmt)
+        ? SDL_YUV_CONVERSION_JPEG
+        : SDL_YUV_CONVERSION_AUTOMATIC);
+
+    if (env && *env) {
+        if (!strcasecmp(env, "jpeg")) {
+            mode = SDL_YUV_CONVERSION_JPEG;
+        } else if (!strcasecmp(env, "auto")) {
+            mode = SDL_YUV_CONVERSION_AUTOMATIC;
+        } else if (!strcasecmp(env, "bt601")) {
+            mode = SDL_YUV_CONVERSION_BT601;
+        } else if (!strcasecmp(env, "bt709")) {
+            mode = SDL_YUV_CONVERSION_BT709;
+        } else {
+            veejay_msg(VEEJAY_MSG_WARNING,
+                "[DISPLAY] Unknown VJ_SDL_YUV_MODE='%s', using default", env);
+        }
+    }
+
+    switch (mode) {
+        case SDL_YUV_CONVERSION_JPEG:
+            veejay_msg(VEEJAY_MSG_DEBUG,
+                "[DISPLAY] SDL YUV conversion mode: JPEG (full range)");
+            break;
+        case SDL_YUV_CONVERSION_AUTOMATIC:
+            veejay_msg(VEEJAY_MSG_DEBUG,
+                "[DISPLAY] BT.601 for SD content, BT.709 for HD content (limited range)");
+            break;
+        case SDL_YUV_CONVERSION_BT601:
+            veejay_msg(VEEJAY_MSG_DEBUG,
+                "[DISPLAY] SDL YUV conversion mode: BT.601");
+            break;
+        case SDL_YUV_CONVERSION_BT709:
+            veejay_msg(VEEJAY_MSG_DEBUG,
+                "[DISPLAY] SDL YUV conversion mode: BT.709");
+            break;
+    }
+
+    return mode;
+}
+
 int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int scaled_width, int scaled_height, char *caption, int show, int fs, int vjfmt, float fps, double *vsync)
 {
     vj_sdl *vjsdl = (vj_sdl*) ptr;
@@ -284,13 +330,12 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
     vj_sdl_grab( vjsdl, 0 );
 
 #if SDL_VERSION_ATLEAST(2,0,8)
-    int sdlmode = (vj_is_full_range(vjfmt) ? SDL_YUV_CONVERSION_JPEG : SDL_YUV_CONVERSION_BT601 );
-
+    int sdlmode = vj_get_sdl_yuv_mode(vjfmt);
     if(sdlmode == SDL_YUV_CONVERSION_JPEG) {
         veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] SDL YUV conversion mode: JPEG (full range)");
     }
-    if(sdlmode == SDL_YUV_CONVERSION_BT601) {
-        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY]  SDL YUV conversion mode: BT601 (limited range)");
+    if(sdlmode == SDL_YUV_CONVERSION_AUTOMATIC) {
+        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] BT.601 for SD content, BT.709 for HD content (limited range)");
     }
 
     SDL_SetYUVConversionMode( sdlmode );
@@ -406,8 +451,6 @@ void vj_sdl_convert_to_screen(void *ptr, VJFrame *frame_to_dsplay, uint8_t *pixe
 	VJFrame *dst_frame = (VJFrame*) vjsdl->dst_frame;
     dst_frame->data[0] = pixels;
 	yuv_convert_and_scale_packed( vjsdl->scaler, frame_to_dsplay,dst_frame );
-
-
 }
 
 uint8_t* vj_sdl_get_buffer( void *ptr, int index ) {

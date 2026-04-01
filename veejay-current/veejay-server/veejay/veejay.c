@@ -833,6 +833,7 @@ int main(int argc, char **argv)
             "\tVEEJAY_SDL_HINT_RENDER_DRIVER\tSet SDL_HINT_RENDER_DRIVER\n"
             "\tVEEJAY_SDL_KEY_REPEAT_DELAY\tDelay key repeat in ms\n"
             "\tVEEJAY_SDL_KEY_REPEAT_INTERVAL\tInterval of key repeat while pressed down\n"
+			"\tVJ_SDL_YUV_MODE\tjpeg,auto,bt601 or bt709\n"
             "\n"
             "  [ System & Streaming ]\n"
             "\tVEEJAY_MAX_FILESIZE\t\tMaximum allowed file size for processing\n"
