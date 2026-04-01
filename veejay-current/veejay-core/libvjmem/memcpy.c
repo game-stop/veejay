@@ -142,6 +142,7 @@
 #include <libyuv/yuvconv.h>
 #include <veejaycore/veejaycore.h>
 #include <libavutil/cpu.h>
+#include <omp.h>
 #ifdef HAVE_ARM
 #include <arm_neon.h>
 #endif
