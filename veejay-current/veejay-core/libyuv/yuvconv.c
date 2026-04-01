@@ -1178,12 +1178,23 @@ void*   yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int sw
     int srcRange, dstRange, brightness, contrast, saturation;
 
     sws_getColorspaceDetails(s->sws, &dummy1, &srcRange, &dummy2, &dstRange, &brightness, &contrast, &saturation);
-    const int *coefs = sws_getCoefficients(SWS_CS_DEFAULT);
 
     srcRange = src->range;
     dstRange = dst->range;
 
-    sws_setColorspaceDetails( s->sws, coefs, srcRange, coefs, dstRange, brightness, contrast, saturation );
+    const int *src_coefs = sws_getCoefficients(SWS_CS_DEFAULT);
+    const int *dst_coefs = sws_getCoefficients(SWS_CS_DEFAULT);
+
+    sws_setColorspaceDetails(
+        s->sws,
+        src_coefs,
+        srcRange,
+        dst_coefs,
+        dstRange,
+        brightness,
+        contrast,
+        saturation
+    );
 #ifdef STRICT_CHECKING
     veejay_msg(VEEJAY_MSG_DEBUG, "Initialized %s scaler: %dx%d @%d -> %dx%d @%d Limited %d - %d",
             (LIBSWSCALE_VERSION_MAJOR >= 5 ? "Modern" : "Legacy"),
