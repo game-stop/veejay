@@ -176,6 +176,14 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
 
     switch(animation)
     {
+        case FX_ANIM_SHAPE_UP:
+        case FX_ANIM_SHAPE_DOWN:
+            veclen = end - start;
+            dy = (diff) / (float)(veclen - 1);
+            dy = dy * ((float)(steps)); //
+            delta_x = ((end - start)/(float)steps);
+
+        break;
         case FX_ANIM_SHAPE_ZAGZIG:
         case FX_ANIM_SHAPE_ZIGZAG:
             //~ veclen = steps; //only needed point in vector, need to fix gtk3curve?
@@ -183,8 +191,8 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
             dy = (diff) / (float)(veclen - 1);
             dy = dy * ((float)(steps<<1)); //
             delta_x = ((end - start)/(float)steps);
-            break;
 
+        break;
         default:
             veclen = end - start;
             dy = (diff) / (float)(veclen - 1);
@@ -199,14 +207,23 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
             for(i = start, k = 0, ry = min; i <= end; i ++ , ry+=dy)
             {
                 vec[k] = ry;
+                if ( (ry + dy) > max)
+                {
+                    ry = min-dy;
+                }
                 k++;
             }
 
         break;
         case FX_ANIM_SHAPE_DOWN:
-            for(i = start, k = 0, ry = max; i <= end; i ++ , ry-=dy)
+            dy = -dy;
+            for(i = start, k = 0, ry = max; i <= end; i ++ , ry+=dy)
             {
                 vec[k] = ry;
+                if ( (ry + dy) < min)
+                {
+                    ry = max+dy;
+                }
                 k++;
             }
         break;
