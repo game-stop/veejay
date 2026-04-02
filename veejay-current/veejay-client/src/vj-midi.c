@@ -354,6 +354,13 @@ void    vj_midi_learning_vims_spin( void *vv, char *widget, int id )
     vj_midi_learning_vims( vv, widget, message, (widget == NULL ? 0 : 2) );
 }
 
+void    vj_midi_learning_vims_mode( void *vv, char *widget, int id, int value, const char *name)
+{
+    char message[256];
+    snprintf( message, sizeof(message), "%03d:%d %d %s:;",id, value, name );
+
+    vj_midi_learning_vims( vv, widget, message,  (widget == NULL ? 0 : 2) );
+}
 
 void    vj_midi_learning_vims_complex( void *vv, char *widget, int id, int first , int extra)
 {

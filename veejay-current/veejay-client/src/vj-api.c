@@ -1304,7 +1304,7 @@ static void single_vims(int id);
 static gdouble get_numd(const char *name);
 static int get_nums(const char *name);
 static gchar *get_text(const char *name);
-static void put_text(const char *name, char *text);
+static void put_text(const char *name, const char *text);
 static void set_toggle_button(const char *name, int status);
 static void update_slider_gvalue(const char *name, gdouble value );
 static void update_slider_value2(GtkWidget *w, gint value, gint scale);
@@ -3202,32 +3202,6 @@ static gchar *recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1,
     return (gchar*) result;
 }
 
-
-static gchar *recv_vims1(int slen, int *bytes_written)
-{
-    int tmp_len = slen+1;
-    unsigned char tmp[tmp_len];
-    veejay_memset(tmp,0,sizeof(tmp));
-    
-    int ret = vj_client_read( info->client, V_CMD, tmp, slen );
-
-    if( ret == -1 )
-        reloaded_schedule_restart();
-    int len = 0;
-    if( sscanf( (char*)tmp, "%d", &len ) != 1 )
-        return NULL;
-    unsigned char *result = NULL;
-    if( ret <= 0 || len <= 0 || slen <= 0)
-        return (gchar*)result;
-
-    result = (unsigned char*) vj_calloc(sizeof(unsigned char) * (len + 1) );
-    *bytes_written = vj_client_read( info->client, V_CMD, result, len );
-    if( *bytes_written == -1 )
-        reloaded_schedule_restart();
-
-    return (gchar*) result;
-}
-
 static gchar *recv_vims(int slen, int *bytes_written)
 {
     int tmp_len = slen + 1;
@@ -3240,10 +3214,6 @@ static gchar *recv_vims(int slen, int *bytes_written)
         veejay_msg(VEEJAY_MSG_DEBUG, "Client read failed, scheduling restart");
         reloaded_schedule_restart();
     }
-
-#ifdef VALIDATE_VIMS
-    veejay_msg_buffer(tmp, ret > 0 ? (size_t)ret : 0, 64, "recv_vims header:");
-#endif
 
     int len = 0;
     if (sscanf((char *)tmp, "%d", &len) != 1) {
@@ -3264,11 +3234,6 @@ static gchar *recv_vims(int slen, int *bytes_written)
         veejay_msg(VEEJAY_MSG_DEBUG, "Client read of data failed, scheduling restart");
         reloaded_schedule_restart();
     }
-
-#ifdef VALIDATE_VIMS
-    veejay_msg_buffer(result, *bytes_written > 0 ? (size_t)*bytes_written : 0, 128,
-                      "recv_vims data:  ");
-#endif
 
     return (gchar *)result;
 }
@@ -3552,7 +3517,7 @@ static gchar *get_text(const char *name)
     return (gchar*) gtk_entry_get_text( GTK_ENTRY(w));
 }
 
-static void put_text(const char *name, char *text)
+static void put_text(const char *name, const char *text)
 {
     GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
     if(!w) {
@@ -8512,77 +8477,88 @@ void vj_gui_set_stylesheet(const char *css_file, gboolean small_as_possible) {
     smallest_possible = small_as_possible;
 
     if( css_file == NULL ) {
-        veejay_msg(VEEJAY_MSG_DEBUG,"Using system's default style");
+        veejay_msg(VEEJAY_MSG_INFO,"Using system's default style");
         use_css_file = 0;
         return;
     }
 
     if(strlen(css_file)==7) {
         if(strncasecmp(css_file, "default",7) == 0 ) {
-            veejay_msg(VEEJAY_MSG_DEBUG, "Using reloaded's default style");
             snprintf( reloaded_css_file, sizeof(reloaded_css_file), "%s/%s", RELOADED_DATADIR, "gveejay.reloaded.css");
+            veejay_msg(VEEJAY_MSG_INFO, "Using reloaded's default style %s", reloaded_css_file);
             use_css_file = 1;
             return;
         }
     }
 
-    veejay_msg(VEEJAY_MSG_DEBUG, "Using CSS %s", reloaded_css_file);
+    veejay_msg(VEEJAY_MSG_DEBUG, "Using CSS %s", css_file);
     snprintf( reloaded_css_file, sizeof(reloaded_css_file), "%s", css_file);
     use_css_file = 1;
 }
 
 void vj_gui_activate_stylesheet(vj_gui_t *gui)
 {
-    GtkCssProvider *css = gtk_css_provider_new();
+    GtkCssProvider *base = gtk_css_provider_new();
+    GtkCssProvider *override = gtk_css_provider_new();
 
-    gtk_style_context_add_provider_for_screen ( gdk_screen_get_default (),GTK_STYLE_PROVIDER (css),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-    
+    GdkScreen *screen = gdk_screen_get_default();
+
+    gtk_style_context_add_provider_for_screen( screen, GTK_STYLE_PROVIDER(base), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION );
+    gtk_style_context_add_provider_for_screen( screen, GTK_STYLE_PROVIDER(override), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION + 1 );
+
     if(use_css_file) {
         GError* error = NULL;
-        veejay_msg(VEEJAY_MSG_DEBUG, "Loading stylesheet %s", reloaded_css_file);
-        if(!gtk_css_provider_load_from_path(css, reloaded_css_file, &error))
+        veejay_msg(VEEJAY_MSG_INFO, "Loading stylesheet %s", reloaded_css_file);
+
+        if(!gtk_css_provider_load_from_path(base, reloaded_css_file, &error))
         {
             veejay_msg(VEEJAY_MSG_WARNING, "Could not load CSS file: %s , %s", error->message, reloaded_css_file);
-            g_error_free (error);
+            g_error_free(error);
         }
-        GtkStyleContext *sc = gtk_widget_get_style_context( GTK_WIDGET(gui->curve) );
-        GdkRGBA bg,col,border;
+
+        GtkStyleContext *sc = gtk_widget_get_style_context(GTK_WIDGET(gui->curve));
+
+        GdkRGBA bg, col, border;
         GtkStateFlags context_state = gtk_style_context_get_state(sc);
+
         vj_gtk_context_get_color(sc, "background-color", context_state, &bg);
         vj_gtk_context_get_color(sc, "border-color", context_state, &border);
-        gtk_style_context_get_color(sc, context_state, &col );
+        gtk_style_context_get_color(sc, context_state, &col);
 
-        gtk3_curve_set_color_background_rgba (GTK_WIDGET(gui->curve), bg.red, bg.green, bg.blue, 1.0);
-        gtk3_curve_set_color_curve_rgba (GTK_WIDGET(gui->curve), col.red, col.green, col.blue, 1.0);
-        gtk3_curve_set_color_grid_rgba (GTK_WIDGET(gui->curve), col.red, col.green, col.blue, 0.33);
-        gtk3_curve_set_color_cpoint_rgba (GTK_WIDGET(gui->curve), border.red, border.green, border.blue, 1.0);
-
+        gtk3_curve_set_color_background_rgba(GTK_WIDGET(gui->curve), bg.red, bg.green, bg.blue, 1.0);
+        gtk3_curve_set_color_curve_rgba(GTK_WIDGET(gui->curve), col.red, col.green, col.blue, 1.0);
+        gtk3_curve_set_color_grid_rgba(GTK_WIDGET(gui->curve), col.red, col.green, col.blue, 0.33);
+        gtk3_curve_set_color_cpoint_rgba(GTK_WIDGET(gui->curve), border.red, border.green, border.blue, 1.0);
     }
     else {
-        gtk3_curve_set_color_background_rgba (GTK_WIDGET(gui->curve), 1.0f,1.0f,1.0f, 1.0);
-        gtk3_curve_set_color_curve_rgba (GTK_WIDGET(gui->curve), 0.0f, 0.0f, 0.0f, 1.0);
-        gtk3_curve_set_color_grid_rgba (GTK_WIDGET(gui->curve), 0.0f, 0.0f, 0.0f, 0.33);
-        gtk3_curve_set_color_cpoint_rgba (GTK_WIDGET(gui->curve), 0.0f, 0.0f, 0.0f, 1.0);
-
+        gtk3_curve_set_color_background_rgba(GTK_WIDGET(gui->curve), 1.0f,1.0f,1.0f,1.0);
+        gtk3_curve_set_color_curve_rgba(GTK_WIDGET(gui->curve), 0.0f,0.0f,0.0f,1.0);
+        gtk3_curve_set_color_grid_rgba(GTK_WIDGET(gui->curve), 0.0f,0.0f,0.0f,0.33);
+        gtk3_curve_set_color_cpoint_rgba(GTK_WIDGET(gui->curve), 0.0f,0.0f,0.0f,1.0);
     }
-   
+
 #if (GTK_MINOR_VERSION >= 20)
-    gchar *css_in_mem = gtk_css_provider_to_string(css);
-    gchar *data = NULL;
-        
-    if( smallest_possible ) {
-        data = g_strconcat(css_in_mem, "\n* { font-size:98%; }\nframe,box,scale,spinbutton,button,radiobutton,checkbutton,entry, .vertical { padding-left:0px; padding-right: 0px }\nbutton,checkbutton,radiobutton,spinbutton { padding-top:1px; padding-bottom:1px;}\n", NULL );
+    const gchar *runtime_css = NULL;
+
+    if (smallest_possible) {
+        veejay_msg(VEEJAY_MSG_INFO,
+            "Reducing size of UI to smallest possible");
+
+        runtime_css =
+            "window { font-size:98%; }"
+            "frame,box,scale,spinbutton,button,radiobutton,checkbutton,entry,.vertical { padding-left:0px; padding-right:0px }"
+            "button,checkbutton,radiobutton,spinbutton { padding-top:1px; padding-bottom:1px;}";
     }
     else {
-        data = g_strconcat(css_in_mem, "\n* { font-size:100%; }", NULL);
+        runtime_css = "window { font-size:100%; }";
     }
 
-    gtk_css_provider_load_from_data(css, data,-1, NULL);
-
-    g_clear_object(&css);
-    g_free(css_in_mem);
-    g_free(data);
+    gtk_css_provider_load_from_data(override, runtime_css, -1, NULL);
 #endif
+
+    g_object_unref(base);
+    g_object_unref(override);
+
 }
 
 static int auto_connect_to_veejay(char *host, int port_num)
@@ -8732,6 +8708,8 @@ void vj_gui_init(const char *glade_file,
     add_class_by_name( "framerate", "h_slider" );
 
     GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
+
+    gtk_widget_set_size_request(GTK_WIDGET(mainw), -1, -1);
 
     init_widget_cache();
 
@@ -8941,6 +8919,32 @@ void vj_gui_init(const char *glade_file,
     }
 
     gtk_widget_show( info->sample_bank_pad );
+
+    if (smallest_possible)
+    {
+        gtk_window_set_default_size(GTK_WINDOW(mainw), 1242, 825);
+    }
+    else
+    {
+        gtk_window_set_default_size(GTK_WINDOW(mainw), 1920, 900);
+    }
+
+    gtk_window_resize(GTK_WINDOW(mainw),
+                   smallest_possible ? 1242 : 1920,
+                   smallest_possible ? 825  : 900);
+
+    GdkGeometry hints = {0};
+    hints.max_width = 1920;
+    hints.max_height = 900;
+
+    gtk_window_set_geometry_hints(GTK_WINDOW(mainw), NULL, &hints, GDK_HINT_MAX_SIZE );
+
+//    gtk_widget_show_all(mainw);
+
+    /* Debug final size */
+    gint w, h;
+    gtk_window_get_size(GTK_WINDOW(mainw), &w, &h);
+    veejay_msg(VEEJAY_MSG_INFO,"Final UI Window size: %dx%d", w, h);
 }
 
 void vj_gui_preview(void)
@@ -9062,6 +9066,8 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
     set_feedback_status();
 
     GtkWidget *w = glade_xml_get_widget_(info->main_window, "gveejay_window" );
+    gtk_widget_set_size_request(w, -1, -1);
+
     gtk_widget_show( w );
 
     if( geo_pos_[0] >= 0 && geo_pos_[1] >= 0 )

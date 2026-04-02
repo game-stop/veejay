@@ -647,7 +647,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	gtk_scrolled_window_set_shadow_type( GTK_SCROLLED_WINDOW(scroll), GTK_SHADOW_ETCHED_IN );
 	gtk_widget_set_size_request_(scroll,30,140);
 	gtk_container_set_border_width(GTK_CONTAINER(scroll),0);
-	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(scroll),GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC );
+	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(scroll),GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC );
 	GtkWidget *vvvbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
 	seqv->tracks = create_track_view(seqv->num, MAX_TRACKS, (void*) seqv, (void*) vp );
 	gtk_tree_view_set_headers_visible( GTK_TREE_VIEW( get_track_tree(seqv->tracks)) , FALSE );

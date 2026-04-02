@@ -1363,6 +1363,7 @@ void	on_v4l_gain_value_changed(GtkWidget *widget, gpointer user_data)
       (int)(gtk_adjustment_get_value (a) * 65535.0) ); 
 	}
 }
+
 void	on_v4l_redbalance_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
@@ -2861,7 +2862,6 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	
 	unsigned char *ptr = buf + hdr_len;
 	int k;
-	int diff = max - min;
 	for( k = 0 ; k < length ; k++ ) {
 		//~ int pval = ((data[k]) * ((float)diff)) + min; // # BYPASS [0-1] NORMALISATION
 		int pval = (int) data[k];
