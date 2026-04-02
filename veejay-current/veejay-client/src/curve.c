@@ -212,32 +212,32 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
                 k++;
             }
         break;
-        case FX_ANIM_SHAPE_MONTAIN:
-            for(i = start, k = 0, ry = min; i < end/2; i ++ , ry+=2*dy)
-            {
-                vec[k] = ry;
-                vec[end-k] = ry;
-                k++;
-            }
-            if (k != end-k) //fill last points (in the middle) if end is odd
-            {
-                vec[k] = max;
-                vec[k+1] = max;
-            }
-        break;
-        case FX_ANIM_SHAPE_VALLEY:
-            for(i = start, k = 0, ry = max; i < end/2; i ++ , ry-=2*dy)
-            {
-                vec[k] = ry;
-                vec[end-k] = ry;
-                k++;
-            }
-            if (k != end-k) //fill last points (in the middle)
-            {
-                vec[k] = min;
-                vec[k+1] = min;
-            }
-        break;
+        //~ case FX_ANIM_SHAPE_MONTAIN:
+            //~ for(i = start, k = 0, ry = min; i < end/2; i ++ , ry+=2*dy)
+            //~ {
+                //~ vec[k] = ry;
+                //~ vec[end-k] = ry;
+                //~ k++;
+            //~ }
+            //~ if (k != end-k) //fill last points (in the middle) if end is odd
+            //~ {
+                //~ vec[k] = max;
+                //~ vec[k+1] = max;
+            //~ }
+        //~ break;
+        //~ case FX_ANIM_SHAPE_VALLEY:
+            //~ for(i = start, k = 0, ry = max; i < end/2; i ++ , ry-=2*dy)
+            //~ {
+                //~ vec[k] = ry;
+                //~ vec[end-k] = ry;
+                //~ k++;
+            //~ }
+            //~ if (k != end-k) //fill last points (in the middle)
+            //~ {
+                //~ vec[k] = min;
+                //~ vec[k+1] = min;
+            //~ }
+        //~ break;
         case FX_ANIM_SHAPE_ZIGZAG: //NAIVE Implement. Could be nested loop to fill all redondant values once
             for(i = start, k = 0, ry = min; i < end; i++, ry+=dy)
             {
