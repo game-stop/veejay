@@ -17,6 +17,13 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+//ISSUE : change sample bound start end nothing happen?
+//ISSUE : memory issue allocating GTK3curve / priv->curve_data.d_point width devrait etre  largeur du clip!???
+//ISSUE : ZIGZag not well shaped
+//ISSUE : are we force to init gtk3curve / set curve vector with full vector witdh or what?
+//NEED TO reset before setting new curve ?
+
+
 #include <config.h>
 #include <glib.h>
 #include <gtk/gtk.h>
@@ -40,7 +47,10 @@ void	get_points_from_curve( GtkWidget *curve, int len, float *vec )
 void	reset_curve( GtkWidget *curve )
 {
   gtk_widget_set_sensitive( curve, TRUE );
-  gtk3_curve_reset( curve );
+  if (!curve_is_empty)
+  {
+    gtk3_curve_reset( curve );
+  }
   curve_is_empty = 0;
 }
 
@@ -148,69 +158,157 @@ void curve_set_position( GtkWidget *curve, double pos)
     gtk3_curve_set_position( curve, pos);
 }
 
-void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_id, int start, int end, int animation)
+void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_id,
+                                      int start, int end, int animation, int amplitude, int steps)
 {
-
     int min=0, max=0;
-	_effect_get_minmax(fx_id, &min, &max, parameter_id );
-    int veclen = end - start;
-	//~ int i,k=0;
-	int i,k;
-    float rx, ry, dx, dy, min_x, delta_x;
+    _effect_get_minmax(fx_id, &min, &max, parameter_id );
+    int veclen = -1;
+    int i,k;
+    float j, rx, ry, dx, dy, min_x, delta_x, complement;
 
-    float	*vec = (float*) vj_calloc(sizeof(float) * veclen ); // FIXME less values len/step?
+    int diff = max - min;
 
-	int diff = max - min;
+    if (end - start <= 1) return; // FIXME (guard again div0)
+    if (steps < 1) steps = 1; //(guard again div0)
+    amplitude = 100; //FIXME missing ui ?
+    complement = 100 - amplitude;
 
-    //~ ry = min;
-    dy = (diff) / (float)(veclen - 1);
     switch(animation)
     {
-        case 0: //Up
-            for(i = start, k = 0, ry = min; i < end; i ++ , ry+=dy) //FIXME less values ? i+=step
+        case FX_ANIM_SHAPE_UP:
+        case FX_ANIM_SHAPE_DOWN:
+            veclen = end - start;
+            dy = (diff) / (float)(veclen - 1);
+            dy = dy * ((float)(steps)); //
+            delta_x = ((end - start)/(float)steps);
+
+        break;
+        case FX_ANIM_SHAPE_ZAGZIG:
+        case FX_ANIM_SHAPE_ZIGZAG:
+            //~ veclen = steps; //only needed point in vector, need to fix gtk3curve?
+            veclen = end - start;
+            dy = (diff) / (float)(veclen - 1);
+            dy = dy * ((float)(steps<<1)); //
+            delta_x = ((end - start)/(float)steps);
+
+        break;
+        default:
+            veclen = end - start;
+            dy = (diff) / (float)(veclen - 1);
+            break;
+    }
+
+    float   *vec = (float*) vj_calloc(sizeof(float) * veclen );
+
+    switch(animation)
+    {
+        case FX_ANIM_SHAPE_UP:
+            for(i = start, k = 0, ry = min; i <= end; i ++ , ry+=dy)
             {
                 vec[k] = ry;
+                if ( (ry + dy) > max)
+                {
+                    ry = min-dy;
+                }
                 k++;
             }
 
         break;
-        case 1: //Down
-            for(i = start, k = 0, ry = max; i < end; i ++ , ry-=dy) //FIXME less values ? i+=step
+        case FX_ANIM_SHAPE_DOWN:
+            dy = -dy;
+            for(i = start, k = 0, ry = max; i <= end; i ++ , ry+=dy)
             {
                 vec[k] = ry;
+                if ( (ry + dy) < min)
+                {
+                    ry = max+dy;
+                }
                 k++;
             }
         break;
-        case 2: //Moutain
-            for(i = start, k = 0, ry = min; i < end/2; i ++ , ry+=2*dy) //FIXME less values ? i+=step
+        //~ case FX_ANIM_SHAPE_MONTAIN:
+            //~ for(i = start, k = 0, ry = min; i < end/2; i ++ , ry+=2*dy)
+            //~ {
+                //~ vec[k] = ry;
+                //~ vec[end-k] = ry;
+                //~ k++;
+            //~ }
+            //~ if (k != end-k) //fill last points (in the middle) if end is odd
+            //~ {
+                //~ vec[k] = max;
+                //~ vec[k+1] = max;
+            //~ }
+        //~ break;
+        //~ case FX_ANIM_SHAPE_VALLEY:
+            //~ for(i = start, k = 0, ry = max; i < end/2; i ++ , ry-=2*dy)
+            //~ {
+                //~ vec[k] = ry;
+                //~ vec[end-k] = ry;
+                //~ k++;
+            //~ }
+            //~ if (k != end-k) //fill last points (in the middle)
+            //~ {
+                //~ vec[k] = min;
+                //~ vec[k+1] = min;
+            //~ }
+        //~ break;
+        case FX_ANIM_SHAPE_ZIGZAG: //NAIVE Implement. Could be nested loop to fill all redondant values once
+            for(i = start, k = 0, ry = min; i < end; i++, ry+=dy)
             {
                 vec[k] = ry;
-                vec[end-k] = ry;
+                if (dy > 0)
+                {
+                    if ( (ry + dy) > max)
+                    {
+                        ry = max+dy;
+                        dy = -dy;
+                    }
+                }
+                else
+                {
+                    if ( (ry + dy) < min)
+                    {
+                        ry = min+dy;
+                        dy = -dy;
+                    }
+                }
+
                 k++;
             }
-            if (k != end-k) //fill last points (in the middle) if end is odd
-            {
-                vec[k] = max;
-                vec[k+1] = max;
-            }
+
         break;
-        case 3: //Valley
-            for(i = start, k = 0, ry = max; i < end/2; i ++ , ry-=2*dy) //FIXME less values ? i+=step
+        case FX_ANIM_SHAPE_ZAGZIG:
+            dy = -dy;
+            for(i = start, k = 0, ry = max; i < end; i++, ry+=dy)
             {
                 vec[k] = ry;
-                vec[end-k] = ry;
+                if (dy < 0)
+                {
+                    if ( ( ry - dy) < min)
+                    {
+                        ry = min-dy;
+                        dy = -dy;
+                    }
+                }
+                else
+                {
+                    if ( ( ry - dy) > max)
+                    {
+                        ry = max-dy;
+                        dy = -dy;
+                    }
+                }
+
                 k++;
             }
-            if (k != end-k) //fill last points (in the middle)
-            {
-                vec[k] = min;
-                vec[k+1] = min;
-            }
+
         break;
         default: break;
     }
 
-    int curve_type = GTK3_CURVE_TYPE_LINEAR;
+    int curve_type = GTK3_CURVE_TYPE_FREE;
+    //~ curve type is force to free ( in callback.c - update_curve_shape()) until gtk3curvewidget point limit is fixed (issue # )
     if( is_button_toggled("curve_typespline")) {
         curve_type = GTK3_CURVE_TYPE_SPLINE;
     } else if ( is_button_toggled("curve_typefreehand")) {

@@ -32,5 +32,5 @@ void	reset_curve( GtkWidget *curve );
 void	get_points_from_curve( GtkWidget *curve, int len, float *v );
 void   set_initial_curve( GtkWidget *curve, int fx_id, int parameter_id, int start, int end, int value );
 void   curve_set_position ( GtkWidget *curve, double pos);
-void   curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_id, int start, int end, int animation);
+void   curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_id, int start, int end, int animation, int amplitude, int steps);
 #endif

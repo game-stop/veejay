@@ -2892,12 +2892,10 @@ void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
     info->uc.reload_hint[HINT_KF] = 1;
 }
 
-void    on_curve_animation_changed(GtkWidget *widget, gpointer user_data)
+void    update_curve_shape(void)
 {
-	if(info->status_lock)
-		return;
-
-    gint selected_anim = gtk_combo_box_get_active( GTK_COMBO_BOX( widget ) );
+    GtkWidget *shape_combo = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_combo_animation"));
+    gint selected_anim = gtk_combo_box_get_active( GTK_COMBO_BOX( shape_combo ) );
 
     int lo = 0, hi = 0;
     /* update the time bounds accordingly the sample marker*/
@@ -2911,9 +2909,33 @@ void    on_curve_animation_changed(GtkWidget *widget, gpointer user_data)
             hi = info->status_tokens[SAMPLE_MARKER_END];
         }
     }
+    int amplitude, steps;
+    amplitude = 10; //pourcents
+    GtkWidget *shape_param_spin = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_spin_animation_shape"));
+    steps = gtk_spin_button_get_value( GTK_SPIN_BUTTON(shape_param_spin) );
+
+    //~ FIXME force curve free until gtk3curvewidget point limit is fixed (issue # )
+    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPEFREEHAND]), TRUE);
+
     curve_set_predifined_animation( info->curve, info->uc.entry_tokens[ENTRY_FXID],
                                     info->uc.selected_parameter_id,
-                                    lo, hi, selected_anim);
+                                    lo, hi, selected_anim, amplitude, steps);
+}
+
+void    on_curve_animation_changed (GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+
+    update_curve_shape();
+}
+
+void    on_curve_spin_shape_changed (GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+
+    update_curve_shape();
 }
 
 void	on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)

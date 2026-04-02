@@ -76,4 +76,32 @@ int gveejay_time_to_sync( void *ptr );
 int update_gveejay(void);
 void reloaded_show_launcher(void);
 void reloaded_restart(void);
+
+
+
+enum {
+  FX_ANIM_SHAPE_UP = 0,
+  FX_ANIM_SHAPE_DOWN,
+  //~ FX_ANIM_SHAPE_MONTAIN,
+  //~ FX_ANIM_SHAPE_VALLEY,
+  FX_ANIM_SHAPE_ZIGZAG,
+  FX_ANIM_SHAPE_ZAGZIG,
+  FX_ANIM_SHAPE_MAX
+};
+
+static struct
+{
+    const char *description;
+    const int id;
+} fx_anim_shape_map[] =
+{
+    { "Up",                 FX_ANIM_SHAPE_UP },
+    { "Down",               FX_ANIM_SHAPE_DOWN },
+    //~ { "Montain",            FX_ANIM_SHAPE_MONTAIN },
+    //~ { "Valley",             FX_ANIM_SHAPE_VALLEY },
+    { "ZigZag",             FX_ANIM_SHAPE_ZIGZAG },
+    { "ZagZig",             FX_ANIM_SHAPE_ZAGZIG },
+    { NULL, -1 },
+};
+
 #endif
