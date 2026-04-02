@@ -165,7 +165,7 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
     int min=0, max=0;
     _effect_get_minmax(fx_id, &min, &max, parameter_id );
     int veclen = -1;
-    int i,k, loop = 0;
+    int i,k;
     float j, rx, ry, dx, dy, min_x, delta_x, complement;
 
     int diff = max - min;
@@ -238,46 +238,52 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
                 vec[k+1] = min;
             }
         break;
-        case FX_ANIM_SHAPE_ZIGZAG:
+        case FX_ANIM_SHAPE_ZIGZAG: //NAIVE Implement. Could be nested loop to fill all redondant values once
             for(i = start, k = 0, ry = min; i < end; i++, ry+=dy)
             {
                 vec[k] = ry;
-                if (loop == (int) ((delta_x / 2.0)))
+                if (dy > 0)
                 {
-                    ry = max+dy;
-                    dy = -dy;
+                    if ( (ry + dy) > max)
+                    {
+                        ry = max+dy;
+                        dy = -dy;
+                    }
                 }
-
-                if (loop == (int) (delta_x))
+                else
                 {
-                    loop = 0;
-                    ry = min-dy;
-                    dy = -dy;
+                    if ( (ry + dy) < min)
+                    {
+                        ry = min+dy;
+                        dy = -dy;
+                    }
                 }
-
-                loop++;
                 k++;
             }
 
         break;
         case FX_ANIM_SHAPE_ZAGZIG:
-            for(i = start, k = 0, ry = max; i < end; i++, ry-=dy)
+            dy = -dy;
+            for(i = start, k = 0, ry = max; i < end; i++, ry+=dy)
             {
                 vec[k] = ry;
-                if (loop == (int) ((delta_x / 2.0)))
+                if (dy < 0)
                 {
-                    ry = min-dy;
-                    dy = -dy;
+                    if ( ( ry - dy) < min)
+                    {
+                        ry = min-dy;
+                        dy = -dy;
+                    }
+                }
+                else
+                {
+                    if ( ( ry - dy) > max)
+                    {
+                        ry = max-dy;
+                        dy = -dy;
+                    }
                 }
 
-                if (loop == (int) (delta_x))
-                {
-                    loop = 0;
-                    ry = max+dy;
-                    dy = -dy;
-                }
-
-                loop++;
                 k++;
             }
             //~ for(i = start, k = 0; i < end; i += delta_x)
@@ -290,7 +296,8 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
         default: break;
     }
 
-    int curve_type = GTK3_CURVE_TYPE_LINEAR;
+    int curve_type = GTK3_CURVE_TYPE_FREE;
+    //~ curve type is force to free ( in callback.c - update_curve_shape()) until gtk3curvewidget point limit is fixed (issue # )
     if( is_button_toggled("curve_typespline")) {
         curve_type = GTK3_CURVE_TYPE_SPLINE;
     } else if ( is_button_toggled("curve_typefreehand")) {
