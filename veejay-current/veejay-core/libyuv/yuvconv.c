@@ -1334,10 +1334,6 @@ void    yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
         dst->format == PIX_FMT_BGR32 ) 
         n = 4;
 
-    veejay_msg(VEEJAY_MSG_DEBUG, "src %d x %d strides [%d,%d,%d] to rgb %d x %d strides %d %d %d",
-        src->width,src->height,src->stride[0],src->stride[1],src->stride[2], 
-        dst->width,dst->height,dst->stride[0],dst->stride[1],dst->stride[2]);
-
     sws_scale( s->sws,(const uint8_t * const*) src->data, src->stride, 0, src->height,(uint8_t * const*) dst->data, dst->stride );
 }
 void    yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
