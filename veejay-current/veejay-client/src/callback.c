@@ -3621,32 +3621,22 @@ gboolean on_effectchain_button_pressed (GtkWidget *tree, GdkEventButton *event, 
             gtk_tree_model_get_iter(model, &iter, path);
             gtk_tree_model_get(model,&iter, FXC_ID, &fxcid, -1 );
 
-            switch (state_modifier){
-                case GDK_SHIFT_MASK:
-                {
-                    /* user can click on all row, uncomment and fix accordingly the test to check particular column */
-                    //guint column_num = get_treeview_col_number_from_column ( column );
-                    //if(column_num != -1)
-                    {
-                        multi_vims(VIMS_CHAIN_ENTRY_SET_STATE, "%d %d",0, fxcid);
-                        info->uc.reload_hint[HINT_HISTORY] = 1;
-                    }
-                }
-                break;
+            if (state_modifier & GDK_SHIFT_MASK)
+			{
+				int active = 0;
+				multi_vims(VIMS_CHAIN_ENTRY_SET_STATE, "%d %d", 0, fxcid);
+				info->uc.reload_hint[HINT_ENTRY] = 1;
+				info->uc.reload_hint[HINT_CHAIN] = 1;
+			}
+			else if (state_modifier & GDK_CONTROL_MASK)
+			{
+			   int active = 0;
+			   gtk_tree_model_get ( model, &iter, FXC_KF_STATUS, &active, -1);
 
-                case GDK_CONTROL_MASK:
-                {
-                    /* user can click on all row, uncomment and fix accordingly the test to check particular column */
-                    //guint column_num = get_treeview_col_number_from_column ( column );
-                    //if(column_num != -1)
-                    {
-                        int active;
-                        gtk_tree_model_get ( model, &iter, FXC_KF_STATUS, &active, -1);
-                        curve_toggleentry_activate(fxcid, !active);
-                    }
-                }
-                break;
-            }
+			   multi_vims( VIMS_SAMPLE_KF_STATUS, "%d %d %d", 0, !active,0);
+			   info->uc.reload_hint[HINT_ENTRY] = 1;
+			   info->uc.reload_hint[HINT_CHAIN] = 1;
+			}
         }
     }
     return FALSE; /* lets normal things happening */
