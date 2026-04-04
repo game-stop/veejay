@@ -29,139 +29,87 @@ vj_effect *lumablend_init(int w, int h)
 	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
 	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
 	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-	ve->limits[0][0] = 0;	/* type */
-	ve->limits[1][0] = 1;
-	ve->limits[0][1] = 0;	/* threshold 1 */
-	ve->limits[1][1] = 255;
-	ve->limits[0][2] = 0;	/* threshold 2 */
-	ve->limits[1][2] = 255;
-	ve->limits[0][3] = 0;	/*opacity */
-	ve->limits[1][3] = 255;
-	ve->defaults[0] = 1;
-	ve->defaults[1] = 0;
-	ve->defaults[2] = 35;
-	ve->defaults[3] = 150;
-	ve->description = "Opacity by Threshold";
+
+    ve->limits[0][0] = 0;
+    ve->limits[1][0] = 1;
+    ve->defaults[0]  = 0;
+    ve->limits[0][1] = 0;
+    ve->limits[1][1] = 255;
+    ve->defaults[1]  = 0;
+    ve->limits[0][2] = 0;
+    ve->limits[1][2] = 255;
+    ve->defaults[2]  = 35;
+    ve->limits[0][3] = 0;
+    ve->limits[1][3] = 255;
+    ve->defaults[3]  = 150;
+    ve->description = "Soft-Edge Luma Flow Mixer";
+    ve->param_description = vje_build_param_list(ve->num_params,"Trigger Source","Min Threshold","Max Threshold","Master Opacity");
 	ve->extra_frame = 1;
-	ve->parallel = 1;
 	ve->sub_format = 1;
-	ve->parallel = 1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Threshold A", "Threshold B", "Opacity" );
 
-	ve->hints = vje_init_value_hint_list( ve->num_params );
-
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
-		   "Inclusive", "Exclusive","Blurred" );	
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+    vje_build_value_hint_list(ve->hints, ve->limits[1][0],0,"Source A", "Source B");
 
 	return ve;
 }
 
-static inline void opacity_threshold_A(VJFrame * restrict frame,
-                                       VJFrame * restrict frame2,
-                                       int t1, int t2, int opacity)
-{
-    const int len = frame->len;
+typedef struct {
+    int n_threads;
+} lumablend_t;
 
-    uint8_t * restrict y1 = frame->data[0];
-    uint8_t * restrict u1 = frame->data[1];
-    uint8_t * restrict v1 = frame->data[2];
-
-    uint8_t * restrict y2 = frame2->data[0];
-    uint8_t * restrict u2 = frame2->data[1];
-    uint8_t * restrict v2 = frame2->data[2];
-
-    const unsigned int op1 = (unsigned int)(opacity < 0 ? 0 : (opacity > 255 ? 255 : opacity));
-    const unsigned int op0 = 255u - op1;
-
-    const unsigned int ut1 = (unsigned int)t1;
-    const unsigned int ut2 = (unsigned int)t2;
-    const unsigned int tr = ut2 - ut1;
-	
-    for (int i = 0; i < len; ++i) {
-        const unsigned int a1 = (unsigned int)y1[i];
-        const unsigned int a2 = (unsigned int)y2[i];
-
-        const unsigned int mask = ((a1 - ut1) <= tr) ? 1u : 0u;
-
-        const unsigned int blended_y = (op0 * a1 + op1 * a2) >> 8;
-        const unsigned int ou_y      = a1;
-
-        const unsigned int ou_u      = (unsigned int)u1[i];
-        const unsigned int blended_u = (op0 * ou_u + op1 * (unsigned int)u2[i]) >> 8;
-
-        const unsigned int ou_v      = (unsigned int)v1[i];
-        const unsigned int blended_v = (op0 * ou_v + op1 * (unsigned int)v2[i]) >> 8;
-
-        y1[i] = (uint8_t)( mask * blended_y + (1u - mask) * ou_y );
-        u1[i] = (uint8_t)( mask * blended_u + (1u - mask) * ou_u );
-        v1[i] = (uint8_t)( mask * blended_v + (1u - mask) * ou_v );
-    }
+void *lumablend_malloc(int w, int h) {
+    lumablend_t *lb = (lumablend_t*) vj_malloc(sizeof(lumablend_t));
+    if(!lb) return NULL;
+    lb->n_threads = vje_advise_num_threads(w*h);
+    return (void*) lb;
 }
 
-static inline void opacity_threshold_B(VJFrame * restrict frame,
-                                       VJFrame * restrict frame2,
-                                       int t1, int t2, int opacity)
-{
-    const int len = frame->len;
-
-    uint8_t * restrict y1 = frame->data[0];
-    uint8_t * restrict u1 = frame->data[1];
-    uint8_t * restrict v1 = frame->data[2];
-
-    uint8_t * restrict y2 = frame2->data[0];
-    uint8_t * restrict u2 = frame2->data[1];
-    uint8_t * restrict v2 = frame2->data[2];
-
-    const unsigned int op1 = (unsigned int)(opacity < 0 ? 0 : (opacity > 255 ? 255 : opacity));
-    const unsigned int op0 = 255u - op1;
-
-    const unsigned int ut1 = (unsigned int)t1;
-    const unsigned int ut2 = (unsigned int)t2;
-    const unsigned int tr = ut2 - ut1;
-	
-    for (int i = 0; i < len; ++i) {
-        const unsigned int a1 = (unsigned int)y1[i];
-        const unsigned int a2 = (unsigned int)y2[i];
-
-        const unsigned int mask = ((a2 - ut1) <= tr) ? 1u : 0u;
-
-        const unsigned int blended_y = (op0 * a1 + op1 * a2) >> 8;
-        const unsigned int ou_y      = a1;
-
-        const unsigned int ou_u      = (unsigned int)u1[i];
-        const unsigned int blended_u = (op0 * ou_u + op1 * (unsigned int)u2[i]) >> 8;
-
-        const unsigned int ou_v      = (unsigned int)v1[i];
-        const unsigned int blended_v = (op0 * ou_v + op1 * (unsigned int)v2[i]) >> 8;
-
-        y1[i] = (uint8_t)( mask * blended_y + (1u - mask) * ou_y );
-        u1[i] = (uint8_t)( mask * blended_u + (1u - mask) * ou_u );
-        v1[i] = (uint8_t)( mask * blended_v + (1u - mask) * ou_v );
+void lumablend_free(void *ptr ) {
+    lumablend_t *lb = (lumablend_t*) ptr;
+    if(lb) {
+        free(lb);
     }
 }
 
 void lumablend_apply(void *ptr, VJFrame * frame, VJFrame * frame2, int *args)
 {
-    (void)ptr;
+    lumablend_t *lb = (lumablend_t*) ptr;
 
-    int type    = args[0];
-    int t1      = args[1];
-    int t2      = args[2];
-    int opacity = args[3];
+    const int type    = args[0];
+    const int t1      = (args[1] < args[2]) ? args[1] : args[2];
+    const int t2      = (args[1] < args[2]) ? args[2] : args[1];
+    const int opacity = (args[3] > 255) ? 255 : (args[3] < 0 ? 0 : args[3]);
 
-    if (t1 > t2) { // invariant
-        int tmp = t1;
-        t1 = t2;
-        t2 = tmp;
-    }
+    const int len = frame->len;
+    const int t_range = t2 - t1;
 
-    switch (type) {
-        case 0:
-            opacity_threshold_A(frame, frame2, t1, t2, opacity);
-            break;
-        case 1:
-            opacity_threshold_B(frame, frame2, t1, t2, opacity);
-            break;
+    uint8_t *y1 = frame->data[0], *u1 = frame->data[1], *v1 = frame->data[2];
+    uint8_t *y2 = frame2->data[0], *u2 = frame2->data[1], *v2 = frame2->data[2];
+
+    const int op1 = opacity;
+    const int op0 = 256 - op1;
+
+    #pragma omp parallel for schedule(static) num_threads(lb->n_threads)
+    for (int i = 0; i < len; ++i) {
+        const int trigger_y = (type == 0) ? y1[i] : y2[i];
+        int mask = 0;
+        if (trigger_y >= t1 && trigger_y <= t2) {
+            mask = 256;
+        } else if (trigger_y > t1 - 4 && trigger_y < t1) {
+            mask = (trigger_y - (t1 - 4)) << 6;
+        } else if (trigger_y > t2 && trigger_y < t2 + 4) {
+            mask = ((t2 + 4) - trigger_y) << 6;
+        }
+
+        if (mask > 0) {
+            const int w2 = (mask * op1) >> 8;
+            const int w1 = 256 - w2;
+
+            y1[i] = (w1 * y1[i] + w2 * y2[i] + 128) >> 8;
+            u1[i] = (w1 * u1[i] + w2 * u2[i] + 128) >> 8;
+            v1[i] = (w1 * v1[i] + w2 * v2[i] + 128) >> 8;
+        }
     }
 }

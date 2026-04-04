@@ -198,7 +198,7 @@ static struct {
     { lumamagick_init,NULL,NULL,NULL,NULL,NULL,lumamagick_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMAMAGICK },
     { lumakey_init,lumakey_malloc,lumakey_free,NULL,NULL,NULL,lumakey_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMAKEY },
     { lumakeyalpha_init, NULL,NULL,NULL,NULL,NULL,lumakeyalpha_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMAKEYALPHA },
-    { lumablend_init, NULL,NULL,NULL,NULL,NULL, lumablend_apply, NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMABLEND },
+    { lumablend_init, lumablend_malloc,lumablend_free,NULL,NULL,NULL, lumablend_apply, NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMABLEND },
     { levelcorrection_init,NULL,NULL,NULL,NULL,levelcorrection_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_LEVELCORRECTION },
     { killchroma_init,NULL,NULL,NULL,NULL,killchroma_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_KILLCHROMA },
     { keyselect_init,NULL,NULL,NULL,NULL,NULL,keyselect_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_KEYSELECT },
