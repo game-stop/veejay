@@ -22,4 +22,6 @@
 #define CHROMAPAL_H
 vj_effect *chromapalette_init(int w, int h);
 void chromapalette_apply(void *ptr, VJFrame *frame, int *args);
+void* chromapalette_malloc(int w, int h);
+void chromapalette_free(void *ptr);
 #endif

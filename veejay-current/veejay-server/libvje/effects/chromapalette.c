@@ -20,129 +20,160 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "chromapalette.h"
+#include "common.h"
+#include <veejaycore/vjmem.h>
+#include "chromapalette.h"
+
+typedef struct {
+	int n_threads;
+	int softness;
+	int tolerance;
+	float *lut;
+} chromapalette_t;
 
 vj_effect *chromapalette_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 6;
+    if (!ve) return NULL;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-	//angle,r,g,b,cbc,crc
+    ve->num_params = 7;
+
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
     ve->limits[0][0] = 1;
-    ve->limits[1][0] = 9000;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 255;
+    ve->limits[1][0] = 255;
+    ve->defaults[0] = 60;
 
-    ve->limits[0][4] = 0;
-    ve->limits[1][4] = 255;
+    ve->limits[0][6] = 0;
+    ve->limits[1][6] = 255;
+    ve->defaults[6] = 20;
 
-    ve->limits[0][5] = 0;
-    ve->limits[1][5] = 255;
+    for(int i=1; i<6; i++) {
+        ve->limits[0][i] = 0;
+        ve->limits[1][i] = 255;
+    }
+    ve->defaults[1] = 255; // Red
+    ve->defaults[4] = 200; // Cb
+    ve->defaults[5] = 20;  // Cr
 
-    ve->defaults[0] = 3000;//angle
-    ve->defaults[1] = 255;   //r
-    ve->defaults[2] = 0;   //g
-    ve->defaults[3] = 0; //b
-    ve->defaults[4] = 200;  //cb default
-    ve->defaults[5] = 20; //cr default
-	ve->parallel = 1;
-
-	ve->description = "Chrominance Palette (rgb key) ";
+    ve->parallel = 0;
+    ve->description = "Chrominance Palette (rgb key)";
     ve->sub_format = 1;
-    ve->extra_frame = 0;
-    ve->has_help = 1;
-	ve->has_user = 0;
-	ve->rgb_conv = 1;
-	ve->parallel = 1;
-	ve->param_description = vje_build_param_list( ve->num_params, "Angle", "Red","Green","Blue", "Chroma Blue","Chroma Red" );
+    ve->rgb_conv = 1;
+
+    ve->param_description = vje_build_param_list(ve->num_params, "Tolerance", "Red", "Green", "Blue", "Chroma Blue", "Chroma Red", "Softness");
     return ve;
 }
 
-static inline int _chroma_key( uint8_t fg_cb, uint8_t fg_cr, uint8_t cb, uint8_t cr, int angle)
-{
-	int xx = ((fg_cb * cb) + (fg_cr * cr)) >> 7;
-	int yy = ((fg_cr * cb) - (fg_cb * cr)) >> 7;
-	int val = (xx * angle) >> 4;
+void* chromapalette_malloc(int w, int h) {
+	chromapalette_t *c = (chromapalette_t*) vj_malloc(sizeof(chromapalette_t));
+	if(!c) {
+		return NULL;
+	}
+	c->n_threads = vje_advise_num_threads(w*h);
 
-/*	if( abs(yy) < val ) 
-		return 1;
-	
-	return 0; */
-	return ( yy >= 0 ? yy : -yy ) < val;
+	c->lut = (float*) vj_malloc(sizeof(float) * 512 * 512 );
+	if(!c->lut) {
+		free(c);
+		return NULL;
+	}
+
+	return (void*) c;
+}
+
+void chromapalette_free(void *ptr) {
+	chromapalette_t *c = (chromapalette_t*) ptr;
+	if(c) {
+		free(c->lut);
+		free(c);
+	}
+}
+
+static void calc_lut(chromapalette_t *c, int tolerance, int softness) {
+    float outer_r = (float)tolerance;
+    float inner_r = outer_r - (float)softness;
+    if (inner_r < 0) inner_r = 0;
+    float inv_range = 1.0f / ((outer_r - inner_r > 0.1f) ? (outer_r - inner_r) : 0.1f);
+
+    for (int dv = -255; dv <= 255; dv++) {
+        for (int du = -255; du <= 255; du++) {
+            float dist = sqrtf((float)(du * du + dv * dv));
+            float blend = 0.0f;
+            if (dist < inner_r)
+				blend = 1.0f;
+            else if (dist < outer_r)
+				blend = (outer_r - dist) * inv_range;
+
+            c->lut[(dv + 255) * 512 + (du + 255)] = blend;
+        }
+    }
 }
 
 void chromapalette_apply(void *ptr, VJFrame *frame, int *args) {
-    int i_angle = args[0];
+
+    uint8_t lut_cb[256];
+	uint8_t lut_cr[256];
+
+	chromapalette_t *c = (chromapalette_t*) ptr;
+
+    int tolerance = args[0];
     int r = args[1];
-    int g = args[2];
-    int b = args[3];
+	int g = args[2];
+	int b = args[3];
     int color_cb = args[4];
-    int color_cr = args[5];
+	int color_cr = args[5];
+    int softness = args[6];
 
-	unsigned int i;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t U;
-	uint8_t V;
-	int	y=0,u=128,v=128;
-	const float cb_mul = 0.492;
-	const float cr_mul = 0.877;
-	
-	_rgb2yuv( r,g,b,y,u,v );
+    const int len = frame->len;
+	const int n_threads = c->n_threads;
 
-	const float aa = (const float) u;
-	const float bb = (const float) v;
+    uint8_t *restrict Y = frame->data[0];
+	uint8_t *restrict Cb = frame->data[1];
+	uint8_t *restrict Cr = frame->data[2];
 
-    float tmp = sqrt(((aa * aa) + (bb * bb)));
-	float angle = (float)(i_angle * 0.01) * (M_PI / 180.0f);
-    const int colorKeycb = 127 * (aa / tmp);
-    const int colorKeycr = 127 * (bb / tmp);
-    const int accept_angle = (int)( 15.0f * tanf(angle));
+    int target_y = 0;
+	int target_u = 128;
+	int target_v = 128;
 
-	if(color_cb != 0 && color_cr != 0) //both cb and cr
-	{
-		for( i = 0 ; i < len ; i ++ )
-		{
-				if( _chroma_key( Cb[i] , Cr[i], colorKeycb,colorKeycr, accept_angle))
-				{
-					U = 128 + (int)(((float)(color_cb - Y[i]) * cb_mul) + 0.5);
-	    	       	V = 128 + (int)(((float)(color_cr - Y[i]) * cr_mul) + 0.5);
-					Cb[i] = CLAMP_UV( U );
-					Cr[i] = CLAMP_UV( V );
-				}
-		}
-	}
-	if(color_cr == 0 ) //only cr
-	{
-		for( i = 0 ; i < len ; i ++ )
-		{
-				if( _chroma_key( Cb[i], Cr[i], colorKeycb, colorKeycr, accept_angle))
-				{
-					V = 128+(int)( (float) (color_cr - Y[i]) * cr_mul );
-					Cr[i] = CLAMP_UV( V );
-				}
-		}
-	}
-	if(color_cb == 0 ) // only cb
-	{
-		for( i = 0 ; i < len ; i ++ )
-		{
-			if( _chroma_key( Cb[i] , Cr[i], colorKeycb,colorKeycr, accept_angle))
-			{
-				U = 128 + (int)( (float) (color_cb - Y[i]) * cb_mul );
-				Cb[i] = CLAMP_UV(U);
-			}
-		}
+    _rgb2yuv(r, g, b, target_y, target_u, target_v);
+
+    float outer_r = (float)tolerance;
+    float inner_r = outer_r - (float)softness;
+
+    if (inner_r < 0) inner_r = 0;
+
+    float range = (outer_r - inner_r);
+
+	if (range < 0.1f) range = 0.1f;
+
+	if(softness != c->softness || tolerance != c->tolerance) {
+		calc_lut(c, tolerance, softness);
+		c->softness = softness;
+		c->tolerance = tolerance;
 	}
 
- 
+	const float *restrict lut = c->lut;
+
+    for (int i = 0; i < 256; i++) {
+        lut_cb[i] = CLAMP_UV(128 + (int)(((float)(color_cb - i) * 0.492f) + 0.5f));
+        lut_cr[i] = CLAMP_UV(128 + (int)(((float)(color_cr - i) * 0.877f) + 0.5f));
+    }
+
+	#pragma omp parallel for schedule(static) num_threads(n_threads)
+    for (int i = 0; i < len; i++) {
+        int du_idx = (int)Cb[i] - target_u + 255;
+        int dv_idx = (int)Cr[i] - target_v + 255;
+
+        float blend = lut[dv_idx * 512 + du_idx];
+
+        if (blend > 0.0f) {
+            int target_cb = lut_cb[Y[i]];
+            int target_cr = lut_cr[Y[i]];
+
+            Cb[i] = CLAMP_UV(Cb[i] + (int)(blend * (target_cb - Cb[i])));
+            Cr[i] = CLAMP_UV(Cr[i] + (int)(blend * (target_cr - Cr[i])));
+        }
+    }
 }

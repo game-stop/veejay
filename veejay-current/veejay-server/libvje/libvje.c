@@ -247,7 +247,7 @@ static struct {
     { colflash_init,colflash_malloc,colflash_free,NULL,NULL,colflash_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_COLFLASH },
     { chromium_init,NULL,NULL,NULL,NULL,chromium_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_CHROMIUM },
     { chromascratcher_init,chromascratcher_malloc,chromascratcher_free,NULL,NULL,chromascratcher_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_CHROMASCRATCHER},
-    { chromapalette_init,NULL,NULL,NULL,NULL,chromapalette_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_CHROMAPALETTE },
+    { chromapalette_init,chromapalette_malloc,chromapalette_free,NULL,NULL,chromapalette_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_CHROMAPALETTE },
     { chromamagick_init,NULL,NULL,NULL,NULL,NULL,chromamagick_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_CHROMAMAGICK },
     { chromamagickalpha_init, NULL,NULL,NULL,NULL,NULL,chromamagickalpha_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_CHROMAMAGICKALPHA },
     { chameleon_init, chameleon_malloc,chameleon_free,chameleon_prepare,NULL,chameleon_apply,NULL,NULL,chameleon_request_fx,chameleon_set_motionmap,VJ_IMAGE_EFFECT_CHAMELEON},
