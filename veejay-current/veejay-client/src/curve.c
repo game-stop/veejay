@@ -17,13 +17,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-//ISSUE : change sample bound start end nothing happen?
-//ISSUE : memory issue allocating GTK3curve / priv->curve_data.d_point width devrait etre  largeur du clip!???
-//ISSUE : ZIGZag not well shaped
-//ISSUE : are we force to init gtk3curve / set curve vector with full vector witdh or what?
-//NEED TO reset before setting new curve ?
-
-
 #include <config.h>
 #include <glib.h>
 #include <gtk/gtk.h>
@@ -32,6 +25,7 @@
 #include <src/vj-api.h>
 #include <stdlib.h>
 #include "curve.h"
+#include <math.h>
 
 static int curve_is_empty = 1;
 
@@ -68,13 +62,15 @@ void   set_initial_curve( GtkWidget *curve, int fx_id, int parameter_id, int sta
 	_effect_get_minmax(fx_id, &min, &max, parameter_id );
     int len = end - start;
 	int i,k=0;
-    float	*vec = (float*) vj_calloc(sizeof(float) * len ); // FIXME less values len/step?
+
+    if( len <= 0 ) return;
+
+    float	*vec = (float*) vj_calloc(sizeof(float) * len );
+    if(vec == NULL ) return;
 
 	int diff = max - min;
-	for(i = start ; i < end; i ++ ) //FIXME less values ? i+=step
+	for(i = start ; i < end; i ++ ) // initial curve, stepsize is widget internal
 	{
-		//~ float val = ((float)(value - min) / (diff)); # BYPASS [0-1] NORMALISATION
-		//~ vec[k] = val;  # BYPASS [0-1] NORMALISATION
 		vec[k] = value;
 		k++;
 	}
@@ -84,13 +80,12 @@ void   set_initial_curve( GtkWidget *curve, int fx_id, int parameter_id, int sta
     gtk3_curve_set_vector( curve , len, vec );
     gtk3_curve_set_curve_type( curve, GTK3_CURVE_TYPE_LINEAR );
 
-
     free(vec);
 
     curve_is_empty = 0;
 }
 
-int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int fx_entry, int *lo, int *hi, int *curve_type, int *status)
+int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int fx_entry,int *curve_type, int *status)
 {
 	int parameter_id = 0;
 	int start = 0, end =0,type=0;
@@ -118,14 +113,7 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 	for(i = start ; i < end; i ++ )
 	{
 		unsigned char *ptr = in + (k * 4);
-		int value =
-		  ( ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24) );
-
-		// val = ((Input - InputLow) / (InputHigh - InputLow)) * (OutputHigh - OutputLow) + OutputLow;
-		// with OutputLow==0 and OutputHigh==1 in gtkcurve range
-
-		//~ float val = ((float)(value - min) / (diff)); // # BYPASS [0-1] NORMALISATION
-		//~ vec[k] = val;
+		int value = ( ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24) );
 		vec[k] = (float)value;
 		k++;
 	}
@@ -143,9 +131,6 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 
     gtk3_curve_set_curve_type( curve, *curve_type );
 
-	*lo = start; //FIXME , why affected ?
-	*hi = end;
-
 	free(vec);
 
     curve_is_empty = 0;
@@ -157,7 +142,6 @@ void curve_set_position( GtkWidget *curve, double pos)
 {
     gtk3_curve_set_position( curve, pos);
 }
-
 void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_id,
                                       int start, int end, int animation, int amplitude, int steps)
 {
@@ -168,10 +152,17 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
     float j, rx, ry, dx, dy, min_x, delta_x, complement;
 
     int diff = max - min;
+    // only FX parameter value is normalized
 
-    if (end - start <= 1) return; // FIXME (guard again div0)
-    if (steps < 1) steps = 1; //(guard again div0)
-    amplitude = 100; //FIXME missing ui ?
+    // veclen is the same as sample length (we dont have a envelope window .. yet to support this on very large clips)
+    // every frame index position has a "parameter keyframe"
+
+    // use start/end position in fx anim to define a region
+
+    if (end - start <= 1) return;
+    if (steps < 1) steps = 1;
+
+    amplitude = 100;
     complement = 100 - amplitude;
 
     switch(animation)
@@ -180,31 +171,45 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
         case FX_ANIM_SHAPE_DOWN:
             veclen = end - start;
             dy = (diff) / (float)(veclen - 1);
-            dy = dy * ((float)(steps)); //
+            dy = dy * ((float)(steps));
             delta_x = ((end - start)/(float)steps);
-
         break;
         case FX_ANIM_SHAPE_ZAGZIG:
         case FX_ANIM_SHAPE_ZIGZAG:
-            //~ veclen = steps; //only needed point in vector, need to fix gtk3curve?
             veclen = end - start;
             dy = (diff) / (float)(veclen - 1);
-            dy = dy * ((float)(steps<<1)); //
+            dy = dy * ((float)(steps<<1));
             delta_x = ((end - start)/(float)steps);
-
         break;
+        case FX_ANIM_SHAPE_SINE:
+        case FX_ANIM_SHAPE_COSINE:
+        case FX_ANIM_SHAPE_TRIANGLE:
+        case FX_ANIM_SHAPE_SAWTOOTH:
+        case FX_ANIM_SHAPE_REVERSE_SAWTOOTH:
+        case FX_ANIM_SHAPE_SQUARE:
+        case FX_ANIM_SHAPE_BOUNCE:
+        case FX_ANIM_SHAPE_NOISE:
+        case FX_ANIM_SHAPE_SMOOTHSTEP:
+        case FX_ANIM_SHAPE_RANDOMWALK:
+        case FX_ANIM_SHAPE_GAUSSIAN:
+        case FX_ANIM_SHAPE_EXPONENTIAL:
+            veclen = end - start;
+            break;
         default:
             veclen = end - start;
             dy = (diff) / (float)(veclen - 1);
             break;
     }
 
+    if (veclen <= 0) return;
+
     float   *vec = (float*) vj_calloc(sizeof(float) * veclen );
+    if (vec == NULL) return;
 
     switch(animation)
     {
         case FX_ANIM_SHAPE_UP:
-            for(i = start, k = 0, ry = min; i <= end; i ++ , ry+=dy)
+            for(i = start, k = 0, ry = min; i < end; i ++ , ry+=dy)
             {
                 vec[k] = ry;
                 if ( (ry + dy) > max)
@@ -213,11 +218,10 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
                 }
                 k++;
             }
-
         break;
         case FX_ANIM_SHAPE_DOWN:
             dy = -dy;
-            for(i = start, k = 0, ry = max; i <= end; i ++ , ry+=dy)
+            for(i = start, k = 0, ry = max; i < end; i ++ , ry+=dy)
             {
                 vec[k] = ry;
                 if ( (ry + dy) < min)
@@ -227,33 +231,7 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
                 k++;
             }
         break;
-        //~ case FX_ANIM_SHAPE_MONTAIN:
-            //~ for(i = start, k = 0, ry = min; i < end/2; i ++ , ry+=2*dy)
-            //~ {
-                //~ vec[k] = ry;
-                //~ vec[end-k] = ry;
-                //~ k++;
-            //~ }
-            //~ if (k != end-k) //fill last points (in the middle) if end is odd
-            //~ {
-                //~ vec[k] = max;
-                //~ vec[k+1] = max;
-            //~ }
-        //~ break;
-        //~ case FX_ANIM_SHAPE_VALLEY:
-            //~ for(i = start, k = 0, ry = max; i < end/2; i ++ , ry-=2*dy)
-            //~ {
-                //~ vec[k] = ry;
-                //~ vec[end-k] = ry;
-                //~ k++;
-            //~ }
-            //~ if (k != end-k) //fill last points (in the middle)
-            //~ {
-                //~ vec[k] = min;
-                //~ vec[k+1] = min;
-            //~ }
-        //~ break;
-        case FX_ANIM_SHAPE_ZIGZAG: //NAIVE Implement. Could be nested loop to fill all redondant values once
+        case FX_ANIM_SHAPE_ZIGZAG:
             for(i = start, k = 0, ry = min; i < end; i++, ry+=dy)
             {
                 vec[k] = ry;
@@ -273,10 +251,8 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
                         dy = -dy;
                     }
                 }
-
                 k++;
             }
-
         break;
         case FX_ANIM_SHAPE_ZAGZIG:
             dy = -dy;
@@ -285,7 +261,7 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
                 vec[k] = ry;
                 if (dy < 0)
                 {
-                    if ( ( ry - dy) < min)
+                    if ( ( ry + dy) < min)
                     {
                         ry = min-dy;
                         dy = -dy;
@@ -293,22 +269,167 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
                 }
                 else
                 {
-                    if ( ( ry - dy) > max)
+                    if ( ( ry + dy) > max)
                     {
                         ry = max-dy;
                         dy = -dy;
                     }
                 }
-
                 k++;
             }
+        break;
+        case FX_ANIM_SHAPE_SINE:
+        {
+            float midpoint = (max + min) / 2.0f;
+            float radius = (max - min) / 2.0f;
+            float frequency = (float)steps;
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float progress = (float)(i - start) / (float)veclen;
+                vec[k] = midpoint + radius * sinf(2.0f * M_PI * frequency * progress);
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_COSINE:
+        {
+            float midpoint = (max + min) / 2.0f;
+            float radius = (max - min) / 2.0f;
+            float frequency = (float)steps;
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float progress = (float)(i - start) / (float)veclen;
+                vec[k] = midpoint + radius * cosf(2.0f * M_PI * frequency * progress);
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_TRIANGLE:
+        {
+            float frequency = (float)steps;
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float progress = (float)(i - start) / (float)veclen;
+                float t = fmodf(progress * frequency, 1.0f);
+                float tri = 1.0f - fabsf(2.0f * t - 1.0f);
+                vec[k] = min + diff * tri;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_SAWTOOTH:
+        {
+            float frequency = (float)steps;
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float progress = (float)(i - start) / (float)veclen;
+                float t = fmodf(progress * frequency, 1.0f);
+                vec[k] = min + diff * t;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_REVERSE_SAWTOOTH:
+        {
+            float frequency = (float)steps;
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float progress = (float)(i - start) / (float)veclen;
+                float t = fmodf(progress * frequency, 1.0f);
+                vec[k] = max - diff * t;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_SQUARE:
+        {
+            float frequency = (float)steps;
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float progress = (float)(i - start) / (float)veclen;
+                float t = progress * frequency;
+                int phase = (int)(t * 2.0f);
+                vec[k] = (phase % 2 == 0) ? max : min;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_BOUNCE:
+        {
+            float frequency = (float)steps;
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float progress = (float)(i - start) / (float)veclen;
+                float t = fmodf(progress * frequency, 1.0f);
+                float b = fabsf(1.0f - 2.0f * t);
+                float bounce = 1.0f - (b * b);
+                vec[k] = min + diff * bounce;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_NOISE:
+        {
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float random_factor = (float)rand() / (float)RAND_MAX;
+                vec[k] = min + (diff * random_factor);
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_SMOOTHSTEP:
+        {
+            float frequency = (float)steps;
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float progress = (float)(i - start) / (float)veclen;
+                float local_progress = fmodf(progress * frequency, 1.0f);
+                float smooth_factor = local_progress * local_progress * (3.0f - 2.0f * local_progress);
+                vec[k] = min + (diff * smooth_factor);
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_RANDOMWALK:
+        {
+            float value = (min + max) * 0.5f;
+            float step_scale = diff * 0.05f;
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float step = ((float)rand() / RAND_MAX) - 0.5f;
+                value += step * step_scale;
+                if (value < min) value = min + (min - value);
+                if (value > max) value = max - (value - max);
+                vec[k] = value;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_GAUSSIAN:
+        {
+            float frequency = (float)steps;
+            float sigma = 0.25f;
 
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float progress = (float)(i - start) / (float)veclen;
+                float t = fmodf(progress * frequency, 1.0f);
+                float x = (t - 0.5f) / sigma;
+                float g = expf(-0.5f * x * x);
+                float g0 = expf(-0.5f * (0.5f / sigma) * (0.5f / sigma));
+                float normalized = (g - g0) / (1.0f - g0);
+                vec[k] = min + diff * normalized;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_EXPONENTIAL:
+        {
+            float frequency = (float)steps;
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float progress = (float)(i - start) / (float)veclen;
+                float t = fmodf(progress * frequency, 1.0f);
+                float expv = (expf(4.0f * t) - 1.0f) / (expf(4.0f) - 1.0f);
+                vec[k] = min + diff * expv;
+            }
+        }
         break;
         default: break;
     }
 
     int curve_type = GTK3_CURVE_TYPE_FREE;
-    //~ curve type is force to free ( in callback.c - update_curve_shape()) until gtk3curvewidget point limit is fixed (issue # )
+
     if( is_button_toggled("curve_typespline")) {
         curve_type = GTK3_CURVE_TYPE_SPLINE;
     } else if ( is_button_toggled("curve_typefreehand")) {

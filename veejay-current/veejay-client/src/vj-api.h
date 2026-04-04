@@ -86,6 +86,18 @@ enum {
   //~ FX_ANIM_SHAPE_VALLEY,
   FX_ANIM_SHAPE_ZIGZAG,
   FX_ANIM_SHAPE_ZAGZIG,
+  FX_ANIM_SHAPE_SINE,
+  FX_ANIM_SHAPE_COSINE,
+  FX_ANIM_SHAPE_TRIANGLE,
+  FX_ANIM_SHAPE_SAWTOOTH,
+  FX_ANIM_SHAPE_REVERSE_SAWTOOTH,
+  FX_ANIM_SHAPE_SQUARE,
+  FX_ANIM_SHAPE_BOUNCE,
+  FX_ANIM_SHAPE_NOISE,
+  FX_ANIM_SHAPE_SMOOTHSTEP,
+  FX_ANIM_SHAPE_RANDOMWALK,
+  FX_ANIM_SHAPE_GAUSSIAN,
+  FX_ANIM_SHAPE_EXPONENTIAL,
   FX_ANIM_SHAPE_MAX
 };
 
@@ -101,6 +113,18 @@ static struct
     //~ { "Valley",             FX_ANIM_SHAPE_VALLEY },
     { "ZigZag",             FX_ANIM_SHAPE_ZIGZAG },
     { "ZagZig",             FX_ANIM_SHAPE_ZAGZIG },
+    { "Sine",               FX_ANIM_SHAPE_SINE },
+    { "Cosine",             FX_ANIM_SHAPE_COSINE },
+    { "Triangle",           FX_ANIM_SHAPE_TRIANGLE },
+    { "Sawtooth",           FX_ANIM_SHAPE_SAWTOOTH },
+    { "Reverse Sawtooth",   FX_ANIM_SHAPE_REVERSE_SAWTOOTH },
+    { "Square",             FX_ANIM_SHAPE_SQUARE },
+    { "Bounce",             FX_ANIM_SHAPE_BOUNCE },
+    { "Noise",              FX_ANIM_SHAPE_NOISE },
+    { "Smooth",             FX_ANIM_SHAPE_SMOOTHSTEP },
+    { "Random Walk",        FX_ANIM_SHAPE_RANDOMWALK },
+    { "Gaussian",           FX_ANIM_SHAPE_GAUSSIAN },
+    { "Exponential",        FX_ANIM_SHAPE_EXPONENTIAL },
     { NULL, -1 },
 };
 

@@ -3399,7 +3399,7 @@ static void update_curve_widget(GtkWidget *curve)
     /* If parameter have KF set the points or set the initial curve */
     if( blob && blen > 0 )
     {
-        p = set_points_in_curve_ext( curve, blob,id,i, &lo,&hi, &curve_type,&status );
+        p = set_points_in_curve_ext( curve, blob,id,i, &curve_type,&status );
         if( p >= 0 )
         {
             info->uc.selected_parameter_id = p;

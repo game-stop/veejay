@@ -26,7 +26,7 @@
 #include "gtk3curve.h"
 
 int is_curve_empty();
-int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int fx_entry, int *lo, int *hi, int *ct, int *status);
+int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int fx_entry, int *ct, int *status);
 void	set_points_in_curve( Gtk3CurveType type, GtkWidget *curve);
 void	reset_curve( GtkWidget *curve );
 void	get_points_from_curve( GtkWidget *curve, int len, float *v );
