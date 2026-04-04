@@ -5180,40 +5180,6 @@ gboolean view_fx_selection_func (GtkTreeSelection *selection,
     return TRUE; /* allow selection state to change */
 }
 
-static guint effectlist_add_mask = 0;
-static const guint FXLIST_ADD_DISABLED = 1 << 1;
-static const guint FXLIST_ADD_TO_SELECTED = 1 << 2;
-
-gboolean on_effectlist_row_key_pressed (GtkWidget *widget, GdkEventKey *event, gpointer user_data)
-{
-    if(event->type & GDK_KEY_PRESS){
-        switch(event->keyval){
-            case GDK_KEY_Shift_L:
-                effectlist_add_mask |= FXLIST_ADD_DISABLED;
-                break;
-            case GDK_KEY_Control_L:
-                effectlist_add_mask |= FXLIST_ADD_TO_SELECTED;
-                break;
-        }
-    }
-    return FALSE;
-}
-
-gboolean on_effectlist_row_key_released (GtkWidget *widget, GdkEventKey  *event, gpointer   user_data)
-{
-    if(event->type & GDK_KEY_RELEASE){
-        switch(event->keyval){
-            case GDK_KEY_Shift_L:
-                effectlist_add_mask &= !(FXLIST_ADD_DISABLED);
-                break;
-            case GDK_KEY_Control_L:
-                effectlist_add_mask &= !(FXLIST_ADD_TO_SELECTED);
-                break;
-        }
-    }
-    return FALSE;
-}
-
 void on_effectlist_row_activated(GtkTreeView *treeview,
                                  GtkTreePath *path,
                                  GtkTreeViewColumn *col,
@@ -5228,16 +5194,33 @@ void on_effectlist_row_activated(GtkTreeView *treeview,
         gchar *name = NULL;
         gtk_tree_model_get(model,&iter, FX_STRING, &name, -1);
         if(vevo_property_get( fx_list_, name, 0, &gid ) == 0 ) {
+            GdkModifierType state = 0;
+
+            GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(treeview));
+            if (window) {
+                gdk_window_get_device_position(
+                    window,
+                    gdk_seat_get_pointer(
+                        gdk_display_get_default_seat(
+                            gdk_display_get_default())),
+                    NULL, NULL,
+                    &state
+                );
+            }
+
+            gboolean shift_pressed = (state & GDK_SHIFT_MASK);
+            gboolean ctrl_pressed  = (state & GDK_CONTROL_MASK);
+
             guint slot = 0;
             
-            if((effectlist_add_mask & FXLIST_ADD_TO_SELECTED) && info->selection_slot)
+            if (ctrl_pressed && info->selection_slot)
                 slot = info->selection_slot->sample_id;
 
             multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d %d",
-                slot, info->uc.selected_chain_entry,gid, !(effectlist_add_mask & FXLIST_ADD_DISABLED) );
+                slot, info->uc.selected_chain_entry,gid, !shift_pressed);
             
             char trip[100];
-            snprintf(trip,sizeof(trip), "%03d:%d %d %d %d;", VIMS_CHAIN_ENTRY_SET_EFFECT,slot,info->uc.selected_chain_entry, gid, !(effectlist_add_mask & FXLIST_ADD_DISABLED) );
+            snprintf(trip,sizeof(trip), "%03d:%d %d %d %d;", VIMS_CHAIN_ENTRY_SET_EFFECT,slot,info->uc.selected_chain_entry, gid, !shift_pressed );
             vj_midi_learning_vims( info->midi, NULL, trip, 0 );
             
             info->uc.reload_hint[HINT_CHAIN] = 1;
@@ -5391,9 +5374,6 @@ void setup_effectlist_info(void)
         GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(trees[i]));
         gtk_tree_selection_set_select_function(selection, view_fx_selection_func, NULL, NULL);
         gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
-
-        g_signal_connect( G_OBJECT(trees[i]), "key_press_event", G_CALLBACK( on_effectlist_row_key_pressed ), NULL );
-        g_signal_connect( G_OBJECT(trees[i]), "key-release-event", G_CALLBACK( on_effectlist_row_key_released ), NULL );
     }
 
     GtkWidget *entry_filterfx = glade_xml_get_widget_( info->main_window, "filter_effects");
