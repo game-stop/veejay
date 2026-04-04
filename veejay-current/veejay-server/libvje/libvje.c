@@ -137,7 +137,7 @@ static struct {
     { overclock_init,overclock_malloc,overclock_free,NULL,NULL,overclock_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_OVERCLOCK },
     { opacitythreshold_init,opacitythreshold_malloc,opacitythreshold_free,NULL,NULL,NULL,opacitythreshold_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_THRESHOLDSMOOTH },
     { opacity_init,NULL,NULL,NULL,NULL,NULL,opacity_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_OPACITY },
-    { opacityadv_init,NULL,NULL,NULL,NULL,NULL,opacityadv_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_THRESHOLD },
+    { opacityadv_init,opacityadv_malloc,opacityadv_free,NULL,NULL,NULL,opacityadv_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_THRESHOLD },
     { noisepencil_init,noisepencil_malloc,noisepencil_free,NULL,NULL,noisepencil_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_NOISEPENCIL },
     { noiseadd_init,noiseadd_malloc,noiseadd_free,NULL,NULL,noiseadd_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_NOISEADD },
     { nervous_init,nervous_malloc,nervous_free,NULL,NULL,nervous_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_NERVOUS },

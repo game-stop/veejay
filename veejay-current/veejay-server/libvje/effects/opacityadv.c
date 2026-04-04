@@ -38,8 +38,8 @@ vj_effect *opacityadv_init(int w, int h)
     ve->defaults[0] = 150;
     ve->defaults[1] = 40;
     ve->defaults[2] = 176;
-    ve->parallel = 1;
-	ve->description = "Overlay by Threshold Range";
+    ve->parallel = 0;
+	ve->description = "Soft-Edge Luma Key";
     ve->sub_format = 1;
     ve->extra_frame = 1;
 	ve->has_user =0;
@@ -47,47 +47,67 @@ vj_effect *opacityadv_init(int w, int h)
     return ve;
 }
 
-void opacityadv_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
-    int opacity = args[0];
-    int threshold = args[1];
-    int threshold2 = args[2];
+typedef struct {
+	int n_threads;
+} opacityadv_t;
 
-    unsigned int x, y;
-	const unsigned int width = frame->width;
-	const int len = frame->len;
-    uint8_t a1, a2;
-    unsigned int op0, op1;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
- 	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
+void *opacityadv_malloc(int w, int h) {
+	opacityadv_t *opa = (opacityadv_t*) vj_malloc(sizeof(opacityadv_t));
+	if(!opa)
+		return NULL;
+	opa->n_threads = vje_advise_num_threads( w * h );
+	return (void*) opa;
+}
 
-    op1 = (opacity > 255) ? 255 : opacity;
-    op0 = 255 - op1;
-
-    for (y = 0; y < len; y += width) {
-	for (x = 0; x < width; x++) {
-	    a1 = Y[x + y];
-	    a2 = Y2[x + y];
-	    /*
-	       if(a2 > a1) {
-	       d = abs(a2-a1);
-	       if (d > threshold && d < threshold2) {
-	       Y[x+y] = (op0 * a1 + op1 * a2 )/255;
-	       Cb[x+y] = (op0 * Cb[x+y] + op1 * Cb2[x+y])/255;
-	       Cr[x+y] = (op0 * Cr[x+y] + op1 * Cr2[x+y])/255;
-	       }
-	       } */
-	    if (a1 >= threshold && a1 <= threshold2) {
-		Y[x + y] = (op0 * a1 + op1 * a2) >> 8;
-
-		Cb[x + y] =
-		    (op0 * Cb[x + y] + op1 * Cb2[x + y]) >> 8;
-		Cr[x + y] =
-		    (op0 * Cr[x + y] + op1 * Cr2[x + y]) >> 8;
-	    }
+void opacityadv_free(void *ptr) {
+	opacityadv_t *opa = (opacityadv_t*) ptr;
+	if(opa) {
+		free(opa);
 	}
+}
+
+void opacityadv_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+
+	opacityadv_t *opa = (opacityadv_t*) ptr;
+
+    const int opacity = args[0];
+    const int tmin    = args[1];
+    const int tmax    = args[2];
+    const int width   = frame->width;
+    const int height  = frame->height;
+    const int len     = width * height;
+
+    uint8_t *Y1 = frame->data[0],  *Y2 = frame2->data[0];
+    uint8_t *U1 = frame->data[1],  *U2 = frame2->data[1];
+    uint8_t *V1 = frame->data[2],  *V2 = frame2->data[2];
+
+    const int global_weight = (opacity > 255) ? 256 : opacity;
+
+    #pragma omp parallel num_threads(opa->n_threads)
+    {
+        #pragma omp for schedule(static)
+        for (int i = 0; i < len; i++) {
+            int y_val = Y1[i];
+            int local_mask = 0;
+
+            if (y_val >= tmin && y_val <= tmax) {
+                local_mask = 256;
+            }
+            else if (y_val > tmin - 4 && y_val < tmin) {
+                local_mask = (y_val - (tmin - 4)) << 6;
+            }
+            else if (y_val > tmax && y_val < tmax + 4) {
+                local_mask = ((tmax + 4) - y_val) << 6;
+            }
+
+            int final_w2 = (local_mask * global_weight) >> 8;
+            int final_w1 = 256 - final_w2;
+
+            if (final_w2 > 0) {
+                Y1[i] = (final_w1 * Y1[i] + final_w2 * Y2[i] + 128) >> 8;
+                U1[i] = (final_w1 * U1[i] + final_w2 * U2[i] + 128) >> 8;
+                V1[i] = (final_w1 * V1[i] + final_w2 * V2[i] + 128) >> 8;
+            }
+        }
     }
 }
