@@ -660,10 +660,11 @@ void veejay_busy(veejay_t * info)
 
     veejay_msg(VEEJAY_MSG_DEBUG, "Waiting for threads to finish...");
     
-    safe_join(&settings->audio_playback_thread, "Audio playback");
+
     safe_join(&settings->renderer_thread, "Renderer");
     safe_join(&settings->producer_thread, "Producer");
-    
+    safe_join(&settings->audio_playback_thread, "Audio playback");
+
     veejay_msg(VEEJAY_MSG_INFO, "Playback engine terminated.");
 }
 
@@ -1969,7 +1970,7 @@ void *veejay_display_renderer_thread(void *arg)
 	pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
 
 
 /*
@@ -2009,7 +2010,13 @@ void *veejay_display_renderer_thread(void *arg)
 	while (atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
 
 		VJFrame *frame = veejay_video_queue_get_frame(info);
-		if (!frame) break;
+		//if (!frame) break;
+		if (atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP) {
+            if (frame) video_queue_return_frame(info, frame);
+            break;
+        }
+
+        if (!frame) continue;
 
 		if (frame->frame_num < 0) {
 			video_queue_return_frame(info, frame);
