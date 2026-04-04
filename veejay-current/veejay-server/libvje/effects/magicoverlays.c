@@ -154,8 +154,7 @@ void overlaymagic_divide(VJFrame *frame, VJFrame *frame2 )
 		c = 255 - Y2[i];
 		if (c == 0)
 			c = 1;
-		a = b / c;
-		Y[i] = a;
+		Y[i] = b / c;
 	}
 }
 
@@ -168,7 +167,7 @@ void overlaymagic_additive(VJFrame *frame, VJFrame *frame2 )
 #pragma omp simd
 	for( i = 0; i < len ; i ++ )
 	{
-		Y[len] = CLAMP_Y(Y[i] + (2 * Y2[i]) - 255);
+		Y[i] = CLAMP_Y(Y[i] + (2 * Y2[i]) - 255);
 	}
 }
 
@@ -198,20 +197,13 @@ void overlaymagic_softburn(VJFrame *frame, VJFrame *frame2 )
 		a = Y[i];
 		b = Y2[i];
 
-		if ( (a + b) <= pixel_Y_hi_)
-		{
-			if (a == pixel_Y_hi_)
-			c = a;
-			else
-			c = (b >> 7) / (256 - a);
-		} else
-		{
-			if (b <= pixel_Y_lo_)
-			{
-				b = 255;
-			}
-			c = 255 - (((255 - a) >> 7) / b);
-		}
+		if ((a + b) <= 255) {
+            c = (a == 255) ? a : (b << 7) / (256 - a);
+        } else {
+            int divisor = b;
+            if (divisor == 0) divisor = 1;
+            c = 255 - (((255 - a) << 7) / divisor);
+        }
 		Y[i] = c;
 	}
 }
