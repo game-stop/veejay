@@ -24,308 +24,145 @@
 
 vj_effect *lumakey_init(int width, int height)
 {
-	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-	ve->num_params = 5;
-	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-	ve->limits[0][0] = 0;	/* feather */
-	ve->limits[1][0] = 255;
-	ve->limits[0][1] = 0;	/* threshold min */
-	ve->limits[1][1] = 255;
-	ve->limits[0][2] = 0;	/* threshold max */
-	ve->limits[1][2] = 255;
-	ve->limits[0][3] = 1;	/* distance */
-	ve->limits[1][3] = width;
-	ve->limits[0][4] = 0;	/* type */
-	ve->limits[1][4] = 2;
-	ve->defaults[0] = 255;
-	ve->defaults[1] = 150;
-	ve->defaults[2] = 200;
-	ve->defaults[3] = 1;
-	ve->defaults[4] = 1;
-	ve->description = "Luma Key";
-	ve->extra_frame = 1;
-	ve->sub_format = 1;
-	ve->has_user = 0;
-	ve->param_description = vje_build_param_list(ve->num_params, "Feather", "Min Threshold","Max Threshold","Distance", "Mode" );
-	ve->hints = vje_init_value_hint_list( ve->num_params );
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    ve->num_params = 5;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][4], 4,"Simple", "White", "Smooth" );
-
+    ve->limits[0][0] = 0;
+    ve->limits[1][0] = 255;
+    ve->limits[0][1] = 0;
+    ve->limits[1][1] = 255;
+    ve->limits[0][2] = 0;
+    ve->limits[1][2] = 255;
+    ve->limits[0][3] = 0;
+    ve->limits[1][3] = 255;
+    ve->limits[0][4] = 0;
+    ve->limits[1][4] = 1;
+    ve->defaults[0] = 255;
+    ve->defaults[1] = 0;
+    ve->defaults[2] = 50;
+    ve->defaults[3] = 20;
+    ve->defaults[4] = 0;
+    ve->description = "Luma Key Mixer";
+    ve->extra_frame = 1;
+    ve->sub_format = 1;
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Luma Min", "Luma Max", "Softness", "Invert");
+    ve->hints = vje_init_value_hint_list( ve->num_params );
 
 
-	return ve;
+    return ve;
 }
 
-static void lumakey_simple(uint8_t *yuv1[3], uint8_t *yuv2[3], int width,
-                           int height, int threshold, int threshold2, int opacity)
+typedef struct {
+	int n_threads;
+} lumakey_t;
+
+void *lumakey_malloc(int w, int h ) {
+	lumakey_t *lk = (lumakey_t*) vj_malloc(sizeof(lumakey_t));
+	if(!lk) return NULL;
+	lk->n_threads = vje_advise_num_threads(w * h);
+	return (void*) lk;
+}
+
+void lumakey_free(void *ptr) {
+	lumakey_t *lk = (lumakey_t*) ptr;
+	if(lk) {
+		free(lk);
+	}
+}
+
+static inline void lumakey_process(lumakey_t *lk, uint8_t *yuv1[3], uint8_t *yuv2[3], int width, int height,
+                            int opacity, int luma_min, int luma_max, int softness, int invert)
 {
     const unsigned int len = width * height;
-    unsigned int op1 = (opacity > 255) ? 255 : opacity;
-    unsigned int op0 = 255 - op1;
 
-    uint8_t *Y1  = yuv1[0];
-    uint8_t *Cb1 = yuv1[1];
-    uint8_t *Cr1 = yuv1[2];
+    uint8_t *restrict Y1  = yuv1[0];
+    uint8_t *restrict Cb1 = yuv1[1];
+    uint8_t *restrict Cr1 = yuv1[2];
 
-    uint8_t *Y2  = yuv2[0];
-    uint8_t *Cb2 = yuv2[1];
-    uint8_t *Cr2 = yuv2[2];
+    uint8_t *restrict Y2  = yuv2[0];
+    uint8_t *restrict Cb2 = yuv2[1];
+    uint8_t *restrict Cr2 = yuv2[2];
 
-#pragma omp simd
+	int alpha_lut[256];
+
+    const float inv_soft = (softness > 0) ? 255.0f / (float)softness : 0.0f;
+    const float op_scale = (float)opacity / 255.0f;
+
+	if(invert) {
+		for (int i = 0; i < 256; i++) {
+			int a;
+
+			if (i >= luma_min && i <= luma_max) {
+				a = 0;
+			}
+			else if (softness > 0 && i >= (luma_min - softness) && i < luma_min) {
+				a = 255 - (int)((i - (luma_min - softness)) * inv_soft);
+			}
+			else if (softness > 0 && i > luma_max && i <= (luma_max + softness)) {
+				a = (int)((i - luma_max) * inv_soft);
+			}
+			else {
+				a = 255;
+			}
+
+			if (a < 0) a = 0;
+			if (a > 255) a = 255;
+
+			a = 255 - a;
+
+			alpha_lut[i] = (int)(a * op_scale);
+		}
+	}
+	else {
+		for (int i = 0; i < 256; i++) {
+			int a;
+
+			if (i >= luma_min && i <= luma_max) {
+				a = 0;
+			}
+			else if (softness > 0 && i >= (luma_min - softness) && i < luma_min) {
+				a = 255 - (int)((i - (luma_min - softness)) * inv_soft);
+			}
+			else if (softness > 0 && i > luma_max && i <= (luma_max + softness)) {
+				a = (int)((i - luma_max) * inv_soft);
+			}
+			else {
+				a = 255;
+			}
+
+			if (a < 0) a = 0;
+			if (a > 255) a = 255;
+
+			alpha_lut[i] = (int)(a * op_scale);
+		}
+	}
+
+#pragma omp parallel for simd schedule(static) num_threads(lk->n_threads)
     for (unsigned int pos = 0; pos < len; pos++) {
-        uint8_t a1 = Y1[pos];
-        uint8_t a2 = Y2[pos];
+        uint8_t y_val = Y1[pos];
 
-        int mask = -((a1 - threshold) >> 31 ^ ((threshold2 - a1) >> 31 ^ 1));
+        uint16_t alpha = alpha_lut[y_val];
+        uint16_t inv_alpha = 256 - alpha;
 
-        // branchless blend
-        uint8_t Y  = (uint8_t)(((op0 * a1 + op1 * a2) & mask) | (a1 & ~mask));
-        uint8_t Cb = (uint8_t)(((op0 * Cb1[pos] + op1 * Cb2[pos]) & mask) | (Cb1[pos] & ~mask));
-        uint8_t Cr = (uint8_t)(((op0 * Cr1[pos] + op1 * Cr2[pos]) & mask) | (Cr1[pos] & ~mask));
-
-        Y1[pos]  = Y;
-        Cb1[pos] = Cb;
-        Cr1[pos] = Cr;
+        Y1[pos]  = (uint8_t)((Y1[pos]  * alpha + Y2[pos]  * inv_alpha) >> 8);
+        Cb1[pos] = (uint8_t)((Cb1[pos] * alpha + Cb2[pos] * inv_alpha) >> 8);
+        Cr1[pos] = (uint8_t)((Cr1[pos] * alpha + Cr2[pos] * inv_alpha) >> 8);
     }
 }
 
-static void lumakey_smooth(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
-			int height, int threshold, int threshold2, int opacity,
-			int distance)
+void lumakey_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args )
 {
+	lumakey_t *lk = (lumakey_t*) ptr;
 
-	unsigned int x, y = 0, len = width * height;
-	uint8_t a1, a2;
-	unsigned int op0, op1;
-	uint8_t Y, Cb, Cr;
- //   unsigned int soft0, soft1;
-	unsigned int t2, t3;
-	uint8_t p1, p2;
-	op1 = (opacity > 255) ? 255 : opacity;
-	op0 = 255 - op1;
+    int opacity   = args[0];
+    int luma_min  = args[1];
+    int luma_max  = args[2];
+    int softness  = args[3];
+    int invert    = args[4];
 
-//	  soft0 = 255 / distance;
-//	  soft1 = 255 - soft0;
-
-	t2 = threshold - distance;	// 0 - 4
-	t3 = threshold2 + distance;	// 3 + 4
-
-	/* first row */
-
-	if (t2 < 0)
-	t2 = 0;
-	if (t3 > 255)
-	t3 = 255;
-
-	for (x = 0; x < width; x++)
-	{
-		a1 = yuv1[0][x];
-		a2 = yuv2[0][x];
-		if (a1 >= threshold && a1 <= threshold2)
-		{
-			Y = (op0 * a1 + op1 * a2) >> 8;
-			Cb = (op0 * yuv1[1][x] + op1 * yuv2[1][x]) >> 8;
-			Cr = (op0 * yuv1[2][x] + op1 * yuv2[2][x]) >> 8;
-
-			yuv1[0][x] = Y;		//< 16 ? 16 : Y > 235 ? 235 : Y;
-			yuv1[1][x] = Cb;	// < 16 ? 16 : Cb > 240 ? 240 : Cb;
-			yuv1[2][x] = Cr;	// < 16 ? 16 : Cr > 240 ? 240 : Cr;
-		}
-	}
-
-	for (y = width; y < len - width; y += width)
-	{
-		/* first pixel in column */
-		a1 = yuv1[0][y];
-		a2 = yuv2[0][y];
-		if (a1 >= threshold && a1 <= threshold2)
-		{
-			Y = (op0 * a1 + op1 * a2)  >> 8;
-			Cb = (op0 * yuv1[1][y] + op1 * yuv2[1][y]) >> 8;
-			Cr = (op0 * yuv1[2][y] + op1 * yuv2[2][y]) >> 8;
-		}
-		/* rest of pixels in column */
-		for (x = 1; x < width - 1; x++)
-		{
-			a1 = yuv1[0][x + y];
-			a2 = yuv2[0][x + y];
-
-			if ((a1 >= t2 && a1 < threshold) || (a1 > threshold2 && a1 <= t3))
-			{
-				/* special case */
-				p1 = (		/* calculate mean of a1 */
-				 yuv1[0][y - width + x - 1] +
-				 yuv1[0][y - width + x + 1] +
-				 yuv1[0][y - width + x] +
-				 yuv1[0][y + x] +
-				 yuv1[0][y + x - 1] +
-				 yuv1[0][y + x + 1] +
-				 yuv1[0][y + width + x] +
-				 yuv1[0][y + width + x + 1] +
-				 yuv1[0][y + width + x - 1]
-				) / 9;
-			p2 = (		/* calculate mean of a1 */
-				 yuv2[0][y - width + x - 1] +
-				 yuv2[0][y - width + x + 1] +
-				 yuv2[0][y - width + x] +
-				 yuv2[0][y + x] +
-				 yuv2[0][y + x - 1] +
-				 yuv2[0][y + x + 1] +
-				 yuv2[0][y + width + x] +
-				 yuv2[0][y + width + x + 1] +
-				 yuv2[0][y + width + x - 1]
-				) / 9;
-
-			yuv1[0][x + y] = (op0 * p1 + op1 * p2)	>> 8;
-			yuv1[1][x + y] = (op0 * yuv1[1][x + y] + op1 * yuv2[1][x + y])  >> 8;
-			yuv1[2][x + y] = (op0 * yuv1[2][x + y] + op1 * yuv2[2][x + y])  >> 8;
-
-			} 
-			else
-			{
-				if (a1 >= threshold && a1 <= threshold2)
-				{
-					Y = (op0 * a1 + op1 * a2)  >> 8;
-					Cb = (op0 * yuv1[1][x + y] + op1 * yuv2[1][x + y])  >> 8;
-					Cr = (op0 * yuv1[2][x + y] + op1 * yuv2[2][x + y])  >> 8;
-	
-					yuv1[0][x + y] = Y;		// < 16 ? 16 : Y > 235 ? 235 : Y;
-					yuv1[1][x + y] = Cb;	// < 16 ? 16 : Cb > 240 ? 240 : Cb;
-					yuv1[2][x + y] = Cr;	// < 16 ? 16 : Cr > 240 ? 240 : Cr;
-				}
-			}
-		}
-	}
-
-	/* last row */
-	for (x = len - width; x < len; x++)
-	{
-		a1 = yuv1[0][x];
-		a2 = yuv2[0][x];
-		if (a1 >= threshold && a1 <= threshold2)
-		{
-			Y = (op0 * a1 + op1 * a2) >> 8;
-			Cb = (op0 * yuv1[1][x] + op1 * yuv2[1][x]) >> 8;
-			Cr = (op0 * yuv1[2][x] + op1 * yuv2[2][x]) >> 8;
-	
-			yuv1[0][x] = Y;		// < 16 ? 16 : Y > 235 ? 235 : Y;
-			yuv1[1][x] = Cb;	// < 16 ? 16 : Cb > 240 ? 240 : Cb;
-			yuv1[2][x] = Cr;	// < 16 ? 16 : Cr > 240 ? 240 : Cr;
-		}
-	}
-
-}
-
-static void lumakey_smooth_white(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
-			  int height, int threshold, int threshold2,
-			  int opacity, int distance)
-{
-
-	unsigned int x, y = 0, len = width * height;
-	uint8_t a1, a2;
-	unsigned int op0, op1;
-	uint8_t Y, Cb, Cr;
-//	  unsigned int soft0, soft1;
-	unsigned int t2, t3;
-	op1 = (opacity > 255) ? 255 : opacity;
-	op0 = 255 - op1;
-
-//	  soft0 = 255 / distance;
-//	  soft1 = 255 - soft0;
-
-	t2 = threshold - distance;
-	t3 = threshold2 + distance;
-
-	/* first row */
-
-	for (x = 0; x < width; x++) {
-	a1 = yuv1[0][x];
-	a2 = yuv2[0][x];
-	if (a1 >= threshold && a1 <= threshold2) {
-		Y = (op0 * a1 + op1 * a2) >> 8;
-		Cb = (op0 * yuv1[1][x] + op1 * yuv2[1][x])	>> 8;
-		Cr = (op0 * yuv1[2][x] + op1 * yuv2[2][x])	>> 8;
-
-		yuv1[0][x] = Y;	// < 16 ? 16 : Y > 235 ? 235 : Y;
-		yuv1[1][x] = Cb;	// < 16 ? 16 : Cb > 240 ? 240 : Cb;
-		yuv1[2][x] = Cr;	// < 16 ? 16 : Cr > 240 ? 240 : Cr;
-	}
-	}
-
-	for (y = width; y < len - width; y += width) {
-	/* first pixel in column */
-	a1 = yuv1[0][y];
-	a2 = yuv2[0][y];
-	if (a1 >= threshold && a1 <= threshold2) {
-		Y = (op0 * a1 + op1 * a2)  >> 8;
-		Cb = (op0 * yuv1[1][y] + op1 * yuv2[1][y]) >> 8;
-		Cr = (op0 * yuv1[2][y] + op1 * yuv2[2][y])	>> 8;
-	}
-	/* rest of pixels in column */
-	/* rest of pixels in column */
-	for (x = 1; x < width - 1; x++) {
-		a1 = yuv1[0][x + y];
-		a2 = yuv2[0][x + y];
-
-		if ((a1 >= t2 && a1 < threshold)
-		|| (a1 > threshold2 && a1 <= t3)) {
-		/* special case */
-		yuv1[0][x + y] = pixel_Y_hi_;
-		yuv1[1][x + y] = 128;
-		yuv1[2][x + y] = 128;
-		} else {
-		if (a1 >= threshold && a1 <= threshold2) {
-			Y = (op0 * a1 + op1 * a2) >> 8;
-			Cb = (op0 * yuv1[1][x + y] +
-			  op1 * yuv2[1][x + y])  >> 8;
-			Cr = (op0 * yuv1[2][x + y] +
-			  op1 * yuv2[2][x + y])  >> 8;
-
-			yuv1[0][x + y] = Y;		// < 16 ? 16 : Y > 235 ? 235 : Y;
-			yuv1[1][x + y] = Cb;	// < 16 ? 16 : Cb > 240 ? 240 : Cb;
-			yuv1[2][x + y] = Cr;	// < 16 ? 16 : Cr > 240 ? 240 : Cr;
-		}
-		}
-	}
-	}
-	/* last row */
-	for (x = len - width; x < len; x++) {
-	a1 = yuv1[0][x];
-	a2 = yuv2[0][x];
-	if (a1 >= threshold && a1 <= threshold2) {
-		Y = (op0 * a1 + op1 * a2)  >> 8;
-		Cb = (op0 * yuv1[1][x] + op1 * yuv2[1][x])	>> 8;
-		Cr = (op0 * yuv1[2][x] + op1 * yuv2[2][x])	>> 8;
-
-		yuv1[0][x] = Y;	// < 16 ? 16 : Y > 235 ? 235 : Y;
-		yuv1[1][x] = Cb;	// < 16 ? 16 : Cb > 240 ? 240 : Cb;
-		yuv1[2][x] = Cr;	// < 16 ? 16 : Cr > 240 ? 240 : Cr;
-	}
-	}
-}
-
-void lumakey_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
-    int type = args[0];
-    int threshold = args[1];
-    int threshold2 = args[2];
-    int feather = args[3];
-    int d = args[4];
-
-	switch(type)
-	{
-		case 0:
-			/* normal overlay */
-			lumakey_simple(frame->data, frame2->data, frame->width, frame->height, threshold, threshold2,feather);
-			break;
-		case 1:
-			/* threshold */
-			lumakey_smooth_white(frame->data, frame2->data, frame->width, frame->height, threshold,threshold2, feather,d);
-			break;
-		case 2:
-			lumakey_smooth(frame->data, frame2->data, frame->width, frame->height, threshold, threshold2,feather, d);
-			break;
-	}
-
+    lumakey_process(lk, frame->data, frame2->data, frame->width, frame->height,opacity, luma_min, luma_max, softness, invert);
 }

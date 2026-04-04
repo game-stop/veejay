@@ -196,7 +196,7 @@ static struct {
     { overlaymagicalpha_init,NULL,NULL,NULL,NULL,NULL,overlaymagicalpha_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_MAGICOVERLAYALPHA },
     { lumamask_init,lumamask_malloc,lumamask_free,NULL,NULL,NULL,lumamask_apply,NULL,lumamask_requests_fx, lumamask_set_motionmap, VJ_VIDEO_EFFECT_LUMAMASK },
     { lumamagick_init,NULL,NULL,NULL,NULL,NULL,lumamagick_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMAMAGICK },
-    { lumakey_init,NULL,NULL,NULL,NULL,NULL,lumakey_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMAKEY },
+    { lumakey_init,lumakey_malloc,lumakey_free,NULL,NULL,NULL,lumakey_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMAKEY },
     { lumakeyalpha_init, NULL,NULL,NULL,NULL,NULL,lumakeyalpha_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMAKEYALPHA },
     { lumablend_init, NULL,NULL,NULL,NULL,NULL, lumablend_apply, NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMABLEND },
     { levelcorrection_init,NULL,NULL,NULL,NULL,levelcorrection_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_LEVELCORRECTION },
