@@ -41,7 +41,7 @@ vj_effect *opacitythreshold_init(int w, int h)
     ve->defaults[0] = 180;
     ve->defaults[1] = 50;
     ve->defaults[2] = 255;
-    ve->description = "Threshold blur with overlay";
+    ve->description = "Soft Luma Key (edge smoothing)";
     ve->sub_format = 1;
     ve->extra_frame = 1;
 	ve->has_user = 0;
@@ -51,6 +51,7 @@ vj_effect *opacitythreshold_init(int w, int h)
 
 typedef struct {
 	uint16_t *hblur;
+    int n_threads;
 } op_thres_t;
 
 void *opacitythreshold_malloc(int w, int h) {
@@ -74,64 +75,73 @@ void opacitythreshold_free(void *ptr) {
 	}
 }
 
+static inline uint8_t mix8(uint8_t a, uint8_t b, int w)
+{
+    return (uint8_t)((w * a + (256 - w) * b + 128) >> 8);
+}
+
 void opacitythreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     const int opacity   = args[0];
-    const int threshold = args[1];
+    const int tmin      = args[1];
     const int tmax      = args[2];
 
-    const int width  = frame->width;
-    const int height = frame->height;
+    const int w = frame->width;
+    const int h = frame->height;
 
-    const unsigned int op1 = (opacity > 255) ? 255 : opacity;
-    const unsigned int op0 = 255 - op1;
+    uint8_t *Y   = frame->data[0];
+    uint8_t *Cb  = frame->data[1];
+    uint8_t *Cr  = frame->data[2];
 
-    uint8_t *restrict Y   = frame->data[0];
-    uint8_t *restrict Cb  = frame->data[1];
-    uint8_t *restrict Cr  = frame->data[2];
+    uint8_t *Y2  = frame2->data[0];
+    uint8_t *Cb2 = frame2->data[1];
+    uint8_t *Cr2 = frame2->data[2];
 
-    uint8_t *restrict Y2  = frame2->data[0];
-    uint8_t *restrict Cb2 = frame2->data[1];
-    uint8_t *restrict Cr2 = frame2->data[2];
+    op_thres_t *opt = (op_thres_t*) ptr;
+    uint16_t *tmp = opt->hblur;
 
-    const int inv9 = 7282;
+    const int t_diff = (tmax > tmin) ? (tmax - tmin) : 1;
 
-	op_thres_t *opt = (op_thres_t*) ptr;
-
-    uint16_t *hblur = opt->hblur;
-
-    for (int y = 0; y < height; y++)
+    #pragma omp parallel num_threads(opt->n_threads)
     {
-        int row = y * width;
-
-        hblur[row + 0] = Y[row + 0] + Y[row + 1] + Y[row + 0];
-#pragma omp simd
-        for (int x = 1; x < width - 1; x++)
+        #pragma omp for schedule(static)
+        for (int y = 0; y < h; y++)
         {
-            hblur[row + x] = Y[row + x - 1] + Y[row + x] + Y[row + x + 1];
+            int row = y * w;
+            tmp[row] = (Y[row] + (Y[row] << 1) + Y[row + 1]) >> 2;
+
+            for (int x = 1; x < w - 1; x++)
+            {
+                tmp[row + x] = (Y[row + x - 1] + (Y[row + x] << 1) + Y[row + x + 1]) >> 2;
+            }
+
+            tmp[row + w - 1] = (Y[row + w - 2] + (Y[row + w - 1] << 1) + Y[row + w - 1]) >> 2;
         }
 
-        hblur[row + width - 1] = Y[row + width - 2] + Y[row + width - 1] + Y[row + width - 1];
-    }
-
-
-    for (int y = 1; y < height - 1; y++)
-    {
-        int row = y * width;
-        int row_up    = (y - 1) * width;
-        int row_down  = (y + 1) * width;
-
-#pragma omp simd
-        for (int x = 1; x < width - 1; x++)
+        #pragma omp for schedule(static)
+        for (int y = 1; y < h - 1; y++)
         {
-            int sum = hblur[row_up + x] + hblur[row + x] + hblur[row_down + x];
-            int blur = (sum * inv9) >> 16;
+            int row = y * w;
+            int up  = (y - 1) * w;
+            int dn  = (y + 1) * w;
 
-            if (blur < threshold || blur > tmax)
+            for (int x = 1; x < w - 1; x++)
             {
-                Y[row + x]  = (op0 * blur + op1 * Y2[row + x]) >> 8;
-                Cb[row + x] = (op0 * Cb[row + x] + op1 * Cb2[row + x]) >> 8;
-                Cr[row + x] = (op0 * Cr[row + x] + op1 * Cr2[row + x]) >> 8;
+                int blur = (tmp[up + x] + (tmp[row + x] << 1) + tmp[dn + x]) >> 2;
+                int mask = 0;
+                if (blur <= tmin)
+                    mask = 0;
+                else if (blur >= tmax)
+                    mask = 256;
+                else
+                    mask = ((blur - tmin) * 256) / t_diff;
+
+                mask = (mask * mask) >> 8;
+                int inv = 256 - mask;
+
+                Y[row + x] = (inv * Y[row + x] + mask * Y2[row + x] + 128) >> 8;
+                Cb[row + x] = (inv * Cb[row + x] + mask * Cb2[row + x] + 128) >> 8;
+                Cr[row + x] = (inv * Cr[row + x] + mask * Cr2[row + x] + 128) >> 8;
             }
         }
     }
