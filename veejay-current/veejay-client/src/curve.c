@@ -147,9 +147,9 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
 {
     int min=0, max=0;
     _effect_get_minmax(fx_id, &min, &max, parameter_id );
-    int veclen = -1;
+    int veclen1 = -1;
     int i,k;
-    float j, rx, ry, dx, dy, min_x, delta_x, complement;
+    float j, rx, ry, dx, dy, min_x, delta_x;
 
     int diff = max - min;
     // only FX parameter value is normalized
@@ -162,22 +162,15 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
     if (end - start <= 1) return;
     if (steps < 1) steps = 1;
 
-    amplitude = 100;
-    complement = 100 - amplitude;
 
+    // TODO : break down this switch case and refactor
+    //        feature: enable layering to combine shapes ( for example, ramp drop + random walk smooth or burst envelope + noise)
     switch(animation)
     {
-        case FX_ANIM_SHAPE_UP:
-        case FX_ANIM_SHAPE_DOWN:
-            veclen = end - start;
-            dy = (diff) / (float)(veclen - 1);
-            dy = dy * ((float)(steps));
-            delta_x = ((end - start)/(float)steps);
-        break;
         case FX_ANIM_SHAPE_ZAGZIG:
         case FX_ANIM_SHAPE_ZIGZAG:
-            veclen = end - start;
-            dy = (diff) / (float)(veclen - 1);
+            veclen1 = end - start;
+            dy = (diff) / (float)(veclen1 - 1);
             dy = dy * ((float)(steps<<1));
             delta_x = ((end - start)/(float)steps);
         break;
@@ -191,46 +184,35 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
         case FX_ANIM_SHAPE_NOISE:
         case FX_ANIM_SHAPE_SMOOTHSTEP:
         case FX_ANIM_SHAPE_RANDOMWALK:
+        case FX_ANIM_SHAPE_RANDOMWALK_INERTIA:
+        case FX_ANIM_SHAPE_RANDOMWALK_MEAN:
+        case FX_ANIM_SHAPE_RANDOMWALK_QUANTIZED:
+        case FX_ANIM_SHAPE_RANDOMWALK_BURST:
+        case FX_ANIM_SHAPE_RANDOMWALK_SMOOTH:
         case FX_ANIM_SHAPE_GAUSSIAN:
         case FX_ANIM_SHAPE_EXPONENTIAL:
-            veclen = end - start;
+        case FX_ANIM_SHAPE_EASE_IN:
+        case FX_ANIM_SHAPE_EASE_OUT:
+        case FX_ANIM_SHAPE_STEPS:
+        case FX_ANIM_SHAPE_BURST_ENVELOPE:
+        case FX_ANIM_SHAPE_RAMP_DROP:
+            veclen1 = end - start;
             break;
         default:
-            veclen = end - start;
-            dy = (diff) / (float)(veclen - 1);
+            veclen1 = end - start;
+            dy = (diff) / (float)(veclen1 - 1);
             break;
     }
 
-    if (veclen <= 0) return;
+    if (veclen1 <= 0) return;
 
-    float   *vec = (float*) vj_calloc(sizeof(float) * veclen );
+    float   *vec = (float*) vj_calloc(sizeof(float) * veclen1 );
     if (vec == NULL) return;
+
+    int veclen = veclen1 - 1;
 
     switch(animation)
     {
-        case FX_ANIM_SHAPE_UP:
-            for(i = start, k = 0, ry = min; i < end; i ++ , ry+=dy)
-            {
-                vec[k] = ry;
-                if ( (ry + dy) > max)
-                {
-                    ry = min-dy;
-                }
-                k++;
-            }
-        break;
-        case FX_ANIM_SHAPE_DOWN:
-            dy = -dy;
-            for(i = start, k = 0, ry = max; i < end; i ++ , ry+=dy)
-            {
-                vec[k] = ry;
-                if ( (ry + dy) < min)
-                {
-                    ry = max+dy;
-                }
-                k++;
-            }
-        break;
         case FX_ANIM_SHAPE_ZIGZAG:
             for(i = start, k = 0, ry = min; i < end; i++, ry+=dy)
             {
@@ -396,6 +378,133 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
             }
         }
         break;
+        case FX_ANIM_SHAPE_RANDOMWALK_INERTIA:
+        {
+            float value = (min + max) * 0.5f;
+            float velocity = 0.0f;
+
+            float accel_scale = diff * 0.02f;
+            float damping = 0.90f;
+
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float accel = (((float)rand() / RAND_MAX) - 0.5f) * accel_scale;
+
+                velocity += accel;
+                velocity *= damping;
+
+                value += velocity;
+
+                if (value < min) {
+                    value = min;
+                    velocity *= -0.5f;
+                }
+                if (value > max) {
+                    value = max;
+                    velocity *= -0.5f;
+                }
+
+                vec[k] = value;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_RANDOMWALK_MEAN:
+        {
+            float value = (min + max) * 0.5f;
+            float mean = value;
+
+            float step_scale = diff * 0.04f;
+            float pull = 0.05f;
+
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float noise = (((float)rand() / RAND_MAX) - 0.5f) * step_scale;
+                value += noise + (mean - value) * pull;
+
+                if (value < min) value = min;
+                if (value > max) value = max;
+
+                vec[k] = value;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_RANDOMWALK_QUANTIZED:
+        {
+            float value = (min + max) * 0.5f;
+            float step_scale = diff * 0.05f;
+            int levels = 8;
+
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float step = (((float)rand() / RAND_MAX) - 0.5f) * step_scale;
+                value += step;
+
+                // quantize
+                float norm = (value - min) / diff;
+                norm = floorf(norm * levels) / (levels - 1);
+
+                value = min + norm * diff;
+
+                if (value < min) value = min;
+                if (value > max) value = max;
+
+                vec[k] = value;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_RANDOMWALK_BURST:
+        {
+            float value = (min + max) * 0.5f;
+            float small_step = diff * 0.01f;
+            float big_step   = diff * 0.8f;
+
+            int desired_bursts = steps > 0 ? steps : 3;
+            float burst_prob = (float)desired_bursts / (float)veclen;
+
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float r = (float)rand() / RAND_MAX;
+
+                float step;
+                if (r < burst_prob)
+                {
+                    // symmetric burst (up + down)
+                    step = (((float)rand() / RAND_MAX) - 0.5f) * big_step;
+                }
+                else
+                {
+                    step = (((float)rand() / RAND_MAX) - 0.5f) * small_step;
+                }
+
+                value += step;
+
+                if (value < min) value = min;
+                if (value > max) value = max;
+
+                vec[k] = value;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_RANDOMWALK_SMOOTH:
+        {
+            float value = (min + max) * 0.5f;
+            float step_scale = diff * 0.05f;
+            float smooth = 0.85f;
+
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float step = (((float)rand() / RAND_MAX) - 0.5f) * step_scale;
+                float target = value + step;
+
+                value = value * smooth + target * (1.0f - smooth);
+
+                if (value < min) value = min;
+                if (value > max) value = max;
+
+                vec[k] = value;
+            }
+        }
+        break;
         case FX_ANIM_SHAPE_GAUSSIAN:
         {
             float frequency = (float)steps;
@@ -422,6 +531,115 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
                 float t = fmodf(progress * frequency, 1.0f);
                 float expv = (expf(4.0f * t) - 1.0f) / (expf(4.0f) - 1.0f);
                 vec[k] = min + diff * expv;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_EASE_IN:
+        {
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float t = (float)(i - start) / (float)veclen;
+                float v = t * t; // quadratic ease-in
+                vec[k] = min + diff * v;
+            }
+        }
+        break;
+
+        case FX_ANIM_SHAPE_EASE_OUT:
+        {
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float t = (float)(i - start) / (float)veclen;
+                float v = 1.0f - (1.0f - t) * (1.0f - t);
+                vec[k] = min + diff * v;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_PULSE:
+        {
+            float frequency = (float)steps;
+            float duty = 0.2f; // 20% TODO: make it a parameter!
+
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float t = fmodf(((float)(i - start) / veclen) * frequency, 1.0f);
+                vec[k] = (t < duty) ? max : min;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_DAMPED_SINE:
+        {
+            float midpoint = (max + min) * 0.5f;
+            float radius = (max - min) * 0.5f;
+            float frequency = (float)steps;
+            float damping = 3.0f;
+
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float t = (float)(i - start) / (float)veclen;
+                float env = expf(-damping * t);
+                float v = sinf(2.0f * M_PI * frequency * t);
+                vec[k] = midpoint + radius * v * env;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_SMOOTH_NOISE:
+        {
+            float last = (min + max) * 0.5f;
+
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float rnd = ((float)rand() / RAND_MAX);
+                float target = min + diff * rnd;
+                last = last * 0.85f + target * 0.15f; // low-pass filter
+                vec[k] = last;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_STEPS:
+            {
+                int levels = steps > 1 ? steps : 4;
+
+                for(i = start, k = 0; i < end; i++, k++)
+                {
+                    float t = (float)(i - start) / (float)veclen;
+                    float q = floorf(t * levels) / (levels - 1);
+                    vec[k] = min + diff * q;
+                }
+            }
+        break;
+        case FX_ANIM_SHAPE_RAMP_DROP:
+        {
+            float frequency = (float)steps;
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float progress = (float)(i - start) / (float)veclen;
+                float t = fmodf(progress * frequency, 1.0f);
+                float v = (expf(4.0f * t) - 1.0f) / (expf(4.0f) - 1.0f);
+                vec[k] = min + diff * v;
+            }
+        }
+        break;
+        case FX_ANIM_SHAPE_BURST_ENVELOPE:
+        {
+            float frequency = (float)steps;
+            for(i = start, k = 0; i < end; i++, k++)
+            {
+                float progress = (float)(i - start) / (float)veclen;
+                float t = fmodf(progress * frequency, 1.0f);
+                float v;
+                if (t < 0.1f)
+                {
+                    // fast attack
+                    v = t / 0.1f;
+                }
+                else
+                {
+                    // exponential decay
+                    float d = (t - 0.1f) / 0.9f;
+                    v = expf(-5.0f * d);
+                }
+                vec[k] = min + diff * v;
             }
         }
         break;

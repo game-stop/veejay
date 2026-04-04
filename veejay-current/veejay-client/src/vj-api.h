@@ -80,10 +80,6 @@ void reloaded_restart(void);
 
 
 enum {
-  FX_ANIM_SHAPE_UP = 0,
-  FX_ANIM_SHAPE_DOWN,
-  //~ FX_ANIM_SHAPE_MONTAIN,
-  //~ FX_ANIM_SHAPE_VALLEY,
   FX_ANIM_SHAPE_ZIGZAG,
   FX_ANIM_SHAPE_ZAGZIG,
   FX_ANIM_SHAPE_SINE,
@@ -96,9 +92,22 @@ enum {
   FX_ANIM_SHAPE_NOISE,
   FX_ANIM_SHAPE_SMOOTHSTEP,
   FX_ANIM_SHAPE_RANDOMWALK,
+  FX_ANIM_SHAPE_RANDOMWALK_INERTIA,
+  FX_ANIM_SHAPE_RANDOMWALK_MEAN,
+  FX_ANIM_SHAPE_RANDOMWALK_QUANTIZED,
+  FX_ANIM_SHAPE_RANDOMWALK_BURST,
+  FX_ANIM_SHAPE_RANDOMWALK_SMOOTH,
   FX_ANIM_SHAPE_GAUSSIAN,
   FX_ANIM_SHAPE_EXPONENTIAL,
-  FX_ANIM_SHAPE_MAX
+  FX_ANIM_SHAPE_EASE_IN,
+  FX_ANIM_SHAPE_EASE_OUT,
+  FX_ANIM_SHAPE_PULSE,
+  FX_ANIM_SHAPE_DAMPED_SINE,
+  FX_ANIM_SHAPE_SMOOTH_NOISE,
+  FX_ANIM_SHAPE_STEPS,
+  FX_ANIM_SHAPE_RAMP_DROP,
+  FX_ANIM_SHAPE_BURST_ENVELOPE,
+  FX_ANIM_SHAPE_MAX // sentinel
 };
 
 static struct
@@ -107,10 +116,6 @@ static struct
     const int id;
 } fx_anim_shape_map[] =
 {
-    { "Up",                 FX_ANIM_SHAPE_UP },
-    { "Down",               FX_ANIM_SHAPE_DOWN },
-    //~ { "Montain",            FX_ANIM_SHAPE_MONTAIN },
-    //~ { "Valley",             FX_ANIM_SHAPE_VALLEY },
     { "ZigZag",             FX_ANIM_SHAPE_ZIGZAG },
     { "ZagZig",             FX_ANIM_SHAPE_ZAGZIG },
     { "Sine",               FX_ANIM_SHAPE_SINE },
@@ -123,8 +128,21 @@ static struct
     { "Noise",              FX_ANIM_SHAPE_NOISE },
     { "Smooth",             FX_ANIM_SHAPE_SMOOTHSTEP },
     { "Random Walk",        FX_ANIM_SHAPE_RANDOMWALK },
+    { "Random Inertia",     FX_ANIM_SHAPE_RANDOMWALK_INERTIA },
+    { "Random Quantized",   FX_ANIM_SHAPE_RANDOMWALK_QUANTIZED },
+    { "Random Mean",        FX_ANIM_SHAPE_RANDOMWALK_MEAN },
+    { "Random Burst",       FX_ANIM_SHAPE_RANDOMWALK_BURST },
+    { "Random Smooth",      FX_ANIM_SHAPE_RANDOMWALK_SMOOTH },
     { "Gaussian",           FX_ANIM_SHAPE_GAUSSIAN },
     { "Exponential",        FX_ANIM_SHAPE_EXPONENTIAL },
+    { "Ease In",            FX_ANIM_SHAPE_EASE_IN },
+    { "Ease Out",           FX_ANIM_SHAPE_EASE_OUT },
+    { "Pulse",              FX_ANIM_SHAPE_PULSE },
+    { "Damped Sine",        FX_ANIM_SHAPE_DAMPED_SINE },
+    { "Smooth Noise",       FX_ANIM_SHAPE_SMOOTH_NOISE },
+    { "Shape Steps",        FX_ANIM_SHAPE_STEPS },
+    { "Ramp Drop",          FX_ANIM_SHAPE_RAMP_DROP },
+    { "Burst Envelope",     FX_ANIM_SHAPE_BURST_ENVELOPE },
     { NULL, -1 },
 };
 
