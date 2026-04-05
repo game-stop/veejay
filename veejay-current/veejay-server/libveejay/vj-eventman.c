@@ -2532,7 +2532,7 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_RGB24_IMAGE]				=	_new_event(
 				"%d %d %d",	
 				VIMS_RGB24_IMAGE,
-				"GUI: Get preview image (raw RGB24)",
+				"GUI: Get preview image (raw RGB24) from the sample's starting position",
 				vj_event_get_scaled_image,
 				3,
 				VIMS_ALLOW_ANY,
