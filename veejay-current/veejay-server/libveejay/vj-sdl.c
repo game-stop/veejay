@@ -160,13 +160,11 @@ void vj_sdl_get_position( void *ptr, int *x, int *y )
 }
 
 
-static int vj_get_sdl_yuv_mode(int vjfmt)
+static int vj_get_sdl_yuv_mode(int vjfmt, int w)
 {
     const char *env = getenv("VJ_SDL_YUV_MODE");
 
-    int mode = (vj_is_full_range(vjfmt)
-        ? SDL_YUV_CONVERSION_JPEG
-        : SDL_YUV_CONVERSION_AUTOMATIC);
+    int mode = SDL_YUV_CONVERSION_AUTOMATIC;
 
     if (env && *env) {
         if (!strcasecmp(env, "jpeg")) {
@@ -330,7 +328,7 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
     vj_sdl_grab( vjsdl, 0 );
 
 #if SDL_VERSION_ATLEAST(2,0,8)
-    int sdlmode = vj_get_sdl_yuv_mode(vjfmt);
+    int sdlmode = vj_get_sdl_yuv_mode(vjfmt, vjsdl->width);
     if(sdlmode == SDL_YUV_CONVERSION_JPEG) {
         veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] SDL YUV conversion mode: JPEG (full range)");
     }
