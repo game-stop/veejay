@@ -443,9 +443,8 @@ static int set_option(const char *name, char *value)
 		max_mem_ =  atoi(optarg);
 		if(max_mem_ < 0 ) max_mem_ = 0; else if (max_mem_ > 100) max_mem_ = 100;
 		info->uc->max_cached_mem = max_mem_;
-    } else if (strcmp(name, "synchronization") == 0
-	       || strcmp(name, "c") == 0) {
-	info->sync_correction = atoi(optarg);
+    } else if (strcmp(name, "synchronization") == 0 || strcmp(name, "c") == 0) {
+		info->sync_correction = atoi(optarg);
 	} else if (strcmp(name, "version") == 0 )
 	{ printf("Veejay %s\n", VERSION); exit(0); 
     } else if (strcmp(name, "graphics-driver") == 0

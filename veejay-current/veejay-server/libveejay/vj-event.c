@@ -1790,7 +1790,7 @@ static void vj_event_format_xml_settings( veejay_t *v, xmlNodePtr node  )
     put_xml_int( node, XML_CONFIG_SETTING_WIDTH, v->video_output_width );
     put_xml_int( node, XML_CONFIG_SETTING_HEIGHT, v->video_output_height );
     put_xml_int( node, XML_CONFIG_SETTING_AUDIO, v->audio );
-    put_xml_int( node, XML_CONFIG_SETTING_SYNC, v->sync_correction );
+    put_xml_int( node, XML_CONFIG_SETTING_SYNC, atomic_load_int(&v->sync_correction) );
     put_xml_int( node, XML_CONFIG_SETTING_TIMER, v->uc->use_timer );
     put_xml_int( node, XML_CONFIG_SETTING_BEZERK, v->bezerk );
     put_xml_int( node, XML_CONFIG_SETTING_COLOR, veejay_is_colored() );
@@ -2458,12 +2458,12 @@ void    vj_event_sync_correction( void *ptr,const char format[], va_list ap )
 
     if(args[0] == 0 )
     {
-        v->sync_correction = 0;
+        atomic_store_int(&v->sync_correction, 0);
         veejay_msg(VEEJAY_MSG_INFO, "Sync correction disabled");
     }
     else if( args[0] == 1 )
     {
-        v->sync_correction = 1;
+        atomic_store_int(&v->sync_correction, 1);
         veejay_msg(VEEJAY_MSG_INFO, "Sync correction enabled");
     }
 

@@ -419,7 +419,7 @@ typedef struct {
     int preserve_pathnames;
     int audio;
     int continuous;
-    int sync_correction; // FIXME remove
+    volatile int sync_correction;
     int sync_skip_frames;
     int sync_ins_frames;
     int auto_deinterlace;

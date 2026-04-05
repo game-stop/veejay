@@ -3023,7 +3023,7 @@ void *veejay_audio_producer_thread(void *arg)
         } else {
 #endif
 			const double next_frame_target = anchor_s + ((double)(loop_count + 1) * SPVF);
-				
+
 			double now = monotonic_now_s();
 			double remaining_s = next_frame_target - now;
 
@@ -3032,8 +3032,40 @@ void *veejay_audio_producer_thread(void *arg)
 			}
 
 			now = monotonic_now_s();
-			
-			atomic_store_double(&settings->audio_master_s, now );
+
+			if (atomic_load_int(&info->sync_correction)) {
+
+				double drift = now - next_frame_target;
+
+				static double integral = 0.0;
+
+				const double KP = 0.6;
+				const double KI = 0.15;
+
+				integral = integral * 0.90 + drift;
+
+				if (integral > 0.15)  integral = 0.15;
+				if (integral < -0.15) integral = -0.15;
+
+				double correction = (KP * drift) + (KI * integral);
+				const double max_correction = 0.5 * SPVF;
+
+				if (correction >  max_correction) correction =  max_correction;
+				if (correction < -max_correction) correction = -max_correction;
+
+				static double phase_offset = 0.0;
+
+				phase_offset = 0.95 * phase_offset + correction;
+
+				if (phase_offset >  SPVF) phase_offset =  SPVF;
+				if (phase_offset < -SPVF) phase_offset = -SPVF;
+
+				atomic_store_double(&settings->audio_master_s, now + phase_offset);
+
+			} else {
+				atomic_store_double(&settings->audio_master_s, now);
+			}
+
 			vj_perform_inc_frame(info, settings->current_playback_speed);
 			loop_count++;
 
@@ -3143,7 +3175,7 @@ static void *veejay_producer_thread_loop(void *ptr)
         
         double diff = pts - elapsed_audio;
 
-        if (diff < -SKIP_TOLERANCE) {
+        if (atomic_load_int(&info->sync_correction) && diff < -SKIP_TOLERANCE) {
             long long frames_to_skip = (long long)((-diff / SPVF));
             
             if (frames_to_skip > 0) {
