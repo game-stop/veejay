@@ -365,7 +365,7 @@ typedef struct {
     int playback_mode;
     int sample_id;
     char *filename;
-    int take_screenshot;
+    volatile int take_screenshot;
     int take_bg;
     int direction;
     int looptype;

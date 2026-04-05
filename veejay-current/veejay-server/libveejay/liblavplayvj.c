@@ -1301,9 +1301,9 @@ static void veejay_screen_update(veejay_t *info, VJFrame *frame_to_display) {
 
 #ifdef HAVE_JPEG
 #ifdef USE_GDK_PIXBUF 
-	if (info->uc->take_screenshot == 1)
+	if (atomic_load_int(&info->uc->take_screenshot) == 1)
 	{
-		info->uc->take_screenshot = 0;
+		atomic_store_int(&info->uc->take_screenshot,0);
 #ifdef USE_GDK_PIXBUF
 		if(!vj_picture_save( info->settings->export_image, frame_to_display->data, 
 			info->video_output_width, info->video_output_height,

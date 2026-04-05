@@ -9724,7 +9724,7 @@ void vj_event_screenshot(void *ptr, const char format[], va_list ap)
     v->settings->export_image = 
         vj_picture_prepare_save( filename , type, args[0], args[1] );
     if(v->settings->export_image)
-      v->uc->take_screenshot = 1;
+      atomic_store_int(&v->uc->take_screenshot,1);
 }
 #else
 #ifdef HAVE_JPEG
@@ -9735,8 +9735,8 @@ void vj_event_screenshot(void *ptr, const char format[], va_list ap)
     P_A(args,sizeof(args), filename,sizeof(filename), format, ap );
     veejay_t *v = (veejay_t*) ptr;
 
-    v->uc->take_screenshot = 1;
     v->uc->filename = vj_strdup( filename );
+    atomic_store_int( &v->uc->take_screenshot, 1 );
 }
 #endif
 #endif
