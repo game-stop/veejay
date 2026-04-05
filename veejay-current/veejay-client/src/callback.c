@@ -203,21 +203,15 @@ void	on_entry_samplename_button_clicked( GtkWidget *widget, gpointer user_data )
 	gchar *title = get_text( "entry_samplename" );
 	multi_vims( VIMS_SAMPLE_SET_DESCRIPTION, "%d %s", 0,title );
 
-	//@ dont reload sample, print info to samplebank
-    // FIXME remplace loop by find_gui_slot_by_sample (info->current) ?
-	int i,j;
-	for( i= 0; i < NUM_BANKS; i ++ )
-	{
-		for( j = 0; j < NUM_SAMPLES_PER_PAGE ; j ++ )
-		{
-			if( (info->sample_banks[i]->slot[j]->sample_id ==
-			    info->status_tokens[CURRENT_ID]) ) 
-			{
-                gtk_label_set_text( GTK_LABEL( info->sample_banks[i]->gui_slot[j]->title ), title );
-				return;
-			}
-		}
-	}
+	int id = info->status_tokens[CURRENT_ID];
+	int type = info->status_tokens[PLAY_MODE];
+
+	int idx = -1;
+	int page = find_bank_by_sample_existing( id, type, &idx);
+
+	if( page >= 0)
+		gtk_label_set_text( GTK_LABEL( info->sample_banks[page]->gui_slot[idx]->title ), title );
+
 }
 
 void	on_button_054_clicked(GtkWidget *widget, gpointer user_data)
@@ -3618,7 +3612,6 @@ gboolean on_effectchain_button_pressed (GtkWidget *tree, GdkEventButton *event, 
 
             if (state_modifier & GDK_SHIFT_MASK)
 			{
-				int active = 0;
 				multi_vims(VIMS_CHAIN_ENTRY_SET_STATE, "%d %d", 0, fxcid);
 				info->uc.reload_hint[HINT_ENTRY] = 1;
 				info->uc.reload_hint[HINT_CHAIN] = 1;
