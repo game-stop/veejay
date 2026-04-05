@@ -71,11 +71,6 @@ static void toggle_siamese_widget(GtkWidget *widget,GtkWidget *first,GtkWidget *
         g_signal_handler_unblock((gpointer)siamese, handler_id);
 }
 
-void	on_no_caching_clicked( GtkWidget *widget, gpointer user_data)
-{
-	single_vims( VIMS_NO_CACHING );
-}
-
 void	on_button_085_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims(VIMS_VIDEO_SKIP_SECOND);

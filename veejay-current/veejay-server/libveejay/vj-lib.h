@@ -487,7 +487,6 @@ typedef struct {
 	void *osd;
 	int  use_osd;
 	sequencer_t *seq;
-	int  no_caching;
 	void	*viewport;
 	void	*composite;
 	void	*composite2;

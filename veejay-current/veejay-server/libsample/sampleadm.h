@@ -350,7 +350,6 @@ extern int	sample_usable_edl( int s1 );
 extern int sample_cache_used( int s1 );
 extern void        sample_free(void *edl);
 extern int sample_stop_playing(int s1, int new_s1);
-extern int sample_start_playing(int s1, int no_cache);
 extern char *UTF8toLAT1(unsigned char *in);
 extern int sample_read_edl( sample_info *sample );
 extern void sample_set_loops(int s1, int loops);

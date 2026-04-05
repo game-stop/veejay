@@ -1616,11 +1616,6 @@ int sample_cache_used( int s1 )
     return 0;
 }
 
-int sample_start_playing(int s1, int no_cache)
-{
-    return 1;
-}
-
 int sample_set_chain_source(int s1, int position, int input)
 {
     sample_info *sample;

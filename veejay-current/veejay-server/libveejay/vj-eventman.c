@@ -2848,16 +2848,6 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				NULL );
 
-	index_map_[VIMS_NO_CACHING]			=	_new_event(	
-				NULL,
-				VIMS_NO_CACHING,
-				"Editlist cache mode toggle",
-				vj_event_no_caching,
-				0,
-				VIMS_ALLOW_ANY,
-				NULL );
-
-
 	index_map_[VIMS_SAMPLE_MODE]			=	_new_event(
 				NULL,
 				VIMS_SAMPLE_MODE,

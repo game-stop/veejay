@@ -671,7 +671,6 @@ void vj_macro_init(void)
     vvm_[VIMS_VIDEO_MCAST_START]=0;
     vvm_[VIMS_VIDEO_MCAST_STOP]=0;
     vvm_[VIMS_SYNC_CORRECTION]=0;
-    vvm_[VIMS_NO_CACHING]=0;
     vvm_[VIMS_SCREENSHOT]=0;
     vvm_[VIMS_RGB_PARAMETER_TYPE]=0;
     vvm_[VIMS_RESIZE_SDL_SCREEN] =0;

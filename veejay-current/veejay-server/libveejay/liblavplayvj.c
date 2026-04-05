@@ -823,9 +823,7 @@ int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 	info->current_edit_list = E;
 	veejay_reset_el_buffer(info);
 
-	sample_start_playing( sample_id, info->no_caching );
-
-   	sample_get_short_info( sample_id , &start,&end,&looptype,&speed);
+	sample_get_short_info( sample_id , &start,&end,&looptype,&speed);
 
 	settings->first_frame = 1;
  
