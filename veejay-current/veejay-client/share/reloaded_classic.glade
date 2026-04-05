@@ -906,25 +906,6 @@
 	      </child>
 
 	      <child>
-		<widget class="GtkButton" id="no_caching">
-		  <property name="visible">True</property>
-		  <property name="tooltip" translatable="yes">Enable/Disable EDL Cache (see veejay console)</property>
-		  <property name="can_focus">True</property>
-		  <property name="relief">GTK_RELIEF_NORMAL</property>
-		  <property name="focus_on_click">True</property>
-		  <signal name="clicked" handler="on_no_caching_clicked" last_modification_time="Thu, 21 Dec 2006 14:59:22 GMT"/>
-
-		  <child>
-		    <widget class="GtkImage" id="image2520">
-		      <property name="visible">True</property>
-		      <property name="pixbuf">icon_cache.png</property>
-		      <property name="xalign">0.5</property>
-		      <property name="yalign">0.5</property>
-		      <property name="xpad">0</property>
-		      <property name="ypad">0</property>
-		    </widget>
-		  </child>
-		</widget>
 		<packing>
 		  <property name="padding">0</property>
 		  <property name="expand">False</property>
