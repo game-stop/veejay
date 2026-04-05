@@ -513,6 +513,7 @@ VJFrame *yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
             f->uv_width = 0; f->uv_height=0;
             f->data[1] = NULL;f->data[2] = NULL;
             f->yuv_fmt = fmt;
+            f->range = 1;
             break;
         case PIX_FMT_BGR32:
         case PIX_FMT_RGB32:
@@ -522,6 +523,7 @@ VJFrame *yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
             f->uv_width = 0; f->uv_height = 0;
             f->data[1] = NULL; f->data[2] = NULL;
             f->yuv_fmt = fmt;
+            f->range = 1;
             break;
         default:
         break;
@@ -544,6 +546,7 @@ VJFrame *yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
     f->height  = h;
     f->out_width = w;
     f->out_height = h;
+    f->range = 1;
     switch( fmt )
     {
         case PIX_FMT_RGB24:
@@ -1179,11 +1182,13 @@ void*   yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int sw
 
     sws_getColorspaceDetails(s->sws, &dummy1, &srcRange, &dummy2, &dstRange, &brightness, &contrast, &saturation);
 
+    int cs = (src->height >= 720 ? SWS_CS_ITU709 : SWS_CS_ITU601 );
+
     srcRange = src->range;
     dstRange = dst->range;
 
-    const int *src_coefs = sws_getCoefficients(SWS_CS_DEFAULT);
-    const int *dst_coefs = sws_getCoefficients(SWS_CS_DEFAULT);
+    const int *src_coefs = sws_getCoefficients(cs);
+    const int *dst_coefs = sws_getCoefficients(cs);
 
     sws_setColorspaceDetails(
         s->sws,
