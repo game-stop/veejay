@@ -733,18 +733,13 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
 
 }
 
-/*
- * subsample YUV 4:4:4 to YUV 4:2:2 using drop method
- */
-void ss_444_to_422_drop(uint8_t *restrict U, uint8_t *restrict V, int width, int height) {
-    const int dest_width = width - 1;
-    const int stride = width >> 1;
-    for (int y = 0; y < height; y++) {
-#pragma omp simd
-        for (int x = 0; x < dest_width; x += 2) {
-            U[y * stride + (x >> 1)] = U[y * width + x];
-            V[y * stride + (x >> 1)] = V[y * width + x];
-        }
+void ss_444_to_422_drop(uint8_t *restrict U, uint8_t *restrict V, int width, int height)
+{
+    const size_t total_dest_pixels = ((size_t)width * height) >> 1;
+    for (size_t i = 0; i < total_dest_pixels; i++) {
+        size_t src_idx = i << 1;
+        U[i] = U[src_idx];
+        V[i] = V[src_idx];
     }
 }
 
@@ -789,63 +784,51 @@ void ss_444_to_422_drop_avx2(uint8_t *restrict U, uint8_t *restrict V, int width
 /*
  * subsample YUV 4:4:4 to YUV 4:2:2 using average method
  */
-void ss_444_to_422_average(uint8_t *restrict U, uint8_t *restrict V, int width, int height) {
-    const int dest_width = width >> 1;
-    const int stride = width >> 1;
-    int x,y;
-    for (y = 0; y < height; y++) {
-#pragma omp simd
-        for (x = 0; x < dest_width; x++) {
-            const int src_index = y * width + x * 2;
-            U[y * stride + x] = (U[src_index] + U[src_index + 1] + 1) >> 1;
-            V[y * stride + x] = (V[src_index] + V[src_index + 1] + 1) >> 1;
-        }
+void ss_444_to_422_average(uint8_t *restrict U, uint8_t *restrict V, int width, int height)
+{
+    const size_t total_dest_pixels = ((size_t)width * height) >> 1;
+
+    for (size_t i = 0; i < total_dest_pixels; i++) {
+        size_t src_idx = i << 1;
+        U[i] = (uint8_t)((U[src_idx] + U[src_idx + 1] + 1) >> 1);
+        V[i] = (uint8_t)((V[src_idx] + V[src_idx + 1] + 1) >> 1);
     }
 }
 
 #ifdef HAVE_ASM_AVX2
-void ss_444_to_422_average_avx2(uint8_t *restrict U, uint8_t *restrict V, int width, int height) {
-    const int dest_width = width >> 1;
-    const int stride = width >> 1;
-
-    __m256i shuf_mask = _mm256_setr_epi8(
-        0, 2, 4, 6, 8, 10, 12, 14,  // Even indices (lane 0)
-        1, 3, 5, 7, 9, 11, 13, 15,  // Odd indices  (lane 0)
-        0, 2, 4, 6, 8, 10, 12, 14,  // Even indices (lane 1)
-        1, 3, 5, 7, 9, 11, 13, 15   // Odd indices  (lane 1)
+void ss_444_to_422_average_avx2(uint8_t *restrict U, uint8_t *restrict V, int width, int height)
+{
+    const size_t total_dest_pixels = ((size_t)width * height) >> 1;
+    const __m256i shuf_mask = _mm256_setr_epi8(
+        0, 2, 4, 6, 8, 10, 12, 14,
+        1, 3, 5, 7, 9, 11, 13, 15,
+        0, 2, 4, 6, 8, 10, 12, 14,
+        1, 3, 5, 7, 9, 11, 13, 15
     );
 
-    for (int y = 0; y < height; y++) {
+    size_t i = 0;
 
-        uint8_t *src_u = &U[y * width];
-        uint8_t *src_v = &V[y * width];
-        uint8_t *dst_u = &U[y * stride];
-        uint8_t *dst_v = &V[y * stride];
+    for (; i <= total_dest_pixels - 16; i += 16) {
+        size_t src_idx = i << 1;
+        __m256i u_data = _mm256_loadu_si256((const __m256i*)(U + src_idx));
+        __m256i u_shuf = _mm256_shuffle_epi8(u_data, shuf_mask);
+        __m256i u_avg  = _mm256_avg_epu8(u_shuf, _mm256_srli_si256(u_shuf, 8));
+        __m256i u_fin  = _mm256_permute4x64_epi64(u_avg, _MM_SHUFFLE(3, 1, 2, 0));
 
-        int x = 0;
+        _mm_storeu_si128((__m128i*)(U + i), _mm256_castsi256_si128(u_fin));
 
-        for (; x <= dest_width - 16; x += 16) {
+        __m256i v_data = _mm256_loadu_si256((const __m256i*)(V + src_idx));
+        __m256i v_shuf = _mm256_shuffle_epi8(v_data, shuf_mask);
+        __m256i v_avg  = _mm256_avg_epu8(v_shuf, _mm256_srli_si256(v_shuf, 8));
+        __m256i v_fin  = _mm256_permute4x64_epi64(v_avg, _MM_SHUFFLE(3, 1, 2, 0));
 
-            __m256i u_data = _mm256_loadu_si256((__m256i*)(src_u + (x * 2)));
+        _mm_storeu_si128((__m128i*)(V + i), _mm256_castsi256_si128(v_fin));
+    }
 
-            __m256i u_shuf = _mm256_shuffle_epi8(u_data, shuf_mask);
-
-            __m256i u_avg = _mm256_avg_epu8(u_shuf, _mm256_srli_si256(u_shuf, 8));
-
-            __m256i u_final = _mm256_permute4x64_epi64(u_avg, _MM_SHUFFLE(3, 1, 2, 0));
-            _mm_storeu_si128((__m128i*)(dst_u + x), _mm256_castsi256_si128(u_final));
-
-            __m256i v_data = _mm256_loadu_si256((__m256i*)(src_v + (x * 2)));
-            __m256i v_shuf = _mm256_shuffle_epi8(v_data, shuf_mask);
-            __m256i v_avg  = _mm256_avg_epu8(v_shuf, _mm256_srli_si256(v_shuf, 8));
-            __m256i v_final = _mm256_permute4x64_epi64(v_avg, _MM_SHUFFLE(3, 1, 2, 0));
-            _mm_storeu_si128((__m128i*)(dst_v + x), _mm256_castsi256_si128(v_final));
-        }
-
-        for (; x < dest_width; x++) {
-            dst_u[x] = (src_u[x * 2] + src_u[x * 2 + 1] + 1) >> 1;
-            dst_v[x] = (src_v[x * 2] + src_v[x * 2 + 1] + 1) >> 1;
-        }
+    for (; i < total_dest_pixels; i++) {
+        size_t src_idx = i << 1;
+        U[i] = (uint8_t)((U[src_idx] + U[src_idx + 1] + 1) >> 1);
+        V[i] = (uint8_t)((V[src_idx] + V[src_idx + 1] + 1) >> 1);
     }
 }
 #endif
@@ -1285,11 +1268,9 @@ void chroma_supersample(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[] )
 {
     uint8_t *_chroma_supersample_data = NULL;
 
-
     if( mode == SSM_420_JPEG_TR ) {
-        _chroma_supersample_data = (uint8_t*) vj_calloc( sizeof(uint8_t) * (frame->width * 2) );
+        _chroma_supersample_data = (uint8_t*) vj_malloc( sizeof(uint8_t) * (frame->width * 2) );
     }
-
 
     switch (mode) {
         // optimized path
