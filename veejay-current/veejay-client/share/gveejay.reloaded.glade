@@ -17694,6 +17694,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                             <property name="tooltip-text" translatable="yes">Speed up/down video</property>
                                             <property name="adjustment">frame_speed</property>
                                             <property name="digits">0</property>
+                                            <signal name="button-press-event" handler="on_speed_slider_click" swapped="no"/>
                                             <signal name="value-changed" handler="on_speed_slider_value_changed" swapped="no"/>
                                           </object>
                                           <packing>
@@ -17710,6 +17711,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                             <property name="tooltip-text" translatable="yes">Slow video</property>
                                             <property name="adjustment">frame_dup</property>
                                             <property name="digits">0</property>
+                                            <signal name="button-press-event" handler="on_slow_slider_click" swapped="no"/>
                                             <signal name="value-changed" handler="on_slow_slider_value_changed" swapped="no"/>
                                           </object>
                                           <packing>

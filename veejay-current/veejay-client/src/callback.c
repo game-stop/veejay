@@ -1236,6 +1236,32 @@ void	on_slow_slider_value_changed( GtkWidget *widget, gpointer user_data )
 	}
 }
 
+void    on_slow_slider_click( GtkWidget *widget, gpointer user_data )
+{
+    if(!info->status_lock)
+    {
+        GdkModifierType state = 0;
+        GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(widget));
+        if (window) {
+            gdk_window_get_device_position(
+                window,
+                gdk_seat_get_pointer(
+                    gdk_display_get_default_seat(
+                        gdk_display_get_default())),
+                NULL, NULL,
+                &state
+            );
+        }
+
+        gboolean ctrl_pressed  = (state & GDK_CONTROL_MASK);
+
+        if (ctrl_pressed)
+        {
+            update_slider_gvalue("slow_slider", 1);
+        }
+    }
+}
+
 
 void	on_speed_slider_value_changed(GtkWidget *widget, gpointer user_data)
 {
@@ -1248,6 +1274,33 @@ void	on_speed_slider_value_changed(GtkWidget *widget, gpointer user_data)
 			value );
 		vj_midi_learning_vims_simple( info->midi, "speed_slider", VIMS_VIDEO_SET_SPEED );
 	}
+}
+
+
+void    on_speed_slider_click(GtkWidget *widget, gpointer user_data)
+{
+    if(!info->status_lock)
+    {
+        GdkModifierType state = 0;
+        GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(widget));
+        if (window) {
+            gdk_window_get_device_position(
+                window,
+                gdk_seat_get_pointer(
+                    gdk_display_get_default_seat(
+                        gdk_display_get_default())),
+                NULL, NULL,
+                &state
+            );
+        }
+
+        gboolean ctrl_pressed  = (state & GDK_CONTROL_MASK);
+
+        if (ctrl_pressed)
+        {
+            update_slider_gvalue("speed_slider", 1);
+        }
+    }
 }
 
 void	on_spin_samplespeed_value_changed(GtkWidget *widget, gpointer user_data)
