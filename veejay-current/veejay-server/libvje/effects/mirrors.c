@@ -43,6 +43,10 @@ vj_effect *mirrors_init(int width,int height)
 	ve->has_user = 0;
 	ve->motion = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "H or V", "Number" );
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0, "Copy Right", "Copy Left" , "Copy Top" , "Copy Down" );
+
 	return ve;
 }
 
