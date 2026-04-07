@@ -38,6 +38,10 @@ vj_effect *mirrors2_init(int w, int h)
 	ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "H or V mode");
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0, "Copy DownRight", "Copy DownLeft", "Copy Top", "Copy Down", "Copy Right", "Copy Left" );
+
 	return ve;
 }
 
@@ -157,25 +161,25 @@ static void mirror_multi_ur(uint8_t * yuv[3], int width, int height)
 {
 	unsigned int x, y;
 
-	unsigned int yi, yi2;
+	unsigned int yi1 , yi2;
+	const unsigned int hlen = height / 2;
 	const unsigned int vlen = width / 2;
-	const unsigned int hlen = width / 2;
 	uint8_t p, cb, cr;
 
 	for (y = hlen; y < height; y++) {
-		yi = y * width;
+		yi1 = y * width;
 		yi2 = (height - y - 1) * width;
 		for (x = 0; x < vlen; x++) {
-			p = yuv[0][yi + x];
-			yuv[0][yi + (width - x - 1)] = p;
+			p = yuv[0][yi1 + x];
+			yuv[0][yi1 + (width - x - 1)] = p;
 			yuv[0][yi2 + x] = p;
 			yuv[0][yi2 + x + (width - x - 1)] = p;
-			cb = yuv[1][yi + x];
-			cr = yuv[2][yi + x];
-			yuv[1][yi + (width - x - 1)] = cb;
+			cb = yuv[1][yi1 + x];
+			cr = yuv[2][yi1 + x];
+			yuv[1][yi1 + (width - x - 1)] = cb;
 			yuv[1][yi2 + x] = cb;
 			yuv[1][yi2 + x + (width - x - 1)] = cb;
-			yuv[2][yi + (width - x - 1)] = cr;
+			yuv[2][yi1 + (width - x - 1)] = cr;
 			yuv[2][yi2 + x] = cr;
 			yuv[2][yi2 + x + (width - x - 1)] = cr;
 		}
