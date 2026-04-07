@@ -39,7 +39,7 @@ vj_effect *mirrors2_init(int w, int h)
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "H or V mode");
 
-	ve->hints = vje_init_value_hint_list( 1 );
+	ve->hints = vje_init_value_hint_list( ve->num_params );
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0, "Copy DownRight", "Copy DownLeft", "Copy Top", "Copy Down", "Copy Right", "Copy Left" );
 
 	return ve;
