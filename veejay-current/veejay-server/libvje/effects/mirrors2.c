@@ -162,8 +162,8 @@ static void mirror_multi_ur(uint8_t * yuv[3], int width, int height)
 	unsigned int x, y;
 
 	unsigned int yi, yi2;
+	const unsigned int hlen = height / 2;
 	const unsigned int vlen = width / 2;
-	const unsigned int hlen = width / 2;
 	uint8_t p, cb, cr;
 
 	for (y = hlen; y < height; y++) {
