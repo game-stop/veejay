@@ -29,52 +29,57 @@ vj_effect *widthmirror_init(int max_width,int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
-    ve->defaults[0] = 2;
-
+    ve->defaults[0] = 4;
     ve->limits[0][0] = 2;
-    ve->limits[1][0] = max_width / 24;
-
+    ve->limits[1][0] = 256;
     ve->description = "Width Mirror";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Widths");
+    ve->param_description = vje_build_param_list( ve->num_params, "Frequency");
     return ve;
 }
 
 void widthmirror_apply(void *ptr, VJFrame *frame, int *args)
 {
-    if (!frame || !args) return;
+    const int width = (int)frame->width;
+    const int height = (int)frame->height;
+    const int frequency = args[0];
 
-    int width_div = args[0];
-    const unsigned int width = frame->width;
-    const int len = frame->len;
+    const int32_t band_w_fp = (width << 16) / frequency;
+    const int band_w_int = band_w_fp >> 16;
 
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
+    if (band_w_int < 1) return;
 
-    if (width_div >= frame->width || width_div < 2)
-        width_div = 2;
+    uint8_t *restrict py = frame->data[0];
+    uint8_t *restrict pu = frame->data[1];
+    uint8_t *restrict pv = frame->data[2];
 
-    unsigned int divisor = width / width_div;
-    if (divisor == 0) divisor = 1; // safety
+    int n_threads = vje_advise_num_threads(width * height);
 
-    for (unsigned int r = 0; r < len; r += width) {
-        #pragma omp simd
-        for (unsigned int c = 0; c < width; c++) {
-            int p1 = r + (divisor - c < 0 ? 0 : (divisor - c >= (int)width ? width - 1 : divisor - c));
-            int p2 = r + (width - c - 1 < 0 ? 0 : (width - c - 1 >= (int)width ? width - 1 : width - c - 1));
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int y = 0; y < height; y++) {
+        uint8_t *restrict ry = py + (y * width);
+        uint8_t *restrict ru = pu + (y * width);
+        uint8_t *restrict rv = pv + (y * width);
 
-            Y[p1] = Y[r + c];
-            Y[p2] = Y[r + c];
+        int local_x = 0;
+        int flip = 0;
 
-            Cb[p1] = Cb[r + c];
-            Cb[p2] = Cb[r + c];
+        for (int x = 0; x < width; x++) {
+            int src_x = flip ? (band_w_int - 1 - local_x) : local_x;
 
-            Cr[p1] = Cr[r + c];
-            Cr[p2] = Cr[r + c];
+            src_x = (src_x < 0) ? 0 : (src_x >= band_w_int ? band_w_int - 1 : src_x);
+
+            ry[x] = ry[src_x];
+            ru[x] = ru[src_x];
+            rv[x] = rv[src_x];
+
+            local_x++;
+            if (local_x >= band_w_int) {
+                local_x = 0;
+                flip = !flip;
+            }
         }
     }
 }
-
