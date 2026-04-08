@@ -20,192 +20,225 @@
 
 #include "common.h"
 #include <veejaycore/vjmem.h>
-#include "complexthreshold.h"
+#include <math.h>
 
-//FIXME: rewrite this FX
+#ifndef M_PI
+#define M_PI 3.14159265358979323846f
+#endif
 
-vj_effect *complexthreshold_init(int w, int h)
-{
-    vj_effect *ve;
-    ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 6;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 4500;	/* angle */
-    ve->defaults[1] = 0;	/* r */
-    ve->defaults[2] = 0;	/* g */
-    ve->defaults[3] = 255;	/* b */
-    ve->defaults[4] = 1;	/* smoothen level */
-    ve->defaults[5] = 255;	/* threshold */
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 9000;
+#define CLAMP(x, low, high) (((x) > (high)) ? (high) : (((x) < (low)) ? (low) : (x)))
+#define DIV255(x) (((x) + 1 + ((x) >> 8)) >> 8)
+#define DIV3(x) (((x) * 21846) >> 16)
 
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
+typedef struct {
+    int n_threads;
+    uint8_t *alpha_map;
+    uint8_t *alpha_temp;
+    uint8_t gamma_lut[256];
+} promixer_t;
 
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
+vj_effect *complexthreshold_init(int w, int h) {
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    ve->num_params = 12;
 
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 255;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][5] = 0;
-    ve->limits[1][5] = 255;
+    ve->defaults[0]  = 1200;
+    ve->defaults[1]  = 120;
+    ve->defaults[2]  = 20;
+    ve->defaults[3]  = 240;
+    ve->defaults[4]  = 128;
+    ve->defaults[5]  = 15;
+    ve->defaults[6]  = 20;
+    ve->defaults[7]  = 160;
+    ve->defaults[8]  = 60;
+    ve->defaults[9]  = 20;
+    ve->defaults[10] = 0;
+    ve->defaults[11] = 0;
 
-    ve->limits[0][4] = 0;
-    ve->limits[1][4] = 4;
+    for(int i = 0; i < ve->num_params; i++) {
+        ve->limits[0][i] = 0;
+        ve->limits[1][i] = 255;
+    }
+    ve->limits[1][0] = 3600; 
 
-	ve->parallel = 1;
-    ve->description = "Complex Threshold (RGB)";
+    ve->description = "Kromatica Mixer (High-Fidelity Keyer)";
     ve->extra_frame = 1;
     ve->sub_format = 1;
-	ve->has_user = 0;
-	ve->rgb_conv = 1;
-	ve->param_description = vje_build_param_list( ve->num_params,"Angle", "Red", "Green", "Blue", "Smoothen", "Threshold" );
+    ve->rgb_conv = 1;
+    ve->param_description = vje_build_param_list(ve->num_params,
+        "Key Color", "Key Reach", "Clip Black", "Clip White", "Matte Gamma",
+        "Sat Gate", "Shadow Prot", "Spill Amount", "Spill Balance", "Edge Blur",
+        "Invert Matte", "Output View");
     return ve;
 }
 
-/* this method decides whether or not a pixel from the fg will be accepted for keying */
-static int accept_tpixel(uint8_t fg_cb, uint8_t fg_cr, int cb, int cr,
-		 int accept_angle_tg)
-{
-    short xx, yy;
-    /* convert foreground to xz coordinates where x direction is
-       defined by key color */
-    uint8_t val;
-
-    xx = ((fg_cb * cb) + (fg_cr * cr)) >> 7;
-    yy = ((fg_cr * cb) - (fg_cb * cr)) >> 7;
-
-    /* accept angle should not be > 90 degrees 
-       reasonable results between 10 and 80 degrees.
-     */
-
-    val = (xx * accept_angle_tg) >> 4;
-    if (abs(yy) < val) {
-	return 1;
-    }
-    return 0;
+void *complexthreshold_malloc(int w, int h) {
+    promixer_t *m = (promixer_t*) vj_malloc(sizeof(promixer_t));
+    m->n_threads = vje_advise_num_threads(w * h);
+    m->alpha_map = (uint8_t*) vj_malloc(w * h);
+    m->alpha_temp = (uint8_t*) vj_malloc(w * h);
+    return (void*) m;
 }
 
-void complexthreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2,int *args) {
-    int i_angle = args[0];
-    int r = args[1];
-    int g = args[2];
-    int b = args[3];
-    int level = args[4];
-    int threshold = args[5];
+void complexthreshold_free(void *ptr) {
+    promixer_t *m = (promixer_t*)ptr;
+    if(m) {
+        if(m->alpha_map) free(m->alpha_map);
+        if(m->alpha_temp) free(m->alpha_temp);
+        free(m);
+    }
+}
 
-    uint8_t *fg_y, *fg_cb, *fg_cr;
-    uint8_t *bg_y, *bg_cb, *bg_cr;
-    int accept_angle_tg, accept_angle_ctg, one_over_kc;
-    int kfgy_scale;
-    int cb, cr;
-    int kbg, x1, y1;
-    float kg1, tmp, aa = 255.0f, bb = 255.0f, _y = 0;
-    float angle = (float) i_angle / 100.0f;
-    //float noise_level = 350.0;
-    unsigned int pos;
-    int matrix[5];
-    int val, tmp1;
-	const int len = frame->len;
-	const unsigned int width = frame->width;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
-	int iy=0,iv=128,iu=128;
-	_rgb2yuv(r,g,b,iy,iu,iv);
-	_y = (float)iy;
-	aa = (float)iu;
-	bb = (float)iv;
+void complexthreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+    promixer_t *mk = (promixer_t*) ptr;
 
-    tmp = sqrt(((aa * aa) + (bb * bb)));
-    cb = 255 * (aa / tmp);
-    cr = 255 * (bb / tmp);
-    kg1 = tmp;
+    float angle_rad = ((float)args[0] / 10.0f) * (M_PI / 180.0f);
+    const float target_u = cosf(angle_rad) * 127.0f;
+    const float target_v = sinf(angle_rad) * 127.0f;
+    const float mag_target = sqrtf(target_u * target_u + target_v * target_v);
 
-    /* obtain coordinate system for cb / cr */
-    accept_angle_tg = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
-    accept_angle_ctg= (int)( 15.0f / tanf(M_PI * angle / 180.0f));
+    const int SCALE = 4096;
+    const int cos_q_fp = (int)((target_u / mag_target) * SCALE);
+    const int sin_q_fp = (int)((target_v / mag_target) * SCALE);
 
-	tmp = 1 / kg1;
-    one_over_kc = 0xff * 2 * tmp - 0xff;
-    kfgy_scale = 0xf * (float) (_y) / kg1;
+    float g_val = fmaxf((float)args[4] / 128.0f, 0.1f);
+    for(int i=0; i<256; i++)
+        mk->gamma_lut[i] = (uint8_t)(powf((float)i / 255.0f, 1.0f/g_val) * 255.0f);
 
-    /* intialize pointers */
-    fg_y = Y2;
-    fg_cb = Cb2;
-    fg_cr = Cr2;
+    const int c_thresh = fmax(args[1], 1);
+    const float m_min = (float)args[2];
+    const float m_range_inv = 255.0f / (fmaxf((float)args[3] - m_min, 1.0f));
+    const int sat_gate = args[5];
+    const int l_thresh = args[6];
+    const int spill_amt = args[7];
+    const int s_mode_val = args[8];
+    const int soft = args[9];
 
-    bg_y = Y;
-    bg_cb = Cb;
-    bg_cr = Cr;
+    const int w = frame->width;
+    const int h = frame->height;
+    const int len = w * h;
 
-    for (pos = width + 1; pos < (len) - width - 1; pos++) {
-	int i = 0;
-	int smooth = 0;
-	/* setup matrix 
-	   [ - 0 - ] = do not accept. [ - 1 - ] = level 5 , accept only when all n = 1
-	   [ 0 0 0 ]                  [ 1 1 1 ]
-	   [ - 0 - ]                  [ - 1 - ]
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
+    const int sat_gate_sq = args[5] * args[5];
+    const int m_range_inv_fp = (255 << 12) / (fmax(args[3] - m_min, 1));
+    const int inv_c_thresh_fp = (1 << 24) / (c_thresh * SCALE);
 
-	   [ - 0 - ] sum of all n is acceptance value for level
-	   [ 1 0 1 ]                    
-	   [ 0 1 0 ]
-	 */
-	matrix[0] = accept_tpixel(fg_cb[pos], fg_cr[pos], cb, cr, accept_angle_tg);	/* center pixel */
-	matrix[1] = accept_tpixel(fg_cb[pos - 1], fg_cr[pos - 1], cb, cr, accept_angle_tg);	/* left pixel */
-	matrix[2] = accept_tpixel(fg_cb[pos + 1], fg_cr[pos + 1], cb, cr, accept_angle_tg);	/* right pixel */
-	matrix[3] = accept_tpixel(fg_cb[pos + width], fg_cr[pos + width], cb, cr, accept_angle_tg);	/* top pixel */
-	matrix[4] = accept_tpixel(fg_cb[pos - width], fg_cr[pos - width], cb, cr, accept_angle_tg);	/* bottom pixel */
-	for (i = 0; i < 5; i++) {
-	    if (matrix[i] == 1)
-		smooth++;
-	}
-	if (smooth >= level) {
-	    short xx, yy;
-	    /* get bg/fg pixels */
-	    uint8_t p1 = (matrix[0] == 0 ? fg_y[pos] : bg_y[pos]);
-	    uint8_t p2 = (matrix[1] == 0 ? fg_y[pos - 1] : bg_y[pos - 1]);
-	    uint8_t p3 = (matrix[2] == 0 ? fg_y[pos + 1] : bg_y[pos + 1]);
-	    uint8_t p4 =
-		(matrix[3] == 0 ? fg_y[pos + width] : bg_y[pos + width]);
-	    uint8_t p5 =
-		(matrix[4] == 0 ? fg_y[pos - width] : bg_y[pos - width]);
-	    /* and blur the pixel */
-	    fg_y[pos] = (p1 + p2 + p3 + p4 + p5 + p1) / 6;
+    int spill_final_fp = 0;
+    if (s_mode_val >= 128) {
+        float spill_softness = 1.0f - ((float)(s_mode_val - 128) / 160.0f);
+        spill_final_fp = (int)(((float)spill_amt / 255.0f) * spill_softness * 4096.0f);
+    }
 
-	    /* convert foreground to xz coordinates where x direction is
-	       defined by key color */
-	    xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
-	    yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
+    #pragma omp parallel num_threads(mk->n_threads)
+    {
+        #pragma omp for schedule(static)
+        for (int i = 0; i < len; i++) {
+            int uc = (int)Cb2[i] - 128;
+            int vc = (int)Cr2[i] - 128;
 
-	    val = (xx * accept_angle_tg) >> 4;
-	    /* see if pixel is within range of color and threshold */
-	    if (abs(yy) < val && fg_y[pos] > threshold) {
+            if ((uc*uc + vc*vc) < sat_gate_sq) {
+                mk->alpha_map[i] = 0;
+                continue;
+            }
 
-		val = (yy * accept_angle_ctg) >> 4;
+            int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
+            int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
+            int dist_fp = (int)(mag_target * SCALE) - (xx << 12) + (abs(yy) * 16);
 
-		x1 = abs(val);
-		y1 = yy;
-		tmp1 = xx - x1;
+            int a = 0;
+            if (dist_fp < (c_thresh * SCALE)) {
+                a = 255 - ((dist_fp * inv_c_thresh_fp) >> 16);
+            }
 
-		kbg = (tmp1 * one_over_kc) >> 1;
-		val = (tmp1 * kfgy_scale) >> 4;
+            if (Y2[i] < l_thresh) {
+                int l_a = (l_thresh - Y2[i]) * 4;
+                if (l_a > a) a = l_a;
+            }
+            mk->alpha_map[i] = (uint8_t)CLAMP(a, 0, 255);
+        }
 
-		Y[pos] = fg_y[pos] - val;
-		/* convert suppressed fg back to cbcr */
-		Cb[pos] = ((x1 * cb) - (y1 * cr)) >> 7;
-		Cr[pos] = ((x1 * cr) - (y1 * cb)) >> 7;
+        if (soft > 0) {
+            #pragma omp for schedule(static)
+            for (int y = 0; y < h; y++) {
+                uint8_t *in = &mk->alpha_map[y * w];
+                uint8_t *out = &mk->alpha_temp[y * w];
+                for (int x = 1; x < w - 1; x++) {
+                    out[x] = DIV3(in[x-1] + in[x] + in[x+1]);
+                }
+            }
+            #pragma omp for schedule(static)
+            for (int y = 1; y < h - 1; y++) {
+                uint8_t *m = &mk->alpha_temp[y * w];
+                uint8_t *t = &mk->alpha_temp[(y-1) * w];
+                uint8_t *b = &mk->alpha_temp[(y+1) * w];
+                uint8_t *dest = &mk->alpha_map[y * w];
+                for (int x = 0; x < w; x++) {
+                    dest[x] = DIV3(t[x] + m[x] + b[x]);
+                }
+            }
+        }
 
-		Y[pos] = (Y[pos] + (kbg * bg_y[pos])) >> 8;
-		Cb[pos] = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
-		Cr[pos] = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
-	    }
-	}
+        #pragma omp for schedule(static)
+        for (int i = 0; i < len; i++) {
+            int raw_a = mk->alpha_map[i];
+            int alpha_f_fp = (raw_a - m_min) * m_range_inv_fp;
+
+            uint8_t snapped_a = (uint8_t)CLAMP(alpha_f_fp >> 12, 0, 255);
+            int a = mk->gamma_lut[snapped_a];
+
+            if (args[10]) a = 255 - a;
+
+            if (args[11] == 1) {
+                Y[i] = a; Cb[i] = 128; Cr[i] = 128;
+                continue;
+            }
+
+            int uc = (int)Cb2[i] - 128;
+            int vc = (int)Cr2[i] - 128;
+            int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
+
+            int sY = Y2[i], sCb = Cb2[i], sCr = Cr2[i];
+            
+            if (xx > 2) {
+                if (s_mode_val >= 128) {
+                    sCb = CLAMP(Cb2[i] - ((uc * spill_final_fp) >> 12), 0, 255);
+                    sCr = CLAMP(Cr2[i] - ((vc * spill_final_fp) >> 12), 0, 255);
+                    sY  = CLAMP(Y2[i] + ((s_mode_val - 128) >> 3), 0, 255);
+                }
+                else {
+                    int spill_f = (xx * spill_amt) >> 8;
+                    sY  = CLAMP(Y2[i] + ((spill_f * s_mode_val) >> 6), 0, 255);
+                    sCb = CLAMP(Cb2[i] - ((spill_f * cos_q_fp) >> 12), 0, 255);
+                    sCr = CLAMP(Cr2[i] - ((spill_f * sin_q_fp) >> 12), 0, 255);
+                }
+            }
+
+            if (args[11] == 2) {
+                Y[i] = sY; Cb[i] = sCb; Cr[i] = sCr;
+                continue;
+            }
+
+            if (a >= 254) {
+                continue;
+            }
+            
+            if (a <= 1) {
+                Y[i] = sY; Cb[i] = sCb; Cr[i] = sCr;
+                continue;
+            }
+
+            int ia = 255 - a;
+            Y[i]  = (uint8_t)DIV255(Y[i]  * a + sY  * ia);
+            Cb[i] = (uint8_t)DIV255(Cb[i] * a + sCb * ia);
+            Cr[i] = (uint8_t)DIV255(Cr[i] * a + sCr * ia);
+        }
     }
 }

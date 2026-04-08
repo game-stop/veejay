@@ -22,4 +22,6 @@
 #define COMPLEXTHRESHOLD_H
 vj_effect *complexthreshold_init(int w, int h);
 void complexthreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2,int *args);
+void *complexthreshold_malloc(int w, int h);
+void complexthreshold_free(void *ptr);
 #endif
