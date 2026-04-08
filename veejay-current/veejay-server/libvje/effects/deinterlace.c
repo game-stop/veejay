@@ -18,41 +18,69 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
+#include <config.h>
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "deinterlace.h"
+#include <omp.h>
 
 vj_effect *deinterlace_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 255;
-    ve->defaults[0] = 0;
 
-    ve->description = "Deinterlace (yuvkineco)";
+    ve->num_params = 1;
+
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    ve->limits[0][0] = 0;
+    ve->limits[1][0] = 64;
+    ve->defaults[0] = 8;
+
+    ve->description = "Deinterlace";
     ve->sub_format = -1;
     ve->extra_frame = 0;
-	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Value" );
+    ve->has_user = 0;
+
+    ve->param_description = vje_build_param_list(ve->num_params, "Motion threshold");
+
     return ve;
 }
 
-void deinterlace_apply(void *ptr, VJFrame *frame, int *args) {
-    int val = args[0];
+static void deinterlace(uint8_t *restrict src, int w, int h, int threshold)
+{
+    if (h < 3) return;
 
-	const unsigned int uv_width = frame->uv_width;
-	const unsigned int uv_height = frame->uv_height;
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
+    for (int y = 1; y < h - 1; y++)
+    {
+        uint8_t *restrict prev = src + (y - 1) * w;
+        uint8_t *restrict curr = src + y * w;
+        uint8_t *restrict next = src + (y + 1) * w;
 
-	deinterlace( Y, width,height,val);
-	deinterlace( Cb, uv_width,uv_height,val);
-	deinterlace( Cr, uv_width,uv_height,val);
+        int x = 0;
+
+        for (; x < w; x++)
+        {
+            unsigned p = prev[x];
+            unsigned n = next[x];
+
+            unsigned diff = (p > n) ? (p - n) : (n - p);
+
+            unsigned avg = (p + n) >> 1;
+
+            if (diff >= (unsigned)threshold)
+                curr[x] = (uint8_t)avg;
+        }
+    }
 }
+
+void deinterlace_apply(void *ptr, VJFrame *frame, int *args)
+{
+    int threshold = args[0];
+
+    deinterlace(frame->data[0], frame->width, frame->height, threshold);
+    deinterlace(frame->data[1], frame->uv_width, frame->uv_height, threshold);
+    deinterlace(frame->data[2], frame->uv_width, frame->uv_height, threshold);
+}
+
