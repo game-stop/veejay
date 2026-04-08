@@ -23,6 +23,11 @@
 #include "mirrors.h"
 #include "motionmap.h"
 
+#define GET_YUV_PTRS \
+    uint8_t * restrict py = yuv[0]; \
+    uint8_t * restrict pu = yuv[1]; \
+    uint8_t * restrict pv = yuv[2];
+
 vj_effect *mirrors_init(int width,int height)
 {
 
@@ -31,7 +36,7 @@ vj_effect *mirrors_init(int width,int height)
 	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
 	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
 	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-	ve->defaults[0] = 0;
+	ve->defaults[0] = 1;
 	ve->defaults[1] = 1;
 	ve->limits[0][0] = 0;	/* horizontal or vertical mirror */
 	ve->limits[1][0] = 3;
@@ -45,100 +50,77 @@ vj_effect *mirrors_init(int width,int height)
 	ve->param_description = vje_build_param_list( ve->num_params, "H or V", "Number" );
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0, "Copy Right", "Copy Left" , "Copy Top" , "Copy Down" );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0,  "Right to Left", "Left to Right" , "Bottom to Top" , "Top to Bottom" );
 
 	return ve;
 }
 
-static void _mirrors_v( uint8_t *yuv[3], int width, int height, int factor, int swap)
+static void _mirrors_v(uint8_t *yuv[3], int width, int height, int factor, int swap, int n_threads)
 {
-	const int len = width * height;
-	int r,c;
-	const int line_width = width / ( factor + 1);
-	int i=0;
+    GET_YUV_PTRS
+    const int tile_w = width / (factor + 1);
+    if (tile_w < 2) return;
 
-	if(swap)
-	{
-		for(r = 0; r < len; r += width )
-		{
-			for( c = 0 ; c < width; c+= line_width)
-			{
-				for(i = 0; i < line_width; i++)
-				{
-					yuv[0][r + c + (line_width-i)] = yuv[0][r + c + i];
-					yuv[1][r + c + (line_width-i)] = yuv[1][r + c + i];
-					yuv[2][r + c + (line_width-i)] = yuv[2][r + c + i];
-				}
-			}
-	
-		}
-	}
-	else
-	{
-		for(r = 0; r < len; r += width )
-		{
-			for( c = 0 ; c < width; c+= line_width)
-			{
-				for(i = 0; i < line_width; i++)
-				{
-					yuv[0][r + c + i] = yuv[0][r + c + (line_width-i)];
-					yuv[1][r + c + i] = yuv[1][r + c + (line_width-i)];
-					yuv[2][r + c + i] = yuv[2][r + c + (line_width-i)];
-				}
-			}
-	
-		}
-	}
+    const int half_tile = tile_w / 2;
+
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int y = 0; y < height; y++) {
+        uint8_t *ry = py + (y * width);
+        uint8_t *ru = pu + (y * width);
+        uint8_t *rv = pv + (y * width);
+
+        for (int t = 0; t <= factor; t++) {
+            int tile_off = t * tile_w;
+            for (int x = 0; x < half_tile; x++) {
+                int src_x = swap ? (tile_w - 1 - x) : x;
+                int dst_x = swap ? x : (tile_w - 1 - x);
+
+                ry[tile_off + dst_x] = ry[tile_off + src_x];
+                ru[tile_off + dst_x] = ru[tile_off + src_x];
+                rv[tile_off + dst_x] = rv[tile_off + src_x];
+            }
+        }
+    }
 }
 
-static void _mirrors_h( uint8_t *yuv[3], int width, int height, int factor, int swap)
+static void _mirrors_h(uint8_t *yuv[3], int width, int height, int factor, int swap, int n_threads)
 {
-	int line_height = height / ( factor + 1);
+    GET_YUV_PTRS
+    const int tile_h = height / (factor + 1);
+    if (tile_h < 2) return;
 
-	int nr = height / line_height;
-	int x,y,i;
-	int slice = 0;
-	int slice_end = 0;
-	if(swap)
-	{
-		for(i=0; i < nr; i++)
-		{
-			slice = i * line_height;
-			slice_end = slice + line_height;
-			for(y=slice; y < slice_end; y++)
-			{
-				for(x=0; x < width; x++)
-				{
-					yuv[0][(y*width)+x] = yuv[0][(slice_end-y)*width+x];
-					yuv[1][y*width+x] = yuv[1][(slice_end-y)*width+x];
-					yuv[2][y*width+x] = yuv[2][(slice_end-y)*width+x];
-				} 
-			}
-		}
-	}
-	else
-	{
-		for(i=0; i < nr; i++)
-		{
-			slice = i * line_height;
-			slice_end = slice + line_height;
-			for(y=slice_end; y > 0; y--)
-			{
-				for(x=0; x < width; x++)
-				{
-					yuv[0][y*width+x] = yuv[0][(slice_end-y)*width+x];
-					yuv[1][y*width+x] = yuv[1][(slice_end-y)*width+x];
-					yuv[2][y*width+x] = yuv[2][(slice_end-y)*width+x];
-				} 
-			}
-		}
-	}
+    const int half_tile = tile_h / 2;
+
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int t = 0; t <= factor; t++) {
+        int tile_start = t * tile_h;
+
+        for (int y = 0; y < half_tile; y++) {
+            int src_y_local = swap ? (tile_h - 1 - y) : y;
+            int dst_y_local = swap ? y : (tile_h - 1 - y);
+
+            const uint8_t *sY = py + (tile_start + src_y_local) * width;
+            const uint8_t *sU = pu + (tile_start + src_y_local) * width;
+            const uint8_t *sV = pv + (tile_start + src_y_local) * width;
+
+            uint8_t *dY = py + (tile_start + dst_y_local) * width;
+            uint8_t *dU = pu + (tile_start + dst_y_local) * width;
+            uint8_t *dV = pv + (tile_start + dst_y_local) * width;
+
+            for (int x = 0; x < width; x++) {
+                dY[x] = sY[x];
+                dU[x] = sU[x];
+                dV[x] = sV[x];
+            }
+        }
+    }
 }
 
 typedef struct {
     int n__;
     int N__;
     void *motionmap;
+	int n_threads;
 } mirrors_t;
     
 void *mirrors_malloc(int w, int h)
@@ -147,6 +129,7 @@ void *mirrors_malloc(int w, int h)
     if(!m) {
         return NULL;
     }
+	m->n_threads = vje_advise_num_threads(w*h);
     return m;
 }       
 
@@ -194,16 +177,16 @@ void mirrors_apply(void *ptr, VJFrame *frame, int *args ) {
 
 	switch (type) {
 		case 0:
-			_mirrors_v(frame->data, width, height, tmp2, 0);
+			_mirrors_v(frame->data, width, height, tmp2, 0,m->n_threads);
 		break;
 		case 1:
-			_mirrors_v(frame->data,width, height,tmp2,1);
+			_mirrors_v(frame->data,width, height,tmp2,1,m->n_threads);
 		break;
 		case 2:
-			_mirrors_h(frame->data,width, height,tmp2,0);
+			_mirrors_h(frame->data,width, height,tmp2,0,m->n_threads);
 		break;
 		case 3:
-			_mirrors_h(frame->data,width, height,tmp2,1);
+			_mirrors_h(frame->data,width, height,tmp2,1,m->n_threads);
 		break;
 	}
 
