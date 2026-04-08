@@ -22,4 +22,6 @@
 #define MIRRORS2_H
 vj_effect *mirrors2_init(int w, int h);
 void mirrors2_apply( void *ptr, VJFrame *frame, int *args );
+void *mirror2_malloc(int w, int h);
+void mirror2_free(void *ptr);
 #endif
