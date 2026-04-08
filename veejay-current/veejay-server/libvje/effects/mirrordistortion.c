@@ -38,8 +38,8 @@ vj_effect *mirrordistortion_init(int w, int h)
     ve->limits[1][0] = 100;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = w * 2;
-        ve->limits[0][2] = 0;
-        ve->limits[1][2] = h * 2;   
+    ve->limits[0][2] = 0;
+    ve->limits[1][2] = h * 2;
     ve->extra_frame = 0;
     ve->sub_format = 1;
     ve->has_user = 0;
@@ -63,40 +63,27 @@ typedef struct {
     int n_threads;
 } mirror_distortion_t;
 
-void *mirrordistortion_malloc(int w, int h)
-{
+void *mirrordistortion_malloc(int w, int h) {
     mirror_distortion_t *m = (mirror_distortion_t*) vj_malloc(sizeof(mirror_distortion_t));
-    if(!m) {
-        return NULL;
-    }
+    if(!m) return NULL;
+
     m->distortion = -1.0f;
-    m->cos_lut = (float*) vj_malloc( sizeof(float) * w );
-    if(!m->cos_lut) {
-        free(m);
-        return NULL;
-    }
-    m->sin_lut = (float*) vj_malloc( sizeof(float) * h );
-    if(!m->sin_lut) {
-        free(m->cos_lut);
-        free(m);
-        return NULL;
-    }
-    m->buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 3 );
-    if(!m->buf[0]) {
-        free(m->cos_lut);
-        free(m->sin_lut);
-        free(m);
-        return NULL;
-    }
-    m->buf[1] = m->buf[0] + (w*h);
-    m->buf[2] = m->buf[1] + (w*h);
+    m->cos_lut = (float*) vj_malloc(sizeof(float) * w);
+    m->sin_lut = (float*) vj_malloc(sizeof(float) * h);
 
-    m->strides[0] = (w*h);
-    m->strides[1] = m->strides[0];
-    m->strides[2] = m->strides[1];
-    m->strides[3] = 0;
+    m->buf[0] = (uint8_t*) vj_malloc(w * h * 3);
 
-    m->n_threads = vje_advise_num_threads(w*h);
+    if(!m->cos_lut || !m->sin_lut || !m->buf[0]) {
+        if(m->cos_lut) free(m->cos_lut);
+        if(m->sin_lut) free(m->sin_lut);
+        if(m->buf[0]) free(m->buf[0]);
+        free(m);
+        return NULL;
+    }
+
+    m->buf[1] = m->buf[0] + (w * h);
+    m->buf[2] = m->buf[1] + (w * h);
+    m->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) m;
 }
@@ -112,60 +99,47 @@ void mirrordistortion_free(void *ptr) {
     }
 }
 
-
-void mirrordistortion_apply(void *ptr, VJFrame *frame, int *args ) {
-
+void mirrordistortion_apply(void *ptr, VJFrame *frame, int *args) {
     mirror_distortion_t *m = (mirror_distortion_t*) ptr;
-
-    float distortionFactor = args[0] * 0.01f;
-    int offsetX = args[1] - frame->width;
-    int offsetY = args[2] - frame->height;
-
     const int w = frame->width;
     const int h = frame->height;
 
-    uint8_t *srcY = m->buf[0];
-    uint8_t *srcU = m->buf[1];
-    uint8_t *srcV = m->buf[2];
+    float dist = args[0] * 0.01f;
+    float offX = (float)(args[1] - w);
+    float offY = (float)(args[2] - h);
 
-    uint8_t *outY = frame->data[0];
-    uint8_t *outU = frame->data[1];
-    uint8_t *outV = frame->data[2];
-
-
-    if( distortionFactor != m->distortion ) {
-        for( int i = 0; i < w; i ++ ) {
-            m->cos_lut[i] = a_cos( i * distortionFactor );
-        }   
-        for( int i = 0; i < h; i ++ ) {
-            m->sin_lut[i] = a_sin( i * distortionFactor );
-        }
-        m->distortion = distortionFactor;
+    if(dist != m->distortion) {
+        for(int i = 0; i < w; i++) m->cos_lut[i] = a_cos(i * dist);
+        for(int i = 0; i < h; i++) m->sin_lut[i] = a_sin(i * dist);
+        m->distortion = dist;
     }
 
-    veejay_memcpy( m->buf[0], frame->data[0], frame->len );
-    veejay_memcpy( m->buf[1], frame->data[1], frame->len );
-    veejay_memcpy( m->buf[2], frame->data[2], frame->len );
+    veejay_memcpy(m->buf[0], frame->data[0], w * h);
+    veejay_memcpy(m->buf[1], frame->data[1], w * h);
+    veejay_memcpy(m->buf[2], frame->data[2], w * h);
 
-    #pragma omp parallel for num_threads(m->n_threads) schedule(static) collapse(2)
-    for (int i = 0; i < h; ++i) {
-        for (int j = 0; j < w; ++j) {
-            int sourceX = j + (int)(offsetX * m->sin_lut[i]);
-            int sourceY = i + (int)(offsetY * m->cos_lut[j]);
+    uint8_t * restrict srcY = m->buf[0];
+    uint8_t * restrict srcU = m->buf[1];
+    uint8_t * restrict srcV = m->buf[2];
 
-            if (sourceX < 0) sourceX = 0;
-            else if (sourceX >= w) sourceX = w - 1;
+    #pragma omp parallel for num_threads(m->n_threads) schedule(static)
+    for (int i = 0; i < h; i++) {
+        uint8_t *dstY = frame->data[0] + (i * w);
+        uint8_t *dstU = frame->data[1] + (i * w);
+        uint8_t *dstV = frame->data[2] + (i * w);
 
-            if (sourceY < 0) sourceY = 0;
-            else if (sourceY >= h) sourceY = h - 1;
+        float s_sin = m->sin_lut[i];
+        for (int j = 0; j < w; j++) {
+            int sx = j + (int)(offX * s_sin);
+            int sy = i + (int)(offY * m->cos_lut[j]);
+            sx = (sx < 0) ? 0 : (sx >= w ? w - 1 : sx);
+            sy = (sy < 0) ? 0 : (sy >= h ? h - 1 : sy);
 
-            int destIdx = i * w + j;
-            int srcIdx = sourceY * w + sourceX;
+            int srcIdx = sy * w + sx;
 
-            outY[destIdx] = srcY[srcIdx];
-            outU[destIdx] = srcU[srcIdx];
-            outV[destIdx] = srcV[srcIdx];
+            dstY[j] = srcY[srcIdx];
+            dstU[j] = srcU[srcIdx];
+            dstV[j] = srcV[srcIdx];
         }
     }
 }
-
