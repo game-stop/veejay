@@ -333,22 +333,6 @@ int max_power(int w)
  * Linear blend deinterlacing algorithm adapted from mplayer's libpostproc
  */
 
-
-
-void	deinterlace(uint8_t *data, int w, int h, int v)
-{
-	int x,y;
-	uint8_t *src;
-	for(y=1; y < h-8; y+=8)
-	{
-		for(x=0; x < w; x+=8)
-		{
-			src = data + x + y * w;	
-			linearBlend(src, w);
-		}
-	}
-}
-
 void frameborder_yuvdata(uint8_t * input_y, uint8_t * input_u,
 			 uint8_t * input_v, uint8_t * putin_y,
 			 uint8_t * putin_u, uint8_t * putin_v, int width,

@@ -415,7 +415,6 @@ void blackborder_yuvdata(uint8_t * input_y, uint8_t * input_u,
 			 uint8_t * input_v, int width, int height, int top,
 			 int bottom, int left, int right, int shiftw, int shifth, int color);
 
-void deinterlace(uint8_t *data, int width, int height, int noise);
 _pf		_get_pf(int type);
 
 uint8_t bl_pix_additive_Y(uint8_t y1, uint8_t y2);
