@@ -3632,6 +3632,14 @@ static void update_slider_range2(GtkWidget *w, gint min, gint max, gint value, g
     }
 
     GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
+    if (max - min > 80)
+    {
+        gtk_adjustment_set_page_increment(a, (max - min)>>6);
+    }
+    else
+    {
+        gtk_adjustment_set_page_increment(a, 1);
+    }
     gtk_range_set_adjustment(range, a );
 }
 
@@ -3663,6 +3671,14 @@ static void update_slider_range(const char *name, gint min, gint max, gint value
     }
 
     GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
+    if (max - min > 80)
+    {
+        gtk_adjustment_set_page_increment(a, (max - min)>>6);
+    }
+    else
+    {
+        gtk_adjustment_set_page_increment(a, 1);
+    }
     gtk_range_set_adjustment(range, a );
 }
 
