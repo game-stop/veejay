@@ -18,10 +18,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef CIRCLEFIT_H
-#define CIRCLEFIT_H
-vj_effect *circlefit_init(int w, int h);
-void *circlefit_malloc(int w, int h);
-void circlefit_free(void *ptr);
-void circlefit_apply(void *ptr, VJFrame *frame, int *args);
+#ifndef CHROMAWARP_H
+#define CHROMAWARP_H
+vj_effect *chromawarp_init(int w, int h);
+void *chromawarp_malloc(int w, int h);
+void chromawarp_free(void *ptr);
+void chromawarp_apply(void *ptr, VJFrame *frame, int *args);
 #endif

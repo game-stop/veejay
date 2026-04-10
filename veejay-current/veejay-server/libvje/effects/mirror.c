@@ -19,56 +19,65 @@
  */
 #include <config.h>
 #include <limits.h>
+#include <math.h>
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include <libvje/internal.h>
 #include "mirror.h"
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+typedef struct {
+    uint8_t *buf[3];
+    int w, h;
+    int n_threads;
+} mirror_t;
+
 vj_effect *mirror_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
-    ve->defaults[0] = w/2;
-    ve->defaults[1] = 45;
-    ve->description = "Reflection Mirror";
+    ve->num_params = 3;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
     ve->limits[0][0] = 0;
     ve->limits[1][0] = w;
+    ve->defaults[0] = w / 2;
+
     ve->limits[0][1] = 0;
-    ve->limits[1][1] = 360;
+    ve->limits[1][1] = h;
+    ve->defaults[1] = h / 2;
 
-    ve->extra_frame = 0;
+    ve->limits[0][2] = 0;
+    ve->limits[1][2] = 360;
+    ve->defaults[2] = 0;
+
+    ve->description = "Axis Mirror Folding";
     ve->sub_format = 1;
-    ve->has_user = 0;
-    ve->parallel = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Reflection Center", "Reflection Angle" );
 
-    ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->param_description = vje_build_param_list(ve->num_params,  "Center X", "Center Y", "Angle");
 
     return ve;
 }
 
-typedef struct {
-    uint8_t *buf[3];
-} mirror_t;
-
 void *mirror_malloc(int w, int h)
 {
     mirror_t *m = (mirror_t*) vj_malloc(sizeof(mirror_t));
-    if(!m) {
-        return NULL;
-    }
+    if(!m) return NULL;
 
-    m->buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 3 );
+    m->buf[0] = (uint8_t*) vj_malloc(w * h * 3);
     if(!m->buf[0]) {
         free(m);
         return NULL;
     }
+    m->buf[1] = m->buf[0] + (w * h);
+    m->buf[2] = m->buf[1] + (w * h);
+    m->w = w; m->h = h;
 
-    m->buf[1] = m->buf[0] + (w*h);
-    m->buf[2] = m->buf[1] + (w*h);
+    m->n_threads = vje_advise_num_threads(w*h);
 
     return (void*) m;
 }
@@ -76,79 +85,68 @@ void *mirror_malloc(int w, int h)
 void mirror_free(void *ptr) {
     mirror_t *m = (mirror_t*) ptr;
     if(m) {
-        if(m->buf[0])
-            free(m->buf[0]);
+        if(m->buf[0]) free(m->buf[0]);
         free(m);
     }
 }
 
-void mirror_apply(void *ptr, VJFrame *frame, int *args) { //FIXME
-
+void mirror_apply(void *ptr, VJFrame *frame, int *args) {
     mirror_t *m = (mirror_t*) ptr;
-
     const int width = frame->width;
     const int height = frame->height;
 
-    uint8_t *restrict srcY = frame->data[0];
-    uint8_t *restrict srcU = frame->data[1];
-    uint8_t *restrict srcV = frame->data[2];
+    const uint8_t *srcY = m->buf[0];
+    const uint8_t *srcU = m->buf[1];
+    const uint8_t *srcV = m->buf[2];
 
-    uint8_t *restrict dstY = frame->data[0];
-    uint8_t *restrict dstU = frame->data[1];
-    uint8_t *restrict dstV = frame->data[2];
+    uint8_t *dstY = frame->data[0];
+    uint8_t *dstU = frame->data[1];
+    uint8_t *dstV = frame->data[2];
 
-    uint8_t *restrict rotY = m->buf[0];
-    uint8_t *restrict rotU = m->buf[1];
-    uint8_t *restrict rotV = m->buf[2];
+    veejay_memcpy(m->buf[0], dstY, width * height);
+    veejay_memcpy(m->buf[1], dstU, width * height);
+    veejay_memcpy(m->buf[2], dstV, width * height);
 
-    const int reflectionCenterX = args[0];
-    const int reflectionCenterY = height/2;
-    const int reflectionAngle   = args[1];
+    const float cx = (float)args[0];
+    const float cy = (float)args[1];
+    const float angle_deg = (float)args[2];
     
-    const float angle = (double) reflectionAngle;
+    const float rad = angle_deg * (M_PI / 180.0f);
+    const float nx = cosf(rad);
+    const float ny = sinf(rad);
 
-    const float cosTheta = cosf( angle * M_PI / 180.0 );
-    const float sinTheta = sinf( angle * M_PI / 180.0 );
-
-    uint8_t black = pixel_Y_lo_;
-
-    const uint8_t p = black;
-    const uint8_t u = 128;
-    const uint8_t v = 128;
-
-    veejay_memcpy( rotY, srcY, frame->len );
-    veejay_memcpy( rotU, srcU,frame->len);
-    veejay_memcpy( rotV, srcV,frame->len);
-
-    const int flip = ( reflectionAngle >= 180 );
-
+    #pragma omp parallel for schedule(static) num_threads(m->n_threads)
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-            const int offset_x = x - reflectionCenterX;
-            const int offset_y = y - reflectionCenterY;
+            float dx = (float)x - cx;
+            float dy = (float)y - cy;
 
-            const int mirroredX = reflectionCenterX - offset_x;
-            const int mirroredY = reflectionCenterY - offset_y;
+            float dot = (dx * nx + dy * ny);
 
-            const int rotatedX = 0.5f + reflectionCenterX + (mirroredX - reflectionCenterX) * cosTheta - (y - reflectionCenterY) * sinTheta;
-            const int rotatedY = 0.5f + reflectionCenterY + (mirroredX - reflectionCenterX) * sinTheta + (y - reflectionCenterY) * cosTheta;
+            if (dot > 0) {
+                float rx = (float)x - 2.0f * dot * nx;
+                float ry = (float)y - 2.0f * dot * ny;
 
-            const int inRotation = (rotatedX >= 0 && rotatedX < width && rotatedY >= 0 && rotatedY < height);
+                int mx = (int)(rx + 0.5f);
+                int my = (int)(ry + 0.5f);
 
-            const int isAboveTop = ( y < reflectionCenterY && rotatedY < 0);
-            const int isToTheRight= flip ? ( x <= reflectionCenterX && x < rotatedX ) : ( x >= reflectionCenterX && x > rotatedX );
-            const int isToTheBottom = (y > reflectionCenterY && rotatedY < 0 );
+                mx = (mx < 0) ? -mx : mx;
+                int quotientX = mx / width;
+                mx %= width;
+                if (quotientX & 1) mx = (width - 1) - mx;
 
-            const int index = y * width + x;
-            const int rot_index = rotatedY * width + rotatedX;
+                my = (my < 0) ? -my : my;
+                int quotientY = my / height;
+                my %= height;
+                if (quotientY & 1) my = (height - 1) - my;
 
-            dstY[ index ] = (isAboveTop || isToTheRight || isToTheBottom ? rotY[ index ] : ( inRotation ? srcY[ rot_index ] : p ) );
-            dstU[ index ] = (isAboveTop || isToTheRight || isToTheBottom ? rotU[ index ] : ( inRotation ? srcU[ rot_index ] : u ) );
-            dstV[ index ] = (isAboveTop || isToTheRight || isToTheBottom ? rotV[ index ] : ( inRotation ? srcV[ rot_index ] : v ) );
+                int idx = y * width + x;
+                int s_idx = my * width + mx;
 
+                dstY[idx] = srcY[s_idx];
+                dstU[idx] = srcU[s_idx];
+                dstV[idx] = srcV[s_idx];
+            }
         }
     }
-
-
 }
-

@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2023 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,11 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-
-#ifndef BALLOONFIT_H
-#define BALLOONFIT_H
-vj_effect *balloonfit_init(int w, int h);
-void *balloonfit_malloc(int w, int h);
-void balloonfit_free(void *ptr);
-void balloonfit_apply(void *ptr, VJFrame *frame, int *args);
+#ifndef ALIENCHROMAFLOW_H
+#define ALIENCHROMAFLOW_H
+vj_effect *alienchromaflow_init(int w, int h);
+void *alienchromaflow_malloc(int w, int h);
+void alienchromaflow_free(void *ptr);
+void alienchromaflow_apply(void *ptr, VJFrame *frame, int *args);
 #endif

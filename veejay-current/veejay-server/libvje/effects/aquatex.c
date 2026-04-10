@@ -20,10 +20,12 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "aquatex.h"
+#include <math.h>
+#include <omp.h>
 
 #define NB_SIZE 128
-#define LUT_SIZE 360
-#define RAND_LUT_SIZE 1000
+#define LUT_SIZE 1024
+#define RAND_LUT_SIZE 2048
 
 vj_effect *aquatex_init(int w, int h)
 {
@@ -34,208 +36,113 @@ vj_effect *aquatex_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 100;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 100;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 360;
-    ve->limits[0][3] = 1;
-    ve->limits[1][3] = NB_SIZE;
-    ve->limits[0][4] = 0;
-    ve->limits[1][4] = 100;
+    ve->limits[0][0] = 0;   ve->limits[1][0] = 100;
+    ve->limits[0][1] = 1;   ve->limits[1][1] = 100;
+    ve->limits[0][2] = 0;   ve->limits[1][2] = 360;
+    ve->limits[0][3] = 1;   ve->limits[1][3] = NB_SIZE;
+    ve->limits[0][4] = 0;   ve->limits[1][4] = 100;
 
-    ve->defaults[0] = 1;
-    ve->defaults[1] = 1;
-    ve->defaults[2] = 1;
-    ve->defaults[3] = 1;
-    ve->defaults[4] = 1;
+    ve->defaults[0] = 30;
+    ve->defaults[1] = 10;
+    ve->defaults[2] = 0;
+    ve->defaults[3] = 20;
+    ve->defaults[4] = 5;
 
-    ve->description = "Turbulent Aquatex";
     ve->sub_format = 1;
-    ve->extra_frame = 0;
-    ve->parallel = 2;
-    ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Intensity", "Frequency", "Phase Shift", "Neighbourhood Size", "Turbulence" );
+
+    ve->description = "Improved Aquatex";
+    ve->param_description = vje_build_param_list( ve->num_params, "Intensity", "Wave Scale", "Phase", "Spread", "Noise" );
     return ve;
 }
 
 typedef struct  
 {
-    uint8_t *buf[3];
-    float *lut;
+    uint8_t *temp_buf;
     float *sin_lut;
-    float *rand_lut;
-    float *offset_y_lut; 
-    float *offset_x_lut;
-    int nb_size_current;
+    float *noise_lut;
+    int n_threads;
 } aquatex_t;
 
-static void init_sin_lut(aquatex_t *f)
-{
-    for(int i = 0; i < LUT_SIZE; ++i) {
-        f->sin_lut[i] = sinf( 2.0f * M_PI * i / LUT_SIZE );
-    }
-}
 void *aquatex_malloc(int w, int h) {
     aquatex_t *s = (aquatex_t*) vj_calloc(sizeof(aquatex_t));
     if(!s) return NULL;
     
-    s->buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 3 );
-    if(!s->buf[0]) {
-        free(s);
-        return NULL;
-    }
-    s->buf[1] = s->buf[0] + ( w * h );
-    s->buf[2] = s->buf[1] + ( w * h );
-
-    const int nb = NB_SIZE * 2 + 1;
-    s->nb_size_current = nb;
-
-    s->lut = (float*) vj_malloc(sizeof(float) * (3 * nb) ); 
-    if(!s->lut) {
-        free(s->buf[0]);
-        free(s);
-        return NULL;
-    }
-
+    s->temp_buf = (uint8_t*) vj_malloc(w * h * 4); 
     s->sin_lut = (float*) vj_malloc(sizeof(float) * LUT_SIZE);
-    if (!s->sin_lut) {
-        free(s->lut);
-        free(s->buf[0]);
-        free(s);
-        return NULL;
+    s->noise_lut = (float*) vj_malloc(sizeof(float) * RAND_LUT_SIZE);
+
+    for(int i = 0; i < LUT_SIZE; ++i) {
+        s->sin_lut[i] = sinf( 2.0f * M_PI * i / LUT_SIZE );
     }
-    
-    s->rand_lut = (float*) vj_malloc(sizeof(float) * RAND_LUT_SIZE);
-    s->offset_y_lut = (float*) vj_malloc(sizeof(float) * RAND_LUT_SIZE);
-    s->offset_x_lut = (float*) vj_malloc(sizeof(float) * RAND_LUT_SIZE);
-    
-    if (!s->rand_lut || !s->offset_y_lut || !s->offset_x_lut) {
-        aquatex_free(s);
-        return NULL;
+    for(int i = 0; i < RAND_LUT_SIZE; ++i) {
+        s->noise_lut[i] = ((float)rand() / (float)RAND_MAX) - 0.5f;
     }
 
-    init_sin_lut(s);
+    s->n_threads = vje_advise_num_threads(w*h);
+
     return (void*) s;
 }
 
 void aquatex_free(void *ptr) {
     aquatex_t *s = (aquatex_t*) ptr;
     if (!s) return;
-    free(s->buf[0]);
-    free(s->lut);
+    free(s->temp_buf);
     free(s->sin_lut);
-    free(s->rand_lut);
-    free(s->offset_y_lut);
-    free(s->offset_x_lut);
+    free(s->noise_lut);
     free(s);
 }
 
 void aquatex_apply(void *ptr, VJFrame *frame, int *args) {
     aquatex_t *s = (aquatex_t*)ptr;
-    if (!s) return;
+    if (!s || !frame || !frame->data[0]) return;
 
-    const float intensity   = (float)args[0] * 0.01f;
-    const float frequency   = (float)args[1] * 0.1f;
-    const float phase_shift = (float)args[2] * LUT_SIZE / 360.0f;
-    int neighborhood_size = args[3];
-    const float turbulence  = (float)args[4] * 0.01f;
+    const float intensity   = (float)args[0]; 
+    const float frequency   = (float)args[1] * 0.05f;
+    const float phase_shift = (float)args[2] * (LUT_SIZE / 360.0f);
+    const float noise_amp   = (float)args[4] * 0.1f;
 
-    if(neighborhood_size <= 0) neighborhood_size = 1;
-    if(neighborhood_size > NB_SIZE) neighborhood_size = NB_SIZE;
-
-    const int width = frame->out_width;
-    const int height = frame->out_height;
-
+    const int w = frame->width;
     const int h = frame->height;
+    const int plane_size = w * h;
 
-    uint8_t *restrict srcY = frame->data[0];
-    uint8_t *restrict srcU = frame->data[1];
-    uint8_t *restrict srcV = frame->data[2];
+    veejay_memcpy(s->temp_buf,                  frame->data[0], plane_size);
+    veejay_memcpy(s->temp_buf + plane_size,     frame->data[1], plane_size);
+    veejay_memcpy(s->temp_buf + (plane_size*2), frame->data[2], plane_size);
 
-    uint8_t *restrict bufY = s->buf[0];
-    uint8_t *restrict bufU = s->buf[1];
-    uint8_t *restrict bufV = s->buf[2];
-    
-    uint8_t *outY;
-    uint8_t *outU;
-    uint8_t *outV;
+    uint8_t *restrict srcY = s->temp_buf;
+    uint8_t *restrict srcU = s->temp_buf + plane_size;
+    uint8_t *restrict srcV = s->temp_buf + (plane_size * 2);
 
-    float *restrict sin_lut = s->sin_lut;
-    float *restrict rand_lut = s->rand_lut;
-    float *restrict offset_y_lut = s->offset_y_lut;
-    float *restrict offset_x_lut = s->offset_x_lut;
+    uint8_t *restrict dstY = frame->data[0];
+    uint8_t *restrict dstU = frame->data[1];
+    uint8_t *restrict dstV = frame->data[2];
 
-    const int nb = neighborhood_size * 2 + 1;
-
-    if( vje_setup_local_bufs( 1, frame, &outY, &outU, &outV, NULL ) == 0 ) {
-        const int len = width * height;
-        veejay_memcpy( bufY, srcY, len );
-        veejay_memcpy( bufU, srcU, len );
-        veejay_memcpy( bufV, srcV, len );
-
-        srcY = bufY;
-        srcU = bufU;
-        srcV = bufV;  
-    }
-
-    if( turbulence > 0 ) {
-        for (int i = 0; i < RAND_LUT_SIZE; ++i) {
-            rand_lut[i] = (rand() / (float)RAND_MAX - 0.5) * turbulence;
-        }
-    }
-    else {
-        veejay_memset( rand_lut, 0, sizeof(float) * RAND_LUT_SIZE );
-    }
-
-    float phase = -frequency * LUT_SIZE + phase_shift;
-    float step  = (frequency * LUT_SIZE) / (float) neighborhood_size;
-
-    for (int i = 0; i < nb; i++) {
-        int index = (int)phase;
-        if (index < 0) index += LUT_SIZE;
-        else if (index >= LUT_SIZE) index -= LUT_SIZE;
-
-        float value = intensity * sin_lut[index];
-        offset_y_lut[i] = value;
-        offset_x_lut[i] = value;
-        phase += step;
-    }
-
-    int rand_idx = 0;
-    for (int y_pos = 0; y_pos < h; y_pos++) {
-        int lut_y_idx = y_pos % nb;
-        int lut_x_idx = 0;
+    #pragma omp parallel for num_threads(s->n_threads) schedule(static) \
+        firstprivate(w, h, frequency, phase_shift, intensity, noise_amp)
+    for (int y = 0; y < h; y++) {
+        int y_wave_idx = (int)(y * frequency + phase_shift) & (LUT_SIZE - 1);
+        float v_offset = s->sin_lut[y_wave_idx] * intensity;
         
-        for (int x_pos = 0; x_pos < width; x_pos++) {
-            const int pixel_index = y_pos * width + x_pos;
-            const float r = rand_lut[ pixel_index % RAND_LUT_SIZE ];
+        int dst_row_offset = y * w;
 
-            rand_idx += 1;
-            rand_idx -= (rand_idx >= RAND_LUT_SIZE) * RAND_LUT_SIZE;
+        for (int x = 0; x < w; x++) {
+            int x_wave_idx = (int)(x * frequency * 0.9f) & (LUT_SIZE - 1);
+            float h_offset = s->sin_lut[x_wave_idx] * intensity;
 
-            const float offset_y = offset_y_lut[lut_y_idx] + r;
-            const float offset_x = offset_x_lut[lut_x_idx] + r;
+            float noise = s->noise_lut[(x + y) % RAND_LUT_SIZE] * noise_amp;
 
-            int new_y = (int)(y_pos + offset_y * height);
-            int new_x = (int)(x_pos + offset_x * width);
+            int sx = x + (int)(v_offset + noise + 0.5f);
+            int sy = y + (int)(h_offset + noise + 0.5f);
 
-            new_y = new_y < 0 ? 0 : new_y;
-            new_y = new_y > height - 1 ? height - 1 : new_y;
+            sx = (sx < 0) ? 0 : (sx >= w ? w - 1 : sx);
+            sy = (sy < 0) ? 0 : (sy >= h ? h - 1 : sy);
 
-            new_x = new_x < 0 ? 0 : new_x;
-            new_x = new_x > width - 1 ? width - 1 : new_x;
+            int src_idx = sy * w + sx;
+            int dst_idx = dst_row_offset + x;
 
-            const int src_idx = new_y * width + new_x;
-                
-            outY[pixel_index] = srcY[src_idx];
-            outU[pixel_index] = srcU[src_idx];
-            outV[pixel_index] = srcV[src_idx];
-
-            lut_x_idx += 1;
-            lut_x_idx -= (lut_x_idx == nb) * nb;
+            dstY[dst_idx] = srcY[src_idx];
+            dstU[dst_idx] = srcU[src_idx];
+            dstV[dst_idx] = srcV[src_idx];
         }
     }
 }
-

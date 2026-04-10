@@ -20,6 +20,7 @@
 
 #include "common.h"
 #include <veejaycore/vjmem.h>
+#include <omp.h>
 #include "bwotsu.h"
 
 vj_effect *bwotsu_init(int w, int h)
@@ -43,9 +44,6 @@ vj_effect *bwotsu_init(int w, int h)
 	ve->description = "Black and White Mask by Otsu's method";
     
 	ve->sub_format = -1;
-	ve->extra_frame = 0;
-	ve->has_user =0;
-	ve->parallel = 1;
 	
 	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
 
@@ -54,8 +52,7 @@ vj_effect *bwotsu_init(int w, int h)
 	return ve;
 }
 
-
-void bwotsu_apply(void *ptr, VJFrame *frame, int *args) { //FIXME banding
+void bwotsu_apply(void *ptr, VJFrame *frame, int *args) {
     int mode   = args[0];
     int skew   = args[1];
     int invert = args[2];
@@ -68,16 +65,21 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args) { //FIXME banding
 
     uint32_t histogram[256] = {0};
 
+    const int n_threads = vje_advise_num_threads(len);
+
     if (skew != 0xff) {
         uint8_t Lookup[256];
         __init_lookup_table(Lookup, 256, 0.0f, 255.0f, 0.0f, (float)skew);
 
+        #pragma omp parallel for num_threads(n_threads) reduction(+:histogram)
         for (int i = 0; i < len; i++) {
             histogram[Lookup[Y[i]]]++;
         }
     } else {
-        for (int i = 0; i < len; i++)
+        #pragma omp parallel for num_threads(n_threads) reduction(+:histogram)
+        for (int i = 0; i < len; i++) {
             histogram[Y[i]]++;
+        }
     }
 
     const uint32_t threshold = otsu_method(histogram);
@@ -87,18 +89,23 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args) { //FIXME banding
 
     switch (mode) {
         case 0:
-#pragma omp simd
+            #pragma omp parallel for num_threads(n_threads)
             for (int i = 0; i < len; i++) {
                 const uint8_t cond = (Y[i] >= threshold);
                 Y[i] = (cond * high) | ((1 - cond) * low);
             }
-            veejay_memset(Cb, 128, (frame->ssm ? len : frame->uv_len));
-            veejay_memset(Cr, 128, (frame->ssm ? len : frame->uv_len));
+
+            #pragma omp parallel sections num_threads(n_threads)
+            {
+                #pragma omp section
+                veejay_memset(Cb, 128, (frame->ssm ? len : frame->uv_len));
+                #pragma omp section
+                veejay_memset(Cr, 128, (frame->ssm ? len : frame->uv_len));
+            }
             break;
 
         case 1:
-            
-#pragma omp simd
+            #pragma omp parallel for num_threads(n_threads)
             for (int i = 0; i < len; i++) {
                 const uint8_t cond = (Y[i] >= threshold);
                 A[i] = (cond * high) | ((1 - cond) * low);

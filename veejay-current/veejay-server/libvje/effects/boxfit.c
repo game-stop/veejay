@@ -1,5 +1,4 @@
-/* 
- * Linux VeeJay
+/* * Linux VeeJay
  *
  * Copyright(C)2023 Niels Elburg <nwelburg@gmail.com>
  *
@@ -19,314 +18,179 @@
  */
 #include <config.h>
 #include <time.h>
+#include <string.h>
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "boxfit.h"
+#include <omp.h>
 
-#define CLAMP(x, min, max) ((x < min) ? min : ((x > max) ? max : x))
+#define CLAMP(x, min, max) ((x < (min)) ? (min) : ((x > (max)) ? (max) : (x)))
+
+typedef struct
+{
+    uint8_t *buf[3];
+    uint32_t *integralY;
+    uint32_t *integralU;
+    uint32_t *integralV;
+    int n_threads;
+} boxfit_t;
 
 vj_effect *boxfit_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 4;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
-    
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = ( w < h ? w/4 : h/4);
-
-    ve->limits[0][1] = 2;
-    ve->limits[1][1] = ( w < h ? w/4 : h/4);
-
+    ve->limits[0][0] = 2;
+    ve->limits[1][0] = w/8;
+    ve->limits[0][1] = 4;
+    ve->limits[1][1] = w/4;
     ve->limits[0][2] = 1;
-    ve->limits[1][2] = 0xff;
+    ve->limits[1][2] = 255;
+    ve->limits[0][3] = 0;
+    ve->limits[1][3] = 1;
 
-    ve->limits[0][3] = 1;
-    ve->limits[1][3] = 100;
-
-    ve->defaults[0] = 6;
-    ve->defaults[1] = 33;
-    ve->defaults[2] = 196;
-    ve->defaults[3] = 25;
-
-    /*
-     * box fitting while keeping some reflection/representation of the original frame
-     *
-     * inspired by the gmic's boxfitting effect
-     *
-     * https://gmic.eu/gallery/img/artistic_zelda_full_24.jpg
-     */
+    ve->defaults[0] = 8;
+    ve->defaults[1] = 40;
+    ve->defaults[2] = 128;
+    ve->defaults[3] = 1;
 
     ve->description = "Box Accumulator";
     ve->sub_format = 1;
-    ve->extra_frame = 0;
-    ve->parallel = 0;
-    ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Min Size", "Max Size" , "Contrast", "Smooth" );
+    ve->param_description = vje_build_param_list(ve->num_params, "Min Size", "Max Size", "Sensitivity", "Borders" );
     return ve;
 }
-
-typedef struct
-{
-    uint8_t *buf[3];
-    int *boxSizes;
-    int *boxIndices;
-    int numBoxes;
-    int minSize;
-    int maxSize;
-    double runningAvg;
-} boxfit_t;
-
-static int boxfit_prepare(boxfit_t *boxfit, int min_size, int max_size);
 
 void *boxfit_malloc(int w, int h)
 {
     boxfit_t *s = (boxfit_t *)vj_calloc(sizeof(boxfit_t));
+    if (!s) return NULL;
 
-    if (!s)
-        return NULL;
+    s->buf[0] = (uint8_t *)vj_malloc(w * h * 3);
+    s->integralY = (uint32_t *)vj_malloc(sizeof(uint32_t) * (w + 1) * (h + 1) * 3);
+    s->integralU = s->integralY + ((w + 1) * (h + 1));
+    s->integralV = s->integralU + ((w + 1) * (h + 1));
+    s->n_threads = vje_advise_num_threads(w * h);
 
-    s->buf[0] = (uint8_t *)vj_malloc(sizeof(uint8_t) * w * h * 3);
-
-    if (!s->buf[0])
-    {
+    if (!s->buf[0] || !s->integralY) {
+        if(s->buf[0]) free(s->buf[0]);
+        if(s->integralY) free(s->integralY);
         free(s);
         return NULL;
     }
 
     s->buf[1] = s->buf[0] + (w * h);
     s->buf[2] = s->buf[1] + (w * h);
-
-    veejay_memset(s->buf[0], 0, (w*h));
-    veejay_memset(s->buf[1], 128, (w*h));
-    veejay_memset(s->buf[2], 128, (w*h));
-
-    srand((unsigned int) time(NULL));
-
     return (void *)s;
 }
 
 void boxfit_free(void *ptr)
 {
     boxfit_t *s = (boxfit_t *)ptr;
-    free(s->buf[0]);
-    free(s);
+    if(s) {
+        free(s->buf[0]);
+        free(s->integralY);
+        free(s);
+    }
 }
 
-// fisher yates shuffling
-static void shuffle_array(int *array, int size)
+static inline uint32_t get_rect_sum(uint32_t *intC, int stride, int x, int y, int rw, int rh)
 {
-    for (int i = size - 1; i > 0; --i)
-    {
-        int j = rand() % (i + 1);
-        int temp = array[i];
-        array[i] = array[j];
-        array[j] = temp;
-    }
+    int x2 = x + rw;
+    int y2 = y + rh;
+    return intC[y2 * stride + x2] - intC[y * stride + x2] - intC[y2 * stride + x] + intC[y * stride + x];
 }
-
-// adjust buffers when size change and calculate random sized boxes
-static int boxfit_prepare(boxfit_t *boxfit, int min_size, int max_size)
-{
-    if (boxfit->minSize == min_size && boxfit->maxSize == max_size &&
-        boxfit->boxSizes != NULL && boxfit->boxIndices != NULL)
-    {
-        return 1;
-    }
-
-    if (boxfit->minSize != min_size || boxfit->maxSize != max_size)
-    {
-        free(boxfit->boxSizes);
-        free(boxfit->boxIndices);
-        boxfit->boxSizes = NULL;
-        boxfit->boxIndices = NULL;
-    }
-
-    if (max_size <= min_size)
-    {
-        return 0;
-    }
-
-    boxfit->numBoxes = rand() % (max_size - min_size + 1) + min_size;
-
-    boxfit->boxSizes = (int *)vj_malloc(sizeof(int) * boxfit->numBoxes);
-    boxfit->boxIndices = (int *)vj_malloc(sizeof(int) * boxfit->numBoxes);
-
-    if (boxfit->boxSizes == NULL || boxfit->boxIndices == NULL)
-    {
-        return 0;
-    }
-
-    for (int k = 0; k < boxfit->numBoxes; ++k)
-    {
-        boxfit->boxSizes[k] = rand() % (max_size - min_size + 1) + min_size;
-        boxfit->boxIndices[k] = k;
-    }
-
-    shuffle_array(boxfit->boxIndices, boxfit->numBoxes);
-
-    boxfit->minSize = min_size;
-    boxfit->maxSize = max_size;
-
-    return 1;
-}
-
-// determine the local contrast within the specified box and keep a running average (to prevent jumpy behaviour)
-static double calculateLocalContrast(uint8_t *srcY, int width, int height, int i, int j, int box_size, double *runavg, double weight)
-{
-    int sum = 0;
-    for (int ii = 0; ii < box_size; ++ii)
-    {
-#pragma omp simd
-        for (int jj = 0; jj < box_size; ++jj)
-        {
-            int row = i + ii;
-            int col = j + jj;
-
-            row = (row < height) ? row : (row - height);
-            col = (col < width) ? col : (col - width);
-
-            int src_idx = row * width + col;
-            sum += srcY[src_idx];
-        }
-    }
-
-    int avg = sum / (box_size * box_size);
-    int contrast = 0;
-    double maxContrast = 255.0 * box_size;
-    
-    for (int ii = 0; ii < box_size; ++ii)
-    {
-#pragma omp simd
-        for (int jj = 0; jj < box_size; ++jj)
-        {
-            int row = i + ii;
-            int col = j + jj;
-
-            row = (row < height) ? row : (row - height);
-            col = (col < width) ? col : (col - width);
-
-            int src_idx = row * width + col;
-            int pixelValue = srcY[src_idx];
-
-            int diff = pixelValue - avg;
-            contrast += (diff ^ (diff >> 31)) - (diff >> 31);
-        }
-    }
-
-    double nc = (double) contrast / maxContrast;
-    *runavg = (*runavg * ( 1.0 - weight )) + (nc * weight);
-
-    return *runavg;
-}
-
 
 void boxfit_apply(void *ptr, VJFrame *frame, int *args)
 {
     boxfit_t *s = (boxfit_t *)ptr;
-    const uint8_t min_size = args[0];
-    const uint8_t max_size = args[1];
-    const uint8_t contrast = args[2];
-    const double weight = (double) args[3] * 0.01;
+    const int min_s = args[0];
+    const int max_s = args[1];
+    const int sensitivity = CLAMP(args[2], 1, 255);
+    const int show_borders = args[3];
 
     const int width = frame->width;
     const int height = frame->height;
+    const int stride = width + 1;
 
-    uint8_t *restrict srcY = frame->data[0];
-    uint8_t *restrict srcU = frame->data[1];
-    uint8_t *restrict srcV = frame->data[2];
-
-    uint8_t *restrict bufY = s->buf[0];
-    uint8_t *restrict bufU = s->buf[1];
-    uint8_t *restrict bufV = s->buf[2];
-
-    if (boxfit_prepare(s, min_size, max_size) == 0)
-        return;
-
-    int *restrict boxSizes = s->boxSizes;
-    int *restrict boxIndices = s->boxIndices;
-    int numBoxes = s->numBoxes;
-    int boxIndex = 0;
-
-    for (int i = 0; i < height;)
-    {
-        for (int j = 0; j < width;)
-        {
-            int box_index = boxIndices[ boxIndex ];
-            int box_size = boxSizes[box_index];
-
-            double localContrast = calculateLocalContrast(srcY, width, height, i, j, box_size, &(s->runningAvg), weight);
-            double sizeMultiplier = 1.0 - (localContrast / contrast); 
-
-            box_size = CLAMP((int)(box_size * sizeMultiplier), min_size, max_size);
-    
-            int avgY = 0, avgU = 128, avgV = 128;
-
-            const int box_size_squared = box_size * box_size;
-
-            // determine the average color of the "selected" box
-            for (int ii = 0; ii < box_size; ++ii)
-            {
-                for (int jj = 0; jj < box_size; ++jj)
-                {
-                    int row = i + ii;
-                    int col = j + jj;
-
-                    row = (row < height) ? row : (row - height);
-                    col = (col < width) ? col : (col - width);
-
-                    int src_idx = row * width + col;
-
-                    avgY += srcY[src_idx];
-                    avgU += (srcU[src_idx]-128);
-                    avgV += (srcV[src_idx]-128);
-                }
-            }
-
-            avgY /= box_size_squared;
-            avgU /= box_size_squared;
-            avgV /= box_size_squared; 
-
-            // fill up and draw a border around it
-            for (int ii = 0; ii < box_size; ++ii)
-            {
-                for (int jj = 0; jj < box_size; ++jj)
-                {
-                    int row = i + ii;
-                    int col = j + jj;
-
-                    row = (row < height) ? row : (row - height);
-                    col = (col < width) ? col : (col - width);
-
-                    int src_idx = row * width + col;
-
-                    if (ii == 0 || ii == box_size - 1 || jj == 0 || jj == box_size - 1)
-                    {
-                        bufY[src_idx] = pixel_Y_lo_;
-                        bufU[src_idx] = 128;
-                        bufV[src_idx] = 128;
-                    }
-                    else
-                    { 
-                        bufY[src_idx] = avgY;
-                        bufU[src_idx] = CLAMP_UV(128 + avgU);
-                        bufV[src_idx] = CLAMP_UV(128 + avgV);
-                    } 
-                }
-            }
-
-            j += box_size;
-            boxIndex = (boxIndex + 1) % numBoxes;
-        }
-
-        i += boxSizes[ boxIndices[boxIndex] ];
+    int size_lut[256];
+    for (int i = 0; i < 256; i++) {
+        float avg = (float)i + 0.001f;
+        float s_f = (float)sensitivity;
+        float detail = (avg > s_f) ? (s_f / avg) : (avg / s_f);
+        int sz = (((int)(max_s * detail) + 2) >> 2) << 2;
+        size_lut[i] = CLAMP(sz, min_s, max_s);
     }
 
-    // copy back, inplace 
-    veejay_memcpy( srcY, bufY, frame->len);
-    veejay_memcpy( srcU, bufU, frame->len);
-    veejay_memcpy( srcV, bufV, frame->len);
-}
+    #pragma omp parallel for num_threads(3)
+    for (int c = 0; c < 3; c++) {
+        uint8_t *src = frame->data[c];
+        uint32_t *intC = (c == 0) ? s->integralY : (c == 1 ? s->integralU : s->integralV);
 
+        for (int x = 0; x <= width; x++) intC[x] = 0;
+
+        for (int y = 0; y < height; y++) {
+            uint32_t row_sum = 0;
+            uint32_t *curr = &intC[(y+1) * stride];
+            uint32_t *prev = &intC[y * stride];
+            curr[0] = 0;
+            for (int x = 0; x < width; x++) {
+                row_sum += src[y * width + x];
+                curr[x+1] = prev[x+1] + row_sum;
+            }
+        }
+    }
+
+    int i = 0;
+    while (i < height) {
+        int rem_h = height - i;
+        int sh = (min_s < rem_h ? min_s : rem_h);
+        int r_avg = get_rect_sum(s->integralY, stride, 0, i, (min_s < width ? min_s : width), sh) / 
+                    ((min_s < width ? min_s : width) * sh);
+        int row_h = size_lut[r_avg]; 
+        if (row_h > rem_h) row_h = rem_h;
+
+        int j = 0;
+        while (j < width) {
+            int rem_w = width - j;
+            int sw = (min_s < rem_w ? min_s : rem_w);
+            int b_avg = get_rect_sum(s->integralY, stride, j, i, sw, row_h) / (sw * row_h);
+            int box_w = size_lut[b_avg];
+            if (box_w > rem_w) box_w = rem_w;
+
+            uint32_t area = box_w * row_h;
+            uint8_t valY = (uint8_t)(get_rect_sum(s->integralY, stride, j, i, box_w, row_h) / area);
+            uint8_t valU = (uint8_t)(get_rect_sum(s->integralU, stride, j, i, box_w, row_h) / area);
+            uint8_t valV = (uint8_t)(get_rect_sum(s->integralV, stride, j, i, box_w, row_h) / area);
+            uint8_t borderY = valY >> 1;
+
+            for (int bi = 0; bi < row_h; bi++) {
+                int row_off = (i + bi) * width + j;
+                uint8_t *pY = frame->data[0] + row_off;
+                uint8_t *pU = frame->data[1] + row_off;
+                uint8_t *pV = frame->data[2] + row_off;
+
+                if (show_borders) {
+                    if (bi == 0 || bi == row_h - 1) {
+                        for (int bk = 0; bk < box_w; bk++) pY[bk] = borderY;
+                    } else {
+                        pY[0] = borderY;
+                        for (int bk = 1; bk < box_w - 1; bk++) pY[bk] = valY;
+                        pY[box_w - 1] = borderY;
+                    }
+                } else {
+                    for (int bk = 0; bk < box_w; bk++) pY[bk] = valY;
+                }
+
+                for (int bk = 0; bk < box_w; bk++) {
+                    pU[bk] = valU;
+                    pV[bk] = valV;
+                }
+            }
+            j += box_w;
+        }
+        i += row_h;
+    }
+}

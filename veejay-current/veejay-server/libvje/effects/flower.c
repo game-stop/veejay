@@ -18,9 +18,11 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include "common.h"
+ #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "flower.h"
+#include <omp.h>
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -28,6 +30,7 @@
 #define FP_SHIFT 16
 #define FP_MULT (1 << FP_SHIFT)
 #define LUT_SIZE 8192
+
 typedef struct 
 {
     uint8_t *buf[3];
@@ -40,6 +43,7 @@ typedef struct
     
     int last_petal_count;
     int last_petal_length;
+    int n_threads;
 } flower_t;
 
 vj_effect *flower_init(int w, int h)
@@ -52,7 +56,7 @@ vj_effect *flower_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     
     ve->limits[0][0] = 1;
-    ve->limits[1][0] = 100;
+    ve->limits[1][0] = 200;
     ve->defaults[0] = 8;
 
     ve->limits[0][1] = 1;
@@ -85,6 +89,8 @@ void *flower_malloc(int w, int h) {
     s->dist_idx = (uint16_t *)(s->atan2_idx + len);
     s->offset_map = (int *)(s->dist_idx + len);
 
+    s->n_threads = vje_advise_num_threads(w * h);
+
     int cx = w >> 1;
     int cy = h >> 1;
     
@@ -92,7 +98,6 @@ void *flower_malloc(int w, int h) {
         int dy = y - cy;
         for (int x = 0; x < w; ++x, ++i) {
             int dx = x - cx;
-            
             float angle = atan2f((float)dy, (float)dx);
             int a_idx = (int)(((angle + M_PI) / (2.0f * M_PI)) * (LUT_SIZE - 1));
             s->atan2_idx[i] = (a_idx < 0) ? 0 : (a_idx >= LUT_SIZE ? LUT_SIZE - 1 : a_idx);
@@ -107,6 +112,7 @@ void *flower_malloc(int w, int h) {
     s->last_petal_length = -1;
     return (void*) s;
 }
+
 void flower_free(void *ptr) {
     flower_t *s = (flower_t*) ptr;
     if (s) {
@@ -146,16 +152,18 @@ void flower_apply(void *ptr, VJFrame *frame, int *args) {
 
     if (petalCount != s->last_petal_count) {
         for (int i = 0; i < LUT_SIZE; i++) {
-            float angle = ((float)i / (LUT_SIZE - 1)) * 2.0f * M_PI - M_PI;
-            s->cos_lut_1d[i] = (int32_t)((1.0f + cosf(petalCount * angle)) * FP_MULT);
+            float angle = ((float)i / (LUT_SIZE - 1)) * 2.0f * M_PI;
+            s->cos_lut_1d[i] = (int32_t)((cosf(petalCount * angle) * 0.5f) * FP_MULT);
         }
         s->last_petal_count = petalCount;
         needs_update = 1;
     }
+
     if (petalLength != s->last_petal_length) {
-        float inv_len = 1.0f / (float)petalLength;
+        float inv_len = 1.0f / (float)(petalLength + 1);
         for (int i = 0; i < LUT_SIZE; i++) {
-            s->exp_lut_1d[i] = (int32_t)(expf(-(float)i * inv_len) * FP_MULT);
+            float decay = expf(-(float)i * inv_len);
+            s->exp_lut_1d[i] = (int32_t)(decay * FP_MULT);
         }
         s->last_petal_length = petalLength;
         needs_update = 1;
@@ -165,32 +173,28 @@ void flower_apply(void *ptr, VJFrame *frame, int *args) {
         const int cx = width >> 1;
         const int cy = height >> 1;
         
-        for (int dy_val = -cy; dy_val < (height - cy); dy_val++) {
-            const int y_curr = cy + dy_val;
-            const int row_base = y_curr * width;
+        #pragma omp parallel for num_threads(s->n_threads) schedule(static)
+        for (int i = 0; i < len; i++) {
+            const int x_curr = i % width;
+            const int y_curr = i / width;
+            const int dx_orig = x_curr - cx;
+            const int dy_orig = y_curr - cy;
 
-            for (int dx_val = -cx; dx_val < (width - cx); dx_val++) {
-                const int x_curr = cx + dx_val;
-                const int i = row_base + x_curr;
+            const uint16_t a_idx = s->atan2_idx[i];
+            const uint16_t d_idx = s->dist_idx[i];
 
-                const uint16_t a_idx = s->atan2_idx[i];
-                const uint16_t d_idx = s->dist_idx[i];
+            int64_t combined = (int64_t)s->cos_lut_1d[a_idx] * s->exp_lut_1d[d_idx];
+            int32_t pVal = (int32_t)(combined >> FP_SHIFT);
 
-                int64_t combined = (int64_t)s->cos_lut_1d[a_idx] * s->exp_lut_1d[d_idx];
-                int32_t pVal = (int32_t)(combined >> FP_SHIFT);
+            int mx = x_curr + ((dx_orig * pVal) >> FP_SHIFT);
+            int my = y_curr + ((dy_orig * pVal) >> FP_SHIFT);
 
-                int mx = cx + ((dx_val * pVal) >> FP_SHIFT);
-                int my = cy + ((dy_val * pVal) >> FP_SHIFT);
-
-                mx = (mx < 0) ? 0 : (mx > w_limit ? w_limit : mx);
-                my = (my < 0) ? 0 : (my > h_limit ? h_limit : my);
-
-                s->offset_map[i] = my * width + mx;
-            }
+            s->offset_map[i] = fast_clamp(my, h_limit) * width + fast_clamp(mx, w_limit);
         }
     }
 
     int *restrict map = s->offset_map;
+    #pragma omp parallel for num_threads(s->n_threads) schedule(static)
     for (int i = 0; i < len; i++) {
         const int src_idx = map[i];
         srcY[i] = bufY[src_idx];

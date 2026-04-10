@@ -17,7 +17,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "rotate.h"
@@ -32,13 +31,49 @@ typedef struct {
     int n_threads;
 } rotate_t;
 
+/* --- Internal Helpers --- */
+
+static inline __attribute__((always_inline)) uint8_t fast_bilinear(
+    const uint8_t * __restrict__ img, const int w, 
+    const int x_fixed, const int y_fixed) 
+{
+    const int x = x_fixed >> 16;
+    const int y = y_fixed >> 16;
+    
+    const int xf = (x_fixed >> 8) & 0xFF;
+    const int yf = (y_fixed >> 8) & 0xFF;
+
+    const int idx = y * w + x;
+    
+    const int w11 = (256 - xf) * (256 - yf);
+    const int w21 = xf * (256 - yf);
+    const int w12 = (256 - xf) * yf;
+    const int w22 = xf * yf;
+
+    const int res = (img[idx] * w11 + img[idx + 1] * w21 + 
+                     img[idx + w] * w12 + img[idx + w + 1] * w22);
+
+    return (uint8_t)(res >> 16);
+}
+
+static inline float mirror_coord(float pos, float max) {
+    if (pos < 0) pos = -pos;
+    if (pos >= max) pos = 2.0f * max - pos;
+    // Final clamp to ensure bilinear +1 safety
+    if (pos < 0) return 0;
+    if (pos > max - 1.001f) return max - 1.001f;
+    return pos;
+}
+
+/* --- VeeJay Effect Interface --- */
+
 vj_effect *rotate_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults[0] = 0;
     ve->defaults[1] = 1;
     ve->defaults[2] = 100;
@@ -48,124 +83,109 @@ vj_effect *rotate_init(int width, int height)
     ve->limits[1][1] = 1;
     ve->limits[0][2] = 1;
     ve->limits[1][2] = 1500;
-    ve->description = "Rotate";
-
+    ve->description = "Rotate (Bilinear/Mirror)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Rotate", "Automatic", "Duration");
     ve->has_user = 0;
-
     return ve;
 }
 
 void *rotate_malloc(int width, int height)
 {
-    int i;
-    rotate_t *r = (rotate_t*) vj_calloc( sizeof(rotate_t) );
-    if(!r) {
-        return NULL;
-    }
+    rotate_t *r = (rotate_t*) vj_calloc(sizeof(rotate_t));
+    if(!r) return NULL;
 
+    // Buffer for Y, U, V
     r->buf[0] = (uint8_t *) vj_calloc(sizeof(uint8_t) * (width * height * 3));
     if(!r->buf[0]) {
         free(r);
         return NULL;
     }
-
     r->buf[1] = r->buf[0] + (width * height);
     r->buf[2] = r->buf[1] + (width * height);
-
     r->direction = 1;
 
-    for( i = 0; i < 360; i ++ ) {
-        r->sin_lut[i] = a_sin( i * M_PI / 180.0 );
-        r->cos_lut[i] = a_cos( i * M_PI / 180.0 );
+    for(int i = 0; i < 360; i++) {
+        r->sin_lut[i] = a_sin(i * M_PI / 180.0);
+        r->cos_lut[i] = a_cos(i * M_PI / 180.0);
     }
-
     r->n_threads = vje_advise_num_threads(width * height);
-
     return (void*) r;
 }
 
 void rotate_free(void *ptr) {
-
     rotate_t *r = (rotate_t*) ptr;
-
-    if(r->buf[0])
-        free(r->buf[0]);
-
+    if(r->buf[0]) free(r->buf[0]);
     free(r);
 }
-
-
-void rotate_apply( void *ptr, VJFrame *frame, int *args )
+void rotate_apply(void *ptr, VJFrame *frame, int *args)
 {
     rotate_t *r = (rotate_t*) ptr;
-
-    const unsigned int width = frame->width;
-    const unsigned int height = frame->height;
-    const int len = frame->len;
+    const int width = frame->width;
+    const int height = frame->height;
+    const int plane_size = width * height;
     
     double rotate = args[0];
-    int autom = args[1];
-    int maxFrames = args[2];
-
-    if( autom ) {
+    if(args[1]) { 
         rotate = r->rotate;
-
-        r->rotate += (r->direction * (360.0 / maxFrames));
-
-        r->frameCount ++;
-
-        if( r->frameCount % maxFrames == 0 || (r->rotate <= 0 || r->rotate >= 360)) {
+        r->rotate += (r->direction * (360.0 / args[2]));
+        r->frameCount++;
+        if(r->frameCount % args[2] == 0 || (r->rotate <= 0 || r->rotate >= 360)) {
             r->direction *= -1;
             r->frameCount = 0;
         }
     }
 
+    // 1. Copy ALL planes at full resolution (4:4:4)
+    veejay_memcpy(r->buf[0], frame->data[0], plane_size);
+    veejay_memcpy(r->buf[1], frame->data[1], plane_size);
+    veejay_memcpy(r->buf[2], frame->data[2], plane_size);
+
+    const float centerX = width * 0.5f;
+    const float centerY = height * 0.5f;
+    const int angle = (int)rotate % 360;
+    const float c = r->cos_lut[angle];
+    const float s = r->sin_lut[angle];
+
     uint8_t *dstY = frame->data[0];
     uint8_t *dstU = frame->data[1];
     uint8_t *dstV = frame->data[2];
 
-    uint8_t *srcY = r->buf[0];
-    uint8_t *srcU = r->buf[1];
-    uint8_t *srcV = r->buf[2];
-
-    veejay_memcpy( r->buf[0], frame->data[0], frame->len );
-    veejay_memcpy( r->buf[1], frame->data[1], frame->len );
-    veejay_memcpy( r->buf[2], frame->data[2], frame->len );
-
-    const int centerX = width / 2;
-    const int centerY = height / 2;
-
-    float *cos_lut = r->cos_lut;
-    float *sin_lut = r->sin_lut;
-
-    int rotate_angle = (int)rotate % 360;
-    float cos_val = cos_lut[rotate_angle];
-    float sin_val = sin_lut[rotate_angle];
-
+    const float w_max = (float)width - 1.001f;
+    const float h_max = (float)height - 1.001f;
 
 #pragma omp parallel for schedule(static) num_threads(r->n_threads)
     for (int y = 0; y < height; ++y) {
-        int dy = y - centerY;
+        const float dy = (float)y - centerY;
+        const int row_off = y * width;
 
-#pragma omp simd
         for (int x = 0; x < width; ++x) {
-            int dx = x - centerX;
+            const float dx = (float)x - centerX;
 
-            int rotatedX = (int)(dx * cos_val - dy * sin_val + centerX);
-            int rotatedY = (int)(dx * sin_val + dy * cos_val + centerY);
+            // Rotate
+            float rx = dx * c - dy * s + centerX;
+            float ry = dx * s + dy * c + centerY;
 
-            int newX = (rotatedX < 0) ? 0 : ((rotatedX >= width) ? width - 1 : rotatedX);
-            int newY = (rotatedY < 0) ? 0 : ((rotatedY >= height) ? height - 1 : rotatedY);
+            // Reflective Mirroring
+            while (rx < 0 || rx > w_max) {
+                if (rx < 0) rx = -rx;
+                else rx = 2.0f * w_max - rx;
+            }
+            while (ry < 0 || ry > h_max) {
+                if (ry < 0) ry = -ry;
+                else ry = 2.0f * h_max - ry;
+            }
 
-            int srcIndex = newY * width + newX;
-            int dstIndex = y * width + x;
-            dstY[dstIndex] = srcY[srcIndex];
-            dstU[dstIndex] = srcU[srcIndex];
-            dstV[dstIndex] = srcV[srcIndex];
+            // Convert to Fixed Point once per pixel
+            const int rx_f = (int)(rx * 65536.0f);
+            const int ry_f = (int)(ry * 65536.0f);
+            const int dst_idx = row_off + x;
+
+            // 2. Sample all planes at full resolution
+            dstY[dst_idx] = fast_bilinear(r->buf[0], width, rx_f, ry_f);
+            dstU[dst_idx] = fast_bilinear(r->buf[1], width, rx_f, ry_f);
+            dstV[dst_idx] = fast_bilinear(r->buf[2], width, rx_f, ry_f);
         }
     }
-
 }
