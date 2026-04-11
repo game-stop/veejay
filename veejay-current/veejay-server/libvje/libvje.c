@@ -253,6 +253,7 @@ static struct {
     { chameleon_init, chameleon_malloc,chameleon_free,chameleon_prepare,NULL,chameleon_apply,NULL,NULL,chameleon_request_fx,chameleon_set_motionmap,VJ_IMAGE_EFFECT_CHAMELEON},
     { chameleonblend_init, chameleonblend_malloc,chameleonblend_free, chameleonblend_prepare,NULL,NULL,chameleonblend_apply,NULL,chameleonblend_request_fx,chameleonblend_set_motionmap,VJ_VIDEO_EFFECT_CHAMBLEND},
     { cartonize_init,NULL,NULL,NULL,NULL,cartonize_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_CARTONIZE},
+    { charcoalsketch_init,charcoalsketch_malloc,charcoalsketch_free,NULL,NULL,charcoalsketch_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_CHARCOAL},
     { bwselect_init,bwselect_malloc,bwselect_free,NULL,NULL,bwselect_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BWSELECT },
     { bwotsu_init,NULL,NULL,NULL,NULL,bwotsu_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_BWOTSU },
     { borders_init,NULL,NULL,NULL,NULL,borders_apply,NULL,NULL,NULL,NULL,VJ_VIDEO_EFFECT_BORDERS }, 
