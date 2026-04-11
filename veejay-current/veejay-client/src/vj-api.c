@@ -1368,7 +1368,6 @@ static void set_selection_of_slot_in_samplebank(gboolean active);
 static void remove_sample_from_slot(void);
 static void create_ref_slots(int envelope_size);
 static void create_sequencer_slots(int x, int y);
-void clear_samplebank_pages(void);
 void free_samplebank(void);
 void reset_samplebank(void);
 int verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_type );
@@ -9171,13 +9170,12 @@ void vj_gui_disconnect(int restart_schedule)
 
     if (restart_schedule) {
         reloaded_schedule_restart();
-        clear_samplebank_pages();
-        free_samplebank();
+        reset_samplebank();
     }
     else {
         multitrack_close_tracks(info->mt);
         multitrack_disconnect(info->mt);
-        free_samplebank();
+        reset_samplebank();
     }
 
     if(info->client)
@@ -9305,12 +9303,6 @@ void reset_samplebank(void)
             }
         }
     }
-}
-
-void clear_samplebank_pages(void)
-{
-    while( gtk_notebook_get_n_pages(GTK_NOTEBOOK(info->sample_bank_pad) ) > 0 )
-        gtk_notebook_remove_page( GTK_NOTEBOOK(info->sample_bank_pad), -1 );
 }
 
 void free_samplebank(void)
