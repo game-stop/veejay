@@ -21,20 +21,20 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "chromium.h"
+#include <omp.h>
 
 vj_effect *chromium_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 1;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 9;
     ve->defaults[0] = 0;
     ve->description = "Chromium";
-    ve->parallel = 1;
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
@@ -54,84 +54,81 @@ vj_effect *chromium_init(int w, int h)
 void chromium_apply(void *ptr, VJFrame *frame, int *args ) {
 
     int m = args[0];
-
+    int n_threads = vje_advise_num_threads(frame->len);
     const int len = (frame->ssm ? frame->len : frame->uv_len);
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
     unsigned int i;
-    double tmp;
     switch(m){
         case 0:
-#pragma omp simd
+#pragma omp parallel for num_threads(n_threads) schedule(static)
         for( i = 0; i < len ; i++) {
           Cb[i] = 0xff - Cb[i];
         }
         break;
         case 1:
-#pragma omp simd
+#pragma omp parallel for num_threads(n_threads) schedule(static)
         for( i = 0; i < len ; i++) {
           Cr[i] = 0xff - Cr[i];
         }
         break;
         case 2:
-#pragma omp simd
+#pragma omp parallel for num_threads(n_threads) schedule(static)
         for( i = 0; i < len; i++) {
           Cb[i] = 0xff - Cb[i];
           Cr[i] = 0xff - Cr[i];
         }
         break;
         case 3:
-#pragma omp simd
-        // swap cb/cr
+#pragma omp parallel for num_threads(n_threads) schedule(static)
         for (i = 0; i < len ; i++) {
-          tmp = Cb[i];
+          uint8_t tmp = Cb[i];
           Cb[i] = Cr[i];
           Cr[i] = tmp;
         }
         break;
         case 4:
-#pragma omp simd
+#pragma omp parallel for num_threads(n_threads) schedule(static)
         for (i = 0; i < len ; i++) {
           Cb[i] = 0xff - Cr[i];
         }
         break;
         case 5:
-#pragma omp simd
+#pragma omp parallel for num_threads(n_threads) schedule(static)
         for (i = 0; i < len ; i++) {
           Cr[i] = 0xff - Cb[i];
         }
         break;
         case 6:
-#pragma omp simd
+#pragma omp parallel for num_threads(n_threads) schedule(static)
         for (i = 0; i < len ; i++) {
-          tmp = Cr[i];
+          uint8_t tmp = Cr[i];
           Cr[i] = 0xff - Cb[i];
           Cb[i] = 0xff - tmp;
         }
         break;
         case 7:
-#pragma omp simd
+#pragma omp parallel for num_threads(n_threads) schedule(static)
         for (i = 0; i < len ; i++) {
-          tmp = Cr[i];
+          uint8_t tmp = Cr[i];
           Cr[i] = Cb[i];
           Cb[i] = 0xff - tmp;
         }
         break;
         case 8:
-#pragma omp simd
+#pragma omp parallel for num_threads(n_threads) schedule(static)
         for (i = 0; i < len ; i++) {
-          tmp = Cr[i];
+          uint8_t tmp = Cr[i];
           Cr[i] = 0xff - Cb[i];
           Cb[i] = tmp;
         }
         break;
-        case 9: // yellow on white
-#pragma omp simd
-	for( i = 0; i < len ; i++) {
+        case 9:
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+        for( i = 0; i < len ; i++) {
           Cb[i] = 0xaa - Cb[i];
         }
         break;
     }
-
 }
