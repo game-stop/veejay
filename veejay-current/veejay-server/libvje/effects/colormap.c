@@ -21,15 +21,16 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "colormap.h"
+#include <omp.h>
 
 vj_effect *colormap_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
     ve->limits[0][1] = 0;
@@ -44,9 +45,8 @@ vj_effect *colormap_init(int w, int h)
     ve->description = "Color Harmony";
     ve->sub_format = -1;
     ve->extra_frame = 0;
-	ve->has_user = 0;
-	ve->parallel = 1;
-	ve->param_description = vje_build_param_list( ve->num_params, "Red","Green","Blue" );
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list( ve->num_params, "Red","Green","Blue" );
     return ve;
 }
 
@@ -55,9 +55,11 @@ void colormap_apply(void *ptr, VJFrame *frame, int *args) {
     int g = args[1];
     int b = args[2];
 
+    int n_threads = vje_advise_num_threads(frame->len);
+
     const int uv_len = frame->uv_len;
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
     uint8_t u_table[256];
     uint8_t v_table[256];
@@ -74,7 +76,7 @@ void colormap_apply(void *ptr, VJFrame *frame, int *args) {
         v_table[i] = (uint8_t)(255 + (diff_v & (diff_v >> 31)));
     }
 
-#pragma omp simd
+#pragma omp parallel for num_threads(n_threads) schedule(static)
     for (int i = 0; i < uv_len; i++) {
         Cb[i] = u_table[Cb[i]];
         Cr[i] = v_table[Cr[i]];
