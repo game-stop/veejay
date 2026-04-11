@@ -39,38 +39,34 @@ vj_effect *rainbowshift_init(int w, int h)
     ve->description = "Rainbow Shift";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 1;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Amplitude", "Frequency" );
     return ve;
 }
 
 
-void rainbowshift_apply( void *ptr, VJFrame *frame, int *args ) {
-    int shift_amplitude = args[0];
-	int shift_frequency = args[1];
+void rainbowshift_apply(void *ptr, VJFrame *frame, int *args) {
+    const int shift_amplitude = args[0];
+    const int shift_frequency = args[1];
 
-    int i;
-    const int len = frame->len;
+    const size_t len = (size_t)frame->len;
 
-    uint8_t *Y = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
-/*
-	for( i = 0; i < len; i ++ ) {
-		int shift = (Y[i] * shift_factor) >> 8;
+    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
-		Cb[i] = ( Cb[i] + shift ) & 255;
-		Cr[i] = ( Cr[i] - shift ) & 255;
-	}
-*/
+    const int n_threads = vje_advise_num_threads((int)len);
+    const double freq_factor = (2.0 * M_PI * shift_frequency) / (double)len;
 
-	
-	for (i = 0; i < len; i++) {
-        double wave_shift = shift_amplitude * a_sin(2 * M_PI * shift_frequency * i / len);
+#pragma omp parallel num_threads(n_threads)
+    {
+#pragma omp for schedule(static)
+        for (size_t i = 0; i < len; i++) {
+            int wave_shift = (int)(shift_amplitude * a_sin(freq_factor * i));
 
-        Cb[i] = (Cb[i] + (int)wave_shift) & 255;
-        Cr[i] = (Cr[i] - (int)wave_shift) & 255;
-        Y[i] = (Y[i] + (int)wave_shift) & 255;
+            Cb[i] = (uint8_t)((Cb[i] + wave_shift) & 255);
+            Cr[i] = (uint8_t)((Cr[i] - wave_shift) & 255);
+            Y[i]  = (uint8_t)((Y[i] + wave_shift) & 255);
+        }
     }
 }

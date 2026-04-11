@@ -36,7 +36,6 @@ vj_effect *killchroma_init(int w, int h)
 	ve->description = "Filter out chroma channels";
 	ve->extra_frame = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Mode" );
-	ve->parallel = 1;
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 

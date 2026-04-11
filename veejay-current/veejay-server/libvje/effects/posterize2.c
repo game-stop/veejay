@@ -43,7 +43,6 @@ vj_effect *posterize2_init(int w, int h)
 	ve->limits[0][3] = 0;
 	ve->limits[1][3] = 5;
 
-	ve->parallel = 1;
     ve->description = "Posterize II (Threshold Range)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
@@ -53,6 +52,7 @@ vj_effect *posterize2_init(int w, int h)
 	return ve;	
 }
 
+
 void posterize2_apply(void *ptr, VJFrame *frame, int *args)
 {
     const int vfactor = args[0];
@@ -61,114 +61,53 @@ void posterize2_apply(void *ptr, VJFrame *frame, int *args)
     const int mode = args[3];
 
     const int len = frame->len;
-    const int factor = 256 / vfactor;
+    const int factor = 256 / (vfactor > 0 ? vfactor : 1);
 
-    uint8_t * restrict Y  = frame->data[0];
-    uint8_t * restrict Cb = frame->data[1];
-    uint8_t * restrict Cr = frame->data[2];
-    uint8_t * restrict A  = frame->data[3];
+    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict A  = frame->data[3];
 
     const uint8_t lo = pixel_Y_lo_;
     const uint8_t hi = pixel_Y_hi_;
     const uint8_t neutral = 128;
 
-    uint8_t lutY[256];
-    uint8_t lutA[256];
-    uint8_t mask[256];
-
-
-    for (int i = 0; i < 256; ++i)
-    {
-        uint8_t v = (i / factor) * factor;
-
+    uint8_t lutY[256], lutA[256], mask[256];
+    for (int i = 0; i < 256; ++i) {
+        uint8_t v = (uint8_t)((i / factor) * factor);
         lutY[i] = v;
         lutA[i] = v;
         mask[i] = 0;
 
-        switch (mode)
-        {
-            case 0:
-                if (v < t1 || v > t2)
-                {
-                    lutY[i] = lo;
-                    mask[i] = 1;
-                }
-                break;
-
-            case 1:
-                if (v >= t1 && v <= t2)
-                {
-                    mask[i] = 1;
-                }
-                break;
-
-            case 2:
-                if (v < t1)
-                {
-                    lutY[i] = lo;
-                    mask[i] = 1;
-                }
-                else if (v > t2)
-                {
-                    lutY[i] = hi;
-                    mask[i] = 1;
-                }
-                break;
-
-            case 3:
-                if (v < t1 || v > t2)
-                    lutA[i] = lo;
-                break;
-
-            case 4:
-                if (v < t1 || v > t2)
-                    lutA[i] = A[0];
-                break;
-
-            case 5:
-                if (v < t1)
-                    lutA[i] = lo;
-                else if (v > t2)
-                    lutA[i] = hi;
-                break;
+        switch (mode) {
+            case 0: if (v < t1 || v > t2) { lutY[i] = lo; mask[i] = 1; } break;
+            case 1: if (v >= t1 && v <= t2) mask[i] = 1; break;
+            case 2: if (v < t1) { lutY[i] = lo; mask[i] = 1; } else if (v > t2) { lutY[i] = hi; mask[i] = 1; } break;
+            case 3: if (v < t1 || v > t2) lutA[i] = lo; break;
+            case 4: if (v < t1 || v > t2) lutA[i] = (A ? A[0] : 0); break;
+            case 5: if (v < t1) lutA[i] = lo; else if (v > t2) lutA[i] = hi; break;
         }
     }
 
-    switch (mode)
+    const int n_threads = vje_advise_num_threads(len);
+
+#pragma omp parallel num_threads(n_threads)
     {
-        case 0:
-        case 1:
-        case 2:
-        {
-            for (int i = 0; i < len; ++i)
-            {
-                uint8_t y = Y[i];
-                uint8_t newY = lutY[y];
-
-                Y[i] = newY;
-
-                if (mask[y])
-                {
+        if (mode <= 2) {
+#pragma omp for schedule(static)
+            for (int i = 0; i < len; ++i) {
+                uint8_t y_idx = Y[i];
+                Y[i] = lutY[y_idx];
+                if (mask[y_idx]) {
                     Cb[i] = neutral;
                     Cr[i] = neutral;
                 }
             }
-            break;
-        }
-
-        case 3:
-        case 4:
-        case 5:
-        {
-            for (int i = 0; i < len; ++i)
-            {
-                uint8_t y = Y[i];
-                A[i] = lutA[y];
+        } else {
+#pragma omp for schedule(static)
+            for (int i = 0; i < len; ++i) {
+                A[i] = lutA[Y[i]];
             }
-            break;
         }
-
-        default:
-            break;
     }
 }

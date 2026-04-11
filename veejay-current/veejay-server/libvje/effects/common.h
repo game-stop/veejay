@@ -355,12 +355,13 @@ enum
 #define _CLAMP(a,min,max) ( round1(a) < min ? min : ( round1(a) > max ? max : round1(a) ))
 
 
-#define	__init_lookup_table( T,Tsize, b_min, b_max, min, max ) \
-	float __c = ((float) (Tsize-1)) / ( (float) b_max - (float) b_min );\
-	int __i;\
-	for( __i = 0; __i < Tsize; __i ++ ) {\
-		T[__i] = _CLAMP( (float) __i * __c - (float) b_min, min,max );\
-	}\
+#define __init_lookup_table(T, Tsize, b_min, b_max, min, max) do { \
+    float __c = ((float) (Tsize - 1)) / ((float) (b_max) - (float) (b_min)); \
+    int __i; \
+    for (__i = 0; __i < (Tsize); __i++) { \
+        (T)[__i] = (uint8_t)_CLAMP((float)(__i - (b_min)) * __c, (min), (max)); \
+    } \
+} while(0)
 
 typedef uint8_t (*pix_func_Y) (uint8_t y1, uint8_t y2);
 typedef uint8_t (*pix_func_C) (uint8_t y1, uint8_t y2);

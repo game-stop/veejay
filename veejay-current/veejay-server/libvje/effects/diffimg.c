@@ -49,7 +49,6 @@ vj_effect *diffimg_init(int width, int height)
     ve->extra_frame = 0;
     ve->sub_format = -1;
     ve->has_user = 0;
-    ve->parallel = 1;
 
     ve->hints = vje_init_value_hint_list (ve->num_params);
     vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
@@ -59,39 +58,39 @@ vj_effect *diffimg_init(int width, int height)
     return ve;
 }
 
-void diffimg_apply(void *ptr, VJFrame *frame, int *args) {
-    int type = args[0];
-    int threshold_min = args[1];
-    int threshold_max = args[2];
 
-    const int width = frame->width;
-    const int len = frame->len - width - 1;
+void diffimg_apply(void *ptr, VJFrame *frame, int *args) {
+    const int type = args[0];
+    const int threshold_min = args[1];
+    const int threshold_max = args[2];
+
+    const int len = frame->len;
     uint8_t *Y = frame->data[0];
 
     _pf _pff = _get_pf(type);
 
-    uint8_t lo = pixel_Y_lo_ ? pixel_Y_lo_ : 1;
-#pragma omp simd
-    for (size_t i = 0; i < len; i++) {
-        uint8_t y = Y[i];
-        uint8_t yb = y;
+    const int n_threads = vje_advise_num_threads(len);
+    const uint8_t lo = pixel_Y_lo_ ? pixel_Y_lo_ : 1;
+    const uint8_t hi = pixel_Y_hi_;
 
-        uint8_t in_range = (y >= threshold_min && y <= threshold_max);
+#pragma omp parallel num_threads(n_threads)
+    {
+#pragma omp for schedule(static)
+        for (size_t i = 0; i < len; i++) {
+            uint8_t y = Y[i];
+            uint8_t in_range = (y >= threshold_min && y <= threshold_max);
 
-        int m = (Y[i + 1] + Y[i + width] + Y[i + width + 1] + 2) >> 2;
+            if (in_range) {
 
-        int d = (y - m) * 5;
-        m += d;
+                int y_calc = (int)y;
 
-        int y_calc = ((((y << 1) - (255 - m)) >> 1) + y) >> 1;
+                y_calc = lo + ((y_calc - threshold_min) * (hi - lo) /
+                         (threshold_max - threshold_min + 1));
 
-        y_calc = (y_calc < lo) ? lo : (y_calc > pixel_Y_hi_ ? pixel_Y_hi_ : y_calc);
+                y_calc = (y_calc < lo) ? lo : (y_calc > hi ? hi : y_calc);
 
-        Y[i] = in_range ? _pff((uint8_t)y_calc, yb) : y;
-    }
-
-#pragma omp simd
-    for (size_t i = len; i < (len + width); i++) {
-        Y[i] = Y[i - width];
+                Y[i] = _pff((uint8_t)y_calc, y);
+            }
+        }
     }
 }

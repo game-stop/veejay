@@ -49,17 +49,17 @@ vj_effect *cosmichue_init(int w, int h)
     ve->description = "Cosmic Hue";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 1;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Amplitude", "Frequency", "Opacity", "Hue Shift" );
     return ve;
 }
-  
 
 void cosmichue_apply(void *ptr, VJFrame *frame, int *args)
 {
     const int opacity = args[2];
     const int len = frame->len;
+
+    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *Y = frame->data[0];
     uint8_t *U = frame->data[1];
@@ -78,25 +78,22 @@ void cosmichue_apply(void *ptr, VJFrame *frame, int *args)
     float cos_lut[256];
     float hsin_lut[256];
     float hcos_lut[256];
-
     const float angle_step = (float)(2.0 * M_PI / 256.0);
 
     for (int i = 0; i < 256; i++) {
         float luminance = i / 255.0f;
         float angle = i * angle_step;
-
         sin_lut[i]  = amplitude * a_sin(frequency * luminance);
         cos_lut[i]  = amplitude * a_cos(frequency * luminance);
         hsin_lut[i] = a_sin(angle);
         hcos_lut[i] = a_cos(angle);
     }
 
-    const int angle_index =
-        (int)((hue_shift / (float)(2.0 * M_PI)) * 256.0f) & 0xFF;
-
+    const int angle_index = (int)((hue_shift / (float)(2.0 * M_PI)) * 256.0f) & 0xFF;
     const float cos_val = hcos_lut[angle_index];
     const float sin_val = hsin_lut[angle_index];
 
+#pragma omp parallel for num_threads(n_threads) schedule(static)
     for (int i = 0; i < len; i++) {
         int u = (int)U[i] - 128;
         int v = (int)V[i] - 128;
@@ -110,8 +107,8 @@ void cosmichue_apply(void *ptr, VJFrame *frame, int *args)
         int u_rot = 128 + (int)(u * cos_val - v * sin_val);
         int v_rot = 128 + (int)(u * sin_val + v * cos_val);
 
-        u_rot = (u_rot + (u_rot >> 31)) ^ (u_rot >> 31);
-        v_rot = (v_rot + (v_rot >> 31)) ^ (v_rot >> 31);
+        u_rot = (u_rot < 0) ? 0 : (u_rot > 255 ? 255 : u_rot);
+        v_rot = (v_rot < 0) ? 0 : (v_rot > 255 ? 255 : v_rot);
 
         U[i] = (uint8_t)((opacity * u_rot + (255 - opacity) * U[i]) >> 8);
         V[i] = (uint8_t)((opacity * v_rot + (255 - opacity) * V[i]) >> 8);

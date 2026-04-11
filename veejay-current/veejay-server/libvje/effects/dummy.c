@@ -38,7 +38,6 @@ vj_effect *dummy_init(int w, int h)
     ve->description = "Dummy Frame";
     ve->sub_format = -1;
     ve->extra_frame = 0;
-    	ve->parallel = 1;
 	ve->has_user= 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Color");
 	return ve;

@@ -21,72 +21,88 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "levelcorrection.h"
+#include <omp.h>
+
+typedef struct {
+    int n_threads;
+} level_t;
 
 vj_effect *levelcorrection_init(int w,int h)
 {
     vj_effect *ve;
     ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 4;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 0;	/* minimum level */
-    ve->defaults[1] = 255;	/* maximum level */
-	ve->defaults[2] = 0;
-	ve->defaults[3] = 0;    /* disabled */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 255;
+    ve->defaults[0] = 0;    /* Level Min */
+    ve->defaults[1] = 255;  /* Level Max */
+    ve->defaults[2] = 0;    /* Shrink Min */
+    ve->defaults[3] = 255;  /* Shrink Max (Corrected default) */
 
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
+    for(int i=0; i<4; i++) {
+        ve->limits[0][i] = 0;
+        ve->limits[1][i] = 255;
+    }
 
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
+    ve->param_description = vje_build_param_list(ve->num_params, "Level Min", "Level Max", "Shrink Min", "Shrink Max");
 
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 255;
-
-
-	ve->param_description = vje_build_param_list(ve->num_params, "Level Min", "Level Max", "Shrink Min", "Shrink Max");
-
-	ve->has_user = 0;
+    ve->has_user = 0;
     ve->description = "Alpha: Level Correction";
     ve->extra_frame = 0;
     ve->sub_format = -1;
-	ve->rgb_conv = 0;
-    ve->parallel = 1;
-	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_SRC_A;
-	return ve;
+    ve->rgb_conv = 0;
+    ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_SRC_A;
+    return ve;
+}
+
+void *levelcorrection_malloc(int w, int h) {
+    level_t *lt = (level_t*) vj_malloc(sizeof(level_t));
+    if(!lt) return NULL;
+    lt->n_threads = vje_advise_num_threads(w*h);
+    return (void*) lt;
+}
+
+void levelcorrection_free(void *ptr) {
+    if(ptr) free(ptr);
 }
 
 void levelcorrection_apply(void *ptr, VJFrame *frame, int *args) {
+    level_t *lt = (level_t*) ptr;
     int min = args[0];
     int max = args[1];
     int bmin = args[2];
     int bmax = args[3];
 
-	unsigned int pos;
-	uint8_t *A = frame->data[3];
-	const int len = frame->len;
-	/* level correction tables */
+    uint8_t *A = frame->data[3];
+    const int len = frame->len;
 
-	uint8_t __lookup_table[256];
-	uint8_t __lookup_tableII[256];
+    lt->n_threads = vje_advise_num_threads(len);
 
-	if( max > min ) {
-		__init_lookup_table( __lookup_table, 256, (float)min, (float)max, 0, 0xff ); 
-	
-		for( pos = 0; pos < len; pos ++ ) {
-			A[pos]  = __lookup_table[A[pos]];
-		}
-	}
+    uint8_t lut[256];
+    uint8_t tmp_lut[256];
+    int apply_levels = (max > min);
+    int apply_shrink = (bmax > bmin);
 
-	if( bmax > bmin ) {
-		__init_lookup_table( __lookup_tableII, 256, 0.0f, 255.0f, bmin,bmax ); 
-		for( pos = 0; pos < len; pos ++ ) {
-			A[pos]  = __lookup_tableII[ A[pos] ];
-		}
-	}
+    if (!apply_levels && !apply_shrink) return;
 
+    if (apply_levels && apply_shrink) {
+        uint8_t lut1[256];
+        uint8_t lut2[256];
+        __init_lookup_table(lut1, 256, (float)min, (float)max, 0, 0xff);
+        __init_lookup_table(lut2, 256, 0.0f, 255.0f, bmin, bmax);
+        for(int i = 0; i < 256; i++) {
+            lut[i] = lut2[lut1[i]];
+        }
+    } else if (apply_levels) {
+        __init_lookup_table(lut, 256, (float)min, (float)max, 0, 0xff);
+    } else {
+        __init_lookup_table(lut, 256, 0.0f, 255.0f, bmin, bmax);
+    }
+
+#pragma omp parallel for simd schedule(static) num_threads(lt->n_threads)
+    for(int pos = 0; pos < len; pos++) {
+        A[pos] = lut[A[pos]];
+    }
 }

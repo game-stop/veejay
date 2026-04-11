@@ -24,108 +24,104 @@
 
 vj_effect *complexsaturation_init(int w, int h)
 {
-    vj_effect *ve;
-    ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 7;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
-    ve->defaults[0] = 4500; /* angle */
-    ve->defaults[1] = 0;    /* r */
-    ve->defaults[2] = 0;    /* g */
-    ve->defaults[3] = 255;  /* b */
-    ve->defaults[4] = 50;   /* v_adjust */
-    ve->defaults[5] = 50;   /* degrees */
-    ve->defaults[6] = 0; /* noise suppression */ 
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 9000;
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    ve->num_params = 9;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
+    ve->defaults[0] = 4500; /* Hue Angle */
+    ve->defaults[1] = 0;    /* Red */
+    ve->defaults[2] = 255;  /* Green */
+    ve->defaults[3] = 0;    /* Blue */
+    ve->defaults[4] = 40;   /* Threshold */
+    ve->defaults[5] = 160;  /* Solidity */
+    ve->defaults[6] = 50;   /* Saturation (v_adjust) */
+    ve->defaults[7] = 50;   /* Hue Degrees */
+    ve->defaults[8] = 0;
 
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
+    ve->limits[0][0] = 500;  ve->limits[1][0] = 8500;
+    ve->limits[0][1] = 0;    ve->limits[1][1] = 255;
+    ve->limits[0][2] = 0;    ve->limits[1][2] = 255;
+    ve->limits[0][3] = 0;    ve->limits[1][3] = 255;
+    ve->limits[0][4] = 0;    ve->limits[1][4] = 255;
+    ve->limits[0][5] = 1;    ve->limits[1][5] = 255;
+    ve->limits[0][6] = 0;    ve->limits[1][6] = 256;
+    ve->limits[0][7] = 1;    ve->limits[1][7] = 360;
+    ve->limits[0][8] = 0;    ve->limits[1][8] = 1;
 
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 255;
-
-    ve->limits[0][4] = 1;
-    ve->limits[1][4] = 360;
-
-    ve->limits[0][5] = 0;
-    ve->limits[1][5] = 256;
-
-    ve->limits[0][6] = 0;
-    ve->limits[1][6] = 100;
+    ve->description = "Complex Saturation (Advanced)";
+    ve->param_description = vje_build_param_list(ve->num_params,
+        "Hue Angle", "Red", "Green", "Blue", "Threshold", "Solidity", "Saturation", "Hue Shift", "Swap Selection");
 
     ve->has_user = 0;
-    ve->description = "Complex Saturation (RGB)";
     ve->extra_frame = 0;
     ve->sub_format = 1;
-    ve->rgb_conv = 1; 
-    ve->parallel = 1;
-    ve->param_description = vje_build_param_list( ve->num_params, "Angle", "Red", "Green", "Blue", "Degrees", "Intensity", "Noise suppression" );
+    ve->rgb_conv = 1;
     return ve;
 }
 
-void complexsaturation_apply(void *ptr, VJFrame *frame,int *args ) {
-    int i_angle = args[0];
-    int r = args[1];
-    int g = args[2];
-    int b = args[3];
-    int adjust_degrees = args[4];
-    int adjust_v = args[5];
-    int i_noise = args[6];
+#define DIV255(x) (((x) + 1 + ((x) >> 8)) >> 8)
 
-    uint8_t *Cb= frame->data[1];
-    uint8_t *Cr= frame->data[2];
+void complexsaturation_apply(void *ptr, VJFrame *frame, int *args) {
+
+    int n_threads = vje_advise_num_threads(frame->len);
+    int iy, iu, iv;
+    _rgb2yuv(args[1], args[2], args[3], iy, iu, iv);
+
+    const int SCALE = 4096;
+    const float ut_f = (float)(iu - 128);
+    const float vt_f = (float)(iv - 128);
+    float mag_f = sqrtf(ut_f * ut_f + vt_f * vt_f);
+    if (mag_f < 1.0f) mag_f = 1.0f;
+
+    const int cos_q_fp = (int)((ut_f / mag_f) * SCALE);
+    const int sin_q_fp = (int)((vt_f / mag_f) * SCALE);
+
+    const float angle_rad = ((float)args[0] / 100.0f) * (M_PI / 180.0f);
+    const int inv_wedge_slope_fp = (int)((1.0f / tanf(angle_rad)) * SCALE);
     
-    const int len = frame->len;
-    unsigned int pos;
+    const float diff = (float)args[5] - (float)args[4];
+    const int inv_range_fp = (int)((255.0f / (diff < 1.0f ? 1.0f : diff)) * (1 << 8));
+    const int black_clip_fp = (int)(args[4] * SCALE);
 
-    int iy = pixel_Y_lo_;
-    int iu = 128;
-    int iv = 128;
+    float hue_rot = ((float)args[7] / 180.0f) * M_PI;
+    float sat_scale = (float)args[6] / 100.0f;
+    const int s = (int)(sinf(hue_rot) * 65536.0f * sat_scale);
+    const int c = (int)(cosf(hue_rot) * 65536.0f * sat_scale);
 
-    float   hue = (adjust_degrees/180.0)*M_PI;
-    float   sat = (adjust_v / 100.0f);
+    const int swap = args[8];
 
-    _rgb2yuv( r,g,b, iy,iu,iv );
-    
-    int cb = (iu * 0xff) / 255;
-    int cr = (iv * 0xff) / 255;
-    int noiseThreshold = (i_noise * 255) / 100;
-    noiseThreshold *= noiseThreshold;
-    
-    float angle = (float) (i_angle * 0.01) * (M_PI / 180.0f);
-    int accept_angle_tg = (int)(15.0f * tanf(angle));
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
-    const int s = rint( a_sin(hue) * (1<<16) * sat );
-    const int c = rint( a_cos(hue) * (1<<16) * sat );
-    
-    for (pos = 0; pos < len; pos++)
-    {
-        int xx = (((Cb[pos]) * cb) + ((Cr[pos]) * cr)) >> 7;
-        int yy = (((Cr[pos]) * cb) - ((Cb[pos]) * cr)) >> 7;
+    #pragma omp parallel for schedule(static) num_threads(n_threads)
+    for (int pos = 0; pos < frame->len; pos++) {
+        int uc = (int)Cb[pos] - 128;
+        int vc = (int)Cr[pos] - 128;
 
-        /* accept angle should not be > 90 degrees 
-           reasonable results between 10 and 80 degrees.
-         */
-        int distanceSquared = ( xx * xx ) + ( yy * yy );
-        int val = (xx * accept_angle_tg) >> 4;
+        int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
+        int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
+        int abs_yy = (yy < 0) ? -yy : yy;
 
-        if ((abs(yy) < val) && (distanceSquared >= noiseThreshold) ) { 
-            /* pixel is within selected color range,  saturate */    
-            int u = Cb[pos] - 128;
-            int v = Cr[pos] - 128;
+        int dist_fp = ((int)(mag_f * SCALE) - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
+        int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
+
+        if (alpha < 0) alpha = 0;
+        else if (alpha > 255) alpha = 255;
+
+        if (swap) alpha = 255 - alpha;
+
+        if (alpha > 0) {
+            const int invA = 255 - alpha;
+            int n_u = (c * uc - s * vc + 32768) >> 16;
+            int n_v = (s * uc + c * vc + 32768) >> 16;
             
-            int new_u = (c * u - s * v + (1<<15) + (128<<16)) >> 16;
-            int new_v = (s * u + c * v + (1<<15) + (128<<16)) >> 16;
-            if( new_u & 768 ) new_u = (-new_u) >> 31;
-            if( new_v & 768 ) new_v = (-new_v) >> 31;
-            Cb[pos] = new_u;
-            Cr[pos] = new_v;
-            
+            int blend_u = DIV255(n_u * alpha + uc * invA);
+            int blend_v = DIV255(n_v * alpha + vc * invA);
+
+            Cb[pos] = (uint8_t)(blend_u + 128);
+            Cr[pos] = (uint8_t)(blend_v + 128);
         }
     }
 }

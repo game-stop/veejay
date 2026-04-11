@@ -38,7 +38,6 @@ vj_effect *rawman_init(int w,int h)
     ve->limits[1][1] = 255;
     ve->sub_format = -1;
     ve->description = "Raw Data Manipulation";
-	ve->parallel = 1;
 	ve->has_user = 0;
     ve->extra_frame = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Value");
@@ -51,61 +50,50 @@ vj_effect *rawman_init(int w,int h)
     return ve;
 }
 
-void rawman_apply(void *ptr, VJFrame *frame, int *args )
-{    
-    int mode = args[0];
-    unsigned int YY = (unsigned int) args[1];
-
+void rawman_apply(void *ptr, VJFrame *frame, int *args)
+{
+    const int mode = args[0];
+    const unsigned int YY = (unsigned int)args[1];
     const int len = frame->len;
-    unsigned int i;
-    uint8_t *Y = frame->data[0];
 
-    /* playing with data. experimentation gives the greatest results.
-       maybe these routine don't seem usefull, but combine them with
-       other effects.
-     */
+    uint8_t *restrict Y = frame->data[0];
+
+    const int n_threads = vje_advise_num_threads(len);
+
     switch (mode) {
+        case 1:
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+            for (int i = 0; i < len; i++) {
+                Y[i] = (Y[i] < YY) ? (uint8_t)(Y[i] * 2) : (uint8_t)(Y[i] / 2);
+            }
+            break;
 
-    case 1:			/* 1 in reverse, if Y == 0 this darkens the image */
-	for (i = 0; i < len; i++) {
-	    if ((Y[i] < YY)) {
-		Y[i] *= 2;
-	    } else {
-		Y[i] /= 2;
-	    }
-	}
-	break;
-    case 2:
+        case 2:
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+            for (int i = 0; i < len; i++) {
+                Y[i] -= (uint8_t)YY;
+            }
+            break;
 
-	for (i = 0; i < len; i++) {
-	    Y[i] -= YY;
-	}
-	break;
-    case 3:			/* divide action */
-	for (i = 0; i < len; i++) {
-	    if ((Y[i] < YY)) {
-		Y[i] /= 2;
-	    } else {
-		/* divide by 2 */
-		Y[i] *= 2;
-	    }
-	}
-	break;
-    case 4:			/* addition */
-	for (i = 0; i < len; i++) {
-	    if ((Y[i] < YY)) {
-		Y[i] += YY;
-	    } else {
-		Y[i] -= YY;
-	    }
-	}
-	break;
-    default:
-	/* brightness */
-	for (i = 0; i < len; i++) {
-	    Y[i] += YY;
-	}
-	break;
+        case 3:
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+            for (int i = 0; i < len; i++) {
+                Y[i] = (Y[i] < YY) ? (uint8_t)(Y[i] / 2) : (uint8_t)(Y[i] * 2);
+            }
+            break;
 
+        case 4:
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+            for (int i = 0; i < len; i++) {
+                Y[i] = (Y[i] < YY) ? (uint8_t)(Y[i] + YY) : (uint8_t)(Y[i] - YY);
+            }
+            break;
+
+        default:
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+            for (int i = 0; i < len; i++) {
+                Y[i] += (uint8_t)YY;
+            }
+            break;
     }
 }

@@ -46,7 +46,6 @@ vj_effect *pencilsketch_init(int w, int h)
     ve->extra_frame = 0;
     ve->sub_format = -1;
 	ve->has_user = 0;
-	ve->parallel = 1;   
 
     ve->hints = vje_init_value_hint_list( ve->num_params );
 
@@ -149,103 +148,62 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 		return &_pcf_none;
 	}
 
+void pencilsketch_apply(void *ptr, VJFrame *frame, int *args) {
+    const int type = args[0];
+    const int threshold_min = args[1];
+    const int threshold_max = args[2];
+    const int mode = args[3];
 
-void pencilsketch_apply(void *ptr, VJFrame *frame, int *args ) {
+    const size_t len = (size_t)frame->len;
+    const size_t width = (size_t)frame->width;
+    const size_t uv_len = (frame->ssm ? len : (size_t)frame->uv_len);
     
-    int type = args[0];
-    int threshold_min = args[1];
-    int threshold_max = args[2];
-    int mode = args[3];
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
-	unsigned int i;
-	int len = frame->len;
-	const unsigned int width = frame->width;
-	const int uv_len = (frame->ssm ? len : frame->uv_len);
-	int m,d;
-	uint8_t y,yb;
-  	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
+    _pcf _pff = (_pcf)_get_pcf(type);
+    const int n_threads = vje_advise_num_threads((int)len);
 
- 	/* get a pointer to a pixel blend function */
-	_pcf _pff =  (_pcf) _get_pcf(type);
-	_pcbcr _pcbcrff = &_pcbcr_color;
-
-	if(mode == 1 ) {
-
-		for(i=0; i < len; i++)
-		{
-			y = Y[i];
-			yb = y;
-
-			if(y >= threshold_min && y <= threshold_max)
-				Y[i] = _pff(y,0xff-yb,threshold_max);
-			else
-				Y[i] = pixel_Y_hi_;
-		}
-	}
-	else
-	{
-		len = len - width - 1;
-		for(i=0; i < len; i++)
-		{
-			y = Y[i];
-			yb = y;
-
-			/* substract user defined mask from image */
-			if(y >= threshold_min && y <= threshold_max)
-			{
-				/* sharpen the pixels */
-				m = (Y[i] + Y[i+1] + Y[i+width] + Y[i+width-1]+2) >> 2;
-				d = Y[i] - m;
-				d *= 500;
-				d /= 100;
-				m = m + d;
-				y = ((((y << 1) - (0xff - m))>>1) + Y[i])>>1;
-				/* apply blend operation on masked pixel */
-				Y[i] = _pff(y,yb,threshold_max);
-			}
-			else
-			{
-				Y[i] = pixel_Y_hi_;
-			}
-		}
-		for(i = len; i < (len+width-1); i ++ ) {
-			y = Y[i];
-			yb = y;
-
-			/* substract user defined mask from image */
-			if(y >= threshold_min && y <= threshold_max)
-			{
-				/* sharpen the pixels */
-				m = (Y[i] + Y[i+1] + Y[i] + Y[i+1]+2) >> 2;
-				d = Y[i] - m;
-				d *= 500;
-				d /= 100;
-				m = m + d;
-				y = ((((y << 1) - (0xff - m))>>1) + Y[i])>>1;
-				/* apply blend operation on masked pixel */
-				Y[i] = _pff(y,yb,threshold_max);
-			}
-			else
-			{
-				Y[i] = pixel_Y_hi_;
-			}
-		
-		}
-	}
-
-	if(type != 7) /* all b/w sketches */
-	{
-		veejay_memset( Cb, 128, uv_len );
-		veejay_memset( Cr, 128, uv_len );
-	}
-	else /* all colour sketches */
-	{
-		for(i=0; i < uv_len; i++)	
-		{
-			Cb[i] = _pcbcrff(128, Cb[i]);
-			Cr[i] = _pcbcrff(128, Cr[i]);
-		}
-	}
+#pragma omp parallel num_threads(n_threads)
+    {
+        if (mode == 1) {
+#pragma omp for schedule(static)
+            for (size_t i = 0; i < len; i++) {
+                uint8_t y = Y[i];
+                if (y >= threshold_min && y <= threshold_max)
+                    Y[i] = _pff(y, (uint8_t)(0xff - y), threshold_max);
+                else
+                    Y[i] = pixel_Y_hi_;
+            }
+        } else {
+            const size_t processing_len = len - width - 1;
+#pragma omp for schedule(static)
+            for (size_t i = 0; i < len; i++) {
+                uint8_t y_orig = Y[i];
+                if (y_orig >= threshold_min && y_orig <= threshold_max) {
+                    int range = threshold_max - threshold_min;
+                    if (range < 1) range = 1;
+                    int normalized = ((y_orig - threshold_min) * 255) / range;
+                    uint8_t y_val = (uint8_t)CLAMP_Y(normalized);
+                    Y[i] = _pff(y_val, y_orig, threshold_max);
+                } else {
+                    Y[i] = pixel_Y_hi_;
+                }
+            }
+        }
+        if (type != 7) {
+#pragma omp for schedule(static)
+            for (size_t i = 0; i < uv_len; i++) {
+                Cb[i] = 128;
+                Cr[i] = 128;
+            }
+        } else {
+#pragma omp for schedule(static)
+            for (size_t i = 0; i < uv_len; i++) {
+                Cb[i] = _pcbcr_color(128, Cb[i]);
+                Cr[i] = _pcbcr_color(128, Cr[i]);
+            }
+        }
+    }
 }

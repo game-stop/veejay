@@ -49,47 +49,48 @@ vj_effect *tripplicity_init(int w, int h)
     ve->sub_format = -1;
     ve->extra_frame = 1;
 	ve->has_user = 0;
- 	ve->parallel = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Opacity Y", "Opacity Cb", "Opacity Cr" );
 
     return ve;
 }
 
-
-
-void tripplicity_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args )
+void tripplicity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    unsigned int i;
-    const int len =  frame->len;
-    const int uv_len = (frame->ssm ? len : frame->uv_len);
-  	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-    const uint8_t *Y2 = frame2->data[0];
- 	const uint8_t *Cb2= frame2->data[1];
-	const uint8_t *Cr2= frame2->data[2];
-    int opacityL = args[0];
-    int opacityCb = args[1];
-    int opacityCr = args[2];
+    const int opacityY  = args[0];
+    const int opacityCb = args[1];
+    const int opacityCr = args[2];
 
-    const uint8_t op1  = (opacityL > 255) ? 255 : opacityL;
-    const uint8_t op0  = 255 - op1;
-    const uint8_t opCb1= (opacityCb > 255) ? 255: opacityCb;
-    const uint8_t opCb0= 255 - opCb1;
-    const uint8_t opCr1= (opacityCr > 255) ? 255: opacityCr;
-    const uint8_t opCr0= 255 - opCr1;
-#pragma omp simd
-    for (i = 0; i < len; i++)
-    {
-		Y[i] = (op0 * Y[i] + op1 * Y2[i]) >> 8;
-    }
+    const size_t len = (size_t)frame->len;
+    const size_t uv_len = (frame->ssm ? len : (size_t)frame->uv_len);
 
-#pragma omp simd
-    for (i = 0; i < uv_len; i++)
+    uint8_t *restrict Y1  = frame->data[0];
+    uint8_t *restrict Cb1 = frame->data[1];
+    uint8_t *restrict Cr1 = frame->data[2];
+
+    const uint8_t *restrict Y2  = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
+
+    const int opY1  = (opacityY > 255) ? 255 : opacityY;
+    const int opY0  = 255 - opY1;
+    const int opCb1 = (opacityCb > 255) ? 255 : opacityCb;
+    const int opCb0 = 255 - opCb1;
+    const int opCr1 = (opacityCr > 255) ? 255 : opacityCr;
+    const int opCr0 = 255 - opCr1;
+
+    const int n_threads = vje_advise_num_threads((int)len);
+
+#pragma omp parallel num_threads(n_threads)
     {
-		Cb[i] = (opCb0 * Cb[i] + opCb1 * Cb2[i]) >> 8;
-		Cr[i] = (opCr0 * Cr[i] + opCr1 * Cr2[i]) >> 8;
+#pragma omp for schedule(static)
+        for (int i = 0; i < (int)len; i++) {
+            Y1[i] = (uint8_t)((opY0 * Y1[i] + opY1 * Y2[i]) >> 8);
+        }
+
+#pragma omp for schedule(static)
+        for (int i = 0; i < (int)uv_len; i++) {
+            Cb1[i] = (uint8_t)((opCb0 * Cb1[i] + opCb1 * Cb2[i]) >> 8);
+            Cr1[i] = (uint8_t)((opCr0 * Cr1[i] + opCr1 * Cr2[i]) >> 8);
+        }
     }
- 
 }
-

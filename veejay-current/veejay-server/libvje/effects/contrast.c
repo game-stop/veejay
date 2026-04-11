@@ -38,10 +38,8 @@ vj_effect *contrast_init(int w, int h)
     ve->limits[1][1] = 255;
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 255;
-    ve->parallel = 1;
 	ve->description = "Contrast";
 	ve->has_user = 0;
-	ve->parallel = 1;
     ve->extra_frame = 0;
     ve->sub_format = -1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Luma", "Chroma" );
@@ -54,22 +52,19 @@ vj_effect *contrast_init(int w, int h)
     return ve;
 }
 
-
 static void contrast_y_apply(VJFrame *frame, int *s)
 {
     const int len = frame->len;
     uint8_t *Y = frame->data[0];
-
     const int scale_fp = (s[1] << 8) / 100;
+    int n_threads = vje_advise_num_threads(len);
 
-#pragma omp simd
+#pragma omp parallel for num_threads(n_threads) schedule(static)
     for (int r = 0; r < len; r++) {
-        int m = Y[r] - 128;
-        m = (m * scale_fp) >> 8;
+        int m = (Y[r] - 128) * scale_fp >> 8;
         m += 128;
-
-		int tmp = m & ~(m >> 31);
-		Y[r] = 255 + ((tmp - 255) & ((tmp - 255) >> 31));
+        int tmp = m & ~(m >> 31);
+        Y[r] = 255 + ((tmp - 255) & ((tmp - 255) >> 31));
     }
 }
 
@@ -78,23 +73,20 @@ static void contrast_cb_apply(VJFrame *frame, int *s)
     const int uv_len = (frame->ssm ? frame->len : frame->uv_len);
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
-
     const int scale_fp = (s[2] << 8) / 100;
+    int n_threads = vje_advise_num_threads(uv_len);
 
-#pragma omp simd
+#pragma omp parallel for num_threads(n_threads) schedule(static)
     for (int r = 0; r < uv_len; r++) {
         int cb = (Cb[r] - 128) * scale_fp >> 8;
         int cr = (Cr[r] - 128) * scale_fp >> 8;
-        cb += 128;
-        cr += 128;
+        cb += 128; cr += 128;
 
-		int tmp_cb = cb & ~(cb >> 31);
-		Cb[r] = 255 + ((tmp_cb - 255) & ((tmp_cb - 255) >> 31));
+        int tmp_cb = cb & ~(cb >> 31);
+        Cb[r] = 255 + ((tmp_cb - 255) & ((tmp_cb - 255) >> 31));
 
-		int tmp_cr = cr & ~(cr >> 31);
-		Cr[r] = 255 + ((tmp_cr - 255) & ((tmp_cr - 255) >> 31));
-
-
+        int tmp_cr = cr & ~(cr >> 31);
+        Cr[r] = 255 + ((tmp_cr - 255) & ((tmp_cr - 255) >> 31));
     }
 }
 
@@ -109,8 +101,36 @@ void contrast_apply(void *ptr, VJFrame *frame, int *s)
             contrast_cb_apply(frame, s);
             break;
         case 2:
-            contrast_y_apply(frame, s);
-            contrast_cb_apply(frame, s);
+        {
+            const int len = frame->len;
+            const int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+            uint8_t *Y  = frame->data[0];
+            uint8_t *Cb = frame->data[1];
+            uint8_t *Cr = frame->data[2];
+
+            const int scale_y  = (s[1] << 8) / 100;
+            const int scale_uv = (s[2] << 8) / 100;
+
+            int n_threads = vje_advise_num_threads(len);
+
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+            for (int r = 0; r < len; r++) {
+                int m = (Y[r] - 128) * scale_y >> 8;
+                m += 128;
+                int tmp = m & ~(m >> 31);
+                Y[r] = 255 + ((tmp - 255) & ((tmp - 255) >> 31));
+
+                int cb = (Cb[r] - 128) * scale_uv >> 8;
+                int cr = (Cr[r] - 128) * scale_uv >> 8;
+                cb += 128; cr += 128;
+
+                int tmp_cb = cb & ~(cb >> 31);
+                Cb[r] = 255 + ((tmp_cb - 255) & ((tmp_cb - 255) >> 31));
+
+                int tmp_cr = cr & ~(cr >> 31);
+                Cr[r] = 255 + ((tmp_cr - 255) & ((tmp_cr - 255) >> 31));
+            }
             break;
+        }
     }
 }

@@ -42,7 +42,6 @@ vj_effect *rawval_init(int w,int h)
     ve->limits[1][2] = 255;
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 255;
-	ve->parallel = 1;
     ve->sub_format = -1;
     ve->description = "Raw Chroma Pixel Replacement";
 	ve->has_user = 0;
@@ -51,22 +50,26 @@ vj_effect *rawval_init(int w,int h)
     return ve;
 }
 
-void rawval_apply( void *ptr, VJFrame *frame, int *args)
+void rawval_apply(void *ptr, VJFrame *frame, int *args)
 {
-    const int color_cb = args[0];
-    const int color_cr = args[1];
-    const int new_color_cb = args[2];
-    const int new_color_cr = args[3];
+    const uint8_t color_cb = (uint8_t)args[0];
+    const uint8_t color_cr = (uint8_t)args[1];
+    const uint8_t new_color_cb = (uint8_t)args[2];
+    const uint8_t new_color_cr = (uint8_t)args[3];
 
-    unsigned int i;
-	const int uv_len = (frame->ssm ? frame->len : frame->uv_len);
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
+    const size_t uv_len = (size_t)(frame->ssm ? frame->len : frame->uv_len);
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
-    for (i = 0; i < uv_len; i++) {
-		if (Cb[i] >= new_color_cb)
-		    Cb[i] = color_cb;
-		if (Cr[i] >= new_color_cr)
-		    Cr[i] = color_cr;
+    const int n_threads = vje_advise_num_threads((int)uv_len);
+
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (size_t i = 0; i < uv_len; i++) {
+        if (Cb[i] >= new_color_cb) {
+            Cb[i] = color_cb;
+        }
+        if (Cr[i] >= new_color_cr) {
+            Cr[i] = color_cr;
+        }
     }
 }

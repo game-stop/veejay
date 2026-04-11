@@ -45,45 +45,38 @@ vj_effect *randnoise_init(int w, int h)
 	ve->description = "Randnoise";
     ve->sub_format = -1;
     ve->extra_frame = 0;
-    ve->parallel = 1;
 	ve->has_user = 0;
 
     ve->param_description = vje_build_param_list( ve->num_params, "Min", "Max" );
     return ve;
 }
 
-void randnoise_apply( void *ptr, VJFrame *frame, int *args )
+void randnoise_apply(void *ptr, VJFrame *frame, int *args)
 {
-    int min = args[0];
-    int max = args[1];
-    int i;
+    const int min = args[0];
+    const int range = args[1] - min;
     const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-	unsigned long t;
-    unsigned long x = 123456789;
-    unsigned long y = 362436069;
-    unsigned long z = 521288629;
+    uint8_t * __restrict Y = frame->data[0];
 
-	for( i = 0; i < len; i ++ )
-	{
-		//xor shift
-		x ^= x << 16;
-		x ^= x >> 5;
-		x ^= x << 1;
+    const int n_threads = vje_advise_num_threads(len);
 
-		t = x;
-		x = y;
-		y = z;
-		z = t ^ x ^ y;
-		//z is the new pseudo random number
+#pragma omp parallel num_threads(n_threads)
+    {
+        unsigned long x = 123456789 + omp_get_thread_num();
+        unsigned long y = 362436069 + omp_get_thread_num();
+        unsigned long z = 521288629 + omp_get_thread_num();
 
-		int rv = (z % max) + min;
-		int y0 = Y[i] + rv;
-		if( y0 > pixel_Y_hi_ )
-			y0 = pixel_Y_hi_;
-		else if( y0 < pixel_Y_lo_ ) 
-			y0 = pixel_Y_lo_;
+#pragma omp for schedule(static)
+        for (int i = 0; i < len; i++) {
+            unsigned long t = x ^ (x << 16);
+            x = y;
+            y = z;
+            z = z ^ (z >> 5) ^ t ^ (t >> 1);
 
-		Y[i] = y0;
-	}
+            int rv = (int)(z % (range + 1)) + min;
+            int y0 = Y[i] + rv;
+
+            Y[i] = (uint8_t)(y0 > 255 ? 255 : (y0 < 0 ? 0 : y0));
+        }
+    }
 }

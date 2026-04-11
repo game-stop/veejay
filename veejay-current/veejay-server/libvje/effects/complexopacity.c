@@ -1,4 +1,4 @@
-/* 
+/*
  * Linux VeeJay
  *
  * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
@@ -17,166 +17,131 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+
 #include <config.h>
 #include <math.h>
 #include "common.h"
 #include <veejaycore/vjmem.h>
-#include "complexopacity.h"
+
+typedef struct
+{
+    int n_threads;
+} complexopacity_t;
+
+#define DIV255(x) (((x) + 1 + ((x) >> 8)) >> 8)
 
 vj_effect *complexopacity_init(int w, int h)
 {
-    vj_effect *ve;
-    ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 5;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 4500;	/* angle */
-    ve->defaults[1] = 0;	/* r */
-    ve->defaults[2] = 0;	/* g */
-    ve->defaults[3] = 255;	/* b */
-    ve->defaults[4] = 150;	/* opacity */
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 9000;
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    ve->num_params = 7;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
+    ve->defaults[0] = 4500; /* Hue Angle */
+    ve->defaults[1] = 0;    /* Red */
+    ve->defaults[2] = 255;  /* Green */
+    ve->defaults[3] = 0;    /* Blue */
+    ve->defaults[4] = 40;   /* Threshold (Black Clip) */
+    ve->defaults[5] = 160;  /* Solidity (White Clip) */
+    ve->defaults[6] = 0;    /* Swap Selection */
 
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
+    ve->limits[0][0] = 500;  ve->limits[1][0] = 8500;
+    ve->limits[0][1] = 0;    ve->limits[1][1] = 255;
+    ve->limits[0][2] = 0;    ve->limits[1][2] = 255;
+    ve->limits[0][3] = 0;    ve->limits[1][3] = 255;
+    ve->limits[0][4] = 0;    ve->limits[1][4] = 255;
+    ve->limits[0][5] = 1;    ve->limits[1][5] = 255;
+    ve->limits[0][6] = 0;    ve->limits[1][6] = 1;
 
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 255;
+    ve->description = "Complex Overlay (Advanced)";
+    ve->param_description = vje_build_param_list(ve->num_params,
+        "Hue Angle", "Red", "Green", "Blue", "Threshold", "Solidity", "Swap Selection");
 
-    ve->limits[0][4] = 0;
-    ve->limits[1][4] = 255;
-
-	ve->has_user = 0;
-	ve->parallel = 1;
-	ve->description = "Complex Overlay (RGB)";
+    ve->has_user = 0;
     ve->extra_frame = 1;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
-	ve->param_description = vje_build_param_list( ve->num_params, "Angle", "Red", "Green", "Blue", "Opacity" );
     return ve;
 }
 
-/* this method decides whether or not a pixel from the fg will be accepted for keying */
-int accept_ipixel(uint8_t fg_cb, uint8_t fg_cr, int cb, int cr,
-		 int accept_angle_tg)
-{
-    short xx, yy;
-    /* convert foreground to xz coordinates where x direction is
-       defined by key color */
-    uint8_t val;
-
-    xx = ((fg_cb * cb) + (fg_cr * cr)) >> 7;
-    yy = ((fg_cr * cb) - (fg_cb * cr)) >> 7;
-
-    /* accept angle should not be > 90 degrees 
-       reasonable results between 10 and 80 degrees.
-     */
-
-    val = (xx * accept_angle_tg) >> 4;
-    if (abs(yy) < val) {
-		return 1;
-    }
-    return 0;
+void *complexopacity_malloc(int w, int h) {
+    complexopacity_t *c = (complexopacity_t*) vj_malloc(sizeof(complexopacity_t));
+    if(!c) return NULL;
+    c->n_threads = vje_advise_num_threads(w * h);
+    return (void*) c;
 }
 
-void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *bg, int *args) {
-	int i_angle = args[0];
-    int r = args[1];
-    int g = args[2];
-    int b = args[3];
-	int level = args[4];
+void complexopacity_free(void *ptr) {
+    if(ptr) free(ptr);
+}
+
+void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+    complexopacity_t *copac = (complexopacity_t*) ptr;
+    int iy, iu, iv;
+
+    _rgb2yuv(args[1], args[2], args[3], iy, iu, iv);
+
+    const int SCALE = 4096;
+    const float ut_f = (float)iu - 128.0f;
+    const float vt_f = (float)iv - 128.0f;
+
+    float mag_f = sqrtf(ut_f * ut_f + vt_f * vt_f);
+    if (mag_f < 1.0f) mag_f = 1.0f;
+
+    const int mag_fp   = (int)(mag_f * SCALE);
+    const int cos_q_fp = (int)((ut_f / mag_f) * SCALE);
+    const int sin_q_fp = (int)((vt_f / mag_f) * SCALE);
+
+    const float angle_rad = ((float)args[0] / 100.0f) * (M_PI / 180.0f);
+    const int inv_wedge_slope_fp = (int)((1.0f / tanf(angle_rad)) * SCALE);
+
+    const float diff = (float)args[5] - (float)args[4];
+    const int inv_range_fp = (int)((255.0f / (diff < 1.0f ? 1.0f : diff)) * (1 << 8));
+    const int black_clip_fp = (int)(args[4] * SCALE);
+
+    const int swap = args[6];
+
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
+
+    const int len = frame->len;
+
+    #pragma omp parallel num_threads(copac->n_threads)
+    {
+        #pragma omp for schedule(static)
+        for (int pos = 0; pos < len; pos++) {
+            int uc = (int)Cb[pos] - 128;
+            int vc = (int)Cr[pos] - 128;
+
+            int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
+            int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
+            int abs_yy = (yy < 0) ? -yy : yy;
+
+            int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
+            int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
+
+            if (alpha < 0) alpha = 0;
+            if (alpha > 255) alpha = 255;
 
 
-    uint8_t *fg_y, *fg_cb, *fg_cr;
-    uint8_t *bg_y;
-    int accept_angle_tg;
+            if (swap) alpha = 255 - alpha;
 
-    uint8_t cb, cr;
-    float kg1, tmp, aa = 255.0f, bb = 255.0f;
-    float angle = (float) i_angle / 100.0f;
-    unsigned int pos;
-    int matrix[5];
-    uint8_t val;
-	const int len = frame->len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-    int width = frame->width;
-	
-	int	iy,iu=128,iv=128;
-	_rgb2yuv(r,g,b,iy,iu,iv);
-	aa = (float) iu;
-	bb = (float) iv;  
-    tmp = sqrt(((aa * aa) + (bb * bb)));
-    cb = 255 * (aa / tmp);
-    cr = 255 * (bb / tmp);
-    kg1 = tmp;
 
-    /* obtain coordinate system for cb / cr */
-    accept_angle_tg = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
+            if (alpha <= 0) {
+                Y[pos] = Y2[pos]; Cb[pos] = Cb2[pos]; Cr[pos] = Cr2[pos];
+            } else if (alpha >= 255) {
 
-    tmp = 1 / kg1;
-
-    /* intialize pointers */
-    fg_y = frame->data[0];
-    fg_cb = frame->data[1];
-    fg_cr = frame->data[2];
-
-    bg_y = bg->data[0];
-
-    for (pos = width + 1; pos < (len) - width - 1; pos++) {
-	int i = 0;
-	int smooth = 0;
-	/* setup matrix 
-	   [ - 0 - ] = do not accept. [ - 1 - ] = level 5 , accept only when all n = 1
-	   [ 0 0 0 ]                  [ 1 1 1 ]
-	   [ - 0 - ]                  [ - 1 - ]
-
-	   [ - 0 - ] sum of all n is acceptance value for level
-	   [ 1 0 1 ]                    
-	   [ 0 1 0 ]
-	 */
-	matrix[0] = accept_ipixel(fg_cb[pos], fg_cr[pos], cb, cr, accept_angle_tg);	/* center pixel */
-	matrix[1] = accept_ipixel(fg_cb[pos - 1], fg_cr[pos - 1], cb, cr, accept_angle_tg);	/* left pixel */
-	matrix[2] = accept_ipixel(fg_cb[pos + 1], fg_cr[pos + 1], cb, cr, accept_angle_tg);	/* right pixel */
-	matrix[3] = accept_ipixel(fg_cb[pos + width], fg_cr[pos + width], cb, cr, accept_angle_tg);	/* top pixel */
-	matrix[4] = accept_ipixel(fg_cb[pos - width], fg_cr[pos - width], cb, cr, accept_angle_tg);	/* bottom pixel */
-	for (i = 0; i < 5; i++) {
-	    if (matrix[i] == 1)
-		smooth++;
-	}
-	if (smooth >= level) {
-	    short xx, yy;
-	    /* get bg/fg pixels */
-	    uint8_t p1 = (matrix[0] == 0 ? fg_y[pos] : bg_y[pos]);
-	    uint8_t p2 = (matrix[1] == 0 ? fg_y[pos - 1] : bg_y[pos - 1]);
-	    uint8_t p3 = (matrix[2] == 0 ? fg_y[pos + 1] : bg_y[pos + 1]);
-	    uint8_t p4 =
-		(matrix[3] == 0 ? fg_y[pos + width] : bg_y[pos + width]);
-	    uint8_t p5 =
-		(matrix[4] == 0 ? fg_y[pos - width] : bg_y[pos - width]);
-	    /* and blur the pixel */
-	    fg_y[pos] = (p1 + p2 + p3 + p4 + p5) / 5;
-
-	    /* convert foreground to xz coordinates where x direction is
-	       defined by key color */
-	    xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
-	    yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
-
-	    val = (xx * accept_angle_tg) >> 4;
-	    if (val > 127)
-			val = 127;
-	    /* see if pixel is within range of color and opacity it */
-	    if (abs(yy) < val ) {
-			Y[pos] = 255 - Y[pos];
-			Cb[pos] = 255 - Cb[pos];
-			Cr[pos] = 255 - Cr[pos];
-	    }
-	}
+            } else {
+                const int invA = 255 - alpha;
+                Y[pos]  = DIV255(Y[pos]  * alpha + Y2[pos]  * invA);
+                Cb[pos] = DIV255(Cb[pos] * alpha + Cb2[pos] * invA);
+                Cr[pos] = DIV255(Cr[pos] * alpha + Cr2[pos] * invA);
+            }
+        }
     }
 }

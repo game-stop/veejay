@@ -45,11 +45,11 @@ vj_effect *colortemp_init(int w, int h)
     ve->description = "Color Temperature";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 1;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Temperature", "Automatic", "Opacity" );
     return ve;
 }
+
 
 static struct {
     int r;
@@ -843,6 +843,7 @@ static struct {
 void colortemp_apply( void *ptr, VJFrame *frame, int *args ) {
     const int temperature = args[0];
     const int mode = args[1];
+    const int n_threads = vje_advise_num_threads(frame->len);
     int opacity = args[2];
 
     int i;
@@ -857,21 +858,21 @@ void colortemp_apply( void *ptr, VJFrame *frame, int *args ) {
     _rgb2yuv( blackbody_t[temperature].r,
               blackbody_t[temperature].g,
               blackbody_t[temperature].b,
-              iy,iu,iv );
+              iy, iu, iv );
 
     iu -= 128;
     iv -= 128;
 
     if( mode == 1 ) {
         uint64_t sum = 0;
-#pragma omp simd
+#pragma omp parallel for reduction(+:sum) num_threads(n_threads) schedule(static)
         for( i = 0; i < frame->len; i ++ ) {
             sum += Y[i];
         }
         opacity = sum / frame->len;
     }
 
-#pragma omp simd
+#pragma omp parallel for num_threads(n_threads) schedule(static)
     for ( i = 0; i < frame->len; i++) {
         int u = U[i] - 128;
         int v = V[i] - 128;
@@ -879,12 +880,7 @@ void colortemp_apply( void *ptr, VJFrame *frame, int *args ) {
         u = 128 + ((opacity * (u - iu) >> 8 ) + u);
         v = 128 + ((opacity * (v - iv) >> 8 ) + v);
     
-        u = (u < 0) ? 0 : (u > 255) ? 255 : u;
-        v = (v < 0) ? 0 : (v > 255) ? 255 : v;
-
-        U[i] = (uint8_t) u;
-        V[i] = (uint8_t) v;
+        U[i] = (uint8_t) ((u < 0) ? 0 : (u > 255) ? 255 : u);
+        V[i] = (uint8_t) ((v < 0) ? 0 : (v > 255) ? 255 : v);
     }
-
 }
-

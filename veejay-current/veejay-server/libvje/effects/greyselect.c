@@ -20,82 +20,115 @@
 
 #include "common.h"
 #include <veejaycore/vjmem.h>
-#include "greyselect.h"
+#include <math.h>
+
+typedef struct
+{
+    int n_threads;
+} greyselect_t;
+
+#define DIV255(x) (((x) + 1 + ((x) >> 8)) >> 8)
 
 vj_effect *greyselect_init(int w, int h)
 {
-    vj_effect *ve;
-    ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 5;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
-    ve->defaults[0] = 4500; /* angle */
-    ve->defaults[1] = 255;  /* r */
-    ve->defaults[2] = 0;    /* g */
-    ve->defaults[3] = 0;    /* b */
-    ve->defaults[4] = 0;    /* swap */
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 9000;
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    ve->num_params = 7;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
+    ve->defaults[0] = 4500; /* Hue Angle */
+    ve->defaults[1] = 255;  /* Red */
+    ve->defaults[2] = 0;    /* Green */
+    ve->defaults[3] = 0;    /* Blue */
+    ve->defaults[4] = 40;   /* Threshold (Min saturation) */
+    ve->defaults[5] = 160;  /* Solidity (Max saturation) */
+    ve->defaults[6] = 0;    /* Swap */
 
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
+    ve->limits[0][0] = 500;  ve->limits[1][0] = 8500;
+    ve->limits[0][1] = 0;    ve->limits[1][1] = 255;
+    ve->limits[0][2] = 0;    ve->limits[1][2] = 255;
+    ve->limits[0][3] = 0;    ve->limits[1][3] = 255;
+    ve->limits[0][4] = 0;    ve->limits[1][4] = 255;
+    ve->limits[0][5] = 1;    ve->limits[1][5] = 255;
+    ve->limits[0][6] = 0;    ve->limits[1][6] = 1;
 
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 255;
-
-    ve->limits[0][4] = 0;
-    ve->limits[1][4] = 1;
+    ve->description = "Grayscale by Color Key (Advanced)";
+    ve->param_description = vje_build_param_list(ve->num_params,
+        "Hue Angle", "Red", "Green", "Blue", "Threshold", "Solidity", "Swap");
 
     ve->has_user = 0;
-    ve->parallel = 1;
-    ve->description = "Grayscale by Color Key (RGB)";
     ve->extra_frame = 0;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
-    ve->param_description = vje_build_param_list(ve->num_params,"Angle","Red","Green","Blue", "Swap");
-
     return ve;
 }
 
-void greyselect_apply(void *ptr, VJFrame *frame, int *args) {
-    int i_angle = args[0];
-    int r = args[1];
-    int g = args[2];
-    int b = args[3];
-    int swap = args[4];
-
-    const int len = frame->len;
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
-
-    int iy=0, iu=128, iv=128;
-    _rgb2yuv(r, g, b, iy, iu, iv);
-
-    float aa = (float) iu;
-    float bb = (float) iv;
-
-    float tmp = sqrtf(aa * aa + bb * bb);
-    const int cb = 255 * (aa / tmp);
-    const int cr = 255 * (bb / tmp);
-
-    int accept_angle_tg = (int)(15.0f * tanf(M_PI * ((float)i_angle / 100.0f)));
-
-#pragma omp simd
-    for (unsigned int pos = 0; pos < len; pos++) {
-        short xx = ((Cb[pos] * cb) + (Cr[pos] * cr)) >> 7;
-        short yy = ((Cr[pos] * cb) - (Cb[pos] * cr)) >> 7;
-        int val = (xx * accept_angle_tg) >> 4;
-
-        int abs_yy = (yy ^ (yy >> 15)) - (yy >> 15);
-
-        int mask = swap ? -((abs_yy - val) >> 31) : -((abs_yy - val) >> 31 ^ 1);
-
-        Cb[pos] = (Cb[pos] & ~mask) | (128 & mask);
-        Cr[pos] = (Cr[pos] & ~mask) | (128 & mask);
-    }
+void *greyselect_malloc(int w, int h) {
+    greyselect_t *g = (greyselect_t*) vj_malloc(sizeof(greyselect_t));
+    if(!g) return NULL;
+    g->n_threads = vje_advise_num_threads(w * h);
+    return (void*) g;
 }
 
+void greyselect_free(void *ptr) {
+    if(ptr) free(ptr);
+}
+
+void greyselect_apply(void *ptr, VJFrame *frame, int *args) {
+    greyselect_t *gs = (greyselect_t*) ptr;
+    int iy, iu, iv;
+    int n_threads = vje_advise_num_threads(frame->len);
+    _rgb2yuv(args[1], args[2], args[3], iy, iu, iv);
+
+    const int SCALE = 4096;
+    const float ut_f = (float)iu - 128.0f;
+    const float vt_f = (float)iv - 128.0f;
+
+    float mag_f = sqrtf(ut_f * ut_f + vt_f * vt_f);
+    if (mag_f < 1.0f) mag_f = 1.0f;
+
+    const int mag_fp   = (int)(mag_f * SCALE);
+    const int cos_q_fp = (int)((ut_f / mag_f) * SCALE);
+    const int sin_q_fp = (int)((vt_f / mag_f) * SCALE);
+
+    const float angle_rad = ((float)args[0] / 100.0f) * (3.14159265f / 180.0f);
+    const int inv_wedge_slope_fp = (int)((1.0f / tanf(angle_rad)) * SCALE);
+
+    const float diff = (float)args[5] - (float)args[4];
+    const int inv_range_fp = (int)((255.0f / (diff < 1.0f ? 1.0f : diff)) * (1 << 8));
+    const int black_clip_fp = (int)(args[4] * SCALE);
+
+    const int swap = args[6];
+
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    const int len = frame->len;
+
+#pragma omp parallel for schedule(static) num_threads(n_threads)
+    for (int pos = 0; pos < len; pos++) {
+        int uc = (int)Cb[pos] - 128;
+        int vc = (int)Cr[pos] - 128;
+
+        int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
+        int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
+        int abs_yy = (yy < 0) ? -yy : yy;
+
+        int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
+        int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
+
+        if (alpha < 0) alpha = 0;
+        if (alpha > 255) alpha = 255;
+
+        if (!swap) alpha = 255 - alpha;
+        if (alpha == 0) {
+            Cb[pos] = 128;
+            Cr[pos] = 128;
+        } else if (alpha < 255) {
+            Cb[pos] = 128 + DIV255(uc * alpha);
+            Cr[pos] = 128 + DIV255(vc * alpha);
+        }
+
+    }
+    
+}

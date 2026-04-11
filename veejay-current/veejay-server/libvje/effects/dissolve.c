@@ -32,7 +32,6 @@ vj_effect *dissolve_init(int w, int h)
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
     ve->defaults[0] = 150;
-	ve->parallel = 1;
     ve->description = "Dissolve Overlay";
     ve->sub_format = 1;
     ve->extra_frame = 1;
@@ -42,30 +41,26 @@ vj_effect *dissolve_init(int w, int h)
 }
 
 void dissolve_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
-    int opacity = args[0];
-
+    const int opacity = args[0];
     const size_t len = (size_t)frame->len;
+
     const int op1 = (opacity > 255) ? 255 : opacity;
     const int op0 = 255 - op1;
 
-    uint8_t *Y = frame->data[0];
+    uint8_t *Y  = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
-    uint8_t *Y2 = frame2->data[0];
+    uint8_t *Y2  = frame2->data[0];
     uint8_t *Cb2 = frame2->data[1];
     uint8_t *Cr2 = frame2->data[2];
 
-#pragma omp simd
+    const int n_threads = vje_advise_num_threads((int)len);
+
+#pragma omp parallel for num_threads(n_threads) schedule(static)
     for (size_t i = 0; i < len; i++) {
-        uint32_t mask = -(Y[i] > opacity);
-
-        uint32_t y_blend  = (op0 * Y[i] + op1 * Y2[i]) >> 8;
-        uint32_t cb_blend = (op0 * Cb[i] + op1 * Cb2[i]) >> 8;
-        uint32_t cr_blend = (op0 * Cr[i] + op1 * Cr2[i]) >> 8;
-
-        Y[i]  = (y_blend & mask) | (Y2[i] & ~mask);
-        Cb[i] = (cb_blend & mask) | (Cb2[i] & ~mask);
-        Cr[i] = (cr_blend & mask) | (Cr2[i] & ~mask);
+        Y[i]  = (uint8_t)((op0 * Y[i]  + op1 * Y2[i])  >> 8);
+        Cb[i] = (uint8_t)((op0 * Cb[i] + op1 * Cb2[i]) >> 8);
+        Cr[i] = (uint8_t)((op0 * Cr[i] + op1 * Cr2[i]) >> 8);
     }
 }

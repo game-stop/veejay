@@ -47,51 +47,31 @@ vj_effect *rgbchannel_init(int w, int h)
     ve->extra_frame = 0;
     ve->has_user = 0;
 	ve->rgba_only = 1;
-	ve->parallel = 1;
 	ve->param_description = vje_build_param_list(ve->num_params, "Red", "Green", "Blue");
     return ve;
 }
 
-void rgbchannel_apply( void *ptr, VJFrame *frame, int *args) {
-    
+
+void rgbchannel_apply(void *ptr, VJFrame *frame, int *args) {
     const int chr = args[0];
     const int chg = args[1];
     const int chb = args[2];
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-	int row_stride = width * 4;
-	int x,y;
-	uint8_t *rgba = frame->data[0];
 
-	if(chr)
-	{
-		for( y = 0; y < height; y ++ )
-		{
-			for( x = 0; x < row_stride; x += 4 )
-			{
-				rgba[ y * row_stride + x ] = 0;
-			}
-		}
-	}
-	if(chg)
-	{
-		for( y = 0; y < height; y ++ )
-		{
-			for( x = 1; x < row_stride-1; x += 4 )
-			{
-				rgba[ y * row_stride + x ] = 0;
-			}
-		}
-	}
-	if(chb)
-	{
-		for( y = 0; y < height; y ++ )
-		{
-			for( x = 2; x < row_stride-2; x += 4 )
-			{
-				rgba[ y * row_stride + x ] = 0;
-			}
-		}
-	}
+    if (!chr && !chg && !chb) return;
 
+    const unsigned int width = frame->width;
+    const unsigned int height = frame->height;
+    uint8_t * __restrict rgba = frame->data[0];
+    const int n_threads = vje_advise_num_threads((int)(width * height));
+
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int y = 0; y < (int)height; y++) {
+        const int row_offset = y * (width * 4);
+        for (int x = 0; x < (int)width; x++) {
+            const int pixel_offset = row_offset + (x * 4);
+            if (chr) rgba[pixel_offset + 0] = 0;
+            if (chg) rgba[pixel_offset + 1] = 0;
+            if (chb) rgba[pixel_offset + 2] = 0;
+        }
+    }
 }

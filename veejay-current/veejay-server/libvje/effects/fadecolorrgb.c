@@ -56,7 +56,6 @@ vj_effect *fadecolorrgb_init(int w,int h)
 	ve->has_user = 0;
     ve->extra_frame = 0;
 	ve->rgb_conv = 1;
-	ve->parallel = 1;
     ve->sub_format = -1;
 	ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Red","Green", "Blue", "Mode", "Frame length");
     return ve;
@@ -74,7 +73,7 @@ void fadecolorrgb_free(void *ptr) {
     free(ptr);
 }
 
-void fadecolorrgb_apply( void *ptr, VJFrame *frame, int *args) {
+void fadecolorrgb_apply(void *ptr, VJFrame *frame, int *args) {
     int opacity = args[0];
     int r = args[1];
     int g = args[2];
@@ -83,41 +82,40 @@ void fadecolorrgb_apply( void *ptr, VJFrame *frame, int *args) {
     fc_t *state = (fc_t*) ptr;
 
     if (args[4] == 0) {
-        if(state->value >= 255 ) {
-           state->value = opacity;
-        }
+        if(state->value >= 255 ) state->value = opacity;
         state->value += (opacity / args[5]);
     } else {
-        if ( state->value <= 0 ) {
-            state->value = opacity;
-        }
+        if (state->value <= 0) state->value = opacity;
         state->value = (opacity / args[5]);
     }
 
-    unsigned int i, op0, op1;
     const int len = frame->len;
-    unsigned int colorCb = 128, colorCr = 128;
-    unsigned int colorY;
     const int uv_len = frame->uv_len;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
-    opacity = state->value;
+    const int current_opacity = state->value;
+    const int op1 = (current_opacity > 255) ? 255 : current_opacity;
+    const int op0 = 255 - op1;
 
-    colorY = ((0.257 * r) + (0.504 * g) + (0.098 * b) + 16);
-    colorCb = ((0.439 * r) - (0.368 * g) - (0.071 * b) + 128);
-    colorCr = (-(0.148 * r) - (0.291 * g) + (0.439 * b) + 128);
+    const uint8_t colorY  = (uint8_t)((0.257f * r) + (0.504f * g) + (0.098f * b) + 16.0f);
+    const uint8_t colorCb = (uint8_t)((0.439f * r) - (0.368f * g) - (0.071f * b) + 128.0f);
+    const uint8_t colorCr = (uint8_t)(-(0.148f * r) - (0.291f * g) + (0.439f * b) + 128.0f);
 
-    op1 = (opacity > 255) ? 255 : opacity;
-    op0 = 255 - op1;
+    const int n_threads = vje_advise_num_threads(len);
 
-#pragma omp simd
-    for (i = 0; i < len; i++)
-		Y[i] = (op0 * Y[i] + op1 * colorY) >> 8;
-#pragma omp simd
-    for (i = 0; i < uv_len; i++) {
-		Cb[i] = (op0 * Cb[i] + op1 * colorCb) >> 8;
-		Cr[i] = (op0 * Cr[i] + op1 * colorCr) >> 8;
+#pragma omp parallel num_threads(n_threads)
+    {
+#pragma omp for schedule(static)
+        for (int i = 0; i < len; i++) {
+            Y[i] = (uint8_t)((op0 * Y[i] + op1 * colorY) >> 8);
+        }
+
+#pragma omp for schedule(static)
+        for (int i = 0; i < uv_len; i++) {
+            Cb[i] = (uint8_t)((op0 * Cb[i] + op1 * colorCb) >> 8);
+            Cr[i] = (uint8_t)((op0 * Cr[i] + op1 * colorCr) >> 8);
+        }
     }
 }

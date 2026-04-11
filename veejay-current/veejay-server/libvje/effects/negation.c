@@ -36,32 +36,33 @@ vj_effect *negation_init(int w, int h)
     ve->description = "Negation";
     ve->sub_format = -1;
     ve->extra_frame = 0;
-    ve->parallel = 1;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Value" );
     return ve;
 }
 
-
-void negation_apply( void *ptr, VJFrame *frame, int *args ) {
-    int val = args[0];
-
-    int i;
+void negation_apply(void *ptr, VJFrame *frame, int *args) {
+    const int val = args[0];
     const int len = frame->len;
-    const int uv_len = (frame->ssm ? len : frame->uv_len );
+    const int uv_len = (frame->ssm ? len : frame->uv_len);
 
-    uint8_t *Y = frame->data[0];
+    uint8_t *Y  = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
-#pragma omp simd
-	for( i = 0; i < len; i ++ ) {
-		Y[i] = val - Y[i];
-	}
+    const int n_threads = vje_advise_num_threads(len);
 
-#pragma omp simd
-	for( i = 0; i < uv_len; i ++ ) {
-		Cb[i] = val - Cb[i];
-		Cr[i] = val - Cr[i];
-	} 
+#pragma omp parallel num_threads(n_threads)
+    {
+#pragma omp for schedule(static)
+        for (int i = 0; i < len; i++) {
+            Y[i] = (uint8_t)(val - Y[i]);
+        }
+
+#pragma omp for schedule(static)
+        for (int i = 0; i < uv_len; i++) {
+            Cb[i] = (uint8_t)(val - Cb[i]);
+            Cr[i] = (uint8_t)(val - Cr[i]);
+        }
+    }
 }

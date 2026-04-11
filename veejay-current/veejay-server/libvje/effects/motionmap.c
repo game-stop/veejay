@@ -262,12 +262,12 @@ void	motionmap_lerp_frame( void *ptr, VJFrame *cur, VJFrame *prev, int N, int n 
 	const int n1 = (( n-1) % N ) + 1;
 	const float frac = 1.0f / (float) N * n1;
 	const int len = cur->len;
-	uint8_t *__restrict__ Y0 = cur->data[0];
-	const uint8_t *__restrict__ Y1 = prev->data[0];
-	uint8_t *__restrict__ U0 = cur->data[1];
-	const uint8_t *__restrict__ U1 = prev->data[1];
-	uint8_t *__restrict__ V0 = cur->data[2];
-	const uint8_t *__restrict__ V1 = prev->data[2];
+	uint8_t *restrict Y0 = cur->data[0];
+	const uint8_t *restrict Y1 = prev->data[0];
+	uint8_t *restrict U0 = cur->data[1];
+	const uint8_t *restrict U1 = prev->data[1];
+	uint8_t *restrict V0 = cur->data[2];
+	const uint8_t *restrict V1 = prev->data[2];
 
 #ifndef NO_AUTOVECTORIZATION
 	for ( i = 0; i < len ; i ++ ) {

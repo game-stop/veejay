@@ -50,7 +50,6 @@ vj_effect *gammacompr_init(int w, int h)
     ve->sub_format = 1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Gamma Compression", "White Threshold", "Black Threshold");
-    ve->parallel = 1;
 	return ve;
 }
 
@@ -96,40 +95,50 @@ static void gammacompr_setup(gammacompr_t *g)
     }
 }
 
-void gammacompr_apply(void *ptr, VJFrame *frame, int *args ) {
+void gammacompr_apply(void *ptr, VJFrame *frame, int *args) {
     int value = args[0];
     int white_threshold = args[1];
     int black_threshold = args[2];
 
     gammacompr_t *g = (gammacompr_t*) ptr;
-
-	unsigned int i;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
+    const int len = frame->len;
+    uint8_t *Y = frame->data[0];
     uint8_t *U = frame->data[1];
     uint8_t *V = frame->data[2];
-    double v = ( (double) value - 3000.0) / 1000.0;
+
+    double v = ((double)value - 3000.0) / 1000.0;
     
     if (v != g->gamma_value) {
-        g->gamma_value = v;
-        gammacompr_setup(g);
-	}
-
-    double *gamma_table = g->gamma_table;
-
-    for (i = 0; i < len; i++) {
-		Y[i] = (uint8_t) gamma_table[Y[i]];
+#pragma omp critical
+        {
+            if (v != g->gamma_value) {
+                g->gamma_value = v;
+                gammacompr_setup(g);
+            }
+        }
     }
 
-    if (white_threshold > 0 || black_threshold > 0) {
-        for (i = 0; i < len; i++) {
-            int y = Y[i];
+    double *gamma_table = g->gamma_table;
+    const int n_threads = vje_advise_num_threads(len);
 
-            int white_mask = -(y > white_threshold);
-            int black_mask = -(y < black_threshold);
+#pragma omp parallel num_threads(n_threads)
+    {
+#pragma omp for schedule(static)
+        for (int i = 0; i < len; i++) {
+            Y[i] = (uint8_t)gamma_table[Y[i]];
+        }
 
-            U[i] = (U[i] & ~(white_mask | black_mask)) | (128 & (white_mask | black_mask));
-            V[i] = (V[i] & ~(white_mask | black_mask)) | (128 & (white_mask | black_mask));
+        if (white_threshold > 0 || black_threshold > 0) {
+#pragma omp for schedule(static)
+            for (int i = 0; i < len; i++) {
+                int y = Y[i];
+                int white_mask = -(y > white_threshold);
+                int black_mask = -(y < black_threshold);
+                int mask = white_mask | black_mask;
+
+                U[i] = (U[i] & ~mask) | (128 & mask);
+                V[i] = (V[i] & ~mask) | (128 & mask);
+            }
         }
     }
 }

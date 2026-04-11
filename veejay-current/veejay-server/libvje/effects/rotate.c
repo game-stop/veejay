@@ -34,7 +34,7 @@ typedef struct {
 /* --- Internal Helpers --- */
 
 static inline __attribute__((always_inline)) uint8_t fast_bilinear(
-    const uint8_t * __restrict__ img, const int w, 
+    const uint8_t *restrict img, const int w,
     const int x_fixed, const int y_fixed) 
 {
     const int x = x_fixed >> 16;

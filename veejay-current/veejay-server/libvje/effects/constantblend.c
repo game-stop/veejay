@@ -48,7 +48,6 @@ vj_effect *constantblend_init(int w, int h)
     ve->defaults[1] = 110; // scale before blend
     ve->defaults[2] = 16;  // constant Y
     ve->description = "Constant Luminance Blend";
-    ve->parallel = 1;
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
@@ -65,6 +64,7 @@ void constantblend_apply(void *ptr, VJFrame *frame, int *args) {
     int type = args[0];
     int scale = args[1];
     int valY = args[2];
+    int n_threads = vje_advise_num_threads(frame->len);
 
     const int len = frame->len;
     const uint8_t y = (uint8_t) valY;
@@ -74,6 +74,7 @@ void constantblend_apply(void *ptr, VJFrame *frame, int *args) {
     pix_func_Y blend_y = get_pix_func_Y(type);
     uint8_t *Y = frame->data[0];
 
+#pragma omp parallel for num_threads(n_threads) schedule(static)
     for (int i = 0; i < len; i++) {
         int tmp_val = (*Y * s_fp) >> 8;
         *Y = blend_y((uint8_t)tmp_val, y);

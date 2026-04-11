@@ -37,7 +37,6 @@ vj_effect *negatechannel_init(int w, int h)
     ve->defaults[0] = 0;
     ve->defaults[1] = 0xff;
     ve->description = "Negate a channel";
-    ve->parallel = 1;
 	ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
@@ -50,42 +49,44 @@ vj_effect *negatechannel_init(int w, int h)
     return ve;
 }
 
-void negatechannel_apply( void *ptr, VJFrame *frame, int *args ) {
-    int chan = args[0];
-    int val = args[1];
-
-    int i;
+void negatechannel_apply(void *ptr, VJFrame *frame, int *args) {
+    const int chan = args[0];
+    const int val = args[1];
     const int len = frame->len;
     const int uv_len = (frame->ssm ? len : frame->uv_len);
 
-    uint8_t *Y = frame->data[0];
+    uint8_t *Y  = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
-    switch( chan ) {
-		case 0:
-#pragma omp simd
-			for (i = 0; i < len; i++) {
-				Y[i] = val - Y[i];
-		    }
-			break;
-		case 1:
-#pragma omp simd
-			for (i = 0; i < uv_len; i++) {
-				Cb[i] = val - Cb[i];
-		    }
-			break;
-		case 2:
-#pragma omp simd
-			for (i = 0; i < uv_len; i++) {
-				Cr[i] = val - Cr[i];
-			}
-		case 3:
-#pragma omp simd
-			for( i = 0; i < uv_len; i ++ ) {
-				Cb[i] = val - Cb[i];
-				Cr[i] = val - Cr[i];
-			}
-			break;
-   }
+    const int n_threads = vje_advise_num_threads((chan == 0) ? len : uv_len);
+
+    switch (chan) {
+        case 0:
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+            for (int i = 0; i < len; i++) {
+                Y[i] = (uint8_t)(val - Y[i]);
+            }
+            break;
+            
+        case 1:
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+            for (int i = 0; i < uv_len; i++) {
+                Cb[i] = (uint8_t)(val - Cb[i]);
+            }
+            break;
+        case 2:
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+            for (int i = 0; i < uv_len; i++) {
+                Cr[i] = (uint8_t)(val - Cr[i]);
+            }
+            break;
+        case 3:
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+            for (int i = 0; i < uv_len; i++) {
+                Cb[i] = (uint8_t)(val - Cb[i]);
+                Cr[i] = (uint8_t)(val - Cr[i]);
+            }
+            break;
+    }
 }

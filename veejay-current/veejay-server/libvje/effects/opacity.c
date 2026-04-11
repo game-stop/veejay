@@ -35,7 +35,6 @@ vj_effect *opacity_init(int w, int h)
     ve->description = "Normal Overlay";
     ve->sub_format = -1;
     ve->extra_frame = 1;
-    ve->parallel = 1;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Opacity"); 
     return ve;
@@ -45,22 +44,71 @@ static inline void blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, size_t siz
 {
     const uint8_t op1 = (opacity > 255) ? 255 : opacity;
     const uint8_t op0 = 255 - op1;
-#pragma omp simd
     for( int i = 0; i < size; i ++ )
         dst[i] = (op0 * A[i] + op1 * B[i] ) >> 8;
 }
 
-void opacity_apply( void *ptr,  VJFrame *frame, VJFrame *frame2, int *args )
+void opacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    blend_plane( frame->data[0], frame->data[0], frame2->data[0], frame->len, args[0] );
-    blend_plane( frame->data[1], frame->data[1], frame2->data[1], frame->ssm ? frame->len : frame->uv_len, args[0] );
-    blend_plane( frame->data[2], frame->data[2], frame2->data[2], frame->ssm ? frame->len : frame->uv_len, args[0] );
+    const int opacity = args[0];
+    const size_t len = frame->len;
+    const size_t uv_len = frame->ssm ? len : (size_t)frame->uv_len;
+
+    uint8_t *restrict Y1 = frame->data[0];
+    uint8_t *restrict Cb1 = frame->data[1];
+    uint8_t *restrict Cr1 = frame->data[2];
+
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
+
+    const int op1 = (opacity > 255) ? 255 : opacity;
+    const int op0 = 255 - op1;
+    const int n_threads = vje_advise_num_threads((int)len);
+
+#pragma omp parallel num_threads(n_threads)
+    {
+#pragma omp for schedule(static)
+        for (int i = 0; i < (int)len; i++) {
+            Y1[i] = (uint8_t)((op0 * Y1[i] + op1 * Y2[i]) >> 8);
+        }
+#pragma omp for schedule(static)
+        for (int i = 0; i < (int)uv_len; i++) {
+            Cb1[i] = (uint8_t)((op0 * Cb1[i] + op1 * Cb2[i]) >> 8);
+        }
+#pragma omp for schedule(static)
+        for (int i = 0; i < (int)uv_len; i++) {
+            Cr1[i] = (uint8_t)((op0 * Cr1[i] + op1 * Cr2[i]) >> 8);
+        }
+    }
 }
-
-void opacity_blend_apply( uint8_t *src1[3], uint8_t *src2[3], int len, int uv_len, int opacity )
+void opacity_blend_apply(uint8_t *src1[3], uint8_t *src2[3], int len, int uv_len, int opacity)
 {
-    blend_plane( src1[0], src1[0], src2[0], len, opacity );
-    blend_plane( src1[1], src1[1], src2[1], uv_len, opacity );
-    blend_plane( src1[2], src1[2], src2[2], uv_len, opacity );
+    uint8_t *restrict Y1  = src1[0];
+    uint8_t *restrict Cb1 = src1[1];
+    uint8_t *restrict Cr1 = src1[2];
 
+    const uint8_t *restrict Y2  = src2[0];
+    const uint8_t *restrict Cb2 = src2[1];
+    const uint8_t *restrict Cr2 = src2[2];
+
+    const int op1 = (opacity > 255) ? 255 : opacity;
+    const int op0 = 255 - op1;
+    const int n_threads = vje_advise_num_threads(len);
+
+#pragma omp parallel num_threads(n_threads)
+    {
+#pragma omp for schedule(static)
+        for (int i = 0; i < len; i++) {
+            Y1[i] = (uint8_t)((op0 * Y1[i] + op1 * Y2[i]) >> 8);
+        }
+#pragma omp for schedule(static)
+        for (int i = 0; i < uv_len; i++) {
+            Cb1[i] = (uint8_t)((op0 * Cb1[i] + op1 * Cb2[i]) >> 8);
+        }
+#pragma omp for schedule(static)
+        for (int i = 0; i < uv_len; i++) {
+            Cr1[i] = (uint8_t)((op0 * Cr1[i] + op1 * Cr2[i]) >> 8);
+        }
+    }
 }

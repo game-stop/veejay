@@ -1174,22 +1174,15 @@ uint8_t _pf_min(uint8_t a, uint8_t b)
 	return ( 255 - abs( (255-p) - b ) );
 }
 
-uint8_t _pf_max(uint8_t a,uint8_t b)
-{
-	uint8_t p = ( (b > a) ? b : a);
-	if( p<=16) p = 16;
-	return ( 255 - ((255 - b) * (255 - b)) / p);
-		
+uint8_t _pf_max(uint8_t a, uint8_t b) {
+    return (a > b) ? a : b;
 }
 
-uint8_t _pf_pq(uint8_t a,uint8_t b)
-{
-	if( a <= 16) a = 16;
-	if( b <= 16) b = 16;
-	int p = 255 - ((255-a) * (255-a)) / a;
-	int q = 255 - ((255-b) * (255-b)) / b;
-	
-	return ( 255 - ((255-p) * (255 - a)) / q);
+uint8_t _pf_pq(uint8_t a, uint8_t b) {
+    int val_a = (a < 16) ? 16 : a;
+    int val_b = (b < 16) ? 16 : b;
+    int result = 255 - ((255 - val_a) * (255 - val_b)) / 255;
+    return (uint8_t)((result > 255) ? 255 : result);
 }
 
 uint8_t _pf_none(uint8_t a, uint8_t b)

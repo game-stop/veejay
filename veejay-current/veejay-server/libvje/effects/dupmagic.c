@@ -35,10 +35,8 @@ vj_effect *dupmagic_init(int w, int h)
 	ve->limits[0][0] = 0;
 	ve->limits[1][0] = 12;
 	ve->extra_frame = 1;
-	ve->parallel = 1;    
 	ve->sub_format = -1;
 	ve->has_user = 0;
-	ve->parallel = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode" );
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
@@ -52,72 +50,73 @@ vj_effect *dupmagic_init(int w, int h)
 
 void dupmagic_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
     int n = args[0];
+	int n_threads = vje_advise_num_threads(frame->len);
 
     switch (n) {
     case 1:
-		overlaymagic_additive(frame, frame );
-		overlaymagic_additive(frame2, frame2 );
-		overlaymagic_additive(frame, frame2 );
+		overlaymagic_additive(frame, frame, n_threads );
+		overlaymagic_additive(frame2, frame2, n_threads );
+		overlaymagic_additive(frame, frame2, n_threads );
 		break;
     case 2:
-		overlaymagic_multiply(frame, frame );
-		overlaymagic_multiply(frame2, frame2 );
-		overlaymagic_multiply(frame, frame2 );
+		overlaymagic_multiply(frame, frame, n_threads );
+		overlaymagic_multiply(frame2, frame2, n_threads );
+		overlaymagic_multiply(frame, frame2, n_threads );
 		break;
     case 3:
-		overlaymagic_divide(frame, frame );
-		overlaymagic_divide(frame2, frame2 );
-		overlaymagic_divide(frame, frame2 );
+		overlaymagic_divide(frame, frame, n_threads );
+		overlaymagic_divide(frame2, frame2, n_threads );
+		overlaymagic_divide(frame, frame2, n_threads );
 		break;
     case 4:
-		overlaymagic_lighten(frame, frame );
-		overlaymagic_lighten(frame2, frame2 );
-		overlaymagic_lighten(frame, frame2 );
+		overlaymagic_lighten(frame, frame, n_threads );
+		overlaymagic_lighten(frame2, frame2, n_threads );
+		overlaymagic_lighten(frame, frame2, n_threads );
 		break;
     case 5:
-		overlaymagic_diffnegate(frame, frame );
-		overlaymagic_diffnegate(frame2, frame2 );
-		overlaymagic_diffnegate(frame, frame2 );
+		overlaymagic_diffnegate(frame, frame, n_threads );
+		overlaymagic_diffnegate(frame2, frame2, n_threads );
+		overlaymagic_diffnegate(frame, frame2, n_threads );
 		break;
     case 6:
-		overlaymagic_freeze(frame, frame );
-		overlaymagic_freeze(frame2, frame2 );
-		overlaymagic_freeze(frame, frame2 );
+		overlaymagic_freeze(frame, frame, n_threads );
+		overlaymagic_freeze(frame2, frame2, n_threads );
+		overlaymagic_freeze(frame, frame2, n_threads );
 		break;
     case 7:
-		overlaymagic_unfreeze(frame, frame );
-		overlaymagic_unfreeze(frame2, frame2 );
-		overlaymagic_unfreeze(frame, frame2 );
+		overlaymagic_unfreeze(frame, frame, n_threads );
+		overlaymagic_unfreeze(frame2, frame2, n_threads );
+		overlaymagic_unfreeze(frame, frame2, n_threads );
 		break;
     case 8:
-		overlaymagic_relativeadd(frame, frame2 );
-		overlaymagic_relativeadd(frame2, frame2 );
-		overlaymagic_relativeadd(frame, frame2 );
+		overlaymagic_relativeadd(frame, frame2, n_threads );
+		overlaymagic_relativeadd(frame2, frame2, n_threads );
+		overlaymagic_relativeadd(frame, frame2, n_threads );
 		break;
     case 9:
-		overlaymagic_relativeaddlum(frame, frame );
-		overlaymagic_relativeaddlum(frame2, frame2 );
-		overlaymagic_relativeaddlum(frame, frame2 );
+		overlaymagic_relativeaddlum(frame, frame, n_threads );
+		overlaymagic_relativeaddlum(frame2, frame2, n_threads );
+		overlaymagic_relativeaddlum(frame, frame2, n_threads );
 	break;
     case 10:
-		overlaymagic_maxselect(frame, frame );
-		overlaymagic_maxselect(frame2, frame2 );
-		overlaymagic_maxselect(frame, frame2 );
+		overlaymagic_maxselect(frame, frame, n_threads );
+		overlaymagic_maxselect(frame2, frame2, n_threads );
+		overlaymagic_maxselect(frame, frame2, n_threads );
 		break;
     case 11:
-		overlaymagic_minselect(frame, frame );
-		overlaymagic_minselect(frame2, frame2 );
-		overlaymagic_minselect(frame, frame2 );
+		overlaymagic_minselect(frame, frame, n_threads );
+		overlaymagic_minselect(frame2, frame2, n_threads );
+		overlaymagic_minselect(frame, frame2, n_threads );
 		break;
     case 12:
-		overlaymagic_addtest2(frame, frame );
-		overlaymagic_addtest2(frame2, frame2 );
-		overlaymagic_addtest2(frame, frame2 );
+		overlaymagic_addtest2(frame, frame, n_threads );
+		overlaymagic_addtest2(frame2, frame2, n_threads );
+		overlaymagic_addtest2(frame, frame2, n_threads );
 		break;
     default:
-		overlaymagic_softburn(frame, frame );
-		overlaymagic_softburn(frame2, frame2 );
-		overlaymagic_softburn(frame, frame2 );
+		overlaymagic_softburn(frame, frame, n_threads );
+		overlaymagic_softburn(frame2, frame2, n_threads );
+		overlaymagic_softburn(frame, frame2, n_threads );
 		break;
     }
 }

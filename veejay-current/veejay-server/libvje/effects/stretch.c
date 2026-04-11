@@ -47,43 +47,40 @@ vj_effect *stretch_init(int w, int h)
     ve->description = "Chroma Stretch";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 1;
 	ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Upper bound", "Lower bound", "Gain factor", "Saturation Amplifier");
     return ve;
 }
 
-
-void stretch_apply( void *ptr, VJFrame *frame, int *args )
+void stretch_apply(void *ptr, VJFrame *frame, int *args)
 {
-    unsigned int i;
-    const int len = frame->len;
+    const int upper = args[0];
+    const int lower = args[1];
+    const int gain = args[2];
+    const int gain_saturation = args[3];
 
-    uint8_t *Y = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
+    const size_t len = (size_t)frame->len;
+    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
-    int upper = args[0];
-    int lower = args[1];
-    int gain = args[2];
-    int gain_saturation = args[3];
-   
-    double gainFactor = (gain * 0.01);
-    double satFactor = (gain_saturation * 0.01);
-    double cb,cr;
+    int fixed_gain = (gain * gain_saturation * 256) / 10000;
+    if (gain_saturation == 0) {
+        fixed_gain = (gain * 256) / 100;
+    }
 
-    if( gain_saturation > 0 )
-        gainFactor *= satFactor;
+    const int n_threads = vje_advise_num_threads((int)len);
 
-    for( i = 0; i < len; i ++ ) {
-		
-        if( Y[i] > lower && Y[i] < upper ) {
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (size_t i = 0; i < len; i++) {
+        const uint8_t y_val = Y[i];
         
-            cb = (double)(Cb[i]-128);
-            cr = (double)(Cr[i]-128);
+        if (y_val > lower && y_val < upper) {
+            int cb = (int)Cb[i] - 128;
+            int cr = (int)Cr[i] - 128;
 
-            Cb[i] = 128 + (cb + (cb * gainFactor));
-            Cr[i] = 128 + (cr - (cr * gainFactor));
+            Cb[i] = (uint8_t)(128 + cb + ((cb * fixed_gain) >> 8));
+            Cr[i] = (uint8_t)(128 + cr - ((cr * fixed_gain) >> 8));
         }
-	}
+    }
 }
