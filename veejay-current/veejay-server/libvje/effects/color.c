@@ -21,6 +21,8 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "color.h"
+#include <omp.h>
+#include <stdlib.h>
 
 vj_effect *color_init(int w, int h)
 {
@@ -59,7 +61,6 @@ vj_effect *color_init(int w, int h)
 
     ve->has_user = 0;
     ve->extra_frame = 0;
-    ve->parallel = 1;
 
     return ve;
 }
@@ -69,14 +70,15 @@ void color_apply(void *ptr, VJFrame *frame, int *args)
     const int vibrance = args[0];
     const int bias_u   = args[1];
     const int bias_v   = args[2];
+    int n_threads = vje_advise_num_threads(frame->len);
 
     const int uv_len = (frame->ssm ? frame->len : frame->uv_len);
 
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp simd
-    for(unsigned int i = 0; i < uv_len; i++)
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for(int i = 0; i < uv_len; i++)
     {
         int cb = Cb[i] - 128;
         int cr = Cr[i] - 128;
@@ -101,7 +103,7 @@ void color_apply(void *ptr, VJFrame *frame, int *args)
         if(cr < 0) cr = 0;
         if(cr > 255) cr = 255;
 
-        Cb[i] = cb;
-        Cr[i] = cr;
+        Cb[i] = (uint8_t)cb;
+        Cr[i] = (uint8_t)cr;
     }
 }
