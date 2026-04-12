@@ -74,10 +74,7 @@ vj_effect *shutterdrag_init(int w, int h)
     );
 
     ve->description = "Shutter Drag";
-    ve->extra_frame = 0;
     ve->sub_format = 1;
-    ve->has_user = 0;
-    ve->parallel = 0;   
 
     return ve;
 }

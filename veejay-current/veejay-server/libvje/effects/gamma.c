@@ -22,10 +22,10 @@
 #include <veejaycore/vjmem.h>
 #include "gamma.h"
 
-
 typedef struct {
     int gamma_flag;
     uint8_t table[256];
+    int n_threads;
 } gamma_t;
 
 vj_effect *gamma_init(int w, int h)
@@ -39,11 +39,8 @@ vj_effect *gamma_init(int w, int h)
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 500;
     ve->description = "Gamma Correction";
-    ve->extra_frame = 0;
     ve->sub_format = -1;
-	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Gamma");
-    ve->parallel = 0;
 	return ve;
 }
 
@@ -52,6 +49,7 @@ void *gamma_malloc(int w, int h) {
     if(!g) {
         return NULL;
     }
+    g->n_threads = vje_advise_num_threads(w*h);
     return (void*) g;
 }
 
@@ -89,6 +87,7 @@ void gamma_apply(void *ptr, VJFrame *frame, int *args ) {
 
     uint8_t *table = g->table;
 
+    #pragma omp parallel for schedule(static) num_threads(g->n_threads)
     for (i = 0; i < len; i++) {
 		Y[i] = (uint8_t) table[Y[i]];
     }

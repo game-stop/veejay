@@ -34,9 +34,6 @@ vj_effect *meanfilter_init(int w, int h)
     ve->num_params = 0;
     ve->description = "Mean Filter (3x3)";
     ve->sub_format = -1;
-    ve->extra_frame = 0;
-    ve->parallel = 0;
-    ve->has_user = 0;
     return ve;
 }
 

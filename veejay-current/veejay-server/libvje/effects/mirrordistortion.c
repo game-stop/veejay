@@ -40,10 +40,7 @@ vj_effect *mirrordistortion_init(int w, int h)
     ve->limits[1][1] = w * 2;
     ve->limits[0][2] = 0;
     ve->limits[1][2] = h * 2;
-    ve->extra_frame = 0;
     ve->sub_format = 1;
-    ve->has_user = 0;
-    ve->parallel = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Distortion", "Offset X", "Offset Y" );
 
     ve->hints = vje_init_value_hint_list( ve->num_params );

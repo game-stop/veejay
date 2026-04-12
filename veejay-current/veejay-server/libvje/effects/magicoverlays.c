@@ -39,8 +39,6 @@ vj_effect *overlaymagic_init(int w, int h)
 	ve->limits[1][1] = 1; // clear chroma or keep
 	ve->extra_frame = 1;
 	ve->sub_format = -1;
-	ve->has_user = 0;
-	ve->parallel = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Keep or clear color" );
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );

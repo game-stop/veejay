@@ -60,9 +60,6 @@ vj_effect *luminouswave_init(int w, int h) {
 
     ve->description = "Luminous Wave";
     ve->sub_format = 1;
-    ve->extra_frame = 0;
-    ve->parallel = 0;
-    ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Frequency X", "Frequency Y", "Amplitude", "Speed", "Angle X", "Angle Y", "Break" );
 
     return ve;
@@ -135,7 +132,6 @@ void luminouswave_apply(void *ptr, VJFrame *frame, int *args) {
 
 
     #pragma omp parallel for num_threads(data->n_threads) schedule(static)
-
     for (int y = 0; y < height; y++) {
         uint8_t *restrict row = &Y[y * width];
         const int actual_y = y + offset;

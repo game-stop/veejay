@@ -38,7 +38,6 @@ vj_effect *opacityadv_init(int w, int h)
     ve->defaults[0] = 150;
     ve->defaults[1] = 40;
     ve->defaults[2] = 176;
-    ve->parallel = 0;
 	ve->description = "Soft-Edge Luma Key";
     ve->sub_format = 1;
     ve->extra_frame = 1;

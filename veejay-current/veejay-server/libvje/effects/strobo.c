@@ -49,12 +49,8 @@ vj_effect *strobo_init(int w, int h)
     ve->limits[0][5] = 0;
     ve->limits[1][5] = 1500;
     ve->description = "Strobotsu";
-    
+
     ve->sub_format = 1;
-    ve->extra_frame = 0;
-    ve->has_user =0;
-    ve->parallel = 0;
-    
     ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Duration", "Opacity", "Echoes", "Mode", "Delay" );
 
     return ve;

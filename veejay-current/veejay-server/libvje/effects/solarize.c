@@ -42,10 +42,7 @@ vj_effect *solarize_init(int w,int h)
     ve->limits[1][1] = 2;
 
     ve->description = "Solarize (Sabattier)";
-    ve->parallel = 0;
     ve->sub_format = 1;
-    ve->extra_frame = 0;
-    ve->has_user = 0;
 
     ve->param_description = vje_build_param_list(ve->num_params,
         "Threshold", "Mode");

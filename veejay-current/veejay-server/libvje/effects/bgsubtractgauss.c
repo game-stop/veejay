@@ -67,11 +67,9 @@ vj_effect *bgsubtractgauss_init(int width, int height)
     ve->defaults[4] = 1;
 
     ve->description = "Gaussian Adaptive Background";
-    ve->extra_frame = 0;
     ve->sub_format = -1;
     ve->has_user = 1;
     ve->static_bg = 1;
-    ve->parallel = 0;
     ve->global = 1;
     ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
 
