@@ -22,11 +22,6 @@
 #include <veejaycore/vjmem.h>
 #include <math.h>
 
-typedef struct
-{
-    int n_threads;
-} isolate_t;
-
 #define DIV255(x) (((x) + 1 + ((x) >> 8)) >> 8)
 
 vj_effect *isolate_init(int w, int h)
@@ -64,20 +59,10 @@ vj_effect *isolate_init(int w, int h)
     return ve;
 }
 
-void *isolate_malloc(int w, int h) {
-    isolate_t *iso = (isolate_t*) vj_malloc(sizeof(isolate_t));
-    if(!iso) return NULL;
-    iso->n_threads = vje_advise_num_threads(w * h);
-    return (void*) iso;
-}
-
-void isolate_free(void *ptr) {
-    if(ptr) free(ptr);
-}
 
 void isolate_apply(void *ptr, VJFrame *frame, int *args) {
-    isolate_t *iso = (isolate_t*) ptr;
     int iy, iu, iv;
+    int n_threads = vje_advise_num_threads(frame->len);
 
     _rgb2yuv(args[1], args[2], args[3], iy, iu, iv);
 
@@ -106,7 +91,7 @@ void isolate_apply(void *ptr, VJFrame *frame, int *args) {
     uint8_t *restrict Cr = frame->data[2];
     const int len = frame->len;
 
-    #pragma omp parallel num_threads(iso->n_threads)
+    #pragma omp parallel num_threads(n_threads)
     {
         #pragma omp for schedule(static)
         for (int pos = 0; pos < len; pos++) {
