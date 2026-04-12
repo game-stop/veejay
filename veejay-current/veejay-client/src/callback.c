@@ -811,137 +811,470 @@ void	on_slider_p15_value_changed(GtkWidget *w, gpointer user_data)
 	SLIDER_CHANGED( 15, (gint)gtk_adjustment_get_value (a) );
 }
 
-void	on_inc_p0_clicked(GtkWidget *w, gpointer user_data)
+void    on_inc_p0_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED( 0, 1 , "slider_p0" );
-}
-void	on_dec_p0_clicked(GtkWidget *w, gpointer user_data)
-{
-	PARAM_CHANGED( 0, -1, "slider_p0");
-}
-void	on_inc_p1_clicked(GtkWidget *w, gpointer user_data)
-{
-	PARAM_CHANGED( 1, 1 , "slider_p1" );
-}
-void	on_dec_p1_clicked(GtkWidget *w, gpointer user_data)
-{
-	PARAM_CHANGED( 1, -1, "slider_p1");
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P0], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
-}
-void	on_inc_p2_clicked(GtkWidget *w, gpointer user_data)
-{
-	PARAM_CHANGED( 2, 1 , "slider_p2" );
-}
-void	on_dec_p2_clicked(GtkWidget *w, gpointer user_data)
-{
-	PARAM_CHANGED( 2, -1, "slider_p2");
-}
-void	on_inc_p3_clicked(GtkWidget *w, gpointer user_data)
-{
-	PARAM_CHANGED( 3, 1 , "slider_p3" );
-}
-	void	on_dec_p3_clicked(GtkWidget *w, gpointer user_data)
-{
-	PARAM_CHANGED( 3, -1, "slider_p3");
-}
-void	on_inc_p4_clicked(GtkWidget *w, gpointer user_data)
-{
-	PARAM_CHANGED(4, 1 , "slider_p4" );
-}
-void	on_dec_p4_clicked(GtkWidget *w, gpointer user_data)
-{
-	PARAM_CHANGED( 4, -1, "slider_p4");
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P0], handler_id);
+
+    PARAM_CHANGED( 0, 1 , "slider_p0" );
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P0], handler_id);
 }
 
-void	on_inc_p5_clicked(GtkWidget *w, gpointer user_data)
+void    on_dec_p0_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED(5, 1 , "slider_p5" );
-}
-void	on_dec_p5_clicked(GtkWidget *w, gpointer user_data)
-{
-	PARAM_CHANGED( 5, -1, "slider_p5");
+        //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P0], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P0], handler_id);
+
+    PARAM_CHANGED( 0, -1, "slider_p0");
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P0], handler_id);
 }
 
-void	on_inc_p6_clicked(GtkWidget *w, gpointer user_data)
+void    on_inc_p1_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED(6, 1 , "slider_p6" );
-}
-void	on_dec_p6_clicked(GtkWidget *w, gpointer user_data)
-{
-	PARAM_CHANGED( 6, -1, "slider_p6");
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P1], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P1], handler_id);
+
+    PARAM_CHANGED( 1, 1 , "slider_p1" );
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P1], handler_id);
 }
 
-void	on_inc_p7_clicked(GtkWidget *w, gpointer user_data)
+void    on_dec_p1_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED(7, 1 , "slider_p7" );
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P1], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P1], handler_id);
+
+    PARAM_CHANGED( 1, -1, "slider_p1");
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P1], handler_id);
 }
-void	on_dec_p7_clicked(GtkWidget *w, gpointer user_data)
+
+void    on_inc_p2_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED( 7, -1, "slider_p7");
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P2], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P2], handler_id);
+
+    PARAM_CHANGED( 2, 1 , "slider_p2" );
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P2], handler_id);
 }
-void	on_inc_p8_clicked(GtkWidget *w, gpointer user_data)
+
+void    on_dec_p2_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED(8, 1 , "slider_p8" );
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P2], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P2], handler_id);
+
+    PARAM_CHANGED( 2, -1, "slider_p2");
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P2], handler_id);
 }
-void	on_dec_p8_clicked(GtkWidget *w, gpointer user_data)
+
+void    on_inc_p3_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED( 8, -1, "slider_p8");
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P3], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P3], handler_id);
+
+    PARAM_CHANGED( 3, 1 , "slider_p3" );
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P3], handler_id);
 }
-void	on_inc_p9_clicked(GtkWidget *w, gpointer user_data)
+
+void    on_dec_p3_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED(9, 1 , "slider_p9" );
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P3], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P3], handler_id);
+
+    PARAM_CHANGED( 3, -1, "slider_p3");
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P3], handler_id);
 }
-void	on_dec_p9_clicked(GtkWidget *w, gpointer user_data)
+
+void    on_inc_p4_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED( 9, -1, "slider_p9");
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P4], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P4], handler_id);
+
+    PARAM_CHANGED(4, 1 , "slider_p4" );
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P4], handler_id);
 }
-void	on_inc_p10_clicked(GtkWidget *w, gpointer user_data)
+
+void    on_dec_p4_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED(10, 1 , "slider_p10" );
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P4], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P4], handler_id);
+
+    PARAM_CHANGED( 4, -1, "slider_p4");
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P4], handler_id);
 }
-void	on_dec_p10_clicked(GtkWidget *w, gpointer user_data)
+
+void    on_inc_p5_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED( 10, -1, "slider_p10");
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P5], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P5], handler_id);
+
+    PARAM_CHANGED(5, 1 , "slider_p5" );
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P5], handler_id);
 }
-void	on_inc_p11_clicked(GtkWidget *w, gpointer user_data)
+
+void    on_dec_p5_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED(11, 1 , "slider_p11" );
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P5], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P5], handler_id);
+
+    PARAM_CHANGED(5, -1, "slider_p5");
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P5], handler_id);
 }
-void	on_dec_p11_clicked(GtkWidget *w, gpointer user_data)
+
+void    on_inc_p6_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED( 11, -1, "slider_p11");
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P6], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P6], handler_id);
+
+    PARAM_CHANGED(6, 1 , "slider_p6" );
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P6], handler_id);
 }
-void	on_inc_p12_clicked(GtkWidget *w, gpointer user_data)
+
+void    on_dec_p6_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED(12, 1 , "slider_p12" );
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P6], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P6], handler_id);
+
+    PARAM_CHANGED( 6, -1, "slider_p6");
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P6], handler_id);
 }
-void	on_dec_p12_clicked(GtkWidget *w, gpointer user_data)
+
+void    on_inc_p7_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED( 12, -1, "slider_p12");
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P7], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P7], handler_id);
+
+    PARAM_CHANGED(7, 1 , "slider_p7" );
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P7], handler_id);
 }
-void	on_inc_p13_clicked(GtkWidget *w, gpointer user_data)
+
+void    on_dec_p7_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED(13, 1 , "slider_p13" );
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P7], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P7], handler_id);
+
+    PARAM_CHANGED( 7, -1, "slider_p7");
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P7], handler_id);
 }
-void	on_dec_p13_clicked(GtkWidget *w, gpointer user_data)
+
+void    on_inc_p8_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED( 13, -1, "slider_p13");
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P8], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P8], handler_id);
+
+    PARAM_CHANGED(8, 1 , "slider_p8" );
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P8], handler_id);
 }
-void	on_inc_p14_clicked(GtkWidget *w, gpointer user_data)
+
+void    on_dec_p8_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED(14, 1 , "slider_p14" );
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P8], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P8], handler_id);
+
+    PARAM_CHANGED( 8, -1, "slider_p8");
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P8], handler_id);
 }
-void	on_dec_p14_clicked(GtkWidget *w, gpointer user_data)
+void    on_inc_p9_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED( 14, -1, "slider_p14");
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P9], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P9], handler_id);
+
+    PARAM_CHANGED(9, 1 , "slider_p9" );
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P9], handler_id);
 }
-void	on_inc_p15_clicked(GtkWidget *w, gpointer user_data)
+void    on_dec_p9_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED(15, 1 , "slider_p15" );
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P9], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P9], handler_id);
+
+    PARAM_CHANGED( 9, -1, "slider_p9");
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P9], handler_id);
 }
-void	on_dec_p15_clicked(GtkWidget *w, gpointer user_data)
+void    on_inc_p10_clicked(GtkWidget *w, gpointer user_data)
 {
-	PARAM_CHANGED( 15, -1, "slider_p15");
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P10], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P10], handler_id);
+
+    PARAM_CHANGED(10, 1 , "slider_p10" );
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P10], handler_id);
+}
+void    on_dec_p10_clicked(GtkWidget *w, gpointer user_data)
+{
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P10], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P10], handler_id);
+
+    PARAM_CHANGED( 10, -1, "slider_p10");
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P10], handler_id);
+}
+void    on_inc_p11_clicked(GtkWidget *w, gpointer user_data)
+{
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P11], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P11], handler_id);
+
+    PARAM_CHANGED(11, 1 , "slider_p11" );
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P11], handler_id);
+}
+void    on_dec_p11_clicked(GtkWidget *w, gpointer user_data)
+{
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P11], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P11], handler_id);
+
+    PARAM_CHANGED( 11, -1, "slider_p11");
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P11], handler_id);
+}
+void    on_inc_p12_clicked(GtkWidget *w, gpointer user_data)
+{
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P12], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P12], handler_id);
+
+    PARAM_CHANGED(12, 1 , "slider_p12" );
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P12], handler_id);
+}
+void    on_dec_p12_clicked(GtkWidget *w, gpointer user_data)
+{
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P12], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P12], handler_id);
+
+    PARAM_CHANGED( 12, -1, "slider_p12");
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P12], handler_id);
+}
+void    on_inc_p13_clicked(GtkWidget *w, gpointer user_data)
+{
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P13], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P13], handler_id);
+
+    PARAM_CHANGED(13, 1 , "slider_p13" );
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P13], handler_id);
+}
+void    on_dec_p13_clicked(GtkWidget *w, gpointer user_data)
+{
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P13], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P13], handler_id);
+
+    PARAM_CHANGED( 13, -1, "slider_p13");
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P13], handler_id);
+}
+void    on_inc_p14_clicked(GtkWidget *w, gpointer user_data)
+{
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P14], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P14], handler_id);
+
+    PARAM_CHANGED(14, 1 , "slider_p14" );
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P14], handler_id);
+}
+void    on_dec_p14_clicked(GtkWidget *w, gpointer user_data)
+{
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P14], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P14], handler_id);
+
+    PARAM_CHANGED( 14, -1, "slider_p14");
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P14], handler_id);
+}
+void    on_inc_p15_clicked(GtkWidget *w, gpointer user_data)
+{
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P15], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P15], handler_id);
+
+    PARAM_CHANGED(15, 1 , "slider_p15" );
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P15], handler_id);
+}
+void    on_dec_p15_clicked(GtkWidget *w, gpointer user_data)
+{
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
+    gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P15], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_cache[WIDGET_SLIDER_P15], handler_id);
+
+    PARAM_CHANGED( 15, -1, "slider_p15");
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_cache[WIDGET_SLIDER_P15], handler_id);
 }
 
 void	slider_g0_value_changed(GtkWidget *w, gpointer user_data)
