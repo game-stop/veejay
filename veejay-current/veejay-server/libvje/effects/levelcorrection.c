@@ -57,19 +57,7 @@ vj_effect *levelcorrection_init(int w,int h)
     return ve;
 }
 
-void *levelcorrection_malloc(int w, int h) {
-    level_t *lt = (level_t*) vj_malloc(sizeof(level_t));
-    if(!lt) return NULL;
-    lt->n_threads = vje_advise_num_threads(w*h);
-    return (void*) lt;
-}
-
-void levelcorrection_free(void *ptr) {
-    if(ptr) free(ptr);
-}
-
 void levelcorrection_apply(void *ptr, VJFrame *frame, int *args) {
-    level_t *lt = (level_t*) ptr;
     int min = args[0];
     int max = args[1];
     int bmin = args[2];
@@ -78,7 +66,7 @@ void levelcorrection_apply(void *ptr, VJFrame *frame, int *args) {
     uint8_t *A = frame->data[3];
     const int len = frame->len;
 
-    lt->n_threads = vje_advise_num_threads(len);
+    int n_threads = vje_advise_num_threads(len);
 
     uint8_t lut[256];
     uint8_t tmp_lut[256];
