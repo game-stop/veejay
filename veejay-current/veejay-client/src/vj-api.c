@@ -6893,12 +6893,12 @@ static void load_editlist_info(void)
 #endif
         return;
     }
-    int got_n = sscanf(res, "%04d %04d %d %c %f %1d %04d %06ld %02d %03ld %08ld %1d %1d %1d",
-           &values[0], &values[1], &values[2], &norm,&fps,
-           &values[4], &values[5], &rate, &values[7],
-           &dum[0], &dum[1], &values[8], &use_vims_mcast, &global_transition_state);
+    int got_n = sscanf(res, "%d %d %d %c %f %d %d %ld %d %ld %ld %d %d %d",
+       &values[0], &values[1], &values[2], &norm, &fps,
+       &values[4], &values[5], &rate, &values[7],
+       &dum[0], &dum[1], &values[8], &use_vims_mcast, &global_transition_state);
     if( got_n != 14 ) {
-        veejay_msg(VEEJAY_MSG_ERROR,"Failed to load all tokens from VIDEO_INFORMATION");
+        veejay_msg(VEEJAY_MSG_ERROR, "Parsing failed: expected 14, got %d. Data: %s", got_n, res);
     }
 
     snprintf( tmp, sizeof(tmp)-1, "%dx%d", values[0],values[1]);
@@ -8434,16 +8434,14 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
     const gchar *runtime_css = NULL;
 
     if (smallest_possible) {
-        veejay_msg(VEEJAY_MSG_INFO,
-            "Reducing size of UI to smallest possible");
-
         runtime_css =
             "window { font-size:98%; }"
-            "frame,box,scale,spinbutton,button,radiobutton,checkbutton,entry,.vertical { padding-left:0px; padding-right:0px }"
-            "button,checkbutton,radiobutton,spinbutton { padding-top:1px; padding-bottom:1px;}";
+            "frame,box,scale,spinbutton,button,radiobutton,checkbutton,entry,.vertical { padding-left:0px; padding-right:0px; padding-top:1px; padding-bottom:1px; }";
     }
     else {
-        runtime_css = "window { font-size:100%; }";
+        runtime_css = 
+            "window { font-size:100%; }"
+            "frame,box { padding-left:0px; padding-right:0px; }"; 
     }
 
     gtk_css_provider_load_from_data(override, runtime_css, -1, NULL);
@@ -8863,6 +8861,13 @@ void vj_gui_init(const char *glade_file,
     {
         gtk_window_set_default_size(GTK_WINDOW(mainw), 1920, 900);
     }
+
+
+    gtk_window_set_resizable(GTK_WINDOW(mainw), TRUE);
+    GdkGeometry geometry;
+    geometry.max_width = 1920;
+    geometry.max_height = 900;
+    gtk_window_set_geometry_hints(GTK_WINDOW(mainw), mainw, &geometry, GDK_HINT_MAX_SIZE);
 
     gtk_window_resize(GTK_WINDOW(mainw),
                    smallest_possible ? 1242 : 1920,

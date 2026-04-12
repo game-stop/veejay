@@ -7326,7 +7326,7 @@
                                     <child>
                                       <object class="GtkFrame" id="frame_p13">
                                         <property name="name">frame_p13</property>
-                                        <property name="visible">True</property>
+                                        <property name="visible">False</property>
                                         <property name="can-focus">False</property>
                                         <property name="label-xalign">0</property>
                                         <child>
@@ -7470,7 +7470,7 @@
                                     <child>
                                       <object class="GtkFrame" id="frame_p14">
                                         <property name="name">frame_p14</property>
-                                        <property name="visible">True</property>
+                                        <property name="visible">False</property>
                                         <property name="can-focus">False</property>
                                         <property name="label-xalign">0</property>
                                         <child>
@@ -7618,7 +7618,7 @@
                                     <child>
                                       <object class="GtkFrame" id="frame_p15">
                                         <property name="name">frame_p15</property>
-                                        <property name="visible">True</property>
+                                        <property name="visible">False</property>
                                         <property name="can-focus">False</property>
                                         <property name="label-xalign">0</property>
                                         <child>
