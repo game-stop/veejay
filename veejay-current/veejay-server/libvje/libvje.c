@@ -214,6 +214,7 @@ static struct {
     { fisheye_init, fisheye_malloc, fisheye_free,NULL,NULL,fisheye_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_FISHEYE },
     { fibdownscale_init, NULL,NULL,NULL,NULL, fibdownscale_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_FIBDOWNSCALE },
     { feathermask_init, feathermask_malloc, feathermask_free,NULL,NULL, feathermask_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_ALPHAFEATHERMASK },
+    { integralblur_init, integralblur_malloc, integralblur_free,NULL,NULL, integralblur_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_INTEGRALBLUR },
     { enhancemask_init, enhancemask_malloc, enhancemask_free, NULL,NULL, enhancemask_apply,NULL,NULL, NULL,NULL, VJ_IMAGE_EFFECT_ENHANCEMASK },
     { emboss_init, NULL, NULL, NULL, NULL, emboss_apply, NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_EMBOSS }, 
     { dupmagic_init, NULL, NULL, NULL, NULL, NULL, dupmagic_apply, NULL, NULL, NULL, VJ_VIDEO_EFFECT_DUPMAGIC },
