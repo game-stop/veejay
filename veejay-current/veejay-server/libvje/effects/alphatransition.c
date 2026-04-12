@@ -49,7 +49,6 @@ vj_effect *alphatransition_init(int width, int height)
 	ve->sub_format = 1;
     ve->extra_frame = 1;
   	ve->has_user = 0; 
-	ve->parallel = 1;
 	ve->alpha = FLAG_ALPHA_SRC_A;
 		 
 	ve->param_description = vje_build_param_list(ve->num_params, "Time Index", "Smooth", "Direction", "Threshold" );
@@ -61,113 +60,61 @@ vj_effect *alphatransition_init(int width, int height)
     return ve;
 }
 
-static inline void alpha_blend1(uint8_t *Y,
-						const uint8_t *Y2,
-						const uint8_t *AA,
-						size_t w)
+
+void alphatransition_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-	size_t j;
-#pragma omp simd
-	for( j = 0; j < w; j ++ )
-	{
-		Y[j] = ((AA[j] * Y[j]) + ((0xff-AA[j]) * Y2[j])) >> 8;
-	}
+    const int time_index = args[0];
+    const int duration   = args[1] + 1;
+    const int direction  = args[2];
+    const int threshold  = args[3];
+
+    const int len = frame->len;
+    const int n_threads = vje_advise_num_threads(len);
+
+    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict A  = frame->data[3];
+
+    uint8_t *restrict Y2  = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
+
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int i = 0; i < len; i++)
+    {
+        const int a = A[i];
+
+        int alpha;
+        if (time_index < a)
+        {
+            alpha = 0;
+        }
+        else if (time_index >= (a + duration))
+        {
+            alpha = 255;
+        }
+        else
+        {
+            alpha = (255 * (time_index - a)) / duration;
+        }
+
+        if (alpha < threshold)
+            alpha = 0;
+
+        const int ia = 255 - alpha;
+
+        if (direction == 0)
+        {
+            Y[i]  = (uint8_t)((alpha * Y[i]  + ia * Y2[i])  >> 8);
+            Cb[i] = (uint8_t)((alpha * Cb[i] + ia * Cb2[i]) >> 8);
+            Cr[i] = (uint8_t)((alpha * Cr[i] + ia * Cr2[i]) >> 8);
+        }
+        else
+        {
+            Y[i]  = (uint8_t)((ia * Y[i]  + alpha * Y2[i])  >> 8);
+            Cb[i] = (uint8_t)((ia * Cb[i] + alpha * Cb2[i]) >> 8);
+            Cr[i] = (uint8_t)((ia * Cr[i] + alpha * Cr2[i]) >> 8);
+        }
+    }
 }
-static inline void alpha_blend2(uint8_t *Y,
-						const uint8_t *Y2,
-						const uint8_t *AA,
-						size_t w)
-{
-	size_t j;
-#pragma omp simd
-	for( j = 0; j < w; j ++ )
-	{
-		Y[j] = (((0xff-AA[j]) * Y[j]) + (AA[j] * Y2[j])) >> 8;
-	}
-}
-
-
-static inline void expand_lookup_table( uint8_t *AA, const uint8_t *lookup, const uint8_t *aA, const size_t w )
-{
-	size_t j;
-#pragma omp simd
-	for( j = 0; j < w; j ++ )
-	{
-		AA[j] = lookup[ aA[j] ];
-	}
-}
-
-
-static void	alpha_blend_transition( uint8_t *Y, uint8_t *Cb, uint8_t *Cr, uint8_t *a0,
-									const uint8_t *Y2, const uint8_t *Cb2, const uint8_t *Cr2,
-									const uint8_t *a1, const size_t len, const size_t w, 
-									unsigned int time_index, const unsigned int dur, const int direction, const int threshold )
-{
-	uint8_t lookup[256];
-	uint8_t AA[ (w+16) ];
-
-	const uint8_t *T  = (const uint8_t*) lookup;
-	const uint8_t *aA = a0;
-
-	size_t i;
-
-	/* precalc lookup table for vectorization */
-	for( i = 0; i < 256; i ++ )
-	{
-		if( time_index < aA[i] )
-			lookup[i] = 0;
-		else if ( time_index >= (aA[i] + dur) )
-			lookup[i] = 0xff;
-		else
-			lookup[i] = 0xff * ( (double) (time_index - i ) / dur );
-	
-		if( lookup[i] < threshold )
-			lookup[i] = 0;
-	}
-
-	if( direction == 0 )
-	{
-		for( i = 0; i < len; i += w )
-		{
-			/* unroll the lookup table so we can vectorize */
-			expand_lookup_table( AA, T, aA + i, w );
-
-			alpha_blend1( Y + i, Y2 + i, AA, w );
-			alpha_blend1( Cb+ i, Cb2+ i, AA, w );
-			alpha_blend1( Cr+ i, Cr2+ i, AA, w );
-		}
-	} 
-	else
-	{
-		for( i = 0; i < len; i += w )
-		{
-			/* unroll the lookup table so we can vectorize */
-			expand_lookup_table( AA, T, aA + i, w );
-
-			alpha_blend2( Y + i, Y2 + i, AA, w );
-			alpha_blend2( Cb+ i, Cb2+ i, AA, w );
-			alpha_blend2( Cr+ i, Cr2+ i, AA, w );
-		}
-
-	}
-}
-
-void alphatransition_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
-    int time_index = args[0];
-    int duration = args[1];
-    int direction = args[2];
-    int threshold = args[3];
-
-	alpha_blend_transition(
-		frame->data[0],frame->data[1],frame->data[2],frame->data[3],
-		frame2->data[0],frame2->data[1],frame2->data[2],frame->data[3],
-		frame->len,
-		frame->width,
-		time_index,
-		duration + 1,
-	    direction,
-		threshold
-	);
-}
-
-

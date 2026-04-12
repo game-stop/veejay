@@ -29,7 +29,6 @@ vj_effect *alpha2img_init(int w, int h)
     ve->description = "Alpha: Show alpha as greyscale";
     ve->sub_format = -1;
     ve->extra_frame = 0;
-    ve->parallel = 1;
 	ve->has_user = 0;
 	ve->alpha = FLAG_ALPHA_SRC_A;
     return ve;

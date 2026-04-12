@@ -36,7 +36,6 @@ vj_effect *alphafill_init(int w, int h)
     ve->description = "Alpha: Fill Alpha channel by value";
     ve->sub_format = -1;
     ve->extra_frame = 0;
-    ve->parallel = 1;
 	ve->has_user = 0;
 	ve->alpha = FLAG_ALPHA_OUT;
     ve->param_description = vje_build_param_list( ve->num_params, "Alpha Value" );

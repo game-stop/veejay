@@ -24,6 +24,7 @@
 
 typedef struct {
     float *running_sum[3];
+    int n_threads;
 } average_t;
 
 vj_effect *average_init(int w, int h)
@@ -36,7 +37,6 @@ vj_effect *average_init(int w, int h)
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 1000;
     ve->defaults[0] = 1;
-	ve->parallel = 0; 
     ve->description = "Exponential Moving Average";
     ve->sub_format = 1; 
     ve->extra_frame = 0;
@@ -60,6 +60,8 @@ void *average_malloc(int width, int height)
 	a->running_sum[1] = a->running_sum[0] + (width*height);
 	a->running_sum[2] = a->running_sum[1] + (width*height);
 
+    a->n_threads = vje_advise_num_threads(width * height);
+
     return (void*) a;
 }
 
@@ -80,30 +82,46 @@ static inline uint8_t clamp_u8(double v)
     return (uint8_t)v;
 }
 
+void average_apply(void *ptr, VJFrame *frame, int *args)
+{
+    average_t *a = (average_t *)ptr;
 
-void average_apply(void *ptr, VJFrame *frame, int *args) {
-    int max_sum = args[0];
+    const int max_sum = args[0];
     const int len = frame->len;
+    const int n_threads = a->n_threads;
+
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    average_t *a = (average_t *)ptr;
+    float *restrict rsY  = a->running_sum[0] + frame->offset;
+    float *restrict rsCb = a->running_sum[1] + frame->offset;
+    float *restrict rsCr = a->running_sum[2] + frame->offset;
 
-    float *restrict running_sum[3];
-    running_sum[0] = a->running_sum[0] + frame->offset;
-    running_sum[1] = a->running_sum[1] + frame->offset;
-    running_sum[2] = a->running_sum[2] + frame->offset;
+    const float w  = 1.0f / (float)max_sum;
+    const float iw = 1.0f - w;
 
-    const float w  = 1.0 / max_sum;
-    const float iw = 1.0 - w;
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int i = 0; i < len; i++)
+    {
+        float y  = rsY[i];
+        float cb = rsCb[i];
+        float cr = rsCr[i];
 
-    for (int i = 0; i < len; i++) {
-        running_sum[0][i] = iw * running_sum[0][i] + w * Y[i];
-        running_sum[1][i] = iw * running_sum[1][i] + w * (Cb[i] - 128);
-        running_sum[2][i] = iw * running_sum[2][i] + w * (Cr[i] - 128);
-        Y[i]  = clamp_u8(running_sum[0][i]);
-        Cb[i] = clamp_u8(128.0 + running_sum[1][i]);
-        Cr[i] = clamp_u8(128.0 + running_sum[2][i]);
+        float inY  = (float)Y[i];
+        float inCb = (float)Cb[i] - 128.0f;
+        float inCr = (float)Cr[i] - 128.0f;
+
+        y  = iw * y  + w * inY;
+        cb = iw * cb + w * inCb;
+        cr = iw * cr + w * inCr;
+
+        rsY[i]  = y;
+        rsCb[i] = cb;
+        rsCr[i] = cr;
+
+        Y[i]  = clamp_u8(y);
+        Cb[i] = clamp_u8(128.0f + cb);
+        Cr[i] = clamp_u8(128.0f + cr);
     }
 }

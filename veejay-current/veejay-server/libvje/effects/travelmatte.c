@@ -29,8 +29,6 @@ vj_effect *travelmatte_init(int w, int h)
     ve->description = "Alpha: Travel Matte";
     ve->sub_format = 1;
     ve->extra_frame = 1;
-    ve->parallel = 1;
-	ve->has_user = 0;
 
 	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);     /* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
@@ -42,64 +40,70 @@ vj_effect *travelmatte_init(int w, int h)
     return ve;
 }
 
-
-void travelmatte_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args )
+void travelmatte_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-	const int len = frame->len;
+    const int len = frame->len;
+    const int w = frame->width;
+    const int h = frame->height;
 
-	uint8_t *a0 = frame->data[0];
-	uint8_t *a1 = frame->data[1];
-	uint8_t *a2 = frame->data[2];
-	uint8_t *aA = frame->data[3];
+    int n_threads = vje_advise_num_threads(w * h);
 
-	uint8_t *o0 = frame->data[0];
-	uint8_t *o1 = frame->data[1];
-	uint8_t *o2 = frame->data[2];
+    uint8_t *a0 = frame->data[0];
+    uint8_t *a1 = frame->data[1];
+    uint8_t *a2 = frame->data[2];
+    uint8_t *aA = frame->data[3];
 
-	uint8_t *b0 = frame2->data[0];
-	uint8_t *b1 = frame2->data[1];
-	uint8_t *b2 = frame2->data[2];
-	uint8_t *aB = frame2->data[3];
+    uint8_t *o0 = frame->data[0];
+    uint8_t *o1 = frame->data[1];
+    uint8_t *o2 = frame->data[2];
+
+    uint8_t *b0 = frame2->data[0];
+    uint8_t *b1 = frame2->data[1];
+    uint8_t *b2 = frame2->data[2];
+    uint8_t *aB = frame2->data[3];
 
     int mode = args[0];
 
-	unsigned int i;
+    #pragma omp parallel for schedule(static) num_threads(n_threads)
+    for (int i = 0; i < len; i++)
+    {
+        if (mode == 0)
+        {
+            if (aA[i] == 0)
+                continue;
 
-	if( mode == 0 ) {
-		for( i = 0; i < len; i ++ ) 
-		{
-			if( aA[i] == 0 )
-				continue;
+            if (aA[i] == 0xff)
+            {
+                o0[i] = b0[i];
+                o1[i] = b1[i];
+                o2[i] = b2[i];
+            }
+            else
+            {
+                uint8_t a = aA[i];
+                o0[i] = ALPHA_BLEND(a, a0[i], b0[i]);
+                o1[i] = ALPHA_BLEND(a, a1[i], b1[i]);
+                o2[i] = ALPHA_BLEND(a, a2[i], b2[i]);
+            }
+        }
+        else
+        {
+            if (aB[i] == 0)
+                continue;
 
-			if( aA[i] == 0xff ) {
-				o0[i] = b0[i];
-				o1[i] = b1[i];
-				o2[i] = b2[i];
-			}
-			else {
-				o0[i] = ALPHA_BLEND( aA[i], a0[i], b0[i] );
-				o1[i] = ALPHA_BLEND( aA[i], a1[i], b1[i] );
-				o2[i] = ALPHA_BLEND( aA[i], a2[i], b2[i] );
-			}
-		}
-	}
-	else
-	{
-		for( i = 0; i < len; i ++ )
-		{
-			if( aB[i] == 0 ) 
-				continue;
-
-			if( aB[i] == 0xff ) {
-				o0[i] = b0[i];
-				o1[i] = b1[i];
-				o2[i] = b2[i];
-			}
-			else {
-				o0[i] = ALPHA_BLEND( aB[i], a0[i], b0[i] );
-				o1[i] = ALPHA_BLEND( aB[i], a1[i], b1[i] );
-				o2[i] = ALPHA_BLEND( aB[i], a2[i], b2[i] );
-			}
-		}
-	}
+            if (aB[i] == 0xff)
+            {
+                o0[i] = b0[i];
+                o1[i] = b1[i];
+                o2[i] = b2[i];
+            }
+            else
+            {
+                uint8_t a = aB[i];
+                o0[i] = ALPHA_BLEND(a, a0[i], b0[i]);
+                o1[i] = ALPHA_BLEND(a, a1[i], b1[i]);
+                o2[i] = ALPHA_BLEND(a, a2[i], b2[i]);
+            }
+        }
+    }
 }

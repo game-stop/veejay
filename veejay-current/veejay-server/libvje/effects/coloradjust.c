@@ -46,40 +46,44 @@ vj_effect *coloradjust_init(int w, int h)
     ve->extra_frame = 0;
     ve->sub_format = -1;
     ve->has_user = 0;
-    ve->parallel = 0;
     return ve;
 }
 
-void coloradjust_apply(void *ptr, VJFrame *frame, int *args) {
-    int val = args[0];
-    int _degrees = args[1];
-    int exposureValue = args[2];
+void coloradjust_apply(void *ptr, VJFrame *frame, int *args)
+{
+    const int val           = args[0];
+    const int _degrees      = args[1];
+    const int exposureValue = args[2];
 
     const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
+    const int n_threads = vje_advise_num_threads(len);
 
-    float hue = ((float)val / 180.0f) * (float)M_PI;
-    float sat = ((float)_degrees * 0.01f);
+    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+
+    const float hue = ((float)val / 180.0f) * (float)M_PI;
+    const float sat = ((float)_degrees * 0.01f);
 
     const int s = (int)rintf(a_sin(hue) * (1 << 16) * sat);
     const int c = (int)rintf(a_cos(hue) * (1 << 16) * sat);
 
-    if (exposureValue > 0) {
-        float powValue = (float)exposureValue / 256.0f;
-#pragma omp simd
-        for (int i = 0; i < len; i++) {
+    const float powValue = (exposureValue > 0) ? ((float)exposureValue / 256.0f) : 1.0f;
+    const int do_exp = (exposureValue > 0);
+
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int i = 0; i < len; i++)
+    {
+        if (do_exp)
+        {
             int y = (int)(Y[i] * powValue);
             y &= ~(y >> 31);
             int diff = y - 255;
             y = 255 + (diff & (diff >> 31));
+
             Y[i] = (uint8_t)y;
         }
-    }
 
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
         int u = (int)Cb[i] - 128;
         int v = (int)Cr[i] - 128;
 
@@ -88,8 +92,10 @@ void coloradjust_apply(void *ptr, VJFrame *frame, int *args) {
 
         new_u &= ~(new_u >> 31);
         new_v &= ~(new_v >> 31);
+
         int diff_u = new_u - 255;
         int diff_v = new_v - 255;
+
         new_u = 255 + (diff_u & (diff_u >> 31));
         new_v = 255 + (diff_v & (diff_v >> 31));
 

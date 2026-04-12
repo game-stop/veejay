@@ -71,9 +71,6 @@ vj_effect *wave_init(int w, int h) {
 
     ve->description = "Wave";
     ve->sub_format = 1;
-    ve->extra_frame = 0;
-    ve->parallel = 0;
-    ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Factor", "Speed", "DeformX", "DeformY" );
 
     return ve;
@@ -95,6 +92,8 @@ typedef struct {
     float lut_speed;
     int lut_deformX;
     int lut_deformY;
+
+    int n_threads;
 } wave_t;
 
 
@@ -127,6 +126,8 @@ void* wave_malloc(int w, int h) {
     data->speed = 1.0f;
     data->deformX = 1;
     data->deformY = 1;
+
+    data->n_threads = vje_advise_num_threads(w*h);
 
     return data;
 }
@@ -187,6 +188,8 @@ void wave_apply(void *ptr, VJFrame *frame, int *args) {
     const int deformX = args[2];
     const int deformY = args[3];
 
+    const int n_threads = data->n_threads;
+
     float speed = data->speed + 0.1f;
     data->speed = (speed > speed_limit) ? 1.0f : speed;
 
@@ -200,6 +203,7 @@ void wave_apply(void *ptr, VJFrame *frame, int *args) {
 
     wave_build_luts(data, width, height, factor, speed, deformX, deformY);
 
+    #pragma omp parallel for schedule(static) num_threads(n_threads)
     for (int y = 0; y < height; y++) {
         const int srcY_base = clamp(y + data->lut_y[y], 0, height - 1);
         const int src_row = srcY_base * width;

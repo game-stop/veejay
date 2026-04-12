@@ -50,9 +50,6 @@ vj_effect *bwselect_init(int w, int h)
     ve->description = "Black and White Mask by Threshold";
     
     ve->sub_format = -1;
-    ve->extra_frame = 0;
-    ve->has_user =0;
-    ve->parallel = 0;
     
     ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
 
@@ -94,42 +91,63 @@ void bwselect_free(void *ptr)
     free(b);
 }
 
-
-void bwselect_apply(void *ptr, VJFrame *frame, int *args) {
-    int min_threshold = args[0];
-    int max_threshold = args[1];
-    int gamma = args[2];
-    int mode  = args[3];
-
+void bwselect_apply(void *ptr, VJFrame *frame, int *args)
+{
     bwselect_t *b = (bwselect_t*) ptr;
-    uint8_t *table = b->table;
+
+    const int min_threshold = args[0];
+    const int max_threshold = args[1];
+    const int gamma         = args[2];
+    const int mode          = args[3];
 
     const int len = frame->len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
+
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
     uint8_t *restrict A  = frame->data[3];
 
-    if (gamma != 0 && gamma != b->last_gamma) {
+    uint8_t *restrict table = b->table;
+
+    if (gamma != 0 && gamma != b->last_gamma)
+    {
         gamma_setup(b, (double)gamma / 100.0);
         b->last_gamma = gamma;
     }
 
-    if (mode == 0) {
-#pragma omp simd
-        for (int i = 0; i < len; i++) {
-            uint8_t p = (gamma == 0) ? Y[i] : table[Y[i]];
-            uint8_t cond = (p > min_threshold) & (p < max_threshold);
-            Y[i] = (cond * pixel_Y_hi_) | ((1 - cond) * pixel_Y_lo_);
+    const int use_gamma = (gamma != 0);
+
+    if (mode == 0)
+    {
+        const int hi = pixel_Y_hi_;
+        const int lo = pixel_Y_lo_;
+
+        #pragma omp parallel for schedule(static)
+        for (int i = 0; i < len; i++)
+        {
+            const uint8_t p = use_gamma ? table[Y[i]] : Y[i];
+            const int cond = (p > min_threshold) & (p < max_threshold);
+            Y[i] = (uint8_t)((-cond & hi) | (~(-cond) & lo));
         }
-        veejay_memset(Cb, 128, (frame->ssm ? len : frame->uv_len));
-        veejay_memset(Cr, 128, (frame->ssm ? len : frame->uv_len));
-    } else {
-#pragma omp simd
-        for (int i = 0; i < len; i++) {
-            uint8_t p = (gamma == 0) ? Y[i] : table[Y[i]];
-            uint8_t cond = (p > min_threshold) & (p < max_threshold);
-            A[i] = cond * 0xff;
+
+        veejay_memset(Cb, 128, frame->uv_len);
+        veejay_memset(Cr, 128, frame->uv_len);
+        
+        return;
+    }
+
+    if (mode == 1)
+    {
+        #pragma omp parallel for schedule(static)
+        for (int i = 0; i < len; i++)
+        {
+            const uint8_t p = use_gamma ? table[Y[i]] : Y[i];
+            const int cond = (p > min_threshold) & (p < max_threshold);
+
+            A[i] = (uint8_t)(-cond);
         }
+
+        return;
     }
 }

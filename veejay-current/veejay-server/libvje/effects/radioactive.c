@@ -376,7 +376,7 @@ void radioactivetv_apply(void *ptr, VJFrame *frame, VJFrame *blue, int *args) {
                 dst_row[x] = src_row[x];
             }
         }
-    } else { 
+    } else {
         #pragma omp parallel for num_threads(r->n_threads) schedule(static)
         for (int y = 0; y < r->buf_height; y++) {
             int frame_offset = (y * width) + r->buf_margin_left;

@@ -38,8 +38,6 @@ vj_effect *masktransition_init(int width, int height)
     ve->description = "Alpha: Transition Map";
 	ve->sub_format = 1;
     ve->extra_frame = 1;
-  	ve->has_user = 0; 
-	ve->parallel = 1;
 	ve->alpha = FLAG_ALPHA_SRC_A;
 		 
 	ve->param_description = vje_build_param_list(ve->num_params, "Time Index", "Smooth" );
@@ -47,63 +45,77 @@ vj_effect *masktransition_init(int width, int height)
 }
 
 static inline void alpha_blend(uint8_t *Y,
-						const uint8_t *Y2,
-						const uint8_t *AA,
-						size_t w)
+                               const uint8_t *Y2,
+                               const uint8_t *AA,
+                               const size_t n)
 {
-	size_t j;
-#pragma omp simd
-	for( j = 0; j < w; j ++ )
-	{
-		Y[j] = ((AA[j] * Y[j]) + ((0xff-AA[j]) * Y2[j])) >> 8;
-	}
+    #pragma omp simd
+    for (size_t j = 0; j < n; j++)
+    {
+        Y[j] = ((AA[j] * Y[j]) + ((0xff - AA[j]) * Y2[j])) >> 8;
+    }
 }
 
-
-static inline void expand_lookup_table( uint8_t *AA, const uint8_t *lookup, const uint8_t *aA, const size_t w )
+static inline void expand_lookup_table(uint8_t *AA,
+                                        const uint8_t *lookup,
+                                        const uint8_t *aA,
+                                        const size_t n)
 {
-	size_t j;
-	for( j = 0; j < w; j ++ )
-	{
-		AA[j] = lookup[ aA[j] ];
-	}
+    #pragma omp simd
+    for (size_t j = 0; j < n; j++)
+    {
+        AA[j] = lookup[aA[j]];
+    }
 }
 
-
-static void	alpha_blend_transition( uint8_t *Y, uint8_t *Cb, uint8_t *Cr, uint8_t *a0,
-									const uint8_t *Y2, const uint8_t *Cb2, const uint8_t *Cr2,
-									const uint8_t *a1, const size_t len, const size_t w, unsigned int time_index, const unsigned int dur, const int alpha_select )
+static void alpha_blend_transition(uint8_t *Y, uint8_t *Cb, uint8_t *Cr,
+                                   const uint8_t *a0,
+                                   const uint8_t *Y2, const uint8_t *Cb2, const uint8_t *Cr2,
+                                   const uint8_t *a1,
+                                   const size_t len,
+                                   const size_t w,
+                                   unsigned int time_index,
+                                   unsigned int dur,
+                                   int alpha_select)
 {
-	uint8_t lookup[256];
-	const uint8_t *T  = (const uint8_t*) lookup;
-	const uint8_t *aA = (alpha_select == 0 ? a0 : a1);
-	size_t i;
+    (void)w;
 
-	/* precalc lookup table for vectorization */
-	for( i = 0; i < 256; i ++ )
-	{
-		if( time_index < aA[i] )
-			lookup[i] = 0;
-		else if ( time_index >= (aA[i] + dur) )
-			lookup[i] = 0xff;
-		else
-			lookup[i] = 0xff * ( (double) (time_index - i ) / dur );
-	}
+    uint8_t lookup[256];
+    const uint8_t *aA = (alpha_select == 0 ? a0 : a1);
 
-	uint8_t AA[ w + 16 ];
+    for (int i = 0; i < 256; i++)
+    {
+        if (time_index < aA[i])
+            lookup[i] = 0;
+        else if (time_index >= (aA[i] + dur))
+            lookup[i] = 0xff;
+        else
+            lookup[i] = (uint8_t)(0xff * ((double)(time_index - aA[i]) / dur));
+    }
 
-#pragma omp simd
-	for( i = 0; i < len; i += w )
-	{
-		/* unroll the lookup table so we can vectorize */
-		expand_lookup_table( AA, T, aA + i, w );
+    const uint8_t *T = lookup;
 
-		alpha_blend( Y + i, Y2 + i, AA, w );
-		alpha_blend( Cb+ i, Cb2+ i, AA, w );
-		alpha_blend( Cr+ i, Cr2+ i, AA, w );
-	}
+    int n_threads = vje_advise_num_threads(len);
+
+    #pragma omp parallel num_threads(n_threads)
+    {
+        uint8_t AA_local[256];
+
+        #pragma omp for schedule(static)
+        for (size_t i = 0; i < len; i += 256)
+        {
+            size_t block = (i + 256 < len) ? 256 : (len - i);
+
+            expand_lookup_table(AA_local, T, aA + i, block);
+
+            alpha_blend(Y  + i, Y2  + i, AA_local, block);
+            alpha_blend(Cb + i, Cb2 + i, AA_local, block);
+            alpha_blend(Cr + i, Cr2 + i, AA_local, block);
+        }
+    }
 }
 
+ 
 #define SMOOTH_DEFAULT 256
 #define USE_FROM_A	   0
 #define USE_FROM_B	   1
@@ -135,4 +147,3 @@ void masktransition_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args
 	    USE_FROM_A
 	);
 }
-

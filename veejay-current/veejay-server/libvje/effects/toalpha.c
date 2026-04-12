@@ -32,9 +32,6 @@ vj_effect *toalpha_init(int w, int h)
     ve->num_params = 1;
     ve->description = "Alpha: Set from Image";
     ve->sub_format = -1;
-    ve->extra_frame = 0;
-    ve->parallel = 1;
-	ve->has_user = 0;
 
 	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);     /* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
@@ -67,26 +64,38 @@ void toalpha_free(void *ptr) {
     free(ptr);
 }
 
-
-void toalpha_apply( void *ptr, VJFrame *frame, int *args )
+void toalpha_apply(void *ptr, VJFrame *frame, int *args)
 {
-	const int len = frame->len;
-	uint8_t *a = frame->data[3];
-	uint8_t *Y = frame->data[0];
-	
+    const int len = frame->len;
+
+    uint8_t *a = frame->data[3];
+    uint8_t *Y = frame->data[0];
+
     int mode = args[0];
+    int range = frame->range;
 
     toalpha_t *t = (toalpha_t*) ptr;
     int *lookup_table = t->lookup_table;
 
-	if( mode == 0 ) {
-		veejay_memcpy(a, Y, len );
-	}
-	else {
-		int i;
-		for( i = 0; i < len; i ++ ) 
-		{
-			a[i] = lookup_table[ Y[i] ];
-		}
-	}
+    int n_threads = vje_advise_num_threads(len);
+
+    if (mode == 0 || range == 1)
+    {
+        #pragma omp parallel for schedule(static) num_threads(n_threads)
+        for (int i = 0; i < len; i++)
+        {
+            a[i] = Y[i];
+        }
+        return;
+    }
+
+    if (range == 0)
+    {
+        #pragma omp parallel for schedule(static) num_threads(n_threads)
+        for (int i = 0; i < len; i++)
+        {
+            a[i] = lookup_table[Y[i]];
+        }
+    }
+
 }

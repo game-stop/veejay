@@ -110,7 +110,7 @@ vj_effect *water_init(int width, int height)
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][3], 3, 
+	vje_build_value_hint_list( ve->hints, ve->limits[1][3], 3,
 			"Raindrops", "Motion detect I (preview)", "Water ripples", "Motion detect II (preview)",
 		    "Drops and Ripples", "Motion detect III (preview)", "Decaying Motion"	);
 

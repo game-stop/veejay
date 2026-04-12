@@ -36,7 +36,6 @@ vj_effect *alphanegate_init(int w, int h)
     ve->description = "Alpha: Negate Alpha Channel";
     ve->sub_format = -1;
     ve->extra_frame = 0;
-    ve->parallel = 1;
 	ve->has_user = 0;
 
     ve->param_description = vje_build_param_list( ve->num_params, "Value" );
@@ -46,14 +45,17 @@ vj_effect *alphanegate_init(int w, int h)
     return ve;
 }
 
-
-void alphanegate_apply(void *ptr, VJFrame *frame, int *args ) {
-    int val= args[0];
+void alphanegate_apply(void *ptr, VJFrame *frame, int *args)
+{
+    const int val = args[0];
     const int len = frame->len;
-    uint8_t *A = frame->data[3];
-	unsigned int i;
+    const int n_threads = vje_advise_num_threads(len);
 
-	for( i = 0; i < len; i ++ ) {
-		A[i] = val - A[i];
-	}
+    uint8_t *restrict A = frame->data[3];
+
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int i = 0; i < len; i++)
+    {
+        A[i] = (uint8_t)(val - A[i]);
+    }
 }

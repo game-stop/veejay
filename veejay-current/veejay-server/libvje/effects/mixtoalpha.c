@@ -29,8 +29,6 @@ vj_effect *mixtoalpha_init(int w, int h)
     ve->description = "Alpha: Set from Mixing source";
     ve->sub_format = -1;
     ve->extra_frame = 1;
-	ve->parallel = 1;
-	ve->has_user = 0;
 
 	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);     /* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
@@ -54,6 +52,7 @@ vj_effect *mixtoalpha_init(int w, int h)
 
 typedef struct {
     uint8_t *lookup_table;
+    int n_threads;
 } mixtoalpha_t;
 
 void *mixtoalpha_malloc(int w, int h)
@@ -71,6 +70,8 @@ void *mixtoalpha_malloc(int w, int h)
 
     __init_lookup_table( m->lookup_table, 256, 16.0f,235.0f, 0, 255 );
 
+    m->n_threads = vje_advise_num_threads(w*h);
+
     return (void*) m;
 }
 
@@ -84,7 +85,7 @@ void mixtoalpha_free(void *ptr) {
 void mixtoalpha_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
     int mode = args[0];
     int scale = args[1];
-
+    int range = frame->range;
 	const int len = frame->len;
 	uint8_t *a = frame->data[3];
 	const uint8_t *Y = frame2->data[0];
@@ -100,12 +101,13 @@ void mixtoalpha_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 		veejay_memcpy(a, frame2->data[3], len );
 	}
 
-	if( scale ) {
-		int i;
-		for( i = 0; i < len; i ++ )
-		{
-			a[i] = T[ a[i] ];
-		}
-	}
+    if (scale && range == 0)
+    {
+        #pragma omp parallel for schedule(static) num_threads(m->n_threads)
+        for (int i = 0; i < len; i++)
+        {
+            a[i] = T[a[i]];
+        }
+    }
 }
 

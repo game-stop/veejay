@@ -331,7 +331,6 @@ vj_effect *colortap_init(int w, int h)
     ve->description = "Color Tap";
     ve->sub_format = -1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Mode" );
 
@@ -340,10 +339,19 @@ vj_effect *colortap_init(int w, int h)
     vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
 		"Sepia", "Heat", "Red-Green", "Old Photo", "XRay", "Esses", "Yellow-Blue", "XPro");
 
-
-
     return ve;
 }
+
+static const uint8_t *const color_tables[] = {
+    sepia_table,
+    heat_table,
+    red_green_table,
+    old_photo_table,
+    xray_table,
+    esses_table,
+    yellowblue_table,
+    xpro_table
+};
 
 typedef struct 
 {
@@ -374,58 +382,52 @@ void colortap_free(void *ptr) {
     free(s);
 }
 
+void colortap_apply(void *ptr, VJFrame *frame, int *args)
+{
+    colortap_t *s = (colortap_t *) ptr;
 
-void colortap_apply( void *ptr, VJFrame *frame, int *args ) {
-    colortap_t *s = (colortap_t*) ptr;
     const int mode = args[0];
-	const int uv_len = frame->uv_len;
     const int len = frame->len;
+    const int uv_len = frame->uv_len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
 
-	uint8_t *restrict tY = s->lut[0];
-	uint8_t *restrict tU = s->lut[1];
-	uint8_t *restrict tV = s->lut[2];
+    uint8_t *restrict tY = s->lut[0];
+    uint8_t *restrict tU = s->lut[1];
+    uint8_t *restrict tV = s->lut[2];
 
-	if( s->last_mode != mode ) {
-		// just convert the lookup table to YUV
-		s->last_mode = mode;
-		const uint8_t *table = sepia_table;
+    if (s->last_mode != mode)
+    {
+        s->last_mode = mode;
 
-		switch(mode) {
-			case 1: table = heat_table; break;
-			case 2: table = red_green_table; break;
-			case 3: table = old_photo_table; break;
-			case 4: table = xray_table; break;
-			case 5: table = esses_table; break;
-			case 6: table = yellowblue_table; break;
-			case 7: table = xpro_table; break;
-		}
+        const uint8_t *table = color_tables[0];
+        if (mode >= 0 && mode < 8)
+            table = color_tables[mode];
 
-		for( int i = 0; i < 256; i ++ ) {
-	    	_rgb2yuv(
-					table[i * 3],
-				    table[i * 3 + 1],
-				    table[i * 3 + 2],
-					tY[i],
-					tU[i],
-					tV[i]
-			);
-		}
+        for (int i = 0; i < 256; i++)
+        {
+            const int j = i * 3;
 
-	}
+            _rgb2yuv(
+                table[j + 0],
+                table[j + 1],
+                table[j + 2],
+                tY[i],
+                tU[i],
+                tV[i]
+            );
+        }
+    }
 
-#pragma omp simd
-	for( int i = 0; i < len; i ++ ) {
-		Y[i] = tY[ Y[i] ];
-	}
-	
-#pragma omp simd    
-	for( int i = 0; i < uv_len; i ++ ) {
-		U[i] = tU[ U[i] ];
-		V[i] = tV[ V[i] ];
-	}
+    const int n_threads = vje_advise_num_threads(len);
 
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int i = 0; i < len; i++)
+    {
+        Y[i] = tY[Y[i]];
+        U[i] = tU[U[i]];
+        V[i] = tV[V[i]];
+    }
 }

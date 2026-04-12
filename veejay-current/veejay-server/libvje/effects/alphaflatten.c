@@ -29,7 +29,6 @@ vj_effect *alphaflatten_init(int w, int h)
     ve->description = "Alpha: Flatten Image";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 1;
 	ve->has_user = 0;
 	ve->num_params = 1;
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
@@ -46,33 +45,30 @@ vj_effect *alphaflatten_init(int w, int h)
 	return ve;
 }
 
+void alphaflatten_apply(void *ptr, VJFrame *frame, int *args)
+{
+    const int mode = args[0];
+    const int len  = frame->len;
+    const int n_threads = vje_advise_num_threads(len);
 
-void alphaflatten_apply( void *ptr, VJFrame *frame, int *args ) {
-    int mode = args[0];
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict U = frame->data[1];
+    uint8_t *restrict V = frame->data[2];
+    uint8_t *restrict A = frame->data[3];
 
-	unsigned int i;
-	const int len = frame->len;
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for (int i = 0; i < len; i++)
+    {
+        unsigned int a  = A[i];
+        unsigned int ia = 255 - a;
 
-	uint8_t *o0 = frame->data[0];
-	uint8_t *o1 = frame->data[1];
-	uint8_t *o2 = frame->data[2];
-	uint8_t *oA = frame->data[3];
-	uint8_t *a0 = frame->data[0];
-	uint8_t *a1 = frame->data[1];
-	uint8_t *a2 = frame->data[2];
-	uint8_t *aA = frame->data[3];
+        Y[i] = (uint8_t)((a * Y[i]) >> 8);
+        U[i] = (uint8_t)((a * U[i] + ia * 128) >> 8);
+        V[i] = (uint8_t)((a * V[i] + ia * 128) >> 8);
+    }
 
-#pragma omp simd
-	for( i = 0; i < len; i ++ )
-	{
-		unsigned int op1 = 0xff - aA[i];
-		unsigned int op0 = aA[i];
-		o0[i] = (op0 * a0[i]) >> 8;
-		o1[i] = (op0 * a1[i] + op1 * 128) >> 8;
-		o2[i] = (op0 * a2[i] + op1 * 128)>>8;
-	}
-
-	if( mode ) {
-		veejay_memset( oA, 0, len );
-	}
+    if (mode)
+    {
+        veejay_memset(A, 0, len);
+    }
 }

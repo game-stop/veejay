@@ -20,33 +20,36 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "enhancemask.h"
-#include <stdlib.h> 
+#include <stdlib.h>
+#include "common.h"
+#include <veejaycore/vjmem.h>
+#include "enhancemask.h"
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct {
+    int n_threads;
+    uint8_t *buf[3];
+} enhancemask_t;
 
 vj_effect *enhancemask_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-
     ve->num_params = 3;
 
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->defaults[0] = 120;
-    ve->defaults[1] = 8;    
-    ve->defaults[2] = 50;   
+    ve->defaults[0] = 120; // Strength
+    ve->defaults[1] = 8;   // Threshold
+    ve->defaults[2] = 50;  // Halo Clamp
 
-    ve->limits[0][0] = 0;    ve->limits[1][0] = 4096; /* Max strength */
-    ve->limits[0][1] = 0;    ve->limits[1][1] = 64;  /* Threshold */
-    ve->limits[0][2] = 0;    ve->limits[1][2] = 128; /* Max Halo */
+    ve->limits[0][0] = 0;    ve->limits[1][0] = 4096;
+    ve->limits[0][1] = 0;    ve->limits[1][1] = 64;
+    ve->limits[0][2] = 0;    ve->limits[1][2] = 128;
 
     ve->description = "Sharpen";
-
-    ve->extra_frame = 0;
-    ve->sub_format = -1;
-    ve->has_user = 0;
-    ve->parallel = 0;
-
     ve->param_description = vje_build_param_list(
         ve->num_params, "Strength", "Grain Threshold", "Halo Clamp"
     );
@@ -54,44 +57,78 @@ vj_effect *enhancemask_init(int width, int height)
     return ve;
 }
 
-static inline int clamp_u8(int x) {
-    x &= ~(x >> 31);
-    x = 255 + ((x - 255) & ((x - 255) >> 31));
-    return x;
+void *enhancemask_malloc(int w, int h) {
+    enhancemask_t *e = (enhancemask_t*) vj_calloc(sizeof(enhancemask_t));
+    if(!e) return NULL;
+    e->n_threads = vje_advise_num_threads(w*h);
+    e->buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h );
+    if(!e->buf[0]) {
+        free(e);
+        return NULL;
+    }
+
+    return (void*) e;
+}
+void enhancemask_free(void *ptr) {
+    enhancemask_t *e = (enhancemask_t*) ptr;
+    if(e) {
+        if(e->buf[0]) free(e->buf[0]);
+        free(e);
+    }
 }
 
-void enhancemask_apply(void *ptr, VJFrame *frame, int *s) {
-    const int width = frame->width;
+static inline uint8_t clamp_u8(int x) {
+    if (x < 0) return 0;
+    if (x > 255) return 255;
+    return (uint8_t)x;
+}
+
+void enhancemask_apply(void *ptr, VJFrame *frame, int *s)
+{
+    enhancemask_t *e = (enhancemask_t*) ptr;
+    const int width  = frame->width;
     const int height = frame->height;
-    uint8_t *Y = frame->data[0];
-    const int amount = s[0];
+    const int n_threads = e->n_threads;
+    
+    uint8_t *dst = frame->data[0];
+    const int amount    = s[0];
     const int threshold = s[1];
-    const int limit = s[2];
+    const int limit     = s[2];
+
     if (amount <= 0) return;
 
     const int stride = width;
-    for (int y = 1; y < height - 1; y++) {
-        uint8_t *p_prev = Y + (y - 1) * stride;
-        uint8_t *p_curr = Y + y * stride;
-        uint8_t *p_next = Y + (y + 1) * stride;
+    veejay_memcpy(e->buf[0], frame->data[0], frame->len);
+    #pragma omp parallel num_threads(n_threads)
+    {
+        uint8_t *src = e->buf[0];
+        #pragma omp for schedule(static)
+        for (int y = 1; y < height - 1; y++)
+        {
+            const uint8_t *p_prev = src + (y - 1) * stride;
+            const uint8_t *p_curr = src + y * stride;
+            const uint8_t *p_next = src + (y + 1) * stride;
+            uint8_t *p_out = dst + y * stride;
 
-        for (int x = 1; x < width - 1; x++) {
-            int c00 = p_prev[x-1], c01 = p_prev[x], c02 = p_prev[x+1];
-            int c10 = p_curr[x-1], c11 = p_curr[x], c12 = p_curr[x+1];
-            int c20 = p_next[x-1], c21 = p_next[x], c22 = p_next[x+1];
+            for (int x = 1; x < width - 1; x++)
+            {
+                const int blur = (
+                    p_prev[x-1] + (p_prev[x] << 1) + p_prev[x+1] +
+                    (p_curr[x-1] << 1) + (p_curr[x] << 2) + (p_curr[x+1] << 1) +
+                    p_next[x-1] + (p_next[x] << 1) + p_next[x+1]
+                ) >> 4;
 
-            int blur = (c00 + (c01 << 1) + c02 +
-                        (c10 << 1) + (c11 << 2) + (c12 << 1) +
-                        c20 + (c21 << 1) + c22) >> 4;
+                const int detail = (int)p_curr[x] - blur;
 
-            int detail = c11 - blur;
-            int abs_detail = (detail ^ (detail >> 31)) - (detail >> 31);
-            detail = abs_detail < threshold ? 0 : detail - ((detail > 0) ? threshold : -threshold);
-            int boost = (detail * amount) >> 7;
-            if (boost > limit) boost = limit;
-            else if (boost < -limit) boost = -limit;
+                int abs_d = (detail ^ (detail >> 31)) - (detail >> 31);
+                int mask = -(abs_d >= threshold);
+                int final_detail = (detail * (mask & 1));
 
-            p_curr[x] = clamp_u8(c11 + boost);;
+                int boost = (final_detail * amount) >> 7;
+                boost = (boost > limit) ? limit : (boost < -limit ? -limit : boost);
+
+                p_out[x] = (uint8_t)clamp_u8((int)p_curr[x] + boost);
+            }
         }
     }
 }

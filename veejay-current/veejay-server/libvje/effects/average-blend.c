@@ -44,7 +44,6 @@ vj_effect *average_blend_init(int w, int h)
     ve->description = "Average Mixer";
     ve->sub_format = -1;
     ve->extra_frame = 1;
-    ve->parallel = 0; 
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Recursions", "Mix Weight"); 
     return ve;

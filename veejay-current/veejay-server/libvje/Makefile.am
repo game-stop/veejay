@@ -22,7 +22,6 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/alphafill.c \
     effects/alphaflatten.c \
     effects/alphanegate.c \
-    effects/alphaselect2.c \
     effects/alphaselect.c \
     effects/alphatransition.c \
     effects/autoeq.c \
@@ -45,7 +44,6 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/chameleonblend.c \
     effects/chameleon.c \
     effects/channeloverlay.c \
-    effects/chromamagickalpha.c \
     effects/chromamagick.c \
     effects/chromapalette.c \
     effects/chromascratcher.c \
@@ -100,13 +98,10 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/killchroma.c \
     effects/levelcorrection.c \
     effects/lumablend.c \
-    effects/lumakeyalpha.c \
     effects/lumakey.c \
     effects/lumamagick.c \
     effects/lumamask.c \
-    effects/magicalphaoverlays.c \
     effects/magicmirror.c \
-    effects/magicoverlaysalpha.c \
     effects/magicoverlays.c \
     effects/magicscratcher.c \
     effects/mask.c \

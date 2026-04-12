@@ -35,7 +35,6 @@ vj_effect *bgpush_init(int w, int h)
     ve->description = "Background take-frame";
     ve->sub_format = -1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
     ve->has_user = 0;
     ve->global = 1;
     ve->static_bg = 1;

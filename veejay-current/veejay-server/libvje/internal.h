@@ -32,7 +32,6 @@
 #include "./effects/alphafill.h"
 #include "./effects/alphaflatten.h"
 #include "./effects/alphanegate.h"
-#include "./effects/alphaselect2.h"
 #include "./effects/alphaselect.h"
 #include "./effects/alphatransition.h"
 #include "./effects/autoeq.h"
@@ -55,7 +54,6 @@
 #include "./effects/chameleonblend.h"
 #include "./effects/chameleon.h"
 #include "./effects/channeloverlay.h"
-#include "./effects/chromamagickalpha.h"
 #include "./effects/chromamagick.h"
 #include "./effects/chromapalette.h"
 #include "./effects/chromascratcher.h"
@@ -110,13 +108,10 @@
 #include "./effects/killchroma.h"
 #include "./effects/levelcorrection.h"
 #include "./effects/lumablend.h"
-#include "./effects/lumakeyalpha.h"
 #include "./effects/lumakey.h"
 #include "./effects/lumamagick.h"
 #include "./effects/lumamask.h"
-#include "./effects/magicalphaoverlays.h"
 #include "./effects/magicmirror.h"
-#include "./effects/magicoverlaysalpha.h"
 #include "./effects/magicoverlays.h"
 #include "./effects/magicscratcher.h"
 #include "./effects/mask.h"
@@ -251,10 +246,10 @@
 //#include "./effects/tunnel.h"
 
 #define VJ_IMAGE_EFFECT_MIN 41
-#define VJ_IMAGE_EFFECT_MAX 199
+#define VJ_IMAGE_EFFECT_MAX 198
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 264
+#define VJ_VIDEO_EFFECT_MAX 261 // + 1
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN + 1)
 #define VJ_PLUGIN 500
@@ -358,17 +353,14 @@ enum {
     VJ_VIDEO_EFFECT_TRAVELMATTE = 250,
     VJ_VIDEO_EFFECT_ALPHABLEND = 251,
     VJ_VIDEO_EFFECT_PORTERDUFF = 252,
-    VJ_VIDEO_EFFECT_LUMAKEYALPHA = 253, 
-    VJ_VIDEO_EFFECT_CHROMAMAGICKALPHA = 254,
-    VJ_VIDEO_EFFECT_MAGICOVERLAYALPHA = 255,
-    VJ_VIDEO_EFFECT_MASKTRANSITION = 256,
-    VJ_VIDEO_EFFECT_PASSTHROUGH = 257,
-    VJ_VIDEO_EFFECT_ALPHATRANSITION = 258,
+    VJ_VIDEO_EFFECT_MASKTRANSITION = 253,
+    VJ_VIDEO_EFFECT_PASSTHROUGH = 254,
+    VJ_VIDEO_EFFECT_ALPHATRANSITION = 255,
+    VJ_VIDEO_EFFECT_COMPLEXOPACITY = 256,
+    VJ_VIDEO_EFFECT_FLASHOPACITY = 257,
+    VJ_VIDEO_EFFECT_HISTOMATCH = 258,
     VJ_VIDEO_EFFECT_SHAPEWIPE = 259,
-    VJ_VIDEO_EFFECT_COMPLEXOPACITY = 260,
-    VJ_VIDEO_EFFECT_FLASHOPACITY = 261,
-    VJ_VIDEO_EFFECT_HISTOMATCH = 262,
-    VJ_VIDEO_EFFECT_DARKREPLACEMIX = 263,
+    VJ_VIDEO_EFFECT_DARKREPLACEMIX = 260,
 };
 
 enum {
@@ -472,7 +464,6 @@ enum {
     VJ_IMAGE_EFFECT_ALPHAFLATTEN = 196,
     VJ_IMAGE_EFFECT_ALPHAFEATHERMASK = 197,
     VJ_IMAGE_EFFECT_ALPHASELECT = 198,
-    VJ_IMAGE_EFFECT_ALPHASELECT2 = 199,
 
     VJ_IMAGE_EFFECT_ALPHANEGATE = 99,
     VJ_IMAGE_EFFECT_CHOKEMATTE = 98,

@@ -48,19 +48,21 @@ vj_effect *alphadampen_init(int w, int h)
 
 void alphadampen_apply(void *ptr, VJFrame *frame, int *args)
 {
+    const int n_threads = vje_advise_num_threads(frame->len);
     int base = args[0];
-    if (base <= 0) base = 1; /* safety guard */
+    if (base <= 0) base = 1;
 
     uint8_t *A = frame->data[3];
     const int len = frame->len;
 
-    /* if base is power-of-2, replace division with mask for speed */
     if ((base & (base - 1)) == 0) {
-        const uint8_t mask = ~(base - 1);
+        int mask = ~(base - 1);
+#pragma omp parallel for num_threads(n_threads) schedule(static)
         for (int i = 0; i < len; i++) {
-            A[i] &= mask;
-		 }
+            A[i] = (uint8_t)(A[i] & mask);
+        }
     } else {
+#pragma omp parallel for num_threads(n_threads) schedule(static)
         for (int i = 0; i < len; i++) {
             A[i] = (A[i] / base) * base;
         }
