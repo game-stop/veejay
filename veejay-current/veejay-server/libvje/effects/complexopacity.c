@@ -23,11 +23,6 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 
-typedef struct
-{
-    int n_threads;
-} complexopacity_t;
-
 #define DIV255(x) (((x) + 1 + ((x) >> 8)) >> 8)
 
 vj_effect *complexopacity_init(int w, int h)
@@ -65,20 +60,9 @@ vj_effect *complexopacity_init(int w, int h)
     return ve;
 }
 
-void *complexopacity_malloc(int w, int h) {
-    complexopacity_t *c = (complexopacity_t*) vj_malloc(sizeof(complexopacity_t));
-    if(!c) return NULL;
-    c->n_threads = vje_advise_num_threads(w * h);
-    return (void*) c;
-}
-
-void complexopacity_free(void *ptr) {
-    if(ptr) free(ptr);
-}
-
 void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
-    complexopacity_t *copac = (complexopacity_t*) ptr;
     int iy, iu, iv;
+    int n_threads = vje_advise_num_threads(frame->len);
 
     _rgb2yuv(args[1], args[2], args[3], iy, iu, iv);
 
@@ -111,7 +95,7 @@ void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const int len = frame->len;
 
-    #pragma omp parallel num_threads(copac->n_threads)
+    #pragma omp parallel num_threads(n_threads)
     {
         #pragma omp for schedule(static)
         for (int pos = 0; pos < len; pos++) {
