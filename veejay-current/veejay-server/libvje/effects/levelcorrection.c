@@ -89,7 +89,7 @@ void levelcorrection_apply(void *ptr, VJFrame *frame, int *args) {
         __init_lookup_table(lut, 256, 0.0f, 255.0f, bmin, bmax);
     }
 
-#pragma omp parallel for simd schedule(static) num_threads(lt->n_threads)
+#pragma omp parallel for simd schedule(static) num_threads(n_threads)
     for(int pos = 0; pos < len; pos++) {
         A[pos] = lut[A[pos]];
     }
