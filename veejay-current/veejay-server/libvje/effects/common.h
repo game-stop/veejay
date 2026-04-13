@@ -545,7 +545,7 @@ typedef enum _vj_effect_parity{
 }vj_effect_parity;
 
 void grid_getbounds_from_orientation(int radius, vj_effect_orientation orientation, vj_effect_parity parity, int * x_inf, int * y_inf, int * x_sup, int * y_sup, int w, int h);
-
+void grid_clear_margins(uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int x_inf, int y_inf, int radius, int color);
 double atan2_approx(double y, double x);
 float atan2_approx_f(float y, float x);
 

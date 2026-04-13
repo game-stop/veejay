@@ -2233,6 +2233,44 @@ void sqrt_table_pixels_free(void) {
 }
 
 
+void grid_clear_margins(uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int x_inf, int y_inf, int radius, int color) {
+    int x, y;
+    int x_end = x_inf + ((w - x_inf) / radius) * radius;
+    int y_end = y_inf + ((h - y_inf) / radius) * radius;
+
+    for (y = 0; y < y_inf; y++) {
+        for (x = 0; x < w; x++) {
+            int idx = y * w + x;
+            Y[idx] = pixel_Y_lo_;
+            if(U && V) { U[idx] = 128; V[idx] = 128; }
+        }
+    }
+
+    for (y = y_end; y < h; y++) {
+        for (x = 0; x < w; x++) {
+            int idx = y * w + x;
+            Y[idx] = pixel_Y_lo_;
+            if(U && V) { U[idx] = 128; V[idx] = 128; }
+        }
+    }
+
+    for (y = y_inf; y < y_end; y++) {
+        for (x = 0; x < x_inf; x++) {
+            int idx = y * w + x;
+            Y[idx] = pixel_Y_lo_;
+            if(U && V) { U[idx] = 128; V[idx] = 128; }
+        }
+    }
+
+    for (y = y_inf; y < y_end; y++) {
+        for (x = x_end; x < w; x++) {
+            int idx = y * w + x;
+            Y[idx] = pixel_Y_lo_;
+            if(U && V) { U[idx] = 128; V[idx] = 128; }
+        }
+    }
+}
+
 inline void grid_getbounds_from_orientation(int radius, vj_effect_orientation orientation, vj_effect_parity parity, int *x_inf, int *y_inf, int *x_sup, int *y_sup, int w, int h) {
 
     int nx = (w + radius - 1) / radius;
