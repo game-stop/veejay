@@ -28,8 +28,7 @@ if(!info->status_lock && !info->parameter_lock)\
 multi_vims( VIMS_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d", 0, info->uc.selected_chain_entry,arg_num, value );\
 vj_midi_learning_vims_fx( info->midi, arg_num, VIMS_CHAIN_ENTRY_SET_ARG_VAL, 0,info->uc.selected_chain_entry, arg_num,1 );\
 if(info->uc.selected_rgbkey) update_rgbkey_from_slider(); \
-int *entry_tokens = &(info->uc.entry_tokens[0]);\
-update_label_str( "value_friendlyname", _effect_get_hint( entry_tokens[ENTRY_FXID], arg_num, value ));\
+info->uc.selected_fx_param = arg_num+WIDGET_SLIDER_P0; \
 }\
 }
 
@@ -41,8 +40,7 @@ multi_vims( VIMS_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d", 0, info->uc.selected_ch
 update_slider_value( name, (get_slider_val(name) + fraction), 0 );\
 vj_midi_learning_vims_fx( info->midi, arg_num, VIMS_CHAIN_ENTRY_SET_ARG_VAL, 0, info->uc.selected_chain_entry,arg_num,2 );\
 if(info->uc.selected_rgbkey) update_rgbkey_from_slider(); \
-int *entry_tokens = &(info->uc.entry_tokens[0]);\
-update_label_str( "value_friendlyname", _effect_get_hint( entry_tokens[ENTRY_FXID], arg_num, get_slider_val(name) ));\
+info->uc.selected_fx_param = arg_num+WIDGET_SLIDER_P0; \
 }\
 }
 

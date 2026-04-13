@@ -943,6 +943,7 @@ typedef struct
     int selected_chain_entry;
     int selected_el_entry;
     int selected_vims_entry;
+    int selected_fx_param;
 
     int render_record;
     int iterator;
@@ -5218,6 +5219,8 @@ void on_effectlist_row_activated(GtkTreeView *treeview,
             
             if (ctrl_pressed && info->selection_slot)
                 slot = info->selection_slot->sample_id;
+            else
+                info->uc.selected_fx_param = -1;
 
             multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d %d",
                 slot, info->uc.selected_chain_entry,gid, !shift_pressed);
@@ -7833,6 +7836,21 @@ static void enable_fx_entry(void) {
     gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_EFFECTNAME] ),fx_name );
     gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_EFFECTANIM_NAME] ), fx_name );
 
+    //Update fx parameter friendly name
+    if( info->uc.selected_fx_param != -1 )
+    {
+        i = 0;
+        //Lookup for adhoc slider.
+        while (( widget_map[i].id != info->uc.selected_fx_param ) && ( widget_map[i].id != -1 ) ) i++;  // Use zero based values, see PARAM_CHANGED in callback.h
+
+        gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_VALUE_FRIENDLYNAME] ),
+                                       _effect_get_hint( entry_tokens[ENTRY_FXID],
+                                                         info->uc.selected_fx_param - WIDGET_SLIDER_P0, // Use zero based values, see PARAM_CHANGED in callback.h
+                                                         get_slider_val(widget_map[i].name )));
+     }
+     else
+        gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_VALUE_FRIENDLYNAME] ), FX_PARAMETER_VALUE_DEFAULT_HINT );
+
     if( entry_tokens[ENTRY_VIDEO_ENABLED] != gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_BUTTON_ENTRY_TOGGLE])) ) {
         gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_BUTTON_ENTRY_TOGGLE]), entry_tokens[ENTRY_VIDEO_ENABLED]);
     }
@@ -8027,6 +8045,7 @@ static void process_reload_hints(int *history, int pm)
         if( lpi == 0 ) {
             if( entry_tokens[ENTRY_FXID] == 0 && gtk_widget_is_sensitive(widget_cache[WIDGET_FRAME_FXTREE2])) {
                 disable_fx_entry();
+                info->uc.selected_fx_param = -1;
                 info->uc.reload_hint[HINT_KF] = 1;
             }
         } else if (lpi == 1 ) {
@@ -9022,6 +9041,7 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
     info->status_lock = 1;
     info->parameter_lock = 1;
     info->uc.selected_chain_entry = 0;
+    info->uc.selected_fx_param = -1;
 
     single_vims( VIMS_PROMOTION );
 
