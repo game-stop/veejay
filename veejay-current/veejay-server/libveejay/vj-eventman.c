@@ -2388,7 +2388,7 @@ void		vj_init_vevo_events(void)
 
 	index_map_[VIMS_CALI_IMAGE]				=	_new_event(
 				"%d %d",	
-				VIMS_REQUIRE_ALL_PARAMS,
+				VIMS_CALI_IMAGE,
 				"GUI: Get Calibrated image (raw)",
 				vj_event_get_cali_image,
 				2,
