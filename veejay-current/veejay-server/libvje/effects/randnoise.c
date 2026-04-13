@@ -23,6 +23,7 @@
  */
 
 #include "common.h"
+#include <omp.h>
 #include <veejaycore/vjmem.h>
 #include "randnoise.h"
 
