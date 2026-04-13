@@ -69,7 +69,6 @@ void levelcorrection_apply(void *ptr, VJFrame *frame, int *args) {
     int n_threads = vje_advise_num_threads(len);
 
     uint8_t lut[256];
-    uint8_t tmp_lut[256];
     int apply_levels = (max > min);
     int apply_shrink = (bmax > bmin);
 

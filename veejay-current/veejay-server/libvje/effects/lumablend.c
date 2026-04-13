@@ -83,7 +83,6 @@ void lumablend_apply(void *ptr, VJFrame * frame, VJFrame * frame2, int *args)
     const int opacity = (args[3] > 255) ? 255 : (args[3] < 0 ? 0 : args[3]);
 
     const int len = frame->len;
-    const int t_range = t2 - t1;
 
     uint8_t *restrict y1 = frame->data[0];
     uint8_t *restrict u1 = frame->data[1];
@@ -93,7 +92,6 @@ void lumablend_apply(void *ptr, VJFrame * frame, VJFrame * frame2, int *args)
     uint8_t *restrict v2 = frame2->data[2];
 
     const int op1 = opacity;
-    const int op0 = 256 - op1;
 
     #pragma omp parallel for schedule(static) num_threads(lb->n_threads)
     for (int i = 0; i < len; ++i) {

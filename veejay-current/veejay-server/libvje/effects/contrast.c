@@ -103,7 +103,6 @@ void contrast_apply(void *ptr, VJFrame *frame, int *s)
         case 2:
         {
             const int len = frame->len;
-            const int uv_len = (frame->ssm ? frame->len : frame->uv_len);
             uint8_t *Y  = frame->data[0];
             uint8_t *Cb = frame->data[1];
             uint8_t *Cr = frame->data[2];

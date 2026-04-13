@@ -284,8 +284,6 @@ void gradientfield_apply(void *ptr, VJFrame *frame, int *args) {
     uint8_t *restrict data[3] = { frame->data[0], frame->data[1], frame->data[2] };
     uint8_t *restrict copy[3] = { s->copyY, s->copyU, s->copyV };
 
-    uint32_t *restrict inv_area_lut = s->inv_area_lut;
-
     for (int i = 0; i < 3; i++) 
         veejay_memcpy(copy[i], data[i], w * h);
 

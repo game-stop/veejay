@@ -104,7 +104,6 @@ void rotozoom_apply( void *ptr, VJFrame *frame, int *args )
 
     const unsigned int width = frame->width;
     const unsigned int height = frame->height;
-    const int len = frame->len;
     
     double rotate = args[0];
     double zoom1 = args[1];

@@ -92,31 +92,6 @@ void integralblur_free(void *ptr)
     free(f->integral);
     free(f);
 }
-static void build_integral1(integralblur_t *f, uint8_t *src)
-{
-    int w = f->width;
-    int h = f->height;
-
-    uint32_t *I = f->integral;
-
-    veejay_memset(I, 0, sizeof(uint32_t) * (w + 1));
-
-    for (int y = 1; y <= h; y++) {
-        uint32_t row_sum = 0;
-
-        int row_off  = y * (w + 1);
-        int prev_off = (y - 1) * (w + 1);
-
-        I[row_off] = 0;
-
-        uint8_t *src_row = &src[(y - 1) * w];
-
-        for (int x = 1; x <= w; x++) {
-            row_sum += src_row[x - 1];
-            I[row_off + x] = I[prev_off + x] + row_sum;
-        }
-    }
-}
 
 static void build_integral(integralblur_t *f, uint8_t *src)
 {

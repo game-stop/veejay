@@ -177,7 +177,6 @@ void pencilsketch_apply(void *ptr, VJFrame *frame, int *args) {
                     Y[i] = pixel_Y_hi_;
             }
         } else {
-            const size_t processing_len = len - width - 1;
 #pragma omp for schedule(static)
             for (size_t i = 0; i < len; i++) {
                 uint8_t y_orig = Y[i];

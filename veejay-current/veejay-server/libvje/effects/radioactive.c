@@ -90,7 +90,7 @@ typedef struct {
 
 static void setTable(radioactive_t *r)
 {
-    int x, y;
+    int y;
     float ratio_ = r->ratio_;
     int buf_width = r->buf_width;
     int buf_height = r->buf_height;
@@ -139,15 +139,6 @@ static void kentaro_blur(radioactive_t *r)
     }
 }
 
-static void apply_blend(uint8_t *restrict dst, const uint8_t *restrict src, const uint8_t *restrict alpha_map, int len) {
-    #pragma omp simd
-    for (int i = 0; i < len; i++) {
-        uint8_t a = alpha_map[i];
-        uint8_t inv_a = 255 - a;
-        dst[i] = (uint8_t)(dst[i] + ((a * (src[i] - dst[i])) >> 8));
-    }
-}
-
 static void zoom(radioactive_t *r)
 {
     const int height = r->buf_height;
@@ -176,12 +167,6 @@ static void zoom(radioactive_t *r)
             q_row[x] = p_row[ r->zoom_offset_x[x] ];
         }
     }
-}
-
-static void blurzoomcore(radioactive_t *r)
-{
-	kentaro_blur(r);
-	zoom(r);
 }
 
 void *radioactivetv_malloc(int w, int h)
@@ -321,7 +306,6 @@ void radioactivetv_apply(void *ptr, VJFrame *frame, VJFrame *blue, int *args) {
     int threshold = args[3];
 
     const int width = frame->width;
-    const int height = frame->height;
     const int len = frame->len;
 
     uint8_t *lum = frame->data[0];

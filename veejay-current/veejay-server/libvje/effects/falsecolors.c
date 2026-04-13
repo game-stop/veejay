@@ -216,8 +216,6 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args){
 
     #pragma omp parallel num_threads(s->n_threads)
     {
-        int tid = omp_get_thread_num();
-
         #pragma omp for schedule(static)
         for(int i = 0; i < len; i++){
             const int lum = b2[i];

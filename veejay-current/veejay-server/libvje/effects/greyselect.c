@@ -78,7 +78,7 @@ void greyselect_free(void *ptr) {
 void greyselect_apply(void *ptr, VJFrame *frame, int *args) {
     greyselect_t *gs = (greyselect_t*) ptr;
     int iy, iu, iv;
-    int n_threads = vje_advise_num_threads(frame->len);
+    int n_threads = gs->n_threads;
     _rgb2yuv(args[1], args[2], args[3], iy, iu, iv);
 
     const int SCALE = 4096;

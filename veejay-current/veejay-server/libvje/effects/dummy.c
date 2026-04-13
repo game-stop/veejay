@@ -77,21 +77,4 @@ void dummy_rgb_apply( VJFrame *frame, int r,int g, int b)
    	veejay_memset( Cr,colorCr,uv_len);
 }
 
-static void	dummy_apply_job( void *arg )
-{
-	vj_task_arg_t *t = (vj_task_arg_t*) arg;
-	int colorCb=128, colorCr=128, colorY=pixel_Y_lo_;
-
-	uint8_t *Y = t->input[0];
-	uint8_t *Cb = t->input[1];
-	uint8_t *Cr = t->input[2];
-
-	_rgb2yuv(t->iparams[0],t->iparams[1],t->iparams[2],colorY,colorCb,colorCr);
-  
- 	veejay_memset( Y, colorY, t->strides[0]);
-   	veejay_memset( Cb,colorCb,t->strides[1]);
-   	veejay_memset( Cr,colorCr,t->strides[2]);
-
-}
-
 

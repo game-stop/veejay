@@ -241,7 +241,6 @@ static void vj_xor( uint8_t *A, uint8_t *B, int n_pixels, int n_threads )
         {
             uint8_t t1 = DIV255(sa * (255 - da));
             uint8_t t2 = DIV255(da * (255 - sa));
-            int v = t1 + t2;
         }
         A[idx + 3] = DIV255(sa * (255 - da) + da * (255 - sa));
     }

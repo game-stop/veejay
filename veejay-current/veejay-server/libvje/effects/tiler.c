@@ -78,7 +78,6 @@ void tiler_apply( void *ptr, VJFrame *frame, int *args ) {
     const int t = args[0];
     const uint8_t op0 = args[1];
 	const uint8_t op1 = 0xff - op0;
-    const int len = frame->len;
     const int width = frame->width;
     const int height = frame->height;
 

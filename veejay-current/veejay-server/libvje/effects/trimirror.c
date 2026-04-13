@@ -155,8 +155,6 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args) {
     const int centerX = width >> 1;
     const int centerY = height >> 1;
 
-    const int maxSum = 255 * numSegments;
-
     float sinSegments[ numSegments ];
     float cosSegments[ numSegments ];
     

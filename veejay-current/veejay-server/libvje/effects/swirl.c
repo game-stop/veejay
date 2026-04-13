@@ -134,7 +134,6 @@ void swirl_apply(void *ptr, VJFrame *frame, int *args)
     int *cached_coords = s->cached_coords;
 
     if (s->v != v || s->mode != mode) {
-        const unsigned int R = width;
         const double coeef = v;
 
         int px, py;

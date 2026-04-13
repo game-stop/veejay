@@ -222,8 +222,6 @@ void flare_apply(void *ptr, VJFrame *frame, int *args)
     int minX = W, maxX = 0, minY = H, maxY = 0;
     int hasGlow = 0;
 
-    const int knee = (threshold >> 3) + 1;
-
     uint16_t *restrict lin = f->lin_lut;
 
 

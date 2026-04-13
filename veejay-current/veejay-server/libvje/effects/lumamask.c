@@ -239,9 +239,6 @@ void lumamask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 
     lumamask_t *l = (lumamask_t*) ptr;
 
-	unsigned int x,y;
-	int dx,dy,nx,ny;
-	int tmp;
 	int interpolate = 1;
 	int tmp1 = v_scale;
 	int tmp2 = h_scale;
@@ -264,8 +261,6 @@ void lumamask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 	if( l->n__ == l->N__ || l->n__ == 0 )
 		interpolate = 0;
 
-	double w_ratio = (double) tmp1 / 128.0;
-	double h_ratio = (double) tmp2 / 128.0;
   	uint8_t *restrict Y = frame->data[0];
 	uint8_t *restrict Cb= frame->data[1];
 	uint8_t *restrict Cr= frame->data[2];
@@ -278,10 +273,8 @@ void lumamask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 	int strides[4] = { len, len, len ,( alpha ? len : 0 )};
 	vj_frame_copy( frame->data, l->buf, strides );
 
-    int w_mul_q8 = (int)(-((double)tmp1 / 128.0) * 256.0);
-    int h_mul_q8 = (int)(-((double)tmp2 / 128.0) * 256.0);
-	const double w_mul = -w_ratio;
-	const double h_mul = -h_ratio;
+    	int w_mul_q8 = (int)(-((double)tmp1 / 128.0) * 256.0);
+    	int h_mul_q8 = (int)(-((double)tmp2 / 128.0) * 256.0);
 	
     if (!alpha) {
         if (!border) {

@@ -388,7 +388,6 @@ void colortap_apply(void *ptr, VJFrame *frame, int *args)
 
     const int mode = args[0];
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];

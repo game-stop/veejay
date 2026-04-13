@@ -177,7 +177,6 @@ void bgsubtractgauss_apply(void *ptr, VJFrame *frame, int *args)
 
     b->bg_n++;
     const int do_update = (b->bg_n % period == 0);
-    const int ssm = frame->ssm;
 
 #pragma omp parallel for num_threads(n_threads) schedule(static)
     for (int i = 0; i < len; i++)

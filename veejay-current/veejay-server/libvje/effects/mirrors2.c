@@ -209,7 +209,10 @@ static void mirror_diag_tr_bl(uint8_t *yuv[3], int width, int height, int invers
                 if ((x * height + y_w) > total_area) {
                     int sy = height - 1 - ((x * rh) >> 16);
                     int sx = width - 1 - sx_base;
-                    if (sy < 0) sy = 0; if (sx < 0) sx = 0;
+                    if (sy < 0) 
+			    sy = 0; 
+		    if (sx < 0) 
+			    sx = 0;
                     
                     const int src = sy * width + sx;
                     const int dst = ty + x;
@@ -228,7 +231,10 @@ static void mirror_diag_tr_bl(uint8_t *yuv[3], int width, int height, int invers
                 if ((x * height + y_w) < total_area) {
                     int sy = height - 1 - ((x * rh) >> 16);
                     int sx = width - 1 - sx_base;
-                    if (sy < 0) sy = 0; if (sx < 0) sx = 0;
+                    if (sy < 0) 
+			    sy = 0; 
+		    if (sx < 0) 
+			    sx = 0;
 
                     const int src = sy * width + sx;
                     const int dst = ty + x;

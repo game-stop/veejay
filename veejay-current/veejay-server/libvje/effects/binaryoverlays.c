@@ -64,7 +64,6 @@ vj_effect *binaryoverlay_init(int w, int h)
 static void _binary_not_and( VJFrame *frame, VJFrame *frame2, int w, int h, int n_threads )
 {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
@@ -84,7 +83,6 @@ static void _binary_not_and( VJFrame *frame, VJFrame *frame2, int w, int h, int 
 static void _binary_xor( VJFrame *frame, VJFrame *frame2, int w, int h, int n_threads )
 {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
     uint8_t *restrict Y = frame->data[0],  *restrict Y2 = frame2->data[0];
     uint8_t *restrict Cb = frame->data[1], *restrict Cb2 = frame2->data[1];
     uint8_t *restrict Cr = frame->data[2], *restrict Cr2 = frame2->data[2];
@@ -100,7 +98,6 @@ static void _binary_xor( VJFrame *frame, VJFrame *frame2, int w, int h, int n_th
 static void _binary_not_xor( VJFrame *frame, VJFrame *frame2, int w, int h, int n_threads )
 {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
@@ -120,7 +117,6 @@ static void _binary_not_xor( VJFrame *frame, VJFrame *frame2, int w, int h, int 
 static void _binary_not_or( VJFrame *frame, VJFrame *frame2, int w, int h, int n_threads )
 {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
@@ -140,7 +136,6 @@ static void _binary_not_or( VJFrame *frame, VJFrame *frame2, int w, int h, int n
 static void _binary_not_and_lh( VJFrame *frame, VJFrame *frame2, int w, int h, int n_threads )
 {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
     uint8_t *restrict Y = frame->data[0],  *restrict Y2 = frame2->data[0];
     uint8_t *restrict Cb = frame->data[1], *restrict Cb2 = frame2->data[1];
     uint8_t *restrict Cr = frame->data[2], *restrict Cr2 = frame2->data[2];
@@ -157,7 +152,6 @@ static void _binary_not_and_lh( VJFrame *frame, VJFrame *frame2, int w, int h, i
 static void _binary_not_xor_lh( VJFrame *frame, VJFrame *frame2, int w, int h, int n_threads )
 {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
@@ -177,7 +171,6 @@ static void _binary_not_xor_lh( VJFrame *frame, VJFrame *frame2, int w, int h, i
 static void _binary_not_or_lh( VJFrame *frame, VJFrame *frame2, int w, int h, int n_threads )
 {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
@@ -196,7 +189,6 @@ static void _binary_not_or_lh( VJFrame *frame, VJFrame *frame2, int w, int h, in
 static void _binary_not_and_rh( VJFrame *frame, VJFrame *frame2, int w, int h, int n_threads )
 {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
     uint8_t *restrict Y = frame->data[0],  *restrict Y2 = frame2->data[0];
     uint8_t *restrict Cb = frame->data[1], *restrict Cb2 = frame2->data[1];
     uint8_t *restrict Cr = frame->data[2], *restrict Cr2 = frame2->data[2];
@@ -211,7 +203,6 @@ static void _binary_not_and_rh( VJFrame *frame, VJFrame *frame2, int w, int h, i
 static void _binary_not_xor_rh( VJFrame *frame, VJFrame *frame2, int w, int h, int n_threads )
 {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
@@ -231,7 +222,6 @@ static void _binary_not_xor_rh( VJFrame *frame, VJFrame *frame2, int w, int h, i
 static void _binary_not_or_rh( VJFrame *frame, VJFrame *frame2, int w, int h, int n_threads )
 {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
@@ -251,7 +241,6 @@ static void _binary_not_or_rh( VJFrame *frame, VJFrame *frame2, int w, int h, in
 static void _binary_or( VJFrame *frame, VJFrame *frame2, int w, int h, int n_threads )
 {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
@@ -271,7 +260,6 @@ static void _binary_or( VJFrame *frame, VJFrame *frame2, int w, int h, int n_thr
 static void _binary_and( VJFrame *frame, VJFrame *frame2, int w, int h, int n_threads )
 {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
@@ -290,7 +278,6 @@ static void _binary_and( VJFrame *frame, VJFrame *frame2, int w, int h, int n_th
 static void _binary_nand( VJFrame *frame, VJFrame *frame2, int w, int h, int n_threads )
 {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
     uint8_t *restrict Y = frame->data[0],  *restrict Y2 = frame2->data[0];
     uint8_t *restrict Cb = frame->data[1], *restrict Cb2 = frame2->data[1];
     uint8_t *restrict Cr = frame->data[2], *restrict Cr2 = frame2->data[2];
@@ -307,7 +294,6 @@ static void _binary_nand( VJFrame *frame, VJFrame *frame2, int w, int h, int n_t
 static void _binary_nor( VJFrame *frame, VJFrame *frame2, int w, int h, int n_threads )
 {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
     uint8_t *restrict Y = frame->data[0],  *restrict Y2 = frame2->data[0];
     uint8_t *restrict Cb = frame->data[1], *restrict Cb2 = frame2->data[1];
     uint8_t *restrict Cr = frame->data[2], *restrict Cr2 = frame2->data[2];
@@ -323,7 +309,6 @@ static void _binary_nor( VJFrame *frame, VJFrame *frame2, int w, int h, int n_th
 static void _binary_nxor( VJFrame *frame, VJFrame *frame2, int w, int h, int n_threads )
 {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
     uint8_t *restrict Y = frame->data[0],  *restrict Y2 = frame2->data[0];
     uint8_t *restrict Cb = frame->data[1], *restrict Cb2 = frame2->data[1];
     uint8_t *restrict Cr = frame->data[2], *restrict Cr2 = frame2->data[2];

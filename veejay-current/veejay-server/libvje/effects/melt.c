@@ -144,9 +144,8 @@ void melt_apply(void *ptr, VJFrame *A, int *args) {
     const int32_t gravity    = args[3] << 16;
     const int32_t curl_amt   = args[4];
     const int32_t alpha_perc = args[5];
-   	const int32_t alpha_inv = 255 - alpha_perc;
+    const int32_t alpha_inv = 255 - alpha_perc;
 
-    const int32_t alpha_smear = 100 - alpha_perc;
     uint8_t *restrict srcY = A->data[0];
     uint8_t *restrict srcU = A->data[1];
     uint8_t *restrict srcV = A->data[2];

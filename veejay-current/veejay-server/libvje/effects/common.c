@@ -1771,7 +1771,6 @@ void	veejay_histogram_analyze( void *his, VJFrame *f, int type )
 inline void veejay_draw_balloonUV(uint8_t *data, int cx, int cy, int bw, int bh, const int w, const int h, int radius, uint8_t value)
 {
     const int scaledRadiusY = (int)(radius > 2 ? radius * 0.5 : radius);
-    const int radiusSquared = radius * radius;
     const int scaledRadiusSquaredY = scaledRadiusY * scaledRadiusY;
 
     const int minX = (cx - radius < 0) ? 0 : (cx - radius);
@@ -1802,7 +1801,6 @@ inline void veejay_draw_balloonUV(uint8_t *data, int cx, int cy, int bw, int bh,
 inline void veejay_draw_balloon(uint8_t *data, int cx, int cy, int bw, int bh, const int w, const int h, int radius, uint8_t value)
 {
     const int scaledRadiusY = (int)(radius > 2 ? radius * 0.5 : radius);
-    const int radiusSquared = radius * radius;
     const int scaledRadiusSquaredY = scaledRadiusY * scaledRadiusY;
 
     const int minX = (cx - radius < 0) ? 0 : (cx - radius);

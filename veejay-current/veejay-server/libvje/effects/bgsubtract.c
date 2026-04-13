@@ -141,27 +141,6 @@ uint8_t* bgsubtract_get_bg_frame(void *ptr, unsigned int plane)
     return b->bg_frame__[ plane ];
 }
 
-static void bgsubtract_cma_frame( bgsubtract_t *b, const int len, uint8_t *I, uint8_t *O )
-{
-    int i;
-    const int bg_n1 = (b->bg_n) + 1;
-    const int bg_n = b->bg_n;
-#pragma omp simd
-    for( i = 0; i < len; i ++ ) {
-        O[i] = ((I[i] + (bg_n * O[i])) / bg_n1);
-    }
-}
-
-static void bgsubtract_adapt_frame( const int len, uint8_t *I, uint8_t *O)
-{
-    int i;
-#pragma omp simd
-    for( i = 0; i < len; i ++ ) {
-        if (I[i] > O[i]) O[i]++;
-        else if (I[i] < O[i]) O[i]--;
-    }
-}
-
 static void bgsubtract_show_bg( bgsubtract_t *b, VJFrame *frame )
 {
     veejay_memcpy( frame->data[0], b->bg_frame__[0], frame->len );
@@ -228,8 +207,6 @@ void bgsubtract_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict V  = frame->data[2];
     uint8_t *restrict A  = frame->data[3];
     uint8_t *restrict BG = b->bg_frame__[0];
-
-    const int ssm = frame->ssm;
 
 #pragma omp parallel for num_threads(n_threads) schedule(static)
     for (int i = 0; i < len; i++)

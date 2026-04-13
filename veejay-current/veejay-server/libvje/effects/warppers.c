@@ -186,7 +186,6 @@ void warppers_apply(void *ptr, VJFrame *frame, int *args) {
     const double sin_val = sin_lut[y_angle];
 
 	const int start = (frame->jobnum * h);	
-	const int end = start + h;
 
     for (int y_pos = 0; y_pos < h; y_pos++) {
         for (int x_pos = 0; x_pos < w; x_pos++) {

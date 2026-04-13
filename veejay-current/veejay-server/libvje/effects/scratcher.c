@@ -141,7 +141,6 @@ void scratcher_apply(void *ptr, VJFrame *src, int *args)
     const int len = src->len;
     const int uv_len = src->uv_len;
 
-    int opacity = args[0];
     int n = args[1];
     int no_reverse = args[2];
     

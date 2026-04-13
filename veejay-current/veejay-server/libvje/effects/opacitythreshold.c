@@ -136,7 +136,7 @@ void opacitythreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *arg
                 else
                     mask = ((blur - tmin) * 256) / t_diff;
 
-                mask = (mask * mask) >> 8;
+                mask = (mask * opacity) >> 8;
                 int inv = 256 - mask;
 
                 Y[row + x] = (inv * Y[row + x] + mask * Y2[row + x] + 128) >> 8;
