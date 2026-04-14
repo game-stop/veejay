@@ -110,8 +110,6 @@ void complexthreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *arg
 
     const int c_thresh = fmax(args[1], 1);
     const float m_min = (float)args[2];
-    const float m_range_inv = 255.0f / (fmaxf((float)args[3] - m_min, 1.0f));
-    const int sat_gate = args[5];
     const int l_thresh = args[6];
     const int spill_amt = args[7];
     const int s_mode_val = args[8];
