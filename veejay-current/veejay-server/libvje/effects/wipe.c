@@ -84,6 +84,11 @@ void wipe_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
     int speed = args[0];
     int restart = args[1];
 
+    if (restart != 0) {
+        wipe->wipePosition = 0;
+        wipe->wipeDirection = 1;
+    }
+
     wipe->wipePosition += speed * wipe->wipeDirection;
 
     if (wipe->wipePosition >= width) {
