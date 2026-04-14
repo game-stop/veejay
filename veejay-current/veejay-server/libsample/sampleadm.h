@@ -31,7 +31,7 @@
 #endif
 #define SAMPLE_MAX_SAMPLES  16384 /* 4096 samples at most */
 
-#define SAMPLE_MAX_PARAMETERS 32	/* 32 parameters per effect at most */
+#define SAMPLE_MAX_PARAMETERS 16	/* 16 parameters per effect at most */
 #ifdef HAVE_XML2
 #define XMLTAG_RENDER_ENTRY "render_entry"
 #define XMLTAG_SAMPLES    "veejay_samples"
@@ -211,7 +211,6 @@ extern sample_info *sample_skeleton_new(long startFrame, long endFrame);
 extern sample_info *sample_get(int sample_id);
 void 	sample_new_simple( void *el, long start, long end );
 extern int sample_store(sample_info * skel);
-extern int sample_is_deleted(int s1);
 extern int sample_exists(int sample_id);
 extern int sample_verify_delete( int sample_id, int sample_type );
 extern void sample_sanity_scan(void);
@@ -295,7 +294,7 @@ extern int sample_get_chain_channel(int s1, int position);
 extern int sample_set_chain_channel(int s1, int position, int channel);
 extern int sample_get_long_info(int sample_id, int *start, int *end, int *loop, int *speed, int *cur_sfd, int *max_sfd);
 
-extern int sample_chain_sprint_status(int s1,int tags,int cache,int sa,int ca, int r, int f, int m, int t,int sr,int curfps,uint32_t lo, uint32_t hi, int macro,char *s, int feedback ); 
+extern int sample_chain_sprint_status(int s1,int tags,int sample_count,int cache,int sa,int ca, int r, int f, int m, int t,int sr,int curfps,uint32_t lo, uint32_t hi, int macro,char *s, int feedback );
 
 extern int sample_set_render_entry(int s1, int entry);
 extern int sample_get_render_entry(int s1);

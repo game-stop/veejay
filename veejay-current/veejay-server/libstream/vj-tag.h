@@ -283,7 +283,7 @@ int 	vj_tag_enable(int t1);
 
 int 	vj_tag_disable(int t1);
 
-int		vj_tag_sprint_status(int tag_id, int tags,int cache,int sa, int ca, int r, int f, int m, int t,int seq_rec_id, int curfps, uint32_t lo, uint32_t hi, int macro,char *str, int feedback );
+int		vj_tag_sprint_status(int tag_id, int tags,int sample_count, int cache,int sa, int ca, int r, int f, int m, int t,int seq_rec_id, int curfps, uint32_t lo, uint32_t hi, int macro,char *str, int feedback );
 
 uint8_t		*vj_tag_get_cali_buffer(int t1, int type, int *total, int *len, int *uvlen);
 int	vj_tag_generator_set_arg(int t1, int *values);
@@ -342,7 +342,6 @@ void 	vj_tag_record_init(int w, int h);
 void vj_tag_get_method_filename(int t1, char *dst);
 int		vj_tag_get_last_tag(void);
 int		vj_tag_put( vj_tag *tag );
-int 	vj_tag_is_deleted(int id);
 void 	vj_tag_close_all(); 
 int 	vj_tag_continue_record( int t1 );
 int 	vj_tag_set_logical_index(int t1, int stream_nr);

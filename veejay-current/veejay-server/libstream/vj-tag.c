@@ -70,8 +70,9 @@ static veejay_t *_tag_info = NULL;
 static hash_t *TagHash = NULL;
 static int this_tag_id = 0;
 static vj_tag_data *vj_tag_input;
-static int next_avail_tag = 0;
 static int avail_tag[SAMPLE_MAX_SAMPLES];
+static int avail_head = 0;
+static int avail_tail = 0;
 static int last_added_tag = 0;
 static int video_driver_  = -1; // V4lUtils
 //forward decl
@@ -156,15 +157,14 @@ int vj_tag_get_last_tag(void) {
 int vj_tag_highest(void)
 {
     return this_tag_id;
-// - next_avail_tag);
 }
 
 int vj_tag_highest_valid_id(void)
 {
     int id = this_tag_id;
-    while(!vj_tag_exists(id) ) {
+    while(!vj_tag_exists(id) ) { // stops at first found
         id --;
-        if( id <= 0 )
+        if( id < 1 )
            break;
     }
 
@@ -899,6 +899,38 @@ int vj_tag_get_stream_color(int t1, int *r, int *g, int *b )
     return 1;
 }
 
+static void _recyle_id(int id) {
+    int next_tail = avail_tail + 1;
+    if (next_tail >= SAMPLE_MAX_SAMPLES) {
+        next_tail = 0;
+    }
+
+    if (next_tail != avail_head) {
+        avail_tag[avail_tail] = id;
+        avail_tail = next_tail;
+    }
+}
+
+static int _new_id(void)
+{
+    int id;
+    if (avail_head != avail_tail)
+    {
+        id = avail_tag[avail_head++];
+
+        if (avail_head >= SAMPLE_MAX_SAMPLES)
+            avail_head = 0;
+    }
+    else
+    {
+        if (!this_tag_id)
+            this_tag_id = 1;
+
+        id = this_tag_id++;
+    }
+    return id;
+}
+
 // for network, filename /channel is passed as host/port num
 int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_fmt, int channel , int extra , int has_composite)
 {
@@ -941,34 +973,9 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
         return -1;
     }
 
-     /* see if we can reclaim some id */
-    for(i=0; i <= next_avail_tag; i++) {
-        if(avail_tag[i] != 0) {
-          hnode_t *tag_node;
-          tag_node = hnode_create(tag);
-          if (!tag_node)
-          {
-            veejay_msg(0, "Unable to find available ID");
-            free(tag->source_name);
-            free(tag);
-            return -1;
-          }
-          id = avail_tag[i];
-          avail_tag[i] = 0;
-          hash_insert(TagHash, tag_node, tag_key(id));
-          break;
-        }
-    }
-
-         
-    if(id==0) { 
-        tag->id = this_tag_id;
-        id = tag->id;
-    }
-    else {
-        tag->id = id;
-    }
+    id = _new_id();
    
+    tag->id = id;
     tag->extra = NULL;
     tag->next_id = 0;
     tag->nframes = 0;
@@ -1262,21 +1269,12 @@ TAG_NEW_FAILED:
     }
 
     tag_cache[id] = NULL;
-    avail_tag[next_avail_tag++] = id;
+
+    _recyle_id(id);
 
     free(tag);
                 
     return -1;
-}
-
-
-int vj_tag_is_deleted(int id) {
-    int i;
-  for (i = 0; i < next_avail_tag; i++) {
-    if (avail_tag[i] == id)
-        return 1;
-    }
-    return 0;
 }
 
 int vj_tag_exists(int id)
@@ -1454,6 +1452,8 @@ int vj_tag_del_internal(vj_tag *tag)
     }
 
     vj_macro_free( tag->macro );
+
+    _recyle_id(tag->id);
     
     free(tag);
     tag = NULL;
@@ -1545,8 +1545,6 @@ int vj_tag_del(int id)
 
     vj_tag_del_internal(tag);
 
-    avail_tag[next_avail_tag++] = id;
-
     recount_hash = 1;
 
     return 1;
@@ -1570,7 +1568,6 @@ void vj_tag_close_all(void)
     }
 
     veejay_memset(avail_tag, 0, sizeof(avail_tag));
-    next_avail_tag = 0;
     this_tag_id = 0;
 
     hash_free_nodes(TagHash);
@@ -3798,9 +3795,7 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
     return 1;
 }
 
-
-//int vj_tag_sprint_status(int tag_id, int entry, int changed, char *str)
-int vj_tag_sprint_status( int tag_id,int samples,int cache,int sa, int ca, int pfps,int frame,int mode,int ts,int seq_rec, int curfps, uint32_t lo, uint32_t hi, int macro, char *str, int feedback )
+int vj_tag_sprint_status( int tag_id,int tag_count, int samples,int cache,int sa, int ca, int pfps,int frame,int mode,int ts,int seq_rec, int curfps, uint32_t lo, uint32_t hi, int macro, char *str, int feedback )
 {
     vj_tag *tag;
     tag = vj_tag_get(tag_id);
@@ -3824,46 +3819,45 @@ int vj_tag_sprint_status( int tag_id,int samples,int cache,int sa, int ca, int p
     }
 
     char *ptr = str;
-    ptr = vj_sprintf( ptr, pfps ); 
+    ptr = vj_sprintf( ptr, pfps ); // 0
     ptr = vj_sprintf( ptr, frame );
     ptr = vj_sprintf( ptr, mode );
     ptr = vj_sprintf( ptr, tag_id );
-    ptr = vj_sprintf( ptr, tag->effect_toggle );
+    ptr = vj_sprintf( ptr, tag->effect_toggle ); // 4
     ptr = vj_sprintf( ptr, tag->color_r );
     ptr = vj_sprintf( ptr, tag->color_g );
-    ptr = vj_sprintf( ptr, tag->color_b );
-    *ptr++ = '0';
+    ptr = vj_sprintf( ptr, tag->color_b ); // 7
+    *ptr++ = '0'; // 8
     *ptr++ = ' ';
-    
-    ptr = vj_sprintf( ptr, e_a );
+    ptr = vj_sprintf( ptr, e_a);
     ptr = vj_sprintf( ptr, e_d );
     ptr = vj_sprintf( ptr, e_s );
-    ptr = vj_sprintf( ptr, vj_tag_size() );
+    ptr = vj_sprintf( ptr, samples ); // 12
     ptr = vj_sprintf( ptr, tag->source_type ); 
     ptr = vj_sprintf( ptr, tag->n_frames ); 
     ptr = vj_sprintf( ptr, tag->selected_entry );
-    ptr = vj_sprintf( ptr, ts );
+    ptr = vj_sprintf( ptr, ts ); // 16
     ptr = vj_sprintf( ptr, cache );
     ptr = vj_sprintf( ptr, curfps );
-    ptr = vj_sprintf( ptr, (int) lo );
-    ptr = vj_sprintf( ptr, (int) hi );
-    ptr = vj_sprintf( ptr, sa );
-    ptr = vj_sprintf( ptr, ca );
+    ptr = vj_sprintf( ptr, (int) lo ); // 19
+    ptr = vj_sprintf( ptr, (int) hi ); // 20
+    ptr = vj_sprintf( ptr, sa ); // 21
+    ptr = vj_sprintf( ptr, ca ); // 22
     ptr = vj_sprintf( ptr, (int) tag->fader_val );
-    *ptr++ = '0'; 
+    *ptr++ = '0';
     *ptr++ = ' ';
     ptr = vj_sprintf( ptr, macro ); 
-    ptr = vj_sprintf( ptr, tag->subrender);
+    ptr = vj_sprintf( ptr, tag->subrender); // 26
     ptr = vj_sprintf( ptr, tag->fade_method);
     ptr = vj_sprintf( ptr, tag->fade_entry );
     ptr = vj_sprintf( ptr, tag->fade_alpha );
-    ptr = vj_sprintf( ptr, tag->loop_stat );
+    ptr = vj_sprintf( ptr, tag->loop_stat ); // 30
     ptr = vj_sprintf( ptr, tag->loop_stat_stop);
     ptr = vj_sprintf( ptr, tag->transition_active);
     ptr = vj_sprintf( ptr, tag->transition_length);
-    ptr = vj_sprintf( ptr, tag->transition_shape);
-    ptr = vj_sprintf( ptr, feedback );
-    ptr = vj_sprintf( ptr, samples );
+    ptr = vj_sprintf( ptr, tag->transition_shape); // 34
+    ptr = vj_sprintf( ptr, feedback ); // 35
+    ptr = vj_sprintf( ptr, tag_count ); // 36
 
     return 0;
 }

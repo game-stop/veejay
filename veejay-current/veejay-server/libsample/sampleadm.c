@@ -74,6 +74,9 @@ static int next_avail_num = 0;  /* available sample id */
 static int initialized = 0; /* whether we are initialized or not */
 static hash_t *SampleHash;  /* hash of sample information structs */
 static int avail_num[SAMPLE_MAX_SAMPLES];   /* an array of freed sample id's */
+static int avail_head = 0;
+static int avail_tail = 0;
+
 static void *sample_font_ = NULL;
 static int sampleadm_state = SAMPLE_PEEK;   /* default state */
 static void *sample_cache[SAMPLE_MAX_SAMPLES];
@@ -101,9 +104,9 @@ int sample_highest(void)
 int sample_highest_valid_id(void)
 {
     int id = this_sample_id;
-    while( !sample_exists( id ) ) {
+    while( !sample_exists( id ) ) { // returns first found
         id --;
-        if( id <= 0 )
+        if( id < 1 )
             break;
     }
 
@@ -271,25 +274,23 @@ int sample_get_state(void)
     return sampleadm_state;
 }
 
+
 static int _new_id(void)
 {
-  /* perhaps we can reclaim a sample id */
-    int n;
-    int id = 0;
-    for (n = 0; n <= next_avail_num; n++)
+    int id;
+    if (avail_head != avail_tail)
     {
-        if (avail_num[n] != 0)  
-        {
-            id = avail_num[n];
-            avail_num[n] = 0;
-            break;
-        }
+        id = avail_num[avail_head++];
+
+        if (avail_head >= SAMPLE_MAX_SAMPLES)
+            avail_head = 0;
     }
-    if( id == 0 )
+    else
     {
-        if(!this_sample_id) this_sample_id = 1;
-        id = this_sample_id;
-        this_sample_id ++;
+        if (!this_sample_id)
+            this_sample_id = 1;
+
+        id = this_sample_id++;
     }
     return id;
 }
@@ -1084,7 +1085,15 @@ static void sample_del_internal(sample_info *si)
     if (si->sample_id >= 0 && si->sample_id <= SAMPLE_MAX_SAMPLES)
         sample_cache[si->sample_id] = NULL;
 
-    avail_num[next_avail_num++] = si->sample_id;
+    int next_tail = avail_tail + 1;
+    if (next_tail >= SAMPLE_MAX_SAMPLES) {
+        next_tail = 0;
+    }
+
+    if (next_tail != avail_head) {
+        avail_num[avail_tail] = si->sample_id;
+        avail_tail = next_tail;
+    }
 
     free(si);
 }
@@ -2488,10 +2497,7 @@ int sample_set_editlist(int s1, editlist *edl)
     return 1;
 }
 
-/* print sample status information into an allocated string str*/
-//int sample_chain_sprint_status(int s1, int entry, int changed, int r_changed,char *str,
-//                 int frame)
-int sample_chain_sprint_status( int s1,int tags,int cache,int sa,int ca, int pfps, int frame, int mode,int total_slots, int seq_rec,int curfps, uint32_t lo, uint32_t hi,int macro,char *str, int feedback )
+int sample_chain_sprint_status( int s1,int tags,int sample_count,int cache,int sa,int ca, int pfps, int frame, int mode,int total_slots, int seq_rec,int curfps, uint32_t lo, uint32_t hi,int macro,char *str, int feedback )
 {
     sample_info *sample;
     sample = sample_get(s1);
@@ -2528,7 +2534,7 @@ int sample_chain_sprint_status( int s1,int tags,int cache,int sa,int ca, int pfp
     ptr = vj_sprintf( ptr, e_a);
     ptr = vj_sprintf( ptr, e_d );
     ptr = vj_sprintf( ptr, e_s );
-    ptr = vj_sprintf( ptr, sample_size() ); // 12
+    ptr = vj_sprintf( ptr, sample_count ); // 12
     ptr = vj_sprintf( ptr, sample->marker_start );
     ptr = vj_sprintf( ptr, sample->marker_end );
     ptr = vj_sprintf( ptr, sample->selected_entry );
@@ -2552,7 +2558,7 @@ int sample_chain_sprint_status( int s1,int tags,int cache,int sa,int ca, int pfp
     ptr = vj_sprintf( ptr, sample->transition_length);
     ptr = vj_sprintf( ptr, sample->transition_shape);
     ptr = vj_sprintf( ptr, feedback);
-    ptr = vj_sprintf( ptr, tags );
+    ptr = vj_sprintf( ptr, tags ); // 36
 
     return 0;
 }

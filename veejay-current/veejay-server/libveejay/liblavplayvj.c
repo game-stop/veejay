@@ -1333,16 +1333,14 @@ static void veejay_pipe_write_status(veejay_t * info)
     video_playback_setup *settings = (video_playback_setup *) info->settings;
     int d_len = 0;
     int pm = info->uc->playback_mode;
-    int n_samples = sample_size();
-    int tags = vj_tag_size();
 
 	int cache_used = 0;
 	int mstatus = 0;
 	int curfps  = (int) ( 100.0f / settings->spvf );
-	int total_slots = n_samples;
+	int sample_count = sample_size();
+	int tag_count = vj_tag_size();
+	int total_slots = sample_count + tag_count;
 	int seq_cur = (info->seq->active ? info->seq->current : MAX_SEQUENCES );
-	if(tags>0)
-		total_slots+=tags;
 
 	veejay_memset( info->status_what, 0, sizeof(info->status_what));
   
@@ -1355,8 +1353,10 @@ static void veejay_pipe_write_status(veejay_t * info)
 		if( info->settings->randplayer.mode == RANDMODE_SAMPLE)
 			pm = VJ_PLAYBACK_MODE_PATTERN;
 
-		if( sample_chain_sprint_status
-			(info->uc->sample_id, tags,cache_used,info->seq->size,seq_cur,info->real_fps,settings->current_frame_num, pm, total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what, settings->feedback ) != 0)
+		if( sample_chain_sprint_status(
+			info->uc->sample_id,tag_count,sample_count,cache_used,info->seq->size,seq_cur,info->real_fps,
+			settings->current_frame_num, pm, total_slots,info->seq->rec_id,curfps,
+			settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what, settings->feedback ) != 0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Fatal error, tried to collect properties of invalid sample");
 			veejay_change_state( info, LAVPLAY_STATE_STOP );
@@ -1366,38 +1366,40 @@ static void veejay_pipe_write_status(veejay_t * info)
             {
                 char *ptr = info->status_what;
                 
-                ptr = vj_sprintf( ptr, info->real_fps );
+                ptr = vj_sprintf( ptr, info->real_fps ); // 0
                 ptr = vj_sprintf( ptr, settings->current_frame_num );
                 ptr = vj_sprintf( ptr, info->uc->playback_mode );
                 
-                *ptr++ = '0'; *ptr++ = ' ';
-                *ptr++ = '0'; *ptr++ = ' ';
+                *ptr++ = '0';
+				*ptr++ = ' ';
+				*ptr++ = '0';
+				*ptr++ = ' '; // 4
                 
                 ptr = vj_sprintf( ptr, settings->min_frame_num );
                 ptr = vj_sprintf( ptr, settings->max_frame_num );
-                ptr = vj_sprintf( ptr, settings->current_playback_speed );
+                ptr = vj_sprintf( ptr, settings->current_playback_speed ); // 7
                 
                 for(int i=0; i<4; i++) { *ptr++ = '0'; *ptr++ = ' '; }
 
-                ptr = vj_sprintf( ptr, n_samples );
+                ptr = vj_sprintf( ptr, sample_count ); // 12
                 
                 for(int i=0; i<3; i++) { *ptr++ = '0'; *ptr++ = ' '; }
 
-                ptr = vj_sprintf( ptr, total_slots );
+                ptr = vj_sprintf( ptr, total_slots ); // 16
                 ptr = vj_sprintf( ptr, cache_used );
                 ptr = vj_sprintf( ptr, curfps );
                 ptr = vj_sprintf( ptr, settings->cycle_count[0] );
-                ptr = vj_sprintf( ptr, settings->cycle_count[1] );
+                ptr = vj_sprintf( ptr, settings->cycle_count[1] ); //20
 
                 for(int i=0; i<3; i++) { *ptr++ = '0'; *ptr++ = ' '; }
 
-                ptr = vj_sprintf( ptr, info->sfd);
+                ptr = vj_sprintf( ptr, info->sfd); //24
                 ptr = vj_sprintf( ptr, mstatus );
 
-                for(int i=0; i<8; i++) { *ptr++ = '0'; *ptr++ = ' '; }
+                for(int i=0; i<9; i++) { *ptr++ = '0'; *ptr++ = ' '; }
 
-                ptr = vj_sprintf( ptr, settings->feedback);
-                ptr = vj_sprintf( ptr, tags);
+                ptr = vj_sprintf( ptr, settings->feedback); // 35
+                ptr = vj_sprintf( ptr, tag_count); // 36
                 
             }
         break;
@@ -1405,8 +1407,9 @@ static void veejay_pipe_write_status(veejay_t * info)
 
 		mstatus = vj_macro_get_status( vj_tag_get_macro( info->uc->sample_id ));
 
-		if( vj_tag_sprint_status( info->uc->sample_id,n_samples,cache_used,info->seq->size,seq_cur, info->real_fps,
-			settings->current_frame_num, info->uc->playback_mode,total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus, info->status_what, settings->feedback ) != 0 )
+		if( vj_tag_sprint_status( info->uc->sample_id,tag_count,sample_count,cache_used,info->seq->size,seq_cur,info->real_fps,
+			settings->current_frame_num, info->uc->playback_mode,total_slots,info->seq->rec_id,curfps,
+			settings->cycle_count[0],settings->cycle_count[1],mstatus, info->status_what, settings->feedback ) != 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status");
 		}
@@ -1416,7 +1419,6 @@ static void veejay_pipe_write_status(veejay_t * info)
 	d_len = strlen(info->status_what);
 	info->status_line_len = d_len + 5;
 	snprintf( info->status_line, MESSAGE_SIZE, "V%03dS%s", d_len, info->status_what );
-
     if (info->uc->chain_changed == 1)
 		info->uc->chain_changed = 0;
 }
