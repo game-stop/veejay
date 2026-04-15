@@ -6842,12 +6842,14 @@ static void load_editlist_info(void)
 #endif
         return;
     }
-    int got_n = sscanf(res, "%d %d %d %c %f %d %d %ld %d %ld %ld %d %d %d",
+    int got_n = sscanf(res, "%d %d %d  %c %f %d %d %ld %d %ld %ld %d %d %d",
        &values[0], &values[1], &values[2], &norm, &fps,
        &values[4], &values[5], &rate, &values[7],
        &dum[0], &dum[1], &values[8], &use_vims_mcast, &global_transition_state);
     if( got_n != 14 ) {
         veejay_msg(VEEJAY_MSG_ERROR, "Parsing failed: expected 14, got %d. Data: %s", got_n, res);
+        free(res);
+        return;
     }
 
     snprintf( tmp, sizeof(tmp)-1, "%dx%d", values[0],values[1]);
