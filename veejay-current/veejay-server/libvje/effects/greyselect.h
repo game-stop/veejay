@@ -22,4 +22,6 @@
 #define GREYSELECT_H
 vj_effect *greyselect_init(int w, int h);
 void greyselect_apply( void *ptr, VJFrame *frame, int *args );
+void *greyselect_malloc(int w, int h);
+void greyselect_free(void *ptr);
 #endif
