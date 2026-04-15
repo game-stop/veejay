@@ -51,7 +51,7 @@
 #include <veejaycore/yuvconv.h>
 #include <libavutil/avutil.h>
 #ifndef SAMPLE_MAX_PARAMETERS
-#define SAMPLE_MAX_PARAMETERS 32 //sampleadm.h
+#define SAMPLE_MAX_PARAMETERS 16 //sampleadm.h
 #endif
 #include <stdlib.h>
 #include <sys/types.h>
