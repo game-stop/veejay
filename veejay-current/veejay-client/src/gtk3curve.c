@@ -150,7 +150,6 @@ static void gtk3_curve_set_property         (GObject              *object,
                                              guint                 param_id,
                                              const GValue         *value,
                                              GParamSpec           *pspec);
-static void gtk3_curve_size_graph           (Gtk3Curve            *curve);
 static void gtk3_curve_create_layouts       (GtkWidget            *widget);
 static void gtk3_curve_reset_vector         (GtkWidget            *widget);
 static void gtk3_curve_interpolate          (GtkWidget            *widget,
@@ -395,7 +394,7 @@ gtk3_curve_init (Gtk3Curve* self)
   gtk3_curve_set_color_grid_rgba (GTK_WIDGET(self), 0.0, 0.0, 0.0, 1.0);
   gtk3_curve_set_color_cpoint_rgba (GTK_WIDGET(self), 0.2, 0.2, 0.2, 1.0);
 
-  gtk3_curve_size_graph (self);
+  //optional: give a sane default minimum size with gtk_widget_set_size_request
 
   DEBUG_INFO("init [E]\n");
 }
@@ -1431,39 +1430,6 @@ gtk3_curve_get_property (GObject              *object,
 }
 
 static void
-gtk3_curve_size_graph (Gtk3Curve *curve)
-{
-  Gtk3CurvePrivate *priv = curve->priv;
-  GdkRectangle geom;
-  gint width, height;
-  //~ gfloat aspect;
-
-  GdkMonitor *monitor = gdk_display_get_primary_monitor(gtk_widget_get_display ((GtkWidget*)curve));
-  gdk_monitor_get_geometry(monitor, &geom);
-
-  width  = (priv->max_x - priv->min_x);
-  height = (priv->max_y - priv->min_y);
-  //~ aspect = width / (gfloat) height;
-
-  width > geom.width >> 2 ? width  = geom.width >> 2 : width;
-  height > geom.height >> 2 ? height = geom.height >> 2 : height;
-
-  //~ Do Nothing code? appart possible rouding mistake. Also, why this is done after possible change of w and h values?
-  //~ if (aspect < 1.0)
-    //~ {
-      //~ width  = height * aspect;
-    //~ }
-  //~ else
-    //~ {
-      //~ height = width / aspect;
-    //~ }
-
-  DEBUG_INFO("Set requested size to [%dx%d]\n", width, height);
-
-  gtk_widget_set_size_request (GTK_WIDGET (curve), width, height);
-}
-
-static void
 gtk3_curve_create_layouts (GtkWidget *widget)
 {
   DEBUG_INFO("create pango [S]\n");
@@ -1728,7 +1694,7 @@ gtk3_curve_set_range (GtkWidget *widget,
 
   g_object_thaw_notify (G_OBJECT (curve));
 
-  gtk3_curve_size_graph (curve);
+  //gtk3_curve_size_graph (curve);
   gtk3_curve_reset_vector (widget);
 
   DEBUG_INFO("set range [E]\n");
