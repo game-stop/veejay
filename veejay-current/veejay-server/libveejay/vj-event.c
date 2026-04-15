@@ -1053,8 +1053,7 @@ void vj_event_parse_bundle(veejay_t *v, char *msg )
 void vj_event_dump()
 {
     vj_event_vevo_dump();
-    
-    vj_osc_dump();
+
 }
 
 typedef struct {

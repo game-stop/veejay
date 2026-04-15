@@ -808,9 +808,16 @@ int main(int argc, char **argv)
 		veejay_set_label(0);
         vj_event_init(NULL);
         vje_init(info->video_output_width <= 0 ? 720 : info->video_output_width, info->video_output_height <= 0 ? 576 : info->video_output_width);
-		vj_osc_allocate(VJ_PORT + 2);
+
         vj_event_dump();
-        vje_dump();
+
+		fflush(stdout);
+		vj_osc_allocate(VJ_PORT + 2);
+		vj_osc_dump();
+		fflush(stdout);
+
+		vje_dump();
+
 		fprintf(stdout,
             "\n\nEnvironment variables:\n"
             "  [ Video & Rendering ]\n"
