@@ -55,7 +55,7 @@ vj_effect *chromascratcher_init(int w, int h)
     ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user =0;
-	ve->param_description = vje_build_param_list(ve->num_params, "Length", "Value", "Mode", "Pingpong" );
+	ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Frames", "Mode", "Pingpong" );
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
@@ -147,12 +147,11 @@ static void chromastore_frame(chromascratcher_t *c, VJFrame *src, int w, int h, 
 }
 
 
-
 void chromascratcher_apply(void *ptr, VJFrame *frame, int *args) {
-    int mode = args[0];
+    int n = args[0];
     int opacity = args[1];
-    int n = args[2];
-    int no_reverse = args[3];
+    int mode = args[2];
+    int no_reverse = (args[3] == 0) ? 1 : 0;
 
     chromascratcher_t *c = (chromascratcher_t*) ptr;
 
