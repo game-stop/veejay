@@ -9246,11 +9246,11 @@ void vj_event_send_video_information(void *ptr, const char format[], va_list ap)
 
     char info_msg[150];
     snprintf(info_msg, sizeof(info_msg),
-             "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld %1d %1d %1d",
+             "%04d %04d %01d %d %02.3f %1d %04d %06ld %02d %03ld %08ld %1d %1d %1d",
              el->video_width,
              el->video_height,
              el->video_inter,
-             el->video_norm,
+             el->video_norm == 'p' ? 1 : (el->video_norm == 'n' ? 0 : 2),
              el->video_fps,
              el->has_audio,
              el->audio_bits,

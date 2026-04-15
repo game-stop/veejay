@@ -6824,7 +6824,6 @@ cleanup:
 // execute after el change:
 static void load_editlist_info(void)
 {
-    char norm;
     float fps;
     int values[10] = { 0 };
     long rate = 0;
@@ -6842,38 +6841,46 @@ static void load_editlist_info(void)
 #endif
         return;
     }
-    int got_n = sscanf(res, "%d %d %d  %c %f %d %d %ld %d %ld %ld %d %d %d",
-       &values[0], &values[1], &values[2], &norm, &fps,
+    int got_n = sscanf(res, "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d",
+       &values[0], &values[1], &values[2], &values[3], &fps,
        &values[4], &values[5], &rate, &values[7],
        &dum[0], &dum[1], &values[8], &use_vims_mcast, &global_transition_state);
+
     if( got_n != 14 ) {
         veejay_msg(VEEJAY_MSG_ERROR, "Parsing failed: expected 14, got %d. Data: %s", got_n, res);
         free(res);
         return;
     }
 
-    snprintf( tmp, sizeof(tmp)-1, "%dx%d", values[0],values[1]);
-
     info->el.width = values[0];
     info->el.height = values[1];
     info->el.num_frames = dum[1];
-    update_label_str( "label_el_wh", tmp );
-    snprintf( tmp, sizeof(tmp)-1, "%s",
-        (norm == 'p' ? "PAL" : "NTSC" ) );
+    info->el.fps = fps;
+    info->el.num_files = dum[0];
+
+    const char *norm_str = "Digital";
+    switch(values[3]) {
+        case 1: norm_str = "PAL"; break;
+        case 0: norm_str = "NTSC"; break;
+        case 2: default: break;
+    }
+
+    snprintf(tmp, sizeof(tmp), "%s", norm_str);
     update_label_str( "label_el_norm", tmp);
+
+    snprintf(tmp,sizeof(tmp), "%dx%d", values[0], values[1]);
+    update_label_str( "label_el_wh", tmp );
+
     update_label_f( "label_el_fps", fps );
 
     update_spin_value( "screenshot_width", info->el.width );
     update_spin_value( "screenshot_height", info->el.height );
 
-    info->el.fps = fps;
-#ifdef STRICT_CHECKING
-    assert( info->el.fps > 0 );
-#endif
-    info->el.num_files = dum[0];
-    snprintf( tmp, sizeof(tmp)-1, "%s",
+
+    snprintf( tmp, sizeof(tmp), "%s",
         ( values[2] == 0 ? "progressive" : (values[2] == 1 ? "top first" : "bottom first" ) ) );
     update_label_str( "label_el_inter", tmp );
+
     update_label_i( "label_el_arate", (int)rate, 0);
     update_label_i( "label_el_achans", values[7], 0);
     update_label_i( "label_el_abits", values[5], 0);
