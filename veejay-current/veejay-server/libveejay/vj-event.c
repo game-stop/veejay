@@ -8299,7 +8299,7 @@ void vj_event_send_track_list(void *ptr, const char format[], va_list ap)
 
         for (int i = 0; i <= n; i++)
         {
-            if (vj_tag_exists(i) && !vj_tag_is_deleted(i))
+            if (vj_tag_exists(i))
             {
                 vj_tag *tag = vj_tag_get(i);
                 if (tag->source_type == VJ_TAG_TYPE_NET)
@@ -8362,7 +8362,7 @@ void vj_event_send_tag_list(void *ptr, const char format[], va_list ap)
 
         for (int i = start_from_tag; i <= n; i++)
         {
-            if (vj_tag_exists(i) && !vj_tag_is_deleted(i))
+            if (vj_tag_exists(i))
             {
                 vj_tag *tag = vj_tag_get(i);
                 char source_name[255];
