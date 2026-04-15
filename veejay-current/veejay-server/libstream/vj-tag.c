@@ -1143,8 +1143,10 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
             
             plug_get_parameters( tag->generator, tag->genargs, &tmp);   
             
-            if( filename != NULL )
-                strcpy( tag->source_name, filename );
+            if (filename != NULL) {
+                strncpy(tag->source_name, filename, sizeof(tag->source_name) - 1);
+                tag->source_name[sizeof(tag->source_name) - 1] = '\0';
+            }
         }
         else {
             goto TAG_NEW_FAILED;
