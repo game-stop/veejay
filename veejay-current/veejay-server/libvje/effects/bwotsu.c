@@ -89,7 +89,7 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args) {
 
     switch (mode) {
         case 0:
-            #pragma omp parallel for num_threads(n_threads)
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
             for (int i = 0; i < len; i++) {
                 const uint8_t cond = (Y[i] >= threshold);
                 Y[i] = (cond * high) | ((1 - cond) * low);
@@ -105,7 +105,7 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args) {
             break;
 
         case 1:
-            #pragma omp parallel for num_threads(n_threads)
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
             for (int i = 0; i < len; i++) {
                 const uint8_t cond = (Y[i] >= threshold);
                 A[i] = (cond * high) | ((1 - cond) * low);
