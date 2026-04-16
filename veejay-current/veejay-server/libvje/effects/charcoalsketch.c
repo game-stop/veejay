@@ -100,7 +100,7 @@ void charcoalsketch_apply(void *ptr, VJFrame *frame, int *args)
 
     if (radius < 1) radius = 1;
 
-    #pragma omp parallel for num_threads(c->n_threads)
+    #pragma omp parallel for num_threads(c->n_threads) schedule(static)
     for (int y = 0; y < height; y++) {
         int sum = 0;
         int row_offset = y * width;
@@ -117,7 +117,7 @@ void charcoalsketch_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    #pragma omp parallel for num_threads(c->n_threads)
+    #pragma omp parallel for num_threads(c->n_threads) schedule(static)
     for (int x = 0; x < width; x++) {
         int sum = 0;
         for (int y = -radius; y <= radius; y++) {
