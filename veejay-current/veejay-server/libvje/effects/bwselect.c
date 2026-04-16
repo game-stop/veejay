@@ -60,6 +60,7 @@ vj_effect *bwselect_init(int w, int h)
 typedef struct {    
     int last_gamma;
     uint8_t table[256];
+    int n_threads;
 } bwselect_t;
 
 static void gamma_setup(bwselect_t *b, double gamma_value)
@@ -81,7 +82,8 @@ void *bwselect_malloc(int w, int h)
     if(!b) {
         return NULL;
     }
-    gamma_setup(b, 4.0 ); 
+    gamma_setup(b, 4.0 );
+    b->n_threads = vje_advise_num_threads(w*h);
     return (void*) b;
 }
 
@@ -122,7 +124,7 @@ void bwselect_apply(void *ptr, VJFrame *frame, int *args)
         const int hi = pixel_Y_hi_;
         const int lo = pixel_Y_lo_;
 
-        #pragma omp parallel for schedule(static)
+        #pragma omp parallel for num_threads(b->n_threads) schedule(static)
         for (int i = 0; i < len; i++)
         {
             const uint8_t p = use_gamma ? table[Y[i]] : Y[i];
@@ -138,7 +140,7 @@ void bwselect_apply(void *ptr, VJFrame *frame, int *args)
 
     if (mode == 1)
     {
-        #pragma omp parallel for schedule(static)
+        #pragma omp parallel for num_threads(b->n_threads) schedule(static)
         for (int i = 0; i < len; i++)
         {
             const uint8_t p = use_gamma ? table[Y[i]] : Y[i];
