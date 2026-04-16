@@ -5949,10 +5949,10 @@ gboolean view_el_selection_func (GtkTreeSelection *selection,
     return TRUE; /* allow selection state to change */
 }
 
-void on_vims_row_activated(GtkTreeView *treeview,
-                           GtkTreePath *path,
-                           GtkTreeViewColumn *col,
-                           gpointer user_data)
+void on_bundle_row_activated(GtkTreeView *treeview,
+                             GtkTreePath *path,
+                             GtkTreeViewColumn *col,
+                             gpointer user_data)
 {
     GtkTreeModel *model;
     GtkTreeIter iter;
@@ -6209,7 +6209,7 @@ static void setup_bundles(void)
     setup_tree_text_column( "tree_bundles", VIMS_FORMAT, "Format",0 );
     g_signal_connect(tree,
                      "row-activated",
-                     (GCallback) on_vims_row_activated,
+                     (GCallback) on_bundle_row_activated,
                      NULL );
 
     GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
