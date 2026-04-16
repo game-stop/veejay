@@ -141,7 +141,7 @@ static void box_blur(integralblur_t *f,
 
     uint32_t *I = f->integral;
 
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static) num_threads(f->n_threads)
     for (int y = 0; y < h; y++)
     {
         int y0 = y - radius; if (y0 < 0) y0 = 0;
