@@ -6000,7 +6000,7 @@ void on_vims_row_activated(GtkTreeView *treeview,
     }
 }
 
-gboolean view_vims_selection_func (GtkTreeSelection *selection,
+gboolean view_bundle_selection_func (GtkTreeSelection *selection,
                                    GtkTreeModel     *model,
                                    GtkTreePath      *path,
                                    gboolean          path_currently_selected,
@@ -6213,7 +6213,7 @@ static void setup_bundles(void)
                      NULL );
 
     GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
-    gtk_tree_selection_set_select_function(selection, view_vims_selection_func, NULL, NULL);
+    gtk_tree_selection_set_select_function(selection, view_bundle_selection_func, NULL, NULL);
     gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 
     GtkWidget *tv = glade_xml_get_widget_( info->main_window, "vimsview" );
