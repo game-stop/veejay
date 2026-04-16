@@ -126,7 +126,7 @@ void alienchromaflow_apply(void *ptr, VJFrame *frame, int *args) {
     uint8_t *pu = frame->data[1];
     uint8_t *pv = frame->data[2];
 
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static) num_threads(n->n_threads)
     for (int i = 0; i < sz; i++) {
         const uint8_t y_orig = py[i];
         float y_raw = (float)y_orig * INV_255;
