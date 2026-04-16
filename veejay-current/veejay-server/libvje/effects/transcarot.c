@@ -144,7 +144,7 @@ void transcarot_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
 
     const int progress = (int)wipe->wipePosition;
 
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for num_threads(wipe->n_threads) schedule(static)
     for (int i = 0; i < height; ++i) {
         const int offset = i * width;
         int limit = progress - i;
