@@ -124,7 +124,7 @@ void boxfit_apply(void *ptr, VJFrame *frame, int *args)
         size_lut[i] = CLAMP(sz, min_s, max_s);
     }
 
-    #pragma omp parallel for num_threads(3)
+    #pragma omp parallel for num_threads(s->n_threads) schedule(static)
     for (int c = 0; c < 3; c++) {
         uint8_t *src = frame->data[c];
         uint32_t *intC = (c == 0) ? s->integralY : (c == 1 ? s->integralU : s->integralV);
