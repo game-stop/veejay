@@ -32,7 +32,6 @@
 #include <libplugger/plugload.h>
 #include <veejaycore/vims.h>
 #include <libvje/libvje.h>
-
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif

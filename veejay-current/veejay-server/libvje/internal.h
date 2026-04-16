@@ -244,9 +244,9 @@
 #include "./effects/fractalkaleido.h"
 #include "./effects/charcoalsketch.h"
 #include "./effects/integralblur.h"
-//#include "./effects/tunnel.h"
+#include "./effects/tunnel.h"
 
-#define VJ_IMAGE_EFFECT_MIN 40
+#define VJ_IMAGE_EFFECT_MIN 39
 #define VJ_IMAGE_EFFECT_MAX 198
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -526,7 +526,7 @@ enum {
     VJ_IMAGE_EFFECT_FRACTALKALEIDO = 42,
     VJ_IMAGE_EFFECT_CHARCOAL = 41,
     VJ_IMAGE_EFFECT_INTEGRALBLUR = 40,
-    //VJ_IMAGE_EFFECT_TUNNEL = 42,
+    VJ_IMAGE_EFFECT_TUNNEL = 39,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
