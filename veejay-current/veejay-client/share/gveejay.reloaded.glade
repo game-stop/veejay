@@ -1726,6 +1726,12 @@
                       <placeholder/>
                     </child>
                     <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
                       <object class="GtkButton" id="generators_close">
                         <property name="visible">True</property>
                         <property name="can-focus">True</property>
@@ -19802,7 +19808,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                     <property name="can-focus">True</property>
                                     <property name="tooltip-text" translatable="yes">Change playback engine framerate</property>
                                     <property name="adjustment">framerat</property>
-                                    <property name="digits">2</property>
+                                    <property name="digits">0</property>
                                     <signal name="value-changed" handler="on_framerate_value_changed" swapped="no"/>
                                   </object>
                                   <packing>
