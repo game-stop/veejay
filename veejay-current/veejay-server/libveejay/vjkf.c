@@ -40,6 +40,7 @@
 #endif
 #include <libvjxml/vj-xml.h>
 #include <libveejay/vjkf.h>
+#include <math.h>
 
 static	char	*extract_( const char *prefix , int p_id )
 {
@@ -500,4 +501,152 @@ int get_keyframe_value(void *port, long long n_frame,
 
     free(k_x); free(k_s); free(k_e); free(k_d);
     return 1;
+}
+
+
+static int *keyframe_resample_data(int *old_values, int old_len, int new_len) 
+{
+    if (!old_values || old_len <= 0 || new_len <= 0) {
+        return NULL;
+    }
+
+    int *new_values = vj_calloc(sizeof(int) * new_len);
+    if (!new_values) {
+        return NULL;
+    }
+
+    if (old_len == 1) {
+        for (int i = 0; i < new_len; i++) {
+            new_values[i] = old_values[0];
+        }
+        return new_values;
+    }
+    
+    if (new_len == 1) {
+        new_values[0] = old_values[0];
+        return new_values;
+    }
+
+    for (int i = 0; i < new_len; i++) {
+        double position = (double)i * (old_len - 1) / (new_len - 1);
+        
+        int index_left = (int)position;
+        int index_right = index_left + 1;
+        
+        if (index_right >= old_len) {
+            index_right = old_len - 1;
+        }
+
+        double fraction = position - index_left;
+        double interpolated_val = (old_values[index_left] * (1.0 - fraction)) + 
+                                  (old_values[index_right] * fraction);
+                     
+        new_values[i] = (int)round(interpolated_val); 
+    }
+
+    return new_values;
+}
+
+int keyframe_resize_entry(void *port, int parameter_id, int new_start, int new_end)
+{
+    if (!port || new_start > new_end) return 0;
+
+    int old_start = 0, old_end = 0, old_len = 0;
+    int *old_values = NULL;
+
+    char *k_s  = extract_("start", parameter_id);
+    char *k_e  = extract_("end", parameter_id);
+    char *k_d  = extract_("data", parameter_id);
+    char *k_dn = extract_("datalen", parameter_id);
+
+    if (vevo_property_get(port, k_s, 0, &old_start) != VEVO_NO_ERROR ||
+        vevo_property_get(port, k_e, 0, &old_end) != VEVO_NO_ERROR ||
+        vevo_property_get(port, k_d, 0, &old_values) != VEVO_NO_ERROR ||
+        vevo_property_get(port, k_dn, 0, &old_len) != VEVO_NO_ERROR) 
+    {
+        free(k_s); free(k_e); free(k_d); free(k_dn);
+        return 0;
+    }
+
+    int new_len = new_end - new_start + 1;
+
+    if (new_len == old_len) {
+        // note: must update start/end if shifted in time
+        vevo_property_set(port, k_s, VEVO_ATOM_TYPE_INT, 1, &new_start);
+        vevo_property_set(port, k_e, VEVO_ATOM_TYPE_INT, 1, &new_end);
+        free(k_s); free(k_e); free(k_d); free(k_dn);
+        return 1;
+    }
+
+    int *new_values = keyframe_resample_data(old_values, old_len, new_len);
+    
+    if (!new_values) {
+        free(k_s); free(k_e); free(k_d); free(k_dn);
+        return 0;
+    }
+
+    vevo_property_set(port, k_s,  VEVO_ATOM_TYPE_INT, 1, &new_start);
+    vevo_property_set(port, k_e,  VEVO_ATOM_TYPE_INT, 1, &new_end);
+    vevo_property_set(port, k_d,  VEVO_ATOM_TYPE_VOIDPTR, 1, &new_values);
+    vevo_property_set(port, k_dn, VEVO_ATOM_TYPE_INT, 1, &new_len);
+
+    if (old_values) {
+        free(old_values); 
+    }
+
+    free(k_s); free(k_e); free(k_d); free(k_dn);
+    return 1;
+}
+
+
+void *keyframe_port_clone_and_resize(void *src_port, int new_len)
+{
+    if (!src_port || new_len <= 0) return NULL;
+
+    void *dst_port = vpn(VEVO_ANONYMOUS_PORT);
+    if (!dst_port) return NULL;
+
+    for (int p_id = 0; p_id < SAMPLE_MAX_PARAMETERS; p_id++) {
+        int status = 0, type = 0;
+        int old_start = 0, old_end = 0, old_datalen = 0;
+        int *old_values = NULL;
+        char *k_dn = extract_("datalen", p_id);
+        if( vevo_property_get(src_port, k_dn, 0, &old_datalen) != VEVO_NO_ERROR ) {
+            free(k_dn);
+            continue;
+        }
+
+        char *k_x = extract_("status", p_id);
+        char *k_s  = extract_("start", p_id);
+        char *k_e  = extract_("end", p_id);
+        char *k_t  = extract_("type", p_id);
+        char *k_d  = extract_("data", p_id);
+
+        vevo_property_get(src_port, k_s,  0, &old_start);
+        vevo_property_get(src_port, k_e,  0, &old_end);
+        vevo_property_get(src_port, k_t,  0, &type);
+        vevo_property_get(src_port, k_d,  0, &old_values);
+        vevo_property_get(src_port, k_x,  0, &status);
+
+        if (old_values && old_datalen > 0) {
+            int *new_values = keyframe_resample_data(old_values, old_datalen, new_len);
+
+            if (new_values) {
+                int new_start = 0;
+                int new_end   = new_len - 1;
+
+                vevo_property_set(dst_port, k_s,  VEVO_ATOM_TYPE_INT, 1, &new_start);
+                vevo_property_set(dst_port, k_e,  VEVO_ATOM_TYPE_INT, 1, &new_end);
+                vevo_property_set(dst_port, k_t,  VEVO_ATOM_TYPE_INT, 1, &type);
+                vevo_property_set(dst_port, k_x,  VEVO_ATOM_TYPE_INT, 1, &status);
+                vevo_property_set(dst_port, k_dn, VEVO_ATOM_TYPE_INT, 1, &new_len);
+                vevo_property_set(dst_port, k_d,  VEVO_ATOM_TYPE_VOIDPTR, 1, &new_values);
+            }
+        }
+
+        free(k_x); free(k_s); free(k_e); 
+        free(k_t); free(k_d); free(k_dn);
+    }
+
+    return dst_port;
 }

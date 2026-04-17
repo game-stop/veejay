@@ -342,7 +342,7 @@ void	vj_event_alpha_composite(void *ptr, const char format[], va_list ap );
 void	vj_event_tag_new_avformat(void *ptr, const char format[], va_list ap);
 void    vj_event_set_transition(void *ptr, const char format[], va_list ap);
 void    vj_event_chain_global(void *ptr, const char format[], va_list ap);
-
+void    vj_event_chain_global_copy(void *ptr, const char format[], va_list ap);
 int     vj_event_push(void *ptr, int mod );
 int     vj_event_pop(void *ptr, int *mod_state);
 

@@ -5046,7 +5046,6 @@ void vj_event_chain_entry_disable_video(void *ptr, const char format[], va_list 
     return;
 }
 
-// clean up and stop mixing inputs from playing
 static void vj_event_chain_global_reset(sample_eff_chain **fx_chain) {
     for(int i=0; i < SAMPLE_MAX_EFFECTS; i++)
     {
@@ -5063,8 +5062,9 @@ static void vj_event_chain_global_reset(sample_eff_chain **fx_chain) {
 
 }
 
-void vj_event_chain_global(void *ptr, const char format[], va_list ap)
+void vj_event_chain_global_copy(void *ptr, const char format[], va_list ap)
 {
+    int fx = 0;
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
     P_A(args,sizeof(args),NULL,0,format,ap);
@@ -5073,9 +5073,7 @@ void vj_event_chain_global(void *ptr, const char format[], va_list ap)
     int enabled = args[1];
 
     if(enabled < 0) enabled = 0;
-    if(enabled > 2) enabled = 1; // sample renders before global chain
-
-    v->global_chain->enabled = enabled;
+    if(enabled > 2) enabled = 2;
     
 
     sample_eff_chain **src = NULL;
@@ -5092,24 +5090,39 @@ void vj_event_chain_global(void *ptr, const char format[], va_list ap)
 
     v->global_chain->origin_id = args[0];
     v->global_chain->origin_mode = SAMPLE_PLAYING(v) ? VJ_PLAYBACK_MODE_SAMPLE : STREAM_PLAYING(v) ? VJ_PLAYBACK_MODE_TAG : VJ_PLAYBACK_MODE_PLAIN;
+
+    vj_event_chain_global_reset(v->global_chain->fx_chain);
+
+    for( int i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
+        if( src[i]->effect_id <= 0 )
+            continue;
+        veejay_memcpy(v->global_chain->fx_chain[i], src[i], sizeof(sample_eff_chain));
+        v->global_chain->fx_chain[i]->fx_instance = NULL;
+        v->global_chain->fx_chain[i]->kf = NULL;
+        fx ++;
+    }
+
+    if(fx > 0 ) {
+        veejay_msg(VEEJAY_MSG_INFO, "Copied %dx FX to render as global FX chain",fx,args[0]);
+        v->global_chain->enabled = enabled;
+    }
+}
+
+void vj_event_chain_global(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*) ptr;
+    int args[2];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+
+    SAMPLE_DEFAULTS(args[0]);
+    int enabled = args[1];
+
+    if(enabled < 0) enabled = 0;
+    if(enabled > 2) enabled = 2;
     
-    if(enabled > 0) {
-        for( int i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
-            if( src[i]->effect_id <= 0 )
-                continue;
-            veejay_memcpy(v->global_chain->fx_chain[i], src[i], sizeof(sample_eff_chain));
-            v->global_chain->fx_chain[i]->fx_instance = NULL;
-            v->global_chain->fx_chain[i]->kf = NULL;
-        }
-        veejay_msg(VEEJAY_MSG_INFO, "Copied FX chain of sample %d to render as global FX chain",args[0]);
-    }
-    else {
-        for( int i  = 0 ; i < SAMPLE_MAX_EFFECTS; i ++ ) {
-            vj_event_chain_global_reset(v->global_chain->fx_chain);
-            veejay_memset(v->global_chain->fx_chain[i], 0, sizeof(sample_eff_chain));
-        }
-        veejay_msg(VEEJAY_MSG_INFO, "Copied FX chain of stream %d to render as global FX chain",args[1]);
-    }
+    v->global_chain->enabled = enabled;
+
+    veejay_msg(VEEJAY_MSG_DEBUG, "Global FX Chain is %s" , (enabled ? "enabled" : "disabled"));
 }
 
 void    vj_event_chain_fade_follow(void *ptr, const char format[], va_list ap )
@@ -9245,7 +9258,7 @@ void vj_event_send_video_information(void *ptr, const char format[], va_list ap)
 
     char info_msg[150];
     snprintf(info_msg, sizeof(info_msg),
-             "%04d %04d %01d %d %02.3f %1d %04d %06ld %02d %03ld %08ld %1d %1d %1d",
+             "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d",
              el->video_width,
              el->video_height,
              el->video_inter,

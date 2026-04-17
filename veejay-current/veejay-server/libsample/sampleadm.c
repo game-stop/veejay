@@ -1478,48 +1478,34 @@ int sample_get_selected_entry(int s1)
     return sample->selected_entry;
 }   
 
-int sample_get_all_effect_arg(int s1, int position, int *args, int arg_len, int n_frame)
+int sample_get_all_effect_arg(sample_eff_chain *entry, int *args, int arg_len, int n_frame)
 {
-    int i;
-    sample_info *sample;
-    sample = sample_get(s1);
-    if( arg_len == 0)
-        return 1;
-
-    if (!sample)
-        return 0;
-
-    if (position >= SAMPLE_MAX_EFFECTS)
-        return 0;
-    if (arg_len < 0 || arg_len > SAMPLE_MAX_PARAMETERS)
-        return 0;
-
-    if( sample->effect_chain[position]->kf )
+    if( entry->kf )
     {
-     for( i = 0; i < arg_len; i ++ )
+     for( int i = 0; i < arg_len; i ++ )
      {
-        if( sample->effect_chain[position]->kf_status ) {
+        if( entry->kf_status ) {
             int tmp = 0;
-            if(!get_keyframe_value( sample->effect_chain[position]->kf, n_frame, i, &tmp ) ) {
-                args[i] = sample->effect_chain[position]->arg[i];
+            if(get_keyframe_value( entry->kf, n_frame, i, &tmp )) {
+                args[i] = tmp;
             }
             else {
-                args[i] = tmp;
+                args[i] = entry->arg[i];
             }
         }
         else {
-            args[i] = sample->effect_chain[position]->arg[i];
+            args[i] = entry->arg[i];
         }
      }
     }
     else
     {
 #pragma omp simd
-     for (i = 0; i < arg_len; i++) {
-        args[i] = sample->effect_chain[position]->arg[i];
+     for (int i = 0; i < arg_len; i++) {
+        args[i] = entry->arg[i];
         }
     }
-    return i;
+    return 1;
 }
 
 /********************************************
@@ -2497,7 +2483,9 @@ int sample_set_editlist(int s1, editlist *edl)
     return 1;
 }
 
-int sample_chain_sprint_status( int s1,int tags,int sample_count,int cache,int sa,int ca, int pfps, int frame, int mode,int total_slots, int seq_rec,int curfps, uint32_t lo, uint32_t hi,int macro,char *str, int feedback )
+int sample_chain_sprint_status( int s1,int tags,int sample_count,int cache,int sa,int ca, 
+    int pfps, int frame, int mode,int total_slots, int seq_rec,int curfps, 
+    uint32_t lo, uint32_t hi,int macro,char *str, int feedback, int global_fx )
 {
     sample_info *sample;
     sample = sample_get(s1);
@@ -2559,7 +2547,7 @@ int sample_chain_sprint_status( int s1,int tags,int sample_count,int cache,int s
     ptr = vj_sprintf( ptr, sample->transition_shape);
     ptr = vj_sprintf( ptr, feedback);
     ptr = vj_sprintf( ptr, tags ); // 36
-
+    ptr = vj_sprintf( ptr, global_fx ); //37
     return 0;
 }
 

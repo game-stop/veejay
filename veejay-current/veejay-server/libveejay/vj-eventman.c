@@ -784,11 +784,11 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				NULL );
 
-	index_map_[VIMS_GLOBAL_CHAIN]			= 	_new_event(
+	index_map_[VIMS_GLOBAL_CHAIN_COPY]			= 	_new_event(
 				"%d %d",
-				VIMS_GLOBAL_CHAIN,
-				"Enable/Disable FX chain as Global FX Chain",
-				vj_event_chain_global,
+				VIMS_GLOBAL_CHAIN_COPY,
+				"Copy FX chain to global chain",
+				vj_event_chain_global_copy,
 				2,
 				VIMS_ALLOW_ANY,
 				SAMPLE_STREAM_ID_HELP,
@@ -796,6 +796,19 @@ void		vj_init_vevo_events(void)
 				"Status (0=off,1=on)",
 				1,
 				NULL );
+	
+	index_map_[VIMS_GLOBAL_CHAIN]			= 	_new_event(
+				"%d %d",
+				VIMS_GLOBAL_CHAIN,
+				"Render global chain after/before FX chain",
+				vj_event_chain_global,
+				2,
+				VIMS_ALLOW_ANY,
+				SAMPLE_STREAM_ID_HELP,
+				0,
+				"Status (0=off,1=on)",
+				1,
+				NULL );			
 
 	index_map_[VIMS_SAMPLE_KF_STATUS_PARAM]		=	_new_event(
 				"%d %d %d %d",

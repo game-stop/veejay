@@ -28,7 +28,7 @@
 
 int	status_to_arr( char *status, int *array )
 {
-	return sscanf(status, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+	return sscanf(status, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		array + 0,
 		array + 1,
 		array + 2,
@@ -65,7 +65,8 @@ int	status_to_arr( char *status, int *array )
         array + 33,
         array + 34,
         array + 35,
-        array + 36
+        array + 36,
+		array + 37
     );
 }
 

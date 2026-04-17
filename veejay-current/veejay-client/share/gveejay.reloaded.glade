@@ -18297,7 +18297,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                         <property name="receives-default">True</property>
                                                         <property name="has-tooltip">True</property>
                                                         <property name="tooltip-text" translatable="yes">Toggle rendering of FX chain on mixing sources</property>
-                                                        <property name="margin-left">20</property>
+                                                        <property name="margin-left">4</property>
                                                         <signal name="toggled" handler="on_subrender_toggled" swapped="no"/>
                                                         <child>
                                                           <object class="GtkImage" id="image18">
@@ -18342,7 +18342,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                         <property name="receives-default">True</property>
                                                         <property name="has-tooltip">True</property>
                                                         <property name="tooltip-text" translatable="yes">Clear Chain</property>
-                                                        <property name="margin-left">20</property>
+                                                        <property name="margin-left">4</property>
                                                         <signal name="clicked" handler="on_button_fx_clearchain_clicked" swapped="no"/>
                                                         <child>
                                                           <object class="GtkImage" id="image162">
@@ -18364,7 +18364,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                         <property name="can-focus">True</property>
                                                         <property name="receives-default">True</property>
                                                         <property name="tooltip-text" translatable="yes">Enable/disable effectchain</property>
-                                                        <property name="margin-right">20</property>
+                                                        <property name="margin-right">4</property>
                                                         <signal name="toggled" handler="on_chain_togglechain_toggled" swapped="no"/>
                                                         <child>
                                                           <object class="GtkImage" id="image61">
@@ -18381,21 +18381,82 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                       </packing>
                                                     </child>
                                                     <child>
-                                                      <placeholder/>
+                                                      <object class="GtkButton" id="chain_copyglobalchain">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Copy FX chain to Global Chain</property>
+                                                        <property name="margin-right">2</property>
+                                                        <signal name="clicked" handler="on_button_globalchaincopy_clicked" swapped="no"/>
+                                                        <child>
+                                                          <object class="GtkImage" id="image_copyglobalchain">
+                                                            <property name="visible">True</property>
+                                                            <property name="can-focus">False</property>
+                                                            <property name="pixbuf">icon_copyglobalchain.png</property>
+                                                          </object>
+                                                        </child>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">9</property>
+                                                      </packing>
                                                     </child>
                                                     <child>
-                                                      <placeholder/>
+                                                      <object class="GtkToggleButton" id="chain_toggleglobalchain">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">True</property>
+                                                        <property name="active">False</property>
+                                                        <property name="tooltip-text" translatable="yes">Enable/Clear Global Chain</property>
+                                                        <property name="margin-right">2</property>
+                                                        <signal name="toggled" handler="on_globalchain_toggled" swapped="no"/>
+                                                        <child>
+                                                          <object class="GtkImage" id="image_toggleglobalchain">
+                                                            <property name="visible">True</property>
+                                                            <property name="can-focus">False</property>
+                                                            <property name="pixbuf">icon_toggleglobalchain.png</property>
+                                                          </object>
+                                                        </child>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">10</property>
+                                                      </packing>
+                                                    </child>
+                                                    <child>
+                                                      <object class="GtkToggleButton" id="chain_globalchainlevel">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">True</property>
+                                                        <property name="active">False</property>
+                                                        <property name="tooltip-text" translatable="yes">Before/After FX Chain</property>
+                                                        <property name="margin-right">2</property>
+                                                        <signal name="toggled" handler="on_globalchainlevel_toggled" swapped="no"/>
+                                                        <child>
+                                                          <object class="GtkImage" id="image_toggleglobalchainlevel">
+                                                            <property name="visible">True</property>
+                                                            <property name="can-focus">False</property>
+                                                            <property name="pixbuf">icon_toggleglobalchainlevel.png</property>
+                                                          </object>
+                                                        </child>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">11</property>
+                                                      </packing>
                                                     </child>
                                                     <child>
                                                       <object class="GtkLabel" id="label36">
                                                         <property name="visible">True</property>
                                                         <property name="can-focus">False</property>
-                                                        <property name="label" translatable="yes">FX entry</property>
                                                       </object>
                                                       <packing>
                                                         <property name="expand">True</property>
                                                         <property name="fill">True</property>
-                                                        <property name="position">11</property>
+                                                        <property name="position">12</property>
                                                       </packing>
                                                     </child>
                                                     <child>

@@ -105,4 +105,7 @@ void vj_produce_audio_chain(veejay_t *info, int sample_id);
 void vj_audio_consume_chain(veejay_t *info, uint8_t *audio_chunk, int num_samples);
 
 long vj_calc_next_subframe(veejay_t *info, int b);
+
+void vj_perform_global_chain_reset(veejay_t *info);
+
 #endif

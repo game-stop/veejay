@@ -2382,46 +2382,33 @@ int vj_tag_set_chain_status(int t1, int position, int status)
     return 1;
 }
 
-int vj_tag_get_all_effect_args(int t1, int position, int *args,
-                   int arg_len, int n_frame)
+int vj_tag_get_all_effect_args(sample_eff_chain *entry, int *args, int arg_len, int n_frame)
 {
-    int i = 0;
-    vj_tag *tag = vj_tag_get(t1);
-    if (!tag)
-        return 0;
-    if (arg_len == 0 )
-        return 1;
-    if (!args)
-        return 0;
-    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
-        return 0;
-    if (arg_len < 0 || arg_len > SAMPLE_MAX_PARAMETERS)
-        return 0;
-
-    if( tag->effect_chain[position]->kf_status )
+    if( entry->kf )
     {
-        for( i =0;i <arg_len; i ++ )
-        {
-            if( tag->effect_chain[position]->kf_status) {
-                int tmp = 0;
-                if(!get_keyframe_value( tag->effect_chain[position]->kf, n_frame, i ,&tmp ) )
-                    args[i] = tag->effect_chain[position]->arg[i];
-                else {
-                    args[i] = tmp;
-                }
+     for( int i = 0; i < arg_len; i ++ )
+     {
+        if( entry->kf_status ) {
+            int tmp = 0;
+            if(get_keyframe_value( entry->kf, n_frame, i, &tmp )) {
+                args[i] = tmp;
             }
             else {
-                args[i] = tag->effect_chain[position]->arg[i];
+                args[i] = entry->arg[i];
             }
         }
+        else {
+            args[i] = entry->arg[i];
+        }
+     }
     }
     else
     {
 #pragma omp simd
-        for( i = 0; i < arg_len; i ++ )
-            args[i] = tag->effect_chain[position]->arg[i];
+     for (int i = 0; i < arg_len; i++) {
+        args[i] = entry->arg[i];
+        }
     }
-
     return 1;
 }
 
@@ -3797,7 +3784,8 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
     return 1;
 }
 
-int vj_tag_sprint_status( int tag_id,int tag_count, int samples,int cache,int sa, int ca, int pfps,int frame,int mode,int ts,int seq_rec, int curfps, uint32_t lo, uint32_t hi, int macro, char *str, int feedback )
+int vj_tag_sprint_status( int tag_id,int tag_count, int samples,int cache,int sa, int ca, int pfps,
+    int frame,int mode,int ts,int seq_rec, int curfps, uint32_t lo, uint32_t hi, int macro, char *str, int feedback, int global_fx )
 {
     vj_tag *tag;
     tag = vj_tag_get(tag_id);
@@ -3860,7 +3848,7 @@ int vj_tag_sprint_status( int tag_id,int tag_count, int samples,int cache,int sa
     ptr = vj_sprintf( ptr, tag->transition_shape); // 34
     ptr = vj_sprintf( ptr, feedback ); // 35
     ptr = vj_sprintf( ptr, tag_count ); // 36
-
+    ptr = vj_sprintf( ptr, global_fx );
     return 0;
 }
 

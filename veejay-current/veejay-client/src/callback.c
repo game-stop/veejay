@@ -1857,6 +1857,44 @@ void on_chain_togglechain_toggled( GtkWidget *widget, gpointer user_data)
     }
 }
 
+void on_button_globalchaincopy_clicked( GtkWidget *widget, gpointer user_data) {
+	int after = gtk_toggle_button_get_active(
+        GTK_TOGGLE_BUTTON(widget_cache[WIDGET_GLOBALCHAINLEVEL])
+    );
+
+	multi_vims( VIMS_GLOBAL_CHAIN_COPY, "%d %d", 0, 1 + after);
+	vj_msg(VEEJAY_MSG_INFO,"Copied current playing FX chain to Global Chain");
+}
+
+void on_globalchain_toggled(GtkWidget *widget, gpointer user_data)
+{
+    if (!info->status_lock)
+    {
+        int state = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+
+        multi_vims(VIMS_GLOBAL_CHAIN, "%d %d", 0, state);
+
+        vj_msg(VEEJAY_MSG_INFO,
+               "Global FX chain is %s",
+               (state == 0 ? "Disabled" :
+               (state == 1 ? "Enabled (Before)" : "Enabled (After)")));
+    }
+}
+
+void on_globalchainlevel_toggled(GtkWidget *widget, gpointer user_data)
+{
+    if (!info->status_lock)
+    {
+		int state = 1 + gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget));
+		
+        multi_vims(VIMS_GLOBAL_CHAIN, "%d %d", 0, state);
+
+        vj_msg(VEEJAY_MSG_INFO,
+               "Global FX chain position: %s",
+               (state == 2 ? "After FX Chain" : "Before FX Chain"));
+    }
+}
+
 void	on_loop_none_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)

@@ -67,6 +67,8 @@
 #include <libvje/effects/shapewipe.h>
 #include <libqrwrap/qrwrapper.h>
 #include <libveejay/vj-split.h>
+#include <libveejay/vjkf.h>
+#include <veejaycore/libvevo.h>
 #include <libvje/libvje.h>
 #ifdef HAVE_JACK
 #include <libveejay/audioscratcher.h>
@@ -1448,28 +1450,33 @@ void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )
 static void vj_perform_apply_first(veejay_t *info,performer_t *p, vjp_kf *todo_info,
     VJFrame **frames, sample_eff_chain *entry, int e , int c, long long n_frame, void *ptr, int playmode) 
 {
-    int args[SAMPLE_MAX_PARAMETERS];
-    int n_a = 0;
+    int n_params = 0;
     int is_mixer = 0;
     int rgb = 0;
-    
-    if(!vje_get_info( e, &is_mixer, &n_a, &rgb)) {
+
+    if(entry == NULL || !vje_get_info( e, &is_mixer, &n_params, &rgb)) {
         return;
     }
 
-    veejay_memset( args, 0 , sizeof(args) );
-    
-    if( playmode == VJ_PLAYBACK_MODE_TAG )
+    if(n_params > SAMPLE_MAX_PARAMETERS) {
+        veejay_msg(VEEJAY_MSG_WARNING, "FX %d has more than %d parameters", SAMPLE_MAX_PARAMETERS);
+        n_params = SAMPLE_MAX_PARAMETERS;
+    }
+
+    int args[SAMPLE_MAX_PARAMETERS];
+    veejay_memset(args,0,sizeof(args));
+
+    if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
     {
-        if(!vj_tag_get_all_effect_args(todo_info->ref, c, args, n_a, n_frame ))
+        if(!vj_tag_get_all_effect_args(entry, args, n_params, (int) n_frame))
             return;
     }
     else
     {
-        if(!sample_get_all_effect_arg( todo_info->ref, c, args, n_a, n_frame))
+        if(!sample_get_all_effect_arg(entry, args, n_params, (int) n_frame))
             return;
     }
-
+    
     if( rgb ) {
         p->yuva_frame[0]->data[0] = frames[0]->data[0];
         p->yuva_frame[0]->data[1] = frames[0]->data[1];
@@ -2473,6 +2480,68 @@ static void vj_perform_render_chain_entry(veejay_t *info,performer_t *p, vjp_kf 
     }
 
 }
+
+void vj_perform_global_chain_reset(veejay_t *info) {
+    global_chain_t *g = info->global_chain;
+    sample_eff_chain **gfx = g->fx_chain;
+
+    if(gfx == NULL)
+        return;
+
+    for(int chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry++)
+    {
+        if(gfx[chain_entry]->kf) {
+            vpf(gfx[chain_entry]->kf);
+            gfx[chain_entry]->kf = NULL;
+            gfx[chain_entry]->kf_type = 0;
+            gfx[chain_entry]->kf_status = 0;
+            veejay_msg(VEEJAY_MSG_DEBUG, "Global KF reset");
+        }
+    }
+}
+
+static void vj_perform_global_chain_sync(veejay_t *info, global_chain_t *g_chain) {
+    int pm = info->uc->playback_mode;
+    int id = info->uc->sample_id;
+    video_playback_setup *settings = info->settings;
+
+    if(!g_chain->enabled)
+        return;
+
+    sample_eff_chain **origin = (g_chain->origin_mode == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_effect_chain(g_chain->origin_id) :
+                                (g_chain->origin_mode == VJ_PLAYBACK_MODE_TAG ? vj_tag_get_effect_chain(g_chain->origin_id) : NULL ));
+    if(origin == NULL) {
+        return; // no keyframes
+    }
+
+    if(g_chain->origin_id == id && g_chain->origin_mode == pm )
+        return;
+
+    sample_eff_chain **gfx = g_chain->fx_chain;
+
+    for(int chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry++)
+    {
+        if(gfx[chain_entry]->effect_id <= 0) {
+            continue;
+        }
+
+        if(gfx[chain_entry]->kf) {
+            continue;
+        }
+
+        if(origin[chain_entry]->kf && origin[chain_entry]->kf_status) {
+            int frame_len = settings->max_frame_num - settings->min_frame_num;
+            void *new_kf = keyframe_port_clone_and_resize( origin[chain_entry]->kf, frame_len);
+            if(new_kf) {
+                gfx[chain_entry]->kf = new_kf;
+                gfx[chain_entry]->kf_status = 1;
+                gfx[chain_entry]->kf_type = origin[chain_entry]->kf_type;
+                veejay_msg(VEEJAY_MSG_DEBUG, "Resampled KF to new length of %d frames", frame_len);
+            }
+        }
+    }
+}
+
 
 static void vj_perform_sample_complete_buffers(veejay_t * info,performer_t *p, vjp_kf *effect_info, int *hint444, 
     VJFrame *f0, VJFrame *f1, int sample_id, int pm, vjp_kf *setup, sample_eff_chain **chain, sample_info *si)
@@ -4764,10 +4833,12 @@ void vj_perform_render_video_frames(veejay_t *info, performer_t *p, vjp_kf *effe
             
             sample_info *si = sample_get(sample_id);
             if(si) {
-                if( info->global_chain->enabled == 1) { // FIXME: global chain rendered but not in output
+                if( info->global_chain->enabled == 1) { 
                     if(p->pvar_.fx_status) vj_perform_sample_complete_buffers(info,p, effect_info, &is444, a, b, sample_id, source_type,setup, si->effect_chain, si);
+                    vj_perform_global_chain_sync(info, info->global_chain);
                     vj_perform_sample_complete_buffers(info,p, effect_info, &is444, a, b, sample_id, source_type, setup,info->global_chain->fx_chain, si);
                 } else if(info->global_chain->enabled == 2) {
+                    vj_perform_global_chain_sync(info, info->global_chain);
                     vj_perform_sample_complete_buffers(info,p, effect_info, &is444, a, b, sample_id, source_type, setup,info->global_chain->fx_chain, si);
                     if(p->pvar_.fx_status) vj_perform_sample_complete_buffers(info,p, effect_info, &is444, a, b, sample_id, source_type,setup, si->effect_chain, si);
                 } else {
@@ -4806,9 +4877,11 @@ void vj_perform_render_video_frames(veejay_t *info, performer_t *p, vjp_kf *effe
             if(tag) {
                 if( info->global_chain->enabled == 1) {
                     if(p->pvar_.fx_status ) vj_perform_tag_complete_buffers(info,p, effect_info, &is444, a, b, sample_id, source_type, setup,tag->effect_chain, tag);
+                    vj_perform_global_chain_sync(info, info->global_chain);
                     vj_perform_tag_complete_buffers(info,p, effect_info, &is444, a, b, sample_id, source_type, setup,info->global_chain->fx_chain, tag);
 
                 } else if(info->global_chain->enabled == 2) {
+                    vj_perform_global_chain_sync(info, info->global_chain);
                     vj_perform_tag_complete_buffers(info,p, effect_info, &is444, a, b, sample_id, source_type, setup,info->global_chain->fx_chain, tag);
                     if(p->pvar_.fx_status ) vj_perform_tag_complete_buffers(info,p, effect_info, &is444, a, b, sample_id, source_type, setup,tag->effect_chain, tag);
                 } else {

@@ -224,8 +224,7 @@ int 	vj_tag_set_chain_status(int t1, int position, int new_status);
 /* return -1 on error or 1 on sucess. tag's effect parameters get copied into args
    args must be initialized.
  */
-int 	vj_tag_get_all_effect_args(int t1, int position, int *args,
-			       int arg_len, int n_frame);
+int vj_tag_get_all_effect_args(sample_eff_chain *entry, int *args, int arg_len, int n_frame);
 
 int 	vj_tag_get_effect_arg(int t1, int p, int arg);
 
@@ -283,7 +282,8 @@ int 	vj_tag_enable(int t1);
 
 int 	vj_tag_disable(int t1);
 
-int		vj_tag_sprint_status(int tag_id, int tags,int sample_count, int cache,int sa, int ca, int r, int f, int m, int t,int seq_rec_id, int curfps, uint32_t lo, uint32_t hi, int macro,char *str, int feedback );
+int		vj_tag_sprint_status(int tag_id, int tags,int sample_count, int cache,int sa, int ca, 
+    int r, int f, int m, int t,int seq_rec_id, int curfps, uint32_t lo, uint32_t hi, int macro,char *str, int feedback, int global_fx );
 
 uint8_t		*vj_tag_get_cali_buffer(int t1, int type, int *total, int *len, int *uvlen);
 int	vj_tag_generator_set_arg(int t1, int *values);

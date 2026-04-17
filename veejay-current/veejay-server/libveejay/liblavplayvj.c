@@ -843,6 +843,8 @@ int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 
     veejay_set_speed(info, speed,1);
 
+	vj_perform_global_chain_reset(info);
+
 	veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (Slow: %d, Speed: %d, Start: %d, End: %d, Looptype: %d, Current position: %d)",
 			sample_id, info->sfd, speed, start, end, looptype, info->settings->current_frame_num
             );
@@ -876,6 +878,8 @@ static int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 
     vj_tag_set_loop_stats( stream_id, 0 );
     vj_tag_set_loops( stream_id, -1 );
+
+	vj_perform_global_chain_reset(info);
 	
 	return 1;
 }
@@ -1356,7 +1360,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 		if( sample_chain_sprint_status(
 			info->uc->sample_id,tag_count,sample_count,cache_used,info->seq->size,seq_cur,info->real_fps,
 			settings->current_frame_num, pm, total_slots,info->seq->rec_id,curfps,
-			settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what, settings->feedback ) != 0)
+			settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what, settings->feedback,info->global_chain->enabled ) != 0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Fatal error, tried to collect properties of invalid sample");
 			veejay_change_state( info, LAVPLAY_STATE_STOP );
@@ -1400,6 +1404,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 
                 ptr = vj_sprintf( ptr, settings->feedback); // 35
                 ptr = vj_sprintf( ptr, tag_count); // 36
+				ptr = vj_sprintf( ptr, info->global_chain->enabled); // 37
                 
             }
         break;
@@ -1409,7 +1414,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 
 		if( vj_tag_sprint_status( info->uc->sample_id,tag_count,sample_count,cache_used,info->seq->size,seq_cur,info->real_fps,
 			settings->current_frame_num, info->uc->playback_mode,total_slots,info->seq->rec_id,curfps,
-			settings->cycle_count[0],settings->cycle_count[1],mstatus, info->status_what, settings->feedback ) != 0 )
+			settings->cycle_count[0],settings->cycle_count[1],mstatus, info->status_what, settings->feedback,info->global_chain->enabled ) != 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status");
 		}

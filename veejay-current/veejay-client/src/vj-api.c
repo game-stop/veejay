@@ -348,7 +348,10 @@ enum {
   WIDGET_OFFLINE_START_SAMPLE = 245,
   WIDGET_BUFFEREDSTREAMID = 246,
   WIDGET_BUFFEREDSTREAMLENGTH = 247,
-  WIDGET_GLOBAL_TRANSITIONS_TOGGLE = 248
+  WIDGET_GLOBAL_TRANSITIONS_TOGGLE = 248,
+  WIDGET_GLOBALCHAINTOGGLE = 249,
+  WIDGET_GLOBALCHAINCOPY = 250,
+  WIDGET_GLOBALCHAINLEVEL = 251,
 };
 
 
@@ -750,6 +753,9 @@ static struct
     { "spin_bufferedstreamid",       WIDGET_BUFFEREDSTREAMID },
     { "spin_bufferedstreamlength",   WIDGET_BUFFEREDSTREAMLENGTH },
     { "toggle_transitions", WIDGET_GLOBAL_TRANSITIONS_TOGGLE},
+    { "chain_toggleglobalchain", WIDGET_GLOBALCHAINTOGGLE },
+    { "chain_copyglobalchain", WIDGET_GLOBALCHAINCOPY },
+    { "chain_globalchainlevel", WIDGET_GLOBALCHAINLEVEL},
     { NULL, -1 },
 };
 
@@ -1331,7 +1337,7 @@ static void load_effectlist_info(void);
 static void load_sequence_list(void);
 static void load_generator_info(void);
 static void load_samplelist_info(void);
-static void load_editlist_info(void);
+static int load_editlist_info(void);
 static void set_pm_page_label(int sample_id, int type);
 static void notebook_set_page(const char *name, int page);
 static void hide_widget(const char *name);
@@ -2378,6 +2384,22 @@ static void clear_progress_bar( const char *name, gdouble val )
 {
     GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
     gtk_progress_bar_set_fraction( GTK_PROGRESS_BAR(w), val );
+}
+
+static int get_global_chain_state(void)
+{
+    int enabled = gtk_toggle_button_get_active(
+        GTK_TOGGLE_BUTTON(widget_cache[WIDGET_GLOBALCHAINTOGGLE])
+    );
+
+    int after = gtk_toggle_button_get_active(
+        GTK_TOGGLE_BUTTON(widget_cache[WIDGET_GLOBALCHAINLEVEL])
+    );
+
+    if (!enabled)
+        return 0;
+
+    return after ? 2 : 1;
 }
 
 static struct
@@ -6822,7 +6844,7 @@ cleanup:
 }
 
 // execute after el change:
-static void load_editlist_info(void)
+static int load_editlist_info(void)
 {
     float fps;
     int values[10] = { 0 };
@@ -6839,7 +6861,7 @@ static void load_editlist_info(void)
 #ifdef STRICT_CHECKING
         assert(len > 0 && res != NULL);
 #endif
-        return;
+        return 0;
     }
     int got_n = sscanf(res, "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d",
        &values[0], &values[1], &values[2], &values[3], &fps,
@@ -6849,7 +6871,7 @@ static void load_editlist_info(void)
     if( got_n != 14 ) {
         veejay_msg(VEEJAY_MSG_ERROR, "Parsing failed: expected 14, got %d. Data: %s", got_n, res);
         free(res);
-        return;
+        return 0;
     }
 
     info->el.width = values[0];
@@ -6857,6 +6879,12 @@ static void load_editlist_info(void)
     info->el.num_frames = dum[1];
     info->el.fps = fps;
     info->el.num_files = dum[0];
+
+    if(info->el.fps <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid FPS %f", fps);
+        free(res);
+        return 0;
+    }
 
     const char *norm_str = "Digital";
     switch(values[3]) {
@@ -6913,6 +6941,8 @@ static void load_editlist_info(void)
     }
 
     free(res);
+
+    return 1;
 }
 
 static void notebook_set_page(const char *name, int page)
@@ -7495,6 +7525,17 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         }
     }
 
+    if (info->status_tokens[GLOBAL_CHAIN] != history[GLOBAL_CHAIN])
+    {
+        int state = info->status_tokens[GLOBAL_CHAIN];
+        int enabled = (state != 0);
+        int after   = (state == 2);
+
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_GLOBALCHAINTOGGLE]),enabled);
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_GLOBALCHAINLEVEL]),after);
+        gtk_widget_set_sensitive( widget_cache[WIDGET_GLOBALCHAINLEVEL], enabled );
+    }
+
     if( (pm == MODE_SAMPLE || pm == MODE_STREAM ) && info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] ) {
         info->uc.selected_chain_entry = info->status_tokens[CURRENT_ENTRY];
         select_chain_entry(info->uc.selected_chain_entry);
@@ -7877,8 +7918,9 @@ static void process_reload_hints(int *history, int pm)
 
     if( info->uc.reload_hint[HINT_EL] )
     {
-        load_editlist_info();
-        reload_editlist_contents();
+        if(load_editlist_info()) {
+            reload_editlist_contents();
+        }
     }
 
     if( info->uc.reload_hint[HINT_SLIST] )

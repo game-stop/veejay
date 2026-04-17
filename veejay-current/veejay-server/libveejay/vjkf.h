@@ -38,4 +38,7 @@ int get_keyframe_value(void *port, long long n_frame, int parameter_id, int *res
 int keyframe_get_param_status( int lookup, int fx_entry, int parameter_id, int is_sample );
 
 void keyframe_set_param_status( int lookup, int fx_entry, int parameter_id, int status, int is_sample );
+
+void *keyframe_port_clone_and_resize(void *src_port, int new_len);
+
 #endif

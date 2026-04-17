@@ -281,8 +281,7 @@ extern int sample_get_chain_status(int s1, int position);
 extern int sample_get_effect_arg(int s1, int position, int argnr);
 extern int sample_set_effect_arg(int s1, int position, int argnr, int value);
 
-extern int sample_get_all_effect_arg(int s1, int position, int *args,
-			      int arg_len, int n_elapsed);
+extern int sample_get_all_effect_arg(sample_eff_chain *entry, int *args, int arg_len, int n_frame);
 extern int sample_chain_remove(int s1, int position);
 extern int sample_chain_clear(int s1);
 extern int sample_chain_size(int s1);
@@ -294,7 +293,9 @@ extern int sample_get_chain_channel(int s1, int position);
 extern int sample_set_chain_channel(int s1, int position, int channel);
 extern int sample_get_long_info(int sample_id, int *start, int *end, int *loop, int *speed, int *cur_sfd, int *max_sfd);
 
-extern int sample_chain_sprint_status(int s1,int tags,int sample_count,int cache,int sa,int ca, int r, int f, int m, int t,int sr,int curfps,uint32_t lo, uint32_t hi, int macro,char *s, int feedback );
+extern int sample_chain_sprint_status(int s1,int tags,int sample_count,int cache,int sa,
+    int ca, int r, int f, int m, int t,int sr,int curfps,
+    uint32_t lo, uint32_t hi, int macro,char *s, int feedback, int global_fx );
 
 extern int sample_set_render_entry(int s1, int entry);
 extern int sample_get_render_entry(int s1);
