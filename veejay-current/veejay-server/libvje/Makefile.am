@@ -234,4 +234,5 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/fractalkaleido.c \
     effects/charcoalsketch.c \
     effects/integralblur.c \
-    effects/tunnel.c
+    effects/tunnel.c \
+    effects/chromaticdrift.c

@@ -148,6 +148,7 @@ static struct {
     { tiler_init,tiler_malloc,tiler_free,NULL,NULL,tiler_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_TILER },
     { boxfit_init,boxfit_malloc,boxfit_free,NULL,NULL,boxfit_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BOXFIT },
     { alienchromaflow_init,alienchromaflow_malloc,alienchromaflow_free,NULL,NULL,alienchromaflow_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_CIRCLEFIT },
+    { chromaticdrift_init,chromaticdrift_malloc,chromaticdrift_free,NULL,NULL,chromaticdrift_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_CHROMATICDRIFT },
     { chromawarp_init,chromawarp_malloc,chromawarp_free,NULL,NULL,chromawarp_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BALLOONFIT },
     { warppers_init,warppers_malloc,warppers_free,NULL,NULL,warppers_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_WARPPERS },
     { spherize_init,spherize_malloc,spherize_free,NULL,NULL,spherize_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SPHERIZE },
