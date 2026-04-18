@@ -54,7 +54,7 @@
  * // DROP FRAME / 23.976fps (no any standard)
  ***************************************************************/
 
-int dropframetimecode = -1;
+static int dropframetimecode = -1;
 
 /* mpeg_timecode() return -tc->f on first frame in the minute, tc->f on other. */
 int

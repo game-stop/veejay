@@ -181,6 +181,18 @@ static VJFrame *el_out_ = NULL;
 
 static int require_same_resolution = 0;
 
+static int should_enable_drop_frame_timecode(float fps)
+{
+    float corrected = fps * 1001.0f / 1000.0f;
+
+    return (
+        fabs(fps - 29.97f) < 0.01f ||
+        fabs(fps - 59.94f) < 0.01f ||
+        fabs(fps - 119.88) < 0.01f ||
+        fabs(fps - 23.976f) < 0.01f
+    );
+}
+
 void	vj_el_init(int pf, int switch_jpeg, int dw, int dh, float fps)
 {
 	el_pixel_format_org = pf;
@@ -211,6 +223,13 @@ void	vj_el_init(int pf, int switch_jpeg, int dw, int dh, float fps)
 		require_same_resolution = 1;
 	}
 
+	if(should_enable_drop_frame_timecode(fps)) {
+        setenv("MJPEG_DROP_FRAME_TIME_CODE", "1",1 );
+		veejay_msg(VEEJAY_MSG_INFO, "Drop-frame ENABLED (%f) fps correction active", fps);
+    } else {
+        setenv("MJPEG_DROP_FRAME_TIME_CODE", "0",1 );
+		veejay_msg(VEEJAY_MSG_INFO, "Timecode is linear (frame accurate)");
+    }
 
 	veejay_msg(VEEJAY_MSG_DEBUG,"Initialized EDL, processing video in %d x %d", el_width_, el_height_ );
 }

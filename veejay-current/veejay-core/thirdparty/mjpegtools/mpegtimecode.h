@@ -28,7 +28,6 @@ typedef struct {
   char h, m, s, f;
 } MPEG_timecode_t;
 
-extern int dropframetimecode;
 extern int mpeg_timecode(MPEG_timecode_t *tc, int f, int fpscode, double fps);
 /* mpeg_timecode() return -tc->f on first frame in the minute, tc->f on other. */
 

@@ -54,7 +54,7 @@
  * // DROP FRAME / 23.976fps (no any standard)
  ***************************************************************/
 
-int dropframetimecode = -1;
+static int dropframetimecode = -1;
 
 /* mpeg_timecode() return -tc->f on first frame in the minute, tc->f on other. */
 int
@@ -63,43 +63,77 @@ mpeg_timecode(MPEG_timecode_t *tc, int f, int fpscode, double fps)
   static const int ifpss[] = { 0, 24, 24, 25, 30, 30, 50, 60, 60, };
   int h, m, s;
 
+  int n_ifpss = (int)(sizeof ifpss / sizeof ifpss[0]);
+
   if (dropframetimecode < 0) {
     char *env = getenv("MJPEG_DROP_FRAME_TIME_CODE");
     dropframetimecode = (env && *env != '0' && *env != 'n' && *env != 'N');
   }
+
+  int safe_fpscode = fpscode;
+  if (safe_fpscode < 0 || safe_fpscode >= n_ifpss)
+    safe_fpscode = 0;
+
+  int ifps = ifpss[safe_fpscode];
+  if (ifps <= 0)
+    ifps = (int)(fps + 0.5);
+  if (ifps <= 0)
+    ifps = 30; /* final fallback to avoid FPE */
+
   if (dropframetimecode &&
-      0 < fpscode && fpscode + 1 < sizeof ifpss / sizeof ifpss[0] &&
-      ifpss[fpscode] == ifpss[fpscode + 1]) {
-    int topinmin = 0, k = (30*4) / ifpss[fpscode];
-    f *= k;			/* frame# when 119.88fps */
-    h = (f / ((10*60*30-18)*4)); /* # of 10min. */
-    f %= ((10*60*30-18)*4);	/* frame# in 10min. */
-    f -= (2*4);			/* frame# in 10min. - (2*4) */
-    m = (f / ((60*30-2)*4));	/* min. in 10min. */
+      safe_fpscode + 1 < n_ifpss &&
+      ifpss[safe_fpscode] == ifpss[safe_fpscode + 1] &&
+      ifpss[safe_fpscode] > 0)
+  {
+    int topinmin = 0;
+
+    int denom = ifpss[safe_fpscode];
+    if (denom <= 0)
+      denom = 30;
+
+    int k = (30 * 4) / denom;
+    if (k <= 0) k = 1; /* prevent division collapse */
+
+    f *= k;
+
+    h = (f / ((10*60*30-18)*4));
+    f %= ((10*60*30-18)*4);
+    f -= (2*4);
+
+    m = (f / ((60*30-2)*4));
     topinmin = ((f - k) / ((60*30-2)*4) < m);
-    m += (h % 6 * 10);		/* min. */
-    h /= 6;			/* hour */
-    f %= ((60*30-2)*4);		/* frame# in min. - (2*4)*/
-    f += (2*4);			/* frame# in min. */
-    s = f / (30*4);		/* sec. */
-    f %= (30*4);		/* frame# in sec. */
-    f /= k;			/* frame# in sec. on original fps */
+
+    m += (h % 6 * 10);
+    h /= 6;
+
+    f %= ((60*30-2)*4);
+    f += (2*4);
+
+    s = f / (30*4);
+    f %= (30*4);
+    f /= k;
+
     tc->f = f;
     if (topinmin)
       f = -f;
-  } else {
-    int ifps = ((0 < fpscode && fpscode < sizeof ifpss / sizeof ifpss[0])?
-		ifpss[fpscode]: (int)(fps + .5));
+  }
+  else
+  {
     s = f / ifps;
     f %= ifps;
+
     m = s / 60;
     s %= 60;
+
     h = m / 60;
     m %= 60;
+
     tc->f = f;
   }
+
   tc->s = s;
   tc->m = m;
   tc->h = h;
+
   return f;
 }

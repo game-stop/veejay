@@ -6859,6 +6859,18 @@ cleanup:
     free(eltext);
 }
 
+static int should_enable_drop_frame_timecode(float fps)
+{
+    float corrected = fps * 1001.0f / 1000.0f;
+
+    return (
+        fabs(fps - 29.97f) < 0.01f ||
+        fabs(fps - 59.94f) < 0.01f ||
+        fabs(fps - 119.88) < 0.01f ||
+        fabs(fps - 23.976f) < 0.01f
+    );
+}
+
 // execute after el change:
 static int load_editlist_info(void)
 {
@@ -6900,6 +6912,12 @@ static int load_editlist_info(void)
         veejay_msg(VEEJAY_MSG_ERROR, "Invalid FPS %f", fps);
         free(res);
         return 0;
+    }
+
+    if(should_enable_drop_frame_timecode(fps)) {
+        setenv("MJPEG_DROP_FRAME_TIME_CODE", "1",1 );
+    } else {
+        setenv("MJPEG_DROP_FRAME_TIME_CODE", "0",1 );
     }
 
     const char *norm_str = "Digital";
