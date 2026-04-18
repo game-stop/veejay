@@ -78,7 +78,7 @@ mpeg_timecode(MPEG_timecode_t *tc, int f, int fpscode, double fps)
   if (ifps <= 0)
     ifps = (int)(fps + 0.5);
   if (ifps <= 0)
-    ifps = 25; /* final fallback to avoid FPE */
+    ifps = 30; /* final fallback to avoid FPE */
 
   if (dropframetimecode &&
       safe_fpscode + 1 < n_ifpss &&
