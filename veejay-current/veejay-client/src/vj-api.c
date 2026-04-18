@@ -8370,7 +8370,7 @@ void vj_gui_set_stylesheet(const char *css_file, gboolean small_as_possible) {
         return;
     }
 
-    if(strncasecmp(css_file, "default",7) == 0 ) {
+    if(strncasecmp(css_file, "system",7) == 0 ) {
         veejay_msg(VEEJAY_MSG_INFO, "Using system default style %s", reloaded_css_file);
         use_css_file = 0;
         return;
