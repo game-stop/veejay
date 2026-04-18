@@ -1,4 +1,4 @@
-/* Gveejay Reloaded - graphical interface for VeeJay
+ /* Gveejay Reloaded - graphical interface for VeeJay
  *          (C) 2002-2004 Niels Elburg <nwelburg@gmail.com>
  *  with contributions by  Thomas Rheinhold (2005)
  *                        (initial sampledeck representation in GTK)
@@ -6183,6 +6183,13 @@ static void setup_vimslist(void)
                                          VIMS_ID, GTK_SORT_ASCENDING);
 }
 
+gboolean on_bundle_interactive_search(GtkTreeView *treeview,
+                                     gpointer user_data)
+{
+    return TRUE;
+}
+
+
 static void setup_bundles(void)
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_bundles");
@@ -6215,6 +6222,15 @@ static void setup_bundles(void)
     GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
     gtk_tree_selection_set_select_function(selection, view_bundle_selection_func, NULL, NULL);
     gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
+
+    gboolean kjdhfkj = gtk_tree_view_get_enable_search( GTK_TREE_VIEW(tree) );
+    guint sigjdf = g_signal_connect(tree,
+                     "start_interactive_search",
+                     (GCallback) on_bundle_interactive_search,
+                     NULL );
+    gtk_tree_view_set_enable_search( GTK_TREE_VIEW(tree) , TRUE);
+
+    kjdhfkj = gtk_tree_view_get_enable_search( GTK_TREE_VIEW(tree) );
 
     GtkWidget *tv = glade_xml_get_widget_( info->main_window, "vimsview" );
     gtk_text_view_set_wrap_mode( GTK_TEXT_VIEW(tv), GTK_WRAP_WORD_CHAR );
