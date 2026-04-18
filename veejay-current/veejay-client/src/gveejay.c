@@ -31,6 +31,7 @@
 #include <glib.h>
 
 #include <veejaycore/vevo.h>
+#include <veejaycore/core.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/libvevo.h>
@@ -147,6 +148,7 @@ gint vj_gui_command_line (GApplication            *app,
     if ( arg_version )
     {
         fprintf(stdout, "version : %s\n", PACKAGE_VERSION);
+        fprintf(stdout, "\tlinked against libveejaycore %s\n", veejay_core_build());
         fprintf(stdout, "data directory : %s\n", get_gveejay_dir());
         return EXIT_FAILURE;
     }
