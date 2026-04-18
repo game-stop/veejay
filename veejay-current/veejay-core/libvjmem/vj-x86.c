@@ -172,7 +172,11 @@ void vj_mem_init(int w, int h)
         veejay_msg(VEEJAY_MSG_DEBUG, "CPU Cache line detection failed, defaulting to 64");
     }
 #endif
+	int lim = w * h;
 
+    setenv("OMP_PROC_BIND", ( lim <= 414720? "close" : "spread"), 1);
+    setenv("OMP_PLACES", "cores", 1);
+    setenv("OMP_WAIT_POLICY", "active", 1);
 
 #if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE)
 	yuyv_plane_init();
