@@ -300,6 +300,7 @@ void	vj_event_toggle_osl( void *ptr, const char format[], va_list ap );
 void	vj_event_toggle_osd_extra(void *ptr, const char format[], va_list ap);
 #endif
 void	vj_event_get_image_part(void *ptr, const char format[], va_list ap);
+void    vj_event_color_vibrance(void *ptr, const char format[], va_list ap);
 void	vj_event_set_macro_status( void *ptr,	const char format[], va_list ap );
 void    vj_event_macro_clear_bank( void *ptr,   const char format[], va_list ap );
 void	vj_event_macro_get(void *ptr, const char format[], va_list ap);

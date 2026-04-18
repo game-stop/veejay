@@ -3425,6 +3425,7 @@ veejay_t *veejay_malloc()
     if (!(info->settings)) 
 		return NULL;
 	info->settings->fxdepth = 1; //@ default to on (VEEJAY_CLASSIC env turns it off)
+	info->settings->color_vibrance = 98;
 	
 	veejay_memset( &(info->settings->action_scheduler), 0, sizeof(vj_schedule_t));
     veejay_memset( &(info->settings->viewport ), 0, sizeof(VJRectangle)); 

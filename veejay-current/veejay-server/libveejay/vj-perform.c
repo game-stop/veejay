@@ -4914,7 +4914,53 @@ void vj_perform_render_video_frames(veejay_t *info, performer_t *p, vjp_kf *effe
         info->settings->feedback_stage = 2;
     }
 }
+#define FP_S    14
+#define FP_M    (1 << FP_S)
+#define FP_HALF (1 << (FP_S - 1))
 
+static void vj_perform_color_vibrancy1(uint8_t *U, uint8_t *V, const int len, int vib) {
+    uint8_t *restrict pu = U;
+    uint8_t *restrict pv = V;
+    const float gain = 0.50f + ((float)vib / 255.0f) * 1.30f;
+    const int32_t gain_fp = (int32_t)(gain * FP_M);
+
+    for (int i = 0; i < len; i++)
+    {
+        int u = pu[i] - 128;
+        int v = pv[i] - 128;
+
+        u = (u * gain_fp + FP_HALF) >> FP_S;
+        v = (v * gain_fp + FP_HALF) >> FP_S;
+
+        pu[i] = (uint8_t)(u + 128);
+        pv[i] = (uint8_t)(v + 128);
+    }
+}
+
+static void vj_perform_color_vibrancy(uint8_t *U, uint8_t *V, const int len, int vib)
+{
+    const float gain = 0.50f + ((float)vib / 255.0f) * 1.30f;
+    const int32_t gain_fp = (int32_t)(gain * FP_M);
+
+    // skip near-identity transform
+    const int32_t diff = (gain_fp > FP_M) ? (gain_fp - FP_M) : (FP_M - gain_fp);
+    if (diff < 164) return;
+
+    uint8_t *restrict pu = U;
+    uint8_t *restrict pv = V;
+
+    for (int i = 0; i < len; i++)
+    {
+        int u = pu[i] - 128;
+        int v = pv[i] - 128;
+
+        u = (u * gain_fp + FP_HALF) >> FP_S;
+        v = (v * gain_fp + FP_HALF) >> FP_S;
+
+        pu[i] = (uint8_t)(u + 128);
+        pv[i] = (uint8_t)(v + 128);
+    }
+}
 
 int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
 {
@@ -4999,16 +5045,16 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
 }
     }
 
-    vj_perform_render_font( info, info->settings, info->effect_frame1);
+    vj_perform_render_font( info, settings, info->effect_frame1);
 
-    if(!info->settings->composite)
-        vj_perform_render_osd( info, info->settings, info->effect_frame1 );
+    if(!settings->composite)
+        vj_perform_render_osd( info, settings, info->effect_frame1 );
 
-    vj_perform_finish_render( info, g->A, info->effect_frame1, info->settings );
+    vj_perform_finish_render( info, g->A, info->effect_frame1, settings );
 
     if( info->effect_frame1->ssm == 1 )
     {
-        chroma_subsample(info->settings->sample_mode,info->effect_frame1,info->effect_frame1->data); 
+        chroma_subsample(settings->sample_mode,info->effect_frame1,info->effect_frame1->data); 
         vj_perform_set_422(info->effect_frame1);
         vj_perform_set_422(info->effect_frame2);
         vj_perform_set_422(info->effect_frame3);
@@ -5016,10 +5062,13 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
 
         g->A->primary_buffer[0]->ssm = 0;
     }
-    
+
     vje_enable_parallel();
 
     vj_perform_record_video_frame(info);
+
+    int col_vib = atomic_load_int(&settings->color_vibrance);
+    vj_perform_color_vibrancy(info->effect_frame1->data[1], info->effect_frame1->data[2],info->effect_frame1->uv_len, col_vib);
 
     // must copy?
     int strides[4] = {info->effect_frame1->len, info->effect_frame1->uv_len,info->effect_frame1->uv_len,0};

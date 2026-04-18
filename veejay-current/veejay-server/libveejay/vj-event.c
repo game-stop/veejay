@@ -403,6 +403,8 @@ static struct {                 /* hardcoded keyboard layout (the default keys) 
     { VIMS_MACRO_SELECT,            SDL_SCANCODE_F11,       VIMS_MOD_CTRL, "10" },
     { VIMS_MACRO_SELECT,            SDL_SCANCODE_F12,       VIMS_MOD_CTRL, "11" },
     { VIMS_SAMPLE_HOLD_FRAME,       SDL_SCANCODE_PAUSE,     VIMS_MOD_NONE, "0 0 5" },
+    { VIMS_COLOR_VIBRANCE,          SDL_SCANCODE_N,         VIMS_MOD_NONE, "-1" },
+    { VIMS_COLOR_VIBRANCE,          SDL_SCANCODE_M,         VIMS_MOD_NONE, "1" },
     { 0,0,0,NULL },
 };
 #endif
@@ -7722,6 +7724,26 @@ void vj_event_toggle_audio_mute(void *ptr, const char format[], va_list ap)
     atomic_exchange_int(&v->settings->audio_mute, new);
     veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Audio is now %s", (new == 1 ? "muted" : "unmuted"));
 #endif
+}
+
+void vj_event_color_vibrance(void *ptr, const char format[], va_list ap) {
+    veejay_t *v = (veejay_t*) ptr;
+    video_playback_setup *settings = v->settings;
+
+    int args[1];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+
+    int cur_val = atomic_load_int(&settings->color_vibrance);
+
+    cur_val += args[0];
+    if( cur_val < 0 )
+        cur_val = 0;
+    else if (cur_val > 255 )
+        cur_val = 255;
+
+    atomic_exchange_int(&settings->color_vibrance, cur_val);
+
+    veejay_msg(VEEJAY_MSG_INFO, "Set color vibrance to %d", cur_val);
 }
 
 void vj_event_effect_inc(void *ptr, const char format[], va_list ap)

@@ -887,6 +887,17 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				NULL );
 
+	index_map_[VIMS_COLOR_VIBRANCE] = _new_event(
+				"%d",
+				VIMS_COLOR_VIBRANCE,
+				"Color Vibrance",
+				vj_event_color_vibrance,
+				1,
+				VIMS_ALLOW_ANY,
+				"Step size",
+				1,
+				NULL );
+
 	index_map_[VIMS_FXLIST_INC]	=	_new_event(
 				"%d",
 				VIMS_FXLIST_INC,

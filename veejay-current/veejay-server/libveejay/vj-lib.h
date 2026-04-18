@@ -258,6 +258,7 @@ typedef struct {
 	volatile long long current_frame_num;
 	volatile long long master_frame_num;
 	volatile long long audio_target_frame;
+	volatile long long color_vibrance;
 	volatile int xruns;
 	int current_playback_speed;
 	int previous_playback_speed;
