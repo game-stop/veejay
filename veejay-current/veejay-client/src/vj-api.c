@@ -6898,6 +6898,12 @@ static int load_editlist_info(void)
 
     if( got_n != 14 ) {
         veejay_msg(VEEJAY_MSG_ERROR, "Parsing failed: expected 14, got %d. Data: %s", got_n, res);
+        veejay_msg(VEEJAY_MSG_ERROR, "fps ptr=%p rate ptr=%p dum0=%p dum1=%p",
+            (void*)&fps,
+            (void*)&rate,
+            (void*)&dum[0],
+            (void*)&dum[1]);
+
         free(res);
         return 0;
     }
