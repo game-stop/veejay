@@ -49,6 +49,41 @@ static	char	*extract_( const char *prefix , int p_id )
 	return vj_strdup(tmp);
 }
 
+static void keyframe_free_data(void *port, const char *k_d)
+{
+    int *values = NULL;
+
+    if (vevo_property_get(port, k_d, 0, &values) == VEVO_NO_ERROR)
+    {
+        if (values)
+        {
+            free(values);
+            values = NULL;
+        }
+
+        vevo_property_del(port, k_d);
+    }
+}
+
+int keyframe_set_data(void *port, int parameter_id, int *values, int value_len)
+{
+    if (!port)
+        return 0;
+
+    const char *k_d = extract_("data", parameter_id);
+    const char *k_len = extract_( "datalen", parameter_id );
+
+    keyframe_free_data(port, k_d);
+
+    vevo_property_set(port, k_d, VEVO_ATOM_TYPE_VOIDPTR, 1, &values);
+    vevo_property_set(port, k_len, VEVO_ATOM_TYPE_INT, 1, &value_len );
+
+    free(k_d);
+    free(k_len);
+
+    return 1;
+}
+
 unsigned char *keyframe_pack(void *port, int parameter_id, int entry_id, int *rlen)
 {
     if (!rlen) return NULL;
@@ -77,17 +112,17 @@ unsigned char *keyframe_pack(void *port, int parameter_id, int entry_id, int *rl
         free(k_s); free(k_e); free(k_t); free(k_x); return NULL;
     }
 
-    char *k_d = extract_("data", parameter_id);
-    if (!k_d || vevo_property_get(port, k_d, 0, &values) != VEVO_NO_ERROR) {
-        free(k_s); free(k_e); free(k_t); free(k_x); free(k_d); return NULL;
-    }
-
     char *k_dn = extract_("datalen", parameter_id);
     if (!k_dn || vevo_property_get(port, k_dn, 0, &values_len) != VEVO_NO_ERROR) {
-        free(k_s); free(k_e); free(k_t); free(k_x); free(k_d); free(k_dn); return NULL;
+        free(k_s); free(k_e); free(k_t); free(k_x); free(k_dn); return NULL;
     }
 
-    free(k_s); free(k_e); free(k_t); free(k_x); free(k_d); free(k_dn);
+    int data_ok = keyframe_set_data(port, parameter_id, values, values_len );
+    if (!data_ok) {
+        free(k_s); free(k_e); free(k_t); free(k_x); return NULL;
+    }
+
+    free(k_s); free(k_e); free(k_t); free(k_x); free(k_dn);
 
     if (values_len <= 0 || values == NULL) return NULL;
 
@@ -186,30 +221,15 @@ void	keyframe_clear_entry( int lookup, int fx_entry, int parameter_id, int is_sa
 	char *k_e = extract_ ( "end", parameter_id );
 	char *k_t = extract_ ( "type", parameter_id );
 	char *k_x = extract_ ( "status", parameter_id );
-	char *k_d = extract_ ( "data", parameter_id );
+    char *k_d = extract_ ( "data" , parameter_id );
 	char *k_dn= extract_ ( "datalen", parameter_id );
 
-    if (vevo_property_get(port, k_s, 0, &start) != VEVO_NO_ERROR) start = 0;
-    if (vevo_property_get(port, k_e, 0, &end) != VEVO_NO_ERROR) end = 0;
-    if (vevo_property_get(port, k_t, 0, &type) != VEVO_NO_ERROR) type = 0;
-    if (vevo_property_get(port, k_x, 0, &status) != VEVO_NO_ERROR) status = 0;
-	
-    if (vevo_property_get(port, k_d, 0, &values) == VEVO_NO_ERROR && values != NULL) {
-        free(values);
-        values = NULL;
-    }
-
-    if (vevo_property_get(port, k_dn, 0, &values_len) != VEVO_NO_ERROR) values_len = 0;
-
-	if( values != NULL ) {
-		free(values);
-	}
+    keyframe_free_data(port, k_d);
 
 	vevo_property_del( port, k_s );
 	vevo_property_del( port, k_e );
 	vevo_property_del( port, k_t );
 	vevo_property_del( port, k_x );
-	vevo_property_del( port, k_d );
 	vevo_property_del( port, k_dn);
 
 	free(k_s);
@@ -228,28 +248,49 @@ int keyframe_unpack(unsigned char *in, int len,
     int fx_entry = 0;
     int status = 0;
 
-    if (len < 27)
-        return 0;
+    if (len < 27) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[FX Anim] packet too small (%d/%d)", len, 27 );
+        return -1;
+    }
 
     int n = sscanf((char*)in,
                    "key%2d%2d%8d%8d%2d%2d",
                    &fx_entry,&parameter_id,&start,&end,&type,&status);
 
-    if (n != 6)
-        return 0;
+    if (n != 6) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[FX Anim] invalid packet header");
+        return -1;
+    }
 
-    if (start < 0 || end < start)
-        return 0;
+    if (start < 0 || end < start) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[FX Anim] start must be > 0 < %d (packet defined %d - %d)", end, start,end );
+        return -1;
+    }
 
     int values_len = end - start + 1;
+
+    if (values_len <= 0 || values_len > len || values_len > 2000000) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[FX Anim] OOB for values_len=%d (len=%d)", values_len, len);
+        return -1;
+    }
+
+    if (values_len > (INT_MAX - 27) / 4) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[FX Anim] values_len too large");
+        return -1;
+    }
+
     int expected = 27 + (values_len * 4);
 
-    if (len < expected)
-        return 0;
+    if (len < expected) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[FX Anim] packet data is truncated (expected %d, have %d)",expected, len );
+        return -1;
+    }
 
-    int *values = vj_calloc(sizeof(int) * values_len);
-    if (!values)
-        return 0;
+    int *values = vj_malloc(sizeof(int) * values_len);
+    if (!values) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[FX Anim] memory allocation error packet of %d size", values_len);
+        return -1;
+    }
 
     unsigned char *ptr = in + 27;
     for (int i = 0; i < values_len; i++) {
@@ -261,9 +302,7 @@ int keyframe_unpack(unsigned char *in, int len,
         ptr += 4;
     }
 
-    void *port = is_sample ?
-        sample_get_kf_port(lookup, fx_entry) :
-        vj_tag_get_kf_port(lookup, fx_entry);
+    void *port = is_sample ? sample_get_kf_port(lookup, fx_entry) : vj_tag_get_kf_port(lookup, fx_entry);
 
     if (!port && is_sample) {
         sample_chain_alloc_kf(lookup, fx_entry);
@@ -286,14 +325,14 @@ int keyframe_unpack(unsigned char *in, int len,
     vevo_property_set(port,k_e,VEVO_ATOM_TYPE_INT,1,&end);
     vevo_property_set(port,k_t,VEVO_ATOM_TYPE_INT,1,&type);
     vevo_property_set(port,k_x,VEVO_ATOM_TYPE_INT,1,&status);
-    vevo_property_set(port,k_d,VEVO_ATOM_TYPE_VOIDPTR,1,&values);
-    vevo_property_set(port,k_dn,VEVO_ATOM_TYPE_INT,1,&values_len);
+
+    int data_ok = keyframe_set_data(port, parameter_id, values, values_len );
 
     free(k_s); free(k_e); free(k_t);
     free(k_x); free(k_d); free(k_dn);
 
     *entry = fx_entry;
-    return 1;
+    return data_ok;
 }
 
 int keyframe_get_tokens(void *port, int parameter_id,
@@ -452,6 +491,7 @@ int keyframe_xml_unpack(xmlDocPtr doc, xmlNodePtr node, void *port)
     vevo_property_set(port,k_e,VEVO_ATOM_TYPE_INT,1,&end);
     vevo_property_set(port,k_t,VEVO_ATOM_TYPE_INT,1,&type);
     vevo_property_set(port,k_x,VEVO_ATOM_TYPE_INT,1,&status);
+
     vevo_property_set(port,k_d,VEVO_ATOM_TYPE_VOIDPTR,1,&values);
     vevo_property_set(port,k_dn,VEVO_ATOM_TYPE_INT,1,&values_len);
 
@@ -510,7 +550,7 @@ static int *keyframe_resample_data(int *old_values, int old_len, int new_len)
         return NULL;
     }
 
-    int *new_values = vj_calloc(sizeof(int) * new_len);
+    int *new_values = vj_malloc(sizeof(int) * new_len);
     if (!new_values) {
         return NULL;
     }
@@ -640,7 +680,8 @@ void *keyframe_port_clone_and_resize(void *src_port, int new_len)
                 vevo_property_set(dst_port, k_t,  VEVO_ATOM_TYPE_INT, 1, &type);
                 vevo_property_set(dst_port, k_x,  VEVO_ATOM_TYPE_INT, 1, &status);
                 vevo_property_set(dst_port, k_dn, VEVO_ATOM_TYPE_INT, 1, &new_len);
-                vevo_property_set(dst_port, k_d,  VEVO_ATOM_TYPE_VOIDPTR, 1, &new_values);
+
+                keyframe_set_data(dst_port, p_id, new_values, new_len );
             }
         }
 

@@ -2174,17 +2174,11 @@ int sample_chain_set_kfs( int s1, int len, char *data )
    sample_info *sample = sample_get(s1);
    if (!sample)
     return -1;
-   if( len <= 0 )
-    return 0;
 
-   int entry = 0;
-   if(!keyframe_unpack( (unsigned char*) data, len, &entry,s1,1 ))
-   {
-    veejay_msg(0, "Unable to unpack keyframe packet");
-    return -1;
-   }
-   return 1;
+   int entry = 0; //ignored
+   return keyframe_unpack( (unsigned char*) data, len, &entry,s1,1 );
 }
+
 int sample_chain_add(int s1, int c, int effect_nr)
 {
     int effect_params = 0, i;

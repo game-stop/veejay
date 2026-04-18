@@ -2242,29 +2242,10 @@ int vj_tag_chain_set_kfs( int s1, int len, unsigned char *data )
 {
     vj_tag *tag = vj_tag_get(s1);
     if (!tag)  return -1;
-    if( len <= 0 )
-    {
-        veejay_msg(0, "Invalid keyframe packet length");
-        return -1;
-    }
 
     int entry = 0;
-    if(!keyframe_unpack( data, len, &entry,s1,0) )
-    {
-        veejay_msg(0, "Unable to unpack keyframe packet");
-        return -1;
-    }
-
-    if ( entry < 0 || entry > SAMPLE_MAX_EFFECTS )
-    {
-        veejay_msg(0, "Invalid FX entry in KF packet");
-        return -1;
-    }
-
-    return 1;
+    return keyframe_unpack( data, len, &entry,s1,0);
 }
-
-
 
 int vj_tag_set_effect(int t1, int position, int effect_id)
 {

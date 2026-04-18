@@ -965,19 +965,12 @@ void vj_event_trigger_function(void *ptr, vj_event f, int max_args, const char *
 /* parse a keyframe packet */
 static void vj_event_parse_kf( veejay_t *v, char *msg, int len )
 {
-    if(SAMPLE_PLAYING(v))
-    {
-        if(sample_chain_set_kfs( v->uc->sample_id, len, msg )==-1)
-            veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) Invalid key frame blob [%s]",msg);
-    }
-    else if (STREAM_PLAYING(v))
-    {
-        if(vj_tag_chain_set_kfs(v->uc->sample_id,len,(unsigned char*)msg ) == -1)
-            veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Invalid key frame blob [%s]",msg);
-    }
-    else
-    {
-        veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Cannot store key frame in this playback mode");
+    int res = (SAMPLE_PLAYING(v)? sample_chain_set_kfs( v->uc->sample_id, len, msg ) :
+                (STREAM_PLAYING(v)? vj_tag_chain_set_kfs(v->uc->sample_id,len,(unsigned char*)msg ) : 1));
+    if(res == -1) {
+        veejay_msg(VEEJAY_MSG_ERROR,"[FX Anim] Invalid blob [%s]",msg);
+    } else if(res == 0) {
+        veejay_msg(VEEJAY_MSG_WARNING, "[FX Anim] No values in blob [%s]",msg);
     }
 }
 
