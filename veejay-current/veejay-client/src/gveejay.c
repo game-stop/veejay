@@ -36,7 +36,7 @@
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/libvevo.h>
 #include <src/vj-api.h>
-
+#include <locale.h>
 #define RELOADED_SUMMARY "-------------------------------------\n\
 Reloaded, a graphical interface for Veejay.\n\n\
 Reloaded is a client for veejay. As long as veejay \
@@ -260,6 +260,8 @@ int main(int argc, char **argv)
     char port_description [255];
     snprintf (port_description, sizeof (port_description),
               "Veejay port to connect to (defaults to %d).", DEFAULT_PORT_NUM);
+
+    setlocale(LC_NUMERIC, "C");
 
     GtkApplication *app;
     int status;

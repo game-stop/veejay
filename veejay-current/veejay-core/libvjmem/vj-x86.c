@@ -28,6 +28,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <veejaycore/veejaycore.h>
+#include <locale.h>
+
 extern void find_best_memcpy(void);
 extern void find_best_memset(void);
 extern void yuyv_plane_init(void);
@@ -177,6 +179,8 @@ void vj_mem_init(int w, int h)
     setenv("OMP_PROC_BIND", ( lim <= 414720? "close" : "spread"), 1);
     setenv("OMP_PLACES", "cores", 1);
     setenv("OMP_WAIT_POLICY", "active", 1);
+
+	setlocale(LC_NUMERIC, "C");
 
 #if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE)
 	yuyv_plane_init();
