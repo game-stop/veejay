@@ -4970,6 +4970,22 @@ static void setup_effectchain_info( void )
     // signal stuff (button press)
     g_signal_connect(GTK_TREE_VIEW(tree), "button-press-event",
                      (GCallback) on_effectchain_button_pressed, NULL);
+
+    GtkTreeViewColumn *col_effect = gtk_tree_view_get_column(GTK_TREE_VIEW(tree), 1);
+
+    if (col_effect) {
+        gtk_tree_view_column_set_expand(col_effect, TRUE);
+        gtk_tree_view_column_set_min_width(col_effect, 150);
+    }
+
+    for(int i = 0; i < FXC_N_COLS; i++) {
+        if(i == 1) continue;
+        GtkTreeViewColumn *c = gtk_tree_view_get_column(GTK_TREE_VIEW(tree), i);
+        if(c) {
+            gtk_tree_view_column_set_expand(c, FALSE);
+            gtk_tree_view_column_set_sizing(c, GTK_TREE_VIEW_COLUMN_AUTOSIZE);
+        }
+    }
 }
 
 
@@ -8348,18 +8364,16 @@ void vj_gui_set_stylesheet(const char *css_file, gboolean small_as_possible) {
     smallest_possible = small_as_possible;
 
     if( css_file == NULL ) {
-        veejay_msg(VEEJAY_MSG_INFO,"Using system's default style");
-        use_css_file = 0;
+        snprintf( reloaded_css_file, sizeof(reloaded_css_file), "%s/%s", RELOADED_DATADIR, "gveejay.reloaded.css");
+        veejay_msg(VEEJAY_MSG_INFO, "Using reloaded's default style %s", reloaded_css_file);
+        use_css_file = 1;
         return;
     }
 
-    if(strlen(css_file)==7) {
-        if(strncasecmp(css_file, "default",7) == 0 ) {
-            snprintf( reloaded_css_file, sizeof(reloaded_css_file), "%s/%s", RELOADED_DATADIR, "gveejay.reloaded.css");
-            veejay_msg(VEEJAY_MSG_INFO, "Using reloaded's default style %s", reloaded_css_file);
-            use_css_file = 1;
-            return;
-        }
+    if(strncasecmp(css_file, "default",7) == 0 ) {
+        veejay_msg(VEEJAY_MSG_INFO, "Using system default style %s", reloaded_css_file);
+        use_css_file = 0;
+        return;
     }
 
     veejay_msg(VEEJAY_MSG_DEBUG, "Using CSS %s", css_file);
@@ -8402,6 +8416,9 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
         gtk3_curve_set_color_cpoint_rgba(GTK_WIDGET(gui->curve), border.red, border.green, border.blue, 1.0);
     }
     else {
+
+        veejay_msg(VEEJAY_MSG_INFO, "Loading without style sheet");
+
         gtk3_curve_set_color_background_rgba(GTK_WIDGET(gui->curve), 1.0f,1.0f,1.0f,1.0);
         gtk3_curve_set_color_curve_rgba(GTK_WIDGET(gui->curve), 0.0f,0.0f,0.0f,1.0);
         gtk3_curve_set_color_grid_rgba(GTK_WIDGET(gui->curve), 0.0f,0.0f,0.0f,0.33);
@@ -8409,20 +8426,45 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
     }
 
 #if (GTK_MINOR_VERSION >= 20)
+
+    int screen_w = gdk_screen_get_width(screen);
+    int screen_h = gdk_screen_get_height(screen);
+    int pad = 2;
+    int margin = 1;
+    const char *font_size = "100%";
+
+    if (!smallest_possible && (screen_w > 1920 || screen_h > 1080)) {
+        font_size = "120%";
+        pad=4;
+        margin=3;
+        veejay_msg(VEEJAY_MSG_INFO, "High DPI screen detected");
+    } else if (smallest_possible) {
+        font_size = "98%";
+        pad=0;
+        margin=0;
+        veejay_msg(VEEJAY_MSG_INFO, "Small screen detected");
+    }
+
     const gchar *runtime_css = NULL;
 
     if (smallest_possible) {
-        runtime_css =
-            "window { font-size:98%; }"
-            "frame,box,scale,spinbutton,button,radiobutton,checkbutton,entry,.vertical { padding-left:0px; padding-right:0px; padding-top:1px; padding-bottom:1px; }";
+        runtime_css = g_strdup_printf(
+            "window { font-size:%s; }"
+            "frame,box,scale,spinbutton,button,radiobutton,checkbutton,entry,.vertical { padding: 0px 0px; margin: 0px; }", 
+            font_size);
     }
     else {
-        runtime_css = 
-            "window { font-size:100%; }"
-            "frame,box { padding-left:0px; padding-right:0px; }"; 
+        runtime_css = g_strdup_printf(
+            "window { font-size:%s; }"
+            "frame,box { padding: 0px; }"
+            "scale,spinbutton,button,radiobutton,checkbutton,entry,.vertical { padding: %dpx; margin: %dpx; }",
+            font_size,
+            pad,
+            margin);
     }
 
     gtk_css_provider_load_from_data(override, runtime_css, -1, NULL);
+    g_free(runtime_css);
 #endif
 
     g_object_unref(base);
@@ -8603,11 +8645,7 @@ void vj_gui_init(const char *glade_file,
 
     GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
 
-    gtk_widget_set_size_request(GTK_WIDGET(mainw), -1, -1);
-
     init_widget_cache();
-
-
 
     GtkWidget *box = glade_xml_get_widget_( info->main_window, "sample_bank_hbox" );
     info->sample_bank_pad = new_bank_pad( box );
@@ -8829,27 +8867,16 @@ void vj_gui_init(const char *glade_file,
         set_toggle_button( "previewtoggle", 1 );
     }
 
-    gtk_widget_show( info->sample_bank_pad );
-
     if (smallest_possible)
     {
-        gtk_window_set_default_size(GTK_WINDOW(mainw), 1242, 825);
+        gtk_window_set_default_size(GTK_WINDOW(mainw), 1242, 854);
     }
-    else
-    {
-        gtk_window_set_default_size(GTK_WINDOW(mainw), 1920, 900);
-    }
-
 
     gtk_window_set_resizable(GTK_WINDOW(mainw), TRUE);
-    GdkGeometry geometry;
-    geometry.max_width = 1920;
-    geometry.max_height = 900;
-    gtk_window_set_geometry_hints(GTK_WINDOW(mainw), mainw, &geometry, GDK_HINT_MAX_SIZE);
 
     gtk_window_resize(GTK_WINDOW(mainw),
-                   smallest_possible ? 1242 : 1920,
-                   smallest_possible ? 825  : 900);
+                   smallest_possible ? 1280 : 1920,
+                   smallest_possible ? 720  : 900);
           
     gint w, h;
     gtk_window_get_size(GTK_WINDOW(mainw), &w, &h);

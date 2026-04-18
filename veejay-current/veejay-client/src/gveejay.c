@@ -234,7 +234,7 @@ gint vj_gui_command_line (GApplication            *app,
         vj_gui_set_stylesheet(arg_style,arg_smallaspossible);
         g_free(arg_style);
     } else {
-        vj_gui_set_stylesheet(NULL,arg_smallaspossible);
+        vj_gui_set_stylesheet(arg_style,arg_smallaspossible);
     }
 
     if( err )
@@ -285,7 +285,7 @@ int main(int argc, char **argv)
     {"verbose",     'v', 0, G_OPTION_ARG_NONE, &arg_verbose,"Be extra verbose", NULL},
     {"version",     'V', 0, G_OPTION_ARG_NONE, &arg_version,"Show version, data directory and exit.", NULL},
     {"tracks",      'X', 0, G_OPTION_ARG_INT, &arg_tracks,"Set number of tracks.", NULL},
-    {"theme",       't', 0, G_OPTION_ARG_FILENAME, &arg_style, "CSS FILE or \"default\"", NULL },
+    {"theme",       't', 0, G_OPTION_ARG_FILENAME, &arg_style, "Use \"system\" to use the default theme or use a filename", NULL },
     {"small-as-possible",'S',0,G_OPTION_ARG_NONE,&arg_smallaspossible, "Create the smallest possible UI",NULL},
 #if GTK_CHECK_VERSION(3,22,30)
     {"faster-ui",   'f', 0, G_OPTION_ARG_NONE, &arg_fasterui, "Hide FX parameter sliders instead of disabling to reduce CPU usage (GTK3 3.22.30)", NULL},

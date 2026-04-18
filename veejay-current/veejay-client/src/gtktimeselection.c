@@ -411,7 +411,7 @@ static void timeline_init( TimelineSelection *te )
   te->stepper_draw_size = 12;
   te->stepper_length = 0;
   te->frame_height = 8;
-  te->font_line = 22;
+  te->font_line = 24;
   te->point = 0.0;
   te->move_x = 0;
 }

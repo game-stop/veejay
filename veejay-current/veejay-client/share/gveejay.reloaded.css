@@ -1,267 +1,376 @@
-@define-color border-color #434449;
 @define-color bg-color #27282f;
+@define-color border-color #323540;
+@define-color text-color #ffffff;
+@define-color panel-color #2d2e36;
+@define-color raised-color #35363e;
+@define-color hover-color #3c3d47;
+@define-color accent-hover #5a6d8c;
+@define-color knob-color #5a6d8c;
+@define-color knob-hover #7a8da8;
+@define-color fill-color #3d4a66;
+@define-color text-muted #858999;
+@define-color select-color #5a6d8c;
+@define-color scrollbar-thumb #454f60;
+@define-color scrollbar-hover #5a6d8c;
+@define-color playing-color #4a7d60;
+@define-color record-color #8a4848;
+@define-color warn-color #a88a48;
 
 * {
- border-color:#434449;
- background-image:none;
- border-width:0px;
- color:#ffffff;
- font-size:98%;
+    background-image: none;
+    border-width: 0;
+    border-radius: 0;
+    border-color: @border-color;
+    color: @text-color;
+    font-size: 98%;
+    padding:0px;
 }
 
-/* .reloaded is a style class for a window, using * to set the background color gives issues with treeview */
+window, box, grid, stack, paned, overlay, viewport, treeview, list, textview {
+    background-color: @bg-color;
+}
+
 .reloaded {
- border-color:#434449;
- background-image:none;
- border-width:0px;
- background:#27282f;
- color:#ffffff;
-}
-
-.sequencer {
- padding:8px;
-}
-
-.sample_slot, .sequencer_slot, .quickselect_slot {
- border-width:1px;
- border-style:solid;
-}
-
-.active {
- border-color:#ff8400;
-}
-
-.selected {
- border-color:#9ec5e3;
+    background-color: @bg-color;
+    color: @text-color;
 }
 
 .smallaspossible {
-    min-height: 0px;
-    min-width: 0px;
+    min-width: 0;
+    min-height: 0;
 }
 
-checkbutton,radiobutton {
- border-style:none;
+button {
+    background-color: @panel-color;
+    border: 1px solid @border-color;
+    min-width: 20px;
+    padding-left: 2px;
+    padding-right:2px;
+    /*margin:2px;*/
 }
 
-entry,button {
- border-style:outset;
- border-color:#2e2f36;
- border-width:1px;
- border-radius:0px;
+button:hover, 
+entry:hover, 
+notebook header.top tabs tab:hover,
+treeview:hover, 
+list row:hover {
+    background-color: @hover-color;
 }
 
-entry:hover, button:hover {
-  background-color:#ff8400;
-  border-radius:6px;
+button:active {
+    background-color: #22242a;
 }
 
-button:hover image, button:hover label {
-  background-color:#ff8400;
+entry, spinbutton {
+    background-color: @panel-color;
+    border: 1px solid @border-color;
+    min-width: 50px;
+    min-height: 28px;
+    padding: 2px 4px;
 }
-
-/*
-spinbutton {
- border-width:4px;
-}
-*/
 
 entry:focus {
- background-color:#626580;
- color:#ffffff;
+    background-color: #626580;
+    color: @text-color;
 }
 
-notebook header.top tabs tab {
- border-style:outset;
+.toggle:checked,
+notebook header.top tabs tab:checked {
+    background-color: @fill-color;
+    border: 1px solid @knob-color;
+    border-radius: 4px;
+    padding-left:2px;
+    padding-right:2px;
 }
 
-notebook header.top tabs tab:hover {
- border-style:outset;
- background-color:#ff8400;
+.active {
+    border-color: @knob-color;
+    border-width: 1px;
+    border-style: solid;
 }
 
+.selected {
+    border-color: @select-color;
+}
+
+scale {
+   padding-top:1px;
+   padding-bottom:1px;
+}
+
+scale contents trough {
+    background-color: @raised-color;
+    border: 1px solid @border-color;
+    min-height: 7px;
+    margin-top: 2px;
+    margin-bottom: 2px;
+}
+
+scale contents trough highlight {
+    background-color: @fill-color;
+}
+
+scale contents slider {
+    background-color: @knob-color;
+    border-radius: 6px;
+    min-width: 16px;
+    min-height: 16px;
+    margin: -5px;
+}
+
+scale contents slider:hover {
+    background-color: @knob-hover;
+}
+
+scale value {
+    color: @fill-color;
+    padding-top: 5px;
+    min-width: 30px;
+    margin-bottom: 6px;
+}
+
+.timeline {
+    background-color: #1b1c20;
+    border-top: 1px solid @border-color;
+    border-bottom: 1px solid @border-color;
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+
+.panel {
+    background-color: @panel-color;
+    border-right: 2px solid @border-color;
+    border-bottom: 2px solid @border-color;
+    padding: 1px;
+}
+
+.p_box {
+    background-color: @panel-color;
+    border: 1px solid @border-color;
+    border-radius: 4px;
+    padding-left: 1px;
+    padding-right: 1px;
+}
+
+progressbar trough {
+    background-color: @raised-color;
+    border: 2px solid @border-color;
+}
+
+progressbar progress {
+    background-color: @fill-color;
+}
+
+scrollbar contents slider {
+    background-color: @scrollbar-thumb;
+    border-radius: 4px;
+}
+
+scrollbar contents slider:hover {
+    background-color: @scrollbar-hover;
+}
+
+treeview:selected, list row:selected {
+    background-color: @raised-color;
+}
+
+menubar {
+    background-color: #1b1c20;
+    border-bottom: 2px solid @border-color;
+}
+
+menuitem {
+    background-color: #1b1c20;
+    padding: 4px 8px;
+}
+
+button:disabled, 
+entry:disabled, 
+image:disabled,
+spinbutton:disabled, 
+radiobutton:disabled, 
+checkbutton:disabled {
+    border-color: #4a4a4e;
+    color: @text-muted;
+    background-color: #37383f;
+}
+
+scale:disabled contents slider,
+scale:disabled contents trough highlight {
+    background-color: #37383f;
+}
+
+scale:disabled value {
+    color: #37383f;
+}
+
+.playing {
+    border-color: @playing-color;
+    background-color: #223328;
+}
+
+.recording, .armed {
+    border-color: @record-color;
+    background-color: #3b2020;
+}
+
+tooltip {
+    background-color: @panel-color;
+    border: 1px solid @select-color;
+    border-radius: 4px;
+    margin:2px;
+    color: @text-color;
+}
+
+
+button:hover image, button:hover label {
+  background-color: @select-color;
+}
 notebook header.top tabs tab:hover label {
- background-color:#ff8400;
+ background-color: @select-color;
+ padding-right:4px;
+ padding-left:4px;
 }
+
 
 .timeline {
  border-color:#ff8400;
  padding-top:4px;
  padding-bottom:4px;
+ min-height:64px;
 }
 
 .timeline stepper hover {
  color:#ff0000;
 }
-scale {
- padding-right:8px;
- padding-left:8px;
+
+
+.sample_slot, 
+.sequencer_slot, 
+.quickselect_slot {
+    border-width: 1px;
+    border-style: solid;
+    border-color: @border-color;
+    background-color: @panel-color;
 }
 
-scale contents trough highlight {
- background-color:#e59420;
+.sample_slot:hover, 
+.sequencer_slot:hover, 
+.quickselect_slot:hover {
+    background-color: @select-color;
+}
+/* 1. Make the main container transparent so it doesn't draw a big box */
+checkbutton, radiobutton {
+    background-color: transparent;
+    border: none;
+    padding: 2px;
 }
 
-scale contents slider:hover {
- background-color:#ffdbb4;
+/* 2. Style the actual unselected checkbox and radio circle */
+checkbutton check, 
+radiobutton radio {
+    background-color: @raised-color;
+    border: 1px solid @border-color;
+    min-width: 14px;
+    min-height: 14px;
 }
 
-scale contents slider {
- background-color:#ff8400;
- border-radius:4px;
+/* Make radio buttons round and checkbuttons square */
+radiobutton radio {
+    border-radius: 50%;
+}
+checkbutton check {
+    border-radius: 3px;
 }
 
-scale value {
- color:#e59420;
- padding-top:5px;
- min-width:24px;
- margin-bottom:6px;
+/* 3. Style them when they are clicked/active */
+checkbutton check:checked, 
+radiobutton radio:checked {
+    background-color: @knob-color;
+    border-color: @knob-hover;
 }
 
-treeview {
- background:#27282f;
+/* 4. Draw the inner dot for the active radio button */
+radiobutton radio:checked {
+    background-image: radial-gradient(circle, @text-color 30%, transparent 40%);
 }
 
-treeview *:selected {
- background-color:#37383f;
+/* Disabled states for the nodes */
+checkbutton check:disabled,
+radiobutton radio:disabled {
+    background-color: #37383f;
+    border-color: #4a4a4e;
 }
 
-treeview *:hover {
-  background-color:#ff8400;
+notebook header tabs tab {
+    min-width: 100px; 
+    
+    margin: 1px 2px;
+    padding: 1px 2px;
+    background-color: @panel-color;
+    border: 1px solid @border-color;
+    border-bottom: none;
 }
 
-.curve {
- background-color:#2e2f36;
- color:#ffffff;
+notebook header tabs tab label {
+    padding: 0;
+    margin: 0;
+    transition: all 0.2s; 
 }
 
-progressbar progress  {
-  border-color:#ff8400;
-  background-color:#ff8400;
-  border-width:2px;
-  border-style:solid;
+notebook header tabs tab:checked {
+    background-color: @fill-color;
+    border-color: @knob-color;
+    min-width: 100px; 
 }
 
-progressbar trough  {
-  background-color:#37383f;
-  border-color:#ff8400;
-  border-width:6px;
-  border-style:solid;
+notebook header tabs tab:hover {
+    background-color: @hover-color;
 }
 
-.track {
- border-style:solid;
- border-width:1px;
+notebook header tabs tab:checked label {
+    font-weight: normal;
+    background: none;
 }
 
-scrollbar contents slider {
- background-color:#434449;
- border-radius:4px;
+treeview, list {
+    background-color: @bg-color;
+    border: 1px solid @border-color;
+    color: @text-color;
 }
 
-scrollbar contents slider:hover {
- background-color:#ff8400;
- border-radius:4px;
+treeview header button {
+    background-color: @panel-color;
+    color: @text-muted;
+    font-weight: bold;
+    text-shadow: none;
+    padding: 4px;
+    border: none;
+    border-bottom: 2px solid @border-color;
+    border-right: 1px solid @border-color;
 }
 
-scrollbar contents trough highlight {
- background-color:#434449;
+treeview row, list row {
+    border: none;
+    border-style: none;
+    padding: 4px;
+    -GtkTreeView-horizontal-separator: 0;
+    -GtkTreeView-vertical-separator: 0;
 }
 
-textview text {
- background-color:#434449;
+treeview:selected, 
+list row:selected {
+    background-color: @fill-color;
+    color: @text-color;
+    border: none;
 }
 
-.p_box {
- padding-left:4px;
- padding-right:4px;
- border-color:#434449;
- border-width:1px;
- border-style:solid;
- border-radius:4px;
+treeview row:hover, 
+list row:hover {
+    background-color: @hover-color;
+    border: none;
 }
 
-
-
-list {
- background-color:#27282f;
-}
-
-
-.search-bar {
- background-color:#27282f;
-}
-
-.view {
-background-color:#27282f;
-}
-
-.image-button {
-background-color:#27282f;
-}
-.sidebar-button {
-background-color:#27282f;
-}
-/*
-revealer box.horizontal, box.vertical {
-background-color:#27281f;
-}*/
-
-menubar {
-background-color:#1b1c20;
-border-bottom-width:2px;
-border-color:#434449;
-border-style:solid;
-}
-
-menuitem {
-background-color:#1b1c20;
-padding-bottom:4px;
-}
-
-button:disabled, spinbutton:disabled,radiobutton:disabled, checkbutton:disabled  {
- border-style:solid;
- border-color:#4a4a4e;
- border-radius:5px;
- color:#000000;
- text-shadow:none;
- background-image: none;
- text-shadow: none;
- border-image-source:none;
- background-color: mix (#4a4a4e, @bg_color, 0.25);
- text-shadow: 0 1px alpha (shade (@button_bg_color, 1.25), 0.4);
-}
-
-button:disabled label, spinbutton:disabled entry {
- background-color: mix (#4a4a4e, @bg_color, 0.25);
-}
-
-radiobutton:disabled label, radiobutton:disabled entry {
- color: mix (#4a4a4e, @bg_color, 0.25);
-}
-
-radiobutton:hover {
- background-color:#ff8400;
-} 
-
-scale:disabled contents slider {
- background-color:mix (#4a4a4e, @bg_color, 0.25);
-}
-scale:disabled contents trough highlight {
- background-color:mix (#4a4a4e, @bg_color, 0.25);
-}
-scale:disabled value {
- color: mix (#4a4a4e, @bg_color, 0.25);
-}
-
-.panel {
- border-style:solid;
- border-right-width:2px;
- border-bottom-width:2px;
-}
-
-.toggle:checked {
- background-color:#e59420;
- border-radius:8px;
- border-style:solid;
+treeview.view cell {
+    border: none;
 }
