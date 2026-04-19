@@ -5067,7 +5067,7 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
 
     vj_perform_record_video_frame(info);
 
-    int col_vib = atomic_load_int(&settings->color_vibrance);
+    int col_vib = atomic_load_long_long(&settings->color_vibrance);
     vj_perform_color_vibrancy(info->effect_frame1->data[1], info->effect_frame1->data[2],info->effect_frame1->uv_len, col_vib);
 
     // must copy?

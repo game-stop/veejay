@@ -7733,7 +7733,7 @@ void vj_event_color_vibrance(void *ptr, const char format[], va_list ap) {
     int args[1];
     P_A(args,sizeof(args),NULL,0,format,ap);
 
-    int cur_val = atomic_load_int(&settings->color_vibrance);
+    int cur_val = atomic_load_long_long(&settings->color_vibrance);
 
     cur_val += args[0];
     if( cur_val < 0 )
@@ -7741,7 +7741,7 @@ void vj_event_color_vibrance(void *ptr, const char format[], va_list ap) {
     else if (cur_val > 255 )
         cur_val = 255;
 
-    atomic_exchange_int(&settings->color_vibrance, cur_val);
+    atomic_exchange_long_long(&settings->color_vibrance, cur_val);
 
     veejay_msg(VEEJAY_MSG_INFO, "Set color vibrance to %d", cur_val);
 }
