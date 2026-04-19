@@ -3611,6 +3611,29 @@ static void update_spin_value(const char *name, gint value )
     
     gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble) value );
 }
+
+static void update_slider_step_and_page_size(GtkWidget *w, gint min, gint max) {
+    GtkRange *range = GTK_RANGE(w);
+    GtkAdjustment *a = gtk_range_get_adjustment(range);
+    gint range_size = max - min;
+    gint step;
+    if (range_size <= 255)
+        step = 1;
+    else if (range_size <= 1000)
+        step = 5;
+    else if (range_size <= 5000)
+        step = 10;
+    else
+        step = 25;
+
+    gint page = step * 8;
+
+    gtk_adjustment_set_step_increment(a, step);
+    gtk_adjustment_set_page_increment(a, page);
+
+    gtk_range_set_adjustment(range, a);
+}
+
 static void update_slider_range2(GtkWidget *w, gint min, gint max, gint value, gint scaled)
 {
     if(min == max) {
@@ -3627,21 +3650,12 @@ static void update_slider_range2(GtkWidget *w, gint min, gint max, gint value, g
     {
         gdouble gmin =0.0;
         gdouble gmax =100.0;
-        gdouble gval = gmax / value;
+        gdouble gval = (value != 0) ? (gmax / value) : gmin;
         gtk_range_set_range(range, gmin, gmax);
         gtk_range_set_value(range, gval );
     }
 
-    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
-    if (max - min > 80)
-    {
-        gtk_adjustment_set_page_increment(a, (max - min)>>6);
-    }
-    else
-    {
-        gtk_adjustment_set_page_increment(a, 1);
-    }
-    gtk_range_set_adjustment(range, a );
+    update_slider_step_and_page_size(w,min,max);
 }
 
 static void update_slider_range(const char *name, gint min, gint max, gint value, gint scaled)
@@ -3666,21 +3680,12 @@ static void update_slider_range(const char *name, gint min, gint max, gint value
     {
         gdouble gmin =0.0;
         gdouble gmax =100.0;
-        gdouble gval = gmax / value;
+        gdouble gval = (value != 0) ? (gmax / value) : gmin;
         gtk_range_set_range(range, gmin, gmax);
         gtk_range_set_value(range, gval );
     }
 
-    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
-    if (max - min > 80)
-    {
-        gtk_adjustment_set_page_increment(a, (max - min)>>6);
-    }
-    else
-    {
-        gtk_adjustment_set_page_increment(a, 1);
-    }
-    gtk_range_set_adjustment(range, a );
+    update_slider_step_and_page_size(w,min,max);
 }
 
 static void update_label_i2(GtkWidget *label, int num, int prefix)
