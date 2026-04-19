@@ -1,4 +1,4 @@
-/* Gveejay Reloaded - graphical interface for VeeJay
+ /* Gveejay Reloaded - graphical interface for VeeJay
  *          (C) 2002-2004 Niels Elburg <nwelburg@gmail.com>
  *  with contributions by  Thomas Rheinhold (2005)
  *                        (initial sampledeck representation in GTK)
@@ -725,17 +725,17 @@ static struct
     { "hbox709",                 WIDGET_HBOX709 },
     { "sample_panel",            WIDGET_SAMPLE_PANEL },
     { "vbox623",                 WIDGET_VBOX623 },
-    { "slider_box_p0",           WIDGET_SLIDER_BOX_G0 },
-    { "slider_box_p1",           WIDGET_SLIDER_BOX_G1 },
-    { "slider_box_p2",           WIDGET_SLIDER_BOX_G2 },
-    { "slider_box_p3",           WIDGET_SLIDER_BOX_G3 },
-    { "slider_box_p4",           WIDGET_SLIDER_BOX_G4 },
-    { "slider_box_p5",           WIDGET_SLIDER_BOX_G5 },
-    { "slider_box_p6",           WIDGET_SLIDER_BOX_G6 },
-    { "slider_box_p7",           WIDGET_SLIDER_BOX_G7 },
-    { "slider_box_p8",           WIDGET_SLIDER_BOX_G8 },
-    { "slider_box_p9",           WIDGET_SLIDER_BOX_G9 },
-    { "slider_box_p10",          WIDGET_SLIDER_BOX_G10 },
+    { "slider_box_g0",           WIDGET_SLIDER_BOX_G0 },
+    { "slider_box_g1",           WIDGET_SLIDER_BOX_G1 },
+    { "slider_box_g2",           WIDGET_SLIDER_BOX_G2 },
+    { "slider_box_g3",           WIDGET_SLIDER_BOX_G3 },
+    { "slider_box_g4",           WIDGET_SLIDER_BOX_G4 },
+    { "slider_box_g5",           WIDGET_SLIDER_BOX_G5 },
+    { "slider_box_g6",           WIDGET_SLIDER_BOX_G6 },
+    { "slider_box_g7",           WIDGET_SLIDER_BOX_G7 },
+    { "slider_box_g8",           WIDGET_SLIDER_BOX_G8 },
+    { "slider_box_g9",           WIDGET_SLIDER_BOX_G9 },
+    { "slider_box_g10",          WIDGET_SLIDER_BOX_G10 },
     { "curve_chain_togglechain", WIDGET_CURVE_CHAIN_TOGGLECHAIN },
     { "spin_macrodelay",         WIDGET_SPIN_MACRODELAY },
     { "macrorecord1",            WIDGET_MACRORECORD1 },
@@ -943,6 +943,7 @@ typedef struct
     int selected_chain_entry;
     int selected_el_entry;
     int selected_vims_entry;
+    int selected_fx_param;
 
     int render_record;
     int iterator;
@@ -3632,6 +3633,14 @@ static void update_slider_range2(GtkWidget *w, gint min, gint max, gint value, g
     }
 
     GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
+    if (max - min > 80)
+    {
+        gtk_adjustment_set_page_increment(a, (max - min)>>6);
+    }
+    else
+    {
+        gtk_adjustment_set_page_increment(a, 1);
+    }
     gtk_range_set_adjustment(range, a );
 }
 
@@ -3663,6 +3672,14 @@ static void update_slider_range(const char *name, gint min, gint max, gint value
     }
 
     GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
+    if (max - min > 80)
+    {
+        gtk_adjustment_set_page_increment(a, (max - min)>>6);
+    }
+    else
+    {
+        gtk_adjustment_set_page_increment(a, 1);
+    }
     gtk_range_set_adjustment(range, a );
 }
 
@@ -5202,6 +5219,8 @@ void on_effectlist_row_activated(GtkTreeView *treeview,
             
             if (ctrl_pressed && info->selection_slot)
                 slot = info->selection_slot->sample_id;
+            else
+                info->uc.selected_fx_param = -1;
 
             multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d %d",
                 slot, info->uc.selected_chain_entry,gid, !shift_pressed);
@@ -5930,10 +5949,10 @@ gboolean view_el_selection_func (GtkTreeSelection *selection,
     return TRUE; /* allow selection state to change */
 }
 
-void on_vims_row_activated(GtkTreeView *treeview,
-                           GtkTreePath *path,
-                           GtkTreeViewColumn *col,
-                           gpointer user_data)
+void on_bundle_row_activated(GtkTreeView *treeview,
+                             GtkTreePath *path,
+                             GtkTreeViewColumn *col,
+                             gpointer user_data)
 {
     GtkTreeModel *model;
     GtkTreeIter iter;
@@ -5981,7 +6000,7 @@ void on_vims_row_activated(GtkTreeView *treeview,
     }
 }
 
-gboolean view_vims_selection_func (GtkTreeSelection *selection,
+gboolean view_bundle_selection_func (GtkTreeSelection *selection,
                                    GtkTreeModel     *model,
                                    GtkTreePath      *path,
                                    gboolean          path_currently_selected,
@@ -6164,6 +6183,13 @@ static void setup_vimslist(void)
                                          VIMS_ID, GTK_SORT_ASCENDING);
 }
 
+gboolean on_bundle_interactive_search(GtkTreeView *treeview,
+                                     gpointer user_data)
+{
+    return TRUE;
+}
+
+
 static void setup_bundles(void)
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_bundles");
@@ -6190,12 +6216,21 @@ static void setup_bundles(void)
     setup_tree_text_column( "tree_bundles", VIMS_FORMAT, "Format",0 );
     g_signal_connect(tree,
                      "row-activated",
-                     (GCallback) on_vims_row_activated,
+                     (GCallback) on_bundle_row_activated,
                      NULL );
 
     GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
-    gtk_tree_selection_set_select_function(selection, view_vims_selection_func, NULL, NULL);
+    gtk_tree_selection_set_select_function(selection, view_bundle_selection_func, NULL, NULL);
     gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
+
+    gboolean kjdhfkj = gtk_tree_view_get_enable_search( GTK_TREE_VIEW(tree) );
+    guint sigjdf = g_signal_connect(tree,
+                     "start_interactive_search",
+                     (GCallback) on_bundle_interactive_search,
+                     NULL );
+    gtk_tree_view_set_enable_search( GTK_TREE_VIEW(tree) , TRUE);
+
+    kjdhfkj = gtk_tree_view_get_enable_search( GTK_TREE_VIEW(tree) );
 
     GtkWidget *tv = glade_xml_get_widget_( info->main_window, "vimsview" );
     gtk_text_view_set_wrap_mode( GTK_TEXT_VIEW(tv), GTK_WRAP_WORD_CHAR );
@@ -7817,6 +7852,21 @@ static void enable_fx_entry(void) {
     gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_EFFECTNAME] ),fx_name );
     gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_EFFECTANIM_NAME] ), fx_name );
 
+    //Update fx parameter friendly name
+    if( info->uc.selected_fx_param != -1 )
+    {
+        i = 0;
+        //Lookup for adhoc slider.
+        while (( widget_map[i].id != info->uc.selected_fx_param ) && ( widget_map[i].id != -1 ) ) i++;  // Use zero based values, see PARAM_CHANGED in callback.h
+
+        gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_VALUE_FRIENDLYNAME] ),
+                                       _effect_get_hint( entry_tokens[ENTRY_FXID],
+                                                         info->uc.selected_fx_param - WIDGET_SLIDER_P0, // Use zero based values, see PARAM_CHANGED in callback.h
+                                                         get_slider_val(widget_map[i].name )));
+     }
+     else
+        gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_VALUE_FRIENDLYNAME] ), FX_PARAMETER_VALUE_DEFAULT_HINT );
+
     if( entry_tokens[ENTRY_VIDEO_ENABLED] != gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_BUTTON_ENTRY_TOGGLE])) ) {
         gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_BUTTON_ENTRY_TOGGLE]), entry_tokens[ENTRY_VIDEO_ENABLED]);
     }
@@ -8011,6 +8061,7 @@ static void process_reload_hints(int *history, int pm)
         if( lpi == 0 ) {
             if( entry_tokens[ENTRY_FXID] == 0 && gtk_widget_is_sensitive(widget_cache[WIDGET_FRAME_FXTREE2])) {
                 disable_fx_entry();
+                info->uc.selected_fx_param = -1;
                 info->uc.reload_hint[HINT_KF] = 1;
             }
         } else if (lpi == 1 ) {
@@ -9006,6 +9057,7 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
     info->status_lock = 1;
     info->parameter_lock = 1;
     info->uc.selected_chain_entry = 0;
+    info->uc.selected_fx_param = -1;
 
     single_vims( VIMS_PROMOTION );
 
