@@ -1987,7 +1987,7 @@ static void *memcpy_neon(void *to, const void *from, size_t n) {
 }
 
 
-static void memcpy_asimd_256_v3(uint8_t *dst, const uint8_t *src) {
+static inline void memcpy_asimd_256_v3(uint8_t *dst, const uint8_t *src) {
     uint8x16_t data;
 
     data = vld1q_u8(src);
@@ -2023,7 +2023,8 @@ static void *memcpy_asimd_v3(void *to, const void *from, size_t n) {
 
     return retval;
 }
-static void memcpy_asimd_256(uint8_t *dst, const uint8_t *src) {
+static inline void memcpy_asimd_256(uint8_t *dst, const uint8_t *src) {
+    uint8_t *dst = (uint8_t*) to;
     uint8x16_t data;
     for (int i = 0; i < 16; ++i) {
         data = vld1q_u8(src);
@@ -2090,7 +2091,7 @@ static void *memcpy_asimdv2(void *to, const void *from, size_t n) {
 
     return retval;
 }
-void *memset_asimd_v3(void *dst, uint8_t val, size_t n) {
+void *memset_asimd_v3(void *dst, int val, size_t n) {
     void *retval = dst;
     uint8_t *dst_bytes = (uint8_t *)dst;
     uint8x16_t value = vdupq_n_u8(val); 
@@ -2147,7 +2148,7 @@ void *memset_asimd_v3(void *dst, uint8_t val, size_t n) {
 #endif
 
 #ifdef HAVE_ARM_ASIMD
-void memset_asimd(void *dst, uint8_t val, size_t len) {
+void memset_asimd(void *dst, int val, size_t len) {
 
 	if( len == 0 || NULL == dst ) 
 		return;
@@ -2166,7 +2167,7 @@ void memset_asimd(void *dst, uint8_t val, size_t len) {
         *dst_bytes++ = val;
     }
 }
-void memset_asimd_v2(void *dst, uint8_t val, size_t len) {
+void memset_asimd_v2(void *dst, int val, size_t len) {
 
 	if( len == 0 || NULL == dst ) 
 		return;
@@ -2196,7 +2197,7 @@ void memset_asimd_v2(void *dst, uint8_t val, size_t len) {
         *dst_bytes++ = val;
     }
 }
-void memset_asimd_v4(void *dst, uint8_t val, size_t len) {
+void memset_asimd_v4(void *dst, int val, size_t len) {
   if( len == 0 || NULL == dst ) 
 	return;
 
@@ -2213,7 +2214,7 @@ void memset_asimd_v4(void *dst, uint8_t val, size_t len) {
   }
 }
 
-void memset_asimd_64(uint8_t *dst, uint8_t value, size_t size) {
+void memset_asimd_64(uint8_t *dst, int value, size_t size) {
 
 	if( size == 0 || NULL == dst ) 
 		return;
@@ -2259,7 +2260,7 @@ void memset_asimd_64(uint8_t *dst, uint8_t value, size_t size) {
 
 }
 
-void memset_asimd_32(uint8_t *dst, uint8_t value, size_t size) {
+void memset_asimd_32(uint8_t *dst, int value, size_t size) {
 	if( size == 0 || dst == NULL ) 
 		return;
 
