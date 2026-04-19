@@ -2024,7 +2024,6 @@ static void *memcpy_asimd_v3(void *to, const void *from, size_t n) {
     return retval;
 }
 static inline void memcpy_asimd_256(uint8_t *dst, const uint8_t *src) {
-    uint8_t *dst = (uint8_t*) to;
     uint8x16_t data;
     for (int i = 0; i < 16; ++i) {
         data = vld1q_u8(src);
