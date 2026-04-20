@@ -963,11 +963,10 @@ int main(int argc, char **argv)
 
     veejay_msg(VEEJAY_MSG_INFO, "Thank you for using Veejay");
 
-    veejay_close(info);
-
 VEEJAY_MAIN_EXIT:
     veejay_busy(info);
-    veejay_free(info);
+    veejay_close(info);
+	veejay_free(info);
     veejay_destroy_msg_ring();
 
     return main_ret;

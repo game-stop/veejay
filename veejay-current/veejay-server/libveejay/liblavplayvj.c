@@ -656,11 +656,14 @@ static inline void safe_join(pthread_t *t, const char *name)
 
 void veejay_busy(veejay_t * info)
 {
-    video_playback_setup *settings = (video_playback_setup*)(info->settings);
+	if (!info || !info->settings) {
+        return;
+    }
+
+	video_playback_setup *settings = (video_playback_setup*)(info->settings);
 
     veejay_msg(VEEJAY_MSG_DEBUG, "Waiting for threads to finish...");
     
-
     safe_join(&settings->renderer_thread, "Renderer");
     safe_join(&settings->producer_thread, "Producer");
     safe_join(&settings->audio_playback_thread, "Audio playback");
@@ -2216,14 +2219,9 @@ int veejay_close(veejay_t *info)
     pthread_cond_broadcast(&settings->renderer_wait_cv);
     pthread_mutex_unlock(&settings->mutex);
 
-    if (pthread_join(settings->renderer_thread, NULL))
-        veejay_msg(VEEJAY_MSG_ERROR, "Failed to join Renderer thread."), success = 0;
-
-    if (pthread_join(settings->producer_thread, NULL))
-        veejay_msg(VEEJAY_MSG_ERROR, "Failed to join Producer thread."), success = 0;
-
-    if (pthread_join(settings->audio_playback_thread, NULL))
-        veejay_msg(VEEJAY_MSG_ERROR, "Failed to join Audio thread."), success = 0;
+    pthread_join(settings->renderer_thread, NULL);
+    pthread_join(settings->producer_thread, NULL);
+    pthread_join(settings->audio_playback_thread, NULL);
 
     pthread_mutex_destroy(&settings->mutex);
     pthread_cond_destroy(&settings->producer_wait_cv);
