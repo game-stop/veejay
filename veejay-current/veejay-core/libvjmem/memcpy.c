@@ -2150,7 +2150,7 @@ void *memset_asimd_v3(void *dst, int val, size_t n) {
 void *memset_asimd(void *dst, int val, size_t len) {
 
 	if( len == 0 || NULL == dst ) 
-		return;
+		return dst;
 
     uint8x16_t value = vdupq_n_u8(val);
 	uint8_t *dst_bytes = (uint8_t *)dst;
@@ -2169,7 +2169,7 @@ void *memset_asimd(void *dst, int val, size_t len) {
 void *memset_asimd_v2(void *dst, int val, size_t len) {
 
 	if( len == 0 || NULL == dst ) 
-		return;
+		return dst;
 
     uint8x16_t value = vdupq_n_u8(val);
     uint8_t *dst_bytes = (uint8_t *)dst;
@@ -2198,7 +2198,7 @@ void *memset_asimd_v2(void *dst, int val, size_t len) {
 }
 void *memset_asimd_v4(void *dst, int val, size_t len) {
   if( len == 0 || NULL == dst ) 
-	return;
+	return dst;
 
   uint8x16_t v = vdupq_n_u8(val);
   size_t multiple_of_16 = len & ~0xF;
@@ -2216,7 +2216,7 @@ void *memset_asimd_v4(void *dst, int val, size_t len) {
 void *memset_asimd_64(uint8_t *dst, int value, size_t size) {
 
 	if( size == 0 || NULL == dst ) 
-		return;
+		return dst;
 
 	uint8x16_t value_v = vdupq_n_u8(value);
 
@@ -2261,7 +2261,7 @@ void *memset_asimd_64(uint8_t *dst, int value, size_t size) {
 
 void *memset_asimd_32(uint8_t *dst, int value, size_t size) {
 	if( size == 0 || dst == NULL ) 
-		return;
+		return dst;
 
 	uint8x16_t value_v = vdupq_n_u8(value);
 
