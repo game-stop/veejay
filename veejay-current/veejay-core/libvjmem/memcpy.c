@@ -2147,7 +2147,7 @@ void *memset_asimd_v3(void *dst, int val, size_t n) {
 #endif
 
 #ifdef HAVE_ARM_ASIMD
-void memset_asimd(void *dst, int val, size_t len) {
+void *memset_asimd(void *dst, int val, size_t len) {
 
 	if( len == 0 || NULL == dst ) 
 		return;
@@ -2166,7 +2166,7 @@ void memset_asimd(void *dst, int val, size_t len) {
         *dst_bytes++ = val;
     }
 }
-void memset_asimd_v2(void *dst, int val, size_t len) {
+void *memset_asimd_v2(void *dst, int val, size_t len) {
 
 	if( len == 0 || NULL == dst ) 
 		return;
@@ -2196,7 +2196,7 @@ void memset_asimd_v2(void *dst, int val, size_t len) {
         *dst_bytes++ = val;
     }
 }
-void memset_asimd_v4(void *dst, int val, size_t len) {
+void *memset_asimd_v4(void *dst, int val, size_t len) {
   if( len == 0 || NULL == dst ) 
 	return;
 
@@ -2213,7 +2213,7 @@ void memset_asimd_v4(void *dst, int val, size_t len) {
   }
 }
 
-void memset_asimd_64(uint8_t *dst, int value, size_t size) {
+void *memset_asimd_64(uint8_t *dst, int value, size_t size) {
 
 	if( size == 0 || NULL == dst ) 
 		return;
@@ -2259,7 +2259,7 @@ void memset_asimd_64(uint8_t *dst, int value, size_t size) {
 
 }
 
-void memset_asimd_32(uint8_t *dst, int value, size_t size) {
+void *memset_asimd_32(uint8_t *dst, int value, size_t size) {
 	if( size == 0 || dst == NULL ) 
 		return;
 
