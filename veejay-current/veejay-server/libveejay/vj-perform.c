@@ -196,6 +196,8 @@ typedef struct
     void *rgba2yuv_scaler;
     void *yuv2rgba_scaler;
     void *yuv420_scaler;
+    int fx_rgb_format;
+    int fx_yuv_format;
     uint8_t *pribuf_area;
     size_t pribuf_len;
     uint8_t *fx_chain_buffer;
@@ -294,6 +296,8 @@ static int vj_perform_render_sample_frame(veejay_t *info, performer_t *p, uint8_
 static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4]);
 static int vj_perform_record_commit_single(veejay_t *info);
 static void vj_perform_end_transition(veejay_t *info, int mode, int sample);
+static int vj_perform_format_changed_rgb(performer_t *p, VJFrame *frame);
+static int vj_perform_format_changed_yuv(performer_t *p, VJFrame *frame);
 
 static void vj_perform_set_444__(VJFrame *frame)
 {
@@ -930,30 +934,6 @@ static performer_t *vj_perform_init_performer(veejay_t *info, int chain_id)
 
     veejay_memset( &(p->pvar_), 0, sizeof( varcache_t));
 
-    sws_template templ;
-    veejay_memset(&templ,0,sizeof(sws_template));
-    templ.flags = yuv_which_scaler();
-
-    p->rgba_frame[0] = yuv_rgb_template( p->rgba_buffer[0], w, h, PIX_FMT_RGBA );
-    p->rgba_frame[1] = yuv_rgb_template( p->rgba_buffer[1], w, h, PIX_FMT_RGBA );
-    p->yuva_frame[0] = yuv_yuv_template( NULL, NULL, NULL, w,h,PIX_FMT_YUVA444P );
-    p->yuva_frame[1] = yuv_yuv_template( NULL, NULL, NULL, w,h,PIX_FMT_YUVA444P );
-    p->yuv420_frame[0] = yuv_yuv_template( NULL, NULL, NULL, w, h, PIX_FMT_YUV420P );
-
-    p->yuv420_scaler =  yuv_init_swscaler( p->yuva_frame[0], p->yuv420_frame[0], &templ, yuv_sws_get_cpu_flags() );
-    if(p->yuv420_scaler == NULL )
-        return NULL;
-
-    p->yuv2rgba_scaler = yuv_init_swscaler( p->yuva_frame[0], p->rgba_frame[0], &templ, yuv_sws_get_cpu_flags() );
-    if(p->yuv2rgba_scaler == NULL )
-        return NULL;
-
-    p->rgba2yuv_scaler = yuv_init_swscaler( p->rgba_frame[1], p->yuva_frame[0], &templ, yuv_sws_get_cpu_flags());
-    if(p->rgba2yuv_scaler == NULL )
-        return NULL;
-
-    p->rgba_frame[0]->data[0] = p->rgba_buffer[0];
-    p->rgba_frame[1]->data[0] = p->rgba_buffer[1];
 
     veejay_msg(VEEJAY_MSG_INFO,
         "[PRODUCER] Using %.2f MB RAM, %.2f MB RAM pre-allocated for FX",
@@ -1444,7 +1424,85 @@ void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )
     pframe.stride[2] = p->yuv420_frame[0]->stride[1];
     pframe.stride[3] = 0;
 
+    vj_perform_format_changed_yuv(p, &pframe);
     yuv_convert_and_scale( p->yuv420_scaler, &pframe, p->yuv420_frame[0] );
+}
+
+static void *vj_perform_init_scaler(VJFrame *src, VJFrame *dst) {
+    sws_template templ;
+    veejay_memset(&templ,0,sizeof(sws_template));
+    templ.flags = yuv_which_scaler();
+
+    return yuv_init_swscaler( src, dst, &templ, yuv_sws_get_cpu_flags() );
+}
+
+static int vj_perform_format_changed_yuv(performer_t *p, VJFrame *frame) {
+    // yuv -> yuv 4:2:0 planar
+    if( p->yuv420_scaler == NULL || p->yuv420_frame[0] == NULL || p->fx_yuv_format != frame->format) {
+        if(p->yuv420_frame[0]) {
+           free(p->yuv420_frame[0]); 
+        }
+        p->yuv420_frame[0] = yuv_yuv_template(NULL, NULL,NULL, frame->width,frame->height,
+            frame->range ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P);
+        if(!p->yuv420_frame[0]) {
+            return 0;
+        }
+        p->yuv420_scaler =  vj_perform_init_scaler( frame, p->yuv420_frame[0]);
+        if(p->yuv420_scaler == NULL )
+            return 0;
+    }
+
+    p->fx_yuv_format = frame->format;
+
+    return 1;
+    
+}
+
+static int vj_perform_format_changed_rgb(performer_t *p, VJFrame *frame) {
+
+    // yuv -> rgb
+    if( p->yuv2rgba_scaler == NULL || p->rgba_frame[0] == NULL || p->fx_rgb_format != frame->format ) {
+        if(p->rgba_frame[0]) {
+            free(p->rgba_frame[0]);
+        }
+        
+        p->rgba_frame[0] = yuv_rgb_template( p->rgba_buffer[0], frame->width, frame->height, PIX_FMT_RGBA );
+        if(!p->rgba_frame[0])
+            return 0;
+        
+        if(p->yuv2rgba_scaler) {
+            yuv_free_swscaler(p->yuv2rgba_scaler);
+        }
+
+        p->yuv2rgba_scaler = vj_perform_init_scaler(frame, p->rgba_frame[0]);
+        if(p->yuv2rgba_scaler == NULL )
+            return 0;
+    }
+
+    // rgb -> yuv
+    if( p->rgba2yuv_scaler == NULL || p->rgba_frame[1] == NULL || p->fx_rgb_format != frame->format ) {
+        if(p->rgba_frame[1]) {
+            free(p->rgba_frame[1]);
+        }
+
+        p->rgba_frame[1] = yuv_rgb_template( p->rgba_buffer[0], frame->width, frame->height, PIX_FMT_RGBA );
+        if(!p->rgba_frame[1])
+            return 0;
+        
+        if(p->rgba2yuv_scaler) {
+            yuv_free_swscaler(p->rgba2yuv_scaler);
+        }
+        p->rgba2yuv_scaler = vj_perform_init_scaler(p->rgba_frame[1], frame);
+        if(p->rgba2yuv_scaler == NULL )
+            return 0;
+    }
+
+    
+    p->rgba_frame[0]->data[0] = p->rgba_buffer[0];
+    p->rgba_frame[1]->data[0] = p->rgba_buffer[1];            
+    p->fx_rgb_format = frame->format;
+
+    return 1;
 }
 
 static void vj_perform_apply_first(veejay_t *info,performer_t *p, vjp_kf *todo_info,
@@ -1478,24 +1536,19 @@ static void vj_perform_apply_first(veejay_t *info,performer_t *p, vjp_kf *todo_i
     }
     
     if( rgb ) {
-        p->yuva_frame[0]->data[0] = frames[0]->data[0];
-        p->yuva_frame[0]->data[1] = frames[0]->data[1];
-        p->yuva_frame[0]->data[2] = frames[0]->data[2];
-        p->yuva_frame[0]->data[3] = frames[0]->data[3];
+        
+        if(!vj_perform_format_changed_rgb) {
+            return;
+        }
 
-        yuv_convert_and_scale_rgb( p->yuv2rgba_scaler, p->yuva_frame[0], p->rgba_frame[0] );
+        yuv_convert_and_scale_rgb( p->yuv2rgba_scaler, frames[0], p->rgba_frame[0] );
         if(is_mixer) {
-            p->yuva_frame[1]->data[0] = frames[1]->data[0];
-            p->yuva_frame[1]->data[1] = frames[1]->data[1];
-            p->yuva_frame[1]->data[2] = frames[1]->data[2];
-            p->yuva_frame[1]->data[3] = frames[1]->data[3];
-
-            yuv_convert_and_scale_rgb( p->yuv2rgba_scaler, p->yuva_frame[1], p->rgba_frame[1] ); 
+            yuv_convert_and_scale_rgb( p->yuv2rgba_scaler, frames[1], p->rgba_frame[1] );
         }
 
         vjert_apply( entry, p->rgba_frame, p->chain_id,c, args );
     
-        yuv_convert_and_scale_from_rgb( p->rgba2yuv_scaler, p->rgba_frame[0],p->yuva_frame[0] );
+        yuv_convert_and_scale_from_rgb( p->rgba2yuv_scaler, p->rgba_frame[0],frames[0] );
     }
     else {
         vjert_apply( entry, frames, p->chain_id, c, args );
@@ -5124,7 +5177,7 @@ void vj_perform_inc_frame(veejay_t *info, int num)
     int next_dir = cur_dir;
 
     if(looptype == 3) { //option: either do this here or at the sample boundary
-        if( speed >= 0 ) {
+        if( speed > 0 ) {
             next_frame = vj_frame_rand(cur_frame,start,end, settings->master_frame_num );
         }
         else if(speed < 0) {
