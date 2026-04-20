@@ -398,6 +398,12 @@ void tunnel_apply(void *ptr, VJFrame *frame, int *args) {
     float liss_x = cosf(t->time * curve_spd * 2.0f) * curve_int;
     float liss_y = sinf(t->time * curve_spd * 3.0f) * curve_int;
 
+    int32_t chroma_fb_fp = (fb_fp * 3) >> 2;
+    int32_t chroma_inv_fp = TO_FP(1.0f) - chroma_fb_fp;
+
+    int32_t current_inv_fb = FP_ONE - fb_fp;
+    int32_t current_inv_chroma_fb = FP_ONE - chroma_fb_fp;
+
     #pragma omp parallel for schedule(static)
     for (int i = 0; i < size; i++) {
 
@@ -461,18 +467,27 @@ void tunnel_apply(void *ptr, VJFrame *frame, int *args) {
         }
 
         if (active_layers > 1) {
-            accY >>= 1;
-            accU >>= 1;
-            accV >>= 1;
+            accY /= active_layers;
+            accU /= active_layers;
+            accV /= active_layers;
         }
 
-        t->histY[i] = ((accY * inv_fb_fp) + ((int64_t)t->histY[i] * fb_fp)) >> FP_SHIFT;
-        t->histU[i] = ((accU * inv_fb_fp) + ((int64_t)t->histU[i] * fb_fp)) >> FP_SHIFT;
-        t->histV[i] = ((accV * inv_fb_fp) + ((int64_t)t->histV[i] * fb_fp)) >> FP_SHIFT;
+        t->histY[i] = ((accY * current_inv_fb) + ((int64_t)t->histY[i] * fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
+        t->histU[i] = ((accU * current_inv_chroma_fb) + ((int64_t)t->histU[i] * chroma_fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
+        t->histV[i] = ((accV * current_inv_chroma_fb) + ((int64_t)t->histV[i] * chroma_fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
 
-        t->dstY[i] = t->gamma_lut[clamp_u8(t->histY[i] >> FP_SHIFT)];
-        t->dstU[i] = clamp_u8((t->histU[i] >> FP_SHIFT) + 128);
-        t->dstV[i] = clamp_u8((t->histV[i] >> FP_SHIFT) + 128);
+        int y_val = t->histY[i] >> FP_SHIFT;
+        int u_val = t->histU[i] >> FP_SHIFT;
+        int v_val = t->histV[i] >> FP_SHIFT;
+
+        u_val = (u_val * 1056) >> 10;
+        v_val = (v_val * 1056) >> 10;
+
+        int y_clamped = (y_val < 0) ? 0 : (y_val > 255 ? 255 : y_val);
+        t->dstY[i] = t->gamma_lut[y_clamped * (GAMMA_LUT_SIZE - 1) / 255];
+
+        t->dstU[i] = clamp_u8(u_val + 128);
+        t->dstV[i] = clamp_u8(v_val + 128);
     }
 
     veejay_memcpy(srcY, t->dstY, size);
