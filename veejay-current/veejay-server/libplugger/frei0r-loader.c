@@ -81,6 +81,8 @@ typedef struct
 	VJFrame *out;
 	VJFrame *dst;
 	VJFrame	*last;
+	int format;
+	int in_count;
 } fr0_conv_t;
 
 
@@ -113,6 +115,8 @@ static struct  {
     { "bgsubtract0r",0, 3},
 	{ NULL, 0, 0 },
 };
+
+static int frei0r_ensure_scaler(fr0_conv_t *fr, VJFrame *src, int n_in);
 
 static inline int frei0r_param_get_double(f0r_get_param_value_f q,void *plugin, int seq_no)
 {
@@ -471,6 +475,9 @@ int	frei0r_push_frame_f( void *plugin, int seqno, int dir, VJFrame *in )
 			return 0;
 		}
 	
+
+		frei0r_ensure_scaler(fr, in, fr->in_count);
+
 		yuv_convert_and_scale_rgb( in_scaler__, in, fr->in[seqno]); //@ yuv -> rgb
 		if(seqno == 0)
 			fr->last = in;
@@ -877,6 +884,67 @@ void	frei0r_destroy(void)
 		yuv_free_swscaler( in_scaler__ );
 }
 
+static void *frei0r_get_scaler(VJFrame *src, VJFrame *dst) {
+    sws_template templ;
+    veejay_memset(&templ,0,sizeof(sws_template));
+    templ.flags = yuv_which_scaler();
+
+    return yuv_init_swscaler( src, dst, &templ, yuv_sws_get_cpu_flags() );
+}
+
+static int frei0r_ensure_scaler(fr0_conv_t *fr, VJFrame *src, int n_in) {
+
+	uint8_t *bufx  = fr->buf;
+
+	if(fr->format != src->format) {
+		if(n_in > 0) {
+			for(int i = 0; i < (n_in+1); i ++ ) {
+				if( fr->in[i] ) {
+					free(fr->in[i]);
+				}
+				fr->in[i] = yuv_rgb_template(bufx, src->width,src->height, PIX_FMT_RGBA );
+				if(!fr->in[i])
+					return 0;
+				bufx   += (src->width*src->height*4);
+			}
+			if( fr->out ) {
+				free(fr->out);
+			}
+		}
+		
+		fr->out = yuv_yuv_template(bufx, bufx+(src->width*src->height), bufx+(src->width*src->height*2), src->width,src->height,src->format );
+		if(!fr->out) {
+			return 0;
+		}
+
+		if(n_in > 0 && in_scaler__) {
+			yuv_free_swscaler(in_scaler__);
+			in_scaler__ = NULL;
+		}
+
+		if(out_scaler__) {
+			yuv_free_swscaler(out_scaler__);
+			out_scaler__ = NULL;
+		}
+	}
+
+	if( n_in > 0 && in_scaler__ == NULL) { 
+		in_scaler__  = frei0r_get_scaler( src,fr->in[0]);  // yuv -> rgb
+		if(!in_scaler__) {
+			return 0;
+		}
+	}
+
+
+	if( out_scaler__ == NULL ) {
+		out_scaler__	= frei0r_get_scaler( fr->in[0],fr->out); // rgb -> yuv
+		if(!out_scaler__) {
+			return 0;
+		}
+	}
+
+	return 1;
+}
 
 void *frei0r_plug_init( void *plugin , int w, int h, int pf, int read_plug_cfg )
 {
@@ -913,11 +981,7 @@ void *frei0r_plug_init( void *plugin , int w, int h, int pf, int read_plug_cfg )
 
 
 	int frfmt = 0;
-	vevo_property_get( plugin, "format",0,&frfmt ); 
-
-	sws_template templ; 
-	memset(&templ,0,sizeof(sws_template));
-	templ.flags = yuv_which_scaler();
+	vevo_property_get( plugin, "format",0,&frfmt );
 
 	int n_in = 0;
 	int n_out = 0;
@@ -935,17 +999,9 @@ void *frei0r_plug_init( void *plugin , int w, int h, int pf, int read_plug_cfg )
 		fr->in[i] = yuv_rgb_template(bufx, w,h, frfmt );
 		bufx   += (w*h*4);
 	}
-
-	fr->out          = yuv_yuv_template(bufx, bufx+(w*h), bufx+(w*h*2), w,h,pf );
-	fr->out->data[3] = bufx + (fr->out->len + fr->out->uv_len + fr->out->uv_len);
-
-	if( out_scaler__ == NULL ) {
-		out_scaler__	= yuv_init_swscaler( fr->in[0],fr->out,&templ,yuv_sws_get_cpu_flags()); // rgb -> yuv
-	}
-
-	if( n_in > 0 && in_scaler__ == NULL) { 
-		in_scaler__  = yuv_init_swscaler( fr->out,fr->in[0],&templ,yuv_sws_get_cpu_flags());  // yuv -> rgb
-	}
+	
+	fr->format = pf;
+	fr->in_count = n_in;
 
 	void *frptr    = (void*) fr;
 	vevo_property_set( instance, "HOST_conv", VEVO_ATOM_TYPE_VOIDPTR,1,&frptr);
@@ -1001,6 +1057,10 @@ int	frei0r_process_frame_f( void *plugin )
 	
 		(*base)( instance, rand(), (const uint32_t*) fr->buf, (uint32_t*) fr->in[0]->data[0] );
 		
+		if(!frei0r_ensure_scaler(fr, fr->last, 0)) {
+			return 0;
+		}
+
 		yuv_convert_and_scale_from_rgb( out_scaler__, fr->in[0], fr->last );
 		
 	} else if( n_inputs == 1 ) {
@@ -1008,6 +1068,10 @@ int	frei0r_process_frame_f( void *plugin )
 		vevo_property_get( parent, "process", 0, &base );
 	
 		(*base)( instance, rand(), (const uint32_t*) fr->in[0]->data[0], (uint32_t*) fr->in[1]->data[0] );
+
+		if(!frei0r_ensure_scaler(fr, fr->last, 0)) {
+			return 0;
+		}
 	
 		yuv_convert_and_scale_from_rgb( out_scaler__, fr->in[1], fr->last );
 
@@ -1016,6 +1080,10 @@ int	frei0r_process_frame_f( void *plugin )
 		vevo_property_get( parent, "process_mix", 0, &base2 );
 		
 		(*base2)( instance, rand(), (const uint32_t*) fr->in[0]->data[0],(const uint32_t*) fr->in[1]->data[0],NULL, (uint32_t*) fr->in[2]->data[0] );
+
+		if(!frei0r_ensure_scaler(fr, fr->last, 0)) {
+			return 0;
+		}
 
 		yuv_convert_and_scale_from_rgb( out_scaler__, fr->in[2], fr->last );
 	}
