@@ -246,12 +246,13 @@
 #include "./effects/integralblur.h"
 #include "./effects/tunnel.h"
 #include "./effects/chromaticdrift.h"
+#include "./effects/morphologymixer.h"
 
 #define VJ_IMAGE_EFFECT_MIN 38
 #define VJ_IMAGE_EFFECT_MAX 198
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 261 // + 1
+#define VJ_VIDEO_EFFECT_MAX 262 // + 1
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN + 1)
 #define VJ_PLUGIN 500
@@ -363,6 +364,7 @@ enum {
     VJ_VIDEO_EFFECT_HISTOMATCH = 258,
     VJ_VIDEO_EFFECT_SHAPEWIPE = 259,
     VJ_VIDEO_EFFECT_DARKREPLACEMIX = 260,
+    VJ_VIDEO_EFFECT_MORPHOLOGY = 261,
 };
 
 enum {

@@ -288,6 +288,7 @@ static struct {
     { buffer_init,buffer_malloc,buffer_free,NULL,NULL,buffer_apply,NULL, NULL,NULL,NULL,VJ_IMAGE_EFFECT_BUFFER },
     { blackreplace_init,blackreplace_malloc,blackreplace_free,NULL,NULL,blackreplace_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BLACKREPLACE },
     { darkreplace_init,darkreplace_malloc,darkreplace_free,NULL,NULL,NULL,darkreplace_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_DARKREPLACEMIX },
+    { morphologymixer_init, morphologymixer_malloc, morphologymixer_free, NULL,NULL,NULL, morphologymixer_apply, NULL,NULL,NULL, VJ_VIDEO_EFFECT_MORPHOLOGY },
     { NULL,NULL,NULL,NULL,NULL, NULL,NULL,NULL,NULL, 0},
 
     // FIXME: global tagged FX : motionmap, bgsubtract, bgsubtractgauss, bgpush
