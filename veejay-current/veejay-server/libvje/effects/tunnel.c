@@ -229,7 +229,7 @@ vj_effect *tunnel_init(int width, int height) {
     ve->limits[0][7]=0;    ve->limits[1][7]=5;   // Shape Mode
     ve->limits[0][8]=0;    ve->limits[1][8]=1;    // HQ
 
-    ve->description = "Tunnel (wip)";
+    ve->description = "Tunnel";
     ve->sub_format = 1;
     ve->param_description = vje_build_param_list(ve->num_params, 
         "Speed","Curve Int","Curve Speed","Swirl","Zoom","Offset","Feedback","Shape", "High Quality");
