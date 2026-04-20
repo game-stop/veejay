@@ -117,12 +117,13 @@ unsigned char *keyframe_pack(void *port, int parameter_id, int entry_id, int *rl
         free(k_s); free(k_e); free(k_t); free(k_x); free(k_dn); return NULL;
     }
 
-    int data_ok = keyframe_set_data(port, parameter_id, values, values_len );
-    if (!data_ok) {
-        free(k_s); free(k_e); free(k_t); free(k_x); return NULL;
+    char *k_d = extract_("data", parameter_id);
+    if(!k_d || vevo_property_get(port, k_d,0, &values) != VEVO_NO_ERROR) {
+        free(k_s); free(k_e); free(k_t); free(k_x); free(k_dn); return NULL;
     }
 
-    free(k_s); free(k_e); free(k_t); free(k_x); free(k_dn);
+
+    free(k_s); free(k_e); free(k_t); free(k_x); free(k_dn); free(k_d);
 
     if (values_len <= 0 || values == NULL) return NULL;
 
