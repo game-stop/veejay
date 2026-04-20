@@ -928,10 +928,15 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 
 	int track = 0;
 
-	if(!gvr_track_connect( mt->preview, hostname, port_num, &track ) )
+	int res = gvr_track_connect( mt->preview, hostname, port_num, &track );
+	if(res == 0)
 	{
 		if(!gvr_track_already_open( mt->preview, hostname,port_num))
 			return -1;
+	}
+	if(res == -1) {
+		veejay_msg(VEEJAY_MSG_DEBUG,"Failed to open track 0 in multi tracker");
+		return -1;
 	}
 
 	gvr_track_configure(mt->preview, track, mt->pw,mt->ph);

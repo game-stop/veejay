@@ -1390,7 +1390,7 @@ GdkPixbuf *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterp
 static void vj_kf_select_parameter(int id);
 static void vj_kf_refresh(gboolean force);
 static void vj_kf_reset(void);
-static void veejay_stop_connecting(vj_gui_t *gui);
+static void veejay_show_main_ui(vj_gui_t *gui);
 void reload_macros(void);
 void reportbug(void);
 void select_chain_entry(int entry);
@@ -7268,30 +7268,20 @@ int gveejay_time_to_sync( void *ptr )
 int veejay_update_multitrack( void *ptr )
 {
     sync_info *s = multitrack_sync( info->mt );
-/*
-    if( s->status_list[s->master] == NULL ) {
-        info->watch.w_state = STATE_STOPPED;
-        free(s->status_list);
-        free(s->img_list );
-        free(s->widths);
-        free(s->heights);
-        free(s);
-        
-        gettimeofday( &(info->time_last) , 0 );
+    if(!s) {
+        return 0;
+    }
 
-        return 1;
-    }*/
+    if( s->status_list == NULL) {
+        if(s) free(s);
+        return 0;
+    }
+
 
     GtkWidget *maintrack = widget_cache[ WIDGET_IMAGEA ];
-    int i;
     GtkWidget *ww = widget_cache[ WIDGET_NOTEBOOK18 ];
     int deckpage = gtk_notebook_get_current_page(GTK_NOTEBOOK(ww));
-
-#ifdef STRICT_CHECKING
-    assert( s->status_list[s->master] != NULL );
-#endif
-
-    int tmp = 0;
+    int tmp = 0, i;
 
     if( s->status_list[s->master] != NULL ) {
         for ( i = 0; i < STATUS_TOKENS; i ++ )
@@ -8560,10 +8550,13 @@ static int auto_connect_to_veejay(char *host, int port_num)
     for( i = port_num; i < 9999; i += 1000 ) {
         //connect client at first available server
         if( vj_gui_reconnect( hostname, NULL, i ) ) {
-            info->watch.state = STATE_PLAYING;
             veejay_msg(VEEJAY_MSG_INFO,"Trying to connect to %s:%d", hostname, i);
-            multrack_audoadd( info->mt, hostname, i);
+            if( multrack_audoadd( info->mt, hostname, i) == -1) {
+                return 0;
+            }
+            
             multitrack_set_master_track( info->mt, 0 );
+            
             // set reconnect info
             update_spin_value( "button_portnum", i );
             put_text( "entry_hostname", hostname );
@@ -8571,11 +8564,15 @@ static int auto_connect_to_veejay(char *host, int port_num)
             // setup tracks
             for( j = (i+1000); j < 9999; j+= 1000 )
             {
-                veejay_msg(VEEJAY_MSG_INFO, "Trying to add %s:%d as a track", hostname, j);
-                multrack_audoadd( info->mt, hostname, j);
+                veejay_msg(VEEJAY_MSG_DEBUG, "Trying to add %s:%d as a track", hostname, j);
+                if(multrack_audoadd( info->mt, hostname, j) == -1 ) {
+                    veejay_msg(VEEJAY_MSG_DEBUG, "Failed connect on port %d", j);
+                }
             }
             multitrack_set_quality( info->mt, 1 );
             i = j;
+                
+            info->watch.state = STATE_PLAYING;
 
             return 1;
         }
@@ -8930,11 +8927,11 @@ void vj_gui_init(const char *glade_file,
 
     if( auto_connect ) {
         if(auto_connect_to_veejay(hostname, port_num)) {
-            veejay_stop_connecting(gui);
+            veejay_show_main_ui(gui);
         }
     }
 
-    if(info->watch.state != STATE_PLAYING) {
+    if(info->watch.state != STATE_PLAYING) { //FIXME needed?
         if(hostname) {
             put_text("entry_hostname",hostname);
         }
@@ -9122,7 +9119,7 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
     return 1;
 }
 
-static void veejay_stop_connecting(vj_gui_t *gui)
+static void veejay_show_main_ui(vj_gui_t *gui)
 {
     GtkWidget *veejay_conncection_window;
 
@@ -9219,26 +9216,32 @@ gboolean    is_alive( int *do_sync )
         veejay_msg(VEEJAY_MSG_INFO, "Connecting to %s: %d", remote,port );
         if(!vj_gui_reconnect( remote, NULL, port ))
         {
-            reloaded_schedule_restart();
+            reloaded_restart();
+            return TRUE;
         }
-        else
-        {
-            info->watch.state = STATE_PLAYING;
 
-            if( use_key_snoop ) {
 
+        if( multrack_audoadd( info->mt, remote, port ) == -1 ) {
+            vj_gui_disconnect(TRUE);
+            reloaded_restart();
+            return TRUE;
+        }
+
+        veejay_msg(VEEJAY_MSG_DEBUG, "Connected to master track");
+        multitrack_set_master_track( info->mt, 0 );
+        multitrack_set_quality( info->mt, 1 );
+
+        *do_sync = 1;
+        info->watch.state = STATE_PLAYING;
+
+        if( use_key_snoop ) {
 #ifdef HAVE_SDL
-                info->key_id = gtk_key_snooper_install( key_handler , NULL);
+            info->key_id = gtk_key_snooper_install( key_handler , NULL);
 #endif
-            }
-            multrack_audoadd( info->mt, remote, port );
-            multitrack_set_master_track( info->mt, 0 );
-            multitrack_set_quality( info->mt, 1 );
-
-            *do_sync = 1;
-
-            veejay_stop_connecting(gui);
         }
+
+        veejay_show_main_ui(gui);
+        
     }
     return TRUE;
 }

@@ -102,7 +102,7 @@ static int veejay_process_status( veejay_preview_t *vp, veejay_track_t *v );
 static int gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v );
 static int track_exists( veejay_preview_t *vp, const char *hostname, int port_num, int *at );
 static int gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v );
-void gvr_veejay_grabber_step( void *data, void *caller_data );
+static int gvr_veejay_grabber_step( void *data, void *caller_data );
 
 void	*gvr_preview_init(int max_tracks, int use_threads)
 {
@@ -343,12 +343,12 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 		int bytes= 0;
 		if( status_len[0] != 'V' ) {
             veejay_msg(0, "Unexpected status byte in [%s] with %s:%d", status_len, v->hostname, v->port_num);
-			return -1;
+			return 0;
 		}
 
 		if( n <= 0 ) {
             veejay_msg(0, "Lost connection with veejay");
-			return -1;
+			return 0;
 		}
 		
         char sta_len[4];
@@ -363,7 +363,7 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 			n = vj_client_read( v->fd, V_STATUS, v->status_buffer, bytes );
 			if( n <= 0 ) {	
 				veejay_msg(0,"Failed to read %d status bytes", bytes);
-			    return -1;
+			    return 0;
             }
 
 	        if( status_to_arr( (char*) v->status_buffer, v->status_tokens ) < 37 )
@@ -376,7 +376,7 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 
     if( k == -1 ) {
         veejay_msg(0, "Dropping connection to veejay");
-        return -1;
+        return 0;
     }
 	
 	return 1;
@@ -452,11 +452,11 @@ static int veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v)
 static int	gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v )
 {
     int k =	veejay_process_status( vp, v );
-	if( k == -1 && v->is_master) {
+	if( k == 0 && v->is_master) {
 	    veejay_msg(VEEJAY_MSG_INFO, "Bringing up launcher window");
-           reloaded_schedule_restart();
-    }
-	return (k >= 0);
+        reloaded_schedule_restart();
+	}
+	return (k > 0);
 }
 
 static int fail_connection	 = 0;
@@ -589,7 +589,7 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_tr
 	{
 		vj_msg(VEEJAY_MSG_ERROR, "Unable to connect to %s:%d", hostname, port_num );
 		vj_client_free( fd );
-		return 0;
+		return -1;
 	}
 	
 	veejay_track_t *vt = (veejay_track_t*) vj_calloc( sizeof(veejay_track_t));
@@ -601,19 +601,19 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_tr
 	vt->status_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * STATUS_LENGTH);
 	if(vt->status_buffer == NULL ) {
 		vj_client_free( fd );
-		return 0;
+		return -1;
 	}
 
 	vt->data_buffer = (uint8_t*) vj_malloc( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 3);
 	if(vt->data_buffer == NULL ) {
 		vj_client_free( fd );
-		return 0;
+		return -1;
 	}
 
 	vt->tmp_buffer = (uint8_t*) vj_calloc( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 4);
 	if(vt->tmp_buffer == NULL ) {
 		vj_client_free( fd );
-		return 0;
+		return -1;
 	}
 
 	*new_track = track_num;
@@ -932,13 +932,15 @@ sync_info	*gvr_sync( void *preview, void *caller_data )
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 	sync_info *s = (sync_info*) vj_calloc(sizeof(sync_info));
 
-	gvr_veejay_grabber_step( preview, caller_data );
+	if(gvr_veejay_grabber_step( preview, caller_data )) {
 
-	s->status_list = gvr_grab_stati( preview );
-	s->tracks      = vp->n_tracks;
-	s->widths      = gvr_grab_widths( preview );
-	s->heights     = gvr_grab_heights( preview);
-	s->img_list    = gvr_grab_images( preview ); 
+		s->status_list = gvr_grab_stati( preview );
+		s->tracks      = vp->n_tracks;
+		s->widths      = gvr_grab_widths( preview );
+		s->heights     = gvr_grab_heights( preview);
+		s->img_list    = gvr_grab_images( preview ); 
+
+	}
 
 	return s;
 }
@@ -1086,7 +1088,7 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 	return score;
 }
 
-void		gvr_veejay_grabber_step( void *data, void *caller_data )
+static int gvr_veejay_grabber_step( void *data, void *caller_data )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) data;
 	int i;
@@ -1106,6 +1108,7 @@ void		gvr_veejay_grabber_step( void *data, void *caller_data )
         {
            gvr_track_disconnect(vp, i);
            multitrack_cleanup_track(caller_data, i);
+		   return 0;
         }
 	}
 
@@ -1117,6 +1120,8 @@ void		gvr_veejay_grabber_step( void *data, void *caller_data )
 				gvr_veejay( vp, vp->tracks[i],i );	
 		}
 	}
+
+	return 1;
 
 }
 
