@@ -249,27 +249,30 @@ static int BENCHMARK_HEI = 1080;
 
 
 #if defined(ARCH_X86) || defined (ARCH_X86_64)
-static __inline__ void * __memcpy(void * to, const void * from, size_t n)
+static inline void *__memcpy(void *restrict to, const void *restrict from, size_t n)
 {
-     int d0, d1, d2;
-     if ( n < 4 ) { 
-          small_memcpy(to,from,n);
-     }
-     else
-          __asm__ __volatile__(
-            "rep ; movsl\n\t"
+    size_t d0;
+    uintptr_t d1, d2;
+
+    if (n < 4) {
+        small_memcpy(to, from, n);
+    } else {
+        __asm__ __volatile__(
+            "rep movsl\n\t"
             "testb $2,%b4\n\t"
             "je 1f\n\t"
-            "movsw\n"
+            "movsw\n\t"
             "1:\ttestb $1,%b4\n\t"
             "je 2f\n\t"
-            "movsb\n"
+            "movsb\n\t"
             "2:"
-            : "=&c" (d0), "=&D" (d1), "=&S" (d2)
-            :"0" (n/4), "q" (n),"1" ((uintptr_t) to),"2" ((uintptr_t) from)
+            : "=&c"(d0), "=&D"(d1), "=&S"(d2)
+            : "0"(n / 4), "q"(n),
+              "1"(to), "2"(from)
             : "memory");
+    }
 
-     return(to);
+    return to;
 }
 
 #ifdef HAVE_ASM_AVX
@@ -478,7 +481,7 @@ void	packed_plane_clear( size_t len, void *to )
 }
 
 #if defined (__SSE4_1__)
-static void *sse41_memcpy(void *dst, const void *src, size_t len) {
+static void *sse41_memcpy(void *restrict dst, const void *restrict src, size_t len) {
   void *retval = dst;
   unsigned char *to = (unsigned char*) dst;
   unsigned char *from = (unsigned char*) src;
@@ -542,7 +545,7 @@ static void *sse41_memcpy(void *dst, const void *src, size_t len) {
 #endif
 
 #if defined (__SSE4_2__ )
-static void *sse42_memcpy(void *dst, const void *src, size_t len) {
+static void *sse42_memcpy(void *restrict dst, const void *restrict src, size_t len) {
   void *retval = dst;
   unsigned char *to = (unsigned char*) dst;
   unsigned char *from = (unsigned char*) src;
@@ -614,7 +617,7 @@ static void *sse42_memcpy(void *dst, const void *src, size_t len) {
  * http://www.ibiblio.org/gferg/ldp/GCC-Inline-Assembly-HOWTO.html#ss5.4
  */
 
-static void *sse2_memcpy(void * to, const void * from, size_t len)
+static void *sse2_memcpy(void *restrict to, const void *restrict from, size_t len)
 {
     void *retval = to;
 
@@ -686,7 +689,7 @@ static void *sse2_memcpy(void * to, const void * from, size_t len)
     return retval;
 }
 
-static void *sse2_memcpy_unaligned(void *dst, const void *ptr, size_t len) {
+static void *sse2_memcpy_unaligned(void *restrict dst, const void *restrict ptr, size_t len) {
   void *retval = dst;
 
   unsigned char *from = (unsigned char*) ptr;
@@ -748,7 +751,7 @@ static void *sse2_memcpy_unaligned(void *dst, const void *ptr, size_t len) {
 
 #ifdef HAVE_ASM_SSE
 /* for veejay, moving 128 bytes a time makes a difference */
-static void *sse_memcpy2(void * to, const void * from, size_t len)
+static void *sse_memcpy2(void *restrict to, const void *restrict from, size_t len)
 {
 	void *retval = to;
 	size_t i;
@@ -823,7 +826,7 @@ static void *sse_memcpy2(void * to, const void * from, size_t len)
 /* SSE note: i tried to move 128 bytes a time instead of 64 but it
 didn't make any measureable difference. i'm using 64 for the sake of
 simplicity. [MF] */
-static void * sse_memcpy(void * to, const void * from, size_t len)
+static void * sse_memcpy(void *restrict to, const void *restrict from, size_t len)
 {
   void *retval;
   size_t i;
@@ -912,80 +915,69 @@ static void * sse_memcpy(void * to, const void * from, size_t len)
 #endif
 
 #ifdef HAVE_ASM_AVX2
-void *avx2_memcpy(void *dst0, const void *src0, size_t len0) {
-    void *retval = dst0;
-
-    const char *src = (const char *)src0;
+void *avx2_memcpy(void *restrict dst0, const void *restrict src0, size_t len0) {
     char *dst = (char *)dst0;
+    const char *src = (const char *)src0;
     size_t len = len0;
-
-	// the avx2 memcpy is undefined if src or dst overlap
-    /*if ((dst < src + len) && (src < dst + len)) {
-        // use memmove for overlapping regions
-        memmove(dst, src, len);
-        return retval;
-    }*/
-
-    if (len >= 128) {
-        uintptr_t misalign = ((uintptr_t)dst) & 31;
-        if (misalign) {
-            size_t delta = 32 - misalign; // bytes to copy to reach 32-byte alignment
-            if (delta > len) delta = len; // defensive, though len >= 128 here
-            memcpy(dst, src, delta);
-            dst += delta;
-            src += delta;
-            len -= delta;
-        }
-
-        size_t blocks = len / 128;
-        len = len % 128;
-
-        int src_aligned = (((uintptr_t)src) & 31) == 0;
-        if(src_aligned) {
-          for (size_t i = 0; i < blocks; i++) {
-              // prefetch next 256-512 bytes
-              _mm_prefetch((const char *)src + 256, _MM_HINT_NTA);
-              _mm_prefetch((const char *)src + 512, _MM_HINT_NTA);
-              __m256i ymm0, ymm1, ymm2, ymm3;
-              ymm0 = _mm256_load_si256((const __m256i *)(src + 0));
-              ymm1 = _mm256_load_si256((const __m256i *)(src + 32));
-              ymm2 = _mm256_load_si256((const __m256i *)(src + 64));
-              ymm3 = _mm256_load_si256((const __m256i *)(src + 96));
-              _mm256_stream_si256((__m256i *)(dst + 0), ymm0);
-              _mm256_stream_si256((__m256i *)(dst + 32), ymm1);
-              _mm256_stream_si256((__m256i *)(dst + 64), ymm2);
-              _mm256_stream_si256((__m256i *)(dst + 96), ymm3);
-
-              src += 128;
-              dst += 128;
-          }
-        } else {
-            for (size_t i = 0; i < blocks; i++) {
-                _mm_prefetch((const char *)src + 256, _MM_HINT_NTA);
-                _mm_prefetch((const char *)src + 512, _MM_HINT_NTA);
-                __m256i ymm0, ymm1, ymm2, ymm3;
-                ymm0 = _mm256_loadu_si256((const __m256i *)(src + 0));
-                ymm1 = _mm256_loadu_si256((const __m256i *)(src + 32));
-                ymm2 = _mm256_loadu_si256((const __m256i *)(src + 64));
-                ymm3 = _mm256_loadu_si256((const __m256i *)(src + 96));
-                _mm256_stream_si256((__m256i *)(dst + 0), ymm0);
-                _mm256_stream_si256((__m256i *)(dst + 32), ymm1);
-                _mm256_stream_si256((__m256i *)(dst + 64), ymm2);
-                _mm256_stream_si256((__m256i *)(dst + 96), ymm3);
-                src += 128;
-                dst += 128;
-            }
-
-        }
-        _mm_sfence(); // ensure stores are visible
+    
+    if (len < 128) {
+        return memcpy(dst, src, len);
     }
 
-    if (len) {
-        memcpy(dst, src, len);
+    uintptr_t misalign = ((uintptr_t)dst) & 31;
+    if (misalign) {
+        size_t padding = 32 - misalign;
+        memcpy(dst, src, padding);
+        dst += padding;
+        src += padding;
+        len -= padding;
     }
 
-    return retval;
+    size_t blocks = len / 128;
+    size_t remainder = len % 128;
+    
+    if (len0 >= 16384) {
+        for (size_t i = 0; i < blocks; i++) {
+            __m256i ymm0 = _mm256_loadu_si256((const __m256i *)(src + 0));
+            __m256i ymm1 = _mm256_loadu_si256((const __m256i *)(src + 32));
+            __m256i ymm2 = _mm256_loadu_si256((const __m256i *)(src + 64));
+            __m256i ymm3 = _mm256_loadu_si256((const __m256i *)(src + 96));
+
+            _mm256_stream_si256((__m256i *)(dst + 0),  ymm0);
+            _mm256_stream_si256((__m256i *)(dst + 32), ymm1);
+            _mm256_stream_si256((__m256i *)(dst + 64), ymm2);
+            _mm256_stream_si256((__m256i *)(dst + 96), ymm3);
+            
+            src += 128;
+            dst += 128;
+        }
+
+    } else {
+
+        for (size_t i = 0; i < blocks; i++) {
+            __m256i ymm0 = _mm256_loadu_si256((const __m256i *)(src + 0));
+            __m256i ymm1 = _mm256_loadu_si256((const __m256i *)(src + 32));
+            __m256i ymm2 = _mm256_loadu_si256((const __m256i *)(src + 64));
+            __m256i ymm3 = _mm256_loadu_si256((const __m256i *)(src + 96));
+
+            _mm256_storeu_si256((__m256i *)(dst + 0),  ymm0);
+            _mm256_storeu_si256((__m256i *)(dst + 32), ymm1);
+            _mm256_storeu_si256((__m256i *)(dst + 64), ymm2);
+            _mm256_storeu_si256((__m256i *)(dst + 96), ymm3);
+            
+            src += 128;
+            dst += 128;
+        }
+    }
+
+    if (remainder) {
+        memcpy(dst, src, remainder);
+    }
+
+    return dst0;
 }
+
+
 __attribute__((target("avx2")))
 void *avx2_memset(void *dst0, int c, size_t len0) {
     void *retval = dst0;
@@ -1084,7 +1076,7 @@ void *avx_memset(void *dst0, int c, size_t len0) {
 
 #ifdef HAVE_ASM_AVX512
 #define AVX512_MMREG_SIZE 64  // 512-bit register = 64 bytes
-static void * avx512_memcpy(void *to, const void *from, size_t len) {
+static void * avx512_memcpy(void *restrict to, const void *restrict from, size_t len) {
     void *retval = to;
     size_t i;
     __asm__ __volatile__ (
@@ -1172,7 +1164,7 @@ static void * avx512_memcpy(void *to, const void *from, size_t len) {
 
 #ifdef HAVE_ASM_AVX
 __attribute__((target("avx")))
-static void* avx_memcpy(void *destination, const void *source, size_t size)
+static void* avx_memcpy(void *restrict destination, const void *restrict source, size_t size)
 {
 	unsigned char *dst = (unsigned char*)destination;
 	const unsigned char *src = (const unsigned char*)source;
@@ -1281,7 +1273,7 @@ static void* avx_memcpy(void *destination, const void *source, size_t size)
 }
 
 
-static void * avx_memcpy2(void * to, const void * from, size_t len)
+static void * avx_memcpy2(void *restrict to, const void *restrict from, size_t len)
 {
   void *retval;
   size_t i;
@@ -1370,7 +1362,7 @@ static void * avx_memcpy2(void * to, const void * from, size_t len)
 #endif /* HAVE_ASM_AVX */
 
 #ifdef HAVE_ASM_MMX
-static void * mmx_memcpy(void * to, const void * from, size_t len)
+static void * mmx_memcpy(void *restrict to, const void *restrict from, size_t len)
 {
   void *retval;
   size_t i;
@@ -1423,7 +1415,7 @@ static void * mmx_memcpy(void * to, const void * from, size_t len)
 #endif
 
 #ifdef HAVE_ASM_MMX2
-static void * mmx2_memcpy(void * to, const void * from, size_t len)
+static void * mmx2_memcpy(void *restrict to, const void *restrict from, size_t len)
 {
   void *retval;
   size_t i;
@@ -1496,7 +1488,7 @@ static void * mmx2_memcpy(void * to, const void * from, size_t len)
 #endif
 
 #if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE ) || defined( HAVE_ASM_MMX2 )
-static void *fast_memcpy(void * to, const void * from, size_t len)
+static void *fast_memcpy(void *restrict to, const void *restrict from, size_t len)
 {
 	void *retval;
 	size_t i;
@@ -1850,53 +1842,42 @@ void *sse41_memset(void *to, int value, size_t len) {
 #endif
 
 
-static void *linux_kernel_memcpy(void *to, const void *from, size_t len) {
+static void *linux_kernel_memcpy(void *restrict to, const void *restrict from, size_t len) {
      return __memcpy(to,from,len);
 }
 
 #endif
 
 #ifdef HAVE_ARM_NEON
-static inline void memcpy_neon_256( uint8_t *dst, const uint8_t *src )
+static inline void memcpy_neon_256(uint8_t *restrict dst, const uint8_t *restrict src)
 {
-	__asm__ volatile(	"pld [%[src], #64]" :: [src] "r" (src));
-	__asm__ volatile(	"pld [%[src], #128]" :: [src] "r" (src));
-	__asm__ volatile(	"pld [%[src], #192]" :: [src] "r" (src));
-	__asm__ volatile(	"pld [%[src], #256]" :: [src] "r" (src));
-	__asm__ volatile(	"pld [%[src], #320]" :: [src] "r" (src));
-	__asm__ volatile(	"pld [%[src], #384]" :: [src] "r" (src));
-	__asm__ volatile(	"pld [%[src], #448]" :: [src] "r" (src));
+    __asm__ volatile(
+        "pld [%[src], #64]      \n\t"
+        "pld [%[src], #128]     \n\t"
+        "pld [%[src], #192]     \n\t"
+        "pld [%[src], #256]     \n\t"
 
-	__asm__ volatile(	
-				"vld1.8 {d0-d3}, [%[src]]!\n\t"
-				"vld1.8 {d4-d7}, [%[src]]!\n\t"
-				"vld1.8 {d8-d11},[%[src]]!\n\t"
-				"vld1.8 {d12-d15},[%[src]]!\n\t"
-				"vld1.8 {d16-d19}, [%[src]]!\n\t"
-				"vld1.8 {d20-d23}, [%[src]]!\n\t"
-				"vld1.8 {d24-d27},[%[src]]!\n\t"
-				"vld1.8 {d28-d31},[%[src]]\n\t"
-				"vst1.8 {d0-d3}, [%[dst]]!\n\t"
-				"vst1.8 {d4-d7}, [%[dst]]!\n\t"
-				"vst1.8 {d8-d11}, [%[dst]]!\n\t"
-				"vst1.8 {d12-d15}, [%[dst]]!\n\t"
-				"vst1.8 {d16-d19}, [%[dst]]!\n\t"
-				"vst1.8 {d20-d23}, [%[dst]]!\n\t"
-				"vst1.8 {d24-d27}, [%[dst]]!\n\t"
-				"vst1.8 {d28-d31}, [%[dst]]!\n\t"
-				
-				: [src] "+r" (src), [dst] "+r" (dst)
-				:: "memory" , 
-						"d0", "d1", "d2", "d3", "d4", "d5", "d6" , "d7",
-						"d8", "d9", "d10","d11","d12","d13","d14", "d15",
-						"d16","d17","d18","d19","d20","d21","d22", "d23",
-						"d24","d23","d24","d25","d26","d27","d28", "d29",
-						"d30","d31"
-				 );
+        "vld1.8 {q0-q3},   [%[src]]! \n\t"
+        "vld1.8 {q4-q7},   [%[src]]! \n\t"
+        "vld1.8 {q8-q11},  [%[src]]! \n\t"
+        "vld1.8 {q12-q15}, [%[src]]  \n\t"
 
+        "vst1.8 {q0-q3},   [%[dst]]! \n\t"
+        "vst1.8 {q4-q7},   [%[dst]]! \n\t"
+        "vst1.8 {q8-q11},  [%[dst]]! \n\t"
+        "vst1.8 {q12-q15}, [%[dst]]  \n\t"
+
+        : [src] "+r"(src), [dst] "+r"(dst)
+        :
+        : "memory",
+          "q0","q1","q2","q3",
+          "q4","q5","q6","q7",
+          "q8","q9","q10","q11",
+          "q12","q13","q14","q15"
+    );
 }
 
-static void *memcpy_neon( void *to, const void *from, size_t n )
+static void *memcpy_neon(void *restrict to, const void *restrict from, size_t n )
 {
 	void *retval = to;
 
@@ -1924,106 +1905,60 @@ static void *memcpy_neon( void *to, const void *from, size_t n )
 	return retval;
 }
 #endif
+
 #ifdef HAVE_ARM_ASIMD
-static inline void memcpy_neon_256(uint8_t *dst, const uint8_t *src) {
+static inline void memcpy_neon_256(uint8_t *restrict dst, const uint8_t *restrict src)
+{
     __asm__ volatile(
-        "prfm pldl1keep, [%[src], #64]\n\t"
-        "prfm pldl1keep, [%[src], #128]\n\t"
-        "prfm pldl1keep, [%[src], #192]\n\t"
-        "prfm pldl1keep, [%[src], #256]\n\t"
-        "prfm pldl1keep, [%[src], #320]\n\t"
-        "prfm pldl1keep, [%[src], #384]\n\t"
-        "prfm pldl1keep, [%[src], #448]\n\t"
-        "ld1 {v0.8b, v1.8b, v2.8b, v3.8b}, [%[src]], #32\n\t"
-        "ld1 {v4.8b, v5.8b, v6.8b, v7.8b}, [%[src]], #32\n\t"
-        "ld1 {v8.8b, v9.8b, v10.8b, v11.8b}, [%[src]], #32\n\t"
-        "ld1 {v12.8b, v13.8b, v14.8b, v15.8b}, [%[src]], #32\n\t"
-        "ld1 {v16.8b, v17.8b, v18.8b, v19.8b}, [%[src]], #32\n\t"
-        "ld1 {v20.8b, v21.8b, v22.8b, v23.8b}, [%[src]], #32\n\t"
-        "ld1 {v24.8b, v25.8b, v26.8b, v27.8b}, [%[src]], #32\n\t"
-        "ld1 {v28.8b, v29.8b, v30.8b, v31.8b}, [%[src]]\n\t"
-        "st1 {v0.8b, v1.8b, v2.8b, v3.8b}, [%[dst]], #32\n\t"
-        "st1 {v4.8b, v5.8b, v6.8b, v7.8b}, [%[dst]], #32\n\t"
-        "st1 {v8.8b, v9.8b, v10.8b, v11.8b}, [%[dst]], #32\n\t"
-        "st1 {v12.8b, v13.8b, v14.8b, v15.8b}, [%[dst]], #32\n\t"
-        "st1 {v16.8b, v17.8b, v18.8b, v19.8b}, [%[dst]], #32\n\t"
-        "st1 {v20.8b, v21.8b, v22.8b, v23.8b}, [%[dst]], #32\n\t"
-        "st1 {v24.8b, v25.8b, v26.8b, v27.8b}, [%[dst]], #32\n\t"
-        "st1 {v28.8b, v29.8b, v30.8b, v31.8b}, [%[dst]]\n\t"
+        "prfm pldl1keep, [%[src], #64]      \n\t"
+        "prfm pldl1keep, [%[src], #128]     \n\t"
+        "prfm pldl1keep, [%[src], #192]     \n\t"
+        "prfm pldl1keep, [%[src], #256]     \n\t"
+
+        "ld1 {v0.16b,  v1.16b,  v2.16b,  v3.16b},  [%[src]], #64 \n\t"
+        "ld1 {v4.16b,  v5.16b,  v6.16b,  v7.16b},  [%[src]], #64 \n\t"
+        "ld1 {v8.16b,  v9.16b,  v10.16b, v11.16b}, [%[src]], #64 \n\t"
+        "ld1 {v12.16b, v13.16b, v14.16b, v15.16b}, [%[src]]      \n\t"
+
+        "st1 {v0.16b,  v1.16b,  v2.16b,  v3.16b},  [%[dst]], #64 \n\t"
+        "st1 {v4.16b,  v5.16b,  v6.16b,  v7.16b},  [%[dst]], #64 \n\t"
+        "st1 {v8.16b,  v9.16b,  v10.16b, v11.16b}, [%[dst]], #64 \n\t"
+        "st1 {v12.16b, v13.16b, v14.16b, v15.16b}, [%[dst]]      \n\t"
+
         : [src] "+r"(src), [dst] "+r"(dst)
         :
-        : "memory", "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7",
-          "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15",
-          "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23",
-          "v24", "v25", "v26", "v27", "v28", "v29", "v30", "v31"
+        : "memory",
+          "v0","v1","v2","v3","v4","v5","v6","v7",
+          "v8","v9","v10","v11","v12","v13","v14","v15"
     );
 }
 
-static void *memcpy_neon(void *to, const void *from, size_t n) {
-    void *retval = to;
+static inline void *memcpy_neon(void *restrict to, const void *restrict from, size_t n)
+{
+    void *ret = to;
 
-    if (n < 16) {
-        memcpy(to, from, n);
-        return retval;
+    if (__builtin_expect(n < 64, 0)) {
+        return memcpy(to, from, n);
     }
 
-    size_t i = n >> 8;
-    size_t r = n & 255;
-
-    uint8_t *src = (uint8_t *)from;
     uint8_t *dst = (uint8_t *)to;
-
-    for (; i > 0; i--) {
-        memcpy_neon_256(dst, src);
-        src += 256;
-        dst += 256;
-    }
-
-    if (r) {
-        memcpy(dst, src, r);
-    }
-
-    return retval;
-}
-
-
-static inline void memcpy_asimd_256_v3(uint8_t *dst, const uint8_t *src) {
-    uint8x16_t data;
-
-    data = vld1q_u8(src);
-
-    for (int i = 0; i < 16; ++i) {
-        vst1q_u8(dst, data);
-        src += 16;
-        dst += 16;
-    }
-}
-
-static void *memcpy_asimd_v3(void *to, const void *from, size_t n) {
-    void *retval = to;
     const uint8_t *src = (const uint8_t *)from;
-    uint8_t *dst = (uint8_t *)to;
 
-    if (n >= 256) {
-        size_t i = n >> 8;
-        size_t r = n & 255;
-
-        for (; i > 0; i--) {
-            memcpy_asimd_256_v3(dst, src);
-            src += 256;
-            dst += 256;
-        }
-
-        if (r) {
-            memcpy(dst, src, r);
-        }
-    } else {
-        memcpy(to, from, n);
+    size_t blocks = n >> 8;
+    while (blocks--) {
+        memcpy_neon_256(dst, src);
+        dst += 256;
+        src += 256;
     }
 
-    return retval;
+    n &= 255;
+    if (n)
+        memcpy(dst, src, n);
+
+    return ret;
 }
-static inline void memcpy_asimd_256(uint8_t *dst, const uint8_t *src) {
+
+static inline void memcpy_asimd_256(uint8_t *restrict dst, const uint8_t *restrict src) {
     uint8x16_t data;
     for (int i = 0; i < 16; ++i) {
         data = vld1q_u8(src);
@@ -2032,7 +1967,7 @@ static inline void memcpy_asimd_256(uint8_t *dst, const uint8_t *src) {
         dst += 16;
     }
 }
-static void *memcpy_asimd(void *to, const void *from, size_t n) {
+static void *memcpy_asimd(void *restrict to, const void *restrict from, size_t n) {
     void *retval = to;
     uint8_t *src = (uint8_t *)from;
     uint8_t *dst = (uint8_t *)to;
@@ -2057,39 +1992,6 @@ static void *memcpy_asimd(void *to, const void *from, size_t n) {
     return retval;
 }
 
-static void memcpy_asimd_256v2(uint8_t *dst, const uint8_t *src) {
-    uint8x16_t data;
-    for (int i = 0; i < 16; ++i) {
-        data = vld1q_u8(src);
-        vst1q_u8(dst, data);
-        src += 16;
-        dst += 16;
-    }
-}
-static void *memcpy_asimdv2(void *to, const void *from, size_t n) {
-    void *retval = to;
-    uint8_t *src = (uint8_t *)from;
-    uint8_t *dst = (uint8_t *)to;
-
-    if (n >= 256) {
-        size_t i = n >> 8;
-        size_t r = n & 255;
-
-        for (; i > 0; i--) {
-            memcpy_asimd_256v2(dst, src);
-            src += 256;
-            dst += 256;
-        }
-
-        if (r) {
-            memcpy(dst, src, r);
-        }
-    } else {
-        memcpy(to, from, n);
-    }
-
-    return retval;
-}
 void *memset_asimd_v3(void *dst, int val, size_t n) {
     void *retval = dst;
     uint8_t *dst_bytes = (uint8_t *)dst;
@@ -2142,7 +2044,6 @@ void *memset_asimd_v3(void *dst, int val, size_t n) {
     }
     return retval;
 }
-
 
 #endif
 
@@ -2213,8 +2114,9 @@ void *memset_asimd_v4(void *dst, int val, size_t len) {
   }
 }
 
-void *memset_asimd_64(uint8_t *dst, int value, size_t size) {
+void *memset_asimd_64(void *ptr), int value, size_t size) {
 
+    uint8_t *dst = (uint8_t*) ptr;
 	if( size == 0 || NULL == dst ) 
 		return dst;
 
@@ -2259,7 +2161,8 @@ void *memset_asimd_64(uint8_t *dst, int value, size_t size) {
 
 }
 
-void *memset_asimd_32(uint8_t *dst, int value, size_t size) {
+void *memset_asimd_32(void *ptr, int value, size_t size) {
+    uint8_t *dst = (uint8_t*) ptr;
 	if( size == 0 || dst == NULL ) 
 		return dst;
 
