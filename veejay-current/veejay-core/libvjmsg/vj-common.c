@@ -154,24 +154,31 @@ void 	veejay_print_backtrace(void)
     }
 }
 #else
-void	veejay_print_backtrace(void)
+void veejay_print_backtrace(void)
 {
-	void *space[100];
-	int i,s;
-	char **strings;
+    void *stack_buffer[64];
+    int num_frames;
+    char **symbols;
 
-	s = backtrace( space, 100 );
-	strings = backtrace_symbols(space,s);
-	if(strings == NULL ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to get backtrace");
-		return;
-	}
+    num_frames = backtrace(stack_buffer, 64);
+    
+    symbols = backtrace_symbols(stack_buffer, num_frames);
 
-	for( i = 0; i < s ; i ++ ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "%s", strings[i] );
-	}
-	
-	free(strings);
+    veejay_msg(VEEJAY_MSG_ERROR, "Crash Backtrace (%d frames)", num_frames);
+
+    if (symbols == NULL) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Failed to resolve symbols (backtrace_symbols returned NULL)");
+        for (int i = 0; i < num_frames; i++) {
+            veejay_msg(VEEJAY_MSG_ERROR, "#%d %p", i, stack_buffer[i]);
+        }
+    } else {
+        for (int i = 0; i < num_frames; i++) {
+            veejay_msg(VEEJAY_MSG_ERROR, "#%-2d %s", i, symbols[i]);
+        }
+        free(symbols);
+    }
+
+    veejay_msg(VEEJAY_MSG_ERROR, "Tip: Use 'addr2line -pC -e <binary> <address>' for line numbers.");
 }
 #endif
 
