@@ -1991,7 +1991,15 @@ static void *memcpy_asimd(void *restrict to, const void *restrict from, size_t n
 
     return retval;
 }
-
+static void memcpy_asimd_256v2(uint8_t *dst, const uint8_t *src) {
+    uint8x16_t data;
+    for (int i = 0; i < 16; ++i) {
+        data = vld1q_u8(src);
+        vst1q_u8(dst, data);
+        src += 16;
+        dst += 16;
+    }
+}
 void *memset_asimd_v3(void *dst, int val, size_t n) {
     void *retval = dst;
     uint8_t *dst_bytes = (uint8_t *)dst;
@@ -2048,73 +2056,95 @@ void *memset_asimd_v3(void *dst, int val, size_t n) {
 #endif
 
 #ifdef HAVE_ARM_ASIMD
-void *memset_asimd(void *dst, int val, size_t len) {
 
-	if( len == 0 || NULL == dst ) 
-		return dst;
+void *memset_asimd(void *restrict dst, int val, size_t len)
+{
+    if (dst == NULL || len == 0)
+        return dst;
 
-    uint8x16_t value = vdupq_n_u8(val);
-	uint8_t *dst_bytes = (uint8_t *)dst;
-	size_t num_blocks = len / 16;
+    uint8_t byte = (uint8_t) val;
+    uint8x16_t value = vdupq_n_u8(byte);
 
-    for (size_t i = 0; i < num_blocks; i++) {
+    uint8_t *dst_bytes = (uint8_t *) dst;
+
+    size_t blocks = len >> 4;
+
+    for (size_t i = 0; i < blocks; i++) {
         vst1q_u8(dst_bytes, value);
         dst_bytes += 16;
     }
 
-    size_t remaining_bytes = len % 16;
-	for (size_t i = 0; i < remaining_bytes; i++) {
-        *dst_bytes++ = val;
-    }
-}
-void *memset_asimd_v2(void *dst, int val, size_t len) {
+    size_t remain = len & 15;
 
-	if( len == 0 || NULL == dst ) 
-		return dst;
+    for (size_t i = 0; i < remain; i++)
+        *dst_bytes++ = byte;
 
-    uint8x16_t value = vdupq_n_u8(val);
-    uint8_t *dst_bytes = (uint8_t *)dst;
-    size_t num_blocks = len / 16;
-
-    size_t alignment_offset = (size_t)dst_bytes & 0xF;
-    size_t start_offset = (alignment_offset > 0) ? (16 - alignment_offset) : 0;
-
-    for (size_t i = 0; i < start_offset; i++) {
-        *dst_bytes++ = val;
-    }
-
-    for (size_t i = 0; i < num_blocks; i += 4) {
-        vst1q_u8(dst_bytes, value);
-        vst1q_u8(dst_bytes + 16, value);
-        vst1q_u8(dst_bytes + 32, value);
-        vst1q_u8(dst_bytes + 48, value);
-
-        dst_bytes += 64;
-    }
-
-    size_t remaining_bytes = len % 16;
-    for (size_t i = 0; i < remaining_bytes; i++) {
-        *dst_bytes++ = val;
-    }
-}
-void *memset_asimd_v4(void *dst, int val, size_t len) {
-  if( len == 0 || NULL == dst ) 
-	return dst;
-
-  uint8x16_t v = vdupq_n_u8(val);
-  size_t multiple_of_16 = len & ~0xF;
-
-  uint8_t *dst8 = (uint8_t *)dst;
-  for (size_t i = 0; i < multiple_of_16; i += 16) {
-    vst1q_u8(dst8 + i, v);
-  }
-
-  for (size_t i = multiple_of_16; i < len; i++) {
-    dst8[i] = val;
-  }
+    return dst;
 }
 
-void *memset_asimd_64(void *ptr), int value, size_t size) {
+void *memset_asimd_v2(void *dst, int val, size_t len)
+{
+    if (dst == NULL || len == 0)
+        return dst;
+
+    uint8_t byte = (uint8_t)val;
+    uint8_t *p = (uint8_t *)dst;
+    uint8x16_t v = vdupq_n_u8(byte);
+
+    size_t misalign = (uintptr_t)p & 15;
+    if (misalign) {
+        size_t prologue = 16 - misalign;
+        if (prologue > len)
+            prologue = len;
+
+        for (size_t i = 0; i < prologue; i++)
+            *p++ = byte;
+
+        len -= prologue;
+    }
+
+    while (len >= 64) {
+        vst1q_u8(p + 0,  v);
+        vst1q_u8(p + 16, v);
+        vst1q_u8(p + 32, v);
+        vst1q_u8(p + 48, v);
+        p += 64;
+        len -= 64;
+    }
+
+    while (len >= 16) {
+        vst1q_u8(p, v);
+        p += 16;
+        len -= 16;
+    }
+
+    while (len--) {
+        *p++ = byte;
+    }
+
+    return dst;
+}
+
+void *memset_asimd_v4(void *dst, int val, size_t len)
+{
+    if (dst == NULL || len == 0)
+        return dst;
+
+    uint8_t *dst8 = (uint8_t *) dst;
+    uint8x16_t v = vdupq_n_u8((uint8_t) val);
+
+    size_t bulk = len & ~(size_t)0xF;
+
+    for (size_t i = 0; i < bulk; i += 16)
+        vst1q_u8(dst8 + i, v);
+
+    for (size_t i = bulk; i < len; i++)
+        dst8[i] = (uint8_t) val;
+
+    return dst;
+}
+
+void *memset_asimd_64(void *ptr, int value, size_t size) {
 
     uint8_t *dst = (uint8_t*) ptr;
 	if( size == 0 || NULL == dst ) 
@@ -2158,7 +2188,7 @@ void *memset_asimd_64(void *ptr), int value, size_t size) {
         dst++;
         remaining_bytes--;
     }
-
+    return dst;
 }
 
 void *memset_asimd_32(void *ptr, int value, size_t size) {
@@ -2200,9 +2230,95 @@ void *memset_asimd_32(void *ptr, int value, size_t size) {
         dst++;
         remaining_bytes--;
     }
+
+    return dst;
 }
 
 #endif
+
+
+#ifdef __aarch64__
+void *memset_asimd_v3(void *dst, int val, size_t len)
+{
+    if (dst == NULL || len == 0)
+        return dst;
+
+    uint8_t byte = (uint8_t)val;
+    uint8_t *p = (uint8_t *)dst;
+
+    if (len < 64) {
+        while (len--)
+            *p++ = byte;
+        return dst;
+    }
+
+#if defined(__linux__)
+    if (byte == 0) {
+        uint64_t zva_len = 64;
+
+        while (((uintptr_t)p & (zva_len - 1)) && len) {
+            *p++ = 0;
+            len--;
+        }
+
+        while (len >= zva_len) {
+            __asm__ volatile(
+                "dc zva, %0"
+                :
+                : "r"(p)
+                : "memory");
+            p += zva_len;
+            len -= zva_len;
+        }
+
+        while (len--)
+            *p++ = 0;
+
+        return dst;
+    }
+#endif
+
+    __asm__ volatile(
+        "dup v0.16b, %w[val]\n"
+        :
+        : [val] "r"(byte)
+        : "v0");
+
+    while (((uintptr_t)p & 15) && len) {
+        *p++ = byte;
+        len--;
+    }
+
+    while (len >= 64) {
+        __asm__ volatile(
+            "stp q0, q0, [%0]\n"
+            "stp q0, q0, [%0, #32]\n"
+            :
+            : "r"(p)
+            : "memory");
+
+        p += 64;
+        len -= 64;
+    }
+
+    while (len >= 16) {
+        __asm__ volatile(
+            "str q0, [%0]"
+            :
+            : "r"(p)
+            : "memory");
+
+        p += 16;
+        len -= 16;
+    }
+
+    while (len--)
+        *p++ = byte;
+
+    return dst;
+}
+#endif
+
 
 void *memset_64(void *ptr, int value, size_t num) {
 
@@ -2326,7 +2442,9 @@ static struct {
     { "Advanced SIMD memset() v4", memset_asimd_v4, 0, AV_CPU_FLAG_ARMV8 },
     { "Advanced SIMD memset() 64-line", memset_asimd_64, 0, AV_CPU_FLAG_ARMV8 },
     { "Advanced SIMD memset() 32-line", memset_asimd_32, 0, AV_CPU_FLAG_ARMV8 },
-    { "Advanced SIMD memset() v3", memset_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },
+#endif
+#ifdef __aarch64__
+    { "ARM64 memset tuned/DC ZVA()", memset_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },
 #endif
 #ifdef HAVE_ARM7A
     { "memset align 0", memset_new_align_0, 0, 0 },
