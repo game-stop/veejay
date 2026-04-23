@@ -104,7 +104,6 @@ enum {
   FX_ANIM_SHAPE_SMOOTHSTEP ,
   FX_ANIM_SHAPE_SMOOTH_NOISE ,
   FX_ANIM_SHAPE_SQUARE ,
-  FX_ANIM_SHAPE_TRIANGLE ,
   FX_ANIM_SHAPE_ZIGZAG ,
   FX_ANIM_SHAPE_MAX // sentinel
 };
@@ -139,7 +138,6 @@ static struct
     { "Smooth",             FX_ANIM_SHAPE_SMOOTHSTEP },
     { "Smooth Noise",       FX_ANIM_SHAPE_SMOOTH_NOISE },
     { "Square",             FX_ANIM_SHAPE_SQUARE },
-    { "Triangle",           FX_ANIM_SHAPE_TRIANGLE },
     { "ZigZag",             FX_ANIM_SHAPE_ZIGZAG },
     { NULL, -1 },
 };
