@@ -167,7 +167,6 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
     //        feature: enable layering to combine shapes ( for example, ramp drop + random walk smooth or burst envelope + noise)
     switch(animation)
     {
-        case FX_ANIM_SHAPE_ZAGZIG:
         case FX_ANIM_SHAPE_ZIGZAG:
             veclen1 = end - start;
             dy = (diff) / (float)(veclen1 - 1);
@@ -214,47 +213,55 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
     switch(animation)
     {
         case FX_ANIM_SHAPE_ZIGZAG:
-            for(i = start, k = 0, ry = min; i < end; i++, ry+=dy)
+            if (reverse)
             {
-                vec[k] = ry;
-                if (dy > 0)
-                {
-                    if ( (ry + dy) > max)
-                    {
-                        ry = max+dy;
-                        dy = -dy;
-                    }
-                }
-                else
-                {
-                    if ( (ry + dy) < min)
-                    {
-                        ry = min+dy;
-                        dy = -dy;
-                    }
-                }
-                k++;
+                dy = -dy;
+                ry = max;
             }
-        break;
-        case FX_ANIM_SHAPE_ZAGZIG:
-            dy = -dy;
-            for(i = start, k = 0, ry = max; i < end; i++, ry+=dy)
+            else
+            {
+                ry = min;
+            }
+
+            for(i = start, k = 0; i < end; i++, ry+=dy)
             {
                 vec[k] = ry;
-                if (dy < 0)
+                if(!reverse)
                 {
-                    if ( ( ry + dy) < min)
+                    if (dy > 0)
                     {
-                        ry = min-dy;
-                        dy = -dy;
+                        if ( (ry + dy) > max)
+                        {
+                            ry = max+dy;
+                            dy = -dy;
+                        }
+                    }
+                    else
+                    {
+                        if ( (ry + dy) < min)
+                        {
+                            ry = min+dy;
+                            dy = -dy;
+                        }
                     }
                 }
                 else
-                {
-                    if ( ( ry + dy) > max)
+                { //ZAGZIG
+                    if (dy < 0)
                     {
-                        ry = max-dy;
-                        dy = -dy;
+                        if ( ( ry + dy) < min)
+                        {
+                            ry = min-dy;
+                            dy = -dy;
+                        }
+                    }
+                    else
+                    {
+                        if ( ( ry + dy) > max)
+                        {
+                            ry = max-dy;
+                            dy = -dy;
+                        }
                     }
                 }
                 k++;

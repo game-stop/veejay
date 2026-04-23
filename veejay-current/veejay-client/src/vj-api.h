@@ -81,7 +81,6 @@ void reloaded_restart(void);
 
 enum {
   FX_ANIM_SHAPE_ZIGZAG,
-  FX_ANIM_SHAPE_ZAGZIG,
   FX_ANIM_SHAPE_SINE,
   FX_ANIM_SHAPE_COSINE,
   FX_ANIM_SHAPE_TRIANGLE,
@@ -117,7 +116,6 @@ static struct
 } fx_anim_shape_map[] =
 {
     { "ZigZag",             FX_ANIM_SHAPE_ZIGZAG },
-    { "ZagZig",             FX_ANIM_SHAPE_ZAGZIG },
     { "Sine",               FX_ANIM_SHAPE_SINE },
     { "Cosine",             FX_ANIM_SHAPE_COSINE },
     { "Triangle",           FX_ANIM_SHAPE_TRIANGLE },
