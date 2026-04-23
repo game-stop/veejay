@@ -3301,16 +3301,20 @@ void    update_curve_shape(void)
         }
     }
     int amplitude, steps;
+    gboolean reverse_shape;
     amplitude = 10; //pourcents
     GtkWidget *shape_param_spin = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_spin_animation_shape"));
     steps = gtk_spin_button_get_value( GTK_SPIN_BUTTON(shape_param_spin) );
+
+    GtkWidget *shape_param_reverse = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_toggleanimation_shape"));
+    reverse_shape = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(shape_param_reverse) );
 
     //~ FIXME force curve free until gtk3curvewidget point limit is fixed (issue # )
     gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPEFREEHAND]), TRUE);
 
     curve_set_predifined_animation( info->curve, info->uc.entry_tokens[ENTRY_FXID],
                                     info->uc.selected_parameter_id,
-                                    lo, hi, selected_anim, amplitude, steps);
+                                    lo, hi, selected_anim, amplitude, steps,reverse_shape);
 }
 
 /* This callback is used by various widgets */

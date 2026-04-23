@@ -143,7 +143,7 @@ void curve_set_position( GtkWidget *curve, double pos)
     gtk3_curve_set_position( curve, pos);
 }
 void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_id,
-                                      int start, int end, int animation, int amplitude, int steps)
+                                      int start, int end, int animation, int amplitude, int steps, gboolean reverse)
 {
     int min=0, max=0;
     _effect_get_minmax(fx_id, &min, &max, parameter_id );
