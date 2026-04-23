@@ -177,7 +177,6 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
         case FX_ANIM_SHAPE_COSINE:
         //~ case FX_ANIM_SHAPE_TRIANGLE:
         case FX_ANIM_SHAPE_SAWTOOTH:
-        case FX_ANIM_SHAPE_REVERSE_SAWTOOTH:
         case FX_ANIM_SHAPE_SQUARE:
         case FX_ANIM_SHAPE_BOUNCE:
         case FX_ANIM_SHAPE_NOISE:
@@ -260,18 +259,6 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
             }
         }
         break;
-        //~ case FX_ANIM_SHAPE_TRIANGLE:
-        //~ {
-            //~ float frequency = (float)steps;
-            //~ for(i = start, k = 0; i < end; i++, k++)
-            //~ {
-                //~ float progress = (float)(i - start) / (float)veclen;
-                //~ float t = fmodf(progress * frequency, 1.0f);
-                //~ float tri = 1.0f - fabsf(2.0f * t - 1.0f);
-                //~ vec[k] = min + diff * tri;
-            //~ }
-        //~ }
-        break;
         case FX_ANIM_SHAPE_SAWTOOTH:
         {
             float frequency = (float)steps;
@@ -280,17 +267,6 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
                 float progress = (float)(i - start) / (float)veclen;
                 float t = fmodf(progress * frequency, 1.0f);
                 vec[k] = min + diff * t;
-            }
-        }
-        break;
-        case FX_ANIM_SHAPE_REVERSE_SAWTOOTH:
-        {
-            float frequency = (float)steps;
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float progress = (float)(i - start) / (float)veclen;
-                float t = fmodf(progress * frequency, 1.0f);
-                vec[k] = max - diff * t;
             }
         }
         break;
@@ -630,18 +606,6 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
             vec[k] = max - vec[k];
         }
     }
-        //~ int middle_point = ((int)((max - min) / 2.0) + 0.5);
-        //~ for(i = start, k = 0; i < end; i++, k++)
-        //~ {
-            //~ if(vec[k] <= middle_point)
-            //~ {
-                //~ vec[k] = max - vec[k];
-            //~ }
-            //~ else
-            //~ {
-                //~ vec[k] = 
-        //~ }
-    //~ }
 
     int curve_type = GTK3_CURVE_TYPE_FREE;
 
