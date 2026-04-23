@@ -3329,6 +3329,14 @@ void    on_curve_spin_shape_changed (GtkWidget *widget, gpointer user_data)
     update_curve_shape();
 }
 
+void    on_curve_toggleanimation_shape_toggled (GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+
+    update_curve_shape();
+}
+
 void	on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
