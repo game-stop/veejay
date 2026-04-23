@@ -9003,7 +9003,7 @@
                             <property name="snap-to-ticks">True</property>
                             <property name="numeric">True</property>
                             <property name="wrap">True</property>
-                            <signal name="value-changed" handler="on_curve_spin_shape_changed" swapped="no"/>
+                            <signal name="value-changed" handler="on_curve_animation_changed" swapped="no"/>
                           </object>
                           <packing>
                             <property name="expand">False</property>
@@ -9018,7 +9018,7 @@
                             <property name="can-focus">True</property>
                             <property name="receives-default">True</property>
                             <property name="tooltip-text" translatable="yes">Reverse the shape</property>
-                            <signal name="toggled" handler="on_curve_toggleanimation_shape_toggled" swapped="no"/>
+                            <signal name="toggled" handler="on_curve_animation_changed" swapped="no"/>
                             <child>
                               <object class="GtkImage" id="image">
                                 <property name="visible">True</property>

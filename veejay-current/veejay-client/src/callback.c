@@ -3313,23 +3313,8 @@ void    update_curve_shape(void)
                                     lo, hi, selected_anim, amplitude, steps);
 }
 
+/* This callback is used by various widgets */
 void    on_curve_animation_changed (GtkWidget *widget, gpointer user_data)
-{
-    if(info->status_lock)
-        return;
-
-    update_curve_shape();
-}
-
-void    on_curve_spin_shape_changed (GtkWidget *widget, gpointer user_data)
-{
-    if(info->status_lock)
-        return;
-
-    update_curve_shape();
-}
-
-void    on_curve_toggleanimation_shape_toggled (GtkWidget *widget, gpointer user_data)
 {
     if(info->status_lock)
         return;
