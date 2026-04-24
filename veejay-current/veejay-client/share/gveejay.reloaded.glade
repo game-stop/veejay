@@ -90,6 +90,17 @@
     <property name="step-increment">1</property>
     <property name="page-increment">4</property>
   </object>
+  <object class="GtkAdjustment" id="fxshape_boundmax">
+    <property name="upper">100</property>
+    <property name="value">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="fxshape_boundmin">
+    <property name="upper">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
   <object class="GtkAdjustment" id="gen_p0">
     <property name="upper">100</property>
     <property name="step-increment">1</property>
@@ -195,6 +206,18 @@
                     <property name="visible">True</property>
                     <property name="can-focus">False</property>
                     <property name="n-columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>
@@ -8871,61 +8894,6 @@
                           </packing>
                         </child>
                         <child>
-                          <object class="GtkButton" id="curve_buttonstore">
-                            <property name="visible">True</property>
-                            <property name="can-focus">True</property>
-                            <property name="receives-default">False</property>
-                            <property name="tooltip-text" translatable="yes">Save this animation (Apply)</property>
-                            <signal name="clicked" handler="on_curve_buttonstore_clicked" swapped="no"/>
-                            <child>
-                              <object class="GtkImage" id="image2521">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="pixbuf">icon_save.png</property>
-                              </object>
-                            </child>
-                          </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">False</property>
-                            <property name="position">1</property>
-                          </packing>
-                        </child>
-                        <child>
-                          <object class="GtkButton" id="curve_clear_parameter">
-                            <property name="visible">True</property>
-                            <property name="can-focus">True</property>
-                            <property name="receives-default">False</property>
-                            <property name="tooltip-text" translatable="yes">Clear this animation</property>
-                            <signal name="clicked" handler="on_curve_clear_parameter_clicked" swapped="no"/>
-                            <child>
-                              <object class="GtkImage" id="image17">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="pixbuf">icon_clear.png</property>
-                              </object>
-                            </child>
-                          </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">False</property>
-                            <property name="position">2</property>
-                          </packing>
-                        </child>
-                        <child>
-                          <object class="GtkComboBoxText" id="curve_combo_animation">
-                            <property name="visible">True</property>
-                            <property name="can-focus">False</property>
-                            <signal name="changed" handler="on_curve_animation_changed" swapped="no"/>
-                          </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">True</property>
-                            <property name="pack-type">end</property>
-                            <property name="position">3</property>
-                          </packing>
-                        </child>
-                        <child>
                           <object class="GtkBox" id="hbox657">
                             <property name="visible">True</property>
                             <property name="can-focus">False</property>
@@ -8991,7 +8959,20 @@
                             <property name="expand">False</property>
                             <property name="fill">False</property>
                             <property name="pack-type">end</property>
-                            <property name="position">3</property>
+                            <property name="position">1</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkComboBoxText" id="curve_combo_animation">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <signal name="changed" handler="on_curve_animation_changed" swapped="no"/>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="pack-type">end</property>
+                            <property name="position">2</property>
                           </packing>
                         </child>
                         <child>
@@ -9009,7 +8990,7 @@
                             <property name="expand">False</property>
                             <property name="fill">True</property>
                             <property name="pack-type">end</property>
-                            <property name="position">5</property>
+                            <property name="position">3</property>
                           </packing>
                         </child>
                         <child>
@@ -9031,7 +9012,123 @@
                             <property name="expand">False</property>
                             <property name="fill">True</property>
                             <property name="pack-type">end</property>
+                            <property name="position">4</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkScaleButton" id="curve_scalebuttonbound_max">
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="focus-on-click">False</property>
+                            <property name="receives-default">True</property>
+                            <property name="tooltip-text" translatable="yes">Shape max bound </property>
+                            <property name="relief">none</property>
+                            <property name="orientation">vertical</property>
+                            <property name="adjustment">fxshape_boundmax</property>
+                            <signal name="value-changed" handler="on_curve_animation_changed" swapped="no"/>
+                            <child internal-child="plus_button">
+                              <object class="GtkButton">
+                                <property name="can-focus">True</property>
+                                <property name="receives-default">True</property>
+                                <property name="halign">center</property>
+                                <property name="valign">center</property>
+                                <property name="relief">none</property>
+                              </object>
+                            </child>
+                            <child internal-child="minus_button">
+                              <object class="GtkButton">
+                                <property name="can-focus">True</property>
+                                <property name="receives-default">True</property>
+                                <property name="halign">center</property>
+                                <property name="valign">center</property>
+                                <property name="relief">none</property>
+                              </object>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="pack-type">end</property>
+                            <property name="position">5</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkScaleButton" id="curve_scalebuttonbound_min">
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="focus-on-click">False</property>
+                            <property name="receives-default">True</property>
+                            <property name="tooltip-text" translatable="yes">Shape min bound </property>
+                            <property name="relief">none</property>
+                            <property name="orientation">vertical</property>
+                            <property name="adjustment">fxshape_boundmin</property>
+                            <signal name="value-changed" handler="on_curve_animation_changed" swapped="no"/>
+                            <child internal-child="plus_button">
+                              <object class="GtkButton">
+                                <property name="can-focus">True</property>
+                                <property name="receives-default">True</property>
+                                <property name="halign">center</property>
+                                <property name="valign">center</property>
+                                <property name="relief">none</property>
+                              </object>
+                            </child>
+                            <child internal-child="minus_button">
+                              <object class="GtkButton">
+                                <property name="can-focus">True</property>
+                                <property name="receives-default">True</property>
+                                <property name="halign">center</property>
+                                <property name="valign">center</property>
+                                <property name="relief">none</property>
+                              </object>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="pack-type">end</property>
                             <property name="position">6</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="curve_buttonstore">
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="receives-default">False</property>
+                            <property name="tooltip-text" translatable="yes">Save this animation (Apply)</property>
+                            <signal name="clicked" handler="on_curve_buttonstore_clicked" swapped="no"/>
+                            <child>
+                              <object class="GtkImage" id="image2521">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="pixbuf">icon_save.png</property>
+                              </object>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">7</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="curve_clear_parameter">
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="receives-default">False</property>
+                            <property name="tooltip-text" translatable="yes">Clear this animation</property>
+                            <signal name="clicked" handler="on_curve_clear_parameter_clicked" swapped="no"/>
+                            <child>
+                              <object class="GtkImage" id="image17">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="pixbuf">icon_clear.png</property>
+                              </object>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">8</property>
                           </packing>
                         </child>
                       </object>

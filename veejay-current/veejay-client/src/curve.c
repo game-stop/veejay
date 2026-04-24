@@ -143,7 +143,7 @@ void curve_set_position( GtkWidget *curve, double pos)
     gtk3_curve_set_position( curve, pos);
 }
 void curve_set_predifined_shape( GtkWidget *curve, int fx_id, int parameter_id,
-                                      int start, int end, int shape, int amplitude, int steps, gboolean reverse)
+                                      int start, int end, int shape, int bound_min, int bound_max, int steps, gboolean reverse)
 {
     int min=0, max=0;
     _effect_get_minmax(fx_id, &min, &max, parameter_id );
@@ -152,8 +152,6 @@ void curve_set_predifined_shape( GtkWidget *curve, int fx_id, int parameter_id,
     float j, rx, ry, dx, dy, min_x, delta_x;
 
     int diff = max - min;
-    int bound_min = 10;
-    int bound_max = 90;
 
     int min_b = ((diff/100.0) * bound_min) + min;
     int max_b = ((diff/100.0) * bound_max) + min;
@@ -614,7 +612,7 @@ void curve_set_predifined_shape( GtkWidget *curve, int fx_id, int parameter_id,
     {
         for(i = start, k = 0; i < end; i++, k++)
         {
-            vec[k] = max - vec[k];
+            vec[k] = max - vec[k] + min;
         }
     }
 
