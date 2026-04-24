@@ -2000,59 +2000,6 @@ static void memcpy_asimd_256v2(uint8_t *dst, const uint8_t *src) {
         dst += 16;
     }
 }
-void *memset_asimd_v3(void *dst, int val, size_t n) {
-    void *retval = dst;
-    uint8_t *dst_bytes = (uint8_t *)dst;
-    uint8x16_t value = vdupq_n_u8(val); 
-	
-    if (n >= 256) {
-        size_t num_blocks = n >> 8;
-        size_t remaining_bytes = n & 255;
-		uint8x16_t val_vec = vdupq_n_u8(val);
-        uint8_t buffer[256];
-		uint8_t *p = buffer;
-
-		vst1q_u8(p, val_vec); p += 16;
-		vst1q_u8(p, val_vec); p += 16;
-		vst1q_u8(p, val_vec); p += 16;
-		vst1q_u8(p, val_vec); p += 16;
-		vst1q_u8(p, val_vec); p += 16;
-		vst1q_u8(p, val_vec); p += 16;
-		vst1q_u8(p, val_vec); p += 16;
-		vst1q_u8(p, val_vec); p += 16;
-
-		vst1q_u8(p, val_vec); p += 16;
-		vst1q_u8(p, val_vec); p += 16;
-		vst1q_u8(p, val_vec); p += 16;
-		vst1q_u8(p, val_vec); p += 16;
-		vst1q_u8(p, val_vec); p += 16;
-		vst1q_u8(p, val_vec); p += 16;
-		vst1q_u8(p, val_vec); p += 16;
-		vst1q_u8(p, val_vec); p += 16;
-
-        for (; num_blocks > 0; num_blocks--) {
-            memcpy_asimd_256v2(dst_bytes, buffer);
-            dst_bytes += 256;
-        }
-
-		for( size_t i = 0; i < remaining_bytes; i ++ )
-			dst_bytes[i] = val;
-
-    } else {
-		while (n >= 16) {
-            vst1q_u8(dst_bytes, value);
-            dst_bytes += 16;
-            n -= 16;
-        }
-
-        while (n > 0) {
-            *dst_bytes++ = val;
-            n--;
-        }
-    }
-    return retval;
-}
-
 #endif
 
 #ifdef HAVE_ARM_ASIMD
