@@ -143,7 +143,7 @@ void curve_set_position( GtkWidget *curve, double pos)
     gtk3_curve_set_position( curve, pos);
 }
 void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_id,
-                                      int start, int end, int animation, int amplitude, int steps)
+                                      int start, int end, int animation, int amplitude, int steps, gboolean reverse)
 {
     int min=0, max=0;
     _effect_get_minmax(fx_id, &min, &max, parameter_id );
@@ -167,7 +167,6 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
     //        feature: enable layering to combine shapes ( for example, ramp drop + random walk smooth or burst envelope + noise)
     switch(animation)
     {
-        case FX_ANIM_SHAPE_ZAGZIG:
         case FX_ANIM_SHAPE_ZIGZAG:
             veclen1 = end - start;
             dy = (diff) / (float)(veclen1 - 1);
@@ -176,9 +175,8 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
         break;
         case FX_ANIM_SHAPE_SINE:
         case FX_ANIM_SHAPE_COSINE:
-        case FX_ANIM_SHAPE_TRIANGLE:
+        //~ case FX_ANIM_SHAPE_TRIANGLE:
         case FX_ANIM_SHAPE_SAWTOOTH:
-        case FX_ANIM_SHAPE_REVERSE_SAWTOOTH:
         case FX_ANIM_SHAPE_SQUARE:
         case FX_ANIM_SHAPE_BOUNCE:
         case FX_ANIM_SHAPE_NOISE:
@@ -214,7 +212,7 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
     switch(animation)
     {
         case FX_ANIM_SHAPE_ZIGZAG:
-            for(i = start, k = 0, ry = min; i < end; i++, ry+=dy)
+            for(i = start, k = 0; i < end; i++, ry+=dy)
             {
                 vec[k] = ry;
                 if (dy > 0)
@@ -235,30 +233,7 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
                 }
                 k++;
             }
-        break;
-        case FX_ANIM_SHAPE_ZAGZIG:
-            dy = -dy;
-            for(i = start, k = 0, ry = max; i < end; i++, ry+=dy)
-            {
-                vec[k] = ry;
-                if (dy < 0)
-                {
-                    if ( ( ry + dy) < min)
-                    {
-                        ry = min-dy;
-                        dy = -dy;
-                    }
-                }
-                else
-                {
-                    if ( ( ry + dy) > max)
-                    {
-                        ry = max-dy;
-                        dy = -dy;
-                    }
-                }
-                k++;
-            }
+
         break;
         case FX_ANIM_SHAPE_SINE:
         {
@@ -284,18 +259,6 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
             }
         }
         break;
-        case FX_ANIM_SHAPE_TRIANGLE:
-        {
-            float frequency = (float)steps;
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float progress = (float)(i - start) / (float)veclen;
-                float t = fmodf(progress * frequency, 1.0f);
-                float tri = 1.0f - fabsf(2.0f * t - 1.0f);
-                vec[k] = min + diff * tri;
-            }
-        }
-        break;
         case FX_ANIM_SHAPE_SAWTOOTH:
         {
             float frequency = (float)steps;
@@ -304,17 +267,6 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
                 float progress = (float)(i - start) / (float)veclen;
                 float t = fmodf(progress * frequency, 1.0f);
                 vec[k] = min + diff * t;
-            }
-        }
-        break;
-        case FX_ANIM_SHAPE_REVERSE_SAWTOOTH:
-        {
-            float frequency = (float)steps;
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float progress = (float)(i - start) / (float)veclen;
-                float t = fmodf(progress * frequency, 1.0f);
-                vec[k] = max - diff * t;
             }
         }
         break;
@@ -644,6 +596,15 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
         }
         break;
         default: break;
+    }
+
+
+    if(reverse)
+    {
+        for(i = start, k = 0; i < end; i++, k++)
+        {
+            vec[k] = max - vec[k];
+        }
     }
 
     int curve_type = GTK3_CURVE_TYPE_FREE;
