@@ -142,8 +142,8 @@ void curve_set_position( GtkWidget *curve, double pos)
 {
     gtk3_curve_set_position( curve, pos);
 }
-void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_id,
-                                      int start, int end, int animation, int amplitude, int steps, gboolean reverse)
+void curve_set_predifined_shape( GtkWidget *curve, int fx_id, int parameter_id,
+                                      int start, int end, int shape, int amplitude, int steps, gboolean reverse)
 {
     int min=0, max=0;
     _effect_get_minmax(fx_id, &min, &max, parameter_id );
@@ -165,7 +165,7 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
 
     // TODO : break down this switch case and refactor
     //        feature: enable layering to combine shapes ( for example, ramp drop + random walk smooth or burst envelope + noise)
-    switch(animation)
+    switch(shape)
     {
         case FX_ANIM_SHAPE_ZIGZAG:
             veclen1 = end - start;
@@ -209,7 +209,7 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
 
     int veclen = veclen1 - 1;
 
-    switch(animation)
+    switch(shape)
     {
         case FX_ANIM_SHAPE_ZIGZAG:
             for(i = start, k = 0; i < end; i++, ry+=dy)
