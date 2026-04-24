@@ -152,6 +152,17 @@ void curve_set_predifined_shape( GtkWidget *curve, int fx_id, int parameter_id,
     float j, rx, ry, dx, dy, min_x, delta_x;
 
     int diff = max - min;
+    int bound_min = 10;
+    int bound_max = 90;
+
+    int min_b = ((diff/100.0) * bound_min) + min;
+    int max_b = ((diff/100.0) * bound_max) + min;
+    int diff_b = max_b - min_b;
+
+    diff = diff_b;
+    min = min_b;
+    max = max_b;
+
     // only FX parameter value is normalized
 
     // veclen is the same as sample length (we dont have a envelope window .. yet to support this on very large clips)
