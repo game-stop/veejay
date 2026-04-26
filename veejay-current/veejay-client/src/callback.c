@@ -3286,7 +3286,7 @@ void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
 void    update_curve_shape(void)
 {
     GtkWidget *shape_combo = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_combo_animation"));
-    gint selected_anim = gtk_combo_box_get_active( GTK_COMBO_BOX( shape_combo ) );
+    gint selected_shape = gtk_combo_box_get_active( GTK_COMBO_BOX( shape_combo ) );
 
     int lo = 0, hi = 0;
     /* update the time bounds accordingly the sample marker*/
@@ -3300,21 +3300,26 @@ void    update_curve_shape(void)
             hi = info->status_tokens[SAMPLE_MARKER_END];
         }
     }
-    int amplitude, steps;
+    int steps, minb, maxb;
     gboolean reverse_shape;
-    amplitude = 10; //pourcents
+
     GtkWidget *shape_param_spin = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_spin_animation_shape"));
     steps = gtk_spin_button_get_value( GTK_SPIN_BUTTON(shape_param_spin) );
 
     GtkWidget *shape_param_reverse = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_toggleanimation_shape"));
     reverse_shape = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(shape_param_reverse) );
 
+    GtkWidget *shape_bound = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_scalebuttonbound_min"));
+    minb = (int)gtk_scale_button_get_value( GTK_SCALE_BUTTON(shape_bound) );
+    shape_bound = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_scalebuttonbound_max"));
+    maxb = (int)gtk_scale_button_get_value( GTK_SCALE_BUTTON(shape_bound) );
+
     //~ FIXME force curve free until gtk3curvewidget point limit is fixed (issue # )
     gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPEFREEHAND]), TRUE);
 
-    curve_set_predifined_animation( info->curve, info->uc.entry_tokens[ENTRY_FXID],
+    curve_set_predifined_shape( info->curve, info->uc.entry_tokens[ENTRY_FXID],
                                     info->uc.selected_parameter_id,
-                                    lo, hi, selected_anim, amplitude, steps,reverse_shape);
+                                    lo, hi, selected_shape, minb, maxb, steps,reverse_shape);
 }
 
 /* This callback is used by various widgets */

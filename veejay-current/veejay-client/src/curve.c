@@ -142,8 +142,8 @@ void curve_set_position( GtkWidget *curve, double pos)
 {
     gtk3_curve_set_position( curve, pos);
 }
-void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_id,
-                                      int start, int end, int animation, int amplitude, int steps, gboolean reverse)
+void curve_set_predifined_shape( GtkWidget *curve, int fx_id, int parameter_id,
+                                      int start, int end, int shape, int bound_min, int bound_max, int steps, gboolean reverse)
 {
     int min=0, max=0;
     _effect_get_minmax(fx_id, &min, &max, parameter_id );
@@ -152,6 +152,15 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
     float j, rx, ry, dx, dy, min_x, delta_x;
 
     int diff = max - min;
+
+    int min_b = ((diff/100.0) * bound_min) + min;
+    int max_b = ((diff/100.0) * bound_max) + min;
+    int diff_b = max_b - min_b;
+
+    diff = diff_b;
+    min = min_b;
+    max = max_b;
+
     // only FX parameter value is normalized
 
     // veclen is the same as sample length (we dont have a envelope window .. yet to support this on very large clips)
@@ -165,7 +174,7 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
 
     // TODO : break down this switch case and refactor
     //        feature: enable layering to combine shapes ( for example, ramp drop + random walk smooth or burst envelope + noise)
-    switch(animation)
+    switch(shape)
     {
         case FX_ANIM_SHAPE_ZIGZAG:
             veclen1 = end - start;
@@ -209,7 +218,7 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
 
     int veclen = veclen1 - 1;
 
-    switch(animation)
+    switch(shape)
     {
         case FX_ANIM_SHAPE_ZIGZAG:
             for(i = start, k = 0; i < end; i++, ry+=dy)
@@ -603,7 +612,7 @@ void curve_set_predifined_animation( GtkWidget *curve, int fx_id, int parameter_
     {
         for(i = start, k = 0; i < end; i++, k++)
         {
-            vec[k] = max - vec[k];
+            vec[k] = max - vec[k] + min;
         }
     }
 
