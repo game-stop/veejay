@@ -211,7 +211,9 @@ vj_spin_until_absolute_deadline(const struct timespec *deadline,
     long long deadline_ns =
         (long long)deadline->tv_sec * 1000000000LL + deadline->tv_nsec;
 
-    const double inv_pause = 1.0 / pause_cost_ns;
+    long long pause_ns = (long long)pause_cost_ns;
+    if (pause_ns <= 0)
+        pause_ns = 1;
 
     for (;;) {
 
@@ -225,7 +227,7 @@ vj_spin_until_absolute_deadline(const struct timespec *deadline,
         if (remaining_ns <= 0)
             break;
 
-        int spin_batch = (int)((remaining_ns * inv_pause) * 0.5);
+        int spin_batch = (int)(remaining_ns / (pause_ns * 2));
 
         if (spin_batch > 128) spin_batch = 128;
         if (spin_batch < 1)   spin_batch = 1;
