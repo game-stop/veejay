@@ -173,7 +173,11 @@
 #define CONFUSION_FACTOR 0
 //Feel free to fine-tune the above 2, it might be possible to get some speedup with them :)
 
-#define FIND_BEST_MAX_ITERATIONS 1024
+#if defined(__arm__) || defined(__aarch64__)
+    #define FIND_BEST_MAX_ITERATIONS 256
+#else
+    #define FIND_BEST_MAX_ITERATIONS 1024
+#endif
 
 
 #define is_aligned__(PTR,LEN) \
@@ -1702,6 +1706,28 @@ static void *fast_memcpy(void *restrict to, const void *restrict from, size_t le
 }
 #endif
 
+#if defined(__x86_64__) || defined(_M_X64)
+void *memcpy_skylake(void *restrict dst, const void *restrict src, size_t n) {
+
+    if( n < 256 ) {
+        small_memcpy(dst,src,n);
+        return dst;
+    }
+
+    __asm__ __volatile__("rep movsb" : "+D"(dst), "+S"(src), "+c"(n) : : "memory"); // skyline erms microcode instruction
+    return dst;
+}
+void *memset_skylake(void *s, int c, size_t n) {
+    void *orig_s = s;
+    if( n < 256 ) {
+        small_memset(s,c,n );
+        return orig_s;
+    }
+    __asm__ __volatile__( "rep stosb" : "+D"(s), "+c"(n) : "a"((uint8_t)c) : "memory");
+    return orig_s;
+}
+#endif
+
 #ifdef HAVE_ASM_SSE4_2
 void *sse42_memset(void *ptr, int value, size_t num) {
     uint8_t *dest = (uint8_t *)ptr;
@@ -2326,6 +2352,9 @@ static struct {
     { "SSE2 optimized memcpy() (128)", sse2_memcpy, 0, AV_CPU_FLAG_SSE2 },
     { "SSE2 optimized memcpy() (128) v2", sse2_memcpy_unaligned, 0, AV_CPU_FLAG_SSE2 },
 #endif
+#if defined(__x86_64__) || defined(_M_X64)
+    { "skylake optimized memcpy()", memcpy_skylake, 0, AV_CPU_FLAG_SSE2 },
+#endif
 #ifdef HAVE_ASM_SSE
     { "SSE optimized memcpy() (64)", sse_memcpy, 0, AV_CPU_FLAG_MMXEXT | AV_CPU_FLAG_SSE },
     { "SSE optimized memcpy() (128)", sse_memcpy2, 0, AV_CPU_FLAG_MMXEXT | AV_CPU_FLAG_SSE },
@@ -2398,12 +2427,41 @@ static struct {
     { "memset align 8", memset_new_align_8, 0, 0 },
     { "memset align 32", memset_new_align_32, 0, 0 },
 #endif
+#ifdef __SSE2__
+    { "skylake optimized memset", memset_skylake, 0, AV_CPU_FLAG_SSE2 },
+#endif
     { "64-bit word memset()", memset_64, 0, 0 },
     { NULL, NULL, 0, 0 } 
 };
 
 void *(* veejay_memcpy)(void *to, const void *from, size_t len) = 0;
 void *(* veejay_memset)(void *what, int val, size_t len ) = 0;
+
+
+static void check_cpu_governor_advice(void) {
+    char governor[64];
+    FILE *f = fopen("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor", "r");
+
+    if (f == NULL) {
+        veejay_msg(VEEJAY_MSG_INFO, "Could not read CPU governor. Frequency scaling may be disabled.");
+        return;
+    }
+
+    if (fgets(governor, sizeof(governor), f)) {
+        governor[strcspn(governor, "\n")] = 0;
+
+        veejay_msg(VEEJAY_MSG_INFO, "Current CPU scaling governor: [%s]", governor);
+
+        if (strcmp(governor, "performance") != 0) {
+            veejay_msg(VEEJAY_MSG_INFO, "ADVICE: For reliable benchmarks, switch to 'performance' mode.");
+            veejay_msg(VEEJAY_MSG_INFO, "Run: echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor");
+        } else {
+            veejay_msg(VEEJAY_MSG_INFO, "System is in 'performance' mode. Benchmark results should be stable.");
+        }
+    }
+
+    fclose(f);
+}
 
 static int set_user_selected_memcpy(void)
 {
@@ -2466,7 +2524,6 @@ void find_best_memcpy(void)
 	if( best > 0 )
 		goto set_best_memcpy_method;
 
-  double t;
   uint8_t *buf1, *buf2, *validbuf;
   int i, k;
   int bufsize = (BENCHMARK_WID * BENCHMARK_HEI * 3);
@@ -2512,23 +2569,36 @@ void find_best_memcpy(void)
 			continue;
 		}
 
-		t = get_time();
-		for( k = 0; k < FIND_BEST_MAX_ITERATIONS; k ++ ) {
-			memcpy_method[i].function( buf2,buf1, bufsize );
-		}
-		t = get_time() - t;
-		
-		if(!mem_verify(buf2,validbuf, bufsize)) {
-            veejay_msg(VEEJAY_MSG_WARNING, "Validation failed for %s", memcpy_method[i].name);
-			continue;
-		}
+		double min_t = -1.0;
 
-		if( t > 0 )
-			veejay_msg(VEEJAY_MSG_INFO, "method '%s' completed in %g seconds", memcpy_method[i].name, t );
-		else
-			veejay_msg(VEEJAY_MSG_WARNING, "method '%s' fails validation");
+        // warm up
+        int warmup = FIND_BEST_MAX_ITERATIONS / 10;
+        if (warmup < 10) warmup = 10;
+        for (k = 0; k < warmup; k++) {
+            memcpy_method[i].function(buf2, buf1, bufsize);
+        }
 
-		memcpy_method[i].t = t;
+        for (int trial = 0; trial < 3; trial++) {
+            double t_start = get_time();
+            for (k = 0; k < FIND_BEST_MAX_ITERATIONS; k++) {
+                memcpy_method[i].function(buf2, buf1, bufsize);
+            }
+            double t_end = get_time() - t_start;
+
+            if (trial == 0 && !mem_verify(buf2, validbuf, bufsize)) {
+                veejay_msg(VEEJAY_MSG_WARNING, "Validation failed for %s", memcpy_method[i].name);
+                min_t = -2.0;
+                break;
+            }
+
+            if (min_t < 0 || t_end < min_t) {
+                min_t = t_end;
+            }
+        }
+
+        memcpy_method[i].t = min_t;
+        if (min_t > 0)
+            veejay_msg(VEEJAY_MSG_INFO, "method '%s' best trial: %g s", memcpy_method[i].name, min_t);
 	}
 
   best = 0;
@@ -2575,8 +2645,6 @@ void find_best_memset(void)
 	if( best > 0 )
 		goto set_best_memset_method;
 
-
-	double t;
 	char *buf1, *buf2;
 	int i, k;
 	int bufsize = (BENCHMARK_WID * BENCHMARK_HEI * 3);
@@ -2590,33 +2658,49 @@ void find_best_memset(void)
 		return;
 	}
 
-  lock_buffers(buf1, bufsize);
-  lock_buffers(buf2, bufsize);
+    lock_buffers(buf1, bufsize);
+    lock_buffers(buf2, bufsize);
 
 	veejay_msg(VEEJAY_MSG_INFO, "Finding best memset... (clear %d blocks of %2.2f Mb)", FIND_BEST_MAX_ITERATIONS, bufsize / 1048576.0f );
 
 	memset( buf1, 0, bufsize * sizeof(char));
 	memset( buf2, 0, bufsize * sizeof(char));
 
-  consume_buffer((unsigned char *)buf1, bufsize);
-  consume_buffer((unsigned char *)buf2, bufsize);
+    consume_buffer((unsigned char *)buf1, bufsize);
+    consume_buffer((unsigned char *)buf2, bufsize);
 
-  for (i = 1; memset_method[i].name != NULL; i++) {
+    for (i = 1; memset_method[i].name != NULL; i++) {
       if (memset_method[i].cpu_require && !(cpu_flags & memset_method[i].cpu_require)) {
           memset_method[i].t = 0.0;
           continue;
       }
 
-      t = get_time();
-      for (k = 0; k < FIND_BEST_MAX_ITERATIONS; k++) {
-          memset_method[i].function(buf1, 0, bufsize);
-      }
-      t = get_time() - t;
 
-      if (t <= 0.0) continue;
+        double min_t = -1.0;
 
-      memset_method[i].t = t;
-      veejay_msg(VEEJAY_MSG_INFO, "method '%s' completed in %g seconds", memset_method[i].name, t);
+        int warmup = FIND_BEST_MAX_ITERATIONS / 10;
+        if (warmup < 10) warmup = 10;
+        for (k = 0; k < warmup; k++) {
+            memset_method[i].function(buf1, 0, bufsize);
+        }
+
+        for (int trial = 0; trial < 3; trial++) {
+            consume_buffer((unsigned char *)buf1, bufsize);
+
+            double t_start = get_time();
+            for (k = 0; k < FIND_BEST_MAX_ITERATIONS; k++) {
+                memset_method[i].function(buf1, 0, bufsize);
+            }
+            double t_end = get_time() - t_start;
+
+            if (min_t < 0 || t_end < min_t) {
+                min_t = t_end;
+            }
+        }
+
+        memset_method[i].t = min_t;
+        veejay_msg(VEEJAY_MSG_INFO, "method '%s' best trial: %g s", memset_method[i].name, min_t);
+
   }
 
   consume_buffer((unsigned char *)buf1, bufsize);
@@ -2783,6 +2867,7 @@ void	benchmark_veejay(int w, int h)
 	if( h < 64)
 		h = 64;
 
+    check_cpu_governor_advice();
 	veejay_msg(VEEJAY_MSG_INFO, "Starting benchmark %dx%d YUVP 4:2:2 (100 frames)", w,h);
     veejay_msg(VEEJAY_MSG_INFO, "   you can set envvar VEEJAY_MEMCPY_METHOD or VEEJAY_MEMSET_METHOD to skip this");
 
