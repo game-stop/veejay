@@ -2427,7 +2427,7 @@ static struct {
     { "memset align 8", memset_new_align_8, 0, 0 },
     { "memset align 32", memset_new_align_32, 0, 0 },
 #endif
-#ifdef __SSE2__
+#if defined(__x86_64__) || defined(_M_X64)
     { "skylake optimized memset", memset_skylake, 0, AV_CPU_FLAG_SSE2 },
 #endif
     { "64-bit word memset()", memset_64, 0, 0 },
