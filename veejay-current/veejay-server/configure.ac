@@ -767,8 +767,6 @@ FFMPEG_LIBS="${LIBAVFORMAT_LIBS} ${LIBAVCODEC_LIBS} ${LIBAVUTIL_LIBS} ${LIBSWSCA
 AC_SUBST(FFMPEG_CFLAGS)
 AC_SUBST(FFMPEG_LIBS)
 
-FREEFRAME_CFLAGS="-freg-struct-return -Wno-unknown-pragmas -DLINUX"
-AC_SUBST(FREEFRAME_CFLAGS)
 AC_SUBST(LIBM_LIBS)
 
 dnl ********************************************************************

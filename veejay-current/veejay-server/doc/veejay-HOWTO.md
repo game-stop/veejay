@@ -266,7 +266,6 @@ See also [README.whatis](./README.whatis.md)
 
  * Support for Frei0r plugins
  * Support for LiVIDO plugins
- * Support for FreeFrame plugins (only for 32 bit systems!)
  * Support for GMIC plugins
  * Android client!
 

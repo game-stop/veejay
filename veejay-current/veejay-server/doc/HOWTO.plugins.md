@@ -40,7 +40,7 @@ $ vi ~/.veejay/plugins.cfg
 
 Apart from the differences due to your OS, the contents of the file can look like:
 ```
-/usr/local/lib/freeframe
+/usr/local/lib/frei0r
 ```
 
 Veejay will pick up the plugins configured in the `plugins.cfg` file the next time you start it.
