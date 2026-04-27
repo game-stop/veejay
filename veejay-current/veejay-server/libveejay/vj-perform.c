@@ -1537,7 +1537,7 @@ static void vj_perform_apply_first(veejay_t *info,performer_t *p, vjp_kf *todo_i
     
     if( rgb ) {
         
-        if(!vj_perform_format_changed_rgb) {
+        if(!vj_perform_format_changed_rgb(p, frames[0])) {
             return;
         }
 
