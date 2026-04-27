@@ -4,10 +4,10 @@ AM_CPPFLAGS = -I$(top_srcdir)/libplugger -I$(includedir) \
 
 AM_CPPFLAGS += ${FFMPEG_CFLAGS} 
 
-AM_CFLAGS = $(VEEJAY_CFLAGS) $(FREEFRAME_CFLAGS)
+AM_CFLAGS = $(VEEJAY_CFLAGS)
 
 LIBVJPLUG_LIB_FILE = libvjplug.la
 noinst_LTLIBRARIES = $(LIBVJPLUG_LIB_FILE)
 
-libvjplug_la_SOURCES = defaults.c utility.c freeframe-loader.c frei0r-loader.c livido-loader.c plugload.c
+libvjplug_la_SOURCES = defaults.c utility.c frei0r-loader.c livido-loader.c plugload.c
 

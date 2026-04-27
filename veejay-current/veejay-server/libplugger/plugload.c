@@ -23,7 +23,6 @@
  * The Plugin Loader can handle:
  *   -# Livido plugins
  *   -# Frei0r plugins
- *   -# FreeFrame plugins
  */
 
 #include <config.h>
@@ -57,7 +56,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <libplugger/plugload.h>
-#include <libplugger/freeframe-loader.h>
 #include <libplugger/frei0r-loader.h>
 #include <libplugger/livido-loader.h>
 #include <libvje/libvje.h>
@@ -118,9 +116,6 @@ static	void* instantiate_plugin( void *plugin, int w , int h )
 	{
 		case VEVO_PLUG_LIVIDO:
 			instance = livido_plug_init( plugin,w,h, yuv_to_alpha_fmt(base_fmt_), base_fmt_, read_cfg );
-			break;
-		case VEVO_PLUG_FF:
-			instance = freeframe_plug_init( plugin,w,h);
 			break;
 		case VEVO_PLUG_FR:
 			instance = frei0r_plug_init( plugin,w,h, yuv_to_alpha_fmt(base_fmt_), read_cfg );
@@ -313,7 +308,6 @@ static	void	free_plugins(void)
 		free_plugin( index_map_[i]);
 
 	vpf( illegal_plugins_ );
-	freeframe_destroy();
 	frei0r_destroy();
 
 	free( index_map_ );
@@ -551,13 +545,6 @@ int	plug_sys_detect_plugins(void)
 		add_to_plugin_list( plugger_paths[i].path );
 	}
 
-	//@ the freeframe version we use is not compatible with 64 bit systems. So, lets see if long is size 4
-	//@ For every time there is a void* passed as int a gremlin will be happy
-	if( sizeof(long) == 4 ) {
-		if( n_ff_ > 0 ) { 
-			veejay_msg(VEEJAY_MSG_INFO, "FreeFrame - %d plugins # cross-platform real-time video effects (http://freeframe.sourceforge.net)", n_ff_);
-		}
-	}
 
 	if( n_fr_ > 0 ) {
 		veejay_msg(VEEJAY_MSG_INFO, "frei0r - %d plugins # a minimalistic plugin API for video effects (http://www.piksel.org/frei0r)", n_fr_);

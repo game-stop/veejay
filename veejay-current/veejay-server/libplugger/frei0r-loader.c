@@ -476,7 +476,9 @@ int	frei0r_push_frame_f( void *plugin, int seqno, int dir, VJFrame *in )
 		}
 	
 
-		frei0r_ensure_scaler(fr, in, fr->in_count);
+		if(!frei0r_ensure_scaler(fr, in, fr->in_count)) {
+			return 0;
+		}
 
 		yuv_convert_and_scale_rgb( in_scaler__, in, fr->in[seqno]); //@ yuv -> rgb
 		if(seqno == 0)
