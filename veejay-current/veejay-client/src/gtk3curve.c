@@ -105,6 +105,7 @@ struct _Gtk3CurvePrivate
   gdouble  grid_resolution; /* VEEJAY NEEDS */
   gdouble  current_position; /* VEEJAY NEEDS */
   gboolean draw_position;  /* VEEJAY NEEDS */
+  gboolean draw_h_guides;  /* VEEJAY NEEDS */
 };
 
 enum
@@ -387,7 +388,8 @@ gtk3_curve_init (Gtk3Curve* self)
   priv->yaxis_hi = 0.0f; /* VEEJAY NEEDS */
 
   priv->grid_resolution = 0.0f; /* VEEJAY NEEDS */
-  priv->draw_position = TRUE;
+  priv->draw_position = TRUE; /* VEEJAY NEEDS */
+  priv->draw_h_guides = TRUE; /* VEEJAY NEEDS */
   /* Default Colors */
   gtk3_curve_set_color_background_rgba (GTK_WIDGET(self), 1.0, 1.0, 1.0, 1.0);
   gtk3_curve_set_color_curve_rgba (GTK_WIDGET(self), 0.0, 0.0, 0.0, 1.0);
@@ -797,15 +799,30 @@ gtk3_curve_draw (GtkWidget *widget,
     }
 
   /* VEEJAY NEEDS --->*/
+  /* Draw some horizontal guides */
+  if (priv->draw_position)
+  {
+      //~ gfloat position = project (priv->current_position, priv->min_x, priv->max_x, wm);// + RADIUS ?
+      cairo_set_line_width (cr, 0.5);
+      cairo_set_source_rgba (cr,
+                             0.8, //priv->position.red
+                             0.3,
+                             0.3,
+                             priv->curve.alpha);
+      gtk3_curve_draw_line (cr, RADIUS, hm/2. + RADIUS, wm + RADIUS, hm/2. + RADIUS);
+  }
+  /* <----- VEEJAY NEEDS */
+
+  /* VEEJAY NEEDS --->*/
   /* Draw a position cursor */
   if (priv->draw_position)
   {
       gfloat position = project (priv->current_position, priv->min_x, priv->max_x, wm);// + RADIUS ?
-      cairo_set_line_width (cr, 0.3);
+      cairo_set_line_width (cr, 0.8);
       cairo_set_source_rgba (cr,
-                             1, //priv->position.red
-                             0,
-                             0,
+                             0.8, //priv->position.red
+                             0.3,
+                             0.3,
                              priv->curve.alpha);
       gtk3_curve_draw_line (cr, position, RADIUS, position, hm + RADIUS);
   }
