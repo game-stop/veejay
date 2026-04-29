@@ -204,18 +204,7 @@ static	int	add_to_plugin_list( const char *path )
 		char *basename = vj_strdup( bname );
 		void *plugin = NULL;
 
-		if(dlsym( handle, "plugMain" ) && sizeof(long) == 4)
-		{
-			plugin = deal_with_ff( handle, name, base_width_, base_height_ );
-			if( plugin )
-			{
-				index_map_[ index_ ] = plugin;
-				index_ ++;
-				n_ff_ ++;
-			}
-			else
-				dlclose( handle );	
-		} else if(dlsym( handle, "f0r_construct" )) {
+		if(dlsym( handle, "f0r_construct" )) {
 			plugin = deal_with_fr( handle, name );
 			if( plugin )
 			{
