@@ -399,6 +399,8 @@ void    vj_midi_learning_vims_fx( void *vv, int widget, int id, int a, int b, in
     snprintf(message,sizeof(message), "%03d:%d %d %d", id, a,b,c );
     snprintf(wid, sizeof(wid),"slider_p%d", widget );
     vj_midi_learning_vims( vv, wid, message, extra );
+
+    veejay_msg(VEEJAY_MSG_DEBUG, "LEARN bake: '%s'", message );
 }
 
 
@@ -486,7 +488,7 @@ static  void    vj_midi_send_vims_now( vmidi_t *v, int *data )
 
             char vims_msg[64];
             snprintf(vims_msg,sizeof(vims_msg), "%s %d;", d->msg, (int) val );
-
+            
             /* use control/param as sample_id */
             int tmpv[3];
             if ( sscanf(vims_msg, "%03d:%d %d;",&tmpv[0],&tmpv[1],&tmpv[2]) == 3 )
@@ -510,10 +512,23 @@ static  void    vj_midi_send_vims_now( vmidi_t *v, int *data )
             }
             
             msg_vims( vims_msg );
+            veejay_msg(VEEJAY_MSG_DEBUG,
+                "VIMS SEND: raw='%s' selector=%d sample_id=%d arg=%d val=%d",
+                vims_msg,
+                tmpv[0],
+                tmpv[1],
+                tmpv[2],
+                (int)val);
+
             vj_msg(VEEJAY_MSG_INFO, "MIDI %x:%x, %x {%g, %g}->  vims %s", data[0], data[1],data[2],range,val,vims_msg);
         }
         else
         {
+            veejay_msg(VEEJAY_MSG_DEBUG,
+                "VIMS SEND: raw='%s'",
+                d->msg
+            );
+
             msg_vims( d->msg );
             vj_msg(VEEJAY_MSG_INFO, "MIDI %x: %x,%x -> vims %s", data[0],data[1],data[2], d->msg);
         }
