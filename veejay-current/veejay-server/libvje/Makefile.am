@@ -236,4 +236,5 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/integralblur.c \
     effects/tunnel.c \
     effects/chromaticdrift.c \
-    effects/morphologymixer.c
+    effects/morphologymixer.c \
+    effects/escherdroste.c
