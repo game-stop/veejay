@@ -10029,64 +10029,127 @@ static void add_sample_to_effect_sources_list(gint id,
     }
 }
 
-static sample_slot_t *update_sample_slot_data(int page_num,
-                                    int slot_num,
-                                    int sample_id,
-                                    gint sample_type,
-                                    gchar *title,
-                                    gchar *timecode)
+
+static inline gboolean str_changed(const char *a, const char *b)
 {
-    if (page_num >= NUM_BANKS || !info->sample_banks[page_num]) return NULL;
+    if (a == b) return FALSE;
+    if (!a || !b) return TRUE;
+    return strcmp(a, b) != 0;
+}
 
-    sample_slot_t *slot = info->sample_banks[page_num]->slot[slot_num];
-    sample_gui_slot_t *gui_slot = info->sample_banks[page_num]->gui_slot[slot_num];
+static inline void replace_string(char **dst, const char *src)
+{
+    if (*dst) {
+        free(*dst);
+        *dst = NULL;
+    }
+    if (src)
+        *dst = strduplastn(src);
+}
 
-    if (!slot || !gui_slot) return NULL;
+static sample_slot_t *
+update_sample_slot_data(int page_num,
+                        int slot_num,
+                        int sample_id,
+                        gint sample_type,
+                        gchar *title,
+                        gchar *timecode)
+{
+    if (page_num >= NUM_BANKS || !info->sample_banks[page_num])
+        return NULL;
 
-    if(slot->timecode) { free(slot->timecode); slot->timecode = NULL; }
-    if(slot->title)    { free(slot->title);    slot->title = NULL;    }
+    sample_slot_t *slot =
+        info->sample_banks[page_num]->slot[slot_num];
+    sample_gui_slot_t *gui_slot =
+        info->sample_banks[page_num]->gui_slot[slot_num];
 
-    slot->sample_id   = sample_id;
-    slot->sample_type = sample_type;
-    slot->timecode    = strduplastn(timecode);
-    slot->title       = strduplastn(title);
+    if (!slot || !gui_slot)
+        return NULL;
 
-    char s_key[32], g_key[32];
-    snprintf(s_key, sizeof(s_key), "S%04d%02d", sample_id, sample_type);
-    snprintf(g_key, sizeof(g_key), "G%04d%02d", sample_id, sample_type);
+    gboolean id_changed    = (slot->sample_id   != sample_id);
+    gboolean type_changed  = (slot->sample_type != sample_type);
+    gboolean title_changed = str_changed(slot->title, title);
+    gboolean time_changed  = str_changed(slot->timecode, timecode);
 
-    if(sample_id > 0)
+    gboolean becoming_empty = (sample_id <= 0 && slot->sample_id > 0);
+    gboolean becoming_full  = (sample_id > 0  && slot->sample_id <= 0);
+
+    gboolean any_model_change =
+        id_changed || type_changed || title_changed || time_changed;
+
+    if (!any_model_change)
+        return slot;
+
+    if (id_changed)
+        slot->sample_id = sample_id;
+
+    if (type_changed)
+        slot->sample_type = sample_type;
+
+    if (title_changed)
+        replace_string(&slot->title, title);
+
+    if (time_changed)
+        replace_string(&slot->timecode, timecode);
+
+    if (sample_id <= 0)
     {
+        if (becoming_empty)
+        {
+            gtk_label_set_text(GTK_LABEL(gui_slot->title), "");
+            gtk_label_set_text(GTK_LABEL(gui_slot->hotkey), "");
+            gtk_label_set_text(GTK_LABEL(gui_slot->timecode), "");
+            gtk_image_set_from_pixbuf(GTK_IMAGE(gui_slot->image), NULL);
+
+            if (slot->pixbuf) {
+                g_object_unref(slot->pixbuf);
+                slot->pixbuf = NULL;
+            }
+
+            gtk_widget_set_sensitive(gui_slot->event_box, FALSE);
+        }
+        return slot;
+    }
+
+
+    if (id_changed || type_changed)
+    {
+        char s_key[32], g_key[32];
+        snprintf(s_key, sizeof(s_key), "S%04d%02d", sample_id, sample_type);
+        snprintf(g_key, sizeof(g_key), "G%04d%02d", sample_id, sample_type);
+
         vevo_property_set(bankport_, s_key, VEVO_ATOM_TYPE_VOIDPTR, 1, &slot);
         vevo_property_set(bankport_, g_key, VEVO_ATOM_TYPE_VOIDPTR, 1, &gui_slot);
 
         char hotkey[64];
-        snprintf(hotkey, sizeof(hotkey), "[Shift]+[%d] -> [F%d] ",
-            page_num,
-             ((sample_id - 1) % 12) + 1);
-        gtk_label_set_text(GTK_LABEL(gui_slot->title),    slot->title ? slot->title : "Untitled");
-        gtk_label_set_text(GTK_LABEL(gui_slot->hotkey),   hotkey);
-        gtk_label_set_text(GTK_LABEL(gui_slot->timecode), slot->timecode ? slot->timecode : "00:00:00");
-        gtk_widget_set_sensitive(gui_slot->event_box, TRUE);
+        snprintf(hotkey, sizeof(hotkey),
+                 "[Shift]+[%d] -> [F%d] ",
+                 page_num,
+                 ((sample_id - 1) % 12) + 1);
+
+        gtk_label_set_text(GTK_LABEL(gui_slot->hotkey), hotkey);
     }
-    else
+
+    if (title_changed)
     {
-        gtk_label_set_text(GTK_LABEL(gui_slot->title),    "");
-        gtk_label_set_text(GTK_LABEL(gui_slot->hotkey),   "");
-        gtk_label_set_text(GTK_LABEL(gui_slot->timecode), "");
-        gtk_image_set_from_pixbuf(GTK_IMAGE(gui_slot->image), NULL);
+        gtk_label_set_text(GTK_LABEL(gui_slot->title),
+            slot->title ? slot->title : "Untitled");
+    }
 
-        if(slot->pixbuf)
-        {
-            g_object_unref(slot->pixbuf);
-            slot->pixbuf = NULL;
-        }
+    if (time_changed)
+    {
+        gtk_label_set_text(GTK_LABEL(gui_slot->timecode),
+            slot->timecode ? slot->timecode : "00:00:00");
+    }
 
-        gtk_widget_set_sensitive(gui_slot->event_box, FALSE);
+    if (becoming_full)
+    {
+        gtk_widget_set_sensitive(gui_slot->event_box, TRUE);
     }
 
     return slot;
 }
+
 
 void veejay_release_track(int id, int release_this)
 {
