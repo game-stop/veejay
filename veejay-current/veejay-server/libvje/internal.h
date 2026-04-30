@@ -248,8 +248,9 @@
 #include "./effects/chromaticdrift.h"
 #include "./effects/morphologymixer.h"
 #include "./effects/escherdroste.h"
+#include "./effects/topomorph.h"
 
-#define VJ_IMAGE_EFFECT_MIN 37
+#define VJ_IMAGE_EFFECT_MIN 36
 #define VJ_IMAGE_EFFECT_MAX 198
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -533,6 +534,7 @@ enum {
     VJ_IMAGE_EFFECT_TUNNEL = 39,
     VJ_IMAGE_EFFECT_CHROMATICDRIFT = 38,
     VJ_IMAGE_EFFECT_EDROSTE = 37,
+    VJ_IMAGE_EFFECT_TOPOMORPH = 36,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 

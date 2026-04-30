@@ -108,6 +108,7 @@ static struct {
     { fractalkaleido_init, fractalkaleido_malloc, fractalkaleido_free, NULL, NULL, fractalkaleido_apply, NULL, NULL, NULL, NULL, VJ_IMAGE_EFFECT_FRACTALKALEIDO},
     { tunnel_init,tunnel_malloc,tunnel_free,NULL,NULL,tunnel_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_TUNNEL },
     { escherdroste_init,escherdroste_malloc,escherdroste_free,NULL,NULL,escherdroste_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_EDROSTE },
+    { topomorph_init,topomorph_malloc,topomorph_free,NULL,NULL,topomorph_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_TOPOMORPH },
     { strobo_init,strobo_malloc,strobo_free,NULL,NULL,strobo_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_STROBOTSU },
     { spectralmotion_init,spectralmotion_malloc,spectralmotion_free,NULL,NULL,spectralmotion_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SPECTRALMOTION},
     { falsecolors_init, falsecolors_malloc,falsecolors_free, NULL,NULL, falsecolors_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_FALSECOLORS },
