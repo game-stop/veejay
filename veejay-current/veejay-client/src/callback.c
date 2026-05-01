@@ -2194,9 +2194,18 @@ void on_button_globalchaincopy_clicked( GtkWidget *widget, gpointer user_data) {
 	int after = gtk_toggle_button_get_active(
         GTK_TOGGLE_BUTTON(widget_cache[WIDGET_GLOBALCHAINLEVEL])
     );
+	int state = gtk_toggle_button_get_active(
+        GTK_TOGGLE_BUTTON(widget_cache[WIDGET_GLOBALCHAINTOGGLE])
+    );
 
-	multi_vims( VIMS_GLOBAL_CHAIN_COPY, "%d %d", 0, 1 + after);
-	vj_msg(VEEJAY_MSG_INFO,"Copied current playing FX chain to Global Chain");
+	int value = ( state == 0 ? 0 : state + after );
+	int sample_id = 0;
+
+	if(info->selected_slot && info->selected_slot->sample_id > 0)
+		sample_id = info->selected_slot->sample_id;
+
+	multi_vims( VIMS_GLOBAL_CHAIN_COPY, "%d %d", 0, value);
+	vj_msg(VEEJAY_MSG_INFO,"Copied sample %d FX chain to Global Chain", sample_id );
 }
 
 void on_globalchain_toggled(GtkWidget *widget, gpointer user_data)
@@ -2204,13 +2213,19 @@ void on_globalchain_toggled(GtkWidget *widget, gpointer user_data)
     if (!info->status_lock)
     {
         int state = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+		int mode = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_GLOBALCHAINLEVEL]));
+		int value = ( state == 0 ? 0 : state + mode );
+		int sample_id = 0;
 
-        multi_vims(VIMS_GLOBAL_CHAIN, "%d %d", 0, state);
+		if(info->selected_slot && info->selected_slot->sample_id > 0)
+			sample_id = info->selected_slot->sample_id;
+
+        multi_vims(VIMS_GLOBAL_CHAIN, "%d %d", sample_id, value);
 
         vj_msg(VEEJAY_MSG_INFO,
                "Global FX chain is %s",
-               (state == 0 ? "Disabled" :
-               (state == 1 ? "Enabled (Before)" : "Enabled (After)")));
+               (value == 0 ? "Disabled" :
+               (value == 1 ? "Enabled (Before)" : "Enabled (After)")));
     }
 }
 
@@ -2218,14 +2233,20 @@ void on_globalchainlevel_toggled(GtkWidget *widget, gpointer user_data)
 {
     if (!info->status_lock)
     {
-		int state = 1 + gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget));
-		
-        multi_vims(VIMS_GLOBAL_CHAIN, "%d %d", 0, state);
+		int state = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_GLOBALCHAINTOGGLE]));
+		int mode = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget));
+		vj_msg(VEEJAY_MSG_INFO, "Global FX chain renders %s the current FX chain",(mode == 1 ? "after" : "before"));
 
-        vj_msg(VEEJAY_MSG_INFO,
-               "Global FX chain position: %s",
-               (state == 2 ? "After FX Chain" : "Before FX Chain"));
-    }
+		int sample_id = 0;
+
+		if(info->selected_slot && info->selected_slot->sample_id > 0)
+			sample_id = info->selected_slot->sample_id;
+
+		if(state > 0) {
+			int value = 1 + mode;
+			multi_vims(VIMS_GLOBAL_CHAIN, "%d %d", sample_id, value);
+		}
+	}
 }
 
 void	on_loop_none_clicked(GtkWidget *widget, gpointer user_data)

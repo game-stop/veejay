@@ -7598,12 +7598,11 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     if (info->status_tokens[GLOBAL_CHAIN] != history[GLOBAL_CHAIN])
     {
         int state = info->status_tokens[GLOBAL_CHAIN];
-        int enabled = (state != 0);
+        int enabled = (state > 0);
         int after   = (state == 2);
 
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_GLOBALCHAINTOGGLE]),enabled);
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_GLOBALCHAINLEVEL]),after);
-        gtk_widget_set_sensitive( widget_cache[WIDGET_GLOBALCHAINLEVEL], enabled );
     }
 
     if( (pm == MODE_SAMPLE || pm == MODE_STREAM ) && info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] ) {
