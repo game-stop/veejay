@@ -322,7 +322,6 @@ usable without them.
 -   (optional) libdv &gt;= 1.02
 -   (optional) The SDL library &gt;= 2.0.0
 -   (optional) JACK low latency audio server &gt;= 0.98.1
--   (optional) DirectFB &gt;= 0.9.17
 -   (optional) FreeType &gt;= 2.1.9
 -   (optional) GTK &gt;= 3.22.0
 -   (optional) libqrencode &gt;= 3.4.2
@@ -1000,7 +999,6 @@ as packages you can use in combination with veejay.
 -   [Quasar DV Codec - libdv.sourceforge.net/](http://libdv.sourceforge.net/)
 -   [Simple DirectMedia Layer - libsdl.org](https://libsdl.org/)
 -   [The XML C library for Gnome - xmlsoft.org](http://www.xmlsoft.org/)
--   [DirectFB - directfb.org](http://www.directfb.org) (outdated)
 -   [JACK - jackaudio.org](http://jackaudio.org/)
 -   [FreeType - freetype.org](https://www.freetype.org/)
 -   [Ffmpeg - ffmpeg.org](https://ffmpeg.org)

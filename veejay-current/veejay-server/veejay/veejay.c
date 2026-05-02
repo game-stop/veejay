@@ -215,9 +215,6 @@ static void CompiledWith(void)
 #ifdef HAVE_LIBUNWIND
     fprintf(stdout, "\tSupport for stack unwinding\n");
 #endif
-#ifdef HAVE_DIRECTFB
-	fprintf(stdout,"\tSupport for Direct Framebuffer\n");
-#endif
 #ifdef HAVE_LIBLO
 	fprintf(stdout,"\tSupport for liblo\n");
 #endif
@@ -292,14 +289,6 @@ static void Usage(char *progname)
 #ifdef HAVE_SDL
 	fprintf(stderr,
 			"\t\t\t\t0 = SDL (default)\t\n");
-#endif
-#ifdef HAVE_DIRECTFB
-	fprintf(stderr,
-			"\t\t\t\t1 = DirectDB\t\n");
-#ifdef HAVE_SDL
-	fprintf(stderr,
-			"\t\t\t\t2 = SDL and DirectDB secondary head (TV-Out) clone mode\n");
-#endif
 #endif
 	fprintf(stderr,
 			"\t\t\t\t3 = Head less (no video output)\n");	

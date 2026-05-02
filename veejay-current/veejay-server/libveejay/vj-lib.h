@@ -440,9 +440,6 @@ typedef struct {
 	VJFrameInfo *effect_frame_info2;
     vjp_kf *effect_info2;	/* effect dependent variables */
     vjp_kf *effect_info;	/* effect dependent variables */
-#ifdef HAVE_DIRECTFB
-    void *dfb;
-#endif
     int video_out;
 #ifdef HAVE_GL
     void	*gl;

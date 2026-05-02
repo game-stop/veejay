@@ -1,5 +1,5 @@
 # norootforbuild
-# neededforbuild update-desktop-files gtk2-devel-packages glib2 gtk2 libglade3 libdv libxml2 jack DirectFB SDL libjpeg freetype2 gtk2-devel glib2-devel libglade-devel libxml2-devel jack-devel pkgconfig SDL-devel libjpeg-devel freetype2-devel valgrind alsa-devel alsa slang-devel slang libstdc++-devel libstdc++ zlib-devel zlib
+# neededforbuild update-desktop-files gtk2-devel-packages glib2 gtk2 libglade3 libdv libxml2 jack SDL libjpeg freetype2 gtk2-devel glib2-devel libglade-devel libxml2-devel jack-devel pkgconfig SDL-devel libjpeg-devel freetype2-devel valgrind alsa-devel alsa slang-devel slang libstdc++-devel libstdc++ zlib-devel zlib
 
 %define name    veejay
 %define	version 1.5
@@ -115,15 +115,3 @@ rm -f %{buildroot}%{_libdir}/lib*.la
 %{_mandir}/man1/*
 
 %changelog -n veejay
-* Jan 2015 - update build (niels)
-* Wed Mar 21 2007 - cleanup
-* Sat Nov 20 2005 - bla
-* Sat Apr 23 2005 - oc2pus@arcor.de 0.8-0.oc2pus.1
-- update to 0.8
-- patched configure for using glib2-2.4.*, gtk2-2.4.*, libglade2-2.2.*
-- patched gveejay sources for using gtk2-2.4
-* Fri Apr 15 2005 - oc2pus@arcor.de 0.7.3-0.oc2pus.2
-- directfb re-enabled
-* Mon Mar 21 2005 - oc2pus@arcor.de 0.7.3-0.oc2pus.1
-- initial rpm
-- directfb disabled, doesn't compile

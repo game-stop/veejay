@@ -27,7 +27,6 @@ AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
               $(DV_FLAGS) \
               $(X_CFLAGS) \
               $(LIBLO_CFLAGS) \
-              $(DIRECTFB_CFLAGS) \
               $(SDL2_CFLAGS) \
               $(JPEG_CFLAGS) \
               $(JACK_CFLAGS) \
@@ -81,7 +80,6 @@ libveejay_la_LIBADD = \
     $(top_builddir)/libqrwrap/libqrwrap.la \
     $(top_builddir)/libvjxml/libvjxml.la \
     $(SDL2_LIBS) \
-    $(DIRECTFB_LIBS) \
     $(X_LIBS) \
     $(PTHREAD_LIBS) \
     $(FT_LDFLAGS) \

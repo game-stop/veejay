@@ -69,10 +69,7 @@ AC_ARG_WITH([pixbuf],
 AC_ARG_WITH([playthread],
             AS_HELP_STRING([--without-playthread],[Do not use playback thread]),
             [], [with_playthread=yes])
-	    
-AC_ARG_WITH([directfb],
-	     AS_HELP_STRING([--without-directfb],[Do not use DirectFB.]),
-	 	[], [with_directfb=yes])
+
 AC_ARG_WITH([sdl],
 	     AS_HELP_STRING([--without-sdl],[Do not use SDL.]),
 	        [], [with_sdl=yes])
@@ -1003,21 +1000,6 @@ else
 fi
 
 dnl *********************************************************************
-dnl Check for the DirectFB library (for Matrox G550 Tvout)
-dnl
-have_directfb=false
-if test x$with_directfb != xno ; then
-PKG_CHECK_MODULES(DIRECTFB, directfb >= 0.9.17, have_directfb=true,
-	have_directfb=false)
-
-if test x$have_directfb = xtrue ; then
-AC_SUBST(DIRECTFB_LIBS)
-AC_SUBST(DIRECTFB_CFLAGS)
-AC_DEFINE(HAVE_DIRECTFB,1,[Compiling with DirectFB])
-fi
-fi
-
-dnl *********************************************************************
 dnl Check for the Jack Audio connection kit
 dnl   AC_DEFINE(HAVE_JACK,,[Compiling with support for Jack])
 dnl
@@ -1141,7 +1123,6 @@ AM_CONDITIONAL(HAVE_SSE2, test x$have_asm_sse2 = xtrue)
 AM_CONDITIONAL(HAVE_SDL, test x$have_sdl = xtrue)
 AM_CONDITIONAL(HAVE_XML2, test x$have_xml2 = xtrue)
 AM_CONDITIONAL(HAVE_JACK, test x$have_jack = xtrue)
-AM_CONDITIONAL(HAVE_DIRECTFB, test x$have_directfb = xtrue)
 AM_CONDITIONAL(HAVE_FREETYPE, test x$have_freetype = xtrue)
 AM_CONDITIONAL(HAVE_V4L2, test x$have_v4l2 = xtrue)
 AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
@@ -1287,7 +1268,6 @@ AC_MSG_NOTICE([  - XML c library for Gnome       : ${have_xml2}])
 AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
 AC_MSG_NOTICE([ Optional dependencies])
-AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])
 AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
 AC_MSG_NOTICE([  - QuickTime support             : ${have_libquicktime} ])
 AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])

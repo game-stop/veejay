@@ -109,9 +109,7 @@
 #ifdef HAVE_SDL
 #include <SDL2/SDL.h>
 #endif
-#ifdef HAVE_DIRECTFB
-#include <libveejay/vj-dfb.h>
-#endif
+
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -1861,40 +1859,10 @@ int veejay_setup_video_out(veejay_t *info) {
 		break;
 
 		case 1:
-			veejay_msg(VEEJAY_MSG_INFO, "Using output driver DirectFB");
-#ifdef HAVE_DIRECTFB
-			info->dfb =(vj_dfb *) vj_dfb_allocate(info->video_output_width,info->video_output_height,el->video_norm);
-			if( !info->dfb )
-				return -1;
-			if (vj_dfb_init(info->dfb) != 0)
-				return -1;
-#endif
 		break;
 
 
 		case 2:
-			veejay_msg(VEEJAY_MSG_INFO, 
-			           "Using output driver SDL & DirectFB");
-#ifdef HAVE_SDL
-			info->sdl = vj_sdl_allocate(info->effect_frame1, info->use_keyb,info->use_mouse,info->show_cursor, info->borderless);
-			if(!info->sdl)
-				return -1;
-
-			title = veejay_title(info);	
-			if (!vj_sdl_init(info->sdl,x,y,info->video_output_width, info->video_output_height, info->bes_width, info->bes_height,title,1,info->settings->full_screen,info->pixel_format, el->video_fps, &settings->vsync_interval_s)) {
-				free(title);
-				return -1;
-			}
-			free(title);
-#endif
-#ifdef HAVE_DIRECTFB
-			info->dfb = (vj_dfb *) vj_dfb_allocate( info->video_output_width, info->video_output_height, el->video_norm);
-			if(!info->dfb)
-				return -1;
-
-			if (vj_dfb_init(info->dfb) != 0)
-				return -1;
-#endif
 		break;
 		case 3:
 	    case 4:
@@ -3288,12 +3256,6 @@ static void veejay_playback_close(veejay_t *info)
     }
     vj_sdl_quit();
 #endif
-#ifdef HAVE_DIRECTFB
-    if( info->dfb ) {
-		vj_dfb_free(info->dfb);
-		free(info->dfb);
-	}
-#endif
 #ifdef HAVE_FREETYPE
 	//vj_font_destroy( info->font );
 	vj_font_destroy( info->osd );
@@ -3511,16 +3473,6 @@ veejay_t *veejay_malloc()
     veejay_memset(info->action_file[1],0,sizeof(info->action_file[1])); 
 	veejay_memset( info->dummy, 0, sizeof(dummy_t));
 	veejay_memset(&(info->settings->sws_templ), 0, sizeof(sws_template));
-
-#ifdef HAVE_SDL
-    info->video_out = 0;
-#else
-#ifdef HAVE_DIRECTFB
-    info->video_out = 1;
-#else
-    info->video_out = 3;
-#endif
-#endif
 
 	info->pixel_format = FMT_422F; //@default 
 	info->settings->ncpu = smp_check();

@@ -244,7 +244,6 @@ see also : [How to video wall](./veejay-current/veejay-server/doc/video-wall.md)
 
  * Support for Frei0r plugins
  * Support for LiVIDO plugins
- * Support for FreeFrame plugins (only for 32 bit systems!)
  * Support for GMIC plugins
  * Android client!
 
