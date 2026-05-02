@@ -698,6 +698,26 @@ if test x$have_gtk3 != xtrue ; then
    AC_MSG_ERROR([Cannot find Gtk+ 3.0 or later.])
 fi
 
+dnl ********************************************************************
+dnl Check for the SDL library (for software playback)
+dnl   (defines SDL_CFLAGS and SDL_LIBS)
+dnl ********************************************************************
+dnl have_sdl=false
+dnl if test x$with_sdl != xno ; then
+dnl AM_PATH_SDL(1.2.3,[
+dnl            have_sdl=true
+dnl            AC_DEFINE(HAVE_SDL,, [SDL library present])],,)
+dnl fi
+
+have_sdl=false
+if test x$with_sdl != xno ; then
+PKG_CHECK_MODULES( SDL2, sdl2 >= 2.0.0, have_sdl=true,have_sdl=false)
+if test x$have_sdl = xfalse ; then
+ AC_MSG_WARN([Could not find SDL 2.0 library!])
+fi
+AC_DEFINE(HAVE_SDL,1,[SDL2 library is installed])
+fi
+
 FFMPEG_CFLAGS="${LIBAVUTIL_CFLAGS}"
 AC_SUBST(FFMPEG_CFLAGS)
 dnl **********************************************************************
@@ -835,3 +855,5 @@ AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - Gtk3 support (gui)            : ${have_gtk3}])
 AC_MSG_NOTICE([  - Alsa support (midi sequencer) : ${have_alsa}])
 AC_MSG_NOTICE([])
+AC_MSG_NOTICE([ Optional dependencies:])
+AC_MSG_NOTICE([  - SDL keyboard mapping support  : ${have_sdl}])

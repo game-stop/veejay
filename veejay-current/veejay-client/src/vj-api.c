@@ -61,9 +61,7 @@
 #include <cellrendererspin.h>
 #include <gtktimeselection.h>
 #include <libgen.h>
-#ifdef HAVE_SDL
 #include <src/keyboard.h>
-#endif
 #include <gtk3curve.h>
 #include <src/curve.h>
 #include <src/multitrack.h>
@@ -8353,8 +8351,6 @@ void vj_gui_wipe(void)
     {
         veejay_memset(info->history_tokens[i],0, sizeof(int) * (STATUS_TOKENS+1));
     }
-
-    reset_samplebank();
 }
 
 GtkWidget *new_bank_pad(GtkWidget *box)
@@ -9261,13 +9257,13 @@ void vj_gui_disconnect(int restart_schedule)
     reset_tree("editlisttree");
 
     if (restart_schedule) {
-        reloaded_schedule_restart();
         reset_samplebank();
+        reloaded_schedule_restart();
     }
     else {
+        reset_samplebank();
         multitrack_close_tracks(info->mt);
         multitrack_disconnect(info->mt);
-        reset_samplebank();
     }
 
     if(info->client)

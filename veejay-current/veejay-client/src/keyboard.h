@@ -20,11 +20,6 @@
 #ifndef GDKSDL
 #define GDKSDL
 
-#include <gdk/gdkkeysyms.h>
-#include <SDL/SDL_keysym.h>
-#include <glib.h>
-#include <stdio.h>
-
 int		sdl2gdk_key( int sdl_key );
 int		gdk2sdl_key( int gdk_key );
 int		gdk2sdl_mod( int gdk_mod );

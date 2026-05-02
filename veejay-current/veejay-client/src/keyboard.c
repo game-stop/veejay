@@ -16,32 +16,50 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+#include <stdio.h>
 #include <config.h>
 #include <gtk/gtk.h>
 #ifdef HAVE_SDL
+#include <gdk/gdkkeysyms.h>
+#include <gdk/gdktypes.h>
+#include <SDL2/SDL_keyboard.h>
+#include <SDL2/SDL_keycode.h>
 #include "keyboard.h"
+
+
+typedef enum {
+  VIMS_MOD_NONE  = 0x0000,
+  VIMS_MOD_ALT= 0x0001,
+  VIMS_MOD_CTRL= 0x0002,
+  VIMS_MOD_SHIFT = 0x0004,
+  VIMS_MOD_CAPSLOCK = 0x0008,
+} KEYMod;
+
+#define VIMS_MOD_ALT_SHIFT        VIMS_MOD_ALT|VIMS_MOD_SHIFT
+#define VIMS_MOD_CTRL_SHIFT       VIMS_MOD_CTRL|VIMS_MOD_SHIFT
+#define VIMS_MOD_CTRL_ALT         VIMS_MOD_CTRL|VIMS_MOD_ALT
+#define VIMS_MOD_CTRL_ALT_SHIFT   VIMS_MOD_CTRL|VIMS_MOD_ALT|VIMS_MOD_SHIFT
+
 static struct
 {
-	const int	sdl_mod;
-	const int	gdk_mod;
-	const gchar	*title;
-} modifier_translation_table_t[] = 
+	const int vims_mod;
+	const int gdk_mod;
+	const gchar *title;
+} modifier_translation_table_t[] =
 {
-	{	0,	0,			" "  },
-	{	0,	16,			" "  },
-	{	3,	1,			"shift" },
-	{	3,	17,			"shift"	},
-	{	1, 	8,			"alt"	},
-	{	1,	24,			"alt"	},
-	{	1,	44,			"alt"	},
-	{	2, 	4,			"ctrl"	},
-	{	2,	20,			"ctrl"	},
-	{	0,	0,			NULL	},
+	{ VIMS_MOD_NONE, 0, "none" },
+	{ VIMS_MOD_SHIFT, GDK_SHIFT_MASK, "shift" },
+	{ VIMS_MOD_ALT, GDK_MOD1_MASK, "alt" },
+	{ VIMS_MOD_CTRL, GDK_CONTROL_MASK, "ctrl" },
+	{ VIMS_MOD_CAPSLOCK, GDK_LOCK_MASK, "capslock" },
+	{ VIMS_MOD_CTRL | VIMS_MOD_ALT, GDK_CONTROL_MASK | GDK_MOD1_MASK, "ctrl+alt" },
+	{ VIMS_MOD_CTRL | VIMS_MOD_SHIFT, GDK_CONTROL_MASK | GDK_SHIFT_MASK, "ctrl+shift" },
+	{ VIMS_MOD_ALT  | VIMS_MOD_SHIFT, GDK_MOD1_MASK | GDK_SHIFT_MASK, "alt+shift" },
+	{ VIMS_MOD_CTRL | VIMS_MOD_ALT | VIMS_MOD_SHIFT,
+	  GDK_CONTROL_MASK | GDK_MOD1_MASK | GDK_SHIFT_MASK, "ctrl+alt+shift" },
+	{ 0, 0, NULL }
 };
-/* fixme: introduce keyboard mapping functionality
-        1. attach VIMS events/VIMS BUNDLES to keys (with arguments)
-	2. save/load VIMS keyboard mapping
-*/
+
 static struct
 {
 	const int gdk_sym;			// GDK key
@@ -55,14 +73,14 @@ static struct
 {	GDK_KEY_quotedbl,	SDLK_QUOTEDBL,		"Double quote"  },
 {	GDK_KEY_numbersign, SDLK_HASH,		"Hash"		},
 {	GDK_KEY_dollar,	SDLK_DOLLAR,		"Dollar"	},
-{	GDK_KEY_percent,	SDLK_PAUSE,		"Percent"	},
+{	GDK_KEY_percent,	SDLK_PERCENT,		"Percent"	},
 {	GDK_KEY_parenleft,	SDLK_LEFTPAREN,		"Leftparen"	},
 {	GDK_KEY_parenright, SDLK_RIGHTPAREN,	"Rightparen"	},
 {	GDK_KEY_asciicircum,SDLK_CARET,		"Caret"		},
 {	GDK_KEY_ampersand,  SDLK_AMPERSAND,		"Ampersand"	},
 {	GDK_KEY_underscore,	SDLK_UNDERSCORE,	"Underscore"	},
-{	GDK_KEY_braceright, 123,			"Rightbrace"	},
-{	GDK_KEY_braceleft,  125,			"Leftbrace"	},
+{	GDK_KEY_braceright, 125,			"Rightbrace"	},
+{	GDK_KEY_braceleft,  123,			"Leftbrace"	},
 {	GDK_KEY_grave, 	SDLK_BACKQUOTE,		"Aphostrophe"	},
 {	GDK_KEY_asciitilde, 126,			"Tilde"		},
 {	GDK_KEY_asterisk,	SDLK_ASTERISK,		"Asterisk"	},
@@ -96,17 +114,16 @@ static struct
 {	GDK_KEY_F10,	SDLK_F10,		"F10"		},
 {	GDK_KEY_F11,	SDLK_F11,		"F11"		},
 {	GDK_KEY_F12,	SDLK_F12,		"F12"		},
-{	GDK_KEY_EuroSign,	SDLK_EURO,		"Euro"		},
-{	GDK_KEY_KP_0,	SDLK_KP0,		"keypad 0"	},
-{	GDK_KEY_KP_1,	SDLK_KP1,		"keypad 1"	},
-{	GDK_KEY_KP_2,	SDLK_KP2,		"keypad 2"	},
-{	GDK_KEY_KP_3,	SDLK_KP3,		"keypad 3"	},
-{	GDK_KEY_KP_4,	SDLK_KP4,		"keypad 4"	},
-{	GDK_KEY_KP_5,	SDLK_KP5,		"keypad 5"	},
-{	GDK_KEY_KP_6,	SDLK_KP6,		"keypad 6"	},
-{	GDK_KEY_KP_7,	SDLK_KP7,		"keypad 7"	},
-{	GDK_KEY_KP_8,	SDLK_KP8,		"keypad 8"	},
-{	GDK_KEY_KP_9,	SDLK_KP9,		"keypad 9"	},
+{	GDK_KEY_KP_0,	SDLK_KP_0,		"keypad 0"	},
+{	GDK_KEY_KP_1,	SDLK_KP_1,		"keypad 1"	},
+{	GDK_KEY_KP_2,	SDLK_KP_2,		"keypad 2"	},
+{	GDK_KEY_KP_3,	SDLK_KP_3,		"keypad 3"	},
+{	GDK_KEY_KP_4,	SDLK_KP_4,		"keypad 4"	},
+{	GDK_KEY_KP_5,	SDLK_KP_5,		"keypad 5"	},
+{	GDK_KEY_KP_6,	SDLK_KP_6,		"keypad 6"	},
+{	GDK_KEY_KP_7,	SDLK_KP_7,		"keypad 7"	},
+{	GDK_KEY_KP_8,	SDLK_KP_8,		"keypad 8"	},
+{	GDK_KEY_KP_9,	SDLK_KP_9,		"keypad 9"	},
 {	GDK_KEY_KP_Divide,	SDLK_KP_DIVIDE,		"keypad /"	},
 {	GDK_KEY_KP_Multiply,SDLK_KP_MULTIPLY,	"keypad *"	},
 {	GDK_KEY_KP_Subtract,SDLK_KP_MINUS,		"keypad -"	},
@@ -115,21 +132,7 @@ static struct
 {	GDK_KEY_KP_Enter,	SDLK_KP_ENTER,		"keypad ENTER"	},
 {	GDK_KEY_ISO_Enter,	SDLK_RETURN,		"ENTER"		},
 {	GDK_KEY_3270_Enter, SDLK_RETURN,		"ENTER"		},  
-
-/* GDK_KEY_KP doesnt word on all systems ... */
-{	0xff9f,		SDLK_KP0,		"keypad 0"	},
-{	0xff9c,		SDLK_KP1,		"keypad 1"	},
-{	0xff99,		SDLK_KP2,		"keypad 2"	},
-{	0xff9b,		SDLK_KP3,		"keypad 3"	},
-{	0xff96,		SDLK_KP4,		"keypad 4"	},
-{	0xff9d,		SDLK_KP5,		"keypad 5"	},
-{	0xff98,		SDLK_KP6,		"keypad 6"	},
-{	0xff95,		SDLK_KP7,		"keypad 7"	},
-{	0xff97,		SDLK_KP8,		"keypad 8"	},
-{	0xff9a,		SDLK_KP9,		"keypad 9"	},
 {	0xff9f,		SDLK_KP_PERIOD,		"keypad ."	},
-
-
 {	GDK_KEY_0,		SDLK_0,			"0"		},
 {	GDK_KEY_1,		SDLK_1,			"1"		},
 {	GDK_KEY_2,		SDLK_2,			"2"		},
@@ -174,7 +177,8 @@ static struct
 {	GDK_KEY_U,		SDLK_u,			"U"		},
 {	GDK_KEY_V,		SDLK_v,			"V"		},
 {	GDK_KEY_W,		SDLK_w,			"W"		},
-{	GDK_KEY_X,		SDLK_y,			"Y"		},
+{	GDK_KEY_X,		SDLK_y,			"X"		},
+{	GDK_KEY_Y,		SDLK_y,			"Y"		},
 {	GDK_KEY_Z,		SDLK_z,			"Z"		},
 {	GDK_KEY_a,		SDLK_a,			"a"		},
 {	GDK_KEY_b,		SDLK_b,			"b"		},
@@ -207,9 +211,14 @@ static struct
 };
 
 
-int		sdl2gdk_key(int sdl_key)
+int sdl2gdk_key(int sdl_key)
 {
-	return 0;
+    for (int i = 0; key_translation_table_t[i].title != NULL; i++)
+    {
+        if (sdl_key == key_translation_table_t[i].sdl_sym)
+            return key_translation_table_t[i].gdk_sym;
+    }
+    return 0;
 }
 
 int		gdk2sdl_key(int gdk_key)
@@ -223,15 +232,18 @@ int		gdk2sdl_key(int gdk_key)
 	return 0;
 }
 
-int		gdk2sdl_mod( int gdk_mod )
+int gdk2sdl_mod(int gdk_mod)
 {
-	int i;
-	for ( i = 0; modifier_translation_table_t[i].title != NULL ; i ++ )
-	{
-		if( gdk_mod == modifier_translation_table_t[i].gdk_mod )
-			return modifier_translation_table_t[i].sdl_mod;
-	}
-	return 0;
+    int result = VIMS_MOD_NONE;
+
+    for(int i = 1; modifier_translation_table_t[i].title != NULL; i++)
+    {
+        if((gdk_mod & modifier_translation_table_t[i].gdk_mod) == modifier_translation_table_t[i].gdk_mod)
+        {
+            result |= modifier_translation_table_t[i].vims_mod;
+        }
+    }
+    return result;
 }
 
 int		sdlmod_by_name( gchar *name )
@@ -244,58 +256,56 @@ int		sdlmod_by_name( gchar *name )
 	{
 		if( g_utf8_collate(name,
 				modifier_translation_table_t[i].title) == 0)
-			return modifier_translation_table_t[i].sdl_mod;
+			return modifier_translation_table_t[i].vims_mod;
 	}
 
 	return 0;
 }
 
-int		sdlkey_by_name( gchar *name )
+int sdlkey_by_name(gchar *name)
 {
 	int i;
+
 	if(!name)
 		return 0;
-	for ( i = 0; key_translation_table_t[i].title != NULL ; i ++ )
+
+	for(i = 0; key_translation_table_t[i].title != NULL; i++)
 	{
-		if( g_utf8_collate(name,
-				key_translation_table_t[i].title) == 0)
+		if(strcmp(name, key_translation_table_t[i].title) == 0)
 			return key_translation_table_t[i].sdl_sym;
 	}
+
 	return 0;
 }
 
-gchar		*sdlkey_by_id( int sdl_key )
-{
-	int i;
-	gchar *ret = NULL;
-	for ( i = 0; key_translation_table_t[i].title != NULL ; i ++ )
-	{
-		if( sdl_key == key_translation_table_t[i].sdl_sym )
-			return (gchar*)key_translation_table_t[i].title;
-	}
-	return ret;
+gchar *sdlkey_by_id(int sdl_key) {
+    for (int i = 0; key_translation_table_t[i].title != NULL; i++) {
+        if (sdl_key == key_translation_table_t[i].sdl_sym) {
+            return (gchar*)key_translation_table_t[i].title;
+        }
+    }
+    return (gchar*)SDL_GetKeyName(sdl_key);
 }
 
-gchar		*sdlmod_by_id( int sdl_mod )
+gchar *sdlmod_by_id(int vims_mod)
 {
-	int i;
-	gchar *ret = NULL;
-	for ( i = 0; modifier_translation_table_t[i].title != NULL ; i ++ )
+	for(int i = 0; modifier_translation_table_t[i].title != NULL; i++)
 	{
-		if( sdl_mod == modifier_translation_table_t[i].sdl_mod )
+		if(vims_mod == modifier_translation_table_t[i].vims_mod)
 			return (gchar*)modifier_translation_table_t[i].title;
 	}
-	return ret;
+
+	return NULL;
 }
-gchar		*gdkmod_by_id( int gdk_mod )
+
+gchar *gdkmod_by_id(int gdk_mod)
 {
-	int i;
-	for( i = 0; modifier_translation_table_t[i].title != NULL ; i ++ )
+	for(int i = 0; modifier_translation_table_t[i].title != NULL; i++)
 	{
-		if( gdk_mod == modifier_translation_table_t[i].gdk_mod ||
-			gdk_mod & modifier_translation_table_t[i].gdk_mod )
+		if(gdk_mod == modifier_translation_table_t[i].gdk_mod)
 			return (gchar*)modifier_translation_table_t[i].title;
 	}
+
 	return NULL;
 }
 
@@ -309,15 +319,6 @@ gchar		*gdkkey_by_id( int gdk_key )
 	}
 	return NULL;
 }
-
-/*
-Key snooper functions are called before normal event delivery.
-They can be used to implement custom key event handling.
-grab_widget¿:	the widget to which the event will be delivered.
-event¿:	the key event.
-func_data¿:	the func_data supplied to gtk_key_snooper_install().
-Returns¿:	TRUE to stop further processing of event, FALSE to continue.
-*/
 
 gboolean	key_snooper(GtkWidget *w, GdkEventKey *event, gpointer user_data)
 {
