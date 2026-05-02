@@ -5116,8 +5116,9 @@ void vj_event_chain_global(void *ptr, const char format[], va_list ap)
     if(enabled > 2) enabled = 2;
     
     v->global_chain->enabled = enabled;
+    int is_after = (enabled == 2);
 
-    veejay_msg(VEEJAY_MSG_DEBUG, "Global FX Chain is %s" , (enabled ? "enabled" : "disabled"));
+    veejay_msg(VEEJAY_MSG_DEBUG, "Global FX Chain is %s and renders %s the current FX chain" , (enabled ? "enabled" : "disabled"), (is_after? "after" :"before"));
 }
 
 void    vj_event_chain_fade_follow(void *ptr, const char format[], va_list ap )
