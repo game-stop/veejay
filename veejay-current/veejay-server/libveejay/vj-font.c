@@ -1928,7 +1928,7 @@ static void vj_font_prepare_osd(vj_font_t *f, int w)
     if (size > MAX_SIZE) size = MAX_SIZE;
 
     f->current_size = size;
-    f->osd_sub->x = 2;
+    f->osd_sub->x = 1;
     f->osd_sub->y = -1;
     f->osd_sub->size = f->current_size;
     f->osd_sub->font = f->current_font;
@@ -1998,7 +1998,7 @@ static void vj_font_text_osd_render(vj_font_t *f, void *_picture, int x, int y)
 
     draw_transparent_box(picture, x, y, bw, bh, f->bgcolor, 160);
 
-    int draw_x = x + 4;
+    int draw_x = x + 2;
     int draw_y = y + 4;
     cur_x = 0;
     prev_c = 0;
