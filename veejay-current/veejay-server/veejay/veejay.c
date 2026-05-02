@@ -53,6 +53,7 @@
 #include <build.h>
 #include <libvje/libvje.h>
 
+extern void el_cache_configure(int t);
 extern void vj_avcodec_print_version();
 static veejay_t *info = NULL;
 static float override_fps = 0.0;
@@ -443,6 +444,8 @@ static int set_option(const char *name, char *value)
 		max_mem_ =  atoi(optarg);
 		if(max_mem_ < 0 ) max_mem_ = 0; else if (max_mem_ > 100) max_mem_ = 100;
 		info->uc->max_cached_mem = max_mem_;
+		el_cache_configure(max_mem_);
+
     } else if (strcmp(name, "synchronization") == 0 || strcmp(name, "c") == 0) {
 		info->sync_correction = atoi(optarg);
 	} else if (strcmp(name, "version") == 0 )
