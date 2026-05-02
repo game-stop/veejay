@@ -45,6 +45,7 @@ instrument for Linux/GNU*
         1. [Global view](veejay-HOWTO.md#4.2.1)
         1. [sayVIMS utility](veejay-HOWTO.md#4.2.2)
     1. [The keyboard interface](veejay-HOWTO.md#4.3)
+       1. [Other Interfaces : Midi, OSC](veejay-HOWTO.md#4.3.1)
     1. [Recording video](veejay-HOWTO.md#4.4)
     1. [Streaming video](veejay-HOWTO.md#4.5)
 1. [Popular packages](veejay-HOWTO.md#5)
@@ -834,6 +835,19 @@ to switch back to the sample playmode.
 
 You can create new input streams by using the console interface **sayVIMS** or by
 using the graphical user interface **reloaded**. All new input streams (and samples) are auto numbered.
+
+<span id="4.4">4.3.1 Other Interfaces : Midi, OSC </span>
+-----------------------------------------
+
+#### MIDI
+
+You can use various controler to the graphical user interface **reloaded** has it will be appear in the outputs 
+(writable) client list of MIDI controler. Do not forget to link any input (readable) client to **reloaded**
+using for example the 'aconnect' utility. Have a look to **reloaded** [documentation](../../veejay-client/doc)  for more informations.
+
+#### OSC
+
+*Write me*
 
 <span id="4.4">4.4 Recording video</span>
 -----------------------------------------

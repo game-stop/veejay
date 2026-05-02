@@ -11,7 +11,7 @@
 * [veejay HOWTO](./veejay-HOWTO.md) : A verbose and deep description
 * [HOWTO plugins](./HOWTO.plugins.md) : All you need to configure external video plugins
 * [README.alpha](./README.alpha.md) : Support for alpha channel compositing
-* [VIMS(./VIMS.md) : VIMS is Veejay's IMS (Internal Message System)
+* [VIMS](./VIMS.md) : VIMS is Veejay's IMS (Internal Message System)
 * [video wall](./video-wall.md) : How to split ouput in multiple screens
 
 * [How to Veejay PureData](./HowtoVeejay-PureData.html)
@@ -25,7 +25,7 @@
 ### Special concerns : codecs and hardware stuff
 * [README audio](./README.audio.md) : To gain audio support in veejay
 * [README video codec](./README.video-codec.md) : What codec choose and how
-* [YCbCr](./YCbCr.txt)
+* [YCbCr](./YCbCr.txt) : Veejay color(s) model 
 * [README memory](./README.memory.md) : Memory concern with veejay
 * [README performance](./README.performance.md) : Performance tips
 * [README network](./README.network.md) : Advanced veejay network communication (aka how to use/synchronize multiple server over the network)
