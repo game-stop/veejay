@@ -25,7 +25,7 @@
 ### Special concerns : codecs and hardware stuff
 * [README audio](./README.audio.md) : To gain audio support in veejay
 * [README video codec](./README.video-codec.md) : What codec choose and how
-* [YCbCr](./YCbCr.txt)
+* [YCbCr](./YCbCr.txt) : Veejay color(s) model 
 * [README memory](./README.memory.md) : Memory concern with veejay
 * [README performance](./README.performance.md) : Performance tips
 * [README network](./README.network.md) : Advanced veejay network communication (aka how to use/synchronize multiple server over the network)
