@@ -850,6 +850,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	el->has_video = 1;
 	el->num_video_files ++;
     
+	el->source_hash = editlist_source_hash(el);
+
 	if( el_width_ == 0 && el_height_ == 0 ) {
 		el_width_ = el->video_width;
 		el_height_ = el->video_height;
@@ -2201,7 +2203,6 @@ static editlist *vj_el_soft_clone_base(editlist *el)
 	clone->auto_deinter = el->auto_deinter;
 	clone->pixel_format = el->pixel_format;
 	clone->is_clone = 1;
-	clone->source_hash = editlist_source_hash(el);
 
     return clone;
 }
@@ -2226,6 +2227,8 @@ editlist	*vj_el_soft_clone(editlist *el)
 		clone->decoders[i] = el->decoders[i]; 
 		clone->ctx[i] = el->ctx[i];
 	}
+
+	clone->source_hash = editlist_source_hash(clone);
 
 	return clone;
 }
@@ -2295,6 +2298,7 @@ editlist *vj_el_soft_clone_range(editlist *el, long n1, long n2)
 
     free(file_frame_counts);
 
+	clone->source_hash = editlist_source_hash(clone);
     clone->video_frames = k;
     clone->total_frames = k - 1;
 
