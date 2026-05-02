@@ -1181,6 +1181,7 @@ typedef struct
     void *midi;
     struct timeval  time_last;
     uint8_t     *cali_buffer;
+    GtkWidget *vims_bundle_dialog;
 } vj_gui_t;
 
 enum
@@ -8876,6 +8877,7 @@ void vj_gui_init(const char *glade_file,
     veejay_memset(&(info->watch.p_time),0,sizeof(struct timeval));
     info->midi =  vj_midi_new( info->main_window, info->tl );
  
+    info->vims_bundle_dialog = glade_xml_get_widget_(info->main_window, "vims_bundles");
 
     if(!beta) // srt-titling sequence stuff
     {
