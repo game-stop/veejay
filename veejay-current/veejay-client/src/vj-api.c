@@ -3615,17 +3615,25 @@ static void update_slider_step_and_page_size(GtkWidget *w, gint min, gint max) {
     GtkRange *range = GTK_RANGE(w);
     GtkAdjustment *a = gtk_range_get_adjustment(range);
     gint range_size = max - min;
-    gint step;
-    if (range_size <= 255)
-        step = 1;
-    else if (range_size <= 1000)
-        step = 5;
-    else if (range_size <= 5000)
-        step = 10;
-    else
-        step = 25;
+    gint step, page;
 
-    gint page = step * 8;
+    if (range_size <= 80)
+    {
+        step = 1;
+        page = 1;
+    }
+    else
+    {
+        if (range_size <= 255)
+            step = 1;
+        else if (range_size <= 1000)
+            step = 5;
+        else if (range_size <= 5000)
+            step = 10;
+        else
+            step = 25;
+        page = step * 8;
+    }
 
     gtk_adjustment_set_step_increment(a, step);
     gtk_adjustment_set_page_increment(a, page);
@@ -8863,6 +8871,7 @@ void vj_gui_init(const char *glade_file,
     {
         gtk_combo_box_text_insert_text (GTK_COMBO_BOX_TEXT(shape_list),i ,fx_anim_shape_map[i].description);
     }
+    gtk_combo_box_set_active (GTK_COMBO_BOX(shape_list), 0);
 
     gtk_widget_show_all(curve_container);
 
