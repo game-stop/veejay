@@ -50,7 +50,6 @@ libveejay_la_SOURCES = \
     x11misc.c \
     vj-shm.c \
     vj-sdl.c \
-    vj-dfb.c \
     vj-viewport.c \
     vj-composite.c \
     vj-font.c \
