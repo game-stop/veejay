@@ -80,6 +80,7 @@ void reloaded_restart(void);
 
 
 enum {
+  FX_ANIM_SHAPE_NO_SHAPE ,
   FX_ANIM_SHAPE_BOUNCE ,
   FX_ANIM_SHAPE_BURST_ENVELOPE ,
   FX_ANIM_SHAPE_COSINE ,
@@ -113,6 +114,7 @@ static struct
     const int id;
 } fx_anim_shape_map[] =
 {
+    { "no shape",           FX_ANIM_SHAPE_NO_SHAPE },
     { "Bounce",             FX_ANIM_SHAPE_BOUNCE },
     { "Burst Envelope",     FX_ANIM_SHAPE_BURST_ENVELOPE },
     { "Cosine",             FX_ANIM_SHAPE_COSINE },

@@ -8871,6 +8871,7 @@ void vj_gui_init(const char *glade_file,
     {
         gtk_combo_box_text_insert_text (GTK_COMBO_BOX_TEXT(shape_list),i ,fx_anim_shape_map[i].description);
     }
+    gtk_combo_box_set_active (GTK_COMBO_BOX(shape_list), 0);
 
     gtk_widget_show_all(curve_container);
 
