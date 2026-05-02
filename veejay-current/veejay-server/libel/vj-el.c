@@ -134,7 +134,7 @@ extern int el_pixel_format_;
 
 typedef struct raw_frame_node_t {
     uint64_t source_hash;
-    long nframe;
+    uint64_t source_frame_ref;
     uint8_t *planes[MAX_PLANES];
     struct raw_frame_node_t *prev;
     struct raw_frame_node_t *next;
@@ -168,6 +168,9 @@ static inline uint64_t editlist_source_hash(const editlist *e)
             h *= 1099511628211ULL;
         }
     }
+
+    h ^= (uint64_t)(uintptr_t)e;
+    h *= 1099511628211ULL;
 
     return h;
 }
@@ -268,7 +271,7 @@ static void evict_oldest_frame(global_raw_frame_cache_t *cache) {
     cache->size--;
 }
 
-static void el_cache_frame(global_raw_frame_cache_t *cache, uint64_t source_hash, long nframe, uint8_t *src[4]) {
+static void el_cache_frame(global_raw_frame_cache_t *cache, uint64_t source_hash, uint64_t source_frame_ref, uint8_t *src[4]) {
     if (cache->size >= cache->capacity) {
         evict_oldest_frame(cache);
     }
@@ -279,7 +282,7 @@ static void el_cache_frame(global_raw_frame_cache_t *cache, uint64_t source_hash
 		return;
 	}
     new_node->source_hash = source_hash;
-    new_node->nframe = nframe;
+    new_node->source_frame_ref = source_frame_ref;
 
     size_t plane_sizes[4] = {el_out_->len, el_out_->uv_len, el_out_->uv_len, 0};
     for (int i = 0; i < 3; i++) {
@@ -302,17 +305,34 @@ static void el_cache_frame(global_raw_frame_cache_t *cache, uint64_t source_hash
     cache->size++;
 }
 
-static int find_cached_frame(global_raw_frame_cache_t *cache, uint64_t source_hash, long nframe, uint8_t *dst[4]) {
+static int find_cached_frame(global_raw_frame_cache_t *cache, uint64_t source_hash, uint64_t source_frame_ref, uint8_t *dst[4]) {
     raw_frame_node_t *current = cache->head;
     size_t plane_sizes[4] = {el_out_->len, el_out_->uv_len, el_out_->uv_len, 0};
 
     while (current != NULL) {
-        if (current->source_hash == source_hash && current->nframe == nframe) {
+        if (current->source_hash == source_hash && current->source_frame_ref == source_frame_ref) {
             for (int i = 0; i < 3; i++) {
                 if (current->planes[i] && dst[i]) {
                     veejay_memcpy(dst[i], current->planes[i], plane_sizes[i]);
                 }
             }
+
+            if (current != cache->head) {
+                current->prev->next = current->next;
+                if (current->next) {
+                    current->next->prev = current->prev;
+                } else {
+                    cache->tail = current->prev;
+                }
+
+                current->next = cache->head;
+                current->prev = NULL;
+                if (cache->head) {
+                    cache->head->prev = current;
+                }
+                cache->head = current;
+            }
+
             return 1;
         }
         current = current->next;
@@ -1059,13 +1079,15 @@ int vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
         nframe = el->total_frames;
     }
 
+    int res = 0;
+    uint64_t n = el->frame_list[nframe];
+
     global_raw_frame_cache_t *cache = get_global_cache();
-    if (cache && find_cached_frame(cache, el->source_hash, nframe, dst)) {
+    if (cache && find_cached_frame(cache, el->source_hash, n, dst)) {
         return 1;
     }
 
-    int res = 0;
-    uint64_t n = el->frame_list[nframe];
+
     int decoder_id = lav_video_compressor_type(el->lav_fd[N_EL_FILE(n)]);
 
     res = lav_set_video_position(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n));
@@ -1168,7 +1190,7 @@ int vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
     }
 
     if (ret_code == 1 && cache) {
-        el_cache_frame(cache, el->source_hash, nframe, dst);
+        el_cache_frame(cache, el->source_hash, n, dst);
     }
 
     return ret_code;
