@@ -724,6 +724,51 @@ vj_msg_bundle *vj_event_bundle_get(int event_id)
     return NULL;
 }
 #ifdef HAVE_SDL
+void vj_format_keycombo(char *out, size_t out_size, int key, KEYMod mod, int is_physical)
+{
+    char *p = out;
+    size_t remaining = out_size;
+
+    if (remaining == 0)
+        return;
+
+    *p = '\0';
+
+    #define APPEND_KEYNAME(txt) do { \
+        int n = snprintf(p, remaining, "%s", txt); \
+        if (n < 0 || (size_t)n >= remaining) return; \
+        p += n; \
+        remaining -= n; \
+    } while(0)
+
+    if (mod & VIMS_MOD_CTRL)     APPEND_KEYNAME("Ctrl+");
+    if (mod & VIMS_MOD_ALT)      APPEND_KEYNAME("Alt+");
+    if (mod & VIMS_MOD_SHIFT)    APPEND_KEYNAME("Shift+");
+    if (mod & VIMS_MOD_CAPSLOCK) APPEND_KEYNAME("CapsLock+");
+
+    if (key != 0)
+    {
+        const char *keyname = NULL;
+        if (is_physical) {
+            keyname = SDL_GetScancodeName((SDL_Scancode)key);
+        } else {
+            keyname = SDL_GetKeyName((SDL_Keycode)key);
+        }
+
+        APPEND_KEYNAME((keyname && *keyname) ? keyname : "Unknown");
+    }
+    else
+    {
+        if (p != out && p[-1] == '+')
+        {
+            p[-1] = '\0';
+            remaining += 1;
+        }
+    }
+
+    #undef APPEND_KEYNAME
+}
+
 int         del_keyboard_event(int id )
 {
     hnode_t *node;
@@ -767,21 +812,6 @@ int     keyboard_event_exists(int id)
     return 0;
 }
 
-static void destroy_keyboard_event( vj_keyboard_event *ev )
-{
-    if( ev ) {
-        if( ev->vims ) {
-            free( ev->vims );
-        }
-
-        if( ev->arguments ) {
-            free( ev->arguments );  
-        }
-
-        free(ev);
-    }
-}
-
 static void configure_vims_key_event(vj_keyboard_event *ev, int symbol, int modifier, int event_id, const char *value)
 {
     ev->arg_len = 0;
@@ -821,7 +851,6 @@ static void configure_vims_key_event(vj_keyboard_event *ev, int symbol, int modi
     ev->key_symbol = symbol;
     ev->key_mod = modifier;
     ev->event_id = event_id;
-
 }
 
 vj_keyboard_event *new_keyboard_event(
@@ -976,72 +1005,58 @@ static void vj_event_parse_kf( veejay_t *v, char *msg, int len )
     }
 }
 
-
-/* parse a message received from network */
-void vj_event_parse_bundle(veejay_t *v, char *msg )
+void vj_event_parse_bundle(veejay_t *v, char *msg)
 {
-    char atomic_msg[256];
+    if (!msg) return;
+
     int num_msg = 0;
     int offset = 3;
-    int i = 0;
-    
-    if ( msg[offset] == ':' )
+    char atomic_msg[256];
+
+    if (msg[offset] != ':') return;
+
+    offset++;
+    if (sscanf(msg + offset, "%03d", &num_msg) <= 0 || num_msg <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Invalid number of messages in bundle: %s", msg);
+        return;
+    }
+
+    offset += 3;
+    if (msg[offset] != '{') {
+        veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Expected '{' at %d in %s", offset, msg);
+        return;
+    }
+    offset++;
+
+    int msg_count = 0;
+
+    char *current_pos = msg + offset;
+
+    while (*current_pos != '\0' && *current_pos != '}' && msg_count < num_msg)
     {
-        int j = 0;
-        offset += 1; /* skip ':' */
-        if( sscanf(msg+offset, "%03d", &num_msg )<= 0 )
-        {
-            veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) Invalid number of messages. Skipping message [%s] ",msg);
-        }
-        if ( num_msg <= 0 ) 
-        {
-            veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) Invalid number of messages given to execute. Skipping message [%s]",msg);
-            return;
+        char *end_of_msg = strchr(current_pos, ';');
+        if (end_of_msg == NULL) {
+            veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Malformed bundle: missing ';' delimiter");
+            break;
         }
 
-        offset += 3;
+        size_t msg_len = (end_of_msg - current_pos) + 1;
 
-        if ( msg[offset] != '{' )
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Expected a left bracket at position %d. Skipping message [%s]",offset,msg);
-            return;
-        }   
-
-        offset += 1;    /* skip # */
-
-        int total_msg_len = strlen(msg);
-
-        for( i = 1; i <= num_msg ; i ++ )
-        {               
-            int found_end_of_msg = 0;
-    
-            veejay_memset( atomic_msg, 0 , sizeof(atomic_msg) ); /* clear */
-
-            while( (offset+j) < total_msg_len)
-            {
-                if(msg[offset+j] == '}')
-                {
-                    return; /* dont care about semicolon here */
-                }   
-                else
-                if(msg[offset+j] == ';')
-                {
-                    found_end_of_msg = offset+j+1;
-                    if(found_end_of_msg > sizeof(atomic_msg)) {
-                        veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) internal buffer overrun");
-                       return;  
-                    }
-                    veejay_strncpy(atomic_msg, msg+offset, (found_end_of_msg-offset));
-                    atomic_msg[ (found_end_of_msg-offset) ] ='\0';
-                    offset += j + 1;
-                    j = 0;
-
-                    int len = (found_end_of_msg - offset);
-                    vj_event_parse_msg(v, atomic_msg, len);
-                }
-                j++;
-            }
+        if (msg_len >= sizeof(atomic_msg)) {
+            veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Internal buffer overrun: message too long");
+            current_pos = end_of_msg + 1;
+            msg_count++;
+            continue;
         }
+
+        veejay_memset(atomic_msg, 0, sizeof(atomic_msg));
+        veejay_strncpy(atomic_msg, current_pos, msg_len);
+        atomic_msg[msg_len] = '\0';
+
+        vj_event_parse_msg(v, atomic_msg, (int)msg_len);
+
+        current_pos = end_of_msg + 1;
+        msg_count++;
     }
 }
 
@@ -1381,7 +1396,7 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
                     arguments += strlen(str);
                 }
             }
-            
+
             if( failed_arg )
             {
                 char *name = vj_event_vevo_get_event_name( net_id );
@@ -1396,21 +1411,20 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
             if( *arguments == ';' || *arguments == 0 )
                 break;
             fmt_offset += 3;
-
             if( *arguments == 0x20 )    
                arguments += 1;
         }
 
         i ++;
-
-        if( flags & VIMS_ALLOW_ANY )
+        if (flags & VIMS_ALLOW_ANY)
             i = np;
 
-        vj_event_fire_net_event( v, net_id, str, i_args, i, 0 );
+        vj_event_fire_net_event(v, net_id, str, i_args, i, 0);
 
         if(fmt) free(fmt);
         if(arg_str) free(arg_str);
         if(str) free(str);
+
 
     }
 
@@ -1644,9 +1658,11 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 
         ev = get_keyboard_event( index );
 
-        /* veejay_msg(VEEJAY_MSG_DEBUG,
-            "VIMS modifier: %d (SDL modifier %d/%x), Key %d, VIMS event %p",
-                vims_mod, mod,mod, vims_key, ev ); */
+        char keycombo[128];
+        vj_format_keycombo(keycombo, sizeof(keycombo),vims_key, vims_mod,1);
+        if( ev == NULL ) {
+            veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) Key %s not bound to any event", keycombo);
+        }
     }
 
     if(!ev )
@@ -1814,6 +1830,7 @@ static void vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cu
     char sample_list[1024];
     // FIXME editlist loading ; veejay restart
 
+    int sync_cor = 1;
     while( cur != NULL )
     {
         get_cstr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_SAMPLELIST, sample_list,sizeof(sample_list) );
@@ -1822,7 +1839,7 @@ static void vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cu
         get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_SDLSIZEX, &(v->bes_width) );
         get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_SDLSIZEY, &(v->bes_height) );
         get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_AUDIO, &(v->audio) );
-        get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_SYNC, &(v->sync_correction) );
+        get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_SYNC, &sync_cor );
         get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_TIMER, &(v->uc->use_timer) );
         get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_GEOX, &(v->uc->geox) );
         get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_GEOY, &(v->uc->geoy) );
@@ -1848,6 +1865,8 @@ static void vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cu
 
         cur = cur->next;
     }
+
+    atomic_store_int(&(v->sync_correction), sync_cor);
 
     veejay_set_colors( c );
     v->settings->action_scheduler.sl = vj_strdup( sample_list );
@@ -1918,8 +1937,18 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
         m->modifier    = b_mod;
 
 
-        if(vj_event_bundle_store(m))
-            veejay_msg(VEEJAY_MSG_DEBUG, "Added VIMS Bundle %d , trigger with key %d using modifier %d", event_id, b_key, b_mod);
+        if(vj_event_bundle_store(m)) {
+            char keycombo[128];
+            vj_format_keycombo(keycombo, sizeof(keycombo),b_key, b_mod, 1);
+
+            veejay_msg(VEEJAY_MSG_INFO,
+                "(VIMS) VIMS bundle %d [%s] -> Key [%s]",
+                event_id,
+                msg,
+                keycombo
+            );
+
+        }
     }
 
 #ifdef HAVE_SDL
@@ -2161,6 +2190,7 @@ int     vj_event_register_keyb_event(int event_id, int symbol, int modifier, con
     int offset = SDL_NUM_SCANCODES * modifier;
     int index = offset + symbol;
     int is_bundle = (event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END);
+    int key_configured = 0;
 
     vj_keyboard_event *ff = get_keyboard_event(index);
     if( ff == NULL ) {
@@ -2176,6 +2206,7 @@ int     vj_event_register_keyb_event(int event_id, int symbol, int modifier, con
             veejay_msg(VEEJAY_MSG_ERROR, "Failed to register a new action");
             return 0;
         }
+        key_configured = 1;
     }
     else {
         /* the action already exists, free old stuff */
@@ -2191,7 +2222,8 @@ int     vj_event_register_keyb_event(int event_id, int symbol, int modifier, con
         vj_event_bundle_update( bun, event_id );
     }
 
-    configure_vims_key_event( ff,symbol,modifier, event_id, value );
+    if(!key_configured)
+        configure_vims_key_event( ff,symbol,modifier, event_id, value );
 
     return vj_event_update_key_collection(ff, index);
 }
@@ -2331,23 +2363,6 @@ void vj_event_init(void *ptr)
 #endif
     vj_macro_init();
 }
-
-#ifdef HAVE_SDL
-static  void vj_event_destroy_hash( hash_t *h)
-{
-    if(!hash_isempty(h)) {
-        hscan_t s = (hscan_t) {0};
-        hash_scan_begin( &s, h );
-        hnode_t *node = NULL;
-        while((node = hash_scan_next(&s)) != NULL ) {
-            void *ptr = hnode_get(node);
-            if(ptr) destroy_keyboard_event(ptr);
-        }
-        hash_free_nodes( h );
-    }
-    hash_destroy( h );
-}
-#endif
 
 static void vj_event_destroy_bundles( hash_t *h )
 {
@@ -5651,15 +5666,23 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
     int index = 4; // sample, chain, fx_id, status
     int args[MAX_ARGUMENTS];
     char str[1024]; 
-    char *end = str;
     veejay_t *v = (veejay_t*)ptr;
     veejay_memset(args,0,sizeof(int) * MAX_ARGUMENTS); 
    
     P_A(args,sizeof(args),str,sizeof(str),format,ap);
 
-    while( (tmp = strtol( end, &end, base ))) {
-        args[index] = (int) tmp;
-        index ++;
+    char *end = str;
+    char *next;
+
+    while (index < MAX_ARGUMENTS) {
+        tmp = strtol(end, &next, base);
+
+        if (end == next) {
+            break;
+        }
+
+        args[index++] = (int) tmp;
+        end = next;
     }
 
     if(SAMPLE_PLAYING(v)) 
@@ -9578,17 +9601,21 @@ void vj_event_attach_detach_key(void *ptr, const char format[], va_list ap)
     char value[100];
     int mode = 0;
     
+    P_A( args, sizeof(args), value, sizeof(value), format, ap );
 
-    P_A( args, sizeof(args), value,sizeof(value), format ,ap );
+    SDL_Scancode scancode = SDL_GetScancodeFromKey((SDL_Keycode)args[1]);
 
-    if( args[1] <= 0 || args[1] >= SDL_NUM_SCANCODES)
+    if( scancode <= 0 || scancode >= SDL_NUM_SCANCODES )
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Invalid key identifier %d (range is 1 - %d)", args[1], SDL_NUM_SCANCODES);
+        veejay_msg(VEEJAY_MSG_ERROR,
+            "Key symbol %d could not be mapped to a valid scancode (Result: %d)",
+            args[1], scancode);
         return;
     }
+
     if( args[2] < 0 || args[2] > VIMS_MOD_SHIFT )
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Invalid key modifier (3=shift,2=ctrl,1=alt, 0=none)");
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid key modifier %d (4=shift, 2=ctrl, 1=alt, 0=none)", args[2]);
         return;
     }
 
@@ -9598,16 +9625,16 @@ void vj_event_attach_detach_key(void *ptr, const char format[], va_list ap)
     switch(mode)
     {
         case 1:
-            vj_event_unregister_keyb_event( args[1],args[2] );
+            vj_event_unregister_keyb_event( (int)scancode, args[2] );
             break;
-        default:
 
-            if( strncmp(value, "dummy",5 ) != 0 )
+        default:
+            if( strncmp(value, "dummy", 5) != 0 )
                 clone = value;
-            vj_event_register_keyb_event( args[0], args[1], args[2], clone );
-        break;
+            vj_event_register_keyb_event( mode, (int)scancode, args[2], clone );
+            break;
     }
-}   
+}
 #endif
 
 void vj_event_bundled_msg_del(void *ptr, const char format[], va_list ap)
