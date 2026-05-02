@@ -1761,6 +1761,12 @@
                       <placeholder/>
                     </child>
                     <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
                       <object class="GtkButton" id="generators_close">
                         <property name="visible">True</property>
                         <property name="can-focus">True</property>
@@ -9025,6 +9031,7 @@
                             <property name="relief">none</property>
                             <property name="orientation">vertical</property>
                             <property name="adjustment">fxshape_boundmax</property>
+                            <property name="icons">go-top</property>
                             <signal name="value-changed" handler="on_curve_animation_changed" swapped="no"/>
                             <child internal-child="plus_button">
                               <object class="GtkButton">
@@ -9062,6 +9069,7 @@
                             <property name="relief">none</property>
                             <property name="orientation">vertical</property>
                             <property name="adjustment">fxshape_boundmin</property>
+                            <property name="icons">go-bottom</property>
                             <signal name="value-changed" handler="on_curve_animation_changed" swapped="no"/>
                             <child internal-child="plus_button">
                               <object class="GtkButton">
@@ -9121,7 +9129,6 @@
                               <object class="GtkImage" id="image17">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
-                                <property name="pixbuf">icon_clear.png</property>
                               </object>
                             </child>
                           </object>
