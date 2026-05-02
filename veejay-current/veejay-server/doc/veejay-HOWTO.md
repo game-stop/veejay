@@ -835,6 +835,13 @@ to switch back to the sample playmode.
 You can create new input streams by using the console interface **sayVIMS** or by
 using the graphical user interface **reloaded**. All new input streams (and samples) are auto numbered.
 
+<span id="4.4">4.3.1 Other Interfaces : Midi, OSC </span>
+-----------------------------------------
+
+You can use various controler to the graphical user interface **reloaded** has it will be appear in the outputs 
+(writable) client list of MIDI controler. Do not forget to link any input (readable) client to **reloaded**
+using for example the 'aconnect' utility. Have a look to **reloaded** [documentation](../../veejay-client/doc)  for more informations.
+
 <span id="4.4">4.4 Recording video</span>
 -----------------------------------------
 
