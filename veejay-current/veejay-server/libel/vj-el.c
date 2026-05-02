@@ -89,6 +89,16 @@ static struct
 	{	"4:2:2 full range" }
 };
 
+static int el_pixel_format_org = 1;
+static int el_pixel_format_ = 1;
+static int el_width_ = 0;
+static float el_fps_ = 30;
+static int el_height_ = 0;
+static int el_switch_jpeg_ = 0;
+
+static VJFrame *el_out_ = NULL;
+
+static int require_same_resolution = 0;
 
 typedef struct
 {
@@ -115,6 +125,171 @@ typedef struct
 #endif
 	void	      *lzo_decoder;
 } vj_decoder;
+
+extern int el_width_;
+extern int el_height_;
+extern int el_pixel_format_;
+
+#define MAX_PLANES 4
+
+typedef struct raw_frame_node_t {
+    void *el_key;
+    long nframe;
+    uint8_t *planes[MAX_PLANES];
+    struct raw_frame_node_t *prev;
+    struct raw_frame_node_t *next;
+} raw_frame_node_t;
+
+typedef struct {
+    long capacity;
+    long size;
+    raw_frame_node_t *head;
+    raw_frame_node_t *tail;
+} global_raw_frame_cache_t;
+
+static global_raw_frame_cache_t *global_cache = NULL;
+
+static int memory_threshold = 30;
+
+void el_cache_configure(int t) {
+
+	if( t < 0 )
+		t = 0;
+	else if ( t > 80 ) {
+		t = 80;
+		veejay_msg(VEEJAY_MSG_WARNING, "You still need memory for the FX chain and the system, capping to 80 percent");
+	}
+
+	memory_threshold = t;
+}
+
+static long get_available_cache_capacity(void) {
+    long page_size = sysconf(_SC_PAGESIZE);
+    long available_pages = sysconf(_SC_AVPHYS_PAGES);
+
+    if (page_size == -1 || available_pages == -1) {
+		veejay_msg(VEEJAY_MSG_WARNING, "Unable to query free memory, assuming you have room for 250 video frames");
+        return 250;
+    }
+
+    unsigned long available_bytes = (unsigned long)available_pages * (unsigned long)page_size;
+    unsigned long cache_budget = available_bytes * memory_threshold / 100;
+    
+    size_t frame_size = el_out_->len + (2 * el_out_->uv_len);
+    return (long)(cache_budget / frame_size);
+}
+
+static global_raw_frame_cache_t *get_global_cache(void) {
+
+	if(memory_threshold == 0)
+		return NULL;
+
+    if (global_cache == NULL) {
+        global_cache = (global_raw_frame_cache_t *)vj_calloc(sizeof(global_raw_frame_cache_t));
+		if(global_cache == NULL) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Out of memory");
+			return NULL;
+		}
+        global_cache->capacity = get_available_cache_capacity();
+        global_cache->size = 0;
+        global_cache->head = NULL;
+        global_cache->tail = NULL;
+
+    }
+    return global_cache;
+}
+
+void vj_cache_print_status(void) {
+    global_raw_frame_cache_t *cache = get_global_cache();
+    if (cache == NULL) return;
+
+    size_t frame_size = el_out_->len + (2 * el_out_->uv_len);
+    float total_mb = (cache->capacity * frame_size) / (1024.0f * 1024.0f);
+
+    veejay_msg(VEEJAY_MSG_INFO, 
+        "[CACHE] Capacity: %ld frames | Memory Budget: %.2f MB",
+        cache->capacity, 
+        total_mb
+	);
+}
+
+static void free_node(raw_frame_node_t *node) {
+    for (int i = 0; i < MAX_PLANES; i++) {
+        if (node->planes[i]) {
+            free(node->planes[i]);
+        }
+    }
+    free(node);
+}
+
+static void evict_oldest_frame(global_raw_frame_cache_t *cache) {
+    if (cache->tail == NULL) return;
+
+    raw_frame_node_t *to_remove = cache->tail;
+
+    if (to_remove->prev) {
+        to_remove->prev->next = NULL;
+        cache->tail = to_remove->prev;
+    } else {
+        cache->head = NULL;
+        cache->tail = NULL;
+    }
+
+    free_node(to_remove);
+    cache->size--;
+}
+
+static void el_cache_frame(global_raw_frame_cache_t *cache, void *el_key, long nframe, uint8_t *src[4]) {
+    if (cache->size >= cache->capacity) {
+        evict_oldest_frame(cache);
+    }
+
+    raw_frame_node_t *new_node = (raw_frame_node_t *)vj_malloc(sizeof(raw_frame_node_t));
+	if(!new_node) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot add frame to cache, memory full");
+		return;
+	}
+    new_node->el_key = el_key;
+    new_node->nframe = nframe;
+
+    size_t plane_sizes[4] = {el_out_->len, el_out_->uv_len, el_out_->uv_len, 0};
+    for (int i = 0; i < 3; i++) {
+        new_node->planes[i] = (uint8_t *)vj_malloc(plane_sizes[i]);
+        veejay_memcpy(new_node->planes[i], src[i], plane_sizes[i]);
+    }
+    new_node->planes[3] = NULL;
+
+    new_node->next = cache->head;
+    new_node->prev = NULL;
+    if (cache->head) {
+        cache->head->prev = new_node;
+    }
+    cache->head = new_node;
+
+    if (cache->tail == NULL) {
+        cache->tail = new_node;
+    }
+
+    cache->size++;
+}
+
+static int find_cached_frame(global_raw_frame_cache_t *cache, void *el_key, long nframe, uint8_t *dst[4]) {
+    raw_frame_node_t *current = cache->head;
+    size_t plane_sizes[4] = {el_out_->len, el_out_->uv_len, el_out_->uv_len, 0};
+
+    while (current != NULL) {
+        if (current->el_key == el_key && current->nframe == nframe) {
+            for (int i = 0; i < 3; i++) {
+                if (current->planes[i] && dst[i]) {
+                    veejay_memcpy(dst[i], current->planes[i], plane_sizes[i]);
+                }
+            }
+            return 1;
+        }
+        current = current->next;
+    }
+    return 0;
+}
 
 
 char	vj_el_get_default_norm( float fps )
@@ -170,16 +345,6 @@ static void	_el_free_decoder( vj_decoder *d )
 	d = NULL;
 }
 
-static int el_pixel_format_org = 1;
-static int el_pixel_format_ = 1;
-static int el_width_ = 0;
-static float el_fps_ = 30;
-static int el_height_ = 0;
-static int el_switch_jpeg_ = 0;
-
-static VJFrame *el_out_ = NULL;
-
-static int require_same_resolution = 0;
 
 static int should_enable_drop_frame_timecode(float fps)
 {
@@ -718,7 +883,7 @@ int	vj_el_set_bogus_length( editlist *el, long nframe, int len )
 	return 1;
 }
 
-int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
+int	vj_el_get_video_frame1(editlist *el, long nframe, uint8_t *dst[4])
 {
 	if( el->has_video == 0 || el->is_empty )
 	{
@@ -845,6 +1010,139 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 	}
 
 	return 0;  
+}
+
+
+int vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
+{
+    if (el->has_video == 0 || el->is_empty)
+    {
+        vj_el_dummy_frame(dst, el, el->pixel_format);
+        return 2;
+    }
+
+    if (nframe < 0) {
+        veejay_msg(VEEJAY_MSG_DEBUG, "Oops, veejay requested frame %d < 0 ", nframe);
+        nframe = 0;
+    }
+    if (nframe > el->total_frames) {
+        veejay_msg(VEEJAY_MSG_DEBUG, "Oops, veejay requested frame %d > %ld ", nframe, el->total_frames);
+        nframe = el->total_frames;
+    }
+
+    global_raw_frame_cache_t *cache = get_global_cache();
+    if (cache && find_cached_frame(cache, (void*)el, nframe, dst)) {
+        return 1;
+    }
+
+    int res = 0;
+    uint64_t n = el->frame_list[nframe];
+    int decoder_id = lav_video_compressor_type(el->lav_fd[N_EL_FILE(n)]);
+
+    res = lav_set_video_position(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n));
+    if (res < 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "Error setting video position: %s", lav_strerror());
+        return -1;
+    }
+
+    int ret_code = 0;
+    int strides[4] = { el_out_->len, el_out_->uv_len, el_out_->uv_len, 0 };
+
+    if (decoder_id == 0xffff)
+    {
+        VJFrame *srci = lav_get_frame_ptr(el->lav_fd[N_EL_FILE(n)]);
+        if (srci == NULL)
+        {
+            veejay_msg(VEEJAY_MSG_ERROR, "Error decoding Image %ld", N_EL_FRAME(n));
+            return -1;
+        }
+        vj_frame_copy(srci->data, dst, strides);
+        ret_code = 1;
+    }
+    else
+    {
+        vj_decoder *d = (vj_decoder*) el->decoders[N_EL_FILE(n)];
+        if (lav_filetype(el->lav_fd[N_EL_FILE(n)]) != 'x')
+        {
+            res = lav_read_frame(el->lav_fd[N_EL_FILE(n)], d->tmp_buffer);
+        }
+
+        uint8_t *data = d->tmp_buffer;
+        uint8_t *in[3] = { NULL, NULL, NULL };
+        uint8_t *dataplanes[4] = { data, data + el_out_->len, data + el_out_->len + el_out_->uv_len, 0 };
+
+        switch (decoder_id)
+        {
+            case CODEC_ID_YUV420:
+                vj_frame_copy1(data, dst[0], el_out_->len);
+                in[0] = data;
+                in[1] = data + el_out_->len;
+                in[2] = data + el_out_->len + (el_out_->len / 4);
+                if (el_pixel_format_ == PIX_FMT_YUVJ422P) {
+                    yuv_scale_pixels_from_ycbcr(in[0], 16.0f, 235.0f, el_out_->len);
+                    yuv_scale_pixels_from_ycbcr(in[1], 16.0f, 240.0f, el_out_->len / 4);
+                }
+                yuv420to422planar(in, dst, el->video_width, el->video_height);
+                ret_code = 1;
+                break;
+            case CODEC_ID_YUV420F:
+                vj_frame_copy1(data, dst[0], el_out_->len);
+                in[0] = data;
+                in[1] = data + el_out_->len;
+                in[2] = data + el_out_->len + (el_out_->len / 4);
+                if (el_pixel_format_ == PIX_FMT_YUV422P) {
+                    yuv_scale_pixels_from_y(dst[0], el_out_->len);
+                    yuv_scale_pixels_from_uv(dst[1], el_out_->len / 4);
+                }
+                yuv420to422planar(in, dst, el->video_width, el->video_height);
+                ret_code = 1;
+                break;
+            case CODEC_ID_YUV422:
+                vj_frame_copy(dataplanes, dst, strides);
+                if (el_pixel_format_ == PIX_FMT_YUVJ422P) {
+                    yuv_scale_pixels_from_ycbcr(dst[0], 16.0f, 235.0f, el_out_->len);
+                    yuv_scale_pixels_from_ycbcr(dst[1], 16.0f, 240.0f, el_out_->len / 2);
+                }
+                ret_code = 1;
+                break;
+            case CODEC_ID_YUV422F:
+                vj_frame_copy(dataplanes, dst, strides);
+                if (el_pixel_format_ == PIX_FMT_YUV422P) {
+                    yuv_scale_pixels_from_y(dst[0], el_out_->len);
+                    yuv_scale_pixels_from_uv(dst[1], el_out_->len / 2);
+                }
+                ret_code = 1;
+                break;
+            case CODEC_ID_YUVLZO:
+                ret_code = lzo_decompress_el(d->lzo_decoder, data, res, dst, el_width_, el_height_, el_pixel_format_);
+                break;
+            case CODEC_ID_QOIY:
+                {
+                    qoi_desc qd;
+                    qd.channels = 1;
+                    qd.colorspace = QOI_LINEAR;
+                    qd.height = el_height_;
+                    qd.width = el_width_;
+                    qoi_decode(data, res, &qd, 1, dst, el_out_->len);
+                    ret_code = 1;
+                }
+                break;
+            default:
+                {
+                    int ret = avhelper_decode_video_direct(el->ctx[N_EL_FILE(n)], data, res, dst, el_pixel_format_, el_width_, el_height_);
+                    avhelper_decode_finish(el->ctx[N_EL_FILE(n)]);
+                    ret_code = ret;
+                }
+                break;
+        }
+    }
+
+    if (ret_code == 1 && cache) {
+        el_cache_frame(cache, (void*)el, nframe, dst);
+    }
+
+    return ret_code;
 }
 
 

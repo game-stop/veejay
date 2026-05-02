@@ -72,7 +72,11 @@ typedef struct
 	int		pixel_format;	
 	int		is_clone;
 	void		*scaler;
-} editlist;  
+} editlist;
+
+void el_cache_configure(int t);
+
+void vj_cache_print_status(void);
 
 int     test_video_frame(editlist *el, int n, lav_file_t *lav,int out_pix_fmt);
 
