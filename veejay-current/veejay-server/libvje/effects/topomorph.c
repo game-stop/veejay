@@ -105,6 +105,7 @@ void *topomorph_malloc(int width, int height) {
     }
     t->p1_x = -0.5f; t->p1_y = 0.0f;
     t->p2_x = 0.5f;  t->p2_y = 0.0f;
+    t->n_threads = vje_advise_num_threads(size);
     return t;
 }
 
@@ -341,7 +342,7 @@ static void process_core_no_mirror(box_topomorph_t *t, VJFrame *frame, int *args
     const float p_avg_x = (p1x + p2x) * 0.5f;
     const float p_avg_y = (p1y + p2y) * 0.5f;
 
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int y = 0; y < h; y++) {
         const float dy = (y - cy) * inv_cy;
         const int row_offset = y * w;
@@ -460,7 +461,7 @@ static void process_core(box_topomorph_t *t, VJFrame *frame, int *args, int genu
     const float p_avg_x = (p1x + p2x) * 0.5f;
     const float p_avg_y = (p1y + p2y) * 0.5f;
 
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int y = 0; y < half_h; y++) {
         const float dy = (float)y * inv_hh;
         const int row_top = (half_h - 1 - y) * w;
