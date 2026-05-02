@@ -212,8 +212,11 @@ vj_spin_until_absolute_deadline(const struct timespec *deadline,
         (long long)deadline->tv_sec * 1000000000LL + deadline->tv_nsec;
 
     long long pause_ns = (long long)pause_cost_ns;
-    if (pause_ns <= 0)
-        pause_ns = 1;
+    if (pause_ns <= 0) {
+		pause_ns = 1;
+	}
+
+	long long pause_ns_x2 = pause_ns * 2;
 
     for (;;) {
 
@@ -227,10 +230,14 @@ vj_spin_until_absolute_deadline(const struct timespec *deadline,
         if (remaining_ns <= 0)
             break;
 
-        int spin_batch = (int)(remaining_ns / (pause_ns * 2));
-
-        if (spin_batch > 128) spin_batch = 128;
-        if (spin_batch < 1)   spin_batch = 1;
+		int spin_batch;
+		if( remaining_ns > (pause_ns_x2 * 128)) {
+			spin_batch = 128;
+		} else {
+			spin_batch = (int)(remaining_ns / pause_ns_x2);
+			if(spin_batch < 1)
+				spin_batch = 1;
+		}
 
         for (int i = 0; i < spin_batch; ++i) {
 #if defined(__i386__) || defined(__x86_64__)
@@ -4009,6 +4016,8 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 
 		return -1;
 	}
+
+	vj_cache_print_status();
 
 	// check audio properties 
 	if( info->edit_list->has_audio && info->audio == AUDIO_PLAY ) {
