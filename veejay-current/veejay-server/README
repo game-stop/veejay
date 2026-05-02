@@ -48,6 +48,7 @@ While playing, you can record the resulting video directly to disk (video sampli
 
      ./configure --enable-debug
 
+   note: do not use --enable-debug if you want a "fast" veejay (the difference is huge)
 
    to build plugins:
 
