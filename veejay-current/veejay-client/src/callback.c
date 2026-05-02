@@ -3049,12 +3049,7 @@ void	on_cali_reset_button_clicked( 	GtkButton *button, gpointer data )
 void on_vims_bundles_activate (GtkMenuItem     *menuitem,
                                gpointer         user_data)
 {
-    GtkWidget *vims_bundles_window = glade_xml_get_widget_(info->main_window, "vims_bundles");
-// GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
-//    gtk_window_set_transient_for (GTK_WINDOW(vims_bundles_window),GTK_WINDOW (mainw));
- //   gtk_window_set_keep_above( GTK_WINDOW(vims_bundles_window), TRUE );
-
-    gtk_window_present(GTK_WINDOW(vims_bundles_window));
+    gtk_window_present(GTK_WINDOW(info->vims_bundle_dialog));
 }
 
 
@@ -3064,8 +3059,7 @@ void on_vims_bundles_activate (GtkMenuItem     *menuitem,
 void on_vims_bundles_close                  (GtkDialog       *dialog,
 					     gpointer         user_data)
 {
-	GtkWidget *vims_bundles_window = glade_xml_get_widget_(info->main_window, "vims_bundles");
-	gtk_widget_hide(vims_bundles_window);	
+	gtk_widget_hide(info->vims_bundle_dialog);
 }
 
 /* Menu entries */
