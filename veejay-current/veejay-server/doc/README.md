@@ -11,7 +11,7 @@
 * [veejay HOWTO](./veejay-HOWTO.md) : A verbose and deep description
 * [HOWTO plugins](./HOWTO.plugins.md) : All you need to configure external video plugins
 * [README.alpha](./README.alpha.md) : Support for alpha channel compositing
-* [VIMS(./VIMS.md) : VIMS is Veejay's IMS (Internal Message System)
+* [VIMS](./VIMS.md) : VIMS is Veejay's IMS (Internal Message System)
 * [video wall](./video-wall.md) : How to split ouput in multiple screens
 
 * [How to Veejay PureData](./HowtoVeejay-PureData.html)
