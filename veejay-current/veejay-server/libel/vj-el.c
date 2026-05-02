@@ -133,7 +133,7 @@ extern int el_pixel_format_;
 #define MAX_PLANES 4
 
 typedef struct raw_frame_node_t {
-    void *el_key;
+    uint64_t source_hash;
     long nframe;
     uint8_t *planes[MAX_PLANES];
     struct raw_frame_node_t *prev;
@@ -150,6 +150,35 @@ typedef struct {
 static global_raw_frame_cache_t *global_cache = NULL;
 
 static int memory_threshold = 30;
+
+static inline uint64_t editlist_source_hash(const editlist *e)
+{
+    uint64_t h = 1469598103934665603ULL;
+
+    if (!e) return 0;
+
+    for (int i = 0; i < e->num_video_files; i++)
+    {
+        const char *s = e->video_file_list[i];
+        if (!s) continue;
+
+        while (*s)
+        {
+            h ^= (unsigned char)*s++;
+            h *= 1099511628211ULL;
+        }
+    }
+
+    return h;
+}
+
+static inline int editlist_same_source(const editlist *a, const editlist *b)
+{
+    if (a == b) return 1;
+    if (!a || !b) return 0;
+
+    return a->source_hash == b->source_hash;
+}
 
 void el_cache_configure(int t) {
 
@@ -239,7 +268,7 @@ static void evict_oldest_frame(global_raw_frame_cache_t *cache) {
     cache->size--;
 }
 
-static void el_cache_frame(global_raw_frame_cache_t *cache, void *el_key, long nframe, uint8_t *src[4]) {
+static void el_cache_frame(global_raw_frame_cache_t *cache, uint64_t source_hash, long nframe, uint8_t *src[4]) {
     if (cache->size >= cache->capacity) {
         evict_oldest_frame(cache);
     }
@@ -249,7 +278,7 @@ static void el_cache_frame(global_raw_frame_cache_t *cache, void *el_key, long n
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot add frame to cache, memory full");
 		return;
 	}
-    new_node->el_key = el_key;
+    new_node->source_hash = source_hash;
     new_node->nframe = nframe;
 
     size_t plane_sizes[4] = {el_out_->len, el_out_->uv_len, el_out_->uv_len, 0};
@@ -273,12 +302,12 @@ static void el_cache_frame(global_raw_frame_cache_t *cache, void *el_key, long n
     cache->size++;
 }
 
-static int find_cached_frame(global_raw_frame_cache_t *cache, void *el_key, long nframe, uint8_t *dst[4]) {
+static int find_cached_frame(global_raw_frame_cache_t *cache, uint64_t source_hash, long nframe, uint8_t *dst[4]) {
     raw_frame_node_t *current = cache->head;
     size_t plane_sizes[4] = {el_out_->len, el_out_->uv_len, el_out_->uv_len, 0};
 
     while (current != NULL) {
-        if (current->el_key == el_key && current->nframe == nframe) {
+        if (current->source_hash == source_hash && current->nframe == nframe) {
             for (int i = 0; i < 3; i++) {
                 if (current->planes[i] && dst[i]) {
                     veejay_memcpy(dst[i], current->planes[i], plane_sizes[i]);
@@ -1031,7 +1060,7 @@ int vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
     }
 
     global_raw_frame_cache_t *cache = get_global_cache();
-    if (cache && find_cached_frame(cache, (void*)el, nframe, dst)) {
+    if (cache && find_cached_frame(cache, el->source_hash, nframe, dst)) {
         return 1;
     }
 
@@ -1139,7 +1168,7 @@ int vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
     }
 
     if (ret_code == 1 && cache) {
-        el_cache_frame(cache, (void*)el, nframe, dst);
+        el_cache_frame(cache, el->source_hash, nframe, dst);
     }
 
     return ret_code;
@@ -1430,6 +1459,7 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 	el->last_apos = 0;
 	el->frame_list = NULL;
 	el->has_video = 0;
+	el->source_hash = editlist_source_hash(el);
 
 	return el;
 }
@@ -1816,6 +1846,8 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	el->last_afile = -1;
 	el->auto_deinter = 0;
 
+	el->source_hash = editlist_source_hash(el);
+
 	return el;
 }
 
@@ -2147,6 +2179,7 @@ static editlist *vj_el_soft_clone_base(editlist *el)
 	clone->auto_deinter = el->auto_deinter;
 	clone->pixel_format = el->pixel_format;
 	clone->is_clone = 1;
+	clone->source_hash = editlist_source_hash(el);
 
     return clone;
 }

@@ -72,6 +72,7 @@ typedef struct
 	int		pixel_format;	
 	int		is_clone;
 	void		*scaler;
+	uint64_t source_hash;
 } editlist;
 
 void el_cache_configure(int t);
