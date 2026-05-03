@@ -572,14 +572,14 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	if (el->num_video_files >= MAX_EDIT_LIST_FILES)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Maximum number of video files exceeded\n");
-        	if(realname) free(realname);
-		return -1; 
-    	}
+        if(realname) free(realname);
+		return -1;
+    }
 
-    	if (el->num_video_files >= 1)
+    if (el->num_video_files >= 1)
 		chroma = el->MJPG_chroma;
       
-        n = el->num_video_files;	
+    n = el->num_video_files;
 	
 	int pixfmt = -1;
 
@@ -2066,7 +2066,80 @@ char *vj_el_write_line_ascii(editlist *el, int *bytes_written)
     return result;
 }
 
-int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
+int vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
+{
+    FILE *fd;
+    int num_files;
+    uint64_t oldfile, oldframe;
+    uint64_t n;
+    uint64_t n1 = (uint64_t) _n1;
+    uint64_t n2 = (uint64_t) _n2;
+    uint64_t i;
+
+    if(!el || el->is_empty) return 0;
+
+    int *index = (int*) vj_malloc( sizeof(int) * MAX_EDIT_LIST_FILES );
+    if(!index) return 0;
+
+    for (i = 0; i < MAX_EDIT_LIST_FILES; i++) index[i] = -1;
+
+    if (n1 < 0) n1 = 0;
+    if (n2 >= el->video_frames) n2 = el->video_frames - 1;
+    if (n2 < n1) { uint64_t tmp = n1; n1 = n2; n2 = tmp; }
+
+    fd = fopen(name, "w");
+    if (!fd) {
+        free(index);
+        return 0;
+    }
+
+    fprintf(fd, "LAV Edit List\n");
+    fprintf(fd, "%s\n", el->video_norm == 'n' ? "NTSC" : "PAL");
+
+    for (i = n1; i <= n2; i++)
+        index[N_EL_FILE(el->frame_list[i])] = 1;
+
+    num_files = 0;
+    for (i = 0; i < MAX_EDIT_LIST_FILES; i++) {
+        if (index[i] == 1) {
+            index[i] = num_files++;
+        }
+    }
+
+    fprintf(fd, "%d\n", num_files);
+
+    for (i = 0; i < MAX_EDIT_LIST_FILES; i++) {
+        if (index[i] != -1 && el->video_file_list[i] != NULL) {
+             fprintf(fd, "%s\n", el->video_file_list[i]);
+        }
+    }
+
+    n = el->frame_list[n1];
+    oldfile = (uint64_t)index[N_EL_FILE(n)];
+    oldframe = N_EL_FRAME(n);
+
+    fprintf(fd, "%" PRIu64 " %" PRIu64 " ", oldfile, oldframe);
+    for (i = n1 + 1; i <= n2; i++) {
+        n = el->frame_list[i];
+        uint64_t cur_file = (uint64_t)index[N_EL_FILE(n)];
+        uint64_t cur_frame = N_EL_FRAME(n);
+
+        if (cur_file != oldfile || cur_frame != oldframe + 1) {
+            fprintf(fd, "%" PRIu64 "\n", oldframe);
+            fprintf(fd, "%" PRIu64 " %" PRIu64 " ", cur_file, cur_frame);
+        }
+        oldfile = cur_file;
+        oldframe = cur_frame;
+    }
+
+    fprintf(fd, "%" PRIu64 "\n", oldframe);
+
+    fclose(fd);
+    free(index);
+    return 1;
+}
+
+int	vj_el_write_editlist1( char *name, long _n1, long _n2, editlist *el )
 {
 	FILE *fd;
     int num_files;
