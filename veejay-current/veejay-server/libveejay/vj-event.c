@@ -3089,7 +3089,7 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
             if(skel)
             {
                 skel->edit_list = el;
-                if(sample_store(skel)==0) 
+                if(sample_store(skel,0)==0)
                 {
                     veejay_msg(VEEJAY_MSG_INFO, "Created new sample [%d]", skel->sample_id);
                 }
@@ -3727,7 +3727,7 @@ void vj_event_sample_end(void *ptr, const char format[], va_list ap)
 
             skel->edit_list = el;
 
-            if(sample_store(skel) == 0)
+            if(sample_store(skel,0) == 0)
             {
                 veejay_msg(VEEJAY_MSG_INFO, "Created new Sample %d\t [%ld] | %ld-%ld | [%ld]",
                     skel->sample_id,
@@ -4397,7 +4397,7 @@ void vj_event_sample_load_list(void *ptr, const char format[], va_list ap)
     int id = 0;
     int mode = 0;
     
-    if( sample_readFromFile( str, v->composite,v->seq, v->font, v->edit_list,&id, &mode ) ) 
+    if( sample_readFromFile( str, v->composite,v->seq, v->font, v->edit_list,&id, &mode,SAMPLE_LOAD_REPLACE ) )
     {
         veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist from file '%s'", str);
     }
@@ -8167,7 +8167,7 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
             int effect_id = y;
             if(effect_id != -1)
             {
-                char bundle[512];
+                char bundle[1024];
                 int np = vje_get_num_params(y);
                 sprintf(bundle, "%03d:0 %d %d 1", VIMS_CHAIN_ENTRY_SET_PRESET,i, effect_id );
                     for (j = 0; j < np; j++)
@@ -9295,9 +9295,9 @@ void vj_event_send_video_information(void *ptr, const char format[], va_list ap)
     if (SAMPLE_PLAYING(v))
         n_frames = sample_max_video_length(v->uc->sample_id);
 
-    char info_msg[150];
+    char info_msg[2048];
     snprintf(info_msg, sizeof(info_msg),
-             "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d",
+             "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d %s",
              el->video_width,
              el->video_height,
              el->video_inter,
@@ -9311,10 +9311,12 @@ void vj_event_send_video_information(void *ptr, const char format[], va_list ap)
              n_frames,
              v->audio,
              v->settings->use_vims_mcast,
-             atomic_load_int(&settings->transition.global_state));
+             atomic_load_int(&settings->transition.global_state),
+             v->action_file[1]
+            );
 
-    char *s_print_buf = get_print_buf(strlen(info_msg) + 4);
-    sprintf(s_print_buf, "%03zu%s", strlen(info_msg), info_msg);
+    char *s_print_buf = get_print_buf(strlen(info_msg) + 5);
+    sprintf(s_print_buf, "%04zu%s", strlen(info_msg), info_msg);
     SEND_MSG(v, s_print_buf);
     free(s_print_buf);
 }
