@@ -1472,7 +1472,7 @@ void	on_button_samplelist_load_clicked(GtkWidget *widget, gpointer user_data)
 		g_free(filename );
 	}
 }
-static char samplelist_name[1024];
+static char samplelist_name[1024] = { 0 };
 static int  as_samplelist_name = 0;
 
 void	on_button_samplelist_save_clicked(GtkWidget *widget, gpointer user_data)
@@ -1513,6 +1513,23 @@ gboolean	on_button_samplelist_qsave_clicked(GtkWidget *widget, GdkEvent *event, 
 	return TRUE;
 }
 
+gboolean on_sync_samplelist_clicked(GtkWidget *widget, GdkEvent *event, gpointer user_data)
+{
+    if (samplelist_name[0] != '\0') {
+        multi_vims(VIMS_SAMPLE_SAVE_SAMPLELIST, "%s", samplelist_name);
+        vj_msg(VEEJAY_MSG_INFO, "Saved samplelist to %s", samplelist_name);
+    } else {
+        gchar *filename = dialog_save_file("Save samplelist", "veejay-samplelist.sl");
+        if (filename) {
+            multi_vims(VIMS_SAMPLE_SAVE_SAMPLELIST, "%s", filename);
+            vj_msg(VEEJAY_MSG_INFO, "Saved samples to %s", filename);
+            strlcpy(samplelist_name, filename, strlen(filename) + 1);
+            as_samplelist_name = 1;
+            g_free(filename);
+        }
+    }
+    return TRUE;
+}
 
 void	on_spin_samplestart_value_changed(GtkWidget *widget, gpointer user_data)
 {

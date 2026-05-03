@@ -772,6 +772,40 @@ static struct
     {NULL},
 };
 
+static struct
+{
+    const char *description;
+    const int id;
+} fx_anim_shape_map[] =
+{
+    { "no shape",           FX_ANIM_SHAPE_NO_SHAPE },
+    { "Bounce",             FX_ANIM_SHAPE_BOUNCE },
+    { "Burst Envelope",     FX_ANIM_SHAPE_BURST_ENVELOPE },
+    { "Cosine",             FX_ANIM_SHAPE_COSINE },
+    { "Sine",               FX_ANIM_SHAPE_SINE },
+    { "Damped Sine",        FX_ANIM_SHAPE_DAMPED_SINE },
+    { "Ease In",            FX_ANIM_SHAPE_EASE_IN },
+    { "Ease Out",           FX_ANIM_SHAPE_EASE_OUT },
+    { "Exponential",        FX_ANIM_SHAPE_EXPONENTIAL },
+    { "Gaussian",           FX_ANIM_SHAPE_GAUSSIAN },
+    { "Noise",              FX_ANIM_SHAPE_NOISE },
+    { "Pulse",              FX_ANIM_SHAPE_PULSE },
+    { "Ramp Drop",          FX_ANIM_SHAPE_RAMP_DROP },
+    { "Random Burst",       FX_ANIM_SHAPE_RANDOMWALK_BURST },
+    { "Random Inertia",     FX_ANIM_SHAPE_RANDOMWALK_INERTIA },
+    { "Random Mean",        FX_ANIM_SHAPE_RANDOMWALK_MEAN },
+    { "Random Quantized",   FX_ANIM_SHAPE_RANDOMWALK_QUANTIZED },
+    { "Random Smooth",      FX_ANIM_SHAPE_RANDOMWALK_SMOOTH },
+    { "Random Walk",        FX_ANIM_SHAPE_RANDOMWALK },
+    { "Sawtooth",           FX_ANIM_SHAPE_SAWTOOTH },
+    { "Shape Steps",        FX_ANIM_SHAPE_STEPS },
+    { "Smooth",             FX_ANIM_SHAPE_SMOOTHSTEP },
+    { "Smooth Noise",       FX_ANIM_SHAPE_SMOOTH_NOISE },
+    { "Square",             FX_ANIM_SHAPE_SQUARE },
+    { "ZigZag",             FX_ANIM_SHAPE_ZIGZAG },
+    { NULL, -1 },
+};
+
 enum
 {
     TOOLTIP_TIMELINE = 0,
@@ -6928,9 +6962,10 @@ static int load_editlist_info(void)
     char tmp[16];
     int len = 0;
     int global_transition_state = 0;
+    char filepath[PATH_MAX];
 
     single_vims( VIMS_VIDEO_INFORMATION );
-    gchar *res = recv_vims(3,&len);
+    gchar *res = recv_vims(4,&len);
     if( len <= 0 || res==NULL)
     {
 #ifdef STRICT_CHECKING
@@ -6938,12 +6973,12 @@ static int load_editlist_info(void)
 #endif
         return 0;
     }
-    int got_n = sscanf(res, "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d",
+    int got_n = sscanf(res, "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d %s",
        &values[0], &values[1], &values[2], &values[3], &fps,
        &values[4], &values[5], &rate, &values[7],
-       &dum[0], &dum[1], &values[8], &use_vims_mcast, &global_transition_state);
+       &dum[0], &dum[1], &values[8], &use_vims_mcast, &global_transition_state, filepath);
 
-    if( got_n != 14 ) {
+    if( got_n < 14 ) {
         veejay_msg(VEEJAY_MSG_ERROR, "Parsing failed: expected 14, got %d. Data: %s", got_n, res);
         veejay_msg(VEEJAY_MSG_ERROR, "fps ptr=%p rate ptr=%p dum0=%p dum1=%p",
             (void*)&fps,
@@ -6960,6 +6995,9 @@ static int load_editlist_info(void)
     info->el.num_frames = dum[1];
     info->el.fps = fps;
     info->el.num_files = dum[0];
+
+    strlcpy(samplelist_name, filepath, strlen(filepath) + 1);
+
 
     if(info->el.fps <= 0) {
         veejay_msg(VEEJAY_MSG_ERROR, "Invalid FPS %f", fps);
@@ -7236,14 +7274,6 @@ GdkPixbuf   *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInte
     free(dst1);
 
     return res;*/
-}
-
-void gveejay_sleep( void *u )
-{
-    struct timespec nsecsleep;
-    nsecsleep.tv_nsec = 500000;
-    nsecsleep.tv_sec = 0;
-    nanosleep( &nsecsleep, NULL );
 }
 
 //static int tick = 0;
@@ -8145,6 +8175,13 @@ void update_gui(void)
 
     update_cpumeter_timeout(NULL);
     update_cachemeter_timeout(NULL);
+}
+
+void vj_gui_set_title(char *remote, int port) {
+    char title[128];
+    snprintf(title, sizeof(title), "Reloaded is connected with %s:%d", remote, port );
+    GtkWidget *mw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
+    gtk_window_set_title(GTK_WINDOW(mw), title);
 }
 
 void vj_gui_free(void)
@@ -9246,6 +9283,7 @@ gboolean    is_alive( int *do_sync )
 #endif
         }
 
+        vj_gui_set_title(remote, port);
         veejay_show_main_ui(gui);
         
     }

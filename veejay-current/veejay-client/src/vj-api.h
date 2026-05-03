@@ -108,38 +108,5 @@ enum {
   FX_ANIM_SHAPE_MAX // sentinel
 };
 
-static struct
-{
-    const char *description;
-    const int id;
-} fx_anim_shape_map[] =
-{
-    { "no shape",           FX_ANIM_SHAPE_NO_SHAPE },
-    { "Bounce",             FX_ANIM_SHAPE_BOUNCE },
-    { "Burst Envelope",     FX_ANIM_SHAPE_BURST_ENVELOPE },
-    { "Cosine",             FX_ANIM_SHAPE_COSINE },
-    { "Sine",               FX_ANIM_SHAPE_SINE },
-    { "Damped Sine",        FX_ANIM_SHAPE_DAMPED_SINE },
-    { "Ease In",            FX_ANIM_SHAPE_EASE_IN },
-    { "Ease Out",           FX_ANIM_SHAPE_EASE_OUT },
-    { "Exponential",        FX_ANIM_SHAPE_EXPONENTIAL },
-    { "Gaussian",           FX_ANIM_SHAPE_GAUSSIAN },
-    { "Noise",              FX_ANIM_SHAPE_NOISE },
-    { "Pulse",              FX_ANIM_SHAPE_PULSE },
-    { "Ramp Drop",          FX_ANIM_SHAPE_RAMP_DROP },
-    { "Random Burst",       FX_ANIM_SHAPE_RANDOMWALK_BURST },
-    { "Random Inertia",     FX_ANIM_SHAPE_RANDOMWALK_INERTIA },
-    { "Random Mean",        FX_ANIM_SHAPE_RANDOMWALK_MEAN },
-    { "Random Quantized",   FX_ANIM_SHAPE_RANDOMWALK_QUANTIZED },
-    { "Random Smooth",      FX_ANIM_SHAPE_RANDOMWALK_SMOOTH },
-    { "Random Walk",        FX_ANIM_SHAPE_RANDOMWALK },
-    { "Sawtooth",           FX_ANIM_SHAPE_SAWTOOTH },
-    { "Shape Steps",        FX_ANIM_SHAPE_STEPS },
-    { "Smooth",             FX_ANIM_SHAPE_SMOOTHSTEP },
-    { "Smooth Noise",       FX_ANIM_SHAPE_SMOOTH_NOISE },
-    { "Square",             FX_ANIM_SHAPE_SQUARE },
-    { "ZigZag",             FX_ANIM_SHAPE_ZIGZAG },
-    { NULL, -1 },
-};
 
 #endif

@@ -96,40 +96,41 @@ void vj_gui_startup (GApplication *application, gpointer user_data)
 
 }
 
-/*
- * GApplication "activate" handler
- *
- *
- * FIXME  gtk_builder_new (); -ADD->   g_object_unref (info->main_window); (vj_gui_clean()?)
- */
-static void vj_gui_activate (GApplication* app, gpointer        user_data)
+typedef struct {
+    GApplication *app;
+} GuiContext;
+
+static gboolean vj_gui_idle_cb(gpointer data)
 {
-    vj_gui_set_debug_level( verbosity , n_tracks,0,0);
-    default_bank_values( &col, &row );
+    GuiContext *ctx = (GuiContext *)data;
+
+    if (!gveejay_idle(NULL)) {
+        g_application_quit(ctx->app);
+        return G_SOURCE_REMOVE;
+    }
+
+    return G_SOURCE_CONTINUE;
+}
+
+static void vj_gui_activate(GApplication *app, gpointer user_data)
+{
+    GuiContext *ctx = g_new0(GuiContext, 1);
+    ctx->app = app;
+
+    vj_gui_set_debug_level(verbosity, n_tracks, 0, 0);
+    default_bank_values(&col, &row);
 
     register_signals();
 
-    if( preview )
-    {
+    if (preview) {
         gveejay_preview(preview);
     }
-    
-    vj_gui_init( skinfile, launcher, hostname, port_num, use_threads, load_midi, midi_file,arg_beta, arg_autoconnect, arg_fasterui);
 
-    while( gveejay_idle(NULL) )
-    {
-        while( gtk_events_pending() ) {
-            gtk_main_iteration_do(FALSE);
-            if (!gveejay_idle(NULL))
-                break;
-        }
+    vj_gui_init(skinfile, launcher, hostname, port_num,
+                use_threads, load_midi, midi_file,
+                arg_beta, arg_autoconnect, arg_fasterui);
 
-        if(!gtk_events_pending() ) {
-            g_usleep(5000);
-        }
-    }
-
-    g_application_quit(app);
+    g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, vj_gui_idle_cb, ctx,(GDestroyNotify)g_free);
 }
 
 /*

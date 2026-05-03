@@ -17520,7 +17520,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                               <object class="GtkImage" id="image_sync_samplelist">
                                                                 <property name="visible">True</property>
                                                                 <property name="can-focus">False</property>
-                                                                <property name="pixbuf">icon_saveas.png</property> 
+                                                                <property name="pixbuf">icon_syncsamplelist.png</property>
                                                               </object>
                                                             </child>
                                                           </object>
