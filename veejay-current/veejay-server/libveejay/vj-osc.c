@@ -328,22 +328,16 @@ static	void	osc_add_client(void *context, int arglen, const void *vargs, OSCTime
 
 	if(vevo_property_set( osc_clients[free_id], "lo", VEVO_ATOM_TYPE_VOIDPTR,1, &t ) != VEVO_NO_ERROR ) {
 		veejay_msg(0, "Unable to add lo_address to vevo port");
-		( osc_clients[free_id] );
-		osc_clients[free_id] = NULL;
 		return;
 	}
 
 	if(vevo_property_set( osc_clients[free_id], "cmd", VEVO_ATOM_TYPE_STRING, 1, &cmd ) != VEVO_NO_ERROR ) {
 		veejay_msg(0, "Unable to store command '%s'", cmd );
-		(osc_clients[free_id]);
-		osc_clients[free_id]=NULL;
 		return;
 	}
 
 	if( vevo_property_set( osc_clients[free_id], "connection", VEVO_ATOM_TYPE_STRING,1,&nptr ) != VEVO_NO_ERROR ) {
 		veejay_msg(0, "Unable to store connection string");
-		(osc_clients[free_id]);
-		osc_clients[free_id] = NULL;
 		return;
 	}
 
