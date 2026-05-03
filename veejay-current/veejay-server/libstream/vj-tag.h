@@ -392,7 +392,6 @@ void	vj_tag_update_ascociated_samples(int s1);
 void	tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp);
 void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp);
 void tagCreateStreamFX(xmlNodePtr node, vj_tag *tag);
-void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font,
-	void *vp);
+void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font,void *vp, SampleLoadMode load_mode);
 #endif
 #endif

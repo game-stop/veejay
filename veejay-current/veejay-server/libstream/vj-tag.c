@@ -962,7 +962,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     if(!tag)
     {
         veejay_msg(0, "Memory allocation error");
-        return -1; 
+        return -1;
     }
 
     tag->source_name = (char *) vj_calloc(sizeof(char) * SOURCE_NAME_LEN);
@@ -1144,8 +1144,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
             plug_get_parameters( tag->generator, tag->genargs, &tmp);   
             
             if (filename != NULL) {
-                strncpy(tag->source_name, filename, sizeof(tag->source_name) - 1);
-                tag->source_name[sizeof(tag->source_name) - 1] = '\0';
+                sprintf(tag->source_name,"%s", filename);
             }
         }
         else {
@@ -2654,7 +2653,7 @@ int    vj_tag_entry_is_rendering(int t1, int position)
 {
     vj_tag *tag = vj_tag_get(t1);
     if(!tag)
-        return -1; 
+        return -1;
     if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
         return -1;
 
@@ -3866,7 +3865,7 @@ static  int tagParseKeys( xmlDocPtr doc, xmlNodePtr cur, void *port )
     return 1;
 }
 
-static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
+static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int identity)
 {
     int effect_id = -1;
     int arg[SAMPLE_MAX_PARAMETERS];
@@ -3972,12 +3971,12 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
  * Parse the effects array 
  *
  ****************************************************************************************************/
-static void tagParseEffects(xmlDocPtr doc, xmlNodePtr cur, int dst_stream)
+static void tagParseEffects(xmlDocPtr doc, xmlNodePtr cur, int dst_stream, int identity)
 {
     int effectIndex = 0;
     while (cur != NULL && effectIndex < SAMPLE_MAX_EFFECTS) {
     if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECT)) {
-        tagParseEffect(doc, cur->xmlChildrenNode, dst_stream);
+        tagParseEffect(doc, cur->xmlChildrenNode, dst_stream, identity);
         effectIndex++;
     }
     //effectIndex++;
@@ -3996,7 +3995,7 @@ static void tagParseCalibration( xmlDocPtr doc, xmlNodePtr cur, int dst_sample ,
  * Parse a sample
  *
  ****************************************************************************************************/
-void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *font, void *vp)
+void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *font, void *vp, SampleLoadMode load_mode)
 {
     int fx_on=0, id=0, source_id=0, source_type=0;
     char *source_file = NULL;
@@ -4007,6 +4006,8 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
     veejay_memset( fx, 0, sizeof(fx));
     int k = 0;
     int subrender = 0;
+    int genargs[SAMPLE_MAX_PARAMETERS];
+    int genargs_count = 0;
     xmlNodePtr subs = NULL;
     xmlNodePtr cali = NULL;
     xmlNodePtr macro = NULL;
@@ -4070,8 +4071,18 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
             k++;
         }
 
-        cur = cur->next;
+        if( !xmlStrcmp(cur->name, (const xmlChar*) "generator_args")) {
+            char *gargs = get_xml_str(doc,cur);
+            genargs_count = (gargs == NULL ? 0: sscanf(gargs,
+                "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+                &genargs[0],  &genargs[1],  &genargs[2],  &genargs[3],
+                &genargs[4],  &genargs[5],  &genargs[6],  &genargs[7],
+                &genargs[8],  &genargs[9],  &genargs[10], &genargs[11],
+                &genargs[12], &genargs[13], &genargs[14], &genargs[15]));
         }
+
+        cur = cur->next;
+    }
 
     if( id > 0 )
     {
@@ -4125,6 +4136,11 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
                 case VJ_TAG_TYPE_COLOR:
                     vj_tag_set_stream_color( id, col[0],col[1],col[2] );
                     break;
+                case VJ_TAG_TYPE_GENERATOR:
+                    for(int i = 0; i < genargs_count; i ++ ) {
+                        tag->genargs[i] = genargs[i];
+                    }
+                    break;
             }
 
             if( subs )
@@ -4156,7 +4172,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
             for( q = 0; q < k ; q ++ )
             {
                 if(fx[q] )
-                    tagParseEffects(doc, fx[q], id );
+                    tagParseEffects(doc, fx[q], id, identity ); // FIXME follow logic in libsample
             }
         }
         else {
@@ -4243,6 +4259,19 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp)
     put_xml_int( node, "opacity", tag->opacity );
 
     vj_font_xml_pack( node, font );
+
+
+    if(tag->source_type == VJ_TAG_TYPE_GENERATOR) {
+        int *genargs = tag->genargs;
+        char out_buf[1024];
+        snprintf(out_buf, sizeof(out_buf),
+             "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+             genargs[0],  genargs[1],  genargs[2],  genargs[3],
+             genargs[4],  genargs[5],  genargs[6],  genargs[7],
+             genargs[8],  genargs[9],  genargs[10], genargs[11],
+             genargs[12], genargs[13], genargs[14], genargs[15]);
+        put_xml_str( node, "generator_args", out_buf );
+    }
 
     xmlNodePtr childnode =  xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTS, NULL);
 
