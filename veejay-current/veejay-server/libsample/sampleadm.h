@@ -74,6 +74,15 @@
 #define XMLTAG_CHAIN_ENABLED "fx"
 #define XMLTAG_EDIT_LIST_FILE "editlist_filename"
 #define XMLTAG_BOGUSVIDEO	 "playlength"
+#define XMLTAG_TRANSITION_SHAPE "transition_shape"
+#define XMLTAG_TRANSITION_LENGTH "transition_length"
+#define XMLTAG_TRANSITION_ACTIVE "transition_active"
+#define XMLTAG_LOOP_STAT "loop_stat"
+#define XMLTAG_LOOP_STAT_STOP "loop_stat_stop"
+#define XMLTAG_LOOP_PP "loop_pp"
+#define XMLTAG_LOOP_DEC "loop_dec"
+#define XMLTAG_LOOP_PERIODS "loop_periods"
+
 #endif
 #define SAMPLE_FREEZE_NONE 0
 #define SAMPLE_FREEZE_PAUSE 1
@@ -152,8 +161,6 @@ typedef struct sample_info_t {
     int fade_entry;
 	int encoder_active;
     unsigned long sequence_num;
-    unsigned long rec_total_bytes;
-    unsigned long encoder_total_frames;
     char *encoder_destination;
     int encoder_format;
     void *encoder;
@@ -189,6 +196,12 @@ typedef struct sample_info_t {
 
 } sample_info;
 
+typedef enum {
+    SAMPLE_LOAD_REPLACE = 0,
+    SAMPLE_LOAD_APPEND  = 1,
+    SAMPLE_LOAD_UPDATE  = 2
+} SampleLoadMode;
+
 #define SAMPLE_YUV420_BUFSIZE 16
 #define SAMPLE_MAX_DEPTH 4
 #define SAMPLE_DEC_BIBBER 1
@@ -201,8 +214,12 @@ extern int sample_verify();
 extern int sample_init(int len, void *font, editlist *el,void *info);
 extern int sample_update(sample_info *sample, int s1);
 #ifdef HAVE_XML2
-extern int sample_readFromFile(char *, void *vp, void *ptr, void *font, void *el, int *id, int *mode);
+extern int sample_readFromFile(char *, void *vp, void *ptr, void *font, void *el, int *id, int *mode,SampleLoadMode load_mode);
 extern int sample_writeToFile(char *, void *vp, void *ptr, void *font, int id, int mode);
+extern void sample_watch_list(void);
+extern int sample_open_and_watch(const char *path, void *vp, void *seq, void *font, void *el, int *id, int *mode);
+extern void sample_watch_suppress_next(void);
+extern void sample_watch_enable_events(void);
 #endif
 extern int sample_get_position(int s1);
 extern int sample_set_state(int new_state);
@@ -210,7 +227,7 @@ extern int sample_get_state();
 extern sample_info *sample_skeleton_new(long startFrame, long endFrame);
 extern sample_info *sample_get(int sample_id);
 void 	sample_new_simple( void *el, long start, long end );
-extern int sample_store(sample_info * skel);
+extern int sample_store(sample_info * skel, int skip_edl_close);
 extern int sample_exists(int sample_id);
 extern int sample_verify_delete( int sample_id, int sample_type );
 extern void sample_sanity_scan(void);
@@ -351,7 +368,7 @@ extern int sample_cache_used( int s1 );
 extern void        sample_free(void *edl);
 extern int sample_stop_playing(int s1, int new_s1);
 extern char *UTF8toLAT1(unsigned char *in);
-extern int sample_read_edl( sample_info *sample );
+extern int sample_read_edl( sample_info *sample, SampleLoadMode load_mode );
 extern void sample_set_loops(int s1, int loops);
 extern int sample_get_loops(int s1);
 extern void sample_set_loop_stats(int s1, int loops);
@@ -387,9 +404,9 @@ extern void CreateEffects(xmlNodePtr node, sample_eff_chain ** effects);
 extern void CreateEffect(xmlNodePtr node, sample_eff_chain * effect, int pos);
 extern void CreateArguments(xmlNodePtr node, int *arg, int argcount);
 extern void CreateKeys(xmlNodePtr node, int argcount, void *port );
-extern xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, void *el, void *font, int start_at, void *vp);
+extern xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, void *el, void *font, int start_at, void *vp, int skip_id, SampleLoadMode load_mode);
 extern void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, int start_at);
-extern void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at);
+extern void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, sample_info *skel, int start_at);
 extern void ParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg );
 extern void ParseKEys(xmlDocPtr doc, xmlNodePtr cur, void *port);
 #endif

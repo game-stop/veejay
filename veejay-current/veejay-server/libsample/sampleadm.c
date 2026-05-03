@@ -36,6 +36,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <string.h>
+#include <limits.h>
+
 #include <veejaycore/defs.h>
 #include <veejaycore/vims.h>
 #include <libsample/sampleadm.h>
@@ -54,11 +56,15 @@
 #include <libveejay/vj-misc.h>
 #include <libstream/vj-tag.h>
 #include <libvjxml/vj-xml.h>
+#include <veejaycore/atomic.h>
+#include <libxml/xmlsave.h>
+#include <libxml/parser.h>
+
 #include <libveejay/vj-macro.h>
 #include <libvje/internal.h>
 
-#ifdef HAVE_XML2
-#endif
+#include <sys/inotify.h>
+#include <pthread.h>
 
 #define FOURCC(a,b,c,d) ( (d<<24) | ((c&0xff)<<16) | ((b&0xff)<<8) | (a&0xff) )
 
@@ -83,9 +89,12 @@ static void *sample_cache[SAMPLE_MAX_SAMPLES];
 static editlist *plain_editlist=NULL; 
 static veejay_t *veejay_info = NULL;
 
-extern void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font, void *vp);
+extern void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font, void *vp, SampleLoadMode load_mode);
 extern void   tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp );
 extern int vj_tag_highest_valid_id();
+static void sample_del_internal(sample_info *si, int skip_edl);
+static void sample_move_fx_pointers(sample_info *si, sample_info *existing);
+static void sample_copy_rec_info(sample_info *si, sample_info *existing);
 
 unsigned int sample_size(void)
 {
@@ -383,22 +392,25 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 }
 
 
-
-int sample_store(sample_info *skel)
+int sample_store(sample_info *skel, int skip_edl_close)
 {
-    if (!skel)
-        return -1;
+    if (!skel) return -1;
 
     hnode_t *node = hash_lookup(SampleHash, sample_key(skel->sample_id));
-
-    if (!node) {
-        node = hnode_create(skel);
-        if (!node)
-            return -1;
-
-        hash_insert(SampleHash, node, sample_key(skel->sample_id));
-    } else {
+    if (node) {
+        sample_info *target = hnode_get(node);
+        if (target) {
+            sample_del_internal(target, skip_edl_close);
+        }
         hnode_put(node, skel);
+    } else {
+        node = hnode_create(skel);
+        if (!node) return -1;
+        hash_insert(SampleHash, node, sample_key(skel->sample_id));
+    }
+
+    if (skel->sample_id >= 0 && skel->sample_id < SAMPLE_MAX_SAMPLES) {
+        sample_cache[skel->sample_id] = skel;
     }
 
     return 0;
@@ -410,30 +422,30 @@ void    sample_new_simple( void *el, long start, long end )
     if(sample) {
         sample->edit_list = el;
         sample->soft_edl = 1;
-        sample_store(sample);
+        sample_store(sample,0);
     }
 }
 
 sample_info *sample_get(int sample_id)
 {
-    if (sample_id < 0 || sample_id > SAMPLE_MAX_SAMPLES)
+    if (sample_id < 0 || sample_id >= SAMPLE_MAX_SAMPLES)
         return NULL;
 
     sample_info *si = sample_cache[sample_id];
 
-    if (si && si->sample_id != sample_id) {
-        // silently fix stale cache
-        sample_cache[sample_id] = NULL;
-        si = NULL;
+    if (si) {
+        if (si->sample_id != sample_id) {
+            sample_cache[sample_id] = NULL;
+            si = NULL;
+        }
     }
 
     if (!si) {
         hnode_t *node = hash_lookup(SampleHash, sample_key(sample_id));
-        if (!node)
-            return NULL;
-
-        si = hnode_get(node);
-        sample_cache[sample_id] = si;
+        if (node) {
+            si = hnode_get(node);
+            sample_cache[sample_id] = si;
+        }
     }
 
     return si;
@@ -452,13 +464,6 @@ int sample_exists(int sample_id) {
     if(!sample_get(sample_id)) return 0;
     return 1;
 }
-/*
-int sample_exists(int sample_id)
-{
-    if(sample_id < 1 || sample_id > SAMPLE_MAX_SAMPLES) return 0;
-    return (sample_get(sample_id) == NULL ? 0 : 1);
-}
-*/
 
 int sample_copy(int sample_id)
 {
@@ -494,7 +499,7 @@ int sample_copy(int sample_id)
         copy->soft_edl = 1;
     }
 
-    if (sample_store(copy) != 0)
+    if (sample_store(copy,0) != 0)
         return 0;
 
     recount_hash = 1;
@@ -1041,18 +1046,103 @@ int sample_find_refs_and_delete(int source_type, int id) {
             }
         }
     }
+
+    return 1;
 }
 
+static void sample_move_fx_pointers(sample_info *si, sample_info *existing)
+{
+    if (!si || !existing)
+        return;
 
-static void sample_del_internal(sample_info *si)
+    for (int i = 0; i < SAMPLE_MAX_EFFECTS; i++)
+    {
+        sample_eff_chain *new_e = si->effect_chain[i];
+        sample_eff_chain *old_e = existing->effect_chain[i];
+
+        if (!new_e)
+            continue;
+
+        if (!old_e)
+            continue;
+
+        if( new_e->effect_id > 0 ) { //safety guard
+            if(!vje_is_valid(new_e->effect_id))
+                continue;
+        }
+        if( old_e->effect_id > 0) {
+            if(!vje_is_valid(old_e->effect_id))
+                continue;
+        }
+
+        if( old_e->effect_id >= 0 && new_e->effect_id <= 0) {
+            if(vje_get_extra_frame(old_e->effect_id)) {
+                if (old_e->source_type == 1 &&
+                    vj_tag_get_active(old_e->channel) &&
+                    vj_tag_get_type(old_e->channel) == VJ_TAG_TYPE_NET)
+                {
+                    vj_tag_disable(old_e->channel);
+                }
+            }
+            vjert_del_fx(old_e,0,i,1);
+            continue;
+        }
+
+        if (new_e->effect_id == old_e->effect_id && old_e->fx_instance != NULL)
+        {
+            new_e->fx_instance = old_e->fx_instance;
+            old_e->fx_instance = NULL;
+            continue;
+        }
+        else if(old_e->effect_id >= 0 && new_e->effect_id >= 0) {
+            if (vje_get_extra_frame(old_e->effect_id) &&
+            !vje_get_extra_frame(new_e->effect_id))
+            {
+                if (old_e->source_type == 1 &&
+                    vj_tag_get_active(old_e->channel) &&
+                    vj_tag_get_type(old_e->channel) == VJ_TAG_TYPE_NET)
+                {
+                    vj_tag_disable(old_e->channel);
+                }
+            }
+        }
+
+        if (old_e->fx_instance)
+        {
+            vjert_del_fx(old_e, 0, i, 1);
+            old_e->fx_instance = NULL;
+        }
+
+    }
+}
+
+static void sample_copy_rec_info(sample_info *si, sample_info *existing) {
+    si->encoder_active = existing->encoder_active;
+    si->encoder_destination = (existing->encoder_destination == NULL ? NULL : strdup(existing->encoder_destination));
+    si->encoder_file = existing->encoder_file;
+    si->encoder_format = existing->encoder_format;
+    si->encoder_frames_recorded = existing->encoder_frames_recorded;
+    si->encoder_frames_to_record = existing->encoder_frames_to_record;
+    si->encoder_height = existing->encoder_height;
+    si->encoder_width = existing->encoder_width;
+    si->encoder_total_frames_recorded = existing->encoder_total_frames_recorded;
+
+    si->sequence_num = existing->sequence_num;
+
+    si->resume_pos = existing->resume_pos;
+}
+
+static void sample_del_internal(sample_info *si, int skip_edl_close)
 {
     if (!si) return;
 
-    sample_chain_free(si->sample_id, 1);
+    if(!skip_edl_close) {
+        sample_chain_free(si->sample_id, 1);
 
-    for (int i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
-        if (si->effect_chain[i] && si->effect_chain[i]->kf) {
-            vpf(si->effect_chain[i]->kf);
+        for (int i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
+            if (si->effect_chain[i] && si->effect_chain[i]->kf) {
+                vpf(si->effect_chain[i]->kf);
+            }
         }
     }
 
@@ -1071,7 +1161,7 @@ static void sample_del_internal(sample_info *si)
         vj_font_dictionary_destroy(sample_font_, si->dict);
 #endif
 
-    if (si->edit_list) {
+    if (!skip_edl_close && si->edit_list) {
         sample_close_edl(si->sample_id, si->edit_list);
     }
 
@@ -1082,7 +1172,9 @@ static void sample_del_internal(sample_info *si)
 
     vj_macro_free(si->macro);
 
-    if (si->sample_id >= 0 && si->sample_id <= SAMPLE_MAX_SAMPLES)
+    si->sample_id = 0;
+
+    if (si->sample_id >= 0 && si->sample_id < SAMPLE_MAX_SAMPLES)
         sample_cache[si->sample_id] = NULL;
 
     int next_tail = avail_tail + 1;
@@ -1097,6 +1189,7 @@ static void sample_del_internal(sample_info *si)
 
     free(si);
 }
+
 int sample_del(int sample_id)
 {
     sample_info *si = sample_get(sample_id);
@@ -1111,7 +1204,7 @@ int sample_del(int sample_id)
         hnode_destroy(node);
     }
 
-    sample_del_internal(si);
+    sample_del_internal(si,0);
 
     recount_hash = 1;
 
@@ -1129,7 +1222,7 @@ void sample_del_all(void *edl)
         sample_info *si = (sample_info *) hnode_get(node);
         hash_scan_delete(SampleHash, node);
 
-        sample_del_internal(si);
+        sample_del_internal(si,0);
 
         hnode_destroy(node);
     }
@@ -2582,15 +2675,63 @@ static void ParseKeys( xmlDocPtr doc, xmlNodePtr cur, void *port )
     }
 }
 
+int sample_chain_apply_full(sample_info *sample,int chain_index,int effect_id,int *args,int anim,int channel,
+    int source_type,int e_flag,int a_flag,int volume,int kf_status,int kf_type)
+{
+    int i, num_params;
 
-/*************************************************************************************************
- *
- * ParseEffect()
- *
- * Parse an effect using libxml2
- *
- ****************************************************************************************************/
-void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at)
+    if (!sample)
+        return 0;
+
+    if (chain_index < 0 || chain_index >= SAMPLE_MAX_EFFECTS)
+        return 0;
+
+    if (!vje_is_valid(effect_id)) {
+        return 0;
+    }
+
+    sample_eff_chain *entry = sample->effect_chain[chain_index];
+
+    entry->effect_id = effect_id;
+
+    num_params = vje_get_num_params(effect_id);
+
+    for (i = 0; i < num_params; i++) {
+        entry->arg[i] = args[i];
+    }
+
+    entry->e_flag = e_flag;
+    entry->a_flag = a_flag;
+
+    if(anim) {
+        if(!entry->kf)
+            entry->kf = vpn(VEVO_ANONYMOUS_PORT);
+        entry->kf_status = kf_status;
+        entry->kf_type   = kf_type;
+    }
+
+    if (volume < 0)
+        volume = 100;
+    if (volume > 100)
+        volume = 0;
+
+    entry->volume = volume;
+    entry->source_type = source_type;
+    entry->channel     = channel;
+    entry->clear = 1;
+    entry->audio_opacity = 0.5f;
+  
+    if (chain_index == sample->fade_entry) {
+        if (sample->fade_method == 4)
+            sample->fade_method = 2;
+        else if (sample->fade_method == 3)
+            sample->fade_method = 1;
+    }
+
+    return 1;
+}
+
+void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, sample_info *skel, int start_at)
 {
     int effect_id = -1;
     int arg[SAMPLE_MAX_PARAMETERS];
@@ -2606,114 +2747,99 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at)
     xmlNodePtr anim = NULL;
 
     for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++) {
-    arg[i] = 0;
+        arg[i] = 0;
     }
 
     if (cur == NULL)
-    return;
+        return;
 
-    while (cur != NULL) {
-    if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTID)) {
-        effect_id = get_xml_int( doc, cur );
-    }
-
-    if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTPOS)) {
-        chain_index = get_xml_int( doc, cur );
-    }
-
-    if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_ARGUMENTS)) {
-
-        ParseArguments(doc, cur->xmlChildrenNode, arg);
-    }
-
-    if( !xmlStrcmp(cur->name, (const xmlChar*) "ANIM" ))
+    while (cur != NULL)
     {
-        anim = cur->xmlChildrenNode;
-    }
-    
+        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTID)) {
+            effect_id = get_xml_int( doc, cur );
+        }
 
-    /* add source,channel,e_flag */
-    if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTSOURCE)) {
-        source_type = get_xml_int( doc, cur );
-    }
+        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTPOS)) {
+            chain_index = get_xml_int( doc, cur );
+        }
 
-    if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTCHANNEL)) {
-        channel = get_xml_int( doc, cur );
-    }
+        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_ARGUMENTS)) {
 
-    if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTACTIVE)) {
-        e_flag = get_xml_int( doc, cur );
-    }
+            ParseArguments(doc, cur->xmlChildrenNode, arg);
+        }
 
-    if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTAUDIOFLAG)) {
-        a_flag = get_xml_int( doc, cur );
-    }
+        if( !xmlStrcmp(cur->name, (const xmlChar*) "ANIM" ))
+        {
+            anim = cur->xmlChildrenNode;
+        }
 
-    if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTAUDIOVOLUME)) {
-        volume = get_xml_int( doc, cur );
-    }
-    
-    if(!xmlStrcmp( cur->name, (const xmlChar*) "kf_status" )) {
-        kf_status = get_xml_int( doc, cur );
-    }
+        /* add source,channel,e_flag */
+        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTSOURCE)) {
+            source_type = get_xml_int( doc, cur );
+        }
 
-    if(!xmlStrcmp( cur->name, (const xmlChar*) "kf_type" )) {
-        kf_type = get_xml_int( doc, cur );
-    }
+        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTCHANNEL)) {
+            channel = get_xml_int( doc, cur );
+        }
 
-    cur = cur->next;
-    }
+        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTACTIVE)) {
+            e_flag = get_xml_int( doc, cur );
+        }
 
+        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTAUDIOFLAG)) {
+            a_flag = get_xml_int( doc, cur );
+        }
+
+        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTAUDIOVOLUME)) {
+            volume = get_xml_int( doc, cur );
+        }
+
+        if(!xmlStrcmp( cur->name, (const xmlChar*) "kf_status" )) {
+            kf_status = get_xml_int( doc, cur );
+        }
+
+        if(!xmlStrcmp( cur->name, (const xmlChar*) "kf_type" )) {
+            kf_type = get_xml_int( doc, cur );
+        }
+
+        cur = cur->next;
+    }
 
     if (effect_id != -1) {
-        int j;
-        if (!sample_chain_add(dst_sample, chain_index, effect_id)) {
+        int ret = sample_chain_apply_full(
+            skel,
+            chain_index,
+            effect_id,
+            arg,
+            (anim ? 1 : 0),
+            channel,
+            source_type,
+            e_flag,
+            a_flag,
+            volume,
+            kf_status,
+            kf_type
+        );
+
+        if (ret == 0) {
             veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d)", effect_id, chain_index);
         }
         else {
-            /* load the parameter values */
-            for (j = 0; j < vje_get_num_params(effect_id); j++) {
-                sample_set_effect_arg(dst_sample, chain_index, j, arg[j]);
-            }
-            sample_set_chain_channel(dst_sample, chain_index, channel);
-            sample_set_chain_source(dst_sample, chain_index, source_type);
-
-            /* set other parameters */
-            if (a_flag) {
-                sample_set_chain_audio(dst_sample, chain_index, a_flag);
-                sample_set_chain_volume(dst_sample, chain_index, volume);
-            }
-    
-            if( effect_id != -1 ) {
-                sample_set_chain_status(dst_sample, chain_index, e_flag);
-            }
-        
-            sample_info *skel = sample_get(dst_sample);
             if(anim)
             {
-                sample_chain_alloc_kf( dst_sample, chain_index );
                 ParseKeys( doc, anim, skel->effect_chain[ chain_index ]->kf );
-                sample_chain_set_kf_status( dst_sample, chain_index, kf_status );
-                sample_set_kf_type(dst_sample,chain_index,kf_type);
             }
         }
     }   
 
 }
 
-/*************************************************************************************************
- *
- * ParseEffect()
- *
- * Parse the effects array 
- *
- ****************************************************************************************************/
 void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, int start_at)
 {
     int effectIndex = 0;
     while (cur != NULL && effectIndex < SAMPLE_MAX_EFFECTS) {
     if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECT)) {
-        ParseEffect(doc, cur->xmlChildrenNode, skel->sample_id, start_at);
+        ParseEffect(doc, cur->xmlChildrenNode, skel, start_at);
         effectIndex++;
     }
     //effectIndex++;
@@ -2788,209 +2914,209 @@ static void LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq, int n_sampl
     }
 }
 
-/*************************************************************************************************
- *
- * ParseSample()
- *
- * Parse a sample
- *
- ****************************************************************************************************/
-xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *el, void  *font, int start_at, void *vp )
+
+xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, void *el, void *font, int start_at, void *vp, int skip_id, SampleLoadMode load_mode)
 {
     xmlNodePtr subs = NULL;
-
-    int original_id = 0;
-
+    int original_id = -1;
     int marker_start = 0, marker_end = 0;
+    int inherit_edl = (load_mode == SAMPLE_LOAD_UPDATE);
+    int skip_edl_close = 0;
 
-    while (cur != NULL)
+    xmlNodePtr node = cur;
+    while (node != NULL)
     {
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLEID)) {
-            original_id = get_xml_int( doc, cur );
+        if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_SAMPLEID)) {
+            original_id = get_xml_int(doc, node);
+            /*if (original_id == skip_id) {
+                veejay_msg(VEEJAY_MSG_DEBUG, "Skipping sample ID %d", original_id);
+                sample_del_internal(skel, 1);
+                return NULL;
+            }*/
             skel->sample_id = original_id + start_at;
-            sample_store(skel);
         }
-    
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EDIT_LIST_FILE)) {
-
-            skel->edit_list_file = get_xml_str( doc, cur );
-            if(!skel->edit_list_file) {
-                veejay_msg(VEEJAY_MSG_ERROR, "No video file specified");
-                skel->edit_list_file = sample_default_edl_name( original_id );
-            }
-            if( start_at > 0 ) {
-                free(skel->edit_list_file);
-                skel->edit_list_file = sample_default_edl_name( original_id );
-            }
-            
-            if(!sample_read_edl( skel ))
-                skel->edit_list = NULL;
-    
-            if(!skel->edit_list)
-            {
-                veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d is using EDL from plain mode", skel->sample_id );
-                skel->edit_list = el;
-                skel->soft_edl = 1;
-            }
-            else
-            {
-                skel->soft_edl = 0;
-                if( start_at == 0 ) {
-                    veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d has its own EDL", skel->sample_id, el );
-                }
-                else {
-                    veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d is using Sample's %d EDL", skel->sample_id, original_id );
-                }
-            }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_EDIT_LIST_FILE)) {
+            if (!skel->edit_list_file)
+                skel->edit_list_file = get_xml_str(doc, node);
         }
-
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_CHAIN_ENABLED)) {
-            skel->effect_toggle = get_xml_int( doc, cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_CHAIN_ENABLED)) {
+            skel->effect_toggle = get_xml_int(doc, node);
         }
-
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLEDESCR) && start_at == 0) {
-            get_xml_str_n( doc, cur, skel->descr, sizeof(skel->descr) );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_SAMPLEDESCR) && start_at == 0) {
+            get_xml_str_n(doc, node, skel->descr, sizeof(skel->descr));
         }
-
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_FIRSTFRAME)) {
-            skel->first_frame = get_xml_int( doc, cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_FIRSTFRAME)) {
+            skel->first_frame = get_xml_int(doc, node);
         }
-
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_VOL)) {
-            skel->audio_volume = get_xml_int( doc, cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_VOL)) {
+            skel->audio_volume = get_xml_int(doc, node);
         }
-
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_LASTFRAME)) {
-            skel->last_frame = get_xml_int( doc, cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_LASTFRAME)) {
+            skel->last_frame = get_xml_int(doc, node);
         }
-
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SPEED)) {
-            skel->speed = get_xml_int( doc, cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_SPEED)) {
+            skel->speed = get_xml_int(doc, node);
         }
-
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_FRAMEDUP)) {
-            skel->dup = get_xml_int( doc, cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_FRAMEDUP)) {
+            skel->dup = get_xml_int(doc, node);
         }
-
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_LOOPTYPE)) {
-            skel->looptype = get_xml_int( doc, cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_LOOPTYPE)) {
+            skel->looptype = get_xml_int(doc, node);
         }
-    
-        if (!xmlStrcmp(cur->name, (const xmlChar *) "subrender")) {
-            skel->subrender = get_xml_int( doc, cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) "subrender")) {
+            skel->subrender = get_xml_int(doc, node);
         }
-
-		if( !xmlStrcmp(cur->name, (const xmlChar*) "loop_stat_stop")) {
-			skel->loop_stat_stop = get_xml_int(doc,cur);
-		}
-
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_MAXLOOPS)) {
-            skel->max_loops = get_xml_int( doc, cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar*) "loop_stat_stop")) {
+            skel->loop_stat_stop = get_xml_int(doc, node);
         }
-
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_NEXTSAMPLE)) {
-            skel->next_sample_id = get_xml_int( doc,cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_MAXLOOPS)) {
+            skel->max_loops = get_xml_int(doc, node);
         }
-
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_DEPTH)) {
-            skel->depth = get_xml_int( doc, cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_NEXTSAMPLE)) {
+            skel->next_sample_id = get_xml_int(doc, node);
         }
-
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_PLAYMODE)) {
-            skel->playmode = get_xml_int( doc, cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_DEPTH)) {
+            skel->depth = get_xml_int(doc, node);
         }
-
-        if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADER_ACTIVE)) {
-            skel->fader_active = get_xml_int( doc, cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_PLAYMODE)) {
+            skel->playmode = get_xml_int(doc, node);
         }
-    
-        if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_METHOD)) {
-            skel->fade_method = get_xml_int( doc, cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_FADER_ACTIVE)) {
+            skel->fader_active = get_xml_int(doc, node);
         }
-
-        if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_ALPHA)) {
-            skel->fade_alpha = get_xml_int( doc, cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_FADE_METHOD)) {
+            skel->fade_method = get_xml_int(doc, node);
         }
-
-        if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_ENTRY)) {
-            skel->fade_entry = get_xml_int( doc, cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_FADE_ALPHA)) {
+            skel->fade_alpha = get_xml_int(doc, node);
         }
-
-        if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADER_VAL)) {
-            skel->fader_val = get_xml_int( doc, cur );
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_FADE_ENTRY)) {
+            skel->fade_entry = get_xml_int(doc, node);
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_FADER_VAL)) {
+            skel->fader_val = get_xml_int(doc, node);
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar*) XMLTAG_FADER_INC)) {
+            skel->fader_inc = get_xml_int(doc, node);
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar*) XMLTAG_FADER_DIRECTION)) {
+            skel->fader_direction = get_xml_int(doc, node);
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar*) XMLTAG_LASTENTRY)) {
+            skel->selected_entry = get_xml_int(doc, node);
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_MARKERSTART)) {
+            marker_start = get_xml_int(doc, node);
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_MARKEREND)) {
+            marker_end = get_xml_int(doc, node);
+        }
+        else if(!xmlStrcmp(node->name, (const xmlChar*) XMLTAG_TRANSITION_SHAPE)) {
+            skel->transition_shape = get_xml_int(doc,node);
+        }
+        else if(!xmlStrcmp(node->name, (const xmlChar*) XMLTAG_TRANSITION_LENGTH)) {
+            skel->transition_length = get_xml_int(doc,node);
+        }
+        else if(!xmlStrcmp(node->name, (const xmlChar*) XMLTAG_TRANSITION_ACTIVE)) {
+            skel->transition_active = get_xml_int(doc,node);
+        }
+        else if(!xmlStrcmp(node->name, (const xmlChar*) XMLTAG_LOOP_STAT)) {
+            skel->loop_stat = get_xml_int(doc,node);
+        }
+        else if(!xmlStrcmp(node->name, (const xmlChar*) XMLTAG_LOOP_STAT_STOP)) {
+            skel->loop_stat_stop = get_xml_int(doc,node);
+        }
+        else if(!xmlStrcmp(node->name, (const xmlChar*) XMLTAG_LOOP_PP)) {
+            skel->loop_pp = get_xml_int(doc,node);
+        }
+        else if(!xmlStrcmp(node->name, (const xmlChar*) XMLTAG_LOOP_PERIODS)) {
+            skel->loop_periods = get_xml_int(doc,node);
+        }
+        else if(!xmlStrcmp(node->name, (const xmlChar*) XMLTAG_LOOP_DEC)) {
+            skel->loop_dec = get_xml_int(doc,node);
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar*) "SUBTITLES")) {
+            subs = node->xmlChildrenNode;
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar*) XMLTAG_MACRO)) {
+            vj_macro_load(skel->macro, doc, node->xmlChildrenNode);
+            int lss = vj_macro_get_loop_stat_stop(skel->macro);
+            if (lss > skel->loop_stat_stop) skel->loop_stat_stop = lss;
         }
 
-        if (!xmlStrcmp(cur->name,(const xmlChar*) XMLTAG_FADER_INC)) {
-            skel->fader_inc = get_xml_int( doc, cur );
+        ParseEffects(doc, node->xmlChildrenNode, skel, start_at);
+
+        if (!xmlStrcmp(node->name, (const xmlChar*) "calibration")) {
+            ParseCalibration(doc, node->xmlChildrenNode, skel, vp);
         }
 
-        if (!xmlStrcmp(cur->name,(const xmlChar*) XMLTAG_FADER_DIRECTION)) {
-            skel->fader_direction = get_xml_int( doc, cur );
-        }
-
-        if(!xmlStrcmp(cur->name,(const xmlChar*) XMLTAG_LASTENTRY)) {
-            skel->selected_entry = get_xml_int( doc, cur );
-        }
-
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_MARKERSTART)) {
-            marker_start = get_xml_int( doc, cur );
-        }
-
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_MARKEREND)) {
-            marker_end = get_xml_int( doc, cur );
-        }
-
-        if(!xmlStrcmp(cur->name, (const xmlChar*) "SUBTITLES" ))
-        {
-            subs = cur->xmlChildrenNode;
-        //  vj_font_xml_unpack( doc, cur->xmlChildrenNode, font );
-        }
-
-        ParseEffects(doc, cur->xmlChildrenNode, skel, start_at);
-
-        if( !xmlStrcmp( cur->name, (const xmlChar*) "calibration" ) ) {
-            ParseCalibration( doc, cur->xmlChildrenNode, skel ,vp);
-        }
-
-	if( !xmlStrcmp( cur->name, (const xmlChar*) XMLTAG_MACRO )) {
-		vj_macro_load( skel->macro, doc, cur->xmlChildrenNode );
-		int lss = vj_macro_get_loop_stat_stop(skel->macro);
-		if( lss > skel->loop_stat_stop ) {
-			skel->loop_stat_stop = lss;
-		}
-	}
-
-        cur = cur->next;
+        node = node->next;
     }
 
-    if( marker_end != marker_start || marker_end != 0 )
+    if (original_id != -1)
     {
-        skel->marker_start = marker_start;
-        skel->marker_end = marker_end;
+        sample_info *existing = NULL;
+        if (inherit_edl) {
+            existing = sample_get(skel->sample_id);
+            if (existing && existing->edit_list) {
+                skel->edit_list = existing->edit_list;
+                skel->soft_edl = existing->soft_edl;
+                if (!skel->edit_list_file && existing->edit_list_file)
+                    skel->edit_list_file = strdup(existing->edit_list_file);
+                skip_edl_close = 1;
+            } else {
+                inherit_edl = 0;
+            }
+        }
+
+        if (!inherit_edl) {
+            if (!skel->edit_list_file || start_at > 0) {
+                if (skel->edit_list_file) free(skel->edit_list_file);
+                skel->edit_list_file = sample_default_edl_name(original_id);
+            }
+
+            if (!sample_read_edl(skel, load_mode)) {
+                skel->edit_list = el;
+                skel->soft_edl = 1;
+            } else {
+                skel->soft_edl = 0;
+            }
+        }
+
+        if (marker_end != marker_start || marker_end != 0) {
+            skel->marker_start = marker_start;
+            skel->marker_end = marker_end;
+        }
+
+        if(existing) {
+            sample_move_fx_pointers(skel, existing);
+            sample_copy_rec_info(skel, existing);
+        }
+
+        sample_store(skel, skip_edl_close);
+    }
+    else {
+        sample_del_internal(skel, 1);
     }
 
     return subs;
 }
 
-
-/****************************************************************************************************
- *
- * sample_readFromFile( filename )
- *
- * load samples and effect chain from an xml file. 
- *
- ****************************************************************************************************/
-int sample_read_edl( sample_info *sample )
+int sample_read_edl( sample_info *sample, SampleLoadMode load_mode )
 {
     char *files[1] = {0};
-    int res = 0;
 
     files[0] = sample->edit_list_file;
 
     void *old = sample->edit_list;
 
-    //EDL is stored in CWD, samplelist file can be anywhere. Cannot always load samplelists due to
-    //    missing EDL files in CWD.
+    if(load_mode == SAMPLE_LOAD_UPDATE ) {
+        if(old) {
+            veejay_msg(VEEJAY_MSG_DEBUG, "Ignoring EDL changes in update mode");
+            return 1;
+        }
+    }
+
     veejay_msg(VEEJAY_MSG_DEBUG, "Loading '%s' from current working directory" , files[0] );
 
     sample->edit_list = vj_el_init_with_args( files,1,
@@ -3004,20 +3130,24 @@ int sample_read_edl( sample_info *sample )
 
     if(sample->edit_list)
     {
-        res = 1;
         sample->soft_edl = 0;
 
-        if( old ) {
+        if( old && load_mode == SAMPLE_LOAD_REPLACE ) {
             sample_close_edl( sample->sample_id, old );
         }
+
+        sample->first_frame = 0;
+        sample->last_frame = sample->edit_list->video_frames - 1;
+
+        return 1;
     }
     else 
     {
         sample->edit_list = old;
-        veejay_msg(VEEJAY_MSG_ERROR, "Error loading '%s' from current working directory", files[0] );
+        veejay_msg(VEEJAY_MSG_ERROR, "Failed to load '%s' from current working directory, current editlist is unchanged", files[0] );
     }
 
-    return res;
+    return 0;
 }
 
 static void LoadSubtitles( sample_info *skel, char *file, void *font )
@@ -3028,29 +3158,45 @@ static void LoadSubtitles( sample_info *skel, char *file, void *font )
     vj_font_load_srt( font, tmp );
 }
 
-int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void *el,int *id, int *mode)
+#define XML_RETRY_COUNT 5
+#define XML_RETRY_DELAY_US 1000
+
+static xmlDocPtr read_xml_with_retry(const char *path)
+{
+    xmlDocPtr doc = NULL;
+
+    for (int attempt = 0; attempt < XML_RETRY_COUNT; attempt++) {
+
+        doc = xmlReadFile(path, NULL, XML_PARSE_RECOVER);
+        if (doc)
+            return doc;
+        if (errno != EIO && errno != ENOENT) break;
+
+        usleep(XML_RETRY_DELAY_US);
+    }
+
+    return NULL;
+}
+
+int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void *el, int *id, int *mode, SampleLoadMode load_mode)
 {
     xmlDocPtr doc;
     xmlNodePtr cur;
     sample_info *skel;
 
-    /*
-     * build an XML tree from a the file;
-     */
-    doc = xmlParseFile(sampleFile);
-    if (doc == NULL) 
-        return 0;
+    doc = read_xml_with_retry(sampleFile);
+    if (!doc) return 0;
 
-    /*
-     * Check the document is of the right kind
-     */
+    int start_at = 0;
 
-    int start_at = sample_size();
-    if( start_at <= 0 )
-        start_at = 0;
+    if (load_mode == SAMPLE_LOAD_APPEND) {
+        start_at = sample_size();
+        if (start_at <= 0) start_at = 0;
 
-    if( start_at != 0 )
-        veejay_msg(VEEJAY_MSG_INFO, "Merging %s into current samplelist, auto number starts at %d", sampleFile, start_at );
+        if (start_at != 0) {
+            veejay_msg(VEEJAY_MSG_INFO, "Merging %s into current samplelist, auto number starts at %d", sampleFile, start_at);
+        }
+    }
 
     cur = xmlDocGetRootElement(doc);
     if (cur == NULL) {
@@ -3060,7 +3206,7 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
     }
 
     if (xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLES)) {
-        veejay_msg(VEEJAY_MSG_ERROR, "This is not a samplelist: %s",XMLTAG_SAMPLES);
+        veejay_msg(VEEJAY_MSG_ERROR, "This is not a samplelist: %s", XMLTAG_SAMPLES);
         xmlFreeDoc(doc);
         return 0;
     }
@@ -3074,53 +3220,49 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
     {
         if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLE)) {
             skel = sample_skeleton_new(0, 1);
-            if( skel == NULL )
-                continue;
+            if (skel == NULL) continue;
 
             void *d = vj_font_get_dict(font);
 
-            xmlNodePtr subs = ParseSample( doc, cur->xmlChildrenNode, skel, el, font, start_at ,vp );   
-            if(subs)
-            {
-                LoadSubtitles( skel, sampleFile, font );
-                vj_font_xml_unpack( doc, subs, font );
+            xmlNodePtr subs = ParseSample(doc, cur->xmlChildrenNode, skel, el, font, start_at, vp, *id, load_mode);
+            if (subs) {
+                LoadSubtitles(skel, sampleFile, font);
+                vj_font_xml_unpack(doc, subs, font);
             }
     
-            vj_font_set_dict(font,d);
+            vj_font_set_dict(font, d);
         }
 
-        if( !xmlStrcmp( cur->name, (const xmlChar*) "CURRENT" )) {
-            LoadCurrentPlaying( doc, cur->xmlChildrenNode, &desired_id, &desired_pm );
+        if (!xmlStrcmp(cur->name, (const xmlChar*) "CURRENT")) {
+            LoadCurrentPlaying(doc, cur->xmlChildrenNode, &desired_id, &desired_pm);
         }
 
-        if( !xmlStrcmp( cur->name, (const xmlChar *) "SEQUENCE" )) {
-            LoadSequences( doc, cur->xmlChildrenNode,seq, start_at );
+        if (!xmlStrcmp(cur->name, (const xmlChar *) "SEQUENCE")) {
+            LoadSequences(doc, cur->xmlChildrenNode, seq, start_at);
         }
 
-        if( !xmlStrcmp( cur->name, (const xmlChar*) "stream" )) {
-            tagParseStreamFX( sampleFile, doc, cur->xmlChildrenNode, font,vp );
+        if (!xmlStrcmp(cur->name, (const xmlChar*) "stream")) {
+            tagParseStreamFX(sampleFile, doc, cur->xmlChildrenNode, font, vp, load_mode);
         }
 
-	    cur = cur->next;
+        cur = cur->next;
     }
 
-    if(desired_id > 0 && desired_pm >= 0) {
-        if(desired_pm == 0 && sample_exists(desired_id)) {
+    if (desired_id > 0 && desired_pm >= 0) {
+        if (desired_pm == 0 && sample_exists(desired_id)) {
             *id = desired_id;
             *mode = desired_pm;
         }
-        else if ( desired_pm > 0 && vj_tag_exists(desired_id)) {
+        else if (desired_pm > 0 && vj_tag_exists(desired_id)) {
             *id = desired_id;
             *mode = desired_pm;
         }
-        //TODO: Error some error message
     }
 
     xmlFreeDoc(doc);
 
     sample_sanity_scan();
     vj_tag_sanity_scan();
-
 
     return 1;
 }
@@ -3231,6 +3373,15 @@ void CreateSample(xmlNodePtr node, sample_info * sample, void *font)
     put_xml_int( node, XMLTAG_FADER_VAL, sample->fader_val );
     put_xml_int( node, XMLTAG_FADER_DIRECTION, sample->fader_direction );
     put_xml_int( node, XMLTAG_LASTENTRY, sample->selected_entry );
+    put_xml_int( node, XMLTAG_TRANSITION_SHAPE, sample->transition_shape);
+    put_xml_int( node, XMLTAG_TRANSITION_ACTIVE, sample->transition_active);
+    put_xml_int( node, XMLTAG_TRANSITION_LENGTH, sample->transition_length);
+    put_xml_int( node, XMLTAG_LOOP_STAT, sample->loop_stat);
+    put_xml_int( node, XMLTAG_LOOP_STAT_STOP, sample->loop_stat_stop);
+    put_xml_int( node, XMLTAG_LOOP_PP, sample->loop_pp);
+    put_xml_int( node, XMLTAG_LOOP_PERIODS, sample->loop_periods);
+    put_xml_int( node, XMLTAG_LOOP_DEC, sample->loop_dec);
+
     put_xml_int( node, "subrender", sample->subrender );
 	put_xml_int( node, "loop_stat_stop", sample->loop_stat_stop);
 
@@ -3285,10 +3436,58 @@ static void WriteSubtitles( sample_info *next_sample, void *font, char *file )
     vj_font_set_dict( font, d );
 }
 
+int write_xml_atomic(const char *path, xmlDocPtr doc)
+{
+    char tmp[4096];
+    if (snprintf(tmp, sizeof(tmp), "%s.tmp", path) >= sizeof(tmp)) {
+        return 0;
+     }
+
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd < 0)
+        return 0;
+
+    xmlSaveCtxtPtr ctxt = xmlSaveToFd(fd, "UTF-8", XML_SAVE_FORMAT);
+    if (!ctxt) {
+        close(fd);
+        unlink(tmp);
+        return 0;
+    }
+
+    if (xmlSaveDoc(ctxt, doc) < 0) {
+        xmlSaveClose(ctxt);
+        close(fd);
+        unlink(tmp);
+        return 0;
+    }
+
+    xmlSaveClose(ctxt);
+
+    if (fsync(fd) != 0) {
+        close(fd);
+        unlink(tmp);
+        return 0;
+    }
+
+    close(fd);
+
+    if (rename(tmp, path) != 0) {
+        unlink(tmp);
+        return 0;
+    }
+
+    int dfd = open(".", O_DIRECTORY | O_RDONLY);
+    if (dfd >= 0) {
+        fsync(dfd);
+        close(dfd);
+    }
+
+    return 1;
+}
+
 int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id, int mode)
 {
     int i;
-    const char *encoding = "UTF-8";
     xmlChar *version = xmlCharStrdup("1.0");    
     sample_info *next_sample;
     xmlDocPtr doc;
@@ -3330,10 +3529,163 @@ int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id,
         tag_writeStream( sampleFile, i, childnode, font ,vp);
     }
 
-    xmlSaveFormatFileEnc( sampleFile, doc, encoding, 1 );
+    sample_watch_suppress_next();
+    int ok = write_xml_atomic(sampleFile, doc);
+    if(!ok) {
+        sample_watch_enable_events();
+    }
     xmlFreeDoc(doc);
     xmlFree(version);
 
+    return ok;
+}
+
+#define EVENT_BUF_LEN (1024 * (sizeof(struct inotify_event) + NAME_MAX + 1))
+
+typedef struct {
+    char filepath[PATH_MAX];
+    void *vp, *seq, *font, *el;
+    int *id, *mode;
+} WatcherContext;
+
+static WatcherContext global_ctx;
+static volatile int needs_reload = 0;
+
+static pthread_t active_thread = 0;
+static volatile int watcher_running = 0;
+
+static volatile int suppress_reload = 0;
+
+void sample_watch_suppress_next(void) {
+    atomic_store_int(&suppress_reload, 1);
+}
+
+void sample_watch_enable_events(void) {
+    atomic_store_int(&suppress_reload, 0);
+}
+
+
+static void* watcher_thread_func(void* arg) {
+
+    WatcherContext ctx = global_ctx;
+
+    char dir_path[PATH_MAX];
+    char target_file[NAME_MAX];
+
+    const char *slash = strrchr(ctx.filepath, '/');
+    if (slash) {
+        snprintf(dir_path, sizeof(dir_path), "%.*s", (int)(slash - ctx.filepath), ctx.filepath);
+        snprintf(target_file, sizeof(target_file), "%s", slash + 1);
+    } else {
+        strcpy(dir_path, ".");
+        strcpy(target_file, ctx.filepath);
+    }
+
+    int fd = inotify_init1(IN_NONBLOCK);
+    if (fd < 0)
+        return NULL;
+
+    int wd = inotify_add_watch(fd, dir_path, IN_CLOSE_WRITE | IN_MOVED_TO);
+    if (wd < 0) {
+        close(fd);
+        return NULL;
+    }
+
+    char buffer[EVENT_BUF_LEN];
+
+    while (watcher_running) {
+
+        ssize_t length = read(fd, buffer, sizeof(buffer));
+
+        if (length < 0) {
+            usleep(10000);
+            continue;
+        }
+
+        int i = 0;
+
+        while (i + sizeof(struct inotify_event) <= length) {
+
+            struct inotify_event *event = (struct inotify_event *)&buffer[i];
+            size_t event_size = sizeof(struct inotify_event) + event->len;
+
+            if (i + event_size > length)
+                break;
+
+            if (event->len > 0 && strcmp(event->name, target_file) == 0) {
+
+                if (atomic_exchange_int(&suppress_reload, 0) == 1) {
+                    veejay_msg(VEEJAY_MSG_INFO,
+                        "Suppressed self-generated event for %s", target_file);
+                } else {
+                    usleep(100000);
+                    atomic_store_int(&needs_reload, 1);
+                }
+            }
+
+            i += event_size;
+        }
+    }
+
+    close(fd);
+    return NULL;
+}
+
+static void start_watcher_thread() {
+
+    if (active_thread != 0) {
+        watcher_running = 0;
+        pthread_join(active_thread, NULL);
+        active_thread = 0;
+    }
+
+    watcher_running = 1;
+    pthread_create(&active_thread, NULL, watcher_thread_func, NULL);
+}
+
+int sample_open_and_watch(const char *path,
+                         void *vp, void *seq, void *font,
+                         void *el, int *id, int *mode) {
+
+    strncpy(global_ctx.filepath, path, PATH_MAX);
+    global_ctx.filepath[PATH_MAX-1] = '\0';
+
+    global_ctx.vp = vp;
+    global_ctx.seq = seq;
+    global_ctx.font = font;
+    global_ctx.el = el;
+    global_ctx.id = id;
+    global_ctx.mode = mode;
+
+    if (!sample_readFromFile(global_ctx.filepath,
+                             vp, seq, font, el, id, mode,
+                             SAMPLE_LOAD_UPDATE)) {
+        return 0;
+    }
+
+    start_watcher_thread();
     return 1;
 }
+
+void sample_watch_list(void) {
+
+    if (atomic_exchange_int(&needs_reload, 0) == 1) {
+
+        WatcherContext ctx = global_ctx;
+
+        veejay_msg(VEEJAY_MSG_INFO, "Samplelist change detected! Reloading: %s",ctx.filepath);
+
+        for (int i = 0; i < 5; i++) {
+            if (sample_readFromFile(ctx.filepath,
+                                    ctx.vp, ctx.seq,
+                                    ctx.font, ctx.el,
+                                    ctx.id, ctx.mode,
+                                    SAMPLE_LOAD_UPDATE)) {
+                return;
+            }
+            usleep(200);
+        }
+    }
+}
+
 #endif
