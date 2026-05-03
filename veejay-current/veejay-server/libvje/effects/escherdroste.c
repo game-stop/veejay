@@ -238,7 +238,7 @@ static void escherdroste_apply1(void *ptr, VJFrame *frame, int *args) {
     uint8_t *restrict srcU = frame->data[1];
     uint8_t *restrict srcV = frame->data[2];
 
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int i = 0; i < size; i++) {
         float dist_rect = FROM_FP(t->v_lut[i]);
         float edge_u = FROM_FP(t->u_lut[i]);
@@ -312,7 +312,7 @@ static void escherdroste_apply2(void *ptr, VJFrame *frame, int *args) {
     uint8_t *restrict srcU = frame->data[1];
     uint8_t *restrict srcV = frame->data[2];
 
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int i = 0; i < size; i++) {
         float log_r = FROM_FP(t->v_lut[i]);
         float theta = FROM_FP(t->u_lut[i]);

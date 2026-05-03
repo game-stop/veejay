@@ -17,6 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+#include <config.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -24,6 +25,7 @@
 #include <veejaycore/defs.h>
 #include <libvje/vje.h>
 #include <veejaycore/vjmem.h>
+#include "common.h"
 
 #define FLOW_SHIFT 4                   
 #define FLOW_SIZE (1 << FLOW_SHIFT)    
@@ -42,6 +44,8 @@ typedef struct {
     int *flow_y1;
     int *flow_x2; 
     int *flow_y2;
+
+    int n_threads;
 } morph_t;
 
 vj_effect *morphologymixer_init(int w, int h)
@@ -97,37 +101,10 @@ void morphologymixer_free(void *ptr)
     morph_t *m = (morph_t*) ptr;
     if(m) {
         if(m->tmpY) free(m->tmpY);
-        if(m->tmpCb) free(m->tmpCb);
-        if(m->tmpCr) free(m->tmpCr);
         if(m->flow_x1) free(m->flow_x1);
-        if(m->flow_y1) free(m->flow_y1);
         if(m->flow_x2) free(m->flow_x2);
-        if(m->flow_y2) free(m->flow_y2);
         free(m);
     }
-}
-
-void *morphologymixer_malloc1(int w, int h) 
-{
-    morph_t *m = (morph_t*) vj_calloc(sizeof(morph_t));
-    if(!m) return NULL;
-    
-    int size = w * h;
-    m->tmpY  = (uint8_t*) vj_calloc(size);
-    m->tmpCb = (uint8_t*) vj_calloc(size);
-    m->tmpCr = (uint8_t*) vj_calloc(size);
-    
-    int full_int_size = w * h * sizeof(int); 
-    
-    m->flow_x1 = (int*) vj_calloc(full_int_size);
-    m->flow_y1 = (int*) vj_calloc(full_int_size);
-    m->flow_x2 = (int*) vj_calloc(full_int_size);
-    m->flow_y2 = (int*) vj_calloc(full_int_size);
-    
-    m->grid_w = (w >> FLOW_SHIFT) + 2;
-    m->grid_h = (h >> FLOW_SHIFT) + 2;
-    
-    return (void*) m;
 }
 
 void *morphologymixer_malloc(int w, int h)
@@ -138,20 +115,22 @@ void *morphologymixer_malloc(int w, int h)
 
     const int size = w * h;
 
-    m->tmpY  = (uint8_t*) vj_calloc(size);
-    m->tmpCb = (uint8_t*) vj_calloc(size);
-    m->tmpCr = (uint8_t*) vj_calloc(size);
+    m->tmpY  = (uint8_t*) vj_calloc(size * 3);
+    m->tmpCb = m->tmpY + size;
+    m->tmpCr = m->tmpCb + size;
 
     m->grid_w = (w >> FLOW_SHIFT) + 2;
     m->grid_h = (h >> FLOW_SHIFT) + 2;
 
     const int gsize = m->grid_w * m->grid_h * sizeof(int);
 
-    m->flow_x2 = (int*) vj_calloc(gsize);
-    m->flow_y2 = (int*) vj_calloc(gsize);
+    m->flow_x2 = (int*) vj_calloc(gsize * 2);
+    m->flow_y2 = m->flow_x2 + gsize;
 
-    m->flow_x1 = (int*) vj_calloc(size * sizeof(int));
-    m->flow_y1 = (int*) vj_calloc(size * sizeof(int));
+    m->flow_x1 = (int*) vj_calloc(size * sizeof(int) * 2);
+    m->flow_y1 = m->flow_x1 + size;
+
+    m->n_threads = vje_advise_num_threads(size);
 
     return (void*) m;
 }
@@ -201,7 +180,7 @@ void morphologymixer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args
 
     if(warp_amt <= 0)
     {
-        #pragma omp parallel for schedule(static)
+        #pragma omp parallel for schedule(static) num_threads(m->n_threads)
         for(int i = 0; i < size; i++)
         {
             Y[i]  = (sY[i]  * inv_progress + Y2[i]  * progress) >> 8;
@@ -215,7 +194,7 @@ void morphologymixer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args
     {
         const int gain = response + 32;
 
-        #pragma omp parallel for schedule(static)
+        #pragma omp parallel for schedule(static) num_threads(m->n_threads)
         for(int y = 0; y < h; y++)
         {
             const int row = y * w;
@@ -260,7 +239,7 @@ void morphologymixer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args
 
         const int soften = 256 - (stability >> 1);
 
-        #pragma omp parallel for schedule(static)
+        #pragma omp parallel for schedule(static) num_threads(m->n_threads)
         for(int gy = 0; gy < m->grid_h; gy++)
         {
             int y = gy << FLOW_SHIFT;
@@ -292,7 +271,7 @@ void morphologymixer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args
             }
         }
 
-        #pragma omp parallel for schedule(static)
+        #pragma omp parallel for schedule(static) num_threads(m->n_threads)
         for(int y = 0; y < h; y++)
         {
             int gy  = y >> FLOW_SHIFT;
@@ -358,7 +337,7 @@ void morphologymixer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args
         const int impact = ((warp_amt * (response + 32)) >> 8);
         const int persistence = 96 + ((stability * 156) >> 8);
 
-        #pragma omp parallel for schedule(static)
+        #pragma omp parallel for schedule(static) num_threads(m->n_threads)
         for(int y = 1; y < h - 1; y++)
         {
             int row = y * w;

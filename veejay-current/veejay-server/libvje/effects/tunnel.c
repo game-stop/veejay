@@ -71,7 +71,7 @@ static void generate_geometry(box_tunnel_t *t, int shape) {
     float cy = t->height * 0.5f;
     int size = t->width * t->height;
 
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int y = 0; y < t->height; y++) {
         for (int x = 0; x < t->width; x++) {
 
@@ -404,7 +404,7 @@ void tunnel_apply(void *ptr, VJFrame *frame, int *args) {
     int32_t current_inv_fb = FP_ONE - fb_fp;
     int32_t current_inv_chroma_fb = FP_ONE - chroma_fb_fp;
 
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int i = 0; i < size; i++) {
 
         float u_base = FROM_FP(t->u_lut[i]);
