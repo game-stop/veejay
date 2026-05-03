@@ -77,6 +77,8 @@ void *vj_macro_new(void)
 
 void vj_macro_free(void *ptr)
 {
+	if(ptr == NULL)
+		return;
 	vj_macro_t *macro = (vj_macro_t*) ptr;
 	for(macro->current_bank = 0; macro->current_bank < MAX_MACRO_BANKS; macro->current_bank ++ ) {
 		vj_macro_clear(ptr);
