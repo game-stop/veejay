@@ -2353,9 +2353,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	
     if( info->settings->action_scheduler.sl && info->settings->action_scheduler.state )
 	{
-		if(sample_readFromFile( info->settings->action_scheduler.sl,
+		if(sample_open_and_watch( info->settings->action_scheduler.sl,
 		                       info->composite,
-		                       info->seq, info->font, el, &(info->uc->sample_id), &(info->uc->playback_mode) ) )
+		                       info->seq, info->font, el, &(info->uc->sample_id), &(info->uc->playback_mode)) )
 			veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s from actionfile - ",
 			           info->settings->action_scheduler.sl );
 	}
@@ -2521,7 +2521,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
             snprintf(skel->descr, SAMPLE_MAX_DESCR_LEN, "%s", sample_name);
             free (sample_name);
           }
-					sample_store(skel);
+					sample_store(skel,0);
 				}
 			}
 		}
@@ -2731,7 +2731,22 @@ static void vj_audio_setup_rt_thread(video_playback_setup *settings) {
 		return;
 	}
 
+}
 
+static void vj_suggest_fit_preview_size(int w, int h, int *out_w, int *out_h)
+{
+    const int max_w = 500;
+    const int max_h = 300;
+
+    double scale_w = (double)max_w / (double)w;
+    double scale_h = (double)max_h / (double)h;
+
+    double s = (scale_w < scale_h) ? scale_w : scale_h;
+
+    if (s > 1.0) s = 1.0;
+
+    *out_w = (int)(w * s);
+    *out_h = (int)(h * s);
 }
 
 static void veejay_producer_initialize_playmode(veejay_t *info) {
@@ -2748,12 +2763,18 @@ static void veejay_producer_initialize_playmode(veejay_t *info) {
     }
 
     if(info->load_sample_file ) {
-        if(sample_readFromFile( info->action_file[1],info->composite,info->seq,info->font,info->edit_list,
-             &(info->uc->sample_id), &(info->uc->playback_mode)  ))
+		int last_edited_sample, last_edited_mode;
+        if(sample_open_and_watch( info->action_file[1],info->composite,info->seq,info->font,info->edit_list,
+             &last_edited_sample, &last_edited_mode))
         {
+			int pw,ph;
             veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s", info->action_file[1]);
+			veejay_msg(VEEJAY_MSG_INFO, "Watching for changes (auto-reload enabled)");
+			vj_suggest_fit_preview_size( info->video_output_width, info->video_output_height, &pw,&ph);
+			veejay_msg(VEEJAY_MSG_INFO, "You can start another veejay for offline editing:");
+			veejay_msg(VEEJAY_MSG_INFO, "  veejay -w %d -h %d -l %s [options]", pw, ph, info->action_file[1]);
         } else {
-            veejay_msg(VEEJAY_MSG_WARNING, "File %s is not a sample file", info->action_file[1]);
+            veejay_msg(VEEJAY_MSG_WARNING, "Failed to load sample list %s", info->action_file[1]);
         }
     }
 
@@ -3212,6 +3233,7 @@ static void *veejay_producer_thread_loop(void *ptr)
 		info->stats.xruns = atomic_load_int(&settings->xruns);
 
 		veejay_consume_events(info);
+		sample_watch_list();
     }
 
     pthread_exit(NULL);
@@ -3995,7 +4017,7 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 		if(sample)
 		{
 			sample->edit_list = sample_edl;
-			sample_store(sample);
+			sample_store(sample,0);
 		//	sample->speed = info->settings->current_playback_speed;
 			veejay_msg(VEEJAY_MSG_INFO,"Created new sample %d from file %s",sample->sample_id,	files[0]);
 		}
