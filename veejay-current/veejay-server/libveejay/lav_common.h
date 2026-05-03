@@ -39,7 +39,7 @@
 #include "mjpeg_logging.h"
 
 
-#define MAX_EDIT_LIST_FILES 4096
+#define MAX_EDIT_LIST_FILES 64
 #define MAX_JPEG_LEN (3*576*768/2)
 
 #define BUFFER_ALIGN 16
