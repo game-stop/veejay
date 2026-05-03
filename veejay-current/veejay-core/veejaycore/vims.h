@@ -347,6 +347,6 @@ enum {
 #define VEEJAY_PORT_MAT 2
 #define VEEJAY_PORT_OSC 6
 
-#define MAX_EDIT_LIST_FILES 4096
+#define MAX_EDIT_LIST_FILES 64
 #define MAX_SPEED_AV    16
 #endif
