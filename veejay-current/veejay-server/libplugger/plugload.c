@@ -800,14 +800,14 @@ void	*plug_activate( int fx_id )
 		veejay_msg(0,"Plugin %d is not loaded",fx_id);
 		return NULL;
 	}
-
+	char *plugname = plug_get_name( fx_id );
 	void *instance = instantiate_plugin( index_map_[fx_id], base_width_,base_height_);
 	if( instance == NULL ) {
-		char *plugname = plug_get_name( fx_id );
 		veejay_msg(VEEJAY_MSG_DEBUG, "Instantiating plugin '%s' failed due to an error", plugname);
-		if(plugname) free(plugname);
-		return NULL;
 	}
+
+	if(plugname)
+		free(plugname);
 	return instance;
 }
 
