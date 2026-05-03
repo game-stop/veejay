@@ -214,7 +214,7 @@ int sample_init_encoder(int sample_id, char *filename, int format, VJFrame *fram
 	si  = sample_get(sample_id);
 	if(!si)
 	{
-		 return -1; 
+		 return -1;
 	}
 	if(format < 0 || format > NUM_ENCODERS)
 	{
