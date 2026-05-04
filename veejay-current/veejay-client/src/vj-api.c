@@ -5084,7 +5084,6 @@ static void load_effectchain_info(void)
     info->uc.reload_hint_checksums[HINT_CHAIN] = checksum;
 
     GtkListStore *store;
-    gchar toggle[4];
     guint arr[VIMS_CHAIN_LIST_ENTRY_VALUES];
     GtkTreeIter iter;
     gint offset=0;
@@ -5147,7 +5146,6 @@ static void load_effectchain_info(void)
 
         // time to fill current entry
         char *name = _effect_get_description( arr[1] );
-        snprintf(toggle,sizeof(toggle),"%s",arr[3] == 1 ? "on" : "off" );
 
         if( last_index == arr[0])
         {
