@@ -6239,6 +6239,9 @@ static void setup_vimslist(void)
                                          VIMS_ID, GTK_SORT_ASCENDING);
 }
 
+
+//~ WIP TODO interactive search on both VIMS id and description
+//~ if search lookup is string search for description if is number search for ID
 gboolean on_bundle_interactive_search(GtkTreeView *treeview,
                                      gpointer user_data)
 {
@@ -6279,6 +6282,8 @@ static void setup_bundles(void)
     gtk_tree_selection_set_select_function(selection, view_bundle_selection_func, NULL, NULL);
     gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 
+//~ WIP TODO interactive search on both VIMS id and description
+//~ if search lookup is string search for description if is number search for ID
     gboolean kjdhfkj = gtk_tree_view_get_enable_search( GTK_TREE_VIEW(tree) );
     guint sigjdf = g_signal_connect(tree,
                      "start_interactive_search",
@@ -6952,7 +6957,7 @@ cleanup:
 
 static int should_enable_drop_frame_timecode(float fps)
 {
-    float corrected = fps * 1001.0f / 1000.0f;
+    //~ float corrected = fps * 1001.0f / 1000.0f;
 
     return (
         fabs(fps - 29.97f) < 0.01f ||
@@ -8582,7 +8587,7 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
     }
 
     gtk_css_provider_load_from_data(override, runtime_css, -1, NULL);
-    g_free(runtime_css);
+    g_free((gchar *)runtime_css);
 #endif
 
     g_object_unref(base);
