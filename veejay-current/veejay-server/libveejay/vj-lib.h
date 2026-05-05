@@ -425,6 +425,7 @@ typedef struct {
     int auto_deinterlace;
     int load_action_file;
     int load_sample_file;
+	int is_master;
     editlist *current_edit_list;
     editlist *edit_list;
     editlist *plain_editlist;
@@ -461,6 +462,9 @@ typedef struct {
     int last_tag_id;
     int nstreams;
     int sfd;
+	char *server_origin;
+	char *master_origin;
+	int master_origin_port;
     vj_server *vjs[4]; /* 0=cmd, 1 = sta, 2 = mcast, 3 = msg */
     int net;
     int render_entry;

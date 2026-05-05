@@ -2353,11 +2353,15 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	
     if( info->settings->action_scheduler.sl && info->settings->action_scheduler.state )
 	{
+		int initial_sample = info->uc->sample_id;
+		int initial_mode = info->uc->playback_mode;
 		if(sample_open_and_watch( info->settings->action_scheduler.sl,
 		                       info->composite,
-		                       info->seq, info->font, el, &(info->uc->sample_id), &(info->uc->playback_mode)) )
-			veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s from actionfile - ",
-			           info->settings->action_scheduler.sl );
+		                       info->seq, info->font, el, &initial_sample, &initial_mode) )
+			veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s from actionfile (mode %d, sample %d)",
+			           info->settings->action_scheduler.sl, initial_mode, initial_sample );
+		info->uc->playback_mode = initial_mode;
+		info->uc->sample_id = initial_sample;
 	}
 
 	if( settings->action_scheduler.state )
@@ -2490,9 +2494,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		{
 			return -1;
 		}
-
-		info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
-		info->uc->sample_id = nid;
+		if(!info->load_sample_file && !info->load_action_file) {
+			info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
+			info->uc->sample_id = nid;
+		}
 	
 	}
 	else if( info->uc->file_as_sample && id <= 0)
@@ -2525,10 +2530,12 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 				}
 			}
 		}
-		info->uc->playback_mode = VJ_PLAYBACK_MODE_SAMPLE;
-		info->uc->sample_id = 1;
+		if(!info->load_sample_file && !info->load_action_file) {
+			info->uc->playback_mode = VJ_PLAYBACK_MODE_SAMPLE;
+			info->uc->sample_id = 1;
+		}
 	}
-	else if(info->dummy->active && id <= 0)
+	else if(info->dummy->active && id <= 0 && !info->load_sample_file && !info->load_action_file)
 	{
 		int dummy_id;
 		/* Use dummy mode, action file could have specified something */
@@ -2751,33 +2758,7 @@ static void vj_suggest_fit_preview_size(int w, int h, int *out_w, int *out_h)
 
 static void veejay_producer_initialize_playmode(veejay_t *info) {
 	video_playback_setup *settings = info->settings;
-
-    if(info->load_action_file)
-    {
-        if(veejay_load_action_file(info, info->action_file[0] ))
-        {
-            veejay_msg(VEEJAY_MSG_INFO, "Loaded configuration file %s", info->action_file[0] );
-        } else {
-            veejay_msg(VEEJAY_MSG_WARNING, "File %s is not an action file", info->action_file[0]);
-        }
-    }
-
-    if(info->load_sample_file ) {
-		int last_edited_sample, last_edited_mode;
-        if(sample_open_and_watch( info->action_file[1],info->composite,info->seq,info->font,info->edit_list,
-             &last_edited_sample, &last_edited_mode))
-        {
-			int pw,ph;
-            veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s", info->action_file[1]);
-			veejay_msg(VEEJAY_MSG_INFO, "Watching for changes (auto-reload enabled)");
-			vj_suggest_fit_preview_size( info->video_output_width, info->video_output_height, &pw,&ph);
-			veejay_msg(VEEJAY_MSG_INFO, "You can start another veejay for offline editing:");
-			veejay_msg(VEEJAY_MSG_INFO, "  veejay -w %d -h %d -l %s [options]", pw, ph, info->action_file[1]);
-        } else {
-            veejay_msg(VEEJAY_MSG_WARNING, "Failed to load sample list %s", info->action_file[1]);
-        }
-    }
-
+ 
 	switch(info->uc->playback_mode)
     {
         case VJ_PLAYBACK_MODE_PLAIN:
@@ -3159,8 +3140,8 @@ static void *veejay_producer_thread_loop(void *ptr)
 
     veejay_msg(VEEJAY_MSG_DEBUG, "[PRODUCER] Wait for playback to reach anchor");
 
-	veejay_producer_initialize_playmode(info);
     veejay_set_speed(info, 1, 0);
+	veejay_producer_initialize_playmode(info);
 
     atomic_store_int(&settings->audio_mode, AUDIO_MODE_CONTENT);
     atomic_store_long_long(&settings->master_frame_num, 0);
@@ -3328,6 +3309,9 @@ int vj_server_setup(veejay_t * info)
 	{
 		GoMultiCast( info->settings->group_name );
 	}
+
+	info->server_origin = vj_server_find_best_ip();
+	veejay_msg(VEEJAY_MSG_DEBUG, "Listening to VIMS on %s", info->server_origin);
 
 	info->osc = (void*) vj_osc_allocate(info->uc->port+6);
 
@@ -3621,6 +3605,35 @@ int veejay_main(veejay_t *info)
             veejay_msg(VEEJAY_MSG_WARNING, "[DISPLAY] Unable to pin display/renderer thread to CPU #1.");
         } else {
             veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Thread affinity set to CPU #1.");
+        }
+    }
+
+	if(info->load_action_file)
+    {
+        if(veejay_load_action_file(info, info->action_file[0] ))
+        {
+            veejay_msg(VEEJAY_MSG_INFO, "Loaded configuration file %s", info->action_file[0] );
+        } else {
+            veejay_msg(VEEJAY_MSG_WARNING, "File %s is not an action file", info->action_file[0]);
+        }
+    }
+
+    if(info->load_sample_file ) {
+		int initial_sample = info->uc->sample_id;
+		int initial_mode = info->uc->playback_mode;
+        if(sample_open_and_watch( info->action_file[1],info->composite,info->seq,info->font,info->edit_list,
+             &initial_sample, &initial_mode))
+        {
+			int pw,ph;
+            veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s", info->action_file[1]);
+			veejay_msg(VEEJAY_MSG_INFO, "Watching for changes (auto-reload enabled)");
+			vj_suggest_fit_preview_size( info->video_output_width, info->video_output_height, &pw,&ph);
+			veejay_msg(VEEJAY_MSG_INFO, "You can start another veejay for offline editing:");
+			veejay_msg(VEEJAY_MSG_INFO, "  veejay -w %d -h %d -l %s [options]", pw, ph, info->action_file[1]);
+			info->uc->sample_id = initial_sample;
+			info->uc->playback_mode = initial_mode;
+        } else {
+            veejay_msg(VEEJAY_MSG_WARNING, "Failed to load sample list %s", info->action_file[1]);
         }
     }
 

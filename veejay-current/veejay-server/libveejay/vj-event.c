@@ -6820,7 +6820,7 @@ void vj_event_tag_del(void *ptr, const char format[] , va_list ap )
                 }
             }
 
-            if(vj_tag_del(args[0]))
+            if(vj_tag_del(args[0],0))
             {
                 veejay_msg(VEEJAY_MSG_INFO, "Deleted stream %d", args[0]);
                 vj_tag_verify_delete( args[0], 1 );

@@ -89,11 +89,17 @@ void vj_macro_free(void *ptr)
 
 void vj_macro_set_status(void *ptr, uint8_t status)
 {
+	if(ptr == NULL) {
+		veejay_msg(0,"Invalid state for macro");
+		return;
+	}
 	vj_macro_t *macro = (vj_macro_t*) ptr;
 	macro->status = status;
 }
 
 uint8_t vj_macro_get_status(void *ptr) {
+	if(ptr == NULL)
+		return 0;
 	vj_macro_t *macro = (vj_macro_t*) ptr;
 	return macro->status;
 }

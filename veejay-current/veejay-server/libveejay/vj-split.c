@@ -102,7 +102,7 @@ static int server_port = 0;
 
 void	vj_split_set_master(int port)
 {
-	server_ip = vj_server_my_ip();
+	server_ip = vj_server_find_best_ip();
 	server_port = port;
 }
 

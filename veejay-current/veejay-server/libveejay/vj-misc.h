@@ -55,4 +55,6 @@ void	free_media_files( veejay_t *info, filelist_t *fl );
 
 int vj_get_sample_display_name(char **dest, const char *filename);
 
+char *vj_read_file_to_buffer(const char *path, size_t *out_size);
+
 #endif

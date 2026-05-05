@@ -447,3 +447,44 @@ int vj_get_sample_display_name(char **destination, const char *filename)
 
     return 1;
 }
+
+char *vj_read_file_to_buffer(const char *path, size_t *out_size)
+{
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return NULL;
+
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return NULL;
+    }
+
+    long size = ftell(f);
+    if (size < 0) {
+        fclose(f);
+        return NULL;
+    }
+
+    rewind(f);
+
+    char *buffer = vj_malloc((size_t)size + 1);
+    if (!buffer) {
+        fclose(f);
+        return NULL;
+    }
+
+    size_t read_size = fread(buffer, 1, (size_t)size, f);
+    fclose(f);
+
+    if (read_size != (size_t)size) {
+        free(buffer);
+        return NULL;
+    }
+
+    buffer[size] = '\0';
+
+    if (out_size)
+        *out_size = (size_t)size;
+
+    return buffer;
+}
