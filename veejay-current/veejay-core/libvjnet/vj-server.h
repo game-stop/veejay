@@ -48,6 +48,12 @@ typedef struct vj_server_t {
     unsigned int recv_bufsize;
 } vj_server;
 
+typedef struct {
+    char origin_id[256];
+    char ip[INET_ADDRSTRLEN];
+    int  port;
+} vj_origin_info;
+
 vj_server *vj_server_alloc(int port, char *mcast_group_name, int type, size_t recv_max_len);
 
 int vj_server_update(vj_server * vje, int link_id);
@@ -61,8 +67,6 @@ int vj_server_poll(vj_server * vje);
 int vj_server_send(vj_server *vje, int link_id, uint8_t *buf, int len);
 
 int vj_server_send_frame(vj_server *vje, int link_id, uint8_t *buf, int total_len, VJFrame *frame);
-
-int	vj_server_init(void);
 
 int _vj_server_del_client(vj_server * vje, int link_id);
 
@@ -84,6 +88,6 @@ int	vj_server_link_can_write( vj_server *vje, int link_id );
 
 int	vj_server_link_can_read( vj_server *vje, int link_id);
 
-char   *vj_server_my_ip();
+char *vj_server_find_best_ip();
 
 #endif

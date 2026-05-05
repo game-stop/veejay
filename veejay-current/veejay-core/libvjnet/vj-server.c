@@ -30,6 +30,8 @@
 #include <netinet/tcp.h>
 #include <netdb.h>
 #include <errno.h>
+#include <ifaddrs.h>
+#include <arpa/inet.h>
 
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
@@ -1073,69 +1075,69 @@ char *vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
 	return msg;
 }
 
+static int score_ip_address(const char *ip) {
+    if (strncmp(ip, "127.", 4) == 0) return 0;
+    if (strncmp(ip, "169.254.", 8) == 0) return 1;
+	if (strncmp(ip, "192.168.", 8) == 0 || 
+        strncmp(ip, "10.", 3) == 0 || 
+        strncmp(ip, "172.", 4) == 0) return 3;
 
-char *vj_server_my_ip()
+	return 2;
+}
+
+char *vj_server_find_best_ip()
 {
-	struct addrinfo h;
+    struct ifaddrs *ifaddr, *ifa;
+    char *best_ip = NULL;
+    int best_score = -1;
 
-	char hostname[512];
-	if( gethostname(hostname,sizeof(hostname)) < 0 ) {
-		return NULL;
-	}
+    if (getifaddrs(&ifaddr) == -1) return NULL;
 
-	const char *target = "8.8.8.8"; //google public dns
-	const char *port = "53";
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+        if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET) continue;
 
-	veejay_memset(&h,0,sizeof(h));
-	h.ai_family = AF_INET;
-	h.ai_socktype = SOCK_STREAM;
-
-	struct addrinfo* info;
-	int ret = 0;
-	if((ret = getaddrinfo( target, port, &h, &info )) != 0 ) {
-		return NULL;
-	}
-
-	if( info->ai_family == AF_INET6 ) {
-		return NULL;
-	}
-
-	int sock = socket( info->ai_family, info->ai_socktype, info->ai_protocol);
-	if( sock <= 0 )
-		return NULL;
-
-    struct timeval timeout;
-    timeout.tv_sec = 10;
-    timeout.tv_usec = 0;
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(sock, &fds);
-
-    if (select(sock + 1, NULL, &fds, NULL, &timeout) <= 0) {
-    	veejay_msg(0, "Timeout");
-		close(sock);
-        return NULL;
+        char host[INET_ADDRSTRLEN];
+        if (inet_ntop(AF_INET, &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr, 
+                      host, sizeof(host))) {
+            int score = score_ip_address(host);
+            if (score > best_score) {
+                best_score = score;
+                if (best_ip) free(best_ip);
+                best_ip = vj_strdup(host);
+            }
+        }
     }
 
-	if( connect(sock, info->ai_addr, info->ai_addrlen ) < 0 ) {
-		close(sock);
-		return NULL;
-	}
+    freeifaddrs(ifaddr);
+    return best_ip;
+}
 
-	struct sockaddr_in local;
-	veejay_memset(&local,0,sizeof(local));
-	socklen_t len = sizeof(local);
-	if( getsockname( sock, (struct sockaddr*)&local, &len ) < 0 ) {
-		close(sock);
-		return NULL;
-	}
+vj_origin_info vj_server_get_origin_info(vj_server *vjs)
+{
+    vj_origin_info info;
+    veejay_memset(&info, 0, sizeof(vj_origin_info));
 
-	char tmp[INET_ADDRSTRLEN ];
-	if( inet_ntop( local.sin_family, &(local.sin_addr), tmp, sizeof(tmp))==NULL) {
-		return NULL;
-	}
+    char hostname[128];
+    if (gethostname(hostname, sizeof(hostname)) < 0) {
+        snprintf(hostname, sizeof(hostname), "veejay-node");
+    } else {
+        hostname[sizeof(hostname) - 1] = '\0';
+    }
 
-	close(sock);
+    snprintf(info.origin_id, sizeof(info.origin_id), "%s:%u", 
+             hostname, ntohs(vjs->myself.sin_port));
 
-	return vj_strdup(tmp);
+    char *ip_str = vj_server_find_best_ip();
+    if (ip_str) { 
+        snprintf(info.ip, sizeof(info.ip), "%s", ip_str);
+        free(ip_str);
+    } else {
+        snprintf(info.ip, sizeof(info.ip), "127.0.0.1");
+    }
+
+    info.port = ntohs(vjs->myself.sin_port);
+    
+    // info.protocol_version = //FIXME
+
+    return info;
 }
