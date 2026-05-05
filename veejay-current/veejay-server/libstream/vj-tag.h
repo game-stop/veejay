@@ -69,7 +69,7 @@ typedef struct {
 
 typedef struct {
     int id;
-//      char description[100];
+    sample_eff_chain *main_fx;
     sample_eff_chain *effect_chain[SAMPLE_MAX_EFFECTS];
     int next_id;
     int nframes;
@@ -186,7 +186,7 @@ void vj_tag_sanity_scan(void);
 int vj_tag_find_refs_and_delete(int source_type, int id);
 
 /* return 1 if tag gets deleted, 0 on error */
-int 	vj_tag_del(int id);
+int 	vj_tag_del(int id, int skip_cleanup);
 
 int	vj_tag_verify_delete(int id, int type );
 

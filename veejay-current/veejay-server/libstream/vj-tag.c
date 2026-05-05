@@ -943,7 +943,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     float fps = _tag_info->effect_frame1->fps;
 
     vj_tag *tag;
-  
+    
     if( this_tag_id == 0)
     {
         this_tag_id = 1; // first tag
@@ -973,8 +973,13 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
         return -1;
     }
 
+    sample_eff_chain *fx_chain = (sample_eff_chain*) vj_calloc(sizeof(sample_eff_chain) * SAMPLE_MAX_EFFECTS );
+    if(!fx_chain) {
+        return -1;
+    }
+
     id = _new_id();
-   
+    tag->main_fx = fx_chain;
     tag->id = id;
     tag->extra = NULL;
     tag->next_id = 0;
@@ -1039,7 +1044,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
             break;
         case VJ_TAG_TYPE_MCAST:
         case VJ_TAG_TYPE_NET:
-            snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename );
+            snprintf(tag->source_name,SOURCE_NAME_LEN, "%s:%d", filename, channel );
             if( _vj_tag_new_net( tag,stream_nr, w,h,pix_fmt, filename, channel ,palette,type) != 1 ) {
                 goto TAG_NEW_FAILED;
             }
@@ -1137,6 +1142,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
                     if(tag->method_filename) 
                         free(tag->method_filename);
                     free(tag);
+                    free(fx_chain);
                     return -1;
             }
             int tmp = 0;
@@ -1211,11 +1217,9 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
 
     vj_tag_get_by_type( tag->id, tag->source_type, tag->descr);
 
-    /* effect chain is empty */
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
     {
-        tag->effect_chain[i] =
-            (sample_eff_chain *) vj_calloc(sizeof(sample_eff_chain));
+        tag->effect_chain[i] = &fx_chain[i];
         tag->effect_chain[i]->effect_id = -1;
         tag->effect_chain[i]->e_flag = 0;
         tag->effect_chain[i]->speed = INT_MAX;
@@ -1272,6 +1276,8 @@ TAG_NEW_FAILED:
     tag_cache[id] = NULL;
 
     _recyle_id(id);
+
+    free(fx_chain);
 
     free(tag);
                 
@@ -1341,7 +1347,7 @@ int vj_tag_verify_delete(int id, int type )
     return 1;
 }
 
-int vj_tag_del_internal(vj_tag *tag)
+int vj_tag_del_internal(vj_tag *tag, int skip_cleanup)
 {
     if(!tag)
         return 0;
@@ -1432,10 +1438,14 @@ int vj_tag_del_internal(vj_tag *tag)
     if( tag->lfv ) free(tag->lfv);
     if(tag->extra) free(tag->extra);
 
-    if(tag->encoder_active)
-        vj_tag_stop_encoder( tag->id ); 
-    if(tag->source_name) 
+    if(!skip_cleanup && (tag->encoder || tag->encoder_file)) {
+        vj_tag_stop_encoder( tag->id );
+    }
+
+    if(tag->source_name) {
         free(tag->source_name);
+        tag->source_name = NULL;
+    }
     
     if(tag->method_filename) 
     {
@@ -1444,12 +1454,13 @@ int vj_tag_del_internal(vj_tag *tag)
     }
 
     for (int i = 0; i < SAMPLE_MAX_EFFECTS; i++)  {
-        if (tag->effect_chain[i]) {
-            if( tag->effect_chain[i]->kf )
-                vpf(tag->effect_chain[i]->kf);
-            free(tag->effect_chain[i]);
-        }
-        tag->effect_chain[i] = NULL;
+        if( tag->effect_chain[i]->kf )
+            vpf(tag->effect_chain[i]->kf);
+    }
+
+    if(tag->main_fx) {
+       free(tag->main_fx);
+       tag->main_fx = NULL;
     }
 
     vj_macro_free( tag->macro );
@@ -1527,7 +1538,7 @@ int vj_tag_find_refs_and_delete(int source_type, int id) {
     }
 }
 
-int vj_tag_del(int id)
+int vj_tag_del(int id, int skip_cleanup)
 {
     vj_tag *tag = vj_tag_get(id);
     if (!tag)
@@ -1544,7 +1555,7 @@ int vj_tag_del(int id)
 
     tag_cache[id] = NULL;
 
-    vj_tag_del_internal(tag);
+    vj_tag_del_internal(tag,skip_cleanup);
 
     recount_hash = 1;
 
@@ -1565,7 +1576,7 @@ void vj_tag_close_all(void)
         vj_tag *tag = (vj_tag *) hnode_get(node);
         hash_scan_delete(TagHash, node);
 
-        vj_tag_del_internal(tag);
+        vj_tag_del_internal(tag,0);
     }
 
     veejay_memset(avail_tag, 0, sizeof(avail_tag));
@@ -1768,21 +1779,25 @@ int vj_tag_stop_encoder(int t1) {
    vj_tag *tag = vj_tag_get(t1);
    if(!tag)
    {
-     veejay_msg(VEEJAY_MSG_ERROR, "Tag %d does not exist", t1);
-     return -1;
+        veejay_msg(VEEJAY_MSG_ERROR, "Tag %d does not exist", t1);
+        return 0;
    }
-   if(tag->encoder_active) {
-    if(tag->encoder_file)
-           lav_close(tag->encoder_file);
-        if(tag->encoder)
-           vj_avcodec_stop( tag->encoder, tag->encoder_format );
+   
+   if(tag->encoder_file) {
+        lav_close(tag->encoder_file);
+        tag->encoder_file = NULL;
+    }
+    
+    if(tag->encoder) {
+        vj_avcodec_stop( tag->encoder, tag->encoder_format );
+        tag->encoder = NULL;
+    }
+
     tag->encoder = NULL;
     tag->encoder_file = NULL; 
     tag->encoder_active = 0;
-    return 1;
-   }
 
-   return 0;
+    return 1;
 }
 
 void vj_tag_reset_encoder(int t1)
@@ -3849,10 +3864,10 @@ static void tagParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg)
         cur = cur->next;
     }
 }
-static  int tagParseKeys( xmlDocPtr doc, xmlNodePtr cur, void *port )
+static  void tagParseKeys( xmlDocPtr doc, xmlNodePtr cur, void *port )
 {
     if(!cur)
-        return 0;
+        return;
 
     while (cur != NULL)
     {
@@ -3861,20 +3876,21 @@ static  int tagParseKeys( xmlDocPtr doc, xmlNodePtr cur, void *port )
             keyframe_xml_unpack( doc, cur->xmlChildrenNode, port );
         }
         cur = cur->next;
-        }
-    return 1;
+    }
 }
 
-static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int identity)
+static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, vj_tag *tag, int identity)
 {
     int effect_id = -1;
     int arg[SAMPLE_MAX_PARAMETERS];
     int source_type = 0;
     int channel = 0;
-    int e_flag = 0;
-    int anim= 0;
-    int anim_type = 0;
+    int e_flag = 0, a_flag = 0;
+    int kf_status = 0;
+    int kf_type = 0;
     int chain_index = 0;
+    int volume = 0;
+    xmlNodePtr anim = NULL;
 
     veejay_memset( arg, 0, sizeof(arg));
 
@@ -3901,12 +3917,17 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int id
             channel = get_xml_int( doc, cur );
         }
 
-        if (!xmlStrcmp(cur->name, (const xmlChar *) "kf_status")) {
-            anim = get_xml_int( doc, cur );
+        if( !xmlStrcmp(cur->name, (const xmlChar*) "ANIM" ))
+        {
+            anim = cur->xmlChildrenNode;
         }
-        
-        if (!xmlStrcmp(cur->name, (const xmlChar *) "kf_type")) {
-            anim_type = get_xml_int( doc, cur );
+
+        if(!xmlStrcmp( cur->name, (const xmlChar*) "kf_status" )) {
+            kf_status = get_xml_int( doc, cur );
+        }
+
+        if(!xmlStrcmp( cur->name, (const xmlChar*) "kf_type" )) {
+            kf_type = get_xml_int( doc, cur );
         }
 
         if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTACTIVE)) {
@@ -3916,85 +3937,76 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int id
         if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_ARGUMENTS)) {
             tagParseArguments(doc, cur->xmlChildrenNode, arg );
         }
+        
+        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTAUDIOFLAG)) {
+            a_flag = get_xml_int( doc, cur );
+        }
+
+        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTAUDIOVOLUME)) {
+            volume = get_xml_int( doc, cur );
+        }
 
         cur = cur->next;
     }
 
     if (effect_id != -1) {
-        int j;
-        int res = vj_tag_set_effect( dst_sample, chain_index, effect_id );
+        int ret = sample_chain_apply_full(
+            tag->effect_chain,
+            chain_index,
+            effect_id,
+            arg,
+            (anim ? 1 : 0),
+            channel,
+            source_type,
+            e_flag,
+            a_flag,
+            volume,
+            kf_status,
+            kf_type
+        );
 
-        if(res < 0 ) {
-            veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d) to stream %d",
-                effect_id, chain_index, dst_sample);
+        if (ret == 0) {
+            veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d)", effect_id, chain_index);
         }
         else {
-
-            /* load the parameter values */
-            for (j = 0; j < vje_get_num_params(effect_id); j++) {
-                vj_tag_set_effect_arg(dst_sample, chain_index, j, arg[j]);
+            if(anim)
+            {        
+                tagParseKeys( doc, curarg->xmlChildrenNode, tag->effect_chain[chain_index]->kf);
             }
-            vj_tag_set_chain_channel(dst_sample, chain_index, channel);
-            vj_tag_set_chain_source(dst_sample, chain_index, source_type);
-    
-            vj_tag_set_chain_status(dst_sample, chain_index, e_flag);
-    
-            j = 0;
-            vj_tag *t = vj_tag_get( dst_sample );
-            while (curarg != NULL) 
-            {
-                    if(!xmlStrcmp(curarg->name,(const xmlChar*)"ANIM"))
-                    {
-                        if(t->effect_chain[chain_index]->effect_id > 0)
-                        {
-                            if(tagParseKeys( doc, curarg->xmlChildrenNode, t->effect_chain[chain_index]->kf))
-                            {
-                                veejay_msg(VEEJAY_MSG_INFO, "Animating FX %d on entry %d (status=%d)", t->effect_chain[chain_index]->effect_id, j,anim);
-                                vj_tag_chain_set_kf_status(dst_sample, chain_index, anim );
-                                vj_tag_set_kf_type( dst_sample,chain_index,anim_type);
-                            }
-                            j++;
-                        }
-                    }
-                    curarg = curarg->next;
-            }
-
         }
     }
 
 }
 
-/*************************************************************************************************
- *
- * ParseEffect()
- *
- * Parse the effects array 
- *
- ****************************************************************************************************/
-static void tagParseEffects(xmlDocPtr doc, xmlNodePtr cur, int dst_stream, int identity)
+static void tagParseEffects(xmlDocPtr doc, xmlNodePtr cur, vj_tag *tag, int identity)
 {
     int effectIndex = 0;
     while (cur != NULL && effectIndex < SAMPLE_MAX_EFFECTS) {
-    if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECT)) {
-        tagParseEffect(doc, cur->xmlChildrenNode, dst_stream, identity);
-        effectIndex++;
-    }
-    //effectIndex++;
-    cur = cur->next;
+        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECT)) {
+            tagParseEffect(doc, cur->xmlChildrenNode, tag, identity);
+            effectIndex++;
+        }
+        cur = cur->next;
     }
 }
 
 static void tagParseCalibration( xmlDocPtr doc, xmlNodePtr cur, int dst_sample , void *vp)
 {
 }
+static void tag_copy_rec_info(vj_tag *target, vj_tag *source) {
+    target->encoder_active = source->encoder_active;
+    target->encoder_file = source->encoder_file;
+    target->encoder_format = source->encoder_format;
+    target->encoder_frames_recorded = source->encoder_frames_recorded;
+    target->encoder_frames_to_record = source->encoder_frames_to_record;
+    target->encoder_height = source->encoder_height;
+    target->encoder_width = source->encoder_width;
+    target->encoder_total_frames_recorded = source->encoder_total_frames_recorded;
 
-/*************************************************************************************************
- *
- * ParseSample()
- *
- * Parse a sample
- *
- ****************************************************************************************************/
+    strncpy(target->encoder_destination, source->encoder_destination, sizeof(source->encoder_destination) - 1);
+    target->encoder_destination[sizeof(target->encoder_destination) - 1] = '\0';
+}
+
 void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *font, void *vp, SampleLoadMode load_mode)
 {
     int fx_on=0, id=0, source_id=0, source_type=0;
@@ -4008,6 +4020,9 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
     int subrender = 0;
     int genargs[SAMPLE_MAX_PARAMETERS];
     int genargs_count = 0;
+    int transition_shape = 0;
+    int transition_active = 0;
+    int transition_length = 0;
     xmlNodePtr subs = NULL;
     xmlNodePtr cali = NULL;
     xmlNodePtr macro = NULL;
@@ -4015,63 +4030,61 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 
     while (cur != NULL)
     {
-        if( !xmlStrcmp(cur->name, (const xmlChar*) XMLTAG_SAMPLEID ))
+        if( !xmlStrcmp(cur->name, (const xmlChar*) XMLTAG_SAMPLEID )) {
             id = get_xml_int( doc, cur );
-        if( !xmlStrcmp(cur->name, (const xmlChar*) "source_id" ) )
+        } else if( !xmlStrcmp(cur->name, (const xmlChar*) "source_id" ) ) {
             source_id = get_xml_int(doc,cur);
-        if( !xmlStrcmp(cur->name, (const xmlChar*) "source_type" ) )
+        } else if ( !xmlStrcmp(cur->name, (const xmlChar*) "source_type" ) ) {
             source_type = get_xml_int(doc,cur);
-        if( !xmlStrcmp(cur->name, (const xmlChar*) "source_file" ) )
+        } else if( !xmlStrcmp(cur->name, (const xmlChar*) "source_file" ) ) {
             source_file = get_xml_str(doc,cur);
-        if( !xmlStrcmp(cur->name, (const xmlChar*) "extra_data" ))
+        } else if( !xmlStrcmp(cur->name, (const xmlChar*) "extra_data" )) {
             extra_data = get_xml_str(doc,cur);
-
-        if(! xmlStrcmp(cur->name, (const xmlChar*) "red" ) )
+        } else if(! xmlStrcmp(cur->name, (const xmlChar*) "red" ) ) {
             col[0] = get_xml_int(doc,cur);
-        if(! xmlStrcmp(cur->name, (const xmlChar*) "green" ) )
+        } else if(! xmlStrcmp(cur->name, (const xmlChar*) "green" ) ) {
             col[1] = get_xml_int(doc,cur);
-        if(! xmlStrcmp(cur->name, (const xmlChar*) "blue" ))
+        } else if(! xmlStrcmp(cur->name, (const xmlChar*) "blue" )) {
             col[2] = get_xml_int(doc,cur);
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_CHAIN_ENABLED))
+        } else if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_CHAIN_ENABLED)) {
             fx_on = get_xml_int(doc,cur);
-        if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADER_ACTIVE)) 
+        } else if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADER_ACTIVE)) {
             fader_active = get_xml_int(doc,cur);
-        if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADER_VAL)) 
+        } else if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADER_VAL)) {
             fader_val = get_xml_int(doc,cur);
-        if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_METHOD)) 
+        } else if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_METHOD)) {
             fade_method = get_xml_int(doc,cur);
-        if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_ALPHA)) 
+        } else if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_ALPHA)) {
             fade_alpha = get_xml_int(doc,cur);
-        if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_METHOD)) 
+        } else if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_METHOD)) {
             fade_entry = get_xml_int(doc,cur);
-        if (!xmlStrcmp(cur->name,(const xmlChar*) XMLTAG_FADER_DIRECTION)) 
+        } else if (!xmlStrcmp(cur->name,(const xmlChar*) XMLTAG_FADER_DIRECTION)) {
             fader_dir = get_xml_int(doc,cur);
-        if (!xmlStrcmp(cur->name,(const xmlChar*) "opacity" ) )
-            opacity   = get_xml_int(doc,cur);
-        if (!xmlStrcmp(cur->name,(const xmlChar*) "nframes" ) )
-            nframes   = get_xml_int(doc,cur);
-
-        if (!xmlStrcmp(cur->name, (const xmlChar*) "SUBTITLES" ))
+        } else if (!xmlStrcmp(cur->name,(const xmlChar*) "opacity" ) ) {
+            opacity = get_xml_int(doc,cur);
+        } else if (!xmlStrcmp(cur->name,(const xmlChar*) "nframes" ) ) {
+            nframes = get_xml_int(doc,cur);
+        } else if (!xmlStrcmp(cur->name, (const xmlChar*) "SUBTITLES" )) {
             subs = cur->xmlChildrenNode;
-
-        if (!xmlStrcmp(cur->name, (const xmlChar*) "calibration" ))
+        } else if (!xmlStrcmp(cur->name, (const xmlChar*) "calibration" )) {
             cali = cur->xmlChildrenNode;
-
-    	if (!xmlStrcmp(cur->name, (const xmlChar*) XMLTAG_MACRO ))
+        } else if (!xmlStrcmp(cur->name, (const xmlChar*) XMLTAG_MACRO )) {
         	macro = cur->xmlChildrenNode;
-
-        if (!xmlStrcmp(cur->name, (const xmlChar*) "subrender" ))
+        } else if (!xmlStrcmp(cur->name, (const xmlChar*) "subrender" )) {
             subrender = get_xml_int(doc,cur);
-    
-		if( !xmlStrcmp(cur->name, (const xmlChar*) "loop_stat_stop"))
+        } else if( !xmlStrcmp(cur->name, (const xmlChar*) "loop_stat_stop")) {
         	loop_stat_stop = get_xml_int(doc,cur);
-
-        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTS)) {
+        } else if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTS)) {
             fx[k] = cur->xmlChildrenNode;
             k++;
+        } else  if(!xmlStrcmp(cur->name, (const xmlChar*) XMLTAG_TRANSITION_SHAPE)) {
+            transition_shape = get_xml_int(doc,cur);
+        } else if(!xmlStrcmp(cur->name, (const xmlChar*) XMLTAG_TRANSITION_LENGTH)) {
+            transition_length = get_xml_int(doc,cur);
+        } else if(!xmlStrcmp(cur->name, (const xmlChar*) XMLTAG_TRANSITION_ACTIVE)) {
+            transition_active = get_xml_int(doc,cur);
         }
-
-        if( !xmlStrcmp(cur->name, (const xmlChar*) "generator_args")) {
+        else if( !xmlStrcmp(cur->name, (const xmlChar*) "generator_args")) {
             char *gargs = get_xml_str(doc,cur);
             genargs_count = (gargs == NULL ? 0: sscanf(gargs,
                 "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
@@ -4087,38 +4100,44 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
     if( id > 0 )
     {
         int zer = 0;
-
         if( source_type == VJ_TAG_TYPE_V4L && extra_data )  
             sscanf( extra_data, "%d",&zer );    
 
-        //vj_tag_del( id );
-    
         int n_id = id;
 
         vj_tag *cur_tag = vj_tag_get( id );
         int identity = 0;
+
         if( cur_tag ) {
-            char *cur_src_file = cur_tag->method_filename;
+            char *cur_src_file = cur_tag->source_name;
             int   type = cur_tag->source_type;
+
             if(cur_src_file && source_file) {
-                if(strncasecmp(cur_tag->method_filename, source_file,strlen(cur_tag->method_filename)) == 0 && type == source_type) {
+                if(strcmp(cur_tag->source_name, source_file) == 0 && type == source_type) {
                     identity = 1; // do we have it already
+                    veejay_msg(VEEJAY_MSG_DEBUG, "We have stream %d already (source %s, type %d)", id, source_file, type);
                 }
             }
         }
 
-        if(!identity) {
-            if(cur_tag)
-                vj_tag_del(id);
+        if(!identity) {  //its something else
+            if(cur_tag) {
+                cur_tag->id = -n_id;
+                vj_tag_put(cur_tag); // change id of old tag 
+                veejay_msg(VEEJAY_MSG_DEBUG, "Updated stream id to %d (to be deleted)", cur_tag->id);
+            }
 
+            // source changes
             n_id = vj_tag_new( source_type, source_file, _tag_info->nstreams,_tag_info->current_edit_list,
                 _tag_info->pixel_format, source_id,zer, _tag_info->settings->composite );
+
+            veejay_msg(VEEJAY_MSG_DEBUG, "Created new stream %d from %s:%d", n_id, source_file, source_type);
         }
 
         if(n_id > 0 )
         {
             vj_tag *tag = vj_tag_get( n_id );
-            tag->id = id;
+            tag->id = n_id;
             tag->effect_toggle = fx_on;
             tag->fader_active = fader_active;
             tag->fader_val = fader_val;
@@ -4130,6 +4149,9 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
             tag->nframes = nframes;
             tag->subrender = subrender;
             tag->loop_stat_stop = loop_stat_stop;
+            tag->transition_active = transition_active;
+            tag->transition_shape = transition_shape;
+            tag->transition_length = transition_length;
 
             switch( source_type )
             {
@@ -4148,9 +4170,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
                 char tmp[512];
                 sprintf(tmp, "%s-SUB-s%d.srt", sampleFile, id ); //FIXME or DELETEME
                 vj_font_set_dict( font, tag->dict );
-
                 vj_font_load_srt( font, tmp );
-
                 vj_font_xml_unpack( doc,subs, font );
             }
 
@@ -4172,7 +4192,17 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
             for( q = 0; q < k ; q ++ )
             {
                 if(fx[q] )
-                    tagParseEffects(doc, fx[q], id, identity ); // FIXME follow logic in libsample
+                    tagParseEffects(doc, fx[q], tag, identity );
+            }
+
+            if(identity) {
+                sample_move_fx_pointers(tag->effect_chain, cur_tag->effect_chain);
+                tag_copy_rec_info(tag, cur_tag);
+            }
+
+            if(!identity && cur_tag) {
+                veejay_msg(VEEJAY_MSG_DEBUG, "Deleted stream %d ", cur_tag->id);
+                vj_tag_del(cur_tag->id,1);
             }
         }
         else {
@@ -4257,6 +4287,13 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp)
 
     put_xml_int( node, "nframes", tag->nframes );
     put_xml_int( node, "opacity", tag->opacity );
+
+    put_xml_int( node, XMLTAG_TRANSITION_SHAPE, tag->transition_shape);
+    put_xml_int( node, XMLTAG_TRANSITION_ACTIVE, tag->transition_active);
+    put_xml_int( node, XMLTAG_TRANSITION_LENGTH, tag->transition_length);
+
+    put_xml_int( node, XMLTAG_LOOP_STAT, tag->loop_stat);
+    put_xml_int( node, XMLTAG_LOOP_STAT_STOP, tag->loop_stat_stop);
 
     vj_font_xml_pack( node, font );
 
