@@ -93,8 +93,6 @@ extern void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *fo
 extern void   tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp );
 extern int vj_tag_highest_valid_id();
 static void sample_del_internal(sample_info *si, int skip_edl);
-static void sample_move_fx_pointers(sample_info *si, sample_info *existing);
-static void sample_copy_rec_info(sample_info *si, sample_info *existing);
 
 unsigned int sample_size(void)
 {
@@ -360,9 +358,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->transition_length = 25;
     si->loop_stat_stop = 1;
     si->edit_list_file = sample_default_edl_name(si->sample_id);
-
     si->main_fx = sec;
-
 
     /* the effect chain is initially empty ! */
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
@@ -1050,15 +1046,15 @@ int sample_find_refs_and_delete(int source_type, int id) {
     return 1;
 }
 
-static void sample_move_fx_pointers(sample_info *si, sample_info *existing)
+void sample_move_fx_pointers(sample_eff_chain **target, sample_eff_chain **source)
 {
-    if (!si || !existing)
+    if (!target || !source)
         return;
 
     for (int i = 0; i < SAMPLE_MAX_EFFECTS; i++)
     {
-        sample_eff_chain *new_e = si->effect_chain[i];
-        sample_eff_chain *old_e = existing->effect_chain[i];
+        sample_eff_chain *new_e = target[i];
+        sample_eff_chain *old_e = source[i];
 
         if (!new_e)
             continue;
@@ -1146,11 +1142,6 @@ static void sample_del_internal(sample_info *si, int skip_edl_close)
         }
     }
 
-    if (si->encoder_destination) {
-        free(si->encoder_destination);
-        si->encoder_destination = NULL;
-    }
-
     if (si->edit_list_file) {
         free(si->edit_list_file);
         si->edit_list_file = NULL;
@@ -1165,7 +1156,16 @@ static void sample_del_internal(sample_info *si, int skip_edl_close)
         sample_close_edl(si->sample_id, si->edit_list);
     }
 
-    if (si->main_fx) {
+    if(!skip_edl_close && (si->encoder || si->encoder_file) ) {
+        sample_stop_encoder(si->sample_id);
+    }
+
+    if (si->encoder_destination) {
+        free(si->encoder_destination);
+        si->encoder_destination = NULL;
+    }
+
+    if (si->main_fx) { // destroys fx chain
         free(si->main_fx);
         si->main_fx = NULL;
     }
@@ -2675,22 +2675,24 @@ static void ParseKeys( xmlDocPtr doc, xmlNodePtr cur, void *port )
     }
 }
 
-int sample_chain_apply_full(sample_info *sample,int chain_index,int effect_id,int *args,int anim,int channel,
+int sample_chain_apply_full(sample_eff_chain **effect_chain,int chain_index,int effect_id,int *args,int anim,int channel,
     int source_type,int e_flag,int a_flag,int volume,int kf_status,int kf_type)
 {
     int i, num_params;
 
-    if (!sample)
+    if (!effect_chain)
         return 0;
 
     if (chain_index < 0 || chain_index >= SAMPLE_MAX_EFFECTS)
         return 0;
 
+    sample_eff_chain *entry = effect_chain[chain_index];
+    if(entry == NULL)
+        return 0;
+
     if (!vje_is_valid(effect_id)) {
         return 0;
-    }
-
-    sample_eff_chain *entry = sample->effect_chain[chain_index];
+    }    
 
     entry->effect_id = effect_id;
 
@@ -2720,13 +2722,6 @@ int sample_chain_apply_full(sample_info *sample,int chain_index,int effect_id,in
     entry->channel     = channel;
     entry->clear = 1;
     entry->audio_opacity = 0.5f;
-  
-    if (chain_index == sample->fade_entry) {
-        if (sample->fade_method == 4)
-            sample->fade_method = 2;
-        else if (sample->fade_method == 3)
-            sample->fade_method = 1;
-    }
 
     return 1;
 }
@@ -2807,7 +2802,7 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, sample_info *skel, int start_at)
 
     if (effect_id != -1) {
         int ret = sample_chain_apply_full(
-            skel,
+            skel->effect_chain,
             chain_index,
             effect_id,
             arg,
@@ -2820,6 +2815,13 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, sample_info *skel, int start_at)
             kf_status,
             kf_type
         );
+
+        if (chain_index == skel->fade_entry) {
+            if (skel->fade_method == 4)
+                skel->fade_method = 2;
+            else if (skel->fade_method == 3)
+                skel->fade_method = 1;
+        }
 
         if (ret == 0) {
             veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d)", effect_id, chain_index);
@@ -2894,24 +2896,15 @@ static void LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq, int n_sampl
     if( tmp_idx == 0 )
         return;
 
-    if( s->size == 0 ) {
-        for( i = 0; i < tmp_idx; i ++ ) {
-            s->samples[i].sample_id = tmp_seq[i].sample_id;
-            s->samples[i].type = tmp_seq[i].type;
-        }
-        s->size = tmp_idx;
-        return;
-    } 
-
-    if( (s->size + tmp_idx ) < MAX_SEQUENCES ) {
-        for( i = 0; i < tmp_idx; i ++ ) {
-            s->samples[ s->size + i ].sample_id = tmp_seq[ i ].sample_id + n_samples;
-            s->samples[ s->size + i ].type = tmp_seq[i].type;
-        }
-        s->size = s->size + tmp_idx;
-    } else {
-        veejay_msg(VEEJAY_MSG_DEBUG, "Can't load this sequence, sequence bank is full");
+    for( i = 0; i < tmp_idx; i ++ ) {
+        s->samples[i].sample_id = tmp_seq[i].sample_id;
+        s->samples[i].type = tmp_seq[i].type;
     }
+    for( i = s->size; i < MAX_SEQUENCES; i ++ ) {
+        s->samples[i].sample_id = 0;
+        s->samples[i].type = 0;
+    }
+    s->size = tmp_idx;
 }
 
 
@@ -3089,7 +3082,7 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, void *
         }
 
         if(existing) {
-            sample_move_fx_pointers(skel, existing);
+            sample_move_fx_pointers(skel->effect_chain, existing->effect_chain);
             sample_copy_rec_info(skel, existing);
         }
 
@@ -3231,6 +3224,19 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
             }
     
             vj_font_set_dict(font, d);
+        }
+
+        if(!xmlStrcmp(cur->name, (const xmlChar *) "server_origin")) {
+            if(!veejay_info->is_master) {
+                veejay_info->master_origin = get_xml_str( doc, cur);
+                
+            }
+        }
+
+        if(!xmlStrcmp(cur->name, (const xmlChar*) "server_port"))  {
+            if(!veejay_info->is_master) {
+                veejay_info->master_origin_port = get_xml_int(doc, cur);
+            }
         }
 
         if (!xmlStrcmp(cur->name, (const xmlChar*) "CURRENT")) {
@@ -3497,6 +3503,11 @@ int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id,
     rootnode = xmlNewDocNode(doc, NULL, (const xmlChar *) XMLTAG_SAMPLES, NULL);
     xmlDocSetRootElement(doc, rootnode);
 
+    if( veejay_info->is_master ) {
+        put_xml_str( rootnode, "server_origin", veejay_info->server_origin );
+        put_xml_int( rootnode, "server_port", veejay_info->uc->port);
+    }
+
     childnode = xmlNewChild( rootnode, NULL,(const xmlChar*) "SEQUENCE", NULL );
     SaveSequences( childnode, seq );
   
@@ -3516,7 +3527,6 @@ int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id,
             WriteSubtitles( next_sample,font, sampleFile );
 
             CreateSample(childnode, next_sample, font);
-    
         }
     }
 
