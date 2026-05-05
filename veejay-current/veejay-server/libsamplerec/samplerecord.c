@@ -324,20 +324,24 @@ int sample_record_frame(int s1, uint8_t *buffer[4], uint8_t *abuff, int audio_si
 
 int sample_stop_encoder(int s1) {
    sample_info *si = sample_get(s1);
-   if(!si) return -1;
-   if(si->encoder_active) {
-	if(si->encoder_file)
-   	  lav_close((lav_file_t*)si->encoder_file);
-	if( si->encoder)
+   if(!si) return 0;
+
+	if( si->encoder) {
 		vj_avcodec_stop( si->encoder, si->encoder_format );
-     
-     veejay_msg(VEEJAY_MSG_INFO, "Stopped sample encoder [%s]",si->encoder_destination);
-     si->encoder_active = 0;
-     si->encoder_file = NULL;
-     si->encoder = NULL;
-     return 1; 
-  }
-   return 0;
+		si->encoder = NULL;
+	}
+	
+    if(si->encoder_file) {
+   	  lav_close((lav_file_t*)si->encoder_file);
+	  si->encoder_file = NULL;
+	}
+
+    veejay_msg(VEEJAY_MSG_INFO, "Stopped sample encoder [%s]",si->encoder_destination);
+    si->encoder_active = 0;
+    si->encoder_file = NULL;
+    si->encoder = NULL;
+    return 1; 
+
 }
 
 
