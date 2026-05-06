@@ -1587,6 +1587,7 @@ void    on_slow_slider_click( GtkWidget *widget, gpointer user_data )
 {
     if(!info->status_lock)
     {
+#if (GTK_CHECK_VERSION (3, 20, 0))
         GdkModifierType state = 0;
         GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(widget));
         if (window) {
@@ -1606,6 +1607,7 @@ void    on_slow_slider_click( GtkWidget *widget, gpointer user_data )
         {
             update_slider_gvalue("slow_slider", 1);
         }
+#endif //TODO #else ?
     }
 }
 
@@ -1628,6 +1630,7 @@ void    on_speed_slider_click(GtkWidget *widget, gpointer user_data)
 {
     if(!info->status_lock)
     {
+#if (GTK_CHECK_VERSION (3, 20, 0))
         GdkModifierType state = 0;
         GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(widget));
         if (window) {
@@ -1647,6 +1650,7 @@ void    on_speed_slider_click(GtkWidget *widget, gpointer user_data)
         {
             update_slider_gvalue("speed_slider", 1);
         }
+#endif //TODO #else ?
     }
 }
 
