@@ -45,6 +45,7 @@
 #include <libvje/vje.h>
 #include <libvje/libvje.h>
 #include <libsubsample/subsample.h>
+#include <libsamplerec/samplerecord.h>
 #include <libveejay/vj-lib.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vevo.h>
