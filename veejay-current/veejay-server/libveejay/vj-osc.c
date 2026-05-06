@@ -499,8 +499,6 @@ static struct
 	{ "console/resize"					, VIMS_RESIZE_SDL_SCREEN },
 #endif
 	{ "console/renderdepth"					, VIMS_RENDER_DEPTH },
-	{ "console/continuous"					, VIMS_CONTINUOUS_PLAY },
-//@ NO VIMS callback!	{ "console/recviewport"			, VIMS_RECVIEWPORT },
 	{ "console/volume"					, VIMS_SET_VOLUME },
 	{ "console/fullscreen"					, VIMS_FULLSCREEN },
 	{ "console/suspsend"					, VIMS_SUSPEND },
