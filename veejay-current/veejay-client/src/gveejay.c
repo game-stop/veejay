@@ -102,29 +102,6 @@ typedef struct {
 
 static int draw_count = 0;
 
-static gboolean vj_gui_idle_cb(gpointer data)
-{
-    static gint64 last = 0;
-    const gint64 now = g_get_monotonic_time();
-        static int counter = 0;
-    if (++counter % 1000000 == 0)
-        fprintf(stderr, "idle alive\n");
-    if (now - last < 20000) {
-        return G_SOURCE_CONTINUE;
-    }
-    last = now;
-
-
-
-    GuiContext *ctx = (GuiContext *)data;
-    
-    if (!gveejay_idle(NULL)) {
-        g_application_quit(ctx->app);
-        return G_SOURCE_REMOVE;
-    }
-
-    return G_SOURCE_CONTINUE;
-}
 static gboolean vj_gui_idle_cb1(gpointer data)
 {
     GuiContext *ctx = data;
@@ -165,7 +142,6 @@ static void vj_gui_activate(GApplication *app, gpointer user_data)
         ctx,
         (GDestroyNotify)g_free
     );
-    //g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, vj_gui_idle_cb, ctx,(GDestroyNotify)g_free);
 }
 
 /*
