@@ -398,6 +398,7 @@ typedef struct {
 	int	max_cached_slots;
 	int drawmode;
 	int drawsize;
+	int vims_mirror; // forward vims
 } user_control;
 
 typedef struct {
@@ -466,6 +467,7 @@ typedef struct {
 	char *master_origin;
 	int master_origin_port;
     vj_server *vjs[4]; /* 0=cmd, 1 = sta, 2 = mcast, 3 = msg */
+	vj_client *master_client;
     int net;
     int render_entry;
     int render_continue;
@@ -504,6 +506,7 @@ typedef struct {
 	int	*rlinks;
 	int *splitted_screens;
 	int	*rmodes;
+	int remote_id;
 	int pause_render;
 	void	*shm;
 	int	use_keyb;
