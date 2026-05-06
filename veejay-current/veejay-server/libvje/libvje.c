@@ -109,6 +109,8 @@ static struct {
     { tunnel_init,tunnel_malloc,tunnel_free,NULL,NULL,tunnel_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_TUNNEL },
     { escherdroste_init,escherdroste_malloc,escherdroste_free,NULL,NULL,escherdroste_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_EDROSTE },
     { topomorph_init,topomorph_malloc,topomorph_free,NULL,NULL,topomorph_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_TOPOMORPH },
+    { edgefold_init,edgefold_malloc,edgefold_free,NULL,NULL,edgefold_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_EDGEFOLD },
+    { virtualcamera_init,virtualcamera_malloc,virtualcamera_free,NULL,NULL,virtualcamera_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_VIRTUALCAMERA },
     { strobo_init,strobo_malloc,strobo_free,NULL,NULL,strobo_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_STROBOTSU },
     { spectralmotion_init,spectralmotion_malloc,spectralmotion_free,NULL,NULL,spectralmotion_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SPECTRALMOTION},
     { falsecolors_init, falsecolors_malloc,falsecolors_free, NULL,NULL, falsecolors_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_FALSECOLORS },

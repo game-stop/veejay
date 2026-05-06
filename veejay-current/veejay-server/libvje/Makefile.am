@@ -238,4 +238,6 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/chromaticdrift.c \
     effects/morphologymixer.c \
     effects/escherdroste.c \
-    effects/topomorph.c
+    effects/topomorph.c \
+    effects/edgefold.c \
+    effects/virtualcamera.c
