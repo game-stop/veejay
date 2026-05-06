@@ -24,6 +24,7 @@
 
 #define VJ_PORT 3490
 #define VJ_MAX_CONNECTIONS 8
+#define VJ_MAX_PENDING_MSG 128
 
 #define VEEJAY_SERVER_LOG "/tmp/veejay.net.log"
 
@@ -60,7 +61,7 @@ int vj_server_update(vj_server * vje, int link_id);
 
 void vj_server_shutdown(vj_server *vje);
 
-char *vj_server_retrieve_msg(vj_server *vje, int link_id, char *dst, int *res);
+char *vj_server_retrieve_msg(vj_server *vje, int link_id, int *res);
 
 int vj_server_poll(vj_server * vje);
 

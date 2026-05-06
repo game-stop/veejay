@@ -61,7 +61,7 @@ int main( int argc, char *argv[] )
 			{
 				char tmp[4096];
 				memset(tmp,0,sizeof(tmp));
-				while( vj_server_retrieve_msg(s,i, tmp, &tmplen ) )
+				while( vj_server_retrieve_msg(s,i, &tmplen ) )
 				{
 					printf("recv %d [%s]\n", tmplen,tmp );
 				}

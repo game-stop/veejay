@@ -76,7 +76,6 @@ typedef struct
 
 static int default_timeout_sec = 10;
 
-#define VJ_MAX_PENDING_MSG 128
 #define RECV_SIZE 4096 
 #define MSG_POOL_SIZE (VJ_MAX_PENDING_MSG * 1024)
 
@@ -470,6 +469,7 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 			return mcast_send( proto[0]->s, buf, bytes_left, vje->ports[0] );
 		}
 	}
+
 	return total;
 }
 
@@ -888,17 +888,6 @@ static int vj_server_update_get_msg_vd(vj_server *vje, int sock_fd, int link_id,
         return -1;
     }
 
-    int net_id = 0;
-    if( sscanf(buf, "%d:", &net_id ) != 1 ) {
-        veejay_msg(VEEJAY_MSG_ERROR,"Expected VIMS identifier followed by semicolon");
-        return -1;
-    }  
-
-    if( buf[ msg_size - 1] != ';' ) {
-       veejay_msg(VEEJAY_MSG_ERROR, "Expected VIMS message end marker ';'");
-       return -1;
-    } 
-
     buf[ msg_size ] = '\0';
 
     _vj_put_kf_msg(vje, link_id, buf, msg_size, *num_msg);
@@ -1052,7 +1041,7 @@ int	vj_server_link_used( vj_server *vje, int link_id)
 	return Link[link_id]->in_use;
 }
 
-char *vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
+char *vj_server_retrieve_msg(vj_server *vje, int id, int *str_len )
 {
 	vj_link **Link = (vj_link**) vje->link;
    	if (!Link[id]->in_use)
