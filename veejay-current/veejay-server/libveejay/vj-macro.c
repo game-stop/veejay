@@ -688,12 +688,10 @@ void vj_macro_init(void)
     vvm_[VIMS_AUDIO_ENABLE]=0;
     vvm_[VIMS_AUDIO_DISABLE]=0;
     vvm_[VIMS_RECORD_DATAFORMAT]=0;
-    vvm_[VIMS_INIT_GUI_SCREEN]=0;
     vvm_[VIMS_SUSPEND]=0;
     vvm_[VIMS_VIEWPORT]=0;
     vvm_[VIMS_PREVIEW_BW]=0;
     vvm_[VIMS_FRONTBACK]=0;
-    vvm_[VIMS_RECVIEWPORT]=0;
     vvm_[VIMS_PROJECTION] = 0;
 	vvm_[VIMS_DEL_MACRO] = 0;
 	vvm_[VIMS_PUT_MACRO] = 0;
