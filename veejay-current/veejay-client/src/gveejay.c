@@ -100,11 +100,36 @@ typedef struct {
     GApplication *app;
 } GuiContext;
 
+static int draw_count = 0;
+
 static gboolean vj_gui_idle_cb(gpointer data)
 {
-    GuiContext *ctx = (GuiContext *)data;
+    static gint64 last = 0;
+    const gint64 now = g_get_monotonic_time();
+        static int counter = 0;
+    if (++counter % 1000000 == 0)
+        fprintf(stderr, "idle alive\n");
+    if (now - last < 20000) {
+        return G_SOURCE_CONTINUE;
+    }
+    last = now;
 
+
+
+    GuiContext *ctx = (GuiContext *)data;
+    
     if (!gveejay_idle(NULL)) {
+        g_application_quit(ctx->app);
+        return G_SOURCE_REMOVE;
+    }
+
+    return G_SOURCE_CONTINUE;
+}
+static gboolean vj_gui_idle_cb1(gpointer data)
+{
+    GuiContext *ctx = data;
+    if (!gveejay_idle(NULL)) {
+        fprintf(stderr, "Quiting application");
         g_application_quit(ctx->app);
         return G_SOURCE_REMOVE;
     }
@@ -116,6 +141,9 @@ static void vj_gui_activate(GApplication *app, gpointer user_data)
 {
     GuiContext *ctx = g_new0(GuiContext, 1);
     ctx->app = app;
+
+
+    g_application_hold(app);
 
     vj_gui_set_debug_level(verbosity, n_tracks, 0, 0);
     default_bank_values(&col, &row);
@@ -130,7 +158,14 @@ static void vj_gui_activate(GApplication *app, gpointer user_data)
                 use_threads, load_midi, midi_file,
                 arg_beta, arg_autoconnect, arg_fasterui);
 
-    g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, vj_gui_idle_cb, ctx,(GDestroyNotify)g_free);
+    g_timeout_add_full(
+        G_PRIORITY_DEFAULT,
+        16,
+        vj_gui_idle_cb1,
+        ctx,
+        (GDestroyNotify)g_free
+    );
+    //g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, vj_gui_idle_cb, ctx,(GDestroyNotify)g_free);
 }
 
 /*
@@ -248,8 +283,6 @@ gint vj_gui_command_line (GApplication            *app,
     }
 
     g_application_activate(app);
-
-    veejay_msg(VEEJAY_MSG_INFO, "See you!");
 
     return EXIT_SUCCESS;
 }

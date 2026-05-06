@@ -65,9 +65,9 @@ typedef struct
 	uint8_t *status_buffer;		
 	int	 track_list[__MAX_TRACKS];
 	int	 track_items;			//shared
-	int	 status_tokens[STATUS_TOKENS];	//shared
-	int   	 active;
-	int 	have_frame;
+	int	 status_tokens[STATUS_ARRAY_SIZE];	//shared
+	int  active;
+	int  have_frame;
 	int	grey_scale;
 	int full_range;
     int	preview;
@@ -112,7 +112,7 @@ void	*gvr_preview_init(int max_tracks, int use_threads)
 	int i;
 	
     for( i = 0; i < max_tracks; i++ )
-		vp->track_sync->status_tokens[i] = (int*) vj_calloc(sizeof(int) * STATUS_TOKENS);
+		vp->track_sync->status_tokens[i] = (int*) vj_calloc(sizeof(int) * STATUS_ARRAY_SIZE);
 
 	vp->n_tracks = max_tracks;
 
@@ -366,7 +366,7 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 			    return 0;
             }
 
-	        if( status_to_arr( (char*) v->status_buffer, v->status_tokens ) < 37 )
+	        if( status_to_arr( (char*) v->status_buffer, v->status_tokens ) < VIMS_STATUS_TOKENS )
             {
                 veejay_msg(VEEJAY_MSG_WARNING, "Expected more status tokens");
                 return 0;
@@ -878,8 +878,8 @@ static GdkPixbuf	**gvr_grab_images(void *preview)
 
 static	int	*int_dup( int *status )
 {
-	int *res = (int*) vj_calloc( sizeof(int) * STATUS_TOKENS );
-    veejay_memcpy( res, status, STATUS_TOKENS * sizeof(int));
+	int *res = (int*) vj_calloc( sizeof(int) * STATUS_ARRAY_SIZE );
+    veejay_memcpy( res, status, STATUS_ARRAY_SIZE * sizeof(int));
     return res;
 }
 

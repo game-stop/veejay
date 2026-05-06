@@ -17487,13 +17487,13 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                           </packing>
                                                         </child>
                                                         <child>
-                                                          <object class="GtkToggleButton" id="toggle_multicast">
+                                                          <object class="GtkToggleButton" id="toggle_vims_forwarding">
                                                             <property name="visible">True</property>
                                                             <property name="can-focus">True</property>
                                                             <property name="receives-default">True</property>
                                                             <property name="has-tooltip">True</property>
-                                                            <property name="tooltip-text" translatable="yes">Enable Multicast frame sender</property>
-                                                            <signal name="toggled" handler="on_toggle_multicast_toggled" swapped="no"/>
+                                                            <property name="tooltip-text" translatable="yes">Enable Forwarding of VIMS trickplay</property>
+                                                            <signal name="toggled" handler="on_toggle_vims_forwarding_toggled" swapped="no"/>
                                                             <child>
                                                             <object class="GtkImage" id="image51">
                                                             <property name="visible">True</property>

@@ -5061,11 +5061,6 @@ void	on_uq_button_clicked( GtkWidget *w, gpointer data ) // 1/8
     vj_msg(VEEJAY_MSG_INFO,"Live view quality set to an eighth resolution");
 }
 
-void	on_record_vp_clicked( GtkWidget *w, gpointer data )
-{
-	single_vims( VIMS_RECVIEWPORT );
-}
-
 void    on_subrender_entry_toggle_toggled(GtkWidget *w, gpointer data)
 {
     if(info->status_lock || info->parameter_lock)
@@ -5273,6 +5268,7 @@ void	on_button_vloop_start_clicked(GtkWidget *widget, gpointer user_data)
 	multi_vims( VIMS_VLOOPBACK_START, "%d", get_nums( "spin_vloop" ) );
 }
 
+/*
 void on_toggle_multicast_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled( "toggle_multicast" ) ) {
@@ -5283,6 +5279,14 @@ void on_toggle_multicast_toggled(GtkWidget *widget, gpointer user_data)
 		single_vims( VIMS_VIDEO_MCAST_STOP );
         vj_msg(VEEJAY_MSG_INFO, "Multicast disabled");
 	}
+}*/
+
+void on_toggle_vims_forwarding_toggled(GtkWidget *widget, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
+	int is_active = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget));
+	multi_vims( VIMS_MESSAGE_FORWARDING, "%d", is_active);
 }
 
 void on_stream_loopstop_value_changed( GtkWidget *widget, gpointer user_data )

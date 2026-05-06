@@ -350,6 +350,7 @@ enum {
   WIDGET_GLOBALCHAINTOGGLE = 249,
   WIDGET_GLOBALCHAINCOPY = 250,
   WIDGET_GLOBALCHAINLEVEL = 251,
+  WIDGET_MESSAGE_FORWARDING = 252
 };
 
 
@@ -754,6 +755,7 @@ static struct
     { "chain_toggleglobalchain", WIDGET_GLOBALCHAINTOGGLE },
     { "chain_copyglobalchain", WIDGET_GLOBALCHAINCOPY },
     { "chain_globalchainlevel", WIDGET_GLOBALCHAINLEVEL},
+    { "toggle_vims_forwarding", WIDGET_MESSAGE_FORWARDING },
     { NULL, -1 },
 };
 
@@ -1147,8 +1149,8 @@ typedef struct
 {
     GtkBuilder *main_window;
     vj_client   *client;
-    int status_tokens[STATUS_TOKENS];   /* current status tokens */
-    int *history_tokens[4];     /* list last known status tokens */
+    int status_tokens[STATUS_ARRAY_SIZE];   /* current status tokens */
+    int *history_tokens[HISTORY_PLAYMODES];     /* list last known status tokens */
     int status_passed;
     int status_lock;
     int slider_lock;
@@ -1161,13 +1163,10 @@ typedef struct
     int launch_sensitive;
     struct timeval  alarm;
     struct timeval  timer;
-//  GIOChannel  *channel;
     GdkVisual *color_map;
     gint connecting;
-//  gint logging;
     gint streamrecording;
     gint samplerecording;
-//  gint cpumeter;
     gint cachemeter;
     gint image_w;
     gint image_h;
@@ -2952,8 +2951,9 @@ int gveejay_restart(void)
 
 gboolean gveejay_running(void)
 {
-    if(!running_g_)
+    if(!running_g_) {
         return FALSE;
+    }
     return TRUE;
 }
 
@@ -3176,24 +3176,34 @@ static gchar *recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1,
     unsigned char tmp[tmp_len];
     veejay_memset(tmp,0,sizeof(tmp));
     int ret = vj_client_read( info->client, V_CMD, tmp, slen );
-    if( ret == -1 )
+    if( ret == -1 ) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Error receiving VIMS packet of len %d", slen);
         reloaded_schedule_restart();
+    }
     int len = 0;
-    if( sscanf( (char*)tmp, "%06d", &len ) != 1 )
+    if( sscanf( (char*)tmp, "%06d", &len ) != 1 ) {
         return NULL;
-    if( sscanf( (char*)tmp + 6, "%04d", arg0 ) != 1 )
+    }
+    if( sscanf( (char*)tmp + 6, "%04d", arg0 ) != 1 ) {
         return NULL;
-    if( sscanf( (char*)tmp + 10, "%02d", arg1) != 1 )
+    }
+    if( sscanf( (char*)tmp + 10, "%02d", arg1) != 1 ) {
         return NULL;
-    if( sscanf( (char*)tmp + 12, "%1d", arg2) != 1 )
+    }
+    if( sscanf( (char*)tmp + 12, "%1d", arg2) != 1 ) {
         return NULL;
+    }
     unsigned char *result = NULL;
-    if( ret <= 0 || len <= 0 || slen <= 0)
+    if( ret <= 0 || len <= 0 || slen <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Got empty VIMS packet");
         return (gchar*)result;
+    }
     result = (unsigned char*) vj_calloc(sizeof(unsigned char) * (len + 16) );
     *bytes_written = vj_client_read( info->client, V_CMD, result, len );
-    if( *bytes_written == -1 )
+    if( *bytes_written == -1 ) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Error reading requested bytes from VIMS packet");
         reloaded_schedule_restart();
+    }
 
     return (gchar*) result;
 }
@@ -7051,15 +7061,6 @@ static int load_editlist_info(void)
             gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_BUTTON_5_4 ] ) , values[8] );
     }
 
-    if( use_vims_mcast ) {
-        if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_TOGGLE_MULTICAST] ))
-            gtk_widget_set_sensitive(widget_cache[ WIDGET_TOGGLE_MULTICAST ], TRUE);
-    }
-    else {
-         if(gtk_widget_is_sensitive(widget_cache[ WIDGET_TOGGLE_MULTICAST ] ))
-            gtk_widget_set_sensitive(widget_cache[ WIDGET_TOGGLE_MULTICAST ], FALSE);
-    }
-
     int button_global_state = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_GLOBAL_TRANSITIONS_TOGGLE ]));
     if( button_global_state != global_transition_state ) {
         gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_GLOBAL_TRANSITIONS_TOGGLE ]), global_transition_state );
@@ -7321,7 +7322,7 @@ int veejay_update_multitrack( void *ptr )
     int tmp = 0, i;
 
     if( s->status_list[s->master] != NULL ) {
-        for ( i = 0; i < STATUS_TOKENS; i ++ )
+        for ( i = 0; i < STATUS_ARRAY_SIZE; i ++ )
         {
             tmp += s->status_list[s->master][i];
             info->status_tokens[i] = s->status_list[s->master][i];
@@ -7352,7 +7353,7 @@ int veejay_update_multitrack( void *ptr )
 #endif
     int *history = info->history_tokens[pm];
 
-    veejay_memcpy( history, info->status_tokens, sizeof(int) * STATUS_TOKENS );
+    veejay_memcpy( history, info->status_tokens, sizeof(int) * VIMS_STATUS_TOKENS );
    
     for( i = 0; i < s->tracks ; i ++ )
     {
@@ -7640,6 +7641,12 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_GLOBALCHAINTOGGLE]),enabled);
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_GLOBALCHAINLEVEL]),after);
+    }
+
+    if( info->status_tokens[MESSAGE_FORWARDING] != history[MESSAGE_FORWARDING]) 
+    {
+        int state = info->status_tokens[MESSAGE_FORWARDING];
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_MESSAGE_FORWARDING]), state);
     }
 
     if( (pm == MODE_SAMPLE || pm == MODE_STREAM ) && info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] ) {
@@ -8323,7 +8330,7 @@ void vj_gui_cb(int state, char *hostname, int port_num)
     int i;
     for( i = 0; i < 4; i ++ ) {
         int *h = info->history_tokens[i];
-        veejay_memset( h, 0, sizeof(int) * STATUS_TOKENS );
+        veejay_memset( h, 0, sizeof(int) * VIMS_STATUS_TOKENS );
     }
 }
 
@@ -8390,11 +8397,11 @@ void register_signals(void)
 void vj_gui_wipe(void)
 {
     int i;
-    veejay_memset( info->status_tokens, 0, sizeof(int) * STATUS_TOKENS );
+    veejay_memset( info->status_tokens, 0, sizeof(int) * VIMS_STATUS_TOKENS );
     veejay_memset( info->uc.entry_tokens,0, sizeof(int) * ENTRY_LAST);
     for( i = 0 ; i < 4; i ++ )
     {
-        veejay_memset(info->history_tokens[i],0, sizeof(int) * (STATUS_TOKENS+1));
+        veejay_memset(info->history_tokens[i],0, sizeof(int) * (VIMS_STATUS_TOKENS+1));
     }
 }
 
@@ -8676,7 +8683,9 @@ void vj_gui_init(const char *glade_file,
     
 	veejay_msg(VEEJAY_MSG_DEBUG, "Loading glade file %s", glade_path);
 
-    veejay_memset( gui->status_tokens, 0, sizeof(int) * STATUS_TOKENS );
+    int status_arr_size = sizeof(int) * sizeof(int) * VIMS_STATUS_TOKENS;
+
+    veejay_memset( gui->status_tokens, 0, status_arr_size );
     veejay_memset( gui->sample, 0, 2 );
     veejay_memset( gui->selection, 0, 3 );
     veejay_memset( &(gui->uc), 0, sizeof(veejay_user_ctrl_t));
@@ -8685,10 +8694,11 @@ void vj_gui_init(const char *glade_file,
     gui->prev_mode = -1;
     veejay_memset( &(gui->el), 0, sizeof(veejay_el_t));
 
-    for( i = 0 ; i < 4; i ++ )
+    for( i = 0 ; i < HISTORY_PLAYMODES; i ++ )
     {
-        gui->history_tokens[i] = (int*) vj_calloc(sizeof(int) * (STATUS_TOKENS+1));
+        gui->history_tokens[i] = (int*) vj_calloc(sizeof(int) * status_arr_size);
     }
+
     for( i = 0; i < NUM_HINTS ; i ++ ) {
         gui->uc.reload_hint_checksums[i] = -1;
     }
@@ -9058,9 +9068,9 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 {
     int k = 0;
     for( k = 0; k < 4; k ++ )
-        veejay_memset( info->history_tokens[k] , 0, (sizeof(int) * STATUS_TOKENS) );
+        veejay_memset( info->history_tokens[k] , 0, (sizeof(int) * STATUS_ARRAY_SIZE) );
 
-    veejay_memset( info->status_tokens, 0, sizeof(int) * STATUS_TOKENS );
+    veejay_memset( info->status_tokens, 0, sizeof(int) * STATUS_ARRAY_SIZE );
 
     if(!hostname && !group_name )
     {
