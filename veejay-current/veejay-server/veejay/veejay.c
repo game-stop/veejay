@@ -273,6 +273,10 @@ static void Usage(char *progname)
 	fprintf(stderr,
 			"  -b/--bezerk    \t\tBezerk (default off)   \n");
 	fprintf(stderr,
+			"  -K/--master\t\tSet this veejay instance as the master output\n");
+	fprintf(stderr,
+			"  -C/--connect <ip address>:<port number>\n");
+	fprintf(stderr,
 	   		"  -l/--sample-file <file name>\tLoad a sample list file (none at default)\n");
 	fprintf(stderr,
 			"  -F/--action-file <file name>\tLoad an action file (none at default)\n");
@@ -493,13 +497,31 @@ static int set_option(const char *name, char *value)
 	}
      }
     else if (strcmp(name, "action-file")==0 || strcmp(name,"F")==0) {
-	check_val(optarg,name);
-	veejay_strncpy(info->action_file[0],(char*) optarg, strlen( (char*) optarg));
-	info->load_action_file = 1;
+		check_val(optarg,name);
+		veejay_strncpy(info->action_file[0],(char*) optarg, strlen( (char*) optarg));
+		info->load_action_file = 1;
 	}else if (strcmp(name, "sample-file")==0 || strcmp(name,"l")==0) {
-	check_val(optarg,name);
-	veejay_strncpy(info->action_file[1],(char*) optarg, strlen( (char*) optarg));
-	info->load_sample_file = 1;
+		check_val(optarg,name);
+		veejay_strncpy(info->action_file[1],(char*) optarg, strlen( (char*) optarg));
+		info->load_sample_file = 1;
+	}
+	else if (strcmp(name, "master") == 0 || strcmp(name, "K") == 0) {
+		info->is_master = 1;
+	}
+	else if (strcmp(name, "connect") == 0 || strcmp(name, "C") == 0) {
+		char *sep = strchr(optarg, ':');
+        if(sep)
+        {
+            *sep = '\0';
+            info->master_origin = strdup(optarg);
+            info->master_origin_port = atoi(sep + 1);
+            *sep = ':';
+        }
+        else
+        {
+            info->master_origin = strdup(optarg);
+            info->master_origin_port = VJ_PORT;
+        }
 	}
 	else if (strcmp(name, "geometry-x") == 0 || strcmp(name, "x")==0) {
 		default_geometry_x = atoi(optarg);
@@ -610,6 +632,8 @@ static int check_command_line_options(int argc, char *argv[])
     /* getopt_long options */
     static struct option long_options[] = {
 	{"verbose", 0, 0, 0},	/* -v/--verbose         */
+	{"master", 0 ,0 ,0},
+	{"connect", 1, 0, 0},
 	{"skip", 1, 0, 0},	/* -s/--skip            */
 	{"synchronization", 1, 0, 0},	/* -c/--synchronization */
 	{"preserve-pathnames", 0, 0, 0},	/* -P/--preserve-pathnames    */
@@ -681,12 +705,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:T:F:Z:nILPVDugvBdibjqeM:S:X?",
+			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:T:F:Z:C:nKILPVDugvBdibjqeM:S:X?",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:T:F:Z:nILPVDugvBdibjqeM:S:X?"
+		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:T:F:Z:C:KnILPVDugvBdibjqeM:S:X?"
 						   )) != EOF)
 #endif
     {

@@ -38,6 +38,8 @@
 #define	STREAM_ID_HELP	"Stream ID (-1=last created, > 0 = Stream ID)"
 #define	SAMPLE_STREAM_ID_HELP	"Sample or Stream ID (0=current playing, -1=last created, > 0 = ID)"
 static	vevo_port_t **index_map_ = NULL;
+static  int *requires_id_map_ = NULL;
+
 /* define the function pointer to any event */
 typedef void (*vevo_event)(void *ptr, const char format[], va_list ap);
 
@@ -379,6 +381,7 @@ void		vj_event_vevo_free(void)
 void		vj_init_vevo_events(void)
 {	
 	index_map_ = (vevo_port_t**) vj_calloc(sizeof(vevo_port_t*) * MAX_INDEX );
+	requires_id_map_ = (int*) vj_calloc(sizeof(int) * MAX_INDEX);
 
     index_map_[ VIMS_SET_TRANSITION ] = _new_event(
                 "%d %d %d %d %d",
@@ -1748,6 +1751,7 @@ void		vj_init_vevo_events(void)
 				STREAM_ID_HELP,
 				0,
 				NULL );
+
 	index_map_[VIMS_CHAIN_ENTRY_SET_EFFECT]			=	_new_event(
 				"%d %d %d %d",
 				VIMS_CHAIN_ENTRY_SET_EFFECT,
@@ -2948,17 +2952,6 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
-	index_map_[ VIMS_CONTINUOUS_PLAY ] 		=	_new_event(
-				"%d",
-				VIMS_CONTINUOUS_PLAY,
-				"Continuous sample play, do not restart samples",
-				vj_event_play_norestart,
-				1,
-				VIMS_ALLOW_ANY,
-				"0=continious play ,1=sample restart (default)",
-				0,
-				NULL );
-
 	index_map_[ VIMS_PROJ_INC ] 			=	_new_event(
 				"%d %d",
 				VIMS_PROJ_INC,
@@ -3245,32 +3238,6 @@ void		vj_init_vevo_events(void)
 				VIMS_REQUIRE_ALL_PARAMS | VIMS_LONG_PARAMS,
 				"Filename",	
 				NULL,
-				NULL );	
-
-	index_map_[VIMS_OFFLINE_PLAYMODE]		=	_new_event(
-				NULL,
-				VIMS_OFFLINE_PLAYMODE,
-				"VIMS: actions depend on playback mode",
-				vj_event_playmode_rule,
-				0,
-				VIMS_ALLOW_ANY,
-				NULL );
-	index_map_[VIMS_OFFLINE_SAMPLES]		=	_new_event(
-				NULL,
-				VIMS_OFFLINE_SAMPLES,
-				"VIMS: pretend playmode is sample (offline sample editing)",
-				vj_event_offline_samples,
-				0,
-				VIMS_ALLOW_ANY,
-				NULL );
-
-	index_map_[VIMS_OFFLINE_TAGS]			=	_new_event(
-				NULL,
-				VIMS_OFFLINE_TAGS,
-				"VIMS: pretend playmode is tag (offline stream editing)",
-				vj_event_offline_tags,
-				0,
-				VIMS_ALLOW_ANY,
 				NULL );
 
 	index_map_[VIMS_FONT_LIST]			=	_new_event(
@@ -3410,6 +3377,17 @@ void		vj_init_vevo_events(void)
 				"Key",
 				0,
 				NULL );
+
+	index_map_[VIMS_MESSAGE_FORWARDING]			=	_new_event(
+				"%d",
+				VIMS_MESSAGE_FORWARDING,
+				"Forward trickplay / sample switching to master veejay",
+				vj_event_vims_message_forwarding,
+				1,
+				VIMS_ALLOW_ANY,
+				"0=On, 1=Off",
+				0,
+				NULL );	
 
 #endif
 }

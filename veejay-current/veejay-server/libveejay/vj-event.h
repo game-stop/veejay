@@ -34,6 +34,7 @@ int	veejay_load_action_file( void *ptr, char *filename );
 void	vj_event_select_macro(				void *ptr, const char format[], va_list ap);
 void    vj_event_stop();
 int  	vj_event_parse_msg( void *v, char *msg, int msg_len );
+int     vj_event_parse_and_maybe_requeue_events(void *ptr, char *buf, int len);
 void	vj_event_push_coords(void *ptr);
  void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap);
 
@@ -45,6 +46,7 @@ void    vj_event_xml_new_keyb_event		( 	void *v,	xmlDocPtr doc, 	xmlNodePtr cur 
 int vj_event_get_video_format(void);
 int vj_event_get_num_args(int net_id);
 void vj_event_update_remote(void *ptr);
+void    vj_event_vims_message_forwarding( void *ptr, const char format[], va_list ap);
 void	vj_event_promote_me			(	void *ptr,	const char format[], 	va_list ap	);
 void	vj_event_dump(void);
 void	vj_event_set_stream_color		(	void *ptr,	const char format[],	va_list ap	);
@@ -158,9 +160,6 @@ void 	vj_event_set_play_mode			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_set_play_mode_go		(	void *ptr,	const char format[], 	va_list ap	); 
 void	vj_event_switch_sample_tag		(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_connect_shm			(	void *ptr,	const char format[],	va_list ap );
-void	vj_event_offline_samples		(	void *ptr,	const char format[], 	va_list ap );
-void	vj_event_offline_tags			(	void *ptr,	const char format[], 	va_list ap );
-void	vj_event_playmode_rule			(	void *ptr,	const char format[],	va_list ap );
 #ifdef HAVE_SDL
 void 	vj_event_set_screen_size		(	void *ptr, 	const char format[], 	va_list ap	);
 #endif

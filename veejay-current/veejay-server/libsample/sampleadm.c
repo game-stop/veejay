@@ -92,6 +92,7 @@ static veejay_t *veejay_info = NULL;
 extern void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font, void *vp, SampleLoadMode load_mode);
 extern void   tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp );
 extern int vj_tag_highest_valid_id();
+extern int sample_stop_encoder(int s1);
 static void sample_del_internal(sample_info *si, int skip_edl);
 
 unsigned int sample_size(void)
@@ -2572,7 +2573,7 @@ int sample_set_editlist(int s1, editlist *edl)
 
 int sample_chain_sprint_status( int s1,int tags,int sample_count,int cache,int sa,int ca, 
     int pfps, int frame, int mode,int total_slots, int seq_rec,int curfps, 
-    uint32_t lo, uint32_t hi,int macro,char *str, int feedback, int global_fx )
+    uint32_t lo, uint32_t hi,int macro,char *str, int feedback, int global_fx, int vims_mirror )
 {
     sample_info *sample;
     sample = sample_get(s1);
@@ -2635,6 +2636,7 @@ int sample_chain_sprint_status( int s1,int tags,int sample_count,int cache,int s
     ptr = vj_sprintf( ptr, feedback);
     ptr = vj_sprintf( ptr, tags ); // 36
     ptr = vj_sprintf( ptr, global_fx ); //37
+    ptr = vj_sprintf( ptr, vims_mirror );
     return 0;
 }
 
@@ -3227,9 +3229,9 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
         }
 
         if(!xmlStrcmp(cur->name, (const xmlChar *) "server_origin")) {
-            if(!veejay_info->is_master) {
+            if(!veejay_info->is_master && veejay_info->master_origin == NULL) {
                 veejay_info->master_origin = get_xml_str( doc, cur);
-                
+                veejay_msg(VEEJAY_MSG_INFO, "Master origin is %s", veejay_info->master_origin);
             }
         }
 

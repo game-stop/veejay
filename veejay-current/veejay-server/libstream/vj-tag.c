@@ -1514,7 +1514,7 @@ void vj_tag_sanity_scan(void) {
     }
 }
 
-int vj_tag_find_refs_and_delete(int source_type, int id) {
+void vj_tag_find_refs_and_delete(int source_type, int id) {
     
     hscan_t hs;
     hnode_t *node;
@@ -3780,7 +3780,8 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 }
 
 int vj_tag_sprint_status( int tag_id,int tag_count, int samples,int cache,int sa, int ca, int pfps,
-    int frame,int mode,int ts,int seq_rec, int curfps, uint32_t lo, uint32_t hi, int macro, char *str, int feedback, int global_fx )
+    int frame,int mode,int ts,int seq_rec, int curfps, uint32_t lo, uint32_t hi, int macro, char *str,
+    int feedback, int global_fx, int vims_mirror )
 {
     vj_tag *tag;
     tag = vj_tag_get(tag_id);
@@ -3844,6 +3845,7 @@ int vj_tag_sprint_status( int tag_id,int tag_count, int samples,int cache,int sa
     ptr = vj_sprintf( ptr, feedback ); // 35
     ptr = vj_sprintf( ptr, tag_count ); // 36
     ptr = vj_sprintf( ptr, global_fx );
+    ptr = vj_sprintf( ptr, vims_mirror );
     return 0;
 }
 
