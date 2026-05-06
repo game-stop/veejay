@@ -215,8 +215,8 @@ vj_effect *tunnel_init(int width, int height) {
     ve->limits[0] = (int*) vj_calloc(sizeof(int)*ve->num_params);
     ve->limits[1] = (int*) vj_calloc(sizeof(int)*ve->num_params);
 
-    ve->defaults[0]=15; ve->defaults[1]=40; ve->defaults[2]=20;
-    ve->defaults[3]=0;  ve->defaults[4]=100; ve->defaults[5]=0;
+    ve->defaults[0]=-5; ve->defaults[1]=40; ve->defaults[2]=20;
+    ve->defaults[3]=0;  ve->defaults[4]=15; ve->defaults[5]=0;
     ve->defaults[6]=60; ve->defaults[7]=1;   ve->defaults[8]=1;
 
     ve->limits[0][0]=-100; ve->limits[1][0]=100;  // Speed
