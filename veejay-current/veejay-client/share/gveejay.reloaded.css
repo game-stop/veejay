@@ -93,6 +93,10 @@ notebook header.top tabs tab:checked {
     border-color: @select-color;
 }
 
+.fx-anim {
+    background-image: linear-gradient(to top right, @border-color 20%, @fill-color 80%);
+}
+
 scale {
    padding-top:1px;
    padding-bottom:1px;

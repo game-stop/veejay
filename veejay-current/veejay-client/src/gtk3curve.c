@@ -191,12 +191,12 @@ gtk3_curve_get_instance_private (Gtk3Curve *self)
   return (G_STRUCT_MEMBER_P (self, Gtk3Curve_private_offset));
 }
 
-static void gtk_gadget_class_intern_init (gpointer klass)
-{
-  g_type_class_adjust_private_offset (klass, &Gtk3Curve_private_offset);
-  gtk3_curve_parent_class = g_type_class_peek_parent (klass);
-  gtk3_curve_class_init ((Gtk3CurveClass*) klass);
-}
+//~ static void gtk_gadget_class_intern_init (gpointer klass)
+//~ {
+  //~ g_type_class_adjust_private_offset (klass, &Gtk3Curve_private_offset);
+  //~ gtk3_curve_parent_class = g_type_class_peek_parent (klass);
+  //~ gtk3_curve_class_init ((Gtk3CurveClass*) klass);
+//~ }
 
 GType
 gtk3_curve_get_type (void)
@@ -973,7 +973,7 @@ gtk3_curve_button_press (GtkWidget        *widget,
                          GdkEventButton   *event)
 {
   Gtk3CurvePrivate *priv = GTK3_CURVE (widget)->priv;
-  GdkCursorType     new_type = priv->cursor_type;
+  //~ GdkCursorType     new_type = priv->cursor_type;
   GtkAllocation     allocation;
   gint              cx, x, y, width, height, i;
   gint              closest_point = 0;
@@ -984,7 +984,7 @@ gtk3_curve_button_press (GtkWidget        *widget,
   DEBUG_INFO("button press [S]\n");
 
   gtk_grab_add (widget);
-  new_type = GDK_TCROSS;
+  //~ new_type = GDK_TCROSS;
 
   gtk_widget_get_allocation (widget, &allocation);
 
@@ -1072,7 +1072,7 @@ gtk3_curve_button_release (GtkWidget        *widget,
 {
   Gtk3CurvePrivate *priv = GTK3_CURVE (widget)->priv;
   GtkAllocation     allocation;
-  GdkCursorType     new_type = priv->cursor_type;
+  //~ GdkCursorType     new_type = priv->cursor_type;
   gint              src, dst, width, height;
   gfloat            min_x;
   //~ gint              closest_point = 0; # not used
@@ -1153,7 +1153,7 @@ gtk3_curve_button_release (GtkWidget        *widget,
         }
     }
 
-  new_type = GDK_FLEUR;
+  //~ new_type = GDK_FLEUR;
   priv->grab_point = -1;
 
   DEBUG_INFO("button release [E]\n");

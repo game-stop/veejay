@@ -1587,6 +1587,7 @@ void    on_slow_slider_click( GtkWidget *widget, gpointer user_data )
 {
     if(!info->status_lock)
     {
+#if (GTK_CHECK_VERSION (3, 20, 0))
         GdkModifierType state = 0;
         GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(widget));
         if (window) {
@@ -1606,6 +1607,7 @@ void    on_slow_slider_click( GtkWidget *widget, gpointer user_data )
         {
             update_slider_gvalue("slow_slider", 1);
         }
+#endif //TODO #else ?
     }
 }
 
@@ -1628,6 +1630,7 @@ void    on_speed_slider_click(GtkWidget *widget, gpointer user_data)
 {
     if(!info->status_lock)
     {
+#if (GTK_CHECK_VERSION (3, 20, 0))
         GdkModifierType state = 0;
         GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(widget));
         if (window) {
@@ -1647,6 +1650,7 @@ void    on_speed_slider_click(GtkWidget *widget, gpointer user_data)
         {
             update_slider_gvalue("speed_slider", 1);
         }
+#endif //TODO #else ?
     }
 }
 
@@ -3363,68 +3367,70 @@ void    on_curve_animation_changed (GtkWidget *widget, gpointer user_data)
     update_curve_shape();
 }
 
-void	on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
+void on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
+    if(info->status_lock)
+        return;
 
-	if( is_button_toggled("curve_typelinear"))
-	{
-		sample_slot_t *s = info->selected_slot;
-		if(!s)
-			return;
-		set_points_in_curve( GTK3_CURVE_TYPE_LINEAR, info->curve );
-	}
+    if( is_button_toggled("curve_typelinear"))
+    {
+        sample_slot_t *s = info->selected_slot;
+        if(!s)
+            return;
+        set_points_in_curve( GTK3_CURVE_TYPE_LINEAR, info->curve );
+    }
 }
 
-void	on_curve_typespline_toggled(GtkWidget *widget, gpointer user_data)
+void on_curve_typespline_toggled(GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
+    if(info->status_lock)
+        return;
 
-	if( is_button_toggled("curve_typespline"))
-	{
-		sample_slot_t *s = info->selected_slot;
-		if(!s)
-			return;
-		set_points_in_curve( GTK3_CURVE_TYPE_SPLINE, info->curve );
-	}
+    if( is_button_toggled("curve_typespline"))
+    {
+        sample_slot_t *s = info->selected_slot;
+        if(!s)
+            return;
+        set_points_in_curve( GTK3_CURVE_TYPE_SPLINE, info->curve );
+    }
 }
 
-void	on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
+void on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-	if( is_button_toggled("curve_typefreehand"))
-	{
-		sample_slot_t *s = info->selected_slot;
-		if(!s)
-			return;
-		set_points_in_curve( GTK3_CURVE_TYPE_FREE, info->curve );
-	}
+    if(info->status_lock)
+        return;
+    if( is_button_toggled("curve_typefreehand"))
+    {
+        sample_slot_t *s = info->selected_slot;
+        if(!s)
+            return;
+        set_points_in_curve( GTK3_CURVE_TYPE_FREE, info->curve );
+    }
 }
 
-void	on_curve_toggleentry_param_toggled( GtkWidget *widget, gpointer user_data)
+void on_curve_toggleentry_param_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
+    if(info->status_lock)
+        return;
 
-	int i = info->uc.selected_chain_entry;
-	if( i == -1 ) {
-		vj_msg(VEEJAY_MSG_INFO,"No FX entry selected for animation");
-		return;
-	}
+    int i = info->uc.selected_chain_entry;
+    if( i == -1 ) {
+        vj_msg(VEEJAY_MSG_INFO,"No FX entry selected for animation");
+        return;
+    }
 
-	int j = info->uc.selected_parameter_id;
-	if( j == -1) {
-		vj_msg(VEEJAY_MSG_INFO,"No FX anim parameter selected");
-		return;
-	}
-	int k = is_button_toggled( "curve_toggleentry_param" );
+    int j = info->uc.selected_parameter_id;
+    if( j == -1) {
+        vj_msg(VEEJAY_MSG_INFO,"No FX anim parameter selected");
+        return;
+    }
+    int k = is_button_toggled( "curve_toggleentry_param" );
 
-	multi_vims( VIMS_SAMPLE_KF_STATUS_PARAM, "0 %d %d %d", i, j,k );
+    multi_vims( VIMS_SAMPLE_KF_STATUS_PARAM, "0 %d %d %d", i, j,k );
 
-	vj_msg(VEEJAY_MSG_INFO, "%s FX parameter %d", (k==0 ? "Disabled" : "Enabled"), i );
+    update_slider_state( j, k);
+
+    vj_msg(VEEJAY_MSG_INFO, "%s FX parameter %d", (k==0 ? "Disabled" : "Enabled"), j );
 }
 
 void curve_toggleentry_activate( int selected_chain_entry, int active)

@@ -68,7 +68,6 @@ void   set_initial_curve( GtkWidget *curve, int fx_id, int parameter_id, int sta
     float	*vec = (float*) vj_calloc(sizeof(float) * len );
     if(vec == NULL ) return;
 
-	int diff = max - min;
 	for(i = start ; i < end; i ++ ) // initial curve, stepsize is widget internal
 	{
 		vec[k] = value;
@@ -109,7 +108,6 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
         return -1;
     }
 
-	int diff = max - min;
 	for(i = start ; i < end; i ++ )
 	{
 		unsigned char *ptr = in + (k * 4);
@@ -149,7 +147,7 @@ void curve_set_predifined_shape( GtkWidget *curve, int fx_id, int parameter_id,
     _effect_get_minmax(fx_id, &min, &max, parameter_id );
     int veclen1 = -1;
     int i,k;
-    float j, rx, ry, dx, dy, min_x, delta_x;
+    float ry, dy;
 
     int diff = max - min;
 
@@ -180,7 +178,6 @@ void curve_set_predifined_shape( GtkWidget *curve, int fx_id, int parameter_id,
             veclen1 = end - start;
             dy = (diff) / (float)(veclen1 - 1);
             dy = dy * ((float)(steps<<1));
-            delta_x = ((end - start)/(float)steps);
         break;
         case FX_ANIM_SHAPE_SINE:
         case FX_ANIM_SHAPE_COSINE:
@@ -221,7 +218,7 @@ void curve_set_predifined_shape( GtkWidget *curve, int fx_id, int parameter_id,
     switch(shape)
     {
         case FX_ANIM_SHAPE_ZIGZAG:
-            for(i = start, k = 0; i < end; i++, ry+=dy)
+            for(i = start, k = 0, ry = min; i < end; i++, ry+=dy)
             {
                 vec[k] = ry;
                 if (dy > 0)

@@ -3301,6 +3301,11 @@ static void vj_kf_reset(void)
         g_signal_handler_unblock((gpointer)curveparam, handler_id);
     }
 
+    for( int i = 0; i < MAX_UI_PARAMETERS; i ++ )
+    {
+        update_slider_state( i, FALSE );
+    }
+
     info->status_lock = osl;
 }
 
@@ -3421,12 +3426,14 @@ static void update_curve_widget(GtkWidget *curve)
             if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM])) != status ) {
                 gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), status );
             }
+            update_slider_state( info->uc.selected_parameter_id, status );
         }
     } else {
         gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE );
         set_initial_curve( curve, info->uc.entry_tokens[ENTRY_FXID], info->uc.selected_parameter_id,
                            lo, hi ,
                            info->uc.entry_tokens[ ENTRY_P0 + info->uc.selected_parameter_id ] );
+        update_slider_state( info->uc.selected_parameter_id, FALSE );
     }
 
     if(blob) free(blob);
@@ -3597,6 +3604,14 @@ static void update_slider_value(const char *name, gint value, gint scale)
 
     GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
     gtk_adjustment_set_value( a, gvalue );
+}
+
+static void update_slider_state(int slider_num, gboolean animated)
+{
+    if(animated)
+        add_class( widget_cache[WIDGET_SLIDER_P0+slider_num], "fx-anim" );
+    else
+        remove_class( widget_cache[WIDGET_SLIDER_P0+slider_num], "fx-anim" );
 }
 
 static void update_spin_incr( const char *name, gdouble step, gdouble page )
@@ -5083,7 +5098,6 @@ static void load_effectchain_info(void)
     info->uc.reload_hint_checksums[HINT_CHAIN] = checksum;
 
     GtkListStore *store;
-    gchar toggle[4];
     guint arr[VIMS_CHAIN_LIST_ENTRY_VALUES];
     GtkTreeIter iter;
     gint offset=0;
@@ -5146,7 +5160,6 @@ static void load_effectchain_info(void)
 
         // time to fill current entry
         char *name = _effect_get_description( arr[1] );
-        snprintf(toggle,sizeof(toggle),"%s",arr[3] == 1 ? "on" : "off" );
 
         if( last_index == arr[0])
         {
@@ -6238,6 +6251,9 @@ static void setup_vimslist(void)
                                          VIMS_ID, GTK_SORT_ASCENDING);
 }
 
+
+//~ WIP TODO interactive search on both VIMS id and description
+//~ if search lookup is string search for description if is number search for ID
 gboolean on_bundle_interactive_search(GtkTreeView *treeview,
                                      gpointer user_data)
 {
@@ -6278,6 +6294,8 @@ static void setup_bundles(void)
     gtk_tree_selection_set_select_function(selection, view_bundle_selection_func, NULL, NULL);
     gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 
+//~ WIP TODO interactive search on both VIMS id and description
+//~ if search lookup is string search for description if is number search for ID
     gboolean kjdhfkj = gtk_tree_view_get_enable_search( GTK_TREE_VIEW(tree) );
     guint sigjdf = g_signal_connect(tree,
                      "start_interactive_search",
@@ -6951,7 +6969,7 @@ cleanup:
 
 static int should_enable_drop_frame_timecode(float fps)
 {
-    float corrected = fps * 1001.0f / 1000.0f;
+    //~ float corrected = fps * 1001.0f / 1000.0f;
 
     return (
         fabs(fps - 29.97f) < 0.01f ||
@@ -7870,6 +7888,8 @@ static void disable_fx_entry(void) {
 
         gtk_label_set_text(GTK_LABEL(widget_cache[WIDGET_LABEL_P0 +i ]), "");
 
+        update_slider_state(WIDGET_SLIDER_P0 + i, FALSE);
+
         if( faster_ui_ )
             gtk_widget_hide( widget_cache[WIDGET_FRAME_P0 + i]);
     }
@@ -8581,7 +8601,7 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
     }
 
     gtk_css_provider_load_from_data(override, runtime_css, -1, NULL);
-    g_free(runtime_css);
+    g_free((gchar *)runtime_css);
 #endif
 
     g_object_unref(base);
