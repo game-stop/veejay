@@ -27,165 +27,203 @@
 #include <veejaycore/vjmem.h>
 #include "baltantv.h"
 
-#define PLANES 50
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
+#define PLANES 64
+#define MAX_TAPS 8
 
-//Inspired by BaltanTV
+typedef struct
+{
+    uint8_t *historyY;
+    int16_t *historyU;
+    int16_t *historyV;
+
+    int plane;
+    int frame_size;
+    int uv_size;
+
+    int n_threads;
+} baltantv_t;
+
 vj_effect *baltantv_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 2;
-    ve->limits[1][0] = PLANES;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = PLANES/2;
-    ve->defaults[0] = 4;
-    ve->defaults[1] = 1;
-    ve->description = "BaltanTV (EffecTV)";
+    vj_effect *ve = (vj_effect*) vj_calloc(sizeof(vj_effect));
+
+    ve->num_params = 5;
+
+    ve->defaults = (int*) vj_calloc(sizeof(int) * ve->num_params);
+
+    ve->limits[0] = (int*) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int*) vj_calloc(sizeof(int) * ve->num_params);
+
+    ve->limits[0][0] = 1;
+    ve->limits[1][0] = 32;
+    ve->defaults[0] = 8;
+
+    ve->limits[0][1] = 2;
+    ve->limits[1][1] = MAX_TAPS;
+    ve->defaults[1] = 4;
+
+    ve->limits[0][2] = 32;
+    ve->limits[1][2] = 255;
+    ve->defaults[2] = 180;
+
+    ve->limits[0][3] = 0;
+    ve->limits[1][3] = 255;
+    ve->defaults[3] = 128;
+
+    ve->limits[0][4] = 0;
+    ve->limits[1][4] = 255;
+    ve->defaults[4] = 96;
+
+    ve->description = "BaltanTV";
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Stride", "Shift" );
+
+    ve->param_description =
+        vje_build_param_list(
+            ve->num_params,
+            "Stride",
+            "Temporal Taps",
+            "Decay",
+            "Feedback",
+            "Chroma Persistence"
+        );
+
     return ve;
 }
 
 
-typedef struct {
-    unsigned int	plane_ ;
-    uint8_t	*planetableY_;
-    int8_t	*planetableU_;
-    int8_t	*planetableV_;
-
-	uint8_t *currentY;
-	int8_t *currentU;
-	int8_t *currentV;
-
-	int stride;
-} baltantv_t;
-
 void *baltantv_malloc(int w, int h)
 {
     baltantv_t *b = (baltantv_t*) vj_calloc(sizeof(baltantv_t));
-    if(!b) {
+
+    if(!b)
+        return NULL;
+
+    const int len = w * h;
+
+    b->frame_size = len;
+    b->uv_size = len;
+
+    b->historyY = (uint8_t*) vj_calloc(sizeof(uint8_t) * len * PLANES);
+    b->historyU = (int16_t*) vj_calloc(sizeof(int16_t) * len * PLANES);
+
+    b->historyV = (int16_t*) vj_calloc(sizeof(int16_t) * len * PLANES);
+
+    if(!b->historyY || !b->historyU || !b->historyV)
+    {
+        baltantv_free(b);
         return NULL;
     }
 
-	b->planetableY_ = (uint8_t*) vj_calloc( sizeof(uint8_t*) * PLANES * (w * h));
-    if(!b->planetableY_) {
-        free(b);
-        return NULL;
-    }
-	b->planetableU_ = (int8_t*) vj_malloc( sizeof(int8_t*) * PLANES * (w * h));
-    if(!b->planetableU_) {
-        free(b->planetableY_);
-        free(b);
-        return NULL;
-    }
-	b->planetableV_ = (int8_t*) vj_malloc( sizeof(int8_t*) * PLANES * (w * h));
-    if(!b->planetableV_) {
-        free(b->planetableY_);
-        free(b->planetableU_);
-		free(b);
-        return NULL;
-    }
+    b->n_threads = vje_advise_num_threads(len);
 
-	b->currentY = (uint8_t*) vj_calloc(sizeof(uint8_t) * w * h );
-	b->currentU = (int8_t*) vj_malloc(sizeof(int8_t) * w * h );
-	b->currentV = (int8_t*) vj_malloc(sizeof(int8_t) * w * h );
-
-	veejay_memset( b->planetableU_, 128, w * h );
-	veejay_memset( b->planetableV_, 128, w * h );
-
-	return (void*) b;
+    return b;
 }
 
-void	baltantv_free(void *ptr)
+void baltantv_free(void *ptr)
 {
     baltantv_t *b = (baltantv_t*) ptr;
-    free(b->planetableY_);
-    free(b->planetableU_);
-    free(b->planetableV_);
-	free(b->currentY);
-	free(b->currentU);
-	free(b->currentV);
+
+    if(!b)
+        return;
+
+    free(b->historyY);
+    free(b->historyU);
+    free(b->historyV);
+
     free(b);
 }
 
-void baltantv_apply( void *ptr, VJFrame *frame, int *args) {
-    int stride = args[0];
-    int shift = args[1];
+void baltantv_apply(void *ptr, VJFrame *frame, int *args)
+{
+    baltantv_t *b = (baltantv_t*) ptr;
 
-	unsigned int cf;
-	const int len = frame->len;
+    const int stride        = args[0];
+    const int taps          = args[1];
+    const int decay         = args[2];
+    const int feedback      = args[3];
+    const int chromaPersist = args[4];
+
+    const int len    = frame->len;
     const int uv_len = frame->uv_len;
-	uint8_t *Y = frame->data[0];
+
+    uint8_t *Y = frame->data[0];
     uint8_t *U = frame->data[1];
     uint8_t *V = frame->data[2];
 
-    baltantv_t *b = (baltantv_t*) ptr;
+    uint8_t *inY = Y;
+    uint8_t *inU = U;
+    uint8_t *inV = V;
 
-	uint8_t *pDstY = b->planetableY_ + (b->plane_ * len);
-    int8_t *pDstU = b->planetableU_ + (b->plane_ * uv_len);
-    int8_t *pDstV = b->planetableV_ + (b->plane_ * uv_len);
+    uint8_t *restrict dstY = b->historyY + (b->plane * len);
+    int16_t *restrict dstU = b->historyU + (b->plane * uv_len);
+    int16_t *restrict dstV = b->historyV + (b->plane * uv_len);
 
-	uint8_t *cY = b->currentY;
-	int8_t *cU = b->currentU;
-	int8_t *cV = b->currentV;
+    const int plane = b->plane;
 
-    uint32_t y;
-    int32_t u,v;
+    #pragma omp parallel num_threads(b->n_threads)
+    {
+    
+        #pragma omp for simd schedule(static)
+        for(int i = 0; i < len; i++)
+            dstY[i] = inY[i];
 
+        #pragma omp for simd schedule(static)
+        for(int i = 0; i < uv_len; i++)
+        {
+            dstU[i] = inU[i] - 128;
+            dstV[i] = inV[i] - 128;
+        }
 
-	if( b->stride != stride ) {
-		b->plane_ = 0;
-		b->stride = stride;
-	}
-#pragma omp simd
-	for( int i = 0; i < len ; i ++ ) {
-		pDstY[i] = Y[i];
-		cY[i] = Y[i];
+        #pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+        {
+            int accumY = 0;
+
+            for(int t = 0; t < taps; t++)
+            {
+                int idx = (plane - (t * stride) + PLANES) & (PLANES - 1);
+                accumY += b->historyY[idx * len + i];
+            }
+
+            accumY = (accumY * decay) >> 8;
+
+            int finalY =
+                ((inY[i] * (255 - feedback)) +
+                 (accumY * feedback / taps)) >> 8;
+
+            Y[i] = CLAMP_Y(finalY);
+        }
+
+        #pragma omp for schedule(static)
+        for(int i = 0; i < uv_len; i++)
+        {
+            int accumU = 0;
+            int accumV = 0;
+
+            for(int t = 0; t < taps; t++)
+            {
+                int idx = (plane - (t * stride) + PLANES) & (PLANES - 1);
+
+                accumU += b->historyU[idx * uv_len + i];
+                accumV += b->historyV[idx * uv_len + i];
+            }
+
+            accumU /= taps;
+            accumV /= taps;
+
+            accumU = (accumU * chromaPersist) >> 8;
+            accumV = (accumV * chromaPersist) >> 8;
+
+            U[i] = CLAMP_UV(accumU + 128);
+            V[i] = CLAMP_UV(accumV + 128);
+        }
     }
-#pragma omp simd
-    for( int i = 0; i < uv_len; i ++ ) {
-        pDstU[i] = (U[i]-128);
-        pDstV[i] = (V[i]-128);
-    }
 
-	uint8_t *pSrcY[4];
-    int8_t *pSrcU[4];
-    int8_t *pSrcV[4];
-    for (int i = 0; i < 4; ++i) {
-        int offset = (b->plane_ - i + stride) % PLANES;
-        offset = (offset + PLANES) % PLANES;
-        pSrcY[i] = b->planetableY_ + (offset * len);
-        pSrcU[i] = b->planetableU_ + (offset * uv_len);
-        pSrcV[i] = b->planetableV_ + (offset * uv_len);
-    }
-	
-	uint32_t ySum, uSum, vSum;
-    for (int i = 0; i < len; ++i) {
-        ySum = cY[i] + pSrcY[0][i] + pSrcY[1][i] + pSrcY[2][i] + pSrcY[3][i];
-        Y[i] = (uint8_t)(ySum / 5); 
-
-        uSum = pSrcU[0][i] + pSrcU[1][i] + pSrcU[2][i] + pSrcU[3][i];
-        U[i] = 128 + (uSum / 4);
-
-        vSum = pSrcV[0][i] + pSrcV[1][i] + pSrcV[2][i] + pSrcV[3][i];
-        V[i] = 128 + (vSum / 4);
-	}
-
-	int offset = (b->plane_ + shift + PLANES) % PLANES;
-    for (int i = 0; i < len; ++i) {
-        b->planetableY_[offset * len + i] = Y[i];
-    }
-    for (int i = 0; i < uv_len; ++i) {
-        b->planetableU_[offset * uv_len + i] = U[i] - 128;
-        b->planetableV_[offset * uv_len + i] = V[i] - 128;
-    }
-
-	b->plane_ ++;
-	b->plane_ = b->plane_ % stride;
+    b->plane = (plane + 1) & (PLANES - 1);
 }
