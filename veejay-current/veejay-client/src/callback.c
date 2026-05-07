@@ -1746,10 +1746,10 @@ void	on_v4l_gain_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
+    	GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d gain", 
-      info->selected_slot->sample_id,
-      (int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+      		info->selected_slot->sample_id,
+      		(int)(gtk_adjustment_get_value (a) * 65535.0) );
 	}
 }
 
@@ -1757,90 +1757,90 @@ void	on_v4l_redbalance_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
+    	GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d red_balance",
-      info->selected_slot->sample_id,
-      (int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+			info->selected_slot->sample_id,
+			(int)(gtk_adjustment_get_value (a) * 65535.0) );
 	}
 }
 void	on_v4l_bluebalance_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
+    	GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d blue_balance",
-      info->selected_slot->sample_id,
-      (int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+			info->selected_slot->sample_id,
+			(int)(gtk_adjustment_get_value (a) * 65535.0) );
 	}
 }
 void	on_v4l_greenbalance_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
+    	GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d green_balance",
-      info->selected_slot->sample_id,
-      (int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+			info->selected_slot->sample_id,
+			(int)(gtk_adjustment_get_value (a) * 65535.0) ); 
 	}
 }
 void	on_v4l_sharpness_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
+		GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d sharpness",
-      info->selected_slot->sample_id,
-      (int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+			info->selected_slot->sample_id,
+			(int)(gtk_adjustment_get_value (a) * 65535.0) ); 
 	}
 }
 void	on_v4l_backlightcompensation_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
+		GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d bl_compensate",
-      info->selected_slot->sample_id,
-      (int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+			info->selected_slot->sample_id,
+			(int)(gtk_adjustment_get_value (a) * 65535.0) ); 
 	}
 }
 void	on_v4l_temperature_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
+    	GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d temperature",
-      info->selected_slot->sample_id,
-      (int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+		info->selected_slot->sample_id,
+		(int)(gtk_adjustment_get_value (a) * 65535.0) ); 
 	}
 }
 void	on_v4l_exposure_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
+    	GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d exposure",
-      info->selected_slot->sample_id,
-      (int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+			info->selected_slot->sample_id,
+			(int)(gtk_adjustment_get_value (a) * 65535.0) ); 
 	}
 }
 void	on_v4l_whiteness_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
+    	GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d whiteness",
-      info->selected_slot->sample_id,
-      (int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+			info->selected_slot->sample_id,
+			(int)(gtk_adjustment_get_value (a) * 65535.0) ); 
 	}
 }
 void	on_v4l_black_level_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
+   		GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d black_level",
-      info->selected_slot->sample_id,
-      (int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+			info->selected_slot->sample_id,
+			(int)(gtk_adjustment_get_value (a) * 65535.0) ); 
 	}
 }
 void	on_check_autogain_toggled(GtkWidget *widget, gpointer user_data)
@@ -5267,19 +5267,6 @@ void	on_button_vloop_start_clicked(GtkWidget *widget, gpointer user_data)
 {
 	multi_vims( VIMS_VLOOPBACK_START, "%d", get_nums( "spin_vloop" ) );
 }
-
-/*
-void on_toggle_multicast_toggled(GtkWidget *widget, gpointer user_data)
-{
-	if( is_button_toggled( "toggle_multicast" ) ) {
-		multi_vims( VIMS_VIDEO_MCAST_START, "%d", 0 );
-        vj_msg(VEEJAY_MSG_INFO, "Multicast enabled");
-	}
-	else {
-		single_vims( VIMS_VIDEO_MCAST_STOP );
-        vj_msg(VEEJAY_MSG_INFO, "Multicast disabled");
-	}
-}*/
 
 void on_toggle_vims_forwarding_toggled(GtkWidget *widget, gpointer user_data)
 {

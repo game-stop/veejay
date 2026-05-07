@@ -711,7 +711,6 @@ static struct
     {"SRTframe",                 WIDGET_SRTFRAME },
     {"frame_fxtree1",            WIDGET_FRAME_FXTREE1 },
     {"button_5_4",               WIDGET_BUTTON_5_4 },
-    {"toggle_multicast",         WIDGET_TOGGLE_MULTICAST },
     {"cali_save_button",         WIDGET_CALI_SAVE_BUTTON },
     {"veejay_box",               WIDGET_VEEJAY_BOX }, 
     { "vbox633",                 WIDGET_VBOX633 },
