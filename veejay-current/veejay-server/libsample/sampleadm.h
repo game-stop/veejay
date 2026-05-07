@@ -306,7 +306,7 @@ extern int sample_chain_remove(int s1, int position);
 extern int sample_chain_clear(int s1);
 extern int sample_chain_size(int s1);
 extern int sample_chain_get_free_entry(int s1);
-extern int sample_chain_add(int s1, int c, int effect_nr);
+extern int sample_chain_add(int s1, int c, int effect_nr, int is_enabled);
 
 /* channel depends on source , it select a channel of a certain video source */
 extern int sample_get_chain_channel(int s1, int position);
@@ -386,6 +386,7 @@ extern int     sample_max_video_length(int s1);
 extern	long	sample_get_resume(int s1);
 extern int sample_set_resume(int s1, long pos );
 extern int sample_set_resume_override(int s1, long pos);
+extern int sample_get_remaining_frames(int sample_id);
 extern void	sample_update_ascociated_samples(int s1);
 
 extern void	sample_chain_alloc_kf( int s1, int entry );

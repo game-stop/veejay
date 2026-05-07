@@ -1303,36 +1303,56 @@ int sample_set_resume_override(int s1, long position)
     if(!sample)
         return -1;
 
-    if(position == -1) {
-        int start = sample_get_startFrame(s1);
-        int end = sample_get_endFrame(s1);
+    int start = sample_get_startFrame(s1);
+    int end   = sample_get_endFrame(s1);
 
-        if( sample->speed < 0) {
-            if(sample->resume_pos < start) {
-                //sample->speed = sample->speed * -1;
-                sample->resume_pos = start;
-            }
-            else if(sample->resume_pos > end) {
-                sample->resume_pos = end;
-            }
+    if(position == -1)
+    {
+        if(sample->resume_pos < start || sample->resume_pos > end)
+        {
+            sample->resume_pos =
+                (sample->speed < 0) ? end : start;
         }
-        else if(sample->speed >= 0) {
-            if(sample->resume_pos > end) {
-                //sample->speed = sample->speed * -1;
-                sample->resume_pos = end;
-            }
-            else if ( sample->resume_pos < start ) {
+        else
+        {
+            if(sample->resume_pos < start)
                 sample->resume_pos = start;
-            }
+
+            if(sample->resume_pos > end)
+                sample->resume_pos = end;
         }
 
         sample->loop_pp = 0;
     }
-    else {
+    else
+    {
         sample->resume_pos = position;
     }
 
     return 1;
+}
+
+int sample_get_remaining_frames(int sample_id)
+{
+    sample_info *si = sample_get(sample_id);
+    if(!si)
+        return 1;
+
+    int start = sample_get_startFrame(sample_id);
+    int end   = sample_get_endFrame(sample_id);
+
+    int pos   = si->resume_pos;
+
+    if(pos < start)
+        pos = start;
+
+    if(pos > end)
+        pos = end;
+
+    if(si->speed < 0)
+        return (pos - start) + 1;
+
+    return (end - pos) + 1;
 }
 
 int sample_set_resume(int s1,long position)
@@ -2273,7 +2293,7 @@ int sample_chain_set_kfs( int s1, int len, char *data )
    return keyframe_unpack( (unsigned char*) data, len, &entry,s1,1 );
 }
 
-int sample_chain_add(int s1, int c, int effect_nr)
+int sample_chain_add(int s1, int c, int effect_nr, int is_enabled)
 {
     int effect_params = 0, i;
     sample_info *sample = sample_get(s1);
@@ -2299,7 +2319,7 @@ int sample_chain_add(int s1, int c, int effect_nr)
         sample->effect_chain[c]->arg[i] = vje_get_param_default(effect_nr, i);
     }
 
-    sample->effect_chain[c]->e_flag = 1;
+    sample->effect_chain[c]->e_flag = is_enabled;
     sample->effect_chain[c]->kf_status = 0;
     sample->effect_chain[c]->kf_type = 0;
 
