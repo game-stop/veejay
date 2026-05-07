@@ -3302,6 +3302,11 @@ static void vj_kf_reset(void)
         g_signal_handler_unblock((gpointer)curveparam, handler_id);
     }
 
+    for( int i = 0; i < MAX_UI_PARAMETERS; i ++ )
+    {
+        update_slider_state( i, FALSE );
+    }
+
     info->status_lock = osl;
 }
 
@@ -3422,12 +3427,14 @@ static void update_curve_widget(GtkWidget *curve)
             if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM])) != status ) {
                 gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), status );
             }
+            update_slider_state( info->uc.selected_parameter_id, status );
         }
     } else {
         gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE );
         set_initial_curve( curve, info->uc.entry_tokens[ENTRY_FXID], info->uc.selected_parameter_id,
                            lo, hi ,
                            info->uc.entry_tokens[ ENTRY_P0 + info->uc.selected_parameter_id ] );
+        update_slider_state( info->uc.selected_parameter_id, FALSE );
     }
 
     if(blob) free(blob);
@@ -3598,6 +3605,14 @@ static void update_slider_value(const char *name, gint value, gint scale)
 
     GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
     gtk_adjustment_set_value( a, gvalue );
+}
+
+static void update_slider_state(int slider_num, gboolean animated)
+{
+    if(animated)
+        add_class( widget_cache[WIDGET_SLIDER_P0+slider_num], "fx-anim" );
+    else
+        remove_class( widget_cache[WIDGET_SLIDER_P0+slider_num], "fx-anim" );
 }
 
 static void update_spin_incr( const char *name, gdouble step, gdouble page )
@@ -7873,6 +7888,8 @@ static void disable_fx_entry(void) {
         gtk_widget_set_tooltip_text( widget_cache[WIDGET_SLIDER_P0 + i], "" );
 
         gtk_label_set_text(GTK_LABEL(widget_cache[WIDGET_LABEL_P0 +i ]), "");
+
+        update_slider_state(WIDGET_SLIDER_P0 + i, FALSE);
 
         if( faster_ui_ )
             gtk_widget_hide( widget_cache[WIDGET_FRAME_P0 + i]);

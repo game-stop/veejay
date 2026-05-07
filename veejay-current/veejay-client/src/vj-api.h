@@ -45,6 +45,7 @@ gboolean gveejay_idle(gpointer data);
 int _effect_get_minmax( int effect_id, int *min, int *max, int index );
 void register_signals(void);
 int is_button_toggled(const char *name);
+static void update_slider_state(int slider_num, gboolean animated);
 gchar *_utf8str( const char *c_str );
 void vj_gui_set_stylesheet(const char *css_file, gboolean small_as_possible); 
 void vj_gui_cb(int state, char *hostname, int port_num);

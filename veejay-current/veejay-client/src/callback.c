@@ -3428,6 +3428,8 @@ void on_curve_toggleentry_param_toggled( GtkWidget *widget, gpointer user_data)
 
     multi_vims( VIMS_SAMPLE_KF_STATUS_PARAM, "0 %d %d %d", i, j,k );
 
+    update_slider_state( j, k);
+
     vj_msg(VEEJAY_MSG_INFO, "%s FX parameter %d", (k==0 ? "Disabled" : "Enabled"), j );
 }
 
