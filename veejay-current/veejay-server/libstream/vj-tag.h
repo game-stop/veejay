@@ -209,7 +209,7 @@ vj_tag 	*vj_tag_get(int id);
 int 	vj_tag_get_effect_any(int t1, int position);
 
 /* return -1 on error, otherwise argument gets updated */
-int 	vj_tag_set_effect(int t1, int position, int effect_id);
+int 	vj_tag_set_effect(int t1, int position, int effect_id, int is_enabled);
 
 /* return -1 on error, or return e_flag (effect enabled/disabled 1/0)*/
 int 	vj_tag_get_chain_status(int t1, int position);

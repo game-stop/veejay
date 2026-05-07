@@ -2261,7 +2261,7 @@ int vj_tag_chain_set_kfs( int s1, int len, unsigned char *data )
     return keyframe_unpack( data, len, &entry,s1,0);
 }
 
-int vj_tag_set_effect(int t1, int position, int effect_id)
+int vj_tag_set_effect(int t1, int position, int effect_id, int is_enabled)
 {
     int params, i;
     vj_tag *tag = vj_tag_get(t1);
@@ -2296,7 +2296,7 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
     for (i = 0; i < params; i++) {
         tag->effect_chain[position]->arg[i] = vje_get_param_default(effect_id, i);
     }
-    tag->effect_chain[position]->e_flag = 1; 
+    tag->effect_chain[position]->e_flag = is_enabled; 
     tag->effect_chain[position]->kf_status = 0;
     tag->effect_chain[position]->kf_type = 0;
     
