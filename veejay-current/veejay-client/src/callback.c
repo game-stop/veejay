@@ -3428,7 +3428,7 @@ void	on_curve_toggleentry_param_toggled( GtkWidget *widget, gpointer user_data)
 
 	multi_vims( VIMS_SAMPLE_KF_STATUS_PARAM, "0 %d %d %d", i, j,k );
 
-	vj_msg(VEEJAY_MSG_INFO, "%s FX parameter %d", (k==0 ? "Disabled" : "Enabled"), i );
+	vj_msg(VEEJAY_MSG_INFO, "%s FX parameter %d", (k==0 ? "Disabled" : "Enabled"), j );
 }
 
 void curve_toggleentry_activate( int selected_chain_entry, int active)
