@@ -151,6 +151,142 @@ static  gboolean  timeline_draw(GtkWidget *widget, cairo_t *cr );
 static  GObjectClass  *parent_class = NULL;
 static  gint  timeline_signals[LAST_SIGNAL] = { 0 };
 
+#define TIMELINE_HANDLE_HIT_PX   10.0
+#define TIMELINE_STEPPER_HIT_PX  28.0
+#define TIMELINE_MIN_FRAMES      1.0
+
+static inline gdouble
+timeline_clamp01(gdouble v)
+{
+    if (v < 0.0) return 0.0;
+    if (v > 1.0) return 1.0;
+    return v;
+}
+
+static inline gdouble
+timeline_frame_count(TimelineSelection *te)
+{
+    return MAX(te->num_video_frames, TIMELINE_MIN_FRAMES);
+}
+
+static inline gdouble
+timeline_x_to_norm(TimelineSelection *te, gdouble x, gdouble width)
+{
+    if (width <= 1.0)
+        return 0.0;
+
+    return timeline_clamp01(x / width);
+}
+
+static inline gdouble
+timeline_norm_to_frame(TimelineSelection *te, gdouble n)
+{
+    return floor(timeline_clamp01(n) * timeline_frame_count(te));
+}
+
+static inline gdouble
+timeline_frame_to_x(TimelineSelection *te, gdouble frame, gdouble width)
+{
+    gdouble nframes = timeline_frame_count(te);
+
+    if (nframes <= 0.0)
+        return 0.0;
+
+    return CLAMP((frame / nframes) * width, 0.0, width);
+}
+
+gdouble snap_to_nearest_valid_position(gdouble pos, int num_video_frames)
+{
+    if (num_video_frames <= 1)
+        return timeline_clamp01(pos);
+
+    pos = timeline_clamp01(pos);
+
+    gdouble frame_interval = 1.0 / (gdouble) num_video_frames;
+    gdouble snapped = round(pos / frame_interval) * frame_interval;
+
+    return timeline_clamp01(snapped);
+}
+
+static inline gdouble
+timeline_snap_norm(TimelineSelection *te, gdouble n)
+{
+    return snap_to_nearest_valid_position(timeline_clamp01(n),
+                                          (int) timeline_frame_count(te));
+}
+
+static gboolean
+timeline_point_near_x(gdouble x, gdouble target, gdouble radius)
+{
+    return fabs(x - target) <= radius;
+}
+
+static void
+timeline_update_cursor(GtkWidget *widget, TimelineAction action)
+{
+    GdkWindow *window = gtk_widget_get_window(widget);
+
+    if (!window)
+        return;
+
+    GdkDisplay *display = gdk_window_get_display(window);
+    GdkCursor *cursor = NULL;
+
+    switch (action) {
+        case action_pos:
+        case action_in_point:
+        case action_out_point:
+            cursor = gdk_cursor_new_for_display(display, GDK_SB_H_DOUBLE_ARROW);
+            break;
+
+        case action_atomic:
+            cursor = gdk_cursor_new_for_display(display, GDK_FLEUR);
+            break;
+
+        default:
+            break;
+    }
+
+    gdk_window_set_cursor(window, cursor);
+
+    if (cursor)
+        g_object_unref(cursor);
+}
+
+static TimelineAction
+timeline_pick_action(TimelineSelection *te,
+                     gdouble x,
+                     gdouble y,
+                     gdouble width)
+{
+    if (te->has_stepper && POINT_IN_RECT(x, y, te->stepper))
+        return action_pos;
+
+    if (!te->has_selection)
+        return action_none;
+
+    gdouble in_x  = te->in  * width;
+    gdouble out_x = te->out * width;
+
+    if (timeline_point_near_x(x, in_x, TIMELINE_HANDLE_HIT_PX))
+        return action_in_point;
+
+    if (timeline_point_near_x(x, out_x, TIMELINE_HANDLE_HIT_PX))
+        return action_out_point;
+
+    if (POINT_IN_RECT(x, y, te->selection)) {
+        if (te->bind)
+            return action_atomic;
+
+        if (fabs(x - in_x) < fabs(x - out_x))
+            return action_in_point;
+
+        return action_out_point;
+    }
+
+    return action_point;
+}
+
 extern  void on_timeline_move_selection();
 
 struct _TimelineSelectionClass
@@ -178,7 +314,7 @@ static  void  set_property  (GObject *object,
     case MAX:
     if(te->max != g_value_get_double(value))
     {
-      te->min = g_value_get_double(value);
+      te->max = g_value_get_double(value);
     }
     break;
     case POS:
@@ -465,19 +601,6 @@ gboolean timeline_get_bind( TimelineSelection *te )
   return result;
 }
 
-gdouble snap_to_nearest_valid_position(gdouble pos, int num_video_frames) {
-    if (pos < 0.0) {
-        pos = 0.0;
-    } else if (pos > 1.0) {
-        pos = 1.0;
-    }
-
-    gdouble frameInterval = 1.0 / num_video_frames;
-    gdouble snappedPos = round(pos / frameInterval) * frameInterval;
-
-    return snappedPos;
-}
-
 void timeline_set_bind(GtkWidget *widget, gboolean active)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
@@ -485,15 +608,21 @@ void timeline_set_bind(GtkWidget *widget, gboolean active)
   g_signal_emit( te->widget, timeline_signals[BIND_CHANGED], 0);
 }
 
-void timeline_set_out_point( GtkWidget *widget, gdouble pos )
+void timeline_set_out_point(GtkWidget *widget, gdouble pos)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
+
   if(te->bind)
     return;
-  pos = snap_to_nearest_valid_position( pos, te->num_video_frames );
-  g_object_set( G_OBJECT(te), "out", pos, NULL );
+
+  pos = timeline_snap_norm(te, pos);
+
+  if (pos < te->in)
+      pos = te->in;
+
+  g_object_set(G_OBJECT(te), "out", pos, NULL);
   g_signal_emit(te->widget, timeline_signals[OUT_CHANGED], 0);
-  gtk_widget_queue_draw( GTK_WIDGET(te->widget) );
+  gtk_widget_queue_draw(GTK_WIDGET(te->widget));
 }
 
 void timeline_clear_points( GtkWidget *widget )
@@ -511,26 +640,40 @@ void timeline_clear_points( GtkWidget *widget )
   gtk_widget_queue_draw(GTK_WIDGET(te->widget) );
 }
 
-void timeline_set_in_point( GtkWidget *widget, gdouble pos )
+void timeline_set_in_point(GtkWidget *widget, gdouble pos)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
+
   if(te->bind)
     return;
-  pos = snap_to_nearest_valid_position( pos, te->num_video_frames );
-  g_object_set( G_OBJECT(te), "in", pos, NULL );
+
+  pos = timeline_snap_norm(te, pos);
+
+  if (pos > te->out)
+      pos = te->out;
+
+  g_object_set(G_OBJECT(te), "in", pos, NULL);
   g_signal_emit(te->widget, timeline_signals[IN_CHANGED], 0);
-  gtk_widget_queue_draw( GTK_WIDGET(te->widget) );
+  gtk_widget_queue_draw(GTK_WIDGET(te->widget));
 }
 
 void timeline_set_in_and_out_point(GtkWidget *widget, gdouble start, gdouble end)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
-  start = snap_to_nearest_valid_position( start, te->num_video_frames );
-  end = snap_to_nearest_valid_position( end, te->num_video_frames );
-  g_object_set( G_OBJECT(te), "in", start, NULL );
-  g_object_set( G_OBJECT(te), "out", end, NULL );
 
-  gtk_widget_queue_draw( GTK_WIDGET(te->widget) );
+  start = timeline_snap_norm(te, start);
+  end   = timeline_snap_norm(te, end);
+
+  if (start > end) {
+      gdouble tmp = start;
+      start = end;
+      end = tmp;
+  }
+
+  g_object_set(G_OBJECT(te), "in", start, NULL);
+  g_object_set(G_OBJECT(te), "out", end, NULL);
+
+  gtk_widget_queue_draw(GTK_WIDGET(te->widget));
 }
 
 void timeline_set_selection( GtkWidget *widget, gboolean active)
@@ -548,15 +691,21 @@ void  timeline_set_length( GtkWidget *widget, gdouble length, gdouble pos)
   timeline_set_pos( GTK_WIDGET(te->widget), pos );
 }
 
-void  timeline_set_pos( GtkWidget *widget,gdouble pos)
+void timeline_set_pos(GtkWidget *widget, gdouble pos)
 {
-  TimelineSelection *te = TIMELINE_SELECTION( widget );
-  //pos = snap_to_nearest_valid_position( pos, te->num_video_frames );
-  g_object_set( G_OBJECT(te), "pos", pos, NULL );
-  g_signal_emit( te->widget, timeline_signals[POS_CHANGED], 0);
-  gtk_widget_queue_draw( GTK_WIDGET(te->widget) );
-}
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
 
+  gdouble nframes = timeline_frame_count(te);
+
+  if (pos < 0.0)
+      pos = 0.0;
+  else if (pos > nframes)
+      pos = nframes;
+
+  g_object_set(G_OBJECT(te), "pos", pos, NULL);
+  g_signal_emit(te->widget, timeline_signals[POS_CHANGED], 0);
+  gtk_widget_queue_draw(GTK_WIDGET(te->widget));
+}
 gdouble timeline_get_pos( TimelineSelection *te )
 {
   gdouble result = 0.0;
@@ -587,183 +736,239 @@ gdouble timeline_get_length( TimelineSelection *te )
   return result;
 }
 
-static  void  move_selection( GtkWidget *widget, gdouble x, gdouble width )
+static void move_selection(GtkWidget *widget, gdouble x, gdouble width)
 {
-  TimelineSelection *te = TIMELINE_SELECTION( widget );
-
-  gdouble dx3  = (0.5 * (te->out - te->in)) * width;
-
-  gdouble dx1  = CLAMP(x - dx3, 0, width);
-  gdouble dx2  = CLAMP(x + dx3, 0, width);
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
 
   gdouble range = te->out - te->in;
 
-  te->in = (1.0/width) * dx1;
-  te->out = (1.0/width ) * dx2;
+  if (range <= 0.0 || width <= 1.0)
+      return;
 
-  // keep marker length when boundary is reached
-  if(te->in <= 0) {
-    te->in = 0;
-    te->out = range;
+  gdouble center_norm = timeline_x_to_norm(te, x, width);
+
+  gdouble new_in = center_norm - te->move_x;
+  gdouble new_out = new_in + range;
+
+  if (new_in < 0.0) {
+      new_in = 0.0;
+      new_out = range;
   }
-  else if( te->in >= (1.0 - range)) {
-    te->in = 1.0 - range;
-    te->out = 1.0;
+  else if (new_out > 1.0) {
+      new_out = 1.0;
+      new_in = 1.0 - range;
   }
-  
-  //timeline_set_out_point(widget, te->out );
-  //timeline_set_in_point(widget, te->in );
-  timeline_set_in_and_out_point(widget,te->in,te->out);
-  te->move_x = x;
+
+  new_in  = timeline_snap_norm(te, new_in);
+  new_out = timeline_snap_norm(te, new_out);
+
+  if (new_out < new_in) {
+      gdouble tmp = new_in;
+      new_in = new_out;
+      new_out = tmp;
+  }
+
+  te->in = new_in;
+  te->out = new_out;
 
   g_signal_emit(te->widget, timeline_signals[IN_CHANGED], 0);
   g_signal_emit(te->widget, timeline_signals[OUT_CHANGED], 0);
 
+  gtk_widget_queue_draw(widget);
+
   on_timeline_move_selection();
 }
 
-static gboolean
-event_scroll (GtkWidget *widget, GdkEventScroll *ev, gpointer user_data)
+static gboolean event_scroll(GtkWidget *widget, GdkEventScroll *ev, gpointer user_data)
 {
-  TimelineSelection *te = TIMELINE_SELECTION (widget);
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
 
   GdkScrollDirection direction;
-  gboolean scroll_status = gdk_event_get_scroll_direction((GdkEvent*)ev, &direction);
-  if(scroll_status)
-  {
-    if( direction == GDK_SCROLL_UP ) {
-      gdouble cur_pos = timeline_get_pos(te);
-      timeline_set_pos( widget, cur_pos + 1 );
-    }
-    else if( direction == GDK_SCROLL_DOWN ) {
-      gdouble cur_pos = timeline_get_pos(te);
-      timeline_set_pos( widget, cur_pos - 1 );
-    }
-  }
-  gtk_widget_queue_draw( widget );
 
-  return FALSE;
+  if (gdk_event_get_scroll_direction((GdkEvent*)ev, &direction)) {
+    gdouble cur_pos = timeline_get_pos(te);
+
+    if (direction == GDK_SCROLL_UP)
+      timeline_set_pos(widget, cur_pos + 1.0);
+    else if (direction == GDK_SCROLL_DOWN)
+      timeline_set_pos(widget, cur_pos - 1.0);
+  }
+
+  return TRUE;
 }
 
-static  gboolean event_press(GtkWidget *widget, GdkEventButton *ev, gpointer user_data)
+static gboolean event_press(GtkWidget *widget, GdkEventButton *ev, gpointer user_data)
 {
-  TimelineSelection *te = TIMELINE_SELECTION( widget );
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
   GtkAllocation all;
+
   gtk_widget_get_allocation(widget, &all);
-  gdouble width   = all.width;
+
+  gdouble width = (gdouble) all.width;
 
   te->grab_button = ev->button;
   te->current_location = MOUSE_WIDGET;
+  te->action = action_none;
 
-  if( ev->type == GDK_2BUTTON_PRESS && te->grab_button == 1 )
-  {
-    timeline_clear_points( widget );
-    return FALSE;
+  gtk_widget_grab_focus(widget);
+
+  if (ev->type == GDK_2BUTTON_PRESS && ev->button == 1) {
+    timeline_clear_points(widget);
+    return TRUE;
   }
 
-  if(te->grab_button == 1 && POINT_IN_RECT( ev->x, ev->y, te->stepper ) )
-  {
-    if(te->has_stepper)
-    {
-      te->current_location = MOUSE_STEPPER;
-      te->action = action_pos;
+  TimelineAction picked = timeline_pick_action(te, ev->x, ev->y, width);
+  te->action = picked;
+
+  if (ev->button == 1) {
+    switch (picked) {
+      case action_pos:
+        te->current_location = MOUSE_STEPPER;
+        timeline_set_pos(widget, timeline_norm_to_frame(te,
+                         timeline_x_to_norm(te, ev->x, width)));
+        return TRUE;
+
+      case action_atomic:
+        te->current_location = MOUSE_SELECTION;
+
+        {
+          gdouble mouse_norm = timeline_x_to_norm(te, ev->x, width);
+          te->move_x = mouse_norm - te->in;
+        }
+
+        return TRUE;
+
+      case action_in_point:
+        te->bind = FALSE;
+        timeline_set_in_point(widget, timeline_x_to_norm(te, ev->x, width));
+        return TRUE;
+
+      case action_out_point:
+        te->bind = FALSE;
+        timeline_set_out_point(widget, timeline_x_to_norm(te, ev->x, width));
+        return TRUE;
+
+      case action_point:
+        timeline_set_point(widget, timeline_norm_to_frame(te,
+                           timeline_x_to_norm(te, ev->x, width)));
+        return TRUE;
+
+      default:
+        break;
     }
-    return FALSE;
   }
 
-  if(te->grab_button == 1 && te->has_selection)
-  {
-    if( POINT_IN_RECT( ev->x, ev->y, te->selection ) && te->bind )
-    {
-      te->current_location = MOUSE_SELECTION;
-    }
-
-    gdouble val = (1.0 / width) * ev->x;
-
+  if (ev->button == 3 && te->has_selection) {
     te->bind = FALSE;
-    timeline_set_in_point(widget,val);
-    
+    te->action = action_out_point;
+    timeline_set_out_point(widget, timeline_x_to_norm(te, ev->x, width));
+    return TRUE;
   }
-  else if(te->grab_button == 3 && te->has_selection )
-  {
-    if( POINT_IN_RECT( ev->x, ev->y, te->selection ) && te->bind )
-    {
-      te->current_location = MOUSE_SELECTION;
-    }
-    gdouble val = (1.0/width) * ev->x;
-    te->bind = FALSE;
-    timeline_set_out_point(widget,val);
-    
-  }
-  else if(te->grab_button == 2 && te->has_selection)
-  {
-    gint dx = ev->x;
-    gint dy = ev->y;
-    if( POINT_IN_RECT( dx, dy, te->selection ) )
-    {
-      timeline_set_bind( widget,  (te->bind ? FALSE: TRUE ));
-      te->move_x = (gdouble) ev->x;
+
+  if (ev->button == 2 && te->has_selection) {
+    if (POINT_IN_RECT(ev->x, ev->y, te->selection)) {
+      timeline_set_bind(widget, te->bind ? FALSE : TRUE);
+
+      if (te->bind) {
+        gdouble mouse_norm = timeline_x_to_norm(te, ev->x, width);
+        te->move_x = mouse_norm - te->in;
+        te->action = action_atomic;
+        te->current_location = MOUSE_SELECTION;
+      }
+
+      return TRUE;
     }
   }
 
+  gtk_widget_queue_draw(widget);
 
-  gtk_widget_queue_draw( widget );
-
-  return FALSE;
+  return TRUE;
 }
 
-static gboolean event_release (GtkWidget *widget, GdkEventButton *ev, gpointer user_data)
+static gboolean event_release(GtkWidget *widget, GdkEventButton *ev, gpointer user_data)
 {
-  TimelineSelection *te = TIMELINE_SELECTION (widget);
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
+
   te->action = action_none;
   te->current_location = MOUSE_WIDGET;
-//  te->grab_button = 0;
-//  te->move_x = 0;
-  return FALSE;
+  te->grab_button = 0;
+  te->move_x = 0.0;
+
+  timeline_update_cursor(widget, action_none);
+  gtk_widget_queue_draw(widget);
+
+  return TRUE;
 }
 
-static gboolean event_motion (GtkWidget *widget, GdkEventMotion *ev, gpointer user_data)
+static gboolean event_motion(GtkWidget *widget, GdkEventMotion *ev, gpointer user_data)
 {
-  TimelineSelection *te = TIMELINE_SELECTION (widget);
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
   GtkAllocation all;
+
   gtk_widget_get_allocation(widget, &all);
+
   gdouble width = (gdouble) all.width;
-  gint x,y;
-  GdkModifierType state;
-  gdk_window_get_device_position ( ev->window, ev->device, &x, &y, &state );
 
-  if( te->has_stepper && te->current_location == MOUSE_STEPPER && ev->state & GDK_BUTTON1_MASK)
-  {
-    gdouble rel_pos = ((gdouble)ev->x / width) * te->num_video_frames;
-    gdouble new_pos = (gdouble) ((gint) rel_pos );
+  if (width <= 1.0)
+      return TRUE;
 
-    timeline_set_pos( widget, new_pos );
-    return FALSE;
+  gboolean b1 = (ev->state & GDK_BUTTON1_MASK) != 0;
+  gboolean b2 = (ev->state & GDK_BUTTON2_MASK) != 0;
+  gboolean b3 = (ev->state & GDK_BUTTON3_MASK) != 0;
+
+  if (!b1 && !b2 && !b3) {
+    TimelineAction hover = timeline_pick_action(te, ev->x, ev->y, width);
+    timeline_update_cursor(widget, hover);
+
+    timeline_set_point(widget,
+        timeline_norm_to_frame(te, timeline_x_to_norm(te, ev->x, width)));
+
+    return TRUE;
   }
 
-  if( te->has_selection && te->current_location != MOUSE_STEPPER)
-  {
-    if(!te->bind)
-    {
-      gdouble gx = (1.0 / width) * x;
-      if(te->grab_button == 1  && ev->state & GDK_BUTTON1_MASK)
-        timeline_set_in_point(widget, gx );
-      else if(te->grab_button == 3 && ev->state & GDK_BUTTON3_MASK)
-        timeline_set_out_point( widget, gx );
+  if (b1) {
+    switch (te->action) {
+      case action_pos:
+        timeline_set_pos(widget,
+            timeline_norm_to_frame(te, timeline_x_to_norm(te, ev->x, width)));
+        return TRUE;
+
+      case action_atomic:
+        if (te->has_selection && te->bind)
+            move_selection(widget, ev->x, width);
+        return TRUE;
+
+      case action_in_point:
+        if (te->has_selection && !te->bind)
+            timeline_set_in_point(widget, timeline_x_to_norm(te, ev->x, width));
+        return TRUE;
+
+      case action_out_point:
+        if (te->has_selection && !te->bind)
+            timeline_set_out_point(widget, timeline_x_to_norm(te, ev->x, width));
+        return TRUE;
+
+      case action_point:
+        timeline_set_point(widget,
+            timeline_norm_to_frame(te, timeline_x_to_norm(te, ev->x, width)));
+        return TRUE;
+
+      default:
+        break;
     }
   }
 
-  if(te->has_selection && te->bind && te->grab_button == 2 )
-    move_selection( widget, x, width );
+  if (b2 && te->has_selection && te->bind) {
+    move_selection(widget, ev->x, width);
+    return TRUE;
+  }
 
-  gdouble rel_pos = ((gdouble)ev->x / width) * te->num_video_frames;
-  gdouble new_pos = (gdouble) ((gint) rel_pos );
+  if (b3 && te->has_selection && !te->bind) {
+    timeline_set_out_point(widget, timeline_x_to_norm(te, ev->x, width));
+    return TRUE;
+  }
 
-  timeline_set_point( widget, new_pos);
-
-  gtk_widget_queue_draw( widget );
-
-  return FALSE;
+  return TRUE;
 }
 
 /*!
@@ -790,167 +995,218 @@ void cairo_rectangle_round(cairo_t *cr, double x0, double y0, double width, doub
     cairo_fill(cr);
 }
 
-
-static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
+static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
 {
-  gchar text[40];
-  TimelineSelection *te = TIMELINE_SELECTION( widget );
-  double width = gtk_widget_get_allocated_width (widget);
-  double height = gtk_widget_get_allocated_height (widget);
+  gchar text[64];
 
-  gdouble marker_width = width/ te->num_video_frames;
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
+
+  double width  = gtk_widget_get_allocated_width(widget);
+  double height = gtk_widget_get_allocated_height(widget);
+
+  if (width <= 1.0 || height <= 1.0)
+      return FALSE;
+
+  gdouble nframes = timeline_frame_count(te);
+  gdouble marker_width = width / nframes;
   gdouble marker_height = te->frame_height;
 
   te->frame_width = marker_width;
 
   GtkStyleContext *sc = gtk_widget_get_style_context(widget);
-  GdkRGBA color;
-  gtk_style_context_get_color ( sc, gtk_style_context_get_state (sc), &color );
-  GdkRGBA col2;
-  vj_gtk_context_get_color(sc, "border-color",GTK_STATE_FLAG_NORMAL, &col2);
 
-  double x1 = marker_width * te->point;
+  GdkRGBA color;
+  gtk_style_context_get_color(sc, gtk_style_context_get_state(sc), &color);
+
+  GdkRGBA col2;
+  vj_gtk_context_get_color(sc, "border-color", GTK_STATE_FLAG_NORMAL, &col2);
 
   cairo_set_antialias(cr, CAIRO_ANTIALIAS_FAST);
+  cairo_select_font_face(cr,
+                         "Sans",
+                         CAIRO_FONT_SLANT_NORMAL,
+                         CAIRO_FONT_WEIGHT_BOLD);
 
-  cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD );
-  cairo_move_to(cr, x1,te->font_line );
-  sprintf(text, "%d",  (gint)te->point );
-  cairo_set_source_rgba( cr, color.red,color.green,color.blue,0.3 );
-  cairo_show_text(cr, text);
+  gdouble tri_h = te->has_stepper ? te->stepper_draw_size : 0.0;
+  gdouble track_h = marker_height;
+  gdouble group_h = tri_h + track_h;
 
-  if( te->has_stepper )
-  {
-    cairo_set_source_rgba( cr, col2.red,col2.green,col2.blue,1.0); 
-    double x1 = marker_width * te->frame_num;
-    te->stepper.x = x1;
-    te->stepper.y = 0;
-    te->stepper.width = te->stepper_size;
-    te->stepper.height = te->stepper_size;
+  gdouble group_y = floor((height - group_h) * 0.5);
+  if (group_y < 0.0)
+      group_y = 0.0;
 
-    cairo_move_to( cr, x1 - te->stepper_draw_size, 0.0 * height );
-    cairo_rel_line_to( cr, te->stepper_draw_size, te->stepper_draw_size  );
-    cairo_rel_line_to( cr, te->stepper_draw_size, -te->stepper_draw_size  );
-    cairo_rel_line_to( cr, -2.0 * te->stepper_draw_size, 0 );
-    cairo_set_line_join( cr, CAIRO_LINE_JOIN_MITER);
-    cairo_move_to(cr, x1, te->stepper_draw_size   );
-    cairo_rel_line_to( cr, 0.0, te->stepper_length );
-    cairo_stroke(cr);
-    if( te->grab_button == 1 && te->current_location == MOUSE_STEPPER )
+  gdouble tri_y = group_y;
+  gdouble track_y = group_y + tri_h;
+  gdouble track_bottom = track_y + track_h;
+  gdouble handle_w = 3.0;
+
+  if (track_bottom > height) {
+      track_y = MAX(0.0, height - track_h);
+      track_bottom = track_y + track_h;
+      tri_y = MAX(0.0, track_y - tri_h);
+  }
+
+  cairo_set_source_rgba(cr, color.red, color.green, color.blue, 0.25);
+  cairo_rectangle_round(cr, 0.0, track_y, width, track_h, 10.0);
+
+  if (te->has_selection) {
+    gdouble in_x  = timeline_clamp01(te->in)  * width;
+    gdouble out_x = timeline_clamp01(te->out) * width;
+
+    if (out_x < in_x) {
+        gdouble tmp = in_x;
+        in_x = out_x;
+        out_x = tmp;
+    }
+
+    gdouble sel_w = MAX(0.0, out_x - in_x);
+
+    cairo_set_source_rgba(cr, col2.red, col2.green, col2.blue, 0.90);
+    cairo_rectangle_round(cr, in_x, track_y, sel_w, track_h, 10.0);
+    cairo_set_source_rgba(cr, color.red, color.green, color.blue, 0.85);
+
+    cairo_rectangle_round(cr,
+                          in_x - (handle_w * 0.5),
+                          track_y,
+                          handle_w,
+                          track_h,
+                          1.5);
+
+    cairo_rectangle_round(cr,
+                          out_x - (handle_w * 0.5),
+                          track_y,
+                          handle_w,
+                          track_h,
+                          1.5);
+
+    if (te->bind) {
+        gdouble cx = in_x + (sel_w * 0.5);
+
+        cairo_set_source_rgba(cr, color.red, color.green, color.blue, 0.55);
+        cairo_arc(cr,
+                  cx,
+                  track_y + (track_h * 0.5),
+                  3.0,
+                  0.0,
+                  2.0 * M_PI);
+        cairo_fill(cr);
+    }
+
+    te->selection.x = (gint) in_x;
+    te->selection.y = (gint) tri_y;
+    te->selection.width = (gint) sel_w;
+    te->selection.height = (gint) (track_bottom - tri_y + 4.0);
+
+    if ((te->grab_button == 1 || te->grab_button == 3) &&
+        te->current_location != MOUSE_STEPPER)
     {
-      cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL,
-        CAIRO_FONT_WEIGHT_BOLD );
-      cairo_move_to(cr, x1,te->font_line );
-      sprintf(text, "%d",  (gint)te->frame_num );
-      cairo_text_path( cr, text );
-      cairo_set_font_size( cr, 0.2 );
-      cairo_set_source_rgba( cr, color.red,color.green,color.blue,0.7 );
+      gdouble f1 = te->in  * nframes;
+      gdouble f2 = te->out * nframes;
 
-      cairo_fill(cr);
+      gdouble text_y = track_bottom + 10.0;
+      if (text_y > height - 2.0)
+          text_y = MAX(10.0, tri_y + 10.0);
+
+      cairo_set_source_rgba(cr, color.red, color.green, color.blue, 0.75);
+      cairo_move_to(cr, in_x, text_y);
+      snprintf(text, sizeof(text), "%d - %d", (gint) f1, (gint) f2);
+      cairo_show_text(cr, text);
     }
   }
-  
-  if( te->has_selection )
+
   {
-    gdouble in = te->in * width;
-    gdouble out = te->out * width;
+    gdouble point_x = timeline_frame_to_x(te, te->point, width);
 
-    if( te->grab_button == 1 && te->current_location != MOUSE_STEPPER )
-    {
-      gdouble f = te->in * te->num_video_frames;
-      gdouble f2 = te->out * te->num_video_frames;
+    gdouble text_y = track_bottom + 10.0;
+    if (text_y > height - 2.0)
+        text_y = MAX(10.0, tri_y + 10.0);
 
-      cairo_set_source_rgba( cr, 0.0, color.green, color.blue,0.3 );
-      cairo_move_to( cr, in, 0.0 );
-      cairo_rel_line_to( cr, 0.0 , te->stepper_length );
-      cairo_stroke(cr);
+    cairo_set_source_rgba(cr, color.red, color.green, color.blue, 0.30);
+    cairo_move_to(cr, point_x, text_y);
+    snprintf(text, sizeof(text), "%d", (gint) te->point);
+    cairo_show_text(cr, text);
+  }
 
-      cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD );
+  if (te->has_stepper) {
+    gdouble pos_x = timeline_frame_to_x(te, te->frame_num, width);
 
-      cairo_move_to(cr, in , te->font_line  );
-      sprintf(text, "%d - %d",(gint) f, (gint) f2 );
-      cairo_text_path( cr, text );
-      cairo_set_font_size( cr, 0.2 );
-      cairo_set_source_rgba( cr, color.red,color.green,color.blue,0.7 );
-      cairo_fill(cr);
+    te->stepper.x = (gint) (pos_x - (TIMELINE_STEPPER_HIT_PX * 0.5));
+    te->stepper.y = (gint) tri_y;
+    te->stepper.width = (gint) TIMELINE_STEPPER_HIT_PX;
+    te->stepper.height = (gint) ((track_bottom - tri_y) + 4.0);
 
-    }
-    if( te->grab_button == 3 && te->current_location != MOUSE_STEPPER )
-    {
-      gdouble f = te->out * te->num_video_frames;
-      gdouble f2 = te->in * te->num_video_frames;
+    cairo_set_source_rgba(cr,
+                          col2.red   * 0.45,
+                          col2.green * 0.45,
+                          col2.blue  * 0.45,
+                          1.0);
 
-      cairo_set_source_rgba( cr, 0.0,color.green,color.blue,0.3 );
-      cairo_move_to( cr, out , 0.0 );
-      cairo_rel_line_to( cr, 0.0 , te->stepper_length );
-      cairo_stroke(cr);
-
-      cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD );
-
-      cairo_move_to(cr, in ,te->font_line );
-      sprintf(text, "%d - %d", (gint) f2, (gint) f );
-      cairo_text_path( cr, text );
-      cairo_set_font_size( cr, 0.2 );
-      cairo_set_source_rgba( cr,color.red,color.green,color.blue,0.7 );
-      cairo_fill(cr);
-    }
-
-    cairo_set_source_rgba( cr, col2.red,col2.green,col2.blue, 1.0 );
-    cairo_rectangle_round(cr, in,
-      0.095 * height,
-      (out - in),
-      marker_height,
-      10);
-    cairo_fill_preserve(cr);
-
-    cairo_set_source_rgba( cr, color.red,color.green,color.blue, 0.3 );
-    cairo_rectangle_round(cr, 0.0, 0.095 * height, width, marker_height,10);
+    cairo_move_to(cr, pos_x - te->stepper_draw_size, tri_y);
+    cairo_line_to(cr, pos_x, tri_y + tri_h);
+    cairo_line_to(cr, pos_x + te->stepper_draw_size, tri_y);
+    cairo_close_path(cr);
     cairo_fill(cr);
+    cairo_set_source_rgba(cr,
+                          col2.red   * 0.45,
+                          col2.green * 0.45,
+                          col2.blue  * 0.45,
+                          0.95);
 
-    te->selection.x = in;
-    te->selection.y = 0;
-    te->selection.width = out;
-    te->selection.height = te->font_line;
-   // cairo_fill_preserve(cr);
-  }
-  else {
-      cairo_set_source_rgba( cr, color.red,color.green,color.blue, 0.3 );
-      cairo_rectangle_round(cr, 0.0, 0.095 * height, width, marker_height,10);
-      cairo_fill(cr);
+    cairo_set_line_width(cr, 1.0);
+    cairo_move_to(cr, pos_x, tri_y + tri_h);
+    cairo_line_to(cr, pos_x, track_bottom);
+    cairo_stroke(cr);
+
+    if (te->grab_button == 1 && te->current_location == MOUSE_STEPPER) {
+      gdouble text_y = track_bottom + 10.0;
+      if (text_y > height - 2.0)
+          text_y = MAX(10.0, tri_y + 10.0);
+
+      cairo_set_source_rgba(cr, color.red, color.green, color.blue, 0.75);
+      cairo_move_to(cr, pos_x, text_y);
+      snprintf(text, sizeof(text), "%d", (gint) te->frame_num);
+      cairo_show_text(cr, text);
+    }
   }
 
- 
   return FALSE;
 }
 
-
 GtkWidget *timeline_new(void)
 {
-  GtkWidget *widget = GTK_WIDGET( g_object_new( timeline_get_type(), NULL ));
-  TimelineSelection *te = TIMELINE_SELECTION( widget );
+  GtkWidget *widget = GTK_WIDGET(g_object_new(timeline_get_type(), NULL));
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
 
-  gtk_widget_set_size_request(widget, 200,24 );
+  gtk_widget_set_size_request(widget, 200, 24);
 
-  gtk_widget_set_events( widget,
-      GDK_EXPOSURE_MASK | GDK_POINTER_MOTION_HINT_MASK | GDK_POINTER_MOTION_MASK |
-      GDK_BUTTON1_MOTION_MASK | GDK_BUTTON2_MOTION_MASK |
-      GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
-      GDK_BUTTON3_MOTION_MASK | GDK_2BUTTON_PRESS | GDK_SCROLL_MASK );
+  gtk_widget_set_can_focus(widget, TRUE);
 
-  g_signal_connect( G_OBJECT(widget), "draw",
-                    G_CALLBACK(timeline_draw), NULL );
+  gtk_widget_set_events(widget,
+      GDK_EXPOSURE_MASK |
+      GDK_POINTER_MOTION_MASK |
+      GDK_BUTTON1_MOTION_MASK |
+      GDK_BUTTON2_MOTION_MASK |
+      GDK_BUTTON3_MOTION_MASK |
+      GDK_BUTTON_PRESS_MASK |
+      GDK_BUTTON_RELEASE_MASK |
+      GDK_SCROLL_MASK |
+      GDK_ENTER_NOTIFY_MASK |
+      GDK_LEAVE_NOTIFY_MASK);
 
-  g_signal_connect( G_OBJECT(widget), "motion_notify_event",
-                    G_CALLBACK(event_motion), NULL );
+  g_signal_connect(G_OBJECT(widget), "draw",
+                   G_CALLBACK(timeline_draw), NULL);
 
-  g_signal_connect( G_OBJECT(widget), "button_press_event",
-                    G_CALLBACK(event_press), NULL );
+  g_signal_connect(G_OBJECT(widget), "motion_notify_event",
+                   G_CALLBACK(event_motion), NULL);
 
-  g_signal_connect( G_OBJECT(widget), "button_release_event",
-                    G_CALLBACK(event_release), NULL );
+  g_signal_connect(G_OBJECT(widget), "button_press_event",
+                   G_CALLBACK(event_press), NULL);
 
-  g_signal_connect( G_OBJECT(widget), "scroll_event",
-                    G_CALLBACK( event_scroll ), NULL );
+  g_signal_connect(G_OBJECT(widget), "button_release_event",
+                   G_CALLBACK(event_release), NULL);
+
+  g_signal_connect(G_OBJECT(widget), "scroll_event",
+                   G_CALLBACK(event_scroll), NULL);
 
   te->widget = widget;
 
