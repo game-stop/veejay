@@ -1188,7 +1188,6 @@ long JACK_Write(int deviceID, unsigned char *data, unsigned long bytes)
     JACK_flush(drv);
   }
 
-  int64_t delay = swr_get_delay(drv->swr_ctx, drv->client_sample_rate);
   int out_frames_needed = swr_get_out_samples(drv->swr_ctx, in_frames);
 
   const size_t rb_write_space = jack_ringbuffer_write_space(drv->pPlayPtr);
