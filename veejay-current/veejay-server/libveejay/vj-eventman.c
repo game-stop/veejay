@@ -922,13 +922,16 @@ void		vj_init_vevo_events(void)
 				"Step size",
 				1,
 				NULL );
+
 	index_map_[VIMS_FXLIST_ADD]	=	_new_event(
-				NULL,
+				"%d",
 				VIMS_FXLIST_ADD,
 				"Put selected effect in Effect List to current sample and current entry",
 				vj_event_effect_add,
-				0,
+				1,
 				VIMS_ALLOW_ANY,
+				"On/Off",
+				1,
 				NULL );
 
 	index_map_[VIMS_SELECT_BANK]	=	_new_event(

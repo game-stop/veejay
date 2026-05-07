@@ -380,7 +380,8 @@ static struct {                 /* hardcoded keyboard layout (the default keys) 
     { VIMS_CHAIN_ENTRY_CLEAR,       SDL_SCANCODE_DELETE,    VIMS_MOD_NONE,  NULL    },
     { VIMS_FXLIST_INC,              SDL_SCANCODE_UP,        VIMS_MOD_NONE,  "1" },
     { VIMS_FXLIST_DEC,              SDL_SCANCODE_DOWN,      VIMS_MOD_NONE,  "1" },
-    { VIMS_FXLIST_ADD,              SDL_SCANCODE_RETURN,    VIMS_MOD_NONE,  NULL    },
+    { VIMS_FXLIST_ADD,              SDL_SCANCODE_RETURN,    VIMS_MOD_NONE,  "1"    },
+    { VIMS_FXLIST_ADD,              SDL_SCANCODE_RETURN,    VIMS_MOD_SHIFT, "0"    },
     { VIMS_SET_SAMPLE_START,        SDL_SCANCODE_LEFTBRACKET,VIMS_MOD_NONE, NULL    },
     { VIMS_SET_SAMPLE_END,          SDL_SCANCODE_RIGHTBRACKET,VIMS_MOD_NONE,    NULL    },
     { VIMS_SAMPLE_SET_MARKER_START, SDL_SCANCODE_LEFTBRACKET,VIMS_MOD_ALT,  NULL    },
@@ -1505,7 +1506,7 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
         char *fmt = vj_event_vevo_get_event_format(net_id);
         int flags = vj_event_vevo_get_flags(net_id);
         char *str = NULL;
-        char *arg_str = vj_strndup(current_msg + v1_offset, current_len - v1_offset);
+        char *arg_str = strndup(current_msg + v1_offset, current_len - v1_offset);
         char *arguments = arg_str;
 
         if(!arg_str) {
@@ -1990,7 +1991,9 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
         else
             len = snprintf(msg,sizeof(msg), "%03d:;", event_id );
 
+        v->log_suppression = 1;
         vj_event_parse_and_maybe_requeue_events( (veejay_t*) ptr, msg, len );
+        v->log_suppression = 0;
     }
     return 1;
 }
@@ -4250,7 +4253,7 @@ void    vj_event_sample_skip_frame(void *ptr, const char format[], va_list ap)
                         si->effect_chain[k]->channel );
                 int end   = sample_get_endFrame(
                         si->effect_chain[k]->channel );
-                int len   = end - start;
+                int len   = (end - start) + 1;
 
                 //@ skip frame = increment current with offset in args[1]
                 int cur = sample_get_resume( si->effect_chain[k]->channel ) + args[1];
@@ -4258,10 +4261,10 @@ void    vj_event_sample_skip_frame(void *ptr, const char format[], va_list ap)
                 //@ check range
                 if( cur > len )
                     cur = len;
-                if( cur < 0 )
+                else if( cur < 0 )
                     cur = 0;
                 
-		sample_set_resume_override( si->effect_chain[k]->channel, cur );
+		        sample_set_resume_override( si->effect_chain[k]->channel, cur );
 
                 veejay_msg(VEEJAY_MSG_DEBUG,
                     "Set offset of mixing sample #%d (%d-%d) on chain entry %d of sample %d to %d",
@@ -5743,11 +5746,9 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
                 return;
             }
 
-            if(sample_chain_add(args[0],args[1],args[2])) 
+            if(sample_chain_add(args[0],args[1],args[2], args[3])) 
             {
                 v->uc->chain_changed = 1;
-
-                sample_set_chain_status( args[0],args[1], args[3] );
             }
             else
             {
@@ -5768,11 +5769,9 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
                 return;
             }
 
-            if(vj_tag_set_effect(args[0],args[1], args[2]))
+            if(vj_tag_set_effect(args[0],args[1], args[2],args[3]))
             {
                 v->uc->chain_changed = 1;
-            
-                vj_tag_set_chain_status( args[0], args[1], args[3] );
             }   
             else
             {
@@ -6010,12 +6009,10 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
             int i;
             num_p   = vje_get_num_params(real_id);
             
-            if(sample_chain_add( args[0],args[1],args[2]))
+            if(sample_chain_add( args[0],args[1],args[2],args[3]))
             {
                 int args_offset = 4;
                 
-                sample_set_chain_status( args[0],args[1], args[3] );
-
                 for(i=0; i < num_p; i++)
                 {
                     if(vje_is_param_value_valid(real_id,i,args[(i+args_offset)]) )
@@ -6049,11 +6046,9 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
             int num_p   = vje_get_num_params(real_id);
             int i;
         
-            if(vj_tag_set_effect(args[0],args[1], args[2]) )
+            if(vj_tag_set_effect(args[0],args[1], args[2], args[3]) )
             {
                 int args_offset = 4;
-            
-                vj_tag_set_chain_status( args[0], args[1], args[3] );
 
                 for(i=0; i < num_p; i++) 
                 {
@@ -6688,7 +6683,8 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
                     tval = vje_get_param_max_limit( effect,args[0] );
             if(sample_set_effect_arg( v->uc->sample_id, c,args[0],tval)!=-1 )
             {
-                veejay_msg(VEEJAY_MSG_DEBUG,"Set \"%s\" parameter %d \"%s\" value %d",effect_descr, args[0], effect_param_descr, tval);
+                if(!v->log_suppression)
+                    veejay_msg(VEEJAY_MSG_DEBUG,"Set \"%s\" parameter %d \"%s\" value %d",effect_descr, args[0], effect_param_descr, tval);
             }
         }
     }
@@ -6711,7 +6707,8 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
 
         if(vj_tag_set_effect_arg(v->uc->sample_id, c, args[0], tval) )
         {
-            veejay_msg(VEEJAY_MSG_DEBUG,"Set \"%s\" parameter %d \"%s\" value %d",effect_descr, args[0], effect_param_descr, tval );
+            if(!v->log_suppression)
+                veejay_msg(VEEJAY_MSG_DEBUG,"Set \"%s\" parameter %d \"%s\" value %d",effect_descr, args[0], effect_param_descr, tval );
         }
     }
 }
@@ -8140,15 +8137,19 @@ void vj_event_effect_dec(void *ptr, const char format[], va_list ap)
 void vj_event_effect_add(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
+    int args[1];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+
     if(SAMPLE_PLAYING(v)) 
     {   
         int c = sample_get_selected_entry(v->uc->sample_id);
 
-        if ( sample_chain_add( v->uc->sample_id, c, v->uc->key_effect ))
+        if ( sample_chain_add( v->uc->sample_id, c, v->uc->key_effect, args[0] ))
         {
-            veejay_msg(VEEJAY_MSG_INFO,"Added Effect %s on chain entry %d",
+            veejay_msg(VEEJAY_MSG_INFO,"Added Effect %s on chain entry %d (state: %s)",
                 vje_get_description(v->uc->key_effect),
-                c
+                c,
+                args[0] == 1 ? "enabled" :"disabled"
             );
             v->uc->chain_changed = 1;
         }
@@ -8156,11 +8157,12 @@ void vj_event_effect_add(void *ptr, const char format[], va_list ap)
     if(STREAM_PLAYING(v))
     {
         int c = vj_tag_get_selected_entry(v->uc->sample_id);
-        if ( vj_tag_set_effect( v->uc->sample_id, c, v->uc->key_effect ))
+        if ( vj_tag_set_effect( v->uc->sample_id, c, v->uc->key_effect, args[0] ))
         {
-            veejay_msg(VEEJAY_MSG_INFO,"Added Effect %s on chain entry %d",
+            veejay_msg(VEEJAY_MSG_INFO,"Added Effect %s on chain entry %d (state: %s)",
                 vje_get_description(v->uc->key_effect),
-                c
+                c,
+                args[0] == 1 ? "enabled" :"disabled"
             );
             v->uc->chain_changed = 1;
         }
@@ -8528,7 +8530,7 @@ void vj_event_print_sample_info(veejay_t *v, int id)
     long start = sample_get_startFrame( id );
     long end = sample_get_endFrame( id );
     long speed = sample_get_speed(id);
-    long len = end - start;
+    long len = (end - start) + 1;
 
     veejay_memset( &tc,0,sizeof(MPEG_timecode_t));
     mpeg_timecode(&tc, len, mpeg_framerate_code( ratio ),v->current_edit_list->video_fps);

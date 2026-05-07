@@ -427,7 +427,7 @@ int vj_get_sample_display_name(char **destination, const char *filename)
     start = (start) ? start + 1 : filename;
 
     const char *end = strrchr(start, '.');
-    size_t len = (end && end > start) ? (size_t)(end - start)
+    size_t len = (end && end > start) ? (size_t)(end - start + 1)
                                       : strlen(start);
 
     if (len > 12) {

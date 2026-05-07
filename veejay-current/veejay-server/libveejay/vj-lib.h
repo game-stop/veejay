@@ -515,6 +515,7 @@ typedef struct {
     int borderless;
 	int 	qrcode;
     int read_plug_cfg;
+	int log_suppression;
     void *performer;
 	global_chain_t *global_chain;
 } veejay_t;

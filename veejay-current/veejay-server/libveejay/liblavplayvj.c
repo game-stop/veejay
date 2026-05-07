@@ -176,9 +176,9 @@ static void veejay_free_frame_buffer(VJFrame *f) {
 static	VJFrame *veejay_allocate_frame_buffer(veejay_t *info) {
 	VJFrame *buf = yuv_yuv_template( NULL,NULL,NULL, info->video_output_width, info->video_output_height, vj_to_pixfmt(info->pixel_format) );
 	buf->fps = info->settings->output_fps;
-	
+	size_t padding = 256;
 	size_t len = sizeof(uint8_t) * ( buf->len + buf->uv_len + buf->uv_len);
-	uint8_t *plane = (uint8_t*)vj_malloc( len );
+	uint8_t *plane = (uint8_t*)vj_malloc( len + padding );
 	if(!plane) {
 		free(buf);
 		return NULL;
@@ -1043,40 +1043,32 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
 
 void veejay_sample_set_initial_positions(veejay_t *info)
 {
-	int first_sample = -1;
-	int i;
-	for( i = 0; i < MAX_SEQUENCES; i ++ ) {
-			if( info->seq->samples[i].sample_id > 0 && first_sample == -1) {
-				first_sample = i;
-			}
+    int first_sample = -1;
 
-			if( info->seq->samples[i].type != 0 ) 
-				continue;
-			int id = info->seq->samples[i].sample_id;
-			int stats[4];
-    
-    		sample_set_loops(id,-1);
-    		sample_get_short_info( id, &stats[0],&stats[1],&stats[2],&stats[3]);
-    		if( stats[2] == 2 ) {
-				if( stats[3] < 0 ) {
-		  			sample_set_speed(id, -1 * stats[3]);
-				}
-            sample_set_resume(id, stats[0]);
-         }
-    	   else {
-        		if( stats[3] < 0 ) { 
-            	sample_set_resume(id, stats[1]);
-        		}
-       		else if(stats[3] > 0) {
-            	sample_set_resume(id, stats[0]);
-        		}
-    	   } 
-	}
+    for(int i = 0; i < MAX_SEQUENCES; i++)
+    {
+        if(info->seq->samples[i].sample_id > 0 && first_sample == -1)
+            first_sample = i;
 
-	if(first_sample >= 0) {
-		veejay_change_playback_mode(info, (info->seq->samples[first_sample].type == 0 ?
-														VJ_PLAYBACK_MODE_SAMPLE : VJ_PLAYBACK_MODE_TAG), info->seq->samples[first_sample].sample_id);
-	}
+        if(info->seq->samples[i].type != 0)
+            continue;
+
+        int id = info->seq->samples[i].sample_id;
+
+        sample_set_loops(id, -1);
+
+        sample_set_resume_override(id, -1);
+    }
+
+    if(first_sample >= 0)
+    {
+        veejay_change_playback_mode(
+            info,
+            (info->seq->samples[first_sample].type == 0
+                ? VJ_PLAYBACK_MODE_SAMPLE
+                : VJ_PLAYBACK_MODE_TAG),
+            info->seq->samples[first_sample].sample_id);
+    }
 }
 
 void veejay_prepare_sample_positions(int id) {

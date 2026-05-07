@@ -1564,7 +1564,7 @@ static long vj_calc_next_sample_offset(
     long end = sb->end;
     int speed = sb->speed;
     int loop_mode  = sb->loopmode;
-    const long len = end - start;
+    const long len = (end - start) + 1;
     int advance = 1;
 
     if (sb->direction_changed) {
@@ -1683,19 +1683,7 @@ long vj_calc_next_subframe(veejay_t *info, int b)
     atomic_store_long_long(&sb->start, start);
 
     sample_set_framedups(b, sb->cur_sfd);
-/*
-    veejay_msg(
-        VEEJAY_MSG_DEBUG,
-        "[AUDIO] pos=%lld off=%ld/%ld dir=%d speed=%d sfd=%d/%d adv=%d direction=%d",
-        (long long)(start + off),
-        off, (end - start),
-        sb->direction,
-        sb->speed,
-        sb->cur_sfd, sb->max_sfd,
-        advance,
-        sb->direction
-    );
- */
+
     return start + off;
 }
 
@@ -5291,27 +5279,28 @@ void    vj_perform_randomize(veejay_t *info)
         take_n = vj_frame_rand(track_dup, 1, n_sample, settings->randplayer.seed ++ );
     }
 
-    int start,end;
-    start = sample_get_startFrame( take_n);
-    end   = sample_get_endFrame( take_n );
-    
+    int remaining = sample_get_remaining_frames(take_n);
+
+    if (remaining < min_delay)
+        remaining = min_delay;
+
     if( settings->randplayer.timer == RANDTIMER_FRAME )
     {
-        int sample_len = (end - start + 1);
-        if (sample_len <= 1) sample_len = 2; // prevent zero-length
-
-        // random delay between min_delay and sample length
-        max_delay = vj_frame_rand(track_dup, min_delay, sample_len, settings->randplayer.seed ++ );
+        max_delay = vj_frame_rand(
+            track_dup,
+            min_delay,
+            remaining,
+            settings->randplayer.seed ++ );
     }
     else
     {
-        max_delay = (end-start);    
+        max_delay = remaining;
     }
 
     settings->randplayer.max_delay = max_delay;
     settings->randplayer.min_delay = min_delay; 
 
-    veejay_msg(VEEJAY_MSG_INFO, "Sample randomizer trigger in %d frame periods", max_delay);
+    veejay_msg(VEEJAY_MSG_INFO, "Sample randomizer triggers in %d frame periods", max_delay);
 
     settings->randplayer.next_id = take_n;
     settings->randplayer.next_mode = VJ_PLAYBACK_MODE_SAMPLE;
