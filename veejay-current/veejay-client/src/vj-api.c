@@ -350,7 +350,11 @@ enum {
   WIDGET_GLOBALCHAINTOGGLE = 249,
   WIDGET_GLOBALCHAINCOPY = 250,
   WIDGET_GLOBALCHAINLEVEL = 251,
-  WIDGET_MESSAGE_FORWARDING = 252
+  WIDGET_MESSAGE_FORWARDING = 252,
+  WIDGET_CURVE_SPIN_ANIMATION_SHAPE = 253,
+  WIDGET_CURVE_BUTTON_BOUND_MIN = 254,
+  WIDGET_CURVE_TOGGLE_ANIMATION_SHAPE = 255,
+  WIDGET_CURVE_BUTTON_BOUND_MAX = 256,
 };
 
 
@@ -674,6 +678,10 @@ static struct
     { "curve_chain_toggleentry",WIDGET_CURVE_CHAIN_TOGGLEENTRY },
     { "frame_fxtree3",          WIDGET_FRAME_FXTREE3 },
     { "curve_combo_animation",  WIDGET_CURVE_ANIMATION_LIST },
+    { "curve_spin_animation_shape", WIDGET_CURVE_SPIN_ANIMATION_SHAPE },
+    { "curve_toggleanimation_shape", WIDGET_CURVE_TOGGLE_ANIMATION_SHAPE },
+    { "curve_scalebuttonbound_min", WIDGET_CURVE_BUTTON_BOUND_MIN },
+    { "curve_scalebuttonbound_max", WIDGET_CURVE_BUTTON_BOUND_MAX },
     { "curve_typespline",       WIDGET_CURVE_TYPESPLINE },
     { "curve_typefreehand",     WIDGET_CURVE_TYPEFREEHAND },
     { "curve_typelinear",       WIDGET_CURVE_TYPELINEAR },
@@ -3402,9 +3410,6 @@ static void update_curve_widget(GtkWidget *curve)
     update_spin_range2( widget_cache[WIDGET_CURVE_SPINSTART],0, total_frames, lo );
     update_spin_range2( widget_cache[WIDGET_CURVE_SPINEND], 0, total_frames, hi );
 
-    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPELINEAR]), TRUE );
-
-    /* If parameter have KF set the points or set the initial curve */
     if( blob && blen > 0 )
     {
         p = set_points_in_curve_ext( curve, blob,id,i, &curve_type,&status );
@@ -3429,6 +3434,7 @@ static void update_curve_widget(GtkWidget *curve)
             update_slider_state( info->uc.selected_parameter_id, status );
         }
     } else {
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPELINEAR]), TRUE );
         gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE );
         set_initial_curve( curve, info->uc.entry_tokens[ENTRY_FXID], info->uc.selected_parameter_id,
                            lo, hi ,

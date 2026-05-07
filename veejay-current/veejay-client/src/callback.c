@@ -46,29 +46,39 @@ void	text_defaults(void)
 	srt_seq_ = 0;
 }
 
-/* --------------------------------------------------------------------------------------------------------------------------
- *  Function to easily maintain toggle siamese widget state
- *
- *  To be used for widgets that support "toggled" event.
-  -------------------------------------------------------------------------------------------------------------------------- */
-static void toggle_siamese_widget(GtkWidget *widget,GtkWidget *first,GtkWidget *second)
+static void toggle_siamese_widget(GtkWidget *widget, GtkWidget *first, GtkWidget *second)
 {
-    GtkWidget *siamese = second;
-    if(widget == second)
-        siamese = first;
+    if (!widget || !first || !second)
+        return;
 
-    //block signal to prevent propagation
-    guint signal_id=g_signal_lookup("toggled", GTK_TYPE_TOGGLE_BUTTON);
-    gulong handler_id=handler_id=g_signal_handler_find( (gpointer)siamese, G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+    GtkWidget *siamese = (widget == second) ? first : second;
+
+    if (!GTK_IS_TOGGLE_BUTTON(widget) || !GTK_IS_TOGGLE_BUTTON(siamese))
+        return;
+
+    gboolean active = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+
+    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(siamese)) == active)
+        return;
+
+    guint signal_id = g_signal_lookup("toggled", GTK_TYPE_TOGGLE_BUTTON);
+    gulong handler_id = g_signal_handler_find(
+        siamese,
+        G_SIGNAL_MATCH_ID,
+        signal_id,
+        0,
+        NULL,
+        NULL,
+        NULL
+    );
 
     if (handler_id)
-        g_signal_handler_block((gpointer)siamese, handler_id);
+        g_signal_handler_block(siamese, handler_id);
 
-    gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON(siamese),
-                                  gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) )) ;
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(siamese), active);
 
     if (handler_id)
-        g_signal_handler_unblock((gpointer)siamese, handler_id);
+        g_signal_handler_unblock(siamese, handler_id);
 }
 
 void	on_button_085_clicked(GtkWidget *widget, gpointer user_data)
@@ -3217,148 +3227,312 @@ void	on_sync_correction_clicked( GtkWidget *w, gpointer data )
 	vj_midi_learning_vims_msg( info->midi, NULL, VIMS_SYNC_CORRECTION, status );
 }
 
-void	on_curve_clear_parameter_clicked( GtkWidget *widget, gpointer user_data )
+static inline void put_le32(unsigned char *p, int v)
 {
-    if( info->uc.selected_parameter_id == -1 )
-        return;
+    uint32_t u = (uint32_t) v;
 
-    multi_vims(VIMS_SAMPLE_KF_CLEAR, "%d %d",info->uc.selected_chain_entry,info->uc.selected_parameter_id);
-    info->uc.reload_hint[HINT_KF] = 1;
+    p[0] = (unsigned char) (u & 0xff);
+    p[1] = (unsigned char) ((u >> 8) & 0xff);
+    p[2] = (unsigned char) ((u >> 16) & 0xff);
+    p[3] = (unsigned char) ((u >> 24) & 0xff);
 }
 
-void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
+static inline int clamp_int_to_range(int v, int lo, int hi)
 {
-	int i = info->uc.selected_chain_entry;
-	int j = info->uc.selected_parameter_id;
+    if (lo > hi) {
+        int t = lo;
+        lo = hi;
+        hi = t;
+    }
 
-	if( j == -1 ) {
-		vj_msg(VEEJAY_MSG_INFO,"No parameter selected for animation");
-		return;
-	}
+    if (v < lo)
+        return lo;
+    if (v > hi)
+        return hi;
 
-	int id = info->uc.entry_tokens[ENTRY_FXID];
+    return v;
+}
 
-	int end = get_nums( "curve_spinend" );
-	int start = get_nums( "curve_spinstart" );
+static Gtk3CurveType curve_selected_type(void)
+{
+    if (is_button_toggled("curve_typelinear"))
+        return GTK3_CURVE_TYPE_LINEAR;
 
-    if( start == end ) {
-        vj_msg(VEEJAY_MSG_ERROR, "Start and end position are the same, there is nothing todo");
+    if (is_button_toggled("curve_typespline"))
+        return GTK3_CURVE_TYPE_SPLINE;
+
+    if (is_button_toggled("curve_typefreehand"))
+        return GTK3_CURVE_TYPE_FREE;
+
+    return GTK3_CURVE_TYPE_FREE;
+}
+
+void on_curve_clear_parameter_clicked(GtkWidget *widget, gpointer user_data)
+{
+    (void) widget;
+    (void) user_data;
+
+    if (info->status_lock)
+        return;
+
+    int entry = info->uc.selected_chain_entry;
+    int param = info->uc.selected_parameter_id;
+
+    if (entry < 0) {
+        vj_msg(VEEJAY_MSG_INFO, "No FX entry selected for animation");
         return;
     }
 
-    int status = is_button_toggled( "curve_toggleentry_param" );
-	const int length = end - start + 1;
+    if (param < 0) {
+        vj_msg(VEEJAY_MSG_INFO, "No FX parameter selected for animation");
+        return;
+    }
 
-
-	if( (length) <= 0 || id <= 0 )	
-	{
-		if( id <= 0 )
-			vj_msg(VEEJAY_MSG_INFO, "No FX set on entry %d",i);
-		else
-			vj_msg(VEEJAY_MSG_INFO, "Length of animation is 0");
-		return;
-	}
-
-	int type = 0;
-	if( is_button_toggled( "curve_typelinear" ) ) {
-		type = GTK3_CURVE_TYPE_LINEAR;
-	} else if ( is_button_toggled( "curve_typespline" ) ) {
-		type = GTK3_CURVE_TYPE_SPLINE;
-	} else if ( is_button_toggled( "curve_typefreehand" ) ) {
-		type = GTK3_CURVE_TYPE_FREE;
-	}
-	
-	int min=0,max=0;
-	float *data = (float*) vj_calloc( sizeof(float) * length ); // FIXME int *data ? because no more normalisation
-
-	_effect_get_minmax( id, &min, &max,j );
-
-	get_points_from_curve( info->curve, length, data );
-
-	char header[64];
-	
-	int payload = 3 + 2 + 2 + 8 + 8 + 2 + 2 + ( sizeof(int) * length );
- 
-	snprintf(header,sizeof(header), "K%08dkey%02d%02d%08d%08d%02d%02d",payload,i,j,start,end,type,status );
-	int hdr_len = strlen(header); //key000000000000000000000000 packet header
-    int tr_len = 9; //K00000000 transport header
-    size_t bufsize = tr_len + payload;
-
-	unsigned char *buf = vj_malloc( sizeof(unsigned char) * bufsize );
-	memcpy( buf, header, hdr_len);
-	
-	unsigned char *ptr = buf + hdr_len;
-	int k;
-	for( k = 0 ; k < length ; k++ ) {
-		//~ int pval = ((data[k]) * ((float)diff)) + min; // # BYPASS [0-1] NORMALISATION
-		int pval = (int) data[k];
-		ptr[0] = pval & 0xff;
-		ptr[1] = (pval >> 8) & 0xff;
-		ptr[2] = (pval >> 16) & 0xff;
-		ptr[3] = (pval >> 24) & 0xff;
-		ptr += 4;
-	}
-
-	vj_client_send_buf( info->client, V_CMD, buf, bufsize );
-
-	vj_msg( VEEJAY_MSG_INFO, "Saved new animation for parameter %d on entry %d, start at frame %d and end at frame %d",j,i,start,end );
-				
-	free(buf);
-	free(data);
-}
-
-void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
-{
-	gint id = info->status_tokens[ENTRY_FXID];
-	if( id < 0 )
-		id = 0;
-	int i = info->uc.selected_chain_entry;
-
-	multi_vims( VIMS_SAMPLE_KF_RESET, "%d", i );
-
+    multi_vims(VIMS_SAMPLE_KF_CLEAR, "%d %d", entry, param);
     info->uc.reload_hint[HINT_KF] = 1;
 }
 
-void    update_curve_shape(void)
+void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
 {
-    GtkWidget *shape_combo = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_combo_animation"));
-    gint selected_shape = gtk_combo_box_get_active( GTK_COMBO_BOX( shape_combo ) );
+    (void) widget;
+    (void) user_data;
 
-    int lo = 0, hi = 0;
-    /* update the time bounds accordingly the sample marker*/
-    if( lo == hi && hi == 0 )
+    if (info->status_lock)
+        return;
+
+    const int entry = info->uc.selected_chain_entry;
+    const int param = info->uc.selected_parameter_id;
+
+    if (entry < 0) {
+        vj_msg(VEEJAY_MSG_INFO, "No FX entry selected for animation");
+        return;
+    }
+
+    if (param < 0) {
+        vj_msg(VEEJAY_MSG_INFO, "No parameter selected for animation");
+        return;
+    }
+
+    const int fx_id = info->uc.entry_tokens[ENTRY_FXID];
+
+    if (fx_id <= 0) {
+        vj_msg(VEEJAY_MSG_INFO, "No FX set on entry %d", entry);
+        return;
+    }
+
+    int start = get_nums("curve_spinstart");
+    int end   = get_nums("curve_spinend");
+
+    if (start == end) {
+        vj_msg(VEEJAY_MSG_ERROR,
+               "Start and end position are the same, there is nothing to do");
+        return;
+    }
+
+    if (end < start) {
+        int t = start;
+        start = end;
+        end = t;
+    }
+
+    const int length = end - start + 1;
+
+    if (length <= 0) {
+        vj_msg(VEEJAY_MSG_INFO, "Length of animation is 0");
+        return;
+    }
+
+    Gtk3CurveType type = curve_selected_type();
+    int status = is_button_toggled("curve_toggleentry_param") ? 1 : 0;
+
+    int min = 0;
+    int max = 0;
+    _effect_get_minmax(fx_id, &min, &max, param);
+
+    float *data = (float *) vj_calloc(sizeof(float) * length);
+    if (!data) {
+        vj_msg(VEEJAY_MSG_ERROR,
+               "Unable to allocate animation buffer for %d points", length);
+        return;
+    }
+
+    get_points_from_curve(info->curve, length, data);
+
+    /*
+     * Protocol:
+     *
+     * transport header: K%08d                         = 9 bytes
+     * payload:
+     *   key                                           = 3 bytes
+     *   entry                                         = 2 bytes
+     *   parameter                                     = 2 bytes
+     *   start                                         = 8 bytes
+     *   end                                           = 8 bytes
+     *   curve type                                    = 2 bytes
+     *   status                                        = 2 bytes
+     *   values, little-endian int32                   = 4 * length
+     */
+    const int payload = 3 + 2 + 2 + 8 + 8 + 2 + 2 + (4 * length);
+    const int tr_len = 9;
+    const size_t bufsize = (size_t) tr_len + (size_t) payload;
+
+    unsigned char *buf = (unsigned char *) vj_malloc(bufsize);
+    if (!buf) {
+        vj_msg(VEEJAY_MSG_ERROR,
+               "Unable to allocate VIMS animation packet of %zu bytes", bufsize);
+        free(data);
+        return;
+    }
+
+    char header[64];
+
+    int hdr_len = snprintf(header,
+                           sizeof(header),
+                           "K%08dkey%02d%02d%08d%08d%02d%02d",
+                           payload,
+                           entry,
+                           param,
+                           start,
+                           end,
+                           (int) type,
+                           status);
+
+    if (hdr_len < 0 || hdr_len != 36) {
+        vj_msg(VEEJAY_MSG_ERROR,
+               "Internal error: invalid keyframe packet header size %d", hdr_len);
+        free(buf);
+        free(data);
+        return;
+    }
+
+    memcpy(buf, header, (size_t) hdr_len);
+
+    unsigned char *ptr = buf + hdr_len;
+
+    for (int k = 0; k < length; k++) {
+        int pval = (int) data[k];
+        pval = clamp_int_to_range(pval, min, max);
+
+        put_le32(ptr, pval);
+        ptr += 4;
+    }
+
+    vj_client_send_buf(info->client, V_CMD, buf, bufsize);
+
+    vj_msg(VEEJAY_MSG_INFO,
+           "Saved new animation for parameter %d on entry %d, start at frame %d and end at frame %d",
+           param,
+           entry,
+           start,
+           end);
+
+    info->uc.reload_hint[HINT_KF] = 1;
+
+    free(buf);
+    free(data);
+}
+
+void on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
+{
+    (void) widget;
+    (void) user_data;
+
+    if (info->status_lock)
+        return;
+
+    int entry = info->uc.selected_chain_entry;
+
+    if (entry < 0) {
+        vj_msg(VEEJAY_MSG_INFO, "No FX entry selected for animation");
+        return;
+    }
+
+    multi_vims(VIMS_SAMPLE_KF_RESET, "%d", entry);
+    info->uc.reload_hint[HINT_KF] = 1;
+}
+
+void update_curve_shape(void)
+{
+    if (!info->curve)
+        return;
+
+    int fx_id = info->uc.entry_tokens[ENTRY_FXID];
+    int param = info->uc.selected_parameter_id;
+
+    if (fx_id <= 0 || param < 0)
+        return;
+
+    GtkWidget *shape_combo = widget_cache[ WIDGET_CURVE_ANIMATION_LIST ];
+    GtkWidget *shape_param_spin = widget_cache[ WIDGET_CURVE_SPIN_ANIMATION_SHAPE ];
+    GtkWidget *shape_param_reverse = widget_cache[ WIDGET_CURVE_TOGGLE_ANIMATION_SHAPE ];
+    GtkWidget *shape_bound_min = widget_cache[ WIDGET_CURVE_BUTTON_BOUND_MIN ];
+    GtkWidget *shape_bound_max = widget_cache[ WIDGET_CURVE_BUTTON_BOUND_MAX ];
+
+    if (!shape_combo ||
+        !shape_param_spin ||
+        !shape_param_reverse ||
+        !shape_bound_min ||
+        !shape_bound_max)
     {
-        if( info->status_tokens[PLAY_MODE] == MODE_SAMPLE ) {
-            lo = info->status_tokens[SAMPLE_START];
-            hi = info->status_tokens[SAMPLE_END];
-        } else {
-            lo = 0;
-            hi = info->status_tokens[SAMPLE_MARKER_END];
-        }
+        return;
     }
-    int steps, minb, maxb;
-    gboolean reverse_shape;
 
-    GtkWidget *shape_param_spin = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_spin_animation_shape"));
-    steps = gtk_spin_button_get_value( GTK_SPIN_BUTTON(shape_param_spin) );
+    gint selected_shape = gtk_combo_box_get_active(GTK_COMBO_BOX(shape_combo));
 
-    GtkWidget *shape_param_reverse = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_toggleanimation_shape"));
-    reverse_shape = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(shape_param_reverse) );
+    if (selected_shape < 0)
+        selected_shape = 0;
 
-    GtkWidget *shape_bound = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_scalebuttonbound_min"));
-    minb = (int)gtk_scale_button_get_value( GTK_SCALE_BUTTON(shape_bound) );
-    shape_bound = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_scalebuttonbound_max"));
-    maxb = (int)gtk_scale_button_get_value( GTK_SCALE_BUTTON(shape_bound) );
+    int lo = 0;
+    int hi = 0;
 
-    //~ FIXME force curve free until gtk3curvewidget point limit is fixed (issue # )
-    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPEFREEHAND]), TRUE);
+    if (info->status_tokens[PLAY_MODE] == MODE_SAMPLE) {
+        lo = info->status_tokens[SAMPLE_START];
+        hi = info->status_tokens[SAMPLE_END];
+    } else {
+        lo = 0;
+        hi = info->status_tokens[SAMPLE_MARKER_END];
+    }
 
-    curve_set_predifined_shape( info->curve, info->uc.entry_tokens[ENTRY_FXID],
-                                    info->uc.selected_parameter_id,
-                                    lo, hi, selected_shape, minb, maxb, steps,reverse_shape);
+    if (hi < lo) {
+        int t = lo;
+        lo = hi;
+        hi = t;
+    }
+
+    if (hi <= lo)
+        return;
+
+    int steps = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(shape_param_spin));
+    if (steps < 1)
+        steps = 1;
+
+    gboolean reverse_shape =
+        gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(shape_param_reverse));
+
+    int minb = (int) gtk_scale_button_get_value(GTK_SCALE_BUTTON(shape_bound_min));
+    int maxb = (int) gtk_scale_button_get_value(GTK_SCALE_BUTTON(shape_bound_max));
+
+    if (maxb < minb) {
+        int t = minb;
+        minb = maxb;
+        maxb = t;
+    }
+
+    if (widget_cache[WIDGET_CURVE_TYPEFREEHAND])
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPEFREEHAND]), TRUE);
+
+    curve_set_predifined_shape(info->curve,
+                               fx_id,
+                               param,
+                               lo,
+                               hi,
+                               selected_shape,
+                               minb,
+                               maxb,
+                               steps,
+                               reverse_shape);
 }
 
-/* This callback is used by various widgets */
 void    on_curve_animation_changed (GtkWidget *widget, gpointer user_data)
 {
     if(info->status_lock)
@@ -3367,120 +3541,164 @@ void    on_curve_animation_changed (GtkWidget *widget, gpointer user_data)
     update_curve_shape();
 }
 
-void on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
+static void curve_set_type_from_toggle(GtkWidget *widget,
+                                       const char *button_name,
+                                       Gtk3CurveType type)
 {
-    if(info->status_lock)
+    (void) widget;
+
+    if (info->status_lock)
         return;
 
-    if( is_button_toggled("curve_typelinear"))
-    {
-        sample_slot_t *s = info->selected_slot;
-        if(!s)
-            return;
-        set_points_in_curve( GTK3_CURVE_TYPE_LINEAR, info->curve );
-    }
+    if (!is_button_toggled(button_name))
+        return;
+
+    if (!info->selected_slot || !info->curve)
+        return;
+
+    set_points_in_curve(type, info->curve);
+}
+
+void on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
+{
+    (void) user_data;
+    curve_set_type_from_toggle(widget, "curve_typelinear", GTK3_CURVE_TYPE_LINEAR);
 }
 
 void on_curve_typespline_toggled(GtkWidget *widget, gpointer user_data)
 {
-    if(info->status_lock)
-        return;
-
-    if( is_button_toggled("curve_typespline"))
-    {
-        sample_slot_t *s = info->selected_slot;
-        if(!s)
-            return;
-        set_points_in_curve( GTK3_CURVE_TYPE_SPLINE, info->curve );
-    }
+    (void) user_data;
+    curve_set_type_from_toggle(widget,"curve_typespline",GTK3_CURVE_TYPE_SPLINE);
 }
 
 void on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
 {
-    if(info->status_lock)
-        return;
-    if( is_button_toggled("curve_typefreehand"))
-    {
-        sample_slot_t *s = info->selected_slot;
-        if(!s)
-            return;
-        set_points_in_curve( GTK3_CURVE_TYPE_FREE, info->curve );
-    }
+    (void) user_data;
+    curve_set_type_from_toggle(widget,"curve_typefreehand", GTK3_CURVE_TYPE_FREE);
 }
 
-void on_curve_toggleentry_param_toggled( GtkWidget *widget, gpointer user_data)
+void on_curve_toggleentry_param_toggled(GtkWidget *widget, gpointer user_data)
 {
-    if(info->status_lock)
+    (void) widget;
+    (void) user_data;
+
+    if (info->status_lock)
         return;
 
-    int i = info->uc.selected_chain_entry;
-    if( i == -1 ) {
-        vj_msg(VEEJAY_MSG_INFO,"No FX entry selected for animation");
+    int entry = info->uc.selected_chain_entry;
+
+    if (entry < 0) {
+        vj_msg(VEEJAY_MSG_INFO, "No FX entry selected for animation");
+        return;
+    }
+
+    int param = info->uc.selected_parameter_id;
+
+    if (param < 0) {
+        vj_msg(VEEJAY_MSG_INFO, "No FX animation parameter selected");
         return;
     }
 
-    int j = info->uc.selected_parameter_id;
-    if( j == -1) {
-        vj_msg(VEEJAY_MSG_INFO,"No FX anim parameter selected");
-        return;
-    }
-    int k = is_button_toggled( "curve_toggleentry_param" );
+    int active = is_button_toggled("curve_toggleentry_param") ? 1 : 0;
 
-    multi_vims( VIMS_SAMPLE_KF_STATUS_PARAM, "0 %d %d %d", i, j,k );
+    multi_vims(VIMS_SAMPLE_KF_STATUS_PARAM,
+               "0 %d %d %d",
+               entry,
+               param,
+               active);
 
-    update_slider_state( j, k);
+    update_slider_state(param, active);
 
-    vj_msg(VEEJAY_MSG_INFO, "%s FX parameter %d", (k==0 ? "Disabled" : "Enabled"), j );
+    vj_msg(VEEJAY_MSG_INFO,
+           "%s FX parameter %d",
+           active ? "Enabled" : "Disabled",
+           param);
 }
 
-void curve_toggleentry_activate( int selected_chain_entry, int active)
+void curve_toggleentry_activate(int selected_chain_entry, int active)
 {
+    if (selected_chain_entry < 0)
+        return;
+
     int curve_type = 0;
-    if( is_button_toggled("curve_typespline")) {
+
+    if (is_button_toggled("curve_typespline"))
         curve_type = 1;
-    } else if ( is_button_toggled("curve_typefreehand")) {
+    else if (is_button_toggled("curve_typefreehand"))
         curve_type = 2;
-    } else if (is_button_toggled("curve_typelinear")) {
+    else
         curve_type = 0;
-    }
 
-    multi_vims( VIMS_SAMPLE_KF_STATUS, "%d %d %d",
-               selected_chain_entry, active, curve_type );
+    multi_vims(VIMS_SAMPLE_KF_STATUS,
+               "%d %d %d",
+               selected_chain_entry,
+               active ? 1 : 0,
+               curve_type);
 
-    //update anim mode
-    GtkTreeView *view = GTK_TREE_VIEW(glade_xml_get_widget_(info->main_window, "tree_chain"));
-    GtkTreeModel *model = gtk_tree_view_get_model( view );
+    GtkTreeView *view =
+        GTK_TREE_VIEW(glade_xml_get_widget_(info->main_window, "tree_chain"));
+
+    if (!view)
+        return;
+
+    GtkTreeModel *model = gtk_tree_view_get_model(view);
+
+    if (!model)
+        return;
+
     GtkTreeIter iter;
-
     GtkTreePath *path = gtk_tree_path_new_from_indices(selected_chain_entry, -1);
-    if(gtk_tree_model_get_iter(model, &iter, path))
-    {
-        GdkPixbuf *kf_toggle = update_pixmap_entry( active );
-        gtk_list_store_set (GTK_LIST_STORE( model ), &iter, FXC_KF, kf_toggle, FXC_KF_STATUS, active, -1);
+
+    if (!path)
+        return;
+
+    if (gtk_tree_model_get_iter(model, &iter, path)) {
+        GdkPixbuf *kf_toggle = update_pixmap_entry(active ? 1 : 0);
+
+        gtk_list_store_set(GTK_LIST_STORE(model),
+                           &iter,
+                           FXC_KF,
+                           kf_toggle,
+                           FXC_KF_STATUS,
+                           active ? 1 : 0,
+                           -1);
+
+        if (kf_toggle)
+            g_object_unref(kf_toggle);
     }
+
     gtk_tree_path_free(path);
 }
 
-void	curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
+void curve_toggleentry_toggled(GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
+    (void) user_data;
 
-    int selected_chain_entry = info->uc.selected_chain_entry;
-	if( selected_chain_entry == -1 ) {
-		vj_msg(VEEJAY_MSG_INFO,"No parameter selected for animation");
-		return;
-	}
+    if (info->status_lock)
+        return;
 
-	int active = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) );
-    curve_toggleentry_activate(selected_chain_entry, active);
+    if (!GTK_IS_TOGGLE_BUTTON(widget))
+        return;
+
+    int entry = info->uc.selected_chain_entry;
+
+    if (entry < 0) {
+        vj_msg(VEEJAY_MSG_INFO, "No FX entry selected for animation");
+        return;
+    }
+
+    int active = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? 1 : 0;
+
+    curve_toggleentry_activate(entry, active);
 }
 
-void curve_panel_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
+void curve_panel_toggleentry_toggled(GtkWidget *widget, gpointer user_data)
 {
-    curve_toggleentry_toggled( widget, user_data);
+    curve_toggleentry_toggled(widget, user_data);
 
-    GtkWidget *panel_toggleentry = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_panel_toggleentry"));
+    GtkWidget *panel_toggleentry =
+        GTK_WIDGET(glade_xml_get_widget_(info->main_window, "curve_panel_toggleentry"));
+
     GtkWidget *chain_toggleentry = widget_cache[WIDGET_CURVE_CHAIN_TOGGLEENTRY];
 
     toggle_siamese_widget(widget, panel_toggleentry, chain_toggleentry);

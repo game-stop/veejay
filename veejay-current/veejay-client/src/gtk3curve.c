@@ -18,16 +18,34 @@
  * Copyright (C) 1997 - 2000 GTK+ Team.
  */
 
+/* Gveejay Reloaded - graphical interface for VeeJay
+ *          (C) 2002-2026 Niels Elburg <nwelburg@gmail.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
 #include <gtk/gtk.h>
-#include <vj-api.h> /* VEEJAY NEEDS to format timecode string */
+#include <vj-api.h> 
 
 #include "gtk3curve.h"
-#include "utils-gtk.h" /* VEEJAY NEEDS */
+#include "utils-gtk.h" 
 
 //~ #define DEBUG
 
@@ -93,19 +111,19 @@ struct _Gtk3CurvePrivate
   guint state                 : 1;
   guint in_curve              : 1;
 
-  gfloat yaxis_lo; /* VEEJAY NEEDS */
-  gfloat yaxis_hi; /* VEEJAY NEEDS */
+  gfloat yaxis_lo;
+  gfloat yaxis_hi;
 
-  gfloat xaxis_lo; /* VEEJAY NEEDS */
-  gfloat xaxis_hi; /* VEEJAY NEEDS */
+  gfloat xaxis_lo;
+  gfloat xaxis_hi;
 
-  gfloat last_x; /* VEEJAY NEEDS */
-  gfloat last_y; /* VEEJAY NEEDS */
+  gfloat last_x;
+  gfloat last_y;
 
-  gdouble  grid_resolution; /* VEEJAY NEEDS */
-  gdouble  current_position; /* VEEJAY NEEDS */
-  gboolean draw_position;  /* VEEJAY NEEDS */
-  gboolean draw_h_guides;  /* VEEJAY NEEDS */
+  gdouble  grid_resolution;
+  gdouble  current_position;
+  gboolean draw_position;
+  gboolean draw_h_guides;
 };
 
 enum
@@ -191,12 +209,6 @@ gtk3_curve_get_instance_private (Gtk3Curve *self)
   return (G_STRUCT_MEMBER_P (self, Gtk3Curve_private_offset));
 }
 
-//~ static void gtk_gadget_class_intern_init (gpointer klass)
-//~ {
-  //~ g_type_class_adjust_private_offset (klass, &Gtk3Curve_private_offset);
-  //~ gtk3_curve_parent_class = g_type_class_peek_parent (klass);
-  //~ gtk3_curve_class_init ((Gtk3CurveClass*) klass);
-//~ }
 
 GType
 gtk3_curve_get_type (void)
@@ -358,7 +370,6 @@ gtk3_curve_init (Gtk3Curve* self)
   self->priv = gtk3_curve_get_instance_private (self);
   priv = self->priv;
 
-  /* Curve Data Points */
   priv->curve_data.description = NULL;
   priv->curve_data.n_points = 0;
   priv->curve_data.d_point = NULL;
@@ -366,60 +377,76 @@ gtk3_curve_init (Gtk3Curve* self)
   priv->curve_data.d_cpoints = NULL;
   priv->curve_data.curve_type = GTK3_CURVE_TYPE_SPLINE;
 
-  /* Misc */
   priv->use_bg_theme = TRUE;
   priv->cursor_type = GDK_TOP_LEFT_ARROW;
-  priv->grid_size = GTK3_CURVE_GRID_MICRO; /* VEEJAY NEEDS */
-  //~ priv->grid_size = GTK3_CURVE_GRID_LARGE;
+  priv->grid_size = GTK3_CURVE_GRID_MICRO;
+
   priv->height = 0;
   priv->grab_point = -1;
 
-  /* Min & Max range */
   priv->min_x = 0.0;
   priv->max_x = 1.0;
   priv->min_y = 0.0;
   priv->max_y = 1.0;
 
-  priv->last_x = 0.0f; /* VEEJAY NEEDS */
-  priv->last_y = 0.0f; /* VEEJAY NEEDS */
-  priv->xaxis_lo = 0.0f; /* VEEJAY NEEDS */
-  priv->xaxis_hi = 0.0f; /* VEEJAY NEEDS */
-  priv->yaxis_lo = 0.0f; /* VEEJAY NEEDS */
-  priv->yaxis_hi = 0.0f; /* VEEJAY NEEDS */
+  priv->last_x = 0.0f;
+  priv->last_y = 0.0f;
+  priv->xaxis_lo = 0.0f;
+  priv->xaxis_hi = 0.0f;
+  priv->yaxis_lo = 0.0f;
+  priv->yaxis_hi = 0.0f;
 
-  priv->grid_resolution = 0.0f; /* VEEJAY NEEDS */
-  priv->draw_position = TRUE; /* VEEJAY NEEDS */
-  priv->draw_h_guides = TRUE; /* VEEJAY NEEDS */
-  /* Default Colors */
+  priv->grid_resolution = 10.0f;
+  priv->draw_position = TRUE;
+  priv->draw_h_guides = TRUE;
+
+  priv->current_position = 0.0;
+  priv->draw_position = TRUE;
+  priv->draw_h_guides = TRUE;
+  priv->state = FALSE;
+  priv->in_curve = FALSE;
+  priv->last = 0;
+  priv->width = 0;
+
   gtk3_curve_set_color_background_rgba (GTK_WIDGET(self), 1.0, 1.0, 1.0, 1.0);
   gtk3_curve_set_color_curve_rgba (GTK_WIDGET(self), 0.0, 0.0, 0.0, 1.0);
   gtk3_curve_set_color_grid_rgba (GTK_WIDGET(self), 0.0, 0.0, 0.0, 1.0);
   gtk3_curve_set_color_cpoint_rgba (GTK_WIDGET(self), 0.2, 0.2, 0.2, 1.0);
 
-  //optional: give a sane default minimum size with gtk_widget_set_size_request
 
   DEBUG_INFO("init [E]\n");
 }
 
-/* VEEJAY NEEDS */
 static gboolean
-gtk3_curve_mouse_scroll(GtkWidget *widget, GdkEventScroll *ev, gpointer user_data) {
-    Gtk3CurvePrivate *priv = GTK3_CURVE (widget)->priv;
+gtk3_curve_mouse_scroll(GtkWidget *widget, GdkEventScroll *ev, gpointer user_data)
+{
+    (void) user_data;
+
+    Gtk3CurvePrivate *priv = GTK3_CURVE(widget)->priv;
 
     GdkScrollDirection direction;
-    gboolean scroll_status = gdk_event_get_scroll_direction((GdkEvent*)ev, &direction);
-    if(scroll_status) {
-        if(direction == GDK_SCROLL_UP) {
-            priv->grid_resolution ++;
-        }
 
-        if(direction == GDK_SCROLL_DOWN) {
-            priv->grid_resolution --;
-        }
+    if (gdk_event_get_scroll_direction((GdkEvent *) ev, &direction)) {
+        if (direction == GDK_SCROLL_UP)
+            priv->grid_resolution += 1.0;
+        else if (direction == GDK_SCROLL_DOWN)
+            priv->grid_resolution -= 1.0;
+    } else {
+        gdouble dx = 0.0;
+        gdouble dy = 0.0;
 
-        if(priv->grid_resolution < 2)
-            priv->grid_resolution = 2;
+        if (gdk_event_get_scroll_deltas((GdkEvent *) ev, &dx, &dy))
+            priv->grid_resolution += dy < 0.0 ? 1.0 : -1.0;
     }
+
+    if (priv->grid_resolution < 2.0)
+        priv->grid_resolution = 2.0;
+
+    if (priv->grid_resolution > 64.0)
+        priv->grid_resolution = 64.0;
+
+    if (gtk_widget_is_visible(widget))
+        gtk_widget_queue_draw(widget);
 
     return TRUE;
 }
@@ -429,7 +456,6 @@ gtk3_curve_new(void)
 {
   GtkWidget *widget = g_object_new (GTK3_TYPE_CURVE, NULL);
 
-  /* VEEJAY NEEDS ---> */
   gtk_widget_set_events( widget,
       GDK_EXPOSURE_MASK | GDK_POINTER_MOTION_HINT_MASK | GDK_POINTER_MOTION_MASK |
       GDK_BUTTON1_MOTION_MASK | GDK_BUTTON2_MOTION_MASK |
@@ -437,23 +463,50 @@ gtk3_curve_new(void)
       GDK_BUTTON3_MOTION_MASK | GDK_2BUTTON_PRESS | GDK_SCROLL_MASK );
 
   g_signal_connect(widget,"scroll-event", G_CALLBACK(gtk3_curve_mouse_scroll), NULL);
-  /* <----- VEEJAY NEEDS */
+
   return widget;
 }
 
-/* VEEJAY NEEDS */
-static gfloat scale_param_value(Gtk3CurvePrivate *priv, gfloat y, gfloat hei) {
-    //~ gfloat distance = (priv->yaxis_hi - priv->yaxis_lo);
-    gfloat distance = (priv->max_y - priv->min_y);
+static gfloat scale_param_value(Gtk3CurvePrivate *priv, gfloat y, gfloat hei)
+{
     gfloat r_hei = hei - (RADIUS * 2);
-    return ( distance / r_hei ) * (r_hei - y);
+
+    if (r_hei <= 0.0f)
+        return priv->min_y;
+
+    gfloat distance = priv->max_y - priv->min_y;
+
+    if (distance == 0.0f)
+        return priv->min_y;
+
+    gfloat v = priv->min_y + ((distance / r_hei) * (r_hei - y));
+
+    if (v < priv->min_y)
+        v = priv->min_y;
+    else if (v > priv->max_y)
+        v = priv->max_y;
+
+    return v;
 }
 
-/* VEEJAY NEEDS */
-static gfloat scale_pos_value(Gtk3CurvePrivate *priv, gfloat x, gfloat wid) {
-    //~ gfloat distance = (priv->xaxis_hi - priv->xaxis_lo) + 1;
-    gfloat distance = (priv->max_x - priv->min_x) + 1;
-    return ( distance / wid ) * x;
+static gfloat scale_pos_value(Gtk3CurvePrivate *priv, gfloat x, gfloat wid)
+{
+    if (wid <= 0.0f)
+        return priv->min_x;
+
+    gfloat distance = priv->max_x - priv->min_x;
+
+    if (distance == 0.0f)
+        return priv->min_x;
+
+    gfloat v = priv->min_x + ((distance / wid) * x);
+
+    if (v < priv->min_x)
+        v = priv->min_x;
+    else if (v > priv->max_x)
+        v = priv->max_x;
+
+    return v;
 }
 
 static void
@@ -614,7 +667,6 @@ static void gtk3_curve_draw_line (cairo_t   *cr,
   cairo_stroke (cr);
 }
 
-/* VEEJAY NEEDS */
 static void
 gtk3_curve_draw_labels(GtkWidget *widget, cairo_t *cr, gint hei, gint wid)
 {
@@ -677,7 +729,6 @@ gtk3_curve_draw_labels(GtkWidget *widget, cairo_t *cr, gint hei, gint wid)
 
   DEBUG_INFO("position %f xaxis_lo %f\n", position, priv->min_x);
 
-  //~ char *timecode = format_selection_time( priv->xaxis_lo, priv->xaxis_lo + position );
   char *timecode = format_selection_time( priv->min_x, priv->min_x + position );
   snprintf(text,sizeof(text), "Value %d at position %d (%s)",(int) value, (int) position, timecode );
   free(timecode);
@@ -689,204 +740,161 @@ gtk3_curve_draw_labels(GtkWidget *widget, cairo_t *cr, gint hei, gint wid)
 }
 
 static gboolean
-gtk3_curve_draw (GtkWidget *widget,
-                 cairo_t   *cr)
+gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
 {
   Gtk3CurvePrivate *priv;
   GtkStyleContext  *style_context;
   GdkRGBA           color;
-  gint              last_x, last_y;
-  gint              i;
   GtkAllocation     allocation;
   Gtk3Curve        *curve;
-  gfloat            grid;
 
-  curve = GTK3_CURVE (widget);
+  curve = GTK3_CURVE(widget);
   priv = curve->priv;
 
-  DEBUG_INFO("draw [S]\n");
-//FIXME Should not be drawn is not visible ... only widget visible test ? or draw called too often?
-
   if (!cr)
-    {
-      DEBUG_ERROR("cairo == null\n");
-      return TRUE;
-    }
+    return TRUE;
 
-  gtk_widget_get_allocation (widget, &allocation);
+  gtk_widget_get_allocation(widget, &allocation);
 
-  DEBUG_INFO("%d x %d\n", allocation.width, allocation.height);
+  gint width  = allocation.width  - RADIUS * 2;
+  gint height = allocation.height - RADIUS * 2;
 
-  if (priv->height != allocation.width ||
-      priv->curve_data.n_points != allocation.height)
-    {
-      gtk3_curve_interpolate (widget,
-                              allocation.width - RADIUS * 2,
-                              allocation.height - RADIUS * 2);
-    }
+  if (width <= 1 || height <= 1)
+    return FALSE;
 
-  if (priv->use_bg_theme)
-    {
-      style_context = gtk_widget_get_style_context(GTK_WIDGET (curve));
-      gtk_render_background(style_context, cr,
-                            0, 0,
-                            allocation.width + RADIUS * 2,
-                            allocation.height + RADIUS * 2);
-      /* VEEJAY NEEDS */
-      vj_gtk_context_get_color (style_context,
-                                "background-color",
-                                gtk_style_context_get_state (style_context),
-                                &color);
-      //~ gtk_style_context_get_color (style_context,
-                                   //~ gtk_style_context_get_state (style_context),
-                                   //~ &color);
-      gdk_cairo_set_source_rgba (cr, &color);
-    }
-  else
-    {
-      cairo_set_source_rgba (cr,
-                             priv->background.red,
-                             priv->background.green,
-                             priv->background.blue,
-                             priv->background.alpha);
-    }
+  if (priv->width != width ||
+      priv->height != height ||
+      priv->curve_data.n_points != width)
+  {
+    gtk3_curve_interpolate(widget, width, height);
+  }
+
+  if (priv->use_bg_theme) {
+    style_context = gtk_widget_get_style_context(widget);
+
+    gtk_render_background(style_context,
+                          cr,
+                          0,
+                          0,
+                          allocation.width,
+                          allocation.height);
+
+    vj_gtk_context_get_color(style_context,
+                             "background-color",
+                             gtk_style_context_get_state(style_context),
+                             &color);
+
+    gdk_cairo_set_source_rgba(cr, &color);
+  } else {
+    cairo_set_source_rgba(cr,
+                          priv->background.red,
+                          priv->background.green,
+                          priv->background.blue,
+                          priv->background.alpha);
+  }
+
   cairo_paint(cr);
+  cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
 
-  cairo_set_line_cap (cr, CAIRO_LINE_CAP_ROUND);
-  /* VEEJAY NEEDS */
-  grid = priv->grid_resolution;
-  //~ switch (priv->grid_size)
-    //~ {
-      //~ default:
-      //~ case GTK3_CURVE_GRID_MICRO:
-        //~ grid = 10.0;
-        //~ break;
-      //~ case GTK3_CURVE_GRID_SMALL:
-        //~ grid = 8.0;
-        //~ break;
-      //~ case GTK3_CURVE_GRID_MEDIUM:
-        //~ grid = 6.0;
-        //~ break;
-      //~ case GTK3_CURVE_GRID_LARGE:
-        //~ grid = 4.0;
-      //~ case GTK3_CURVE_GRID_XLARGE:
-        //~ grid = 2.0;
-    //~ }
+  gfloat grid = priv->grid_resolution;
 
-  gfloat wm = allocation.width - (RADIUS * 2);
+  if (grid < 2.0f)
+    grid = 2.0f;
+
+  if (grid > 64.0f)
+    grid = 64.0f;
+
+  gfloat wm = allocation.width  - (RADIUS * 2);
   gfloat hm = allocation.height - (RADIUS * 2);
 
-  /* Draw grid */
-  for (i = 0; i < (int)grid+1; i++)
-    {
-      cairo_set_line_width (cr, 0.5);
-      cairo_set_source_rgba (cr,
-                             priv->grid.red,
-                             priv->grid.green,
-                             priv->grid.blue,
-                             priv->grid.alpha);
-      gdouble x1 = RADIUS;
-      gdouble y1 = i * (hm / grid) + RADIUS;
-      gdouble x2 = wm + RADIUS;
-      gdouble y2 = i * (hm / grid) + RADIUS;
-      gtk3_curve_draw_line (cr, x1, y1, x2, y2);
+  cairo_set_line_width(cr, 0.5);
+  cairo_set_source_rgba(cr,
+                        priv->grid.red,
+                        priv->grid.green,
+                        priv->grid.blue,
+                        priv->grid.alpha);
 
-      x1 = i * (wm / grid) + RADIUS;
-      y1 = RADIUS;
-      x2 = i * (wm / grid) + RADIUS;
-      y2 = hm + RADIUS;
-      gtk3_curve_draw_line (cr, x1, y1, x2, y2);
-    }
+  for (int i = 0; i <= (int) grid; i++) {
+    gdouble gy = RADIUS + (i * (hm / grid));
+    gtk3_curve_draw_line(cr, RADIUS, gy, wm + RADIUS, gy);
 
-  /* VEEJAY NEEDS --->*/
-  /* Draw some horizontal guides */
-  if (priv->draw_position)
-  {
-      //~ gfloat position = project (priv->current_position, priv->min_x, priv->max_x, wm);// + RADIUS ?
-      cairo_set_line_width (cr, 0.5);
-      cairo_set_source_rgba (cr,
-                             0.8, //priv->position.red
-                             0.3,
-                             0.3,
-                             priv->curve.alpha);
-      gtk3_curve_draw_line (cr, RADIUS, hm/2. + RADIUS, wm + RADIUS, hm/2. + RADIUS);
+    gdouble gx = RADIUS + (i * (wm / grid));
+    gtk3_curve_draw_line(cr, gx, RADIUS, gx, hm + RADIUS);
   }
-  /* <----- VEEJAY NEEDS */
 
-  /* VEEJAY NEEDS --->*/
-  /* Draw a position cursor */
-  if (priv->draw_position)
-  {
-      gfloat position = project (priv->current_position, priv->min_x, priv->max_x, wm);// + RADIUS ?
-      cairo_set_line_width (cr, 0.8);
-      cairo_set_source_rgba (cr,
-                             0.8, //priv->position.red
-                             0.3,
-                             0.3,
-                             priv->curve.alpha);
-      gtk3_curve_draw_line (cr, position, RADIUS, position, hm + RADIUS);
+  if (priv->draw_h_guides) {
+    cairo_set_line_width(cr, 0.5);
+    cairo_set_source_rgba(cr, 0.8, 0.3, 0.3, priv->curve.alpha);
+    gtk3_curve_draw_line(cr,
+                         RADIUS,
+                         RADIUS + hm / 2.0,
+                         RADIUS + wm,
+                         RADIUS + hm / 2.0);
   }
-  /* <----- VEEJAY NEEDS */
 
-  /* Draw a curve or line or set of lines */
-  /* VEEJAY NEEDS --->*/
-  if(priv->grid_resolution > 0 ) {
-    /* Draw labels */
-    gtk3_curve_draw_labels(widget ,cr, allocation.height, allocation.width );
-  /* <--- VEEJAY NEEDS*/
-    for (int i=0; i<priv->curve_data.n_points; i++)
-    {
+  if (priv->draw_position) {
+    gfloat position = RADIUS + project(priv->current_position,
+                                       priv->min_x,
+                                       priv->max_x,
+                                       wm);
+
+    cairo_set_line_width(cr, 0.8);
+    cairo_set_source_rgba(cr, 0.8, 0.3, 0.3, priv->curve.alpha);
+    gtk3_curve_draw_line(cr, position, RADIUS, position, hm + RADIUS);
+  }
+
+  gtk3_curve_draw_labels(widget, cr, allocation.height, allocation.width);
+
+  if (priv->curve_data.d_point && priv->curve_data.n_points > 1) {
+    cairo_set_line_width(cr, 0.8);
+    cairo_set_source_rgba(cr,
+                          priv->curve.red,
+                          priv->curve.green,
+                          priv->curve.blue,
+                          priv->curve.alpha);
+
+    gdouble last_x = priv->curve_data.d_point[0].x;
+    gdouble last_y = priv->curve_data.d_point[0].y;
+
+    for (int i = 1; i < priv->curve_data.n_points; i++) {
       gdouble x = priv->curve_data.d_point[i].x;
       gdouble y = priv->curve_data.d_point[i].y;
 
-      if (i > 0)
-        {
-          cairo_set_line_width (cr, 0.5);
-          cairo_set_source_rgba (cr,
-                                 priv->curve.red,
-                                 priv->curve.green,
-                                 priv->curve.blue,
-                                 priv->curve.alpha);
-          gtk3_curve_draw_line (cr, last_x, last_y, x, y);
-        }
+      gtk3_curve_draw_line(cr, last_x, last_y, x, y);
 
       last_x = x;
       last_y = y;
     }
-  }  /* VEEJAY NEEDS */
+  }
 
-  if (priv->curve_data.curve_type != GTK3_CURVE_TYPE_FREE)
-    for (i = 0; i < priv->curve_data.n_cpoints; ++i)
-      {
-        gdouble x, y;
+  if (priv->curve_data.curve_type != GTK3_CURVE_TYPE_FREE) {
+    for (int i = 0; i < priv->curve_data.n_cpoints; ++i) {
+      gdouble x, y;
 
-        if (priv->curve_data.d_cpoints[i].x < priv->min_x)
-          continue;
+      if (priv->curve_data.d_cpoints[i].x < priv->min_x)
+        continue;
 
-        x = project (priv->curve_data.d_cpoints[i].x,
-                     priv->min_x, priv->max_x,
-                     wm);
-        y = allocation.height - project (priv->curve_data.d_cpoints[i].y,
-                                         priv->min_y,
-                                         priv->max_y,
-                                         hm);
+      x = RADIUS + project(priv->curve_data.d_cpoints[i].x,
+                           priv->min_x,
+                           priv->max_x,
+                           wm);
 
-        /* draw a bullet */
-        cairo_set_source_rgba (cr,
-                               priv->cpoint.red,
-                               priv->cpoint.green,
-                               priv->cpoint.blue,
-                               priv->cpoint.alpha);
-        cairo_arc(cr,
-                  x,
-                  y,
-                  RADIUS * 1.5,
-                  0,
-                  2 * M_PI);
-        cairo_fill (cr);
-      }
+      y = RADIUS + hm - project(priv->curve_data.d_cpoints[i].y,
+                                priv->min_y,
+                                priv->max_y,
+                                hm);
 
-  DEBUG_INFO("draw [E]\n");
+      cairo_set_source_rgba(cr,
+                            priv->cpoint.red,
+                            priv->cpoint.green,
+                            priv->cpoint.blue,
+                            priv->cpoint.alpha);
+
+      cairo_arc(cr, x, y, RADIUS * 1.5, 0, 2 * M_PI);
+      cairo_fill(cr);
+    }
+  }
+
   return FALSE;
 }
 
@@ -960,7 +968,6 @@ void gtk3_curve_get_cursor_coord(GtkWidget *widget, gint *tx, gint *ty)
   GdkSeat          *user_seat;
   GdkDevice        *device_pointer;
 
-  /*  get the pointer position  */
   user_seat = gdk_display_get_default_seat (gtk_widget_get_display (widget));
   device_pointer = gdk_seat_get_pointer (user_seat);
   gdk_window_get_device_position (gtk_widget_get_window (widget),
@@ -969,99 +976,103 @@ void gtk3_curve_get_cursor_coord(GtkWidget *widget, gint *tx, gint *ty)
 }
 
 static gboolean
-gtk3_curve_button_press (GtkWidget        *widget,
-                         GdkEventButton   *event)
+gtk3_curve_button_press(GtkWidget *widget, GdkEventButton *event)
 {
-  Gtk3CurvePrivate *priv = GTK3_CURVE (widget)->priv;
-  //~ GdkCursorType     new_type = priv->cursor_type;
-  GtkAllocation     allocation;
-  gint              cx, x, y, width, height, i;
-  gint              closest_point = 0;
-  gfloat            min_x;
-  gint              tx, ty;
-  guint             distance;
+  (void) event;
 
-  DEBUG_INFO("button press [S]\n");
+  Gtk3CurvePrivate *priv = GTK3_CURVE(widget)->priv;
+  GtkAllocation allocation;
+  gint x, y, width, height;
+  gint tx, ty;
+  gint closest_point = 0;
+  guint distance = ~0U;
 
-  gtk_grab_add (widget);
-  //~ new_type = GDK_TCROSS;
+  gtk_grab_add(widget);
 
-  gtk_widget_get_allocation (widget, &allocation);
+  gtk_widget_get_allocation(widget, &allocation);
 
   width = allocation.width - RADIUS * 2;
   height = allocation.height - RADIUS * 2;
 
-  if ((width < 0) || (height < 0))
+  if (width <= 1 || height <= 1)
     return FALSE;
 
-  /*  get the pointer position  */
-  gtk3_curve_get_cursor_coord (widget, &tx, &ty);
-  x = CLAMP ((tx - RADIUS), 0, width - 1);
-  y = CLAMP ((ty - RADIUS), 0, height - 1);
+  if (!priv->curve_data.d_point || priv->curve_data.n_points != width)
+    gtk3_curve_interpolate(widget, width, height);
 
-  DEBUG_INFO("press : xy[%dx%d] txy[%dx%d]\n",
-              x, y,
-              tx, ty);
+  gtk3_curve_get_cursor_coord(widget, &tx, &ty);
 
-  min_x = priv->min_x;
+  x = CLAMP((tx - RADIUS), 0, width - 1);
+  y = CLAMP((ty - RADIUS), 0, height - 1);
 
-  distance = ~0U;
-  for (i = 0; i < priv->curve_data.n_cpoints; ++i)
-    {
-      cx = project (priv->curve_data.d_cpoints[i].x, min_x, priv->max_x, width);
-      if ((guint) abs (x - cx) < distance)
-        {
-          distance = abs (x - cx);
-          closest_point = i;
-        }
+  gfloat min_x = priv->min_x;
+
+  for (int i = 0; i < priv->curve_data.n_cpoints; ++i) {
+    gint cx = project(priv->curve_data.d_cpoints[i].x,
+                      min_x,
+                      priv->max_x,
+                      width);
+
+    guint d = (guint) abs(x - cx);
+
+    if (d < distance) {
+      distance = d;
+      closest_point = i;
     }
+  }
 
-  switch (priv->curve_data.curve_type)
-    {
+  switch (priv->curve_data.curve_type) {
     default:
     case GTK3_CURVE_TYPE_LINEAR:
     case GTK3_CURVE_TYPE_SPLINE:
-      if (distance > MIN_DISTANCE)
-        {
-          /* insert a new control point */
-          if (priv->curve_data.n_cpoints > 0)
-            {
-              cx = project (priv->curve_data.d_cpoints[closest_point].x, min_x,
-                            priv->max_x, width);
-              if (x > cx)
-                ++closest_point;
-            }
-          ++priv->curve_data.n_cpoints;
-          priv->curve_data.d_cpoints =
-            g_realloc (priv->curve_data.d_cpoints,
-                       priv->curve_data.n_cpoints * sizeof (*priv->curve_data.d_cpoints));
-          for (i = priv->curve_data.n_cpoints - 1; i > closest_point; --i)
-            memcpy (priv->curve_data.d_cpoints + i, priv->curve_data.d_cpoints + i - 1,
-                    sizeof (*priv->curve_data.d_cpoints));
+      if (distance > MIN_DISTANCE) {
+        if (priv->curve_data.n_cpoints > 0) {
+          gint cx = project(priv->curve_data.d_cpoints[closest_point].x,
+                            min_x,
+                            priv->max_x,
+                            width);
+
+          if (x > cx)
+            ++closest_point;
         }
+
+        ++priv->curve_data.n_cpoints;
+
+        priv->curve_data.d_cpoints =
+          g_realloc(priv->curve_data.d_cpoints,
+                    priv->curve_data.n_cpoints *
+                    sizeof(*priv->curve_data.d_cpoints));
+
+        for (int i = priv->curve_data.n_cpoints - 1; i > closest_point; --i) {
+          memcpy(priv->curve_data.d_cpoints + i,
+                 priv->curve_data.d_cpoints + i - 1,
+                 sizeof(*priv->curve_data.d_cpoints));
+        }
+      }
+
       priv->grab_point = closest_point;
+
       priv->curve_data.d_cpoints[priv->grab_point].x =
-        unproject (x, min_x, priv->max_x, width);
+        unproject(x, min_x, priv->max_x, width);
+
       priv->curve_data.d_cpoints[priv->grab_point].y =
-        unproject (height - y, priv->min_y, priv->max_y, height);
-      gtk3_curve_interpolate (widget, width, height);
+        unproject(height - y, priv->min_y, priv->max_y, height);
+
+      gtk3_curve_interpolate(widget, width, height);
       break;
 
     case GTK3_CURVE_TYPE_FREE:
-      priv->curve_data.d_point[x].x = RADIUS + x;
-      priv->curve_data.d_point[x].y = RADIUS + y;
-      priv->grab_point = x;
-      priv->last = y;
+      if (priv->curve_data.d_point && x < priv->curve_data.n_points) {
+        priv->curve_data.d_point[x].x = RADIUS + x;
+        priv->curve_data.d_point[x].y = RADIUS + y;
+        priv->grab_point = x;
+        priv->last = y;
+      }
       break;
-    }
+  }
 
-  if (gtk_widget_is_visible (widget))
-    {
-      DEBUG_INFO("queue draw\n");
-      gtk_widget_queue_draw (widget);
-    }
-
-  DEBUG_INFO("button press [E]\n");
+  if (gtk_widget_is_visible(widget))
+    gtk_widget_queue_draw(widget);
 
   return FALSE;
 }
@@ -1072,12 +1083,8 @@ gtk3_curve_button_release (GtkWidget        *widget,
 {
   Gtk3CurvePrivate *priv = GTK3_CURVE (widget)->priv;
   GtkAllocation     allocation;
-  //~ GdkCursorType     new_type = priv->cursor_type;
   gint              src, dst, width, height;
   gfloat            min_x;
-  //~ gint              closest_point = 0; # not used
-  //~ guint             distance; # not used
-  //~ gint              tx, ty; # not used
 
   DEBUG_INFO("button release [S]\n");
 
@@ -1091,30 +1098,8 @@ gtk3_curve_button_release (GtkWidget        *widget,
   if ((width < 0) || (height < 0))
     return FALSE;
 
-  /*  get the pointer position  */
-  //~ gtk3_curve_get_cursor_coord (widget, &tx, &ty);
-  //~ x = CLAMP ((tx - RADIUS), 0, width - 1);
-  //~ y = CLAMP ((ty - RADIUS), 0, height - 1);
-
-  //~ DEBUG_INFO("release : xy[%dx%d] txy[%dx%d]\n",
-              //~ x, y,
-              //~ tx, ty);
-
   min_x = priv->min_x;
 
-  //~ distance = ~0U; # not used
-  //~ for (i = 0; i < priv->curve_data.n_cpoints; ++i)
-    //~ {
-      //~ cx = project (priv->curve_data.d_cpoints[i].x,
-                    //~ min_x, priv->max_x, width);
-      //~ if ((guint) abs (x - cx) < distance)
-        //~ {
-          //~ distance = abs (x - cx); ##
-          //~ closest_point = i; ## ALL THAT PROCESS BUT distance and closest_point are not used after this part
-        //~ }
-    //~ }
-
-  /* delete inactive points: */
   if (priv->curve_data.curve_type != GTK3_CURVE_TYPE_FREE)
     {
       for (src = dst = 0; src < priv->curve_data.n_cpoints; ++src)
@@ -1153,7 +1138,6 @@ gtk3_curve_button_release (GtkWidget        *widget,
         }
     }
 
-  //~ new_type = GDK_FLEUR;
   priv->grab_point = -1;
 
   DEBUG_INFO("button release [E]\n");
@@ -1162,174 +1146,158 @@ gtk3_curve_button_release (GtkWidget        *widget,
 }
 
 static gboolean
-gtk3_curve_motion_notify (GtkWidget        *widget,
-                          GdkEventMotion   *event)
+gtk3_curve_motion_notify(GtkWidget *widget, GdkEventMotion *event)
 {
-  Gtk3CurvePrivate *priv = GTK3_CURVE (widget)->priv;
-  GtkAllocation     allocation;
-  GdkCursorType     new_type = priv->cursor_type;
-  gint              i, leftbound, rightbound;
-  GdkEventMotion   *mevent;
-  gint              tx, ty;
-  gint              cx, x, y, width, height;
-  //~ gint              closest_point = 0; # not used
-  gfloat            rx, ry, min_x;
-  guint             distance;
-  gint              x1, x2, y1, y2;
+  Gtk3CurvePrivate *priv = GTK3_CURVE(widget)->priv;
+  GtkAllocation allocation;
+  GdkCursorType new_type = priv->cursor_type;
+  gint tx, ty;
+  gint x, y;
+  gint width, height;
+  guint distance;
+  gboolean changed = FALSE;
 
-  DEBUG_INFO("motion_notify [S]\n");
-  mevent = (GdkEventMotion *) event;
-
-
-  gtk_widget_get_allocation (widget, &allocation);
+  gtk_widget_get_allocation(widget, &allocation);
 
   width = allocation.width - RADIUS * 2;
   height = allocation.height - RADIUS * 2;
 
-  if ((width < 0) || (height < 0))
+  if (width <= 1 || height <= 1)
     return FALSE;
 
-  /*  get the pointer position  */
-  gtk3_curve_get_cursor_coord (widget, &tx, &ty);
-  x = CLAMP ((tx - RADIUS), 0, width - 1);
-  y = CLAMP ((ty - RADIUS), 0, height - 1);
+  gtk3_curve_get_cursor_coord(widget, &tx, &ty);
 
-  DEBUG_INFO("motion : xy[%dx%d] txy[%dx%d]\n",
-              x, y,
-              tx, ty);
+  x = CLAMP((tx - RADIUS), 0, width - 1);
+  y = CLAMP((ty - RADIUS), 0, height - 1);
 
-  min_x = priv->min_x;
-
-  distance = ~0U;
-  for (i = 0; i < priv->curve_data.n_cpoints; ++i)
-    {
-      cx = project (priv->curve_data.d_cpoints[i].x, min_x, priv->max_x, width);
-      if ((guint) abs (x - cx) < distance)
-        {
-          distance = abs (x - cx);
-          //~ closest_point = i;  # not used
-        }
-    }
-
-  DEBUG_INFO("motion : privlastxy[%fx%f] xy[%dx%d]\n",
-              priv->last_x, priv->last_y,
-              x, y);
   priv->last_x = (gfloat) x;
   priv->last_y = (gfloat) y;
-  DEBUG_INFO("motion : privlastxy[%fx%f] xy[%dx%d]\n",
-              priv->last_x, priv->last_y,
-              x, y);
 
-  switch (priv->curve_data.curve_type)
-    {
+  gfloat min_x = priv->min_x;
+
+  distance = ~0U;
+
+  for (int i = 0; i < priv->curve_data.n_cpoints; ++i) {
+    gint cx = project(priv->curve_data.d_cpoints[i].x,
+                      min_x,
+                      priv->max_x,
+                      width);
+
+    guint d = (guint) abs(x - cx);
+
+    if (d < distance)
+      distance = d;
+  }
+
+  switch (priv->curve_data.curve_type) {
     default:
     case GTK3_CURVE_TYPE_LINEAR:
     case GTK3_CURVE_TYPE_SPLINE:
-      if (priv->grab_point == -1)
-        {
-          /* if no point is grabbed...  */
-          if (distance <= MIN_DISTANCE)
-            new_type = GDK_FLEUR;
-          else
-            new_type = GDK_TCROSS;
-        }
-      else
-        {
-          /* drag the grabbed point  */
+      if (priv->grab_point == -1) {
+        if (distance <= MIN_DISTANCE)
+          new_type = GDK_FLEUR;
+        else
           new_type = GDK_TCROSS;
+      } else {
+        gint leftbound = -MIN_DISTANCE;
+        gint rightbound = width + RADIUS * 2 + MIN_DISTANCE;
 
-          leftbound = -MIN_DISTANCE;
-          if (priv->grab_point > 0)
-            leftbound = project (priv->curve_data.d_cpoints[priv->grab_point - 1].x,
-                                 min_x, priv->max_x, width);
+        new_type = GDK_TCROSS;
 
-          rightbound = width + RADIUS * 2 + MIN_DISTANCE;
-          if (priv->grab_point + 1 < priv->curve_data.n_cpoints)
-            rightbound = project (priv->curve_data.d_cpoints[priv->grab_point + 1].x,
-                                  min_x, priv->max_x, width);
-
-          if (tx <= leftbound || tx >= rightbound
-              || ty > height + RADIUS * 2 + MIN_DISTANCE
-              || ty < -MIN_DISTANCE)
-            priv->curve_data.d_cpoints[priv->grab_point].x = min_x - 1.0;
-          else
-            {
-              rx = unproject (x, min_x, priv->max_x, width);
-              ry = unproject (height - y, priv->min_y, priv->max_y, height);
-              priv->curve_data.d_cpoints[priv->grab_point].x = rx;
-              priv->curve_data.d_cpoints[priv->grab_point].y = ry;
-            }
-          gtk3_curve_interpolate (widget, width, height);
-          if (gtk_widget_is_visible (widget))
-            {
-              DEBUG_INFO("queue draw\n");
-              gtk_widget_queue_draw (widget);
-            }
+        if (priv->grab_point > 0) {
+          leftbound =
+            RADIUS + project(priv->curve_data.d_cpoints[priv->grab_point - 1].x,
+                             min_x,
+                             priv->max_x,
+                             width);
         }
+
+        if (priv->grab_point + 1 < priv->curve_data.n_cpoints) {
+          rightbound =
+            RADIUS + project(priv->curve_data.d_cpoints[priv->grab_point + 1].x,
+                             min_x,
+                             priv->max_x,
+                             width);
+        }
+
+        if (tx <= leftbound ||
+            tx >= rightbound ||
+            ty > height + RADIUS * 2 + MIN_DISTANCE ||
+            ty < -MIN_DISTANCE)
+        {
+          priv->curve_data.d_cpoints[priv->grab_point].x = min_x - 1.0f;
+        } else {
+          priv->curve_data.d_cpoints[priv->grab_point].x =
+            unproject(x, min_x, priv->max_x, width);
+
+          priv->curve_data.d_cpoints[priv->grab_point].y =
+            unproject(height - y, priv->min_y, priv->max_y, height);
+        }
+
+        gtk3_curve_interpolate(widget, width, height);
+        changed = TRUE;
+      }
       break;
 
     case GTK3_CURVE_TYPE_FREE:
-      if (priv->grab_point != -1)
-        {
-          if (priv->grab_point > x)
-            {
-              x1 = x;
-              x2 = priv->grab_point;
-              y1 = y;
-              y2 = priv->last;
-            }
-          else
-            {
-              x1 = priv->grab_point;
-              x2 = x;
-              y1 = priv->last;
-              y2 = y;
-            }
+      if (priv->grab_point != -1 && priv->curve_data.d_point) {
+        gint x1, x2, y1, y2;
 
-          if (x2 != x1)
-            for (i = x1; i <= x2; i++)
-              {
-                priv->curve_data.d_point[i].x = RADIUS + i;
-                priv->curve_data.d_point[i].y = RADIUS +
-                                   (y1 + ((y2 - y1) * (i - x1)) / (x2 - x1));
-              }
-          else
-            {
-              priv->curve_data.d_point[x].x = RADIUS + x;
-              priv->curve_data.d_point[x].y = RADIUS + y;
-            }
-          priv->grab_point = x;
-          priv->last = y;
-          if (gtk_widget_is_visible (widget))
-            {
-              DEBUG_INFO("queue draw\n");
-              gtk_widget_queue_draw (widget);
-            }
+        if (priv->grab_point > x) {
+          x1 = x;
+          x2 = priv->grab_point;
+          y1 = y;
+          y2 = priv->last;
+        } else {
+          x1 = priv->grab_point;
+          x2 = x;
+          y1 = priv->last;
+          y2 = y;
         }
-      if (mevent->state & GDK_BUTTON1_MASK)
+
+        if (x1 < 0)
+          x1 = 0;
+        if (x2 >= priv->curve_data.n_points)
+          x2 = priv->curve_data.n_points - 1;
+
+        if (x2 != x1) {
+          for (int i = x1; i <= x2; i++) {
+            priv->curve_data.d_point[i].x = RADIUS + i;
+            priv->curve_data.d_point[i].y =
+              RADIUS + (y1 + ((y2 - y1) * (i - x1)) / (x2 - x1));
+          }
+        } else if (x >= 0 && x < priv->curve_data.n_points) {
+          priv->curve_data.d_point[x].x = RADIUS + x;
+          priv->curve_data.d_point[x].y = RADIUS + y;
+        }
+
+        priv->grab_point = x;
+        priv->last = y;
+        changed = TRUE;
+      }
+
+      if (event->state & GDK_BUTTON1_MASK)
         new_type = GDK_TCROSS;
       else
         new_type = GDK_PENCIL;
+
       break;
-    }
+  }
 
-  if (new_type != (GdkCursorType) priv->cursor_type)
-    {
-      GdkCursor *cursor;
-      priv->cursor_type = new_type;
-      cursor = gdk_cursor_new_for_display (gtk_widget_get_display (widget),
-                                           priv->cursor_type);
-      gdk_window_set_cursor (gtk_widget_get_window (widget), cursor);
-      g_object_unref (cursor);
-    }
+  if (new_type != (GdkCursorType) priv->cursor_type) {
+    GdkCursor *cursor;
 
-  if (gtk_widget_is_visible (widget))
-    {
-      DEBUG_INFO("queue draw\n");
-      gtk_widget_queue_draw (widget);
-    }
+    priv->cursor_type = new_type;
 
-  DEBUG_INFO("motion_notify [E]\n");
+    cursor = gdk_cursor_new_for_display(gtk_widget_get_display(widget),
+                                        priv->cursor_type);
+
+    gdk_window_set_cursor(gtk_widget_get_window(widget), cursor);
+    g_object_unref(cursor);
+  }
+
+  if (changed && gtk_widget_is_visible(widget))
+    gtk_widget_queue_draw(widget);
 
   return TRUE;
 }
@@ -1446,82 +1414,125 @@ gtk3_curve_get_property (GObject              *object,
     }
 }
 
-static void
-gtk3_curve_create_layouts (GtkWidget *widget)
+void
+gtk3_curve_set_vector(GtkWidget *widget, int veclen, gfloat vector[])
 {
-  DEBUG_INFO("create pango [S]\n");
-  DEBUG_INFO("create pango [E]\n");
-}
-
-static void
-gtk3_curve_reset_vector (GtkWidget *widget)
-{
-  Gtk3Curve *curve = GTK3_CURVE (widget);
+  Gtk3Curve *curve = GTK3_CURVE(widget);
   Gtk3CurvePrivate *priv = curve->priv;
-  gint width, height;
+  Gtk3CurveType old_type;
+  gint width;
+  gint height;
 
-  g_free (priv->curve_data.d_cpoints);
-
-  priv->curve_data.n_cpoints = 2;
-  priv->curve_data.d_cpoints = g_malloc (2 * sizeof (priv->curve_data.d_cpoints[0]));
-  priv->curve_data.d_cpoints[0].x = priv->min_x;
-  priv->curve_data.d_cpoints[0].y = priv->min_y;
-  priv->curve_data.d_cpoints[1].x = priv->max_x;
-  priv->curve_data.d_cpoints[1].y = priv->max_y;
+  if (!vector || veclen <= 0)
+    return;
 
   width = gtk_widget_get_allocated_width(widget) - RADIUS * 2;
   height = gtk_widget_get_allocated_height(widget) - RADIUS * 2;
-  if (width < RADIUS * 2) return;
-  if (height < RADIUS * 2) return;
 
-  if (priv->curve_data.curve_type == GTK3_CURVE_TYPE_FREE)
-    {
-      priv->curve_data.curve_type = GTK3_CURVE_TYPE_LINEAR;
-      gtk3_curve_interpolate (widget, width, height);
-      priv->curve_data.curve_type = GTK3_CURVE_TYPE_FREE;
+  if (width <= 1)
+    width = veclen;
+
+  if (height <= 1) {
+    height = (gint) (priv->max_y - priv->min_y);
+    if (height <= 1)
+      height = 128;
+  }
+
+  old_type = priv->curve_data.curve_type;
+  priv->curve_data.curve_type = GTK3_CURVE_TYPE_FREE;
+
+  if (priv->curve_data.n_points != width || !priv->curve_data.d_point) {
+    g_free(priv->curve_data.d_point);
+
+    priv->curve_data.n_points = width;
+    priv->curve_data.d_point =
+      g_malloc(priv->curve_data.n_points *
+               sizeof(priv->curve_data.d_point[0]));
+
+    if (!priv->curve_data.d_point) {
+      priv->curve_data.n_points = 0;
+      priv->curve_data.curve_type = old_type;
+      return;
     }
-  else
-    gtk3_curve_interpolate (widget, width, height);
+  }
 
-  DEBUG_INFO("reset vector\n");
+  priv->width = width;
+  priv->height = height;
 
-  if (gtk_widget_is_visible (GTK_WIDGET (curve)))
-    {
-      DEBUG_INFO("queue draw\n");
-      gtk_widget_queue_draw (GTK_WIDGET (curve));
+  gfloat rx = 0.0f;
+  gfloat dx = (veclen > 1 && priv->curve_data.n_points > 1)
+                ? ((gfloat) (veclen - 1) /
+                   (gfloat) (priv->curve_data.n_points - 1))
+                : 0.0f;
 
-    }
+  for (int i = 0; i < priv->curve_data.n_points; ++i, rx += dx) {
+    int src = (int) (rx + 0.5f);
+
+    if (src < 0)
+      src = 0;
+    else if (src >= veclen)
+      src = veclen - 1;
+
+    gfloat ry = vector[src];
+
+    if (ry > priv->max_y)
+      ry = priv->max_y;
+    else if (ry < priv->min_y)
+      ry = priv->min_y;
+
+    priv->curve_data.d_point[i].x = RADIUS + i;
+    priv->curve_data.d_point[i].y =
+      RADIUS + height - project(ry, priv->min_y, priv->max_y, height);
+  }
+
+  if (old_type != GTK3_CURVE_TYPE_FREE) {
+    g_signal_emit(curve, curve_type_changed_signal, 0);
+    g_object_notify(G_OBJECT(curve), "curve-type");
+  }
+
+  if (gtk_widget_is_visible(widget))
+    gtk_widget_queue_draw(widget);
 }
 
 static void
-gtk3_curve_interpolate (GtkWidget *widget, gint width, gint height)
+gtk3_curve_interpolate(GtkWidget *widget, gint width, gint height)
 {
-  Gtk3Curve *curve = GTK3_CURVE (widget);
+  Gtk3Curve *curve = GTK3_CURVE(widget);
   Gtk3CurvePrivate *priv = curve->priv;
-  gfloat *vector;
-  int i;
 
-  if (width < 0 || height < 0) return;
-  vector = g_malloc (width * sizeof (vector[0]));
+  if (width <= 1 || height <= 1)
+    return;
 
-  gtk3_curve_get_vector (widget, width, vector);
+  gfloat *vector = g_malloc(width * sizeof(vector[0]));
 
+  if (!vector)
+    return;
+
+  gtk3_curve_get_vector(widget, width, vector);
+
+  priv->width = width;
   priv->height = height;
-  if (priv->curve_data.n_points != width)
-    {
-      priv->curve_data.n_points = width;
-      g_free (priv->curve_data.d_point);
-      priv->curve_data.d_point = g_malloc (priv->curve_data.n_points * sizeof (priv->curve_data.d_point[0]));
-    }
 
-  for (i = 0; i < width; ++i)
-    {
-      priv->curve_data.d_point[i].x = RADIUS + i;
-      priv->curve_data.d_point[i].y = RADIUS + height
-                         - project (vector[i], priv->min_y, priv->max_y, height);
-    }
+  if (priv->curve_data.n_points != width) {
+    priv->curve_data.n_points = width;
+    g_free(priv->curve_data.d_point);
+    priv->curve_data.d_point =
+      g_malloc(priv->curve_data.n_points * sizeof(priv->curve_data.d_point[0]));
 
-  g_free (vector);
+    if (!priv->curve_data.d_point) {
+      priv->curve_data.n_points = 0;
+      g_free(vector);
+      return;
+    }
+  }
+
+  for (int i = 0; i < width; ++i) {
+    priv->curve_data.d_point[i].x = RADIUS + i;
+    priv->curve_data.d_point[i].y =
+      RADIUS + height - project(vector[i], priv->min_y, priv->max_y, height);
+  }
+
+  g_free(vector);
 }
 
 /*                          =====================                          */
@@ -1530,76 +1541,154 @@ gtk3_curve_interpolate (GtkWidget *widget, gint width, gint height)
 
 /* Solve the tridiagonal equation system that determines the second
    derivatives for the interpolation points.  (Based on Numerical
-   Recipies 2nd Edition.) */
+   Recipies 2nd Edition.) 
+   Guarded version   
+*/
 static void
-spline_solve (int n, gfloat x[], gfloat y[], gfloat y2[])
+spline_solve(int n, gfloat x[], gfloat y[], gfloat y2[])
 {
-  gfloat p, sig, *u;
+  gfloat p, sig;
+  gfloat *u;
   gint i, k;
 
-  u = g_malloc ((n - 1) * sizeof (u[0]));
+  if (n <= 0 || !x || !y || !y2)
+    return;
 
-  y2[0] = u[0] = 0.0; /* set lower boundary condition to "natural" */
+  if (n == 1) {
+    y2[0] = 0.0f;
+    return;
+  }
 
-  for (i = 1; i < n - 1; ++i)
-    {
-      sig = (x[i] - x[i - 1]) / (x[i + 1] - x[i - 1]);
-      p = sig * y2[i - 1] + 2.0;
-      y2[i] = (sig - 1.0) / p;
-      u[i] = ((y[i + 1] - y[i])
-              / (x[i + 1] - x[i]) - (y[i] - y[i - 1]) / (x[i] - x[i - 1]));
-      u[i] = (6.0 * u[i] / (x[i + 1] - x[i - 1]) - sig * u[i - 1]) / p;
+  /*
+   * Natural spline boundary condition.
+   */
+  y2[0] = 0.0f;
+  y2[n - 1] = 0.0f;
+
+  u = g_malloc((n - 1) * sizeof(u[0]));
+
+  if (!u) {
+    for (i = 0; i < n; ++i)
+      y2[i] = 0.0f;
+    return;
+  }
+
+  u[0] = 0.0f;
+
+  for (i = 1; i < n - 1; ++i) {
+    gfloat x_im1 = x[i - 1];
+    gfloat x_i   = x[i];
+    gfloat x_ip1 = x[i + 1];
+
+    gfloat den_a = x_ip1 - x_im1;
+    gfloat den_b = x_ip1 - x_i;
+    gfloat den_c = x_i - x_im1;
+
+    if (den_a <= 0.0f || den_b <= 0.0f || den_c <= 0.0f) {
+      y2[i] = 0.0f;
+      u[i] = 0.0f;
+      continue;
     }
 
-  y2[n - 1] = 0.0;
+    sig = den_c / den_a;
+    p = sig * y2[i - 1] + 2.0f;
+
+    if (p == 0.0f) {
+      y2[i] = 0.0f;
+      u[i] = 0.0f;
+      continue;
+    }
+
+    y2[i] = (sig - 1.0f) / p;
+
+    u[i] = ((y[i + 1] - y[i]) / den_b) -
+           ((y[i] - y[i - 1]) / den_c);
+
+    u[i] = ((6.0f * u[i] / den_a) - sig * u[i - 1]) / p;
+  }
+
   for (k = n - 2; k >= 0; --k)
     y2[k] = y2[k] * y2[k + 1] + u[k];
 
-  g_free (u);
+  g_free(u);
 }
 
 static gfloat
-spline_eval (int n, gfloat x[], gfloat y[], gfloat y2[], gfloat val)
+spline_eval(int n, gfloat x[], gfloat y[], gfloat y2[], gfloat val)
 {
   gint k_lo, k_hi, k;
   gfloat h, b, a;
 
-  /* do a binary search for the right interval: */
+  if (n <= 0 || !x || !y || !y2)
+    return 0.0f;
+
+  if (n == 1)
+    return y[0];
+
+  if (val <= x[0])
+    return y[0];
+
+  if (val >= x[n - 1])
+    return y[n - 1];
+
   k_lo = 0;
   k_hi = n - 1;
-  while (k_hi - k_lo > 1)
-    {
-      k = (k_hi + k_lo) / 2;
-      if (x[k] > val)
-        k_hi = k;
-      else
-        k_lo = k;
-    }
+
+  while (k_hi - k_lo > 1) {
+    k = (k_hi + k_lo) / 2;
+
+    if (x[k] > val)
+      k_hi = k;
+    else
+      k_lo = k;
+  }
 
   h = x[k_hi] - x[k_lo];
-  g_assert (h > 0.0);
+
+  if (h <= 0.0f)
+    return y[k_lo];
 
   a = (x[k_hi] - val) / h;
   b = (val - x[k_lo]) / h;
-  return a*y[k_lo] + b*y[k_hi] +
-         ((a*a*a - a)*y2[k_lo] + (b*b*b - b)*y2[k_hi]) * (h*h)/6.0;
+
+  return a * y[k_lo] + b * y[k_hi] +
+         ((a * a * a - a) * y2[k_lo] +
+          (b * b * b - b) * y2[k_hi]) * (h * h) / 6.0f;
 }
 
-static int
-project (gfloat value, gfloat min, gfloat max, int norm)
+static int project(gfloat value, gfloat min, gfloat max, int norm)
 {
-  return (norm - 1) * ((value - min) / (max - min)) + 0.5;
+  if (norm <= 1)
+    return 0;
+
+  if (max == min)
+    return 0;
+
+  gfloat t = (value - min) / (max - min);
+
+  if (t < 0.0f)
+    t = 0.0f;
+  else if (t > 1.0f)
+    t = 1.0f;
+
+  return (int) ((norm - 1) * t + 0.5f);
 }
 
-static gfloat
-unproject (gint value, gfloat min, gfloat max, int norm)
+static gfloat unproject(gint value, gfloat min, gfloat max, int norm)
 {
-  return value / (gfloat) (norm - 1) * (max - min) + min;
-}
+  if (norm <= 1)
+    return min;
 
-/*                          =====================                           */
-/* =========================== PUBLIC FUNCTIONS =========================== */
-/*                          =====================                           */
+  if (max == min)
+    return min;
+
+  if (value < 0)
+    value = 0;
+  else if (value > norm - 1)
+    value = norm - 1;
+
+  return ((gfloat) value / (gfloat) (norm - 1)) * (max - min) + min;
+}
 
 void
 gtk3_curve_set_gamma (GtkWidget *widget, gfloat gamma)
@@ -1642,7 +1731,6 @@ gtk3_curve_set_gamma (GtkWidget *widget, gfloat gamma)
     }
 }
 
-/* VEEJAY NEEDS */
 void
 gtk3_curve_set_x_lo (GtkWidget *widget,
                       gfloat    min_x)
@@ -1655,7 +1743,6 @@ gtk3_curve_set_x_lo (GtkWidget *widget,
     gtk3_curve_set_range (widget, min_x, priv->max_x, priv->min_y, priv->max_y);
 }
 
-/* VEEJAY NEEDS */
 void
 gtk3_curve_set_x_hi (GtkWidget *widget,
                       gfloat    max_x)
@@ -1669,305 +1756,371 @@ gtk3_curve_set_x_hi (GtkWidget *widget,
 }
 
 void
-gtk3_curve_set_range (GtkWidget *widget,
-                      gfloat    min_x,
-                      gfloat    max_x,
-                      gfloat    min_y,
-                      gfloat    max_y)
+gtk3_curve_set_range(GtkWidget *widget,
+                     gfloat    min_x,
+                     gfloat    max_x,
+                     gfloat    min_y,
+                     gfloat    max_y)
 {
-  Gtk3Curve *curve = GTK3_CURVE (widget);
+  Gtk3Curve *curve = GTK3_CURVE(widget);
   Gtk3CurvePrivate *priv = curve->priv;
 
-  DEBUG_INFO("set range [S]\n");
+  if (max_x <= min_x)
+    max_x = min_x + 1.0f;
 
-  DEBUG_INFO("min_x[%0.1f] max_x[%0.1f]\n", min_x, max_x);
-  DEBUG_INFO("min_y[%0.1f] max_y[%0.1f]\n", min_y, max_y);
+  if (max_y <= min_y)
+    max_y = min_y + 1.0f;
 
-  g_object_freeze_notify (G_OBJECT (curve));
+  g_object_freeze_notify(G_OBJECT(curve));
 
-  if (priv->min_x != min_x)
-    {
-      priv->min_x = min_x;
-      g_object_notify (G_OBJECT (curve), "min-x");
-    }
+  if (priv->min_x != min_x) {
+    priv->min_x = min_x;
+    g_object_notify(G_OBJECT(curve), "min-x");
+  }
 
-  if (priv->max_x != max_x)
-    {
-      priv->max_x = max_x;
-      g_object_notify (G_OBJECT (curve), "max-x");
-    }
+  if (priv->max_x != max_x) {
+    priv->max_x = max_x;
+    g_object_notify(G_OBJECT(curve), "max-x");
+  }
 
-  if (priv->min_y != min_y)
-    {
-      priv->min_y = min_y;
-      g_object_notify (G_OBJECT (curve), "min-y");
-    }
+  if (priv->min_y != min_y) {
+    priv->min_y = min_y;
+    g_object_notify(G_OBJECT(curve), "min-y");
+  }
 
-  if (priv->max_y != max_y)
-    {
-      priv->max_y = max_y;
-      g_object_notify (G_OBJECT (curve), "max-y");
-    }
+  if (priv->max_y != max_y) {
+    priv->max_y = max_y;
+    g_object_notify(G_OBJECT(curve), "max-y");
+  }
 
-  g_object_thaw_notify (G_OBJECT (curve));
+  g_object_thaw_notify(G_OBJECT(curve));
 
-  //gtk3_curve_size_graph (curve);
-  gtk3_curve_reset_vector (widget);
-
-  DEBUG_INFO("set range [E]\n");
+  gtk3_curve_reset_vector(widget);
 }
 
 void
-gtk3_curve_get_vector (GtkWidget *widget, int veclen, gfloat vector[])
+gtk3_curve_get_vector(GtkWidget *widget, int veclen, gfloat vector[])
 {
-  Gtk3Curve *curve = GTK3_CURVE (widget);
+  Gtk3Curve *curve = GTK3_CURVE(widget);
   Gtk3CurvePrivate *priv = curve->priv;
-  gfloat rx, ry, dx, dy, min_x, delta_x, *mem, *xv, *yv, *y2v, prev;
-  gint dst, i, x, next, num_active_ctlpoints = 0, first_active = -1;
 
-  min_x = priv->min_x;
+  if (!vector || veclen <= 0)
+    return;
 
-  if (priv->curve_data.curve_type != GTK3_CURVE_TYPE_FREE)
-    {
-      /* count active points: */
-      prev = min_x - 1.0;
-      for (i = num_active_ctlpoints = 0; i < priv->curve_data.n_cpoints; ++i)
-        if (priv->curve_data.d_cpoints[i].x > prev)
-          {
-            if (first_active < 0)
-              first_active = i;
-            prev = priv->curve_data.d_cpoints[i].x;
-            ++num_active_ctlpoints;
-          }
+  if (veclen == 1) {
+    vector[0] = priv->min_y;
+    return;
+  }
 
-      /* handle degenerate case: */
-      if (num_active_ctlpoints < 2)
-        {
-          if (num_active_ctlpoints > 0)
-            ry = priv->curve_data.d_cpoints[first_active].y;
-          else
-            ry = priv->min_y;
-          if (ry < priv->min_y) ry = priv->min_y;
-          if (ry > priv->max_y) ry = priv->max_y;
-          for (x = 0; x < veclen; ++x)
-            vector[x] = ry;
-          return;
-        }
+  gfloat min_x = priv->min_x;
+
+  if (priv->curve_data.curve_type != GTK3_CURVE_TYPE_FREE) {
+    gint num_active_ctlpoints = 0;
+    gint first_active = -1;
+    gfloat prev = min_x - 1.0f;
+
+    for (int i = 0; i < priv->curve_data.n_cpoints; ++i) {
+      if (priv->curve_data.d_cpoints[i].x > prev) {
+        if (first_active < 0)
+          first_active = i;
+
+        prev = priv->curve_data.d_cpoints[i].x;
+        ++num_active_ctlpoints;
+      }
     }
 
-  switch (priv->curve_data.curve_type)
-    {
-    default:
-    case GTK3_CURVE_TYPE_SPLINE:
-      mem = g_malloc (3 * num_active_ctlpoints * sizeof (gfloat));
-      xv  = mem;
-      yv  = mem + num_active_ctlpoints;
-      y2v = mem + 2*num_active_ctlpoints;
+    if (num_active_ctlpoints < 2) {
+      gfloat ry = priv->min_y;
 
-      prev = min_x - 1.0;
-      for (i = dst = 0; i < priv->curve_data.n_cpoints; ++i)
-        if (priv->curve_data.d_cpoints[i].x > prev)
-          {
-            prev    = priv->curve_data.d_cpoints[i].x;
+      if (num_active_ctlpoints > 0)
+        ry = priv->curve_data.d_cpoints[first_active].y;
+
+      if (ry < priv->min_y)
+        ry = priv->min_y;
+      else if (ry > priv->max_y)
+        ry = priv->max_y;
+
+      for (int x = 0; x < veclen; ++x)
+        vector[x] = ry;
+
+      return;
+    }
+
+    switch (priv->curve_data.curve_type) {
+      default:
+      case GTK3_CURVE_TYPE_SPLINE:
+      {
+        gfloat *mem = g_malloc(3 * num_active_ctlpoints * sizeof(gfloat));
+
+        if (!mem) {
+          for (int x = 0; x < veclen; ++x)
+            vector[x] = priv->min_y;
+          return;
+        }
+
+        gfloat *xv  = mem;
+        gfloat *yv  = mem + num_active_ctlpoints;
+        gfloat *y2v = mem + 2 * num_active_ctlpoints;
+
+        prev = min_x - 1.0f;
+
+        int dst = 0;
+
+        for (int i = 0; i < priv->curve_data.n_cpoints; ++i) {
+          if (priv->curve_data.d_cpoints[i].x > prev) {
+            prev = priv->curve_data.d_cpoints[i].x;
             xv[dst] = priv->curve_data.d_cpoints[i].x;
             yv[dst] = priv->curve_data.d_cpoints[i].y;
             ++dst;
           }
+        }
 
-      spline_solve (num_active_ctlpoints, xv, yv, y2v);
+        spline_solve(num_active_ctlpoints, xv, yv, y2v);
 
-      rx = min_x;
-      dx = (priv->max_x - min_x) / (veclen - 1);
-      for (x = 0; x < veclen; ++x, rx += dx)
-        {
-          ry = spline_eval (num_active_ctlpoints, xv, yv, y2v, rx);
-          if (ry < priv->min_y) ry = priv->min_y;
-          if (ry > priv->max_y) ry = priv->max_y;
+        gfloat rx = min_x;
+        gfloat dx = (priv->max_x - min_x) / (gfloat) (veclen - 1);
+
+        for (int x = 0; x < veclen; ++x, rx += dx) {
+          gfloat ry = spline_eval(num_active_ctlpoints, xv, yv, y2v, rx);
+
+          if (ry < priv->min_y)
+            ry = priv->min_y;
+          else if (ry > priv->max_y)
+            ry = priv->max_y;
+
           vector[x] = ry;
         }
 
-      g_free (mem);
-      break;
+        g_free(mem);
+        break;
+      }
 
-    case GTK3_CURVE_TYPE_LINEAR:
-      dx = (priv->max_x - min_x) / (veclen - 1);
-      rx = min_x;
-      ry = priv->min_y;
-      dy = 0.0;
-      i  = first_active;
-      for (x = 0; x < veclen; ++x, rx += dx)
-        {
-          if (rx >= priv->curve_data.d_cpoints[i].x)
+      case GTK3_CURVE_TYPE_LINEAR:
+      {
+        gfloat dx = (priv->max_x - min_x) / (gfloat) (veclen - 1);
+        gfloat rx = min_x;
+        gfloat ry = priv->min_y;
+        gfloat dy = 0.0f;
+
+        gint first_active = -1;
+        gfloat prev = min_x - 1.0f;
+
+        for (int i = 0; i < priv->curve_data.n_cpoints; ++i) {
+          if (priv->curve_data.d_cpoints[i].x > prev) {
+            first_active = i;
+            break;
+          }
+        }
+
+        if (first_active < 0) {
+          for (int x = 0; x < veclen; ++x)
+            vector[x] = priv->min_y;
+          return;
+        }
+
+        int i = first_active;
+
+        for (int x = 0; x < veclen; ++x, rx += dx) {
+          if (rx >= priv->curve_data.d_cpoints[i].x) {
+            if (rx > priv->curve_data.d_cpoints[i].x)
+              ry = priv->min_y;
+
+            dy = 0.0f;
+
+            int next = i + 1;
+
+            while (next < priv->curve_data.n_cpoints &&
+                   priv->curve_data.d_cpoints[next].x <= priv->curve_data.d_cpoints[i].x)
             {
-              if (rx > priv->curve_data.d_cpoints[i].x)
-                ry = priv->min_y;
-              dy = 0.0;
-              next = i + 1;
-              while (next < priv->curve_data.n_cpoints
-                     && priv->curve_data.d_cpoints[next].x <= priv->curve_data.d_cpoints[i].x)
-                ++next;
-              if (next < priv->curve_data.n_cpoints)
-                {
-                  delta_x = priv->curve_data.d_cpoints[next].x - priv->curve_data.d_cpoints[i].x;
-                  dy = ((priv->curve_data.d_cpoints[next].y - priv->curve_data.d_cpoints[i].y)
-                        / delta_x);
-                  dy *= dx;
-                  ry = priv->curve_data.d_cpoints[i].y;
-                  i = next;
-                }
+              ++next;
             }
+
+            if (next < priv->curve_data.n_cpoints) {
+              gfloat delta_x =
+                priv->curve_data.d_cpoints[next].x -
+                priv->curve_data.d_cpoints[i].x;
+
+              if (delta_x != 0.0f) {
+                dy =
+                  (priv->curve_data.d_cpoints[next].y -
+                   priv->curve_data.d_cpoints[i].y) / delta_x;
+
+                dy *= dx;
+              }
+
+              ry = priv->curve_data.d_cpoints[i].y;
+              i = next;
+            }
+          }
+
+          if (ry < priv->min_y)
+            ry = priv->min_y;
+          else if (ry > priv->max_y)
+            ry = priv->max_y;
+
           vector[x] = ry;
           ry += dy;
         }
-      break;
 
-    case GTK3_CURVE_TYPE_FREE:
-      if (priv->curve_data.d_point)
-        {
-          rx = 0.0;
-          dx = priv->curve_data.n_points / (double) veclen;
-          for (x = 0; x < veclen; ++x, rx += dx)
-            vector[x] = unproject (RADIUS + priv->height - priv->curve_data.d_point[(int) rx].y,
-                                   priv->min_y, priv->max_y,
-                                   priv->height);
-        }
-      else
-        memset (vector, 0, veclen * sizeof (vector[0]));
-      break;
+        break;
+      }
     }
+
+    return;
+  }
+
+  if (priv->curve_data.d_point &&
+      priv->curve_data.n_points > 0 &&
+      priv->height > 1)
+  {
+    gfloat rx = 0.0f;
+    gfloat dx = (gfloat) priv->curve_data.n_points / (gfloat) veclen;
+
+    for (int x = 0; x < veclen; ++x, rx += dx) {
+      int idx = (int) rx;
+
+      if (idx < 0)
+        idx = 0;
+      else if (idx >= priv->curve_data.n_points)
+        idx = priv->curve_data.n_points - 1;
+
+      vector[x] = unproject(RADIUS + priv->height - priv->curve_data.d_point[idx].y,
+                            priv->min_y,
+                            priv->max_y,
+                            priv->height);
+    }
+  } else {
+    for (int x = 0; x < veclen; ++x)
+      vector[x] = priv->min_y;
+  }
 }
+
 
 void
-gtk3_curve_set_vector (GtkWidget *widget, int veclen, gfloat vector[])
+gtk3_curve_set_curve_type(GtkWidget *widget, Gtk3CurveType new_type)
 {
-  Gtk3Curve *curve = GTK3_CURVE (widget);
+  Gtk3Curve *curve = GTK3_CURVE(widget);
   Gtk3CurvePrivate *priv = curve->priv;
-  Gtk3CurveType old_type;
-  GdkRectangle geom;
-  gfloat rx, dx, ry;
-  gint i, height;
 
-  DEBUG_INFO("set vector [S]\n");
-  DEBUG_INFO("vector len [%d]\n", veclen);
+  if (new_type == priv->curve_data.curve_type)
+    return;
 
-  GdkMonitor *monitor = gdk_display_get_primary_monitor(gtk_widget_get_display (widget));
-  gdk_monitor_get_geometry(monitor, &geom);
+  gint width = gtk_widget_get_allocated_width(widget) - RADIUS * 2;
+  gint height = gtk_widget_get_allocated_height(widget) - RADIUS * 2;
 
+  if (width <= 1 || height <= 1) {
+    priv->curve_data.curve_type = new_type;
 
-  old_type = priv->curve_data.curve_type;
-  priv->curve_data.curve_type = GTK3_CURVE_TYPE_FREE;
+    g_signal_emit(curve, curve_type_changed_signal, 0);
+    g_object_notify(G_OBJECT(curve), "curve-type");
 
-  if (priv->curve_data.d_point)
-    height = gtk_widget_get_allocated_height(GTK_WIDGET (curve)) - RADIUS * 2;
-  else
-    {
-      height = (priv->max_y - priv->min_y);
-      height > geom.height >> 2 ? height = geom.height >> 2 : height;
+    if (gtk_widget_is_visible(widget))
+      gtk_widget_queue_draw(widget);
 
-      priv->height = height;
-      priv->curve_data.n_points = veclen;
-      priv->curve_data.d_point = g_malloc (priv->curve_data.n_points * sizeof (priv->curve_data.d_point[0]));
-    }
-  rx = 0;
-  dx = (veclen - 1.0) / (priv->curve_data.n_points - 1.0);
+    return;
+  }
 
-  for (i = 0; i < priv->curve_data.n_points; ++i, rx += dx)
-    {
-      ry = vector[(int) (rx + 0.5)];
-      //~ DEBUG_INFO("curve data rx, vector[rx] - ry [%f %f]\n", rx, ry);
-      if (ry > priv->max_y) ry = priv->max_y;
-      if (ry < priv->min_y) ry = priv->min_y;
-      priv->curve_data.d_point[i].x = RADIUS + i;
-      priv->curve_data.d_point[i].y =
-        RADIUS + height - project (ry, priv->min_y, priv->max_y, height);
-      //~ DEBUG_INFO("vector data : curve_data [%d - %d]\n", priv->curve_data.d_point[i].x, priv->curve_data.d_point[i].y );
-    }
-  if (old_type != GTK3_CURVE_TYPE_FREE)
-    {
-      g_signal_emit (curve, curve_type_changed_signal, 0);
-      g_object_notify (G_OBJECT (curve), "curve-type");
+  if (new_type == GTK3_CURVE_TYPE_FREE) {
+    gtk3_curve_interpolate(widget, width, height);
+    priv->curve_data.curve_type = new_type;
+  }
+  else if (priv->curve_data.curve_type == GTK3_CURVE_TYPE_FREE) {
+    const gint n_cpoints = 9;
+
+    g_free(priv->curve_data.d_cpoints);
+
+    priv->curve_data.n_cpoints = n_cpoints;
+    priv->curve_data.d_cpoints =
+      g_malloc(priv->curve_data.n_cpoints *
+               sizeof(*priv->curve_data.d_cpoints));
+
+    if (!priv->curve_data.d_cpoints) {
+      priv->curve_data.n_cpoints = 0;
+      return;
     }
 
-  priv->width = priv->curve_data.n_points;
+    if (!priv->curve_data.d_point || priv->curve_data.n_points <= 1) {
 
-  if (gtk_widget_is_visible (GTK_WIDGET (curve)))
-    {
-      DEBUG_INFO("queue draw\n");
-      gtk_widget_queue_draw (GTK_WIDGET (curve));
+      priv->curve_data.d_cpoints[0].x = priv->min_x;
+      priv->curve_data.d_cpoints[0].y = priv->min_y;
+
+      priv->curve_data.d_cpoints[1].x = priv->max_x;
+      priv->curve_data.d_cpoints[1].y = priv->max_y;
+
+      priv->curve_data.n_cpoints = 2;
+      priv->curve_data.curve_type = new_type;
+
+      gtk3_curve_interpolate(widget, width, height);
+    } else {
+      gfloat rx = 0.0f;
+      gfloat dx = (gfloat)(priv->curve_data.n_points - 1) /
+                  (gfloat)(priv->curve_data.n_cpoints - 1);
+
+      for (gint i = 0; i < priv->curve_data.n_cpoints; ++i, rx += dx) {
+        gint x = (gint)(rx + 0.5f);
+
+        if (x < 0)
+          x = 0;
+        else if (x >= priv->curve_data.n_points)
+          x = priv->curve_data.n_points - 1;
+
+        priv->curve_data.d_cpoints[i].x =
+          unproject(x,
+                    priv->min_x,
+                    priv->max_x,
+                    priv->curve_data.n_points);
+
+        priv->curve_data.d_cpoints[i].y =
+          unproject(RADIUS + height - priv->curve_data.d_point[x].y,
+                    priv->min_y,
+                    priv->max_y,
+                    height);
+
+        if (priv->curve_data.d_cpoints[i].y < priv->min_y)
+          priv->curve_data.d_cpoints[i].y = priv->min_y;
+        else if (priv->curve_data.d_cpoints[i].y > priv->max_y)
+          priv->curve_data.d_cpoints[i].y = priv->max_y;
+      }
+
+      // force anchor
+      priv->curve_data.d_cpoints[0].x = priv->min_x;
+      priv->curve_data.d_cpoints[priv->curve_data.n_cpoints - 1].x = priv->max_x;
+
+      priv->curve_data.curve_type = new_type;
+      gtk3_curve_interpolate(widget, width, height);
     }
+  }
+  else {
+    priv->curve_data.curve_type = new_type;
+    gtk3_curve_interpolate(widget, width, height);
+  }
 
-  DEBUG_INFO("set vector [E]\n");
+  g_signal_emit(curve, curve_type_changed_signal, 0);
+  g_object_notify(G_OBJECT(curve), "curve-type");
+
+  DEBUG_INFO("set curve type\n");
+
+  if (gtk_widget_is_visible(widget))
+    gtk_widget_queue_draw(widget);
 }
 
-void
-gtk3_curve_set_curve_type (GtkWidget *widget, Gtk3CurveType new_type)
+void gtk3_curve_set_grid_resolution(GtkWidget *widget, gint grid_resolution)
 {
-  Gtk3Curve *curve = GTK3_CURVE (widget);
-  Gtk3CurvePrivate *priv = curve->priv;
-  gfloat rx, dx;
-  gint x, i;
-
-  if (new_type != priv->curve_data.curve_type)
-    {
-      gint width, height;
-
-      width = gtk_widget_get_allocated_width(widget) - RADIUS * 2;
-      height = gtk_widget_get_allocated_height(widget) - RADIUS * 2;
-
-      if (new_type == GTK3_CURVE_TYPE_FREE)
-        {
-          gtk3_curve_interpolate (widget, width, height);
-          priv->curve_data.curve_type = new_type;
-        }
-      else if (priv->curve_data.curve_type == GTK3_CURVE_TYPE_FREE)
-        {
-          g_free (priv->curve_data.d_cpoints);
-          priv->curve_data.n_cpoints = 9;
-          priv->curve_data.d_cpoints = g_malloc (priv->curve_data.n_cpoints * sizeof (*priv->curve_data.d_cpoints));
-
-          rx = 0.0;
-          dx = (width - 1) / (gfloat) (priv->curve_data.n_cpoints - 1);
-
-          for (i = 0; i < priv->curve_data.n_cpoints; ++i, rx += dx)
-            {
-              x = (int) (rx + 0.5);
-              priv->curve_data.d_cpoints[i].x =
-                unproject (x, priv->min_x, priv->max_x, width);
-              priv->curve_data.d_cpoints[i].y =
-                unproject (RADIUS + height - priv->curve_data.d_point[x].y,
-                           priv->min_y, priv->max_y, height);
-            }
-
-          priv->curve_data.curve_type = new_type;
-          gtk3_curve_interpolate (widget, width, height);
-        }
-      else
-        {
-          priv->curve_data.curve_type = new_type;
-          gtk3_curve_interpolate (widget, width, height);
-        }
-
-      g_signal_emit (curve, curve_type_changed_signal, 0);
-      g_object_notify (G_OBJECT (curve), "curve-type");
-
-      DEBUG_INFO("set curve type\n");
-
-      if (gtk_widget_is_visible (GTK_WIDGET (curve)))
-        {
-          DEBUG_INFO("queue draw\n");
-          gtk_widget_queue_draw (GTK_WIDGET (curve));
-        }
-    }
-}
-
-void gtk3_curve_set_grid_resolution(GtkWidget *widget, gint grid_resolution) {
     Gtk3Curve *curve = GTK3_CURVE(widget);
     Gtk3CurvePrivate *priv = curve->priv;
+
+    if (grid_resolution < 2)
+        grid_resolution = 2;
+    else if (grid_resolution > 64)
+        grid_resolution = 64;
+
+    if ((gint) priv->grid_resolution == grid_resolution)
+        return;
+
     priv->grid_resolution = grid_resolution;
-    if (gtk_widget_is_visible (widget))
-    {
-      gtk_widget_queue_draw (widget);
-    }
+
+    if (gtk_widget_is_visible(widget))
+        gtk_widget_queue_draw(widget);
 }
 
 void gtk3_curve_set_color_background (GtkWidget *widget, Gtk3CurveColor color)
@@ -2160,28 +2313,30 @@ Gtk3CurveGridSize gtk3_curve_get_grid_size(GtkWidget *widget)
 }
 
 void
-gtk3_curve_reset (GtkWidget *widget)
+gtk3_curve_reset(GtkWidget *widget)
 {
-  Gtk3Curve *curve = GTK3_CURVE (widget);
+  Gtk3Curve *curve = GTK3_CURVE(widget);
   Gtk3CurvePrivate *priv = curve->priv;
-  Gtk3CurveType old_type;
+  Gtk3CurveType old_type = priv->curve_data.curve_type;
 
-  old_type = priv->curve_data.curve_type;
   priv->curve_data.curve_type = GTK3_CURVE_TYPE_SPLINE;
-/* VEEJAY NEEDS ---> */
-  priv->grid_resolution = 0;
+
+  priv->grid_resolution = 10.0f;
   priv->xaxis_lo = 0.0f;
   priv->xaxis_hi = 1.0f;
   priv->yaxis_lo = 0.0f;
   priv->yaxis_hi = 1.0f;
- /* <--- VEEJAY NEEDS */
-  gtk3_curve_reset_vector (widget);
+  priv->current_position = 0.0;
 
-  if (old_type != GTK3_CURVE_TYPE_SPLINE)
-    {
-       g_signal_emit (curve, curve_type_changed_signal, 0);
-       g_object_notify (G_OBJECT (curve), "curve-type");
-    }
+  gtk3_curve_reset_vector(widget);
+
+  if (old_type != GTK3_CURVE_TYPE_SPLINE) {
+    g_signal_emit(curve, curve_type_changed_signal, 0);
+    g_object_notify(G_OBJECT(curve), "curve-type");
+  }
+
+  if (gtk_widget_is_visible(widget))
+    gtk_widget_queue_draw(widget);
 }
 
 void
@@ -2197,16 +2352,68 @@ gtk3_curve_load(gchar *filename) {
   return empty;
 }
 
+static void gtk3_curve_create_layouts (GtkWidget *widget) {
+}
+
+static void
+gtk3_curve_reset_vector(GtkWidget *widget)
+{
+  Gtk3Curve *curve = GTK3_CURVE(widget);
+  Gtk3CurvePrivate *priv = curve->priv;
+  gint width, height;
+
+  width = gtk_widget_get_allocated_width(widget) - RADIUS * 2;
+  height = gtk_widget_get_allocated_height(widget) - RADIUS * 2;
+
+  g_free(priv->curve_data.d_cpoints);
+
+  priv->curve_data.n_cpoints = 2;
+  priv->curve_data.d_cpoints =
+    g_malloc(2 * sizeof(priv->curve_data.d_cpoints[0]));
+
+  if (!priv->curve_data.d_cpoints) {
+    priv->curve_data.n_cpoints = 0;
+    return;
+  }
+
+  priv->curve_data.d_cpoints[0].x = priv->min_x;
+  priv->curve_data.d_cpoints[0].y = priv->min_y;
+  priv->curve_data.d_cpoints[1].x = priv->max_x;
+  priv->curve_data.d_cpoints[1].y = priv->max_y;
+
+  if (width <= 1 || height <= 1)
+    return;
+
+  if (priv->curve_data.curve_type == GTK3_CURVE_TYPE_FREE) {
+    Gtk3CurveType old_type = priv->curve_data.curve_type;
+
+    priv->curve_data.curve_type = GTK3_CURVE_TYPE_LINEAR;
+    gtk3_curve_interpolate(widget, width, height);
+    priv->curve_data.curve_type = old_type;
+  } else {
+    gtk3_curve_interpolate(widget, width, height);
+  }
+
+  if (gtk_widget_is_visible(GTK_WIDGET(curve)))
+    gtk_widget_queue_draw(GTK_WIDGET(curve));
+}
+
 void
 gtk3_curve_set_position(GtkWidget *widget, gdouble pos)
 {
-  Gtk3Curve *curve = GTK3_CURVE (widget);
+  Gtk3Curve *curve = GTK3_CURVE(widget);
   Gtk3CurvePrivate *priv = curve->priv;
+
+  if (pos < priv->min_x)
+    pos = priv->min_x;
+  else if (pos > priv->max_x)
+    pos = priv->max_x;
+
+  if (priv->current_position == pos)
+    return;
 
   priv->current_position = pos;
 
-  if (gtk_widget_is_visible (widget))
-    {
-      gtk_widget_queue_draw (widget);
-    }
+  if (gtk_widget_is_visible(widget))
+    gtk_widget_queue_draw(widget);
 }
