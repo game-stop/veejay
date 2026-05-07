@@ -513,6 +513,7 @@ struct {
     { VIMS_SRT_LOAD },
     { VIMS_SRT_SELECT },
     { VIMS_SRT_SAVE },
+    { VIMS_FEEDBACK },
     { -1 }
 };
 
