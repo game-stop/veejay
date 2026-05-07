@@ -240,4 +240,6 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/escherdroste.c \
     effects/topomorph.c \
     effects/edgefold.c \
-    effects/virtualcamera.c
+    effects/virtualcamera.c \
+    effects/ghostwash.c \
+    effects/plasmafeedback.c 

@@ -251,8 +251,10 @@
 #include "./effects/topomorph.h"
 #include "./effects/edgefold.h"
 #include "./effects/virtualcamera.h"
+#include "./effects/ghostwash.h"
+#include "./effects/plasmafeedback.h"
 
-#define VJ_IMAGE_EFFECT_MIN 34
+#define VJ_IMAGE_EFFECT_MIN 32
 #define VJ_IMAGE_EFFECT_MAX 198
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -539,6 +541,8 @@ enum {
     VJ_IMAGE_EFFECT_TOPOMORPH = 36,
     VJ_IMAGE_EFFECT_EDGEFOLD = 35,
     VJ_IMAGE_EFFECT_VIRTUALCAMERA = 34,
+    VJ_IMAGE_EFFECT_GHOSTWASH = 33,
+    VJ_IMAGE_EFFECT_PLASMAFEEDBACK = 32,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 

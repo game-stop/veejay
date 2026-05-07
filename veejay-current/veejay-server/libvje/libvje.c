@@ -223,6 +223,8 @@ static struct {
     { emboss_init, NULL, NULL, NULL, NULL, emboss_apply, NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_EMBOSS }, 
     { dupmagic_init, NULL, NULL, NULL, NULL, NULL, dupmagic_apply, NULL, NULL, NULL, VJ_VIDEO_EFFECT_DUPMAGIC },
     { dotillism_init, dotillism_malloc, dotillism_free, NULL,NULL, dotillism_apply, NULL,NULL,NULL, NULL, VJ_IMAGE_EFFECT_DOTILLISM },
+    { ghostwash_init, ghostwash_malloc, ghostwash_free, NULL,NULL, ghostwash_apply, NULL,NULL,NULL, NULL, VJ_IMAGE_EFFECT_GHOSTWASH },
+    { plasmafeedback_init, plasmafeedback_malloc, plasmafeedback_free, NULL,NULL, plasmafeedback_apply, NULL,NULL,NULL, NULL, VJ_IMAGE_EFFECT_PLASMAFEEDBACK },
     { dither_init, dither_malloc, dither_free, NULL,NULL, dither_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_DITHER },
     { distortion_init, distortion_malloc, distortion_free, NULL, NULL, distortion_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_DISTORTION },
     { dissolve_init, NULL, NULL, NULL, NULL, NULL, dissolve_apply, NULL, NULL, NULL, VJ_VIDEO_EFFECT_DISSOLVE },
