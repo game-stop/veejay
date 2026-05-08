@@ -465,6 +465,7 @@ struct {
     { VIMS_SET_PLAIN_MODE },
     { VIMS_SET_MODE_AND_GO },
     { VIMS_SAMPLE_SELECT },
+    { VIMS_STREAM_SELECT },
     { VIMS_VIDEO_SET_FRAME },
     { VIMS_VIDEO_GOTO_END },
     { VIMS_VIDEO_GOTO_START },
@@ -517,8 +518,18 @@ struct {
     { -1 }
 };
 
+struct {
+    int vims_id;
+} nopm_forward_vims[] = {
+    { VIMS_SET_MODE_AND_GO },
+    { VIMS_SAMPLE_SELECT },
+    { VIMS_STREAM_SELECT },
+    { -1 }
+};
+
 static int never_forward_vims_cache_[1024];
 static int maybe_forward_vims_cache_[1024];
+static int atomic_vims_cache_[1024];
 
 static void init_vims_forward_cache(void) {
 
@@ -536,6 +547,32 @@ static void init_vims_forward_cache(void) {
             optional_forward_vims[i].vims_id
         ] = 1;
     }
+
+    memset(atomic_vims_cache_, 0, sizeof(atomic_vims_cache_));
+    for( int i = 0; nopm_forward_vims[i].vims_id > 0; i ++ ) {
+        atomic_vims_cache_[
+            nopm_forward_vims[i].vims_id
+        ] = 1;
+    }
+}
+
+static inline int consume_vims_sample_id(int vims_id) {
+    if( atomic_vims_cache_[ vims_id] )
+        return 1;
+    return 0;
+}
+
+static inline int is_forwarding_allowed(int vims_id, int vims_mirror) {
+
+    if( never_forward_vims_cache_[vims_id] )
+        return 0;
+
+    if(!vims_mirror) {
+        if(maybe_forward_vims_cache_[vims_id] )
+            return 0;
+    }
+    
+    return 1;
 }
 
 static inline char *format_msg(char *dst, const char *str)
@@ -1452,32 +1489,39 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
     {
         int rmode = -1;
         int parsed_offset = 0;
+        int parsed_remote_id = 0;
 
-        if (sscanf(current_msg + 4, "%d %d %d:%n", &rmode, &remote_id, &remote_fx_list_entry, &parsed_offset) == 3 && parsed_offset > 0) {
-            // matched
+        if (sscanf(current_msg + 4,
+           "%d %d %d:%n",
+           &rmode,
+           &remote_id,
+           &remote_fx_list_entry,
+           &parsed_offset) == 3 && parsed_offset > 0)
+        {
+            sscanf((current_msg + 4) + parsed_offset, "%d", &parsed_remote_id);
         }
 
         if (parsed_offset > 0)
         {
-            if ( v->uc->sample_id == remote_id && rmode == v->uc->playback_mode ) {
-                if(!v->uc->vims_mirror && maybe_forward_vims_cache_[ net_id ] ) {
-                    return 0;
-                }
+            if(consume_vims_sample_id(net_id)) {
+                v->remote_id = parsed_remote_id;
+            } 
+            else if( is_forwarding_allowed( net_id, v->uc->vims_mirror ) ) {
+                v->remote_id = remote_id;
             }
-
-            v->remote_id = remote_id;
+            else {
+                v->remote_id = v->uc->sample_id; // fallback
+            }
 
             if ( v->uc->current_link >= 0)
                 v->rmodes[v->uc->current_link] = rmode;
-
+            
             v->uc->key_effect = remote_fx_list_entry;
 
             current_msg += (4 + parsed_offset);
             current_len -= (4 + parsed_offset);
 
             v1_offset = 0;
-
-            //veejay_msg(VEEJAY_MSG_DEBUG, "Execute forwarded vims %s", current_msg);
         }
 
     }
@@ -1497,54 +1541,52 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
     memset(i_args, 0, sizeof(i_args));
     np = vj_event_vevo_get_num_args(net_id);
 
-    if (current_len <= 4) {
-        for(int i = 0; i < np; i++) {
-            i_args[i] = vj_event_vevo_get_default_value(net_id, i);
-        }
-        vj_event_fire_net_event(v, net_id, NULL, i_args, np, 0);
-    }
-    else {
-        char *fmt = vj_event_vevo_get_event_format(net_id);
-        int flags = vj_event_vevo_get_flags(net_id);
-        char *str = NULL;
-        char *arg_str = strndup(current_msg + v1_offset, current_len - v1_offset);
-        char *arguments = arg_str;
 
-        if(!arg_str) {
-            if(fmt) free(fmt);
-            return 0;
-        }
+    char *fmt = vj_event_vevo_get_event_format(net_id);
+    int flags = vj_event_vevo_get_flags(net_id);
+    char *str = NULL;
+    char *arg_str = strndup(current_msg + v1_offset, current_len - v1_offset);
+    char *arguments = arg_str;
 
-        for(int i = 0; i < np; i++) {
-            i_args[i] = vj_event_vevo_get_default_value(net_id, i);
-            int fmt_offset = (i * 3) + 1;
-            int failed_arg = 1;
-            
-            if(fmt[fmt_offset] == 'd') {
-                int il = inline_str_to_int(arguments, &i_args[i]);
-                if(il > 0) {
-                    failed_arg = 0;
-                    arguments += il;
-                }
-            } else if(fmt[fmt_offset] == 's' && str == NULL) {
-                str = inline_str_to_str(flags, arguments);
-                if(str) {
-                    failed_arg = 0;
-                    arguments += strlen(str);
-                }
-            }
-
-            if(failed_arg) break;
-            if(*arguments == ';' || *arguments == 0) break;
-            if(*arguments == ' ') arguments++;
-        }
-
-        vj_event_fire_net_event(v, net_id, str, i_args, np, 0);
-
+    if(!arg_str) {
         if(fmt) free(fmt);
-        if(arg_str) free(arg_str);
-        if(str) free(str);
+        return 0;
     }
+
+    for(int i = 0; i < np; i++) {
+        i_args[i] = vj_event_vevo_get_default_value(net_id, i);
+        
+        if( fmt == NULL )
+            continue;
+        
+        int fmt_offset = (i * 3) + 1;
+        int failed_arg = 1;
+        
+        if(fmt[fmt_offset] == 'd') {
+            int il = inline_str_to_int(arguments, &i_args[i]);
+            if(il > 0) {
+                failed_arg = 0;
+                arguments += il;
+            }
+        } else if(fmt[fmt_offset] == 's' && str == NULL) {
+            str = inline_str_to_str(flags, arguments);
+            if(str) {
+                failed_arg = 0;
+                arguments += strlen(str);
+            }
+        }
+
+        if(failed_arg) continue;
+        if(*arguments == ';' || *arguments == 0) break;
+        if(*arguments == ' ') arguments++;
+    }
+
+    vj_event_fire_net_event(v, net_id, str, i_args, np, 0);
+
+    if(fmt) free(fmt);
+    if(arg_str) free(arg_str);
+    if(str) free(str);
+
 
     void *macro = NULL;
     if(SAMPLE_PLAYING(v)) macro = sample_get_macro(v->uc->sample_id);
@@ -1597,31 +1639,28 @@ static int vj_parse_and_queue_to_master(
     int capture_sample_id = 0;
     int capture_key_effect = 0;
 
-    if(!v->is_master && v->master_origin != NULL)
+    if(v->master_origin != NULL)
     {
         if(colon && colon != buf)
         {
             char *end = NULL;
             vims_id = strtol(buf, &end, 10);
 
-            if(end == colon && vims_id > 0 && vims_id < VIMS_MAX)
+            if(end == colon && ((vims_id > 0 && vims_id < VIMS_MAX ) && (vims_id < 400 || vims_id > 500)))
             {
-                if(!never_forward_vims_cache_[vims_id])
+                if(v->uc->vims_mirror)
                 {
-                    if(v->uc->vims_mirror || !maybe_forward_vims_cache_[vims_id])
-                    {
-                        should_forward = 1;
+                    should_forward = 1;
 
-                        prefix_len = (int)(colon - buf);
-                        payload_len = effective_len - (prefix_len + 1);
+                    prefix_len = (int)(colon - buf);
+                    payload_len = effective_len - (prefix_len + 1);
 
-                        if(payload_len < 0)
-                            payload_len = 0;
+                    if(payload_len < 0)
+                        payload_len = 0;
 
-                        capture_playback_mode = v->uc->playback_mode;
-                        capture_sample_id     = v->uc->sample_id;
-                        capture_key_effect    = v->uc->key_effect;
-                    }
+                    capture_playback_mode = v->uc->playback_mode;
+                    capture_sample_id     = v->uc->sample_id;
+                    capture_key_effect    = v->uc->key_effect;
                 }
             }
         }
@@ -1740,7 +1779,7 @@ int vj_event_parse_and_maybe_requeue_events(void *ptr, char *buf, int len) {
 
 void vj_event_dispatch_requeued_events(veejay_t *v) {
 
-    if( !v->is_master && to_master_n_queued > 0 && v->master_origin != NULL ) {
+    if( to_master_n_queued > 0 && v->master_origin != NULL ) {
         if(v->master_client == NULL ) {
             v->master_client = vj_client_alloc();
             if(vj_client_connect(v->master_client, v->master_origin,NULL, v->master_origin_port )!=1) {
@@ -1753,6 +1792,7 @@ void vj_event_dispatch_requeued_events(veejay_t *v) {
         if (v->master_client) {
             char *bundle = vj_bundle_format_messages(to_master_n_queued, to_master_buf);
             if (bundle) {
+                veejay_msg(VEEJAY_MSG_DEBUG, "Dispatch %s", bundle);
                 vj_client_send(v->master_client, V_CMD, (unsigned char*) bundle);           
                 free(bundle);
             }
@@ -2943,41 +2983,41 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*) ptr;
 
     P_A(args,sizeof(args),NULL,0,format,ap);
-    if(vj_event_valid_mode(args[0]))
+    if(vj_event_valid_mode(args[1]))
     {
         if(args[0] == VJ_PLAYBACK_MODE_PLAIN) 
         {
             if( vj_has_video(v,v->edit_list) )
-                veejay_change_playback_mode(v, args[0], 0);
+                veejay_change_playback_mode(v, args[1], 0);
             else
                 veejay_msg(VEEJAY_MSG_ERROR,
                 "There are no video files in the editlist");
             return;
         }
     
-        if(args[0] == VJ_PLAYBACK_MODE_SAMPLE) 
+        if(args[1] == VJ_PLAYBACK_MODE_SAMPLE) 
         {
-            SAMPLE_DEFAULTS(args[1]);
-            if(sample_exists(args[1]))
+            SAMPLE_DEFAULTS(args[0]);
+            if(sample_exists(args[0]))
             {
-                veejay_change_playback_mode(v,args[0] ,args[1]);
+                veejay_change_playback_mode(v,args[1] ,args[0]);
             }
             else
             {   
-                p_no_sample(args[1]);
+                p_no_sample(args[0]);
             }
             return;
         }
-        if(args[0] == VJ_PLAYBACK_MODE_TAG)
+        if(args[1] == VJ_PLAYBACK_MODE_TAG)
         {
-            STREAM_DEFAULTS(args[1]);
-            if(vj_tag_exists(args[1]))
+            STREAM_DEFAULTS(args[0]);
+            if(vj_tag_exists(args[0]))
             {
-                veejay_change_playback_mode(v,args[0],args[1]);
+                veejay_change_playback_mode(v,args[1],args[0]);
             }
             else
             {
-                p_no_tag(args[1]);
+                p_no_tag(args[0]);
             }
             return;
         }
