@@ -3148,6 +3148,12 @@ static void *veejay_producer_thread_loop(void *ptr)
     atomic_store_long_long(&settings->master_frame_num, 0);
 
 	while (atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
+
+		veejay_consume_events(info);
+		sample_watch_list();
+		if (atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP)
+        	break;
+
         info->stats.skipped_frames = 0;
 
         long long frame = atomic_load_long_long(&settings->master_frame_num);
@@ -3213,9 +3219,6 @@ static void *veejay_producer_thread_loop(void *ptr)
         info->stats.last_pts_s = pts;
         info->stats.delta_s = diff;
 		info->stats.xruns = atomic_load_int(&settings->xruns);
-
-		veejay_consume_events(info);
-		sample_watch_list();
     }
 
     pthread_exit(NULL);

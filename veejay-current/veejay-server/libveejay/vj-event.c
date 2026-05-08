@@ -1577,16 +1577,6 @@ static int vj_parse_and_queue_to_master(
     if(!v || !buf || len <= 0)
         return 0;
 
-    int ok = vj_event_parse_msg(v, (char*)buf, len);
-    if(!ok) {
-        veejay_msg(0, "Error while parsing '%s'" , buf);
-        return 0;
-    }
-
-    if(v->is_master || v->master_origin == NULL) {
-        return 0;
-     }
-
     int effective_len = len;
     while(effective_len > 0 &&
          (buf[effective_len-1] == '\n' ||
@@ -1598,55 +1588,78 @@ static int vj_parse_and_queue_to_master(
     }
 
     const char *colon = memchr(buf, ':', effective_len);
-    if(!colon || colon == buf) {
-        veejay_msg(0, "No column found or column at end of buffer");
+    long vims_id = 0;
+    int prefix_len = 0;
+    int payload_len = 0;
+    int should_forward = 0;
+
+    int capture_playback_mode = 0;
+    int capture_sample_id = 0;
+    int capture_key_effect = 0;
+
+    if(!v->is_master && v->master_origin != NULL)
+    {
+        if(colon && colon != buf)
+        {
+            char *end = NULL;
+            vims_id = strtol(buf, &end, 10);
+
+            if(end == colon && vims_id > 0 && vims_id < VIMS_MAX)
+            {
+                if(!never_forward_vims_cache_[vims_id])
+                {
+                    if(v->uc->vims_mirror || !maybe_forward_vims_cache_[vims_id])
+                    {
+                        should_forward = 1;
+
+                        prefix_len = (int)(colon - buf);
+                        payload_len = effective_len - (prefix_len + 1);
+
+                        if(payload_len < 0)
+                            payload_len = 0;
+
+                        capture_playback_mode = v->uc->playback_mode;
+                        capture_sample_id     = v->uc->sample_id;
+                        capture_key_effect    = v->uc->key_effect;
+                    }
+                }
+            }
+        }
+    }
+
+    int ok = vj_event_parse_msg(v, (char*)buf, len);
+    if(!ok) {
+        veejay_msg(0, "Error while parsing '%.*s'", len, buf);
         return 0;
     }
 
-    char *end = NULL;
-    long vims_id = strtol(buf, &end, 10);
-    if(end != colon) {
-        veejay_msg(0, "Expected a numeric value");
+    if(!should_forward)
         return 0;
-    }
-
-    if( vims_id >= 400 )
-        return 0;
-
-    if( never_forward_vims_cache_[ vims_id ] )
-        return 0;
-
-    if(!v->uc->vims_mirror && maybe_forward_vims_cache_[ vims_id ] )
-        return 0;
-
-    int prefix_len = (int)(colon - buf);
-    int payload_len = effective_len - (prefix_len + 1);
-
-    if(payload_len < 0) {
-        veejay_msg(0, "Payload too small");
-        return 0;
-    }
 
     char inject[64];
     int inject_len = snprintf(inject, sizeof(inject), ":%d %d %d:",
-        v->uc->playback_mode, v->uc->sample_id, v->uc->key_effect );
+        capture_playback_mode,
+        capture_sample_id,
+        capture_key_effect);
 
     if(inject_len <= 0 || inject_len >= (int)sizeof(inject)) {
-        veejay_msg(0,"Buffer missue");
+        veejay_msg(0, "Buffer misuse while building forwarded VIMS message");
         return 0;
     }
 
     int new_msg_len = prefix_len + inject_len + payload_len;
-    int required_total = *to_master_size + new_msg_len + 2; 
+    int required_total = *to_master_size + new_msg_len + 2;
 
     if(required_total > *to_master_capacity)
     {
         int new_cap = (*to_master_capacity <= 0) ? 256 : *to_master_capacity;
+
         while(new_cap < required_total)
             new_cap = (new_cap * 2) + 64;
 
         char *tmp = realloc(*to_master_buf, new_cap);
-        if(!tmp) return 0;
+        if(!tmp)
+            return 0;
 
         *to_master_buf = tmp;
         *to_master_capacity = new_cap;
@@ -1660,8 +1673,10 @@ static int vj_parse_and_queue_to_master(
     memcpy(dst, inject, inject_len);
     dst += inject_len;
 
-    memcpy(dst, colon + 1, payload_len);
-    dst += payload_len;
+    if(payload_len > 0) {
+        memcpy(dst, colon + 1, payload_len);
+        dst += payload_len;
+    }
 
     *dst = ';';
     dst++;
@@ -1669,7 +1684,7 @@ static int vj_parse_and_queue_to_master(
     *to_master_size += new_msg_len + 1;
     (*to_master_buf)[*to_master_size] = '\0';
 
-    to_master_n_queued ++;
+    to_master_n_queued++;
 
     return 1;
 }
