@@ -355,6 +355,7 @@ enum {
   WIDGET_CURVE_BUTTON_BOUND_MIN = 254,
   WIDGET_CURVE_TOGGLE_ANIMATION_SHAPE = 255,
   WIDGET_CURVE_BUTTON_BOUND_MAX = 256,
+  WIDGET_CURVE_COMBO_ANIMATION = 257,
 };
 
 
@@ -763,6 +764,7 @@ static struct
     { "chain_copyglobalchain", WIDGET_GLOBALCHAINCOPY },
     { "chain_globalchainlevel", WIDGET_GLOBALCHAINLEVEL},
     { "toggle_vims_forwarding", WIDGET_MESSAGE_FORWARDING },
+    { "curve_combo_animation", WIDGET_CURVE_COMBO_ANIMATION },
     { NULL, -1 },
 };
 
@@ -1471,6 +1473,38 @@ static void init_widget_cache(void)
     }
 }
 
+
+static int get_vj_kf_active_parameter(void) {
+    GtkWidget* curveparam = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
+    gint active_kf_param_num = gtk_combo_box_get_active (GTK_COMBO_BOX(curveparam));
+    return active_kf_param_num;
+}
+
+static void vj_kf_sync_selected_parameter_from_combo(void)
+{
+    gint active_kf_id = get_vj_kf_active_parameter();
+
+    if(active_kf_id < 0)
+        active_kf_id = 0;
+
+    info->uc.selected_parameter_id = active_kf_id;
+    info->uc.reload_hint_checksums[HINT_KF] = -1;
+}
+
+static void vj_kf_reset_shape_combo(void)
+{
+    GtkWidget *shape_list = widget_cache[WIDGET_CURVE_COMBO_ANIMATION];
+
+    if(!shape_list)
+        return;
+
+    int osl = info->status_lock;
+    info->status_lock = 1;
+
+    gtk_combo_box_set_active(GTK_COMBO_BOX(shape_list), 0);
+
+    info->status_lock = osl;
+}
 
 static gboolean is_edl_displayed(void)
 {
@@ -3270,21 +3304,16 @@ static int get_slider_val(const char *name)
     return (int) gtk_adjustment_get_value (a);
 }
 
-static void vj_kf_reset(void)
+static void vj_kf_reset_panel(void)
 {
     int osl = info->status_lock;
 
     info->status_lock = 1;
     reset_curve( info->curve );
-
-    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]))) {
-        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE );
-    }
-
-    /* update the time bounds accordingly the sample marker*/
     int total_frames = (info->status_tokens[PLAY_MODE] == MODE_STREAM ? 
                         info->status_tokens[SAMPLE_MARKER_END] : 
                         ( info->status_tokens[PLAY_MODE] == MODE_SAMPLE ? info->status_tokens[TOTAL_FRAMES]: 0) );
+
     int lo = (info->selection[0] == info->selection[1] ? 0 : info->selection[0]);
     int hi = (info->selection[1] > info->selection[0] ? info->selection[1] : total_frames );
     if( lo == hi ) {
@@ -3294,20 +3323,16 @@ static void vj_kf_reset(void)
     update_spin_range2( widget_cache[WIDGET_CURVE_SPINSTART], 0, total_frames, lo );
     update_spin_range2( widget_cache[WIDGET_CURVE_SPINEND], 0, total_frames, hi );
 
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]))) {
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE );
+    }
+
     GtkWidget* curveparam = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
-    //block "changed" signal to prevent propagation
-    guint signal_id = g_signal_lookup("changed", GTK_TYPE_COMBO_BOX);
-    gulong handler_id = g_signal_handler_find( (gpointer)curveparam,
-                                                        G_SIGNAL_MATCH_ID,
-                                                        signal_id,
-                                                        0, NULL, NULL, NULL );
-    if (handler_id) {
-        g_signal_handler_block((gpointer)curveparam, handler_id);
-    }
     gtk_combo_box_set_active (GTK_COMBO_BOX(curveparam),0);
-    if (handler_id) {
-        g_signal_handler_unblock((gpointer)curveparam, handler_id);
-    }
+
+    info->uc.selected_parameter_id = 0;
+    info->uc.reload_hint_checksums[HINT_KF] = -1;
+    vj_kf_reset_shape_combo();
 
     for( int i = 0; i < MAX_UI_PARAMETERS; i ++ )
     {
@@ -3317,6 +3342,7 @@ static void vj_kf_reset(void)
     info->status_lock = osl;
 }
 
+
 static void vj_kf_refresh(gboolean force)
 {
     if(!force && !is_fxanim_displayed())
@@ -3324,23 +3350,13 @@ static void vj_kf_refresh(gboolean force)
 
     int *entry_tokens = &(info->uc.entry_tokens[0]);
 
-    if( entry_tokens[ENTRY_FXID] > 0 && _effect_get_np( entry_tokens[ENTRY_FXID] )) {
+    int np = _effect_get_np( entry_tokens[ENTRY_FXID] );
+
+    if( entry_tokens[ENTRY_FXID] > 0 && np > 0) {
         gtk_widget_set_sensitive_( widget_cache[WIDGET_FRAME_FXTREE3] , TRUE );
-
-        GtkWidget* curveparam = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
-        //block "changed" signal to prevent propagation
-        guint signal_id=g_signal_lookup("changed", GTK_TYPE_COMBO_BOX);
-        gulong handler_id=handler_id=g_signal_handler_find( (gpointer)curveparam,
-                                                            G_SIGNAL_MATCH_ID,
-                                                            signal_id,
-                                                            0, NULL, NULL, NULL );
-        if (handler_id) g_signal_handler_block((gpointer)curveparam, handler_id);
-        gtk_combo_box_set_active (GTK_COMBO_BOX(curveparam),0);
-        if (handler_id) g_signal_handler_unblock((gpointer)curveparam, handler_id);
-
-        vj_kf_select_parameter(0);
+        update_curve_widget( info->curve );
     } else {
-        vj_kf_reset();
+        vj_kf_reset_panel();
         gtk_widget_set_sensitive_( widget_cache[WIDGET_FRAME_FXTREE3], FALSE );
     }
 }
@@ -3354,17 +3370,10 @@ static void vj_kf_refresh(gboolean force)
  */
 static void vj_kf_select_parameter(int num)
 {
-    sample_slot_t *s = info->selected_slot;
-    if(!s) {
-        gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_COMBO_CURVE_FX_PARAM]),FALSE);
-        return;
-    }
-
     info->uc.selected_parameter_id = num;
-    reset_curve( info->curve );
     info->uc.reload_hint_checksums[HINT_KF] = -1;
-    update_curve_widget( info->curve );
 }
+
 
 /*! \brief Ask server KF of current fx param and and set them. If none set initial value
  *
@@ -3385,13 +3394,20 @@ static void update_curve_widget(GtkWidget *curve)
     multi_vims( VIMS_SAMPLE_KF_GET, "%d %d",i,info->uc.selected_parameter_id );
 
     unsigned char *blob = (unsigned char*) recv_vims( 8, &blen );
-    int checksum = data_checksum( (char*) blob, blen ) + i + info->uc.selected_parameter_id;
+
+    int checksum = i + id + info->uc.selected_parameter_id + blen;
+
+    if(blob && blen > 0)
+        checksum += data_checksum((char*) blob, blen);
 
     if( info->uc.reload_hint_checksums[HINT_KF] == checksum ) {
         if( blob ) free(blob);
         return;
     }
     info->uc.reload_hint_checksums[HINT_KF] = checksum;
+
+    // its a real update
+    reset_curve(curve);
 
     /* update the time bounds accordingly the sample marker*/
     if( lo == hi && hi == 0 )
@@ -3431,6 +3447,19 @@ static void update_curve_widget(GtkWidget *curve)
             if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM])) != status ) {
                 gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), status );
             }
+
+            if(gtk_combo_box_get_active(GTK_COMBO_BOX(widget_cache[WIDGET_COMBO_CURVE_FX_PARAM])) != p) {
+                int osl = info->status_lock;
+                info->status_lock = 1;
+
+                gtk_combo_box_set_active(
+                    GTK_COMBO_BOX(widget_cache[WIDGET_COMBO_CURVE_FX_PARAM]),
+                    p
+                );
+
+                info->status_lock = osl;
+            }
+    
             update_slider_state( info->uc.selected_parameter_id, status );
         }
     } else {
@@ -8025,8 +8054,19 @@ static void enable_fx_entry(void) {
         }
     }
 
-    if (np){
-        gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0);
+    if(np) {
+        int osl = info->status_lock;
+        info->status_lock = 1;
+
+        gtk_combo_box_set_active(GTK_COMBO_BOX(kf_param), 0);
+
+        info->status_lock = osl;
+
+        vj_kf_sync_selected_parameter_from_combo();
+
+        vj_kf_refresh(TRUE);
+
+        vj_kf_reset_shape_combo();
     }
 
     min = 0; max = 1; value = 0; 
@@ -8144,6 +8184,7 @@ static void process_reload_hints(int *history, int pm)
     if ( info->uc.reload_hint[HINT_KF]) {
         info->uc.reload_hint_checksums[HINT_KF] = -1;
         vj_kf_refresh(FALSE);
+        
     }
 
     if( beta__ && info->uc.reload_hint[HINT_HISTORY]) {
@@ -8938,12 +8979,11 @@ void vj_gui_init(const char *glade_file,
 
     gtk_container_add(GTK_CONTAINER(curve_container), gui->curve);
 
-    GtkWidget *shape_list = glade_xml_get_widget_(info->main_window,"curve_combo_animation" );
     for (int i = 0; i < FX_ANIM_SHAPE_MAX; i++)
     {
-        gtk_combo_box_text_insert_text (GTK_COMBO_BOX_TEXT(shape_list),i ,fx_anim_shape_map[i].description);
+        gtk_combo_box_text_insert_text (GTK_COMBO_BOX_TEXT(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]),i ,fx_anim_shape_map[i].description);
     }
-    gtk_combo_box_set_active (GTK_COMBO_BOX(shape_list), 0);
+    gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]), 0);
 
     gtk_widget_show_all(curve_container);
 
@@ -9728,8 +9768,8 @@ static gboolean on_cacheslot_activated_by_mouse (GtkWidget *widget, GdkEventButt
                "Start playing %s %d",
                (g->sample_type==0 ? "Sample" : "Stream" ), g->sample_id );
         }
-        multi_vims(VIMS_SET_MODE_AND_GO, "%d %d", g->sample_type, g->sample_id );
-        vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO, g->sample_type,g->sample_id );
+        multi_vims(VIMS_SET_MODE_AND_GO, "%d %d",g->sample_id, g->sample_type);
+        vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO,g->sample_id, g->sample_type);
     }
     return FALSE;
 }
@@ -9916,13 +9956,15 @@ static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *e
 
         multi_vims( VIMS_SET_MODE_AND_GO,
                     "%d %d",
-                    (select_slot->sample_type==0? MODE_SAMPLE:MODE_STREAM),
-                    select_slot->sample_id);
+                    (select_slot->sample_id),
+                    (select_slot->sample_type==0? MODE_SAMPLE:MODE_STREAM));
+
         vj_midi_learning_vims_msg2( info->midi,
                                     NULL,
                                     VIMS_SET_MODE_AND_GO,
-                                    select_slot->sample_type,
-                                    select_slot->sample_id );
+                                    select_slot->sample_id,
+                                    select_slot->sample_type);
+
         vj_msg(VEEJAY_MSG_INFO,
                "Start playing %s %d (%s)",
                (select_slot->sample_type==0 ? "Sample" : "Stream" ),

@@ -140,48 +140,79 @@ void curve_set_position( GtkWidget *curve, double pos)
 {
     gtk3_curve_set_position( curve, pos);
 }
-void curve_set_predifined_shape( GtkWidget *curve, int fx_id, int parameter_id,
-                                      int start, int end, int shape, int bound_min, int bound_max, int steps, gboolean reverse)
+
+void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
+                                int start, int end, int shape,
+                                int bound_min, int bound_max,
+                                int steps, gboolean reverse)
 {
-    int min=0, max=0;
-    _effect_get_minmax(fx_id, &min, &max, parameter_id );
-    int veclen1 = -1;
-    int i,k;
-    float ry, dy;
+    int min = 0, max = 0;
+    _effect_get_minmax(fx_id, &min, &max, parameter_id);
+
+    int i, k;
+    float ry = 0.0f;
+    float dy = 0.0f;
+
+    if(end - start <= 1)
+        return;
+
+    if(steps < 1)
+        steps = 1;
+
+    if(bound_min > bound_max) {
+        int tmp = bound_min;
+        bound_min = bound_max;
+        bound_max = tmp;
+    }
 
     int diff = max - min;
 
-    int min_b = ((diff/100.0) * bound_min) + min;
-    int max_b = ((diff/100.0) * bound_max) + min;
-    int diff_b = max_b - min_b;
+    int min_b = ((diff / 100.0f) * bound_min) + min;
+    int max_b = ((diff / 100.0f) * bound_max) + min;
 
-    diff = diff_b;
     min = min_b;
     max = max_b;
+    diff = max - min;
 
-    // only FX parameter value is normalized
+    int veclen1 = end - start;
 
-    // veclen is the same as sample length (we dont have a envelope window .. yet to support this on very large clips)
-    // every frame index position has a "parameter keyframe"
+    if(veclen1 <= 0)
+        return;
 
-    // use start/end position in fx anim to define a region
+    float *vec = (float*) vj_calloc(sizeof(float) * veclen1);
+    if(vec == NULL)
+        return;
 
-    if (end - start <= 1) return;
-    if (steps < 1) steps = 1;
+    int veclen = veclen1 - 1;
+    if(diff == 0) {
+        for(i = 0; i < veclen1; i++)
+            vec[i] = min;
 
+        gtk3_curve_reset(curve);
+        gtk3_curve_set_range(curve,
+                             (gfloat) start,
+                             (gfloat) end,
+                             (gfloat) min,
+                             (gfloat) max);
+        gtk3_curve_set_grid_resolution(curve, 16);
+        gtk3_curve_set_vector(curve, veclen1, vec);
+        gtk3_curve_set_curve_type(curve, GTK3_CURVE_TYPE_LINEAR);
+        gtk_widget_queue_draw(curve);
 
-    // TODO : break down this switch case and refactor
-    //        feature: enable layering to combine shapes ( for example, ramp drop + random walk smooth or burst envelope + noise)
+        curve_is_empty = 0;
+        free(vec);
+        return;
+    }
+
     switch(shape)
     {
         case FX_ANIM_SHAPE_ZIGZAG:
-            veclen1 = end - start;
-            dy = (diff) / (float)(veclen1 - 1);
-            dy = dy * ((float)(steps<<1));
-        break;
+            dy = diff / (float)(veclen1 - 1);
+            dy = dy * ((float)(steps << 1));
+            break;
+
         case FX_ANIM_SHAPE_SINE:
         case FX_ANIM_SHAPE_COSINE:
-        //~ case FX_ANIM_SHAPE_TRIANGLE:
         case FX_ANIM_SHAPE_SAWTOOTH:
         case FX_ANIM_SHAPE_SQUARE:
         case FX_ANIM_SHAPE_BOUNCE:
@@ -200,100 +231,94 @@ void curve_set_predifined_shape( GtkWidget *curve, int fx_id, int parameter_id,
         case FX_ANIM_SHAPE_STEPS:
         case FX_ANIM_SHAPE_BURST_ENVELOPE:
         case FX_ANIM_SHAPE_RAMP_DROP:
-            veclen1 = end - start;
+        case FX_ANIM_SHAPE_PULSE:
+        case FX_ANIM_SHAPE_DAMPED_SINE:
+        case FX_ANIM_SHAPE_SMOOTH_NOISE:
             break;
+
         default:
-            veclen1 = end - start;
-            dy = (diff) / (float)(veclen1 - 1);
+            dy = diff / (float)(veclen1 - 1);
             break;
     }
-
-    if (veclen1 <= 0) return;
-
-    float   *vec = (float*) vj_calloc(sizeof(float) * veclen1 );
-    if (vec == NULL) return;
-
-    int veclen = veclen1 - 1;
 
     switch(shape)
     {
         case FX_ANIM_SHAPE_ZIGZAG:
-            for(i = start, k = 0, ry = min; i < end; i++, ry+=dy)
+            for(i = start, k = 0, ry = min; i < end; i++, ry += dy, k++)
             {
                 vec[k] = ry;
-                if (dy > 0)
-                {
-                    if ( (ry + dy) > max)
-                    {
-                        ry = max+dy;
-                        dy = -dy;
-                    }
-                }
-                else
-                {
-                    if ( (ry + dy) < min)
-                    {
-                        ry = min+dy;
-                        dy = -dy;
-                    }
-                }
-                k++;
-            }
 
-        break;
+                if(dy > 0.0f) {
+                    if((ry + dy) > max) {
+                        ry = max + dy;
+                        dy = -dy;
+                    }
+                } else {
+                    if((ry + dy) < min) {
+                        ry = min + dy;
+                        dy = -dy;
+                    }
+                }
+            }
+            break;
+
         case FX_ANIM_SHAPE_SINE:
         {
-            float midpoint = (max + min) / 2.0f;
-            float radius = (max - min) / 2.0f;
-            float frequency = (float)steps;
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float progress = (float)(i - start) / (float)veclen;
+            float midpoint = (max + min) * 0.5f;
+            float radius = (max - min) * 0.5f;
+            float frequency = (float) steps;
+
+            for(i = start, k = 0; i < end; i++, k++) {
+                float progress = (float)(i - start) / (float) veclen;
                 vec[k] = midpoint + radius * sinf(2.0f * M_PI * frequency * progress);
             }
         }
         break;
+
         case FX_ANIM_SHAPE_COSINE:
         {
-            float midpoint = (max + min) / 2.0f;
-            float radius = (max - min) / 2.0f;
-            float frequency = (float)steps;
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float progress = (float)(i - start) / (float)veclen;
+            float midpoint = (max + min) * 0.5f;
+            float radius = (max - min) * 0.5f;
+            float frequency = (float) steps;
+
+            for(i = start, k = 0; i < end; i++, k++) {
+                float progress = (float)(i - start) / (float) veclen;
                 vec[k] = midpoint + radius * cosf(2.0f * M_PI * frequency * progress);
             }
         }
         break;
+
         case FX_ANIM_SHAPE_SAWTOOTH:
         {
-            float frequency = (float)steps;
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float progress = (float)(i - start) / (float)veclen;
+            float frequency = (float) steps;
+
+            for(i = start, k = 0; i < end; i++, k++) {
+                float progress = (float)(i - start) / (float) veclen;
                 float t = fmodf(progress * frequency, 1.0f);
                 vec[k] = min + diff * t;
             }
         }
         break;
+
         case FX_ANIM_SHAPE_SQUARE:
         {
-            float frequency = (float)steps;
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float progress = (float)(i - start) / (float)veclen;
+            float frequency = (float) steps;
+
+            for(i = start, k = 0; i < end; i++, k++) {
+                float progress = (float)(i - start) / (float) veclen;
                 float t = progress * frequency;
                 int phase = (int)(t * 2.0f);
                 vec[k] = (phase % 2 == 0) ? max : min;
             }
         }
         break;
+
         case FX_ANIM_SHAPE_BOUNCE:
         {
-            float frequency = (float)steps;
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float progress = (float)(i - start) / (float)veclen;
+            float frequency = (float) steps;
+
+            for(i = start, k = 0; i < end; i++, k++) {
+                float progress = (float)(i - start) / (float) veclen;
                 float t = fmodf(progress * frequency, 1.0f);
                 float b = fabsf(1.0f - 2.0f * t);
                 float bounce = 1.0f - (b * b);
@@ -301,63 +326,68 @@ void curve_set_predifined_shape( GtkWidget *curve, int fx_id, int parameter_id,
             }
         }
         break;
+
         case FX_ANIM_SHAPE_NOISE:
-        {
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float random_factor = (float)rand() / (float)RAND_MAX;
+            for(i = start, k = 0; i < end; i++, k++) {
+                float random_factor = (float) rand() / (float) RAND_MAX;
                 vec[k] = min + (diff * random_factor);
             }
-        }
-        break;
+            break;
+
         case FX_ANIM_SHAPE_SMOOTHSTEP:
         {
-            float frequency = (float)steps;
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float progress = (float)(i - start) / (float)veclen;
+            float frequency = (float) steps;
+
+            for(i = start, k = 0; i < end; i++, k++) {
+                float progress = (float)(i - start) / (float) veclen;
                 float local_progress = fmodf(progress * frequency, 1.0f);
-                float smooth_factor = local_progress * local_progress * (3.0f - 2.0f * local_progress);
+                float smooth_factor = local_progress * local_progress *
+                                      (3.0f - 2.0f * local_progress);
                 vec[k] = min + (diff * smooth_factor);
             }
         }
         break;
+
         case FX_ANIM_SHAPE_RANDOMWALK:
         {
             float value = (min + max) * 0.5f;
             float step_scale = diff * 0.05f;
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float step = ((float)rand() / RAND_MAX) - 0.5f;
+
+            for(i = start, k = 0; i < end; i++, k++) {
+                float step = ((float) rand() / RAND_MAX) - 0.5f;
                 value += step * step_scale;
-                if (value < min) value = min + (min - value);
-                if (value > max) value = max - (value - max);
+
+                if(value < min) value = min + (min - value);
+                if(value > max) value = max - (value - max);
+
+                if(value < min) value = min;
+                if(value > max) value = max;
+
                 vec[k] = value;
             }
         }
         break;
+
         case FX_ANIM_SHAPE_RANDOMWALK_INERTIA:
         {
             float value = (min + max) * 0.5f;
             float velocity = 0.0f;
-
             float accel_scale = diff * 0.02f;
             float damping = 0.90f;
 
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float accel = (((float)rand() / RAND_MAX) - 0.5f) * accel_scale;
+            for(i = start, k = 0; i < end; i++, k++) {
+                float accel = (((float) rand() / RAND_MAX) - 0.5f) * accel_scale;
 
                 velocity += accel;
                 velocity *= damping;
-
                 value += velocity;
 
-                if (value < min) {
+                if(value < min) {
                     value = min;
                     velocity *= -0.5f;
                 }
-                if (value > max) {
+
+                if(value > max) {
                     value = max;
                     velocity *= -0.5f;
                 }
@@ -366,266 +396,277 @@ void curve_set_predifined_shape( GtkWidget *curve, int fx_id, int parameter_id,
             }
         }
         break;
+
         case FX_ANIM_SHAPE_RANDOMWALK_MEAN:
         {
             float value = (min + max) * 0.5f;
             float mean = value;
-
             float step_scale = diff * 0.04f;
             float pull = 0.05f;
 
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float noise = (((float)rand() / RAND_MAX) - 0.5f) * step_scale;
+            for(i = start, k = 0; i < end; i++, k++) {
+                float noise = (((float) rand() / RAND_MAX) - 0.5f) * step_scale;
                 value += noise + (mean - value) * pull;
 
-                if (value < min) value = min;
-                if (value > max) value = max;
+                if(value < min) value = min;
+                if(value > max) value = max;
 
                 vec[k] = value;
             }
         }
         break;
+
         case FX_ANIM_SHAPE_RANDOMWALK_QUANTIZED:
         {
             float value = (min + max) * 0.5f;
             float step_scale = diff * 0.05f;
             int levels = 8;
 
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float step = (((float)rand() / RAND_MAX) - 0.5f) * step_scale;
+            for(i = start, k = 0; i < end; i++, k++) {
+                float step = (((float) rand() / RAND_MAX) - 0.5f) * step_scale;
                 value += step;
 
-                // quantize
-                float norm = (value - min) / diff;
-                norm = floorf(norm * levels) / (levels - 1);
+                if(value < min) value = min;
+                if(value > max) value = max;
+
+                float norm = (value - min) / (float) diff;
+                norm = floorf(norm * levels) / (float)(levels - 1);
 
                 value = min + norm * diff;
 
-                if (value < min) value = min;
-                if (value > max) value = max;
+                if(value < min) value = min;
+                if(value > max) value = max;
 
                 vec[k] = value;
             }
         }
         break;
+
         case FX_ANIM_SHAPE_RANDOMWALK_BURST:
         {
             float value = (min + max) * 0.5f;
             float small_step = diff * 0.01f;
-            float big_step   = diff * 0.8f;
-
+            float big_step = diff * 0.8f;
             int desired_bursts = steps > 0 ? steps : 3;
-            float burst_prob = (float)desired_bursts / (float)veclen;
+            float burst_prob = (float) desired_bursts / (float) veclen;
 
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float r = (float)rand() / RAND_MAX;
-
+            for(i = start, k = 0; i < end; i++, k++) {
+                float r = (float) rand() / RAND_MAX;
                 float step;
-                if (r < burst_prob)
-                {
-                    // symmetric burst (up + down)
-                    step = (((float)rand() / RAND_MAX) - 0.5f) * big_step;
-                }
+
+                if(r < burst_prob)
+                    step = (((float) rand() / RAND_MAX) - 0.5f) * big_step;
                 else
-                {
-                    step = (((float)rand() / RAND_MAX) - 0.5f) * small_step;
-                }
+                    step = (((float) rand() / RAND_MAX) - 0.5f) * small_step;
 
                 value += step;
 
-                if (value < min) value = min;
-                if (value > max) value = max;
+                if(value < min) value = min;
+                if(value > max) value = max;
 
                 vec[k] = value;
             }
         }
         break;
+
         case FX_ANIM_SHAPE_RANDOMWALK_SMOOTH:
         {
             float value = (min + max) * 0.5f;
             float step_scale = diff * 0.05f;
             float smooth = 0.85f;
 
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float step = (((float)rand() / RAND_MAX) - 0.5f) * step_scale;
+            for(i = start, k = 0; i < end; i++, k++) {
+                float step = (((float) rand() / RAND_MAX) - 0.5f) * step_scale;
                 float target = value + step;
 
                 value = value * smooth + target * (1.0f - smooth);
 
-                if (value < min) value = min;
-                if (value > max) value = max;
+                if(value < min) value = min;
+                if(value > max) value = max;
 
                 vec[k] = value;
             }
         }
         break;
+
         case FX_ANIM_SHAPE_GAUSSIAN:
         {
-            float frequency = (float)steps;
+            float frequency = (float) steps;
             float sigma = 0.25f;
 
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float progress = (float)(i - start) / (float)veclen;
+            for(i = start, k = 0; i < end; i++, k++) {
+                float progress = (float)(i - start) / (float) veclen;
                 float t = fmodf(progress * frequency, 1.0f);
                 float x = (t - 0.5f) / sigma;
                 float g = expf(-0.5f * x * x);
                 float g0 = expf(-0.5f * (0.5f / sigma) * (0.5f / sigma));
                 float normalized = (g - g0) / (1.0f - g0);
+
                 vec[k] = min + diff * normalized;
             }
         }
         break;
+
         case FX_ANIM_SHAPE_EXPONENTIAL:
         {
-            float frequency = (float)steps;
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float progress = (float)(i - start) / (float)veclen;
+            float frequency = (float) steps;
+            float denom = expf(4.0f) - 1.0f;
+
+            for(i = start, k = 0; i < end; i++, k++) {
+                float progress = (float)(i - start) / (float) veclen;
                 float t = fmodf(progress * frequency, 1.0f);
-                float expv = (expf(4.0f * t) - 1.0f) / (expf(4.0f) - 1.0f);
+                float expv = (expf(4.0f * t) - 1.0f) / denom;
                 vec[k] = min + diff * expv;
             }
         }
         break;
+
         case FX_ANIM_SHAPE_EASE_IN:
-        {
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float t = (float)(i - start) / (float)veclen;
-                float v = t * t; // quadratic ease-in
+            for(i = start, k = 0; i < end; i++, k++) {
+                float t = (float)(i - start) / (float) veclen;
+                float v = t * t;
                 vec[k] = min + diff * v;
             }
-        }
-        break;
+            break;
 
         case FX_ANIM_SHAPE_EASE_OUT:
-        {
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float t = (float)(i - start) / (float)veclen;
+            for(i = start, k = 0; i < end; i++, k++) {
+                float t = (float)(i - start) / (float) veclen;
                 float v = 1.0f - (1.0f - t) * (1.0f - t);
                 vec[k] = min + diff * v;
             }
-        }
-        break;
+            break;
+
         case FX_ANIM_SHAPE_PULSE:
         {
-            float frequency = (float)steps;
-            float duty = 0.2f; // 20% TODO: make it a parameter!
+            float frequency = (float) steps;
+            float duty = 0.2f;
 
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float t = fmodf(((float)(i - start) / veclen) * frequency, 1.0f);
+            for(i = start, k = 0; i < end; i++, k++) {
+                float t = fmodf(((float)(i - start) / (float) veclen) * frequency, 1.0f);
                 vec[k] = (t < duty) ? max : min;
             }
         }
         break;
+
         case FX_ANIM_SHAPE_DAMPED_SINE:
         {
             float midpoint = (max + min) * 0.5f;
             float radius = (max - min) * 0.5f;
-            float frequency = (float)steps;
+            float frequency = (float) steps;
             float damping = 3.0f;
 
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float t = (float)(i - start) / (float)veclen;
+            for(i = start, k = 0; i < end; i++, k++) {
+                float t = (float)(i - start) / (float) veclen;
                 float env = expf(-damping * t);
                 float v = sinf(2.0f * M_PI * frequency * t);
                 vec[k] = midpoint + radius * v * env;
             }
         }
         break;
+
         case FX_ANIM_SHAPE_SMOOTH_NOISE:
         {
             float last = (min + max) * 0.5f;
 
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float rnd = ((float)rand() / RAND_MAX);
+            for(i = start, k = 0; i < end; i++, k++) {
+                float rnd = (float) rand() / (float) RAND_MAX;
                 float target = min + diff * rnd;
-                last = last * 0.85f + target * 0.15f; // low-pass filter
+                last = last * 0.85f + target * 0.15f;
                 vec[k] = last;
             }
         }
         break;
-        case FX_ANIM_SHAPE_STEPS:
-            {
-                int levels = steps > 1 ? steps : 4;
 
-                for(i = start, k = 0; i < end; i++, k++)
-                {
-                    float t = (float)(i - start) / (float)veclen;
-                    float q = floorf(t * levels) / (levels - 1);
-                    vec[k] = min + diff * q;
-                }
+        case FX_ANIM_SHAPE_STEPS:
+        {
+            int levels = steps > 1 ? steps : 4;
+
+            for(i = start, k = 0; i < end; i++, k++) {
+                float t = (float)(i - start) / (float) veclen;
+                float q = floorf(t * levels) / (float)(levels - 1);
+                vec[k] = min + diff * q;
             }
+        }
         break;
+
         case FX_ANIM_SHAPE_RAMP_DROP:
         {
-            float frequency = (float)steps;
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float progress = (float)(i - start) / (float)veclen;
+            float frequency = (float) steps;
+            float denom = expf(4.0f) - 1.0f;
+
+            for(i = start, k = 0; i < end; i++, k++) {
+                float progress = (float)(i - start) / (float) veclen;
                 float t = fmodf(progress * frequency, 1.0f);
-                float v = (expf(4.0f * t) - 1.0f) / (expf(4.0f) - 1.0f);
+                float v = (expf(4.0f * t) - 1.0f) / denom;
                 vec[k] = min + diff * v;
             }
         }
         break;
+
         case FX_ANIM_SHAPE_BURST_ENVELOPE:
         {
-            float frequency = (float)steps;
-            for(i = start, k = 0; i < end; i++, k++)
-            {
-                float progress = (float)(i - start) / (float)veclen;
+            float frequency = (float) steps;
+
+            for(i = start, k = 0; i < end; i++, k++) {
+                float progress = (float)(i - start) / (float) veclen;
                 float t = fmodf(progress * frequency, 1.0f);
                 float v;
-                if (t < 0.1f)
-                {
-                    // fast attack
+
+                if(t < 0.1f) {
                     v = t / 0.1f;
-                }
-                else
-                {
-                    // exponential decay
+                } else {
                     float d = (t - 0.1f) / 0.9f;
                     v = expf(-5.0f * d);
                 }
+
                 vec[k] = min + diff * v;
             }
         }
         break;
-        default: break;
+
+        default:
+            for(i = start, k = 0, ry = min; i < end; i++, ry += dy, k++) {
+                vec[k] = ry;
+
+                if(vec[k] < min) vec[k] = min;
+                if(vec[k] > max) vec[k] = max;
+            }
+            break;
     }
 
-
-    if(reverse)
-    {
-        for(i = start, k = 0; i < end; i++, k++)
-        {
+    if(reverse) {
+        for(i = start, k = 0; i < end; i++, k++) {
             vec[k] = max - vec[k] + min;
         }
     }
 
     int curve_type = GTK3_CURVE_TYPE_FREE;
 
-    if( is_button_toggled("curve_typespline")) {
+    if(is_button_toggled("curve_typespline")) {
         curve_type = GTK3_CURVE_TYPE_SPLINE;
-    } else if ( is_button_toggled("curve_typefreehand")) {
+    } else if(is_button_toggled("curve_typefreehand")) {
         curve_type = GTK3_CURVE_TYPE_FREE;
-    } else if (is_button_toggled("curve_typelinear")) {
+    } else if(is_button_toggled("curve_typelinear")) {
         curve_type = GTK3_CURVE_TYPE_LINEAR;
     }
 
-    gtk3_curve_set_vector( curve , veclen, vec );
-    gtk3_curve_set_curve_type( curve, curve_type );
+    gtk3_curve_reset(curve);
+
+    gtk3_curve_set_range(curve,
+                         (gfloat) start,
+                         (gfloat) end,
+                         (gfloat) min,
+                         (gfloat) max);
+
+    gtk3_curve_set_grid_resolution(curve, 16);
+
+    gtk3_curve_set_vector(curve, veclen1, vec);
+    gtk3_curve_set_curve_type(curve, curve_type);
+
+    gtk_widget_queue_draw(curve);
 
     curve_is_empty = 0;
+
     free(vec);
 }

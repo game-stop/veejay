@@ -46,7 +46,7 @@ void	text_defaults(void)
 	srt_seq_ = 0;
 }
 
-static void toggle_siamese_widget(GtkWidget *widget, GtkWidget *first, GtkWidget *second)
+static void toggle_siamese_widget(GtkWidget *widget, GtkWidget *first, GtkWidget *second, int signal_suppression)
 {
     if (!widget || !first || !second)
         return;
@@ -61,24 +61,31 @@ static void toggle_siamese_widget(GtkWidget *widget, GtkWidget *first, GtkWidget
     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(siamese)) == active)
         return;
 
-    guint signal_id = g_signal_lookup("toggled", GTK_TYPE_TOGGLE_BUTTON);
-    gulong handler_id = g_signal_handler_find(
-        siamese,
-        G_SIGNAL_MATCH_ID,
-        signal_id,
-        0,
-        NULL,
-        NULL,
-        NULL
-    );
+	gulong handler_id = 0;
 
-    if (handler_id)
-        g_signal_handler_block(siamese, handler_id);
+	if( signal_suppression) {
+		guint signal_id = g_signal_lookup("toggled", GTK_TYPE_TOGGLE_BUTTON);
+		handler_id = g_signal_handler_find(
+			siamese,
+			G_SIGNAL_MATCH_ID,
+			signal_id,
+			0,
+			NULL,
+			NULL,
+			NULL
+		);
+
+		if (handler_id)
+			g_signal_handler_block(siamese, handler_id);
+	}
 
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(siamese), active);
 
-    if (handler_id)
-        g_signal_handler_unblock(siamese, handler_id);
+
+	if( signal_suppression ) {
+		if (handler_id)
+			g_signal_handler_unblock(siamese, handler_id);
+	}
 }
 
 void	on_button_085_clicked(GtkWidget *widget, gpointer user_data)
@@ -1445,12 +1452,12 @@ void	on_button_sample_play_clicked(GtkWidget *widget, gpointer user_data)
 	if(info->selection_slot)
 	{
 		multi_vims( VIMS_SET_MODE_AND_GO , "%d %d" ,
-			(info->selection_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM),		
-			info->selection_slot->sample_id );
+			info->selection_slot->sample_id,
+			(info->selection_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM));
 
-		vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO, 
-			(info->selection_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM ),
-						info->selection_slot->sample_id );
+		vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO,
+			info->selection_slot->sample_id,
+			(info->selection_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM ));
 	}
 }
 void	on_button_sample_del_clicked(GtkWidget *widget, gpointer user_data)
@@ -2183,7 +2190,7 @@ void on_check_samplefx_toggled(GtkWidget *widget , gpointer user_data)
     GtkWidget *check_samplefx = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "check_samplefx"));
     GtkWidget *curve_chain_togglechain = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_chain_togglechain"));
 
-    toggle_siamese_widget(widget, check_samplefx, curve_chain_togglechain);
+    toggle_siamese_widget(widget, check_samplefx, curve_chain_togglechain, 1);
 }
 
 void on_check_streamfx_toggled(GtkWidget *widget, gpointer user_data)
@@ -2202,7 +2209,7 @@ void on_check_streamfx_toggled(GtkWidget *widget, gpointer user_data)
     GtkWidget *check_streamfx = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "check_streamfx"));
     GtkWidget *curve_chain_togglechain = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_chain_togglechain"));
 
-    toggle_siamese_widget(widget, check_streamfx, curve_chain_togglechain);
+    toggle_siamese_widget(widget, check_streamfx, curve_chain_togglechain, 1);
 
 }
 
@@ -3457,10 +3464,12 @@ void update_curve_shape(void)
         return;
 
     int fx_id = info->uc.entry_tokens[ENTRY_FXID];
-    int param = info->uc.selected_parameter_id;
+    int param = get_vj_kf_active_parameter();
 
-    if (fx_id <= 0 || param < 0)
-        return;
+    if (fx_id <= 0 || param < 0) {
+		veejay_msg(0, "FX ID or Parameter ID not set %d %d",fx_id, param);
+		return;
+	}
 
     GtkWidget *shape_combo = widget_cache[ WIDGET_CURVE_ANIMATION_LIST ];
     GtkWidget *shape_param_spin = widget_cache[ WIDGET_CURVE_SPIN_ANIMATION_SHAPE ];
@@ -3474,6 +3483,7 @@ void update_curve_shape(void)
         !shape_bound_min ||
         !shape_bound_max)
     {
+		veejay_msg(0, "Required widget not found");
         return;
     }
 
@@ -3499,8 +3509,10 @@ void update_curve_shape(void)
         hi = t;
     }
 
-    if (hi <= lo)
-        return;
+    if (hi <= lo) {
+		veejay_msg(0,"End before start");
+		return;
+	}
 
     int steps = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(shape_param_spin));
     if (steps < 1)
@@ -3701,18 +3713,36 @@ void curve_panel_toggleentry_toggled(GtkWidget *widget, gpointer user_data)
 
     GtkWidget *chain_toggleentry = widget_cache[WIDGET_CURVE_CHAIN_TOGGLEENTRY];
 
-    toggle_siamese_widget(widget, panel_toggleentry, chain_toggleentry);
+    toggle_siamese_widget(widget, panel_toggleentry, chain_toggleentry, 1);
 }
 
 void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
 {
-    GtkWidget *kf_param = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
-    gint active_kf_id = gtk_combo_box_get_active (GTK_COMBO_BOX(kf_param));
-    if (active_kf_id != -1) {
-        vj_kf_select_parameter(active_kf_id);
+    if(info->status_lock)
+        return;
 
-        if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_CURVECONTAINER ]))
-           gtk_widget_set_sensitive(widget_cache[ WIDGET_CURVECONTAINER ], TRUE);
+    gint active_kf_id = get_vj_kf_active_parameter();
+
+    if(active_kf_id < 0)
+        return;
+
+    vj_kf_select_parameter(active_kf_id);
+
+    if(!gtk_widget_is_sensitive(widget_cache[WIDGET_CURVECONTAINER]))
+        gtk_widget_set_sensitive(widget_cache[WIDGET_CURVECONTAINER], TRUE);
+
+    vj_kf_refresh(TRUE);
+
+	if(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]) {
+        int osl = info->status_lock;
+        info->status_lock = 1;
+
+        gtk_combo_box_set_active(
+            GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]),
+            0
+        );
+
+        info->status_lock = osl;
     }
 }
 
@@ -3731,11 +3761,11 @@ void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
 		   info->status_tokens[CURRENT_ID] !=
 			info->selected_slot->sample_id )
 		multi_vims( VIMS_SET_MODE_AND_GO, "%d %d",
-			(info->selected_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM ),
-			info->selected_slot->sample_id );
+			info->selected_slot->sample_id,
+			(info->selected_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM ));
 		vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO,
-				info->selected_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE: MODE_STREAM,
-				info->selected_slot->sample_id );
+				info->selected_slot->sample_id,
+				info->selected_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE: MODE_STREAM);
 	}
 }
 
