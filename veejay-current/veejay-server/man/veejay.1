@@ -1,646 +1,1154 @@
 .TH "veejay" 1
 .SH NAME
-veejay - a visual (video) instrument and video sampler for GNU/Linux
+veejay \- a visual video instrument and video sampler for GNU/Linux
+
 .SH SYNOPSIS
-.B veejay [options] Videofile1 [Videofile2 ... VideofileN]
+.B veejay
+.RI [ options ]
+.RI [ Videofile1
+.RI [ Videofile2
+.IR ... ]]
+
 .SH DESCRIPTION
 .B Veejay
-is a visual instrument and realtime video sampler. It allows you
-to "play" the video like you would play a Piano.
+is a visual instrument and real-time video sampler. It allows you to
+play video like a musical instrument.
 
-While playing, you can record the resulting video directly to disk (video sampling). Veejay keeps audio in sync and pitches when needed through trickplay (slow , faster, reverse, loop) and delivered to JACK for possible further processing.
+While playing, you can record the resulting video directly to disk. This is
+called video sampling. Veejay keeps audio in sync and changes pitch when needed
+during trickplay, such as slow playback, fast playback, reverse playback, and
+looping. Audio is sent to JACK for possible further processing.
 
-Veejay can be operated live by using the keyboard (which is 100% user definable)
-and remotely over network (both unicast and multicast) using an inhouse message
-system that allows mapping of various protocols on top of it, including OSC.
+Veejay can be operated live using the keyboard, which is fully user-definable.
+It can also be controlled remotely over the network using unicast or multicast.
+Remote control is handled by VIMS, Veejay's Internal Message System, which can
+map several protocols on top of it, including OSC.
 
-Veejay is beeing developed in the hope it will be usefull for VJ's, media artists
-theathers and other interested users that want to use Free Software for their
-performances and/or video installations.
+Veejay is developed in the hope that it will be useful for VJs, media artists,
+theatres, and other users who want to use Free Software for performances and
+video installations.
 
+.SH RUNNING MULTIPLE VEEJAYS: MAIN OUTPUT AND PREVIEW
 
-.TP
-.SH Supported video containers
-.TP
-AVI , QuickTime, DVVideo
-.TP
-.SH Supported video codecs/formats
-* MJPEG AVI / Quicktime (fourcc: mjpg,mjpb,mjpa,jfif)
+Veejay can run multiple instances at the same time. A common setup is to run
+one veejay as the main video output and another veejay as a smaller preview or
+editing instance.
 
-* Lossless JPEG AVI (fourcc: ljpg)
+The main output instance is started with
+.B --master
+or
+.BR -K .
 
-* Quasar DV codec (NTSC/PAL) AVI / Quicktime (fourcc: dv,dvhd,dvp,dvcp)
+The preview or editing instance is started with
+.B --connect
+or
+.BR -C ,
+followed by the address and port of the master veejay:
 
-* YUV4MPEG (chroma 4:2:0 jpeg/mpeg2, chroma 4:2:2) AVI / Y4M
+.PP
+.RS
+.nf
+\fBveejay --connect 127.0.0.1:3490\fR
+.fi
+.RE
 
-* Motion PNG (fourcc: mpng, png)
+When both instances run on the same machine, they can share the same samplelist
+file. Veejay watches the samplelist file for changes, so edits made by one
+instance can be picked up by the other instance automatically.
 
-* RAW YUV 4:2:2 planar JPEG/JFIF (sample range 0-255,8 bit, 3 planes) (fourcc: vj22,vj20)
+Start the main output veejay:
 
-* RAW YUV 4:2:2 planar  Rec. 601 (Y’CbCr) (sample range 16-235 Y, 16-240 UV, 8 bit, 3 planes)
+.PP
+.RS
+.nf
+\fBveejay -a 1 -v -n -l veejay-samplelist.sl --master -w 1920 -h 1080\fR
+.fi
+.RE
 
-* MLZO (YUV 4:2:2 planar compressed with OberHumer's LZO real-time data compression library) (fourcc: mlzo)
+Start the preview or editing veejay:
 
-* FFmpeg RAW format
-.TP
-.SH Audio
-.TP
-Veejay uses Jack, a low latency audio server, to transport (playback) audio in sync with video. This allows you to process veejay's audio output in another sound processing application.
-.TP
-.SH General Usage (How to work with veejay)
-.TP
+.PP
+.RS
+.nf
+\fBveejay -v -w 720 -h 480 -l veejay-samplelist.sl --connect 127.0.0.1:3490\fR
+.fi
+.RE
+
+In this setup, the first veejay owns the main video output. The second veejay
+can be used as a lower-resolution preview and control or editing instance.
+
+When using Reloaded, connect Reloaded to the preview or editing veejay. Enable
+.B Forward VIMS trickplay
+to mirror playback and trickplay commands to the master output. Disable it when
+you want to stay in editing mode without forwarding playback controls.
+
+Samplelist changes are synchronized through the shared samplelist file. Playback
+and trickplay commands are forwarded over the VIMS connection when forwarding is
+enabled.
+
+.SH SUPPORTED VIDEO CONTAINERS
+
+.IP \(bu 2
+AVI
+.IP \(bu 2
+QuickTime
+.IP \(bu 2
+DVVideo
+
+.SH SUPPORTED VIDEO CODECS AND FORMATS
+
+.IP \(bu 2
+MJPEG AVI / QuickTime, fourcc:
+.BR mjpg ,
+.BR mjpb ,
+.BR mjpa ,
+.B jfif
+
+.IP \(bu 2
+Lossless JPEG AVI, fourcc:
+.B ljpg
+
+.IP \(bu 2
+Quasar DV codec, NTSC/PAL, AVI / QuickTime, fourcc:
+.BR dv ,
+.BR dvhd ,
+.BR dvp ,
+.B dvcp
+
+.IP \(bu 2
+YUV4MPEG, chroma 4:2:0 JPEG/MPEG-2, chroma 4:2:2, AVI / Y4M
+
+.IP \(bu 2
+Motion PNG, fourcc:
+.BR mpng ,
+.B png
+
+.IP \(bu 2
+RAW YUV 4:2:2 planar JPEG/JFIF, sample range 0-255, 8 bit, 3 planes,
+fourcc:
+.BR vj22 ,
+.B vj20
+
+.IP \(bu 2
+RAW YUV 4:2:2 planar Rec. 601, Y'CbCr, sample range 16-235 for Y and
+16-240 for UV, 8 bit, 3 planes
+
+.IP \(bu 2
+MLZO, YUV 4:2:2 planar compressed with OberHumer's LZO real-time data
+compression library, fourcc:
+.B mlzo
+
+.IP \(bu 2
+FFmpeg RAW format
+
+.SH CHROMA AND INTERNAL VIDEO FORMAT
+
+Veejay converts all source video data to planar YUV 4:2:2 for internal
+processing and playback.
+
+Effects and filters that need full chroma resolution can use 4:4:4 chroma
+upsampling internally. The chroma upsampling method can be selected with
+.BR VEEJAY_SUPERSAMPLE_MODE .
+The chroma downsampling method used when converting back from 4:4:4 to 4:2:2
+can be selected with
+.BR VEEJAY_SUBSAMPLE_MODE .
+
+.SH AUDIO
+
+Veejay uses JACK, a low-latency audio server, to transport audio in sync with
+video. This allows you to process veejay's audio output in another sound
+processing application.
+
+.SH GENERAL USAGE
+
 Veejay has a console and a video window.
 
-* The console is used for displaying messages only.
+.IP \(bu 2
+The console is used for displaying messages only.
 
-* If the mouse is moved over to the video window, you can use the keyboard like a piano to play/manipulate the video.
-.TP
-You can start veejay with multiple files, video files and/or Mjpegtools' EditList files. Upon startup, veejay creates a new EditList in memory containing all the files you have loaded. As a result, all files will appear as a single large video file. Next you can start making selections (samples) of your EditList. These samples will be placed in a slot in a so called 'sample banks' and they can be triggered for continue or playback by combining the F-keys (1 to 12) with SHIFT. You can select a sample bank holding SHIFT and pressing a number 1 to 9.
-.TP
-Note that if you change the EditList (for example, when deleting portions of your editlist) you should save your editlist as well as your samplelist.
-.TP
-You can select effects to put on your samples by pressing the cursor keys up and down, once you have found an effect you would like to use, press ENTER and it will be added to the current chain entry. The current chain entry can be changed with the PLUS and MINUS key on your numeric keyboard. Look at the KEYBINDINGS in this manual page to see what other possibilities you could have. 
-.TP
-.SH Interactive camera/projection system
-.TP
-You can use veejay to calibrate a camera (or another input source) against a projector screen to map a physical position to veejay's projection. To use this feature, you can press CTRL\-s to activate the projection/camera calibration setup. This will render a graphical OSD on top of the video.Next, you need to play the live input source in order to find veejay's projection in the camera image. Set the points to the edges of the screen and right-click. Now press CTRL\-s or the middle mouse button to leave setup. Press CTRL-i to enable transforming the camera input and press CTRL-p to bring the projection screen in front.
-.TP
-.SH Interoperability
-.TP
-Using the OpenSoundControl (OSC) veejay can be used with a great number of sound and video processing applications.
-.TP
-Veejay can record video data to the yuv4mpeg format (mjpegtools), or stream uncompressed video over the network (uni - and multicast)
-.TP
-The power come with VIMS, Veejay's IMS (Internal Message System). With sayVIMS; a command line utility; you can control mainly all veejay's function on the fly, headless. You can scripts your performance / video installation, you can even plug them with the real world ...!
+.IP \(bu 2
+When the mouse is over the video window, you can use the keyboard like a piano
+to play and manipulate the video.
+
+.PP
+You can start veejay with multiple video files and/or Mjpegtools EditList files.
+Upon startup, veejay creates a new EditList in memory containing all files you
+loaded. As a result, all files appear as one large video file.
+
+You can then start making selections, called samples, from your EditList. These
+samples are placed into slots in sample banks. They can be triggered for
+continued playback or resumed playback by combining the F-keys, F1 to F12, with
+SHIFT. You can select a sample bank by holding SHIFT and pressing a number from
+1 to 9.
+
+If you change the EditList, for example by deleting parts of it, you should save
+both the editlist and the samplelist.
+
+You can select effects for your samples by pressing the cursor keys up and down.
+Once you find an effect you want to use, press ENTER to add it to the current
+chain entry. The current chain entry can be changed with the PLUS and MINUS keys
+on the numeric keyboard. See
+.B KEYBINDINGS
+for more possibilities.
+
+.SH INTERACTIVE CAMERA/PROJECTION SYSTEM
+
+You can use veejay to calibrate a camera, or another input source, against a
+projector screen. This maps a physical position to veejay's projection.
+
+Press CTRL-s to activate the projection/camera calibration setup. This renders a
+graphical OSD on top of the video. Next, play the live input source so you can
+find veejay's projection in the camera image. Set the points to the edges of the
+screen and right-click.
+
+Press CTRL-s again, or press the middle mouse button, to leave setup. Press
+CTRL-i to enable transformation of the camera input. Press CTRL-p to bring the
+projection screen to the front.
+
+.SH INTEROPERABILITY
+
+Using Open Sound Control, OSC, veejay can be used with many sound and video
+processing applications.
+
+Veejay can record video data to the YUV4MPEG format used by mjpegtools. It can
+also stream uncompressed video over the network using unicast or multicast.
+
+VIMS, Veejay's Internal Message System, provides remote control. With
+.BR sayVIMS ,
+a command-line utility, you can control almost all veejay functions on the fly,
+including in headless setups. You can script performances or video installations
+and connect them to external systems.
+
 .SH OPTIONS
+
 .TP
-.B \-w/--output-width <num>
-Specify video output width
+.B \-v/--verbose
+Enable verbose/debugging output. Default is off.
+
 .TP
-.B \-h/--output-height <num>
-Specify video output height
+.B \-n/--no-color
+Do not use coloured text in console output.
+
 .TP
-.B \-C/--connect <ip address:port>
-Connect this server to the main video out veejay
+.B \-u/--dump-events
+Dump veejay's VIMS, OSC, effect, and environment documentation to stdout.
+
+.TP
+.B \-B/--features
+List compiled-in features and exit.
+
+.TP
+.B \--version
+Print veejay version and exit.
+
+.TP
+.B \-?/--help
+Print command-line help and exit.
+
+.TP
+.B \-D/--composite
+Do not start with the camera/projection calibration viewport.
+
+.TP
+.B \-p/--port <num>
+Set the TCP port used to accept and send VIMS messages. Default is 3490.
+
+.TP
+.B \-M/--multicast-osc <multicast address>
+Start the OSC receiver in multicast mode.
+
+.TP
+.B \-T/--multicast-vims <multicast address>
+Set up multicast VIMS. The multicast frame sender transmits on port offset + 3.
+Commands are received on port offset + 4.
+
+.TP
+.B \-m/--memory <num>
+Set maximum memory to use for cache, as a percentage of total system RAM.
+Use 0 to disable. Valid range is 0-80. Default is 30.
+
+.TP
+.B \-j/--max_cache <num>
+Divide cache memory over at most N samples. Valid range is 0-100. Default is 0.
+
+.TP
+.B \-Y/--yuv [0|1]
+Force YCbCr mode. Use 0 for YUV 4:2:2 Rec. 601 or 1 for YUV 4:2:2 JPEG/JFIF.
+
+.TP
+.B \-t/--timer <num>
+Select timer. Use 0 for none or 1 for the default timer. Default is 1.
+
+.TP
+.B \-P/--preserve-pathnames
+Do not canonicalise pathnames in editlists.
+
+.TP
+.B \-e/--swap-range
+Swap YUV range 0-255 with 16-235 on video files. This option enables range
+swapping; it does not take an argument.
+
+.TP
+.B \-L/--auto-loop
+Start with the default sample loop.
+
+.TP
+.B \-b/--bezerk
+Enable bezerk mode. This allows you to change input channels on the fly without
+restarting the samples.
+
 .TP
 .B \-K/--master
-Start this server as the main video output
+Start this veejay instance as the master or main video output. Other veejay
+instances can connect to it with
+.BR --connect .
+
+.TP
+.B \-C/--connect <ip address:port>
+Connect this veejay instance to a master veejay. If no port is given, the
+default VIMS port is used. This is typically used for a preview or editing
+instance that forwards selected VIMS playback or trickplay commands to the main
+video output.
+
+.TP
+.B \-l/--sample-file <filename>
+Load a samplelist file at startup. The samplelist file stores your project,
+including samples, FX chains, loop and play modes, the currently playing sample,
+and sequencer information.
+
+.TP
+.B \-F/--action-file <filename>
+Load an action file at startup. The action file stores custom keybindings,
+custom bundles, available VIMS events, editlists, samplelists, streamlists, and
+command-line options.
+
+.TP
+.B \-g/--clip-as-sample
+Load every video file on the command line as a new sample.
+
+.TP
+.B \-a/--audio [0|1]
+Enable or disable audio. Use 0 for off or 1 for on. Default is 1.
+
+.TP
+.B \--pace-correction <ms>
+Set audio pace correction offset in milliseconds. The value must be positive.
+
+.TP
+.B \-c/--synchronization [0|1]
+Disable or enable sync correction. Default is on.
+
+.TP
+.B \-G/--graphics-driver <num>
+Alias for
+.BR --output .
+Select the video output driver.
+
 .TP
 .B \-O/--output [0..8]
 Specify video output:
-0 = SDL (default)
-1 = (unused)
-2 = (unused)
-3 = OpenGL (requires ARB fragment shader)
-4 = Y4M Stream 4:2:0
-5 = VLOOPBACK (native)
-6 = Y4M Stream 4:2:2
-7 = VLOOPBACK (YUV 4:2:0)
-8 = VLOOPBACK (BGR24)
-Options 4, 5, 6, 7 and 8 require --output-file.
+.RS
+.IP 0 3
+SDL, default
+.IP 3 3
+Headless, no video output
+.IP 4 3
+Y4M Stream 4:2:0, requires
+.B --output-file
+.IP 5 3
+Vloopback device, native format, requires
+.B --output-file
+.IP 6 3
+Y4M Stream 4:2:2, requires
+.B --output-file
+.IP 7 3
+Vloopback device, YUV 4:2:0, requires
+.B --output-file
+.IP 8 3
+Vloopback device, BGR, requires
+.B --output-file
+.RE
+
 .TP
-.B \-o/--output-file [file]
-Write to file (for use with -O/--output)
+.B \-o/--output-file <file>
+Write video output to file or device. This is used with
+.BR -O/--output .
+
 .TP
 .B \-s/--size WxH
-Scaled video dimensions for SDL video output (Width x Height)
-.TP
-.B \-a/--audio [0-1]
-Play audio 0 = off , 1 = on (default)
-.TP
-.B \-r/--audiorate <num>
-Set audio rate (defaults to 48Khz)
-.TP
-.B \--pace-correction [ms]
-Set audio pace correction in milliseconds.
-.TP
-.B \-c/--synchronization [0-1]
-Sync correction off/on (default on)
-.TP
-.B \-P/--preverse-pathnames
-Do not 'canonicalise' pathnames in editlists
-.TP
-.B \-v/--verbose 
-Verbosity on/off (default off)
-.TP
-.B \-t/--timer [0-1]
-Timer to use 0=none, 1=default timer (default=1)
-.TP
-.B \-f/--fps <num>
-Override framerate of video. Disables audio when used. (default: read from first loaded file)
+Set display dimensions for the SDL video window.
+
 .TP
 .B \-x/--geometry-x <num>
-Geometry x offset for SDL video window
+Set the top-left X offset for the SDL video window.
+
 .TP
 .B \-y/--geometry-y <num>
-Geometry y offset for SDL video window
+Set the top-left Y offset for the SDL video window.
+
+.TP
+.B \--borderless
+Open the SDL video window without a title bar.
+
 .TP
 .B \--no-keyboard
-Disable keyboard for SDL video window
+Disable keyboard input for the SDL video window.
+
 .TP
 .B \--no-mouse
-Disable mouse for SDL video window
+Disable mouse input for the SDL video window.
+
 .TP
 .B \--show-cursor
-Show mouse cursor in SDL video window
+Show the mouse cursor in the SDL video window.
+
 .TP
-.B \-F/--action-file <filename>
-Configuration File to load at initialization.
-The configuration file stores custom keybindings, custom bundles, available VIMS events, editlist,samplelist,streamlist
-and commandline options.
-.TP
-.B \-l/--sample-file <filename>
-Load a sample list file at startup.
-The sample list file store your project. Samples load in sample bank (based on .edl files), effects in fx chain, loop and play mode,
-sample currently playing, sequencer information...
-.TP
-.B \-b/--bezerk
-Bezerk mode, if enabled it allows you to change input channels on the fly (without restarting the samples)      
-.TP
-.B \-g/--clip-as-sample
-Load every file on the commandline as a new sample
-.TP
-.B \-q/--quit
-Quit at end of the file
-.TP
-.B \-n/--no-color
-Dont use colored text in console output
-.TP
-.B \-u/--dump-events
-Dump veejay's documentation to stdout
-.TP
-.B \-m/--memory [0..100]
-Frame cache size in percentage of total system RAM 
-.TP
-.B \-j/--max_cache [0..100]
-Maximum number of samples to cache
-.TP
-.B \-B/--features
-Show compiled in options
-.TP
-.B \-Y/--yuv [0-1]
-Force YCbCr (defaults to YUV). Use 0 for YUV 4:2:2 Rec 601 or 1 for YUV 4:2:2 JPEG/JFIF
-.TP
-.B \-e/--swap-range [0..3]
-Swap YUV range [0..255] <-> [16..235] on videofiles (0 = YUV 4:2:0 Planar,
-1 = YUV 4:2:2 Planar (default),2 = YUV 4:2:0 Planar full range, 3 = YUV 4:2:2 Planar full range)
-.TP
-.B \-I/--deinterlace
-Deinterlace video if it is interlaced
+.B \-A/--capture-device <num>
+Start with capture device
+.BR <num> .
+This replaces the older
+.B --all
+description.
+
 .TP
 .B \-d/--dummy
-Start veejay with no video files (dummy mode). By default it will play black video (Stream 1 [F1])
-.TP
-.B \-W/--width <num>
-Specify width of dummy video
-.TP
-.B \-H/--height <num>
-Specify height of dummy video
-.TP
-.B \-N/--norm [0..2]
-Set video norm of dummy video [0=PAL, 1=NTSC, 2=SECAM (defaults to PAL)]
-.TP
-.B \-M/--multicast-osc <address>
-Starts OSC receiver in multicast mode
-.TP
-.B \-T/--multicast-vims <address>
-Setup additional multicast frame sender / command receiver.
-The frame sender transmits on port offset + 3, send commands to port offset + 4, 
-.TP
-.B \-A/--all
-Start with all capture devices active as streams
+Start with no video files. This is dummy mode. By default, veejay plays black
+frames.
+
 .TP
 .B \-Z/--load-generators <num>
-Load and instantiate all plugins of type generator and start playing <num>
+Load all generator plugins as streams and start playing generator stream
+.BR <num> .
+
 .TP
-.B \-D/--composite
-Do not start with camera/projection calibration viewport.
+.B \-W/--input-width <num>
+Set input video width for dummy/capture input.
+
+.TP
+.B \-H/--input-height <num>
+Set input video height for dummy/capture input.
+
+.TP
+.B \-f/--fps <num>
+Override the default frame rate. By default, the frame rate is read from the
+first loaded file. Using this option disables audio.
+
+.TP
+.B \-r/--audiorate <num>
+Set audio rate. Default is 48 kHz.
+
+.TP
+.B \-I/--deinterlace
+Deinterlace video if it is interlaced.
+
+.TP
+.B \-N/--norm <num>
+Set video norm. Use 0 for PAL, 1 for NTSC, or 2 for SECAM. Default is PAL.
+
+.TP
+.B \-w/--output-width <num>
+Set output video width for projection/output rendering.
+
+.TP
+.B \-h/--output-height <num>
+Set output video height for projection/output rendering.
+
+.TP
+.B \--benchmark WxH
+Run veejay benchmark using the given resolution.
+
 .TP
 .B \--qrcode-connection-info
-Encode veejay server IP and port number in QR code image (available if build with qrcode support)
+Encode veejay's external IP address and port number into a QR code image. This
+is available only when built with QR code support.
+
 .TP
 .B \-S/--scene-detection <threshold>
-Create new samples based on scene detection threshold.
+Create new samples based on scene detection threshold
+.BR <threshold> .
+
 .TP
-.B \-M/--dynamic-fx-chain
-Do not keep the fx chain buffers in RAM. Specify this option if you prefer dynamic allocation instead (slower, but no RAM is reserved)
+.B \-X/--dynamic-fx-chain
+Do not keep FX chain buffers in RAM. Use this option if you prefer dynamic
+allocation instead. This is slower, but reserves less RAM.
+
 .TP
 .B \--split-screen
-Load split screen configuration
+Load split-screen configuration.
+
 .TP
 .B \--fx-custom-default-values
-Read FX custom default values from ~/.veejay/[livido,frei0r]
+Read FX custom default values from
+.B ~/.veejay/livido
+and
+.BR ~/.veejay/frei0r .
+
 .TP
-.B \--benchmark NxN
-Benchmark veejay's core functions (multi-thread vs single thread model) using a specific resolution NxN
-.TP
-.B \-?
-Print veejay's options to stdout and quit
-.TP
-.SH Environment variables
-.TP
-.B VEEJAY_SUBSAMPLE_MODE
-Selects a sampling method for up-and down sampling of UV data (drop,average,bilinear,mitchell)
-.TP
-.B VEEJAY_NUM_DECODE_THREADS
-Set the number of MJPEG decode threads you would like to spawn. 
-.TP
-.B VEEJAY_MULTITHREAD_TASKS
-You can set this environment variable to the number of threads you would like to spawn for veejay's pixel tasks. This option is automatically enabled if you run high resolution video.
-.TP
-.B VEEJAY_AUTO_SCALE_PIXELS
-Tell veejay to automatically convert between CCIR 601 and JPEG
-pixels - hence, it scales YUV values from 0 - 255 to YCbCr 16-235/16-240
-and vice versa. Use "0" to disable this behaviour, "1" to enable.
+.B \-q/--quit
+Quit at the end of the file.
+
+.SH ENVIRONMENT VARIABLES
+
+.SS Video and rendering
+
 .TP
 .B SDL_VIDEO_HWACCEL
-Set to 1 to use SDL video hardware accel (default=on)
+Set to 1 to use SDL video hardware acceleration. Default is on.
+
 .TP
 .B VEEJAY_PERFORMANCE
-Set to "quality" or "fastest" (default is fastest)
+Set rendering performance mode. Valid values are
+.B quality
+and
+.BR fastest .
+Default is
+.BR fastest .
+
 .TP
 .B VEEJAY_AUTO_SCALE_PIXELS
-Set to 1 to convert between CCIR 601 and JPEG automatically (default=dont care,white != white)
+Set to 1 to automatically convert between CCIR 601 and JPEG pixel ranges. This
+scales YUV values from 0-255 to YCbCr 16-235/16-240 and vice versa. Use 0 to
+disable this behaviour.
+
 .TP
 .B VEEJAY_INTERPOLATE_CHROMA
-Set to 1 if you wish to interpolate every chroma sample when scaling (default=0)
+Set to 1 to interpolate chroma samples when scaling. Default is 0.
+
 .TP
-.B VEEJAY_SDL_KEY_REPEAT_INTERVAL
-Interval of key pressed to repeat while pressed down.
+.B VEEJAY_ORIGINAL_FRAME
+Force use of the original frame in composition.
+
 .TP
-.B VEEJAY_SDL_DRIVER
-Tells SDL which video driver to use
+.B VEEJAY_SUBSAMPLE_MODE
+Select the chroma subsampling method used when converting from 4:4:4 to 4:2:2.
+Valid values are
+.BR drop ,
+.BR average ,
+.BR bilinear ,
+and
+.BR mitchell .
+Default is
+.BR drop .
+
 .TP
-.B VEEJAY_SDL_HINT_RENDER_DRIVER
-Set a hint before creating the SDL driver (e.g: opengl)
+.B VEEJAY_SUPERSAMPLE_MODE
+Select the chroma supersampling method used when converting from 4:2:2 to 4:4:4.
+Valid values are
+.B dup
+and
+.BR mitchell .
+Default is
+.BR dup .
+
 .TP
-.B VEEJAY_SDL_HINT_FRAMEBUFFER_ACCELERATION
-Enable or disable SDL hardware acceleration (0,1,2)
+.B VEEJAY_BG_AUTO_HISTOGRAM_EQ
+Enable automatic histogram equalization for background subtraction.
+
+.SS Display and user interface
+
 .TP
-.B VEEJAY_PLAYBACK_CACHE   
-Sample cache size in MB - by default, veejay will consume up to 30% of your total RAM to cache video samples.
-.TP
-.B VEEJAY_SDL_KEY_REPEAT_DELAY
-Delay key repeat in ms
-.TP
-.B VEEJAY_FULLSCREEN 
-Fullscreen (1) or windowed (0) mode
-.TP
-.B VEEJAY_DESKTOP_GEOMETRY
-Specify the desktop geometry for veejay to position the video window. Use this feature to specify where a video window appears in TwinView or One Big Desktop
-.TP
-.B VEEJAY_VIDEO_SIZE
-Specify the size of the video window (inside VEEJAY_DESKTOP_GEOMETRY)
+.B VEEJAY_FULLSCREEN
+Set fullscreen mode. Use 1 for fullscreen or 0 for windowed mode.
+
 .TP
 .B VEEJAY_VIDEO_POSITION
-Specify the position of the video window (inside VEEJAY_DESKTOP_GEOMETRY)
+Specify the position of the video window inside
+.BR VEEJAY_DESKTOP_GEOMETRY .
+
 .TP
-.B VEEJAY_DEFAULT_CHANNEL
-Specify the default video4linux channel id
+.B VEEJAY_VIDEO_SIZE
+Specify the size of the video window inside
+.BR VEEJAY_DESKTOP_GEOMETRY .
+
 .TP
-.B VEEJAY_SWAP_RGB
-Capture in RGB or BGR (Video4Linux)
+.B VEEJAY_DESKTOP_GEOMETRY
+Specify desktop geometry so veejay can position the video window. This is useful
+for TwinView or one large desktop setups.
+
 .TP
-.B VEEJAY_MMAP_PER_FILE
-MMap size per loaded video file
+.B VEEJAY_SDL_DRIVER
+Tell SDL which video driver to use.
+
 .TP
-.B VEEJAY_RUN_MODE
-Set this to "CLASSIC" if you want to startup in low resolution
-.B Examples
+.B VEEJAY_SDL_HINT_RENDER_DRIVER
+Set
+.B SDL_HINT_RENDER_DRIVER
+before creating the SDL renderer, for example
+.BR opengl .
+
 .TP
-.B VEEJAY_DESKTOP_GEOMETRY=2624x1024+1600x0
-The video window will be displayed on the second screen, first screen is 1600 pixels wide. Specify this and VEEJAY_VIDEO_SIZE to create a borderless video window for use on one of your monitors in TwinView or One Big Desktop mode.
+.B VEEJAY_SDL_KEY_REPEAT_DELAY
+Set key repeat delay in milliseconds.
+
 .TP
-.B VEEJAY_VIDEO_SIZE=1024x768
-The second screen is 1024x768, the video window will appear fullscreen 
+.B VEEJAY_SDL_KEY_REPEAT_INTERVAL
+Set the interval, in milliseconds, at which a pressed key repeats.
+
 .TP
-.B VEEJAY_DEFAULT_CHANNEL
-Set the Video4Linux Channel ID for veejay to use by default.
-.TP
-.B VEEJAY_SHMID
-Set SHMID by environment variable (slave mode)
-.TP
-.B VEEJAY_PAUSE_EVERYTHING
-Pause behaviour; Set to 0 to pause only top sample (and keep playing FX chain) or to 1 to pause everything (default).
+.B VJ_SDL_YUV_MODE
+Select SDL YUV conversion mode. Valid values are
+.BR jpeg ,
+.BR auto ,
+.BR bt601 ,
+and
+.BR bt709 .
+
+.SS System, decoding, and streaming
+
 .TP
 .B VEEJAY_MAX_FILESIZE
-Set the maximum file size in bytes. This option influences the maximum file size of recorded AVI files.
+Set the maximum file size in bytes. This option influences the maximum size of
+recorded AVI files and other file processing limits.
+
+.TP
+.B VEEJAY_NUM_DECODE_THREADS
+Set the number of avcodec/MJPEG decode threads to spawn.
+
+.TP
+.B VEEJAY_MULTITHREAD_TASKS
+Set the number of parallel pixel-processing tasks. By default, veejay uses the
+available CPU cores when multi-threaded processing is enabled.
+
+.TP
+.B VEEJAY_AV_LOG
+Set the libavcodec/libav logging level.
+
+.TP
+.B VEEJAY_LOG_NET_IO
+Enable network I/O logging when set.
+
+.TP
+.B VEEJAY_MMAP_PER_FILE
+Set mmap allocation size per loaded video file, in kilobytes.
+
+.TP
+.B VEEJAY_VLOOPBACK_PIXELFORMAT
+Set the pixel format used for vloopback streaming.
+
+.TP
+.B VEEJAY_PLAYBACK_CACHE
+Set sample cache size in MB. By default, veejay can consume up to 30% of total
+RAM to cache video samples.
+
+.TP
+.B VEEJAY_RUN_MODE
+Set this to
+.B CLASSIC
+to start in low-resolution mode.
+
+.TP
+.B VEEJAY_SHMID
+Set SHMID by environment variable for slave mode.
+
+.TP
+.B VEEJAY_PAUSE_EVERYTHING
+Set pause behaviour. Use 0 to pause only the top sample and keep playing the FX
+chain. Use 1 to pause everything. Default is 1.
+
 .TP
 .B VEEJAY_MEMSET_METHOD
-Set a preferred memset method. A list of memset methods is printed when an invalid value is given.
+Set the preferred memset method. A list of memset methods is printed when an
+invalid value is given.
+
 .TP
 .B VEEJAY_MEMCPY_METHOD
-Set a preferred memcpy method. A list of memcpy methods is printed when an invalid value is given. Set to "glibc memcpy()" if you experience random crashes
-.TP
-.SH Home directory
-.TP
-Veejay creates a new directory in your $HOME , ".veejay".
-You must put a TrueType font file in $HOME/.veejay/fonts for veejay's OSD functionality.
-.TP
-.B .veejay/recovery
-If veejay stops unexpectedly, it will try to save your samplelist and editlist before aborting. Most of the time, veejay will be able to fully recover.
-.TP
-.B .veejay/plugins.cfg
-If you want to load frei0r or freeframe plugins , set the paths
-to the .so files in the plugins.cfg file. Only support for single
-channel plugins.  
-.TP
-.SH ENVIRONMENT VARIABLES FOR V4L2 CAPTURE
+Set the preferred memcpy method. A list of memcpy methods is printed when an
+invalid value is given. Set to
+.B "glibc memcpy()"
+if you experience random crashes.
+
+.SS V4L2 capture
+
 .TP
 .B VEEJAY_V4L2_GREYSCALE_ONLY
-Use '1' to capture in greyscale only
+Use 1 to capture in greyscale only.
+
 .TP
 .B VEEJAY_V4L2_PREFER_JPEG
-Use '1' to set preferred capture format to (M)JPEG
+Use 1 to set the preferred capture format to MJPEG.
+
 .TP
 .B VEEJAY_V4L2_CAPTURE_METHOD
-Capturing method. Use 0 for read/write, 1 for memory mapping.
+Set the capture method. Use 0 for read/write or 1 for memory mapping.
+
 .TP
 .B VEEJAY_V4L2_MAX_RETRIES
-Maximum number of attempts before giving up on capture device
+Set the maximum number of attempts before giving up on the capture device.
+
 .TP
 .B VEEJAY_V4L2_NO_THREADING
-Do not start a seperate thread for capturing. Use '1' to disable threads.
+Use 1 to query frames in the main loop instead of using a separate capture
+thread.
+
+.SH ENVIRONMENT VARIABLE EXAMPLES
+
 .TP
-.SH INTERFACE COMMANDS (STDIN)
-When you are running veejay with a SDL window you can use keybindings for
-realtime interaction. See 
+.B VEEJAY_DESKTOP_GEOMETRY=2624x1024+1600x0
+Display the video window on the second screen. In this example, the first screen
+is 1600 pixels wide. Specify this together with
+.B VEEJAY_VIDEO_SIZE
+to create a borderless video window on one monitor in a TwinView or one large
+desktop setup.
+
+.TP
+.B VEEJAY_VIDEO_SIZE=1024x768
+Set the second screen size to 1024x768. The video window will appear fullscreen
+on that screen.
+
+.TP
+.B VEEJAY_DEFAULT_CHANNEL
+Set the default Video4Linux channel ID for veejay.
+
+.SH HOME DIRECTORY
+
+Veejay creates a new directory in your home directory:
+
+.PP
+.RS
+.nf
+\fB$HOME/.veejay\fR
+.fi
+.RE
+
+.TP
+.B .veejay/recovery
+If veejay stops unexpectedly, it will try to save your samplelist and editlist
+before aborting. Most of the time, veejay will be able to recover fully.
+
+.TP
+.B .veejay/plugins.cfg
+To load frei0r or FreeFrame plugins, set the paths to the
+.B .so
+files in this configuration file. Only single-channel plugins are supported.
+
+.SH INTERFACE COMMANDS
+
+When you are running veejay with an SDL window, you can use keybindings for
+real-time interaction. See
 .B KEYBINDINGS
 for details.
+
 .SH KEYBINDINGS
+
 .TP
 .B [Keypad *]
-Switch loop mode ("Normal" or "Ping Pong")
+Switch loop mode between Normal and Ping Pong.
+
 .TP
 .B [SHIFT] + [Keypad *]
-Switch random loop mode ("Play once and keep playing last frame" or "Random")
+Switch random loop mode between Random and Play once.
+
 .TP
 .B [Keypad 1]
-Goto start of sample
+Go to start of sample.
+
 .TP
 .B [Keypad 2]
-Go back 25 frames
+Go back 25 frames.
+
 .TP
 .B [Keypad 3]
-Goto end of sample
+Go to end of sample.
+
 .TP
 .B [Keypad 4]
-Play backward
+Play backward.
+
 .TP
 .B [Keypad 5]
-Pause
+Pause.
+
+.TP
+.B [SHIFT] + [Keypad 5]
+Stop playback of all samples.
+
 .TP
 .B [Keypad 6]
-Play forward
+Play forward.
+
 .TP
 .B [Keypad 7]
-Goto previous frame
+Go to previous frame.
+
 .TP
 .B [Keypad 8]
-Go forward 25 frames
+Go forward 25 frames.
+
 .TP
 .B [Keypad 9]
-Goto next frame
+Go to next frame.
+
 .TP
 .B [Keypad /]
-Switch to Plain video playback mode (from Sample or Tag mode)
+Switch to Plain video playback mode from Sample or Tag mode.
+
+.TP
+.B [z]
+Pause and hold the FX chain. This freezes the current video state.
+
 .TP
 .B [LEFT BRACKET]
-Set sample start
+Set sample start.
+
 .TP
 .B [RIGHT BRACKET]
-Set sample end and create new sample
+Set sample end and create a new sample.
+
 .TP
 .B [ALT] + [LEFT BRACKET]
-Set marker start
+Set marker start.
+
 .TP
 .B [ALT] + [RIGHT BRACKET]
-Set marker end and activate marker
+Set marker end and activate marker.
+
 .TP
 .B [Backspace]
-Delete current marker 
+Delete current marker.
+
 .TP
 .B [a,s,d,f,g,h,j,k,l]
-Set playback speed to 1,2,3,4,5,6,7,8, or 9
+Set playback speed to 1, 2, 3, 4, 5, 6, 7, 8, or 9.
+
 .TP
 .B [ALT] + [a|s|d|f|g|h|j|k|l]
-Adjust frame duplicator to 1,2,3,4,5,6,7,8 or 9. Interpolates missing frames.
-.TP
-.B [1..9]
-Quick jump into sample position : 10%, 20%, 30% etc.
-.TP
-.B [SHIFT] + [1..9]
-Sample bank selection: range [0-12], [12-24], [24-36] etc.
-.TP
-.B [ALT] + [1..9]
-Change the channel ID 1-9, depending on sample range
+Adjust frame duplicator to 1, 2, 3, 4, 5, 6, 7, 8, or 9. Missing frames are
+interpolated.
+
 .TP
 .B [SHIFT] + [a,s,d,f,g,h,j,k,l]
-Set current mixing channel speed to 1,2,3,4,5,6,7,8, or 9
+Set current mixing channel speed to 1, 2, 3, 4, 5, 6, 7, 8, or 9.
+
 .TP
 .B [SHIFT] + [ALT] + [a|s|d|f|g|h|j|k|l]
-Adjust current mixing channel frame duplicator to 1,2,3,4,5,6,7,8 or 9. Interpolates missing frames.
+Adjust current mixing channel frame duplicator to 1, 2, 3, 4, 5, 6, 7, 8, or
+9. Missing frames are interpolated.
+
+.TP
+.B [0..9]
+Quick jump into the current sample or stream position: 0%, 10%, 20%, 30%, and
+so on up to 90%.
+
+.TP
+.B [SHIFT] + [1..9]
+Select sample bank range: 0-12, 12-24, 24-36, and so on.
+
+.TP
+.B [ALT] + [1..9]
+Change channel ID 1-9, depending on sample range.
+
 .TP
 .B [F1..F12]
-Select and play sample bank 1 .. 12
+Select and play sample bank 1 to 12.
+
 .TP
 .B [SHIFT] + [F1..F12]
-Select and resume sample bank 1 .. 12
+Select and resume sample bank 1 to 12.
+
 .TP
 .B [ESC]
-Switch between Plain -> Tag or Sample playback mode
+Switch between Sample and Stream playback mode.
+
 .TP
 .B [SHIFT] + [t]
-Toggle transitions between samples
+Toggle transitions between samples.
+
 .TP
 .B [RETURN | ENTER]
-Add selected effect from list to sample effect chain
+Add the selected effect from the list to the sample effect chain.
+
+.TP
+.B [SHIFT] + [RETURN | ENTER]
+Add the selected effect from the list to the sample effect chain in disabled
+state.
+
 .TP
 .B [DELETE]
-Delete effect from selected chain entry
+Delete effect from selected chain entry.
+
 .TP
 .B [UP]
-Go up 1 position in the effect list
+Move up one position in the effect list.
+
 .TP
 .B [DOWN]
-Go down 1 position in the effect list
+Move down one position in the effect list.
+
 .TP
 .B [Keypad -]
-Decrease selected effect chain entry
+Decrease selected effect chain entry.
+
 .TP
 .B [Keypad +]
-Increase selected effect chain entry
+Increase selected effect chain entry.
+
 .TP
 .B [-]
-Decrease mixing channel ID
+Decrease mixing channel ID.
+
 .TP
 .B [=]
-Increase mixing channel ID
+Increase mixing channel ID.
+
 .TP
 .B [/]
-Toggle mixing source between Clips and Streams
+Toggle mixing source between Clips and Streams.
+
 .TP
 .B [END]
-Enable/Disable Effect Chain
+Enable or disable the effect chain.
+
 .TP
 .B [ALT] + [END]
-Enable/Disable Effect on current entry
+Enable or disable the effect on the current entry.
+
 .TP
 .B [PgUp]
-Increase parameter 0 of selected effect
+Increase parameter 0 of the selected effect.
+
 .TP
 .B [PgDn]
-Decrease parameter 0 of selected effect
+Decrease parameter 0 of the selected effect.
+
 .TP
 .B [Keypad 0]
-Decrease parameter 1 of selected effect
+Decrease parameter 1 of the selected effect.
+
 .TP
 .B [Keypad .]
-Increase parameter 1 of selected effect
+Increase parameter 1 of the selected effect.
+
 .TP
 .B [.]
-Increase parameter 2 of selected effect
+Increase parameter 2 of the selected effect.
+
 .TP
 .B [,]
-Decrease parameter 2 of selected effect
+Decrease parameter 2 of the selected effect.
+
 .TP
 .B [q]
-Decrease parameter 3 of selected effect
+Decrease parameter 3 of the selected effect.
+
 .TP
 .B [w]
-Increase parameter 3 of selected effect
+Increase parameter 3 of the selected effect.
+
 .TP
 .B [e]
-Decrease parameter 4 of selected effect
+Decrease parameter 4 of the selected effect.
+
 .TP
 .B [r]
-Increase parameter 4 of selected effect
+Increase parameter 4 of the selected effect.
+
 .TP
 .B [t]
-Decrease parameter 5 of selected effect
+Decrease parameter 5 of the selected effect.
+
 .TP
 .B [y]
-Increase parameter 5 of selected effect
+Increase parameter 5 of the selected effect.
+
 .TP
 .B [u]
-Decrease parameter 6 of selected effect
+Decrease parameter 6 of the selected effect.
+
 .TP
 .B [i]
-Increase parameter 6 of selected effect
+Increase parameter 6 of the selected effect.
+
 .TP
 .B [o]
-Decrease parameter 7 of selected effect
+Decrease parameter 7 of the selected effect.
+
 .TP
 .B [p]
-Increase parameter 7 of selected effect
+Increase parameter 7 of the selected effect.
+
 .TP
-.B [SHIFT] + [Spacebar]
-Start keystroke recorder. The keystroke recorder
-records most of the received VIMS messages and plays them
-back in order and on the position you have pressed them.
-Instead of using the keyboard, you can also use 'Reloaded',
-and record the buttons pressed. However, some VIMS messages
-are excluded from the keystroke recorder for safety reasons. 
+.B [CTRL] + [Arrow keys]
+Move the currently selected projection/camera calibration point. LEFT and RIGHT
+move the point horizontally. UP and DOWN move the point vertically.
+
 .TP
-.B [Spacebar]
-(re)play recorded VIMS messages. The keystroke recorder
-will jump to the starting position and replay all
-recorded VIMS messages. 
+.B [CTRL] + [a]
+Enable or disable viewport rendering.
+
 .TP
-.B [CTRL] + [Spacebar]
-Clear recorded keystrokes. This clears all VIMS messages
-in the current selected macro slot.
-.TP
-.B [Spacebar] (CAPS-LOCK on)
-Plays the next sample in queue (in playing direction)
-.TP
-.B [CTRL] + [ F1 - F12 ]
-Select a slot to record keystrokes to (default=0)
-Use this if you want to record multiple keystrokes. You
-can switch slots while in keystroke playback.
-.TP
-.B [ALT] + [b]
-Take a snapshot of a video frame and put it in a seperate
-buffer (used by some effects like Difference Overlay)
-.TP
-.B [CTRL] + [s]
-Show/hide interactive camera/projector calibration setup
-.TP
-.B [CTRL] + [p]
-Focus on front (primary output) or back (secundary input) projection
-.TP
-.B [CTRL] + [i]
-Toggle current playing sample/stream as input source to be transformed
-.TP
-.B [CTRL] + [v]
-Toggle grayscale/color mode
-.TP
-.B [CTRL] + [h]
-Toggle OSD help for camera/projector setup
-.TP
-.B [CTRL] + [o]
-Toggle OSD help for general status messages and mouse coordinates
+.B [CTRL] + [c]
+Show or hide the copyright information.
+
 .TP
 .B [CTRL] + [d]
-Toggle rendering of single source FX on underlying samples
+Toggle rendering of single-source FX on underlying samples.
+
 .TP
-.B [CTRL] + [r]
-Start recording
-.TP
-.B [CTRL] + [t]
-Stop recording
+.B [CTRL] + [e]
+Start automatic recording and play the result when recording finishes.
+
 .TP
 .B [CTRL] + [f]
-Toggle fullscreen / windowed mode
+Toggle fullscreen or windowed mode.
+
+.TP
+.B [CTRL] + [h]
+Toggle OSD help for camera/projector setup.
+
+.TP
+.B [CTRL] + [i]
+Toggle the currently playing sample or stream as the input source to be
+transformed.
+
+.TP
+.B [CTRL] + [m]
+Mute or unmute audio.
+
+.TP
+.B [CTRL] + [o]
+Toggle OSD help for general status messages and mouse coordinates.
+
+.TP
+.B [CTRL] + [p]
+Focus on the front projection, primary output, or back projection, secondary
+input.
+
+.TP
+.B [CTRL] + [r]
+Start recording.
+
+.TP
+.B [CTRL] + [s]
+Show or hide the interactive camera/projector calibration setup.
+
+.TP
+.B [CTRL] + [t]
+Stop recording.
+
+.TP
+.B [CTRL] + [v]
+Toggle grayscale or colour mode.
+
+.TP
+.B [ALT] + [b]
+Use the current frame as the background or mask frame for the current effect.
+This is used by effects that need a captured reference frame, such as difference
+or background-subtraction effects.
+
+.TP
+.B [n]
+Decrease colour vibrance.
+
+.TP
+.B [m]
+Increase colour vibrance.
+
+.TP
+.B [Pause]
+Hold the current frame temporarily and resume playback after the configured hold
+duration.
+
 .TP
 .B [Home]
-Print sample/tag information
-.SH EXAMPLES
+Print sample or tag information.
+
 .TP
-.B veejay -u |less
-Startup veejay and list all events (VIMS/OSC) and effect descriptions
+.B [CTRL] + [Home]
+Toggle on-screen logging, if enabled.
+
+.TP
+.B [SHIFT] + [Spacebar]
+Start the keystroke recorder. The keystroke recorder records most received VIMS
+messages and plays them back in order from the position where they were
+recorded. Instead of using the keyboard, you can also use Reloaded and record
+button presses. Some VIMS messages are excluded from the keystroke recorder for
+safety reasons.
+
+.TP
+.B [Spacebar]
+Replay recorded VIMS messages. The keystroke recorder jumps to the starting
+position and replays all recorded VIMS messages.
+
+.TP
+.B [CTRL] + [Spacebar]
+Clear recorded keystrokes. This clears all VIMS messages in the currently
+selected macro slot.
+
+.TP
+.B [Spacebar] with CAPS LOCK on
+Play the next sample in the queue, in the current playing direction.
+
+.TP
+.B [CTRL] + [F1-F12]
+Select a slot to record keystrokes to. The default slot is 0. Use this if you
+want to record multiple keystroke sequences. You can switch slots during
+keystroke playback.
+
+.SH EXAMPLES
+
+.TP
+.B veejay -u | less
+Start veejay and list all events, VIMS/OSC commands, and effect descriptions.
+
 .TP
 .B veejay -p 4000 ~/my_video1.avi
-Startup veejay listening on port 4000 (use this to use multiple veejays)
+Start veejay listening on port 4000. Use this to run multiple veejay instances.
+
 .TP
 .B veejay -d -W 352 -H 288 -N 0 -a 0
-Startup veejay using dummy video, dimensions 352x288, using PAL and no audio.
+Start veejay in dummy mode, using 352x288 PAL video and no audio.
+
 .TP
 .B veejay movie1.avi -M 224.0.0.50 -p 5000 -n -v
-Startup veejay, using osc multicast protocol on port 5000 and no colored but verbose output
+Start veejay using OSC multicast on port 5000, with verbose output and no
+coloured console text.
+
 .TP
 .B veejay -g movie1.avi movie2.avi movie3.avi --output 5 --output-file /dev/video1
-Startup veejay headless and use given clip as sample, the video output is writen
-to /dev/video1 (a video loopback device)
+Start veejay headless and load each given clip as a sample. The video output is
+written to
+.BR /dev/video1 ,
+a video loopback device.
 
-You will need something like v4l2looback kernel module to setup the video loopback.
+.IP
+You need the
+.B v4l2loopback
+kernel module to set up the video loopback device. Only video is written to the
+loopback device. Audio, if any, still goes to JACK.
 
-Only the video channel is writen to the loopback device! audio, if any, still goes to jack
 .TP
 .B veejay movie1.avi --output 4 --output-file /tmp/video-yuv4mpeg.pipe
-Startup veejay headless and write yuv4mpeg video to a named fifo pipe.
+Start veejay headless and write YUV4MPEG video to a named FIFO pipe. Only video
+is written to the pipe. Audio, if any, still goes to JACK. Because of how pipes
+work, audio and video can lose sync.
 
-Only video channel goes to the pipe! the audio still goes to jack
-
-Dues how pipe works, audio and video could lost synchro
 .TP
+.B veejay -a 1 -v -n -l veejay-samplelist.sl --master -w 1920 -h 1080
+Start veejay as the main video output at 1920x1080.
+
+.TP
+.B veejay -v -w 720 -h 480 -l veejay-samplelist.sl --connect 127.0.0.1:3490
+Start a second veejay as a lower-resolution preview or editing instance and
+connect it to the master output.
+
+.IP
+When both instances use the same samplelist file, local samplelist changes are
+picked up through veejay's samplelist watcher. In Reloaded, connect to the
+preview or editing veejay and enable
+.B Forward VIMS trickplay
+to mirror playback controls to the master output.
+
 .SH REFERENCES
-.TP
+
 .I http://veejayhq.net
-.TP
+
 .SH BUGS
-.TP
+
 See
 .I https://github.com/game-stop/veejay/issues
-.SH AUTHOR
-This man page was written by Niels Elburg.
 
-If you have questions, remarks or you just want to
-contact the developers, the main mailing list for this
-project is: 
-.I http://groups.google.com/group/veejay-discussion/post?hl=en
+.SH SEE ALSO
 
-For more info see the website at
-.I http://veejayhq.net
-.SH "SEE ALSO"
-.B veejay sayVIMS reloaded
+.BR veejay ,
+.BR sayVIMS ,
+.B reloaded
