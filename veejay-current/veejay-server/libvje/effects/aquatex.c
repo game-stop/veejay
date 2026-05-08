@@ -50,7 +50,7 @@ vj_effect *aquatex_init(int w, int h)
 
     ve->sub_format = 1;
 
-    ve->description = "Improved Aquatex";
+    ve->description = "Aquatex";
     ve->param_description = vje_build_param_list( ve->num_params, "Intensity", "Wave Scale", "Phase", "Spread", "Noise" );
     return ve;
 }
