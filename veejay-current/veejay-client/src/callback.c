@@ -1900,16 +1900,41 @@ void	on_check_autowhitebalance_toggled(GtkWidget *widget, gpointer user_data)
 	}
 }
 
-void on_button_seq_clearall_clicked( GtkWidget *w, gpointer data )
+void on_button_seq_clearall_clicked(GtkWidget *w, gpointer data)
 {
-	multi_vims( VIMS_SEQUENCE_DEL, "-1");
-	int slot;
-	for (slot = 0; slot < info->sequencer_col * info->sequencer_row ; slot++)
-	{
-		gtk_label_set_text(GTK_LABEL(info->sequencer_view->gui_slot[slot]->image),
-		                   NULL );
-	}
-	vj_msg(VEEJAY_MSG_INFO, "Sequencer cleared");
+    multi_vims(VIMS_SEQUENCE_DEL, "-1");
+
+    if(info->sequencer_view && info->sequencer_view->gui_slot)
+    {
+        const int n_slots = info->sequencer_col * info->sequencer_row;
+
+        if(info->sequence_playing >= 0 &&
+           info->sequence_playing < n_slots &&
+           info->sequencer_view->gui_slot[info->sequence_playing])
+        {
+            indicate_sequence(FALSE,
+                info->sequencer_view->gui_slot[info->sequence_playing]);
+        }
+
+        info->sequence_playing = -1;
+
+        int slot;
+        for(slot = 0; slot < n_slots; slot++)
+        {
+            if(info->sequencer_view->gui_slot[slot])
+            {
+                gtk_label_set_text(
+                    GTK_LABEL(info->sequencer_view->gui_slot[slot]->image),
+                    NULL);
+            }
+        }
+    }
+
+    gtk_toggle_button_set_active(
+        GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SEQACTIVE]),
+        FALSE);
+
+    vj_msg(VEEJAY_MSG_INFO, "Sequencer cleared");
 }
 
 void	on_seq_rec_stop_clicked( GtkWidget *w, gpointer data )
@@ -5285,16 +5310,20 @@ void	on_osdbutton_clicked(GtkWidget *w, gpointer data )
 	single_vims(VIMS_OSD);
 }
 
-void	on_seqactive_toggled( GtkWidget *w, gpointer data )
+void on_seqactive_toggled(GtkWidget *w, gpointer data)
 {
-	if(info->status_lock)
-		return;
-    int enabled = is_button_toggled("seqactive" );
-	multi_vims( VIMS_SEQUENCE_STATUS, "%d", enabled );
-	vj_midi_learning_vims_msg(info->midi,NULL, VIMS_SEQUENCE_STATUS, enabled);
-    vj_msg(VEEJAY_MSG_INFO, "Sample sequencer is %s", (enabled ? "enabled" : "disabled" ));
-}
+    if(info->status_lock)
+        return;
 
+    int enabled = is_button_toggled("seqactive");
+
+    multi_vims(VIMS_SEQUENCE_STATUS, "%d", enabled);
+    vj_midi_learning_vims_msg(info->midi, NULL, VIMS_SEQUENCE_STATUS, enabled);
+
+    vj_msg(VEEJAY_MSG_INFO,
+           "Sample sequencer is %s",
+           enabled ? "enabled" : "disabled");
+}
 void	on_hqbutton_clicked( GtkWidget *w, gpointer data ) // 1/1
 {
 	multitrack_set_quality( info->mt, 0 );

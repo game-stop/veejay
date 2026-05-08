@@ -258,6 +258,15 @@ notebook header.top tabs tab:hover label {
     background-color: @panel-color;
 }
 
+.sample_slot.active,
+.sequencer_slot.active,
+.quickselect_slot.active {
+    border-color: @knob-color;
+    border-width: 2px;
+    border-style: solid;
+    background-color: #223328;
+}
+
 .sample_slot:hover, 
 .sequencer_slot:hover, 
 .quickselect_slot:hover {
@@ -377,4 +386,31 @@ list row:hover {
 
 treeview.view cell {
     border: none;
+}
+
+frame.sequencer_slot.active {
+    border-color: @playing-color;
+    border-width: 2px;
+    border-style: solid;
+    background-color: #223328;
+}
+
+frame.sequencer_slot.active:hover {
+    border-color: @knob-hover;
+    background-color: #2a4634;
+}
+
+frame.sequencer_slot.sequence-playing,
+frame.sequencer_slot.sequence-playing > border {
+    border-color: @playing-color;
+    border-width: 2px;
+    border-style: solid;
+    background-color: #223328;
+}
+
+#frame316,
+#frame318 {
+    padding: 0;
+    margin: 0;
+    border-width: 0;
 }

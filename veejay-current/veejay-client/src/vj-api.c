@@ -1435,6 +1435,8 @@ static void veejay_show_main_ui(vj_gui_t *gui);
 void reload_macros(void);
 void reportbug(void);
 void select_chain_entry(int entry);
+static void update_active_sequence_from_status(void);
+static void clear_active_sequence_slot(void);
 
 GtkWidget *glade_xml_get_widget_( GtkBuilder *m, const char *name );
 
@@ -7573,6 +7575,61 @@ static void set_pm_page_label(int sample_id, int type)
     g_free(title);
 }
 
+static inline int normalize_sequence_slot(int raw, int n_slots)
+{
+    if(raw >= 0 && raw < n_slots)
+        return raw;
+
+    return -1;
+}
+
+static void update_sequence_playing_from_status(void)
+{
+    if(!info->sequencer_view || !info->sequencer_view->gui_slot)
+        return;
+
+    const int n_slots = info->sequencer_col * info->sequencer_row;
+
+    const int seq_cur_raw = info->status_tokens[SEQ_CUR];
+    const int seq_act_raw = info->status_tokens[SEQ_ACT];
+
+    const int playing = normalize_sequence_slot(seq_cur_raw, n_slots);
+    const gboolean active = (seq_act_raw != 0);
+
+    if(playing == info->sequence_playing) {
+        info->status_lock = 1;
+        gtk_toggle_button_set_active(
+            GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SEQACTIVE]),
+            active);
+        info->status_lock = 0;
+        return;
+    }
+
+    if(info->sequence_playing >= 0 &&
+       info->sequence_playing < n_slots &&
+       info->sequencer_view->gui_slot[info->sequence_playing])
+    {
+        indicate_sequence(FALSE,
+            info->sequencer_view->gui_slot[info->sequence_playing]);
+    }
+
+    info->sequence_playing = playing;
+
+    info->status_lock = 1;
+    gtk_toggle_button_set_active(
+        GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SEQACTIVE]),
+        active);
+    info->status_lock = 0;
+
+    if(playing >= 0 &&
+       playing < n_slots &&
+       info->sequencer_view->gui_slot[playing])
+    {
+        indicate_sequence(TRUE,
+            info->sequencer_view->gui_slot[playing]);
+    }
+}
+
 static void update_globalinfo(int *history, int pm, int last_pm)
 {
     int i;
@@ -7774,21 +7831,12 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     {
         info->uc.reload_hint[HINT_SEQ_ACT] = 1;
     }
-    if( info->status_tokens[SEQ_CUR] != history[SEQ_CUR] && pm != MODE_PLAIN )
+
+    if(info->status_tokens[SEQ_CUR]   != history[SEQ_CUR] ||
+    info->status_tokens[SEQ_ACT]   != history[SEQ_ACT] ||
+    info->status_tokens[PLAY_MODE] != history[PLAY_MODE])
     {
-        int in = info->status_tokens[SEQ_CUR];
-        if( in < MAX_SEQUENCES )
-        {
-            gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SEQACTIVE]), TRUE );
-            indicate_sequence( FALSE, info->sequencer_view->gui_slot[ info->sequence_playing ] );
-            info->sequence_playing = in;
-            indicate_sequence( TRUE, info->sequencer_view->gui_slot[ info->sequence_playing ] );
-        }
-        else
-        {
-            indicate_sequence( FALSE, info->sequencer_view->gui_slot[ info->sequence_playing ] );
-            gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SEQACTIVE]), FALSE );
-        }
+        update_sequence_playing_from_status();
     }
 
     if( history[CURRENT_ID] != info->status_tokens[CURRENT_ID] )
@@ -10011,14 +10059,107 @@ static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *e
     return FALSE;
 }
 
-static void indicate_sequence( gboolean active, sequence_gui_slot_t *slot )
+static int active_sequence_gui_slot = -1;
+
+static void clear_active_sequence_slot(void)
 {
-    if(!active) {
-        remove_class( slot->frame, "active");
+    if(!info->sequencer_view || !info->sequencer_view->gui_slot)
+        return;
+
+    if(active_sequence_gui_slot < 0)
+        return;
+
+    int n_slots = info->sequencer_col * info->sequencer_row;
+
+    if(active_sequence_gui_slot < n_slots &&
+       info->sequencer_view->gui_slot[active_sequence_gui_slot])
+    {
+        indicate_sequence(FALSE,
+            info->sequencer_view->gui_slot[active_sequence_gui_slot]);
     }
-    else {
-        add_class( slot->frame, "active");
+
+    active_sequence_gui_slot = -1;
+}
+
+static int sequencer_slot_label_to_id(sequence_gui_slot_t *slot)
+{
+    if(!slot || !slot->image)
+        return -1;
+
+    const gchar *txt = gtk_label_get_text(GTK_LABEL(slot->image));
+
+    if(!txt || txt[0] == '\0')
+        return -1;
+
+    char *endptr = NULL;
+    long id = strtol(txt, &endptr, 10);
+
+    if(endptr == txt)
+        return -1;
+
+    return (int) id;
+}
+
+static void set_active_sequence_slot_by_sample_id(int sample_id)
+{
+    if(!info->sequencer_view || !info->sequencer_view->gui_slot)
+        return;
+
+    int n_slots = info->sequencer_col * info->sequencer_row;
+    int slot;
+
+    clear_active_sequence_slot();
+
+    if(sample_id <= 0)
+        return;
+
+    for(slot = 0; slot < n_slots; slot++)
+    {
+        sequence_gui_slot_t *gui_slot = info->sequencer_view->gui_slot[slot];
+
+        if(!gui_slot)
+            continue;
+
+        if(sequencer_slot_label_to_id(gui_slot) == sample_id)
+        {
+            indicate_sequence(TRUE, gui_slot);
+            active_sequence_gui_slot = slot;
+
+            gtk_widget_grab_focus(GTK_WIDGET(gui_slot->event_box));
+            return;
+        }
     }
+}
+
+static void update_active_sequence_from_status(void)
+{
+    if(!info->sequencer_view)
+        return;
+
+    if(info->status_tokens[PLAY_MODE] != MODE_SAMPLE &&
+       info->status_tokens[PLAY_MODE] != MODE_STREAM)
+    {
+        clear_active_sequence_slot();
+        return;
+    }
+
+    set_active_sequence_slot_by_sample_id(info->status_tokens[CURRENT_ID]);
+}
+
+static void indicate_sequence(gboolean active, sequence_gui_slot_t *slot)
+{
+    if(!slot || !slot->frame)
+        return;
+
+    if(active) {
+        add_class(slot->frame, "active");
+        add_class(slot->frame, "sequence-playing");
+    } else {
+        remove_class(slot->frame, "active");
+        remove_class(slot->frame, "sequence-playing");
+    }
+
+    gtk_widget_queue_draw(slot->frame);
 }
 
 static void set_activation_of_slot_in_samplebank( gboolean activate)
