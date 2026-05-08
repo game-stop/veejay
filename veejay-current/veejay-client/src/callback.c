@@ -3533,7 +3533,7 @@ void update_curve_shape(void)
     if (widget_cache[WIDGET_CURVE_TYPEFREEHAND])
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPEFREEHAND]), TRUE);
 
-    curve_set_predifined_shape(info->curve,
+    curve_set_predefined_shape(info->curve,
                                fx_id,
                                param,
                                lo,
@@ -3542,7 +3542,8 @@ void update_curve_shape(void)
                                minb,
                                maxb,
                                steps,
-                               reverse_shape);
+                               reverse_shape,
+							   info->el.fps);
 }
 
 void    on_curve_animation_changed (GtkWidget *widget, gpointer user_data)

@@ -3428,7 +3428,7 @@ static void update_curve_widget(GtkWidget *curve)
 
     if( blob && blen > 0 )
     {
-        p = set_points_in_curve_ext( curve, blob,id,i, &curve_type,&status );
+        p = set_points_in_curve_ext( curve, blob,id,i, &curve_type,&status, info->el.fps );
         if( p >= 0 )
         {
             info->uc.selected_parameter_id = p;
@@ -3467,7 +3467,8 @@ static void update_curve_widget(GtkWidget *curve)
         gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE );
         set_initial_curve( curve, info->uc.entry_tokens[ENTRY_FXID], info->uc.selected_parameter_id,
                            lo, hi ,
-                           info->uc.entry_tokens[ ENTRY_P0 + info->uc.selected_parameter_id ] );
+                           info->uc.entry_tokens[ ENTRY_P0 + info->uc.selected_parameter_id ],
+                           (double) info->el.fps);
         update_slider_state( info->uc.selected_parameter_id, FALSE );
     }
 

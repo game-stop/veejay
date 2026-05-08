@@ -180,4 +180,7 @@ void gtk3_curve_save                              (Gtk3CurveData      *data,
                                                    gchar              *filename);
 Gtk3CurveData gtk3_curve_load                     (gchar              *filename);
 
+void gtk3_curve_set_fps(GtkWidget *widget, gdouble fps);
+
+
 #endif /* __GTK3_CURVE__H__ */
