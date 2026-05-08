@@ -1360,7 +1360,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 			pm = VJ_PLAYBACK_MODE_PATTERN;
 
 		if( sample_chain_sprint_status(
-			info->uc->sample_id,tag_count,sample_count,cache_used,info->seq->size,seq_cur,info->real_fps,
+			info->uc->sample_id,tag_count,sample_count,cache_used,info->seq->active,seq_cur,info->real_fps,
 			settings->current_frame_num, pm, total_slots,info->seq->rec_id,curfps,
 			settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what, settings->feedback,
 			info->global_chain->enabled,info->uc->vims_mirror ) != 0)
@@ -1416,7 +1416,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 
 		mstatus = vj_macro_get_status( vj_tag_get_macro( info->uc->sample_id ));
 
-		if( vj_tag_sprint_status( info->uc->sample_id,tag_count,sample_count,cache_used,info->seq->size,seq_cur,info->real_fps,
+		if( vj_tag_sprint_status( info->uc->sample_id,tag_count,sample_count,cache_used,info->seq->active,seq_cur,info->real_fps,
 			settings->current_frame_num, info->uc->playback_mode,total_slots,info->seq->rec_id,curfps,
 			settings->cycle_count[0],settings->cycle_count[1],mstatus, info->status_what,
 			settings->feedback,info->global_chain->enabled, info->uc->vims_mirror ) != 0 )
