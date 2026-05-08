@@ -146,8 +146,10 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
                                 int bound_min, int bound_max,
                                 int steps, gboolean reverse)
 {
-    int min = 0, max = 0;
-    _effect_get_minmax(fx_id, &min, &max, parameter_id);
+    int param_min = 0;
+    int param_max = 0;
+
+    _effect_get_minmax(fx_id, &param_min, &param_max, parameter_id);
 
     int i, k;
     float ry = 0.0f;
@@ -165,14 +167,11 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
         bound_max = tmp;
     }
 
-    int diff = max - min;
+    int param_diff = param_max - param_min;
 
-    int min_b = ((diff / 100.0f) * bound_min) + min;
-    int max_b = ((diff / 100.0f) * bound_max) + min;
-
-    min = min_b;
-    max = max_b;
-    diff = max - min;
+    int shape_min = ((param_diff / 100.0f) * bound_min) + param_min;
+    int shape_max = ((param_diff / 100.0f) * bound_max) + param_min;
+    int shape_diff = shape_max - shape_min;
 
     int veclen1 = end - start;
 
@@ -184,22 +183,26 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
         return;
 
     int veclen = veclen1 - 1;
-    if(diff == 0) {
+
+    if(shape_diff == 0) {
         for(i = 0; i < veclen1; i++)
-            vec[i] = min;
+            vec[i] = shape_min;
 
         gtk3_curve_reset(curve);
+
         gtk3_curve_set_range(curve,
                              (gfloat) start,
                              (gfloat) end,
-                             (gfloat) min,
-                             (gfloat) max);
+                             (gfloat) param_min,
+                             (gfloat) param_max);
+
         gtk3_curve_set_grid_resolution(curve, 16);
         gtk3_curve_set_vector(curve, veclen1, vec);
         gtk3_curve_set_curve_type(curve, GTK3_CURVE_TYPE_LINEAR);
         gtk_widget_queue_draw(curve);
 
         curve_is_empty = 0;
+
         free(vec);
         return;
     }
@@ -207,7 +210,7 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
     switch(shape)
     {
         case FX_ANIM_SHAPE_ZIGZAG:
-            dy = diff / (float)(veclen1 - 1);
+            dy = shape_diff / (float)(veclen1 - 1);
             dy = dy * ((float)(steps << 1));
             break;
 
@@ -237,25 +240,25 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
             break;
 
         default:
-            dy = diff / (float)(veclen1 - 1);
+            dy = shape_diff / (float)(veclen1 - 1);
             break;
     }
 
     switch(shape)
     {
         case FX_ANIM_SHAPE_ZIGZAG:
-            for(i = start, k = 0, ry = min; i < end; i++, ry += dy, k++)
+            for(i = start, k = 0, ry = shape_min; i < end; i++, ry += dy, k++)
             {
                 vec[k] = ry;
 
                 if(dy > 0.0f) {
-                    if((ry + dy) > max) {
-                        ry = max + dy;
+                    if((ry + dy) > shape_max) {
+                        ry = shape_max + dy;
                         dy = -dy;
                     }
                 } else {
-                    if((ry + dy) < min) {
-                        ry = min + dy;
+                    if((ry + dy) < shape_min) {
+                        ry = shape_min + dy;
                         dy = -dy;
                     }
                 }
@@ -264,8 +267,8 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
 
         case FX_ANIM_SHAPE_SINE:
         {
-            float midpoint = (max + min) * 0.5f;
-            float radius = (max - min) * 0.5f;
+            float midpoint = (shape_max + shape_min) * 0.5f;
+            float radius = (shape_max - shape_min) * 0.5f;
             float frequency = (float) steps;
 
             for(i = start, k = 0; i < end; i++, k++) {
@@ -277,8 +280,8 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
 
         case FX_ANIM_SHAPE_COSINE:
         {
-            float midpoint = (max + min) * 0.5f;
-            float radius = (max - min) * 0.5f;
+            float midpoint = (shape_max + shape_min) * 0.5f;
+            float radius = (shape_max - shape_min) * 0.5f;
             float frequency = (float) steps;
 
             for(i = start, k = 0; i < end; i++, k++) {
@@ -295,7 +298,7 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
             for(i = start, k = 0; i < end; i++, k++) {
                 float progress = (float)(i - start) / (float) veclen;
                 float t = fmodf(progress * frequency, 1.0f);
-                vec[k] = min + diff * t;
+                vec[k] = shape_min + shape_diff * t;
             }
         }
         break;
@@ -308,7 +311,7 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
                 float progress = (float)(i - start) / (float) veclen;
                 float t = progress * frequency;
                 int phase = (int)(t * 2.0f);
-                vec[k] = (phase % 2 == 0) ? max : min;
+                vec[k] = (phase % 2 == 0) ? shape_max : shape_min;
             }
         }
         break;
@@ -322,7 +325,7 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
                 float t = fmodf(progress * frequency, 1.0f);
                 float b = fabsf(1.0f - 2.0f * t);
                 float bounce = 1.0f - (b * b);
-                vec[k] = min + diff * bounce;
+                vec[k] = shape_min + shape_diff * bounce;
             }
         }
         break;
@@ -330,7 +333,7 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
         case FX_ANIM_SHAPE_NOISE:
             for(i = start, k = 0; i < end; i++, k++) {
                 float random_factor = (float) rand() / (float) RAND_MAX;
-                vec[k] = min + (diff * random_factor);
+                vec[k] = shape_min + (shape_diff * random_factor);
             }
             break;
 
@@ -343,25 +346,25 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
                 float local_progress = fmodf(progress * frequency, 1.0f);
                 float smooth_factor = local_progress * local_progress *
                                       (3.0f - 2.0f * local_progress);
-                vec[k] = min + (diff * smooth_factor);
+                vec[k] = shape_min + (shape_diff * smooth_factor);
             }
         }
         break;
 
         case FX_ANIM_SHAPE_RANDOMWALK:
         {
-            float value = (min + max) * 0.5f;
-            float step_scale = diff * 0.05f;
+            float value = (shape_min + shape_max) * 0.5f;
+            float step_scale = shape_diff * 0.05f;
 
             for(i = start, k = 0; i < end; i++, k++) {
                 float step = ((float) rand() / RAND_MAX) - 0.5f;
                 value += step * step_scale;
 
-                if(value < min) value = min + (min - value);
-                if(value > max) value = max - (value - max);
+                if(value < shape_min) value = shape_min + (shape_min - value);
+                if(value > shape_max) value = shape_max - (value - shape_max);
 
-                if(value < min) value = min;
-                if(value > max) value = max;
+                if(value < shape_min) value = shape_min;
+                if(value > shape_max) value = shape_max;
 
                 vec[k] = value;
             }
@@ -370,9 +373,9 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
 
         case FX_ANIM_SHAPE_RANDOMWALK_INERTIA:
         {
-            float value = (min + max) * 0.5f;
+            float value = (shape_min + shape_max) * 0.5f;
             float velocity = 0.0f;
-            float accel_scale = diff * 0.02f;
+            float accel_scale = shape_diff * 0.02f;
             float damping = 0.90f;
 
             for(i = start, k = 0; i < end; i++, k++) {
@@ -382,13 +385,13 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
                 velocity *= damping;
                 value += velocity;
 
-                if(value < min) {
-                    value = min;
+                if(value < shape_min) {
+                    value = shape_min;
                     velocity *= -0.5f;
                 }
 
-                if(value > max) {
-                    value = max;
+                if(value > shape_max) {
+                    value = shape_max;
                     velocity *= -0.5f;
                 }
 
@@ -399,17 +402,17 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
 
         case FX_ANIM_SHAPE_RANDOMWALK_MEAN:
         {
-            float value = (min + max) * 0.5f;
+            float value = (shape_min + shape_max) * 0.5f;
             float mean = value;
-            float step_scale = diff * 0.04f;
+            float step_scale = shape_diff * 0.04f;
             float pull = 0.05f;
 
             for(i = start, k = 0; i < end; i++, k++) {
                 float noise = (((float) rand() / RAND_MAX) - 0.5f) * step_scale;
                 value += noise + (mean - value) * pull;
 
-                if(value < min) value = min;
-                if(value > max) value = max;
+                if(value < shape_min) value = shape_min;
+                if(value > shape_max) value = shape_max;
 
                 vec[k] = value;
             }
@@ -418,24 +421,24 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
 
         case FX_ANIM_SHAPE_RANDOMWALK_QUANTIZED:
         {
-            float value = (min + max) * 0.5f;
-            float step_scale = diff * 0.05f;
+            float value = (shape_min + shape_max) * 0.5f;
+            float step_scale = shape_diff * 0.05f;
             int levels = 8;
 
             for(i = start, k = 0; i < end; i++, k++) {
                 float step = (((float) rand() / RAND_MAX) - 0.5f) * step_scale;
                 value += step;
 
-                if(value < min) value = min;
-                if(value > max) value = max;
+                if(value < shape_min) value = shape_min;
+                if(value > shape_max) value = shape_max;
 
-                float norm = (value - min) / (float) diff;
+                float norm = (value - shape_min) / (float) shape_diff;
                 norm = floorf(norm * levels) / (float)(levels - 1);
 
-                value = min + norm * diff;
+                value = shape_min + norm * shape_diff;
 
-                if(value < min) value = min;
-                if(value > max) value = max;
+                if(value < shape_min) value = shape_min;
+                if(value > shape_max) value = shape_max;
 
                 vec[k] = value;
             }
@@ -444,9 +447,9 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
 
         case FX_ANIM_SHAPE_RANDOMWALK_BURST:
         {
-            float value = (min + max) * 0.5f;
-            float small_step = diff * 0.01f;
-            float big_step = diff * 0.8f;
+            float value = (shape_min + shape_max) * 0.5f;
+            float small_step = shape_diff * 0.01f;
+            float big_step = shape_diff * 0.8f;
             int desired_bursts = steps > 0 ? steps : 3;
             float burst_prob = (float) desired_bursts / (float) veclen;
 
@@ -461,8 +464,8 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
 
                 value += step;
 
-                if(value < min) value = min;
-                if(value > max) value = max;
+                if(value < shape_min) value = shape_min;
+                if(value > shape_max) value = shape_max;
 
                 vec[k] = value;
             }
@@ -471,8 +474,8 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
 
         case FX_ANIM_SHAPE_RANDOMWALK_SMOOTH:
         {
-            float value = (min + max) * 0.5f;
-            float step_scale = diff * 0.05f;
+            float value = (shape_min + shape_max) * 0.5f;
+            float step_scale = shape_diff * 0.05f;
             float smooth = 0.85f;
 
             for(i = start, k = 0; i < end; i++, k++) {
@@ -481,8 +484,8 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
 
                 value = value * smooth + target * (1.0f - smooth);
 
-                if(value < min) value = min;
-                if(value > max) value = max;
+                if(value < shape_min) value = shape_min;
+                if(value > shape_max) value = shape_max;
 
                 vec[k] = value;
             }
@@ -502,7 +505,7 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
                 float g0 = expf(-0.5f * (0.5f / sigma) * (0.5f / sigma));
                 float normalized = (g - g0) / (1.0f - g0);
 
-                vec[k] = min + diff * normalized;
+                vec[k] = shape_min + shape_diff * normalized;
             }
         }
         break;
@@ -516,7 +519,7 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
                 float progress = (float)(i - start) / (float) veclen;
                 float t = fmodf(progress * frequency, 1.0f);
                 float expv = (expf(4.0f * t) - 1.0f) / denom;
-                vec[k] = min + diff * expv;
+                vec[k] = shape_min + shape_diff * expv;
             }
         }
         break;
@@ -525,7 +528,7 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
             for(i = start, k = 0; i < end; i++, k++) {
                 float t = (float)(i - start) / (float) veclen;
                 float v = t * t;
-                vec[k] = min + diff * v;
+                vec[k] = shape_min + shape_diff * v;
             }
             break;
 
@@ -533,7 +536,7 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
             for(i = start, k = 0; i < end; i++, k++) {
                 float t = (float)(i - start) / (float) veclen;
                 float v = 1.0f - (1.0f - t) * (1.0f - t);
-                vec[k] = min + diff * v;
+                vec[k] = shape_min + shape_diff * v;
             }
             break;
 
@@ -544,15 +547,15 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
 
             for(i = start, k = 0; i < end; i++, k++) {
                 float t = fmodf(((float)(i - start) / (float) veclen) * frequency, 1.0f);
-                vec[k] = (t < duty) ? max : min;
+                vec[k] = (t < duty) ? shape_max : shape_min;
             }
         }
         break;
 
         case FX_ANIM_SHAPE_DAMPED_SINE:
         {
-            float midpoint = (max + min) * 0.5f;
-            float radius = (max - min) * 0.5f;
+            float midpoint = (shape_max + shape_min) * 0.5f;
+            float radius = (shape_max - shape_min) * 0.5f;
             float frequency = (float) steps;
             float damping = 3.0f;
 
@@ -567,11 +570,11 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
 
         case FX_ANIM_SHAPE_SMOOTH_NOISE:
         {
-            float last = (min + max) * 0.5f;
+            float last = (shape_min + shape_max) * 0.5f;
 
             for(i = start, k = 0; i < end; i++, k++) {
                 float rnd = (float) rand() / (float) RAND_MAX;
-                float target = min + diff * rnd;
+                float target = shape_min + shape_diff * rnd;
                 last = last * 0.85f + target * 0.15f;
                 vec[k] = last;
             }
@@ -585,7 +588,7 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
             for(i = start, k = 0; i < end; i++, k++) {
                 float t = (float)(i - start) / (float) veclen;
                 float q = floorf(t * levels) / (float)(levels - 1);
-                vec[k] = min + diff * q;
+                vec[k] = shape_min + shape_diff * q;
             }
         }
         break;
@@ -599,7 +602,7 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
                 float progress = (float)(i - start) / (float) veclen;
                 float t = fmodf(progress * frequency, 1.0f);
                 float v = (expf(4.0f * t) - 1.0f) / denom;
-                vec[k] = min + diff * v;
+                vec[k] = shape_min + shape_diff * v;
             }
         }
         break;
@@ -620,24 +623,24 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
                     v = expf(-5.0f * d);
                 }
 
-                vec[k] = min + diff * v;
+                vec[k] = shape_min + shape_diff * v;
             }
         }
         break;
 
         default:
-            for(i = start, k = 0, ry = min; i < end; i++, ry += dy, k++) {
+            for(i = start, k = 0, ry = shape_min; i < end; i++, ry += dy, k++) {
                 vec[k] = ry;
 
-                if(vec[k] < min) vec[k] = min;
-                if(vec[k] > max) vec[k] = max;
+                if(vec[k] < shape_min) vec[k] = shape_min;
+                if(vec[k] > shape_max) vec[k] = shape_max;
             }
             break;
     }
 
     if(reverse) {
         for(i = start, k = 0; i < end; i++, k++) {
-            vec[k] = max - vec[k] + min;
+            vec[k] = shape_max - vec[k] + shape_min;
         }
     }
 
@@ -656,8 +659,8 @@ void curve_set_predifined_shape(GtkWidget *curve, int fx_id, int parameter_id,
     gtk3_curve_set_range(curve,
                          (gfloat) start,
                          (gfloat) end,
-                         (gfloat) min,
-                         (gfloat) max);
+                         (gfloat) param_min,
+                         (gfloat) param_max);
 
     gtk3_curve_set_grid_resolution(curve, 16);
 
