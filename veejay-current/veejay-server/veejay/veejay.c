@@ -340,6 +340,10 @@ static void Usage(char *progname)
    	fprintf(stderr,
 		"  -r/--audiorate <num>\t\tSet audio rate (defaults to 48Khz)\n");
 	fprintf(stderr,
+		"     --audio-channels <num>\tSet dummy audio channels (default from dummy/sample config)\n");
+	fprintf(stderr,
+		"     --audio-bits <num>\t\tSet dummy audio bits per sample\n");
+	fprintf(stderr,
 	    "  -I/--deinterlace\t\tDeinterlace video if it is interlaced\n");    
 	fprintf(stderr,
 		"  -N/--norm <num>\t\tSet video norm [0=PAL, 1=NTSC, 2=SECAM (defaults to PAL)]\n");
@@ -503,6 +507,13 @@ static int set_option(const char *name, char *value)
 	}else if (strcmp(name, "sample-file")==0 || strcmp(name,"l")==0) {
 		check_val(optarg,name);
 		veejay_strncpy(info->action_file[1],(char*) optarg, strlen( (char*) optarg));
+
+		if(!sample_readInfoFromSampleFile(info->action_file[1], &(info->dummy->width), &(info->dummy->height),
+			&(info->dummy->fps), &(info->dummy->arate), &(info->dummy->achans), &(info->dummy->abits), &(info->dummy->abps))) {
+				fprintf(stderr, "Failed to load %s\n", info->action_file[1]);
+				exit(1);
+			}
+
 		info->load_sample_file = 1;
 	}
 	else if (strcmp(name, "master") == 0 || strcmp(name, "K") == 0) {
@@ -573,7 +584,23 @@ static int set_option(const char *name, char *value)
 	{
 		info->dummy->arate = atoi(optarg);
 	}
-    	else if (strcmp(name,"fps")==0 || strcmp(name, "f")==0) {
+	else if(strcmp(name, "audio-channels") == 0 )
+	{
+		info->dummy->achans = atoi(optarg);
+		if(info->dummy->achans <= 0) {
+			fprintf(stderr, "Audio channels must be greater than zero\n");
+			nerr++;
+		}
+	}
+	else if(strcmp(name, "audio-bits") == 0 )
+	{
+		info->dummy->abits = atoi(optarg);
+		if(info->dummy->abits <= 0) {
+			fprintf(stderr, "Audio bits must be greater than zero\n");
+			nerr++;
+		}
+	}
+    else if (strcmp(name,"fps")==0 || strcmp(name, "f")==0) {
 		override_fps = atof(optarg);
 	}
 	else if(strcmp(name,"yuv")==0 || strcmp(name,"Y")==0)
@@ -676,6 +703,8 @@ static int check_command_line_options(int argc, char *argv[])
 	{"output-height", 1,0,0 },
 	{"norm",1,0,0},
 	{"audiorate",1,0,0},
+	{"audio-channels",1,0,0},
+	{"audio-bits",1,0,0},
 	{"yuv",1,0,0},
 	{"multicast-osc",1,0,0},
 	{"multicast-vims",1,0,0},

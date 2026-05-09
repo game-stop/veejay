@@ -104,6 +104,9 @@ typedef struct
 	float fps;
 	int active;
 	long arate;
+	int  achans;
+	int  abits;
+	int  abps;
 } dummy_t;
 
 typedef struct

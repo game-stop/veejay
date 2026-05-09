@@ -3193,6 +3193,56 @@ static xmlDocPtr read_xml_with_retry(const char *path)
     return NULL;
 }
 
+
+int sample_readInfoFromSampleFile(char *sampleFile, int *video_wid, int *video_hei, float *fps, int *arate, int *achans, int *abits, int *abps )
+{
+    xmlDocPtr doc;
+    xmlNodePtr cur;
+    sample_info *skel;
+
+    doc = read_xml_with_retry(sampleFile);
+    if (!doc) return 0;
+
+    cur = xmlDocGetRootElement(doc);
+    if (cur == NULL) {
+        veejay_msg(VEEJAY_MSG_ERROR,"Empty samplelist. Nothing to do.\n");
+        xmlFreeDoc(doc);
+        return 0;
+    }
+
+    if (xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLES)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "This is not a samplelist: %s", XMLTAG_SAMPLES);
+        xmlFreeDoc(doc);
+        return 0;
+    }
+
+    cur = cur->xmlChildrenNode;
+
+    while (cur != NULL)
+    {
+
+        if(!xmlStrcmp(cur->name, (const xmlChar *) "video_width")) {
+            *video_wid = get_xml_int(doc,cur);
+        } else if(!xmlStrcmp(cur->name, (const xmlChar *) "video_height")) {
+            *video_hei = get_xml_int(doc,cur);
+        } else if(!xmlStrcmp(cur->name, (const xmlChar *) "video_fps")) {
+            *fps = get_xml_float(doc,cur);
+        } else if(!xmlStrcmp(cur->name, (const xmlChar *) "audio_rate")) {
+            *arate = get_xml_int(doc,cur);
+        } else if(!xmlStrcmp(cur->name, (const xmlChar *) "audio_channels")) {
+            *achans = get_xml_int(doc,cur);
+        } else if(!xmlStrcmp(cur->name, (const xmlChar *) "audio_bits")) {
+            *abits = get_xml_int(doc,cur);
+        }
+        cur = cur->next;
+    }
+
+    *abps = *achans * (*abits / 8);
+
+    xmlFreeDoc(doc);
+    return 1;
+}
+
 int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void *el, int *id, int *mode, SampleLoadMode load_mode)
 {
     xmlDocPtr doc;
@@ -3529,6 +3579,13 @@ int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id,
         put_xml_str( rootnode, "server_origin", veejay_info->server_origin );
         put_xml_int( rootnode, "server_port", veejay_info->uc->port);
     }
+
+    put_xml_int( rootnode, "video_width", veejay_info->edit_list->video_width);
+    put_xml_int( rootnode, "video_height", veejay_info->edit_list->video_height);
+    put_xml_float( rootnode, "video_fps", veejay_info->edit_list->video_fps);
+    put_xml_int( rootnode, "audio_rate", veejay_info->edit_list->audio_rate);
+    put_xml_int( rootnode, "audio_channels", veejay_info->edit_list->audio_chans);
+    put_xml_int( rootnode, "audio_bits", veejay_info->edit_list->audio_bits);
 
     childnode = xmlNewChild( rootnode, NULL,(const xmlChar*) "SEQUENCE", NULL );
     SaveSequences( childnode, seq );

@@ -214,6 +214,7 @@ extern int sample_verify();
 extern int sample_init(int len, void *font, editlist *el,void *info);
 extern int sample_update(sample_info *sample, int s1);
 #ifdef HAVE_XML2
+extern int sample_readInfoFromSampleFile(char *sampleFile, int *video_wid, int *video_hei, float *fps, int *arate, int *achans, int *abits, int *abps );
 extern int sample_readFromFile(char *, void *vp, void *ptr, void *font, void *el, int *id, int *mode,SampleLoadMode load_mode);
 extern int sample_writeToFile(char *, void *vp, void *ptr, void *font, int id, int mode);
 extern void sample_watch_list(void);

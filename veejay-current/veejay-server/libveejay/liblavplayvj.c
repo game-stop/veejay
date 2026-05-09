@@ -4162,9 +4162,9 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 			editlist *el = info->plain_editlist;
 			el->has_audio = 1;
 			el->audio_rate = info->dummy->arate;
-			el->audio_chans = 2;
-			el->audio_bits = 16;
-			el->audio_bps = 4;
+			el->audio_chans = info->dummy->achans;
+			el->audio_bits = info->dummy->abits;
+			el->audio_bps = info->dummy->abps;
 			veejay_msg(VEEJAY_MSG_DEBUG, "Dummy Audio: %f KHz, %d channels, %d bps, %d bit audio",
 				(float)el->audio_rate/1000.0,el->audio_chans,el->audio_bps,el->audio_bits);
 		}
@@ -4211,108 +4211,153 @@ static int configure_dummy_defaults(veejay_t *info, char override_norm, float fp
 {
 	int default_dw = 720;
 	int default_dh = (override_norm == 'n' ? 480 : 576);
-	int default_norm = (override_norm == '\0' ? VIDEO_MODE_PAL : veejay_get_norm( override_norm ) );
+	int default_norm = (override_norm == '\0' ? VIDEO_MODE_PAL : veejay_get_norm(override_norm));
 	float default_fps = vj_el_get_default_framerate(default_norm);
-	
-	if( has_env_setting( "VEEJAY_RUN_MODE", "CLASSIC" ) ) {
-	       default_dw = (default_norm == VIDEO_MODE_PAL || default_norm == VIDEO_MODE_SECAM ? 352 : 360 );
-	       default_dh = (default_norm == VIDEO_MODE_PAL || default_norm == VIDEO_MODE_SECAM ? 288 : 240 );
-		   info->settings->fxdepth = 0;
+
+	if(has_env_setting("VEEJAY_RUN_MODE", "CLASSIC")) {
+		default_dw = (default_norm == VIDEO_MODE_PAL || default_norm == VIDEO_MODE_SECAM ? 352 : 360);
+		default_dh = (default_norm == VIDEO_MODE_PAL || default_norm == VIDEO_MODE_SECAM ? 288 : 240);
+		info->settings->fxdepth = 0;
 	}
 
 	int dw = default_dw;
 	int dh = default_dh;
 
-	float dfps = (fps <= 0.0f ? default_fps : fps );
+	float dfps = (fps <= 0.0f ? default_fps : fps);
 	float tmp_fps = 0.0f;
 	long tmp_arate = 0;
 
-	if( n_files > 0  ) {
-		int in_w = 0, in_h = 0;
+	if(n_files > 0) {
+		int in_w = 0;
+		int in_h = 0;
 
-		vj_el_scan_video_file( files[0], &in_w, &in_h, &tmp_fps, &tmp_arate );
+		vj_el_scan_video_file(files[0], &in_w, &in_h, &tmp_fps, &tmp_arate);
 
-		if( in_w <= 0 || in_h <= 0 ) {
-			veejay_msg(VEEJAY_MSG_WARNING, "Unable to determine video properties" );
-		}
-
-		if(info->video_output_width<=0)
-			dw = in_w;
-		if(info->video_output_height<=0)
-			dh = in_h;
-		
-		if( tmp_fps > 0.0f && fps == 0 ) 
-			dfps = tmp_fps;
-
-		if( dw == default_dw && in_w > 0 )
-			dw = in_w;
-		if( dh == default_dh && in_h > 0 )
-			dh = in_h;
-
-		default_norm = (override_norm == '\0' ? veejay_get_norm(vj_el_get_default_norm(tmp_fps)) : veejay_get_norm(override_norm));
-        
-		//dw = (dw / 8) * 8;
-        //dh = (dh / 8) * 8;
-
-		veejay_msg(VEEJAY_MSG_DEBUG, "Video input source is: %dx%d %2.2f fps norm %d",in_w,in_h,tmp_fps, default_norm);
-
-		if( in_w <= 0 || in_h <= 0) {
+		if(in_w <= 0 || in_h <= 0) {
+			veejay_msg(VEEJAY_MSG_WARNING, "Unable to determine video properties");
 			return 0;
 		}
 
-	} 
+		if(info->video_output_width <= 0)
+			dw = in_w;
+		if(info->video_output_height <= 0)
+			dh = in_h;
 
-	if( info->video_output_width <= 0 ) 
-		info->video_output_width = dw;
-	else
-		dw = info->video_output_width;
+		if(tmp_fps > 0.0f && fps == 0.0f)
+			dfps = tmp_fps;
 
-	if( info->video_output_height <= 0 ) 
-		info->video_output_height = dh;
-	else
-		dh = info->video_output_height;
-	
-	lav_set_project( dw, dh, dfps, info->pixel_format);	
-	
-	if( override_norm != '\0' ) {
-		info->dummy->norm = override_norm;
-	} else {
-		info->dummy->norm = vj_el_get_default_norm( dfps );
+		if(dw == default_dw && in_w > 0)
+			dw = in_w;
+		if(dh == default_dh && in_h > 0)
+			dh = in_h;
+
+		default_norm = (override_norm == '\0' ? veejay_get_norm(vj_el_get_default_norm(tmp_fps)) :
+			veejay_get_norm(override_norm));
+
+		veejay_msg(VEEJAY_MSG_DEBUG, "Video input source is: %dx%d %2.2f fps norm %d",
+			in_w, in_h, tmp_fps, default_norm);
 	}
 
-	if( info->dummy->width <= 0 )
-		info->dummy->width  = dw;
-	if( info->dummy->height <= 0)
+	if(info->video_output_width <= 0) {
+		if(info->dummy->width > 0)
+			info->video_output_width = info->dummy->width;
+		else
+			info->video_output_width = dw;
+	} else {
+		dw = info->video_output_width;
+	}
+
+	if(info->video_output_height <= 0) {
+		if(info->dummy->height > 0)
+			info->video_output_height = info->dummy->height;
+		else
+			info->video_output_height = dh;
+	} else {
+		dh = info->video_output_height;
+	}
+
+	dw = info->video_output_width;
+	dh = info->video_output_height;
+
+	if(info->dummy->norm == '\0') {
+		if(override_norm != '\0')
+			info->dummy->norm = override_norm;
+		else
+			info->dummy->norm = vj_el_get_default_norm(dfps);
+	}
+
+	if(info->dummy->width <= 0)
+		info->dummy->width = dw;
+
+	if(info->dummy->height <= 0)
 		info->dummy->height = dh;
-	if( info->dummy->fps <= 0.0f)
+
+	if(info->dummy->fps <= 0.0f)
 		info->dummy->fps = dfps;
-	
-	info->dummy->chroma = get_chroma_from_pixfmt( vj_to_pixfmt( info->pixel_format ) );
+
+	dfps = info->dummy->fps;
+
+	lav_set_project(dw, dh, dfps, info->pixel_format);
+
+	info->dummy->chroma = get_chroma_from_pixfmt(vj_to_pixfmt(info->pixel_format));
 	info->settings->output_fps = dfps;
 
-	if( n_files <= 0 ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "Dummy source is: %dx%d %2.2f fps norm %d",dw,dh,dfps, info->dummy->norm );
-	}
-
-	if( info->audio ) {
-
-		if( tmp_arate > 0 && info->audio == AUDIO_PLAY && fps > 0.0f) {
-			/* just warn if user customizes framerate */
-			veejay_msg(VEEJAY_MSG_WARNING, "Going to run with user specified FPS. This will affect audio playback");
-			veejay_msg(VEEJAY_MSG_WARNING, "Specify -a0 to start without audio playback");
+	if(info->audio) {
+		if(tmp_arate > 0 && info->audio == AUDIO_PLAY && fps > 0.0f) {
+			veejay_msg(VEEJAY_MSG_WARNING,"Going to run with user specified FPS. This will affect audio playback");
+			veejay_msg(VEEJAY_MSG_WARNING,"Specify -a0 to start without audio playback");
 		}
 
-		if( tmp_arate == 0 && info->audio == AUDIO_PLAY ) {
-			tmp_arate = 48000;
-			veejay_msg(VEEJAY_MSG_WARNING, "Defaulting to 48Khz audio");
+		if(info->dummy->arate <= 0) {
+			if(tmp_arate > 0) {
+				info->dummy->arate = tmp_arate;
+			} else {
+				info->dummy->arate = 48000;
+				veejay_msg(VEEJAY_MSG_WARNING, "Defaulting to 48Khz audio");
+			}
 		}
 
-		if( info->dummy->arate <= 0)
-			info->dummy->arate = tmp_arate;
+		if(info->dummy->achans <= 0)
+			info->dummy->achans = 2;
 
+		if(info->dummy->abits <= 0)
+			info->dummy->abits = 16;
+
+		if(info->dummy->abps <= 0) {
+			if((info->dummy->abits % 8) != 0) {
+				veejay_msg(VEEJAY_MSG_ERROR,"Audio bits must be byte-aligned, got %d",
+					info->dummy->abits);
+				return 0;
+			}
+
+			info->dummy->abps = info->dummy->achans * (info->dummy->abits / 8);
+		}
 	}
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Video output is %dx%d pixels, %2.2f fps", info->video_output_width, info->video_output_height, dfps );
+	if(n_files <= 0) {
+		veejay_msg(VEEJAY_MSG_DEBUG,
+			"Dummy source is: %dx%d %2.2f fps norm %d",
+			info->dummy->width,
+			info->dummy->height,
+			info->dummy->fps,
+			info->dummy->norm);
+	}
+
+	if(info->audio) {
+		veejay_msg(VEEJAY_MSG_DEBUG,
+			"Dummy audio is: %ld Hz, %d channels, %d bits, %d bytes/sample-frame",
+			info->dummy->arate,
+			info->dummy->achans,
+			info->dummy->abits,
+			info->dummy->abps);
+	}
+
+	veejay_msg(VEEJAY_MSG_DEBUG,
+		"Video output is %dx%d pixels, %2.2f fps",
+		info->video_output_width,
+		info->video_output_height,
+		dfps);
+
 	return 1;
 }
 
