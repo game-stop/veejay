@@ -17,7 +17,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include <math.h>
@@ -61,12 +60,11 @@ static void generate_geometry(box_escherdroste_t *t) {
             float dx = (x - cx) / cx;
             float dy = (y - cy) / cy;
 
-            float r = fmaxf(sqrtf(dx*dx + dy*dy), 1e-6f);
+            float r = fmaxf(sqrtf(dx * dx + dy * dy), 1e-6f);
             float theta = atan2f(dy, dx);
 
             t->v_lut[i] = (int)(logf(r) * FP_ONE);
             t->u_lut[i] = (int)(theta * FP_ONE);
-
 
             float dist_rect = fmaxf(fabsf(dx), fabsf(dy));
             t->v_lut_rect[i] = (int)(dist_rect * FP_ONE);
@@ -78,87 +76,115 @@ static void generate_geometry(box_escherdroste_t *t) {
 vj_effect *escherdroste_init(int width, int height) {
     vj_effect *ve = (vj_effect*) vj_calloc(sizeof(vj_effect));
     ve->num_params = 9;
-    ve->defaults = (int*) vj_calloc(sizeof(int)*ve->num_params);
-    ve->limits[0] = (int*) vj_calloc(sizeof(int)*ve->num_params);
-    ve->limits[1] = (int*) vj_calloc(sizeof(int)*ve->num_params);
+    ve->defaults = (int*) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int*) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int*) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->defaults[0]=1; 
-    ve->defaults[1]=256;
-    ve->defaults[2]=1;
-    ve->defaults[3]=0;
-    ve->defaults[4]=1;
-    ve->defaults[5]=60;
-    ve->defaults[6]=100;
-    ve->defaults[7]=1;
-    ve->defaults[8]=1;
+    ve->defaults[0] = 1;
+    ve->defaults[1] = 256;
+    ve->defaults[2] = 1;
+    ve->defaults[3] = 0;
+    ve->defaults[4] = 1;
+    ve->defaults[5] = 60;
+    ve->defaults[6] = 100;
+    ve->defaults[7] = 1;
+    ve->defaults[8] = 1;
 
-    ve->limits[0][0]=-100; ve->limits[1][0]=100;  // Speed
-    ve->limits[0][1]=2;    ve->limits[1][1]=500;  // Scale Factor
-    ve->limits[0][2]=1;    ve->limits[1][2]=20;   // Branches
-    ve->limits[0][3]=-100; ve->limits[1][3]=100;  // Swirl
-    ve->limits[0][4]=-100; ve->limits[1][4]=100;  // Rot Speed
-    ve->limits[0][5]=0;    ve->limits[1][5]=100;  // Feedback
-    ve->limits[0][6]=-300;  ve->limits[1][6]=300; // Pitch
-    ve->limits[0][7]=0;    ve->limits[1][7]=1;    // HQ
-    ve->limits[0][8]=0;    ve->limits[1][8]=2;    // Vortex , Pinhole or Rect
+    ve->limits[0][0] = -100; ve->limits[1][0] = 100;
+    ve->limits[0][1] = 2;    ve->limits[1][1] = 500;
+    ve->limits[0][2] = 1;    ve->limits[1][2] = 20;
+    ve->limits[0][3] = -100; ve->limits[1][3] = 100;
+    ve->limits[0][4] = -100; ve->limits[1][4] = 100;
+    ve->limits[0][5] = 0;    ve->limits[1][5] = 100;
+    ve->limits[0][6] = -300; ve->limits[1][6] = 300;
+    ve->limits[0][7] = 0;    ve->limits[1][7] = 1;
+    ve->limits[0][8] = 0;    ve->limits[1][8] = 2;
+
     ve->description = "Escher Droste";
     ve->sub_format = 1;
-    ve->param_description = vje_build_param_list(ve->num_params, 
-        "Speed", "Scale Factor", "Branches", "Swirl", "Rot Speed", "Feedback","Pitch", "High Quality", "Mode");
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Speed",
+        "Scale Factor",
+        "Branches",
+        "Swirl",
+        "Rot Speed",
+        "Feedback",
+        "Pitch",
+        "High Quality",
+        "Mode"
+    );
+
     return ve;
 }
 
 void *escherdroste_malloc(int width, int height) {
     box_escherdroste_t *t = (box_escherdroste_t*) vj_calloc(sizeof(box_escherdroste_t));
-    if(!t) return NULL;
+    if (!t) return NULL;
 
-    t->width = width; t->height = height;
+    t->width = width;
+    t->height = height;
+
     int size = width * height;
 
     t->u_lut = (int*) vj_malloc(sizeof(int) * size * 4);
+    if (!t->u_lut) {
+        free(t);
+        return NULL;
+    }
+
     t->v_lut = t->u_lut + size;
     t->u_lut_rect = t->v_lut + size;
     t->v_lut_rect = t->u_lut_rect + size;
 
-    t->histY = (int*) vj_calloc(sizeof(int) * size * 3); 
+    t->histY = (int*) vj_calloc(sizeof(int) * size * 3);
+    if (!t->histY) {
+        free(t->u_lut);
+        free(t);
+        return NULL;
+    }
+
     t->histU = t->histY + size;
     t->histV = t->histU + size;
 
     t->dstY = (uint8_t*) vj_malloc(size * 3);
+    if (!t->dstY) {
+        free(t->histY);
+        free(t->u_lut);
+        free(t);
+        return NULL;
+    }
+
     t->dstU = t->dstY + size;
     t->dstV = t->dstU + size;
 
-    for(int i = 0; i < GAMMA_LUT_SIZE; i++) {
-        float val = (float)i / (GAMMA_LUT_SIZE - 1);
+    for (int i = 0; i < GAMMA_LUT_SIZE; i++) {
+        float val = (float)i / (float)(GAMMA_LUT_SIZE - 1);
         t->gamma_lut[i] = clamp_u8(powf(val, 0.85f) * 255.0f);
     }
 
     t->n_threads = vje_advise_num_threads(size);
-    generate_geometry(t); 
+    generate_geometry(t);
 
     return t;
 }
 
-static inline int32_t sample_bilinear(const uint8_t *buf, int32_t u_fp, int32_t v_fp, int w, int h)
-{
+static inline int32_t sample_bilinear(const uint8_t *buf, int32_t u_fp, int32_t v_fp, int w, int h) {
     int32_t u = u_fp & (FP_ONE - 1);
     int32_t v = v_fp & (FP_ONE - 1);
 
-    int32_t xf = (int64_t)u * (w - 1);
-    int32_t yf = (int64_t)v * (h - 1);
+    int32_t xf = (int32_t)(((int64_t)u * (w - 1)) >> FP_SHIFT);
+    int32_t yf = (int32_t)(((int64_t)v * (h - 1)) >> FP_SHIFT);
 
-    int x = xf >> FP_SHIFT;
-    int y = yf >> FP_SHIFT;
+    int32_t fx = (int32_t)(((int64_t)u * (w - 1)) & (FP_ONE - 1));
+    int32_t fy = (int32_t)(((int64_t)v * (h - 1)) & (FP_ONE - 1));
 
-    int32_t fx = xf & (FP_ONE - 1);
-    int32_t fy = yf & (FP_ONE - 1);
+    int x1 = (xf + 1 >= w) ? 0 : xf + 1;
+    int y1 = (yf + 1 >= h) ? 0 : yf + 1;
 
-    int x1 = (x + 1 >= w) ? 0 : x + 1;
-    int y1 = (y + 1 >= h) ? 0 : y + 1;
-
-    int p00 = buf[y * w + x];
-    int p10 = buf[y * w + x1];
-    int p01 = buf[y1 * w + x];
+    int p00 = buf[yf * w + xf];
+    int p10 = buf[yf * w + x1];
+    int p01 = buf[y1 * w + xf];
     int p11 = buf[y1 * w + x1];
 
     int64_t w00 = (int64_t)(FP_ONE - fx) * (FP_ONE - fy);
@@ -166,68 +192,62 @@ static inline int32_t sample_bilinear(const uint8_t *buf, int32_t u_fp, int32_t 
     int64_t w01 = (int64_t)(FP_ONE - fx) * fy;
     int64_t w11 = (int64_t)fx * fy;
 
-    int64_t sum = w00 * p00 + w10 * p10 + w01 * p01 + w11 * p11;
-
-    return (int32_t)(sum >> (FP_SHIFT * 2));
+    return (int32_t)((w00 * p00 + w10 * p10 + w01 * p01 + w11 * p11) >> (FP_SHIFT * 2));
 }
 
-static inline int32_t sample_bilinear_uv(const uint8_t *buf, int32_t u_fp, int32_t v_fp, int w, int h)
-{
+static inline int32_t sample_bilinear_uv(const uint8_t *buf, int32_t u_fp, int32_t v_fp, int w, int h) {
     int32_t u = u_fp & (FP_ONE - 1);
     int32_t v = v_fp & (FP_ONE - 1);
 
-    int32_t xf = (int64_t)u * (w - 1);
-    int32_t yf = (int64_t)v * (h - 1);
+    int32_t xf = (int32_t)(((int64_t)u * (w - 1)) >> FP_SHIFT);
+    int32_t yf = (int32_t)(((int64_t)v * (h - 1)) >> FP_SHIFT);
 
-    int x = xf >> FP_SHIFT;
-    int y = yf >> FP_SHIFT;
+    int32_t fx = (int32_t)(((int64_t)u * (w - 1)) & (FP_ONE - 1));
+    int32_t fy = (int32_t)(((int64_t)v * (h - 1)) & (FP_ONE - 1));
 
-    int32_t fx = xf & (FP_ONE - 1);
-    int32_t fy = yf & (FP_ONE - 1);
+    int x1 = (xf + 1 >= w) ? 0 : xf + 1;
+    int y1 = (yf + 1 >= h) ? 0 : yf + 1;
 
-    int x1 = (x + 1 >= w) ? 0 : x + 1;
-    int y1 = (y + 1 >= h) ? 0 : y + 1;
-
-    int p00 = buf[y * w + x]  - 128;
-    int p10 = buf[y * w + x1] - 128;
-    int p01 = buf[y1 * w + x] - 128;
-    int p11 = buf[y1 * w + x1]- 128;
+    int p00 = buf[yf * w + xf] - 128;
+    int p10 = buf[yf * w + x1] - 128;
+    int p01 = buf[y1 * w + xf] - 128;
+    int p11 = buf[y1 * w + x1] - 128;
 
     int64_t w00 = (int64_t)(FP_ONE - fx) * (FP_ONE - fy);
     int64_t w10 = (int64_t)fx * (FP_ONE - fy);
     int64_t w01 = (int64_t)(FP_ONE - fx) * fy;
     int64_t w11 = (int64_t)fx * fy;
 
-    int64_t sum = w00 * p00 + w10 * p10 + w01 * p01 + w11 * p11;
-
-    return (int32_t)(sum >> (FP_SHIFT * 2));
+    return (int32_t)((w00 * p00 + w10 * p10 + w01 * p01 + w11 * p11) >> (FP_SHIFT * 2));
 }
 
-void escherdroste_free(void *ptr){
-    box_escherdroste_t *t = (box_escherdroste_t*)ptr;
+void escherdroste_free(void *ptr) {
+    box_escherdroste_t *t = (box_escherdroste_t*) ptr;
     if (!t) return;
+
     free(t->u_lut);
     free(t->histY);
     free(t->dstY);
     free(t);
 }
 
-
 static void escherdroste_apply1(void *ptr, VJFrame *frame, int *args) {
-    box_escherdroste_t *t = (box_escherdroste_t*)ptr;
-    int w = t->width, h = t->height, size = w * h;
+    box_escherdroste_t *t = (box_escherdroste_t*) ptr;
+    int w = t->width;
+    int h = t->height;
+    int size = w * h;
 
-    t->time += args[0] * 0.0025f; 
+    t->time += args[0] * 0.0025f;
     t->phase += args[4] * 0.00125f;
 
-    const float branches = (float)args[2];
+    const float branches = (float) args[2];
     const float swirl = args[3] * 0.01f;
-    const int use_high_quality = (args[7] == 1);
+    const int use_high_quality = args[7] == 1;
 
-    const float zoom_intensity = 0.8f + ((float)args[1] / 500.0f) * 12.0f;
-    const float factor = branches / zoom_intensity; 
+    const float zoom_intensity = 0.8f + ((float) args[1] / 500.0f) * 12.0f;
+    const float factor = branches / zoom_intensity;
     const float inv_2pi = 0.15915494f;
-    const float pitch = (float)args[6] * 0.01f;
+    const float pitch = (float) args[6] * 0.01f;
 
     const int32_t fb_fp = TO_FP(args[5] * 0.01f);
     const int32_t current_inv_fb = FP_ONE - fb_fp;
@@ -244,7 +264,7 @@ static void escherdroste_apply1(void *ptr, VJFrame *frame, int *args) {
         float edge_u = FROM_FP(t->u_lut[i]);
 
         float base_v = dist_rect * factor;
-        float base_u = edge_u * inv_2pi * branches;
+        float base_u = (edge_u * inv_2pi * branches) - (dist_rect * factor * pitch);
 
         float v_val_f = base_v + t->time;
         float u_val_f = base_u + t->phase + (swirl * dist_rect);
@@ -252,20 +272,24 @@ static void escherdroste_apply1(void *ptr, VJFrame *frame, int *args) {
         int32_t u_fp = (int32_t)(u_val_f * 65536.0f);
         int32_t v_fp = (int32_t)(v_val_f * 65536.0f);
 
-        int64_t accY, accU, accV;
+        int64_t accY;
+        int64_t accU;
+        int64_t accV;
 
         if (use_high_quality) {
-            accY = (int64_t)sample_bilinear(srcY, u_fp, v_fp, w, h) << FP_SHIFT;
-            accU = (int64_t)sample_bilinear_uv(srcU, u_fp, v_fp, w, h) << FP_SHIFT;
-            accV = (int64_t)sample_bilinear_uv(srcV, u_fp, v_fp, w, h) << FP_SHIFT;
+            accY = (int64_t) sample_bilinear(srcY, u_fp, v_fp, w, h) << FP_SHIFT;
+            accU = (int64_t) sample_bilinear_uv(srcU, u_fp, v_fp, w, h) << FP_SHIFT;
+            accV = (int64_t) sample_bilinear_uv(srcV, u_fp, v_fp, w, h) << FP_SHIFT;
         } else {
-            int32_t um = u_fp & 0xFFFF;
-            int32_t vm = v_fp & 0xFFFF;
+            int32_t um = u_fp & 0xffff;
+            int32_t vm = v_fp & 0xffff;
             int tx = ((um >> 8) * (w - 1)) >> 8;
             int ty = ((vm >> 8) * (h - 1)) >> 8;
-            accY = (int64_t)srcY[ty * w + tx] << FP_SHIFT;
-            accU = (int64_t)(srcU[ty * w + tx] - 128) << FP_SHIFT;
-            accV = (int64_t)(srcV[ty * w + tx] - 128) << FP_SHIFT;
+            int p = ty * w + tx;
+
+            accY = (int64_t) srcY[p] << FP_SHIFT;
+            accU = (int64_t)(srcU[p] - 128) << FP_SHIFT;
+            accV = (int64_t)(srcV[p] - 128) << FP_SHIFT;
         }
 
         t->histY[i] = ((accY * current_inv_fb) + ((int64_t)t->histY[i] * fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
@@ -273,10 +297,11 @@ static void escherdroste_apply1(void *ptr, VJFrame *frame, int *args) {
         t->histV[i] = ((accV * current_inv_chroma_fb) + ((int64_t)t->histV[i] * chroma_fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
 
         int y_val = t->histY[i] >> FP_SHIFT;
-        int u_px = (t->histU[i] >> FP_SHIFT);
-        int v_px = (t->histV[i] >> FP_SHIFT);
+        int u_px = t->histU[i] >> FP_SHIFT;
+        int v_px = t->histV[i] >> FP_SHIFT;
 
-        int y_idx = (y_val < 0) ? 0 : (y_val > 255 ? 255 : y_val);
+        int y_idx = y_val < 0 ? 0 : (y_val > 255 ? 255 : y_val);
+
         t->dstY[i] = t->gamma_lut[y_idx * (GAMMA_LUT_SIZE - 1) / 255];
         t->dstU[i] = clamp_u8(((u_px * 1056) >> 10) + 128);
         t->dstV[i] = clamp_u8(((v_px * 1056) >> 10) + 128);
@@ -288,20 +313,22 @@ static void escherdroste_apply1(void *ptr, VJFrame *frame, int *args) {
 }
 
 static void escherdroste_apply2(void *ptr, VJFrame *frame, int *args) {
-    box_escherdroste_t *t = (box_escherdroste_t*)ptr;
-    int w = t->width, h = t->height, size = w * h;
+    box_escherdroste_t *t = (box_escherdroste_t*) ptr;
+    int w = t->width;
+    int h = t->height;
+    int size = w * h;
 
     t->time += args[0] * 0.000725f;
     t->phase += args[4] * 0.000725f;
 
-    const float branches = (float)args[2];
+    const float branches = (float) args[2];
     const float swirl = args[3] * 0.01f;
-    const int use_high_quality = (args[7] == 1);
+    const int use_high_quality = args[7] == 1;
 
-    const float zoom_intensity = 0.8f + ((float)args[1] / 500.0f) * 12.0f;
+    const float zoom_intensity = 0.8f + ((float) args[1] / 500.0f) * 12.0f;
     const float factor = branches / zoom_intensity;
     const float inv_2pi = 0.15915494f;
-    const float pitch = (float)args[6] * 0.01f;
+    const float pitch = (float) args[6] * 0.01f;
 
     const int32_t fb_fp = TO_FP(args[5] * 0.01f);
     const int32_t current_inv_fb = FP_ONE - fb_fp;
@@ -326,20 +353,24 @@ static void escherdroste_apply2(void *ptr, VJFrame *frame, int *args) {
         int32_t u_fp = (int32_t)(u_val_f * 65536.0f);
         int32_t v_fp = (int32_t)(v_val_f * 65536.0f);
 
-        int64_t accY, accU, accV;
+        int64_t accY;
+        int64_t accU;
+        int64_t accV;
 
         if (use_high_quality) {
-            accY = (int64_t)sample_bilinear(srcY, u_fp, v_fp, w, h) << FP_SHIFT;
-            accU = (int64_t)sample_bilinear_uv(srcU, u_fp, v_fp, w, h) << FP_SHIFT;
-            accV = (int64_t)sample_bilinear_uv(srcV, u_fp, v_fp, w, h) << FP_SHIFT;
+            accY = (int64_t) sample_bilinear(srcY, u_fp, v_fp, w, h) << FP_SHIFT;
+            accU = (int64_t) sample_bilinear_uv(srcU, u_fp, v_fp, w, h) << FP_SHIFT;
+            accV = (int64_t) sample_bilinear_uv(srcV, u_fp, v_fp, w, h) << FP_SHIFT;
         } else {
-            int32_t um = u_fp & 0xFFFF;
-            int32_t vm = v_fp & 0xFFFF;
+            int32_t um = u_fp & 0xffff;
+            int32_t vm = v_fp & 0xffff;
             int tx = ((um >> 8) * (w - 1)) >> 8;
             int ty = ((vm >> 8) * (h - 1)) >> 8;
-            accY = (int64_t)srcY[ty * w + tx] << FP_SHIFT;
-            accU = (int64_t)(srcU[ty * w + tx] - 128) << FP_SHIFT;
-            accV = (int64_t)(srcV[ty * w + tx] - 128) << FP_SHIFT;
+            int p = ty * w + tx;
+
+            accY = (int64_t) srcY[p] << FP_SHIFT;
+            accU = (int64_t)(srcU[p] - 128) << FP_SHIFT;
+            accV = (int64_t)(srcV[p] - 128) << FP_SHIFT;
         }
 
         t->histY[i] = ((accY * current_inv_fb) + ((int64_t)t->histY[i] * fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
@@ -347,10 +378,11 @@ static void escherdroste_apply2(void *ptr, VJFrame *frame, int *args) {
         t->histV[i] = ((accV * current_inv_chroma_fb) + ((int64_t)t->histV[i] * chroma_fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
 
         int y_val = t->histY[i] >> FP_SHIFT;
-        int u_px = (t->histU[i] >> FP_SHIFT);
-        int v_px = (t->histV[i] >> FP_SHIFT);
+        int u_px = t->histU[i] >> FP_SHIFT;
+        int v_px = t->histV[i] >> FP_SHIFT;
 
-        int y_idx = (y_val < 0) ? 0 : (y_val > 255 ? 255 : y_val);
+        int y_idx = y_val < 0 ? 0 : (y_val > 255 ? 255 : y_val);
+
         t->dstY[i] = t->gamma_lut[y_idx * (GAMMA_LUT_SIZE - 1) / 255];
         t->dstU[i] = clamp_u8(((u_px * 1056) >> 10) + 128);
         t->dstV[i] = clamp_u8(((v_px * 1056) >> 10) + 128);
@@ -362,20 +394,22 @@ static void escherdroste_apply2(void *ptr, VJFrame *frame, int *args) {
 }
 
 static void escherdroste_apply3(void *ptr, VJFrame *frame, int *args) {
-    box_escherdroste_t *t = (box_escherdroste_t*)ptr;
-    int w = t->width, h = t->height, size = w * h;
+    box_escherdroste_t *t = (box_escherdroste_t*) ptr;
+    int w = t->width;
+    int h = t->height;
+    int size = w * h;
 
     t->time += args[0] * 0.000725f;
     t->phase += args[4] * 0.000725f;
 
-    const float branches = (float)args[2];
+    const float branches = (float) args[2];
     const float swirl = args[3] * 0.01f;
-    const int use_high_quality = (args[7] == 1);
+    const int use_high_quality = args[7] == 1;
 
-    const float zoom_intensity = 0.8f + ((float)args[1] / 500.0f) * 12.0f;
+    const float zoom_intensity = 0.8f + ((float) args[1] / 500.0f) * 12.0f;
     const float factor = branches / zoom_intensity;
     const float inv_2pi = 0.15915494f;
-    const float pitch = (float)args[6] * 0.01f;
+    const float pitch = (float) args[6] * 0.01f;
 
     const int32_t fb_fp = TO_FP(args[5] * 0.01f);
     const int32_t current_inv_fb = FP_ONE - fb_fp;
@@ -385,14 +419,14 @@ static void escherdroste_apply3(void *ptr, VJFrame *frame, int *args) {
     uint8_t *restrict srcY = frame->data[0];
     uint8_t *restrict srcU = frame->data[1];
     uint8_t *restrict srcV = frame->data[2];
-    
-    #pragma omp parallel for schedule(static)
+
+    #pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int i = 0; i < size; i++) {
         float dist_rect = FROM_FP(t->v_lut_rect[i]);
         float edge_u = FROM_FP(t->u_lut_rect[i]);
 
         float base_v = dist_rect * factor;
-        float base_u = edge_u * inv_2pi * branches;
+        float base_u = (edge_u * inv_2pi * branches) - (dist_rect * factor * pitch);
 
         float v_val_f = base_v + t->time;
         float u_val_f = base_u + t->phase + (swirl * dist_rect);
@@ -400,20 +434,24 @@ static void escherdroste_apply3(void *ptr, VJFrame *frame, int *args) {
         int32_t u_fp = (int32_t)(u_val_f * 65536.0f);
         int32_t v_fp = (int32_t)(v_val_f * 65536.0f);
 
-        int64_t accY, accU, accV;
+        int64_t accY;
+        int64_t accU;
+        int64_t accV;
 
         if (use_high_quality) {
-            accY = (int64_t)sample_bilinear(srcY, u_fp, v_fp, w, h) << FP_SHIFT;
-            accU = (int64_t)sample_bilinear_uv(srcU, u_fp, v_fp, w, h) << FP_SHIFT;
-            accV = (int64_t)sample_bilinear_uv(srcV, u_fp, v_fp, w, h) << FP_SHIFT;
+            accY = (int64_t) sample_bilinear(srcY, u_fp, v_fp, w, h) << FP_SHIFT;
+            accU = (int64_t) sample_bilinear_uv(srcU, u_fp, v_fp, w, h) << FP_SHIFT;
+            accV = (int64_t) sample_bilinear_uv(srcV, u_fp, v_fp, w, h) << FP_SHIFT;
         } else {
-            int32_t um = u_fp & 0xFFFF;
-            int32_t vm = v_fp & 0xFFFF;
+            int32_t um = u_fp & 0xffff;
+            int32_t vm = v_fp & 0xffff;
             int tx = ((um >> 8) * (w - 1)) >> 8;
             int ty = ((vm >> 8) * (h - 1)) >> 8;
-            accY = (int64_t)srcY[ty * w + tx] << FP_SHIFT;
-            accU = (int64_t)(srcU[ty * w + tx] - 128) << FP_SHIFT;
-            accV = (int64_t)(srcV[ty * w + tx] - 128) << FP_SHIFT;
+            int p = ty * w + tx;
+
+            accY = (int64_t) srcY[p] << FP_SHIFT;
+            accU = (int64_t)(srcU[p] - 128) << FP_SHIFT;
+            accV = (int64_t)(srcV[p] - 128) << FP_SHIFT;
         }
 
         t->histY[i] = ((accY * current_inv_fb) + ((int64_t)t->histY[i] * fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
@@ -421,10 +459,11 @@ static void escherdroste_apply3(void *ptr, VJFrame *frame, int *args) {
         t->histV[i] = ((accV * current_inv_chroma_fb) + ((int64_t)t->histV[i] * chroma_fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
 
         int y_val = t->histY[i] >> FP_SHIFT;
-        int u_px = (t->histU[i] >> FP_SHIFT);
-        int v_px = (t->histV[i] >> FP_SHIFT);
+        int u_px = t->histU[i] >> FP_SHIFT;
+        int v_px = t->histV[i] >> FP_SHIFT;
 
-        int y_idx = (y_val < 0) ? 0 : (y_val > 255 ? 255 : y_val);
+        int y_idx = y_val < 0 ? 0 : (y_val > 255 ? 255 : y_val);
+
         t->dstY[i] = t->gamma_lut[y_idx * (GAMMA_LUT_SIZE - 1) / 255];
         t->dstU[i] = clamp_u8(((u_px * 1056) >> 10) + 128);
         t->dstV[i] = clamp_u8(((v_px * 1056) >> 10) + 128);
@@ -436,9 +475,18 @@ static void escherdroste_apply3(void *ptr, VJFrame *frame, int *args) {
 }
 
 void escherdroste_apply(void *ptr, VJFrame *frame, int *args) {
-    switch(args[8]) {
-        case 0:  escherdroste_apply1(ptr, frame, args); break;
-        case 1:  escherdroste_apply2(ptr, frame, args); break; 
-        case 2:  escherdroste_apply3(ptr, frame, args); break;
+    switch (args[8]) {
+        case 0:
+            escherdroste_apply1(ptr, frame, args);
+            break;
+        case 1:
+            escherdroste_apply2(ptr, frame, args);
+            break;
+        case 2:
+            escherdroste_apply3(ptr, frame, args);
+            break;
+        default:
+            escherdroste_apply2(ptr, frame, args);
+            break;
     }
 }
