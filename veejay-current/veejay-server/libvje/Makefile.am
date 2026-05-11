@@ -242,4 +242,15 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/edgefold.c \
     effects/virtualcamera.c \
     effects/ghostwash.c \
-    effects/plasmafeedback.c 
+    effects/plasmafeedback.c \
+    effects/chronofold.c \
+    effects/chronocortex.c \
+    effects/chronorain.c \
+    effects/chronovein.c \
+    effects/chronoglass.c \
+    effects/chronomirror.c \
+    effects/blackhole.c \
+    effects/strataflight.c \
+    effects/chronoetch.c \
+    effects/radiantfissure.c \
+    effects/meteorvector.c

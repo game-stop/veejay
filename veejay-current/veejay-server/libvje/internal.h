@@ -253,8 +253,19 @@
 #include "./effects/virtualcamera.h"
 #include "./effects/ghostwash.h"
 #include "./effects/plasmafeedback.h"
+#include "./effects/chronofold.h"
+#include "./effects/chronocortex.h"
+#include "./effects/chronorain.h"
+#include "./effects/chronovein.h"
+#include "./effects/chronoglass.h"
+#include "./effects/chronomirror.h"
+#include "./effects/strataflight.h"
+#include "./effects/blackhole.h"
+#include "./effects/radiantfissure.h"
+#include "./effects/meteorvector.h"
+#include "./effects/chronoetch.h"
 
-#define VJ_IMAGE_EFFECT_MIN 32
+#define VJ_IMAGE_EFFECT_MIN 21
 #define VJ_IMAGE_EFFECT_MAX 198
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -543,6 +554,17 @@ enum {
     VJ_IMAGE_EFFECT_VIRTUALCAMERA = 34,
     VJ_IMAGE_EFFECT_GHOSTWASH = 33,
     VJ_IMAGE_EFFECT_PLASMAFEEDBACK = 32,
+    VJ_IMAGE_EFFECT_CHRONOFOLD = 31,
+    VJ_IMAGE_EFFECT_CHRONOCORTEX = 30,
+    VJ_IMAGE_EFFECT_CHRONORAIN = 29,
+    VJ_IMAGE_EFFECT_CHRONOVEIN = 28,
+    VJ_IMAGE_EFFECT_CHRONOGLASS = 27,
+    VJ_IMAGE_EFFECT_CHRONOMIRROR = 26,
+    VJ_IMAGE_EFFECT_BLACKHOLE = 25,
+    VJ_IMAGE_EFFECT_STRATAFLIGHT = 24,
+    VJ_IMAGE_EFFECT_RADIANTFISSURE = 23,
+    VJ_IMAGE_EFFECT_METEORVECTOR = 22,
+    VJ_IMAGE_EFFECT_CHRONOETCH = 21,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
