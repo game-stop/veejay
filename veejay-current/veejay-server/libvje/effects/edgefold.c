@@ -159,7 +159,6 @@ void edgefold_apply(void *ptr, VJFrame *frame, int *args) {
             
             float fX = 0.0f, fY = 0.0f;
             if (mag_sq > edge_thresh_sq) {
-                float mag = sqrtf(mag_sq);
                 fX = (gx / 255.0f) * fold_force;
                 fY = (gy / 255.0f) * fold_force;
             }
