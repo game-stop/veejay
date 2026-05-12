@@ -253,4 +253,6 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/strataflight.c \
     effects/chronoetch.c \
     effects/radiantfissure.c \
-    effects/meteorvector.c
+    effects/meteorvector.c \
+    effects/eventhorizon.c \
+    effects/chromadrift.c

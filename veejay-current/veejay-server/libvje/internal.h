@@ -264,8 +264,10 @@
 #include "./effects/radiantfissure.h"
 #include "./effects/meteorvector.h"
 #include "./effects/chronoetch.h"
+#include "./effects/eventhorizon.h"
+#include "./effects/chromadrift.h"
 
-#define VJ_IMAGE_EFFECT_MIN 21
+#define VJ_IMAGE_EFFECT_MIN 19
 #define VJ_IMAGE_EFFECT_MAX 198
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -565,6 +567,8 @@ enum {
     VJ_IMAGE_EFFECT_RADIANTFISSURE = 23,
     VJ_IMAGE_EFFECT_METEORVECTOR = 22,
     VJ_IMAGE_EFFECT_CHRONOETCH = 21,
+    VJ_IMAGE_EFFECT_EVENTHORIZON = 20,
+    VJ_IMAGE_EFFECT_CHROMADRIFT = 19,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 

@@ -124,6 +124,8 @@ static struct {
     { radiantfissure_init, radiantfissure_malloc, radiantfissure_free, NULL,NULL, radiantfissure_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_RADIANTFISSURE },
     { meteorvector_init, meteorvector_malloc, meteorvector_free, NULL,NULL, meteorvector_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_METEORVECTOR },
     { blackhole_init, blackhole_malloc,blackhole_free, NULL,NULL, blackhole_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_BLACKHOLE },
+    { eventhorizon_init, eventhorizon_malloc,eventhorizon_free, NULL,NULL, eventhorizon_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_EVENTHORIZON },
+    { chromadrift_init, chromadrift_malloc,chromadrift_free, NULL,NULL, chromadrift_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_CHROMADRIFT },
     { strataflight_init, strataflight_malloc,strataflight_free, NULL,NULL, strataflight_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_STRATAFLIGHT },
     { rgbkeysmooth_init,rgbkeysmooth_malloc,rgbkeysmooth_free,NULL,NULL,NULL,rgbkeysmooth_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_RGBKEYSMOOTH },
     { rgbkey_init,rgbkey_malloc,rgbkey_free,NULL,NULL,NULL,rgbkey_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_RGBKEY },
