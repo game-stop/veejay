@@ -23,7 +23,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define STRATAFLIGHT_PARAMS 14
+#define STRATAFLIGHT_PARAMS 15
 #define SF_ZLUT_MAX 225
 
 #define P_OPACITY      0
@@ -40,6 +40,7 @@
 #define P_FREEFORWARD  11
 #define P_STRAFE       12
 #define P_FLIGHTHEIGHT 13
+#define P_FLIGHTSPEED  14
 
 typedef struct {
     int w;
@@ -239,6 +240,7 @@ vj_effect *strataflight_init(int w, int h)
     ve->defaults[P_FREEFORWARD]  = 500;
     ve->defaults[P_STRAFE]       = 500;
     ve->defaults[P_FLIGHTHEIGHT] = 520;
+    ve->defaults[P_FLIGHTSPEED]  = 28;
 
     ve->limits[0][P_OPACITY]      = 0;
     ve->limits[1][P_OPACITY]      = 100;
@@ -282,6 +284,9 @@ vj_effect *strataflight_init(int w, int h)
     ve->limits[0][P_FLIGHTHEIGHT] = 0;
     ve->limits[1][P_FLIGHTHEIGHT] = 1000;
 
+    ve->limits[0][P_FLIGHTSPEED]  = 0;
+    ve->limits[1][P_FLIGHTSPEED]  = 100;
+
     ve->param_description = vje_build_param_list(
         ve->num_params,
         "Opacity",
@@ -297,7 +302,8 @@ vj_effect *strataflight_init(int w, int h)
         "Material Chroma",
         "Free Forward Back",
         "Free Side Drift",
-        "Flight Height"
+        "Flight Height",
+        "Flight Speed"
     );
 
     return ve;
@@ -444,6 +450,7 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
     int freeforward;
     int strafe;
     int flightheight;
+    int flightspeed;
 
     int alpha;
     int chroma_q;
@@ -543,6 +550,7 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
     freeforward  = sf_clampi(args[P_FREEFORWARD],  0, 1000);
     strafe       = sf_clampi(args[P_STRAFE],       0, 1000);
     flightheight = sf_clampi(args[P_FLIGHTHEIGHT], 0, 1000);
+    flightspeed  = sf_clampi(args[P_FLIGHTSPEED],  0, 100);
 
     alpha = (opacity * 256 + 50) / 100;
     chroma_q = (chroma * 256 + 50) / 100;
@@ -1190,8 +1198,14 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
         int move_forward_fp = cruise_fp + free_fp;
         int move_side_fp = side_fp;
 
+        int speed_q;
         int dx;
         int dy;
+
+        speed_q = (flightspeed * flightspeed * 256 + 5000) / 10000;
+
+        move_forward_fp = (move_forward_fp * speed_q) >> 8;
+        move_side_fp = (move_side_fp * speed_q) >> 8;
 
         move_forward_fp = (move_forward_fp * world_q) >> 8;
         move_side_fp = (move_side_fp * world_q) >> 8;
