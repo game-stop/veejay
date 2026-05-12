@@ -12,7 +12,7 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
@@ -23,20 +23,23 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define STRATAFLIGHT_PARAMS 11
+#define STRATAFLIGHT_PARAMS 14
 #define SF_ZLUT_MAX 225
 
-#define P_OPACITY    0
-#define P_YAW        1
-#define P_PITCH      2
-#define P_DISTANCE   3
-#define P_FORWARD    4
-#define P_WORLDZOOM  5
-#define P_HEIGHT     6
-#define P_DEPOSIT    7
-#define P_MEMORY     8
-#define P_EROSION    9
-#define P_CHROMA     10
+#define P_OPACITY      0
+#define P_YAW          1
+#define P_PITCH        2
+#define P_DISTANCE     3
+#define P_FORWARD      4
+#define P_WORLDZOOM    5
+#define P_HEIGHT       6
+#define P_DEPOSIT      7
+#define P_MEMORY       8
+#define P_EROSION      9
+#define P_CHROMA       10
+#define P_FREEFORWARD  11
+#define P_STRAFE       12
+#define P_FLIGHTHEIGHT 13
 
 typedef struct {
     int w;
@@ -126,6 +129,20 @@ static inline int sf_wrap_fp(int v, int max_fp)
     return v;
 }
 
+static inline int sf_signed_speed_from_center(int v)
+{
+    int d = v - 500;
+    int a = sf_abs_i(d);
+    int s;
+
+    if (a < 5)
+        return 0;
+
+    s = (a * a * 12) / 2500;
+
+    return d < 0 ? -s : s;
+}
+
 static inline int sf_sample_u8_feather(
     const uint8_t *buf,
     int x,
@@ -205,53 +222,65 @@ vj_effect *strataflight_init(int w, int h)
         return NULL;
     }
 
-    ve->description = "Luma Terrain";
+    ve->description = "Luma Terrain Freeflight";
     ve->sub_format = 1;
 
-    ve->defaults[P_OPACITY]   = 100;
-    ve->defaults[P_YAW]       = 500;
-    ve->defaults[P_PITCH]     = 680;
-    ve->defaults[P_DISTANCE]  = 520;
-    ve->defaults[P_FORWARD]   = 320;
-    ve->defaults[P_WORLDZOOM] = 360;
-    ve->defaults[P_HEIGHT]    = 54;
-    ve->defaults[P_DEPOSIT]   = 62;
-    ve->defaults[P_MEMORY]    = 66;
-    ve->defaults[P_EROSION]   = 22;
-    ve->defaults[P_CHROMA]    = 72;
+    ve->defaults[P_OPACITY]      = 100;
+    ve->defaults[P_YAW]          = 500;
+    ve->defaults[P_PITCH]        = 680;
+    ve->defaults[P_DISTANCE]     = 520;
+    ve->defaults[P_FORWARD]      = 320;
+    ve->defaults[P_WORLDZOOM]    = 360;
+    ve->defaults[P_HEIGHT]       = 54;
+    ve->defaults[P_DEPOSIT]      = 62;
+    ve->defaults[P_MEMORY]       = 66;
+    ve->defaults[P_EROSION]      = 22;
+    ve->defaults[P_CHROMA]       = 72;
+    ve->defaults[P_FREEFORWARD]  = 500;
+    ve->defaults[P_STRAFE]       = 500;
+    ve->defaults[P_FLIGHTHEIGHT] = 520;
 
-    ve->limits[0][P_OPACITY]   = 0;
-    ve->limits[1][P_OPACITY]   = 100;
+    ve->limits[0][P_OPACITY]      = 0;
+    ve->limits[1][P_OPACITY]      = 100;
 
-    ve->limits[0][P_YAW]       = 0;
-    ve->limits[1][P_YAW]       = 1000;
+    ve->limits[0][P_YAW]          = 0;
+    ve->limits[1][P_YAW]          = 1000;
 
-    ve->limits[0][P_PITCH]     = 0;
-    ve->limits[1][P_PITCH]     = 1000;
+    ve->limits[0][P_PITCH]        = 0;
+    ve->limits[1][P_PITCH]        = 1000;
 
-    ve->limits[0][P_DISTANCE]  = 0;
-    ve->limits[1][P_DISTANCE]  = 1000;
+    ve->limits[0][P_DISTANCE]     = 0;
+    ve->limits[1][P_DISTANCE]     = 1000;
 
-    ve->limits[0][P_FORWARD]   = 0;
-    ve->limits[1][P_FORWARD]   = 1000;
+    ve->limits[0][P_FORWARD]      = 0;
+    ve->limits[1][P_FORWARD]      = 1000;
 
-    ve->limits[0][P_WORLDZOOM] = 0;
-    ve->limits[1][P_WORLDZOOM] = 1000;
+    ve->limits[0][P_WORLDZOOM]    = 0;
+    ve->limits[1][P_WORLDZOOM]    = 1000;
 
-    ve->limits[0][P_HEIGHT]    = 0;
-    ve->limits[1][P_HEIGHT]    = 100;
+    ve->limits[0][P_HEIGHT]       = 0;
+    ve->limits[1][P_HEIGHT]       = 100;
 
-    ve->limits[0][P_DEPOSIT]   = 0;
-    ve->limits[1][P_DEPOSIT]   = 100;
+    ve->limits[0][P_DEPOSIT]      = 0;
+    ve->limits[1][P_DEPOSIT]      = 100;
 
-    ve->limits[0][P_MEMORY]    = 0;
-    ve->limits[1][P_MEMORY]    = 100;
+    ve->limits[0][P_MEMORY]       = 0;
+    ve->limits[1][P_MEMORY]       = 100;
 
-    ve->limits[0][P_EROSION]   = 0;
-    ve->limits[1][P_EROSION]   = 100;
+    ve->limits[0][P_EROSION]      = 0;
+    ve->limits[1][P_EROSION]      = 100;
 
-    ve->limits[0][P_CHROMA]    = 0;
-    ve->limits[1][P_CHROMA]    = 100;
+    ve->limits[0][P_CHROMA]       = 0;
+    ve->limits[1][P_CHROMA]       = 100;
+
+    ve->limits[0][P_FREEFORWARD]  = 0;
+    ve->limits[1][P_FREEFORWARD]  = 1000;
+
+    ve->limits[0][P_STRAFE]       = 0;
+    ve->limits[1][P_STRAFE]       = 1000;
+
+    ve->limits[0][P_FLIGHTHEIGHT] = 0;
+    ve->limits[1][P_FLIGHTHEIGHT] = 1000;
 
     ve->param_description = vje_build_param_list(
         ve->num_params,
@@ -265,7 +294,10 @@ vj_effect *strataflight_init(int w, int h)
         "Source Deposit",
         "Terrain Memory",
         "Erosion",
-        "Material Chroma"
+        "Material Chroma",
+        "Free Forward Back",
+        "Free Side Drift",
+        "Flight Height"
     );
 
     return ve;
@@ -299,7 +331,6 @@ void *strataflight_malloc(int w, int h)
     c->cam_y_fp = h << 7;
 
     len = (size_t) c->len;
-
 
     total_u8 = len * 5;
 
@@ -410,6 +441,9 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
     int memory;
     int erosion;
     int chroma;
+    int freeforward;
+    int strafe;
+    int flightheight;
 
     int alpha;
     int chroma_q;
@@ -430,6 +464,8 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
     int fov_q;
     int dist_curve;
     int dist_far;
+    int flight_curve;
+    int flight_far;
     int world_q;
     int seam_feather;
     int use_feather;
@@ -493,17 +529,20 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
     z_lut = c->z_lut;
     z_fog_lut = c->z_fog_lut;
 
-    opacity      = sf_clampi(args[P_OPACITY],   0, 100);
-    yaw          = sf_clampi(args[P_YAW],       0, 1000);
-    pitch        = sf_clampi(args[P_PITCH],     0, 1000);
-    distance     = sf_clampi(args[P_DISTANCE],  0, 1000);
-    forward      = sf_clampi(args[P_FORWARD],   0, 1000);
-    worldzoom    = sf_clampi(args[P_WORLDZOOM], 0, 1000);
-    height_scale = sf_clampi(args[P_HEIGHT],    0, 100);
-    deposit      = sf_clampi(args[P_DEPOSIT],   0, 100);
-    memory       = sf_clampi(args[P_MEMORY],    0, 100);
-    erosion      = sf_clampi(args[P_EROSION],   0, 100);
-    chroma       = sf_clampi(args[P_CHROMA],    0, 100);
+    opacity      = sf_clampi(args[P_OPACITY],      0, 100);
+    yaw          = sf_clampi(args[P_YAW],          0, 1000);
+    pitch        = sf_clampi(args[P_PITCH],        0, 1000);
+    distance     = sf_clampi(args[P_DISTANCE],     0, 1000);
+    forward      = sf_clampi(args[P_FORWARD],      0, 1000);
+    worldzoom    = sf_clampi(args[P_WORLDZOOM],    0, 1000);
+    height_scale = sf_clampi(args[P_HEIGHT],       0, 100);
+    deposit      = sf_clampi(args[P_DEPOSIT],      0, 100);
+    memory       = sf_clampi(args[P_MEMORY],       0, 100);
+    erosion      = sf_clampi(args[P_EROSION],      0, 100);
+    chroma       = sf_clampi(args[P_CHROMA],       0, 100);
+    freeforward  = sf_clampi(args[P_FREEFORWARD],  0, 1000);
+    strafe       = sf_clampi(args[P_STRAFE],       0, 1000);
+    flightheight = sf_clampi(args[P_FLIGHTHEIGHT], 0, 1000);
 
     alpha = (opacity * 256 + 50) / 100;
     chroma_q = (chroma * 256 + 50) / 100;
@@ -524,6 +563,9 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
 
     dist_curve = (distance * distance) / 1000;
     dist_far = (distance + dist_curve) >> 1;
+
+    flight_curve = (flightheight * flightheight) / 1000;
+    flight_far = (flightheight + flight_curve) >> 1;
 
     {
         int wz_curve = (worldzoom * worldzoom) / 1000;
@@ -562,7 +604,7 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
 
     horizon = -horizon_above;
 
-    cam_height = 34 + ((dist_far * 420) / 1000);
+    cam_height = 34 + ((flight_far * 420) / 1000);
     projection = 64 + (rows / 8) + ((dist_far * rows) / 7600);
 
     max_z = 128 + ((dist_far * 2200) / 1000);
@@ -815,9 +857,15 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
                         base_u = ((base_u * (256 - fog)) + (128 * fog)) >> 8;
                         base_v = ((base_v * (256 - fog)) + (128 * fog)) >> 8;
 
-                        Y[i] = (uint8_t) base_y;
-                        U[i] = (uint8_t) base_u;
-                        V[i] = (uint8_t) base_v;
+                        if (alpha >= 256) {
+                            Y[i] = (uint8_t) base_y;
+                            U[i] = (uint8_t) base_u;
+                            V[i] = (uint8_t) base_v;
+                        } else if (alpha > 0) {
+                            Y[i] = (uint8_t) sf_blend((int) Y[i], base_y, alpha);
+                            U[i] = (uint8_t) sf_blend((int) U[i], base_u, alpha);
+                            V[i] = (uint8_t) sf_blend((int) V[i], base_v, alpha);
+                        }
 
                         wx_q16 += wx_step_q16;
                         wy_q16 += wy_step_q16;
@@ -1001,9 +1049,15 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
                         base_u = ((base_u * (256 - fog)) + (128 * fog)) >> 8;
                         base_v = ((base_v * (256 - fog)) + (128 * fog)) >> 8;
 
-                        Y[i] = (uint8_t) base_y;
-                        U[i] = (uint8_t) base_u;
-                        V[i] = (uint8_t) base_v;
+                        if (alpha >= 256) {
+                            Y[i] = (uint8_t) base_y;
+                            U[i] = (uint8_t) base_u;
+                            V[i] = (uint8_t) base_v;
+                        } else if (alpha > 0) {
+                            Y[i] = (uint8_t) sf_blend((int) Y[i], base_y, alpha);
+                            U[i] = (uint8_t) sf_blend((int) U[i], base_u, alpha);
+                            V[i] = (uint8_t) sf_blend((int) V[i], base_v, alpha);
+                        }
 
                         wx_q16 += wx_step_q16;
                         wy_q16 += wy_step_q16;
@@ -1129,12 +1183,24 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
     }
 
     {
-        int speed_fp = (forward * forward * 12) / 10000;
+        int cruise_fp = (forward * forward * 12) / 10000;
+        int free_fp = sf_signed_speed_from_center(freeforward);
+        int side_fp = sf_signed_speed_from_center(strafe);
 
-        speed_fp = (speed_fp * world_q) >> 8;
+        int move_forward_fp = cruise_fp + free_fp;
+        int move_side_fp = side_fp;
 
-        c->cam_x_fp += (fwd_x_q * speed_fp) >> 12;
-        c->cam_y_fp += (fwd_y_q * speed_fp) >> 12;
+        int dx;
+        int dy;
+
+        move_forward_fp = (move_forward_fp * world_q) >> 8;
+        move_side_fp = (move_side_fp * world_q) >> 8;
+
+        dx = ((fwd_x_q * move_forward_fp) + (right_x_q * move_side_fp)) >> 12;
+        dy = ((fwd_y_q * move_forward_fp) + (right_y_q * move_side_fp)) >> 12;
+
+        c->cam_x_fp += dx;
+        c->cam_y_fp += dy;
 
         c->cam_x_fp = sf_wrap_fp(c->cam_x_fp, w << 8);
         c->cam_y_fp = sf_wrap_fp(c->cam_y_fp, rows << 8);
