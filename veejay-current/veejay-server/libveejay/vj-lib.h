@@ -103,7 +103,7 @@ typedef struct
 	int height;
 	float fps;
 	int active;
-	long arate;
+	int arate;
 	int  achans;
 	int  abits;
 	int  abps;
