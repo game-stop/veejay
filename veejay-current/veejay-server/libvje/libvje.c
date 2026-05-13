@@ -125,6 +125,8 @@ static struct {
     { meteorvector_init, meteorvector_malloc, meteorvector_free, NULL,NULL, meteorvector_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_METEORVECTOR },
     { blackhole_init, blackhole_malloc,blackhole_free, NULL,NULL, blackhole_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_BLACKHOLE },
     { eventhorizon_init, eventhorizon_malloc,eventhorizon_free, NULL,NULL, eventhorizon_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_EVENTHORIZON },
+    { edgefoldtide_init, edgefoldtide_malloc,edgefoldtide_free, NULL,NULL, edgefoldtide_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_EDGEFOLDTIDE },
+    { hyperfold_init, hyperfold_malloc,hyperfold_free, NULL,NULL, hyperfold_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_HYPERFOLD },
     { chromadrift_init, chromadrift_malloc,chromadrift_free, NULL,NULL, chromadrift_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_CHROMADRIFT },
     { strataflight_init, strataflight_malloc,strataflight_free, NULL,NULL, strataflight_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_STRATAFLIGHT },
     { rgbkeysmooth_init,rgbkeysmooth_malloc,rgbkeysmooth_free,NULL,NULL,NULL,rgbkeysmooth_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_RGBKEYSMOOTH },

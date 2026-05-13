@@ -255,4 +255,6 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/radiantfissure.c \
     effects/meteorvector.c \
     effects/eventhorizon.c \
-    effects/chromadrift.c
+    effects/chromadrift.c \
+    effects/edgefoldtide.c \
+    effects/hyperfold.c
