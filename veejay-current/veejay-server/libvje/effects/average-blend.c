@@ -42,7 +42,7 @@ vj_effect *average_blend_init(int w, int h)
     ve->limits[1][1] = 255;
     ve->defaults[1] = 128;
     ve->description = "Average Mixer";
-    ve->sub_format = -1;
+    ve->sub_format = 1;
     ve->extra_frame = 1;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Recursions", "Mix Weight"); 
@@ -62,39 +62,33 @@ void average_blend_free(void *ptr) {
 void average_blend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     avgblend_t *t = (avgblend_t*) ptr;
+
     const int recursions = args[0];
     const int weight = args[1];
     const int n_threads = t->n_threads;
-
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
 
-    #pragma omp parallel num_threads(n_threads)
+    uint8_t *restrict Y1 = frame->data[0];
+    uint8_t *restrict U1 = frame->data[1];
+    uint8_t *restrict V1 = frame->data[2];
+
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict U2 = frame2->data[1];
+    const uint8_t *restrict V2 = frame2->data[2];
+
+#pragma omp parallel num_threads(n_threads)
     {
         for (int r = 0; r < recursions; r++) {
-            
-            uint8_t *restrict Y1 = frame->data[0];
-            const uint8_t *restrict Y2 = frame2->data[0];
-            
-            #pragma omp for schedule(static)
+#pragma omp for schedule(static)
             for (int i = 0; i < len; i++) {
-                int diff = (int)Y2[i] - (int)Y1[i];
-                Y1[i] = (uint8_t)(Y1[i] + ((weight * diff) >> 8));
+                int y = Y1[i];
+                int u = U1[i];
+                int v = V1[i];
+
+                Y1[i] = (uint8_t)(y + ((weight * ((int)Y2[i] - y)) >> 8));
+                U1[i] = (uint8_t)(u + ((weight * ((int)U2[i] - u)) >> 8));
+                V1[i] = (uint8_t)(v + ((weight * ((int)V2[i] - v)) >> 8));
             }
-
-            uint8_t *restrict U1 = frame->data[1];
-            uint8_t *restrict V1 = frame->data[2];
-            const uint8_t *restrict U2 = frame2->data[1];
-            const uint8_t *restrict V2 = frame2->data[2];
-
-            #pragma omp for schedule(static)
-            for (int i = 0; i < uv_len; i++) {
-                int diffU = (int)U2[i] - (int)U1[i];
-                int diffV = (int)V2[i] - (int)V1[i];
-                U1[i] = (uint8_t)(U1[i] + ((weight * diffU) >> 8));
-                V1[i] = (uint8_t)(V1[i] + ((weight * diffV) >> 8));
-            }
-
         }
     }
 }
