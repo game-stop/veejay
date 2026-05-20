@@ -181,6 +181,6 @@ void gtk3_curve_save                              (Gtk3CurveData      *data,
 Gtk3CurveData gtk3_curve_load                     (gchar              *filename);
 
 void gtk3_curve_set_fps(GtkWidget *widget, gdouble fps);
-
+void gtk3_curve_clear(GtkWidget *widget);
 
 #endif /* __GTK3_CURVE__H__ */

@@ -78,6 +78,9 @@ static GtkDrawingAreaClass *gtk3_curve_parent_class = NULL;
                           GDK_BUTTON_RELEASE_MASK | \
                           GDK_BUTTON1_MOTION_MASK)
 
+#define CURVE_X_LABEL_HEIGHT 16
+#define CURVE_LEGEND_HEIGHT  22
+
 struct _Gtk3CurvePrivate
 {
   GdkWindow *event_window;
@@ -248,6 +251,14 @@ static void gtk3_curve_draw_hover_label(GtkWidget *widget,
                                         gfloat     value,
                                         gint       allocation_width,
                                         gint       allocation_height);
+static void gtk3_curve_draw_cursor_legend(GtkWidget *widget,
+                                          cairo_t   *cr,
+                                          gint       allocation_width,
+                                          gint       allocation_height,
+                                          gint       graph_width,
+                                          gint       graph_height);
+
+static const char *gtk3_curve_type_name(Gtk3CurveType type);
 
 static void gtk3_curve_update_x_grid(Gtk3CurvePrivate *priv);
 
@@ -304,6 +315,41 @@ gtk3_curve_type_get_type (void)
                                       values);
     }
   return etype;
+}
+
+static gboolean
+gtk3_curve_has_curve_data(Gtk3CurvePrivate *priv)
+{
+    return ((priv->curve_data.d_point &&
+             priv->curve_data.n_points > 0) ||
+            (priv->curve_data.d_cpoints &&
+             priv->curve_data.n_cpoints > 0));
+}
+
+static const char *
+gtk3_curve_type_name(Gtk3CurveType type)
+{
+  switch (type) {
+    case GTK3_CURVE_TYPE_LINEAR: return "Linear";
+    case GTK3_CURVE_TYPE_SPLINE: return "Spline";
+    case GTK3_CURVE_TYPE_FREE:   return "Freehand";
+    default:                     return "Curve";
+  }
+}
+
+
+static gint
+gtk3_curve_graph_width_from_allocation(gint allocation_width)
+{
+  return allocation_width - (RADIUS * 2);
+}
+
+static gint
+gtk3_curve_graph_height_from_allocation(gint allocation_height)
+{
+  return allocation_height - (RADIUS * 2)
+                           - CURVE_X_LABEL_HEIGHT
+                           - CURVE_LEGEND_HEIGHT;
 }
 
 static void
@@ -658,6 +704,110 @@ gtk3_curve_nice_x_grid_step(gint frame_count, gdouble fps)
   return raw_step;
 }
 
+
+static void
+gtk3_curve_draw_cursor_legend(GtkWidget *widget,
+                              cairo_t   *cr,
+                              gint       allocation_width,
+                              gint       allocation_height,
+                              gint       graph_width,
+                              gint       graph_height)
+{
+  Gtk3CurvePrivate *priv = GTK3_CURVE(widget)->priv;
+
+  gchar left[128];
+  gchar right[128];
+
+  gfloat x_value;
+  gfloat y_value;
+  char *timecode = NULL;
+
+  if (graph_width <= 1 || graph_height <= 1)
+    return;
+
+  if (priv->in_curve) {
+    x_value = scale_pos_value(priv,
+                              CLAMP(priv->last_x, 0.0f, (gfloat)(graph_width - 1)),
+                              (gfloat) graph_width);
+
+    y_value = scale_param_value(priv,
+                                CLAMP(priv->last_y, 0.0f, (gfloat)(graph_height - 1)),
+                                (gfloat) graph_height);
+
+    timecode = format_selection_time(priv->min_x, x_value);
+
+    g_snprintf(left,
+               sizeof(left),
+               "X: Frame %.0f %s%s",
+               x_value,
+               timecode ? " / " : "",
+               timecode ? timecode : "");
+
+    g_snprintf(right,
+               sizeof(right),
+               "Y: Value %.2f     Mode: %s",
+               y_value,
+               gtk3_curve_type_name(priv->curve_data.curve_type));
+  } else {
+    g_snprintf(left,
+               sizeof(left),
+               "X: Frame");
+
+    g_snprintf(right,
+               sizeof(right),
+               "Y: Value    Mode: %s",
+               gtk3_curve_type_name(priv->curve_data.curve_type));
+  }
+
+  if (timecode)
+    free(timecode);
+
+  cairo_save(cr);
+
+  gdouble y = allocation_height - CURVE_LEGEND_HEIGHT;
+
+  cairo_set_source_rgba(cr,
+                        priv->grid.red,
+                        priv->grid.green,
+                        priv->grid.blue,
+                        priv->grid.alpha * 0.10);
+  cairo_rectangle(cr, 0.0, y, allocation_width, CURVE_LEGEND_HEIGHT);
+  cairo_fill(cr);
+
+  cairo_set_source_rgba(cr,
+                        priv->grid.red,
+                        priv->grid.green,
+                        priv->grid.blue,
+                        priv->grid.alpha * 0.35);
+  cairo_set_line_width(cr, 0.5);
+  gtk3_curve_draw_line(cr, 0.0, y + 0.5, allocation_width, y + 0.5);
+
+  cairo_select_font_face(cr,
+                         "Sans",
+                         CAIRO_FONT_SLANT_NORMAL,
+                         CAIRO_FONT_WEIGHT_NORMAL);
+  cairo_set_font_size(cr, 11.0);
+
+  cairo_set_source_rgba(cr,
+                        priv->grid.red,
+                        priv->grid.green,
+                        priv->grid.blue,
+                        priv->grid.alpha * 0.90);
+
+  cairo_move_to(cr, 6.0, y + 15.0);
+  cairo_show_text(cr, left);
+
+  cairo_text_extents_t ext;
+  cairo_text_extents(cr, right, &ext);
+
+  cairo_move_to(cr,
+                allocation_width - ext.width - 8.0,
+                y + 15.0);
+  cairo_show_text(cr, right);
+
+  cairo_restore(cr);
+}
+
 static gdouble
 gtk3_curve_auto_x_grid_resolution(gfloat min_x, gfloat max_x, gdouble fps)
 {
@@ -860,7 +1010,12 @@ static void gtk3_curve_draw_line (cairo_t   *cr,
 }
 
 static void
-gtk3_curve_draw_labels(GtkWidget *widget, cairo_t *cr, gint hei, gint wid)
+gtk3_curve_draw_labels(GtkWidget *widget,
+                       cairo_t   *cr,
+                       gint       allocation_width,
+                       gint       allocation_height,
+                       gint       graph_width,
+                       gint       graph_height)
 {
   gchar text[100];
   Gtk3CurvePrivate *priv;
@@ -872,12 +1027,19 @@ gtk3_curve_draw_labels(GtkWidget *widget, cairo_t *cr, gint hei, gint wid)
   curve = GTK3_CURVE(widget);
   priv = curve->priv;
 
+  if (graph_width <= 1 || graph_height <= 1)
+    return;
+
+  (void) allocation_height;
+
   y_grid = priv->y_grid_resolution;
 
   if (y_grid < 1.0f)
     y_grid = 1.0f;
   else if (y_grid > 64.0f)
     y_grid = 64.0f;
+
+  cairo_save(cr);
 
   cairo_set_source_rgba(cr,
                         priv->grid.red,
@@ -891,13 +1053,19 @@ gtk3_curve_draw_labels(GtkWidget *widget, cairo_t *cr, gint hei, gint wid)
                          CAIRO_FONT_WEIGHT_NORMAL);
   cairo_set_font_size(cr, 11);
 
-  gfloat wm = wid - (RADIUS * 2);
-  gfloat hm = hei - (RADIUS * 2);
+  gfloat wm = graph_width;
+  gfloat hm = graph_height;
 
+  /*
+   * X-axis labels live in their own band below the graph and above the
+   * live cursor legend. Do not draw them at allocation_height - 2, because
+   * that collides with the legend band.
+   */
   {
     gint min_frame = (gint)(priv->min_x + 0.5f);
     gint max_frame = (gint)(priv->max_x + 0.5f);
     gint step = priv->x_grid_step;
+    gdouble label_y = RADIUS + hm + 12.0;
 
     if (step <= 0)
       step = 1;
@@ -907,12 +1075,11 @@ gtk3_curve_draw_labels(GtkWidget *widget, cairo_t *cr, gint hei, gint wid)
                                     priv->min_x,
                                     priv->max_x,
                                     (gint) wm);
-      gdouble y1 = hei - 2.0;
 
       snprintf(text, sizeof(text), "%d", frame);
 
       cairo_text_extents(cr, text, &extents);
-      cairo_move_to(cr, x1 - (extents.width / 2.0), y1);
+      cairo_move_to(cr, x1 - (extents.width / 2.0), label_y);
       cairo_show_text(cr, text);
     }
 
@@ -921,27 +1088,31 @@ gtk3_curve_draw_labels(GtkWidget *widget, cairo_t *cr, gint hei, gint wid)
                                     priv->min_x,
                                     priv->max_x,
                                     (gint) wm);
-      gdouble y1 = hei - 2.0;
 
       snprintf(text, sizeof(text), "%d", max_frame);
 
       cairo_text_extents(cr, text, &extents);
-      cairo_move_to(cr, x1 - (extents.width / 2.0), y1);
+      cairo_move_to(cr, x1 - (extents.width / 2.0), label_y);
       cairo_show_text(cr, text);
     }
   }
 
+  /*
+   * Y-axis labels: center with Cairo extents and clamp the baseline so the
+   * top and bottom values remain fully readable inside the graph.
+   */
   incr = 1;
 
   snprintf(text, sizeof(text), "%d", (int) priv->max_y);
   cairo_text_extents(cr, text, &extents);
 
-  while (((extents.height * 2.0 * y_grid) / incr) > hei)
+  while (((extents.height * 2.0 * y_grid) / incr) > graph_height)
     incr++;
 
   for (i = 0; i <= (int) y_grid; i += incr) {
     gdouble y1 = RADIUS + hm - (i * (hm / y_grid));
     gdouble x1 = 2.0;
+    gdouble baseline;
 
     snprintf(text,
              sizeof(text),
@@ -951,9 +1122,38 @@ gtk3_curve_draw_labels(GtkWidget *widget, cairo_t *cr, gint hei, gint wid)
                                       (gfloat) hm));
 
     cairo_text_extents(cr, text, &extents);
-    cairo_move_to(cr, x1, y1 + (extents.height / 2.0));
+
+    baseline = y1 - extents.y_bearing - (extents.height / 2.0);
+
+    if (baseline + extents.y_bearing < 1.0)
+      baseline = 1.0 - extents.y_bearing;
+
+    if (baseline + extents.y_bearing + extents.height >
+        RADIUS + hm - 1.0)
+    {
+      baseline = RADIUS + hm - 1.0 - extents.y_bearing - extents.height;
+    }
+
+    cairo_move_to(cr, x1, baseline);
     cairo_show_text(cr, text);
   }
+
+  /*
+   * Subtle separator between the graph and the x-axis label band.
+   */
+  cairo_set_source_rgba(cr,
+                        priv->grid.red,
+                        priv->grid.green,
+                        priv->grid.blue,
+                        priv->grid.alpha * 0.20);
+  cairo_set_line_width(cr, 0.5);
+  gtk3_curve_draw_line(cr,
+                       0.0,
+                       RADIUS + hm + 0.5,
+                       allocation_width,
+                       RADIUS + hm + 0.5);
+
+  cairo_restore(cr);
 }
 
 static gboolean
@@ -1177,17 +1377,18 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
 
   gtk_widget_get_allocation(widget, &allocation);
 
-  gint width  = allocation.width  - RADIUS * 2;
-  gint height = allocation.height - RADIUS * 2;
+  gint width  = gtk3_curve_graph_width_from_allocation(allocation.width);
+  gint height = gtk3_curve_graph_height_from_allocation(allocation.height);
 
   if (width <= 1 || height <= 1)
     return FALSE;
 
-  if (priv->width != width ||
-      priv->height != height ||
-      priv->curve_data.n_points != width)
+  if ((priv->curve_data.d_point || priv->curve_data.d_cpoints) &&
+    (priv->width != width ||
+     priv->height != height ||
+     priv->curve_data.n_points != width))
   {
-    gtk3_curve_interpolate(widget, width, height);
+      gtk3_curve_interpolate(widget, width, height);
   }
 
   if (priv->use_bg_theme) {
@@ -1223,8 +1424,8 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
   else if (y_grid > 64.0f)
     y_grid = 64.0f;
 
-  gfloat wm = allocation.width  - (RADIUS * 2);
-  gfloat hm = allocation.height - (RADIUS * 2);
+  gfloat wm = width;
+  gfloat hm = height;
 
   cairo_set_line_width(cr, 0.5);
   cairo_set_source_rgba(cr,
@@ -1275,7 +1476,12 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
                          RADIUS + hm / 2.0);
   }
 
-  gtk3_curve_draw_labels(widget, cr, allocation.height, allocation.width);
+  gtk3_curve_draw_labels(widget,
+                         cr,
+                         allocation.width,
+                         allocation.height,
+                         width,
+                         height);
 
   if (priv->curve_data.d_point && priv->curve_data.n_points > 1) {
     cairo_set_line_width(cr, 1.25);
@@ -1348,6 +1554,13 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
                                   allocation.height,
                                   width,
                                   height);
+
+  gtk3_curve_draw_cursor_legend(widget,
+                                cr,
+                                allocation.width,
+                                allocation.height,
+                                width,
+                                height);
 
   return FALSE;
 }
@@ -1459,20 +1672,30 @@ gtk3_curve_button_press(GtkWidget *widget, GdkEventButton *event)
   if (!event || event->button != 1)
     return FALSE;
 
-  gtk_grab_add(widget);
-
   gtk_widget_get_allocation(widget, &allocation);
 
-  width = allocation.width - RADIUS * 2;
-  height = allocation.height - RADIUS * 2;
+  width = gtk3_curve_graph_width_from_allocation(allocation.width);
+  height = gtk3_curve_graph_height_from_allocation(allocation.height);
 
   if (width <= 1 || height <= 1)
     return FALSE;
 
+  gtk3_curve_get_cursor_coord(widget, &tx, &ty);
+
+  /*
+   * Only the graph area is editable. The x-axis label band and live legend
+   * are passive, so a click there must not create or move a curve point.
+   */
+  if (tx < RADIUS ||
+      tx >= RADIUS + width ||
+      ty < RADIUS ||
+      ty >= RADIUS + height)
+    return FALSE;
+
+  gtk_grab_add(widget);
+
   if (!priv->curve_data.d_point || priv->curve_data.n_points != width)
     gtk3_curve_interpolate(widget, width, height);
-
-  gtk3_curve_get_cursor_coord(widget, &tx, &ty);
 
   x = CLAMP((tx - RADIUS), 0, width - 1);
   y = CLAMP((ty - RADIUS), 0, height - 1);
@@ -1564,8 +1787,8 @@ gtk3_curve_button_release (GtkWidget        *widget,
 
   gtk_widget_get_allocation (widget, &allocation);
 
-  width = allocation.width - RADIUS * 2;
-  height = allocation.height - RADIUS * 2;
+  width = gtk3_curve_graph_width_from_allocation(allocation.width);
+  height = gtk3_curve_graph_height_from_allocation(allocation.height);
 
   if ((width < 0) || (height < 0))
     return FALSE;
@@ -1632,8 +1855,8 @@ gtk3_curve_motion_notify(GtkWidget *widget, GdkEventMotion *event)
 
   gtk_widget_get_allocation(widget, &allocation);
 
-  width = allocation.width - RADIUS * 2;
-  height = allocation.height - RADIUS * 2;
+  width = gtk3_curve_graph_width_from_allocation(allocation.width);
+  height = gtk3_curve_graph_height_from_allocation(allocation.height);
 
   if (width <= 1 || height <= 1)
     return FALSE;
@@ -1642,6 +1865,12 @@ gtk3_curve_motion_notify(GtkWidget *widget, GdkEventMotion *event)
 
   x = CLAMP((tx - RADIUS), 0, width - 1);
   y = CLAMP((ty - RADIUS), 0, height - 1);
+
+  priv->in_curve =
+    (tx >= RADIUS &&
+    tx <  RADIUS + width &&
+    ty >= RADIUS &&
+    ty <  RADIUS + height);
 
   priv->last_x = (gfloat) x;
   priv->last_y = (gfloat) y;
@@ -1839,7 +2068,7 @@ gtk3_curve_motion_notify(GtkWidget *widget, GdkEventMotion *event)
     g_object_unref(cursor);
   }
 
-  if ((changed || hover_changed) && gtk_widget_is_visible(widget))
+  if ((changed || hover_changed || priv->in_curve) && gtk_widget_is_visible(widget))
     gtk_widget_queue_draw(widget);
 
   return TRUE;
@@ -1880,6 +2109,42 @@ gtk3_curve_finalize (GObject *object)
 }
 
 void
+gtk3_curve_clear(GtkWidget *widget)
+{
+    Gtk3Curve *curve = GTK3_CURVE(widget);
+    Gtk3CurvePrivate *priv = curve->priv;
+
+    g_free(priv->curve_data.d_point);
+    g_free(priv->curve_data.d_cpoints);
+
+    priv->curve_data.d_point = NULL;
+    priv->curve_data.n_points = 0;
+
+    priv->curve_data.d_cpoints = NULL;
+    priv->curve_data.n_cpoints = 0;
+
+    priv->grab_point = -1;
+    priv->last = 0;
+
+    priv->hover_cpoint = -1;
+    priv->hover_cpoint_x = 0.0;
+    priv->hover_cpoint_y = 0.0;
+    priv->hover_cpoint_value = 0.0f;
+    priv->hover_cpoint_position = 0.0f;
+
+    priv->marker_x = 0.0;
+    priv->marker_y = 0.0;
+    priv->marker_value = 0.0f;
+    priv->marker_hover = FALSE;
+
+    priv->width = 0;
+    priv->height = 0;
+
+    if (gtk_widget_is_visible(widget))
+        gtk_widget_queue_draw(widget);
+}
+
+void
 gtk3_curve_set_curve_type(GtkWidget *widget, Gtk3CurveType new_type)
 {
   Gtk3Curve *curve = GTK3_CURVE(widget);
@@ -1890,10 +2155,10 @@ gtk3_curve_set_curve_type(GtkWidget *widget, Gtk3CurveType new_type)
   if (new_type == priv->curve_data.curve_type)
     return;
 
-  gint width = gtk_widget_get_allocated_width(widget) - RADIUS * 2;
-  gint height = gtk_widget_get_allocated_height(widget) - RADIUS * 2;
+  gint width = gtk3_curve_graph_width_from_allocation(gtk_widget_get_allocated_width(widget));
+  gint height = gtk3_curve_graph_height_from_allocation(gtk_widget_get_allocated_height(widget));
 
-  if (width <= 1 || height <= 1) {
+  if (width <= 1 || height <= 1 || !gtk3_curve_has_curve_data(priv)) {
     priv->curve_data.curve_type = new_type;
 
     g_signal_emit(curve, curve_type_changed_signal, 0);
@@ -2089,7 +2354,7 @@ gtk3_curve_set_vector(GtkWidget *widget, int veclen, gfloat vector[])
   priv->curve_data.curve_type = GTK3_CURVE_TYPE_FREE;
 
   if (priv->curve_data.d_point) {
-    height = gtk_widget_get_allocated_height(widget) - RADIUS * 2;
+    height = gtk3_curve_graph_height_from_allocation(gtk_widget_get_allocated_height(widget));
 
     if (height <= 1) {
       height = priv->height;
@@ -2099,7 +2364,7 @@ gtk3_curve_set_vector(GtkWidget *widget, int veclen, gfloat vector[])
         height = 128;
     }
   } else {
-    height = gtk_widget_get_allocated_height(widget) - RADIUS * 2;
+    height = gtk3_curve_graph_height_from_allocation(gtk_widget_get_allocated_height(widget));
 
     if (height <= 1) {
       height = (gint)(priv->max_y - priv->min_y);
@@ -2454,43 +2719,101 @@ gtk3_curve_set_range(GtkWidget *widget,
                      gfloat    min_y,
                      gfloat    max_y)
 {
-  Gtk3Curve *curve = GTK3_CURVE(widget);
-  Gtk3CurvePrivate *priv = curve->priv;
+    Gtk3Curve *curve = GTK3_CURVE(widget);
+    Gtk3CurvePrivate *priv = curve->priv;
 
-  if (max_x <= min_x)
-    max_x = min_x + 1.0f;
+    gfloat old_min_x = priv->min_x;
+    gfloat old_max_x = priv->max_x;
+    gfloat old_min_y = priv->min_y;
+    gfloat old_max_y = priv->max_y;
 
-  if (max_y <= min_y)
-    max_y = min_y + 1.0f;
+    gboolean had_curve =
+        ((priv->curve_data.d_point &&
+          priv->curve_data.n_points > 0) ||
+         (priv->curve_data.d_cpoints &&
+          priv->curve_data.n_cpoints > 0));
 
-  g_object_freeze_notify(G_OBJECT(curve));
+    if (max_x <= min_x)
+        max_x = min_x + 1.0f;
 
-  if (priv->min_x != min_x) {
-    priv->min_x = min_x;
-    g_object_notify(G_OBJECT(curve), "min-x");
-  }
+    if (max_y <= min_y)
+        max_y = min_y + 1.0f;
 
-  if (priv->max_x != max_x) {
-    priv->max_x = max_x;
-    g_object_notify(G_OBJECT(curve), "max-x");
-  }
+    gint old_x_len = (gint)(fabsf(old_max_x - old_min_x) + 0.5f);
+    gint new_x_len = (gint)(fabsf(max_x - min_x) + 0.5f);
 
-  if (priv->min_y != min_y) {
-    priv->min_y = min_y;
-    g_object_notify(G_OBJECT(curve), "min-y");
-  }
+    gboolean x_len_changed = (old_x_len != new_x_len);
 
-  if (priv->max_y != max_y) {
-    priv->max_y = max_y;
-    g_object_notify(G_OBJECT(curve), "max-y");
-  }
+    gboolean range_changed =
+        old_min_x != min_x ||
+        old_max_x != max_x ||
+        old_min_y != min_y ||
+        old_max_y != max_y;
 
-  g_object_thaw_notify(G_OBJECT(curve));
+    g_object_freeze_notify(G_OBJECT(curve));
 
-  priv->y_grid_resolution = gtk3_curve_auto_y_grid_resolution(priv->min_y,priv->max_y);
-  gtk3_curve_update_x_grid(priv);
-  
-  gtk3_curve_reset_vector(widget);
+    if (priv->min_x != min_x) {
+        priv->min_x = min_x;
+        g_object_notify(G_OBJECT(curve), "min-x");
+    }
+
+    if (priv->max_x != max_x) {
+        priv->max_x = max_x;
+        g_object_notify(G_OBJECT(curve), "max-x");
+    }
+
+    if (priv->min_y != min_y) {
+        priv->min_y = min_y;
+        g_object_notify(G_OBJECT(curve), "min-y");
+    }
+
+    if (priv->max_y != max_y) {
+        priv->max_y = max_y;
+        g_object_notify(G_OBJECT(curve), "max-y");
+    }
+
+    g_object_thaw_notify(G_OBJECT(curve));
+
+    priv->y_grid_resolution =
+        gtk3_curve_auto_y_grid_resolution(priv->min_y, priv->max_y);
+
+    gtk3_curve_update_x_grid(priv);
+
+    if (had_curve && range_changed) {
+        gint width  = gtk3_curve_graph_width_from_allocation(gtk_widget_get_allocated_width(widget));
+        gint height = gtk3_curve_graph_height_from_allocation(gtk_widget_get_allocated_height(widget));
+
+        if (width > 1 && height > 1) {
+            if (x_len_changed &&
+                priv->curve_data.d_cpoints &&
+                priv->curve_data.n_cpoints > 0)
+            {
+                gfloat old_span = old_max_x - old_min_x;
+                gfloat new_span = priv->max_x - priv->min_x;
+
+                if (old_span != 0.0f && new_span != 0.0f) {
+                    for (int i = 0; i < priv->curve_data.n_cpoints; i++) {
+                        gfloat t =
+                            (priv->curve_data.d_cpoints[i].x - old_min_x) /
+                            old_span;
+
+                        if (t < 0.0f)
+                            t = 0.0f;
+                        else if (t > 1.0f)
+                            t = 1.0f;
+
+                        priv->curve_data.d_cpoints[i].x =
+                            priv->min_x + (t * new_span);
+                    }
+                }
+            }
+
+            gtk3_curve_interpolate(widget, width, height);
+        }
+    }
+
+    if (gtk_widget_is_visible(widget))
+        gtk_widget_queue_draw(widget);
 }
 
 void
@@ -3005,8 +3328,8 @@ gtk3_curve_reset_vector(GtkWidget *widget)
   priv->curve_data.d_cpoints[1].x = priv->max_x;
   priv->curve_data.d_cpoints[1].y = priv->max_y;
 
-  width = gtk_widget_get_allocated_width(widget) - RADIUS * 2;
-  height = gtk_widget_get_allocated_height(widget) - RADIUS * 2;
+  width = gtk3_curve_graph_width_from_allocation(gtk_widget_get_allocated_width(widget));
+  height = gtk3_curve_graph_height_from_allocation(gtk_widget_get_allocated_height(widget));
 
   if (width <= 1 || height <= 1)
     return;

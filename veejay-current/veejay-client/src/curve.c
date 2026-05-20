@@ -43,16 +43,21 @@ void	reset_curve( GtkWidget *curve )
   gtk_widget_set_sensitive( curve, TRUE );
   if (!curve_is_empty)
   {
-    gtk3_curve_reset( curve );
+    gtk3_curve_clear(curve);
   }
-  curve_is_empty = 0;
+  curve_is_empty = 1;
+  gtk_widget_queue_draw(curve);
 }
 
-void	set_points_in_curve( Gtk3CurveType type, GtkWidget *curve)
+void set_points_in_curve(Gtk3CurveType type, GtkWidget *curve)
 {
-  gtk3_curve_set_curve_type( curve , type );
+    if (curve_is_empty)
+        return;
 
-  curve_is_empty = 0;
+    gtk3_curve_set_curve_type(curve, type);
+    curve_is_empty = 0;
+
+    gtk_widget_queue_draw(curve);
 }
 
 
@@ -145,6 +150,13 @@ void curve_set_predefined_shape(GtkWidget *curve, int fx_id, int parameter_id,
                                 int bound_min, int bound_max,
                                 int steps, gboolean reverse, double fps)
 {
+    if(shape == FX_ANIM_SHAPE_NO_SHAPE || shape < 0 || shape >= FX_ANIM_SHAPE_MAX || fx_id < 0 || parameter_id < 0)
+    {
+        curve_is_empty = 1;
+        gtk_widget_queue_draw(curve);
+        return;
+    }
+
     int param_min = 0;
     int param_max = 0;
 
@@ -211,7 +223,6 @@ void curve_set_predefined_shape(GtkWidget *curve, int fx_id, int parameter_id,
             dy = shape_diff / (float)(veclen1 - 1);
             dy = dy * ((float)(steps << 1));
             break;
-
         case FX_ANIM_SHAPE_SINE:
         case FX_ANIM_SHAPE_COSINE:
         case FX_ANIM_SHAPE_SAWTOOTH:
@@ -624,6 +635,13 @@ void curve_set_predefined_shape(GtkWidget *curve, int fx_id, int parameter_id,
                 vec[k] = shape_min + shape_diff * v;
             }
         }
+        break;
+
+        case FX_ANIM_SHAPE_NO_SHAPE:
+            free(vec);
+            curve_is_empty = 1;
+            gtk_widget_queue_draw(curve);
+            return;
         break;
 
         default:

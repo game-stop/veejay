@@ -4209,61 +4209,81 @@ static void update_current_slot(int *history, int pm, int last_pm) {
 	
 	}
 
-    /* Actions for sample mode*/
-    if( pm == MODE_SAMPLE )
+    if (pm == MODE_SAMPLE)
     {
-        /* Update marker bounds */
-        if( (history[SAMPLE_MARKER_START] != info->status_tokens[SAMPLE_MARKER_START]) )
+        const gboolean sample_bounds_changed =
+            history[SAMPLE_START] != info->status_tokens[SAMPLE_START] ||
+            history[SAMPLE_END]   != info->status_tokens[SAMPLE_END];
+
+        const gboolean frame_changed =
+            history[FRAME_NUM] != info->status_tokens[FRAME_NUM];
+
+        const gboolean marker_start_changed =
+            history[SAMPLE_MARKER_START] != info->status_tokens[SAMPLE_MARKER_START];
+
+        const gboolean marker_end_changed =
+            history[SAMPLE_MARKER_END] != info->status_tokens[SAMPLE_MARKER_END];
+
+        const gint sample_start = info->status_tokens[SAMPLE_START];
+        const gint sample_end   = info->status_tokens[SAMPLE_END];
+        const gint sample_len   = MAX(1, sample_end - sample_start + 1);
+        gint marker_duration = 0;
+
+        if (sample_bounds_changed || frame_changed)
         {
+            gint local_frame = info->status_tokens[FRAME_NUM] - sample_start;
+            local_frame = CLAMP(local_frame, 0, sample_len - 1);
+
+            timeline_set_length(info->tl,
+                (gdouble) sample_len,
+                (gdouble) local_frame);
+
             update = 1;
-            gint nm =  info->status_tokens[SAMPLE_MARKER_START];
-            if(nm >= 0)
-            {
-                gdouble in = (1.0 / (gdouble)info->status_tokens[TOTAL_FRAMES]) * nm;
-                timeline_set_in_point( info->tl, in );
-            }
-            else
-            {
-                if(pm == MODE_SAMPLE)
-                {
-                    timeline_set_in_point( info->tl, 0.0 );
-                }
-            }
-            char *start = format_framenum( info->status_tokens[SAMPLE_MARKER_START] );
-            gtk_label_set_text( GTK_LABEL(widget_cache[WIDGET_LABEL_MARKERSTART]), start);
-            free(start);
         }
 
-        if( (history[SAMPLE_MARKER_END] != info->status_tokens[SAMPLE_MARKER_END]) )
+        if (sample_bounds_changed || marker_start_changed || marker_end_changed)
         {
-            gint nm = info->status_tokens[SAMPLE_MARKER_END];
-            if(nm > 0 )
-            {
-                gdouble out = (1.0/ (gdouble)info->status_tokens[TOTAL_FRAMES]) * nm;
+            const gboolean scratch_active =
+                timeline_get_bind(TIMELINE_SELECTION(info->tl));
 
-                timeline_set_out_point( info->tl, out );
+            gint marker_start = info->status_tokens[SAMPLE_MARKER_START];
+            gint marker_end   = info->status_tokens[SAMPLE_MARKER_END];
+            marker_duration = marker_end - marker_start + 1;
+            
+            if(marker_start >= 0 && marker_end > marker_start) {
+                timeline_set_in_and_out_point(info->tl,
+                        (gdouble) marker_start,
+                        (gdouble) marker_end);
+
+                timeline_set_selection(info->tl, TRUE);
+
+                info->selection[1] = marker_start;
+                info->selection[0] = marker_end;
             }
             else
             {
-                if(pm == MODE_SAMPLE)
-                {
-                    timeline_set_out_point(info->tl, 1.0 );
-                }
+                timeline_set_in_and_out_point(info->tl, 0.0, sample_len);
+                timeline_set_selection(info->tl, TRUE);
+                marker_duration = sample_len;
+                info->selection[1] = -1;
+                info->selection[0] = -1;
             }
 
-            char *end = format_framenum( info->status_tokens[SAMPLE_MARKER_END]);
-            gtk_label_set_text( GTK_LABEL(widget_cache[WIDGET_LABEL_MARKEREND]), end);
+            char *start = format_framenum(marker_start);
+            gtk_label_set_text(GTK_LABEL(widget_cache[WIDGET_LABEL_MARKERSTART]), start);
+            free(start);
+
+            char *end = format_framenum(marker_end);
+            gtk_label_set_text(GTK_LABEL(widget_cache[WIDGET_LABEL_MARKEREND]), end);
             free(end);
 
+            char *dur = format_framenum(marker_duration);
+            gtk_label_set_text(GTK_LABEL(widget_cache[WIDGET_LABEL_MARKERDURATION]), dur);
+            free(dur);
+
+
             update = 1;
         }
-
-        if( history[SAMPLE_MARKER_START] != info->status_tokens[SAMPLE_MARKER_START] ||
-            history[SAMPLE_MARKER_END] != info->status_tokens[SAMPLE_MARKER_END]) {
-                char *dur = format_framenum( info->status_tokens[SAMPLE_MARKER_END] - info->status_tokens[SAMPLE_MARKER_START]);
-                gtk_label_set_text( GTK_LABEL(widget_cache[WIDGET_LABEL_MARKERDURATION]),dur);
-                free(dur);        
-            }
 
         if( history[SAMPLE_LOOP] != info->status_tokens[SAMPLE_LOOP])
         {
@@ -4324,33 +4344,41 @@ static void update_current_slot(int *history, int pm, int last_pm) {
             update = 1;
         }
 
-        if(update)
+        
+        if (update)
         {
-            speed = info->status_tokens[SAMPLE_SPEED];
-            if(speed < 0 ) info->play_direction = -1; else info->play_direction = 1;
+            const gint sample_start = info->status_tokens[SAMPLE_START];
+            const gint sample_end   = info->status_tokens[SAMPLE_END];
+            const gint sample_len   = MAX(1, sample_end - sample_start + 1);
 
-            gint len = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START] + 1;
+            gint speed = info->status_tokens[SAMPLE_SPEED];
 
-            int speed = info->status_tokens[SAMPLE_SPEED];
-            if(speed < 0 ) info->play_direction = -1; else info->play_direction = 1;
-            if(speed < 0 ) speed *= -1;
+            info->play_direction = (speed < 0) ? -1 : 1;
 
+            if (speed < 0)
+                speed = -speed;
 
-            update_spin_range2( widget_cache[ WIDGET_SPIN_SAMPLESPEED ], -1 * len, len, speed );
+            update_spin_range2(widget_cache[WIDGET_SPIN_SAMPLESPEED],
+                -sample_len,
+                sample_len,
+                speed);
 
-            gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLESTART]), (gdouble) info->status_tokens[SAMPLE_START] );
-            gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLEEND]), (gdouble) info->status_tokens[SAMPLE_END]);
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLESTART]),
+                (gdouble) sample_start);
 
-            timeline_set_length( info->tl,
-                (gdouble) info->status_tokens[SAMPLE_END], 
-                info->status_tokens[FRAME_NUM] );
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLEEND]),
+                (gdouble) sample_end);
 
-            if(info->selected_slot) {
-                sample_gui_slot_t* gui_slot = find_gui_slot_by_sample(info->selected_slot->sample_id, info->selected_slot->sample_type);
+            if (info->selected_slot)
+            {
+                sample_gui_slot_t *gui_slot = find_gui_slot_by_sample(info->selected_slot->sample_id,
+                                                                    info->selected_slot->sample_type);
                 if (gui_slot != NULL)
-                    put_text( "entry_samplename", gtk_label_get_text( GTK_LABEL(gui_slot->title)) );
+                    put_text("entry_samplename", gtk_label_get_text(GTK_LABEL(gui_slot->title)));
             }
         }
+
+
     }
 
 
@@ -7308,28 +7336,6 @@ void get_gd(char *buf, char *suf, const char *filename)
 GdkPixbuf   *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type )
 {
     return gdk_pixbuf_scale_simple( src,dw,dh,inter_type );
-/*
-    GdkPixbuf *res = gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, dw, dh );
-#ifdef STRICT_CHECKING
-    assert( GDK_IS_PIXBUF( res ) );
-#endif
-    uint8_t *res_out = gdk_pixbuf_get_pixels( res );
-    uint8_t *src_in  = gdk_pixbuf_get_pixels( src );
-    uint32_t src_w   = gdk_pixbuf_get_width( src );
-    uint32_t src_h   = gdk_pixbuf_get_height( src );
-    int dst_w = gdk_pixbuf_get_width( res );
-    int dst_h = gdk_pixbuf_get_height( res );
-    VJFrame *src1 = yuv_rgb_template( src_in, src_w, src_h, PIX_FMT_BGR24 );
-    VJFrame *dst1 = yuv_rgb_template( res_out, dst_w, dst_h, PIX_FMT_BGR24 );
-
-    veejay_msg(VEEJAY_MSG_ERROR, "%s: %dx%d -> %dx%d", __FUNCTION__, src_w,src_h,dst_w,dst_h );
-
-    yuv_convert_any_ac( src1,dst1, src1->format, dst1->format );
-
-    free(src1);
-    free(dst1);
-
-    return res;*/
 }
 
 //static int tick = 0;
@@ -7669,7 +7675,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         else
             gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_SAMPLE_LENGTH_LABEL] ), "0:00:00:00" );
 
-        timeline_set_length( info->tl, (gdouble) total_frames_ , current_frame_);
+        timeline_set_length( info->tl, (gdouble) total_frames_ , (gdouble) current_frame_);
 
         if( pm != MODE_STREAM )
             info->uc.reload_hint[HINT_EL] = 1;
@@ -8926,6 +8932,8 @@ void vj_gui_init(const char *glade_file,
         (GCallback) on_timeline_in_point_changed, NULL );
     g_signal_connect( info->tl, "out_point_changed",
         (GCallback) on_timeline_out_point_changed, NULL );
+    g_signal_connect(info->tl, "selection_changed",
+        (GCallback) on_timeline_selection_changed, NULL);
     g_signal_connect( info->tl, "bind_toggled",
         (GCallback) on_timeline_bind_toggled, NULL );
     g_signal_connect( info->tl, "cleared",
@@ -9817,8 +9825,8 @@ static gboolean on_cacheslot_activated_by_mouse (GtkWidget *widget, GdkEventButt
                "Start playing %s %d",
                (g->sample_type==0 ? "Sample" : "Stream" ), g->sample_id );
         }
-        multi_vims(VIMS_SET_MODE_AND_GO, "%d %d",g->sample_id, g->sample_type);
-        vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO,g->sample_id, g->sample_type);
+        multi_vims(VIMS_SET_MODE_AND_GO, "%d %d",g->sample_id, g->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM);
+        vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO,g->sample_id, g->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM);
     }
     return FALSE;
 }
@@ -10006,13 +10014,13 @@ static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *e
         multi_vims( VIMS_SET_MODE_AND_GO,
                     "%d %d",
                     (select_slot->sample_id),
-                    (select_slot->sample_type==0? MODE_SAMPLE:MODE_STREAM));
+                    (select_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM));
 
         vj_midi_learning_vims_msg2( info->midi,
                                     NULL,
                                     VIMS_SET_MODE_AND_GO,
                                     select_slot->sample_id,
-                                    select_slot->sample_type);
+                                    select_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM);
 
         vj_msg(VEEJAY_MSG_INFO,
                "Start playing %s %d (%s)",

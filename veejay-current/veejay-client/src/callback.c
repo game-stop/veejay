@@ -3791,7 +3791,7 @@ void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
 			(info->selected_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM ));
 		vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO,
 				info->selected_slot->sample_id,
-				info->selected_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE: MODE_STREAM);
+				(info->selected_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM) );
 	}
 }
 
@@ -3824,24 +3824,175 @@ void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 				page_needed );
 }
 
-void	on_timeline_move_selection(void) {
-	vj_midi_learning_vims_msg2_extra( info->midi, VIMS_SAMPLE_MOVE_MARKER, 0, 4);
+static gint timeline_marker_last_sent_sample = -1;
+static gint timeline_marker_last_sent_center = -1;
+static gint timeline_marker_last_sent_start  = -1;
+static gint timeline_marker_last_sent_end    = -1;
+
+static void timeline_marker_move_reset_cache(void)
+{
+    timeline_marker_last_sent_sample = -1;
+    timeline_marker_last_sent_center = -1;
+    timeline_marker_last_sent_start  = -1;
+    timeline_marker_last_sent_end    = -1;
 }
 
-void	on_timeline_cleared(GtkWidget *widget, gpointer user_data)
+static gboolean timeline_read_current_marker(gint *marker_start_out,
+                                             gint *marker_end_out,
+                                             gint *marker_center_backend_out)
 {
-    if( info->status_tokens[PLAY_MODE] == MODE_SAMPLE && !info->status_lock) {
-	    multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0 );
-	    vj_midi_learning_vims_msg( info->midi, NULL, VIMS_SAMPLE_CLEAR_MARKER, 0 );
+    if (info == NULL || info->tl == NULL)
+        return FALSE;
+
+    if (info->status_lock)
+        return FALSE;
+
+    if (info->status_tokens[PLAY_MODE] != MODE_SAMPLE)
+        return FALSE;
+
+    TimelineSelection *tl = TIMELINE_SELECTION(info->tl);
+
+    if (!timeline_get_selection(tl))
+        return FALSE;
+
+    const gint sample_start = info->status_tokens[SAMPLE_START];
+    const gint sample_end   = info->status_tokens[SAMPLE_END];
+    const gint sample_len   = MAX(1, sample_end - sample_start + 1);
+
+    gint marker_start = (gint) (timeline_get_in_point(tl) + 0.5);
+    gint marker_end   = (gint) (timeline_get_out_point(tl) + 0.5);
+
+    marker_start = CLAMP(marker_start, 0, sample_len - 1);
+    marker_end   = CLAMP(marker_end,   0, sample_len - 1);
+
+    if (marker_end < marker_start) {
+        const gint tmp = marker_start;
+        marker_start = marker_end;
+        marker_end = tmp;
+    }
+
+    const gint marker_center_local =
+        marker_start + ((marker_end - marker_start) / 2);
+
+    const gint marker_center_backend =
+        sample_start + marker_center_local;
+
+    if (marker_start_out)
+        *marker_start_out = marker_start;
+
+    if (marker_end_out)
+        *marker_end_out = marker_end;
+
+    if (marker_center_backend_out)
+        *marker_center_backend_out = marker_center_backend;
+
+    return TRUE;
+}
+
+static gboolean timeline_send_marker_move_now(const char *reason)
+{
+    if (info == NULL || info->tl == NULL)
+        return FALSE;
+
+    if (info->status_lock)
+        return FALSE;
+
+    if (info->status_tokens[PLAY_MODE] != MODE_SAMPLE)
+        return FALSE;
+
+    gint marker_start = 0;
+    gint marker_end = 0;
+    gint marker_center_backend = 0;
+
+    if (!timeline_read_current_marker(&marker_start,
+                                      &marker_end,
+                                      &marker_center_backend))
+    {
+        return FALSE;
+    }
+
+    const gint sample_id = 0;
+
+    if (timeline_marker_last_sent_sample == sample_id &&
+        timeline_marker_last_sent_center == marker_center_backend &&
+        timeline_marker_last_sent_start  == marker_start &&
+        timeline_marker_last_sent_end    == marker_end)
+    {
+        return FALSE;
+    }
+
+    const gint sample_start = info->status_tokens[SAMPLE_START];
+
+    info->selection[1] = sample_start + marker_start;
+    info->selection[0] = sample_start + marker_end;
+
+    multi_vims(VIMS_SAMPLE_MOVE_MARKER,
+        "%d %d",
+        sample_id,
+        marker_center_backend);
+
+    timeline_marker_last_sent_sample = sample_id;
+    timeline_marker_last_sent_center = marker_center_backend;
+    timeline_marker_last_sent_start  = marker_start;
+    timeline_marker_last_sent_end    = marker_end;
+
+    return TRUE;
+}
+
+void on_timeline_move_selection(void)
+{
+    if (info == NULL || info->tl == NULL )
+        return;
+
+    if (info->status_lock)
+        return;
+
+    if (info->status_tokens[PLAY_MODE] != MODE_SAMPLE)
+        return;
+
+    TimelineSelection *tl = TIMELINE_SELECTION(info->tl);
+
+    if (!timeline_get_bind(tl))
+        return;
+
+    if (!timeline_get_selection(tl))
+        return;
+
+    timeline_send_marker_move_now("selection_changed");
+}
+
+void on_timeline_selection_changed(GtkWidget *widget, gpointer user_data)
+{
+    (void) user_data;
+
+    TimelineSelection *tl = TIMELINE_SELECTION(widget);
+
+    on_timeline_move_selection();
+}
+
+void on_timeline_cleared(GtkWidget *widget, gpointer user_data)
+{
+    (void) widget;
+    (void) user_data;
+
+    timeline_marker_move_reset_cache();
+
+    if (info &&
+        info->status_tokens[PLAY_MODE] == MODE_SAMPLE &&
+        !info->status_lock)
+    {
+        multi_vims(VIMS_SAMPLE_CLEAR_MARKER, "%d", 0);
+        vj_midi_learning_vims_msg(info->midi, NULL, VIMS_SAMPLE_CLEAR_MARKER, 0);
     }
 }
 
-void	on_timeline_bind_toggled( GtkWidget *widget, gpointer user_data)
+void on_timeline_bind_toggled(GtkWidget *widget, gpointer user_data)
 {
-//	gboolean toggled = timeline_get_bind( TIMELINE_SELECTION(widget)) ;
-//	set_toggle_button( "check_marker_bind", (toggled ? 1 :0) );
-}
+    (void) widget;
+    (void) user_data;
 
+    timeline_marker_move_reset_cache();
+}
 void	on_timeline_value_changed( GtkWidget *widget, gpointer user_data )
 {
 	if(!info->status_lock)
@@ -3888,65 +4039,70 @@ void	on_len_mul_clicked(GtkWidget *widget, gpointer user_data)
 	vj_midi_learning_vims_msg(info->midi, NULL, VIMS_SAMPLE_GROW_MARKER, 0);
 }
 
-void	on_timeline_out_point_changed(GtkWidget *widget, gpointer user_data)
+void on_timeline_out_point_changed(GtkWidget *widget, gpointer user_data)
 {
-	if(!info->status_lock)
-	{
+    if (info->status_lock)
+        return;
 
-		gdouble pos1 = timeline_get_in_point( TIMELINE_SELECTION(widget) );
-		gdouble pos2 = timeline_get_out_point( TIMELINE_SELECTION(widget) );
-		pos1 *= info->status_tokens[TOTAL_FRAMES];
-		pos2 *= info->status_tokens[TOTAL_FRAMES];
-		if(pos2 > pos1 )
-		{
-			multi_vims( VIMS_SAMPLE_SET_MARKER , "%d %d %d", 0,(gint) pos1, (gint) pos2 );
-			char *dur = format_framenum( pos2 - pos1);
-			char *end = format_framenum( pos2 );
-			update_label_str( "label_markerduration", dur );
-			update_label_str( "label_markerend", end);
-			free(dur);
-			free(end);
+    const gint sample_start = info->status_tokens[SAMPLE_START];
+    const gint sample_end   = info->status_tokens[SAMPLE_END];
+    const gint sample_len   = MAX(1, sample_end - sample_start + 1);
 
-			update_spin_value ( "button_el_selend", pos2 );
-			update_spin_value ( "curve_spinend", pos2 );
-			info->selection[0] = pos2;
-			
-			vj_midi_learning_vims_msg2_extra(info->midi, VIMS_SAMPLE_SET_MARKER_END, 0, 4); 
-		}
-		else
-			vj_msg(VEEJAY_MSG_INFO, "Set Out point after In point !");
-		
+    gint out_b = (gint)(timeline_get_out_point(TIMELINE_SELECTION(widget)) + 0.5);
+    out_b = CLAMP(out_b, 1, sample_len);
 
-	}
+    const gint abs_end = sample_start + out_b - 1;
+
+    gint abs_start = info->status_tokens[SAMPLE_MARKER_START];
+
+    if (abs_start < sample_start || abs_start > sample_end || abs_start > abs_end)
+        abs_start = sample_start;
+
+    multi_vims(VIMS_SAMPLE_SET_MARKER, "%d %d %d",
+        0,
+        abs_start,
+        abs_end);
+
+    info->selection[0] = abs_end;
+    info->selection[1] = abs_start;
+
+    vj_midi_learning_vims_msg2_extra(info->midi,
+        VIMS_SAMPLE_SET_MARKER_END,
+        0,
+        4);
 }
 
-void	on_timeline_in_point_changed(GtkWidget *widget, gpointer user_data)
+void on_timeline_in_point_changed(GtkWidget *widget, gpointer user_data)
 {
-	if(!info->status_lock)
-	{
-		gdouble pos1 = timeline_get_in_point( TIMELINE_SELECTION(widget) );
-		gdouble pos2 = timeline_get_out_point( TIMELINE_SELECTION(widget) );
-		pos1 *= info->status_tokens[TOTAL_FRAMES];
-		pos2 *= info->status_tokens[TOTAL_FRAMES];
-		if(pos1 < pos2 )
-		{
-			multi_vims( VIMS_SAMPLE_SET_MARKER , "%d %d %d", 0, (gint) pos1, (gint) pos2 );
-			char *dur = format_framenum( pos2 - pos1 );
-			char *start = format_framenum(pos1);
-			update_label_str( "label_markerduration", dur );
-			update_label_str( "label_markerstart", start);
-			free(dur);
-			free(start);
+    if (info->status_lock)
+        return;
 
-			update_spin_value( "button_el_selstart",pos1 );
-			update_spin_value( "curve_spinstart", pos1 );
-			info->selection[1] = pos1;
+    const gint sample_start = info->status_tokens[SAMPLE_START];
+    const gint sample_end   = info->status_tokens[SAMPLE_END];
+    const gint sample_len   = MAX(1, sample_end - sample_start + 1);
 
-			vj_midi_learning_vims_msg2_extra(info->midi, VIMS_SAMPLE_SET_MARKER_START, 0, 4); 
-		}
-		else
-			vj_msg(VEEJAY_MSG_INFO,"Set In Point before Out Point !");
-	}
+    gint in_b = (gint)(timeline_get_in_point(TIMELINE_SELECTION(widget)) + 0.5);
+    in_b = CLAMP(in_b, 0, sample_len - 1);
+
+    const gint abs_start = sample_start + in_b;
+
+    gint abs_end = info->status_tokens[SAMPLE_MARKER_END];
+
+    if (abs_end <= 0 || abs_end < sample_start || abs_end > sample_end || abs_end < abs_start)
+        abs_end = sample_end;
+
+    multi_vims(VIMS_SAMPLE_SET_MARKER, "%d %d %d",
+        0,
+        abs_start,
+        abs_end);
+
+    info->selection[0] = abs_end;
+    info->selection[1] = abs_start;
+
+    vj_midi_learning_vims_msg2_extra(info->midi,
+        VIMS_SAMPLE_SET_MARKER_START,
+        0,
+        4);
 }
 
 void	on_sampleadd_clicked(GtkWidget *widget, gpointer user_data)
