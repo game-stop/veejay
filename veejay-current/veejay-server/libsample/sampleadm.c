@@ -93,7 +93,9 @@ extern void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *fo
 extern void   tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp );
 extern int vj_tag_highest_valid_id();
 extern int sample_stop_encoder(int s1);
-static void sample_del_internal(sample_info *si, int skip_edl);
+static void sample_del_internal_ex(sample_info *si, int skip_edl_close, int recycle_id);
+static void sample_del_internal(sample_info *si, int skip_edl_close);
+static void sample_normalize_marker_info(sample_info *sample);
 
 unsigned int sample_size(void)
 {
@@ -215,8 +217,105 @@ void    sample_set_project(int fmt, int deinterlace, int flags, int force, char 
     __sample_project_settings.norm = norm;
     __sample_project_settings.width = w;
     __sample_project_settings.height = h;
+}
 
-} 
+static int sample_effective_range_from_info(sample_info *sample, int *start, int *end)
+{
+    if (!sample || !start || !end)
+        return 0;
+
+    int s = sample->first_frame;
+    int e = sample->last_frame;
+
+    if (sample->marker_end > 0 && sample->marker_start >= 0) {
+        s = sample->marker_start;
+        e = sample->marker_end;
+    }
+
+    if (s < sample->first_frame)
+        s = sample->first_frame;
+
+    if (e > sample->last_frame)
+        e = sample->last_frame;
+
+    if (s < 0 || e < s)
+        return 0;
+
+    *start = s;
+    *end = e;
+    return 1;
+}
+
+static void sample_clamp_resume_info(sample_info *sample)
+{
+    int start;
+    int end;
+
+    if (!sample_effective_range_from_info(sample, &start, &end))
+        return;
+
+    if (sample->resume_pos < start)
+        sample->resume_pos = start;
+    else if (sample->resume_pos > end)
+        sample->resume_pos = end;
+}
+
+static void sample_normalize_marker_info(sample_info *sample)
+{
+    if (!sample)
+        return;
+
+    if (sample->marker_end <= 0)
+        return;
+
+    int first = sample->first_frame;
+    int last  = sample->last_frame;
+
+    if (first < 0)
+        first = 0;
+
+    if (last < first) {
+        sample->marker_start = 0;
+        sample->marker_end = 0;
+        return;
+    }
+
+    int s = sample->marker_start;
+    int e = sample->marker_end;
+
+    if (s < first)
+        s = first;
+    else if (s > last)
+        s = last;
+
+    if (e < first)
+        e = first;
+    else if (e > last)
+        e = last;
+
+    if (e <= s) {
+        if (s < last) {
+            e = s + 1;
+        }
+        else if (last > first) {
+            s = last - 1;
+            e = last;
+        }
+        else {
+            s = first;
+            e = last;
+        }
+    }
+
+    sample->marker_start = s;
+    sample->marker_end = e;
+}
+
+static void sample_clamp_resume_to_range(int s1)
+{
+    sample_clamp_resume_info(sample_get(s1));
+}
+
 void    *sample_get_dict( int sample_id )
 {
 #ifdef HAVE_FREETYPE
@@ -227,16 +326,6 @@ void    *sample_get_dict( int sample_id )
     return NULL;
 }
 
-/****************************************************************************************************
- *
- * sample_init()
- * \param len TODO
- * \param font
- * \param pedl
- *
- * call before using any other function as sample_skeleton_new
- *
- ****************************************************************************************************/
 int sample_init(int len, void *font, editlist *pedl, void *info)
 {
     if (!initialized) {
@@ -270,9 +359,8 @@ void    sample_free(void *edl)
 
 int sample_set_state(int new_state)
 {
-    if (new_state == SAMPLE_LOAD || new_state == SAMPLE_RUN
-    || new_state == SAMPLE_PEEK) {
-    sampleadm_state = new_state;
+    if (new_state == SAMPLE_LOAD || new_state == SAMPLE_RUN || new_state == SAMPLE_PEEK) {
+        sampleadm_state = new_state;
     }
     return sampleadm_state;
 }
@@ -343,14 +431,14 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     snprintf(si->descr,SAMPLE_MAX_DESCR_LEN, "Sample %4d", si->sample_id);
     si->first_frame = startFrame;
     si->last_frame = endFrame;
-    si->resume_pos = 0;
     si->edit_list = NULL;   // clone later
     si->soft_edl = 1;
     si->speed = 1;
+    si->resume_pos = (si->speed < 0) ? endFrame : startFrame;
+    
     si->looptype = 1; // normal looping
     si->audio_volume = 50;
     si->marker_start = 0;
-    si->marker_end = 0;
     si->effect_toggle = 1;
     si->fade_method = 0;
     si->fade_alpha = 0;
@@ -388,21 +476,24 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     return si;
 }
 
-
 int sample_store(sample_info *skel, int skip_edl_close)
 {
-    if (!skel) return -1;
+    if (!skel)
+        return -1;
+
+    sample_clamp_resume_info(skel);
 
     hnode_t *node = hash_lookup(SampleHash, sample_key(skel->sample_id));
     if (node) {
         sample_info *target = hnode_get(node);
         if (target) {
-            sample_del_internal(target, skip_edl_close);
+            sample_del_internal_ex(target, skip_edl_close, 0);
         }
         hnode_put(node, skel);
     } else {
         node = hnode_create(skel);
-        if (!node) return -1;
+        if (!node)
+            return -1;
         hash_insert(SampleHash, node, sample_key(skel->sample_id));
     }
 
@@ -574,13 +665,16 @@ int sample_get_longest(int sample_id)
 int sample_get_startFrame(int sample_id)
 {
     sample_info *si = sample_get(sample_id);
-    if (si) {
-    if (si->marker_start >= 0 || si->marker_end > 0)
-        return si->marker_start;
-        else
-        return si->first_frame;
-    }
-    return -1;
+    if (!si)
+        return -1;
+
+    int start;
+    int end;
+
+    if (!sample_effective_range_from_info(si, &start, &end))
+        return -1;
+
+    return start;
 }
 
 int sample_has_cali_fx(int sample_id)
@@ -815,51 +909,62 @@ int sample_set_fader_inc(int s1, float inc) {
   return 1;
 }
 
-int sample_marker_clear(int sample_id) {
+int sample_marker_clear(int sample_id)
+{
     sample_info *si = sample_get(sample_id);
     if (!si)
-    return -1;
+        return -1;
+
     si->marker_start = 0;
-    si->marker_end   = 0;
+    si->marker_end = 0;
+
     veejay_msg(VEEJAY_MSG_INFO, "Marker cleared (%d - %d) - (speed=%d)",
-    si->marker_start, si->marker_end, si->speed);
+        si->marker_start, si->marker_end, si->speed);
+
+    sample_clamp_resume_info(si);
+
     return 1;
 }
-
 int sample_set_marker_start(int sample_id, int marker)
 {
     sample_info *si = sample_get(sample_id);
     if (!si)
         return -1;
 
-    if( marker < si->first_frame )
+    if (marker < si->first_frame)
         marker = si->first_frame;
-    else if( marker > si->last_frame )
+    else if (marker > si->last_frame)
         marker = si->last_frame;
 
     si->marker_start = marker;
-    
+
+    sample_normalize_marker_info(si);
+    sample_clamp_resume_info(si);
+
     return 1;
 }
-
 int sample_set_marker(int sample_id, int start, int end)
 {
     sample_info *si = sample_get(sample_id);
-    if(!si) return 0;
-    
-    if( start < si->first_frame )
+    if (!si)
+        return 0;
+
+    if (start < si->first_frame)
         start = si->first_frame;
-    else if( start >= si->last_frame )
-        start = si->last_frame - 1;
-    
-    if( end <= si->first_frame )
+    else if (start > si->last_frame)
+        start = si->last_frame;
+
+    if (end <= si->first_frame)
         end = si->first_frame + 1;
-    else if( end > si->last_frame )
-        end = si->last_frame; 
+    else if (end > si->last_frame)
+        end = si->last_frame;
 
     si->marker_start = start;
     si->marker_end = end;
-    
+
+    sample_normalize_marker_info(si);
+    sample_clamp_resume_info(si);
+
     return 1;
 }
 
@@ -869,13 +974,16 @@ int sample_set_marker_end(int sample_id, int marker)
     if (!si)
         return -1;
 
-    if( marker <= si->first_frame )
+    if (marker <= si->first_frame)
         marker = si->first_frame + 1;
-    else if( marker > si->last_frame )
-        marker = si->last_frame; 
+    else if (marker > si->last_frame)
+        marker = si->last_frame;
 
-    si->marker_end      = marker;
-    
+    si->marker_end = marker;
+
+    sample_normalize_marker_info(si);
+    sample_clamp_resume_info(si);
+
     return 1;
 }
 
@@ -908,25 +1016,21 @@ int sample_get_description(int sample_id, char *description)
     return 0;
 }
 
-/****************************************************************************************************
- *
- * sample_get_endFrame(int sample_id)
- *
- * returns last frame of sample.
- *
- ****************************************************************************************************/
 int sample_get_endFrame(int sample_id)
 {
     sample_info *si = sample_get(sample_id);
-    if (si) {
-    if (si->marker_end > 0 && si->marker_start >= 0)
-        return si->marker_end;
-     else {
-        return si->last_frame;
-    }
-    }
-    return -1;
+    if (!si)
+        return -1;
+
+    int start;
+    int end;
+
+    if (!sample_effective_range_from_info(si, &start, &end))
+        return -1;
+
+    return end;
 }
+
 /****************************************************************************************************
  *
  * sample_del( sample_nr )
@@ -1129,16 +1233,20 @@ static void sample_copy_rec_info(sample_info *si, sample_info *existing) {
     si->resume_pos = existing->resume_pos;
 }
 
-static void sample_del_internal(sample_info *si, int skip_edl_close)
+static void sample_del_internal_ex(sample_info *si, int skip_edl_close, int recycle_id)
 {
-    if (!si) return;
+    if (!si)
+        return;
 
-    if(!skip_edl_close) {
-        sample_chain_free(si->sample_id, 1);
+    int old_id = si->sample_id;
+
+    if (!skip_edl_close) {
+        sample_chain_free(old_id, 1);
 
         for (int i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
             if (si->effect_chain[i] && si->effect_chain[i]->kf) {
                 vpf(si->effect_chain[i]->kf);
+                si->effect_chain[i]->kf = NULL;
             }
         }
     }
@@ -1149,16 +1257,19 @@ static void sample_del_internal(sample_info *si, int skip_edl_close)
     }
 
 #ifdef HAVE_FREETYPE
-    if (si->dict)
+    if (si->dict) {
         vj_font_dictionary_destroy(sample_font_, si->dict);
+        si->dict = NULL;
+    }
 #endif
 
     if (!skip_edl_close && si->edit_list) {
-        sample_close_edl(si->sample_id, si->edit_list);
+        sample_close_edl(old_id, si->edit_list);
+        si->edit_list = NULL;
     }
 
-    if(!skip_edl_close && (si->encoder || si->encoder_file) ) {
-        sample_stop_encoder(si->sample_id);
+    if (!skip_edl_close && (si->encoder || si->encoder_file)) {
+        sample_stop_encoder(old_id);
     }
 
     if (si->encoder_destination) {
@@ -1166,29 +1277,39 @@ static void sample_del_internal(sample_info *si, int skip_edl_close)
         si->encoder_destination = NULL;
     }
 
-    if (si->main_fx) { // destroys fx chain
+    if (si->main_fx) {
         free(si->main_fx);
         si->main_fx = NULL;
     }
 
-    vj_macro_free(si->macro);
+    if (si->macro) {
+        vj_macro_free(si->macro);
+        si->macro = NULL;
+    }
 
     si->sample_id = 0;
 
-    if (si->sample_id >= 0 && si->sample_id < SAMPLE_MAX_SAMPLES)
-        sample_cache[si->sample_id] = NULL;
+    if (old_id >= 0 && old_id < SAMPLE_MAX_SAMPLES)
+        sample_cache[old_id] = NULL;
 
-    int next_tail = avail_tail + 1;
-    if (next_tail >= SAMPLE_MAX_SAMPLES) {
-        next_tail = 0;
-    }
+    if (recycle_id && old_id > 0 && old_id < SAMPLE_MAX_SAMPLES) {
+        int next_tail = avail_tail + 1;
 
-    if (next_tail != avail_head) {
-        avail_num[avail_tail] = si->sample_id;
-        avail_tail = next_tail;
+        if (next_tail >= SAMPLE_MAX_SAMPLES)
+            next_tail = 0;
+
+        if (next_tail != avail_head) {
+            avail_num[avail_tail] = old_id;
+            avail_tail = next_tail;
+        }
     }
 
     free(si);
+}
+
+static void sample_del_internal(sample_info *si, int skip_edl_close)
+{
+    sample_del_internal_ex(si, skip_edl_close, 1);
 }
 
 int sample_del(int sample_id)
@@ -1211,7 +1332,6 @@ int sample_del(int sample_id)
 
     return 1;
 }
-
 void sample_del_all(void *edl)
 {
     hscan_t hs;
@@ -1223,19 +1343,20 @@ void sample_del_all(void *edl)
         sample_info *si = (sample_info *) hnode_get(node);
         hash_scan_delete(SampleHash, node);
 
-        sample_del_internal(si,0);
+        sample_del_internal_ex(si, 0, 0);
 
         hnode_destroy(node);
     }
 
-    veejay_memset( avail_num, 0, sizeof(avail_num) );
+    veejay_memset(avail_num, 0, sizeof(avail_num));
+    avail_head = 0;
+    avail_tail = 0;
     next_avail_num = 0;
     this_sample_id = 0;
 
-    hash_free_nodes( SampleHash );
+    hash_free_nodes(SampleHash);
     recount_hash = 1;
 }
-
 sample_eff_chain **sample_get_effect_chain(int s1)
 {
     sample_info *sample = sample_get(s1);
@@ -1296,36 +1417,30 @@ int sample_get_chain_status(int s1, int position)
     return -1;
     return sample->effect_chain[position]->e_flag;
 }
-
 int sample_set_resume_override(int s1, long position)
 {
     sample_info *sample = sample_get(s1);
-    if(!sample)
+    if (!sample)
         return -1;
 
-    int start = sample_get_startFrame(s1);
-    int end   = sample_get_endFrame(s1);
+    int start;
+    int end;
 
-    if(position == -1)
-    {
-        if(sample->resume_pos < start || sample->resume_pos > end)
-        {
-            sample->resume_pos =
-                (sample->speed < 0) ? end : start;
-        }
-        else
-        {
-            if(sample->resume_pos < start)
-                sample->resume_pos = start;
+    if (!sample_effective_range_from_info(sample, &start, &end))
+        return -1;
 
-            if(sample->resume_pos > end)
-                sample->resume_pos = end;
-        }
+    if (position == -1) {
+        if (sample->resume_pos < start || sample->resume_pos > end)
+            sample->resume_pos = (sample->speed < 0) ? end : start;
 
         sample->loop_pp = 0;
     }
-    else
-    {
+    else {
+        if (position < start)
+            position = start;
+        else if (position > end)
+            position = end;
+
         sample->resume_pos = position;
     }
 
@@ -1335,38 +1450,43 @@ int sample_set_resume_override(int s1, long position)
 int sample_get_remaining_frames(int sample_id)
 {
     sample_info *si = sample_get(sample_id);
-    if(!si)
+    if (!si)
         return 1;
 
-    int start = sample_get_startFrame(sample_id);
-    int end   = sample_get_endFrame(sample_id);
+    int start;
+    int end;
 
-    int pos   = si->resume_pos;
+    if (!sample_effective_range_from_info(si, &start, &end))
+        return 1;
 
-    if(pos < start)
+    int pos = si->resume_pos;
+
+    if (pos < start)
         pos = start;
-
-    if(pos > end)
+    else if (pos > end)
         pos = end;
 
-    if(si->speed < 0)
+    if (si->speed < 0)
         return (pos - start) + 1;
 
     return (end - pos) + 1;
 }
 
-int sample_set_resume(int s1,long position)
+int sample_set_resume(int s1, long position)
 {
     sample_info *sample = sample_get(s1);
-    if(!sample)
+    if (!sample)
         return -1;
 
-    if(position == -1) {
-        int start = sample_get_startFrame(s1);
-        int end = sample_get_endFrame(s1);
+    int start;
+    int end;
 
-        if( sample->speed < 0) {
-            if(sample->resume_pos <= start) {
+    if (!sample_effective_range_from_info(sample, &start, &end))
+        return -1;
+
+    if (position == -1) {
+        if (sample->speed < 0) {
+            if (sample->resume_pos <= start) {
                 sample->speed = sample->speed * -1;
                 sample->resume_pos = start;
             }
@@ -1374,8 +1494,8 @@ int sample_set_resume(int s1,long position)
                 sample->resume_pos = end;
             }
         }
-        else if(sample->speed >= 0) {
-            if(sample->resume_pos >= end) {
+        else {
+            if (sample->resume_pos >= end) {
                 sample->speed = sample->speed * -1;
                 sample->resume_pos = end;
             }
@@ -1387,11 +1507,17 @@ int sample_set_resume(int s1,long position)
         sample->loop_pp = 0;
     }
     else {
+        if (position < start)
+            position = start;
+        else if (position > end)
+            position = end;
+
         sample->resume_pos = position;
     }
 
     return 1;
 }
+
 long    sample_get_resume(int s1)
 {
     sample_info *sample = sample_get(s1);
@@ -2002,31 +2128,28 @@ int sample_set_playmode(int s1, int playmode)
     return 1;
 }
 
-
-
-/*************************************************************************************************
- * update start frame
- *
- *************************************************************************************************/
 int sample_set_startframe(int s1, long frame_num)
 {
     sample_info *sample = sample_get(s1);
     if (!sample)
-    return 0;
+        return 0;
 
-    if( frame_num < 0 )
-    return 0;
+    if (frame_num < 0)
+        return 0;
 
-    if( frame_num > sample->edit_list->total_frames  )
+    if (sample->edit_list && frame_num > sample->edit_list->total_frames)
         frame_num = sample->edit_list->total_frames;
-  
-    sample->first_frame = frame_num;
-    if(sample->first_frame >= sample->last_frame )
-    	sample->first_frame = sample->last_frame-1;
 
-    if( sample->resume_pos < frame_num )
-        sample->resume_pos = frame_num;
-    
+    if (frame_num >= sample->last_frame)
+        frame_num = sample->last_frame - 1;
+
+    if (frame_num < 0)
+        frame_num = 0;
+
+    sample->first_frame = frame_num;
+
+    sample_normalize_marker_info(sample);
+    sample_clamp_resume_info(sample);
 
     return 1;
 }
@@ -2059,16 +2182,30 @@ int sample_set_endframe(int s1, long frame_num)
 {
     sample_info *sample = sample_get(s1);
     if (!sample)
-    	return 0;
-    if(frame_num < 0)
-    	return 0;
+        return 0;
 
-    if( frame_num > sample->edit_list->total_frames )
+    if (frame_num < 0)
+        return 0;
+
+    if (sample->edit_list && frame_num > sample->edit_list->total_frames)
         frame_num = sample->edit_list->total_frames;
 
+    if (frame_num <= sample->first_frame) {
+        frame_num = sample->first_frame + 1;
+
+        if (sample->edit_list && frame_num > sample->edit_list->total_frames) {
+            frame_num = sample->edit_list->total_frames;
+            sample->first_frame = frame_num - 1;
+
+            if (sample->first_frame < 0)
+                sample->first_frame = 0;
+        }
+    }
+
     sample->last_frame = frame_num;
-    if( sample->resume_pos > frame_num )
-        sample->resume_pos = frame_num;
+
+    sample_normalize_marker_info(sample);
+    sample_clamp_resume_info(sample);
 
     return 1;
 }
@@ -3103,10 +3240,14 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, void *
             skel->marker_end = marker_end;
         }
 
-        if(existing) {
+        sample_normalize_marker_info(skel);
+
+        if (existing) {
             sample_move_fx_pointers(skel->effect_chain, existing->effect_chain);
             sample_copy_rec_info(skel, existing);
         }
+
+        sample_clamp_resume_info(skel);
 
         sample_store(skel, skip_edl_close);
     }
@@ -3575,17 +3716,19 @@ int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id,
     rootnode = xmlNewDocNode(doc, NULL, (const xmlChar *) XMLTAG_SAMPLES, NULL);
     xmlDocSetRootElement(doc, rootnode);
 
-    if( veejay_info->is_master ) {
+    if( veejay_info != NULL && veejay_info->is_master ) {
         put_xml_str( rootnode, "server_origin", veejay_info->server_origin );
         put_xml_int( rootnode, "server_port", veejay_info->uc->port);
     }
 
-    put_xml_int( rootnode, "video_width", veejay_info->edit_list->video_width);
-    put_xml_int( rootnode, "video_height", veejay_info->edit_list->video_height);
-    put_xml_float( rootnode, "video_fps", veejay_info->edit_list->video_fps);
-    put_xml_int( rootnode, "audio_rate", veejay_info->edit_list->audio_rate);
-    put_xml_int( rootnode, "audio_channels", veejay_info->edit_list->audio_chans);
-    put_xml_int( rootnode, "audio_bits", veejay_info->edit_list->audio_bits);
+    if( veejay_info != NULL ) {
+        put_xml_int( rootnode, "video_width", veejay_info->edit_list->video_width);
+        put_xml_int( rootnode, "video_height", veejay_info->edit_list->video_height);
+        put_xml_float( rootnode, "video_fps", veejay_info->edit_list->video_fps);
+        put_xml_int( rootnode, "audio_rate", veejay_info->edit_list->audio_rate);
+        put_xml_int( rootnode, "audio_channels", veejay_info->edit_list->audio_chans);
+        put_xml_int( rootnode, "audio_bits", veejay_info->edit_list->audio_bits);
+    }
 
     childnode = xmlNewChild( rootnode, NULL,(const xmlChar*) "SEQUENCE", NULL );
     SaveSequences( childnode, seq );
