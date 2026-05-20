@@ -268,8 +268,13 @@
 #include "./effects/chromadrift.h"
 #include "./effects/edgefoldtide.h"
 #include "./effects/hyperfold.h"
+#include "./effects/datamosh.h"
+#include "./effects/slitscan.h"
+#include "./effects/tomolight.h"
+#include "./effects/kineticdisplay.h"
+#include "./effects/mechanicalpixels.h"
 
-#define VJ_IMAGE_EFFECT_MIN 17
+#define VJ_IMAGE_EFFECT_MIN 12
 #define VJ_IMAGE_EFFECT_MAX 198
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -573,6 +578,11 @@ enum {
     VJ_IMAGE_EFFECT_CHROMADRIFT = 19,
     VJ_IMAGE_EFFECT_EDGEFOLDTIDE = 18,
     VJ_IMAGE_EFFECT_HYPERFOLD = 17,
+    VJ_IMAGE_EFFECT_DATAMOSH = 16,
+    VJ_IMAGE_EFFECT_SLITSCAN = 15,
+    VJ_IMAGE_EFFECT_TOMOLIGHT = 14,
+    VJ_IMAGE_EFFECT_KINETICDISPLAY = 13,
+    VJ_IMAGE_EFFECT_MECHANICALPIXELS = 12,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 

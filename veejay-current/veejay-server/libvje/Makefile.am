@@ -257,4 +257,9 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/eventhorizon.c \
     effects/chromadrift.c \
     effects/edgefoldtide.c \
-    effects/hyperfold.c
+    effects/hyperfold.c \
+    effects/datamosh.c \
+    effects/slitscan.c \
+    effects/tomolight.c \
+    effects/kineticdisplay.c \
+    effects/mechanicalpixels.c
