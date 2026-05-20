@@ -356,11 +356,15 @@ void veejay_change_state_save(veejay_t * info, int new_state)
 		}
         snprintf(recover_edl, len + 1, "%s/recovery/recovery_editlist_p%d.edl", info->homedir, (int)my_pid);
         
-		int rs = sample_writeToFile( recover_samples,info->composite,info->seq,info->font,
-				info->uc->sample_id, info->uc->playback_mode );
 		int re = veejay_save_all( info, recover_edl, 0, 0 );
+		int rs= 0;
+		if(re) {
+			rs = sample_writeToFile( recover_samples,info->composite,info->seq,info->font,
+				info->uc->sample_id, info->uc->playback_mode );
+		}
+
 		if(rs)
-			veejay_msg(VEEJAY_MSG_WARNING, "Saved samplelist to %s", recover_samples );
+			veejay_msg(VEEJAY_MSG_WARNING, "Saved Samplelist to %s", recover_samples );
 		if(re)
 			veejay_msg(VEEJAY_MSG_WARNING, "Saved Editlist to %s", recover_edl );
 
@@ -565,7 +569,7 @@ int veejay_increase_frame(veejay_t *info, long num)
     // detect jump vs normal increment ---
     int edge_type = AUDIO_EDGE_NONE;
 
-    if(abs(num) != 1) {
+    if(labs(num) != 1) {
         // large skip = jump
         edge_type = AUDIO_EDGE_JUMP;
     } else if((num > 0 && settings->current_playback_speed < 0) ||
@@ -687,18 +691,24 @@ int veejay_set_frame(veejay_t *info, long framenum)
 {
     video_playback_setup *settings = (video_playback_setup *)info->settings;
 
-    if (framenum < settings->min_frame_num)
-        framenum = settings->min_frame_num;
+    long long min_frame = atomic_load_long_long(&settings->min_frame_num);
+    long long max_frame = atomic_load_long_long(&settings->max_frame_num);
 
-    if (framenum > settings->max_frame_num)
-        framenum = settings->max_frame_num;
+    if (framenum < min_frame)
+        framenum = min_frame;
+
+    if (framenum > max_frame)
+        framenum = max_frame;
 
     if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
         int start, end, loop, speed;
-        sample_get_short_info(info->uc->sample_id, &start, &end, &loop, &speed);
+
+        if (sample_get_short_info(info->uc->sample_id, &start, &end, &loop, &speed) != 0)
+            return 0;
 
         if (framenum < start)
             framenum = start;
+
         if (framenum > end)
             framenum = end;
 
@@ -706,23 +716,31 @@ int veejay_set_frame(veejay_t *info, long framenum)
             sample_set_framedups(info->uc->sample_id, 0);
     }
     else if (info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG) {
-        if (framenum > settings->max_frame_num)
-            framenum = settings->max_frame_num;
+        if (framenum > max_frame)
+            framenum = max_frame;
     }
-	long long current_frame_num = atomic_load_long_long(&settings->current_frame_num);
-	long long delta = abs( settings->current_frame_num - framenum);
 
-	if(delta != abs(settings->current_playback_speed) ) {
-		int prev_dir = playback_dir( settings->current_playback_speed );
-		int cur_dir = playback_dir( current_frame_num - framenum );
-		vj_perform_initiate_edge_change(info, AUDIO_EDGE_JUMP, prev_dir, cur_dir);
-	}
+    long long current_frame_num = atomic_load_long_long(&settings->current_frame_num);
+    long long move = (long long)framenum - current_frame_num;
+    long long delta = llabs(move);
+
+    if (delta > 0) {
+        int prev_dir = playback_dir(settings->current_playback_speed);
+        int cur_dir  = playback_dir(move);
+        long long normal_step = llabs((long long)settings->current_playback_speed);
+
+        if (normal_step == 0 || delta != normal_step) {
+            vj_perform_initiate_edge_change(info, AUDIO_EDGE_JUMP, prev_dir, cur_dir);
+        }
+        else if (prev_dir != 0 && cur_dir != 0 && prev_dir != cur_dir) {
+            vj_perform_initiate_edge_change(info, AUDIO_EDGE_DIRECTION, prev_dir, cur_dir);
+        }
+    }
 
     atomic_store_long_long(&settings->current_frame_num, framenum);
 
     return 1;
 }
-
 
 int	veejay_composite_active( veejay_t *info )
 {
@@ -786,15 +804,10 @@ int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 {
 	video_playback_setup *settings = info->settings;
 	int tx_active = atomic_load_int(&settings->transition.active);
-    if( tx_active ) {
+    long long current_frame_num = atomic_load_long_long(&settings->current_frame_num);
+	if( tx_active ) {
         return 0;
     }
-
-	if(!sample_stop_playing( info->uc->sample_id, new_sample_id ) )
-	{
-		veejay_msg(0, "Error while stopping sample %d", new_sample_id );
-		return 0;
-	}
 	
 	if( info->composite ) {
 		if( info->settings->composite == 2 ) {
@@ -804,6 +817,8 @@ int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 
 	sample_chain_free( info->uc->sample_id,0);
 	sample_set_framedups(info->uc->sample_id,0);
+
+	sample_set_resume(info->uc->sample_id, (long)current_frame_num);
 
 	return 1;
 }
@@ -1116,14 +1131,8 @@ void veejay_set_sample(veejay_t * info, int sampleid)
    	}
     else if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
 	{
-		if( info->uc->sample_id == sampleid)
-		{
-			veejay_sample_resume_at( info, sampleid );
-		}
-		else
-		{
-			veejay_start_playing_sample(info,sampleid );
-		}
+		if( info->uc->sample_id != sampleid )
+			veejay_start_playing_sample(info, sampleid);
 	}
 }
 
@@ -4126,6 +4135,10 @@ int veejay_save_all(veejay_t * info, char *filename, long n1, long n2)
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE ) {
 		e = info->current_edit_list;
 	}
+
+	if( e == NULL ) 
+		return 0;
+
 	if( e->num_video_files <= 0 )
 		return 0;
 		

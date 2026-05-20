@@ -107,6 +107,9 @@ static int vj_event_valid_mode(int mode) {
      case VJ_PLAYBACK_MODE_TAG:
      case VJ_PLAYBACK_MODE_PLAIN:
      return 1;
+     default:
+        veejay_msg(0, "Playback mode %d is invalid", mode);
+        break;
     }
 
     return 0;
@@ -2047,9 +2050,9 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
         else
             len = snprintf(msg,sizeof(msg), "%03d:;", event_id );
 
-        v->log_suppression = 1;
-        vj_event_parse_and_maybe_requeue_events( (veejay_t*) ptr, msg, len );
         v->log_suppression = 0;
+        vj_event_parse_and_maybe_requeue_events( (veejay_t*) ptr, msg, len );
+        v->log_suppression = 1;
     }
     return 1;
 }
@@ -2985,7 +2988,7 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
     P_A(args,sizeof(args),NULL,0,format,ap);
     if(vj_event_valid_mode(args[1]))
     {
-        if(args[0] == VJ_PLAYBACK_MODE_PLAIN) 
+        if(args[1] == VJ_PLAYBACK_MODE_PLAIN) 
         {
             if( vj_has_video(v,v->edit_list) )
                 veejay_change_playback_mode(v, args[1], 0);
@@ -4388,50 +4391,74 @@ void vj_event_set_transition(void *ptr, const char format[], va_list ap)
             (playmode == VJ_PLAYBACK_MODE_SAMPLE ? "Sample"  : "Stream"),
             sample_id, transition_active, transition_shape, transition_length );
 }
-
 void vj_event_sample_move_marker(void *ptr, const char format[], va_list ap)
 {
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
 
-    P_A(args,sizeof(args),NULL,0,format,ap);
+    P_A(args, sizeof(args), NULL, 0, format, ap);
 
     SAMPLE_DEFAULTS(args[0]);
 
     sample_info *s = sample_get(args[0]);
-    if( s == NULL ) {
-        p_no_sample( args[0] );
+    if (s == NULL) {
+        p_no_sample(args[0]);
         return;
     }
 
-    int len = s->marker_end - s->marker_start;
-    if( len <= 0 ) {
+    const int first = s->first_frame;
+    const int last  = s->last_frame;
+    const int available = last - first + 1;
+
+    if (available <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid sample bounds %d - %d", first, last);
+        return;
+    }
+
+    int span = s->marker_end - s->marker_start + 1;
+    if (span <= 0) {
         veejay_msg(VEEJAY_MSG_ERROR, "No marker set");
         return;
     }
 
-    int mid = len / 2;
+    if (span > available)
+        span = available;
 
-    int marker_start = args[1] - mid;
-    int marker_end   = args[1] + mid;
+    int center = args[1];
+    if (center < first)
+        center = first;
+    if (center > last)
+        center = last;
 
-    if(marker_start < s->first_frame) {
-        marker_start = s->first_frame;
-        marker_end = len;
+    const int left_span  = (span - 1) / 2;
+    const int right_span = (span - 1) - left_span;
+
+    int marker_start = center - left_span;
+    int marker_end   = center + right_span;
+
+    if (marker_start < first) {
+        marker_start = first;
+        marker_end = marker_start + span - 1;
     }
 
-    if (marker_end > s->last_frame) {
-        marker_end = s->last_frame;
-        marker_start = marker_end - len;
+    if (marker_end > last) {
+        marker_end = last;
+        marker_start = marker_end - span + 1;
     }
 
-    if(marker_start < 0)
-      marker_start = s->first_frame;
+    if (marker_start < first)
+        marker_start = first;
+
+    if (marker_end > last)
+        marker_end = last;
 
     s->marker_start = marker_start;
     s->marker_end = marker_end;
 
-    veejay_msg(VEEJAY_MSG_INFO, "Moved marker selection to %d - %d", s->marker_start, s->marker_end);
+    veejay_msg(VEEJAY_MSG_INFO,
+        "Moved marker selection to %d - %d",
+        s->marker_start,
+        s->marker_end);
 }
 
 void vj_event_sample_grow_marker(void *ptr, const char format[], va_list ap)
@@ -8252,11 +8279,10 @@ void vj_event_resume_id(void *ptr, const char format[], va_list ap)
     else if(SAMPLE_PLAYING(v)) {
         int sample_id = (v->uc->sample_key*12)-12 + args[0];
         if(sample_exists(sample_id)) {
-            if(sample_id != v->uc->sample_id) {
-                long pos = sample_get_resume(sample_id);
-                veejay_start_playing_sample(v, sample_id);
-                veejay_set_frame(v,pos);
-            }
+            veejay_set_sample(v, sample_id);
+            long pos = sample_get_resume(sample_id);
+            veejay_set_frame(v, sample_id );
+            veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d continues with frame %d", sample_id, pos );
         }
     }   
 
@@ -8287,7 +8313,6 @@ void vj_event_select_id(void *ptr, const char format[], va_list ap)
         if(vj_tag_exists(sample_id ))
         {
             veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG ,sample_id);
-
         }
         else
         {

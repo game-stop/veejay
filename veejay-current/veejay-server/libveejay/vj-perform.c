@@ -610,7 +610,7 @@ int vj_perform_next_sequence( veejay_t *info, int *type, int *next_slot )
     *next_slot = next_current;
 
     if( info->bezerk && current_type == 0 ) {
- 	sample_set_resume_override( sample_id, -1 );
+ 	    sample_set_resume_override( sample_id, -1 );
     }
   
     return next_sample_id;
@@ -635,10 +635,9 @@ int vj_perform_try_sequence( veejay_t *info )
         if( n > 0 )
         {
             // if not transitioning, we hard cut into the next sequence here
-            if( atomic_load_int(&settings->transition.global_state) ) {
+            if( !atomic_load_int(&settings->transition.global_state) ) {
                 info->seq->current = next_slot;
                 veejay_change_playback_mode( info, type, n );
-                return 0;
             }
         }
     }
@@ -1563,8 +1562,17 @@ static long vj_calc_next_sample_offset(
     long start = sb->start;
     long end = sb->end;
     int speed = sb->speed;
-    int loop_mode  = sb->loopmode;
+    int loop_mode = sb->loopmode;
+
     const long len = (end - start) + 1;
+
+    if (len <= 0) {
+        *advance_out = 0;
+        sb->offset = 0;
+        return 0;
+    }
+
+    const long max_off = len - 1;
     int advance = 1;
 
     if (sb->direction_changed) {
@@ -1583,36 +1591,44 @@ static long vj_calc_next_sample_offset(
         }
     }
 
-
     *advance_out = advance;
 
     long off = sb->offset;
 
+    if (off < 0)
+        off = 0;
+    else if (off > max_off)
+        off = max_off;
+
     if (advance && loop_mode == 3) {
-        off = (long)((double)len * rand() / RAND_MAX);
+        off = (long)((double)len * (double)rand() / ((double)RAND_MAX + 1.0));
+        if (off > max_off)
+            off = max_off;
+
         sb->offset = off;
         return off;
     }
 
     if (advance) {
-        const long step = llabs(speed);
+        const long step = llabs((long long)speed);
+
         off += step * sb->direction;
 
-        if (off > len) {
+        if (off > max_off) {
             if (loop_mode == 2) {
-                off = len;
+                off = max_off;
                 sb->direction = -1;
             } else if (loop_mode == 1) {
                 off = 0;
             } else {
-                off = len;
+                off = max_off;
             }
         } else if (off < 0) {
             if (loop_mode == 2) {
                 off = 0;
                 sb->direction = +1;
             } else if (loop_mode == 1) {
-                off = len;
+                off = max_off;
             } else {
                 off = 0;
             }
