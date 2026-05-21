@@ -3328,6 +3328,12 @@ void on_curve_clear_parameter_clicked(GtkWidget *widget, gpointer user_data)
     info->uc.reload_hint[HINT_KF] = 1;
 }
 
+#define KF_STORE_HEADER_LEN 44 // K%08d + packed header is 36 bytes + 8 bytes for payload length
+#define KF_STORE_HEADER_BUFSZ (KF_STORE_HEADER_LEN + 1)
+
+#define KF_PACKED_HEADER_SCAN_FMT  "key%2d%2d%8d%8d%2d%8d%2d"
+#define KF_STORE_HEADER_FMT        "K%08dkey%02d%02d%08d%08d%02d%08d%02d"
+
 void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
 {
     (void) widget;
@@ -3358,6 +3364,7 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
 
     int start = get_nums("curve_spinstart");
     int end   = get_nums("curve_spinend");
+	int shape = gtk_combo_box_get_active(GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]));
 
     if (start == end) {
         vj_msg(VEEJAY_MSG_ERROR,
@@ -3394,21 +3401,7 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
 
     get_points_from_curve(info->curve, length, data);
 
-    /*
-     * Protocol:
-     *
-     * transport header: K%08d                         = 9 bytes
-     * payload:
-     *   key                                           = 3 bytes
-     *   entry                                         = 2 bytes
-     *   parameter                                     = 2 bytes
-     *   start                                         = 8 bytes
-     *   end                                           = 8 bytes
-     *   curve type                                    = 2 bytes
-     *   status                                        = 2 bytes
-     *   values, little-endian int32                   = 4 * length
-     */
-    const int payload = 3 + 2 + 2 + 8 + 8 + 2 + 2 + (4 * length);
+    const int payload = 3 + 2 + 2 + 8 + 8 + 2 + 8 + 2 + (4 * length);
     const int tr_len = 9;
     const size_t bufsize = (size_t) tr_len + (size_t) payload;
 
@@ -3420,26 +3413,27 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
         return;
     }
 
-    char header[64];
+	char header[KF_STORE_HEADER_BUFSZ];
 
-    int hdr_len = snprintf(header,
-                           sizeof(header),
-                           "K%08dkey%02d%02d%08d%08d%02d%02d",
-                           payload,
-                           entry,
-                           param,
-                           start,
-                           end,
-                           (int) type,
-                           status);
+	int hdr_len = snprintf(header,
+                       sizeof(header),
+                       KF_STORE_HEADER_FMT,
+                       payload,
+                       entry,
+                       param,
+                       start,
+                       end,
+                       (int) type,
+                       shape,
+                       status);
 
-    if (hdr_len < 0 || hdr_len != 36) {
-        vj_msg(VEEJAY_MSG_ERROR,
-               "Internal error: invalid keyframe packet header size %d", hdr_len);
-        free(buf);
-        free(data);
-        return;
-    }
+	if (hdr_len != KF_STORE_HEADER_LEN) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				"[FX Anim] invalid keyframe store header length %d expected %d",
+				hdr_len,
+				KF_STORE_HEADER_LEN);
+		return 0;
+	}
 
     memcpy(buf, header, (size_t) hdr_len);
 

@@ -3391,6 +3391,7 @@ static void update_curve_widget(GtkWidget *curve)
     int blen = 0;
     int lo = 0, hi = 0, curve_type=0;
     int p = -1;
+    int shape = 0;
     int status = 0;
 
     multi_vims( VIMS_SAMPLE_KF_GET, "%d %d",i,info->uc.selected_parameter_id );
@@ -3430,7 +3431,7 @@ static void update_curve_widget(GtkWidget *curve)
 
     if( blob && blen > 0 )
     {
-        p = set_points_in_curve_ext( curve, blob,id,i, &curve_type,&status, info->el.fps );
+        p = set_points_in_curve_ext( curve, blob,blen, id,i, &curve_type,&shape, &status, (double) info->el.fps );
         if( p >= 0 )
         {
             info->uc.selected_parameter_id = p;
@@ -3460,6 +3461,10 @@ static void update_curve_widget(GtkWidget *curve)
                 );
 
                 info->status_lock = osl;
+            }
+
+            if(gtk_combo_box_get_active(GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION])) != shape) {
+                gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]), shape);
             }
     
             update_slider_state( info->uc.selected_parameter_id, status );

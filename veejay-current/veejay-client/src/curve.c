@@ -61,83 +61,166 @@ void set_points_in_curve(Gtk3CurveType type, GtkWidget *curve)
 }
 
 
-void   set_initial_curve( GtkWidget *curve, int fx_id, int parameter_id, int start, int end, int value, double fps )
+void set_initial_curve(GtkWidget *curve,
+                       int fx_id,
+                       int parameter_id,
+                       int start,
+                       int end,
+                       int value,
+                       double fps)
 {
-    int min=0, max=0;
-	_effect_get_minmax(fx_id, &min, &max, parameter_id );
-    int len = end - start;
-	int i,k=0;
+    int min = 0;
+    int max = 0;
 
-    if( len <= 0 ) return;
+    if (!curve)
+        return;
 
-    float	*vec = (float*) vj_calloc(sizeof(float) * len );
-    if(vec == NULL ) return;
+    if (end < start) {
+        int t = start;
+        start = end;
+        end = t;
+    }
 
-	for(i = start ; i < end; i ++ ) // initial curve, stepsize is widget internal
-	{
-		vec[k] = value;
-		k++;
-	}
+    const int len = end - start + 1;
+
+    if (len <= 0)
+        return;
+
+    _effect_get_minmax(fx_id, &min, &max, parameter_id);
+
+    value = (value < min) ? min : ((value > max) ? max : value);
+
+    float *vec = (float *) vj_malloc(sizeof(float) * len);
+    if (vec == NULL)
+        return;
+
+    for (int k = 0; k < len; k++)
+        vec[k] = (float) value;
 
     gtk3_curve_set_fps(curve, fps);
-    gtk3_curve_set_range( curve,  (gfloat) start, (gfloat) end, (gfloat) min, (gfloat) max );
-    gtk3_curve_set_vector( curve , len, vec );
-    gtk3_curve_set_curve_type( curve, GTK3_CURVE_TYPE_LINEAR );
+    gtk3_curve_set_range(curve,
+                         (gfloat) start,
+                         (gfloat) end,
+                         (gfloat) min,
+                         (gfloat) max);
+    gtk3_curve_set_vector(curve, len, vec);
+    gtk3_curve_set_curve_type(curve, GTK3_CURVE_TYPE_LINEAR);
 
     free(vec);
 
     curve_is_empty = 0;
 }
 
-int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int fx_entry,int *curve_type, int *status, double fps)
+#define KF_PACKED_HEADER_LEN       35
+#define KF_PACKED_HEADER_SCAN_FMT  "key%2d%2d%8d%8d%2d%8d%2d"
+
+int set_points_in_curve_ext(GtkWidget *curve,
+                            unsigned char *blob,
+                            int blen,
+                            int id,
+                            int fx_entry,
+                            int *curve_type,
+                            int *shape,
+                            int *status,
+                            double fps)
 {
-	int parameter_id = 0;
-	int start = 0, end =0,type=0;
-	int entry  = 0;
-	int n = sscanf( (char*) blob, "key%2d%2d%8d%8d%2d%2d", &entry, &parameter_id, &start, &end,&type,status );
-	int len = end - start;
-	int i;
-	int min = 0, max = 0;
+    (void) fx_entry;
 
-	if(n != 6 || len <= 0 )
-	{
-		return -1;
-	}
-
-	_effect_get_minmax(id, &min, &max, parameter_id );
-
-	unsigned int k = 0;
-	unsigned char *in = blob + 27;
-	float	*vec = (float*) vj_calloc(sizeof(float) * len );
-    if(vec == NULL) {
+    if (!curve || !blob || !curve_type || !shape || !status)
         return -1;
+
+    if (blen < KF_PACKED_HEADER_LEN)
+        return -1;
+
+    int parameter_id = 0;
+    int start = 0;
+    int end = 0;
+    int type = 0;
+    int entry = 0;
+
+    char header[KF_PACKED_HEADER_LEN + 1];
+    memcpy(header, blob, KF_PACKED_HEADER_LEN);
+    header[KF_PACKED_HEADER_LEN] = '\0';
+
+    int n = sscanf(header,
+                   KF_PACKED_HEADER_SCAN_FMT,
+                   &entry,
+                   &parameter_id,
+                   &start,
+                   &end,
+                   &type,
+                   shape,
+                   status);
+
+    if (n != 7)
+        return -1;
+
+    if (start < 0 || end < start)
+        return -1;
+
+    const int len = end - start + 1;
+
+    if (len <= 0)
+        return -1;
+
+    if (len > (INT_MAX - KF_PACKED_HEADER_LEN) / 4)
+        return -1;
+
+    const int expected = KF_PACKED_HEADER_LEN + (4 * len);
+
+    if (blen < expected)
+        return -1;
+
+    int min = 0;
+    int max = 0;
+    _effect_get_minmax(id, &min, &max, parameter_id);
+
+    float *vec = (float *) vj_calloc(sizeof(float) * len);
+    if (vec == NULL)
+        return -1;
+
+    const unsigned char *in = blob + KF_PACKED_HEADER_LEN;
+
+    for (int k = 0; k < len; k++) {
+        const unsigned char *ptr = in + (k * 4);
+
+        int value =
+            ((int) ptr[0]) |
+            ((int) ptr[1] << 8) |
+            ((int) ptr[2] << 16) |
+            ((int) ptr[3] << 24);
+
+        vec[k] = (float) value;
     }
 
-	for(i = start ; i < end; i ++ )
-	{
-		unsigned char *ptr = in + (k * 4);
-		int value = ( ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24) );
-		vec[k] = (float)value;
-		k++;
-	}
-    gtk3_curve_reset( curve );
+    gtk3_curve_reset(curve);
     gtk3_curve_set_fps(curve, fps);
-    gtk3_curve_set_range( curve, (gfloat) start, (gfloat) end, (gfloat) min, (gfloat) max );
-    gtk3_curve_set_vector( curve , len, vec );
+    gtk3_curve_set_range(curve,
+                         (gfloat) start,
+                         (gfloat) end,
+                         (gfloat) min,
+                         (gfloat) max);
+    gtk3_curve_set_vector(curve, len, vec);
 
-	switch( type ) {
-		case 1: *curve_type = GTK3_CURVE_TYPE_SPLINE; break;
-		case 2: *curve_type = GTK3_CURVE_TYPE_FREE; break;
-		default: *curve_type = GTK3_CURVE_TYPE_LINEAR; break;
-	}
+    switch (type) {
+        case 1:
+            *curve_type = GTK3_CURVE_TYPE_SPLINE;
+            break;
+        case 2:
+            *curve_type = GTK3_CURVE_TYPE_FREE;
+            break;
+        default:
+            *curve_type = GTK3_CURVE_TYPE_LINEAR;
+            break;
+    }
 
-    gtk3_curve_set_curve_type( curve, *curve_type );
+    gtk3_curve_set_curve_type(curve, *curve_type);
 
-	free(vec);
+    free(vec);
 
     curve_is_empty = 0;
 
-	return parameter_id;
+    return parameter_id;
 }
 
 void curve_set_position( GtkWidget *curve, double pos)
