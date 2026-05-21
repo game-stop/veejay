@@ -35,6 +35,8 @@ typedef struct {
     uint8_t *energy;
     uint8_t *next_energy;
     uint8_t *prev_src_y;
+    uint8_t *buffer;
+    float *grid;
     float *grid_x;
     float *grid_y;
     int grid_capacity;
@@ -118,26 +120,17 @@ static inline int sample_energy_half_to_full(const uint8_t *restrict plane, int 
 {
     const int hx = x >> 1;
     const int hy = y >> 1;
-    const int hx1 = (hx + 1 < ew) ? hx + 1 : hx;
-    const int hy1 = (hy + 1 < eh) ? hy + 1 : hy;
-    const int fx = x & 1;
-    const int fy = y & 1;
 
-    const int i00 = hy * ew + hx;
-    const int i10 = hy * ew + hx1;
-    const int i01 = hy1 * ew + hx;
-    const int i11 = hy1 * ew + hx1;
+    const int nx = (x & 1) ? ((hx + 1 < ew) ? hx + 1 : hx) : ((hx > 0) ? hx - 1 : hx);
+    const int ny = (y & 1) ? ((hy + 1 < eh) ? hy + 1 : hy) : ((hy > 0) ? hy - 1 : hy);
 
-    if (!fx && !fy)
-        return plane[i00];
+    const int row0 = hy * ew;
+    const int row1 = ny * ew;
 
-    if (fx && !fy)
-        return ((int)plane[i00] + (int)plane[i10] + 1) >> 1;
+    const int a = ((int)plane[row0 + hx] * 3) + (int)plane[row0 + nx];
+    const int b = ((int)plane[row1 + hx] * 3) + (int)plane[row1 + nx];
 
-    if (!fx && fy)
-        return ((int)plane[i00] + (int)plane[i01] + 1) >> 1;
-
-    return ((int)plane[i00] + (int)plane[i10] + (int)plane[i01] + (int)plane[i11] + 2) >> 2;
+    return ((a * 3) + b + 8) >> 4;
 }
 
 static int plasmafeedback_grid_required(int w, int h, int cell)
@@ -145,8 +138,8 @@ static int plasmafeedback_grid_required(int w, int h, int cell)
     if (w <= 0 || h <= 0 || cell <= 0)
         return 0;
 
-    const int gw = (w + cell - 1) / cell + 2;
-    const int gh = (h + cell - 1) / cell + 2;
+    const int gw = (w + cell - 1) / cell + 1;
+    const int gh = (h + cell - 1) / cell + 1;
 
     if (gw <= 0 || gh <= 0)
         return 0;
@@ -167,26 +160,25 @@ static int plasmafeedback_ensure_grid(plasmafeedback_t *p, int w, int h, int cel
     if (required <= 0)
         return 0;
 
-    if (required <= p->grid_capacity && p->grid_x && p->grid_y)
+    if (required <= p->grid_capacity && p->grid && p->grid_x && p->grid_y)
         return 1;
 
-    float *new_x = (float *)vj_malloc(sizeof(float) * (size_t)required);
-    float *new_y = (float *)vj_malloc(sizeof(float) * (size_t)required);
-
-    if (!new_x || !new_y) {
-        if (new_x) free(new_x);
-        if (new_y) free(new_y);
+    if (required > INT_MAX / 2)
         return 0;
-    }
 
-    veejay_memset(new_x, 0, sizeof(float) * (size_t)required);
-    veejay_memset(new_y, 0, sizeof(float) * (size_t)required);
+    float *new_grid = (float *)vj_malloc(sizeof(float) * (size_t)required * 2u);
 
-    if (p->grid_x) free(p->grid_x);
-    if (p->grid_y) free(p->grid_y);
+    if (!new_grid)
+        return 0;
 
-    p->grid_x = new_x;
-    p->grid_y = new_y;
+    veejay_memset(new_grid, 0, sizeof(float) * (size_t)required * 2u);
+
+    if (p->grid)
+        free(p->grid);
+
+    p->grid = new_grid;
+    p->grid_x = new_grid;
+    p->grid_y = new_grid + required;
     p->grid_capacity = required;
 
     return 1;
@@ -194,11 +186,11 @@ static int plasmafeedback_ensure_grid(plasmafeedback_t *p, int w, int h, int cel
 
 static void build_flow_grid(plasmafeedback_t *p, int w, int h, int cell)
 {
-    const int gw = (w + cell - 1) / cell + 2;
-    const int gh = (h + cell - 1) / cell + 2;
+    const int gw = (w + cell - 1) / cell + 1;
+    const int gh = (h + cell - 1) / cell + 1;
     const uint32_t seed0 = p->frame_no >> 4;
     const uint32_t seed1 = seed0 + 1U;
-    const float phase = ((float)(p->frame_no & 15U)) * (1.0f / 16.0f);
+    const float phase = smoothstepf_local(((float)(p->frame_no & 15U)) * (1.0f / 16.0f));
 
     for (int gy = 0; gy < gh; gy++) {
         for (int gx = 0; gx < gw; gx++) {
@@ -312,21 +304,24 @@ vj_effect *plasmafeedback_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *)vj_calloc(sizeof(vj_effect));
 
+    if (!ve)
+        return NULL;
+
     ve->num_params = 11;
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 0; ve->limits[1][0] = 100; ve->defaults[0] = 78;
-    ve->limits[0][1] = 0; ve->limits[1][1] = 100; ve->defaults[1] = 86;
+    ve->limits[0][0] = 0; ve->limits[1][0] = 100; ve->defaults[0] = 82;
+    ve->limits[0][1] = 0; ve->limits[1][1] = 100; ve->defaults[1] = 70;
     ve->limits[0][2] = 0; ve->limits[1][2] = 100; ve->defaults[2] = 35;
-    ve->limits[0][3] = 0; ve->limits[1][3] = 100; ve->defaults[3] = 62;
+    ve->limits[0][3] = 0; ve->limits[1][3] = 100; ve->defaults[3] = 72;
     ve->limits[0][4] = 0; ve->limits[1][4] = 100; ve->defaults[4] = 78;
     ve->limits[0][5] = 0; ve->limits[1][5] = 100; ve->defaults[5] = 82;
     ve->limits[0][6] = 0; ve->limits[1][6] = 100; ve->defaults[6] = 55;
-    ve->limits[0][7] = 0; ve->limits[1][7] = 100; ve->defaults[7] = 20;
-    ve->limits[0][8] = 0; ve->limits[1][8] = 100; ve->defaults[8] = 45;
-    ve->limits[0][9] = 0; ve->limits[1][9] = 100; ve->defaults[9] = 95;
+    ve->limits[0][7] = 0; ve->limits[1][7] = 100; ve->defaults[7] = 0;
+    ve->limits[0][8] = 0; ve->limits[1][8] = 100; ve->defaults[8] = 0;
+    ve->limits[0][9] = 0; ve->limits[1][9] = 100; ve->defaults[9] = 70;
     ve->limits[0][10] = 0; ve->limits[1][10] = 100; ve->defaults[10] = 35;
 
     ve->description = "Plasma Feedback";
@@ -340,10 +335,10 @@ vj_effect *plasmafeedback_init(int w, int h)
         "Filaments",
         "Turbulence",
         "Glow",
-        "Source Feed",
-        "Color Phase",
+        "Source Mix",
+        "Palette Phase",
         "Motion React",
-        "False Color"
+        "Palette"
     );
 
     return ve;
@@ -356,11 +351,8 @@ void plasmafeedback_free(void *ptr)
     if (!p)
         return;
 
-    if (p->energy) free(p->energy);
-    if (p->next_energy) free(p->next_energy);
-    if (p->prev_src_y) free(p->prev_src_y);
-    if (p->grid_x) free(p->grid_x);
-    if (p->grid_y) free(p->grid_y);
+    if (p->buffer) free(p->buffer);
+    if (p->grid) free(p->grid);
 
     free(p);
 }
@@ -401,22 +393,34 @@ void *plasmafeedback_malloc(int w, int h)
     p->eh = eh;
     p->grid_capacity = capacity;
 
-    p->energy = (uint8_t *)vj_malloc(energy_len);
-    p->next_energy = (uint8_t *)vj_malloc(energy_len);
-    p->prev_src_y = (uint8_t *)vj_malloc(full_len);
-    p->grid_x = (float *)vj_malloc(sizeof(float) * (size_t)p->grid_capacity);
-    p->grid_y = (float *)vj_malloc(sizeof(float) * (size_t)p->grid_capacity);
+    if (energy_len > (SIZE_MAX - full_len) / 2u) {
+        free(p);
+        return NULL;
+    }
 
-    if (!p->energy || !p->next_energy || !p->prev_src_y || !p->grid_x || !p->grid_y) {
+    const size_t state_len = energy_len + energy_len + full_len;
+
+    if ((size_t)p->grid_capacity > SIZE_MAX / (sizeof(float) * 2u)) {
+        free(p);
+        return NULL;
+    }
+
+    p->buffer = (uint8_t *)vj_malloc(state_len);
+    p->grid = (float *)vj_malloc(sizeof(float) * (size_t)p->grid_capacity * 2u);
+
+    if (!p->buffer || !p->grid) {
         plasmafeedback_free(p);
         return NULL;
     }
 
-    veejay_memset(p->energy, 0, energy_len);
-    veejay_memset(p->next_energy, 0, energy_len);
-    veejay_memset(p->prev_src_y, 0, full_len);
-    veejay_memset(p->grid_x, 0, sizeof(float) * (size_t)p->grid_capacity);
-    veejay_memset(p->grid_y, 0, sizeof(float) * (size_t)p->grid_capacity);
+    p->energy = p->buffer;
+    p->next_energy = p->buffer + energy_len;
+    p->prev_src_y = p->buffer + energy_len + energy_len;
+    p->grid_x = p->grid;
+    p->grid_y = p->grid + p->grid_capacity;
+
+    veejay_memset(p->buffer, 0, state_len);
+    veejay_memset(p->grid, 0, sizeof(float) * (size_t)p->grid_capacity * 2u);
 
     p->initialized = 0;
     p->frame_no = 0;
@@ -488,7 +492,6 @@ void plasmafeedback_apply(void *ptr, VJFrame *frame, int *args)
     const float turbulence_param = clampf_local((float)args[5] * 0.01f, 0.0f, 1.0f);
     const float glow_param = clampf_local((float)args[6] * 0.01f, 0.0f, 1.0f);
     const float source_param = clampf_local((float)args[7] * 0.01f, 0.0f, 1.0f);
-    const float color_phase_param = clampf_local((float)args[8] * 0.01f, 0.0f, 1.0f);
     const float motion_param = clampf_local((float)args[9] * 0.01f, 0.0f, 1.0f);
     const float false_color_param = clampf_local((float)args[10] * 0.01f, 0.0f, 1.0f);
 
@@ -499,7 +502,7 @@ void plasmafeedback_apply(void *ptr, VJFrame *frame, int *args)
     const float filament_curve = filament_param * filament_param;
     const float turbulence_curve = turbulence_param * turbulence_param;
     const float glow_curve = glow_param * glow_param;
-    const float source_curve = source_param * source_param;
+    const float source_curve = source_param;
     const float motion_curve = motion_param * motion_param;
 
     int cell = 22 - (int)(turbulence_curve * 15.0f);
@@ -514,10 +517,8 @@ void plasmafeedback_apply(void *ptr, VJFrame *frame, int *args)
     for (int i = 0; i <= cell; i++)
         lut[i] = smoothstepf_local((float)i / (float)cell);
 
-    build_flow_grid(p, ew, eh, cell);
-
-    const int gw = (ew + cell - 1) / cell + 2;
-    const int gh = (eh + cell - 1) / cell + 2;
+    const int gw = (ew + cell - 1) / cell + 1;
+    const int gh = (eh + cell - 1) / cell + 1;
 
     if (gw <= 1 || gh <= 1)
         return;
@@ -525,28 +526,35 @@ void plasmafeedback_apply(void *ptr, VJFrame *frame, int *args)
     if (plasmafeedback_grid_required(ew, eh, cell) > p->grid_capacity)
         return;
 
-    float color_phase = (float)p->frame_no * (0.0015f + color_phase_param * 0.018f);
+    const int original_color_mode = (args[8] <= 0);
+    float color_phase = original_color_mode ? 0.0f : ((float)(args[8] - 1) * (1.0f / 100.0f));
     color_phase -= floorf(color_phase);
 
-    const int phase_i = (int)(color_phase * 1023.0f);
+    const int phase_i = original_color_mode ? -2 : args[8];
     const int false_i = args[10];
 
-    if (phase_i != p->last_phase_i || false_i != p->last_false_i) {
+    if (!original_color_mode && (phase_i != p->last_phase_i || false_i != p->last_false_i)) {
         build_plasma_lut(p, color_phase, false_color_param);
         p->last_phase_i = phase_i;
         p->last_false_i = false_i;
     }
 
-    const float charge_gain = 28.0f + charge_curve * 230.0f;
+    const float charge_gain = charge_curve * 258.0f;
     const float decay_keep = 0.780f + decay_curve * 0.214f;
-    const float discharge = discharge_curve * 0.018f;
-    const float flow_pixels = (0.15f + flow_curve * 13.0f) * (0.65f + decay_curve * 0.65f);
-    const float filament_gain = 1.0f + filament_curve * 5.5f;
+    const float discharge = discharge_curve * 1.35f;
+    const float flow_pixels = flow_curve * 13.50f * (0.65f + decay_curve * 0.65f);
+
+    const float filament_gain = filament_curve * 6.5f;
     const float pressure_gain = 2.20f + flow_curve * 3.80f;
     const float turbulence_gain = turbulence_curve * 2.5f;
     const float arc_gain = 0.50f + turbulence_curve * 2.50f;
-    const float motion_gain = 0.20f + motion_curve * 2.80f;
-    const float brightness_gain = 0.08f + charge_curve * 0.52f;
+    const float noise_force_gain = turbulence_gain * arc_gain;
+    const float noise_lap_gain = turbulence_curve * 2.25f;
+    const float motion_gain = motion_curve * 3.0f;
+    const float brightness_gain = 0.10f + charge_curve * 0.50f;
+
+    if (turbulence_gain > 0.0001f || noise_lap_gain > 0.0001f)
+        build_flow_grid(p, ew, eh, cell);
 
     const int charge_i = args[0];
     const int motion_i = args[9];
@@ -560,168 +568,206 @@ void plasmafeedback_apply(void *ptr, VJFrame *frame, int *args)
     const uint8_t *restrict old_e = p->energy;
     uint8_t *restrict next_e = p->next_energy;
     const uint8_t *restrict prev_y = p->prev_src_y;
+    uint8_t *restrict prev_y_write = p->prev_src_y;
 
-    #pragma omp parallel for collapse(2) schedule(static) num_threads(p->n_threads)
-    for (int gy = 0; gy < gh - 1; gy++) {
-        for (int gx = 0; gx < gw - 1; gx++) {
-            const int y0 = gy * cell;
-            const int y1 = y0 + cell;
-            const int ye = (y1 < eh) ? y1 : eh;
-            const int x0 = gx * cell;
-            const int x1 = x0 + cell;
-            const int xe = (x1 < ew) ? x1 : ew;
+    const int glow_mix_i = (int)(glow_curve * 218.0f + 0.5f);
+    const int source_mix_i = (int)(source_curve * 256.0f + 0.5f);
+    const int plasma_mix_i = 256 - source_mix_i;
+    const int motion_render_i = (int)(motion_curve * (42.0f * 256.0f / 255.0f) + 0.5f);
 
-            const int gi00 = gy * gw + gx;
-            const int gi10 = gy * gw + gx + 1;
-            const int gi01 = (gy + 1) * gw + gx;
-            const int gi11 = (gy + 1) * gw + gx + 1;
+    #pragma omp parallel num_threads(p->n_threads)
+    {
+        #pragma omp for collapse(2) schedule(static)
+        for (int gy = 0; gy < gh - 1; gy++) {
+            for (int gx = 0; gx < gw - 1; gx++) {
+                const int y0 = gy * cell;
+                const int y1 = y0 + cell;
+                const int ye = (y1 < eh) ? y1 : eh;
+                const int x0 = gx * cell;
+                const int x1 = x0 + cell;
+                const int xe = (x1 < ew) ? x1 : ew;
 
-            const float vx00 = p->grid_x[gi00];
-            const float vx10 = p->grid_x[gi10];
-            const float vx01 = p->grid_x[gi01];
-            const float vx11 = p->grid_x[gi11];
+                const int gi00 = gy * gw + gx;
+                const int gi10 = gi00 + 1;
+                const int gi01 = gi00 + gw;
+                const int gi11 = gi01 + 1;
 
-            const float vy00 = p->grid_y[gi00];
-            const float vy10 = p->grid_y[gi10];
-            const float vy01 = p->grid_y[gi01];
-            const float vy11 = p->grid_y[gi11];
+                const float vx00 = p->grid_x[gi00];
+                const float vx10 = p->grid_x[gi10];
+                const float vx01 = p->grid_x[gi01];
+                const float vx11 = p->grid_x[gi11];
 
-            for (int ey = y0; ey < ye; ey++) {
-                const int ly = ey - y0;
-                const float fy = lut[ly];
-                const float ax = lerpf_local(vx00, vx01, fy);
-                const float bx = lerpf_local(vx10, vx11, fy);
-                const float ay = lerpf_local(vy00, vy01, fy);
-                const float by = lerpf_local(vy10, vy11, fy);
-                const int erow = ey * ew;
-                const int eym = (ey > 0) ? ey - 1 : ey;
-                const int eyp = (ey < eh - 1) ? ey + 1 : ey;
+                const float vy00 = p->grid_y[gi00];
+                const float vy10 = p->grid_y[gi10];
+                const float vy01 = p->grid_y[gi01];
+                const float vy11 = p->grid_y[gi11];
 
-                const int sy0 = ey << 1;
-                const int sy1 = (sy0 + 1 < h) ? sy0 + 1 : sy0;
-                const int srow0 = sy0 * w;
-                const int srow1 = sy1 * w;
+                for (int ey = y0; ey < ye; ey++) {
+                    const int ly = ey - y0;
+                    const float fy = lut[ly];
+                    const float ax = lerpf_local(vx00, vx01, fy);
+                    const float bx = lerpf_local(vx10, vx11, fy);
+                    const float ay = lerpf_local(vy00, vy01, fy);
+                    const float by = lerpf_local(vy10, vy11, fy);
+                    const int erow = ey * ew;
+                    const int eym = (ey > 0) ? ey - 1 : ey;
+                    const int eyp = (ey < eh - 1) ? ey + 1 : ey;
 
-                for (int ex = x0; ex < xe; ex++) {
-                    const int eidx = erow + ex;
-                    const int lx = ex - x0;
-                    const float fx = lut[lx];
+                    const int sy0 = ey << 1;
+                    const int sy1 = (sy0 + 1 < h) ? sy0 + 1 : sy0;
+                    const int srow0 = sy0 * w;
+                    const int srow1 = sy1 * w;
 
-                    const int exm = (ex > 0) ? ex - 1 : ex;
-                    const int exp = (ex < ew - 1) ? ex + 1 : ex;
+                    for (int ex = x0; ex < xe; ex++) {
+                        const int eidx = erow + ex;
+                        const int lx = ex - x0;
+                        const float fx = lut[lx];
 
-                    const int idx_l = erow + exm;
-                    const int idx_r = erow + exp;
-                    const int idx_u = eym * ew + ex;
-                    const int idx_d = eyp * ew + ex;
+                        const int exm = (ex > 0) ? ex - 1 : ex;
+                        const int exp = (ex < ew - 1) ? ex + 1 : ex;
 
-                    const float e_l = (float)old_e[idx_l] * (1.0f / 255.0f);
-                    const float e_r = (float)old_e[idx_r] * (1.0f / 255.0f);
-                    const float e_u = (float)old_e[idx_u] * (1.0f / 255.0f);
-                    const float e_d = (float)old_e[idx_d] * (1.0f / 255.0f);
-                    const float e_c = (float)old_e[eidx] * (1.0f / 255.0f);
+                        const int idx_l = erow + exm;
+                        const int idx_r = erow + exp;
+                        const int idx_u = eym * ew + ex;
+                        const int idx_d = eyp * ew + ex;
 
-                    const float egx = e_r - e_l;
-                    const float egy = e_d - e_u;
-                    const float lap = (e_l + e_r + e_u + e_d) - e_c * 4.0f;
+                        const float e_l = (float)old_e[idx_l] * (1.0f / 255.0f);
+                        const float e_r = (float)old_e[idx_r] * (1.0f / 255.0f);
+                        const float e_u = (float)old_e[idx_u] * (1.0f / 255.0f);
+                        const float e_d = (float)old_e[idx_d] * (1.0f / 255.0f);
+                        const float e_c = (float)old_e[eidx] * (1.0f / 255.0f);
 
-                    const float noise_x = lerpf_local(ax, bx, fx);
-                    const float noise_y = lerpf_local(ay, by, fx);
+                        const float egx = e_r - e_l;
+                        const float egy = e_d - e_u;
+                        const float lap = (e_l + e_r + e_u + e_d) - e_c * 4.0f;
 
-                    float vx = egx * pressure_gain + (-egy) * filament_gain + noise_x * turbulence_gain * arc_gain + lap * noise_x * 2.25f;
-                    float vy = egy * pressure_gain + ( egx) * filament_gain + noise_y * turbulence_gain * arc_gain + lap * noise_y * 2.25f;
+                        const float noise_x = lerpf_local(ax, bx, fx);
+                        const float noise_y = lerpf_local(ay, by, fx);
 
-                    const float hot_drive = 0.35f + e_c * 1.65f;
-                    vx *= hot_drive;
-                    vy *= hot_drive;
+                        float vx = egx * pressure_gain + (-egy) * filament_gain + noise_x * noise_force_gain + lap * noise_x * noise_lap_gain;
+                        float vy = egy * pressure_gain + ( egx) * filament_gain + noise_y * noise_force_gain + lap * noise_y * noise_lap_gain;
 
-                    const float mag2 = vx * vx + vy * vy;
+                        const float hot_drive = 0.35f + e_c * 1.65f;
+                        vx *= hot_drive;
+                        vy *= hot_drive;
 
-                    if (mag2 > 6.25f) {
-                        const float s = 1.0f / (1.0f + (mag2 - 6.25f) * 0.080f);
-                        vx *= s;
-                        vy *= s;
-                    }
+                        const float mag2 = vx * vx + vy * vy;
 
-                    const float sx = (float)ex - vx * flow_pixels;
-                    const float sy = (float)ey - vy * flow_pixels;
-                    const float adv = sample_energy_nearest(old_e, sx, sy, ew, eh);
+                        if (mag2 > 6.25f) {
+                            const float s = 1.0f / (1.0f + (mag2 - 6.25f) * 0.080f);
+                            vx *= s;
+                            vy *= s;
+                        }
 
-                    const int sx0 = ex << 1;
-                    const int sx1 = (sx0 + 1 < w) ? sx0 + 1 : sx0;
+                        const float sx = (float)ex - vx * flow_pixels;
+                        const float sy = (float)ey - vy * flow_pixels;
+                        const float adv = sample_energy_nearest(old_e, sx, sy, ew, eh);
 
-                    const int si00 = srow0 + sx0;
-                    const int si10 = srow0 + sx1;
-                    const int si01 = srow1 + sx0;
-                    const int si11 = srow1 + sx1;
+                        const int sx0 = ex << 1;
+                        const int sx1 = (sx0 + 1 < w) ? sx0 + 1 : sx0;
 
-                    const int src_y_avg = ((int)Y[si00] + (int)Y[si10] + (int)Y[si01] + (int)Y[si11] + 2) >> 2;
+                        const int si00 = srow0 + sx0;
+                        const int si10 = srow0 + sx1;
+                        const int si01 = srow1 + sx0;
+                        const int si11 = srow1 + sx1;
 
-                    int dm0 = (int)Y[si00] - (int)prev_y[si00]; if (dm0 < 0) dm0 = -dm0;
-                    int dm1 = (int)Y[si10] - (int)prev_y[si10]; if (dm1 < 0) dm1 = -dm1;
-                    int dm2 = (int)Y[si01] - (int)prev_y[si01]; if (dm2 < 0) dm2 = -dm2;
-                    int dm3 = (int)Y[si11] - (int)prev_y[si11]; if (dm3 < 0) dm3 = -dm3;
+                        const int src_y_avg = ((int)Y[si00] + (int)Y[si10] + (int)Y[si01] + (int)Y[si11] + 2) >> 2;
 
-                    const int motion_avg = (dm0 + dm1 + dm2 + dm3 + 2) >> 2;
+                        int dm0 = (int)Y[si00] - (int)prev_y[si00]; dm0 = (dm0 < 0) ? -dm0 : dm0;
+                        int dm1 = (int)Y[si10] - (int)prev_y[si10]; dm1 = (dm1 < 0) ? -dm1 : dm1;
+                        int dm2 = (int)Y[si01] - (int)prev_y[si01]; dm2 = (dm2 < 0) ? -dm2 : dm2;
+                        int dm3 = (int)Y[si11] - (int)prev_y[si11]; dm3 = (dm3 < 0) ? -dm3 : dm3;
 
-                    float e = adv * decay_keep + (float)p->excite_y_lut[src_y_avg] + (float)p->excite_motion_lut[motion_avg];
+                        const int motion_avg = (dm0 + dm1 + dm2 + dm3 + 2) >> 2;
 
-                    if (discharge > 0.0f) {
+                        float e = adv * decay_keep + (float)p->excite_y_lut[src_y_avg] + (float)p->excite_motion_lut[motion_avg];
+
                         const float hot = clampf_local((e - 168.0f) * (1.0f / 87.0f), 0.0f, 1.0f);
-                        e -= hot * hot * discharge * e * 255.0f;
-                    }
+                        e -= hot * hot * discharge * e;
 
-                    next_e[eidx] = clamp_u8f(e);
+                        next_e[eidx] = clamp_u8f(e);
+                    }
                 }
             }
         }
-    }
 
-    const uint8_t *restrict plasma = p->next_energy;
-    uint8_t *restrict prev_y_write = p->prev_src_y;
-    const float glow_amount = glow_curve * 0.85f;
-    const float source_feed = source_curve * 0.78f;
-    const float plasma_mix = 1.0f - source_feed;
-    const float motion_render_gain = motion_curve * 42.0f;
+        if (original_color_mode) {
+            #pragma omp for schedule(static)
+            for (int y = 0; y < h; y++) {
+                const int row = y * w;
+                const int hy = y >> 1;
+                const int hym = (hy > 0) ? hy - 1 : hy;
+                const int hyp = (hy < eh - 1) ? hy + 1 : hy;
+                const int hrow = hy * ew;
+                const int hrow_m = hym * ew;
+                const int hrow_p = hyp * ew;
 
-    #pragma omp parallel for schedule(static) num_threads(p->n_threads)
-    for (int y = 0; y < h; y++) {
-        const int row = y * w;
+                for (int x = 0; x < w; x++) {
+                    const int idx = row + x;
+                    const int hx = x >> 1;
+                    const int hxm = (hx > 0) ? hx - 1 : hx;
+                    const int hxp = (hx < ew - 1) ? hx + 1 : hx;
 
-        for (int x = 0; x < w; x++) {
-            const int idx = row + x;
-            const int hx = x >> 1;
-            const int hy = y >> 1;
-            const int hxm = (hx > 0) ? hx - 1 : hx;
-            const int hxp = (hx < ew - 1) ? hx + 1 : hx;
-            const int hym = (hy > 0) ? hy - 1 : hy;
-            const int hyp = (hy < eh - 1) ? hy + 1 : hy;
+                    const int e0 = sample_energy_half_to_full(next_e, x, y, ew, eh);
+                    const int glow = (e0 * 4 + next_e[hrow + hxm] + next_e[hrow + hxp] + next_e[hrow_m + hx] + next_e[hrow_p + hx]) >> 3;
 
-            const int e0 = sample_energy_half_to_full(plasma, x, y, ew, eh);
-            const int hrow = hy * ew;
-            const int glow = (e0 * 4 + plasma[hrow + hxm] + plasma[hrow + hxp] + plasma[hym * ew + hx] + plasma[hyp * ew + hx]) >> 3;
+                    const uint8_t src_y = Y[idx];
 
-            const uint8_t src_y = Y[idx];
-            const uint8_t src_u = U[idx];
-            const uint8_t src_v = V[idx];
+                    int dm = (int)src_y - (int)prev_y_write[idx];
+                    dm = (dm < 0) ? -dm : dm;
 
-            int dm = (int)src_y - (int)prev_y_write[idx];
-            if (dm < 0) dm = -dm;
+                    int ei = e0 + ((glow * glow_mix_i + 128) >> 8) + ((dm * motion_render_i + 128) >> 8);
+                    ei = (ei > 255) ? 255 : ei;
 
-            int ei = e0 + (int)((float)glow * glow_amount) + (int)((float)dm * motion_render_gain * (1.0f / 255.0f));
+                    const int lift = ((((255 - (int)src_y) * ei) + 128) * 257) >> 16;
+                    const int py = (int)src_y + lift;
 
-            if (ei > 255)
-                ei = 255;
+                    Y[idx] = (uint8_t)((py * plasma_mix_i + (int)src_y * source_mix_i + 128) >> 8);
 
-            const uint8_t py = p->lut_y[ei];
-            const uint8_t pu = p->lut_u[ei];
-            const uint8_t pv = p->lut_v[ei];
+                    prev_y_write[idx] = src_y;
+                }
+            }
+        } else {
+            #pragma omp for schedule(static)
+            for (int y = 0; y < h; y++) {
+                const int row = y * w;
+                const int hy = y >> 1;
+                const int hym = (hy > 0) ? hy - 1 : hy;
+                const int hyp = (hy < eh - 1) ? hy + 1 : hy;
+                const int hrow = hy * ew;
+                const int hrow_m = hym * ew;
+                const int hrow_p = hyp * ew;
 
-            Y[idx] = clamp_u8f((float)py * plasma_mix + (float)src_y * source_feed);
-            U[idx] = clamp_u8f((float)pu * plasma_mix + (float)src_u * source_feed);
-            V[idx] = clamp_u8f((float)pv * plasma_mix + (float)src_v * source_feed);
+                for (int x = 0; x < w; x++) {
+                    const int idx = row + x;
+                    const int hx = x >> 1;
+                    const int hxm = (hx > 0) ? hx - 1 : hx;
+                    const int hxp = (hx < ew - 1) ? hx + 1 : hx;
 
-            prev_y_write[idx] = src_y;
+                    const int e0 = sample_energy_half_to_full(next_e, x, y, ew, eh);
+                    const int glow = (e0 * 4 + next_e[hrow + hxm] + next_e[hrow + hxp] + next_e[hrow_m + hx] + next_e[hrow_p + hx]) >> 3;
+
+                    const uint8_t src_y = Y[idx];
+                    const uint8_t src_u = U[idx];
+                    const uint8_t src_v = V[idx];
+
+                    int dm = (int)src_y - (int)prev_y_write[idx];
+                    dm = (dm < 0) ? -dm : dm;
+
+                    int ei = e0 + ((glow * glow_mix_i + 128) >> 8) + ((dm * motion_render_i + 128) >> 8);
+                    ei = (ei > 255) ? 255 : ei;
+
+                    const uint8_t py = p->lut_y[ei];
+                    const uint8_t pu = p->lut_u[ei];
+                    const uint8_t pv = p->lut_v[ei];
+
+                    Y[idx] = (uint8_t)(((int)py * plasma_mix_i + (int)src_y * source_mix_i + 128) >> 8);
+                    U[idx] = (uint8_t)(((int)pu * plasma_mix_i + (int)src_u * source_mix_i + 128) >> 8);
+                    V[idx] = (uint8_t)(((int)pv * plasma_mix_i + (int)src_v * source_mix_i + 128) >> 8);
+
+                    prev_y_write[idx] = src_y;
+                }
+            }
         }
     }
 
