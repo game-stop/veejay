@@ -89,7 +89,7 @@ void overclock_apply(void *ptr, VJFrame *frame, int *args ) {
 
 	for ( y = 0 ; y < height ; y ++)
 	{
-		blur2( oc_buf[0] + (y*width),Y + (y*width) ,width, radius,1,1,1);
+		veejay_blur2( oc_buf[0] + (y*width),Y + (y*width) ,width, radius,1,1,1);
 	}
 
 	for( y = N ; y < (height-N); y += (1+rand()%N) )

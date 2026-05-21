@@ -187,7 +187,7 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args){
 
         #pragma omp for schedule(static)
         for(int y = 0; y < h; y++){
-            blur2(tmp, Y + (y * w), w, 2, 2, 1, 1);
+            veejay_blur2(tmp, Y + (y * w), w, 2, 2, 1, 1);
             memcpy(b2 + (y * w), tmp, w);
         }
 
@@ -196,7 +196,7 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args){
             for(int y = 0; y < h; y++)
                 col_tmp[y] = b2[y*w + x];
 
-            blur2(col_out, col_tmp, h, 2, 2, 1, 1);
+            veejay_blur2(col_out, col_tmp, h, 2, 2, 1, 1);
 
             for(int y = 0; y < h; y++)
                 b2[y*w + x] = col_out[y];

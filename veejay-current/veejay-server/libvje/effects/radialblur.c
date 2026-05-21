@@ -107,7 +107,7 @@ static void rhblur_apply( uint8_t *dst , uint8_t *src, int w, int h, int r , int
 	#pragma omp parallel for num_threads(max_threads) default(none) shared(dst, src, w, h, r, p)
 	for(y = 0; y < h ; y ++ )
 	{
-		blur2( dst + y * w, src + y *w , w, r,p, 1, 1);
+		veejay_blur2( dst + y * w, src + y *w , w, r,p, 1, 1);
 	}	
 
 }
@@ -121,7 +121,7 @@ static void rvblur_apply( uint8_t *dst, uint8_t *src, int w, int h, int r , int 
 	#pragma omp parallel for num_threads(max_threads) default(none) shared(dst, src, w, h, r, p)
 	for(x=0; x < w; x++)
 	{
-		blur2( dst + x, src + x , h, r, p, w, w );
+		veejay_blur2( dst + x, src + x , h, r, p, w, w );
 	}
 }
 
