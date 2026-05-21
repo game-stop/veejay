@@ -2210,16 +2210,6 @@ void    vj_tag_set_kf_type(int s1, int entry, int type )
    tag->effect_chain[entry]->kf_type = type;
 }
 
-
-int vj_tag_get_kf_tokens( int s1, int entry, int id, int *start,int *end, int *type, int *status)
-{
-  vj_tag *tag = vj_tag_get(s1);
-   if (!tag)
-    return 0;
-   return keyframe_get_tokens( tag->effect_chain[entry]->kf,id, start,end,type,status);
-}
-
-
 int vj_tag_chain_set_kf_status( int s1, int entry, int status )
 {
    vj_tag *tag = vj_tag_get(s1);

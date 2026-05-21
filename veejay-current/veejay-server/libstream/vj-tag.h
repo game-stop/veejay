@@ -366,7 +366,6 @@ int	vj_tag_highest_valid_id();
 void    *vj_tag_get_kf_port( int s1, int entry );
 
 char *vj_tag_scan_devices( void );
-int    vj_tag_get_kf_tokens( int s1, int entry, int id, int *start,int *end, int *type, int *status);
 int vj_tag_grab_blackframe(int t1, int duration, int median_radius,int mode );
 int vj_tag_drop_blackframe(int t1);
 int    vj_tag_num_devices();
