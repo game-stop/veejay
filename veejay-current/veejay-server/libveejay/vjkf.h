@@ -25,8 +25,6 @@ unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *r
 
 int keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int tag );
 
-int keyframe_get_tokens( void *port, int parameter_id, int *start, int *end, int *type, int *status );
-
 void keyframe_clear_entry( int lookup, int fx_entry, int parameter_id, int is_sample );
 
 int keyframe_xml_pack( xmlNodePtr node, void *port, int parameter_id  );
