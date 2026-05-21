@@ -266,7 +266,6 @@ extern int sample_set_next(int s1, int next_sample_id);
 extern int sample_get_chain_source(int sample_id, int position);
 extern int sample_set_chain_source(int sample_id, int position, int source);
 extern int sample_get_sub_audio(int s1);
-extern int sample_get_kf_tokens( int s1, int entry, int id, int *start, int *end, int *type, int *status );
 extern void    *sample_get_kf_port( int s1, int entry );
 extern int	sample_chain_set_kf_status( int s1, int entry, int status );
 extern int	sample_get_kf_status( int s1, int entry, int *type );

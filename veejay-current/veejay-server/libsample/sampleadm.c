@@ -2334,15 +2334,6 @@ int sample_chain_reset_kf( int s1, int entry )
     return 1;
 }
 
-int sample_get_kf_tokens( int s1, int entry, int id, int *start, int *end, int *type, int *status )
-{
-    sample_info *sample = sample_get(s1);
-    if(!sample) return 0;
-    if( sample->effect_chain[entry]->kf == NULL )
-        return 0;
-    return keyframe_get_tokens( sample->effect_chain[entry]->kf, id, start,end,type, status );
-}
-
 void    *sample_get_kf_port( int s1, int entry )
 {
     sample_info *sample = sample_get(s1);
