@@ -10,9 +10,13 @@
 @define-color fill-color #3d4a66;
 @define-color text-muted #858999;
 @define-color select-color #5a6d8c;
+@define-color preselect-color #d85f00;
+@define-color slot-playing-color #ff8400;
+@define-color slot-selected-bg #2d2e36;
+@define-color slot-playing-bg #3a2614;
 @define-color scrollbar-thumb #454f60;
 @define-color scrollbar-hover #5a6d8c;
-@define-color playing-color #4a7d60;
+@define-color playing-color #ff8400;
 @define-color record-color #8a4848;
 @define-color warn-color #a88a48;
 
@@ -90,7 +94,7 @@ notebook header.top tabs tab:checked {
 }
 
 .selected {
-    border-color: @select-color;
+    border-color: @preselect-color;
 }
 
 .fx-anim {
@@ -209,8 +213,8 @@ scale:disabled value {
 }
 
 .playing {
-    border-color: @playing-color;
-    background-color: #223328;
+    border-color: @slot-playing-color;
+    background-color: @slot-playing-bg;
 }
 
 .recording, .armed {
@@ -258,13 +262,40 @@ notebook header.top tabs tab:hover label {
     background-color: @panel-color;
 }
 
-.sample_slot.active,
+.sample_slot.active {
+    border-color: @slot-playing-color;
+    border-width: 3px;
+    border-style: solid;
+    background-color: @slot-playing-bg;
+}
+
 .sequencer_slot.active,
 .quickselect_slot.active {
-    border-color: @knob-color;
-    border-width: 2px;
+    border-color: @slot-playing-color;
+    border-width: 3px;
     border-style: solid;
-    background-color: #223328;
+    background-color: @slot-playing-bg;
+}
+
+/* Preselected sample-bank slot: pending user intent, not currently playing.
+ * Same warm timeline color as playback, but intentionally thinner. */
+frame.sample_slot.selected,
+frame.sample_slot.selected > border,
+.sample_slot.selected {
+    border-color: @preselect-color;
+    border-width: 1px;
+    border-style: solid;
+    background-color: @slot-selected-bg;
+}
+
+/* If a slot is both active and selected, active/playback state wins. */
+frame.sample_slot.active.selected,
+frame.sample_slot.active.selected > border,
+.sample_slot.active.selected {
+    border-color: @slot-playing-color;
+    border-width: 3px;
+    border-style: solid;
+    background-color: @slot-playing-bg;
 }
 
 .sample_slot:hover, 
@@ -389,23 +420,23 @@ treeview.view cell {
 }
 
 frame.sequencer_slot.active {
-    border-color: @playing-color;
-    border-width: 2px;
+    border-color: @slot-playing-color;
+    border-width: 3px;
     border-style: solid;
-    background-color: #223328;
+    background-color: @slot-playing-bg;
 }
 
 frame.sequencer_slot.active:hover {
-    border-color: @knob-hover;
-    background-color: #2a4634;
+    border-color: @slot-playing-color;
+    background-color: #4a3118;
 }
 
 frame.sequencer_slot.sequence-playing,
 frame.sequencer_slot.sequence-playing > border {
-    border-color: @playing-color;
-    border-width: 2px;
+    border-color: @slot-playing-color;
+    border-width: 3px;
     border-style: solid;
-    background-color: #223328;
+    background-color: @slot-playing-bg;
 }
 
 #frame316,

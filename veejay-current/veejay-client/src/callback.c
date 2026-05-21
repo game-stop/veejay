@@ -3210,7 +3210,11 @@ void	on_stream_length_value_changed( GtkWidget *widget, gpointer user_data)
 	if(info->status_lock)
 		return;
 
-	multi_vims( VIMS_STREAM_SET_LENGTH, "%d", (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON( widget ) ) );
+	int end_pos = (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON( widget ) );
+
+	multi_vims( VIMS_STREAM_SET_LENGTH, "%d", end_pos );
+
+	gtk3_curve_set_x_hi( info->curve, (gfloat) end_pos );
 }
 
 int	on_curve_buttontime_clicked(void)

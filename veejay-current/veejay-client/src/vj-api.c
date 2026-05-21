@@ -10170,54 +10170,72 @@ static void indicate_sequence(gboolean active, sequence_gui_slot_t *slot)
     gtk_widget_queue_draw(slot->frame);
 }
 
-static void set_activation_of_slot_in_samplebank( gboolean activate)
+static gboolean samplebank_slot_is_current(sample_slot_t *slot)
 {
-    if(!info->selected_gui_slot || !info->selected_slot )
-        return;
+    if (slot == NULL)
+        return FALSE;
 
+    if (info->status_tokens[CURRENT_ID] != slot->sample_id)
+        return FALSE;
+
+    if (info->status_tokens[PLAY_MODE] == MODE_SAMPLE &&
+        slot->sample_type == 0)
+        return TRUE;
+
+    if (info->status_tokens[PLAY_MODE] == MODE_STREAM &&
+        slot->sample_type != 0)
+        return TRUE;
+
+    return FALSE;
+}
+
+static void set_activation_of_slot_in_samplebank(gboolean activate)
+{
+    if (!info->selected_gui_slot || !info->selected_slot)
+        return;
 
     if (activate)
     {
-        if( (info->status_tokens[CURRENT_ID] == info->selected_slot->sample_id &&
-        info->status_tokens[PLAY_MODE] == MODE_SAMPLE &&
-        info->selected_slot->sample_type == 0 ) ||
-        (info->status_tokens[CURRENT_ID] == info->selected_slot->sample_id &&
-        info->status_tokens[PLAY_MODE] == MODE_STREAM &&
-        info->selected_slot->sample_type != 0 ) 
-       ) {
+        if (samplebank_slot_is_current(info->selected_slot))
+        {
             gtk_widget_grab_focus(GTK_WIDGET(info->selected_gui_slot->frame));
-            if( info->selection_gui_slot ) {
-                // double click event also submitted button press event
+
+            if (info->selection_gui_slot &&
+                info->selection_gui_slot == info->selected_gui_slot)
+            {
                 remove_class(info->selection_gui_slot->frame, "selected");
             }
+
             add_class(info->selected_gui_slot->frame, "active");
         }
+        else
+        {
+            remove_class(info->selected_gui_slot->frame, "active");
+        }
     }
-    else {
+    else
+    {
         remove_class(info->selected_gui_slot->frame, "active");
     }
-
 }
 
 static void set_selection_of_slot_in_samplebank(gboolean active)
 {
-    if(!info->selection_gui_slot || !info->selection_slot )
+    if (!info->selection_gui_slot || !info->selection_slot)
         return;
 
-    if( (info->status_tokens[CURRENT_ID] == info->selection_slot->sample_id &&
-        info->status_tokens[PLAY_MODE] == MODE_SAMPLE &&
-        info->selection_slot->sample_type == 0 ) ||
-        (info->status_tokens[CURRENT_ID] == info->selection_slot->sample_id &&
-        info->status_tokens[PLAY_MODE] == MODE_STREAM &&
-        info->selection_slot->sample_type != 0 ) 
-       ) {
+    if (samplebank_slot_is_current(info->selection_slot))
+    {
+        remove_class(info->selection_gui_slot->frame, "selected");
         return;
     }
 
-    if(active) {
+    if (active)
+    {
         add_class(info->selection_gui_slot->frame, "selected");
     }
-    else {
+    else
+    {
         remove_class(info->selection_gui_slot->frame, "selected");
     }
 }
