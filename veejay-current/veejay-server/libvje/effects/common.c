@@ -19,6 +19,7 @@
  */
 
 #include <config.h>
+#include <omp.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <math.h>
@@ -2075,7 +2076,7 @@ static void build_histogram(histogram_t *h, VJFrame *f)
 
 #pragma omp parallel num_threads(nth)
         {
-            const int tid = vje_advise_num_threads(len);
+            const int tid = omp_get_thread_num();
             uint32_t *restrict LH = local[tid];
 
 #pragma omp for schedule(static) nowait
