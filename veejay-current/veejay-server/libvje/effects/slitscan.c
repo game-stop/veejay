@@ -32,17 +32,17 @@
 #define SS_HISTORY_MASK (SS_HISTORY_MAX - 1)
 #define SS_GEOM_MODES   32
 
-#define P_AMOUNT       0
-#define P_DEPTH        1
-#define P_MODE         2
+#define P_MODE         0
+#define P_AMOUNT       1
+#define P_DEPTH        2
 #define P_SOURCE       3
 #define P_SOURCE_GAIN  4
 #define P_MOTION       5
-#define P_TIME_OFFSET  6
-#define P_TIME_SCALE   7
-#define P_TIME_BLEND   8
-#define P_CHROMA       9
-#define P_TIME_MOTION 10
+#define P_TIME_MOTION  6
+#define P_TIME_OFFSET  7
+#define P_TIME_SCALE   8
+#define P_TIME_BLEND   9
+#define P_CHROMA      10
 #define P_RESET       11
 
 #define SS_MODE_ROWS              0
@@ -94,6 +94,12 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+#define SS_SQRT_LUT_SIZE 8192
+#define SS_ATAN_LUT_SIZE 4097
+#define SS_ATAN_LUT_MAX  4096
+#define SS_ANGLE_QUARTER 16384
+#define SS_ANGLE_HALF    32768
+
 static inline int ss_clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : (v > hi ? hi : v);
@@ -102,6 +108,11 @@ static inline int ss_clampi(int v, int lo, int hi)
 static inline float ss_clampf(float v, float lo, float hi)
 {
     return (v < lo) ? lo : (v > hi ? hi : v);
+}
+
+static inline float ss_absf(float v)
+{
+    return (v < 0.0f) ? -v : v;
 }
 
 static inline uint8_t ss_blend_q8_u8(uint8_t a, uint8_t b, int q8)
@@ -118,19 +129,13 @@ static inline uint16_t ss_u16_from_float(float v)
 static inline uint16_t ss_triangle_u16(uint32_t v)
 {
     v &= 65535u;
-    if(v < 32768u) {
-        return (uint16_t)(v << 1);
-    }
-    return (uint16_t)((65535u - v) << 1);
+    return (uint16_t)((v < 32768u) ? (v << 1) : ((65535u - v) << 1));
 }
 
 static inline uint8_t ss_wave8(uint32_t v)
 {
     v &= 65535u;
-    if(v < 32768u) {
-        return (uint8_t)(v >> 7);
-    }
-    return (uint8_t)((65535u - v) >> 7);
+    return (uint8_t)((v < 32768u) ? (v >> 7) : ((65535u - v) >> 7));
 }
 
 static inline uint32_t ss_hash_u32(uint32_t x)
@@ -161,7 +166,7 @@ static inline float ss_lerpf(float a, float b, float t)
 
 static inline float ss_value_noise(int x, int y, int scale, uint32_t seed)
 {
-    if(scale < 1) scale = 1;
+    scale = (scale < 1) ? 1 : scale;
 
     const int xi = x / scale;
     const int yi = y / scale;
@@ -193,7 +198,11 @@ typedef struct {
     uint8_t *history;
     uint8_t *prev_y;
     uint16_t *geom;
+    uint16_t *radial_lut;
+    uint16_t *angle_lut;
     uint16_t time_lut[256];
+    uint16_t sqrt_lut[SS_SQRT_LUT_SIZE];
+    uint16_t atan_lut[SS_ATAN_LUT_SIZE];
     uint8_t *hist_y[SS_HISTORY_MAX];
     uint8_t *hist_u[SS_HISTORY_MAX];
     uint8_t *hist_v[SS_HISTORY_MAX];
@@ -218,9 +227,8 @@ typedef struct {
     int time_blend_q8;
     uint32_t phase_base;
     uint32_t scale_q16;
-    uint32_t drift;
-    uint32_t pulse;
-    int time_motion;
+    uint32_t time_add;
+    int time_reverse;
 } ss_render_cfg;
 
 static void ss_refresh_history_planes(slitscan_t *s)
@@ -265,46 +273,121 @@ static void ss_seed_history(slitscan_t *s, VJFrame *frame)
     s->seeded = 1;
 }
 
-static inline uint32_t ss_time_motion_u16(uint32_t g16, int mode, uint32_t drift, uint32_t pulse)
+
+static void ss_build_math_luts(slitscan_t *s)
 {
-    switch(mode) {
-        case SS_TMOVE_REVERSE:
-            return 65535u - g16;
-        case SS_TMOVE_DRIFT_FWD:
-            return (g16 + drift) & 65535u;
-        case SS_TMOVE_DRIFT_REV:
-            return (g16 - drift) & 65535u;
-        case SS_TMOVE_PULSE:
-            return (g16 + pulse) & 65535u;
-        default:
-            return g16;
+    const float inv_sqrt_max = 1.0f / (float)(SS_SQRT_LUT_SIZE - 1);
+    for(int i = 0; i < SS_SQRT_LUT_SIZE; i++) {
+        const float x = (float)i * inv_sqrt_max;
+        s->sqrt_lut[i] = ss_u16_from_float(sqrtf(x));
+    }
+
+    const float atan_scale = 32768.0f / (float)M_PI;
+    const float inv_atan_max = 1.0f / (float)SS_ATAN_LUT_MAX;
+    for(int i = 0; i < SS_ATAN_LUT_SIZE; i++) {
+        const float r = (float)i * inv_atan_max;
+        int a = (int)(atanf(r) * atan_scale + 0.5f);
+        s->atan_lut[i] = (uint16_t)ss_clampi(a, 0, SS_ANGLE_QUARTER);
+    }
+}
+
+static inline uint16_t ss_sqrt_norm_u16(const slitscan_t *s, float norm2)
+{
+    norm2 = ss_clampf(norm2, 0.0f, 1.0f);
+    const int idx = ss_clampi((int)(norm2 * (float)(SS_SQRT_LUT_SIZE - 1) + 0.5f), 0, SS_SQRT_LUT_SIZE - 1);
+    return s->sqrt_lut[idx];
+}
+
+static inline float ss_sqrt_norm_f(const slitscan_t *s, float norm2)
+{
+    return (float)ss_sqrt_norm_u16(s, norm2) * (1.0f / 65535.0f);
+}
+
+static inline uint16_t ss_sqrt_ratio_u16(const slitscan_t *s, uint64_t d2, uint64_t max_d2)
+{
+    if(max_d2 == 0u) {
+        return 0;
+    }
+
+    d2 = (d2 > max_d2) ? max_d2 : d2;
+    const uint64_t idx64 = (d2 * (uint64_t)(SS_SQRT_LUT_SIZE - 1) + (max_d2 >> 1)) / max_d2;
+    return s->sqrt_lut[(int)idx64];
+}
+
+static inline uint16_t ss_angle_from_dxy2_u16(const slitscan_t *s, int dx2, int dy2)
+{
+    const uint32_t ax = (uint32_t)((dx2 < 0) ? -dx2 : dx2);
+    const uint32_t ay = (uint32_t)((dy2 < 0) ? -dy2 : dy2);
+
+    if((ax | ay) == 0u) {
+        return SS_ANGLE_HALF;
+    }
+
+    uint32_t q;
+    if(ax >= ay) {
+        const uint32_t r = (ax > 0u) ? (uint32_t)(((uint64_t)ay * SS_ATAN_LUT_MAX + (ax >> 1)) / ax) : 0u;
+        q = s->atan_lut[(int)r];
+    } else {
+        const uint32_t r = (ay > 0u) ? (uint32_t)(((uint64_t)ax * SS_ATAN_LUT_MAX + (ay >> 1)) / ay) : 0u;
+        q = (uint32_t)SS_ANGLE_QUARTER - (uint32_t)s->atan_lut[(int)r];
+    }
+
+    const int theta = (dx2 >= 0)
+        ? ((dy2 >= 0) ? (int)q : -(int)q)
+        : ((dy2 >= 0) ? (SS_ANGLE_HALF - (int)q) : ((int)q - SS_ANGLE_HALF));
+
+    return (uint16_t)((theta + SS_ANGLE_HALF) & 65535);
+}
+
+static void ss_build_center_polar_luts(slitscan_t *s)
+{
+    const int w = s->w;
+    const int h = s->h;
+    const int max_dx2 = (w > 1) ? (w - 1) : 1;
+    const int max_dy2 = (h > 1) ? (h - 1) : 1;
+    const uint64_t max_d2 = (uint64_t)max_dx2 * (uint64_t)max_dx2 +
+                            (uint64_t)max_dy2 * (uint64_t)max_dy2;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        const int dy2 = (y << 1) - (h - 1);
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const int dx2 = (x << 1) - (w - 1);
+            const uint64_t d2 = (uint64_t)(dx2 * dx2) + (uint64_t)(dy2 * dy2);
+            s->radial_lut[idx] = ss_sqrt_ratio_u16(s, d2, max_d2);
+            s->angle_lut[idx] = ss_angle_from_dxy2_u16(s, dx2, dy2);
+        }
     }
 }
 
 static inline uint32_t ss_geom_time_u16(uint16_t g, const ss_render_cfg *cfg)
 {
-    uint32_t v = ((uint32_t)(((uint64_t)g * cfg->scale_q16) >> 16) + cfg->phase_base) & 65535u;
-    return ss_time_motion_u16(v, cfg->time_motion, cfg->drift, cfg->pulse);
+    uint32_t v = ((uint32_t)(((uint64_t)g * cfg->scale_q16) >> 16) + cfg->phase_base + cfg->time_add) & 65535u;
+    return cfg->time_reverse ? (65535u - v) : v;
+}
+
+static inline int ss_motion_value_q8(const ss_render_cfg *cfg, int idx, int cy)
+{
+    const int d = cy - (int)cfg->prev_y[idx];
+    const int diff = (d < 0) ? -d : d;
+    const int raw_mv = (diff * cfg->motion_mul_q8 + 128) >> 8;
+    return (raw_mv > 255) ? 255 : raw_mv;
 }
 
 static inline int ss_source_time_value(const ss_render_cfg *cfg, int idx, int t)
 {
     const int cy = cfg->cur_y[idx];
-    int sv;
-
-    if(cfg->source == SS_SRC_LUMA) {
-        sv = cy;
-    } else if(cfg->source == SS_SRC_INV_LUMA) {
-        sv = 255 - cy;
-    } else {
-        int diff = abs(cy - (int)cfg->prev_y[idx]);
-        int mv = (diff * cfg->motion_mul_q8 + 128) >> 8;
-        if(mv > 255) mv = 255;
-        sv = (cfg->source == SS_SRC_MOTION) ? mv : ((cy + mv) >> 1);
-    }
+    const int sv = (cfg->source == SS_SRC_LUMA)
+        ? cy
+        : ((cfg->source == SS_SRC_INV_LUMA)
+            ? (255 - cy)
+            : ((cfg->source == SS_SRC_MOTION)
+                ? ss_motion_value_q8(cfg, idx, cy)
+                : ((cy + ss_motion_value_q8(cfg, idx, cy)) >> 1)));
 
     t += ((sv - t) * cfg->source_gain_q8 + 128) >> 8;
-    return ss_clampi(t, 0, 255);
+    return (t < 0) ? 0 : ((t > 255) ? 255 : t);
 }
 
 static void ss_render_shape_hard(slitscan_t *s, const ss_render_cfg *cfg)
@@ -335,21 +418,20 @@ static void ss_render_shape_soft(slitscan_t *s, const ss_render_cfg *cfg)
         const int back0 = tq >> 8;
         const int frac = tq & 255;
         int back1 = back0 + 1;
-        if(back1 >= SS_HISTORY_MAX) back1 = SS_HISTORY_MAX - 1;
+        back1 = (back1 >= SS_HISTORY_MAX) ? (SS_HISTORY_MAX - 1) : back1;
 
         const int slot0 = (cfg->write_slot - back0) & SS_HISTORY_MASK;
         const int slot1 = (cfg->write_slot - back1) & SS_HISTORY_MASK;
+        const int q = ((slot1 != slot0) ? ((frac * cfg->time_blend_q8 + 128) >> 8) : 0);
+        const int iq = 256 - q;
 
-        int sy = s->hist_y[slot0][idx];
-        int su = s->hist_u[slot0][idx];
-        int sv = s->hist_v[slot0][idx];
+        const int sy0 = s->hist_y[slot0][idx];
+        const int su0 = s->hist_u[slot0][idx];
+        const int sv0 = s->hist_v[slot0][idx];
 
-        if(frac > 0 && slot1 != slot0) {
-            const int q = (frac * cfg->time_blend_q8 + 128) >> 8;
-            sy = (((sy * (256 - q)) + ((int)s->hist_y[slot1][idx] * q) + 128) >> 8);
-            su = (((su * (256 - q)) + ((int)s->hist_u[slot1][idx] * q) + 128) >> 8);
-            sv = (((sv * (256 - q)) + ((int)s->hist_v[slot1][idx] * q) + 128) >> 8);
-        }
+        const int sy = ((sy0 * iq) + ((int)s->hist_y[slot1][idx] * q) + 128) >> 8;
+        const int su = ((su0 * iq) + ((int)s->hist_u[slot1][idx] * q) + 128) >> 8;
+        const int sv = ((sv0 * iq) + ((int)s->hist_v[slot1][idx] * q) + 128) >> 8;
 
         cfg->out_y[idx] = ss_blend_q8_u8(cfg->cur_y[idx], (uint8_t)sy, cfg->amount_q8);
         cfg->out_u[idx] = ss_blend_q8_u8(cfg->cur_u[idx], (uint8_t)su, cfg->chroma_q8);
@@ -391,27 +473,777 @@ static void ss_render_source_soft(slitscan_t *s, const ss_render_cfg *cfg)
         const int back0 = tq >> 8;
         const int frac = tq & 255;
         int back1 = back0 + 1;
-        if(back1 >= SS_HISTORY_MAX) back1 = SS_HISTORY_MAX - 1;
+        back1 = (back1 >= SS_HISTORY_MAX) ? (SS_HISTORY_MAX - 1) : back1;
 
         const int slot0 = (cfg->write_slot - back0) & SS_HISTORY_MASK;
         const int slot1 = (cfg->write_slot - back1) & SS_HISTORY_MASK;
+        const int q = ((slot1 != slot0) ? ((frac * cfg->time_blend_q8 + 128) >> 8) : 0);
+        const int iq = 256 - q;
 
-        int sy = s->hist_y[slot0][idx];
-        int su = s->hist_u[slot0][idx];
-        int sv = s->hist_v[slot0][idx];
+        const int sy0 = s->hist_y[slot0][idx];
+        const int su0 = s->hist_u[slot0][idx];
+        const int sv0 = s->hist_v[slot0][idx];
 
-        if(frac > 0 && slot1 != slot0) {
-            const int q = (frac * cfg->time_blend_q8 + 128) >> 8;
-            sy = (((sy * (256 - q)) + ((int)s->hist_y[slot1][idx] * q) + 128) >> 8);
-            su = (((su * (256 - q)) + ((int)s->hist_u[slot1][idx] * q) + 128) >> 8);
-            sv = (((sv * (256 - q)) + ((int)s->hist_v[slot1][idx] * q) + 128) >> 8);
-        }
+        const int sy = ((sy0 * iq) + ((int)s->hist_y[slot1][idx] * q) + 128) >> 8;
+        const int su = ((su0 * iq) + ((int)s->hist_u[slot1][idx] * q) + 128) >> 8;
+        const int sv = ((sv0 * iq) + ((int)s->hist_v[slot1][idx] * q) + 128) >> 8;
 
         cfg->out_y[idx] = ss_blend_q8_u8(cfg->cur_y[idx], (uint8_t)sy, cfg->amount_q8);
         cfg->out_u[idx] = ss_blend_q8_u8(cfg->cur_u[idx], (uint8_t)su, cfg->chroma_q8);
         cfg->out_v[idx] = ss_blend_q8_u8(cfg->cur_v[idx], (uint8_t)sv, cfg->chroma_q8);
     }
 }
+
+typedef void (*ss_render_fn)(slitscan_t *s, const ss_render_cfg *cfg);
+
+typedef struct {
+    float cx;
+    float cy;
+    float inv_w;
+    float inv_h;
+    float inv_d;
+    float inv_maxr2;
+    float inv_manhattan;
+    float inv_2pi;
+    float two_pi;
+    int min_wh;
+    int max_wh;
+    int checker_tile;
+    int small_tile;
+    int large_tile;
+    int noise_s0;
+    int noise_s1;
+    int noise_s2;
+} ss_geom_ctx;
+
+typedef void (*ss_geom_builder_fn)(slitscan_t *s, const ss_geom_ctx *c);
+
+static void ss_build_geom_rows(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            uint16_t v = 0;
+
+            v = (uint16_t)ss_clampi((int)((float)y * c->inv_h + 0.5f), 0, 65535);
+
+            s->geom[idx] = v;
+        }
+    }
+}
+
+static void ss_build_geom_columns(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            uint16_t v = 0;
+
+            v = (uint16_t)ss_clampi((int)((float)x * c->inv_w + 0.5f), 0, 65535);
+
+            s->geom[idx] = v;
+        }
+    }
+}
+
+static void ss_build_geom_diagonal(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            uint16_t v = 0;
+
+            v = (uint16_t)ss_clampi((int)((float)(x + y) * c->inv_d + 0.5f), 0, 65535);
+
+            s->geom[idx] = v;
+        }
+    }
+}
+
+static void ss_build_geom_radial(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+    (void)c;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            s->geom[idx] = s->radial_lut[idx];
+        }
+    }
+}
+
+static void ss_build_geom_spiral(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+    (void)c;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const uint32_t rad = (uint32_t)s->radial_lut[idx];
+            const uint32_t ang = (uint32_t)s->angle_lut[idx];
+            s->geom[idx] = (uint16_t)(((rad * 3u) + (ang * 2u)) & 65535u);
+        }
+    }
+}
+
+static void ss_build_geom_waves(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            uint16_t v = 0;
+
+            {
+                                const uint16_t row = (uint16_t)ss_clampi((int)((float)y * c->inv_h + 0.5f), 0, 65535);
+                                const uint16_t col = (uint16_t)ss_clampi((int)((float)x * c->inv_w + 0.5f), 0, 65535);
+                                const uint16_t dia = (uint16_t)ss_clampi((int)((float)(x + y) * c->inv_d + 0.5f), 0, 65535);
+                                v = (uint16_t)((((uint32_t)ss_wave8(((uint32_t)col * 5u) + ((uint32_t)row * 2u)) << 8) | ss_wave8(((uint32_t)dia * 7u))) & 65535u);
+
+                            }
+
+            s->geom[idx] = v;
+        }
+    }
+}
+
+static void ss_build_geom_curtains(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            uint16_t v = 0;
+
+            {
+                                const uint16_t col = (uint16_t)ss_clampi((int)((float)x * c->inv_w + 0.5f), 0, 65535);
+                                const int d = (int)col - 32768;
+                                v = (uint16_t)(((d < 0) ? -d : d) * 2);
+
+                            }
+
+            s->geom[idx] = v;
+        }
+    }
+}
+
+static void ss_build_geom_tunnel(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+    (void)c;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const uint32_t rad = (uint32_t)s->radial_lut[idx];
+            const uint32_t ang = (uint32_t)s->angle_lut[idx];
+            s->geom[idx] = (uint16_t)(((rad * 4u) + ang) & 65535u);
+        }
+    }
+}
+
+static void ss_build_geom_rings(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+    (void)c;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const uint32_t rad = (uint32_t)s->radial_lut[idx];
+            s->geom[idx] = ss_triangle_u16(rad * 9u);
+        }
+    }
+}
+
+static void ss_build_geom_angular(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+    (void)c;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            s->geom[idx] = s->angle_lut[idx];
+        }
+    }
+}
+
+static void ss_build_geom_diamond(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const int dx2 = (x << 1) - (w - 1);
+            const int dy2 = (y << 1) - (h - 1);
+            const int ax2 = (dx2 < 0) ? -dx2 : dx2;
+            const int ay2 = (dy2 < 0) ? -dy2 : dy2;
+            const float manhattan = ((float)(ax2 + ay2) * 0.5f) * c->inv_manhattan;
+            s->geom[idx] = (uint16_t)ss_clampi((int)(manhattan + 0.5f), 0, 65535);
+        }
+    }
+}
+
+static void ss_build_geom_checker(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            uint16_t v = 0;
+
+            {
+                                const int tx = x / c->checker_tile;
+                                const int ty = y / c->checker_tile;
+                                const int lx = x - tx * c->checker_tile;
+                                const int ly = y - ty * c->checker_tile;
+                                const int local = ((lx + ly) * 65535) / (c->checker_tile * 2);
+                                v = (uint16_t)(((tx ^ ty) & 1) ? (65535 - local) : local);
+
+                            }
+
+            s->geom[idx] = v;
+        }
+    }
+}
+
+static void ss_build_geom_lissajous(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            uint16_t v = 0;
+
+            {
+                                const float nx = (w > 1) ? ((float)x / (float)(w - 1)) : 0.0f;
+                                const float ny = (h > 1) ? ((float)y / (float)(h - 1)) : 0.0f;
+                                const float a = sinf(c->two_pi * (3.0f * nx + 0.35f * ny));
+                                const float b = cosf(c->two_pi * (2.0f * ny - 0.20f * nx));
+                                const float cv = sinf(c->two_pi * (nx + ny) * 1.5f);
+                                v = ss_u16_from_float(ss_clampf(0.5f + 0.25f * a + 0.18f * b + 0.07f * cv, 0.0f, 1.0f));
+
+                            }
+
+            s->geom[idx] = v;
+        }
+    }
+}
+
+static void ss_build_geom_interference(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const float fx = (float)x;
+            const float fy = (float)y;
+            const float x1 = c->cx * 0.35f;
+            const float y1 = c->cy * 0.55f;
+            const float x2 = c->cx * 1.65f;
+            const float y2 = c->cy * 0.85f;
+            const float x3 = c->cx * 1.05f;
+            const float y3 = c->cy * 1.55f;
+            const float dx1 = fx - x1;
+            const float dy1 = fy - y1;
+            const float dx2 = fx - x2;
+            const float dy2 = fy - y2;
+            const float dx3 = fx - x3;
+            const float dy3 = fy - y3;
+            const float r1 = ss_sqrt_norm_f(s, (dx1 * dx1 + dy1 * dy1) * c->inv_maxr2);
+            const float r2 = ss_sqrt_norm_f(s, (dx2 * dx2 + dy2 * dy2) * c->inv_maxr2);
+            const float r3 = ss_sqrt_norm_f(s, (dx3 * dx3 + dy3 * dy3) * c->inv_maxr2);
+            const float n = 0.5f + 0.20f * sinf(c->two_pi * 7.0f * r1) + 0.18f * sinf(c->two_pi * 9.0f * r2) + 0.12f * cosf(c->two_pi * 5.0f * r3);
+            s->geom[idx] = ss_u16_from_float(ss_clampf(n, 0.0f, 1.0f));
+        }
+    }
+}
+
+static void ss_build_geom_horizon(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+    (void)c;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const float ny = (h > 1) ? ((float)y / (float)(h - 1)) : 0.0f;
+            s->geom[idx] = ss_u16_from_float(ss_sqrt_norm_f(s, ny));
+        }
+    }
+}
+
+static void ss_build_geom_organic(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            uint16_t v = 0;
+
+            {
+                                float n0 = ss_value_noise(x, y, c->noise_s0, 11u);
+                                float n1 = ss_value_noise(x, y, c->noise_s1, 47u);
+                                float n2 = ss_value_noise(x, y, c->noise_s2, 89u);
+                                float n = n0 * 0.55f + n1 * 0.30f + n2 * 0.15f;
+                                const uint16_t row = (uint16_t)ss_clampi((int)((float)y * c->inv_h + 0.5f), 0, 65535);
+                                const uint16_t col = (uint16_t)ss_clampi((int)((float)x * c->inv_w + 0.5f), 0, 65535);
+                                n = n * 0.78f + ((float)(((uint32_t)row + ((uint32_t)col * 3u)) & 65535u) * (1.0f / 65535.0f)) * 0.22f;
+                                v = ss_u16_from_float(ss_clampf(n, 0.0f, 1.0f));
+
+                            }
+
+            s->geom[idx] = v;
+        }
+    }
+}
+
+static void ss_build_geom_fan_blades(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+    (void)c;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const uint32_t ang = (uint32_t)s->angle_lut[idx];
+            const uint32_t rad = (uint32_t)s->radial_lut[idx];
+            s->geom[idx] = ss_triangle_u16((ang * 12u) + (rad * 2u));
+        }
+    }
+}
+
+
+
+static void ss_build_geom_polar_checker(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+    (void)c;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const uint32_t ang = (uint32_t)s->angle_lut[idx];
+            const uint32_t rad = (uint32_t)s->radial_lut[idx];
+            const uint32_t ring = rad / 5461u;
+            const uint32_t sector = ang / 4096u;
+            const uint32_t local = ((rad * 5u) + (ang * 3u)) & 65535u;
+            s->geom[idx] = (uint16_t)(((ring ^ sector) & 1u) ? (65535u - local) : local);
+        }
+    }
+}
+
+static void ss_build_geom_saddle(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            uint16_t v = 0;
+
+            {
+                                const float nx = ((float)x - c->cx) / ((c->cx > 0.0f) ? c->cx : 1.0f);
+                                const float ny = ((float)y - c->cy) / ((c->cy > 0.0f) ? c->cy : 1.0f);
+                                const float sdl = 0.5f + 0.5f * (nx * ny);
+                                const float fold = 0.5f + 0.25f * (nx * nx - ny * ny);
+                                v = ss_u16_from_float(ss_clampf(sdl * 0.72f + fold * 0.28f, 0.0f, 1.0f));
+
+                            }
+
+            s->geom[idx] = v;
+        }
+    }
+}
+
+static void ss_build_geom_vortex_rings(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const float rn = (float)s->radial_lut[idx] * (1.0f / 65535.0f);
+            const float an = (float)s->angle_lut[idx] * (1.0f / 65535.0f);
+            const float n = 0.5f + 0.38f * sinf(c->two_pi * (rn * 7.0f + an * 2.0f)) + 0.12f * cosf(c->two_pi * (rn * 13.0f - an * 3.0f));
+            s->geom[idx] = ss_u16_from_float(ss_clampf(n, 0.0f, 1.0f));
+        }
+    }
+}
+
+
+
+static void ss_build_geom_venetian(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            uint16_t v = 0;
+
+            {
+                                const int band = y / c->small_tile;
+                                const int local = y - band * c->small_tile;
+                                const int pos = (local * 65535) / c->small_tile;
+                                v = (uint16_t)((band & 1) ? (65535 - pos) : pos);
+
+                            }
+
+            s->geom[idx] = v;
+        }
+    }
+}
+
+static void ss_build_geom_crt_roll(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            uint16_t v = 0;
+
+            {
+                                const uint32_t row = (uint32_t)ss_clampi((int)((float)y * c->inv_h + 0.5f), 0, 65535);
+                                const int band_h = ss_clampi(h / 12, 8, 96);
+                                const int b = y / band_h;
+                                const int local = y - b * band_h;
+                                const uint32_t sync = (local < 3) ? 65535u : 0u;
+                                const uint32_t wobble = (uint32_t)ss_wave8(row * 9u + (uint32_t)(b * 7919)) << 8;
+                                v = (uint16_t)((row + (wobble >> 2) + sync) & 65535u);
+
+                            }
+
+            s->geom[idx] = v;
+        }
+    }
+}
+
+static void ss_build_geom_topographic(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+    (void)c;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const uint32_t rad = (uint32_t)s->radial_lut[idx];
+            const uint32_t wave = ((uint32_t)ss_wave8(((uint32_t)x * 257u) + ((uint32_t)y * 389u)) << 8);
+            const uint32_t q = ((rad + (wave >> 3)) / 4096u) * 4096u;
+            s->geom[idx] = (uint16_t)(q & 65535u);
+        }
+    }
+}
+
+static void ss_build_geom_cellular_cracks(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            uint16_t v = 0;
+
+            {
+                                const int gx = x / c->large_tile;
+                                const int gy = y / c->large_tile;
+                                const int lx = x - gx * c->large_tile;
+                                const int ly = y - gy * c->large_tile;
+                                const int edge = ss_clampi((lx < ly ? lx : ly), 0, c->large_tile);
+                                const int edge2 = ss_clampi(((c->large_tile - lx) < (c->large_tile - ly) ? (c->large_tile - lx) : (c->large_tile - ly)), 0, c->large_tile);
+                                const int crack = (edge < edge2) ? edge : edge2;
+                                const uint32_t h0 = ss_hash_u32((uint32_t)gx * 92837111u ^ (uint32_t)gy * 689287499u ^ 0x51ed270bu);
+                                const uint32_t base = h0 & 65535u;
+                                const uint32_t cv = (uint32_t)ss_clampi((crack * 65535) / c->large_tile, 0, 65535);
+                                v = (uint16_t)((base + (65535u - cv) * 2u) & 65535u);
+
+                            }
+
+            s->geom[idx] = v;
+        }
+    }
+}
+
+static void ss_build_geom_ellipse(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const float fx = ((float)x - c->cx) / ((c->cx > 0.0f) ? c->cx : 1.0f);
+            const float fy = ((float)y - c->cy) / ((c->cy > 0.0f) ? c->cy : 1.0f);
+            const float e = ss_sqrt_norm_f(s, fx * fx * 0.72f + fy * fy * 1.45f);
+            s->geom[idx] = ss_u16_from_float(e);
+        }
+    }
+}
+
+static void ss_build_geom_cross_fold(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+    (void)c;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const int dx2 = (x << 1) - (w - 1);
+            const int dy2 = (y << 1) - (h - 1);
+            const int ax2 = (dx2 < 0) ? -dx2 : dx2;
+            const int ay2 = (dy2 < 0) ? -dy2 : dy2;
+            const float ax = (w > 1) ? ((float)ax2 / (float)(w - 1)) : 0.0f;
+            const float ay = (h > 1) ? ((float)ay2 / (float)(h - 1)) : 0.0f;
+            const float cross = ss_clampf(((ax < ay) ? ax : ay) * 1.55f, 0.0f, 1.0f);
+            const float diamond = ss_clampf((ax + ay) * 0.5f, 0.0f, 1.0f);
+            s->geom[idx] = ss_u16_from_float(cross * 0.65f + diamond * 0.35f);
+        }
+    }
+}
+
+
+
+static void ss_build_geom_offset_rings(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const float ox = c->cx + 0.22f * (float)w;
+            const float oy = c->cy - 0.13f * (float)h;
+            const float fx = (float)x - ox;
+            const float fy = (float)y - oy;
+            const uint32_t rad = (uint32_t)ss_sqrt_norm_u16(s, (fx * fx + fy * fy) * c->inv_maxr2);
+            s->geom[idx] = ss_triangle_u16(rad * 11u + (uint32_t)((float)x * c->inv_w));
+        }
+    }
+}
+
+
+
+static void ss_build_geom_noise_curtains(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            uint16_t v = 0;
+
+            {
+                                const float n0 = ss_value_noise(x, y, c->noise_s1, 123u);
+                                const float col = (w > 1) ? ((float)x / (float)(w - 1)) : 0.0f;
+                                const float stripe = 0.5f + 0.5f * sinf(c->two_pi * (col * 8.0f + n0 * 0.85f));
+                                const float row = (h > 1) ? ((float)y / (float)(h - 1)) : 0.0f;
+                                v = ss_u16_from_float(ss_clampf(stripe * 0.78f + row * 0.22f, 0.0f, 1.0f));
+
+                            }
+
+            s->geom[idx] = v;
+        }
+    }
+}
+
+static void ss_build_geom_lightning(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const float ny = (h > 1) ? ((float)y / (float)(h - 1)) : 0.0f;
+            const float jag0 = ss_value_noise(0, y, c->noise_s2, 179u) - 0.5f;
+            const float jag1 = ss_value_noise(17, y, c->noise_s1, 313u) - 0.5f;
+            const float center = c->cx + (jag0 * 0.38f + jag1 * 0.17f) * (float)w;
+            const float d = (float)x - center;
+            const float dist = ((d < 0.0f) ? -d : d) / ((float)w * 0.5f);
+            const float bolt = ss_clampf(1.0f - dist * 2.6f, 0.0f, 1.0f);
+            s->geom[idx] = ss_u16_from_float(ss_clampf(ny * 0.58f + bolt * 0.42f, 0.0f, 1.0f));
+        }
+    }
+}
+
+
+
+static void ss_build_geom_perspective_grid(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const float ny = (h > 1) ? ((float)y / (float)(h - 1)) : 0.0f;
+            const float px = ((float)x - c->cx) / ((float)c->max_wh + 1.0f);
+            const float py = ny + 0.04f;
+            const float gx = fmodf(px / py * 9.0f, 1.0f) - 0.5f;
+            const float gy = fmodf((1.0f / py) * 0.55f, 1.0f) - 0.5f;
+            const float gridx = ((gx < 0.0f) ? -gx : gx) * 2.0f;
+            const float gridy = ((gy < 0.0f) ? -gy : gy) * 2.0f;
+            const float grid = (gridx < gridy) ? gridx : gridy;
+            s->geom[idx] = ss_u16_from_float(ss_clampf(ny * 0.75f + (1.0f - grid) * 0.25f, 0.0f, 1.0f));
+        }
+    }
+}
+
+
+
+static void ss_build_geom_orbit_comet(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            const float rn = (float)s->radial_lut[idx] * (1.0f / 65535.0f);
+            const float an = (float)s->angle_lut[idx] * (1.0f / 65535.0f);
+            const float arm_s = sinf(c->two_pi * (an * 2.0f + rn * 1.7f));
+            const float arm = (arm_s < 0.0f) ? -arm_s : arm_s;
+            const float falloff = ss_clampf(1.0f - rn, 0.0f, 1.0f);
+            s->geom[idx] = ss_u16_from_float(ss_clampf((an * 0.45f) + (rn * 0.35f) + (arm * falloff * 0.35f), 0.0f, 1.0f));
+        }
+    }
+}
+
+static void ss_build_geom_broken_tiles(slitscan_t *s, const ss_geom_ctx *c)
+{
+    const int w = s->w;
+    const int h = s->h;
+
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            const int idx = y * w + x;
+            uint16_t v = 0;
+
+            {
+                                const int tx = x / c->checker_tile;
+                                const int ty = y / c->checker_tile;
+                                const int lx = x - tx * c->checker_tile;
+                                const int ly = y - ty * c->checker_tile;
+                                const uint32_t h0 = ss_hash_u32((uint32_t)tx * 73856093u ^ (uint32_t)ty * 19349663u ^ 0xb5297a4du);
+                                const uint32_t base = h0 & 65535u;
+                                const uint32_t local = (uint32_t)(((lx * 257) ^ (ly * 521)) & 65535);
+                                v = (uint16_t)((base + local) & 65535u);
+
+                            }
+
+            s->geom[idx] = v;
+        }
+    }
+}
+static const ss_geom_builder_fn ss_geom_builders[SS_GEOM_MODES] = {
+    ss_build_geom_rows,
+    ss_build_geom_columns,
+    ss_build_geom_diagonal,
+    ss_build_geom_radial,
+    ss_build_geom_spiral,
+    ss_build_geom_waves,
+    ss_build_geom_curtains,
+    ss_build_geom_tunnel,
+    ss_build_geom_rings,
+    ss_build_geom_angular,
+    ss_build_geom_diamond,
+    ss_build_geom_checker,
+    ss_build_geom_lissajous,
+    ss_build_geom_interference,
+    ss_build_geom_horizon,
+    ss_build_geom_organic,
+    ss_build_geom_fan_blades,
+    ss_build_geom_polar_checker,
+    ss_build_geom_saddle,
+    ss_build_geom_vortex_rings,
+    ss_build_geom_venetian,
+    ss_build_geom_crt_roll,
+    ss_build_geom_topographic,
+    ss_build_geom_cellular_cracks,
+    ss_build_geom_ellipse,
+    ss_build_geom_cross_fold,
+    ss_build_geom_offset_rings,
+    ss_build_geom_noise_curtains,
+    ss_build_geom_lightning,
+    ss_build_geom_perspective_grid,
+    ss_build_geom_orbit_comet,
+    ss_build_geom_broken_tiles
+};
 
 static void ss_build_geom(slitscan_t *s, int mode)
 {
@@ -424,350 +1256,31 @@ static void ss_build_geom(slitscan_t *s, int mode)
     const int h = s->h;
     const float cx = (float)(w - 1) * 0.5f;
     const float cy = (float)(h - 1) * 0.5f;
-    const float maxr = sqrtf(cx * cx + cy * cy);
-    const float inv_w = (w > 1) ? (65535.0f / (float)(w - 1)) : 0.0f;
-    const float inv_h = (h > 1) ? (65535.0f / (float)(h - 1)) : 0.0f;
-    const float inv_d = ((w + h) > 2) ? (65535.0f / (float)(w + h - 2)) : 0.0f;
-    const float inv_r = (maxr > 0.0f) ? (65535.0f / maxr) : 0.0f;
-    const float inv_manhattan = ((cx + cy) > 0.0f) ? (65535.0f / (cx + cy)) : 0.0f;
-    const float inv_2pi = 1.0f / (2.0f * (float)M_PI);
-    const float two_pi = 2.0f * (float)M_PI;
     const int min_wh = (w < h) ? w : h;
     const int max_wh = (w > h) ? w : h;
-    const int checker_tile = ss_clampi(min_wh / 10, 8, 96);
-    const int small_tile = ss_clampi(min_wh / 18, 6, 64);
-    const int large_tile = ss_clampi(min_wh / 7, 16, 160);
-    const int noise_s0 = ss_clampi(min_wh / 7, 12, 192);
-    const int noise_s1 = ss_clampi(min_wh / 15, 8, 96);
-    const int noise_s2 = ss_clampi(min_wh / 31, 4, 48);
+    const float maxr2 = cx * cx + cy * cy;
 
-#pragma omp parallel for num_threads(s->n_threads) schedule(static)
-    for(int y = 0; y < h; y++) {
-        for(int x = 0; x < w; x++) {
-            const int idx = y * w + x;
-            uint16_t v = 0;
+    const ss_geom_ctx c = {
+        cx,
+        cy,
+        (w > 1) ? (65535.0f / (float)(w - 1)) : 0.0f,
+        (h > 1) ? (65535.0f / (float)(h - 1)) : 0.0f,
+        ((w + h) > 2) ? (65535.0f / (float)(w + h - 2)) : 0.0f,
+        (maxr2 > 0.0f) ? (1.0f / maxr2) : 0.0f,
+        ((cx + cy) > 0.0f) ? (65535.0f / (cx + cy)) : 0.0f,
+        1.0f / (2.0f * (float)M_PI),
+        2.0f * (float)M_PI,
+        min_wh,
+        max_wh,
+        ss_clampi(min_wh / 10, 8, 96),
+        ss_clampi(min_wh / 18, 6, 64),
+        ss_clampi(min_wh / 7, 16, 160),
+        ss_clampi(min_wh / 7, 12, 192),
+        ss_clampi(min_wh / 15, 8, 96),
+        ss_clampi(min_wh / 31, 4, 48)
+    };
 
-            switch(mode) {
-                case SS_MODE_ROWS:
-                    v = (uint16_t)ss_clampi((int)((float)y * inv_h + 0.5f), 0, 65535);
-                    break;
-
-                case SS_MODE_COLUMNS:
-                    v = (uint16_t)ss_clampi((int)((float)x * inv_w + 0.5f), 0, 65535);
-                    break;
-
-                case SS_MODE_DIAGONAL:
-                    v = (uint16_t)ss_clampi((int)((float)(x + y) * inv_d + 0.5f), 0, 65535);
-                    break;
-
-                case SS_MODE_RADIAL: {
-                    const float fx = (float)x - cx;
-                    const float fy = (float)y - cy;
-                    const float r = sqrtf(fx * fx + fy * fy);
-                    v = (uint16_t)ss_clampi((int)(r * inv_r + 0.5f), 0, 65535);
-                    break;
-                }
-
-                case SS_MODE_SPIRAL: {
-                    const float fx = (float)x - cx;
-                    const float fy = (float)y - cy;
-                    const float r = sqrtf(fx * fx + fy * fy);
-                    const float a = atan2f(fy, fx);
-                    const uint16_t rad = (uint16_t)ss_clampi((int)(r * inv_r + 0.5f), 0, 65535);
-                    const uint16_t ang = (uint16_t)ss_clampi((int)(((a + (float)M_PI) * (65535.0f * inv_2pi)) + 0.5f), 0, 65535);
-                    v = (uint16_t)((((uint32_t)rad * 3u) + ((uint32_t)ang * 2u)) & 65535u);
-                    break;
-                }
-
-                case SS_MODE_WAVES: {
-                    const uint16_t row = (uint16_t)ss_clampi((int)((float)y * inv_h + 0.5f), 0, 65535);
-                    const uint16_t col = (uint16_t)ss_clampi((int)((float)x * inv_w + 0.5f), 0, 65535);
-                    const uint16_t dia = (uint16_t)ss_clampi((int)((float)(x + y) * inv_d + 0.5f), 0, 65535);
-                    v = (uint16_t)((((uint32_t)ss_wave8(((uint32_t)col * 5u) + ((uint32_t)row * 2u)) << 8) | ss_wave8(((uint32_t)dia * 7u))) & 65535u);
-                    break;
-                }
-
-                case SS_MODE_CURTAINS: {
-                    const uint16_t col = (uint16_t)ss_clampi((int)((float)x * inv_w + 0.5f), 0, 65535);
-                    v = (uint16_t)(abs((int)col - 32768) * 2);
-                    break;
-                }
-
-                case SS_MODE_TUNNEL: {
-                    const float fx = (float)x - cx;
-                    const float fy = (float)y - cy;
-                    const float r = sqrtf(fx * fx + fy * fy);
-                    const float a = atan2f(fy, fx);
-                    const uint16_t rad = (uint16_t)ss_clampi((int)(r * inv_r + 0.5f), 0, 65535);
-                    const uint16_t ang = (uint16_t)ss_clampi((int)(((a + (float)M_PI) * (65535.0f * inv_2pi)) + 0.5f), 0, 65535);
-                    v = (uint16_t)((((uint32_t)rad * 4u) + ((uint32_t)ang)) & 65535u);
-                    break;
-                }
-
-                case SS_MODE_RINGS: {
-                    const float fx = (float)x - cx;
-                    const float fy = (float)y - cy;
-                    const float r = sqrtf(fx * fx + fy * fy);
-                    const uint32_t rad = (uint32_t)ss_clampi((int)(r * inv_r + 0.5f), 0, 65535);
-                    v = ss_triangle_u16(rad * 9u);
-                    break;
-                }
-
-                case SS_MODE_ANGULAR: {
-                    const float fx = (float)x - cx;
-                    const float fy = (float)y - cy;
-                    const float a = atan2f(fy, fx);
-                    v = (uint16_t)ss_clampi((int)(((a + (float)M_PI) * (65535.0f * inv_2pi)) + 0.5f), 0, 65535);
-                    break;
-                }
-
-                case SS_MODE_DIAMOND: {
-                    const float fx = fabsf((float)x - cx);
-                    const float fy = fabsf((float)y - cy);
-                    v = (uint16_t)ss_clampi((int)((fx + fy) * inv_manhattan + 0.5f), 0, 65535);
-                    break;
-                }
-
-                case SS_MODE_CHECKER: {
-                    const int tx = x / checker_tile;
-                    const int ty = y / checker_tile;
-                    const int lx = x - tx * checker_tile;
-                    const int ly = y - ty * checker_tile;
-                    const int local = ((lx + ly) * 65535) / (checker_tile * 2);
-                    v = (uint16_t)(((tx ^ ty) & 1) ? (65535 - local) : local);
-                    break;
-                }
-
-                case SS_MODE_LISSAJOUS: {
-                    const float nx = (w > 1) ? ((float)x / (float)(w - 1)) : 0.0f;
-                    const float ny = (h > 1) ? ((float)y / (float)(h - 1)) : 0.0f;
-                    const float a = sinf(two_pi * (3.0f * nx + 0.35f * ny));
-                    const float b = cosf(two_pi * (2.0f * ny - 0.20f * nx));
-                    const float c = sinf(two_pi * (nx + ny) * 1.5f);
-                    v = ss_u16_from_float(ss_clampf(0.5f + 0.25f * a + 0.18f * b + 0.07f * c, 0.0f, 1.0f));
-                    break;
-                }
-
-                case SS_MODE_INTERFERENCE: {
-                    const float fx = (float)x;
-                    const float fy = (float)y;
-                    const float x1 = cx * 0.35f;
-                    const float y1 = cy * 0.55f;
-                    const float x2 = cx * 1.65f;
-                    const float y2 = cy * 0.85f;
-                    const float x3 = cx * 1.05f;
-                    const float y3 = cy * 1.55f;
-                    const float r1 = sqrtf((fx - x1) * (fx - x1) + (fy - y1) * (fy - y1)) * inv_r;
-                    const float r2 = sqrtf((fx - x2) * (fx - x2) + (fy - y2) * (fy - y2)) * inv_r;
-                    const float r3 = sqrtf((fx - x3) * (fx - x3) + (fy - y3) * (fy - y3)) * inv_r;
-                    const float n = 0.5f + 0.20f * sinf(two_pi * 7.0f * r1) + 0.18f * sinf(two_pi * 9.0f * r2) + 0.12f * cosf(two_pi * 5.0f * r3);
-                    v = ss_u16_from_float(ss_clampf(n, 0.0f, 1.0f));
-                    break;
-                }
-
-                case SS_MODE_HORIZON: {
-                    const float ny = (h > 1) ? ((float)y / (float)(h - 1)) : 0.0f;
-                    const float perspective = sqrtf(ss_clampf(ny, 0.0f, 1.0f));
-                    v = ss_u16_from_float(perspective);
-                    break;
-                }
-
-                case SS_MODE_ORGANIC: {
-                    float n0 = ss_value_noise(x, y, noise_s0, 11u);
-                    float n1 = ss_value_noise(x, y, noise_s1, 47u);
-                    float n2 = ss_value_noise(x, y, noise_s2, 89u);
-                    float n = n0 * 0.55f + n1 * 0.30f + n2 * 0.15f;
-                    const uint16_t row = (uint16_t)ss_clampi((int)((float)y * inv_h + 0.5f), 0, 65535);
-                    const uint16_t col = (uint16_t)ss_clampi((int)((float)x * inv_w + 0.5f), 0, 65535);
-                    n = n * 0.78f + ((float)(((uint32_t)row + ((uint32_t)col * 3u)) & 65535u) * (1.0f / 65535.0f)) * 0.22f;
-                    v = ss_u16_from_float(ss_clampf(n, 0.0f, 1.0f));
-                    break;
-                }
-
-                case SS_MODE_FAN_BLADES: {
-                    const float fx = (float)x - cx;
-                    const float fy = (float)y - cy;
-                    const float r = sqrtf(fx * fx + fy * fy);
-                    const float a = atan2f(fy, fx);
-                    const uint32_t ang = (uint32_t)ss_clampi((int)(((a + (float)M_PI) * (65535.0f * inv_2pi)) + 0.5f), 0, 65535);
-                    const uint32_t rad = (uint32_t)ss_clampi((int)(r * inv_r + 0.5f), 0, 65535);
-                    v = ss_triangle_u16((ang * 12u) + (rad * 2u));
-                    break;
-                }
-
-                case SS_MODE_POLAR_CHECKER: {
-                    const float fx = (float)x - cx;
-                    const float fy = (float)y - cy;
-                    const float r = sqrtf(fx * fx + fy * fy);
-                    const float a = atan2f(fy, fx);
-                    const uint32_t ang = (uint32_t)ss_clampi((int)(((a + (float)M_PI) * (65535.0f * inv_2pi)) + 0.5f), 0, 65535);
-                    const uint32_t rad = (uint32_t)ss_clampi((int)(r * inv_r + 0.5f), 0, 65535);
-                    const uint32_t ring = rad / 5461u;
-                    const uint32_t sector = ang / 4096u;
-                    const uint32_t local = ((rad * 5u) + (ang * 3u)) & 65535u;
-                    v = (uint16_t)(((ring ^ sector) & 1u) ? (65535u - local) : local);
-                    break;
-                }
-
-                case SS_MODE_SADDLE: {
-                    const float nx = ((float)x - cx) / ((cx > 0.0f) ? cx : 1.0f);
-                    const float ny = ((float)y - cy) / ((cy > 0.0f) ? cy : 1.0f);
-                    const float sdl = 0.5f + 0.5f * (nx * ny);
-                    const float fold = 0.5f + 0.25f * (nx * nx - ny * ny);
-                    v = ss_u16_from_float(ss_clampf(sdl * 0.72f + fold * 0.28f, 0.0f, 1.0f));
-                    break;
-                }
-
-                case SS_MODE_VORTEX_RINGS: {
-                    const float fx = (float)x - cx;
-                    const float fy = (float)y - cy;
-                    const float r = sqrtf(fx * fx + fy * fy);
-                    const float a = atan2f(fy, fx);
-                    const float rn = (maxr > 0.0f) ? (r / maxr) : 0.0f;
-                    const float an = (a + (float)M_PI) * inv_2pi;
-                    const float n = 0.5f + 0.38f * sinf(two_pi * (rn * 7.0f + an * 2.0f)) + 0.12f * cosf(two_pi * (rn * 13.0f - an * 3.0f));
-                    v = ss_u16_from_float(ss_clampf(n, 0.0f, 1.0f));
-                    break;
-                }
-
-                case SS_MODE_VENETIAN: {
-                    const int band = y / small_tile;
-                    const int local = y - band * small_tile;
-                    const int pos = (local * 65535) / small_tile;
-                    v = (uint16_t)((band & 1) ? (65535 - pos) : pos);
-                    break;
-                }
-
-                case SS_MODE_CRT_ROLL: {
-                    const uint32_t row = (uint32_t)ss_clampi((int)((float)y * inv_h + 0.5f), 0, 65535);
-                    const int band_h = ss_clampi(h / 12, 8, 96);
-                    const int b = y / band_h;
-                    const int local = y - b * band_h;
-                    const uint32_t sync = (local < 3) ? 65535u : 0u;
-                    const uint32_t wobble = (uint32_t)ss_wave8(row * 9u + (uint32_t)(b * 7919)) << 8;
-                    v = (uint16_t)((row + (wobble >> 2) + sync) & 65535u);
-                    break;
-                }
-
-                case SS_MODE_TOPOGRAPHIC: {
-                    const float fx = (float)x - cx;
-                    const float fy = (float)y - cy;
-                    const float r = sqrtf(fx * fx + fy * fy);
-                    const uint32_t rad = (uint32_t)ss_clampi((int)(r * inv_r + 0.5f), 0, 65535);
-                    const uint32_t wave = ((uint32_t)ss_wave8(((uint32_t)x * 257u) + ((uint32_t)y * 389u)) << 8);
-                    const uint32_t q = ((rad + (wave >> 3)) / 4096u) * 4096u;
-                    v = (uint16_t)(q & 65535u);
-                    break;
-                }
-
-                case SS_MODE_CELLULAR_CRACKS: {
-                    const int gx = x / large_tile;
-                    const int gy = y / large_tile;
-                    const int lx = x - gx * large_tile;
-                    const int ly = y - gy * large_tile;
-                    const int edge = ss_clampi((lx < ly ? lx : ly), 0, large_tile);
-                    const int edge2 = ss_clampi(((large_tile - lx) < (large_tile - ly) ? (large_tile - lx) : (large_tile - ly)), 0, large_tile);
-                    const int crack = (edge < edge2) ? edge : edge2;
-                    const uint32_t h0 = ss_hash_u32((uint32_t)gx * 92837111u ^ (uint32_t)gy * 689287499u ^ 0x51ed270bu);
-                    const uint32_t base = h0 & 65535u;
-                    const uint32_t c = (uint32_t)ss_clampi((crack * 65535) / large_tile, 0, 65535);
-                    v = (uint16_t)((base + (65535u - c) * 2u) & 65535u);
-                    break;
-                }
-
-                case SS_MODE_ELLIPSE: {
-                    const float fx = ((float)x - cx) / ((cx > 0.0f) ? cx : 1.0f);
-                    const float fy = ((float)y - cy) / ((cy > 0.0f) ? cy : 1.0f);
-                    const float e = sqrtf(fx * fx * 0.72f + fy * fy * 1.45f);
-                    v = ss_u16_from_float(ss_clampf(e, 0.0f, 1.0f));
-                    break;
-                }
-
-                case SS_MODE_CROSS_FOLD: {
-                    const float ax = fabsf((float)x - cx) / ((cx > 0.0f) ? cx : 1.0f);
-                    const float ay = fabsf((float)y - cy) / ((cy > 0.0f) ? cy : 1.0f);
-                    const float cross = ss_clampf((ax < ay ? ax : ay) * 1.55f, 0.0f, 1.0f);
-                    const float diamond = ss_clampf((ax + ay) * 0.5f, 0.0f, 1.0f);
-                    v = ss_u16_from_float(cross * 0.65f + diamond * 0.35f);
-                    break;
-                }
-
-                case SS_MODE_OFFSET_RINGS: {
-                    const float ox = cx + 0.22f * (float)w;
-                    const float oy = cy - 0.13f * (float)h;
-                    const float fx = (float)x - ox;
-                    const float fy = (float)y - oy;
-                    const float r = sqrtf(fx * fx + fy * fy);
-                    const uint32_t rad = (uint32_t)ss_clampi((int)(r * inv_r + 0.5f), 0, 65535);
-                    v = ss_triangle_u16(rad * 11u + (uint32_t)((float)x * inv_w));
-                    break;
-                }
-
-                case SS_MODE_NOISE_CURTAINS: {
-                    const float n0 = ss_value_noise(x, y, noise_s1, 123u);
-                    const float col = (w > 1) ? ((float)x / (float)(w - 1)) : 0.0f;
-                    const float stripe = 0.5f + 0.5f * sinf(two_pi * (col * 8.0f + n0 * 0.85f));
-                    const float row = (h > 1) ? ((float)y / (float)(h - 1)) : 0.0f;
-                    v = ss_u16_from_float(ss_clampf(stripe * 0.78f + row * 0.22f, 0.0f, 1.0f));
-                    break;
-                }
-
-                case SS_MODE_LIGHTNING: {
-                    const float ny = (h > 1) ? ((float)y / (float)(h - 1)) : 0.0f;
-                    const float jag0 = ss_value_noise(0, y, noise_s2, 179u) - 0.5f;
-                    const float jag1 = ss_value_noise(17, y, noise_s1, 313u) - 0.5f;
-                    const float center = cx + (jag0 * 0.38f + jag1 * 0.17f) * (float)w;
-                    const float dist = fabsf((float)x - center) / ((float)w * 0.5f);
-                    const float bolt = ss_clampf(1.0f - dist * 2.6f, 0.0f, 1.0f);
-                    v = ss_u16_from_float(ss_clampf(ny * 0.58f + bolt * 0.42f, 0.0f, 1.0f));
-                    break;
-                }
-
-                case SS_MODE_PERSPECTIVE_GRID: {
-                    const float ny = (h > 1) ? ((float)y / (float)(h - 1)) : 0.0f;
-                    const float px = ((float)x - cx) / ((float)max_wh + 1.0f);
-                    const float py = ny + 0.04f;
-                    const float gridx = fabsf(fmodf(px / py * 9.0f, 1.0f) - 0.5f) * 2.0f;
-                    const float gridy = fabsf(fmodf((1.0f / py) * 0.55f, 1.0f) - 0.5f) * 2.0f;
-                    const float grid = (gridx < gridy) ? gridx : gridy;
-                    v = ss_u16_from_float(ss_clampf(ny * 0.75f + (1.0f - grid) * 0.25f, 0.0f, 1.0f));
-                    break;
-                }
-
-                case SS_MODE_ORBIT_COMET: {
-                    const float fx = (float)x - cx;
-                    const float fy = (float)y - cy;
-                    const float r = sqrtf(fx * fx + fy * fy);
-                    const float a = atan2f(fy, fx);
-                    const float rn = (maxr > 0.0f) ? (r / maxr) : 0.0f;
-                    const float an = (a + (float)M_PI) * inv_2pi;
-                    const float arm = fabsf(sinf(two_pi * (an * 2.0f + rn * 1.7f)));
-                    const float falloff = ss_clampf(1.0f - rn, 0.0f, 1.0f);
-                    v = ss_u16_from_float(ss_clampf((an * 0.45f) + (rn * 0.35f) + (arm * falloff * 0.35f), 0.0f, 1.0f));
-                    break;
-                }
-
-                case SS_MODE_BROKEN_TILES: {
-                    const int tx = x / checker_tile;
-                    const int ty = y / checker_tile;
-                    const int lx = x - tx * checker_tile;
-                    const int ly = y - ty * checker_tile;
-                    const uint32_t h0 = ss_hash_u32((uint32_t)tx * 73856093u ^ (uint32_t)ty * 19349663u ^ 0xb5297a4du);
-                    const uint32_t base = h0 & 65535u;
-                    const uint32_t local = (uint32_t)(((lx * 257) ^ (ly * 521)) & 65535);
-                    v = (uint16_t)((base + local) & 65535u);
-                    break;
-                }
-
-                default:
-                    v = (uint16_t)ss_clampi((int)((float)y * inv_h + 0.5f), 0, 65535);
-                    break;
-            }
-
-            s->geom[idx] = v;
-        }
-    }
-
+    ss_geom_builders[mode](s, &c);
     s->last_mode = mode;
 }
 
@@ -780,6 +1293,10 @@ vj_effect *slitscan_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    ve->limits[0][P_MODE] = 0;
+    ve->limits[1][P_MODE] = SS_GEOM_MODES - 1;
+    ve->defaults[P_MODE] = SS_MODE_ROWS;
+
     ve->limits[0][P_AMOUNT] = 0;
     ve->limits[1][P_AMOUNT] = 100;
     ve->defaults[P_AMOUNT] = 100;
@@ -787,10 +1304,6 @@ vj_effect *slitscan_init(int w, int h)
     ve->limits[0][P_DEPTH] = 1;
     ve->limits[1][P_DEPTH] = SS_HISTORY_MAX;
     ve->defaults[P_DEPTH] = 16;
-
-    ve->limits[0][P_MODE] = 0;
-    ve->limits[1][P_MODE] = SS_GEOM_MODES - 1;
-    ve->defaults[P_MODE] = SS_MODE_ROWS;
 
     ve->limits[0][P_SOURCE] = 0;
     ve->limits[1][P_SOURCE] = 4;
@@ -803,6 +1316,10 @@ vj_effect *slitscan_init(int w, int h)
     ve->limits[0][P_MOTION] = 0;
     ve->limits[1][P_MOTION] = 100;
     ve->defaults[P_MOTION] = 55;
+
+    ve->limits[0][P_TIME_MOTION] = 0;
+    ve->limits[1][P_TIME_MOTION] = 4;
+    ve->defaults[P_TIME_MOTION] = SS_TMOVE_FORWARD;
 
     ve->limits[0][P_TIME_OFFSET] = 0;
     ve->limits[1][P_TIME_OFFSET] = 1000;
@@ -820,10 +1337,6 @@ vj_effect *slitscan_init(int w, int h)
     ve->limits[1][P_CHROMA] = 100;
     ve->defaults[P_CHROMA] = 100;
 
-    ve->limits[0][P_TIME_MOTION] = 0;
-    ve->limits[1][P_TIME_MOTION] = 4;
-    ve->defaults[P_TIME_MOTION] = SS_TMOVE_FORWARD;
-
     ve->limits[0][P_RESET] = 0;
     ve->limits[1][P_RESET] = 1;
     ve->defaults[P_RESET] = 0;
@@ -831,17 +1344,17 @@ vj_effect *slitscan_init(int w, int h)
     ve->sub_format = 1;
     ve->description = "Slit Scan Time";
     ve->param_description = vje_build_param_list(ve->num_params,
+        "Sculpture Mode",
         "Time Amount",
         "Time Depth",
-        "Sculpture Mode",
-        "Depth Source",
-        "Source Influence",
+        "Time Source",
+        "Source Mix",
         "Motion Reactivity",
+        "Time Animation",
         "Time Offset",
         "Time Scale",
-        "Time Blend",
-        "Chroma Time",
-        "Time Animation",
+        "Temporal Smoothing",
+        "Chroma Amount",
         "Reset Memory"
     );
 
@@ -858,8 +1371,21 @@ void *slitscan_malloc(int w, int h)
     const int len = w * h;
     const size_t history_bytes = (size_t)SS_HISTORY_MAX * 3u * (size_t)len;
     const size_t prev_bytes = (size_t)len;
-    const size_t geom_bytes = (size_t)len * sizeof(uint16_t);
-    const size_t total = history_bytes + prev_bytes + geom_bytes;
+    const size_t u16_plane_bytes = (size_t)len * sizeof(uint16_t);
+
+    size_t off = 0;
+    const size_t history_off = off;
+    off += history_bytes;
+    const size_t prev_off = off;
+    off += prev_bytes;
+    off = (off + sizeof(uint16_t) - 1u) & ~(sizeof(uint16_t) - 1u);
+    const size_t geom_off = off;
+    off += u16_plane_bytes;
+    const size_t radial_off = off;
+    off += u16_plane_bytes;
+    const size_t angle_off = off;
+    off += u16_plane_bytes;
+    const size_t total = off;
 
     s->region = (uint8_t*) vj_calloc(total);
     if(!s->region) {
@@ -871,9 +1397,11 @@ void *slitscan_malloc(int w, int h)
     s->h = h;
     s->len = len;
     s->n_threads = vje_advise_num_threads(len);
-    s->history = s->region;
-    s->prev_y = s->history + history_bytes;
-    s->geom = (uint16_t*)(void*)(s->prev_y + prev_bytes);
+    s->history = s->region + history_off;
+    s->prev_y = s->region + prev_off;
+    s->geom = (uint16_t*)(void*)(s->region + geom_off);
+    s->radial_lut = (uint16_t*)(void*)(s->region + radial_off);
+    s->angle_lut = (uint16_t*)(void*)(s->region + angle_off);
     s->frame = 0;
     s->write_pos = 0;
     s->seeded = 0;
@@ -882,6 +1410,8 @@ void *slitscan_malloc(int w, int h)
     s->last_mode = -1;
 
     ss_refresh_history_planes(s);
+    ss_build_math_luts(s);
+    ss_build_center_polar_luts(s);
     ss_build_geom(s, SS_MODE_ROWS);
     ss_build_time_lut(s, 16);
     return (void*)s;
@@ -947,8 +1477,16 @@ void slitscan_apply(void *ptr, VJFrame *frame, int *args)
     const uint32_t drift = ((uint32_t)s->frame * 181u) & 65535u;
     const uint32_t phase64 = (uint32_t)(s->frame & 63);
     const uint32_t pulse = (phase64 <= 31u) ? (phase64 * 2048u) : ((63u - phase64) * 2048u);
+    uint32_t time_add = 0u;
+    time_add = (time_motion == SS_TMOVE_DRIFT_FWD) ? drift : time_add;
+    time_add = (time_motion == SS_TMOVE_DRIFT_REV) ? ((0u - drift) & 65535u) : time_add;
+    time_add = (time_motion == SS_TMOVE_PULSE) ? pulse : time_add;
+    const int time_reverse = (time_motion == SS_TMOVE_REVERSE);
     const int use_source = (source != SS_SRC_SHAPE && source_gain_q8 > 0);
     const int use_soft = (time_blend_q8 > 0);
+    const ss_render_fn render = (!use_source)
+        ? (use_soft ? ss_render_shape_soft : ss_render_shape_hard)
+        : (use_soft ? ss_render_source_soft : ss_render_source_hard);
 
     ss_render_cfg cfg;
     cfg.geom = s->geom;
@@ -969,25 +1507,12 @@ void slitscan_apply(void *ptr, VJFrame *frame, int *args)
     cfg.time_blend_q8 = time_blend_q8;
     cfg.phase_base = phase_base;
     cfg.scale_q16 = scale_q16;
-    cfg.drift = drift;
-    cfg.pulse = pulse;
-    cfg.time_motion = time_motion;
+    cfg.time_add = time_add;
+    cfg.time_reverse = time_reverse;
 
 #pragma omp parallel num_threads(s->n_threads)
     {
-        if(!use_source) {
-            if(use_soft) {
-                ss_render_shape_soft(s, &cfg);
-            } else {
-                ss_render_shape_hard(s, &cfg);
-            }
-        } else {
-            if(use_soft) {
-                ss_render_source_soft(s, &cfg);
-            } else {
-                ss_render_source_hard(s, &cfg);
-            }
-        }
+        render(s, &cfg);
 
 #pragma omp single
         {

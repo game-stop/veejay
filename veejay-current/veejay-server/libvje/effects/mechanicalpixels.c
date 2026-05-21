@@ -50,13 +50,18 @@
 #define KD_PALETTE_SOURCE_FULL 4
 #define KD_PALETTE_NEON        5
 
-#define KD_WAVES 4
-#define KD_WAVE_ROW           0
-#define KD_WAVE_DIAGONAL      1
-#define KD_WAVE_RADIAL        2
-#define KD_WAVE_SOLENOIDS     3
+#define KD_WAVES 8
+#define KD_MODE_ROW            0  /* horizontal scan, top -> bottom */
+#define KD_MODE_COLUMN         1  /* vertical scan, left -> right */
+#define KD_MODE_DIAGONAL       2  /* diagonal sweep */
+#define KD_MODE_CROSS_DIAGONAL 3  /* opposite diagonal sweep */
+#define KD_MODE_RADIAL         4  /* centre-out rings */
+#define KD_MODE_SPIRAL         5  /* rotating radial sweep */
+#define KD_MODE_CHECKER        6  /* interleaved mechanical checker bank */
+#define KD_MODE_SOLENOIDS      7  /* stable randomized solenoid bank */
 
 #define KD_STEP_Q 21
+#define KD_MOTOR_Q 8
 
 typedef struct {
     int w;
@@ -64,10 +69,11 @@ typedef struct {
     int len;
     int n_threads;
     int frame;
-    int motor_pos;
+    int motor_q8;        /* 8.8 governor phase. Speed 0 leaves this unchanged. */
     int seeded;
     int last_reset;
     int last_cell_size;
+    int last_wave;
     int cols;
     int rows;
     int max_cols;
@@ -82,6 +88,7 @@ typedef struct {
     uint8_t *cell_delay;    /* delayed solenoid release */
     uint8_t *cell_phase;    /* distance to target / stress */
     uint8_t *cell_rand;     /* stable mechanical variation */
+    uint8_t *cell_wave;     /* precomputed render-mode phase for current grid/mode */
     uint8_t *cell_avg_y;
     uint8_t *cell_avg_u;
     uint8_t *cell_avg_v;
@@ -89,7 +96,18 @@ typedef struct {
     uint8_t *cell_slow_y;   /* slow exposure/luma envelope */
     uint8_t *cell_pressure; /* stored source pressure, released by governor */
     uint8_t *cell_impact;   /* actuator hit flash / mechanical stress */
+    uint8_t *cell_detail;   /* filtered intra-cell contrast, keeps large cells alive */
 } kinetic_t;
+
+typedef struct {
+    int gap;
+    int lift;
+    int side;
+    int face_x0;
+    int face_y0;
+    int face_x1;
+    int face_y1;
+} kd_geom_t;
 
 static inline int kd_clampi(int v, int lo, int hi)
 {
@@ -136,21 +154,34 @@ static inline int kd_quantize_height(int v)
     return kd_clampi(q, 0, 255);
 }
 
-static inline void kd_write_pixel(uint8_t *Y, uint8_t *U, uint8_t *V, int p,
-                                  int sy, int su, int sv,
-                                  int fy, int fu, int fv,
-                                  int amount_q)
+static inline int kd_approach_shift(int cur, int target, int rise_shift, int fall_shift)
 {
-    if(amount_q >= 256) {
-        Y[p] = kd_clip_u8(fy);
-        U[p] = kd_clip_u8(fu);
-        V[p] = kd_clip_u8(fv);
-        return;
+    cur = kd_clampi(cur, 0, 255);
+    target = kd_clampi(target, 0, 255);
+
+    if(target > cur) {
+        const int d = target - cur;
+        cur += (d + ((1 << rise_shift) - 1)) >> rise_shift;
+    } else if(target < cur) {
+        const int d = cur - target;
+        cur -= (d + ((1 << fall_shift) - 1)) >> fall_shift;
     }
 
-    Y[p] = kd_clip_u8(kd_blend_q8(sy, fy, amount_q));
-    U[p] = kd_clip_u8(kd_blend_q8(su, fu, amount_q));
-    V[p] = kd_clip_u8(kd_blend_q8(sv, fv, amount_q));
+    return kd_clampi(cur, 0, 255);
+}
+
+/*
+ * Non-linear fixed-point governor speed.
+ * 0 means a fully frozen motor phase.
+ * 1 is a very slow crawl; 100 is close to the old fastest rate.
+ */
+static inline int kd_motor_inc_q8(int speed)
+{
+    speed = kd_clampi(speed, 0, 100);
+    if(speed <= 0)
+        return 0;
+
+    return 4 + ((speed * speed * 30 + 50) / 100);
 }
 
 static void kd_configure_grid(kinetic_t *k, int cell_size)
@@ -159,38 +190,40 @@ static void kd_configure_grid(kinetic_t *k, int cell_size)
     k->cols = (k->w + cell_size - 1) / cell_size;
     k->rows = (k->h + cell_size - 1) / cell_size;
     k->last_cell_size = cell_size;
+    k->last_wave = -1;
 }
 
 static void kd_clear_cells(kinetic_t *k)
 {
     const size_t n = (size_t) k->max_cells;
-    memset(k->cell_value, 0, n);
-    memset(k->cell_target, 0, n);
-    memset(k->cell_delay, 0, n);
-    memset(k->cell_phase, 0, n);
-    memset(k->cell_avg_y, 0, n);
-    memset(k->cell_avg_u, 128, n);
-    memset(k->cell_avg_v, 128, n);
-    memset(k->cell_motion, 0, n);
-    memset(k->cell_slow_y, 0, n);
-    memset(k->cell_pressure, 0, n);
-    memset(k->cell_impact, 0, n);
+    veejay_memset(k->cell_value, 0, n);
+    veejay_memset(k->cell_target, 0, n);
+    veejay_memset(k->cell_delay, 0, n);
+    veejay_memset(k->cell_phase, 0, n);
+    veejay_memset(k->cell_wave, 0, n);
+    veejay_memset(k->cell_avg_y, 0, n);
+    veejay_memset(k->cell_avg_u, 128, n);
+    veejay_memset(k->cell_avg_v, 128, n);
+    veejay_memset(k->cell_motion, 0, n);
+    veejay_memset(k->cell_slow_y, 0, n);
+    veejay_memset(k->cell_pressure, 0, n);
+    veejay_memset(k->cell_impact, 0, n);
+    veejay_memset(k->cell_detail, 0, n);
 }
 
 static inline void kd_palette_color(int palette, int value, int avg_u, int avg_v,
                                     int rnd, int *u, int *v)
 {
-
     switch(palette) {
         case KD_PALETTE_SOURCE_SOFT: {
-            const int sat = 104 + ((value * 92) >> 8);
+            const int sat = 112 + ((value * 80) >> 8);
             *u = 128 + (((avg_u - 128) * sat) >> 8);
             *v = 128 + (((avg_v - 128) * sat) >> 8);
             break;
         }
 
         case KD_PALETTE_SOURCE_FULL: {
-            const int sat = 190 + ((value * 96) >> 8);
+            const int sat = 204 + ((value * 78) >> 8);
             *u = 128 + (((avg_u - 128) * sat) >> 8);
             *v = 128 + (((avg_v - 128) * sat) >> 8);
 
@@ -210,10 +243,9 @@ static inline void kd_palette_color(int palette, int value, int avg_u, int avg_v
             break;
 
         case KD_PALETTE_NEON: {
-
             int du = avg_u - 128;
             int dv = avg_v - 128;
-            const int boost = 215 + ((value * 80) >> 8);
+            const int boost = 218 + ((value * 74) >> 8);
             du = (du * boost) >> 8;
             dv = (dv * boost) >> 8;
 
@@ -238,29 +270,178 @@ static inline void kd_palette_color(int palette, int value, int avg_u, int avg_v
     *v = kd_clampi(*v, 16, 240);
 }
 
+static inline int kd_phase_from_axis(int v, int max_v)
+{
+    if(max_v <= 0)
+        return 0;
+    return kd_clampi((v * 255 + (max_v >> 1)) / max_v, 0, 255);
+}
+
+static inline int kd_pseudo_angle_phase(int dx, int dy)
+{
+    const int ax = abs(dx);
+    const int ay = abs(dy);
+    const int sum = ax + ay;
+
+    if(sum <= 0)
+        return 0;
+
+    if(dx >= 0 && dy >= 0)
+        return (ay * 64) / sum;
+    if(dx < 0 && dy >= 0)
+        return 64 + ((ax * 64) / sum);
+    if(dx < 0 && dy < 0)
+        return 128 + ((ay * 64) / sum);
+    return 192 + ((ax * 64) / sum);
+}
+
+static inline int kd_radial_phase_for_cell(int cx, int cy, int cols, int rows)
+{
+    const int max_x = (cols > 1) ? (cols - 1) : 1;
+    const int max_y = (rows > 1) ? (rows - 1) : 1;
+    const int dx = abs((cx << 1) - (cols - 1));
+    const int dy = abs((cy << 1) - (rows - 1));
+    const int nx = kd_clampi((dx * 255 + (max_x >> 1)) / max_x, 0, 255);
+    const int ny = kd_clampi((dy * 255 + (max_y >> 1)) / max_y, 0, 255);
+    const int hi = (nx > ny) ? nx : ny;
+    const int lo = (nx > ny) ? ny : nx;
+
+    /* Approximate Euclidean distance, scaled so corners reach the full 0..255 range.
+     * The previous radial mode only covered about half the phase space, leaving a
+     * visible dead half-cycle. */
+    return kd_clampi(((hi + (lo >> 1)) * 2 + 1) / 3, 0, 255);
+}
+
 static inline int kd_wave_phase_for_cell(int wave, int cx, int cy, int cols, int rows, int rnd)
 {
     const int safe_cols = (cols > 0) ? cols : 1;
     const int safe_rows = (rows > 0) ? rows : 1;
+    const int max_c = safe_cols - 1;
+    const int max_r = safe_rows - 1;
+    const int sx = kd_phase_from_axis(cx, max_c);
+    const int sy = kd_phase_from_axis(cy, max_r);
 
     switch(wave) {
-        case KD_WAVE_ROW:
-            return (cy * 256) / safe_rows;
+        case KD_MODE_ROW:
+            return sy;
 
-        case KD_WAVE_DIAGONAL:
-            return (((cx * 128) / safe_cols) + ((cy * 128) / safe_rows)) & 255;
+        case KD_MODE_COLUMN:
+            return sx;
 
-        case KD_WAVE_RADIAL: {
-            const int dx = abs((cx << 1) - cols);
-            const int dy = abs((cy << 1) - rows);
-            const int denom = (cols + rows) ? (cols + rows) : 1;
-            return ((dx + dy) * 128) / denom;
+        case KD_MODE_DIAGONAL:
+            return ((sx + sy) >> 1) & 255;
+
+        case KD_MODE_CROSS_DIAGONAL:
+            return ((sx + (255 - sy)) >> 1) & 255;
+
+        case KD_MODE_RADIAL:
+            return kd_radial_phase_for_cell(cx, cy, safe_cols, safe_rows);
+
+        case KD_MODE_SPIRAL: {
+            const int dx = (cx << 1) - max_c;
+            const int dy = (cy << 1) - max_r;
+            const int angle = kd_pseudo_angle_phase(dx, dy);
+            const int radius = kd_radial_phase_for_cell(cx, cy, safe_cols, safe_rows);
+            return (angle + ((radius * 3) >> 2)) & 255;
         }
 
-        case KD_WAVE_SOLENOIDS:
+        case KD_MODE_CHECKER: {
+            const int bank = ((cx ^ cy) & 1) ? 128 : 0;
+            const int sweep = ((sx + sy) >> 1);
+            return (sweep + bank) & 255;
+        }
+
+        case KD_MODE_SOLENOIDS:
         default:
             return rnd;
     }
+}
+
+static void kd_rebuild_wave_lut(kinetic_t *k, int wave)
+{
+    const int cols = k->cols;
+    const int rows = k->rows;
+    const int max_cols = k->max_cols;
+
+#pragma omp parallel for num_threads(k->n_threads) schedule(static)
+    for(int cy = 0; cy < rows; cy++) {
+        for(int cx = 0; cx < cols; cx++) {
+            const int idx = cy * max_cols + cx;
+            k->cell_wave[idx] = (uint8_t) kd_wave_phase_for_cell(
+                wave, cx, cy, cols, rows, k->cell_rand[idx]);
+        }
+    }
+
+    k->last_wave = wave;
+}
+
+static inline kd_geom_t kd_make_geometry(int cw, int ch, int depth, int value)
+{
+    kd_geom_t g;
+    const int min_dim = (cw < ch) ? cw : ch;
+
+    g.gap = 0;
+    g.lift = 0;
+    g.side = 0;
+    g.face_x0 = 0;
+    g.face_y0 = 0;
+    g.face_x1 = (cw > 0) ? cw : 1;
+    g.face_y1 = (ch > 0) ? ch : 1;
+
+    if(cw <= 2 || ch <= 2 || min_dim <= 2 || depth <= 0) {
+        return g;
+    }
+
+    if(min_dim >= 12) {
+        g.gap = (min_dim + 5) / 8;
+        if(g.gap > 5) g.gap = 5;
+    } else if(min_dim >= 8) {
+        g.gap = 1;
+    } else {
+        g.gap = 0;
+    }
+
+    int inner_w = cw - (g.gap << 1);
+    int inner_h = ch - (g.gap << 1);
+
+    if(inner_w < 3 || inner_h < 3) {
+        g.gap = 0;
+        inner_w = cw;
+        inner_h = ch;
+        if(inner_w < 3 || inner_h < 3) {
+            return g;
+        }
+    }
+
+    const int min_face_w = kd_clampi((inner_w * 55 + 50) / 100, 3, inner_w);
+    const int min_face_h = kd_clampi((inner_h * 55 + 50) / 100, 3, inner_h);
+
+    int max_side_x = inner_w - min_face_w;
+    int max_side_y = inner_h - min_face_h;
+    int max_side = (max_side_x < max_side_y) ? max_side_x : max_side_y;
+    if(max_side < 0) max_side = 0;
+
+    if(max_side > 0) {
+        int max_lift = (max_side * depth + 50) / 100;
+        if(max_lift < 1) max_lift = 1;
+        if(max_lift > max_side) max_lift = max_side;
+
+        g.lift = 1 + ((value * max_lift) >> 8);
+        if(g.lift > max_lift) g.lift = max_lift;
+        g.side = g.lift;
+    }
+
+    g.face_x0 = g.gap;
+    g.face_y0 = g.gap;
+    g.face_x1 = cw - g.gap - g.side;
+    g.face_y1 = ch - g.gap - g.side;
+
+    if(g.face_x1 <= g.face_x0) g.face_x1 = g.face_x0 + 1;
+    if(g.face_y1 <= g.face_y0) g.face_y1 = g.face_y0 + 1;
+    if(g.face_x1 > cw - g.gap) g.face_x1 = cw - g.gap;
+    if(g.face_y1 > ch - g.gap) g.face_y1 = ch - g.gap;
+
+    return g;
 }
 
 vj_effect *mechanicalpixels_init(int w, int h)
@@ -275,11 +456,11 @@ vj_effect *mechanicalpixels_init(int w, int h)
 
     ve->limits[0][P_AMOUNT] = 0;       ve->limits[1][P_AMOUNT] = 100;       ve->defaults[P_AMOUNT] = 100;
     ve->limits[0][P_CELL_SIZE] = 6;    ve->limits[1][P_CELL_SIZE] = 80;     ve->defaults[P_CELL_SIZE] = 28;
-    ve->limits[0][P_DEPTH] = 0;        ve->limits[1][P_DEPTH] = 100;        ve->defaults[P_DEPTH] = 86;
-    ve->limits[0][P_MOTOR] = 0;        ve->limits[1][P_MOTOR] = 100;        ve->defaults[P_MOTOR] = 28;
-    ve->limits[0][P_TRIGGER] = 0;      ve->limits[1][P_TRIGGER] = 100;      ve->defaults[P_TRIGGER] = 44;
-    ve->limits[0][P_WAVE] = 0;         ve->limits[1][P_WAVE] = KD_WAVES - 1; ve->defaults[P_WAVE] = KD_WAVE_DIAGONAL;
-    ve->limits[0][P_INERTIA] = 0;      ve->limits[1][P_INERTIA] = 100;      ve->defaults[P_INERTIA] = 82;
+    ve->limits[0][P_DEPTH] = 0;        ve->limits[1][P_DEPTH] = 100;        ve->defaults[P_DEPTH] = 88;
+    ve->limits[0][P_MOTOR] = 0;        ve->limits[1][P_MOTOR] = 100;        ve->defaults[P_MOTOR] = 18;
+    ve->limits[0][P_TRIGGER] = 0;      ve->limits[1][P_TRIGGER] = 100;      ve->defaults[P_TRIGGER] = 46;
+    ve->limits[0][P_WAVE] = 0;         ve->limits[1][P_WAVE] = KD_WAVES - 1; ve->defaults[P_WAVE] = KD_MODE_DIAGONAL;
+    ve->limits[0][P_INERTIA] = 0;      ve->limits[1][P_INERTIA] = 100;      ve->defaults[P_INERTIA] = 84;
     ve->limits[0][P_PALETTE] = 0;      ve->limits[1][P_PALETTE] = KD_PALETTES - 1; ve->defaults[P_PALETTE] = KD_PALETTE_SOURCE_FULL;
     ve->limits[0][P_RESET] = 0;        ve->limits[1][P_RESET] = 1;          ve->defaults[P_RESET] = 0;
 
@@ -289,9 +470,9 @@ vj_effect *mechanicalpixels_init(int w, int h)
         "Amount",
         "Pixel Size",
         "3D Depth",
-        "Motor Speed",
+        "Cycle Speed",
         "Trigger",
-        "Wave Shape",
+        "Render Mode",
         "Mechanical Inertia",
         "Palette",
         "Reset State"
@@ -315,11 +496,12 @@ void *mechanicalpixels_malloc(int w, int h)
     k->max_rows = (h + KD_CELL_MIN - 1) / KD_CELL_MIN;
     k->max_cells = k->max_cols * k->max_rows;
     k->last_cell_size = -1;
-    k->motor_pos = 0;
+    k->last_wave = -1;
+    k->motor_q8 = 0;
 
     const size_t len = (size_t) k->len;
     const size_t cells = (size_t) k->max_cells;
-    const size_t total = len + cells * 12u;
+    const size_t total = len + cells * 14u;
 
     k->region = (uint8_t *) vj_calloc(total);
     if(!k->region) {
@@ -334,13 +516,15 @@ void *mechanicalpixels_malloc(int w, int h)
     k->cell_delay = p; p += cells;
     k->cell_phase = p; p += cells;
     k->cell_rand = p; p += cells;
+    k->cell_wave = p; p += cells;
     k->cell_avg_y = p; p += cells;
     k->cell_avg_u = p; p += cells;
     k->cell_avg_v = p; p += cells;
     k->cell_motion = p; p += cells;
     k->cell_slow_y = p; p += cells;
     k->cell_pressure = p; p += cells;
-    k->cell_impact = p;
+    k->cell_impact = p; p += cells;
+    k->cell_detail = p;
 
     for(int y = 0; y < k->max_rows; y++) {
         for(int x = 0; x < k->max_cols; x++) {
@@ -370,6 +554,7 @@ static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
     const int cols = k->cols;
     const int rows = k->rows;
     const int max_cols = k->max_cols;
+    uint8_t *prev_y = k->prev_y;
 
 #pragma omp parallel for num_threads(k->n_threads) schedule(static)
     for(int cy = 0; cy < rows; cy++) {
@@ -383,15 +568,21 @@ static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
             int sum_y = 0;
             int sum_u = 0;
             int sum_v = 0;
+            int min_y = 255;
+            int max_y = 0;
             int count = 0;
 
             for(int y = y0; y < y1; y++) {
                 const int off = y * w;
                 for(int x = x0; x < x1; x++) {
                     const int p = off + x;
-                    sum_y += Y[p];
+                    const int yy = Y[p];
+                    prev_y[p] = (uint8_t) yy;
+                    sum_y += yy;
                     sum_u += U[p];
                     sum_v += V[p];
+                    if(yy < min_y) min_y = yy;
+                    if(yy > max_y) max_y = yy;
                     count++;
                 }
             }
@@ -411,27 +602,33 @@ static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
             k->cell_delay[idx] = 0;
             k->cell_phase[idx] = 0;
             k->cell_impact[idx] = 0;
+            k->cell_detail[idx] = (uint8_t) kd_clampi(max_y - min_y, 0, 255);
         }
     }
 }
 
 static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
                             const uint8_t *V, int cell_size, int motor_speed,
-                            int trigger, int wave, int inertia)
+                            int trigger, int inertia)
 {
     const int w = k->w;
     const int h = k->h;
     const int cols = k->cols;
     const int rows = k->rows;
     const int max_cols = k->max_cols;
-    const int motor_phase = k->motor_pos & 255;
-    const int motor_step = (motor_speed <= 0) ? 0 : (1 + (motor_speed * 11) / 100);
-    const int wave_width = 2 + motor_step + ((100 - trigger) / 42); /* 2..15 */
-    const int deadband = 6 + (trigger * 28) / 100;                 /* 6..34 */
-    const int slow_shift = 5 + (trigger / 34);                     /* 5..7 */
-    const int release_slop = 8 + (trigger / 5);                    /* 8..28 */
-    const int actuator_step = 1 + ((100 - inertia) * 7) / 100;     /* 1..8 */
+    const int motor_phase = (k->motor_q8 >> KD_MOTOR_Q) & 255;
+
+    /* Width is no longer the speed. This keeps high speed from turning the whole wall on at once. */
+    const int wave_width = 2 + ((100 - trigger) / 38) + ((motor_speed > 65) ? 1 : 0); /* 2..6 */
+    const int deadband = 7 + (trigger * 29) / 100;                                    /* 7..36 */
+    const int slow_shift = 5 + (trigger / 34);                                        /* 5..7 */
+    const int release_slop = 9 + (trigger / 5);                                       /* 9..29 */
+    const int actuator_step = 1 + ((100 - inertia) * 7) / 100;                        /* 1..8 */
     const int fall_step = (actuator_step > 1) ? (actuator_step - 1) : 1;
+    const int pressure_decay = 26 + (inertia >> 2);
+    const int motion_gain_q8 = 240 + kd_clampi((cell_size - 10) * 11, 0, 224);
+
+    uint8_t *prev_y = k->prev_y;
 
 #pragma omp parallel for num_threads(k->n_threads) schedule(static)
     for(int cy = 0; cy < rows; cy++) {
@@ -446,6 +643,8 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
             int sum_u = 0;
             int sum_v = 0;
             int sum_m = 0;
+            int min_y = 255;
+            int max_y = 0;
             int count = 0;
 
             for(int y = y0; y < y1; y++) {
@@ -453,10 +652,14 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
                 for(int x = x0; x < x1; x++) {
                     const int p = off + x;
                     const int yy = Y[p];
+                    const int old = prev_y[p];
+                    prev_y[p] = (uint8_t) yy;
                     sum_y += yy;
                     sum_u += U[p];
                     sum_v += V[p];
-                    sum_m += abs(yy - (int) k->prev_y[p]);
+                    sum_m += abs(yy - old);
+                    if(yy < min_y) min_y = yy;
+                    if(yy > max_y) max_y = yy;
                     count++;
                 }
             }
@@ -475,42 +678,51 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
 
             int slow_y = k->cell_slow_y[idx];
             const int luma_delta = abs(ay - slow_y);
-            slow_y += (ay - slow_y) >> slow_shift;
-            slow_y = kd_clampi(slow_y, 0, 255);
+            slow_y = kd_approach_shift(slow_y, ay, slow_shift, slow_shift);
             k->cell_slow_y[idx] = (uint8_t) slow_y;
 
-            int motion_energy = raw_motion * 8;
+            const int raw_detail = kd_clampi(max_y - min_y, 0, 255);
+            int detail = k->cell_detail[idx];
+            detail = kd_approach_shift(detail, raw_detail, 3, 4);
+            k->cell_detail[idx] = (uint8_t) detail;
+
+            int motion_energy = (raw_motion * 8 * motion_gain_q8) >> 8;
             if(motion_energy > 255) motion_energy = 255;
 
             int fm = k->cell_motion[idx];
             if(motion_energy > fm) {
-                fm += ((motion_energy - fm) + 7) >> 3;  /* slow rise */
+                fm += ((motion_energy - fm) + 7) >> 3;
             } else {
-                fm -= ((fm - motion_energy) + 19) / 20; /* slower fall */
+                fm -= ((fm - motion_energy) + 21) / 22;
             }
             fm = kd_clampi(fm, 0, 255);
             k->cell_motion[idx] = (uint8_t) fm;
 
-            int base_relief = 22 + ((slow_y * 46) >> 8); /* 22..68 */
+            int base_relief = 18 + ((slow_y * 44) >> 8) + (detail >> 4);
+
             int luma_impulse = 0;
             if(luma_delta > deadband) {
-                luma_impulse = (luma_delta - deadband) * (140 - trigger) / 62;
+                luma_impulse = (luma_delta - deadband) * (136 - trigger) / 64;
             }
 
             int motion_impulse = 0;
             if(fm > (deadband << 1)) {
-                motion_impulse = (fm - (deadband << 1)) * (150 - (trigger >> 1)) / 120;
+                motion_impulse = (fm - (deadband << 1)) * (150 - (trigger >> 1)) / 124;
             }
 
-            int desired_pressure = base_relief + luma_impulse + motion_impulse;
+            int detail_impulse = 0;
+            if(detail > deadband) {
+                detail_impulse = (detail - deadband) / 4;
+            }
+
+            int desired_pressure = base_relief + luma_impulse + motion_impulse + detail_impulse;
             desired_pressure = kd_clampi(desired_pressure, 0, 255);
 
             int pressure = k->cell_pressure[idx];
             if(desired_pressure > pressure) {
                 pressure += ((desired_pressure - pressure) + 3) >> 2;
             } else {
-                const int decay = 24 + (inertia >> 2); /* heavy wall keeps pressure */
-                pressure -= ((pressure - desired_pressure) + decay - 1) / decay;
+                pressure -= ((pressure - desired_pressure) + pressure_decay - 1) / pressure_decay;
             }
             pressure = kd_clampi(pressure, 0, 255);
             k->cell_pressure[idx] = (uint8_t) pressure;
@@ -525,8 +737,7 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
                 k->cell_delay[idx]--;
             } else if(motor_speed > 0) {
                 const int rnd = k->cell_rand[idx];
-                const int cell_phase = kd_wave_phase_for_cell(wave, cx, cy, cols, rows, rnd);
-                const int d = kd_circular_dist8(motor_phase, cell_phase);
+                const int d = kd_circular_dist8(motor_phase, k->cell_wave[idx]);
 
                 if(d <= wave_width) {
                     int qtarget = kd_quantize_height(pressure);
@@ -537,11 +748,12 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
                     if(abs(qtarget - (int) k->cell_target[idx]) >= release_slop) {
                         const int hit = abs(qtarget - (int) k->cell_value[idx]);
                         k->cell_target[idx] = (uint8_t) qtarget;
-                        impact += 70 + (hit >> 1);
+                        impact += 66 + (hit >> 1);
+                        if(detail > 32) impact += detail >> 4;
                         if(impact > 255) impact = 255;
 
-                        /* Small per-cell release delay keeps waves physical, not digital. */
-                        k->cell_delay[idx] = (uint8_t) ((rnd * (100 - motor_speed)) / 900);
+                        /* Speed 0 never reaches here. Low speed gets small stagger; high speed gets near-zero delay. */
+                        k->cell_delay[idx] = (uint8_t) ((rnd * (100 - motor_speed)) / 950);
                     }
                 }
             }
@@ -555,7 +767,7 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
                 value = target;
             } else if(diff > 0) {
                 value += step;
-            } else if(diff < 0) {
+            } else {
                 value -= step;
             }
 
@@ -580,6 +792,7 @@ static void kd_render_wall(kinetic_t *k, VJFrame *frame, int cell_size,
     const int rows = k->rows;
     const int max_cols = k->max_cols;
     const int amount_q = (amount * 256 + 50) / 100;
+    const int full_amount = (amount_q >= 256);
 
 #pragma omp parallel for num_threads(k->n_threads) schedule(static)
     for(int cy = 0; cy < rows; cy++) {
@@ -597,49 +810,41 @@ static void kd_render_wall(kinetic_t *k, VJFrame *frame, int cell_size,
             const int phase = k->cell_phase[idx];
             const int impact = k->cell_impact[idx];
             const int rnd = k->cell_rand[idx];
+            const int avg_y = k->cell_avg_y[idx];
             const int avg_u = k->cell_avg_u[idx];
             const int avg_v = k->cell_avg_v[idx];
             const int motion = k->cell_motion[idx];
+            const int detail = k->cell_detail[idx];
 
-            const int min_dim = (cw < ch) ? cw : ch;
-            int gap = (min_dim >= 28) ? 4 : ((min_dim >= 18) ? 3 : ((min_dim >= 10) ? 2 : 1));
-            if(min_dim <= 8) gap = 0;
+            const kd_geom_t g = kd_make_geometry(cw, ch, depth, value);
 
-            int max_lift = (min_dim * depth) / 118;
-            if(max_lift < 1) max_lift = 1;
-            if(max_lift > (min_dim - 2)) max_lift = min_dim - 2;
-
-            int lift = 1 + ((value * max_lift) >> 8);
-            if(lift < 1) lift = 1;
-            if(lift > max_lift) lift = max_lift;
-
-            int side = lift;
-            if(side > min_dim / 2) side = min_dim / 2;
-            if(side < 1) side = 1;
-
-            int face_x0 = gap;
-            int face_y0 = gap;
-            int face_x1 = cw - gap - side;
-            int face_y1 = ch - gap - side;
-
-            if(face_x1 <= face_x0 + 2) face_x1 = cw - gap;
-            if(face_y1 <= face_y0 + 2) face_y1 = ch - gap;
-
-            const int face_w = (face_x1 - face_x0) ? (face_x1 - face_x0) : 1;
-            const int face_h = (face_y1 - face_y0) ? (face_y1 - face_y0) : 1;
-            const int face_mid_x = (face_x0 + face_x1) >> 1;
-            const int face_mid_y = (face_y0 + face_y1) >> 1;
+            const int face_w = (g.face_x1 > g.face_x0) ? (g.face_x1 - g.face_x0) : 1;
+            const int face_h = (g.face_y1 > g.face_y0) ? (g.face_y1 - g.face_y0) : 1;
+            const int face_mid_x = (g.face_x0 + g.face_x1) >> 1;
+            const int face_mid_y = (g.face_y0 + g.face_y1) >> 1;
+            const int grad_x_q8 = (18 << 8) / face_w;
+            const int grad_y_q8 = (24 << 8) / face_h;
+            const int ax_q8 = (255 << 8) / face_w;
+            const int ay_q8 = (255 << 8) / face_h;
+            const int source_texture_q8 =
+                (palette == KD_PALETTE_SOURCE_FULL) ? (28 + (detail >> 3)) :
+                (palette == KD_PALETTE_SOURCE_SOFT) ? (16 + (detail >> 4)) :
+                (palette == KD_PALETTE_NEON) ? (20 + (detail >> 4)) : 0;
 
             int base_y = 5 + ((rnd & 15) >> 1);
-            int face_y = 34 + ((value * 194) >> 8);
+            base_y += (detail >> 5);
+
+            int face_y = 34 + ((value * 190) >> 8);
             face_y += (motion >> 5);
             face_y += (impact >> 4);
+            face_y += (detail >> 5);
             if(phase > 80) face_y += (phase >> 6);
 
-
             if(palette == KD_PALETTE_SOURCE_FULL || palette == KD_PALETTE_NEON) {
-                const int color_lift = ((int)k->cell_avg_y[idx] - 128) >> 3;
-                face_y += color_lift;
+                const int source_relief = avg_y + ((value - 128) >> 2);
+                face_y = ((face_y * 3) + source_relief) >> 2;
+            } else if(palette == KD_PALETTE_SOURCE_SOFT) {
+                face_y += (avg_y - 128) >> 4;
             }
 
             face_y = kd_clampi(face_y, 0, 255);
@@ -654,6 +859,7 @@ static void kd_render_wall(kinetic_t *k, VJFrame *frame, int cell_size,
             const int shadow_v = 128 + ((face_v - 128) * 3) / 10;
             const int back_u = 128 + ((face_u - 128) / 6);
             const int back_v = 128 + ((face_v - 128) / 6);
+            const int rim_flash = (impact > 32) ? (impact >> 3) : 0;
 
             for(int y = y0; y < y1; y++) {
                 const int ly = y - y0;
@@ -670,45 +876,48 @@ static void kd_render_wall(kinetic_t *k, VJFrame *frame, int cell_size,
                     int fu = back_u;
                     int fv = back_v;
 
-                    if(lx < gap || ly < gap || lx >= cw - gap || ly >= ch - gap) {
+                    if(g.gap > 0 &&
+                       (lx < g.gap || ly < g.gap || lx >= cw - g.gap || ly >= ch - g.gap)) {
                         fy = 2;
                         fu = 128;
                         fv = 128;
-                    } else if(lx >= face_x0 && lx < face_x1 && ly >= face_y0 && ly < face_y1) {
+                    } else if(lx >= g.face_x0 && lx < g.face_x1 &&
+                              ly >= g.face_y0 && ly < g.face_y1) {
                         const int rel_x = lx - face_mid_x;
                         const int rel_y = ly - face_mid_y;
-                        const int bevel_x = (lx == face_x0 || lx == face_x1 - 1);
-                        const int bevel_y = (ly == face_y0 || ly == face_y1 - 1);
+                        const int bevel_x = (lx == g.face_x0 || lx == g.face_x1 - 1);
+                        const int bevel_y = (ly == g.face_y0 || ly == g.face_y1 - 1);
 
-                        int grad = (rel_x * 18) / face_w + (rel_y * 24) / face_h;
-
-                        int ax = abs(rel_x) * 255 / face_w;
-                        int ay = abs(rel_y) * 255 / face_h;
-                        int pillow = 36 - ((ax + ay) >> 3);
+                        int grad = ((rel_x * grad_x_q8) + (rel_y * grad_y_q8)) >> 8;
+                        int ax = (abs(rel_x) * ax_q8) >> 8;
+                        int ay = (abs(rel_y) * ay_q8) >> 8;
+                        int pillow = 34 - ((ax + ay) >> 3);
                         if(pillow < -18) pillow = -18;
 
-                        int surface = 0;
+                        int surface = ((detail + 16) >> 5);
                         if(palette == KD_PALETTE_WOOD) {
-                            surface = (((lx * 3 + ly + rnd) & 7) - 3);
+                            surface += (((lx * 3 + ly + rnd) & 7) - 3);
                         } else if(palette == KD_PALETTE_STEEL) {
-                            surface = (((ly + rnd) & 7) - 3);
+                            surface += (((ly + rnd) & 7) - 3);
                         } else if(palette == KD_PALETTE_SOURCE_FULL) {
-                            surface = (((lx ^ ly ^ rnd) & 3) - 1);
+                            surface += (((lx ^ ly ^ rnd) & 3) - 1);
                         } else if(palette == KD_PALETTE_NEON) {
-                            surface = (((lx + ly + rnd) & 3) == 0) ? 3 : 0;
+                            surface += (((lx + ly + rnd) & 3) == 0) ? 3 : 0;
                         }
 
                         fy = face_y - grad + pillow + surface;
-                        if(bevel_x || bevel_y) fy -= 16;
-                        if(lx <= face_x0 + 1 || ly <= face_y0 + 1) fy += 22;
-                        if(lx >= face_x1 - 2 || ly >= face_y1 - 2) fy -= 25;
+                        if(source_texture_q8 > 0)
+                            fy += ((sy - avg_y) * source_texture_q8) >> 8;
 
+                        if(bevel_x || bevel_y) fy -= 14;
+                        if(lx <= g.face_x0 + 1 || ly <= g.face_y0 + 1) fy += 20 + rim_flash;
+                        if(lx >= g.face_x1 - 2 || ly >= g.face_y1 - 2) fy -= 23 + (impact >> 4);
 
                         if(impact > 24) {
-                            if(lx <= face_x0 + 1 || ly <= face_y0 + 1) {
-                                fy += impact >> 3;
+                            if(lx <= g.face_x0 + 1 || ly <= g.face_y0 + 1) {
+                                fy += impact >> 4;
                             }
-                            if(lx >= face_x1 - 2 || ly >= face_y1 - 2) {
+                            if(lx >= g.face_x1 - 2 || ly >= g.face_y1 - 2) {
                                 fy -= impact >> 4;
                             }
                         }
@@ -720,25 +929,35 @@ static void kd_render_wall(kinetic_t *k, VJFrame *frame, int cell_size,
                             fu = kd_clampi(fu + (((face_u - 128) * impact) >> 10), 16, 240);
                             fv = kd_clampi(fv + (((face_v - 128) * impact) >> 10), 16, 240);
                         }
-                    } else if(lx >= face_x1 && lx < face_x1 + side &&
-                              ly >= face_y0 + side / 2 && ly < face_y1 + side / 2) {
-                        const int d = lx - face_x1;
+                    } else if(g.side > 0 &&
+                              lx >= g.face_x1 && lx < g.face_x1 + g.side &&
+                              ly >= g.face_y0 + g.side / 2 && ly < g.face_y1 + g.side / 2) {
+                        const int d = lx - g.face_x1;
                         fy = face_y - 47 - d * 7 - (impact >> 5);
                         fu = side_u;
                         fv = side_v;
-                    } else if(ly >= face_y1 && ly < face_y1 + side &&
-                              lx >= face_x0 + side / 2 && lx < face_x1 + side / 2) {
-                        const int d = ly - face_y1;
+                    } else if(g.side > 0 &&
+                              ly >= g.face_y1 && ly < g.face_y1 + g.side &&
+                              lx >= g.face_x0 + g.side / 2 && lx < g.face_x1 + g.side / 2) {
+                        const int d = ly - g.face_y1;
                         fy = face_y - 68 - d * 8 - (impact >> 5);
                         fu = side_u;
                         fv = side_v;
-                    } else if(lx >= face_x1 + side / 2 || ly >= face_y1 + side / 2) {
-                        fy = base_y - 4 - (lift >> 1) - (impact >> 6);
+                    } else if(lx >= g.face_x1 + g.side / 2 || ly >= g.face_y1 + g.side / 2) {
+                        fy = base_y - 4 - (g.lift >> 1) - (impact >> 6);
                         fu = shadow_u;
                         fv = shadow_v;
                     }
 
-                    kd_write_pixel(Y, U, V, p, sy, su, sv, fy, fu, fv, amount_q);
+                    if(full_amount) {
+                        Y[p] = kd_clip_u8(fy);
+                        U[p] = kd_clip_u8(fu);
+                        V[p] = kd_clip_u8(fv);
+                    } else {
+                        Y[p] = kd_clip_u8(kd_blend_q8(sy, fy, amount_q));
+                        U[p] = kd_clip_u8(kd_blend_q8(su, fu, amount_q));
+                        V[p] = kd_clip_u8(kd_blend_q8(sv, fv, amount_q));
+                    }
                 }
             }
         }
@@ -772,32 +991,32 @@ void mechanicalpixels_apply(void *ptr, VJFrame *frame, int *args)
         kd_configure_grid(k, cell_size);
         kd_clear_cells(k);
         k->seeded = 0;
-        k->motor_pos = 0;
+        k->motor_q8 = 0;
     }
+
+    if(k->last_wave != wave)
+        kd_rebuild_wave_lut(k, wave);
 
     if(!k->seeded || (reset && !k->last_reset)) {
         kd_seed_cells(k, Y, U, V, cell_size);
-        veejay_memcpy(k->prev_y, Y, (size_t) k->len);
         k->seeded = 1;
-        k->motor_pos = 0;
+        k->motor_q8 = 0;
     }
     k->last_reset = reset;
 
     if(amount <= 0) {
         veejay_memcpy(k->prev_y, Y, (size_t) k->len);
         if(motor_speed > 0)
-            k->motor_pos = (k->motor_pos + 1 + (motor_speed * 11) / 100) & 255;
+            k->motor_q8 = (k->motor_q8 + kd_motor_inc_q8(motor_speed)) & 0xffff;
         k->frame++;
         return;
     }
 
-    kd_update_cells(k, Y, U, V, cell_size, motor_speed, trigger, wave, inertia);
-
-    veejay_memcpy(k->prev_y, Y, (size_t) k->len);
-
+    kd_update_cells(k, Y, U, V, cell_size, motor_speed, trigger, inertia);
     kd_render_wall(k, frame, cell_size, amount, depth, palette);
 
     if(motor_speed > 0)
-        k->motor_pos = (k->motor_pos + 1 + (motor_speed * 11) / 100) & 255;
+        k->motor_q8 = (k->motor_q8 + kd_motor_inc_q8(motor_speed)) & 0xffff;
+
     k->frame++;
 }
