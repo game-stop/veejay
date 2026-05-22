@@ -362,6 +362,14 @@ void    vj_midi_learning_vims_complex( void *vv, char *widget, int id, int first
     vj_midi_learning_vims( vv, widget, message, extra );
 }
 
+void    vj_midi_learning_vims_complex_msg( void *vv, char *widget, int id, int first , int extra, char *name)
+{
+    char message[16];
+    snprintf( message, sizeof(message), "%03d:0 %d %s",id, first, name );
+
+    vj_midi_learning_vims( vv, widget, message, extra );
+}
+
 void    vj_midi_learning_vims_msg( void *vv, char *widget, int id, int arg )
 {
     char message[32];
@@ -370,10 +378,10 @@ void    vj_midi_learning_vims_msg( void *vv, char *widget, int id, int arg )
     vj_midi_learning_vims( vv, widget, message, 0 );
 }
 
-void    vj_midi_learning_vims_msg2(void *vv, char *widget, int id, int arg, int b )
+void    vj_midi_learning_vims_msg2(void *vv, char *widget, int vims_id, int id, int arg )
 {
     char message[32];
-    snprintf(message,sizeof(message), "%03d:%d %d;", id, arg,b );
+    snprintf(message,sizeof(message), "%03d:%d %d;", vims_id, id,arg );
     vj_midi_learning_vims( vv, widget, message, 0 );
 }
 

@@ -1459,6 +1459,11 @@ void	on_button_sample_play_clicked(GtkWidget *widget, gpointer user_data)
 		vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO,
 			info->selection_slot->sample_id,
 			(info->selection_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM ));
+
+		vj_msg(VEEJAY_MSG_INFO, "Start playing %s %d (type %d) in slot %d", 
+			(info->selection_slot->sample_type == MODE_SAMPLE ? "sample" : "stream"),
+			info->selection_slot->sample_id,
+			info->selection_slot->sample_type);
 	}
 }
 void	on_button_sample_del_clicked(GtkWidget *widget, gpointer user_data)
