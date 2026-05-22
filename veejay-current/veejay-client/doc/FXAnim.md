@@ -44,5 +44,5 @@ affine the curve. Hit _Save this animation (Apply)_ to play the new automation.
 * Toggle by parameters hitting accordingly the _Enable/disable parameter animation_ button (VIMS 142 / keybinding TBD)
 
 === Clear the animation ===
-* You can clear the full automation, using the _Reset all animated parameters_ button, from the _Fx Anim_ panel (VIMS ? / keybinding TBD),
-* Or by parameters using the _Clear this animation_, from the _Fx Anim_ panel (VIMS ? / keybinding TBD).
+* You can clear the full automation, using the _Reset all animated parameters_ button, from the _Fx Anim_ panel (VIMS 147 / keybinding TBD),
+* Or by parameters using the _Clear this animation_, from the _Fx Anim_ panel (VIMS 152 / keybinding TBD).
