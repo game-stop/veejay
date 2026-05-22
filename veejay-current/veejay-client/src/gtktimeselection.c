@@ -185,6 +185,7 @@ static gint timeline_signals[LAST_SIGNAL] = { 0 };
 #define TIMELINE_LABEL_FONT_SIZE    10.0
 #define TIMELINE_INFO_FONT_SIZE     10.0
 
+#ifdef TIMELINE_DEBUG
 static const char *timeline_action_name(TimelineAction action)
 {
     switch (action) {
@@ -197,6 +198,7 @@ static const char *timeline_action_name(TimelineAction action)
         default:               return "?";
     }
 }
+#endif
 
 static inline gdouble timeline_clamp01(gdouble v)
 {
@@ -917,7 +919,7 @@ void timeline_set_bind(GtkWidget *widget, gboolean active)
 void timeline_set_out_point(GtkWidget *widget, gdouble pos)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
-  gdouble raw = pos;
+
   gint old_in = timeline_clamp_frame_i(te, (gint) llround(te->in));
   gint old_out = timeline_clamp_frame_i(te, (gint) llround(te->out));
   gint new_out = timeline_clamp_frame_i(te, (gint) llround(pos));
@@ -992,7 +994,7 @@ void timeline_clear_points(GtkWidget *widget)
 void timeline_set_in_point(GtkWidget *widget, gdouble pos)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
-  gdouble raw = pos;
+
   gint old_in = timeline_clamp_frame_i(te, (gint) llround(te->in));
   gint old_out = timeline_clamp_frame_i(te, (gint) llround(te->out));
   gint new_in = timeline_clamp_frame_i(te, (gint) llround(pos));
@@ -1040,10 +1042,6 @@ void timeline_set_in_point(GtkWidget *widget, gdouble pos)
 void timeline_set_in_and_out_point(GtkWidget *widget, gdouble start, gdouble end)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
-  gdouble raw_start = start;
-  gdouble raw_end = end;
-  gdouble old_in = te->in;
-  gdouble old_out = te->out;
 
   start = timeline_clamp_frame(te, start);
   end = timeline_clamp_frame(te, end);
@@ -1090,7 +1088,6 @@ void timeline_set_in_and_out_point(GtkWidget *widget, gdouble start, gdouble end
 void timeline_set_selection(GtkWidget *widget, gboolean active)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
-  gboolean old = te->has_selection;
 
   if (te->bind && te->action == action_atomic) {
       TL_EVT(te, "set_selection", "ignored while scratch is active: request=%d old=%d in=%.3f out=%.3f fixed_span=%d",
@@ -1152,9 +1149,6 @@ void timeline_set_length(GtkWidget *widget, gdouble length, gdouble pos)
 void timeline_set_pos(GtkWidget *widget, gdouble pos)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
-  gdouble raw = pos;
-  gdouble old = te->frame_num;
-  gdouble nframes = timeline_frame_count(te);
 
   pos = timeline_clamp_pos(te, pos);
 

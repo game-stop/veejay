@@ -58,8 +58,9 @@ static void toggle_siamese_widget(GtkWidget *widget, GtkWidget *first, GtkWidget
 
     gboolean active = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
 
-    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(siamese)) == active)
+    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(siamese)) == active) {
         return;
+	}
 
 	gulong handler_id = 0;
 
@@ -3432,7 +3433,7 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
 				"[FX Anim] invalid keyframe store header length %d expected %d",
 				hdr_len,
 				KF_STORE_HEADER_LEN);
-		return 0;
+		return;
 	}
 
     memcpy(buf, header, (size_t) hdr_len);
@@ -3962,8 +3963,6 @@ void on_timeline_move_selection(void)
 void on_timeline_selection_changed(GtkWidget *widget, gpointer user_data)
 {
     (void) user_data;
-
-    TimelineSelection *tl = TIMELINE_SELECTION(widget);
 
     on_timeline_move_selection();
 }

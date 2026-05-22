@@ -1430,13 +1430,11 @@ int get_and_draw_frame(int type, char *wid_name);
 GdkPixbuf *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
 static void vj_kf_select_parameter(int id);
 static void vj_kf_refresh(gboolean force);
-static void vj_kf_reset(void);
 static void veejay_show_main_ui(vj_gui_t *gui);
 void reload_macros(void);
 void reportbug(void);
 void select_chain_entry(int entry);
-static void update_active_sequence_from_status(void);
-static void clear_active_sequence_slot(void);
+static void update_slider_state(int slider_num, gboolean animated);
 
 GtkWidget *glade_xml_get_widget_( GtkBuilder *m, const char *name );
 
@@ -2460,22 +2458,6 @@ static void clear_progress_bar( const char *name, gdouble val )
 {
     GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
     gtk_progress_bar_set_fraction( GTK_PROGRESS_BAR(w), val );
-}
-
-static int get_global_chain_state(void)
-{
-    int enabled = gtk_toggle_button_get_active(
-        GTK_TOGGLE_BUTTON(widget_cache[WIDGET_GLOBALCHAINTOGGLE])
-    );
-
-    int after = gtk_toggle_button_get_active(
-        GTK_TOGGLE_BUTTON(widget_cache[WIDGET_GLOBALCHAINLEVEL])
-    );
-
-    if (!enabled)
-        return 0;
-
-    return after ? 2 : 1;
 }
 
 static struct
@@ -4248,9 +4230,6 @@ static void update_current_slot(int *history, int pm, int last_pm) {
 
         if (sample_bounds_changed || marker_start_changed || marker_end_changed)
         {
-            const gboolean scratch_active =
-                timeline_get_bind(TIMELINE_SELECTION(info->tl));
-
             gint marker_start = info->status_tokens[SAMPLE_MARKER_START];
             gint marker_end   = info->status_tokens[SAMPLE_MARKER_END];
             marker_duration = marker_end - marker_start + 1;
@@ -6367,14 +6346,14 @@ static void setup_bundles(void)
 
 //~ WIP TODO interactive search on both VIMS id and description
 //~ if search lookup is string search for description if is number search for ID
-    gboolean kjdhfkj = gtk_tree_view_get_enable_search( GTK_TREE_VIEW(tree) );
-    guint sigjdf = g_signal_connect(tree,
+    gtk_tree_view_get_enable_search( GTK_TREE_VIEW(tree) );
+    g_signal_connect(tree,
                      "start_interactive_search",
                      (GCallback) on_bundle_interactive_search,
                      NULL );
     gtk_tree_view_set_enable_search( GTK_TREE_VIEW(tree) , TRUE);
 
-    kjdhfkj = gtk_tree_view_get_enable_search( GTK_TREE_VIEW(tree) );
+    gtk_tree_view_get_enable_search( GTK_TREE_VIEW(tree) );
 
     GtkWidget *tv = glade_xml_get_widget_( info->main_window, "vimsview" );
     gtk_text_view_set_wrap_mode( GTK_TEXT_VIEW(tv), GTK_WRAP_WORD_CHAR );
@@ -7812,8 +7791,8 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
     if( info->status_tokens[TOTAL_SLOTS] != history[TOTAL_SLOTS] && samplebank_ready_)
     {
-        int n_samples = 0;
         int n_streams = 0;
+        int n_samples = 0;
         if( pm == MODE_PLAIN || pm == MODE_SAMPLE ) {
             n_samples = info->status_tokens[SAMPLE_COUNT];
             n_streams = info->status_tokens[SAMPLE_INV_COUNT];
@@ -10070,93 +10049,6 @@ static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *e
         }
     }
     return FALSE;
-}
-
-static int active_sequence_gui_slot = -1;
-
-static void clear_active_sequence_slot(void)
-{
-    if(!info->sequencer_view || !info->sequencer_view->gui_slot)
-        return;
-
-    if(active_sequence_gui_slot < 0)
-        return;
-
-    int n_slots = info->sequencer_col * info->sequencer_row;
-
-    if(active_sequence_gui_slot < n_slots &&
-       info->sequencer_view->gui_slot[active_sequence_gui_slot])
-    {
-        indicate_sequence(FALSE,
-            info->sequencer_view->gui_slot[active_sequence_gui_slot]);
-    }
-
-    active_sequence_gui_slot = -1;
-}
-
-static int sequencer_slot_label_to_id(sequence_gui_slot_t *slot)
-{
-    if(!slot || !slot->image)
-        return -1;
-
-    const gchar *txt = gtk_label_get_text(GTK_LABEL(slot->image));
-
-    if(!txt || txt[0] == '\0')
-        return -1;
-
-    char *endptr = NULL;
-    long id = strtol(txt, &endptr, 10);
-
-    if(endptr == txt)
-        return -1;
-
-    return (int) id;
-}
-
-static void set_active_sequence_slot_by_sample_id(int sample_id)
-{
-    if(!info->sequencer_view || !info->sequencer_view->gui_slot)
-        return;
-
-    int n_slots = info->sequencer_col * info->sequencer_row;
-    int slot;
-
-    clear_active_sequence_slot();
-
-    if(sample_id <= 0)
-        return;
-
-    for(slot = 0; slot < n_slots; slot++)
-    {
-        sequence_gui_slot_t *gui_slot = info->sequencer_view->gui_slot[slot];
-
-        if(!gui_slot)
-            continue;
-
-        if(sequencer_slot_label_to_id(gui_slot) == sample_id)
-        {
-            indicate_sequence(TRUE, gui_slot);
-            active_sequence_gui_slot = slot;
-
-            gtk_widget_grab_focus(GTK_WIDGET(gui_slot->event_box));
-            return;
-        }
-    }
-}
-
-static void update_active_sequence_from_status(void)
-{
-    if(!info->sequencer_view)
-        return;
-
-    if(info->status_tokens[PLAY_MODE] != MODE_SAMPLE &&
-       info->status_tokens[PLAY_MODE] != MODE_STREAM)
-    {
-        clear_active_sequence_slot();
-        return;
-    }
-
-    set_active_sequence_slot_by_sample_id(info->status_tokens[CURRENT_ID]);
 }
 
 static void indicate_sequence(gboolean active, sequence_gui_slot_t *slot)

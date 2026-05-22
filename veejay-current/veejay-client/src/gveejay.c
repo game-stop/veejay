@@ -100,8 +100,6 @@ typedef struct {
     GApplication *app;
 } GuiContext;
 
-static int draw_count = 0;
-
 static gboolean vj_gui_idle_cb1(gpointer data)
 {
     GuiContext *ctx = data;
