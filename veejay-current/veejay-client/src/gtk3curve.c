@@ -45,6 +45,7 @@
 #include <vj-api.h> 
 
 #include "gtk3curve.h"
+#include "curve.h"
 #include "utils-gtk.h"
 
 #ifdef DEBUG
