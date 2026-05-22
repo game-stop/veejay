@@ -1993,7 +1993,7 @@ void		vj_init_vevo_events(void)
 				vj_event_chain_fade_follow,
 				1,
 				VIMS_ALLOW_ANY,
-				"0=On, 1=Off",
+				"On = 1, Off = 0",
 				0,
 				NULL );
 
