@@ -811,7 +811,7 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				SAMPLE_STREAM_ID_HELP,
 				0,
-				"Status (0=off,1=on)",
+				"Status (On = 1, Off = 0)",
 				1,
 				NULL );
 	
@@ -824,7 +824,7 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				SAMPLE_STREAM_ID_HELP,
 				0,
-				"Status (0=off,1=on)",
+				"Status (On = 1, Off = 0)",
 				1,
 				NULL );			
 
@@ -885,7 +885,7 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_SAMPLE_KF_CLEAR]		=	_new_event(
 				"%d %d",
 				VIMS_SAMPLE_KF_CLEAR,
-				"Clear animated FX parameter",
+				"Clear animated FX parameter Y on entry X",
 				vj_event_del_keyframes,
 				2,
 				VIMS_REQUIRE_ALL_PARAMS,
@@ -945,7 +945,7 @@ void		vj_init_vevo_events(void)
 				vj_event_effect_add,
 				1,
 				VIMS_ALLOW_ANY,
-				"On/Off",
+				"On = 1, Off = 0",
 				1,
 				NULL );
 
@@ -2753,7 +2753,7 @@ void		vj_init_vevo_events(void)
 				vj_event_all_samples_chain_toggle,
 				1,	
 				VIMS_REQUIRE_ALL_PARAMS,
-				"On = 1, Off= 0",
+				"On = 1, Off = 0",
 				0,
 				NULL );
 	index_map_[VIMS_SAMPLE_UPDATE]				=	_new_event(
@@ -2961,7 +2961,7 @@ void		vj_init_vevo_events(void)
 				vj_event_sync_correction,
 				1,
 				VIMS_REQUIRE_ALL_PARAMS,
-				"0=off,1=on",
+				"On = 1, Off = 0",
 				0,
 				NULL );
 	index_map_[VIMS_FRAMERATE]			=	_new_event(
@@ -3053,7 +3053,7 @@ void		vj_init_vevo_events(void)
 				vj_event_alpha_composite,
 				2,
 				VIMS_ALLOW_ANY,
-				"0=on 1=off",
+				"On = 1, Off = 0",
 				0,
 				"Default value",
 				0,
@@ -3142,7 +3142,7 @@ void		vj_init_vevo_events(void)
 				vj_event_vp_stack,
 				2,
 				VIMS_ALLOW_ANY,
-				"On/Off",
+				"On = 1, Off = 0",
 				1,
 				"Color=0, Grayscale=1",
 				1,
@@ -3174,7 +3174,7 @@ void		vj_init_vevo_events(void)
 				vj_event_fullscreen,
 				1,
 				VIMS_ALLOW_ANY,
-				"On = 1, Off=0",
+				"On = 1, Off = 0",
 				1,
 				NULL );
 #endif
@@ -3393,7 +3393,7 @@ void		vj_init_vevo_events(void)
 				vj_event_sample_sequencer_active,
 				1,
 				VIMS_ALLOW_ANY,
-				"Status 0=off,1=on",
+				"Status (On = 1, Off = 0)",
 				0,
 				NULL );
 
@@ -3449,7 +3449,7 @@ void		vj_init_vevo_events(void)
 				vj_event_set_shm_status,
 				1,
 				VIMS_ALLOW_ANY,
-				"Status (0=off,1=on)",
+				"Status (On = 1, Off = 0)",
 				0,
 				NULL );
 
@@ -3492,7 +3492,7 @@ void		vj_init_vevo_events(void)
 				vj_event_vims_message_forwarding,
 				1,
 				VIMS_ALLOW_ANY,
-				"0=On, 1=Off",
+				"On = 1, Off = 0",
 				0,
 				NULL );	
 
