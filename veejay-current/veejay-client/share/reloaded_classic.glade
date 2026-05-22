@@ -11859,7 +11859,7 @@ Quicktime-MJPEG</property>
 				  <child>
 				    <widget class="GtkToggleButton" id="curve_toggleentry">
 				      <property name="visible">True</property>
-				      <property name="tooltip" translatable="yes">Toggle keyframing for this chain entry</property>
+				      <property name="tooltip" translatable="yes">Toggle animation rendering for the FX</property>
 				      <property name="can_focus">True</property>
 				      <property name="relief">GTK_RELIEF_HALF</property>
 				      <property name="focus_on_click">True</property>

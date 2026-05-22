@@ -4043,7 +4043,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">True</property>
-                                    <property name="tooltip_text" translatable="yes">Toggle keyframing for this chain entry</property>
+                                    <property name="tooltip_text" translatable="yes">Toggle animation rendering for the FX</property>
                                     <signal name="toggled" handler="curve_panel_toggleentry_toggled" swapped="no"/>
                                   </object>
                                   <packing>
@@ -12615,7 +12615,7 @@
                                                         <property name="can_focus">True</property>
                                                         <property name="receives_default">True</property>
                                                         <property name="has_tooltip">True</property>
-                                                        <property name="tooltip_text" translatable="yes">Toggle keyframing for this chain entry</property>
+                                                        <property name="tooltip_text" translatable="yes">Toggle animation rendering for the FX</property>
                                                         <signal name="toggled" handler="curve_chain_toggleentry_toggled" swapped="no"/>
                                                         <child>
                                                           <object class="GtkImage" id="image50">

@@ -1767,6 +1767,12 @@
                       <placeholder/>
                     </child>
                     <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
                       <object class="GtkButton" id="generators_close">
                         <property name="visible">True</property>
                         <property name="can-focus">True</property>
@@ -8679,7 +8685,7 @@
                                         <property name="visible">True</property>
                                         <property name="can-focus">True</property>
                                         <property name="receives-default">False</property>
-                                        <property name="tooltip-text" translatable="yes">Toggle rendering of this animation in FX chain</property>
+                                        <property name="tooltip-text" translatable="yes">Toggle animation rendering for the FX</property>
                                         <signal name="toggled" handler="curve_panel_toggleentry_toggled" swapped="no"/>
                                         <child>
                                           <object class="GtkImage" id="image58">
@@ -8910,7 +8916,7 @@
                             <property name="visible">True</property>
                             <property name="can-focus">True</property>
                             <property name="receives-default">False</property>
-                            <property name="tooltip-text" translatable="yes">Toggle parameter animation status</property>
+                            <property name="tooltip-text" translatable="yes">Enable/disable parameter animation</property>
                             <signal name="toggled" handler="on_curve_toggleentry_param_toggled" swapped="no"/>
                             <child>
                               <object class="GtkImage" id="image2146">
@@ -8999,6 +9005,7 @@
                           <object class="GtkComboBoxText" id="curve_combo_animation">
                             <property name="visible">True</property>
                             <property name="can-focus">False</property>
+                            <property name="tooltip-text" translatable="yes">Shape animation list</property>
                             <signal name="changed" handler="on_curve_animation_changed" swapped="no"/>
                           </object>
                           <packing>
@@ -9012,6 +9019,7 @@
                           <object class="GtkSpinButton" id="curve_spin_animation_shape">
                             <property name="visible">True</property>
                             <property name="can-focus">True</property>
+                            <property name="tooltip-text" translatable="yes">Shape repeat</property>
                             <property name="progress-pulse-step">1</property>
                             <property name="adjustment">curve_animation_shape</property>
                             <property name="snap-to-ticks">True</property>
@@ -17544,11 +17552,11 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                             <property name="tooltip-text" translatable="yes">Sync sample list</property>
                                                             <signal name="clicked" handler="on_sync_samplelist_clicked" swapped="no"/>
                                                             <child>
-                                                              <object class="GtkImage" id="image_sync_samplelist">
-                                                                <property name="visible">True</property>
-                                                                <property name="can-focus">False</property>
-                                                                <property name="pixbuf">icon_syncsamplelist.png</property>
-                                                              </object>
+                                                            <object class="GtkImage" id="image_sync_samplelist">
+                                                            <property name="visible">True</property>
+                                                            <property name="can-focus">False</property>
+                                                            <property name="pixbuf">icon_syncsamplelist.png</property>
+                                                            </object>
                                                             </child>
                                                           </object>
                                                           <packing>
@@ -18517,7 +18525,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                         <property name="can-focus">True</property>
                                                         <property name="receives-default">True</property>
                                                         <property name="has-tooltip">True</property>
-                                                        <property name="tooltip-text" translatable="yes">Toggle keyframing for this chain entry</property>
+                                                        <property name="tooltip-text" translatable="yes">Toggle animation rendering for the FX</property>
                                                         <signal name="toggled" handler="curve_panel_toggleentry_toggled" swapped="no"/>
                                                         <child>
                                                           <object class="GtkImage" id="image50">
