@@ -30,11 +30,20 @@
   Mouse contract:
   - Left click on the playhead triangle moves the playhead.
   - Left click on the track sets IN to the clicked frame.
+  - Left click + drag on the track continuously edits IN.
   - Right click on the track sets OUT to the clicked frame.
+  - Right click + drag on the track continuously edits OUT.
   - Middle click inside an existing selection toggles bound/scratch movement.
   - In scratch mode, the marker is translated as a rigid block.
   - In scratch mode, left/right edge edits and status in/out echoes are ignored.
   - Double left click clears the local selection.
+  - Mouse wheel never cancels scratch/bind mode.
+  - Mouse wheel with any button held is ignored.
+  - Mouse wheel steps the playhead by the default scroll step.
+  - Ctrl + mouse wheel steps the playhead by about one second.
+  - Shift + mouse wheel steps the playhead by about two seconds.
+  - While the middle-click scratch box is active, mouse wheel resizes the marker.
+  - The playhead remains clamped to the active selection marker.
  */
 
 /*
@@ -170,6 +179,8 @@ static gboolean event_leave(GtkWidget *widget, GdkEventCrossing *ev, gpointer us
 static void timeline_cancel_drag_mode(GtkWidget *widget);
 static void timeline_clear_selection_ghost(TimelineSelection *te);
 static void timeline_capture_selection_ghost(TimelineSelection *te);
+static gint timeline_clamp_playhead_i(TimelineSelection *te, gint frame);
+static void timeline_guard_playhead(GtkWidget *widget, gboolean emit_signal);
 
 static void timeline_class_init(TimelineSelectionClass *class);
 static void timeline_init(TimelineSelection *te);
@@ -184,6 +195,10 @@ static gint timeline_signals[LAST_SIGNAL] = { 0 };
 #define TIMELINE_MIN_HEIGHT_PX      34
 #define TIMELINE_LABEL_FONT_SIZE    10.0
 #define TIMELINE_INFO_FONT_SIZE     10.0
+#define TIMELINE_DEFAULT_SCROLL_STEP_FRAMES 13
+#define TIMELINE_CTRL_SCROLL_STEP_FRAMES    25
+#define TIMELINE_SHIFT_SCROLL_STEP_FRAMES   50
+#define TIMELINE_SCRATCH_SCROLL_EDGE_STEP_FRAMES 5
 
 #ifdef TIMELINE_DEBUG
 static const char *timeline_action_name(TimelineAction action)
@@ -377,6 +392,68 @@ static gboolean timeline_current_empty_clear_range(TimelineSelection *te)
     return te->clear && s == 0 && e <= 1;
 }
 
+static gboolean timeline_active_selection_bounds(TimelineSelection *te, gint *in_f, gint *out_f)
+{
+    gint i;
+    gint o;
+
+    if (!te->has_selection)
+        return FALSE;
+
+    i = timeline_clamp_frame_i(te, (gint) llround(te->in));
+    o = timeline_clamp_frame_i(te, (gint) llround(te->out));
+
+    if (o < i)
+        return FALSE;
+
+    if (te->clear && i == 0 && o <= 1)
+        return FALSE;
+
+    if (in_f)
+        *in_f = i;
+    if (out_f)
+        *out_f = o;
+
+    return TRUE;
+}
+
+static gint timeline_clamp_playhead_i(TimelineSelection *te, gint frame)
+{
+    gint in_f;
+    gint out_f;
+
+    frame = timeline_clamp_frame_i(te, frame);
+
+    if (timeline_active_selection_bounds(te, &in_f, &out_f)) {
+        if (frame < in_f)
+            frame = in_f;
+        else if (frame > out_f)
+            frame = out_f;
+    }
+
+    return frame;
+}
+
+static void timeline_guard_playhead(GtkWidget *widget, gboolean emit_signal)
+{
+    TimelineSelection *te = TIMELINE_SELECTION(widget);
+    gint old_pos = timeline_clamp_frame_i(te, (gint) llround(te->frame_num));
+    gint new_pos = timeline_clamp_playhead_i(te, old_pos);
+
+    if (new_pos == old_pos)
+        return;
+
+    te->frame_num = (gdouble) new_pos;
+
+    TL_EVT(te, "guard-playhead", "old=%d new=%d in=%.3f out=%.3f selection=%d clear=%d",
+           old_pos, new_pos, te->in, te->out, te->has_selection, te->clear);
+
+    if (emit_signal)
+        g_signal_emit(te->widget, timeline_signals[POS_CHANGED], 0);
+
+    gtk_widget_queue_draw(widget);
+}
+
 static void timeline_update_cursor(GtkWidget *widget, TimelineAction action)
 {
     GdkWindow *window = gtk_widget_get_window(widget);
@@ -498,9 +575,9 @@ static void set_property(GObject *object,
     }
 
     case POS: {
-      gdouble v = timeline_clamp_pos(te, g_value_get_double(value));
-      TL_DBG(te, "set_property(pos): %.3f -> %.3f", te->frame_num, v);
-      te->frame_num = v;
+      gint v = timeline_clamp_playhead_i(te, (gint) llround(g_value_get_double(value)));
+      TL_DBG(te, "set_property(pos): %.3f -> %d", te->frame_num, v);
+      te->frame_num = (gdouble) v;
       break;
     }
 
@@ -529,6 +606,7 @@ static void set_property(GObject *object,
       TL_DBG(te, "set_property(in): %.3f -> %d", te->in, v);
       te->in = (gdouble) v;
       timeline_clear_selection_ghost(te);
+      timeline_guard_playhead(GTK_WIDGET(te), FALSE);
       break;
     }
 
@@ -540,6 +618,7 @@ static void set_property(GObject *object,
       TL_DBG(te, "set_property(out): %.3f -> %d", te->out, v);
       te->out = (gdouble) v;
       timeline_clear_selection_ghost(te);
+      timeline_guard_playhead(GTK_WIDGET(te), FALSE);
       break;
     }
 
@@ -555,6 +634,7 @@ static void set_property(GObject *object,
           if (!te->has_selection)
               timeline_clear_selection_ghost(te);
       }
+      timeline_guard_playhead(GTK_WIDGET(te), FALSE);
       break;
     }
 
@@ -824,7 +904,7 @@ static void timeline_init(TimelineSelection *te)
   te->stepper_size = 24;
   te->stepper_draw_size = 12;
   te->stepper_length = 0;
-  te->step_size = 1;
+  te->step_size = TIMELINE_DEFAULT_SCROLL_STEP_FRAMES;
   te->frame_width = 0.0;
   te->frame_height = 8;
   te->font_line = 24;
@@ -919,6 +999,8 @@ void timeline_set_bind(GtkWidget *widget, gboolean active)
 void timeline_set_out_point(GtkWidget *widget, gdouble pos)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
+  gdouble raw = pos;
+  (void) raw;
 
   gint old_in = timeline_clamp_frame_i(te, (gint) llround(te->in));
   gint old_out = timeline_clamp_frame_i(te, (gint) llround(te->out));
@@ -949,6 +1031,7 @@ void timeline_set_out_point(GtkWidget *widget, gdouble pos)
   te->has_selection = TRUE;
   te->clear = FALSE;
   timeline_clear_selection_ghost(te);
+  timeline_guard_playhead(widget, TRUE);
 
   TL_EVT(te, "set_out", "raw=%.3f old=(%d,%d) new=(%d,%d) bind=%d action=%s",
          raw, old_in, old_out, old_in, new_out, te->bind, timeline_action_name(te->action));
@@ -994,6 +1077,8 @@ void timeline_clear_points(GtkWidget *widget)
 void timeline_set_in_point(GtkWidget *widget, gdouble pos)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
+  gdouble raw = pos;
+  (void) raw;
 
   gint old_in = timeline_clamp_frame_i(te, (gint) llround(te->in));
   gint old_out = timeline_clamp_frame_i(te, (gint) llround(te->out));
@@ -1026,6 +1111,7 @@ void timeline_set_in_point(GtkWidget *widget, gdouble pos)
   te->has_selection = TRUE;
   te->clear = FALSE;
   timeline_clear_selection_ghost(te);
+  timeline_guard_playhead(widget, TRUE);
 
   TL_EVT(te, "set_in", "raw=%.3f old=(%d,%d) new=(%d,%d) bind=%d action=%s initialized=%d",
          raw, old_in, old_out, new_in, old_out, te->bind, timeline_action_name(te->action), initialized);
@@ -1042,6 +1128,14 @@ void timeline_set_in_point(GtkWidget *widget, gdouble pos)
 void timeline_set_in_and_out_point(GtkWidget *widget, gdouble start, gdouble end)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
+  gdouble raw_start = start;
+  gdouble raw_end = end;
+  gdouble old_in = te->in;
+  gdouble old_out = te->out;
+  (void) raw_start;
+  (void) raw_end;
+  (void) old_in;
+  (void) old_out;
 
   start = timeline_clamp_frame(te, start);
   end = timeline_clamp_frame(te, end);
@@ -1078,6 +1172,7 @@ void timeline_set_in_and_out_point(GtkWidget *widget, gdouble start, gdouble end
   te->has_selection = TRUE;
   te->clear = FALSE;
   timeline_clear_selection_ghost(te);
+  timeline_guard_playhead(widget, TRUE);
 
   TL_EVT(te, "set_in_and_out", "raw=(%.3f,%.3f) snapped=(%.3f,%.3f) old=(%.3f,%.3f) bind=%d action=%s span=%.3f",
          raw_start, raw_end, start, end, old_in, old_out, te->bind, timeline_action_name(te->action), end - start + 1.0);
@@ -1088,6 +1183,8 @@ void timeline_set_in_and_out_point(GtkWidget *widget, gdouble start, gdouble end
 void timeline_set_selection(GtkWidget *widget, gboolean active)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
+  gboolean old = te->has_selection;
+  (void) old;
 
   if (te->bind && te->action == action_atomic) {
       TL_EVT(te, "set_selection", "ignored while scratch is active: request=%d old=%d in=%.3f out=%.3f fixed_span=%d",
@@ -1113,6 +1210,7 @@ void timeline_set_selection(GtkWidget *widget, gboolean active)
              active, old, te->has_selection, te->in, te->out);
   }
 
+  timeline_guard_playhead(widget, TRUE);
   gtk_widget_queue_draw(GTK_WIDGET(te->widget));
 }
 
@@ -1149,12 +1247,11 @@ void timeline_set_length(GtkWidget *widget, gdouble length, gdouble pos)
 void timeline_set_pos(GtkWidget *widget, gdouble pos)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
+  gint new_pos = timeline_clamp_playhead_i(te, (gint) llround(pos));
 
-  pos = timeline_clamp_pos(te, pos);
+  te->frame_num = (gdouble) new_pos;
 
-  te->frame_num = pos;
-
-  //TL_EVT(te, "set_pos", "raw=%.3f clamped=%.3f old=%.3f nframes=%.3f", raw, pos, old, nframes);
+  //TL_EVT(te, "set_pos", "raw=%.3f clamped=%d in=%.3f out=%.3f selection=%d", pos, new_pos, te->in, te->out, te->has_selection);
   //TL_EVT(te, "emit", "pos_changed");
   g_signal_emit(te->widget, timeline_signals[POS_CHANGED], 0);
   gtk_widget_queue_draw(GTK_WIDGET(te->widget));
@@ -1257,6 +1354,7 @@ static void move_selection(GtkWidget *widget, gdouble x, gdouble width)
   te->in = (gdouble) new_in;
   te->out = (gdouble) new_out;
   te->clear = FALSE;
+  timeline_guard_playhead(widget, TRUE);
 
   TL_EVT(te, "move_selection",
         "x=%.2f width=%.2f move_x=%.3f old=(%d,%d) new=(%d,%d) fixed_span=%d current_span=%d no_edge_signals=1",
@@ -1269,6 +1367,80 @@ static void move_selection(GtkWidget *widget, gdouble x, gdouble width)
 
   TL_EVT(te, "emit", "selection_changed");
   g_signal_emit(te->widget, timeline_signals[SELECTION_CHANGED_SIGNAL], 0);
+}
+
+static void resize_scratch_selection(GtkWidget *widget,
+                                     gint direction,
+                                     gdouble mouse_x,
+                                     gdouble width)
+{
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
+  gint old_in;
+  gint old_out;
+  gint new_in;
+  gint new_out;
+  gint nframes;
+  gint span;
+  gint center;
+
+  if (!timeline_latch_visible(te) ||
+      !timeline_active_selection_bounds(te, &old_in, &old_out))
+      return;
+
+  nframes = timeline_frame_count_i(te);
+
+  if (direction > 0) {
+      new_in = old_in - TIMELINE_SCRATCH_SCROLL_EDGE_STEP_FRAMES;
+      new_out = old_out + TIMELINE_SCRATCH_SCROLL_EDGE_STEP_FRAMES;
+
+      if (new_in < 0)
+          new_in = 0;
+      if (new_out >= nframes)
+          new_out = nframes - 1;
+  }
+  else {
+      new_in = old_in + TIMELINE_SCRATCH_SCROLL_EDGE_STEP_FRAMES;
+      new_out = old_out - TIMELINE_SCRATCH_SCROLL_EDGE_STEP_FRAMES;
+
+      if (new_in > new_out) {
+          center = (old_in + old_out) / 2;
+          new_in = center;
+          new_out = center;
+      }
+  }
+
+  new_in = timeline_clamp_frame_i(te, new_in);
+  new_out = timeline_clamp_frame_i(te, new_out);
+
+  if (new_out < new_in)
+      new_out = new_in;
+
+  if (new_in == old_in && new_out == old_out)
+      return;
+
+  te->in = (gdouble) new_in;
+  te->out = (gdouble) new_out;
+  te->has_selection = TRUE;
+  te->clear = FALSE;
+
+  span = new_out - new_in + 1;
+  te->scratch_span = span;
+
+  if (width > 1.0) {
+      gdouble mouse_frame = timeline_x_to_frame_cont(te, mouse_x, width);
+      te->move_x = mouse_frame - (gdouble) new_in;
+  }
+
+  timeline_guard_playhead(widget, TRUE);
+
+  TL_EVT(te, "resize-scratch",
+         "direction=%d old=(%d,%d) new=(%d,%d) span=%d move_x=%.3f",
+         direction, old_in, old_out, new_in, new_out, span, te->move_x);
+
+  g_signal_emit(te->widget, timeline_signals[IN_CHANGED], 0);
+  g_signal_emit(te->widget, timeline_signals[OUT_CHANGED], 0);
+
+  gtk_widget_queue_draw(widget);
 }
 
 static void timeline_cancel_drag_mode(GtkWidget *widget)
@@ -1294,6 +1466,62 @@ static void timeline_cancel_drag_mode(GtkWidget *widget)
     gtk_widget_queue_draw(widget);
 }
 
+static gint timeline_scroll_step(GdkEventScroll *ev)
+{
+    GdkScrollDirection direction;
+
+    if (!gdk_event_get_scroll_direction((GdkEvent *) ev, &direction))
+        return 0;
+
+    switch (direction) {
+        case GDK_SCROLL_UP:
+        case GDK_SCROLL_RIGHT:
+            return 1;
+
+        case GDK_SCROLL_DOWN:
+        case GDK_SCROLL_LEFT:
+            return -1;
+
+        case GDK_SCROLL_SMOOTH: {
+            gdouble dx = 0.0;
+            gdouble dy = 0.0;
+
+            if (!gdk_event_get_scroll_deltas((GdkEvent *) ev, &dx, &dy))
+                return 0;
+
+            if (fabs(dy) >= fabs(dx)) {
+                if (dy < 0.0) return 1;
+                if (dy > 0.0) return -1;
+            }
+            else {
+                if (dx > 0.0) return 1;
+                if (dx < 0.0) return -1;
+            }
+
+            return 0;
+        }
+
+        default:
+            break;
+    }
+
+    return 0;
+}
+
+static gint timeline_scroll_frame_step(TimelineSelection *te, GdkEventScroll *ev)
+{
+    gint step;
+
+    if (ev->state & GDK_SHIFT_MASK)
+        step = TIMELINE_SHIFT_SCROLL_STEP_FRAMES;
+    else if (ev->state & GDK_CONTROL_MASK)
+        step = TIMELINE_CTRL_SCROLL_STEP_FRAMES;
+    else
+        step = MAX(1, te->step_size);
+
+    return step;
+}
+
 static void timeline_apply_action_at_x(GtkWidget *widget,
                                        TimelineAction action,
                                        gdouble x,
@@ -1307,6 +1535,14 @@ static void timeline_apply_action_at_x(GtkWidget *widget,
     switch (action) {
         case action_pos:
             timeline_set_pos(widget, timeline_x_to_pos(te, x, width));
+            break;
+
+        case action_in_point:
+            timeline_set_in_point(widget, timeline_x_to_marker_frame(te, x, width));
+            break;
+
+        case action_out_point:
+            timeline_set_out_point(widget, timeline_x_to_marker_frame(te, x, width));
             break;
 
         case action_atomic:
@@ -1329,29 +1565,38 @@ static void timeline_apply_action_at_x(GtkWidget *widget,
 static gboolean event_scroll(GtkWidget *widget, GdkEventScroll *ev, gpointer user_data)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
-  GdkScrollDirection direction;
+  GtkAllocation all;
+  gint direction;
+  gint step;
 
   (void) user_data;
 
-  TL_EVT(te, "scroll", "bind=%d action=%s drag_latched=%d", te->bind, timeline_action_name(te->action), te->drag_latched);
+  TL_EVT(te, "scroll", "bind=%d action=%s drag_latched=%d state=0x%x",
+         te->bind, timeline_action_name(te->action), te->drag_latched, ev->state);
 
-  if (te->bind && te->action == action_atomic) {
-      TL_EVT(te, "scroll", "ignored while scratch is active; middle click toggles scratch off");
+  direction = timeline_scroll_step(ev);
+  if (direction == 0)
+      return TRUE;
+
+  if (ev->state & (GDK_BUTTON1_MASK | GDK_BUTTON2_MASK | GDK_BUTTON3_MASK)) {
+      TL_EVT(te, "scroll", "ignored while mouse button is held");
       return TRUE;
   }
 
-  if (te->drag_latched || te->bind)
-      timeline_cancel_drag_mode(widget);
-
-  if (gdk_event_get_scroll_direction((GdkEvent*)ev, &direction)) {
-    gdouble cur_pos = timeline_get_pos(te);
-
-    if (direction == GDK_SCROLL_UP)
-      timeline_set_pos(widget, cur_pos + 1.0);
-    else if (direction == GDK_SCROLL_DOWN)
-      timeline_set_pos(widget, cur_pos - 1.0);
+  if (timeline_latch_visible(te)) {
+      gtk_widget_get_allocation(widget, &all);
+      resize_scratch_selection(widget, direction, ev->x, (gdouble) all.width);
+      return TRUE;
   }
 
+  step = direction * timeline_scroll_frame_step(te, ev);
+
+  TL_EVT(te, "scroll-playhead", "direction=%d step=%d ctrl=%d shift=%d",
+         direction, step,
+         (ev->state & GDK_CONTROL_MASK) != 0,
+         (ev->state & GDK_SHIFT_MASK) != 0);
+
+  timeline_set_pos(widget, timeline_get_pos(te) + (gdouble) step);
   return TRUE;
 }
 
@@ -1560,6 +1805,18 @@ static gboolean event_motion(GtkWidget *widget, GdkEventMotion *ev, gpointer use
 
   if (b1 && te->action == action_pos) {
     timeline_apply_action_at_x(widget, action_pos, ev->x, width);
+    return TRUE;
+  }
+
+  if (b1 && te->action == action_in_point) {
+    timeline_apply_action_at_x(widget, action_in_point, ev->x, width);
+    timeline_set_point(widget, timeline_x_to_pos(te, ev->x, width));
+    return TRUE;
+  }
+
+  if (b3 && te->action == action_out_point) {
+    timeline_apply_action_at_x(widget, action_out_point, ev->x, width);
+    timeline_set_point(widget, timeline_x_to_pos(te, ev->x, width));
     return TRUE;
   }
 

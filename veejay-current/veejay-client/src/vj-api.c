@@ -773,7 +773,15 @@ static struct
     const char *text;
 } tooltips[] =
 {
-    {"Mouse left: Set in point,\nMouse right: Set out point,\nDouble click: Clear selection,\nMouse middle: Drag selection"},
+    {
+    "Mouse left: Set/drag in point,\n"
+    "Mouse right: Set/drag out point,\n"
+    "Double click: Clear selection,\n"
+    "Mouse middle: Toggle/drag selection,\n"
+    "Mouse wheel: Move playhead ±13 frames,\n"
+    "Ctrl + wheel: Move playhead ±1 second,\n"
+    "Shift + wheel: Move playhead ±2 seconds"
+    },
     {"Mouse left/right: Play slot,\nShift + Mouse left: Put sample in slot.\nYou can also put selected samples."},
     {"Mouse left: Select slot (sample in slot),\nMouse double click: Play sample in slot,\nShift + Mouse left: Set slot as mixing current mixing channel"},
     {"Select a SRT sequence to edit"},
