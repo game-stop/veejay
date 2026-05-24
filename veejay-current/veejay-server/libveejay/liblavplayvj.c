@@ -81,6 +81,7 @@
 #include <libel/pixbuf.h>
 #include <veejaycore/avcommon.h>
 #include <veejaycore/vj-client.h>
+#include <libveejay/audioscratcher.h>
 #ifdef HAVE_JACK
 #include <libveejay/vj-jack.h>
 #endif
@@ -143,6 +144,8 @@ extern int vj_event_single_fire(void *ptr, SDL_Event event, int pressed);
 static	veejay_t	*veejay_instance_ = NULL;
 
 static void veejay_playback_close(veejay_t *info);
+
+
 
 int veejay_get_state(veejay_t *info) {
 	video_playback_setup *settings = (video_playback_setup*)info->settings;
@@ -384,128 +387,177 @@ static inline int playback_dir(int speed)
 
 int veejay_set_framedup(veejay_t *info, int n)
 {
-	 video_playback_setup *settings = info->settings;
+    video_playback_setup *settings = info->settings;
 
-	 int cur_dir = playback_dir( settings->current_playback_speed );
-	 int cur_sfd = 0;
+    if (n < 1)
+        n = 1;
 
-	switch(info->uc->playback_mode) {
-		case VJ_PLAYBACK_MODE_PLAIN:
-			cur_sfd = info->sfd;	
-			if( cur_sfd != n) {
-				veejay_seek(info,settings->current_playback_speed, n);
-				info->sfd = n;
-			}
-			break;
-		case VJ_PLAYBACK_MODE_SAMPLE:
-			cur_sfd = sample_get_framedup( info->uc->sample_id );
-			if(cur_sfd != n ) {
-				sample_set_framedup(info->uc->sample_id,n);
+    const int speed = settings->current_playback_speed;
+    const int cur_dir = playback_dir(speed);
 
-				veejay_seek(info,settings->current_playback_speed, n);
+    int cur_sfd = 0;
 
-			}
-		break;
+    switch (info->uc->playback_mode) {
+        case VJ_PLAYBACK_MODE_PLAIN:
+            cur_sfd = info->sfd;
 
-		default:
-		return -1;
-	}
+            if (cur_sfd != n) {
+                info->sfd = n;
+                settings->sfd = n;
 
-	if(cur_sfd != n) {
-		vj_perform_initiate_edge_change(info, AUDIO_EDGE_RESET,cur_dir, cur_dir );
-	}
-	
-	settings->sfd = n;
-	info->sfd = n;
-	
-	return 1;
+                atomic_store_int(&settings->audio_slice, 0);
+                atomic_store_int(&settings->audio_slice_len, n);
+                settings->audio_last_stretched_samples = 0;
+
+                veejay_seek(info, speed, n);
+
+                vj_perform_initiate_edge_change(
+                    info,
+                    (cur_dir == 0) ? AUDIO_EDGE_SILENCE : AUDIO_EDGE_JUMP,
+                    cur_dir,
+                    cur_dir
+                );
+            } else {
+                info->sfd = n;
+                settings->sfd = n;
+                atomic_store_int(&settings->audio_slice_len, n);
+            }
+            break;
+
+        case VJ_PLAYBACK_MODE_SAMPLE:
+            cur_sfd = sample_get_framedup(info->uc->sample_id);
+
+            if (cur_sfd != n) {
+                sample_set_framedup(info->uc->sample_id, n);
+
+                info->sfd = n;
+                settings->sfd = n;
+
+                atomic_store_int(&settings->audio_slice, 0);
+                atomic_store_int(&settings->audio_slice_len, n);
+                settings->audio_last_stretched_samples = 0;
+
+                veejay_seek(info, speed, n);
+
+                vj_perform_initiate_edge_change(
+                    info,
+                    (cur_dir == 0) ? AUDIO_EDGE_SILENCE : AUDIO_EDGE_JUMP,
+                    cur_dir,
+                    cur_dir
+                );
+            } else {
+                info->sfd = n;
+                settings->sfd = n;
+                atomic_store_int(&settings->audio_slice_len, n);
+            }
+            break;
+
+        default:
+            return -1;
+    }
+
+    return 1;
 }
 
-int veejay_set_speed(veejay_t * info, int speed, int force_seek)
+
+int veejay_set_speed(veejay_t *info, int speed, int force_seek)
 {
     video_playback_setup *settings =
-	(video_playback_setup *) info->settings;
-    int len=0;
-	
-    int prev_dir = playback_dir( settings->current_playback_speed );
-	int cur_dir = playback_dir( speed );
-	int direction_changed = (prev_dir != cur_dir);
+        (video_playback_setup *)info->settings;
 
+    int len = 0;
 
-	int old_speed = settings->current_playback_speed;
-	int max_sfd = 1;
+    if (speed > MAX_SPEED)
+        speed = MAX_SPEED;
+    else if (speed < -MAX_SPEED)
+        speed = -MAX_SPEED;
 
-    if( speed > MAX_SPEED )
-		speed = MAX_SPEED;
-    if( speed < -(MAX_SPEED))
-		speed = -(MAX_SPEED);
+    const int old_speed = settings->current_playback_speed;
+    const int prev_dir = playback_dir(old_speed);
 
-	switch (info->uc->playback_mode)
-	{
-		case VJ_PLAYBACK_MODE_PLAIN:
-			if( abs(speed) <= info->current_edit_list->total_frames )
-				settings->current_playback_speed = speed;	
-			else
-				veejay_msg(VEEJAY_MSG_DEBUG, "Speed %d too high to set", speed);
-			max_sfd = info->sfd;
-		break;
+    int max_sfd = 1;
 
-		case VJ_PLAYBACK_MODE_SAMPLE:
-			len = sample_get_endFrame(info->uc->sample_id) - sample_get_startFrame(info->uc->sample_id);
-			if( speed < 0)
-			{
-				if ( (-1*len) > speed )
-				{
-					veejay_msg(VEEJAY_MSG_ERROR,"Speed %d too high to set",speed);
-					return 1;
-				}
-			}
-			else
-			{
-				if(speed >= 0)
-				{
-					if( len < speed )
-					{
-						veejay_msg(VEEJAY_MSG_ERROR, "Speed %d too high to set",speed);
-						return 1;
-					}
-				}
-			}
-			if(sample_set_speed(info->uc->sample_id, speed) != -1)
-				settings->current_playback_speed = speed;
-			max_sfd = sample_get_framedup(info->uc->sample_id);
+    switch (info->uc->playback_mode) {
+        case VJ_PLAYBACK_MODE_PLAIN:
+            if (abs(speed) <= info->current_edit_list->total_frames) {
+                settings->current_playback_speed = speed;
+            } else {
+                veejay_msg(VEEJAY_MSG_DEBUG,
+                           "Speed %d too high to set",
+                           speed);
+            }
+            max_sfd = info->sfd;
+            break;
 
-		break;
+        case VJ_PLAYBACK_MODE_SAMPLE:
+            len = sample_get_endFrame(info->uc->sample_id) -
+                  sample_get_startFrame(info->uc->sample_id);
 
-		case VJ_PLAYBACK_MODE_TAG:
-			settings->current_playback_speed = 1;
-			max_sfd = 1;
-		break;
+            if (speed < 0) {
+                if ((-1 * len) > speed) {
+                    veejay_msg(VEEJAY_MSG_ERROR,
+                               "Speed %d too high to set",
+                               speed);
+                    return 1;
+                }
+            } else {
+                if (len < speed) {
+                    veejay_msg(VEEJAY_MSG_ERROR,
+                               "Speed %d too high to set",
+                               speed);
+                    return 1;
+                }
+            }
 
-		default:
-			veejay_msg(VEEJAY_MSG_ERROR, "Unknown playback mode");
-		break;
-	}
+            if (sample_set_speed(info->uc->sample_id, speed) != -1)
+                settings->current_playback_speed = speed;
 
-	int edge_type = (speed == 0 ? AUDIO_EDGE_RESET : AUDIO_EDGE_NONE);
-	if(old_speed != speed && old_speed != 0)
-		edge_type = AUDIO_EDGE_RESET;
-	if(old_speed != speed && abs(old_speed) == abs(speed))
-		edge_type = AUDIO_EDGE_DIRECTION;
+            max_sfd = sample_get_framedup(info->uc->sample_id);
+            break;
 
-	if(direction_changed) {
-		atomic_store_int(&settings->audio_direction_changed, 1);
-	}
+        case VJ_PLAYBACK_MODE_TAG:
+            settings->current_playback_speed = 1;
+            max_sfd = 1;
+            break;
 
-	vj_perform_initiate_edge_change(info, edge_type,prev_dir, cur_dir);
+        default:
+            veejay_msg(VEEJAY_MSG_ERROR, "Unknown playback mode");
+            return 0;
+    }
 
-	if(force_seek) {
-		veejay_seek( info, settings->current_playback_speed, max_sfd);
-	}
+    const int effective_speed = settings->current_playback_speed;
+    const int cur_dir = playback_dir(effective_speed);
+    const int speed_changed = (old_speed != effective_speed);
+    const int real_direction_flip =
+        (prev_dir != 0 && cur_dir != 0 && prev_dir != cur_dir);
 
+    int edge_type = AUDIO_EDGE_NONE;
 
-	return 1;
+    if (speed_changed) {
+        if (effective_speed == 0 || old_speed == 0)
+            edge_type = AUDIO_EDGE_SILENCE;
+        else if (real_direction_flip)
+            edge_type = AUDIO_EDGE_DIRECTION;
+    }
+
+    if (real_direction_flip)
+        atomic_store_int(&settings->audio_direction_changed, 1);
+
+    if (edge_type != AUDIO_EDGE_NONE) {
+        atomic_store_int(&settings->audio_slice, 0);
+
+        if (edge_type != AUDIO_EDGE_DIRECTION)
+            settings->audio_last_stretched_samples = 0;
+
+        vj_perform_initiate_edge_change(info, edge_type, prev_dir, cur_dir);
+    }
+
+    if (force_seek)
+        veejay_seek(info, effective_speed, max_sfd);
+
+    return 1;
 }
+
 
 
 int veejay_hold_frame(veejay_t * info, int rel_resume_pos, int hold_pos)
@@ -543,48 +595,117 @@ int veejay_hold_frame(veejay_t * info, int rel_resume_pos, int hold_pos)
     return 1;
 }
 
-static void	veejay_sample_resume_at( veejay_t *info, int cur_id )
+
+static void veejay_sample_resume_at(veejay_t *info, int cur_id)
 {
-	long pos = sample_get_resume(cur_id);
-	veejay_set_frame(info, pos );
-	veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d continues with frame %d", cur_id, pos );
+    video_playback_setup *settings = info->settings;
+
+    long pos = sample_get_resume(cur_id);
+    long start = sample_get_startFrame(cur_id);
+    long end = sample_get_endFrame(cur_id);
+
+    if (pos < start)
+        pos = start;
+    else if (pos > end)
+        pos = end;
+
+    long long cur_frame = atomic_load_long_long(&settings->current_frame_num);
+
+    if ((long long) pos != cur_frame) {
+        int speed = settings->current_playback_speed;
+        int dir = playback_dir(speed);
+
+        int edge_type = (pos == start) ? AUDIO_EDGE_RESET : AUDIO_EDGE_JUMP;
+
+        if (dir == 0)
+            edge_type = AUDIO_EDGE_SILENCE;
+
+        atomic_store_int(&settings->audio_slice, 0);
+
+        vj_perform_initiate_edge_change(
+            info,
+            edge_type,
+            dir,
+            dir
+        );
+    }
+
+    veejay_set_frame(info, pos);
+
+    veejay_msg(
+        VEEJAY_MSG_DEBUG,
+        "Sample %d continues with frame %ld",
+        cur_id,
+        pos
+    );
 }
 
 int veejay_increase_frame(veejay_t *info, long num)
 {
     video_playback_setup *settings = info->settings;
-    long long current_frame_num = atomic_load_long_long(&settings->current_frame_num);
-	long long min_frame_num = atomic_load_long_long(&settings->min_frame_num);
-	long long max_frame_num = atomic_load_long_long(&settings->max_frame_num);
-    long long next_frame = current_frame_num + num;
 
-    if(info->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN) {
-        if(next_frame < min_frame_num) return 0;
-        if(next_frame > max_frame_num) return 0;
-    } else if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
-        if(next_frame < sample_get_startFrame(info->uc->sample_id)) return 0;
-        if(next_frame > sample_get_endFrame(info->uc->sample_id)) return 0;
+    long long current_frame_num = atomic_load_long_long(&settings->current_frame_num);
+    long long min_frame_num = atomic_load_long_long(&settings->min_frame_num);
+    long long max_frame_num = atomic_load_long_long(&settings->max_frame_num);
+    long long next_frame = current_frame_num + (long long) num;
+
+    int speed = settings->current_playback_speed;
+
+    if (num == 0)
+        return 1;
+
+    if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
+        int s_start = 0;
+        int s_end = 0;
+        int s_loop = 0;
+        int s_speed = speed;
+
+        if (sample_get_short_info(info->uc->sample_id,
+                                  &s_start,
+                                  &s_end,
+                                  &s_loop,
+                                  &s_speed) != 0)
+            return 0;
+
+        (void) s_loop;
+
+        min_frame_num = s_start;
+        max_frame_num = s_end;
+        speed = s_speed;
+        next_frame = current_frame_num + (long long) num;
     }
 
-    // detect jump vs normal increment ---
+    if (next_frame < min_frame_num)
+        return 0;
+
+    if (next_frame > max_frame_num)
+        return 0;
+
+    const int play_dir = playback_dir(speed);
+    const int move_dir = (num > 0) ? 1 : -1;
+
     int edge_type = AUDIO_EDGE_NONE;
 
-    if(labs(num) != 1) {
-        // large skip = jump
+    if (play_dir == 0) {
+        edge_type = AUDIO_EDGE_SILENCE;
+    } else if (num < -1 || num > 1) {
+        edge_type = (next_frame == min_frame_num) ?
+            AUDIO_EDGE_RESET : AUDIO_EDGE_JUMP;
+    } else if (move_dir != play_dir) {
         edge_type = AUDIO_EDGE_JUMP;
-    } else if((num > 0 && settings->current_playback_speed < 0) ||
-              (num < 0 && settings->current_playback_speed > 0)) {
-        // changing direction
-        edge_type = AUDIO_EDGE_DIRECTION;
     }
 
-    atomic_add_fetch_old_long_long(&settings->current_frame_num, num);
+    atomic_store_long_long(&settings->current_frame_num, next_frame);
 
-    if(edge_type != AUDIO_EDGE_NONE) {
-        int prev_dir = settings->current_playback_speed >= 0 ? 1 : -1;
-        int cur_dir  = num >= 0 ? 1 : -1;
-		
-        vj_perform_initiate_edge_change(info, edge_type, prev_dir, cur_dir);
+    if (edge_type != AUDIO_EDGE_NONE) {
+        atomic_store_int(&settings->audio_slice, 0);
+
+        vj_perform_initiate_edge_change(
+            info,
+            edge_type,
+            play_dir,
+            play_dir
+        );
     }
 
     return 1;
@@ -687,6 +808,7 @@ void veejay_quit(veejay_t * info)
 	veejay_change_state(info, LAVPLAY_STATE_STOP);
 }
 
+
 int veejay_set_frame(veejay_t *info, long framenum)
 {
     video_playback_setup *settings = (video_playback_setup *)info->settings;
@@ -694,51 +816,64 @@ int veejay_set_frame(veejay_t *info, long framenum)
     long long min_frame = atomic_load_long_long(&settings->min_frame_num);
     long long max_frame = atomic_load_long_long(&settings->max_frame_num);
 
+    int sample_start = -1;
+
     if (framenum < min_frame)
         framenum = min_frame;
-
     if (framenum > max_frame)
         framenum = max_frame;
 
     if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
-        int start, end, loop, speed;
+        int start = 0;
+        int end = 0;
+        int loop = 0;
+        int speed = 0;
 
-        if (sample_get_short_info(info->uc->sample_id, &start, &end, &loop, &speed) != 0)
+        if (sample_get_short_info(info->uc->sample_id,
+                                  &start, &end, &loop, &speed) != 0)
             return 0;
+
+        (void)loop;
+        (void)speed;
+
+        sample_start = start;
 
         if (framenum < start)
             framenum = start;
-
         if (framenum > end)
             framenum = end;
 
         if (framenum == start || framenum == end)
             sample_set_framedups(info->uc->sample_id, 0);
-    }
-    else if (info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG) {
+    } else if (info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG) {
         if (framenum > max_frame)
             framenum = max_frame;
     }
 
-    long long current_frame_num = atomic_load_long_long(&settings->current_frame_num);
-    long long move = (long long)framenum - current_frame_num;
-    long long delta = llabs(move);
+    long long current_frame_num =
+        atomic_load_long_long(&settings->current_frame_num);
 
-    if (delta > 0) {
-        int prev_dir = playback_dir(settings->current_playback_speed);
-        int cur_dir  = playback_dir(move);
-        long long normal_step = llabs((long long)settings->current_playback_speed);
+    if ((long long)framenum != current_frame_num) {
+        const int dir = playback_dir(settings->current_playback_speed);
 
-        if (normal_step == 0 || delta != normal_step) {
-            vj_perform_initiate_edge_change(info, AUDIO_EDGE_JUMP, prev_dir, cur_dir);
+        int edge_type = AUDIO_EDGE_JUMP;
+        if (dir == 0)
+            edge_type = AUDIO_EDGE_SILENCE;
+        else if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
+            if (sample_start >= 0 && framenum == sample_start)
+                edge_type = AUDIO_EDGE_RESET;
+        } else {
+            if ((long long)framenum == min_frame)
+                edge_type = AUDIO_EDGE_RESET;
         }
-        else if (prev_dir != 0 && cur_dir != 0 && prev_dir != cur_dir) {
-            vj_perform_initiate_edge_change(info, AUDIO_EDGE_DIRECTION, prev_dir, cur_dir);
-        }
+
+        atomic_store_int(&settings->audio_slice, 0);
+        settings->audio_last_stretched_samples = 0;
+
+        vj_perform_initiate_edge_change(info, edge_type, dir, dir);
     }
 
     atomic_store_long_long(&settings->current_frame_num, framenum);
-
     return 1;
 }
 

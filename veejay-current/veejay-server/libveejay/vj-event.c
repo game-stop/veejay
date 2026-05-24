@@ -4455,10 +4455,6 @@ void vj_event_sample_move_marker(void *ptr, const char format[], va_list ap)
     s->marker_start = marker_start;
     s->marker_end = marker_end;
 
-    veejay_msg(VEEJAY_MSG_INFO,
-        "Moved marker selection to %d - %d",
-        s->marker_start,
-        s->marker_end);
 }
 
 void vj_event_sample_grow_marker(void *ptr, const char format[], va_list ap)

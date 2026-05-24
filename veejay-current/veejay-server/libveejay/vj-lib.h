@@ -142,50 +142,6 @@ typedef struct
 } transition_t;
 
 typedef enum {
-    AUDIO_EDGE_NONE = 0,
-    AUDIO_EDGE_DIRECTION, //1
-    AUDIO_EDGE_JUMP, // 2
-    AUDIO_EDGE_RESET,     // frame 0 / start
-    AUDIO_EDGE_SILENCE,   // crossfade from zero
-} audio_edge_type_t;
-
-
-typedef struct {
-	int    buflen;
-	int16_t *fwdL;
-	int16_t *fwdR;
-
-
-	int16_t *silenceR;
-	int16_t *silenceL;
-
-	int16_t *history;
-	int history_len;
-
-	int heuristic_applied;
-
-	volatile int    last_direction;
-	int    xfade_active;
-	
-	volatile int pending_edge;
-	int edge_linger;
-	
-	volatile int	fwd_history_valid;
-	volatile int	rev_history_valid;
-
-	float *fade_lut;
-
-	int16_t last_sample[8];
-	int16_t last_output_sample[8];
-	int16_t prev_output_sample[8];
-
-	int     last_sample_valid;
-	int		last_best_offset;
-	long long		ticks_since_last_flip;
-
-} audio_edge_t; // FIXME delete this whole thing
-
-typedef enum {
 	BUFFER_FREE = 0,
 	BUFFER_RESERVED,
 	BUFFER_FILLED,
