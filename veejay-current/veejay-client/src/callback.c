@@ -4005,38 +4005,124 @@ void	on_timeline_value_changed( GtkWidget *widget, gpointer user_data )
 	}
 }
 
+static gint clamp_marker_frame(gint frame, gint nframes)
+{
+	if (nframes < 1)
+		nframes = 1;
+
+	if (frame < 0)
+		return 0;
+
+	if (frame >= nframes)
+		return nframes - 1;
+
+	return frame;
+}
+
+static void set_marker_span_centered(GtkWidget *tl, gint new_span)
+{
+	gdouble pos1 = timeline_get_in_point(TIMELINE_SELECTION(tl));
+	gdouble pos2 = timeline_get_out_point(TIMELINE_SELECTION(tl));
+	gdouble len  = timeline_get_length(TIMELINE_SELECTION(tl));
+
+	gint nframes = (gint) llround(len);
+	gint in_f;
+	gint out_f;
+	gint old_span;
+	gint center2;
+	gint new_in;
+	gint new_out;
+
+	if (nframes < 1)
+		nframes = 1;
+
+	in_f = clamp_marker_frame((gint) llround(pos1), nframes);
+	out_f = clamp_marker_frame((gint) llround(pos2), nframes);
+
+	if (out_f < in_f) {
+		gint tmp = in_f;
+		in_f = out_f;
+		out_f = tmp;
+	}
+
+	old_span = out_f - in_f + 1;
+	if (old_span < 1)
+		old_span = 1;
+
+	if (new_span < 1)
+		new_span = 1;
+	if (new_span > nframes)
+		new_span = nframes;
+
+	center2 = in_f + out_f;
+
+	new_in = (center2 - new_span + 1) / 2;
+	new_out = new_in + new_span - 1;
+
+	if (new_in < 0) {
+		new_in = 0;
+		new_out = new_span - 1;
+	}
+	else if (new_out >= nframes) {
+		new_out = nframes - 1;
+		new_in = new_out - new_span + 1;
+	}
+
+	new_in = clamp_marker_frame(new_in, nframes);
+	new_out = clamp_marker_frame(new_out, nframes);
+
+	if (new_out < new_in)
+		new_out = new_in;
+
+	timeline_set_in_and_out_point(tl, (gdouble) new_in, (gdouble) new_out);
+}
+
 void	on_len_div_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gdouble pos1 = timeline_get_in_point( TIMELINE_SELECTION(info->tl) );
-	gdouble pos2 = timeline_get_out_point( TIMELINE_SELECTION(info->tl) );
+	gdouble pos1 = timeline_get_in_point(TIMELINE_SELECTION(info->tl));
+	gdouble pos2 = timeline_get_out_point(TIMELINE_SELECTION(info->tl));
+	gint in_f = (gint) llround(pos1);
+	gint out_f = (gint) llround(pos2);
+	gint span;
 
-	gdouble npos1 = (pos1 + pos2) / 2 - (pos2 - pos1) / 4;
-	gdouble npos2 = (pos1 + pos2) / 2 + (pos2 - pos1) / 4;
+	if (out_f < in_f) {
+		gint tmp = in_f;
+		in_f = out_f;
+		out_f = tmp;
+	}
 
-	if( npos1 < 0.0 ) npos1 = 0.0; else if (npos1 > 1.0) npos1 = 1.0;
-	if( npos2 < 0.0 ) npos2 = 0.0; else if (npos2 > 1.0) npos2 = 1.0;
+	span = out_f - in_f + 1;
+	if (span < 1)
+		span = 1;
 
-	timeline_set_in_and_out_point( info->tl, npos1, npos2 );
+	set_marker_span_centered(info->tl, (span + 1) / 2);
 
-	multi_vims( VIMS_SAMPLE_SHRINK_MARKER, "%d", 0 );
+	multi_vims(VIMS_SAMPLE_SHRINK_MARKER, "%d", 0);
 
-	vj_midi_learning_vims_msg(info->midi, NULL, VIMS_SAMPLE_SHRINK_MARKER, 0); 
+	vj_midi_learning_vims_msg(info->midi, NULL, VIMS_SAMPLE_SHRINK_MARKER, 0);
 }
 
 void	on_len_mul_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gdouble pos1 = timeline_get_in_point( TIMELINE_SELECTION(info->tl) );
-	gdouble pos2 = timeline_get_out_point( TIMELINE_SELECTION(info->tl) );
+	gdouble pos1 = timeline_get_in_point(TIMELINE_SELECTION(info->tl));
+	gdouble pos2 = timeline_get_out_point(TIMELINE_SELECTION(info->tl));
+	gint in_f = (gint) llround(pos1);
+	gint out_f = (gint) llround(pos2);
+	gint span;
 
-	gdouble npos1 = (pos1 + pos2) / 2 - ( pos2 - pos1 );
-	gdouble npos2 = (pos1 + pos2) / 2 + ( pos2 - pos1 );
+	if (out_f < in_f) {
+		gint tmp = in_f;
+		in_f = out_f;
+		out_f = tmp;
+	}
 
-	if( npos1 < 0.0 ) npos1 = 0.0; else if (npos1 > 1.0) npos1 = 1.0;
-	if( npos2 < 0.0 ) npos2 = 0.0; else if (npos2 > 1.0) npos2 = 1.0;
+	span = out_f - in_f + 1;
+	if (span < 1)
+		span = 1;
 
-	timeline_set_in_and_out_point( info->tl, npos1, npos2 );
+	set_marker_span_centered(info->tl, span * 2);
 
-	multi_vims( VIMS_SAMPLE_GROW_MARKER , "%d", 0);
+	multi_vims(VIMS_SAMPLE_GROW_MARKER, "%d", 0);
 
 	vj_midi_learning_vims_msg(info->midi, NULL, VIMS_SAMPLE_GROW_MARKER, 0);
 }
