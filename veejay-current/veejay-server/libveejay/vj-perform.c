@@ -79,6 +79,44 @@
 #define PSLOW_A 3
 #define PSLOW_B 4
 
+void vj_audio_declick_observe(const void *owner, const uint8_t *buf, int samples,
+                              int frame_bytes, int path, int speed, int dir);
+int vj_scratch_process(void *ptr,
+                       short *output,
+                       int max_out_frames,
+                       const short *input,
+                       int src_frames,
+                       double speed);
+int vj_audio_render_slow_stream_bend_s16(uint8_t *dst,
+                                           int dst_samples,
+                                           const uint8_t *src,
+                                           int source_base_sample,
+                                           int context_samples,
+                                           int slice_count,
+                                           int start_stretched_sample,
+                                           int phase_offset_start,
+                                           int phase_offset_end,
+                                           int frame_bytes);
+int vj_audio_render_slow_stream_turn_s16(uint8_t *dst,
+                                           int dst_samples,
+                                           const uint8_t *src,
+                                           int source_base_sample,
+                                           int context_samples,
+                                           int slice_count,
+                                           int start_stretched_sample,
+                                           int phase_offset_start,
+                                           int phase_offset_end,
+                                           int frame_bytes);
+int vj_audio_render_slow_stream_velocity_turn_s16(uint8_t *dst,
+                                                  int dst_samples,
+                                                  const uint8_t *src,
+                                                  int source_base_sample,
+                                                  int context_samples,
+                                                  int slice_count,
+                                                  int start_stretched_sample,
+                                                  int phase_offset_start,
+                                                  int phase_offset_end,
+                                                  int frame_bytes);
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -529,10 +567,11 @@ static inline int vj_perform_cache_use_frame(ycbcr_frame *cached_frame, VJFrame 
     veejay_memcpy( dst->data[1], cached_frame->Cb, len);
     veejay_memcpy( dst->data[2], cached_frame->Cr, len );
 
+    //veejay_memcpy( dst->data[3], cached_frame->data[3], cached_frame->stride[3] * cached_frame->height );
     return cached_frame->ssm;
 }
 
-#ifdef VEEJAY_AUDIO_DEBUG
+
 static const char *vj_audio_edge_name(int edge_type)
 {
     switch (edge_type) {
@@ -544,7 +583,6 @@ static const char *vj_audio_edge_name(int edge_type)
         default:                   return "unknown";
     }
 }
-#endif
 
 void vj_perform_initiate_edge_change(
     veejay_t *info,
@@ -569,7 +607,7 @@ void vj_perform_initiate_edge_change(
 
     if (edge_type == AUDIO_EDGE_DIRECTION && !real_direction_change)
         edge_type = AUDIO_EDGE_JUMP;
-#ifdef VEEJAY_AUDIO_DEBUG
+
     const int old_a = atomic_load_int(&g->A->audio_edge->pending_edge);
     const int old_b = atomic_load_int(&g->B->audio_edge->pending_edge);
 
@@ -582,7 +620,7 @@ void vj_perform_initiate_edge_change(
                    vj_audio_edge_name(old_a), old_a,
                    vj_audio_edge_name(old_b), old_b);
     }
-#endif
+
     atomic_store_int(&g->A->audio_edge->pending_edge, edge_type);
     atomic_store_int(&g->B->audio_edge->pending_edge, edge_type);
 }
@@ -1170,14 +1208,16 @@ int vj_perform_init_audio(veejay_t * info, int AorB)
     performer_t *p = (AorB ? global->A : global->B);
     double samples_per_frame = (double)el->audio_rate / (double)el->video_fps;
     const uint32_t sample_len = ceil(samples_per_frame) * el->audio_bps;
+    const uint32_t runtime_audio_len = (uint32_t)(ceil((double)el->audio_rate) * el->audio_bps) + 4096;
+    const uint32_t top_audio_len = (runtime_audio_len > (8 * PERFORM_AUDIO_SIZE)) ? runtime_audio_len : (8 * PERFORM_AUDIO_SIZE);
 
     p->top_audio_buffer =
-        (uint8_t *) vj_calloc(sizeof(uint8_t) * 8 * PERFORM_AUDIO_SIZE);
+        (uint8_t *) vj_calloc(sizeof(uint8_t) * top_audio_len);
     if(!p->top_audio_buffer)
         return 0;
 
     p->audio_rec_buffer =
-        (uint8_t *) vj_calloc(sizeof(uint8_t) * 8 * PERFORM_AUDIO_SIZE );
+        (uint8_t *) vj_calloc(sizeof(uint8_t) * top_audio_len );
     if(!p->audio_rec_buffer)
         return 0;
 
@@ -1809,7 +1849,18 @@ static void slow_motion_update_turn_history(sample_b_t *posdata,
                                             const uint8_t *buf,
                                             int samples,
                                             int frame_bytes);
-
+static int slow_motion_apply_reverse_tail_bridge_s16(uint8_t *dst,
+                                                     int dst_samples,
+                                                     const sample_b_t *posdata,
+                                                     int frame_bytes,
+                                                     int max_bridge_samples,
+                                                     int *bridge_used,
+                                                     int *hist_used);
+static void vj_audio_window_step_stats_s16(const uint8_t *buf,
+                                           int samples,
+                                           int frame_bytes,
+                                           int *max_step,
+                                           int *avg_step);
 
 static int get_audio_frame_safe(
     veejay_t *info,
@@ -1876,6 +1927,67 @@ static double slow_motion_ctx_exact_to_actual_rel(const slow_scratch_ctx_map_t *
                                                   double abs_pos,
                                                   int ctx_samples);
 static inline int16_t slow_motion_cubic_interp_s16(int p0, int p1, int p2, int p3, double t);
+
+static int normal_ctx_value_delta_s16(const uint8_t *ctx,
+                                      int ctx_samples,
+                                      double ctx_abs_start,
+                                      const slow_scratch_ctx_map_t *ctx_map,
+                                      double abs_pos,
+                                      const uint8_t *prev_frame,
+                                      int frame_bytes)
+{
+    if (ctx == NULL || prev_frame == NULL || ctx_samples <= 0 ||
+        frame_bytes <= 0 || (frame_bytes & 1))
+        return 0x3fffffff;
+
+    const int words = frame_bytes / 2;
+    const int max_index = ctx_samples - 1;
+    double rel = (ctx_map != NULL && ctx_map->valid)
+        ? slow_motion_ctx_exact_to_actual_rel(ctx_map, abs_pos, ctx_samples)
+        : (abs_pos - ctx_abs_start);
+
+    if (rel < 0.0)
+        rel = 0.0;
+    else if (rel > (double)max_index)
+        rel = (double)max_index;
+
+    int idx = (int)floor(rel);
+    double frac = rel - (double)idx;
+    if (idx < 0) {
+        idx = 0;
+        frac = 0.0;
+    } else if (idx > max_index) {
+        idx = max_index;
+        frac = 0.0;
+    }
+
+    int i0 = idx - 1;
+    int i1 = idx;
+    int i2 = idx + 1;
+    int i3 = idx + 2;
+    if (i0 < 0) i0 = 0;
+    if (i2 > max_index) i2 = max_index;
+    if (i3 > max_index) i3 = max_index;
+
+    const int16_t *in = (const int16_t*)ctx;
+    const int16_t *prev = (const int16_t*)prev_frame;
+    const int b0 = i0 * words;
+    const int b1 = i1 * words;
+    const int b2 = i2 * words;
+    const int b3 = i3 * words;
+    int delta = 0;
+
+    for (int c = 0; c < words; c++) {
+        int v = slow_motion_cubic_interp_s16(
+            in[b0 + c], in[b1 + c], in[b2 + c], in[b3 + c], frac);
+        int d = v - (int)prev[c];
+        d = (d < 0) ? -d : d;
+        if (d > delta)
+            delta = d;
+    }
+
+    return delta;
+}
 
 static inline void normal_ctx_sample_frame_s16(const uint8_t *ctx,
                                                int ctx_samples,
@@ -2309,13 +2421,11 @@ static int perform_normal_direction_turn(veejay_t *info,
     const int unsafe_step_limit = (turn_speed > 1) ? 1024 : 768;
     const int unsafe_slope_limit = (turn_speed > 1) ? 14000 : 12000;
     if (phase_delta > 4096 || phase_slope > unsafe_slope_limit || phase_step > unsafe_step_limit) {
-#ifdef VEEJAY_AUDIO_DEBUG
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[AUDIO-DIAG] normal-turn-skip stage=59 edge=%s(%d) flip=1 speed=%d dir=%d target=%lld phase_delta=%d phase_slope=%d phase_step=%d phase=%d reason=unsafe-candidate mode=guarded-dual-head-microfade",
                    vj_audio_edge_name(pending_edge), pending_edge,
                    sample_ptr->speed, cur_dir, cur_frame,
                    phase_delta, phase_slope, phase_step, phase_shift);
-#endif
         return 0;
     }
 
@@ -2373,7 +2483,6 @@ static int perform_normal_direction_turn(veejay_t *info,
     }
 
     if (edge_delta >= 768 || step_max >= 768 || peak >= 32760) {
-#ifdef VEEJAY_AUDIO_DEBUG
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[AUDIO-DIAG] normal-turn stage=59 edge=%s(%d) flip=1 speed=%d dir=%d target=%lld samples=%d turn_speed=%d delta=%d phase_delta=%d phase_slope=%d phase_step=%d peak=%d step_max=%d step_avg=%d phase=%d turn=%d base=%.3f start=%.3f v0=%.3f v1=%.3f ctx=%lld..%lld mode=guarded-dual-head-microfade",
                    vj_audio_edge_name(pending_edge), pending_edge,
@@ -2381,7 +2490,6 @@ static int perform_normal_direction_turn(veejay_t *info,
                    edge_delta, phase_delta, phase_slope, phase_step, peak, step_max, step_avg,
                    phase_shift, turn_samples,
                    base_pos, start_pos, v0, v1, ctx_first, ctx_last);
-#endif                  
     }
 
     sample_ptr->scratch_initialized = 0;
@@ -2429,14 +2537,14 @@ static int perform_normal_playback(
 
     const int direction_flipped =
         (last_dir != 0 && cur_dir != 0 && last_dir != cur_dir);
-#ifdef VEEJAY_AUDIO_DEBUG
+
     if (pending_edge != AUDIO_EDGE_NONE || direction_flipped) {
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[AUDIO-DIAG] normal-edge edge=%s(%d) flip=%d last_dir=%d cur_dir=%d speed=%d target=%lld pred=%d",
                    vj_audio_edge_name(pending_edge), pending_edge, direction_flipped,
                    last_dir, cur_dir, speed, cur_frame, pred_len);
     }
-#endif
+
     if (speed == 0 || pending_edge == AUDIO_EDGE_SILENCE) {
         veejay_memset(audio_buf, 0, pred_len * frame_bytes);
 
@@ -2488,12 +2596,10 @@ static int perform_normal_playback(
                 vj_audio_declick_apply(p, audio_buf, n_samples, frame_bytes,
                                        AUDIO_PATH_DIRECT, speed, cur_dir,
                                        AUDIO_EDGE_DIRECTION, 1);
-#ifdef VEEJAY_AUDIO_DEBUG                       
                 veejay_msg(VEEJAY_MSG_DEBUG,
                            "[AUDIO-DIAG] normal-turn-fallback stage=60 edge=%s(%d) flip=1 speed=%d dir=%d target=%lld reason=unsafe-declick-fallback mode=direct-copy-declick",
                            vj_audio_edge_name(pending_edge), pending_edge,
                            speed, cur_dir, cur_frame);
-#endif
             } else {
                 vj_audio_declick_apply(p, audio_buf, n_samples, frame_bytes,
                                     AUDIO_PATH_DIRECT, speed, cur_dir,
@@ -2568,12 +2674,11 @@ static int perform_normal_playback(
             sample_ptr->prev_n_samples = turn_out;
             return turn_out;
         }
-#ifdef VEEJAY_AUDIO_DEBUG
+
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[AUDIO-DIAG] fast-turn-fallback stage=60 edge=%s(%d) flip=1 speed=%d dir=%d target=%lld reason=unsafe-declick-fallback",
                    vj_audio_edge_name(pending_edge), pending_edge,
                    speed, cur_dir, cur_frame);
-#endif
     }
 
     uint8_t *tmp_ptr = temporary_buffer;
@@ -2632,6 +2737,202 @@ static int perform_normal_playback(
     sample_ptr->prev_n_samples = out;
     return out;
 }
+
+static void perform_slow_motion_soft_edge(
+    performer_t *p,
+    int edge_type,
+    int direction_flipped
+) {
+    if ((edge_type != AUDIO_EDGE_NONE || direction_flipped) &&
+        p != NULL && p->audio_scratcher != NULL)
+        vj_scratch_soft_reset(p->audio_scratcher);
+}
+
+static int perform_slow_motion_fetch_resample(
+    veejay_t *info,
+    editlist *el,
+    performer_t *p,
+    uint8_t *audio_buf,
+    uint8_t *downsample_buffer,
+    int frame_bytes,
+    int pred_len,
+    int slice_count,
+    int speed_int,
+    sample_b_t *posdata,
+    long long target_frame,
+    int direction
+) {
+    (void)p;
+    (void)audio_buf;
+
+    if (el == NULL || posdata == NULL || downsample_buffer == NULL ||
+        pred_len <= 0 || frame_bytes <= 0 || slice_count <= 1 || direction == 0) {
+        if (posdata != NULL) {
+            posdata->audio_last_stretched_samples = 0;
+            posdata->audio_total_samples = 0;
+            posdata->audio_src_offset = 0;
+        }
+        return 0;
+    }
+
+    const int slot_samples = pred_len + 16;
+    const int scratch_capacity_samples = (512 * 1024) / frame_bytes;
+    if (scratch_capacity_samples < (slot_samples * 6 + 16)) {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[AUDIO-DIAG] slow-context no-room target=%lld capacity=%d need=%d",
+                   target_frame, scratch_capacity_samples, slot_samples * 6 + 16);
+        posdata->audio_last_stretched_samples = 0;
+        posdata->audio_total_samples = 0;
+        posdata->audio_src_offset = 0;
+        return 0;
+    }
+
+    uint8_t *ctx = downsample_buffer;
+    uint8_t *left_tmp = ctx;
+    uint8_t *cur_tmp = ctx + ((size_t)slot_samples * (size_t)frame_bytes);
+    uint8_t *right_tmp = ctx + ((size_t)slot_samples * 2u * (size_t)frame_bytes);
+
+    int cur_samples = get_audio_frame_safe(info, el, target_frame,
+                                           cur_tmp, pred_len,
+                                           frame_bytes, speed_int);
+    if (cur_samples <= 0) {
+        posdata->audio_last_stretched_samples = 0;
+        posdata->audio_total_samples = 0;
+        posdata->audio_src_offset = 0;
+        return 0;
+    }
+
+    if (direction < 0)
+        vj_audio_reverse_buffer(cur_tmp, cur_samples, frame_bytes);
+
+    long long left_frame = target_frame - (long long)direction;
+    long long right_frame = target_frame + (long long)direction;
+
+    if (posdata->end > posdata->start) {
+        if (left_frame < posdata->start || left_frame > posdata->end)
+            left_frame = target_frame;
+        if (right_frame < posdata->start || right_frame > posdata->end)
+            right_frame = target_frame;
+    }
+
+    int left_samples = 0;
+    int right_samples = 0;
+
+    if (left_frame != target_frame) {
+        left_samples = get_audio_frame_safe(info, el, left_frame,
+                                            left_tmp, pred_len,
+                                            frame_bytes, speed_int);
+        if (left_samples > 0 && direction < 0)
+            vj_audio_reverse_buffer(left_tmp, left_samples, frame_bytes);
+    }
+
+    if (left_samples <= 0) {
+        veejay_memcpy(left_tmp, cur_tmp, (size_t)frame_bytes);
+        left_samples = 1;
+        left_frame = target_frame;
+    }
+
+    if (right_frame != target_frame) {
+        right_samples = get_audio_frame_safe(info, el, right_frame,
+                                             right_tmp, pred_len,
+                                             frame_bytes, speed_int);
+        if (right_samples > 0 && direction < 0)
+            vj_audio_reverse_buffer(right_tmp, right_samples, frame_bytes);
+    }
+
+    if (right_samples <= 0) {
+        veejay_memcpy(right_tmp,
+                      cur_tmp + ((size_t)(cur_samples - 1) * (size_t)frame_bytes),
+                      (size_t)frame_bytes);
+        right_samples = 1;
+        right_frame = target_frame;
+    }
+
+    const size_t left_bytes = (size_t)left_samples * (size_t)frame_bytes;
+    const size_t cur_bytes = (size_t)cur_samples * (size_t)frame_bytes;
+    const size_t right_bytes = (size_t)right_samples * (size_t)frame_bytes;
+
+    uint8_t *pack = ctx + ((size_t)slot_samples * 3u * (size_t)frame_bytes);
+    memmove(pack, left_tmp, left_bytes);
+    memmove(pack + left_bytes, cur_tmp, cur_bytes);
+    memmove(pack + left_bytes + cur_bytes, right_tmp, right_bytes);
+    memmove(ctx, pack, left_bytes + cur_bytes + right_bytes);
+
+    const int context_samples = left_samples + cur_samples + right_samples;
+    const int virtual_stretched_samples = cur_samples * slice_count;
+
+    posdata->audio_src_offset = left_samples;
+    posdata->audio_total_samples = context_samples;
+    posdata->audio_last_stretched_samples = virtual_stretched_samples;
+
+    return posdata->audio_last_stretched_samples;
+}
+
+static int slow_motion_nominal_slice_len(int total_samples, int slice_count, int slice_index)
+{
+    if (total_samples <= 0 || slice_count <= 0)
+        return 0;
+
+    slice_index = vj_audio_clampi(slice_index, 0, slice_count - 1);
+
+    const int start = (int)(((int64_t)slice_index * (int64_t)total_samples) /
+                            (int64_t)slice_count);
+    const int end = (int)((((int64_t)slice_index + 1) * (int64_t)total_samples) /
+                          (int64_t)slice_count);
+
+    return (end > start) ? (end - start) : 0;
+}
+
+static void slow_motion_slice_bounds(int total_samples,
+                                     int slice_count,
+                                     int slice_index,
+                                     int *start_sample,
+                                     int *end_sample)
+{
+    if (start_sample == NULL || end_sample == NULL)
+        return;
+
+    if (total_samples <= 0 || slice_count <= 0) {
+        *start_sample = 0;
+        *end_sample = 0;
+        return;
+    }
+
+    slice_index = vj_audio_clampi(slice_index, 0, slice_count - 1);
+
+    int start = (int)(((int64_t)slice_index * (int64_t)total_samples) /
+                      (int64_t)slice_count);
+    int end = (int)((((int64_t)slice_index + 1) * (int64_t)total_samples) /
+                    (int64_t)slice_count);
+
+    if (start < 0)
+        start = 0;
+    if (end > total_samples)
+        end = total_samples;
+    if (end < start)
+        end = start;
+
+    *start_sample = start;
+    *end_sample = end;
+}
+
+static int slow_motion_slice_from_cursor(int consumed_samples,
+                                         int total_samples,
+                                         int slice_count)
+{
+    if (total_samples <= 0 || slice_count <= 1)
+        return 0;
+
+    consumed_samples = vj_audio_clampi(consumed_samples, 0, total_samples - 1);
+
+    int slice = (int)(((int64_t)consumed_samples * (int64_t)slice_count) /
+                      (int64_t)total_samples);
+
+    return vj_audio_clampi(slice, 0, slice_count - 1);
+}
+
+
+
 
 static int slow_motion_turn_history_capacity(int frame_bytes)
 {
@@ -2707,6 +3008,329 @@ static void slow_motion_update_turn_history(sample_b_t *posdata,
     posdata->audio_turn_history_samples = old_keep + keep_from_new;
     posdata->audio_turn_history_frame_bytes = frame_bytes;
 }
+
+static int slow_motion_apply_reverse_tail_bridge_s16(uint8_t *dst,
+                                                     int dst_samples,
+                                                     const sample_b_t *posdata,
+                                                     int frame_bytes,
+                                                     int max_bridge_samples,
+                                                     int *bridge_used,
+                                                     int *hist_used)
+{
+    if (bridge_used != NULL)
+        *bridge_used = 0;
+    if (hist_used != NULL)
+        *hist_used = 0;
+
+    if (dst == NULL || posdata == NULL || dst_samples <= 0 ||
+        frame_bytes <= 0 || (frame_bytes & 1) || max_bridge_samples <= 0)
+        return 0;
+
+    if (posdata->audio_turn_history_frame_bytes != frame_bytes ||
+        posdata->audio_turn_history_samples <= 2)
+        return 0;
+
+    int bridge = max_bridge_samples;
+    if (bridge > dst_samples)
+        bridge = dst_samples;
+    if (bridge > posdata->audio_turn_history_samples)
+        bridge = posdata->audio_turn_history_samples;
+    if (bridge < 8)
+        return 0;
+
+    const int words = frame_bytes / 2;
+    int16_t *out = (int16_t*)dst;
+    const int16_t *hist = (const int16_t*)posdata->audio_turn_history;
+    const int hist_samples = posdata->audio_turn_history_samples;
+
+    for (int i = 0; i < bridge; i++) {
+        const int64_t t = (bridge > 1)
+            ? (((int64_t)i << 16) / (int64_t)(bridge - 1))
+            : 65536;
+        const int64_t t2 = (t * t) >> 16;
+        const int64_t t3 = (t2 * t) >> 16;
+        int64_t w = (3LL * t2) - (2LL * t3);
+        if (w < 0)
+            w = 0;
+        else if (w > 65536)
+            w = 65536;
+
+        const int rev_index = hist_samples - 1 - i;
+        const int16_t *oldp = hist + ((size_t)rev_index * (size_t)words);
+        int16_t *newp = out + ((size_t)i * (size_t)words);
+
+        for (int c = 0; c < words; c++) {
+            int v = (int)(((int64_t)oldp[c] * (65536 - w) +
+                           (int64_t)newp[c] * w + 32768) >> 16);
+            if (v > 32767)
+                v = 32767;
+            else if (v < -32768)
+                v = -32768;
+            newp[c] = (int16_t)v;
+        }
+    }
+
+    if (bridge_used != NULL)
+        *bridge_used = bridge;
+    if (hist_used != NULL)
+        *hist_used = hist_samples;
+
+    return bridge;
+}
+
+static void vj_audio_window_step_stats_s16(const uint8_t *buf,
+                                           int samples,
+                                           int frame_bytes,
+                                           int *max_step,
+                                           int *avg_step)
+{
+    if (max_step != NULL)
+        *max_step = 0;
+    if (avg_step != NULL)
+        *avg_step = 0;
+
+    if (buf == NULL || samples < 2 || frame_bytes <= 0 || (frame_bytes & 1))
+        return;
+
+    const int words = frame_bytes / (int)sizeof(int16_t);
+    const int16_t *p = (const int16_t*)buf;
+    int peak = 0;
+    int64_t sum = 0;
+    int n = 0;
+
+    for (int i = 1; i < samples; i++) {
+        int frame_peak = 0;
+        const int16_t *a = p + ((size_t)i * (size_t)words);
+        const int16_t *b = p + ((size_t)(i - 1) * (size_t)words);
+
+        for (int c = 0; c < words; c++) {
+            int d = (int)a[c] - (int)b[c];
+            d = (d < 0) ? -d : d;
+            if (d > frame_peak)
+                frame_peak = d;
+        }
+
+        if (frame_peak > peak)
+            peak = frame_peak;
+        sum += frame_peak;
+        n++;
+    }
+
+    if (max_step != NULL)
+        *max_step = peak;
+    if (avg_step != NULL)
+        *avg_step = (n > 0) ? (int)(sum / n) : 0;
+}
+
+
+static int vj_audio_frame_seam_cost_s16(const uint8_t *candidate,
+                                        int candidate_samples,
+                                        const uint8_t *prev_frame,
+                                        const uint8_t *tail_frame,
+                                        int frame_bytes,
+                                        int *value_delta_out,
+                                        int *slope_delta_out)
+{
+    if (value_delta_out != NULL)
+        *value_delta_out = 0;
+    if (slope_delta_out != NULL)
+        *slope_delta_out = 0;
+
+    if (candidate == NULL || prev_frame == NULL || tail_frame == NULL ||
+        candidate_samples <= 0 || frame_bytes <= 0 || (frame_bytes & 1))
+        return 0x7fffffff;
+
+    const int channels = frame_bytes / 2;
+    const int16_t *cand0 = (const int16_t*)candidate;
+    const int16_t *cand1 = (candidate_samples > 1)
+        ? (const int16_t*)(candidate + (size_t)frame_bytes)
+        : cand0;
+    const int16_t *prev = (const int16_t*)prev_frame;
+    const int16_t *tail = (const int16_t*)tail_frame;
+
+    int value_max = 0;
+    int value_sum = 0;
+    int slope_max = 0;
+    int slope_sum = 0;
+
+    for (int c = 0; c < channels; c++) {
+        int value_delta = (int)cand0[c] - (int)tail[c];
+        value_delta = (value_delta < 0) ? -value_delta : value_delta;
+
+        int old_slope = (int)tail[c] - (int)prev[c];
+        int new_slope = (int)cand1[c] - (int)cand0[c];
+        int slope_delta = new_slope - old_slope;
+        slope_delta = (slope_delta < 0) ? -slope_delta : slope_delta;
+
+        if (value_delta > value_max)
+            value_max = value_delta;
+        if (slope_delta > slope_max)
+            slope_max = slope_delta;
+        value_sum += value_delta;
+        slope_sum += slope_delta;
+    }
+
+    if (value_delta_out != NULL)
+        *value_delta_out = value_max;
+    if (slope_delta_out != NULL)
+        *slope_delta_out = slope_max;
+
+    return (value_max * 4) + value_sum + (slope_max * 12) + (slope_sum * 3);
+}
+
+static int vj_audio_switch_seam_cost_s16(const uint8_t *old_buf,
+                                         const uint8_t *new_buf,
+                                         int switch_sample,
+                                         int samples,
+                                         int frame_bytes,
+                                         int *value_delta_out,
+                                         int *slope_delta_out)
+{
+    if (value_delta_out != NULL)
+        *value_delta_out = 0;
+    if (slope_delta_out != NULL)
+        *slope_delta_out = 0;
+
+    if (old_buf == NULL || new_buf == NULL || switch_sample <= 0 ||
+        switch_sample >= samples || samples <= 1 || frame_bytes <= 0 ||
+        (frame_bytes & 1))
+        return 0x7fffffff;
+
+    const int channels = frame_bytes / 2;
+    const int old_tail_i = switch_sample - 1;
+    const int old_prev_i = (switch_sample >= 2) ? (switch_sample - 2) : old_tail_i;
+    const int new_i = switch_sample;
+    const int new_next_i = (switch_sample + 1 < samples) ? (switch_sample + 1) : new_i;
+
+    const int16_t *old_tail = (const int16_t*)(old_buf + ((size_t)old_tail_i * (size_t)frame_bytes));
+    const int16_t *old_prev = (const int16_t*)(old_buf + ((size_t)old_prev_i * (size_t)frame_bytes));
+    const int16_t *new0 = (const int16_t*)(new_buf + ((size_t)new_i * (size_t)frame_bytes));
+    const int16_t *new1 = (const int16_t*)(new_buf + ((size_t)new_next_i * (size_t)frame_bytes));
+
+    int value_max = 0;
+    int value_sum = 0;
+    int slope_max = 0;
+    int slope_sum = 0;
+
+    for (int c = 0; c < channels; c++) {
+        int value_delta = (int)new0[c] - (int)old_tail[c];
+        value_delta = (value_delta < 0) ? -value_delta : value_delta;
+
+        int old_slope = (int)old_tail[c] - (int)old_prev[c];
+        int new_slope = (int)new1[c] - (int)new0[c];
+        int slope_delta = new_slope - old_slope;
+        slope_delta = (slope_delta < 0) ? -slope_delta : slope_delta;
+
+        if (value_delta > value_max)
+            value_max = value_delta;
+        if (slope_delta > slope_max)
+            slope_max = slope_delta;
+        value_sum += value_delta;
+        slope_sum += slope_delta;
+    }
+
+    if (value_delta_out != NULL)
+        *value_delta_out = value_max;
+    if (slope_delta_out != NULL)
+        *slope_delta_out = slope_max;
+
+    return (value_max * 6) + value_sum + (slope_max * 10) + (slope_sum * 3);
+}
+
+static int slow_motion_tail_xfade_s16(uint8_t *dst,
+                                      int dst_samples,
+                                      const uint8_t *prev_frame,
+                                      const uint8_t *tail_frame,
+                                      const uint8_t *new_buf,
+                                      int new_samples,
+                                      int frame_bytes,
+                                      int max_fade_samples,
+                                      int slope_cap_per_sample,
+                                      int *fade_used,
+                                      int *slope_cap_used)
+{
+    (void)prev_frame;
+
+    if (dst == NULL || tail_frame == NULL || new_buf == NULL ||
+        dst_samples <= 0 || new_samples <= 0 || frame_bytes <= 0)
+        return 0;
+
+    const int channels = frame_bytes / 2;
+    if (channels <= 0 || (frame_bytes & 1))
+        return 0;
+
+    int fade_samples = max_fade_samples;
+    if (fade_samples < 12)
+        fade_samples = 12;
+    if (fade_samples > dst_samples)
+        fade_samples = dst_samples;
+    if (fade_samples > new_samples)
+        fade_samples = new_samples;
+
+    int corr_cap = slope_cap_per_sample;
+    if (corr_cap < 0)
+        corr_cap = 0;
+    if (slope_cap_used != NULL)
+        *slope_cap_used = corr_cap;
+
+
+    veejay_memcpy(dst, new_buf, (size_t)new_samples * (size_t)frame_bytes);
+
+    const int16_t *tail = (const int16_t *)tail_frame;
+    const int16_t *src0 = (const int16_t *)new_buf;
+
+    int corr0[8];
+    int local_channels = channels;
+    if (local_channels > 8)
+        local_channels = 8;
+
+    for (int c = 0; c < local_channels; c++) {
+        int corr = (int)tail[c] - (int)src0[c];
+        if (corr_cap > 0)
+            corr = vj_audio_clampi(corr, -corr_cap, corr_cap);
+        corr0[c] = corr;
+    }
+
+    for (int i = 0; i < fade_samples; i++) {
+        const int32_t t = (fade_samples > 1)
+            ? (int32_t)(((int64_t)i * 32768) / (int64_t)(fade_samples - 1))
+            : 32768;
+
+        /* 1.0 - smoothstep(t): starts at 1, ends at 0, zero slope at both ends. */
+        const int32_t t2 = (int32_t)(((int64_t)t * (int64_t)t) >> 15);
+        const int32_t t3 = (int32_t)(((int64_t)t2 * (int64_t)t) >> 15);
+        int32_t smooth = (3 * t2) - (2 * t3);
+        smooth = vj_audio_clampi(smooth, 0, 32768);
+        const int32_t w_corr = 32768 - smooth;
+
+        int16_t *out = (int16_t *)(dst + ((size_t)i * (size_t)frame_bytes));
+        const int16_t *src = (const int16_t *)(new_buf + ((size_t)i * (size_t)frame_bytes));
+
+        for (int c = 0; c < channels; c++) {
+            int corr = 0;
+            if (c < local_channels) {
+                corr = corr0[c];
+            } else {
+                corr = (int)tail[c] - (int)src0[c];
+                if (corr_cap > 0)
+                    corr = vj_audio_clampi(corr, -corr_cap, corr_cap);
+            }
+
+            int64_t add64 = (int64_t)corr * (int64_t)w_corr;
+            int add = (int)((add64 >= 0)
+                ? ((add64 + 16384) >> 15)
+                : -(((-add64) + 16384) >> 15));
+            int mixed = (int)src[c] + add;
+            out[c] = (int16_t)vj_audio_clampi(mixed, -32768, 32767);
+        }
+    }
+
+    if (fade_used != NULL)
+        *fade_used = fade_samples;
+
+    return new_samples;
+}
+
 
 static inline double slow_motion_clampd(double v, double lo, double hi)
 {
@@ -2917,11 +3541,9 @@ static int slow_motion_fetch_scratch_context(veejay_t *info,
     const int context_capacity_samples = frames * slot_capacity;
 
     if (context_capacity_samples > scratch_capacity_samples) {
-#ifdef VEEJAY_AUDIO_DEBUG
         veejay_msg(VEEJAY_MSG_DEBUG,
-                   "[AUDIO-DIAG] scratch-context stage=60 no-room frames=%d need=%d cap=%d",
+                   "[AUDIO-DIAG] scratch-context stage=59 no-room frames=%d need=%d cap=%d",
                    frames, context_capacity_samples, scratch_capacity_samples);
-#endif
         return 0;
     }
 
@@ -2962,7 +3584,11 @@ static int slow_motion_fetch_scratch_context(veejay_t *info,
         dst += (size_t)got * (size_t)frame_bytes;
         total_samples += got;
     }
+
     const double exact_start = slow_motion_frame_abs_start_exact(el, first, pred_len);
+    const double exact_end = slow_motion_frame_abs_start_exact(el, last + 1, pred_len);
+    const int exact_total = (int)(exact_end - exact_start);
+    const int map_err = total_samples - exact_total;
 
     if (map != NULL) {
         map->valid = 1;
@@ -2971,17 +3597,13 @@ static int slow_motion_fetch_scratch_context(veejay_t *info,
         map->last_frame = last;
     }
 
-#ifdef VEEJAY_AUDIO_DEBUG
-    const double exact_end = slow_motion_frame_abs_start_exact(el, last + 1, pred_len);
-    const int exact_total = (int)(exact_end - exact_start);
-    const int map_err = total_samples - exact_total;
     if (map_err <= -3 || map_err >= 3 || over_frames > 0) {
         veejay_msg(VEEJAY_MSG_DEBUG,
-                   "[AUDIO-DIAG] scratch-context stage=60 actual-prefix frames=%d got=%d..%d total=%d exact=%d map_err=%d over=%d pred=%d ctx=%lld..%lld",
+                   "[AUDIO-DIAG] scratch-context stage=59 actual-prefix frames=%d got=%d..%d total=%d exact=%d map_err=%d over=%d pred=%d ctx=%lld..%lld",
                    frames, min_got, max_got, total_samples, exact_total, map_err,
                    over_frames, pred_len, first, last);
     }
-#endif
+
     if (ctx_abs_start_out != NULL)
         *ctx_abs_start_out = exact_start;
     if (ctx_samples_out != NULL)
@@ -3238,14 +3860,7 @@ int perform_slow_motion(
     cur_slice = (cur_slice < 0) ? 0 : cur_slice;
     cur_slice = (cur_slice >= slice_count) ? (slice_count - 1) : cur_slice;
 
-    const int previous_sfd = posdata->scratch_last_sfd;
-    const int sfd_changed =
-        (posdata->scratch_initialized && previous_sfd > 0 &&
-         previous_sfd != slice_count);
-#ifdef VEEJAY_AUDIO_DEBUG
-    const int edge_requested = (pending_edge != AUDIO_EDGE_NONE ||
-                                direction_flipped || sfd_changed);
-#endif
+    const int edge_requested = (pending_edge != AUDIO_EDGE_NONE || direction_flipped);
     const int hard_edge = (pending_edge != AUDIO_EDGE_NONE &&
                            pending_edge != AUDIO_EDGE_DIRECTION);
     const int edge_transition = (pending_edge == AUDIO_EDGE_DIRECTION || direction_flipped);
@@ -3291,15 +3906,16 @@ int perform_slow_motion(
         slow_motion_clear_turn_history(posdata);
     } else {
         posdata->scratch_last_reset = 0;
-        if (edge_transition || sfd_changed || posdata->scratch_last_dir != cur_dir) {
-            posdata->scratch_ramp_left = sfd_changed ? (pred_len * 2) : pred_len;
+        if (edge_transition || posdata->scratch_last_dir != cur_dir ||
+            posdata->scratch_last_sfd != slice_count) {
+            posdata->scratch_ramp_left = pred_len;
             if (posdata->scratch_ramp_left < 512)
                 posdata->scratch_ramp_left = 512;
-            if (posdata->scratch_ramp_left > 4096)
-                posdata->scratch_ramp_left = 4096;
+            if (posdata->scratch_ramp_left > 2048)
+                posdata->scratch_ramp_left = 2048;
 
-            if (edge_transition || sfd_changed) {
-                posdata->scratch_sync_hold_blocks = (slice_count >= 8) ? 14 : 10;
+            if (edge_transition) {
+                posdata->scratch_sync_hold_blocks = (slice_count >= 8) ? 12 : 8;
                 posdata->scratch_stable_blocks = 0;
                 posdata->scratch_sync_bias = 0.0;
             }
@@ -3437,7 +4053,7 @@ int perform_slow_motion(
                                                      sync_pos,
                                                      frame_bytes,
                                                      pred_len,
-                                                     (edge_transition || sfd_changed),
+                                                     edge_transition,
                                                      &step_max,
                                                      &step_avg,
                                                      &pos0,
@@ -3455,20 +4071,17 @@ int perform_slow_motion(
                                               posdata->audio_diag_last_frame,
                                               frame_bytes);
 
-    const int peak = vj_audio_peak_s16(audio_buf, copied, frame_bytes);
-    const int soft_retime_edge = (!hard_edge && (sfd_changed || reset_head || init_head));
-    const int slow_boundary_splice =
-        (!hard_edge && !soft_retime_edge && edge_delta >= 1024);
-#ifdef VEEJAY_AUDIO_DEBUG
     const double sync_end = sync_pos + (target_vel * (double)copied);
     const double sync_err0 = sync_pos - pos0;
     const double sync_err1 = sync_end - pos1;
+    const int peak = vj_audio_peak_s16(audio_buf, copied, frame_bytes);
+
     if (edge_requested || reset_head || hard_edge ||
         fabs(sync_err0) > (double)(pred_len * 4) ||
         fabs(sync_err1) > (double)(pred_len * 4) ||
         edge_delta >= 1500 || step_max >= 3000 || peak >= 32760) {
         veejay_msg(VEEJAY_MSG_DEBUG,
-                   "[AUDIO-DIAG] scratch-head stage=60 edge=%s(%d) flip=%d init=%d reset=%d hard=%d dir=%d speed_mag=%d sfd=%d audio_slice=%d req=%lld sync=%.3f pos0=%.3f pos1=%.3f vel0=%.6f vel1=%.6f target=%.6f nominal=%.6f bias=%.6f raw=%.6f hold=%d stable=%d err0=%.3f err1=%.3f ramp_left=%d ctx=%lld..%lld samples=%d delta=%d peak=%d step_max=%d step_avg=%d mode=persistent-readhead pll=stable-window-leash map=actual-prefix",
+                   "[AUDIO-DIAG] scratch-head stage=59 edge=%s(%d) flip=%d init=%d reset=%d hard=%d dir=%d speed_mag=%d sfd=%d audio_slice=%d req=%lld sync=%.3f pos0=%.3f pos1=%.3f vel0=%.6f vel1=%.6f target=%.6f nominal=%.6f bias=%.6f raw=%.6f hold=%d stable=%d err0=%.3f err1=%.3f ramp_left=%d ctx=%lld..%lld samples=%d delta=%d peak=%d step_max=%d step_avg=%d mode=persistent-readhead pll=stable-window-leash map=actual-prefix",
                    vj_audio_edge_name(pending_edge), pending_edge, direction_flipped,
                    init_head, reset_head, hard_edge, cur_dir, speed_mag, slice_count, cur_slice,
                    target_frame, sync_pos, pos0, pos1, vel0, vel1, target_vel,
@@ -3478,25 +4091,19 @@ int perform_slow_motion(
                    ctx_first, ctx_last, ctx_samples, edge_delta, peak,
                    step_max, step_avg);
     }
-#endif
-    if (hard_edge || soft_retime_edge || slow_boundary_splice) {
-        int declick_edge = pending_edge;
-        if (soft_retime_edge || slow_boundary_splice)
-            declick_edge = AUDIO_EDGE_DIRECTION;
 
+    if (hard_edge) {
         vj_audio_declick_apply(p, audio_buf, copied, frame_bytes,
                                AUDIO_PATH_SLOW, posdata->speed, cur_dir,
-                               declick_edge, direction_flipped);
+                               pending_edge, direction_flipped);
     } else {
         vj_audio_declick_observe(p, audio_buf, copied, frame_bytes,
                                  AUDIO_PATH_SLOW, posdata->speed, cur_dir);
-#ifdef VEEJAY_AUDIO_DEBUG
         if (edge_requested || edge_delta >= 1500 || step_max >= 3000 || peak >= 32760) {
             veejay_msg(VEEJAY_MSG_DEBUG,
-                       "[AUDIO-DIAG] declick-observe stage=60 reason=persistent-readhead edge_delta=%d step_max=%d sync_err=%.3f",
+                       "[AUDIO-DIAG] declick-observe stage=59 reason=persistent-readhead edge_delta=%d step_max=%d sync_err=%.3f",
                        edge_delta, step_max, sync_err1);
         }
-#endif
     }
 
     if (posdata->audio_diag_valid && posdata->audio_diag_frame_bytes == frame_bytes) {
@@ -4917,6 +5524,15 @@ static int vj_perform_post_chain_tag(veejay_t *info,performer_t *p, VJFrame *fra
     return follow;
 }
 
+static double vj_perform_runtime_audio_rate(veejay_t *info, editlist *el);
+static int vj_perform_runtime_sfd(veejay_t *info);
+static double vj_perform_runtime_effective_audio_rate(veejay_t *info, editlist *el);
+static void vj_audio_pad_exact_tail(uint8_t *dst, int produced, int expected, int frame_bytes);
+static int vj_audio_retime_slow_cubic_s16(uint8_t *dst, int dst_samples, const uint8_t *src, int src_samples, int frame_bytes, double rate);
+static int vj_perform_retime_audio_chunk(veejay_t *info, performer_t *p, editlist *el, uint8_t *dst, int dst_samples, const uint8_t *src, int src_samples, int frame_bytes);
+static int vj_perform_runtime_slow_audio_chunk(veejay_t *info, performer_t *p, editlist *el, uint8_t *dst, int dst_samples, long long target_frame, int frame_bytes, double rate);
+int vj_perform_queue_audio_frame(veejay_t *info, void *ptr, uint8_t *a_buf, int speed, long long target_frame,int sample_id);
+
 int vj_perform_queue_audio_chunk_ext(
     veejay_t *info,
     int client_frames_to_write,
@@ -4927,13 +5543,62 @@ int vj_perform_queue_audio_chunk_ext(
     performer_global_t *g = (performer_global_t*) info->performer;
     performer_t *p = g->A;
     video_playback_setup *settings = info->settings;
-    
+
+    (void)fade_in;
+
+    if (client_frames_to_write <= 0 || audio_payload_chunk == NULL)
+        return 0;
+
+    editlist *el = (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
+        ? sample_get_editlist(info->uc->sample_id)
+        : info->edit_list;
+    if (el == NULL)
+        el = info->current_edit_list;
+
+    const double rate = vj_perform_runtime_audio_rate(info, el);
+    const double effective_rate = vj_perform_runtime_effective_audio_rate(info, el);
     int speed = settings->current_playback_speed;
-    int num_samples = 0;
 
-    num_samples = vj_perform_queue_audio_frame(info,(void*) p, audio_payload_chunk,speed, target_frame, info->uc->sample_id);
+    if (rate > 0.9995 && rate < 1.0005) {
+        return vj_perform_queue_audio_frame(info,
+                                            (void*)p,
+                                            audio_payload_chunk,
+                                            speed,
+                                            target_frame,
+                                            info->uc->sample_id);
+    }
 
-    return num_samples;
+    int frame_bytes = (el != NULL) ? el->audio_bps : 0;
+
+    if (effective_rate < 0.9995 && frame_bytes > 0 && !(frame_bytes & 1)) {
+        return vj_perform_runtime_slow_audio_chunk(info,
+                                                   p,
+                                                   el,
+                                                   audio_payload_chunk,
+                                                   client_frames_to_write,
+                                                   target_frame,
+                                                   frame_bytes,
+                                                   effective_rate);
+    }
+
+    int num_samples = vj_perform_queue_audio_frame(info,
+                                                   (void*)p,
+                                                   p->top_audio_buffer,
+                                                   speed,
+                                                   target_frame,
+                                                   info->uc->sample_id);
+
+    if (num_samples > 0)
+        vj_audio_consume_chain(info, p->top_audio_buffer, num_samples);
+
+    return vj_perform_retime_audio_chunk(info,
+                                         p,
+                                         el,
+                                         audio_payload_chunk,
+                                         client_frames_to_write,
+                                         p->top_audio_buffer,
+                                         num_samples,
+                                         frame_bytes);
 }
 
 static int32_t read_sample(const uint8_t *buf, int bytes_per_sample) {
@@ -5059,6 +5724,489 @@ int vj_audio_crossfade_buffers( // FIXME optimize
 }
 
 
+
+static double vj_perform_runtime_audio_rate(veejay_t *info, editlist *el)
+{
+    if (info == NULL || info->settings == NULL || el == NULL || el->video_fps <= 0.0)
+        return 1.0;
+
+    video_playback_setup *settings = info->settings;
+    double rate = settings->runtime_playback_rate;
+
+    if (rate <= 0.0) {
+        double fps = settings->output_fps;
+        if (fps <= 0.0)
+            fps = el->video_fps;
+        rate = fps / (double)el->video_fps;
+    }
+
+    if (rate < 0.01)
+        rate = 0.01;
+    else if (rate > 16.0)
+        rate = 16.0;
+
+    return rate;
+}
+
+static int vj_perform_runtime_sfd(veejay_t *info)
+{
+    if (info == NULL || info->settings == NULL)
+        return 1;
+
+    video_playback_setup *settings = info->settings;
+    int sfd = atomic_load_int(&settings->audio_slice_len);
+
+    if (sfd < 1)
+        sfd = settings->sfd;
+
+    if (sfd < 1) {
+        if (info->uc != NULL && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
+            sfd = sample_get_framedup(info->uc->sample_id);
+        else
+            sfd = info->sfd;
+    }
+
+    if (sfd < 1)
+        sfd = 1;
+    else if (sfd > MAX_SPEED_AV)
+        sfd = MAX_SPEED_AV;
+
+    return sfd;
+}
+
+static double vj_perform_runtime_effective_audio_rate(veejay_t *info, editlist *el)
+{
+    double rate = vj_perform_runtime_audio_rate(info, el);
+    const int sfd = vj_perform_runtime_sfd(info);
+
+    if (sfd > 1)
+        rate /= (double)sfd;
+
+    if (rate < 0.01)
+        rate = 0.01;
+    else if (rate > 16.0)
+        rate = 16.0;
+
+    return rate;
+}
+
+
+static int vj_perform_runtime_slow_audio_chunk(veejay_t *info,
+                                               performer_t *p,
+                                               editlist *el,
+                                               uint8_t *dst,
+                                               int dst_samples,
+                                               long long target_frame,
+                                               int frame_bytes,
+                                               double rate)
+{
+    if (info == NULL || p == NULL || el == NULL || dst == NULL ||
+        dst_samples <= 0 || frame_bytes <= 0)
+        return 0;
+
+    if ((frame_bytes & 1) || p->down_sample_buffer == NULL) {
+        int pred_len = (el->audio_rate > 0 && el->video_fps > 0.0)
+            ? (int)((double)el->audio_rate / (double)el->video_fps)
+            : dst_samples;
+        if (pred_len < 1)
+            pred_len = 1;
+        int got = vj_perform_queue_audio_frame(info, (void*)p, p->top_audio_buffer,
+                                               info->settings->current_playback_speed,
+                                               target_frame, info->uc->sample_id);
+        return vj_audio_retime_slow_cubic_s16(dst, dst_samples, p->top_audio_buffer,
+                                              got > 0 ? got : pred_len,
+                                              frame_bytes, rate);
+    }
+
+    video_playback_setup *settings = info->settings;
+    performer_global_t *g = (performer_global_t*)info->performer;
+    sample_b_t *posdata = (g != NULL && g->A != NULL && p == g->A)
+        ? &(g->A->sample_a)
+        : ((g != NULL && g->A != NULL) ? &(g->A->sample_b) : &(p->sample_b));
+    audio_edge_t *edge = p->audio_edge;
+
+    int pred_len = (el->audio_rate > 0 && el->video_fps > 0.0)
+        ? (int)((double)el->audio_rate / (double)el->video_fps)
+        : dst_samples;
+    if (pred_len < 1)
+        pred_len = 1;
+
+    int speed = settings->current_playback_speed;
+    int cur_dir = (speed > 0) ? 1 : ((speed < 0) ? -1 : 0);
+    int speed_mag = abs(speed);
+    if (speed_mag < 1)
+        speed_mag = 1;
+    if (speed_mag > MAX_SPEED_AV)
+        speed_mag = MAX_SPEED_AV;
+
+    int pending_edge = AUDIO_EDGE_NONE;
+    int last_dir = 0;
+    int direction_flipped = 0;
+    if (edge != NULL) {
+        pending_edge = atomic_load_int(&edge->pending_edge);
+        last_dir = atomic_load_int(&edge->last_direction);
+        direction_flipped = (last_dir != 0 && cur_dir != 0 && cur_dir != last_dir);
+    }
+
+    if (cur_dir == 0 || pending_edge == AUDIO_EDGE_SILENCE ||
+        settings->audio_mute || !el->has_audio || target_frame == -1) {
+        veejay_memset(dst, 0, (size_t)dst_samples * (size_t)frame_bytes);
+        vj_audio_declick_apply(p, dst, dst_samples, frame_bytes,
+                               AUDIO_PATH_SILENCE, 0, 0,
+                               pending_edge, direction_flipped);
+        vj_perform_clear_audio_edges(info, edge, 0);
+        slow_motion_clear_scratch_head(posdata);
+        posdata->prev_n_samples = dst_samples;
+        return dst_samples;
+    }
+
+    int target_frame_samples = slow_motion_frame_len_exact(el, target_frame, pred_len);
+    if (target_frame_samples < 1)
+        target_frame_samples = pred_len;
+
+    int slice_count = vj_perform_runtime_sfd(info);
+    int cur_slice = atomic_load_int(&settings->audio_slice);
+    cur_slice = (cur_slice < 0) ? 0 : cur_slice;
+    cur_slice = (cur_slice >= slice_count) ? (slice_count - 1) : cur_slice;
+    const int last_slice = posdata->cur_sfd;
+    const int last_slice_count = posdata->scratch_last_sfd;
+
+    double sync_pos = slow_motion_sync_abs_pos(el, posdata, target_frame, pred_len,
+                                               slice_count, cur_slice, cur_dir);
+
+    double target_vel = (double)cur_dir * (double)speed_mag * rate;
+
+    const int hard_edge = (pending_edge != AUDIO_EDGE_NONE &&
+                           pending_edge != AUDIO_EDGE_DIRECTION);
+    const int edge_transition = (pending_edge == AUDIO_EDGE_DIRECTION || direction_flipped);
+    const int same_target_frame = (posdata->scratch_initialized &&
+                                   posdata->last_resampled_frame == target_frame &&
+                                   last_slice == cur_slice &&
+                                   last_slice_count == slice_count &&
+                                   !hard_edge && !edge_transition);
+    if (same_target_frame)
+        sync_pos = posdata->scratch_pos;
+    const int reset_head = (!posdata->scratch_initialized || hard_edge);
+
+    if (reset_head) {
+        posdata->scratch_initialized = 1;
+        posdata->scratch_pos = sync_pos;
+        posdata->scratch_vel = target_vel;
+        posdata->scratch_target_vel = target_vel;
+        posdata->scratch_last_dir = cur_dir;
+        posdata->scratch_last_sfd = slice_count;
+        posdata->cur_sfd = cur_slice;
+        posdata->max_sfd = slice_count;
+        posdata->scratch_ramp_left = 0;
+        posdata->scratch_last_reset = 1;
+        posdata->scratch_sync_bias = 0.0;
+        posdata->scratch_sync_hold_blocks = 0;
+        posdata->scratch_stable_blocks = 0;
+        slow_motion_clear_turn_history(posdata);
+    } else {
+        posdata->scratch_last_reset = 0;
+        double dv = fabs(posdata->scratch_target_vel - target_vel);
+        if (edge_transition || posdata->scratch_last_dir != cur_dir ||
+            posdata->scratch_last_sfd != slice_count || posdata->cur_sfd != cur_slice ||
+            dv > 0.0005) {
+            int ramp = dst_samples / 2;
+            if (ramp < 512)
+                ramp = 512;
+            if (ramp > 4096)
+                ramp = 4096;
+            posdata->scratch_ramp_left = ramp;
+            posdata->scratch_sync_hold_blocks = 4;
+            posdata->scratch_stable_blocks = 0;
+        }
+        posdata->scratch_target_vel = target_vel;
+        posdata->scratch_last_dir = cur_dir;
+        posdata->scratch_last_sfd = slice_count;
+        posdata->cur_sfd = cur_slice;
+        posdata->max_sfd = slice_count;
+    }
+
+    if (!reset_head && !edge_transition) {
+        double err = sync_pos - posdata->scratch_pos;
+        double max_snap = (double)pred_len * 8.0;
+        if (fabs(err) > max_snap) {
+            posdata->scratch_pos = sync_pos;
+            posdata->scratch_vel = target_vel;
+            posdata->scratch_ramp_left = 0;
+        } else {
+            double max_bias = fabs(target_vel) * 0.0125;
+            if (max_bias < 0.0001)
+                max_bias = 0.0001;
+            if (max_bias > 0.006)
+                max_bias = 0.006;
+            double bias = err / ((double)dst_samples * 64.0);
+            bias = slow_motion_clampd(bias, -max_bias, max_bias);
+            target_vel += bias;
+        }
+    }
+
+    double predicted_end = posdata->scratch_pos + target_vel * (double)dst_samples;
+    double ctx_abs_start = 0.0;
+    int ctx_samples = 0;
+    long long ctx_first = 0;
+    long long ctx_last = 0;
+    slow_scratch_ctx_map_t ctx_map;
+    veejay_memset(&ctx_map, 0, sizeof(ctx_map));
+
+    int got_ctx = slow_motion_fetch_scratch_context(info, el, posdata,
+                                                    p->down_sample_buffer,
+                                                    &ctx_map,
+                                                    pred_len,
+                                                    frame_bytes,
+                                                    speed,
+                                                    posdata->scratch_pos,
+                                                    predicted_end,
+                                                    &ctx_abs_start,
+                                                    &ctx_samples,
+                                                    &ctx_first,
+                                                    &ctx_last);
+
+    if (got_ctx <= 0 || ctx_samples <= 0) {
+        veejay_memset(dst, 0, (size_t)dst_samples * (size_t)frame_bytes);
+        vj_audio_declick_apply(p, dst, dst_samples, frame_bytes,
+                               AUDIO_PATH_SILENCE, 0, 0,
+                               pending_edge, direction_flipped);
+        vj_perform_clear_audio_edges(info, edge, cur_dir);
+        posdata->prev_n_samples = dst_samples;
+        return dst_samples;
+    }
+
+    double pos0 = posdata->scratch_pos;
+    double pos1 = posdata->scratch_pos;
+    double vel0 = posdata->scratch_vel;
+    double vel1 = posdata->scratch_vel;
+    int step_max = 0;
+    int step_avg = 0;
+
+    int copied = slow_motion_render_scratch_head_s16(dst,
+                                                     dst_samples,
+                                                     p->down_sample_buffer,
+                                                     ctx_samples,
+                                                     ctx_abs_start,
+                                                     &ctx_map,
+                                                     posdata,
+                                                     target_vel,
+                                                     sync_pos,
+                                                     frame_bytes,
+                                                     pred_len,
+                                                     edge_transition,
+                                                     &step_max,
+                                                     &step_avg,
+                                                     &pos0,
+                                                     &pos1,
+                                                     &vel0,
+                                                     &vel1);
+    if (copied <= 0) {
+        veejay_memset(dst, 0, (size_t)dst_samples * (size_t)frame_bytes);
+        copied = dst_samples;
+    }
+
+    int edge_delta = -1;
+    if (posdata->audio_diag_valid && posdata->audio_diag_frame_bytes == frame_bytes)
+        edge_delta = vj_audio_frame_delta_s16(dst, posdata->audio_diag_last_frame, frame_bytes);
+
+    if (hard_edge || edge_delta >= 1800 || step_max >= 3200) {
+        vj_audio_declick_apply(p, dst, copied, frame_bytes,
+                               AUDIO_PATH_SLOW, speed, cur_dir,
+                               hard_edge ? pending_edge : AUDIO_EDGE_DIRECTION,
+                               direction_flipped || edge_delta >= 1800 || step_max >= 3200);
+    } else {
+        vj_audio_declick_observe(p, dst, copied, frame_bytes,
+                                 AUDIO_PATH_SLOW, speed, cur_dir);
+    }
+
+    if (posdata->audio_diag_valid && posdata->audio_diag_frame_bytes == frame_bytes) {
+        vj_audio_copy_last_frame(posdata->audio_diag_prev_frame,
+                                 (int)sizeof(posdata->audio_diag_prev_frame),
+                                 posdata->audio_diag_last_frame, 1, frame_bytes);
+    } else {
+        veejay_memset(posdata->audio_diag_prev_frame, 0,
+                      sizeof(posdata->audio_diag_prev_frame));
+    }
+
+    vj_audio_copy_last_frame(posdata->audio_diag_last_frame,
+                             (int)sizeof(posdata->audio_diag_last_frame),
+                             dst, copied, frame_bytes);
+    posdata->audio_diag_valid = 1;
+    posdata->audio_diag_frame_bytes = frame_bytes;
+    slow_motion_update_turn_history(posdata, dst, copied, frame_bytes);
+
+    posdata->audio_last_stretched_samples = dst_samples;
+    posdata->audio_total_samples = ctx_samples;
+    posdata->audio_src_offset = (int)((ctx_map.valid)
+        ? slow_motion_ctx_exact_to_actual_rel(&ctx_map, posdata->scratch_pos, ctx_samples)
+        : (posdata->scratch_pos - ctx_abs_start));
+    posdata->last_resampled_frame = target_frame;
+    posdata->last_resampled_dir = cur_dir;
+    posdata->cur_sfd = cur_slice;
+    posdata->max_sfd = slice_count;
+    posdata->scratch_last_sfd = slice_count;
+    posdata->consumed_samples = 0;
+    posdata->prev_n_samples = copied;
+
+    if (edge != NULL)
+        edge->ticks_since_last_flip++;
+
+    vj_perform_clear_audio_edges(info, edge, cur_dir);
+    return copied;
+}
+
+static int vj_audio_retime_slow_cubic_s16(uint8_t *dst, int dst_samples, const uint8_t *src, int src_samples, int frame_bytes, double rate)
+{
+    if (dst == NULL || dst_samples <= 0 || frame_bytes <= 0)
+        return 0;
+
+    if (src == NULL || src_samples <= 0) {
+        veejay_memset(dst, 0, dst_samples * frame_bytes);
+        return dst_samples;
+    }
+
+    if ((frame_bytes & 1) || rate <= 0.0) {
+        int n = (src_samples < dst_samples) ? src_samples : dst_samples;
+        if (src != dst && n > 0)
+            veejay_memcpy(dst, src, n * frame_bytes);
+        vj_audio_pad_exact_tail(dst, n, dst_samples, frame_bytes);
+        return dst_samples;
+    }
+
+    const int words = frame_bytes / 2;
+    const int16_t *in = (const int16_t*)src;
+    int16_t *out = (int16_t*)dst;
+    const int max_index = src_samples - 1;
+
+    if (src_samples == 1) {
+        for (int i = 0; i < dst_samples; i++)
+            for (int c = 0; c < words; c++)
+                out[(i * words) + c] = in[c];
+        return dst_samples;
+    }
+
+    const double step = ((double)src_samples / (double)dst_samples);
+
+    for (int i = 0; i < dst_samples; i++) {
+        double pos = (double)i * step;
+        if (pos < 0.0)
+            pos = 0.0;
+        else if (pos > (double)max_index)
+            pos = (double)max_index;
+
+        int idx = (int)floor(pos);
+        double frac = pos - (double)idx;
+
+        if (idx < 0) {
+            idx = 0;
+            frac = 0.0;
+        } else if (idx > max_index) {
+            idx = max_index;
+            frac = 0.0;
+        }
+
+        int i0 = idx - 1;
+        int i1 = idx;
+        int i2 = idx + 1;
+        int i3 = idx + 2;
+
+        if (i0 < 0) i0 = 0;
+        if (i2 > max_index) i2 = max_index;
+        if (i3 > max_index) i3 = max_index;
+
+        const int b0 = i0 * words;
+        const int b1 = i1 * words;
+        const int b2 = i2 * words;
+        const int b3 = i3 * words;
+        const int bo = i * words;
+
+        for (int c = 0; c < words; c++) {
+            out[bo + c] = slow_motion_cubic_interp_s16(
+                in[b0 + c], in[b1 + c], in[b2 + c], in[b3 + c], frac
+            );
+        }
+    }
+
+    return dst_samples;
+}
+
+static void vj_audio_pad_exact_tail(uint8_t *dst, int produced, int expected, int frame_bytes)
+{
+    if (dst == NULL || expected <= 0 || frame_bytes <= 0)
+        return;
+
+    if (produced <= 0) {
+        veejay_memset(dst, 0, expected * frame_bytes);
+        return;
+    }
+
+    if (produced >= expected)
+        return;
+
+    uint8_t *last = dst + ((size_t)(produced - 1) * (size_t)frame_bytes);
+    uint8_t *out = dst + ((size_t)produced * (size_t)frame_bytes);
+
+    for (int i = produced; i < expected; i++) {
+        veejay_memcpy(out, last, frame_bytes);
+        out += frame_bytes;
+    }
+}
+
+static int vj_perform_retime_audio_chunk(veejay_t *info,
+                                         performer_t *p,
+                                         editlist *el,
+                                         uint8_t *dst,
+                                         int dst_samples,
+                                         const uint8_t *src,
+                                         int src_samples,
+                                         int frame_bytes)
+{
+    if (dst == NULL || dst_samples <= 0 || frame_bytes <= 0)
+        return 0;
+
+    if (src == NULL || src_samples <= 0) {
+        veejay_memset(dst, 0, dst_samples * frame_bytes);
+        return dst_samples;
+    }
+
+    const double rate = vj_perform_runtime_effective_audio_rate(info, el);
+
+    if (rate < 0.9995 && !(frame_bytes & 1))
+        return vj_audio_retime_slow_cubic_s16(dst, dst_samples, src, src_samples, frame_bytes, rate);
+
+    if ((frame_bytes & 1) || p == NULL || p->audio_scratcher == NULL) {
+        if (src != dst) {
+            int n = (src_samples < dst_samples) ? src_samples : dst_samples;
+            veejay_memcpy(dst, src, n * frame_bytes);
+            vj_audio_pad_exact_tail(dst, n, dst_samples, frame_bytes);
+        } else {
+            vj_audio_pad_exact_tail(dst, src_samples, dst_samples, frame_bytes);
+        }
+        return dst_samples;
+    }
+
+    if (src_samples == dst_samples && rate > 0.999 && rate < 1.001) {
+        if (src != dst)
+            veejay_memcpy(dst, src, dst_samples * frame_bytes);
+        return dst_samples;
+    }
+
+    int produced = vj_scratch_process(p->audio_scratcher,
+                                      (short*)dst,
+                                      dst_samples,
+                                      (const short*)src,
+                                      src_samples,
+                                      rate);
+
+    if (produced < 0)
+        produced = 0;
+    if (produced > dst_samples)
+        produced = dst_samples;
+
+    vj_audio_pad_exact_tail(dst, produced, dst_samples, frame_bytes);
+    return dst_samples;
+}
+
 // vj_perform_queue_audio_frame
 int vj_perform_queue_audio_chunk_crossfade(
     veejay_t *info,
@@ -5075,6 +6223,9 @@ int vj_perform_queue_audio_chunk_crossfade(
     performer_t *q = g->B;
     editlist *el = info->current_edit_list;
 
+    if (client_frames_to_write <= 0 || audio_payload_chunk == NULL || el == NULL)
+        return 0;
+
     const int bps = el->audio_bps;
     const int num_channels = el->audio_chans;
     const int speed_a = info->settings->current_playback_speed;
@@ -5082,13 +6233,13 @@ int vj_perform_queue_audio_chunk_crossfade(
 
     int num_samples_a =
         vj_perform_queue_audio_frame(info, (void*)p,
-                                    p->top_audio_buffer,
+                                     p->top_audio_buffer,
                                      speed_a,
                                      target_frame_a,
                                      info->uc->sample_id);
 
-
-    vj_audio_consume_chain(info,p->top_audio_buffer,num_samples_a);                                 
+    if (num_samples_a > 0)
+        vj_audio_consume_chain(info, p->top_audio_buffer, num_samples_a);
 
     int num_samples_b =
         vj_perform_queue_audio_frame(info, (void*)q,
@@ -5101,36 +6252,25 @@ int vj_perform_queue_audio_chunk_crossfade(
                         ? num_samples_a
                         : num_samples_b;
 
-    if (num_samples > client_frames_to_write)
-        num_samples = client_frames_to_write;
-
-    if (num_samples <= 0)
-        return 0;
+    if (num_samples <= 0) {
+        veejay_memset(audio_payload_chunk, 0, client_frames_to_write * bps);
+        return client_frames_to_write;
+    }
 
     double trans_len = (double)(trans_end_frame - trans_start_frame);
     if (trans_len <= 0.0)
         trans_len = 1.0;
 
-    const double absolute_frame =
-        (double)target_frame_a;
-
+    const double absolute_frame = (double)target_frame_a;
     float t = (float)((absolute_frame - trans_start_frame) / trans_len);
     t = fminf(fmaxf(t, 0.0f), 1.0f);
 
     if (absolute_frame >= (double)trans_end_frame) {
-
-        if (num_samples > 0) {
-            veejay_msg(VEEJAY_MSG_DEBUG,
-                "[AudioMix] SWITCH a=%lld b=%lld gain A=0.00 gain B=1.00",
-                (long long)absolute_frame,
-                target_frame_b);
-        }
-
         vj_audio_crossfade_buffers(
             g,
             NULL,
             (speed_b != 0) ? q->top_audio_buffer : NULL,
-            audio_payload_chunk,
+            p->audio_render_buffer,
             num_samples,
             num_channels,
             bps,
@@ -5138,24 +6278,37 @@ int vj_perform_queue_audio_chunk_crossfade(
             0.0f,
             1.0f
         );
-
-        return num_samples;
+    } else {
+        vj_audio_crossfade_buffers(
+            g,
+            (speed_a != 0) ? p->top_audio_buffer : NULL,
+            (speed_b != 0) ? q->top_audio_buffer : NULL,
+            p->audio_render_buffer,
+            num_samples,
+            num_channels,
+            bps,
+            t,
+            1.0f,
+            1.0f
+        );
     }
 
-    vj_audio_crossfade_buffers(
-        g,
-        (speed_a != 0) ? p->top_audio_buffer : NULL,
-        (speed_b != 0) ? q->top_audio_buffer : NULL,
-        audio_payload_chunk,
-        num_samples,
-        num_channels,
-        bps,
-        t,
-        1.0f,
-        1.0f
-    );
+    const double rate = vj_perform_runtime_audio_rate(info, el);
+    if (rate > 0.9995 && rate < 1.0005) {
+        int n = (num_samples < client_frames_to_write) ? num_samples : client_frames_to_write;
+        if (n > 0)
+            veejay_memcpy(audio_payload_chunk, p->audio_render_buffer, n * bps);
+        return n;
+    }
 
-    return num_samples;
+    return vj_perform_retime_audio_chunk(info,
+                                         p,
+                                         el,
+                                         audio_payload_chunk,
+                                         client_frames_to_write,
+                                         p->audio_render_buffer,
+                                         num_samples,
+                                         bps);
 }
 
 static int vj_perform_queue_audio_frame_buf(veejay_t *info, performer_t *p, uint8_t *a_buf, editlist *el,int speed, long long target_frame )

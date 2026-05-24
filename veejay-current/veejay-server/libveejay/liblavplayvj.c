@@ -124,6 +124,9 @@
 #define MAP_FAILED ( (caddr_t) -1 )
 #endif
 #define HZ 100
+#define VJ_DYNAMIC_FPS_MIN 1.0f
+#define VJ_DYNAMIC_FPS_MAX 240.0f
+#define VJ_DYNAMIC_ALLOC_MIN_FPS 1.0
 #include <libel/vj-el.h>
 
 #include <libvje/libvje.h>
@@ -201,6 +204,68 @@ static inline double monotonic_now_s(void)
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec + ts.tv_nsec * 1e-9;
+}
+
+static inline float vj_runtime_clamp_fps(float fps)
+{
+    if (fps < VJ_DYNAMIC_FPS_MIN)
+        return VJ_DYNAMIC_FPS_MIN;
+    if (fps > VJ_DYNAMIC_FPS_MAX)
+        return VJ_DYNAMIC_FPS_MAX;
+    return fps;
+}
+
+static inline double vj_runtime_spvf_from_fps(float fps)
+{
+    fps = vj_runtime_clamp_fps(fps);
+
+    int fps_2dp = (int)(fps * 100.0f + 0.5f);
+
+    switch (fps_2dp) {
+        case 2398:
+            return 1001.0 / 24000.0;
+        case 2997:
+            return 1001.0 / 30000.0;
+        case 5994:
+            return 1001.0 / 60000.0;
+        default:
+            return 1.0 / (double) fps;
+    }
+}
+
+static inline double vj_runtime_target_time_s(video_playback_setup *settings, long long frame)
+{
+    double epoch_s = atomic_load_double(&settings->fps_epoch_s);
+    long long epoch_frame = atomic_load_long_long(&settings->fps_epoch_frame);
+    double spvf = settings->spvf;
+
+    if (spvf <= 0.0)
+        spvf = 1.0 / 25.0;
+
+    if (epoch_s <= 0.0) {
+        double anchor = atomic_load_double(&settings->audio_start_offset);
+        epoch_s = (anchor > 0.0) ? anchor : monotonic_now_s();
+    }
+
+    return epoch_s + ((double)(frame - epoch_frame) * spvf);
+}
+
+static void vj_runtime_update_frame_fps(veejay_t *info, float fps)
+{
+    if (info == NULL || info->settings == NULL)
+        return;
+
+    video_playback_setup *settings = info->settings;
+
+    if (info->effect_frame1) info->effect_frame1->fps = fps;
+    if (info->effect_frame2) info->effect_frame2->fps = fps;
+    if (info->effect_frame3) info->effect_frame3->fps = fps;
+    if (info->effect_frame4) info->effect_frame4->fps = fps;
+
+    for (int i = 0; i < VIDEO_QUEUE_LEN; i++) {
+        if (settings->buffers[i])
+            settings->buffers[i]->fps = fps;
+    }
 }
 
 static inline void
@@ -939,11 +1004,50 @@ void	veejay_auto_loop(veejay_t *info)
 
 void	veejay_set_framerate( veejay_t *info , float fps )
 {
-	video_playback_setup *settings = (video_playback_setup*) info->settings;
-	settings->spvf = 1.0 / (double) fps;
+    if (info == NULL || info->settings == NULL)
+        return;
 
+    video_playback_setup *settings = (video_playback_setup*) info->settings;
+    fps = vj_runtime_clamp_fps(fps);
+
+    long long cur_frame = atomic_load_long_long(&settings->master_frame_num);
+    if (cur_frame < 0)
+        cur_frame = atomic_load_long_long(&settings->current_frame_num);
+    if (cur_frame < 0)
+        cur_frame = 0;
+
+    pthread_mutex_lock(&(settings->control_mutex));
+
+    double old_spvf = settings->spvf;
+    if (old_spvf <= 0.0)
+        old_spvf = vj_runtime_spvf_from_fps(settings->output_fps > 0.0f ? settings->output_fps : fps);
+
+    double epoch_s = atomic_load_double(&settings->fps_epoch_s);
+    long long epoch_frame = atomic_load_long_long(&settings->fps_epoch_frame);
+
+    if (epoch_s <= 0.0) {
+        double anchor = atomic_load_double(&settings->audio_start_offset);
+        epoch_s = (anchor > 0.0) ? anchor : monotonic_now_s();
+        epoch_frame = cur_frame;
+    }
+
+    double retime_s = epoch_s + ((double)(cur_frame - epoch_frame) * old_spvf);
+
+    atomic_store_double(&settings->fps_epoch_s, retime_s);
+    atomic_store_long_long(&settings->fps_epoch_frame, cur_frame);
+
+    settings->spvf = vj_runtime_spvf_from_fps(fps);
     settings->usec_per_frame = vj_el_get_usec_per_frame(fps);
-	veejay_msg(VEEJAY_MSG_DEBUG, "Playing at %f FPS, usec_per_frame set to %d" , fps, settings->usec_per_frame);
+    settings->output_fps = fps;
+    double media_fps = (info->edit_list && info->edit_list->video_fps > 0.0) ? info->edit_list->video_fps : fps;
+    atomic_store_double(&settings->runtime_playback_rate, (double)fps / media_fps);
+    settings->fps_generation++;
+
+    vj_runtime_update_frame_fps(info, fps);
+
+    pthread_mutex_unlock(&(settings->control_mutex));
+
+    veejay_msg(VEEJAY_MSG_INFO, "Playback engine is now playing at %.2f FPS", fps);
 }
 
 
@@ -2119,7 +2223,7 @@ char	*veejay_title(veejay_t *info)
 {
 	char tmp[128];
 	snprintf(tmp,sizeof(tmp), "Veejay %s on port %d in %dx%d@%2.2f", VERSION,
-	      info->uc->port, info->video_output_width,info->video_output_height,info->dummy->fps );
+	      info->uc->port, info->video_output_width,info->video_output_height,info->settings->output_fps );
 	return strdup(tmp);
 }
 
@@ -2188,19 +2292,20 @@ void *veejay_display_renderer_thread(void *arg)
 		}
 
 		double audio_master = atomic_load_double(&settings->audio_master_s);
-		double target_time_s = audio_start_offset + (frame->frame_num * settings->spvf);
+        double spvf = settings->spvf;
+        double target_time_s = vj_runtime_target_time_s(settings, frame->frame_num);
 		double delay_s = target_time_s - audio_master;
 
 		// drop frame if too late
-		if (delay_s < -settings->spvf) {
+		if (delay_s < -spvf) {
 			veejay_screen_update(info, frame);	// even if late, display and immediately continue
 			video_queue_return_frame(info,frame);
 			continue;
 		}
 
-		if (delay_s > (settings->spvf * 1.5f)) {
+		if (delay_s > (spvf * 1.5f)) {
 			// audio catchup
-			usleep_accurate((long long)(settings->spvf * 1.0e6), settings);
+			usleep_accurate((long long)(spvf * 1.0e6), settings);
 			veejay_screen_update(info, frame);		
 			video_queue_return_frame(info, frame);
 			continue;
@@ -2334,28 +2439,15 @@ static int veejay_mjpeg_set_playback_rate(veejay_t *info, float video_fps, int n
 {
 	video_playback_setup *settings = (video_playback_setup *) info->settings;
 
-	int fps_2dp = (int)(video_fps * 100.0f + 0.5f);
-
-	switch (fps_2dp)
-	{
-		case 2398: /* 23.976 */
-			settings->spvf = 1001.0 / 24000.0;
-			break;
-
-		case 2997: /* 29.97 */
-			settings->spvf = 1001.0 / 30000.0;
-			break;
-
-		case 5994: /* 59.94 */
-			settings->spvf = 1001.0 / 60000.0;
-			break;
-
-		default:
-			settings->spvf = 1.0 / video_fps;
-			break;
-	}
-
+    video_fps = vj_runtime_clamp_fps(video_fps);
+    settings->spvf = vj_runtime_spvf_from_fps(video_fps);
+    settings->output_fps = video_fps;
 	settings->usec_per_frame = vj_el_get_usec_per_frame(video_fps);
+    double media_fps = (info->edit_list && info->edit_list->video_fps > 0.0) ? info->edit_list->video_fps : video_fps;
+    atomic_store_double(&settings->runtime_playback_rate, (double)video_fps / media_fps);
+    atomic_store_double(&settings->fps_epoch_s, 0.0);
+    atomic_store_long_long(&settings->fps_epoch_frame, 0);
+    atomic_store_int(&settings->fps_generation, 0);
 
 	veejay_msg(
 		VEEJAY_MSG_INFO,
@@ -3026,16 +3118,18 @@ void *veejay_audio_producer_thread(void *arg)
 #ifdef HAVE_JACK
     const long CLIENT_RATE = vj_jack_get_client_samplerate();
     const long JACK_RATE   = vj_jack_get_rate();
-    const double half_frame_s = 0.5 / (double) el->video_fps;
 #else
     const long CLIENT_RATE = el->audio_rate;
 #endif
 
-    const double SPVF      = settings->spvf;
     double anchor_s = 0;
+    double audio_frame_accum = 0.0;
+    double slow_video_phase = 0.0;
+    double slow_audio_deadline_s = 0.0;
+    int last_dynamic_slow = 0;
     unsigned long long loop_count = 0; // 19.5 billion years playing 29fps/44.1Khz
     const int BPS = el->audio_bps;
-    const int MAX_CLIENT_FRAMES = (int)(SPVF * CLIENT_RATE * 2 + 1024);
+    const int MAX_CLIENT_FRAMES = (int)(((double)CLIENT_RATE / VJ_DYNAMIC_ALLOC_MIN_FPS) + 4096.0);
 
     uint8_t *audio_chunk = NULL;
     uint8_t *silenced    = NULL;
@@ -3100,6 +3194,8 @@ void *veejay_audio_producer_thread(void *arg)
 
         atomic_store_double(&settings->audio_master_s, anchor_s);
         atomic_store_double(&settings->audio_start_offset, anchor_s);
+        atomic_store_double(&settings->fps_epoch_s, anchor_s);
+        atomic_store_long_long(&settings->fps_epoch_frame, 0);
 
         veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] Audio anchor established at %fs", anchor_s);
         atomic_store_long_long(&settings->current_frame_num, 0);
@@ -3109,6 +3205,8 @@ void *veejay_audio_producer_thread(void *arg)
 		anchor_s = monotonic_now_s();
         atomic_store_double(&settings->audio_start_offset, anchor_s);
         atomic_store_double(&settings->audio_master_s, anchor_s);
+        atomic_store_double(&settings->fps_epoch_s, anchor_s);
+        atomic_store_long_long(&settings->fps_epoch_frame, 0);
         atomic_store_long_long(&settings->current_frame_num, 0);
 
         veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] Monotonic clock anchor established at %fs", anchor_s);
@@ -3130,7 +3228,31 @@ void *veejay_audio_producer_thread(void *arg)
 
 #ifdef HAVE_JACK
         if (has_audio) {
-            int needed = (int)(SPVF * CLIENT_RATE + 0.5);
+            double media_fps = (el != NULL && el->video_fps > 0.0) ? (double)el->video_fps : 25.0;
+            double runtime_rate = atomic_load_double(&settings->runtime_playback_rate);
+            if (runtime_rate <= 0.0) {
+                double fps = settings->output_fps;
+                runtime_rate = (fps > 0.0) ? (fps / media_fps) : 1.0;
+            }
+            if (runtime_rate < 0.01)
+                runtime_rate = 0.01;
+            else if (runtime_rate > 16.0)
+                runtime_rate = 16.0;
+
+            const int dynamic_slow = (runtime_rate < 0.9995);
+            double spvf = dynamic_slow ? (1.0 / media_fps) : settings->spvf;
+            if (dynamic_slow != last_dynamic_slow) {
+                audio_frame_accum = 0.0;
+                slow_video_phase = 0.0;
+                slow_audio_deadline_s = dynamic_slow ? (monotonic_now_s() + spvf) : 0.0;
+                last_dynamic_slow = dynamic_slow;
+            }
+            audio_frame_accum += spvf * (double)CLIENT_RATE;
+            int needed = (int)audio_frame_accum;
+            if (needed < 1) needed = 1;
+            if (needed > MAX_CLIENT_FRAMES) needed = MAX_CLIENT_FRAMES;
+            audio_frame_accum -= (double)needed;
+            if (audio_frame_accum < 0.0) audio_frame_accum = 0.0;
             long long media_frame = atomic_load_long_long(&settings->current_frame_num); 
 			int decoded;
 			if(vj_jack_xrun_flag()) {
@@ -3143,6 +3265,7 @@ void *veejay_audio_producer_thread(void *arg)
 				double master = atomic_load_double(&settings->audio_master_s);
 
 				double delta = played_hw - master;
+                double half_frame_s = 0.5 * spvf;
 				if (delta > half_frame_s) {
 					atomic_store_double(&settings->audio_master_s, played_hw);
 					veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Audio master clock resynced after xrun by %.6fs (~1 video frame)", delta);
@@ -3169,29 +3292,80 @@ void *veejay_audio_producer_thread(void *arg)
 				decoded = vj_perform_queue_audio_chunk_crossfade(info, needed, media_frame, b_frame, audio_chunk, settings->transition.next_id,start,end);
 			}
 
-            const int jack_frames_needed = (int)((double)decoded * JACK_RATE / CLIENT_RATE + 1);
+            int frames_written = 0;
+            int write_pos = 0;
+            int remaining = decoded;
 
-         	vj_audio_wait_for_jack_space( jack_frames_needed, settings);
+            while (remaining > 0 && atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
+                int free_jack = vj_jack_get_ringbuffer_frames_free();
+                int free_client = (int)(((double)free_jack * (double)CLIENT_RATE) / (double)JACK_RATE) - 1;
 
-            const int frames_written = vj_perform_play_audio(settings, audio_chunk, decoded * BPS, silenced);
+                if (free_client <= 0) {
+                    vj_audio_wait_for_jack_space(1, settings);
+                    continue;
+                }
+
+                int chunk = (remaining < free_client) ? remaining : free_client;
+                if (chunk > 8192)
+                    chunk = 8192;
+                if (chunk < 1)
+                    chunk = 1;
+
+                int written = vj_perform_play_audio(settings,
+                                                    audio_chunk + ((size_t)write_pos * (size_t)BPS),
+                                                    chunk * BPS,
+                                                    silenced);
+                if (written <= 0) {
+                    usleep_accurate(500, settings);
+                    continue;
+                }
+
+                if (written > chunk)
+                    written = chunk;
+
+                write_pos += written;
+                remaining -= written;
+                frames_written += written;
+            }
           
             double played_hw = (double) vj_jack_get_played_frames() / JACK_RATE;
-            double predicted = played_hw + (double)frames_written / JACK_RATE;
+            double predicted = played_hw + (double)frames_written / (double)CLIENT_RATE;
             atomic_store_double(&settings->audio_master_s, predicted);
 
-            vj_perform_inc_frame(info, settings->current_playback_speed);		
+            if (dynamic_slow) {
+                slow_video_phase += runtime_rate;
+                int guard = 0;
+                while (slow_video_phase >= 1.0 && guard < 32) {
+                    vj_perform_inc_frame(info, settings->current_playback_speed);
+                    slow_video_phase -= 1.0;
+                    guard++;
+                }
+            } else {
+                slow_video_phase = 0.0;
+                vj_perform_inc_frame(info, settings->current_playback_speed);
+            }
 
 			loop_count++;
-            double next_frame_target = anchor_s + (loop_count * SPVF);
+            double next_frame_target = dynamic_slow
+                ? slow_audio_deadline_s
+                : vj_runtime_target_time_s(settings, (long long)loop_count);
             double now = monotonic_now_s();
             double sleep_s = next_frame_target - now;
 
             if (sleep_s > 0.001) { 
                 usleep_accurate((long long)(sleep_s * 1e6 * 0.9), settings);
             }
+
+            if (dynamic_slow) {
+                if (slow_audio_deadline_s <= 0.0 || sleep_s < -1.0)
+                    slow_audio_deadline_s = monotonic_now_s() + spvf;
+                else
+                    slow_audio_deadline_s += spvf;
+            }
         } else {
 #endif
-			const double next_frame_target = anchor_s + ((double)(loop_count + 1) * SPVF);
+			double spvf = settings->spvf;
+			const double next_frame_target = vj_runtime_target_time_s(settings, (long long)(loop_count + 1));
 
 			double now = monotonic_now_s();
 			double remaining_s = next_frame_target - now;
@@ -3217,7 +3391,7 @@ void *veejay_audio_producer_thread(void *arg)
 				if (integral < -0.15) integral = -0.15;
 
 				double correction = (KP * drift) + (KI * integral);
-				const double max_correction = 0.5 * SPVF;
+				const double max_correction = 0.5 * spvf;
 
 				if (correction >  max_correction) correction =  max_correction;
 				if (correction < -max_correction) correction = -max_correction;
@@ -3226,8 +3400,8 @@ void *veejay_audio_producer_thread(void *arg)
 
 				phase_offset = 0.95 * phase_offset + correction;
 
-				if (phase_offset >  SPVF) phase_offset =  SPVF;
-				if (phase_offset < -SPVF) phase_offset = -SPVF;
+				if (phase_offset >  spvf) phase_offset =  spvf;
+				if (phase_offset < -spvf) phase_offset = -spvf;
 
 				atomic_store_double(&settings->audio_master_s, now + phase_offset);
 
@@ -3293,9 +3467,6 @@ static void *veejay_producer_thread_loop(void *ptr)
 {
     veejay_t *info = (veejay_t*) ptr;
     video_playback_setup *settings = info->settings;
-    const double SPVF = settings->spvf;
-
-    const double SKIP_TOLERANCE = 1.1 * SPVF + 0.002; // ~1.1 frames + 2 ms margin
 
     sigset_t mask;
     sigemptyset(&mask);
@@ -3341,17 +3512,14 @@ static void *veejay_producer_thread_loop(void *ptr)
         info->stats.skipped_frames = 0;
 
         long long frame = atomic_load_long_long(&settings->master_frame_num);
+        double spvf = settings->spvf;
+        double skip_tolerance = 1.1 * spvf + 0.002;
         double audio_now = atomic_load_double(&settings->audio_master_s);
-        double audio_anchor = atomic_load_double(&settings->audio_start_offset);
-        double elapsed_audio = audio_now - audio_anchor;
-        if (elapsed_audio < 0) elapsed_audio = 0;
+        double pts = vj_runtime_target_time_s(settings, frame);
+        double diff = pts - audio_now;
 
-        double pts = frame * SPVF;
-        
-        double diff = pts - elapsed_audio;
-
-        if (atomic_load_int(&info->sync_correction) && diff < -SKIP_TOLERANCE) {
-            long long frames_to_skip = (long long)((-diff / SPVF));
+        if (atomic_load_int(&info->sync_correction) && diff < -skip_tolerance) {
+            long long frames_to_skip = (long long)((-diff / spvf));
             
             if (frames_to_skip > 0) {
                  if( frame > 0 ) {
@@ -3363,20 +3531,19 @@ static void *veejay_producer_thread_loop(void *ptr)
                  info->stats.total_frames_skipped += frames_to_skip;
                  frame += frames_to_skip;
                  
-                 pts = frame * SPVF;
-                 diff = pts - elapsed_audio;
+                 pts = vj_runtime_target_time_s(settings, frame);
+                 diff = pts - audio_now;
             }
         }
 
         if (diff > 0) {
-            double sleep_s = (diff > SPVF) ? SPVF : diff;
+            double sleep_s = (diff > spvf) ? spvf : diff;
             
             if (sleep_s > 0.0001) {
                 usleep_accurate((long long)(sleep_s * 1e6), settings);
                 
                 audio_now = atomic_load_double(&settings->audio_master_s);
-                elapsed_audio = audio_now - audio_anchor;
-                diff = pts - elapsed_audio;
+                diff = pts - audio_now;
             }
         }
 

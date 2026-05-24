@@ -2802,12 +2802,9 @@ void    vj_event_set_framerate( void *ptr, const char format[] , va_list ap )
         veejay_msg(VEEJAY_MSG_WARNING, "Limited new framerate to %2.2f ", new_fps );
     }
 
-    if( v->audio == AUDIO_PLAY ) {
-        veejay_msg(VEEJAY_MSG_WARNING,"You need to run without audio playback(-a0) to dynamically change the framerate");
-    }else {
-        veejay_set_framerate( v, new_fps );
-        veejay_msg(VEEJAY_MSG_INFO, "Playback engine is now playing at %2.2f FPS", new_fps );
-    }
+    
+    veejay_set_framerate( v, new_fps );
+    veejay_msg(VEEJAY_MSG_INFO, "Playback engine is now playing at %2.2f FPS", new_fps );
 }
 
 void    vj_event_sync_correction( void *ptr,const char format[], va_list ap )

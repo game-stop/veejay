@@ -187,6 +187,10 @@ typedef struct {
 	volatile int state;
 	volatile double audio_master_s;
 	volatile double audio_start_offset;
+	volatile double fps_epoch_s;
+	volatile long long fps_epoch_frame;
+	volatile int fps_generation;
+	volatile double runtime_playback_rate;
 	volatile long long anchor_frame;
 	
 	volatile int audio_producer_mode;
