@@ -2919,7 +2919,7 @@ static int slow_motion_fetch_scratch_context(veejay_t *info,
     if (context_capacity_samples > scratch_capacity_samples) {
 #ifdef VEEJAY_AUDIO_DEBUG
         veejay_msg(VEEJAY_MSG_DEBUG,
-                   "[AUDIO-DIAG] scratch-context stage=59 no-room frames=%d need=%d cap=%d",
+                   "[AUDIO-DIAG] scratch-context stage=60 no-room frames=%d need=%d cap=%d",
                    frames, context_capacity_samples, scratch_capacity_samples);
 #endif
         return 0;
@@ -2977,7 +2977,7 @@ static int slow_motion_fetch_scratch_context(veejay_t *info,
     const int map_err = total_samples - exact_total;
     if (map_err <= -3 || map_err >= 3 || over_frames > 0) {
         veejay_msg(VEEJAY_MSG_DEBUG,
-                   "[AUDIO-DIAG] scratch-context stage=59 actual-prefix frames=%d got=%d..%d total=%d exact=%d map_err=%d over=%d pred=%d ctx=%lld..%lld",
+                   "[AUDIO-DIAG] scratch-context stage=60 actual-prefix frames=%d got=%d..%d total=%d exact=%d map_err=%d over=%d pred=%d ctx=%lld..%lld",
                    frames, min_got, max_got, total_samples, exact_total, map_err,
                    over_frames, pred_len, first, last);
     }
@@ -3237,8 +3237,14 @@ int perform_slow_motion(
     int cur_slice = posdata->cur_sfd;
     cur_slice = (cur_slice < 0) ? 0 : cur_slice;
     cur_slice = (cur_slice >= slice_count) ? (slice_count - 1) : cur_slice;
+
+    const int previous_sfd = posdata->scratch_last_sfd;
+    const int sfd_changed =
+        (posdata->scratch_initialized && previous_sfd > 0 &&
+         previous_sfd != slice_count);
 #ifdef VEEJAY_AUDIO_DEBUG
-    const int edge_requested = (pending_edge != AUDIO_EDGE_NONE || direction_flipped);
+    const int edge_requested = (pending_edge != AUDIO_EDGE_NONE ||
+                                direction_flipped || sfd_changed);
 #endif
     const int hard_edge = (pending_edge != AUDIO_EDGE_NONE &&
                            pending_edge != AUDIO_EDGE_DIRECTION);
@@ -3285,16 +3291,15 @@ int perform_slow_motion(
         slow_motion_clear_turn_history(posdata);
     } else {
         posdata->scratch_last_reset = 0;
-        if (edge_transition || posdata->scratch_last_dir != cur_dir ||
-            posdata->scratch_last_sfd != slice_count) {
-            posdata->scratch_ramp_left = pred_len;
+        if (edge_transition || sfd_changed || posdata->scratch_last_dir != cur_dir) {
+            posdata->scratch_ramp_left = sfd_changed ? (pred_len * 2) : pred_len;
             if (posdata->scratch_ramp_left < 512)
                 posdata->scratch_ramp_left = 512;
-            if (posdata->scratch_ramp_left > 2048)
-                posdata->scratch_ramp_left = 2048;
+            if (posdata->scratch_ramp_left > 4096)
+                posdata->scratch_ramp_left = 4096;
 
-            if (edge_transition) {
-                posdata->scratch_sync_hold_blocks = (slice_count >= 8) ? 12 : 8;
+            if (edge_transition || sfd_changed) {
+                posdata->scratch_sync_hold_blocks = (slice_count >= 8) ? 14 : 10;
                 posdata->scratch_stable_blocks = 0;
                 posdata->scratch_sync_bias = 0.0;
             }
@@ -3432,7 +3437,7 @@ int perform_slow_motion(
                                                      sync_pos,
                                                      frame_bytes,
                                                      pred_len,
-                                                     edge_transition,
+                                                     (edge_transition || sfd_changed),
                                                      &step_max,
                                                      &step_avg,
                                                      &pos0,
@@ -3449,17 +3454,21 @@ int perform_slow_motion(
         edge_delta = vj_audio_frame_delta_s16(audio_buf,
                                               posdata->audio_diag_last_frame,
                                               frame_bytes);
+
+    const int peak = vj_audio_peak_s16(audio_buf, copied, frame_bytes);
+    const int soft_retime_edge = (!hard_edge && (sfd_changed || reset_head || init_head));
+    const int slow_boundary_splice =
+        (!hard_edge && !soft_retime_edge && edge_delta >= 1024);
 #ifdef VEEJAY_AUDIO_DEBUG
     const double sync_end = sync_pos + (target_vel * (double)copied);
     const double sync_err0 = sync_pos - pos0;
     const double sync_err1 = sync_end - pos1;
-    const int peak = vj_audio_peak_s16(audio_buf, copied, frame_bytes);
     if (edge_requested || reset_head || hard_edge ||
         fabs(sync_err0) > (double)(pred_len * 4) ||
         fabs(sync_err1) > (double)(pred_len * 4) ||
         edge_delta >= 1500 || step_max >= 3000 || peak >= 32760) {
         veejay_msg(VEEJAY_MSG_DEBUG,
-                   "[AUDIO-DIAG] scratch-head stage=59 edge=%s(%d) flip=%d init=%d reset=%d hard=%d dir=%d speed_mag=%d sfd=%d audio_slice=%d req=%lld sync=%.3f pos0=%.3f pos1=%.3f vel0=%.6f vel1=%.6f target=%.6f nominal=%.6f bias=%.6f raw=%.6f hold=%d stable=%d err0=%.3f err1=%.3f ramp_left=%d ctx=%lld..%lld samples=%d delta=%d peak=%d step_max=%d step_avg=%d mode=persistent-readhead pll=stable-window-leash map=actual-prefix",
+                   "[AUDIO-DIAG] scratch-head stage=60 edge=%s(%d) flip=%d init=%d reset=%d hard=%d dir=%d speed_mag=%d sfd=%d audio_slice=%d req=%lld sync=%.3f pos0=%.3f pos1=%.3f vel0=%.6f vel1=%.6f target=%.6f nominal=%.6f bias=%.6f raw=%.6f hold=%d stable=%d err0=%.3f err1=%.3f ramp_left=%d ctx=%lld..%lld samples=%d delta=%d peak=%d step_max=%d step_avg=%d mode=persistent-readhead pll=stable-window-leash map=actual-prefix",
                    vj_audio_edge_name(pending_edge), pending_edge, direction_flipped,
                    init_head, reset_head, hard_edge, cur_dir, speed_mag, slice_count, cur_slice,
                    target_frame, sync_pos, pos0, pos1, vel0, vel1, target_vel,
@@ -3470,17 +3479,21 @@ int perform_slow_motion(
                    step_max, step_avg);
     }
 #endif
-    if (hard_edge) {
+    if (hard_edge || soft_retime_edge || slow_boundary_splice) {
+        int declick_edge = pending_edge;
+        if (soft_retime_edge || slow_boundary_splice)
+            declick_edge = AUDIO_EDGE_DIRECTION;
+
         vj_audio_declick_apply(p, audio_buf, copied, frame_bytes,
                                AUDIO_PATH_SLOW, posdata->speed, cur_dir,
-                               pending_edge, direction_flipped);
+                               declick_edge, direction_flipped);
     } else {
         vj_audio_declick_observe(p, audio_buf, copied, frame_bytes,
                                  AUDIO_PATH_SLOW, posdata->speed, cur_dir);
 #ifdef VEEJAY_AUDIO_DEBUG
         if (edge_requested || edge_delta >= 1500 || step_max >= 3000 || peak >= 32760) {
             veejay_msg(VEEJAY_MSG_DEBUG,
-                       "[AUDIO-DIAG] declick-observe stage=59 reason=persistent-readhead edge_delta=%d step_max=%d sync_err=%.3f",
+                       "[AUDIO-DIAG] declick-observe stage=60 reason=persistent-readhead edge_delta=%d step_max=%d sync_err=%.3f",
                        edge_delta, step_max, sync_err1);
         }
 #endif

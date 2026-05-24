@@ -384,6 +384,26 @@ static inline int playback_dir(int speed)
     return 0; // paused
 }
 
+static inline int playback_retime_audio_slice(int old_sfd, int new_sfd, int old_slice)
+{
+    if (old_sfd <= 1 || new_sfd <= 1)
+        return 0;
+
+    if (old_slice < 0)
+        old_slice = 0;
+    else if (old_slice >= old_sfd)
+        old_slice = old_sfd - 1;
+
+    int new_slice = (old_slice * new_sfd) / old_sfd;
+
+    if (new_slice < 0)
+        new_slice = 0;
+    else if (new_slice >= new_sfd)
+        new_slice = new_sfd - 1;
+
+    return new_slice;
+}
+
 
 int veejay_set_framedup(veejay_t *info, int n)
 {
@@ -402,21 +422,31 @@ int veejay_set_framedup(veejay_t *info, int n)
             cur_sfd = info->sfd;
 
             if (cur_sfd != n) {
+                const int soft_slow_retime =
+                    (cur_sfd > 1 && n > 1 && cur_dir != 0);
+
                 info->sfd = n;
                 settings->sfd = n;
 
-                atomic_store_int(&settings->audio_slice, 0);
-                atomic_store_int(&settings->audio_slice_len, n);
-                settings->audio_last_stretched_samples = 0;
+                if (soft_slow_retime) {
+                    const int cur_slice = atomic_load_int(&settings->audio_slice);
+                    const int new_slice = playback_retime_audio_slice(cur_sfd, n, cur_slice);
+                    atomic_store_int(&settings->audio_slice, new_slice);
+                    atomic_store_int(&settings->audio_slice_len, n);
+                } else {
+                    atomic_store_int(&settings->audio_slice, 0);
+                    atomic_store_int(&settings->audio_slice_len, n);
+                    settings->audio_last_stretched_samples = 0;
 
-                veejay_seek(info, speed, n);
+                    veejay_seek(info, speed, n);
 
-                vj_perform_initiate_edge_change(
-                    info,
-                    (cur_dir == 0) ? AUDIO_EDGE_SILENCE : AUDIO_EDGE_JUMP,
-                    cur_dir,
-                    cur_dir
-                );
+                    vj_perform_initiate_edge_change(
+                        info,
+                        (cur_dir == 0) ? AUDIO_EDGE_SILENCE : AUDIO_EDGE_JUMP,
+                        cur_dir,
+                        cur_dir
+                    );
+                }
             } else {
                 info->sfd = n;
                 settings->sfd = n;
@@ -428,23 +458,33 @@ int veejay_set_framedup(veejay_t *info, int n)
             cur_sfd = sample_get_framedup(info->uc->sample_id);
 
             if (cur_sfd != n) {
+                const int soft_slow_retime =
+                    (cur_sfd > 1 && n > 1 && cur_dir != 0);
+
                 sample_set_framedup(info->uc->sample_id, n);
 
                 info->sfd = n;
                 settings->sfd = n;
 
-                atomic_store_int(&settings->audio_slice, 0);
-                atomic_store_int(&settings->audio_slice_len, n);
-                settings->audio_last_stretched_samples = 0;
+                if (soft_slow_retime) {
+                    const int cur_slice = atomic_load_int(&settings->audio_slice);
+                    const int new_slice = playback_retime_audio_slice(cur_sfd, n, cur_slice);
+                    atomic_store_int(&settings->audio_slice, new_slice);
+                    atomic_store_int(&settings->audio_slice_len, n);
+                } else {
+                    atomic_store_int(&settings->audio_slice, 0);
+                    atomic_store_int(&settings->audio_slice_len, n);
+                    settings->audio_last_stretched_samples = 0;
 
-                veejay_seek(info, speed, n);
+                    veejay_seek(info, speed, n);
 
-                vj_perform_initiate_edge_change(
-                    info,
-                    (cur_dir == 0) ? AUDIO_EDGE_SILENCE : AUDIO_EDGE_JUMP,
-                    cur_dir,
-                    cur_dir
-                );
+                    vj_perform_initiate_edge_change(
+                        info,
+                        (cur_dir == 0) ? AUDIO_EDGE_SILENCE : AUDIO_EDGE_JUMP,
+                        cur_dir,
+                        cur_dir
+                    );
+                }
             } else {
                 info->sfd = n;
                 settings->sfd = n;
