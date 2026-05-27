@@ -769,6 +769,21 @@ void		vj_init_vevo_events(void)
 				-1,
 				NULL );
 
+	index_map_[VIMS_CHAIN_ENTRY_BEAT_TOGGLE]		=	_new_event(
+				"%d %d %d",
+				VIMS_CHAIN_ENTRY_BEAT_TOGGLE,
+				"Enable / disable beat on current entry",
+				vj_event_audio_beat_fx_entry,
+				3,
+				VIMS_ALLOW_ANY,
+				SAMPLE_STREAM_ID_HELP,
+				0,
+				"Chain Index (-1=current)",
+				-1,
+				"Enable/Disable beat detector (0=disable,1=enable)",
+				0,
+				NULL );
+
 	index_map_[VIMS_CHAIN_TOGGLE]			=	_new_event(
 				NULL,
 				VIMS_CHAIN_TOGGLE,
@@ -2147,6 +2162,95 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY ,
 				NULL );
 
+	index_map_[VIMS_AUDIO_BEAT_TOGGLE]		=	_new_event(
+				NULL,
+				VIMS_AUDIO_BEAT_TOGGLE,
+				"Toggle JACK audio beat detector",
+				vj_event_audio_beat_toggle,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_STATUS]		=	_new_event(
+				"%d",
+				VIMS_AUDIO_BEAT_STATUS,
+				"Enable or disable JACK audio beat detector",
+				vj_event_audio_beat_enable,
+				1,
+				VIMS_ALLOW_ANY,
+				"Enabled state, 0 or 1",
+				1,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_CONFIG]		=	_new_event(
+				"%d %d %d %d",
+				VIMS_AUDIO_BEAT_CONFIG,
+				"Configure JACK audio beat detector",
+				vj_event_audio_beat_config,
+				4,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Freeze duration in milliseconds",
+				90,
+				"Cooldown duration in milliseconds",
+				155,
+				"Beat detection threshold",
+				125,
+				"Input channel count",
+				2,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_FREEZE]		=	_new_event(
+				"%d",
+				VIMS_AUDIO_BEAT_FREEZE,
+				"Set JACK audio beat freeze duration",
+				vj_event_audio_beat_freeze,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Freeze duration in milliseconds",
+				90,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_COOLDOWN]		=	_new_event(
+				"%d",
+				VIMS_AUDIO_BEAT_COOLDOWN,
+				"Set JACK audio beat cooldown duration",
+				vj_event_audio_beat_cooldown,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Cooldown duration in milliseconds",
+				155,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_THRESHOLD]	=	_new_event(
+				"%d",
+				VIMS_AUDIO_BEAT_THRESHOLD,
+				"Set JACK audio beat detection threshold",
+				vj_event_audio_beat_threshold,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Beat detection threshold",
+				125,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_CHANNELS]		=	_new_event(
+				"%d",
+				VIMS_AUDIO_BEAT_CHANNELS,
+				"Set JACK audio beat input channels",
+				vj_event_audio_beat_channels,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Input channel count",
+				2,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_PRINT]		=	_new_event(
+				NULL,
+				VIMS_AUDIO_BEAT_PRINT,
+				"Print JACK audio beat detector status",
+				vj_event_audio_beat_status,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
 	
 	index_map_[VIMS_EDITLIST_PASTE_AT]			=	_new_event(
 				"%d",
@@ -2505,7 +2609,7 @@ void		vj_init_vevo_events(void)
 
 	index_map_[VIMS_CHAIN_GET_PARAMETERS]			=	_new_event(
 				"%d %d",
-				VIMS_CHAIN_GET_ENTRY,
+				VIMS_CHAIN_GET_PARAMETERS,
 				"GUI: Get effect chain index details (incl. min/max/default)",
 				vj_event_send_chain_entry_parameters,
 				2,

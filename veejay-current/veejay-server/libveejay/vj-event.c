@@ -54,6 +54,7 @@
 #include <libveejay/vj-event.h>
 #ifdef HAVE_JACK
 #include <libveejay/vj-jack.h>
+#include <libveejay/vj-audio-beat.h>
 #endif
 #include <libstream/vj-tag.h>
 #include <libstream/vj-vloopback.h>
@@ -8125,6 +8126,302 @@ void vj_event_toggle_audio_mute(void *ptr, const char format[], va_list ap)
 #endif
 }
 
+static int vj_event_audio_beat_ready(veejay_t *v)
+{
+#ifdef HAVE_JACK
+    video_playback_setup *settings;
+
+    if(!v || !v->settings)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-BEAT] No veejay/settings context for beat detector event");
+        return 0;
+    }
+
+    settings = v->settings;
+
+    /*
+     * Do not test v->audio or v->audio_running here.
+     *
+     * v->audio == NO_AUDIO means playback is disabled. It does not mean
+     * JACK capture analysis is unavailable. The beat detector has its own
+     * thread and can open capture input after the user enables it.
+     */
+    if(!atomic_load_int(&settings->audio_beat.initialized))
+        vj_audio_beat_init(&settings->audio_beat, 2);
+
+    return 1;
+#else
+    (void)v;
+    return 0;
+#endif
+}
+
+
+void vj_event_audio_beat_toggle(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t *)ptr;
+    int enabled;
+
+    (void)format;
+    (void)ap;
+
+    if(!vj_event_audio_beat_ready(v))
+        return;
+
+    enabled = veejay_audio_beat_toggle(v);
+
+    if(enabled < 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO] Unable to toggle beat detector");
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO] Beat detector is now %s",
+               enabled ? "enabled" : "disabled");
+#else
+    (void)ptr;
+    (void)format;
+    (void)ap;
+#endif
+}
+
+void vj_event_audio_beat_fx_entry(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t *) ptr;
+    int args[4];
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    int is_sample = SAMPLE_PLAYING(v);
+    int is_stream = STREAM_PLAYING(v);
+
+    sample_eff_chain **src = NULL;
+
+    if(is_sample) {
+        SAMPLE_DEFAULTS(args[0]);
+        src = sample_get_effect_chain(args[0]);
+
+        if(args[1] == -1)
+            args[1] = sample_get_selected_entry(args[0]);
+    }
+    else if(is_stream) {
+        STREAM_DEFAULTS(args[0]);
+        src = vj_tag_get_effect_chain(args[0]);
+
+        if(args[1] == -1)
+            args[1] = vj_tag_get_selected_entry(args[0]);
+    }
+
+    int state = args[2] == 0 ? 0 : 1;
+
+    src [ args[1] ]->beat_flag = state;
+
+    veejay_msg(VEEJAY_MSG_INFO, "Audio beat detector %s on FX entry %d",
+        (state == 1 ? "enabled" : "disabled"), args[1]);
+
+#else
+    (void)ptr;
+    (void)format;
+    (void)ap;
+#endif
+}
+
+void vj_event_audio_beat_enable(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t *)ptr;
+    int args[1] = { 1 };
+    int enabled;
+    int rc;
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if(!vj_event_audio_beat_ready(v))
+        return;
+
+    enabled = args[0] ? 1 : 0;
+    rc = veejay_audio_beat_set_enabled(v, enabled);
+
+    if(rc < 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO] Unable to %s beat detector",
+                   enabled ? "enable" : "disable");
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO] Beat detector is now %s",
+               rc ? "enabled" : "disabled");
+#else
+    (void)ptr;
+    (void)format;
+    (void)ap;
+#endif
+}
+
+void vj_event_audio_beat_config(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t *)ptr;
+    int args[4] = { -1, -1, -1, -1 };
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if (!vj_event_audio_beat_ready(v))
+        return;
+
+    if (veejay_audio_beat_push_config(v, args[0], args[1], args[2], args[3]) < 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO] Unable to configure beat detector");
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] Beat detector config freeze=%d cooldown=%d threshold=%d channels=%d",
+        args[0], args[1], args[2], args[3]);
+#else
+    (void)ptr;
+    (void)format;
+    (void)ap;
+#endif
+}
+
+void vj_event_audio_beat_freeze(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t *)ptr;
+    int args[1] = { -1 };
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if (!vj_event_audio_beat_ready(v))
+        return;
+
+    if (veejay_audio_beat_push_config(v, args[0], -1, -1, -1) < 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO] Unable to set beat freeze time");
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] Beat freeze time set to %d ms", args[0]);
+#else
+    (void)ptr;
+    (void)format;
+    (void)ap;
+#endif
+}
+
+void vj_event_audio_beat_cooldown(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t *)ptr;
+    int args[1] = { -1 };
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if (!vj_event_audio_beat_ready(v))
+        return;
+
+    if (veejay_audio_beat_push_config(v, -1, args[0], -1, -1) < 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO] Unable to set beat cooldown");
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] Beat cooldown set to %d ms", args[0]);
+#else
+    (void)ptr;
+    (void)format;
+    (void)ap;
+#endif
+}
+
+void vj_event_audio_beat_threshold(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t *)ptr;
+    int args[1] = { -1 };
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if (!vj_event_audio_beat_ready(v))
+        return;
+
+    if (veejay_audio_beat_push_config(v, -1, -1, args[0], -1) < 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO] Unable to set beat threshold");
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] Beat threshold set to %d", args[0]);
+#else
+    (void)ptr;
+    (void)format;
+    (void)ap;
+#endif
+}
+
+void vj_event_audio_beat_channels(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t *)ptr;
+    int args[1] = { -1 };
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if (!vj_event_audio_beat_ready(v))
+        return;
+
+    if (veejay_audio_beat_push_config(v, -1, -1, -1, args[0]) < 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO] Unable to set beat input channels");
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] Beat input channels set to %d", args[0]);
+#else
+    (void)ptr;
+    (void)format;
+    (void)ap;
+#endif
+}
+
+void vj_event_audio_beat_status(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t *)ptr;
+    int enabled = 0;
+    int open = 0;
+    int level_q15 = 0;
+    int transient_q8 = 0;
+    long hits = 0;
+
+    (void)format;
+    (void)ap;
+
+    if (!vj_event_audio_beat_ready(v))
+        return;
+
+    if (veejay_audio_beat_get_status(v, &enabled, &open, &hits, &level_q15, &transient_q8) < 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO] Unable to read beat detector status");
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+        "[AUDIO] Beat detector enabled=%d open=%d hits=%ld level=%d transient=%d",
+        enabled, open, hits, level_q15, transient_q8);
+#else
+    (void)ptr;
+    (void)format;
+    (void)ap;
+#endif
+}
+
 void vj_event_color_vibrance(void *ptr, const char format[], va_list ap) {
     veejay_t *v = (veejay_t*) ptr;
     video_playback_setup *settings = v->settings;
@@ -8444,9 +8741,91 @@ void vj_event_select_bank(void *ptr, const char format[], va_list ap)
     }
 }
 
+static inline void vj_event_print_fx_chain(veejay_t *v, int id, sample_eff_chain **src)
+{
+    int i, j;
+
+    if (src == NULL)
+        return;
+
+    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
+    {
+        sample_eff_chain *e = src[i];
+
+        if (e == NULL)
+            continue;
+
+        int effect_id = e->effect_id;
+
+        if (effect_id <= 0 || effect_id == -1)
+            continue;
+
+        char tmp[256];
+        size_t pos = 0;
+
+        tmp[0] = '\0';
+
+        int n_params = vje_get_num_params(effect_id);
+        if (n_params > SAMPLE_MAX_PARAMETERS)
+            n_params = SAMPLE_MAX_PARAMETERS;
+
+        for (j = 0; j < n_params; j++)
+        {
+            int written = snprintf(
+                tmp + pos,
+                sizeof(tmp) - pos,
+                "P%d = %d ",
+                j,
+                e->arg[j]
+            );
+
+            if (written < 0)
+                break;
+
+            if ((size_t) written >= sizeof(tmp) - pos)
+            {
+                pos = sizeof(tmp) - 1;
+                break;
+            }
+
+            pos += (size_t) written;
+        }
+
+        veejay_msg(VEEJAY_MSG_INFO,
+            "%02d | %03d | %s | beat %s | anim %s | vol %03d | %s %s {%s}",
+            i,
+            effect_id,
+            e->e_flag ? "on " : "off",
+            e->beat_flag ? "on " : "off",
+            e->kf_status ? "on " : "off",
+            e->volume,
+            vje_get_description(effect_id),
+            (vje_get_subformat(effect_id) == 1 ? "2x2" : "1x1"),
+            tmp
+        );
+
+        if (vje_get_extra_frame(effect_id) == 1)
+        {
+            int source_type = e->source_type;
+            int channel = e->channel;
+            int sample_speed = 0;
+
+            if (source_type == VJ_TAG_TYPE_NONE)
+                sample_speed = sample_get_speed(channel);
+
+            veejay_msg(VEEJAY_MSG_INFO,
+                "Mixing with %s %d at speed %d, position %d",
+                (source_type == VJ_TAG_TYPE_NONE ? "sample" : "stream"),
+                channel,
+                sample_speed,
+                sample_get_resume(id)
+            );
+        }
+    }
+}
+
 void vj_event_print_tag_info(veejay_t *v, int id) 
 {
-    int i, y, j, value;
     char description[100];
     char source[255];
     char title[150];
@@ -8470,35 +8849,7 @@ void vj_event_print_tag_info(veejay_t *v, int id)
             vj_tag_get_transition_length(id));
     }
 
-    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
-    {
-        y = vj_tag_get_effect_any(id, i);
-        if (y != -1) 
-        {
-            veejay_msg(VEEJAY_MSG_INFO, "%02d  [%d] [%s] %s (%s)",
-                i,
-                y,
-                vj_tag_get_chain_status(id,i) ? "on" : "off", vje_get_description(y),
-                (vje_get_subformat(y) == 1 ? "2x2" : "1x1")
-            );
-
-
-            char tmp[256] = {0};
-            for (j = 0; j < vje_get_num_params(y); j++)
-            {
-                char small[32];
-                value = vj_tag_get_effect_arg(id, i, j);
-                snprintf( small,sizeof(small), "P%d = %d ",j,value );
-                strcat( tmp, small );   
-                }
-
-            if (vje_get_extra_frame(y) == 1)
-            {
-                int source_type = vj_tag_get_chain_source(id, i);
-                veejay_msg(VEEJAY_MSG_INFO, "Mixing with %s %d",(source_type == VJ_TAG_TYPE_NONE ? "Sample" : "Stream"),vj_tag_get_chain_channel(id,i));
-                }
-        }
-    }
+    vj_event_print_fx_chain(v, id, vj_tag_get_effect_chain(id));
 }
 
 void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_mod )
@@ -8594,8 +8945,6 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
 void vj_event_print_sample_info(veejay_t *v, int id) 
 {
     video_playback_setup *s = v->settings;
-    int y, i, j;
-    long value;
     char timecode[48];
     char curtime[48];
     char sampletitle[SAMPLE_MAX_DESCR_LEN];
@@ -8633,54 +8982,13 @@ void vj_event_print_sample_info(veejay_t *v, int id)
         (sample_get_looptype(id) == 2 ? "pingpong" : (sample_get_looptype(id)==1 ? "normal" : (sample_get_looptype(id)==3 ? "random" : "no"))),
         (sample_get_transition_active(id) == 1 ? " " : " not " ), sample_get_transition_shape(id), sample_get_transition_length(id));
 
-
-    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
-    {
-        y = sample_get_effect_any(id, i);
-        if (y != -1)
-        {
-        
-            char tmp[256] = { 0 };
-            for (j = 0; j < vje_get_num_params(y); j++)
-            {
-                char small[32];
-                value = sample_get_effect_arg(id, i, j);
-                
-                snprintf(small, sizeof(small), "P%d = %ld ",j, value );
-                strcat( tmp, small );
-            }
-
-            veejay_msg(VEEJAY_MSG_INFO, "%02d | %03d | %s |%s %s {%s}",
-                i,
-                y,
-                sample_get_chain_status(id,i) ? "on " : "off", vje_get_description(y),
-                (vje_get_subformat(y) == 1 ? "2x2" : "1x1"),
-                tmp
-            );
-
-                if (vje_get_extra_frame(y) == 1)
-            {
-                int source = sample_get_chain_source(id, i);
-                int sample_offset = sample_get_resume(id);
-                int c = sample_get_chain_channel(id,i);
-                int sample_speed = 0;
-                if( source == VJ_TAG_TYPE_NONE )
-                   sample_speed = sample_get_speed(c);
-     
-                veejay_msg(VEEJAY_MSG_INFO, "Mixing with %s %d at speed %d, position %d",(source == VJ_TAG_TYPE_NONE ? "sample" : "stream"),
-                        c,
-                        sample_speed,
-                        sample_offset );
-                }
-        }
-        }
-
     if(  sample_get_editlist(id) == v->current_edit_list ) {
         veejay_msg(VEEJAY_MSG_DEBUG, "Sample is using EDL from plain video");
     } else {
         veejay_msg(VEEJAY_MSG_DEBUG, "Sample is using its own EDL");
     }
 
+    vj_event_print_fx_chain(v, id, sample_get_effect_chain(id));
 }
 
 void vj_event_print_plain_info(void *ptr, int x)
@@ -9456,103 +9764,6 @@ void vj_event_send_generator_list(void *ptr, const char format[], va_list ap)
     free(generators);
 }
 
-void vj_event_send_chain_entry_parameters(void *ptr, const char format[], va_list ap)
-{
-    veejay_t *v = (veejay_t*)ptr;
-    int args[4];
-    P_A(args, sizeof(args), NULL, 0, format, ap);
-
-    int entry_id = args[1];
-    int effect_id = 0;
-    int num_params = 0;
-    int params[SAMPLE_MAX_PARAMETERS] = {0};
-    int is_video = 0, video_on = 0;
-    int kf_type = 0, kf_status = 0;
-    int chain_source = 0, chain_channel = 0;
-    int transition_enabled = 0, transition_loop = 0;
-    int subrender_entry = 0;
-
-    int is_sample = SAMPLE_PLAYING(v);
-    int is_stream = STREAM_PLAYING(v);
-
-    if (is_sample || is_stream)
-    {
-        if (is_sample) {
-            SAMPLE_DEFAULTS(args[0]);
-            if (entry_id == -1) entry_id = sample_get_selected_entry(args[0]);
-            effect_id = sample_get_effect_any(args[0], entry_id);
-        } else {
-            STREAM_DEFAULTS(args[0]);
-            if (entry_id == -1) entry_id = vj_tag_get_selected_entry(args[0]);
-            effect_id = vj_tag_get_effect_any(args[0], entry_id);
-        }
-
-        if (effect_id > 0)
-        {
-            is_video = vje_get_extra_frame(effect_id);
-            num_params = vje_get_num_params(effect_id);
-            
-            if (is_sample) {
-                video_on = sample_get_chain_status(args[0], entry_id);
-                kf_status = sample_get_kf_status(args[0], entry_id, &kf_type);
-                chain_source = sample_get_chain_source(args[0], entry_id);
-                chain_channel = sample_get_chain_channel(args[0], entry_id);
-                subrender_entry = sample_entry_is_rendering(args[0], entry_id);
-                for (int i = 0; i < num_params; i++)
-                    params[i] = sample_get_effect_arg(args[0], entry_id, i);
-            } else {
-                video_on = vj_tag_get_chain_status(args[0], entry_id);
-                kf_status = vj_tag_get_kf_status(args[0], entry_id, &kf_type);
-                chain_source = vj_tag_get_chain_source(args[0], entry_id);
-                chain_channel = vj_tag_get_chain_channel(args[0], entry_id);
-                subrender_entry = vj_tag_entry_is_rendering(args[0], entry_id);
-                for (int i = 0; i < num_params; i++)
-                    params[i] = vj_tag_get_effect_arg(args[0], entry_id, i);
-            }
-        }
-    }
-
-    if (effect_id > 0)
-    {
-        char payload[4096];
-        char *p = payload;
-
-        p += sprintf(p, "000");
-
-        int fields[] = {
-            effect_id, is_video, num_params, kf_type, kf_status,
-            transition_enabled, transition_loop,
-            chain_source, chain_channel, video_on
-        };
-
-        *p++ = ' ';
-        for (int i = 0; i < 10; i++)
-        {
-            p += sprintf(p, "%d ", fields[i]);
-        }
-        p += sprintf(p, "%d ", subrender_entry);
-
-        for (int i = 0; i < num_params; i++)
-        {
-            int min = vje_get_param_min_limit(effect_id, i);
-            int max = vje_get_param_max_limit(effect_id, i);
-            int def = vje_get_param_default(effect_id, i);
-            p += sprintf(p, "%d %d %d %d", params[i], min, max, def);
-            if (i < num_params - 1)
-                *p++ = ' ';
-        }
-        *p = '\0';
-
-        char fline[5024];
-        snprintf(fline, sizeof(fline), "%04zu%s", strlen(payload), payload);
-        SEND_MSG(v, fline);
-    }
-    else
-    {
-        SEND_MSG(v, "0000"); 
-    }
-}
-
 void vj_event_send_chain_list(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
@@ -9675,7 +9886,7 @@ void vj_event_send_video_information(void *ptr, const char format[], va_list ap)
 
     char info_msg[2048];
     snprintf(info_msg, sizeof(info_msg),
-             "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d %s",
+             "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d %s %d",
              el->video_width,
              el->video_height,
              el->video_inter,
@@ -9690,7 +9901,8 @@ void vj_event_send_video_information(void *ptr, const char format[], va_list ap)
              v->audio,
              v->settings->use_vims_mcast,
              atomic_load_int(&settings->transition.global_state),
-             v->action_file[1]
+             v->action_file[1],
+            atomic_load_int(&settings->audio_beat.enabled) ? 1 : 0
             );
 
     char *s_print_buf = get_print_buf(strlen(info_msg) + 5);
@@ -9701,77 +9913,224 @@ void vj_event_send_video_information(void *ptr, const char format[], va_list ap)
 
 void vj_event_send_chain_entry(void *ptr, const char format[], va_list ap)
 {
-    veejay_t *v = (veejay_t *)ptr;
+    veejay_t *v = (veejay_t *) ptr;
     int args[4];
+
     P_A(args, sizeof(args), NULL, 0, format, ap);
 
     char payload[1024];
     char fline[1096];
-    int error = 1;
 
     int is_sample = SAMPLE_PLAYING(v);
     int is_stream = STREAM_PLAYING(v);
 
-    if (is_sample || is_stream)
-    {
-        if (is_sample) {
-          SAMPLE_DEFAULTS(args[0]);  
-        }
-        else {
-            STREAM_DEFAULTS(args[0]);
-        }
+    sample_eff_chain **src = NULL;
 
-        int entry_id = (args[1] == -1) ? 
-            (is_sample ? sample_get_selected_entry(args[0]) : vj_tag_get_selected_entry(args[0])) : 
-            args[1];
+    if(is_sample) {
+        SAMPLE_DEFAULTS(args[0]);
+        src = sample_get_effect_chain(args[0]);
 
-        int effect_id = is_sample ? sample_get_effect_any(args[0], entry_id)
-                                  : vj_tag_get_effect_any(args[0], entry_id);
+        if(args[1] == -1)
+            args[1] = sample_get_selected_entry(args[0]);
+    }
+    else if(is_stream) {
+        STREAM_DEFAULTS(args[0]);
+        src = vj_tag_get_effect_chain(args[0]);
 
-        if (effect_id > 0)
-        {
-            int is_video = vje_get_extra_frame(effect_id);
-            int video_on = is_sample ? sample_get_chain_status(args[0], entry_id)
-                                     : vj_tag_get_chain_status(args[0], entry_id);
-            int num_params = vje_get_num_params(effect_id);
-            int kf_type = 0, kf_status = 0, subrender_entry = 0;
-
-            if (is_sample) {
-                kf_status = sample_get_kf_status(args[0], entry_id, &kf_type);
-                subrender_entry = sample_entry_is_rendering(args[0], entry_id);
-            } else {
-                kf_status = vj_tag_get_kf_status(args[0], entry_id, &kf_type);
-                subrender_entry = vj_tag_entry_is_rendering(args[0], entry_id);
-            }
-
-            int n = snprintf(payload, sizeof(payload), "%d %d %d %d %d 0 0 %d %d %d %d",
-                         effect_id, is_video, num_params, kf_status, kf_type,
-                         (is_sample ? sample_get_chain_source(args[0], entry_id) : vj_tag_get_chain_source(args[0], entry_id)),
-                         (is_sample ? sample_get_chain_channel(args[0], entry_id) : vj_tag_get_chain_channel(args[0], entry_id)),
-                         video_on, subrender_entry);
-
-            for (int i = 0; i < num_params; i++) {
-                int val = is_sample ? sample_get_effect_arg(args[0], entry_id, i)
-                                    : vj_tag_get_effect_arg(args[0], entry_id, i);
-                
-                if (n < (int)sizeof(payload) - 16) {
-                    n += snprintf(payload + n, sizeof(payload) - n, " %d", val);
-                }
-            }
-            error = 0;
-        }
+        if(args[1] == -1)
+            args[1] = vj_tag_get_selected_entry(args[0]);
     }
 
-    if (!error)
-    {
-        format_msg_safe(fline, sizeof(fline), payload);
+    if(src == NULL) {
+        veejay_msg(0, "FX chain only available in Sample or Stream mode");
+        format_msg_safe(fline, sizeof(fline), "");
         SEND_MSG(v, fline);
+        return;
     }
-    else
-    {
-        format_msg_safe(fline, sizeof(fline), ""); 
+
+    int entry_id = args[1];
+
+    if(entry_id < 0 || entry_id >= SAMPLE_MAX_EFFECTS || src[entry_id] == NULL) {
+        format_msg_safe(fline, sizeof(fline), "");
         SEND_MSG(v, fline);
+        return;
     }
+
+    sample_eff_chain *entry = src[entry_id];
+    int effect_id = entry->effect_id;
+
+    if(effect_id <= 0 || !vje_is_valid(effect_id)) {
+        format_msg_safe(fline, sizeof(fline), "");
+        SEND_MSG(v, fline);
+        return;
+    }
+
+    int is_video = vje_get_extra_frame(effect_id);
+    int num_params = vje_get_num_params(effect_id);
+
+    if(num_params < 0)
+        num_params = 0;
+    else if(num_params > SAMPLE_MAX_PARAMETERS)
+        num_params = SAMPLE_MAX_PARAMETERS;
+
+    int transition_enabled = 0;
+    int transition_loop = 0;
+
+    int n = snprintf(
+        payload,
+        sizeof(payload),
+        "%d %d %d %d %d %d %d %d %d %d %d %d",
+        effect_id,
+        is_video,
+        num_params,
+        entry->kf_type,
+        entry->kf_status,
+        transition_enabled,
+        transition_loop,
+        entry->source_type,
+        entry->channel,
+        entry->e_flag,
+        entry->beat_flag,
+        entry->is_rendering
+    );
+
+    if(n < 0) {
+        format_msg_safe(fline, sizeof(fline), "");
+        SEND_MSG(v, fline);
+        return;
+    }
+
+    for(int i = 0; i < num_params; i++) {
+        if(n >= (int) sizeof(payload) - 16)
+            break;
+
+        int r = snprintf(
+            payload + n,
+            sizeof(payload) - (size_t) n,
+            " %d",
+            entry->arg[i]
+        );
+
+        if(r < 0)
+            break;
+
+        n += r;
+    }
+
+    payload[sizeof(payload) - 1] = '\0';
+
+    format_msg_safe(fline, sizeof(fline), payload);
+    SEND_MSG(v, fline);
+}
+
+void vj_event_send_chain_entry_parameters(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*) ptr;
+    int args[4];
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    int is_sample = SAMPLE_PLAYING(v);
+    int is_stream = STREAM_PLAYING(v);
+
+    sample_eff_chain **src = NULL;
+
+    if(is_sample) {
+        SAMPLE_DEFAULTS(args[0]);
+        src = sample_get_effect_chain(args[0]);
+
+        if(args[1] == -1)
+            args[1] = sample_get_selected_entry(args[0]);
+    }
+    else if(is_stream) {
+        STREAM_DEFAULTS(args[0]);
+        src = vj_tag_get_effect_chain(args[0]);
+
+        if(args[1] == -1)
+            args[1] = vj_tag_get_selected_entry(args[0]);
+    }
+
+    if(src == NULL) {
+        veejay_msg(0, "FX chain only available in Sample or Stream mode");
+        SEND_MSG(v, "0000");
+        return;
+    }
+
+    int entry_id = args[1];
+
+    if(entry_id < 0 || entry_id >= SAMPLE_MAX_EFFECTS || src[entry_id] == NULL) {
+        SEND_MSG(v, "0000");
+        return;
+    }
+
+    sample_eff_chain *entry = src[entry_id];
+    int effect_id = entry->effect_id;
+
+    if(effect_id <= 0 || !vje_is_valid(effect_id)) {
+        SEND_MSG(v, "0000");
+        return;
+    }
+
+    int is_video = vje_get_extra_frame(effect_id);
+    int num_params = vje_get_num_params(effect_id);
+
+    if(num_params < 0)
+        num_params = 0;
+    else if(num_params > SAMPLE_MAX_PARAMETERS)
+        num_params = SAMPLE_MAX_PARAMETERS;
+
+    int transition_enabled = 0;
+    int transition_loop = 0;
+
+    char payload[4096];
+    char *p = payload;
+    char *end = payload + sizeof(payload);
+
+    p += snprintf(p, (size_t)(end - p), "000 ");
+
+    int fields[] = {
+        effect_id,
+        is_video,
+        num_params,
+        entry->kf_type,
+        entry->kf_status,
+        transition_enabled,
+        transition_loop,
+        entry->source_type,
+        entry->channel,
+        entry->e_flag,
+        entry->beat_flag,
+        entry->is_rendering,
+        entry->beat_flag
+    };
+
+    for(int i = 0; i < 13 && p < end; i++) {
+        p += snprintf(p, (size_t)(end - p), "%d ", fields[i]);
+    }
+
+    for(int i = 0; i < num_params && p < end; i++) {
+        int min = vje_get_param_min_limit(effect_id, i);
+        int max = vje_get_param_max_limit(effect_id, i);
+        int def = vje_get_param_default(effect_id, i);
+
+        p += snprintf(
+            p,
+            (size_t)(end - p),
+            "%d %d %d %d%s",
+            entry->arg[i],
+            min,
+            max,
+            def,
+            (i < num_params - 1) ? " " : ""
+        );
+    }
+
+    payload[sizeof(payload) - 1] = '\0';
+
+    char fline[5024];
+    snprintf(fline, sizeof(fline), "%04zu%s", strlen(payload), payload);
+
+    SEND_MSG(v, fline);
 }
 
 void vj_event_send_editlist(void *ptr, const char format[], va_list ap)

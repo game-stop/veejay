@@ -343,6 +343,16 @@ void	vj_event_tag_new_avformat(void *ptr, const char format[], va_list ap);
 void    vj_event_set_transition(void *ptr, const char format[], va_list ap);
 void    vj_event_chain_global(void *ptr, const char format[], va_list ap);
 void    vj_event_chain_global_copy(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_toggle(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_enable(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_config(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_freeze(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_cooldown(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_threshold(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_channels(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_status(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_fx_entry(void *ptr, const char format[], va_list ap);
+
 int     vj_event_push(void *ptr, int mod );
 int     vj_event_pop(void *ptr, int *mod_state);
 
