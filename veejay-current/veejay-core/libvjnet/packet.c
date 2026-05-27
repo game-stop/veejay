@@ -56,6 +56,8 @@ int			packet_get_data(packet_header_t *h, const void *data, uint8_t *plane )
 
 int			packet_put_padded_data(packet_header_t *h, void *payload, const uint8_t *plane, int bytes )
 {
+	if( bytes < 0 || bytes > (int)CHUNK_SIZE )
+		bytes = (int)CHUNK_SIZE;
 	uint8_t *dst = (uint8_t*) payload;
 	size_t len = PACKET_HEADER_LENGTH;
 	veejay_memcpy( dst, h , len );

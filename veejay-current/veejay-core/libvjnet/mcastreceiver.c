@@ -222,6 +222,11 @@ int	mcast_recv_packet_frame( mcast_receiver *v )
 	//@ destination slot
 	packet_buffer_t	*pb = q->slot[d_slot];
 	
+	if( hdr->seq_num >= hdr->length ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid packet: seq_num %d out of range (length=%d)", hdr->seq_num, hdr->length);
+		return -1;
+	}
+
 	uint8_t *dst = q->buf + (CHUNK_SIZE * hdr->seq_num );
     
 	packet_get_data( hdr, chunk, dst );
