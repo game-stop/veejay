@@ -257,9 +257,6 @@ static gdouble gtk3_curve_auto_y_grid_resolution(gfloat min_y,
 static gint gtk3_curve_nice_x_grid_step(gint frame_count,
                                         gdouble fps);
 
-static gdouble gtk3_curve_auto_x_grid_resolution(gfloat min_x,
-                                                 gfloat max_x,
-                                                 gdouble fps);
 static void gtk3_curve_draw_hover_label(GtkWidget *widget,
                                         cairo_t   *cr,
                                         gdouble    px,
@@ -917,23 +914,6 @@ gtk3_curve_draw_cursor_legend(GtkWidget *widget,
   cairo_show_text(cr, right);
 
   cairo_restore(cr);
-}
-
-static gdouble
-gtk3_curve_auto_x_grid_resolution(gfloat min_x, gfloat max_x, gdouble fps)
-{
-  gint frame_count = (gint)(fabs(max_x - min_x) + 0.5);
-  gint step;
-
-  if (frame_count <= 0)
-    return 1.0;
-
-  step = gtk3_curve_nice_x_grid_step(frame_count, fps);
-
-  if (step <= 0)
-    step = 1;
-
-  return CLAMP(ceil((gdouble) frame_count / (gdouble) step), 1.0, 32.0);
 }
 
 static void
@@ -3529,9 +3509,9 @@ gtk3_curve_get_vector(GtkWidget *widget, int veclen, gfloat vector[])
 {
   Gtk3Curve *curve = GTK3_CURVE(widget);
   Gtk3CurvePrivate *priv = curve->priv;
-  gfloat rx, ry, dx, dy, min_x, delta_x;
+  gfloat rx, ry, dx, min_x;
   gfloat *mem, *xv, *yv, *y2v, prev;
-  gint dst, i, x, next;
+  gint dst, i, x;
   gint num_active_ctlpoints = 0;
   gint first_active = -1;
 
