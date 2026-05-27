@@ -7536,7 +7536,7 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
         if(vj_perform_audio_beat_playmode_has_fx_chain(ab_mode))
         {
             ab_queue_seq++;
-            if(ab_queue_seq <= 12 || (ab_queue_seq % 120) == 0) {
+          /*  if(ab_queue_seq <= 12 || (ab_queue_seq % 120) == 0) {
                 veejay_msg(VEEJAY_MSG_INFO,
                            "] performer-v27 queue-video seq=%d sample=%d mode=%d audio=%d beat_enabled=%d beat_open=%d beat_running=%d global_enabled=%d hold=%d",
                            ab_queue_seq,
@@ -7548,7 +7548,7 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
                            vj_audio_beat_is_running(&settings->audio_beat),
                            ((info->uc && vj_perform_audio_beat_playmode_has_fx_chain(info->uc->playback_mode) && info->global_chain) ? info->global_chain->enabled : 0),
                            settings->hold_fx);
-            }
+            }*/
         }
     }
 #endif
