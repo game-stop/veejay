@@ -84,6 +84,7 @@
 #include <libveejay/audioscratcher.h>
 #ifdef HAVE_JACK
 #include <libveejay/vj-jack.h>
+#include <libveejay/vj-audio-beat.h>
 #endif
 #include <veejaycore/yuvconv.h>
 #include <libveejay/vj-composite.h>
@@ -639,8 +640,10 @@ int veejay_set_speed(veejay_t *info, int speed, int force_seek)
     int edge_type = AUDIO_EDGE_NONE;
 
     if (speed_changed) {
-        if (effective_speed == 0 || old_speed == 0)
+        if (effective_speed == 0)
             edge_type = AUDIO_EDGE_SILENCE;
+        else if (old_speed == 0)
+            edge_type = AUDIO_EDGE_JUMP;
         else if (real_direction_flip)
             edge_type = AUDIO_EDGE_DIRECTION;
     }
@@ -657,7 +660,7 @@ int veejay_set_speed(veejay_t *info, int speed, int force_seek)
         vj_perform_initiate_edge_change(info, edge_type, prev_dir, cur_dir);
     }
 
-    if (force_seek)
+    if (force_seek && old_speed != 0 && effective_speed != 0)
         veejay_seek(info, effective_speed, max_sfd);
 
     return 1;
@@ -900,10 +903,16 @@ void veejay_busy(veejay_t * info)
 	video_playback_setup *settings = (video_playback_setup*)(info->settings);
 
     veejay_msg(VEEJAY_MSG_DEBUG, "Waiting for threads to finish...");
-    
+#ifdef HAVE_JACK
+    vj_audio_beat_request_stop(&settings->audio_beat);
+#endif
+
     safe_join(&settings->renderer_thread, "Renderer");
     safe_join(&settings->producer_thread, "Producer");
     safe_join(&settings->audio_playback_thread, "Audio playback");
+#ifdef HAVE_JACK
+    safe_join(&settings->audio_beat_thread, "Audio beat");
+#endif
 
     veejay_msg(VEEJAY_MSG_INFO, "Playback engine terminated.");
 }
@@ -2390,6 +2399,27 @@ static void Welcome(veejay_t *info)
 }
 
 
+
+#ifdef HAVE_JACK
+static void veejay_audio_beat_ensure_default_action(vj_audio_beat_shared_t *s, const char *reason)
+{
+    if(!s)
+        return;
+
+    if(!atomic_load_int(&s->initialized))
+        return;
+
+    if(atomic_load_int(&s->action_mode) == VJ_AUDIO_BEAT_ACTION_NONE)
+    {
+        vj_audio_beat_set_action(s, VJ_AUDIO_BEAT_ACTION_AUTO_FX);
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[AUDIO-BEAT] default action corrected to auto-fx(2) at %s",
+                   reason ? reason : "unknown");
+    }
+}
+
+#endif
+
 int veejay_open(veejay_t * info)
 {
     video_playback_setup *settings = (video_playback_setup *) info->settings;
@@ -2410,7 +2440,17 @@ int veejay_open(veejay_t * info)
     settings->renderer_index = 0;
     settings->frames_available = 0;
 	settings->warmup_frames = 2;
- 
+
+#ifdef HAVE_JACK
+    /*
+     * Beat analysis is independent from audio playback.
+     * Starting veejay with playback disabled must not make the beat detector
+     * unavailable; the detector thread can still open JACK capture later.
+     */
+    vj_audio_beat_init(&settings->audio_beat, 2);
+    veejay_audio_beat_ensure_default_action(&settings->audio_beat, "open");
+#endif
+
     for(i = 0; i < VIDEO_QUEUE_LEN ; i ++ )
     {
         settings->buffers[i] = veejay_allocate_frame_buffer(info); 
@@ -2467,15 +2507,21 @@ int veejay_close(veejay_t *info)
     int success = 1;
 
     veejay_change_state_save(info, LAVPLAY_STATE_STOP);
+#ifdef HAVE_JACK
+    vj_audio_beat_request_stop(&settings->audio_beat);
+#endif
 
     pthread_mutex_lock(&settings->mutex);
     pthread_cond_broadcast(&settings->producer_wait_cv);
     pthread_cond_broadcast(&settings->renderer_wait_cv);
     pthread_mutex_unlock(&settings->mutex);
 
-    pthread_join(settings->renderer_thread, NULL);
-    pthread_join(settings->producer_thread, NULL);
-    pthread_join(settings->audio_playback_thread, NULL);
+    safe_join(&settings->renderer_thread, "Renderer");
+    safe_join(&settings->producer_thread, "Producer");
+    safe_join(&settings->audio_playback_thread, "Audio playback");
+#ifdef HAVE_JACK
+    safe_join(&settings->audio_beat_thread, "Audio beat");
+#endif
 
     pthread_mutex_destroy(&settings->mutex);
     pthread_cond_destroy(&settings->producer_wait_cv);
@@ -2624,6 +2670,20 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 
 
 	vje_init( info->video_output_width,info->video_output_height);
+#ifdef HAVE_JACK
+    /*
+     * Build the audio-beat auto-FX metadata table for every JACK build,
+     * even when audio playback is disabled.
+     *
+     * info->audio == NO_AUDIO only means playback is off.  The beat detector
+     * can still run as JACK capture-only and needs this table to translate
+     * active FX parameters into beat modulation targets.
+     */
+    if(!vj_audio_beat_auto_build_table()) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-BEAT] auto-fx metadata table could not be built after vje_init(); auto-FX mapping will have no targets");
+    }
+#endif
 
 	if(info->dump)
 		vje_dump();
@@ -3463,6 +3523,274 @@ static void veejay_producer_thread_audio_startup(veejay_t *info)
 
 }
 
+#ifdef HAVE_JACK
+static void veejay_audio_beat_thread_startup(veejay_t *info)
+{
+    video_playback_setup *settings;
+    int ret;
+
+    if(!info || !info->settings)
+        return;
+
+    settings = info->settings;
+
+    if(atomic_load_int(&settings->audio_beat.running))
+        return;
+
+    if(!atomic_load_int(&settings->audio_beat.initialized))
+        vj_audio_beat_init(&settings->audio_beat, 2);
+
+    veejay_audio_beat_ensure_default_action(&settings->audio_beat, "thread-startup");
+
+    atomic_store_int(&settings->audio_beat.stop_request, 0);
+    atomic_store_int(&settings->audio_beat.enabled, 0);
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-BEAT] Starting Audio Beat Detector thread%s",
+               (info->audio == NO_AUDIO) ? " (capture only; playback disabled)" : "");
+
+    ret = pthread_create(&(settings->audio_beat_thread), NULL,
+                         vj_audio_beat_thread, &settings->audio_beat);
+
+    if(ret != 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO-BEAT] Failed to start Audio Beat Detector thread.");
+        vj_audio_beat_request_stop(&settings->audio_beat);
+        settings->audio_beat_thread = 0;
+        return;
+    }
+
+    while(!atomic_load_int(&settings->audio_beat.running) &&
+          atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP)
+        usleep_accurate(200, settings);
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-BEAT] Detector thread state: initialized=%d running=%d enabled=%d open=%d audio=%d",
+               atomic_load_int(&settings->audio_beat.initialized),
+               atomic_load_int(&settings->audio_beat.running),
+               atomic_load_int(&settings->audio_beat.enabled),
+               atomic_load_int(&settings->audio_beat.open),
+               info->audio);
+}
+
+#endif
+
+int veejay_audio_beat_set_enabled(veejay_t *info, int enabled)
+{
+#ifdef HAVE_JACK
+    video_playback_setup *settings;
+    int rc;
+
+    if(!info || !info->settings)
+        return -1;
+
+    settings = info->settings;
+    enabled = enabled ? 1 : 0;
+
+    if(!atomic_load_int(&settings->audio_beat.initialized))
+        vj_audio_beat_init(&settings->audio_beat, 2);
+
+    veejay_audio_beat_ensure_default_action(&settings->audio_beat, "set-enabled");
+
+    if(enabled && !vj_audio_beat_auto_build_table()) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-BEAT] auto-fx metadata table is not ready while enabling analysis; detector will run, but auto-FX mapping will have no targets");
+    }
+
+    if(!atomic_load_int(&settings->audio_beat.running))
+    {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-BEAT] Detector thread is not running; cannot %s analysis",
+                   enabled ? "enable" : "disable");
+        return -1;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-BEAT] set_enabled request=%d current_enabled=%d open=%d running=%d action=%d hits=%ld audio=%d",
+               enabled,
+               atomic_load_int(&settings->audio_beat.enabled),
+               atomic_load_int(&settings->audio_beat.open),
+               atomic_load_int(&settings->audio_beat.running),
+               atomic_load_int(&settings->audio_beat.action_mode),
+               __sync_add_and_fetch(&settings->audio_beat.hits, 0),
+               info->audio);
+
+    rc = enabled ? vj_audio_beat_enable(&settings->audio_beat)
+                 : vj_audio_beat_disable(&settings->audio_beat);
+
+    if(rc <= 0)
+        return -1;
+
+    return enabled;
+#else
+    (void)info;
+    (void)enabled;
+    return -1;
+#endif
+}
+
+
+int veejay_audio_beat_toggle(veejay_t *info)
+{
+#ifdef HAVE_JACK
+    video_playback_setup *settings;
+    int enabled;
+    int rc;
+
+    if(!info || !info->settings)
+        return -1;
+
+    settings = info->settings;
+
+    if(!atomic_load_int(&settings->audio_beat.initialized))
+        vj_audio_beat_init(&settings->audio_beat, 2);
+
+    veejay_audio_beat_ensure_default_action(&settings->audio_beat, "toggle");
+
+    if(!atomic_load_int(&settings->audio_beat.running))
+    {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-BEAT] Detector thread is not running; cannot toggle analysis");
+        return -1;
+    }
+
+    enabled = atomic_load_int(&settings->audio_beat.enabled) ? 1 : 0;
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-BEAT] toggle request current_enabled=%d open=%d running=%d action=%d hits=%ld audio=%d",
+               enabled,
+               atomic_load_int(&settings->audio_beat.open),
+               atomic_load_int(&settings->audio_beat.running),
+               atomic_load_int(&settings->audio_beat.action_mode),
+               __sync_add_and_fetch(&settings->audio_beat.hits, 0),
+               info->audio);
+
+    if(enabled)
+    {
+        rc = vj_audio_beat_disable(&settings->audio_beat);
+        return (rc > 0) ? 0 : -1;
+    }
+
+    rc = vj_audio_beat_enable(&settings->audio_beat);
+    return (rc > 0) ? 1 : -1;
+#else
+    (void)info;
+    return -1;
+#endif
+}
+
+
+int veejay_audio_beat_push_config(veejay_t *info, int freeze_ms, int cooldown_ms, int threshold, int input_channels)
+{
+#ifdef HAVE_JACK
+    video_playback_setup *settings;
+
+    if(!info || !info->settings)
+        return -1;
+
+    settings = info->settings;
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-BEAT] push_config request: freeze_ms=%d cooldown_ms=%d threshold=%d input_channels=%d initialized=%d enabled=%d open=%d running=%d action=%d audio=%d",
+               freeze_ms,
+               cooldown_ms,
+               threshold,
+               input_channels,
+               atomic_load_int(&settings->audio_beat.initialized),
+               atomic_load_int(&settings->audio_beat.enabled),
+               atomic_load_int(&settings->audio_beat.open),
+               atomic_load_int(&settings->audio_beat.running),
+               atomic_load_int(&settings->audio_beat.action_mode),
+               info->audio);
+
+    if(!atomic_load_int(&settings->audio_beat.initialized))
+        vj_audio_beat_init(&settings->audio_beat, input_channels > 0 ? input_channels : 2);
+
+    veejay_audio_beat_ensure_default_action(&settings->audio_beat, "push-config");
+
+    if(freeze_ms >= 0)
+        vj_audio_beat_set_freeze_ms(&settings->audio_beat, freeze_ms);
+
+    if(cooldown_ms >= 0)
+        vj_audio_beat_set_cooldown_ms(&settings->audio_beat, cooldown_ms);
+
+    if(threshold >= 0)
+        vj_audio_beat_set_threshold(&settings->audio_beat, threshold);
+
+    if(input_channels > 0)
+        vj_audio_beat_set_input_channels(&settings->audio_beat, input_channels);
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-BEAT] push_config applied: freeze_ms=%d cooldown_ms=%d threshold=%d input_channels=%d action=%d enabled=%d open=%d running=%d reset_seq=%d",
+               atomic_load_int(&settings->audio_beat.freeze_ms),
+               atomic_load_int(&settings->audio_beat.cooldown_ms),
+               atomic_load_int(&settings->audio_beat.threshold),
+               atomic_load_int(&settings->audio_beat.input_channels_request),
+               atomic_load_int(&settings->audio_beat.action_mode),
+               atomic_load_int(&settings->audio_beat.enabled),
+               atomic_load_int(&settings->audio_beat.open),
+               atomic_load_int(&settings->audio_beat.running),
+               atomic_load_int(&settings->audio_beat.reset_seq));
+
+    return 1;
+#else
+    (void)info;
+    (void)freeze_ms;
+    (void)cooldown_ms;
+    (void)threshold;
+    (void)input_channels;
+    return -1;
+#endif
+}
+
+
+int veejay_audio_beat_is_enabled(veejay_t *info)
+{
+#ifdef HAVE_JACK
+    return vj_audio_beat_is_enabled(&info->settings->audio_beat);
+#else
+    (void)info;
+    return 0;
+#endif
+}
+
+int veejay_audio_beat_get_status(veejay_t *info, int *enabled, int *open, long *hits, int *level_q15, int *transient_q8)
+{
+#ifdef HAVE_JACK
+    vj_audio_beat_shared_t *s;
+
+    if(!info || !info->settings)
+        return -1;
+
+    s = &info->settings->audio_beat;
+
+    if(!atomic_load_int(&s->initialized))
+        vj_audio_beat_init(s, 2);
+
+    if(enabled)
+        *enabled = atomic_load_int(&s->enabled);
+    if(open)
+        *open = atomic_load_int(&s->open);
+    if(hits)
+        *hits = __sync_add_and_fetch(&s->hits, 0);
+    if(level_q15)
+        *level_q15 = atomic_load_int(&s->level_q15);
+    if(transient_q8)
+        *transient_q8 = atomic_load_int(&s->transient_q8);
+
+    return 1;
+#else
+    (void)info;
+    (void)enabled;
+    (void)open;
+    (void)hits;
+    (void)level_q15;
+    (void)transient_q8;
+    return -1;
+#endif
+}
+
+
 static void *veejay_producer_thread_loop(void *ptr)
 {
     veejay_t *info = (veejay_t*) ptr;
@@ -3505,6 +3833,12 @@ static void *veejay_producer_thread_loop(void *ptr)
 	while (atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
 
 		veejay_consume_events(info);
+#ifdef HAVE_JACK
+        if(info->audio != NO_AUDIO)
+        {
+            vj_audio_beat_consume(info, &settings->audio_beat);
+        }
+#endif
 		sample_watch_list();
 		if (atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP)
         	break;
@@ -4014,7 +4348,9 @@ int veejay_main(veejay_t *info)
 
     veejay_producer_thread_audio_startup(info);
 
-
+#ifdef HAVE_JACK
+    veejay_audio_beat_thread_startup(info);
+#endif
 
     while (atomic_load_int(&settings->first_audio_frame_ready) == 0) {
         usleep_accurate(5000, settings);
