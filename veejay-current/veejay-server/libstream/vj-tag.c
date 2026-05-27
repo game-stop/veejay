@@ -3883,6 +3883,7 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, vj_tag *tag, int ident
     int chain_index = 0;
     int volume = 0;
     xmlNodePtr anim = NULL;
+    int beat = 0;
 
     veejay_memset( arg, 0, sizeof(arg));
 
@@ -3921,6 +3922,9 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, vj_tag *tag, int ident
         if(!xmlStrcmp( cur->name, (const xmlChar*) "kf_type" )) {
             kf_type = get_xml_int( doc, cur );
         }
+        if(!xmlStrcmp( cur->name, (const xmlChar*) "beat_flag" )) {
+            beat = get_xml_int( doc,cur );
+        }
 
         if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTACTIVE)) {
             e_flag = get_xml_int( doc, cur );
@@ -3954,7 +3958,8 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, vj_tag *tag, int ident
             a_flag,
             volume,
             kf_status,
-            kf_type
+            kf_type,
+            beat
         );
 
         if (ret == 0) {
