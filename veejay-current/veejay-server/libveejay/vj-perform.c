@@ -858,18 +858,6 @@ static void vj_perform_ab_ctx_debug_dump(
         snprintf(summary, sizeof(summary), "ctx=NULL");
     }
 
-    veejay_msg(VEEJAY_MSG_INFO,
-               "] render-bridge-v27 %s sample=%d mode=%d renderer=%d chains=%d local=%d global=%d active_fx=%d changed=%d %s",
-               tag ? tag : "state",
-               sample_id,
-               playmode,
-               renderer_id,
-               ctx ? ctx->chain_count : 0,
-               local_enabled,
-               global_enabled,
-               active_fx,
-               changed,
-               summary);
 }
 
 static int vj_perform_audio_beat_playmode_has_fx_chain(int playmode)
