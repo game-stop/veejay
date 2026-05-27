@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "mirrors.h"
 #include "motionmap.h"
 
@@ -51,7 +50,12 @@ vj_effect *mirrors_init(int width,int height)
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0,  "Right to Left", "Left to Right" , "Bottom to Top" , "Top to Bottom" );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* H or V */
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 0,                  24,                 6, 20, 2200, 5200, 1800,25     /* Number */
+    );
 	return ve;
 }
 

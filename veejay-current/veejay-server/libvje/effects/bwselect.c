@@ -20,7 +20,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "bwselect.h"
 
 vj_effect *bwselect_init(int w, int h)
@@ -54,6 +53,14 @@ vj_effect *bwselect_init(int w, int h)
     ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
 
     ve->param_description = vje_build_param_list( ve->num_params, "Min Threshold", "Max Threshold", "Gamma", "To Alpha" );
+        ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY,                   0,                  96,                 6,  22,  1600, 3400, 800,  35,    /* Min Threshold */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY,                   150,                255,                6,  22,  1600, 3400, 800,  35,    /* Max Threshold */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS,                    120,                700,                8,  32,  1200, 3000, 0,    45,    /* Gamma */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* To Alpha */
+    );
     return ve;
 }
 

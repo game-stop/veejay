@@ -19,8 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <omp.h>
 #include "bwotsu.h"
 
 vj_effect *bwotsu_init(int w, int h)
@@ -48,6 +46,14 @@ vj_effect *bwotsu_init(int w, int h)
 	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
 
 	ve->param_description = vje_build_param_list( ve->num_params, "To Alpha", "Skew", "Invert" );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0, -1000, /* To Alpha */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS,                    64,                 255,                8,  32, 1200, 2800, 0, 45,    /* Skew */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0, -1000  /* Invert */
+    );
 
 	return ve;
 }

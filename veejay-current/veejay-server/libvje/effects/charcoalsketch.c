@@ -18,9 +18,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
- #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <stdlib.h>
+#include "common.h"
+#include "charcoalsketch.h"
 
 typedef struct {
     uint8_t *temp_Y;
@@ -51,7 +50,13 @@ vj_effect *charcoalsketch_init(int w, int h)
     ve->extra_frame = 0;
     ve->sub_format = -1;
     ve->has_user = 0;
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 2,  24,  8,  28, 1800, 3800, 900,  35, /* Stroke Thickness */
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_CONTINUOUS,                       96, 240, 14, 52, 900,  2400, 0,    70, /* Intensity */
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,  32,  4,  22, 1600, 3600, 500,  25  /* Grain Level */
+    );
     return ve;
 }
 

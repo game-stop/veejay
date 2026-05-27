@@ -19,12 +19,7 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "edgefoldtide.h"
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
 
 #define EH_PARAMS 10
 
@@ -539,6 +534,21 @@ vj_effect *edgefoldtide_init(int w, int h)
         "Pastel Color",
         "Motion Speed",
         "Surface Softness"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                                      8,                  72,                 10, 36, 1200, 3000, 0,   55, /* Source Presence */
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                                      18,                 88,                 12, 48, 900,  2400, 0,   80, /* Contour Flow */
+        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS,                                      16,                 92,                 12, 46, 900,  2400, 0,   75, /* Cathedral Geometry */
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                                20,                 92,                 10, 40, 1000, 2800, 0,   65, /* Mirror Depth */
+        VJ_BEAT_GLOW,         VJ_BEAT_F_CONTINUOUS,                                      8,                  84,                 12, 44, 1000, 2600, 0,   65, /* Biolume Glow */
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS,                                      8,                  78,                 10, 38, 1000, 2800, 0,   60, /* Contour Pull */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                                     45,                 96,                 8,  32, 1800, 4200, 900, 45, /* Trail Memory */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                                      18,                 90,                 10, 38, 1000, 2600, 0,   55, /* Pastel Color */
+        VJ_BEAT_SIGNED_SPEED, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -80,       80,                 12, 46, 1000, 2800, 0,   70, /* Motion Speed */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                                     20,                 92,                 6,  24, 1800, 4200, 900, 30  /* Surface Softness */
     );
 
     (void) w;

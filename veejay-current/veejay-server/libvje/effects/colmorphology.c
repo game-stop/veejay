@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "colmorphology.h"
 
 static const uint8_t kernels[8][9] = {
@@ -62,6 +61,13 @@ vj_effect *colmorphology_init(int w, int h)
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Threshold", "Kernel", "Dilate or Erode");
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY,                    48,                 220,                6,  24, 1600, 3400, 700, 35,    /* Threshold */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Kernel */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Dilate or Erode */
+    );
     return ve;
 }
 

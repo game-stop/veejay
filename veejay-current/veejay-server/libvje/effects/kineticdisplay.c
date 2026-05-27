@@ -18,11 +18,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "kineticdisplay.h"
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
+
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -180,7 +177,22 @@ vj_effect *kineticdisplay_init(int w, int h)
         "Motion Reactivity",
         "Reset State"
     );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                                      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Amount */
+        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 6,                  32,                 6,  22, 2200, 5200, 1800, 25,    /* Cell Size */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY,                                                 64,                 180,                6,  22, 1600, 3400, 700,  35,    /* Threshold */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_CONTINUOUS,                                                  0,                  80,                 8,  30, 1200, 3000, 0,    45,    /* Dither */
+        VJ_BEAT_SPEED,            VJ_BEAT_F_CONTINUOUS,                                                  18,                 92,                 12, 46, 900,  2400, 0,    75,    /* Flip Speed */
+        VJ_BEAT_INERTIA,          VJ_BEAT_F_CONTINUOUS,                                                  8,                  80,                 10, 38, 1000, 2800, 0,    55,    /* Mechanical Lag */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS,                                                  30,                 92,                 8,  32, 1200, 3200, 0,    50,    /* Persistence */
+        VJ_BEAT_GLOW,             VJ_BEAT_F_CONTINUOUS,                                                  70,                 190,                10, 36, 1000, 2600, 0,    55,    /* Brightness */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_CONTINUOUS,                                                  70,                 180,                8,  30, 1200, 3000, 0,    45,    /* Contrast */
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                               VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Display Mode */
+        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS,                                                  20,                 95,                 12, 46, 900,  2400, 0,    70,    /* Motion Reactivity */
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000  /* Reset State */
+    );
     (void) w;
     (void) h;
     return ve;

@@ -17,14 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <veejaycore/defs.h>
-#include <libvje/vje.h>
-#include <veejaycore/vjmem.h>
-#include "diffimg.h"
+
+
 #include "common.h"
+#include "diffimg.h"
 
 vj_effect *diffimg_init(int width, int height)
 {
@@ -54,7 +50,13 @@ vj_effect *diffimg_init(int width, int height)
     vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
                               "Negation", "Minimum", "Maximum", "Lenght", "None", "Quantize", "Negation2"
     );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Mode */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY,                       1,                  96,                 6,  22,  1600, 3400, 700,  35,    /* Min threshold */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY,                       150,                255,                6,  22,  1600, 3400, 700,  35     /* Max threshold */
+    );
     return ve;
 }
 

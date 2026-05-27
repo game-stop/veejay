@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "magicoverlays.h"
 #include "dupmagic.h"
 

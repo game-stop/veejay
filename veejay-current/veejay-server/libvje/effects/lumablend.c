@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "lumablend.h"
 
 vj_effect *lumablend_init(int w, int h)
@@ -51,7 +50,14 @@ vj_effect *lumablend_init(int w, int h)
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
     vje_build_value_hint_list(ve->hints, ve->limits[1][0],0,"Source A", "Source B");
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Mode */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY,                    8,                  120,                6, 22, 1600, 3400, 700, 35,    /* Threshold A */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY,                    135,                245,                6, 22, 1600, 3400, 700, 35,    /* Threshold B */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Opacity */
+    );
 	return ve;
 }
 

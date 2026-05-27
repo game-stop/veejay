@@ -19,9 +19,7 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "levelcorrection.h"
-#include <omp.h>
 
 typedef struct {
     int n_threads;
@@ -54,6 +52,14 @@ vj_effect *levelcorrection_init(int w,int h)
     ve->sub_format = -1;
     ve->rgb_conv = 0;
     ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_SRC_A;
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY,  0,   110, 6, 22, 1600, 3400, 700, 35, /* Level Min */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY,  145, 255, 6, 22, 1600, 3400, 700, 35, /* Level Max */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_PHRASE_ONLY,  0,   80,  6, 22, 1800, 4200, 900, 25, /* Shrink Min */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_PHRASE_ONLY,  160, 255, 6, 22, 1800, 4200, 900, 30  /* Shrink Max */
+    );
     return ve;
 }
 

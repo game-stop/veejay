@@ -18,8 +18,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <libvje/effects/common.h>
-#include <veejaycore/vjmem.h>
+#include "common.h"
 #include "fadecolorrgb.h"
 
 vj_effect *fadecolorrgb_init(int w,int h)
@@ -58,6 +57,16 @@ vj_effect *fadecolorrgb_init(int w,int h)
 	ve->rgb_conv = 1;
     ve->sub_format = -1;
 	ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Red","Green", "Blue", "Mode", "Frame length");
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Opacity */
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Red */
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Green */
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Blue */
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Mode */
+        VJ_BEAT_SPEED,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 4,                240,                6, 22, 1800, 4200, 900, 30     /* Frame length */
+    );
     return ve;
 }
 
@@ -86,7 +95,7 @@ void fadecolorrgb_apply(void *ptr, VJFrame *frame, int *args) {
         state->value += (opacity / args[5]);
     } else {
         if (state->value <= 0) state->value = opacity;
-        state->value = (opacity / args[5]);
+        state->value -= (opacity / args[5]);
     }
 
     const int len = frame->len;

@@ -19,10 +19,8 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "motionmap.h"
 #include "magicmirror.h"
-#include "motionmap.h"
 
 typedef struct {
     uint8_t *magicmirrorbuf[4];
@@ -74,6 +72,15 @@ vj_effect *magicmirror_init(int w, int h)
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][4], 4, "Normal", "Alpha Mirror Mask", "Alpha Mirror Mask Only" );
+	ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
+
+		VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                         0,                  w / 3,              12, 46, 900,  2400, 0,   75,    /* X displacement */
+		VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                         0,                  h / 3,              12, 46, 900,  2400, 0,   70,    /* Y displacement */
+		VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE, 2,                70,                 8,  30, 1200, 3000, 0,   50,    /* X wave */
+		VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE, 2,                70,                 8,  30, 1200, 3000, 0,   50,    /* Y wave */
+		VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Alpha */
+	);
 
 	return ve;
 }

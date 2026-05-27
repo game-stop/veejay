@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "blackreplace.h"
 
 vj_effect *blackreplace_init(int w, int h)

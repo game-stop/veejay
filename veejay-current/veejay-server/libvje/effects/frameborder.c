@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "frameborder.h"
 
 vj_effect *frameborder_init(int width, int height)
@@ -37,6 +36,11 @@ vj_effect *frameborder_init(int width, int height)
 	ve->sub_format = 0;
 	ve->extra_frame = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Size");
+		ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
+
+		VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  4,  height / 3,  6, 22, 1800, 4200, 900, 30 /* Size */
+	);
 	return ve;
 }
 

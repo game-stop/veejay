@@ -26,66 +26,135 @@ vj_effect *posterize2_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 4;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
     ve->defaults[0] = 4;
     ve->defaults[1] = 16;
     ve->defaults[2] = 235;
-	ve->defaults[3] = 0;
+    ve->defaults[3] = 0;
 
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 256;
+
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 256;
+
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 256;
-	ve->limits[0][3] = 0;
-	ve->limits[1][3] = 5;
+
+    ve->limits[0][3] = 0;
+    ve->limits[1][3] = 5;
 
     ve->description = "Posterize II (Threshold Range)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-	ve->has_user = 0;
-	ve->param_description = vje_build_param_list(ve->num_params, "Factor", "Min Threshold", "Max Threshold", "Mode");
-	
-	return ve;	
+    ve->has_user = 0;
+    ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_SRC_A;
+
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Factor",
+        "Min Threshold",
+        "Max Threshold",
+        "Mode"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 2,                  32,                 6, 22, 1600, 3400, 700, 35,    /* Factor */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY,                        8,                  120,                6, 22, 1600, 3400, 700, 35,    /* Min Threshold */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY,                        135,                245,                6, 22, 1600, 3400, 700, 35,    /* Max Threshold */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Mode */
+    );
+
+    (void) w;
+    (void) h;
+
+    return ve;
 }
 
+static inline int posterize2_clampi(int v, int lo, int hi)
+{
+    return (v < lo) ? lo : (v > hi ? hi : v);
+}
 
 void posterize2_apply(void *ptr, VJFrame *frame, int *args)
 {
-    const int vfactor = args[0];
-    const int t1 = args[1];
-    const int t2 = args[2];
-    const int mode = args[3];
+    (void) ptr;
+
+    if(!frame || !args)
+        return;
+
+    int vfactor = posterize2_clampi(args[0], 1, 256);
+    int t1 = posterize2_clampi(args[1], 0, 256);
+    int t2 = posterize2_clampi(args[2], 0, 256);
+    int mode = posterize2_clampi(args[3], 0, 5);
+
+    if(t2 < t1) {
+        int tmp = t1;
+        t1 = t2;
+        t2 = tmp;
+    }
 
     const int len = frame->len;
-    const int factor = 256 / (vfactor > 0 ? vfactor : 1);
+    if(len <= 0)
+        return;
+
+    const int factor = 256 / vfactor;
 
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
     uint8_t *restrict A  = frame->data[3];
 
+    if(!Y || !Cb || !Cr)
+        return;
+
+    if(mode >= 3 && !A)
+        return;
+
     const uint8_t lo = pixel_Y_lo_;
     const uint8_t hi = pixel_Y_hi_;
     const uint8_t neutral = 128;
 
-    uint8_t lutY[256], lutA[256], mask[256];
-    for (int i = 0; i < 256; ++i) {
-        uint8_t v = (uint8_t)((i / factor) * factor);
+    uint8_t lutY[256];
+    uint8_t mask[256];
+
+    for(int i = 0; i < 256; i++) {
+        const uint8_t v = (uint8_t)((i / factor) * factor);
+
         lutY[i] = v;
-        lutA[i] = v;
         mask[i] = 0;
 
-        switch (mode) {
-            case 0: if (v < t1 || v > t2) { lutY[i] = lo; mask[i] = 1; } break;
-            case 1: if (v >= t1 && v <= t2) mask[i] = 1; break;
-            case 2: if (v < t1) { lutY[i] = lo; mask[i] = 1; } else if (v > t2) { lutY[i] = hi; mask[i] = 1; } break;
-            case 3: if (v < t1 || v > t2) lutA[i] = lo; break;
-            case 4: if (v < t1 || v > t2) lutA[i] = (A ? A[0] : 0); break;
-            case 5: if (v < t1) lutA[i] = lo; else if (v > t2) lutA[i] = hi; break;
+        switch(mode) {
+            case 0:
+                if(v < t1 || v > t2) {
+                    lutY[i] = lo;
+                    mask[i] = 1;
+                }
+                break;
+
+            case 1:
+                if(v >= t1 && v <= t2)
+                    mask[i] = 1;
+                break;
+
+            case 2:
+                if(v < t1) {
+                    lutY[i] = lo;
+                    mask[i] = 1;
+                } else if(v > t2) {
+                    lutY[i] = hi;
+                    mask[i] = 1;
+                }
+                break;
+
+            default:
+                break;
         }
     }
 
@@ -93,20 +162,45 @@ void posterize2_apply(void *ptr, VJFrame *frame, int *args)
 
 #pragma omp parallel num_threads(n_threads)
     {
-        if (mode <= 2) {
+        if(mode <= 2) {
 #pragma omp for schedule(static)
-            for (int i = 0; i < len; ++i) {
-                uint8_t y_idx = Y[i];
+            for(int i = 0; i < len; i++) {
+                const uint8_t y_idx = Y[i];
+
                 Y[i] = lutY[y_idx];
-                if (mask[y_idx]) {
+
+                if(mask[y_idx]) {
                     Cb[i] = neutral;
                     Cr[i] = neutral;
                 }
             }
+        } else if(mode == 3) {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                const uint8_t v = (uint8_t)(((int)Y[i] / factor) * factor);
+
+                if(v < t1 || v > t2)
+                    A[i] = lo;
+            }
+        } else if(mode == 4) {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                const uint8_t v = (uint8_t)(((int)Y[i] / factor) * factor);
+
+                if(v >= t1 && v <= t2)
+                    A[i] = v;
+            }
         } else {
 #pragma omp for schedule(static)
-            for (int i = 0; i < len; ++i) {
-                A[i] = lutA[Y[i]];
+            for(int i = 0; i < len; i++) {
+                const uint8_t v = (uint8_t)(((int)Y[i] / factor) * factor);
+
+                if(v < t1)
+                    A[i] = lo;
+                else if(v > t2)
+                    A[i] = hi;
+                else
+                    A[i] = v;
             }
         }
     }

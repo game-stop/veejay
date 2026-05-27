@@ -43,7 +43,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "colortap.h"
 
 
@@ -338,7 +337,11 @@ vj_effect *colortap_init(int w, int h)
 
     vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
 		"Sepia", "Heat", "Red-Green", "Old Photo", "XRay", "Esses", "Yellow-Blue", "XPro");
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000 /* Mode */
+    );
     return ve;
 }
 

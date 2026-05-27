@@ -2607,3 +2607,4 @@ void veejay_histogram_analyze(void *his, VJFrame *f, int type)
 
     build_histogram(h, f);
 }
+

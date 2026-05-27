@@ -19,67 +19,161 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "widthmirror.h"
 
-vj_effect *widthmirror_init(int max_width,int h)
+typedef struct {
+    uint8_t *buf[3];
+    int n_threads;
+    int w;
+    int h;
+} widthmirror_t;
+
+static inline int widthmirror_clampi(int v, int lo, int hi)
+{
+    return (v < lo) ? lo : (v > hi ? hi : v);
+}
+
+vj_effect *widthmirror_init(int max_width, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 1;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
+
+    ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    int max_freq = max_width > 0 ? max_width : 2;
+    if(max_freq > 256)
+        max_freq = 256;
+    if(max_freq < 2)
+        max_freq = 2;
+
     ve->defaults[0] = 4;
     ve->limits[0][0] = 2;
-    ve->limits[1][0] = 256;
+    ve->limits[1][0] = max_freq;
+
     ve->description = "Width Mirror";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Frequency");
+    ve->parallel = 0;
+
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Frequency"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 2, max_freq, 6, 22, 2200, 5200, 1800, 25 /* Frequency */
+    );
+
+    (void) h;
+
     return ve;
+}
+
+void *widthmirror_malloc(int w, int h)
+{
+    if(w <= 0 || h <= 0)
+        return NULL;
+
+    widthmirror_t *wm = (widthmirror_t*) vj_calloc(sizeof(widthmirror_t));
+    if(!wm)
+        return NULL;
+
+    const int len = w * h;
+
+    wm->buf[0] = (uint8_t*) vj_malloc((size_t)len * 3u);
+    if(!wm->buf[0]) {
+        free(wm);
+        return NULL;
+    }
+
+    wm->buf[1] = wm->buf[0] + len;
+    wm->buf[2] = wm->buf[1] + len;
+
+    wm->w = w;
+    wm->h = h;
+
+    wm->n_threads = vje_advise_num_threads(len);
+    if(wm->n_threads < 1)
+        wm->n_threads = 1;
+
+    return (void*) wm;
+}
+
+void widthmirror_free(void *ptr)
+{
+    widthmirror_t *wm = (widthmirror_t*) ptr;
+
+    if(!wm)
+        return;
+
+    if(wm->buf[0])
+        free(wm->buf[0]);
+
+    free(wm);
 }
 
 void widthmirror_apply(void *ptr, VJFrame *frame, int *args)
 {
-    const int width = (int)frame->width;
-    const int height = (int)frame->height;
-    const int frequency = args[0];
+    widthmirror_t *wm = (widthmirror_t*) ptr;
 
-    const int32_t band_w_fp = (width << 16) / frequency;
-    const int band_w_int = band_w_fp >> 16;
+    if(!wm || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
+        return;
 
-    if (band_w_int < 1) return;
+    const int width = frame->width;
+    const int height = frame->height;
+    const int len = frame->len;
 
-    uint8_t *restrict py = frame->data[0];
-    uint8_t *restrict pu = frame->data[1];
-    uint8_t *restrict pv = frame->data[2];
+    if(width <= 0 || height <= 0 || len <= 0)
+        return;
 
-    int n_threads = vje_advise_num_threads(width * height);
+    if(width != wm->w || height != wm->h)
+        return;
 
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
-    for (int y = 0; y < height; y++) {
-        uint8_t *restrict ry = py + (y * width);
-        uint8_t *restrict ru = pu + (y * width);
-        uint8_t *restrict rv = pv + (y * width);
+    int frequency = widthmirror_clampi(args[0], 2, width);
+    if(frequency > 256)
+        frequency = 256;
 
-        int local_x = 0;
-        int flip = 0;
+    const int band_w = (width + frequency - 1) / frequency;
+    if(band_w <= 1)
+        return;
 
-        for (int x = 0; x < width; x++) {
-            int src_x = flip ? (band_w_int - 1 - local_x) : local_x;
+    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
-            src_x = (src_x < 0) ? 0 : (src_x >= band_w_int ? band_w_int - 1 : src_x);
+    uint8_t *restrict srcY  = wm->buf[0];
+    uint8_t *restrict srcCb = wm->buf[1];
+    uint8_t *restrict srcCr = wm->buf[2];
 
-            ry[x] = ry[src_x];
-            ru[x] = ru[src_x];
-            rv[x] = rv[src_x];
+    veejay_memcpy(srcY,  Y,  len);
+    veejay_memcpy(srcCb, Cb, len);
+    veejay_memcpy(srcCr, Cr, len);
 
-            local_x++;
-            if (local_x >= band_w_int) {
-                local_x = 0;
-                flip = !flip;
-            }
+#pragma omp parallel for schedule(static) num_threads(wm->n_threads)
+    for(int y = 0; y < height; y++) {
+        const int row = y * width;
+
+        for(int x = 0; x < width; x++) {
+            const int band = x / band_w;
+            const int band_start = band * band_w;
+            const int band_end = widthmirror_clampi(band_start + band_w, 0, width);
+            const int local = x - band_start;
+            const int src_x = (band & 1)
+                ? (band_end - 1 - local)
+                : (band_start + local);
+
+            const int sx = widthmirror_clampi(src_x, band_start, band_end - 1);
+            const int dst = row + x;
+            const int src = row + sx;
+
+            Y[dst]  = srcY[src];
+            Cb[dst] = srcCb[src];
+            Cr[dst] = srcCr[src];
         }
     }
 }

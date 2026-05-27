@@ -17,9 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "colorshift.h"
 
 vj_effect *colorshift_init(int w, int h)
@@ -48,7 +46,14 @@ vj_effect *colorshift_init(int w, int h)
 		"Luma (OR)", "Chroma Blue (OR)", "Chroma Red (OR)", "Chroma Blue and Red (OR)",
 		"All Channels (OR)", "All Channels (AND)", "Luma (AND)", "Chroma Blue (AND)",
 		"Chroma Red (AND)", "Chroma Blue and Red (AND)"
-	);	
+	);
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000, /* Mode */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000  /* Value - bitmask */
+    );
 
     return ve;
 }

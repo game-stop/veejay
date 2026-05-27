@@ -18,9 +18,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <libvje/effects/common.h>
-#include <veejaycore/vjmem.h>
-#include <libvje/internal.h>
+#include "common.h"
+#include "internal.h"
 #include "fadecolor.h"
 
 vj_effect *fadecolor_init(int w,int h)
@@ -50,6 +49,14 @@ vj_effect *fadecolor_init(int w,int h)
 	ve->description = "Transition Fade to Color";
 	ve->extra_frame = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Color", "Frame length", "Mode" );
+	ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
+
+		VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Opacity */
+		VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Color */
+		VJ_BEAT_SPEED,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,           4,                  240,                6, 22, 1800, 4200, 900, 30,    /* Frame length */
+		VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Mode */
+	);
 	return ve;
 }
 

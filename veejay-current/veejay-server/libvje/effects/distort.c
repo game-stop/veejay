@@ -44,8 +44,6 @@
    Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include "widthmirror.h"
 #include "distort.h"
 
 typedef struct {
@@ -89,7 +87,16 @@ vj_effect *distortion_init(int width, int height)
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Increment 1", "Increment 2", "Increment 3", "Increment 4", "Increment 5", "Increment 6"	);
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1, 72, 6,  20, 1800, 4200, 900, 30, /* Increment 1 */
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1, 72, 6,  20, 1800, 4200, 900, 30, /* Increment 2 */
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1, 64, 6,  20, 1800, 4200, 900, 25, /* Increment 3 */
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1, 64, 6,  20, 1800, 4200, 900, 25, /* Increment 4 */
+        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS,                         0, 48, 10, 38, 1000, 2800, 0,   55, /* Increment 5 */
+        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS,                         0, 48, 10, 38, 1000, 2800, 0,   55  /* Increment 6 */
+    );
     return ve;
 }
 

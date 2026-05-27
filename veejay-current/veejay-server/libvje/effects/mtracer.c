@@ -760,7 +760,17 @@ vj_effect *mtracer_init(int w, int h)
         "Multisub","Softburn","Inverse Burn","Dodge","Distorted Add","Distorted Subtract",
         "Experimental 4","Negation Divide","Screen","Overlay"
     );
+	ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
 
+		VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Mode */
+		VJ_BEAT_GLOW,         VJ_BEAT_F_CONTINUOUS,                           24,                 230,                10, 38, 1000, 2600, 0,   60,    /* Strength */
+		VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Use Classic Blend */
+		VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS,                           36,                 225,                8,  30, 1200, 3000, 0,   45,    /* Character */
+		VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS,                           4,                  160,                8,  32, 1200, 3200, 0,   55,    /* Decay Strength */
+		VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Motion Only */
+		VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                           24,                 230,                10, 38, 1000, 2600, 0,   55     /* Frame2 Opacity */
+	);
     return ve;
 }
 

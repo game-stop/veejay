@@ -19,11 +19,9 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <stdlib.h>
-#include <math.h>
+#include "radiantfissure.h"
 
-#define RADIANTFISSURE_PARAMS 12
+#define RADIANTFISSURE_PARAMS 13
 #define WBA_MAX_FRAMES 8
 
 #define P_OPACITY        0
@@ -38,6 +36,7 @@
 #define P_TRAIL          9
 #define P_STROKE_CHROMA 10
 #define P_COLOR_BIAS    11
+#define P_BEAT_PUSH     12
 
 typedef struct {
     int w;
@@ -69,6 +68,86 @@ static inline int wba_clampi(int v, int lo, int hi)
 static inline uint8_t wba_u8(int v)
 {
     return (uint8_t) wba_clampi(v, 0, 255);
+}
+
+static inline int wba_param1000_to_100(int v)
+{
+    v = wba_clampi(v, 0, 1000);
+    return (v * 100 + 500) / 1000;
+}
+
+static inline int wba_100_to_param1000(int v)
+{
+    v = wba_clampi(v, 0, 100);
+    return v * 10;
+}
+
+static inline int wba_range1000_to_i(int v, int lo, int hi)
+{
+    v = wba_clampi(v, 0, 1000);
+    return lo + ((hi - lo) * v + 500) / 1000;
+}
+
+static inline int wba_i_to_range1000(int v, int lo, int hi)
+{
+    int d = hi - lo;
+    if(d <= 0)
+        return 0;
+    v = wba_clampi(v, lo, hi);
+    return ((v - lo) * 1000 + d / 2) / d;
+}
+
+static inline int wba_beat_shape1000_to_100(int v)
+{
+    v = wba_clampi(v, 0, 1000);
+    return (v * v + 5000) / 10000;
+}
+
+static inline int wba_beat_density_gate(int beat_drive, int density, int length_comp_q8)
+{
+    int k;
+
+    beat_drive = wba_clampi(beat_drive, 0, 100);
+    density = wba_clampi(density, 0, 100);
+
+    k = 3 + ((beat_drive * (12 + (density >> 2)) + 50) / 100);
+    k = (k * length_comp_q8 + 128) >> 8;
+
+    return wba_clampi(k, 2, 32);
+}
+
+static inline int wba_beat_event_strength(int beat_drive, int edge, int motion, int density)
+{
+    int s;
+
+    beat_drive = wba_clampi(beat_drive, 0, 100);
+    edge = wba_clampi(edge, 0, 255);
+    motion = wba_clampi(motion, 0, 255);
+    density = wba_clampi(density, 0, 100);
+
+    s = 30 + ((beat_drive * 92 + 50) / 100);
+    s += (edge * (24 + (density >> 3)) + 127) >> 8;
+    s += (motion * (34 + (beat_drive >> 1)) + 127) >> 8;
+
+    return wba_clampi(s, 0, 208);
+}
+
+static inline int wba_mix100(int a, int b, int q)
+{
+    int d;
+    q = wba_clampi(q, 0, 100);
+    d = b - a;
+    return a + (d * q + (d >= 0 ? 50 : -50)) / 100;
+}
+
+static inline int wba_soft_ceiling_y(int y)
+{
+    if(y > 238) {
+        y = 238 + ((y - 238) >> 2);
+        if(y > 248)
+            y = 248;
+    }
+    return wba_clampi(y, 0, 255);
 }
 
 static inline int wba_absi(int v)
@@ -152,7 +231,7 @@ static inline void wba_blend_canvas_pixel(
         vv = (c->trail_v[idx] * inv + sv * alpha + 127) / 255;
     }
 
-    yy = wba_clampi(yy, 0, 255);
+    yy = wba_soft_ceiling_y(yy);
     uu = wba_clampi(uu, 0, 255);
     vv = wba_clampi(vv, 0, 255);
 
@@ -236,7 +315,7 @@ static inline void wba_draw_stroke(
         bone_length = (bone_length * (48 + fissure)) / 150;
     }
 
-    bone_length = wba_clampi(bone_length, 2, 76);
+    bone_length = wba_clampi(bone_length, 2, 96);
 
     half = bone_length >> 1;
     if (half < 1)
@@ -407,15 +486,16 @@ vj_effect *radiantfissure_init(int w, int h)
     ve->defaults[P_OPACITY]       = 100;
     ve->defaults[P_STEP]          = 3;
     ve->defaults[P_TIME_DEPTH]    = 4;
-    ve->defaults[P_BONE_LENGTH]   = 64;
-    ve->defaults[P_EDGE]          = 88;
-    ve->defaults[P_MOTION_AGE]    = 40;
-    ve->defaults[P_BONE_DENSITY]  = 70;
-    ve->defaults[P_WHITE_FORGE]   = 86;
-    ve->defaults[P_FISSURE]       = 42;
-    ve->defaults[P_TRAIL]         = 98;
-    ve->defaults[P_STROKE_CHROMA] = 5;
-    ve->defaults[P_COLOR_BIAS]    = 95;
+    ve->defaults[P_BONE_LENGTH]   = wba_i_to_range1000(64, 2, 96);
+    ve->defaults[P_EDGE]          = wba_100_to_param1000(88);
+    ve->defaults[P_MOTION_AGE]    = wba_100_to_param1000(40);
+    ve->defaults[P_BONE_DENSITY]  = wba_100_to_param1000(70);
+    ve->defaults[P_WHITE_FORGE]   = wba_100_to_param1000(86);
+    ve->defaults[P_FISSURE]       = wba_100_to_param1000(42);
+    ve->defaults[P_TRAIL]         = wba_100_to_param1000(98);
+    ve->defaults[P_STROKE_CHROMA] = wba_100_to_param1000(5);
+    ve->defaults[P_COLOR_BIAS]    = wba_100_to_param1000(95);
+    ve->defaults[P_BEAT_PUSH]     = 0;
 
     ve->limits[0][P_OPACITY]       = 0;
     ve->limits[1][P_OPACITY]       = 100;
@@ -426,32 +506,35 @@ vj_effect *radiantfissure_init(int w, int h)
     ve->limits[0][P_TIME_DEPTH]    = 1;
     ve->limits[1][P_TIME_DEPTH]    = WBA_MAX_FRAMES;
 
-    ve->limits[0][P_BONE_LENGTH]   = 2;
-    ve->limits[1][P_BONE_LENGTH]   = 64;
+    ve->limits[0][P_BONE_LENGTH]   = 0;
+    ve->limits[1][P_BONE_LENGTH]   = 1000;
 
     ve->limits[0][P_EDGE]          = 0;
-    ve->limits[1][P_EDGE]          = 100;
+    ve->limits[1][P_EDGE]          = 1000;
 
     ve->limits[0][P_MOTION_AGE]    = 0;
-    ve->limits[1][P_MOTION_AGE]    = 100;
+    ve->limits[1][P_MOTION_AGE]    = 1000;
 
     ve->limits[0][P_BONE_DENSITY]  = 0;
-    ve->limits[1][P_BONE_DENSITY]  = 100;
+    ve->limits[1][P_BONE_DENSITY]  = 1000;
 
     ve->limits[0][P_WHITE_FORGE]   = 0;
-    ve->limits[1][P_WHITE_FORGE]   = 100;
+    ve->limits[1][P_WHITE_FORGE]   = 1000;
 
     ve->limits[0][P_FISSURE]       = 0;
-    ve->limits[1][P_FISSURE]       = 100;
+    ve->limits[1][P_FISSURE]       = 1000;
 
     ve->limits[0][P_TRAIL]         = 0;
-    ve->limits[1][P_TRAIL]         = 100;
+    ve->limits[1][P_TRAIL]         = 1000;
 
     ve->limits[0][P_STROKE_CHROMA] = 0;
-    ve->limits[1][P_STROKE_CHROMA] = 100;
+    ve->limits[1][P_STROKE_CHROMA] = 1000;
 
     ve->limits[0][P_COLOR_BIAS]    = 0;
-    ve->limits[1][P_COLOR_BIAS]    = 100;
+    ve->limits[1][P_COLOR_BIAS]    = 1000;
+
+    ve->limits[0][P_BEAT_PUSH]     = 0;
+    ve->limits[1][P_BEAT_PUSH]     = 1000;
 
     ve->description = "Radiant Fissure";
 
@@ -470,9 +553,26 @@ vj_effect *radiantfissure_init(int w, int h)
         "Fissure Amount",
         "Trail Memory",
         "Stroke Chroma",
-        "Color Bias"
+        "Color Bias",
+        "Beat Push"
     );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Opacity */
+        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                 3,                  7,                  6,  22, 2200, 5200, 1800, 25,    /* Step Size */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                 2,                  7,                  6,  22, 1800, 4200, 900,  30,    /* Time Depth */
+        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                 240,                860,                6,  22, 1800, 4200, 900,  28,    /* Bone Length */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_CONTINUOUS,                                       420,                980,                10, 38, 1000, 2600, 0,    58,    /* Edge Sensitivity */
+        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS,                                       100,                860,                10, 38, 1000, 2600, 0,    62,    /* Motion Ageing */
+        VJ_BEAT_DENSITY,          VJ_BEAT_F_CONTINUOUS,                                       240,                960,                10, 38, 1000, 2600, 0,    64,    /* Bone Density */
+        VJ_BEAT_GLOW,             VJ_BEAT_F_CONTINUOUS,                                       280,                940,                10, 38, 1000, 2600, 0,    58,    /* White Forge */
+        VJ_BEAT_TURBULENCE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY,               100,                880,                8,  32, 1200, 3200, 500,  38,    /* Fissure Amount */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY,                                      760,                1000,               6,  24, 1800, 4200, 1200, 34,    /* Trail Memory */
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS,                                       0,                  520,                8,  30, 1200, 3000, 0,    42,    /* Stroke Chroma */
+        VJ_BEAT_COLOR_PHASE,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, 620,       1000,               8,  30, 1200, 3000, 0,    42,    /* Color Bias */
+        VJ_BEAT_INTENSITY,        VJ_BEAT_F_CONTINUOUS,                                       0,                  850,                18, 78, 80,   650,  0,    100    /* Beat Push */
+    );
     return ve;
 }
 
@@ -587,6 +687,8 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
     int stroke_chroma;
     int stroke_chroma_q8;
     int color_bias;
+    int beat_push;
+    int beat_drive;
 
     int chroma_gain_age_q8[WBA_MAX_FRAMES];
 
@@ -602,6 +704,10 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
     int motion_min;
     int motion_fracture_keep;
     int current_keep_base;
+    int beat_edge_floor;
+    int beat_seed_keep;
+    int beat_strength_boost;
+    int beat_fissure_boost;
 
     int long_dense_fast;
     int length_comp_q8;
@@ -633,15 +739,25 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
     opacity       = wba_clampi(args[P_OPACITY],       0, 100);
     step          = wba_clampi(args[P_STEP],          3, 14);
     time_depth    = wba_clampi(args[P_TIME_DEPTH],    1, WBA_MAX_FRAMES);
-    bone_length   = wba_clampi(args[P_BONE_LENGTH],   2, 64);
-    edge_sens     = wba_clampi(args[P_EDGE],          0, 100);
-    motion_age    = wba_clampi(args[P_MOTION_AGE],    0, 100);
-    bone_density  = wba_clampi(args[P_BONE_DENSITY],  0, 100);
-    white_forge   = wba_clampi(args[P_WHITE_FORGE],   0, 100);
-    fissure       = wba_clampi(args[P_FISSURE],       0, 100);
-    trail         = wba_clampi(args[P_TRAIL],         0, 100);
-    stroke_chroma = wba_clampi(args[P_STROKE_CHROMA], 0, 100);
-    color_bias    = wba_clampi(args[P_COLOR_BIAS],    0, 100) - 50;
+    bone_length   = wba_range1000_to_i(args[P_BONE_LENGTH], 2, 96);
+    edge_sens     = wba_param1000_to_100(args[P_EDGE]);
+    motion_age    = wba_param1000_to_100(args[P_MOTION_AGE]);
+    bone_density  = wba_param1000_to_100(args[P_BONE_DENSITY]);
+    white_forge   = wba_param1000_to_100(args[P_WHITE_FORGE]);
+    fissure       = wba_param1000_to_100(args[P_FISSURE]);
+    trail         = wba_param1000_to_100(args[P_TRAIL]);
+    stroke_chroma = wba_param1000_to_100(args[P_STROKE_CHROMA]);
+    color_bias    = wba_param1000_to_100(args[P_COLOR_BIAS]) - 50;
+    beat_push     = wba_clampi(args[P_BEAT_PUSH], 0, 1000);
+    beat_drive    = wba_beat_shape1000_to_100(beat_push);
+
+    bone_length = wba_clampi(bone_length + ((beat_drive * 18 + 50) / 100), 2, 96);
+    edge_sens = wba_mix100(edge_sens, 100, (beat_drive * 45 + 50) / 100);
+    motion_age = wba_mix100(motion_age, 100, (beat_drive * 62 + 50) / 100);
+    bone_density = wba_mix100(bone_density, 100, (beat_drive * 58 + 50) / 100);
+    white_forge = wba_mix100(white_forge, 94, (beat_drive * 38 + 50) / 100);
+    fissure = wba_mix100(fissure, 100, (beat_drive * 72 + 50) / 100);
+    stroke_chroma = wba_mix100(stroke_chroma, 82, (beat_drive * 34 + 50) / 100);
 
     opacity_q8 = (opacity * 255 + 50) / 100;
     white_forge_q8 = (white_forge * 256 + 50) / 100;
@@ -690,6 +806,28 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
 
     motion_fracture_keep = 2 + (((bone_density / 7) + (motion_age / 10)) * length_comp_q8 >> 8);
     current_keep_base = 8 + (((bone_density / 4) + 6) * length_comp_q8 >> 8);
+
+    if(beat_drive > 0) {
+        int beat_motion_lift = (beat_drive * 9 + 50) / 100;
+
+        motion_min -= beat_motion_lift;
+        if(motion_min < 6)
+            motion_min = 6;
+
+        motion_fracture_keep += wba_beat_density_gate(beat_drive, bone_density, length_comp_q8);
+        current_keep_base += (beat_drive * 10 + 50) / 100;
+    }
+
+    motion_fracture_keep = wba_clampi(motion_fracture_keep, 1, 58);
+    current_keep_base = wba_clampi(current_keep_base, 4, 74);
+
+    beat_edge_floor = 6 + ((100 - edge_sens) / 12);
+    beat_edge_floor -= (beat_drive * 4 + 50) / 100;
+    beat_edge_floor = wba_clampi(beat_edge_floor, 4, 18);
+
+    beat_seed_keep = wba_beat_density_gate(beat_drive, bone_density, length_comp_q8);
+    beat_strength_boost = (beat_drive * (34 + (white_forge >> 1)) + 50) / 100;
+    beat_fissure_boost = (beat_drive * 18 + 50) / 100;
 
     long_dense_fast = (step <= 4 && bone_length >= 48 && bone_density >= 50);
 
@@ -776,6 +914,7 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
 
             int accepted = 0;
             int motion_fracture = 0;
+            int beat_seed = 0;
 
             int age = 0;
             int y_age;
@@ -816,7 +955,14 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
                 if (strength > 225)
                     keep += 12;
 
-                keep = wba_clampi(keep, 6, 188);
+                if (beat_drive > 0) {
+                    keep += (beat_drive * (10 + (strength >> 5)) + 50) / 100;
+                    strength += beat_strength_boost;
+                    if(strength > 255)
+                        strength = 255;
+                }
+
+                keep = wba_clampi(keep, 6, 218);
 
                 density_hash = (int)((spatial_hash >> 8) & 255);
 
@@ -838,15 +984,42 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
                             gx = 1;
 
                         strength = 46 + ((motion * motion_age) / 190);
-                        strength = wba_clampi(strength, 0, 132);
+                        strength += (beat_strength_boost * 3) >> 2;
+                        strength = wba_clampi(strength, 0, 176);
                     }
                 } else {
                     strength = 0;
                 }
             }
 
+            if ((!accepted || strength <= 0) && beat_drive > 0) {
+                int beat_hash = (int)((spatial_hash >> 20) & 255);
+                int beat_edge = edge >= beat_edge_floor;
+                int beat_motion = motion >= (motion_min >> 1);
+
+                if ((beat_edge || beat_motion) && beat_hash <= beat_seed_keep) {
+                    accepted = 1;
+                    beat_seed = 1;
+                    strength = wba_beat_event_strength(beat_drive, edge, motion, bone_density);
+
+                    if (edge < seed_floor || gx == 0 || gy == 0) {
+                        gx = (int)((shape_hash >> 16) & 255) - 128;
+                        gy = (int)((shape_hash >> 24) & 255) - 128;
+
+                        if(gx == 0 && gy == 0)
+                            gx = 1;
+                    }
+                }
+            }
+
             if (!accepted || strength <= 0)
                 continue;
+
+            if(beat_drive > 0 && !beat_seed) {
+                strength += beat_strength_boost >> 1;
+                if(strength > 255)
+                    strength = 255;
+            }
 
             if (max_age > 0) {
                 int motion_part = (motion * motion_age * max_age) / 7800;
@@ -858,6 +1031,13 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
                 }
 
                 age = motion_part + jitter_part;
+
+                if(beat_seed) {
+                    int beat_age = (beat_drive * max_age + 70) / 140;
+                    if(beat_age > age)
+                        age = beat_age;
+                }
+
                 age = wba_clampi(age, 0, max_age);
             } else {
                 age = 0;
@@ -885,7 +1065,9 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
             }
 
             local_length = bone_length + (((int)((shape_hash >> 6) & 15) - 7) * bone_length) / 64;
-            local_length = wba_clampi(local_length, 2, 64);
+            if(beat_seed)
+                local_length += (beat_drive * 18 + 50) / 100;
+            local_length = wba_clampi(local_length, 2, 96);
 
             wba_draw_stroke(
                 c,
@@ -911,7 +1093,7 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
                 long_dense_fast
             );
 
-            if (age > 0 && !motion_fracture && strength > 168) {
+            if (age > 0 && !motion_fracture && strength > 148) {
                 if ((int)((spatial_hash >> 2) & 255) <= current_keep_base) {
                     int cur_strength = (strength * 58) / 100;
                     int cur_length = (local_length * 2) / 3;
@@ -945,17 +1127,23 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
 
-            if (fissure > 0 && !motion_fracture && strength > 96) {
+            if (fissure > 0 && !motion_fracture && strength > 82) {
                 int fiss_keep = (fissure * (18 + (bone_density >> 1))) / 100;
                 int fiss_hash = (int)((spatial_hash >> 18) & 255);
 
                 if (edge > 220)
                     fiss_keep += 12;
 
+                if(beat_drive > 0)
+                    fiss_keep += beat_fissure_boost;
+
+                if(beat_seed)
+                    fiss_keep += 8;
+
                 if (long_dense_fast)
                     fiss_keep = (fiss_keep * 3) >> 2;
 
-                fiss_keep = wba_clampi(fiss_keep, 0, 72);
+                fiss_keep = wba_clampi(fiss_keep, 0, 96);
 
                 if (fiss_hash <= fiss_keep) {
                     int fiss_strength = (strength * (62 + fissure)) / 170;

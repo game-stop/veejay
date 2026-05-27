@@ -26,9 +26,8 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
+#include "internal.h"
 #include "constantblend.h"
-#include <libvje/internal.h>
 
 vj_effect *constantblend_init(int w, int h)
 {
@@ -51,12 +50,18 @@ vj_effect *constantblend_init(int w, int h)
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Threshold", "Constant" );
+	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Luma Scale", "Constant" );
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, VJ_EFFECT_BLEND_STRINGS);
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0,    0,    0, -1000, /* Mode */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS,                    70,                 220,                8, 32, 1200, 2800, 0, 45,    /* Threshold - scale */
+        VJ_BEAT_GLOW,     VJ_BEAT_F_CONTINUOUS,                    pixel_Y_lo_,        180,                8, 30, 1200, 3000, 0, 40     /* Constant */
+    );
     return ve;
 }
 

@@ -19,7 +19,6 @@
  */
         
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "opacity.h"
 
 vj_effect *darkreplace_init(int w, int h)

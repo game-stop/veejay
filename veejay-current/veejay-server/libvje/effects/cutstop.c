@@ -22,7 +22,6 @@
 */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "cutstop.h"
 
 typedef struct {
@@ -59,7 +58,14 @@ vj_effect *cutstop_init(int width , int height)
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Frame freq", "Cut mode", "Hold front/back" );	
+	ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
 
+		VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS,                             12,                 160,                8,  32, 1200, 2800, 0,   55,    /* Threshold */
+		VJ_BEAT_MEMORY,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,        8,                  160,                6,  24, 1800, 4200, 900, 35,    /* Frame freq */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Cut mode */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Hold front/back */
+	);
     return ve;
 }
 

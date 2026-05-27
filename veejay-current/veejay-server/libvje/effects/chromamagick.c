@@ -23,7 +23,6 @@
    of this effect */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "chromamagick.h"
 
 vj_effect *chromamagick_init(int w, int h)

@@ -18,8 +18,6 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <math.h>
 #include <omp.h>
 
 #define GAMMA_LUT_SIZE 1024
@@ -113,6 +111,20 @@ vj_effect *escherdroste_init(int width, int height) {
         "Pitch",
         "High Quality",
         "Mode"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SIGNED_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -70,                70,                 12, 46, 1000, 2800, 0,    70,    /* Speed */
+        VJ_BEAT_GEOMETRY_AMPLITUDE,  VJ_BEAT_F_CONTINUOUS,                                            32,                 420,                10, 38, 1000, 2800, 0,    60,    /* Scale Factor */
+        VJ_BEAT_GEOMETRY_FREQUENCY,  VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                      1,                  9,                  6,  20, 2200, 5200, 1800, 25,    /* Branches */
+        VJ_BEAT_SIGNED_CURVE,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -80,                80,                 10, 38, 1200, 3000, 0,    50,    /* Swirl */
+        VJ_BEAT_SIGNED_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -80,                80,                 12, 46, 1000, 2800, 0,    70,    /* Rot Speed */
+        VJ_BEAT_MEMORY,              VJ_BEAT_F_PHRASE_ONLY,                                           18,                 88,                 8,  30, 1800, 4200, 900,  45,    /* Feedback */
+        VJ_BEAT_SIGNED_CURVE,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -180,               180,                8,  32, 1400, 3400, 0,    40,    /* Pitch */
+        VJ_BEAT_SELECTOR,            VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* High Quality */
+        VJ_BEAT_SELECTOR,            VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Mode */
     );
 
     return ve;

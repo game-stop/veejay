@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "alpha2img.h"
 
 vj_effect *alpha2img_init(int w, int h)

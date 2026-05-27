@@ -17,11 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include "chromapalette.h"
-#include "common.h"
-#include <veejaycore/vjmem.h>
 #include "chromapalette.h"
 
 typedef struct {
@@ -63,6 +60,17 @@ vj_effect *chromapalette_init(int w, int h)
     ve->rgb_conv = 1;
 
     ve->param_description = vje_build_param_list(ve->num_params, "Tolerance", "Red", "Green", "Blue", "Chroma Blue", "Chroma Red", "Softness");
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE,  12,                 120,                6,  24,  1800, 3800, 900,  35,    /* Tolerance */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Red - key color */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Green - key color */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Blue - key color */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                              96,                 230,                10, 38,  1200, 3000, 0,    45,    /* Chroma Blue */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                              16,                 190,                10, 38,  1200, 3000, 0,    45,    /* Chroma Red */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE,  0,                  96,                 6,  22,  1800, 3800, 900,  30     /* Softness */
+    );
     return ve;
 }
 

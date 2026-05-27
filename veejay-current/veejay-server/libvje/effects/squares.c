@@ -19,386 +19,250 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "squares.h"
 
+static inline int squares_clampi(int v, int lo, int hi)
+{
+    return (v < lo) ? lo : (v > hi ? hi : v);
+}
 
-/*
- * simple effect that iterates over a frame using a bounding box
- * a new value will be determined (average of all pixels in the bounding box, the brightest or the darkest pixel)
- * and the bounding box will be filled with this new value
- */
+static inline uint8_t squares_u8(int v)
+{
+    return (uint8_t)squares_clampi(v, 0, 255);
+}
 
 vj_effect *squares_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 4;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    const int max_dim = (w > h) ? w : h;
+    int max_radius = max_dim >> 1;
+    int def_radius = max_dim >> 6;
+
+    if(max_radius < 1)
+        max_radius = 1;
+    if(def_radius < 1)
+        def_radius = 1;
+
     ve->limits[0][0] = 1;
-    ve->limits[1][0] = ( w > h ? w / 2 : h / 2 );
+    ve->limits[1][0] = max_radius;
+    ve->defaults[0] = def_radius;
+
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 2;
+    ve->defaults[1] = 0;
+
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 7;
+    ve->defaults[2] = 0;
+
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 2;
-    ve->defaults[0] = ( w > h ? w / 64 : h / 64 );
-    ve->defaults[1] = 0;
-    ve->defaults[2] = 0;
     ve->defaults[3] = 0;
+
     ve->description = "Squares";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->parallel = 0;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Radius", "Mode" , "Orientation", "Parity");
 
-    ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Radius",
+        "Mode",
+        "Orientation",
+        "Parity"
+    );
 
+    ve->hints = vje_init_value_hint_list(ve->num_params);
 
-    vje_build_value_hint_list( ve->hints, ve->limits[1][1],1, "Average", "Min", "Max" );
-    vje_build_value_hint_list( ve->hints, ve->limits[1][2],2, "Centered", "North", "North East", "East" , "South East", "South West", "West" , "North West");
-   
-    vje_build_value_hint_list( ve->hints, ve->limits[1][3],3, "Even", "Odd", "No parity"); //TODO add 'Berzek?' parameter aka broken/random parity; very cool on Mode animation
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][1],
+        1,
+        "Average",
+        "Min",
+        "Max"
+    );
+
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][2],
+        2,
+        "Centered",
+        "North",
+        "North East",
+        "East",
+        "South East",
+        "South West",
+        "West",
+        "North West"
+    );
+
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][3],
+        3,
+        "Even",
+        "Odd",
+        "No parity"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1,                  max_radius > 96 ? 96 : max_radius, 6, 22, 2200, 5200, 1800, 25,    /* Radius */
+        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,              0, 0,  0,    0,    0,   -1000, /* Mode */
+        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,              0, 0,  0,    0,    0,   -1000, /* Orientation */
+        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,              0, 0,  0,    0,    0,   -1000  /* Parity */
+    );
 
     return ve;
 }
 
-static void squares_apply_max( VJFrame *frame, int radius, int orientation, int parity)
+static void squares_apply_blocks(VJFrame *frame, int radius, int mode, int orientation, int parity)
 {
-    uint8_t *Y = frame->data[0];
-    uint8_t *U = frame->data[1];
-    uint8_t *V = frame->data[2];
-    int w = frame->width;
-    int h = frame->height;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict U = frame->data[1];
+    uint8_t *restrict V = frame->data[2];
 
-    int32_t sum = 0;
-    uint8_t  val = 0;
+    const int w = frame->width;
+    const int h = frame->height;
 
-    double v = 0;
+    int x_inf = 0;
+    int y_inf = 0;
+    int x_sup = w;
+    int y_sup = h;
 
-    int x,y,x1,y1,x_inf,y_inf, x_sup, y_sup;
+    grid_getbounds_from_orientation(
+        radius,
+        (vj_effect_orientation)orientation,
+        (vj_effect_parity)parity,
+        &x_inf,
+        &y_inf,
+        &x_sup,
+        &y_sup,
+        w,
+        h
+    );
 
-    x_inf = 0; // initial init for North East
-    y_inf = 0;
-    x_sup = w;
-    y_sup = h;
+    x_sup = squares_clampi(x_sup, -radius, w + radius);
+    y_sup = squares_clampi(y_sup, -radius, h + radius);
 
-    grid_getbounds_from_orientation(radius, orientation, parity, &x_inf, &y_inf, &x_sup, &y_sup,w,h);
+    if(x_sup <= x_inf || y_sup <= y_inf)
+        return;
 
-    for( y =  y_inf ; y < h; y += radius ) {
-        for( x =  x_inf ; x < w; x += radius ) {
-            val = 0;
+    const int nx = ((x_sup - x_inf) + radius - 1) / radius;
+    const int ny = ((y_sup - y_inf) + radius - 1) / radius;
+    const int n_threads = vje_advise_num_threads(w * h);
 
-            int lim_x = (x + radius);
-            if( lim_x > w )
-                lim_x = w;
-            int lim_y = (y + radius);
-            if( lim_y > h)
-                lim_y = h;
+#pragma omp parallel for schedule(static) num_threads(n_threads > 0 ? n_threads : 1)
+    for(int by = 0; by < ny; by++) {
+        const int y = y_inf + by * radius;
 
-            for( y1 = (y < 0) ? 0 : y ; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    if( Y[ y1 * w + x1 ] > val )
-                        val = Y[ y1 * w + x1 ];
+        for(int bx = 0; bx < nx; bx++) {
+            const int x = x_inf + bx * radius;
+
+            const int x0 = (x < 0) ? 0 : x;
+            const int y0 = (y < 0) ? 0 : y;
+            int x1 = x + radius;
+            int y1 = y + radius;
+
+            if(x1 > w) x1 = w;
+            if(y1 > h) y1 = h;
+
+            if(x1 <= x0 || y1 <= y0)
+                continue;
+
+            int sum_y = 0;
+            int sum_u = 0;
+            int sum_v = 0;
+            int count = 0;
+            uint8_t min_y = 255;
+            uint8_t max_y = 0;
+
+            for(int yy = y0; yy < y1; yy++) {
+                const int row = yy * w;
+
+                for(int xx = x0; xx < x1; xx++) {
+                    const int idx = row + xx;
+                    const uint8_t yv = Y[idx];
+
+                    sum_y += yv;
+                    sum_u += (int)U[idx] - 128;
+                    sum_v += (int)V[idx] - 128;
+                    count++;
+
+                    if(yv < min_y)
+                        min_y = yv;
+                    if(yv > max_y)
+                        max_y = yv;
                 }
             }
-            for( y1 = (y < 0) ? 0 : y ; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    Y[y1 * w + x1] = val;
-                }
-            }
-        }
-    }
 
-    for( y =  y_inf ; y < h; y += radius ) {
-        for( x =  x_inf ; x < w; x += radius ) {
+            if(count <= 0)
+                continue;
 
-            sum = 0;
-            uint32_t hit = 0;
+            uint8_t out_y;
 
-            int lim_x = (x + radius);
-            if( lim_x > w )
-                lim_x = w;
-            int lim_y = (y + radius);
-            if( lim_y > h)
-                lim_y = h;
+            if(mode == 1)
+                out_y = min_y;
+            else if(mode == 2)
+                out_y = max_y;
+            else
+                out_y = (uint8_t)((sum_y + (count >> 1)) / count);
 
-            for( y1 = (y < 0) ? 0 : y; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    sum += U[ y1 * w + x1 ]-128; 
-                    hit ++;
-                }
-            }
-            v = 1.0 / (double) hit;
-            val = (sum * v);
-            for( y1 = (y < 0) ? 0 : y; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    U[y1 * w + x1] = 128 + val;
-                }
-            }
-        }
-    }
+            const uint8_t out_u = squares_u8(128 + ((sum_u >= 0)
+                ? ((sum_u + (count >> 1)) / count)
+                : -((-sum_u + (count >> 1)) / count)));
 
-    for( y =  y_inf ; y < h; y += radius ) {
-        for( x =  x_inf ; x < w; x += radius ) {
-            sum = 0;
-            uint32_t hit = 0;
+            const uint8_t out_v = squares_u8(128 + ((sum_v >= 0)
+                ? ((sum_v + (count >> 1)) / count)
+                : -((-sum_v + (count >> 1)) / count)));
 
-            int lim_x = (x + radius);
-            if( lim_x > w )
-                lim_x = w;
-            int lim_y = (y + radius);
-            if( lim_y > h)
-                lim_y = h;
+            for(int yy = y0; yy < y1; yy++) {
+                const int row = yy * w;
 
+                for(int xx = x0; xx < x1; xx++) {
+                    const int idx = row + xx;
 
-            for( y1 = (y < 0) ? 0 : y; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    sum += (V[ y1 * w + x1 ]-128); 
-                    hit ++;
-                }
-            }
-            v = 1.0 / (double) hit;
-            val = (sum * v);
-            for( y1 = (y < 0) ? 0 : y; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    V[y1 * w + x1] = 128 + val;
+                    Y[idx] = out_y;
+                    U[idx] = out_u;
+                    V[idx] = out_v;
                 }
             }
         }
     }
 }
 
-static void squares_apply_min( VJFrame *frame, int radius, int orientation, int parity)
+void squares_apply(void *ptr, VJFrame *frame, int *args)
 {
-    uint8_t *Y = frame->data[0];
-    uint8_t *U = frame->data[1];
-    uint8_t *V = frame->data[2];
-    int w = frame->width;
-    int h = frame->height;
-    
-    int32_t sum = 0;
-    uint8_t  val = 0;
-    double v = 0;
+    (void) ptr;
 
-    int x,y,x1,y1,x_inf,y_inf, x_sup, y_sup;
+    if(!frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
+        return;
 
-    x_inf = 0; // initial init for North East
-    y_inf = 0;
-    x_sup = w;
-    y_sup = h;
+    const int w = frame->width;
+    const int h = frame->height;
 
-    grid_getbounds_from_orientation(radius, orientation, parity, &x_inf, &y_inf, &x_sup, &y_sup,w,h);
+    if(w <= 0 || h <= 0 || frame->len <= 0)
+        return;
 
-    for( y =  y_inf ; y < h; y += radius ) {
-        for( x =  x_inf ; x < w; x += radius ) {
-            int lim_x = (x + radius);
-            if( lim_x > w )
-                lim_x = w;
-            int lim_y = (y + radius);
-            if( lim_y > h)
-                lim_y = h;
+    const int max_dim = (w > h) ? w : h;
+    int max_radius = max_dim >> 1;
 
-            val = 0xff;
-            for( y1 = (y < 0) ? 0 : y; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    if(Y[ y1 * w + x1 ] < val)
-                        val = Y[ y1 * w + x1];
-                }
-            }
-            for( y1 = (y < 0) ? 0 : y; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    Y[y1 * w + x1] = val;
-                }
-            }
-        }
-    }
-    
-    for( y =  y_inf ; y < h; y += radius ) {
-        for( x =  x_inf ; x < w; x += radius ) {
+    if(max_radius < 1)
+        max_radius = 1;
 
-            int lim_x = (x + radius);
-            if( lim_x > w )
-                lim_x = w;
-            int lim_y = (y + radius);
-            if( lim_y > h)
-                lim_y = h;
+    const int radius = squares_clampi(args[0], 1, max_radius);
+    const int mode = squares_clampi(args[1], 0, 2);
+    const int orientation = squares_clampi(args[2], 0, 7);
+    const int parity = squares_clampi(args[3], 0, 2);
 
-            sum = 0;
-            uint32_t hit = 0;
-            for( y1 = (y < 0) ? 0 : y; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    sum += U[ y1 * w + x1 ]-128; 
-                    hit ++;
-                }
-            }
-            v = 1.0 / (double) hit;
-            val = (sum * v);
-            for( y1 = (y < 0) ? 0 : y; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    U[y1 * w + x1] = 128 + val;
-                }
-            }
-        }
-    }
-
-    for( y =  y_inf ; y < h; y += radius ) {
-        for( x =  x_inf ; x < w; x += radius ) {
-
-            int lim_x = (x + radius);
-            if( lim_x > w )
-                lim_x = w;
-            int lim_y = (y + radius);
-            if( lim_y > h)
-                lim_y = h;
-
-            sum = 0;
-            uint32_t hit = 0;
-            for( y1 = (y < 0) ? 0 : y; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    sum += (V[ y1 * w + x1 ]-128); 
-                    hit ++;
-                }
-            }
-            v = 1.0 / (double) hit;
-            val = (sum * v);
-            for( y1 = (y < 0) ? 0 : y; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    V[y1 * w + x1] = 128 + val;
-                }
-            }
-        }
-    }
-
-}
-
-static void squares_apply_average( VJFrame *frame, int radius, int orientation, int parity)
-{
-    uint8_t *Y = frame->data[0];
-    uint8_t *U = frame->data[1];
-    uint8_t *V = frame->data[2];
-    int w = frame->width;
-    int h = frame->height;
-
-    int32_t sum = 0;
-    uint8_t val = 0;
-    double v = 0;
-
-    int x,y,x1,y1,x_inf,y_inf, x_sup, y_sup;
-
-    x_inf = 0; // initial init for North East
-    y_inf = 0;
-    x_sup = w;
-    y_sup = h;
-
-    grid_getbounds_from_orientation(radius, orientation, parity, &x_inf, &y_inf, &x_sup, &y_sup,w,h);
-
-    for( y =  y_inf ; y < h; y += radius ) {
-        for( x =  x_inf ; x < w; x += radius ) {
-
-            int lim_x = (x + radius);
-            if( lim_x > w )
-                lim_x = w;
-            int lim_y = (y + radius);
-            if( lim_y > h)
-                lim_y = h;
-
-            sum = 0;
-            uint32_t hit = 0;
-            for( y1 = (y < 0) ? 0 : y; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    sum += Y[ y1 * w + x1 ]; 
-                    hit ++;
-                }
-            }
-            v = 1.0 / (double) hit;
-            val = (sum * v);
-            for( y1 = (y < 0) ? 0 : y; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    Y[y1 * w + x1] = val;
-                }
-            }
-        }
-    }
-
-    for( y =  y_inf ; y < h; y += radius ) {
-        for( x =  x_inf ; x < w; x += radius ) {
-
-            int lim_x = (x + radius);
-            if( lim_x > w )
-                lim_x = w;
-            int lim_y = (y + radius);
-            if( lim_y > h)
-                lim_y = h;
-
-            sum = 0;
-            uint32_t hit = 0;
-            for( y1 = (y < 0) ? 0 : y; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    sum += U[ y1 * w + x1 ]-128; 
-                    hit ++;
-                }
-            }
-            v = 1.0 / (double) hit;
-            val = (sum * v);
-            for( y1 = (y < 0) ? 0 : y; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    U[y1 * w + x1] = 128 + val;
-                }
-            }
-        }
-    }
-
-    for( y =  y_inf ; y < h; y += radius ) {
-        for( x =  x_inf ; x < w; x += radius ) {
-
-            int lim_x = (x + radius);
-            if( lim_x > w )
-                lim_x = w;
-            int lim_y = (y + radius);
-            if( lim_y > h)
-                lim_y = h;
-
-            sum = 0;
-            uint32_t hit = 0;
-            for( y1 = (y < 0) ? 0 : y; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    sum += (V[ y1 * w + x1 ]-128); 
-                    hit ++;
-                }
-            }
-            v = 1.0 / (double) hit;
-            val = (sum * v);
-            for( y1 = (y < 0) ? 0 : y; y1 < lim_y; y1 ++ ) {
-                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
-                    V[y1 * w + x1] = 128 + val;
-                }
-            }
-        }
-    }
-
-}
-
-void squares_apply( void *ptr, VJFrame *frame, int *args ) {
-    int radius = args[0];
-    int mode = args[1];
-    int orientation = args[2];
-    int parity = args[3];
-
-    switch(mode) {
-        case 0:
-            squares_apply_average( frame, radius, (vj_effect_orientation)orientation, (vj_effect_parity)parity );
-            break;
-        case 1:
-            squares_apply_min( frame, radius, (vj_effect_orientation)orientation, (vj_effect_parity)parity );
-            break;
-        case 2:
-            squares_apply_max( frame, radius, (vj_effect_orientation)orientation, (vj_effect_parity)parity );
-            break;
-    }
-
+    squares_apply_blocks(frame, radius, mode, orientation, parity);
 }

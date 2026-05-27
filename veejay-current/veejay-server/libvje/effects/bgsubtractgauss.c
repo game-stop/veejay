@@ -18,20 +18,12 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <float.h>
-#include <veejaycore/vjmem.h>
-#include <math.h>
-#include <veejaycore/defs.h>
-#include <libvje/vje.h>
-#include <veejaycore/yuvconv.h>
-#include <veejaycore/vj-msg.h>
-#include <libsubsample/subsample.h>
-#include "bgsubtractgauss.h"
-#include "common.h"
 
+#include <float.h>
+#include "common.h"
+#include "bgsubtractgauss.h"
+#include <libsubsample/subsample.h>
+  
 typedef struct {
     uint8_t *static_bg__;
     uint8_t *static_bg_frame__[4];

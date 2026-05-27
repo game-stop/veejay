@@ -19,14 +19,11 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
+#include "chronorain.h"
 
-#define CHRONOFOLD_PARAMS 8
+#define CHRONOFOLD_PARAMS 11
 
-#define P_THRESHOLD       0
+#define P_TRIGGER_GATE    0
 #define P_GRAVITY         1
 #define P_CONDUCTIVITY    2
 #define P_DECAY           3
@@ -34,6 +31,9 @@
 #define P_SOURCE_BLEED    5
 #define P_COLOR_MODE      6
 #define P_STORM           7
+#define P_BEAT_PUSH       8
+#define P_TRAIL_GAIN      9
+#define P_COLOR_ENERGY   10
 
 #define CF_COLOR_POLARITY 0
 #define CF_COLOR_THERMAL  1
@@ -68,19 +68,41 @@ typedef struct {
     uint8_t bleed_y_lut[256];
     uint8_t bleed_uv_lut[256];
     uint8_t adapt_lut[256];
+    uint8_t trail_gain_lut[256];
+    uint8_t chroma_energy_lut[256];
 
     int lut_valid;
-    int last_threshold;
+    int last_trigger_gate;
     int last_gravity;
     int last_conductivity;
     int last_decay;
     int last_source_bleed;
     int last_storm;
+    int last_beat_push;
+    int last_trail_gain;
+    int last_color_energy;
 } chronorain_t;
 
 static inline int cf_clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline int cf_param1000_to_u8(int v)
+{
+    v = cf_clampi(v, 0, 1000);
+    return (v * 255 + 500) / 1000;
+}
+
+static inline int cf_u8_to_param1000(int v)
+{
+    v = cf_clampi(v, 0, 255);
+    return (v * 1000 + 127) / 255;
+}
+
+static inline int cf_mix_u8(int a, int b, int q)
+{
+    return a + (((b - a) * q + 127) / 255);
 }
 
 static inline int cf_absi(int v)
@@ -98,6 +120,104 @@ static inline uint8_t cf_blend_fast_u8(uint8_t a, uint8_t b, int amount)
     return (uint8_t) (((int) a * (256 - amount) + (int) b * amount) >> 8);
 }
 
+#define CF_OUTPUT_SOFT_KNEE 176
+#define CF_OUTPUT_MAX_Y     210
+#define CF_DENSITY_AVG_START 48
+#define CF_DENSITY_AVG_FULL  128
+#define CF_DENSITY_HOT_START 6
+#define CF_DENSITY_HOT_FULL  42
+#define CF_DENSITY_HOT_Y     160
+
+static inline int cf_event_energy_limited(int on, int off)
+{
+    int hi = on > off ? on : off;
+    int lo = on > off ? off : on;
+    int overlap = (hi * lo + 255) >> 9;
+    int ev = hi + ((lo + 2) >> 2) - overlap;
+
+    if(ev < 0)
+        return 0;
+
+    return ev > 255 ? 255 : ev;
+}
+
+static inline int cf_beat_shape_u8(int beat_push)
+{
+    beat_push = cf_clampi(beat_push, 0, 255);
+    return (beat_push * beat_push + 127) / 255;
+}
+
+static int cf_density_render_gain_q8(chronorain_t *c, int beat_push)
+{
+    int len = c->len;
+    int i;
+    int avg;
+    int hot_pct;
+    int avg_penalty = 0;
+    int hot_penalty = 0;
+    int beat_penalty;
+    int gain;
+
+    uint64_t sum = 0;
+    uint64_t hot = 0;
+
+#pragma omp parallel for schedule(static) num_threads(c->n_threads) reduction(+:sum,hot)
+    for(i = 0; i < len; i++) {
+        int ev = cf_event_energy_limited(c->on_y[i], c->off_y[i]);
+
+        sum += (uint64_t) ev;
+        hot += (uint64_t) (ev > CF_DENSITY_HOT_Y);
+    }
+
+    if(len <= 0)
+        return 256;
+
+    avg = (int) (sum / (uint64_t) len);
+    hot_pct = (int) ((hot * 100u) / (uint64_t) len);
+
+    if(avg > CF_DENSITY_AVG_START) {
+        avg_penalty =
+            ((avg - CF_DENSITY_AVG_START) * 128) /
+            (CF_DENSITY_AVG_FULL - CF_DENSITY_AVG_START);
+    }
+
+    if(hot_pct > CF_DENSITY_HOT_START) {
+        hot_penalty =
+            ((hot_pct - CF_DENSITY_HOT_START) * 128) /
+            (CF_DENSITY_HOT_FULL - CF_DENSITY_HOT_START);
+    }
+
+    if(avg_penalty > 128)
+        avg_penalty = 128;
+    if(hot_penalty > 128)
+        hot_penalty = 128;
+
+    beat_penalty = (beat_push * 36 + 127) / 255;
+
+    gain = 256 - avg_penalty - hot_penalty - beat_penalty;
+
+    if(gain < 48)
+        gain = 48;
+    if(gain > 256)
+        gain = 256;
+
+    return gain;
+}
+
+static inline int cf_soft_ceiling_y(int y)
+{
+    if(y > CF_OUTPUT_SOFT_KNEE) {
+        y = CF_OUTPUT_SOFT_KNEE + ((y - CF_OUTPUT_SOFT_KNEE) >> 3);
+        if(y > CF_OUTPUT_MAX_Y)
+            y = CF_OUTPUT_MAX_Y;
+    }
+
+    if(y < 0)
+        return 0;
+
+    return y;
+}
+
 static inline int cf_sign_or_down(int v)
 {
     if(v > 0)
@@ -112,6 +232,9 @@ vj_effect *chronorain_init(int w, int h)
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     if(!ve)
         return NULL;
+
+    (void) w;
+    (void) h;
 
     ve->num_params = CHRONOFOLD_PARAMS;
 
@@ -130,37 +253,49 @@ vj_effect *chronorain_init(int w, int h)
         return NULL;
     }
 
-    ve->limits[0][P_THRESHOLD] = 0;
-    ve->limits[1][P_THRESHOLD] = 255;
-    ve->defaults[P_THRESHOLD] = 18;
+    ve->limits[0][P_TRIGGER_GATE] = 0;
+    ve->limits[1][P_TRIGGER_GATE] = 1000;
+    ve->defaults[P_TRIGGER_GATE] = cf_u8_to_param1000(18);
 
     ve->limits[0][P_GRAVITY] = 0;
-    ve->limits[1][P_GRAVITY] = 255;
-    ve->defaults[P_GRAVITY] = 160;
+    ve->limits[1][P_GRAVITY] = 1000;
+    ve->defaults[P_GRAVITY] = cf_u8_to_param1000(160);
 
     ve->limits[0][P_CONDUCTIVITY] = 0;
-    ve->limits[1][P_CONDUCTIVITY] = 255;
-    ve->defaults[P_CONDUCTIVITY] = 115;
+    ve->limits[1][P_CONDUCTIVITY] = 1000;
+    ve->defaults[P_CONDUCTIVITY] = cf_u8_to_param1000(115);
 
     ve->limits[0][P_DECAY] = 0;
-    ve->limits[1][P_DECAY] = 255;
-    ve->defaults[P_DECAY] = 140;
+    ve->limits[1][P_DECAY] = 1000;
+    ve->defaults[P_DECAY] = cf_u8_to_param1000(140);
 
     ve->limits[0][P_POLARITY_SPLIT] = 0;
-    ve->limits[1][P_POLARITY_SPLIT] = 255;
-    ve->defaults[P_POLARITY_SPLIT] = 210;
+    ve->limits[1][P_POLARITY_SPLIT] = 1000;
+    ve->defaults[P_POLARITY_SPLIT] = cf_u8_to_param1000(210);
 
     ve->limits[0][P_SOURCE_BLEED] = 0;
-    ve->limits[1][P_SOURCE_BLEED] = 255;
-    ve->defaults[P_SOURCE_BLEED] = 10;
+    ve->limits[1][P_SOURCE_BLEED] = 1000;
+    ve->defaults[P_SOURCE_BLEED] = cf_u8_to_param1000(10);
 
     ve->limits[0][P_COLOR_MODE] = 0;
     ve->limits[1][P_COLOR_MODE] = 4;
     ve->defaults[P_COLOR_MODE] = CF_COLOR_POLARITY;
 
     ve->limits[0][P_STORM] = 0;
-    ve->limits[1][P_STORM] = 255;
-    ve->defaults[P_STORM] = 90;
+    ve->limits[1][P_STORM] = 1000;
+    ve->defaults[P_STORM] = cf_u8_to_param1000(90);
+
+    ve->limits[0][P_BEAT_PUSH] = 0;
+    ve->limits[1][P_BEAT_PUSH] = 1000;
+    ve->defaults[P_BEAT_PUSH] = 0;
+
+    ve->limits[0][P_TRAIL_GAIN] = 0;
+    ve->limits[1][P_TRAIL_GAIN] = 1000;
+    ve->defaults[P_TRAIL_GAIN] = 500;
+
+    ve->limits[0][P_COLOR_ENERGY] = 0;
+    ve->limits[1][P_COLOR_ENERGY] = 1000;
+    ve->defaults[P_COLOR_ENERGY] = 1000;
 
     ve->description = "Chronofold Synaptic Rain";
     ve->sub_format = 1;
@@ -170,14 +305,33 @@ vj_effect *chronorain_init(int w, int h)
 
     ve->param_description = vje_build_param_list(
         ve->num_params,
-        "Threshold",
-        "Gravity",
+        "Trigger Gate",
+        "Rain Gravity",
         "Conductivity",
-        "Decay",
+        "Memory Decay",
         "Polarity Split",
         "Source Bleed",
         "Color Mode",
-        "Storm"
+        "Storm Spread",
+        "Beat Push",
+        "Trail Gain",
+        "Color Energy"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                    35,                 230,                5,  18,  1800, 4200, 1200, -25,    /* Trigger Gate */
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     180,                900,                12, 46,  900,  2400, 0,    72,     /* Rain Gravity */
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     60,                 780,                8,  34,  1100, 3000, 300,  48,     /* Conductivity */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                    360,                920,                6,  24,  2200, 5200, 1400, 34,     /* Memory Decay */
+        VJ_BEAT_DRIFT,        VJ_BEAT_F_PHRASE_ONLY,                    120,                940,                5,  20,  2200, 5200, 1600, 22,     /* Polarity Split */
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_REJECT,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Source Bleed */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Color Mode */
+        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CLIMAX_ONLY,                    0,                  560,                6,  24,  1600, 4200, 700,  30,     /* Storm Spread */
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     0,                  650,                12, 48,  120,  900,  0,    70,     /* Beat Push */
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     240,                820,                8,  32,  600,  1800, 200,  58,     /* Trail Gain */
+        VJ_BEAT_CONTRAST,     VJ_BEAT_F_CONTINUOUS,                     260,                1000,               8,  28,  900,  2600, 400,  54      /* Color Energy */
     );
 
     return ve;
@@ -280,39 +434,51 @@ static void cf_seed(chronorain_t *c, VJFrame *frame)
 }
 
 static void cf_build_luts_if_needed(chronorain_t *c,
-                                    int threshold,
+                                    int trigger_gate,
                                     int gravity,
                                     int conductivity,
                                     int decay,
                                     int source_bleed,
-                                    int storm)
+                                    int storm,
+                                    int beat_push,
+                                    int trail_gain,
+                                    int color_energy)
 {
     int i;
     int denom;
+    int trail_q8;
+    int chroma_q8;
 
     if(c->lut_valid &&
-       c->last_threshold == threshold &&
+       c->last_trigger_gate == trigger_gate &&
        c->last_gravity == gravity &&
        c->last_conductivity == conductivity &&
        c->last_decay == decay &&
        c->last_source_bleed == source_bleed &&
-       c->last_storm == storm) {
+       c->last_storm == storm &&
+       c->last_beat_push == beat_push &&
+       c->last_trail_gain == trail_gain &&
+       c->last_color_energy == color_energy) {
         return;
     }
 
-    denom = 255 - threshold;
+    denom = 255 - trigger_gate;
     if(denom < 1)
         denom = 1;
+
+    trail_q8 = 48 + ((trail_gain * 256 + 500) / 1000);
+    chroma_q8 = (color_energy * 256 + 500) / 1000;
 
     for(i = 0; i < 256; i++) {
         int event_strength;
         int excess;
         int gain;
         int mem;
+        int v;
 
-        if(i > threshold) {
-            excess = i - threshold;
-            gain = 150 + (gravity >> 2) + (storm >> 1);
+        if(i > trigger_gate) {
+            excess = i - trigger_gate;
+            gain = 132 + (gravity >> 3) + (storm >> 2) + ((beat_push * 96 + 127) / 255);
             event_strength = (excess * gain + denom / 2) / denom;
 
             if(event_strength > 255)
@@ -321,6 +487,13 @@ static void cf_build_luts_if_needed(chronorain_t *c,
         else {
             event_strength = 0;
         }
+
+        v = (i * trail_q8 + 128) >> 8;
+        v = cf_soft_ceiling_y(v);
+        c->trail_gain_lut[i] = cf_u8(v);
+
+        v = (i * chroma_q8 + 128) >> 8;
+        c->chroma_energy_lut[i] = cf_u8(v);
 
         c->event_lut[i] = (uint8_t) event_strength;
         c->decay_lut[i] = (uint8_t) ((i * decay + 127) / 255);
@@ -340,12 +513,15 @@ static void cf_build_luts_if_needed(chronorain_t *c,
         c->adapt_lut[i] = (uint8_t) mem;
     }
 
-    c->last_threshold = threshold;
+    c->last_trigger_gate = trigger_gate;
     c->last_gravity = gravity;
     c->last_conductivity = conductivity;
     c->last_decay = decay;
     c->last_source_bleed = source_bleed;
     c->last_storm = storm;
+    c->last_beat_push = beat_push;
+    c->last_trail_gain = trail_gain;
+    c->last_color_energy = color_energy;
     c->lut_valid = 1;
 }
 
@@ -981,7 +1157,8 @@ static void cf_render_const_pure(chronorain_t *c,
                                  int on_u,
                                  int on_v,
                                  int off_u,
-                                 int off_v)
+                                 int off_v,
+                                 int render_gain_q8)
 {
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -990,6 +1167,8 @@ static void cf_render_const_pure(chronorain_t *c,
     uint8_t *restrict PREV = c->prev_y;
     uint8_t *restrict ON = c->on_y;
     uint8_t *restrict OFF = c->off_y;
+    uint8_t *restrict GAIN = c->trail_gain_lut;
+    uint8_t *restrict CHROMA = c->chroma_energy_lut;
 
     int len = c->len;
     int i;
@@ -1011,7 +1190,7 @@ static void cf_render_const_pure(chronorain_t *c,
         }
 
         {
-            int ev = on + off;
+            int ev = cf_event_energy_limited(on, off);
             int dominant_on = on >= off;
             int amount = 128 + ((dominant_on ? (on - off) : (off - on)) >> 1);
 
@@ -1019,9 +1198,11 @@ static void cf_render_const_pure(chronorain_t *c,
             int ev_v;
 
             ev = ev > 255 ? 255 : ev;
+            ev = GAIN[ev];
+            ev = (ev * render_gain_q8 + 128) >> 8;
             amount = amount > 255 ? 255 : amount;
 
-            Y[i] = (uint8_t) ev;
+            Y[i] = (uint8_t) cf_soft_ceiling_y(ev);
 
             ev_u = dominant_on ?
                 cf_blend_fast_u8((uint8_t) off_u, (uint8_t) on_u, amount) :
@@ -1031,8 +1212,11 @@ static void cf_render_const_pure(chronorain_t *c,
                 cf_blend_fast_u8((uint8_t) off_v, (uint8_t) on_v, amount) :
                 cf_blend_fast_u8((uint8_t) on_v, (uint8_t) off_v, amount);
 
-            U[i] = cf_blend_fast_u8(128, (uint8_t) ev_u, ev);
-            V[i] = cf_blend_fast_u8(128, (uint8_t) ev_v, ev);
+            {
+                int cev = CHROMA[ev];
+                U[i] = cf_blend_fast_u8(128, (uint8_t) ev_u, cev);
+                V[i] = cf_blend_fast_u8(128, (uint8_t) ev_v, cev);
+            }
         }
     }
 }
@@ -1042,7 +1226,8 @@ static void cf_render_const_bleed(chronorain_t *c,
                                   int on_u,
                                   int on_v,
                                   int off_u,
-                                  int off_v)
+                                  int off_v,
+                                  int render_gain_q8)
 {
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -1051,6 +1236,8 @@ static void cf_render_const_bleed(chronorain_t *c,
     uint8_t *restrict PREV = c->prev_y;
     uint8_t *restrict ON = c->on_y;
     uint8_t *restrict OFF = c->off_y;
+    uint8_t *restrict GAIN = c->trail_gain_lut;
+    uint8_t *restrict CHROMA = c->chroma_energy_lut;
 
     uint8_t *restrict BLEEDY = c->bleed_y_lut;
     uint8_t *restrict BLEEDUV = c->bleed_uv_lut;
@@ -1078,7 +1265,7 @@ static void cf_render_const_bleed(chronorain_t *c,
         }
 
         {
-            int ev = on + off;
+            int ev = cf_event_energy_limited(on, off);
             int dominant_on = on >= off;
             int amount = 128 + ((dominant_on ? (on - off) : (off - on)) >> 1);
             int yy;
@@ -1087,10 +1274,12 @@ static void cf_render_const_bleed(chronorain_t *c,
             int ev_v;
 
             ev = ev > 255 ? 255 : ev;
+            ev = GAIN[ev];
+            ev = (ev * render_gain_q8 + 128) >> 8;
             amount = amount > 255 ? 255 : amount;
 
-            yy = base_y + ev;
-            Y[i] = (uint8_t) (yy > 255 ? 255 : yy);
+            yy = cf_soft_ceiling_y(base_y + ev);
+            Y[i] = (uint8_t) yy;
 
             ev_u = dominant_on ?
                 cf_blend_fast_u8((uint8_t) off_u, (uint8_t) on_u, amount) :
@@ -1100,15 +1289,19 @@ static void cf_render_const_bleed(chronorain_t *c,
                 cf_blend_fast_u8((uint8_t) off_v, (uint8_t) on_v, amount) :
                 cf_blend_fast_u8((uint8_t) on_v, (uint8_t) off_v, amount);
 
-            U[i] = cf_blend_fast_u8(base_u, (uint8_t) ev_u, ev);
-            V[i] = cf_blend_fast_u8(base_v, (uint8_t) ev_v, ev);
+            {
+                int cev = CHROMA[ev];
+                U[i] = cf_blend_fast_u8(base_u, (uint8_t) ev_u, cev);
+                V[i] = cf_blend_fast_u8(base_v, (uint8_t) ev_v, cev);
+            }
         }
     }
 }
 
 static void cf_render_source(chronorain_t *c,
                              VJFrame *frame,
-                             int source_bleed)
+                             int source_bleed,
+                             int render_gain_q8)
 {
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -1117,6 +1310,8 @@ static void cf_render_source(chronorain_t *c,
     uint8_t *restrict PREV = c->prev_y;
     uint8_t *restrict ON = c->on_y;
     uint8_t *restrict OFF = c->off_y;
+    uint8_t *restrict GAIN = c->trail_gain_lut;
+    uint8_t *restrict CHROMA = c->chroma_energy_lut;
 
     uint8_t *restrict BLEEDY = c->bleed_y_lut;
     uint8_t *restrict BLEEDUV = c->bleed_uv_lut;
@@ -1158,7 +1353,7 @@ static void cf_render_source(chronorain_t *c,
         }
 
         {
-            int ev = on + off;
+            int ev = cf_event_energy_limited(on, off);
             int dominant_on = on >= off;
             int amount = 128 + ((dominant_on ? (on - off) : (off - on)) >> 1);
             int yy;
@@ -1172,10 +1367,12 @@ static void cf_render_source(chronorain_t *c,
             int ev_v;
 
             ev = ev > 255 ? 255 : ev;
+            ev = GAIN[ev];
+            ev = (ev * render_gain_q8 + 128) >> 8;
             amount = amount > 255 ? 255 : amount;
 
-            yy = base_y + ev;
-            Y[i] = (uint8_t) (yy > 255 ? 255 : yy);
+            yy = cf_soft_ceiling_y(base_y + ev);
+            Y[i] = (uint8_t) yy;
 
             ev_u = dominant_on ?
                 cf_blend_fast_u8((uint8_t) off_u, (uint8_t) on_u, amount) :
@@ -1185,14 +1382,18 @@ static void cf_render_source(chronorain_t *c,
                 cf_blend_fast_u8((uint8_t) off_v, (uint8_t) on_v, amount) :
                 cf_blend_fast_u8((uint8_t) on_v, (uint8_t) off_v, amount);
 
-            U[i] = cf_blend_fast_u8(base_u, (uint8_t) ev_u, ev);
-            V[i] = cf_blend_fast_u8(base_v, (uint8_t) ev_v, ev);
+            {
+                int cev = CHROMA[ev];
+                U[i] = cf_blend_fast_u8(base_u, (uint8_t) ev_u, cev);
+                V[i] = cf_blend_fast_u8(base_v, (uint8_t) ev_v, cev);
+            }
         }
     }
 }
 
 static void cf_render_white_pure(chronorain_t *c,
-                                 VJFrame *frame)
+                                 VJFrame *frame,
+                                 int render_gain_q8)
 {
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -1201,6 +1402,7 @@ static void cf_render_white_pure(chronorain_t *c,
     uint8_t *restrict PREV = c->prev_y;
     uint8_t *restrict ON = c->on_y;
     uint8_t *restrict OFF = c->off_y;
+    uint8_t *restrict GAIN = c->trail_gain_lut;
 
     int len = c->len;
     int i;
@@ -1209,20 +1411,22 @@ static void cf_render_white_pure(chronorain_t *c,
     for(i = 0; i < len; i++) {
         uint8_t src_y = Y[i];
 
-        int ev = ON[i] + OFF[i];
+        int ev = cf_event_energy_limited(ON[i], OFF[i]);
 
         PREV[i] = src_y;
 
-        ev = ev > 255 ? 255 : ev;
+        ev = GAIN[ev];
+        ev = (ev * render_gain_q8 + 128) >> 8;
 
-        Y[i] = (uint8_t) ev;
+        Y[i] = (uint8_t) cf_soft_ceiling_y(ev);
         U[i] = 128;
         V[i] = 128;
     }
 }
 
 static void cf_render_white_bleed(chronorain_t *c,
-                                  VJFrame *frame)
+                                  VJFrame *frame,
+                                  int render_gain_q8)
 {
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -1231,6 +1435,7 @@ static void cf_render_white_bleed(chronorain_t *c,
     uint8_t *restrict PREV = c->prev_y;
     uint8_t *restrict ON = c->on_y;
     uint8_t *restrict OFF = c->off_y;
+    uint8_t *restrict GAIN = c->trail_gain_lut;
 
     uint8_t *restrict BLEEDY = c->bleed_y_lut;
     uint8_t *restrict BLEEDUV = c->bleed_uv_lut;
@@ -1242,16 +1447,17 @@ static void cf_render_white_bleed(chronorain_t *c,
     for(i = 0; i < len; i++) {
         uint8_t src_y = Y[i];
 
-        int ev = ON[i] + OFF[i];
+        int ev = cf_event_energy_limited(ON[i], OFF[i]);
         int base_y = BLEEDY[src_y];
         int yy;
 
         PREV[i] = src_y;
 
-        ev = ev > 255 ? 255 : ev;
-        yy = base_y + ev;
+        ev = GAIN[ev];
+        ev = (ev * render_gain_q8 + 128) >> 8;
+        yy = cf_soft_ceiling_y(base_y + ev);
 
-        Y[i] = (uint8_t) (yy > 255 ? 255 : yy);
+        Y[i] = (uint8_t) yy;
         U[i] = BLEEDUV[U[i]];
         V[i] = BLEEDUV[V[i]];
     }
@@ -1260,40 +1466,41 @@ static void cf_render_white_bleed(chronorain_t *c,
 static void cf_render(chronorain_t *c,
                       VJFrame *frame,
                       int source_bleed,
-                      int color_mode)
+                      int color_mode,
+                      int render_gain_q8)
 {
     switch(color_mode) {
         case CF_COLOR_WHITE:
             if(source_bleed == 0)
-                cf_render_white_pure(c, frame);
+                cf_render_white_pure(c, frame, render_gain_q8);
             else
-                cf_render_white_bleed(c, frame);
+                cf_render_white_bleed(c, frame, render_gain_q8);
             break;
 
         case CF_COLOR_THERMAL:
             if(source_bleed == 0)
-                cf_render_const_pure(c, frame, 84, 220, 212, 84);
+                cf_render_const_pure(c, frame, 84, 220, 212, 84, render_gain_q8);
             else
-                cf_render_const_bleed(c, frame, 84, 220, 212, 84);
+                cf_render_const_bleed(c, frame, 84, 220, 212, 84, render_gain_q8);
             break;
 
         case CF_COLOR_SOURCE:
-            cf_render_source(c, frame, source_bleed);
+            cf_render_source(c, frame, source_bleed, render_gain_q8);
             break;
 
         case CF_COLOR_ELECTRIC:
             if(source_bleed == 0)
-                cf_render_const_pure(c, frame, 54, 196, 210, 54);
+                cf_render_const_pure(c, frame, 54, 196, 210, 54, render_gain_q8);
             else
-                cf_render_const_bleed(c, frame, 54, 196, 210, 54);
+                cf_render_const_bleed(c, frame, 54, 196, 210, 54, render_gain_q8);
             break;
 
         case CF_COLOR_POLARITY:
         default:
             if(source_bleed == 0)
-                cf_render_const_pure(c, frame, 92, 226, 226, 92);
+                cf_render_const_pure(c, frame, 92, 226, 226, 92, render_gain_q8);
             else
-                cf_render_const_bleed(c, frame, 92, 226, 226, 92);
+                cf_render_const_bleed(c, frame, 92, 226, 226, 92, render_gain_q8);
             break;
     }
 }
@@ -1315,7 +1522,7 @@ void chronorain_apply(void *ptr, VJFrame *frame, int *args)
 {
     chronorain_t *c = (chronorain_t *) ptr;
 
-    int threshold;
+    int trigger_gate;
     int gravity;
     int conductivity;
     int decay;
@@ -1323,36 +1530,87 @@ void chronorain_apply(void *ptr, VJFrame *frame, int *args)
     int source_bleed;
     int color_mode;
     int storm;
+    int beat_push;
+    int beat_drive;
+    int trail_gain;
+    int color_energy;
+
+    int trigger_gate_eff;
+    int gravity_eff;
+    int conductivity_eff;
+    int storm_eff;
+    int trail_gain_eff;
+    int color_energy_eff;
+    int render_gain_q8;
 
     int use_conduct;
     int use_storm;
 
+    if(!c || !frame || !args)
+        return;
+
     if(!c->seeded)
         cf_seed(c, frame);
 
-    threshold      = cf_clampi(args[P_THRESHOLD], 0, 255);
-    gravity        = cf_clampi(args[P_GRAVITY], 0, 255);
-    conductivity   = cf_clampi(args[P_CONDUCTIVITY], 0, 255);
-    decay          = cf_clampi(args[P_DECAY], 0, 255);
-    polarity_split = cf_clampi(args[P_POLARITY_SPLIT], 0, 255);
-    source_bleed   = cf_clampi(args[P_SOURCE_BLEED], 0, 255);
+    trigger_gate   = cf_param1000_to_u8(args[P_TRIGGER_GATE]);
+    gravity        = cf_param1000_to_u8(args[P_GRAVITY]);
+    conductivity   = cf_param1000_to_u8(args[P_CONDUCTIVITY]);
+    decay          = cf_param1000_to_u8(args[P_DECAY]);
+    polarity_split = cf_param1000_to_u8(args[P_POLARITY_SPLIT]);
+    source_bleed   = cf_param1000_to_u8(args[P_SOURCE_BLEED]);
     color_mode     = cf_clampi(args[P_COLOR_MODE], 0, 4);
-    storm          = cf_clampi(args[P_STORM], 0, 255);
+    storm          = cf_param1000_to_u8(args[P_STORM]);
+    beat_push      = cf_param1000_to_u8(args[P_BEAT_PUSH]);
+    beat_drive     = cf_beat_shape_u8(beat_push);
+    trail_gain     = cf_clampi(args[P_TRAIL_GAIN], 0, 1000);
+    color_energy   = cf_clampi(args[P_COLOR_ENERGY], 0, 1000);
+
+    trigger_gate_eff = trigger_gate - ((trigger_gate * beat_drive + 765) / 1530);
+    if(trigger_gate_eff < 0)
+        trigger_gate_eff = 0;
+
+    gravity_eff = cf_mix_u8(
+        gravity,
+        230,
+        (beat_drive * 52 + 127) / 255
+    );
+
+    conductivity_eff = cf_mix_u8(
+        conductivity,
+        190,
+        (beat_drive * 18 + 127) / 255
+    );
+
+    storm_eff = cf_mix_u8(
+        storm,
+        190,
+        (beat_drive * 54 + 127) / 255
+    );
+
+    trail_gain_eff = trail_gain + ((beat_drive * 72 + 127) / 255);
+    if(trail_gain_eff > 780)
+        trail_gain_eff = 780;
+
+    color_energy_eff = color_energy + ((beat_drive * 54 + 127) / 255);
+    if(color_energy_eff > 1000)
+        color_energy_eff = 1000;
 
     cf_build_luts_if_needed(
         c,
-        threshold,
-        gravity,
-        conductivity,
+        trigger_gate_eff,
+        gravity_eff,
+        conductivity_eff,
         decay,
         source_bleed,
-        storm
+        storm_eff,
+        beat_drive,
+        trail_gain_eff,
+        color_energy_eff
     );
 
-
     {
-        int conduct_power = conductivity * decay;
-        int storm_span_hint = (storm * 5 + 127) / 255;
+        int conduct_power = conductivity_eff * decay;
+        int storm_span_hint = (storm_eff * 5 + 127) / 255;
 
         use_conduct = (conduct_power >= 128);
         use_storm = (storm_span_hint > 0);
@@ -1360,23 +1618,26 @@ void chronorain_apply(void *ptr, VJFrame *frame, int *args)
 
     if(use_conduct) {
         if(use_storm)
-            cf_compute_rain_full(c, frame, gravity, polarity_split, storm);
+            cf_compute_rain_full(c, frame, gravity_eff, polarity_split, storm_eff);
         else
-            cf_compute_rain_conduct(c, frame, gravity, polarity_split, storm);
+            cf_compute_rain_conduct(c, frame, gravity_eff, polarity_split, storm_eff);
     }
     else {
         if(use_storm)
-            cf_compute_rain_storm(c, frame, gravity, polarity_split, storm);
+            cf_compute_rain_storm(c, frame, gravity_eff, polarity_split, storm_eff);
         else
-            cf_compute_rain_plain(c, frame, gravity, polarity_split, storm);
+            cf_compute_rain_plain(c, frame, gravity_eff, polarity_split, storm_eff);
     }
 
     cf_swap_fields(c);
+
+    render_gain_q8 = cf_density_render_gain_q8(c, beat_push);
 
     cf_render(
         c,
         frame,
         source_bleed,
-        color_mode
+        color_mode,
+        render_gain_q8
     );
 }

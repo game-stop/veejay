@@ -20,8 +20,6 @@
 
 #include "common.h"
 #include <veejaycore/vjmem.h>
-#include <veejaycore/yuvconv.h>
-#include <libavutil/pixfmt.h>
 #include "rgbchannel.h"
 
 vj_effect *rgbchannel_init(int w, int h)
@@ -29,49 +27,79 @@ vj_effect *rgbchannel_init(int w, int h)
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 1;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 1;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 1;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->defaults[0] = 0;
-    ve->defaults[0] = 0;
-    ve->defaults[0] = 0;
+    for(int i = 0; i < ve->num_params; i++) {
+        ve->limits[0][i] = 0;
+        ve->limits[1][i] = 1;
+        ve->defaults[i] = 0;
+    }
+
     ve->description = "RGB Channel";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-	ve->rgba_only = 1;
-	ve->param_description = vje_build_param_list(ve->num_params, "Red", "Green", "Blue");
+    ve->rgba_only = 1;
+
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Red",
+        "Green",
+        "Blue"
+    );
+
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+
+    vje_build_value_hint_list(ve->hints, ve->limits[1][0], 0, "Keep", "Suppress");
+    vje_build_value_hint_list(ve->hints, ve->limits[1][1], 1, "Keep", "Suppress");
+    vje_build_value_hint_list(ve->hints, ve->limits[1][2], 2, "Keep", "Suppress");
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000, /* Red */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000, /* Green */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000  /* Blue */
+    );
+
+    (void) w;
+    (void) h;
+
     return ve;
 }
 
+void rgbchannel_apply(void *ptr, VJFrame *frame, int *args)
+{
+    (void) ptr;
 
-void rgbchannel_apply(void *ptr, VJFrame *frame, int *args) {
-    const int chr = args[0];
-    const int chg = args[1];
-    const int chb = args[2];
+    if(!frame || !args || !frame->data[0])
+        return;
 
-    if (!chr && !chg && !chb) return;
+    const int kill_r = args[0] ? 1 : 0;
+    const int kill_g = args[1] ? 1 : 0;
+    const int kill_b = args[2] ? 1 : 0;
 
-    const unsigned int width = frame->width;
-    const unsigned int height = frame->height;
-    uint8_t * __restrict rgba = frame->data[0];
-    const int n_threads = vje_advise_num_threads((int)(width * height));
+    if(!kill_r && !kill_g && !kill_b)
+        return;
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for (int y = 0; y < (int)height; y++) {
-        const int row_offset = y * (width * 4);
-        for (int x = 0; x < (int)width; x++) {
-            const int pixel_offset = row_offset + (x * 4);
-            if (chr) rgba[pixel_offset + 0] = 0;
-            if (chg) rgba[pixel_offset + 1] = 0;
-            if (chb) rgba[pixel_offset + 2] = 0;
-        }
+    const int pixels = frame->width * frame->height;
+    if(pixels <= 0)
+        return;
+
+    uint8_t *restrict rgba = frame->data[0];
+    const int n_threads = vje_advise_num_threads(pixels);
+
+#pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int i = 0; i < pixels; i++) {
+        uint8_t *p = rgba + (i << 2);
+
+        if(kill_r)
+            p[0] = 0;
+        if(kill_g)
+            p[1] = 0;
+        if(kill_b)
+            p[2] = 0;
     }
 }

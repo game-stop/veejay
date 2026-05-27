@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "feathermask.h"
 
 vj_effect *feathermask_init(int w,int h)
@@ -43,6 +42,12 @@ vj_effect *feathermask_init(int w,int h)
     ve->description = "Alpha: Feather Mask";
     ve->sub_format = 1;
 	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_SRC_A;
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  1,  18,  6, 22, 1800, 4200, 900, 30, /* Radius */
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  1,  3,   6, 20, 2200, 5200, 1200, 20  /* Iterations */
+    );
     return ve;
 }
 

@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "alphatransition.h"
 
 /* almost the same as masktransition.c, but adding threshold and direction parameters */

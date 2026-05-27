@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "complexsaturate.h"
 
 vj_effect *complexsaturation_init(int w, int h)

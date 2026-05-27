@@ -43,10 +43,16 @@ vj_effect *iris_init(int w, int h)
     ve->defaults[0] = 1;
 	ve->defaults[1] = 0;
     ve->description = "Iris Transition (Circle,Rect)";
-    ve->sub_format = 1; //@todo: write this for native
+    ve->sub_format = 1;
     ve->extra_frame = 1;
 	ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Value", "Shape" );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_PHRASE_ONLY,                    8,                  92,                 6, 22, 1800, 4200, 900, 35,    /* Value */
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Shape */
+    );
     return ve;
 }
 

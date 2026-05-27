@@ -57,7 +57,6 @@
 */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "boids.h"
 typedef struct 
 {
@@ -128,6 +127,20 @@ vj_effect *boids_init(int w, int h)
 	ve->extra_frame = 0;
 	ve->has_user =0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Radius","Blobs","Shape","Cohesion","Seperation","Alignment","Speed","Home Radius");
+
+	ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
+
+		VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 4,                  96,                 8,  26,  1800, 4200, 1400, 30,    /* Radius */
+		VJ_BEAT_GRID_SIZE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 12,                 180,                6,  20,  2200, 5000, 1800, 20,    /* Blobs */
+		VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Shape */
+		VJ_BEAT_MOTION_REACT,  VJ_BEAT_F_CONTINUOUS,                                                        0,                  65,                 10, 38,  1200, 3000, 0,    55,    /* Cohesion */
+		VJ_BEAT_MOTION_REACT,  VJ_BEAT_F_CONTINUOUS,                                                        0,                  75,                 10, 42,  1000, 2800, 0,    60,    /* Seperation */
+		VJ_BEAT_MOTION_REACT,  VJ_BEAT_F_CONTINUOUS,                                                        0,                  55,                 8,  34,  1400, 3200, 0,    45,    /* Alignment */
+		VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SQUARED,                                    1,                  36,                 12, 45,  900,  2600, 0,    70,    /* Speed */
+		VJ_BEAT_GRID_SIZE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE,                            32,                 300,                6,  22,  2200, 5000, 1800, 25     /* Home Radius */
+	);
+
 	return ve;
 }
 

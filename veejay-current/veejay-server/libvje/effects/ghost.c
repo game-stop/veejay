@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "ghost.h"
 
 typedef struct {
@@ -43,6 +42,11 @@ vj_effect *ghost_init(int w, int h)
     ve->extra_frame = 0;
 	ve->has_user =0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Opacity" );
+		ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
+
+		VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000 /* Opacity */
+	);
     return ve;
 }
 
@@ -118,7 +122,7 @@ void ghost_apply(void *ptr, VJFrame *frame, int *args ) {
 
 		int abs_diff = (diff ^ (diff >> 31)) - (diff >> 31);
 
-		bm[i] = 0xff & -((abs_diff - 1) >> 31 ^ 1);
+		bm[i] = (uint8_t)(-(abs_diff > 0));
 	}
 
 

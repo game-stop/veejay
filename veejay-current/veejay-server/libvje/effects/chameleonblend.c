@@ -24,8 +24,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <veejaycore/vj-msg.h>
 #include "softblur.h"
 #include "chameleonblend.h"
 #include "motionmap.h"

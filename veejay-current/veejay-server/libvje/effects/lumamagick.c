@@ -20,8 +20,7 @@
 
 /* 7 ,14, 24, 25, 26 */
 #include "common.h"
-#include <libvje/internal.h>
-#include <veejaycore/vjmem.h>
+#include "internal.h"
 #include "lumamagick.h"
 /* 04/01/03: added transparency parameters for frame a and frame b in each function */
 

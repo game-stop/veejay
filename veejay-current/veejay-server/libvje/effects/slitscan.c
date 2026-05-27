@@ -19,13 +19,7 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "slitscan.h"
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
-#include <omp.h>
 
 #define SS_PARAMS       12
 #define SS_HISTORY_MAX  32
@@ -1357,7 +1351,22 @@ vj_effect *slitscan_init(int w, int h)
         "Chroma Amount",
         "Reset Memory"
     );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Sculpture Mode */
+        VJ_BEAT_INTENSITY,     VJ_BEAT_F_CONTINUOUS,                                        18,                 100,                10, 38, 1000, 2600, 0,   65,    /* Time Amount */
+        VJ_BEAT_MEMORY,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                  4,                  28,                 6,  22, 1800, 4200, 900, 30,    /* Time Depth */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Time Source */
+        VJ_BEAT_SOURCE_MIX,    VJ_BEAT_F_CONTINUOUS,                                        8,                  88,                 8,  30, 1200, 3000, 0,   48,    /* Source Mix */
+        VJ_BEAT_MOTION_REACT,  VJ_BEAT_F_CONTINUOUS,                                        8,                  92,                 10, 38, 1000, 2600, 0,   62,    /* Motion Reactivity */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Time Animation */
+        VJ_BEAT_COLOR_PHASE,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                       0,                  1000,               8,  30, 1200, 3000, 0,   45,    /* Time Offset */
+        VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS,                                        35,                 220,                8,  30, 1200, 3000, 0,   50,    /* Time Scale */
+        VJ_BEAT_MEMORY,        VJ_BEAT_F_CONTINUOUS,                                        0,                  82,                 8,  32, 1200, 3200, 0,   50,    /* Temporal Smoothing */
+        VJ_BEAT_COLOR_AMOUNT,  VJ_BEAT_F_CONTINUOUS,                                        0,                  100,                8,  30, 1200, 3000, 0,   45,    /* Chroma Amount */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Reset Memory */
+    );
     (void) w;
     (void) h;
     return ve;

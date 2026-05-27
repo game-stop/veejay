@@ -18,12 +18,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <config.h>
-#include <string.h>
-#include <math.h>
-#include <omp.h>
 #include "common.h"
-#include <veejaycore/vjmem.h>
+#include "chromawarp.h"
 
 #define CLAMP(x,a,b) ((x) < (a) ? (a) : ((x) > (b) ? (b) : (x)))
 
@@ -87,7 +83,15 @@ vj_effect *chromawarp_init(int w, int h)
             "Mix",
             "Temporal Smooth",
             "Directional Bias");
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                         2,                  42,                 14, 52,  800,  2200, 0,   80,    /* Warp Strength */
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,         0,                  360,                10, 38,  1200, 3000, 0,   55,    /* Flow Rotation */
+        VJ_BEAT_ALPHA_OR_OPACITY,   VJ_BEAT_F_REJECT,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,   -1000, /* Mix */
+        VJ_BEAT_INERTIA,            VJ_BEAT_F_PHRASE_ONLY,                        64,                 230,                8,  32,  1800, 4200, 900, 35,    /* Temporal Smooth */
+        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS,                         0,                  170,                10, 36,  1200, 3000, 0,   45     /* Directional Bias */
+    );
     return ve;
 }
 

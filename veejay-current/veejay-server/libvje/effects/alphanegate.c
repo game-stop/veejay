@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "alphanegate.h"
 
 vj_effect *alphanegate_init(int w, int h)

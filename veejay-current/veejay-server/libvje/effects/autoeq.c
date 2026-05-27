@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "autoeq.h"
 
 vj_effect *autoeq_init(int w, int h)

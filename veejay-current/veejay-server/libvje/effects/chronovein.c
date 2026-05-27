@@ -19,12 +19,9 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
+#include "chronovein.h"
 
-#define CHRONOVEIN_PARAMS 8
+#define CHRONOVEIN_PARAMS 11
 
 #define P_THRESHOLD       0
 #define P_GROWTH          1
@@ -34,6 +31,9 @@
 #define P_SOURCE_BLEED    5
 #define P_COLOR_MODE      6
 #define P_PULSE           7
+#define P_BEAT_PUSH       8
+#define P_VEIN_GAIN       9
+#define P_COLOR_ENERGY   10
 
 #define CV_COLOR_POLARITY 0
 #define CV_COLOR_THERMAL  1
@@ -90,6 +90,35 @@ static inline uint8_t cv_blend_fast_u8(uint8_t a, uint8_t b, int amount)
     return (uint8_t) (((int) a * (256 - amount) + (int) b * amount) >> 8);
 }
 
+static inline int cv_param1000_to_u8(int v)
+{
+    v = cv_clampi(v, 0, 1000);
+    return (v * 255 + 500) / 1000;
+}
+
+static inline int cv_gain1000_to_q8(int v)
+{
+    v = cv_clampi(v, 0, 1000);
+    return 64 + ((v * 384 + 500) / 1000);
+}
+
+static inline int cv_push_u8(int v, int push_q8, int gain_q8)
+{
+    v += (((255 - v) * push_q8 * gain_q8) + 32768) >> 16;
+    return cv_clampi(v, 0, 255);
+}
+
+static inline int cv_push_1000(int v, int push, int gain_q8)
+{
+    long n;
+
+    v = cv_clampi(v, 0, 1000);
+    push = cv_clampi(push, 0, 1000);
+    n = ((long) (1000 - v) * (long) push * (long) gain_q8) + 128000L;
+
+    return cv_clampi(v + (int) (n / 256000L), 0, 1000);
+}
+
 vj_effect *chronovein_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -114,36 +143,48 @@ vj_effect *chronovein_init(int w, int h)
     }
 
     ve->limits[0][P_THRESHOLD] = 0;
-    ve->limits[1][P_THRESHOLD] = 255;
-    ve->defaults[P_THRESHOLD] = 18;
+    ve->limits[1][P_THRESHOLD] = 1000;
+    ve->defaults[P_THRESHOLD] = 70;
 
     ve->limits[0][P_GROWTH] = 0;
-    ve->limits[1][P_GROWTH] = 255;
-    ve->defaults[P_GROWTH] = 180;
+    ve->limits[1][P_GROWTH] = 1000;
+    ve->defaults[P_GROWTH] = 706;
 
     ve->limits[0][P_CONDUCTIVITY] = 0;
-    ve->limits[1][P_CONDUCTIVITY] = 255;
-    ve->defaults[P_CONDUCTIVITY] = 150;
+    ve->limits[1][P_CONDUCTIVITY] = 1000;
+    ve->defaults[P_CONDUCTIVITY] = 588;
 
     ve->limits[0][P_DECAY] = 0;
-    ve->limits[1][P_DECAY] = 255;
-    ve->defaults[P_DECAY] = 185;
+    ve->limits[1][P_DECAY] = 1000;
+    ve->defaults[P_DECAY] = 725;
 
     ve->limits[0][P_BRANCH] = 0;
-    ve->limits[1][P_BRANCH] = 255;
-    ve->defaults[P_BRANCH] = 96;
+    ve->limits[1][P_BRANCH] = 1000;
+    ve->defaults[P_BRANCH] = 376;
 
     ve->limits[0][P_SOURCE_BLEED] = 0;
-    ve->limits[1][P_SOURCE_BLEED] = 255;
-    ve->defaults[P_SOURCE_BLEED] = 12;
+    ve->limits[1][P_SOURCE_BLEED] = 1000;
+    ve->defaults[P_SOURCE_BLEED] = 47;
 
     ve->limits[0][P_COLOR_MODE] = 0;
     ve->limits[1][P_COLOR_MODE] = 4;
     ve->defaults[P_COLOR_MODE] = CV_COLOR_ELECTRIC;
 
     ve->limits[0][P_PULSE] = 0;
-    ve->limits[1][P_PULSE] = 255;
-    ve->defaults[P_PULSE] = 64;
+    ve->limits[1][P_PULSE] = 1000;
+    ve->defaults[P_PULSE] = 250;
+
+    ve->limits[0][P_BEAT_PUSH] = 0;
+    ve->limits[1][P_BEAT_PUSH] = 1000;
+    ve->defaults[P_BEAT_PUSH] = 0;
+
+    ve->limits[0][P_VEIN_GAIN] = 0;
+    ve->limits[1][P_VEIN_GAIN] = 1000;
+    ve->defaults[P_VEIN_GAIN] = 500;
+
+    ve->limits[0][P_COLOR_ENERGY] = 0;
+    ve->limits[1][P_COLOR_ENERGY] = 1000;
+    ve->defaults[P_COLOR_ENERGY] = 500;
 
     ve->description = "Chronovein";
     ve->sub_format = 1;
@@ -153,16 +194,33 @@ vj_effect *chronovein_init(int w, int h)
 
     ve->param_description = vje_build_param_list(
         ve->num_params,
-        "Threshold",
-        "Growth",
+        "Trigger Gate",
+        "Vein Growth",
         "Conductivity",
-        "Decay",
-        "Branch",
+        "Memory Decay",
+        "Branching",
         "Source Bleed",
         "Color Mode",
-        "Pulse"
+        "Auto Pulse",
+        "Beat Push",
+        "Vein Gain",
+        "Color Energy"
     );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                    16,                 380,                6,  22,  1600, 3400, 700,  35,    /* Trigger Gate */
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     180,                920,                12, 52,  900,  2400, 0,    75,    /* Vein Growth */
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     80,                 860,                8,  38,  1000, 2800, 0,    55,    /* Conductivity */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                    360,                940,                6,  28,  1800, 4400, 900,  45,    /* Memory Decay */
+        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS,                     0,                  720,                8,  36,  1200, 3200, 0,    50,    /* Branching */
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                     0,                  280,                6,  28,  1200, 3000, 0,    35,    /* Source Bleed */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
+        VJ_BEAT_GLOW,         VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_CLIMAX_ONLY, 0,             620,                4,  24,  1800, 4200, 600,  25,    /* Auto Pulse */
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     0,                  1000,               18, 72,  450,  1500, 0,    95,    /* Beat Push */
+        VJ_BEAT_CONTRAST,     VJ_BEAT_F_CONTINUOUS,                     250,                920,                10, 46,  700,  1800, 0,    75,    /* Vein Gain */
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     260,                900,                8,  38,  900,  2200, 0,    55     /* Color Energy */
+    );
     return ve;
 }
 
@@ -694,6 +752,7 @@ static void cv_render_const(chronovein_t *c,
                             VJFrame *frame,
                             int source_bleed,
                             int pulse_gain,
+                            int color_energy_q8,
                             int on_u,
                             int on_v,
                             int off_u,
@@ -726,6 +785,7 @@ static void cv_render_const(chronovein_t *c,
 
         int ev_u;
         int ev_v;
+        int chroma_amount;
         int yy;
 
         PREV[i] = src_y;
@@ -753,19 +813,22 @@ static void cv_render_const(chronovein_t *c,
 
         ev_u = cv_blend_fast_u8((uint8_t) off_u, (uint8_t) on_u, pol);
         ev_v = cv_blend_fast_u8((uint8_t) off_v, (uint8_t) on_v, pol);
+        chroma_amount = (ev * color_energy_q8 + 128) >> 8;
+        chroma_amount = chroma_amount > 255 ? 255 : chroma_amount;
 
         yy = base_y + ev;
 
         Y[i] = (uint8_t) (yy > 255 ? 255 : yy);
-        U[i] = cv_blend_fast_u8(base_u, (uint8_t) ev_u, ev);
-        V[i] = cv_blend_fast_u8(base_v, (uint8_t) ev_v, ev);
+        U[i] = cv_blend_fast_u8(base_u, (uint8_t) ev_u, chroma_amount);
+        V[i] = cv_blend_fast_u8(base_v, (uint8_t) ev_v, chroma_amount);
     }
 }
 
 static void cv_render_source(chronovein_t *c,
                              VJFrame *frame,
                              int source_bleed,
-                             int pulse_gain)
+                             int pulse_gain,
+                             int color_energy_q8)
 {
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -796,6 +859,7 @@ static void cv_render_source(chronovein_t *c,
 
         int ev_u;
         int ev_v;
+        int chroma_amount;
         int yy;
 
         PREV[i] = src_y;
@@ -823,12 +887,14 @@ static void cv_render_source(chronovein_t *c,
 
         ev_u = cv_blend_fast_u8((uint8_t) (255 - src_u), src_u, pol);
         ev_v = cv_blend_fast_u8((uint8_t) (255 - src_v), src_v, pol);
+        chroma_amount = (ev * color_energy_q8 + 128) >> 8;
+        chroma_amount = chroma_amount > 255 ? 255 : chroma_amount;
 
         yy = base_y + ev;
 
         Y[i] = (uint8_t) (yy > 255 ? 255 : yy);
-        U[i] = cv_blend_fast_u8(base_u, (uint8_t) ev_u, ev);
-        V[i] = cv_blend_fast_u8(base_v, (uint8_t) ev_v, ev);
+        U[i] = cv_blend_fast_u8(base_u, (uint8_t) ev_u, chroma_amount);
+        V[i] = cv_blend_fast_u8(base_v, (uint8_t) ev_v, chroma_amount);
     }
 }
 
@@ -889,9 +955,17 @@ static void cv_render(chronovein_t *c,
                       VJFrame *frame,
                       int source_bleed,
                       int color_mode,
-                      int pulse)
+                      int pulse,
+                      int vein_gain,
+                      int color_energy)
 {
     int pulse_gain = cv_pulse_gain(c, pulse);
+    int vein_gain_q8 = cv_gain1000_to_q8(vein_gain);
+    int color_energy_q8 = cv_gain1000_to_q8(color_energy);
+
+    pulse_gain = (pulse_gain * vein_gain_q8 + 128) >> 8;
+    if(pulse_gain > 1024)
+        pulse_gain = 1024;
 
     switch(color_mode) {
         case CV_COLOR_WHITE:
@@ -899,20 +973,20 @@ static void cv_render(chronovein_t *c,
             break;
 
         case CV_COLOR_THERMAL:
-            cv_render_const(c, frame, source_bleed, pulse_gain, 84, 220, 212, 84);
+            cv_render_const(c, frame, source_bleed, pulse_gain, color_energy_q8, 84, 220, 212, 84);
             break;
 
         case CV_COLOR_SOURCE:
-            cv_render_source(c, frame, source_bleed, pulse_gain);
+            cv_render_source(c, frame, source_bleed, pulse_gain, color_energy_q8);
             break;
 
         case CV_COLOR_ELECTRIC:
-            cv_render_const(c, frame, source_bleed, pulse_gain, 54, 196, 210, 54);
+            cv_render_const(c, frame, source_bleed, pulse_gain, color_energy_q8, 54, 196, 210, 54);
             break;
 
         case CV_COLOR_POLARITY:
         default:
-            cv_render_const(c, frame, source_bleed, pulse_gain, 92, 226, 226, 92);
+            cv_render_const(c, frame, source_bleed, pulse_gain, color_energy_q8, 92, 226, 226, 92);
             break;
     }
 }
@@ -942,6 +1016,9 @@ void chronovein_apply(void *ptr, VJFrame *frame, int *args)
     int source_bleed;
     int color_mode;
     int pulse;
+    int beat_push;
+    int vein_gain;
+    int color_energy;
 
     int use_conduct;
     int use_branch;
@@ -949,14 +1026,41 @@ void chronovein_apply(void *ptr, VJFrame *frame, int *args)
     if(!c->seeded)
         cv_seed(c, frame);
 
-    threshold    = cv_clampi(args[P_THRESHOLD], 0, 255);
-    growth       = cv_clampi(args[P_GROWTH], 0, 255);
-    conductivity = cv_clampi(args[P_CONDUCTIVITY], 0, 255);
-    decay        = cv_clampi(args[P_DECAY], 0, 255);
-    branch       = cv_clampi(args[P_BRANCH], 0, 255);
-    source_bleed = cv_clampi(args[P_SOURCE_BLEED], 0, 255);
+    threshold    = cv_param1000_to_u8(args[P_THRESHOLD]);
+    growth       = cv_param1000_to_u8(args[P_GROWTH]);
+    conductivity = cv_param1000_to_u8(args[P_CONDUCTIVITY]);
+    decay        = cv_param1000_to_u8(args[P_DECAY]);
+    branch       = cv_param1000_to_u8(args[P_BRANCH]);
+    source_bleed = cv_param1000_to_u8(args[P_SOURCE_BLEED]);
     color_mode   = cv_clampi(args[P_COLOR_MODE], 0, 4);
-    pulse        = cv_clampi(args[P_PULSE], 0, 255);
+    pulse        = cv_param1000_to_u8(args[P_PULSE]);
+    beat_push    = cv_clampi(args[P_BEAT_PUSH], 0, 1000);
+    vein_gain    = cv_clampi(args[P_VEIN_GAIN], 0, 1000);
+    color_energy = cv_clampi(args[P_COLOR_ENERGY], 0, 1000);
+
+    if(beat_push > 0) {
+        int push_q8 = (beat_push * 256 + 500) / 1000;
+        int gate_drop = ((18 + (threshold >> 2)) * push_q8 + 128) >> 8;
+        int bleed_target = 120;
+
+        threshold -= gate_drop;
+        if(threshold < 0)
+            threshold = 0;
+
+        growth = cv_push_u8(growth, push_q8, 220);
+        conductivity = cv_push_u8(conductivity, push_q8, 120);
+        branch = cv_push_u8(branch, push_q8, 190);
+        pulse = cv_push_u8(pulse, push_q8, 230);
+
+        if(source_bleed < bleed_target) {
+            source_bleed += (((bleed_target - source_bleed) * push_q8 * 120) + 32768) >> 16;
+            if(source_bleed > bleed_target)
+                source_bleed = bleed_target;
+        }
+
+        vein_gain = cv_push_1000(vein_gain, beat_push, 190);
+        color_energy = cv_push_1000(color_energy, beat_push, 150);
+    }
 
     cv_build_luts_if_needed(
         c,
@@ -989,7 +1093,9 @@ void chronovein_apply(void *ptr, VJFrame *frame, int *args)
         frame,
         source_bleed,
         color_mode,
-        pulse
+        pulse,
+        vein_gain,
+        color_energy
     );
 
     c->frame++;

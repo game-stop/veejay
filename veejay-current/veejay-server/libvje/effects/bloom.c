@@ -17,12 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "bloom.h"
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
 
 vj_effect *bloom_init(int width, int height)
@@ -58,6 +55,15 @@ vj_effect *bloom_init(int width, int height)
             "Threshold",
             "Persistence"
         );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  2,   36,  8,  28,  1800, 3800, 900,  35, /* Radius */
+        VJ_BEAT_GLOW,          VJ_BEAT_F_CONTINUOUS,                        64,  240, 16, 58,  700,  1800, 0,    85, /* Intensity */
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_CONTINUOUS,                        96,  230, 10, 38,  1000, 2600, 0,    55, /* Threshold */
+        VJ_BEAT_MEMORY,        VJ_BEAT_F_PHRASE_ONLY,                       0,   180, 8,  34,  1800, 4200, 900,  45  /* Persistence */
+    );
 
     return ve;
 }

@@ -17,9 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "coloradjust.h"
 
 vj_effect *coloradjust_init(int w, int h)
@@ -46,6 +44,13 @@ vj_effect *coloradjust_init(int w, int h)
     ve->extra_frame = 0;
     ve->sub_format = -1;
     ve->has_user = 0;
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_COLOR_PHASE,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,  0,   360, 12, 42, 900,  2200, 0, 70, /* Degrees */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                    12,  190, 10, 38, 1000, 2600, 0, 60, /* Intensity */
+        VJ_BEAT_GLOW,         VJ_BEAT_F_CONTINUOUS,                    160, 520, 8,  32, 1200, 3000, 0, 45  /* Exposure */
+    );
     return ve;
 }
 

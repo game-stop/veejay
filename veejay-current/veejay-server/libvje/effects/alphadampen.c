@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "alphadampen.h"
 
 vj_effect *alphadampen_init(int w, int h)

@@ -18,8 +18,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <libvje/effects/common.h>
-#include <veejaycore/vjmem.h>
+#include "common.h"
 #include "3bar.h"
 
 vj_effect *bar_init(int width, int height)
@@ -54,6 +53,17 @@ vj_effect *bar_init(int width, int height)
 	ve->has_user = 0;
     ve->parallel = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Divider", "Top Y", "Bot Y", "Top X", "Bot X");
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_GRID_SIZE,          VJ_BEAT_F_PHRASE_ONLY,                    2,                  8,                  6,  18,  1600, 3200, 1200, 10,  /* Divider */
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,    0,                  height / 16 + 1,    18, 45,  700,  1800, 0,    55,  /* Top Y */
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,    0,                  height / 16 + 1,    18, 45,  700,  1800, 0,    55,  /* Bot Y */
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,    0,                  width / 20 + 1,     18, 50,  650,  1700, 0,    60,  /* Top X */
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,    0,                  width / 20 + 1,     18, 50,  650,  1700, 0,    60   /* Bot X */
+    );
+
     return ve;
 }
 

@@ -17,9 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
+
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "magicphotos.h"
 
 vj_effect *photoplay_init(int w, int h)
@@ -66,7 +65,13 @@ vj_effect *photoplay_init(int w, int h)
                                "TopRight to BottomLeft : Vertical",     // 6
                                "TopRight to BottomLeft : Horizontal",   // 7
                                "BottomLeft to TopRight : Vertical");    // 8
+	ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
 
+		VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 2,                  12,                 6, 20, 2200, 5200, 1800, 25,    /* Photos */
+		VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,    -1000, /* Waterfall */
+		VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,    -1000  /* Mode */
+	);
     return ve;
 }
 

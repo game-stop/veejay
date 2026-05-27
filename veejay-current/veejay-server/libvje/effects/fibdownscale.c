@@ -43,8 +43,13 @@ vj_effect *fibdownscale_init(int w, int h)
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints,ve->limits[0][1],0, "Down", "Rectangle" );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "Down", "Rectangle" );
+	ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
 
+		VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Mode */
+		VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,           1,                  5,                  6, 20, 2200, 5200, 1200, 20     /* Fib */
+	);
 	return ve;
 }
 

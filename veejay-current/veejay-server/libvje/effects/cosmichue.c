@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "cosmichue.h"
 
 vj_effect *cosmichue_init(int w, int h)
@@ -51,6 +50,14 @@ vj_effect *cosmichue_init(int w, int h)
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Amplitude", "Frequency", "Opacity", "Hue Shift" );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_COLOR_AMOUNT,      VJ_BEAT_F_CONTINUOUS,                    80,                 900,                12, 46, 1000, 2600, 0, 65,    /* Amplitude */
+        VJ_BEAT_GEOMETRY_FREQUENCY,VJ_BEAT_F_CONTINUOUS,                    40,                 700,                10, 38, 1200, 3000, 0, 55,    /* Frequency */
+        VJ_BEAT_ALPHA_OR_OPACITY,  VJ_BEAT_F_REJECT,                        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0, -1000, /* Opacity */
+        VJ_BEAT_COLOR_PHASE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,    0,                  3600,               12, 42, 900,  2400, 0, 70     /* Hue Shift */
+    );
     return ve;
 }
 

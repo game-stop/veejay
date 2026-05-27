@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "alphablend.h"
 
 vj_effect *alphablend_init(int w, int h)

@@ -18,7 +18,6 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "flashopacity.h"
 #ifdef HAVE_ARM
 #include <arm_neon.h>
@@ -57,7 +56,17 @@ vj_effect *flashopacity_init(int w, int h)
     ve->extra_frame = 1;
     ve->parallel = 0;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Exposure", "Start Opacity", "End Opacity" , "Interval", "Mode"); 
+    ve->param_description = vje_build_param_list( ve->num_params, "Exposure", "Start Opacity", "End Opacity" , "Interval", "Mode");
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_GLOW,             VJ_BEAT_F_CONTINUOUS,                             4,                  70,                 12, 46, 900,  2400, 0,   75,    /* Exposure */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                 VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Start Opacity */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                 VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* End Opacity */
+        VJ_BEAT_SPEED,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,        4,                  96,                 6,  22, 1800, 4200, 900, 30,    /* Interval */
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Mode */
+    );
+
     return ve;
 }
 

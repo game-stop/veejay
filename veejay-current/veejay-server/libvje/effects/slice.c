@@ -19,42 +19,117 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "slice.h"
 #include "motionmap.h"
 
 typedef struct {
-    uint8_t *slice_frame[4];
+    uint8_t *slice_frame[3];
     int *slice_xshift;
     int *slice_yshift;
     int frame_periods;
     int current_period;
+    int current_slices;
     int n__;
     int N__;
+    int n_threads;
     void *motionmap;
 } slice_t;
 
-void slice_recalc(slice_t *s, int width, int height, int val);
+static inline int slice_clampi(int v, int lo, int hi)
+{
+    return (v < lo) ? lo : (v > hi ? hi : v);
+}
 
-vj_effect *slice_init(int width,int height)
+static inline int slice_rand_range(int lo, int hi)
+{
+    if(hi <= lo)
+        return lo;
+
+    return lo + (rand() % (hi - lo + 1));
+}
+
+static void slice_recalc(slice_t *s, int width, int height, int val)
+{
+    val = slice_clampi(val, 2, 128);
+
+    int *restrict slice_xshift = s->slice_xshift;
+    int *restrict slice_yshift = s->slice_yshift;
+
+    const int half = val >> 1;
+    const int min_shift = -half;
+    const int max_shift = half;
+    const int min_run = 8;
+    const int max_run = 8 + (half > 1 ? half - 1 : 1);
+
+    int run = 0;
+    int shift = 0;
+
+    for(int x = 0; x < width; x++) {
+        if(run <= 0) {
+            shift = slice_rand_range(min_shift, max_shift);
+            run = slice_rand_range(min_run, max_run);
+        } else {
+            run--;
+        }
+
+        slice_yshift[x] = shift;
+    }
+
+    run = 0;
+    shift = 0;
+
+    for(int y = 0; y < height; y++) {
+        if(run <= 0) {
+            shift = slice_rand_range(min_shift, max_shift);
+            run = slice_rand_range(min_run, max_run);
+        } else {
+            run--;
+        }
+
+        slice_xshift[y] = shift;
+    }
+
+    s->current_slices = val;
+}
+
+vj_effect *slice_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 2;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
     ve->limits[0][0] = 2;
     ve->limits[1][0] = 128;
+    ve->defaults[0] = 63;
+
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 8 * 30;
-    ve->defaults[0] = 63;
     ve->defaults[1] = 0;
+
     ve->description = "Slice Window";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-	ve->motion = 1;
-	ve->param_description = vje_build_param_list( ve->num_params, "Slices", "Slice Period");
+    ve->motion = 1;
+    ve->has_user = 0;
+
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Slices",
+        "Slice Period"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_WARP,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 4,  96,  6, 22, 1800, 4200, 900, 30, /* Slices */
+        VJ_BEAT_SPEED,  VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                            0,  180, 6, 22, 1800, 4200, 900, 30  /* Slice Period */
+    );
+
+    (void) width;
+    (void) height;
 
     return ve;
 }
@@ -62,178 +137,186 @@ vj_effect *slice_init(int width,int height)
 void *slice_malloc(int width, int height)
 {
     slice_t *s = (slice_t*) vj_calloc(sizeof(slice_t));
-    if(!s) {
+    if(!s)
         return NULL;
-    }
-    s->slice_frame[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * (width * height * 4));
+
+    const int len = width * height;
+
+    s->slice_frame[0] = (uint8_t*) vj_malloc((size_t)len * 3u);
     if(!s->slice_frame[0]) {
-	    free(s);
+        free(s);
         return NULL;
     }
-    s->slice_frame[1] = s->slice_frame[0] + (width * height);
-    s->slice_frame[2] = s->slice_frame[1] + (width * height);
-	s->slice_frame[3] = s->slice_frame[2] + (width * height);
+
+    s->slice_frame[1] = s->slice_frame[0] + len;
+    s->slice_frame[2] = s->slice_frame[1] + len;
+
     s->slice_xshift = (int*) vj_malloc(sizeof(int) * height);
     if(!s->slice_xshift) {
         free(s->slice_frame[0]);
         free(s);
         return NULL;
     }
+
     s->slice_yshift = (int*) vj_malloc(sizeof(int) * width);
     if(!s->slice_yshift) {
-        free(s->slice_frame[0]);
         free(s->slice_xshift);
+        free(s->slice_frame[0]);
         free(s);
         return NULL;
     }
 
-    slice_recalc(s, width,height, 63);
-    
+    s->frame_periods = 0;
+    s->current_period = 0;
+    s->current_slices = -1;
+    s->n__ = 0;
+    s->N__ = 0;
+    s->motionmap = NULL;
+
+    s->n_threads = vje_advise_num_threads(len);
+    if(s->n_threads < 1)
+        s->n_threads = 1;
+
+    slice_recalc(s, width, height, 63);
+
     return (void*) s;
 }
 
-
-void slice_free(void *ptr) {
+void slice_free(void *ptr)
+{
     slice_t *s = (slice_t*) ptr;
-    free(s->slice_frame[0]);
-    free(s->slice_xshift);
-    free(s->slice_yshift);
+    if(!s)
+        return;
+
+    if(s->slice_frame[0])
+        free(s->slice_frame[0]);
+    if(s->slice_xshift)
+        free(s->slice_xshift);
+    if(s->slice_yshift)
+        free(s->slice_yshift);
+
     free(s);
 }
 
-/* much like the bathroom window, width height indicate block size within frame */
-void slice_recalc(slice_t *s, int width, int height, int val) {
-  unsigned int x,y,dx,dy,r;
-
-  int *slice_xshift = s->slice_xshift;
-  int *slice_yshift = s->slice_yshift;
-
-  const int hval = val >> 1;
-  for(x = dx = 0; x < width; x++) 
-  {
-    if(dx==0)
-	{ 
-		r = ((rand() & val))-( hval + 1); 
-		dx = 8 + (rand() & ( hval - 1));
-	}
-	else
-	{
-		 dx--;
-	}
-    slice_yshift[x] = r;
-  }
- 
-  for(y=dy=0; y < height; y++) {
-  	if(dy==0)
-  	{
-		r = (rand() & val)-(hval + 1);
-		dy = 8 + (rand() & (hval-1));
-  	}
-  	else
-  	{
-		dy--;
-  	}
-  	slice_xshift[y] = r;
-  }
-}
-
-void slice_apply(void *ptr, VJFrame *frame, int *args ) {
-    int val = args[0];
-    int re_init = args[1];
-	unsigned int x,y,dx,dy;
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-
+void slice_apply(void *ptr, VJFrame *frame, int *args)
+{
     slice_t *s = (slice_t*) ptr;
 
-	int interpolate = 1;
-	int tmp1 = val;
-	int tmp2 = re_init;
-	int motion = 0;
+    if(!s || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
+        return;
+
+    const int width = frame->width;
+    const int height = frame->height;
+    const int len = frame->len;
+
+    if(width <= 0 || height <= 0 || len <= 0)
+        return;
+
+    int val = slice_clampi(args[0], 2, 128);
+    int re_init = slice_clampi(args[1], 0, 8 * 30);
+
+    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
     uint8_t **slice_frame = s->slice_frame;
-    int *slice_xshift = s->slice_xshift;
-    int *slice_yshift = s->slice_yshift;
+    int *restrict slice_xshift = s->slice_xshift;
+    int *restrict slice_yshift = s->slice_yshift;
 
-	if( s->frame_periods != re_init ) {
-		s->frame_periods = re_init;
-		s->current_period = s->frame_periods;
-	}
+    int interpolate = 0;
+    int motion = 0;
+    int tmp1 = val;
+    int tmp2 = re_init;
 
-	if( motionmap_active(s->motionmap))
-	{
-		motionmap_scale_to(s->motionmap, 128,1, 2, 0, &tmp1, &tmp2, &(s->n__) , &(s->N__) );
-		if( val >= 64 )
-		{
-			if( (rand() % 25 )== 0)
-				tmp2 = 1;
-		}
-		else
-		{
-			tmp2 = 1;
-		}
-		motion = 1;
-	}
-	else
-	{
-		s->n__ = 0;
-		s->N__ = 0;
-	}
+    if(s->frame_periods != re_init) {
+        s->frame_periods = re_init;
+        s->current_period = re_init;
+    }
 
-	if( s->n__ == s->N__ || s->n__ == 0 )
-		interpolate = 0;
+    if(s->motionmap && motionmap_active(s->motionmap)) {
+        motionmap_scale_to(
+            s->motionmap,
+            128,
+            1,
+            2,
+            0,
+            &tmp1,
+            &tmp2,
+            &(s->n__),
+            &(s->N__)
+        );
 
-  if( motionmap_active(s->motionmap) ) {
-	 if(tmp2==1) slice_recalc(s,width,height,tmp1);
-  }
-  else {
-		s->current_period --;
-	  
-		if (s->current_period == 0 ) {
-			slice_recalc(s,width,height,tmp1);
-		}
-		if( s->current_period <= 0 ) {
-			s->current_period = s->frame_periods;
-		}
-  }
+        tmp1 = slice_clampi(tmp1, 2, 128);
 
-	int strides[4] = { len, len, len, 0 };
-	vj_frame_copy( frame->data, slice_frame, strides );  
+        if(tmp1 >= 64) {
+            tmp2 = ((rand() % 25) == 0) ? 1 : 0;
+        } else {
+            tmp2 = 1;
+        }
 
-	for(y=0; y < height; y++){ 
-	 	for(x=0; x < width; x++) {
-			dx = x + slice_xshift[y];
-			dy = y + slice_yshift[x];
-			if(dx < width && dy < height && dx >= 0 && dy >= 0)
-			{
-				Y[(y*width)+x] = slice_frame[0][(dy*width)+dx];
-				Cb[(y*width)+x] = slice_frame[1][(dy*width)+dx];
-				Cr[(y*width)+x] = slice_frame[2][(dy*width)+dx];
-				//A[(y*width)+x] = slice_frame[3][(dy*width)+dx];
-			}
-		}
-	}
+        motion = 1;
+        interpolate = !(s->n__ == s->N__ || s->n__ == 0);
+    } else {
+        s->n__ = 0;
+        s->N__ = 0;
+    }
 
+    if(motion) {
+        if(tmp2 == 1)
+            slice_recalc(s, width, height, tmp1);
+    } else {
+        if(re_init > 0) {
+            s->current_period--;
 
-	if( interpolate )
-		motionmap_interpolate_frame( s->motionmap, frame, s->N__, s->n__ );
+            if(s->current_period <= 0) {
+                slice_recalc(s, width, height, val);
+                s->current_period = s->frame_periods;
+            }
+        } else if(val != s->current_slices) {
+            slice_recalc(s, width, height, val);
+        }
+    }
 
-	if( motion )
-		motionmap_store_frame( s->motionmap, frame );
+    veejay_memcpy(slice_frame[0], Y,  len);
+    veejay_memcpy(slice_frame[1], Cb, len);
+    veejay_memcpy(slice_frame[2], Cr, len);
 
+#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+    for(int y = 0; y < height; y++) {
+        const int row = y * width;
+        const int y_shift = slice_xshift[y];
+
+        for(int x = 0; x < width; x++) {
+            const int dx = x + y_shift;
+            const int dy = y + slice_yshift[x];
+
+            if((unsigned)dx < (unsigned)width && (unsigned)dy < (unsigned)height) {
+                const int dst = row + x;
+                const int src = dy * width + dx;
+
+                Y[dst]  = slice_frame[0][src];
+                Cb[dst] = slice_frame[1][src];
+                Cr[dst] = slice_frame[2][src];
+            }
+        }
+    }
+
+    if(interpolate)
+        motionmap_interpolate_frame(s->motionmap, frame, s->N__, s->n__);
+
+    if(motion)
+        motionmap_store_frame(s->motionmap, frame);
 }
 
-int slice_request_fx(void) {
+int slice_request_fx(void)
+{
     return VJ_IMAGE_EFFECT_MOTIONMAP_ID;
 }
 
 void slice_set_motionmap(void *ptr, void *priv)
 {
     slice_t *s = (slice_t*) ptr;
-    s->motionmap = priv;
-}
 
+    if(s)
+        s->motionmap = priv;
+}

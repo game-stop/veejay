@@ -17,9 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "buffer.h"
 
 /* very simple effect that stores frames in a buffer and plays them once a certain number of frames are stored,
@@ -44,6 +42,11 @@ vj_effect *buffer_init(int w, int h)
     ve->description = "Frame Delay";
     ve->sub_format = -1;
     ve->param_description = vje_build_param_list( ve->num_params, "Frame Delay" );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_MEMORY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 0, 300, 6, 24, 2200, 5200, 2000, 25 /* Frame Delay */
+    );
     return ve;
 }
 

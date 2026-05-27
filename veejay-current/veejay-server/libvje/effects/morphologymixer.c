@@ -17,15 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <veejaycore/defs.h>
-#include <libvje/vje.h>
-#include <veejaycore/vjmem.h>
+
 #include "common.h"
+#include "morphologymixer.h"
 
 #define FLOW_SHIFT 4                   
 #define FLOW_SIZE (1 << FLOW_SHIFT)    
@@ -92,7 +86,15 @@ vj_effect *morphologymixer_init(int w, int h)
             "Response",
             "Stability"
         );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                         12,                 235,                10, 38, 1000, 2600, 0,   60,    /* Mix Progress */
+        VJ_BEAT_WARP,       VJ_BEAT_F_CONTINUOUS,                         8,                  190,                12, 46, 900,  2400, 0,   75,    /* Warp Intensity */
+        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Mode */
+        VJ_BEAT_MOTION_REACT,VJ_BEAT_F_CONTINUOUS,                        48,                 230,                10, 38, 1000, 2600, 0,   60,    /* Response */
+        VJ_BEAT_INERTIA,    VJ_BEAT_F_CONTINUOUS,                         40,                 245,                8,  32, 1200, 3200, 0,   50     /* Stability */
+    );
     return ve;
 }
 

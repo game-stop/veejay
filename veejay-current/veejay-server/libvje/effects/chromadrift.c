@@ -1,23 +1,3 @@
-/* 
- * Linux VeeJay
- *
- * Copyright(C)2026 Niels Elburg <nwelburg@gmail.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
- */
-#include <config.h>
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "chromadrift.h"
@@ -26,18 +6,20 @@
 #include <string.h>
 #include <stdint.h>
 
-#define EH_PARAMS 10
+#define EH_PARAMS 11
 
-#define P_SOURCE  0
-#define P_DRIFT   1
-#define P_CONTOUR 2
-#define P_GLOW    3
-#define P_PULL    4
-#define P_CURL    5
-#define P_TRAIL   6
-#define P_COLOR   7
-#define P_SPEED   8
-#define P_SOFT    9
+#define P_SOURCE    0
+#define P_DRIFT     1
+#define P_CONTOUR   2
+#define P_GLOW      3
+#define P_PULL      4
+#define P_CURL      5
+#define P_TRAIL     6
+#define P_COLOR     7
+#define P_SPEED     8
+#define P_SOFT      9
+#define P_BEAT_PUSH 10
+
 
 #define EH_TRIG_SIZE 1024
 #define EH_TRIG_MASK 1023
@@ -103,6 +85,45 @@ static inline int eh_clampi(int v, int lo, int hi)
 static inline float eh_clampf(float v, float lo, float hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline int eh_param1000_to_100(int v)
+{
+    v = eh_clampi(v, 0, 1000);
+    return (v * 100 + 500) / 1000;
+}
+
+static inline int eh_param1000_to_signed100(int v)
+{
+    v = eh_clampi(v, -1000, 1000);
+    if (v < 0)
+        return -((-v * 100 + 500) / 1000);
+    return (v * 100 + 500) / 1000;
+}
+
+static inline int eh_mix_i100(int a, int b, int q)
+{
+    int d;
+
+    q = eh_clampi(q, 0, 100);
+    d = (b - a) * q;
+
+    if (d < 0)
+        return a + ((d - 50) / 100);
+
+    return a + ((d + 50) / 100);
+}
+
+static inline int eh_beat_shape100(int beat_push)
+{
+    int q;
+    int shaped;
+
+    beat_push = eh_clampi(beat_push, 0, 1000);
+    q = (beat_push * 255 + 500) / 1000;
+    shaped = (q * q + 127) / 255;
+
+    return (shaped * 100 + 127) / 255;
 }
 
 static inline int eh_absi(int v)
@@ -552,18 +573,19 @@ vj_effect *chromadrift_init(int w, int h)
         return NULL;
     }
 
-    ve->limits[0][P_SOURCE] = 0; ve->limits[1][P_SOURCE] = 100; ve->defaults[P_SOURCE] = 42;
-    ve->limits[0][P_DRIFT] = 0; ve->limits[1][P_DRIFT] = 100; ve->defaults[P_DRIFT] = 22;
-    ve->limits[0][P_CONTOUR] = 0; ve->limits[1][P_CONTOUR] = 100; ve->defaults[P_CONTOUR] = 58;
-    ve->limits[0][P_GLOW] = 0; ve->limits[1][P_GLOW] = 100; ve->defaults[P_GLOW] = 30;
-    ve->limits[0][P_PULL] = 0; ve->limits[1][P_PULL] = 100; ve->defaults[P_PULL] = 36;
-    ve->limits[0][P_CURL] = -100; ve->limits[1][P_CURL] = 100; ve->defaults[P_CURL] = 46;
-    ve->limits[0][P_TRAIL] = 0; ve->limits[1][P_TRAIL] = 100; ve->defaults[P_TRAIL] = 64;
-    ve->limits[0][P_COLOR] = 0; ve->limits[1][P_COLOR] = 100; ve->defaults[P_COLOR] = 54;
-    ve->limits[0][P_SPEED] = -100; ve->limits[1][P_SPEED] = 100; ve->defaults[P_SPEED] = 30;
-    ve->limits[0][P_SOFT] = 0; ve->limits[1][P_SOFT] = 100; ve->defaults[P_SOFT] = 46;
+    ve->limits[0][P_SOURCE] = 0; ve->limits[1][P_SOURCE] = 1000; ve->defaults[P_SOURCE] = 420;
+    ve->limits[0][P_DRIFT] = 0; ve->limits[1][P_DRIFT] = 1000; ve->defaults[P_DRIFT] = 220;
+    ve->limits[0][P_CONTOUR] = 0; ve->limits[1][P_CONTOUR] = 1000; ve->defaults[P_CONTOUR] = 580;
+    ve->limits[0][P_GLOW] = 0; ve->limits[1][P_GLOW] = 1000; ve->defaults[P_GLOW] = 300;
+    ve->limits[0][P_PULL] = 0; ve->limits[1][P_PULL] = 1000; ve->defaults[P_PULL] = 360;
+    ve->limits[0][P_CURL] = -1000; ve->limits[1][P_CURL] = 1000; ve->defaults[P_CURL] = 460;
+    ve->limits[0][P_TRAIL] = 0; ve->limits[1][P_TRAIL] = 1000; ve->defaults[P_TRAIL] = 640;
+    ve->limits[0][P_COLOR] = 0; ve->limits[1][P_COLOR] = 1000; ve->defaults[P_COLOR] = 540;
+    ve->limits[0][P_SPEED] = -1000; ve->limits[1][P_SPEED] = 1000; ve->defaults[P_SPEED] = 300;
+    ve->limits[0][P_SOFT] = 0; ve->limits[1][P_SOFT] = 1000; ve->defaults[P_SOFT] = 460;
+    ve->limits[0][P_BEAT_PUSH] = 0; ve->limits[1][P_BEAT_PUSH] = 1000; ve->defaults[P_BEAT_PUSH] = 0;
 
-    ve->description = "Chroma Drift";
+    ve->description = "Spectral Ink Current";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->parallel = 0;
@@ -580,9 +602,24 @@ vj_effect *chromadrift_init(int w, int h)
         "Trail Memory",
         "Pastel Palette",
         "Motion Speed",
-        "Surface Softness"
+        "Surface Softness",
+        "Beat Push"
     );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_REJECT,                                      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Source Feed */
+        VJ_BEAT_DRIFT,        VJ_BEAT_F_CONTINUOUS,                                  80,                 760,                8,  30,  1000, 2600, 0,    52,    /* Ink Drift */
+        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS,                                  180,                920,                10, 42,  800,  2200, 0,    68,    /* Contour Current */
+        VJ_BEAT_GLOW,         VJ_BEAT_F_CONTINUOUS,                                  80,                 820,                10, 38,  900,  2400, 0,    60,    /* Aurora Glow */
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS,                                  80,                 860,                10, 40,  900,  2400, 0,    60,    /* Luma Pull */
+        VJ_BEAT_DRIFT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                  -760,               760,                8,  28,  1200, 3200, 400,  38,    /* Curl Direction */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                                 360,                900,                6,  24,  1800, 4200, 1200, 34,    /* Trail Memory */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                                  120,                900,                8,  30,  1000, 2600, 0,    48,    /* Pastel Palette */
+        VJ_BEAT_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                  -760,               760,                8,  30,  1000, 2600, 400,  44,    /* Motion Speed */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS,                                  80,                 760,                8,  30,  1000, 2600, 0,    34,    /* Surface Softness */
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                                  0,                  850,                16, 72,  80,   720,  0,    100     /* Beat Push */
+    );
     (void) w;
     (void) h;
     return ve;
@@ -1093,6 +1130,18 @@ void chromadrift_apply(void *ptr, VJFrame *frame, int *args)
     int color_i;
     int speed_i;
     int soft_i;
+    int beat_push_i;
+    int beat_drive_i;
+    int source_user_i;
+    int drift_user_i;
+    int contour_user_i;
+    int glow_user_i;
+    int pull_user_i;
+    int curl_user_i;
+    int trail_user_i;
+    int color_user_i;
+    int speed_user_i;
+    int soft_user_i;
     float build_t;
     float source_t;
     float drift_t;
@@ -1157,16 +1206,49 @@ void chromadrift_apply(void *ptr, VJFrame *frame, int *args)
     if (!e->seeded)
         eh_seed(e, frame);
 
-    source_i = eh_clampi(args[P_SOURCE], 0, 100);
-    drift_i = eh_clampi(args[P_DRIFT], 0, 100);
-    contour_i = eh_clampi(args[P_CONTOUR], 0, 100);
-    glow_i = eh_clampi(args[P_GLOW], 0, 100);
-    pull_i = eh_clampi(args[P_PULL], 0, 100);
-    curl_i = eh_clampi(args[P_CURL], -100, 100);
-    trail_i = eh_clampi(args[P_TRAIL], 0, 100);
-    color_i = eh_clampi(args[P_COLOR], 0, 100);
-    speed_i = eh_clampi(args[P_SPEED], -100, 100);
-    soft_i = eh_clampi(args[P_SOFT], 0, 100);
+    source_user_i = eh_param1000_to_100(args[P_SOURCE]);
+    drift_user_i = eh_param1000_to_100(args[P_DRIFT]);
+    contour_user_i = eh_param1000_to_100(args[P_CONTOUR]);
+    glow_user_i = eh_param1000_to_100(args[P_GLOW]);
+    pull_user_i = eh_param1000_to_100(args[P_PULL]);
+    curl_user_i = eh_param1000_to_signed100(args[P_CURL]);
+    trail_user_i = eh_param1000_to_100(args[P_TRAIL]);
+    color_user_i = eh_param1000_to_100(args[P_COLOR]);
+    speed_user_i = eh_param1000_to_signed100(args[P_SPEED]);
+    soft_user_i = eh_param1000_to_100(args[P_SOFT]);
+
+    beat_push_i = eh_clampi(args[P_BEAT_PUSH], 0, 1000);
+    beat_drive_i = eh_beat_shape100(beat_push_i);
+
+    source_i = source_user_i;
+    trail_i = trail_user_i;
+
+    drift_i = eh_mix_i100(drift_user_i, 78, beat_drive_i);
+    contour_i = eh_mix_i100(contour_user_i, 94, beat_drive_i);
+    glow_i = eh_mix_i100(glow_user_i, 82, beat_drive_i);
+    pull_i = eh_mix_i100(pull_user_i, 86, beat_drive_i);
+    color_i = eh_mix_i100(color_user_i, 88, beat_drive_i);
+
+    if (curl_user_i < 0)
+        curl_i = eh_mix_i100(curl_user_i, -82, beat_drive_i);
+    else
+        curl_i = eh_mix_i100(curl_user_i, 82, beat_drive_i);
+
+    if (speed_user_i < 0)
+        speed_i = eh_mix_i100(speed_user_i, -76, beat_drive_i);
+    else
+        speed_i = eh_mix_i100(speed_user_i, 76, beat_drive_i);
+
+    soft_i = eh_mix_i100(soft_user_i, 22, beat_drive_i >> 1);
+
+    drift_i = eh_clampi(drift_i, 0, 100);
+    contour_i = eh_clampi(contour_i, 0, 100);
+    glow_i = eh_clampi(glow_i, 0, 100);
+    pull_i = eh_clampi(pull_i, 0, 100);
+    curl_i = eh_clampi(curl_i, -100, 100);
+    color_i = eh_clampi(color_i, 0, 100);
+    speed_i = eh_clampi(speed_i, -100, 100);
+    soft_i = eh_clampi(soft_i, 0, 100);
 
     build_i = 66;
     decay_i = eh_clampi(44 + (trail_i * 42 + 50) / 100 + (soft_i * 20 + 50) / 100, 0, 100);

@@ -60,6 +60,12 @@ vj_effect *porterduff_init(int w,int h)
     vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
         "Dest", "Dest Atop", "Dest In", "Dest Over", "Dest Out", "Src Over", "Src Atop", "Src In", "Src Out", "Multiply", "Xor", "Add", "Subtract", "Divide", "Screen" , "Overlay" );
 
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000 /* Operator */
+    );
+
+
     return ve;
 }
 

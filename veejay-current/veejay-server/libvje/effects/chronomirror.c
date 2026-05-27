@@ -18,14 +18,11 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
+#include "chronomirror.h"
 
-#define CHRONOSMOKE_PARAMS 8
+#define CHRONOSMOKE_PARAMS 11
 
-#define P_THRESHOLD     0
+#define P_TRIGGER_GATE  0
 #define P_RISE          1
 #define P_CURL          2
 #define P_DECAY         3
@@ -33,6 +30,9 @@
 #define P_SOURCE_BLEED  5
 #define P_COLOR_MODE    6
 #define P_TURBULENCE    7
+#define P_BEAT_PUSH     8
+#define P_PLUME_GAIN    9
+#define P_COLOR_ENERGY 10
 
 #define CS_COLOR_POLARITY 0
 #define CS_COLOR_THERMAL  1
@@ -75,6 +75,8 @@ typedef struct {
     uint8_t curl_lut[256];
     uint8_t spread_lut[256];
     uint8_t density_lut[256];
+    uint8_t plume_gain_lut[256];
+    uint8_t chroma_energy_lut[256];
 
     uint8_t bleed_y_lut[256];
     uint8_t bleed_uv_lut[256];
@@ -82,6 +84,7 @@ typedef struct {
 
     int field_lut_valid;
     int bleed_lut_valid;
+    int render_lut_valid;
 
     int last_threshold;
     int last_rise;
@@ -90,11 +93,42 @@ typedef struct {
     int last_density;
     int last_source_bleed;
     int last_turbulence;
+    int last_plume_gain;
+    int last_color_energy;
 } chronomirror_t;
 
 static inline int cs_clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline int cs_param1000_to_u8(int v)
+{
+    v = cs_clampi(v, 0, 1000);
+    return (v * 255 + 500) / 1000;
+}
+
+static inline int cs_u8_to_param1000(int v)
+{
+    v = cs_clampi(v, 0, 255);
+    return (v * 1000 + 127) / 255;
+}
+
+static inline int cs_mix_u8(int a, int b, int q)
+{
+    return a + (((b - a) * q + 127) / 255);
+}
+
+static inline int cs_push_u8(int a, int b, int q)
+{
+    if(b <= a)
+        return a;
+    return cs_mix_u8(a, b, q);
+}
+
+static inline uint8_t cs_u8(int v)
+{
+    return (uint8_t) cs_clampi(v, 0, 255);
 }
 
 static inline int cs_absi(int v)
@@ -184,37 +218,49 @@ vj_effect *chronomirror_init(int w, int h)
         return NULL;
     }
 
-    ve->limits[0][P_THRESHOLD] = 0;
-    ve->limits[1][P_THRESHOLD] = 255;
-    ve->defaults[P_THRESHOLD] = 16;
+    ve->limits[0][P_TRIGGER_GATE] = 0;
+    ve->limits[1][P_TRIGGER_GATE] = 1000;
+    ve->defaults[P_TRIGGER_GATE] = cs_u8_to_param1000(16);
 
     ve->limits[0][P_RISE] = 0;
-    ve->limits[1][P_RISE] = 255;
-    ve->defaults[P_RISE] = 165;
+    ve->limits[1][P_RISE] = 1000;
+    ve->defaults[P_RISE] = cs_u8_to_param1000(165);
 
     ve->limits[0][P_CURL] = 0;
-    ve->limits[1][P_CURL] = 255;
-    ve->defaults[P_CURL] = 95;
+    ve->limits[1][P_CURL] = 1000;
+    ve->defaults[P_CURL] = cs_u8_to_param1000(95);
 
     ve->limits[0][P_DECAY] = 0;
-    ve->limits[1][P_DECAY] = 255;
-    ve->defaults[P_DECAY] = 215;
+    ve->limits[1][P_DECAY] = 1000;
+    ve->defaults[P_DECAY] = cs_u8_to_param1000(215);
 
     ve->limits[0][P_DENSITY] = 0;
-    ve->limits[1][P_DENSITY] = 255;
-    ve->defaults[P_DENSITY] = 170;
+    ve->limits[1][P_DENSITY] = 1000;
+    ve->defaults[P_DENSITY] = cs_u8_to_param1000(170);
 
     ve->limits[0][P_SOURCE_BLEED] = 0;
-    ve->limits[1][P_SOURCE_BLEED] = 255;
-    ve->defaults[P_SOURCE_BLEED] = 12;
+    ve->limits[1][P_SOURCE_BLEED] = 1000;
+    ve->defaults[P_SOURCE_BLEED] = cs_u8_to_param1000(12);
 
     ve->limits[0][P_COLOR_MODE] = 0;
     ve->limits[1][P_COLOR_MODE] = 4;
     ve->defaults[P_COLOR_MODE] = CS_COLOR_POLARITY;
 
     ve->limits[0][P_TURBULENCE] = 0;
-    ve->limits[1][P_TURBULENCE] = 255;
-    ve->defaults[P_TURBULENCE] = 80;
+    ve->limits[1][P_TURBULENCE] = 1000;
+    ve->defaults[P_TURBULENCE] = cs_u8_to_param1000(80);
+
+    ve->limits[0][P_BEAT_PUSH] = 0;
+    ve->limits[1][P_BEAT_PUSH] = 1000;
+    ve->defaults[P_BEAT_PUSH] = 0;
+
+    ve->limits[0][P_PLUME_GAIN] = 0;
+    ve->limits[1][P_PLUME_GAIN] = 1000;
+    ve->defaults[P_PLUME_GAIN] = 500;
+
+    ve->limits[0][P_COLOR_ENERGY] = 0;
+    ve->limits[1][P_COLOR_ENERGY] = 1000;
+    ve->defaults[P_COLOR_ENERGY] = 500;
 
     ve->description = "Chronosmoke";
     ve->sub_format = 1;
@@ -224,16 +270,33 @@ vj_effect *chronomirror_init(int w, int h)
 
     ve->param_description = vje_build_param_list(
         ve->num_params,
-        "Threshold",
-        "Rise",
-        "Curl",
-        "Decay",
-        "Density",
+        "Trigger Gate",
+        "Smoke Rise",
+        "Curl Flow",
+        "Memory Decay",
+        "Smoke Density",
         "Source Bleed",
         "Color Mode",
-        "Turbulence"
+        "Turbulence",
+        "Beat Push",
+        "Plume Gain",
+        "Color Energy"
     );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                    24,                 260,                5,  18,  1800, 4200, 1200, -28,    /* Trigger Gate */
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     180,                900,                12, 48,  900,  2400, 0,    76,     /* Smoke Rise */
+        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS,                     60,                 820,                8,  34,  900,  2600, 0,    58,     /* Curl Flow */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                    460,                1000,               5,  24,  2200, 5200, 1400, 34,     /* Memory Decay */
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     160,                920,                10, 42,  900,  2400, 0,    68,     /* Smoke Density */
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                     0,                  320,                6,  26,  1000, 2600, 0,    32,     /* Source Bleed */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Color Mode */
+        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,              760,                8,  34,  1200, 3600, 500,  44,     /* Turbulence */
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     0,                  1000,               18, 80,  60,   650,  0,    100,    /* Beat Push */
+        VJ_BEAT_GLOW,         VJ_BEAT_F_CONTINUOUS,                     250,                1000,               10, 44,  450,  1600, 0,    82,     /* Plume Gain */
+        VJ_BEAT_CONTRAST,     VJ_BEAT_F_CONTINUOUS,                     260,                1000,               8,  30,  900,  2600, 400,  54      /* Color Energy */
+    );
     (void) w;
     (void) h;
 
@@ -259,6 +322,7 @@ void *chronomirror_malloc(int w, int h)
     c->frame = 0;
     c->field_lut_valid = 0;
     c->bleed_lut_valid = 0;
+    c->render_lut_valid = 0;
 
     c->n_threads = vje_advise_num_threads(w * h);
     if(c->n_threads <= 0)
@@ -390,7 +454,9 @@ static void cs_build_luts_if_needed(chronomirror_t *c,
                                     int decay,
                                     int density,
                                     int source_bleed,
-                                    int turbulence)
+                                    int turbulence,
+                                    int plume_gain,
+                                    int color_energy)
 {
     int i;
 
@@ -406,6 +472,11 @@ static void cs_build_luts_if_needed(chronomirror_t *c,
     int rebuild_bleed =
         !c->bleed_lut_valid ||
         c->last_source_bleed != source_bleed;
+
+    int rebuild_render =
+        !c->render_lut_valid ||
+        c->last_plume_gain != plume_gain ||
+        c->last_color_energy != color_energy;
 
     if(rebuild_field) {
         int denom;
@@ -494,6 +565,23 @@ static void cs_build_luts_if_needed(chronomirror_t *c,
 
         c->last_source_bleed = source_bleed;
         c->bleed_lut_valid = 1;
+    }
+
+    if(rebuild_render) {
+        int plume_q8 = 64 + ((plume_gain * 384 + 500) / 1000);
+        int chroma_q8 = 64 + ((color_energy * 384 + 500) / 1000);
+
+        for(i = 0; i < 256; i++) {
+            int v = (i * plume_q8 + 128) >> 8;
+            c->plume_gain_lut[i] = cs_u8(v);
+
+            v = (i * chroma_q8 + 128) >> 8;
+            c->chroma_energy_lut[i] = cs_u8(v);
+        }
+
+        c->last_plume_gain = plume_gain;
+        c->last_color_energy = color_energy;
+        c->render_lut_valid = 1;
     }
 }
 
@@ -1651,6 +1739,8 @@ static void cs_render_const_pure(chronomirror_t *c,
     uint8_t *restrict OFF = c->off_y;
     uint8_t *restrict VEIL = c->veil;
     uint8_t *restrict DLUT = c->density_lut;
+    uint8_t *restrict GAIN = c->plume_gain_lut;
+    uint8_t *restrict CHROMA = c->chroma_energy_lut;
 
     int len = c->len;
     int i;
@@ -1670,6 +1760,7 @@ static void cs_render_const_pure(chronomirror_t *c,
 
         if(plume > 255)
             plume = 255;
+        plume = GAIN[plume];
 
         active = plume + (veil >> 1);
         if(active > 255)
@@ -1712,8 +1803,11 @@ static void cs_render_const_pure(chronomirror_t *c,
         }
 
         Y[i] = (uint8_t) yy;
-        U[i] = cs_blend_fast_u8(128, (uint8_t) ev_u, active);
-        V[i] = cs_blend_fast_u8(128, (uint8_t) ev_v, active);
+        {
+            int cev = CHROMA[active];
+            U[i] = cs_blend_fast_u8(128, (uint8_t) ev_u, cev);
+            V[i] = cs_blend_fast_u8(128, (uint8_t) ev_v, cev);
+        }
     }
 }
 
@@ -1731,6 +1825,8 @@ static void cs_render_const_bleed(chronomirror_t *c,
     uint8_t *restrict ON = c->on_y;
     uint8_t *restrict OFF = c->off_y;
     uint8_t *restrict VEIL = c->veil;
+    uint8_t *restrict GAIN = c->plume_gain_lut;
+    uint8_t *restrict CHROMA = c->chroma_energy_lut;
     uint8_t *restrict BY = c->bleed_y_lut;
     uint8_t *restrict BUV = c->bleed_uv_lut;
     uint8_t *restrict DLUT = c->density_lut;
@@ -1757,6 +1853,7 @@ static void cs_render_const_bleed(chronomirror_t *c,
 
         if(plume > 255)
             plume = 255;
+        plume = GAIN[plume];
 
         active = plume + (veil >> 1);
         if(active > 255)
@@ -1803,8 +1900,11 @@ static void cs_render_const_bleed(chronomirror_t *c,
         }
 
         Y[i] = (uint8_t) yy;
-        U[i] = cs_blend_fast_u8(base_u, (uint8_t) ev_u, active);
-        V[i] = cs_blend_fast_u8(base_v, (uint8_t) ev_v, active);
+        {
+            int cev = CHROMA[active];
+            U[i] = cs_blend_fast_u8(base_u, (uint8_t) ev_u, cev);
+            V[i] = cs_blend_fast_u8(base_v, (uint8_t) ev_v, cev);
+        }
     }
 }
 
@@ -1819,6 +1919,8 @@ static void cs_render_source_pure(chronomirror_t *c,
     uint8_t *restrict OFF = c->off_y;
     uint8_t *restrict VEIL = c->veil;
     uint8_t *restrict DLUT = c->density_lut;
+    uint8_t *restrict GAIN = c->plume_gain_lut;
+    uint8_t *restrict CHROMA = c->chroma_energy_lut;
 
     int len = c->len;
     int i;
@@ -1846,6 +1948,7 @@ static void cs_render_source_pure(chronomirror_t *c,
 
         if(plume > 255)
             plume = 255;
+        plume = GAIN[plume];
 
         active = plume + (veil >> 1);
         if(active > 255)
@@ -1882,8 +1985,11 @@ static void cs_render_source_pure(chronomirror_t *c,
         }
 
         Y[i] = (uint8_t) yy;
-        U[i] = cs_blend_fast_u8(128, (uint8_t) ev_u, active);
-        V[i] = cs_blend_fast_u8(128, (uint8_t) ev_v, active);
+        {
+            int cev = CHROMA[active];
+            U[i] = cs_blend_fast_u8(128, (uint8_t) ev_u, cev);
+            V[i] = cs_blend_fast_u8(128, (uint8_t) ev_v, cev);
+        }
     }
 }
 
@@ -1897,6 +2003,8 @@ static void cs_render_source_bleed(chronomirror_t *c,
     uint8_t *restrict ON = c->on_y;
     uint8_t *restrict OFF = c->off_y;
     uint8_t *restrict VEIL = c->veil;
+    uint8_t *restrict GAIN = c->plume_gain_lut;
+    uint8_t *restrict CHROMA = c->chroma_energy_lut;
     uint8_t *restrict BY = c->bleed_y_lut;
     uint8_t *restrict BUV = c->bleed_uv_lut;
     uint8_t *restrict DLUT = c->density_lut;
@@ -1932,6 +2040,7 @@ static void cs_render_source_bleed(chronomirror_t *c,
 
         if(plume > 255)
             plume = 255;
+        plume = GAIN[plume];
 
         active = plume + (veil >> 1);
         if(active > 255)
@@ -1972,8 +2081,11 @@ static void cs_render_source_bleed(chronomirror_t *c,
         }
 
         Y[i] = (uint8_t) yy;
-        U[i] = cs_blend_fast_u8(base_u, (uint8_t) ev_u, active);
-        V[i] = cs_blend_fast_u8(base_v, (uint8_t) ev_v, active);
+        {
+            int cev = CHROMA[active];
+            U[i] = cs_blend_fast_u8(base_u, (uint8_t) ev_u, cev);
+            V[i] = cs_blend_fast_u8(base_v, (uint8_t) ev_v, cev);
+        }
     }
 }
 
@@ -1987,6 +2099,7 @@ static void cs_render_white_pure(chronomirror_t *c,
     uint8_t *restrict ON = c->on_y;
     uint8_t *restrict OFF = c->off_y;
     uint8_t *restrict VEIL = c->veil;
+    uint8_t *restrict GAIN = c->plume_gain_lut;
 
     int len = c->len;
     int i;
@@ -1997,6 +2110,7 @@ static void cs_render_white_pure(chronomirror_t *c,
 
         if(ev > 255)
             ev = 255;
+        ev = GAIN[ev];
 
         Y[i] = (uint8_t) ev;
     }
@@ -2015,6 +2129,7 @@ static void cs_render_white_bleed(chronomirror_t *c,
     uint8_t *restrict ON = c->on_y;
     uint8_t *restrict OFF = c->off_y;
     uint8_t *restrict VEIL = c->veil;
+    uint8_t *restrict GAIN = c->plume_gain_lut;
     uint8_t *restrict BY = c->bleed_y_lut;
     uint8_t *restrict BUV = c->bleed_uv_lut;
 
@@ -2029,6 +2144,7 @@ static void cs_render_white_bleed(chronomirror_t *c,
 
         if(ev > 255)
             ev = 255;
+        ev = GAIN[ev];
 
         yy = base_y + ev;
         if(yy > 255)
@@ -2088,7 +2204,7 @@ void chronomirror_apply(void *ptr, VJFrame *frame, int *args)
 {
     chronomirror_t *c = (chronomirror_t *) ptr;
 
-    int threshold;
+    int trigger_gate;
     int rise;
     int curl;
     int decay;
@@ -2096,36 +2212,103 @@ void chronomirror_apply(void *ptr, VJFrame *frame, int *args)
     int source_bleed;
     int color_mode;
     int turbulence;
+    int beat_push;
+    int plume_gain;
+    int color_energy;
+
+    int trigger_gate_eff;
+    int rise_eff;
+    int curl_eff;
+    int decay_eff;
+    int density_eff;
+    int source_bleed_eff;
+    int turbulence_eff;
+    int plume_gain_eff;
+    int color_energy_eff;
+
+    if(!c || !frame || !args)
+        return;
 
     if(!c->seeded)
         cs_seed(c, frame);
 
-    threshold    = cs_clampi(args[P_THRESHOLD], 0, 255);
-    rise         = cs_clampi(args[P_RISE], 0, 255);
-    curl         = cs_clampi(args[P_CURL], 0, 255);
-    decay        = cs_clampi(args[P_DECAY], 0, 255);
-    density      = cs_clampi(args[P_DENSITY], 0, 255);
-    source_bleed = cs_clampi(args[P_SOURCE_BLEED], 0, 255);
+    trigger_gate = cs_param1000_to_u8(args[P_TRIGGER_GATE]);
+    rise         = cs_param1000_to_u8(args[P_RISE]);
+    curl         = cs_param1000_to_u8(args[P_CURL]);
+    decay        = cs_param1000_to_u8(args[P_DECAY]);
+    density      = cs_param1000_to_u8(args[P_DENSITY]);
+    source_bleed = cs_param1000_to_u8(args[P_SOURCE_BLEED]);
     color_mode   = cs_clampi(args[P_COLOR_MODE], 0, 4);
-    turbulence   = cs_clampi(args[P_TURBULENCE], 0, 255);
+    turbulence   = cs_param1000_to_u8(args[P_TURBULENCE]);
+    beat_push    = cs_param1000_to_u8(args[P_BEAT_PUSH]);
+    plume_gain   = cs_clampi(args[P_PLUME_GAIN], 0, 1000);
+    color_energy = cs_clampi(args[P_COLOR_ENERGY], 0, 1000);
+
+    trigger_gate_eff = trigger_gate - ((trigger_gate * beat_push + 510) / 1020);
+    if(trigger_gate_eff < 0)
+        trigger_gate_eff = 0;
+
+    rise_eff = cs_push_u8(
+        rise,
+        255,
+        (beat_push * 100 + 127) / 255
+    );
+
+    curl_eff = cs_push_u8(
+        curl,
+        235,
+        (beat_push * 80 + 127) / 255
+    );
+
+    decay_eff = cs_push_u8(
+        decay,
+        255,
+        (beat_push * 18 + 127) / 255
+    );
+
+    density_eff = cs_push_u8(
+        density,
+        255,
+        (beat_push * 150 + 127) / 255
+    );
+
+    source_bleed_eff = source_bleed + ((beat_push * 44 + 127) / 255);
+    if(source_bleed_eff > 255)
+        source_bleed_eff = 255;
+
+    turbulence_eff = cs_push_u8(
+        turbulence,
+        255,
+        (beat_push * 150 + 127) / 255
+    );
+
+    plume_gain_eff = plume_gain + ((beat_push * 300 + 127) / 255);
+    if(plume_gain_eff > 1000)
+        plume_gain_eff = 1000;
+
+    color_energy_eff = color_energy + ((beat_push * 220 + 127) / 255);
+    if(color_energy_eff > 1000)
+        color_energy_eff = 1000;
 
     cs_build_luts_if_needed(
         c,
-        threshold,
-        rise,
-        curl,
-        decay,
-        density,
-        source_bleed,
-        turbulence
+        trigger_gate_eff,
+        rise_eff,
+        curl_eff,
+        decay_eff,
+        density_eff,
+        source_bleed_eff,
+        turbulence_eff,
+        plume_gain_eff,
+        color_energy_eff
     );
 
     cs_compute_smoke(
         c,
         frame,
-        rise,
-        curl,
-        turbulence
+        rise_eff,
+        curl_eff,
+        turbulence_eff
     );
 
     cs_swap_fields(c);
@@ -2133,7 +2316,7 @@ void chronomirror_apply(void *ptr, VJFrame *frame, int *args)
     cs_render(
         c,
         frame,
-        source_bleed,
+        source_bleed_eff,
         color_mode
     );
 

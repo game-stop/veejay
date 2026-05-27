@@ -17,8 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "softblur.h"
 #include "diffmap.h"
 
@@ -46,6 +46,13 @@ vj_effect *differencemap_init(int w, int h)
     ve->extra_frame = 1;
     ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Reverse", "Show");
+	ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
+
+		VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY,                   8,                  140,                6, 22, 1600, 3400, 700, 35,    /* Threshold */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Reverse */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Show */
+	);
     return ve;
 }
 

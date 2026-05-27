@@ -24,12 +24,8 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "baltantv.h"
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
 
 #define PLANES 64
 #define MAX_TAPS 8
@@ -92,6 +88,16 @@ vj_effect *baltantv_init(int w, int h)
             "Feedback",
             "Chroma Persistence"
         );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,    1,   24,  8,  26,  1800, 3600, 900,  35,  /* Stride */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,    2,   6,   6,  20,  2200, 4200, 1200, 25,  /* Temporal Taps */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS,                          96,  235, 12, 45,  1200, 3200, 0,    60,  /* Decay */
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                          40,  210, 12, 42,  1100, 2800, 0,    55,  /* Feedback */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_PHRASE_ONLY,   48,  220, 8,  34,  1600, 3600, 700,  40   /* Chroma Persistence */
+    );
 
     return ve;
 }

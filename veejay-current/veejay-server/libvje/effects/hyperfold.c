@@ -19,23 +19,22 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "hyperfold.h"
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
 
-#define AFM_PARAMS 8
 
-#define P_MODE      0
-#define P_MINWIDTH  1
-#define P_MAXWIDTH  2
-#define P_OFFSET    3
-#define P_SEAM      4
-#define P_SPEED     5
-#define P_MONO      6
-#define P_BG        7
+#define AFM_PARAMS 11
+
+#define P_MODE        0
+#define P_MINWIDTH    1
+#define P_MAXWIDTH    2
+#define P_OFFSET      3
+#define P_SEAM        4
+#define P_SPEED       5
+#define P_MONO        6
+#define P_BG          7
+#define P_BEAT_PUSH   8
+#define P_CONTRAST    9
+#define P_TURBULENCE 10
 
 #define AFM_MODE_VERTICAL             0
 #define AFM_MODE_BARCODE             1
@@ -402,7 +401,7 @@ static void afm_build_luts(mirrormadness_t *m, int strength)
     if (m->lut_valid && m->last_strength == strength)
         return;
 
-    contrast = 0.94f + (float) strength * 0.0026f;
+    contrast = 0.94f + (float) strength * 0.00026f;
 
     for (i = 0; i < 256; i++) {
         float t = (float) i * (1.0f / 255.0f);
@@ -4281,13 +4280,16 @@ vj_effect *hyperfold_init(int w, int h)
     }
 
     ve->limits[0][P_MODE] = 0; ve->limits[1][P_MODE] = AFM_MODE_LAST; ve->defaults[P_MODE] = AFM_MODE_VERTICAL;
-    ve->limits[0][P_MINWIDTH] = 0; ve->limits[1][P_MINWIDTH] = 100; ve->defaults[P_MINWIDTH] = 12;
-    ve->limits[0][P_MAXWIDTH] = 0; ve->limits[1][P_MAXWIDTH] = 100; ve->defaults[P_MAXWIDTH] = 82;
-    ve->limits[0][P_OFFSET] = 0; ve->limits[1][P_OFFSET] = 100; ve->defaults[P_OFFSET] = 50;
-    ve->limits[0][P_SEAM] = 0; ve->limits[1][P_SEAM] = 100; ve->defaults[P_SEAM] = 58;
-    ve->limits[0][P_SPEED] = -100; ve->limits[1][P_SPEED] = 100; ve->defaults[P_SPEED] = 0;
-    ve->limits[0][P_MONO] = 0; ve->limits[1][P_MONO] = 100; ve->defaults[P_MONO] = 0;
+    ve->limits[0][P_MINWIDTH] = 0; ve->limits[1][P_MINWIDTH] = 1000; ve->defaults[P_MINWIDTH] = 120;
+    ve->limits[0][P_MAXWIDTH] = 0; ve->limits[1][P_MAXWIDTH] = 1000; ve->defaults[P_MAXWIDTH] = 820;
+    ve->limits[0][P_OFFSET] = 0; ve->limits[1][P_OFFSET] = 1000; ve->defaults[P_OFFSET] = 500;
+    ve->limits[0][P_SEAM] = 0; ve->limits[1][P_SEAM] = 1000; ve->defaults[P_SEAM] = 580;
+    ve->limits[0][P_SPEED] = -1000; ve->limits[1][P_SPEED] = 1000; ve->defaults[P_SPEED] = 0;
+    ve->limits[0][P_MONO] = 0; ve->limits[1][P_MONO] = 1000; ve->defaults[P_MONO] = 0;
     ve->limits[0][P_BG] = 0; ve->limits[1][P_BG] = 1; ve->defaults[P_BG] = 0;
+    ve->limits[0][P_BEAT_PUSH] = 0; ve->limits[1][P_BEAT_PUSH] = 1000; ve->defaults[P_BEAT_PUSH] = 0;
+    ve->limits[0][P_CONTRAST] = 0; ve->limits[1][P_CONTRAST] = 1000; ve->defaults[P_CONTRAST] = 580;
+    ve->limits[0][P_TURBULENCE] = 0; ve->limits[1][P_TURBULENCE] = 1000; ve->defaults[P_TURBULENCE] = 0;
 
     ve->description = "Mirror Madness";
     ve->sub_format = 1;
@@ -4298,13 +4300,16 @@ vj_effect *hyperfold_init(int w, int h)
     ve->param_description = vje_build_param_list(
         ve->num_params,
         "Mode",
-        "Minimum Strip Width",
-        "Maximum Strip Width",
-        "Strip Shift",
-        "Seam Darkness",
-        "Drift Speed",
-        "Monochrome Copies",
-        "Background"
+        "Minimum Fold Size",
+        "Maximum Fold Size",
+        "Fold Phase",
+        "Edge Darkness",
+        "Motion Speed",
+        "Chroma Damp",
+        "Background",
+        "Beat Push",
+        "Tone Contrast",
+        "Micro Turbulence"
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
@@ -4372,6 +4377,23 @@ vj_effect *hyperfold_init(int w, int h)
         "Black",
         "Original Source"
     );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,    0,   0,    0,    0,    -1000, /* Mode */
+        VJ_BEAT_GRID_SIZE,          VJ_BEAT_F_CONTINUOUS,                                                 20,                 420, 8,   34,  1600, 3800, 400,  42,    /* Minimum Fold Size */
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                                                 240,                920, 8,   32,  1400, 3600, 300,  54,    /* Maximum Fold Size */
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                                0,                  1000,12,  48,  700,  1900, 0,    72,    /* Fold Phase */
+        VJ_BEAT_DETAIL,             VJ_BEAT_F_CONTINUOUS,                                                 60,                 880, 10,  34,  900,  2200, 0,    58,    /* Edge Darkness */
+        VJ_BEAT_SIGNED_SPEED,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -700,               700, 12,  46,  900,  2400, 0,    70,    /* Motion Speed */
+        VJ_BEAT_CONTRAST,           VJ_BEAT_F_CONTINUOUS,                                                 0,                  520, 4,   18,  1600, 3600, 1200, 18,    /* Chroma Damp */
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,    0,   0,    0,    0,    -1000, /* Background */
+        VJ_BEAT_INTENSITY,          VJ_BEAT_F_CONTINUOUS,                                                 0,                  1000,18,  72,  80,   650,  0,    100,   /* Beat Push */
+        VJ_BEAT_CONTRAST,           VJ_BEAT_F_CONTINUOUS,                                                 250,                950, 8,   30,  900,  2600, 300,  65,    /* Tone Contrast */
+        VJ_BEAT_TURBULENCE,         VJ_BEAT_F_CONTINUOUS,                                                 0,                  760, 8,   30,  1100, 3200, 500,  62     /* Micro Turbulence */
+    );
+     
 
     (void) w;
     (void) h;
@@ -4607,6 +4629,127 @@ static inline void afm_sample_yuv_layer(const uint8_t *restrict sy,
     *ov = sv[p00];
 }
 
+
+typedef struct {
+    float width_push;
+    float phase_push;
+    float seam_push;
+    float speed_push;
+    float contrast_push;
+    float turbulence_push;
+} afm_beat_profile_t;
+
+static inline afm_beat_profile_t afm_mode_beat_profile(int mode)
+{
+    afm_beat_profile_t p = { 0.14f, 0.10f, 0.22f, 0.70f, 0.24f, 0.12f };
+
+    switch (mode) {
+        case AFM_MODE_VERTICAL:
+        case AFM_MODE_HORIZONTAL:
+        case AFM_MODE_BARCODE:
+        case AFM_MODE_LETTERBOX:
+        case AFM_MODE_DIAGONAL_SLATS:
+        case AFM_MODE_ANTIDIAGONAL_SLATS:
+        case AFM_MODE_SLICED_LENS:
+        case AFM_MODE_SLIT_SCAN:
+        case AFM_MODE_WATERFALL_STRIPS:
+        case AFM_MODE_POLAR_BARCODE:
+        case AFM_MODE_AXIS_ROULETTE:
+            p.width_push = 0.24f;
+            p.phase_push = 0.16f;
+            p.seam_push = 0.22f;
+            p.speed_push = 0.85f;
+            p.contrast_push = 0.22f;
+            p.turbulence_push = 0.12f;
+            break;
+
+        case AFM_MODE_VENETIAN_FAN:
+        case AFM_MODE_ELASTIC_STRIP:
+        case AFM_MODE_STAIRCASE:
+        case AFM_MODE_WAVE_BARS:
+        case AFM_MODE_SERPENTINE_SLITS:
+        case AFM_MODE_TORN_POSTER:
+        case AFM_MODE_ACCORDION:
+        case AFM_MODE_RIBBON_LATTICE:
+        case AFM_MODE_WOVEN_MIRROR:
+            p.width_push = 0.18f;
+            p.phase_push = 0.22f;
+            p.seam_push = 0.18f;
+            p.speed_push = 0.95f;
+            p.contrast_push = 0.18f;
+            p.turbulence_push = 0.28f;
+            break;
+
+        case AFM_MODE_SQUARE:
+        case AFM_MODE_BROKEN_WINDOW:
+        case AFM_MODE_SPLIT_PORTRAIT:
+        case AFM_MODE_CENTER_STACK:
+        case AFM_MODE_CONTACT_SHEET:
+        case AFM_MODE_CASCADE_COLLAGE:
+        case AFM_MODE_PRISM_STACK:
+        case AFM_MODE_FILM_GATE:
+        case AFM_MODE_ORBIT_COLLAGE:
+        case AFM_MODE_SPIRAL_SHARDS:
+        case AFM_MODE_SLIDING_DOORS:
+        case AFM_MODE_NESTED_FILM_GATES:
+            p.width_push = 0.16f;
+            p.phase_push = 0.18f;
+            p.seam_push = 0.25f;
+            p.speed_push = 0.65f;
+            p.contrast_push = 0.22f;
+            p.turbulence_push = 0.10f;
+            break;
+
+        case AFM_MODE_ROUND:
+        case AFM_MODE_TUNNEL:
+        case AFM_MODE_TUNNEL_XL:
+        case AFM_MODE_SPIRAL_STAIR:
+        case AFM_MODE_QUAD_PORTAL:
+        case AFM_MODE_MOEBIUS_RIBBON:
+        case AFM_MODE_HOURGLASS:
+        case AFM_MODE_DIAMOND_TUNNEL:
+        case AFM_MODE_CORNER_TUNNEL:
+            p.width_push = 0.14f;
+            p.phase_push = 0.26f;
+            p.seam_push = 0.20f;
+            p.speed_push = 1.00f;
+            p.contrast_push = 0.20f;
+            p.turbulence_push = 0.18f;
+            break;
+
+        case AFM_MODE_IRIS:
+        case AFM_MODE_SHUTTER:
+        case AFM_MODE_PINWHEEL_PANELS:
+        case AFM_MODE_CORNER_KALEIDO:
+        case AFM_MODE_CORNER_PULL:
+        case AFM_MODE_TRIANGLE_MIRROR:
+        case AFM_MODE_HEX_MIRROR:
+        case AFM_MODE_FAN_BLADES:
+            p.width_push = 0.10f;
+            p.phase_push = 0.24f;
+            p.seam_push = 0.26f;
+            p.speed_push = 1.05f;
+            p.contrast_push = 0.24f;
+            p.turbulence_push = 0.14f;
+            break;
+
+        case AFM_MODE_VORONOI_PLATES:
+        case AFM_MODE_LENS_ARRAY:
+            p.width_push = 0.12f;
+            p.phase_push = 0.20f;
+            p.seam_push = 0.18f;
+            p.speed_push = 0.75f;
+            p.contrast_push = 0.18f;
+            p.turbulence_push = 0.35f;
+            break;
+
+        default:
+            break;
+    }
+
+    return p;
+}
+
 void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
 {
     mirrormadness_t *m = (mirrormadness_t *) ptr;
@@ -4630,6 +4773,9 @@ void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
     int speed_i;
     int mono_i;
     int background_i;
+    int beatpush_i;
+    int contrast_i;
+    int turbulence_i;
 
     float minwidth_t;
     float maxwidth_t;
@@ -4637,7 +4783,10 @@ void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
     float seam_t;
     float speed_t;
     float mono_t;
+    float beatpush_t;
+    float turbulence_t;
     float time;
+    afm_beat_profile_t beat_profile;
 
     if (!m || !frame || !args)
         return;
@@ -4659,26 +4808,59 @@ void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
         afm_seed(m, frame);
 
     mode_i = afm_clampi(args[P_MODE], AFM_MODE_VERTICAL, AFM_MODE_LAST);
-    minwidth_i = afm_clampi(args[P_MINWIDTH], 0, 100);
-    maxwidth_i = afm_clampi(args[P_MAXWIDTH], 0, 100);
-    offset_i = afm_clampi(args[P_OFFSET], 0, 100);
-    seam_i = afm_clampi(args[P_SEAM], 0, 100);
-    speed_i = afm_clampi(args[P_SPEED], -100, 100);
-    mono_i = afm_clampi(args[P_MONO], 0, 100);
+    minwidth_i = afm_clampi(args[P_MINWIDTH], 0, 1000);
+    maxwidth_i = afm_clampi(args[P_MAXWIDTH], 0, 1000);
+    offset_i = afm_clampi(args[P_OFFSET], 0, 1000);
+    seam_i = afm_clampi(args[P_SEAM], 0, 1000);
+    speed_i = afm_clampi(args[P_SPEED], -1000, 1000);
+    mono_i = afm_clampi(args[P_MONO], 0, 1000);
     background_i = afm_clampi(args[P_BG], 0, 1);
+    beatpush_i = afm_clampi(args[P_BEAT_PUSH], 0, 1000);
+    contrast_i = afm_clampi(args[P_CONTRAST], 0, 1000);
+    turbulence_i = afm_clampi(args[P_TURBULENCE], 0, 1000);
 
-    minwidth_t = (float) minwidth_i * 0.01f;
-    maxwidth_t = (float) maxwidth_i * 0.01f;
-    offset_t = ((float) offset_i * 0.01f - 0.5f) * 1.65f;
-    seam_t = (float) seam_i * 0.01f;
-    speed_t = (float) speed_i * 0.01f;
-    mono_t = (float) mono_i * 0.01f;
+    minwidth_t = (float) minwidth_i * 0.001f;
+    maxwidth_t = (float) maxwidth_i * 0.001f;
+    offset_t = ((float) offset_i * 0.001f - 0.5f) * 1.65f;
+    seam_t = (float) seam_i * 0.001f;
+    speed_t = (float) speed_i * 0.001f;
+    mono_t = (float) mono_i * 0.001f;
+    beatpush_t = (float) beatpush_i * 0.001f;
+    turbulence_t = (float) turbulence_i * 0.001f;
 
     speed_t = (speed_t < 0.0f ? -1.0f : 1.0f) * afm_absf(speed_t) * afm_absf(speed_t);
     if (speed_i == 0)
         speed_t = 0.0f;
 
-    afm_build_luts(m, seam_i);
+    beat_profile = afm_mode_beat_profile(mode_i);
+
+    {
+        float push = beatpush_t * beatpush_t * (3.0f - 2.0f * beatpush_t);
+        float turb_lfo = 0.0f;
+
+        if (turbulence_t > 0.0f) {
+            float a = afm_lut_sin(m, m->time * 1.73f + (float) m->frame * 0.013f);
+            float b = afm_lut_sin(m, m->time * 2.41f + 2.10f);
+            turb_lfo = (a * 0.63f + b * 0.37f) * turbulence_t;
+        }
+
+        if (push > 0.0f || turbulence_t > 0.0f) {
+            float tw = afm_absf(turb_lfo);
+            minwidth_t = afm_clampf(minwidth_t - push * beat_profile.width_push * 0.45f -
+                                    tw * beat_profile.turbulence_push * 0.13f, 0.0f, 1.0f);
+            maxwidth_t = afm_clampf(maxwidth_t + push * beat_profile.width_push * 0.55f +
+                                    tw * beat_profile.turbulence_push * 0.18f, 0.0f, 1.0f);
+            offset_t += push * beat_profile.phase_push + turb_lfo * beat_profile.turbulence_push * 0.55f;
+            seam_t = afm_clampf(seam_t + push * beat_profile.seam_push +
+                                tw * beat_profile.turbulence_push * 0.25f, 0.0f, 1.65f);
+            speed_t *= 1.0f + push * beat_profile.speed_push + tw * 0.65f;
+            contrast_i += (int) (push * beat_profile.contrast_push * 320.0f +
+                                 tw * beat_profile.turbulence_push * 160.0f + 0.5f);
+            contrast_i = afm_clampi(contrast_i, 0, 1000);
+        }
+    }
+
+    afm_build_luts(m, contrast_i);
 
     m->time = afm_wrap_2pi(m->time + (0.0012f + seam_t * 0.0020f + maxwidth_t * 0.0012f) * speed_t);
     time = m->time;

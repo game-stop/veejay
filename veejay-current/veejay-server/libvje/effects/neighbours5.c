@@ -22,224 +22,379 @@
 #include <veejaycore/vjmem.h>
 #include "neighbours5.h"
 
+#ifdef _OPENMP
+#include <omp.h>
+#define NB5_THREAD_ID() omp_get_thread_num()
+#else
+#define NB5_THREAD_ID() 0
+#endif
+
+#define NB5_BINS 256
+#define NB5_SCRATCH_PLANES 4
+#define NB5_SCRATCH_STRIDE (NB5_BINS * NB5_SCRATCH_PLANES)
+
 vj_effect *neighbours5_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
     ve->limits[0][0] = 2;
-    ve->limits[1][0] = 32;	/* line size */
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 255;     /* smoothness */
-    ve->limits[0][2] = 0; 	/* luma only / include chroma */
-    ve->limits[1][2] = 1;
+    ve->limits[1][0] = 32;
     ve->defaults[0] = 4;
+
+    ve->limits[0][1] = 1;
+    ve->limits[1][1] = 255;
     ve->defaults[1] = 5;
+
+    ve->limits[0][2] = 0;
+    ve->limits[1][2] = 1;
     ve->defaults[2] = 1;
+
     ve->description = "ZArtistic Filter (Vertical strokes)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Stroke size", "Smoothness", "Mode" );
 
-	ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Stroke size",
+        "Smoothness",
+        "Mode"
+    );
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][2], 2, "Luma Only", "Luma and Chroma" );
-    
-	return ve;
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][2],
+        2,
+        "Luma Only",
+        "Luma and Chroma"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 2,                  24,                 6, 22, 1800, 4200, 900, 30,    /* Stroke size */
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY,                        8,                  180,                6, 22, 1600, 3400, 700, 30,    /* Smoothness */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Mode */
+    );
+
+    (void) w;
+    (void) h;
+
+    return ve;
 }
 
 typedef struct {
-    int *row_hist[256];
-    int *row_y_map[256];
-    int *row_cb_map[256];
-    int *row_cr_map[256];
-    uint8_t *tmp_buf[2];
-    uint8_t *chromacity[2];
-    int width,height;
-} nb_t;
+    uint8_t *src[3];
+    uint8_t *bin;
+    int *scratch;
+    int width;
+    int height;
+    int n_threads;
+} nb5_t;
 
-typedef struct
+void *neighbours5_malloc(int w, int h)
 {
-	uint8_t y;
-	uint8_t u;
-	uint8_t v;
-} pixel_t;
+    nb5_t *n = (nb5_t*) vj_calloc(sizeof(nb5_t));
+    if(!n)
+        return NULL;
 
+    const int len = w * h;
 
-void *neighbours5_malloc(int w,int h)
-{
-    nb_t *n=(nb_t*)vj_calloc(sizeof(nb_t));
-    if(!n) return NULL;
+    n->width = w;
+    n->height = h;
+    n->n_threads = vje_advise_num_threads(len);
+    if(n->n_threads < 1)
+        n->n_threads = 1;
 
-    n->width=w; n->height=h;
-
-    n->tmp_buf[0]=(uint8_t*)vj_malloc(sizeof(uint8_t)*w*h*2);
-    if(!n->tmp_buf[0]) { free(n); return NULL; }
-    n->tmp_buf[1]=n->tmp_buf[0]+w*h;
-
-    n->chromacity[0]=(uint8_t*)vj_malloc(sizeof(uint8_t)*w*h*2);
-    if(!n->chromacity[0]) { free(n->tmp_buf[0]); free(n); return NULL; }
-    n->chromacity[1]=n->chromacity[0]+w*h;
-
-    for(int i=0;i<256;i++){
-        n->row_hist[i]=(int*)vj_calloc(sizeof(int)*w);
-        n->row_y_map[i]=(int*)vj_calloc(sizeof(int)*w);
-        n->row_cb_map[i]=(int*)vj_calloc(sizeof(int)*w);
-        n->row_cr_map[i]=(int*)vj_calloc(sizeof(int)*w);
+    n->src[0] = (uint8_t*) vj_malloc((size_t) len * 4u);
+    if(!n->src[0]) {
+        free(n);
+        return NULL;
     }
 
-    return n;
+    n->src[1] = n->src[0] + len;
+    n->src[2] = n->src[1] + len;
+    n->bin    = n->src[2] + len;
+
+    n->scratch = (int*) vj_calloc(sizeof(int) * NB5_SCRATCH_STRIDE * n->n_threads);
+    if(!n->scratch) {
+        free(n->src[0]);
+        free(n);
+        return NULL;
+    }
+
+    return (void*) n;
 }
 
 void neighbours5_free(void *ptr)
 {
-    nb_t *n=(nb_t*)ptr;
-    if(!n) return;
+    nb5_t *n = (nb5_t*) ptr;
+    if(!n)
+        return;
 
-    for(int i=0;i<256;i++){
-        free(n->row_hist[i]);
-        free(n->row_y_map[i]);
-        free(n->row_cb_map[i]);
-        free(n->row_cr_map[i]);
-    }
+    if(n->src[0])
+        free(n->src[0]);
 
-    free(n->tmp_buf[0]);
-    free(n->chromacity[0]);
+    if(n->scratch)
+        free(n->scratch);
+
     free(n);
 }
 
-static inline int clamp_int(int val,int min,int max){ return val<min?min:(val>max?max:val); }
-
-static inline uint8_t evaluate_pixel_row(
-    int x,int y,int brush_size,int max_intensity,
-    uint8_t *premul,uint8_t *Y,
-    int *row_hist,int *row_y_map,int width,int height
-){
-    int peak_val=0,peak_idx=0;
-
-    veejay_memset(row_hist, 0, max_intensity * sizeof(int));
-    veejay_memset(row_y_map, 0, max_intensity * sizeof(int));;
-
-    int y0=clamp_int(y-brush_size,0,height-1);
-    int y1=clamp_int(y+brush_size,0,height-1);
-
-    for(int j=y0;j<y1;j++){
-        int idx=j*width+x;
-        int bright=premul[idx];
-        row_hist[bright]++;
-        row_y_map[bright]+=Y[idx];
-    }
-
-    for(int i=0;i<max_intensity;i++)
-        if(row_hist[i]>peak_val){ peak_val=row_hist[i]; peak_idx=i; }
-
-    return peak_val>15 ? (uint8_t)(row_y_map[peak_idx]/peak_val) : Y[y*width+x];
-}
-
-static inline pixel_t evaluate_pixel_row_c(
-    int x,int y,int brush_size,int max_intensity,
-    uint8_t *premul,uint8_t *Y,uint8_t *Cb,uint8_t *Cr,
-    int *row_hist,int *row_y_map,int *row_cb_map,int *row_cr_map,int width,int height
-){
-    pixel_t val;
-    int peak_val=0,peak_idx=0;
-
-    veejay_memset(row_hist, 0, max_intensity * sizeof(int));
-    veejay_memset(row_y_map, 0, max_intensity * sizeof(int));
-    veejay_memset(row_cb_map, 0, max_intensity * sizeof(int));
-    veejay_memset(row_cr_map, 0, max_intensity * sizeof(int));
-
-    int y0=clamp_int(y-brush_size,0,height-1);
-    int y1=clamp_int(y+brush_size,0,height-1);
-
-    for(int j=y0;j<y1;j++){
-        int idx=j*width+x;
-        int bright=premul[idx];
-        row_hist[bright]++;
-        row_y_map[bright]+=Y[idx];
-        row_cb_map[bright]+=Cb[idx];
-        row_cr_map[bright]+=Cr[idx];
-    }
-
-    for(int i=0;i<max_intensity;i++)
-        if(row_hist[i]>peak_val){ peak_val=row_hist[i]; peak_idx=i; }
-
-    if(peak_val>0){
-        val.y=row_y_map[peak_idx]/peak_val;
-        val.u=row_cb_map[peak_idx]/peak_val;
-        val.v=row_cr_map[peak_idx]/peak_val;
-    } else {
-        int idx=y*width+x;
-        val.y=Y[idx]; val.u=Cb[idx]; val.v=Cr[idx];
-    }
-
-    return val;
-}
-
-void neighbours5_apply(void *ptr,VJFrame *frame,int *args)
+static inline int nb5_clampi(int v, int lo, int hi)
 {
-    int brush_size=args[0],intensity_level=args[1],mode=args[2];
-    nb_t *n=(nb_t*)ptr;
+    return (v < lo) ? lo : (v > hi ? hi : v);
+}
 
-    int width=frame->width,height=frame->height,len=frame->len;
+static inline uint8_t nb5_quant_luma(uint8_t y, int smoothness)
+{
+    return (uint8_t)(((int)y * smoothness + 127) / 255);
+}
 
-    double intensity=intensity_level/255.0;
-    int max_intensity=(int)(0xff*intensity);
+static inline void nb5_clear_luma_scratch(int *hist, int *sum_y)
+{
+    veejay_memset(hist, 0, sizeof(int) * NB5_BINS);
+    veejay_memset(sum_y, 0, sizeof(int) * NB5_BINS);
+}
 
-    uint8_t *Y=n->tmp_buf[0],*Y2=n->tmp_buf[1];
-    uint8_t *dstY=frame->data[0],*dstCb=frame->data[1],*dstCr=frame->data[2];
+static inline void nb5_clear_color_scratch(int *hist, int *sum_y, int *sum_u, int *sum_v)
+{
+    veejay_memset(hist, 0, sizeof(int) * NB5_BINS);
+    veejay_memset(sum_y, 0, sizeof(int) * NB5_BINS);
+    veejay_memset(sum_u, 0, sizeof(int) * NB5_BINS);
+    veejay_memset(sum_v, 0, sizeof(int) * NB5_BINS);
+}
 
-    vj_frame_copy1(frame->data[0],Y2,len);
+static inline int nb5_peak_bin(const int *hist)
+{
+    int peak_count = hist[0];
+    int peak_bin = 0;
 
-    if(mode){
-        int strides[3]={0,len,len};
-        uint8_t *dest[3]={NULL,n->chromacity[0],n->chromacity[1]};
-        vj_frame_copy(frame->data,dest,strides);
+    for(int i = 1; i < NB5_BINS; i++) {
+        if(hist[i] > peak_count) {
+            peak_count = hist[i];
+            peak_bin = i;
+        }
     }
 
-#pragma omp simd
-    for(int i=0;i<len;i++) Y[i]=(uint8_t)(Y2[i]*intensity);
+    return peak_bin;
+}
 
-    if (!mode) {
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                dstY[y * width + x] = evaluate_pixel_row(
-                    x, y,                    // coordinates
-                    brush_size,               // brush size
-                    max_intensity,            // max intensity for histogram
-                    Y,                        // premultiplied map
-                    Y2,                       // original luma
-                    n->row_hist[0],           // histogram buffer
-                    n->row_y_map[0],          // y_map buffer
-                    width, height             // frame dimensions
-                );
+static inline void nb5_add_luma_sample(
+    int *hist,
+    int *sum_y,
+    const uint8_t *restrict src_y,
+    const uint8_t *restrict bin,
+    int idx
+) {
+    const int b = bin[idx];
+    hist[b]++;
+    sum_y[b] += src_y[idx];
+}
+
+static inline void nb5_remove_luma_sample(
+    int *hist,
+    int *sum_y,
+    const uint8_t *restrict src_y,
+    const uint8_t *restrict bin,
+    int idx
+) {
+    const int b = bin[idx];
+    hist[b]--;
+    sum_y[b] -= src_y[idx];
+}
+
+static inline void nb5_add_color_sample(
+    int *hist,
+    int *sum_y,
+    int *sum_u,
+    int *sum_v,
+    const uint8_t *restrict src_y,
+    const uint8_t *restrict src_u,
+    const uint8_t *restrict src_v,
+    const uint8_t *restrict bin,
+    int idx
+) {
+    const int b = bin[idx];
+    hist[b]++;
+    sum_y[b] += src_y[idx];
+    sum_u[b] += src_u[idx];
+    sum_v[b] += src_v[idx];
+}
+
+static inline void nb5_remove_color_sample(
+    int *hist,
+    int *sum_y,
+    int *sum_u,
+    int *sum_v,
+    const uint8_t *restrict src_y,
+    const uint8_t *restrict src_u,
+    const uint8_t *restrict src_v,
+    const uint8_t *restrict bin,
+    int idx
+) {
+    const int b = bin[idx];
+    hist[b]--;
+    sum_y[b] -= src_y[idx];
+    sum_u[b] -= src_u[idx];
+    sum_v[b] -= src_v[idx];
+}
+
+static void nb5_apply_luma(
+    nb5_t *n,
+    uint8_t *restrict dst_y,
+    const uint8_t *restrict src_y,
+    const uint8_t *restrict bin,
+    int width,
+    int height,
+    int stroke_size
+) {
+#pragma omp parallel for schedule(static) num_threads(n->n_threads)
+    for(int x = 0; x < width; x++) {
+        const int tid = NB5_THREAD_ID();
+        int *scratch = n->scratch + tid * NB5_SCRATCH_STRIDE;
+        int *hist = scratch;
+        int *sum_y = scratch + NB5_BINS;
+
+        int top = 0;
+        int bottom = -1;
+
+        nb5_clear_luma_scratch(hist, sum_y);
+
+        for(int y = 0; y < height; y++) {
+            const int want_top = nb5_clampi(y - stroke_size, 0, height - 1);
+            const int want_bottom = nb5_clampi(y + stroke_size, 0, height - 1);
+
+            while(bottom < want_bottom) {
+                bottom++;
+                nb5_add_luma_sample(hist, sum_y, src_y, bin, bottom * width + x);
             }
+
+            while(top < want_top) {
+                nb5_remove_luma_sample(hist, sum_y, src_y, bin, top * width + x);
+                top++;
+            }
+
+            const int peak = nb5_peak_bin(hist);
+            const int count = hist[peak];
+            const int idx = y * width + x;
+
+            dst_y[idx] = count > 15
+                ? (uint8_t)(sum_y[peak] / count)
+                : src_y[idx];
         }
-        veejay_memset(frame->data[1], 128, len);
-        veejay_memset(frame->data[2], 128, len);
-    } 
-    else {
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                pixel_t tmp = evaluate_pixel_row_c(
-                    x, y,
-                    brush_size,
-                    max_intensity,
-                    Y, Y2,
-                    n->chromacity[0], n->chromacity[1],
-                    n->row_hist[0], n->row_y_map[0],
-                    n->row_cb_map[0], n->row_cr_map[0],
-                    width, height
-                );
-                dstY[y * width + x] = tmp.y;
-                dstCb[y * width + x] = tmp.u;
-                dstCr[y * width + x] = tmp.v;
+    }
+}
+
+static void nb5_apply_color(
+    nb5_t *n,
+    uint8_t *restrict dst_y,
+    uint8_t *restrict dst_u,
+    uint8_t *restrict dst_v,
+    const uint8_t *restrict src_y,
+    const uint8_t *restrict src_u,
+    const uint8_t *restrict src_v,
+    const uint8_t *restrict bin,
+    int width,
+    int height,
+    int stroke_size
+) {
+#pragma omp parallel for schedule(static) num_threads(n->n_threads)
+    for(int x = 0; x < width; x++) {
+        const int tid = NB5_THREAD_ID();
+        int *scratch = n->scratch + tid * NB5_SCRATCH_STRIDE;
+        int *hist = scratch;
+        int *sum_y = scratch + NB5_BINS;
+        int *sum_u = scratch + NB5_BINS * 2;
+        int *sum_v = scratch + NB5_BINS * 3;
+
+        int top = 0;
+        int bottom = -1;
+
+        nb5_clear_color_scratch(hist, sum_y, sum_u, sum_v);
+
+        for(int y = 0; y < height; y++) {
+            const int want_top = nb5_clampi(y - stroke_size, 0, height - 1);
+            const int want_bottom = nb5_clampi(y + stroke_size, 0, height - 1);
+
+            while(bottom < want_bottom) {
+                bottom++;
+                nb5_add_color_sample(hist, sum_y, sum_u, sum_v, src_y, src_u, src_v, bin, bottom * width + x);
+            }
+
+            while(top < want_top) {
+                nb5_remove_color_sample(hist, sum_y, sum_u, sum_v, src_y, src_u, src_v, bin, top * width + x);
+                top++;
+            }
+
+            const int peak = nb5_peak_bin(hist);
+            const int count = hist[peak];
+            const int idx = y * width + x;
+
+            if(count > 0) {
+                dst_y[idx] = (uint8_t)(sum_y[peak] / count);
+                dst_u[idx] = (uint8_t)(sum_u[peak] / count);
+                dst_v[idx] = (uint8_t)(sum_v[peak] / count);
+            } else {
+                dst_y[idx] = src_y[idx];
+                dst_u[idx] = src_u[idx];
+                dst_v[idx] = src_v[idx];
             }
         }
     }
 }
 
+void neighbours5_apply(void *ptr, VJFrame *frame, int *args)
+{
+    nb5_t *n = (nb5_t*) ptr;
+    if(!n || !frame || !args)
+        return;
+
+    const int width = frame->width;
+    const int height = frame->height;
+    const int len = frame->len;
+
+    if(width <= 0 || height <= 0 || len <= 0)
+        return;
+
+    int stroke_size = nb5_clampi(args[0], 2, 32);
+    int smoothness = nb5_clampi(args[1], 1, 255);
+    int mode = nb5_clampi(args[2], 0, 1);
+
+    uint8_t *restrict dst_y = frame->data[0];
+    uint8_t *restrict dst_u = frame->data[1];
+    uint8_t *restrict dst_v = frame->data[2];
+
+    uint8_t *restrict src_y = n->src[0];
+    uint8_t *restrict src_u = n->src[1];
+    uint8_t *restrict src_v = n->src[2];
+    uint8_t *restrict bin = n->bin;
+
+    veejay_memcpy(src_y, dst_y, len);
+
+    if(mode) {
+        veejay_memcpy(src_u, dst_u, len);
+        veejay_memcpy(src_v, dst_v, len);
+    }
+
+#pragma omp parallel for schedule(static) num_threads(n->n_threads)
+    for(int i = 0; i < len; i++) {
+        bin[i] = nb5_quant_luma(src_y[i], smoothness);
+    }
+
+    if(!mode) {
+        const int uv_len = frame->ssm ? len : frame->uv_len;
+
+        nb5_apply_luma(n, dst_y, src_y, bin, width, height, stroke_size);
+        veejay_memset(dst_u, 128, uv_len);
+        veejay_memset(dst_v, 128, uv_len);
+    } else {
+        nb5_apply_color(n, dst_y, dst_u, dst_v, src_y, src_u, src_v, bin, width, height, stroke_size);
+    }
+}

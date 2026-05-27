@@ -19,14 +19,31 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <math.h>
-#include <stdint.h>
-#include <omp.h>
+#include "topomorph.h"
 
 #define FP_SHIFT 16
 #define FP_ONE (1 << FP_SHIFT)
 #define TO_FP(x) ((int32_t)((x) * (float)FP_ONE))
+
+#define TOPOMORPH_PARAMS 12
+
+#define P_SPEED       0
+#define P_SCALE       1
+#define P_BRANCHES    2
+#define P_SWIRL       3
+#define P_ROT_SPEED   4
+#define P_FEEDBACK    5
+#define P_PITCH       6
+#define P_TOPO_MODE   7
+#define P_SALIENCY    8
+#define P_SHAPE_P     9
+#define P_MIRROR     10
+#define P_BEAT_PUSH  11
+
+#define TOPOMORPH_INTERNAL_PARAMS 15
+#define P_BEAT_ENV   12
+#define P_BEAT_KICK  13
+#define P_BEAT_PHASE 14
 
 #define TOPO_TRIG_LUT_SIZE 4096
 #define TOPO_TRIG_LUT_MASK (TOPO_TRIG_LUT_SIZE - 1)
@@ -66,6 +83,18 @@ typedef struct {
     int cached_shape_p;
     float p1_x, p1_y;
     float p2_x, p2_y;
+    float beat_env;
+    float beat_kick;
+    float beat_prev;
+    int beat_phase;
+    float eff_speed;
+    float eff_scale;
+    float eff_swirl;
+    float eff_rot_speed;
+    float eff_feedback;
+    float eff_pitch;
+    float eff_saliency;
+    int eff_initialized;
 } box_topomorph_t;
 
 static inline uint8_t clamp_u8_i32(const int v)
@@ -90,6 +119,111 @@ static inline int genus_clamp(const int g)
     return (g < 0) ? 0 : ((g > 2) ? 2 : g);
 }
 
+static inline int topo_clampi_int(const int v, const int lo, const int hi)
+{
+    return (v < lo) ? lo : ((v > hi) ? hi : v);
+}
+
+static inline int topo_push_towards(const int v, const int target, const int beat_push, const int strength)
+{
+    const int q = topo_clampi_int((beat_push * strength + 500) / 1000, 0, 1000);
+    return v + (((target - v) * q + ((target >= v) ? 500 : -500)) / 1000);
+}
+
+static inline int topo_push_abs(const int v, const int target_abs, const int beat_push, const int strength)
+{
+    const int q = topo_clampi_int((beat_push * strength + 500) / 1000, 0, 1000);
+    const int sign = (v < 0) ? -1 : 1;
+    const int av = (v < 0) ? -v : v;
+    int out = av + (((target_abs - av) * q + ((target_abs >= av) ? 500 : -500)) / 1000);
+    if(out < 0)
+        out = 0;
+    return sign * out;
+}
+
+
+static inline int topo_soft_luma_i(const int y)
+{
+    if (y > 232) {
+        int v = 232 + ((y - 232) >> 2);
+        return (v > 244) ? 244 : v;
+    }
+
+    return y < 0 ? 0 : y;
+}
+
+static inline int topo_beat_shape_q1000(const int beat_push)
+{
+    const int bp = topo_clampi_int(beat_push, 0, 1000);
+    const int sq = (bp * bp + 500) / 1000;
+    return topo_clampi_int(((sq * 620) + (bp * 380) + 500) / 1000, 0, 1000);
+}
+
+static inline void topo_update_beat_state(box_topomorph_t *restrict t,
+                                          const int beat_push,
+                                          int *restrict env_out,
+                                          int *restrict kick_out,
+                                          int *restrict phase_out)
+{
+    const int shaped = topo_beat_shape_q1000(beat_push);
+    const float target = (float)shaped;
+    const float diff = target - t->beat_prev;
+    float kick_target;
+
+    if (target > t->beat_env)
+        t->beat_env += (target - t->beat_env) * 0.245f;
+    else
+        t->beat_env += (target - t->beat_env) * 0.082f;
+
+    kick_target = (diff > 0.0f) ? (diff * 0.30f + target * 0.035f) : 0.0f;
+
+    if (kick_target > t->beat_kick)
+        t->beat_kick += (kick_target - t->beat_kick) * 0.32f;
+    else
+        t->beat_kick *= 0.74f;
+
+    t->beat_prev += (target - t->beat_prev) * 0.220f;
+
+    if (t->beat_env < 0.5f)
+        t->beat_env = 0.0f;
+    if (t->beat_kick < 0.5f)
+        t->beat_kick = 0.0f;
+
+    t->beat_phase = (t->beat_phase + 3 + (int)(t->beat_env * 0.010f) + (int)(t->beat_kick * 0.020f)) & 1023;
+
+    *env_out = topo_clampi_int((int)(t->beat_env + 0.5f), 0, 1000);
+    *kick_out = topo_clampi_int((int)(t->beat_kick + 0.5f), 0, 1000);
+    *phase_out = t->beat_phase;
+}
+
+
+static inline int topo_smooth_i(float *restrict state, const int target, const float attack, const float release)
+{
+    const float cur = *state;
+    const float diff = (float)target - cur;
+    const float step = (diff > 0.0f) ? attack : release;
+    const float out = cur + diff * step;
+    *state = out;
+    return (int)(out + (out >= 0.0f ? 0.5f : -0.5f));
+}
+
+static inline void topo_limit_chroma_pair_i(int *restrict u, int *restrict v)
+{
+    int au = (*u < 0) ? -*u : *u;
+    int av = (*v < 0) ? -*v : *v;
+    int m = (au > av) ? au : av;
+
+    if (m > 112) {
+        int lim = 112 + ((m - 112) >> 2);
+
+        if (lim > 126)
+            lim = 126;
+
+        *u = (*u * lim + ((*u >= 0) ? (m >> 1) : -(m >> 1))) / m;
+        *v = (*v * lim + ((*v >= 0) ? (m >> 1) : -(m >> 1))) / m;
+    }
+}
+
 static inline int topo_radius_kind(const int p)
 {
     return (p <= 10) ? 0 : ((p == 20) ? 1 : ((p >= 80) ? 2 : 3));
@@ -98,6 +232,11 @@ static inline int topo_radius_kind(const int p)
 static inline int topo_lut_index_wrap(const float angle)
 {
     return ((int)(angle * TOPO_TRIG_MUL)) & TOPO_TRIG_LUT_MASK;
+}
+
+static inline float topo_lut_sin(const box_topomorph_t *restrict t, const float angle)
+{
+    return t->sin_lut[topo_lut_index_wrap(angle)];
 }
 
 static inline void topo_lut_sincos(const box_topomorph_t *restrict t,
@@ -351,12 +490,13 @@ static inline void blend_store_pixel(box_topomorph_t *restrict t,
     t->histY[i] = (int32_t)(((accY * inv_fb) + ((int64_t)t->histY[i] * fb) + 32768) >> FP_SHIFT);
     t->histU[i] = (int32_t)(((accU * inv_fb) + ((int64_t)t->histU[i] * fb) + 32768) >> FP_SHIFT);
     t->histV[i] = (int32_t)(((accV * inv_fb) + ((int64_t)t->histV[i] * fb) + 32768) >> FP_SHIFT);
-    const int yv = clamp_i32_255(t->histY[i] >> FP_SHIFT);
-    const int uv = t->histU[i] >> FP_SHIFT;
-    const int vv = t->histV[i] >> FP_SHIFT;
+    const int yv = topo_soft_luma_i(clamp_i32_255(t->histY[i] >> FP_SHIFT));
+    int uv = t->histU[i] >> FP_SHIFT;
+    int vv = t->histV[i] >> FP_SHIFT;
+    topo_limit_chroma_pair_i(&uv, &vv);
     t->dstY[i] = t->gamma8_lut[yv];
-    t->dstU[i] = clamp_u8_i32(((uv * 1056) >> 10) + 128);
-    t->dstV[i] = clamp_u8_i32(((vv * 1056) >> 10) + 128);
+    t->dstU[i] = clamp_u8_i32(((uv * 1024) >> 10) + 128);
+    t->dstV[i] = clamp_u8_i32(((vv * 1024) >> 10) + 128);
 }
 
 #define DEFINE_NO_MIRROR_KERNEL(MODE_ID, RADIUS_ID, RADIUS_FN, SAMPLE_ID, SAMPLE_FN, MAP_FN) \
@@ -365,15 +505,15 @@ static void topo_nm_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *re
     const int w = t->width; \
     const int h = t->height; \
     const int size = w * h; \
-    t->time += (double)args[0] * 0.000725; \
-    t->phase += (double)args[4] * 0.000725; \
-    const float branches = (float)args[2]; \
-    const float swirl = (float)args[3] * 0.01f; \
-    const float zoom = 0.8f + ((float)args[1] * 0.024f); \
+    t->time += (double)args[P_SPEED] * 0.0000725 + (double)args[P_BEAT_ENV] * 0.0000100 + (double)args[P_BEAT_KICK] * 0.0000200; \
+    t->phase += (double)args[P_ROT_SPEED] * 0.0000725 + (double)args[P_BEAT_ENV] * 0.0000075 + (double)args[P_BEAT_KICK] * 0.0000140; \
+    const float branches = (float)args[P_BRANCHES]; \
+    const float swirl = (float)args[P_SWIRL] * 0.001f; \
+    const float zoom = 0.8f + ((float)args[P_SCALE] * 0.024f); \
     const float factor = branches / zoom; \
-    const float pitch = (float)args[6] * 0.01f; \
-    const float influence = (float)args[9] * 0.01f; \
-    const int32_t fb = TO_FP((float)args[5] * 0.01f); \
+    const float pitch = (float)args[P_PITCH] * 0.001f; \
+    const float influence = (float)args[P_SALIENCY] * 0.001f; \
+    const int32_t fb = TO_FP((float)args[P_FEEDBACK] * 0.001f); \
     const int32_t inv_fb = FP_ONE - fb; \
     const uint8_t *restrict srcY = frame->data[0]; \
     const uint8_t *restrict srcU = frame->data[1]; \
@@ -393,6 +533,7 @@ static void topo_nm_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *re
     (void)pay; \
     const float time_f = (float)t->time; \
     const float phase_f = (float)t->phase; \
+    (void)args[P_BEAT_PHASE]; \
     _Pragma("omp parallel for schedule(static) num_threads(t->n_threads)") \
     for (int y = 0; y < h; y++) { \
         const int row = y * w; \
@@ -429,15 +570,15 @@ static void topo_m_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *res
     const int size = w * h; \
     const int half_w = w >> 1; \
     const int half_h = h >> 1; \
-    t->time += (double)args[0] * 0.0005; \
-    t->phase += (double)args[4] * 0.0005; \
-    const float branches = (float)args[2]; \
-    const float swirl = (float)args[3] * 0.01f; \
-    const float zoom = 0.8f + ((float)args[1] * 0.024f); \
+    t->time += (double)args[P_SPEED] * 0.00005 + (double)args[P_BEAT_ENV] * 0.0000075 + (double)args[P_BEAT_KICK] * 0.0000150; \
+    t->phase += (double)args[P_ROT_SPEED] * 0.00005 + (double)args[P_BEAT_ENV] * 0.0000060 + (double)args[P_BEAT_KICK] * 0.0000110; \
+    const float branches = (float)args[P_BRANCHES]; \
+    const float swirl = (float)args[P_SWIRL] * 0.001f; \
+    const float zoom = 0.8f + ((float)args[P_SCALE] * 0.024f); \
     const float factor = branches / zoom; \
-    const float pitch = (float)args[6] * 0.01f; \
-    const float influence = (float)args[9] * 0.01f; \
-    const int32_t fb = TO_FP((float)args[5] * 0.01f); \
+    const float pitch = (float)args[P_PITCH] * 0.001f; \
+    const float influence = (float)args[P_SALIENCY] * 0.001f; \
+    const int32_t fb = TO_FP((float)args[P_FEEDBACK] * 0.001f); \
     const int32_t inv_fb = FP_ONE - fb; \
     const uint8_t *restrict srcY = frame->data[0]; \
     const uint8_t *restrict srcU = frame->data[1]; \
@@ -457,8 +598,9 @@ static void topo_m_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *res
     (void)pay; \
     const float time_f = (float)t->time; \
     const float phase_f = (float)t->phase; \
+    (void)args[P_BEAT_PHASE]; \
     float rs, rc; \
-    topo_lut_sincos(t, (float)args[4] * 0.01f, &rs, &rc); \
+    topo_lut_sincos(t, (float)args[P_ROT_SPEED] * 0.001f, &rs, &rc); \
     _Pragma("omp parallel for schedule(static) num_threads(t->n_threads)") \
     for (int y = 0; y < half_h; y++) { \
         const float dy = (float)y * inv_hh; \
@@ -606,7 +748,7 @@ vj_effect *topomorph_init(int width, int height)
     if (!ve)
         return NULL;
 
-    ve->num_params = 13;
+    ve->num_params = TOPOMORPH_PARAMS;
     ve->defaults = (int*) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int*) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int*) vj_calloc(sizeof(int) * ve->num_params);
@@ -619,40 +761,87 @@ vj_effect *topomorph_init(int width, int height)
         return NULL;
     }
 
-    ve->defaults[0] = 10;
-    ve->defaults[1] = 256;
-    ve->defaults[2] = 1;
-    ve->defaults[3] = 0;
-    ve->defaults[4] = 1;
-    ve->defaults[5] = 60;
-    ve->defaults[6] = 100;
-    ve->defaults[7] = 1;
-    ve->defaults[8] = 0;
-    ve->defaults[9] = 50;
-    ve->defaults[10] = 1;
-    ve->defaults[11] = 50;
-    ve->defaults[12] = 0;
+    ve->defaults[P_SPEED]     = 100;
+    ve->defaults[P_SCALE]     = 256;
+    ve->defaults[P_BRANCHES]  = 1;
+    ve->defaults[P_SWIRL]     = 0;
+    ve->defaults[P_ROT_SPEED] = 10;
+    ve->defaults[P_FEEDBACK]  = 600;
+    ve->defaults[P_PITCH]     = 1000;
+    ve->defaults[P_TOPO_MODE] = 3;
+    ve->defaults[P_SALIENCY]  = 500;
+    ve->defaults[P_SHAPE_P]   = 50;
+    ve->defaults[P_MIRROR]    = 0;
+    ve->defaults[P_BEAT_PUSH] = 0;
 
-    ve->limits[0][0] = -100; ve->limits[1][0] = 100;
-    ve->limits[0][1] = 2; ve->limits[1][1] = 500;
-    ve->limits[0][2] = 1; ve->limits[1][2] = 20;
-    ve->limits[0][3] = -100; ve->limits[1][3] = 100;
-    ve->limits[0][4] = -100; ve->limits[1][4] = 100;
-    ve->limits[0][5] = 0; ve->limits[1][5] = 100;
-    ve->limits[0][6] = -300; ve->limits[1][6] = 300;
-    ve->limits[0][7] = 0; ve->limits[1][7] = 1;
-    ve->limits[0][8] = 0; ve->limits[1][8] = 2;
-    ve->limits[0][9] = 0; ve->limits[1][9] = 100;
-    ve->limits[0][10] = 0; ve->limits[1][10] = 1;
-    ve->limits[0][11] = 10; ve->limits[1][11] = 80;
-    ve->limits[0][12] = 0; ve->limits[1][12] = 1;
+    ve->limits[0][P_SPEED] = -1000;     ve->limits[1][P_SPEED] = 1000;
+    ve->limits[0][P_SCALE] = 2;         ve->limits[1][P_SCALE] = 500;
+    ve->limits[0][P_BRANCHES] = 1;      ve->limits[1][P_BRANCHES] = 20;
+    ve->limits[0][P_SWIRL] = -1000;     ve->limits[1][P_SWIRL] = 1000;
+    ve->limits[0][P_ROT_SPEED] = -1000; ve->limits[1][P_ROT_SPEED] = 1000;
+    ve->limits[0][P_FEEDBACK] = 0;      ve->limits[1][P_FEEDBACK] = 1000;
+    ve->limits[0][P_PITCH] = -3000;     ve->limits[1][P_PITCH] = 3000;
+    ve->limits[0][P_TOPO_MODE] = 0;     ve->limits[1][P_TOPO_MODE] = 5;
+    ve->limits[0][P_SALIENCY] = 0;      ve->limits[1][P_SALIENCY] = 1000;
+    ve->limits[0][P_SHAPE_P] = 10;      ve->limits[1][P_SHAPE_P] = 80;
+    ve->limits[0][P_MIRROR] = 0;        ve->limits[1][P_MIRROR] = 1;
+    ve->limits[0][P_BEAT_PUSH] = 0;     ve->limits[1][P_BEAT_PUSH] = 1000;
 
     ve->description = "Topological Morph";
     ve->sub_format = 1;
     ve->param_description = vje_build_param_list(ve->num_params,
-        "Speed", "Scale Factor", "Branches", "Swirl", "Rot Speed", "Feedback",
-        "Pitch", "High Quality", "Genus", "Saliency Influence", "Geometry", "Shape P", "Mirror");
+        "Speed",
+        "Scale Factor",
+        "Branches",
+        "Swirl",
+        "Rot Speed",
+        "Feedback",
+        "Pitch",
+        "Topology Mode",
+        "Saliency Influence",
+        "Shape P",
+        "Mirror",
+        "Beat Push"
+    );
 
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][P_TOPO_MODE],
+        P_TOPO_MODE,
+        "Complex Genus 0",
+        "Complex Genus 1",
+        "Complex Genus 2",
+        "Box Product Genus 0",
+        "Box Product Genus 1",
+        "Box Product Genus 2"
+    );
+
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][P_MIRROR],
+        P_MIRROR,
+        "Full Frame",
+        "Mirrored"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                 -420,                620,                7,  28,  1200, 3200, 300,  42,     /* Speed */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                                  120,                 365,                6,  24,  1400, 3400, 500,  32,     /* Scale Factor */
+        VJ_BEAT_GRID_SIZE,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,               VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Branches */
+        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                                  -520,                520,                7,  28,  1200, 3200, 300,  40,     /* Swirl */
+        VJ_BEAT_GEOMETRY_PHASE,VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                 -420,                560,                6,  24,  1400, 3400, 500,  34,     /* Rot Speed */
+        VJ_BEAT_MEMORY,        VJ_BEAT_F_REJECT,                                      VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Feedback */
+        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                                  -1200,               1450,               5,  20,  1800, 4200, 900,  24,     /* Pitch */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,               VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Topology Mode */
+        VJ_BEAT_MOTION_REACT,  VJ_BEAT_F_CONTINUOUS,                                  240,                 900,                7,  28,  1400, 3600, 500,  34,     /* Saliency Influence */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,               VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Shape P */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,               VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Mirror */
+        VJ_BEAT_INTENSITY,     VJ_BEAT_F_CONTINUOUS,                                  0,                  860,                16, 64,  160,  1200, 0,    100     /* Beat Push */
+    );
     return ve;
 }
 
@@ -722,6 +911,18 @@ void *topomorph_malloc(int width, int height)
     t->p1_y = 0.0f;
     t->p2_x = 0.5f;
     t->p2_y = 0.0f;
+    t->beat_env = 0.0f;
+    t->beat_kick = 0.0f;
+    t->beat_prev = 0.0f;
+    t->beat_phase = 0;
+    t->eff_speed = 0.0f;
+    t->eff_scale = 0.0f;
+    t->eff_swirl = 0.0f;
+    t->eff_rot_speed = 0.0f;
+    t->eff_feedback = 0.0f;
+    t->eff_pitch = 0.0f;
+    t->eff_saliency = 0.0f;
+    t->eff_initialized = 0;
 
     return t;
 }
@@ -772,44 +973,113 @@ static void update_saliency_poles(box_topomorph_t *restrict t, const uint8_t *re
 
 static void process_core_no_mirror(box_topomorph_t *restrict t,
                                    VJFrame *restrict frame,
-                                   const int *restrict args,
-                                   const int genus)
+                                   const int *restrict args)
 {
-    const int mode = ((args[10] != 0) ? 3 : 0) + genus_clamp(genus);
-    const int radius = topo_radius_kind(args[11]);
-    const int sampler = (args[7] != 0) ? 1 : 0;
+    const int mode = topo_clampi_int(args[P_TOPO_MODE], 0, 5);
+    const int radius = topo_radius_kind(args[P_SHAPE_P]);
+    const int sampler = 1;
     topo_no_mirror_kernels[mode][radius][sampler](t, frame, args);
 }
 
 static void process_core_mirror(box_topomorph_t *restrict t,
                                 VJFrame *restrict frame,
-                                const int *restrict args,
-                                const int genus)
+                                const int *restrict args)
 {
     if ((t->width & 1) || (t->height & 1)) {
-        process_core_no_mirror(t, frame, args, genus);
+        process_core_no_mirror(t, frame, args);
         return;
     }
 
-    const int mode = ((args[10] != 0) ? 3 : 0) + genus_clamp(genus);
-    const int radius = topo_radius_kind(args[11]);
-    const int sampler = (args[7] != 0) ? 1 : 0;
+    const int mode = topo_clampi_int(args[P_TOPO_MODE], 0, 5);
+    const int radius = topo_radius_kind(args[P_SHAPE_P]);
+    const int sampler = 1;
     topo_mirror_kernels[mode][radius][sampler](t, frame, args);
 }
 
 void topomorph_apply(void *ptr, VJFrame *frame, int *args)
 {
     box_topomorph_t *t = (box_topomorph_t*) ptr;
+    int eff[TOPOMORPH_INTERNAL_PARAMS];
+
     if (!t || !frame || !args)
         return;
 
-    topo_rebuild_shape_lut(t, args[11]);
-    update_saliency_poles(t, frame->data[0]);
+    eff[P_SPEED]     = topo_clampi_int(args[P_SPEED], -1000, 1000);
+    eff[P_SCALE]     = topo_clampi_int(args[P_SCALE], 2, 500);
+    eff[P_BRANCHES]  = topo_clampi_int(args[P_BRANCHES], 1, 20);
+    eff[P_SWIRL]     = topo_clampi_int(args[P_SWIRL], -1000, 1000);
+    eff[P_ROT_SPEED] = topo_clampi_int(args[P_ROT_SPEED], -1000, 1000);
+    eff[P_FEEDBACK]  = topo_clampi_int(args[P_FEEDBACK], 0, 1000);
+    eff[P_PITCH]     = topo_clampi_int(args[P_PITCH], -3000, 3000);
+    eff[P_TOPO_MODE] = topo_clampi_int(args[P_TOPO_MODE], 0, 5);
+    eff[P_SALIENCY]  = topo_clampi_int(args[P_SALIENCY], 0, 1000);
+    eff[P_SHAPE_P]   = topo_clampi_int(args[P_SHAPE_P], 10, 80);
+    eff[P_MIRROR]    = topo_clampi_int(args[P_MIRROR], 0, 1);
+    eff[P_BEAT_PUSH] = topo_clampi_int(args[P_BEAT_PUSH], 0, 1000);
 
-    if (args[12] == 1)
-        process_core_mirror(t, frame, args, args[8]);
+    topo_update_beat_state(t,
+                           eff[P_BEAT_PUSH],
+                           &eff[P_BEAT_ENV],
+                           &eff[P_BEAT_KICK],
+                           &eff[P_BEAT_PHASE]);
+
+    if(eff[P_BEAT_ENV] > 0 || eff[P_BEAT_KICK] > 0) {
+        const int mode = topo_clampi_int(eff[P_TOPO_MODE], 0, 5);
+        const int bp = eff[P_BEAT_ENV];
+
+        const int complex_mode = (mode <= 2);
+        const int speed_target = complex_mode ? 720 : 600;
+        const int swirl_target = complex_mode ? 720 : 560;
+        const int rot_target = complex_mode ? 640 : 540;
+        const int pitch_target = complex_mode ? 1450 : 1120;
+        const int scale_target = complex_mode ? 132 : 164;
+        const int saliency_target = complex_mode ? 900 : 950;
+
+        eff[P_SPEED]     = topo_clampi_int(topo_push_abs(eff[P_SPEED], speed_target, bp, 70), -1000, 1000);
+        eff[P_SCALE]     = topo_clampi_int(topo_push_towards(eff[P_SCALE], scale_target, bp, 50), 2, 500);
+        eff[P_SWIRL]     = topo_clampi_int(topo_push_abs(eff[P_SWIRL], swirl_target, bp, 66), -1000, 1000);
+        eff[P_ROT_SPEED] = topo_clampi_int(topo_push_abs(eff[P_ROT_SPEED], rot_target, bp, 52), -1000, 1000);
+        eff[P_FEEDBACK]  = topo_clampi_int(topo_push_towards(eff[P_FEEDBACK], 610, bp, 18), 0, 760);
+        eff[P_PITCH]     = topo_clampi_int(topo_push_abs(eff[P_PITCH], pitch_target, bp, 46), -3000, 3000);
+        eff[P_SALIENCY]  = topo_clampi_int(topo_push_towards(eff[P_SALIENCY], saliency_target, bp, 54), 0, 1000);
+    }
+
+    if(!t->eff_initialized) {
+        t->eff_speed = (float)eff[P_SPEED];
+        t->eff_scale = (float)eff[P_SCALE];
+        t->eff_swirl = (float)eff[P_SWIRL];
+        t->eff_rot_speed = (float)eff[P_ROT_SPEED];
+        t->eff_feedback = (float)eff[P_FEEDBACK];
+        t->eff_pitch = (float)eff[P_PITCH];
+        t->eff_saliency = (float)eff[P_SALIENCY];
+        t->eff_initialized = 1;
+    } else {
+        eff[P_SPEED]     = topo_smooth_i(&t->eff_speed,     eff[P_SPEED],     0.115f, 0.060f);
+        eff[P_SCALE]     = topo_smooth_i(&t->eff_scale,     eff[P_SCALE],     0.095f, 0.055f);
+        eff[P_SWIRL]     = topo_smooth_i(&t->eff_swirl,     eff[P_SWIRL],     0.115f, 0.060f);
+        eff[P_ROT_SPEED] = topo_smooth_i(&t->eff_rot_speed, eff[P_ROT_SPEED], 0.095f, 0.055f);
+        eff[P_FEEDBACK]  = topo_smooth_i(&t->eff_feedback,  eff[P_FEEDBACK],  0.052f, 0.038f);
+        eff[P_PITCH]     = topo_smooth_i(&t->eff_pitch,     eff[P_PITCH],     0.085f, 0.050f);
+        eff[P_SALIENCY]  = topo_smooth_i(&t->eff_saliency,  eff[P_SALIENCY],  0.078f, 0.045f);
+    }
+
+    eff[P_SPEED]     = topo_clampi_int(eff[P_SPEED], -1000, 1000);
+    eff[P_SCALE]     = topo_clampi_int(eff[P_SCALE], 2, 500);
+    eff[P_SWIRL]     = topo_clampi_int(eff[P_SWIRL], -1000, 1000);
+    eff[P_ROT_SPEED] = topo_clampi_int(eff[P_ROT_SPEED], -1000, 1000);
+    eff[P_FEEDBACK]  = topo_clampi_int(eff[P_FEEDBACK], 0, 760);
+    eff[P_PITCH]     = topo_clampi_int(eff[P_PITCH], -3000, 3000);
+    eff[P_SALIENCY]  = topo_clampi_int(eff[P_SALIENCY], 0, 1000);
+
+    topo_rebuild_shape_lut(t, eff[P_SHAPE_P]);
+
+    if(eff[P_SALIENCY] > 0)
+        update_saliency_poles(t, frame->data[0]);
+
+    if (eff[P_MIRROR] == 1)
+        process_core_mirror(t, frame, eff);
     else
-        process_core_no_mirror(t, frame, args, args[8]);
+        process_core_no_mirror(t, frame, eff);
 }
 
 void topomorph_free(void *ptr)

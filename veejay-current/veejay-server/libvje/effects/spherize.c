@@ -17,36 +17,85 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
+
+
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "spherize.h"
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+typedef struct {
+    uint8_t *buf[3];
+    float *lut;
+    float *atan2_lut;
+    float *sin_lut;
+    float *dist_lut;
+    float *exp_lut;
+    int last_cx;
+    int last_cy;
+    int last_radius;
+    float last_angle;
+    int n_threads;
+} spherize_t;
+
+static inline int spherize_clampi(int v, int lo, int hi)
+{
+    return (v < lo) ? lo : (v > hi ? hi : v);
+}
+
+static inline int spherize_wrapi(int v, int max)
+{
+    if(max <= 1)
+        return 0;
+
+    v %= max;
+
+    if(v < 0)
+        v += max;
+
+    return v;
+}
+
+static inline int spherize_reflecti(int v, int max)
+{
+    if(max <= 1)
+        return 0;
+
+    const int hi = max - 1;
+    const int period = hi << 1;
+
+    if(period <= 0)
+        return 0;
+
+    v %= period;
+
+    if(v < 0)
+        v += period;
+
+    return (v <= hi) ? v : period - v;
+}
 
 vj_effect *spherize_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 8;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 100;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 360;
-    ve->limits[0][2] = 1;
-    ve->limits[1][2] = sqrtf(w*w/4.0f + h*h/4.0f);
-    ve->limits[0][3] = 10;
-    ve->limits[1][3] = 200;
-    ve->limits[0][4] = 10;
-    ve->limits[1][4] = 200;
-    ve->limits[0][5] = 0;
-    ve->limits[1][5] = w;
-    ve->limits[0][6] = 0;
-    ve->limits[1][6] = h;
-    ve->limits[0][7] = 0;
-    ve->limits[1][7] = 2;
+    const int max_radius = (int)sqrtf(((float)w * (float)w * 0.25f) + ((float)h * (float)h * 0.25f));
+
+    ve->limits[0][0] = 0;              ve->limits[1][0] = 100;
+    ve->limits[0][1] = 0;              ve->limits[1][1] = 360;
+    ve->limits[0][2] = 1;              ve->limits[1][2] = max_radius > 1 ? max_radius : 1;
+    ve->limits[0][3] = 10;             ve->limits[1][3] = 200;
+    ve->limits[0][4] = 10;             ve->limits[1][4] = 200;
+    ve->limits[0][5] = 0;              ve->limits[1][5] = w;
+    ve->limits[0][6] = 0;              ve->limits[1][6] = h;
+    ve->limits[0][7] = 0;              ve->limits[1][7] = 2;
 
     ve->defaults[0] = 33;
     ve->defaults[1] = 340;
@@ -59,153 +108,173 @@ vj_effect *spherize_init(int w, int h)
 
     ve->description = "Spherize";
     ve->sub_format = 1;
-    ve->param_description = vje_build_param_list( ve->num_params, "Strength" , "Angle", "Radius", "Ratio X" , "Ratio Y", "Center X" , "Center Y", "Mode" );
+    ve->extra_frame = 0;
+    ve->has_user = 0;
+
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Strength",
+        "Angle",
+        "Radius",
+        "Ratio X",
+        "Ratio Y",
+        "Center X",
+        "Center Y",
+        "Mode"
+    );
+
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][7],
+        7,
+        "Clamp",
+        "Wrap",
+        "Reflect"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                       0,                  88,                 8, 30, 1200, 3000, 0,   55,    /* Strength */
+        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,      0,                  360,                8, 30, 1200, 3000, 0,   45,    /* Angle */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE, 8,              ve->limits[1][2],   8, 30, 1200, 3000, 0,   45,    /* Radius */
+        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                       50,                 160,                8, 30, 1200, 3000, 0,   42,    /* Ratio X */
+        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                       50,                 160,                8, 30, 1200, 3000, 0,   42,    /* Ratio Y */
+        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE, 0,              w,                  8, 30, 1200, 3000, 0,   35,    /* Center X */
+        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE, 0,              h,                  8, 30, 1200, 3000, 0,   35,    /* Center Y */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Mode */
+    );
+
     return ve;
 }
 
-typedef struct 
+static void spherize_rebuild_center_luts(spherize_t *s, int w, int h, int cx, int cy)
 {
-    uint8_t *buf[3];
-    uint8_t *buf_alloc;
-
-    float *lut;
-    float *atan2_lut;
-    float *sin_lut;
-    float *sqrt_lut;
-    float *exp_lut;
-
-    int last_cx;
-    int last_cy;
-    int last_radius;
-    float last_angle;
-
-    int n_threads;
-} spherize_t;
-
-static void init_atan2_lut(spherize_t *f, int w, int h, int cx, int cy)
-{
-    for (int x = 0; x < w; ++x) {
-        double dx = x - cx;
-
-        for (int y = 0; y < h; ++y) {
-            double dy = y - cy;
-            f->atan2_lut[y * w + x] = atan2(dy, dx); // slow
-        }
-    }
-    f->last_cx = cx;
-    f->last_cy = cy;
-}
-
-static inline void init_sin_lut(spherize_t *f, int w, int h, float angle)
-{
-    const int size = w * h;
-    for (int i = 0; i < size; ++i)
-        f->sin_lut[i] = sinf(f->atan2_lut[i] - angle);
-
-    f->last_angle = angle;
-}
-
-static void init_sqrt_lut(spherize_t *f, int w, int h, int cx, int cy)
-{
-    for (int y = 0; y < h; ++y) {
+#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+    for(int y = 0; y < h; y++) {
         const float dy = (float)(y - cy);
         const int row = y * w;
 
-        for (int x = 0; x < w; ++x) {
+        for(int x = 0; x < w; x++) {
             const float dx = (float)(x - cx);
-            f->sqrt_lut[row + x] = sqrtf(dx * dx + dy * dy);
+            const int idx = row + x;
+
+            s->atan2_lut[idx] = atan2f(dy, dx);
+            s->dist_lut[idx] = sqrtf(dx * dx + dy * dy);
         }
     }
+
+    s->last_cx = cx;
+    s->last_cy = cy;
+    s->last_angle = -999999.0f;
+    s->last_radius = -1;
 }
 
-static void init_exp_lut(spherize_t *f, int w, int h, int radius)
+static void spherize_rebuild_sin_lut(spherize_t *s, int len, float angle)
 {
-    const float inv_sigma =
-        1.0f / (2.0f * radius * radius);
+#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+    for(int i = 0; i < len; i++)
+        s->sin_lut[i] = sinf(s->atan2_lut[i] - angle);
 
-    const int size = w * h;
+    s->last_angle = angle;
+}
 
-    for (int i = 0; i < size; ++i) {
-        const float d = f->sqrt_lut[i];
-        f->exp_lut[i] = expf(-d * d * inv_sigma);
+static void spherize_rebuild_exp_lut(spherize_t *s, int len, int radius)
+{
+    const float r = (float)(radius > 0 ? radius : 1);
+    const float inv_sigma = 1.0f / (2.0f * r * r);
+
+#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+    for(int i = 0; i < len; i++) {
+        const float d = s->dist_lut[i];
+        s->exp_lut[i] = expf(-(d * d) * inv_sigma);
     }
 
-    f->last_radius = radius;
+    s->last_radius = radius;
 }
 
 void *spherize_malloc(int w, int h)
 {
     spherize_t *s = (spherize_t*) vj_calloc(sizeof(spherize_t));
-    if (!s) return NULL;
+    if(!s)
+        return NULL;
 
-    const int padded_w = w + 2;
-    const int padded_h = h + 2;
-    const int padded_pixels = padded_w * padded_h;
+    const int pixels = w * h;
 
-    s->buf[0] = (uint8_t*) vj_malloc(padded_pixels * 3);
-    if (!s->buf[0]) {
+    s->buf[0] = (uint8_t*) vj_malloc((size_t)pixels * 3u);
+    if(!s->buf[0]) {
         free(s);
         return NULL;
     }
-    s->buf_alloc = s->buf[0];
 
-    s->buf[1] = s->buf[0] + padded_pixels;
-    s->buf[2] = s->buf[1] + padded_pixels;
+    s->buf[1] = s->buf[0] + pixels;
+    s->buf[2] = s->buf[1] + pixels;
 
-    s->buf[0] += padded_w + 1;
-    s->buf[1] += padded_w + 1;
-    s->buf[2] += padded_w + 1;
-
-    const int pixels = w * h;
-    s->lut = (float*) vj_malloc(sizeof(float) * pixels * 4);
-    if (!s->lut) {
-        free(s->buf_alloc);
+    s->lut = (float*) vj_malloc(sizeof(float) * (size_t)pixels * 4u);
+    if(!s->lut) {
+        free(s->buf[0]);
         free(s);
         return NULL;
     }
 
     s->atan2_lut = s->lut;
     s->sin_lut   = s->atan2_lut + pixels;
-    s->sqrt_lut  = s->sin_lut + pixels;
-    s->exp_lut   = s->sqrt_lut + pixels;
+    s->dist_lut  = s->sin_lut + pixels;
+    s->exp_lut   = s->dist_lut + pixels;
 
-    init_sqrt_lut(s, w, h, w/2, h/2);
+    s->last_cx = INT_MIN;
+    s->last_cy = INT_MIN;
+    s->last_radius = -1;
+    s->last_angle = -999999.0f;
 
     s->n_threads = vje_advise_num_threads(pixels);
+    if(s->n_threads < 1)
+        s->n_threads = 1;
 
-    return s;
+    return (void*) s;
 }
 
 void spherize_free(void *ptr)
 {
-    if (!ptr) return;
     spherize_t *s = (spherize_t*) ptr;
+    if(!s)
+        return;
 
-    if(s->buf_alloc) {
-        free(s->buf_alloc);
-    }
-    // Free LUT allocation
+    if(s->buf[0])
+        free(s->buf[0]);
+
     if(s->lut)
         free(s->lut);
 
     free(s);
 }
 
-void spherize_apply(void *ptr, VJFrame *frame, int *args) {
-    spherize_t *s = (spherize_t*)ptr;
-    const int n_threads = s->n_threads;
-    const float strength = args[0] * 0.01f;
-    const float angle    = args[1] * (M_PI/180.0f);
-    const float ratio_x  = args[3] * 0.01f;
-    const float ratio_y  = args[4] * 0.01f;
-    const int   center_x = args[5];
-    const int   center_y = args[6];
-    const int radius = args[2];
-    const int mode = args[7];
+void spherize_apply(void *ptr, VJFrame *frame, int *args)
+{
+    spherize_t *s = (spherize_t*) ptr;
 
-    const int width  = frame->width;
+    if(!s || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
+        return;
+
+    const int width = frame->width;
     const int height = frame->height;
-    const int len = width * height;
+    const int len = frame->len;
+
+    if(width <= 0 || height <= 0 || len <= 0)
+        return;
+
+    const int max_radius = (int)sqrtf(((float)width * (float)width * 0.25f) + ((float)height * (float)height * 0.25f));
+
+    const float strength = (float)spherize_clampi(args[0], 0, 100) * 0.01f;
+    const float angle = (float)spherize_clampi(args[1], 0, 360) * ((float)M_PI / 180.0f);
+    const int radius = spherize_clampi(args[2], 1, max_radius > 1 ? max_radius : 1);
+    const float ratio_x = (float)spherize_clampi(args[3], 10, 200) * 0.01f;
+    const float ratio_y = (float)spherize_clampi(args[4], 10, 200) * 0.01f;
+    const int center_x = spherize_clampi(args[5], 0, width);
+    const int center_y = spherize_clampi(args[6], 0, height);
+    const int mode = spherize_clampi(args[7], 0, 2);
 
     uint8_t *restrict srcY = frame->data[0];
     uint8_t *restrict srcU = frame->data[1];
@@ -219,83 +288,89 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args) {
     veejay_memcpy(bufU, srcU, len);
     veejay_memcpy(bufV, srcV, len);
 
-    if (s->last_cx != center_x || s->last_cy != center_y)
-        init_atan2_lut(s, width, height, center_x, center_y);
+    if(s->last_cx != center_x || s->last_cy != center_y)
+        spherize_rebuild_center_luts(s, width, height, center_x, center_y);
 
-    if( s->last_angle != angle )
-        init_sin_lut(s, width, height, angle);
+    if(s->last_angle != angle)
+        spherize_rebuild_sin_lut(s, len, angle);
 
-    if (s->last_radius != radius)
-        init_exp_lut(s, width, height, radius);
+    if(s->last_radius != radius)
+        spherize_rebuild_exp_lut(s, len, radius);
 
-    float *restrict sin_lut = s->sin_lut;
-    float *restrict exp_lut = s->exp_lut;
+    const float *restrict sin_lut = s->sin_lut;
+    const float *restrict exp_lut = s->exp_lut;
 
-    switch(mode) {
-        case 0:
-            #pragma omp parallel for num_threads(n_threads) schedule(static)
-            for (int y = 0; y < height; ++y) {
-                const int row = y * width;
-                const float dy_scaled = (y - center_y) * ratio_y;
+    if(mode == 0) {
+#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+        for(int y = 0; y < height; y++) {
+            const int row = y * width;
+            const float dy_scaled = (float)(y - center_y) * ratio_y;
 
-                for (int x = 0; x < width; ++x) {
-                    const float dx_scaled = (x - center_x) * ratio_x;
-                    const float ratio = 1.0f + strength * sin_lut[row + x] * exp_lut[row + x];
+            for(int x = 0; x < width; x++) {
+                const int idx = row + x;
+                const float dx_scaled = (float)(x - center_x) * ratio_x;
+                const float warp = 1.0f + strength * sin_lut[idx] * exp_lut[idx];
 
-                    int new_x = (int)(center_x + dx_scaled * ratio);
-                    int new_y = (int)(center_y + dy_scaled * ratio);
+                int sx = (int)((float)center_x + dx_scaled * warp);
+                int sy = (int)((float)center_y + dy_scaled * warp);
 
-                    new_x = (new_x < 0) ? 0 : ((new_x >= width) ? width - 1 : new_x);
-                    new_y = (new_y < 0) ? 0 : ((new_y >= height) ? height - 1 : new_y);
+                sx = spherize_clampi(sx, 0, width - 1);
+                sy = spherize_clampi(sy, 0, height - 1);
 
-                    int idx = row + x;
-                    srcY[idx] = bufY[new_y * width + new_x];
-                    srcU[idx] = bufU[new_y * width + new_x];
-                    srcV[idx] = bufV[new_y * width + new_x];
-                }
+                const int src = sy * width + sx;
+
+                srcY[idx] = bufY[src];
+                srcU[idx] = bufU[src];
+                srcV[idx] = bufV[src];
             }
-            break;
-        case 1:
-            #pragma omp parallel for num_threads(n_threads) schedule(static)
-            for (int y = 0; y < height; ++y) {
-                const int row = y * width;
-                const float dy_scaled = (y - center_y) * ratio_y;
+        }
+    } else if(mode == 1) {
+#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+        for(int y = 0; y < height; y++) {
+            const int row = y * width;
+            const float dy_scaled = (float)(y - center_y) * ratio_y;
 
-                for (int x = 0; x < width; ++x) {
-                    const float dx_scaled = (x - center_x) * ratio_x;
-                    const float ratio = 1.0f + strength * sin_lut[row + x] * exp_lut[row + x];
+            for(int x = 0; x < width; x++) {
+                const int idx = row + x;
+                const float dx_scaled = (float)(x - center_x) * ratio_x;
+                const float warp = 1.0f + strength * sin_lut[idx] * exp_lut[idx];
 
-                    int new_x = (int)(center_x + dx_scaled * ratio);
-                    int new_y = (int)(center_y + dy_scaled * ratio);
-                    new_x = (new_x + width) % width;
-                    new_y = (new_y + height) % height;
-                    int idx = row + x;
-                    srcY[idx] = bufY[new_y * width + new_x];
-                    srcU[idx] = bufU[new_y * width + new_x];
-                    srcV[idx] = bufV[new_y * width + new_x];
-                }
+                int sx = (int)((float)center_x + dx_scaled * warp);
+                int sy = (int)((float)center_y + dy_scaled * warp);
+
+                sx = spherize_wrapi(sx, width);
+                sy = spherize_wrapi(sy, height);
+
+                const int src = sy * width + sx;
+
+                srcY[idx] = bufY[src];
+                srcU[idx] = bufU[src];
+                srcV[idx] = bufV[src];
             }
-            break;
-        case 2:
-            #pragma omp parallel for num_threads(n_threads) schedule(static)
-            for (int y = 0; y < height; ++y) {
-                const int row = y * width;
-                const float dy_scaled = (y - center_y) * ratio_y;
+        }
+    } else {
+#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+        for(int y = 0; y < height; y++) {
+            const int row = y * width;
+            const float dy_scaled = (float)(y - center_y) * ratio_y;
 
-                for (int x = 0; x < width; ++x) {
-                    const float dx_scaled = (x - center_x) * ratio_x;
-                    const float ratio = 1.0f + strength * sin_lut[row + x] * exp_lut[row + x];
+            for(int x = 0; x < width; x++) {
+                const int idx = row + x;
+                const float dx_scaled = (float)(x - center_x) * ratio_x;
+                const float warp = 1.0f + strength * sin_lut[idx] * exp_lut[idx];
 
-                    int new_x = (int)(center_x + dx_scaled * ratio);
-                    int new_y = (int)(center_y + dy_scaled * ratio);
-                    new_x = (new_x < 0) ? -new_x : ((new_x >= width) ? 2*width - new_x - 2 : new_x);
-                    new_y = (new_y < 0) ? -new_y : ((new_y >= height) ? 2*height - new_y - 2 : new_y);
-                    int idx = row + x;
-                    srcY[idx] = bufY[new_y * width + new_x];
-                    srcU[idx] = bufU[new_y * width + new_x];
-                    srcV[idx] = bufV[new_y * width + new_x];
-                }
+                int sx = (int)((float)center_x + dx_scaled * warp);
+                int sy = (int)((float)center_y + dy_scaled * warp);
+
+                sx = spherize_reflecti(sx, width);
+                sy = spherize_reflecti(sy, height);
+
+                const int src = sy * width + sx;
+
+                srcY[idx] = bufY[src];
+                srcU[idx] = bufU[src];
+                srcV[idx] = bufV[src];
             }
-            break;
+        }
     }
 }

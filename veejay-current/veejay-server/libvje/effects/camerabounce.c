@@ -18,9 +18,8 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "camerabounce.h"
-#include <stdint.h>
+
 
 #define CB_PARAMS 8
 
@@ -98,6 +97,19 @@ vj_effect *camerabounce_init(int w, int h)
         "Center Y",
         "Direction Mode",
         "Phase"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SPEED,              VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,       8,                  120,                8,  28,  1800, 4200, 900,  45,    /* Tempo (Frames) */
+        VJ_BEAT_TRIGGER,            VJ_BEAT_F_IMPULSE,                                20,                 100,                55, 100, 45,   320,  0,    85,    /* Impact (Percentage) */
+        VJ_BEAT_DETAIL,             VJ_BEAT_F_CONTINUOUS,                             0,                  70,                 10, 38,  900,  2400, 0,    50,    /* Motion Blur */
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                             8,                  78,                 16, 56,  800,  2200, 0,    80,    /* Zoom Depth */
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_PHRASE_ONLY,                            25,                 75,                 6,  20,  1800, 3600, 900,  25,    /* Center X */
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_PHRASE_ONLY,                            25,                 75,                 6,  20,  1800, 3600, 900,  25,    /* Center Y */
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,          VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Direction Mode */
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,            0,                  100,                12, 42,  900,  2400, 0,    55     /* Phase */
     );
 
     return ve;

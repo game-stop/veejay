@@ -19,77 +19,122 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "rotozoom.h"
 
 typedef struct {
-    uint8_t *rotobuffer[4];
-	float sin_lut[360];
-	float cos_lut[360];
-	double zoom;
-	double rotate;
-	int frameCount;
-	int direction;
+    uint8_t *rotobuffer[3];
+    float sin_lut[360];
+    float cos_lut[360];
+    double zoom;
+    double rotate;
+    int frameCount;
+    int direction;
+    int n_threads;
 } rotozoom_t;
 
 vj_effect *rotozoom_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 4;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
+
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
     ve->defaults[0] = 30;
     ve->defaults[1] = 2;
     ve->defaults[2] = 1;
     ve->defaults[3] = 100;
+
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 360;
+
     ve->limits[0][1] = -1000;
     ve->limits[1][1] = 1000;
+
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 1;
+
     ve->limits[0][3] = 1;
     ve->limits[1][3] = 1500;
+
     ve->description = "Rotozoom";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->param_description = vje_build_param_list(ve->num_params, "Rotate", "Zoom" , "Automatic", "Duration");
     ve->has_user = 0;
+
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Rotate",
+        "Zoom",
+        "Automatic",
+        "Duration"
+    );
+
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][2],
+        2,
+        "Manual",
+        "Automatic"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,      0,                  360,                8, 30, 1200, 3000, 0,   45,    /* Rotate */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                       -220,               420,                8, 30, 1200, 3000, 0,   50,    /* Zoom */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Automatic */
+        VJ_BEAT_SPEED,         VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 24,                 360,                6, 22, 1800, 4200, 900, 30     /* Duration */
+    );
+
+    (void) width;
+    (void) height;
 
     return ve;
 }
 
 void *rotozoom_malloc(int width, int height)
 {
-    int i;
-    rotozoom_t *r = (rotozoom_t*) vj_calloc( sizeof(rotozoom_t) );
-    if(!r) {
+    rotozoom_t *r = (rotozoom_t*) vj_calloc(sizeof(rotozoom_t));
+    if(!r)
         return NULL;
-    }
 
-    r->rotobuffer[0] = (uint8_t *) vj_calloc(sizeof(uint8_t) * (width * height * 3));
+    const int len = width * height;
+
+    r->rotobuffer[0] = (uint8_t*) vj_malloc((size_t)len * 3u);
     if(!r->rotobuffer[0]) {
         free(r);
         return NULL;
     }
 
-    r->rotobuffer[1] = r->rotobuffer[0] + (width * height);
-    r->rotobuffer[2] = r->rotobuffer[1] + (width * height);
+    r->rotobuffer[1] = r->rotobuffer[0] + len;
+    r->rotobuffer[2] = r->rotobuffer[1] + len;
 
-	r->direction = 1;
+    r->zoom = 0.0;
+    r->rotate = 0.0;
+    r->frameCount = 0;
+    r->direction = 1;
 
-	for( i = 0; i < 360; i ++ ) {
-		r->sin_lut[i] = a_sin( i * M_PI / 180.0 );
-		r->cos_lut[i] = a_cos( i * M_PI / 180.0 );
-	}
+    for(int i = 0; i < 360; i++) {
+        const double rad = (double)i * M_PI / 180.0;
+        r->sin_lut[i] = a_sin(rad);
+        r->cos_lut[i] = a_cos(rad);
+    }
+
+    r->n_threads = vje_advise_num_threads(len);
+    if(r->n_threads < 1)
+        r->n_threads = 1;
 
     return (void*) r;
 }
 
-void rotozoom_free(void *ptr) {
-
+void rotozoom_free(void *ptr)
+{
     rotozoom_t *r = (rotozoom_t*) ptr;
+    if(!r)
+        return;
 
     if(r->rotobuffer[0])
         free(r->rotobuffer[0]);
@@ -97,92 +142,124 @@ void rotozoom_free(void *ptr) {
     free(r);
 }
 
+static inline int rotozoom_clampi(int v, int lo, int hi)
+{
+    return (v < lo) ? lo : (v > hi ? hi : v);
+}
 
-void rotozoom_apply( void *ptr, VJFrame *frame, int *args )
+static inline int rotozoom_wrap360(double v)
+{
+    int a = (int)v % 360;
+
+    if(a < 0)
+        a += 360;
+
+    return a;
+}
+
+static inline double rotozoom_scale_from_arg(double zoom_arg)
+{
+    if(zoom_arg > 0.0)
+        return 1.0 / (1.0 + zoom_arg / 100.0);
+
+    if(zoom_arg < 0.0)
+        return pow(2.0, -zoom_arg / 200.0);
+
+    return 1.0;
+}
+
+void rotozoom_apply(void *ptr, VJFrame *frame, int *args)
 {
     rotozoom_t *r = (rotozoom_t*) ptr;
+    if(!r || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
+        return;
 
-    const unsigned int width = frame->width;
-    const unsigned int height = frame->height;
-    
-    double rotate = args[0];
-    double zoom1 = args[1];
-    int autom = args[2];
-	int maxFrames = args[3];
+    const int width = frame->width;
+    const int height = frame->height;
+    const int len = frame->len;
 
-	double zoom;
-	if( zoom1 > 0) {
-		zoom = 1.0 / (1.0 + zoom1 / 100.0);
-	}
-	else if(zoom1 < 0) {
-		zoom = pow( 2.0, -zoom1 / 200.0);
-	}
-	else {
-		zoom = 1.0;
-	}
-	
-	if( autom ) {
-		zoom1 = r->zoom;
-		rotate = r->rotate;
+    if(width <= 0 || height <= 0 || len <= 0)
+        return;
 
-		r->zoom += (r->direction * (2000.0 / maxFrames));
-		r->rotate += (r->direction * (360.0 / maxFrames));
+    double rotate = (double)rotozoom_clampi(args[0], 0, 360);
+    double zoom_arg = (double)rotozoom_clampi(args[1], -1000, 1000);
+    int autom = args[2] ? 1 : 0;
+    int maxFrames = rotozoom_clampi(args[3], 1, 1500);
 
-		r->frameCount ++;
+    if(autom) {
+        zoom_arg = r->zoom;
+        rotate = r->rotate;
 
-		if( r->frameCount % maxFrames == 0 || (r->rotate <= 0 || r->rotate >= 360)) {
-			r->direction *= -1;
-			r->frameCount = 0;
-		}
-		r->zoom = fmin(1000, fmax(-1000, r->zoom));
-	}
+        r->zoom += (double)r->direction * (2000.0 / (double)maxFrames);
+        r->rotate += (double)r->direction * (360.0 / (double)maxFrames);
+        r->frameCount++;
 
-    uint8_t *dstY = frame->data[0];
-    uint8_t *dstU = frame->data[1];
-    uint8_t *dstV = frame->data[2];
+        if(r->frameCount >= maxFrames || r->rotate <= 0.0 || r->rotate >= 360.0) {
+            r->direction *= -1;
+            r->frameCount = 0;
 
-    uint8_t *srcY = r->rotobuffer[0];
-    uint8_t *srcU = r->rotobuffer[1];
-    uint8_t *srcV = r->rotobuffer[2];
+            if(r->rotate < 0.0)
+                r->rotate = 0.0;
+            else if(r->rotate > 360.0)
+                r->rotate = 360.0;
+        }
 
-    veejay_memcpy( r->rotobuffer[0], frame->data[0], frame->len );
-    veejay_memcpy( r->rotobuffer[1], frame->data[1], frame->len );
-    veejay_memcpy( r->rotobuffer[2], frame->data[2], frame->len );
+        if(r->zoom < -1000.0)
+            r->zoom = -1000.0;
+        else if(r->zoom > 1000.0)
+            r->zoom = 1000.0;
+    } else {
+        r->zoom = zoom_arg;
+        r->rotate = rotate;
+        r->frameCount = 0;
+        r->direction = 1;
+    }
 
-    const int centerX = width / 2;
-    const int centerY = height / 2;
+    const double zoom = rotozoom_scale_from_arg(zoom_arg);
 
+    uint8_t *restrict dstY = frame->data[0];
+    uint8_t *restrict dstU = frame->data[1];
+    uint8_t *restrict dstV = frame->data[2];
 
-	float *cos_lut = r->cos_lut;
-	float *sin_lut = r->sin_lut;
+    uint8_t *restrict srcY = r->rotobuffer[0];
+    uint8_t *restrict srcU = r->rotobuffer[1];
+    uint8_t *restrict srcV = r->rotobuffer[2];
 
+    veejay_memcpy(srcY, dstY, len);
+    veejay_memcpy(srcU, dstU, len);
+    veejay_memcpy(srcV, dstV, len);
 
-    int rotate_angle = (int)rotate % 360;
-    float cos_val = cos_lut[rotate_angle];
-    float sin_val = sin_lut[rotate_angle];
+    const float centerX = ((float)width  - 1.0f) * 0.5f;
+    const float centerY = ((float)height - 1.0f) * 0.5f;
 
+    const int angle = rotozoom_wrap360(rotate);
+    const float cos_val = r->cos_lut[angle];
+    const float sin_val = r->sin_lut[angle];
+    const float z = (float)zoom;
 
-    for (int y = 0; y < height; ++y) {
-#pragma omp simd
-		for (int x = 0; x < width; ++x) {
+#pragma omp parallel for schedule(static) num_threads(r->n_threads)
+    for(int y = 0; y < height; y++) {
+        const float dy = (float)y - centerY;
+        const int row = y * width;
 
-		 	int rotatedX = (int)((x - centerX) * cos_val - (y - centerY) * sin_val + centerX);
-            int rotatedY = (int)((x - centerX) * sin_val + (y - centerY) * cos_val + centerY);
-         
-            int newX = (int)((rotatedX - centerX) * zoom + centerX);
-            int newY = (int)((rotatedY - centerY) * zoom + centerY);
+        for(int x = 0; x < width; x++) {
+            const float dx = (float)x - centerX;
 
-            newX = (newX < 0) ? 0 : ((newX > width - 1) ? width - 1 : newX);
-            newY = (newY < 0) ? 0 : ((newY > height - 1) ? height - 1 : newY);
+            const float rotatedX = dx * cos_val - dy * sin_val;
+            const float rotatedY = dx * sin_val + dy * cos_val;
 
-            int srcIndex = newY * width + newX;
-            int dstIndex = y * width + x;
+            int newX = (int)(rotatedX * z + centerX);
+            int newY = (int)(rotatedY * z + centerY);
 
+            newX = rotozoom_clampi(newX, 0, width - 1);
+            newY = rotozoom_clampi(newY, 0, height - 1);
+
+            const int srcIndex = newY * width + newX;
+            const int dstIndex = row + x;
 
             dstY[dstIndex] = srcY[srcIndex];
             dstU[dstIndex] = srcU[srcIndex];
             dstV[dstIndex] = srcV[srcIndex];
         }
     }
-
 }

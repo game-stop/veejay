@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "halftone.h"
 
 vj_effect *halftone_init(int w, int h)
@@ -52,7 +51,14 @@ vj_effect *halftone_init(int w, int h)
         "Averaged Colored Dots", "Brightest Dot", "Darkest Dot","Inverted Gray", "Chroma Swap"  );
     vje_build_value_hint_list( ve->hints, ve->limits[1][2],2, "Centered", "North", "North East", "East" , "South East", "South West", "West" , "North West");
     vje_build_value_hint_list( ve->hints, ve->limits[1][3],3, "Even", "Odd", "No parity", "Bezerk");
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,    3,                  (w > h ? w / 12 : h / 12), 6, 22, 2200, 5200, 1800, 30,    /* Radius */
+        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,        0, 0,  0,    0,    0,    -1000, /* Mode */
+        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,        0, 0,  0,    0,    0,    -1000, /* Orientation */
+        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,        0, 0,  0,    0,    0,    -1000  /* Parity */
+    );
     return ve;
 }
 

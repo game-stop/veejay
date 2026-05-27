@@ -19,17 +19,26 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "ghostwash.h"
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-#include <limits.h>
 
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+
+#define GHOSTWASH_PARAMS 12
+
+#define P_SOURCE          0
+#define P_DRIFT           1
+#define P_WARP            2
+#define P_DETAIL          3
+#define P_PERSISTENCE     4
+#define P_INSTABILITY     5
+#define P_FLOW_SIZE       6
+#define P_MOTION_PULL     7
+#define P_COLOR_STRENGTH  8
+#define P_COLOR_MODE      9
+#define P_GEOMETRY       10
+#define P_BEAT_PUSH      11
 
 typedef struct {
     uint8_t *canvas_y;
@@ -80,6 +89,24 @@ static inline float lerpf_local(float a, float b, float t)
 static inline float smoothstepf_local(float t)
 {
     return t * t * (3.0f - 2.0f * t);
+}
+
+static inline float param1000_to_float(int v)
+{
+    if (v < 0) v = 0;
+    else if (v > 1000) v = 1000;
+    return (float)v * 0.001f;
+}
+
+static inline float ghostwash_beat_shape(float v)
+{
+    v = clampf_local(v, 0.0f, 1.0f);
+    return v * v;
+}
+
+static inline float ghostwash_push01(float base, float drive, float amount)
+{
+    return clampf_local(base + (1.0f - base) * drive * amount, 0.0f, 1.0f);
 }
 
 static inline uint8_t avg2_u8(uint8_t a, uint8_t b)
@@ -256,34 +283,77 @@ vj_effect *ghostwash_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *)vj_calloc(sizeof(vj_effect));
 
-    ve->num_params = 13;
+    if (!ve)
+        return NULL;
+
+    ve->num_params = GHOSTWASH_PARAMS;
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 0; ve->limits[1][0] = 100; ve->defaults[0] = 35;
-    ve->limits[0][1] = 0; ve->limits[1][1] = 100; ve->defaults[1] = 14;
-    ve->limits[0][2] = 0; ve->limits[1][2] = 100; ve->defaults[2] = 38;
-    ve->limits[0][3] = 0; ve->limits[1][3] = 100; ve->defaults[3] = 18;
-    ve->limits[0][4] = 0; ve->limits[1][4] = 100; ve->defaults[4] = 42;
-    ve->limits[0][5] = 0; ve->limits[1][5] = 100; ve->defaults[5] = 22;
-    ve->limits[0][6] = 0; ve->limits[1][6] = 100; ve->defaults[6] = 94;
-    ve->limits[0][7] = 0; ve->limits[1][7] = 100; ve->defaults[7] = 20;
-    ve->limits[0][8] = 0; ve->limits[1][8] = 100; ve->defaults[8] = 85;
-    ve->limits[0][9] = 0; ve->limits[1][9] = 100; ve->defaults[9] = 55;
-    ve->limits[0][10] = 0; ve->limits[1][10] = 100; ve->defaults[10] = 58;
-    ve->limits[0][11] = 0; ve->limits[1][11] = 1; ve->defaults[11] = 0;
-    ve->limits[0][12] = 0; ve->limits[1][12] = 9; ve->defaults[12] = 0;
+    if (!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if (ve->defaults) free(ve->defaults);
+        if (ve->limits[0]) free(ve->limits[0]);
+        if (ve->limits[1]) free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
+    ve->limits[0][P_SOURCE] = 0;
+    ve->limits[1][P_SOURCE] = 1000;
+    ve->defaults[P_SOURCE] = 140;
+
+    ve->limits[0][P_DRIFT] = 0;
+    ve->limits[1][P_DRIFT] = 1000;
+    ve->defaults[P_DRIFT] = 380;
+
+    ve->limits[0][P_WARP] = 0;
+    ve->limits[1][P_WARP] = 1000;
+    ve->defaults[P_WARP] = 180;
+
+    ve->limits[0][P_DETAIL] = 0;
+    ve->limits[1][P_DETAIL] = 1000;
+    ve->defaults[P_DETAIL] = 220;
+
+    ve->limits[0][P_PERSISTENCE] = 0;
+    ve->limits[1][P_PERSISTENCE] = 1000;
+    ve->defaults[P_PERSISTENCE] = 940;
+
+    ve->limits[0][P_INSTABILITY] = 0;
+    ve->limits[1][P_INSTABILITY] = 1000;
+    ve->defaults[P_INSTABILITY] = 200;
+
+    ve->limits[0][P_FLOW_SIZE] = 0;
+    ve->limits[1][P_FLOW_SIZE] = 1000;
+    ve->defaults[P_FLOW_SIZE] = 850;
+
+    ve->limits[0][P_MOTION_PULL] = 0;
+    ve->limits[1][P_MOTION_PULL] = 1000;
+    ve->defaults[P_MOTION_PULL] = 550;
+
+    ve->limits[0][P_COLOR_STRENGTH] = 0;
+    ve->limits[1][P_COLOR_STRENGTH] = 1000;
+    ve->defaults[P_COLOR_STRENGTH] = 580;
+
+    ve->limits[0][P_COLOR_MODE] = 0;
+    ve->limits[1][P_COLOR_MODE] = 1;
+    ve->defaults[P_COLOR_MODE] = 0;
+
+    ve->limits[0][P_GEOMETRY] = 0;
+    ve->limits[1][P_GEOMETRY] = 9;
+    ve->defaults[P_GEOMETRY] = 0;
+
+    ve->limits[0][P_BEAT_PUSH] = 0;
+    ve->limits[1][P_BEAT_PUSH] = 1000;
+    ve->defaults[P_BEAT_PUSH] = 0;
 
     ve->description = "Ghost Wash";
     ve->sub_format = 1;
     ve->param_description = vje_build_param_list(
         ve->num_params,
-        "Fade In",
         "Source",
         "Drift",
         "Warp",
-        "Color Bleed",
         "Detail",
         "Persistence",
         "Instability",
@@ -291,8 +361,55 @@ vj_effect *ghostwash_init(int w, int h)
         "Motion Pull",
         "Color Strength",
         "Color Mode",
-        "Geometry"
+        "Geometry",
+        "Beat Push"
     );
+
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][P_COLOR_MODE],
+        P_COLOR_MODE,
+        "Color",
+        "Mono"
+    );
+
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][P_GEOMETRY],
+        P_GEOMETRY,
+        "Vortex",
+        "Expand",
+        "Gradient Curl",
+        "Shear Spiral",
+        "Diamond Fold",
+        "Tunnel Pull",
+        "Gradient Drift",
+        "Edge Prism",
+        "Triangle Field",
+        "Rectangle Field"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_REJECT,                                      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,   -1000, /* Source */
+        VJ_BEAT_DRIFT,        VJ_BEAT_F_CONTINUOUS,                                  120,                900,                12, 46,  900,  2400, 0,    72,    /* Drift */
+        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS,                                  80,                 880,                12, 46,  900,  2400, 0,    72,    /* Warp */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS,                                  100,                760,                10, 36,  1000, 2800, 0,    54,    /* Detail */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                                 540,                980,                6,  24,  2200, 5200, 1400, 36,    /* Persistence */
+        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CLIMAX_ONLY,                                 0,                  620,                4,  24,  1800, 4200, 800,  24,    /* Instability */
+        VJ_BEAT_GRID_SIZE,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,             180,                880,                5,  20,  2200, 5200, 1800, 20,    /* Flow Size */
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS,                                  180,                920,                12, 46,  900,  2400, 0,    70,    /* Motion Pull */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                                  240,                1000,               10, 38,  1000, 2600, 0,    58,    /* Color Strength */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,   -1000, /* Color Mode */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,   -1000, /* Geometry */
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                                  0,                  820,                18, 72,  80,   700,  0,    100    /* Beat Push */
+    );
+
+    (void)w;
+    (void)h;
 
     return ve;
 }
@@ -825,25 +942,34 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
         p->frame_no = 0;
     }
 
-    const float fade_param = clampf_local((float)args[0] * 0.01f, 0.0f, 1.0f);
-    const float source_param = clampf_local((float)args[1] * 0.01f, 0.0f, 1.0f);
-    const float drift_param = clampf_local((float)args[2] * 0.01f, 0.0f, 1.0f);
-    const float warp_param = clampf_local((float)args[3] * 0.01f, 0.0f, 1.0f);
-    const float bleed_param = clampf_local((float)args[4] * 0.01f, 0.0f, 1.0f);
-    const float detail_param = clampf_local((float)args[5] * 0.01f, 0.0f, 1.0f);
-    const float persist_param = clampf_local((float)args[6] * 0.01f, 0.0f, 1.0f);
-    const float instability_param = clampf_local((float)args[7] * 0.01f, 0.0f, 1.0f);
-    const float flow_size_param = clampf_local((float)args[8] * 0.01f, 0.0f, 1.0f);
-    const float motion_param = clampf_local((float)args[9] * 0.01f, 0.0f, 1.0f);
-    const float color_strength_param = clampf_local((float)args[10] * 0.01f, 0.0f, 1.0f);
-    const int mono_mode = (args[11] != 0);
+    const float fade_param = 0.35f;
+    const float source_param = param1000_to_float(args[P_SOURCE]);
+    float drift_param = param1000_to_float(args[P_DRIFT]);
+    float warp_param = param1000_to_float(args[P_WARP]);
+    float detail_param = param1000_to_float(args[P_DETAIL]);
+    const float persist_param = param1000_to_float(args[P_PERSISTENCE]);
+    float instability_param = param1000_to_float(args[P_INSTABILITY]);
+    const float flow_size_param = param1000_to_float(args[P_FLOW_SIZE]);
+    float motion_param = param1000_to_float(args[P_MOTION_PULL]);
+    float color_strength_param = param1000_to_float(args[P_COLOR_STRENGTH]);
+    const int mono_mode = (args[P_COLOR_MODE] != 0);
+    float beat_drive = ghostwash_beat_shape(param1000_to_float(args[P_BEAT_PUSH]));
 
-    int geometry_mode = args[12];
+    int geometry_mode = args[P_GEOMETRY];
 
     if (geometry_mode < 0)
         geometry_mode = 0;
     else if (geometry_mode > 9)
         geometry_mode = 9;
+
+    drift_param = ghostwash_push01(drift_param, beat_drive, 0.42f);
+    warp_param = ghostwash_push01(warp_param, beat_drive, 0.38f);
+    detail_param = ghostwash_push01(detail_param, beat_drive, 0.46f);
+    instability_param = ghostwash_push01(instability_param, beat_drive, 0.26f);
+    motion_param = ghostwash_push01(motion_param, beat_drive, 0.48f);
+    color_strength_param = ghostwash_push01(color_strength_param, beat_drive, 0.34f);
+
+    const float bleed_param = clampf_local(color_strength_param * 0.72f, 0.0f, 1.0f);
 
     const float fade_curve = fade_param * fade_param;
     const float source_curve = source_param * source_param;

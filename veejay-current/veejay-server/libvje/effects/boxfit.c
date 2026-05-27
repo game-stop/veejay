@@ -16,13 +16,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <time.h>
-#include <string.h>
+
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "boxfit.h"
-#include <omp.h>
 
 #define CLAMP(x, min, max) ((x < (min)) ? (min) : ((x > (max)) ? (max) : (x)))
 
@@ -60,6 +56,14 @@ vj_effect *boxfit_init(int w, int h)
     ve->description = "Box Accumulator";
     ve->sub_format = 1;
     ve->param_description = vje_build_param_list(ve->num_params, "Min Size", "Max Size", "Sensitivity", "Borders" );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,       2,                  w / 12,             6,  20,  1800, 3800, 900,  30,    /* Min Size */
+        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,       8,                  w / 5,              8,  28,  1800, 4200, 900,  40,    /* Max Size */
+        VJ_BEAT_DETAIL,    VJ_BEAT_F_CONTINUOUS,                             48,                 220,                12, 42,  900,  2400, 0,    65,    /* Sensitivity */
+        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,          VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Borders */
+    );
     return ve;
 }
 

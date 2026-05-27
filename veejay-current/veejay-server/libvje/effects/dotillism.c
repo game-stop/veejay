@@ -1,10 +1,26 @@
+/* 
+ * Linux VeeJay
+ *
+ * Copyright(C)2026 Niels Elburg <nwelburg@gmail.com>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License , or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
+ */
+
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "dotillism.h"
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
+
 
 typedef struct {
     uint8_t *canvas_y;
@@ -162,6 +178,21 @@ vj_effect *dotillism_init(int w, int h)
         "Flow Scale",
         "Motion React",
         "Chroma Gain"
+    );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SPEED,        VJ_BEAT_F_PHRASE_ONLY,                    18, 80,  8,  30, 1800, 4200, 900,  35, /* Build Speed */
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                     4,  55,  8,  30, 1200, 3000, 0,    45, /* Source Feed */
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     12, 90,  12, 48, 900,  2400, 0,    80, /* Flow */
+        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS,                     0,  75,  10, 42, 1000, 2800, 0,    65, /* Swirl */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                     20, 95,  10, 40, 1000, 2600, 0,    60, /* Color Bleed */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS,                     12, 78,  10, 38, 1000, 2600, 0,    55, /* Detail */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                    45, 96,  8,  32, 1800, 4200, 900,  45, /* Trail */
+        VJ_BEAT_WARP,         VJ_BEAT_F_CLIMAX_ONLY,                    0,  70,  4,  28, 1800, 4200, 600,  25, /* Turbulence */
+        VJ_BEAT_GRID_SIZE,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 10, 75, 6,  22, 2200, 5200, 1800, 25, /* Flow Scale */
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS,                     20, 92,  12, 46, 900,  2400, 0,    70, /* Motion React */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                     30, 96,  10, 38, 1000, 2600, 0,    55  /* Chroma Gain */
     );
     return ve;
 }

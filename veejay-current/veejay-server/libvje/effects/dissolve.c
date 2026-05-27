@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "dissolve.h"
 
 vj_effect *dissolve_init(int w, int h)
@@ -37,6 +36,11 @@ vj_effect *dissolve_init(int w, int h)
     ve->extra_frame = 1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Opacity" );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000 /* Opacity */
+    );
     return ve;
 }
 

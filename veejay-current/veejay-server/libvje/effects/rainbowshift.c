@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "rainbowshift.h"
 
 vj_effect *rainbowshift_init(int w, int h)
@@ -41,6 +40,12 @@ vj_effect *rainbowshift_init(int w, int h)
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Amplitude", "Frequency" );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                               0,  220, 8,  30, 1200, 3000, 0,   55, /* Amplitude */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,         0,  8,   6,  22, 1600, 3400, 700, 30  /* Frequency */
+    );
     return ve;
 }
 

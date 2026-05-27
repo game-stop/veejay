@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "dummy.h"
 
 vj_effect *dummy_init(int w, int h)

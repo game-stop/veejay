@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "masktransition.h"
 
 vj_effect *masktransition_init(int width, int height)
@@ -41,6 +40,12 @@ vj_effect *masktransition_init(int width, int height)
 	ve->alpha = FLAG_ALPHA_SRC_A;
 		 
 	ve->param_description = vje_build_param_list(ve->num_params, "Time Index", "Smooth" );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_PHRASE_ONLY,                    0,    1255, 6, 22, 1800, 4200, 900, 35, /* Time Index */
+        VJ_BEAT_INERTIA,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 16,   420,  6, 22, 1800, 4200, 900, 25  /* Smooth */
+    );
     return ve;
 }
 

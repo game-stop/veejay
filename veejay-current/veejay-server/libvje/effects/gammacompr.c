@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "gammacompr.h"
 
 /* 
@@ -50,6 +49,13 @@ vj_effect *gammacompr_init(int w, int h)
     ve->sub_format = 1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Gamma Compression", "White Threshold", "Black Threshold");
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS,    2400, 4300, 10, 36, 1200, 3000, 0,   50, /* Gamma Compression */
+        VJ_BEAT_DETAIL, VJ_BEAT_F_PHRASE_ONLY,   170,  255,  6,  22, 1600, 3400, 700, 35, /* White Threshold */
+        VJ_BEAT_DETAIL, VJ_BEAT_F_PHRASE_ONLY,   0,    72,   6,  22, 1600, 3400, 700, 30  /* Black Threshold */
+    );
 	return ve;
 }
 

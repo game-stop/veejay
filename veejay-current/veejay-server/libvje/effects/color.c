@@ -19,10 +19,8 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "color.h"
-#include <omp.h>
-#include <stdlib.h>
+
 
 vj_effect *color_init(int w, int h)
 {
@@ -61,7 +59,13 @@ vj_effect *color_init(int w, int h)
 
     ve->has_user = 0;
     ve->extra_frame = 0;
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,  32, 220, 12, 46, 900,  2400, 0, 70, /* Vibrance */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,  96, 190, 8,  30, 1200, 3000, 0, 45, /* Blue/Yellow Bias */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,  96, 190, 8,  30, 1200, 3000, 0, 45  /* Red/Green Bias */
+    );
     return ve;
 }
 

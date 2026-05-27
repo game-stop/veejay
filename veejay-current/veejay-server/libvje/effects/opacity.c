@@ -19,7 +19,6 @@
  */
         
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "opacity.h"
 
 vj_effect *opacity_init(int w, int h)
@@ -36,8 +35,13 @@ vj_effect *opacity_init(int w, int h)
     ve->sub_format = -1;
     ve->extra_frame = 1;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Opacity"); 
-    return ve;
+    ve->param_description = vje_build_param_list( ve->num_params, "Opacity");
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000 /* Opacity */
+    );
+        return ve;
 }
 
 static inline void blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, size_t size, int opacity )

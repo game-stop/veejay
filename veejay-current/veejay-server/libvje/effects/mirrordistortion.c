@@ -19,8 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <libvje/internal.h>
 #include "mirrordistortion.h"
 
 vj_effect *mirrordistortion_init(int w, int h)
@@ -44,7 +42,13 @@ vj_effect *mirrordistortion_init(int w, int h)
     ve->param_description = vje_build_param_list( ve->num_params, "Distortion", "Offset X", "Offset Y" );
 
     ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE,                2,          72,         8,  30, 1200, 3000, 0, 50, /* Distortion */
+        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, w + 8, (w * 3) / 2, 12, 46, 900,  2400, 0, 70, /* Offset X */
+        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, h + 8, (h * 3) / 2, 12, 46, 900,  2400, 0, 65  /* Offset Y */
+    );
     return ve;
 }
 

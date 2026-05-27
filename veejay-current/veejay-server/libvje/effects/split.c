@@ -1,6 +1,8 @@
- /* Linux VeeJay
+/* 
+ * Linux VeeJay
  *
  * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -10,23 +12,34 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "split.h"
 
-vj_effect *split_init(int width,int height)
+typedef struct {
+    uint8_t *tmp[3];
+    int n_threads;
+} split_t;
+
+static inline int split_clampi(int v, int lo, int hi)
+{
+    return (v < lo) ? lo : (v > hi ? hi : v);
+}
+
+vj_effect *split_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 2;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+
+    ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
     ve->defaults[0] = 8;
     ve->defaults[1] = 1;
 
@@ -40,556 +53,329 @@ vj_effect *split_init(int width,int height)
     ve->sub_format = 1;
     ve->extra_frame = 1;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Switch");
+
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Mode",
+        "Switch"
+    );
+
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][0],
+        0,
+        "Right Half",
+        "Right Mirror",
+        "Left Mirror",
+        "Upper Left",
+        "Upper Right",
+        "Lower Right",
+        "Lower Left",
+        "Dual Squeeze",
+        "Upper Half"
+    );
+
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][1],
+        1,
+        "Direct",
+        "Fit Source"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000, /* Mode */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000  /* Switch */
+    );
+
+    (void) width;
+    (void) height;
+
     return ve;
 }
 
-typedef struct {
-    uint8_t *split_buf[4];
-} split_t;
-
-
 void *split_malloc(int width, int height)
 {
-    split_t *s = (split_t*) vj_calloc( sizeof(split_t) );
-    if(!s) {
+    split_t *s = (split_t*) vj_calloc(sizeof(split_t));
+    if(!s)
+        return NULL;
+
+    const int len = width * height;
+
+    s->tmp[0] = (uint8_t*) vj_malloc((size_t)len * 3u);
+    if(!s->tmp[0]) {
+        free(s);
         return NULL;
     }
-	s->split_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * ( width + (width*height*3) ));
-	if(!s->split_buf[0]) {
-        free(s);
-		return NULL;
-    }
 
-	s->split_buf[1] = s->split_buf[0] + (width*height);
-	s->split_buf[2] = s->split_buf[1] + (width*height);
+    s->tmp[1] = s->tmp[0] + len;
+    s->tmp[2] = s->tmp[1] + len;
 
-	return (void*)s;
+    s->n_threads = vje_advise_num_threads(len);
+    if(s->n_threads < 1)
+        s->n_threads = 1;
+
+    return (void*) s;
 }
 
-void split_free(void *ptr) {
+void split_free(void *ptr)
+{
     split_t *s = (split_t*) ptr;
-    free(s->split_buf[0]);
+    if(!s)
+        return;
+
+    if(s->tmp[0])
+        free(s->tmp[0]);
+
     free(s);
 }
 
-static void split_fib_downscale(VJFrame *frame, int width, int height)
+static void split_copy_region_plane(uint8_t *restrict dst,
+                                    const uint8_t *restrict src,
+                                    int w,
+                                    int h,
+                                    int x0,
+                                    int y0,
+                                    int x1,
+                                    int y1,
+                                    int mirror_x,
+                                    int fit_source,
+                                    int n_threads)
 {
-    int i, len = frame->len/2;
-    int f;
-    unsigned int x, y;
-    int uv_width;
-    const int ilen = frame->len;
-    const int uv_len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
-    i = 0;
-    for (y = 0; y < len; y += width)
-	{
-		for (x = 0; x < width; x++)
-		{
-			i++;
-			f = (i + 1) + (i - 1);
-			if( f >= ilen ) break;
-			Y[y + x] = Y[f];
-		}
-    }
+    x0 = split_clampi(x0, 0, w);
+    x1 = split_clampi(x1, 0, w);
+    y0 = split_clampi(y0, 0, h);
+    y1 = split_clampi(y1, 0, h);
 
-    i = 0;
-    uv_width = frame->width;
+    if(x1 <= x0 || y1 <= y0)
+        return;
 
-    for (y = 0; y < uv_len; y += width)
-	{
-		for (x = 0; x < uv_width; x++) {
-			i++;
-			f = (i + 1) + (i - 1);
-			if( f >= uv_len ) break;
-			Cb[y + x] = Cb[f];
-			Cr[y + x] = Cr[f];
-		}
-    }
+    const int rw = x1 - x0;
+    const int rh = y1 - y0;
 
-}
+#pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int y = y0; y < y1; y++) {
+        const int dst_row = y * w;
 
-static void split_fib_downscaleb(VJFrame *frame, int width, int height)
-{
-    int len = frame->len / 2;
-    unsigned int uv_len = frame->len /2;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
+        for(int x = x0; x < x1; x++) {
+            int sx;
+            int sy;
 
-    split_fib_downscale(frame, width, height);
+            if(fit_source) {
+                sx = ((x - x0) * w) / rw;
+                sy = ((y - y0) * h) / rh;
+            } else {
+                sx = x;
+                sy = y;
+            }
 
-    int strides[4] = { len, uv_len, uv_len, 0 };
-    uint8_t *output[4] = {
-	Y + len,
-	Cb + uv_len,
-	Cr + uv_len,
-	NULL };
+            if(mirror_x)
+                sx = (w - 1) - sx;
 
-    vj_frame_copy( frame->data, output, strides );
-}
+            sx = split_clampi(sx, 0, w - 1);
+            sy = split_clampi(sy, 0, h - 1);
 
-static void split_push_downscale_uh(void *ptr, VJFrame *frame, int width, int height)
-{
-	int len = frame->len/2;
-    int uvlen = frame->len/2;
-	int	strides[4] = { len,uvlen,uvlen ,0};
-    split_t *s = (split_t*) ptr;
-	vj_frame_copy( frame->data, s->split_buf,strides );
-}
-
-static void split_push_vscale_left(void *ptr, VJFrame *frame, int width, int height)
-{
-    unsigned int x, y, y1;
-
-    unsigned int wlen = width >> 1; //half
-    const int uv_height = frame->height;
-    const int uv_width = frame->width;
-    const int uv_wlen = frame->width>>1;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-
-    split_t *s = (split_t*) ptr;
-    uint8_t **split_buf = s->split_buf;
-
-    for (y = 0; y < height; y++)
-	{
-		y1 = y * width;
-		for (x = 0; x < wlen; x++)
-		{
-		  split_buf[0][y1 + x] = Y[y1 + (x << 1)];
-		}
-    }
-
-    for (y = 0; y < uv_height; y++)
-	{
-		y1 = y * uv_width;
-		for (x = 0; x < uv_wlen; x++)
-		{
-			split_buf[1][y1 + x] = Cb[y1 + (x << 1)];
-			split_buf[2][y1 + x] = Cr[y1 + (x << 1)];
-		}
-    }
-
-
-    for (y = 0; y < height; y++)
-	{
-		y1 = y * width;
-		for (x = 0; x < wlen; x++)
-		{
-		 Y[y1 + x] = split_buf[0][y1 + x];
-		}
-    }
-
-    for (y = 0; y < uv_height; y++) {
-	y1 = y * uv_width;
-	for (x = 0; x < uv_wlen; x++) {
-		Cb[y1 + x] = split_buf[1][y1 + x];
-		Cr[y1 + x] = split_buf[2][y1 + x];
-	}
-    }
-
-
-}
-
-static void split_push_vscale_right(void *ptr, VJFrame *frame, int width, int height)
-{
-    unsigned int x, y, y1;
-    unsigned int wlen = width >> 1;
-	const int uv_height = frame->height;
-    const int uv_width = frame->width;
-    const int uv_wlen = frame->width / 2;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-
-    split_t *s = (split_t*) ptr;
-    uint8_t **split_buf = s->split_buf;
-
-    for (y = 0; y < height; y++) {
-		y1 = y * width;
-		for (x = 0; x < wlen; x++) {
-			split_buf[0][y1 + x] = Y[y1 + (x * 2)];
-		}
-	}
-	
-	for (y = 0; y < uv_height; y++) {
-		y1 = y * uv_width;
-		for (x = 0; x < uv_wlen; x++) {
-			split_buf[1][y1 + x] = Cb[y1 + (x * 2)];
-			split_buf[2][y1 + x] = Cr[y1 + (x * 2)];
-		}
-    }
-
-    for (y = 0; y < height; y++) {
-		y1 = y * width;
-		for (x = 0; x < wlen; x++) {
-			Y[y1 + x + wlen] = split_buf[0][y1 + x];
-		}
-    }
-    for (y = 0; y < uv_height; y++) {
-		y1 = y * uv_width;
-		for (x = 0; x < uv_wlen; x++) {
-			Cb[y1 + x + uv_wlen] = split_buf[1][y1 + x];
-			Cr[y1 + x + uv_wlen] = split_buf[2][y1 + x];
-		}
+            dst[dst_row + x] = src[sy * w + sx];
+        }
     }
 }
 
-static void split_corner_framedata_ul(VJFrame *frame, VJFrame *frame2,
-				 int width, int height)
+static void split_copy_region(VJFrame *dst_frame,
+                              VJFrame *src_frame,
+                              int x0_num,
+                              int x0_den,
+                              int y0_num,
+                              int y0_den,
+                              int x1_num,
+                              int x1_den,
+                              int y1_num,
+                              int y1_den,
+                              int mirror_x,
+                              int fit_source,
+                              int n_threads)
 {
-    unsigned int w_len = width / 2;
-    unsigned int h_len = height / 2;
-    unsigned int x, y;
-    unsigned int y1;
-    const int uv_width = frame->width;
-    const int uv_wlen = frame->width / 2;
-    const int uv_hlen = frame->height / 2;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
+    const int w = dst_frame->width;
+    const int h = dst_frame->height;
 
-    for (y = 0; y < h_len; y++) {
-	y1 = width * y;
-	for (x = 0; x < w_len; x++) {
-		Y[y1 + x] = Y2[y1 + x];
-	}
-    }
-    for (y = 0; y < uv_hlen; y++) {
-	y1 = uv_width * y;
-	for (x = 0; x < uv_wlen; x++) {
-		Cb[y1 + x] = Cb2[y1 + x];
-		Cr[y1 + x] = Cr2[y1 + x];
-	}
-    }
+    const int x0 = (w * x0_num) / x0_den;
+    const int y0 = (h * y0_num) / y0_den;
+    const int x1 = (w * x1_num) / x1_den;
+    const int y1 = (h * y1_num) / y1_den;
 
+    split_copy_region_plane(
+        dst_frame->data[0],
+        src_frame->data[0],
+        w,
+        h,
+        x0,
+        y0,
+        x1,
+        y1,
+        mirror_x,
+        fit_source,
+        n_threads
+    );
 
-}
+    if(dst_frame->data[1] && dst_frame->data[2] &&
+       src_frame->data[1] && src_frame->data[2])
+    {
+        const int uw = dst_frame->ssm ? w : dst_frame->uv_width;
+        const int uh = dst_frame->ssm ? h : dst_frame->uv_height;
 
-static void split_corner_framedata_ur(VJFrame *frame, VJFrame *frame2,
-				 int width, int height)
-{
-    unsigned int w_len = width / 2;
-    unsigned int h_len = height / 2;
-    unsigned int x, y;
-    unsigned int y1;
-    const int uv_width = frame->width;
-    const int uv_wlen = frame->width / 2;
-    const int uv_hlen = frame->height / 2;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
+        const int ux0 = (uw * x0_num) / x0_den;
+        const int uy0 = (uh * y0_num) / y0_den;
+        const int ux1 = (uw * x1_num) / x1_den;
+        const int uy1 = (uh * y1_num) / y1_den;
 
-    for (y = 0; y < h_len; y++) {
-	y1 = width * y;
-	for (x = w_len; x < width; x++) {
-		Y[y1 + x] = Y2[y1 + x];
-	}
-    }
-    for (y = 0; y < uv_hlen; y++) {
-	y1 = uv_width * y;
-	for (x = uv_wlen; x < uv_width; x++) {
-		Cb[y1 + x] = Cb2[y1 + x];
-		Cr[y1 + x] = Cr2[y1 + x];
-	}
-    }
+        split_copy_region_plane(
+            dst_frame->data[1],
+            src_frame->data[1],
+            uw,
+            uh,
+            ux0,
+            uy0,
+            ux1,
+            uy1,
+            mirror_x,
+            fit_source,
+            n_threads
+        );
 
-}
-
-static void split_corner_framedata_dl(VJFrame *frame, VJFrame *frame2,
-				 int width, int height)
-{
-    unsigned int w_len = width / 2;
-    unsigned int h_len = height / 2;
-    unsigned int x, y;
-    unsigned int y1;
-    const int uv_height = frame->height;
-    const int uv_width = frame->width;
-    const int uv_wlen = frame->width / 2;
-    const int uv_hlen = frame->height / 2;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
-
-
-    for (y = h_len; y < height; y++) {
-	y1 = width * y;
-	for (x = 0; x < w_len; x++) {
-		Y[y1 + x] = Y2[y1 + x];
-	}
-    }
-    for (y = uv_hlen; y < uv_height; y++) {
-	y1 = uv_width * y;
-	for (x = 0; x < uv_wlen; x++) {
-		Cb[y1 + x] = Cb2[y1 + x];
-		Cr[y1 + x] = Cr2[y1 + x];
-	}
-    }
-
-} 
-
-
-static void split_corner_framedata_dr(VJFrame *frame, VJFrame *frame2,
-				 int width, int height)
-{
-    unsigned int w_len = width / 2;
-    unsigned int h_len = height / 2;
-    unsigned int x, y;
-    unsigned int y1;
-    const int uv_height = frame->uv_height;
-    const int uv_width = frame->width;
-    const int uv_wlen = frame->width / 2;
-    const int uv_hlen = frame->height / 2;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
-
-
-    for (y = h_len; y < height; y++) {
-	y1 = width * y;
-	for (x = w_len; x < width; x++) {
-		Y[y1 + x] = Y2[y1 + x];
-	}
-    }
-    for (y = uv_hlen; y < uv_height; y++) {
-	y1 = uv_width * y;
-	for (x = uv_wlen; x < uv_width; x++) {
-		Cb[y1 + x] = Cb2[y1 + x];
-		Cr[y1 + x] = Cr2[y1 + x];
-	}
-    }
-
-}
-
-static void split_v_first_halfs(VJFrame *frame, VJFrame *frame2, int width,
-			 int height)
-{
-
-    unsigned int r, c;
-    const int uv_height = frame->height;
-    const int uv_width = frame->width;
-    const int uv_len = uv_height * uv_width;
-
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
-
-
-    for (r = 0; r < (width * height); r += width) {
-	for (c = width / 2; c < width; c++) {
-		Y[c + r] = Y2[(width - c) + r];
-	}
-    }
-    for (r = 0; r < uv_len; r += uv_width) {
-	for (c = uv_width/2; c < uv_width; c++) {
-		Cb[c + r] = Cb2[(uv_width - c) + r];
-		Cr[c + r] = Cr2[(uv_width - c) + r];
-	}
-    }
-
-}
-
-static void split_v_second_half(VJFrame *frame, VJFrame *frame2, int width,
-			 int height)
-{
-    unsigned int r, c;
-    const int uv_height = frame->height;
-    const int uv_width = frame->width;
-    const int uv_len = uv_height * uv_width;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
-	
-
-    for (r = 0; r < (width * height); r += width) {
-	for (c = width / 2; c < width; c++) {
-		Y[c + r] = Y2[c + r];
-	}
-    }
-
-
-    for (r = 0; r < uv_len; r += uv_width) {
-	for (c = uv_width / 2; c < uv_width; c++) {
-		Cb[c + r] = Cb2[c + r];
-		Cr[c + r] = Cr2[c + r];
-	}
+        split_copy_region_plane(
+            dst_frame->data[2],
+            src_frame->data[2],
+            uw,
+            uh,
+            ux0,
+            uy0,
+            ux1,
+            uy1,
+            mirror_x,
+            fit_source,
+            n_threads
+        );
     }
 }
 
-static void split_v_first_half(VJFrame *frame, VJFrame *frame2, int width,
-			int height)
+static void split_snapshot(split_t *s, VJFrame *frame)
 {
-    unsigned int r, c;
-
-    const int uv_height = frame->height;
-    const int uv_width = frame->width;
-    const int uv_len = uv_height * uv_width;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
-
-
-    for (r = 0; r < (width * height); r += width) {
-	for (c = 0; c < width / 2; c++) {
-		Y[c + r] = Y2[c + r];
-	}
-    }
-
-    for (r = 0; r < uv_len; r += uv_width) {
-	for (c = 0; c < uv_width / 2; c++) {
-		Cb[c + r] = Cb2[c + r];
-		Cr[c + r] = Cr2[c + r];
-	}
-    }
-
-}
-
-static void split_v_second_halfs(VJFrame *frame, VJFrame *frame2, int width,
-			  int height)
-{
-    int r;
-	unsigned int c;
-    const int lw = width / 2;
     const int len = frame->len;
-    const int uv_height = frame->height;
-    const int uv_width = frame->width;
-    const int uv_len = uv_height * uv_width;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
+    const int uv_len = frame->ssm ? len : frame->uv_len;
 
+    veejay_memcpy(s->tmp[0], frame->data[0], len);
 
-    for (r = 0; r < len; r += width) {
-	for (c = 0; c < lw; c++) {
-		Y[c + r] = Y2[(width - c) + r];
-	}
+    if(frame->data[1] && frame->data[2] && uv_len > 0) {
+        veejay_memcpy(s->tmp[1], frame->data[1], uv_len);
+        veejay_memcpy(s->tmp[2], frame->data[2], uv_len);
     }
+}
 
-    for (r = 0; r < uv_len; r += uv_width) {
-	for (c = 0; c < (uv_width/2); c++) {
-		Cb[c + r] = Cb2[(width - c) + r];
-		Cr[c + r] = Cr2[(width - c) + r];
-	}
+static void split_squeeze_plane(uint8_t *restrict dst,
+                                const uint8_t *restrict src,
+                                int w,
+                                int h,
+                                int x0,
+                                int x1,
+                                int n_threads)
+{
+    x0 = split_clampi(x0, 0, w);
+    x1 = split_clampi(x1, 0, w);
+
+    if(x1 <= x0)
+        return;
+
+    const int rw = x1 - x0;
+
+#pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int y = 0; y < h; y++) {
+        const int row = y * w;
+
+        for(int x = x0; x < x1; x++) {
+            const int sx = ((x - x0) * w) / rw;
+            dst[row + x] = src[row + sx];
+        }
     }
-
 }
 
-static void split_h_first_half(VJFrame *frame, VJFrame *frame2, int width,
-			int height)
+static void split_dual_squeeze(split_t *s, VJFrame *frame, VJFrame *frame2)
 {
-	const int len = frame->len / 2;
-	const int uv_len = frame->len / 2;
-	int strides[4] = { len,uv_len,uv_len, 0 };
+    const int w = frame->width;
+    const int h = frame->height;
+    const int half = w >> 1;
 
-	vj_frame_copy( frame2->data, frame->data, strides );    
-}
+    split_snapshot(s, frame);
 
-static void split_h_second_half(VJFrame *frame, VJFrame *frame2, int width,
-			 int height)
-{
-	const int len = frame->len / 2;
-	const int uv_len = frame->len / 2;
-	int strides[4] = { len, uv_len, uv_len, 0 };
-	vj_frame_copy( frame2->data,frame->data, strides );
-}
+    split_squeeze_plane(frame->data[0], frame2->data[0], w, h, 0, half, s->n_threads);
+    split_squeeze_plane(frame->data[0], s->tmp[0],       w, h, half, w, s->n_threads);
 
-static void split_h_first_halfs(VJFrame *frame, VJFrame *frame2, int width,
-			 int height)
-{
-	const int len = frame->len / 2;
-	const int uv_len = frame->len / 2;
-	int strides[4] = { len,uv_len,uv_len, 0 };
-	vj_frame_copy( frame2->data, frame->data, strides );
-}
+    if(frame->data[1] && frame->data[2] &&
+       frame2->data[1] && frame2->data[2])
+    {
+        const int uw = frame->ssm ? w : frame->uv_width;
+        const int uh = frame->ssm ? h : frame->uv_height;
+        const int uhalf = uw >> 1;
 
-static void split_h_second_halfs(VJFrame *frame, VJFrame *frame2, int width,
-			  int height)
-{
-	const int len = frame->len / 2;
-	const int uv_len = frame->len / 2;
-	int strides[4] = { len, uv_len, uv_len, 0 };
-	vj_frame_copy( frame2->data, frame->data, strides );
-}
+        split_squeeze_plane(frame->data[1], frame2->data[1], uw, uh, 0, uhalf, s->n_threads);
+        split_squeeze_plane(frame->data[2], frame2->data[2], uw, uh, 0, uhalf, s->n_threads);
 
-void split_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args )
-{
-    int n = args[0];
-    int swap = args[1];
-
-    switch (n) {
-    case 0:
-	if (swap)
-		split_push_vscale_right(ptr, frame2, frame->width, frame->height);
-	 /**/ split_v_second_half(frame, frame2, frame->width, frame->height);
-	break;
-    case 1:
-	if (swap)
-		split_push_vscale_left(ptr,frame2, frame->width, frame->height);
-	 /**/ split_v_first_halfs(frame, frame2, frame->width, frame->height);
-	break;
-    case 2:
-	if (swap)
-		split_push_vscale_right(ptr, frame2, frame->width, frame->height);
-	    split_v_second_halfs(frame, frame2, frame->width, frame->height);
-	break;
-    case 3:
-	if (swap)
-		split_fib_downscale(frame2, frame->width, frame->height);
-	split_corner_framedata_ul(frame, frame2, frame->width, frame->height);
-	break;
-    case 4:
-	if (swap)
-		split_fib_downscale(frame2, frame->width, frame->height);
-	split_corner_framedata_ur(frame, frame2, frame->width, frame->height);
-	break;
-    case 5:
-	if (swap)
-		split_fib_downscaleb(frame2, frame->width, frame->height);
-	split_corner_framedata_dr(frame, frame2, frame->width, frame->height);
-	break;
-    case 6:
-	if (swap)
-		split_fib_downscaleb(frame2, frame->width, frame->height);
-	 /**/ split_corner_framedata_dl(frame, frame2, frame->width, frame->height);
-	break;
-    case 7:
-	split_push_vscale_left(ptr, frame2, frame->width, frame->height);
-	 /**/ split_push_vscale_right(ptr, frame, frame->width, frame->height);
-	split_v_first_half(frame, frame2, frame->width, frame->height);
-	break;
-    case 8:
-	split_push_downscale_uh(ptr, frame2, frame->width, frame->height);
-	split_h_first_half(frame, frame2, frame->width, frame->height);
-	break;
+        split_squeeze_plane(frame->data[1], s->tmp[1], uw, uh, uhalf, uw, s->n_threads);
+        split_squeeze_plane(frame->data[2], s->tmp[2], uw, uh, uhalf, uw, s->n_threads);
     }
+}
 
+void split_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
+{
+    split_t *s = (split_t*) ptr;
+
+    if(!s || !frame || !frame2 || !args ||
+       !frame->data[0] || !frame2->data[0])
+        return;
+
+    const int mode = split_clampi(args[0], 0, 8);
+    const int fit_source = args[1] ? 1 : 0;
+
+    switch(mode) {
+        case 0:
+            split_copy_region(frame, frame2, 1, 2, 0, 1, 1, 1, 1, 1, 0, fit_source, s->n_threads);
+            break;
+
+        case 1:
+            split_copy_region(frame, frame2, 1, 2, 0, 1, 1, 1, 1, 1, 1, fit_source, s->n_threads);
+            break;
+
+        case 2:
+            split_copy_region(frame, frame2, 0, 1, 0, 1, 1, 2, 1, 1, 1, fit_source, s->n_threads);
+            break;
+
+        case 3:
+            split_copy_region(frame, frame2, 0, 1, 0, 1, 1, 2, 1, 2, 0, fit_source, s->n_threads);
+            break;
+
+        case 4:
+            split_copy_region(frame, frame2, 1, 2, 0, 1, 1, 1, 1, 2, 0, fit_source, s->n_threads);
+            break;
+
+        case 5:
+            split_copy_region(frame, frame2, 1, 2, 1, 2, 1, 1, 1, 1, 0, fit_source, s->n_threads);
+            break;
+
+        case 6:
+            split_copy_region(frame, frame2, 0, 1, 1, 2, 1, 2, 1, 1, 0, fit_source, s->n_threads);
+            break;
+
+        case 7:
+            split_dual_squeeze(s, frame, frame2);
+            break;
+
+        case 8:
+            split_copy_region(frame, frame2, 0, 1, 0, 1, 1, 1, 1, 2, 0, fit_source, s->n_threads);
+            break;
+
+        default:
+            break;
+    }
 }

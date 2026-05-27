@@ -18,11 +18,9 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <config.h>
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "deinterlace.h"
-#include <omp.h>
+
 
 vj_effect *deinterlace_init(int w, int h)
 {

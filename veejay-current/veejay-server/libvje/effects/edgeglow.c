@@ -24,7 +24,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "edgeglow.h"
 
 vj_effect *edgeglow_init(int w, int h)
@@ -59,6 +58,17 @@ vj_effect *edgeglow_init(int w, int h)
 	ve->extra_frame = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Red", "Green" , "Blue", "Scaling Factor" );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,  4,   96,  6,  24, 1600, 3400, 700, 35, /* Threshold */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,   96,  255, 8,  28, 1400, 3400, 0,   35, /* Red */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,   96,  255, 8,  28, 1400, 3400, 0,   35, /* Green */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,   0,   180, 8,  28, 1400, 3400, 0,   30, /* Blue */
+        VJ_BEAT_GLOW,         VJ_BEAT_F_CONTINUOUS,   4,   70,  12, 44, 900,  2400, 0,   70  /* Scaling Factor */
+    );
+
     return ve;
 }
 

@@ -8,7 +8,6 @@
  * Copyright (C) 2005 Ryo-ta
  *
  * Ported and arranged by Kentaro Fukuchi
-
  * Ported and modified by Niels Elburg 
  *
  * This program is free software; you can redistribute it and/or
@@ -25,266 +24,415 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+
 #include "common.h"
 #include <veejaycore/vjmem.h>
-#include "softblur.h"
 #include "timedistort.h"
 #include <libvje/internal.h>
 #include <libvje/effects/motionmap.h>
+#include <stdint.h>
 
+#define TD_MAX_PLANES 256
 
-static int PLANES = 256;
+typedef struct {
+    int n__;
+    int N__;
+
+    uint8_t *maps;
+    uint8_t *diff;
+    uint8_t *prev;
+    uint8_t *blur;
+
+    uint8_t *planes[3];
+    uint8_t *planetableY[TD_MAX_PLANES];
+    uint8_t *planetableU[TD_MAX_PLANES];
+    uint8_t *planetableV[TD_MAX_PLANES];
+
+    uint8_t *warptime[2];
+
+    int plane;
+    int warptimeFrame;
+    int have_bg;
+    int plane_populated;
+    int n_planes;
+    int plane_mask;
+    int n_threads;
+
+    void *motionmap;
+} timedistort_t;
+
+static inline int td_clampi(int v, int lo, int hi)
+{
+    return (v < lo) ? lo : (v > hi ? hi : v);
+}
 
 vj_effect *timedistort_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 1;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
     ve->limits[0][0] = 5;
     ve->limits[1][0] = 100;
     ve->defaults[0] = 40;
+
     ve->description = "TimeDistortionTV (EffectTV)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-	ve->motion = 1;
-	ve->param_description = vje_build_param_list( ve->num_params, "Value");
+    ve->motion = 1;
+
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Value"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS, 5, 100, 10, 38, 1000, 2600, 0, 62 /* Value */
+    );
+
+    (void) w;
+    (void) h;
+
     return ve;
 }
 
-typedef struct {
-    int n__;
-    int N__;
-    uint8_t	*nonmap;
-    uint8_t *planes[4];
-    uint8_t *planetableY[512];
-    uint8_t *planetableU[512];
-    uint8_t *planetableV[512];
-    uint8_t *warptime[2];
-    int state;
-    int plane;
-    int warptimeFrame;
-    int have_bg;
-    void *motionmap;
-	int n_threads;
-	int plane_populated;
-} timedistort_t;
+static void timedistort_init_plane_tables(timedistort_t *td, int len)
+{
+    for(int i = 0; i < td->n_planes; i++) {
+        td->planetableY[i] = td->planes[0] + ((size_t)len * (size_t)i);
+        td->planetableU[i] = td->planes[1] + ((size_t)len * (size_t)i);
+        td->planetableV[i] = td->planes[2] + ((size_t)len * (size_t)i);
+    }
+}
 
 void *timedistort_malloc(int w, int h)
 {
-    unsigned int i;
-    timedistort_t *td = (timedistort_t*) vj_calloc(sizeof(timedistort_t));
-    if(!td) return NULL;
+    timedistort_t *td;
+    const int try_planes[] = { 256, 128, 64 };
+    const int len = w * h;
 
-    td->nonmap = vj_calloc((2 * w * h + 2 * w) * sizeof(uint8_t));
-    if(!td->nonmap) {
+    if(w <= 0 || h <= 0 || len <= 0)
+        return NULL;
+
+    td = (timedistort_t*) vj_calloc(sizeof(timedistort_t));
+    if(!td)
+        return NULL;
+
+    td->maps = (uint8_t*) vj_malloc((size_t)len * 3u);
+    if(!td->maps) {
         free(td);
         return NULL;
     }
 
-	td->n_threads = vje_advise_num_threads(w*h);
+    td->diff = td->maps;
+    td->prev = td->diff + len;
+    td->blur = td->prev + len;
 
-    // try allocations: 256 -> 128 -> 64 planes
-    int try_planes[] = { 256, 128, 64 };
-    int success = 0;
     for(int t = 0; t < 3; t++) {
-        PLANES = try_planes[t];
-        td->planes[0] = vj_malloc((size_t)PLANES * 3 * w * h * sizeof(uint8_t));
+        const int planes = try_planes[t];
+
+        td->planes[0] = (uint8_t*) vj_malloc((size_t)planes * 3u * (size_t)len);
         if(td->planes[0]) {
-            success = 1;
+            td->n_planes = planes;
+            td->plane_mask = planes - 1;
             break;
         }
     }
 
-    if(!success) {
-        free(td->nonmap);
+    if(!td->planes[0]) {
+        free(td->maps);
         free(td);
         return NULL;
     }
 
-    td->planes[1] = td->planes[0] + PLANES * w * h;
-    td->planes[2] = td->planes[1] + PLANES * w * h;
+    td->planes[1] = td->planes[0] + ((size_t)td->n_planes * (size_t)len);
+    td->planes[2] = td->planes[1] + ((size_t)td->n_planes * (size_t)len);
 
-    veejay_memset(td->planes[0], 0, PLANES * w * h);
-    veejay_memset(td->planes[1], 128, PLANES * w * h);
-    veejay_memset(td->planes[2], 128, PLANES * w * h);
+    veejay_memset(td->planes[0], 0,   (size_t)td->n_planes * (size_t)len);
+    veejay_memset(td->planes[1], 128, (size_t)td->n_planes * (size_t)len);
+    veejay_memset(td->planes[2], 128, (size_t)td->n_planes * (size_t)len);
 
-    td->have_bg = 0;
-    td->n__ = 0;
-    td->N__ = 0;
+    timedistort_init_plane_tables(td, len);
 
-    for(i = 0; i < PLANES; i++) {
-        td->planetableY[i] = &(td->planes[0][(w * h) * i]);
-        td->planetableU[i] = &(td->planes[1][(w * h) * i]);
-        td->planetableV[i] = &(td->planes[2][(w * h) * i]);
-    }
-
-    td->warptime[0] = (uint8_t*) vj_calloc(w * h);
+    td->warptime[0] = (uint8_t*) vj_calloc((size_t)len);
     if(!td->warptime[0]) {
-        free(td->nonmap);
         free(td->planes[0]);
+        free(td->maps);
         free(td);
         return NULL;
     }
-    td->warptime[1] = (uint8_t*) vj_calloc(w * h);
+
+    td->warptime[1] = (uint8_t*) vj_calloc((size_t)len);
     if(!td->warptime[1]) {
-        free(td->nonmap);
-        free(td->planes[0]);
         free(td->warptime[0]);
+        free(td->planes[0]);
+        free(td->maps);
         free(td);
         return NULL;
     }
 
     td->plane = 0;
-    td->state = 1;
+    td->warptimeFrame = 0;
+    td->have_bg = 0;
+    td->plane_populated = 0;
+    td->n__ = 0;
+    td->N__ = 0;
+    td->motionmap = NULL;
 
-    return (void*)td;
+    td->n_threads = vje_advise_num_threads(len);
+
+    return (void*) td;
 }
 
-void	timedistort_free(void *ptr)
+void timedistort_free(void *ptr)
 {
     timedistort_t *td = (timedistort_t*) ptr;
 
-	if(td->nonmap)
-		free(td->nonmap);
-	if( td->planes[0])
-		free(td->planes[0]);
-	if( td->warptime[0] )
-		free(td->warptime[0]);
-	if( td->warptime[1] )
-		free(td->warptime[1] );
+    if(!td)
+        return;
+
+    if(td->maps)
+        free(td->maps);
+
+    if(td->planes[0])
+        free(td->planes[0]);
+
+    if(td->warptime[0])
+        free(td->warptime[0]);
+
+    if(td->warptime[1])
+        free(td->warptime[1]);
+
     free(td);
 }
 
-int timedistort_request_fx(void) {
+int timedistort_request_fx(void)
+{
     return VJ_IMAGE_EFFECT_MOTIONMAP;
 }
 
 void timedistort_set_motionmap(void *ptr, void *priv)
 {
-    timedistort_t *t = (timedistort_t*) ptr;
-    t->motionmap = priv;
+    timedistort_t *td = (timedistort_t*) ptr;
+
+    if(td)
+        td->motionmap = priv;
+}
+
+static void timedistort_soft_bg(timedistort_t *td, const uint8_t *restrict src, int w, int h)
+{
+    uint8_t *restrict dst = td->prev;
+
+#pragma omp parallel for schedule(static) num_threads(td->n_threads)
+    for(int y = 0; y < h; y++) {
+        const int ym = (y > 0) ? y - 1 : y;
+        const int yp = (y < h - 1) ? y + 1 : y;
+
+        const uint8_t *restrict r0 = src + ym * w;
+        const uint8_t *restrict r1 = src + y  * w;
+        const uint8_t *restrict r2 = src + yp * w;
+
+        uint8_t *restrict out = dst + y * w;
+
+        for(int x = 0; x < w; x++) {
+            const int xm = (x > 0) ? x - 1 : x;
+            const int xp = (x < w - 1) ? x + 1 : x;
+
+            const int sum =
+                (int)r0[xm] + (int)r0[x] + (int)r0[xp] +
+                (int)r1[xm] + (int)r1[x] + (int)r1[xp] +
+                (int)r2[xm] + (int)r2[x] + (int)r2[xp];
+
+            out[x] = (uint8_t)((sum + 4) / 9);
+        }
+    }
+}
+
+static void timedistort_build_diff(timedistort_t *td,
+                                   const uint8_t *restrict current,
+                                   int threshold,
+                                   int len)
+{
+    uint8_t *restrict diff = td->diff;
+    const uint8_t *restrict prev = td->prev;
+
+#pragma omp parallel for schedule(static) num_threads(td->n_threads)
+    for(int i = 0; i < len; i++) {
+        int d = (int)current[i] - (int)prev[i];
+        d = (d < 0) ? -d : d;
+
+        diff[i] = (d > threshold) ? 255 : 0;
+    }
 }
 
 void timedistort_apply(void *ptr, VJFrame *frame, int *args)
 {
-    const unsigned int width = frame->width;
-    const unsigned int height = frame->height;
-    const int len = frame->len;
+    timedistort_t *td = (timedistort_t*) ptr;
 
-    uint8_t *restrict Y = frame->data[0];
+    if(!td || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
+        return;
+
+    const int width = frame->width;
+    const int height = frame->height;
+    int len = frame->len;
+
+    if(width <= 0 || height <= 0 || len <= 0)
+        return;
+
+    if(len > width * height)
+        len = width * height;
+
+    uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    int interpolate = 1;
+    int value = td_clampi(args[0], 5, 100);
+    int interpolate = 0;
     int motion = 0;
-    int tmp1, tmp2;
-    int val = args[0];
 
-    timedistort_t *td = (timedistort_t*) ptr;
-    uint8_t *restrict diff = td->nonmap;
-    uint8_t *restrict prev = td->nonmap + len;
+    uint8_t *restrict diff = td->diff;
 
-    if (motionmap_active(td->motionmap)) {
-        motionmap_scale_to(td->motionmap, 255, 255, 1, 1, &tmp1, &tmp2, &(td->n__), &(td->N__));
-        diff = motionmap_bgmap(td->motionmap);
-        motion = 1;
+    if(td->motionmap && motionmap_active(td->motionmap)) {
+        int tmp1 = value;
+        int tmp2 = value;
+
+        motionmap_scale_to(
+            td->motionmap,
+            255,
+            255,
+            1,
+            1,
+            &tmp1,
+            &tmp2,
+            &(td->n__),
+            &(td->N__)
+        );
+
+        uint8_t *mm = motionmap_bgmap(td->motionmap);
+        if(mm) {
+            diff = mm;
+            motion = 1;
+        } else {
+            td->n__ = 0;
+            td->N__ = 0;
+        }
     } else {
         td->n__ = 0;
         td->N__ = 0;
 
-        if (!td->have_bg) {
+        if(!td->have_bg) {
+            timedistort_soft_bg(td, Y, width, height);
 
-            vj_frame_copy1(Y, prev, len);
-            veejay_memcpy(td->planetableY[0], Y, len);
+            veejay_memcpy(td->planetableY[0], Y,  len);
             veejay_memcpy(td->planetableU[0], Cb, len);
             veejay_memcpy(td->planetableV[0], Cr, len);
 
-            VJFrame smooth;
-            veejay_memcpy(&smooth, frame, sizeof(VJFrame));
-            smooth.data[0] = prev;
-            softblur_apply_internal(&smooth);
+            veejay_memset(td->diff, 0, len);
+            veejay_memset(td->warptime[0], 0, len);
+            veejay_memset(td->warptime[1], 0, len);
 
-            veejay_memset(diff, 0, len);
             td->have_bg = 1;
-            td->plane = 1;
+            td->plane = 1 & td->plane_mask;
             td->plane_populated = 1;
             return;
-        } else {
-            vje_diff_plane(prev, Y, diff, val, len);
-            vj_frame_copy1(Y, prev, len);
-            VJFrame smooth;
-            veejay_memcpy(&smooth, frame, sizeof(VJFrame));
-            smooth.data[0] = prev;
-            softblur_apply_internal(&smooth);
         }
+
+        timedistort_build_diff(td, Y, value, len);
+        timedistort_soft_bg(td, Y, width, height);
+        diff = td->diff;
     }
 
-    if (td->n__ == td->N__ || td->n__ == 0)
-        interpolate = 0;
+    if(!(td->n__ == td->N__ || td->n__ == 0))
+        interpolate = 1;
 
-    uint8_t *planeTables[4] = {
-        td->planetableY[td->plane],
-        td->planetableU[td->plane],
-        td->planetableV[td->plane],
-        NULL
-    };
-    int strides[4] = { len, len, len, 0 };
-    vj_frame_copy(frame->data, planeTables, strides);
+    veejay_memcpy(td->planetableY[td->plane], Y,  len);
+    veejay_memcpy(td->planetableU[td->plane], Cb, len);
+    veejay_memcpy(td->planetableV[td->plane], Cr, len);
 
-    if (td->plane_populated < PLANES)
+    if(td->plane_populated < td->n_planes)
         td->plane_populated++;
 
-    uint8_t *restrict warptime0 = td->warptime[td->warptimeFrame];
-    uint8_t *restrict warptime1 = td->warptime[td->warptimeFrame ^ 1];
-    int nthreads = td->n_threads;
-    const int width_i = (int) width;
-    const int height_i = (int) height;
+    uint8_t *restrict wt_old = td->warptime[td->warptimeFrame];
+    uint8_t *restrict wt_new = td->warptime[td->warptimeFrame ^ 1];
 
-    #pragma omp parallel for num_threads(nthreads) schedule(static)
-    for (int y = 0; y < height_i; y++) {
-        const int row_off = y * width_i;
-        for (int x = 0; x < width_i; x++) {
-            const int idx = row_off + x;
-            int tmp = 0;
+#pragma omp parallel for schedule(static) num_threads(td->n_threads)
+    for(int y = 0; y < height; y++) {
+        const int row = y * width;
 
-            if (y > 0) tmp += warptime0[idx - width_i];
-            if (y < height_i - 1) tmp += warptime0[idx + width_i];
-            if (x > 0) tmp += warptime0[idx - 1];
-            if (x < width_i - 1) tmp += warptime0[idx + 1];
+        for(int x = 0; x < width; x++) {
+            const int idx = row + x;
+            int sum = 0;
+            int count = 0;
 
-            if (tmp > 3) tmp -= 3;
-            warptime1[idx] = (uint8_t)(tmp >> 2);
+            if(y > 0) {
+                sum += wt_old[idx - width];
+                count++;
+            }
+
+            if(y < height - 1) {
+                sum += wt_old[idx + width];
+                count++;
+            }
+
+            if(x > 0) {
+                sum += wt_old[idx - 1];
+                count++;
+            }
+
+            if(x < width - 1) {
+                sum += wt_old[idx + 1];
+                count++;
+            }
+
+            if(count > 0)
+                sum = (sum + (count >> 1)) / count;
+
+            if(sum > 0)
+                sum--;
+
+            wt_new[idx] = (uint8_t)sum;
         }
     }
 
-    uint8_t *restrict q = td->warptime[td->warptimeFrame ^ 1];
-    const int planes_mask = PLANES - 1;
+    const int n_planes = td->n_planes;
+    const int plane_mask = td->plane_mask;
     const int plane_now = td->plane;
     const int populated = td->plane_populated;
 
-    #pragma omp parallel for num_threads(td->n_threads) schedule(static)
-    for (int i = 0; i < len; i++) {
-        int age = q[i];
-        if (populated < PLANES && age >= populated)
-            age = populated - 1;
-        if (diff[i])
-            q[i] = PLANES - 1;
-        int n_plane = (plane_now - age + PLANES) & planes_mask;
+#pragma omp parallel for schedule(static) num_threads(td->n_threads)
+    for(int i = 0; i < len; i++) {
+        int age = wt_new[i];
 
-        Y[i] = td->planetableY[n_plane][i];
+        if(diff[i]) {
+            age = n_planes - 1;
+            wt_new[i] = (uint8_t)age;
+        }
+
+        if(populated < n_planes && age >= populated)
+            age = populated - 1;
+
+        if(age < 0)
+            age = 0;
+
+        const int n_plane = (plane_now - age + n_planes) & plane_mask;
+
+        Y[i]  = td->planetableY[n_plane][i];
         Cb[i] = td->planetableU[n_plane][i];
         Cr[i] = td->planetableV[n_plane][i];
     }
 
-    td->plane = (td->plane + 1) & (PLANES - 1);
+    td->plane = (td->plane + 1) & td->plane_mask;
     td->warptimeFrame ^= 1;
 
-    if (interpolate)
+    if(interpolate)
         motionmap_interpolate_frame(td->motionmap, frame, td->N__, td->n__);
-    if (motion)
+
+    if(motion)
         motionmap_store_frame(td->motionmap, frame);
 }

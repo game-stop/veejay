@@ -22,54 +22,85 @@
 #include <veejaycore/vjmem.h>
 #include "rawval.h"
 
-vj_effect *rawval_init(int w,int h)
+vj_effect *rawval_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 4;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
     ve->defaults[0] = 232;
     ve->defaults[1] = 16;
     ve->defaults[2] = 16;
     ve->defaults[3] = 16;
 
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 255;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 255;
+    for(int i = 0; i < ve->num_params; i++) {
+        ve->limits[0][i] = 0;
+        ve->limits[1][i] = 255;
+    }
+
     ve->sub_format = -1;
     ve->description = "Raw Chroma Pixel Replacement";
-	ve->has_user = 0;
+    ve->has_user = 0;
     ve->extra_frame = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Old Cb", "Old Cr", "New Cb", "New Cr" );
+
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Old Cb",
+        "Old Cr",
+        "New Cb",
+        "New Cr"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000, /* Old Cb */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000, /* Old Cr */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000, /* New Cb */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000  /* New Cr */
+    );
+
+    (void) w;
+    (void) h;
+
     return ve;
+}
+
+static inline int rawval_clampi(int v, int lo, int hi)
+{
+    return (v < lo) ? lo : (v > hi ? hi : v);
 }
 
 void rawval_apply(void *ptr, VJFrame *frame, int *args)
 {
-    const uint8_t color_cb = (uint8_t)args[0];
-    const uint8_t color_cr = (uint8_t)args[1];
-    const uint8_t new_color_cb = (uint8_t)args[2];
-    const uint8_t new_color_cr = (uint8_t)args[3];
+    (void) ptr;
 
-    const size_t uv_len = (size_t)(frame->ssm ? frame->len : frame->uv_len);
+    if(!frame || !args || !frame->data[1] || !frame->data[2])
+        return;
+
+    const uint8_t old_cb = (uint8_t)rawval_clampi(args[0], 0, 255);
+    const uint8_t old_cr = (uint8_t)rawval_clampi(args[1], 0, 255);
+    const uint8_t new_cb = (uint8_t)rawval_clampi(args[2], 0, 255);
+    const uint8_t new_cr = (uint8_t)rawval_clampi(args[3], 0, 255);
+
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
+
+    if(uv_len <= 0)
+        return;
+
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    const int n_threads = vje_advise_num_threads((int)uv_len);
+    const int n_threads = vje_advise_num_threads(uv_len);
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for (size_t i = 0; i < uv_len; i++) {
-        if (Cb[i] >= new_color_cb) {
-            Cb[i] = color_cb;
-        }
-        if (Cr[i] >= new_color_cr) {
-            Cr[i] = color_cr;
+#pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int i = 0; i < uv_len; i++) {
+        if(Cb[i] == old_cb && Cr[i] == old_cr) {
+            Cb[i] = new_cb;
+            Cr[i] = new_cr;
         }
     }
 }

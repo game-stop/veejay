@@ -25,7 +25,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "bathroom.h"
 #include "motionmap.h"
 
@@ -69,7 +68,14 @@ vj_effect *bathroom_init(int width,int height)
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "Horizontal", "Vertical", "Horizontal (Alpha)", "Vertical (Alpha)" );
 
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Mode */
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE,              2,                  48,                 12, 38,  900,  2200, 0,    65,    /* Distance */
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE,       0,                  width / 3,          6,  20,  1800, 3600, 1200, 20,    /* X start position */
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE,       (width * 2) / 3,     width,              6,  20,  1800, 3600, 1200, 20     /* X end position */
+    );
 	return ve;
 }
 

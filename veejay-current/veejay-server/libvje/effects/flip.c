@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "flip.h"
 
 vj_effect *flip_init(int w, int h)
@@ -52,7 +51,12 @@ vj_effect *flip_init(int w, int h)
 	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 1,
 	                          "Normal", "Flip Vertical"
 	);
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000, /* Horizontal */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000  /* Vertical */
+    );
 	return ve;
 }
 /**********************************************************************************************
@@ -131,7 +135,7 @@ static void flip_y_yuvdata(VJFrame *frame)
     uint8_t *Cr = frame->data[2];
 
     /* Luminance */
-    pos_b = (frame->height ) * frame->width;
+    pos_b = (frame->height - 1) * frame->width;
     do {
         x = w1;
         do {
@@ -145,7 +149,7 @@ static void flip_y_yuvdata(VJFrame *frame)
 
     /* Chrominance */
     pos_a = 0;
-    pos_b = (uv_height ) * uv_width;
+    pos_b = (uv_height - 1) * uv_width;
     do {
         x = uw1;
         do {

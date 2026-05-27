@@ -17,12 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "mechanicalpixels.h"
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
+
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -476,6 +474,20 @@ vj_effect *mechanicalpixels_init(int w, int h)
         "Mechanical Inertia",
         "Palette",
         "Reset State"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_ALPHA_OR_OPACITY,    VJ_BEAT_F_REJECT,                                      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,   0,   0,   0,   0,    -1000, /* Amount */
+        VJ_BEAT_GRID_SIZE,           VJ_BEAT_F_REBUILDS_STATE,                              14,                 42,                 22,  64,  70,  360, 135,  25,    /* Pixel Size */
+        VJ_BEAT_GEOMETRY_AMPLITUDE,  VJ_BEAT_F_CONTINUOUS,                                  58,                 100,                34,  70,  55,  520, 0,    58,    /* 3D Depth */
+        VJ_BEAT_SPEED,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SQUARED,               10,                 86,                 42,  88,  35,  420, 0,    92,    /* Cycle Speed */
+        VJ_BEAT_MEMORY,              VJ_BEAT_F_IMPULSE,                                     8,                  46,                 100, 100, 15,  160, 0,    115,   /* Trigger: inverted sensitivity dip on hit */
+        VJ_BEAT_SELECTOR,            VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,   0,   0,   0,   0,    -1000, /* Render Mode */
+        VJ_BEAT_INERTIA,             VJ_BEAT_F_CONTINUOUS,                                  24,                 92,                 42,  82,  45,  620, 115,  60,    /* Mechanical Inertia */
+        VJ_BEAT_SELECTOR,            VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,   0,   0,   0,   0,    -1000, /* Palette */
+        VJ_BEAT_RESET,               VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,   0,   0,   0,   0,    -1000  /* Reset State */
     );
 
     (void) w;

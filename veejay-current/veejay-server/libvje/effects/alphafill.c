@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "alphafill.h"
 
 vj_effect *alphafill_init(int w, int h)

@@ -20,13 +20,10 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <libavutil/avutil.h>
-#include <veejaycore/vj-msg.h>
-#include <veejaycore/yuvconv.h>
 #include "softblur.h"
 #include "diff.h"
 #include "contourextract.h"
+#include <libyuv/yuvconv.h>
 
 static uint8_t *static_bg = NULL;
 static uint32_t *dt_map = NULL;
@@ -102,6 +99,17 @@ vj_effect *contourextract_init(int width, int height)
 	vje_build_value_hint_list (ve->hints, ve->limits[1][3],3,
 	                           "Do not take background",		//0
 	                           "Take background");	//1
+
+	ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
+
+		VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS,                              8,                  120,                8,  32,  1200, 2800, 0,    55,    /* Threshold */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Mode */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Show image/contour */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Take background - unused in apply */
+		VJ_BEAT_DETAIL,   VJ_BEAT_F_REJECT,                                   VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Thinning - currently unused */
+		VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,         40,                 1200,               6,  22,  1800, 4200, 900,  30     /* Min weight */
+	);
 
     return ve;
 }

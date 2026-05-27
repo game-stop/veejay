@@ -19,9 +19,6 @@
  */
 
 #include "common.h"
-#include <libavutil/avutil.h>
-#include <veejaycore/vjmem.h>
-#include <veejaycore/vj-msg.h>
 #include "softblur.h"
 #include "diff.h"
 

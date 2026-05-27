@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "colflash.h"
 
 // very simple color flashing fx
@@ -52,6 +51,15 @@ vj_effect *colflash_init(int w, int h)
     ve->has_user = 0;
     ve->rgb_conv = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Frametime" , "Red", "Green", "Blue", "Delay" );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SPEED,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,      2,                  24,                 6,  22,  1800, 4200, 900,  35,    /* Frametime */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Red */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Green */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Blue */
+        VJ_BEAT_TRIGGER,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,      1,                  6,                  6,  20,  1600, 3600, 700,  30     /* Delay */
+    );
     return ve;
 }
 

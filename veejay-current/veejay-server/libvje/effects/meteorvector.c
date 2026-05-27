@@ -19,11 +19,9 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <stdlib.h>
-#include <math.h>
+#include "meteorvector.h"
 
-#define BONECOMETAUTOPSY_PARAMS 12
+#define BONECOMETAUTOPSY_PARAMS 13
 #define BCA_MAX_FRAMES 8
 
 #define P_OPACITY        0
@@ -38,6 +36,7 @@
 #define P_TRAIL          9
 #define P_STROKE_CHROMA 10
 #define P_COLOR_BIAS    11
+#define P_BEAT_PUSH     12
 
 typedef struct {
     int w;
@@ -71,6 +70,17 @@ static inline uint8_t bca_u8(int v)
     return (uint8_t) bca_clampi(v, 0, 255);
 }
 
+
+static inline int bca_soft_luma_ceiling(int y)
+{
+    if (y > 230) {
+        y = 230 + ((y - 230) >> 2);
+        if (y > 242)
+            y = 242;
+    }
+    return y < 0 ? 0 : y;
+}
+
 static inline int bca_absi(int v)
 {
     return v < 0 ? -v : v;
@@ -79,6 +89,47 @@ static inline int bca_absi(int v)
 static inline int bca_maxi(int a, int b)
 {
     return a > b ? a : b;
+}
+
+
+static inline int bca_param1000_to_range(int v, int lo, int hi)
+{
+    v = bca_clampi(v, 0, 1000);
+    return lo + (((hi - lo) * v + 500) / 1000);
+}
+
+static inline int bca_param1000_to_100(int v)
+{
+    v = bca_clampi(v, 0, 1000);
+    return (v * 100 + 500) / 1000;
+}
+
+static inline int bca_percent_to_param1000(int v)
+{
+    v = bca_clampi(v, 0, 100);
+    return (v * 1000 + 50) / 100;
+}
+
+static inline int bca_range_to_param1000(int v, int lo, int hi)
+{
+    v = bca_clampi(v, lo, hi);
+    if (hi <= lo)
+        return 0;
+    return ((v - lo) * 1000 + ((hi - lo) >> 1)) / (hi - lo);
+}
+
+static inline int bca_beat_shape_q8(int beat_push)
+{
+    int q;
+    beat_push = bca_clampi(beat_push, 0, 1000);
+    q = (beat_push * beat_push * 255 + 500000) / 1000000;
+    return bca_clampi(q, 0, 255);
+}
+
+static inline int bca_mix_i(int a, int b, int q8)
+{
+    q8 = bca_clampi(q8, 0, 255);
+    return a + (((b - a) * q8 + (b >= a ? 127 : -127)) / 255);
 }
 
 static inline unsigned int bca_hash_u32(unsigned int x)
@@ -203,7 +254,7 @@ static inline void bca_make_bone_color(
         vv0 = 128 + (((vv0 - 128) * chroma_gain_q8) >> 8) - color_push;
     }
 
-    *yy = bca_clampi(yv, 0, 255);
+    *yy = bca_soft_luma_ceiling(yv);
     *uu = bca_clampi(uv, 0, 255);
     *vv = bca_clampi(vv0, 0, 255);
 }
@@ -516,14 +567,15 @@ vj_effect *meteorvector_init(int w, int h)
     ve->defaults[P_STEP]          = 3;
     ve->defaults[P_TIME_DEPTH]    = 4;
     ve->defaults[P_HEAD_SIZE]     = 3;
-    ve->defaults[P_TAIL_LENGTH]   = 56;
-    ve->defaults[P_EDGE]          = 86;
-    ve->defaults[P_MOTION_LAUNCH] = 54;
-    ve->defaults[P_COMET_DENSITY] = 54;
-    ve->defaults[P_WHITE_FORGE]   = 88;
-    ve->defaults[P_TRAIL]         = 97;
-    ve->defaults[P_STROKE_CHROMA] = 10;
-    ve->defaults[P_COLOR_BIAS]    = 92;
+    ve->defaults[P_TAIL_LENGTH]   = bca_range_to_param1000(56, 2, 112);
+    ve->defaults[P_EDGE]          = bca_percent_to_param1000(86);
+    ve->defaults[P_MOTION_LAUNCH] = bca_percent_to_param1000(54);
+    ve->defaults[P_COMET_DENSITY] = bca_percent_to_param1000(54);
+    ve->defaults[P_WHITE_FORGE]   = bca_percent_to_param1000(88);
+    ve->defaults[P_TRAIL]         = bca_percent_to_param1000(97);
+    ve->defaults[P_STROKE_CHROMA] = bca_percent_to_param1000(10);
+    ve->defaults[P_COLOR_BIAS]    = bca_percent_to_param1000(92);
+    ve->defaults[P_BEAT_PUSH]     = 0;
 
     ve->limits[0][P_OPACITY]       = 0;
     ve->limits[1][P_OPACITY]       = 100;
@@ -537,29 +589,32 @@ vj_effect *meteorvector_init(int w, int h)
     ve->limits[0][P_HEAD_SIZE]     = 1;
     ve->limits[1][P_HEAD_SIZE]     = 8;
 
-    ve->limits[0][P_TAIL_LENGTH]   = 2;
-    ve->limits[1][P_TAIL_LENGTH]   = 96;
+    ve->limits[0][P_TAIL_LENGTH]   = 0;
+    ve->limits[1][P_TAIL_LENGTH]   = 1000;
 
     ve->limits[0][P_EDGE]          = 0;
-    ve->limits[1][P_EDGE]          = 100;
+    ve->limits[1][P_EDGE]          = 1000;
 
     ve->limits[0][P_MOTION_LAUNCH] = 0;
-    ve->limits[1][P_MOTION_LAUNCH] = 100;
+    ve->limits[1][P_MOTION_LAUNCH] = 1000;
 
     ve->limits[0][P_COMET_DENSITY] = 0;
-    ve->limits[1][P_COMET_DENSITY] = 100;
+    ve->limits[1][P_COMET_DENSITY] = 1000;
 
     ve->limits[0][P_WHITE_FORGE]   = 0;
-    ve->limits[1][P_WHITE_FORGE]   = 100;
+    ve->limits[1][P_WHITE_FORGE]   = 1000;
 
     ve->limits[0][P_TRAIL]         = 0;
-    ve->limits[1][P_TRAIL]         = 100;
+    ve->limits[1][P_TRAIL]         = 1000;
 
     ve->limits[0][P_STROKE_CHROMA] = 0;
-    ve->limits[1][P_STROKE_CHROMA] = 100;
+    ve->limits[1][P_STROKE_CHROMA] = 1000;
 
     ve->limits[0][P_COLOR_BIAS]    = 0;
-    ve->limits[1][P_COLOR_BIAS]    = 100;
+    ve->limits[1][P_COLOR_BIAS]    = 1000;
+
+    ve->limits[0][P_BEAT_PUSH]     = 0;
+    ve->limits[1][P_BEAT_PUSH]     = 1000;
 
     ve->description = "Meteor Static";
 
@@ -578,7 +633,26 @@ vj_effect *meteorvector_init(int w, int h)
         "White Forge",
         "Trail Memory",
         "Stroke Chroma",
-        "Color Bias"
+        "Color Bias",
+        "Beat Push"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Opacity */
+        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                 3,                  8,                  6,  22, 2200, 5200, 1800, 20,    /* Step Size */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                 2,                  7,                  6,  22, 1800, 4200, 900,  30,    /* Time Depth */
+        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                 1,                  6,                  6,  20, 1800, 4200, 900,  20,    /* Head Size */
+        VJ_BEAT_TRAIL_LENGTH,     VJ_BEAT_F_CONTINUOUS,                                       160,                880,                10, 38, 1000, 2800, 0,    52,    /* Tail Length */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY,                                      560,                980,                6,  22, 1600, 3400, 700,  28,    /* Edge Sensitivity */
+        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS,                                       160,                900,                12, 46, 900,  2400, 0,    68,    /* Motion Launch */
+        VJ_BEAT_DENSITY,          VJ_BEAT_F_PHRASE_ONLY,                                      160,                840,                6,  22, 1800, 4200, 900,  28,    /* Comet Density */
+        VJ_BEAT_GLOW,             VJ_BEAT_F_CONTINUOUS,                                       360,                900,                10, 36, 1000, 2600, 0,    52,    /* White Forge */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY,                                      680,                990,                6,  24, 2200, 5200, 1200, 30,    /* Trail Memory */
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS,                                       0,                  520,                8,  30, 1200, 3000, 0,    42,    /* Stroke Chroma */
+        VJ_BEAT_COLOR_PHASE,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, 620,       1000,               8,  30, 1200, 3000, 0,    38,    /* Color Bias */
+        VJ_BEAT_INTENSITY,        VJ_BEAT_F_CONTINUOUS,                                       0,                  720,                18, 76, 80,   720,  0,    100    /* Beat Push */
     );
 
     return ve;
@@ -694,6 +768,8 @@ void meteorvector_apply(void *ptr, VJFrame *frame, int *args)
     int trail_q8;
     int stroke_chroma;
     int stroke_chroma_q8;
+    int beat_push;
+    int beat_drive;
     int color_bias;
 
     int chroma_gain_age_q8[BCA_MAX_FRAMES];
@@ -709,6 +785,9 @@ void meteorvector_apply(void *ptr, VJFrame *frame, int *args)
     int seed_floor;
     int motion_min;
     int motion_only_keep;
+    int beat_seed_keep;
+    int beat_edge_floor;
+    int beat_motion_floor;
     int long_fast;
     int tail_comp_q8;
 
@@ -740,14 +819,29 @@ void meteorvector_apply(void *ptr, VJFrame *frame, int *args)
     step          = bca_clampi(args[P_STEP],          3, 14);
     time_depth    = bca_clampi(args[P_TIME_DEPTH],    1, BCA_MAX_FRAMES);
     head_size     = bca_clampi(args[P_HEAD_SIZE],     1, 8);
-    tail_length   = bca_clampi(args[P_TAIL_LENGTH],   2, 96);
-    edge_sens     = bca_clampi(args[P_EDGE],          0, 100);
-    motion_launch = bca_clampi(args[P_MOTION_LAUNCH], 0, 100);
-    comet_density = bca_clampi(args[P_COMET_DENSITY], 0, 100);
-    white_forge   = bca_clampi(args[P_WHITE_FORGE],   0, 100);
-    trail         = bca_clampi(args[P_TRAIL],         0, 100);
-    stroke_chroma = bca_clampi(args[P_STROKE_CHROMA], 0, 100);
-    color_bias    = bca_clampi(args[P_COLOR_BIAS],    0, 100) - 50;
+    tail_length   = bca_param1000_to_range(args[P_TAIL_LENGTH], 2, 112);
+    edge_sens     = bca_param1000_to_100(args[P_EDGE]);
+    motion_launch = bca_param1000_to_100(args[P_MOTION_LAUNCH]);
+    comet_density = bca_param1000_to_100(args[P_COMET_DENSITY]);
+    white_forge   = bca_param1000_to_100(args[P_WHITE_FORGE]);
+    trail         = bca_param1000_to_100(args[P_TRAIL]);
+    stroke_chroma = bca_param1000_to_100(args[P_STROKE_CHROMA]);
+    color_bias    = bca_param1000_to_100(args[P_COLOR_BIAS]) - 50;
+    beat_push     = bca_clampi(args[P_BEAT_PUSH], 0, 1000);
+    beat_drive    = bca_beat_shape_q8(beat_push);
+
+    if (beat_drive > 0) {
+        edge_sens = bca_mix_i(edge_sens, 100, (beat_drive * 105 + 127) / 255);
+        motion_launch = bca_mix_i(motion_launch, 100, (beat_drive * 150 + 127) / 255);
+        comet_density = bca_mix_i(comet_density, 94, (beat_drive * 110 + 127) / 255);
+        white_forge = bca_mix_i(white_forge, 96, (beat_drive * 60 + 127) / 255);
+        stroke_chroma = bca_mix_i(stroke_chroma, 70, (beat_drive * 110 + 127) / 255);
+        tail_length += (beat_drive * (8 + (tail_length / 6)) + 127) / 255;
+        if (tail_length > 112)
+            tail_length = 112;
+        if (beat_drive > 192 && head_size < 8)
+            head_size++;
+    }
 
     opacity_q8 = (opacity * 255 + 50) / 100;
     white_forge_q8 = (white_forge * 256 + 50) / 100;
@@ -795,6 +889,21 @@ void meteorvector_apply(void *ptr, VJFrame *frame, int *args)
     tail_comp_q8 = bca_clampi(tail_comp_q8, 96, 256);
 
     motion_only_keep = 2 + (((comet_density / 8) + (motion_launch / 12)) * tail_comp_q8 >> 8);
+
+    beat_seed_keep = 0;
+    beat_edge_floor = 255;
+    beat_motion_floor = 255;
+
+    if (beat_drive > 0) {
+        beat_seed_keep = 2 + ((beat_drive * (22 + (comet_density >> 1)) * tail_comp_q8 + 32768) >> 16);
+        if (beat_seed_keep > 72)
+            beat_seed_keep = 72;
+
+        beat_edge_floor = 18 - ((edge_sens * 10) / 100);
+        beat_edge_floor = bca_clampi(beat_edge_floor, 6, 18);
+
+        beat_motion_floor = 10 + ((100 - motion_launch) / 8);
+    }
 
     long_fast = (step <= 4 && tail_length >= 48 && comet_density >= 45);
 
@@ -881,6 +990,7 @@ void meteorvector_apply(void *ptr, VJFrame *frame, int *args)
 
             int accepted = 0;
             int motion_only = 0;
+            int beat_ignited = 0;
 
             int age = 0;
             int tail_slot;
@@ -946,20 +1056,68 @@ void meteorvector_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
 
+            if (!accepted && beat_drive > 0) {
+                int beat_hash = (int)((spatial_hash >> 18) & 255);
+                int beat_edge = (edge >= beat_edge_floor);
+                int beat_motion = (available > 1 && motion >= beat_motion_floor);
+                int beat_keep = beat_seed_keep;
+
+                if (edge > 80)
+                    beat_keep += (edge - 80) >> 4;
+
+                if (motion > 8)
+                    beat_keep += (motion * beat_drive) >> 11;
+
+                beat_keep = bca_clampi(beat_keep, 0, 96);
+
+                if ((beat_edge || beat_motion) && beat_hash <= beat_keep) {
+                    accepted = 1;
+                    beat_ignited = 1;
+                    motion_only = beat_edge ? 0 : 1;
+
+                    strength = 52 + ((beat_drive * 118 + 127) / 255);
+
+                    if (edge > beat_edge_floor)
+                        strength += bca_ramp255(edge - beat_edge_floor, 220) >> 1;
+
+                    if (motion > 0)
+                        strength += (motion * motion_launch) / 220;
+
+                    strength = bca_clampi(strength, 0, 225);
+
+                    if (!beat_edge || (gx == 0 && gy == 0)) {
+                        gx = (int)((shape_hash >> 16) & 255) - 128;
+                        gy = (int)((shape_hash >> 24) & 255) - 128;
+
+                        if (gx == 0 && gy == 0)
+                            gx = 1;
+                    }
+                }
+            }
+
             if (!accepted || strength <= 0)
                 continue;
 
             if (max_age > 0) {
-                int motion_part = (motion * motion_launch * max_age) / 7200;
-                int jitter_part = 0;
+                if (beat_ignited) {
+                    int beat_age = (beat_drive * max_age + 192) / 384;
 
-                if (motion > 3 &&
-                    (int)((spatial_hash >> 16) & 255) < (comet_density + 34)) {
-                    jitter_part = (int)((spatial_hash >> 24) & 3);
+                    if ((int)((spatial_hash >> 21) & 1))
+                        beat_age++;
+
+                    age = bca_clampi(beat_age, 0, max_age);
+                } else {
+                    int motion_part = (motion * motion_launch * max_age) / 7200;
+                    int jitter_part = 0;
+
+                    if (motion > 3 &&
+                        (int)((spatial_hash >> 16) & 255) < (comet_density + 34)) {
+                        jitter_part = (int)((spatial_hash >> 24) & 3);
+                    }
+
+                    age = motion_part + jitter_part;
+                    age = bca_clampi(age, 0, max_age);
                 }
-
-                age = motion_part + jitter_part;
-                age = bca_clampi(age, 0, max_age);
             } else {
                 age = 0;
             }
@@ -977,13 +1135,16 @@ void meteorvector_apply(void *ptr, VJFrame *frame, int *args)
             }
 
             local_tail = tail_length + (((int)((shape_hash >> 6) & 15) - 7) * tail_length) / 64;
-            local_tail = bca_clampi(local_tail, 2, 96);
+            local_tail = bca_clampi(local_tail, 2, 112);
 
             local_head = head_size;
             if (motion_only && local_head > 1)
                 local_head--;
 
             if (!motion_only && motion > 12 && local_head < 8)
+                local_head++;
+
+            if (beat_ignited && beat_drive > 150 && local_head < 8)
                 local_head++;
 
             bca_draw_comet(

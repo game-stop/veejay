@@ -19,12 +19,9 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
+#include "chronocortex.h"
 
-#define CHRONOFOLD_PARAMS 8
+#define CHRONOFOLD_PARAMS 11
 
 #define P_THRESHOLD     0
 #define P_DECAY         1
@@ -34,6 +31,9 @@
 #define P_COLOR_MODE    5
 #define P_NOISE         6
 #define P_SOURCE_BLEED  7
+#define P_BEAT_PUSH     8
+#define P_FLASH_GAIN    9
+#define P_COLOR_ENERGY 10
 
 #define CF_COLOR_WHITE      0
 #define CF_COLOR_POLARITY   1
@@ -66,6 +66,7 @@ typedef struct {
     uint8_t trail_lut[256];
     uint8_t bleed_y_lut[256];
     uint8_t bleed_uv_lut[256];
+    uint8_t output_lut[256];
     uint8_t mix_lut[256];
     uint8_t adapt_lut[256];
     uint8_t noise_lut[64];
@@ -80,6 +81,8 @@ typedef struct {
     int last_trail;
     int last_noise;
     int last_source_bleed;
+    int last_flash_gain;
+    int last_color_energy;
 
     int last_color_mode;
 } chronofold_t;
@@ -102,6 +105,32 @@ static inline uint8_t cf_u8(int v)
 static inline uint8_t cf_blend_fast_u8(uint8_t a, uint8_t b, int amount)
 {
     return (uint8_t) (((int) a * (256 - amount) + (int) b * amount) >> 8);
+}
+
+static inline int cf_scale_1000_to_255(int v)
+{
+    v = cf_clampi(v, 0, 1000);
+    return (v * 255 + 500) / 1000;
+}
+
+static inline int cf_old_default_1000(int v)
+{
+    return (v * 1000 + 127) / 255;
+}
+
+static inline int cf_push_add_255(int base, int push, int amount)
+{
+    return cf_clampi(base + ((push * amount + 127) / 255), 0, 255);
+}
+
+static inline int cf_push_sub_255(int base, int push, int amount)
+{
+    return cf_clampi(base - ((push * amount + 127) / 255), 0, 255);
+}
+
+static inline int cf_push_add_1000(int base, int push, int amount)
+{
+    return cf_clampi(base + ((push * amount + 127) / 255), 0, 1000);
 }
 
 static inline uint32_t cf_hash_u32(uint32_t x)
@@ -138,75 +167,66 @@ vj_effect *chronofold_init(int w, int h)
         return NULL;
     }
     /*
-        input frame + memory + temporal difference
-            -> event field
-            -> afterimage / polarity / neural response
-            -> output
-    
-    */
-    /*
-     * Threshold:
-     *   Event sensitivity. Lower = more events.
+     * input frame + adaptive reference + temporal difference
+     *     -> event field
+     *     -> afterimage / polarity / neural response
+     *     -> output flash and chroma mix
      *
-     * Decay:
-     *   Event persistence. Higher = longer afterimage.
+     * Most continuous controls are exposed at 0..1000 UI resolution and
+     * converted to the internal 0..255 field scale in apply().
      *
-     * Gain:
-     *   Event brightness amplification.
-     *
-     * Memory:
-     *   Adaptive reference speed.
-     *   Low  = slow retina, more ghosting.
-     *   High = fast retina, more immediate.
-     *
-     * Trail:
-     *   Neighbor event diffusion / neural smear.
-     *
-     * Color Mode:
-     *   0 = White events
-     *   1 = Polarity ON/OFF color
-     *   2 = Source chroma events
-     *   3 = Thermal polarity
-     *   4 = Inverted source chroma
-     *
-     * Noise:
-     *   Spontaneous retinal firing.
-     *
-     * Source Bleed:
-     *   0   = pure event view
-     *   255 = source visible behind events
+     * Trigger Gate: lower = more events.
+     * Event Decay: higher = longer afterimage.
+     * Event Gain: temporal-difference amplification.
+     * Retina Memory: adaptive reference speed.
+     * Neural Trail: neighbor event diffusion / smear.
+     * Beat Push: safe musical impact macro.
+     * Flash Gain: output-only event brightness.
+     * Color Energy: output-only chroma strength.
      */
     ve->limits[0][P_THRESHOLD] = 0;
-    ve->limits[1][P_THRESHOLD] = 255;
-    ve->defaults[P_THRESHOLD] = 18;
+    ve->limits[1][P_THRESHOLD] = 1000;
+    ve->defaults[P_THRESHOLD] = cf_old_default_1000(18);
 
     ve->limits[0][P_DECAY] = 0;
-    ve->limits[1][P_DECAY] = 255;
-    ve->defaults[P_DECAY] = 224;
+    ve->limits[1][P_DECAY] = 1000;
+    ve->defaults[P_DECAY] = cf_old_default_1000(224);
 
     ve->limits[0][P_GAIN] = 0;
-    ve->limits[1][P_GAIN] = 255;
-    ve->defaults[P_GAIN] = 212;
+    ve->limits[1][P_GAIN] = 1000;
+    ve->defaults[P_GAIN] = cf_old_default_1000(212);
 
-    ve->limits[0][P_MEMORY] = 1;
-    ve->limits[1][P_MEMORY] = 255;
-    ve->defaults[P_MEMORY] = 42;
+    ve->limits[0][P_MEMORY] = 4;
+    ve->limits[1][P_MEMORY] = 1000;
+    ve->defaults[P_MEMORY] = cf_old_default_1000(42);
 
     ve->limits[0][P_TRAIL] = 0;
-    ve->limits[1][P_TRAIL] = 255;
-    ve->defaults[P_TRAIL] = 128;
+    ve->limits[1][P_TRAIL] = 1000;
+    ve->defaults[P_TRAIL] = cf_old_default_1000(128);
 
     ve->limits[0][P_COLOR_MODE] = 0;
     ve->limits[1][P_COLOR_MODE] = 4;
     ve->defaults[P_COLOR_MODE] = CF_COLOR_POLARITY;
 
     ve->limits[0][P_NOISE] = 0;
-    ve->limits[1][P_NOISE] = 255;
-    ve->defaults[P_NOISE] = 4;
+    ve->limits[1][P_NOISE] = 1000;
+    ve->defaults[P_NOISE] = cf_old_default_1000(4);
 
     ve->limits[0][P_SOURCE_BLEED] = 0;
-    ve->limits[1][P_SOURCE_BLEED] = 255;
-    ve->defaults[P_SOURCE_BLEED] = 8;
+    ve->limits[1][P_SOURCE_BLEED] = 1000;
+    ve->defaults[P_SOURCE_BLEED] = cf_old_default_1000(8);
+
+    ve->limits[0][P_BEAT_PUSH] = 0;
+    ve->limits[1][P_BEAT_PUSH] = 1000;
+    ve->defaults[P_BEAT_PUSH] = 0;
+
+    ve->limits[0][P_FLASH_GAIN] = 0;
+    ve->limits[1][P_FLASH_GAIN] = 1000;
+    ve->defaults[P_FLASH_GAIN] = 500;
+
+    ve->limits[0][P_COLOR_ENERGY] = 0;
+    ve->limits[1][P_COLOR_ENERGY] = 1000;
+    ve->defaults[P_COLOR_ENERGY] = 500;
 
     ve->description = "Chronofold Retina";
     ve->sub_format = 1;
@@ -214,16 +234,33 @@ vj_effect *chronofold_init(int w, int h)
 
     ve->param_description = vje_build_param_list(
         ve->num_params,
-        "Threshold",
-        "Decay",
-        "Gain",
-        "Memory",
-        "Trail",
+        "Trigger Gate",
+        "Event Decay",
+        "Event Gain",
+        "Retina Memory",
+        "Neural Trail",
         "Color Mode",
-        "Noise",
-        "Source Bleed"
+        "Neural Noise",
+        "Source Bleed",
+        "Beat Push",
+        "Flash Gain",
+        "Color Energy"
     );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                    16,                 375,                20, 70,  1600, 3400, 700,  35,    /* Trigger Gate */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                    470,                1000,               18, 72,  1800, 4200, 900,  55,    /* Event Decay */
+        VJ_BEAT_TRIGGER,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 250,                940,                55, 180, 80,   420,  0,    90,    /* Event Gain */
+        VJ_BEAT_INERTIA,      VJ_BEAT_F_PHRASE_ONLY,                    45,                 705,                20, 80,  1800, 4200, 900,  40,    /* Retina Memory */
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     60,                 825,                35, 140, 900,  2600, 0,    70,    /* Neural Trail */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CLIMAX_ONLY,                    0,                  280,                12, 70,  1800, 4200, 600,  20,    /* Neural Noise */
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                     0,                  375,                20, 95,  1200, 3000, 0,    40,    /* Source Bleed */
+        VJ_BEAT_TRIGGER,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 0,                  1000,               70, 240, 60,   360,  0,    100,   /* Beat Push */
+        VJ_BEAT_CONTRAST,     VJ_BEAT_F_CONTINUOUS,                     220,                1000,               45, 170, 700,  1800, 0,    85,    /* Flash Gain */
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     160,                1000,               35, 140, 800,  2200, 0,    65     /* Color Energy */
+    );
     return ve;
 }
 
@@ -343,10 +380,14 @@ static void cf_build_luts_if_needed(chronofold_t *c,
                                     int memory,
                                     int trail,
                                     int noise,
-                                    int source_bleed)
+                                    int source_bleed,
+                                    int flash_gain,
+                                    int color_energy)
 {
     int i;
     int denom;
+    int flash_q8;
+    int color_q8;
 
     if(c->lut_valid &&
        c->last_threshold == threshold &&
@@ -355,13 +396,21 @@ static void cf_build_luts_if_needed(chronofold_t *c,
        c->last_memory == memory &&
        c->last_trail == trail &&
        c->last_noise == noise &&
-       c->last_source_bleed == source_bleed) {
+       c->last_source_bleed == source_bleed &&
+       c->last_flash_gain == flash_gain &&
+       c->last_color_energy == color_energy) {
         return;
     }
 
     denom = 255 - threshold;
     if(denom < 1)
         denom = 1;
+
+    flash_gain = cf_clampi(flash_gain, 0, 1000);
+    color_energy = cf_clampi(color_energy, 0, 1000);
+
+    flash_q8 = 64 + ((flash_gain * 384 + 500) / 1000);
+    color_q8 = 64 + ((color_energy * 384 + 500) / 1000);
 
     for(i = 0; i < 256; i++) {
         int event_strength;
@@ -387,9 +436,16 @@ static void cf_build_luts_if_needed(chronofold_t *c,
         c->bleed_uv_lut[i] =
             (uint8_t) ((128 * (255 - source_bleed) + i * source_bleed + 127) / 255);
 
+        c->output_lut[i] = cf_u8((i * flash_q8 + 128) >> 8);
+
         mix = i + (i >> 1);
         if(mix > 255)
             mix = 255;
+
+        mix = (mix * color_q8 + 128) >> 8;
+        if(mix > 255)
+            mix = 255;
+
         c->mix_lut[i] = (uint8_t) mix;
 
         mem = memory + (i >> 3);
@@ -419,6 +475,8 @@ static void cf_build_luts_if_needed(chronofold_t *c,
     c->last_trail = trail;
     c->last_noise = noise;
     c->last_source_bleed = source_bleed;
+    c->last_flash_gain = flash_gain;
+    c->last_color_energy = color_energy;
     c->lut_valid = 1;
 }
 
@@ -753,7 +811,7 @@ static void cf_render_white_pure(chronofold_t *c, VJFrame *frame)
 
     CF_OMP_FOR
     for(i = 0; i < len; i++)
-        Y[i] = c->ev_y[i];
+        Y[i] = c->output_lut[c->ev_y[i]];
 
     veejay_memset(frame->data[1], 128, (size_t) len);
     veejay_memset(frame->data[2], 128, (size_t) len);
@@ -771,7 +829,7 @@ static void cf_render_white_bleed(chronofold_t *c, VJFrame *frame)
     CF_OMP_FOR
     for(i = 0; i < len; i++) {
         int base_y = c->bleed_y_lut[Y[i]];
-        int ev = c->ev_y[i];
+        int ev = c->output_lut[c->ev_y[i]];
 
         Y[i] = cf_u8(base_y + ev);
         U[i] = c->bleed_uv_lut[U[i]];
@@ -791,9 +849,10 @@ static void cf_render_color_pure(chronofold_t *c, VJFrame *frame)
     CF_OMP_FOR
     for(i = 0; i < len; i++) {
         int ev = c->ev_y[i];
+        int out_ev = c->output_lut[ev];
         int mix = c->mix_lut[ev];
 
-        Y[i] = (uint8_t) ev;
+        Y[i] = (uint8_t) out_ev;
         U[i] = cf_blend_fast_u8(128, c->ev_u[i], mix);
         V[i] = cf_blend_fast_u8(128, c->ev_v[i], mix);
     }
@@ -811,13 +870,14 @@ static void cf_render_color_bleed(chronofold_t *c, VJFrame *frame)
     CF_OMP_FOR
     for(i = 0; i < len; i++) {
         int ev = c->ev_y[i];
+        int out_ev = c->output_lut[ev];
         int mix = c->mix_lut[ev];
 
         int base_y = c->bleed_y_lut[Y[i]];
         uint8_t base_u = c->bleed_uv_lut[U[i]];
         uint8_t base_v = c->bleed_uv_lut[V[i]];
 
-        Y[i] = cf_u8(base_y + ev);
+        Y[i] = cf_u8(base_y + out_ev);
         U[i] = cf_blend_fast_u8(base_u, c->ev_u[i], mix);
         V[i] = cf_blend_fast_u8(base_v, c->ev_v[i], mix);
     }
@@ -843,6 +903,9 @@ void chronofold_apply(void *ptr, VJFrame *frame, int *args)
     int color_mode;
     int noise;
     int source_bleed;
+    int beat_push;
+    int flash_gain;
+    int color_energy;
 
     uint8_t *swap;
 
@@ -853,14 +916,27 @@ void chronofold_apply(void *ptr, VJFrame *frame, int *args)
     if(!c->seeded)
         cf_seed(c, frame);
 
-    threshold    = cf_clampi(args[P_THRESHOLD], 0, 255);
-    decay        = cf_clampi(args[P_DECAY], 0, 255);
-    gain         = cf_clampi(args[P_GAIN], 0, 255);
-    memory       = cf_clampi(args[P_MEMORY], 1, 255);
-    trail        = cf_clampi(args[P_TRAIL], 0, 255);
+    beat_push = cf_scale_1000_to_255(args[P_BEAT_PUSH]);
+
+    threshold    = cf_scale_1000_to_255(args[P_THRESHOLD]);
+    decay        = cf_scale_1000_to_255(args[P_DECAY]);
+    gain         = cf_scale_1000_to_255(args[P_GAIN]);
+    memory       = cf_clampi(cf_scale_1000_to_255(args[P_MEMORY]), 1, 255);
+    trail        = cf_scale_1000_to_255(args[P_TRAIL]);
     color_mode   = cf_clampi(args[P_COLOR_MODE], 0, 4);
-    noise        = cf_clampi(args[P_NOISE], 0, 255);
-    source_bleed = cf_clampi(args[P_SOURCE_BLEED], 0, 255);
+    noise        = cf_scale_1000_to_255(args[P_NOISE]);
+    source_bleed = cf_scale_1000_to_255(args[P_SOURCE_BLEED]);
+    flash_gain   = cf_clampi(args[P_FLASH_GAIN], 0, 1000);
+    color_energy = cf_clampi(args[P_COLOR_ENERGY], 0, 1000);
+
+    threshold    = cf_push_sub_255(threshold, beat_push, 42);
+    decay        = cf_push_add_255(decay, beat_push, 10);
+    gain         = cf_push_add_255(gain, beat_push, 64);
+    trail        = cf_push_add_255(trail, beat_push, 72);
+    noise        = cf_push_add_255(noise, beat_push, 8);
+    source_bleed = cf_push_add_255(source_bleed, beat_push, 34);
+    flash_gain   = cf_push_add_1000(flash_gain, beat_push, 220);
+    color_energy = cf_push_add_1000(color_energy, beat_push, 180);
 
     use_white = (color_mode == CF_COLOR_WHITE);
     use_trail = (trail > 0);
@@ -877,7 +953,9 @@ void chronofold_apply(void *ptr, VJFrame *frame, int *args)
         memory,
         trail,
         noise,
-        source_bleed
+        source_bleed,
+        flash_gain,
+        color_energy
     );
 
     if(use_white) {

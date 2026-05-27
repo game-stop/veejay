@@ -21,24 +21,29 @@
 #include <libvje/effects/common.h>
 #include <veejaycore/vjmem.h>
 #include "transcarot.h"
-#include <libvje/effects/common.h>
-#include <veejaycore/vjmem.h>
 
 typedef struct {
-    float wipePositionX;
-    float wipePositionY;
-    float wipePosition;
-    int directionX;
-    int directionY;
-    int initialized;
+    int diagonal_pos;
+
+    int box_x;
+    int box_y;
+    int box_dir_x;
+    int box_dir_y;
+
     int n_threads;
 } wipe_t;
+
+static inline int transcarot_clampi(int v, int lo, int hi)
+{
+    return (v < lo) ? lo : (v > hi ? hi : v);
+}
 
 vj_effect *transcarot_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 2;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
@@ -50,10 +55,38 @@ vj_effect *transcarot_init(int width, int height)
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 1;
 
-    ve->sub_format = 1;
     ve->description = "Transition Wipe Diagonal";
-    ve->param_description = vje_build_param_list(ve->num_params, "Speed", "Mode");
+    ve->sub_format = 1;
     ve->extra_frame = 1;
+    ve->has_user = 0;
+    ve->parallel = 0;
+
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Speed",
+        "Mode"
+    );
+
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][1],
+        1,
+        "Diagonal",
+        "Bouncy Box"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SPEED,    VJ_BEAT_F_CONTINUOUS,                         0,                  72,                 8, 30, 1200, 3000, 0,   50,    /* Speed */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Mode */
+    );
+
+    (void) width;
+    (void) height;
+
     return ve;
 }
 
@@ -62,108 +95,129 @@ void *transcarot_malloc(int w, int h)
     wipe_t *wipe = (wipe_t*) vj_calloc(sizeof(wipe_t));
     if(!wipe)
         return NULL;
-    wipe->directionX = 1;
-    wipe->directionY = 1;
-    wipe->initialized = 0;
-    wipe->n_threads = vje_advise_num_threads(w*h);
+
+    wipe->diagonal_pos = 0;
+
+    wipe->box_x = 0;
+    wipe->box_y = 0;
+    wipe->box_dir_x = 1;
+    wipe->box_dir_y = 1;
+
+    wipe->n_threads = vje_advise_num_threads(w * h);
+    if(wipe->n_threads < 1)
+        wipe->n_threads = 1;
+
     return wipe;
 }
 
-void transcarot_free(void *ptr) {
+void transcarot_free(void *ptr)
+{
+    if(ptr)
+        free(ptr);
+}
+
+static void transcarot_copy_prefix_rows(VJFrame *frame,
+                                        VJFrame *frame2,
+                                        int rows,
+                                        int cols,
+                                        int n_threads)
+{
+    const int width = frame->width;
+
+    if(rows <= 0 || cols <= 0)
+        return;
+
+#pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int y = 0; y < rows; y++) {
+        const int off = y * width;
+
+        veejay_memcpy(frame->data[0] + off, frame2->data[0] + off, cols);
+        veejay_memcpy(frame->data[1] + off, frame2->data[1] + off, cols);
+        veejay_memcpy(frame->data[2] + off, frame2->data[2] + off, cols);
+    }
+}
+
+static void transcarot_apply_bouncybox(wipe_t *wipe, VJFrame *frame, VJFrame *frame2, int speed)
+{
+    const int width = frame->width;
+    const int height = frame->height;
+
+    wipe->box_x += speed * wipe->box_dir_x;
+    wipe->box_y += speed * wipe->box_dir_y;
+
+    if(wipe->box_x >= width) {
+        wipe->box_x = width;
+        wipe->box_dir_x = -1;
+    } else if(wipe->box_x <= 0) {
+        wipe->box_x = 0;
+        wipe->box_dir_x = 1;
+    }
+
+    if(wipe->box_y >= height) {
+        wipe->box_y = height;
+        wipe->box_dir_y = -1;
+    } else if(wipe->box_y <= 0) {
+        wipe->box_y = 0;
+        wipe->box_dir_y = 1;
+    }
+
+    const int cur_x = transcarot_clampi(wipe->box_x, 0, width);
+    const int cur_y = transcarot_clampi(wipe->box_y, 0, height);
+
+    transcarot_copy_prefix_rows(frame, frame2, cur_y, cur_x, wipe->n_threads);
+}
+
+void transcarot_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
+{
     wipe_t *wipe = (wipe_t*) ptr;
-    if(wipe) {
-        free(wipe);
-    }
-}
 
-void transcarot_apply_bouncybox(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
-    wipe_t *wipe = (wipe_t *)ptr;
+    if(!wipe || !frame || !frame2 || !args ||
+       !frame->data[0] || !frame->data[1] || !frame->data[2] ||
+       !frame2->data[0] || !frame2->data[1] || !frame2->data[2])
+        return;
+
     const int width = frame->width;
     const int height = frame->height;
-    const int speed = args[0];
+    const int len = frame->len;
 
-    if (!wipe->initialized) {
-        wipe->wipePositionX = 0;
-        wipe->wipePositionY = 0;
-        wipe->initialized = 1;
-    }
+    if(width <= 0 || height <= 0 || len <= 0)
+        return;
 
-    wipe->wipePositionX += (float)speed * wipe->directionX;
-    wipe->wipePositionY += (float)speed * wipe->directionY;
+    const int speed = transcarot_clampi(args[0], 0, 100);
+    const int mode = args[1] ? 1 : 0;
 
-    if (wipe->wipePositionX >= width) { wipe->wipePositionX = (float)width; wipe->directionX = -1; }
-    if (wipe->wipePositionX <= 0) { wipe->wipePositionX = 0; wipe->directionX = 1; }
-    if (wipe->wipePositionY >= height) { wipe->wipePositionY = (float)height; wipe->directionY = -1; }
-    if (wipe->wipePositionY <= 0) { wipe->wipePositionY = 0; wipe->directionY = 1; }
-
-    const int curX = (int)wipe->wipePositionX;
-    const int curY = (int)wipe->wipePositionY;
-
-    #pragma omp parallel for schedule(static) num_threads(wipe->n_threads)
-    for (int i = 0; i < curY; ++i) {
-        const int offset = i * width;
-
-        uint8_t *dstY = &frame->data[0][offset];
-        const uint8_t *srcY = &frame2->data[0][offset];
-        uint8_t *dstU = &frame->data[1][offset];
-        const uint8_t *srcU = &frame2->data[1][offset];
-        uint8_t *dstV = &frame->data[2][offset];
-        const uint8_t *srcV = &frame2->data[2][offset];
-
-        #pragma omp simd
-        for (int j = 0; j < curX; ++j) {
-            dstY[j] = srcY[j];
-            dstU[j] = srcU[j];
-            dstV[j] = srcV[j];
-        }
-    }
-}
-
-void transcarot_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
-    wipe_t *wipe = (wipe_t *)ptr;
-    const int width = frame->width;
-    const int height = frame->height;
-    const int speed = args[0];
-    const int mode = args[1];
-
-    if(mode == 1 ) {
-        transcarot_apply_bouncybox(ptr,frame,frame2,args);
+    if(mode == 1) {
+        transcarot_apply_bouncybox(wipe, frame, frame2, speed);
         return;
     }
 
-    if (!wipe->initialized) {
-        wipe->wipePosition = 0;
-        wipe->initialized = 1;
-    }
-
-    wipe->wipePosition += (float)speed;
     const int total_span = width + height;
-    if (wipe->wipePosition >= total_span) {
-        wipe->wipePosition = 0;
+
+    wipe->diagonal_pos += speed;
+
+    if(total_span > 0) {
+        while(wipe->diagonal_pos >= total_span)
+            wipe->diagonal_pos -= total_span;
+    } else {
+        wipe->diagonal_pos = 0;
     }
 
-    const int progress = (int)wipe->wipePosition;
+    const int progress = wipe->diagonal_pos;
 
-    #pragma omp parallel for num_threads(wipe->n_threads) schedule(static)
-    for (int i = 0; i < height; ++i) {
-        const int offset = i * width;
-        int limit = progress - i;
+#pragma omp parallel for schedule(static) num_threads(wipe->n_threads)
+    for(int y = 0; y < height; y++) {
+        int limit = progress - y;
 
-        if (limit < 0) limit = 0;
-        if (limit > width) limit = width;
+        if(limit <= 0)
+            continue;
 
-        uint8_t *dstY = &frame->data[0][offset];
-        const uint8_t *srcY = &frame2->data[0][offset];
-        uint8_t *dstU = &frame->data[1][offset];
-        const uint8_t *srcU = &frame2->data[1][offset];
-        uint8_t *dstV = &frame->data[2][offset];
-        const uint8_t *srcV = &frame2->data[2][offset];
+        if(limit > width)
+            limit = width;
 
-        #pragma omp simd
-        for (int j = 0; j < limit; ++j) {
-            dstY[j] = srcY[j];
-            dstU[j] = srcU[j];
-            dstV[j] = srcV[j];
-        }
+        const int off = y * width;
+
+        veejay_memcpy(frame->data[0] + off, frame2->data[0] + off, limit);
+        veejay_memcpy(frame->data[1] + off, frame2->data[1] + off, limit);
+        veejay_memcpy(frame->data[2] + off, frame2->data[2] + off, limit);
     }
 }

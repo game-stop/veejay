@@ -19,236 +19,381 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "neighbours.h"
+
+#ifdef _OPENMP
+#include <omp.h>
+#define NB_THREAD_ID() omp_get_thread_num()
+#else
+#define NB_THREAD_ID() 0
+#endif
+
+#define NB_BINS 256
+#define NB_SCRATCH_PLANES 4
+#define NB_SCRATCH_STRIDE (NB_BINS * NB_SCRATCH_PLANES)
+
+typedef struct {
+    uint8_t *src[4];
+    int *scratch;
+    int width;
+    int height;
+    int n_threads;
+} nb_t;
 
 vj_effect *neighbours_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
     ve->limits[0][0] = 2;
-    ve->limits[1][0] = 16;  /* brush size (shape is rectangle)*/
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 255;     /* smoothness */
-    ve->limits[0][2] = 0;   /* luma only / include chroma */
-    ve->limits[1][2] = 1;
+    ve->limits[1][0] = 16;
     ve->defaults[0] = 4;
+
+    ve->limits[0][1] = 1;
+    ve->limits[1][1] = 255;
     ve->defaults[1] = 4;
+
+    ve->limits[0][2] = 0;
+    ve->limits[1][2] = 1;
     ve->defaults[2] = 0;
+
     ve->description = "ZArtistic Filter (Oilpainting, acc. add )";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Brush size", "Smoothness", "Mode" );
 
-    ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Brush size",
+        "Smoothness",
+        "Mode"
+    );
 
-    vje_build_value_hint_list( ve->hints, ve->limits[1][2], 2, "Luma Only", "Luma and Chroma" );
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][2],
+        2,
+        "Luma Only",
+        "Luma and Chroma"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 2,                  12,                 6, 22, 1800, 4200, 900, 30,    /* Brush size */
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY,                        8,                  180,                6, 22, 1600, 3400, 700, 30,    /* Smoothness */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Mode */
+    );
+
+    (void) w;
+    (void) h;
 
     return ve;
 }
 
-typedef struct
+void *neighbours_malloc(int w, int h)
 {
-    uint8_t y;
-    uint8_t u;
-    uint8_t v;
-} pixel_t;
-
-typedef struct {
-    int *row_hist[256];
-    int *row_y_map[256];
-    int *row_cb_map[256];
-    int *row_cr_map[256];
-    uint8_t *tmp_buf[2];
-    uint8_t *chromacity[2];
-    int width;
-    int height;
-    int brush_size_max;    
-} nb_t;
-
-void *neighbours_malloc(int w, int h) {
     nb_t *n = (nb_t*) vj_calloc(sizeof(nb_t));
-    if(!n) return NULL;
+    if(!n)
+        return NULL;
+
+    const int len = w * h;
 
     n->width = w;
     n->height = h;
+    n->n_threads = vje_advise_num_threads(len);
+    if(n->n_threads < 1)
+        n->n_threads = 1;
 
-    n->tmp_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w*h*2));
-    if(!n->tmp_buf[0]) { free(n); return NULL; }
-    n->tmp_buf[1] = n->tmp_buf[0] + (w*h);
-
-    n->chromacity[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w*h*2));
-    if(!n->chromacity[0]) { free(n->tmp_buf[0]); free(n); return NULL; }
-    n->chromacity[1] = n->chromacity[0] + (w*h);
-
-    for(int i=0;i<256;i++){
-        n->row_hist[i] = (int*) vj_calloc(sizeof(int) * w);
-        n->row_y_map[i] = (int*) vj_calloc(sizeof(int) * w);
-        n->row_cb_map[i] = (int*) vj_calloc(sizeof(int) * w);
-        n->row_cr_map[i] = (int*) vj_calloc(sizeof(int) * w);
-        if(!n->row_hist[i] || !n->row_y_map[i] || !n->row_cb_map[i] || !n->row_cr_map[i]){
-            for(int j=0;j<=i;j++){
-                if(n->row_hist[j]) free(n->row_hist[j]);
-                if(n->row_y_map[j]) free(n->row_y_map[j]);
-                if(n->row_cb_map[j]) free(n->row_cb_map[j]);
-                if(n->row_cr_map[j]) free(n->row_cr_map[j]);
-                    n->row_hist[i] = NULL;
-                    n->row_y_map[i] = NULL;
-                    n->row_cb_map[i] = NULL;
-                    n->row_cr_map[i] = NULL;
-            }
-            free(n->chromacity[0]); free(n->tmp_buf[0]); free(n);
-            return NULL;
-        }
+    n->src[0] = (uint8_t*) vj_malloc((size_t) len * 4u);
+    if(!n->src[0]) {
+        free(n);
+        return NULL;
     }
 
-    return (void*)n;
+    n->src[1] = n->src[0] + len;
+    n->src[2] = n->src[1] + len;
+    n->src[3] = n->src[2] + len;
+
+    n->scratch = (int*) vj_calloc(sizeof(int) * NB_SCRATCH_STRIDE * n->n_threads);
+    if(!n->scratch) {
+        free(n->src[0]);
+        free(n);
+        return NULL;
+    }
+
+    return (void*) n;
 }
 
-void neighbours_free(void *ptr){
+void neighbours_free(void *ptr)
+{
     nb_t *n = (nb_t*) ptr;
-    if(!n) return;
+    if(!n)
+        return;
 
-    for(int i=0;i<256;i++){
-        if(n->row_hist[i]) { free(n->row_hist[i]); n->row_hist[i]=NULL; }
-        if(n->row_y_map[i]) { free(n->row_y_map[i]); n->row_y_map[i]=NULL; }
-        if(n->row_cb_map[i]) { free(n->row_cb_map[i]); n->row_cb_map[i]=NULL; }
-        if(n->row_cr_map[i]) { free(n->row_cr_map[i]); n->row_cr_map[i]=NULL; }
-    }
+    if(n->src[0])
+        free(n->src[0]);
 
-    if(n->tmp_buf[0]) { free(n->tmp_buf[0]); n->tmp_buf[0]=NULL; }
-    if(n->chromacity[0]) { free(n->chromacity[0]); n->chromacity[0]=NULL; }
+    if(n->scratch)
+        free(n->scratch);
+
     free(n);
 }
 
-static inline int clamp(int val,int min,int max){return val<min?min:(val>max?max:val);}
-
-static inline uint8_t evaluate_pixel_row(
-    int x,int y,int brush_size,int max_intensity,
-    uint8_t *premul,uint8_t *Y,
-    int *row_hist,int *row_y_map,
-    int width,int height
-){
-    int left = clamp(x - brush_size,0,width-1);
-    int right = clamp(x + brush_size,0,width-1);
-    int peak_value=0,peak_index=0;
-
-    veejay_memset(row_hist, 0, max_intensity * sizeof(int));
-    veejay_memset(row_y_map, 0, max_intensity * sizeof(int));;
-
-    for(int j=left;j<=right;j++){
-        int bright = premul[y*width + j];
-        row_hist[bright]++;
-        row_y_map[bright] += Y[y*width + j];
-    }
-
-    for(int i=0;i<max_intensity;i++){
-        if(row_hist[i]>peak_value){ peak_value=row_hist[i]; peak_index=i; }
-    }
-
-    return peak_value ? (uint8_t)(row_y_map[peak_index]/peak_value) : Y[y*width + x];
+static inline int nb_clampi(int v, int lo, int hi)
+{
+    return (v < lo) ? lo : (v > hi ? hi : v);
 }
 
-static inline pixel_t evaluate_pixel_row_c(
-    int x,int y,int brush_size,int max_intensity,
-    uint8_t *premul,uint8_t *Y,uint8_t *Cb,uint8_t *Cr,
-    int *row_hist,int *row_y_map,int *row_cb_map,int *row_cr_map,
-    int width,int height
-){
-    pixel_t val;
-    int left = clamp(x - brush_size,0,width-1);
-    int right = clamp(x + brush_size,0,width-1);
-    int peak_value=0,peak_index=0;
-
-    veejay_memset(row_hist, 0, max_intensity * sizeof(int));
-    veejay_memset(row_y_map, 0, max_intensity * sizeof(int));
-    veejay_memset(row_cb_map, 0, max_intensity * sizeof(int));
-    veejay_memset(row_cr_map, 0, max_intensity * sizeof(int));
-
-    for(int j=left;j<=right;j++){
-        int bright = premul[y*width + j];
-        row_hist[bright]++;
-        row_y_map[bright] += Y[y*width + j];
-        row_cb_map[bright] += Cb[y*width + j];
-        row_cr_map[bright] += Cr[y*width + j];
-    }
-
-    for(int i=0;i<max_intensity;i++){
-        if(row_hist[i]>peak_value){ peak_value=row_hist[i]; peak_index=i; }
-    }
-
-    if(peak_value>0){
-        val.y = row_y_map[peak_index]/peak_value;
-        val.u = row_cb_map[peak_index]/peak_value;
-        val.v = row_cr_map[peak_index]/peak_value;
-    }else{
-        val.y = Y[y*width + x];
-        val.u = Cb[y*width + x];
-        val.v = Cr[y*width + x];
-    }
-
-    return val;
+static inline uint8_t nb_quant_luma(uint8_t y, int smoothness)
+{
+    return (uint8_t) (((int)y * smoothness + 127) / 255);
 }
 
-void neighbours_apply(void *ptr,VJFrame *frame,int *args){
-    int brush_size=args[0];
-    int intensity_level=args[1];
-    int mode=args[2];
+static inline void nb_clear_luma_scratch(int *hist, int *sum_y)
+{
+    veejay_memset(hist, 0, sizeof(int) * NB_BINS);
+    veejay_memset(sum_y, 0, sizeof(int) * NB_BINS);
+}
 
+static inline void nb_clear_color_scratch(int *hist, int *sum_y, int *sum_u, int *sum_v)
+{
+    veejay_memset(hist, 0, sizeof(int) * NB_BINS);
+    veejay_memset(sum_y, 0, sizeof(int) * NB_BINS);
+    veejay_memset(sum_u, 0, sizeof(int) * NB_BINS);
+    veejay_memset(sum_v, 0, sizeof(int) * NB_BINS);
+}
+
+static inline int nb_peak_bin(const int *hist)
+{
+    int peak_count = hist[0];
+    int peak_bin = 0;
+
+    for(int i = 1; i < NB_BINS; i++) {
+        if(hist[i] > peak_count) {
+            peak_count = hist[i];
+            peak_bin = i;
+        }
+    }
+
+    return peak_bin;
+}
+
+static inline void nb_add_luma_sample(
+    int *hist,
+    int *sum_y,
+    const uint8_t *restrict src_y,
+    const uint8_t *restrict bins,
+    int idx
+) {
+    const int b = bins[idx];
+    hist[b]++;
+    sum_y[b] += src_y[idx];
+}
+
+static inline void nb_remove_luma_sample(
+    int *hist,
+    int *sum_y,
+    const uint8_t *restrict src_y,
+    const uint8_t *restrict bins,
+    int idx
+) {
+    const int b = bins[idx];
+    hist[b]--;
+    sum_y[b] -= src_y[idx];
+}
+
+static inline void nb_add_color_sample(
+    int *hist,
+    int *sum_y,
+    int *sum_u,
+    int *sum_v,
+    const uint8_t *restrict src_y,
+    const uint8_t *restrict src_u,
+    const uint8_t *restrict src_v,
+    const uint8_t *restrict bins,
+    int idx
+) {
+    const int b = bins[idx];
+    hist[b]++;
+    sum_y[b] += src_y[idx];
+    sum_u[b] += src_u[idx];
+    sum_v[b] += src_v[idx];
+}
+
+static inline void nb_remove_color_sample(
+    int *hist,
+    int *sum_y,
+    int *sum_u,
+    int *sum_v,
+    const uint8_t *restrict src_y,
+    const uint8_t *restrict src_u,
+    const uint8_t *restrict src_v,
+    const uint8_t *restrict bins,
+    int idx
+) {
+    const int b = bins[idx];
+    hist[b]--;
+    sum_y[b] -= src_y[idx];
+    sum_u[b] -= src_u[idx];
+    sum_v[b] -= src_v[idx];
+}
+
+static void nb_apply_luma(
+    nb_t *n,
+    uint8_t *restrict dst_y,
+    const uint8_t *restrict src_y,
+    const uint8_t *restrict bins,
+    int width,
+    int height,
+    int brush_size
+) {
+#pragma omp parallel for schedule(static) num_threads(n->n_threads)
+    for(int y = 0; y < height; y++) {
+        const int tid = NB_THREAD_ID();
+        int *scratch = n->scratch + tid * NB_SCRATCH_STRIDE;
+        int *hist = scratch;
+        int *sum_y = scratch + NB_BINS;
+
+        const int row = y * width;
+        int left = 0;
+        int right = -1;
+
+        nb_clear_luma_scratch(hist, sum_y);
+
+        for(int x = 0; x < width; x++) {
+            const int want_left = nb_clampi(x - brush_size, 0, width - 1);
+            const int want_right = nb_clampi(x + brush_size, 0, width - 1);
+
+            while(right < want_right) {
+                right++;
+                nb_add_luma_sample(hist, sum_y, src_y, bins, row + right);
+            }
+
+            while(left < want_left) {
+                nb_remove_luma_sample(hist, sum_y, src_y, bins, row + left);
+                left++;
+            }
+
+            const int peak = nb_peak_bin(hist);
+            const int count = hist[peak];
+
+            dst_y[row + x] = count > 0
+                ? (uint8_t) (sum_y[peak] / count)
+                : src_y[row + x];
+        }
+    }
+}
+
+static void nb_apply_color(
+    nb_t *n,
+    uint8_t *restrict dst_y,
+    uint8_t *restrict dst_u,
+    uint8_t *restrict dst_v,
+    const uint8_t *restrict src_y,
+    const uint8_t *restrict src_u,
+    const uint8_t *restrict src_v,
+    const uint8_t *restrict bins,
+    int width,
+    int height,
+    int brush_size
+) {
+#pragma omp parallel for schedule(static) num_threads(n->n_threads)
+    for(int y = 0; y < height; y++) {
+        const int tid = NB_THREAD_ID();
+        int *scratch = n->scratch + tid * NB_SCRATCH_STRIDE;
+        int *hist = scratch;
+        int *sum_y = scratch + NB_BINS;
+        int *sum_u = scratch + NB_BINS * 2;
+        int *sum_v = scratch + NB_BINS * 3;
+
+        const int row = y * width;
+        int left = 0;
+        int right = -1;
+
+        nb_clear_color_scratch(hist, sum_y, sum_u, sum_v);
+
+        for(int x = 0; x < width; x++) {
+            const int want_left = nb_clampi(x - brush_size, 0, width - 1);
+            const int want_right = nb_clampi(x + brush_size, 0, width - 1);
+
+            while(right < want_right) {
+                right++;
+                nb_add_color_sample(hist, sum_y, sum_u, sum_v, src_y, src_u, src_v, bins, row + right);
+            }
+
+            while(left < want_left) {
+                nb_remove_color_sample(hist, sum_y, sum_u, sum_v, src_y, src_u, src_v, bins, row + left);
+                left++;
+            }
+
+            const int peak = nb_peak_bin(hist);
+            const int count = hist[peak];
+            const int idx = row + x;
+
+            if(count > 0) {
+                dst_y[idx] = (uint8_t) (sum_y[peak] / count);
+                dst_u[idx] = (uint8_t) (sum_u[peak] / count);
+                dst_v[idx] = (uint8_t) (sum_v[peak] / count);
+            } else {
+                dst_y[idx] = src_y[idx];
+                dst_u[idx] = src_u[idx];
+                dst_v[idx] = src_v[idx];
+            }
+        }
+    }
+}
+
+void neighbours_apply(void *ptr, VJFrame *frame, int *args)
+{
     nb_t *n = (nb_t*) ptr;
-    int width = frame->width;
-    int height = frame->height;
-    int len = frame->len;
+    if(!n || !frame || !args)
+        return;
 
-    const double intensity = intensity_level/255.0;
-    int max_intensity = (int)(0xff*intensity);
+    const int width = frame->width;
+    const int height = frame->height;
+    const int len = frame->len;
 
-    uint8_t *Y = n->tmp_buf[0];
-    uint8_t *Y2 = n->tmp_buf[1];
-    uint8_t *dstY = frame->data[0];
-    uint8_t *dstCb = frame->data[1];
-    uint8_t *dstCr = frame->data[2];
+    if(width <= 0 || height <= 0 || len <= 0)
+        return;
 
-    vj_frame_copy1(frame->data[0],Y2,len);
-    if(mode){
-        int strides[4]={0,len,len};
-        uint8_t *dest[4]={NULL,n->chromacity[0],n->chromacity[1],NULL};
-        vj_frame_copy(frame->data,dest,strides);
+    int brush_size = args[0];
+    int smoothness = args[1];
+    int mode = args[2];
+
+    brush_size = nb_clampi(brush_size, 2, 16);
+    smoothness = nb_clampi(smoothness, 1, 255);
+    mode = nb_clampi(mode, 0, 1);
+
+    uint8_t *restrict dst_y = frame->data[0];
+    uint8_t *restrict dst_u = frame->data[1];
+    uint8_t *restrict dst_v = frame->data[2];
+
+    uint8_t *restrict src_y = n->src[0];
+    uint8_t *restrict src_u = n->src[1];
+    uint8_t *restrict src_v = n->src[2];
+    uint8_t *restrict bins  = n->src[3];
+
+    veejay_memcpy(src_y, dst_y, len);
+
+    if(mode) {
+        veejay_memcpy(src_u, dst_u, len);
+        veejay_memcpy(src_v, dst_v, len);
     }
 
-#pragma omp simd
-    for(int i=0;i<len;i++) Y[i]=(uint8_t)(Y2[i]*intensity);
+#pragma omp parallel for schedule(static) num_threads(n->n_threads)
+    for(int i = 0; i < len; i++) {
+        bins[i] = nb_quant_luma(src_y[i], smoothness);
+    }
 
-    if(!mode){
-        for(int y=0;y<height;y++){
-            for(int x=0;x<width;x++){
-                *(dstY++) = evaluate_pixel_row(
-                    x,y,brush_size,max_intensity,Y,Y2,
-                    n->row_hist[0],n->row_y_map[0],
-                    width,height
-                );
-            }
-        }
-    }else{
-        pixel_t tmp;
-        for(int y=0;y<height;y++){
-            for(int x=0;x<width;x++){
-                tmp = evaluate_pixel_row_c(
-                    x,y,brush_size,max_intensity,
-                    Y,Y2,n->chromacity[0],n->chromacity[1],
-                    n->row_hist[0],n->row_y_map[0],
-                    n->row_cb_map[0],n->row_cr_map[0],
-                    width,height
-                );
-                *(dstY++) = tmp.y;
-                *(dstCb++) = tmp.u;
-                *(dstCr++) = tmp.v;
-            }
-        }
+    if(!mode) {
+        nb_apply_luma(n, dst_y, src_y, bins, width, height, brush_size);
+    } else {
+        nb_apply_color(n, dst_y, dst_u, dst_v, src_y, src_u, src_v, bins, width, height, brush_size);
     }
 }

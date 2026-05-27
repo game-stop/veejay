@@ -17,9 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "fisheye.h"
 
 vj_effect *fisheye_init(int w, int h)
@@ -42,6 +40,12 @@ vj_effect *fisheye_init(int w, int h)
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Curve", "Mask to Alpha" );
     ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL | FLAG_ALPHA_SRC_A;
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SIGNED_CURVE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS | VJ_BEAT_F_REBUILDS_STATE, -420,               420,                6, 22, 2200, 5200, 1200, 25,    /* Curve */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                                     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,    -1000  /* Mask to Alpha */
+    );
     return ve;
 }
 

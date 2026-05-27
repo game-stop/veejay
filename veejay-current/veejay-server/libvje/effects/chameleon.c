@@ -24,8 +24,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <veejaycore/vj-msg.h>
 #include "softblur.h"
 #include "chameleon.h"
 #include "motionmap.h"
@@ -49,6 +47,12 @@ vj_effect *chameleon_init(int w, int h)
 
     ve->description = "ChameleonTV (EffectTV)";
     ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Sensitivity");
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0, -1000, /* Mode */
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS,                    2,                  24,                 10, 42, 900,  2400, 0, 65     /* Sensitivity */
+    );
     return ve;
 }
 

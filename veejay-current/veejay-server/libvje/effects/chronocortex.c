@@ -19,12 +19,9 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
+#include "chronocortex.h"
 
-#define CHRONOFOLD_PARAMS 8
+#define CHRONOFOLD_PARAMS 11
 
 #define P_THRESHOLD      0
 #define P_EXCITATION     1
@@ -34,6 +31,9 @@
 #define P_POLARITY_DRIFT 5
 #define P_SOURCE_BLEED   6
 #define P_COLOR_MODE     7
+#define P_BEAT_PUSH      8
+#define P_CORTEX_GAIN    9
+#define P_COLOR_ENERGY  10
 
 #define CF_COLOR_POLARITY 0
 #define CF_COLOR_THERMAL  1
@@ -69,6 +69,8 @@ typedef struct {
     uint8_t branch_lut[256];
     uint8_t bleed_y_lut[256];
     uint8_t bleed_uv_lut[256];
+    uint8_t gain_lut[256];
+    uint8_t color_lut[256];
     uint8_t adapt_lut[256];
 
     int lut_valid;
@@ -78,6 +80,8 @@ typedef struct {
     int last_decay;
     int last_branching;
     int last_source_bleed;
+    int last_cortex_gain;
+    int last_color_energy;
 } chronocortex_t;
 
 static inline int cf_clampi(int v, int lo, int hi)
@@ -93,6 +97,11 @@ static inline int cf_absi(int v)
 static inline uint8_t cf_u8(int v)
 {
     return (uint8_t) cf_clampi(v, 0, 255);
+}
+
+static inline int cf_ui1000_to_u8(int v)
+{
+    return (cf_clampi(v, 0, 1000) * 255 + 500) / 1000;
 }
 
 static inline uint8_t cf_blend_fast_u8(uint8_t a, uint8_t b, int amount)
@@ -134,36 +143,48 @@ vj_effect *chronocortex_init(int w, int h)
     }
 
     ve->limits[0][P_THRESHOLD] = 0;
-    ve->limits[1][P_THRESHOLD] = 255;
-    ve->defaults[P_THRESHOLD] = 18;
+    ve->limits[1][P_THRESHOLD] = 1000;
+    ve->defaults[P_THRESHOLD] = 70;
 
     ve->limits[0][P_EXCITATION] = 0;
-    ve->limits[1][P_EXCITATION] = 255;
-    ve->defaults[P_EXCITATION] = 150;
+    ve->limits[1][P_EXCITATION] = 1000;
+    ve->defaults[P_EXCITATION] = 590;
 
     ve->limits[0][P_INHIBITION] = 0;
-    ve->limits[1][P_INHIBITION] = 255;
-    ve->defaults[P_INHIBITION] = 90;
+    ve->limits[1][P_INHIBITION] = 1000;
+    ve->defaults[P_INHIBITION] = 350;
 
     ve->limits[0][P_DECAY] = 0;
-    ve->limits[1][P_DECAY] = 255;
-    ve->defaults[P_DECAY] = 220;
+    ve->limits[1][P_DECAY] = 1000;
+    ve->defaults[P_DECAY] = 865;
 
     ve->limits[0][P_BRANCHING] = 0;
-    ve->limits[1][P_BRANCHING] = 255;
-    ve->defaults[P_BRANCHING] = 95;
+    ve->limits[1][P_BRANCHING] = 1000;
+    ve->defaults[P_BRANCHING] = 370;
 
     ve->limits[0][P_POLARITY_DRIFT] = 0;
-    ve->limits[1][P_POLARITY_DRIFT] = 255;
-    ve->defaults[P_POLARITY_DRIFT] = 90;
+    ve->limits[1][P_POLARITY_DRIFT] = 1000;
+    ve->defaults[P_POLARITY_DRIFT] = 350;
 
     ve->limits[0][P_SOURCE_BLEED] = 0;
-    ve->limits[1][P_SOURCE_BLEED] = 255;
-    ve->defaults[P_SOURCE_BLEED] = 10;
+    ve->limits[1][P_SOURCE_BLEED] = 1000;
+    ve->defaults[P_SOURCE_BLEED] = 40;
 
     ve->limits[0][P_COLOR_MODE] = 0;
     ve->limits[1][P_COLOR_MODE] = 4;
     ve->defaults[P_COLOR_MODE] = CF_COLOR_POLARITY;
+
+    ve->limits[0][P_BEAT_PUSH] = 0;
+    ve->limits[1][P_BEAT_PUSH] = 1000;
+    ve->defaults[P_BEAT_PUSH] = 0;
+
+    ve->limits[0][P_CORTEX_GAIN] = 0;
+    ve->limits[1][P_CORTEX_GAIN] = 1000;
+    ve->defaults[P_CORTEX_GAIN] = 670;
+
+    ve->limits[0][P_COLOR_ENERGY] = 0;
+    ve->limits[1][P_COLOR_ENERGY] = 1000;
+    ve->defaults[P_COLOR_ENERGY] = 670;
 
     ve->description = "Chronofold Cortex";
     ve->sub_format = 1;
@@ -173,16 +194,33 @@ vj_effect *chronocortex_init(int w, int h)
 
     ve->param_description = vje_build_param_list(
         ve->num_params,
-        "Threshold",
-        "Excitation",
-        "Inhibition",
-        "Decay",
+        "Trigger Gate",
+        "Neural Excitation",
+        "Lateral Inhibition",
+        "Memory Decay",
         "Branching",
         "Polarity Drift",
         "Source Bleed",
-        "Color Mode"
+        "Color Mode",
+        "Beat Push",
+        "Cortex Gain",
+        "Color Energy"
     );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                         20,                 380,                6,  24,  1600, 3400, 700,  40,    /* Trigger Gate */
+        VJ_BEAT_TRIGGER,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,       250,                940,                18, 76,  80,   420,  0,    90,    /* Neural Excitation */
+        VJ_BEAT_INERTIA,      VJ_BEAT_F_CONTINUOUS,                          80,                 650,                8,  30,  1100, 2800, 0,    35,    /* Lateral Inhibition */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                         470,                1000,               8,  34,  1800, 4200, 900,  55,    /* Memory Decay */
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                          60,                 800,                12, 48,  1000, 2800, 0,    70,    /* Branching */
+        VJ_BEAT_DRIFT,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,     0,                  700,                6,  24,  1800, 4200, 1200, 30,    /* Polarity Drift */
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                          0,                  300,                8,  30,  1200, 3000, 0,    45,    /* Source Bleed */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
+        VJ_BEAT_TRIGGER,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,       0,                  1000,               24, 92,  60,   360,  0,    100,   /* Beat Push */
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                          220,                1000,               16, 62,  500,  1400, 0,    85,    /* Cortex Gain */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                          180,                1000,               12, 48,  800,  2200, 0,    55     /* Color Energy */
+    );
     return ve;
 }
 
@@ -280,7 +318,9 @@ static void cf_build_luts_if_needed(chronocortex_t *c,
                                     int inhibition,
                                     int decay,
                                     int branching,
-                                    int source_bleed)
+                                    int source_bleed,
+                                    int cortex_gain,
+                                    int color_energy)
 {
     int i;
     int denom;
@@ -291,7 +331,9 @@ static void cf_build_luts_if_needed(chronocortex_t *c,
        c->last_inhibition == inhibition &&
        c->last_decay == decay &&
        c->last_branching == branching &&
-       c->last_source_bleed == source_bleed) {
+       c->last_source_bleed == source_bleed &&
+       c->last_cortex_gain == cortex_gain &&
+       c->last_color_energy == color_energy) {
         return;
     }
 
@@ -329,6 +371,16 @@ static void cf_build_luts_if_needed(chronocortex_t *c,
         c->bleed_uv_lut[i] =
             (uint8_t) ((128 * (255 - source_bleed) + i * source_bleed + 127) / 255);
 
+        {
+            int gain_q8 = (cortex_gain * 384 + 127) / 255;
+            int color_q8 = (color_energy * 384 + 127) / 255;
+            int gv = (i * gain_q8 + 128) >> 8;
+            int cv = (i * color_q8 + 128) >> 8;
+
+            c->gain_lut[i] = (uint8_t) (gv > 255 ? 255 : gv);
+            c->color_lut[i] = (uint8_t) (cv > 255 ? 255 : cv);
+        }
+
         mem = 8 + ((255 - decay) >> 3) + (i >> 4);
         if(mem > 255)
             mem = 255;
@@ -341,6 +393,8 @@ static void cf_build_luts_if_needed(chronocortex_t *c,
     c->last_decay = decay;
     c->last_branching = branching;
     c->last_source_bleed = source_bleed;
+    c->last_cortex_gain = cortex_gain;
+    c->last_color_energy = color_energy;
     c->lut_valid = 1;
 }
 
@@ -1064,6 +1118,7 @@ static void cf_render_cortex_const_pure(chronocortex_t *c,
         if(ev > 255)
             ev = 255;
 
+        ev = c->gain_lut[ev];
         Y[i] = (uint8_t) ev;
 
         if(ev <= 0) {
@@ -1089,8 +1144,11 @@ static void cf_render_cortex_const_pure(chronocortex_t *c,
             ev_v = cf_blend_fast_u8((uint8_t) on_v, (uint8_t) off_v, amount);
         }
 
-        U[i] = cf_blend_fast_u8(128, (uint8_t) ev_u, ev);
-        V[i] = cf_blend_fast_u8(128, (uint8_t) ev_v, ev);
+        {
+            int cev = c->color_lut[ev];
+            U[i] = cf_blend_fast_u8(128, (uint8_t) ev_u, cev);
+            V[i] = cf_blend_fast_u8(128, (uint8_t) ev_v, cev);
+        }
     }
 }
 
@@ -1124,6 +1182,8 @@ static void cf_render_cortex_const_bleed(chronocortex_t *c,
         if(ev > 255)
             ev = 255;
 
+        ev = c->gain_lut[ev];
+
         base_y = c->bleed_y_lut[Y[i]];
         base_u = c->bleed_uv_lut[U[i]];
         base_v = c->bleed_uv_lut[V[i]];
@@ -1153,8 +1213,11 @@ static void cf_render_cortex_const_bleed(chronocortex_t *c,
             ev_v = cf_blend_fast_u8((uint8_t) on_v, (uint8_t) off_v, amount);
         }
 
-        U[i] = cf_blend_fast_u8(base_u, (uint8_t) ev_u, ev);
-        V[i] = cf_blend_fast_u8(base_v, (uint8_t) ev_v, ev);
+        {
+            int cev = c->color_lut[ev];
+            U[i] = cf_blend_fast_u8(base_u, (uint8_t) ev_u, cev);
+            V[i] = cf_blend_fast_u8(base_v, (uint8_t) ev_v, cev);
+        }
     }
 }
 
@@ -1193,6 +1256,8 @@ static void cf_render_cortex_source(chronocortex_t *c,
         if(ev > 255)
             ev = 255;
 
+        ev = c->gain_lut[ev];
+
         if(source_bleed > 0) {
             base_y = c->bleed_y_lut[Y[i]];
             base_u = c->bleed_uv_lut[src_u];
@@ -1229,8 +1294,11 @@ static void cf_render_cortex_source(chronocortex_t *c,
             ev_v = cf_blend_fast_u8((uint8_t) on_v, (uint8_t) off_v, amount);
         }
 
-        U[i] = cf_blend_fast_u8(base_u, (uint8_t) ev_u, ev);
-        V[i] = cf_blend_fast_u8(base_v, (uint8_t) ev_v, ev);
+        {
+            int cev = c->color_lut[ev];
+            U[i] = cf_blend_fast_u8(base_u, (uint8_t) ev_u, cev);
+            V[i] = cf_blend_fast_u8(base_v, (uint8_t) ev_v, cev);
+        }
     }
 }
 
@@ -1247,7 +1315,7 @@ static void cf_render_cortex_white_pure(chronocortex_t *c,
         int ev = c->on_y[i] + c->off_y[i];
         if(ev > 255)
             ev = 255;
-        Y[i] = (uint8_t) ev;
+        Y[i] = c->gain_lut[ev];
     }
 
     veejay_memset(frame->data[1], 128, (size_t) len);
@@ -1272,6 +1340,7 @@ static void cf_render_cortex_white_bleed(chronocortex_t *c,
         if(ev > 255)
             ev = 255;
 
+        ev = c->gain_lut[ev];
         base_y = c->bleed_y_lut[Y[i]];
 
         Y[i] = cf_u8(base_y + ev);
@@ -1346,20 +1415,57 @@ void chronocortex_apply(void *ptr, VJFrame *frame, int *args)
     int polarity_drift;
     int source_bleed;
     int color_mode;
+    int beat_push;
+    int cortex_gain;
+    int color_energy;
+
+    int threshold_ui;
+    int excitation_ui;
+    int inhibition_ui;
+    int decay_ui;
+    int branching_ui;
+    int polarity_drift_ui;
+    int source_bleed_ui;
+    int cortex_gain_ui;
+    int color_energy_ui;
 
     int prop_mode;
 
     if(!c->seeded)
         cf_seed(c, frame);
 
-    threshold      = cf_clampi(args[P_THRESHOLD], 0, 255);
-    excitation     = cf_clampi(args[P_EXCITATION], 0, 255);
-    inhibition     = cf_clampi(args[P_INHIBITION], 0, 255);
-    decay          = cf_clampi(args[P_DECAY], 0, 255);
-    branching      = cf_clampi(args[P_BRANCHING], 0, 255);
-    polarity_drift = cf_clampi(args[P_POLARITY_DRIFT], 0, 255);
-    source_bleed   = cf_clampi(args[P_SOURCE_BLEED], 0, 255);
-    color_mode     = cf_clampi(args[P_COLOR_MODE], 0, 4);
+    beat_push = cf_clampi(args[P_BEAT_PUSH], 0, 1000);
+
+    threshold_ui      = cf_clampi(args[P_THRESHOLD], 0, 1000);
+    excitation_ui     = cf_clampi(args[P_EXCITATION], 0, 1000);
+    inhibition_ui     = cf_clampi(args[P_INHIBITION], 0, 1000);
+    decay_ui          = cf_clampi(args[P_DECAY], 0, 1000);
+    branching_ui      = cf_clampi(args[P_BRANCHING], 0, 1000);
+    polarity_drift_ui = cf_clampi(args[P_POLARITY_DRIFT], 0, 1000);
+    source_bleed_ui   = cf_clampi(args[P_SOURCE_BLEED], 0, 1000);
+    cortex_gain_ui    = cf_clampi(args[P_CORTEX_GAIN], 0, 1000);
+    color_energy_ui   = cf_clampi(args[P_COLOR_ENERGY], 0, 1000);
+    color_mode        = cf_clampi(args[P_COLOR_MODE], 0, 4);
+
+    threshold_ui      = cf_clampi(threshold_ui - (beat_push / 3), 0, 1000);
+    excitation_ui     = cf_clampi(excitation_ui + ((beat_push * 45) / 100), 0, 1000);
+    inhibition_ui     = cf_clampi(inhibition_ui - (beat_push / 6), 0, 1000);
+    decay_ui          = cf_clampi(decay_ui + (beat_push / 20), 0, 1000);
+    branching_ui      = cf_clampi(branching_ui + ((beat_push * 40) / 100), 0, 1000);
+    polarity_drift_ui = cf_clampi(polarity_drift_ui + (beat_push / 5), 0, 1000);
+    source_bleed_ui   = cf_clampi(source_bleed_ui + (beat_push / 8), 0, 1000);
+    cortex_gain_ui    = cf_clampi(cortex_gain_ui + ((beat_push * 45) / 100), 0, 1000);
+    color_energy_ui   = cf_clampi(color_energy_ui + ((beat_push * 35) / 100), 0, 1000);
+
+    threshold      = cf_ui1000_to_u8(threshold_ui);
+    excitation     = cf_ui1000_to_u8(excitation_ui);
+    inhibition     = cf_ui1000_to_u8(inhibition_ui);
+    decay          = cf_ui1000_to_u8(decay_ui);
+    branching      = cf_ui1000_to_u8(branching_ui);
+    polarity_drift = cf_ui1000_to_u8(polarity_drift_ui);
+    source_bleed   = cf_ui1000_to_u8(source_bleed_ui);
+    cortex_gain    = cf_ui1000_to_u8(cortex_gain_ui);
+    color_energy   = cf_ui1000_to_u8(color_energy_ui);
 
     cf_build_luts_if_needed(
         c,
@@ -1368,7 +1474,9 @@ void chronocortex_apply(void *ptr, VJFrame *frame, int *args)
         inhibition,
         decay,
         branching,
-        source_bleed
+        source_bleed,
+        cortex_gain,
+        color_energy
     );
 
     prop_mode = c->frame & 3;

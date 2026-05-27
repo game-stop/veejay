@@ -28,7 +28,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "dices.h"
 
 typedef struct {
@@ -90,7 +89,12 @@ vj_effect *dices_init(int width, int height)
 	}
 
 	ve->limits[1][0] = iter - 1;
+	ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
 
+		VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 1,                  ve->limits[1][0],    6,  20, 2200, 5200, 1800, 25,    /* Dice size */
+		VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000  /* Orientation */
+	);
 	return ve;
 }
 

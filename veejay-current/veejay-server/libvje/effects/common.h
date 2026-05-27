@@ -25,11 +25,14 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <limits.h>
 #include <math.h>
 #include <sys/types.h>
 #include <veejaycore/defs.h>
 #include <libvje/vje.h>
+#include <libvje/libvje.h>
 #include <veejaycore/vj-task.h>
+#include <veejaycore/vjmem.h>
 #ifdef HAVE_ARM
 #include <arm_neon.h>
 #endif

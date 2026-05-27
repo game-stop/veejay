@@ -17,14 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
+#include "chronoglass.h"
 
-#define CHRONOSILT_PARAMS 8
+#define CHRONOSILT_PARAMS 11
 
 #define P_THRESHOLD      0
 #define P_FLOW           1
@@ -34,6 +30,9 @@
 #define P_SOURCE_BLEED   5
 #define P_COLOR_MODE     6
 #define P_TURBULENCE     7
+#define P_BEAT_PUSH      8
+#define P_SILT_GAIN      9
+#define P_COLOR_ENERGY  10
 
 #define CS_COLOR_SILT     0
 #define CS_COLOR_THERMAL  1
@@ -42,6 +41,7 @@
 #define CS_COLOR_WHITE    4
 
 #define CS_ACTIVITY_GATE  6
+#define CS_UI_MAX        1000
 
 typedef struct {
     int w;
@@ -73,6 +73,8 @@ typedef struct {
     uint8_t bleed_y_lut[256];
     uint8_t bleed_uv_lut[256];
     uint8_t adapt_lut[256];
+    uint8_t silt_gain_lut[256];
+    uint8_t color_energy_lut[256];
 
     int lut_valid;
     int last_threshold;
@@ -82,6 +84,8 @@ typedef struct {
     int last_sediment;
     int last_source_bleed;
     int last_turbulence;
+    int last_silt_gain;
+    int last_color_energy;
 } chronoglass_t;
 
 static inline int cs_clampi(int v, int lo, int hi)
@@ -92,6 +96,27 @@ static inline int cs_clampi(int v, int lo, int hi)
 static inline int cs_absi(int v)
 {
     return v < 0 ? -v : v;
+}
+
+static inline int cs_ui_to_u8(int v)
+{
+    v = cs_clampi(v, 0, CS_UI_MAX);
+    return (v * 255 + (CS_UI_MAX >> 1)) / CS_UI_MAX;
+}
+
+static inline int cs_push_add_u8(int base, int push, int amount)
+{
+    return cs_clampi(base + ((cs_clampi(push, 0, CS_UI_MAX) * amount + 500) / CS_UI_MAX), 0, 255);
+}
+
+static inline int cs_push_sub_u8(int base, int push, int amount)
+{
+    return cs_clampi(base - ((cs_clampi(push, 0, CS_UI_MAX) * amount + 500) / CS_UI_MAX), 0, 255);
+}
+
+static inline int cs_push_add_ui(int base, int push, int amount)
+{
+    return cs_clampi(base + ((cs_clampi(push, 0, CS_UI_MAX) * amount + 500) / CS_UI_MAX), 0, CS_UI_MAX);
 }
 
 static inline uint8_t cs_blend_fast_u8(uint8_t a, uint8_t b, int amount)
@@ -138,36 +163,48 @@ vj_effect *chronoglass_init(int w, int h)
     }
 
     ve->limits[0][P_THRESHOLD] = 0;
-    ve->limits[1][P_THRESHOLD] = 255;
-    ve->defaults[P_THRESHOLD] = 18;
+    ve->limits[1][P_THRESHOLD] = CS_UI_MAX;
+    ve->defaults[P_THRESHOLD] = 70;
 
     ve->limits[0][P_FLOW] = 0;
-    ve->limits[1][P_FLOW] = 255;
-    ve->defaults[P_FLOW] = 150;
+    ve->limits[1][P_FLOW] = CS_UI_MAX;
+    ve->defaults[P_FLOW] = 588;
 
     ve->limits[0][P_EROSION] = 0;
-    ve->limits[1][P_EROSION] = 255;
-    ve->defaults[P_EROSION] = 80;
+    ve->limits[1][P_EROSION] = CS_UI_MAX;
+    ve->defaults[P_EROSION] = 314;
 
     ve->limits[0][P_DECAY] = 0;
-    ve->limits[1][P_DECAY] = 255;
-    ve->defaults[P_DECAY] = 205;
+    ve->limits[1][P_DECAY] = CS_UI_MAX;
+    ve->defaults[P_DECAY] = 804;
 
     ve->limits[0][P_SEDIMENT] = 0;
-    ve->limits[1][P_SEDIMENT] = 255;
-    ve->defaults[P_SEDIMENT] = 165;
+    ve->limits[1][P_SEDIMENT] = CS_UI_MAX;
+    ve->defaults[P_SEDIMENT] = 647;
 
     ve->limits[0][P_SOURCE_BLEED] = 0;
-    ve->limits[1][P_SOURCE_BLEED] = 255;
-    ve->defaults[P_SOURCE_BLEED] = 18;
+    ve->limits[1][P_SOURCE_BLEED] = CS_UI_MAX;
+    ve->defaults[P_SOURCE_BLEED] = 70;
 
     ve->limits[0][P_COLOR_MODE] = 0;
     ve->limits[1][P_COLOR_MODE] = 4;
     ve->defaults[P_COLOR_MODE] = CS_COLOR_SILT;
 
     ve->limits[0][P_TURBULENCE] = 0;
-    ve->limits[1][P_TURBULENCE] = 255;
-    ve->defaults[P_TURBULENCE] = 52;
+    ve->limits[1][P_TURBULENCE] = CS_UI_MAX;
+    ve->defaults[P_TURBULENCE] = 204;
+
+    ve->limits[0][P_BEAT_PUSH] = 0;
+    ve->limits[1][P_BEAT_PUSH] = CS_UI_MAX;
+    ve->defaults[P_BEAT_PUSH] = 0;
+
+    ve->limits[0][P_SILT_GAIN] = 0;
+    ve->limits[1][P_SILT_GAIN] = CS_UI_MAX;
+    ve->defaults[P_SILT_GAIN] = 500;
+
+    ve->limits[0][P_COLOR_ENERGY] = 0;
+    ve->limits[1][P_COLOR_ENERGY] = CS_UI_MAX;
+    ve->defaults[P_COLOR_ENERGY] = 820;
 
     ve->description = "Chronosilt";
     ve->sub_format = 1;
@@ -177,14 +214,33 @@ vj_effect *chronoglass_init(int w, int h)
 
     ve->param_description = vje_build_param_list(
         ve->num_params,
-        "Threshold",
-        "Flow",
+        "Trigger Gate",
+        "Sediment Flow",
         "Erosion",
-        "Decay",
-        "Sediment",
+        "Memory Decay",
+        "Sediment Load",
         "Source Bleed",
         "Color Mode",
-        "Turbulence"
+        "Turbulence",
+        "Beat Push",
+        "Silt Gain",
+        "Color Energy"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                    20,                 380,                20, 80,  1600, 3400, 700,  35,    /* Trigger Gate */
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     160,                900,                18, 72,  800,  2200, 0,    80,    /* Sediment Flow */
+        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS,                     40,                 760,                12, 56,  1000, 2800, 0,    62,    /* Erosion */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                    520,                980,                8,  30,  1800, 4200, 900,  48,    /* Memory Decay */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS,                     180,                900,                14, 60,  1000, 2800, 0,    64,    /* Sediment Load */
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                     0,                  360,                8,  32,  1200, 3000, 0,    42,    /* Source Bleed */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
+        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,              720,                6,  42,  1500, 3800, 500,  38,    /* Turbulence */
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     0,                  1000,               18, 80,  450,  1500, 0,    95,    /* Beat Push */
+        VJ_BEAT_CONTRAST,     VJ_BEAT_F_CONTINUOUS,                     220,                1000,               12, 56,  800,  2200, 0,    75,    /* Silt Gain */
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     120,                1000,               8,  44,  900,  2400, 0,    58     /* Color Energy */
     );
 
     (void) w;
@@ -314,7 +370,9 @@ static void cs_build_luts_if_needed(chronoglass_t *c,
                                     int decay,
                                     int sediment,
                                     int source_bleed,
-                                    int turbulence)
+                                    int turbulence,
+                                    int silt_gain,
+                                    int color_energy)
 {
     int i;
     int denom;
@@ -324,6 +382,8 @@ static void cs_build_luts_if_needed(chronoglass_t *c,
     int erosion_power;
     int bed_decay_power;
     int deposit_power;
+    int gain_q8;
+    int color_q8;
 
     if(c->lut_valid &&
        c->last_threshold == threshold &&
@@ -332,7 +392,9 @@ static void cs_build_luts_if_needed(chronoglass_t *c,
        c->last_decay == decay &&
        c->last_sediment == sediment &&
        c->last_source_bleed == source_bleed &&
-       c->last_turbulence == turbulence) {
+       c->last_turbulence == turbulence &&
+       c->last_silt_gain == silt_gain &&
+       c->last_color_energy == color_energy) {
         return;
     }
 
@@ -367,6 +429,12 @@ static void cs_build_luts_if_needed(chronoglass_t *c,
     deposit_power = (sediment * (128 + (flow >> 1)) + 127) / 255;
     if(deposit_power > 255)
         deposit_power = 255;
+
+    silt_gain = cs_clampi(silt_gain, 0, CS_UI_MAX);
+    color_energy = cs_clampi(color_energy, 0, CS_UI_MAX);
+
+    gain_q8 = 128 + ((silt_gain * 256 + 500) / CS_UI_MAX);
+    color_q8 = (color_energy * 256 + 500) / CS_UI_MAX;
 
     for(i = 0; i < 256; i++) {
         int event_strength = 0;
@@ -403,6 +471,20 @@ static void cs_build_luts_if_needed(chronoglass_t *c,
             mem = 255;
 
         c->adapt_lut[i] = (uint8_t) mem;
+
+        {
+            int gv = (i * gain_q8 + 128) >> 8;
+            int cv = (i * color_q8 + 128) >> 8;
+
+            if(gv > 255)
+                gv = 255;
+
+            if(cv > 255)
+                cv = 255;
+
+            c->silt_gain_lut[i] = (uint8_t) gv;
+            c->color_energy_lut[i] = (uint8_t) cv;
+        }
     }
 
     c->last_threshold = threshold;
@@ -412,6 +494,8 @@ static void cs_build_luts_if_needed(chronoglass_t *c,
     c->last_sediment = sediment;
     c->last_source_bleed = source_bleed;
     c->last_turbulence = turbulence;
+    c->last_silt_gain = silt_gain;
+    c->last_color_energy = color_energy;
     c->lut_valid = 1;
 }
 
@@ -979,6 +1063,8 @@ static void cs_render_const(chronoglass_t *c,
 
     uint8_t *restrict BY = c->bleed_y_lut;
     uint8_t *restrict BUV = c->bleed_uv_lut;
+    uint8_t *restrict GLUT = c->silt_gain_lut;
+    uint8_t *restrict CLUT = c->color_energy_lut;
 
     int len = c->len;
     int i;
@@ -1023,8 +1109,8 @@ static void cs_render_const(chronoglass_t *c,
     for(i = 0; i < len; i++) {
         uint8_t src_y = Y[i];
 
-        int mass = M[i];
-        int bed = B[i];
+        int mass = GLUT[M[i]];
+        int bed = GLUT[B[i]];
         int pol = P[i];
 
         int ev = mass + (bed >> 1);
@@ -1041,6 +1127,9 @@ static void cs_render_const(chronoglass_t *c,
 
         if(ev > 255)
             ev = 255;
+
+        {
+            int color_ev = CLUT[ev];
 
         if(source_bleed > 0) {
             base_y = BY[src_y];
@@ -1076,8 +1165,9 @@ static void cs_render_const(chronoglass_t *c,
             yy = 255;
 
         Y[i] = (uint8_t) yy;
-        U[i] = cs_blend_fast_u8(base_u, (uint8_t) ev_u, ev);
-        V[i] = cs_blend_fast_u8(base_v, (uint8_t) ev_v, ev);
+        U[i] = cs_blend_fast_u8(base_u, (uint8_t) ev_u, color_ev);
+        V[i] = cs_blend_fast_u8(base_v, (uint8_t) ev_v, color_ev);
+        }
     }
 }
 
@@ -1096,6 +1186,8 @@ static void cs_render_source(chronoglass_t *c,
 
     uint8_t *restrict BY = c->bleed_y_lut;
     uint8_t *restrict BUV = c->bleed_uv_lut;
+    uint8_t *restrict GLUT = c->silt_gain_lut;
+    uint8_t *restrict CLUT = c->color_energy_lut;
 
     int len = c->len;
     int i;
@@ -1106,8 +1198,8 @@ static void cs_render_source(chronoglass_t *c,
         uint8_t src_u = U[i];
         uint8_t src_v = V[i];
 
-        int mass = M[i];
-        int bed = B[i];
+        int mass = GLUT[M[i]];
+        int bed = GLUT[B[i]];
         int pol = P[i];
 
         int ev = mass + (bed >> 1);
@@ -1124,6 +1216,9 @@ static void cs_render_source(chronoglass_t *c,
 
         if(ev > 255)
             ev = 255;
+
+        {
+            int color_ev = CLUT[ev];
 
         if(source_bleed > 0) {
             base_y = BY[src_y];
@@ -1153,8 +1248,9 @@ static void cs_render_source(chronoglass_t *c,
             yy = 255;
 
         Y[i] = (uint8_t) yy;
-        U[i] = cs_blend_fast_u8(base_u, (uint8_t) ev_u, ev);
-        V[i] = cs_blend_fast_u8(base_v, (uint8_t) ev_v, ev);
+        U[i] = cs_blend_fast_u8(base_u, (uint8_t) ev_u, color_ev);
+        V[i] = cs_blend_fast_u8(base_v, (uint8_t) ev_v, color_ev);
+        }
     }
 }
 
@@ -1181,18 +1277,25 @@ void chronoglass_apply(void *ptr, VJFrame *frame, int *args)
     int source_bleed;
     int color_mode;
     int turbulence;
+    int beat_push;
+    int silt_gain;
+    int color_energy;
 
     if(!c->seeded)
         cs_seed(c, frame);
 
-    threshold    = cs_clampi(args[P_THRESHOLD], 0, 255);
-    flow         = cs_clampi(args[P_FLOW], 0, 255);
-    erosion      = cs_clampi(args[P_EROSION], 0, 255);
-    decay        = cs_clampi(args[P_DECAY], 0, 255);
-    sediment     = cs_clampi(args[P_SEDIMENT], 0, 255);
-    source_bleed = cs_clampi(args[P_SOURCE_BLEED], 0, 255);
+    beat_push = cs_clampi(args[P_BEAT_PUSH], 0, CS_UI_MAX);
+
+    threshold    = cs_push_sub_u8(cs_ui_to_u8(args[P_THRESHOLD]), beat_push, 34);
+    flow         = cs_push_add_u8(cs_ui_to_u8(args[P_FLOW]), beat_push, 54);
+    erosion      = cs_push_add_u8(cs_ui_to_u8(args[P_EROSION]), beat_push, 46);
+    decay        = cs_push_add_u8(cs_ui_to_u8(args[P_DECAY]), beat_push, 14);
+    sediment     = cs_push_add_u8(cs_ui_to_u8(args[P_SEDIMENT]), beat_push, 58);
+    source_bleed = cs_push_add_u8(cs_ui_to_u8(args[P_SOURCE_BLEED]), beat_push, 36);
     color_mode   = cs_clampi(args[P_COLOR_MODE], 0, 4);
-    turbulence   = cs_clampi(args[P_TURBULENCE], 0, 255);
+    turbulence   = cs_push_add_u8(cs_ui_to_u8(args[P_TURBULENCE]), beat_push, 74);
+    silt_gain    = cs_push_add_ui(cs_clampi(args[P_SILT_GAIN], 0, CS_UI_MAX), beat_push, 300);
+    color_energy = cs_push_add_ui(cs_clampi(args[P_COLOR_ENERGY], 0, CS_UI_MAX), beat_push, 180);
 
     cs_build_luts_if_needed(
         c,
@@ -1202,7 +1305,9 @@ void chronoglass_apply(void *ptr, VJFrame *frame, int *args)
         decay,
         sediment,
         source_bleed,
-        turbulence
+        turbulence,
+        silt_gain,
+        color_energy
     );
 
     cs_compute_silt(

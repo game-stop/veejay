@@ -18,8 +18,7 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <math.h>
+#include "fractalkaleido.h"
 
 #define TWO_PI 6.28318530718f
 #define ONE_PI2 1.57079632679f
@@ -38,7 +37,13 @@ typedef struct {
     float *sin_lut;
     float angle;
     int n_threads;
-    int last_args[9];
+    int last_args[10];
+    int smooth_args[10];
+    int smooth_init;
+    int map_ready;
+    float beat_env;
+    float beat_kick;
+    float beat_prev;
     uint8_t *buf[3];
 } fractalkaleido_t;
 
@@ -46,7 +51,7 @@ vj_effect *fractalkaleido_init(int w, int h)
 {
     vj_effect *ve = (vj_effect*) vj_calloc(sizeof(vj_effect));
 
-    ve->num_params = 10;
+    ve->num_params = 11;
 
     ve->defaults = (int*) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int*) vj_calloc(sizeof(int) * ve->num_params);
@@ -102,6 +107,11 @@ vj_effect *fractalkaleido_init(int w, int h)
     ve->limits[1][9] = 5;
     ve->defaults[9]  = 0;
 
+    // Beat Push
+    ve->limits[0][10] = 0;
+    ve->limits[1][10] = 1000;
+    ve->defaults[10]  = 0;
+
     ve->description = "Fractal Kaleido";
     ve->sub_format = 1;
     ve->extra_frame = 0;
@@ -119,7 +129,8 @@ vj_effect *fractalkaleido_init(int w, int h)
         "Spin Speed",
         "Twist Energy",
         "Chaos Field",
-        "Twist Mode"
+        "Twist Mode",
+        "Beat Push"
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
@@ -132,6 +143,22 @@ vj_effect *fractalkaleido_init(int w, int h)
         "Segment-Coupled Twist",
         "Vortex Collapse Twist",
         "Inversion Twist"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 3,                  20,                 6,  20, 2200, 5200, 1800, 25,    /* Segment Count */
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                                  0,                  360,                10, 38, 1000, 2600, 0,    58,    /* Global Rotation */
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                                                   60,                 620,                10, 36, 1000, 2800, 0,    56,    /* Zoom */
+        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -90,                 90,                 6,  24, 1800, 4200, 900,  24,    /* Center X */
+        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -90,                 90,                 6,  24, 1800, 4200, 900,  24,    /* Center Y */
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Mirror Mode */
+        VJ_BEAT_SIGNED_SPEED,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,    -90,                90,                 12, 46, 900,  2400, 0,    72,    /* Spin Speed */
+        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,    -220,               220,                10, 38, 1000, 2800, 0,    68,    /* Twist Energy */
+        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS,                                                   0,                  85,                 8,  30, 1000, 3000, 0,    54,    /* Chaos Field */
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Twist Mode */
+        VJ_BEAT_INTENSITY,          VJ_BEAT_F_CONTINUOUS,                                                   0,                  840,                18, 80, 100,  850,  0,    100    /* Beat Push */
     );
     return ve;
 }
@@ -257,6 +284,124 @@ static inline float chaos_spectral(float input)
     float mid  = sinf(c * 6.0f + low * 2.0f);
     float high = sinf(c * 18.0f + mid * 3.0f);
     return low  * 0.55f * mid  * 0.30f + high * 0.15f;
+}
+
+static inline int fk_clampi(int v, int lo, int hi)
+{
+    return (v < lo) ? lo : ((v > hi) ? hi : v);
+}
+
+static inline int fk_absi(int v)
+{
+    return (v < 0) ? -v : v;
+}
+
+static inline int fk_beat_shape_q1000(int beat_push)
+{
+    int bp = fk_clampi(beat_push, 0, 1000);
+    int sq = (bp * bp + 500) / 1000;
+    return fk_clampi(((sq * 560) + (bp * 440) + 500) / 1000, 0, 1000);
+}
+
+static inline int fk_smooth_i(int current, int target, int num, int den)
+{
+    int diff = target - current;
+    int step;
+
+    if (diff == 0)
+        return current;
+
+    step = (diff * num + ((diff > 0) ? (den >> 1) : -(den >> 1))) / den;
+
+    if (step == 0)
+        step = (diff > 0) ? 1 : -1;
+
+    return current + step;
+}
+
+static inline int fk_push_towards(int v, int target, int drive, int strength)
+{
+    int q = fk_clampi((drive * strength + 500) / 1000, 0, 1000);
+    return v + (((target - v) * q + ((target >= v) ? 500 : -500)) / 1000);
+}
+
+static inline int fk_push_signed_abs(int v, int target_abs, int drive, int strength)
+{
+    int sign = (v < 0) ? -1 : 1;
+    int av = fk_absi(v);
+    int q = fk_clampi((drive * strength + 500) / 1000, 0, 1000);
+    int out = av + (((target_abs - av) * q + ((target_abs >= av) ? 500 : -500)) / 1000);
+
+    if (out < 0)
+        out = 0;
+
+    if (v == 0)
+        sign = 1;
+
+    return sign * out;
+}
+
+static inline void fk_update_beat_state(fractalkaleido_t *s, int beat_push, int *env_out, int *kick_out)
+{
+    int shaped = fk_beat_shape_q1000(beat_push);
+    float target = (float) shaped;
+    float diff = target - s->beat_prev;
+    float kick_target;
+
+    if (target > s->beat_env)
+        s->beat_env += (target - s->beat_env) * 0.34f;
+    else
+        s->beat_env += (target - s->beat_env) * 0.12f;
+
+    kick_target = (diff > 0.0f) ? (diff * 0.42f + target * 0.08f) : 0.0f;
+
+    if (kick_target > s->beat_kick)
+        s->beat_kick += (kick_target - s->beat_kick) * 0.46f;
+    else
+        s->beat_kick *= 0.68f;
+
+    s->beat_prev += (target - s->beat_prev) * 0.30f;
+
+    if (s->beat_env < 0.5f)
+        s->beat_env = 0.0f;
+
+    if (s->beat_kick < 0.5f)
+        s->beat_kick = 0.0f;
+
+    *env_out = fk_clampi((int)(s->beat_env + 0.5f), 0, 1000);
+    *kick_out = fk_clampi((int)(s->beat_kick + 0.5f), 0, 1000);
+}
+
+static inline int fk_wrap_index(float tx, float ty, float inv_w, float inv_h, int w, int h)
+{
+    float u_wrap = tx * inv_w;
+    float v_wrap = ty * inv_h;
+
+    int tilex = (int)u_wrap;
+    int tiley = (int)v_wrap;
+
+    float fx = u_wrap - tilex;
+    float fy = v_wrap - tiley;
+
+    int negx = (u_wrap < 0.0f) & (fx != 0.0f);
+    int negy = (v_wrap < 0.0f) & (fy != 0.0f);
+
+    int sx;
+    int sy;
+
+    tilex -= negx;
+    tiley -= negy;
+
+    fx += (float)negx;
+    fy += (float)negy;
+
+    sx = (int)(fx * (float)(w - 1) + 0.5f);
+    sy = (int)(fy * (float)(h - 1) + 0.5f);
+
+    sx = ((unsigned)sx < (unsigned)w) ? sx : 0;
+    sy = ((unsigned)sy < (unsigned)h) ? sy : 0;
+
+    return sy * w + sx;
 }
 
 static void fractalkaleido_apply1_twistinversion(void *ptr, VJFrame *frame, int *args, float base_angle)
@@ -878,6 +1023,77 @@ static void fractalkaleido_apply1_wave(void *ptr, VJFrame *frame, int *args, flo
     }
 }
 
+static inline int fk_radialclassic_sample_idx(
+    const float r,
+    float theta,
+    const float falloff,
+    const float twist_amt,
+    const float rotation_dir,
+    const float chaos_amt,
+    const float base_angle,
+    const float scale,
+    const float offxw,
+    const float offyh,
+    const float inv_w,
+    const float inv_h,
+    const float inv_seg,
+    const float seg_angle,
+    const float mirror,
+    const float *restrict cos_lut,
+    const float *restrict sin_lut,
+    const int w,
+    const int h)
+{
+    theta += falloff * twist_amt * TWO_PI * 4.0f * rotation_dir;
+
+    {
+        const float chaos_phase = r * 0.035f + theta * 2.5f;
+        const float c_f = chaos_phase * LUT_DIVISOR;
+        const int c_i = (int)c_f;
+        const float c_frac = c_f - (float)c_i;
+        const int c0 = c_i & LUT_MASK;
+        const int c1 = (c_i + 1) & LUT_MASK;
+        const float chaos_wave = sin_lut[c0] + (sin_lut[c1] - sin_lut[c0]) * c_frac;
+        const float chaos = chaos_amt * (0.4f + 0.6f * falloff) * chaos_wave;
+        const float a = theta + chaos + base_angle * rotation_dir;
+        const float f = a * inv_seg;
+        const int seg_i = (int)f;
+        const float u = f - (float)seg_i;
+        const float u2 = u + u - 1.0f;
+        float tri = 1.0f - u2 * u2;
+        float seg;
+        float lut_f;
+        int lut_i;
+        float frac;
+        int i0;
+        int i1;
+        float t;
+        float cosv;
+        float sinv;
+        float nx;
+        float ny;
+
+        tri = tri * tri * (3.0f - 2.0f * tri);
+        seg = tri * seg_angle;
+        seg = seg * (1.0f - mirror) + (seg_angle - seg) * mirror;
+
+        lut_f = seg * LUT_DIVISOR;
+        lut_i = (int)lut_f;
+        frac = lut_f - (float)lut_i;
+        i0 = lut_i & LUT_MASK;
+        i1 = (lut_i + 1) & LUT_MASK;
+
+        t = frac * frac * (3.0f - 2.0f * frac);
+        cosv = cos_lut[i0] + (cos_lut[i1] - cos_lut[i0]) * t;
+        sinv = sin_lut[i0] + (sin_lut[i1] - sin_lut[i0]) * t;
+
+        nx = r * cosv * scale + offxw;
+        ny = r * sinv * scale + offyh;
+
+        return fk_wrap_index(nx, ny, inv_w, inv_h, w, h);
+    }
+}
+
 static void fractalkaleido_apply1_radialclassic(void *ptr, VJFrame *frame, int *args, float base_angle)
 {
     fractalkaleido_t *s = (fractalkaleido_t*) ptr;
@@ -908,102 +1124,70 @@ static void fractalkaleido_apply1_radialclassic(void *ptr, VJFrame *frame, int *
     const float *sin_lut = s->sin_lut;
 
     int *map = s->map;
+
 #pragma omp parallel for num_threads(s->n_threads) schedule(static)
     for(int y = 0; y <= hh; y++)
     {
         const int row = y * w;
-
         const float *atan_row = s->atan_lut + row;
         const float *sqrt_row = s->sqrt_lut + row;
 
         for(int x = 0; x <= hw; x++)
         {
-            float theta = atan_row[x];
-            float r = sqrt_row[x];
-            float rn = r * inv_radius_norm;
-
+            const float r = sqrt_row[x];
+            float theta_tl = atan_row[x];
+            const float rn = r * inv_radius_norm;
             float falloff = rn / (1.0f + rn);
+            float theta_local = theta_tl - ONE_PI2 - ONE_PI2;
+            float theta_tr;
+            float theta_br;
+            float theta_bl;
+            int idx_tl;
+            int idx_tr;
+            int idx_br;
+            int idx_bl;
+
             falloff = falloff * falloff * (3.0f - 2.0f * falloff);
 
-            theta += falloff * twist_amt * TWO_PI * 4.0f * rotation_dir;
+            while (theta_local < 0.0f)
+                theta_local += TWO_PI;
+            while (theta_local >= TWO_PI)
+                theta_local -= TWO_PI;
 
-            float chaos_phase = r * 0.035f + theta * 2.5f;
-            float c_f = chaos_phase * LUT_DIVISOR;
-            int c_i = (int)c_f;
-            float c_frac = c_f - c_i;
+            if (theta_local > ONE_PI2)
+                theta_local = TWO_PI - theta_local;
+            if (theta_local > ONE_PI2)
+                theta_local = ONE_PI2;
 
-            int c0 = c_i & LUT_MASK;
-            int c1 = (c_i + 1) & LUT_MASK;
+            theta_tl = ONE_PI2 + ONE_PI2 + theta_local;
+            theta_tr = TWO_PI - theta_local;
+            theta_br = TWO_PI + theta_local;
+            theta_bl = ONE_PI2 + ONE_PI2 - theta_local;
 
-            float chaos_wave = sin_lut[c0] + (sin_lut[c1] - sin_lut[c0]) * c_frac;
-            float chaos = chaos_amt * (0.4f + 0.6f * falloff) * chaos_wave;
+            idx_tl = fk_radialclassic_sample_idx(
+                r, theta_tl, falloff, twist_amt, rotation_dir, chaos_amt,
+                base_angle, scale, offxw, offyh, inv_w, inv_h,
+                inv_seg, seg_angle, mirror, cos_lut, sin_lut, w, h);
 
-            ////chaos:
-            //float a = wrap_angle( theta + chaos + base_angle * rotation_dir);
+            idx_tr = fk_radialclassic_sample_idx(
+                r, theta_tr, falloff, twist_amt, rotation_dir, chaos_amt,
+                base_angle, scale, offxw, offyh, inv_w, inv_h,
+                inv_seg, seg_angle, mirror, cos_lut, sin_lut, w, h);
 
-            //float a = wrap_angle((theta + chaos) * rotation_dir + base_angle);
-            float local = theta + chaos;
-            //float a = wrap_angle(local + base_angle * rotation_dir);
-            float a = local + base_angle * rotation_dir;
-            float f = a * inv_seg;
-            int seg_i = (int)f;
-            float u = f - seg_i;
-            float u2 = u + u - 1.0f;
-            float tri = 1.0f - u2 * u2;
-                  tri = tri * tri * (3.0f - 2.0f * tri);
+            idx_br = fk_radialclassic_sample_idx(
+                r, theta_br, falloff, twist_amt, rotation_dir, chaos_amt,
+                base_angle, scale, offxw, offyh, inv_w, inv_h,
+                inv_seg, seg_angle, mirror, cos_lut, sin_lut, w, h);
 
-            float seg = tri * seg_angle;
-                  seg = seg * (1.0f - mirror) + (seg_angle - seg) * mirror;
+            idx_bl = fk_radialclassic_sample_idx(
+                r, theta_bl, falloff, twist_amt, rotation_dir, chaos_amt,
+                base_angle, scale, offxw, offyh, inv_w, inv_h,
+                inv_seg, seg_angle, mirror, cos_lut, sin_lut, w, h);
 
-            float lut_f = seg * LUT_DIVISOR;
-
-
-            int lut_i = (int)lut_f;
-            float frac = lut_f - lut_i;
-            
-            int i0 = lut_i & LUT_MASK;
-            int i1 = (lut_i + 1) & LUT_MASK;
-
-            float t = frac * frac * (3.0f - 2.0f * frac);
-            float cosv = cos_lut[i0] + (cos_lut[i1] - cos_lut[i0]) * t;
-            float sinv = sin_lut[i0] + (sin_lut[i1] - sin_lut[i0]) * t;
-
-            float nx = r * cosv * scale + offxw;
-            float ny = r * sinv * scale + offyh;
-
-            float tx = nx * inv_w;
-            float ty = ny * inv_h;
-
-            int tilex = (int)tx;
-            int tiley = (int)ty;
-
-            float fx = tx - tilex;
-            float fy = ty - tiley;
-
-            float nxm = (tx < 0.0f && fx != 0.0f) ? 1.0f : 0.0f;
-            float nym = (ty < 0.0f && fy != 0.0f) ? 1.0f : 0.0f;
-
-            tilex -= (int)nxm;
-            tiley -= (int)nym;
-
-            fx += nxm;
-            fy += nym;
-
-            int sx = (int)(fx * (float)(w - 1) + 0.5f);
-            int sy = (int)(fy * (float)(h - 1) + 0.5f);
-
-            int maskx = (unsigned)sx < (unsigned)w;
-            int masky = (unsigned)sy < (unsigned)h;
-
-            sx = maskx * sx;
-            sy = masky * sy;
-
-            int idx = sy * w + sx;
-
-            map[y * w + x] = idx;
-            map[y * w + (w - 1 - x)] = idx;
-            map[(h - 1 - y) * w + x] = idx;
-            map[(h - 1 - y) * w + (w - 1 - x)] = idx;
+            map[y * w + x] = idx_tl;
+            map[y * w + (w - 1 - x)] = idx_tr;
+            map[(h - 1 - y) * w + (w - 1 - x)] = idx_br;
+            map[(h - 1 - y) * w + x] = idx_bl;
         }
     }
 }
@@ -1022,29 +1206,100 @@ void fractalkaleido_apply(void *ptr, VJFrame *frame, int *args) {
     const int w = frame->out_width;
     const int h = frame->out_height;
     const int len = w * h;
-    const int mode = args[9];
 
-    int needs_update = (args[6] != 0); 
-    for(int i = 0; i < 9; i++) {
-        if(s->last_args[i] != args[i]) { 
-            needs_update = 1; 
-            s->last_args[i] = args[i];
+    int eff[11];
+    int map_args[10];
+    int beat_env;
+    int beat_kick;
+    int beat_drive;
+    int needs_update;
+    int changed;
+
+    eff[0]  = fk_clampi(args[0], 2, 48);
+    eff[1]  = fk_clampi(args[1], 0, 360);
+    eff[2]  = fk_clampi(args[2], 1, 1000);
+    eff[3]  = fk_clampi(args[3], -200, 200);
+    eff[4]  = fk_clampi(args[4], -200, 200);
+    eff[5]  = args[5] ? 1 : 0;
+    eff[6]  = fk_clampi(args[6], -100, 100);
+    eff[7]  = fk_clampi(args[7], -300, 300);
+    eff[8]  = fk_clampi(args[8], 0, 100);
+    eff[9]  = fk_clampi(args[9], 0, 5);
+    eff[10] = fk_clampi(args[10], 0, 1000);
+
+    fk_update_beat_state(s, eff[10], &beat_env, &beat_kick);
+
+    beat_drive = fk_clampi(beat_env + (beat_kick >> 1), 0, 1000);
+
+    if (beat_drive > 0) {
+        int sign = (eff[7] < 0) ? -1 : 1;
+
+        eff[1] = fk_clampi(eff[1] + ((beat_env * 10 + beat_kick * 16 + 500) / 1000), 0, 360);
+        eff[2] = fk_clampi(fk_push_towards(eff[2], 360, beat_drive, 280), 1, 1000);
+        eff[6] = fk_clampi(fk_push_signed_abs(eff[6], 82, beat_drive, 330), -100, 100);
+
+        if (eff[7] == 0)
+            sign = 1;
+
+        eff[7] = fk_clampi(sign * fk_absi(fk_push_signed_abs(eff[7], 205, beat_drive, 430)), -300, 300);
+        eff[8] = fk_clampi(fk_push_towards(eff[8], 78, beat_drive, 390), 0, 100);
+    }
+
+    if (!s->smooth_init) {
+        for (int i = 0; i < 10; i++)
+            s->smooth_args[i] = eff[i];
+
+        s->smooth_init = 1;
+    } else {
+        s->smooth_args[0] = eff[0];
+        s->smooth_args[1] = fk_smooth_i(s->smooth_args[1], eff[1], 4, 10);
+        s->smooth_args[2] = fk_smooth_i(s->smooth_args[2], eff[2], 3, 10);
+        s->smooth_args[3] = fk_smooth_i(s->smooth_args[3], eff[3], 2, 10);
+        s->smooth_args[4] = fk_smooth_i(s->smooth_args[4], eff[4], 2, 10);
+        s->smooth_args[5] = eff[5];
+        s->smooth_args[6] = fk_smooth_i(s->smooth_args[6], eff[6], 3, 10);
+        s->smooth_args[7] = fk_smooth_i(s->smooth_args[7], eff[7], 3, 10);
+        s->smooth_args[8] = fk_smooth_i(s->smooth_args[8], eff[8], 3, 10);
+        s->smooth_args[9] = eff[9];
+    }
+
+    for (int i = 0; i < 10; i++)
+        map_args[i] = s->smooth_args[i];
+
+    changed = 0;
+    for (int i = 0; i < 10; i++) {
+        if (s->last_args[i] != map_args[i]) {
+            changed = 1;
+            break;
         }
     }
 
+    needs_update = (!s->map_ready) || changed || (map_args[6] != 0);
+
     if(needs_update) {
-        float rot_speed = args[6] * 0.0002f;
+        const int mode = map_args[9];
+        float rot_speed = map_args[6] * 0.0002f;
+        float base_angle;
+
         s->angle = wrap_angle(s->angle + rot_speed);
-        float base_angle = wrap_angle(s->angle + (args[1] / 360.0f) * TWO_PI);
-        
+        base_angle = wrap_angle(s->angle + (map_args[1] / 360.0f) * TWO_PI);
+
         switch(mode) {
-            case 4: fractalkaleido_apply1(s, frame, args, base_angle); break;
-            case 3: fractalkaleido_apply1_twistinversion(s, frame, args, base_angle); break;
-            case 2: fractalkaleido_apply1_segcouple(s, frame, args, base_angle); break;
-            case 1: fractalkaleido_apply1_wave(s, frame, args, base_angle); break;
-            case 5: fractalkaleido_apply1_vortex(s, frame, args, base_angle); break;
-            case 0: fractalkaleido_apply1_radialclassic(s, frame, args, base_angle); break;
+            case 4: fractalkaleido_apply1(s, frame, map_args, base_angle); break;
+            case 3: fractalkaleido_apply1_twistinversion(s, frame, map_args, base_angle); break;
+            case 2: fractalkaleido_apply1_segcouple(s, frame, map_args, base_angle); break;
+            case 1: fractalkaleido_apply1_wave(s, frame, map_args, base_angle); break;
+            case 5: fractalkaleido_apply1_vortex(s, frame, map_args, base_angle); break;
+            case 0:
+            default:
+                fractalkaleido_apply1_radialclassic(s, frame, map_args, base_angle);
+                break;
         }
+
+        for (int i = 0; i < 10; i++)
+            s->last_args[i] = map_args[i];
+
+        s->map_ready = 1;
     }
 
     #pragma omp parallel for num_threads(s->n_threads) schedule(static)
@@ -1054,7 +1309,7 @@ void fractalkaleido_apply(void *ptr, VJFrame *frame, int *args) {
         outU[i] = srcU[idx];
         outV[i] = srcV[idx];
     }
-   
+
     veejay_memcpy(frame->data[0], outY, frame->len);
     veejay_memcpy(frame->data[1], outU, frame->uv_len);
     veejay_memcpy(frame->data[2], outV, frame->uv_len);

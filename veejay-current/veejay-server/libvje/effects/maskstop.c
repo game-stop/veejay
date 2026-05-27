@@ -22,7 +22,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "maskstop.h"
 
 typedef struct {
@@ -61,7 +60,14 @@ vj_effect *maskstop_init(int width , int height)
     ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
+	ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
 
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Negate Mask */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Swap Mask/Frame */
+		VJ_BEAT_SPEED,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 6,                  170,                6, 22, 1800, 4200, 900, 30,    /* Hold Frame Frequency */
+		VJ_BEAT_SPEED,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 4,                  130,                6, 22, 1800, 4200, 900, 25     /* Hold Mask Frequency */
+	);
     return ve;
 }
 

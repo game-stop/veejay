@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "crosspixel.h"
 
 typedef struct {
@@ -49,7 +48,12 @@ vj_effect *crosspixel_init(int w, int h)
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 	
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,"Black", "White" );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Mode */
+        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                 1,                  24,                 6,  22,  1800, 4200, 900,  30     /* Size */
+    );
     return ve;
 }
 

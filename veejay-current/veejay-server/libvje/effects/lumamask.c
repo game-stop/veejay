@@ -30,7 +30,6 @@
 */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "lumamask.h"
 #include "motionmap.h"
 
@@ -65,6 +64,14 @@ vj_effect *lumamask_init(int width, int height)
     ve->extra_frame = 1;
   	ve->has_user = 0; 
 	ve->param_description = vje_build_param_list(ve->num_params, "X displacement", "Y displacement", "Mode", "Update Alpha" );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SIGNED_CURVE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -(width / 3),  width / 3,  12, 46, 900, 2400, 0, 75,    /* X displacement */
+        VJ_BEAT_SIGNED_CURVE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -(height / 3), height / 3, 12, 46, 900, 2400, 0, 70,    /* Y displacement */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000, /* Mode */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000  /* Update Alpha */
+    );
     return ve;
 }
 

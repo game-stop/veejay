@@ -19,9 +19,7 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "colormap.h"
-#include <omp.h>
 
 vj_effect *colormap_init(int w, int h)
 {
@@ -47,6 +45,13 @@ vj_effect *colormap_init(int w, int h)
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Red","Green","Blue" );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,  24, 140, 8, 30, 1200, 3000, 0, 45, /* Red */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,  48, 170, 8, 30, 1200, 3000, 0, 40, /* Green */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,  32, 160, 8, 30, 1200, 3000, 0, 45  /* Blue */
+    );
     return ve;
 }
 

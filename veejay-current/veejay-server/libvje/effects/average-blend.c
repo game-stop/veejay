@@ -19,7 +19,6 @@
  */
 #pragma GCC optimize ("unroll-loops","tree-vectorize")
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "average-blend.h"
 
 typedef struct {

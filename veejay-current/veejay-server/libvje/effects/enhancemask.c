@@ -18,14 +18,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "enhancemask.h"
-#include <stdlib.h>
-#include "common.h"
-#include <veejaycore/vjmem.h>
-#include "enhancemask.h"
-#include <stdlib.h>
-#include <string.h>
 
 typedef struct {
     int n_threads;
@@ -52,6 +45,13 @@ vj_effect *enhancemask_init(int width, int height)
     ve->description = "Sharpen";
     ve->param_description = vje_build_param_list(
         ve->num_params, "Strength", "Grain Threshold", "Halo Clamp"
+    );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS,   64,  900, 12, 46, 900,  2400, 0,   70, /* Strength */
+        VJ_BEAT_DETAIL, VJ_BEAT_F_PHRASE_ONLY,  2,   28,  6,  22, 1600, 3400, 700, 35, /* Grain Threshold */
+        VJ_BEAT_GLOW,   VJ_BEAT_F_CONTINUOUS,   12,  96,  10, 38, 1000, 2600, 0,   55  /* Halo Clamp */
     );
 
     return ve;

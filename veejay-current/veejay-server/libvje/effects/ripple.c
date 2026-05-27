@@ -18,209 +18,264 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-
-/* This effect recalculates a pretty large table if 'waves' or 'amplitude'
-   is changed. Results will be placed in ripple_table, a copy of the 
-   frame is kept in ripple_data. So is the calculation of the first frame slow,
-   the following frames will use the cached coordinates until the user changes
-   the number of waves or the amplitude. 
-
-
-*/
+/* This effect recalculates the coordinate map when waves, amplitude,
+ * or attenuation changes. Frame data is copied to a scratch buffer,
+ * then sampled through the cached ripple map.
+ */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "ripple.h"
 
 #define RIPPLE_DEGREES 360
-#define RIPPLE_VAL 180.0
+#define RIPPLE_PI 3.14159265358979323846
 
 typedef struct {
-    double *ripple_table;
-    uint8_t *ripple_data[4];
-    double *ripple_sin;
-    double *ripple_cos;
+    int *ripple_table;
+    uint8_t *ripple_data[3];
+    float *ripple_sin;
+    float *ripple_cos;
     int ripple_waves;
     int ripple_ampli;
     int ripple_attn;
+    int n_threads;
 } ripple_t;
 
 vj_effect *ripple_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 3600;
+    ve->defaults[0] = 132;
+
     ve->limits[0][1] = 1;
     ve->limits[1][1] = 80;
+    ve->defaults[1] = 47;
+
     ve->limits[0][2] = 1;
     ve->limits[1][2] = 360;
-    ve->defaults[0] = 132;
-    ve->defaults[1] = 47;
     ve->defaults[2] = 7;
+
     ve->description = "Ripple";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Waves", "Amplitude", "Attenuation");
+    ve->has_user = 0;
+
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Waves",
+        "Amplitude",
+        "Attenuation"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_WARP,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE, 40,  760, 6, 22, 1800, 4200, 900, 30, /* Waves */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE, 8,   64,  6, 22, 1800, 4200, 900, 30, /* Amplitude */
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE, 4,   80,  6, 22, 1600, 3400, 700, 30  /* Attenuation */
+    );
+
+    (void) width;
+    (void) height;
+
     return ve;
 }
 
 void *ripple_malloc(int width, int height)
 {
-    int i;
     ripple_t *r = (ripple_t*) vj_calloc(sizeof(ripple_t));
-    if(!r) {
+    if(!r)
         return NULL;
-    }
 
-    
-    r->ripple_table = (double*) vj_malloc(sizeof(double) * ((width * height) + width) );
+    const int len = width * height;
+
+    r->ripple_table = (int*) vj_malloc(sizeof(int) * len);
     if(!r->ripple_table) {
         free(r);
         return NULL;
     }
 
-    r->ripple_data[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * 3 * ( (width * height) + width) );
+    r->ripple_data[0] = (uint8_t*) vj_malloc((size_t)len * 3u);
     if(!r->ripple_data[0]) {
         free(r->ripple_table);
         free(r);
         return NULL;
     }
 
-    r->ripple_data[1] = r->ripple_data[0] +((width*height) + width);
-    r->ripple_data[2] = r->ripple_data[1] +((width*height) + width);
+    r->ripple_data[1] = r->ripple_data[0] + len;
+    r->ripple_data[2] = r->ripple_data[1] + len;
 
-	veejay_memset( r->ripple_data[1], 128, (width * height) + width );
-	veejay_memset( r->ripple_data[2], 128, (width * height) + width );
-    veejay_memset( r->ripple_data[0], pixel_Y_lo_, (width*height) + width);
-
-    r->ripple_sin = (double*) vj_malloc(sizeof(double) * RIPPLE_DEGREES);
+    r->ripple_sin = (float*) vj_malloc(sizeof(float) * RIPPLE_DEGREES);
     if(!r->ripple_sin) {
-        free(r->ripple_table);
         free(r->ripple_data[0]);
+        free(r->ripple_table);
         free(r);
         return NULL;
     }
-    r->ripple_cos = (double*) vj_malloc(sizeof(double) * RIPPLE_DEGREES);
+
+    r->ripple_cos = (float*) vj_malloc(sizeof(float) * RIPPLE_DEGREES);
     if(!r->ripple_cos) {
-        free(r->ripple_table);
-        free(r->ripple_data[0]);
         free(r->ripple_sin);
+        free(r->ripple_data[0]);
+        free(r->ripple_table);
         free(r);
         return NULL;
     }
-    
-    for(i=0; i < RIPPLE_DEGREES; i++) {
- 		fast_sin(r->ripple_sin[i], (M_PI * i) / RIPPLE_VAL);
-		fast_sin(r->ripple_cos[i], (M_PI * i) / RIPPLE_VAL);
+
+    for(int i = 0; i < RIPPLE_DEGREES; i++) {
+        const float rad = (float)((2.0 * RIPPLE_PI * (double)i) / (double)RIPPLE_DEGREES);
+        r->ripple_sin[i] = sinf(rad);
+        r->ripple_cos[i] = cosf(rad);
     }
+
+    for(int i = 0; i < len; i++)
+        r->ripple_table[i] = i;
+
+    veejay_memset(r->ripple_data[0], pixel_Y_lo_, len);
+    veejay_memset(r->ripple_data[1], 128, len);
+    veejay_memset(r->ripple_data[2], 128, len);
+
+    r->ripple_waves = -1;
+    r->ripple_ampli = -1;
+    r->ripple_attn = -1;
+
+    r->n_threads = vje_advise_num_threads(len);
+    if(r->n_threads < 1)
+        r->n_threads = 1;
 
     return (void*) r;
-
 }
 
-void ripple_free(void *ptr) {
-	
+void ripple_free(void *ptr)
+{
     ripple_t *r = (ripple_t*) ptr;
+    if(!r)
+        return;
 
-    free(r->ripple_table);
-    free(r->ripple_sin);
-    free(r->ripple_cos);
-    free(r->ripple_data[0]);
+    if(r->ripple_table)
+        free(r->ripple_table);
+    if(r->ripple_sin)
+        free(r->ripple_sin);
+    if(r->ripple_cos)
+        free(r->ripple_cos);
+    if(r->ripple_data[0])
+        free(r->ripple_data[0]);
+
     free(r);
 }
 
+static inline int ripple_clampi(int v, int lo, int hi)
+{
+    return (v < lo) ? lo : (v > hi ? hi : v);
+}
 
-void ripple_apply(void *ptr, VJFrame *frame, int *args ) {
+static void ripple_build_table(ripple_t *r, int width, int height, int waves_arg, int amplitude_arg, int attenuation_arg)
+{
+    const float cx = ((float)width - 1.0f) * 0.5f;
+    const float cy = ((float)height - 1.0f) * 0.5f;
+    const float maxradius = sqrtf(cx * cx + cy * cy);
 
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-	const int len = frame->len;
-	double wp2 = width * 0.5;
-	double hp2 = height * 0.5;
-	int x,y,dx,dy,a=0,sx=0,sy=0,angle=0;
-	double r,z;
-	double maxradius,frequency,amplitude;
-    
-    int _w = args[0];
-    int _a = args[1];
-    int _att = args[2];
+    const float waves = (float)waves_arg * 0.1f;
+    const float ampli = (float)amplitude_arg * 0.1f;
+    const float attenuation = (float)attenuation_arg * 0.1f;
 
-	double waves = (_w/10.0);
-	double ampli = (double) (_a/10.0);
-	double attenuation = (_att/10.0);
-	
-  	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
+    const float frequency = (maxradius > 0.0f) ? ((float)RIPPLE_DEGREES * waves / maxradius) : 0.0f;
+    const float amplitude = (ampli > 0.0001f) ? (maxradius / ampli) : 0.0f;
 
-    ripple_t *ripple = (ripple_t*) ptr;
+    int *restrict table = r->ripple_table;
+    float *restrict sin_lut = r->ripple_sin;
+    float *restrict cos_lut = r->ripple_cos;
 
-	fast_sqrt(maxradius, wp2 * wp2 + hp2 * hp2);
-	
-	frequency = 360.0 * waves / maxradius;
-	amplitude = maxradius / ampli;
+#pragma omp parallel for schedule(static) num_threads(r->n_threads)
+    for(int y = 0; y < height; y++) {
+        for(int x = 0; x < width; x++) {
+            const int idx = y * width + x;
 
-	int have_calc_data=0;
+            const float dx = (float)x - cx;
+            const float dy = (float)y - cy;
+            const float dist2 = dx * dx + dy * dy;
 
-	if(ripple->ripple_waves != _w || ripple->ripple_ampli != _a || ripple->ripple_attn != _att) {
-		ripple->ripple_waves = _w;
-		ripple->ripple_ampli = _a;
-		ripple->ripple_attn = _att;	
-		have_calc_data=1;
-	}
-	
-	int strides[4] = { len, len, len,0 };
-	vj_frame_copy( frame->data, ripple->ripple_data , strides );
+            if(dist2 <= 0.000001f) {
+                table[idx] = idx;
+                continue;
+            }
 
-    double *ripple_table = ripple->ripple_table;
-    uint8_t **ripple_data = ripple->ripple_data;
-    double *ripple_sin = ripple->ripple_sin;
-    double *ripple_cos = ripple->ripple_cos;
+            const float radius = sqrtf(dist2);
+            int angle = (int)((atan2f(dy, dx) * 180.0f) / (float)RIPPLE_PI);
 
-	if (have_calc_data) {
-  	   for(y=0; y < height-1;y++) {
-		for (x=0; x < width; x++) {
-		  dx = x - wp2;
-		  dy = y - hp2;
-		  
-		  angle = 180.0 * (atan2(dx,dy)/M_PI);
+            if(angle < 0)
+                angle += RIPPLE_DEGREES;
 
-		  if (angle < 0) angle+=360.0;
+            angle %= RIPPLE_DEGREES;
 
-		  fast_sqrt( r, dx * dx + dy * dy);
-	
-		  z = amplitude/ pow(r,attenuation) * ripple_sin[ ((int)(frequency * r)) % 360 ];
+            const int wave_index = ((int)(frequency * radius)) % RIPPLE_DEGREES;
+            const float denom = powf(radius, attenuation);
+            const float z = (denom > 0.000001f) ? ((amplitude / denom) * sin_lut[wave_index]) : 0.0f;
 
-		  a = ((int) (angle)) % 360;
-		  sx = (int) (x+z * ripple_cos[a]);
-		  sy = (int) (y+z * ripple_sin[a]);
+            int sx = (int)((float)x + z * cos_lut[angle]);
+            int sy = (int)((float)y + z * sin_lut[angle]);
 
-		  if(sy > (height-1)) sy = height-1;
-		  if(sx > width) sx = width;
-		  if(sx < 0) sx =0;
-		  if(sy < 0) sy =0;
-	 		
-		  ripple_table[(y*width)+x] = (sx + (sy * width));
+            sx = ripple_clampi(sx, 0, width - 1);
+            sy = ripple_clampi(sy, 0, height - 1);
 
-		  Y[((y * width) +x)] = ripple_data[0][(sx +( sy * width)) ];		
-		  Cb[((y * width) +x)] = ripple_data[1][(sx +( sy * width)) ];
-		  Cr[((y * width) +x)] = ripple_data[2][(sx +( sy * width)) ];
-		}
-	    }
-	}
-	else {
-	   for(y=0; y < height-1;y++) {
-		for (x=0; x < width; x++) {
-		  sx = (int) ripple_table[(y*width)+x];	
-		  Y[(y * width) +x] = ripple_data[0][sx];
-		  Cb[(y * width) +x] = ripple_data[1][sx];
-		  Cr[(y * width) +x] = ripple_data[2][sx];
-		}
-  	   }
-	}
+            table[idx] = sy * width + sx;
+        }
+    }
+
+    r->ripple_waves = waves_arg;
+    r->ripple_ampli = amplitude_arg;
+    r->ripple_attn = attenuation_arg;
+}
+
+void ripple_apply(void *ptr, VJFrame *frame, int *args)
+{
+    ripple_t *r = (ripple_t*) ptr;
+    if(!r || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
+        return;
+
+    const int width = frame->width;
+    const int height = frame->height;
+    const int len = frame->len;
+
+    if(width <= 0 || height <= 0 || len <= 0)
+        return;
+
+    int waves_arg = ripple_clampi(args[0], 1, 3600);
+    int amplitude_arg = ripple_clampi(args[1], 1, 80);
+    int attenuation_arg = ripple_clampi(args[2], 1, 360);
+
+    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+
+    veejay_memcpy(r->ripple_data[0], Y, len);
+    veejay_memcpy(r->ripple_data[1], Cb, len);
+    veejay_memcpy(r->ripple_data[2], Cr, len);
+
+    if(r->ripple_waves != waves_arg ||
+       r->ripple_ampli != amplitude_arg ||
+       r->ripple_attn != attenuation_arg)
+    {
+        ripple_build_table(r, width, height, waves_arg, amplitude_arg, attenuation_arg);
+    }
+
+    int *restrict table = r->ripple_table;
+    uint8_t *restrict srcY  = r->ripple_data[0];
+    uint8_t *restrict srcCb = r->ripple_data[1];
+    uint8_t *restrict srcCr = r->ripple_data[2];
+
+#pragma omp parallel for schedule(static) num_threads(r->n_threads)
+    for(int i = 0; i < len; i++) {
+        const int src = table[i];
+
+        Y[i]  = srcY[src];
+        Cb[i] = srcCb[src];
+        Cr[i] = srcCr[src];
+    }
 }

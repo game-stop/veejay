@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
 #include "gaussblur.h"
@@ -57,7 +56,13 @@ vj_effect *gaussblur_init(int w,int h)
 	ve->parallel = 0;
 
 	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_SRC_A;
+	ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
 
+		VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,  8,                  220,                6, 22, 2200, 5200, 1800, 30,    /* Radius */
+		VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, -60,                 80,                 6, 22, 1800, 4200, 900,  30,    /* Strength */
+		VJ_BEAT_DETAIL,        VJ_BEAT_F_REJECT | VJ_BEAT_F_REBUILDS_STATE,                          VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,    -1000  /* Quality */
+	);
 	return ve;
 }
 

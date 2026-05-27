@@ -19,7 +19,6 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "emboss.h"
 
 vj_effect *emboss_init(int w, int h)
@@ -44,6 +43,11 @@ vj_effect *emboss_init(int w, int h)
 	                          "Aggressive Emboss", "Dark Emboss",
 	                          "Grayish Emboss", "Edged", "Emboss Expi",
 	                          "Another Expi");
+	ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
+
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000 /* Mode */
+	);						  
 	return ve;
 }
 

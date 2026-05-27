@@ -19,10 +19,7 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <math.h>
+#include "strataflight.h"
 
 #define STRATAFLIGHT_PARAMS 13
 #define SF_ZLUT_MAX 225
@@ -165,6 +162,9 @@ static inline int sf_sample_u8_feather(
     int yy;
     int v;
 
+    if (feather <= 0)
+        return buf[sf_wrap_i_fast(y, h) * w + sf_wrap_i_fast(x, w)];
+
     if (x >= feather && x < w - feather &&
         y >= feather && y < h - feather) {
         return buf[y * w + x];
@@ -175,47 +175,55 @@ static inline int sf_sample_u8_feather(
 
     v = buf[yy * w + xx];
 
-    if (feather > 0) {
-        if (xx < feather) {
-            int ox = xx + w - feather;
-            int ov = buf[yy * w + sf_wrap_i_fast(ox, w)];
-            int a = ((feather - xx) * 256) / feather;
+    if (xx < feather) {
+        int ox = xx + w - feather;
+        int ov = buf[yy * w + sf_wrap_i_fast(ox, w)];
+        int a = ((feather - xx) * 256) / feather;
 
-            v = ((v * (256 - a)) + (ov * a)) >> 8;
-        } else if (xx >= w - feather) {
-            int ox = xx - w + feather;
-            int ov = buf[yy * w + sf_wrap_i_fast(ox, w)];
-            int a = ((xx - (w - feather)) * 256) / feather;
+        v = ((v * (256 - a)) + (ov * a)) >> 8;
+    } else if (xx >= w - feather) {
+        int ox = xx - w + feather;
+        int ov = buf[yy * w + sf_wrap_i_fast(ox, w)];
+        int a = ((xx - (w - feather)) * 256) / feather;
 
-            v = ((v * (256 - a)) + (ov * a)) >> 8;
-        }
+        v = ((v * (256 - a)) + (ov * a)) >> 8;
+    }
 
-        if (yy < feather) {
-            int oy = yy + h - feather;
-            int ov = buf[sf_wrap_i_fast(oy, h) * w + xx];
-            int a = ((feather - yy) * 256) / feather;
+    if (yy < feather) {
+        int oy = yy + h - feather;
+        int ov = buf[sf_wrap_i_fast(oy, h) * w + xx];
+        int a = ((feather - yy) * 256) / feather;
 
-            v = ((v * (256 - a)) + (ov * a)) >> 8;
-        } else if (yy >= h - feather) {
-            int oy = yy - h + feather;
-            int ov = buf[sf_wrap_i_fast(oy, h) * w + xx];
-            int a = ((yy - (h - feather)) * 256) / feather;
+        v = ((v * (256 - a)) + (ov * a)) >> 8;
+    } else if (yy >= h - feather) {
+        int oy = yy - h + feather;
+        int ov = buf[sf_wrap_i_fast(oy, h) * w + xx];
+        int a = ((yy - (h - feather)) * 256) / feather;
 
-            v = ((v * (256 - a)) + (ov * a)) >> 8;
-        }
+        v = ((v * (256 - a)) + (ov * a)) >> 8;
     }
 
     return v;
 }
 
+static inline int sf_sample_plane(
+    const uint8_t *buf,
+    int x,
+    int y,
+    int w,
+    int h,
+    int use_feather,
+    int feather
+) {
+    if (use_feather)
+        return sf_sample_u8_feather(buf, x, y, w, h, feather);
+
+    return buf[sf_wrap_i_fast(y, h) * w + sf_wrap_i_fast(x, w)];
+}
+
 vj_effect *strataflight_init(int w, int h)
 {
-    vj_effect *ve;
-
-    (void) w;
-    (void) h;
-
-    ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
 
     if (!ve)
         return NULL;
@@ -239,6 +247,9 @@ vj_effect *strataflight_init(int w, int h)
 
     ve->description = "Luma Terrain Freeflight";
     ve->sub_format = 1;
+    ve->extra_frame = 0;
+    ve->has_user = 0;
+    ve->parallel = 0;
 
     ve->defaults[P_OPACITY]      = 100;
     ve->defaults[P_YAW]          = 500;
@@ -254,44 +265,19 @@ vj_effect *strataflight_init(int w, int h)
     ve->defaults[P_EROSION]      = 22;
     ve->defaults[P_CHROMA]       = 72;
 
-    ve->limits[0][P_OPACITY]      = 0;
-    ve->limits[1][P_OPACITY]      = 100;
-
-    ve->limits[0][P_YAW]          = 0;
-    ve->limits[1][P_YAW]          = 1000;
-
-    ve->limits[0][P_PITCH]        = 0;
-    ve->limits[1][P_PITCH]        = 1000;
-
-    ve->limits[0][P_DISTANCE]     = 0;
-    ve->limits[1][P_DISTANCE]     = 1000;
-
-    ve->limits[0][P_FLIGHTHEIGHT] = 0;
-    ve->limits[1][P_FLIGHTHEIGHT] = 1000;
-
-    ve->limits[0][P_FLIGHTSPEED]  = 0;
-    ve->limits[1][P_FLIGHTSPEED]  = 100;
-
-    ve->limits[0][P_FREEFORWARD]  = 0;
-    ve->limits[1][P_FREEFORWARD]  = 1000;
-
-    ve->limits[0][P_STRAFE]       = 0;
-    ve->limits[1][P_STRAFE]       = 1000;
-
-    ve->limits[0][P_HEIGHT]       = 0;
-    ve->limits[1][P_HEIGHT]       = 100;
-
-    ve->limits[0][P_DEPOSIT]      = 0;
-    ve->limits[1][P_DEPOSIT]      = 100;
-
-    ve->limits[0][P_MEMORY]       = 0;
-    ve->limits[1][P_MEMORY]       = 100;
-
-    ve->limits[0][P_EROSION]      = 0;
-    ve->limits[1][P_EROSION]      = 100;
-
-    ve->limits[0][P_CHROMA]       = 0;
-    ve->limits[1][P_CHROMA]       = 100;
+    ve->limits[0][P_OPACITY]      = 0;    ve->limits[1][P_OPACITY]      = 100;
+    ve->limits[0][P_YAW]          = 0;    ve->limits[1][P_YAW]          = 1000;
+    ve->limits[0][P_PITCH]        = 0;    ve->limits[1][P_PITCH]        = 1000;
+    ve->limits[0][P_DISTANCE]     = 0;    ve->limits[1][P_DISTANCE]     = 1000;
+    ve->limits[0][P_FLIGHTHEIGHT] = 0;    ve->limits[1][P_FLIGHTHEIGHT] = 1000;
+    ve->limits[0][P_FLIGHTSPEED]  = 0;    ve->limits[1][P_FLIGHTSPEED]  = 100;
+    ve->limits[0][P_FREEFORWARD]  = 0;    ve->limits[1][P_FREEFORWARD]  = 1000;
+    ve->limits[0][P_STRAFE]       = 0;    ve->limits[1][P_STRAFE]       = 1000;
+    ve->limits[0][P_HEIGHT]       = 0;    ve->limits[1][P_HEIGHT]       = 100;
+    ve->limits[0][P_DEPOSIT]      = 0;    ve->limits[1][P_DEPOSIT]      = 100;
+    ve->limits[0][P_MEMORY]       = 0;    ve->limits[1][P_MEMORY]       = 100;
+    ve->limits[0][P_EROSION]      = 0;    ve->limits[1][P_EROSION]      = 100;
+    ve->limits[0][P_CHROMA]       = 0;    ve->limits[1][P_CHROMA]       = 100;
 
     ve->param_description = vje_build_param_list(
         ve->num_params,
@@ -309,6 +295,27 @@ vj_effect *strataflight_init(int w, int h)
         "Erosion",
         "Material Chroma"
     );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS,                   24,  100, 8,  30, 1200, 3000, 0,   45, /* Opacity */
+        VJ_BEAT_WARP,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,  0,   1000,8,  30, 1200, 3000, 0,   45, /* Camera Yaw */
+        VJ_BEAT_WARP,             VJ_BEAT_F_CONTINUOUS,                   420, 860, 8,  30, 1200, 3000, 0,   45, /* Camera Pitch */
+        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS,                   180, 860, 8,  30, 1200, 3000, 0,   50, /* View Distance */
+        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS,                   180, 820, 8,  30, 1200, 3000, 0,   50, /* Flight Height */
+        VJ_BEAT_SPEED,            VJ_BEAT_F_CONTINUOUS,                   0,   72,  8,  30, 1200, 3000, 0,   55, /* Flight Speed */
+        VJ_BEAT_DRIFT,            VJ_BEAT_F_CONTINUOUS,                   360, 640, 8,  30, 1200, 3000, 0,   40, /* Move Forward Back */
+        VJ_BEAT_DRIFT,            VJ_BEAT_F_CONTINUOUS,                   360, 640, 8,  30, 1200, 3000, 0,   40, /* Strafe Left Right */
+        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS,                   12,  92,  8,  30, 1200, 3000, 0,   55, /* Terrain Height */
+        VJ_BEAT_SOURCE_MIX,       VJ_BEAT_F_CONTINUOUS,                   0,   92,  10, 38, 1000, 2600, 0,   62, /* Source Deposit */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS,                   18,  96,  8,  32, 1200, 3200, 0,   55, /* Terrain Memory */
+        VJ_BEAT_TURBULENCE,       VJ_BEAT_F_CONTINUOUS,                   0,   72,  10, 38, 1000, 2600, 0,   58, /* Erosion */
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS,                   0,   100, 8,  30, 1200, 3000, 0,   45  /* Material Chroma */
+    );
+
+    (void) w;
+    (void) h;
 
     return ve;
 }
@@ -592,18 +599,28 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
         world_q = sf_clampi(world_q, 160, 2048);
     }
 
-    use_feather = worldzoom >= 700;
+    use_feather = 0;
+    seam_feather = 0;
 
-    seam_feather = 4 + ((worldzoom * 20) / 1000);
+    if (worldzoom >= 700 && w > 8 && rows > 8) {
+        int max_feather = w >> 4;
+        int row_feather = rows >> 4;
 
-    if (seam_feather > (w >> 4))
-        seam_feather = w >> 4;
+        if (row_feather < max_feather)
+            max_feather = row_feather;
 
-    if (seam_feather > (rows >> 4))
-        seam_feather = rows >> 4;
+        if (max_feather >= 2) {
+            seam_feather = 4 + ((worldzoom * 20) / 1000);
 
-    if (seam_feather < 2)
-        seam_feather = 2;
+            if (seam_feather > max_feather)
+                seam_feather = max_feather;
+
+            if (seam_feather < 2)
+                seam_feather = 2;
+
+            use_feather = 1;
+        }
+    }
 
     angle = (((float) yaw - 500.0f) / 1000.0f) * 6.28318530718f;
 
@@ -655,20 +672,16 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
         int free_fp = sf_signed_speed_from_center(freeforward);
         int side_fp = sf_signed_speed_from_center(strafe);
 
-        int move_forward_fp = free_fp;
-        int move_side_fp = side_fp;
-
         int speed_q = flightspeed <= 0 ? 0 : 1 + ((flightspeed * flightspeed * 255 + 5000) / 10000);
-        int dx;
-        int dy;
 
-        move_forward_fp = sf_scale_move_q(move_forward_fp, speed_q, world_q);
-        move_side_fp = sf_scale_move_q(move_side_fp, speed_q, world_q);
+        int move_forward_fp = sf_scale_move_q(free_fp, speed_q, world_q);
+        int move_side_fp = sf_scale_move_q(side_fp, speed_q, world_q);
 
-        dx = (int) ((((int64_t) fwd_x_q * (int64_t) move_forward_fp) +
-                     ((int64_t) right_x_q * (int64_t) move_side_fp)) >> 12);
-        dy = (int) ((((int64_t) fwd_y_q * (int64_t) move_forward_fp) +
-                     ((int64_t) right_y_q * (int64_t) move_side_fp)) >> 12);
+        int dx = (int) ((((int64_t) fwd_x_q * (int64_t) move_forward_fp) +
+                         ((int64_t) right_x_q * (int64_t) move_side_fp)) >> 12);
+
+        int dy = (int) ((((int64_t) fwd_y_q * (int64_t) move_forward_fp) +
+                         ((int64_t) right_y_q * (int64_t) move_side_fp)) >> 12);
 
         c->cam_x_fp = sf_wrap_fp(c->cam_x_fp + dx, w << 8);
         c->cam_y_fp = sf_wrap_fp(c->cam_y_fp + dy, rows << 8);
@@ -838,385 +851,191 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
             const uint8_t *render_mu = c->mat_u;
             const uint8_t *render_mv = c->mat_v;
 
-            if (!use_feather) {
 #pragma omp for schedule(static)
-                for (int y = 0; y < rows; y++) {
-                    int row = y * w;
+            for (int y = 0; y < rows; y++) {
+                int row = y * w;
 
-                    int z = row_z_lut[y];
-                    int fog = row_fog_lut[y];
-                    int haze_y = row_haze_lut[y];
-                    int row_bright = row_bright_lut[y];
+                int z = row_z_lut[y];
+                int fog = row_fog_lut[y];
+                int haze_y = row_haze_lut[y];
+                int row_bright = row_bright_lut[y];
 
-                    int wx0 = cam_x_fp + ((ray_x_lut[0] * z) >> 4);
-                    int wy0 = cam_y_fp + ((ray_y_lut[0] * z) >> 4);
+                int wx0 = cam_x_fp + ((ray_x_lut[0] * z) >> 4);
+                int wy0 = cam_y_fp + ((ray_y_lut[0] * z) >> 4);
 
-                    int wx1 = cam_x_fp + ((ray_x_lut[w - 1] * z) >> 4);
-                    int wy1 = cam_y_fp + ((ray_y_lut[w - 1] * z) >> 4);
+                int wx1 = cam_x_fp + ((ray_x_lut[w - 1] * z) >> 4);
+                int wy1 = cam_y_fp + ((ray_y_lut[w - 1] * z) >> 4);
 
-                    int denom = w > 1 ? w - 1 : 1;
+                int denom = w > 1 ? w - 1 : 1;
 
-                    int64_t wx_q16 = ((int64_t) wx0) << 16;
-                    int64_t wy_q16 = ((int64_t) wy0) << 16;
+                int64_t wx_q16 = ((int64_t) wx0) << 16;
+                int64_t wy_q16 = ((int64_t) wy0) << 16;
 
-                    int64_t wx_step_q16 = (((int64_t) wx1 - (int64_t) wx0) << 16) / denom;
-                    int64_t wy_step_q16 = (((int64_t) wy1 - (int64_t) wy0) << 16) / denom;
+                int64_t wx_step_q16 = (((int64_t) wx1 - (int64_t) wx0) << 16) / denom;
+                int64_t wy_step_q16 = (((int64_t) wy1 - (int64_t) wy0) << 16) / denom;
 
-                    for (int x = 0; x < w; x++) {
-                        int i = row + x;
-
-                        int tx = sf_wrap_i_fast((int) (wx_q16 >> 24), w);
-                        int ty = sf_wrap_i_fast((int) (wy_q16 >> 24), rows);
-
-                        int xr = tx < w - 1 ? tx + 1 : 0;
-                        int yd = ty < rows - 1 ? ty + 1 : 0;
-
-                        int ti = ty * w + tx;
-
-                        int h0 = render_ht[ti];
-                        int hx1 = render_ht[ty * w + xr];
-                        int hy1 = render_ht[yd * w + tx];
-
-                        int shade = ((h0 - hx1) * 2 + (h0 - hy1)) * height_shade_floor;
-
-                        int base_y;
-                        int base_u;
-                        int base_v;
-
-                        shade >>= 8;
-
-                        base_y = h0 + shade - 6 + row_bright;
-                        base_y = sf_clampi(base_y, 0, 255);
-
-                        base_u = 128 + ((((int) render_mu[ti] - 128) * chroma_q) >> 8);
-                        base_v = 128 + ((((int) render_mv[ti] - 128) * chroma_q) >> 8);
-
-                        base_u = sf_clampi(base_u, 0, 255);
-                        base_v = sf_clampi(base_v, 0, 255);
-
-                        base_y = ((base_y * (256 - fog)) + (haze_y * fog)) >> 8;
-                        base_u = ((base_u * (256 - fog)) + (128 * fog)) >> 8;
-                        base_v = ((base_v * (256 - fog)) + (128 * fog)) >> 8;
-
-                        if (alpha >= 256) {
-                            Y[i] = (uint8_t) base_y;
-                            U[i] = (uint8_t) base_u;
-                            V[i] = (uint8_t) base_v;
-                        } else if (alpha > 0) {
-                            Y[i] = (uint8_t) sf_blend((int) Y[i], base_y, alpha);
-                            U[i] = (uint8_t) sf_blend((int) U[i], base_u, alpha);
-                            V[i] = (uint8_t) sf_blend((int) V[i], base_v, alpha);
-                        }
-
-                        wx_q16 += wx_step_q16;
-                        wy_q16 += wy_step_q16;
-                    }
-                }
-
-#pragma omp for schedule(static)
                 for (int x = 0; x < w; x++) {
-                    int ray_x = ray_x_lut[x];
-                    int ray_y = ray_y_lut[x];
+                    int i = row + x;
 
-                    int y_limit = rows;
+                    int tx = sf_wrap_i_fast((int) (wx_q16 >> 24), w);
+                    int ty = sf_wrap_i_fast((int) (wy_q16 >> 24), rows);
 
-                    for (int s = 1; s <= steps; s++) {
-                        int z = z_lut[s];
+                    int h0 = sf_sample_plane(render_ht, tx, ty, w, rows, use_feather, seam_feather);
+                    int hx1 = sf_sample_plane(render_ht, tx + 1, ty, w, rows, use_feather, seam_feather);
+                    int hy1 = sf_sample_plane(render_ht, tx, ty + 1, w, rows, use_feather, seam_feather);
 
-                        int wx_fp = cam_x_fp + ((ray_x * z) >> 4);
-                        int wy_fp = cam_y_fp + ((ray_y * z) >> 4);
+                    int shade = ((h0 - hx1) * 2 + (h0 - hy1)) * height_shade_floor;
 
-                        int tx = sf_wrap_i_fast(wx_fp >> 8, w);
-                        int ty = sf_wrap_i_fast(wy_fp >> 8, rows);
+                    int base_y;
+                    int base_u;
+                    int base_v;
 
-                        int ti = ty * w + tx;
+                    shade >>= 8;
 
-                        int h0 = render_ht[ti];
+                    base_y = h0 + shade - 6 + row_bright;
+                    base_y = sf_clampi(base_y, 0, 255);
 
-                        int elev = ((h0 - 128) * elev_scale) >> 8;
-                        int screen_y;
+                    base_u =
+                        128 +
+                        ((sf_sample_plane(render_mu, tx, ty, w, rows, use_feather, seam_feather) - 128) * chroma_q >> 8);
 
-                        if (elev_damp_q != 256)
-                            elev = (elev * elev_damp_q) >> 8;
+                    base_v =
+                        128 +
+                        ((sf_sample_plane(render_mv, tx, ty, w, rows, use_feather, seam_feather) - 128) * chroma_q >> 8);
 
-                        screen_y = horizon + (((cam_height - elev) * projection) / z);
+                    base_u = sf_clampi(base_u, 0, 255);
+                    base_v = sf_clampi(base_v, 0, 255);
 
-                        if (screen_y < y_limit) {
-                            int xl = tx > 0 ? tx - 1 : w - 1;
-                            int xr = tx < w - 1 ? tx + 1 : 0;
-                            int yu = ty > 0 ? ty - 1 : rows - 1;
-                            int yd = ty < rows - 1 ? ty + 1 : 0;
+                    base_y = ((base_y * (256 - fog)) + (haze_y * fog)) >> 8;
+                    base_u = ((base_u * (256 - fog)) + (128 * fog)) >> 8;
+                    base_v = ((base_v * (256 - fog)) + (128 * fog)) >> 8;
 
-                            int hx0 = render_ht[ty * w + xl];
-                            int hx1 = render_ht[ty * w + xr];
-                            int hy0 = render_ht[yu * w + tx];
-                            int hy1 = render_ht[yd * w + tx];
-
-                            int shade = ((hx0 - hx1) * 2 + (hy0 - hy1)) * height_shade_column;
-
-                            int base_y;
-                            int base_u;
-                            int base_v;
-
-                            int fog = z_fog_lut[s];
-                            int draw_from;
-                            int draw_to;
-
-                            shade >>= 8;
-
-                            base_y = h0 + shade + 10;
-                            base_y = sf_clampi(base_y, 0, 255);
-
-                            base_u = 128 + ((((int) render_mu[ti] - 128) * chroma_q) >> 8);
-                            base_v = 128 + ((((int) render_mv[ti] - 128) * chroma_q) >> 8);
-
-                            base_u = sf_clampi(base_u, 0, 255);
-                            base_v = sf_clampi(base_v, 0, 255);
-
-                            base_y = ((base_y * (256 - fog)) + (56 * fog)) >> 8;
-                            base_u = ((base_u * (256 - fog)) + (128 * fog)) >> 8;
-                            base_v = ((base_v * (256 - fog)) + (128 * fog)) >> 8;
-
-                            draw_from = screen_y;
-                            draw_to = y_limit;
-
-                            if (draw_from < 0)
-                                draw_from = 0;
-
-                            if (draw_to > rows)
-                                draw_to = rows;
-
-                            if (draw_from < draw_to) {
-                                int span_len = draw_to - draw_from + 1;
-                                int dark_acc = 0;
-                                int dark_step = (42 << 8) / span_len;
-
-                                if (alpha >= 256) {
-                                    for (int yy = draw_from; yy < draw_to; yy++) {
-                                        int oi = yy * w + x;
-
-                                        int wall_dark = dark_acc >> 8;
-                                        int ey = base_y - wall_dark;
-
-                                        dark_acc += dark_step;
-
-                                        Y[oi] = (uint8_t) sf_clampi(ey, 0, 255);
-                                        U[oi] = (uint8_t) base_u;
-                                        V[oi] = (uint8_t) base_v;
-                                    }
-                                } else if (alpha > 0) {
-                                    for (int yy = draw_from; yy < draw_to; yy++) {
-                                        int oi = yy * w + x;
-
-                                        int wall_dark = dark_acc >> 8;
-                                        int ey = base_y - wall_dark;
-
-                                        dark_acc += dark_step;
-
-                                        ey = sf_clampi(ey, 0, 255);
-
-                                        Y[oi] = (uint8_t) sf_blend((int) Y[oi], ey, alpha);
-                                        U[oi] = (uint8_t) sf_blend((int) U[oi], base_u, alpha);
-                                        V[oi] = (uint8_t) sf_blend((int) V[oi], base_v, alpha);
-                                    }
-                                }
-                            }
-
-                            y_limit = screen_y;
-
-                            if (y_limit <= 0)
-                                break;
-                        }
+                    if (alpha >= 256) {
+                        Y[i] = (uint8_t) base_y;
+                        U[i] = (uint8_t) base_u;
+                        V[i] = (uint8_t) base_v;
+                    } else if (alpha > 0) {
+                        Y[i] = (uint8_t) sf_blend((int) Y[i], base_y, alpha);
+                        U[i] = (uint8_t) sf_blend((int) U[i], base_u, alpha);
+                        V[i] = (uint8_t) sf_blend((int) V[i], base_v, alpha);
                     }
+
+                    wx_q16 += wx_step_q16;
+                    wy_q16 += wy_step_q16;
                 }
-            } else {
+            }
+
 #pragma omp for schedule(static)
-                for (int y = 0; y < rows; y++) {
-                    int row = y * w;
+            for (int x = 0; x < w; x++) {
+                int ray_x = ray_x_lut[x];
+                int ray_y = ray_y_lut[x];
 
-                    int z = row_z_lut[y];
-                    int fog = row_fog_lut[y];
-                    int haze_y = row_haze_lut[y];
-                    int row_bright = row_bright_lut[y];
+                int y_limit = rows;
 
-                    int wx0 = cam_x_fp + ((ray_x_lut[0] * z) >> 4);
-                    int wy0 = cam_y_fp + ((ray_y_lut[0] * z) >> 4);
+                for (int s = 1; s <= steps; s++) {
+                    int z = z_lut[s];
 
-                    int wx1 = cam_x_fp + ((ray_x_lut[w - 1] * z) >> 4);
-                    int wy1 = cam_y_fp + ((ray_y_lut[w - 1] * z) >> 4);
+                    int wx_fp = cam_x_fp + ((ray_x * z) >> 4);
+                    int wy_fp = cam_y_fp + ((ray_y * z) >> 4);
 
-                    int denom = w > 1 ? w - 1 : 1;
+                    int tx = sf_wrap_i_fast(wx_fp >> 8, w);
+                    int ty = sf_wrap_i_fast(wy_fp >> 8, rows);
 
-                    int64_t wx_q16 = ((int64_t) wx0) << 16;
-                    int64_t wy_q16 = ((int64_t) wy0) << 16;
+                    int h0 = sf_sample_plane(render_ht, tx, ty, w, rows, use_feather, seam_feather);
 
-                    int64_t wx_step_q16 = (((int64_t) wx1 - (int64_t) wx0) << 16) / denom;
-                    int64_t wy_step_q16 = (((int64_t) wy1 - (int64_t) wy0) << 16) / denom;
+                    int elev = ((h0 - 128) * elev_scale) >> 8;
+                    int screen_y;
 
-                    for (int x = 0; x < w; x++) {
-                        int i = row + x;
+                    if (elev_damp_q != 256)
+                        elev = (elev * elev_damp_q) >> 8;
 
-                        int tx = sf_wrap_i_fast((int) (wx_q16 >> 24), w);
-                        int ty = sf_wrap_i_fast((int) (wy_q16 >> 24), rows);
+                    screen_y = horizon + (((cam_height - elev) * projection) / z);
 
-                        int h0 = sf_sample_u8_feather(render_ht, tx, ty, w, rows, seam_feather);
+                    if (screen_y < y_limit) {
+                        int hx0 = sf_sample_plane(render_ht, tx - 1, ty, w, rows, use_feather, seam_feather);
+                        int hx1 = sf_sample_plane(render_ht, tx + 1, ty, w, rows, use_feather, seam_feather);
+                        int hy0 = sf_sample_plane(render_ht, tx, ty - 1, w, rows, use_feather, seam_feather);
+                        int hy1 = sf_sample_plane(render_ht, tx, ty + 1, w, rows, use_feather, seam_feather);
 
-                        int hx1 = sf_sample_u8_feather(render_ht, tx + 1, ty, w, rows, seam_feather);
-                        int hy1 = sf_sample_u8_feather(render_ht, tx, ty + 1, w, rows, seam_feather);
-
-                        int shade = ((h0 - hx1) * 2 + (h0 - hy1)) * height_shade_floor;
+                        int shade = ((hx0 - hx1) * 2 + (hy0 - hy1)) * height_shade_column;
 
                         int base_y;
                         int base_u;
                         int base_v;
 
+                        int fog = z_fog_lut[s];
+                        int draw_from;
+                        int draw_to;
+
                         shade >>= 8;
 
-                        base_y = h0 + shade - 6 + row_bright;
+                        base_y = h0 + shade + 10;
                         base_y = sf_clampi(base_y, 0, 255);
 
                         base_u =
                             128 +
-                            ((sf_sample_u8_feather(render_mu, tx, ty, w, rows, seam_feather) - 128) * chroma_q >> 8);
+                            ((sf_sample_plane(render_mu, tx, ty, w, rows, use_feather, seam_feather) - 128) * chroma_q >> 8);
 
                         base_v =
                             128 +
-                            ((sf_sample_u8_feather(render_mv, tx, ty, w, rows, seam_feather) - 128) * chroma_q >> 8);
+                            ((sf_sample_plane(render_mv, tx, ty, w, rows, use_feather, seam_feather) - 128) * chroma_q >> 8);
 
                         base_u = sf_clampi(base_u, 0, 255);
                         base_v = sf_clampi(base_v, 0, 255);
 
-                        base_y = ((base_y * (256 - fog)) + (haze_y * fog)) >> 8;
+                        base_y = ((base_y * (256 - fog)) + (56 * fog)) >> 8;
                         base_u = ((base_u * (256 - fog)) + (128 * fog)) >> 8;
                         base_v = ((base_v * (256 - fog)) + (128 * fog)) >> 8;
 
-                        if (alpha >= 256) {
-                            Y[i] = (uint8_t) base_y;
-                            U[i] = (uint8_t) base_u;
-                            V[i] = (uint8_t) base_v;
-                        } else if (alpha > 0) {
-                            Y[i] = (uint8_t) sf_blend((int) Y[i], base_y, alpha);
-                            U[i] = (uint8_t) sf_blend((int) U[i], base_u, alpha);
-                            V[i] = (uint8_t) sf_blend((int) V[i], base_v, alpha);
-                        }
+                        draw_from = screen_y;
+                        draw_to = y_limit;
 
-                        wx_q16 += wx_step_q16;
-                        wy_q16 += wy_step_q16;
-                    }
-                }
+                        if (draw_from < 0)
+                            draw_from = 0;
 
-#pragma omp for schedule(static)
-                for (int x = 0; x < w; x++) {
-                    int ray_x = ray_x_lut[x];
-                    int ray_y = ray_y_lut[x];
+                        if (draw_to > rows)
+                            draw_to = rows;
 
-                    int y_limit = rows;
+                        if (draw_from < draw_to) {
+                            int span_len = draw_to - draw_from;
+                            int dark_acc = 0;
+                            int dark_step = span_len > 0 ? (42 << 8) / span_len : 0;
 
-                    for (int s = 1; s <= steps; s++) {
-                        int z = z_lut[s];
+                            if (alpha >= 256) {
+                                for (int yy = draw_from; yy < draw_to; yy++) {
+                                    int oi = yy * w + x;
 
-                        int wx_fp = cam_x_fp + ((ray_x * z) >> 4);
-                        int wy_fp = cam_y_fp + ((ray_y * z) >> 4);
+                                    int wall_dark = dark_acc >> 8;
+                                    int ey = base_y - wall_dark;
 
-                        int tx = sf_wrap_i_fast(wx_fp >> 8, w);
-                        int ty = sf_wrap_i_fast(wy_fp >> 8, rows);
+                                    dark_acc += dark_step;
 
-                        int h0 = sf_sample_u8_feather(render_ht, tx, ty, w, rows, seam_feather);
+                                    Y[oi] = (uint8_t) sf_clampi(ey, 0, 255);
+                                    U[oi] = (uint8_t) base_u;
+                                    V[oi] = (uint8_t) base_v;
+                                }
+                            } else if (alpha > 0) {
+                                for (int yy = draw_from; yy < draw_to; yy++) {
+                                    int oi = yy * w + x;
 
-                        int elev = ((h0 - 128) * elev_scale) >> 8;
-                        int screen_y;
+                                    int wall_dark = dark_acc >> 8;
+                                    int ey = base_y - wall_dark;
 
-                        if (elev_damp_q != 256)
-                            elev = (elev * elev_damp_q) >> 8;
+                                    dark_acc += dark_step;
 
-                        screen_y = horizon + (((cam_height - elev) * projection) / z);
+                                    ey = sf_clampi(ey, 0, 255);
 
-                        if (screen_y < y_limit) {
-                            int hx0 = sf_sample_u8_feather(render_ht, tx - 1, ty, w, rows, seam_feather);
-                            int hx1 = sf_sample_u8_feather(render_ht, tx + 1, ty, w, rows, seam_feather);
-                            int hy0 = sf_sample_u8_feather(render_ht, tx, ty - 1, w, rows, seam_feather);
-                            int hy1 = sf_sample_u8_feather(render_ht, tx, ty + 1, w, rows, seam_feather);
-
-                            int shade = ((hx0 - hx1) * 2 + (hy0 - hy1)) * height_shade_column;
-
-                            int base_y;
-                            int base_u;
-                            int base_v;
-
-                            int fog = z_fog_lut[s];
-                            int draw_from;
-                            int draw_to;
-
-                            shade >>= 8;
-
-                            base_y = h0 + shade + 10;
-                            base_y = sf_clampi(base_y, 0, 255);
-
-                            base_u =
-                                128 +
-                                ((sf_sample_u8_feather(render_mu, tx, ty, w, rows, seam_feather) - 128) * chroma_q >> 8);
-
-                            base_v =
-                                128 +
-                                ((sf_sample_u8_feather(render_mv, tx, ty, w, rows, seam_feather) - 128) * chroma_q >> 8);
-
-                            base_u = sf_clampi(base_u, 0, 255);
-                            base_v = sf_clampi(base_v, 0, 255);
-
-                            base_y = ((base_y * (256 - fog)) + (56 * fog)) >> 8;
-                            base_u = ((base_u * (256 - fog)) + (128 * fog)) >> 8;
-                            base_v = ((base_v * (256 - fog)) + (128 * fog)) >> 8;
-
-                            draw_from = screen_y;
-                            draw_to = y_limit;
-
-                            if (draw_from < 0)
-                                draw_from = 0;
-
-                            if (draw_to > rows)
-                                draw_to = rows;
-
-                            if (draw_from < draw_to) {
-                                int span_len = draw_to - draw_from + 1;
-                                int dark_acc = 0;
-                                int dark_step = (42 << 8) / span_len;
-
-                                if (alpha >= 256) {
-                                    for (int yy = draw_from; yy < draw_to; yy++) {
-                                        int oi = yy * w + x;
-
-                                        int wall_dark = dark_acc >> 8;
-                                        int ey = base_y - wall_dark;
-
-                                        dark_acc += dark_step;
-
-                                        Y[oi] = (uint8_t) sf_clampi(ey, 0, 255);
-                                        U[oi] = (uint8_t) base_u;
-                                        V[oi] = (uint8_t) base_v;
-                                    }
-                                } else if (alpha > 0) {
-                                    for (int yy = draw_from; yy < draw_to; yy++) {
-                                        int oi = yy * w + x;
-
-                                        int wall_dark = dark_acc >> 8;
-                                        int ey = base_y - wall_dark;
-
-                                        dark_acc += dark_step;
-
-                                        ey = sf_clampi(ey, 0, 255);
-
-                                        Y[oi] = (uint8_t) sf_blend((int) Y[oi], ey, alpha);
-                                        U[oi] = (uint8_t) sf_blend((int) U[oi], base_u, alpha);
-                                        V[oi] = (uint8_t) sf_blend((int) V[oi], base_v, alpha);
-                                    }
+                                    Y[oi] = (uint8_t) sf_blend((int) Y[oi], ey, alpha);
+                                    U[oi] = (uint8_t) sf_blend((int) U[oi], base_u, alpha);
+                                    V[oi] = (uint8_t) sf_blend((int) V[oi], base_v, alpha);
                                 }
                             }
-
-                            y_limit = screen_y;
-
-                            if (y_limit <= 0)
-                                break;
                         }
+
+                        y_limit = screen_y;
+
+                        if (y_limit <= 0)
+                            break;
                     }
                 }
             }
