@@ -54,6 +54,7 @@ libveejay_la_SOURCES = \
     vj-composite.c \
     vj-font.c \
     vj-pjack.c \
+    vj-audio-beat.c \
     vj-share.c \
     vj-split.c \
     liblavplayvj.c
