@@ -154,6 +154,51 @@ typedef struct {
 	volatile int current_write;
 } display_frame_t;
 
+
+typedef struct
+{
+    volatile int initialized;
+    volatile int stop_request;
+    volatile int running;
+    volatile int enabled;
+    volatile int open;
+    volatile int paused_by_beat;
+
+    volatile int input_channels_request;
+    volatile int freeze_ms;
+    volatile int cooldown_ms;
+    volatile int threshold;
+    volatile int resume_speed;
+
+    volatile int action_mode;
+    volatile int pulse_ms;
+    volatile int gate_ms;
+
+    volatile int reset_seq;
+    volatile int consumed_seq;
+    volatile int hit_seq;
+
+    volatile int channels;
+    volatile int bytes_per_frame;
+    volatile int bits_per_channel;
+    volatile int sample_rate;
+
+    volatile int level_q15;
+    volatile int envelope_q15;
+    volatile int transient_q8;
+    volatile int transient_norm_q15;
+    volatile int flux_q15;
+    volatile int beat_toggle_q15;
+    volatile int bpm_q8;
+
+    volatile long last_hit_ms;
+    volatile long hold_until_ms;
+    volatile long hits;
+    volatile long overruns;
+    volatile long read_errors;
+    volatile long reads;
+} vj_audio_beat_shared_t;
+
 typedef struct {
 	pthread_attr_t playback_attr;
 	pthread_t signal_thread;
@@ -174,6 +219,7 @@ typedef struct {
 	pthread_t producer_thread;
 	pthread_t renderer_thread;
 	pthread_t audio_playback_thread;
+	pthread_t audio_beat_thread;
 
 	display_frame_t display_frame;
 
@@ -182,6 +228,8 @@ typedef struct {
 	volatile int warmup_active;
 	int warmup_frames;
 	volatile int frames_available;
+
+	vj_audio_beat_shared_t audio_beat;
 
 	volatile int audio_mode;
 	volatile int state;
@@ -482,6 +530,8 @@ typedef struct {
     void *performer;
 	global_chain_t *global_chain;
 } veejay_t;
+
+
 
 typedef struct {
     int arg;
