@@ -311,11 +311,6 @@ static void sample_normalize_marker_info(sample_info *sample)
     sample->marker_end = e;
 }
 
-static void sample_clamp_resume_to_range(int s1)
-{
-    sample_clamp_resume_info(sample_get(s1));
-}
-
 void    *sample_get_dict( int sample_id )
 {
 #ifdef HAVE_FREETYPE
@@ -2450,6 +2445,7 @@ int sample_chain_add(int s1, int c, int effect_nr, int is_enabled)
     sample->effect_chain[c]->e_flag = is_enabled;
     sample->effect_chain[c]->kf_status = 0;
     sample->effect_chain[c]->kf_type = 0;
+    sample->effect_chain[c]->beat_flag = 0;
 
     if (vje_get_extra_frame(effect_nr))
     {
@@ -2826,7 +2822,7 @@ static void ParseKeys( xmlDocPtr doc, xmlNodePtr cur, void *port )
 }
 
 int sample_chain_apply_full(sample_eff_chain **effect_chain,int chain_index,int effect_id,int *args,int anim,int channel,
-    int source_type,int e_flag,int a_flag,int volume,int kf_status,int kf_type)
+    int source_type,int e_flag,int a_flag,int volume,int kf_status,int kf_type, int beat)
 {
     int i, num_params;
 
@@ -2872,6 +2868,7 @@ int sample_chain_apply_full(sample_eff_chain **effect_chain,int chain_index,int 
     entry->channel     = channel;
     entry->clear = 1;
     entry->audio_opacity = 0.5f;
+    entry->beat_flag = beat;
 
     return 1;
 }
@@ -2889,6 +2886,7 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, sample_info *skel, int start_at)
     int chain_index = 0;
     int kf_status = 0;
     int kf_type = 0;
+    int beat = 0;
     xmlNodePtr anim = NULL;
 
     for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++) {
@@ -2947,6 +2945,10 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, sample_info *skel, int start_at)
             kf_type = get_xml_int( doc, cur );
         }
 
+        if(!xmlStrcmp( cur->name, (const xmlChar*) "beat_flag" )) {
+            beat = get_xml_int(doc,cur);
+        }
+
         cur = cur->next;
     }
 
@@ -2963,7 +2965,8 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, sample_info *skel, int start_at)
             a_flag,
             volume,
             kf_status,
-            kf_type
+            kf_type,
+            beat
         );
 
         if (chain_index == skel->fade_entry) {
@@ -3330,7 +3333,6 @@ int sample_readInfoFromSampleFile(char *sampleFile, int *video_wid, int *video_h
 {
     xmlDocPtr doc;
     xmlNodePtr cur;
-    sample_info *skel;
 
     doc = read_xml_with_retry(sampleFile);
     if (!doc) return 0;
@@ -3508,6 +3510,7 @@ void CreateEffect(xmlNodePtr node, sample_eff_chain * effect, int position)
     put_xml_int( node, XMLTAG_EFFECTAUDIOVOLUME, effect->volume );
     put_xml_int( node, "kf_status", effect->kf_status );
     put_xml_int( node, "kf_type", effect->kf_type );
+    put_xml_int( node, "beat_flag", effect->beat_flag );
 
     childnode = xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_ARGUMENTS, NULL);
     CreateArguments(childnode, effect->arg, vje_get_num_params(effect->effect_id));

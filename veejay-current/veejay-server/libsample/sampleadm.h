@@ -102,6 +102,7 @@ enum {
 typedef struct sample_eff_t {
     int effect_id;		/* effect ID */
     int e_flag;
+    int beat_flag;
     void *vje_instance;
     int arg[SAMPLE_MAX_PARAMETERS];	/* array of arguments */
     int speed;			/* last known play speed */
@@ -223,7 +224,7 @@ extern void sample_watch_suppress_next(void);
 extern void sample_watch_enable_events(void);
 extern void sample_move_fx_pointers(sample_eff_chain **target, sample_eff_chain **source);
 extern int sample_chain_apply_full(sample_eff_chain **effect_chain,int chain_index,int effect_id,int *args,int anim,int channel,
-    int source_type,int e_flag,int a_flag,int volume,int kf_status,int kf_type);
+    int source_type,int e_flag,int a_flag,int volume,int kf_status,int kf_type, int beat);
 #endif
 extern int sample_get_position(int s1);
 extern int sample_set_state(int new_state);
