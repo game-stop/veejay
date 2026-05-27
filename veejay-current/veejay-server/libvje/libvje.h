@@ -21,6 +21,13 @@
 #ifndef VJELIB_H
 #define VJELIB_H
 
+#ifndef VJ_BEAT_SOFT_UNSET
+#define VJ_BEAT_SOFT_UNSET (-2147483647 - 1)
+#endif
+
+
+vj_beat_param_hint_t *vje_build_beat_hint_list(int num_params, ...);
+
 // set/get pixel value ranges
 unsigned int get_pixel_range_min_UV(); 
 unsigned int get_pixel_range_min_Y(); 
@@ -77,5 +84,8 @@ void vje_dump();
 void vjert_apply( void *entry, VJFrame **frames, int chain_id, int chain_position, int *args ); //FIXME
 void vjert_del_fx( void *ptr, int chain_id, int chain_position, int clear ); //FIXME
 void vjert_update( void *ptr, VJFrame *frame );
+
+const vj_beat_param_hint_t *vje_get_beat_hint(int fx_id, int parameter_id);
+int vje_get_beat_hint_copy(int fx_id, int parameter_id, vj_beat_param_hint_t *dst);
 
 #endif

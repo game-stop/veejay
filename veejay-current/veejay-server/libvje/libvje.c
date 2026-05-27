@@ -24,6 +24,8 @@
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/defs.h>
 #include <libvje/vje.h>
+#include <libvje/libvje.h>
+
 #include <libvje/internal.h>
 #include <libavutil/pixfmt.h>
 #include <veejaycore/avcommon.h>
@@ -31,7 +33,7 @@
 #include "effects/common.h"
 #include <libplugger/plugload.h>
 #include <veejaycore/vims.h>
-#include <libvje/libvje.h>
+
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -976,6 +978,166 @@ static int vje_global_couple(int chain_id, int ref_id, int fx_id, void *ptr)
     }
 
     return 0;
+}
+
+
+static int vje_clampi_local(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static vj_beat_param_hint_t vje_beat_hint_default(void)
+{
+    vj_beat_param_hint_t h;
+
+    h.klass = VJ_BEAT_OFF;
+    h.flags = VJ_BEAT_F_REJECT;
+    h.soft_min = VJ_BEAT_SOFT_UNSET;
+    h.soft_max = VJ_BEAT_SOFT_UNSET;
+    h.normal_depth_pct = 0;
+    h.climax_depth_pct = 0;
+    h.attack_ms = 0;
+    h.release_ms = 0;
+    h.hold_ms = 0;
+    h.priority = 0;
+
+    return h;
+}
+
+static vj_beat_param_hint_t vje_beat_hint_sanitize(vj_beat_param_hint_t h)
+{
+    if(h.klass < VJ_BEAT_OFF || h.klass > VJ_BEAT_LAST)
+        return vje_beat_hint_default();
+
+    if(h.klass == VJ_BEAT_OFF)
+        h.flags |= VJ_BEAT_F_REJECT;
+
+    if(h.klass == VJ_BEAT_SELECTOR ||
+       h.klass == VJ_BEAT_RESET ||
+       h.klass == VJ_BEAT_ALPHA_OR_OPACITY)
+        h.flags |= VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL;
+
+    if(h.flags & VJ_BEAT_F_REJECT) {
+        h.normal_depth_pct = 0;
+        h.climax_depth_pct = 0;
+        h.attack_ms = 0;
+        h.release_ms = 0;
+        h.hold_ms = 0;
+    } else {
+        h.normal_depth_pct = vje_clampi_local(h.normal_depth_pct, 0, 100);
+        h.climax_depth_pct = vje_clampi_local(h.climax_depth_pct, 0, 100);
+        h.attack_ms = vje_clampi_local(h.attack_ms, 0, 60000);
+        h.release_ms = vje_clampi_local(h.release_ms, 0, 60000);
+        h.hold_ms = vje_clampi_local(h.hold_ms, 0, 60000);
+    }
+
+    h.priority = vje_clampi_local(h.priority, -1000, 1000);
+
+    if(h.soft_min != VJ_BEAT_SOFT_UNSET &&
+       h.soft_max != VJ_BEAT_SOFT_UNSET &&
+       h.soft_max < h.soft_min) {
+        int tmp = h.soft_min;
+        h.soft_min = h.soft_max;
+        h.soft_max = tmp;
+    }
+
+    if((h.flags & VJ_BEAT_F_IMPULSE) &&
+       h.release_ms < h.attack_ms)
+        h.release_ms = h.attack_ms;
+
+    if((h.flags & VJ_BEAT_F_REBUILDS_STATE) &&
+       h.hold_ms < 250)
+        h.hold_ms = 250;
+
+    return h;
+}
+
+vj_beat_param_hint_t *vje_build_beat_hint_list(int num_params, ...)
+{
+    vj_beat_param_hint_t *hints;
+    va_list ap;
+
+    if(num_params <= 0)
+        return NULL;
+
+    hints = (vj_beat_param_hint_t *)
+        vj_calloc(sizeof(vj_beat_param_hint_t) * (size_t) num_params);
+
+    if(!hints)
+        return NULL;
+
+    va_start(ap, num_params);
+
+    for(int i = 0; i < num_params; i++) {
+        vj_beat_param_hint_t h;
+
+        h.klass = va_arg(ap, int);
+        h.flags = (uint32_t) va_arg(ap, unsigned int);
+        h.soft_min = va_arg(ap, int);
+        h.soft_max = va_arg(ap, int);
+        h.normal_depth_pct = va_arg(ap, int);
+        h.climax_depth_pct = va_arg(ap, int);
+        h.attack_ms = va_arg(ap, int);
+        h.release_ms = va_arg(ap, int);
+        h.hold_ms = va_arg(ap, int);
+        h.priority = va_arg(ap, int);
+
+        hints[i] = vje_beat_hint_sanitize(h);
+    }
+
+    va_end(ap);
+
+    return hints;
+}
+
+static const vj_beat_param_hint_t vje_beat_hint_reject_default = {
+    VJ_BEAT_OFF,
+    VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+    VJ_BEAT_SOFT_UNSET,
+    VJ_BEAT_SOFT_UNSET,
+    0,
+    0,
+    0,
+    0,
+    0,
+    -1000
+};
+
+const vj_beat_param_hint_t *vje_get_beat_hint(int fx_id, int parameter_id)
+{
+    vj_effect *ve;
+
+    if(parameter_id < 0)
+        return &vje_beat_hint_reject_default;
+
+    int idx = vj_fx_map[ fx_id ];
+    ve = vj_effect_map [ idx ];
+
+
+    if(!ve)
+        return &vje_beat_hint_reject_default;
+
+    if(parameter_id >= ve->num_params)
+        return &vje_beat_hint_reject_default;
+
+    if(!ve->beat_hints)
+        return &vje_beat_hint_reject_default;
+
+    return &ve->beat_hints[parameter_id];
+}
+
+int vje_get_beat_hint_copy(int fx_id, int parameter_id, vj_beat_param_hint_t *dst)
+{
+    const vj_beat_param_hint_t *src;
+
+    if(!dst)
+        return 0;
+
+    src = vje_get_beat_hint(fx_id, parameter_id);
+
+    *dst = *src;
+
+    return !(src->flags & VJ_BEAT_F_REJECT);
 }
 
 void vje_dump(void) {
