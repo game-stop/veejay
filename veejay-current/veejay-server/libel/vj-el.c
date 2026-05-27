@@ -397,8 +397,6 @@ static void	_el_free_decoder( vj_decoder *d )
 
 static int should_enable_drop_frame_timecode(float fps)
 {
-    float corrected = fps * 1001.0f / 1000.0f;
-
     return (
         fabs(fps - 29.97f) < 0.01f ||
         fabs(fps - 59.94f) < 0.01f ||
