@@ -254,22 +254,28 @@ void	on_button_200_clicked(GtkWidget *widget, gpointer user_data)
 		"Requested background mask of frame %d",
 			info->status_tokens[FRAME_NUM] + 1 );
 }
-void	on_button_5_4_clicked(GtkWidget *widget, gpointer user_data)
-{
-	if( is_button_toggled("button_5_4") )
-	{
-		single_vims( VIMS_AUDIO_ENABLE );
-		vj_msg(VEEJAY_MSG_INFO, "Audio is enabled");
-		vj_midi_learning_vims_simple(info->midi, NULL, VIMS_AUDIO_ENABLE );
-	}
-	else
-	{
-		single_vims( VIMS_AUDIO_DISABLE );	
-		vj_msg(VEEJAY_MSG_INFO, "Audio is disabled");
-		vj_midi_learning_vims_simple(info->midi, NULL, VIMS_AUDIO_DISABLE );
-	}
+
+void on_beat_entry_toggle_toggled(GtkWidget *widget, gpointer user_data) {
+	
+	if(info->status_lock)
+		return;
+
+	int status = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+	
+ 	multi_vims( VIMS_CHAIN_ENTRY_BEAT_TOGGLE,"%d %d %d", 0, info->uc.selected_chain_entry, status );
+}
+
+void    on_button_audio_beat_toggled(GtkWidget *widget, gpointer user_data) {
+
+	if(info->status_lock)
+		return;
+
+	int status = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+
+	multi_vims(	VIMS_AUDIO_BEAT_STATUS, "%d", status );
 
 }
+
 void	on_button_samplestart_clicked(GtkWidget *widget, gpointer user_data)
 {
 	info->sample[0] = info->status_tokens[FRAME_NUM];
@@ -4590,57 +4596,74 @@ gboolean on_effectchain_button_pressed (GtkWidget *tree, GdkEventButton *event, 
     return FALSE; /* lets normal things happening */
 }
 
-static 
-gchar *get_clipboard_fx_parameter_buffer(int *mixing_src, int *mixing_cha, int *enabled, int *fx_id)
+static gchar *get_clipboard_fx_parameter_buffer(
+        int *mixing_src,
+        int *mixing_cha,
+        int *enabled,
+        int *beat_flag,
+        int *fx_id)
 {
-	char rest[2048 + 22 + 1];
-	int	len = 0;
-	int tmp[8];
-	int 	i;
-	int n_params = 0;
-	int fid = 0;
+    char rest[2048 + 22 + 1];
+    int len = 0;
+    int tmp = 0;
+    int n_params = 0;
+    int fid = 0;
 
-	veejay_memset( rest,0,sizeof(rest));
+    int is_video = 0;
+    int kf_type = 0;
+    int kf_status = 0;
+    int transition_enabled = 0;
+    int transition_loop = 0;
+    int chain_source = 0;
+    int chain_channel = 0;
+    int video_on = 0;
+    int beat_on = 0;
+    int subrender_entry = 0;
 
-	multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0,info->uc.selected_chain_entry );
+    veejay_memset(rest, 0, sizeof(rest));
 
-	gchar *answer = recv_vims(3,&len);
-	if(len <= 0 || answer == NULL )
-	{
-		gveejay_popup_err( "Error", "Nothing in FX clipboard");
-		if(answer) g_free(answer);
-		return NULL;
-	}
+    multi_vims(VIMS_CHAIN_GET_ENTRY, "%d %d", 0, info->uc.selected_chain_entry);
 
-	i = sscanf( answer, "%d %d %d %d %d %d %d %d %d %d %d %1024[0-9 ]",
-			&fid, //fx id
-			&tmp[0], //is video
-			&n_params, //num params
-			&tmp[0], //kf_type
-			&tmp[0], //transition enabled, not copied
-			&tmp[0], //transition loop, not copied
-			&tmp[0], //kf_status
-			&tmp[1], //source
-			&tmp[2], //channel
-			&tmp[3], //fx enabled
-			&tmp[0], //dummy
-			rest
-	);	
+    gchar *answer = recv_vims(3, &len);
+    if (len <= 0 || answer == NULL) {
+        gveejay_popup_err("Error", "Nothing in FX clipboard");
+        if (answer)
+            g_free(answer);
+        return NULL;
+    }
 
-	if( i != 12 ) {
-		g_free(answer);
-		return NULL;
-	}
+    int n = sscanf(answer,
+        "%d %d %d %d %d %d %d %d %d %d %d %d %2048[0-9 ]",
+        &fid,
+        &is_video,
+        &n_params,
+        &kf_type,
+        &kf_status,
+        &transition_enabled,
+        &transition_loop,
+        &chain_source,
+        &chain_channel,
+        &video_on,
+        &beat_on,
+        &subrender_entry,
+        rest
+    );
 
-	*mixing_src = tmp[1];
-	*mixing_cha = tmp[2];
-	*enabled = tmp[3];
-	*fx_id = fid;
+    if (n != 13) {
+        g_free(answer);
+        return NULL;
+    }
 
-	g_free(answer);
+    *mixing_src = chain_source;
+    *mixing_cha = chain_channel;
+    *enabled = video_on;
+    *beat_flag = beat_on;
+    *fx_id = fid;
 
-	return strdup(rest);
-}	 
+    g_free(answer);
+
+    return strdup(rest);
+}
 
 typedef struct
 {
@@ -4649,13 +4672,14 @@ typedef struct
 	int	 src;
 	int	 cha;
 	int	 enabled;
+	int beat_flag;
 } clipboard_t;
 
 static clipboard_t	*get_new_clipboard(void)
 {
 	clipboard_t *c = (clipboard_t*) vj_calloc( sizeof(clipboard_t) );
 	
-	c->parameters = get_clipboard_fx_parameter_buffer( &(c->src), &(c->cha), &(c->enabled), &(c->fx_id) );
+	c->parameters = get_clipboard_fx_parameter_buffer( &(c->src), &(c->cha), &(c->enabled),&(c->beat_flag), &(c->fx_id) );
 	if( c->parameters == NULL ) {
 		free(c);
 		return NULL;

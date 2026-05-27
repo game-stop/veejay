@@ -304,7 +304,7 @@ enum {
   WIDGET_CURVECONTAINER = 190,
   WIDGET_SRTFRAME = 192,
   WIDGET_FRAME_FXTREE1 = 193,
-  WIDGET_BUTTON_5_4 = 194,
+  WIDGET_button_audio_playback = 194,
   WIDGET_TOGGLE_MULTICAST = 195,
   WIDGET_CALI_SAVE_BUTTON = 196,
   WIDGET_VBOX633 = 197,
@@ -356,6 +356,8 @@ enum {
   WIDGET_CURVE_TOGGLE_ANIMATION_SHAPE = 255,
   WIDGET_CURVE_BUTTON_BOUND_MAX = 256,
   WIDGET_CURVE_COMBO_ANIMATION = 257,
+  WIDGET_CHAIN_ENTRY_BEAT_TOGGLE = 258,
+  WIDGET_AUDIO_BEAT_TOGGLE = 259,
 };
 
 
@@ -719,7 +721,7 @@ static struct
     {"curve_container",          WIDGET_CURVECONTAINER },
     {"SRTframe",                 WIDGET_SRTFRAME },
     {"frame_fxtree1",            WIDGET_FRAME_FXTREE1 },
-    {"button_5_4",               WIDGET_BUTTON_5_4 },
+    {"button_audio_playback",               WIDGET_button_audio_playback },
     {"cali_save_button",         WIDGET_CALI_SAVE_BUTTON },
     {"veejay_box",               WIDGET_VEEJAY_BOX }, 
     { "vbox633",                 WIDGET_VBOX633 },
@@ -765,6 +767,8 @@ static struct
     { "chain_globalchainlevel", WIDGET_GLOBALCHAINLEVEL},
     { "toggle_vims_forwarding", WIDGET_MESSAGE_FORWARDING },
     { "curve_combo_animation", WIDGET_CURVE_COMBO_ANIMATION },
+    { "beat_entry_toggle", WIDGET_CHAIN_ENTRY_BEAT_TOGGLE},
+    { "button_audio_beat", WIDGET_AUDIO_BEAT_TOGGLE },
     { NULL, -1 },
 };
 
@@ -873,46 +877,33 @@ enum
     ENTRY_FXID = 0,
     ENTRY_ISVIDEO = 1,
     ENTRY_NUM_PARAMETERS = 2,
-    ENTRY_KF_STATUS = 3,
-    ENTRY_KF_TYPE = 4,
+    ENTRY_KF_TYPE = 3,
+    ENTRY_KF_STATUS = 4,
     ENTRY_TRANSITION_ENABLED = 5,
     ENTRY_TRANSITION_LOOP = 6,
     ENTRY_SOURCE = 7,
     ENTRY_CHANNEL = 8,
     ENTRY_VIDEO_ENABLED = 9,
-    ENTRY_SUBRENDER_ENTRY = 10,
-    ENTRY_P0 = 11,
-    ENTRY_P1 = 12,
-    ENTRY_P2 = 13,
-    ENTRY_P3 = 14,
-    ENTRY_P4 = 15,
-    ENTRY_P5 = 16,
-    ENTRY_P6 = 17,
-    ENTRY_P8 = 18,
-    ENTRY_P9 = 19,
-    ENTRY_P10 = 20,
-    ENTRY_P11 = 21,
-    ENTRY_P12 = 22,
-    ENTRY_P13 = 23,
-    ENTRY_P14 = 24,
-    ENTRY_P15 = 25,
-    ENTRY_LAST = 26
-    /*
-    ENTRY_P1 = 16,
-    ENTRY_P2 = 21,
-    ENTRY_P3 = 26,
-    ENTRY_P4 = 31,
-    ENTRY_P5 = 36,
-    ENTRY_P6 = 41,
-    ENTRY_P8 = 46,
-    ENTRY_P9 = 51,
-    ENTRY_P10 = 56,
-    ENTRY_P11 = 61,
-    ENTRY_P12 = 66,
-    ENTRY_P13 = 71,
-    ENTRY_P14 = 76,
-    ENTRY_P15 = 81,
-    ENTRY_LAST = 86 */
+    ENTRY_BEAT_FLAG = 10,
+    ENTRY_SUBRENDER_ENTRY = 11,
+    ENTRY_BEAT_GLOBAL_STATE = 12,
+    ENTRY_P0 = 13,
+    ENTRY_P1 = 14,
+    ENTRY_P2 = 15,
+    ENTRY_P3 = 16,
+    ENTRY_P4 = 17,
+    ENTRY_P5 = 18,
+    ENTRY_P6 = 19,
+    ENTRY_P7 = 20,
+    ENTRY_P8 = 21,
+    ENTRY_P9 = 22,
+    ENTRY_P10 = 23,
+    ENTRY_P11 = 24,
+    ENTRY_P12 = 25,
+    ENTRY_P13 = 26,
+    ENTRY_P14 = 27,
+    ENTRY_P15 = 28,
+    ENTRY_LAST = 29,
 };
 
 #define ENTRY_PARAMSET ENTRY_P0
@@ -1250,11 +1241,12 @@ enum
     FXC_ID = 0,
     FXC_FXID = 1,
     FXC_FXSTATUS = 2,
-    FXC_KF = 3,
-    FXC_MIXING = 4,
-    FXC_SUBRENDER = 5,
-    FXC_KF_STATUS = 6,
-    FXC_N_COLS = 7,
+    FXC_BEAT = 3,
+    FXC_KF = 4,
+    FXC_MIXING = 5,
+    FXC_SUBRENDER = 6,
+    FXC_KF_STATUS = 7,
+    FXC_N_COLS = 8,
 };
 
 enum {
@@ -3972,48 +3964,58 @@ static gboolean chain_update_row(GtkTreeModel * model,
     int entry = info->uc.selected_chain_entry;
     gint gentry = 0;
 
-    gtk_tree_model_get (model, iter,FXC_ID, &gentry, -1);
+    gtk_tree_model_get(model, iter, FXC_ID, &gentry, -1);
 
     if(gentry == entry)
     {
-        int effect_id = gui->uc.entry_tokens[ ENTRY_FXID ];
-        if( effect_id <= 0 )
+        int effect_id = gui->uc.entry_tokens[ENTRY_FXID];
+        if(effect_id <= 0)
         {
-            gtk_list_store_set( GTK_LIST_STORE(model),iter, FXC_ID, entry, -1 );
+            gtk_list_store_set(GTK_LIST_STORE(model), iter, FXC_ID, entry, -1);
         }
         else
         {
-            gchar *descr = _utf8str( _effect_get_description( effect_id ));
-            char  tmp[128];
-            if( _effect_get_mix( effect_id ) )
+            gchar *descr = _utf8str(_effect_get_description(effect_id));
+            char tmp[128];
+            if(_effect_get_mix(effect_id))
             {
-                snprintf(tmp,sizeof(tmp),"%s %d", (gui->uc.entry_tokens[ENTRY_SOURCE] == 0 ? "Sample " : "T " ),
-                    gui->uc.entry_tokens[ENTRY_CHANNEL]);
+                snprintf(tmp, sizeof(tmp), "%s %d",
+                         (gui->uc.entry_tokens[ENTRY_SOURCE] == 0 ? "Sample " : "T "),
+                         gui->uc.entry_tokens[ENTRY_CHANNEL]);
             }
             else
             {
-                snprintf(tmp,sizeof(tmp),"%s"," ");
+                snprintf(tmp, sizeof(tmp), "%s", " ");
             }
 
             gchar *mixing = _utf8str(tmp);
             int kf_status = gui->uc.entry_tokens[ENTRY_KF_STATUS];
-            GdkPixbuf *toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_VIDEO_ENABLED] );
-            GdkPixbuf *kf_toggle = update_pixmap_entry( kf_status );
-            GdkPixbuf *subrender_toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_SUBRENDER_ENTRY]);
-            gtk_list_store_set( GTK_LIST_STORE(model),iter,
+            GdkPixbuf *toggle = update_pixmap_entry(gui->uc.entry_tokens[ENTRY_VIDEO_ENABLED]);
+            GdkPixbuf *beat_toggle = update_pixmap_entry(gui->uc.entry_tokens[ENTRY_BEAT_FLAG]);
+            GdkPixbuf *kf_toggle = update_pixmap_entry(kf_status);
+            GdkPixbuf *subrender_toggle = update_pixmap_entry(gui->uc.entry_tokens[ENTRY_SUBRENDER_ENTRY]);
+
+            gtk_list_store_set(GTK_LIST_STORE(model), iter,
                                FXC_ID, entry,
                                FXC_FXID, descr,
                                FXC_FXSTATUS, toggle,
+                               FXC_BEAT, beat_toggle,
                                FXC_KF, kf_toggle,
                                FXC_MIXING, mixing,
                                FXC_SUBRENDER, subrender_toggle,
                                FXC_KF_STATUS, kf_status,
-                               -1 );
+                               -1);
+
             g_free(descr);
             g_free(mixing);
-            g_object_unref( kf_toggle );
-            g_object_unref( toggle );
-            g_object_unref( subrender_toggle );
+            if(kf_toggle)
+                g_object_unref(kf_toggle);
+            if(toggle)
+                g_object_unref(toggle);
+            if(beat_toggle)
+                g_object_unref(beat_toggle);
+            if(subrender_toggle)
+                g_object_unref(subrender_toggle);
         }
     }
     return FALSE;
@@ -4941,7 +4943,6 @@ static gint load_parameter_info(void)
 {
     int *p = &(info->uc.entry_tokens[0]);
     int len = 0;
-    int i = 0;
 
     multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0, info->uc.selected_chain_entry );
 
@@ -4965,21 +4966,60 @@ static gint load_parameter_info(void)
         return 0;
     }
 
-    char *ptr;
-    char *token = strtok_r( answer," ", &ptr );
-    if(!token) {
+    int raw[ENTRY_LAST];
+    int raw_count = 0;
+    char *ptr = NULL;
+    char *token = NULL;
+
+    veejay_memset(raw, 0, sizeof(raw));
+
+    token = strtok_r(answer, " ", &ptr);
+    while(token != NULL && raw_count < ENTRY_LAST)
+    {
+        raw[raw_count++] = atoi(token);
+        token = strtok_r(NULL, " ", &ptr);
+    }
+
+    if(raw_count < 12)
+    {
         veejay_msg(VEEJAY_MSG_ERROR,"Invalid reply from %d", VIMS_CHAIN_GET_ENTRY );
         free(answer);
         return 0;
     }
-    p[i] = atoi(token);
-    while( (token = strtok_r( NULL, " ", &ptr ) ) != NULL )
+
+    int n_params = raw[ENTRY_NUM_PARAMETERS];
+    if(n_params < 0)
+        n_params = 0;
+    else if(n_params > SAMPLE_MAX_PARAMETERS)
+        n_params = SAMPLE_MAX_PARAMETERS;
+
+    int header_tokens = 12;
+
+    p[ENTRY_FXID] = raw[0];
+    p[ENTRY_ISVIDEO] = raw[1];
+    p[ENTRY_NUM_PARAMETERS] = n_params;
+    p[ENTRY_KF_TYPE] = raw[3];
+    p[ENTRY_KF_STATUS] = raw[4];
+    p[ENTRY_TRANSITION_ENABLED] = raw[5];
+    p[ENTRY_TRANSITION_LOOP] = raw[6];
+    p[ENTRY_SOURCE] = raw[7];
+    p[ENTRY_CHANNEL] = raw[8];
+    p[ENTRY_VIDEO_ENABLED] = raw[9];
+    p[ENTRY_BEAT_FLAG] = raw[10];
+    p[ENTRY_SUBRENDER_ENTRY] = raw[11];
+
+    for(int j = 0; j < n_params; j++)
     {
-        i++;
-        p[i] = atoi( token );
+        int src_index = header_tokens + j;
+        int dst_index = ENTRY_PARAMSET + j;
+
+        if(src_index >= raw_count || dst_index >= ENTRY_LAST)
+            break;
+
+        p[dst_index] = raw[src_index];
     }
 
-    info->uc.selected_rgbkey = _effect_get_rgb( p[0] );
+    info->uc.selected_rgbkey = _effect_get_rgb( p[ENTRY_FXID] );
     if(info->uc.selected_rgbkey)
     {
         gtk_widget_set_sensitive_( widget_cache[WIDGET_RGBKEY], TRUE );
@@ -5018,6 +5058,10 @@ static gint load_parameter_info(void)
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SUBRENDER_ENTRY_TOGGLE])) != p[ENTRY_SUBRENDER_ENTRY]) {
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SUBRENDER_ENTRY_TOGGLE]), p[ENTRY_SUBRENDER_ENTRY]);
+    }
+
+    if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHAIN_ENTRY_BEAT_TOGGLE])) != p[ENTRY_BEAT_FLAG]) {
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHAIN_ENTRY_BEAT_TOGGLE]), p[ENTRY_BEAT_FLAG]);
     }
 
     free(answer);
@@ -5095,13 +5139,22 @@ static void load_generator_info(void)
 static void setup_effectchain_info( void )
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
-    GtkListStore *store = gtk_list_store_new( FXC_N_COLS, G_TYPE_INT, G_TYPE_STRING, GDK_TYPE_PIXBUF,GDK_TYPE_PIXBUF,G_TYPE_STRING, GDK_TYPE_PIXBUF, G_TYPE_INT);
+    GtkListStore *store = gtk_list_store_new(FXC_N_COLS,
+                                             G_TYPE_INT,
+                                             G_TYPE_STRING,
+                                             GDK_TYPE_PIXBUF,
+                                             GDK_TYPE_PIXBUF,
+                                             GDK_TYPE_PIXBUF,
+                                             G_TYPE_STRING,
+                                             GDK_TYPE_PIXBUF,
+                                             G_TYPE_INT);
     gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
     g_object_unref( G_OBJECT( store ));
 
     setup_tree_text_column( "tree_chain", FXC_ID, "#",0 );
     setup_tree_text_column( "tree_chain", FXC_FXID, "Effect",0 ); //FIXME
     setup_tree_pixmap_column( "tree_chain", FXC_FXSTATUS, "Run");
+    setup_tree_pixmap_column( "tree_chain", FXC_BEAT, "Beat");
     setup_tree_pixmap_column( "tree_chain", FXC_KF , "Anim" ); // TODO parameter interpolation on/off per entry
     setup_tree_text_column( "tree_chain", FXC_MIXING, "Channel",0);
     setup_tree_pixmap_column( "tree_chain", FXC_SUBRENDER, "Subrender");
@@ -5116,7 +5169,7 @@ static void setup_effectchain_info( void )
     g_signal_connect(GTK_TREE_VIEW(tree), "button-press-event",
                      (GCallback) on_effectchain_button_pressed, NULL);
 
-    GtkTreeViewColumn *col_effect = gtk_tree_view_get_column(GTK_TREE_VIEW(tree), 1);
+    GtkTreeViewColumn *col_effect = gtk_tree_view_get_column(GTK_TREE_VIEW(tree), FXC_FXID);
 
     if (col_effect) {
         gtk_tree_view_column_set_expand(col_effect, TRUE);
@@ -5124,7 +5177,7 @@ static void setup_effectchain_info( void )
     }
 
     for(int i = 0; i < FXC_N_COLS; i++) {
-        if(i == 1) continue;
+        if(i == FXC_FXID) continue;
         GtkTreeViewColumn *c = gtk_tree_view_get_column(GTK_TREE_VIEW(tree), i);
         if(c) {
             gtk_tree_view_column_set_expand(c, FALSE);
@@ -5156,7 +5209,7 @@ static void load_effectchain_info(void)
     info->uc.reload_hint_checksums[HINT_CHAIN] = checksum;
 
     GtkListStore *store;
-    guint arr[VIMS_CHAIN_LIST_ENTRY_VALUES];
+    guint arr[10];
     GtkTreeIter iter;
     gint offset=0;
 
@@ -5201,15 +5254,44 @@ static void load_effectchain_info(void)
         veejay_memset(line,0,sizeof(line));
 
         strncpy( line, fxtext + offset, VIMS_CHAIN_LIST_ENTRY_LENGTH );
+#if VIMS_CHAIN_LIST_ENTRY_VALUES >= 10
         int n_tokens = sscanf( line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
-               &arr[0],&arr[1],&arr[2],&arr[3],&arr[4],&arr[5],&arr[6], &arr[7], &arr[8]);
+               &arr[0], &arr[1], &arr[2], &arr[3], &arr[4],
+               &arr[5], &arr[6], &arr[7], &arr[8], &arr[9]);
+#else
+        int n_tokens = sscanf( line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
+               &arr[0], &arr[1], &arr[2], &arr[3], &arr[4],
+               &arr[5], &arr[6], &arr[7], &arr[8]);
+#endif
         if( n_tokens != VIMS_CHAIN_LIST_ENTRY_VALUES ) {
             veejay_msg(0,"Error parsing FX chain response");
             break;
         }
 
+        int chain_entry = arr[0];
+        int effect_id = arr[1];
+        int entry_enabled = arr[3];
+        int beat_enabled = 0;
+        int chain_source = 0;
+        int chain_channel = 0;
+        int kf_status = 0;
+        int subrender_entry = 0;
+
+#if VIMS_CHAIN_LIST_ENTRY_VALUES >= 10
+        beat_enabled = arr[4];
+        chain_source = arr[6];
+        chain_channel = arr[7];
+        kf_status = arr[8];
+        subrender_entry = arr[9];
+#else
+        chain_source = arr[5];
+        chain_channel = arr[6];
+        kf_status = arr[7];
+        subrender_entry = arr[8];
+#endif
+
         // clean list until next entry
-        while( last_index < arr[0] )
+        while( last_index < chain_entry )
         {
             gtk_list_store_append( store, &iter );
             gtk_list_store_set( store, &iter, FXC_ID, last_index,-1);
@@ -5217,15 +5299,15 @@ static void load_effectchain_info(void)
         }
 
         // time to fill current entry
-        char *name = _effect_get_description( arr[1] );
+        char *name = _effect_get_description( effect_id );
 
-        if( last_index == arr[0])
+        if( last_index == chain_entry)
         {
             gchar *utf8_name = _utf8str( name );
             char  tmp[128];
-            if( _effect_get_mix( arr[1] ) ) {
-                snprintf(tmp,sizeof(tmp),"%s %d", (arr[5] == 0 ? "Sample " : "T " ),
-                    arr[6]);
+            if( _effect_get_mix( effect_id ) ) {
+                snprintf(tmp,sizeof(tmp),"%s %d", (chain_source == 0 ? "Sample " : "T " ),
+                    chain_channel);
             }
             else {
                 snprintf(tmp,sizeof(tmp),"%s"," ");
@@ -5233,14 +5315,15 @@ static void load_effectchain_info(void)
             gchar *mixing = _utf8str(tmp);
 
             gtk_list_store_append( store, &iter );
-            int kf_status = arr[7];
-            GdkPixbuf *toggle = update_pixmap_entry( arr[3] );
+            GdkPixbuf *toggle = update_pixmap_entry( entry_enabled );
+            GdkPixbuf *beat_toggle = update_pixmap_entry( beat_enabled );
             GdkPixbuf *kf_togglepf = update_pixmap_entry( kf_status );
-            GdkPixbuf *subrender_toggle = update_pixmap_entry(arr[8]);
+            GdkPixbuf *subrender_toggle = update_pixmap_entry(subrender_entry);
             gtk_list_store_set( store, &iter,
-                               FXC_ID, arr[0],
+                               FXC_ID, chain_entry,
                                FXC_FXID, utf8_name,
                                FXC_FXSTATUS, toggle,
+                               FXC_BEAT, beat_toggle,
                                FXC_KF, kf_togglepf,
                                FXC_MIXING,mixing, 
                                FXC_SUBRENDER, subrender_toggle,
@@ -5249,9 +5332,14 @@ static void load_effectchain_info(void)
             last_index ++;
             g_free(utf8_name);
             g_free(mixing);
-            g_object_unref( toggle );
-            g_object_unref( kf_togglepf );
-            g_object_unref( subrender_toggle );
+            if(toggle)
+                g_object_unref( toggle );
+            if(beat_toggle)
+                g_object_unref( beat_toggle );
+            if(kf_togglepf)
+                g_object_unref( kf_togglepf );
+            if(subrender_toggle)
+                g_object_unref( subrender_toggle );
         }
         offset += VIMS_CHAIN_LIST_ENTRY_LENGTH;
     }
@@ -7046,6 +7134,7 @@ static int load_editlist_info(void)
     long dum[2];
     char tmp[16];
     int len = 0;
+    int beat_enabled = 0;
     int global_transition_state = 0;
     char filepath[PATH_MAX];
 
@@ -7058,12 +7147,12 @@ static int load_editlist_info(void)
 #endif
         return 0;
     }
-    int got_n = sscanf(res, "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d %s",
+    int got_n = sscanf(res, "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d %s %d",
        &values[0], &values[1], &values[2], &values[3], &fps,
        &values[4], &values[5], &rate, &values[7],
-       &dum[0], &dum[1], &values[8], &use_vims_mcast, &global_transition_state, filepath);
+       &dum[0], &dum[1], &values[8], &use_vims_mcast, &global_transition_state, filepath, &beat_enabled);
 
-    if( got_n < 14 ) {
+    if( got_n < 15 ) {
         veejay_msg(VEEJAY_MSG_ERROR, "Parsing failed: expected 14, got %d. Data: %s", got_n, res);
         veejay_msg(VEEJAY_MSG_ERROR, "fps ptr=%p rate ptr=%p dum0=%p dum1=%p",
             (void*)&fps,
@@ -7123,23 +7212,15 @@ static int load_editlist_info(void)
     update_label_i( "label_el_achans", values[7], 0);
     update_label_i( "label_el_abits", values[5], 0);
 
-    if( values[4] == 0 )
-    {
-        if(gtk_widget_is_sensitive( widget_cache[ WIDGET_BUTTON_5_4 ] ))
-            gtk_widget_set_sensitive(widget_cache[ WIDGET_BUTTON_5_4 ], FALSE);
-    }
-    else
-    {
-        if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_BUTTON_5_4 ] ))
-            gtk_widget_set_sensitive(widget_cache[ WIDGET_BUTTON_5_4 ], TRUE);
-        if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_BUTTON_5_4 ] )) != values[8] )
-            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_BUTTON_5_4 ] ) , values[8] );
-    }
-
     int button_global_state = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_GLOBAL_TRANSITIONS_TOGGLE ]));
     if( button_global_state != global_transition_state ) {
         gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_GLOBAL_TRANSITIONS_TOGGLE ]), global_transition_state );
     }
+
+
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_AUDIO_BEAT_TOGGLE ] )) != beat_enabled )
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_AUDIO_BEAT_TOGGLE ] ) , beat_enabled );
+
 
     free(res);
 
