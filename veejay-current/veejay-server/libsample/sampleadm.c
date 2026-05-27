@@ -2445,7 +2445,7 @@ int sample_chain_add(int s1, int c, int effect_nr, int is_enabled)
     sample->effect_chain[c]->e_flag = is_enabled;
     sample->effect_chain[c]->kf_status = 0;
     sample->effect_chain[c]->kf_type = 0;
-    sample->effect_chain[c]->beat_flag = 0;
+    // sample->effect_chain[c]->beat_flag = 0;
 
     if (vje_get_extra_frame(effect_nr))
     {
