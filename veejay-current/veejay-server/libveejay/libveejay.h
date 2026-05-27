@@ -142,4 +142,11 @@ void usleep_accurate(long long usec, video_playback_setup *settings);
 
 void	veejay_event_handle(veejay_t *info);
 
+
+int veejay_audio_beat_toggle(veejay_t *info);
+int veejay_audio_beat_set_enabled(veejay_t *info, int enabled);
+int veejay_audio_beat_push_config(veejay_t *info, int freeze_ms, int cooldown_ms, int threshold, int input_channels);
+int veejay_audio_beat_is_enabled(veejay_t *info);
+int veejay_audio_beat_get_status(veejay_t *info, int *enabled, int *open, long *hits, int *level_q15, int *transient_q8);
+
 #endif
