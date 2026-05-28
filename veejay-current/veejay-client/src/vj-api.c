@@ -2155,8 +2155,11 @@ char *_effect_get_hint(int effect_id, int p, int v)
     if(ec != NULL)
     {
         if( ec->hints[p] == NULL)
-                return FX_PARAMETER_VALUE_DEFAULT_HINT;
-
+            return FX_PARAMETER_VALUE_DEFAULT_HINT;
+        if( ec->hints[p]->description == NULL ||
+            ec->hints[p]->description[v] == NULL )
+            return FX_PARAMETER_VALUE_DEFAULT_HINT;
+            
         return ec->hints[p]->description[v];
     }
     return FX_PARAMETER_VALUE_DEFAULT_HINT;
