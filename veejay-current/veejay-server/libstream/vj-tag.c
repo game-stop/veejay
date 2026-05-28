@@ -2848,6 +2848,9 @@ int vj_tag_get_loop_stat_stop(int s1) {
 void    vj_tag_set_loop_stat_stop(int s1, int loop_stop) {
     vj_tag *tag = vj_tag_get(s1);
     if(!tag) return;
+    if(loop_stop < 1)
+        loop_stop = 1;
+
     tag->loop_stat_stop = loop_stop;
 }
 

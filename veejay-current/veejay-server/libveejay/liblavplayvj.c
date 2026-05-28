@@ -1216,16 +1216,20 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
     } else if (new_pm == VJ_PLAYBACK_MODE_PLAIN) {
         if (info->edit_list->video_frames < 1) {
             veejay_msg(VEEJAY_MSG_ERROR, "[Playback] No video frames in EditList");
-            return; 
+            return;
         }
     }
 
-    if (!info->seq->active && // transitions from current position in the timeline
+	const int seq_transition_commit =
+		info->seq->active &&
+		new_pm == VJ_PLAYBACK_MODE_SAMPLE &&
+		settings->transition.ready != 0;
+
+    if (!info->seq->active &&
         settings->transition.ready == 0 &&
         new_pm != VJ_PLAYBACK_MODE_PLAIN &&
         (sample_id != cur_id || new_pm != current_pm) &&
-		atomic_load_int(&settings->transition.global_state)
-	) 
+        atomic_load_int(&settings->transition.global_state))
     {
         settings->transition.next_type = new_pm;
         settings->transition.next_id = sample_id;
@@ -1239,36 +1243,42 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
 
         if (settings->current_playback_speed < 0) {
             end = start - transition_length;
-            if (end < settings->min_frame_num) end = settings->min_frame_num;
+            if (end < settings->min_frame_num)
+                end = settings->min_frame_num;
         } else if (settings->current_playback_speed > 0) {
             end = start + transition_length;
-            if (end > settings->max_frame_num) end = settings->max_frame_num;
+            if (end > settings->max_frame_num)
+                end = settings->max_frame_num;
         } else {
-            end = start; 
+            end = start;
         }
-        
+
         atomic_store_long_long(&settings->transition.start, start);
         atomic_store_long_long(&settings->transition.end, end);
 
         int transition_shape = (current_pm == VJ_PLAYBACK_MODE_SAMPLE)
-                                ? sample_get_transition_shape(cur_id)
-                                : vj_tag_get_transition_shape(cur_id);
+                                    ? sample_get_transition_shape(cur_id)
+                                    : vj_tag_get_transition_shape(cur_id);
 
-        settings->transition.shape = (transition_shape != -1)
-                                        ? transition_shape
-                                        : (int)(  ((double) shapewipe_get_num_shapes(settings->transition.ptr)) * rand() / (RAND_MAX));
+        settings->transition.shape =
+            (transition_shape != -1)
+                ? transition_shape
+                : (int)(((double)shapewipe_get_num_shapes(settings->transition.ptr)) *
+                        rand() / (RAND_MAX));
 
         int active = (current_pm == VJ_PLAYBACK_MODE_SAMPLE)
-                                        ? sample_get_transition_active(cur_id)
-                                        : vj_tag_get_transition_active(cur_id);
+                         ? sample_get_transition_active(cur_id)
+                         : vj_tag_get_transition_active(cur_id);
 
         atomic_store_int(&settings->transition.active, active);
 
-        veejay_msg(VEEJAY_MSG_INFO, "[Playback] Transition: length=%d, shape=%d, active=%d", 
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[Playback] Transition: length=%d, shape=%d, active=%d",
                    transition_length, settings->transition.shape, active);
 
         if (active) {
-            veejay_msg(VEEJAY_MSG_INFO, "[Playback] Deferring mode switch for transition");
+            veejay_msg(VEEJAY_MSG_INFO,
+                       "[Playback] Deferring mode switch for transition");
             return;
         }
     }
@@ -1279,67 +1289,97 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
         {
             if (!info->seq->active) {
                 if (info->settings->sample_restart) {
-                    veejay_msg(VEEJAY_MSG_INFO, "[Playback] Restarting Sample %d", cur_id);
+                    veejay_msg(VEEJAY_MSG_INFO,
+                               "[Playback] Restarting Sample %d", cur_id);
                     sample_set_resume_override(cur_id, -1);
                     veejay_sample_resume_at(info, cur_id);
                 } else {
-                    veejay_msg(VEEJAY_MSG_INFO, "[Playback] (Continuous mode) Sample %d already playing", sample_id);
+                    veejay_msg(VEEJAY_MSG_INFO,
+                               "[Playback] (Continuous mode) Sample %d already playing",
+                               sample_id);
                 }
                 return;
             }
         } else {
-            veejay_msg(VEEJAY_MSG_INFO, "[Playback] Stopping Sample %d", cur_id);
+            veejay_msg(VEEJAY_MSG_INFO,
+                       "[Playback] Stopping Sample %d", cur_id);
             veejay_stop_playing_sample(info, cur_id);
         }
     }
-    
+
     if (current_pm == VJ_PLAYBACK_MODE_TAG)
     {
-        if (cur_id != sample_id) {
-            veejay_msg(VEEJAY_MSG_INFO, "[Playback] Stopping Stream %d", cur_id);
+        if (cur_id != sample_id || new_pm != VJ_PLAYBACK_MODE_TAG) {
+            veejay_msg(VEEJAY_MSG_INFO,
+                       "[Playback] Stopping Stream %d", cur_id);
             veejay_stop_playing_stream(info, cur_id);
         }
     }
 
     if (new_pm == VJ_PLAYBACK_MODE_PLAIN)
     {
-        if (current_pm == VJ_PLAYBACK_MODE_TAG) veejay_stop_playing_stream(info, cur_id);
-        if (current_pm == VJ_PLAYBACK_MODE_SAMPLE) veejay_stop_playing_sample(info, cur_id);
-            
+        if (current_pm == VJ_PLAYBACK_MODE_TAG)
+            veejay_stop_playing_stream(info, cur_id);
+
+        if (current_pm == VJ_PLAYBACK_MODE_SAMPLE)
+            veejay_stop_playing_sample(info, cur_id);
+
         info->uc->playback_mode = new_pm;
         info->current_edit_list = info->edit_list;
 
-		atomic_store_long_long(&settings->min_frame_num, 0 );
-		atomic_store_long_long(&settings->max_frame_num, (long long) info->edit_list->total_frames);
-		atomic_store_long_long(&settings->current_frame_num, 0);
-	}
+        atomic_store_long_long(&settings->min_frame_num, 0);
+        atomic_store_long_long(&settings->max_frame_num,
+                               (long long)info->edit_list->total_frames);
+        atomic_store_long_long(&settings->current_frame_num, 0);
+    }
     else if (new_pm == VJ_PLAYBACK_MODE_TAG)
     {
         info->uc->playback_mode = new_pm;
-        
-		atomic_store_long_long(&settings->min_frame_num, 0 );
-        atomic_store_long_long(&settings->max_frame_num, (long long) vj_tag_get_n_frames(sample_id));
+
+        atomic_store_long_long(&settings->min_frame_num, 0);
+        atomic_store_long_long(&settings->max_frame_num,
+                               (long long)vj_tag_get_n_frames(sample_id));
         atomic_store_long_long(&settings->current_frame_num, 0);
 
         veejay_start_playing_stream(info, sample_id);
     }
-    else if (new_pm == VJ_PLAYBACK_MODE_SAMPLE) 
+    else if (new_pm == VJ_PLAYBACK_MODE_SAMPLE)
     {
         info->uc->playback_mode = new_pm;
         veejay_start_playing_sample(info, sample_id);
     }
-    
-    if (info->seq->active) {
-		sample_set_resume(sample_id, -1);
-        long pos = sample_get_resume(sample_id);
-        veejay_set_frame(info, pos);
-  		int next_id = sample_id;
-		int next_slot = info->seq->current;
+
+    if (info->seq->active)
+    {
+        if (new_pm == VJ_PLAYBACK_MODE_SAMPLE) {
+            if (!seq_transition_commit)
+                sample_set_resume(sample_id, -1);
+
+            long pos = sample_get_resume(sample_id);
+            veejay_set_frame(info, pos);
+        }
+        else if (new_pm == VJ_PLAYBACK_MODE_TAG) {
+            veejay_set_frame(info, 0);
+        }
+        else if (new_pm == VJ_PLAYBACK_MODE_PLAIN) {
+            veejay_set_frame(info, 0);
+        }
+
+        int next_id   = sample_id;
+        int next_slot = info->seq->current;
         int next_mode = new_pm;
-		next_id = vj_perform_next_sequence( info, &next_mode,&next_slot );
-        vj_perform_setup_transition( info, next_id, next_mode, sample_id, new_pm, next_slot );
+
+        next_id = vj_perform_next_sequence(info, &next_mode, &next_slot);
+
+        vj_perform_setup_transition(info,
+                                    next_id,
+                                    next_mode,
+                                    sample_id,
+                                    new_pm,
+                                    next_slot);
     }
-    else if (new_pm == VJ_PLAYBACK_MODE_SAMPLE) {
+    else if (new_pm == VJ_PLAYBACK_MODE_SAMPLE)
+    {
         veejay_sample_resume_at(info, sample_id);
     }
 }

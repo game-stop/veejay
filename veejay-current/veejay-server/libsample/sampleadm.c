@@ -1614,26 +1614,32 @@ int sample_set_chain_status(int s1, int position, int status)
 
 int sample_get_frame_length(int s1)
 {
-	sample_info *sample = sample_get(s1);
+    sample_info *sample = sample_get(s1);
     if (!sample)
-		return 0;
+        return 0;
 
-	int len = 1 + abs( sample->last_frame - sample->first_frame );
-	int speed = abs( sample->speed );
+    int start = 0;
+    int end = 0;
 
-	len = len / speed;
+    if (!sample_effective_range_from_info(sample, &start, &end))
+        return 0;
 
-	if( sample->dup > 0) {
-		len = len * sample->dup;
-	}
+    int len = 1 + abs(end - start);
 
-	if(sample->looptype == 2) {
-		len *= 2;
-	}
+    int speed = abs(sample->speed);
+    if (speed == 0)
+        speed = 1;
 
-	return len;
+    len = len / speed;
+
+    if (sample->dup > 0)
+        len *= sample->dup;
+
+    if (sample->looptype == 2)
+        len *= 2;
+
+    return len;
 }
-
 /****************************************************************************************************
  *
  * sample_get_speed

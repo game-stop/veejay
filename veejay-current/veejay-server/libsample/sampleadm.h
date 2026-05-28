@@ -226,7 +226,6 @@ extern void sample_move_fx_pointers(sample_eff_chain **target, sample_eff_chain 
 extern int sample_chain_apply_full(sample_eff_chain **effect_chain,int chain_index,int effect_id,int *args,int anim,int channel,
     int source_type,int e_flag,int a_flag,int volume,int kf_status,int kf_type, int beat);
 #endif
-extern int sample_get_position(int s1);
 extern int sample_set_state(int new_state);
 extern int sample_get_state();
 extern sample_info *sample_skeleton_new(long startFrame, long endFrame);

@@ -9552,8 +9552,11 @@ void vj_event_send_sample_list(void *ptr, const char format[], va_list ap)
             if (!sample_exists(i))
                 continue;
 
-            int start_frame = sample_get_startFrame(i);
-            int end_frame   = sample_get_endFrame(i);
+            int start_frame = 0;
+            int end_frame = 0;
+
+            if (sample_get_el_position(i, &start_frame, &end_frame) <= 0)
+                continue;
 
             char description[SAMPLE_MAX_DESCR_LEN];
             sample_get_description(i, description);
@@ -11442,43 +11445,74 @@ void    vj_event_get_sample_sequences(      void *ptr,  const char format[],    
     free(s_print_buf);  
 }
 
-void    vj_event_sample_sequencer_active(   void *ptr,  const char format[],    va_list ap )
+void vj_event_sample_sequencer_active(void *ptr, const char format[], va_list ap)
 {
-    int args[5];
-    veejay_t *v = (veejay_t*)ptr;
-    P_A(args,sizeof(args),NULL,0,format,ap);
+    int args[5] = { 0, 0, 0, 0, 0 };
+    veejay_t *v = (veejay_t*) ptr;
 
-    if( v->seq->size == 0 )
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if (args[0] == 0)
+    {
+        const int cur_mode = v->uc->playback_mode;
+        const int cur_id   = v->uc->sample_id;
+
+        v->seq->active = 0;
+        v->seq->current = 0;
+
+        vj_perform_reset_transition(v);
+
+        if (cur_mode == VJ_PLAYBACK_MODE_SAMPLE && sample_exists(cur_id)) {
+            sample_set_loop_stats(cur_id, 0);
+            sample_set_loops(cur_id, -1);
+        }
+        else if (cur_mode == VJ_PLAYBACK_MODE_TAG && vj_tag_exists(cur_id)) {
+            vj_tag_set_loop_stats(cur_id, 0);
+            vj_tag_set_loops(cur_id, -1);
+        }
+
+        veejay_msg(VEEJAY_MSG_INFO,"Sample sequencer disabled; current source keeps looping");
+        return;
+    }
+
+    if (v->seq->size == 0)
     {
         veejay_msg(VEEJAY_MSG_ERROR, "Sequencer list is empty. Please add samples first");
         return;
     }
 
-    if( args[0] == 0 )
-    {
-        v->seq->active = 0;
-        v->seq->current = 0;
-        
-        veejay_reset_sample_positions( v, -1 );
-        veejay_msg(VEEJAY_MSG_INFO, "Sample sequencer disabled");
-    }
-    else 
-    {
-        v->seq->current = 0;
+    v->seq->current = 0;
 
-        int next_type = 0;
-        int next_sample_id = vj_perform_get_next_sequence_id(v, &next_type, 0, &(v->seq->current) );
-    
-        if( next_sample_id > 0 ) {
-            v->seq->active = 1;
-            veejay_reset_sample_positions( v, -1 );
-            veejay_change_playback_mode(v, (next_type == VJ_PLAYBACK_MODE_SAMPLE ? VJ_PLAYBACK_MODE_SAMPLE: VJ_PLAYBACK_MODE_TAG ), next_sample_id );
-            veejay_msg(VEEJAY_MSG_INFO, "Sample sequencer enabled");
-        }
-        else {
-            veejay_msg(VEEJAY_MSG_ERROR,"Sample sequencer is empty");
+    int next_type = 0;
+    int next_sample_id = vj_perform_get_next_sequence_id(v, &next_type, 0, &(v->seq->current));
+
+    if (next_sample_id <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Sample sequencer is empty");
+        return;
+    }
+
+    const int playback_mode = (next_type == 0 || next_type == VJ_PLAYBACK_MODE_SAMPLE) ? VJ_PLAYBACK_MODE_SAMPLE : VJ_PLAYBACK_MODE_TAG;
+
+    if (playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
+        if (!sample_exists(next_sample_id)) {
+            veejay_msg(VEEJAY_MSG_ERROR,"Sequencer sample %d does not exist",next_sample_id);
+            return;
         }
     }
+    else {
+        if (!vj_tag_exists(next_sample_id)) {
+            veejay_msg(VEEJAY_MSG_ERROR,"Sequencer stream %d does not exist",next_sample_id);
+            return;
+        }
+    }
+
+    v->seq->active = 1;
+
+    veejay_reset_sample_positions(v, -1);
+
+    veejay_change_playback_mode(v, playback_mode, next_sample_id);
+
+    veejay_msg(VEEJAY_MSG_INFO, "Sample sequencer enabled");
 }
 
 static int  vj_event_macro_loop_stat_auto( veejay_t *v, void *macro, int new_state )
