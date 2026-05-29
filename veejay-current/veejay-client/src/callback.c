@@ -1942,11 +1942,18 @@ void on_button_seq_clearall_clicked(GtkWidget *w, gpointer data)
         }
     }
 
+	int old_lock = info->status_lock;
+    info->status_lock = 1;
+
     gtk_toggle_button_set_active(
         GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SEQACTIVE]),
         FALSE);
 
+	info->status_lock = old_lock;
+
     vj_msg(VEEJAY_MSG_INFO, "Sequencer cleared");
+
+	info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
 void	on_seq_rec_stop_clicked( GtkWidget *w, gpointer data )
@@ -5588,7 +5595,10 @@ void on_seqactive_toggled(GtkWidget *w, gpointer data)
     multi_vims(VIMS_SEQUENCE_STATUS, "%d", enabled);
     vj_midi_learning_vims_msg(info->midi, NULL, VIMS_SEQUENCE_STATUS, enabled);
 
-    vj_msg(VEEJAY_MSG_INFO,
+	if(enabled)
+		info->uc.reload_hint[HINT_SEQ_ACT] = 1; // reload sequence list on enabled
+    
+	vj_msg(VEEJAY_MSG_INFO,
            "Sample sequencer is %s",
            enabled ? "enabled" : "disabled");
 }
