@@ -6978,6 +6978,31 @@ void	reload_macros(void)
 	info->uc.reload_hint[HINT_MACRO] = 0;
 }
 
+static int el_parse_dec_field(const char *buf, size_t len, size_t *off, size_t width, uint64_t *out)
+{
+    if (!buf || !off || !out)
+        return 0;
+
+    if (*off + width > len)
+        return 0;
+
+    uint64_t v = 0;
+
+    for (size_t i = 0; i < width; i++) {
+        unsigned char c = (unsigned char)buf[*off + i];
+
+        if (c < '0' || c > '9')
+            return 0;
+
+        v = (v * 10) + (uint64_t)(c - '0');
+    }
+
+    *off += width;
+    *out = v;
+
+    return 1;
+}
+
 static void reload_editlist_contents(void)
 {
     GtkWidget *tree = glade_xml_get_widget_(info->main_window, "editlisttree");
@@ -6986,133 +7011,184 @@ static void reload_editlist_contents(void)
 
     gint len = 0;
     single_vims(VIMS_EDITLIST_LIST);
-    gchar *eltext = recv_vims(6, &len); // msg len
-    gint offset = 0;
-    gint num_files = 0;
+    gchar *eltext = recv_vims(6, &len);
+
+    size_t offset = 0;
+    uint64_t u = 0;
 
     reset_tree("editlisttree");
     _el_ref_reset();
     _el_entry_reset();
     _edl_reset();
 
-    if (!eltext || len <= 0) {
+    if (!eltext || len <= 0)
         return;
-    }
 
-    if (len - offset < 4) goto cleanup;
-    char tmp[2048] = {0};
+#define FAIL() goto cleanup
+#define NEED(N) do { if (offset + (size_t)(N) > (size_t)len) FAIL(); } while (0)
 
-    // num_files 
-    strncpy(tmp, eltext + offset, 4);
-    if (sscanf(tmp, "%d", &num_files) != 1) goto cleanup;
-    offset += 4;
+    if (!el_parse_dec_field(eltext, len, &offset, 4, &u))
+        FAIL();
 
-    for (int i = 0; i < num_files; i++)
-    {
-        int name_len = 0;
-        if (len - offset < 4) goto cleanup;
-        strncpy(tmp, eltext + offset, 4);
-        if (sscanf(tmp, "%d", &name_len) != 1) goto cleanup;
-        offset += 4;
-        
-        if (len - offset < name_len) goto cleanup;
-        char *file = strndup(eltext + offset, name_len);
+    int num_files = (int)u;
+
+    for (int i = 0; i < num_files; i++) {
+        if (!el_parse_dec_field(eltext, len, &offset, 4, &u))
+            FAIL();
+
+        size_t name_len = (size_t)u;
+        NEED(name_len);
+
+        char *file = g_strndup(eltext + offset, name_len);
+        if (!file)
+            FAIL();
+
         offset += name_len;
 
-        if (len - offset < 4) { free(file); goto cleanup; }
-        strncpy(tmp, eltext + offset, 4);
-        int iterv = 0;
-        if (sscanf(tmp, "%d", &iterv) != 1) { free(file); goto cleanup; }
-        offset += 4;
+        if (!g_utf8_validate(file, -1, NULL)) {
+            g_free(file);
+            FAIL();
+        }
 
-        if (len - offset < 10) { free(file); goto cleanup; }
-        strncpy(tmp, eltext + offset, 10);
-        long num_frames = 0;
-        if (sscanf(tmp, "%ld", &num_frames) != 1) { free(file); goto cleanup; }
-        offset += 10;
+        if (!el_parse_dec_field(eltext, len, &offset, 4, &u)) {
+            g_free(file);
+            FAIL();
+        }
 
-        if (len - offset < 4) { free(file); goto cleanup; }
-        char *fourcc = strndup(eltext + offset, 4);
+        int iterv = (int)u;
+
+        if (!el_parse_dec_field(eltext, len, &offset, 10, &u)) {
+            g_free(file);
+            FAIL();
+        }
+
+        long num_frames = (long)u;
+
+        NEED(4);
+
+        char *fourcc = g_strndup(eltext + offset, 4);
+        if (!fourcc) {
+            g_free(file);
+            FAIL();
+        }
+
         offset += 4;
 
         el_constr *el = _el_entry_new(iterv, file, num_frames, fourcc);
         info->editlist = g_list_append(info->editlist, el);
 
-        free(file);
-        free(fourcc);
+        g_free(file);
+        g_free(fourcc);
     }
 
+    if (!tree)
+        FAIL();
+
     GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(tree));
-    if (!GTK_IS_LIST_STORE(model)) goto cleanup;
+    if (!GTK_IS_LIST_STORE(model))
+        FAIL();
+
     store = GTK_LIST_STORE(model);
+
+    if (!el_parse_dec_field(eltext, len, &offset, 16, &u))
+        FAIL();
+
+    long cur_file = (long)u;
+
+    if (!el_parse_dec_field(eltext, len, &offset, 16, &u))
+        FAIL();
+
+    long cur_start = (long)u;
 
     int total_frames = 0;
     int row_num = 0;
 
-    
-    if (offset + 32 > len) goto cleanup;
+#define APPEND_SEGMENT(FILE_IDX, START, END) do {                                \
+    long file_idx_ = (FILE_IDX);                                                  \
+    long seg_start_ = (START);                                                    \
+    long seg_end_ = (END);                                                        \
+                                                                                  \
+    if (seg_end_ < seg_start_)                                                    \
+        FAIL();                                                                   \
+                                                                                  \
+    total_frames += (int)(seg_end_ - seg_start_ + 1);                             \
+                                                                                  \
+    info->elref = g_list_append(info->elref,                                      \
+        _el_ref_new(row_num, (int)file_idx_, seg_start_, seg_end_, total_frames)); \
+                                                                                  \
+    char *tmpname = _el_get_filename((int)file_idx_);                             \
+    gchar *fname_raw = tmpname ? get_relative_path(tmpname) : g_strdup("(missing)"); \
+    gchar *fname = g_utf8_validate(fname_raw, -1, NULL)                           \
+                 ? g_strdup(fname_raw)                                            \
+                 : g_utf8_make_valid(fname_raw, -1);                              \
+    char *timecode = format_selection_time(seg_start_, seg_end_);                 \
+    gchar *gfourcc = _utf8str(_el_get_fourcc((int)file_idx_));                    \
+    gchar *timeline = format_selection_time(0, total_frames);                     \
+                                                                                  \
+    gtk_list_store_append(store, &iter);                                          \
+    gtk_list_store_set(store, &iter,                                              \
+        COLUMN_INT, (guint)row_num,                                               \
+        COLUMN_STRING0, timeline,                                                 \
+        COLUMN_STRINGA, fname,                                                    \
+        COLUMN_STRINGB, timecode,                                                 \
+        COLUMN_STRINGC, gfourcc,                                                  \
+        -1);                                                                      \
+                                                                                  \
+    free(timecode);                                                               \
+    g_free(gfourcc);                                                              \
+    g_free(fname);                                                                \
+    g_free(fname_raw);                                                            \
+    free(timeline);                                                               \
+                                                                                  \
+    row_num++;                                                                    \
+} while (0)
 
-    char firstbuf[33] = {0};
-    memcpy(firstbuf, eltext + offset, 32);
-    offset += 32;
+    while ((size_t)len - offset > 16) {
+        if ((size_t)len - offset < 48)
+            FAIL();
 
-    long oldfile = 0;
-    long oldframe = 0;
+        if (!el_parse_dec_field(eltext, len, &offset, 16, &u))
+            FAIL();
 
-    if (sscanf(firstbuf, "%016ld%016ld", &oldfile, &oldframe) != 2)
-        goto cleanup;
+        long prev_end = (long)u;
 
-    while(offset + 48 < len ) {
-        long cur_file_idx = 0;
-        long cur_frame_idx = 0;
+        if (!el_parse_dec_field(eltext, len, &offset, 16, &u))
+            FAIL();
 
-        if( sscanf(eltext + offset, "%16ld%16ld%16ld",&oldframe, &cur_file_idx,
-            &cur_frame_idx) != 3) 
-            goto cleanup;
-            
-        total_frames += (cur_frame_idx - oldframe + 1);
+        long next_file = (long)u;
 
-        info->elref = g_list_append(info->elref,
-                        _el_ref_new(row_num, (int)cur_file_idx, oldframe, cur_frame_idx, total_frames));
+        if (!el_parse_dec_field(eltext, len, &offset, 16, &u))
+            FAIL();
 
-        char *tmpname = _el_get_filename(cur_file_idx);
-        gchar *fname = get_relative_path(tmpname);
-        char *timecode = format_selection_time(oldframe, cur_frame_idx);
-        gchar *gfourcc = _utf8str(_el_get_fourcc(oldframe));
-        gchar *timeline = format_selection_time(0, total_frames);
+        long next_start = (long)u;
 
-        gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter,
-                        COLUMN_INT, (guint)row_num,
-                        COLUMN_STRING0, timeline,
-                        COLUMN_STRINGA, fname,
-                        COLUMN_STRINGB, timecode,
-                        COLUMN_STRINGC, gfourcc, -1);
+        APPEND_SEGMENT(cur_file, cur_start, prev_end);
 
-        free(timecode);
-        g_free(gfourcc);
-        g_free(fname);
-        free(timeline);
-
-        row_num++;
-        offset += 48;
-
+        cur_file = next_file;
+        cur_start = next_start;
     }
 
-    while(offset + 16 < len ) {
-        if( sscanf(eltext + offset, "%16ld", &oldframe) != 1)
-            goto cleanup;
+    if (!el_parse_dec_field(eltext, len, &offset, 16, &u))
+        FAIL();
 
-        offset += 16;
-    }
+    long final_end = (long)u;
+
+    APPEND_SEGMENT(cur_file, cur_start, final_end);
 
     gtk_tree_view_set_model(GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 
-    free(eltext);
+#undef APPEND_SEGMENT
+#undef NEED
+#undef FAIL
 
+    free(eltext);
     return;
+
 cleanup:
-    veejay_msg(VEEJAY_MSG_DEBUG, "Failed to load editlist");
+#undef APPEND_SEGMENT
+#undef NEED
+#undef FAIL
+
     free(eltext);
 }
 
@@ -9850,6 +9926,7 @@ static gboolean on_sequencerslot_activated_by_mouse(GtkWidget *widget,
     {
         int id = info->status_tokens[CURRENT_ID];
         int type=info->status_tokens[STREAM_TYPE];
+        
         if( info->selection_slot ) {
             id = info->selection_slot->sample_id;
             type=info->selection_slot->sample_type;

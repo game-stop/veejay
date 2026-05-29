@@ -642,16 +642,68 @@ veejay_msg(VEEJAY_MSG_INFO, "---------------------------------------------------
     }\
 }
 
+static inline int vj_utf8_seq_len(unsigned char c)
+{
+    if (c < 0x80) return 1;
+    if (c >= 0xc2 && c <= 0xdf) return 2;
+    if (c >= 0xe0 && c <= 0xef) return 3;
+    if (c >= 0xf0 && c <= 0xf4) return 4;
+    return 0;
+}
+
+static inline int vj_utf8_valid_at(const unsigned char *s, size_t len, size_t i, int *seq_len)
+{
+    unsigned char c = s[i];
+    int n = vj_utf8_seq_len(c);
+
+    if (seq_len) *seq_len = n;
+    if (n == 0) return 0;
+    if (n == 1) return 1;
+    if (i + (size_t)n > len) return 0;
+
+    for (int k = 1; k < n; k++)
+        if ((s[i + k] & 0xc0) != 0x80)
+            return 0;
+
+    if (n == 3) {
+        unsigned char b1 = s[i + 1];
+        if ((c == 0xe0 && b1 < 0xa0) || (c == 0xed && b1 >= 0xa0))
+            return 0;
+    }
+
+    if (n == 4) {
+        unsigned char b1 = s[i + 1];
+        if ((c == 0xf0 && b1 < 0x90) || (c == 0xf4 && b1 > 0x8f))
+            return 0;
+    }
+
+    return 1;
+}
+
 static inline void validate_send_buffer(const char *buf, const char *label, const char *caller, const int line)
 {
-    size_t maxlen = strlen(buf);
-    for (size_t i = 0; i < maxlen; i++)
-    {
-        unsigned char c = (unsigned char)buf[i];
-        if ((c < 32 || c > 126) && c != '\n' && c != '\r' && c != '\t')
-        {
-            veejay_msg(0,"%s:%d %s non-printable at offset %zu: 0x%02x\n",caller, line, label, i, c);
+    if (!buf) return;
+
+    const unsigned char *s = (const unsigned char *) buf;
+    size_t len = strlen(buf);
+
+    for (size_t i = 0; i < len; ) {
+        unsigned char c = s[i];
+
+        if (c == '\n' || c == '\r' || c == '\t' || (c >= 32 && c <= 126)) {
+            i++;
+            continue;
         }
+
+        int n = 0;
+        if (vj_utf8_valid_at(s, len, i, &n)) {
+            i += (size_t)n;
+            continue;
+        }
+
+        veejay_msg(0, "%s:%d %s invalid UTF-8/control byte at offset %zu: 0x%02x\n", caller, line, label, i, c);
+
+        i++;
     }
 }
 
@@ -10136,39 +10188,72 @@ void vj_event_send_chain_entry_parameters(void *ptr, const char format[], va_lis
     SEND_MSG(v, fline);
 }
 
+static int edl_send_put_dec_field(char **pp, char *end, uint64_t v, int width)
+{
+    char tmp[32];
+
+    if (width <= 0 || width >= (int)sizeof(tmp)) return 0;
+    if (*pp + width > end) return 0;
+
+    for (int i = width - 1; i >= 0; i--) {
+        tmp[i] = (char)('0' + (v % 10));
+        v /= 10;
+    }
+
+    if (v != 0) return 0;
+
+    memcpy(*pp, tmp, width);
+    *pp += width;
+
+    return 1;
+}
+
 void vj_event_send_editlist(void *ptr, const char format[], va_list ap)
 {
-    veejay_t *v = (veejay_t*)ptr;
+    veejay_t *v = (veejay_t *)ptr;
     editlist *el = v->current_edit_list;
 
-    if (!el || el->num_video_files <= 0)
-    {
+    if (!el || el->num_video_files <= 0) {
         SEND_MSG(v, "000000");
         return;
     }
 
     int bytes_written = 0;
-    char *line_ascii = vj_el_write_line_ascii(el, &bytes_written);
+    char *line_utf8 = vj_el_write_line_utf8(el, &bytes_written);
 
-    if (!line_ascii || bytes_written <= 0)
-    {
+    if (!line_utf8 || bytes_written <= 0 || bytes_written > 999999) {
         SEND_MSG(v, "000000");
-        free(line_ascii);
+        free(line_utf8);
         return;
     }
 
-    char *s_print_buf = get_print_buf(bytes_written + 8);
-    if (!s_print_buf)
-    {
-        free(line_ascii);
+    int send_len = bytes_written + 6;
+    char *s_print_buf = get_print_buf(send_len + 1);
+
+    if (!s_print_buf) {
+        free(line_utf8);
         SEND_MSG(v, "000000");
         return;
     }
 
-    snprintf(s_print_buf, bytes_written + 8, "%06d%s", bytes_written, line_ascii);
+    char *p = s_print_buf;
+    char *end = s_print_buf + send_len + 1;
 
-    free(line_ascii);
+    if (!edl_send_put_dec_field(&p, end, (uint64_t)bytes_written, 6)) {
+        free(line_utf8);
+        free(s_print_buf);
+        SEND_MSG(v, "000000");
+        return;
+    }
+
+    memcpy(p, line_utf8, bytes_written);
+    p += bytes_written;
+    *p = '\0';
+
+    free(line_utf8);
+
     SEND_MSG(v, s_print_buf);
+
     free(s_print_buf);
 }
 

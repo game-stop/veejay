@@ -872,21 +872,31 @@ static int	vj_el_dummy_frame( uint8_t *dst[3], editlist *el ,int pix_fmt)
 	return 1;
 }
 
-int	vj_el_get_file_fourcc(editlist *el, int num, char *fourcc)
+int vj_el_get_file_fourcc(editlist *el, int num, char *fourcc)
 {
-	if(num >= el->num_video_files)
-		return 0;
-	if( fourcc == NULL)
-		return 0;
+    if (!fourcc)
+        return 0;
 
-	const char *compr = lav_video_compressor( el->lav_fd[num] );
-	if(compr == NULL)
-		return 0;
-	snprintf(fourcc,4,"%s", compr );
-	fourcc[5] = '\0';
-	return 1;
+    if (num < 0 || num >= el->num_video_files)
+        return 0;
+
+    const char *compr = lav_video_compressor(el->lav_fd[num]);
+    if (!compr)
+        return 0;
+
+    fourcc[0] = '0';
+    fourcc[1] = '0';
+    fourcc[2] = '0';
+    fourcc[3] = '0';
+    fourcc[4] = '\0';
+
+    for (int i = 0; i < 4 && compr[i]; i++) {
+        unsigned char c = (unsigned char)compr[i];
+        fourcc[i] = (c >= 32 && c <= 126) ? (char)c : '?';
+    }
+
+    return 1;
 }
-
 
 int	vj_el_bogus_length( editlist *el, long nframe )
 {
@@ -1981,32 +1991,73 @@ int	vj_el_get_file_entry(editlist *el, long *start_pos, long *end_pos, long entr
 	return 1;
 }
 
-char *vj_el_write_line_ascii(editlist *el, int *bytes_written)
+
+static int edl_put_dec_field(char **pp, char *end, uint64_t v, int width)
 {
-    if (!el || el->is_empty) return NULL;
+    char tmp[32];
+
+    if (width <= 0 || width >= (int)sizeof(tmp)) return 0;
+    if (*pp + width > end) return 0;
+
+    for (int i = width - 1; i >= 0; i--) {
+        tmp[i] = (char)('0' + (v % 10));
+        v /= 10;
+    }
+
+    if (v != 0) return 0;
+
+    memcpy(*pp, tmp, width);
+    *pp += width;
+
+    return 1;
+}
+
+static int edl_put_bytes(char **pp, char *end, const char *src, size_t n)
+{
+    if (!src || *pp + n > end) return 0;
+
+    memcpy(*pp, src, n);
+    *pp += n;
+
+    return 1;
+}
+
+char *vj_el_write_line_utf8(editlist *el, int *bytes_written)
+{
+    if (bytes_written) *bytes_written = 0;
+    if (!el || el->is_empty || !bytes_written) return NULL;
 
     int64_t *index = (int64_t *)vj_malloc(sizeof(int64_t) * MAX_EDIT_LIST_FILES);
     if (!index) return NULL;
 
-    for (int i = 0; i < MAX_EDIT_LIST_FILES; i++) index[i] = -1;
+    for (int i = 0; i < MAX_EDIT_LIST_FILES; i++)
+        index[i] = -1;
 
     for (uint64_t j = 0; j <= (uint64_t)el->total_frames; j++) {
-        index[N_EL_FILE(el->frame_list[j])] = 1;
+        int f = N_EL_FILE(el->frame_list[j]);
+
+        if (f >= 0 && f < MAX_EDIT_LIST_FILES && el->video_file_list[f])
+            index[f] = 1;
     }
 
     int nnf = 0;
     size_t total_len_estimate = 128;
 
     for (int j = 0; j < MAX_EDIT_LIST_FILES; j++) {
-        if (index[j] == 1 && el->video_file_list[j] != NULL) {
-            index[j] = nnf++; 
+        if (index[j] == 1 && el->video_file_list[j]) {
+            index[j] = nnf++;
             total_len_estimate += strlen(el->video_file_list[j]) + 64;
         } else {
             index[j] = -1;
         }
     }
 
-    total_len_estimate += (el->total_frames * 48); 
+    if (nnf <= 0) {
+        free(index);
+        return NULL;
+    }
+
+    total_len_estimate += ((size_t)el->total_frames + 1) * 48;
 
     char *result = (char *)vj_calloc(total_len_estimate);
     if (!result) {
@@ -2017,51 +2068,83 @@ char *vj_el_write_line_ascii(editlist *el, int *bytes_written)
     char *p = result;
     char *end = result + total_len_estimate;
 
-    // number of files
-    p += sprintf(p, "%04d", nnf);
+#define PUT_DEC(V, W) do { if (!edl_put_dec_field(&p, end, (uint64_t)(V), (W))) goto fail; } while (0)
+#define PUT_MEM(S, N) do { if (!edl_put_bytes(&p, end, (S), (N))) goto fail; } while (0)
+
+    PUT_DEC(nnf, 4);
 
     for (int j = 0; j < MAX_EDIT_LIST_FILES; j++) {
-        if (el->video_file_list[j]) {
+        if (index[j] >= 0 && el->video_file_list[j]) {
+            const char *name = el->video_file_list[j];
+            size_t name_len = strlen(name);
+
+            if (name_len > 9999) goto fail;
+
             char fourcc[5] = "????";
             vj_el_get_file_fourcc(el, j, fourcc);
-            
-            p += sprintf(p, "%04zu%s%04d%010lu%s",
-                         strlen(el->video_file_list[j]),
-                         el->video_file_list[j],
-                         j,
-                         (unsigned long)el->num_frames[j],
-                         fourcc);
+
+            PUT_DEC(name_len, 4);
+            PUT_MEM(name, name_len);
+            PUT_DEC(j, 4);
+            PUT_DEC((uint64_t)el->num_frames[j], 10);
+            PUT_MEM(fourcc, 4);
         }
     }
 
     uint64_t first_raw = el->frame_list[0];
-    uint64_t oldfile = index[N_EL_FILE(first_raw)];
+    int first_file = N_EL_FILE(first_raw);
+
+    if (first_file < 0 || first_file >= MAX_EDIT_LIST_FILES || index[first_file] < 0)
+        goto fail;
+
+    int64_t oldfile = index[first_file];
     uint64_t oldframe = N_EL_FRAME(first_raw);
 
-    p += sprintf(p, "%016" PRId64 "%016" PRId64, oldfile, oldframe);
+    if (oldfile < 0) goto fail;
 
-    for (uint64_t j = 0; j <= (uint64_t)el->total_frames; j++) {
+    PUT_DEC((uint64_t)oldfile, 16);
+    PUT_DEC(oldframe, 16);
+
+    for (uint64_t j = 1; j <= (uint64_t)el->total_frames; j++) {
         uint64_t nframe = el->frame_list[j];
-        int64_t cur_file_idx = index[N_EL_FILE(nframe)];
+
+        int file_no = N_EL_FILE(nframe);
+        if (file_no < 0 || file_no >= MAX_EDIT_LIST_FILES) goto fail;
+
+        int64_t cur_file_idx = index[file_no];
+        if (cur_file_idx < 0) goto fail;
+
         uint64_t cur_frame_idx = N_EL_FRAME(nframe);
 
-        // check for discontinuity
-        if (cur_file_idx != (int64_t)oldfile || cur_frame_idx != oldframe + 1) {
-            // format: [end_prev][new_file][new_start]
-            p += sprintf(p, "%016" PRId64 "%016" PRId64 "%016" PRIu64,
-                         oldframe, (uint64_t)cur_file_idx, cur_frame_idx);
+        if (cur_file_idx != oldfile || cur_frame_idx != oldframe + 1) {
+            PUT_DEC(oldframe, 16);
+            PUT_DEC((uint64_t)cur_file_idx, 16);
+            PUT_DEC(cur_frame_idx, 16);
         }
-        oldfile = (uint64_t)cur_file_idx;
+
+        oldfile = cur_file_idx;
         oldframe = cur_frame_idx;
     }
 
-    p += sprintf(p, "%016" PRId64, oldframe);
+    PUT_DEC(oldframe, 16);
 
-    //*bytes_written = strlen(result);
-    *bytes_written = (int) ( p - result );
+    *bytes_written = (int)(p - result);
 
-	free(index);
+#undef PUT_DEC
+#undef PUT_MEM
+
+    free(index);
     return result;
+
+fail:
+#undef PUT_DEC
+#undef PUT_MEM
+
+    veejay_msg(VEEJAY_MSG_ERROR, "Failed to serialize editlist");
+
+    free(index);
+    free(result);
+    return NULL;
 }
 
 int vj_el_write_editlist(char *name, long _n1, long _n2, editlist *el)
