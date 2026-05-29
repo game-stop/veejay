@@ -2992,6 +2992,9 @@ gboolean gveejay_relaunch(void)
 
 gboolean gveejay_quit( GtkWidget *widget, gpointer user_data)
 {
+    if( info->watch.state == STATE_QUIT )
+         return TRUE;
+
     if( info->watch.state == STATE_PLAYING)
     {
         if(prompt_dialog("Quit Reloaded", "Are you sure?") != GTK_RESPONSE_ACCEPT)
@@ -3000,7 +3003,7 @@ gboolean gveejay_quit( GtkWidget *widget, gpointer user_data)
 
     info->watch.state = STATE_QUIT;
 
-    return FALSE;
+    return TRUE;
 }
 
 int is_current_track(char *host, int port )
@@ -9576,19 +9579,26 @@ gboolean    is_alive( int *do_sync )
 
 void vj_gui_disconnect(int restart_schedule)
 {
-    if(info->key_id)
-        gtk_key_snooper_remove( info->key_id );
-    /* reset all trees */
-//  reset_tree("tree_effectlist");
-//  reset_tree("tree_effectmixlist");
+    const int quitting = (info->watch.state == STATE_QUIT);
 
-    reset_fxtree();
-    reset_tree("tree_chain");
-    reset_tree("tree_sources");
-    reset_tree("editlisttree");
+    if(info->key_id) {
+        gtk_key_snooper_remove( info->key_id );
+        info->key_id = 0;
+    }
+
+
+    if(!quitting) {
+        /* reset all trees */
+    //  reset_tree("tree_effectlist");
+    //  reset_tree("tree_effectmixlist");
+
+        reset_fxtree();
+        reset_tree("tree_chain");
+        reset_tree("tree_sources");
+        reset_tree("editlisttree");
+    }
 
     if (restart_schedule) {
-        reset_samplebank();
         reloaded_schedule_restart();
     }
     else {
@@ -9604,7 +9614,6 @@ void vj_gui_disconnect(int restart_schedule)
         info->client = NULL;
     }
 
-    info->key_id = 0;
 }
 
 void vj_gui_disable(void)
