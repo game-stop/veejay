@@ -11364,7 +11364,7 @@ void    vj_event_sequencer_add_sample(      void *ptr,  const char format[],    
         if( vj_tag_exists(id) )
         {
             v->seq->samples[seq].sample_id = id;
-            v->seq->samples[seq].type = type;
+            v->seq->samples[seq].type = vj_tag_get_type(id);
             if( v->seq->size < MAX_SEQUENCES ) 
                 v->seq->size ++;
             veejay_msg(VEEJAY_MSG_INFO, "Added stream %d to slot %d/%d", id, seq, MAX_SEQUENCES );
