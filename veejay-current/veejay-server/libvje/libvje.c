@@ -84,7 +84,7 @@ static struct {
     { videowall_init,videowall_malloc,videowall_free,NULL,NULL,NULL,videowall_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_VIDEOWALL },
     { videoplay_init,videoplay_malloc,videoplay_free,NULL,NULL,NULL,videoplay_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_VIDEOPLAY },
     { uvcorrect_init,uvcorrect_malloc,uvcorrect_free,NULL,NULL,uvcorrect_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_UVCORRECT},
-    { tripplicity_init,NULL,NULL,NULL,NULL,NULL,tripplicity_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_TRIPPLICITY},
+    { tripplicity_init,tripplicity_malloc,tripplicity_free,NULL,NULL,NULL,tripplicity_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_TRIPPLICITY},
     { travelmatte_init,NULL,NULL,NULL,NULL,NULL,travelmatte_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_TRAVELMATTE},
     { transform_init,NULL,NULL,NULL,NULL,transform_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_TRANSFORM},
     { tracer_init,tracer_malloc,tracer_free,NULL, NULL,NULL,tracer_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_TRACER},

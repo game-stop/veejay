@@ -98,17 +98,6 @@ vj_effect *tripplicity_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->limits[0][P_OPACITY_Y]   = 0; ve->limits[1][P_OPACITY_Y]   = 255;  ve->defaults[P_OPACITY_Y]   = 150;
     ve->limits[0][P_OPACITY_CB]  = 0; ve->limits[1][P_OPACITY_CB]  = 255;  ve->defaults[P_OPACITY_CB]  = 150;
     ve->limits[0][P_OPACITY_CR]  = 0; ve->limits[1][P_OPACITY_CR]  = 255;  ve->defaults[P_OPACITY_CR]  = 150;
@@ -174,19 +163,6 @@ void tripplicity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     tripplicity_t *t = (tripplicity_t*) ptr;
 
-    if(!frame || !frame2 || !args ||
-       !frame->data[0] || !frame->data[1] || !frame->data[2] ||
-       !frame2->data[0] || !frame2->data[1] || !frame2->data[2])
-        return;
-
-    const int len = frame->len;
-    if(len <= 0)
-        return;
-
-    const int uv_len = frame->ssm ? len : frame->uv_len;
-    if(uv_len <= 0)
-        return;
-
     const int beat_mix = tripplicity_clampi(args[P_BEAT_MIX], 0, 1000);
     const int beat_chroma = tripplicity_clampi(args[P_BEAT_CHROMA], 0, 1000);
     const int beat_push = tripplicity_clampi(args[P_BEAT_PUSH], 0, 1000);
@@ -197,38 +173,34 @@ void tripplicity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     float beat_env = 0.0f;
     float beat_kick = 0.0f;
 
-    if(t) {
-        const float old_env = t->beat_env;
-        const float smooth = tripplicity_unit(beat_smooth);
-        const float attack = 0.52f - smooth * 0.34f;
-        const float release = 0.16f - smooth * 0.105f;
-        const float kick_decay = 0.42f + smooth * 0.34f;
+    const float old_env = t->beat_env;
+    const float smooth = tripplicity_unit(beat_smooth);
+    const float attack = 0.52f - smooth * 0.34f;
+    const float release = 0.16f - smooth * 0.105f;
+    const float kick_decay = 0.42f + smooth * 0.34f;
 
-        if(target > t->beat_env)
-            t->beat_env += (target - t->beat_env) * attack;
-        else
-            t->beat_env += (target - t->beat_env) * release;
+    if(target > t->beat_env)
+        t->beat_env += (target - t->beat_env) * attack;
+    else
+        t->beat_env += (target - t->beat_env) * release;
 
-        if(t->beat_env < 0.0001f)
-            t->beat_env = 0.0f;
-        else if(t->beat_env > 1.0f)
-            t->beat_env = 1.0f;
+    if(t->beat_env < 0.0001f)
+        t->beat_env = 0.0f;
+    else if(t->beat_env > 1.0f)
+        t->beat_env = 1.0f;
 
-        if(t->beat_env > old_env)
-            t->beat_kick += (t->beat_env - old_env) * 1.45f;
+    if(t->beat_env > old_env)
+        t->beat_kick += (t->beat_env - old_env) * 1.45f;
 
-        t->beat_kick *= kick_decay;
-        if(t->beat_kick > 1.0f)
-            t->beat_kick = 1.0f;
-        else if(t->beat_kick < 0.0001f)
-            t->beat_kick = 0.0f;
+    t->beat_kick *= kick_decay;
+    if(t->beat_kick > 1.0f)
+        t->beat_kick = 1.0f;
+    else if(t->beat_kick < 0.0001f)
+        t->beat_kick = 0.0f;
 
-        beat_env = t->beat_env;
-        beat_kick = t->beat_kick;
-    } else {
-        beat_env = target;
-        beat_kick = target;
-    }
+    beat_env = t->beat_env;
+    beat_kick = t->beat_kick;
+
 
     const float drive = beat_env * beat_env + beat_kick * 0.55f;
 
@@ -248,7 +220,8 @@ void tripplicity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-
+    const int len = frame->len;
+    const int uv_len = frame->uv_len;
 #pragma omp parallel num_threads(t->n_threads)
     {
 #pragma omp for schedule(static)
