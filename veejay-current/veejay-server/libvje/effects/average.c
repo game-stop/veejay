@@ -41,7 +41,14 @@ vj_effect *average_init(int w, int h)
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Smoothing factor" );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_MEMORY,
+        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
+        2, 240,
+        5, 18, 2200, 5200, 1200, 18 /* Smoothing factor */
+    );
 	return ve;
 }
 

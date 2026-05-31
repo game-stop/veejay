@@ -80,7 +80,13 @@ typedef enum {
     VJ_BEAT_CONTRAST,
     VJ_BEAT_INTENSITY,
     VJ_BEAT_TURBULENCE,
-    VJ_BEAT_LAST = VJ_BEAT_DENSITY
+
+    VJ_BEAT_KICK,
+    VJ_BEAT_SNARE,
+    VJ_BEAT_HAT,
+
+    VJ_BEAT_LAST = VJ_BEAT_HAT
+
 } vj_beat_param_class_t;
 
 #define VJ_BEAT_F_REJECT          (1u << 0)

@@ -50,8 +50,8 @@ vj_effect *chameleon_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0, -1000, /* Mode */
-        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS,                    2,                  24,                 10, 42, 900,  2400, 0, 65     /* Sensitivity */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,    0, -1000, /* Mode */
+        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    2,                  28,                 8,  38, 100, 820,  0, 72     /* Sensitivity */
     );
     return ve;
 }

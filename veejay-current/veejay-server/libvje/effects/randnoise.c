@@ -56,8 +56,8 @@ vj_effect *randnoise_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS, -96,  -4,  10, 38, 1000, 2600, 0, 60, /* Min */
-        VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS,   4,  128, 10, 38, 1000, 2600, 0, 60  /* Max */
+        VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS, -96,  -4,  10, 38, 1000, 2600, 0, 60, /* Min */
+        VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS,   4, 128,  10, 38, 1000, 2600, 0, 60  /* Max */
     );
 
     (void) w;

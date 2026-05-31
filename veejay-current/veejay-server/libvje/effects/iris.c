@@ -50,8 +50,8 @@ vj_effect *iris_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_PHRASE_ONLY,                    8,                  92,                 6, 22, 1800, 4200, 900, 35,    /* Value */
-        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Shape */
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    8,                  96,                 14, 58, 90, 720, 0,   82,    /* Value */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,  0,   0,   -1000  /* Shape */
     );
     return ve;
 }

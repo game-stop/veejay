@@ -182,17 +182,17 @@ vj_effect *dotillism_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SPEED,        VJ_BEAT_F_PHRASE_ONLY,                    18, 80,  8,  30, 1800, 4200, 900,  35, /* Build Speed */
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                     4,  55,  8,  30, 1200, 3000, 0,    45, /* Source Feed */
-        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     12, 90,  12, 48, 900,  2400, 0,    80, /* Flow */
-        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS,                     0,  75,  10, 42, 1000, 2800, 0,    65, /* Swirl */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                     20, 95,  10, 40, 1000, 2600, 0,    60, /* Color Bleed */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS,                     12, 78,  10, 38, 1000, 2600, 0,    55, /* Detail */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                    45, 96,  8,  32, 1800, 4200, 900,  45, /* Trail */
-        VJ_BEAT_WARP,         VJ_BEAT_F_CLIMAX_ONLY,                    0,  70,  4,  28, 1800, 4200, 600,  25, /* Turbulence */
-        VJ_BEAT_GRID_SIZE,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 10, 75, 6,  22, 2200, 5200, 1800, 25, /* Flow Scale */
-        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS,                     20, 92,  12, 46, 900,  2400, 0,    70, /* Motion React */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                     30, 96,  10, 38, 1000, 2600, 0,    55  /* Chroma Gain */
+        VJ_BEAT_KICK,        VJ_BEAT_F_CONTINUOUS,                       18, 88, 14, 58, 90,   720,  0,   82, /* Build Speed */
+        VJ_BEAT_SOURCE_MIX,  VJ_BEAT_F_CONTINUOUS,                       4,  58, 8,  30, 900,  2400, 0,   42, /* Source Feed */
+        VJ_BEAT_KICK,        VJ_BEAT_F_CONTINUOUS,                       14, 96, 14, 58, 90,   720,  0,   86, /* Flow */
+        VJ_BEAT_SNARE,       VJ_BEAT_F_CONTINUOUS,                       0,  82, 10, 42, 120,  900,  0,   70, /* Swirl */
+        VJ_BEAT_SNARE,       VJ_BEAT_F_CONTINUOUS,                       24, 98, 10, 40, 120,  900,  0,   64, /* Color Bleed */
+        VJ_BEAT_SNARE,       VJ_BEAT_F_CONTINUOUS,                       12, 84, 8,  36, 120,  900,  0,   68, /* Detail */
+        VJ_BEAT_MEMORY,      VJ_BEAT_F_PHRASE_ONLY,                      45, 96, 8,  28, 1800, 4200, 900, 38, /* Trail */
+        VJ_BEAT_HAT,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0, 76, 4,  28, 120,  900,  500, 40, /* Turbulence */
+        VJ_BEAT_GRID_SIZE,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  10, 75, 6,  22, 2200, 5200, 1800,24, /* Flow Scale */
+        VJ_BEAT_SNARE,       VJ_BEAT_F_CONTINUOUS,                       20, 96, 10, 46, 120,  900,  0,   72, /* Motion React */
+        VJ_BEAT_KICK,        VJ_BEAT_F_CONTINUOUS,                       32, 98, 14, 58, 90,   720,  0,   76  /* Chroma Gain */
     );
     return ve;
 }

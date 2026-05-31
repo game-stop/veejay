@@ -76,10 +76,10 @@ vj_effect *flare_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Mode */
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Opacity */
-        VJ_BEAT_GLOW,             VJ_BEAT_F_CONTINUOUS,                     4,                  72,                 10, 40, 1000, 2600, 0,   65,    /* Spread */
-        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY,                    96,                 220,                6,  22, 1600, 3400, 700, 35     /* Threshold */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0, -1000, /* Mode */
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    24,                 220,                14, 58, 90,  720, 0, 82,    /* Opacity */
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    4,                  82,                 14, 58, 90,  720, 0, 78,    /* Spread */
+        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    72,                 230,                8,  36, 120, 900, 0, 66     /* Threshold */
     );
 
     return ve;

@@ -79,8 +79,8 @@ vj_effect *neighbours5_init(int w, int h)
         ve->num_params,
 
         VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 2,                  24,                 6, 22, 1800, 4200, 900, 30,    /* Stroke size */
-        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY,                        8,                  180,                6, 22, 1600, 3400, 700, 30,    /* Smoothness */
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Mode */
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 8,                  180,                6, 22, 1600, 3400, 700, 30,    /* Smoothness */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Mode */
     );
 
     (void) w;

@@ -85,12 +85,12 @@ vj_effect *melt_init(int w, int h) {
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS,                                                2,                  55,                 12, 46, 900,  2400, 0,   75, /* Speed */
-        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS,                                                24,                 190,                12, 46, 900,  2400, 0,   75, /* Intensity */
-        VJ_BEAT_MEMORY,             VJ_BEAT_F_CONTINUOUS,                                                72,                 99,                 8,  32, 1200, 3200, 0,   50, /* Damping */
-        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -7,                 7,                  10, 38, 1000, 2600, 0,   60, /* Gravity */
-        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS,                                                0,                  82,                 12, 46, 900,  2400, 0,   70, /* Curl */
-        VJ_BEAT_SOURCE_MIX,         VJ_BEAT_F_CONTINUOUS,                                                0,                  180,                8,  30, 1200, 3000, 0,   45  /* Alpha */
+        VJ_BEAT_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SQUARED,                          2,                  55,                 12, 46, 900,  2400, 0,   72, /* Speed */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                          24,                 210,                22, 88, 60,   360,  0,   96, /* Intensity */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS,                                              72,                 99,                 8,  32, 1200, 3200, 0,   50, /* Damping */
+        VJ_BEAT_SIGNED_CURVE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -7,               7,                  10, 38, 1000, 2600, 0,   60, /* Gravity */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                          0,                  92,                 22, 88, 60,   360,  0,   90, /* Curl */
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                                              0,                  180,                8,  30, 1200, 3000, 0,   45  /* Alpha */
     );
     return ve;
 }

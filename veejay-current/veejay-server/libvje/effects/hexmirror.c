@@ -347,11 +347,11 @@ vj_effect *hexmirror_init(int w, int h)
         ve->num_params,
 
         VJ_BEAT_GRID_SIZE,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 160,                900,                6,  22, 2200, 5200, 1800, 28,    /* Size (log) */
-        VJ_BEAT_GEOMETRY_PHASE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,      0,                  360,                8,  32, 1200, 3200, 0,    42,    /* Offset Angle */
+        VJ_BEAT_HAT,            VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,      0,                  360,                4,  26, 80,   620,  0,    52,    /* Offset Angle */
         VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Anti clockwise */
         VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Swap */
-        VJ_BEAT_SPEED,          VJ_BEAT_F_CONTINUOUS,                       0,                  78,                 10, 40, 800,  2200, 0,    70,    /* Rotation Speed */
-        VJ_BEAT_INTENSITY,      VJ_BEAT_F_CONTINUOUS,                       0,                  760,                18, 68, 80,   760,  0,    100    /* Beat Push */
+        VJ_BEAT_HAT,            VJ_BEAT_F_CONTINUOUS,                       0,                  82,                 4,  26, 80,   620,  0,    54,    /* Rotation Speed */
+        VJ_BEAT_KICK,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,   0,                  860,                22, 88, 60,   360,  0,    100    /* Beat Push */
     );
 
     (void)w;

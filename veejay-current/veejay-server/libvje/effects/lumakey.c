@@ -51,7 +51,15 @@ vj_effect *lumakey_init(int width, int height)
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Luma Min", "Luma Max", "Softness", "Invert");
     ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                       48,                 235,                14, 58, 90,   720,  0,   78,    /* Opacity */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 0,                  110,                6,  22, 1600, 3400, 700, 35,    /* Luma Min */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 135,                255,                6,  22, 1600, 3400, 700, 35,    /* Luma Max */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 4,                  96,                 6,  22, 1800, 4200, 900, 30,    /* Softness */
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Invert */
+    );
 
     return ve;
 }

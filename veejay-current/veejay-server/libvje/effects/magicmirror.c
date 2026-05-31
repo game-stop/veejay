@@ -75,11 +75,11 @@ vj_effect *magicmirror_init(int w, int h)
 	ve->beat_hints = vje_build_beat_hint_list(
 		ve->num_params,
 
-		VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                         0,                  w / 3,              12, 46, 900,  2400, 0,   75,    /* X displacement */
-		VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                         0,                  h / 3,              12, 46, 900,  2400, 0,   70,    /* Y displacement */
-		VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE, 2,                70,                 8,  30, 1200, 3000, 0,   50,    /* X wave */
-		VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE, 2,                70,                 8,  30, 1200, 3000, 0,   50,    /* Y wave */
-		VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Alpha */
+		VJ_BEAT_KICK,               VJ_BEAT_F_CONTINUOUS,                                                       0,                  w / 3,              14, 58, 90,   720,  0,    82,    /* X displacement */
+		VJ_BEAT_SNARE,              VJ_BEAT_F_CONTINUOUS,                                                       0,                  h / 3,              10, 42, 120,  900,  0,    70,    /* Y displacement */
+		VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,       2,                  70,                 6,  22, 2200, 5200, 1200, 24,    /* X wave */
+		VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,       2,                  70,                 6,  22, 2200, 5200, 1200, 24,    /* Y wave */
+		VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Alpha */
 	);
 
 	return ve;
@@ -220,12 +220,8 @@ void magicmirror_apply( void *ptr, VJFrame *frame, int *args) {
 		changed = 1; m->last[0] = n;
 	}
 
-	if( vx != m->last[2] ) {
-		changed = 1; m->last[2] = vx;
-	}
-	if( vy != m->last[3] ) {
-		changed = 1; m->last[3] = vy;
-	} 
+	m->last[2] = vx;
+	m->last[3] = vy;
 
 	if(changed==1)
 	{	

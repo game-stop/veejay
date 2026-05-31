@@ -75,14 +75,14 @@ vj_effect *glitch_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS,                                                  8,                  160,                12, 46, 900,  2400, 0,    75,    /* Amplitude */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS,                                                  1,                  8,                  8,  30, 1200, 3000, 0,    45,    /* Noise Strength */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                            1,                  48,                 6,  22, 1800, 4200, 900,  30,    /* Noise Quantity */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS,                                                  20,                 180,                10, 38, 1000, 2600, 0,    55,    /* Noise Scale */
-        VJ_BEAT_SPEED,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                            4,                  160,                6,  22, 1800, 4200, 900,  30,    /* Interval */
-        VJ_BEAT_SIGNED_CURVE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,   -55,                55,                 12, 46, 900,  2400, 0,    70,    /* Distortion X */
-        VJ_BEAT_SIGNED_CURVE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,   -55,                55,                 12, 46, 900,  2400, 0,    70,    /* Distortion Y */
-        VJ_BEAT_SPEED,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                            2,                  96,                 6,  22, 1800, 4200, 900,  30     /* Duration */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                                                8,                  190,                14, 58, 90,   720,  0,   84,    /* Amplitude */
+        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS,                                                1,                  9,                  4,  26, 80,   620,  0,   52,    /* Noise Strength */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                          1,                  48,                 6,  22, 1800, 4200, 900, 30,    /* Noise Quantity */
+        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS,                                                20,                 190,                4,  26, 80,   620,  0,   48,    /* Noise Scale */
+        VJ_BEAT_SPEED,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                          4,                  160,                6,  22, 1800, 4200, 900, 30,    /* Interval */
+        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -70,                70,                 10, 42, 120,  900,  0,   72,    /* Distortion X */
+        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -70,                70,                 10, 42, 120,  900,  0,   72,    /* Distortion Y */
+        VJ_BEAT_SPEED,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                          2,                  96,                 6,  22, 1800, 4200, 900, 30     /* Duration */
     );
     return ve;
 }

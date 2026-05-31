@@ -59,9 +59,9 @@ vj_effect *boxfit_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,       2,                  w / 12,             6,  20,  1800, 3800, 900,  30,    /* Min Size */
-        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,       8,                  w / 5,              8,  28,  1800, 4200, 900,  40,    /* Max Size */
-        VJ_BEAT_DETAIL,    VJ_BEAT_F_CONTINUOUS,                             48,                 220,                12, 42,  900,  2400, 0,    65,    /* Sensitivity */
+        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,       2,                  w / 12,             6,  18,  1800, 3800, 900,  26,    /* Min Size */
+        VJ_BEAT_DENSITY,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,       8,                  w / 5,              8,  26,  1800, 4200, 900,  36,    /* Max Size */
+        VJ_BEAT_SNARE,     VJ_BEAT_F_CONTINUOUS,                             42,                 235,                10, 46,  120,  820,  0,    76,    /* Sensitivity */
         VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,          VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Borders */
     );
     return ve;

@@ -42,48 +42,64 @@ vj_effect *bgpush_init(int w, int h)
 
 void *bgpush_malloc(int w, int h)
 {
+    if(w <= 0 || h <= 0)
+        return NULL;
+
     bgpush_t *b = (bgpush_t*) vj_calloc(sizeof(bgpush_t));
-    if(!b) {
+    if(!b)
+        return NULL;
+
+    const size_t len = (size_t)w * (size_t)h;
+
+    b->frame_data = (uint8_t*) vj_malloc(len * 4u);
+    if(!b->frame_data) {
         free(b);
         return NULL;
     }
-    
-	b->frame_data =  (uint8_t*) vj_malloc( (w*h*4) );
-	b->frame_ptr[0] = b->frame_data;
-	b->frame_ptr[1] = b->frame_ptr[0] + (w*h);
-	b->frame_ptr[2] = b->frame_ptr[1] + (w*h);
-	b->frame_ptr[3] = b->frame_ptr[2] + (w*h);
 
-	veejay_memset( b->frame_ptr[0], 0, w * h );
-	veejay_memset( b->frame_ptr[1], 128, w * h );
-	veejay_memset( b->frame_ptr[2], 128, w * h );
-	veejay_memset( b->frame_ptr[3], 0, w * h );
-	
-	return (void*) b;
+    b->frame_ptr[0] = b->frame_data;
+    b->frame_ptr[1] = b->frame_ptr[0] + len;
+    b->frame_ptr[2] = b->frame_ptr[1] + len;
+    b->frame_ptr[3] = b->frame_ptr[2] + len;
+
+    veejay_memset(b->frame_ptr[0], pixel_Y_lo_, len);
+    veejay_memset(b->frame_ptr[1], 128,         len);
+    veejay_memset(b->frame_ptr[2], 128,         len);
+    veejay_memset(b->frame_ptr[3], 0,           len);
+
+    return (void*) b;
 }
-
 void bgpush_free(void *ptr)
 {
     bgpush_t *b = (bgpush_t*) ptr;
 
-	free(b->frame_data);
+    if(!b)
+        return;
+
+    if(b->frame_data)
+        free(b->frame_data);
+
     free(b);
 }
 
-int bgpush_prepare(void *ptr, VJFrame *frame )
+int bgpush_prepare(void *ptr, VJFrame *frame)
 {
-	const int uv_len = (frame->ssm ? frame->len : frame->uv_len );
-	bgpush_t *b = (bgpush_t*) ptr;
+    bgpush_t *b = (bgpush_t*) ptr;
 
-	veejay_memcpy( b->frame_ptr[0], frame->data[0], frame->len );
-	veejay_memcpy( b->frame_ptr[1], frame->data[1], uv_len );
-	veejay_memcpy( b->frame_ptr[2], frame->data[2], uv_len );
+    if(!b || !b->frame_data || !frame ||
+       !frame->data[0] || !frame->data[1] || !frame->data[2])
+        return 0;
 
-	if( frame->ssm == 0 ) {
-		chroma_supersample( SSM_422_444, frame, b->frame_ptr );
-	}
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
-	return 1;
+    veejay_memcpy(b->frame_ptr[0], frame->data[0], frame->len);
+    veejay_memcpy(b->frame_ptr[1], frame->data[1], uv_len);
+    veejay_memcpy(b->frame_ptr[2], frame->data[2], uv_len);
+
+    if(frame->ssm == 0)
+        chroma_supersample(SSM_422_444, frame, b->frame_ptr);
+
+    return 1;
 }
 
 //FIXME: issue #78 , background frame in 4:4:4

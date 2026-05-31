@@ -75,20 +75,48 @@ vj_effect *rgbkeysmooth_init(int w, int h)
     ve->sub_format   = 1;
     ve->rgb_conv     = 1;
 
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1200,               7000,               6,  22, 1600, 3400, 700, 35,    /* Hue Angle */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Red */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Green */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Blue */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 8,                  96,                 6,  22, 1600, 3400, 700, 35,    /* Matte Min */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 120,                235,                6,  22, 1600, 3400, 700, 35,    /* Matte Max */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 0,                  72,                 6,  22, 1600, 3400, 700, 30,    /* Luma Min */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 180,                255,                6,  22, 1600, 3400, 700, 30,    /* Luma Max */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                       24,                 220,                8,  30, 1200, 3000, 0,   45,    /* Spill Amount */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                       32,                 220,                8,  30, 1200, 3000, 0,   42,    /* Spill Recovery */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* View Mode */
+        VJ_BEAT_INERTIA,      VJ_BEAT_F_CONTINUOUS,                       0,                  180,                8,  30, 1200, 3000, 0,   40     /* Softness */
+    );
     return ve;
 }
+void *rgbkeysmooth_malloc(int w, int h)
+{
+    rgbkey_t *r = (rgbkey_t*) vj_calloc(sizeof(rgbkey_t));
+    if(!r)
+        return NULL;
 
-void *rgbkeysmooth_malloc(int w, int h) {
-    rgbkey_t *r = (rgbkey_t*) vj_malloc(sizeof(rgbkey_t));
-    if(!r) return NULL;
     r->n_threads = vje_advise_num_threads(w * h);
+
     r->alpha_map = (uint8_t*) vj_malloc(w * h);
     r->alpha_temp = (uint8_t*) vj_malloc(w * h);
-    for (int i = 0; i <= 32768; i++) {
+
+    if(!r->alpha_map || !r->alpha_temp) {
+        if(r->alpha_map) free(r->alpha_map);
+        if(r->alpha_temp) free(r->alpha_temp);
+        free(r);
+        return NULL;
+    }
+
+    for(int i = 0; i <= 32768; i++) {
         float m = sqrtf((float)i);
         r->mag_lut[i] = (m < 0.0001f) ? 0.0001f : m;
         r->inv_mag_lut[i] = 1.0f / r->mag_lut[i];
     }
+
     return (void*) r;
 }
 

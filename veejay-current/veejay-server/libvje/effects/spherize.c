@@ -137,14 +137,29 @@ vj_effect *spherize_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                       0,                  88,                 8, 30, 1200, 3000, 0,   55,    /* Strength */
-        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,      0,                  360,                8, 30, 1200, 3000, 0,   45,    /* Angle */
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE, 8,              ve->limits[1][2],   8, 30, 1200, 3000, 0,   45,    /* Radius */
-        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                       50,                 160,                8, 30, 1200, 3000, 0,   42,    /* Ratio X */
-        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                       50,                 160,                8, 30, 1200, 3000, 0,   42,    /* Ratio Y */
-        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE, 0,              w,                  8, 30, 1200, 3000, 0,   35,    /* Center X */
-        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE, 0,              h,                  8, 30, 1200, 3000, 0,   35,    /* Center Y */
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Mode */
+        VJ_BEAT_INTENSITY,          VJ_BEAT_F_CONTINUOUS,
+            0, 88, 8, 34, 900, 2600, 0, 60, /* Strength */
+
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_WRAP,
+            0, 360, 6, 26, 1400, 3600, 900, 30, /* Angle */
+
+        VJ_BEAT_WINDOW_RADIUS,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,
+            8, ve->limits[1][2], 6, 22, 1800, 4200, 900, 30, /* Radius */
+
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,
+            55, 155, 5, 20, 1800, 4200, 0, 34, /* Ratio X */
+
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,
+            55, 155, 5, 20, 1800, 4200, 0, 34, /* Ratio Y */
+
+        VJ_BEAT_DRIFT,              VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,
+            w / 4, (w * 3) / 4, 4, 14, 2400, 6200, 1200, 22, /* Center X */
+
+        VJ_BEAT_DRIFT,              VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,
+            h / 4, (h * 3) / 4, 4, 14, 2400, 6200, 1200, 22, /* Center Y */
+
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000 /* Mode */
     );
 
     return ve;

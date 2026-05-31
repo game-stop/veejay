@@ -74,8 +74,8 @@ vj_effect *threshold_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS,                         0,                  180,                8, 30, 1200, 3000, 0,   55,    /* Threshold */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Reverse */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 0,                  180,                6, 22, 1600, 3400, 700, 35,    /* Threshold */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Reverse */
     );
 
     (void) w;
@@ -99,8 +99,6 @@ void *threshold_malloc(int w, int h)
     }
 
     t->n_threads = vje_advise_num_threads(len);
-    if(t->n_threads < 1)
-        t->n_threads = 1;
 
     return (void*) t;
 }

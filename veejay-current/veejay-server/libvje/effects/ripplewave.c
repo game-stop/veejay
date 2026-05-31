@@ -63,10 +63,10 @@ vj_effect *ripplewave_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_WARP,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE, 0,  72, 6, 22, 1800, 4200, 900, 30, /* Frequency X */
-        VJ_BEAT_WARP,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE, 1,  72, 6, 22, 1800, 4200, 900, 30, /* Frequency Y */
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                            0,  38, 8, 30, 1200, 3000, 0,   45, /* Amplitude */
-        VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS,                            0,  64, 8, 30, 1200, 3000, 0,   45  /* Speed */
+        VJ_BEAT_WARP,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 0, 72, 6, 22, 1800, 4200, 900, 30, /* Frequency X */
+        VJ_BEAT_WARP,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1, 72, 6, 22, 1800, 4200, 900, 30, /* Frequency Y */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                       0, 38, 8, 30, 1200, 3000, 0,   45, /* Amplitude */
+        VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS,                       0, 64, 8, 30, 1200, 3000, 0,   45  /* Speed */
     );
 
     (void) w;

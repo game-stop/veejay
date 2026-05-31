@@ -37,6 +37,23 @@ vj_effect *travelmatte_init(int w, int h)
     ve->limits[1][0] = 1;
     ve->defaults[0] = 1;
     ve->param_description = vje_build_param_list( ve->num_params, "Matte Travel Luma" );
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][0],
+        0,
+        "Use Alpha from A",
+        "Use Alpha from B"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000 /* Matte Travel Luma */
+    );
     return ve;
 }
 
@@ -64,42 +81,33 @@ void travelmatte_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     int mode = args[0];
 
-    #pragma omp parallel for schedule(static) num_threads(n_threads)
-    for (int i = 0; i < len; i++)
-    {
-        if (mode == 0)
-        {
-            if (aA[i] == 0)
+    if(mode == 0) {
+#pragma omp parallel for schedule(static) num_threads(n_threads)
+        for(int i = 0; i < len; i++) {
+            const uint8_t a = aA[i];
+            if(a == 0)
                 continue;
-
-            if (aA[i] == 0xff)
-            {
+            if(a == 0xff) {
                 o0[i] = b0[i];
                 o1[i] = b1[i];
                 o2[i] = b2[i];
-            }
-            else
-            {
-                uint8_t a = aA[i];
+            } else {
                 o0[i] = ALPHA_BLEND(a, a0[i], b0[i]);
                 o1[i] = ALPHA_BLEND(a, a1[i], b1[i]);
                 o2[i] = ALPHA_BLEND(a, a2[i], b2[i]);
             }
         }
-        else
-        {
-            if (aB[i] == 0)
+    } else {
+#pragma omp parallel for schedule(static) num_threads(n_threads)
+        for(int i = 0; i < len; i++) {
+            const uint8_t a = aB[i];
+            if(a == 0)
                 continue;
-
-            if (aB[i] == 0xff)
-            {
+            if(a == 0xff) {
                 o0[i] = b0[i];
                 o1[i] = b1[i];
                 o2[i] = b2[i];
-            }
-            else
-            {
-                uint8_t a = aB[i];
+            } else {
                 o0[i] = ALPHA_BLEND(a, a0[i], b0[i]);
                 o1[i] = ALPHA_BLEND(a, a1[i], b1[i]);
                 o2[i] = ALPHA_BLEND(a, a2[i], b2[i]);

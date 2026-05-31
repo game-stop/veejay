@@ -285,17 +285,17 @@ vj_effect *chronomirror_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                    24,                 260,                5,  18,  1800, 4200, 1200, -28,    /* Trigger Gate */
-        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     180,                900,                12, 48,  900,  2400, 0,    76,     /* Smoke Rise */
-        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS,                     60,                 820,                8,  34,  900,  2600, 0,    58,     /* Curl Flow */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                    460,                1000,               5,  24,  2200, 5200, 1400, 34,     /* Memory Decay */
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     160,                920,                10, 42,  900,  2400, 0,    68,     /* Smoke Density */
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                     0,                  320,                6,  26,  1000, 2600, 0,    32,     /* Source Bleed */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Color Mode */
-        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,              760,                8,  34,  1200, 3600, 500,  44,     /* Turbulence */
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     0,                  1000,               18, 80,  60,   650,  0,    100,    /* Beat Push */
-        VJ_BEAT_GLOW,         VJ_BEAT_F_CONTINUOUS,                     250,                1000,               10, 44,  450,  1600, 0,    82,     /* Plume Gain */
-        VJ_BEAT_CONTRAST,     VJ_BEAT_F_CONTINUOUS,                     260,                1000,               8,  30,  900,  2600, 400,  54      /* Color Energy */
+        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY,                    24,                 260,                5,  16,  1800, 4200, 1200, -24,    /* Trigger Gate */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     200,                940,                14, 58,  90,   720,  0,    84,     /* Smoke Rise */
+        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     80,                 860,                10, 42,  120,  900,  0,    70,     /* Curl Flow */
+        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                    460,                1000,               5,  22,  2200, 5200, 1400, 30,     /* Memory Decay */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     180,                960,                14, 58,  90,   760,  0,    78,     /* Smoke Density */
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                     0,                  360,                6,  26,  900,  2400, 0,    36,     /* Source Bleed */
+        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Color Mode */
+        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,              820,                4,  28,  120,  900,  500,  42,     /* Turbulence */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 0,                  1000,               24, 96,  60,   360,  0,    100,    /* Beat Push */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     260,                1000,               16, 68,  90,   720,  0,    86,     /* Plume Gain */
+        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     260,                1000,               10, 46,  120,  900,  400,  64      /* Color Energy */
     );
     (void) w;
     (void) h;

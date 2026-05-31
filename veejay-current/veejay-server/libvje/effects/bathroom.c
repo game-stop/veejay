@@ -71,10 +71,10 @@ vj_effect *bathroom_init(int width,int height)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Mode */
-        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE,              2,                  48,                 12, 38,  900,  2200, 0,    65,    /* Distance */
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE,       0,                  width / 3,          6,  20,  1800, 3600, 1200, 20,    /* X start position */
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE,       (width * 2) / 3,     width,              6,  20,  1800, 3600, 1200, 20     /* X end position */
+        VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,          VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Mode */
+        VJ_BEAT_KICK,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE,        2,                  56,                 14, 56,  90,   680,  0,    86,    /* Distance */
+        VJ_BEAT_SNARE,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE, 0,                  width / 3,          6,  22,  1800, 3600, 1200, 24,    /* X start position */
+        VJ_BEAT_SNARE,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE, (width * 2) / 3,     width,              6,  22,  1800, 3600, 1200, 24     /* X end position */
     );
 	return ve;
 }

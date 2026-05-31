@@ -49,9 +49,9 @@ vj_effect *differencemap_init(int w, int h)
 	ve->beat_hints = vje_build_beat_hint_list(
 		ve->num_params,
 
-		VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY,                   8,                  140,                6, 22, 1600, 3400, 700, 35,    /* Threshold */
-		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Reverse */
-		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Show */
+		VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    8,                  150,                8, 36, 120, 900, 0,   70,    /* Threshold */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,   0,   0,   -1000, /* Reverse */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,   0,   0,   -1000  /* Show */
 	);
     return ve;
 }

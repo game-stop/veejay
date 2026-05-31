@@ -56,7 +56,12 @@ vj_effect *medianfilter_init(int w, int h)
     ve->param_description = vje_build_param_list( ve->num_params, "Value" );
     
     l2_cache_size_ = sysconf( _SC_LEVEL2_CACHE_SIZE );
-    
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
+        1, 17, 6, 22, 2200, 5200, 1800, 24 /* Value */
+    );
     return ve;
 }
 

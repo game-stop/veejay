@@ -38,6 +38,12 @@ vj_effect *negation_init(int w, int h)
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Value" );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_CONTRAST, VJ_BEAT_F_CONTINUOUS,
+        160, 255, 8, 30, 1000, 2600, 0, 52 /* Value */
+    );
     return ve;
 }
 

@@ -63,7 +63,7 @@ vj_effect *motionblur_init(int w, int h)
         VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS,                                                72,                 99,                 8,  32, 1200, 3200, 0,   55, /* Decay */
         VJ_BEAT_SIGNED_CURVE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -75,                75,                 10, 38, 1000, 2600, 0,   55, /* Direction */
         VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS,                                                10,                 95,                 12, 46, 900,  2400, 0,   70, /* Velocity */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                                               18,                 150,                6,  22, 1600, 3400, 700, 35  /* Reset Threshold */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                          18,                 150,                6,  22, 1600, 3400, 700, 35  /* Reset Threshold */
     );
     return ve;
 }

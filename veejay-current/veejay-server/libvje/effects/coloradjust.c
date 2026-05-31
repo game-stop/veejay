@@ -47,9 +47,9 @@ vj_effect *coloradjust_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_COLOR_PHASE,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,  0,   360, 12, 42, 900,  2200, 0, 70, /* Degrees */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                    12,  190, 10, 38, 1000, 2600, 0, 60, /* Intensity */
-        VJ_BEAT_GLOW,         VJ_BEAT_F_CONTINUOUS,                    160, 520, 8,  32, 1200, 3000, 0, 45  /* Exposure */
+        VJ_BEAT_HAT,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,  0,   360, 4,  24, 80,  520,  0, 48, /* Degrees */
+        VJ_BEAT_SNARE, VJ_BEAT_F_CONTINUOUS,                    12,  220, 8,  38, 120, 900,  0, 68, /* Intensity */
+        VJ_BEAT_KICK,  VJ_BEAT_F_CONTINUOUS,                    180, 620, 14, 58, 90,  720,  0, 82  /* Exposure */
     );
     return ve;
 }

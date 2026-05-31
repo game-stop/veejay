@@ -166,11 +166,11 @@ vj_effect *chromium_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Mode */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                           100,                1000,               16, 64,  320,  1400, 0,    85,    /* Transform Amount */
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                           650,                1750,               12, 52,  420,  1700, 0,    75,    /* Chroma Energy */
-        VJ_BEAT_DRIFT,        VJ_BEAT_F_CONTINUOUS,                          -420,                420,                8,  30,  900,  2600, 0,    35,    /* Chroma Rotate */
-        VJ_BEAT_TRIGGER,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,        0,                  1000,               20, 84,  60,   360,  0,    95     /* Beat Push */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Mode */
+        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                           120,                1000,               12, 52,  120,  900,  0,    76,    /* Transform Amount */
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                           700,                1900,               14, 58,  90,   680,  0,    86,    /* Chroma Energy */
+        VJ_BEAT_HAT,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,          -520,                520,                4,  24,  80,   520,  0,    48,    /* Chroma Rotate */
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,        0,                  1000,               20, 88,  60,   360,  0,    100     /* Beat Push */
     );
 
     (void) w;

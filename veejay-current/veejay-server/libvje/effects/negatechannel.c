@@ -43,7 +43,12 @@ vj_effect *negatechannel_init(int w, int h)
     ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Value" );
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Mode */
+        VJ_BEAT_CONTRAST,  VJ_BEAT_F_CONTINUOUS,                     160,                255,                8, 30, 1000, 2600, 0,   52     /* Value */
+    );
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "Luminance" ,"Chroma Blue", "Chroma Red", "Chroma Red and Blue" );
 
     return ve;

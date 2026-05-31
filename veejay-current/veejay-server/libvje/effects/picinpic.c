@@ -143,10 +143,10 @@ vj_effect *picinpic_init(int width, int height)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 32,                 width / 2,          6, 22, 1800, 4200, 900, 30, /* Width */
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 32,                 height / 2,         6, 22, 1800, 4200, 900, 30, /* Height */
-        VJ_BEAT_DRIFT,         VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                          0,                  width,              6, 22, 1800, 4200, 900, 25, /* X offset */
-        VJ_BEAT_DRIFT,         VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                          0,                  height,             6, 22, 1800, 4200, 900, 25  /* Y offset */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 32, width / 2,  6, 22, 1800, 4200, 900, 30, /* Width */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 32, height / 2, 6, 22, 1800, 4200, 900, 30, /* Height */
+        VJ_BEAT_DRIFT,         VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                          0,  width,      6, 22, 1800, 4200, 900, 25, /* X offset */
+        VJ_BEAT_DRIFT,         VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                          0,  height,     6, 22, 1800, 4200, 900, 25  /* Y offset */
     );
 
     return ve;

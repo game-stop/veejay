@@ -53,11 +53,11 @@ vj_effect *aquatex_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                                  0,                  70,                 18, 55,  800,  1800, 0,    75,    /* Intensity */
-        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY,                                  2,                  38,                 8,  28,  1600, 3400, 900,  35,    /* Wave Scale */
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                  0,                  360,                12, 45,  900,  2200, 0,    60,    /* Phase */
+        VJ_BEAT_KICK,               VJ_BEAT_F_CONTINUOUS,                                  0,                  78,                 16, 62,  90,   620,  0,    86,    /* Intensity */
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY,                                  2,                  42,                 8,  28,  1600, 3400, 900,  35,    /* Wave Scale */
+        VJ_BEAT_HAT,                VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                  0,                  360,                4,  20,  80,   480,  0,    54,    /* Phase */
         VJ_BEAT_OFF,                VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Spread - unused */
-        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY,           0,                  42,                 4,  24,  1800, 4200, 500,  20     /* Noise */
+        VJ_BEAT_SNARE,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY,           0,                  46,                 6,  28,  180,  1100, 400,  34     /* Noise */
     );
 
     return ve;

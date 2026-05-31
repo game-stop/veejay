@@ -39,13 +39,26 @@
 #include "wave.h"
 #include <stdint.h>
 
+#define WAVE_PARAMS 7
+
+#define P_FACTOR      0
+#define P_SPEED       1
+#define P_DEFORM_X    2
+#define P_DEFORM_Y    3
+#define P_BEAT_WARP   4
+#define P_BEAT_PUSH   5
+#define P_BEAT_SMOOTH 6
+
 typedef struct {
     uint8_t *buf[3];
-    int16_t *lut_x;
-    int16_t *lut_y;
+    int *map_x;
+    int *map_y;
     int width;
     int height;
     float phase;
+    float beat_env;
+    float beat_kick;
+    float beat_prev;
     int n_threads;
 } wave_t;
 
@@ -54,30 +67,66 @@ static inline int wave_clampi(int v, int lo, int hi)
     return (v < lo) ? lo : (v > hi ? hi : v);
 }
 
+static inline int wave_beat_shape(int beat_push)
+{
+    int sq;
+
+    beat_push = wave_clampi(beat_push, 0, 1000);
+    sq = (beat_push * beat_push + 500) / 1000;
+
+    return wave_clampi((beat_push * 35 + sq * 65 + 50) / 100, 0, 1000);
+}
+
 vj_effect *wave_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
+    if(!ve)
+        return NULL;
+
+    ve->num_params = WAVE_PARAMS;
 
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 100;
-    ve->defaults[0] = 10;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 100;
-    ve->defaults[1] = 1;
+    ve->limits[0][P_FACTOR] = 1;
+    ve->limits[1][P_FACTOR] = 100;
+    ve->defaults[P_FACTOR] = 10;
 
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 1;
-    ve->defaults[2] = 1;
+    ve->limits[0][P_SPEED] = 1;
+    ve->limits[1][P_SPEED] = 100;
+    ve->defaults[P_SPEED] = 1;
 
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 1;
-    ve->defaults[3] = 1;
+    ve->limits[0][P_DEFORM_X] = 0;
+    ve->limits[1][P_DEFORM_X] = 1;
+    ve->defaults[P_DEFORM_X] = 1;
+
+    ve->limits[0][P_DEFORM_Y] = 0;
+    ve->limits[1][P_DEFORM_Y] = 1;
+    ve->defaults[P_DEFORM_Y] = 1;
+
+    ve->limits[0][P_BEAT_WARP] = 0;
+    ve->limits[1][P_BEAT_WARP] = 1000;
+    ve->defaults[P_BEAT_WARP] = 520;
+
+    ve->limits[0][P_BEAT_PUSH] = 0;
+    ve->limits[1][P_BEAT_PUSH] = 1000;
+    ve->defaults[P_BEAT_PUSH] = 0;
+
+    ve->limits[0][P_BEAT_SMOOTH] = 0;
+    ve->limits[1][P_BEAT_SMOOTH] = 1000;
+    ve->defaults[P_BEAT_SMOOTH] = 520;
 
     ve->description = "Wave";
     ve->sub_format = 1;
@@ -90,23 +139,26 @@ vj_effect *wave_init(int w, int h)
         "Factor",
         "Speed",
         "DeformX",
-        "DeformY"
+        "DeformY",
+        "Beat Warp",
+        "Beat Push",
+        "Beat Smooth"
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
 
     vje_build_value_hint_list(
         ve->hints,
-        ve->limits[1][2],
-        2,
+        ve->limits[1][P_DEFORM_X],
+        P_DEFORM_X,
         "Off",
         "On"
     );
 
     vje_build_value_hint_list(
         ve->hints,
-        ve->limits[1][3],
-        3,
+        ve->limits[1][P_DEFORM_Y],
+        P_DEFORM_Y,
         "Off",
         "On"
     );
@@ -114,10 +166,29 @@ vj_effect *wave_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_WARP,     VJ_BEAT_F_CONTINUOUS,                         1,                  80,                 8, 30, 1200, 3000, 0,   55,    /* Factor */
-        VJ_BEAT_SPEED,    VJ_BEAT_F_CONTINUOUS,                         1,                  70,                 8, 30, 1200, 3000, 0,   50,    /* Speed */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* DeformX */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* DeformY */
+        VJ_BEAT_WARP,     VJ_BEAT_F_CONTINUOUS,
+        1, 72, 8, 30, 1200, 3000, 0, 38, /* Factor */
+
+        VJ_BEAT_SPEED,    VJ_BEAT_F_CONTINUOUS,
+        1, 82, 10, 42, 900, 2400, 0, 58, /* Speed */
+
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000, /* DeformX */
+
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000, /* DeformY */
+
+        VJ_BEAT_WARP,     VJ_BEAT_F_REJECT,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000, /* Beat Warp */
+
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,
+        0, 780, 18, 70, 80, 780, 0, 100, /* Beat Push */
+
+        VJ_BEAT_MEMORY,   VJ_BEAT_F_PHRASE_ONLY,
+        260, 840, 5, 18, 2200, 5200, 1200, 18 /* Beat Smooth */
     );
 
     (void) w;
@@ -146,18 +217,21 @@ void *wave_malloc(int w, int h)
     data->buf[1] = data->buf[0] + len;
     data->buf[2] = data->buf[1] + len;
 
-    data->lut_x = (int16_t*) vj_malloc(sizeof(int16_t) * (size_t)(w + h));
-    if(!data->lut_x) {
+    data->map_x = (int*) vj_malloc(sizeof(int) * (size_t)(w + h));
+    if(!data->map_x) {
         free(data->buf[0]);
         free(data);
         return NULL;
     }
 
-    data->lut_y = data->lut_x + w;
+    data->map_y = data->map_x + w;
 
     data->width = w;
     data->height = h;
     data->phase = 0.0f;
+    data->beat_env = 0.0f;
+    data->beat_kick = 0.0f;
+    data->beat_prev = 0.0f;
 
     data->n_threads = vje_advise_num_threads(len);
     if(data->n_threads < 1)
@@ -176,13 +250,13 @@ void wave_free(void *ptr)
     if(data->buf[0])
         free(data->buf[0]);
 
-    if(data->lut_x)
-        free(data->lut_x);
+    if(data->map_x)
+        free(data->map_x);
 
     free(data);
 }
 
-static void wave_build_luts(wave_t *data,
+static void wave_build_maps(wave_t *data,
                             int width,
                             int height,
                             int factor_arg,
@@ -193,18 +267,24 @@ static void wave_build_luts(wave_t *data,
     const float pulsation = 0.5f / amplitude;
     const float phase = data->phase;
 
-    if(deform_x) {
-        for(int y = 0; y < height; y++)
-            data->lut_y[y] = (int16_t)(a_sin(pulsation * (float)y + phase) * amplitude);
+    if(deform_y) {
+        for(int x = 0; x < width; x++) {
+            const int off = (int)(a_sin((pulsation * (float)x * 2.0f) + phase) * amplitude);
+            data->map_x[x] = wave_clampi(x + off, 0, width - 1);
+        }
     } else {
-        veejay_memset(data->lut_y, 0, sizeof(int16_t) * (size_t)height);
+        for(int x = 0; x < width; x++)
+            data->map_x[x] = x;
     }
 
-    if(deform_y) {
-        for(int x = 0; x < width; x++)
-            data->lut_x[x] = (int16_t)(a_sin((pulsation * (float)x * 2.0f) + phase) * amplitude);
+    if(deform_x) {
+        for(int y = 0; y < height; y++) {
+            const int off = (int)(a_sin(pulsation * (float)y + phase) * amplitude);
+            data->map_y[y] = wave_clampi(y + off, 0, height - 1);
+        }
     } else {
-        veejay_memset(data->lut_x, 0, sizeof(int16_t) * (size_t)width);
+        for(int y = 0; y < height; y++)
+            data->map_y[y] = y;
     }
 }
 
@@ -225,20 +305,70 @@ void wave_apply(void *ptr, VJFrame *frame, int *args)
     if(width != data->width || height != data->height)
         return;
 
-    const int factor = wave_clampi(args[0], 1, 100);
-    const int speed = wave_clampi(args[1], 1, 100);
-    const int deform_x = args[2] ? 1 : 0;
-    const int deform_y = args[3] ? 1 : 0;
+    const int base_factor = wave_clampi(args[P_FACTOR], 1, 100);
+    const int base_speed = wave_clampi(args[P_SPEED], 1, 100);
+    const int deform_x = args[P_DEFORM_X] ? 1 : 0;
+    const int deform_y = args[P_DEFORM_Y] ? 1 : 0;
+    const int beat_warp = wave_clampi(args[P_BEAT_WARP], 0, 1000);
+    const int beat_push = wave_clampi(args[P_BEAT_PUSH], 0, 1000);
+    const int beat_smooth = wave_clampi(args[P_BEAT_SMOOTH], 0, 1000);
 
     if(!deform_x && !deform_y)
         return;
 
+    {
+        const int shaped = wave_beat_shape(beat_push);
+        const float target = (float)shaped * 0.001f;
+        const float smooth_t = (float)beat_smooth * 0.001f;
+        const float attack = 0.16f + (1.0f - smooth_t) * 0.36f;
+        const float release = 0.030f + (1.0f - smooth_t) * 0.095f;
+
+        if(target > data->beat_env) {
+            const float rise = target - data->beat_prev;
+            if(rise > 0.001f) {
+                data->beat_kick += rise * 0.72f;
+                if(data->beat_kick > 1.0f)
+                    data->beat_kick = 1.0f;
+            }
+
+            data->beat_env += (target - data->beat_env) * attack;
+        } else {
+            data->beat_env += (target - data->beat_env) * release;
+        }
+
+        data->beat_prev = target;
+        data->beat_kick *= 0.60f + smooth_t * 0.25f;
+
+        if(data->beat_env < 0.0001f)
+            data->beat_env = 0.0f;
+        else if(data->beat_env > 1.0f)
+            data->beat_env = 1.0f;
+
+        if(data->beat_kick < 0.0001f)
+            data->beat_kick = 0.0f;
+    }
+
+    const int beat_q = wave_clampi((int)(data->beat_env * 1000.0f + 0.5f), 0, 1000);
+    const int kick_q = wave_clampi((int)(data->beat_kick * 1000.0f + 0.5f), 0, 1000);
+
+    const int factor_add =
+        (int)(((int64_t)beat_q * beat_warp * 55 + 500000) / 1000000) +
+        (int)(((int64_t)kick_q * beat_warp * 18 + 500000) / 1000000);
+
+    const int speed_add =
+        ((beat_q * 30 + 500) / 1000) +
+        ((kick_q * 42 + 500) / 1000);
+
+    const int factor = wave_clampi(base_factor + factor_add, 1, 100);
+    const int speed = wave_clampi(base_speed + speed_add, 1, 100);
+
     data->phase += (float)speed * 0.015f;
+    data->phase += data->beat_kick * ((float)beat_warp * 0.00070f);
 
     if(data->phase > 4096.0f)
         data->phase -= 4096.0f;
 
-    wave_build_luts(data, width, height, factor, deform_x, deform_y);
+    wave_build_maps(data, width, height, factor, deform_x, deform_y);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -248,15 +378,16 @@ void wave_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict dstU = data->buf[1];
     uint8_t *restrict dstV = data->buf[2];
 
+    const int *restrict map_x = data->map_x;
+    const int *restrict map_y = data->map_y;
+
 #pragma omp parallel for schedule(static) num_threads(data->n_threads)
     for(int y = 0; y < height; y++) {
-        const int sy = wave_clampi(y + data->lut_y[y], 0, height - 1);
-        const int src_row = sy * width;
+        const int src_row = map_y[y] * width;
         const int dst_row = y * width;
 
         for(int x = 0; x < width; x++) {
-            const int sx = wave_clampi(x + data->lut_x[x], 0, width - 1);
-            const int src = src_row + sx;
+            const int src = src_row + map_x[x];
             const int dst = dst_row + x;
 
             dstY[dst] = Y[src];

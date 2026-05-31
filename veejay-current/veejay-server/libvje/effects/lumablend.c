@@ -42,8 +42,7 @@ vj_effect *lumablend_init(int w, int h)
     ve->limits[1][3] = 255;
     ve->defaults[3]  = 150;
     ve->description = "Soft-Edge Luma Flow Mixer";
-    ve->param_description = vje_build_param_list(ve->num_params,"Trigger Source","Min Threshold","Max Threshold","Master Opacity");
-	ve->extra_frame = 1;
+    ve->extra_frame = 1;
 	ve->sub_format = 1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Threshold A", "Threshold B", "Opacity" );
@@ -53,10 +52,10 @@ vj_effect *lumablend_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Mode */
-        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY,                    8,                  120,                6, 22, 1600, 3400, 700, 35,    /* Threshold A */
-        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY,                    135,                245,                6, 22, 1600, 3400, 700, 35,    /* Threshold B */
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Opacity */
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Mode */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,    8,                  120,                6,  22, 1600, 3400, 700, 35,    /* Threshold A */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,    135,                245,                6,  22, 1600, 3400, 700, 35,    /* Threshold B */
+        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                          48,                 235,                14, 58, 90,   720,  0,   78     /* Opacity */
     );
 	return ve;
 }

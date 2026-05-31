@@ -452,17 +452,17 @@ vj_effect *chronoetch_init(int w, int h)
         ve->num_params,
 
         VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                                        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Opacity */
-        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,   3,                  8,                  5,  16,  1800, 4200, 1200, 15,    /* Step Size */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,   1,                  7,                  6,  22,  1800, 4200, 1000, 35,    /* Time Depth */
-        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS,                                                    12,                 88,                 8,  34,  900,  2400, 0,    55,    /* Rib Length */
-        VJ_BEAT_DETAIL,           VJ_BEAT_F_CONTINUOUS,                                                    300,                1000,               8,  34,  700,  1900, 0,    70,    /* Edge Sensitivity */
-        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS,                                                    120,                880,                10, 42,  700,  2000, 0,    75,    /* Motion Ageing */
-        VJ_BEAT_DETAIL,           VJ_BEAT_F_CONTINUOUS,                                                    80,                 860,                8,  34,  900,  2400, 0,    60,    /* Bone Density */
-        VJ_BEAT_TURBULENCE,       VJ_BEAT_F_CLIMAX_ONLY,                                                   0,                  780,                4,  24,  1400, 3600, 500,  25,    /* Age Violence */
-        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CLIMAX_ONLY,                                                   0,                  760,                4,  24,  1400, 3600, 500,  25,    /* Chroma Time Tear */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY,                                                   720,                1000,               5,  22,  2000, 5200, 1200, 35,    /* Trail Memory */
-        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS,                                                    120,                920,                8,  32,  900,  2500, 0,    50,    /* Stroke Chroma */
-        VJ_BEAT_TRIGGER,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                                0,                  1000,               24, 90,  60,   360,  0,    95     /* Beat Push */
+        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,   3,                  8,                  5,  14,  1800, 4200, 1200, 12,    /* Step Size */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,   1,                  7,                  6,  20,  1800, 4200, 1000, 30,    /* Time Depth */
+        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                                                    16,                 96,                 14, 58,  90,   720,  0,    82,    /* Rib Length */
+        VJ_BEAT_SNARE,            VJ_BEAT_F_CONTINUOUS,                                                    360,                1000,               10, 46,  120,  900,  0,    78,    /* Edge Sensitivity */
+        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                                                    160,                940,                14, 58,  90,   760,  0,    82,    /* Motion Ageing */
+        VJ_BEAT_SNARE,            VJ_BEAT_F_CONTINUOUS,                                                    120,                920,                10, 46,  120,  900,  0,    72,    /* Bone Density */
+        VJ_BEAT_HAT,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY,                            0,                  840,                4,  24,  120,  900,  400,  38,    /* Age Violence */
+        VJ_BEAT_SNARE,            VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY,                            0,                  820,                8,  34,  120,  980,  400,  48,    /* Chroma Time Tear */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY,                                                   720,                1000,               5,  20,  2000, 5200, 1200, 30,    /* Trail Memory */
+        VJ_BEAT_SNARE,            VJ_BEAT_F_CONTINUOUS,                                                    120,                960,                8,  36,  120,  900,  0,    62,    /* Stroke Chroma */
+        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                                0,                  1000,               24, 96,  60,   360,  0,    100     /* Beat Push */
     );
 
     return ve;

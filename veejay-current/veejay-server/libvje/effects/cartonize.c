@@ -45,12 +45,12 @@ vj_effect *cartonize_init(int w, int h)
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Damp Y", "Damp U", "Damp V" );
-        ve->beat_hints = vje_build_beat_hint_list(
+    ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE,  4,  96,  10, 38,  900,  2400, 0, 65, /* Damp Y */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE,  0,  96,  8,  30,  1200, 3000, 0, 45, /* Damp U */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE,  0,  96,  8,  30,  1200, 3000, 0, 45  /* Damp V */
+        VJ_BEAT_SNARE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE,  4,  112, 10, 42,  100,  820,  0, 76, /* Damp Y */
+        VJ_BEAT_HAT,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE,  0,  88,  4,  22,  80,   520,  0, 46, /* Damp U */
+        VJ_BEAT_SNARE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE,  0,  96,  6,  28,  120,  760,  0, 58  /* Damp V */
     );
     return ve;
 }

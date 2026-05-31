@@ -65,7 +65,8 @@ vj_effect *transform_init(int width, int height)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1, max_size, 6, 22, 2200, 5200, 1800, 25 /* Cubics */
+        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
+        1, max_size, 6, 22, 2200, 5200, 1800, 25 /* Cubics */
     );
 
     (void) width;
@@ -104,8 +105,6 @@ void *transform_malloc(int w, int h)
         t->max_size = 1;
 
     t->n_threads = vje_advise_num_threads(len);
-    if(t->n_threads < 1)
-        t->n_threads = 1;
 
     return (void*) t;
 }

@@ -116,7 +116,7 @@ vj_effect *pencilsketch2_init(int w, int h)
     ve->limits[1][5] = 1;
     ve->defaults[5] = 1;
 
-    ve->description = "Sketchify Optimized";
+    ve->description = "Sketchify";
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
@@ -134,12 +134,12 @@ vj_effect *pencilsketch2_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  6,                  72,                 6, 22, 1800, 4200, 900, 30,    /* Blur Radius */
-        VJ_BEAT_DETAIL,        VJ_BEAT_F_CONTINUOUS,                         450,                2400,               8, 30, 1200, 3000, 0,   45,    /* Gamma Compression */
-        VJ_BEAT_DETAIL,        VJ_BEAT_F_CONTINUOUS,                         0,                  180,                8, 30, 1200, 3000, 0,   45,    /* Strength */
-        VJ_BEAT_CONTRAST,      VJ_BEAT_F_CONTINUOUS,                         0,                  180,                8, 30, 1200, 3000, 0,   45,    /* Contrast */
-        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,    0,                  24,                 6, 22, 1600, 3400, 700, 30,    /* Levels */
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Grayscale */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                                 6,                  72,                 6, 22, 1800, 4200, 900, 30,    /* Blur Radius */
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,       450,                2400,               6, 22, 1800, 4200, 900, 30,    /* Gamma Compression */
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_CONTINUOUS,                                                       0,                  180,                8, 30, 1200, 3000, 0,   45,    /* Strength */
+        VJ_BEAT_CONTRAST,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,       0,                  180,                6, 22, 1800, 4200, 900, 30,    /* Contrast */
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,       0,                  24,                 6, 22, 1600, 3400, 700, 30,    /* Levels */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Grayscale */
     );
 
     (void) w;

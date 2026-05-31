@@ -206,20 +206,21 @@ vj_effect *chronovein_init(int w, int h)
         "Vein Gain",
         "Color Energy"
     );
+    
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                    16,                 380,                6,  22,  1600, 3400, 700,  35,    /* Trigger Gate */
-        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     180,                920,                12, 52,  900,  2400, 0,    75,    /* Vein Growth */
-        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     80,                 860,                8,  38,  1000, 2800, 0,    55,    /* Conductivity */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                    360,                940,                6,  28,  1800, 4400, 900,  45,    /* Memory Decay */
-        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS,                     0,                  720,                8,  36,  1200, 3200, 0,    50,    /* Branching */
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                     0,                  280,                6,  28,  1200, 3000, 0,    35,    /* Source Bleed */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
-        VJ_BEAT_GLOW,         VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_CLIMAX_ONLY, 0,             620,                4,  24,  1800, 4200, 600,  25,    /* Auto Pulse */
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     0,                  1000,               18, 72,  450,  1500, 0,    95,    /* Beat Push */
-        VJ_BEAT_CONTRAST,     VJ_BEAT_F_CONTINUOUS,                     250,                920,                10, 46,  700,  1800, 0,    75,    /* Vein Gain */
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     260,                900,                8,  38,  900,  2200, 0,    55     /* Color Energy */
+        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY,                    16,                 380,                6,  20,  1600, 3400, 700,  30,    /* Trigger Gate */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     200,                960,                14, 58,  90,   720,  0,    84,    /* Vein Growth */
+        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     100,                900,                10, 42,  120,  900,  0,    66,    /* Conductivity */
+        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                    360,                940,                6,  24,  1800, 4400, 900,  40,    /* Memory Decay */
+        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     0,                  820,                10, 44,  120,  980,  0,    72,    /* Branching */
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                     0,                  320,                6,  26,  900,  2400, 0,    36,    /* Source Bleed */
+        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
+        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,              680,                4,  26,  120,  900,  500,  34,    /* Auto Pulse */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 0,                  1000,               24, 96,  60,   360,  0,    100,   /* Beat Push */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     260,                1000,               16, 68,  90,   720,  0,    86,    /* Vein Gain */
+        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     260,                1000,               10, 46,  120,  900,  0,    64     /* Color Energy */
     );
     return ve;
 }

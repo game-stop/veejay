@@ -30,16 +30,20 @@ typedef struct {
     int box_w;
     int box_h;
     int n_threads;
+
+    float beat_env;
+    float beat_kick;
+    float slide_phase;
 } videowall_t;
 
 static void destroy_filmstrip(videowall_t *vw);
 
-static inline int videowall_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : (v > hi ? hi : v);
 }
 
-static inline int videowall_wrapi(int v, int max)
+static inline int wrapi(int v, int max)
 {
     if(max <= 0)
         return 0;
@@ -50,6 +54,20 @@ static inline int videowall_wrapi(int v, int max)
         v += max;
 
     return v;
+}
+
+static inline uint8_t u8_add(uint8_t v, int add)
+{
+    const int r = (int)v + add;
+    return (uint8_t)((r < 0) ? 0 : (r > 255 ? 255 : r));
+}
+
+static inline int videowall_beat_shape(int beat_push)
+{
+    beat_push = clampi(beat_push, 0, 1000);
+
+    const int sq = (beat_push * beat_push + 500) / 1000;
+    return clampi((beat_push * 35 + sq * 65 + 50) / 100, 0, 1000);
 }
 
 static int videowall_gcd(int a, int b)
@@ -84,7 +102,7 @@ static int videowall_num_pics(int w, int h)
 vj_effect *videowall_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
+    ve->num_params = 7;
 
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
@@ -107,10 +125,22 @@ vj_effect *videowall_init(int w, int h)
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 1;
 
+    ve->limits[0][4] = 0;
+    ve->limits[1][4] = 1000;
+
+    ve->limits[0][5] = 0;
+    ve->limits[1][5] = 1000;
+
+    ve->limits[0][6] = 0;
+    ve->limits[1][6] = 1000;
+
     ve->defaults[0] = 0;
     ve->defaults[1] = 1;
     ve->defaults[2] = 1;
     ve->defaults[3] = 0;
+    ve->defaults[4] = 220;
+    ve->defaults[5] = 0;
+    ve->defaults[6] = 560;
 
     ve->description = "VideoWall / Tile Placement";
     ve->sub_format = 1;
@@ -123,7 +153,10 @@ vj_effect *videowall_init(int w, int h)
         "Photo Slot",
         "X Displacement",
         "Y Displacement",
-        "Lock Update"
+        "Lock Update",
+        "Beat Slide",
+        "Beat Push",
+        "Beat Smooth"
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
@@ -139,10 +172,31 @@ vj_effect *videowall_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000, /* Photo Slot */
-        VJ_BEAT_DRIFT,    VJ_BEAT_F_CONTINUOUS,                    0,                  max_w,              8, 30, 1200, 3000, 0, 35,    /* X Displacement */
-        VJ_BEAT_DRIFT,    VJ_BEAT_F_CONTINUOUS,                    0,                  max_h,              8, 30, 1200, 3000, 0, 35,    /* Y Displacement */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000  /* Lock Update */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000, /* Photo Slot */
+
+        VJ_BEAT_DRIFT, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000, /* X Displacement */
+
+        VJ_BEAT_DRIFT, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000, /* Y Displacement */
+
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000, /* Lock Update */
+
+        VJ_BEAT_DRIFT, VJ_BEAT_F_REJECT,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000, /* Beat Slide */
+
+        VJ_BEAT_KICK, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,
+        0, 760, 18, 68, 80, 760, 0, 100, /* Beat Push */
+
+        VJ_BEAT_MEMORY, VJ_BEAT_F_PHRASE_ONLY,
+        260, 840, 5, 18, 2200, 5200, 1200, 18 /* Beat Smooth */
     );
 
     return ve;
@@ -234,6 +288,9 @@ static void *prepare_filmstrip(int w, int h)
     vw->box_w = picture_width;
     vw->box_h = picture_height;
     vw->frame_counter = 0;
+    vw->beat_env = 0.0f;
+    vw->beat_kick = 0.0f;
+    vw->slide_phase = 0.0f;
 
     vw->n_threads = vje_advise_num_threads(w * h);
     if(vw->n_threads < 1)
@@ -360,31 +417,46 @@ static void put_photo_plane(uint8_t *restrict dst,
                             int box_h,
                             int x,
                             int y,
+                            int luma_lift,
                             int n_threads)
 {
     if(!dst || !photo || dst_w <= 0 || dst_h <= 0 || box_w <= 0 || box_h <= 0)
         return;
 
-    x = videowall_wrapi(x, dst_w);
-    y = videowall_wrapi(y, dst_h);
+    x = wrapi(x, dst_w);
+    y = wrapi(y, dst_h);
 
+    if(luma_lift <= 0) {
 #pragma omp parallel for schedule(static) num_threads(n_threads)
-    for(int yy = 0; yy < box_h; yy++) {
-        const int dy = videowall_wrapi(y + yy, dst_h);
-        const int dst_row = dy * dst_w;
-        const int src_row = yy * box_w;
+        for(int yy = 0; yy < box_h; yy++) {
+            const int dy = wrapi(y + yy, dst_h);
+            const int dst_row = dy * dst_w;
+            const int src_row = yy * box_w;
 
-        if(x + box_w <= dst_w) {
-            veejay_memcpy(dst + dst_row + x, photo + src_row, box_w);
-        } else {
-            const int left = dst_w - x;
-            const int right = box_w - left;
+            if(x + box_w <= dst_w) {
+                veejay_memcpy(dst + dst_row + x, photo + src_row, box_w);
+            } else {
+                const int left = dst_w - x;
+                const int right = box_w - left;
 
-            if(left > 0)
-                veejay_memcpy(dst + dst_row + x, photo + src_row, left);
+                if(left > 0)
+                    veejay_memcpy(dst + dst_row + x, photo + src_row, left);
 
-            if(right > 0)
-                veejay_memcpy(dst + dst_row, photo + src_row + left, right);
+                if(right > 0)
+                    veejay_memcpy(dst + dst_row, photo + src_row + left, right);
+            }
+        }
+    } else {
+#pragma omp parallel for schedule(static) num_threads(n_threads)
+        for(int yy = 0; yy < box_h; yy++) {
+            const int dy = wrapi(y + yy, dst_h);
+            const int dst_row = dy * dst_w;
+            const int src_row = yy * box_w;
+
+            for(int xx = 0; xx < box_w; xx++) {
+                const int dx = wrapi(x + xx, dst_w);
+                dst[dst_row + dx] = u8_add(photo[src_row + xx], luma_lift);
+            }
         }
     }
 }
@@ -394,7 +466,12 @@ static void put_photo(videowall_t *vw,
                       const uint8_t *photo,
                       int dst_w,
                       int dst_h,
-                      int index)
+                      int index,
+                      int global_x,
+                      int global_y,
+                      int stagger_x,
+                      int stagger_y,
+                      int luma_lift)
 {
     if(!vw || !dst_plane || !photo || index < 0 || index >= vw->num_photos || !vw->photo_list[index])
         return;
@@ -407,8 +484,12 @@ static void put_photo(videowall_t *vw,
     const int dx = vw->offset_table_x[index];
     const int dy = vw->offset_table_y[index];
 
-    const int base_x = (box_w * (index % per_row)) + dx;
-    const int base_y = (index < n) ? dy : (dst_h - box_h - dy);
+    const int row_group = (index < n) ? 0 : 1;
+    const int alt_x = (index & 1) ? -stagger_x : stagger_x;
+    const int alt_y = row_group ? -stagger_y : stagger_y;
+
+    const int base_x = (box_w * (index % per_row)) + dx + global_x + alt_x;
+    const int base_y = ((index < n) ? dy : (dst_h - box_h - dy)) + global_y + alt_y;
 
     put_photo_plane(
         dst_plane,
@@ -419,6 +500,7 @@ static void put_photo(videowall_t *vw,
         box_h,
         base_x,
         base_y,
+        luma_lift,
         vw->n_threads
     );
 }
@@ -439,10 +521,62 @@ void videowall_apply(void *ptr, VJFrame *frameA, VJFrame *frameB, int *args)
     if(width <= 0 || height <= 0 || len <= 0 || vw->num_photos <= 0)
         return;
 
-    int slot = videowall_clampi(args[0], 0, vw->num_photos - 1);
-    int x_disp = videowall_clampi(args[1], 0, width);
-    int y_disp = videowall_clampi(args[2], 0, height);
+    int slot = clampi(args[0], 0, vw->num_photos - 1);
+    int x_disp = clampi(args[1], 0, width);
+    int y_disp = clampi(args[2], 0, height);
     int lock_update = args[3] ? 1 : 0;
+    const int beat_slide = clampi(args[4], 0, 1000);
+    const int beat_push = clampi(args[5], 0, 1000);
+    const int beat_smooth = clampi(args[6], 0, 1000);
+
+    const int shaped = videowall_beat_shape(beat_push);
+    const float beat_target = (float)shaped * 0.001f;
+    const float smooth_t = (float)beat_smooth * 0.001f;
+    const float attack = 0.22f + (1.0f - smooth_t) * 0.34f;
+    const float release = 0.030f + (1.0f - smooth_t) * 0.090f;
+    const float old_env = vw->beat_env;
+
+    if(beat_target > vw->beat_env)
+        vw->beat_env += (beat_target - vw->beat_env) * attack;
+    else
+        vw->beat_env += (beat_target - vw->beat_env) * release;
+
+    if(vw->beat_env < 0.0001f)
+        vw->beat_env = 0.0f;
+    else if(vw->beat_env > 1.0f)
+        vw->beat_env = 1.0f;
+
+    {
+        const float rise = vw->beat_env - old_env;
+        if(rise > 0.035f)
+            vw->beat_kick += rise * 0.75f;
+
+        vw->beat_kick *= 0.68f;
+
+        if(vw->beat_kick > 1.0f)
+            vw->beat_kick = 1.0f;
+        else if(vw->beat_kick < 0.0001f)
+            vw->beat_kick = 0.0f;
+    }
+
+    const float beat_drive = vw->beat_env * 0.72f + vw->beat_kick * 0.95f;
+    const int drive_q = clampi((int)(beat_drive * 1000.0f + 0.5f), 0, 1000);
+    const int max_slide_px = ((vw->box_w + vw->box_h) * beat_slide + 1000) / 2000;
+    const int amp = (max_slide_px * drive_q + 500) / 1000;
+
+    vw->slide_phase += 0.20f + ((float)beat_slide * 0.00045f) + beat_drive * 0.85f;
+    if(vw->slide_phase > 8192.0f)
+        vw->slide_phase -= 8192.0f;
+
+    const int phase = ((int)vw->slide_phase) & 7;
+    const int tri = (phase < 4) ? phase : (7 - phase);
+    const int sign = (phase < 4) ? 1 : -1;
+
+    const int global_x = (amp * sign * tri) / 3;
+    const int global_y = (amp * (((phase + 2) & 4) ? -1 : 1)) / 3;
+    const int stagger_x = amp;
+    const int stagger_y = amp >> 1;
+    const int beat_lift = (drive_q * 22 + 500) / 1000;
 
     if(!lock_update) {
         vw->offset_table_x[slot] = x_disp;
@@ -458,9 +592,12 @@ void videowall_apply(void *ptr, VJFrame *frameA, VJFrame *frameB, int *args)
     take_photo(vw, frameB, index_b);
 
     for(int i = 0; i < vw->num_photos; i++) {
-        put_photo(vw, frameA->data[0], vw->photo_list[i]->data[0], width, height, i);
-        put_photo(vw, frameA->data[1], vw->photo_list[i]->data[1], width, height, i);
-        put_photo(vw, frameA->data[2], vw->photo_list[i]->data[2], width, height, i);
+        put_photo(vw, frameA->data[0], vw->photo_list[i]->data[0], width, height, i,
+                  global_x, global_y, stagger_x, stagger_y, beat_lift);
+        put_photo(vw, frameA->data[1], vw->photo_list[i]->data[1], width, height, i,
+                  global_x, global_y, stagger_x, stagger_y, 0);
+        put_photo(vw, frameA->data[2], vw->photo_list[i]->data[2], width, height, i,
+                  global_x, global_y, stagger_x, stagger_y, 0);
     }
 
     vw->frame_counter++;

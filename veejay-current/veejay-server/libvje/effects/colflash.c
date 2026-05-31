@@ -54,11 +54,11 @@ vj_effect *colflash_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SPEED,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,      2,                  24,                 6,  22,  1800, 4200, 900,  35,    /* Frametime */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Red */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Green */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Blue */
-        VJ_BEAT_TRIGGER,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,      1,                  6,                  6,  20,  1600, 3600, 700,  30     /* Delay */
+        VJ_BEAT_SPEED, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 2,  24,  6,  20,  1800, 4200, 900,  32, /* Frametime */
+        VJ_BEAT_KICK,  VJ_BEAT_F_CONTINUOUS,                      0,  255, 18, 72,  70,   520,  0,    90, /* Red */
+        VJ_BEAT_SNARE, VJ_BEAT_F_CONTINUOUS,                      0,  255, 12, 52,  100,  760,  0,    72, /* Green */
+        VJ_BEAT_HAT,   VJ_BEAT_F_CONTINUOUS,                      0,  255, 4,  28,  80,   520,  0,    52, /* Blue */
+        VJ_BEAT_KICK,  VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1,  6,   6,  18,  1600, 3600, 700,  28  /* Delay */
     );
     return ve;
 }

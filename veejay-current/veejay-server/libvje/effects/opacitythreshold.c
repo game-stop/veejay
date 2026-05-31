@@ -57,9 +57,9 @@ vj_effect *opacitythreshold_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Opacity */
-        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY,  8,                  120,                6, 22, 1600, 3400, 700, 35,    /* Min Threshold */
-        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY,  135,                245,                6, 22, 1600, 3400, 700, 35     /* Max Threshold */
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                       24,                 235,                10, 38, 900,  2400, 0, 65, /* Opacity */
+        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 8,                  120,                6,  22, 1600, 3400, 700, 35, /* Min Threshold */
+        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 135,                245,                6,  22, 1600, 3400, 700, 35  /* Max Threshold */
     );
 
     (void) w;

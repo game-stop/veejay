@@ -45,9 +45,9 @@ vj_effect *mirrordistortion_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE,                2,          72,         8,  30, 1200, 3000, 0, 50, /* Distortion */
-        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, w + 8, (w * 3) / 2, 12, 46, 900,  2400, 0, 70, /* Offset X */
-        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, h + 8, (h * 3) / 2, 12, 46, 900,  2400, 0, 65  /* Offset Y */
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 2,          72,         6,  22, 2200, 5200, 1800, 24, /* Distortion */
+        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  w + 8,      (w * 3) / 2, 12, 46, 900,  2400, 0,    70, /* Offset X */
+        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  h + 8,      (h * 3) / 2, 12, 46, 900,  2400, 0,    65  /* Offset Y */
     );
     return ve;
 }
@@ -96,10 +96,11 @@ void mirrordistortion_free(void *ptr) {
             free(m->sin_lut);
         if(m->cos_lut)
             free(m->cos_lut);
+        if(m->buf[0])
+            free(m->buf[0]);
         free(m);
     }
 }
-
 void mirrordistortion_apply(void *ptr, VJFrame *frame, int *args) {
     mirror_distortion_t *m = (mirror_distortion_t*) ptr;
     const int w = frame->width;

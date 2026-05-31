@@ -218,15 +218,15 @@ vj_effect *edgefold_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_DETAIL,             VJ_BEAT_F_PHRASE_ONLY,                    60,                 420,                6,  22, 1800, 4200, 900,  -28,   /* Edge Gate */
-        VJ_BEAT_INERTIA,            VJ_BEAT_F_PHRASE_ONLY,                    460,                960,                6,  24, 1800, 4200, 900,  34,    /* Flow Memory */
-        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                     80,                 860,                12, 48, 900,  2400, 0,    78,    /* Fold Force */
-        VJ_BEAT_FLOW,               VJ_BEAT_F_CONTINUOUS,                     0,                  660,                10, 36, 1000, 2800, 0,    55,    /* Expansion */
-        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS,                     110,                920,                12, 48, 900,  2400, 0,    82,    /* Displacement */
-        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS,                     90,                 850,                10, 38, 1000, 2800, 0,    58,    /* Max Speed */
-        VJ_BEAT_COLOR_AMOUNT,       VJ_BEAT_F_CONTINUOUS,                     0,                  720,                8,  30, 1200, 3000, 0,    44,    /* Chroma Slip */
-        VJ_BEAT_TURBULENCE,         VJ_BEAT_F_CLIMAX_ONLY,                    0,                  700,                6,  28, 1400, 3600, 600,  36,    /* Turbulence */
-        VJ_BEAT_INTENSITY,          VJ_BEAT_F_CONTINUOUS,                     0,                  900,                22, 90, 60,   620,  0,    100    /* Beat Push */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                    60,                 420,                6,  22, 1800, 4200, 900,  -28,  /* Edge Gate */
+        VJ_BEAT_INERTIA,      VJ_BEAT_F_PHRASE_ONLY,                    460,                960,                6,  24, 1800, 4200, 900,  34,   /* Flow Memory */
+        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                     80,                 900,                10, 46, 120,  900,  0,    76,   /* Fold Force */
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     0,                  680,                10, 36, 1000, 2800, 0,    54,   /* Expansion */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                     120,                940,                14, 58, 90,   720,  0,    84,   /* Displacement */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                     90,                 880,                14, 58, 90,   720,  0,    78,   /* Max Speed */
+        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS,                     0,                  760,                4,  26, 80,   620,  0,    48,   /* Chroma Slip */
+        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,              760,                4,  28, 120,  900,  500,  40,   /* Turbulence */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,  0,                  960,                24, 96, 60,   360,  0,    100   /* Beat Push */
     );
 
     (void)w;

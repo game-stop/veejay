@@ -61,10 +61,10 @@ vj_effect *cutstop_init(int width , int height)
 	ve->beat_hints = vje_build_beat_hint_list(
 		ve->num_params,
 
-		VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS,                             12,                 160,                8,  32, 1200, 2800, 0,   55,    /* Threshold */
-		VJ_BEAT_MEMORY,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,        8,                  160,                6,  24, 1800, 4200, 900, 35,    /* Frame freq */
-		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Cut mode */
-		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Hold front/back */
+		VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    12,                 180,                8,  36, 120, 900, 0,   70,    /* Threshold */
+		VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE, 8,                 220,                14, 58, 90,  720, 0,   82,    /* Frame freq */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Cut mode */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000  /* Hold front/back */
 	);
     return ve;
 }

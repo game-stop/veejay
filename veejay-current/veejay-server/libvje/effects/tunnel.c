@@ -353,45 +353,35 @@ static void tunnel_build_value_hints(vj_effect *ve)
     );
 }
 
-static void tunnel_build_beat_hints(vj_effect *ve, int variant)
+static void tunnel_build_beat_hints(vj_effect *ve)
 {
-    if(variant == 1) {
-        ve->beat_hints = vje_build_beat_hint_list(
-            ve->num_params,
+    /*
+     * Single beat-hint set for both public initializers.
+     *
+     * tunnel_init1(): P_A/P_B/P_SWIRL are "Twist", "Swirl Linear", "Swirl Sine".
+     * tunnel_init() : P_A/P_B/P_SWIRL are "Curve Int", "Curve Speed", "Swirl".
+     *
+     * Keep the shared ranges inside both variants' limits.  This avoids the old
+     * split where one branch could push signed values into parameters that are
+     * unsigned in the other initializer.
+     */
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
-            VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,          -90,                 90,                 10, 38,  700,  2200, 0,    68,     /* Speed */
-            VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                           -72,                 72,                 8,  32,  900,  2600, 0,    48,     /* Twist */
-            VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                           -72,                 72,                 8,  32,  900,  2600, 0,    50,     /* Swirl Linear */
-            VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                           0,                   78,                 8,  30,  900,  2600, 0,    44,     /* Swirl Sine */
-            VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                           80,                  680,                8,  32,  900,  2600, 0,    50,     /* Zoom */
-            VJ_BEAT_COLOR_PHASE,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,          0,                   1550,               8,  30,  1000, 3000, 0,    42,     /* Offset */
-            VJ_BEAT_MEMORY,        VJ_BEAT_F_PHRASE_ONLY,                          12,                  82,                 5,  20,  2200, 5200, 1200, 22,     /* Feedback */
-            VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Shape */
-            VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* High Quality */
-            VJ_BEAT_INTENSITY,     VJ_BEAT_F_CONTINUOUS,                           0,                   880,                18, 84,  50,   620,  0,    100,    /* Beat Push */
-            VJ_BEAT_SPEED,         VJ_BEAT_F_PHRASE_ONLY,                          260,                 900,                6,  22,  1800, 4200, 900,  24,     /* Beat Travel */
-            VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                           0,                   680,                10, 42,  700,  2200, 0,    48,     /* Beat Zoom */
-            VJ_BEAT_COLOR_PHASE,   VJ_BEAT_F_CONTINUOUS,                           0,                   620,                8,  32,  1000, 2800, 0,    38      /* Chroma Flow */
-        );
-    } else {
-        ve->beat_hints = vje_build_beat_hint_list(
-            ve->num_params,
-
-            VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,          -90,                 90,                 10, 38,  700,  2200, 0,    68,     /* Speed */
-            VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                           0,                   92,                 8,  32,  900,  2600, 0,    48,     /* Curve Int */
-            VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS,                           0,                   92,                 8,  32,  900,  2600, 0,    50,     /* Curve Speed */
-            VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                           -86,                 86,                 8,  32,  900,  2600, 0,    52,     /* Swirl */
-            VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                           0,                   360,                8,  32,  900,  2600, 0,    50,     /* Zoom */
-            VJ_BEAT_COLOR_PHASE,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,          0,                   820,                8,  30,  1000, 3000, 0,    42,     /* Offset */
-            VJ_BEAT_MEMORY,        VJ_BEAT_F_PHRASE_ONLY,                          12,                  82,                 5,  20,  2200, 5200, 1200, 22,     /* Feedback */
-            VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Shape */
-            VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* High Quality */
-            VJ_BEAT_INTENSITY,     VJ_BEAT_F_CONTINUOUS,                           0,                   880,                18, 84,  50,   620,  0,    100,    /* Beat Push */
-            VJ_BEAT_SPEED,         VJ_BEAT_F_PHRASE_ONLY,                          260,                 900,                6,  22,  1800, 4200, 900,  24,     /* Beat Travel */
-            VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                           0,                   680,                10, 42,  700,  2200, 0,    48,     /* Beat Zoom */
-            VJ_BEAT_COLOR_PHASE,   VJ_BEAT_F_CONTINUOUS,                           0,                   620,                8,  32,  1000, 2800, 0,    38      /* Chroma Flow */
-        );
-    }
+        VJ_BEAT_SIGNED_SPEED,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -90,                90,                 10, 38,  700,  2200, 0,    68,     /* Speed */
+        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                                                0,                  72,                 8,  32,  900,  2600, 0,    48,     /* Twist / Curve Int */
+        VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS,                                                0,                  72,                 8,  32,  900,  2600, 0,    50,     /* Swirl Linear / Curve Speed */
+        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                                                0,                  78,                 8,  30,  900,  2600, 0,    52,     /* Swirl Sine / Swirl */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                                                80,                 360,                8,  32,  900,  2600, 0,    50,     /* Zoom */
+        VJ_BEAT_COLOR_PHASE,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                               0,                  820,                8,  30,  1000, 3000, 0,    42,     /* Offset */
+        VJ_BEAT_MEMORY,        VJ_BEAT_F_PHRASE_ONLY,                                               12,                 82,                 5,  20,  2200, 5200, 1200, 22,     /* Feedback */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Shape */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* High Quality */
+        VJ_BEAT_KICK,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                            0,                  880,                18, 84,  50,   620,  0,    100,    /* Beat Push */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT,                                                    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Beat Travel */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT,                                                    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Beat Zoom */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT,                                                    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000   /* Chroma Flow */
+    );
 }
 
 static void precompute_warp_luts(box_tunnel_t *t)
@@ -613,7 +603,7 @@ vj_effect *tunnel_init1(int width, int height)
     );
 
     tunnel_build_value_hints(ve);
-    tunnel_build_beat_hints(ve, 1);
+    tunnel_build_beat_hints(ve);
 
     (void) width;
     (void) height;
@@ -693,7 +683,7 @@ vj_effect *tunnel_init(int width, int height)
     );
 
     tunnel_build_value_hints(ve);
-    tunnel_build_beat_hints(ve, 0);
+    tunnel_build_beat_hints(ve);
 
     (void) width;
     (void) height;
@@ -716,9 +706,6 @@ void *tunnel_malloc(int width, int height)
     const int size = width * height;
 
     t->n_threads = vje_advise_num_threads(size);
-    if(t->n_threads < 1)
-        t->n_threads = 1;
-
     t->last_shape = -1;
 
     t->u_lut = (int*) vj_malloc(sizeof(int) * (size_t)size * 3u);

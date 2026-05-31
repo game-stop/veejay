@@ -32,6 +32,10 @@
 #include <libvje/effects/motionmap.h>
 #include <stdint.h>
 
+#ifndef VJ_IMAGE_EFFECT_MOTIONMAP_ID
+#define VJ_IMAGE_EFFECT_MOTIONMAP_ID VJ_IMAGE_EFFECT_MOTIONMAP
+#endif
+
 #define TD_MAX_PLANES 256
 
 typedef struct {
@@ -93,7 +97,8 @@ vj_effect *timedistort_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS, 5, 100, 10, 38, 1000, 2600, 0, 62 /* Value */
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
+        5, 100, 6, 22, 1800, 4200, 900, 30 /* Value */
     );
 
     (void) w;
@@ -214,7 +219,7 @@ void timedistort_free(void *ptr)
 
 int timedistort_request_fx(void)
 {
-    return VJ_IMAGE_EFFECT_MOTIONMAP;
+    return VJ_IMAGE_EFFECT_MOTIONMAP_ID;
 }
 
 void timedistort_set_motionmap(void *ptr, void *priv)

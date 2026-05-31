@@ -48,7 +48,13 @@ vj_effect *lumamagick_init(int width, int height)
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
     vje_build_value_hint_list(ve->hints, ve->limits[1][0], 0, VJ_EFFECT_BLEND_STRINGS);
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Mode */
+        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                    35,                 200,                14, 58, 90,  720, 0,   82,    /* Opacity A */
+        VJ_BEAT_SNARE,            VJ_BEAT_F_CONTINUOUS,                    35,                 200,                8,  36, 120, 900, 0,   68     /* Opacity B */
+    );
 	return ve;
 }
 static void lumamagick_adddistorted(VJFrame *frame, VJFrame *frame2, int op_a, int op_b, int n_threads)

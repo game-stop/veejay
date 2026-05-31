@@ -141,14 +141,14 @@ vj_effect *slicer_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_WARP,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 4,                  96,                 6, 22, 1800, 4200, 900, 30,    /* Width */
-        VJ_BEAT_WARP,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 4,                  96,                 6, 22, 1800, 4200, 900, 30,    /* Height */
-        VJ_BEAT_TURBULENCE,VJ_BEAT_F_CONTINUOUS,                                                    0,                  96,                 10,38, 1000, 2600, 0,   62,    /* Shatter */
-        VJ_BEAT_SPEED,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                               0,                  240,                6, 22, 1800, 4200, 900, 30,    /* Period */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Mode */
-        VJ_BEAT_MEMORY,   VJ_BEAT_F_CONTINUOUS,                                                    0,                  82,                 8, 32, 1200, 3200, 0,   50,    /* Smoothness */
-        VJ_BEAT_SOURCE_MIX,VJ_BEAT_F_CONTINUOUS,                                                   0,                  100,                8, 30, 1200, 3000, 0,   45,    /* Dominance */
-        VJ_BEAT_GRID_SIZE,VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                               2,                  max_shift,          6, 22, 2200, 5200, 1800, 25     /* Block Size */
+        VJ_BEAT_WARP,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 4,                  96,                 6,  22, 1800, 4200, 900,  30,    /* Width */
+        VJ_BEAT_WARP,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 4,                  96,                 6,  22, 1800, 4200, 900,  30,    /* Height */
+        VJ_BEAT_TURBULENCE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 0,                  96,                 6,  22, 1800, 4200, 900,  30,    /* Shatter */
+        VJ_BEAT_SPEED,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                            0,                  240,                6,  22, 1800, 4200, 900,  30,    /* Period */
+        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                               VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Mode */
+        VJ_BEAT_MEMORY,     VJ_BEAT_F_CONTINUOUS,                                                  0,                  82,                 8,  32, 1200, 3200, 0,    50,    /* Smoothness */
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                                                  0,                  100,                8,  30, 1200, 3000, 0,    45,    /* Dominance */
+        VJ_BEAT_GRID_SIZE,  VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                            2,                  max_shift,          6,  22, 2200, 5200, 1800, 25     /* Block Size */
     );
 
     return ve;

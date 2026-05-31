@@ -55,7 +55,6 @@ vj_effect *rgbchannel_init(int w, int h)
     vje_build_value_hint_list(ve->hints, ve->limits[1][0], 0, "Keep", "Suppress");
     vje_build_value_hint_list(ve->hints, ve->limits[1][1], 1, "Keep", "Suppress");
     vje_build_value_hint_list(ve->hints, ve->limits[1][2], 2, "Keep", "Suppress");
-
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 

@@ -28,7 +28,7 @@ typedef struct {
     int h;
 } widthmirror_t;
 
-static inline int widthmirror_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : (v > hi ? hi : v);
 }
@@ -66,9 +66,9 @@ vj_effect *widthmirror_init(int max_width, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 2, max_freq, 6, 22, 2200, 5200, 1800, 25 /* Frequency */
+        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
+        2, max_freq, 6, 22, 2200, 5200, 1800, 25 /* Frequency */
     );
-
     (void) h;
 
     return ve;
@@ -134,7 +134,7 @@ void widthmirror_apply(void *ptr, VJFrame *frame, int *args)
     if(width != wm->w || height != wm->h)
         return;
 
-    int frequency = widthmirror_clampi(args[0], 2, width);
+    int frequency = clampi(args[0], 2, width);
     if(frequency > 256)
         frequency = 256;
 
@@ -161,13 +161,13 @@ void widthmirror_apply(void *ptr, VJFrame *frame, int *args)
         for(int x = 0; x < width; x++) {
             const int band = x / band_w;
             const int band_start = band * band_w;
-            const int band_end = widthmirror_clampi(band_start + band_w, 0, width);
+            const int band_end = clampi(band_start + band_w, 0, width);
             const int local = x - band_start;
             const int src_x = (band & 1)
                 ? (band_end - 1 - local)
                 : (band_start + local);
 
-            const int sx = widthmirror_clampi(src_x, band_start, band_end - 1);
+            const int sx = clampi(src_x, band_start, band_end - 1);
             const int dst = row + x;
             const int src = row + sx;
 

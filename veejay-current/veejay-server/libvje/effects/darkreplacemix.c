@@ -49,7 +49,19 @@ vj_effect *darkreplace_init(int w, int h)
         "Threshold",
         "Softness"
     );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_MOTION_REACT,
+        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
+        16, 180,
+        6, 22, 1600, 3600, 900, 30, /* Threshold */
+
+        VJ_BEAT_DETAIL,
+        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
+        4, 72,
+        6, 22, 1800, 4200, 900, 24 /* Softness */
+    );
     return ve;
 }
 

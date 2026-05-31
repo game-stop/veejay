@@ -1082,15 +1082,19 @@ vj_effect *eventhorizon_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SIGNED_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -70,                70,                 12, 46, 1000, 2800, 0,    70,    /* Speed */
-        VJ_BEAT_GEOMETRY_AMPLITUDE,  VJ_BEAT_F_CONTINUOUS,                                            32,                 420,                10, 38, 1000, 2800, 0,    60,    /* Scale Factor */
-        VJ_BEAT_GEOMETRY_FREQUENCY,  VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                      1,                  9,                  6,  20, 2200, 5200, 1800, 25,    /* Branches */
-        VJ_BEAT_SIGNED_CURVE,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -80,                80,                 10, 38, 1200, 3000, 0,    50,    /* Swirl */
-        VJ_BEAT_SIGNED_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -80,                80,                 12, 46, 1000, 2800, 0,    70,    /* Rot Speed */
-        VJ_BEAT_MEMORY,              VJ_BEAT_F_PHRASE_ONLY,                                           18,                 88,                 8,  30, 1800, 4200, 900,  45,    /* Feedback */
-        VJ_BEAT_SIGNED_CURVE,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -180,               180,                8,  32, 1400, 3400, 0,    40,    /* Pitch */
-        VJ_BEAT_SELECTOR,            VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* High Quality */
-        VJ_BEAT_SELECTOR,            VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Mode */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                                      30,                 96,  14, 58, 90,   720,  0,   82, /* Build Speed */
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                                      12,                 100, 8,  30, 900,  2400, 0,   42, /* Source Feed */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                                      8,                  86,  14, 58, 90,   720,  0,   86, /* Liquid Flow */
+        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                                      0,                  78,  10, 42, 120,  900,  0,   70, /* Swirl Memory */
+        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                  42,                 100, 16, 68, 80,   520,  0,   92, /* Ignition */
+        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                                     50,                 96,  8,  28, 1800, 4200, 900, 38, /* Decay */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                                      36,                 100, 14, 58, 90,   720,  0,   84, /* Density */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                                      12,                 84,  14, 58, 90,   720,  0,   82, /* Light Gravity */
+        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                                      16,                 94,  10, 46, 120,  900,  0,   76, /* River Detail */
+        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -100,      100, 4,  26, 80,   620,  0,   52, /* Well Spin */
+        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                                     30,                 92,  8,  28, 1800, 4200, 900, 36, /* Trail Memory */
+        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS,                                      24,                 98,  4,  26, 80,   620,  0,   50, /* Nebula Palette */
+        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -80,       80,  4,  26, 80,   620,  0,   52  /* Motion Speed */
     );
 
     (void) w;

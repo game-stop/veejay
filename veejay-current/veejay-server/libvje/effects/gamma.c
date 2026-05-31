@@ -40,10 +40,10 @@ vj_effect *gamma_init(int w, int h)
     ve->description = "Gamma Correction";
     ve->sub_format = -1;
 	ve->param_description = vje_build_param_list(ve->num_params, "Gamma");
-        ve->beat_hints = vje_build_beat_hint_list(
+    ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS,  45, 220, 8, 30, 1200, 3000, 0, 45 /* Gamma */
+        VJ_BEAT_CONTRAST, VJ_BEAT_F_CONTINUOUS, 45, 220, 8, 34, 900, 2400, 0, 58 /* Gamma */
     );
 	return ve;
 }

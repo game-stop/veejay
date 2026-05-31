@@ -49,6 +49,24 @@ vj_effect *autoeq_init(int w, int h)
 
     vje_build_value_hint_list( ve->hints, ve->limits[1][0],0,
 		    "Show Histogram", "Equalize Frame" );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SELECTOR,
+        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000, /* Mode */
+
+        VJ_BEAT_INTENSITY,
+        VJ_BEAT_F_CONTINUOUS,
+        64, 240,
+        8, 30, 1200, 3000, 0, 50, /* Intensity */
+
+        VJ_BEAT_CONTRAST,
+        VJ_BEAT_F_CONTINUOUS,
+        32, 220,
+        8, 30, 1200, 3000, 0, 48 /* Strength */
+    );
     return ve;
 }
 
@@ -78,14 +96,21 @@ void *autoeq_malloc(int w, int h)
 	return (void*) a;
 }
 
-void	autoeq_free(void *ptr)
+void autoeq_free(void *ptr)
 {
     autoeq_t *a = (autoeq_t*) ptr;
-	veejay_histogram_del(a->histogram_);
-    free(a->tmp);
+
+    if(!a)
+        return;
+
+    if(a->histogram_)
+        veejay_histogram_del(a->histogram_);
+
+    if(a->tmp)
+        free(a->tmp);
+
     free(a);
 }
-
 
 void autoeq_apply( void *ptr, VJFrame *frame,int *args) {
     int val = args[0];

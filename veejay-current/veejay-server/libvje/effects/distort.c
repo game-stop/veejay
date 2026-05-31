@@ -92,10 +92,10 @@ vj_effect *distortion_init(int width, int height)
 
         VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1, 72, 6,  20, 1800, 4200, 900, 30, /* Increment 1 */
         VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1, 72, 6,  20, 1800, 4200, 900, 30, /* Increment 2 */
-        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1, 64, 6,  20, 1800, 4200, 900, 25, /* Increment 3 */
-        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1, 64, 6,  20, 1800, 4200, 900, 25, /* Increment 4 */
-        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS,                         0, 48, 10, 38, 1000, 2800, 0,   55, /* Increment 5 */
-        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS,                         0, 48, 10, 38, 1000, 2800, 0,   55  /* Increment 6 */
+        VJ_BEAT_TURBULENCE,         VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1, 64, 5,  18, 1800, 4200, 900, 24, /* Increment 3 */
+        VJ_BEAT_TURBULENCE,         VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1, 64, 5,  18, 1800, 4200, 900, 24, /* Increment 4 */
+        VJ_BEAT_KICK,               VJ_BEAT_F_CONTINUOUS,                         0, 72, 14, 58, 90,   720,  0,   82, /* Increment 5 */
+        VJ_BEAT_HAT,                VJ_BEAT_F_CONTINUOUS,                         0, 56, 4,  26, 80,   520,  0,   48  /* Increment 6 */
     );
     return ve;
 }

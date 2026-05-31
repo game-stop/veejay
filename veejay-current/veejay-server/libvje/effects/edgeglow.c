@@ -62,11 +62,11 @@ vj_effect *edgeglow_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,  4,   96,  6,  24, 1600, 3400, 700, 35, /* Threshold */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,   96,  255, 8,  28, 1400, 3400, 0,   35, /* Red */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,   96,  255, 8,  28, 1400, 3400, 0,   35, /* Green */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,   0,   180, 8,  28, 1400, 3400, 0,   30, /* Blue */
-        VJ_BEAT_GLOW,         VJ_BEAT_F_CONTINUOUS,   4,   70,  12, 44, 900,  2400, 0,   70  /* Scaling Factor */
+        VJ_BEAT_SNARE, VJ_BEAT_F_CONTINUOUS,  4,   110, 8,  36, 120, 900, 0, 70, /* Threshold */
+        VJ_BEAT_KICK,  VJ_BEAT_F_CONTINUOUS,  96,  255, 14, 58, 90,  720, 0, 82, /* Red */
+        VJ_BEAT_SNARE, VJ_BEAT_F_CONTINUOUS,  96,  255, 8,  36, 120, 900, 0, 64, /* Green */
+        VJ_BEAT_HAT,   VJ_BEAT_F_CONTINUOUS,  0,   220, 4,  26, 80,  620, 0, 50, /* Blue */
+        VJ_BEAT_KICK,  VJ_BEAT_F_CONTINUOUS,  4,   90,  14, 58, 90,  720, 0, 84  /* Scaling Factor */
     );
 
     return ve;

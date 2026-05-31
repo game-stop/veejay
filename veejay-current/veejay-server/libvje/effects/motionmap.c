@@ -73,7 +73,18 @@ vj_effect *motionmap_init(int w, int h)
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][6], 6, "Normal", "Local Max", "Global Max", "Hold Last" );
-	
+	ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_DETAIL,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  12,                 140,                6, 22, 1600, 3400, 700, 35,    /* Difference Threshold */
+        VJ_BEAT_INTENSITY,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  250,                (w * h) / 80,        6, 22, 1800, 4200, 900, 30,    /* Maximum Motion Energy */
+        VJ_BEAT_SELECTOR,    VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Draw Motion Map */
+        VJ_BEAT_MEMORY,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  3,                  48,                 6, 22, 1800, 4200, 900, 30,    /* History in frames */
+        VJ_BEAT_INERTIA,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  3,                  64,                 6, 22, 1800, 4200, 900, 30,    /* Decay */
+        VJ_BEAT_SELECTOR,    VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Interpolate frames */
+        VJ_BEAT_SELECTOR,    VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Activity Mode */
+        VJ_BEAT_MEMORY,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  0,                  240,                6, 22, 2200, 5200, 1200, 18     /* Activity Decay */
+    );
 
     return ve;
 }

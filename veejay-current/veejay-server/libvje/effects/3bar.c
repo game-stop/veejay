@@ -57,11 +57,11 @@ vj_effect *bar_init(int width, int height)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_GRID_SIZE,          VJ_BEAT_F_PHRASE_ONLY,                    2,                  8,                  6,  18,  1600, 3200, 1200, 10,  /* Divider */
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,    0,                  height / 16 + 1,    18, 45,  700,  1800, 0,    55,  /* Top Y */
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,    0,                  height / 16 + 1,    18, 45,  700,  1800, 0,    55,  /* Bot Y */
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,    0,                  width / 20 + 1,     18, 50,  650,  1700, 0,    60,  /* Top X */
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,    0,                  width / 20 + 1,     18, 50,  650,  1700, 0,    60   /* Bot X */
+        VJ_BEAT_GRID_SIZE,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_STRUCTURAL, 2,                  8,                  4,  14,  1800, 3600, 1200, 10,  /* Divider */
+        VJ_BEAT_HAT,            VJ_BEAT_F_CONTINUOUS,                          0,                  height / 18 + 1,    4,  18,  80,   420,  0,    46,  /* Top Y */
+        VJ_BEAT_SNARE,          VJ_BEAT_F_CONTINUOUS,                          0,                  height / 12 + 1,    8,  32,  120,  760,  0,    64,  /* Bot Y */
+        VJ_BEAT_KICK,           VJ_BEAT_F_CONTINUOUS,                          0,                  width / 12 + 1,     10, 42,  100,  780,  0,    78,  /* Top X */
+        VJ_BEAT_SNARE,          VJ_BEAT_F_CONTINUOUS,                          0,                  width / 14 + 1,     8,  34,  120,  720,  0,    68   /* Bot X */
     );
 
     return ve;

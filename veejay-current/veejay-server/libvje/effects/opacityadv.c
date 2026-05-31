@@ -45,9 +45,9 @@ vj_effect *opacityadv_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Opacity */
-        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY,  8,                  120,                6, 22, 1600, 3400, 700, 35,    /* Min Threshold */
-        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY,  135,                245,                6, 22, 1600, 3400, 700, 35     /* Max Threshold */
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                       24,                 235,                10, 38, 900,  2400, 0, 65, /* Opacity */
+        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 8,                  120,                6,  22, 1600, 3400, 700, 35, /* Min Threshold */
+        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 135,                245,                6,  22, 1600, 3400, 700, 35  /* Max Threshold */
     );
     return ve;
 }
@@ -76,8 +76,14 @@ void opacityadv_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
 	opacityadv_t *opa = (opacityadv_t*) ptr;
 
     const int opacity = args[0];
-    const int tmin    = args[1];
-    const int tmax    = args[2];
+    int tmin = args[1];
+    int tmax = args[2];
+
+    if(tmax < tmin) {
+        int tmp = tmin;
+        tmin = tmax;
+        tmax = tmp;
+    }
     const int width   = frame->width;
     const int height  = frame->height;
     const int len     = width * height;
@@ -86,7 +92,9 @@ void opacityadv_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
     uint8_t *U1 = frame->data[1],  *U2 = frame2->data[1];
     uint8_t *V1 = frame->data[2],  *V2 = frame2->data[2];
 
-    const int global_weight = (opacity > 255) ? 256 : opacity;
+    const int global_weight = (opacity >= 255) ? 256 : (opacity < 0 ? 0 : opacity);
+
+
 
     #pragma omp parallel num_threads(opa->n_threads)
     {

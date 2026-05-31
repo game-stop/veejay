@@ -59,10 +59,10 @@ vj_effect *bloom_init(int width, int height)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  2,   36,  8,  28,  1800, 3800, 900,  35, /* Radius */
-        VJ_BEAT_GLOW,          VJ_BEAT_F_CONTINUOUS,                        64,  240, 16, 58,  700,  1800, 0,    85, /* Intensity */
-        VJ_BEAT_DETAIL,        VJ_BEAT_F_CONTINUOUS,                        96,  230, 10, 38,  1000, 2600, 0,    55, /* Threshold */
-        VJ_BEAT_MEMORY,        VJ_BEAT_F_PHRASE_ONLY,                       0,   180, 8,  34,  1800, 4200, 900,  45  /* Persistence */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  2,   36,  8,  26,  1800, 3800, 900,  32, /* Radius */
+        VJ_BEAT_KICK,          VJ_BEAT_F_CONTINUOUS,                        72,  255, 18, 68,  90,   680,  0,    92, /* Intensity */
+        VJ_BEAT_SNARE,         VJ_BEAT_F_CONTINUOUS,                        88,  238, 8,  34,  120,  760,  0,    62, /* Threshold */
+        VJ_BEAT_MEMORY,        VJ_BEAT_F_PHRASE_ONLY,                       0,   200, 8,  32,  1800, 4200, 900,  42  /* Persistence */
     );
 
     return ve;

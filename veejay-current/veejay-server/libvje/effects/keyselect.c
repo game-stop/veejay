@@ -76,7 +76,18 @@ vj_effect *keyselect_init(int w, int h) {
     ve->description = "Blend by Color Key (Advanced)";
     ve->param_description = vje_build_param_list(ve->num_params,
         "Hue Angle", "Red", "Green", "Blue", "Threshold", "Solidity", "Blend mode", "Swap Selection");
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    1500,               7200,               8,  36, 120, 900, 0,   64,    /* Hue Angle */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Red */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Green */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Blue */
+        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    12,                 120,                8,  36, 120, 900, 0,   70,    /* Threshold */
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    96,                 235,                14, 58, 90,  720, 0,   74,    /* Solidity */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Blend mode */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000  /* Swap Selection */
+    );
     ve->has_user = 0;
     ve->extra_frame = 1;
     ve->sub_format = 1;

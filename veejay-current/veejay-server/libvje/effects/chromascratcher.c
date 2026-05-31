@@ -70,10 +70,10 @@ vj_effect *chromascratcher_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
 		ve->num_params,
 
-		VJ_BEAT_MEMORY,              VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 1,                  96,                 6,  22,  2200, 5200, 1800, 25,    /* Frames - label says Opacity */
-		VJ_BEAT_ALPHA_OR_OPACITY,    VJ_BEAT_F_REJECT,                                                        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Opacity - label says Frames */
-		VJ_BEAT_SELECTOR,            VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                 VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Mode */
-		VJ_BEAT_SELECTOR,            VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                 VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Pingpong */
+		VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 1,                  96,                 6,  20,  2200, 5200, 1800, 22,    /* Frames */
+		VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                                                        32,                 235,                14, 58,  90,   680,  0,    86,    /* Opacity */
+		VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Mode */
+		VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Pingpong */
 	);
 	return ve;
 }

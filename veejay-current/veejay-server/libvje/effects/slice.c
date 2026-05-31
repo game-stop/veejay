@@ -120,12 +120,11 @@ vj_effect *slice_init(int width, int height)
         "Slices",
         "Slice Period"
     );
-
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_WARP,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 4,  96,  6, 22, 1800, 4200, 900, 30, /* Slices */
-        VJ_BEAT_SPEED,  VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                            0,  180, 6, 22, 1800, 4200, 900, 30  /* Slice Period */
+        VJ_BEAT_WARP,  VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 4,  96,  6, 22, 1800, 4200, 900, 30, /* Slices */
+        VJ_BEAT_SPEED, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                            0,  180, 6, 22, 1800, 4200, 900, 30  /* Slice Period */
     );
 
     (void) width;

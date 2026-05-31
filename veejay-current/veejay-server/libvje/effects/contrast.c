@@ -50,9 +50,9 @@ vj_effect *contrast_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0, -1000, /* Mode */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS,                     70,                 220,                10, 38, 1000, 2600, 0, 60,    /* Luma */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                     60,                 220,                10, 38, 1000, 2800, 0, 55     /* Chroma */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,   0,   0, -1000, /* Mode */
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                     70,                 235,                14, 58, 90,  720, 0, 82,    /* Luma */
+        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                     60,                 235,                10, 42, 120, 900, 0, 68     /* Chroma */
     );
     return ve;
 }

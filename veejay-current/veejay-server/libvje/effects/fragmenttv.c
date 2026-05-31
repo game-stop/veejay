@@ -218,11 +218,11 @@ vj_effect *fragmenttv_init(int w, int h)
         VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 35,                 96,                 6, 22, 1800, 4200, 900,  26,    /* Coverage */
         VJ_BEAT_SPEED,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                            4,                  160,                6, 22, 1800, 4200, 900,  24,    /* Refresh Frames */
         VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,    -1000, /* Blend Mode */
-        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY,                                                   0,                  70,                 6, 22, 1800, 4200, 900,  20,    /* Border Strength */
+        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                                                   0,                  82,                 8, 36, 120,  900,  0,    66,    /* Border Strength */
         VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,    -1000, /* Black Background */
         VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,    -1000, /* Edge Style */
-        VJ_BEAT_INTENSITY,  VJ_BEAT_F_CONTINUOUS,                                                    0,                  520,                16, 58, 120,  900,  0,    100,   /* Beat Push */
-        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                                                   360,                860,                5,  18, 2200, 5200, 1200, 18     /* Beat Smooth */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                               0,                  760,                22,88, 60,   360,  0,    100,   /* Beat Push */
+        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                                                   360,                860,                5, 18, 2200, 5200, 1200, 18     /* Beat Smooth */
     );
     return ve;
 }

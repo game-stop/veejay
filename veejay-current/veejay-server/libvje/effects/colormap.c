@@ -48,9 +48,9 @@ vj_effect *colormap_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,  24, 140, 8, 30, 1200, 3000, 0, 45, /* Red */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,  48, 170, 8, 30, 1200, 3000, 0, 40, /* Green */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,  32, 160, 8, 30, 1200, 3000, 0, 45  /* Blue */
+        VJ_BEAT_KICK,  VJ_BEAT_F_CONTINUOUS,  24, 180, 14, 58, 90,  720, 0, 78, /* Red */
+        VJ_BEAT_SNARE, VJ_BEAT_F_CONTINUOUS,  40, 190, 8,  38, 120, 900, 0, 64, /* Green */
+        VJ_BEAT_HAT,   VJ_BEAT_F_CONTINUOUS,  32, 190, 4,  26, 80,  520, 0, 50  /* Blue */
     );
     return ve;
 }

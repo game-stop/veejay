@@ -282,18 +282,23 @@ vj_effect *tomolight_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Render Mode */
-        VJ_BEAT_ALPHA_OR_OPACITY,   VJ_BEAT_F_REJECT,                                      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Opacity */
-        VJ_BEAT_INTENSITY,          VJ_BEAT_F_CONTINUOUS,                                  24,                 100,                14, 52,  450,  1500, 0,    85,    /* Light Strength */
-        VJ_BEAT_MEMORY,             VJ_BEAT_F_CONTINUOUS,                                  62,                 98,                 8,  26,  1800, 4200, 700,  35,    /* Residue Memory */
-        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Depth Source */
-        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                                  45,                 245,                14, 48,  800,  2200, 0,    70,    /* Depth Scale */
-        VJ_BEAT_DETAIL,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE, 4, 48, 6, 22, 1800, 3600, 1200, 20, /* Slice Count */
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                  0,                  1000,               10, 42,  700,  1900, 0,    55,    /* Scan Position */
-        VJ_BEAT_WINDOW_RADIUS,      VJ_BEAT_F_CONTINUOUS,                                  4,                  58,                 8,  34,  900,  2200, 0,    55,    /* Scan Width */
-        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Scan Motion */
-        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
-        VJ_BEAT_RESET,              VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Reset Memory */
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Render Mode */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE,                      24,                 100,                8,  30,  1200, 3000, 0,    45,    /* Opacity */
+
+        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                             28,                 100,                18, 66,  90,   520,  0,    95,    /* Light Strength */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS,                                                 62,                 98,                 8,  26,  1800, 4200, 700,  35,    /* Residue Memory */
+
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Depth Source */
+
+        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE | VJ_BEAT_F_REBUILDS_STATE,   55,                 255,                12, 48,  120,  900,  0,    82,    /* Depth Scale */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 4,                  48,                 6,  22,  1800, 3600, 1200, 20,    /* Slice Count */
+
+        VJ_BEAT_HAT,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                                0,                  1000,               4,  22,  70,   420,  0,    48,    /* Scan Position */
+        VJ_BEAT_SNARE,            VJ_BEAT_F_CONTINUOUS,                                                 4,                  68,                 10, 42,  80,   650,  0,    72,    /* Scan Width */
+
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Scan Motion */
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
+        VJ_BEAT_RESET,            VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Reset Memory */
     );
 
     return ve;

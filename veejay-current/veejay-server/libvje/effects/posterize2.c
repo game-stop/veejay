@@ -40,10 +40,10 @@ vj_effect *posterize2_init(int w, int h)
     ve->limits[1][0] = 256;
 
     ve->limits[0][1] = 0;
-    ve->limits[1][1] = 256;
+    ve->limits[1][1] = 255;
 
     ve->limits[0][2] = 0;
-    ve->limits[1][2] = 256;
+    ve->limits[1][2] = 255;
 
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 5;
@@ -66,9 +66,9 @@ vj_effect *posterize2_init(int w, int h)
         ve->num_params,
 
         VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 2,                  32,                 6, 22, 1600, 3400, 700, 35,    /* Factor */
-        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY,                        8,                  120,                6, 22, 1600, 3400, 700, 35,    /* Min Threshold */
-        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY,                        135,                245,                6, 22, 1600, 3400, 700, 35,    /* Max Threshold */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Mode */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 8,                  120,                6, 22, 1600, 3400, 700, 35,    /* Min Threshold */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 135,                245,                6, 22, 1600, 3400, 700, 35,    /* Max Threshold */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Mode */
     );
 
     (void) w;

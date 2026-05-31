@@ -52,9 +52,9 @@ vj_effect *gammacompr_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS,    2400, 4300, 10, 36, 1200, 3000, 0,   50, /* Gamma Compression */
-        VJ_BEAT_DETAIL, VJ_BEAT_F_PHRASE_ONLY,   170,  255,  6,  22, 1600, 3400, 700, 35, /* White Threshold */
-        VJ_BEAT_DETAIL, VJ_BEAT_F_PHRASE_ONLY,   0,    72,   6,  22, 1600, 3400, 700, 30  /* Black Threshold */
+        VJ_BEAT_CONTRAST, VJ_BEAT_F_CONTINUOUS,  2200, 4600, 10, 40, 900,  2400, 0, 62, /* Gamma Compression */
+        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,  150,  255,  8,  36, 120,  900,  0, 66, /* White Threshold */
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,  0,    88,   14, 58, 90,   720,  0, 70  /* Black Threshold */
     );
 	return ve;
 }

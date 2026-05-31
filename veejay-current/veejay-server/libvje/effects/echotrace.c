@@ -110,10 +110,10 @@ vj_effect *echotrace_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_PHRASE_ONLY,                   80,                 255,                6,  22, 1800, 4200, 900,  28,    /* Intensity */
-        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 4,                96,                 6,  24, 1800, 4200, 900,  34,    /* Decay */
-        VJ_BEAT_INTENSITY,  VJ_BEAT_F_CONTINUOUS,                    0,                  760,                16, 68, 80,   760,  0,    100,   /* Beat Push */
-        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                   260,                820,                5,  18, 2200, 5200, 1200, 18     /* Beat Smooth */
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_PHRASE_ONLY,                    80,                 255,                6,  22, 1800, 4200, 900,  28,  /* Intensity */
+        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 4,                 96,                 6,  24, 1800, 4200, 900,  34,  /* Decay */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,  0,                  860,                22, 88, 60,   360,  0,    100, /* Beat Push */
+        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                    260,                820,                5,  18, 2200, 5200, 1200, 18   /* Beat Smooth */
     );
 
     (void) w;

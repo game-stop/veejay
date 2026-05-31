@@ -636,23 +636,22 @@ vj_effect *meteorvector_init(int w, int h)
         "Color Bias",
         "Beat Push"
     );
-
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Opacity */
-        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                 3,                  8,                  6,  22, 2200, 5200, 1800, 20,    /* Step Size */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                 2,                  7,                  6,  22, 1800, 4200, 900,  30,    /* Time Depth */
-        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                 1,                  6,                  6,  20, 1800, 4200, 900,  20,    /* Head Size */
-        VJ_BEAT_TRAIL_LENGTH,     VJ_BEAT_F_CONTINUOUS,                                       160,                880,                10, 38, 1000, 2800, 0,    52,    /* Tail Length */
-        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY,                                      560,                980,                6,  22, 1600, 3400, 700,  28,    /* Edge Sensitivity */
-        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS,                                       160,                900,                12, 46, 900,  2400, 0,    68,    /* Motion Launch */
-        VJ_BEAT_DENSITY,          VJ_BEAT_F_PHRASE_ONLY,                                      160,                840,                6,  22, 1800, 4200, 900,  28,    /* Comet Density */
-        VJ_BEAT_GLOW,             VJ_BEAT_F_CONTINUOUS,                                       360,                900,                10, 36, 1000, 2600, 0,    52,    /* White Forge */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY,                                      680,                990,                6,  24, 2200, 5200, 1200, 30,    /* Trail Memory */
-        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS,                                       0,                  520,                8,  30, 1200, 3000, 0,    42,    /* Stroke Chroma */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS,                                      35,                 100,                10, 42, 900,  2400, 0,    62,    /* Opacity */
+        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                3,                  8,                  6,  22, 2200, 5200, 1800, 20,    /* Step Size */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                2,                  7,                  6,  22, 1800, 4200, 900,  30,    /* Time Depth */
+        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                1,                  6,                  6,  20, 1800, 4200, 900,  20,    /* Head Size */
+        VJ_BEAT_TRAIL_LENGTH,     VJ_BEAT_F_CONTINUOUS,                                      160,                880,                10, 38, 1000, 2800, 0,    52,    /* Tail Length */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                560,                980,                6,  22, 1600, 3400, 700,  28,    /* Edge Sensitivity */
+        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS,                                      160,                900,                12, 46, 900,  2400, 0,    68,    /* Motion Launch */
+        VJ_BEAT_DENSITY,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                160,                840,                6,  22, 1800, 4200, 900,  28,    /* Comet Density */
+        VJ_BEAT_GLOW,             VJ_BEAT_F_CONTINUOUS,                                      360,                900,                10, 36, 1000, 2600, 0,    52,    /* White Forge */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY,                                     680,                990,                6,  24, 2200, 5200, 1200, 30,    /* Trail Memory */
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS,                                      0,                  520,                8,  30, 1200, 3000, 0,    42,    /* Stroke Chroma */
         VJ_BEAT_COLOR_PHASE,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, 620,       1000,               8,  30, 1200, 3000, 0,    38,    /* Color Bias */
-        VJ_BEAT_INTENSITY,        VJ_BEAT_F_CONTINUOUS,                                       0,                  720,                18, 76, 80,   720,  0,    100    /* Beat Push */
+        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                  0,                  900,                22, 88, 60,   360,  0,    100    /* Beat Push */
     );
 
     return ve;

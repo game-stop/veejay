@@ -58,7 +58,7 @@ vj_effect *porterduff_init(int w,int h)
     ve->hints = vje_init_value_hint_list( ve->num_params );
 
     vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
-        "Dest", "Dest Atop", "Dest In", "Dest Over", "Dest Out", "Src Over", "Src Atop", "Src In", "Src Out", "Multiply", "Xor", "Add", "Subtract", "Divide", "Screen" , "Overlay" );
+        "Dest", "Dest Atop", "Dest In", "Dest Over", "Dest Out", "Src Over", "SrcAtop", "Src In", "Src Out", "Multiply", "Xor", "Add", "Subtract", "Divide", "Screen" , "Overlay" );
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
@@ -235,19 +235,27 @@ static void svg_multiply( uint8_t *A, uint8_t *B, int n_pixels, int n_threads )
     }
 }
 
-static void vj_xor( uint8_t *A, uint8_t *B, int n_pixels, int n_threads )
+static void vj_xor(uint8_t *A, uint8_t *B, int n_pixels, int n_threads)
 {
 #pragma omp parallel for simd schedule(static) num_threads(n_threads)
-    for( int i = 0; i < n_pixels; i ++ )
+    for(int i = 0; i < n_pixels; i++)
     {
         int idx = i * 4;
         uint8_t sa = B[idx + 3];
         uint8_t da = A[idx + 3];
-        for( int j = 0; j < 3; j ++ )
+
+        for(int j = 0; j < 3; j++)
         {
-            uint8_t t1 = DIV255(sa * (255 - da));
-            uint8_t t2 = DIV255(da * (255 - sa));
+            uint8_t s = B[idx + j];
+            uint8_t d = A[idx + j];
+
+            uint8_t t1 = DIV255(s * (255 - da));
+            uint8_t t2 = DIV255(d * (255 - sa));
+
+            int v = t1 + t2;
+            A[idx + j] = (v > 255) ? 255 : v;
         }
+
         A[idx + 3] = DIV255(sa * (255 - da) + da * (255 - sa));
     }
 }

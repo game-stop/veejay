@@ -69,7 +69,29 @@ vj_effect *bgsubtract_init(int width, int height)
     vje_build_value_hint_list( ve->hints, ve->limits[1][3], 3, "Create Alpha Mask", "Black Background", "Show B&W Mask" );
 
     ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_MOTION_REACT,
+        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
+        8, 150,
+        6, 22, 1600, 3600, 900, 30, /* Threshold */
+
+        VJ_BEAT_SELECTOR,
+        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000, /* BG Method */
+
+        VJ_BEAT_SELECTOR,
+        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000, /* Enable */
+
+        VJ_BEAT_SELECTOR,
+        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000 /* Output Mode */
+    );
     return ve;
 }
 
@@ -104,10 +126,15 @@ void *bgsubtract_malloc(int width, int height)
 void bgsubtract_free(void *ptr)
 {
     bgsubtract_t *b = (bgsubtract_t*) ptr;
-    free(b->static_bg__);
+
+    if(!b)
+        return;
+
+    if(b->static_bg__)
+        free(b->static_bg__);
+
     free(b);
 }
-
 int bgsubtract_prepare(void *ptr, VJFrame *frame)
 {
     bgsubtract_t *b = (bgsubtract_t*) ptr;

@@ -89,8 +89,8 @@ vj_effect *transblend_init(int width, int height)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SPEED,    VJ_BEAT_F_CONTINUOUS,                         0,                  max_speed > 240 ? 240 : max_speed, 8, 30, 1200, 3000, 0,   50,    /* Speed */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,              0, 0,  0,    0,    0,   -1000  /* Bounce */
+        VJ_BEAT_SPEED,    VJ_BEAT_F_CONTINUOUS,                   0,                  max_speed > 240 ? 240 : max_speed, 8, 30, 1200, 3000, 0,   50,    /* Speed */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,              0, 0,  0,    0,    0,   -1000  /* Bounce */
     );
 
     return ve;

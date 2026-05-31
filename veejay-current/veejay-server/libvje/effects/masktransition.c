@@ -43,8 +43,8 @@ vj_effect *masktransition_init(int width, int height)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_PHRASE_ONLY,                    0,    1255, 6, 22, 1800, 4200, 900, 35, /* Time Index */
-        VJ_BEAT_INERTIA,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 16,   420,  6, 22, 1800, 4200, 900, 25  /* Smooth */
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                       0,    1255, 10, 42, 900,  2400, 0,   68, /* Time Index */
+        VJ_BEAT_INERTIA,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 16,   420,  6,  22, 1800, 4200, 900, 25  /* Smooth */
     );
     return ve;
 }
@@ -90,12 +90,12 @@ static void alpha_blend_transition(uint8_t *Y, uint8_t *Cb, uint8_t *Cr,
 
     for (int i = 0; i < 256; i++)
     {
-        if (time_index < aA[i])
+        if (time_index < (unsigned int)i)
             lookup[i] = 0;
-        else if (time_index >= (aA[i] + dur))
+        else if (time_index >= ((unsigned int)i + dur))
             lookup[i] = 0xff;
         else
-            lookup[i] = (uint8_t)(0xff * ((double)(time_index - aA[i]) / dur));
+            lookup[i] = (uint8_t)(0xff * ((double)(time_index - (unsigned int)i) / dur));
     }
 
     const uint8_t *T = lookup;

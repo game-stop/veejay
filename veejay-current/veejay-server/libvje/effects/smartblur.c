@@ -93,9 +93,9 @@ vj_effect *smartblur_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,  2,  36,  8,  30, 1200, 3000, 0, 45, /* Radius */
-        VJ_BEAT_CONTRAST,      VJ_BEAT_F_CONTINUOUS,  60, 460, 8,  30, 1200, 3000, 0, 50, /* Sharpness */
-        VJ_BEAT_COLOR_AMOUNT,  VJ_BEAT_F_CONTINUOUS,  0,  100, 8,  30, 1200, 3000, 0, 45  /* Chroma */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS, 2,  36,  8, 30, 1200, 3000, 0, 45, /* Radius */
+        VJ_BEAT_CONTRAST,      VJ_BEAT_F_CONTINUOUS, 60, 460, 8, 30, 1200, 3000, 0, 50, /* Sharpness */
+        VJ_BEAT_COLOR_AMOUNT,  VJ_BEAT_F_CONTINUOUS, 0,  100, 8, 30, 1200, 3000, 0, 45  /* Chroma */
     );
 
     (void) w;

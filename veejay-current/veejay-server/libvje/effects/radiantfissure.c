@@ -571,7 +571,7 @@ vj_effect *radiantfissure_init(int w, int h)
         VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY,                                      760,                1000,               6,  24, 1800, 4200, 1200, 34,    /* Trail Memory */
         VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS,                                       0,                  520,                8,  30, 1200, 3000, 0,    42,    /* Stroke Chroma */
         VJ_BEAT_COLOR_PHASE,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, 620,       1000,               8,  30, 1200, 3000, 0,    42,    /* Color Bias */
-        VJ_BEAT_INTENSITY,        VJ_BEAT_F_CONTINUOUS,                                       0,                  850,                18, 78, 80,   650,  0,    100    /* Beat Push */
+        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                   0,                  850,                18, 78, 80,   650,  0,    100    /* Beat Push */
     );
     return ve;
 }

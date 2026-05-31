@@ -73,12 +73,12 @@ vj_effect *radialblur_init(int w,int h)
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Radius", "Power", "Direction"); 
     ve->beat_hints = vje_build_beat_hint_list(
-		ve->num_params,
+        ve->num_params,
 
-		VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                                  2,                  64,                 8,  30, 1200, 3000, 0,   45,    /* Radius */
-		VJ_BEAT_INTENSITY,     VJ_BEAT_F_CONTINUOUS,                                  0,                  6,                  10, 38, 1000, 2600, 0,   60,    /* Power */
-		VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,               VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Direction */
-	);
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                       2,                  64,                 8,  30, 1200, 3000, 0,   45,    /* Radius */
+        VJ_BEAT_INTENSITY,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 0,                  6,                  6,  22, 1600, 3400, 700, 30,    /* Power */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Direction */
+    );
 	return ve;
 }
 

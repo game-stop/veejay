@@ -84,10 +84,10 @@ vj_effect *noisepencil_init(int width, int height)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,   0,  0,    0,    0,   -1000, /* Mode */
-        VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS,                    250,                4200,               10, 38, 1000, 2600, 0,    60,    /* Amplification */
-        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY,                   32,                 120,                6,  22, 1600, 3400, 700,  35,    /* Min Threshold */
-        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY,                   128,                235,                6,  22, 1600, 3400, 700,  35     /* Max Threshold */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,   0,  0,    0,    0,   -1000, /* Mode */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS,                       250,                4200,               10, 38, 1000, 2600, 0,    60,    /* Amplification */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 32,                 120,                6,  22, 1600, 3400, 700,  35,    /* Min Threshold */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 128,                235,                6,  22, 1600, 3400, 700,  35     /* Max Threshold */
     );
 
     (void) width;

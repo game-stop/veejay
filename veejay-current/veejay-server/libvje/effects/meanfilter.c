@@ -89,10 +89,12 @@ static void vje_mean_filter(const uint8_t *restrict src, uint8_t *restrict dst, 
     }
 }
 
-void meanfilter_apply( void *ptr, VJFrame *frame, int *args )
+void meanfilter_apply(void *ptr, VJFrame *frame, int *args)
 {
-	mean_t *m = (mean_t*) ptr;
-	vje_mean_filter( frame->data[0], m->mean, frame->width, frame->height );
+    mean_t *m = (mean_t*) ptr;
 
-	veejay_memcpy( frame->data[0], m->mean, frame->len );
+    veejay_memcpy(m->mean, frame->data[0], frame->len);
+    vje_mean_filter(frame->data[0], m->mean, frame->width, frame->height);
+
+    veejay_memcpy(frame->data[0], m->mean, frame->len);
 }

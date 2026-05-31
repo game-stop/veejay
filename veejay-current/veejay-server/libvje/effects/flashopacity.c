@@ -60,11 +60,11 @@ vj_effect *flashopacity_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_GLOW,             VJ_BEAT_F_CONTINUOUS,                             4,                  70,                 12, 46, 900,  2400, 0,   75,    /* Exposure */
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                 VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Start Opacity */
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                 VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* End Opacity */
-        VJ_BEAT_SPEED,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,        4,                  96,                 6,  22, 1800, 4200, 900, 30,    /* Interval */
-        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Mode */
+        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                       4,                  82,                 14, 58, 90,   720,  0,   84,    /* Exposure */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_PHRASE_ONLY,                      0,                  160,                6,  22, 1800, 4200, 900, 26,    /* Start Opacity */
+        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                       96,                 255,                14, 58, 90,   720,  0,   82,    /* End Opacity */
+        VJ_BEAT_SPEED,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 4,                  96,                 6,  22, 1800, 4200, 900, 30,    /* Interval */
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Mode */
     );
 
     return ve;

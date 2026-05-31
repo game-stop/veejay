@@ -118,10 +118,10 @@ vj_effect *tracer_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_PHRASE_ONLY,                         32,                 220,                5,  18, 1800, 4200, 900,  24,    /* Opacity */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,    2,                  64,                 6,  22, 1800, 4200, 900,  30,    /* Buffer length */
-        VJ_BEAT_INTENSITY,        VJ_BEAT_F_CONTINUOUS,                         0,                  780,                18, 72, 80,   760,  0,    100,   /* Beat Push */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY,                         280,                820,                5,  18, 2200, 5200, 1200, 18     /* Beat Smooth */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS,                       32,                 220,                8,  30, 1200, 3000, 0,    45,    /* Opacity */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 2,                  64,                 6,  22, 1800, 4200, 900,  30,    /* Buffer length */
+        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,   0,                  780,                18, 72, 80,   760,  0,    100,   /* Beat Push */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY,                      280,                820,                5,  18, 2200, 5200, 1200, 18     /* Beat Smooth */
     );
 
     (void) w;
@@ -158,8 +158,6 @@ void *tracer_malloc(int w, int h)
     t->beat_env = 0.0f;
 
     t->n_threads = vje_advise_num_threads(len);
-    if(t->n_threads < 1)
-        t->n_threads = 1;
 
     return (void*) t;
 }

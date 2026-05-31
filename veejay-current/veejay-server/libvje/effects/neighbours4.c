@@ -112,12 +112,11 @@ vj_effect *neighbours4_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 2,                  24,                 6, 22, 1800, 4200, 900, 30,    /* Radius */
-        VJ_BEAT_DENSITY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 8,                  160,                6, 22, 1800, 4200, 900, 30,    /* Distance from center */
-        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY,                        8,                  180,                6, 22, 1600, 3400, 700, 30,    /* Smoothness */
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Mode */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 2,                  24,                 6, 22, 1800, 4200, 900, 30,    /* Radius */
+        VJ_BEAT_DENSITY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 8,                  160,                6, 22, 1800, 4200, 900, 30,    /* Distance from center */
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                          8,                  180,                6, 22, 1600, 3400, 700, 30,    /* Smoothness */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Mode */
     );
-
     (void) w;
     (void) h;
 

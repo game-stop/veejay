@@ -58,9 +58,9 @@ vj_effect *constantblend_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0,    0,    0, -1000, /* Mode */
-        VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS,                    70,                 220,                8, 32, 1200, 2800, 0, 45,    /* Threshold - scale */
-        VJ_BEAT_GLOW,     VJ_BEAT_F_CONTINUOUS,                    pixel_Y_lo_,        180,                8, 30, 1200, 3000, 0, 40     /* Constant */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,   0, -1000, /* Mode */
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    70,                 260,                14, 58, 90,   720, 0, 82,    /* Luma Scale */
+        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    pixel_Y_lo_,        210,                8,  36, 120,  900, 0, 64     /* Constant */
     );
     return ve;
 }

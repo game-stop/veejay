@@ -52,10 +52,10 @@ vj_effect *fadecolor_init(int w,int h)
 	ve->beat_hints = vje_build_beat_hint_list(
 		ve->num_params,
 
-		VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Opacity */
-		VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Color */
-		VJ_BEAT_SPEED,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,           4,                  240,                6, 22, 1800, 4200, 900, 30,    /* Frame length */
-		VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Mode */
+		VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    32,                 255,                14, 58, 90,   720,  0,   82,    /* Opacity */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Color */
+		VJ_BEAT_SPEED,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 4,                240,                6,  22, 1800, 4200, 900, 30,    /* Frame length */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Mode */
 	);
 	return ve;
 }

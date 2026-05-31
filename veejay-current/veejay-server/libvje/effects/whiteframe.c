@@ -44,7 +44,15 @@ vj_effect *whiteframe_init(int w,int h)
         "Threshold",
         "Softness"
     );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_DETAIL, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
+        160, 250, 6, 22, 1600, 3400, 900, 30, /* Threshold */
+
+        VJ_BEAT_DETAIL, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
+        4, 64, 6, 22, 1800, 4200, 900, 24 /* Softness */
+    );
     return ve;
 }
 
@@ -79,11 +87,6 @@ void whiteframe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int full = threshold - softness;
     const int edge = threshold + softness;
     const int denom = edge - full;
-
-    const int max_chroma = 128;
-    float k = (float)full / max_chroma;
-    if(k < 0.5f) k = 0.5f;
-    if(k > 2.5f) k = 2.5f;
 
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];

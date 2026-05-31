@@ -88,8 +88,17 @@ vj_effect *split_init(int width, int height)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000, /* Mode */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000  /* Switch */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+            0, 0,
+            0, 0, 0,
+            -1000, /* Mode */
+
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+            0, 0,
+            0, 0, 0,
+            -1000  /* Switch */
     );
 
     (void) width;

@@ -129,14 +129,14 @@ vj_effect *spectralmotion_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_MOTION_REACT,      VJ_BEAT_F_CONTINUOUS,                              72,                 230,                10, 38, 1000, 2600, 0,   62,    /* Trigger */
-        VJ_BEAT_SPEED,             VJ_BEAT_F_CONTINUOUS,                              0,                  180,                8,  30, 1200, 3000, 0,   50,    /* Cycle Speed */
-        VJ_BEAT_ALPHA_OR_OPACITY,  VJ_BEAT_F_CONTINUOUS,                              64,                 255,                8,  30, 1200, 3000, 0,   45,    /* Opacity */
-        VJ_BEAT_SELECTOR,          VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Mode */
-        VJ_BEAT_SPEED,             VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,        1,                  32,                 6,  22, 1800, 4200, 900, 30,    /* Strobe Rate */
-        VJ_BEAT_MEMORY,            VJ_BEAT_F_CONTINUOUS,                              96,                 255,                8,  32, 1200, 3200, 0,   55,    /* Trail Persistence */
-        VJ_BEAT_MEMORY,            VJ_BEAT_F_CONTINUOUS,                              0,                  240,                8,  32, 1200, 3200, 0,   50,    /* Motion Persistence */
-        VJ_BEAT_INTENSITY,         VJ_BEAT_F_CONTINUOUS,                              96,                 768,                10, 38, 1000, 2600, 0,   65     /* Motion Gain */
+        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS,                       72,                 230,                10, 38, 1000, 2600, 0,   62,    /* Trigger */
+        VJ_BEAT_SPEED,            VJ_BEAT_F_CONTINUOUS,                       0,                  180,                8,  30, 1200, 3000, 0,   50,    /* Cycle Speed */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS,                       64,                 255,                8,  30, 1200, 3000, 0,   45,    /* Opacity */
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Mode */
+        VJ_BEAT_SPEED,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1,                  32,                 6,  22, 1800, 4200, 900, 30,    /* Strobe Rate */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS,                       96,                 255,                8,  32, 1200, 3200, 0,   55,    /* Trail Persistence */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS,                       0,                  240,                8,  32, 1200, 3200, 0,   50,    /* Motion Persistence */
+        VJ_BEAT_INTENSITY,        VJ_BEAT_F_CONTINUOUS,                       96,                 768,                10, 38, 1000, 2600, 0,   65     /* Motion Gain */
     );
 
     (void) w;

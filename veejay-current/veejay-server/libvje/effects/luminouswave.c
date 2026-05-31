@@ -64,8 +64,8 @@ vj_effect *luminouswave_init(int w, int h) {
 
         VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_CONTINUOUS,                       2,   55,  10, 38, 1000, 2600, 0,   55, /* Frequency X */
         VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_CONTINUOUS,                       2,   60,  10, 38, 1000, 2600, 0,   55, /* Frequency Y */
-        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                       4,   42,  12, 46, 900,  2400, 0,   75, /* Amplitude */
-        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS,                       2,   80,  12, 46, 900,  2400, 0,   70, /* Speed */
+        VJ_BEAT_KICK,               VJ_BEAT_F_CONTINUOUS,                       4,   44,  14, 58, 90,   720,  0,   82, /* Amplitude */
+        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS,                       2,   86,  12, 46, 900,  2400, 0,   70, /* Speed */
         VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,       0,   360, 10, 38, 1000, 2600, 0,   55, /* Angle X */
         VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,       0,   360, 10, 38, 1000, 2600, 0,   55, /* Angle Y */
         VJ_BEAT_SPEED,              VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  12,  220, 6,  22, 1800, 4200, 900, 30  /* Break */

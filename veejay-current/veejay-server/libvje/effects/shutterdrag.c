@@ -115,14 +115,14 @@ vj_effect *shutterdrag_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS,                              4,                  86,                 10, 38, 1000, 2600, 0,   62,    /* Trail Strength */
-        VJ_BEAT_MEMORY,    VJ_BEAT_F_CONTINUOUS,                              0,                  78,                 8,  32, 1200, 3200, 0,   55,    /* Duration */
-        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Loop */
-        VJ_BEAT_GLOW,      VJ_BEAT_F_CONTINUOUS,                              0,                  42,                 10, 38, 1000, 2600, 0,   58,    /* Y Boost */
-        VJ_BEAT_CONTRAST,  VJ_BEAT_F_CONTINUOUS,                              96,                 190,                8,  30, 1200, 3000, 0,   45,    /* Sharpen */
-        VJ_BEAT_WARP,      VJ_BEAT_F_CONTINUOUS,                              0,                  78,                 10, 38, 1000, 2600, 0,   60,    /* Propagate */
-        VJ_BEAT_CONTRAST,  VJ_BEAT_F_PHRASE_ONLY,                             180,                320,                6,  22, 1600, 3400, 700, 35,    /* Luma Ceiling */
-        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Reset */
+        VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS,                       4,                  86,                 10, 38, 1000, 2600, 0,   62,    /* Trail Strength */
+        VJ_BEAT_MEMORY,    VJ_BEAT_F_CONTINUOUS,                       0,                  78,                 8,  32, 1200, 3200, 0,   55,    /* Duration */
+        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Loop */
+        VJ_BEAT_GLOW,      VJ_BEAT_F_CONTINUOUS,                       0,                  42,                 10, 38, 1000, 2600, 0,   58,    /* Y Boost */
+        VJ_BEAT_CONTRAST,  VJ_BEAT_F_CONTINUOUS,                       96,                 190,                8,  30, 1200, 3000, 0,   45,    /* Sharpen */
+        VJ_BEAT_WARP,      VJ_BEAT_F_CONTINUOUS,                       0,                  78,                 10, 38, 1000, 2600, 0,   60,    /* Propagate */
+        VJ_BEAT_CONTRAST,  VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 180,                320,                6,  22, 1600, 3400, 700, 35,    /* Luma Ceiling */
+        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Reset */
     );
 
     (void) w;

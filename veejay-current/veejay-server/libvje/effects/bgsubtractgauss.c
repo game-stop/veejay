@@ -74,6 +74,35 @@ vj_effect *bgsubtractgauss_init(int width, int height)
                     "Alpha Masking",
                     "Binary (B&W) Mask" );
 
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SELECTOR,
+        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000, /* Learning Rate */
+
+        VJ_BEAT_MOTION_REACT,
+        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
+        120, 1200,
+        6, 22, 1600, 3600, 900, 30, /* Threshold */
+
+        VJ_BEAT_SELECTOR,
+        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000, /* Min Noise */
+
+        VJ_BEAT_SELECTOR,
+        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000, /* Mode */
+
+        VJ_BEAT_SELECTOR,
+        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
+        0, 0, 0, 0, 0, -1000 /* Update Period */
+    );
+
     return ve;
 }
 

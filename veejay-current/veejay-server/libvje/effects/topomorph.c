@@ -829,18 +829,18 @@ vj_effect *topomorph_init(int width, int height)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                 -420,                620,                7,  28,  1200, 3200, 300,  42,     /* Speed */
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                                  120,                 365,                6,  24,  1400, 3400, 500,  32,     /* Scale Factor */
-        VJ_BEAT_GRID_SIZE,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,               VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Branches */
-        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                                  -520,                520,                7,  28,  1200, 3200, 300,  40,     /* Swirl */
-        VJ_BEAT_GEOMETRY_PHASE,VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                 -420,                560,                6,  24,  1400, 3400, 500,  34,     /* Rot Speed */
-        VJ_BEAT_MEMORY,        VJ_BEAT_F_REJECT,                                      VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Feedback */
-        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                                  -1200,               1450,               5,  20,  1800, 4200, 900,  24,     /* Pitch */
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,               VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Topology Mode */
-        VJ_BEAT_MOTION_REACT,  VJ_BEAT_F_CONTINUOUS,                                  240,                 900,                7,  28,  1400, 3600, 500,  34,     /* Saliency Influence */
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,               VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Shape P */
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,               VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Mirror */
-        VJ_BEAT_INTENSITY,     VJ_BEAT_F_CONTINUOUS,                                  0,                  860,                16, 64,  160,  1200, 0,    100     /* Beat Push */
+        VJ_BEAT_SIGNED_CURVE,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -420,                620,                7,  28,  1200, 3200, 0,    42,     /* Speed */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                                                120,                 365,                6,  24,  1400, 3400, 500,  32,     /* Scale Factor */
+        VJ_BEAT_GRID_SIZE,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Branches */
+        VJ_BEAT_SIGNED_CURVE,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -520,                520,                7,  28,  1200, 3200, 0,    40,     /* Swirl */
+        VJ_BEAT_SIGNED_CURVE,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -420,                560,                6,  24,  1400, 3400, 0,    34,     /* Rot Speed */
+        VJ_BEAT_MEMORY,        VJ_BEAT_F_REJECT,                                                    VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Feedback */
+        VJ_BEAT_SIGNED_CURVE,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -1200,               1450,               5,  20,  1800, 4200, 0,    24,     /* Pitch */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Topology Mode */
+        VJ_BEAT_MOTION_REACT,  VJ_BEAT_F_CONTINUOUS,                                                240,                 900,                7,  28,  1400, 3600, 500,  34,     /* Saliency Influence */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,   VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Shape P */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET,  VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Mirror */
+        VJ_BEAT_KICK,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                             0,                  860,                16, 64,  160,  1200, 0,    100     /* Beat Push */
     );
     return ve;
 }

@@ -91,7 +91,7 @@ vj_effect *radioactivetv_init(int w, int h)
         VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,               VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Mode */
         VJ_BEAT_WARP,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE,       72,                 100,                8,  30, 1200, 3000, 0,   45,    /* Zoom ratio */
         VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS,                                  48,                 255,                10, 38, 1000, 2600, 0,   65,    /* Strength */
-        VJ_BEAT_DETAIL,    VJ_BEAT_F_PHRASE_ONLY,                                 8,                  110,                6,  22, 1600, 3400, 700, 35     /* Difference Threshold */
+        VJ_BEAT_DETAIL,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,            8,                  110,                6,  22, 1600, 3400, 700, 35     /* Difference Threshold */
     );
 
     (void) w;

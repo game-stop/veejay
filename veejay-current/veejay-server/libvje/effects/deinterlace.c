@@ -42,7 +42,14 @@ vj_effect *deinterlace_init(int w, int h)
     ve->has_user = 0;
 
     ve->param_description = vje_build_param_list(ve->num_params, "Motion threshold");
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_MOTION_REACT,
+        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
+        2, 48,
+        6, 22, 1600, 3600, 900, 30 /* Motion threshold */
+    );
     return ve;
 }
 

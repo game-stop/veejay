@@ -76,9 +76,9 @@ vj_effect *scratcher_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Opacity */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  2,                  32,                 6, 22, 1800, 4200, 900, 30,    /* Scratch buffer */
-        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* PingPong */
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                       24,                 235,                10, 38, 900,  2400, 0,   65,    /* Opacity */
+        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  2,                  32,                 6,  22, 1800, 4200, 900, 30,    /* Scratch buffer */
+        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* PingPong */
     );
 
     (void) w;

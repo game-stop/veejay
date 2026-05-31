@@ -394,18 +394,18 @@ vj_effect *ghostwash_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_REJECT,                                      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,   -1000, /* Source */
-        VJ_BEAT_DRIFT,        VJ_BEAT_F_CONTINUOUS,                                  120,                900,                12, 46,  900,  2400, 0,    72,    /* Drift */
-        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS,                                  80,                 880,                12, 46,  900,  2400, 0,    72,    /* Warp */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS,                                  100,                760,                10, 36,  1000, 2800, 0,    54,    /* Detail */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                                 540,                980,                6,  24,  2200, 5200, 1400, 36,    /* Persistence */
-        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CLIMAX_ONLY,                                 0,                  620,                4,  24,  1800, 4200, 800,  24,    /* Instability */
-        VJ_BEAT_GRID_SIZE,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,             180,                880,                5,  20,  2200, 5200, 1800, 20,    /* Flow Size */
-        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS,                                  180,                920,                12, 46,  900,  2400, 0,    70,    /* Motion Pull */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                                  240,                1000,               10, 38,  1000, 2600, 0,    58,    /* Color Strength */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,   -1000, /* Color Mode */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,   -1000, /* Geometry */
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                                  0,                  820,                18, 72,  80,   700,  0,    100    /* Beat Push */
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                       40,                 360,                8,  30, 900,  2400, 0,    42,    /* Source */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                       120,                940,                14, 58, 90,   720,  0,    82,    /* Drift */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                       80,                 920,                14, 58, 90,   720,  0,    80,    /* Warp */
+        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                       100,                820,                10, 42, 120,  900,  0,    70,    /* Detail */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                      540,                980,                6,  24, 2200, 5200, 1400, 36,    /* Persistence */
+        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,                 680,                4,  26, 120,  900,  500,  40,    /* Instability */
+        VJ_BEAT_GRID_SIZE,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  180,                880,                5,  20, 2200, 5200, 1800, 20,    /* Flow Size */
+        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                       180,                940,                10, 46, 120,  900,  0,    74,    /* Motion Pull */
+        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS,                       240,                1000,               4,  28, 80,   620,  0,    52,    /* Color Strength */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,   -1000, /* Color Mode */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,   -1000, /* Geometry */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,    0,                  900,                22, 88, 60,   360,  0,    100    /* Beat Push */
     );
 
     (void)w;

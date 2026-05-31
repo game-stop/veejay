@@ -64,7 +64,34 @@ vj_effect *blackreplace_init(int w, int h)
         "Green",
         "Blue"
     );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_MOTION_REACT,
+        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
+        24, 220,
+        6, 22, 1600, 3600, 900, 30, /* Threshold */
+
+        VJ_BEAT_DETAIL,
+        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
+        4, 72,
+        6, 22, 1800, 4200, 900, 24, /* Softness */
+
+        VJ_BEAT_COLOR_AMOUNT,
+        VJ_BEAT_F_PHRASE_ONLY,
+        32, 255,
+        5, 18, 2200, 5200, 1200, 18, /* Red */
+
+        VJ_BEAT_COLOR_AMOUNT,
+        VJ_BEAT_F_PHRASE_ONLY,
+        32, 220,
+        5, 18, 2200, 5200, 1200, 18, /* Green */
+
+        VJ_BEAT_COLOR_AMOUNT,
+        VJ_BEAT_F_PHRASE_ONLY,
+        64, 255,
+        5, 18, 2200, 5200, 1200, 18 /* Blue */
+    );
     return ve;
 }
 

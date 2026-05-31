@@ -49,8 +49,8 @@ vj_effect *posterize_init(int w, int h)
         ve->num_params,
 
         VJ_BEAT_DETAIL, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 2,   32,  6, 22, 1600, 3400, 700, 30, /* Posterize */
-        VJ_BEAT_DETAIL, VJ_BEAT_F_PHRASE_ONLY,                          8,   120, 6, 22, 1600, 3400, 700, 35, /* Min Threshold */
-        VJ_BEAT_DETAIL, VJ_BEAT_F_PHRASE_ONLY,                          135, 245, 6, 22, 1600, 3400, 700, 35  /* Max Threshold */
+        VJ_BEAT_DETAIL, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 8,   120, 6, 22, 1600, 3400, 700, 35, /* Min Threshold */
+        VJ_BEAT_DETAIL, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 135, 245, 6, 22, 1600, 3400, 700, 35  /* Max Threshold */
     );
     return ve;	
 }
@@ -87,5 +87,17 @@ static void _posterize_y_simple(uint8_t *restrict src[3],
 
 void posterize_apply(void *ptr, VJFrame *frame, int *args)
 {
-    _posterize_y_simple(frame->data, frame->len, args[0], args[1], args[2]);
+    (void) ptr;
+
+    int value = args[0];
+    int tmin  = args[1];
+    int tmax  = args[2];
+
+    if(tmax < tmin) {
+        int tmp = tmin;
+        tmin = tmax;
+        tmax = tmp;
+    }
+
+    _posterize_y_simple(frame->data, frame->len, value, tmin, tmax);
 }

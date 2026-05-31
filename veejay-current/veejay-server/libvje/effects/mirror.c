@@ -191,20 +191,19 @@ vj_effect *mirror_init(int w, int h)
         "Beat Push",
         "Beat Smooth"
     );
-
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_DRIFT,             VJ_BEAT_F_PHRASE_ONLY,                       w / 4,              (w * 3) / 4,        6,  22, 1800, 4200, 900,  22,    /* Center X */
-        VJ_BEAT_DRIFT,             VJ_BEAT_F_PHRASE_ONLY,                       h / 4,              (h * 3) / 4,        6,  22, 1800, 4200, 900,  22,    /* Center Y */
-        VJ_BEAT_GEOMETRY_PHASE,    VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Angle */
-        VJ_BEAT_SIGNED_SPEED,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -72, 72,         10, 42, 900,  2400, 0,    65,    /* Spin Speed */
-        VJ_BEAT_SOURCE_MIX,        VJ_BEAT_F_PHRASE_ONLY,                       620,                1000,               5,  18, 1800, 4200, 900,  18,    /* Reflection Mix */
-        VJ_BEAT_WINDOW_RADIUS,     VJ_BEAT_F_PHRASE_ONLY,                       4,                  96,                 5,  18, 1800, 4200, 900,  22,    /* Axis Width */
-        VJ_BEAT_GLOW,              VJ_BEAT_F_CONTINUOUS,                        0,                  720,                10, 42, 900,  2600, 0,    52,    /* Axis Glow */
-        VJ_BEAT_SPEED,             VJ_BEAT_F_REJECT,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Beat Spin */
-        VJ_BEAT_INTENSITY,         VJ_BEAT_F_CONTINUOUS,                        0,                  820,                18, 72, 80,   760,  0,    100,   /* Beat Push */
-        VJ_BEAT_MEMORY,            VJ_BEAT_F_PHRASE_ONLY,                       280,                860,                5,  18, 2200, 5200, 1200, 18     /* Beat Smooth */
+        VJ_BEAT_DRIFT,          VJ_BEAT_F_PHRASE_ONLY,                                      w / 4,              (w * 3) / 4,        6,  22, 1800, 4200, 900,  22,    /* Center X */
+        VJ_BEAT_DRIFT,          VJ_BEAT_F_PHRASE_ONLY,                                      h / 4,              (h * 3) / 4,        6,  22, 1800, 4200, 900,  22,    /* Center Y */
+        VJ_BEAT_GEOMETRY_PHASE, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Angle */
+        VJ_BEAT_SIGNED_SPEED,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -72, 72,   10, 42, 900,  2400, 0,    65,    /* Spin Speed */
+        VJ_BEAT_SOURCE_MIX,     VJ_BEAT_F_CONTINUOUS,                                       620,                1000,               8,  30, 1000, 2600, 0,    46,    /* Reflection Mix */
+        VJ_BEAT_WINDOW_RADIUS,  VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                 4,                  96,                 5,  18, 1800, 4200, 900,  22,    /* Axis Width */
+        VJ_BEAT_GLOW,           VJ_BEAT_F_CONTINUOUS,                                       0,                  720,                10, 42, 900,  2600, 0,    52,    /* Axis Glow */
+        VJ_BEAT_SPEED,          VJ_BEAT_F_REJECT,                                           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Beat Spin */
+        VJ_BEAT_KICK,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                   0,                  860,                22, 88, 60,   360,  0,    100,   /* Beat Push */
+        VJ_BEAT_MEMORY,         VJ_BEAT_F_PHRASE_ONLY,                                      280,                860,                5,  18, 2200, 5200, 1200, 18     /* Beat Smooth */
     );
 
     return ve;

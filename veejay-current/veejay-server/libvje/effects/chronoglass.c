@@ -230,17 +230,17 @@ vj_effect *chronoglass_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                    20,                 380,                20, 80,  1600, 3400, 700,  35,    /* Trigger Gate */
-        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     160,                900,                18, 72,  800,  2200, 0,    80,    /* Sediment Flow */
-        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS,                     40,                 760,                12, 56,  1000, 2800, 0,    62,    /* Erosion */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                    520,                980,                8,  30,  1800, 4200, 900,  48,    /* Memory Decay */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS,                     180,                900,                14, 60,  1000, 2800, 0,    64,    /* Sediment Load */
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                     0,                  360,                8,  32,  1200, 3000, 0,    42,    /* Source Bleed */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
-        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,              720,                6,  42,  1500, 3800, 500,  38,    /* Turbulence */
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     0,                  1000,               18, 80,  450,  1500, 0,    95,    /* Beat Push */
-        VJ_BEAT_CONTRAST,     VJ_BEAT_F_CONTINUOUS,                     220,                1000,               12, 56,  800,  2200, 0,    75,    /* Silt Gain */
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     120,                1000,               8,  44,  900,  2400, 0,    58     /* Color Energy */
+        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY,                    20,                 380,                20, 70,  1600, 3400, 700,  30,    /* Trigger Gate */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     180,                940,                14, 58,  90,   720,  0,    84,    /* Sediment Flow */
+        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     60,                 820,                10, 46,  120,  900,  0,    76,    /* Erosion */
+        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                    520,                980,                8,  26,  1800, 4200, 900,  42,    /* Memory Decay */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     220,                940,                14, 60,  90,   760,  0,    78,    /* Sediment Load */
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                     0,                  400,                8,  30,  900,  2400, 0,    42,    /* Source Bleed */
+        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
+        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,              780,                4,  28,  120,  900,  500,  38,    /* Turbulence */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 0,                  1000,               24, 96,  60,   360,  0,    100,   /* Beat Push */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     240,                1000,               16, 68,  90,   720,  0,    86,    /* Silt Gain */
+        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     160,                1000,               10, 46,  120,  900,  0,    64     /* Color Energy */
     );
 
     (void) w;

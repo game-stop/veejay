@@ -321,17 +321,17 @@ vj_effect *chronorain_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                    35,                 230,                5,  18,  1800, 4200, 1200, -25,    /* Trigger Gate */
-        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     180,                900,                12, 46,  900,  2400, 0,    72,     /* Rain Gravity */
-        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     60,                 780,                8,  34,  1100, 3000, 300,  48,     /* Conductivity */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                    360,                920,                6,  24,  2200, 5200, 1400, 34,     /* Memory Decay */
-        VJ_BEAT_DRIFT,        VJ_BEAT_F_PHRASE_ONLY,                    120,                940,                5,  20,  2200, 5200, 1600, 22,     /* Polarity Split */
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_REJECT,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Source Bleed */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Color Mode */
-        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CLIMAX_ONLY,                    0,                  560,                6,  24,  1600, 4200, 700,  30,     /* Storm Spread */
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     0,                  650,                12, 48,  120,  900,  0,    70,     /* Beat Push */
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     240,                820,                8,  32,  600,  1800, 200,  58,     /* Trail Gain */
-        VJ_BEAT_CONTRAST,     VJ_BEAT_F_CONTINUOUS,                     260,                1000,               8,  28,  900,  2600, 400,  54      /* Color Energy */
+        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY,                    35,                 230,                5,  16,  1800, 4200, 1200, -22,    /* Trigger Gate */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     200,                940,                14, 58,  90,   720,  0,    84,     /* Rain Gravity */
+        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     80,                 820,                10, 42,  120,  900,  300,  62,     /* Conductivity */
+        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                    360,                920,                6,  22,  2200, 5200, 1400, 30,     /* Memory Decay */
+        VJ_BEAT_DRIFT,      VJ_BEAT_F_PHRASE_ONLY,                    120,                940,                5,  18,  2200, 5200, 1600, 18,     /* Polarity Split */
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_REJECT,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Source Bleed */
+        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Color Mode */
+        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,              620,                4,  26,  120,  900,  500,  38,     /* Storm Spread */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 0,                  900,                22, 88,  60,   360,  0,    100,    /* Beat Push */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     260,                860,                14, 58,  90,   720,  200,  78,     /* Trail Gain */
+        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     300,                1000,               10, 46,  120,  900,  400,  64      /* Color Energy */
     );
 
     return ve;

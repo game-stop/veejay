@@ -93,10 +93,10 @@ vj_effect *reflection_init(int width, int height)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_DRIFT,    VJ_BEAT_F_CONTINUOUS,                          0,                  ve->limits[1][0],   8,  30, 1200, 3000, 0,   45,    /* X */
-        VJ_BEAT_DRIFT,    VJ_BEAT_F_CONTINUOUS,                          0,                  ve->limits[1][1],   8,  30, 1200, 3000, 0,   45,    /* Y */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Move */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Mode */
+        VJ_BEAT_DRIFT,    VJ_BEAT_F_CONTINUOUS,                    0,                  ve->limits[1][0],   8, 30, 1200, 3000, 0,   45,    /* X */
+        VJ_BEAT_DRIFT,    VJ_BEAT_F_CONTINUOUS,                    0,                  ve->limits[1][1],   8, 30, 1200, 3000, 0,   45,    /* Y */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Move */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Mode */
     );
 
     return ve;

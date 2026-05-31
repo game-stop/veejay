@@ -49,9 +49,9 @@ vj_effect *enhancemask_init(int width, int height)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS,   64,  900, 12, 46, 900,  2400, 0,   70, /* Strength */
-        VJ_BEAT_DETAIL, VJ_BEAT_F_PHRASE_ONLY,  2,   28,  6,  22, 1600, 3400, 700, 35, /* Grain Threshold */
-        VJ_BEAT_GLOW,   VJ_BEAT_F_CONTINUOUS,   12,  96,  10, 38, 1000, 2600, 0,   55  /* Halo Clamp */
+        VJ_BEAT_SNARE,  VJ_BEAT_F_CONTINUOUS,   64,  1200, 10, 44, 120, 900,  0,   74, /* Strength */
+        VJ_BEAT_DETAIL, VJ_BEAT_F_PHRASE_ONLY,  2,   28,   6,  22, 1600,3400, 700, 32, /* Grain Threshold */
+        VJ_BEAT_KICK,   VJ_BEAT_F_CONTINUOUS,   12,  112,  14, 58, 90,  720,  0,   78  /* Halo Clamp */
     );
 
     return ve;

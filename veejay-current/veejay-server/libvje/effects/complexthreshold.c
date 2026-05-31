@@ -71,6 +71,23 @@ vj_effect *complexthreshold_init(int w, int h) {
         "Key Color", "Key Reach", "Clip Black", "Clip White", "Matte Gamma",
         "Sat Gate", "Shadow Prot", "Spill Amount", "Spill Balance", "Edge Blur",
         "Invert Matte", "Output View");
+    
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0, -1000, /* Key Color */
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    40,                 220,                14, 58, 90,  720, 0, 82,    /* Key Reach */
+        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    0,                  120,                8,  36, 120, 900, 0, 70,    /* Clip Black */
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    140,                255,                14, 58, 90,  720, 0, 78,    /* Clip White */
+        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    64,                 220,                8,  34, 120, 900, 0, 62,    /* Matte Gamma */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY,                   0,                  80,                 6,  20, 1600, 3400, 700, 28, /* Sat Gate */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY,                   0,                  96,                 6,  20, 1600, 3400, 700, 24, /* Shadow Prot */
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    40,                 240,                12, 52, 90,  720, 0, 76,    /* Spill Amount */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0, -1000, /* Spill Balance */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0, -1000, /* Edge Blur */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0, -1000, /* Invert Matte */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0, -1000  /* Output View */
+    );
     return ve;
 }
 

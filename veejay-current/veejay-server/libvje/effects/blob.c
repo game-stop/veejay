@@ -103,9 +103,9 @@ vj_effect *blob_init(int w, int h)
 	ve->beat_hints = vje_build_beat_hint_list(
 		ve->num_params,
 
-		VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 4,                  96,                 8,  28,  1800, 4200, 1400, 35,    /* Radius */
-		VJ_BEAT_GRID_SIZE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 3,                  60,                 6,  22,  2200, 4800, 1800, 25,    /* Blobs */
-		VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS,                                                        4,                  75,                 14, 52,  900,  2400, 0,    70,    /* Speed */
+		VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 4,                  96,                 8,  26,  1800, 4200, 1400, 32,    /* Radius */
+		VJ_BEAT_DENSITY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 3,                  70,                 6,  24,  2200, 4800, 1800, 28,    /* Blobs */
+		VJ_BEAT_KICK,          VJ_BEAT_F_CONTINUOUS,                                                        4,                  90,                 16, 62,  90,   680,  0,    86,    /* Speed */
 		VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Shape */
 	);
 

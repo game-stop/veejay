@@ -246,20 +246,21 @@ vj_effect *chronofold_init(int w, int h)
         "Flash Gain",
         "Color Energy"
     );
+    
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                    16,                 375,                20, 70,  1600, 3400, 700,  35,    /* Trigger Gate */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                    470,                1000,               18, 72,  1800, 4200, 900,  55,    /* Event Decay */
-        VJ_BEAT_TRIGGER,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 250,                940,                55, 180, 80,   420,  0,    90,    /* Event Gain */
-        VJ_BEAT_INERTIA,      VJ_BEAT_F_PHRASE_ONLY,                    45,                 705,                20, 80,  1800, 4200, 900,  40,    /* Retina Memory */
-        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                     60,                 825,                35, 140, 900,  2600, 0,    70,    /* Neural Trail */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_CLIMAX_ONLY,                    0,                  280,                12, 70,  1800, 4200, 600,  20,    /* Neural Noise */
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                     0,                  375,                20, 95,  1200, 3000, 0,    40,    /* Source Bleed */
-        VJ_BEAT_TRIGGER,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 0,                  1000,               70, 240, 60,   360,  0,    100,   /* Beat Push */
-        VJ_BEAT_CONTRAST,     VJ_BEAT_F_CONTINUOUS,                     220,                1000,               45, 170, 700,  1800, 0,    85,    /* Flash Gain */
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                     160,                1000,               35, 140, 800,  2200, 0,    65     /* Color Energy */
+        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY,                    16,                 375,                20, 64,  1600, 3400, 700,  30,    /* Trigger Gate */
+        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                    470,                1000,               18, 64,  1800, 4200, 900,  48,    /* Event Decay */
+        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 260,                960,                16, 72,  100,  820,  0,    82,    /* Event Gain */
+        VJ_BEAT_INERTIA,    VJ_BEAT_F_PHRASE_ONLY,                    45,                 705,                18, 70,  1800, 4200, 900,  34,    /* Retina Memory */
+        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     80,                 860,                12, 52,  120,  980,  0,    74,    /* Neural Trail */
+        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
+        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,              320,                4,  24,  120,  900,  500,  32,    /* Neural Noise */
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                     0,                  420,                8,  30,  900,  2400, 0,    42,    /* Source Bleed */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 0,                  1000,               24, 96,  60,   360,  0,    100,   /* Beat Push */
+        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     240,                1000,               16, 68,  90,   720,  0,    86,    /* Flash Gain */
+        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     180,                1000,               10, 46,  120,  900,  0,    64     /* Color Energy */
     );
     return ve;
 }

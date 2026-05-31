@@ -149,16 +149,16 @@ vj_effect *fractalkaleido_init(int w, int h)
         ve->num_params,
 
         VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 3,                  20,                 6,  20, 2200, 5200, 1800, 25,    /* Segment Count */
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                                  0,                  360,                10, 38, 1000, 2600, 0,    58,    /* Global Rotation */
-        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                                                   60,                 620,                10, 36, 1000, 2800, 0,    56,    /* Zoom */
+        VJ_BEAT_HAT,                VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                                  0,                  360,                4,  26, 80,   620,  0,    52,    /* Global Rotation */
+        VJ_BEAT_KICK,               VJ_BEAT_F_CONTINUOUS,                                                   60,                 680,                14, 58, 90,   720,  0,    82,    /* Zoom */
         VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -90,                 90,                 6,  24, 1800, 4200, 900,  24,    /* Center X */
         VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -90,                 90,                 6,  24, 1800, 4200, 900,  24,    /* Center Y */
         VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Mirror Mode */
-        VJ_BEAT_SIGNED_SPEED,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,    -90,                90,                 12, 46, 900,  2400, 0,    72,    /* Spin Speed */
-        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,    -220,               220,                10, 38, 1000, 2800, 0,    68,    /* Twist Energy */
-        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS,                                                   0,                  85,                 8,  30, 1000, 3000, 0,    54,    /* Chaos Field */
+        VJ_BEAT_HAT,                VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,   -90,                 90,                 4,  26, 80,   620,  0,    52,    /* Spin Speed */
+        VJ_BEAT_SNARE,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,   -240,                240,                10, 42, 120,  900,  0,    74,    /* Twist Energy */
+        VJ_BEAT_SNARE,              VJ_BEAT_F_CONTINUOUS,                                                   0,                  90,                 8,  36, 120,  900,  0,    68,    /* Chaos Field */
         VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Twist Mode */
-        VJ_BEAT_INTENSITY,          VJ_BEAT_F_CONTINUOUS,                                                   0,                  840,                18, 80, 100,  850,  0,    100    /* Beat Push */
+        VJ_BEAT_KICK,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                               0,                  900,                22, 88, 60,   360,  0,    100    /* Beat Push */
     );
     return ve;
 }

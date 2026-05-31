@@ -209,17 +209,17 @@ vj_effect *chronocortex_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                         20,                 380,                6,  24,  1600, 3400, 700,  40,    /* Trigger Gate */
-        VJ_BEAT_TRIGGER,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,       250,                940,                18, 76,  80,   420,  0,    90,    /* Neural Excitation */
-        VJ_BEAT_INERTIA,      VJ_BEAT_F_CONTINUOUS,                          80,                 650,                8,  30,  1100, 2800, 0,    35,    /* Lateral Inhibition */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                         470,                1000,               8,  34,  1800, 4200, 900,  55,    /* Memory Decay */
-        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                          60,                 800,                12, 48,  1000, 2800, 0,    70,    /* Branching */
-        VJ_BEAT_DRIFT,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,     0,                  700,                6,  24,  1800, 4200, 1200, 30,    /* Polarity Drift */
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                          0,                  300,                8,  30,  1200, 3000, 0,    45,    /* Source Bleed */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                         20,                 380,                6,  22,  1600, 3400, 700,  34,    /* Trigger Gate */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,       250,                960,                20, 82,  70,   420,  0,    92,    /* Neural Excitation */
+        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                          60,                 700,                10, 42,  120,  900,  0,    68,    /* Lateral Inhibition */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                         470,                1000,               8,  30,  1800, 4200, 900,  48,    /* Memory Decay */
+        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                          80,                 860,                12, 52,  120,  980,  0,    78,    /* Branching */
+        VJ_BEAT_HAT,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,     0,                  760,                4,  22,  1200, 3200, 900,  30,    /* Polarity Drift */
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                          0,                  340,                8,  30,  900,  2400, 0,    42,    /* Source Bleed */
         VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
-        VJ_BEAT_TRIGGER,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,       0,                  1000,               24, 92,  60,   360,  0,    100,   /* Beat Push */
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                          220,                1000,               16, 62,  500,  1400, 0,    85,    /* Cortex Gain */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                          180,                1000,               12, 48,  800,  2200, 0,    55     /* Color Energy */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,       0,                  1000,               24, 96,  60,   360,  0,    100,   /* Beat Push */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                          240,                1000,               16, 68,  90,   720,  0,    86,    /* Cortex Gain */
+        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                          180,                1000,               10, 46,  120,  900,  0,    64     /* Color Energy */
     );
     return ve;
 }

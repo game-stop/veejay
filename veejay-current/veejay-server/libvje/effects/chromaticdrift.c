@@ -230,18 +230,18 @@ vj_effect *chromaticdrift_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_COLOR_PHASE,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,   0,                  1000,               10, 36, 1100, 2600, 0,    46,    /* Global Hue */
-        VJ_BEAT_COLOR_PHASE,  VJ_BEAT_F_CONTINUOUS,                    0,                  520,                8,  28, 1400, 3200, 250,  34,    /* Rainbow Wrap */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                    80,                 680,                10, 34, 1000, 2600, 0,    52,    /* Vibrance */
-        VJ_BEAT_GLOW,         VJ_BEAT_F_CONTINUOUS,                    0,                  420,                8,  28, 1200, 3000, 100,  36,    /* Pastel Glow */
-        VJ_BEAT_SPEED,        VJ_BEAT_F_CONTINUOUS,                    0,                  700,                10, 40, 900,  2400, 0,    58,    /* Flux Speed */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                   0,                  620,                5,  18, 1800, 4200, 900,  22,    /* Edge Softness */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                   140,                560,                5,  18, 1800, 4200, 900,  20,    /* Black Protect */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                   640,                1000,               5,  18, 1800, 4200, 900,  18,    /* White Protect */
-        VJ_BEAT_CONTRAST,     VJ_BEAT_F_PHRASE_ONLY,                   240,                540,                6,  20, 1800, 4200, 900,  20,    /* Luma Contrast */
+        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,   0,                  1000,               4,  22, 80,   520,  0,    48,    /* Global Hue */
+        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                    0,                  620,                8,  34, 120,  820,  250,  42,    /* Rainbow Wrap */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                    100,                760,                12, 48, 90,   680,  0,    74,    /* Vibrance */
+        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                    0,                  520,                10, 42, 120,  820,  100,  62,    /* Pastel Glow */
+        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS,                    0,                  760,                4,  24, 80,   520,  0,    56,    /* Flux Speed */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                   0,                  620,                5,  18, 1800, 4200, 900,  20,    /* Edge Softness */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                   140,                560,                5,  18, 1800, 4200, 900,  18,    /* Black Protect */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                   640,                1000,               5,  18, 1800, 4200, 900,  16,    /* White Protect */
+        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                    240,                620,                8,  36, 120,  900,  0,    58,    /* Luma Contrast */
         VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Direction */
         VJ_BEAT_CONTRAST,     VJ_BEAT_F_REJECT,                        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Chroma Guard */
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                    0,                  700,                18, 74, 80,   760,  0,    100,   /* Beat Push */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                    0,                  880,                18, 80, 70,   620,  0,    100,   /* Beat Push */
         VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                   360,                860,                5,  18, 2200, 5200, 1200, 18     /* Beat Smooth */
     );
 

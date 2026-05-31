@@ -120,17 +120,15 @@ static void falsecolors_build_beat_hints(vj_effect *ve)
 {
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_MOTION_REACT,      VJ_BEAT_F_PHRASE_ONLY,                    48,                 178,                5,  22, 1800, 4200, 900,  24,    /* Motion Sensitivity */
-        VJ_BEAT_COLOR_PHASE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,    0,                  36,                 10, 38, 1000, 2600, 0,    52,    /* Cycle Speed */
-        VJ_BEAT_INTENSITY,         VJ_BEAT_F_PHRASE_ONLY,                    128,                238,                6,  24, 1800, 4200, 800,  22,    /* Opacity / Heat Mix */
-        VJ_BEAT_CONTRAST,          VJ_BEAT_F_PHRASE_ONLY,                    42,                 132,                5,  20, 1800, 4200, 900,  20,    /* Gamma */
-        VJ_BEAT_MEMORY,            VJ_BEAT_F_PHRASE_ONLY,                    6,                  64,                 5,  20, 2200, 5200, 1200, 24,    /* Trail Decay */
 
-        VJ_BEAT_MOTION_REACT,      VJ_BEAT_F_CONTINUOUS,                     96,                 760,                12, 46, 900,  2400, 0,    66,    /* Motion Gain */
-
-        VJ_BEAT_INTENSITY,         VJ_BEAT_F_CONTINUOUS,                     0,                  820,                18, 76, 80,   820,  0,    100,   /* Beat Push */
-
-        VJ_BEAT_MEMORY,            VJ_BEAT_F_PHRASE_ONLY,                    260,                820,                5,  18, 2200, 5200, 1200, 18     /* Beat Smooth */
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_PHRASE_ONLY,                    48,  178, 5,  22, 1800, 4200, 900, 24,  /* Motion Sensitivity */
+        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,    0,   48,  4,  26, 80,   620,  0,   52,  /* Cycle Speed */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                     128, 255, 14, 58, 90,   720,  0,   78,  /* Opacity / Heat Mix */
+        VJ_BEAT_CONTRAST,     VJ_BEAT_F_PHRASE_ONLY,                    42,  132, 5,  20, 1800, 4200, 900, 20,  /* Gamma */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                    6,   64,  5,  20, 2200, 5200, 1200,24,  /* Trail Decay */
+        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                     96,  820, 10, 46, 120,  900,  0,   72,  /* Motion Gain */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 0,   900, 22, 88, 60,   360,  0,   100, /* Beat Push */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                    260, 820, 5,  18, 2200, 5200, 1200,18   /* Beat Smooth */
     );
 }
 

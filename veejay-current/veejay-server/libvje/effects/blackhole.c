@@ -842,16 +842,16 @@ vj_effect *blackhole_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SIGNED_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -900, 900,  12, 46,  1000, 2800, 0,    70, /* Accretion Speed */
-        VJ_BEAT_GEOMETRY_AMPLITUDE,  VJ_BEAT_F_CONTINUOUS,                                             18,   88,   16, 58,  900,  2200, 0,    80, /* Lens Mass */
-        VJ_BEAT_GEOMETRY_FREQUENCY,  VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                        0,    8,    8,  28,  1800, 3800, 1200, 35, /* Caustic Folds */
-        VJ_BEAT_SIGNED_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -70,  70,   10, 42,  1200, 3000, 0,    55, /* Spin Drag */
-        VJ_BEAT_SIGNED_CURVE,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -70,  70,   10, 40,  1400, 3200, 0,    50, /* Accretion Pitch */
-        VJ_BEAT_MEMORY,              VJ_BEAT_F_CONTINUOUS,                                             0,    45,   10, 36,  1400, 3400, 0,    45, /* Echo Memory */
-        VJ_BEAT_GEOMETRY_AMPLITUDE,  VJ_BEAT_F_PHRASE_ONLY,                                            8,    62,   8,  28,  1800, 4200, 900,  35, /* Core Size */
-        VJ_BEAT_MOTION_REACT,        VJ_BEAT_F_CONTINUOUS,                                             0,    55,   12, 42,  1000, 2600, 0,    60, /* Source Gravity */
-        VJ_BEAT_GEOMETRY_PHASE,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                             0,    300,  14, 50,  900,  2400, 0,    65, /* Merger Cycle */
-        VJ_BEAT_GEOMETRY_AMPLITUDE,  VJ_BEAT_F_CONTINUOUS,                                             12,   86,   14, 52,  900,  2400, 0,    75  /* Caustic Strength */
+        VJ_BEAT_SIGNED_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -900, 900,  10, 38,  900,  2400, 0,    62, /* Accretion Speed */
+        VJ_BEAT_KICK,                VJ_BEAT_F_CONTINUOUS,                                             22,   96,   18, 68,  90,   760,  0,    92, /* Lens Mass */
+        VJ_BEAT_GEOMETRY_FREQUENCY,  VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                        0,    8,    8,  26,  1800, 3800, 1200, 30, /* Caustic Folds */
+        VJ_BEAT_SIGNED_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -70,  70,   8,  32,  1000, 2600, 0,    48, /* Spin Drag */
+        VJ_BEAT_SIGNED_CURVE,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -70,  70,   8,  30,  1200, 2800, 0,    44, /* Accretion Pitch */
+        VJ_BEAT_MEMORY,              VJ_BEAT_F_CONTINUOUS,                                             0,    52,   8,  34,  1400, 3600, 0,    42, /* Echo Memory */
+        VJ_BEAT_KICK,                VJ_BEAT_F_PHRASE_ONLY,                                            8,    68,   8,  30,  1600, 3800, 900,  36, /* Core Size */
+        VJ_BEAT_MOTION_REACT,        VJ_BEAT_F_CONTINUOUS,                                             0,    62,   10, 38,  900,  2400, 0,    58, /* Source Gravity */
+        VJ_BEAT_SNARE,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                             0,    300,  10, 42,  120,  900,  0,    76, /* Merger Cycle */
+        VJ_BEAT_SNARE,               VJ_BEAT_F_CONTINUOUS,                                             16,   96,   14, 58,  100,  780,  0,    86  /* Caustic Strength */
     );
 
     return ve;

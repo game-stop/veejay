@@ -88,12 +88,12 @@ vj_effect *transop_init(int width, int height)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS, 8, width  > 0 ? width  : 1, 8,  30, 1200, 3000, 0, 45, /* Width */
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS, 8, height > 0 ? height : 1, 8,  30, 1200, 3000, 0, 45, /* Height */
-        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS, 0, height > 0 ? height : 1, 8,  30, 1200, 3000, 0, 35, /* Source Y */
-        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS, 0, width  > 0 ? width  : 1, 8,  30, 1200, 3000, 0, 35, /* Source X */
-        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS, 0, height > 0 ? height : 1, 8,  30, 1200, 3000, 0, 35, /* Dest Y */
-        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS, 0, width  > 0 ? width  : 1, 8,  30, 1200, 3000, 0, 35  /* Dest X */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS, 8, width  > 0 ? width  : 1, 8, 30, 1200, 3000, 0, 45, /* Width */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS, 8, height > 0 ? height : 1, 8, 30, 1200, 3000, 0, 45, /* Height */
+        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS, 0, height > 0 ? height : 1, 8, 30, 1200, 3000, 0, 35, /* Source Y */
+        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS, 0, width  > 0 ? width  : 1, 8, 30, 1200, 3000, 0, 35, /* Source X */
+        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS, 0, height > 0 ? height : 1, 8, 30, 1200, 3000, 0, 35, /* Dest Y */
+        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS, 0, width  > 0 ? width  : 1, 8, 30, 1200, 3000, 0, 35  /* Dest X */
     );
 
     return ve;

@@ -176,12 +176,12 @@ vj_effect *integralblur_init(int w,int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY,                              ib_range_to_param1000(2, 1, max_radius), ib_range_to_param1000(MIN(max_radius, 18), 1, max_radius), 5, 20, 1800, 4200, 900, 24,    /* Radius */
-        VJ_BEAT_DETAIL,        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000, /* Iterations */
-        VJ_BEAT_INTENSITY,     VJ_BEAT_F_CONTINUOUS,                               720, 1000, 8, 30, 1200, 3200, 300, 42,                      /* Blur Amount */
-        VJ_BEAT_COLOR_AMOUNT,  VJ_BEAT_F_PHRASE_ONLY,                              520, 1000, 5, 20, 2200, 5200, 1200, 20,                     /* Chroma Blur */
-        VJ_BEAT_INTENSITY,     VJ_BEAT_F_CONTINUOUS,                               0, 820, 16, 72, 120, 900, 0, 100,                           /* Beat Push */
-        VJ_BEAT_INERTIA,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000  /* Beat Smooth */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,     ib_range_to_param1000(2, 1, max_radius), ib_range_to_param1000(MIN(max_radius, 18), 1, max_radius), 5, 20, 1800, 4200, 900, 24,    /* Radius */
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Iterations */
+        VJ_BEAT_INTENSITY,     VJ_BEAT_F_CONTINUOUS,                           720,                1000,               8, 30, 1200, 3200, 300, 42,    /* Blur Amount */
+        VJ_BEAT_COLOR_AMOUNT,  VJ_BEAT_F_CONTINUOUS,                           520,                1000,               8, 30, 1000, 2600, 0,   48,    /* Chroma Blur */
+        VJ_BEAT_KICK,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,        0,                  860,                22,88, 60,   360,  0,   100,   /* Beat Push */
+        VJ_BEAT_MEMORY,        VJ_BEAT_F_PHRASE_ONLY,                          360,                860,                5, 18, 2200, 5200, 1200,18     /* Beat Smooth */
     );
 
     return ve;

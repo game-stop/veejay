@@ -58,6 +58,19 @@ vj_effect *rgbkey_init(int w, int h)
     ve->param_description = vje_build_param_list(ve->num_params,
         "Hue Angle", "Red", "Green", "Blue", "Threshold", "Solidity", "Spill Kill", "Mode");
 
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1200,               7000,               6,  22, 1600, 3400, 700, 35,    /* Hue Angle */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Red */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Green */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Blue */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 8,                  120,                6,  22, 1600, 3400, 700, 35,    /* Threshold */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 135,                245,                6,  22, 1600, 3400, 700, 35,    /* Solidity */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                       32,                 240,                8,  30, 1200, 3000, 0,   45,    /* Spill Kill */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Mode */
+    );    
+
     ve->has_user = 0;
     ve->extra_frame = 1;
     ve->sub_format = 1;
@@ -120,60 +133,61 @@ void rgbkey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
     const int len = frame->len;
 
     #pragma omp parallel num_threads(rgbkey->n_threads)
+    {
+        if (mode != 0) {
+            #pragma omp for schedule(static)
+            for (int pos = 0; pos < len; pos++) {
+                int uc = (int)Cb[pos] - 128;
+                int vc = (int)Cr[pos] - 128;
+                int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
+                int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
+                int abs_yy = (yy < 0) ? -yy : yy;
 
-    if (mode != 0) {
-        #pragma omp for schedule(static)
-        for (int pos = 0; pos < len; pos++) {
-            int uc = (int)Cb[pos] - 128;
-            int vc = (int)Cr[pos] - 128;
-            int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
-            int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
-            int abs_yy = (yy < 0) ? -yy : yy;
+                int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
+                int a = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
 
-            int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
-            int a = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
-
-            Y[pos] = (a < 0) ? 0 : (a > 255 ? 255 : (uint8_t)a);
-            Cb[pos] = 128; Cr[pos] = 128;
-        }
-    } else {
-        #pragma omp for schedule(static)
-        for (int pos = 0; pos < len; pos++) {
-            int uc = (int)Cb[pos] - 128;
-            int vc = (int)Cr[pos] - 128;
-
-            int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
-            int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
-
-            int abs_yy = (yy < 0) ? -yy : yy;
-            int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
-            int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
-
-            if (LIKELY(alpha <= 0)) {
-                Y[pos] = Y2[pos]; Cb[pos] = Cb2[pos]; Cr[pos] = Cr2[pos];
-                continue;
+                Y[pos] = (a < 0) ? 0 : (a > 255 ? 255 : (uint8_t)a);
+                Cb[pos] = 128; Cr[pos] = 128;
             }
+        } else {
+            #pragma omp for schedule(static)
+            for (int pos = 0; pos < len; pos++) {
+                int uc = (int)Cb[pos] - 128;
+                int vc = (int)Cr[pos] - 128;
 
-            if (UNLIKELY(alpha > 255)) alpha = 255;
-            const int invA = 255 - alpha;
+                int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
+                int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
 
-            int cb_c = Cb[pos];
-            int cr_c = Cr[pos];
+                int abs_yy = (yy < 0) ? -yy : yy;
+                int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
+                int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
 
-            if (xx > 0) {
-                int suppress_fp = (xx * spill_factor_fp);
-                if (suppress_fp > SCALE) suppress_fp = SCALE;
+                if (LIKELY(alpha <= 0)) {
+                    Y[pos] = Y2[pos]; Cb[pos] = Cb2[pos]; Cr[pos] = Cr2[pos];
+                    continue;
+                }
 
-                cb_c -= (suppress_fp * ut) >> 12;
-                cr_c -= (suppress_fp * vt) >> 12;
+                if (UNLIKELY(alpha > 255)) alpha = 255;
+                const int invA = 255 - alpha;
 
-                cb_c = (cb_c < 0) ? 0 : (cb_c > 255 ? 255 : cb_c);
-                cr_c = (cr_c < 0) ? 0 : (cr_c > 255 ? 255 : cr_c);
+                int cb_c = Cb[pos];
+                int cr_c = Cr[pos];
+
+                if (xx > 0) {
+                    int suppress_fp = (xx * spill_factor_fp);
+                    if (suppress_fp > SCALE) suppress_fp = SCALE;
+
+                    cb_c -= (suppress_fp * ut) >> 12;
+                    cr_c -= (suppress_fp * vt) >> 12;
+
+                    cb_c = (cb_c < 0) ? 0 : (cb_c > 255 ? 255 : cb_c);
+                    cr_c = (cr_c < 0) ? 0 : (cr_c > 255 ? 255 : cr_c);
+                }
+
+                Y[pos]  = DIV255(Y[pos]  * alpha + Y2[pos]  * invA);
+                Cb[pos] = DIV255(cb_c    * alpha + Cb2[pos] * invA);
+                Cr[pos] = DIV255(cr_c    * alpha + Cr2[pos] * invA);
             }
-
-            Y[pos]  = DIV255(Y[pos]  * alpha + Y2[pos]  * invA);
-            Cb[pos] = DIV255(cb_c    * alpha + Cb2[pos] * invA);
-            Cr[pos] = DIV255(cr_c    * alpha + Cr2[pos] * invA);
         }
     }
 }

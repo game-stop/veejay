@@ -83,7 +83,14 @@ vj_effect *morphology_init(int w, int h)
 	vje_build_value_hint_list(ve->hints, ve->limits[1][3], 3,
 				  "Luminance",
 				  "Alpha"  );
-	
+	ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
+
+		VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  12,                 220,                6, 22, 1600, 3400, 700, 35,    /* Threshold */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Convolution Kernel */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Mode */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Channel */
+	);
 	return ve;
 }
 
@@ -196,8 +203,7 @@ void morphology_apply( void *ptr, VJFrame *frame, int *args ) {
 		veejay_memset( Cr, 128, uv_len );
 	}	
 
-	len -= width;
-
+	
 	if( mode == 0 ) {
 		for (y = width; y < len - width; y += width)
 		{

@@ -368,17 +368,17 @@ vj_effect *datamosh_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                 VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Flow Mode */
-        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS,                                                     28,                 96,                 12, 48,  900,  2400, 0,    80,    /* Mosh Amount */
-        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS,                                                     16,                 90,                 12, 46,  900,  2400, 0,    70,    /* Motion Reactivity */
-        VJ_BEAT_GRID_SIZE,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE,    6,                  32,                 6,  20,  2200, 5200, 1800, 25,    /* Block Size */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                               4,                  22,                 6,  24,  1800, 4200, 900,  35,    /* Time Depth */
-        VJ_BEAT_DRIFT,        VJ_BEAT_F_CONTINUOUS,                                                     12,                 88,                 10, 38,  1000, 2800, 0,    60,    /* Time Slip */
-        VJ_BEAT_INERTIA,      VJ_BEAT_F_PHRASE_ONLY,                                                    55,                 98,                 8,  30,  1800, 4200, 900,  45,    /* Persistence */
-        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                                                     0,                  85,                 12, 46,  900,  2400, 0,    75,    /* Flow Strength */
-        VJ_BEAT_WARP,         VJ_BEAT_F_CLIMAX_ONLY,                                                    0,                  70,                 4,  28,  1800, 4200, 600,  25,    /* Tear/Jitter */
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                                     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Source Opacity */
-        VJ_BEAT_TRIGGER,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Reset Memory */
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Flow Mode */
+        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                                                  34,                 98,                 16, 64,  90,   720,  0,    88,    /* Mosh Amount */
+        VJ_BEAT_SNARE,            VJ_BEAT_F_CONTINUOUS,                                                  18,                 94,                 10, 46,  120,  900,  0,    74,    /* Motion Reactivity */
+        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 6,                  32,                 6,  20,  2200, 5200, 1800, 24,    /* Block Size */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                            4,                  22,                 6,  22,  1800, 4200, 900,  32,    /* Time Depth */
+        VJ_BEAT_HAT,              VJ_BEAT_F_CONTINUOUS,                                                  8,                  92,                 4,  28,  80,   620,  0,    52,    /* Time Slip */
+        VJ_BEAT_INERTIA,          VJ_BEAT_F_PHRASE_ONLY,                                                 55,                 98,                 8,  28,  1800, 4200, 900,  38,    /* Persistence */
+        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                                                  0,                  90,                 14, 58,  90,   720,  0,    82,    /* Flow Strength */
+        VJ_BEAT_HAT,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY,                          0,                  76,                 4,  28,  120,  900,  500,  40,    /* Tear/Jitter */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS,                                                  0,                  42,                 10, 40,  120,  900,  0,    48,    /* Source Opacity */
+        VJ_BEAT_TRIGGER,          VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                               VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Reset Memory */
     );
     (void) w;
     (void) h;

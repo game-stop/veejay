@@ -45,6 +45,11 @@ vj_effect *chameleonblend_init(int w, int h)
 	ve->extra_frame = 1;
 	ve->has_user = 0;
 	ve->motion = 1;
+    ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
+
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000  /* Appearing/Dissapearing */
+	);
 	ve->param_description = vje_build_param_list(ve->num_params, "Appearing/Dissapearing");
 	return ve;
 }

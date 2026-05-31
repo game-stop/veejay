@@ -152,16 +152,16 @@ vj_effect *trimirror_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_GRID_SIZE,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                              2,                  16,                 6,  22, 2200, 5200, 1800, 24,    /* Segments */
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                                   0,                  360,                8,  32, 1200, 3200, 0,    48,    /* Rotation */
-        VJ_BEAT_SIGNED_SPEED,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,     -70,                70,                 10, 40, 900,  2400, 0,    62,    /* Spin Speed */
-        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                                                    720,                1420,               8,  34, 1000, 2800, 0,    46,    /* Zoom */
-        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,    -320,               320,                5,  18, 2200, 5200, 1200, 18,    /* Center X */
-        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,    -320,               320,                5,  18, 2200, 5200, 1200, 18,    /* Center Y */
-        VJ_BEAT_SPEED,              VJ_BEAT_F_REJECT,                                                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Beat Spin */
-        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_REJECT,                                                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Beat Zoom */
-        VJ_BEAT_INTENSITY,          VJ_BEAT_F_CONTINUOUS,                                                     0,                  860,                18, 72, 80,   760,  0,    100,   /* Beat Push */
-        VJ_BEAT_MEMORY,             VJ_BEAT_F_PHRASE_ONLY,                                                    220,                820,                5,  18, 2200, 5200, 1200, 16     /* Beat Smooth */
+        VJ_BEAT_GRID_SIZE,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                           2,                  16,                 6,  22, 2200, 5200, 1800, 24,    /* Segments */
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                                0,                  360,                8,  32, 1200, 3200, 0,    48,    /* Rotation */
+        VJ_BEAT_SIGNED_SPEED,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -70,                70,                 10, 40, 900,  2400, 0,    62,    /* Spin Speed */
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                                                 720,                1420,               8,  34, 1000, 2800, 0,    46,    /* Zoom */
+        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_SIGN_LOCK,                          -320,               320,                5,  18, 2200, 5200, 1200, 18,    /* Center X */
+        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_SIGN_LOCK,                          -320,               320,                5,  18, 2200, 5200, 1200, 18,    /* Center Y */
+        VJ_BEAT_SPEED,              VJ_BEAT_F_REJECT,                                                      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Beat Spin */
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_REJECT,                                                      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Beat Zoom */
+        VJ_BEAT_KICK,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                              0,                  860,                18, 72, 80,   760,  0,    100,   /* Beat Push */
+        VJ_BEAT_MEMORY,             VJ_BEAT_F_PHRASE_ONLY,                                                 220,                820,                5,  18, 2200, 5200, 1200, 16     /* Beat Smooth */
     );
 
     (void) w;

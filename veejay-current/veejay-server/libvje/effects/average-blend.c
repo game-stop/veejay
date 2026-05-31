@@ -44,7 +44,20 @@ vj_effect *average_blend_init(int w, int h)
     ve->sub_format = 1;
     ve->extra_frame = 1;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list(ve->num_params, "Recursions", "Mix Weight"); 
+    ve->param_description = vje_build_param_list(ve->num_params, "Recursions", "Mix Weight");
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_INTENSITY,
+        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
+        1, 12,
+        6, 22, 1800, 4200, 900, 28, /* Recursions */
+
+        VJ_BEAT_ALPHA_OR_OPACITY,
+        VJ_BEAT_F_CONTINUOUS,
+        16, 220,
+        8, 30, 1200, 3000, 0, 45 /* Mix Weight */
+    );
     return ve;
 }
 

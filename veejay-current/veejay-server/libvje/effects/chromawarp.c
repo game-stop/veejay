@@ -86,11 +86,11 @@ vj_effect *chromawarp_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                         2,                  42,                 14, 52,  800,  2200, 0,   80,    /* Warp Strength */
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,         0,                  360,                10, 38,  1200, 3000, 0,   55,    /* Flow Rotation */
-        VJ_BEAT_ALPHA_OR_OPACITY,   VJ_BEAT_F_REJECT,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,   -1000, /* Mix */
-        VJ_BEAT_INERTIA,            VJ_BEAT_F_PHRASE_ONLY,                        64,                 230,                8,  32,  1800, 4200, 900, 35,    /* Temporal Smooth */
-        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS,                         0,                  170,                10, 36,  1200, 3000, 0,   45     /* Directional Bias */
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                  2,                  54,                 16, 62,  90,   680,  0,   88,    /* Warp Strength */
+        VJ_BEAT_HAT,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP, 0,                  360,                4,  24,  80,   520,  0,   48,    /* Flow Rotation */
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                  96,                 255,                12, 48,  90,   720,  0,   72,    /* Mix */
+        VJ_BEAT_INERTIA,  VJ_BEAT_F_PHRASE_ONLY,                 64,                 230,                8,  28,  1800, 4200, 900, 30,    /* Temporal Smooth */
+        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                  0,                  190,                8,  34,  120,  820,  0,   66     /* Directional Bias */
     );
     return ve;
 }

@@ -62,9 +62,9 @@ vj_effect *color_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,  32, 220, 12, 46, 900,  2400, 0, 70, /* Vibrance */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,  96, 190, 8,  30, 1200, 3000, 0, 45, /* Blue/Yellow Bias */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,  96, 190, 8,  30, 1200, 3000, 0, 45  /* Red/Green Bias */
+        VJ_BEAT_KICK,  VJ_BEAT_F_CONTINUOUS,  32, 235, 14, 58, 90,  720, 0, 82, /* Vibrance */
+        VJ_BEAT_HAT,   VJ_BEAT_F_CONTINUOUS,  72, 210, 4,  24, 80,  520, 0, 48, /* Blue/Yellow Bias */
+        VJ_BEAT_SNARE, VJ_BEAT_F_CONTINUOUS,  72, 220, 8,  36, 120, 900, 0, 64  /* Red/Green Bias */
     );
     return ve;
 }

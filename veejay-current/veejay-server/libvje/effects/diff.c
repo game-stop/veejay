@@ -59,7 +59,14 @@ vj_effect *diff_init(int width, int height)
 
 	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Mode", "Show mask/image", "Thinning" );
 	ve->hints = vje_init_value_hint_list( ve->num_params );
-	
+	ve->beat_hints = vje_build_beat_hint_list(
+		ve->num_params,
+
+		VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    8,                  120,                8,  36, 120, 900, 0,   70,    /* Threshold */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Mode */
+		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Show mask/image */
+		VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    1,                  42,                 14, 58, 90,  720, 0,   78     /* Thinning */
+	);
 	vje_build_value_hint_list( ve->hints, ve->limits[1][2],2, "Show Difference", "Show Distance Map", "Normal" );
 
 	return ve;

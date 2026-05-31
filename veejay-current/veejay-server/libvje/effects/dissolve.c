@@ -39,7 +39,7 @@ vj_effect *dissolve_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000 /* Opacity */
+        VJ_BEAT_KICK, VJ_BEAT_F_CONTINUOUS, 32, 235, 14, 58, 90, 720, 0, 82 /* Opacity */
     );
     return ve;
 }

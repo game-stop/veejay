@@ -4381,17 +4381,17 @@ vj_effect *hyperfold_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,    0,   0,    0,    0,    -1000, /* Mode */
-        VJ_BEAT_GRID_SIZE,          VJ_BEAT_F_CONTINUOUS,                                                 20,                 420, 8,   34,  1600, 3800, 400,  42,    /* Minimum Fold Size */
-        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                                                 240,                920, 8,   32,  1400, 3600, 300,  54,    /* Maximum Fold Size */
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                                0,                  1000,12,  48,  700,  1900, 0,    72,    /* Fold Phase */
-        VJ_BEAT_DETAIL,             VJ_BEAT_F_CONTINUOUS,                                                 60,                 880, 10,  34,  900,  2200, 0,    58,    /* Edge Darkness */
-        VJ_BEAT_SIGNED_SPEED,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -700,               700, 12,  46,  900,  2400, 0,    70,    /* Motion Speed */
-        VJ_BEAT_CONTRAST,           VJ_BEAT_F_CONTINUOUS,                                                 0,                  520, 4,   18,  1600, 3600, 1200, 18,    /* Chroma Damp */
-        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,    0,   0,    0,    0,    -1000, /* Background */
-        VJ_BEAT_INTENSITY,          VJ_BEAT_F_CONTINUOUS,                                                 0,                  1000,18,  72,  80,   650,  0,    100,   /* Beat Push */
-        VJ_BEAT_CONTRAST,           VJ_BEAT_F_CONTINUOUS,                                                 250,                950, 8,   30,  900,  2600, 300,  65,    /* Tone Contrast */
-        VJ_BEAT_TURBULENCE,         VJ_BEAT_F_CONTINUOUS,                                                 0,                  760, 8,   30,  1100, 3200, 500,  62     /* Micro Turbulence */
+        VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Mode */
+        VJ_BEAT_GRID_SIZE,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                       40,                 360,                6,  22, 2200, 5200, 1800, 24,    /* Minimum Fold Size */
+        VJ_BEAT_GRID_SIZE,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                       420,                980,                6,  22, 2200, 5200, 1800, 28,    /* Maximum Fold Size */
+        VJ_BEAT_GEOMETRY_PHASE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                            0,                  1000,               8,  32, 900,  2400, 0,    58,    /* Fold Phase */
+        VJ_BEAT_SNARE,          VJ_BEAT_F_CONTINUOUS,                                             120,                920,                8,  36, 120,  900,  0,    70,    /* Edge Darkness */
+        VJ_BEAT_HAT,            VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -620,             620,                4,  26, 80,   620,  0,    52,    /* Motion Speed */
+        VJ_BEAT_COLOR_AMOUNT,   VJ_BEAT_F_CONTINUOUS,                                             0,                  780,                6,  28, 900,  2400, 0,    42,    /* Chroma Damp */
+        VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Background */
+        VJ_BEAT_KICK,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                         0,                  900,                22, 88, 60,   360,  0,    100,   /* Beat Push */
+        VJ_BEAT_CONTRAST,       VJ_BEAT_F_CONTINUOUS,                                             260,                980,                10, 42, 900,  2400, 0,    64,    /* Tone Contrast */
+        VJ_BEAT_HAT,            VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY,                     0,                  820,                4,  26, 120,  900,  500,  44     /* Micro Turbulence */
     );
      
 

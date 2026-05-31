@@ -74,8 +74,8 @@ vj_effect *gradientfield_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_WINDOW_RADIUS,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  2,                  18,                 6, 22, 1800, 4200, 900, 30,    /* Window Size */
-        VJ_BEAT_ALPHA_OR_OPACITY,  VJ_BEAT_F_REJECT,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Opacity */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 2,  18,  6,  22, 1800, 4200, 900, 30, /* Window Size */
+        VJ_BEAT_KICK,          VJ_BEAT_F_CONTINUOUS,                      0,  210, 14, 58, 90,   720,  0,   72  /* Opacity */
     );
 
     return ve;
@@ -283,7 +283,7 @@ void gradientfield_apply(void *ptr, VJFrame *frame, int *args) {
     
     int w = s->width, h = s->height, stride = w + 1;
     int a = args[0];
-    int mode = args[2];
+    int mode = 0;
 
     uint32_t fb = (uint32_t)clamp(args[1], 0, 255);
     uint32_t inv_fb = 255 - fb;

@@ -72,7 +72,8 @@ vj_effect *softblur_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 0, 2, 6, 22, 1800, 4200, 900, 30 /* Kernel Size */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
+        0, 2, 6, 22, 1800, 4200, 900, 30 /* Kernel Size */
     );
 
     (void) w;

@@ -52,7 +52,19 @@ vj_effect *complexsaturation_init(int w, int h)
     ve->description = "Complex Saturation (Advanced)";
     ve->param_description = vje_build_param_list(ve->num_params,
         "Hue Angle", "Red", "Green", "Blue", "Threshold", "Solidity", "Saturation", "Hue Shift", "Swap Selection");
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
 
+        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    800,                6500,               10, 42, 120, 900, 0, 68,    /* Hue Angle */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0, -1000, /* Red */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0, -1000, /* Green */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0, -1000, /* Blue */
+        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    0,                  180,                8,  36, 120, 900, 0, 72,    /* Threshold */
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    80,                 255,                14, 58, 90,  720, 0, 82,    /* Solidity */
+        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    24,                 220,                14, 58, 90,  720, 0, 80,    /* Saturation */
+        VJ_BEAT_HAT,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,   1,                  360,                4,  24, 80,  520, 0, 48,    /* Hue Shift */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0, -1000  /* Swap Selection */
+    );
     ve->has_user = 0;
     ve->extra_frame = 0;
     ve->sub_format = 1;

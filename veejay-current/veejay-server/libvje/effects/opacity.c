@@ -39,9 +39,10 @@ vj_effect *opacity_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000 /* Opacity */
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,
+        24, 235, 10, 38, 900, 2400, 0, 65 /* Opacity */
     );
-        return ve;
+    return ve;
 }
 
 static inline void blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, size_t size, int opacity )

@@ -42,7 +42,7 @@ vj_effect *perspective_init(int width , int height)
     ve->defaults[6] = 30; /* x3, y4 */
     ve->defaults[7] = 70;
 
-    ve->defaults[0] = 0; /* reverse */
+    ve->defaults[8] = 0; /* reverse */
 
     int i;
     for( i = 0; i < 8 ; i ++ ) {
@@ -62,6 +62,20 @@ vj_effect *perspective_init(int width , int height)
             "Point 1 (X)", "Point 1 (Y)", "Point 2 (X)", "Point 2 (Y)",
             "Point 3 (X)", "Point 3 (Y)", "Point 4 (X)", "Point 4 (Y)",
             "Reverse"   );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+
+        VJ_BEAT_DRIFT,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, -80,                 80,                 6, 22, 2200, 5200, 1200, 24,    /* Point 1 (X) */
+        VJ_BEAT_DRIFT,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, -80,                 80,                 6, 22, 2200, 5200, 1200, 24,    /* Point 1 (Y) */
+        VJ_BEAT_DRIFT,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, -80,                 80,                 6, 22, 2200, 5200, 1200, 24,    /* Point 2 (X) */
+        VJ_BEAT_DRIFT,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, -80,                 80,                 6, 22, 2200, 5200, 1200, 24,    /* Point 2 (Y) */
+        VJ_BEAT_DRIFT,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, -80,                 80,                 6, 22, 2200, 5200, 1200, 24,    /* Point 3 (X) */
+        VJ_BEAT_DRIFT,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, -80,                 80,                 6, 22, 2200, 5200, 1200, 24,    /* Point 3 (Y) */
+        VJ_BEAT_DRIFT,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, -80,                 80,                 6, 22, 2200, 5200, 1200, 24,    /* Point 4 (X) */
+        VJ_BEAT_DRIFT,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, -80,                 80,                 6, 22, 2200, 5200, 1200, 24,    /* Point 4 (Y) */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Reverse */
+    );            
     return ve;
 }
 
@@ -94,7 +108,8 @@ void perspective_free(void *ptr) {
     perspective_t *p = (perspective_t*) ptr;
 
     free(p->perspective_private_[0] );
-    viewport_destroy( p->perspective_vp_ );
+    if(p->perspective_vp_)
+        viewport_destroy(p->perspective_vp_);
     free(p);
 }
 

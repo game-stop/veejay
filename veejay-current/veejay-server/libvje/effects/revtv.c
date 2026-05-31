@@ -64,10 +64,10 @@ vj_effect *revtv_init(int max_width, int max_height)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1,                  16,                 6, 22, 2200, 5200, 1800, 25,    /* Line spacing */
-        VJ_BEAT_WARP,      VJ_BEAT_F_CONTINUOUS,                               8,                  96,                 8, 30, 1200, 3000, 0,   45,    /* Vertical scale */
-        VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS,                               48,                 255,                10,38, 1000, 2600, 0,   60,    /* Luminance intensity */
-        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Color range */
+        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1,                  16,                 6,  22, 2200, 5200, 1800, 25,    /* Line spacing */
+        VJ_BEAT_WARP,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 8,                  96,                 6,  22, 1800, 4200, 900,  30,    /* Vertical scale */
+        VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS,                       48,                 255,                10, 38, 1000, 2600, 0,    60,    /* Luminance intensity */
+        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000  /* Color range */
     );
 
     return ve;

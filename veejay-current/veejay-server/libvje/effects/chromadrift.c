@@ -609,16 +609,16 @@ vj_effect *chromadrift_init(int w, int h)
         ve->num_params,
 
         VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_REJECT,                                      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Source Feed */
-        VJ_BEAT_DRIFT,        VJ_BEAT_F_CONTINUOUS,                                  80,                 760,                8,  30,  1000, 2600, 0,    52,    /* Ink Drift */
-        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS,                                  180,                920,                10, 42,  800,  2200, 0,    68,    /* Contour Current */
-        VJ_BEAT_GLOW,         VJ_BEAT_F_CONTINUOUS,                                  80,                 820,                10, 38,  900,  2400, 0,    60,    /* Aurora Glow */
-        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS,                                  80,                 860,                10, 40,  900,  2400, 0,    60,    /* Luma Pull */
-        VJ_BEAT_DRIFT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                  -760,               760,                8,  28,  1200, 3200, 400,  38,    /* Curl Direction */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                                 360,                900,                6,  24,  1800, 4200, 1200, 34,    /* Trail Memory */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                                  120,                900,                8,  30,  1000, 2600, 0,    48,    /* Pastel Palette */
-        VJ_BEAT_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                  -760,               760,                8,  30,  1000, 2600, 400,  44,    /* Motion Speed */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS,                                  80,                 760,                8,  30,  1000, 2600, 0,    34,    /* Surface Softness */
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                                  0,                  850,                16, 72,  80,   720,  0,    100     /* Beat Push */
+        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS,                                  80,                 760,                4,  22,  80,   520,  0,    46,    /* Ink Drift */
+        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                                  180,                960,                12, 50,  100,  820,  0,    82,    /* Contour Current */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                                  100,                900,                14, 58,  90,   680,  0,    86,    /* Aurora Glow */
+        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                                  80,                 900,                10, 42,  120,  900,  0,    72,    /* Luma Pull */
+        VJ_BEAT_DRIFT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                  -760,               760,                8,  26,  1200, 3000, 400,  34,    /* Curl Direction */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                                 360,                900,                6,  22,  1800, 4200, 1200, 30,    /* Trail Memory */
+        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS,                                  120,                900,                4,  24,  100,  680,  0,    48,    /* Pastel Palette */
+        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                  -760,               760,                4,  22,  80,   520,  400,  42,    /* Motion Speed */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS,                                  80,                 760,                6,  26,  1000, 2600, 0,    30,    /* Surface Softness */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                                  0,                  950,                18, 80,  70,   620,  0,    100     /* Beat Push */
     );
     (void) w;
     (void) h;

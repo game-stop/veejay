@@ -51,7 +51,7 @@ vj_effect *bwotsu_init(int w, int h)
         ve->num_params,
 
         VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0, -1000, /* To Alpha */
-        VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS,                    64,                 255,                8,  32, 1200, 2800, 0, 45,    /* Skew */
+        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    48,                 255,                8,  38, 100,  820,  0, 72,    /* Skew */
         VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0, -1000  /* Invert */
     );
 

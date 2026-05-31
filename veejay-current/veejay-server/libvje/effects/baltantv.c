@@ -92,11 +92,11 @@ vj_effect *baltantv_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,    1,   24,  8,  26,  1800, 3600, 900,  35,  /* Stride */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,    2,   6,   6,  20,  2200, 4200, 1200, 25,  /* Temporal Taps */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS,                          96,  235, 12, 45,  1200, 3200, 0,    60,  /* Decay */
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                          40,  210, 12, 42,  1100, 2800, 0,    55,  /* Feedback */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_PHRASE_ONLY,   48,  220, 8,  34,  1600, 3600, 700,  40   /* Chroma Persistence */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,    1,   24,  8,  24,  1800, 3600, 900,  32,  /* Stride */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,    2,   6,   6,  18,  2200, 4200, 1200, 22,  /* Temporal Taps */
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS,                          110, 242, 10, 38,  1200, 3400, 0,    54,  /* Decay */
+        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                          48,  230, 14, 58,  90,   720,  0,    84,  /* Feedback */
+        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_PHRASE_ONLY,   56,  235, 8,  36,  500,  2400, 700,  46   /* Chroma Persistence */
     );
 
     return ve;
