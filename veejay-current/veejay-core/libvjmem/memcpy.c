@@ -2943,74 +2943,33 @@ static const char digit_pairs[201] = {
   "90919293949596979899"
 };
 
-char *vj_sprintf(char* c, int n) {
-    int sign = -(n<0);
-    unsigned int val = (n^sign)-sign;
+char *vj_sprintf(char *c, int n)
+{
+    (void) digit_pairs;
 
-    int size;
-    if(val>=10000) {
-        if(val>=10000000) {
-            if(val>=1000000000) {
-                size=10;
-            }
-            else if(val>=100000000) {
-                size=9;
-            }
-            else size=8;
-        }
-        else {
-            if(val>=1000000) {
-                size=7;
-            }
-            else if(val>=100000) {
-                size=6;
-            }
-            else size=5;
-        }
-    }
-    else {
-        if(val>=100) {
-            if(val>=1000) {
-                size=4;
-            }
-            else size=3;
-        }
-        else {
-            if(val>=10) {
-                size=2;
-            }
-            else if(n==0) {
-                c[0]='0';
-                c[1] = ' ';
-                return c + 2;
-            }
-            else size=1;
-        }
-    }
-    size -= sign;
-    if(sign)
-      *c='-';
+    char *p = c;
+    unsigned int val;
 
-    c += size-1;
-    while(val>=100) {
-        int pos = val % 100;
-        val /= 100;
-        *(short*)(c-1)=*(short*)(digit_pairs+2*pos); 
-        c-=2;
-    }
-    while(val>0) {
-        *c--='0' + (val % 10);
-        val /= 10;
-    }
-    
-    if(sign) { 
-        c[size] = ' ';
-        return c + size + 1;
-    }
-    else {
-        c[size + 1] = ' ';
+    if (n < 0) {
+        *p++ = '-';
+        val = 0u - (unsigned int)n;   /* handles INT_MIN */
+    } else {
+        val = (unsigned int)n;
     }
 
-    return c + size + 2;
+    char tmp[16];
+    int i = 0;
+
+    do {
+        tmp[i++] = (char)('0' + (val % 10u));
+        val /= 10u;
+    } while (val != 0u);
+
+    while (i > 0) {
+        *p++ = tmp[--i];
+    }
+
+    *p++ = ' ';
+    return p;
 }
 
