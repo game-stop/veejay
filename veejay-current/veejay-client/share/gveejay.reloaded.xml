@@ -13683,7 +13683,7 @@
                                           <object class="GtkLabel" id="label948">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>
-                                            <property name="label" translatable="yes">Listing of Veejay's working directory. Doube click a row to add it as a Sample</property>
+                                            <property name="label" translatable="yes">Listing of Veejay's working directory. Double click a row to add it as a Sample</property>
                                           </object>
                                           <packing>
                                             <property name="expand">False</property>
