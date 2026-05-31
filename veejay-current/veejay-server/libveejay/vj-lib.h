@@ -124,6 +124,7 @@ typedef struct
 	int	rec_id;
 } sequencer_t;
 
+
 typedef struct
 {
     volatile int active;
@@ -197,6 +198,19 @@ typedef struct
     volatile long overruns;
     volatile long read_errors;
     volatile long reads;
+
+    volatile int record_lock;
+    uint8_t *record_ring;
+    int record_ring_size;
+    int record_write_pos;
+    int record_bytes_available;
+    int record_channels;
+    int record_bytes_per_frame;
+    int record_bits_per_channel;
+    int record_sample_rate;
+    volatile long record_overruns;
+    volatile long record_underruns;
+
 } vj_audio_beat_shared_t;
 
 typedef struct {
@@ -348,6 +362,7 @@ typedef struct {
 	int is_rt_kernel;
 	long long clock_overshoot;
 	double pause_cost_ns;
+	volatile int record_audio_source;
 } video_playback_setup;
 
 typedef struct {

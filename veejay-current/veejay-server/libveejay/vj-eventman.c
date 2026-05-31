@@ -27,6 +27,7 @@
 #include <veejaycore/vjmem.h>
 
 #define MAX_INDEX 1024
+#define VIMS_DEFAULT_ARG_MAX 16
 
 #define VIMS_REQUIRE_ALL_PARAMS (1<<0)			/* all params needed */
 #define VIMS_DONT_PARSE_PARAMS (1<<1)		/* dont parse arguments */
@@ -42,6 +43,7 @@ static  int *requires_id_map_ = NULL;
 
 /* define the function pointer to any event */
 typedef void (*vevo_event)(void *ptr, const char format[], va_list ap);
+
 
 static	void		dump_event_stderr(vevo_port_t *event)
 {
@@ -120,34 +122,64 @@ char	*vj_event_vevo_help_vims( int id, int n )
 	return help;
 }
 
-char	*vj_event_vevo_list_serialize(void)
+char *vj_event_vevo_list_serialize(void)
 {
-	int len = vj_event_vevo_list_size();
-	char *res = (char*) vj_calloc(sizeof(char) * (len+6) );
-	int i;
-	sprintf( res, "%05d", len);
-	for ( i = 0; i < MAX_INDEX ;i ++ )
-	{
-		if ( index_map_[i] != NULL )
-		{
-			char *name  = vj_event_vevo_get_event_name( i );
-			char *format= vj_event_vevo_get_event_format( i ); 
-			int name_len = (name == NULL ?  0: strlen( name ));
-			int fmt_len  = (format == NULL? 0: strlen( format ));
-			char tmp[16];
-			snprintf( tmp,sizeof(tmp),"%04d%02d%03d%03d",
-				i, vj_event_vevo_get_num_args(i), fmt_len, name_len );
-			strncat( res, tmp, strlen(tmp));
-			if( format != NULL )
-				strncat( res, format, fmt_len );
-			if( name != NULL )
-				strncat( res, name, name_len );
-			if(name) free(name);
-			if(format) free(format);
-			
-		}
-	}
-	return res;
+    int len = vj_event_vevo_list_size();
+    size_t cap = (size_t) len + 6;
+
+    char *res = (char*) vj_calloc(sizeof(char) * cap);
+    if (!res)
+        return NULL;
+
+    size_t off = 0;
+    int n = snprintf(res, cap, "%05d", len);
+
+    if (n < 0 || (size_t)n >= cap)
+        return res;
+
+    off = (size_t)n;
+
+    for (int i = 0; i < MAX_INDEX; i++)
+    {
+        if (index_map_[i] != NULL)
+        {
+            char *name   = vj_event_vevo_get_event_name(i);
+            char *format = vj_event_vevo_get_event_format(i);
+
+            int name_len = name   ? (int) strlen(name)   : 0;
+            int fmt_len  = format ? (int) strlen(format) : 0;
+
+            char tmp[16];
+            n = snprintf(tmp, sizeof(tmp), "%04d%02d%03d%03d",
+                         i,
+                         vj_event_vevo_get_num_args(i),
+                         fmt_len,
+                         name_len);
+
+            if (n > 0 && off + (size_t)n < cap) {
+                memcpy(res + off, tmp, (size_t)n);
+                off += (size_t)n;
+            }
+
+            if (format && fmt_len > 0 && off + (size_t)fmt_len < cap) {
+                memcpy(res + off, format, (size_t)fmt_len);
+                off += (size_t)fmt_len;
+            }
+
+            if (name && name_len > 0 && off + (size_t)name_len < cap) {
+                memcpy(res + off, name, (size_t)name_len);
+                off += (size_t)name_len;
+            }
+
+            if (name)
+                free(name);
+            if (format)
+                free(format);
+        }
+    }
+
+    res[off] = '\0';
+    return res;
 }
 
 void	vj_event_vevo_inline_fire(void *super, int vims_id, const char *format, ... )
@@ -168,21 +200,88 @@ void		vj_event_vevo_inline_fire_default( void *super, int vims_id, const char *f
 	char key[20];
 	int i = 0;
 	int n = 0;
-	int dval[4] = {0,0,0,0};
+	int dval[VIMS_DEFAULT_ARG_MAX];
+
 	if(!index_map_[vims_id])
 	{
 		veejay_msg(0, "No such event: %d", vims_id);
 		return;
 	}
+
+	for(i = 0; i < VIMS_DEFAULT_ARG_MAX; i++)
+		dval[i] = 0;
+
 	vevo_property_get( index_map_[vims_id] , "arguments", 0, &n );
-	// dangerous, dval != atom_type, i != n defaults
-	while( i < n )
+
+	if(n < 0)
+		n = 0;
+
+	if(n > VIMS_DEFAULT_ARG_MAX)
+	{
+		veejay_msg(0, "Too many default arguments for VIMS %d: %d", vims_id, n);
+		return;
+	}
+
+	for(i = 0; i < n; i++)
 	{
 		snprintf(key,sizeof(key), "argument_%d", i );
 		vevo_property_get( index_map_[vims_id], key, 0, &dval[i] );
-		i++;
 	}
-	vj_event_vevo_inline_fire( super, vims_id, format, &dval[0],&dval[1],&dval[2],&dval[3]);
+
+	switch(n)
+	{
+		case 0:
+			vj_event_vevo_inline_fire( super, vims_id, format );
+			break;
+		case 1:
+			vj_event_vevo_inline_fire( super, vims_id, format, &dval[0] );
+			break;
+		case 2:
+			vj_event_vevo_inline_fire( super, vims_id, format, &dval[0], &dval[1] );
+			break;
+		case 3:
+			vj_event_vevo_inline_fire( super, vims_id, format, &dval[0], &dval[1], &dval[2] );
+			break;
+		case 4:
+			vj_event_vevo_inline_fire( super, vims_id, format, &dval[0], &dval[1], &dval[2], &dval[3] );
+			break;
+		case 5:
+			vj_event_vevo_inline_fire( super, vims_id, format, &dval[0], &dval[1], &dval[2], &dval[3], &dval[4] );
+			break;
+		case 6:
+			vj_event_vevo_inline_fire( super, vims_id, format, &dval[0], &dval[1], &dval[2], &dval[3], &dval[4], &dval[5] );
+			break;
+		case 7:
+			vj_event_vevo_inline_fire( super, vims_id, format, &dval[0], &dval[1], &dval[2], &dval[3], &dval[4], &dval[5], &dval[6] );
+			break;
+		case 8:
+			vj_event_vevo_inline_fire( super, vims_id, format, &dval[0], &dval[1], &dval[2], &dval[3], &dval[4], &dval[5], &dval[6], &dval[7] );
+			break;
+		case 9:
+			vj_event_vevo_inline_fire( super, vims_id, format, &dval[0], &dval[1], &dval[2], &dval[3], &dval[4], &dval[5], &dval[6], &dval[7], &dval[8] );
+			break;
+		case 10:
+			vj_event_vevo_inline_fire( super, vims_id, format, &dval[0], &dval[1], &dval[2], &dval[3], &dval[4], &dval[5], &dval[6], &dval[7], &dval[8], &dval[9] );
+			break;
+		case 11:
+			vj_event_vevo_inline_fire( super, vims_id, format, &dval[0], &dval[1], &dval[2], &dval[3], &dval[4], &dval[5], &dval[6], &dval[7], &dval[8], &dval[9], &dval[10] );
+			break;
+		case 12:
+			vj_event_vevo_inline_fire( super, vims_id, format, &dval[0], &dval[1], &dval[2], &dval[3], &dval[4], &dval[5], &dval[6], &dval[7], &dval[8], &dval[9], &dval[10], &dval[11] );
+			break;
+		case 13:
+			vj_event_vevo_inline_fire( super, vims_id, format, &dval[0], &dval[1], &dval[2], &dval[3], &dval[4], &dval[5], &dval[6], &dval[7], &dval[8], &dval[9], &dval[10], &dval[11], &dval[12] );
+			break;
+		case 14:
+			vj_event_vevo_inline_fire( super, vims_id, format, &dval[0], &dval[1], &dval[2], &dval[3], &dval[4], &dval[5], &dval[6], &dval[7], &dval[8], &dval[9], &dval[10], &dval[11], &dval[12], &dval[13] );
+			break;
+		case 15:
+			vj_event_vevo_inline_fire( super, vims_id, format, &dval[0], &dval[1], &dval[2], &dval[3], &dval[4], &dval[5], &dval[6], &dval[7], &dval[8], &dval[9], &dval[10], &dval[11], &dval[12], &dval[13], &dval[14] );
+			break;
+		case 16:
+			vj_event_vevo_inline_fire( super, vims_id, format, &dval[0], &dval[1], &dval[2], &dval[3], &dval[4], &dval[5], &dval[6], &dval[7], &dval[8], &dval[9], &dval[10], &dval[11], &dval[12], &dval[13], &dval[14], &dval[15] );
+			break;
+	}
 }	
 
 static vevo_port_t	*_new_event(
@@ -1047,7 +1146,18 @@ void		vj_init_vevo_events(void)
 				VIMS_REQUIRE_ALL_PARAMS | VIMS_LONG_PARAMS,
 				"Codec name (use 'x' to see list)",
 				NULL,
-				NULL );	
+				NULL );
+
+    index_map_[VIMS_RECORD_AUDIO_SOURCE] = _new_event(
+                "%d",
+                VIMS_RECORD_AUDIO_SOURCE,
+                "Set audio source for sample recording",
+                vj_event_record_audio_source,
+                1,
+                VIMS_REQUIRE_ALL_PARAMS,
+                "Audio source: 0=auto, 1=original source, 2=beat JACK input",
+                VJ_RECORD_AUDIO_SOURCE_AUTO,
+                NULL );
 
 	index_map_[VIMS_REC_AUTO_START]		=	_new_event(
 				NULL,
@@ -2145,12 +2255,14 @@ void		vj_init_vevo_events(void)
 				NULL );
 
 	index_map_[VIMS_AUDIO_TOGGLE_MUTE]				=	_new_event(
-				NULL,
+				"%d",
 				VIMS_AUDIO_TOGGLE_MUTE,
 				"Mute/Unmute Audio",
 				vj_event_toggle_audio_mute,
+				1,
+				VIMS_ALLOW_ANY,
+				"0=off,1=on",
 				0,
-				VIMS_ALLOW_ANY ,
 				NULL );
 
 	index_map_[VIMS_AUDIO_ENABLE]				=	_new_event(
@@ -2192,9 +2304,9 @@ void		vj_init_vevo_events(void)
 				"Freeze duration in milliseconds",
 				90,
 				"Cooldown duration in milliseconds",
-				155,
+				240,
 				"Beat detection threshold",
-				125,
+				145,
 				"Input channel count",
 				2,
 				NULL );
@@ -2218,7 +2330,7 @@ void		vj_init_vevo_events(void)
 				1,
 				VIMS_REQUIRE_ALL_PARAMS,
 				"Cooldown duration in milliseconds",
-				155,
+				240,
 				NULL );
 
 	index_map_[VIMS_AUDIO_BEAT_THRESHOLD]	=	_new_event(
@@ -2229,7 +2341,7 @@ void		vj_init_vevo_events(void)
 				1,
 				VIMS_REQUIRE_ALL_PARAMS,
 				"Beat detection threshold",
-				125,
+				145,
 				NULL );
 
 	index_map_[VIMS_AUDIO_BEAT_CHANNELS]		=	_new_event(
@@ -2241,6 +2353,108 @@ void		vj_init_vevo_events(void)
 				VIMS_REQUIRE_ALL_PARAMS,
 				"Input channel count",
 				2,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_ACTION]		=	_new_event(
+				"%d",
+				VIMS_AUDIO_BEAT_ACTION,
+				"Set JACK audio beat action mode",
+				vj_event_audio_beat_action,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Action: 0=none, 1=freeze, 2=auto-fx, 3=freeze+auto-fx",
+				2,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_PULSE]		=	_new_event(
+				"%d",
+				VIMS_AUDIO_BEAT_PULSE,
+				"Set JACK audio beat pulse duration",
+				vj_event_audio_beat_pulse,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Pulse duration in milliseconds",
+				180,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_GATE]		=	_new_event(
+				"%d",
+				VIMS_AUDIO_BEAT_GATE,
+				"Set JACK audio beat gate duration",
+				vj_event_audio_beat_gate,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Gate duration in milliseconds",
+				90,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_AUTO_MODE]	=	_new_event(
+				"%d",
+				VIMS_AUDIO_BEAT_AUTO_MODE,
+				"Set JACK audio beat auto-fx mode",
+				vj_event_audio_beat_auto_mode,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Auto-fx mode: 0=off, 1=primary, 2=primary+motion, 3=primary+motion+memory, 4=chaos",
+				2,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_AUTO_AMOUNT]	=	_new_event(
+				"%d",
+				VIMS_AUDIO_BEAT_AUTO_AMOUNT,
+				"Set JACK audio beat auto-fx amount",
+				vj_event_audio_beat_auto_amount,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Auto-fx amount, 0-100",
+				75,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_AUTO_RESET]	=	_new_event(
+				NULL,
+				VIMS_AUDIO_BEAT_AUTO_RESET,
+				"Reset JACK audio beat auto-fx mapping",
+				vj_event_audio_beat_auto_reset,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_UI_CONFIG]	=	_new_event(
+				"%d %d %d %d %d %d %d %d %d %d",
+				VIMS_AUDIO_BEAT_UI_CONFIG,
+				"Configure JACK audio beat detector for UI",
+				vj_event_audio_beat_ui_config,
+				10,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Enabled state, 0 or 1",
+				1,
+				"Action: 0=none, 1=freeze, 2=auto-fx, 3=freeze+auto-fx",
+				2,
+				"Freeze duration in milliseconds",
+				90,
+				"Cooldown duration in milliseconds",
+				240,
+				"Beat detection threshold",
+				145,
+				"Input channel count",
+				2,
+				"Pulse duration in milliseconds",
+				180,
+				"Gate duration in milliseconds",
+				90,
+				"Auto-fx mode: 0=off, 1=primary, 2=primary+motion, 3=primary+motion+memory, 4=chaos",
+				2,
+				"Auto-fx amount, 0-100",
+				75,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_STATE]		=	_new_event(
+				NULL,
+				VIMS_AUDIO_BEAT_STATE,
+				"Send JACK audio beat detector state",
+				vj_event_audio_beat_state,
+				0,
+				VIMS_ALLOW_ANY,
 				NULL );
 
 	index_map_[VIMS_AUDIO_BEAT_PRINT]		=	_new_event(

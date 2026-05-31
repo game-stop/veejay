@@ -108,4 +108,6 @@ long vj_calc_next_subframe(veejay_t *info, int b);
 
 void vj_perform_global_chain_reset(veejay_t *info);
 
+void vj_perform_record_audio_source_reset(veejay_t *info);
+
 #endif

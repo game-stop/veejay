@@ -381,6 +381,16 @@ static void vj_perform_end_transition(veejay_t *info, int mode, int sample);
 static int vj_perform_format_changed_rgb(performer_t *p, VJFrame *frame);
 static int vj_perform_format_changed_yuv(performer_t *p, VJFrame *frame);
 
+#ifdef HAVE_JACK
+static int vj_perform_queue_audio_frame_impl(veejay_t *info,
+                                             void *ptr,
+                                             uint8_t *a_buf,
+                                             int speed,
+                                             long long target_frame,
+                                             int sample_id,
+                                             int *audio_sample_ptr);
+#endif
+
 static void vj_perform_set_444__(VJFrame *frame)
 {
     frame->ssm = 1;
@@ -613,7 +623,7 @@ void vj_perform_initiate_edge_change(
     const int old_a = atomic_load_int(&g->A->audio_edge->pending_edge);
     const int old_b = atomic_load_int(&g->B->audio_edge->pending_edge);
 
-    if (edge_type != AUDIO_EDGE_DIRECTION || old_a != AUDIO_EDGE_NONE ||
+/*    if (edge_type != AUDIO_EDGE_DIRECTION || old_a != AUDIO_EDGE_NONE ||
         old_b != AUDIO_EDGE_NONE || !real_direction_change) {
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[AUDIO-DIAG] edge-request-watch edge=%s(%d) prev_dir=%d cur_dir=%d real_flip=%d oldA=%s(%d) oldB=%s(%d)",
@@ -621,7 +631,7 @@ void vj_perform_initiate_edge_change(
                    prev_dir, cur_dir, real_direction_change,
                    vj_audio_edge_name(old_a), old_a,
                    vj_audio_edge_name(old_b), old_b);
-    }
+    } */
 
     atomic_store_int(&g->A->audio_edge->pending_edge, edge_type);
     atomic_store_int(&g->B->audio_edge->pending_edge, edge_type);
@@ -774,8 +784,8 @@ static int vj_perform_ab_ctx_debug_should_log(const char *tag, int active_fx, in
 
     return ((seq % 45) == 0);
 }
-
 static void vj_perform_ab_ctx_debug_dump(
+    veejay_t *veejay_instance_,
     const char *tag,
     int sample_id,
     int playmode,
@@ -789,9 +799,33 @@ static void vj_perform_ab_ctx_debug_dump(
 {
     char summary[1024];
     int pos = 0;
+    int action = -1;
+    int enabled = -1;
+    int running = -1;
+    int open = -1;
+    int paused = -1;
+    int hit_seq = -1;
+    int consumed_seq = -1;
+    int sample_speed = 0;
+    int play_speed = 0;
 
-    if(tag && strcmp(tag, "state") == 0 && !vj_perform_ab_ctx_debug_should_log(tag, active_fx, changed))
-        return;
+    static long last_log_ms = 0;
+    static int log_count = 0;
+
+    long now_ms = 0;
+
+    if(!tag)
+        tag = "unknown";
+
+    now_ms = (long)(time(NULL) * 1000L);
+
+    if(strcmp(tag, "state") == 0 && changed <= 0 && log_count > 20) {
+        if(last_log_ms != 0 && (now_ms - last_log_ms) < 1000L)
+            return;
+    }
+
+    last_log_ms = now_ms;
+    log_count++;
 
     summary[0] = '\0';
 
@@ -803,10 +837,13 @@ static void vj_perform_ab_ctx_debug_dump(
             int lane_active = 0;
             int lane_raw = 0;
             int lane_disabled = 0;
+            int lane_beat = 0;
             int first_active_fx = 0;
             int first_raw_fx = 0;
+            int first_beat_fx = 0;
             int first_active_entry = -1;
             int first_raw_entry = -1;
+            int first_beat_entry = -1;
 
             if(chain)
             {
@@ -818,39 +855,50 @@ static void vj_perform_ab_ctx_debug_dump(
                         continue;
 
                     lane_raw++;
-                    if(first_raw_fx == 0)
-                    {
+
+                    if(first_raw_fx == 0) {
                         first_raw_fx = entry->effect_id;
                         first_raw_entry = entry_nr;
                     }
 
-                    if(entry->e_flag == 0 || entry->beat_flag == 0)
-                    {
+                    if(entry->e_flag == 0) {
                         lane_disabled++;
                         continue;
                     }
 
                     lane_active++;
-                    if(first_active_fx == 0)
-                    {
+
+                    if(first_active_fx == 0) {
                         first_active_fx = entry->effect_id;
                         first_active_entry = entry_nr;
+                    }
+
+                    if(entry->beat_flag) {
+                        lane_beat++;
+
+                        if(first_beat_fx == 0) {
+                            first_beat_fx = entry->effect_id;
+                            first_beat_entry = entry_nr;
+                        }
                     }
                 }
             }
 
             pos += snprintf(summary + pos,
                             sizeof(summary) - (size_t)pos,
-                            "%sL%d:raw=%d:active=%d:disabled=%d:first_raw=%d@%d:first_active=%d@%d",
-                            (lane == 0 ? "" : " "),
+                            "%sL%d:raw=%d active=%d beat=%d disabled=%d first_raw=%d@%d first_active=%d@%d first_beat=%d@%d",
+                            lane == 0 ? "" : " | ",
                             lane,
                             lane_raw,
                             lane_active,
+                            lane_beat,
                             lane_disabled,
                             first_raw_fx,
                             first_raw_entry,
                             first_active_fx,
-                            first_active_entry);
+                            first_active_entry,
+                            first_beat_fx,
+                            first_beat_entry);
         }
     }
     else
@@ -858,21 +906,52 @@ static void vj_perform_ab_ctx_debug_dump(
         snprintf(summary, sizeof(summary), "ctx=NULL");
     }
 
-}
+#ifdef HAVE_JACK
+    if(veejay_instance_ && veejay_instance_->settings) {
+        video_playback_setup *settings = veejay_instance_->settings;
 
+        action = atomic_load_int(&settings->audio_beat.action_mode);
+        enabled = vj_audio_beat_is_enabled(&settings->audio_beat);
+        running = vj_audio_beat_is_running(&settings->audio_beat);
+        open = vj_audio_beat_is_open(&settings->audio_beat);
+        paused = vj_audio_beat_is_paused_by_beat(&settings->audio_beat);
+        hit_seq = atomic_load_int(&settings->audio_beat.hit_seq);
+        consumed_seq = atomic_load_int(&settings->audio_beat.consumed_seq);
+        play_speed = settings->current_playback_speed;
+
+        if(veejay_instance_->uc &&
+           veejay_instance_->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
+            sample_speed = sample_get_speed(veejay_instance_->uc->sample_id);
+    }
+#endif
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-BEAT-PERFORM] %s sample=%d mode=%d renderer=%d local=%d global=%d chains=%d active_fx=%d changed=%d action=%d enabled=%d open=%d running=%d paused=%d hit_seq=%d consumed=%d play_speed=%d sample_speed=%d :: %s",
+               tag,
+               sample_id,
+               playmode,
+               renderer_id,
+               local_enabled,
+               global_enabled,
+               ctx ? ctx->chain_count : -1,
+               active_fx,
+               changed,
+               action,
+               enabled,
+               open,
+               running,
+               paused,
+               hit_seq,
+               consumed_seq,
+               play_speed,
+               sample_speed,
+               summary);
+}
 static int vj_perform_audio_beat_playmode_has_fx_chain(int playmode)
 {
-    /*
-     * VeeJay has three public playback modes here:
-     *   PLAIN  - no FX render path and no global FX chain
-     *   SAMPLE - sample FX chain, optionally composed with the global FX chain
-     *   STREAM - represented in this code as VJ_PLAYBACK_MODE_TAG
-     *
-     * Keep the beat mapper out of PLAIN entirely.
-     */
-    return (playmode == VJ_PLAYBACK_MODE_SAMPLE || playmode == VJ_PLAYBACK_MODE_TAG);
+    return playmode == VJ_PLAYBACK_MODE_SAMPLE ||
+           playmode == VJ_PLAYBACK_MODE_TAG;
 }
-
 static int vj_perform_audio_beat_global_chain_is_rendered(
     veejay_t *info,
     int sample_id,
@@ -897,6 +976,40 @@ static int vj_perform_audio_beat_global_chain_is_rendered(
     return 1;
 }
 
+static int vj_perform_ab_ctx_beat_fx_count(vj_perform_ab_render_ctx_t *ctx)
+{
+    int active = 0;
+
+    if(!ctx)
+        return 0;
+
+    for(int lane = 0; lane < ctx->chain_count; lane++)
+    {
+        sample_eff_chain **chain = ctx->chain[lane];
+
+        if(!chain)
+            continue;
+
+        for(int entry_nr = 0; entry_nr < SAMPLE_MAX_EFFECTS; entry_nr++)
+        {
+            sample_eff_chain *entry = chain[entry_nr];
+
+            if(!entry)
+                continue;
+
+            if(entry->e_flag == 0 || entry->effect_id <= 0)
+                continue;
+
+            if(entry->beat_flag == 0)
+                continue;
+
+            active++;
+        }
+    }
+
+    return active;
+}
+
 static int vj_perform_audio_beat_apply_render_chains(
     veejay_t *info,
     int sample_id,
@@ -910,12 +1023,28 @@ static int vj_perform_audio_beat_apply_render_chains(
     vj_perform_ab_render_ctx_t ctx;
     sample_eff_chain **global_chain = NULL;
     int global_enabled = 0;
+    int active_fx = 0;
+    int beat_fx = 0;
     int changed = 0;
+    int action = VJ_AUDIO_BEAT_ACTION_NONE;
 
     if(!info || !info->settings)
         return 0;
 
     settings = info->settings;
+
+    if(!vj_audio_beat_is_enabled(&settings->audio_beat))
+        return 0;
+
+    if(!vj_audio_beat_is_running(&settings->audio_beat))
+        return 0;
+
+    action = atomic_load_int(&settings->audio_beat.action_mode);
+
+
+    if(action != VJ_AUDIO_BEAT_ACTION_AUTO_FX &&
+       action != VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX)
+        return 0;
 
     if(!vj_perform_audio_beat_playmode_has_fx_chain(playmode))
         return 0;
@@ -939,7 +1068,7 @@ static int vj_perform_audio_beat_apply_render_chains(
 
     if(ctx.chain_count <= 0)
     {
-        vj_perform_ab_ctx_debug_dump("skip-no-chain",
+        vj_perform_ab_ctx_debug_dump(info, "skip-no-chain",
                                      sample_id,
                                      playmode,
                                      renderer_id,
@@ -951,71 +1080,11 @@ static int vj_perform_audio_beat_apply_render_chains(
         return 0;
     }
 
+    active_fx = vj_perform_ab_ctx_active_fx_count(&ctx);
+
+    if(active_fx <= 0)
     {
-        int active_fx = vj_perform_ab_ctx_active_fx_count(&ctx);
-
-        if(active_fx <= 0)
-        {
-            vj_perform_ab_ctx_debug_dump("skip-no-active-fx",
-                                         sample_id,
-                                         playmode,
-                                         renderer_id,
-                                         &ctx,
-                                         (local_enabled && local_chain) ? 1 : 0,
-                                         global_enabled,
-                                         active_fx,
-                                         0);
-            return 0;
-        }
-
-        /*
-         * The renderer may see valid FX before the user enables beat analysis.
-         * Do not rebuild or advance the auto mapper while disabled; just log
-         * the real render context so integration problems stay visible.
-         */
-        if(!vj_audio_beat_is_enabled(&settings->audio_beat))
-        {
-            vj_perform_ab_ctx_debug_dump("skip-beat-disabled",
-                                         sample_id,
-                                         playmode,
-                                         renderer_id,
-                                         &ctx,
-                                         (local_enabled && local_chain) ? 1 : 0,
-                                         global_enabled,
-                                         active_fx,
-                                         0);
-            return 0;
-        }
-
-        if(!vj_audio_beat_is_running(&settings->audio_beat))
-        {
-            vj_perform_ab_ctx_debug_dump("skip-beat-not-running",
-                                         sample_id,
-                                         playmode,
-                                         renderer_id,
-                                         &ctx,
-                                         (local_enabled && local_chain) ? 1 : 0,
-                                         global_enabled,
-                                         active_fx,
-                                         0);
-            return 0;
-        }
-
-#ifdef _OPENMP
-#pragma omp critical(vj_perform_audio_beat_auto_apply)
-#endif
-        {
-            changed = vj_audio_beat_auto_apply_chain(
-                &settings->audio_beat,
-                &ctx,
-                ctx.chain_count * SAMPLE_MAX_EFFECTS,
-                vj_perform_ab_chain_get_fx_id,
-                vj_perform_ab_chain_get_arg,
-                vj_perform_ab_chain_set_arg
-            );
-        }
-
-        vj_perform_ab_ctx_debug_dump("state",
+        vj_perform_ab_ctx_debug_dump(info, "skip-no-active-fx",
                                      sample_id,
                                      playmode,
                                      renderer_id,
@@ -1023,11 +1092,53 @@ static int vj_perform_audio_beat_apply_render_chains(
                                      (local_enabled && local_chain) ? 1 : 0,
                                      global_enabled,
                                      active_fx,
-                                     changed);
+                                     0);
+        return 0;
     }
+
+    beat_fx = vj_perform_ab_ctx_beat_fx_count(&ctx);
+
+    if(beat_fx <= 0)
+    {
+        vj_perform_ab_ctx_debug_dump(info, "skip-no-beat-fx",
+                                     sample_id,
+                                     playmode,
+                                     renderer_id,
+                                     &ctx,
+                                     (local_enabled && local_chain) ? 1 : 0,
+                                     global_enabled,
+                                     active_fx,
+                                     0);
+        return 0;
+    }
+
+#ifdef _OPENMP
+#pragma omp critical(vj_perform_audio_beat_auto_apply)
+#endif
+    {
+        changed = vj_audio_beat_auto_apply_chain(
+            &settings->audio_beat,
+            &ctx,
+            ctx.chain_count * SAMPLE_MAX_EFFECTS,
+            vj_perform_ab_chain_get_fx_id,
+            vj_perform_ab_chain_get_arg,
+            vj_perform_ab_chain_set_arg
+        );
+    }
+
+    vj_perform_ab_ctx_debug_dump(info, "state",
+                                 sample_id,
+                                 playmode,
+                                 renderer_id,
+                                 &ctx,
+                                 (local_enabled && local_chain) ? 1 : 0,
+                                 global_enabled,
+                                 active_fx,
+                                 changed);
 
     return changed;
 }
+
 #endif
 
 static void vj_perform_clear_audio_edges(
@@ -2184,6 +2295,19 @@ static long vj_calc_next_sample_offset(
     const long max_off = len - 1;
     int advance = 1;
 
+    if(speed == 0) {
+        long off = sb->offset;
+
+        if(off < 0)
+            off = 0;
+        else if(off > max_off)
+            off = max_off;
+
+        *advance_out = 0;
+        sb->offset = off;
+        return off;
+    }
+
     if (sb->direction_changed) {
         sb->cur_sfd = 0;
         sb->direction_changed = 0;
@@ -2818,11 +2942,11 @@ static int perform_normal_direction_turn(veejay_t *info,
     const int unsafe_step_limit = (turn_speed > 1) ? 1024 : 768;
     const int unsafe_slope_limit = (turn_speed > 1) ? 14000 : 12000;
     if (phase_delta > 4096 || phase_slope > unsafe_slope_limit || phase_step > unsafe_step_limit) {
-        veejay_msg(VEEJAY_MSG_DEBUG,
+        /*veejay_msg(VEEJAY_MSG_DEBUG,
                    "[AUDIO-DIAG] normal-turn-skip stage=59 edge=%s(%d) flip=1 speed=%d dir=%d target=%lld phase_delta=%d phase_slope=%d phase_step=%d phase=%d reason=unsafe-candidate mode=guarded-dual-head-microfade",
                    vj_audio_edge_name(pending_edge), pending_edge,
                    sample_ptr->speed, cur_dir, cur_frame,
-                   phase_delta, phase_slope, phase_step, phase_shift);
+                   phase_delta, phase_slope, phase_step, phase_shift); */
         return 0;
     }
 
@@ -2879,7 +3003,7 @@ static int perform_normal_direction_turn(veejay_t *info,
                                  declick_path, sample_ptr->speed, cur_dir);
     }
 
-    if (edge_delta >= 768 || step_max >= 768 || peak >= 32760) {
+    /*if (edge_delta >= 768 || step_max >= 768 || peak >= 32760) {
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[AUDIO-DIAG] normal-turn stage=59 edge=%s(%d) flip=1 speed=%d dir=%d target=%lld samples=%d turn_speed=%d delta=%d phase_delta=%d phase_slope=%d phase_step=%d peak=%d step_max=%d step_avg=%d phase=%d turn=%d base=%.3f start=%.3f v0=%.3f v1=%.3f ctx=%lld..%lld mode=guarded-dual-head-microfade",
                    vj_audio_edge_name(pending_edge), pending_edge,
@@ -2887,7 +3011,7 @@ static int perform_normal_direction_turn(veejay_t *info,
                    edge_delta, phase_delta, phase_slope, phase_step, peak, step_max, step_avg,
                    phase_shift, turn_samples,
                    base_pos, start_pos, v0, v1, ctx_first, ctx_last);
-    }
+    }*/
 
     sample_ptr->scratch_initialized = 0;
     sample_ptr->scratch_pos = 0.0;
@@ -2938,12 +3062,12 @@ static int perform_normal_playback(
     const int direction_flipped =
         (last_dir != 0 && cur_dir != 0 && last_dir != cur_dir);
 
-    if (pending_edge != AUDIO_EDGE_NONE || direction_flipped) {
+    /*if (pending_edge != AUDIO_EDGE_NONE || direction_flipped) {
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[AUDIO-DIAG] normal-edge edge=%s(%d) flip=%d last_dir=%d cur_dir=%d speed=%d target=%lld pred=%d",
                    vj_audio_edge_name(pending_edge), pending_edge, direction_flipped,
                    last_dir, cur_dir, speed, cur_frame, pred_len);
-    }
+    }*/
 
     if (speed == 0 || pending_edge == AUDIO_EDGE_SILENCE) {
         veejay_memset(audio_buf, 0, pred_len * frame_bytes);
@@ -2996,10 +3120,10 @@ static int perform_normal_playback(
                 vj_audio_declick_apply(p, audio_buf, n_samples, frame_bytes,
                                        AUDIO_PATH_DIRECT, speed, cur_dir,
                                        AUDIO_EDGE_DIRECTION, 1);
-                veejay_msg(VEEJAY_MSG_DEBUG,
+                /*veejay_msg(VEEJAY_MSG_DEBUG,
                            "[AUDIO-DIAG] normal-turn-fallback stage=60 edge=%s(%d) flip=1 speed=%d dir=%d target=%lld reason=unsafe-declick-fallback mode=direct-copy-declick",
                            vj_audio_edge_name(pending_edge), pending_edge,
-                           speed, cur_dir, cur_frame);
+                           speed, cur_dir, cur_frame);  */
             } else {
                 vj_audio_declick_apply(p, audio_buf, n_samples, frame_bytes,
                                     AUDIO_PATH_DIRECT, speed, cur_dir,
@@ -3075,10 +3199,10 @@ static int perform_normal_playback(
             return turn_out;
         }
 
-        veejay_msg(VEEJAY_MSG_DEBUG,
+        /*veejay_msg(VEEJAY_MSG_DEBUG,
                    "[AUDIO-DIAG] fast-turn-fallback stage=60 edge=%s(%d) flip=1 speed=%d dir=%d target=%lld reason=unsafe-declick-fallback",
                    vj_audio_edge_name(pending_edge), pending_edge,
-                   speed, cur_dir, cur_frame);
+                   speed, cur_dir, cur_frame); */
     }
 
     uint8_t *tmp_ptr = temporary_buffer;
@@ -3422,9 +3546,9 @@ static int slow_motion_fetch_scratch_context(veejay_t *info,
     const int context_capacity_samples = frames * slot_capacity;
 
     if (context_capacity_samples > scratch_capacity_samples) {
-        veejay_msg(VEEJAY_MSG_DEBUG,
+        /*veejay_msg(VEEJAY_MSG_DEBUG,
                    "[AUDIO-DIAG] scratch-context stage=59 no-room frames=%d need=%d cap=%d",
-                   frames, context_capacity_samples, scratch_capacity_samples);
+                   frames, context_capacity_samples, scratch_capacity_samples); */
         return 0;
     }
 
@@ -3477,13 +3601,13 @@ static int slow_motion_fetch_scratch_context(veejay_t *info,
         map->first_frame = first;
         map->last_frame = last;
     }
-
+/*
     if (map_err <= -3 || map_err >= 3 || over_frames > 0) {
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[AUDIO-DIAG] scratch-context stage=59 actual-prefix frames=%d got=%d..%d total=%d exact=%d map_err=%d over=%d pred=%d ctx=%lld..%lld",
                    frames, min_got, max_got, total_samples, exact_total, map_err,
                    over_frames, pred_len, first, last);
-    }
+    } */
 
     if (ctx_abs_start_out != NULL)
         *ctx_abs_start_out = exact_start;
@@ -3960,7 +4084,7 @@ int perform_slow_motion(
     const double sync_err1 = sync_end - pos1;
     const int peak = vj_audio_peak_s16(audio_buf, copied, frame_bytes);
 
-    if (edge_requested || reset_head || hard_edge ||
+    /*if (edge_requested || reset_head || hard_edge ||
         fabs(sync_err0) > (double)(pred_len * 4) ||
         fabs(sync_err1) > (double)(pred_len * 4) ||
         edge_delta >= 1500 || step_max >= 3000 || peak >= 32760) {
@@ -3974,7 +4098,7 @@ int perform_slow_motion(
                    sync_err0, sync_err1, posdata->scratch_ramp_left,
                    ctx_first, ctx_last, ctx_samples, edge_delta, peak,
                    step_max, step_avg);
-    }
+    } */
 
     if (hard_edge) {
         vj_audio_declick_apply(p, audio_buf, copied, frame_bytes,
@@ -3983,11 +4107,11 @@ int perform_slow_motion(
     } else {
         vj_audio_declick_observe(p, audio_buf, copied, frame_bytes,
                                  AUDIO_PATH_SLOW, posdata->speed, cur_dir);
-        if (edge_requested || edge_delta >= 1500 || step_max >= 3000 || peak >= 32760) {
+        /*if (edge_requested || edge_delta >= 1500 || step_max >= 3000 || peak >= 32760) {
             veejay_msg(VEEJAY_MSG_DEBUG,
                        "[AUDIO-DIAG] declick-observe stage=59 reason=persistent-readhead edge_delta=%d step_max=%d sync_err=%.3f",
                        edge_delta, step_max, sync_err1);
-        }
+        } */
     }
 
     if (posdata->audio_diag_valid && posdata->audio_diag_frame_bytes == frame_bytes) {
@@ -4216,6 +4340,15 @@ static  int vj_perform_get_frame_( veejay_t *info, int s1, long long nframe, VJF
 
     int cur_sfd = (s1 ? sample_get_framedups(s1 ) : 0);
     int speed = (s1 ? sample_get_speed(s1) : info->settings->current_playback_speed);
+    if(speed == 0) {
+        int res = vj_el_get_video_frame(el, (long)nframe, dst->data);
+
+        if(res)
+            dst->ssm = 0;
+
+        return res;
+    }
+
     int uv_len = dst->uv_len;
     
     long p0_frame = 0;
@@ -4697,33 +4830,254 @@ static void vj_perform_plain_fill_buffer(veejay_t * info, performer_t *p,VJFrame
 }
 
 static int rec_audio_sample_ = 0;
-static int vj_perform_render_sample_frame(veejay_t *info, performer_t *p, uint8_t *frame[4], int sample, int type)
-{
-    int audio_len = 0;
 
-    if( type == 0 && info->audio == AUDIO_PLAY ) {
-        if( info->current_edit_list->has_audio )
-        {
+static editlist *vj_perform_record_audio_editlist(veejay_t *info)
+{
+    editlist *el = NULL;
+
+    if(!info)
+        return NULL;
+
+    if(info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
+        el = sample_get_editlist(info->uc->sample_id);
+
+    if(!el)
+        el = info->current_edit_list;
+    if(!el)
+        el = info->edit_list;
+
+    return el;
+}
+
+static int vj_perform_record_audio_expected_frames(editlist *el)
+{
+    if(!el || el->audio_rate <= 0 || el->video_fps <= 0.0)
+        return 0;
+
+    return (int)ceil((double)el->audio_rate / (double)el->video_fps);
+}
+
 #ifdef HAVE_JACK
-            audio_len = vj_perform_fill_audio_buffers(
-                            info,
-                            info->current_edit_list,
-                            p->audio_rec_buffer,
-                            p,
-                            
-                            &rec_audio_sample_,
-                            atomic_load_long_long(&info->settings->current_frame_num)
-                        );
-#endif
-        } 
+static int vj_perform_record_audio_beat_active(video_playback_setup *settings)
+{
+    if(!settings)
+        return 0;
+
+    return vj_audio_beat_is_enabled(&settings->audio_beat) &&
+           vj_audio_beat_is_running(&settings->audio_beat) &&
+           vj_audio_beat_is_open(&settings->audio_beat);
+}
+
+static int vj_perform_record_audio_from_beat(
+    veejay_t *info,
+    performer_t *p,
+    editlist *el
+) {
+    video_playback_setup *settings;
+    int wanted_frames;
+    int frame_bytes;
+    int copied_frames;
+
+    if(!info || !info->settings || !p || !p->audio_rec_buffer || !el)
+        return 0;
+
+    settings = info->settings;
+
+    wanted_frames = vj_perform_record_audio_expected_frames(el);
+    if(wanted_frames <= 0)
+        return 0;
+
+    frame_bytes = el->audio_bps;
+    if(frame_bytes <= 0)
+        return 0;
+
+    copied_frames = vj_audio_beat_copy_record_audio(
+        &settings->audio_beat,
+        p->audio_rec_buffer,
+        wanted_frames,
+        frame_bytes,
+        el->audio_chans,
+        el->audio_rate
+    );
+
+    if(copied_frames < 0)
+        copied_frames = 0;
+
+    if(copied_frames > wanted_frames)
+        copied_frames = wanted_frames;
+
+    /*
+     * Keep recorder cadence stable: one video frame gets one expected
+     * audio slice. Underrun becomes silence, not a sudden fallback to
+     * editlist audio mid-recording.
+     */
+    if(copied_frames < wanted_frames) {
+        veejay_memset(
+            p->audio_rec_buffer + ((size_t)copied_frames * (size_t)frame_bytes),
+            0,
+            (size_t)(wanted_frames - copied_frames) * (size_t)frame_bytes
+        );
     }
 
-    return sample_record_frame( sample,frame,p->audio_rec_buffer,audio_len,info->pixel_format );
+    return wanted_frames;
+}
+#endif
+
+static int vj_perform_record_audio_from_original(
+    veejay_t *info,
+    performer_t *p
+) {
+#ifdef HAVE_JACK
+    video_playback_setup *settings;
+    editlist *el;
+    long long target_frame;
+    int wanted_frames;
+    int frame_bytes;
+    int sample_id;
+    int got;
+
+    if(!info || !info->settings || !p || !p->audio_rec_buffer)
+        return 0;
+
+    settings = info->settings;
+    el = vj_perform_record_audio_editlist(info);
+    if(!el || !el->has_audio)
+        return 0;
+
+    wanted_frames = vj_perform_record_audio_expected_frames(el);
+    frame_bytes = el->audio_bps;
+    if(wanted_frames <= 0 || frame_bytes <= 0)
+        return 0;
+
+    target_frame = atomic_load_long_long(&settings->current_frame_num);
+    sample_id = (info->uc ? info->uc->sample_id : 0);
+
+    got = vj_perform_queue_audio_frame_impl(info,
+                                            (void*)p,
+                                            p->audio_rec_buffer,
+                                            settings->current_playback_speed,
+                                            target_frame,
+                                            sample_id,
+                                            &rec_audio_sample_);
+
+    if(got < 0)
+        got = 0;
+    if(got > wanted_frames)
+        got = wanted_frames;
+
+    if(got < wanted_frames) {
+        veejay_memset(p->audio_rec_buffer + ((size_t)got * (size_t)frame_bytes),
+                      0,
+                      (size_t)(wanted_frames - got) * (size_t)frame_bytes);
+        got = wanted_frames;
+    }
+
+    return got;
+#else
+    (void)info;
+    (void)p;
+    return 0;
+#endif
+}
+
+static int vj_perform_record_audio_frame(
+    veejay_t *info,
+    performer_t *p
+) {
+    video_playback_setup *settings;
+    editlist *el;
+    int source = VJ_RECORD_AUDIO_SOURCE_AUTO;
+
+    if(!info || !info->settings || !p || !p->audio_rec_buffer)
+        return 0;
+
+    settings = info->settings;
+    el = vj_perform_record_audio_editlist(info);
+
+    source = atomic_load_int(&settings->record_audio_source);
+
+#ifdef HAVE_JACK
+    if(source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK) {
+        if(!vj_perform_record_audio_beat_active(settings) &&
+        vj_audio_beat_is_running(&settings->audio_beat))
+        {
+            vj_audio_beat_set_action(&settings->audio_beat, VJ_AUDIO_BEAT_ACTION_NONE);
+            vj_audio_beat_enable(&settings->audio_beat);
+        }
+
+        if(vj_perform_record_audio_beat_active(settings))
+            return vj_perform_record_audio_from_beat(info, p, el);
+
+        if(el) {
+            int wanted_frames = vj_perform_record_audio_expected_frames(el);
+            int frame_bytes = el->audio_bps;
+
+            if(wanted_frames > 0 && frame_bytes > 0) {
+                veejay_memset(
+                    p->audio_rec_buffer,
+                    0,
+                    (size_t)wanted_frames * (size_t)frame_bytes
+                );
+                return wanted_frames;
+            }
+        }
+
+        return 0;
+    }
+
+    if(source == VJ_RECORD_AUDIO_SOURCE_AUTO &&
+       vj_perform_record_audio_beat_active(settings))
+    {
+        return vj_perform_record_audio_from_beat(info, p, el);
+    }
+#endif
+
+    return vj_perform_record_audio_from_original(info, p);
+}
+
+void vj_perform_record_audio_source_reset(veejay_t *info)
+{
+    rec_audio_sample_ = 0;
+
+    if(!info || !info->settings)
+        return;
+
+    video_playback_setup *settings = info->settings;
+
+    atomic_store_int(&settings->audio_slice, 0);
+    atomic_store_int(&settings->audio_flush_request, 1);
+    settings->audio_last_stretched_samples = 0;
+
+    vj_perform_initiate_edge_change(info, AUDIO_EDGE_RESET, 0, 0);
+}
+
+static int vj_perform_render_sample_frame(
+    veejay_t *info,
+    performer_t *p,
+    uint8_t *frame[4],
+    int sample,
+    int type
+) {
+    int audio_len = 0;
+
+    if(type == 0 && info->audio == AUDIO_PLAY) {
+        audio_len = vj_perform_record_audio_frame(info, p);
+    }
+
+    return sample_record_frame(
+        sample,
+        frame,
+        p->audio_rec_buffer,
+        audio_len,
+        info->pixel_format
+    );
 }
 
 static int vj_perform_render_offline_tag_frame(veejay_t *info)
 {
     performer_global_t *g = (performer_global_t*) info->performer;
+    performer_t *p = g ? g->A : NULL;
+    int audio_len = 0;
 
     if(vj_tag_get_active( info->settings->offline_tag_id ) == 0 ) {
         vj_tag_enable( info->settings->offline_tag_id );
@@ -4731,12 +5085,30 @@ static int vj_perform_render_offline_tag_frame(veejay_t *info)
 
     vj_tag_get_frame( info->settings->offline_tag_id, g->offline_frame, NULL );
 
-    return vj_tag_record_frame( info->settings->offline_tag_id, g->offline_frame->data, NULL, 0, info->pixel_format );
+    if(p && info->audio == AUDIO_PLAY)
+        audio_len = vj_perform_record_audio_frame(info, p);
+
+    return vj_tag_record_frame(info->settings->offline_tag_id,
+                               g->offline_frame->data,
+                               (audio_len > 0 && p) ? p->audio_rec_buffer : NULL,
+                               audio_len,
+                               info->pixel_format);
 }
     
 static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4])
 {
-    return vj_tag_record_frame( info->uc->sample_id, frame, NULL, 0, info->pixel_format);
+    performer_global_t *g = (performer_global_t*) info->performer;
+    performer_t *p = g ? g->A : NULL;
+    int audio_len = 0;
+
+    if(p && info->audio == AUDIO_PLAY)
+        audio_len = vj_perform_record_audio_frame(info, p);
+
+    return vj_tag_record_frame(info->uc->sample_id,
+                               frame,
+                               (audio_len > 0 && p) ? p->audio_rec_buffer : NULL,
+                               audio_len,
+                               info->pixel_format);
 }   
 
 int vj_perform_commit_offline_recording(veejay_t *info, int id, char *recording)
@@ -5171,13 +5543,14 @@ void vj_perform_record_tag_frame(veejay_t *info) {
      }
 }
 
-static void vj_perform_tag_fill_buffer(veejay_t * info, performer_t *p, VJFrame *dst, int sample_id)
+static void vj_perform_tag_fill_buffer(veejay_t *info, performer_t *p, VJFrame *dst, int sample_id)
 {
     int error = 1;
     performer_global_t *g = (performer_global_t*) info->performer;
     int active = p->pvar_.active;
+    video_playback_setup *settings = info->settings;
 
-    if(info->settings->feedback && info->settings->feedback_stage > 1 ) {
+    if(info->settings->feedback && info->settings->feedback_stage > 1) {
         dst->data[0] = g->feedback_frame.data[0];
         dst->data[1] = g->feedback_frame.data[1];
         dst->data[2] = g->feedback_frame.data[2];
@@ -5189,24 +5562,22 @@ static void vj_perform_tag_fill_buffer(veejay_t * info, performer_t *p, VJFrame 
         dst->data[2] = p->primary_buffer[0]->Cr;
         dst->data[3] = p->primary_buffer[0]->alpha;
     }
-    
+
+    if(settings && settings->current_playback_speed == 0)
+        return;
+
     if(!active)
     {
-        vj_tag_enable( sample_id );
+        vj_tag_enable(sample_id);
     }
     else
     {
-        if (vj_tag_get_frame(sample_id, dst,NULL))
-        {
+        if(vj_tag_get_frame(sample_id, dst, NULL))
             error = 0;
-        }
-    }         
-
-    if (error == 1)
-    {
-        dummy_apply(dst,VJ_EFFECT_COLOR_BLACK );
     }
 
+    if(error == 1)
+        dummy_apply(dst, VJ_EFFECT_COLOR_BLACK);
 }
 
 static void vj_perform_pre_chain(performer_t *p, VJFrame *frame)
@@ -5727,7 +6098,7 @@ static int vj_perform_runtime_slow_audio_chunk(veejay_t *info,
         pending_edge = AUDIO_EDGE_JUMP;
 
     if (cur_dir == 0 || pending_edge == AUDIO_EDGE_SILENCE ||
-        settings->audio_mute || !el->has_audio || target_frame == -1) {
+        !el->has_audio || target_frame == -1) {
         veejay_memset(dst, 0, (size_t)dst_samples * (size_t)frame_bytes);
         vj_audio_declick_apply(p, dst, dst_samples, frame_bytes,
                                AUDIO_PATH_SILENCE, 0, 0,
@@ -6192,8 +6563,11 @@ int vj_perform_queue_audio_chunk_crossfade(
 static int vj_perform_queue_audio_frame_buf(veejay_t *info, performer_t *p, uint8_t *a_buf, editlist *el,int speed, long long target_frame )
 {
     int num_samples = 0;
-    video_playback_setup *settings = info->settings;
-    if( settings->audio_mute || !el->has_audio || speed == 0 || target_frame == -1) {
+
+    if(!info || !p || !a_buf || !el)
+        return 0;
+
+    if(!el->has_audio || speed == 0 || target_frame == -1) {
         num_samples = (el->audio_rate / el->video_fps);
         int bps = el->audio_bps;
         veejay_memset( a_buf, 0, num_samples * bps);
@@ -6209,7 +6583,7 @@ static int vj_perform_queue_audio_frame_buf(veejay_t *info, performer_t *p, uint
     return num_samples;
 }
 
-int vj_perform_queue_audio_frame(veejay_t *info, void *ptr, uint8_t *a_buf, int speed, long long target_frame,int sample_id )
+static int vj_perform_queue_audio_frame_impl(veejay_t *info, void *ptr, uint8_t *a_buf, int speed, long long target_frame,int sample_id, int *audio_sample_ptr)
 {
     if( info->audio == NO_AUDIO )
         return 0;
@@ -6218,10 +6592,10 @@ int vj_perform_queue_audio_frame(veejay_t *info, void *ptr, uint8_t *a_buf, int 
     if(el == NULL)
         el = el_fallback; //safety
 
-    video_playback_setup *settings = info->settings;
     performer_t *p = (performer_t*) ptr;
+    int *sample_cursor = audio_sample_ptr ? audio_sample_ptr : &(p->play_audio_sample_);
 
-    if( settings->audio_mute || !el->has_audio || speed == 0 || target_frame == -1) {
+    if(!el->has_audio || speed == 0 || target_frame == -1) {
         int num_samples = (el->audio_rate / el->video_fps);
         int bps = el->audio_bps;
         veejay_memset( a_buf, 0, num_samples * bps);
@@ -6238,11 +6612,11 @@ int vj_perform_queue_audio_frame(veejay_t *info, void *ptr, uint8_t *a_buf, int 
         {
             case VJ_PLAYBACK_MODE_SAMPLE:
                 if( el->has_audio )
-                    num_samples = vj_perform_fill_audio_buffers(info,el, a_buf, p, &(p->play_audio_sample_), target_frame);
+                    num_samples = vj_perform_fill_audio_buffers(info,el, a_buf, p, sample_cursor, target_frame);
                 break;
             case VJ_PLAYBACK_MODE_PLAIN:
                 if( el->has_audio )
-                    num_samples = vj_perform_fill_audio_buffers(info,el, a_buf, p, &(p->play_audio_sample_), target_frame);
+                    num_samples = vj_perform_fill_audio_buffers(info,el, a_buf, p, sample_cursor, target_frame);
                 break;
             case VJ_PLAYBACK_MODE_TAG:
                 if(el->has_audio)
@@ -6262,6 +6636,22 @@ int vj_perform_queue_audio_frame(veejay_t *info, void *ptr, uint8_t *a_buf, int 
      }  
     return 0;
 }
+
+int vj_perform_queue_audio_frame(veejay_t *info, void *ptr, uint8_t *a_buf, int speed, long long target_frame,int sample_id )
+{
+    performer_t *p = (performer_t*) ptr;
+    if(!p)
+        return 0;
+
+    return vj_perform_queue_audio_frame_impl(info,
+                                             ptr,
+                                             a_buf,
+                                             speed,
+                                             target_frame,
+                                             sample_id,
+                                             &(p->play_audio_sample_));
+}
+
 
 
 // FX audio chain processing
@@ -7756,6 +8146,11 @@ void vj_perform_inc_frame(veejay_t *info, int num)
         looptype = 1;
         speed = settings->current_playback_speed;
         cur_dir = (speed < 0) ? -1 : speed > 0 ? 1 : 0;
+    }
+
+    if(speed == 0) {
+        settings->current_playback_speed = 0;
+        return;
     }
 
     long long cur_slice = atomic_load_int(&settings->audio_slice);

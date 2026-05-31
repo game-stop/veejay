@@ -193,6 +193,7 @@ void 	vj_event_select_bank			( 	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_enable_audio			( 	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_disable_audio			(	void *ptr,	const char format[],	va_list ap	);
 void    vj_event_toggle_audio_mute      (   void *ptr,  const char format[],    va_list ap  );
+void    vj_event_record_audio_source(void *ptr, const char format[], va_list ap);
 void	vj_event_print_info			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_keylist( void *ptr, const char format[], va_list ap );
 void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	);
@@ -352,6 +353,16 @@ void    vj_event_audio_beat_threshold(void *ptr, const char format[], va_list ap
 void    vj_event_audio_beat_channels(void *ptr, const char format[], va_list ap);
 void    vj_event_audio_beat_status(void *ptr, const char format[], va_list ap);
 void    vj_event_audio_beat_fx_entry(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_action(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_pulse(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_gate(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_auto_mode(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_auto_amount(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_auto_reset(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_state(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_beat_ui_config(void *ptr, const char format[], va_list ap);
+
+
 
 int     vj_event_push(void *ptr, int mod );
 int     vj_event_pop(void *ptr, int *mod_state);

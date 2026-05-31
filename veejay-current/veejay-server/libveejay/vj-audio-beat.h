@@ -48,7 +48,10 @@ typedef enum
     VJ_AUDIO_CTRL_HIGH = 10,
     VJ_AUDIO_CTRL_BAND_BALANCE = 11,
     VJ_AUDIO_CTRL_TRAIL_LENGTH = 12,
-    VJ_AUDIO_CTRL_DENSITY = 13
+    VJ_AUDIO_CTRL_DENSITY = 13,
+    VJ_AUDIO_CTRL_KICK = 14,
+    VJ_AUDIO_CTRL_SNARE = 15,
+    VJ_AUDIO_CTRL_HAT = 16
 } vj_audio_beat_signal_t;
 
 #define VJ_AUDIO_BEAT_AUTO_MAX_TARGETS 16
@@ -109,6 +112,12 @@ typedef struct
     float band_balance;
     float beat_trail_length;
     float beat_density;
+
+    float kick;
+    float snare;
+    float hat;
+    int hit_kind;
+
 } vj_audio_beat_snapshot_t;
 
 typedef int (*vj_audio_beat_get_fx_id_func)(void *ctx, int chain_pos);
@@ -122,6 +131,7 @@ void *vj_audio_beat_thread(void *arg);
 int vj_audio_beat_enable(vj_audio_beat_shared_t *s);
 int vj_audio_beat_disable(vj_audio_beat_shared_t *s);
 int vj_audio_beat_toggle(vj_audio_beat_shared_t *s);
+int vj_audio_beat_resume_if_due(veejay_t *v, vj_audio_beat_shared_t *s);
 int vj_audio_beat_consume(veejay_t *v, vj_audio_beat_shared_t *s);
 
 int vj_audio_beat_is_enabled(vj_audio_beat_shared_t *s);
@@ -152,12 +162,21 @@ int vj_audio_beat_auto_apply_chain(
     vj_audio_beat_set_fx_arg_func set_arg
 );
 
+int vj_audio_beat_copy_record_audio(
+    vj_audio_beat_shared_t *s,
+    uint8_t *dst,
+    int dst_frames,
+    int dst_frame_bytes,
+    int dst_channels,
+    int dst_sample_rate
+);
+
 float vj_audio_beat_get_level(vj_audio_beat_shared_t *s);
 float vj_audio_beat_get_transient(vj_audio_beat_shared_t *s);
 float vj_audio_beat_get_trail_length(vj_audio_beat_shared_t *s);
 float vj_audio_beat_get_density(vj_audio_beat_shared_t *s);
 long vj_audio_beat_get_hits(vj_audio_beat_shared_t *s);
-
+int vj_audio_beat_get_action(vj_audio_beat_shared_t *s);
 int vj_audio_beat_get_snapshot(vj_audio_beat_shared_t *s, vj_audio_beat_snapshot_t *dst);
 float vj_audio_beat_get_signal(vj_audio_beat_shared_t *s, int signal);
 int vj_audio_beat_map_signal(vj_audio_beat_shared_t *s, int signal, int min_value, int max_value, int invert);

@@ -145,6 +145,8 @@ extern void GoMultiCast(const char *groupname);
 extern int vj_event_single_fire(void *ptr, SDL_Event event, int pressed);
 #endif
 
+extern void vj_perform_record_audio_source_reset(veejay_t *info);
+
 static	veejay_t	*veejay_instance_ = NULL;
 
 static void veejay_playback_close(veejay_t *info);
@@ -622,7 +624,7 @@ int veejay_set_speed(veejay_t *info, int speed, int force_seek)
             break;
 
         case VJ_PLAYBACK_MODE_TAG:
-            settings->current_playback_speed = 1;
+            settings->current_playback_speed = (speed == 0) ? 0 : 1;
             max_sfd = 1;
             break;
 
@@ -780,6 +782,9 @@ int veejay_increase_frame(veejay_t *info, long num)
         min_frame_num = s_start;
         max_frame_num = s_end;
         speed = s_speed;
+
+		if(speed == 0)
+            return 1;
         next_frame = current_frame_num + (long long) num;
     }
 
@@ -1669,106 +1674,262 @@ static void veejay_screen_update(veejay_t *info, VJFrame *frame_to_display) {
     atomic_store_long_long(&settings->display_frame.seq, frame_to_display->frame_num);
 }
 
+#define VJ_AUDIO_BEAT_STATUS_TOKENS 18
 
+static inline int veejay_record_audio_source_status(video_playback_setup *settings)
+{
+#ifndef HAVE_JACK
+    return VJ_RECORD_AUDIO_SOURCE_ORIGINAL;
+#endif
 
+    int source = VJ_RECORD_AUDIO_SOURCE_AUTO;
+
+    if(settings)
+        source = atomic_load_int(&settings->record_audio_source);
+
+    source = source < VJ_RECORD_AUDIO_SOURCE_AUTO
+        ? VJ_RECORD_AUDIO_SOURCE_AUTO
+        : (source > VJ_RECORD_AUDIO_SOURCE_BEAT_JACK
+            ? VJ_RECORD_AUDIO_SOURCE_BEAT_JACK
+            : source);
+
+    return source;
+}
+
+static char *veejay_pipe_append_audio_beat_status(veejay_t *info, char *ptr)
+{
+    video_playback_setup *settings = info->settings;
+    const int audio_mute = settings->audio_mute;
+    const int record_audio_source = veejay_record_audio_source_status(settings);
+#ifdef HAVE_JACK
+    vj_audio_beat_snapshot_t snap;
+    int ok = 0;
+
+    if(info && info->settings)
+        ok = vj_audio_beat_get_snapshot(&info->settings->audio_beat, &snap);
+
+#define AB_PCT(v_) \
+    ((int)((((v_) < 0.0f) ? 0.0f : (((v_) > 1.0f) ? 1.0f : (v_))) * 100.0f) + 0.5f)
+
+#define AB_BPM10(v_) \
+    ((int)((((v_) < 0.0f) ? 0.0f : (((v_) > 9999.9f) ? 9999.9f : (v_))) * 10.0f) + 0.5f)
+
+#define AB_AGE(v_) \
+    ((int)(((v_) < 0 || (v_) > 999999L) ? 999999L : (v_)))
+
+#define AB_POS(v_) \
+    ((int)(((v_) < 0) ? 0 : (v_)))
+
+    ptr = vj_sprintf(ptr, ok ? (snap.enabled ? 1 : 0) : 0);         /* 39 */
+    ptr = vj_sprintf(ptr, ok ? (snap.open ? 1 : 0) : 0);            /* 40 */
+    ptr = vj_sprintf(ptr, ok ? AB_PCT(snap.level) : 0);             /* 41 */
+    ptr = vj_sprintf(ptr, ok ? AB_PCT(snap.transient) : 0);         /* 42 */
+    ptr = vj_sprintf(ptr, ok ? AB_POS((int)snap.hits) : 0);         /* 43 */
+    ptr = vj_sprintf(ptr, ok ? AB_PCT(snap.envelope) : 0);          /* 44 */
+    ptr = vj_sprintf(ptr, ok ? AB_PCT(snap.flux) : 0);              /* 45 */
+    ptr = vj_sprintf(ptr, ok ? AB_PCT(snap.bass) : 0);              /* 46 */
+    ptr = vj_sprintf(ptr, ok ? AB_PCT(snap.mid) : 0);               /* 47 */
+    ptr = vj_sprintf(ptr, ok ? AB_PCT(snap.high) : 0);              /* 48 */
+    ptr = vj_sprintf(ptr, ok ? AB_PCT(snap.beat_pulse) : 0);        /* 49 */
+    ptr = vj_sprintf(ptr, ok ? AB_PCT(snap.beat_gate) : 0);         /* 50 */
+    ptr = vj_sprintf(ptr, ok ? AB_BPM10(snap.bpm) : 0);             /* 51 */
+    ptr = vj_sprintf(ptr, ok ? AB_AGE(snap.beat_age_ms) : 999999);  /* 52 */
+    ptr = vj_sprintf(ptr, ok ? AB_POS(snap.sample_rate) : 0);       /* 53 */
+    ptr = vj_sprintf(ptr, ok ? AB_POS(snap.hit_seq) : 0);           /* 54 */
+    ptr = vj_sprintf(ptr, audio_mute);                              /* 55 */
+    ptr = vj_sprintf(ptr, record_audio_source);
+#undef AB_POS
+#undef AB_AGE
+#undef AB_BPM10
+#undef AB_PCT
+
+#else
+    ptr = vj_sprintf(ptr, 0);       /* 39 enabled */
+    ptr = vj_sprintf(ptr, 0);       /* 40 open */
+    ptr = vj_sprintf(ptr, 0);       /* 41 level */
+    ptr = vj_sprintf(ptr, 0);       /* 42 transient */
+    ptr = vj_sprintf(ptr, 0);       /* 43 hits */
+    ptr = vj_sprintf(ptr, 0);       /* 44 envelope */
+    ptr = vj_sprintf(ptr, 0);       /* 45 flux */
+    ptr = vj_sprintf(ptr, 0);       /* 46 bass */
+    ptr = vj_sprintf(ptr, 0);       /* 47 mid */
+    ptr = vj_sprintf(ptr, 0);       /* 48 high */
+    ptr = vj_sprintf(ptr, 0);       /* 49 pulse */
+    ptr = vj_sprintf(ptr, 0);       /* 50 gate */
+    ptr = vj_sprintf(ptr, 0);       /* 51 bpm_x10 */
+    ptr = vj_sprintf(ptr, 999999);  /* 52 age_ms */
+    ptr = vj_sprintf(ptr, 0);       /* 53 sample_rate */
+    ptr = vj_sprintf(ptr, 0);       /* 54 hit_seq */
+    ptr = vj_sprintf(ptr, 1);       /* 55 muted */
+    ptr = vj_sprintf(ptr, record_audio_source);
+#endif
+
+    return ptr;
+}
 static void veejay_pipe_write_status(veejay_t * info)
 {
     video_playback_setup *settings = (video_playback_setup *) info->settings;
     int d_len = 0;
     int pm = info->uc->playback_mode;
 
-	int cache_used = 0;
-	int mstatus = 0;
-	int curfps  = (int) ( 100.0f / settings->spvf );
-	int sample_count = sample_size();
-	int tag_count = vj_tag_size();
-	int total_slots = sample_count + tag_count;
-	int seq_cur = (info->seq->active ? info->seq->current : MAX_SEQUENCES );
+    int cache_used = 0;
+    int mstatus = 0;
+    int curfps  = (int) (100.0f / settings->spvf);
+    int sample_count = sample_size();
+    int tag_count = vj_tag_size();
+    int total_slots = sample_count + tag_count;
+    int seq_cur = (info->seq->active ? info->seq->current : MAX_SEQUENCES);
 
-	veejay_memset( info->status_what, 0, sizeof(info->status_what));
-  
-	switch (info->uc->playback_mode) {
-    	case VJ_PLAYBACK_MODE_SAMPLE:
-			cache_used = sample_cache_used(0);
+    veejay_memset(info->status_what, 0, VJ_STATUS_BUF_SIZE);
 
-		mstatus = vj_macro_get_status( sample_get_macro( info->uc->sample_id ));
+    switch (info->uc->playback_mode)
+    {
+        case VJ_PLAYBACK_MODE_SAMPLE:
+            cache_used = sample_cache_used(0);
 
-		if( info->settings->randplayer.mode == RANDMODE_SAMPLE)
-			pm = VJ_PLAYBACK_MODE_PATTERN;
+            mstatus = vj_macro_get_status(sample_get_macro(info->uc->sample_id));
 
-		if( sample_chain_sprint_status(
-			info->uc->sample_id,tag_count,sample_count,cache_used,info->seq->active,seq_cur,info->real_fps,
-			settings->current_frame_num, pm, total_slots,info->seq->rec_id,curfps,
-			settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what, settings->feedback,
-			info->global_chain->enabled,info->uc->vims_mirror ) != 0)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Fatal error, tried to collect properties of invalid sample");
-			veejay_change_state( info, LAVPLAY_STATE_STOP );
-		}
-		break;
-       case VJ_PLAYBACK_MODE_PLAIN:
+            if (info->settings->randplayer.mode == RANDMODE_SAMPLE)
+                pm = VJ_PLAYBACK_MODE_PATTERN;
+
+            if (sample_chain_sprint_status(
+                    info->uc->sample_id,
+                    tag_count,
+                    sample_count,
+                    cache_used,
+                    info->seq->active,
+                    seq_cur,
+                    info->real_fps,
+                    settings->current_frame_num,
+                    pm,
+                    total_slots,
+                    info->seq->rec_id,
+                    curfps,
+                    settings->cycle_count[0],
+                    settings->cycle_count[1],
+                    mstatus,
+                    info->status_what,
+                    settings->feedback,
+                    info->global_chain->enabled,
+                    info->uc->vims_mirror) != 0)
+            {
+                veejay_msg(VEEJAY_MSG_ERROR,
+                           "Fatal error, tried to collect properties of invalid sample");
+                veejay_change_state(info, LAVPLAY_STATE_STOP);
+            }
+            break;
+
+        case VJ_PLAYBACK_MODE_PLAIN:
             {
                 char *ptr = info->status_what;
-                
-                ptr = vj_sprintf( ptr, info->real_fps ); // 0
-                ptr = vj_sprintf( ptr, settings->current_frame_num );
-                ptr = vj_sprintf( ptr, info->uc->playback_mode );
-                
+
+                ptr = vj_sprintf(ptr, info->real_fps);                 // 0
+                ptr = vj_sprintf(ptr, settings->current_frame_num);    // 1
+                ptr = vj_sprintf(ptr, info->uc->playback_mode);        // 2
+
                 *ptr++ = '0';
-				*ptr++ = ' ';
-				*ptr++ = '0';
-				*ptr++ = ' '; // 4
-                
-                ptr = vj_sprintf( ptr, settings->min_frame_num );
-                ptr = vj_sprintf( ptr, settings->max_frame_num );
-                ptr = vj_sprintf( ptr, settings->current_playback_speed ); // 7
-                
-                for(int i=0; i<4; i++) { *ptr++ = '0'; *ptr++ = ' '; }
+                *ptr++ = ' ';
+                *ptr++ = '0';
+                *ptr++ = ' ';                                          // 4
 
-                ptr = vj_sprintf( ptr, sample_count ); // 12
-                
-                for(int i=0; i<3; i++) { *ptr++ = '0'; *ptr++ = ' '; }
+                ptr = vj_sprintf(ptr, settings->min_frame_num);        // 5
+                ptr = vj_sprintf(ptr, settings->max_frame_num);        // 6
+                ptr = vj_sprintf(ptr, settings->current_playback_speed); // 7
 
-                ptr = vj_sprintf( ptr, total_slots ); // 16
-                ptr = vj_sprintf( ptr, cache_used );
-                ptr = vj_sprintf( ptr, curfps );
-                ptr = vj_sprintf( ptr, settings->cycle_count[0] );
-                ptr = vj_sprintf( ptr, settings->cycle_count[1] ); //20
+                for (int i = 0; i < 4; i++) {
+                    *ptr++ = '0';
+                    *ptr++ = ' ';
+                }                                                       // 8..11
 
-                for(int i=0; i<3; i++) { *ptr++ = '0'; *ptr++ = ' '; }
+                ptr = vj_sprintf(ptr, sample_count);                   // 12
 
-                ptr = vj_sprintf( ptr, info->sfd); //24
-                ptr = vj_sprintf( ptr, mstatus );
+                for (int i = 0; i < 3; i++) {
+                    *ptr++ = '0';
+                    *ptr++ = ' ';
+                }                                                       // 13..15
 
-                for(int i=0; i<9; i++) { *ptr++ = '0'; *ptr++ = ' '; }
+                ptr = vj_sprintf(ptr, total_slots);                    // 16
+                ptr = vj_sprintf(ptr, cache_used);                     // 17
+                ptr = vj_sprintf(ptr, curfps);                         // 18
+                ptr = vj_sprintf(ptr, settings->cycle_count[0]);       // 19
+                ptr = vj_sprintf(ptr, settings->cycle_count[1]);       // 20
 
-                ptr = vj_sprintf( ptr, settings->feedback); // 35
-                ptr = vj_sprintf( ptr, tag_count); // 36
-				ptr = vj_sprintf( ptr, info->global_chain->enabled); // 37
-				ptr = vj_sprintf( ptr, info->uc->vims_mirror);
-                
+                for (int i = 0; i < 3; i++) {
+                    *ptr++ = '0';
+                    *ptr++ = ' ';
+                }                                                       // 21..23
+
+                ptr = vj_sprintf(ptr, info->sfd);                      // 24
+                ptr = vj_sprintf(ptr, mstatus);                        // 25
+
+                for (int i = 0; i < 9; i++) {
+                    *ptr++ = '0';
+                    *ptr++ = ' ';
+                }                                                       // 26..34
+
+                ptr = vj_sprintf(ptr, settings->feedback);             // 35
+                ptr = vj_sprintf(ptr, tag_count);                      // 36
+                ptr = vj_sprintf(ptr, info->global_chain->enabled);    // 37
+                ptr = vj_sprintf(ptr, info->uc->vims_mirror);          // 38
+                *ptr = '\0';
             }
-        break;
-    	case VJ_PLAYBACK_MODE_TAG:
+            break;
 
-		mstatus = vj_macro_get_status( vj_tag_get_macro( info->uc->sample_id ));
+        case VJ_PLAYBACK_MODE_TAG:
+            mstatus = vj_macro_get_status(vj_tag_get_macro(info->uc->sample_id));
 
-		if( vj_tag_sprint_status( info->uc->sample_id,tag_count,sample_count,cache_used,info->seq->active,seq_cur,info->real_fps,
-			settings->current_frame_num, info->uc->playback_mode,total_slots,info->seq->rec_id,curfps,
-			settings->cycle_count[0],settings->cycle_count[1],mstatus, info->status_what,
-			settings->feedback,info->global_chain->enabled, info->uc->vims_mirror ) != 0 )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status");
-		}
-		break;
+            if (vj_tag_sprint_status(
+                    info->uc->sample_id,
+                    tag_count,
+                    sample_count,
+                    cache_used,
+                    info->seq->active,
+                    seq_cur,
+                    info->real_fps,
+                    settings->current_frame_num,
+                    info->uc->playback_mode,
+                    total_slots,
+                    info->seq->rec_id,
+                    curfps,
+                    settings->cycle_count[0],
+                    settings->cycle_count[1],
+                    mstatus,
+                    info->status_what,
+                    settings->feedback,
+                    info->global_chain->enabled,
+                    info->uc->vims_mirror) != 0)
+            {
+                veejay_msg(VEEJAY_MSG_ERROR, "Invalid status");
+            }
+            break;
     }
-   
-	d_len = strlen(info->status_what);
-	info->status_line_len = d_len + 5;
-	snprintf( info->status_line, MESSAGE_SIZE, "V%03dS%s", d_len, info->status_what );
+
+    size_t base_len = strnlen(info->status_what, VJ_STATUS_BUF_SIZE);
+    if (base_len >= VJ_STATUS_BUF_SIZE)
+        base_len = VJ_STATUS_BUF_SIZE - 1;
+
+    char *ptr = info->status_what + base_len;
+
+    if (base_len <= (VJ_STATUS_BUF_SIZE - 1 - (VJ_AUDIO_BEAT_STATUS_TOKENS * VJ_INT_FIELD_MAX))) {
+        ptr = veejay_pipe_append_audio_beat_status(info, ptr);
+    }
+
+    *ptr = '\0';
+
+    d_len = (int)(ptr - info->status_what);
+    if (d_len > 999) {
+        d_len = 999;
+        info->status_what[d_len] = '\0';
+    }
+
+    info->status_line_len = d_len + 5;
+
+    snprintf(info->status_line, VJ_STATUS_BUF_SIZE, "V%03dS%s", d_len, info->status_what);
+
     if (info->uc->chain_changed == 1)
-		info->uc->chain_changed = 0;
+        info->uc->chain_changed = 0;
 }
+
 
 static inline char *veejay_concat_paths(const char *path, const char *suffix)
 {
@@ -2480,6 +2641,7 @@ int veejay_open(veejay_t * info)
     settings->renderer_index = 0;
     settings->frames_available = 0;
 	settings->warmup_frames = 2;
+    atomic_store_int(&settings->record_audio_source, VJ_RECORD_AUDIO_SOURCE_AUTO);
 
 #ifdef HAVE_JACK
     /*
@@ -3630,7 +3792,7 @@ int veejay_audio_beat_set_enabled(veejay_t *info, int enabled)
     if(!atomic_load_int(&settings->audio_beat.initialized))
         vj_audio_beat_init(&settings->audio_beat, 2);
 
-    veejay_audio_beat_ensure_default_action(&settings->audio_beat, "set-enabled");
+   // veejay_audio_beat_ensure_default_action(&settings->audio_beat, "set-enabled");
 
     if(enabled && !vj_audio_beat_auto_build_table()) {
         veejay_msg(VEEJAY_MSG_WARNING,
@@ -3685,7 +3847,7 @@ int veejay_audio_beat_toggle(veejay_t *info)
     if(!atomic_load_int(&settings->audio_beat.initialized))
         vj_audio_beat_init(&settings->audio_beat, 2);
 
-    veejay_audio_beat_ensure_default_action(&settings->audio_beat, "toggle");
+    //veejay_audio_beat_ensure_default_action(&settings->audio_beat, "toggle");
 
     if(!atomic_load_int(&settings->audio_beat.running))
     {
@@ -3746,7 +3908,7 @@ int veejay_audio_beat_push_config(veejay_t *info, int freeze_ms, int cooldown_ms
     if(!atomic_load_int(&settings->audio_beat.initialized))
         vj_audio_beat_init(&settings->audio_beat, input_channels > 0 ? input_channels : 2);
 
-    veejay_audio_beat_ensure_default_action(&settings->audio_beat, "push-config");
+    //veejay_audio_beat_ensure_default_action(&settings->audio_beat, "push-config");
 
     if(freeze_ms >= 0)
         vj_audio_beat_set_freeze_ms(&settings->audio_beat, freeze_ms);
@@ -3873,12 +4035,23 @@ static void *veejay_producer_thread_loop(void *ptr)
 	while (atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
 
 		veejay_consume_events(info);
+
 #ifdef HAVE_JACK
-        if(info->audio != NO_AUDIO)
         {
-            vj_audio_beat_consume(info, &settings->audio_beat);
+            int beat_action = vj_audio_beat_get_action(&settings->audio_beat);
+
+            if(beat_action == VJ_AUDIO_BEAT_ACTION_FREEZE ||
+               beat_action == VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX)
+            {
+                vj_audio_beat_consume(info, &settings->audio_beat);
+            }
+            else
+            {
+                vj_audio_beat_resume_if_due(info, &settings->audio_beat);
+            }
         }
 #endif
+
 		sample_watch_list();
 		if (atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP)
         	break;
@@ -4134,7 +4307,7 @@ veejay_t *veejay_malloc()
 	veejay_memset( &(info->settings->action_scheduler), 0, sizeof(vj_schedule_t));
     veejay_memset( &(info->settings->viewport ), 0, sizeof(VJRectangle)); 
 
-    info->status_what = (char*) vj_calloc(sizeof(char) * MESSAGE_SIZE );
+    info->status_what = (char*) vj_calloc(sizeof(char) * VJ_STATUS_BUF_SIZE );
 
 	info->uc = (user_control *) vj_calloc(sizeof(user_control));
 	info->uc->drawsize = 4;
@@ -4196,7 +4369,7 @@ veejay_t *veejay_malloc()
     info->uc->sample_end = 0;
 	info->uc->ram_chain = 1; /* enable, keep FX chain buffers in memory (reduces the number of malloc/free of frame buffers) */
 	info->net = 1;
-	info->status_line = (char*) vj_calloc(sizeof(char) * MESSAGE_SIZE );
+	info->status_line = (char*) vj_calloc(sizeof(char) * VJ_STATUS_BUF_SIZE );
 	info->status_line_len = 0;
     for( int i =0; i < VJ_MAX_CONNECTIONS ; i ++ ) {
 		info->rlinks[i] = -1;
@@ -4839,12 +5012,84 @@ int veejay_toggle_audio(veejay_t * info, int audio)
 	return 0;
     }
 
-    settings->audio_mute = !settings->audio_mute;
+    atomic_store_int(&settings->audio_mute, !atomic_load_int(&settings->audio_mute));
 
     veejay_msg(VEEJAY_MSG_DEBUG, 
 		"Audio playback was %s", audio == 0 ? "muted" : "unmuted");
  
     return 1;
+}
+
+#ifdef HAVE_JACK
+static void veejay_record_audio_source_ensure_beat_jack(veejay_t *info)
+{
+    video_playback_setup *settings;
+
+    if(!info || !info->settings)
+        return;
+
+    settings = info->settings;
+
+    if(!atomic_load_int(&settings->audio_beat.initialized))
+        vj_audio_beat_init(&settings->audio_beat, 2);
+
+    if(!atomic_load_int(&settings->audio_beat.running))
+    {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-REC] Beat Jack source selected, but beat detector thread is not running");
+        return;
+    }
+
+    if(!atomic_load_int(&settings->audio_beat.enabled))
+    {
+        if(vj_audio_beat_enable(&settings->audio_beat) <= 0)
+        {
+            veejay_msg(VEEJAY_MSG_WARNING,
+                       "[AUDIO-REC] Unable to auto-enable Beat Jack capture source");
+            return;
+        }
+        
+        vj_audio_beat_set_action(&settings->audio_beat, VJ_AUDIO_BEAT_ACTION_NONE);
+
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[AUDIO-REC] Auto-enabled Beat Jack capture source with beat action none");
+    }
+}
+#endif
+
+int veejay_set_record_audio_source(veejay_t *info, int source)
+{
+    if(!info || !info->settings)
+        return -1;
+
+    if(source < VJ_RECORD_AUDIO_SOURCE_AUTO)
+        source = VJ_RECORD_AUDIO_SOURCE_AUTO;
+    else if(source > VJ_RECORD_AUDIO_SOURCE_BEAT_JACK)
+        source = VJ_RECORD_AUDIO_SOURCE_BEAT_JACK;
+
+    video_playback_setup *settings = info->settings;
+    int old = atomic_load_int(&settings->record_audio_source);
+
+    if(old == source)
+        return source;
+
+    atomic_store_int(&settings->record_audio_source, source);
+
+    vj_perform_record_audio_source_reset(info);
+
+#ifdef HAVE_JACK
+    if(source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK)
+        veejay_record_audio_source_ensure_beat_jack(info);
+#endif
+
+    vj_perform_record_audio_source_reset(info);
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-REC] recording audio source changed %d -> %d; requested edge reset",
+               old,
+               source);
+
+    return source;
 }
 
 int veejay_save_all(veejay_t * info, char *filename, long n1, long n2)
