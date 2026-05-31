@@ -249,7 +249,7 @@ void tripplicity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cr2 = frame2->data[2];
 
 
-#pragma omp parallel num_threads(n_threads)
+#pragma omp parallel num_threads(t->n_threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
