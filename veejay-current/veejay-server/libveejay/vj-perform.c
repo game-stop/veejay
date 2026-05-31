@@ -925,28 +925,7 @@ static void vj_perform_ab_ctx_debug_dump(
     }
 #endif
 
-    veejay_msg(VEEJAY_MSG_INFO,
-               "[AUDIO-BEAT-PERFORM] %s sample=%d mode=%d renderer=%d local=%d global=%d chains=%d active_fx=%d changed=%d action=%d enabled=%d open=%d running=%d paused=%d hit_seq=%d consumed=%d play_speed=%d sample_speed=%d :: %s",
-               tag,
-               sample_id,
-               playmode,
-               renderer_id,
-               local_enabled,
-               global_enabled,
-               ctx ? ctx->chain_count : -1,
-               active_fx,
-               changed,
-               action,
-               enabled,
-               open,
-               running,
-               paused,
-               hit_seq,
-               consumed_seq,
-               play_speed,
-               sample_speed,
-               summary);
-}
+
 static int vj_perform_audio_beat_playmode_has_fx_chain(int playmode)
 {
     return playmode == VJ_PLAYBACK_MODE_SAMPLE ||
