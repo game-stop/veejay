@@ -114,3 +114,72 @@ Or in veejay's console
 
 
  Enjoy!
+
+
+```
+ooooooooooooo ooooo        oooooooooo.   ooooooooo.       
+8'   888   `8 `888'        `888'   `Y8b  `888   `Y88.     
+     888       888          888      888  888   .d88'     
+     888       888          888      888  888ooo88P'      
+     888       888          888      888  888`88b.    o8o 
+     888       888       o  888     d88'  888  `88b.  `"' 
+    o888o     o888ooooood8 o888bood8P'   o888o  o888o o8o 
+                                                      `]P 
+                                                       '  
+
+```
+
+
+TLDR;
+*I have a working directory with [compatible](./README.video-codec.md) video samples in it, I want to play with them, now !*
+
+First, open a terminal and navigate to the folder where your samples are located.
+
+
+`$ cd /mount_point/my_samples_directory`
+
+Before we start veejay, there are two possibilities :
+
+a.
+
+It’s the recommended way to go, use video samples with equal frame size.
+
+In case of .avi files, running
+`$ file *.avi` 
+should return lines like this.
+
+`RIFF (little-endian) data, AVI, 720 x 480, 25.00 fps, video: Motion JPEG`
+
+b.
+
+IDK, samples maybe oddly sized. Let’s go further, I want to try.
+Be aware your samples may not be displayed as expected.
+
+Now launch veejay following your case.
+
+a.
+
+`$ veejay -w 720 -h 480`
+
+b.
+
+`$ veejay -D`
+
+In both cases, a black window will open. It means veejay server is running.
+
+Now open another terminal, optionally in your working directory and type the following :
+
+`$ reloaded -a`
+
+You may add -S option if you’re running veejay on a laptop.
+
+`$ reloaded -Sa`
+
+You've just opened the user interface, aka the client.
+
+On the right side, click the ‘media’ tab. Then click the box icon right under the 'samplebank' label.
+
+All you need now is to double click the samples that have just appeared in order to load them into the samplebank. [Up] and [Down] keys + [ENTER] on wanted samples works as well.
+
+Once you're done, go back to the samplebank tab, see your samples loaded. Double click any of them and start looping around.
+Lots of tooltips will guide you in reloaded and there is much more to read in the docs.
