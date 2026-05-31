@@ -4511,40 +4511,73 @@ void vj_event_sample_grow_marker(void *ptr, const char format[], va_list ap)
 {
     int args[2];
     veejay_t *v = (veejay_t*)ptr;
-    
-    P_A(args,sizeof(args),NULL,0,format,ap);
-    
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
     SAMPLE_DEFAULTS(args[0]);
 
     sample_info *s = sample_get(args[0]);
-    if( s == NULL ) {
-        p_no_sample( args[0] );
+    if (s == NULL) {
+        p_no_sample(args[0]);
         return;
     }
 
-    int start = s->first_frame;
-    int end = s->last_frame;
-        
+    const int first = s->first_frame;
+    const int last  = s->last_frame;
+    const int available = last - first + 1;
+
+    if (available <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid sample bounds %d - %d", first, last);
+        return;
+    }
+
     int pos1 = s->marker_start;
     int pos2 = s->marker_end;
 
-    if( pos1 == 0 && pos2 == 0 ) {
-        pos1 = start;
-        pos2 = end;
+    if (pos1 == 0 && pos2 == 0) {
+        pos1 = first;
+        pos2 = last;
     }
 
-    int npos1 = (pos1 + pos2) / 2 - ( pos2 - pos1 );
-    int npos2 = (pos1 + pos2) / 2 + ( pos2 - pos1 );
-
-    if( npos1 == npos2 ) {
-        npos1--;
-        npos2++;
+    if (pos2 < pos1) {
+        int tmp = pos1;
+        pos1 = pos2;
+        pos2 = tmp;
     }
 
-    if( npos1 < start ) npos1 = start; else if (npos1 > end) npos1 = end;
-    if( npos2 < start ) npos2 = start; else if (npos2 > end) npos2 = end;
+    if (pos1 < first) pos1 = first;
+    if (pos1 > last)  pos1 = last;
+    if (pos2 < first) pos2 = first;
+    if (pos2 > last)  pos2 = last;
 
-    veejay_msg(VEEJAY_MSG_INFO, "Grow marker selection to %d - %d" , npos1, npos2 );
+    int span = pos2 - pos1 + 1;
+    if (span < 1)
+        span = 1;
+
+    int new_span = (span > available / 2) ? available : span * 2;
+
+    const int center2 = pos1 + pos2;
+
+    int npos1 = (center2 - new_span + 1) / 2;
+    int npos2 = npos1 + new_span - 1;
+
+    if (npos1 < first) {
+        npos1 = first;
+        npos2 = npos1 + new_span - 1;
+    }
+
+    if (npos2 > last) {
+        npos2 = last;
+        npos1 = npos2 - new_span + 1;
+    }
+
+    if (npos1 < first) npos1 = first;
+    if (npos2 > last)  npos2 = last;
+
+    veejay_msg(VEEJAY_MSG_INFO,
+        "Grow marker selection to %d - %d",
+        npos1,
+        npos2);
 
     s->marker_start = npos1;
     s->marker_end = npos2;
