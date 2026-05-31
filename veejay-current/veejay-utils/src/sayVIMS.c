@@ -38,9 +38,11 @@
 #endif
 
 #define SHM_ID_LEN 16
-#define STATUS_BUF_SIZE 512
 #define STA_LEN_SIZE 6
 #define HEADER_READ_SIZE 5
+#define STATUS_HEADER_SIZE HEADER_READ_SIZE
+#define STATUS_MAX_BODY 999
+#define STATUS_TOKEN_COUNT 43
 #define MAX_FRAME_READ_RETRIES 5
 
 static int interactive = 0;
@@ -261,41 +263,52 @@ static int vimsMustReadReply(char *msg, int *vims_event_id) {
     return mustRead;
 }
 
-static int vj_flush(int frames) { 
-    char status[STATUS_BUF_SIZE];
+static int vj_flush(int frames)
+{
+    char status[VJ_STATUS_BUF_SIZE];
 
     while (frames > 0) {
+        char sta_len[STA_LEN_SIZE] = {0};
+        int bytes = 0;
+
         if (!vj_client_poll(sayvims, V_STATUS))
             continue;
 
-        char sta_len[STA_LEN_SIZE] = {0};
-
-        if (read_full(sayvims, V_STATUS, (unsigned char*)sta_len, HEADER_READ_SIZE) <= 0) {
-            fprintf(stderr, "Connection closed or error reading header\n");
+        if (read_full(sayvims, V_STATUS, (unsigned char*)sta_len, STATUS_HEADER_SIZE) <= 0) {
+            fprintf(stderr, "Connection closed or error reading status header\n");
             return 0;
         }
 
-        if (sta_len[0] != 'V') {
-            fprintf(stderr, "Invalid status header: '%c'\n", sta_len[0]);
+        sta_len[STATUS_HEADER_SIZE] = '\0';
+
+        if (sta_len[0] != 'V' || sta_len[4] != 'D') {
+            fprintf(stderr, "Invalid status header: '%s'\n", sta_len);
             continue;
         }
 
-        int bytes = 0;
-        if (sscanf(sta_len + 1, "%03d", &bytes) != 1 || bytes <= 0) {
-            fprintf(stderr, "Invalid status length: '%s'\n", sta_len + 1);
-            continue;
+        if (sscanf(sta_len + 1, "%03d", &bytes) != 1 || bytes <= 0 || bytes > STATUS_MAX_BODY) {
+            fprintf(stderr, "Invalid status length/header: '%s'\n", sta_len);
+            return 0;
         }
 
-        if (bytes > STATUS_BUF_SIZE) {
-            fprintf(stderr, "Status too large (%d > %d), skipping\n", bytes, STATUS_BUF_SIZE);
-            unsigned char discard[STATUS_BUF_SIZE];
+        if (bytes >= VJ_STATUS_BUF_SIZE) {
+            fprintf(stderr, "Status too large (%d >= %d), discarding\n", bytes, VJ_STATUS_BUF_SIZE);
+
             int to_read = bytes;
+            unsigned char discard[VJ_STATUS_BUF_SIZE];
+
             while (to_read > 0) {
-                int chunk = to_read > STATUS_BUF_SIZE ? STATUS_BUF_SIZE : to_read;
-                if (read_full(sayvims, V_STATUS, discard, chunk) <= 0)
-                    break;
+                int chunk = (to_read > VJ_STATUS_BUF_SIZE) ? VJ_STATUS_BUF_SIZE : to_read;
+
+                if (read_full(sayvims, V_STATUS, discard, chunk) <= 0) {
+                    fprintf(stderr, "Error discarding oversized status packet\n");
+                    return 0;
+                }
+
                 to_read -= chunk;
             }
+
+            frames--;
             continue;
         }
 
@@ -304,10 +317,10 @@ static int vj_flush(int frames) {
             return 0;
         }
 
-        if (dump) {
-            status[bytes] = '\0';
+        status[bytes] = '\0';
+
+        if (dump)
             fprintf(stdout, "%s\n", status);
-        }
 
         frames--;
     }
