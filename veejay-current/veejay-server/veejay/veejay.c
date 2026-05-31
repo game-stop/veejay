@@ -285,6 +285,8 @@ static void Usage(char *progname)
 	fprintf(stderr,
 	    	"  -a/--audio [01]\t\tEnable (1) or disable (0) audio (default 1)\n");
     fprintf(stderr,
+            "     --audio-muted\t\tStart audio engine active, but mute playback output\n");
+    fprintf(stderr,
 			"     --pace-correction [ms]\tAudio pace correction offset in milliseconds\n");
 	fprintf(stderr,
 	    	"  -c/--synchronization [01]\tSync correction off/on (default on)\n");
@@ -394,6 +396,8 @@ static int set_option(const char *name, char *value)
 	 veejay_set_colors(0);
     } else if (strcmp(name, "audio") == 0 || strcmp(name, "a") == 0) {
 	info->audio = atoi(optarg);
+    } else if (strcmp(name, "audio-muted") == 0) {
+	atomic_store_int(&info->settings->audio_mute, 1);
 	} else if (strcmp(name, "pace-correction") == 0 ) {
 	info->settings->pace_correction = atoi( optarg);
 		if( info->settings->pace_correction < 0 ) {
@@ -665,6 +669,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"synchronization", 1, 0, 0},	/* -c/--synchronization */
 	{"preserve-pathnames", 0, 0, 0},	/* -P/--preserve-pathnames    */
 	{"audio", 1, 0, 0},	/* -a/--audio num       */
+	{"audio-muted", 0, 0, 0},
 	{"size", 1, 0, 0},	/* -S/--size            */
 	{"benchmark", 1, 0, 0}, /* --benchmark	 */
 /*#ifdef HAVE_XINERAMA
