@@ -111,6 +111,18 @@ extern int veejay_set_speed(veejay_t *v, int speed, int force_seek);
 #define VEEJAY_AUDIO_BEAT_MAX_PERIOD_MS 2400L  /* 25 BPM */
 #endif
 
+#ifndef VEEJAY_AUDIO_BEAT_TARGET_ANALYSIS_MS
+#define VEEJAY_AUDIO_BEAT_TARGET_ANALYSIS_MS 8L
+#endif
+
+#ifndef VEEJAY_AUDIO_BEAT_MIN_READ_FRAMES
+#define VEEJAY_AUDIO_BEAT_MIN_READ_FRAMES 96
+#endif
+
+#ifndef VEEJAY_AUDIO_BEAT_BACKLOG_YIELD_US
+#define VEEJAY_AUDIO_BEAT_BACKLOG_YIELD_US 1000L
+#endif
+
 enum
 {
     AB_HIT_NONE = 0,
@@ -414,6 +426,24 @@ static void ab_sleep_us(long usec)
     ts.tv_nsec = (usec % 1000000L) * 1000L;
 
     while(nanosleep(&ts, &ts) == -1) { }
+}
+
+static inline long ab_target_analysis_bytes(const vj_audio_beat_thread_t *t)
+{
+    long frames;
+
+    if(!t || t->bytes_per_frame <= 0)
+        return 0;
+
+    frames = ((long)t->sample_rate * VEEJAY_AUDIO_BEAT_TARGET_ANALYSIS_MS) / 1000L;
+
+    if(frames < VEEJAY_AUDIO_BEAT_MIN_READ_FRAMES)
+        frames = VEEJAY_AUDIO_BEAT_MIN_READ_FRAMES;
+
+    if(frames > VEEJAY_AUDIO_BEAT_MAX_ANALYSIS_FRAMES)
+        frames = VEEJAY_AUDIO_BEAT_MAX_ANALYSIS_FRAMES;
+
+    return frames * (long)t->bytes_per_frame;
 }
 
 static inline double ab_absd(double v)
@@ -1119,7 +1149,34 @@ int vj_audio_beat_copy_record_audio(vj_audio_beat_shared_t *s,
     }
 
     read_pos = s->record_write_pos - s->record_bytes_available;
+    if(src_rate == dst_sample_rate &&
+       src_channels == dst_channels &&
+       src_frame_bytes == dst_frame_bytes)
+    {
+        int copy_bytes = out_frames * src_frame_bytes;
+        int first = s->record_ring_size - read_pos;
 
+        if(first > copy_bytes)
+            first = copy_bytes;
+
+        veejay_memcpy(dst, s->record_ring + read_pos, first);
+
+        if(copy_bytes > first)
+            veejay_memcpy(dst + first, s->record_ring, copy_bytes - first);
+
+        consume_bytes = copy_bytes;
+
+        if(consume_bytes > s->record_bytes_available)
+            consume_bytes = s->record_bytes_available;
+
+        s->record_bytes_available -= consume_bytes;
+
+        if(s->record_bytes_available < 0)
+            s->record_bytes_available = 0;
+
+        ab_record_unlock(s);
+        return out_frames;
+    }
     while(read_pos < 0)
         read_pos += s->record_ring_size;
 
@@ -2160,6 +2217,8 @@ void *vj_audio_beat_thread(void *arg)
     {
         int reset_seq;
         long stored;
+        long target_bytes;
+        long min_read_bytes;
         int got;
         int hit;
         long now;
@@ -2192,8 +2251,8 @@ void *vj_audio_beat_thread(void *arg)
 
             ab_thread_reset(&t);
             ab_record_ring_clear(s);
-            //ab_clear_published_control(s);
-            //vj_jack_reset_input();
+            ab_clear_published_control(s);
+            vj_jack_reset_input();
 
             t.last_reset_seq = reset_seq;
             first_capture_logged = 0;
@@ -2229,15 +2288,27 @@ void *vj_audio_beat_thread(void *arg)
             continue;
         }
 
+        target_bytes = ab_target_analysis_bytes(&t);
+
+        if(target_bytes <= 0)
         {
-            long max_read = (long)VEEJAY_AUDIO_BEAT_MAX_ANALYSIS_FRAMES * (long)t.bytes_per_frame;
-
-            if(max_read < (long)t.bytes_per_frame)
-                max_read = (long)t.bytes_per_frame;
-
-            if(stored > max_read)
-                stored = max_read;
+            ab_sleep_us(2000);
+            continue;
         }
+
+        min_read_bytes = target_bytes / 4;
+
+        if(min_read_bytes < (long)VEEJAY_AUDIO_BEAT_MIN_READ_FRAMES * (long)t.bytes_per_frame)
+            min_read_bytes = (long)VEEJAY_AUDIO_BEAT_MIN_READ_FRAMES * (long)t.bytes_per_frame;
+
+        if(stored < min_read_bytes)
+        {
+            ab_sleep_us(1000);
+            continue;
+        }
+
+        if(stored > target_bytes)
+            stored = target_bytes;
 
         if(stored > t.buffer_size)
             stored = t.buffer_size;
@@ -2293,7 +2364,6 @@ void *vj_audio_beat_thread(void *arg)
                 int toggle;
                 int hit_kind = t.last_hit_kind;
                 double hit_confidence = t.last_kick_score;
-                const char *tempo_reason;
 
                 if(t.last_snare_score > hit_confidence)
                     hit_confidence = t.last_snare_score;
@@ -2301,8 +2371,8 @@ void *vj_audio_beat_thread(void *arg)
                 if(t.last_hat_score > hit_confidence)
                     hit_confidence = t.last_hat_score;
 
-                tempo_reason = ab_update_dynamic_bpm(s, &t, interval, hit_kind, hit_confidence);
-
+                (void) ab_update_dynamic_bpm(s, &t, interval, hit_kind, hit_confidence);
+                
                 t.last_hit_ms = now;
                 t.last_accept_score = hit_confidence;
                 t.last_accept_level = ab_from_q15(ab_load_i(&s->level_q15));
@@ -2331,6 +2401,13 @@ void *vj_audio_beat_thread(void *arg)
                     ab_load_i(&s->running));*/
             }
         }
+
+        /*
+         * If there is still backlog, yield deliberately.
+         * Detector latency may rise by ~1ms, but audio playback wins.
+         */
+        if(vj_jack_get_input_bytes_stored() > target_bytes)
+            ab_sleep_us(VEEJAY_AUDIO_BEAT_BACKLOG_YIELD_US);
     }
 
     if(t.buffer)
@@ -2373,6 +2450,11 @@ int vj_audio_beat_disable(vj_audio_beat_shared_t *s)
         return 0;
 
     ab_store_i(&s->enabled, 0);
+    ab_store_i(&s->consumed_seq, ab_load_i(&s->hit_seq));
+
+    ab_clear_published_control(s);
+    ab_record_ring_clear(s);
+
     veejay_msg(VEEJAY_MSG_INFO, "[AUDIO-BEAT] analysis disabled");
     ab_log_config(s, "on disable");
     return 1;
@@ -6987,6 +7069,47 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
     return value;
 }
 
+static void ab_auto_clear_runtime_state(int mark_dirty)
+{
+    ab_auto_signature = 0;
+    ab_auto_target_count = 0;
+    ab_auto_active = 0;
+
+    ab_auto_climax_level = 0.0f;
+    ab_auto_climax_last_ms = 0;
+    ab_auto_climax_last_hit_seq = 0;
+
+    ab_auto_groove_level = 0.0f;
+    ab_auto_phrase_level = 0.0f;
+    ab_auto_groove_last_ms = 0;
+    ab_auto_groove_last_hit_seq = 0;
+
+    ab_auto_last_apply_ms = 0;
+    ab_auto_resume_guard_until_ms = 0;
+    ab_auto_resume_guard_active = 0;
+    ab_auto_debug_last_apply_ms = 0;
+
+    memset(ab_auto_targets, 0, sizeof(ab_auto_targets));
+
+    if(mark_dirty)
+        ab_store_i(&ab_auto_dirty, 1);
+}
+
+static int ab_auto_release_and_clear(
+    void *ctx,
+    vj_audio_beat_get_fx_id_func get_fx_id,
+    vj_audio_beat_get_fx_arg_func get_arg,
+    vj_audio_beat_set_fx_arg_func set_arg
+)
+{
+    int released = 0;
+
+    if(ab_auto_target_count > 0)
+        released = ab_auto_release_targets_to_base(ctx, get_fx_id, get_arg, set_arg);
+
+    ab_auto_clear_runtime_state(1);
+    return released;
+}
 
 void vj_audio_beat_set_auto_mode(vj_audio_beat_shared_t *s, int mode)
 {
@@ -7020,23 +7143,7 @@ void vj_audio_beat_set_auto_amount(vj_audio_beat_shared_t *s, int amount)
 void vj_audio_beat_auto_reset(vj_audio_beat_shared_t *s)
 {
     (void)s;
-
-    ab_auto_signature = 0;
-    ab_auto_target_count = 0;
-    ab_auto_active = 0;
-    ab_auto_climax_level = 0.0f;
-    ab_auto_climax_last_ms = 0;
-    ab_auto_climax_last_hit_seq = 0;
-    ab_auto_groove_level = 0.0f;
-    ab_auto_phrase_level = 0.0f;
-    ab_auto_groove_last_ms = 0;
-    ab_auto_groove_last_hit_seq = 0;
-    ab_auto_last_apply_ms = 0;
-    ab_auto_resume_guard_until_ms = 0;
-    ab_auto_resume_guard_active = 0;
-    ab_auto_debug_last_apply_ms = 0;
-    memset(ab_auto_targets, 0, sizeof(ab_auto_targets));
-    ab_store_i(&ab_auto_dirty, 1);
+    ab_auto_clear_runtime_state(1);
 }
 
 int vj_audio_beat_auto_apply_chain(
@@ -7063,22 +7170,24 @@ int vj_audio_beat_auto_apply_chain(
     if(!s || !ctx || !get_fx_id || !get_arg || !set_arg || chain_len <= 0)
         return 0;
 
-    if(!ab_load_i(&s->initialized) || !ab_load_i(&s->enabled))
+    if(!ab_load_i(&s->initialized))
         return 0;
+
+    if(!ab_load_i(&s->enabled))
+        return ab_auto_release_and_clear(ctx, get_fx_id, get_arg, set_arg);
 
     action = ab_load_i(&s->action_mode);
 
     if(action != VJ_AUDIO_BEAT_ACTION_AUTO_FX &&
-       action != VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX)
-        return 0;
+    action != VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX)
+        return ab_auto_release_and_clear(ctx, get_fx_id, get_arg, set_arg);
 
     mode = ab_load_i(&ab_auto_mode);
 
     if(mode <= VJ_AUDIO_BEAT_AUTO_OFF)
-        return 0;
-
-    if(!vj_audio_beat_get_snapshot(s, &snap))
-        return 0;
+        return ab_auto_release_and_clear(ctx, get_fx_id, get_arg, set_arg);
+        if(!vj_audio_beat_get_snapshot(s, &snap))
+            return 0;
 
     {
         const int combined_freeze_auto =
