@@ -104,6 +104,39 @@ static int track_exists( veejay_preview_t *vp, const char *hostname, int port_nu
 static int gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v );
 static int gvr_veejay_grabber_step( void *data, void *caller_data );
 
+
+static int gvr_status_to_arr(const char *status, int *tokens)
+{
+    const char *p = status;
+    int count = 0;
+
+    if(!status || !tokens)
+        return 0;
+
+    veejay_memset(tokens, 0, sizeof(int) * STATUS_ARRAY_SIZE);
+
+    while(*p && count < STATUS_ARRAY_SIZE)
+    {
+        char *end = NULL;
+        long v;
+
+        while(*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')
+            p++;
+
+        if(*p == '\0')
+            break;
+
+        v = strtol(p, &end, 10);
+        if(end == p)
+            break;
+
+        tokens[count++] = (int)v;
+        p = end;
+    }
+
+    return count;
+}
+
 void	*gvr_preview_init(int max_tracks, int use_threads)
 {
 	veejay_preview_t *vp = (veejay_preview_t*) vj_calloc(sizeof( veejay_preview_t ));
@@ -332,22 +365,23 @@ static unsigned char		*vims_track_list( veejay_track_t *v, int slen, int *bytes_
 
 static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 {
+    (void) vp;
 
 	unsigned char status_len[6];
 	int k = -1;
 	int n = 0;
 	while( (k = vj_client_poll( v->fd, V_STATUS )) ) // is there a more recent message?
     {
+        veejay_memset(status_len, 0, sizeof(status_len));
         n = vj_client_read(v->fd, V_STATUS, status_len, 5 );
-
-		int bytes= 0;
-		if( status_len[0] != 'V' ) {
-            veejay_msg(0, "Unexpected status byte in [%s] with %s:%d", status_len, v->hostname, v->port_num);
-			return 0;
-		}
 
 		if( n <= 0 ) {
             veejay_msg(0, "Lost connection with veejay");
+			return 0;
+		}
+
+        if( n != 5 || status_len[0] != 'V' || status_len[4] != 'S' ) {
+            veejay_msg(0, "Unexpected status header [%s] with %s:%d", status_len, v->hostname, v->port_num);
 			return 0;
 		}
 		
@@ -357,20 +391,42 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
         sta_len[2] = *(status_len + 3);
         sta_len[3] = '\0';
 
-        bytes = atoi(sta_len);
+        int bytes = atoi(sta_len);
 		if(bytes > 0 )
 		{
-			n = vj_client_read( v->fd, V_STATUS, v->status_buffer, bytes );
-			if( n <= 0 ) {	
-				veejay_msg(0,"Failed to read %d status bytes", bytes);
-			    return 0;
-            }
-
-	        if( status_to_arr( (char*) v->status_buffer, v->status_tokens ) < VIMS_STATUS_TOKENS )
-            {
-                veejay_msg(VEEJAY_MSG_WARNING, "Expected more status tokens");
+            if(bytes >= STATUS_LENGTH) {
+                veejay_msg(VEEJAY_MSG_WARNING, "Status packet too large: %d bytes", bytes);
                 return 0;
             }
+
+            veejay_memset(v->status_buffer, 0, STATUS_LENGTH);
+
+            int got = 0;
+            while(got < bytes) {
+			    n = vj_client_read( v->fd, V_STATUS, v->status_buffer + got, bytes - got );
+			    if( n <= 0 ) {	
+				    veejay_msg(0,"Failed to read %d status bytes", bytes);
+			        return 0;
+                }
+                got += n;
+            }
+            v->status_buffer[bytes] = '\0';
+
+            int token_count = gvr_status_to_arr( (char*) v->status_buffer, v->status_tokens );
+            int min_status_tokens = VIMS_STATUS_TOKENS;
+
+            if(min_status_tokens > 0)
+                min_status_tokens--;
+
+			if( token_count < min_status_tokens )
+			{
+				veejay_msg(VEEJAY_MSG_WARNING,
+                           "Expected at least %d status tokens, got %d: %s",
+                           min_status_tokens,
+                           token_count,
+                           v->status_buffer);
+				return 0;
+			}
 		}
 	}
 

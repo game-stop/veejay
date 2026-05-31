@@ -265,16 +265,167 @@ void on_beat_entry_toggle_toggled(GtkWidget *widget, gpointer user_data) {
  	multi_vims( VIMS_CHAIN_ENTRY_BEAT_TOGGLE,"%d %d %d", 0, info->uc.selected_chain_entry, status );
 }
 
-void    on_button_audio_beat_toggled(GtkWidget *widget, gpointer user_data) {
+void    on_button_audio_mute_toggled(GtkWidget *widget, gpointer user_data) {
 
-	if(info->status_lock)
-		return;
+    if(info->status_lock)
+        return;
 
-	int status = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+        return;
 
-	multi_vims(	VIMS_AUDIO_BEAT_STATUS, "%d", status );
+    int status = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? 1 : 0;
+
+    multi_vims( VIMS_AUDIO_TOGGLE_MUTE, "%d", status );
 
 }
+
+
+static int audio_beat_widget_int_value(GtkWidget *widget)
+{
+    if(!widget)
+        return 0;
+
+    if(GTK_IS_RANGE(widget))
+        return (int) gtk_range_get_value(GTK_RANGE(widget));
+
+    if(GTK_IS_SPIN_BUTTON(widget))
+        return (int) gtk_spin_button_get_value(GTK_SPIN_BUTTON(widget));
+
+    if(GTK_IS_COMBO_BOX(widget))
+        return gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
+
+    return 0;
+}
+
+static void audio_beat_send_int(GtkWidget *widget, int vims_id)
+{
+    if(info->status_lock)
+        return;
+
+    multi_vims(vims_id, "%d", audio_beat_widget_int_value(widget));
+}
+
+static void audio_beat_enable_chain_entry_toggle_guarded(int active)
+{
+    GtkWidget *w = widget_cache[WIDGET_CHAIN_ENTRY_BEAT_TOGGLE];
+
+    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+        return;
+
+    active = active ? 1 : 0;
+
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == active)
+        return;
+
+    int osl = info->status_lock;
+    info->status_lock = 1;
+
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), active);
+
+    info->status_lock = osl;
+}
+
+void on_audio_beat_enable_toggle_toggled(GtkToggleButton *togglebutton, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+
+    const int enabled = gtk_toggle_button_get_active(togglebutton) ? 1 : 0;
+
+    if(enabled)
+        audio_beat_enable_chain_entry_toggle_guarded(1);
+
+    multi_vims(VIMS_AUDIO_BEAT_TOGGLE, "%d", enabled);
+}
+void on_audio_beat_action_combo_changed(GtkWidget *widget, gpointer user_data)
+{
+    int mode;
+
+    if(info->status_lock)
+        return;
+
+    mode = gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
+    if(mode < 0)
+        return;
+
+    multi_vims(VIMS_AUDIO_BEAT_ACTION, "%d", mode);
+}
+
+void on_audio_beat_channels_spin_value_changed(GtkWidget *widget, gpointer user_data)
+{
+    audio_beat_send_int(widget, VIMS_AUDIO_BEAT_CHANNELS);
+}
+
+void on_audio_beat_threshold_value_changed(GtkWidget *widget, gpointer user_data)
+{
+    audio_beat_send_int(widget, VIMS_AUDIO_BEAT_THRESHOLD);
+}
+
+void on_audio_beat_cooldown_value_changed(GtkWidget *widget, gpointer user_data)
+{
+    audio_beat_send_int(widget, VIMS_AUDIO_BEAT_COOLDOWN);
+}
+
+void on_audio_beat_freeze_value_changed(GtkWidget *widget, gpointer user_data)
+{
+    audio_beat_send_int(widget, VIMS_AUDIO_BEAT_FREEZE);
+}
+
+void on_audio_beat_pulse_value_changed(GtkWidget *widget, gpointer user_data)
+{
+    audio_beat_send_int(widget, VIMS_AUDIO_BEAT_PULSE);
+}
+
+void on_audio_beat_gate_value_changed(GtkWidget *widget, gpointer user_data)
+{
+    audio_beat_send_int(widget, VIMS_AUDIO_BEAT_GATE);
+}
+
+void on_audio_beat_auto_mode_combo_changed(GtkWidget *widget, gpointer user_data)
+{
+    int mode;
+
+    if(info->status_lock)
+        return;
+
+    mode = gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
+    if(mode < 0)
+        return;
+
+    multi_vims(VIMS_AUDIO_BEAT_AUTO_MODE, "%d", mode);
+}
+
+void on_audio_beat_auto_amount_value_changed(GtkWidget *widget, gpointer user_data)
+{
+    audio_beat_send_int(widget, VIMS_AUDIO_BEAT_AUTO_AMOUNT);
+}
+
+void on_audio_beat_refresh_button_clicked(GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+
+    single_vims(VIMS_AUDIO_BEAT_STATE);
+}
+
+void on_audio_beat_auto_reset_button_toggled(GtkWidget *widget, gpointer user_data)
+{
+    int old_lock;
+
+    if(info->status_lock)
+        return;
+
+    if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
+        return;
+
+    single_vims(VIMS_AUDIO_BEAT_AUTO_RESET);
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), FALSE);
+    info->status_lock = old_lock;
+}
+
 
 void	on_button_samplestart_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -5899,4 +6050,107 @@ void on_spin_bufferedstreamid_value_changed(GtkWidget *widget, gpointer user_dat
 void on_spin_bufferedstreamlength_value_changed(GtkWidget *widget, gpointer user_data)
 {
 }
+static void record_audio_source_set_radio(GtkWidget *w, int active)
+{
+    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+        return;
 
+    active = active ? 1 : 0;
+
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == active)
+        return;
+
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), active);
+}
+
+static GtkWidget *record_audio_source_widget_for(int source, int stream_page)
+{
+    switch(source)
+    {
+        case VJ_RECORD_AUDIO_SOURCE_ORIGINAL:
+            return widget_cache[
+                stream_page
+                    ? WIDGET_RECORD_AUDIO_SOURCE_STREAM_ORIGINAL
+                    : WIDGET_RECORD_AUDIO_SOURCE_SAMPLE_ORIGINAL
+            ];
+
+        case VJ_RECORD_AUDIO_SOURCE_BEAT_JACK:
+            return widget_cache[
+                stream_page
+                    ? WIDGET_RECORD_AUDIO_SOURCE_STREAM_BEAT_JACK
+                    : WIDGET_RECORD_AUDIO_SOURCE_SAMPLE_BEAT_JACK
+            ];
+
+        case VJ_RECORD_AUDIO_SOURCE_AUTO:
+        default:
+            return widget_cache[
+                stream_page
+                    ? WIDGET_RECORD_AUDIO_SOURCE_STREAM_AUTO
+                    : WIDGET_RECORD_AUDIO_SOURCE_SAMPLE_AUTO
+            ];
+    }
+}
+
+static void record_audio_source_sync_groups(int source)
+{
+    int old_lock;
+
+    if(source < VJ_RECORD_AUDIO_SOURCE_AUTO)
+        source = VJ_RECORD_AUDIO_SOURCE_AUTO;
+    else if(source > VJ_RECORD_AUDIO_SOURCE_BEAT_JACK)
+        source = VJ_RECORD_AUDIO_SOURCE_BEAT_JACK;
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+
+    record_audio_source_set_radio(record_audio_source_widget_for(source, 0), 1);
+    record_audio_source_set_radio(record_audio_source_widget_for(source, 1), 1);
+
+    info->status_lock = old_lock;
+}
+
+static void record_audio_source_changed(GtkWidget *widget, int source)
+{
+    if(info->status_lock)
+        return;
+
+    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+        return;
+
+    if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
+        return;
+
+    record_audio_source_sync_groups(source);
+
+    multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", source);
+}
+
+void on_record_audio_source_sample_auto_toggled(GtkWidget *widget, gpointer user_data)
+{
+    record_audio_source_changed(widget, VJ_RECORD_AUDIO_SOURCE_AUTO);
+}
+
+void on_record_audio_source_sample_original_toggled(GtkWidget *widget, gpointer user_data)
+{
+    record_audio_source_changed(widget, VJ_RECORD_AUDIO_SOURCE_ORIGINAL);
+}
+
+void on_record_audio_source_sample_beat_jack_toggled(GtkWidget *widget, gpointer user_data)
+{
+    record_audio_source_changed(widget, VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
+}
+
+void on_record_audio_source_stream_auto_toggled(GtkWidget *widget, gpointer user_data)
+{
+    record_audio_source_changed(widget, VJ_RECORD_AUDIO_SOURCE_AUTO);
+}
+
+void on_record_audio_source_stream_original_toggled(GtkWidget *widget, gpointer user_data)
+{
+    record_audio_source_changed(widget, VJ_RECORD_AUDIO_SOURCE_ORIGINAL);
+}
+
+void on_record_audio_source_stream_beat_jack_toggled(GtkWidget *widget, gpointer user_data)
+{
+    record_audio_source_changed(widget, VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
+}

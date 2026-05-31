@@ -57,6 +57,26 @@
 #define FEEDBACK 35
 #define GLOBAL_CHAIN 37
 #define MESSAGE_FORWARDING 38
+#define AUDIO_BEAT_ENABLED      39
+#define AUDIO_BEAT_OPEN         40
+#define AUDIO_BEAT_LEVEL        41  /* 0..100 */
+#define AUDIO_BEAT_TRANSIENT    42  /* 0..100 */
+#define AUDIO_BEAT_HITS         43
+
+#define AUDIO_BEAT_ENVELOPE     44  /* 0..100 */
+#define AUDIO_BEAT_FLUX         45  /* 0..100 */
+#define AUDIO_BEAT_BASS         46  /* 0..100 */
+#define AUDIO_BEAT_MID          47  /* 0..100 */
+#define AUDIO_BEAT_HIGH         48  /* 0..100 */
+#define AUDIO_BEAT_PULSE        49  /* 0..100 */
+#define AUDIO_BEAT_GATE         50  /* 0..100 */
+#define AUDIO_BEAT_BPM_X10      51  /* BPM * 10 */
+#define AUDIO_BEAT_AGE_MS       52
+#define AUDIO_BEAT_SAMPLE_RATE  53
+#define AUDIO_BEAT_HIT_SEQ      54
+#define AUDIO_MUTED             55
+#define RECORD_AUDIO_SOURCE     56
+
 #define SAMPLE_TRANSITION_ACTIVE  32
 #define SAMPLE_TRANSITION_LENGTH  33
 #define SAMPLE_TRANSITION_SHAPE  34

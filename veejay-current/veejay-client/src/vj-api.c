@@ -95,6 +95,10 @@ static int faster_ui_ = 0;
 
 static GtkWidget *widget_cache[MAX_WIDGET_CACHE];
 
+#ifndef AUDIO_MUTED
+#define AUDIO_MUTED 55
+#endif
+
 //FIXME: declare some symbols here because veejaycore is not correctly structured
 int	avhelper_decode_video_buffer( void *ptr, uint8_t *data, int len )  {
 	return -1;
@@ -357,7 +361,50 @@ enum {
   WIDGET_CURVE_BUTTON_BOUND_MAX = 256,
   WIDGET_CURVE_COMBO_ANIMATION = 257,
   WIDGET_CHAIN_ENTRY_BEAT_TOGGLE = 258,
-  WIDGET_AUDIO_BEAT_TOGGLE = 259,
+  WIDGET_AUDIO_MUTE_TOGGLE = 259,
+
+  WIDGET_AUDIO_BEAT_ENABLE_TOGGLE = 260,
+  WIDGET_AUDIO_BEAT_ACTION_COMBO = 261,
+  WIDGET_AUDIO_BEAT_CHANNELS_SPIN = 262,
+  WIDGET_AUDIO_BEAT_THRESHOLD_SCALE = 263,
+  WIDGET_AUDIO_BEAT_THRESHOLD_SPIN = 264,
+  WIDGET_AUDIO_BEAT_COOLDOWN_SCALE = 265,
+  WIDGET_AUDIO_BEAT_COOLDOWN_SPIN = 266,
+  WIDGET_AUDIO_BEAT_FREEZE_SCALE = 267,
+  WIDGET_AUDIO_BEAT_FREEZE_SPIN = 268,
+  WIDGET_AUDIO_BEAT_PULSE_SCALE = 269,
+  WIDGET_AUDIO_BEAT_PULSE_SPIN = 270,
+  WIDGET_AUDIO_BEAT_GATE_SCALE = 271,
+  WIDGET_AUDIO_BEAT_GATE_SPIN = 272,
+  WIDGET_AUDIO_BEAT_AUTO_MODE_COMBO = 273,
+  WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SCALE = 274,
+  WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SPIN = 275,
+  WIDGET_AUDIO_BEAT_REFRESH_BUTTON = 276,
+  WIDGET_AUDIO_BEAT_AUTO_RESET_BUTTON = 277,
+
+  WIDGET_AUDIO_BEAT_LEVEL_BAR = 278,
+  WIDGET_AUDIO_BEAT_ENVELOPE_BAR = 279,
+  WIDGET_AUDIO_BEAT_TRANSIENT_BAR = 280,
+  WIDGET_AUDIO_BEAT_FLUX_BAR = 281,
+  WIDGET_AUDIO_BEAT_BASS_BAR = 282,
+  WIDGET_AUDIO_BEAT_MID_BAR = 283,
+  WIDGET_AUDIO_BEAT_HIGH_BAR = 284,
+  WIDGET_AUDIO_BEAT_GATE_BAR = 285,
+  WIDGET_AUDIO_BEAT_PULSE_BAR = 286,
+
+  WIDGET_AUDIO_BEAT_BPM_VALUE = 287,
+  WIDGET_AUDIO_BEAT_HITS_VALUE = 288,
+  WIDGET_AUDIO_BEAT_AGE_VALUE = 289,
+  WIDGET_AUDIO_BEAT_SAMPLE_RATE_VALUE = 290,
+  WIDGET_AUDIO_BEAT_HIT_SEQ_VALUE = 291,
+
+  WIDGET_RECORD_AUDIO_SOURCE_SAMPLE_AUTO = 292,
+  WIDGET_RECORD_AUDIO_SOURCE_SAMPLE_ORIGINAL = 293,
+  WIDGET_RECORD_AUDIO_SOURCE_SAMPLE_BEAT_JACK = 294,
+
+  WIDGET_RECORD_AUDIO_SOURCE_STREAM_AUTO = 295,
+  WIDGET_RECORD_AUDIO_SOURCE_STREAM_ORIGINAL = 296,
+  WIDGET_RECORD_AUDIO_SOURCE_STREAM_BEAT_JACK = 297,
 };
 
 
@@ -768,7 +815,51 @@ static struct
     { "toggle_vims_forwarding", WIDGET_MESSAGE_FORWARDING },
     { "curve_combo_animation", WIDGET_CURVE_COMBO_ANIMATION },
     { "beat_entry_toggle", WIDGET_CHAIN_ENTRY_BEAT_TOGGLE},
-    { "button_audio_beat", WIDGET_AUDIO_BEAT_TOGGLE },
+    { "button_audio_mute", WIDGET_AUDIO_MUTE_TOGGLE },
+
+    { "audio_beat_enable_toggle", WIDGET_AUDIO_BEAT_ENABLE_TOGGLE },
+    { "audio_beat_action_combo", WIDGET_AUDIO_BEAT_ACTION_COMBO },
+    { "audio_beat_channels_spin", WIDGET_AUDIO_BEAT_CHANNELS_SPIN },
+    { "audio_beat_threshold_scale", WIDGET_AUDIO_BEAT_THRESHOLD_SCALE },
+    { "audio_beat_threshold_spin", WIDGET_AUDIO_BEAT_THRESHOLD_SPIN },
+    { "audio_beat_cooldown_scale", WIDGET_AUDIO_BEAT_COOLDOWN_SCALE },
+    { "audio_beat_cooldown_spin", WIDGET_AUDIO_BEAT_COOLDOWN_SPIN },
+    { "audio_beat_freeze_scale", WIDGET_AUDIO_BEAT_FREEZE_SCALE },
+    { "audio_beat_freeze_spin", WIDGET_AUDIO_BEAT_FREEZE_SPIN },
+    { "audio_beat_pulse_scale", WIDGET_AUDIO_BEAT_PULSE_SCALE },
+    { "audio_beat_pulse_spin", WIDGET_AUDIO_BEAT_PULSE_SPIN },
+    { "audio_beat_gate_scale", WIDGET_AUDIO_BEAT_GATE_SCALE },
+    { "audio_beat_gate_spin", WIDGET_AUDIO_BEAT_GATE_SPIN },
+    { "audio_beat_auto_mode_combo", WIDGET_AUDIO_BEAT_AUTO_MODE_COMBO },
+    { "audio_beat_auto_amount_scale", WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SCALE },
+    { "audio_beat_auto_amount_spin", WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SPIN },
+    { "audio_beat_refresh_button", WIDGET_AUDIO_BEAT_REFRESH_BUTTON },
+    { "audio_beat_auto_reset_button", WIDGET_AUDIO_BEAT_AUTO_RESET_BUTTON },
+
+    { "audio_beat_level_bar", WIDGET_AUDIO_BEAT_LEVEL_BAR },
+    { "audio_beat_envelope_bar", WIDGET_AUDIO_BEAT_ENVELOPE_BAR },
+    { "audio_beat_transient_bar", WIDGET_AUDIO_BEAT_TRANSIENT_BAR },
+    { "audio_beat_flux_bar", WIDGET_AUDIO_BEAT_FLUX_BAR },
+    { "audio_beat_bass_bar", WIDGET_AUDIO_BEAT_BASS_BAR },
+    { "audio_beat_mid_bar", WIDGET_AUDIO_BEAT_MID_BAR },
+    { "audio_beat_high_bar", WIDGET_AUDIO_BEAT_HIGH_BAR },
+    { "audio_beat_beat_gate_bar", WIDGET_AUDIO_BEAT_GATE_BAR },
+    { "audio_beat_beat_pulse_bar", WIDGET_AUDIO_BEAT_PULSE_BAR },
+
+    { "audio_beat_bpm_value", WIDGET_AUDIO_BEAT_BPM_VALUE },
+    { "audio_beat_hits_value", WIDGET_AUDIO_BEAT_HITS_VALUE },
+    { "audio_beat_age_value", WIDGET_AUDIO_BEAT_AGE_VALUE },
+    { "audio_beat_sample_rate_value", WIDGET_AUDIO_BEAT_SAMPLE_RATE_VALUE },
+    { "audio_beat_hit_seq_value", WIDGET_AUDIO_BEAT_HIT_SEQ_VALUE },
+
+    { "record_audio_source_sample_auto",      WIDGET_RECORD_AUDIO_SOURCE_SAMPLE_AUTO },
+    { "record_audio_source_sample_original",  WIDGET_RECORD_AUDIO_SOURCE_SAMPLE_ORIGINAL },
+    { "record_audio_source_sample_beat_jack", WIDGET_RECORD_AUDIO_SOURCE_SAMPLE_BEAT_JACK },
+
+    { "record_audio_source_stream_auto",      WIDGET_RECORD_AUDIO_SOURCE_STREAM_AUTO },
+    { "record_audio_source_stream_original",  WIDGET_RECORD_AUDIO_SOURCE_STREAM_ORIGINAL },
+    { "record_audio_source_stream_beat_jack", WIDGET_RECORD_AUDIO_SOURCE_STREAM_BEAT_JACK },
+
     { NULL, -1 },
 };
 
@@ -792,6 +883,34 @@ static struct
     {"Double click: add effect to current entry in chain list,\n [+] Shift L: add disabled,\n [+] Ctrl L: add to selected sample"},
     {"Filter the effects list by any string"},
     {"Shift + Mouse left : Toogle selected fx,\nControl + Mouse left : Toogle selected fx anim"},
+
+    {"Enable or disable the JACK audio beat detector. The detector can stay available even when normal audio playback is disabled."},
+    {"Action performed on beat hits: none, freeze, auto FX modulation, or freeze plus auto FX."},
+    {"Number of JACK input channels analysed by the beat detector."},
+    {"Beat trigger sensitivity. Lower values trigger more easily; higher values require stronger transients."},
+    {"Minimum time between accepted beat hits. Increase this to avoid double triggers."},
+    {"How long playback is frozen when the freeze action is active."},
+    {"Duration of the beat pulse signal used for short one-shot visual reactions."},
+    {"Duration of the beat gate signal used for held visual reactions."},
+    {"Automatic FX mapping mode. Higher modes use more motion, memory, and chaos-oriented parameter roles."},
+    {"Global intensity of automatic FX parameter modulation."},
+    {"Request the latest beat detector state from the backend."},
+    {"Reset automatic FX beat mappings so the backend can rebuild them for the current chain."},
+
+    {"Current input level from the JACK analysis stream."},
+    {"Smoothed input energy envelope used for stable modulation."},
+    {"Short attack/transient strength used for beat detection."},
+    {"Spectral/onset flux. Useful for detecting changes in rhythm and texture."},
+    {"Low-frequency energy estimate."},
+    {"Mid-frequency energy estimate."},
+    {"High-frequency energy estimate."},
+    {"Beat gate output. Stays high for the configured gate duration after a hit."},
+    {"Beat pulse output. Short pulse envelope after a hit."},
+    {"Estimated tempo in beats per minute."},
+    {"Total number of accepted beat hits."},
+    {"Milliseconds since the last accepted beat hit."},
+    {"Sample rate reported by the JACK beat input."},
+    {"Monotonic hit sequence number for detecting new beat events in the UI."},
     {NULL},
 };
 
@@ -837,7 +956,35 @@ enum
     TOOLTIP_SRTSELECT = 3,
     TOOLTIP_FXSELECT = 4,
     TOOLTIP_FXFILTER = 5,
-    TOOLTIP_FXCHAINTREE = 6
+    TOOLTIP_FXCHAINTREE = 6,
+
+    TOOLTIP_AUDIO_BEAT_ENABLE,
+    TOOLTIP_AUDIO_BEAT_ACTION,
+    TOOLTIP_AUDIO_BEAT_CHANNELS,
+    TOOLTIP_AUDIO_BEAT_THRESHOLD,
+    TOOLTIP_AUDIO_BEAT_COOLDOWN,
+    TOOLTIP_AUDIO_BEAT_FREEZE,
+    TOOLTIP_AUDIO_BEAT_PULSE,
+    TOOLTIP_AUDIO_BEAT_GATE,
+    TOOLTIP_AUDIO_BEAT_AUTO_MODE,
+    TOOLTIP_AUDIO_BEAT_AUTO_AMOUNT,
+    TOOLTIP_AUDIO_BEAT_REFRESH,
+    TOOLTIP_AUDIO_BEAT_AUTO_RESET,
+
+    TOOLTIP_AUDIO_BEAT_LEVEL,
+    TOOLTIP_AUDIO_BEAT_ENVELOPE,
+    TOOLTIP_AUDIO_BEAT_TRANSIENT,
+    TOOLTIP_AUDIO_BEAT_FLUX,
+    TOOLTIP_AUDIO_BEAT_BASS,
+    TOOLTIP_AUDIO_BEAT_MID,
+    TOOLTIP_AUDIO_BEAT_HIGH,
+    TOOLTIP_AUDIO_BEAT_GATE_VALUE,
+    TOOLTIP_AUDIO_BEAT_PULSE_VALUE,
+    TOOLTIP_AUDIO_BEAT_BPM,
+    TOOLTIP_AUDIO_BEAT_HITS,
+    TOOLTIP_AUDIO_BEAT_AGE,
+    TOOLTIP_AUDIO_BEAT_SAMPLE_RATE,
+    TOOLTIP_AUDIO_BEAT_HIT_SEQ
 };
 
 #define FX_PARAMETER_DEFAULT_NAME "<none>"
@@ -1944,6 +2091,69 @@ static void set_tooltip(const char *name, const char *text)
         return;
     }
     gtk_widget_set_tooltip_text(    w,text );
+}
+
+static struct
+{
+    const int widget_id;
+    const int tooltip_id;
+} audio_beat_tooltip_map[] =
+{
+    { WIDGET_AUDIO_BEAT_ENABLE_TOGGLE, TOOLTIP_AUDIO_BEAT_ENABLE },
+    { WIDGET_AUDIO_BEAT_ACTION_COMBO, TOOLTIP_AUDIO_BEAT_ACTION },
+    { WIDGET_AUDIO_BEAT_CHANNELS_SPIN, TOOLTIP_AUDIO_BEAT_CHANNELS },
+
+    { WIDGET_AUDIO_BEAT_THRESHOLD_SCALE, TOOLTIP_AUDIO_BEAT_THRESHOLD },
+    { WIDGET_AUDIO_BEAT_THRESHOLD_SPIN, TOOLTIP_AUDIO_BEAT_THRESHOLD },
+    { WIDGET_AUDIO_BEAT_COOLDOWN_SCALE, TOOLTIP_AUDIO_BEAT_COOLDOWN },
+    { WIDGET_AUDIO_BEAT_COOLDOWN_SPIN, TOOLTIP_AUDIO_BEAT_COOLDOWN },
+    { WIDGET_AUDIO_BEAT_FREEZE_SCALE, TOOLTIP_AUDIO_BEAT_FREEZE },
+    { WIDGET_AUDIO_BEAT_FREEZE_SPIN, TOOLTIP_AUDIO_BEAT_FREEZE },
+    { WIDGET_AUDIO_BEAT_PULSE_SCALE, TOOLTIP_AUDIO_BEAT_PULSE },
+    { WIDGET_AUDIO_BEAT_PULSE_SPIN, TOOLTIP_AUDIO_BEAT_PULSE },
+    { WIDGET_AUDIO_BEAT_GATE_SCALE, TOOLTIP_AUDIO_BEAT_GATE },
+    { WIDGET_AUDIO_BEAT_GATE_SPIN, TOOLTIP_AUDIO_BEAT_GATE },
+
+    { WIDGET_AUDIO_BEAT_AUTO_MODE_COMBO, TOOLTIP_AUDIO_BEAT_AUTO_MODE },
+    { WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SCALE, TOOLTIP_AUDIO_BEAT_AUTO_AMOUNT },
+    { WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SPIN, TOOLTIP_AUDIO_BEAT_AUTO_AMOUNT },
+    { WIDGET_AUDIO_BEAT_REFRESH_BUTTON, TOOLTIP_AUDIO_BEAT_REFRESH },
+    { WIDGET_AUDIO_BEAT_AUTO_RESET_BUTTON, TOOLTIP_AUDIO_BEAT_AUTO_RESET },
+
+    { WIDGET_AUDIO_BEAT_LEVEL_BAR, TOOLTIP_AUDIO_BEAT_LEVEL },
+    { WIDGET_AUDIO_BEAT_ENVELOPE_BAR, TOOLTIP_AUDIO_BEAT_ENVELOPE },
+    { WIDGET_AUDIO_BEAT_TRANSIENT_BAR, TOOLTIP_AUDIO_BEAT_TRANSIENT },
+    { WIDGET_AUDIO_BEAT_FLUX_BAR, TOOLTIP_AUDIO_BEAT_FLUX },
+    { WIDGET_AUDIO_BEAT_BASS_BAR, TOOLTIP_AUDIO_BEAT_BASS },
+    { WIDGET_AUDIO_BEAT_MID_BAR, TOOLTIP_AUDIO_BEAT_MID },
+    { WIDGET_AUDIO_BEAT_HIGH_BAR, TOOLTIP_AUDIO_BEAT_HIGH },
+    { WIDGET_AUDIO_BEAT_GATE_BAR, TOOLTIP_AUDIO_BEAT_GATE_VALUE },
+    { WIDGET_AUDIO_BEAT_PULSE_BAR, TOOLTIP_AUDIO_BEAT_PULSE_VALUE },
+
+    { WIDGET_AUDIO_BEAT_BPM_VALUE, TOOLTIP_AUDIO_BEAT_BPM },
+    { WIDGET_AUDIO_BEAT_HITS_VALUE, TOOLTIP_AUDIO_BEAT_HITS },
+    { WIDGET_AUDIO_BEAT_AGE_VALUE, TOOLTIP_AUDIO_BEAT_AGE },
+    { WIDGET_AUDIO_BEAT_SAMPLE_RATE_VALUE, TOOLTIP_AUDIO_BEAT_SAMPLE_RATE },
+    { WIDGET_AUDIO_BEAT_HIT_SEQ_VALUE, TOOLTIP_AUDIO_BEAT_HIT_SEQ },
+
+    { -1, -1 }
+};
+
+static void init_audio_beat_tooltips(void)
+{
+    for (int i = 0; audio_beat_tooltip_map[i].widget_id >= 0; i++) {
+        int widget_id = audio_beat_tooltip_map[i].widget_id;
+        int tooltip_id = audio_beat_tooltip_map[i].tooltip_id;
+
+        if (widget_id >= MAX_WIDGET_CACHE)
+            continue;
+        if (!widget_cache[widget_id])
+            continue;
+        if (!tooltips[tooltip_id].text)
+            continue;
+
+        set_tooltip_by_widget(widget_cache[widget_id], tooltips[tooltip_id].text);
+    }
 }
 
 void on_devicelist_row_activated(GtkTreeView *treeview,
@@ -5066,10 +5276,6 @@ static gint load_parameter_info(void)
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SUBRENDER_ENTRY_TOGGLE]), p[ENTRY_SUBRENDER_ENTRY]);
     }
 
-    if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHAIN_ENTRY_BEAT_TOGGLE])) != p[ENTRY_BEAT_FLAG]) {
-        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHAIN_ENTRY_BEAT_TOGGLE]), p[ENTRY_BEAT_FLAG]);
-    }
-
     free(answer);
     return 1;
 }
@@ -5192,91 +5398,116 @@ static void setup_effectchain_info( void )
     }
 }
 
+#define FILL_EMPTY_CHAIN()                                                   \
+    do {                                                                     \
+        for (int _i = 0; _i < SAMPLE_MAX_EFFECTS; _i++) {                    \
+            gtk_list_store_append(store, &iter);                             \
+            gtk_list_store_set(store, &iter, FXC_ID, _i, -1);                \
+        }                                                                    \
+        gtk_tree_view_set_model(GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store)); \
+    } while (0)
 
-/******************************************************
- * load_effectchain_info()
- *   load effect chain from server (VIMS transmition)
- *   to the fx chain tree view
- *
- ******************************************************/
 static void load_effectchain_info(void)
 {
-    GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
+    GtkWidget *tree = glade_xml_get_widget_(info->main_window, "tree_chain");
 
     gint fxlen = 0;
-    multi_vims( VIMS_CHAIN_LIST,"%d",0 );
-    gchar *fxtext = recv_vims(3,&fxlen);
 
-    int checksum = data_checksum(fxtext,fxlen);
-    if( info->uc.reload_hint_checksums[HINT_CHAIN] == checksum ) {
-        if(fxtext) free(fxtext);
+    multi_vims(VIMS_CHAIN_LIST, "%d", 0);
+    gchar *fxtext = recv_vims(4, &fxlen);
+
+    int checksum = (fxtext && fxlen > 0) ? data_checksum(fxtext, fxlen) : 0;
+    if (info->uc.reload_hint_checksums[HINT_CHAIN] == checksum) {
+        if (fxtext)
+            free(fxtext);
         return;
     }
     info->uc.reload_hint_checksums[HINT_CHAIN] = checksum;
 
-    GtkListStore *store;
-    guint arr[10];
+    set_tooltip_by_widget(tree, tooltips[TOOLTIP_FXCHAINTREE].text);
+
+    reset_tree("tree_chain");
+
+    GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(tree));
+    GtkListStore *store = GTK_LIST_STORE(model);
     GtkTreeIter iter;
-    gint offset=0;
 
-    set_tooltip_by_widget (tree, tooltips[TOOLTIP_FXCHAINTREE].text);
+    gtk_toggle_button_set_active(
+        GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_CHAIN_TOGGLECHAIN]),
+        info->status_tokens[SAMPLE_FX]);
 
-    reset_tree( "tree_chain" );
-
-    GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));
-    store = GTK_LIST_STORE(model);
-
-    //update chain fx status
-    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_CHAIN_TOGGLECHAIN]), info->status_tokens[SAMPLE_FX] );
-    //also for stream (index is equivalent)
-    if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE){
-        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHECK_SAMPLEFX]), info->status_tokens[SAMPLE_FX] );
+    if (info->status_tokens[PLAY_MODE] == MODE_SAMPLE) {
+        gtk_toggle_button_set_active(
+            GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHECK_SAMPLEFX]),
+            info->status_tokens[SAMPLE_FX]);
     } else {
-        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHECK_STREAMFX]), info->status_tokens[SAMPLE_FX] );
+        gtk_toggle_button_set_active(
+            GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHECK_STREAMFX]),
+            info->status_tokens[SAMPLE_FX]);
     }
 
-    // no fx, clean list and return
-    if(fxlen <= 0 )
-    {
-        int i;
-        for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ )
-        {
-            gtk_list_store_append(store,&iter);
-            gtk_list_store_set(store,&iter, FXC_ID, i ,-1);
-            gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
-        }
+
+
+    if (!fxtext || fxlen <= 0) {
+        FILL_EMPTY_CHAIN();
+
+        if (fxtext)
+            free(fxtext);
+
+
         return;
     }
 
-    if(fxlen == 5 )
-        offset = fxlen;
+    if ((fxlen % VIMS_CHAIN_LIST_ENTRY_LENGTH) != 0) {
+        veejay_msg(0,
+                   "Error parsing FX chain response: payload length %d is not a multiple of %d",
+                   fxlen,
+                   VIMS_CHAIN_LIST_ENTRY_LENGTH);
 
-    gint last_index =0;
+        FILL_EMPTY_CHAIN();
 
-    while( offset < fxlen )
+        free(fxtext);
+
+        return;
+    }
+
+    guint arr[10];
+    gint offset = 0;
+    gint last_index = 0;
+
+    while (offset < fxlen)
     {
-        char line[VIMS_CHAIN_LIST_ENTRY_LENGTH+1];
-        veejay_memset(arr,0,sizeof(arr));
-        veejay_memset(line,0,sizeof(line));
+        char line[VIMS_CHAIN_LIST_ENTRY_LENGTH + 1];
 
-        strncpy( line, fxtext + offset, VIMS_CHAIN_LIST_ENTRY_LENGTH );
+        veejay_memset(arr, 0, sizeof(arr));
+        veejay_memset(line, 0, sizeof(line));
+
+        strncpy(line, fxtext + offset, VIMS_CHAIN_LIST_ENTRY_LENGTH);
+        line[VIMS_CHAIN_LIST_ENTRY_LENGTH] = '\0';
+
 #if VIMS_CHAIN_LIST_ENTRY_VALUES >= 10
-        int n_tokens = sscanf( line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
-               &arr[0], &arr[1], &arr[2], &arr[3], &arr[4],
-               &arr[5], &arr[6], &arr[7], &arr[8], &arr[9]);
+        int n_tokens = sscanf(line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
+                              &arr[0], &arr[1], &arr[2], &arr[3], &arr[4],
+                              &arr[5], &arr[6], &arr[7], &arr[8], &arr[9]);
 #else
-        int n_tokens = sscanf( line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
-               &arr[0], &arr[1], &arr[2], &arr[3], &arr[4],
-               &arr[5], &arr[6], &arr[7], &arr[8]);
+        int n_tokens = sscanf(line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
+                              &arr[0], &arr[1], &arr[2], &arr[3], &arr[4],
+                              &arr[5], &arr[6], &arr[7], &arr[8]);
 #endif
-        if( n_tokens != VIMS_CHAIN_LIST_ENTRY_VALUES ) {
-            veejay_msg(0,"Error parsing FX chain response");
+
+        if (n_tokens != VIMS_CHAIN_LIST_ENTRY_VALUES) {
+            veejay_msg(0,
+                       "Error parsing FX chain response: expected %d tokens, got %d",
+                       VIMS_CHAIN_LIST_ENTRY_VALUES,
+                       n_tokens);
+
             break;
         }
 
         int chain_entry = arr[0];
         int effect_id = arr[1];
         int entry_enabled = arr[3];
+
         int beat_enabled = 0;
         int chain_source = 0;
         int chain_channel = 0;
@@ -5296,73 +5527,88 @@ static void load_effectchain_info(void)
         subrender_entry = arr[8];
 #endif
 
-        // clean list until next entry
-        while( last_index < chain_entry )
-        {
-            gtk_list_store_append( store, &iter );
-            gtk_list_store_set( store, &iter, FXC_ID, last_index,-1);
-            last_index ++;
+        if (chain_entry < 0 || chain_entry >= SAMPLE_MAX_EFFECTS) {
+            veejay_msg(0,
+                       "Error parsing FX chain response: invalid chain entry %d",
+                       chain_entry);
+            break;
         }
 
-        // time to fill current entry
-        char *name = _effect_get_description( effect_id );
-
-        if( last_index == chain_entry)
+        while (last_index < chain_entry)
         {
-            gchar *utf8_name = _utf8str( name );
-            char  tmp[128];
-            if( _effect_get_mix( effect_id ) ) {
-                snprintf(tmp,sizeof(tmp),"%s %d", (chain_source == 0 ? "Sample " : "T " ),
-                    chain_channel);
+            gtk_list_store_append(store, &iter);
+            gtk_list_store_set(store, &iter, FXC_ID, last_index, -1);
+            last_index++;
+        }
+
+        char *name = _effect_get_description(effect_id);
+
+        if (last_index == chain_entry)
+        {
+            gchar *utf8_name = _utf8str(name);
+
+            char tmp[128];
+            if (_effect_get_mix(effect_id)) {
+                snprintf(tmp,
+                         sizeof(tmp),
+                         "%s %d",
+                         (chain_source == 0 ? "Sample " : "T "),
+                         chain_channel);
+            } else {
+                snprintf(tmp, sizeof(tmp), "%s", " ");
             }
-            else {
-                snprintf(tmp,sizeof(tmp),"%s"," ");
-            }
+
             gchar *mixing = _utf8str(tmp);
 
-            gtk_list_store_append( store, &iter );
-            GdkPixbuf *toggle = update_pixmap_entry( entry_enabled );
-            GdkPixbuf *beat_toggle = update_pixmap_entry( beat_enabled );
-            GdkPixbuf *kf_togglepf = update_pixmap_entry( kf_status );
+            gtk_list_store_append(store, &iter);
+
+            GdkPixbuf *toggle = update_pixmap_entry(entry_enabled);
+            GdkPixbuf *beat_toggle = update_pixmap_entry(beat_enabled);
+            GdkPixbuf *kf_togglepf = update_pixmap_entry(kf_status);
             GdkPixbuf *subrender_toggle = update_pixmap_entry(subrender_entry);
-            gtk_list_store_set( store, &iter,
+
+            gtk_list_store_set(store, &iter,
                                FXC_ID, chain_entry,
                                FXC_FXID, utf8_name,
                                FXC_FXSTATUS, toggle,
                                FXC_BEAT, beat_toggle,
                                FXC_KF, kf_togglepf,
-                               FXC_MIXING,mixing, 
+                               FXC_MIXING, mixing,
                                FXC_SUBRENDER, subrender_toggle,
                                FXC_KF_STATUS, kf_status,
-                                -1 );
-            last_index ++;
+                               -1);
+
+            last_index++;
+
             g_free(utf8_name);
             g_free(mixing);
-            if(toggle)
-                g_object_unref( toggle );
-            if(beat_toggle)
-                g_object_unref( beat_toggle );
-            if(kf_togglepf)
-                g_object_unref( kf_togglepf );
-            if(subrender_toggle)
-                g_object_unref( subrender_toggle );
+
+            if (toggle)
+                g_object_unref(toggle);
+            if (beat_toggle)
+                g_object_unref(beat_toggle);
+            if (kf_togglepf)
+                g_object_unref(kf_togglepf);
+            if (subrender_toggle)
+                g_object_unref(subrender_toggle);
         }
+
         offset += VIMS_CHAIN_LIST_ENTRY_LENGTH;
     }
 
-    // finally clean list end
-    while( last_index < SAMPLE_MAX_EFFECTS )
+    while (last_index < SAMPLE_MAX_EFFECTS)
     {
-        gtk_list_store_append( store, &iter );
-        gtk_list_store_set( store, &iter,
-            FXC_ID, last_index , -1 );
-        last_index ++;
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, FXC_ID, last_index, -1);
+        last_index++;
     }
-    gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
+
+    gtk_tree_view_set_model(GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
+
     free(fxtext);
+
+#undef FILL_EMPTY_CHAIN
 }
-
-
 /******************************************************
  *
  *                    EFFECTS LISTS
@@ -7294,14 +7540,11 @@ static int load_editlist_info(void)
     update_label_i( "label_el_achans", values[7], 0);
     update_label_i( "label_el_abits", values[5], 0);
 
+    //FIXME wrong place
     int button_global_state = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_GLOBAL_TRANSITIONS_TOGGLE ]));
     if( button_global_state != global_transition_state ) {
         gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_GLOBAL_TRANSITIONS_TOGGLE ]), global_transition_state );
     }
-
-
-    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_AUDIO_BEAT_TOGGLE ] )) != beat_enabled )
-        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_AUDIO_BEAT_TOGGLE ] ) , beat_enabled );
 
 
     free(res);
@@ -7569,7 +7812,7 @@ int veejay_update_multitrack( void *ptr )
 #endif
     int *history = info->history_tokens[pm];
 
-    veejay_memcpy( history, info->status_tokens, sizeof(int) * VIMS_STATUS_TOKENS );
+    veejay_memcpy( history, info->status_tokens, sizeof(int) * STATUS_ARRAY_SIZE );
    
     for( i = 0; i < s->tracks ; i ++ )
     {
@@ -7789,6 +8032,173 @@ static void update_sequence_playing_from_status(void)
         indicate_sequence(TRUE,
             info->sequencer_view->gui_slot[playing]);
     }
+}
+
+static void audio_beat_set_bar(int widget_id, int value)
+{
+    GtkWidget *w = widget_cache[widget_id];
+
+    if(!w)
+        return;
+
+    value = (value < 0) ? 0 : ((value > 100) ? 100 : value);
+
+    if(GTK_IS_LEVEL_BAR(w)) {
+        gdouble min = gtk_level_bar_get_min_value(GTK_LEVEL_BAR(w));
+        gdouble max = gtk_level_bar_get_max_value(GTK_LEVEL_BAR(w));
+        gtk_level_bar_set_value(GTK_LEVEL_BAR(w),
+            min + ((max - min) * (gdouble)value) / 100.0);
+    }
+    else if(GTK_IS_PROGRESS_BAR(w)) {
+        char pct[16];
+
+        gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(w),
+            ((gdouble)value) / 100.0);
+
+        snprintf(pct, sizeof(pct), "%d%%", value);
+        gtk_progress_bar_set_text(GTK_PROGRESS_BAR(w), pct);
+    }
+    else if(GTK_IS_RANGE(w)) {
+        gtk_range_set_value(GTK_RANGE(w), (gdouble)value);
+    }
+}
+
+static void audio_beat_set_label_i(int widget_id, int value)
+{
+    GtkWidget *w = widget_cache[widget_id];
+    char txt[32];
+
+    if(!w || !GTK_IS_LABEL(w))
+        return;
+
+    snprintf(txt, sizeof(txt), "%d", value);
+    gtk_label_set_text(GTK_LABEL(w), txt);
+}
+
+static void audio_beat_set_label_s(int widget_id, const char *txt)
+{
+    GtkWidget *w = widget_cache[widget_id];
+
+    if(!w || !GTK_IS_LABEL(w))
+        return;
+
+    gtk_label_set_text(GTK_LABEL(w), txt ? txt : "");
+}
+
+
+
+
+static void audio_beat_set_toggle(int widget_id, int value)
+{
+    GtkWidget *w = widget_cache[widget_id];
+
+    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+        return;
+
+    value = value ? 1 : 0;
+
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) != value)
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), value);
+}
+
+static void update_audio_beat_status_widgets(int *history, int force)
+{
+    char txt[64];
+
+    if(!history)
+        return;
+
+#define AB_CUR(tok_)      (info->status_tokens[(tok_)])
+#define AB_OLD(tok_)      (history[(tok_)])
+#define AB_CHANGED(tok_)  (force || AB_CUR(tok_) != AB_OLD(tok_))
+
+#define AB_SET_BAR(tok_, wid_)                                      \
+    do {                                                            \
+        if(AB_CHANGED(tok_))                                        \
+            audio_beat_set_bar((wid_), AB_CUR(tok_));               \
+    } while(0)
+
+#define AB_SET_LABEL(tok_, wid_, fmt_)                              \
+    do {                                                            \
+        if(AB_CHANGED(tok_)) {                                      \
+            snprintf(txt, sizeof(txt), (fmt_), AB_CUR(tok_));        \
+            audio_beat_set_label_s((wid_), txt);                    \
+        }                                                           \
+    } while(0)
+
+    const int enabled = AB_CUR(AUDIO_BEAT_ENABLED) ? 1 : 0;
+    const int open    = AB_CUR(AUDIO_BEAT_OPEN) ? 1 : 0;
+    const int muted   = AB_CUR(AUDIO_MUTED) ? 1 : 0;
+
+
+    if(AB_CHANGED(AUDIO_BEAT_ENABLED)) {
+        audio_beat_set_toggle(WIDGET_AUDIO_BEAT_ENABLE_TOGGLE, enabled);
+    }
+
+    if(AB_CHANGED(AUDIO_MUTED)) {
+        audio_beat_set_toggle(WIDGET_AUDIO_MUTE_TOGGLE, muted);
+    }
+
+    if(AB_CHANGED(AUDIO_BEAT_OPEN)) {
+        /*
+         * Backend liveness is available here.
+         * Keep controls active even when open == 0: the detector must remain activatable.
+         */
+        (void)open;
+    }
+
+    AB_SET_BAR(AUDIO_BEAT_LEVEL,     WIDGET_AUDIO_BEAT_LEVEL_BAR);
+    AB_SET_BAR(AUDIO_BEAT_ENVELOPE,  WIDGET_AUDIO_BEAT_ENVELOPE_BAR);
+    AB_SET_BAR(AUDIO_BEAT_TRANSIENT, WIDGET_AUDIO_BEAT_TRANSIENT_BAR);
+    AB_SET_BAR(AUDIO_BEAT_FLUX,      WIDGET_AUDIO_BEAT_FLUX_BAR);
+    AB_SET_BAR(AUDIO_BEAT_BASS,      WIDGET_AUDIO_BEAT_BASS_BAR);
+    AB_SET_BAR(AUDIO_BEAT_MID,       WIDGET_AUDIO_BEAT_MID_BAR);
+    AB_SET_BAR(AUDIO_BEAT_HIGH,      WIDGET_AUDIO_BEAT_HIGH_BAR);
+    AB_SET_BAR(AUDIO_BEAT_GATE,      WIDGET_AUDIO_BEAT_GATE_BAR);
+    AB_SET_BAR(AUDIO_BEAT_PULSE,     WIDGET_AUDIO_BEAT_PULSE_BAR);
+
+    AB_SET_LABEL(AUDIO_BEAT_HITS,    WIDGET_AUDIO_BEAT_HITS_VALUE, "%d");
+
+    if(AB_CHANGED(AUDIO_BEAT_BPM_X10)) {
+        int bpm10 = AB_CUR(AUDIO_BEAT_BPM_X10);
+
+        if(bpm10 > 0)
+            snprintf(txt, sizeof(txt), "%d.%d", bpm10 / 10, bpm10 % 10);
+        else
+            snprintf(txt, sizeof(txt), "-");
+
+        audio_beat_set_label_s(WIDGET_AUDIO_BEAT_BPM_VALUE, txt);
+    }
+
+    if(AB_CHANGED(AUDIO_BEAT_AGE_MS)) {
+        int age = AB_CUR(AUDIO_BEAT_AGE_MS);
+
+        if(age >= 999999)
+            snprintf(txt, sizeof(txt), "-");
+        else
+            snprintf(txt, sizeof(txt), "%d ms", age);
+
+        audio_beat_set_label_s(WIDGET_AUDIO_BEAT_AGE_VALUE, txt);
+    }
+
+    if(AB_CHANGED(AUDIO_BEAT_SAMPLE_RATE)) {
+        int rate = AB_CUR(AUDIO_BEAT_SAMPLE_RATE);
+
+        if(rate > 0)
+            snprintf(txt, sizeof(txt), "%d Hz", rate);
+        else
+            snprintf(txt, sizeof(txt), "-");
+
+        audio_beat_set_label_s(WIDGET_AUDIO_BEAT_SAMPLE_RATE_VALUE, txt);
+    }
+
+    AB_SET_LABEL(AUDIO_BEAT_HIT_SEQ, WIDGET_AUDIO_BEAT_HIT_SEQ_VALUE, "%d");
+
+#undef AB_SET_LABEL
+#undef AB_SET_BAR
+#undef AB_CHANGED
+#undef AB_OLD
+#undef AB_CUR
 }
 
 static void update_globalinfo(int *history, int pm, int last_pm)
@@ -8297,6 +8707,28 @@ static void enable_fx_entry(void) {
         gtk_label_set_text(GTK_LABEL (widget_cache[WIDGET_LABEL_P0 + i]), "");
     }
 }
+
+static void sync_chain_entry_beat_toggle_from_status(void)
+{
+    GtkWidget *w = widget_cache[WIDGET_CHAIN_ENTRY_BEAT_TOGGLE];
+    int *p = &(info->uc.entry_tokens[0]);
+
+    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+        return;
+
+    int active = p[ENTRY_BEAT_FLAG] ? 1 : 0;
+
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == active)
+        return;
+
+    int old_lock = info->status_lock;
+    info->status_lock = 1;
+
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), active);
+
+    info->status_lock = old_lock;
+}
+
 static void process_reload_hints(int *history, int pm)
 {
     int *entry_tokens = &(info->uc.entry_tokens[0]);
@@ -8383,6 +8815,7 @@ static void process_reload_hints(int *history, int pm)
                 info->uc.reload_hint[HINT_KF] = 1;
             }
         }
+        sync_chain_entry_beat_toggle_from_status();
     }
     info->parameter_lock = 0;
 
@@ -8411,6 +8844,14 @@ static void process_reload_hints(int *history, int pm)
         info->uc.reload_hint[HINT_MACRODELAY] = md;
     }
 
+}
+
+static void update_record_audio_source_from_status(int *history)
+{
+    if(history[RECORD_AUDIO_SOURCE] == info->status_tokens[RECORD_AUDIO_SOURCE])
+        return;
+
+    record_audio_source_sync_groups(info->status_tokens[RECORD_AUDIO_SOURCE]);
 }
 
 void update_gui(void)
@@ -8442,22 +8883,19 @@ void update_gui(void)
         pm = MODE_SAMPLE;
     }
 
-    update_globalinfo(history, pm, last_pm);
+    update_audio_beat_status_widgets(history, last_pm < 0);
 
-//  #include <valgrind/callgrind.h>
-//    CALLGRIND_START_INSTRUMENTATION;
-//    CALLGRIND_TOGGLE_COLLECT;
+    update_globalinfo(history, pm, last_pm);
+    update_record_audio_source_from_status(history);
 
     process_reload_hints(history, pm);
-//   CALLGRIND_TOGGLE_COLLECT;
-//    CALLGRIND_STOP_INSTRUMENTATION;
-//    CALLGRIND_DUMP_STATS;
-
 
     on_vims_messenger();
 
     update_cpumeter_timeout(NULL);
     update_cachemeter_timeout(NULL);
+
+
 }
 
 void vj_gui_set_title(char *remote, int port) {
@@ -8606,7 +9044,7 @@ void vj_gui_cb(int state, char *hostname, int port_num)
     int i;
     for( i = 0; i < 4; i ++ ) {
         int *h = info->history_tokens[i];
-        veejay_memset( h, 0, sizeof(int) * VIMS_STATUS_TOKENS );
+        veejay_memset( h, 0, sizeof(int) * STATUS_ARRAY_SIZE );
     }
 }
 
@@ -8673,11 +9111,11 @@ void register_signals(void)
 void vj_gui_wipe(void)
 {
     int i;
-    veejay_memset( info->status_tokens, 0, sizeof(int) * VIMS_STATUS_TOKENS );
+    veejay_memset( info->status_tokens, 0, sizeof(int) * STATUS_ARRAY_SIZE );
     veejay_memset( info->uc.entry_tokens,0, sizeof(int) * ENTRY_LAST);
     for( i = 0 ; i < 4; i ++ )
     {
-        veejay_memset(info->history_tokens[i],0, sizeof(int) * (VIMS_STATUS_TOKENS+1));
+        veejay_memset(info->history_tokens[i],0, sizeof(int) * STATUS_ARRAY_SIZE);
     }
 }
 
@@ -8959,9 +9397,9 @@ void vj_gui_init(const char *glade_file,
     
 	veejay_msg(VEEJAY_MSG_DEBUG, "Loading glade file %s", glade_path);
 
-    int status_arr_size = sizeof(int) * sizeof(int) * VIMS_STATUS_TOKENS;
+    const int status_arr_size = sizeof(int) * STATUS_ARRAY_SIZE;
 
-    veejay_memset( gui->status_tokens, 0, status_arr_size );
+    veejay_memset(gui->status_tokens, 0, status_arr_size);
     veejay_memset( gui->sample, 0, 2 );
     veejay_memset( gui->selection, 0, 3 );
     veejay_memset( &(gui->uc), 0, sizeof(veejay_user_ctrl_t));
@@ -8972,7 +9410,7 @@ void vj_gui_init(const char *glade_file,
 
     for( i = 0 ; i < HISTORY_PLAYMODES; i ++ )
     {
-        gui->history_tokens[i] = (int*) vj_calloc(sizeof(int) * status_arr_size);
+        gui->history_tokens[i] = (int*) vj_calloc(status_arr_size);
     }
 
     for( i = 0; i < NUM_HINTS ; i ++ ) {
@@ -9050,6 +9488,7 @@ void vj_gui_init(const char *glade_file,
     GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
 
     init_widget_cache();
+    init_audio_beat_tooltips();
 
     GtkWidget *box = glade_xml_get_widget_( info->main_window, "sample_bank_hbox" );
     info->sample_bank_pad = new_bank_pad( box );
