@@ -784,6 +784,7 @@ static int vj_perform_ab_ctx_debug_should_log(const char *tag, int active_fx, in
 
     return ((seq % 45) == 0);
 }
+
 static void vj_perform_ab_ctx_debug_dump(
     veejay_t *veejay_instance_,
     const char *tag,
@@ -799,56 +800,33 @@ static void vj_perform_ab_ctx_debug_dump(
 {
     char summary[1024];
     int pos = 0;
-    int action = -1;
-    int enabled = -1;
-    int running = -1;
-    int open = -1;
-    int paused = -1;
-    int hit_seq = -1;
-    int consumed_seq = -1;
-    int sample_speed = 0;
-    int play_speed = 0;
 
-    static long last_log_ms = 0;
-    static int log_count = 0;
-
-    long now_ms = 0;
+    (void)veejay_instance_;
 
     if(!tag)
         tag = "unknown";
 
-    now_ms = (long)(time(NULL) * 1000L);
-
-    if(strcmp(tag, "state") == 0 && changed <= 0 && log_count > 20) {
-        if(last_log_ms != 0 && (now_ms - last_log_ms) < 1000L)
-            return;
-    }
-
-    last_log_ms = now_ms;
-    log_count++;
+    if(!vj_perform_ab_ctx_debug_should_log(tag, active_fx, changed))
+        return;
 
     summary[0] = '\0';
 
-    if(ctx)
-    {
-        for(int lane = 0; lane < ctx->chain_count && pos < (int)sizeof(summary) - 1; lane++)
-        {
+    if(ctx) {
+        for(int lane = 0; lane < ctx->chain_count && pos < (int)sizeof(summary) - 1; lane++) {
             sample_eff_chain **chain = ctx->chain[lane];
-            int lane_active = 0;
             int lane_raw = 0;
+            int lane_active = 0;
             int lane_disabled = 0;
             int lane_beat = 0;
-            int first_active_fx = 0;
             int first_raw_fx = 0;
+            int first_active_fx = 0;
             int first_beat_fx = 0;
-            int first_active_entry = -1;
             int first_raw_entry = -1;
+            int first_active_entry = -1;
             int first_beat_entry = -1;
 
-            if(chain)
-            {
-                for(int entry_nr = 0; entry_nr < SAMPLE_MAX_EFFECTS; entry_nr++)
-                {
+            if(chain) {
+                for(int entry_nr = 0; entry_nr < SAMPLE_MAX_EFFECTS; entry_nr++) {
                     sample_eff_chain *entry = chain[entry_nr];
 
                     if(!entry || entry->effect_id <= 0)
@@ -900,31 +878,23 @@ static void vj_perform_ab_ctx_debug_dump(
                             first_beat_fx,
                             first_beat_entry);
         }
-    }
-    else
-    {
+    } else {
         snprintf(summary, sizeof(summary), "ctx=NULL");
     }
 
-#ifdef HAVE_JACK
-    if(veejay_instance_ && veejay_instance_->settings) {
-        video_playback_setup *settings = veejay_instance_->settings;
-
-        action = atomic_load_int(&settings->audio_beat.action_mode);
-        enabled = vj_audio_beat_is_enabled(&settings->audio_beat);
-        running = vj_audio_beat_is_running(&settings->audio_beat);
-        open = vj_audio_beat_is_open(&settings->audio_beat);
-        paused = vj_audio_beat_is_paused_by_beat(&settings->audio_beat);
-        hit_seq = atomic_load_int(&settings->audio_beat.hit_seq);
-        consumed_seq = atomic_load_int(&settings->audio_beat.consumed_seq);
-        play_speed = settings->current_playback_speed;
-
-        if(veejay_instance_->uc &&
-           veejay_instance_->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
-            sample_speed = sample_get_speed(veejay_instance_->uc->sample_id);
-    }
-#endif
-
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "[AUDIO-BEAT-AUTO] %s sample=%d playmode=%d renderer=%d local=%d global=%d active=%d changed=%d chains=%d %s",
+               tag,
+               sample_id,
+               playmode,
+               renderer_id,
+               local_enabled,
+               global_enabled,
+               active_fx,
+               changed,
+               ctx ? ctx->chain_count : 0,
+               summary);
+}
 
 static int vj_perform_audio_beat_playmode_has_fx_chain(int playmode)
 {
@@ -1118,8 +1088,6 @@ static int vj_perform_audio_beat_apply_render_chains(
     return changed;
 }
 
-#endif
-
 static void vj_perform_clear_audio_edges(
     veejay_t *info,
     audio_edge_t *edge,
@@ -1147,6 +1115,7 @@ static void vj_perform_clear_audio_edges(
     (void)old_a;
     (void)old_b;
 }
+#endif
 
 static inline int vj_seq_type_to_playback_mode(int type)
 {
