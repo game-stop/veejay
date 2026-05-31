@@ -37,7 +37,15 @@
 
 
 #define POLL_INTERVAL (1.0f) // agressive polling
-#define MAX_MSG 256          // maximum message size (bytes)
+#define MAX_MSG 256          // maximum outgoing command message size (bytes)
+
+
+#define SENDVIMS_STATUS_TOKENS    57 // lock step requirement with vims.h
+#define SENDVIMS_STATUS_BODY_MAX  1024
+#define SENDVIMS_HEADER_SIZE      5
+
+#define SENDVIMS_STATUS_AUDIO_MUTED           55
+#define SENDVIMS_STATUS_RECORD_AUDIO_SOURCE   56
 
 #define QUEUE_SIZE (1<<8)    // message queue size (power of 2)
 #define QUEUE_MASK (QUEUE_SIZE - 1)
@@ -67,7 +75,7 @@ typedef struct {
 typedef struct {
     t_symbol *selector;
     int argc;
-    t_atom argv[(MAX_MSG / sizeof(t_atom)) - sizeof(t_symbol *) - sizeof(int)];
+    t_atom argv[SENDVIMS_STATUS_TOKENS];
 } pd_msg_t;
 
 
@@ -133,7 +141,7 @@ int selector_map(t_symbol *s){
     }
 
     // fallthrough
-    post("sendVIMS: selector %d not recognized", s->s_name);
+    post("sendVIMS: selector %s not recognized", s->s_name);
     return 0;
 }
 
@@ -152,38 +160,51 @@ void setup_selectors(void){
 
 
 pd_msg_t *pd_msg_new(char *msg){
-    int i, parsed, size = -1;
-    char *body = msg + 5;
+    char *body = msg + SENDVIMS_HEADER_SIZE;
     pd_msg_t *m = NULL;
-    int s[34]; 
+    int values[SENDVIMS_STATUS_TOKENS];
     int n = 0;
-	
-    /* get 31 ints */
-    n = sscanf(body, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
-		s+0, s+1, s+2, s+3,
-		s+4, s+5, s+6, s+7,
-		s+8, s+9, s+10, s+11,
-		s+12,s+13,s+14, s+15,
-		s+16,s+17,s+18, s+19,
-		s+20,s+21,s+22, s+23,
-	   	s+24,s+25, s+26, s + 27, s + 28, s + 29, s + 30, s + 31, s + 32, s + 33,s + 34, s+35, s+36, s+37, s+38);
+    int i;
+    char *p = body;
 
-    /* create msg */
-    size_t est = n * sizeof(float) + sizeof(pd_msg_t); //@ malloc(sizeof(*m)) not ok
-    m = malloc(est);
-    m->selector = s_veejay; // not used
+    while (n < SENDVIMS_STATUS_TOKENS) {
+        char *end = NULL;
+        long v;
+
+        while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
+            p++;
+
+        if (*p == '\0' || *p == ';')
+            break;
+
+        errno = 0;
+        v = strtol(p, &end, 10);
+
+        if (end == p || errno != 0)
+            break;
+
+        values[n++] = (int)v;
+        p = end;
+    }
+
+    if (n != SENDVIMS_STATUS_TOKENS) {
+        post("sendVIMS: parsed %d status tokens, expected %d",
+             n, SENDVIMS_STATUS_TOKENS);
+    }
+
+    m = malloc(sizeof(*m));
+    if (!m)
+        return NULL;
+
+    m->selector = s_veejay;
     m->argc = n;
-    for(i=0; i<n; i++) SETFLOAT(m->argv + i, (float)s[i]);
+
+    for (i = 0; i < n; i++)
+        SETFLOAT(m->argv + i, (float) values[i]);
+
     return m;
-
-  error:
-    if( m )
-    	msg_free(m);
-
-    post("Parsed %d status outlets", n);
-    return 0;
-
 }
+
 
 
 // create veejay message from a pd message
@@ -333,46 +354,71 @@ static void sendVIMS_disconnect_from_thread(sendVIMS_t *x){
     longjmp(x->errorhandler, -1);   // jump to thread error handler
 }
 
+// read exactly len bytes unless the socket closes/errors
+static int sendVIMS_recv_all(int fd, char *buf, int len) {
+    int total = 0;
+
+    while (total < len) {
+        int r = recv(fd, buf + total, len - total, 0);
+
+        if (r <= 0)
+            return (total > 0) ? total : r;
+
+        total += r;
+    }
+
+    return total;
+}
+
 // read one chunk of status information
 static pd_msg_t *sendVIMS_status(sendVIMS_t *x) {
     int gotbytes = 0;
     int wantbytes = 0;
-    pd_msg_t *m = 0;
-    char buf[100];
     int size = -1;
+    char header[SENDVIMS_HEADER_SIZE + 1];
+    char buf[SENDVIMS_HEADER_SIZE + SENDVIMS_STATUS_BODY_MAX + 1];
 
     // read header
-    wantbytes = 5;
-    gotbytes  = recv(x->status_socket.handle, buf, wantbytes, 0);
+    wantbytes = SENDVIMS_HEADER_SIZE;
+    gotbytes = sendVIMS_recv_all(x->status_socket.handle, header, wantbytes);
     if (wantbytes != gotbytes) goto error;
-    if (1 != sscanf(buf, "V%03dD", &size)) goto proto_error;
+
+    header[SENDVIMS_HEADER_SIZE] = '\0';
+    if (1 != sscanf(header, "V%03dD", &size)) goto proto_error;
+    if (size < 0 || size > SENDVIMS_STATUS_BODY_MAX) goto proto_error;
 
     // read body
+    memcpy(buf, header, SENDVIMS_HEADER_SIZE);
     wantbytes = size;
-    gotbytes  = recv(x->status_socket.handle, buf + 5, wantbytes, 0);
+    gotbytes = sendVIMS_recv_all(x->status_socket.handle,
+                                 buf + SENDVIMS_HEADER_SIZE,
+                                 wantbytes);
     if (wantbytes != gotbytes) goto error;
+
+    buf[SENDVIMS_HEADER_SIZE + size] = '\0';
 
     // return a pd message
     return pd_msg_new(buf);
 
   error:
     if (gotbytes > 0) {
-	post("sendVIMS: message truncated: wanted %d bytes, got %d", 
-	     wantbytes, gotbytes);
+        post("sendVIMS: message truncated: wanted %d bytes, got %d", 
+             wantbytes, gotbytes);
     }
     else if (gotbytes == 0) {
-	post("sendVIMS: remote end closed connection");
+        post("sendVIMS: remote end closed connection");
     }
     else {
-	perror("sendVIMS");
+        perror("sendVIMS");
     }
     return 0;
 
   proto_error:
-    post("sendVIMS: protocol error: not a valid veejay header.");
+    post("sendVIMS: protocol error: not a valid veejay status packet.");
     return 0;
 
 }
+
 
 // flush and get status messages
 static void sendVIMS_flush(sendVIMS_t *x, int frames) {
@@ -540,7 +586,7 @@ static void *sendVIMS_new(t_symbol *moi, int argc, t_atom *argv){
     x->outlet = outlet_new(&x->obj, gensym("anything"));
 
     if ((argc >= 1) && argv[0].a_type == A_SYMBOL){
-	x->hostname = argv[1].a_w.w_symbol;
+	x->hostname = argv[0].a_w.w_symbol;
     }
     if ((argc >= 2) && argv[1].a_type == A_FLOAT){
 	x->port = (int)argv[1].a_w.w_float;
