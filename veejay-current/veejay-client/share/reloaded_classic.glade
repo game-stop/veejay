@@ -772,8 +772,8 @@
 			<property name="visible">True</property>
 			<property name="can-focus">True</property>
 			<property name="receives-default">False</property>
-			<property name="tooltip-text" translatable="yes">Enable Beat detection</property>
-			<signal name="clicked" handler="on_button_audio_beat_toggled" swapped="no"/>
+			<property name="tooltip-text" translatable="yes">Audio mute/unmute</property>
+			<signal name="clicked" handler="on_button_audio_mute_toggled" swapped="no"/>
 			<child>
 				<object class="GtkImage" id="image266beat">
 				<property name="visible">True</property>
