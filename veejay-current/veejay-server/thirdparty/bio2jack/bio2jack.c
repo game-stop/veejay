@@ -71,6 +71,10 @@
 #define MAX_INPUT_PORTS 2
 
 #define DEFAULT_VOLUME 100
+
+#define JACK_RECONNECT_INITIAL_DELAY_NS 250000000L
+#define JACK_RECONNECT_MAX_DELAY_NS     8000000000L
+#define JACK_RECONNECT_MAX_ATTEMPTS     6
 typedef struct jack_driver_s
 {
   int allocated;
@@ -133,6 +137,11 @@ typedef struct jack_driver_s
   volatile int state;
   volatile int jackd_died;
   struct timespec last_reconnect_attempt;
+  unsigned int reconnect_attempts;
+  long reconnect_delay_ns;
+  volatile int reconnect_failed;
+  volatile int reconnect_final_warned;
+  volatile int pwjack_hint_emitted;
 
   volatile unsigned int volume[MAX_OUTPUT_PORTS];
   volatile int volumeEffectType;
@@ -174,6 +183,7 @@ static void JACK_CloseDevice(jack_driver_t *drv);
 #endif
 
 static int JACK_OpenDevice(jack_driver_t *drv);
+static int JACK_OpenDeviceRaw(jack_driver_t *drv);
 static unsigned long JACK_GetBytesFreeSpaceFromDriver(jack_driver_t *drv);
 static void JACK_ResetFromDriver(jack_driver_t *drv);
 static unsigned long JACK_GetPositionFromDriver(jack_driver_t *drv, int position, int type);
@@ -305,21 +315,137 @@ long TimeValDifference(struct timespec *start, struct timespec *end)
          ((start->tv_sec * 1000000000) + start->tv_nsec);
 }
 
+static long JACK_ReconnectDelayNs(unsigned int failures)
+{
+  long delay = JACK_RECONNECT_INITIAL_DELAY_NS;
+
+  if (failures == 0)
+    return 0;
+
+  for (unsigned int i = 1; i < failures; i++)
+  {
+    if (delay >= (JACK_RECONNECT_MAX_DELAY_NS / 2))
+      return JACK_RECONNECT_MAX_DELAY_NS;
+
+    delay *= 2;
+  }
+
+  return (delay > JACK_RECONNECT_MAX_DELAY_NS)
+             ? JACK_RECONNECT_MAX_DELAY_NS
+             : delay;
+}
+
+static void JACK_ResetReconnectPolicy(jack_driver_t *drv)
+{
+  if (!drv)
+    return;
+
+  drv->reconnect_attempts = 0;
+  drv->reconnect_delay_ns = JACK_RECONNECT_INITIAL_DELAY_NS;
+  drv->reconnect_failed = FALSE;
+  drv->reconnect_final_warned = FALSE;
+  drv->pwjack_hint_emitted = FALSE;
+
+  clock_gettime(CLOCK_MONOTONIC, &drv->last_reconnect_attempt);
+}
+
+static int JACK_ReconnectAllowed(jack_driver_t *drv)
+{
+  if (!drv)
+    return 0;
+
+  if (atomic_load_int(&drv->reconnect_failed))
+  {
+    if (!atomic_exchange_int(&drv->reconnect_final_warned, TRUE))
+    {
+      WARN("Jack reconnect disabled after %u failed attempts. Audio will stay offline until JACK is restarted or veejay is restarted.",
+           drv->reconnect_attempts);
+    }
+    return 0;
+  }
+
+  if (drv->reconnect_attempts == 0)
+  {
+    clock_gettime(CLOCK_MONOTONIC, &drv->last_reconnect_attempt);
+    return 1;
+  }
+
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+
+  if (TimeValDifference(&drv->last_reconnect_attempt, &now) < drv->reconnect_delay_ns)
+    return 0;
+
+  drv->last_reconnect_attempt = now;
+  return 1;
+}
+
+static void JACK_MaybeWarnPwJack(jack_driver_t *drv)
+{
+  if (!drv)
+    return;
+
+  if (atomic_exchange_int(&drv->pwjack_hint_emitted, TRUE))
+    return;
+
+  char jack_socket[128];
+  snprintf(jack_socket, sizeof(jack_socket),
+           "/dev/shm/jack-%ld/default/jack_0", (long)getuid());
+
+  if (access(jack_socket, F_OK) != 0)
+  {
+    WARN("No JACK server socket found at %s. If this is a PipeWire JACK system, start veejay through pw-jack, e.g. `pw-jack veejay ...`; otherwise start jackd.",
+         jack_socket);
+  }
+}
+
+static void JACK_RecordOpenFailure(jack_driver_t *drv, int retval)
+{
+  if (!drv)
+    return;
+
+  drv->client = NULL;
+  drv->jackd_died = TRUE;
+
+  drv->reconnect_attempts++;
+
+  JACK_MaybeWarnPwJack(drv);
+
+  if (drv->reconnect_attempts >= JACK_RECONNECT_MAX_ATTEMPTS)
+  {
+    drv->reconnect_failed = TRUE;
+    drv->reconnect_delay_ns = JACK_RECONNECT_MAX_DELAY_NS;
+    atomic_exchange_int(&drv->state, CLOSED);
+
+    if (!atomic_exchange_int(&drv->reconnect_final_warned, TRUE))
+    {
+      WARN("Giving up on JACK after %u failed connection attempts (last error %d). Audio reconnect is now disabled for this device.",
+           drv->reconnect_attempts, retval);
+    }
+    return;
+  }
+
+  drv->reconnect_delay_ns = JACK_ReconnectDelayNs(drv->reconnect_attempts);
+
+  WARN("JACK unavailable; reconnect attempt %u/%u failed (error %d). Next retry in %.2f seconds.",
+       drv->reconnect_attempts,
+       JACK_RECONNECT_MAX_ATTEMPTS,
+       retval,
+       (double)drv->reconnect_delay_ns / 1000000000.0);
+}
+
 static inline jack_driver_t *getDriver(int deviceID)
 {
+  if (deviceID < 0 || deviceID >= MAX_OUTDEVICES)
+    return NULL;
+
   jack_driver_t *drv = &outDev[deviceID];
 
   if (drv->jackd_died && drv->client == 0)
   {
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-
-    if (TimeValDifference(&drv->last_reconnect_attempt, &now) >= 250000000L)
-    {
-      JACK_OpenDevice(drv);
-      drv->last_reconnect_attempt = now;
-      veejay_msg(VEEJAY_MSG_WARNING, "[AUDIO] Last connection attempt to Jack!");
-    }
+    int retval = JACK_OpenDevice(drv);
+    if (retval == ERR_SUCCESS)
+      veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] Reconnected to JACK");
   }
 
   return drv;
@@ -664,10 +790,10 @@ void JACK_shutdown(void *arg)
 {
   jack_driver_t *drv = (jack_driver_t *)arg;
 
-  getDriver(drv->deviceID);
+  if (!drv)
+    return;
 
   drv->client = 0;
-  drv->jackd_died = TRUE;
 
 #if JACK_CLOSE_HACK
   JACK_CloseDevice(drv, TRUE);
@@ -675,7 +801,10 @@ void JACK_shutdown(void *arg)
   JACK_CloseDevice(drv);
 #endif
 
-  veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO] Jack has shutdown. You will probably need to restart for Audio playback");
+  drv->jackd_died = TRUE;
+  drv->client = 0;
+
+  veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO] Jack has shutdown. Audio reconnect will use the JACK backoff policy.");
 }
 
 static void
@@ -685,7 +814,7 @@ JACK_Error(const char *desc)
 }
 
 static int
-JACK_OpenDevice(jack_driver_t *drv)
+JACK_OpenDeviceRaw(jack_driver_t *drv)
 {
   const char **ports;
   char *our_client_name = 0;
@@ -1191,6 +1320,33 @@ JACK_OpenDevice(jack_driver_t *drv)
   return ERR_SUCCESS;
 }
 
+static int
+JACK_OpenDevice(jack_driver_t *drv)
+{
+  if (!JACK_ReconnectAllowed(drv))
+    return ERR_OPENING_JACK;
+
+  int retval = JACK_OpenDeviceRaw(drv);
+
+  if (retval == ERR_SUCCESS)
+  {
+    JACK_ResetReconnectPolicy(drv);
+    return ERR_SUCCESS;
+  }
+
+  if (drv && drv->client)
+  {
+#if JACK_CLOSE_HACK
+    JACK_CloseDevice(drv, TRUE);
+#else
+    JACK_CloseDevice(drv);
+#endif
+  }
+
+  JACK_RecordOpenFailure(drv, retval);
+  return retval;
+}
+
 #if JACK_CLOSE_HACK
 static void
 JACK_CloseDevice(jack_driver_t *drv, bool close_client)
@@ -1379,6 +1535,8 @@ int JACK_Close(int deviceID)
 #else
   JACK_CloseDevice(drv);
 #endif
+
+  JACK_ResetReconnectPolicy(drv);
 
   if (drv->pPlayPtr)
   {
@@ -2364,6 +2522,7 @@ void JACK_Init(void)
     }
 
     JACK_CleanupDriver(drv);
+    JACK_ResetReconnectPolicy(drv);
 
     JACK_ResetFromDriver(drv);
   }
