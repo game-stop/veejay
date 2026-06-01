@@ -9630,11 +9630,23 @@ void vj_gui_init(const char *glade_file,
 
     gtk_container_add(GTK_CONTAINER(curve_container), gui->curve);
 
+    GtkWidget* widget_shape = widget_cache[WIDGET_CURVE_COMBO_ANIMATION];
     for (int i = 0; i < FX_ANIM_SHAPE_MAX; i++)
     {
-        gtk_combo_box_text_insert_text (GTK_COMBO_BOX_TEXT(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]),i ,fx_anim_shape_map[i].description);
+        gtk_combo_box_text_insert_text (GTK_COMBO_BOX_TEXT(widget_shape) ,i ,fx_anim_shape_map[i].description);
     }
-    gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]), 0);
+    //block signal propagation during init
+    guint signal_id=g_signal_lookup("changed", G_TYPE_FROM_INSTANCE(widget_shape));
+    gulong handler_id=g_signal_handler_find(widget_shape , G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block(widget_shape , handler_id);
+
+    gtk_combo_box_set_active (GTK_COMBO_BOX(widget_shape) , 0);
+
+    if (handler_id)
+        g_signal_handler_unblock(widget_shape, handler_id);
+
 
     gtk_widget_show_all(curve_container);
 
