@@ -76,11 +76,10 @@ vj_effect *ripple_init(int width, int height)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_WARP,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE, 40,  760, 6, 22, 1800, 4200, 900, 30, /* Waves */
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE, 8,   64,  6, 22, 1800, 4200, 900, 30, /* Amplitude */
-        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE, 4,   80,  6, 22, 1600, 3400, 700, 30  /* Attenuation */
+        VJ_BEAT_WARP,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 40, 760, 6, 22, 1800, 4200, 900, 30, /* Waves */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 8,  64,  6, 22, 1800, 4200, 900, 30, /* Amplitude */
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 4,  80,  6, 22, 1600, 3400, 700, 30  /* Attenuation */
     );
-
     (void) width;
     (void) height;
 

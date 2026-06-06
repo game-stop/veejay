@@ -71,7 +71,7 @@ vj_effect *smuck_init(int w, int h)
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 2;
 
-    ve->description = "SmuckTV (Pro)";
+    ve->description = "SmuckTV";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
