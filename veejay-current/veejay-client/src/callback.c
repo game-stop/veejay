@@ -1,5 +1,5 @@
 /* gveejay - Linux VeeJay - GVeejay GTK+-2/Glade User Interface
- *           (C) 2002-2015 Niels Elburg <nwelburg@gmail.com> 
+ *           (C) 2002-2015 Niels Elburg <nwelburg@gmail.com>
  *           (C)      2006 Matthijs van Henten <matthijs.vanhenten@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -18,6 +18,7 @@
  */
 
 #include <ctype.h>
+#include <math.h>
 #include <veejaycore/vj-msg.h>
 #include <gtktimeselection.h>
 #include <veejaycore/vims.h>
@@ -25,26 +26,97 @@
 
 static int config_file_status = 0;
 static gchar *config_file = NULL;
-static int srt_locked_ = 0;
-static int srt_seq_ = 0;
 
-static int bg_[4];
-static int fg_[4];
-static int ln_[4];
+#define FRAMERATE_SEND_MIN_US 40000
+
+static int framerate_last_sent_x100 = -1;
+static int framerate_pending_x100 = -1;
+static gint64 framerate_last_sent_us = 0;
+static guint framerate_timeout_id = 0;
+
+static inline int ui_clampi(int v, int lo, int hi)
+{
+    return (v < lo) ? lo : ((v > hi) ? hi : v);
+}
+
+static inline double ui_clampd(double v, double lo, double hi)
+{
+    return (v < lo) ? lo : ((v > hi) ? hi : v);
+}
+
+static int framerate_slider_value_to_ceil_x100(gdouble slider_val)
+{
+    slider_val = ui_clampd(slider_val, 1.0, 240.0);
+
+    int fps = (int)slider_val;
+    fps += (slider_val > ((gdouble)fps + 0.000001));
+
+    return ui_clampi(fps, 1, 240) * 100;
+}
+
+
+static void framerate_snap_widget_to_integer(GtkWidget *w, int value_x100)
+{
+    GtkAdjustment *a;
+    gdouble snapped;
+    int old_lock;
+
+    if(!w || !GTK_IS_RANGE(w))
+        return;
+
+    a = gtk_range_get_adjustment(GTK_RANGE(w));
+    snapped = ((gdouble)value_x100) / 100.0;
+
+    if(gtk_adjustment_get_value(a) == snapped)
+        return;
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+    gtk_adjustment_set_value(a, snapped);
+    info->status_lock = old_lock;
+}
+
+static void framerate_send_x100(int value_x100, int midi_learn)
+{
+    value_x100 = ui_clampi(value_x100, 100, 24000);
+
+    if(value_x100 == framerate_last_sent_x100)
+        return;
+
+    multi_vims(VIMS_FRAMERATE, "%d", value_x100);
+
+    if(midi_learn)
+        vj_midi_learning_vims_simple(info->midi, "framerate", VIMS_FRAMERATE);
+
+    framerate_last_sent_x100 = value_x100;
+    framerate_last_sent_us = g_get_monotonic_time();
+}
+
+static gboolean framerate_flush_pending_cb(gpointer data)
+{
+    (void)data;
+
+    if(info && info->status_lock)
+        return TRUE;
+
+    framerate_timeout_id = 0;
+
+    if(framerate_pending_x100 >= 0) {
+        int value_x100 = framerate_pending_x100;
+        framerate_pending_x100 = -1;
+        framerate_send_x100(value_x100, 0);
+    }
+
+    return FALSE;
+}
 
 static inline int sample_calctime(int nframes);
 static int sample_calctime_selection();
 static int sample_calctime_mulloop();
 
-static	void change_box_color_rgb( GtkWidget *box, int r, int g, int b,int a, int fill );
-
-void	text_defaults(void)
-{
-	bg_[0] = 255; bg_[1] = 255; bg_[2] = 255; bg_[3] = 0;
-	fg_[0] = 0;   fg_[1] = 0;   fg_[2] = 0;   fg_[3] = 0;
-	ln_[0] = 200; ln_[1] = 255; ln_[2] = 255; ln_[3] = 0;
-	srt_seq_ = 0;
-}
+static gboolean timeline_marker_mode_is_sample(void);
+static gboolean timeline_marker_can_send(void);
+static void timeline_marker_disable_selection_guarded(GtkWidget *widget);
 
 static void toggle_siamese_widget(GtkWidget *widget, GtkWidget *first, GtkWidget *second, int signal_suppression)
 {
@@ -214,7 +286,7 @@ void	on_button_251_clicked( GtkWidget *widget, gpointer user_data)
 	single_vims( VIMS_BEZERK );
 	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_BEZERK );
 	vj_msg(VEEJAY_MSG_INFO, "Bezerk mode toggled");
-}	
+}
 
 void	on_entry_samplename_button_clicked( GtkWidget *widget, gpointer user_data )
 {
@@ -248,7 +320,7 @@ void	on_button_054_clicked(GtkWidget *widget, gpointer user_data)
 }
 void	on_button_200_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims( VIMS_EFFECT_SET_BG ); 
+	single_vims( VIMS_EFFECT_SET_BG );
 	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_EFFECT_SET_BG );
 	vj_msg(VEEJAY_MSG_INFO,
 		"Requested background mask of frame %d",
@@ -256,12 +328,12 @@ void	on_button_200_clicked(GtkWidget *widget, gpointer user_data)
 }
 
 void on_beat_entry_toggle_toggled(GtkWidget *widget, gpointer user_data) {
-	
+
 	if(info->status_lock)
 		return;
 
 	int status = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
-	
+
  	multi_vims( VIMS_CHAIN_ENTRY_BEAT_TOGGLE,"%d %d %d", 0, info->uc.selected_chain_entry, status );
 }
 
@@ -335,7 +407,9 @@ void on_audio_beat_enable_toggle_toggled(GtkToggleButton *togglebutton, gpointer
     if(enabled)
         audio_beat_enable_chain_entry_toggle_guarded(1);
 
-    multi_vims(VIMS_AUDIO_BEAT_TOGGLE, "%d", enabled);
+
+
+    multi_vims(VIMS_AUDIO_BEAT_STATUS, "%d", enabled);
 }
 void on_audio_beat_action_combo_changed(GtkWidget *widget, gpointer user_data)
 {
@@ -427,6 +501,743 @@ void on_audio_beat_auto_reset_button_toggled(GtkWidget *widget, gpointer user_da
 }
 
 
+static int audio_sync_last_non_jack_master = VJ_RECORD_AUDIO_SOURCE_ORIGINAL;
+
+static void audio_input_selector_set_guarded(int active)
+{
+    GtkWidget *w = widget_cache[WIDGET_AUDIO_INPUT_SELECTOR_COMBO];
+    int old_lock;
+
+    if(!w || !GTK_IS_COMBO_BOX(w))
+        return;
+
+    if(gtk_combo_box_get_active(GTK_COMBO_BOX(w)) == active)
+        return;
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+    gtk_combo_box_set_active(GTK_COMBO_BOX(w), active);
+    info->status_lock = old_lock;
+}
+
+enum {
+    AUDIO_MASTER_ORIGINAL = 0,
+    AUDIO_MASTER_JACK     = 1,
+    AUDIO_MASTER_WAV      = 2,
+    AUDIO_MASTER_SILENCE  = 3
+};
+
+static int audio_input_selector_record_source_from_active(int active)
+{
+    switch(active) {
+        case AUDIO_MASTER_JACK:
+        case AUDIO_MASTER_WAV:
+
+
+            return VJ_RECORD_AUDIO_SOURCE_BEAT_JACK;
+        case AUDIO_MASTER_SILENCE:
+            return VJ_RECORD_AUDIO_SOURCE_SILENCE;
+        case AUDIO_MASTER_ORIGINAL:
+        default:
+            return VJ_RECORD_AUDIO_SOURCE_ORIGINAL;
+    }
+}
+
+static int audio_input_selector_active_from_record_source(int source)
+{
+    switch(source) {
+        case VJ_RECORD_AUDIO_SOURCE_BEAT_JACK: return AUDIO_MASTER_JACK;
+        case VJ_RECORD_AUDIO_SOURCE_SILENCE:   return AUDIO_MASTER_SILENCE;
+        case VJ_RECORD_AUDIO_SOURCE_AUTO:
+        case VJ_RECORD_AUDIO_SOURCE_ORIGINAL:
+        default: return AUDIO_MASTER_ORIGINAL;
+    }
+}
+
+static int audio_input_selector_active_from_ui(void)
+{
+    GtkWidget *w = widget_cache[WIDGET_AUDIO_INPUT_SELECTOR_COMBO];
+
+    if(!w || !GTK_IS_COMBO_BOX(w))
+        return AUDIO_MASTER_ORIGINAL;
+
+    int active = gtk_combo_box_get_active(GTK_COMBO_BOX(w));
+    return (active < 0) ? AUDIO_MASTER_ORIGINAL : active;
+}
+
+static int audio_input_selector_wav_from_ui(void)
+{
+    return audio_input_selector_active_from_ui() == AUDIO_MASTER_WAV;
+}
+
+static const char *audio_input_selector_name_from_active(int active)
+{
+    switch(active) {
+        case AUDIO_MASTER_JACK:    return "JACK external";
+        case AUDIO_MASTER_WAV:     return "WAV file";
+        case AUDIO_MASTER_SILENCE: return "Silence";
+        case AUDIO_MASTER_ORIGINAL:
+        default: return "Original video audio";
+    }
+}
+
+static void audio_sync_remember_non_jack_master(int record_source)
+{
+    if(record_source == VJ_RECORD_AUDIO_SOURCE_ORIGINAL ||
+       record_source == VJ_RECORD_AUDIO_SOURCE_SILENCE)
+        audio_sync_last_non_jack_master = record_source;
+}
+
+static int audio_sync_non_jack_master_from_status(void)
+{
+    int source = info->status_tokens[RECORD_AUDIO_SOURCE];
+
+    if(source == VJ_RECORD_AUDIO_SOURCE_ORIGINAL ||
+       source == VJ_RECORD_AUDIO_SOURCE_SILENCE)
+    {
+        audio_sync_last_non_jack_master = source;
+        return source;
+    }
+
+    return audio_sync_last_non_jack_master;
+}
+
+static int audio_sync_get_combo_active(int widget_id, int fallback)
+{
+    GtkWidget *w = widget_cache[widget_id];
+
+    if(!w || !GTK_IS_COMBO_BOX(w))
+        return fallback;
+
+    int v = gtk_combo_box_get_active(GTK_COMBO_BOX(w));
+    return (v < 0) ? fallback : v;
+}
+
+static int audio_sync_mode_combo_to_mode(int active)
+{
+
+
+    switch(active) {
+        case 1: return VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE;
+        case 2: return VJ_AUDIO_SYNC_MODE_TRACK_ALIGN;
+        case 3: return VJ_AUDIO_SYNC_MODE_MONITOR;
+        case 0:
+        default: return 0;
+    }
+}
+
+static int audio_sync_mode_combo_from_mode(int mode)
+{
+    switch(mode) {
+        case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE: return 1;
+        case VJ_AUDIO_SYNC_MODE_TRACK_ALIGN:  return 2;
+        case VJ_AUDIO_SYNC_MODE_MONITOR:      return 3;
+        case 0:
+        default: return 0;
+    }
+}
+
+static void audio_sync_set_mode_combo_guarded(int mode)
+{
+    GtkWidget *w = widget_cache[WIDGET_AUDIO_SYNC_MODE_COMBO];
+    int active = audio_sync_mode_combo_from_mode(mode);
+    int old_lock;
+
+    if(!w || !GTK_IS_COMBO_BOX(w))
+        return;
+
+    if(gtk_combo_box_get_active(GTK_COMBO_BOX(w)) == active)
+        return;
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+    gtk_combo_box_set_active(GTK_COMBO_BOX(w), active);
+    info->status_lock = old_lock;
+}
+
+static int audio_sync_mode_from_ui(void)
+{
+    return audio_sync_mode_combo_to_mode(
+        audio_sync_get_combo_active(WIDGET_AUDIO_SYNC_MODE_COMBO, 0));
+}
+
+static int audio_sync_channels_from_ui(void)
+{
+    GtkWidget *w = widget_cache[WIDGET_AUDIO_SYNC_CHANNELS_SPIN];
+    int ch = 2;
+
+    if(w && GTK_IS_SPIN_BUTTON(w))
+        ch = (int)gtk_spin_button_get_value(GTK_SPIN_BUTTON(w));
+
+    return ui_clampi(ch, 1, 2);
+}
+
+static int audio_sync_spin_int(int widget_id, int fallback)
+{
+    GtkWidget *w = widget_cache[widget_id];
+
+    if(!w || !GTK_IS_SPIN_BUTTON(w))
+        return fallback;
+
+    return (int)gtk_spin_button_get_value(GTK_SPIN_BUTTON(w));
+}
+
+static int audio_sync_bpm_x10_from_ui(void)
+{
+    GtkWidget *w = widget_cache[WIDGET_AUDIO_SYNC_TARGET_BPM_SPIN];
+    double bpm = 128.0;
+
+    if(w && GTK_IS_SPIN_BUTTON(w))
+        bpm = gtk_spin_button_get_value(GTK_SPIN_BUTTON(w));
+
+    bpm = ui_clampd(bpm, 40.0, 240.0);
+
+    return (int)((bpm * 10.0) + 0.5);
+}
+
+static int audio_sync_loop_from_ui(void)
+{
+    GtkWidget *w = widget_cache[WIDGET_AUDIO_SYNC_WAV_LOOP_TOGGLE];
+
+    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+        return 0;
+
+    return gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) ? 1 : 0;
+}
+
+static void audio_sync_set_master_wav_options_visible(int visible)
+{
+    GtkWidget *w = widget_cache[WIDGET_AUDIO_MASTER_WAV_OPTIONS_GRID];
+
+    if(w)
+        gtk_widget_set_visible(w, visible ? TRUE : FALSE);
+}
+
+static void audio_sync_set_external_source_guarded(int use_wav)
+{
+    audio_input_selector_set_guarded(use_wav ? AUDIO_MASTER_WAV : AUDIO_MASTER_JACK);
+    audio_sync_set_master_wav_options_visible(use_wav);
+}
+
+static int audio_sync_wav_path_vims_safe(const char *path)
+{
+    const unsigned char *p;
+
+    if(!path || path[0] == '\0')
+        return 0;
+
+
+
+    for(p = (const unsigned char *)path; *p; p++) {
+        if(*p == ';' || *p == '\n' || *p == '\r')
+            return 0;
+    }
+
+    return 1;
+}
+
+static int audio_sync_wav_path_ready(int allow_dialog)
+{
+    gchar *path = get_text("audio_sync_wav_path");
+
+    if(path && path[0] != '\0') {
+        if(audio_sync_wav_path_vims_safe(path))
+            return 1;
+
+        vj_msg(VEEJAY_MSG_WARNING,
+               "WAV master path contains a VIMS command separator/control character; choose another WAV file");
+        return 0;
+    }
+
+    if(allow_dialog) {
+        gchar *filename = dialog_open_file("Select master WAV audio track", FILE_FILTER_WAV);
+        if(filename && filename[0] != '\0') {
+            if(!audio_sync_wav_path_vims_safe(filename)) {
+                vj_msg(VEEJAY_MSG_WARNING,
+                       "WAV master path contains a VIMS command separator/control character; choose another WAV file");
+                g_free(filename);
+                return 0;
+            }
+
+            put_text("audio_sync_wav_path", filename);
+            g_free(filename);
+            return 1;
+        }
+        if(filename)
+            g_free(filename);
+    }
+
+    return 0;
+}
+
+static void audio_sync_send_target_clock(void)
+{
+    int bpm_x10 = audio_sync_bpm_x10_from_ui();
+    int phase = audio_sync_spin_int(WIDGET_AUDIO_SYNC_PHASE_SPIN, 0);
+    int confidence = audio_sync_spin_int(WIDGET_AUDIO_SYNC_CONFIDENCE_SPIN, 100);
+
+    phase = ui_clampi(phase, 0, 100);
+    confidence = ui_clampi(confidence, 0, 100);
+
+    multi_vims(VIMS_AUDIO_SYNC_TARGET, "%d %d %d", bpm_x10, phase, confidence);
+}
+
+static void audio_sync_send_mode_control(int mode)
+{
+    mode = ui_clampi(mode, 0, VJ_AUDIO_SYNC_MODE_MONITOR);
+
+    multi_vims(VIMS_AUDIO_SYNC_MODE, "%d", mode);
+}
+
+static int audio_sync_send_selected_source(void)
+{
+    int mode = audio_sync_mode_from_ui();
+
+    if(mode == 0) {
+        audio_sync_send_mode_control(0);
+        return 1;
+    }
+
+    audio_sync_send_mode_control(mode);
+
+    if(audio_input_selector_wav_from_ui()) {
+        gchar *path;
+
+        if(!audio_sync_wav_path_ready(0)) {
+            vj_msg(VEEJAY_MSG_WARNING,
+                   "No WAV master file selected; choose a WAV file first");
+            return 0;
+        }
+
+        path = get_text("audio_sync_wav_path");
+        if(!path || path[0] == '\0')
+            return 0;
+
+
+
+        multi_vims(VIMS_AUDIO_SYNC_WAV, "%d %d %s",
+                   mode, audio_sync_loop_from_ui(), path);
+        return 1;
+    }
+
+    multi_vims(VIMS_AUDIO_SYNC_JACK, "%d %d", mode, audio_sync_channels_from_ui());
+    return 1;
+}
+
+static void audio_sync_assert_tempo_bridge_active(void)
+{
+    if(audio_sync_mode_from_ui() != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE)
+        return;
+
+    if(audio_input_selector_active_from_ui() != AUDIO_MASTER_WAV)
+        audio_input_selector_set_guarded(AUDIO_MASTER_JACK);
+
+    multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
+    if(audio_sync_send_selected_source())
+        multi_vims(VIMS_AUDIO_SYNC_STATUS, "%d", 1);
+}
+
+static int audio_sync_clamped_correction_from_ui(void)
+{
+    int correction = audio_sync_spin_int(WIDGET_AUDIO_SYNC_CORRECTION_SPIN, 4);
+
+    return ui_clampi(correction, 0, 25);
+}
+
+static void audio_sync_send_mode_settings_if_needed(int mode)
+{
+    if(mode != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE)
+        return;
+
+    audio_sync_send_target_clock();
+    multi_vims(VIMS_AUDIO_SYNC_CORRECTION, "%d", audio_sync_clamped_correction_from_ui());
+}
+
+
+#define audio_sync_send_bridge_settings_if_needed audio_sync_send_mode_settings_if_needed
+
+static void audio_sync_deactivate_playback(void)
+{
+    audio_sync_send_mode_control(0);
+    multi_vims(VIMS_AUDIO_SYNC_STATUS, "%d", 0);
+}
+
+static int audio_input_selector_use_external_playback(int use_wav, int allow_wav_dialog)
+{
+    int mode = audio_sync_mode_from_ui();
+
+    if(mode == 0) {
+        mode = VJ_AUDIO_SYNC_MODE_MONITOR;
+        audio_sync_set_mode_combo_guarded(mode);
+    }
+
+    audio_sync_set_external_source_guarded(use_wav);
+
+    if(use_wav && !audio_sync_wav_path_ready(allow_wav_dialog))
+        return 0;
+
+    multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
+
+    if(!audio_sync_send_selected_source())
+        return 0;
+
+    audio_sync_send_bridge_settings_if_needed(mode);
+    multi_vims(VIMS_AUDIO_SYNC_STATUS, "%d", 1);
+    return 1;
+}
+
+static void audio_input_selector_use_jack_playback(void)
+{
+    (void) audio_input_selector_use_external_playback(0, 0);
+}
+
+static void audio_input_selector_use_wav_playback(int allow_dialog)
+{
+    (void) audio_input_selector_use_external_playback(1, allow_dialog);
+}
+
+void on_audio_input_selector_combo_changed(GtkWidget *widget, gpointer user_data)
+{
+    int active;
+    int record_source;
+
+    if(info->status_lock)
+        return;
+
+    if(!widget || !GTK_IS_COMBO_BOX(widget))
+        return;
+
+    active = gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
+    if(active < 0)
+        return;
+
+    record_source = audio_input_selector_record_source_from_active(active);
+
+    switch(active)
+    {
+        case AUDIO_MASTER_ORIGINAL:
+        case AUDIO_MASTER_SILENCE:
+            audio_sync_remember_non_jack_master(record_source);
+            audio_sync_set_mode_combo_guarded(0);
+            multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", record_source);
+            audio_sync_deactivate_playback();
+            audio_sync_set_master_wav_options_visible(0);
+            vj_msg(VEEJAY_MSG_INFO, "Audio master track: %s",
+                   audio_input_selector_name_from_active(active));
+            break;
+
+        case AUDIO_MASTER_JACK:
+            audio_sync_set_mode_combo_guarded(VJ_AUDIO_SYNC_MODE_MONITOR);
+            audio_input_selector_use_jack_playback();
+            vj_msg(VEEJAY_MSG_INFO, "Audio master track: JACK external, JACK mode: %s",
+                   audio_sync_mode_name(VJ_AUDIO_SYNC_MODE_MONITOR));
+            break;
+
+        case AUDIO_MASTER_WAV:
+            audio_sync_set_mode_combo_guarded(VJ_AUDIO_SYNC_MODE_MONITOR);
+            if(audio_input_selector_use_external_playback(1, 1)) {
+                vj_msg(VEEJAY_MSG_INFO, "Audio master track: WAV file, mode: %s%s",
+                       audio_sync_mode_name(audio_sync_mode_from_ui()),
+                       audio_sync_loop_from_ui() ? " (loop)" : "");
+            } else {
+                int fallback = audio_sync_non_jack_master_from_status();
+                audio_input_selector_set_guarded(audio_input_selector_active_from_record_source(fallback));
+                multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", fallback);
+                audio_sync_deactivate_playback();
+                vj_msg(VEEJAY_MSG_WARNING,
+                       "No WAV master file selected; master track restored to %s",
+                       audio_sync_master_track_name(fallback));
+            }
+            break;
+
+        default:
+            break;
+    }
+}
+
+void on_audio_sync_enable_toggle_toggled(GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+
+    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+        return;
+
+    int enabled = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? 1 : 0;
+
+    if(enabled) {
+        int active = audio_input_selector_active_from_ui();
+        int use_wav = (active == AUDIO_MASTER_WAV);
+
+        if(active != AUDIO_MASTER_JACK && active != AUDIO_MASTER_WAV)
+            active = AUDIO_MASTER_JACK;
+
+        if(audio_sync_mode_from_ui() == 0)
+            audio_sync_set_mode_combo_guarded(VJ_AUDIO_SYNC_MODE_MONITOR);
+
+        audio_input_selector_set_guarded(active);
+        if(audio_input_selector_use_external_playback(use_wav, use_wav)) {
+            vj_msg(VEEJAY_MSG_INFO, "%s audio sync enabled (%s)",
+                   use_wav ? "WAV" : "JACK",
+                   audio_sync_mode_name(audio_sync_mode_from_ui()));
+        } else if(use_wav) {
+            int fallback = audio_sync_non_jack_master_from_status();
+            int old_lock;
+
+            audio_sync_set_mode_combo_guarded(0);
+            audio_input_selector_set_guarded(audio_input_selector_active_from_record_source(fallback));
+            multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", fallback);
+            audio_sync_deactivate_playback();
+            audio_sync_set_master_wav_options_visible(0);
+
+            old_lock = info->status_lock;
+            info->status_lock = 1;
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), FALSE);
+            info->status_lock = old_lock;
+
+            vj_msg(VEEJAY_MSG_WARNING,
+                   "WAV audio sync was not enabled; master track restored to %s",
+                   audio_sync_master_track_name(fallback));
+        }
+    } else {
+        int fallback = audio_sync_non_jack_master_from_status();
+        audio_sync_set_mode_combo_guarded(0);
+        audio_input_selector_set_guarded(audio_input_selector_active_from_record_source(fallback));
+        multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", fallback);
+        audio_sync_deactivate_playback();
+        audio_sync_set_master_wav_options_visible(0);
+        vj_msg(VEEJAY_MSG_INFO, "Audio sync disabled, master track: %s",
+               audio_sync_master_track_name(fallback));
+    }
+}
+
+void on_audio_sync_mode_combo_changed(GtkWidget *widget, gpointer user_data)
+{
+    int mode;
+
+    if(info->status_lock)
+        return;
+
+    mode = audio_sync_mode_from_ui();
+
+    if(mode == 0) {
+        int fallback = audio_sync_non_jack_master_from_status();
+        audio_input_selector_set_guarded(audio_input_selector_active_from_record_source(fallback));
+        multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", fallback);
+        audio_sync_deactivate_playback();
+        vj_msg(VEEJAY_MSG_INFO, "Audio sync mode: None, master track: %s",
+               audio_sync_master_track_name(fallback));
+        return;
+    }
+
+
+
+    if(audio_input_selector_active_from_ui() != AUDIO_MASTER_WAV)
+        audio_input_selector_set_guarded(AUDIO_MASTER_JACK);
+
+    multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
+    if(audio_sync_send_selected_source()) {
+        audio_sync_send_bridge_settings_if_needed(mode);
+        multi_vims(VIMS_AUDIO_SYNC_STATUS, "%d", 1);
+        vj_msg(VEEJAY_MSG_INFO, "%s mode: %s",
+               audio_input_selector_wav_from_ui() ? "WAV" : "JACK",
+               audio_sync_mode_name(mode));
+    }
+}
+
+void on_audio_sync_source_combo_changed(GtkWidget *widget, gpointer user_data)
+{
+    int mode;
+    int active = 0;
+
+    if(info->status_lock)
+        return;
+
+    mode = audio_sync_mode_from_ui();
+    if(mode == 0)
+        return;
+
+    if(widget && GTK_IS_COMBO_BOX(widget))
+        active = gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
+
+
+    if(active == VJ_AUDIO_SYNC_SOURCE_WAV_FILE)
+        audio_sync_set_external_source_guarded(1);
+    else if(active == VJ_AUDIO_SYNC_SOURCE_JACK)
+        audio_sync_set_external_source_guarded(0);
+
+    if(audio_sync_send_selected_source()) {
+        audio_sync_send_bridge_settings_if_needed(mode);
+        multi_vims(VIMS_AUDIO_SYNC_STATUS, "%d", 1);
+        vj_msg(VEEJAY_MSG_INFO, "External master source: %s",
+               audio_input_selector_wav_from_ui() ? "WAV file" : "JACK input");
+    }
+}
+
+void on_audio_sync_channels_spin_value_changed(GtkWidget *widget, gpointer user_data)
+{
+    int mode;
+
+    if(info->status_lock)
+        return;
+
+    mode = audio_sync_mode_from_ui();
+
+    if(mode == 0)
+        return;
+
+    if(!audio_input_selector_wav_from_ui())
+    {
+        int ch = audio_sync_channels_from_ui();
+        audio_sync_send_mode_control(mode);
+        multi_vims(VIMS_AUDIO_SYNC_JACK, "%d %d", mode, ch);
+        audio_sync_send_bridge_settings_if_needed(mode);
+        multi_vims(VIMS_AUDIO_SYNC_STATUS, "%d", 1);
+        vj_msg(VEEJAY_MSG_INFO, "JACK audio sync channels: %d", ch);
+    }
+}
+
+void on_audio_sync_target_bpm_value_changed(GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+
+    if(audio_sync_mode_from_ui() == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE) {
+        int bpm_x10 = audio_sync_bpm_x10_from_ui();
+        audio_sync_assert_tempo_bridge_active();
+        audio_sync_send_target_clock();
+        vj_msg(VEEJAY_MSG_INFO, "Tempo Bridge target BPM: %d.%d",
+               bpm_x10 / 10, bpm_x10 % 10);
+    }
+}
+
+void on_audio_sync_phase_value_changed(GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+
+    if(audio_sync_mode_from_ui() == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE) {
+        int phase = audio_sync_spin_int(WIDGET_AUDIO_SYNC_PHASE_SPIN, 0);
+        audio_sync_assert_tempo_bridge_active();
+        audio_sync_send_target_clock();
+        vj_msg(VEEJAY_MSG_INFO, "Tempo Bridge phase: %d%%", phase);
+    }
+}
+
+void on_audio_sync_confidence_value_changed(GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+
+    if(audio_sync_mode_from_ui() == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE) {
+        int confidence = audio_sync_spin_int(WIDGET_AUDIO_SYNC_CONFIDENCE_SPIN, 100);
+        audio_sync_assert_tempo_bridge_active();
+        audio_sync_send_target_clock();
+        vj_msg(VEEJAY_MSG_INFO, "Tempo Bridge confidence: %d%%", confidence);
+    }
+}
+
+void on_audio_sync_correction_value_changed(GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+
+    if(audio_sync_mode_from_ui() == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE) {
+        int correction = audio_sync_clamped_correction_from_ui();
+        audio_sync_assert_tempo_bridge_active();
+        multi_vims(VIMS_AUDIO_SYNC_CORRECTION, "%d", correction);
+        vj_msg(VEEJAY_MSG_INFO, "Tempo Bridge max correction: %d%%", correction);
+    }
+}
+
+void on_audio_sync_jack_button_clicked(GtkWidget *widget, gpointer user_data)
+{
+    int mode;
+
+    if(info->status_lock)
+        return;
+
+    if(widget && GTK_IS_TOGGLE_BUTTON(widget) &&
+       !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
+        return;
+
+    mode = audio_sync_mode_from_ui();
+    if(mode == 0)
+        return;
+
+    audio_input_selector_use_jack_playback();
+    vj_msg(VEEJAY_MSG_INFO, "External master source: JACK input");
+}
+
+void on_audio_sync_wav_button_clicked(GtkWidget *widget, gpointer user_data)
+{
+    int mode;
+
+    if(info->status_lock)
+        return;
+
+    if(widget && GTK_IS_TOGGLE_BUTTON(widget) &&
+       !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
+        return;
+
+    mode = audio_sync_mode_from_ui();
+    if(mode == 0)
+        audio_sync_set_mode_combo_guarded(VJ_AUDIO_SYNC_MODE_MONITOR);
+
+    audio_input_selector_use_wav_playback(1);
+    vj_msg(VEEJAY_MSG_INFO, "External master source: WAV file%s",
+           audio_sync_loop_from_ui() ? " (loop)" : "");
+}
+
+void on_audio_sync_wav_browse_button_clicked(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    if(info->status_lock)
+        return;
+
+    if(!audio_sync_wav_path_ready(1))
+        return;
+
+    audio_sync_set_external_source_guarded(1);
+    audio_input_selector_use_wav_playback(0);
+}
+
+void on_audio_sync_wav_path_activate(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    if(info->status_lock)
+        return;
+
+    audio_sync_set_external_source_guarded(1);
+    audio_input_selector_use_wav_playback(0);
+}
+
+void on_audio_sync_wav_loop_toggle_toggled(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    if(info->status_lock)
+        return;
+
+    if(audio_input_selector_wav_from_ui())
+        audio_input_selector_use_wav_playback(0);
+}
+
+void on_audio_sync_refresh_button_clicked(GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+
+    single_vims(VIMS_AUDIO_SYNC_PRINT);
+    vj_msg(VEEJAY_MSG_INFO, "Requested Audio panel status refresh");
+}
+
+
 void	on_button_samplestart_clicked(GtkWidget *widget, gpointer user_data)
 {
 	info->sample[0] = info->status_tokens[FRAME_NUM];
@@ -444,7 +1255,7 @@ void	on_button_sampleend_clicked(GtkWidget *widget, gpointer user_data)
 void	on_button_veejay_clicked(GtkWidget *widget, gpointer user_data)
 {
 #ifdef STRICT_CHECKING
-	//assert( info->watch.state == STATE_WAIT_FOR_USER );
+
 #endif
 	info->watch.state = STATE_CONNECT;
     int do_sync = 0;
@@ -467,21 +1278,18 @@ void	on_vimsmessage_activate(GtkWidget *widget, gpointer user_data)
 
 void	on_button_fadedur_value_changed(GtkWidget *widget, gpointer user_data)
 {
-	
+
 }
 
 void	on_toggle_fademethod_toggled(GtkWidget *w, gpointer user_data)
 {
 	if(info->status_lock)
 		return;
-	
-	multi_vims( VIMS_CHAIN_FADE_ALPHA,"%d %d",0, is_button_toggled("toggle_fademethod") );	
+
+	multi_vims( VIMS_CHAIN_FADE_ALPHA,"%d %d",0, is_button_toggled("toggle_fademethod") );
 }
 
-/* 0 = normal chain fade
- * 1 = source entry FX
- * 2 = source mixing B
- */
+
 void	on_fx_m2_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
@@ -560,15 +1368,15 @@ void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
 
 	GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
 	gdouble val = gtk_adjustment_get_value (a);
-	
+
 	int mode = is_button_toggled("toggle_fademethod");
 	int value = ( mode == 1 ? 0xff - (int) val : (int) val );
 
 	multi_vims( VIMS_CHAIN_MANUAL_FADE, "0 %d", value );
-	
+
 	vj_midi_learning_vims_complex( info->midi, "manualopacity", VIMS_CHAIN_MANUAL_FADE, 0,1 );
-	
-	vj_msg(VEEJAY_MSG_INFO, "FX Opacity set to %1.2f", val ); 
+
+	vj_msg(VEEJAY_MSG_INFO, "FX Opacity set to %1.2f", val );
 }
 
 static void	el_selection_update(void)
@@ -689,8 +1497,8 @@ void	on_button_el_newclip_clicked(GtkWidget *w, gpointer *user)
 
 void    on_button_el_takepastepos_clicked(GtkWidget *w, gpointer *user_data)
 {
-    update_spin_value ("button_el_selpaste", 
-                        info->status_tokens[FRAME_NUM] );       
+    update_spin_value ("button_el_selpaste",
+                        info->status_tokens[FRAME_NUM] );
     vj_msg(VEEJAY_MSG_INFO, "Set current frame %d as destination position",
            info->status_tokens[FRAME_NUM]);
 }
@@ -730,7 +1538,7 @@ void	on_button_el_savesel_clicked(GtkWidget *w, gpointer *user_data)
 		gint end = get_nums( "button_el_selend" );
 		multi_vims( VIMS_EDITLIST_SAVE, "%s %d %d",
 			filename, start, end );
-		vj_msg(VEEJAY_MSG_INFO,"Save EditList selection to %s", filename); 
+		vj_msg(VEEJAY_MSG_INFO,"Save EditList selection to %s", filename);
 		g_free(filename);
 	}
 }
@@ -768,7 +1576,7 @@ void	on_button_el_delfile_clicked(GtkWidget *w, gpointer *user_data)
 		time1,time2);
 	free(time1);
 	free(time2);
-} 
+}
 void	on_button_fx_clearchain_clicked(GtkWidget *w, gpointer user_data)
 {
 	multi_vims( VIMS_CHAIN_CLEAR, "%d",0);
@@ -794,7 +1602,7 @@ void	on_button_entry_toggle_clicked(GtkWidget *w, gpointer user_data)
 			info->uc.selected_chain_entry,
 			(val ? "Enabled" : "Disabled" ));
 		info->uc.reload_hint[HINT_ENTRY] = 1;
-	}	
+	}
 }
 
 static void update_fx_chain(int val) {
@@ -816,12 +1624,12 @@ void	on_button_fx_entry_value_changed(GtkWidget *w, gpointer user_data)
 		multi_vims( VIMS_CHAIN_SET_ENTRY, "%d", val );
 		vj_midi_learning_vims_spin( info->midi, "button_fx_entry", VIMS_CHAIN_SET_ENTRY );
         update_fx_chain(val);
-	}  	
+	}
 }
 
 void	on_button_fx_del_clicked(GtkWidget *w, gpointer user_data)
 {
-	multi_vims( VIMS_CHAIN_ENTRY_CLEAR, "%d %d", 0, 
+	multi_vims( VIMS_CHAIN_ENTRY_CLEAR, "%d %d", 0,
 		info->uc.selected_chain_entry );
 	info->uc.reload_hint[HINT_ENTRY] = 1;
 	info->uc.reload_hint[HINT_CHAIN] = 1;
@@ -894,7 +1702,7 @@ static void genv_changed( int num, int value, const char *selected )
 				values[0],values[1],values[2],values[3],values[4],values[5],
 				values[6],values[7],values[8],values[9]);
 		msg_vims(line);
-		
+
 		info->parameter_lock = 0;
 	}
 }
@@ -988,7 +1796,7 @@ void	on_slider_p15_value_changed(GtkWidget *w, gpointer user_data)
 
 void    on_inc_p0_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P0], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1003,7 +1811,7 @@ void    on_inc_p0_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_dec_p0_clicked(GtkWidget *w, gpointer user_data)
 {
-        //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P0], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1018,7 +1826,7 @@ void    on_dec_p0_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_inc_p1_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P1], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1033,7 +1841,7 @@ void    on_inc_p1_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_dec_p1_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P1], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1048,7 +1856,7 @@ void    on_dec_p1_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_inc_p2_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P2], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1063,7 +1871,7 @@ void    on_inc_p2_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_dec_p2_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P2], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1078,7 +1886,7 @@ void    on_dec_p2_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_inc_p3_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P3], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1093,7 +1901,7 @@ void    on_inc_p3_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_dec_p3_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P3], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1108,7 +1916,7 @@ void    on_dec_p3_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_inc_p4_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P4], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1123,7 +1931,7 @@ void    on_inc_p4_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_dec_p4_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P4], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1138,7 +1946,7 @@ void    on_dec_p4_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_inc_p5_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P5], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1153,7 +1961,7 @@ void    on_inc_p5_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_dec_p5_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P5], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1168,7 +1976,7 @@ void    on_dec_p5_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_inc_p6_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P6], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1183,7 +1991,7 @@ void    on_inc_p6_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_dec_p6_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P6], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1198,7 +2006,7 @@ void    on_dec_p6_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_inc_p7_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P7], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1213,7 +2021,7 @@ void    on_inc_p7_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_dec_p7_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P7], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1228,7 +2036,7 @@ void    on_dec_p7_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_inc_p8_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P8], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1243,7 +2051,7 @@ void    on_inc_p8_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_dec_p8_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P8], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1257,7 +2065,7 @@ void    on_dec_p8_clicked(GtkWidget *w, gpointer user_data)
 }
 void    on_inc_p9_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P9], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1271,7 +2079,7 @@ void    on_inc_p9_clicked(GtkWidget *w, gpointer user_data)
 }
 void    on_dec_p9_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P9], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1285,7 +2093,7 @@ void    on_dec_p9_clicked(GtkWidget *w, gpointer user_data)
 }
 void    on_inc_p10_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P10], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1299,7 +2107,7 @@ void    on_inc_p10_clicked(GtkWidget *w, gpointer user_data)
 }
 void    on_dec_p10_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P10], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1313,7 +2121,7 @@ void    on_dec_p10_clicked(GtkWidget *w, gpointer user_data)
 }
 void    on_inc_p11_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P11], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1327,7 +2135,7 @@ void    on_inc_p11_clicked(GtkWidget *w, gpointer user_data)
 }
 void    on_dec_p11_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P11], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1341,7 +2149,7 @@ void    on_dec_p11_clicked(GtkWidget *w, gpointer user_data)
 }
 void    on_inc_p12_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P12], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1355,7 +2163,7 @@ void    on_inc_p12_clicked(GtkWidget *w, gpointer user_data)
 }
 void    on_dec_p12_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P12], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1369,7 +2177,7 @@ void    on_dec_p12_clicked(GtkWidget *w, gpointer user_data)
 }
 void    on_inc_p13_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P13], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1383,7 +2191,7 @@ void    on_inc_p13_clicked(GtkWidget *w, gpointer user_data)
 }
 void    on_dec_p13_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P13], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1397,7 +2205,7 @@ void    on_dec_p13_clicked(GtkWidget *w, gpointer user_data)
 }
 void    on_inc_p14_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P14], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1411,7 +2219,7 @@ void    on_inc_p14_clicked(GtkWidget *w, gpointer user_data)
 }
 void    on_dec_p14_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P14], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1425,7 +2233,7 @@ void    on_dec_p14_clicked(GtkWidget *w, gpointer user_data)
 }
 void    on_inc_p15_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P15], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1439,7 +2247,7 @@ void    on_inc_p15_clicked(GtkWidget *w, gpointer user_data)
 }
 void    on_dec_p15_clicked(GtkWidget *w, gpointer user_data)
 {
-    //block signal to prevent propagation
+
     guint signal_id=g_signal_lookup("value_changed", GTK_TYPE_RANGE);
     gulong handler_id=handler_id=g_signal_handler_find( widget_cache[WIDGET_SLIDER_P15], G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
 
@@ -1602,7 +2410,7 @@ void	on_dec_g10_clicked(GtkWidget *w, gpointer user_data)
 
 void    on_button_stoplaunch_clicked(GtkWidget *widget, gpointer user_data)
 {
-    //TODO: remove me and glade part
+
 }
 
 void	on_button_sample_play_clicked(GtkWidget *widget, gpointer user_data)
@@ -1617,7 +2425,7 @@ void	on_button_sample_play_clicked(GtkWidget *widget, gpointer user_data)
 			info->selection_slot->sample_id,
 			(info->selection_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM ));
 
-		vj_msg(VEEJAY_MSG_INFO, "Start playing %s %d (type %d) in slot %d", 
+		vj_msg(VEEJAY_MSG_INFO, "Start playing %s %d (type %d) in slot %d",
 			(info->selection_slot->sample_type == MODE_SAMPLE ? "sample" : "stream"),
 			info->selection_slot->sample_id,
 			info->selection_slot->sample_type);
@@ -1625,7 +2433,7 @@ void	on_button_sample_play_clicked(GtkWidget *widget, gpointer user_data)
 }
 void	on_button_sample_del_clicked(GtkWidget *widget, gpointer user_data)
 {
-	if( info->selection_slot )	
+	if( info->selection_slot )
 		remove_sample_from_slot();
 }
 void	on_button_samplelist_load_clicked(GtkWidget *widget, gpointer user_data)
@@ -1645,7 +2453,7 @@ void	on_button_samplelist_load_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		if(erase_all)
 		{
-			single_vims( VIMS_SAMPLE_DEL_ALL ); 
+			single_vims( VIMS_SAMPLE_DEL_ALL );
 		}
 		multi_vims( VIMS_SAMPLE_LOAD_SAMPLELIST, "%s", filename );
 
@@ -1670,7 +2478,7 @@ void	on_button_samplelist_save_clicked(GtkWidget *widget, gpointer user_data)
 
 gboolean	on_button_samplelist_qsave_clicked(GtkWidget *widget, GdkEvent *event, gpointer user_data)
 {
-	//save as if shift click
+
 	if(event && ((GdkEventButton *) event)->state & GDK_SHIFT_MASK) {
 		as_samplelist_name = 0;
 	}
@@ -1730,7 +2538,7 @@ void	on_spin_sampleend_value_changed( GtkWidget *widget, gpointer user_data)
 	{
 		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
 		char *time1 = format_time(value,info->el.fps);
-		
+
 		multi_vims(VIMS_SAMPLE_SET_END, "%d %d", 0, value );
 		vj_msg(VEEJAY_MSG_INFO, "Set sample's ending position to %d (timecode %s)",
 			value, time1);
@@ -1755,9 +2563,9 @@ void	on_slow_slider_value_changed( GtkWidget *widget, gpointer user_data )
 {
 	if(!info->status_lock) {
 		gint value = (gint) get_slider_val("slow_slider");
-		multi_vims(VIMS_VIDEO_SET_SLOW, "%d", value );	
+		multi_vims(VIMS_VIDEO_SET_SLOW, "%d", value );
 		value ++;
-		vj_msg(VEEJAY_MSG_INFO, "Slow video to %2.2f fps",	
+		vj_msg(VEEJAY_MSG_INFO, "Slow video to %2.2f fps",
 			info->el.fps / (float) value );
 		vj_midi_learning_vims_simple(info->midi, "slow_slider",VIMS_VIDEO_SET_SLOW);
 	}
@@ -1767,27 +2575,15 @@ void    on_slow_slider_click( GtkWidget *widget, gpointer user_data )
 {
     if(!info->status_lock)
     {
-#if (GTK_CHECK_VERSION (3, 20, 0))
         GdkModifierType state = 0;
-        GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(widget));
-        if (window) {
-            gdk_window_get_device_position(
-                window,
-                gdk_seat_get_pointer(
-                    gdk_display_get_default_seat(
-                        gdk_display_get_default())),
-                NULL, NULL,
-                &state
-            );
-        }
+        gtk_get_current_event_state(&state);
 
-        gboolean ctrl_pressed  = (state & GDK_CONTROL_MASK);
+        gboolean ctrl_pressed = (state & GDK_CONTROL_MASK);
 
         if (ctrl_pressed)
         {
             update_slider_gvalue("slow_slider", 1);
         }
-#endif //TODO #else ?
     }
 }
 
@@ -1797,7 +2593,7 @@ void	on_speed_slider_value_changed(GtkWidget *widget, gpointer user_data)
 	if(!info->status_lock)
 	{
 		gint value = (gint) get_slider_val( "speed_slider" );
-	//	value *= info->play_direction;
+
 		multi_vims( VIMS_VIDEO_SET_SPEED, "%d", value );
 			vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
 			value );
@@ -1810,27 +2606,15 @@ void    on_speed_slider_click(GtkWidget *widget, gpointer user_data)
 {
     if(!info->status_lock)
     {
-#if (GTK_CHECK_VERSION (3, 20, 0))
         GdkModifierType state = 0;
-        GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(widget));
-        if (window) {
-            gdk_window_get_device_position(
-                window,
-                gdk_seat_get_pointer(
-                    gdk_display_get_default_seat(
-                        gdk_display_get_default())),
-                NULL, NULL,
-                &state
-            );
-        }
+        gtk_get_current_event_state(&state);
 
-        gboolean ctrl_pressed  = (state & GDK_CONTROL_MASK);
+        gboolean ctrl_pressed = (state & GDK_CONTROL_MASK);
 
         if (ctrl_pressed)
         {
             update_slider_gvalue("speed_slider", 1);
         }
-#endif //TODO #else ?
     }
 }
 
@@ -1865,7 +2649,7 @@ void	on_v4l_contrast_value_changed(GtkWidget *widget, gpointer user_data)
 	if(!info->status_lock)
 	{
     GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
-		multi_vims( VIMS_STREAM_SET_CONTRAST, "%d %d", 
+		multi_vims( VIMS_STREAM_SET_CONTRAST, "%d %d",
 			info->selected_slot->sample_id,
 			(gint) (gtk_adjustment_get_value (a) * 65535.0 ) );
 		vj_midi_learning_vims_complex( info->midi, "v4l_contrast", VIMS_STREAM_SET_CONTRAST, info->selected_slot->sample_id,
@@ -1886,7 +2670,7 @@ void	on_v4l_hue_value_changed(GtkWidget *widget, gpointer user_data)
 			1 );
 
 	}
-}	
+}
 
 void	on_v4l_gamma_value_changed(GtkWidget *widget, gpointer user_data)
 {
@@ -1925,13 +2709,13 @@ void	on_v4l_saturation_value_changed(GtkWidget *widget, gpointer user_data)
 	}
 }
 
-/* no midi support yet for the following v4l controls (FIXME) */
+
 void	on_v4l_gain_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
     	GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
-		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d gain", 
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d gain",
       		info->selected_slot->sample_id,
       		(int)(gtk_adjustment_get_value (a) * 65535.0) );
 	}
@@ -1964,7 +2748,7 @@ void	on_v4l_greenbalance_value_changed(GtkWidget *widget, gpointer user_data)
     	GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d green_balance",
 			info->selected_slot->sample_id,
-			(int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+			(int)(gtk_adjustment_get_value (a) * 65535.0) );
 	}
 }
 void	on_v4l_sharpness_value_changed(GtkWidget *widget, gpointer user_data)
@@ -1974,7 +2758,7 @@ void	on_v4l_sharpness_value_changed(GtkWidget *widget, gpointer user_data)
 		GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d sharpness",
 			info->selected_slot->sample_id,
-			(int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+			(int)(gtk_adjustment_get_value (a) * 65535.0) );
 	}
 }
 void	on_v4l_backlightcompensation_value_changed(GtkWidget *widget, gpointer user_data)
@@ -1984,7 +2768,7 @@ void	on_v4l_backlightcompensation_value_changed(GtkWidget *widget, gpointer user
 		GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d bl_compensate",
 			info->selected_slot->sample_id,
-			(int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+			(int)(gtk_adjustment_get_value (a) * 65535.0) );
 	}
 }
 void	on_v4l_temperature_value_changed(GtkWidget *widget, gpointer user_data)
@@ -1994,7 +2778,7 @@ void	on_v4l_temperature_value_changed(GtkWidget *widget, gpointer user_data)
     	GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d temperature",
 		info->selected_slot->sample_id,
-		(int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+		(int)(gtk_adjustment_get_value (a) * 65535.0) );
 	}
 }
 void	on_v4l_exposure_value_changed(GtkWidget *widget, gpointer user_data)
@@ -2004,7 +2788,7 @@ void	on_v4l_exposure_value_changed(GtkWidget *widget, gpointer user_data)
     	GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d exposure",
 			info->selected_slot->sample_id,
-			(int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+			(int)(gtk_adjustment_get_value (a) * 65535.0) );
 	}
 }
 void	on_v4l_whiteness_value_changed(GtkWidget *widget, gpointer user_data)
@@ -2014,7 +2798,7 @@ void	on_v4l_whiteness_value_changed(GtkWidget *widget, gpointer user_data)
     	GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d whiteness",
 			info->selected_slot->sample_id,
-			(int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+			(int)(gtk_adjustment_get_value (a) * 65535.0) );
 	}
 }
 void	on_v4l_black_level_value_changed(GtkWidget *widget, gpointer user_data)
@@ -2024,7 +2808,7 @@ void	on_v4l_black_level_value_changed(GtkWidget *widget, gpointer user_data)
    		GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d black_level",
 			info->selected_slot->sample_id,
-			(int)(gtk_adjustment_get_value (a) * 65535.0) ); 
+			(int)(gtk_adjustment_get_value (a) * 65535.0) );
 	}
 }
 void	on_check_autogain_toggled(GtkWidget *widget, gpointer user_data)
@@ -2121,16 +2905,16 @@ void	on_rec_seq_start_clicked( GtkWidget *w, gpointer data )
 	{
 		multi_vims( VIMS_RECORD_DATAFORMAT,"%s",
 			format );
-	}	
+	}
 	else
 	{
 		format = NULL;
 	}
 
-    if( is_button_toggled("sample_mulloop") ) {// reset selection when user wants to record a loop
-        multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0);    
+    if( is_button_toggled("sample_mulloop") ) {
+        multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0);
     }
-    
+
 	multi_vims( VIMS_SAMPLE_REC_START,
 		"%d %d",
 		0,
@@ -2143,7 +2927,7 @@ void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 {
 
 	gint nframes = get_nums( "spin_streamduration");
-	gint autoplay = is_button_toggled("button_stream_autoplay"); 
+	gint autoplay = is_button_toggled("button_stream_autoplay");
 	GtkComboBoxText *combo = GTK_COMBO_BOX_TEXT( glade_xml_get_widget_(info->main_window,"combo_streamcodec"));
 	gchar *gformat = (gchar*)gtk_combo_box_text_get_active_text(combo) ;
 	gchar *format = gformat;
@@ -2151,11 +2935,11 @@ void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		multi_vims( VIMS_RECORD_DATAFORMAT,"%s",
 			format );
-	}	
+	}
 	else
 	{
 		format = NULL;
-	}	
+	}
 
 	multi_vims( VIMS_STREAM_REC_START,
 		"%d %d",
@@ -2165,12 +2949,12 @@ void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 
 	char *time1 = format_time( nframes,info->el.fps );
 	if(format)
-		vj_msg(VEEJAY_MSG_INFO, "Record in %s,  duration: %s",format, time1); 
+		vj_msg(VEEJAY_MSG_INFO, "Record in %s,  duration: %s",format, time1);
 	else
 		vj_msg(VEEJAY_MSG_INFO, "Recording in default format (MJPEG) , duration: %s", time1);
 
 	free(time1);
-	g_free(format);	
+	g_free(format);
 }
 
 void	on_stream_recordstop_clicked(GtkWidget *widget, gpointer user_data)
@@ -2225,7 +3009,7 @@ void	on_shm_7490_clicked(GtkWidget *w, gpointer data)
 void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 {
 
-	gint autoplay = is_button_toggled("button_sample_autoplay"); 
+	gint autoplay = is_button_toggled("button_sample_autoplay");
 	GtkComboBoxText *combo = GTK_COMBO_BOX_TEXT( glade_xml_get_widget_(info->main_window,"combo_samplecodec"));
 
 	gchar *format = (gchar*) gtk_combo_box_text_get_active_text(combo);
@@ -2252,7 +3036,7 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		multi_vims( VIMS_RECORD_DATAFORMAT,"%s",
 			format );
-	}		
+	}
 
 	multi_vims( VIMS_SAMPLE_REC_START,
 		"%d %d",
@@ -2268,7 +3052,7 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 		vj_msg(VEEJAY_MSG_INFO,"Recording %s from current sample",time1);
 	}
 	free(time1);
-	g_free(format);	
+	g_free(format);
 }
 
 void	on_button_sample_recordstop_clicked(GtkWidget *widget, gpointer user_data)
@@ -2311,7 +3095,7 @@ static int sample_calctime_mulloop(void)
 void	on_spin_sampleduration_value_changed(GtkWidget *widget , gpointer user_data)
 {
     int n_frames = 0;
-	// get num and display label_samplerecord_duration
+
 	if( is_button_toggled( "sample_mulloop" )) {
 		n_frames = sample_calctime_mulloop();
         n_frames *= get_nums( "spin_sampleduration" );
@@ -2396,7 +3180,7 @@ void on_check_streamfx_toggled(GtkWidget *widget, gpointer user_data)
 
         if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ) == TRUE )
 			vims_id = VIMS_STREAM_CHAIN_ENABLE;
-		multi_vims( vims_id, "%d", 0 );	
+		multi_vims( vims_id, "%d", 0 );
 
 		vj_midi_learning_vims_msg( info->midi, NULL, vims_id, 0 );
 	}
@@ -2524,22 +3308,22 @@ void	on_loop_pingpong_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_loop_oncenop_clicked(GtkWidget *widget, gpointer user_data)
 {
-	if(!info->status_lock) 
+	if(!info->status_lock)
 	{
 		multi_vims(VIMS_SAMPLE_SET_LOOPTYPE,"%d %d",0,4);
 		vj_midi_learning_vims_msg2(info->midi,NULL,VIMS_SAMPLE_SET_LOOPTYPE,0,4);
 	}
 }
 
-/*
-void	on_check_marker_bind_clicked(GtkWidget *widget, gpointer user_data)
-{
-	if(!info->status_lock)
-		timeline_set_bind( info->tl, is_button_toggled("check_marker_bind"));
-}*/
 
 void	on_button_clearmarker_clicked(GtkWidget *widget, gpointer user_data)
 {
+    if(!timeline_marker_can_send()) {
+        if(info && !info->status_lock && !timeline_marker_mode_is_sample())
+            timeline_marker_disable_selection_guarded(info ? info->tl : NULL);
+        return;
+    }
+
 	multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0 );
 	vj_midi_learning_vims_msg( info->midi, NULL, VIMS_SAMPLE_CLEAR_MARKER, 0 );
 	char *dur = format_framenum( 0 );
@@ -2561,7 +3345,7 @@ void	on_button_samplelist_open_clicked(GtkWidget *widget, gpointer user_data)
 	gchar *filename = dialog_open_file( "Open samplelist",FILE_FILTER_SL);
 	if(filename)
 	{
-		single_vims( VIMS_SAMPLE_DEL_ALL ); 
+		single_vims( VIMS_SAMPLE_DEL_ALL );
 		multi_vims( VIMS_SAMPLE_LOAD_SAMPLELIST, "%s", filename );
 		g_free(filename );
 	}
@@ -2590,7 +3374,7 @@ void	on_veejay_ctrl_expander_activate(GtkWidget *exp, gpointer user_data)
 	if(!gtk_expander_get_expanded(GTK_EXPANDER(exp)))
 	{
 		gtk_widget_set_size_request(
-			glade_xml_get_widget_(info->main_window, "veejaypanel" ), 
+			glade_xml_get_widget_(info->main_window, "veejaypanel" ),
 		 width,
 		 400 );
 
@@ -2598,9 +3382,9 @@ void	on_veejay_ctrl_expander_activate(GtkWidget *exp, gpointer user_data)
 
 	}
 	else
-	{	
+	{
 		gtk_widget_set_size_request(
-			glade_xml_get_widget_(info->main_window, "veejaypanel" ), 
+			glade_xml_get_widget_(info->main_window, "veejaypanel" ),
 			 width,
 			 0 );
 		gtk_window_resize( window, width, 100 );
@@ -2616,8 +3400,8 @@ void	on_button_el_takestart_clicked(GtkWidget *widget, gpointer user_data)
 }
 void	on_button_el_takeend_clicked(GtkWidget *widget, gpointer user_data)
 {
-	update_spin_value ("button_el_selend", 
-			info->status_tokens[FRAME_NUM] );	
+	update_spin_value ("button_el_selend",
+			info->status_tokens[FRAME_NUM] );
 	vj_msg(VEEJAY_MSG_INFO, "Set current frame %d as editlist ending position",
 		info->status_tokens[FRAME_NUM]);
 }
@@ -2639,7 +3423,7 @@ void	on_new_colorstream_clicked(GtkWidget *widget, gpointer user_data)
 		GTK_COLOR_SELECTION( colorsel ),
 		&current_color );
 
-	// scale to 0 - 255
+
 	gint red = current_color.red / 255.0;
 	gint green = current_color.green / 255.0;
 	gint blue = current_color.blue / 255.0;
@@ -2695,7 +3479,7 @@ void	on_button_key_detach_clicked(GtkWidget *widget, gpointer user)
 
 	if( key_val > 0 )
 	{
-		multi_vims( 
+		multi_vims(
 			VIMS_BUNDLE_ATTACH_KEY,
 			"1 %d %d %s",
 			key_val, key_mod, "dummy" );
@@ -2703,7 +3487,7 @@ void	on_button_key_detach_clicked(GtkWidget *widget, gpointer user)
 		char *strmod = sdlmod_by_id( key_mod );
 		char *strkey = sdlkey_by_id( key_val);
 		if(key_mod)
-			vj_msg(VEEJAY_MSG_INFO, "Key binding %s + %s released",strmod,strkey); 
+			vj_msg(VEEJAY_MSG_INFO, "Key binding %s + %s released",strmod,strkey);
 		else
 			vj_msg(VEEJAY_MSG_INFO, "Key binding %s released", strkey );
 	}
@@ -2730,20 +3514,20 @@ void	on_vims_key_clicked( GtkWidget *widget, gpointer user_data)
 
 		if( event_id > 0 && key_val > 0 )
 		{
-			multi_vims( 
+			multi_vims(
 				VIMS_BUNDLE_ATTACH_KEY,
 				"%d %d %d %s",
 				event_id, key_val, mod, buf ? buf : "dummy" );
-			info->uc.reload_hint[HINT_BUNDLES] = 1; 
+			info->uc.reload_hint[HINT_BUNDLES] = 1;
 			char *strmod = sdlmod_by_id( mod );
 			if(strmod)
 				vj_msg(VEEJAY_MSG_INFO, "VIMS %d attached to key combination %s + %s",
 				event_id, strmod, sdlkey_by_id( key_val));
-			else 
+			else
 				vj_msg(VEEJAY_MSG_INFO, "VIMS %d attached to key %s",
 					event_id, sdlkey_by_id(key_val) );
 		}
-	}	
+	}
 #endif
 }
 
@@ -2761,14 +3545,14 @@ void	on_button_vimsupdate_clicked(GtkWidget *widget, gpointer user_data)
 		}
 		else
 		{
-			multi_vims( 
+			multi_vims(
 				VIMS_BUNDLE_ATTACH_KEY,
 				"2 %d %d %s",
 				info->uc.selected_vims_accel[1],
 				info->uc.selected_vims_accel[0],
 				info->uc.selected_vims_args );
 		}
-		info->uc.reload_hint[HINT_BUNDLES] = 1; 
+		info->uc.reload_hint[HINT_BUNDLES] = 1;
 	}
 
 }
@@ -2802,7 +3586,7 @@ void	on_button_saveactionfile_clicked(GtkWidget *widget, gpointer user_data)
 		multi_vims( VIMS_BUNDLE_SAVE, "%d %s",0, filename );
 		vj_msg(VEEJAY_MSG_INFO, "Save Bundles and Keybindings to %s", filename );
 		g_free(filename);
-	} 	
+	}
 }
 
 void	on_button_loadconfigfile_clicked(GtkWidget *widget, gpointer user_data)
@@ -2833,8 +3617,8 @@ void	on_button_newbundle_clicked(GtkWidget *widget, gpointer user_data)
 	if(count_textview_buffer( "vimsview" ) > 0 )
 	{
 		gchar *buf = get_textview_buffer( "vimsview" );
-		multi_vims( VIMS_BUNDLE_ADD, "%d %s", 0, buf ); 
-		info->uc.reload_hint[HINT_BUNDLES] = 1;	
+		multi_vims( VIMS_BUNDLE_ADD, "%d %s", 0, buf );
+		info->uc.reload_hint[HINT_BUNDLES] = 1;
 		vj_msg(VEEJAY_MSG_INFO, "If your VIMS document was valid,you'll find it in the list.");
 	}
 	else
@@ -2859,7 +3643,7 @@ static	void	load_server_files(char *buf, int len)
 {
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "server_files");
 	GtkTreeIter iter;
-	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
+	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));
 	GtkListStore *store = GTK_LIST_STORE(model);
 #ifdef STRICT_CHECKING
 	assert(tree != NULL );
@@ -2892,13 +3676,9 @@ static	void	load_server_files(char *buf, int len)
 
 void	on_button_browse_clicked(GtkWidget *widget, gpointer user_data)
 {
-	// open file browser for launcher
-/*	gchar *filename = dialog_open_file( "Open Videofile or EditList",FILE_FILTER_DEFAULT );
-	if(filename)
-	{
-		put_text( "entry_filename", filename );
-		g_free(filename);
-	}*/
+
+
+
 	single_vims(VIMS_WORKINGDIR);
 
 	gint len = 0;
@@ -2927,7 +3707,7 @@ void on_button_offline_start_clicked(GtkWidget *widget, gpointer user_data)
 	if( stream_id > 0 ) {
 		multi_vims( VIMS_STREAM_OFFLINE_REC_START, "%d %d %d %d", stream_id, get_nums("spin_offlineduration1" ), is_button_toggled("button_offline_autoplay1"),-1);
 	    vj_msg(VEEJAY_MSG_INFO, "Started offline recording from stream %d", stream_id );
-    }	
+    }
 	else {
 		vj_msg(VEEJAY_MSG_INFO, "You can only use this recorder on streams, not samples!");
 	}
@@ -2956,7 +3736,7 @@ void	on_button_clipcopy_clicked(GtkWidget *widget, gpointer user_data)
 		else {
 			multi_vims( VIMS_SAMPLE_COPY, "%d", info->selected_slot->sample_id );
 		}
-	}		
+	}
 }
 
 void	on_check_priout_fullscreen_clicked(
@@ -2985,7 +3765,7 @@ void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
 	}
 
 	gchar *remote = g_locale_from_utf8(
-			remote_ , -1, &br, &bw, NULL ); 
+			remote_ , -1, &br, &bw, NULL );
 
 	if( !remote || strlen(remote) <= 1 )
 	{
@@ -3066,10 +3846,6 @@ void	on_samplerand_toggled(GtkWidget *widget, gpointer user_data)
 }
 
 
-
-/* 
- * Handler to open the veejay_connection-dialog via menu
- */
 void on_openConnection_activate (GtkMenuItem     *menuitem,
                                  gpointer         user_data)
 {
@@ -3083,9 +3859,6 @@ void on_openConnection_activate (GtkMenuItem     *menuitem,
 }
 
 
-/*
- * Handler to close the veejay_connection-dialog
- */
 void on_veejay_connection_close (GtkDialog       *dialog,
                                  gpointer         user_data)
 {
@@ -3093,11 +3866,6 @@ void on_veejay_connection_close (GtkDialog       *dialog,
 }
 
 
-/*
- * Handler to show the video_settings-dialog via menu
- *
- * TODO : if info locked, output message
- */
 void on_video_settings_activate (GtkMenuItem     *menuitem,
                                  gpointer         user_data)
 {
@@ -3113,9 +3881,6 @@ void on_video_settings_activate (GtkMenuItem     *menuitem,
 }
 
 
-/*
- * Handler to show the image calibration dialog via menu
- */
 void on_image_calibration_activate (GtkMenuItem    *menuitem,
                                     gpointer        data)
 {
@@ -3129,23 +3894,18 @@ void on_image_calibration_activate (GtkMenuItem    *menuitem,
     cali_onoff = 1;
 }
 
-/* 
- * Handler to close the video_settings-dialog 
- */
+
 void on_video_options_close                 (GtkDialog       *dialog,
 					     gpointer         user_data)
 {
 	if(!info->status_lock)
 	{
 		GtkWidget *veejay_settings_window = glade_xml_get_widget_(info->main_window, "video_options");
-		gtk_widget_hide(veejay_settings_window);	
+		gtk_widget_hide(veejay_settings_window);
 	}
 }
 
 
-/* 
- * Handler to apply the settings of the video_settings-dialog 
- */
 void on_video_options_apply_clicked         (GtkButton       *button,
 					     gpointer         user_data)
 {
@@ -3162,7 +3922,7 @@ void on_video_options_apply_clicked         (GtkButton       *button,
 	}
 }
 
-void	on_cali_save_button_clicked( GtkButton *button, gpointer user_data) //TEST ME ! to fix filter
+void	on_cali_save_button_clicked( GtkButton *button, gpointer user_data)
 {
 	gchar *filename = dialog_save_file( "Save calibration to file", "veejay-calibration.xml");
 	if( filename ) {
@@ -3222,12 +3982,12 @@ void	on_cali_take_button_clicked(	GtkButton *button, gpointer data )
 	info->uc.cali_duration = duration;
 }
 
-void	on_cali_darkframe_clicked( GtkButton *button, gpointer data ) 
+void	on_cali_darkframe_clicked( GtkButton *button, gpointer data )
 {
 	get_and_draw_frame( 0, "image_darkframe" );
 }
 
-void	on_cali_lightframe_clicked( GtkButton *button, gpointer data ) 
+void	on_cali_lightframe_clicked( GtkButton *button, gpointer data )
 {
 	get_and_draw_frame( 1, "image_lightframe" );
 }
@@ -3240,9 +4000,6 @@ void	on_cali_flatframe_clicked( GtkButton *button, gpointer data )
 void	on_cali_image_clicked( GtkButton *button, gpointer data )
 {
 
-//	get_and_draw_frame( 0, "image_darkframe" );
-//	get_and_draw_frame( 1, "image_lightframe");
-//	get_and_draw_frame( 2, "image_flatframe");
 
 }
 
@@ -3256,7 +4013,7 @@ void	on_cali_reset_button_clicked( 	GtkButton *button, gpointer data )
 
 	if( cali_stream_id <= 0 ) {
 		error_dialog( "Error", "No source selected to calibrate. Play a Live stream or double click one in the List");
-		
+
 		return;
 	}
 
@@ -3276,9 +4033,7 @@ void	on_cali_reset_button_clicked( 	GtkButton *button, gpointer data )
         gtk_widget_set_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ], FALSE);
 }
 
-/*
- * Handler to show the VIMS_Bundles-dialog
- */
+
 void on_vims_bundles_activate (GtkMenuItem     *menuitem,
                                gpointer         user_data)
 {
@@ -3286,22 +4041,20 @@ void on_vims_bundles_activate (GtkMenuItem     *menuitem,
 }
 
 
-/*
- * Handler to close the VIMS_Bundles-dialog
- */ 
+
 void on_vims_bundles_close                  (GtkDialog       *dialog,
 					     gpointer         user_data)
 {
 	gtk_widget_hide(info->vims_bundle_dialog);
 }
 
-/* Menu entries */
+
 void on_quit_activate( GtkWidget *w, gpointer user_data )
 {
   gveejay_quit(NULL,NULL);
 }
 
-/* depending on the state, we either load an action file or a sample list !*/
+
 void	on_open2_activate( GtkWidget *w, gpointer user_data)
 {
 	gchar *filename = NULL;
@@ -3314,7 +4067,7 @@ void	on_open2_activate( GtkWidget *w, gpointer user_data)
 				if(config_file)
 				    g_free(config_file);
 				config_file = g_strdup( filename );
-				config_file_status = 1; 
+				config_file_status = 1;
 				g_free(filename);
 			}
 			break;
@@ -3341,9 +4094,7 @@ void	on_save1_activate( GtkWidget *w, gpointer user_data )
 		vj_msg(VEEJAY_MSG_ERROR, "Nothing to save (start or connect to veejay first)");
 }
 
-/*
- * Help menu handlers
- */
+
 void on_about_activate(GtkWidget *widget, gpointer user_data)
 {
   about_dialog();
@@ -3410,7 +4161,10 @@ void    on_framerate_dec_clicked( GtkWidget *w, gpointer data )
 
 void	on_frameratenormal_clicked( GtkWidget *w, gpointer data )
 {
-	update_slider_value( "framerate", (int) info->el.fps,0 );
+    int fps_x100 = framerate_slider_value_to_ceil_x100((gdouble)info->el.fps);
+
+    update_slider_gvalue("framerate", ((gdouble)fps_x100) / 100.0);
+    vj_msg(VEEJAY_MSG_INFO, "Playback framerate reset to %d FPS", fps_x100 / 100);
 }
 
 void	on_framerate_value_changed( GtkWidget *w, gpointer data )
@@ -3418,11 +4172,30 @@ void	on_framerate_value_changed( GtkWidget *w, gpointer data )
 	if(info->status_lock)
 		return;
 
-  GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
-	gdouble slider_val = gtk_adjustment_get_value (a);
-	int value = (int)(100.0 * slider_val);
-	multi_vims( VIMS_FRAMERATE, "%d", value );
-	vj_midi_learning_vims_simple( info->midi, "framerate", VIMS_FRAMERATE );
+    GtkAdjustment *a = gtk_range_get_adjustment(GTK_RANGE(w));
+	gdouble slider_val = gtk_adjustment_get_value(a);
+	int value = framerate_slider_value_to_ceil_x100(slider_val);
+    gint64 now_us = g_get_monotonic_time();
+
+    framerate_snap_widget_to_integer(w, value);
+
+    if(value == framerate_last_sent_x100)
+        return;
+
+    if(framerate_last_sent_us == 0 ||
+       (now_us - framerate_last_sent_us) >= FRAMERATE_SEND_MIN_US)
+    {
+        framerate_pending_x100 = -1;
+        framerate_send_x100(value, 1);
+        return;
+    }
+
+    framerate_pending_x100 = value;
+    if(framerate_timeout_id == 0)
+        framerate_timeout_id = g_timeout_add(
+            (guint)((FRAMERATE_SEND_MIN_US + 999) / 1000),
+            framerate_flush_pending_cb,
+            NULL);
 }
 
 void	on_sync_correction_clicked( GtkWidget *w, gpointer data )
@@ -3498,7 +4271,7 @@ void on_curve_clear_parameter_clicked(GtkWidget *widget, gpointer user_data)
     info->uc.reload_hint[HINT_KF] = 1;
 }
 
-#define KF_STORE_HEADER_LEN 44 // K%08d + packed header is 36 bytes + 8 bytes for payload length
+#define KF_STORE_HEADER_LEN 44
 #define KF_STORE_HEADER_BUFSZ (KF_STORE_HEADER_LEN + 1)
 
 #define KF_PACKED_HEADER_SCAN_FMT  "key%2d%2d%8d%8d%2d%8d%2d"
@@ -3943,14 +4716,14 @@ void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
 void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "videobook" );
-	// set page 1 from notebook panels
+
 	gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
 	if(page == 1 )
 		gtk_notebook_prev_page(GTK_NOTEBOOK(n) );
-	if(info->selected_slot)	
+	if(info->selected_slot)
 	{
-		/* Only if we are not playing it */
-		if(info->status_tokens[STREAM_TYPE] != 
+
+		if(info->status_tokens[STREAM_TYPE] !=
 			info->selected_slot->sample_type &&
 		   info->status_tokens[CURRENT_ID] !=
 			info->selected_slot->sample_id )
@@ -3971,7 +4744,7 @@ void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
 
 	gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
-	
+
 	gint page_needed = 2;
 
 	switch( info->status_tokens[PLAY_MODE] )
@@ -3984,8 +4757,8 @@ void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 			page_needed = 2; break;
 		default:
 			break;
-	}	
-	
+	}
+
 	if( page_needed != page )
 		gtk_notebook_set_current_page(
 				GTK_NOTEBOOK(n),
@@ -4005,17 +4778,42 @@ static void timeline_marker_move_reset_cache(void)
     timeline_marker_last_sent_end    = -1;
 }
 
+static gboolean timeline_marker_mode_is_sample(void)
+{
+    return info && info->tl && info->status_tokens[PLAY_MODE] == MODE_SAMPLE;
+}
+
+static gboolean timeline_marker_can_send(void)
+{
+    return timeline_marker_mode_is_sample() && !info->status_lock;
+}
+
+static void timeline_marker_disable_selection_guarded(GtkWidget *widget)
+{
+    GtkWidget *tl = widget ? widget : (info ? info->tl : NULL);
+    int old_lock;
+
+    if(!info || !tl)
+        return;
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+
+    timeline_set_selection(tl, FALSE);
+    timeline_clear_points(tl);
+
+    info->selection[0] = -1;
+    info->selection[1] = -1;
+
+    info->status_lock = old_lock;
+    timeline_marker_move_reset_cache();
+}
+
 static gboolean timeline_read_current_marker(gint *marker_start_out,
                                              gint *marker_end_out,
                                              gint *marker_center_backend_out)
 {
-    if (info == NULL || info->tl == NULL)
-        return FALSE;
-
-    if (info->status_lock)
-        return FALSE;
-
-    if (info->status_tokens[PLAY_MODE] != MODE_SAMPLE)
+    if (!timeline_marker_can_send())
         return FALSE;
 
     TimelineSelection *tl = TIMELINE_SELECTION(info->tl);
@@ -4057,15 +4855,9 @@ static gboolean timeline_read_current_marker(gint *marker_start_out,
     return TRUE;
 }
 
-static gboolean timeline_send_marker_move_now(const char *reason)
+static gboolean timeline_send_marker_move_now(void)
 {
-    if (info == NULL || info->tl == NULL)
-        return FALSE;
-
-    if (info->status_lock)
-        return FALSE;
-
-    if (info->status_tokens[PLAY_MODE] != MODE_SAMPLE)
+    if (!timeline_marker_can_send())
         return FALSE;
 
     gint marker_start = 0;
@@ -4109,14 +4901,11 @@ static gboolean timeline_send_marker_move_now(const char *reason)
 
 void on_timeline_move_selection(void)
 {
-    if (info == NULL || info->tl == NULL )
+    if (!timeline_marker_can_send()) {
+        if(info && !info->status_lock && !timeline_marker_mode_is_sample())
+            timeline_marker_disable_selection_guarded(NULL);
         return;
-
-    if (info->status_lock)
-        return;
-
-    if (info->status_tokens[PLAY_MODE] != MODE_SAMPLE)
-        return;
+    }
 
     TimelineSelection *tl = TIMELINE_SELECTION(info->tl);
 
@@ -4126,7 +4915,7 @@ void on_timeline_move_selection(void)
     if (!timeline_get_selection(tl))
         return;
 
-    timeline_send_marker_move_now("selection_changed");
+    timeline_send_marker_move_now();
 }
 
 void on_timeline_selection_changed(GtkWidget *widget, gpointer user_data)
@@ -4138,26 +4927,30 @@ void on_timeline_selection_changed(GtkWidget *widget, gpointer user_data)
 
 void on_timeline_cleared(GtkWidget *widget, gpointer user_data)
 {
-    (void) widget;
     (void) user_data;
 
     timeline_marker_move_reset_cache();
 
-    if (info &&
-        info->status_tokens[PLAY_MODE] == MODE_SAMPLE &&
-        !info->status_lock)
-    {
-        multi_vims(VIMS_SAMPLE_CLEAR_MARKER, "%d", 0);
-        vj_midi_learning_vims_msg(info->midi, NULL, VIMS_SAMPLE_CLEAR_MARKER, 0);
+    if(!info || info->status_lock)
+        return;
+
+    if(!timeline_marker_mode_is_sample()) {
+        timeline_marker_disable_selection_guarded(widget);
+        return;
     }
+
+    multi_vims(VIMS_SAMPLE_CLEAR_MARKER, "%d", 0);
+    vj_midi_learning_vims_msg(info->midi, NULL, VIMS_SAMPLE_CLEAR_MARKER, 0);
 }
 
 void on_timeline_bind_toggled(GtkWidget *widget, gpointer user_data)
 {
-    (void) widget;
     (void) user_data;
 
     timeline_marker_move_reset_cache();
+
+    if(info && !info->status_lock && !timeline_marker_mode_is_sample())
+        timeline_marker_disable_selection_guarded(widget);
 }
 void	on_timeline_value_changed( GtkWidget *widget, gpointer user_data )
 {
@@ -4243,6 +5036,12 @@ static void set_marker_span_centered(GtkWidget *tl, gint new_span)
 
 void	on_len_div_clicked(GtkWidget *widget, gpointer user_data)
 {
+	if(!timeline_marker_can_send()) {
+		if(info && !info->status_lock && !timeline_marker_mode_is_sample())
+			timeline_marker_disable_selection_guarded(info ? info->tl : NULL);
+		return;
+	}
+
 	gdouble pos1 = timeline_get_in_point(TIMELINE_SELECTION(info->tl));
 	gdouble pos2 = timeline_get_out_point(TIMELINE_SELECTION(info->tl));
 	gint in_f = (gint) llround(pos1);
@@ -4268,6 +5067,12 @@ void	on_len_div_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_len_mul_clicked(GtkWidget *widget, gpointer user_data)
 {
+	if(!timeline_marker_can_send()) {
+		if(info && !info->status_lock && !timeline_marker_mode_is_sample())
+			timeline_marker_disable_selection_guarded(info ? info->tl : NULL);
+		return;
+	}
+
 	gdouble pos1 = timeline_get_in_point(TIMELINE_SELECTION(info->tl));
 	gdouble pos2 = timeline_get_out_point(TIMELINE_SELECTION(info->tl));
 	gint in_f = (gint) llround(pos1);
@@ -4293,8 +5098,13 @@ void	on_len_mul_clicked(GtkWidget *widget, gpointer user_data)
 
 void on_timeline_out_point_changed(GtkWidget *widget, gpointer user_data)
 {
-    if (info->status_lock)
+    if(!info || info->status_lock)
         return;
+
+    if(!timeline_marker_mode_is_sample()) {
+        timeline_marker_disable_selection_guarded(widget);
+        return;
+    }
 
     const gint sample_start = info->status_tokens[SAMPLE_START];
     const gint sample_end   = info->status_tokens[SAMPLE_END];
@@ -4326,8 +5136,13 @@ void on_timeline_out_point_changed(GtkWidget *widget, gpointer user_data)
 
 void on_timeline_in_point_changed(GtkWidget *widget, gpointer user_data)
 {
-    if (info->status_lock)
+    if(!info || info->status_lock)
         return;
+
+    if(!timeline_marker_mode_is_sample()) {
+        timeline_marker_disable_selection_guarded(widget);
+        return;
+    }
 
     const gint sample_start = info->status_tokens[SAMPLE_START];
     const gint sample_end   = info->status_tokens[SAMPLE_END];
@@ -4369,7 +5184,7 @@ void	on_sampleadd_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_streamnew_clicked(GtkWidget *widget, gpointer user_data)
 {
-    // inputstream_window
+
     scan_devices( "tree_v4ldevices" );
 
     GtkWidget *inputstream_window = glade_xml_get_widget_(info->main_window, "inputstream_window");
@@ -4395,14 +5210,14 @@ void	on_generatornew_clicked(GtkWidget *widget, gpointer user_data)
 void	on_inputstream_close_clicked(GtkWidget *w,  gpointer user_data)
 {
 	GtkWidget *wid = glade_xml_get_widget_(info->main_window, "inputstream_window");
-	gtk_widget_hide(wid);	
+	gtk_widget_hide(wid);
 }
 
 void	on_generators_close_clicked(GtkWidget *w, gpointer user_data)
 {
 	GtkWidget *wid = glade_xml_get_widget_(info->main_window, "generator_window");
-	gtk_widget_hide(wid);	
-}	
+	gtk_widget_hide(wid);
+}
 
 void 	on_button_sdlclose_clicked(GtkWidget *w, gpointer user_data)
 {
@@ -4414,11 +5229,8 @@ void 	on_button_sdlclose_clicked(GtkWidget *w, gpointer user_data)
 
 void	on_quicklaunch_clicked(GtkWidget *widget, gpointer user_data)
 {
-/*	if( info->watch.state == STATE_STOPPED )
-	{ 
-		vj_fork_or_connect_veejay( config_file );
-	}
-*/	
+
+
 }
 
 void	on_inputstream_window_delete_event(GtkWidget *w, gpointer user_data)
@@ -4500,16 +5312,16 @@ void	on_alpha_effects_toggled(GtkWidget *w, gpointer user_data)
 
 void	on_toggle_alpha255_toggled(GtkWidget *w, gpointer user_data)
 {
-	multi_vims( VIMS_ALPHA_COMPOSITE,"%d %d", is_button_toggled( "alphacomposite"), is_button_toggled("toggle_alpha255") ? 255: 0 ); 
+	multi_vims( VIMS_ALPHA_COMPOSITE,"%d %d", is_button_toggled( "alphacomposite"), is_button_toggled("toggle_alpha255") ? 255: 0 );
 }
 
 void	on_alphacomposite_toggled(GtkWidget *widget, gpointer user_data)
-{	
+{
 	int alpha_value = 0;
 	if (is_button_toggled( "toggle_alpha255"))
 		alpha_value = 255;
 
-	multi_vims( VIMS_ALPHA_COMPOSITE,"%d %d", is_button_toggled( "alphacomposite" ), alpha_value ); 
+	multi_vims( VIMS_ALPHA_COMPOSITE,"%d %d", is_button_toggled( "alphacomposite" ), alpha_value );
 }
 
 
@@ -4551,8 +5363,8 @@ void	on_filter_effects_changed( GtkWidget *w, effectlist_data *user_data)
 			}
 			user_data->filter_string = NULL;
 		} else {
-			vj_msg(VEEJAY_MSG_DEBUG, ""); // FIXME why debug ? check vj-msg.h and "void vj_msg( " from vj-api.c:2340
-			// filter with "user_data->filter_string = NULL" to remove the filter
+			vj_msg(VEEJAY_MSG_DEBUG, "");
+
 			gtk_tree_model_filter_refilter (user_data->stores[0].filtered);
 			gtk_tree_model_filter_refilter (user_data->stores[1].filtered);
 			gtk_tree_model_filter_refilter (user_data->stores[2].filtered);
@@ -4581,14 +5393,14 @@ gboolean	on_entry_hostname_focus_in_event( GtkWidget *w, gpointer user_data)
 
 gboolean	on_entry_hostname_focus_out_event( GtkWidget *w, gpointer user_data)
 {
-//	update_label_str( "runlabel", "Run" );
+
 	return FALSE;
 }
 
 
 gboolean 	on_entry_filename_focus_in_event( GtkWidget *w, gpointer user_data)
 {
-//	update_label_str( "runlabel", "Run" );
+
 	return FALSE;
 }
 
@@ -4602,7 +5414,7 @@ int alphaonly_view = 0;
 void		on_previewalphaonly_toggled( GtkWidget *w, gpointer user_data)
 {
 	alphaonly_view = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(w) );
-	vj_msg(VEEJAY_MSG_INFO, "Live viewing %s", (alphaonly_view ? "Alpha only" : "Preview" ) );	
+	vj_msg(VEEJAY_MSG_INFO, "Live viewing %s", (alphaonly_view ? "Alpha only" : "Preview" ) );
 }
 
 void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
@@ -4637,7 +5449,6 @@ void	on_mt_delete_activate( GtkWidget *w, gpointer user_data)
 {
 	multitrack_close_track( info->mt );
 }
-
 
 
 void	on_mt_sync_start_clicked( GtkWidget *w, gpointer user_data)
@@ -4699,19 +5510,10 @@ void	on_add_file1_activate(GtkWidget *w, gpointer user_data)
 {
 }
 
-/******************************************************
- * on_effectchain_button_pressed()
- *
- *  Signal handler over the effect chain.
- *
- *  Catch button press event on shift+click to toogle fx state.
- *  Catch button press event on ctrl+click to toogle fx anim state.
- *  NOTA : works over the FULL row
- *
- ******************************************************/
+
 gboolean on_effectchain_button_pressed (GtkWidget *tree, GdkEventButton *event, gpointer userdata)
 {
-    //filter events over ctrl and shift
+
     int state_modifier = event->state & (GDK_SHIFT_MASK | GDK_CONTROL_MASK);
 
     if (state_modifier && (event->type == GDK_BUTTON_PRESS) && (event->button == 1))
@@ -4726,7 +5528,7 @@ gboolean on_effectchain_button_pressed (GtkWidget *tree, GdkEventButton *event, 
                             &path, &column, &cell_x, &cell_y ))
 
         {
-            /* get iter from clicked path */
+
             GtkTreeIter iter;
             gint fxcid = 0;
             GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW( tree ));
@@ -4751,7 +5553,7 @@ gboolean on_effectchain_button_pressed (GtkWidget *tree, GdkEventButton *event, 
 			}
         }
     }
-    return FALSE; /* lets normal things happening */
+    return FALSE;
 }
 
 static gchar *get_clipboard_fx_parameter_buffer(
@@ -4763,7 +5565,6 @@ static gchar *get_clipboard_fx_parameter_buffer(
 {
     char rest[2048 + 22 + 1];
     int len = 0;
-    int tmp = 0;
     int n_params = 0;
     int fid = 0;
 
@@ -4836,7 +5637,7 @@ typedef struct
 static clipboard_t	*get_new_clipboard(void)
 {
 	clipboard_t *c = (clipboard_t*) vj_calloc( sizeof(clipboard_t) );
-	
+
 	c->parameters = get_clipboard_fx_parameter_buffer( &(c->src), &(c->cha), &(c->enabled),&(c->beat_flag), &(c->fx_id) );
 	if( c->parameters == NULL ) {
 		free(c);
@@ -4894,7 +5695,7 @@ void	on_button_fx_cut_clicked( GtkWidget *w, gpointer user_data)
 {
 	if(last_clipboard)
 		del_clipboard( last_clipboard );
-	
+
 	last_clipboard = get_new_clipboard();
 
 	on_button_fx_del_clicked( NULL,NULL );
@@ -4908,14 +5709,14 @@ void	on_button_fx_paste_clicked( GtkWidget *w, gpointer user_data)
 		vj_msg(VEEJAY_MSG_INFO, "Nothing in FX clipboard");
 		return;
 	}
-	
+
 	if( s == NULL ) {
 		vj_msg(VEEJAY_MSG_INFO, "No FX entry selected");
 		return;
 	}
 
 	do_clipboard( last_clipboard, s->sample_id, info->uc.selected_chain_entry );
-	
+
 	info->uc.reload_hint[HINT_ENTRY]=1;
 }
 
@@ -4943,17 +5744,17 @@ on_spin_samplebank_select_value_changed
         GtkNotebook *samplebank = GTK_NOTEBOOK( info->sample_bank_pad );
 
         gint max_page = gtk_notebook_get_n_pages(samplebank);
-        
+
         gint page = gtk_spin_button_get_value_as_int(spinbutton);
 
-        if(page >= max_page){ /* @mvh I know this is not pretty but why make it difficult */
-                 page = 0; 
+        if(page >= max_page){
+                 page = 0;
                  gtk_spin_button_set_value(spinbutton, page);
         } else if( page < 0 ) {
 		page = max_page;
 		gtk_spin_button_set_value(spinbutton,page);
 	}
-        gtk_notebook_set_current_page_(samplebank, page);        
+        gtk_notebook_set_current_page_(samplebank, page);
 }
 void
 on_button_samplebank_prev_clicked      (GtkButton       *button,
@@ -4961,7 +5762,7 @@ on_button_samplebank_prev_clicked      (GtkButton       *button,
 {
 	GtkNotebook *samplebank = GTK_NOTEBOOK( info->sample_bank_pad );
 	gtk_notebook_prev_page(samplebank);
-	//update the bank spin widget
+
 	gint page = gtk_notebook_get_current_page (samplebank);
 	if (page != -1)
 		update_spin_value("spin_samplebank_select", page);
@@ -4974,7 +5775,7 @@ on_button_samplebank_next_clicked      (GtkButton       *button,
 {
 	GtkNotebook *samplebank = GTK_NOTEBOOK( info->sample_bank_pad );
 	gtk_notebook_next_page(samplebank);
-	//update the bank spin widget
+
 	gint page = gtk_notebook_get_current_page (samplebank);
 	if (page != -1)
 		update_spin_value("spin_samplebank_select", page);
@@ -5003,7 +5804,7 @@ static void set_transition(int active, int shape, int length)
             "%d %d %d %d %d",
             info->status_tokens[PLAY_MODE],
             info->status_tokens[CURRENT_ID],
-            active, 
+            active,
             shape,
             length );
 
@@ -5075,27 +5876,27 @@ on_vims_messenger_single_clicked( void )
 					info->main_window,
 					"vims_messenger_textview"))
 			);
-  
+
 	GtkTextBuffer* buffer =  gtk_text_view_get_buffer(t);
   	int lc = gtk_text_buffer_get_line_count(buffer);
-	
+
 	if(info->vims_line > lc )
 		info->vims_line = 0;
-	
+
 	while(info->vims_line < lc )
 	{
 		GtkTextIter start, end;
        		gtk_text_buffer_get_iter_at_line(buffer, &start, info->vims_line);
-  
+
  	 	end = start;
-                
+
 	        gtk_text_iter_forward_sentence_end(&end);
        		gchar *str = gtk_text_buffer_get_text (buffer, &start, &end, FALSE);
-	
+
 		info->vims_line++;
 
 		if(strlen(str) <= 0)
-			continue; // skip empty lines
+			continue;
 
 	        if(str[0] != '+')
 		{
@@ -5105,631 +5906,6 @@ on_vims_messenger_single_clicked( void )
         	}
 	}
 }
-
-static	gint	srt_load_subtitle(int sid)
-{
-	gint len = 0;
-	gint seq_id = 0;
-	gint tc1l=0;
-	gint tc2l=0;
-	char tc1[20];
-	char tc2[20];
-	char tmp[1000];
-	gint tlen=0;
-	gint ln[4];
-	gint fg[4];
-	gint bg[4];
-	gint use_bg = 0;
-	gint outline = 0;
-	gint size = 0;
-	gint font = 0;
-	gint x =0;
-	gint y = 0;
-
-	multi_vims( VIMS_SRT_INFO, "%d", sid );
-	gchar *text = recv_vims( 6,&len );
-	veejay_memset(tmp,0,sizeof(tmp));
-	veejay_memset(tc1,0,sizeof(tc1));
-	veejay_memset(tc2,0,sizeof(tc2));
-
-	clear_textview_buffer( "textview_text" );
-	int s1=0,s2=0;
-	if(text && len > 0 )
-	{
-		sscanf( text,"%5d%9d%9d%2d", &seq_id ,&s1,&s2,&tc1l );
-		strncpy( tc1, text+7+18,tc1l );	
-		sscanf( text+7+18+tc1l,"%2d", &tc2l );
-		strncpy( tc2, text+7+18+tc1l + 2, tc2l );
-		sscanf( text+7+18+tc1l+2+tc2l, "%3d", &tlen );
-		strncpy( tmp, text + 7 + 18 + tc1l + 2 + tc2l + 3, tlen );
-		sscanf( text+7+18 + tc1l+2+tc2l+3+tlen,"%04d%04d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d",
-			&x,&y, &font, &size, &bg[0],&bg[1],&bg[2],&fg[0],&fg[1],&fg[2],&use_bg,&outline,&ln[0],&ln[1],
-			&ln[2],&bg[3],&fg[3],&ln[3] );
-	}
-
-	srt_locked_ = 1;
-	
-	update_spin_range( "spin_text_start",0, get_total_frames(),s1);
-	update_spin_range( "spin_text_end",0, get_total_frames(),s2);
-
-	set_textview_buffer( "textview_text", tmp );
-
-	update_spin_value( "spin_text_start" ,s1);
-	update_spin_value( "spin_text_end", s2 );
-
-	change_box_color_rgb(
-		 glade_xml_get_widget_(info->main_window, "boxbg" ),
-		 bg[0],bg[1],bg[2],bg[3], (is_button_toggled( "textcolorbg" ) ? 1 : 0 ) );
-
-	change_box_color_rgb(
-		 glade_xml_get_widget_(info->main_window, "boxtext" ),
-		 fg[0],fg[1],fg[2],fg[3], (is_button_toggled( "textcolorfg" ) ? 1: 0) );
-
-
-	change_box_color_rgb(
-		glade_xml_get_widget_( info->main_window, "boxln" ),
-		ln[0],ln[1],ln[2],ln[3], (is_button_toggled( "textcolorln" ) ? 1: 0) );
-
-	memcpy( bg_, bg, sizeof(bg_));
-	memcpy( fg_, fg, sizeof(fg_));
-	memcpy( ln_, ln, sizeof(ln_));
-
-	set_toggle_button( "use_bg", use_bg );
-	set_toggle_button( "use_outline", outline);
-	update_spin_value( "spin_text_size", size );
-	update_spin_value( "spin_text_x", x );
-	update_spin_value( "spin_text_y", y );	
-
-	if(is_button_toggled( "textcolorfg") )
-	{
-		update_slider_value( "textcolorred", fg_[0],0 );
-		update_slider_value( "textcolorblue",fg_[2],0 );
-		update_slider_value( "textcolorgreen",fg_[1],0);
-		update_slider_value( "textcoloralpha", fg_[3],0);
-	}
-	else if( is_button_toggled( "textcolorbg") )
-	{
-		update_slider_value( "textcolorred", bg_[0],0 );
-		update_slider_value( "textcolorblue",bg_[2],0 );
-		update_slider_value( "textcolorgreen",bg_[1],0);
-		update_slider_value( "textcoloralpha",bg_[3],0);
-	}
-	else if ( is_button_toggled( "textcolorln" ))
-	{
-		update_slider_value( "textcolorred", ln_[0],0 );
-		update_slider_value( "textcolorblue",ln_[2],0 );
-		update_slider_value( "textcolorgreen",ln_[1],0);
-		update_slider_value( "textcoloralpha", ln_[3],0);
-	}
-	GtkWidget *combo = glade_xml_get_widget_( info->main_window, "combobox_fonts" );
-	gtk_combo_box_set_active( GTK_COMBO_BOX( combo ), font );
-
-
-//	glade_xml_get_widget_( info->main_window, "combobox_textsrt" );
-//      gtk_combo_box_set_active( GTK_COMBO_BOX( combo ), seq_id-1 );
-
-//	if(len > 0 )
-//		enable_widget( "SRTframe");
-
-
-	srt_locked_ = 0;
-
-	if(text) free(text);
-
-	return seq_id;
-}
-
-void	on_button_text_new_clicked( GtkWidget *w, gpointer data )
-{
-	gint x = get_nums( "spin_text_x" );
-	gint y = get_nums( "spin_text_y" );
-	gint s1 = 0;
-	gint s2 = 0;
-	if( info->status_tokens[PLAY_MODE] == MODE_SAMPLE )
-        {
-              s1 = info->status_tokens[SAMPLE_START];
-              s2 = info->status_tokens[SAMPLE_END];
-        }
-        else
-        {
-          	s1 = 0;
-                s2 = get_nums("stream_length");
-        }
-
-	gchar *text = strdup(" ");
-	
-	multi_vims( VIMS_SRT_ADD, "%d %d %d %d %d %s",
-		0,s1,s2,x,y,text );
-
-	int tmp = 0;
-	gchar *new_srt_id = recv_vims( 5, &tmp );
-	int id = 0;
-	if(new_srt_id && tmp > 0)
-	{
-		sscanf( new_srt_id, "%d", &id );
-		if(id > 0 )
-		  srt_seq_ = id;
-	}
-	if( new_srt_id )
-		free(new_srt_id);
-	
-	free(text);
-	if( id > 0 )
-		info->uc.reload_hint[HINT_HISTORY] = 1;
-
-}
-
-void	on_button_text_del_clicked( GtkWidget *w, gpointer data )
-{
-	multi_vims( VIMS_SRT_DEL, "%d", srt_seq_ );
-	info->uc.reload_hint[HINT_HISTORY] = 1;
-}
-
-void	on_spin_text_start_value_changed( GtkWidget *w, gpointer data )
-{
-	gint start = get_nums( "spin_text_end");
-	char *text = format_time( start, info->el.fps );
-	update_label_str( "labeltextstart", text );
-	free(text);	
-}
-
-void	on_spin_text_end_value_changed( GtkWidget *w, gpointer data )
-{
-	gint end = get_nums( "spin_text_end" );
-	char *text = format_time( end, info->el.fps );
-	update_label_str( "labeltextend", text );
-	free(text);
-}
-void	on_spin_text_x_value_changed( GtkWidget *w, gpointer data )
-{
-	if( srt_locked_)
-		return;
-
-	gint x = get_nums( "spin_text_x" );
-	gint y = get_nums( "spin_text_y");
-	multi_vims( VIMS_FONT_POS,"%d %d", x,y );
-}
-void	on_spin_text_y_value_changed( GtkWidget *w, gpointer data )
-{
-	if( srt_locked_)
-		return;
-
-	gint x = get_nums( "spin_text_x" );
-	gint y = get_nums( "spin_text_y");
-	multi_vims( VIMS_FONT_POS,"%d %d", x,y );
-}
-void	on_button_srt_save_clicked( GtkWidget *w, gpointer data )
-{
-	gchar *filename = dialog_save_file("Save SRT file", "veejay-srt.file");
-	if( filename )
-	{
-		multi_vims( VIMS_SRT_SAVE, "%s", filename );
-		g_free(filename);
-	}
-}
-void	on_button_srt_load_clicked( GtkWidget *w, gpointer data )
-{
-	gchar *filename = dialog_open_file("Load SRT file",FILE_FILTER_NONE);
-	if( filename )
-	{
-		multi_vims( VIMS_SRT_LOAD, "%s", filename );
-		g_free(filename);
-	}
-}
-
-
-void	on_combobox_fonts_changed( GtkWidget *w, gpointer data )
-{
-	if(srt_locked_)
-		return;
-	gint font = gtk_combo_box_get_active( GTK_COMBO_BOX( w ) );
-	gint size = get_nums( "spin_text_size" );
-	if( font < 0 || size < 0 )
-		return;
-	multi_vims( VIMS_FONT_SIZE_FONT, "%d %d", font , size );
-}
-void	on_spin_text_size_value_changed( GtkWidget *w, gpointer data )
-{
-	if( srt_locked_)
-		return;
-	GtkWidget *ww = glade_xml_get_widget_( info->main_window,
-			"combobox_fonts" );
-	gint font = gtk_combo_box_get_active( GTK_COMBO_BOX( ww ) );
-	gint size = get_nums( "spin_text_size" );
-
-	multi_vims( VIMS_FONT_SIZE_FONT, "%d %d", font , size );
-}
-
-void	on_button_text_update_clicked(GtkWidget *w, gpointer data)
-{
-	gint s1 = get_nums( "spin_text_start" );
-	gint s2 = get_nums( "spin_text_end" );
-	gchar *text = get_textview_buffer( "textview_text" );
-	if(text)
-		multi_vims( VIMS_SRT_UPDATE, "%d %d %d %s", srt_seq_, s1,s2,text );
-}
-
-static	void change_box_color_rgb( GtkWidget *box, int r, int g, int b,int a, int fill )
-{
-  cairo_t *cr;
-  cr = gdk_cairo_create (gtk_widget_get_window(box));
-
-  GdkColor col;
-
-  memset( &col,0, sizeof( GdkColor ) );
-  col.red = 255.0 * r;
-  col.green = 255.0 * g;
-  col.blue = 255.0 * b;
-
-  if(fill)
-  {
-    update_slider_value( "textcolorred", r ,0);
-    update_slider_value( "textcolorgreen",g,0 );
-    update_slider_value( "textcolorblue",b,0);
-    update_slider_value( "textcoloralpha",a,0);
-  }
-
-  gdk_cairo_set_source_color( cr, &col );
-  cairo_rectangle (cr, 0, 0, 24, 24);
-  cairo_fill (cr);
-
-  cairo_destroy(cr);
-}
-
-void	on_combobox_textsrt_changed( GtkWidget *w, gpointer data)
-{
-	if(info->status_lock)
-		return;
-
-	gchar *k = gtk_combo_box_text_get_active_text( GTK_COMBO_BOX_TEXT(w) );
-	int sid  = atoi(k);
-	if( sid > 0)
-	{
-		multi_vims( VIMS_SRT_SELECT, "%d", sid );
-		srt_seq_ = sid;
-		gint res = srt_load_subtitle(sid);
-		char text[32];	
-		sprintf(text, "Edit SRT %d", res );
-		update_label_str( "srtid_label", text );	
-	}
-}
-
-
-static	void change_box_color( GtkWidget *box, double val, int plane, int fill )
-{
-  cairo_t *cr;
-  cr = gdk_cairo_create (gtk_widget_get_window(box));
-
-  GdkColor col;
-  memset( &col,0, sizeof( GdkColor ) );
-  double v = (1.0 / 255.0) * val;
-
-  int r = get_slider_val( "textcolorred" );
-  int b =  get_slider_val( "textcolorgreen" );
-  int g =  get_slider_val( "textcolorblue" );
-  int a = get_slider_val("textcoloralpha" );
-
-  if(plane==0)
-  {
-    col.red = 65535.0 * v;
-    switch(fill)
-    {
-      case 0:	fg_[0] = r; break;
-      case 1: bg_[0] = r; break;
-      case 2: ln_[0] = r; break;
-    }
-  }
-  if(plane==1)
-  {
-    col.green = 65535 * v;
-    switch(fill)
-    {
-      case 0:	fg_[1] = g; break;
-      case 1: bg_[1] = g; break;
-      case 2: ln_[1] = g; break;
-    }
-  }
-  if(plane==2)
-  {
-    col.blue = 65535 * v;
-    switch(fill)
-    {
-      case 0:	fg_[2] = b; break;
-      case 1: bg_[2] = b; break;
-      case 2: ln_[2] = b; break;
-    }
-  }
-
-  if(plane==-1)
-  {
-    col.red = 255.0 * r;
-    col.green = 255.0 * g;
-    col.blue = 255.0 * b;
-    switch(fill)
-    {
-      case 0:	fg_[0] = r; fg_[1] = g; fg_[2] = b; fg_[3] = a; break;
-      case 1: bg_[0] = r; bg_[1] = g; bg_[2] = b; bg_[3] = a; break;
-      case 2: ln_[0] = r; ln_[1] = g; ln_[2] = b; ln_[3] = a; break;
-    }
-
-  }
-
-  gdk_cairo_set_source_color( cr, &col );
-  cairo_rectangle (cr, 0, 0, 24, 24);
-  cairo_fill (cr);
-
-  cairo_destroy(cr);
-}
-
-static	void	colbox( const char *name1,const char *name2, int plane )
-{	
-	int fg = is_button_toggled("textcolorfg");
-	int bg = is_button_toggled("textcolorbg");
-	int ln = is_button_toggled("textcolorln");
-
-	int v  = get_slider_val( name2 );
-	change_box_color(
-			glade_xml_get_widget_( info->main_window,name1 ) ,
-			v, 
-			plane,
-			-1 ); //green
-
-	if(fg)
-		change_box_color(
-				glade_xml_get_widget_( info->main_window, "boxtext" ),
-				0.0,
-				-1,
-			        0	);
-	if(bg)
-		change_box_color(
-				glade_xml_get_widget_( info->main_window, "boxbg" ),
-				0.0,
-				-1,
-			        1	);
-
-	if(ln)
-		change_box_color(
-				glade_xml_get_widget_( info->main_window, "boxln" ),
-				0.0,
-				-1,
-			        2	);
-
-}
-	
-void	on_textcoloralpha_value_changed(GtkWidget *w, gpointer data )
-{
-	if(info->status_lock || srt_locked_)
-		return;
-
-	int fg = is_button_toggled("textcolorfg");
-	int bg = is_button_toggled("textcolorbg");
-	int ln = is_button_toggled("textcolorln");
-	gint r = get_slider_val( "textcolorred" );
-	gint g = get_slider_val( "textcolorgreen" );
-	gint b = get_slider_val( "textcolorblue" );
-	gint a = get_slider_val( "textcoloralpha" );
-	
-	int m = 0;
-	if( fg )
-	{
-		fg_[3] = a;
-		m = 1;
-	}	
-	if( bg )
-	{
-		bg_[3] = a;
-		m = 2;
-	}
-	if( ln )
-	{
-		ln_[3] = a;
-		m = 3;
-	}
-		
-	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", r,g,b,a, m );	
-}
-
-void	on_textcolorred_value_changed(GtkWidget *w , gpointer data )
-{
-	colbox( "boxred", "textcolorred", 0 );
-}
-
-
-void	on_textcolorgreen_value_changed(GtkWidget *w , gpointer data )
-{
-	colbox( "boxgreen", "textcolorgreen", 1 );
-}
-
-void	on_textcolorblue_value_changed(GtkWidget *w , gpointer data )
-{
-	colbox( "boxblue", "textcolorblue", 2  );	
-}
-
-void	on_textcolorfg_toggled( GtkWidget *w, gpointer data )
-{
-	if( is_button_toggled( "textcolorfg" ) )
-	{
-		update_slider_value( "textcolorred", fg_[0],0 );
-		update_slider_value( "textcolorgreen", fg_[1],0 );
-		update_slider_value( "textcolorblue", fg_[2],0);
-		update_slider_value( "textcoloralpha", fg_[3],0);
-	}
-}
-void	on_textcolorbg_toggled( GtkWidget *w, gpointer data )
-{
-	if( is_button_toggled( "textcolorbg" ) )
-	{
-		update_slider_value( "textcolorred", bg_[0],0 );
-		update_slider_value( "textcolorgreen", bg_[1],0 );
-		update_slider_value( "textcolorblue", bg_[2],0);
-		update_slider_value( "textcoloralpha", bg_[3],0);
-	}
-}
-void	on_textcolorln_toggled( GtkWidget *w, gpointer data )
-{
-	if( is_button_toggled( "textcolorln" ) )
-	{
-		update_slider_value( "textcolorred", ln_[0],0 );
-		update_slider_value( "textcolorgreen", ln_[1],0 );
-		update_slider_value( "textcolorblue", ln_[2],0);
-		update_slider_value( "textcoloralpha", ln_[3],0);
-	}
-}
-
-void	on_use_bg_toggled( GtkWidget *w , gpointer data)
-{
-	if(srt_locked_ || info->status_lock)
-		return;
-
-	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", 
-			is_button_toggled("use_outline"),
-			is_button_toggled("use_bg"),
-			0,
-			0,
-			0 );
-}	
-
-void	on_use_outline_toggled( GtkWidget *w, gpointer data)
-{
-	if(srt_locked_ || info->status_lock)
-		return;
-
-	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", 
-			is_button_toggled("use_outline"),
-			is_button_toggled("use_bg"),
-			0,
-			0,
-			0 );
-
-}
-
-void	on_buttonfg_clicked( GtkWidget *w, gpointer data )
-{
-	gint r = get_slider_val( "textcolorred" );
-	gint g = get_slider_val( "textcolorgreen" );
-	gint b = get_slider_val( "textcolorblue" );
-	gint a = get_slider_val( "textcoloralpha");
-	fg_[0] = r;
-	fg_[1] = g;
-	fg_[2] = b;
-	fg_[3] = a;
-	
-	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", r,g,b,a, 1 );
-}
-void	on_buttonbg_clicked( GtkWidget *w, gpointer data )
-{
-	gint r = get_slider_val( "textcolorred" );
-	gint g = get_slider_val( "textcolorgreen" );
-	gint b = get_slider_val( "textcolorblue" );
-	gint a = get_slider_val( "textcoloralpha" );
-	
-	bg_[0] = r;
-	bg_[1] = g;
-	bg_[2] = b;
-	bg_[3] = a;
-	
-	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", r,g,b,a, 2 );	
-}
-void	on_buttonln_clicked( GtkWidget *w, gpointer data )
-{
-	gint r = get_slider_val( "textcolorred" );
-	gint g = get_slider_val( "textcolorgreen" );
-	gint b = get_slider_val( "textcolorblue" );
-	gint a = get_slider_val( "textcoloralpha" );
-	
-	ln_[0] = r;
-	ln_[1] = g;
-	ln_[2] = b;
-	ln_[3] = a;
-	
-	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", r,g,b,a, 3 );	
-}
-
-gboolean boxfg_draw(GtkWidget *w, cairo_t *cr )
-{
-  GdkColor col;
-  memset( &col,0, sizeof( GdkColor ) );
-  col.red = 255.0 * fg_[0];
-  col.green = 255.0 * fg_[1];
-  col.blue = 255.0 * fg_[2];
-
-  gdk_cairo_set_source_color( cr, &col );
-  cairo_rectangle (cr, 0, 0, 24, 24);
-  cairo_fill ( cr );
-
-  return TRUE;
-}
-
-gboolean boxbg_draw(GtkWidget *w, cairo_t *cr )
-{
-  GdkColor col;
-  memset( &col,0, sizeof( GdkColor ) );
-  col.red = 255.0 * bg_[0];
-  col.green = 255.0 * bg_[1];
-  col.blue = 255.0 * bg_[2];
-
-  gdk_cairo_set_source_color( cr, &col );
-  cairo_rectangle (cr, 0, 0, 24, 24);
-  cairo_fill ( cr );
-
-  return TRUE;
-}
-
-gboolean boxln_draw(GtkWidget *w, cairo_t *cr )
-{
-  GdkColor col;
-  memset( &col,0, sizeof( GdkColor ) );
-  col.red = 255.0 * ln_[0];
-  col.green = 255.0 * ln_[1];
-  col.blue = 255.0 * ln_[2];
-
-  gdk_cairo_set_source_color( cr, &col );
-  cairo_rectangle (cr, 0, 0, 24, 24);
-  cairo_fill ( cr );
-
-  return TRUE;
-}
-
-gboolean boxred_draw(GtkWidget *w, cairo_t *cr )
-{
-  GdkColor col;
-  memset( &col,0, sizeof( GdkColor ) );
-  col.red = 255 * get_slider_val( "textcolorred" );
-
-  gdk_cairo_set_source_color( cr, &col );
-  cairo_rectangle (cr, 0, 0, 24, 24);
-  cairo_fill ( cr );
-
-  return TRUE;
-}
-
-
-gboolean boxgreen_draw(GtkWidget *w, cairo_t *cr )
-{
-  GdkColor col;
-  memset( &col,0, sizeof( GdkColor ) );
-  col.green = 0xff * get_slider_val( "textcolorgreen" );
-
-  gdk_cairo_set_source_color( cr, &col );
-  cairo_rectangle (cr, 0, 0, 24, 24);
-  cairo_fill ( cr );
-
-  return TRUE;
-}
-
-gboolean boxblue_draw(GtkWidget *w, cairo_t *cr )
-{
-  GdkColor col;
-  memset( &col,0, sizeof( GdkColor ) );
-  col.blue = 255 * get_slider_val( "textcolorblue" );
-
-  gdk_cairo_set_source_color( cr, &col );
-  cairo_rectangle (cr, 0, 0, 24, 24);
-  cairo_fill ( cr );
-
-  return TRUE;
-}
-
 
 void	on_osdbutton_clicked(GtkWidget *w, gpointer data )
 {
@@ -5747,28 +5923,28 @@ void on_seqactive_toggled(GtkWidget *w, gpointer data)
     vj_midi_learning_vims_msg(info->midi, NULL, VIMS_SEQUENCE_STATUS, enabled);
 
 	if(enabled)
-		info->uc.reload_hint[HINT_SEQ_ACT] = 1; // reload sequence list on enabled
-    
+		info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+
 	vj_msg(VEEJAY_MSG_INFO,
            "Sample sequencer is %s",
            enabled ? "enabled" : "disabled");
 }
-void	on_hqbutton_clicked( GtkWidget *w, gpointer data ) // 1/1
+void	on_hqbutton_clicked( GtkWidget *w, gpointer data )
 {
 	multitrack_set_quality( info->mt, 0 );
     vj_msg(VEEJAY_MSG_INFO, "Live view quality set to best");
 }
-void	on_lqbutton_clicked( GtkWidget *w, gpointer data ) // 1/2
+void	on_lqbutton_clicked( GtkWidget *w, gpointer data )
 {
 	multitrack_set_quality( info->mt, 1 );
     vj_msg(VEEJAY_MSG_INFO, "Live view quality set to half resolution");
 }
-void	on_bq_button_clicked( GtkWidget *w, gpointer data ) // 1/4
+void	on_bq_button_clicked( GtkWidget *w, gpointer data )
 {
 	multitrack_set_quality( info->mt, 2 );
     vj_msg(VEEJAY_MSG_INFO, "Live view quality set to a quarter resolution");
 }
-void	on_uq_button_clicked( GtkWidget *w, gpointer data ) // 1/8
+void	on_uq_button_clicked( GtkWidget *w, gpointer data )
 {
 	multitrack_set_quality( info->mt, 3 );
     vj_msg(VEEJAY_MSG_INFO,"Live view quality set to an eighth resolution");
@@ -5803,7 +5979,7 @@ void    on_transition_loop_value_changed(GtkWidget *w, gpointer data)
 {
     if(info->status_lock || info->parameter_lock)
 		return;
-    
+
     int enabled = is_button_toggled( "transition_enabled" );
     int loop = get_nums("transition_loop");
 
@@ -5815,7 +5991,7 @@ void	on_macroplay_toggled( GtkWidget *w, gpointer data )
 	if(info->status_lock)
 		return;
 	if( is_button_toggled( "macroplay" ) || is_button_toggled("macroplay1"))
-	{	
+	{
 		multi_vims( VIMS_MACRO, "%d", 2 );
 		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,2 );
 		info->uc.reload_hint[HINT_MACRO] = 1;
@@ -5831,7 +6007,7 @@ void	on_macrorecord_toggled( GtkWidget *w, gpointer data  )
     int delay = get_nums("spin_macrodelay");
 
 	if( (is_button_toggled( "macrorecord") || is_button_toggled("macrorecord1")) && delay == 0)
-	{	
+	{
 		multi_vims( VIMS_MACRO, "%d", 1 );
 		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,1 );
 		info->uc.reload_hint[HINT_MACRO] = 1;
@@ -5860,7 +6036,7 @@ void	on_macroclear_clicked( GtkWidget *w, gpointer data )
 {
 	if(info->status_lock)
 		return;
-	
+
 	multi_vims( VIMS_MACRO, "%d", 3 );
 	vj_midi_learning_vims_msg( info->midi,NULL, VIMS_MACRO, 3);
     info->uc.reload_hint[HINT_MACRO] = 1;
@@ -6050,64 +6226,6 @@ void on_spin_bufferedstreamid_value_changed(GtkWidget *widget, gpointer user_dat
 void on_spin_bufferedstreamlength_value_changed(GtkWidget *widget, gpointer user_data)
 {
 }
-static void record_audio_source_set_radio(GtkWidget *w, int active)
-{
-    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
-        return;
-
-    active = active ? 1 : 0;
-
-    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == active)
-        return;
-
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), active);
-}
-
-static GtkWidget *record_audio_source_widget_for(int source, int stream_page)
-{
-    switch(source)
-    {
-        case VJ_RECORD_AUDIO_SOURCE_ORIGINAL:
-            return widget_cache[
-                stream_page
-                    ? WIDGET_RECORD_AUDIO_SOURCE_STREAM_ORIGINAL
-                    : WIDGET_RECORD_AUDIO_SOURCE_SAMPLE_ORIGINAL
-            ];
-
-        case VJ_RECORD_AUDIO_SOURCE_BEAT_JACK:
-            return widget_cache[
-                stream_page
-                    ? WIDGET_RECORD_AUDIO_SOURCE_STREAM_BEAT_JACK
-                    : WIDGET_RECORD_AUDIO_SOURCE_SAMPLE_BEAT_JACK
-            ];
-
-        case VJ_RECORD_AUDIO_SOURCE_AUTO:
-        default:
-            return widget_cache[
-                stream_page
-                    ? WIDGET_RECORD_AUDIO_SOURCE_STREAM_AUTO
-                    : WIDGET_RECORD_AUDIO_SOURCE_SAMPLE_AUTO
-            ];
-    }
-}
-
-static void record_audio_source_sync_groups(int source)
-{
-    int old_lock;
-
-    if(source < VJ_RECORD_AUDIO_SOURCE_AUTO)
-        source = VJ_RECORD_AUDIO_SOURCE_AUTO;
-    else if(source > VJ_RECORD_AUDIO_SOURCE_BEAT_JACK)
-        source = VJ_RECORD_AUDIO_SOURCE_BEAT_JACK;
-
-    old_lock = info->status_lock;
-    info->status_lock = 1;
-
-    record_audio_source_set_radio(record_audio_source_widget_for(source, 0), 1);
-    record_audio_source_set_radio(record_audio_source_widget_for(source, 1), 1);
-
-    info->status_lock = old_lock;
-}
 
 static void record_audio_source_changed(GtkWidget *widget, int source)
 {
@@ -6153,4 +6271,15 @@ void on_record_audio_source_stream_original_toggled(GtkWidget *widget, gpointer 
 void on_record_audio_source_stream_beat_jack_toggled(GtkWidget *widget, gpointer user_data)
 {
     record_audio_source_changed(widget, VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
+}
+
+
+void on_record_audio_source_sample_silence_toggled(GtkWidget *widget, gpointer user_data)
+{
+    record_audio_source_changed(widget, VJ_RECORD_AUDIO_SOURCE_SILENCE);
+}
+
+void on_record_audio_source_stream_silence_toggled(GtkWidget *widget, gpointer user_data)
+{
+    record_audio_source_changed(widget, VJ_RECORD_AUDIO_SOURCE_SILENCE);
 }

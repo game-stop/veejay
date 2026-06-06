@@ -42,7 +42,7 @@
 #include <math.h>
 
 #include <gtk/gtk.h>
-#include <vj-api.h> 
+#include <vj-api.h>
 
 #include "gtk3curve.h"
 #include "curve.h"
@@ -70,8 +70,8 @@ static GtkDrawingAreaClass *gtk3_curve_parent_class = NULL;
 #define GDK_SMOOTH_SCROLL_MASK 0
 #endif
 
-#define RADIUS            3 /* radius of the control points */
-#define MIN_DISTANCE      8 /* min distance between control points */
+#define RADIUS            3
+#define MIN_DISTANCE      8
 #define GRAPH_MASK       (GDK_EXPOSURE_MASK | \
                           GDK_POINTER_MOTION_MASK | \
                           GDK_POINTER_MOTION_HINT_MASK | \
@@ -195,7 +195,6 @@ static gboolean gtk3_curve_scroll_event      (GtkWidget            *widget,
                                              GdkEventScroll       *event);
 static void gtk3_curve_screen_changed       (GtkWidget            *widget,
                                              GdkScreen            *prev_screen);
-static void gtk3_curve_style_updated        (GtkWidget            *widget);
 static void gtk3_curve_finalize             (GObject              *object);
 static void gtk3_curve_dispose              (GObject              *object);
 static void gtk3_curve_get_property         (GObject              *object,
@@ -310,13 +309,13 @@ gtk3_curve_get_type (void)
       const GTypeInfo curve_info =
       {
         sizeof (Gtk3CurveClass),
-        NULL,   // base_init
-        NULL,   // base_finalize
+        NULL,
+        NULL,
         (GClassInitFunc) gtk3_curve_class_init,
-        NULL,   // class_finalize
-        NULL,   // class_data
+        NULL,
+        NULL,
         sizeof (Gtk3Curve),
-        0,    // n_preallocs
+        0,
         (GInstanceInitFunc) gtk3_curve_init,
       };
 
@@ -431,7 +430,7 @@ gtk3_curve_class_init (Gtk3CurveClass* klass)
                                    PROP_CURVE_TYPE,
                                    g_param_spec_enum ("curve-type",
                                        "Curve type",
-                                       "Is this curve linear, spline interpolated, or free-form",
+                                       "Curve interpolation mode: linear, spline, or freehand",
                                        GTK3_TYPE_CURVE_TYPE,
                                        GTK3_CURVE_TYPE_SPLINE,
                                        GTK3_PARAM_READWRITE));
@@ -439,7 +438,7 @@ gtk3_curve_class_init (Gtk3CurveClass* klass)
                                    PROP_MIN_X,
                                    g_param_spec_float ("min-x",
                                        "Minimum X",
-                                       "Minimum possible value for X",
+                                       "Minimum X value",
                                        -G_MAXFLOAT,
                                        G_MAXFLOAT,
                                        0.0,
@@ -448,7 +447,7 @@ gtk3_curve_class_init (Gtk3CurveClass* klass)
                                    PROP_MAX_X,
                                    g_param_spec_float ("max-x",
                                        "Maximum X",
-                                       "Maximum possible X value",
+                                       "Maximum X value",
                                        -G_MAXFLOAT,
                                        G_MAXFLOAT,
                                        1.0,
@@ -457,7 +456,7 @@ gtk3_curve_class_init (Gtk3CurveClass* klass)
                                    PROP_MIN_Y,
                                    g_param_spec_float ("min-y",
                                        "Minimum Y",
-                                       "Minimum possible value for Y",
+                                       "Minimum Y value",
                                        -G_MAXFLOAT,
                                        G_MAXFLOAT,
                                        0.0,
@@ -466,7 +465,7 @@ gtk3_curve_class_init (Gtk3CurveClass* klass)
                                    PROP_MAX_Y,
                                    g_param_spec_float ("max-y",
                                        "Maximum Y",
-                                       "Maximum possible value for Y",
+                                       "Maximum Y value",
                                        -G_MAXFLOAT,
                                        G_MAXFLOAT,
                                        1.0,
@@ -846,24 +845,24 @@ gtk3_curve_draw_cursor_legend(GtkWidget *widget,
 
     g_snprintf(left,
                sizeof(left),
-               "X: Frame %.0f %s%s",
+               "Frame %.0f%s%s",
                x_value,
                timecode ? " / " : "",
                timecode ? timecode : "");
 
     g_snprintf(right,
                sizeof(right),
-               "Y: Value %.2f     Mode: %s",
+               "Value %.2f     Mode: %s",
                y_value,
                gtk3_curve_type_name(priv->curve_data.curve_type));
   } else {
     g_snprintf(left,
                sizeof(left),
-               "X: Frame");
+               "Frame");
 
     g_snprintf(right,
                sizeof(right),
-               "Y: Value    Mode: %s",
+               "Value    Mode: %s",
                gtk3_curve_type_name(priv->curve_data.curve_type));
   }
 
@@ -930,7 +929,7 @@ gtk3_curve_update_x_grid(Gtk3CurvePrivate *priv)
   if (frame_count <= 0)
     frame_count = 1;
 
-  //priv->x_grid_step = gtk3_curve_nice_x_grid_step(frame_count, 0.0);
+
   priv->x_grid_step = gtk3_curve_nice_x_grid_step(frame_count, priv->fps);
 
   if (priv->x_grid_step <= 0)
@@ -1639,17 +1638,17 @@ gtk3_curve_draw_position_marker(GtkWidget *widget,
 
   cairo_save(cr);
 
-  // soft halo (#5a6d8c)
+
   cairo_set_source_rgba(cr, 0.352941, 0.427451, 0.549020, 0.18);
   cairo_arc(cr, mx, my, 8.0, 0.0, 2.0 * M_PI);
   cairo_fill(cr);
 
-  // current position dot (#ff8400)
+
   cairo_set_source_rgba(cr, 1.000000, 0.517647, 0.000000, 0.95);
   cairo_arc(cr, mx, my, 4.5, 0.0, 2.0 * M_PI);
   cairo_fill(cr);
 
-  // dark outline, matching orange
+
   cairo_set_source_rgba(cr, 0.55, 0.25, 0.00, 0.95);
   cairo_arc(cr, mx, my, 5.5, 0.0, 2.0 * M_PI);
   cairo_set_line_width(cr, 1.0);
@@ -2853,15 +2852,7 @@ gtk3_curve_interpolate(GtkWidget *widget, gint width, gint height)
   g_free(vector);
 }
 
-/*                          =====================                          */
-/* ===========================   YE OLDE MATH   ========================== */
-/*                          =====================                          */
 
-/* Solve the tridiagonal equation system that determines the second
-   derivatives for the interpolation points.  (Based on Numerical
-   Recipies 2nd Edition.) 
-   Guarded version   
-*/
 static void
 spline_solve(int n, gfloat x[], gfloat y[], gfloat y2[])
 {
@@ -2877,9 +2868,8 @@ spline_solve(int n, gfloat x[], gfloat y[], gfloat y2[])
     return;
   }
 
-  /*
-   * Natural spline boundary condition.
-   */
+
+
   y2[0] = 0.0f;
   y2[n - 1] = 0.0f;
 
@@ -3994,7 +3984,6 @@ Gtk3CurveColor gtk3_curve_get_color_cpoint (GtkWidget *widget)
 }
 
 
-
 Gtk3CurveType gtk3_curve_get_curve_type (GtkWidget *widget)
 {
   Gtk3Curve *curve = GTK3_CURVE (widget);
@@ -4070,13 +4059,13 @@ gtk3_curve_reset(GtkWidget *widget)
 
 void
 gtk3_curve_save(Gtk3CurveData *data, gchar *filename) {
-  // TODO - add code here
+
 }
 
 
 Gtk3CurveData
 gtk3_curve_load(gchar *filename) {
-  // TODO - add code here
+
   Gtk3CurveData empty={};
   return empty;
 }

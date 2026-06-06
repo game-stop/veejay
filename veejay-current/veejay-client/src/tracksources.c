@@ -98,7 +98,7 @@ void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data )
 		if(id != i)
 		{
 			char name[16];
-			snprintf(name,sizeof(name),"Track %uh", i);
+			snprintf(name,sizeof(name),"Track %u", (unsigned int)i);
 			gchar *uname = _utf8str( name );
 			gtk_list_store_append( store, &iter );
 			gtk_list_store_set(
@@ -138,7 +138,7 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data, void *mt)
 	gtk_tree_view_insert_column_with_attributes(
 			GTK_TREE_VIEW( view ),
 			-1,
-			"T",
+			"Track",
 			renderer,
 			"text",
 			0,
@@ -146,7 +146,7 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data, void *mt)
 	gtk_tree_view_insert_column_with_attributes(
 			GTK_TREE_VIEW( view ),
 			-1,
-			"-",
+			"Link",
 			wrenderer,
 			"activatable",
 			1,
@@ -173,7 +173,7 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data, void *mt)
 		if( i != track_id )
 		{
 			char str[16];
-			snprintf(str,sizeof(str),"Track %uh",i);
+			snprintf(str,sizeof(str),"Track %u", (unsigned int)i);
 			gchar *ustr = _utf8str( str );
 			gtk_list_store_append( store, &iter );
 			gtk_list_store_set( store, &iter,

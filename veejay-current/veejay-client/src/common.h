@@ -21,7 +21,6 @@
 
 #define STATUS_LENGTH	1024
 #define VEEJAY_CODENAME VERSION
-/* Status bytes */
 
 #define ELAPSED_TIME	0
 #define PLAY_MODE	2
@@ -77,6 +76,32 @@
 #define AUDIO_MUTED             55
 #define RECORD_AUDIO_SOURCE     56
 
+#define AUDIO_SYNC_ENABLED       57
+#define AUDIO_SYNC_OPEN          58
+#define AUDIO_SYNC_RUNNING       59
+#define AUDIO_SYNC_MODE          60
+#define AUDIO_SYNC_SOURCE        61
+#define AUDIO_SYNC_CHANNELS      62
+#define AUDIO_SYNC_SAMPLE_RATE   63
+#define AUDIO_SYNC_LEVEL_PCT     64
+#define AUDIO_SYNC_TRANSIENT_PCT 65
+#define AUDIO_SYNC_BPM_X10       66
+#define AUDIO_SYNC_PHASE_PCT     67
+#define AUDIO_SYNC_CONFIDENCE    68
+#define AUDIO_SYNC_BRIDGE_ACTIVE 69
+#define AUDIO_SYNC_RATIO_X1000   70
+#define AUDIO_SYNC_CORRECTION    71  /* actual applied bridge pull, x100; 100 == 1.00 */
+#define AUDIO_SYNC_TARGET_MODE   72  /* 0 manual, 1 current clip */
+#define AUDIO_SYNC_TARGET_BPM_X10 73 /* target BPM * 10 */
+#define AUDIO_SYNC_TARGET_CONFIDENCE 74 /* 0..100 */
+#define AUDIO_SYNC_MAX_CORRECTION 75 /* configured max correction %, 0..25 */
+#define AUDIO_SYNC_BRIDGE_STATE  76  /* 0 idle, 1 wait source, 2 wait target, 3 locked, 4 hold, 5 fallback */
+#define AUDIO_SYNC_TRACK_ALIGN_LOCKED         77 /* 0/1 */
+#define AUDIO_SYNC_TRACK_ALIGN_OFFSET_MS      78 /* signed ms: positive means video/reference is late */
+#define AUDIO_SYNC_TRACK_ALIGN_CONFIDENCE     79 /* 0..100 */
+#define AUDIO_SYNC_TRACK_ALIGN_CORRECTION_PPM 80 /* signed ppm video-rate trim */
+#define AUDIO_SYNC_TRACK_ALIGN_STATE          81 /* 0 idle, 1 wait source, 2 wait target, 3 searching, 4 locked, 5 hold, 6 fallback */
+
 #define SAMPLE_TRANSITION_ACTIVE  32
 #define SAMPLE_TRANSITION_LENGTH  33
 #define SAMPLE_TRANSITION_SHAPE  34
@@ -96,7 +121,7 @@
 
 #define __MAX_TRACKS 16
 
-
+/* One spare slot keeps older loops that use <= highest-index style safe. */
 #define STATUS_ARRAY_SIZE (VIMS_STATUS_TOKENS+1)
 #define HISTORY_PLAYMODES 4
 

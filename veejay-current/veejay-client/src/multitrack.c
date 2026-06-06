@@ -527,7 +527,7 @@ static	void	sequence_preview_size(multitracker_t *mt, int track_num)
 	calculate_img_dimension(mt->width,mt->height, &tmp_w, &tmp_h, &ratio, 160, 120,0);
 	if(!gvr_track_configure( mt->preview, track_num,tmp_w,tmp_h ) )
 	{
-		veejay_msg(0, "Unable to configure preview %d x %d",tmp_w,tmp_h );
+		veejay_msg(0, "Unable to configure preview %dx%d",tmp_w,tmp_h );
 	}
 
 }
@@ -602,7 +602,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	gtk_widget_set_size_request_( seqv->area, 176,144  ); 
 	seqv->panel = gtk_frame_new(NULL);
 
-	seqv->toggle = gtk_toggle_button_new_with_label( "preview" );
+	seqv->toggle = gtk_toggle_button_new_with_label( "Preview" );
 
     gtk_toggle_button_set_active(
 		GTK_TOGGLE_BUTTON(seqv->toggle), gveejay_user_preview()  );
@@ -631,7 +631,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL,0);
 	seqv->timeline_ = gtk_scale_new_with_range( GTK_ORIENTATION_HORIZONTAL, 
                                               0.0, 1.0, 0.1);
-    gtk_widget_set_tooltip_text(GTK_WIDGET(seqv->timeline_), "Set frame position");
+    gtk_widget_set_tooltip_text(GTK_WIDGET(seqv->timeline_), "Set the frame position");
 	gtk_scale_set_draw_value( GTK_SCALE(seqv->timeline_), FALSE );
 	//gtk_widget_set_size_request_( seqv->panel,180 ,180);
     GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( seqv->timeline_ ));
@@ -729,7 +729,7 @@ void		*multitrack_sync( void * mt )
 static char *mt_new_connection_dialog(multitracker_t *mt, int *port_num, int *error)
 {
 	GtkWidget *dialog = gtk_dialog_new_with_buttons(
-				"Connect to a Veejay",
+				"Connect to Veejay",
 				GTK_WINDOW( mt->main_window ),
 				GTK_DIALOG_DESTROY_WITH_PARENT,
 				GTK_STOCK_CANCEL,
@@ -850,7 +850,7 @@ int		multitrack_add_track( void *data )
 
 	if( gvr_track_connect( mt->preview, hostname, port_num, &track ) )
 	{
-		status_print( mt, "Connection established with veejay runnning on %s port %d", hostname, port_num );
+		status_print( mt, "Connection established with Veejay running on %s, port %d", hostname, port_num );
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(mt->view[track]->toggle), gveejay_user_preview() );
 		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
 		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), TRUE );
@@ -859,7 +859,7 @@ int		multitrack_add_track( void *data )
 	}
 	else
 	{
-		status_print( mt, "Unable to open connection with %s : %d", hostname, port_num );
+		status_print( mt, "Unable to open connection to %s:%d", hostname, port_num );
 	}
 
 	free( hostname );
@@ -935,7 +935,7 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 			return -1;
 	}
 	if(res == -1) {
-		veejay_msg(VEEJAY_MSG_DEBUG,"Failed to open track 0 in multi tracker");
+		veejay_msg(VEEJAY_MSG_DEBUG,"Failed to open track 0 in the multitracker");
 		return -1;
 	}
 
@@ -996,7 +996,7 @@ void		multitrack_set_quality( void *data , int quality )
     for( i = 0; i < MAX_TRACKS; i ++ ) {
 	    if(!gvr_track_configure( mt->preview, i,w,h ) )
 	    {
-		    veejay_msg(0, "Unable to configure preview %d x %d",w , h );
+		    veejay_msg(0, "Unable to configure preview %dx%d",w , h );
 	    }
     }
 
@@ -1016,7 +1016,7 @@ void		multitrack_toggle_preview( void *data, int track_id, int status, GtkWidget
 	if(track_id == -1 )
 	{
 		gvr_track_toggle_preview( mt->preview, mt->master_track, status );
-		veejay_msg(VEEJAY_MSG_INFO, "VeejayGrabber: master preview %s", (status ? "enabled" : "disabled") );
+		veejay_msg(VEEJAY_MSG_INFO, "Veejay grabber: master preview %s", (status ? "enabled" : "disabled") );
 		if( status == 0 )
 			multitrack_set_logo( data, img );
 	}
@@ -1091,7 +1091,7 @@ static gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
         return FALSE;
 
       if( mt->master_track == v->num ) {
-        vj_msg(VEEJAY_MSG_INFO, "Already have focus on track %d", mt->master_track);
+        vj_msg(VEEJAY_MSG_INFO, "Track %d already has focus", mt->master_track);
         return FALSE;
       }
 
@@ -1114,9 +1114,9 @@ static gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
       gvr_set_master( mt->preview, v->num );
       if(!gvr_track_configure( mt->preview, v->num, mt->pw,mt->ph) )
       {
-        veejay_msg(0, "Unable to configure preview %d x %d",mt->pw , mt->ph );
+        veejay_msg(0, "Unable to configure preview %dx%d",mt->pw , mt->ph );
       }
-      veejay_msg(VEEJAY_MSG_INFO, "Set master to track %d", mt->master_track );
+      veejay_msg(VEEJAY_MSG_INFO, "Set master track to %d", mt->master_track );
       mt->master_track = v->num;
 
       if( last_selected >= 0 && last_selected < MAX_TRACKS )
@@ -1125,7 +1125,7 @@ static gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 	      gtk_frame_set_label( GTK_FRAME(mt->view[last_selected]->frame), track_title );
       }
 
-      snprintf(track_title,sizeof(track_title), "Track %d (MASTER)", v->num );
+      snprintf(track_title,sizeof(track_title), "Track %d (master)", v->num );
 	  gtk_frame_set_label( GTK_FRAME(v->frame), track_title );
 
       vj_gui_enable();

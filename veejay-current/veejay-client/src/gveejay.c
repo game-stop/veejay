@@ -39,13 +39,13 @@
 #include <locale.h>
 #define RELOADED_SUMMARY "-------------------------------------\n\
 Reloaded, a graphical interface for Veejay.\n\n\
-Reloaded is a client for veejay. As long as veejay \
-(the server) is running, you can connect and disconnect from it with reloaded.\n\
+Reloaded is a client for Veejay. As long as Veejay \
+(the server) is running, you can connect and disconnect from it with Reloaded.\n\
 -------------------------------------"
 
 #define RELOADED_DESCRIPTION "-------------------------------------\n\
-The veejay website is over http://veejayhq.net\n\n\
-If you found a bug, please use the ticket system on https://github.com/game-stop/veejay/issues\n\
+The Veejay website is at http://veejayhq.net\n\n\
+If you find a bug, please use the issue tracker at https://github.com/game-stop/veejay/issues\n\
 -------------------------------------"
 
 extern int mt_get_max_tracks();
@@ -104,7 +104,7 @@ static gboolean vj_gui_idle_cb1(gpointer data)
 {
     GuiContext *ctx = data;
     if (!gveejay_idle(NULL)) {
-        fprintf(stderr, "Quiting application");
+        fprintf(stderr, "Quitting application");
         g_application_quit(ctx->app);
         return G_SOURCE_REMOVE;
     }
@@ -157,9 +157,9 @@ gint vj_gui_command_line (GApplication            *app,
 /* First check version and quit */
     if ( arg_version )
     {
-        fprintf(stdout, "version : %s\n", PACKAGE_VERSION);
-        fprintf(stdout, "\tlinked against libveejaycore %s\n", veejay_core_build());
-        fprintf(stdout, "data directory : %s\n", get_gveejay_dir());
+        fprintf(stdout, "Version: %s\n", PACKAGE_VERSION);
+        fprintf(stdout, "\tLinked against libveejaycore %s\n", veejay_core_build());
+        fprintf(stdout, "Data directory: %s\n", get_gveejay_dir());
         return EXIT_FAILURE;
     }
 
@@ -172,10 +172,10 @@ gint vj_gui_command_line (GApplication            *app,
     { //FIXME NxN format
         if(sscanf( (char*) arg_geometry, "%d,%d",&geom_[0],&geom_[1]) != 2 )
         {
-          veejay_msg(VEEJAY_MSG_WARNING, "--geometry parameter invalid \"X,Y\" screen coordinates : \"%s\"", arg_geometry);
+          veejay_msg(VEEJAY_MSG_WARNING, "--geometry parameter requires \"X,Y\" screen coordinates: \"%s\"", arg_geometry);
         }else
         {
-          if(verbosity) veejay_msg(VEEJAY_MSG_INFO, "Place window at %d,%d.", geom_[0],geom_[1]);
+          if(verbosity) veejay_msg(VEEJAY_MSG_INFO, "Placing window at %d,%d.", geom_[0],geom_[1]);
           vj_gui_set_geom(geom_[0],geom_[1]);
         }
         g_free(arg_geometry);
@@ -185,7 +185,7 @@ gint vj_gui_command_line (GApplication            *app,
     {
         strcpy( hostname, arg_host );
         g_free(arg_host);
-        if(verbosity) veejay_msg(VEEJAY_MSG_INFO, "Selected host is %s.", hostname);
+        if(verbosity) veejay_msg(VEEJAY_MSG_INFO, "Selected host: %s.", hostname);
         launcher ++;
     }
 
@@ -209,7 +209,7 @@ gint vj_gui_command_line (GApplication            *app,
     if ( arg_port )
     {
         port_num=arg_port;
-        if(verbosity) veejay_msg(VEEJAY_MSG_INFO, "We will have fun on port %d !", port_num);
+        if(verbosity) veejay_msg(VEEJAY_MSG_INFO, "Using port %d.", port_num);
         launcher++;
     }
 
@@ -218,17 +218,17 @@ gint vj_gui_command_line (GApplication            *app,
         preview = arg_preview;
         if(preview <= 0 || preview > 4 )
         {
-            veejay_msg(VEEJAY_MSG_ERROR, "--preview parameter invalid [0-4] : %d", preview);
+            veejay_msg(VEEJAY_MSG_ERROR, "--preview parameter must be in the range 0-4: %d", preview);
             err++;
         }
-        else if(verbosity) veejay_msg(VEEJAY_MSG_INFO, "Preview at quality %d", preview);
+        else if(verbosity) veejay_msg(VEEJAY_MSG_INFO, "Preview quality: %d", preview);
     }
 
     if ( arg_size )
     {
         if(sscanf( (char*) arg_size, "%dx%d", &row, &col ) != 2 )
         {
-            veejay_msg(VEEJAY_MSG_ERROR, "--size parameter requires \"NxN\" argument : \"%s\"", arg_size);
+            veejay_msg(VEEJAY_MSG_ERROR, "--size parameter requires a \"CxR\" argument: \"%s\"", arg_size);
             err++;
         }
         g_free(arg_size);
@@ -239,7 +239,7 @@ gint vj_gui_command_line (GApplication            *app,
         n_tracks = 1 + arg_tracks;
         if( n_tracks < 1 || n_tracks > mt_get_max_tracks() )
             n_tracks = 1;
-        if(verbosity) veejay_msg(VEEJAY_MSG_INFO, "Tracks parameted at %d", n_tracks);
+        if(verbosity) veejay_msg(VEEJAY_MSG_INFO, "Track count set to %d", n_tracks);
     }
 
     if( arg_style ) {
@@ -267,7 +267,7 @@ int main(int argc, char **argv)
     snprintf(hostname,sizeof(hostname), "127.0.0.1");
     char port_description [255];
     snprintf (port_description, sizeof (port_description),
-              "Veejay port to connect to (defaults to %d).", DEFAULT_PORT_NUM);
+              "Veejay port to connect to (default: %d).", DEFAULT_PORT_NUM);
 
     setlocale(LC_NUMERIC, "C");
 
@@ -284,23 +284,23 @@ int main(int argc, char **argv)
 
 /* in alphabetical order of short options */
     const GOptionEntry options[] = {
-    {"auto-connect", 'a', 0, G_OPTION_ARG_NONE, &arg_autoconnect, "Auto-connect to local running veejays.", NULL},
+    {"auto-connect", 'a', 0, G_OPTION_ARG_NONE, &arg_autoconnect, "Auto-connect to locally running Veejay instances.", NULL},
     {"beta",        'b', 0, G_OPTION_ARG_NONE, &arg_beta, "Enable beta features.", NULL},
     {"geometry",    'g', 0, G_OPTION_ARG_STRING, &arg_geometry, "Window position on screen \"X,Y\".", NULL},
-    {"host",        'h', 0, G_OPTION_ARG_STRING, &arg_host, "Veejay host to connect to (defaults to localhost).", NULL},
-    {"lowband",     'L', 0, G_OPTION_ARG_NONE, &arg_lowband, "Low-bandwith connection (disables image loading in samplebank)", NULL},
+    {"host",        'h', 0, G_OPTION_ARG_STRING, &arg_host, "Veejay host to connect to (default: localhost).", NULL},
+    {"lowband",     'L', 0, G_OPTION_ARG_NONE, &arg_lowband, "Low-bandwidth connection (disables image loading in the sample bank).", NULL},
     {"midi",        'm', 0, G_OPTION_ARG_FILENAME, &arg_midifile, "MIDI configuration file.", NULL},
-    {"no-color",    'n', 0, G_OPTION_ARG_NONE, &arg_notcolored, "Do not use colored text in console logging.", NULL},
+    {"no-color",    'n', 0, G_OPTION_ARG_NONE, &arg_notcolored, "Do not use colored text in console logs.", NULL},
     {"port",        'p', 0, G_OPTION_ARG_INT, &arg_port, port_description, NULL},
-    {"preview",     'P', 0, G_OPTION_ARG_INT, &arg_preview, "Start with preview enabled (1=1/1,2=1/2,3=1/4,4=1/8)", NULL},
+    {"preview",     'P', 0, G_OPTION_ARG_INT, &arg_preview, "Start with preview enabled (1=full, 2=1/2, 3=1/4, 4=1/8).", NULL},
     {"size",        's', 0, G_OPTION_ARG_STRING, &arg_size, "Set bank resolution \"CxR\".", NULL},
-    {"verbose",     'v', 0, G_OPTION_ARG_NONE, &arg_verbose,"Be extra verbose", NULL},
-    {"version",     'V', 0, G_OPTION_ARG_NONE, &arg_version,"Show version, data directory and exit.", NULL},
-    {"tracks",      'X', 0, G_OPTION_ARG_INT, &arg_tracks,"Set number of tracks.", NULL},
-    {"theme",       't', 0, G_OPTION_ARG_FILENAME, &arg_style, "Use \"system\" to use the default theme or use a filename", NULL },
-    {"small-as-possible",'S',0,G_OPTION_ARG_NONE,&arg_smallaspossible, "Create the smallest possible UI",NULL},
+    {"verbose",     'v', 0, G_OPTION_ARG_NONE, &arg_verbose,"Be more verbose.", NULL},
+    {"version",     'V', 0, G_OPTION_ARG_NONE, &arg_version,"Show version and data directory, then exit.", NULL},
+    {"tracks",      'X', 0, G_OPTION_ARG_INT, &arg_tracks,"Set the number of tracks.", NULL},
+    {"theme",       't', 0, G_OPTION_ARG_FILENAME, &arg_style, "Use \"system\" for the default theme, or pass a stylesheet filename.", NULL },
+    {"small-as-possible",'S',0,G_OPTION_ARG_NONE,&arg_smallaspossible, "Create the smallest possible UI.",NULL},
 #if GTK_CHECK_VERSION(3,22,30)
-    {"faster-ui",   'f', 0, G_OPTION_ARG_NONE, &arg_fasterui, "Hide FX parameter sliders instead of disabling to reduce CPU usage (GTK3 3.22.30)", NULL},
+    {"faster-ui",   'f', 0, G_OPTION_ARG_NONE, &arg_fasterui, "Hide FX parameter sliders instead of disabling them to reduce CPU usage (GTK3 3.22.30).", NULL},
 #endif
     {NULL}};
 
