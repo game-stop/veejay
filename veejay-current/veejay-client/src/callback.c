@@ -2569,20 +2569,21 @@ void	on_slow_slider_value_changed( GtkWidget *widget, gpointer user_data )
 	}
 }
 
-void    on_slow_slider_click( GtkWidget *widget, gpointer user_data )
+gboolean on_slow_slider_click(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
 {
-    if(!info->status_lock)
+    (void)widget;
+    (void)user_data;
+
+    if(info->status_lock)
+        return FALSE;
+
+    if(event && (event->state & GDK_CONTROL_MASK))
     {
-        GdkModifierType state = 0;
-        gtk_get_current_event_state(&state);
-
-        gboolean ctrl_pressed = (state & GDK_CONTROL_MASK);
-
-        if (ctrl_pressed)
-        {
-            update_slider_gvalue("slow_slider", 1);
-        }
+        update_slider_gvalue("slow_slider", 1);
+        return TRUE;
     }
+
+    return FALSE;
 }
 
 
@@ -2600,20 +2601,21 @@ void	on_speed_slider_value_changed(GtkWidget *widget, gpointer user_data)
 }
 
 
-void    on_speed_slider_click(GtkWidget *widget, gpointer user_data)
+gboolean on_speed_slider_click(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
 {
-    if(!info->status_lock)
+    (void)widget;
+    (void)user_data;
+
+    if(info->status_lock)
+        return FALSE;
+
+    if(event && (event->state & GDK_CONTROL_MASK))
     {
-        GdkModifierType state = 0;
-        gtk_get_current_event_state(&state);
-
-        gboolean ctrl_pressed = (state & GDK_CONTROL_MASK);
-
-        if (ctrl_pressed)
-        {
-            update_slider_gvalue("speed_slider", 1);
-        }
+        update_slider_gvalue("speed_slider", 1);
+        return TRUE;
     }
+
+    return FALSE;
 }
 
 void	on_spin_samplespeed_value_changed(GtkWidget *widget, gpointer user_data)
@@ -2841,7 +2843,7 @@ void	on_check_autowhitebalance_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d auto_white", info->selected_slot->sample_id,is_button_toggled("chekc_autowhitebalance"));
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d auto_white", info->selected_slot->sample_id,is_button_toggled("check_autowhitebalance"));
 	}
 }
 
@@ -2974,12 +2976,6 @@ void	on_new_avformat_stream_clicked(GtkWidget *wid, gpointer data)
 {
 	char *url = get_text("inputstream_filename");
 	multi_vims(VIMS_STREAM_NEW_AVFORMAT, "%s", url);
-}
-
-void 	on_new_shm_stream_clicked(GtkWidget *wid, gpointer data)
-{
-	char	*port = get_text("shm_text_port");
-	multi_vims( VIMS_STREAM_NEW_SHARED, "%s", port );
 }
 
 void	on_shm_3490_clicked(GtkWidget *w, gpointer data)
@@ -3360,35 +3356,6 @@ void	on_button_samplelist_append_clicked(GtkWidget *widget, gpointer user_data)
 void	on_veejay_expander_activate(GtkWidget *exp, gpointer user_data)
 {
 }
-void	on_veejay_ctrl_expander_activate(GtkWidget *exp, gpointer user_data)
-{
-	gint width= 0;
-	gint height = 0;
-
-	GtkWindow *window = GTK_WINDOW( glade_xml_get_widget_( info->main_window, "gveejay_window"));
-
-	gtk_window_get_size( window, &width, &height );
-
-	if(!gtk_expander_get_expanded(GTK_EXPANDER(exp)))
-	{
-		gtk_widget_set_size_request(
-			glade_xml_get_widget_(info->main_window, "veejaypanel" ),
-		 width,
-		 400 );
-
-		gtk_window_resize( window, width, 600 );
-
-	}
-	else
-	{
-		gtk_widget_set_size_request(
-			glade_xml_get_widget_(info->main_window, "veejaypanel" ),
-			 width,
-			 0 );
-		gtk_window_resize( window, width, 100 );
-	}
-}
-
 void	on_button_el_takestart_clicked(GtkWidget *widget, gpointer user_data)
 {
 	update_spin_value( "button_el_selstart",
@@ -3857,10 +3824,20 @@ void on_openConnection_activate (GtkMenuItem     *menuitem,
 }
 
 
-void on_veejay_connection_close (GtkDialog       *dialog,
-                                 gpointer         user_data)
+void on_veejay_connection_close(GtkDialog *dialog, gpointer user_data)
 {
+    (void)dialog;
+    (void)user_data;
+
     info->watch.state = STATE_QUIT;
+}
+
+gboolean on_veejay_connection_delete_event(GtkWidget *widget, GdkEvent *event, gpointer user_data)
+{
+    (void)event;
+
+    on_veejay_connection_close(GTK_DIALOG(widget), user_data);
+    return TRUE;
 }
 
 
@@ -3893,14 +3870,25 @@ void on_image_calibration_activate (GtkMenuItem    *menuitem,
 }
 
 
-void on_video_options_close                 (GtkDialog       *dialog,
-					     gpointer         user_data)
+void on_video_options_close(GtkDialog *dialog, gpointer user_data)
 {
-	if(!info->status_lock)
-	{
-		GtkWidget *veejay_settings_window = glade_xml_get_widget_(info->main_window, "video_options");
-		gtk_widget_hide(veejay_settings_window);
-	}
+    (void)dialog;
+    (void)user_data;
+
+    if(!info->status_lock)
+    {
+        GtkWidget *veejay_settings_window = glade_xml_get_widget_(info->main_window, "video_options");
+        if(veejay_settings_window)
+            gtk_widget_hide(veejay_settings_window);
+    }
+}
+
+gboolean on_video_options_delete_event(GtkWidget *widget, GdkEvent *event, gpointer user_data)
+{
+    (void)event;
+
+    on_video_options_close(GTK_DIALOG(widget), user_data);
+    return TRUE;
 }
 
 
@@ -4040,10 +4028,22 @@ void on_vims_bundles_activate (GtkMenuItem     *menuitem,
 
 
 
-void on_vims_bundles_close                  (GtkDialog       *dialog,
-					     gpointer         user_data)
+void on_vims_bundles_close(GtkDialog *dialog, gpointer user_data)
 {
-	gtk_widget_hide(info->vims_bundle_dialog);
+    (void)dialog;
+    (void)user_data;
+
+    if(info->vims_bundle_dialog)
+        gtk_widget_hide(info->vims_bundle_dialog);
+}
+
+gboolean on_vims_bundles_delete_event(GtkWidget *widget, GdkEvent *event, gpointer user_data)
+{
+    (void)widget;
+    (void)event;
+
+    on_vims_bundles_close(NULL, user_data);
+    return TRUE;
 }
 
 
@@ -4105,19 +4105,6 @@ void on_report_a_bug_activate(GtkWidget *w, gpointer user_data )
 
 void on_donate_activate( GtkWidget *w, gpointer user_data ) {
   donatenow();
-}
-
-void	on_new_input_stream1_activate(GtkWidget *widget, gpointer user_data)
-{
-	GtkWidget *dialog = glade_xml_get_widget_( info->main_window, "inputdialog" );
-	gtk_dialog_run( GTK_DIALOG( dialog ));
-	gtk_widget_hide( dialog );
-}
-
-void	on_istream_cancel_clicked(GtkWidget *widget, gpointer user_data)
-{
-	GtkWidget *dialog = glade_xml_get_widget_( info->main_window, "inputdialog" );
-	gtk_widget_hide( dialog );
 }
 
 void	on_curve_togglerun_toggled(GtkWidget *widget , gpointer user_data)
@@ -4711,29 +4698,6 @@ void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
     }
 }
 
-void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
-{
-	GtkWidget *n = glade_xml_get_widget_( info->main_window, "videobook" );
-
-	gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
-	if(page == 1 )
-		gtk_notebook_prev_page(GTK_NOTEBOOK(n) );
-	if(info->selected_slot)
-	{
-
-		if(info->status_tokens[STREAM_TYPE] !=
-			info->selected_slot->sample_type &&
-		   info->status_tokens[CURRENT_ID] !=
-			info->selected_slot->sample_id )
-		multi_vims( VIMS_SET_MODE_AND_GO, "%d %d",
-			info->selected_slot->sample_id,
-			(info->selected_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM ));
-		vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO,
-				info->selected_slot->sample_id,
-				(info->selected_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM) );
-	}
-}
-
 void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *m = glade_xml_get_widget_(info->main_window , "notebook18");
@@ -5231,23 +5195,44 @@ void	on_quicklaunch_clicked(GtkWidget *widget, gpointer user_data)
 
 }
 
-void	on_inputstream_window_delete_event(GtkWidget *w, gpointer user_data)
+gboolean on_inputstream_window_delete_event(GtkWidget *w, GdkEvent *event, gpointer user_data)
 {
-	GtkWidget *vs = glade_xml_get_widget_(info->main_window, "inputstream_window");
-	gtk_widget_hide(vs);
+    (void)w;
+    (void)event;
+    (void)user_data;
+
+    GtkWidget *vs = glade_xml_get_widget_(info->main_window, "inputstream_window");
+    if(vs)
+        gtk_widget_hide(vs);
+
+    return TRUE;
 }
 
-void	on_generator_window_delete_event(GtkWidget *w, gpointer user_data)
+gboolean on_generator_window_delete_event(GtkWidget *w, GdkEvent *event, gpointer user_data)
 {
-	GtkWidget *vs = glade_xml_get_widget_(info->main_window, "generator_window");
-	gtk_widget_hide(vs);
+    (void)w;
+    (void)event;
+    (void)user_data;
+
+    GtkWidget *vs = glade_xml_get_widget_(info->main_window, "generator_window");
+    if(vs)
+        gtk_widget_hide(vs);
+
+    return TRUE;
 }
 
-void	on_calibration_window_delete_event(GtkWidget *w,gpointer data)
+gboolean on_calibration_window_delete_event(GtkWidget *w, GdkEvent *event, gpointer data)
 {
-	GtkWidget *win = glade_xml_get_widget_(info->main_window, "calibration_window");
-	cali_onoff = 0;
-	gtk_widget_hide(win);
+    (void)w;
+    (void)event;
+    (void)data;
+
+    GtkWidget *win = glade_xml_get_widget_(info->main_window, "calibration_window");
+    cali_onoff = 0;
+    if(win)
+        gtk_widget_hide(win);
+
+    return TRUE;
 }
 
 void	on_quit_veejay1_activate( GtkWidget *w, gpointer user_data)
@@ -5281,13 +5266,24 @@ void	on_curve_spinstart_value_changed(GtkWidget *w, gpointer user_data)
     vj_msg(VEEJAY_MSG_INFO, "Click the FX store button to save the new values");
 }
 
-void	on_veejayevent_enter_notify_event(GtkWidget *w, gpointer user_data)
+gboolean on_veejayevent_enter_notify_event(GtkWidget *w, GdkEventCrossing *event, gpointer user_data)
 {
-	info->key_now = TRUE;
+    (void)w;
+    (void)event;
+    (void)user_data;
+
+    info->key_now = TRUE;
+    return FALSE;
 }
-void	on_veejayevent_leave_notify_event(GtkWidget *w , gpointer user_data)
+
+gboolean on_veejayevent_leave_notify_event(GtkWidget *w, GdkEventCrossing *event, gpointer user_data)
 {
-	info->key_now = FALSE;
+    (void)w;
+    (void)event;
+    (void)user_data;
+
+    info->key_now = FALSE;
+    return FALSE;
 }
 
 void 	on_spin_framedelay_value_changed(GtkWidget *w, gpointer user_data)
