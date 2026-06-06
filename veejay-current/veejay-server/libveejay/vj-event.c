@@ -1490,7 +1490,7 @@ static      char    *inline_str_to_str(int flags, char *msg)
     else            
     {
         char str[256];
-        if(sscanf( msg, "%256s", str ) <= 0 )
+        if(sscanf( msg, "%255s", str ) <= 0 )
             return NULL;
         res = vj_strndup( str, 255 );
     }   
@@ -2607,7 +2607,7 @@ int     vj_event_register_keyb_event(int event_id, int symbol, int modifier, con
         /* registering a new bundle or vims event triggered by key action */
         if(is_bundle) {
             char val[10];
-            sprintf(val, "%d", event_id);
+            snprintf(val, sizeof(val), "%d", event_id);
             extra = val;
         }   
         ff = new_keyboard_event( symbol, modifier, extra, event_id ); 
@@ -2692,7 +2692,7 @@ static void vj_event_load_keyboard_configuration(veejay_t *info)
     int key = 0;
     int mod = 0;
     int keyb_events = 0;
-    while( (fscanf( f, "%d,%d,%d,\"%[^\"]\"", &event_id,&key,&mod,msg ) ) == 4 ) {
+    while( (fscanf( f, "%d,%d,%d,\"%99[^\"]\"", &event_id, &key, &mod, msg ) ) == 4 ) {
         if( vj_event_register_keyb_event(
                 event_id,
                 key,
@@ -7709,7 +7709,7 @@ void    vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
     char send_msg[128];
     char message[125];
 
-    sprintf( send_msg, "000" );
+    snprintf(send_msg, sizeof(send_msg), "000");
 
     if(vj_tag_exists(args[0]))
     {
@@ -9848,7 +9848,7 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
             {
                 char bundle[1024];
                 int np = vje_get_num_params(y);
-                sprintf(bundle, "%03d:0 %d %d 1", VIMS_CHAIN_ENTRY_SET_PRESET,i, effect_id );
+                snprintf(bundle, sizeof(bundle), "%03d:0 %d %d 1", VIMS_CHAIN_ENTRY_SET_PRESET, i, effect_id);
                     for (j = 0; j < np; j++)
                 {
                     char svalue[32];
@@ -9856,9 +9856,9 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
                     if(value != -1)
                     {
                         if(j == (np-1))
-                            sprintf(svalue, " %d;", value);
+                            snprintf(svalue, sizeof(svalue), " %d;", value);
                         else 
-                            sprintf(svalue, " %d", value);
+                            snprintf(svalue, sizeof(svalue), " %d", value);
                         veejay_strncat( bundle, svalue, strlen(svalue));
                     }
                 }
@@ -9868,8 +9868,8 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
             }
         }
     }
-    sprintf(prefix, "BUN:%03d{", num_cmd);
-    sprintf(buf, "%s%s}",prefix,blob);
+    snprintf(prefix, sizeof(prefix), "BUN:%03d{", num_cmd);
+    snprintf(buf, 4096, "%s%s}", prefix, blob);
     event_id = vj_event_suggest_bundle_id();
 
     if(event_id <= 0 )  
@@ -10470,7 +10470,7 @@ void    vj_event_get_feedback       (   void *ptr, const char format[], va_list 
     char message[16];
     char *s_print_buf = get_print_buf(0);
 
-    sprintf(message, "%d", v->settings->feedback);
+    snprintf(message, sizeof(message), "%d", v->settings->feedback);
     FORMAT_MSG(s_print_buf, message);
     SEND_MSG(v, s_print_buf);
 }
@@ -10896,7 +10896,7 @@ void vj_event_send_video_information(void *ptr, const char format[], va_list ap)
             );
 
     char *s_print_buf = get_print_buf(strlen(info_msg) + 5);
-    sprintf(s_print_buf, "%04zu%s", strlen(info_msg), info_msg);
+    snprintf(s_print_buf, strlen(info_msg) + 5, "%04zu%s", strlen(info_msg), info_msg);
     SEND_MSG(v, s_print_buf);
     free(s_print_buf);
 }
@@ -11574,7 +11574,7 @@ void    vj_event_vloopback_start(void *ptr, const char format[], va_list ap)
     
     veejay_t *v = (veejay_t*)ptr;
 
-    sprintf(device_name, "/dev/video%d", args[0] );
+    snprintf(device_name, sizeof(device_name), "/dev/video%d", args[0] );
 
     veejay_msg(VEEJAY_MSG_INFO, "Open vloopback %s", device_name );
 
@@ -11700,9 +11700,9 @@ void vj_event_send_sample_options   (   void *ptr,  const char format[],    va_l
         }   
 
     if(failed)
-        sprintf( s_print_buf, "%05d", 0 );
+        snprintf(s_print_buf, 128, "%05d", 0);
     else
-        sprintf( s_print_buf, "%05zu%s%s",strlen(prefix) + strlen(options), prefix,options );
+        snprintf(s_print_buf, 128, "%05zu%s%s", strlen(prefix) + strlen(options), prefix, options);
 
     SEND_MSG(v , s_print_buf );
     free(s_print_buf);
@@ -11833,11 +11833,11 @@ void    vj_event_get_srt_list(  void *ptr,  const char format[],    va_list ap  
 
     str = vj_calloc( len + (i*2) + 6 );
     char *p = str;
-    sprintf(p, "%06d", len );
+    snprintf(p, 7, "%06d", len );
     p += 6;
     for(i = 0; list[i] != NULL ; i ++ )
     {
-        sprintf(p, "%s ", list[i]);
+        snprintf(p, strlen(list[i]) + 2, "%s ", list[i]);
         p += strlen(list[i]) + 1;
         free(list[i]);
     }
@@ -11882,12 +11882,12 @@ void    vj_event_get_font_list( void *ptr,  const char format[],    va_list ap  
 
     str = vj_calloc( len + 20 );
     char *p = str;
-    sprintf(p, "%06d", len );
+    snprintf(p, 7, "%06d", len );
     p += 6;
     for(i = 0; list[i] != NULL ; i ++ )
     {
         int k = strlen(list[i]);
-        sprintf(p, "%03d%s", k,list[i]);
+        snprintf(p, 4 + strlen(list[i]), "%03d%s", k, list[i]);
         p += (k + 3);
         free(list[i]);
     }
@@ -11920,7 +11920,7 @@ void    vj_event_get_srt_info(  void *ptr,  const char format[],    va_list ap  
     
     int len = strlen( sequence );
     char *str = vj_calloc( len+20 );
-    sprintf(str,"%06d%s",len,sequence);
+    snprintf(str, len + 7, "%06d%s", len, sequence);
     free(sequence); 
     
     SEND_MSG(v , str );
@@ -11996,7 +11996,7 @@ void    vj_event_get_keyframes( void *ptr,  const char format[],    va_list ap  
         if( data_len > 0 && data )
         {   
             char header[32];
-            sprintf(header, "%08d",data_len );
+            snprintf(header, sizeof(header), "%08d", data_len);
             SEND_DATA( v, header,8);
             SEND_DATA( v, data, data_len );
             free(data);
@@ -12010,7 +12010,7 @@ void    vj_event_get_keyframes( void *ptr,  const char format[],    va_list ap  
         if( data_len > 0 && data )
         {   
             char header[32];
-            sprintf(header, "%08d",data_len );
+            snprintf(header, sizeof(header), "%08d", data_len);
             SEND_DATA( v, header,8);
             SEND_DATA( v, data, data_len );
             free(data);
@@ -12150,7 +12150,7 @@ void    vj_event_add_subtitle(  void *ptr,  const char format[],    va_list ap  
     vj_font_set_position( v->font, args[3] ,args[4] );
 
     char newslot[16];
-    sprintf(newslot, "%05d%05d",5, id );
+    snprintf(newslot, sizeof(newslot), "%05d%05d", 5, id);
     SEND_MSG(v,newslot);    
 }
 void    vj_event_upd_subtitle(  void *ptr,  const char format[],    va_list ap  )
@@ -12436,14 +12436,14 @@ void    vj_event_get_sample_sequences(      void *ptr,  const char format[],    
     }
     
     char *s_print_buf = get_print_buf( 32  + (MAX_SEQUENCES*6));
-    sprintf(s_print_buf, "%06d%04d%04d%04d",
+    snprintf(s_print_buf, 32 + (MAX_SEQUENCES * 6), "%06d%04d%04d%04d",
             ( 12 + (6*MAX_SEQUENCES)),
             v->seq->current,MAX_SEQUENCES, v->seq->active );
     
     for( i =0; i < MAX_SEQUENCES ;i ++ )
     {
         char tmp[32];
-        sprintf(tmp, "%04d%02d", v->seq->samples[i].sample_id, v->seq->samples[i].type);
+        snprintf(tmp, sizeof(tmp), "%04d%02d", v->seq->samples[i].sample_id, v->seq->samples[i].type);
         veejay_strncat(s_print_buf, tmp, 6 );
     }
 

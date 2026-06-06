@@ -128,6 +128,14 @@ extern int veejay_set_speed(veejay_t *v, int speed, int force_seek);
 #define VEEJAY_AUDIO_BEAT_BACKLOG_YIELD_US 1000L
 #endif
 
+#ifndef VEEJAY_AUDIO_BEAT_SYNC_READ_ARM_MS
+#define VEEJAY_AUDIO_BEAT_SYNC_READ_ARM_MS 35L
+#endif
+
+#ifndef VEEJAY_AUDIO_BEAT_SYNC_READ_SLOW_MS
+#define VEEJAY_AUDIO_BEAT_SYNC_READ_SLOW_MS 25L
+#endif
+
 enum
 {
     AB_HIT_NONE = 0,
@@ -324,6 +332,11 @@ typedef struct
     int pub_bpm_q8;
     int beat_toggle_state;
     long pub_overruns;
+    long sync_read_arm_until_ms;
+    long sync_read_last_slow_log_ms;
+    int sync_read_probe_pending;
+    int sync_read_probe_source;
+    int sync_read_probe_seq;
 
 #ifdef VEEJAY_AUDIO_BEAT_DEBUG
     long last_debug_ms;
@@ -761,6 +774,39 @@ static void ab_log_config(vj_audio_beat_shared_t *s, const char *reason)
                ab_load_i(&s->running));
 }
 
+
+static inline int ab_sync_source(vj_audio_beat_shared_t *s)
+{
+    return (s && s->sync) ? ab_load_i(&s->sync->source) : -1;
+}
+
+static void ab_arm_sync_read_probe(vj_audio_beat_shared_t *s,
+                                   vj_audio_beat_thread_t *t,
+                                   int reset_seq)
+{
+    long now;
+    int source;
+
+    if(!s || !t || !s->sync)
+        return;
+
+    source = ab_sync_source(s);
+
+    if(source != VJ_AUDIO_SYNC_SOURCE_PUSH)
+        return;
+
+    now = ab_now_ms();
+    t->sync_read_arm_until_ms = now + VEEJAY_AUDIO_BEAT_SYNC_READ_ARM_MS;
+    t->sync_read_probe_pending = 1;
+    t->sync_read_probe_source = source;
+    t->sync_read_probe_seq = reset_seq;
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-BEAT] sync reader armed source=push reset_seq=%d guard=%ldms",
+               reset_seq,
+               (long)VEEJAY_AUDIO_BEAT_SYNC_READ_ARM_MS);
+}
+
 void vj_audio_beat_init(vj_audio_beat_shared_t *s, int input_channels)
 {
     if(!s)
@@ -881,6 +927,11 @@ static void ab_thread_reset(vj_audio_beat_thread_t *t)
     t->filter_sample_rate = 0;
     t->filter_low_alpha = 0.0f;
     t->filter_mid_alpha = 0.0f;
+    t->sync_read_arm_until_ms = 0;
+    t->sync_read_last_slow_log_ms = 0;
+    t->sync_read_probe_pending = 0;
+    t->sync_read_probe_source = -1;
+    t->sync_read_probe_seq = 0;
     ab_thread_publish_cache_reset(t);
 
 #ifdef VEEJAY_AUDIO_BEAT_DEBUG
@@ -1679,7 +1730,10 @@ static int ab_configure_from_sync(vj_audio_beat_shared_t *s, vj_audio_beat_threa
     ab_store_i(&s->sample_rate, rate);
     ab_store_i(&s->open, 1);
 
-    vj_audio_sync_reset_beat_reader(s->sync);
+    if(ab_sync_source(s) == VJ_AUDIO_SYNC_SOURCE_PUSH)
+        ab_arm_sync_read_probe(s, t, t->last_reset_seq);
+    else
+        vj_audio_sync_reset_beat_reader(s->sync);
 
     return 1;
 }
@@ -2513,7 +2567,12 @@ void *vj_audio_beat_thread(void *arg)
             ab_clear_published_control(s);
 
             if(s->sync)
-                vj_audio_sync_reset_beat_reader(s->sync);
+            {
+                if(ab_sync_source(s) == VJ_AUDIO_SYNC_SOURCE_PUSH)
+                    ab_arm_sync_read_probe(s, &t, reset_seq);
+                else
+                    vj_audio_sync_reset_beat_reader(s->sync);
+            }
 
             if(!s->sync)
                 vj_jack_reset_input();
@@ -2542,11 +2601,62 @@ void *vj_audio_beat_thread(void *arg)
                 continue;
             }
 
-            got = vj_audio_sync_read_beat_audio(
-                s->sync,
-                t.buffer,
-                t.buffer_size
-            );
+            now = ab_now_ms();
+
+            if(t.sync_read_arm_until_ms > 0 && now < t.sync_read_arm_until_ms)
+            {
+                ab_sleep_us(1000);
+                continue;
+            }
+
+            t.sync_read_arm_until_ms = 0;
+
+            {
+                long read_start = now;
+                int probe = t.sync_read_probe_pending;
+
+                if(probe)
+                {
+                    t.sync_read_probe_pending = 0;
+                    veejay_msg(VEEJAY_MSG_INFO,
+                               "[AUDIO-BEAT] sync read probe enter source=%d reset_seq=%d open=%d enabled=%d buffer=%d bpf=%d",
+                               t.sync_read_probe_source,
+                               t.sync_read_probe_seq,
+                               ab_load_i(&s->open),
+                               ab_load_i(&s->enabled),
+                               t.buffer_size,
+                               t.bytes_per_frame);
+                }
+
+                got = vj_audio_sync_read_beat_audio(
+                    s->sync,
+                    t.buffer,
+                    t.buffer_size
+                );
+
+                now = ab_now_ms();
+
+                if(probe)
+                {
+                    veejay_msg(VEEJAY_MSG_INFO,
+                               "[AUDIO-BEAT] sync read probe leave got=%d elapsed=%ldms",
+                               got,
+                               now - read_start);
+                }
+                else if((now - read_start) >= VEEJAY_AUDIO_BEAT_SYNC_READ_SLOW_MS &&
+                        (t.sync_read_last_slow_log_ms == 0 ||
+                         (now - t.sync_read_last_slow_log_ms) >= 1000L))
+                {
+                    t.sync_read_last_slow_log_ms = now;
+                    veejay_msg(VEEJAY_MSG_WARNING,
+                               "[AUDIO-BEAT] sync read slow source=%d got=%d elapsed=%ldms buffer=%d bpf=%d",
+                               ab_sync_source(s),
+                               got,
+                               now - read_start,
+                               t.buffer_size,
+                               t.bytes_per_frame);
+                }
+            }
 
             if(got <= 0)
             {

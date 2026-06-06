@@ -906,17 +906,6 @@ static volatile int vj_audio_source_transition_fade_bytes_left_ = 0;
 static volatile int vj_audio_source_transition_fade_bytes_total_ = 0;
 static volatile int vj_audio_source_transition_frame_bytes_ = 0;
 
-static const char *vj_audio_source_name_dbg(int source)
-{
-    switch(source) {
-        case VJ_RECORD_AUDIO_SOURCE_AUTO:      return "auto";
-        case VJ_RECORD_AUDIO_SOURCE_ORIGINAL:  return "original";
-        case VJ_RECORD_AUDIO_SOURCE_BEAT_JACK: return "external-jack";
-        case VJ_RECORD_AUDIO_SOURCE_SILENCE:   return "silence";
-        default:                               return "unknown";
-    }
-}
-
 
 void vj_perform_audio_source_transition_guard_ex(int blocks,
                                                  const char *reason,
@@ -1057,7 +1046,6 @@ static inline int vj_perform_audio_source_transition_guard_consume_block(int fra
 }
 
 
-static const char *vj_audio_edge_name(int edge_type);
 
 static void vj_perform_audio_source_transition_force_fade_blocks(int frames,
                                                                  int frame_bytes,
@@ -1068,9 +1056,7 @@ static void vj_perform_audio_source_transition_force_fade_blocks(int frames,
                                                                  const char *path)
 {
     int fade_bytes;
-    int old_left;
-    int old_total;
-
+    
     if(frames <= 0 || frame_bytes <= 0)
         return;
 
@@ -1080,42 +1066,10 @@ static void vj_perform_audio_source_transition_force_fade_blocks(int frames,
     if(fade_bytes <= 0)
         return;
 
-    old_left = atomic_load_int(&vj_audio_source_transition_fade_bytes_left_);
-    old_total = atomic_load_int(&vj_audio_source_transition_fade_bytes_total_);
-
-
-    if(old_left >= fade_bytes)
-    {
-        veejay_msg(VEEJAY_MSG_DEBUG,
-                   "[AUDIO-FADE] keep old_left=%d old_total=%d requested=%d blocks=%d frame_bytes=%d edge=%s(%d) target=%lld path=%s reason=%s",
-                   old_left,
-                   old_total,
-                   fade_bytes,
-                   blocks,
-                   frame_bytes,
-                   vj_audio_edge_name(edge_type), edge_type,
-                   target_frame,
-                   path ? path : "unknown",
-                   reason ? reason : "media-boundary");
-        return;
-    }
-
     atomic_store_int(&vj_audio_source_transition_frame_bytes_, frame_bytes);
     atomic_store_int(&vj_audio_source_transition_fade_bytes_left_, fade_bytes);
     atomic_store_int(&vj_audio_source_transition_fade_bytes_total_, fade_bytes);
 
-    veejay_msg(VEEJAY_MSG_DEBUG,
-               "[AUDIO-FADE] arm bytes=%d blocks=%d frames=%d frame_bytes=%d old_left=%d old_total=%d edge=%s(%d) target=%lld path=%s reason=%s",
-               fade_bytes,
-               blocks,
-               frames,
-               frame_bytes,
-               old_left,
-               old_total,
-               vj_audio_edge_name(edge_type), edge_type,
-               target_frame,
-               path ? path : "unknown",
-               reason ? reason : "media-boundary");
 }
 
 static inline int vj_perform_audio_source_transition_take_silence_bytes(int want_bytes)
@@ -1190,18 +1144,6 @@ static void vj_perform_audio_source_transition_apply_fade(uint8_t *source, int l
 
     atomic_store_int(&vj_audio_source_transition_fade_bytes_left_, left - fade_bytes);
 
-    if(left == total) {
-        veejay_msg(VEEJAY_MSG_DEBUG,
-                   "[AUDIO-FADE] begin bytes=%d frame_bytes=%d total=%d",
-                   fade_bytes,
-                   frame_bytes,
-                   total);
-    }
-    if(left - fade_bytes <= 0) {
-        veejay_msg(VEEJAY_MSG_DEBUG,
-                   "[AUDIO-FADE] release total=%d",
-                   total);
-    }
 }
 
 
@@ -1209,16 +1151,9 @@ int vj_perform_play_audio( video_playback_setup *settings, uint8_t *source, int 
 {
     int audio_muted = atomic_load_int(&settings->audio_mute);
     int audio_source = atomic_load_int(&settings->record_audio_source);
-    int guard_seq = atomic_load_int(&vj_audio_source_transition_guard_seq_);
     int guard_left_before = atomic_load_int(&vj_audio_source_transition_guard_blocks_);
-    int silence_budget_before = atomic_load_int(&vj_audio_source_transition_silence_bytes_);
     int silence_take = 0;
     int output_reason = 0;
-    static int last_output_reason = -1;
-    static int last_output_source = -999;
-    static int last_output_mute = -1;
-    static int last_silence_budget = -1;
-    static int last_guard_left = -1;
 
 
     if(audio_muted)
@@ -1329,18 +1264,6 @@ static inline int vj_perform_cache_use_frame(ycbcr_frame *cached_frame, VJFrame 
     return cached_frame->ssm;
 }
 
-
-static const char *vj_audio_edge_name(int edge_type)
-{
-    switch (edge_type) {
-        case AUDIO_EDGE_NONE:      return "none";
-        case AUDIO_EDGE_JUMP:      return "jump";
-        case AUDIO_EDGE_RESET:     return "reset";
-        case AUDIO_EDGE_SILENCE:   return "silence";
-        case AUDIO_EDGE_DIRECTION: return "direction";
-        default:                   return "unknown";
-    }
-}
 
 static void vj_perform_initiate_edge_change_ex(
     veejay_t *info,
@@ -2371,24 +2294,6 @@ int init_audio_resampler(veejay_t *info, performer_t *p) {
     return 1;
 }
 
-
-static void vj_audio_chain_init(performer_global_t *g, performer_t *p, const uint32_t sample_len) {
-    g->audio_chain_index = 0;
-    for (int i = 0; i < 2; i++) {
-        veejay_memset(&g->audio_chain_buffers[i], 0, sizeof(audio_chain_buffer_t));
-        g->audio_chain_buffers[i].state = AC_STATE_IDLE;
-        g->audio_chain_buffers[i].count = 0;
-        g->accum[i] = (float*) vj_calloc(sizeof(float) * sample_len);
-
-        for (int j = 0; j < SAMPLE_MAX_EFFECTS; j++) {
-            g->audio_chain_buffers[i].entries[j].state = AC_STATE_IDLE;
-            g->audio_chain_buffers[i].entries[j].buffer = p->audio_downmix_buffer + ( sample_len * i );
-            g->audio_chain_buffers[i].entries[j].buffer_size = sample_len;
-        }
-    }
-
-    g->audio_chain_buffers[0].state = AC_STATE_CONSUMING;
-}
 
 int vj_perform_init_audio(veejay_t * info, int AorB)
 {
@@ -3686,7 +3591,6 @@ static int perform_normal_direction_turn(veejay_t *info,
     }
 
     const int peak = vj_audio_peak_s16(audio_buf, copied, frame_bytes);
-
     const int declick_path = (turn_speed > 1) ? AUDIO_PATH_FAST : AUDIO_PATH_DIRECT;
     const int hard_turn_boundary =
         (edge_delta >= 3072 ||
@@ -4283,9 +4187,6 @@ static int slow_motion_fetch_scratch_context(veejay_t *info,
     }
 
     const double exact_start = slow_motion_frame_abs_start_exact(el, first, pred_len);
-    const double exact_end = slow_motion_frame_abs_start_exact(el, last + 1, pred_len);
-    const int exact_total = (int)(exact_end - exact_start);
-    const int map_err = total_samples - exact_total;
 
     if (map != NULL) {
         map->valid = 1;
@@ -4566,7 +4467,6 @@ int perform_slow_motion(
     cur_slice = (cur_slice < 0) ? 0 : cur_slice;
     cur_slice = (cur_slice >= slice_count) ? (slice_count - 1) : cur_slice;
 
-    const int edge_requested = (pending_edge != AUDIO_EDGE_NONE || direction_flipped);
     const int hard_edge = (pending_edge != AUDIO_EDGE_NONE &&
                            pending_edge != AUDIO_EDGE_DIRECTION);
     const int edge_transition = (pending_edge == AUDIO_EDGE_DIRECTION || direction_flipped);
@@ -4588,10 +4488,8 @@ int perform_slow_motion(
     double sync_bias_raw = 0.0;
 
     int reset_head = 0;
-    int init_head = 0;
     if (!posdata->scratch_initialized) {
         reset_head = 1;
-        init_head = 1;
     }
     if (hard_edge)
         reset_head = 1;
@@ -4770,17 +4668,6 @@ int perform_slow_motion(
         veejay_memset(audio_buf, 0, pred_len * frame_bytes);
         copied = pred_len;
     }
-
-    int edge_delta = -1;
-    if (posdata->audio_diag_valid && posdata->audio_diag_frame_bytes == frame_bytes)
-        edge_delta = vj_audio_frame_delta_s16(audio_buf,
-                                              posdata->audio_diag_last_frame,
-                                              frame_bytes);
-
-    const double sync_end = sync_pos + (target_vel * (double)copied);
-    const double sync_err0 = sync_pos - pos0;
-    const double sync_err1 = sync_end - pos1;
-    const int peak = vj_audio_peak_s16(audio_buf, copied, frame_bytes);
 
 
     if (hard_edge) {
@@ -5741,8 +5628,6 @@ void vj_perform_record_audio_source_reset(veejay_t *info)
     const int edge = (cur_dir == 0) ? AUDIO_EDGE_SILENCE : AUDIO_EDGE_JUMP;
 
 #ifdef HAVE_JACK
-    const int sync_mode = atomic_load_int(&settings->audio_sync.mode);
-
 #endif
 
     atomic_store_int(&settings->audio_slice, 0);
@@ -6560,12 +6445,10 @@ static void vj_external_audio_history_append(performer_t *p, const uint8_t *src,
 static int vj_external_audio_history_read_latest(performer_t *p, uint8_t *dst, int wanted_frames, int frame_bytes);
 static int vj_external_audio_output_latest_or_silence(performer_t *p, uint8_t *dst, int wanted_frames, int frame_bytes);
 static int vj_external_audio_history_ready(performer_t *p, int needed_frames, int frame_bytes);
-static int vj_external_audio_context_frames(performer_t *p, int dst_frames, int speed, double effective_rate, int frame_bytes, int sample_rate);
 static int vj_external_audio_min_ready_frames(int dst_frames, double transport_rate, int sample_rate);
 static void vj_external_audio_store_tail(performer_t *p, const uint8_t *buf, int frames, int frame_bytes);
 static void vj_external_audio_smooth_block_start(performer_t *p, uint8_t *buf, int frames, int frame_bytes, int force_edge);
 static int vj_external_audio_render_transport(performer_t *p, uint8_t *dst, int dst_frames, int frame_bytes, double transport_rate, int sample_rate);
-static int vj_external_audio_render_pitch_latest(performer_t *p, uint8_t *dst, int dst_frames, int frame_bytes, double pitch_rate, int reverse);
 static int vj_external_audio_render_tape_deck(performer_t *p, uint8_t *dst, int dst_frames, int frame_bytes, double deck_rate, int reverse, int sample_rate);
 static int vj_external_audio_render_reverse_deck(performer_t *p, uint8_t *dst, int dst_frames, int frame_bytes, double deck_rate, int sample_rate);
 static void vj_perform_feed_beat_analysis(veejay_t *info, const uint8_t *buf, int frames, int frame_bytes, editlist *el);
@@ -7064,8 +6947,6 @@ int vj_perform_queue_audio_chunk_ext(
         int guard_left_after = 0;
         int guard_silence_bytes = 0;
         int guard_fade_bytes = 0;
-        int sync_mode_dbg = atomic_load_int(&settings->audio_sync.mode);
-        int sync_enabled_dbg = vj_audio_sync_is_enabled(&settings->audio_sync);
         int mute_dbg = atomic_load_int(&settings->audio_mute);
 
 
@@ -7632,9 +7513,6 @@ int vj_perform_queue_audio_chunk_ext(
     }
 #endif
 
-original_audio_fallback:
-
-
     if ((audio_source == VJ_RECORD_AUDIO_SOURCE_AUTO ||
          audio_source == VJ_RECORD_AUDIO_SOURCE_ORIGINAL) &&
         speed_abs == 1 &&
@@ -8062,50 +7940,6 @@ static int vj_external_audio_history_ready(performer_t *p,
     return p->external_audio_history_filled >= need;
 }
 
-static int vj_external_audio_context_frames(performer_t *p,
-                                            int dst_frames,
-                                            int speed,
-                                            double effective_rate,
-                                            int frame_bytes,
-                                            int sample_rate)
-{
-    int mag = (speed < 0) ? -speed : speed;
-    int frames = dst_frames;
-
-    if(mag < 1)
-        mag = 1;
-    if(mag > MAX_SPEED_AV)
-        mag = MAX_SPEED_AV;
-
-    if(speed < 0) {
-        frames = dst_frames * (mag + 4);
-        int min_rev = sample_rate / 4;
-        if(min_rev > frames)
-            frames = min_rev;
-    }
-    else if(speed > 1) {
-        frames = dst_frames * (mag + 2);
-    }
-    else if(effective_rate < 0.9995) {
-        double inv = 1.0 / ((effective_rate > 0.01) ? effective_rate : 0.01);
-        frames = (int)((double)dst_frames * (inv + 2.0));
-    }
-
-    if(frames < dst_frames * 2)
-        frames = dst_frames * 2;
-
-    if(frame_bytes > 0 && p && p->external_audio_context_capacity > 0) {
-        int cap_frames = (int)(p->external_audio_context_capacity / (size_t)frame_bytes);
-        if(frames > cap_frames)
-            frames = cap_frames;
-    }
-
-    if(frames < dst_frames)
-        frames = dst_frames;
-
-    return frames;
-}
-
 
 static int vj_external_audio_min_ready_frames(int dst_frames,
                                               double transport_rate,
@@ -8175,111 +8009,6 @@ static inline int16_t vj_external_audio_cubic_s16(int p0, int p1, int p2, int p3
     return (int16_t)iv;
 }
 
-
-static int vj_external_audio_render_pitch_latest(performer_t *p,
-                                                 uint8_t *dst,
-                                                 int dst_frames,
-                                                 int frame_bytes,
-                                                 double pitch_rate,
-                                                 int reverse)
-{
-    if(!p || !dst || !p->external_audio_history || dst_frames <= 0 ||
-       frame_bytes <= 0 || (frame_bytes & 1) ||
-       p->external_audio_history_frame_bytes != frame_bytes)
-        return 0;
-
-    const int words = frame_bytes / 2;
-    const int cap_frames = (int)(p->external_audio_history_capacity / (size_t)frame_bytes);
-    const int avail_frames = (int)(p->external_audio_history_filled / (size_t)frame_bytes);
-
-    if(cap_frames <= 8 || avail_frames <= dst_frames + 8)
-        return 0;
-
-    if(pitch_rate < 1.0)
-        pitch_rate = 1.0;
-    if(pitch_rate > (double)MAX_SPEED)
-        pitch_rate = (double)MAX_SPEED;
-
-    const long long newest = p->external_audio_history_abs_write - 1;
-    const long long oldest = p->external_audio_history_abs_write - (long long)avail_frames;
-
-    const double span = ((double)(dst_frames - 1) * pitch_rate) + 4.0;
-    if((double)avail_frames < span + 8.0)
-        return 0;
-
-    const double guard_old = (double)oldest + 4.0;
-    const double guard_new = (double)newest - 4.0;
-
-    double start;
-    double step;
-
-    if(reverse) {
-        start = guard_new;
-        step = -pitch_rate;
-    } else {
-        start = guard_new - ((double)(dst_frames - 1) * pitch_rate);
-        step = pitch_rate;
-    }
-
-    double end = start + step * (double)(dst_frames - 1);
-    double lo = (start < end ? start : end) - 2.0;
-    double hi = (start > end ? start : end) + 3.0;
-
-    if(lo < guard_old || hi > guard_new)
-        return 0;
-
-    const int16_t *hist = (const int16_t*)p->external_audio_history;
-    int16_t *out = (int16_t*)dst;
-
-    for(int i = 0; i < dst_frames; i++) {
-        double pos = start + step * (double)i;
-
-        if(pos < guard_old)
-            pos = guard_old;
-        else if(pos > guard_new)
-            pos = guard_new;
-
-        long long ip = (long long)floor(pos);
-        double frac = pos - (double)ip;
-
-        long long ip0 = ip - 1;
-        long long ip1 = ip;
-        long long ip2 = ip + 1;
-        long long ip3 = ip + 2;
-
-        if(ip0 < oldest) ip0 = oldest;
-        if(ip1 < oldest) ip1 = oldest;
-        if(ip2 > newest) ip2 = newest;
-        if(ip3 > newest) ip3 = newest;
-
-        int idx0 = (int)(ip0 % (long long)cap_frames);
-        int idx1 = (int)(ip1 % (long long)cap_frames);
-        int idx2 = (int)(ip2 % (long long)cap_frames);
-        int idx3 = (int)(ip3 % (long long)cap_frames);
-        if(idx0 < 0) idx0 += cap_frames;
-        if(idx1 < 0) idx1 += cap_frames;
-        if(idx2 < 0) idx2 += cap_frames;
-        if(idx3 < 0) idx3 += cap_frames;
-
-        const int b0 = idx0 * words;
-        const int b1 = idx1 * words;
-        const int b2 = idx2 * words;
-        const int b3 = idx3 * words;
-        const int bo = i * words;
-
-        for(int c = 0; c < words; c++) {
-            out[bo + c] = vj_external_audio_cubic_s16(
-                hist[b0 + c],
-                hist[b1 + c],
-                hist[b2 + c],
-                hist[b3 + c],
-                frac
-            );
-        }
-    }
-
-    return dst_frames;
-}
 
 
 static inline int16_t vj_external_audio_sample_history_s16(const int16_t *hist,
@@ -8959,7 +8688,6 @@ static double vj_perform_runtime_audio_rate(veejay_t *info, editlist *el)
 
     video_playback_setup *settings = info->settings;
     double rate = settings->runtime_playback_rate;
-    const double raw_rate = rate;
 
     if (rate <= 0.0) {
         double fps = settings->output_fps;
@@ -10447,7 +10175,6 @@ static void vj_perform_track_align_wide_search(veejay_t *info,
     int coarse_probe_ok = 0;
     int coarse_no_audio = 0;
     int coarse_best_reject_conf = 0;
-    int coarse_best_reject_delta = 0;
     long long coarse_got_sum = 0;
     double coarse_rms_sum = 0.0;
     double coarse_peak_max = 0.0;
@@ -10457,7 +10184,6 @@ static void vj_perform_track_align_wide_search(veejay_t *info,
     int fine_probe_ok = 0;
     int fine_no_audio = 0;
     int fine_best_reject_conf = 0;
-    int fine_best_reject_delta = 0;
     long long fine_got_sum = 0;
     double fine_rms_sum = 0.0;
     double fine_peak_max = 0.0;
@@ -10472,8 +10198,6 @@ static void vj_perform_track_align_wide_search(veejay_t *info,
     int acquisition_bucket_score = 0;
     int acquisition_bucket_runner_score = 0;
     int acquisition_bucket_obs = 0;
-    int acquisition_small_alias_blocked = 0;
-    int acquisition_strong_one_shot = 0;
     int acquisition_live_far_conflict = 0;
     long search_interval = VJ_TRACK_ALIGN_WIDE_SEARCH_INTERVAL_MS;
 
@@ -10652,8 +10376,6 @@ static void vj_perform_track_align_wide_search(veejay_t *info,
         int hint_end;
         int hint_attempts = 0;
         int hint_ok = 0;
-        int hint_best_before = best_conf;
-
         if(hint_radius < step_frames)
             hint_radius = step_frames;
         if(hint_step < 1)
@@ -10720,7 +10442,6 @@ static void vj_perform_track_align_wide_search(veejay_t *info,
             {
                 if(conf > coarse_best_reject_conf) {
                     coarse_best_reject_conf = conf;
-                    coarse_best_reject_delta = (int)(candidate - target_frame);
                 }
                 continue;
             }
@@ -10803,7 +10524,6 @@ static void vj_perform_track_align_wide_search(veejay_t *info,
         {
             if(conf > coarse_best_reject_conf) {
                 coarse_best_reject_conf = conf;
-                coarse_best_reject_delta = (int)(candidate - target_frame);
             }
             continue;
         }
@@ -10897,7 +10617,6 @@ static void vj_perform_track_align_wide_search(veejay_t *info,
             {
                 if(conf > fine_best_reject_conf) {
                     fine_best_reject_conf = conf;
-                    fine_best_reject_delta = (int)(candidate - target_frame);
                 }
                 continue;
             }
@@ -10932,7 +10651,6 @@ static void vj_perform_track_align_wide_search(veejay_t *info,
 
     {
         int long_best_delta = best_delta;
-        int long_best_conf = best_conf;
         int long_margin = best_conf - second_conf;
 
         if(best_conf >= 0 &&
@@ -11191,8 +10909,6 @@ static void vj_perform_track_align_wide_search(veejay_t *info,
             acquisition_bucket_score = bucket_score;
             acquisition_bucket_runner_score = runner_score;
             acquisition_bucket_obs = bucket_obs;
-            acquisition_small_alias_blocked = small_alias_blocked;
-            acquisition_strong_one_shot = strong_one_shot;
             acquisition_live_far_conflict = 0;
 
 
@@ -11213,7 +10929,6 @@ static void vj_perform_track_align_wide_search(veejay_t *info,
                     acquisition_live_far_conflict = 1;
                     if(strong_one_shot) {
                         strong_one_shot = 0;
-                        acquisition_strong_one_shot = 0;
                     }
                 }
             }
@@ -11358,9 +11073,6 @@ static void vj_perform_track_align_wide_search(veejay_t *info,
         {
             int avg_conf = (p->track_align_candidate_count > 0) ?
                            (p->track_align_candidate_sum_conf / p->track_align_candidate_count) : best_conf;
-            int avg_margin = (p->track_align_candidate_count > 0) ?
-                             (p->track_align_candidate_sum_margin / p->track_align_candidate_count) : margin;
-
             int small_delta_frames = (int)(fps * ((double)VJ_TRACK_ALIGN_WIDE_SMALL_DELTA_MS / 1000.0) + 0.5);
             int small_needs_strict = 0;
             int small_live_agrees = 0;
