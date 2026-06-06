@@ -3078,19 +3078,19 @@ gchar *dialog_open_file(const char *title, file_filter_t type)
 static char *produce_os_str(void)
 {
     char os_str[512];
-    char cpu_type[32];
+    char cpu_type[32] = "unknown";
     char *simd = vj_calloc( 128 );
 #ifdef ARCH_X86
-    sprintf(cpu_type,"x86");
+    snprintf(cpu_type, sizeof(cpu_type), "x86");
 #endif
 #ifdef ARCH_X86_64
-    sprintf(cpu_type, "x86-64");
+    snprintf(cpu_type, sizeof(cpu_type), "x86-64");
 #endif
 #ifdef ARCH_PPC
-    sprintf(cpu_type, "ppc");
+    snprintf(cpu_type, sizeof(cpu_type), "ppc");
 #endif
 #ifdef ARCH_MIPS
-    sprintf(cpu_type, "mips");
+    snprintf(cpu_type, sizeof(cpu_type), "mips");
 #endif
 #ifdef HAVE_ASM_MMX
     strcat( simd, "MMX ");
@@ -3120,7 +3120,7 @@ static char *produce_os_str(void)
 #ifdef ARCH_MIPS
     strcat( simd, "no optimizations");
 #endif
-    sprintf(os_str,"Arch: %s with %s",
+    snprintf(os_str, sizeof(os_str), "Arch: %s with %s",
         cpu_type, simd );
 
     return strdup( os_str );
@@ -3158,7 +3158,7 @@ void about_dialog(void)
     char *os_str = produce_os_str();
 
 
-    sprintf(blob, "Veejay - A visual instrument and realtime video sampler for GNU/Linux\n%s\n", os_str );
+    snprintf(blob, sizeof(blob), "Veejay - A visual instrument and realtime video sampler for GNU/Linux\n%s\n", os_str );
 
     free(os_str);
 
@@ -3177,7 +3177,7 @@ void about_dialog(void)
 
     char path[MAX_PATH_LEN];
     veejay_memset( path,0, sizeof(path));
-    get_gd( path, NULL,  "veejay-logo.png" );
+    get_gd(path, NULL, "veejay-logo.png");
     GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file
         ( path, NULL );
     GtkWidget *about = g_object_new(
@@ -3276,7 +3276,7 @@ int prompt_keydialog(const char *title, char *msg)
 
     char pixmap[1024];
     veejay_memset(pixmap,0,sizeof(pixmap));
-    get_gd( pixmap, NULL, "icon_keybind.png");
+    get_gd(pixmap, NULL, "icon_keybind.png");
 
     GtkWidget *mainw = glade_xml_get_widget_(info->main_window, "gveejay_window");
     GtkWidget *dialog = gtk_dialog_new_with_buttons(title,
@@ -3701,16 +3701,16 @@ void vj_msg(int type, const char format[], ...)
     switch(type)
     {
         case 2:
-            sprintf(prefix,"Info:");
+            snprintf(prefix, sizeof(prefix), "Info:");
             break;
         case 1:
-            sprintf(prefix,"Warning:");
+            snprintf(prefix, sizeof(prefix), "Warning:");
             break;
         case 0:
-            sprintf(prefix,"Error:" );
+            snprintf(prefix, sizeof(prefix), "Error:");
             break;
         default:
-            sprintf(prefix,"Debug:");
+            snprintf(prefix, sizeof(prefix), "Debug:");
             break;
     }
 
@@ -4502,7 +4502,7 @@ static  GdkPixbuf   *update_pixmap_entry( int status )
 
     snprintf(filename,sizeof(filename), "fx_entry_%s.png",
              ( status == 1 ? "on" : "off" ));
-    get_gd(path,NULL, filename);
+    get_gd(path, NULL, filename);
 
     GError *error = NULL;
     GdkPixbuf *icon = gdk_pixbuf_new_from_file(path, &error);
@@ -6478,7 +6478,7 @@ static void load_sequence_list(void)
         offset += 6;
         if( sample_id > 0 )
         {
-            sprintf(seqtext,"%c%d",( type == 0 ? 'S' : 'T' ), sample_id);
+            snprintf(seqtext, sizeof(seqtext), "%c%d", (type == 0 ? 'S' : 'T'), sample_id);
             gtk_label_set_text(
                 GTK_LABEL(info->sequencer_view->gui_slot[id]->image),
                 seqtext );
@@ -6672,9 +6672,11 @@ void on_bundle_row_activated(GtkTreeView *treeview,
                 {
                     if( args != NULL && strlen(args) > 0 )
                     {
-                        char msg[100];
-                        sprintf(msg, "%03d:%s;", event_id, args );
-                        msg_vims(msg);
+                        gchar *msg = g_strdup_printf("%03d:%s;", event_id, args);
+                        if(msg) {
+                            msg_vims(msg);
+                            g_free(msg);
+                        }
                     }
                 }
             }
@@ -7231,7 +7233,7 @@ static void reload_vimslist(void)
         vj_event_list[ val[0] ].format   = format;
         vj_event_list[ val[0] ].descr    = descr;
 
-        sprintf(vimsid, "%03d", val[0] );
+        snprintf(vimsid, sizeof(vimsid), "%03d", val[0] );
         gtk_list_store_set(store, &iter,
                            VIMS_LIST_ITEM_ID, vimsid,
                            VIMS_LIST_ITEM_DESCR,descr,-1 );
@@ -7590,7 +7592,7 @@ static int load_editlist_info(void)
 #endif
         return 0;
     }
-    int got_n = sscanf(res, "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d %s %d",
+    int got_n = sscanf(res, "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d %4095s %d",
        &values[0], &values[1], &values[2], &values[3], &fps,
        &values[4], &values[5], &rate, &values[7],
        &dum[0], &dum[1], &values[8], &use_vims_mcast, &global_transition_state, filepath, &beat_enabled);
@@ -7721,7 +7723,7 @@ static gboolean update_cpumeter_timeout( gpointer data )
     else
     {
         char text[32];
-        sprintf(text, "%2.2f FPS", ( 1.0f / ms ) * 1000.0 );
+        snprintf(text, sizeof(text), "%2.2f FPS", ( 1.0f / ms ) * 1000.0 );
 
         update_label_str( "cpumeter", text );
     }
@@ -7732,7 +7734,7 @@ static gboolean update_cachemeter_timeout( gpointer data )
 {
     char text[32];
     gint v = info->status_tokens[TOTAL_MEM];
-    sprintf(text,"%d MB cached",v);
+    snprintf(text, sizeof(text), "%d MB cached", v);
     update_label_str( "cachemeter", text );
 
     return TRUE;
@@ -7838,12 +7840,17 @@ void get_gd(char *buf, char *suf, const char *filename)
 {
     const char *dir = RELOADED_DATADIR;
 
-    if(filename !=NULL && suf != NULL)
-        sprintf(buf, "%s/%s/%s",dir,suf, filename );
-    if(filename !=NULL && suf==NULL)
-        sprintf(buf, "%s/%s", dir, filename);
-    if(filename == NULL && suf != NULL)
-        sprintf(buf, "%s/%s/" , dir, suf);
+    if(!buf)
+        return;
+
+    buf[0] = '\0';
+
+    if(filename != NULL && suf != NULL)
+        snprintf(buf, MAX_PATH_LEN, "%s/%s/%s", dir, suf, filename);
+    else if(filename != NULL && suf == NULL)
+        snprintf(buf, MAX_PATH_LEN, "%s/%s", dir, filename);
+    else if(filename == NULL && suf != NULL)
+        snprintf(buf, MAX_PATH_LEN, "%s/%s/", dir, suf);
 }
 
 GdkPixbuf   *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type )
@@ -11226,7 +11233,7 @@ static void remove_sample_from_slot(void)
         info->selection_slot->sample_type == info->status_tokens[STREAM_TYPE] )
     {
         gchar error_msg[100];
-        sprintf(error_msg, "Cannot delete %s %d while playing",
+        snprintf(error_msg, sizeof(error_msg), "Cannot delete %s %d while playing",
             (info->selection_slot->sample_type == MODE_SAMPLE ? "Sample" : "Stream" ),
             info->selection_slot->sample_id );
         message_dialog( "Error while deleting", error_msg );

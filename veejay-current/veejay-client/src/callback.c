@@ -310,7 +310,7 @@ void	on_button_054_clicked(GtkWidget *widget, gpointer user_data)
 	if(ext)
 	{
 		gchar filename[100];
-		sprintf(filename, "frame-%d.%s", info->status_tokens[FRAME_NUM] + 1 , ext);
+		snprintf(filename, sizeof(filename), "frame-%d.%s", info->status_tokens[FRAME_NUM] + 1, ext);
 		gint w = get_nums("screenshot_width");
 		gint h = get_nums("screenshot_height");
 		multi_vims( VIMS_SCREENSHOT,"%d %d %s",w,h,filename );
@@ -479,7 +479,7 @@ void on_audio_beat_refresh_button_clicked(GtkWidget *widget, gpointer user_data)
     if(info->status_lock)
         return;
 
-    single_vims(VIMS_AUDIO_BEAT_STATE);
+    single_vims(VIMS_AUDIO_BEAT_PRINT);
 }
 
 void on_audio_beat_auto_reset_button_toggled(GtkWidget *widget, gpointer user_data)
@@ -3498,7 +3498,7 @@ void	on_vims_key_clicked( GtkWidget *widget, gpointer user_data)
 {
 #ifdef HAVE_SDL
 	char which_vims[128];
-	sprintf(which_vims, "Press a key to bind VIMS %03d",
+	snprintf(which_vims, sizeof(which_vims), "Press a key to bind VIMS %03d",
 			info->uc.selected_vims_entry );
 
 	int n = prompt_keydialog(
