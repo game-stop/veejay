@@ -489,6 +489,7 @@ enum {
   WIDGET_AUDIO_SYNC_LIVE_TEMPO_FRAME = 345,
   WIDGET_AUDIO_SYNC_LIVE_TRACK_FRAME = 346,
   WIDGET_AUDIO_SYNC_PHASE_BAR = 347,
+  WIDGET_AUDIO_SYNC_WAV_BROWSE_BUTTON = 348,
 };
 
 
@@ -949,6 +950,8 @@ static struct
     { "audio_sync_correction_spin",     WIDGET_AUDIO_SYNC_CORRECTION_SPIN },
     { "audio_sync_wav_path",            WIDGET_AUDIO_SYNC_WAV_PATH },
     { "audio_sync_wav_loop_toggle",     WIDGET_AUDIO_SYNC_WAV_LOOP_TOGGLE },
+    { "audio_sync_wav_browse_button",   WIDGET_AUDIO_SYNC_WAV_BROWSE_BUTTON },
+    { "audio_sync_refresh_button",      WIDGET_AUDIO_SYNC_REFRESH_BUTTON },
     { "audio_sync_level_bar",           WIDGET_AUDIO_SYNC_LEVEL_BAR },
     { "audio_sync_transient_bar",       WIDGET_AUDIO_SYNC_TRANSIENT_BAR },
     { "audio_sync_enabled_value",       WIDGET_AUDIO_SYNC_ENABLED_VALUE },
@@ -1069,6 +1072,23 @@ static struct
     {"Waveform correlation confidence for track alignment."},
     {"Current video timing correction requested by track alignment, in parts per million."},
     {"Current waveform track alignment state: idle, waiting, searching, locked, hold, or fallback."},
+
+    {"Choose a WAV file to use as the external master. The selected file can drive Monitor, Tempo bridge, or Track align modes."},
+    {"Mute or unmute the audible output. Beat analysis and sync providers may continue to run."},
+    {"Enable beat-triggered control for the currently selected FX chain entry. Select an entry first."},
+    {"Enable the Global FX chain for the current sample or stream. Backend status confirms the final state."},
+    {"Copy the current FX chain into the Global FX chain using the current before/after render setting."},
+    {"Choose whether the Global FX chain renders before or after the current FX chain."},
+    {"Forward VIMS messages to connected peers when message forwarding is enabled."},
+    {"Enable or disable the transition shape for this sample. Length and shape are applied only while active."},
+    {"Transition duration in frames for the selected sample."},
+    {"Transition shape number for the selected sample."},
+    {"Enable or disable the transition shape for this stream. Length and shape are applied only while active."},
+    {"Transition duration in frames for the selected stream."},
+    {"Transition shape number for the selected stream."},
+    {"Enable shape transitions when switching samples or streams. Configure the current transition in the properties panel."},
+    {"Request subrendering for the current chain state."},
+    {"Enable or disable feedback rendering. Some navigation and sample-grid controls are locked while feedback is active."},
     {NULL},
 };
 
@@ -1248,7 +1268,24 @@ enum
     TOOLTIP_AUDIO_SYNC_TRACK_ALIGN_OFFSET_VALUE,
     TOOLTIP_AUDIO_SYNC_TRACK_ALIGN_CONFIDENCE_VALUE,
     TOOLTIP_AUDIO_SYNC_TRACK_ALIGN_CORRECTION_VALUE,
-    TOOLTIP_AUDIO_SYNC_TRACK_ALIGN_STATE_VALUE
+    TOOLTIP_AUDIO_SYNC_TRACK_ALIGN_STATE_VALUE,
+
+    TOOLTIP_AUDIO_SYNC_WAV_BROWSE,
+    TOOLTIP_AUDIO_MUTE,
+    TOOLTIP_CHAIN_ENTRY_BEAT,
+    TOOLTIP_GLOBAL_CHAIN,
+    TOOLTIP_GLOBAL_CHAIN_COPY,
+    TOOLTIP_GLOBAL_CHAIN_LEVEL,
+    TOOLTIP_MESSAGE_FORWARDING,
+    TOOLTIP_SAMPLE_TRANSITION_ACTIVE,
+    TOOLTIP_SAMPLE_TRANSITION_LENGTH,
+    TOOLTIP_SAMPLE_TRANSITION_SHAPE,
+    TOOLTIP_STREAM_TRANSITION_ACTIVE,
+    TOOLTIP_STREAM_TRANSITION_LENGTH,
+    TOOLTIP_STREAM_TRANSITION_SHAPE,
+    TOOLTIP_GLOBAL_TRANSITIONS,
+    TOOLTIP_SUBRENDER,
+    TOOLTIP_FEEDBACK
 };
 
 #define FX_PARAMETER_DEFAULT_NAME "<none>"
@@ -2325,7 +2362,10 @@ static void scan_generators( const char *name)
 
 static void set_tooltip_by_widget(GtkWidget *w, const char *text)
 {
-    gtk_widget_set_tooltip_text( w,text );
+    if(!w)
+        return;
+
+    gtk_widget_set_tooltip_text(w, text);
 }
 
 static void set_tooltip(const char *name, const char *text)
@@ -2420,6 +2460,8 @@ static struct
     { WIDGET_AUDIO_SYNC_CORRECTION_SPIN, TOOLTIP_AUDIO_SYNC_CORRECTION },
     { WIDGET_AUDIO_SYNC_WAV_PATH, TOOLTIP_AUDIO_SYNC_WAV_PATH },
     { WIDGET_AUDIO_SYNC_WAV_LOOP_TOGGLE, TOOLTIP_AUDIO_SYNC_WAV_LOOP },
+    { WIDGET_AUDIO_SYNC_WAV_BROWSE_BUTTON, TOOLTIP_AUDIO_SYNC_WAV_BROWSE },
+    { WIDGET_AUDIO_SYNC_REFRESH_BUTTON, TOOLTIP_AUDIO_SYNC_REFRESH },
     { WIDGET_AUDIO_SYNC_LEVEL_BAR, TOOLTIP_AUDIO_SYNC_LEVEL },
     { WIDGET_AUDIO_SYNC_TRANSIENT_BAR, TOOLTIP_AUDIO_SYNC_TRANSIENT },
     { WIDGET_AUDIO_SYNC_ENABLED_VALUE, TOOLTIP_AUDIO_SYNC_ENABLED_VALUE },
@@ -2458,6 +2500,47 @@ static void init_audio_sync_tooltips(void)
         if (!widget_cache[widget_id])
             continue;
         if (!tooltips[tooltip_id].text)
+            continue;
+
+        set_tooltip_by_widget(widget_cache[widget_id], tooltips[tooltip_id].text);
+    }
+}
+
+static struct
+{
+    const int widget_id;
+    const int tooltip_id;
+} polish_tooltip_map[] =
+{
+    { WIDGET_AUDIO_MUTE_TOGGLE, TOOLTIP_AUDIO_MUTE },
+    { WIDGET_CHAIN_ENTRY_BEAT_TOGGLE, TOOLTIP_CHAIN_ENTRY_BEAT },
+    { WIDGET_GLOBALCHAINTOGGLE, TOOLTIP_GLOBAL_CHAIN },
+    { WIDGET_GLOBALCHAINCOPY, TOOLTIP_GLOBAL_CHAIN_COPY },
+    { WIDGET_GLOBALCHAINLEVEL, TOOLTIP_GLOBAL_CHAIN_LEVEL },
+    { WIDGET_MESSAGE_FORWARDING, TOOLTIP_MESSAGE_FORWARDING },
+    { WIDGET_SAMPLE_TRANSITION_ACTIVE, TOOLTIP_SAMPLE_TRANSITION_ACTIVE },
+    { WIDGET_SAMPLE_TRANSITION_LENGTH, TOOLTIP_SAMPLE_TRANSITION_LENGTH },
+    { WIDGET_SAMPLE_TRANSITION_SHAPE, TOOLTIP_SAMPLE_TRANSITION_SHAPE },
+    { WIDGET_STREAM_TRANSITION_ACTIVE, TOOLTIP_STREAM_TRANSITION_ACTIVE },
+    { WIDGET_STREAM_TRANSITION_LENGTH, TOOLTIP_STREAM_TRANSITION_LENGTH },
+    { WIDGET_STREAM_TRANSITION_SHAPE, TOOLTIP_STREAM_TRANSITION_SHAPE },
+    { WIDGET_GLOBAL_TRANSITIONS_TOGGLE, TOOLTIP_GLOBAL_TRANSITIONS },
+    { WIDGET_TOGGLE_SUBRENDER, TOOLTIP_SUBRENDER },
+    { WIDGET_FEEDBACKBUTTON, TOOLTIP_FEEDBACK },
+    { -1, -1 }
+};
+
+static void init_polish_tooltips(void)
+{
+    for(int i = 0; polish_tooltip_map[i].widget_id >= 0; i++) {
+        int widget_id = polish_tooltip_map[i].widget_id;
+        int tooltip_id = polish_tooltip_map[i].tooltip_id;
+
+        if(widget_id >= MAX_WIDGET_CACHE)
+            continue;
+        if(!widget_cache[widget_id])
+            continue;
+        if(!tooltips[tooltip_id].text)
             continue;
 
         set_tooltip_by_widget(widget_cache[widget_id], tooltips[tooltip_id].text);
@@ -4597,6 +4680,28 @@ static void update_record_tab(int pm)
 }
 
 
+static void set_widget_sensitive_cached(int widget_id, int sensitive)
+{
+    GtkWidget *w = widget_cache[widget_id];
+
+    if(w)
+        gtk_widget_set_sensitive(w, sensitive ? TRUE : FALSE);
+}
+
+static void update_transition_control_sensitivity(int pm)
+{
+    const int active = info->status_tokens[SAMPLE_TRANSITION_ACTIVE] ? 1 : 0;
+
+    if(pm == MODE_SAMPLE) {
+        set_widget_sensitive_cached(WIDGET_SAMPLE_TRANSITION_LENGTH, active);
+        set_widget_sensitive_cached(WIDGET_SAMPLE_TRANSITION_SHAPE, active);
+    }
+    else if(pm == MODE_STREAM) {
+        set_widget_sensitive_cached(WIDGET_STREAM_TRANSITION_LENGTH, active);
+        set_widget_sensitive_cached(WIDGET_STREAM_TRANSITION_SHAPE, active);
+    }
+}
+
 static void update_current_slot_transition_state(int * history, int pm)
 {
     if (history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE]){
@@ -4630,6 +4735,8 @@ static void update_current_slot_transition_state(int * history, int pm)
                                     (gdouble) info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
         }
     }
+
+    update_transition_control_sensitivity(pm);
 }
 
 const char *get_stream_prefix(int type)
@@ -8402,6 +8509,7 @@ static void audio_sync_update_mode_sensitivity(int mode, int source, int target_
     const int master_wav_ids[] = {
         WIDGET_AUDIO_SYNC_WAV_PATH,
         WIDGET_AUDIO_SYNC_WAV_LOOP_TOGGLE,
+        WIDGET_AUDIO_SYNC_WAV_BROWSE_BUTTON,
         -1
     };
 
@@ -8422,7 +8530,8 @@ static void audio_sync_update_mode_sensitivity(int mode, int source, int target_
     audio_sync_set_widget_visible(WIDGET_AUDIO_MASTER_JACK_OPTIONS_GRID, external_master);
     audio_sync_set_widget_visible(WIDGET_AUDIO_MASTER_WAV_OPTIONS_GRID, wav_master);
     audio_sync_set_widget_sensitive(WIDGET_AUDIO_SYNC_ENABLE_TOGGLE, external_master);
-    audio_sync_set_widget_sensitive(WIDGET_AUDIO_SYNC_MODE_COMBO, sync_enabled);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_SYNC_MODE_COMBO, external_master);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_SYNC_REFRESH_BUTTON, external_master);
 
 
 
@@ -9992,6 +10101,7 @@ void vj_gui_init(const char *glade_file,
     init_widget_cache();
     init_audio_beat_tooltips();
     init_audio_sync_tooltips();
+    init_polish_tooltips();
 
     GtkWidget *box = glade_xml_get_widget_( info->main_window, "sample_bank_hbox" );
     info->sample_bank_pad = new_bank_pad( box );

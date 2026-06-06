@@ -236,8 +236,10 @@ void	on_videobar_value_changed(GtkWidget *widget, gpointer user_data)
 
 void	on_subrender_toggled(GtkWidget *widget, gpointer user_data)
 {
-	if(!info->status_lock)
+	if(!info->status_lock) {
 		multi_vims( VIMS_SUB_RENDER,"%d",0);
+		vj_msg(VEEJAY_MSG_INFO, "Subrender request sent for the current chain");
+	}
 }
 
 void	on_button_001_clicked(GtkWidget *widget, gpointer user_data)
@@ -251,6 +253,7 @@ void	on_feedbackbutton_toggled( GtkWidget *widget, gpointer data )
 	if(!info->status_lock) {
 		int val = is_button_toggled( "feedbackbutton" ) ? 1:0;
 		multi_vims( VIMS_FEEDBACK, "%d", val );
+		vj_msg(VEEJAY_MSG_INFO, "Feedback rendering %s requested", val ? "enabled" : "disabled");
 	}
 }
 
@@ -332,9 +335,17 @@ void on_beat_entry_toggle_toggled(GtkWidget *widget, gpointer user_data) {
 	if(info->status_lock)
 		return;
 
+    if(info->uc.selected_chain_entry < 0) {
+        vj_msg(VEEJAY_MSG_INFO, "Select an FX chain entry before enabling beat control");
+        return;
+    }
+
 	int status = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
 
  	multi_vims( VIMS_CHAIN_ENTRY_BEAT_TOGGLE,"%d %d %d", 0, info->uc.selected_chain_entry, status );
+    vj_msg(VEEJAY_MSG_INFO, "Beat control %s for FX chain entry %d",
+           status ? "enabled" : "disabled",
+           info->uc.selected_chain_entry);
 }
 
 void    on_button_audio_mute_toggled(GtkWidget *widget, gpointer user_data) {
@@ -348,6 +359,7 @@ void    on_button_audio_mute_toggled(GtkWidget *widget, gpointer user_data) {
     int status = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? 1 : 0;
 
     multi_vims( VIMS_AUDIO_TOGGLE_MUTE, "%d", status );
+    vj_msg(VEEJAY_MSG_INFO, "Audio output %s requested", status ? "mute" : "unmute");
 
 }
 
@@ -375,6 +387,50 @@ static void audio_beat_send_int(GtkWidget *widget, int vims_id)
         return;
 
     multi_vims(vims_id, "%d", audio_beat_widget_int_value(widget));
+}
+
+static const char *audio_beat_action_name(int mode)
+{
+    switch(mode) {
+        case 1: return "freeze";
+        case 2: return "auto FX";
+        case 3: return "freeze + auto FX";
+        case 0:
+        default: return "none";
+    }
+}
+
+static const char *audio_beat_auto_mode_name(int mode)
+{
+    switch(mode) {
+        case 1: return "primary";
+        case 2: return "primary + motion";
+        case 3: return "motion + memory";
+        case 4: return "chaos";
+        case 0:
+        default: return "off";
+    }
+}
+
+static void audio_beat_set_widget_sensitive(int widget_id, int sensitive)
+{
+    GtkWidget *w = widget_cache[widget_id];
+
+    if(w)
+        gtk_widget_set_sensitive(w, sensitive ? TRUE : FALSE);
+}
+
+static void audio_beat_update_action_sensitivity(int action)
+{
+    const int uses_freeze = (action == 1 || action == 3);
+    const int uses_auto = (action == 2 || action == 3);
+
+    audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_FREEZE_SCALE, uses_freeze);
+    audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_FREEZE_SPIN, uses_freeze);
+    audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_MODE_COMBO, uses_auto);
+    audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SCALE, uses_auto);
+    audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SPIN, uses_auto);
+    audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_RESET_BUTTON, uses_auto);
 }
 
 static void audio_beat_enable_chain_entry_toggle_guarded(int active)
@@ -407,9 +463,10 @@ void on_audio_beat_enable_toggle_toggled(GtkToggleButton *togglebutton, gpointer
     if(enabled)
         audio_beat_enable_chain_entry_toggle_guarded(1);
 
-
+    audio_beat_update_action_sensitivity(audio_beat_widget_int_value(widget_cache[WIDGET_AUDIO_BEAT_ACTION_COMBO]));
 
     multi_vims(VIMS_AUDIO_BEAT_STATUS, "%d", enabled);
+    vj_msg(VEEJAY_MSG_INFO, "Audio beat detector %s requested", enabled ? "enabled" : "disabled");
 }
 void on_audio_beat_action_combo_changed(GtkWidget *widget, gpointer user_data)
 {
@@ -423,6 +480,8 @@ void on_audio_beat_action_combo_changed(GtkWidget *widget, gpointer user_data)
         return;
 
     multi_vims(VIMS_AUDIO_BEAT_ACTION, "%d", mode);
+    audio_beat_update_action_sensitivity(mode);
+    vj_msg(VEEJAY_MSG_INFO, "Audio beat action: %s", audio_beat_action_name(mode));
 }
 
 void on_audio_beat_channels_spin_value_changed(GtkWidget *widget, gpointer user_data)
@@ -467,6 +526,7 @@ void on_audio_beat_auto_mode_combo_changed(GtkWidget *widget, gpointer user_data
         return;
 
     multi_vims(VIMS_AUDIO_BEAT_AUTO_MODE, "%d", mode);
+    vj_msg(VEEJAY_MSG_INFO, "Audio beat Auto FX mode: %s", audio_beat_auto_mode_name(mode));
 }
 
 void on_audio_beat_auto_amount_value_changed(GtkWidget *widget, gpointer user_data)
@@ -1200,6 +1260,7 @@ void on_audio_sync_wav_browse_button_clicked(GtkWidget *widget, gpointer user_da
 
     audio_sync_set_external_source_guarded(1);
     audio_input_selector_use_wav_playback(0);
+    vj_msg(VEEJAY_MSG_INFO, "WAV master file selected");
 }
 
 void on_audio_sync_wav_path_activate(GtkWidget *widget, gpointer user_data)
@@ -1212,6 +1273,7 @@ void on_audio_sync_wav_path_activate(GtkWidget *widget, gpointer user_data)
 
     audio_sync_set_external_source_guarded(1);
     audio_input_selector_use_wav_playback(0);
+    vj_msg(VEEJAY_MSG_INFO, "WAV master path applied");
 }
 
 void on_audio_sync_wav_loop_toggle_toggled(GtkWidget *widget, gpointer user_data)
@@ -1222,8 +1284,11 @@ void on_audio_sync_wav_loop_toggle_toggled(GtkWidget *widget, gpointer user_data
     if(info->status_lock)
         return;
 
-    if(audio_input_selector_wav_from_ui())
+    if(audio_input_selector_wav_from_ui()) {
         audio_input_selector_use_wav_playback(0);
+        vj_msg(VEEJAY_MSG_INFO, "WAV master loop %s requested",
+               audio_sync_loop_from_ui() ? "enabled" : "disabled");
+    }
 }
 
 void on_audio_sync_refresh_button_clicked(GtkWidget *widget, gpointer user_data)
@@ -3158,6 +3223,8 @@ void on_check_samplefx_toggled(GtkWidget *widget , gpointer user_data)
 		multi_vims( vims_id, "%d", 0 );
 
 		vj_midi_learning_vims_msg( info->midi, NULL, vims_id, 0 );
+        vj_msg(VEEJAY_MSG_INFO, "Sample FX chain %s requested",
+               gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? "enabled" : "disabled");
 	}
 
     GtkWidget *check_samplefx = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "check_samplefx"));
@@ -3177,6 +3244,8 @@ void on_check_streamfx_toggled(GtkWidget *widget, gpointer user_data)
 		multi_vims( vims_id, "%d", 0 );
 
 		vj_midi_learning_vims_msg( info->midi, NULL, vims_id, 0 );
+        vj_msg(VEEJAY_MSG_INFO, "Stream FX chain %s requested",
+               gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? "enabled" : "disabled");
 	}
 
     GtkWidget *check_streamfx = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "check_streamfx"));
@@ -5810,11 +5879,14 @@ on_transition_length_value_changed( GtkWidget *widget, gpointer user_data)
     if(info->status_lock)
         return;
 
+    int length = (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
+
     set_transition(
             info->status_tokens[ SAMPLE_TRANSITION_ACTIVE ],
             info->status_tokens[ SAMPLE_TRANSITION_SHAPE ],
-            (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) )
+            length
             );
+    vj_msg(VEEJAY_MSG_INFO, "Transition length requested: %d frames", length);
 }
 
 void
@@ -5823,11 +5895,14 @@ on_transition_shape_value_changed( GtkWidget *widget, gpointer user_data)
     if(info->status_lock)
         return;
 
+    int shape = (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
+
     set_transition(
             info->status_tokens[ SAMPLE_TRANSITION_ACTIVE ],
-            (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) ),
+            shape,
             info->status_tokens[ SAMPLE_TRANSITION_LENGTH ]
             );
+    vj_msg(VEEJAY_MSG_INFO, "Transition shape requested: %d", shape);
 }
 
 void
@@ -5836,11 +5911,14 @@ on_transition_active_toggled( GtkWidget *widget, gpointer user_data)
     if(info->status_lock)
         return;
 
+    int active = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ) ? 1 : 0;
+
     set_transition(
-            gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ),
+            active,
             info->status_tokens[ SAMPLE_TRANSITION_SHAPE ],
             info->status_tokens[ SAMPLE_TRANSITION_LENGTH ]
             );
+    vj_msg(VEEJAY_MSG_INFO, "Transition %s requested for current source", active ? "enabled" : "disabled");
 }
 
 void

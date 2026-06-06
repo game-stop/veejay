@@ -10670,6 +10670,8 @@
   <property name="can-focus">False</property>
   <property name="active">0</property>
   <property name="hexpand">True</property>
+  <property name="has-tooltip">True</property>
+  <property name="tooltip-text" translatable="yes">Choose the audio master: original video audio, external JACK, WAV file, or silence.</property>
   <items>
     <item translatable="yes">Original video audio</item>
     <item translatable="yes">JACK external</item>
@@ -10682,6 +10684,24 @@
     <property name="left-attach">1</property>
     <property name="top-attach">0</property>
     <property name="width">2</property>
+    <property name="height">1</property>
+  </packing>
+</child>
+
+<child>
+<object class="GtkButton" id="audio_sync_refresh_button">
+  <property name="label" translatable="yes">Refresh</property>
+  <property name="visible">True</property>
+  <property name="can-focus">True</property>
+  <property name="receives-default">False</property>
+  <property name="has-tooltip">True</property>
+  <property name="tooltip-text" translatable="yes">Print the current Audio Sync backend state and refresh visible status values.</property>
+  <signal name="clicked" handler="on_audio_sync_refresh_button_clicked" swapped="no"/>
+</object>
+  <packing>
+    <property name="left-attach">3</property>
+    <property name="top-attach">0</property>
+    <property name="width">1</property>
     <property name="height">1</property>
   </packing>
 </child>
@@ -10727,6 +10747,8 @@
   <property name="visible">True</property>
   <property name="can-focus">True</property>
   <property name="receives-default">True</property>
+  <property name="has-tooltip">True</property>
+  <property name="tooltip-text" translatable="yes">Choose a WAV file to use as the external master for Monitor, Tempo bridge, or Track align.</property>
   <signal name="clicked" handler="on_audio_sync_wav_browse_button_clicked" swapped="no"/>
 </object>
   <packing>
