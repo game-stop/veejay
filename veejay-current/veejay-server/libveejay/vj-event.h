@@ -363,6 +363,13 @@ void    vj_event_audio_beat_state(void *ptr, const char format[], va_list ap);
 void    vj_event_audio_beat_ui_config(void *ptr, const char format[], va_list ap);
 
 
+void    vj_event_audio_sync_status(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_sync_mode(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_sync_jack(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_sync_wav(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_sync_target(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_sync_correction(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_sync_print(void *ptr, const char format[], va_list ap);
 
 int     vj_event_push(void *ptr, int mod );
 int     vj_event_pop(void *ptr, int *mod_state);

@@ -55,6 +55,7 @@
 #ifdef HAVE_JACK
 #include <libveejay/vj-jack.h>
 #include <libveejay/vj-audio-beat.h>
+#include <libveejay/vj-audio-sync.h>
 #endif
 #include <libstream/vj-tag.h>
 #include <libstream/vj-vloopback.h>
@@ -458,6 +459,14 @@ struct {
     { VIMS_EDITLIST_LOAD },
     { VIMS_BUNDLE_FILE },
     { VIMS_BUNDLE_SAVE },
+
+    { VIMS_AUDIO_SYNC_STATUS },
+    { VIMS_AUDIO_SYNC_MODE },
+    { VIMS_AUDIO_SYNC_JACK },
+    { VIMS_AUDIO_SYNC_WAV },
+    { VIMS_AUDIO_SYNC_TARGET },
+    { VIMS_AUDIO_SYNC_CORRECTION },
+    { VIMS_AUDIO_SYNC_PRINT },
 
     { -1 }
 };
@@ -2431,8 +2440,6 @@ void    vj_event_format_xml_event( xmlNodePtr node, int event_id )
     
         put_xml_str( node, XML_CONFIG_KEY_EXTRA, m->bundle );
     }
-    /* Put all known VIMS so we can detect differences in runtime
-           some Events will not exist if SDL, Jack, DV, Video4Linux would be missing */
 
     put_xml_int( node, XML_CONFIG_KEY_VIMS, event_id );
         
@@ -2855,9 +2862,7 @@ void    vj_event_set_framerate( void *ptr, const char format[] , va_list ap )
         veejay_msg(VEEJAY_MSG_WARNING, "Limited new framerate to %2.2f ", new_fps );
     }
 
-    
     veejay_set_framerate( v, new_fps );
-    veejay_msg(VEEJAY_MSG_INFO, "Playback engine is now playing at %2.2f FPS", new_fps );
 }
 
 void    vj_event_sync_correction( void *ptr,const char format[], va_list ap )
@@ -4890,7 +4895,10 @@ static const char *vj_event_record_audio_source_name(int source)
             return "original";
 
         case VJ_RECORD_AUDIO_SOURCE_BEAT_JACK:
-            return "beat-jack";
+            return "external-jack";
+
+        case VJ_RECORD_AUDIO_SOURCE_SILENCE:
+            return "silence";
 
         default:
             return "unknown";
@@ -4916,8 +4924,8 @@ void vj_event_record_audio_source(void *ptr, const char format[], va_list ap)
 
     if(source < VJ_RECORD_AUDIO_SOURCE_AUTO)
         source = VJ_RECORD_AUDIO_SOURCE_AUTO;
-    else if(source > VJ_RECORD_AUDIO_SOURCE_BEAT_JACK)
-        source = VJ_RECORD_AUDIO_SOURCE_BEAT_JACK;
+    else if(source > VJ_RECORD_AUDIO_SOURCE_SILENCE)
+        source = VJ_RECORD_AUDIO_SOURCE_SILENCE;
 
     veejay_set_record_audio_source(v, source );    
 
@@ -8280,13 +8288,6 @@ static int vj_event_audio_beat_ready(veejay_t *v)
 
     settings = v->settings;
 
-    /*
-     * Do not test v->audio or v->audio_running here.
-     *
-     * v->audio == NO_AUDIO means playback is disabled. It does not mean
-     * JACK capture analysis is unavailable. The beat detector has its own
-     * thread and can open capture input after the user enables it.
-     */
     if(!atomic_load_int(&settings->audio_beat.initialized))
         vj_audio_beat_init(&settings->audio_beat, 2);
 
@@ -8300,6 +8301,38 @@ static int vj_event_audio_beat_ready(veejay_t *v)
 #ifdef HAVE_JACK
 static int vj_audio_beat_event_auto_mode_cache = VJ_AUDIO_BEAT_AUTO_PRIMARY_MOTION;
 static int vj_audio_beat_event_auto_amount_cache = 75;
+
+static const char *vj_event_audio_sync_mode_name(int mode)
+{
+    switch(mode) {
+        case VJ_AUDIO_SYNC_MODE_OFF:           return "off";
+        case VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL: return "live-external";
+        case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE:  return "tempo-bridge";
+        case VJ_AUDIO_SYNC_MODE_TRACK_ALIGN:   return "track-align";
+        case VJ_AUDIO_SYNC_MODE_MONITOR:       return "monitor";
+        default:                               return "unknown";
+    }
+}
+
+static const char *vj_event_audio_sync_source_name(int source)
+{
+    switch(source) {
+        case VJ_AUDIO_SYNC_SOURCE_NONE:     return "none";
+        case VJ_AUDIO_SYNC_SOURCE_JACK:     return "jack";
+        case VJ_AUDIO_SYNC_SOURCE_WAV_FILE: return "wav";
+        case VJ_AUDIO_SYNC_SOURCE_PUSH:     return "push";
+        default:                            return "unknown";
+    }
+}
+
+static int vj_event_audio_sync_clamp_mode(int mode)
+{
+    if(mode < VJ_AUDIO_SYNC_MODE_OFF)
+        return VJ_AUDIO_SYNC_MODE_OFF;
+    if(mode > VJ_AUDIO_SYNC_MODE_MONITOR)
+        return VJ_AUDIO_SYNC_MODE_MONITOR;
+    return mode;
+}
 
 static inline int vj_audio_beat_event_clampi(int v, int lo, int hi)
 {
@@ -8362,7 +8395,6 @@ static const char *vj_audio_beat_event_auto_mode_name(int mode)
     }
 }
 #endif
-
 void vj_event_audio_beat_toggle(void *ptr, const char format[], va_list ap)
 {
 #ifdef HAVE_JACK
@@ -8507,6 +8539,259 @@ void vj_event_audio_beat_enable(void *ptr, const char format[], va_list ap)
     (void)ap;
 #endif
 }
+
+
+void vj_event_audio_sync_status(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t*) ptr;
+    int args[1] = { 1 };
+    int rc;
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    rc = veejay_audio_sync_set_enabled(v, args[0] ? 1 : 0);
+    if(rc < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-SYNC] Unable to %s audio sync",
+                   args[0] ? "enable" : "disable");
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-SYNC] Audio sync %s",
+               args[0] ? "enabled" : "disabled");
+#else
+    (void)ptr; (void)format; (void)ap;
+#endif
+}
+
+void vj_event_audio_sync_mode(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t*) ptr;
+    int args[1] = { VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL };
+    int mode;
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+    mode = vj_event_audio_sync_clamp_mode(args[0]);
+
+    if(veejay_audio_sync_set_mode_control(v, mode) < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO-SYNC] Unable to set mode");
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-SYNC] Mode set to %s(%d)",
+               vj_event_audio_sync_mode_name(mode),
+               mode);
+#else
+    (void)ptr; (void)format; (void)ap;
+#endif
+}
+
+void vj_event_audio_sync_jack(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t*) ptr;
+    int args[2] = { VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL, 2 };
+    int mode;
+    int channels;
+    int rc;
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    mode = vj_event_audio_sync_clamp_mode(args[0]);
+    if(mode == VJ_AUDIO_SYNC_MODE_OFF)
+        mode = VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL;
+
+    channels = args[1];
+    if(channels < 1)
+        channels = 1;
+    else if(channels > 2)
+        channels = 2;
+
+    rc = veejay_audio_sync_set_external_jack(v, mode, channels);
+    if(rc < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-SYNC] Unable to enable JACK source");
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-SYNC] JACK source enabled, mode=%s(%d), channels=%d",
+               vj_event_audio_sync_mode_name(mode),
+               mode,
+               channels);
+#else
+    (void)ptr; (void)format; (void)ap;
+#endif
+}
+void vj_event_audio_sync_wav(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t*) ptr;
+    int args[2] = { VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE, 0 };
+    char path[4096];
+    int mode;
+    int loop;
+    int rc;
+
+    veejay_memset(path, 0, sizeof(path));
+    P_A(args, sizeof(args), path, sizeof(path), format, ap);
+
+    mode = vj_event_audio_sync_clamp_mode(args[0]);
+    if(mode == VJ_AUDIO_SYNC_MODE_OFF)
+        mode = VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE;
+
+    loop = args[1] ? 1 : 0;
+
+    if(path[0] == '\0') {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-SYNC][VIMS-WAV] missing WAV path");
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-SYNC][VIMS-WAV] request mode=%s(%d) loop=%d path='%s'",
+               vj_event_audio_sync_mode_name(mode),
+               mode,
+               loop,
+               path);
+
+    rc = veejay_audio_sync_set_external_wav(v, path, loop, mode);
+    if(rc < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-SYNC][VIMS-WAV] failed mode=%s(%d) loop=%d path='%s'",
+                   vj_event_audio_sync_mode_name(mode),
+                   mode,
+                   loop,
+                   path);
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-SYNC][VIMS-WAV] enabled mode=%s(%d) loop=%d path='%s'",
+               vj_event_audio_sync_mode_name(mode),
+               mode,
+               loop,
+               path);
+#else
+    (void)ptr; (void)format; (void)ap;
+#endif
+}
+
+void vj_event_audio_sync_target(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t*) ptr;
+    int args[3] = { 1200, 0, 100 };
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if(args[0] < 0) {
+        if(veejay_audio_sync_set_target_clock(v, -1, 0, 100) < 0) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "[AUDIO-SYNC] Unable to set current-clip target clock");
+            return;
+        }
+
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[AUDIO-SYNC] Target clock follows current clip/original media audio");
+        return;
+    }
+
+    if(args[0] < 250)
+        args[0] = 250;
+    else if(args[0] > 3000)
+        args[0] = 3000;
+
+    if(args[1] < 0) args[1] = 0;
+    else if(args[1] > 100) args[1] = 100;
+
+    if(args[2] < 0) args[2] = 0;
+    else if(args[2] > 100) args[2] = 100;
+
+    if(veejay_audio_sync_set_target_clock(v, args[0], args[1], args[2]) < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-SYNC] Unable to set target clock");
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-SYNC] Target clock bpm=%.1f phase=%d%% confidence=%d%%",
+               ((double)args[0]) * 0.1,
+               args[1],
+               args[2]);
+#else
+    (void)ptr; (void)format; (void)ap;
+#endif
+}
+
+void vj_event_audio_sync_correction(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t*) ptr;
+    int args[1] = { 4 };
+    int pct;
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    pct = veejay_audio_sync_set_bridge_correction(v, args[0]);
+    if(pct < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-SYNC] Unable to set bridge correction");
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-SYNC] Max bridge phase correction set to %d%%",
+               pct);
+#else
+    (void)ptr; (void)format; (void)ap;
+#endif
+}
+
+void vj_event_audio_sync_print(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t*) ptr;
+    vj_audio_sync_snapshot_t snap;
+
+    (void)format;
+    (void)ap;
+
+    if(!v || !v->settings || !vj_audio_sync_get_snapshot(&v->settings->audio_sync, &snap)) {
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[AUDIO-SYNC] unavailable");
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-SYNC] enabled=%d open=%d running=%d mode=%s(%d) source=%s(%d) rate=%d ch=%d level=%d%% source_bpm=%.1f source_phase=%d%% source_conf=%d%% target_bpm=%.1f target_phase=%d%% target_conf=%d%% ratio=%.4f correction=%.4f",
+               snap.enabled,
+               snap.open,
+               snap.running,
+               vj_event_audio_sync_mode_name(snap.mode),
+               snap.mode,
+               vj_event_audio_sync_source_name(snap.source),
+               snap.source,
+               snap.sample_rate,
+               snap.channels,
+               (int)(snap.level * 100.0f + 0.5f),
+               snap.bpm,
+               (int)(snap.beat_phase * 100.0f + 0.5f),
+               (int)(snap.confidence * 100.0f + 0.5f),
+               snap.target_bpm,
+               (int)(snap.target_phase * 100.0f + 0.5f),
+               (int)(snap.target_confidence * 100.0f + 0.5f),
+               snap.bridge_ratio,
+               snap.bridge_correction);
+#else
+    (void)ptr; (void)format; (void)ap;
+#endif
+}
+
 
 #ifdef HAVE_JACK
 
@@ -11308,14 +11593,7 @@ void    vj_event_vloopback_stop( void *ptr, const char format[], va_list ap )
     vj_vloopback_close( v->vloopback );
     v->vloopback = NULL;
 }
-/* 
- * Function that returns the options for a special sample (markers, looptype, speed ...) or
- * for a special stream ... 
- *
- * Needs two Parameters, first on: -1 last created sample, 0 == current playing sample, >=1 id of sample
- * second parameter is the playmode of this sample to decide if its a video sample or any kind of stream
- * (for this see comment on void vj_event_send_sample_info(..) 
- */ 
+ 
 void vj_event_send_sample_options   (   void *ptr,  const char format[],    va_list ap  )
 {
     veejay_t *v = (veejay_t*)ptr;
@@ -11341,7 +11619,6 @@ void vj_event_send_sample_options   (   void *ptr,  const char format[],    va_l
 
             if(sample_exists(id))
             {
-            /* For gathering sample-infos use the sample_info_t-structure that is defined in /libsample/sampleadm.h */
             sample_info *si = sample_get(id);
                 if (si)
                 {
@@ -11367,9 +11644,6 @@ void vj_event_send_sample_options   (   void *ptr,  const char format[],    va_l
     
         if(vj_tag_exists(id)) 
             {
-            /* For gathering further informations of the stream first decide which type of stream it is 
-               the types are definded in libstream/vj-tag.h and uses then the structure that is definded in 
-               libstream/vj-tag.h as well as some functions that are defined there */
                 vj_tag *si = vj_tag_get(id);
                 int stream_type = si->source_type;
                 snprintf(prefix,sizeof(prefix), "%02d", stream_type );
@@ -11383,9 +11657,6 @@ void vj_event_send_sample_options   (   void *ptr,  const char format[],    va_l
                     snprintf( options,sizeof(options),"%03d%03d%03d",col[0],col[1],col[2]);
                     failed = 0;
                 }
-            /* this part of returning v4l-properties is here implemented again ('cause there is
-             * actually a VIMS-command to get these values) to get all necessary stream-infos at 
-             * once so only ONE VIMS-command is needed */
                 else if (stream_type == VJ_TAG_TYPE_V4L)
                 {
                     vj_tag_get_v4l_properties(id,values);

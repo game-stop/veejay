@@ -26,6 +26,10 @@
 #include <veejaycore/vj-client.h>
 #include <veejaycore/yuvconv.h>
 #include <libstream/vj-yuv4mpeg.h>
+#ifdef HAVE_JACK
+
+#include <libveejay/vj-audio-sync.h>
+#endif
 #include <libel/lav_io.h>
 #include <libel/vj-el.h>
 
@@ -51,6 +55,15 @@ enum {
 
 #define AUDIO_MODE_SILENCE_FILL 0
 #define AUDIO_MODE_CONTENT 1
+
+/* Coherent recording audio source selection.
+ * AUTO follows the active audible external path when one is selected,
+ * otherwise it records the original media audio.
+ */
+#define VJ_RECORD_AUDIO_SOURCE_AUTO      0
+#define VJ_RECORD_AUDIO_SOURCE_ORIGINAL  1
+#define VJ_RECORD_AUDIO_SOURCE_BEAT_JACK 2
+#define VJ_RECORD_AUDIO_SOURCE_SILENCE   3
 
 //classic vars
 #define DUMMY_DEFAULT_WIDTH 352
@@ -156,7 +169,7 @@ typedef struct {
 } display_frame_t;
 
 
-typedef struct
+typedef struct vj_audio_beat_shared_t
 {
     volatile int initialized;
     volatile int stop_request;
@@ -211,7 +224,43 @@ typedef struct
     volatile long record_overruns;
     volatile long record_underruns;
 
+#ifdef HAVE_JACK
+    /*
+     * External capture/clock provider.
+     * Beat consumes this instead of owning JACK input directly.
+     * NULL keeps legacy direct-JACK capture alive during transition.
+     */
+    vj_audio_sync_shared_t *sync;
+#endif
+
 } vj_audio_beat_shared_t;
+
+typedef struct vj_audio_clock_osd_t {
+    volatile long long prod_loops;
+    volatile long long prod_anomalies;
+    volatile long long prod_write_zero;
+    volatile long long prod_write_short;
+    volatile long long prod_waits;
+    volatile long long prod_pending_drop_frames;
+    volatile long long prod_video_drop_frames;
+    volatile long long prod_queue_nulls;
+    volatile long long prod_slow_renders;
+    volatile long long last_predicted_ms;
+    volatile long long last_media_frame;
+
+    volatile int last_src;
+    volatile int last_sync;
+    volatile int last_speed;
+    volatile int last_sfd;
+    volatile int last_needed;
+    volatile int last_decoded;
+    volatile int last_written;
+    volatile int last_pending;
+    volatile int last_free_jack;
+    volatile int last_qdepth_ms;
+    volatile int last_sleep_ms;
+    volatile int last_elapsed_ms;
+} vj_audio_clock_osd_t;
 
 typedef struct {
 	pthread_attr_t playback_attr;
@@ -233,7 +282,10 @@ typedef struct {
 	pthread_t producer_thread;
 	pthread_t renderer_thread;
 	pthread_t audio_playback_thread;
+#ifdef HAVE_JACK
+	pthread_t audio_sync_thread;
 	pthread_t audio_beat_thread;
+#endif
 
 	display_frame_t display_frame;
 
@@ -242,18 +294,48 @@ typedef struct {
 	volatile int warmup_active;
 	int warmup_frames;
 	volatile int frames_available;
-
+#ifdef HAVE_JACK
+	vj_audio_sync_shared_t audio_sync;
+#endif
 	vj_audio_beat_shared_t audio_beat;
 
 	volatile int audio_mode;
 	volatile int state;
 	volatile double audio_master_s;
+	volatile double audio_queued_s;
 	volatile double audio_start_offset;
 	volatile double fps_epoch_s;
 	volatile long long fps_epoch_frame;
 	volatile int fps_generation;
 	volatile double runtime_playback_rate;
 	volatile long long anchor_frame;
+#ifdef HAVE_JACK
+	/* Track Align re-anchor bookkeeping.  When the user scratches, reverses,
+	 * pauses, or changes runtime FPS, the external JACK/master track keeps
+	 * moving forward.  On return to normal +1 playback we can estimate the
+	 * expected media frame linearly from the audio clock, then let waveform
+	 * align fine-tune it.  track_align_reacquire_seq lets performer-side wide
+	 * acquisition clear stale buckets without coupling libveejay to performer_t.
+	 */
+	volatile int track_align_reacquire_seq;
+	volatile int track_align_linear_active;
+	volatile long long track_align_linear_anchor_frame;
+	volatile double track_align_linear_anchor_audio_s;
+	volatile double track_align_linear_segment_audio_s;
+	volatile double track_align_linear_segment_fps;
+	volatile double track_align_linear_frame_accum;
+	volatile int track_align_linear_mode;
+	volatile int track_align_linear_id;
+	/* Track Align correction edge handling.
+	 * Current Track Align corrections use the normal AUDIO_EDGE_JUMP
+	 * crossfade/declick path for arbitrary corrected seeks. AUDIO_EDGE_RESET
+	 * stays reserved for real reset boundaries such as sample start/min-frame
+	 * handling. These fields are kept for ABI/source compatibility with earlier
+	 * experimental builds; playback no longer mutes on track_align_audio_guard.
+	 */
+	volatile int track_align_force_audio_edge_reset;
+	volatile long long track_align_audio_guard_until_ms;
+#endif
 	
 	volatile int audio_producer_mode;
 	volatile int first_audio_frame_ready;
@@ -363,6 +445,7 @@ typedef struct {
 	long long clock_overshoot;
 	double pause_cost_ns;
 	volatile int record_audio_source;
+	vj_audio_clock_osd_t audio_osd;
 } video_playback_setup;
 
 typedef struct {
@@ -439,7 +522,8 @@ typedef struct {
 #define VIDEO_OUT_Y4M 3
 #define VIDEO_OUT_NONE 4
 
-typedef struct {
+typedef struct veejay_t
+{
     int video_output_width;
     int video_output_height;
     int double_factor;

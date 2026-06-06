@@ -150,4 +150,12 @@ int veejay_audio_beat_push_config(veejay_t *info, int freeze_ms, int cooldown_ms
 int veejay_audio_beat_is_enabled(veejay_t *info);
 int veejay_audio_beat_get_status(veejay_t *info, int *enabled, int *open, long *hits, int *level_q15, int *transient_q8);
 
+int veejay_audio_sync_set_enabled(veejay_t *info, int enabled);
+int veejay_audio_sync_set_mode_control(veejay_t *info, int mode);
+int veejay_audio_sync_set_bridge_correction(veejay_t *info, int max_pct);
+
+int veejay_audio_sync_set_external_jack(veejay_t *info, int mode, int channels);
+int veejay_audio_sync_set_external_wav(veejay_t *info, const char *path, int loop, int mode);
+int veejay_audio_sync_set_target_clock(veejay_t *info, int bpm_x10, int phase_pct, int confidence_pct);
+
 #endif

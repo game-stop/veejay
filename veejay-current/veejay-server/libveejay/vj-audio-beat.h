@@ -20,10 +20,18 @@
 #define VJ_AUDIO_BEAT_H
 
 #include <config.h>
+#include <stdint.h>
 
 #ifdef HAVE_JACK
 
-#include <libveejay/vj-lib.h>
+/* Keep this public header independent from vj-lib.h and vj-audio-sync.h.
+ * Only pointer types are used here, so forward declarations are enough.
+ * The complete vj_audio_beat_shared_t and veejay_t definitions live in
+ * vj-lib.h; vj_audio_sync_shared_t lives in vj-audio-sync.h.
+ */
+typedef struct vj_audio_beat_shared_t vj_audio_beat_shared_t;
+typedef struct vj_audio_sync_shared_t vj_audio_sync_shared_t;
+typedef struct veejay_t veejay_t;
 
 typedef enum
 {
@@ -125,6 +133,7 @@ typedef int (*vj_audio_beat_get_fx_arg_func)(void *ctx, int chain_pos, int param
 typedef int (*vj_audio_beat_set_fx_arg_func)(void *ctx, int chain_pos, int param_nr, int value);
 
 void vj_audio_beat_init(vj_audio_beat_shared_t *s, int input_channels);
+void vj_audio_beat_bind_sync(vj_audio_beat_shared_t *s, vj_audio_sync_shared_t *sync);
 void vj_audio_beat_request_stop(vj_audio_beat_shared_t *s);
 void *vj_audio_beat_thread(void *arg);
 

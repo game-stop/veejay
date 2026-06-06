@@ -1155,7 +1155,7 @@ void		vj_init_vevo_events(void)
                 vj_event_record_audio_source,
                 1,
                 VIMS_REQUIRE_ALL_PARAMS,
-                "Audio source: 0=auto, 1=original source, 2=beat JACK input",
+                "Audio source: 0=auto, 1=original source, 2=JACK capture input, 3=silence",
                 VJ_RECORD_AUDIO_SOURCE_AUTO,
                 NULL );
 
@@ -2447,6 +2447,92 @@ void		vj_init_vevo_events(void)
 				"Auto-fx amount, 0-100",
 				75,
 				NULL );
+
+index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
+                "%d",
+                VIMS_AUDIO_SYNC_STATUS,
+                "Enable or disable external audio sync",
+                vj_event_audio_sync_status,
+                1,
+                VIMS_ALLOW_ANY,
+                "Enabled state, 0 or 1",
+                1,
+                NULL );
+
+    index_map_[VIMS_AUDIO_SYNC_MODE] = _new_event(
+                "%d",
+                VIMS_AUDIO_SYNC_MODE,
+                "Set external audio sync mode",
+                vj_event_audio_sync_mode,
+                1,
+                VIMS_ALLOW_ANY,
+                "Mode: 0=off,1=live external,2=tempo bridge,3=track align,4=monitor passthrough",
+                1,
+                NULL );
+
+    index_map_[VIMS_AUDIO_SYNC_JACK] = _new_event(
+                "%d %d",
+                VIMS_AUDIO_SYNC_JACK,
+                "Use JACK input as external audio sync source",
+                vj_event_audio_sync_jack,
+                2,
+                VIMS_ALLOW_ANY,
+                "Mode: 1=live external,2=tempo bridge,3=track align,4=monitor passthrough",
+                1,
+                "Input channel count",
+                2,
+                NULL );
+
+    index_map_[VIMS_AUDIO_SYNC_WAV] = _new_event(
+                "%d %d %s",
+                VIMS_AUDIO_SYNC_WAV,
+                "Use WAV file as external audio sync source",
+                vj_event_audio_sync_wav,
+                3,
+                VIMS_LONG_PARAMS,
+                "Mode: 1=live external,2=tempo bridge,3=track align,4=monitor passthrough",
+                2,
+                "Loop WAV source, 0 or 1",
+                0,
+                "Path to PCM WAV file",
+                NULL,
+                NULL );
+
+    index_map_[VIMS_AUDIO_SYNC_TARGET] = _new_event(
+                "%d %d %d",
+                VIMS_AUDIO_SYNC_TARGET,
+                "Set external audio sync target clock for tempo bridge",
+                vj_event_audio_sync_target,
+                3,
+                VIMS_ALLOW_ANY,
+                "Target BPM x10, e.g. 1280 = 128.0 BPM",
+                1200,
+                "Target beat phase percent, 0..100",
+                0,
+                "Target clock confidence percent, 0..100",
+                100,
+                NULL );
+
+    index_map_[VIMS_AUDIO_SYNC_CORRECTION] = _new_event(
+                "%d",
+                VIMS_AUDIO_SYNC_CORRECTION,
+                "Set tempo bridge phase correction limit",
+                vj_event_audio_sync_correction,
+                1,
+                VIMS_ALLOW_ANY,
+                "Maximum phase correction percent, 0..25",
+                4,
+                NULL );
+
+    index_map_[VIMS_AUDIO_SYNC_PRINT] = _new_event(
+                NULL,
+                VIMS_AUDIO_SYNC_PRINT,
+                "Print external audio sync state",
+                vj_event_audio_sync_print,
+                0,
+                VIMS_ALLOW_ANY,
+                NULL );
+
 
 	index_map_[VIMS_AUDIO_BEAT_STATE]		=	_new_event(
 				NULL,

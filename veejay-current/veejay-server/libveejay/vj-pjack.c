@@ -90,8 +90,15 @@ int vj_jack_initialize(void)
     _vj_jack_clear_open_state();
     return 0;
 }
-
-static int _vj_jack_start_ex(int *dri, int bytes_per_frame, long audio_rate, int audio_channels, int input_channels, int output_channels, unsigned long jack_port_flags, double SPVF)
+static int _vj_jack_start_ex(int *dri,
+                             int bytes_per_frame,
+                             long audio_rate,
+                             int audio_channels,
+                             int input_channels,
+                             int output_channels,
+                             unsigned long jack_port_flags,
+                             double SPVF,
+                             enum JACK_PORT_CONNECTION_MODE connect_mode)
 {
     int bpc = _vj_jack_bits_per_channel(bytes_per_frame, audio_channels);
     unsigned long rate = (unsigned long)audio_rate;
@@ -100,12 +107,30 @@ static int _vj_jack_start_ex(int *dri, int bytes_per_frame, long audio_rate, int
     if(bpc <= 0)
         return 0;
 
-    err = JACK_OpenEx(dri, bpc, &rate, (unsigned int)input_channels, (unsigned int)output_channels, NULL, 0, jack_port_flags, SPVF);
+    JACK_SetPortConnectionMode(connect_mode);
+
+    err = JACK_OpenEx(dri, bpc, &rate,
+                      (unsigned int)input_channels,
+                      (unsigned int)output_channels,
+                      NULL,
+                      0,
+                      jack_port_flags,
+                      SPVF);
+
     if(err == ERR_RATE_MISMATCH)
     {
         JACK_Close(*dri);
         rate = (unsigned long)audio_rate;
-        err = JACK_OpenEx(dri, bpc, &rate, (unsigned int)input_channels, (unsigned int)output_channels, NULL, 0, jack_port_flags, SPVF);
+
+        JACK_SetPortConnectionMode(connect_mode);
+
+        err = JACK_OpenEx(dri, bpc, &rate,
+                          (unsigned int)input_channels,
+                          (unsigned int)output_channels,
+                          NULL,
+                          0,
+                          jack_port_flags,
+                          SPVF);
     }
 
     if(err != ERR_SUCCESS)
@@ -127,6 +152,8 @@ int vj_jack_stop(void)
         _vj_jack_clear_open_state();
         return 1;
     }
+
+    JACK_SetInputPassthrough(driver, 0);
 
     if(JACK_GetState(driver) == PLAYING)
         JACK_SetState(driver, STOPPED);
@@ -155,7 +182,8 @@ static int _vj_jack_start(int *dri, int bytes_per_frame, long audio_rate, int au
         input_channels,
         audio_channels,
         0,
-        SPVF
+        SPVF,
+        CONNECT_OUTPUT
     );
 }
 
@@ -192,7 +220,8 @@ int vj_jack_init_input(editlist *el)
         2,
         0,
         0,
-        1.0 / (double)el->video_fps
+        1.0 / (double)el->video_fps,
+        CONNECT_NONE
     );
 }
 
@@ -212,7 +241,8 @@ int vj_jack_init_duplex(editlist *el)
         2,
         el->audio_chans,
         0,
-        1.0 / (double)el->video_fps
+        1.0 / (double)el->video_fps,
+        CONNECT_OUTPUT
     );
 }
 
@@ -231,7 +261,17 @@ int vj_jack_init_capture(int input_channels, unsigned int bits_per_channel, unsi
 
     bytes_per_frame = input_channels * ((int)bits_per_channel / 8);
 
-    return _vj_jack_start_ex(&driver, bytes_per_frame, 0, input_channels, input_channels, 0, jack_port_flags, 1.0 / 25.0);
+    return _vj_jack_start_ex(
+        &driver,
+        bytes_per_frame,
+        0,
+        input_channels,
+        input_channels,
+        0,
+        jack_port_flags,
+        1.0 / 25.0,
+        CONNECT_NONE
+    );
 }
 
 int vj_jack_update_buffer(uint8_t *buff, int bps, int num_channels, int buf_len)
@@ -533,6 +573,21 @@ double vj_jack_get_total_latency(void)
     if(!driver_open || driver_output_channels <= 0)
         return 0.0;
     return JACK_GetTotalLatency(driver);
+}
+
+void vj_jack_set_input_passthrough(int enabled)
+{
+    if(driver_open && driver >= 0) {
+        int on = enabled ? 1 : 0;
+        JACK_SetInputPassthrough(driver, on);
+    }
+}
+
+int vj_jack_get_input_passthrough(void)
+{
+    if(!driver_open || driver < 0)
+        return 0;
+    return JACK_GetInputPassthrough(driver);
 }
 
 int vj_jack_is_running(void)

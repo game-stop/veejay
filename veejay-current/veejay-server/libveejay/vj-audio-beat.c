@@ -37,6 +37,7 @@
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/vjmem.h>
 #include <libveejay/vj-jack.h>
+#include <libveejay/vj-audio-sync.h>
 #include "vj-audio-beat.h"
 
 extern int veejay_set_speed(veejay_t *v, int speed, int force_seek);
@@ -62,6 +63,10 @@ extern int veejay_set_speed(veejay_t *v, int speed, int force_seek);
 
 #ifndef VEEJAY_AUDIO_BEAT_AUTO_DEBUG_INTERVAL_MS
 #define VEEJAY_AUDIO_BEAT_AUTO_DEBUG_INTERVAL_MS 700L
+#endif
+
+#ifndef VEEJAY_AUDIO_BEAT_AUTO_SIG_CHECK_MS
+#define VEEJAY_AUDIO_BEAT_AUTO_SIG_CHECK_MS 250L
 #endif
 
 #ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
@@ -168,6 +173,89 @@ static int ab_classify_hit(double kick_score, double snare_score, double hat_sco
 }
 
 
+
+#ifndef VEEJAY_AUDIO_BEAT_USE_SAMPLE_LUTS
+#define VEEJAY_AUDIO_BEAT_USE_SAMPLE_LUTS 1
+#endif
+
+#if VEEJAY_AUDIO_BEAT_USE_SAMPLE_LUTS
+static int ab_analysis_luts_ready = 0;
+static float ab_s16_norm_lut[65536];
+static float ab_u8_norm_lut[256];
+
+static void ab_analysis_luts_init(void)
+{
+    if(ab_analysis_luts_ready)
+        return;
+
+    for(int i = 0; i < 65536; i++)
+    {
+        int v = i < 32768 ? i : i - 65536;
+        ab_s16_norm_lut[i] = (float)v * (1.0f / 32768.0f);
+    }
+
+    for(int i = 0; i < 256; i++)
+        ab_u8_norm_lut[i] = ((float)i - 128.0f) * (1.0f / 128.0f);
+
+    ab_analysis_luts_ready = 1;
+}
+
+static inline float ab_lut_s16(const uint8_t *p)
+{
+    return ab_s16_norm_lut[(uint16_t)p[0] | ((uint16_t)p[1] << 8)];
+}
+
+static inline float ab_lut_u8(const uint8_t *p)
+{
+    return ab_u8_norm_lut[p[0]];
+}
+#else
+static inline void ab_analysis_luts_init(void) { }
+static inline float ab_lut_s16(const uint8_t *p)
+{
+    int16_t v = (int16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
+    return (float)v * (1.0f / 32768.0f);
+}
+static inline float ab_lut_u8(const uint8_t *p)
+{
+    return ((float)p[0] - 128.0f) * (1.0f / 128.0f);
+}
+#endif
+
+static inline void ab_accum_mono_sample(
+    float mono,
+    float *last,
+    float low_a,
+    float mid_a,
+    float *low_lp,
+    float *mid_lp,
+    float *energy,
+    float *flux,
+    float *low_sum,
+    float *mid_sum,
+    float *high_sum)
+{
+    float a = mono < 0.0f ? -mono : mono;
+    float d = mono >= *last ? mono - *last : *last - mono;
+    float low;
+    float mid_band;
+    float high_band;
+
+    *low_lp += low_a * (mono - *low_lp);
+    *mid_lp += mid_a * (mono - *mid_lp);
+
+    low = *low_lp;
+    mid_band = *mid_lp - *low_lp;
+    high_band = mono - *mid_lp;
+
+    *low_sum += low * low;
+    *mid_sum += mid_band * mid_band;
+    *high_sum += high_band * high_band;
+    *energy += a * a;
+    *flux += d;
+    *last = mono;
+}
+
 typedef struct
 {
     int open;
@@ -216,6 +304,26 @@ typedef struct
     double last_hat_score;
     int last_hit_kind;
     int blocks_seen;
+
+    int filter_sample_rate;
+    float filter_low_alpha;
+    float filter_mid_alpha;
+
+    int pub_level_q15;
+    int pub_envelope_q15;
+    int pub_flux_q15;
+    int pub_band_low_q15;
+    int pub_band_mid_q15;
+    int pub_band_high_q15;
+    int pub_band_balance_q15;
+    int pub_kick_q15;
+    int pub_snare_q15;
+    int pub_hat_q15;
+    int pub_transient_norm_q15;
+    int pub_transient_q8;
+    int pub_bpm_q8;
+    int beat_toggle_state;
+    long pub_overruns;
 
 #ifdef VEEJAY_AUDIO_BEAT_DEBUG
     long last_debug_ms;
@@ -334,6 +442,8 @@ static float ab_auto_phrase_level = 0.0f;
 static long ab_auto_groove_last_ms = 0;
 static int ab_auto_groove_last_hit_seq = 0;
 static long ab_auto_last_apply_ms = 0;
+static long ab_auto_signature_last_check_ms = 0;
+static int ab_auto_signature_last_chain_len = -1;
 static long ab_auto_resume_guard_until_ms = 0;
 static int ab_auto_resume_guard_active = 0;
 static long ab_auto_debug_last_apply_ms = 0;
@@ -396,6 +506,32 @@ static inline void ab_store_i(volatile int *p, int v)
 static inline void ab_store_l(volatile long *p, long v)
 {
     atomic_store_long(p, v);
+}
+
+static inline void ab_publish_i_cached(volatile int *p, int *cache, int v)
+{
+    if(!cache || *cache != v)
+    {
+        if(cache)
+            *cache = v;
+        ab_store_i(p, v);
+    }
+}
+
+static inline void ab_publish_l_cached(volatile long *p, long *cache, long v)
+{
+    if(!cache || *cache != v)
+    {
+        if(cache)
+            *cache = v;
+        ab_store_l(p, v);
+    }
+}
+
+static inline int ab_publish_transient_q8(double onset_score)
+{
+    int v = (int)(onset_score * 256.0);
+    return v < 0 ? 0 : (v > 65535 ? 65535 : v);
 }
 
 static inline int ab_add_i(volatile int *p, int v)
@@ -499,22 +635,48 @@ static inline double ab_filter_alpha(double cutoff_hz, double sample_rate)
 {
     double a;
 
-    if(sample_rate <= 1.0)
-        sample_rate = 44100.0;
-
-    if(cutoff_hz < 1.0)
-        cutoff_hz = 1.0;
-    else if(cutoff_hz > sample_rate * 0.45)
-        cutoff_hz = sample_rate * 0.45;
+    sample_rate = sample_rate <= 1.0 ? 44100.0 : sample_rate;
+    cutoff_hz = cutoff_hz < 1.0 ? 1.0 : (cutoff_hz > sample_rate * 0.45 ? sample_rate * 0.45 : cutoff_hz);
 
     a = 1.0 - exp((-2.0 * M_PI * cutoff_hz) / sample_rate);
+    return a < 0.00001 ? 0.00001 : (a > 1.0 ? 1.0 : a);
+}
 
-    if(a < 0.00001)
-        a = 0.00001;
-    else if(a > 1.0)
-        a = 1.0;
+static inline void ab_prepare_analysis_filters(vj_audio_beat_thread_t *t)
+{
+    if(!t)
+        return;
 
-    return a;
+    if(t->filter_sample_rate == t->sample_rate &&
+       t->filter_low_alpha > 0.0f &&
+       t->filter_mid_alpha > 0.0f)
+        return;
+
+    t->filter_sample_rate = t->sample_rate;
+    t->filter_low_alpha = (float)ab_filter_alpha(160.0, (double)t->sample_rate);
+    t->filter_mid_alpha = (float)ab_filter_alpha(1800.0, (double)t->sample_rate);
+}
+
+static inline void ab_thread_publish_cache_reset(vj_audio_beat_thread_t *t)
+{
+    if(!t)
+        return;
+
+    t->pub_level_q15 = INT_MIN;
+    t->pub_envelope_q15 = INT_MIN;
+    t->pub_flux_q15 = INT_MIN;
+    t->pub_band_low_q15 = INT_MIN;
+    t->pub_band_mid_q15 = INT_MIN;
+    t->pub_band_high_q15 = INT_MIN;
+    t->pub_band_balance_q15 = INT_MIN;
+    t->pub_kick_q15 = INT_MIN;
+    t->pub_snare_q15 = INT_MIN;
+    t->pub_hat_q15 = INT_MIN;
+    t->pub_transient_norm_q15 = INT_MIN;
+    t->pub_transient_q8 = INT_MIN;
+    t->pub_bpm_q8 = INT_MIN;
+    t->beat_toggle_state = 0;
+    t->pub_overruns = LONG_MIN;
 }
 
 static inline long ab_clamp_l(long v, long lo, long hi)
@@ -635,6 +797,8 @@ void vj_audio_beat_init(vj_audio_beat_shared_t *s, int input_channels)
     ab_auto_groove_last_ms = 0;
     ab_auto_groove_last_hit_seq = 0;
     ab_auto_last_apply_ms = 0;
+    ab_auto_signature_last_check_ms = 0;
+    ab_auto_signature_last_chain_len = -1;
     ab_auto_resume_guard_until_ms = 0;
     ab_auto_resume_guard_active = 0;
     ab_auto_debug_last_apply_ms = 0;
@@ -659,6 +823,14 @@ void vj_audio_beat_init(vj_audio_beat_shared_t *s, int input_channels)
 
     ab_store_i(&s->initialized, 1);
     ab_log_config(s, "initialized defaults");
+}
+
+void vj_audio_beat_bind_sync(vj_audio_beat_shared_t *s, vj_audio_sync_shared_t *sync)
+{
+    if(!s)
+        return;
+
+    s->sync = sync;
 }
 
 void vj_audio_beat_request_stop(vj_audio_beat_shared_t *s)
@@ -706,6 +878,10 @@ static void ab_thread_reset(vj_audio_beat_thread_t *t)
     t->last_snare_score = 0.0;
     t->last_hat_score = 0.0;
     t->last_hit_kind = AB_HIT_NONE;
+    t->filter_sample_rate = 0;
+    t->filter_low_alpha = 0.0f;
+    t->filter_mid_alpha = 0.0f;
+    ab_thread_publish_cache_reset(t);
 
 #ifdef VEEJAY_AUDIO_BEAT_DEBUG
     t->last_debug_ms = 0;
@@ -796,6 +972,7 @@ static void ab_clear_detector_memory(vj_audio_beat_thread_t *t, long cooldown_an
     t->last_snare_score = 0.0;
     t->last_hat_score = 0.0;
     t->last_hit_kind = AB_HIT_NONE;
+    ab_thread_publish_cache_reset(t);
 #ifdef VEEJAY_AUDIO_BEAT_DEBUG
     t->dbg_energy = 0.0;
     t->dbg_flux = 0.0;
@@ -1073,6 +1250,17 @@ int vj_audio_beat_copy_record_audio(vj_audio_beat_shared_t *s,
     int out_frames;
     int read_pos;
     int consume_bytes;
+
+    if(s && s->sync) {
+        return vj_audio_sync_copy_record_audio(
+            s->sync,
+            dst,
+            dst_frames,
+            dst_frame_bytes,
+            dst_channels,
+            dst_sample_rate
+        );
+    }
 
     if(!s || !dst || dst_frames <= 0 || dst_frame_bytes <= 0 ||
        dst_channels <= 0 || dst_sample_rate <= 0)
@@ -1449,6 +1637,53 @@ static int ab_configure_from_jack(vj_audio_beat_shared_t *s, vj_audio_beat_threa
     return 1;
 }
 
+static int ab_configure_from_sync(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t)
+{
+    int ch = 0;
+    int bpf = 0;
+    int bits = 0;
+    int rate = 0;
+
+    if(!s || !t || !s->sync)
+        return 0;
+
+    if(!vj_audio_sync_get_format(s->sync, &ch, &bpf, &bits, &rate)) {
+        ab_store_i(&s->open, 0);
+        return 0;
+    }
+
+    if(ch <= 0 || bpf <= 0 || rate <= 0 || (bits != 8 && bits != 16)) {
+        ab_store_i(&s->open, 0);
+        return 0;
+    }
+
+    t->channels = ch;
+    t->bytes_per_frame = bpf;
+    t->bits_per_channel = bits;
+    t->sample_rate = rate;
+
+    if(!ab_thread_prepare_buffer(t)) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-BEAT] unable to allocate sync analysis buffer");
+        ab_store_i(&s->open, 0);
+        return 0;
+    }
+
+    ab_thread_reset(t);
+    t->open = 1;
+    t->last_reset_seq = ab_load_i(&s->reset_seq);
+
+    ab_store_i(&s->channels, ch);
+    ab_store_i(&s->bytes_per_frame, bpf);
+    ab_store_i(&s->bits_per_channel, bits);
+    ab_store_i(&s->sample_rate, rate);
+    ab_store_i(&s->open, 1);
+
+    vj_audio_sync_reset_beat_reader(s->sync);
+
+    return 1;
+}
+
 static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t, const uint8_t *data, int bytes)
 {
     int frames;
@@ -1517,100 +1752,113 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
     if(frames <= 0)
         return 0;
 
-    energy = 0.0;
-    flux = 0.0;
-    low_sum = 0.0;
-    mid_sum = 0.0;
-    high_sum = 0.0;
-    low_a = ab_filter_alpha(160.0, (double)t->sample_rate);
-    mid_a = ab_filter_alpha(1800.0, (double)t->sample_rate);
-    last = t->last_sample;
+    ab_analysis_luts_init();
+    ab_prepare_analysis_filters(t);
 
-    if(t->bits_per_channel == 16)
     {
-        const int sample_bytes = 2;
+        const int bpf = t->bytes_per_frame;
+        const int ch = t->channels;
+        const float inv_frames = 1.0f / (float)frames;
+        const float inv_ch = ch > 0 ? 1.0f / (float)ch : 1.0f;
+        const float low_af = t->filter_low_alpha;
+        const float mid_af = t->filter_mid_alpha;
+        const uint8_t *p = data;
+        float energy_f = 0.0f;
+        float flux_f = 0.0f;
+        float low_sum_f = 0.0f;
+        float mid_sum_f = 0.0f;
+        float high_sum_f = 0.0f;
+        float last_f = (float)t->last_sample;
+        float low_lp = (float)t->band_low_lp;
+        float mid_lp = (float)t->band_mid_lp;
 
-        for(int i = 0; i < frames; i++)
+        if(t->bits_per_channel == 16)
         {
-            const uint8_t *f = data + (i * t->bytes_per_frame);
-            double mono = 0.0;
-
-            for(int c = 0; c < t->channels; c++)
-                mono += ab_sample_s16(f + c * sample_bytes);
-
-            mono /= (double)t->channels;
-
+            if(ch == 2 && bpf >= 4)
             {
-                double a = ab_absd(mono);
-                double d = ab_absd(mono - last);
-                double low;
-                double mid_band;
-                double high_band;
+                for(int i = 0; i < frames; i++, p += bpf)
+                {
+                    float mono = (ab_lut_s16(p) + ab_lut_s16(p + 2)) * 0.5f;
+                    ab_accum_mono_sample(mono, &last_f, low_af, mid_af, &low_lp, &mid_lp,
+                                         &energy_f, &flux_f, &low_sum_f, &mid_sum_f, &high_sum_f);
+                }
+            }
+            else if(ch == 1 && bpf >= 2)
+            {
+                for(int i = 0; i < frames; i++, p += bpf)
+                {
+                    float mono = ab_lut_s16(p);
+                    ab_accum_mono_sample(mono, &last_f, low_af, mid_af, &low_lp, &mid_lp,
+                                         &energy_f, &flux_f, &low_sum_f, &mid_sum_f, &high_sum_f);
+                }
+            }
+            else
+            {
+                for(int i = 0; i < frames; i++, p += bpf)
+                {
+                    float mono = 0.0f;
 
-                t->band_low_lp += low_a * (mono - t->band_low_lp);
-                t->band_mid_lp += mid_a * (mono - t->band_mid_lp);
+                    for(int c = 0; c < ch; c++)
+                        mono += ab_lut_s16(p + (c * 2));
 
-                low = t->band_low_lp;
-                mid_band = t->band_mid_lp - t->band_low_lp;
-                high_band = mono - t->band_mid_lp;
-
-                low_sum += low * low;
-                mid_sum += mid_band * mid_band;
-                high_sum += high_band * high_band;
-
-                energy += a * a;
-                flux += d;
-                last = mono;
+                    mono *= inv_ch;
+                    ab_accum_mono_sample(mono, &last_f, low_af, mid_af, &low_lp, &mid_lp,
+                                         &energy_f, &flux_f, &low_sum_f, &mid_sum_f, &high_sum_f);
+                }
             }
         }
-    }
-    else
-    {
-        const int sample_bytes = 1;
-
-        for(int i = 0; i < frames; i++)
+        else
         {
-            const uint8_t *f = data + (i * t->bytes_per_frame);
-            double mono = 0.0;
-
-            for(int c = 0; c < t->channels; c++)
-                mono += ab_sample_u8(f + c * sample_bytes);
-
-            mono /= (double)t->channels;
-
+            if(ch == 2 && bpf >= 2)
             {
-                double a = ab_absd(mono);
-                double d = ab_absd(mono - last);
-                double low;
-                double mid_band;
-                double high_band;
+                for(int i = 0; i < frames; i++, p += bpf)
+                {
+                    float mono = (ab_lut_u8(p) + ab_lut_u8(p + 1)) * 0.5f;
+                    ab_accum_mono_sample(mono, &last_f, low_af, mid_af, &low_lp, &mid_lp,
+                                         &energy_f, &flux_f, &low_sum_f, &mid_sum_f, &high_sum_f);
+                }
+            }
+            else if(ch == 1 && bpf >= 1)
+            {
+                for(int i = 0; i < frames; i++, p += bpf)
+                {
+                    float mono = ab_lut_u8(p);
+                    ab_accum_mono_sample(mono, &last_f, low_af, mid_af, &low_lp, &mid_lp,
+                                         &energy_f, &flux_f, &low_sum_f, &mid_sum_f, &high_sum_f);
+                }
+            }
+            else
+            {
+                for(int i = 0; i < frames; i++, p += bpf)
+                {
+                    float mono = 0.0f;
 
-                t->band_low_lp += low_a * (mono - t->band_low_lp);
-                t->band_mid_lp += mid_a * (mono - t->band_mid_lp);
+                    for(int c = 0; c < ch; c++)
+                        mono += ab_lut_u8(p + c);
 
-                low = t->band_low_lp;
-                mid_band = t->band_mid_lp - t->band_low_lp;
-                high_band = mono - t->band_mid_lp;
-
-                low_sum += low * low;
-                mid_sum += mid_band * mid_band;
-                high_sum += high_band * high_band;
-
-                energy += a * a;
-                flux += d;
-                last = mono;
+                    mono *= inv_ch;
+                    ab_accum_mono_sample(mono, &last_f, low_af, mid_af, &low_lp, &mid_lp,
+                                         &energy_f, &flux_f, &low_sum_f, &mid_sum_f, &high_sum_f);
+                }
             }
         }
+
+        t->band_low_lp = (double)low_lp;
+        t->band_mid_lp = (double)mid_lp;
+        last = (double)last_f;
+        energy = (double)(energy_f * inv_frames);
+        flux = (double)(flux_f * inv_frames);
+        low_sum = (double)(low_sum_f * inv_frames);
+        mid_sum = (double)(mid_sum_f * inv_frames);
+        high_sum = (double)(high_sum_f * inv_frames);
+        low_a = (double)low_af;
+        mid_a = (double)mid_af;
+        (void)low_a;
+        (void)mid_a;
     }
 
     t->last_sample = last;
     t->blocks_seen++;
-
-    energy /= (double)frames;
-    flux /= (double)frames;
-    low_sum /= (double)frames;
-    mid_sum /= (double)frames;
-    high_sum /= (double)frames;
 
     t->band_low_env = t->band_low_env * 0.72 + sqrt(low_sum) * 0.28;
     t->band_mid_env = t->band_mid_env * 0.68 + sqrt(mid_sum) * 0.32;
@@ -1642,15 +1890,15 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
         t->slow_flux = flux;
         t->envelope = block_level;
 
-        ab_store_i(&s->level_q15, ab_q15(block_level));
-        ab_store_i(&s->envelope_q15, ab_q15(t->envelope));
-        ab_store_i(&s->flux_q15, 0);
-        ab_store_i(&ab_band_low_q15, ab_q15(bass_norm));
-        ab_store_i(&ab_band_mid_q15, ab_q15(mid_norm));
-        ab_store_i(&ab_band_high_q15, ab_q15(high_norm));
-        ab_store_i(&ab_band_balance_q15, ab_q15(band_balance));
-        ab_store_i(&s->transient_norm_q15, 0);
-        ab_store_i(&s->transient_q8, 0);
+        ab_publish_i_cached(&s->level_q15, &t->pub_level_q15, ab_q15(block_level));
+        ab_publish_i_cached(&s->envelope_q15, &t->pub_envelope_q15, ab_q15(t->envelope));
+        ab_publish_i_cached(&s->flux_q15, &t->pub_flux_q15, 0);
+        ab_publish_i_cached(&ab_band_low_q15, &t->pub_band_low_q15, ab_q15(bass_norm));
+        ab_publish_i_cached(&ab_band_mid_q15, &t->pub_band_mid_q15, ab_q15(mid_norm));
+        ab_publish_i_cached(&ab_band_high_q15, &t->pub_band_high_q15, ab_q15(high_norm));
+        ab_publish_i_cached(&ab_band_balance_q15, &t->pub_band_balance_q15, ab_q15(band_balance));
+        ab_publish_i_cached(&s->transient_norm_q15, &t->pub_transient_norm_q15, 0);
+        ab_publish_i_cached(&s->transient_q8, &t->pub_transient_q8, 0);
 
 #ifdef VEEJAY_AUDIO_BEAT_DEBUG
         t->debug_blocks++;
@@ -1887,26 +2135,21 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
         snare_onset = 0;
     }
 
-    ab_store_i(&s->level_q15, ab_q15(level));
-    ab_store_i(&s->envelope_q15, ab_q15(t->envelope));
-    ab_store_i(&s->flux_q15, ab_q15(flux_norm));
-    ab_store_i(&ab_band_low_q15, ab_q15(bass_norm));
-    ab_store_i(&ab_band_mid_q15, ab_q15(mid_norm));
-    ab_store_i(&ab_band_high_q15, ab_q15(high_norm));
-    ab_store_i(&ab_band_balance_q15, ab_q15(band_balance));
-    ab_store_i(&ab_kick_q15, ab_q15(kick_score));
-    ab_store_i(&ab_snare_q15, ab_q15(snare_score));
-    ab_store_i(&ab_hat_q15, ab_q15(hat_score));
+    ab_publish_i_cached(&s->level_q15, &t->pub_level_q15, ab_q15(level));
+    ab_publish_i_cached(&s->envelope_q15, &t->pub_envelope_q15, ab_q15(t->envelope));
+    ab_publish_i_cached(&s->flux_q15, &t->pub_flux_q15, ab_q15(flux_norm));
+    ab_publish_i_cached(&ab_band_low_q15, &t->pub_band_low_q15, ab_q15(bass_norm));
+    ab_publish_i_cached(&ab_band_mid_q15, &t->pub_band_mid_q15, ab_q15(mid_norm));
+    ab_publish_i_cached(&ab_band_high_q15, &t->pub_band_high_q15, ab_q15(high_norm));
+    ab_publish_i_cached(&ab_band_balance_q15, &t->pub_band_balance_q15, ab_q15(band_balance));
+    ab_publish_i_cached(&ab_kick_q15, &t->pub_kick_q15, ab_q15(kick_score));
+    ab_publish_i_cached(&ab_snare_q15, &t->pub_snare_q15, ab_q15(snare_score));
+    ab_publish_i_cached(&ab_hat_q15, &t->pub_hat_q15, ab_q15(hat_score));
 
-    transient_q8 = (int)(onset_score * 256.0);
+    transient_q8 = ab_publish_transient_q8(onset_score);
 
-    if(transient_q8 < 0)
-        transient_q8 = 0;
-    else if(transient_q8 > 65535)
-        transient_q8 = 65535;
-
-    ab_store_i(&s->transient_norm_q15, ab_q15(transient_norm));
-    ab_store_i(&s->transient_q8, transient_q8);
+    ab_publish_i_cached(&s->transient_norm_q15, &t->pub_transient_norm_q15, ab_q15(transient_norm));
+    ab_publish_i_cached(&s->transient_q8, &t->pub_transient_q8, transient_q8);
 
     hit_candidate = settled &&
                     first_hit_ready &&
@@ -2189,7 +2432,9 @@ static const char *ab_update_dynamic_bpm(vj_audio_beat_shared_t *s,
     else if(t->beat_period_ms > (double)VEEJAY_AUDIO_BEAT_MAX_PERIOD_MS)
         t->beat_period_ms = (double)VEEJAY_AUDIO_BEAT_MAX_PERIOD_MS;
 
-    ab_store_i(&s->bpm_q8, (int)((60000.0 / t->beat_period_ms) * 256.0 + 0.5));
+    ab_publish_i_cached(&s->bpm_q8,
+                        &t->pub_bpm_q8,
+                        (int)((60000.0 / t->beat_period_ms) * 256.0 + 0.5));
 
     return reason;
 }
@@ -2231,7 +2476,18 @@ void *vj_audio_beat_thread(void *arg)
 
         if(!t.open)
         {
-            if(!ab_configure_from_jack(s, &t))
+            if(s->sync)
+            {
+                if(!vj_audio_sync_is_enabled(s->sync))
+                    vj_audio_sync_enable(s->sync);
+
+                if(!ab_configure_from_sync(s, &t))
+                {
+                    ab_sleep_us(20000);
+                    continue;
+                }
+            }
+            else if(!ab_configure_from_jack(s, &t))
             {
                 ab_sleep_us(250000);
                 continue;
@@ -2250,9 +2506,17 @@ void *vj_audio_beat_thread(void *arg)
                 req_ch = 2;
 
             ab_thread_reset(&t);
-            ab_record_ring_clear(s);
+
+            if(!s->sync)
+                ab_record_ring_clear(s);
+
             ab_clear_published_control(s);
-            vj_jack_reset_input();
+
+            if(s->sync)
+                vj_audio_sync_reset_beat_reader(s->sync);
+
+            if(!s->sync)
+                vj_jack_reset_input();
 
             t.last_reset_seq = reset_seq;
             first_capture_logged = 0;
@@ -2268,6 +2532,40 @@ void *vj_audio_beat_thread(void *arg)
             }
         }
 
+        if(s->sync)
+        {
+            if(!vj_audio_sync_is_open(s->sync))
+            {
+                t.open = 0;
+                ab_store_i(&s->open, 0);
+                ab_sleep_us(10000);
+                continue;
+            }
+
+            got = vj_audio_sync_read_beat_audio(
+                s->sync,
+                t.buffer,
+                t.buffer_size
+            );
+
+            if(got <= 0)
+            {
+                ab_sleep_us(1000);
+                continue;
+            }
+
+            got -= got % t.bytes_per_frame;
+            if(got <= 0)
+                continue;
+
+            ab_add_l(&s->reads, 1);
+
+            hit = ab_analyse_block(s, &t, t.buffer, got);
+            now = ab_now_ms();
+
+            goto beat_process_hit;
+        }
+
         if(!vj_jack_is_running() || !vj_jack_has_input())
         {
             t.open = 0;
@@ -2278,7 +2576,7 @@ void *vj_audio_beat_thread(void *arg)
 
         now = ab_now_ms();
 
-        ab_store_l(&s->overruns, vj_jack_input_overruns());
+        ab_publish_l_cached(&s->overruns, &t.pub_overruns, vj_jack_input_overruns());
 
         stored = vj_jack_get_input_bytes_stored();
 
@@ -2338,15 +2636,14 @@ void *vj_audio_beat_thread(void *arg)
         ab_record_ring_publish(s, &t, t.buffer, got);
 
         if(!first_capture_logged)
-        {
             first_capture_logged = 1;
-        }
 
         ab_add_l(&s->reads, 1);
 
         hit = ab_analyse_block(s, &t, t.buffer, got);
         now = ab_now_ms();
 
+beat_process_hit:
         if(hit)
         {
             long cooldown = ab_effective_cooldown_ms(s, &t);
@@ -2361,7 +2658,6 @@ void *vj_audio_beat_thread(void *arg)
             {
                 long prev = t.last_hit_ms;
                 long interval = prev > 0 ? now - prev : 0;
-                int toggle;
                 int hit_kind = t.last_hit_kind;
                 double hit_confidence = t.last_kick_score;
 
@@ -2372,54 +2668,39 @@ void *vj_audio_beat_thread(void *arg)
                     hit_confidence = t.last_hat_score;
 
                 (void) ab_update_dynamic_bpm(s, &t, interval, hit_kind, hit_confidence);
-                
+
                 t.last_hit_ms = now;
                 t.last_accept_score = hit_confidence;
-                t.last_accept_level = ab_from_q15(ab_load_i(&s->level_q15));
+                t.last_accept_level = ab_from_q15(t.pub_level_q15 == INT_MIN ? 0 : t.pub_level_q15);
 
                 ab_store_l(&s->last_hit_ms, now);
                 ab_store_i(&ab_last_hit_kind, hit_kind);
                 ab_add_l(&s->hits, 1);
                 ab_add_i(&s->hit_seq, 1);
 
-                toggle = ab_load_i(&s->beat_toggle_q15);
-                ab_store_i(&s->beat_toggle_q15, toggle > 0 ? 0 : 32767);
-
-                /*veejay_msg(VEEJAY_MSG_INFO,
-                    "[AUDIO-BEAT] accepted hit kind=%s interval=%ldms cooldown=%ldms bpm=%.2f tempo=%s kick=%.2f snare=%.2f hat=%.2f action=%d enabled=%d open=%d running=%d",
-                    ab_hit_kind_name(hit_kind),
-                    interval,
-                    cooldown,
-                    (double)ab_load_i(&s->bpm_q8) / 256.0,
-                    tempo_reason ? tempo_reason : "-",
-                    t.last_kick_score,
-                    t.last_snare_score,
-                    t.last_hat_score,
-                    ab_load_i(&s->action_mode),
-                    ab_load_i(&s->enabled),
-                    ab_load_i(&s->open),
-                    ab_load_i(&s->running));*/
+                t.beat_toggle_state = t.beat_toggle_state > 0 ? 0 : 32767;
+                ab_store_i(&s->beat_toggle_q15, t.beat_toggle_state);
             }
         }
 
         /*
-         * If there is still backlog, yield deliberately.
-         * Detector latency may rise by ~1ms, but audio playback wins.
+         * If there is still legacy JACK backlog, yield deliberately.
+         * Sync-provider input owns its own read pacing.
          */
-        if(vj_jack_get_input_bytes_stored() > target_bytes)
+        if(!s->sync && vj_jack_get_input_bytes_stored() > target_bytes)
             ab_sleep_us(VEEJAY_AUDIO_BEAT_BACKLOG_YIELD_US);
     }
 
     if(t.buffer)
         free(t.buffer);
 
-    ab_record_ring_free(s);
+    if(!s->sync)
+        ab_record_ring_free(s);
 
     ab_store_i(&s->open, 0);
     ab_store_i(&s->running, 0);
 
-    
-    veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO-BEAT] analysis thread stopped");
+    veejay_msg(VEEJAY_MSG_DEBUG, "Beat analysis thread finished");
     return NULL;
 }
 
@@ -2430,6 +2711,35 @@ int vj_audio_beat_enable(vj_audio_beat_shared_t *s)
 
     if(!ab_load_i(&s->initialized))
         vj_audio_beat_init(s, 2);
+
+    if(s->sync) {
+        int mode = vj_audio_sync_get_mode(s->sync);
+        int channels = ab_load_i(&s->input_channels_request);
+        int source = s->sync->source;
+        int current_channels = s->sync->input_channels_request;
+
+        if(mode == VJ_AUDIO_SYNC_MODE_OFF)
+            vj_audio_sync_set_mode(s->sync,
+                                   VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL);
+
+        if(channels <= 0)
+            channels = 2;
+        else if(channels > 2)
+            channels = 2;
+
+        /*
+         * Do not let the beat detector steal monitor/tempo-bridge playback
+         * or repeatedly reset the same JACK source/ring.
+         */
+        if(source == VJ_AUDIO_SYNC_SOURCE_NONE ||
+           (source == VJ_AUDIO_SYNC_SOURCE_JACK && current_channels != channels))
+        {
+            vj_audio_sync_set_source_jack(s->sync, channels);
+        }
+
+        vj_audio_sync_enable(s->sync);
+        vj_audio_sync_reset_beat_reader(s->sync);
+    }
 
     ab_store_i(&s->consumed_seq, ab_load_i(&s->hit_seq));
     ab_add_i(&s->reset_seq, 1);
@@ -2697,6 +3007,24 @@ void vj_audio_beat_set_input_channels(vj_audio_beat_shared_t *s, int channels)
     if(old_channels != channels)
     {
         ab_store_i(&s->input_channels_request, channels);
+
+        if(s->sync) {
+            int src = s->sync->source;
+
+            /* Channel changes are a JACK-capture concern.  Do not turn
+             * original-media PUSH or explicit WAV analysis back into JACK.
+             */
+            if(src == VJ_AUDIO_SYNC_SOURCE_NONE ||
+               src == VJ_AUDIO_SYNC_SOURCE_JACK)
+            {
+                vj_audio_sync_set_source_jack(s->sync, channels);
+            }
+            else if(src == VJ_AUDIO_SYNC_SOURCE_PUSH)
+            {
+                vj_audio_sync_reset_beat_reader(s->sync);
+            }
+        }
+
         ab_add_i(&s->reset_seq, 1);
     }
 }
@@ -5238,25 +5566,82 @@ static float ab_auto_subdivision_pulse(const vj_audio_beat_snapshot_t *snap)
     return v;
 }
 
-static float ab_auto_signal_for_role(const vj_audio_beat_snapshot_t *snap, int role)
+typedef struct
 {
     float groove;
     float phrase;
     float musical;
     float subdiv;
+    float hit;
+    float trigger;
+    float drum;
+    float activity;
+} ab_auto_frame_signal_t;
+
+static void ab_auto_build_frame_signal(const vj_audio_beat_snapshot_t *snap,
+                                       float climax,
+                                       ab_auto_frame_signal_t *fs)
+{
+    if(!fs)
+        return;
+
+    memset(fs, 0, sizeof(*fs));
+
+    if(!snap)
+        return;
+
+    fs->groove = ab_auto_groove_level;
+    fs->phrase = ab_auto_phrase_level;
+    fs->musical = ab_auto_musical_pulse(snap);
+    fs->subdiv = ab_auto_subdivision_pulse(snap);
+
+    fs->trigger = snap->beat_gate > snap->beat_pulse ? snap->beat_gate : snap->beat_pulse;
+    fs->trigger = fs->trigger < 0.0f ? 0.0f : (fs->trigger > 1.0f ? 1.0f : fs->trigger);
+
+    fs->hit = fs->trigger;
+    fs->hit = (snap->transient * 0.92f) > fs->hit ? snap->transient * 0.92f : fs->hit;
+    fs->hit = (snap->flux * 0.64f) > fs->hit ? snap->flux * 0.64f : fs->hit;
+    fs->hit = fs->hit < 0.0f ? 0.0f : (fs->hit > 1.0f ? 1.0f : fs->hit);
+
+    fs->drum = fs->trigger * 0.42f +
+               snap->transient * 0.30f +
+               snap->flux * 0.24f +
+               snap->kick * 0.34f +
+               snap->snare * 0.26f +
+               snap->hat * 0.14f +
+               snap->envelope * 0.16f +
+               snap->level * 0.14f;
+
+    if(snap->bass > 0.72f)
+        fs->drum += 0.10f * (0.35f + snap->flux * 0.65f);
+    if(snap->mid > 0.72f)
+        fs->drum += 0.08f * (0.35f + snap->flux * 0.65f);
+    if(snap->high > 0.72f)
+        fs->drum += 0.08f * (0.35f + snap->flux * 0.65f);
+
+    fs->drum = fs->drum < 0.0f ? 0.0f : (fs->drum > 1.0f ? 1.0f : fs->drum);
+    fs->activity = ab_auto_activity_gate(snap);
+    (void)climax;
+}
+
+static float ab_auto_signal_for_role(const vj_audio_beat_snapshot_t *snap,
+                                     const ab_auto_frame_signal_t *fs,
+                                     int role)
+{
+    const float groove = fs ? fs->groove : 0.0f;
+    const float phrase = fs ? fs->phrase : 0.0f;
+    const float musical = fs ? fs->musical : 0.0f;
+    const float subdiv = fs ? fs->subdiv : 0.0f;
+    const float hit = fs ? fs->hit : 0.0f;
+    const float trigger = fs ? fs->trigger : 0.0f;
 
     if(!snap)
         return 0.0f;
 
-    groove = ab_auto_groove_level;
-    phrase = ab_auto_phrase_level;
-    musical = ab_auto_musical_pulse(snap);
-    subdiv = ab_auto_subdivision_pulse(snap);
-
     switch(role)
     {
         case VJ_AUDIO_BEAT_AUTO_ROLE_TRIGGER:
-            return ab_auto_trigger_signal(snap);
+            return trigger;
 
         case VJ_AUDIO_BEAT_AUTO_ROLE_AMOUNT:
             return ab_auto_mix3(snap->beat_pulse * 0.26f + musical * 0.16f + snap->kick * 0.18f,
@@ -5264,7 +5649,7 @@ static float ab_auto_signal_for_role(const vj_audio_beat_snapshot_t *snap, int r
                                 groove * 0.24f + phrase * 0.08f);
 
         case VJ_AUDIO_BEAT_AUTO_ROLE_SPEED:
-            return ab_auto_mix3(musical * 0.20f + subdiv * 0.12f + ab_auto_hit_signal(snap) * 0.22f,
+            return ab_auto_mix3(musical * 0.20f + subdiv * 0.12f + hit * 0.22f,
                                 snap->mid * 0.18f,
                                 snap->transient * 0.14f + groove * 0.14f);
 
@@ -5289,7 +5674,7 @@ static float ab_auto_signal_for_role(const vj_audio_beat_snapshot_t *snap, int r
                                 groove * 0.08f + musical * 0.05f);
 
         case VJ_AUDIO_BEAT_AUTO_ROLE_SPATIAL:
-            return ab_auto_mix3(snap->bass * 0.18f + snap->envelope * 0.16f + ab_auto_hit_signal(snap) * 0.20f,
+            return ab_auto_mix3(snap->bass * 0.18f + snap->envelope * 0.16f + hit * 0.20f,
                                 groove * 0.24f,
                                 musical * 0.12f + phrase * 0.08f);
 
@@ -5327,33 +5712,25 @@ static float ab_auto_signal_for_role(const vj_audio_beat_snapshot_t *snap, int r
 }
 
 
-static float ab_auto_signal_for_target(const vj_audio_beat_snapshot_t *snap, const ab_auto_target_t *t, float climax)
+static float ab_auto_signal_for_target(const vj_audio_beat_snapshot_t *snap,
+                                       const ab_auto_target_t *t,
+                                       float climax,
+                                       const ab_auto_frame_signal_t *fs)
 {
     float v;
-    float groove;
-    float phrase;
-    float musical;
-    float subdiv;
-    float hit;
-    float trigger_hit;
-    float drum;
+    const float groove = fs ? fs->groove : 0.0f;
+    const float phrase = fs ? fs->phrase : 0.0f;
+    const float musical = fs ? fs->musical : 0.0f;
+    const float subdiv = fs ? fs->subdiv : 0.0f;
+    const float hit = fs ? fs->hit : 0.0f;
+    const float trigger_hit = fs ? fs->trigger : 0.0f;
+    const float drum = fs ? fs->drum : 0.0f;
 
     if(!snap || !t)
         return 0.0f;
 
-    if(climax < 0.0f)
-        climax = 0.0f;
-    else if(climax > 1.0f)
-        climax = 1.0f;
-
-    groove = ab_auto_groove_level;
-    phrase = ab_auto_phrase_level;
-    musical = ab_auto_musical_pulse(snap);
-    subdiv = ab_auto_subdivision_pulse(snap);
-    hit = ab_auto_hit_signal(snap);
-    trigger_hit = ab_auto_trigger_signal(snap);
-    drum = ab_auto_drum_drive(snap);
-    v = ab_auto_signal_for_role(snap, t->role);
+    climax = climax < 0.0f ? 0.0f : (climax > 1.0f ? 1.0f : climax);
+    v = ab_auto_signal_for_role(snap, fs, t->role);
 
 #ifdef VJ_BEAT_F_REJECT
     if(t->has_hint)
@@ -5521,7 +5898,7 @@ static float ab_auto_signal_for_target(const vj_audio_beat_snapshot_t *snap, con
         if(snap->hit_seq <= 0)
             v = 0.0f;
 
-        activity = ab_auto_activity_gate(snap);
+        activity = fs ? fs->activity : ab_auto_activity_gate(snap);
         keep = ab_auto_low_activity_keep(t->role, groove, phrase, climax, activity, snap->beat_age_ms);
         gate = activity + keep;
 
@@ -5782,14 +6159,13 @@ static float ab_auto_role_signal_deadband(int role)
     }
 }
 
-static float ab_auto_slew_signal(ab_auto_target_t *t, float raw)
+static float ab_auto_slew_signal(ab_auto_target_t *t, float raw, long now)
 {
     float current;
     float alpha;
     float base_alpha;
     float diff;
     float dt;
-    long now;
 
     if(!t)
         return 0.0f;
@@ -5806,11 +6182,12 @@ static float ab_auto_slew_signal(ab_auto_target_t *t, float raw)
     {
         t->mod_initialized = 1;
         t->mod_value = raw;
-        t->last_slew_ms = ab_now_ms();
+        t->last_slew_ms = now;
         return raw;
     }
 
-    now = ab_now_ms();
+    if(now <= 0)
+        now = ab_now_ms();
 
     if(!t->mod_initialized)
     {
@@ -7085,6 +7462,8 @@ static void ab_auto_clear_runtime_state(int mark_dirty)
     ab_auto_groove_last_hit_seq = 0;
 
     ab_auto_last_apply_ms = 0;
+    ab_auto_signature_last_check_ms = 0;
+    ab_auto_signature_last_chain_len = -1;
     ab_auto_resume_guard_until_ms = 0;
     ab_auto_resume_guard_active = 0;
     ab_auto_debug_last_apply_ms = 0;
@@ -7159,8 +7538,13 @@ int vj_audio_beat_auto_apply_chain(
     int action;
     int mode;
     int amount;
+    int dirty;
+    int paused;
+    int need_dirty_store = 0;
     float climax;
     int sig;
+    long now;
+    ab_auto_frame_signal_t frame_sig;
     int changed = 0;
 #ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
     long auto_dbg_now = 0;
@@ -7170,6 +7554,8 @@ int vj_audio_beat_auto_apply_chain(
     if(!s || !ctx || !get_fx_id || !get_arg || !set_arg || chain_len <= 0)
         return 0;
 
+    now = ab_now_ms();
+
     if(!ab_load_i(&s->initialized))
         return 0;
 
@@ -7177,25 +7563,26 @@ int vj_audio_beat_auto_apply_chain(
         return ab_auto_release_and_clear(ctx, get_fx_id, get_arg, set_arg);
 
     action = ab_load_i(&s->action_mode);
+    paused = ab_load_i(&s->paused_by_beat);
 
     if(action != VJ_AUDIO_BEAT_ACTION_AUTO_FX &&
-    action != VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX)
+       action != VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX)
         return ab_auto_release_and_clear(ctx, get_fx_id, get_arg, set_arg);
 
     mode = ab_load_i(&ab_auto_mode);
 
     if(mode <= VJ_AUDIO_BEAT_AUTO_OFF)
         return ab_auto_release_and_clear(ctx, get_fx_id, get_arg, set_arg);
-        if(!vj_audio_beat_get_snapshot(s, &snap))
-            return 0;
+
+    if(!vj_audio_beat_get_snapshot(s, &snap))
+        return 0;
 
     {
         const int combined_freeze_auto =
             action == VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX;
 
-        if(ab_load_i(&s->paused_by_beat) && !combined_freeze_auto)
+        if(paused && !combined_freeze_auto)
         {
-            long now = ab_now_ms();
             int released = ab_auto_release_targets_to_base(ctx, get_fx_id, get_arg, set_arg);
 
             ab_auto_clear_macro_state_for_resume(&snap, now);
@@ -7203,7 +7590,6 @@ int vj_audio_beat_auto_apply_chain(
         }
 
         {
-            long now = ab_now_ms();
             long gap = ab_auto_last_apply_ms > 0 ? now - ab_auto_last_apply_ms : 0;
             long gap_threshold = ab_auto_pause_gap_threshold_ms();
 
@@ -7228,9 +7614,21 @@ int vj_audio_beat_auto_apply_chain(
         }
     }
 
-    sig = ab_auto_chain_signature(ctx, chain_len, get_fx_id);
+    dirty = ab_load_i(&ab_auto_dirty);
+    sig = ab_auto_signature;
 
-    if(sig != ab_auto_signature || ab_load_i(&ab_auto_dirty))
+    if(dirty ||
+       sig == 0 ||
+       ab_auto_signature_last_chain_len != chain_len ||
+       ab_auto_signature_last_check_ms == 0 ||
+       (now - ab_auto_signature_last_check_ms) >= VEEJAY_AUDIO_BEAT_AUTO_SIG_CHECK_MS)
+    {
+        sig = ab_auto_chain_signature(ctx, chain_len, get_fx_id);
+        ab_auto_signature_last_check_ms = now;
+        ab_auto_signature_last_chain_len = chain_len;
+    }
+
+    if(sig != ab_auto_signature || dirty)
     {
         int signature_changed = sig != ab_auto_signature;
 
@@ -7244,9 +7642,10 @@ int vj_audio_beat_auto_apply_chain(
     amount = ab_load_i(&ab_auto_amount);
     ab_auto_update_groove(&snap);
     climax = ab_auto_update_climax(&snap);
+    ab_auto_build_frame_signal(&snap, climax, &frame_sig);
 
 #ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-    auto_dbg_now = ab_now_ms();
+    auto_dbg_now = now;
     if(ab_auto_debug_last_apply_ms == 0 ||
        (auto_dbg_now - ab_auto_debug_last_apply_ms) >= VEEJAY_AUDIO_BEAT_AUTO_DEBUG_INTERVAL_MS)
     {
@@ -7268,7 +7667,7 @@ int vj_audio_beat_auto_apply_chain(
                     snap.kick,
                     snap.snare,
                     snap.hat,
-                    ab_auto_activity_gate(&snap),
+                    frame_sig.activity,
                     ab_auto_groove_level,
                     ab_auto_phrase_level,
                     climax,
@@ -7289,7 +7688,7 @@ int vj_audio_beat_auto_apply_chain(
 
         if(get_fx_id(ctx, t->chain_pos) != t->effect_id)
         {
-            ab_store_i(&ab_auto_dirty, 1);
+            need_dirty_store = 1;
             continue;
         }
 
@@ -7336,7 +7735,7 @@ int vj_audio_beat_auto_apply_chain(
                     {
                         changed++;
                         current = value;
-                        t->last_change_ms = ab_now_ms();
+                        t->last_change_ms = now;
                     }
                 }
             }
@@ -7346,11 +7745,11 @@ int vj_audio_beat_auto_apply_chain(
             continue;
         }
 
-        signal = ab_auto_signal_for_target(&snap, t, climax);
+        signal = ab_auto_signal_for_target(&snap, t, climax, &frame_sig);
 #ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
         {
             float role_signal = signal;
-            signal = ab_auto_slew_signal(t, signal);
+            signal = ab_auto_slew_signal(t, signal, now);
             value = ab_auto_compute_value(t, signal, amount, climax);
 
             if(auto_dbg_emit && (t->role == VJ_AUDIO_BEAT_AUTO_ROLE_GEOMETRY || t->has_hint))
@@ -7361,12 +7760,11 @@ int vj_audio_beat_auto_apply_chain(
                 if(span > 0)
                     pos = (float)(value - t->min_value) / (float)span;
 
-                float activity = ab_auto_activity_gate(&snap);
-                float keep = ab_auto_low_activity_keep(t->role, ab_auto_groove_level, ab_auto_phrase_level, climax, activity, snap.beat_age_ms);
+                float activity = frame_sig.activity;
+                float keep = ab_auto_low_activity_keep(t->role, frame_sig.groove, frame_sig.phrase, climax, activity, snap.beat_age_ms);
                 float gate_dbg = activity + keep;
 
-                if(gate_dbg > 1.0f)
-                    gate_dbg = 1.0f;
+                gate_dbg = gate_dbg > 1.0f ? 1.0f : gate_dbg;
 
                 AB_AUTO_DBG("target=%d chain=%d fx=%d param=%d role=%s hint=%s flags=0x%x base=%d current=%d value=%d pos=%.3f range=%d..%d soft=%d..%d role_signal=%.3f activity=%.3f keep=%.3f gate=%.3f slewed=%.3f expanded=%.3f climax=%.3f amount_pct=%d invert=%d hold=%dms calc_drive=%.3f depth=%.3f delta=%.2f cap=%d dir=%d floor=%d why=%s edge=%s",
                             i,
@@ -7405,7 +7803,7 @@ int vj_audio_beat_auto_apply_chain(
             }
         }
 #else
-        signal = ab_auto_slew_signal(t, signal);
+        signal = ab_auto_slew_signal(t, signal, now);
         value = ab_auto_compute_value(t, signal, amount, climax);
 #endif
 
@@ -7422,30 +7820,24 @@ int vj_audio_beat_auto_apply_chain(
             int written = 0;
             const char *skip_reason = "none";
 
-            if(t->hold_ms > 0 && t->last_change_ms > 0)
+            if(t->hold_ms > 0 &&
+               t->last_change_ms > 0 &&
+               (now - t->last_change_ms) < (long)t->hold_ms)
             {
-                long now_hold = ab_now_ms();
+                int cur_dist = ab_auto_absi(current - t->base_value);
+                int new_dist = ab_auto_absi(value - t->base_value);
+                int release_toward_base = new_dist < cur_dist;
+                int fresh_hit_override = snap.beat_age_ms >= 0 && snap.beat_age_ms <= 120L && frame_sig.activity >= 0.45f;
 
-                if((now_hold - t->last_change_ms) < (long)t->hold_ms)
-                {
-                    int cur_dist = ab_auto_absi(current - t->base_value);
-                    int new_dist = ab_auto_absi(value - t->base_value);
-                    float activity = ab_auto_activity_gate(&snap);
-                    int release_toward_base = new_dist < cur_dist;
-                    int fresh_hit_override = snap.beat_age_ms >= 0 && snap.beat_age_ms <= 120L && activity >= 0.45f;
+                hold_ok = 0;
 
-                    hold_ok = 0;
-
-                    if(release_toward_base && (activity < 0.18f || snap.beat_age_ms > 260L))
-                        hold_ok = 1;
-                    else if(fresh_hit_override && diff >= deadband)
-                        hold_ok = 1;
-                }
+                if(release_toward_base && (frame_sig.activity < 0.18f || snap.beat_age_ms > 260L))
+                    hold_ok = 1;
+                else if(fresh_hit_override && diff >= deadband)
+                    hold_ok = 1;
             }
 
-            deadband_ok = value == t->base_value ||
-                          current == t->base_value ||
-                          diff >= deadband;
+            deadband_ok = value == t->base_value || current == t->base_value || diff >= deadband;
             valid_value = vje_is_param_value_valid(t->effect_id, t->param_nr, value);
 
             if(hold_ok && deadband_ok && valid_value)
@@ -7465,7 +7857,7 @@ int vj_audio_beat_auto_apply_chain(
                                     ab_auto_calc_dbg.reason ? ab_auto_calc_dbg.reason : "?");
 #endif
                     current = value;
-                    t->last_change_ms = ab_now_ms();
+                    t->last_change_ms = now;
                     written = 1;
                 }
                 else
@@ -7509,6 +7901,9 @@ int vj_audio_beat_auto_apply_chain(
         t->last_value = current;
         t->active = signal > 0.002f ? 1 : 0;
     }
+
+    if(need_dirty_store)
+        ab_store_i(&ab_auto_dirty, 1);
 
     ab_auto_active = changed > 0 ? 1 : 0;
 
