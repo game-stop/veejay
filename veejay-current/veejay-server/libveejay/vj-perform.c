@@ -2377,20 +2377,21 @@ int vj_perform_init_audio(veejay_t * info, int AorB)
     veejay_msg(VEEJAY_MSG_DEBUG, "Jack was not enabled during build, no support for audio");
 #else
 
-    if(info->audio == NO_AUDIO) {
-        veejay_msg(VEEJAY_MSG_DEBUG, "Skipping Audio initialization");
-        return 1;
-    }
-
     performer_global_t *global = (performer_global_t*) info->performer;
     editlist *el = vj_perform_audio_editlist(info);
 
-    if(!vj_perform_audio_media_valid(el)) {
-        veejay_msg(VEEJAY_MSG_WARNING, "[AUDIO] Skipping media audio buffers: no valid embedded audio stream");
-        return 0;
+    if(!vj_perform_audio_params_valid(el)) {
+        if(!vj_perform_prepare_silence_audio_params(el)) {
+            veejay_msg(VEEJAY_MSG_WARNING, "[AUDIO] Unable to prepare silent audio runtime parameters");
+            return 0;
+        }
     }
 
     performer_t *p = (AorB ? global->A : global->B);
+
+    if(p && p->top_audio_buffer && p->audio_edge && p->audio_silence_)
+        return 1;
+
     double samples_per_frame = (double)el->audio_rate / (double)el->video_fps;
     const uint32_t sample_len = ceil(samples_per_frame) * el->audio_bps;
 
@@ -2656,6 +2657,9 @@ int vj_perform_audio_start(veejay_t * info)
         return 0;
 
 #ifdef HAVE_JACK
+    if(info->settings && atomic_load_int(&info->settings->audio_threads_disabled))
+        return 0;
+
     if(el->has_audio && !vj_perform_audio_params_valid(el)) {
         veejay_msg(VEEJAY_MSG_WARNING, "[AUDIO] Embedded audio stream has invalid parameters; audio playback disabled");
         return 0;
@@ -2728,7 +2732,7 @@ void vj_perform_audio_stop(veejay_t * info)
     if(!info)
         return;
 
-    if (info->audio == AUDIO_PLAY || (info->edit_list && info->edit_list->has_audio)) {
+    if (info->audio == AUDIO_PLAY) {
 #ifdef HAVE_JACK
         vj_jack_stop();
 #endif
@@ -6820,12 +6824,24 @@ static void vj_perform_feed_clip_target_clock(veejay_t *info,
     int cur_mode;
     int cur_id;
 
-    if(!info || !info->settings || !p || !el || !el->has_audio ||
+    if(!info || !info->settings || !p || !el ||
        target_frame < 0 || dst_frames <= 0 || frame_bytes <= 0)
         return;
 
     if(!vj_audio_sync_is_enabled(&info->settings->audio_sync))
         return;
+
+    if(!el->has_audio || !vj_perform_audio_params_valid(el)) {
+        if(vj_audio_sync_get_target_mode(&info->settings->audio_sync) ==
+           VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP)
+        {
+            vj_audio_sync_reset_target_clock(&info->settings->audio_sync);
+            p->clip_target_last_frame = -1;
+            p->clip_target_last_mode = -1;
+            p->clip_target_last_id = -1;
+        }
+        return;
+    }
 
     if(vj_audio_sync_get_target_mode(&info->settings->audio_sync) !=
        VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP)
@@ -7029,7 +7045,17 @@ int vj_perform_queue_audio_chunk_ext(
     if (el == NULL)
         el = info->current_edit_list;
 
-    if (el == NULL || el->audio_bps <= 0)
+    if (el == NULL)
+        return 0;
+
+#ifdef HAVE_JACK
+    if(!vj_perform_audio_params_valid(el)) {
+        if(!vj_perform_prepare_silence_audio_params(el))
+            return 0;
+    }
+#endif
+
+    if (el->audio_bps <= 0)
         return 0;
 
     const double rate = vj_perform_runtime_audio_rate(info, el);

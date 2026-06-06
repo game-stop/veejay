@@ -3055,7 +3055,10 @@ static int sync_configure_jack(vj_audio_sync_shared_t *s)
     else if(!vj_jack_has_input()) {
         long now = sync_now_ms();
 
-        if(!vj_jack_has_output()) {
+        if(vj_jack_init_capture(req_ch, 16, 0)) {
+            vj_jack_enable();
+        }
+        else if(!vj_jack_has_output()) {
             vj_jack_stop();
             vj_jack_initialize();
             if(!vj_jack_init_capture(req_ch, 16, 0)) {
@@ -3073,7 +3076,7 @@ static int sync_configure_jack(vj_audio_sync_shared_t *s)
             if(last_fail_ms == 0 || (now - last_fail_ms) >= 2000) {
                 last_fail_ms = now;
                 veejay_msg(VEEJAY_MSG_WARNING,
-                           "[AUDIO-SYNC] JACK is open for playback but has no capture ports; start JACK in duplex/capture mode");
+                           "[AUDIO-SYNC] JACK playback client has no capture ports and adding capture ports failed");
             }
             sync_store_i(&s->open, 0);
             return 0;

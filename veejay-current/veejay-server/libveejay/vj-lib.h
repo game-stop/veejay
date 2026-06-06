@@ -346,6 +346,7 @@ typedef struct {
 	volatile int audio_direction_changed;
 	volatile int audio_flush_request;
 	volatile int audio_mute;
+	volatile int audio_threads_disabled;
 	volatile int audio_last_stretched_samples;
 	volatile long long audio_wrap_offset;
 	int audio_needs_fade_in;

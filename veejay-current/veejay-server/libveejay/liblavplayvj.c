@@ -244,6 +244,7 @@ extern int vj_perform_audio_source_transition_guard_pending(void);
 extern int vj_perform_audio_source_transition_silence_pending(void);
 extern int vj_perform_audio_source_transition_fade_pending(void);
 extern int vj_perform_audio_source_transition_guard_seq_debug(void);
+static int veejay_audio_threads_disabled(video_playback_setup *settings);
 #endif
 
 static	veejay_t	*veejay_instance_ = NULL;
@@ -4560,11 +4561,7 @@ static inline int vj_audio_is_external_jack_monitor_source(
        source != VJ_AUDIO_SYNC_SOURCE_WAV_FILE)
         return 0;
 
-    if(source == VJ_AUDIO_SYNC_SOURCE_WAV_FILE)
-        return audio_source != VJ_RECORD_AUDIO_SOURCE_SILENCE;
-
-    return (audio_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK ||
-            audio_source == VJ_RECORD_AUDIO_SOURCE_AUTO);
+    return audio_source != VJ_RECORD_AUDIO_SOURCE_SILENCE;
 }
 
 static int vj_tempo_bridge_reverse_should_reanchor(
@@ -4593,9 +4590,6 @@ static int vj_tempo_bridge_reverse_should_reanchor(
         return 0;
 
     if(!vj_audio_sync_is_enabled(&settings->audio_sync))
-        return 0;
-
-    if(atomic_load_int(&settings->audio_mute))
         return 0;
 
     if(!vj_audio_is_external_jack_monitor_source(
@@ -4982,25 +4976,36 @@ void *veejay_audio_producer_thread(void *arg)
 {
     veejay_t *info = (veejay_t *)arg;
     video_playback_setup *settings = info->settings;
-    editlist *el = info->current_edit_list;
-    int audio_channels = 2;
+    editlist *el = info->current_edit_list ? info->current_edit_list : info->edit_list;
     int BPS = 4;
     int media_audio = 0;
+    int embedded_media_audio = 0;
 
-    if(el) {
-        if(el->audio_chans > 0 && el->audio_chans <= 2)
-            audio_channels = el->audio_chans;
-        if(el->audio_bps > 0)
-            BPS = el->audio_bps;
+#ifdef HAVE_JACK
+    const int playback_enabled =
+        (info->audio == AUDIO_PLAY) &&
+        !atomic_load_int(&settings->audio_threads_disabled);
+
+    if(playback_enabled) {
+        media_audio = vj_perform_init_audio(info,0) &&
+                      vj_perform_init_audio(info,1);
+        el = info->current_edit_list ? info->current_edit_list : info->edit_list;
     }
-
+#else
     media_audio = (el && el->has_audio &&
                    vj_perform_init_audio(info,0) &&
                    vj_perform_init_audio(info,1) &&
                    info->audio == AUDIO_PLAY);
+#endif
+
+    if(el) {
+        embedded_media_audio = (el->has_audio && el->audio_bps > 0);
+        if(el->audio_bps > 0)
+            BPS = el->audio_bps;
+    }
 
 #ifdef HAVE_JACK
-    int has_audio = (info->audio == AUDIO_PLAY);
+    int has_audio = playback_enabled && media_audio;
 #else
     int has_audio = media_audio;
 #endif
@@ -5157,7 +5162,6 @@ void *veejay_audio_producer_thread(void *arg)
                 master_before_s = played_before_s;
             }
             int audio_source_dbg = atomic_load_int(&settings->record_audio_source);
-            int audio_mute_dbg = atomic_load_int(&settings->audio_mute);
             int audio_sync_mode_dbg = atomic_load_int(&settings->audio_sync.mode);
             int audio_sync_enabled_dbg = vj_audio_sync_is_enabled(&settings->audio_sync);
             int external_tape_source_dbg = 0;
@@ -5169,29 +5173,19 @@ void *veejay_audio_producer_thread(void *arg)
                     runtime_rate,
                     sfd_dbg
                 );
-            int external_live_source_dbg =
-                audio_sync_mode_dbg != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE &&
-                vj_audio_is_external_jack_monitor_source(
-                    settings,
-                    audio_source_dbg,
-                    audio_sync_mode_dbg,
-                    audio_sync_enabled_dbg
-                ) &&
-                external_tape_neutral_dbg &&
-                !audio_mute_dbg;
             int external_monitor_audio =
                 vj_audio_is_external_jack_monitor_source(
                     settings,
                     audio_source_dbg,
                     audio_sync_mode_dbg,
                     audio_sync_enabled_dbg
-                ) &&
-                !audio_mute_dbg;
-            int external_direct_passthrough =
+                );
+            external_tape_source_dbg =
                 external_monitor_audio &&
-                external_live_source_dbg &&
-                atomic_load_int(&settings->audio_sync.source) == VJ_AUDIO_SYNC_SOURCE_JACK;
-
+                (audio_sync_mode_dbg == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
+                 !external_tape_neutral_dbg);
+            int external_live_source_dbg =
+                external_monitor_audio && !external_tape_source_dbg;
 				if(vj_jack_xrun_flag()) {
 			
 					atomic_add_fetch_old_int(&settings->xruns, 1);
@@ -5208,28 +5202,14 @@ void *veejay_audio_producer_thread(void *arg)
 				}
 
 			int tx_active = atomic_load_int(&settings->transition.active) && atomic_load_int(&settings->transition.global_state);
-			if(external_monitor_audio) {
-#ifdef HAVE_JACK
-                vj_jack_set_input_passthrough(external_direct_passthrough ? 1 : 0);
-#endif
-                if(external_direct_passthrough) {
-                    veejay_memset(audio_chunk, 0, (size_t)needed * (size_t)BPS);
-                    decoded = needed;
-                } else {
-				    decoded = vj_audio_sync_render_monitor_s16(&settings->audio_sync,
-                                                           audio_chunk,
-                                                           needed,
-                                                           BPS,
-                                                           audio_channels,
-                                                           CLIENT_RATE);
 
-                    if(decoded <= 0) {
-                        veejay_memset(audio_chunk, 0, (size_t)needed * (size_t)BPS);
-                        decoded = needed;
-                    }
-                }
+			if(has_audio && tx_active && embedded_media_audio && !external_monitor_audio) {
+				long long b_frame = vj_calc_next_subframe(info, settings->transition.next_id);
+				long long start = atomic_load_long_long(&settings->transition.start);
+				long long end = atomic_load_long_long(&settings->transition.end);
+				decoded = vj_perform_queue_audio_chunk_crossfade(info, needed, media_frame, b_frame, audio_chunk, settings->transition.next_id,start,end);
 			}
-			else if(media_audio && !tx_active) {
+			else if(has_audio) {
 				decoded = vj_perform_queue_audio_chunk_ext(info, needed, media_frame, 0, audio_chunk);
 				
 				if (decoded <= 0) { 
@@ -5249,12 +5229,6 @@ void *veejay_audio_producer_thread(void *arg)
                         decoded = needed;
                     }
 				}
-			}
-			else if(media_audio) {
-				long long b_frame = vj_calc_next_subframe(info, settings->transition.next_id);
-				long long start = atomic_load_long_long(&settings->transition.start);
-				long long end = atomic_load_long_long(&settings->transition.end);
-				decoded = vj_perform_queue_audio_chunk_crossfade(info, needed, media_frame, b_frame, audio_chunk, settings->transition.next_id,start,end);
 			}
             else {
 #ifdef HAVE_JACK
@@ -5778,6 +5752,15 @@ static void veejay_producer_thread_audio_startup(veejay_t *info)
 	has_audio = 0;
 #endif
 
+#ifdef HAVE_JACK
+    if(veejay_audio_threads_disabled(settings)) {
+        has_audio = 0;
+        info->audio = NO_AUDIO;
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO] JACK audio services disabled; using monotonic fallback");
+    }
+#endif
+
     if (has_audio) {
 #ifdef HAVE_JACK	    
         if (!vj_perform_audio_start(info)) {
@@ -5821,6 +5804,12 @@ static void veejay_audio_sync_thread_startup(veejay_t *info)
         return;
 
     settings = info->settings;
+
+    if(veejay_audio_threads_disabled(settings)) {
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[AUDIO-SYNC] External audio sync thread disabled by command line");
+        return;
+    }
 
     if(atomic_load_int(&settings->audio_sync.running))
         return;
@@ -5870,6 +5859,11 @@ static int veejay_audio_sync_mode_is_playback(int mode)
            mode == VJ_AUDIO_SYNC_MODE_MONITOR;
 }
 
+static int veejay_audio_threads_disabled(video_playback_setup *settings)
+{
+    return settings ? (atomic_load_int(&settings->audio_threads_disabled) ? 1 : 0) : 1;
+}
+
 static int veejay_audio_beat_provider_needed(video_playback_setup *settings)
 {
     if(!settings)
@@ -5883,7 +5877,7 @@ static int veejay_audio_external_provider_needed(video_playback_setup *settings)
 {
     int source;
 
-    if(!settings)
+    if(!settings || veejay_audio_threads_disabled(settings))
         return 0;
 
     if(veejay_audio_beat_provider_needed(settings))
@@ -5945,6 +5939,12 @@ int veejay_audio_sync_set_enabled(veejay_t *info, int enabled)
     settings = info->settings;
     enabled = enabled ? 1 : 0;
 
+    if(veejay_audio_threads_disabled(settings)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-SYNC] request ignored; audio service threads are disabled");
+        return -1;
+    }
+
     if(!atomic_load_int(&settings->audio_sync.initialized))
         vj_audio_sync_init(&settings->audio_sync, 2);
 
@@ -5984,6 +5984,12 @@ int veejay_audio_sync_set_mode_control(veejay_t *info, int mode)
 
     settings = info->settings;
 
+    if(veejay_audio_threads_disabled(settings)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-SYNC] mode request ignored; audio service threads are disabled");
+        return -1;
+    }
+
     if(!atomic_load_int(&settings->audio_sync.initialized))
         vj_audio_sync_init(&settings->audio_sync, 2);
 
@@ -6019,6 +6025,12 @@ int veejay_audio_sync_set_bridge_correction(veejay_t *info, int max_pct)
     if(!info || !info->settings)
         return -1;
 
+    if(veejay_audio_threads_disabled(info->settings)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-SYNC] bridge correction request ignored; audio service threads are disabled");
+        return -1;
+    }
+
     if(!atomic_load_int(&info->settings->audio_sync.initialized))
         vj_audio_sync_init(&info->settings->audio_sync, 2);
 
@@ -6040,6 +6052,12 @@ static void veejay_audio_beat_thread_startup(veejay_t *info)
         return;
 
     settings = info->settings;
+
+    if(veejay_audio_threads_disabled(settings)) {
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[AUDIO-BEAT] Audio beat detector thread disabled by command line");
+        return;
+    }
 
     if(atomic_load_int(&settings->audio_beat.running))
         return;
@@ -6159,6 +6177,9 @@ static void veejay_audio_beat_prepare_sync_source(veejay_t *info)
         return;
 
     settings = info->settings;
+
+    if(veejay_audio_threads_disabled(settings))
+        return;
 
     if(!atomic_load_int(&settings->audio_sync.initialized))
         vj_audio_sync_init(&settings->audio_sync, 2);
@@ -7561,33 +7582,7 @@ int veejay_toggle_audio(veejay_t * info, int audio)
 
     (void) audio;
 
-#ifdef HAVE_JACK
-    int external_audio = vj_audio_is_external_jack_monitor_source(
-        settings,
-        atomic_load_int(&settings->record_audio_source),
-        atomic_load_int(&settings->audio_sync.mode),
-        vj_audio_sync_is_enabled(&settings->audio_sync)
-    );
-#else
-    int external_audio = 0;
-#endif
-
-    int silent_output = (info->audio == AUDIO_PLAY &&
-                         el &&
-                         !el->has_audio &&
-                         el->audio_rate > 0 &&
-                         el->audio_chans > 0 &&
-                         el->audio_bps > 0);
-
-    if((!el || !(el->has_audio)) && !external_audio && !silent_output) {
-	veejay_msg(VEEJAY_MSG_WARNING,
-		    "Audio playback has not been enabled");
-	info->audio = NO_AUDIO;
-	return 0;
-    }
-
-    if(external_audio || silent_output)
-        info->audio = AUDIO_PLAY;
+    (void)el;
 
     old_mute = atomic_load_int(&settings->audio_mute) ? 1 : 0;
     new_mute = old_mute ? 0 : 1;
@@ -7668,6 +7663,12 @@ int veejay_audio_sync_set_external_jack(veejay_t *info, int mode, int channels)
         return -1;
 
     settings = info->settings;
+
+    if(veejay_audio_threads_disabled(settings)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-SYNC] external JACK request ignored; audio service threads are disabled");
+        return -1;
+    }
 
     veejay_audio_sync_thread_startup(info);
     vj_audio_sync_set_mode(&settings->audio_sync, mode);
@@ -7772,6 +7773,13 @@ int veejay_audio_sync_set_external_wav(veejay_t *info, const char *path, int loo
     }
 
     settings = info->settings;
+
+    if(veejay_audio_threads_disabled(settings)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-SYNC][WAV] request ignored; audio service threads are disabled");
+        return -1;
+    }
+
     limit_ms = loop ? 0 : veejay_audio_sync_wav_plain_limit_ms(info);
 
     veejay_msg(VEEJAY_MSG_INFO,
@@ -7824,6 +7832,12 @@ int veejay_audio_sync_set_target_clock(veejay_t *info, int bpm_x10, int phase_pc
 {
     if(!info || !info->settings)
         return -1;
+
+    if(veejay_audio_threads_disabled(info->settings)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-SYNC] target clock request ignored; audio service threads are disabled");
+        return -1;
+    }
 
     if(!atomic_load_int(&info->settings->audio_sync.initialized))
         vj_audio_sync_init(&info->settings->audio_sync, 2);
@@ -7910,14 +7924,15 @@ int veejay_set_record_audio_source(veejay_t *info, int source)
 
 #ifdef HAVE_JACK
     if(source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK) {
-        veejay_record_audio_source_ensure_external_jack(info);
-    } else if(source == VJ_RECORD_AUDIO_SOURCE_ORIGINAL ||
-              source == VJ_RECORD_AUDIO_SOURCE_SILENCE ||
-              source == VJ_RECORD_AUDIO_SOURCE_AUTO)
-    {
-        veejay_audio_sync_leave_external_playback(info);
-        vj_jack_set_input_passthrough(0);
+        if(veejay_audio_threads_disabled(settings))
+            veejay_msg(VEEJAY_MSG_WARNING,
+                       "[AUDIO-REC] JACK external source ignored; audio service threads are disabled");
+        else
+            veejay_record_audio_source_ensure_external_jack(info);
     }
+
+    if(source == VJ_RECORD_AUDIO_SOURCE_SILENCE)
+        vj_jack_set_input_passthrough(0);
 #endif
 
     vj_perform_record_audio_source_reset(info);

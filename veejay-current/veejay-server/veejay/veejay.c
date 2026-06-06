@@ -285,7 +285,11 @@ static void Usage(char *progname)
 	fprintf(stderr,
 	    	"  -a/--audio [01]\t\tEnable (1) or disable (0) audio (default 1)\n");
     fprintf(stderr,
-            "     --audio-muted\t\tStart audio engine active, but mute playback output\n");
+            "     --audio-muted\t\tStart audio services active, but mute all playback output\n");
+    fprintf(stderr,
+            "     --no-audio-threads\tDisable JACK capture/sync/beat service threads\n");
+    fprintf(stderr,
+            "     --audio-threads [01]\tEnable (1) or disable (0) JACK audio service threads\n");
     fprintf(stderr,
 			"     --pace-correction [ms]\tAudio pace correction offset in milliseconds\n");
 	fprintf(stderr,
@@ -398,6 +402,10 @@ static int set_option(const char *name, char *value)
 	info->audio = atoi(optarg);
     } else if (strcmp(name, "audio-muted") == 0) {
 	atomic_store_int(&info->settings->audio_mute, 1);
+    } else if (strcmp(name, "no-audio-threads") == 0) {
+	atomic_store_int(&info->settings->audio_threads_disabled, 1);
+    } else if (strcmp(name, "audio-threads") == 0) {
+	atomic_store_int(&info->settings->audio_threads_disabled, atoi(optarg) ? 0 : 1);
 	} else if (strcmp(name, "pace-correction") == 0 ) {
 	info->settings->pace_correction = atoi( optarg);
 		if( info->settings->pace_correction < 0 ) {
@@ -670,6 +678,8 @@ static int check_command_line_options(int argc, char *argv[])
 	{"preserve-pathnames", 0, 0, 0},	/* -P/--preserve-pathnames    */
 	{"audio", 1, 0, 0},	/* -a/--audio num       */
 	{"audio-muted", 0, 0, 0},
+	{"no-audio-threads", 0, 0, 0},
+	{"audio-threads", 1, 0, 0},
 	{"size", 1, 0, 0},	/* -S/--size            */
 	{"benchmark", 1, 0, 0}, /* --benchmark	 */
 /*#ifdef HAVE_XINERAMA
