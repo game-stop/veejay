@@ -667,29 +667,49 @@ static	int	memory_needed_for_port( void *port, const char *key )
 	return len;
 }
 
-static	char *	flatten_port( void *port, const char *key )
+static char *flatten_port(void *port, const char *key)
 {
-	int len = memory_needed_for_port( port, key );
-	if( len <= 0 )
-		return NULL;
-	
-	char *res = (char*) vj_malloc( len );
-	void *subport = NULL;
+    int len = memory_needed_for_port(port, key);
+    if (len <= 0)
+        return NULL;
 
-	int error = vevo_property_get( port , key, 0, &subport );
-	if( error != VEVO_NO_ERROR )
-		return 0;
-	
-	memset(res,0,len);
-	char **items = vevo_sprintf_port( subport );
-	int k   = 0;
-	for( k = 0; items[k] != NULL; k ++ )
-	{
-		strncat(res, items[k],strlen(items[k]));
-		free(items[k]);
-	}
-	free(items);
-	return res;
+    void *subport = NULL;
+    int error = vevo_property_get(port, key, 0, &subport);
+    if (error != VEVO_NO_ERROR)
+        return NULL;
+
+    char *res = (char *) vj_malloc(len);
+    if (!res)
+        return NULL;
+
+    memset(res, 0, len);
+
+    char **items = vevo_sprintf_port(subport);
+    if (!items)
+        return res;
+
+    char *dst = res;
+    size_t remaining = (size_t) len;
+
+    for (int k = 0; items[k] != NULL; k++) {
+        size_t n = strlen(items[k]);
+
+        if (remaining > 1) {
+            size_t copy = n;
+            if (copy >= remaining)
+                copy = remaining - 1;
+
+            memcpy(dst, items[k], copy);
+            dst += copy;
+            remaining -= copy;
+            *dst = '\0';
+        }
+
+        free(items[k]);
+    }
+
+    free(items);
+    return res;
 }
 
 char	*plug_describe( int fx_id )
