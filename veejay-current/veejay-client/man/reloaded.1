@@ -1,0 +1,329 @@
+.TH GVEEJAY-RELOADED 1 "June 2026" "Veejay" "User Commands"
+.SH NAME
+Gveejay Reloaded \- graphical live-performance interface for Veejay
+.SH SYNOPSIS
+.B gveejay-reloaded
+.RI [ OPTIONS ]
+.br
+.B reloaded
+.RI [ OPTIONS ]
+.br
+.B gveejay
+.RI [ OPTIONS ]
+.SH DESCRIPTION
+.B Gveejay Reloaded
+is the GTK3 graphical interface for Veejay.  It is a client for a running
+Veejay server and can connect to, control, and disconnect from that server
+while Veejay continues to run.
+.PP
+Reloaded is intended for live video performance, sample-bank operation,
+stream control, effect-chain editing, MIDI learning, VIMS messaging, preview
+management, recording, audio beat detection, and external audio synchronisation.
+.PP
+The interface is status-driven.  Many controls are refreshed from backend status
+messages.  When a button or slider appears to return to a backend value, the
+backend state is normally authoritative.
+.SH OPTIONS
+.TP
+.BR -a , " --auto-connect"
+Auto-connect to locally running Veejay instances.
+.TP
+.BR -b , " --beta"
+Enable beta UI features.
+.TP
+.BR -g , " --geometry " \fIX,Y\fR
+Place the main window at screen position \fIX,Y\fR.
+.TP
+.BR -h , " --host " \fIHOST\fR
+Connect to the given Veejay host.  The default host is localhost.
+.TP
+.BR -L , " --lowband"
+Use a low-bandwidth mode.  This disables image loading in the sample bank.
+.TP
+.BR -m , " --midi " \fIFILE\fR
+Load a MIDI configuration file.
+.TP
+.BR -n , " --no-color"
+Disable coloured text in console logs.
+.TP
+.BR -p , " --port " \fIPORT\fR
+Connect to the given Veejay port.  The default is the compiled default port,
+typically 3490.
+.TP
+.BR -P , " --preview " \fIN\fR
+Start with preview enabled.  Accepted values are 1 for full size, 2 for half
+size, 3 for quarter size, and 4 for one eighth size.
+.TP
+.BR -s , " --size " \fICxR\fR
+Set the sample-bank grid resolution as columns by rows.
+.TP
+.BR -v , " --verbose"
+Enable more verbose logging.
+.TP
+.BR -V , " --version"
+Print the program version, linked libveejaycore version, and data directory,
+then exit.
+.TP
+.BR -X , " --tracks " \fIN\fR
+Set the number of multitrack tracks.
+.TP
+.BR -t , " --theme " \fIFILE\fR
+Load a CSS stylesheet.  Use \fBsystem\fR to use the system default theme.
+.TP
+.BR -S , " --small-as-possible"
+Create the smallest possible UI layout.
+.TP
+.BR -f , " --faster-ui"
+Hide unused FX parameter sliders instead of disabling them.  This reduces GTK
+CPU usage on GTK 3.22.30 and newer builds.
+.SH USER INTERFACE OVERVIEW
+The main window is arranged around a live preview, transport controls, a
+sample bank, effect controls, status indicators, and several notebook panels.
+The exact panel visibility depends on the current play mode, selected sample or
+stream, backend status, and compile-time features.
+.PP
+The top-level menus expose file loading and saving, sample actions, stream
+creation, MIDI learning, preferences, video settings, image calibration, VIMS
+bundles, help, bug reporting, and application exit.
+.SH TRANSPORT AND TIMELINE
+The transport controls provide forward playback, backward playback, stop,
+previous and next frame, previous and next second, and jump-to-start or
+jump-to-end actions.
+.PP
+The timeline and marker area are mouse driven:
+.TP
+.B Left mouse button
+Set or drag the in point.
+.TP
+.B Right mouse button
+Set or drag the out point.
+.TP
+.B Middle mouse button
+Toggle or drag the current selection.
+.TP
+.B Double click
+Clear the current selection.
+.TP
+.B Mouse wheel
+Move the playhead by about 13 frames.
+.TP
+.B Ctrl + mouse wheel
+Move the playhead by about one second.
+.TP
+.B Shift + mouse wheel
+Move the playhead by about two seconds.
+.PP
+The speed slider controls playback speed.  The slow-motion slider divides the
+current frame rate by the selected multiplier.  Ctrl-clicking these sliders
+resets them to neutral.
+.SH SAMPLE BANK
+The sample bank provides quick access to sample slots.  Slots can be selected,
+played, and populated from selected samples.
+.TP
+.B Left or right click
+Play a slot.
+.TP
+.B Shift + left click
+Place the currently selected sample into a slot.
+.TP
+.B Double click
+Play the sample in the slot.
+.TP
+.B Shift + left click on a populated slot
+Set the slot as the current mixing channel.
+.PP
+The active bank selector changes the visible sample-bank page.  The bank can be
+run in repeat mode.  In low-bandwidth mode, sample images are not loaded.
+.SH SAMPLE AND STREAM PANELS
+The sample panel shows sample title, start and end positions, playback speed,
+slow-motion multiplier, transitions, transition shape, transition length, loop
+stop, stream buffering links, and offline recording length.
+.PP
+The stream panel shows stream timecode, duration, codec information, recording
+options, transition settings, camera controls, video-device controls, solid
+stream controls, generator parameters, and stream recording progress when the
+selected source supports those controls.
+.PP
+Live capture controls include brightness, contrast, hue, saturation, gamma,
+gain, RGB balance, automatic white balance, sharpness, backlight compensation,
+automatic gain, automatic hue, temperature, flips, exposure, black level, and
+whiteness.  Unsupported camera controls may be hidden or insensitive.
+.SH EFFECTS AND FX CHAIN
+The FX panel lists available effects and exposes the current chain.  Effects
+are grouped into mixing effects, image effects, alpha effects, video effects,
+and related categories.
+.TP
+.B Double click an effect
+Add the effect to the current chain entry.
+.TP
+.B Shift + double click
+Add the effect disabled.
+.TP
+.B Ctrl + double click
+Add the effect to the selected sample.
+.TP
+.B Effect filter entry
+Filter the effects list by text.
+.PP
+Each selected effect exposes up to sixteen parameters, named p0 through p15
+unless the effect supplies more specific names.  Parameter sliders, increment
+and decrement controls, RGB key controls, opacity controls, and mixing-source
+controls are updated from the selected chain entry.
+.PP
+The FX chain panel can enable or disable effect-chain processing for the
+current sample or stream.  Global chain controls, chain copy, and chain level
+controls apply to shared chain operations.
+.SH FX ANIMATION
+The FX animation panel edits parameter animation curves.  It provides start and
+end positions, curve type selection, linear, spline, and freehand modes, and
+predefined animation shapes.  The curve preview is disposable until stored; the
+backend value remains authoritative once the curve is committed.
+.PP
+The selected FX parameter combo chooses the animated parameter.  The animation
+list shows stored animation entries.  Bound-min and bound-max controls restrict
+the animation range.
+.SH AUDIO BEAT DETECTOR
+The Audio Beat Detector analyses JACK input and can drive visual actions.  It
+can remain available even when normal audio playback is disabled.
+.TP
+.B Enable beat detector
+Start or stop beat analysis.
+.TP
+.B Action
+Choose what happens on accepted beat hits: none, freeze, Auto FX modulation, or
+freeze plus Auto FX.
+.TP
+.B Input channels
+Set the number of JACK input channels analysed.
+.TP
+.B Threshold
+Set beat sensitivity.  Lower values trigger more easily; higher values require
+stronger transients.
+.TP
+.B Cooldown
+Set the minimum time between accepted beat hits.
+.TP
+.B Freeze
+Set how long playback is frozen when a freeze action is active.
+.TP
+.B Pulse
+Set the duration of the short one-shot beat pulse used for visual reactions.
+.TP
+.B Gate
+Set the duration of the held beat gate used for longer visual reactions.
+.TP
+.B Refresh
+Request a fresh Audio Beat status print from the backend.  This refreshes
+analysis state reporting but does not rebuild Auto FX mapping.
+.TP
+.B Reset Auto FX
+Forget the current automatic FX mapping.  The next beat or update rebuilds the
+Auto FX target set from the current effect chain.
+.PP
+Live beat values show level, envelope, transient, flux, bass, mid, high, gate,
+pulse, estimated BPM, accepted hit count, age since last accepted hit, sample
+rate, and monotonic hit sequence.
+.SH AUTO FX
+Auto FX maps the current chain using beat hints.  The automatic mode determines
+how aggressively parameter roles are selected.  Higher modes use more motion,
+memory, and chaos-oriented roles.  The automatic amount controls the global
+intensity of beat-driven modulation.
+.SH AUDIO SYNC
+The Audio panel controls the master audio source and external synchronisation.
+The master source can be original video audio, JACK input, WAV file, or silence.
+.PP
+Audio sync modes include:
+.TP
+.B Off
+Disable external audio synchronisation and return to the last non-external
+master source.
+.TP
+.B Monitor
+Use the external source as the audible timing reference without tempo-bridge
+correction.
+.TP
+.B Tempo bridge
+Lock playback timing to a target tempo and phase.  Controls include target BPM,
+phase, confidence, and maximum correction.
+.TP
+.B Track align
+Use waveform correlation to align the selected clip or video against the
+external master track.
+.PP
+The source selector chooses JACK or WAV as the external provider.  WAV mode
+uses the configured path and optional looping.  The status area shows enabled,
+open, running, mode, source, channel count, sample rate, BPM, confidence,
+bridge activity, ratio, correction, target BPM, target confidence, maximum
+correction, bridge state, track lock, track offset, track confidence, track
+correction, and track state.
+.SH RECORDING
+Recording controls choose the audio source for disk recording, including
+automatic, original audio, JACK input, or silence where available.  The record
+to disk panel exposes recording progress and related output options.
+.SH MEDIA AND STREAM CREATION
+The Media panel lists Veejay's working directory.  Double-clicking a row adds
+it as a sample.
+.PP
+The stream menu and input-stream dialog can create or open live input streams,
+YUV4MPEG streams, FFmpeg/AVFormat streams, solid streams, generators, and
+remote Veejay-to-Veejay network sources.  The generator dialog exposes the
+available generator list and generator parameters.
+.SH VIDEO SETTINGS
+The Video Settings dialog contains screenshot dimensions, preview scaling,
+primary SDL video-window options, fullscreen settings, aspect-ratio controls,
+window offsets, and video loopback settings.
+.SH IMAGE CALIBRATION
+The Image Calibration dialog captures dark, light, and flat frames for live
+stream calibration.  It can run calibration globally or per stream and provides
+reset, capture, and save controls.  Calibration requires a selected live stream.
+.SH VIMS MESSENGER AND BUNDLES
+The VIMS messenger sends VIMS commands directly to the backend.  Bundle editing
+allows stored VIMS command groups to be edited and reused.  The VIMS scheduler
+can fire messages at selected frame, duplicate-frame, or loop positions.
+.SH MIDI
+The MIDI menu enables MIDI learning, toggles MIDI support, clears the MIDI
+layout, saves the MIDI layout, and loads an existing MIDI layout.  Many UI
+controls register their corresponding VIMS command when MIDI learning is active.
+.SH STATUS BAR AND FEEDBACK
+Reloaded reports user-visible actions through the status bar and console logs.
+Refresh, reset, screenshot, background-mask, audio-sync, and beat-detector
+actions should report that the click landed.  If the UI appears unchanged after
+an action, check the status bar and backend log first.
+.SH FILES
+.TP
+.I gveejay.reloaded.glade
+GTK3 Glade UI definition loaded at startup.
+.TP
+.I gveejay.reloaded.css
+Default Reloaded stylesheet.
+.TP
+.I MIDI layout files
+User-saved MIDI mappings loaded or saved from the MIDI menu or command line.
+.SH EXAMPLES
+.TP
+Start Reloaded and auto-connect to a local Veejay server:
+.B gveejay-reloaded --auto-connect
+.TP
+Connect to a remote server on a custom port:
+.B gveejay-reloaded --host 192.168.1.20 --port 3490
+.TP
+Start with quarter-size preview and a small UI:
+.B gveejay-reloaded --preview 3 --small-as-possible
+.TP
+Use the system GTK theme instead of Reloaded's CSS:
+.B gveejay-reloaded --theme system
+.TP
+Use a custom CSS file and load a MIDI layout:
+.B gveejay-reloaded --theme ./dark-live.css --midi ./layout.xml
+.SH BUGS
+Report bugs through the Veejay issue tracker.  When reporting UI bugs, include
+the Reloaded version, GTK version, backend version, the selected play mode,
+whether the selected item is a sample or stream, and any status-bar or console
+messages printed after the action.
+.SH SEE ALSO
+.BR veejay (1),
+.BR jackd (1)
+.SH AUTHORS
+Gveejay Reloaded was written by Niels Elburg and contributors.  GTK3 migration
+and other work by Jerome Blanchi.  Initial sampledeck representation by Thomas
+Rheinhold.  See the project source files for the full copyright notices.

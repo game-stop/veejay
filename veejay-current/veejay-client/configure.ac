@@ -798,6 +798,7 @@ dnl
 AC_CONFIG_FILES([
 Makefile
 src/Makefile
+man/Makefile
 gveejay-paths.sh
 ])
 AC_OUTPUT
