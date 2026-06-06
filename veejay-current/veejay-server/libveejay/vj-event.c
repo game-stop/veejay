@@ -9521,7 +9521,7 @@ void vj_event_resume_id(void *ptr, const char format[], va_list ap)
         if(sample_exists(sample_id)) {
             veejay_set_sample(v, sample_id);
             long pos = sample_get_resume(sample_id);
-            veejay_set_frame(v, sample_id );
+            veejay_set_frame(v, pos );
             veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d continues with frame %d", sample_id, pos );
         }
     }   
