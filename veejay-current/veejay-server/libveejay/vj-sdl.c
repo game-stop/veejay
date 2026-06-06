@@ -85,9 +85,19 @@ static void fill_yuyv_black(uint8_t *buf, int width, int height)
 
 void *vj_sdl_allocate(VJFrame *frame, int use_key, int use_mouse, int show_cursor, int borderless)
 {
-    vj_sdl *vjsdl = (vj_sdl *) vj_calloc(sizeof(vj_sdl));
+    vj_sdl *vjsdl;
+    VJFrame *src;
+    VJFrame *dst;
+    sws_template templ;
+    size_t bufsize;
+    size_t total_size;
+
+    if (!frame)
+        return NULL;
+
+    vjsdl = (vj_sdl *) vj_calloc(sizeof(vj_sdl));
     if (!vjsdl)
-	    return NULL;
+        return NULL;
 
     vjsdl->flags = 0;
     vjsdl->use_keyboard = use_key;
@@ -99,25 +109,58 @@ void *vj_sdl_allocate(VJFrame *frame, int use_key, int use_mouse, int show_curso
     vjsdl->sw_scale_height = 0;
     vjsdl->borderless = borderless;
 
-    sws_template templ;	
-    memset(&templ,0,sizeof(sws_template));
+    memset(&templ, 0, sizeof(sws_template));
     templ.flags = yuv_which_scaler();
-    VJFrame *src = yuv_yuv_template( NULL,NULL,NULL,frame->width,frame->height, alpha_fmt_to_yuv(frame->format) );
-    VJFrame *dst = yuv_yuv_template(  NULL,NULL,NULL,frame->width,frame->height,PIX_FMT_YUYV422);
-    vjsdl->scaler = yuv_init_swscaler( src,dst, &templ, yuv_sws_get_cpu_flags() );
+
+    src = yuv_yuv_template(NULL, NULL, NULL,
+                           frame->width,
+                           frame->height,
+                           alpha_fmt_to_yuv(frame->format));
+    dst = yuv_yuv_template(NULL, NULL, NULL,
+                           frame->width,
+                           frame->height,
+                           PIX_FMT_YUYV422);
+
+    if (!src || !dst) {
+        if (src)
+            free(src);
+        if (dst)
+            free(dst);
+        free(vjsdl);
+        return NULL;
+    }
+
+    vjsdl->scaler = yuv_init_swscaler(src, dst, &templ, yuv_sws_get_cpu_flags());
+    if (!vjsdl->scaler) {
+        free(src);
+        free(dst);
+        free(vjsdl);
+        return NULL;
+    }
 
     vjsdl->src_frame = (void*) src;
     vjsdl->dst_frame = (void*) dst;
 
-    size_t bufsize = frame->len * 2;
+    /* SDL texture is YUYV/YUY2: 2 bytes per source pixel.  Allocate one
+     * packed display buffer per queue slot; the renderer rotates through
+     * VIDEO_QUEUE_LEN indices, not just two.
+     */
+    bufsize = (size_t) frame->width * (size_t) frame->height * 2u;
+    total_size = bufsize * (size_t) VIDEO_QUEUE_LEN;
 
-    vjsdl->pixels = (uint8_t*) vj_calloc(sizeof(uint8_t) * bufsize * 2); // continous dubblebuffer
+    vjsdl->pixels = (uint8_t*) vj_calloc(total_size);
+    if (!vjsdl->pixels) {
+        yuv_free_swscaler(vjsdl->scaler);
+        free(src);
+        free(dst);
+        free(vjsdl);
+        return NULL;
+    }
 
-    vjsdl->buf[0] = vjsdl->pixels;
-    vjsdl->buf[1] = vjsdl->pixels + bufsize;
-
-    fill_yuyv_black( vjsdl->buf[0], vjsdl->width, vjsdl->height);
-    fill_yuyv_black( vjsdl->buf[1], vjsdl->width, vjsdl->height);
+    for (int i = 0; i < VIDEO_QUEUE_LEN; i++) {
+        vjsdl->buf[i] = vjsdl->pixels + ((size_t)i * bufsize);
+        fill_yuyv_black(vjsdl->buf[i], vjsdl->width, vjsdl->height);
+    }
 
     return (void*) vjsdl;
 }
@@ -405,35 +448,68 @@ void	vj_sdl_grab(void *ptr, int status)
 void vj_sdl_put_to_screen(void *ptr, uint8_t *pixels_to_render)
 {
     vj_sdl *vjsdl = (vj_sdl*) ptr;
-    if(!vjsdl)
+
+    if (!vjsdl)
         return;
 
-    if( SDL_UpdateTexture( vjsdl->texture, NULL, pixels_to_render, vjsdl->width * 2 ) != 0 ) {
-        veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] %s" , SDL_GetError());
+    if (!vjsdl->renderer || !vjsdl->texture) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[DISPLAY] SDL renderer/texture is not initialized");
+        return;
     }
 
-    SDL_RenderClear( vjsdl->renderer );
-    SDL_RenderCopy( vjsdl->renderer, vjsdl->texture, NULL,NULL );
-    SDL_RenderPresent( vjsdl->renderer );   
+    if (!pixels_to_render) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[DISPLAY] SDL texture update skipped: pixels buffer is NULL");
+        return;
+    }
+
+    if (SDL_UpdateTexture(vjsdl->texture, NULL,
+                          pixels_to_render,
+                          vjsdl->width * 2) != 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[DISPLAY] SDL texture update failed: %s",
+                   SDL_GetError());
+        return;
+    }
+
+    SDL_RenderClear(vjsdl->renderer);
+    SDL_RenderCopy(vjsdl->renderer, vjsdl->texture, NULL, NULL);
+    SDL_RenderPresent(vjsdl->renderer);
 }
 
-void vj_sdl_preroll(void *ptr, int frame_count) {
-        vj_sdl *vjsdl = (vj_sdl*) ptr;
-    
-    veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Initializing GPU pipeline (Preroll %d frames)", frame_count);
-    
-    memset(vjsdl->pixels, 0x80, vjsdl->width * vjsdl->height * 2);
+void vj_sdl_preroll(void *ptr, int frame_count)
+{
+    vj_sdl *vjsdl = (vj_sdl*) ptr;
+
+    if (!vjsdl || !vjsdl->renderer || !vjsdl->texture || !vjsdl->buf[0])
+        return;
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[DISPLAY] Initializing GPU pipeline (Preroll %d frames)",
+               frame_count);
+
+    fill_yuyv_black(vjsdl->buf[0], vjsdl->width, vjsdl->height);
 
     for (int i = 0; i < frame_count; i++) {
-        SDL_UpdateTexture(vjsdl->texture, NULL, vjsdl->pixels, vjsdl->width * 2);
+        if (SDL_UpdateTexture(vjsdl->texture, NULL,
+                              vjsdl->buf[0],
+                              vjsdl->width * 2) != 0)
+        {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "[DISPLAY] SDL preroll texture update failed: %s",
+                       SDL_GetError());
+            return;
+        }
+
         veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] Pushed warm-up frame %d", i);
         SDL_RenderClear(vjsdl->renderer);
         SDL_RenderCopy(vjsdl->renderer, vjsdl->texture, NULL, NULL);
-
         SDL_RenderPresent(vjsdl->renderer);
-        
-        SDL_Delay(10); 
+        SDL_Delay(10);
     }
+
     veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] GPU Warm-up complete.");
 }
 
@@ -445,16 +521,35 @@ void vj_sdl_convert_and_update_screen(void *ptr, uint8_t ** yuv420)
 void vj_sdl_convert_to_screen(void *ptr, VJFrame *frame_to_dsplay, uint8_t *pixels)
 {
     vj_sdl *vjsdl = (vj_sdl*) ptr;
+    VJFrame *dst_frame;
 
-	VJFrame *dst_frame = (VJFrame*) vjsdl->dst_frame;
+    if (!vjsdl || !frame_to_dsplay || !pixels) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[DISPLAY] SDL conversion skipped: invalid frame or pixels buffer");
+        return;
+    }
+
+    dst_frame = (VJFrame*) vjsdl->dst_frame;
+    if (!dst_frame || !vjsdl->scaler) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[DISPLAY] SDL conversion skipped: scaler is not initialized");
+        return;
+    }
+
     dst_frame->data[0] = pixels;
-	yuv_convert_and_scale_packed( vjsdl->scaler, frame_to_dsplay,dst_frame );
+    yuv_convert_and_scale_packed(vjsdl->scaler, frame_to_dsplay, dst_frame);
 }
 
-uint8_t* vj_sdl_get_buffer( void *ptr, int index ) {
+uint8_t* vj_sdl_get_buffer(void *ptr, int index)
+{
     vj_sdl *vjsdl = (vj_sdl*) ptr;
-    if(!vjsdl)
+
+    if (!vjsdl)
         return NULL;
+
+    if (index < 0 || index >= VIDEO_QUEUE_LEN)
+        return NULL;
+
     return vjsdl->buf[index];
 }
 
