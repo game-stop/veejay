@@ -4974,8 +4974,6 @@ void *veejay_audio_producer_thread(void *arg)
     video_playback_setup *settings = info->settings;
     editlist *el = info->current_edit_list;
 
-	vj_audio_setup_rt_thread(settings);
-
 	int has_audio = (info->current_edit_list->has_audio &&
                      vj_perform_init_audio(info,0) &&
 					 vj_perform_init_audio(info, 1) &&
@@ -4983,6 +4981,16 @@ void *veejay_audio_producer_thread(void *arg)
 #ifndef HAVE_JACK
 	has_audio = 0;
 #endif
+
+#ifdef HAVE_JACK
+    if(has_audio) {
+        vj_audio_setup_rt_thread(settings);
+    } else
+#endif
+    {
+        settings->clock_overshoot = 30000;
+        settings->pause_cost_ns = 10.0;
+    }
 
 #ifdef HAVE_JACK
     const long CLIENT_RATE = vj_jack_get_client_samplerate();
@@ -5047,18 +5055,6 @@ void *veejay_audio_producer_thread(void *arg)
 
 #ifdef HAVE_JACK
     if (has_audio) {
-		const int seed_frames = el->video_fps * 2;
-		const long seed_client_frames = (long)(CLIENT_RATE * seed_frames / el->video_fps);
-
-
-        unsigned long start_hw = vj_jack_get_played_frames();
-        unsigned long frames_to_wait = (unsigned long)seed_client_frames * JACK_RATE / CLIENT_RATE;
-        
-        while ((vj_jack_get_played_frames() - start_hw) < frames_to_wait) {
-            if (atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP) break;
-            usleep_accurate(100, settings);
-        }
-
         anchor_s = (double) vj_jack_get_played_frames() / JACK_RATE;
 
         vj_runtime_publish_audio_clocks(settings, anchor_s, anchor_s);
@@ -5180,11 +5176,20 @@ void *veejay_audio_producer_thread(void *arg)
 				
 				if (decoded <= 0) { 
 					long sleep_us = 100;
-					while (decoded <= 0) {
+                    int retries = 0;
+
+					while (decoded <= 0 &&
+                           atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP &&
+                           retries++ < 8) {
 						usleep_accurate(sleep_us, settings);
 						decoded = vj_perform_queue_audio_chunk_ext(info, needed, media_frame, 0, audio_chunk);
 						sleep_us = sleep_us < 2000 ? sleep_us * 2 : 2000;
 					}
+
+                    if(decoded <= 0) {
+                        veejay_memset(audio_chunk, 0, (size_t)needed * (size_t)BPS);
+                        decoded = needed;
+                    }
 				}
 			}
 			else {
@@ -7037,9 +7042,6 @@ int veejay_main(veejay_t *info)
 
     veejay_producer_thread_audio_startup(info);
 
-#ifdef HAVE_JACK
-    veejay_audio_beat_thread_startup(info);
-#endif
 
     while (atomic_load_int(&settings->first_audio_frame_ready) == 0) {
         usleep_accurate(5000, settings);

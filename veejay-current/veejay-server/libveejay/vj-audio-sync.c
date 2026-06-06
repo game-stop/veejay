@@ -269,6 +269,10 @@
 #define VJ_AUDIO_SYNC_SETTLED_BACKWARD_SNAP_BLOCK_MS 1000
 #endif
 
+#ifndef VJ_AUDIO_SYNC_TRACK_ALIGN_PUBLISH_MIN_MS
+#define VJ_AUDIO_SYNC_TRACK_ALIGN_PUBLISH_MIN_MS 40L
+#endif
+
 static inline int sync_load_i(const volatile int *p) { return atomic_load_int(p); }
 static inline long sync_load_l(const volatile long *p) { return atomic_load_long(p); }
 static inline void sync_store_i(volatile int *p, int v) { atomic_store_int(p, v); }
@@ -280,6 +284,21 @@ static long sync_now_ms(void)
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ((long)ts.tv_sec * 1000L) + ((long)ts.tv_nsec / 1000000L);
+}
+
+static volatile long sync_track_align_last_publish_gate_ms = 0;
+
+static inline int sync_track_align_publish_gate_ready(void)
+{
+    long now_ms = sync_now_ms();
+    long last_ms = sync_load_l(&sync_track_align_last_publish_gate_ms);
+
+    if(last_ms <= 0 || (now_ms - last_ms) >= VJ_AUDIO_SYNC_TRACK_ALIGN_PUBLISH_MIN_MS) {
+        sync_store_l(&sync_track_align_last_publish_gate_ms, now_ms);
+        return 1;
+    }
+
+    return 0;
 }
 
 
@@ -1123,8 +1142,6 @@ static void sync_track_align_try_live_snap_locked(vj_audio_sync_shared_t *s,
     if(!same_candidate ||
        s->align_live_candidate_count < required_stable)
     {
-        int avg_dbg = (s->align_live_candidate_count > 0) ?
-            sync_clampi(s->align_live_candidate_conf_sum / s->align_live_candidate_count, 0, 100) : confidence_pct;
         return;
     }
 
@@ -1175,11 +1192,7 @@ static void sync_track_align_publish_locked(vj_audio_sync_shared_t *s)
     int target_pos;
     int source_count;
     int target_count;
-    int source_rate;
-    int target_rate;
     long long target_queue_frames = 0;
-    long target_overruns = 0;
-    long target_reads = 0;
     int target_queue_ms = 0;
 
     int min_count;
@@ -1204,7 +1217,6 @@ static void sync_track_align_publish_locked(vj_audio_sync_shared_t *s)
     int best_overlap = 0;
     int no_valid_score = 0;
     sync_track_align_live_score_t selected_score;
-    const char *quality_reason = "ok";
 
     if(!s)
         return;
@@ -1236,8 +1248,6 @@ static void sync_track_align_publish_locked(vj_audio_sync_shared_t *s)
     }
 
     target_queue_frames = 0;
-    target_overruns = sync_load_l(&s->target_queue_overruns);
-    target_reads = sync_load_l(&s->target_queue_reads);
     target_queue_ms = 0;
     if(s->target_write_frame_abs > s->target_read_frame_abs)
         target_queue_frames = s->target_write_frame_abs - s->target_read_frame_abs;
@@ -1270,15 +1280,11 @@ if(!first_acquire)
     target_pos = s->align_target_pos;
     source_count = s->align_source_count;
     target_count = s->align_target_count;
-    source_rate = s->align_source_rate;
-    target_rate = s->align_target_rate;
     memcpy(source_feat, s->align_source_feat, sizeof(source_feat));
     memcpy(target_feat, s->align_target_feat, sizeof(target_feat));
 
     if(s->target_write_frame_abs > s->target_read_frame_abs)
         target_queue_frames = s->target_write_frame_abs - s->target_read_frame_abs;
-    target_overruns = sync_load_l(&s->target_queue_overruns);
-    target_reads = sync_load_l(&s->target_queue_reads);
     if(s->target_sample_rate > 0 && target_queue_frames > 0) {
         long long qms = (target_queue_frames * 1000LL) / (long long)s->target_sample_rate;
         if(qms > 999999LL)
@@ -1293,11 +1299,6 @@ if(!first_acquire)
     {
         sync_lock(s);
         if(sync_load_i(&s->mode) == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN) {
-            const char *wait_reason = "wait-target-history";
-            if(target_count < VJ_AUDIO_SYNC_ALIGN_LOCK_MIN_TARGET_FEATURES)
-                wait_reason = "wait-target-lock-features";
-            else if(!first_acquire && target_count < min_publish_features)
-                wait_reason = "wait-settled-target-features";
             sync_store_i(&s->track_align_locked, 0);
             sync_store_i(&s->track_align_state, VJ_AUDIO_SYNC_TRACK_STATE_WAIT_TARGET);
             sync_store_i(&s->track_align_confidence_pct,
@@ -1503,8 +1504,6 @@ sync_unlock(s);
     no_valid_score = selected_score.no_valid_score;
     best_overlap = selected_score.best_overlap;
     conf = selected_score.conf;
-    quality_reason = selected_score.quality_reason ? selected_score.quality_reason : "ok";
-
     if(window < VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES) {
         sync_lock(s);
         sync_store_i(&s->track_align_locked, 0);
@@ -2202,9 +2201,11 @@ static void sync_track_align_push_block(vj_audio_sync_shared_t *s,
 
 
 
-            sync_unlock(s);
-            sync_track_align_publish(s);
-            sync_lock(s);
+            if(sync_track_align_publish_gate_ready()) {
+                sync_unlock(s);
+                sync_track_align_publish(s);
+                sync_lock(s);
+            }
         }
     }
     sync_unlock(s);
