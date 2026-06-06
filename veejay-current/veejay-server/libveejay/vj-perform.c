@@ -475,6 +475,62 @@ static inline int vj_perform_clampi(int v, int lo, int hi)
     return (v < lo) ? lo : ((v > hi) ? hi : v);
 }
 
+#ifndef VJ_SILENCE_AUDIO_RATE
+#define VJ_SILENCE_AUDIO_RATE 48000
+#endif
+#ifndef VJ_SILENCE_AUDIO_CHANS
+#define VJ_SILENCE_AUDIO_CHANS 2
+#endif
+#ifndef VJ_SILENCE_AUDIO_BITS
+#define VJ_SILENCE_AUDIO_BITS 16
+#endif
+
+static inline editlist *vj_perform_audio_editlist(veejay_t *info)
+{
+    if(!info)
+        return NULL;
+    return info->current_edit_list ? info->current_edit_list : info->edit_list;
+}
+
+static inline int vj_perform_audio_params_valid(const editlist *el)
+{
+    return el &&
+           el->video_fps > 0.0 &&
+           el->audio_rate > 0 &&
+           el->audio_chans > 0 &&
+           el->audio_bits > 0 &&
+           el->audio_bps > 0;
+}
+
+static inline int vj_perform_audio_media_valid(const editlist *el)
+{
+    return el && el->has_audio && vj_perform_audio_params_valid(el);
+}
+
+#ifdef HAVE_JACK
+static int vj_perform_prepare_silence_audio_params(editlist *el)
+{
+    if(!el || el->video_fps <= 0.0)
+        return 0;
+
+    if(el->audio_rate <= 0)
+        el->audio_rate = VJ_SILENCE_AUDIO_RATE;
+
+    if(el->audio_chans <= 0)
+        el->audio_chans = VJ_SILENCE_AUDIO_CHANS;
+    else if(el->audio_chans > 2)
+        el->audio_chans = 2;
+
+    if(el->audio_bits <= 0 || (el->audio_bits % 8) != 0)
+        el->audio_bits = VJ_SILENCE_AUDIO_BITS;
+
+    if(el->audio_bps <= 0)
+        el->audio_bps = el->audio_chans * (el->audio_bits / 8);
+
+    return vj_perform_audio_params_valid(el);
+}
+#endif
+
 
 #define CACHE_TOP 0
 #define CACHE 1
@@ -1888,36 +1944,50 @@ static void vj_perform_record_buffer_free(performer_global_t *g)
 
 int vj_init_audio_fader_luts(veejay_t *info) {
     performer_global_t *global = (performer_global_t*) info->performer;
+    editlist *el = vj_perform_audio_editlist(info);
 
-    const int audio_rate = info->current_edit_list->audio_rate;
-    const double video_fps = info->current_edit_list->video_fps;
+    if(!global)
+        return 0;
 
+    if(!vj_perform_audio_media_valid(el)) {
+        if(el && !el->has_audio)
+            veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] No embedded audio stream; audio mixer runs silent");
+        else
+            veejay_msg(VEEJAY_MSG_WARNING, "[AUDIO] Invalid embedded audio parameters; audio mixer disabled");
+        return 1;
+    }
+
+    const int audio_rate = el->audio_rate;
+    const double video_fps = el->video_fps;
+    const int frame_bytes = el->audio_bps;
     const int max_samples_per_frame = (int)ceil((double)audio_rate / video_fps);
-    size_t buffer_size = max_samples_per_frame * info->current_edit_list->audio_bps;
 
-    global->fade_lut = (float*) vj_calloc( sizeof(float) * buffer_size);
-    if(!global->fade_lut) {
-        return 0;
-    }
-    global->gain_lut[0] = (float*) vj_calloc( (sizeof(float) * buffer_size));
-    if(!global->gain_lut[0]) {
-        return 0;
+    if(max_samples_per_frame < 2 || frame_bytes <= 0) {
+        veejay_msg(VEEJAY_MSG_WARNING, "[AUDIO] Invalid mixer geometry; audio mixer disabled");
+        return 1;
     }
 
-    global->gain_lut[1] = (float*) vj_calloc( (sizeof(float) * buffer_size));
-    if(!global->gain_lut[1]) {
+    size_t buffer_size = (size_t)max_samples_per_frame * (size_t)frame_bytes;
+
+    global->fade_lut = (float*) vj_calloc(sizeof(float) * buffer_size);
+    if(!global->fade_lut)
         return 0;
-    }
+
+    global->gain_lut[0] = (float*) vj_calloc(sizeof(float) * buffer_size);
+    if(!global->gain_lut[0])
+        return 0;
+
+    global->gain_lut[1] = (float*) vj_calloc(sizeof(float) * buffer_size);
+    if(!global->gain_lut[1])
+        return 0;
 
     for (int i = 0; i < max_samples_per_frame; i++) {
         float t = (float)i / (float)(max_samples_per_frame - 1);
 
         global->gain_lut[0][i] = cosf(t * (M_PI / 2.0f));
         global->gain_lut[1][i] = sinf(t * (M_PI / 2.0f));
-
         global->fade_lut[i] = t;
     }
-
 
     global->gain_lut[0][max_samples_per_frame - 1] = 0.0f;
     global->gain_lut[0][max_samples_per_frame - 2] = 0.0f;
@@ -1933,6 +2003,7 @@ int vj_init_audio_fader_luts(veejay_t *info) {
     veejay_msg(VEEJAY_MSG_DEBUG, "[AudioMix] LUT[0]   : out=%.3f in=%.3f (start)", global->gain_lut[0][0], global->gain_lut[1][0]);
     veejay_msg(VEEJAY_MSG_DEBUG, "[AudioMix] LUT[%d]  : out=%.3f in=%.3f (mid)", mid, global->gain_lut[0][mid], global->gain_lut[1][mid]);
     veejay_msg(VEEJAY_MSG_DEBUG, "[AudioMix] LUT[%d]  : out=%.3f in=%.3f (end)", last, global->gain_lut[0][last], global->gain_lut[1][last]);
+
     float energy_mid = global->gain_lut[0][mid] * global->gain_lut[0][mid] +
                     global->gain_lut[1][mid] * global->gain_lut[1][mid];
 
@@ -2286,10 +2357,15 @@ static void vj_perform_close_audio(performer_t *p) {
 
 int init_audio_resampler(veejay_t *info, performer_t *p) {
 #ifdef HAVE_JACK
-    const int chans = info->edit_list->audio_chans;
-    const int rate  = info->edit_list->audio_rate;
+    editlist *el = vj_perform_audio_editlist(info);
 
-    p->audio_scratcher = vj_scratch_init( chans, rate, info->edit_list->video_fps );
+    if(!vj_perform_audio_media_valid(el))
+        return 1;
+
+    const int chans = el->audio_chans;
+    const int rate  = el->audio_rate;
+
+    p->audio_scratcher = vj_scratch_init(chans, rate, el->video_fps);
 #endif
     return 1;
 }
@@ -2307,7 +2383,13 @@ int vj_perform_init_audio(veejay_t * info, int AorB)
     }
 
     performer_global_t *global = (performer_global_t*) info->performer;
-    editlist *el = info->edit_list;
+    editlist *el = vj_perform_audio_editlist(info);
+
+    if(!vj_perform_audio_media_valid(el)) {
+        veejay_msg(VEEJAY_MSG_WARNING, "[AUDIO] Skipping media audio buffers: no valid embedded audio stream");
+        return 0;
+    }
+
     performer_t *p = (AorB ? global->A : global->B);
     double samples_per_frame = (double)el->audio_rate / (double)el->video_fps;
     const uint32_t sample_len = ceil(samples_per_frame) * el->audio_bps;
@@ -2568,54 +2650,85 @@ int vj_perform_preview_max_height(veejay_t *info) {
 
 int vj_perform_audio_start(veejay_t * info)
 {
-    editlist *el = info->edit_list;
+    editlist *el = info ? info->edit_list : NULL;
 
-    if (el->has_audio)
-    {
-#ifdef HAVE_JACK
-        vj_jack_initialize();
-
-        int res = vj_jack_init_duplex(el);
-
-        if( res <= 0 ) {
-            veejay_msg(VEEJAY_MSG_WARNING,
-                       "[AUDIO] Jack duplex start failed; falling back to playback-only mode");
-
-            vj_jack_initialize();
-            res = vj_jack_init(el);
-        }
-
-        if( res <= 0 ) {
-            veejay_msg(0, "[AUDIO] Audio playback disabled");
-            info->audio = NO_AUDIO;
-            return 0;
-        }
-
-        if ( res == 2 )
-        {
-            vj_jack_stop();
-            info->audio = NO_AUDIO;
-            veejay_msg(VEEJAY_MSG_ERROR,"Please run jackd with a sample rate of %ld",el->audio_rate );
-            return 0;
-        }
-
-        if(vj_jack_has_input())
-            veejay_msg(VEEJAY_MSG_DEBUG,"[AUDIO] Jack audio playback started with capture input ports");
-        else
-            veejay_msg(VEEJAY_MSG_WARNING,"[AUDIO] Jack audio playback started without capture input ports");
-
-        return 1;
-#else
-        veejay_msg(VEEJAY_MSG_WARNING, "[AUDIO] Jack support not compiled in (no audio)");
+    if(!info || !el)
         return 0;
-#endif
+
+#ifdef HAVE_JACK
+    if(el->has_audio && !vj_perform_audio_params_valid(el)) {
+        veejay_msg(VEEJAY_MSG_WARNING, "[AUDIO] Embedded audio stream has invalid parameters; audio playback disabled");
+        return 0;
     }
+
+    const int silent_output = !el->has_audio;
+    int saved_has_audio = el->has_audio;
+
+    if(silent_output) {
+        if(!vj_perform_prepare_silence_audio_params(el)) {
+            veejay_msg(VEEJAY_MSG_WARNING, "[AUDIO] Unable to prepare silent playback parameters");
+            return 0;
+        }
+
+        if(info->current_edit_list && info->current_edit_list != el)
+            vj_perform_prepare_silence_audio_params(info->current_edit_list);
+
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[AUDIO] No embedded audio stream; starting JACK silence output (%ld Hz, %d channels, %d bit)",
+                   (long)el->audio_rate,
+                   el->audio_chans,
+                   el->audio_bits);
+        el->has_audio = 1;
+    }
+
+    vj_jack_initialize();
+
+    int res = vj_jack_init_duplex(el);
+
+    if( res <= 0 ) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO] Jack duplex start failed; falling back to playback-only mode");
+
+        vj_jack_initialize();
+        res = vj_jack_init(el);
+    }
+
+    if(silent_output)
+        el->has_audio = saved_has_audio;
+
+    if( res <= 0 ) {
+        veejay_msg(0, "[AUDIO] Audio playback disabled");
+        info->audio = NO_AUDIO;
+        return 0;
+    }
+
+    if ( res == 2 )
+    {
+        vj_jack_stop();
+        info->audio = NO_AUDIO;
+        veejay_msg(VEEJAY_MSG_ERROR,"Please run jackd with a sample rate of %ld",(long)el->audio_rate );
+        return 0;
+    }
+
+    if(vj_jack_has_input())
+        veejay_msg(VEEJAY_MSG_DEBUG,"[AUDIO] Jack audio playback started with capture input ports");
+    else
+        veejay_msg(VEEJAY_MSG_WARNING,"[AUDIO] Jack audio playback started without capture input ports");
+
+    return 1;
+#else
+    if(el->has_audio)
+        veejay_msg(VEEJAY_MSG_WARNING, "[AUDIO] Jack support not compiled in (no audio)");
     return 0;
+#endif
 }
 
 void vj_perform_audio_stop(veejay_t * info)
 {
-    if (info->edit_list->has_audio) {
+    if(!info)
+        return;
+
+    if (info->audio == AUDIO_PLAY || (info->edit_list && info->edit_list->has_audio)) {
 #ifdef HAVE_JACK
         vj_jack_stop();
 #endif

@@ -4315,6 +4315,11 @@ void vj_event_sample_set_rand_loop(void *ptr, const char format[], va_list ap)
 
     SAMPLE_DEFAULTS(args[0]);
 
+    if(v->seq && v->seq->active && sample_exists(args[0])) {
+        sample_set_loop_stats(args[0], 0);
+        sample_set_loops(args[0], -1);
+    }
+
     if( args[1] == -1 )
     {
         if( sample_exists(args[0]) )
@@ -4349,6 +4354,13 @@ void vj_event_sample_set_loop_type(void *ptr, const char format[], va_list ap)
     if(!sample_exists(args[0])) {
         p_no_sample(args[0]);
         return;
+    }
+
+    if(v->seq && v->seq->active) {
+        sample_set_loop_stats(args[0], 0);
+        sample_set_loops(args[0], -1);
+        if(args[1] == 0)
+            args[1] = 4;
     }
 
     if(args[1] == -1) {
@@ -4457,6 +4469,12 @@ void vj_event_sample_set_speed(void *ptr, const char format[], va_list ap)
     P_A(args,sizeof(args),NULL,0, format, ap);
 
     SAMPLE_DEFAULTS(args[0]);
+
+    if(v->seq && v->seq->active && args[1] == 0) {
+        args[1] = v->settings->previous_playback_speed;
+        if(args[1] == 0)
+            args[1] = 1;
+    }
 
     if( sample_set_speed(args[0], args[1]) != -1)
     {
@@ -12651,6 +12669,13 @@ void vj_event_sample_sequencer_active(void *ptr, const char format[], va_list ap
             vj_tag_set_loops(cur_id, -1);
         }
 
+        if(v->settings && v->settings->current_playback_speed == 0) {
+            int resume_speed = v->settings->previous_playback_speed;
+            if(resume_speed == 0)
+                resume_speed = 1;
+            veejay_set_speed(v, resume_speed, 0);
+        }
+
         veejay_msg(VEEJAY_MSG_INFO,"Sample sequencer disabled; current source keeps looping");
         return;
     }
@@ -12687,6 +12712,13 @@ void vj_event_sample_sequencer_active(void *ptr, const char format[], va_list ap
     }
 
     v->seq->active = 1;
+
+    if(v->settings && v->settings->current_playback_speed == 0) {
+        int resume_speed = v->settings->previous_playback_speed;
+        if(resume_speed == 0)
+            resume_speed = 1;
+        veejay_set_speed(v, resume_speed, 0);
+    }
 
     veejay_reset_sample_positions(v, -1);
 
@@ -12953,4 +12985,3 @@ void vj_event_alpha_composite(void *ptr, const char format[], va_list ap)
         veejay_msg(VEEJAY_MSG_INFO,"New alpha mask every frame (default alpha value is %d)", v->settings->alpha_value);
     }
 }
-
