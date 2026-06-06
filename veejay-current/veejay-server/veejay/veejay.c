@@ -230,154 +230,128 @@ static void CompiledWith(void)
 static void Usage(char *progname)
 {
     fprintf(stderr, "This is Veejay %s\n\n", VERSION);
-    fprintf(stderr, "Usage: %s [options] <file name> [<file name> ...]\n", progname);
-    fprintf(stderr,"where options are:\n\n");
-	fprintf(stderr,
-			"  -v/--verbose  \t\tEnable debugging output (default off)\n");
-	fprintf(stderr,
-			"  -n/--no-color     \t\tDo not use colored text\n");
-   	fprintf(stderr,
-	    	"  -u/--dump-events  \t\tDump veejay's documentation to stdout\n");
-	fprintf(stderr,
-			"  -B/--features  \t\tList of compiled features\n");
-   	fprintf(stderr,
-			"  -D/--composite \t\tDo not start with camera/projection calibration viewport \n");
-	fprintf(stderr,
-	   		"  -p/--port <num>\t\tTCP port to accept/send messages (default: 3490)\n");
-	fprintf(stderr,
-			"  -M/--multicast-osc <multicast address> \t\tmulticast OSC\n");
-	fprintf(stderr,
-			"  -T/--multicast-vims <multicast address> \t\tmulticast VIMS\n");
- 	fprintf(stderr,
-			"  -m/--memory <num>\t\tMaximum memory to use for cache (0=disable, default=0 max=100)\n");  
-	fprintf(stderr,
-			"  -j/--max_cache <num>\t\tDivide cache memory over N samples (default=0)\n");
-	fprintf(stderr,
-			"  -Y/--yuv [01]\t\t\tForce YCbCr (defaults to YUV)\n");
-	fprintf(stderr,
-	    	"  -t/--timer <num>\t\tSpecify timer to use (0=none, 1=default timer) (default=1) \n");
-    fprintf(stderr,
-	    	"  -P/--preserve-pathnames\tDo not 'canonicalise' pathnames in edit lists\n");
-	fprintf(stderr,
-            "  -e/--swap-range <num>\t\tSwap YUV range [0..255] <-> [16..235] on videofiles\n");
-	fprintf(stderr,
-		"\t\t\t\t 0 = YUV 4:2:0 Planar\n");
-	fprintf(stderr,
-		"\t\t\t\t 1 = YUV 4:2:2 Planar (default)\n");
-	fprintf(stderr,
-		"\t\t\t\t 2 = YUV 4:2:0 Planar full range\n");
-	fprintf(stderr,
-		"\t\t\t\t 3 = YUV 4:2:2 Planar full range\n");
-   	fprintf(stderr,
-			"  -L/--auto-loop   \t\tStart with default sample\n");
-	fprintf(stderr,
-			"  -b/--bezerk    \t\tBezerk (default off)   \n");
-	fprintf(stderr,
-			"  -K/--master\t\tSet this veejay instance as the master output\n");
-	fprintf(stderr,
-			"  -C/--connect <ip address>:<port number>\n");
-	fprintf(stderr,
-	   		"  -l/--sample-file <file name>\tLoad a sample list file (none at default)\n");
-	fprintf(stderr,
-			"  -F/--action-file <file name>\tLoad an action file (none at default)\n");
-	fprintf(stderr,
-			"  -g/--clip-as-sample\t\tLoad every video clip as a new sample\n");	
-	fprintf(stderr,
-	    	"  -a/--audio [01]\t\tEnable (1) or disable (0) audio (default 1)\n");
-    fprintf(stderr,
-            "     --audio-muted\t\tStart audio services active, but mute all playback output\n");
-    fprintf(stderr,
-            "     --no-audio-threads\tDisable JACK capture/sync/beat service threads\n");
-    fprintf(stderr,
-            "     --audio-threads [01]\tEnable (1) or disable (0) JACK audio service threads\n");
-    fprintf(stderr,
-			"     --pace-correction [ms]\tAudio pace correction offset in milliseconds\n");
-	fprintf(stderr,
-	    	"  -c/--synchronization [01]\tSync correction off/on (default on)\n");
-    fprintf(stderr,
-	    	"  -O/--output [0..6]\t\tOutput video\n");
-#ifdef HAVE_SDL
-	fprintf(stderr,
-			"\t\t\t\t0 = SDL (default)\t\n");
-#endif
-	fprintf(stderr,
-			"\t\t\t\t3 = Head less (no video output)\n");	
-	fprintf(stderr,
-			"\t\t\t\t4 = Y4M Stream 4:2:0 (requires -o <filename>)\n");
-	fprintf(stderr,
-			"\t\t\t\t5 = Vloopback device (native) (requires -o <filename>)\n");
-	fprintf(stderr,
-			"\t\t\t\t6 = Y4M Stream 4:2:2 (requires -o <filename>)\n");
-	fprintf(stderr,
-			"\t\t\t\t7 = Vloopback device YUV 4:2:0 (requires -o <filename>)\n");
-	fprintf(stderr,
-			"\t\t\t\t8 = Vloopback device BGR (requires -o <filename>)\n");
+    fprintf(stderr, "Usage: %s [options] <file name> [<file name> ...]\n\n", progname);
+    fprintf(stderr, "Options:\n\n");
 
-	fprintf(stderr,
-			"  -o/--output-file [file]\tWrite to file (for use with -O/--output)\n");
+    fprintf(stderr, "  -v/--verbose                 Enable debug output\n");
+    fprintf(stderr, "  -n/--no-color                Disable colored console output\n");
+    fprintf(stderr, "  -u/--dump-events             Dump VIMS, OSC, FX and environment docs\n");
+    fprintf(stderr, "  -B/--features                List compiled-in features and exit\n");
+    fprintf(stderr, "     --version                 Print version and exit\n");
+    fprintf(stderr, "  -?/--help                    Print this help and exit\n");
+    fprintf(stderr, "\n");
+
+    fprintf(stderr, "Project and control:\n");
+    fprintf(stderr, "  -p/--port <num>              TCP port for VIMS messages (default: 3490)\n");
+    fprintf(stderr, "  -M/--multicast-osc <addr>    Use multicast OSC\n");
+    fprintf(stderr, "  -T/--multicast-vims <addr>   Use multicast VIMS\n");
+    fprintf(stderr, "  -K/--master                  Run as the master video output\n");
+    fprintf(stderr, "  -C/--connect <addr[:port]>   Connect to a master Veejay instance\n");
+    fprintf(stderr, "  -l/--sample-file <file>      Load a sample list file\n");
+    fprintf(stderr, "  -F/--action-file <file>      Load an action/keybinding file\n");
+    fprintf(stderr, "  -P/--preserve-pathnames      Do not canonicalize paths in edit lists\n");
+    fprintf(stderr, "  -q/--quit                    Quit at end of file\n");
+    fprintf(stderr, "\n");
+
+    fprintf(stderr, "Playback and samples:\n");
+    fprintf(stderr, "  -L/--auto-loop               Start with the default sample loop\n");
+    fprintf(stderr, "  -b/--bezerk                  Enable bezerk mode\n");
+    fprintf(stderr, "  -g/--clip-as-sample          Load each video clip as a new sample\n");
+    fprintf(stderr, "  -c/--synchronization [0|1]   Disable or enable sync correction (default: 1)\n");
+    fprintf(stderr, "  -f/--fps <num>               Override frame rate (disables source audio sync)\n");
+    fprintf(stderr, "\n");
+
+    fprintf(stderr, "Audio:\n");
+    fprintf(stderr, "  -a/--audio [0|1]             Enable or disable audio playback output (default: 1)\n");
+    fprintf(stderr, "                                -a 0 keeps JACK input, sync and beat services available\n");
+    fprintf(stderr, "     --audio-muted             Start with all audio playback output muted\n");
+    fprintf(stderr, "                                JACK input, sync and beat services remain available\n");
+    fprintf(stderr, "     --audio-threads [0|1]     Enable or disable JACK capture/sync/beat threads\n");
+    fprintf(stderr, "     --no-audio-threads        Disable JACK capture/sync/beat threads\n");
+    fprintf(stderr, "     --pace-correction <ms>    Audio pace correction offset in milliseconds\n");
+    fprintf(stderr, "  -r/--audiorate <num>         Set dummy/sample audio rate (default: 48000 Hz)\n");
+    fprintf(stderr, "     --audio-channels <num>    Set dummy/sample audio channel count\n");
+    fprintf(stderr, "     --audio-bits <num>        Set dummy/sample audio bits per sample\n");
+    fprintf(stderr, "\n");
+
+    fprintf(stderr, "Video input and format:\n");
+    fprintf(stderr, "  -d/--dummy                   Start without video files; render black frames\n");
+    fprintf(stderr, "  -A/--capture-device <num>    Start with capture device <num>\n");
+    fprintf(stderr, "  -Z/--load-generators <num>   Load generator plugins and start stream <num>\n");
+    fprintf(stderr, "  -W/--input-width <num>       Set input video width\n");
+    fprintf(stderr, "  -H/--input-height <num>      Set input video height\n");
+    fprintf(stderr, "  -N/--norm <num>              Set norm: 0=PAL, 1=NTSC, 2=SECAM (default: PAL)\n");
+    fprintf(stderr, "  -Y/--yuv [0|1]               Force YCbCr mode (default: YUV)\n");
+    fprintf(stderr, "  -e/--swap-range              Swap YUV range 0-255 <-> 16-235 on video files\n");
+    fprintf(stderr, "  -I/--deinterlace             Deinterlace interlaced video\n");
+    fprintf(stderr, "\n");
+
+    fprintf(stderr, "Video output and display:\n");
+    fprintf(stderr, "  -D/--composite               Do not start with the camera/projection viewport\n");
+    fprintf(stderr, "  -G/--graphics-driver <num>   Alias for -O/--output\n");
+    fprintf(stderr, "  -O/--output <num>            Select video output driver\n");
 #ifdef HAVE_SDL
-    fprintf(stderr,
-	    "  -s/--size NxN\t\t\tDisplay dimension for video window, use Width x Height\n");
-	fprintf(stderr,
-		"  -x/--geometry-x <num> \tTop left x offset for SDL video window\n");
-	fprintf(stderr,
-		"  -y/--geometry-y <num> \tTop left y offset for SDL video window\n");
-    fprintf(stderr,
-        "  --borderless\t\t\tOpen video window without title bar\n");
-	fprintf(stderr,
-		"  --no-keyboard\t\t\tdisable keyboard for SDL video window\n");
-	fprintf(stderr,
-		"  --no-mouse\t\t\tdisable mouse for SDL video window\n");
-	fprintf(stderr, 
-		"  --show-cursor\t\t\tshow mouse cursor in SDL video window\n");	
+    fprintf(stderr, "                                0 = SDL (default)\n");
 #endif
-	fprintf(stderr,
-		"  -A/--all [num] \t\tStart with capture device <num> \n");
-	fprintf(stderr,
-		"  -d/--dummy	\t\tStart with no video (black frames)\n");
-	fprintf(stderr,
-		"  -Z/--load-generators [num]\tLoad all generator plugins as streams and start with N\n");
-	fprintf(stderr,
-		"  -W/--input-width <num>\tSet input video width\n");
-	fprintf(stderr,
-		"  -H/--input-height <num>\tSet input video height\n");
-    fprintf(stderr,
-		"  -f/--fps <num>\t\tOverride default frame rate (default: read from first loaded file)\n");
-   	fprintf(stderr,
-		"  -r/--audiorate <num>\t\tSet audio rate (defaults to 48Khz)\n");
-	fprintf(stderr,
-		"     --audio-channels <num>\tSet dummy audio channels (default from dummy/sample config)\n");
-	fprintf(stderr,
-		"     --audio-bits <num>\t\tSet dummy audio bits per sample\n");
-	fprintf(stderr,
-	    "  -I/--deinterlace\t\tDeinterlace video if it is interlaced\n");    
-	fprintf(stderr,
-		"  -N/--norm <num>\t\tSet video norm [0=PAL, 1=NTSC, 2=SECAM (defaults to PAL)]\n");
-	fprintf(stderr,
-		"  -w/--output-width <num>\tSet output video width (Projection)\n");
-	fprintf(stderr,
-		"  -h/--output-height <num>\tSet output video height (Projection)\n");
-	fprintf(stderr,
-		"  --benchmark NxN\t\tveejay benchmark using NxN resolution\n");
-#ifdef HAVE_QRENCODE  
-	fprintf(stderr,
-		"  --qrcode-connection-info\tEncode veejay's external IP and port number into QR code\n" );
+    fprintf(stderr, "                                3 = Headless, no video output\n");
+    fprintf(stderr, "                                4 = Y4M stream 4:2:0 (requires -o)\n");
+    fprintf(stderr, "                                5 = Vloopback native format (requires -o)\n");
+    fprintf(stderr, "                                6 = Y4M stream 4:2:2 (requires -o)\n");
+    fprintf(stderr, "                                7 = Vloopback YUV 4:2:0 (requires -o)\n");
+    fprintf(stderr, "                                8 = Vloopback BGR (requires -o)\n");
+    fprintf(stderr, "  -o/--output-file <file>      Write output to file/device for -O/--output\n");
+    fprintf(stderr, "  -w/--output-width <num>      Set output/projection width\n");
+    fprintf(stderr, "  -h/--output-height <num>     Set output/projection height\n");
+#ifdef HAVE_SDL
+    fprintf(stderr, "  -s/--size WxH                Set SDL window size\n");
+    fprintf(stderr, "  -x/--geometry-x <num>        Set SDL window X position\n");
+    fprintf(stderr, "  -y/--geometry-y <num>        Set SDL window Y position\n");
+    fprintf(stderr, "     --borderless              Open SDL window without a title bar\n");
+    fprintf(stderr, "     --no-keyboard             Disable SDL keyboard input\n");
+    fprintf(stderr, "     --no-mouse                Disable SDL mouse input\n");
+    fprintf(stderr, "     --show-cursor             Show the mouse cursor in the SDL window\n");
 #endif
-	fprintf(stderr,
-		"  -S/--scene-detection <num>\tCreate new samples based on scene detection threshold <num>\n");
-	fprintf(stderr,
-		"  -X/--dynamic-fx-chain\t\tDo not keep FX chain buffers in RAM (default off)\n");
-	fprintf(stderr,
-		"    /--split-screen\t\tLoad split screen configuration\n");
-    fprintf(stderr,
-        "    /--fx-custom-default-values Read FX custom default values from ~/.veejay/[livido,frei0r]\n");
-	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
-    fprintf(stderr,"  -?/--help \t\t\tYou are looking at it\n");
-	fprintf(stderr,"\n\n");
+    fprintf(stderr, "\n");
+
+    fprintf(stderr, "Cache, rendering and utilities:\n");
+    fprintf(stderr, "  -m/--memory <num>            Cache memory percentage (0=disable, max=100)\n");
+    fprintf(stderr, "  -j/--max_cache <num>         Divide cache memory over N samples\n");
+    fprintf(stderr, "  -t/--timer <num>             Select timer: 0=none, 1=default (default: 1)\n");
+    fprintf(stderr, "  -S/--scene-detection <num>   Create samples using scene detection threshold\n");
+    fprintf(stderr, "  -X/--dynamic-fx-chain        Do not keep FX chain buffers in RAM\n");
+    fprintf(stderr, "     --split-screen            Load split-screen configuration\n");
+    fprintf(stderr, "     --fx-custom-default-values\n");
+    fprintf(stderr, "                                Read FX defaults from ~/.veejay/livido and frei0r\n");
+    fprintf(stderr, "     --benchmark WxH           Run benchmark at the given resolution\n");
+#ifdef HAVE_QRENCODE
+    fprintf(stderr, "     --qrcode-connection-info  Encode external IP and port into a QR code\n");
+#endif
+    fprintf(stderr, "\n");
 }
 
 #define OUT_OF_RANGE(val) ( val < 0 ? 1 : ( val > 100 ? 1 : 0) )
 #define OUT_OF_RANGE_ERR(val) if(OUT_OF_RANGE(val)) { fprintf(stderr,"\tValue must be 0-100\n"); exit(1); }
+
+static int parse_binary_option(const char *name, const char *value, int *dst)
+{
+    if(!value || !dst) {
+        fprintf(stderr, "%s requires argument 0 or 1\n", name ? name : "option");
+        return 1;
+    }
+
+    if(strcmp(value, "0") == 0) {
+        *dst = 0;
+        return 0;
+    }
+
+    if(strcmp(value, "1") == 0) {
+        *dst = 1;
+        return 0;
+    }
+
+    fprintf(stderr, "%s must be 0 or 1\n", name ? name : "option");
+    return 1;
+}
 
 #define check_val(val,msg) {\
 if(val==NULL){\
@@ -399,13 +373,21 @@ static int set_option(const char *name, char *value)
 	{
 	 veejay_set_colors(0);
     } else if (strcmp(name, "audio") == 0 || strcmp(name, "a") == 0) {
-	info->audio = atoi(optarg);
+        int enabled = 0;
+        if(parse_binary_option("-a/--audio", value, &enabled))
+            nerr++;
+        else
+            info->audio = enabled ? AUDIO_PLAY : NO_AUDIO;
     } else if (strcmp(name, "audio-muted") == 0) {
-	atomic_store_int(&info->settings->audio_mute, 1);
+        atomic_store_int(&info->settings->audio_mute, 1);
     } else if (strcmp(name, "no-audio-threads") == 0) {
-	atomic_store_int(&info->settings->audio_threads_disabled, 1);
+        atomic_store_int(&info->settings->audio_threads_disabled, 1);
     } else if (strcmp(name, "audio-threads") == 0) {
-	atomic_store_int(&info->settings->audio_threads_disabled, atoi(optarg) ? 0 : 1);
+        int enabled = 0;
+        if(parse_binary_option("--audio-threads", value, &enabled))
+            nerr++;
+        else
+            atomic_store_int(&info->settings->audio_threads_disabled, enabled ? 0 : 1);
 	} else if (strcmp(name, "pace-correction") == 0 ) {
 	info->settings->pace_correction = atoi( optarg);
 		if( info->settings->pace_correction < 0 ) {
