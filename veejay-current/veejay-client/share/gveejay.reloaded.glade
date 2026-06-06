@@ -9691,6 +9691,8 @@
                                             <property name="visible">True</property>
                                             <property name="can-focus">True</property>
                                             <property name="receives-default">False</property>
+                                            <property name="has-tooltip">True</property>
+                                            <property name="tooltip-text" translatable="yes">Restart beat analysis for the current audio source. This clears detector history, beat timing, pulse/gate state, and re-arms the analysis reader; it does not change Auto FX mapping.</property>
                                             <property name="use-underline">True</property>
                                             <signal name="clicked" handler="on_audio_beat_refresh_button_clicked" swapped="no"/>
                                           </object>
@@ -9701,13 +9703,15 @@
                                           </packing>
                                         </child>
                                         <child>
-                                          <object class="GtkToggleButton" id="audio_beat_auto_reset_button">
+                                          <object class="GtkButton" id="audio_beat_auto_reset_button">
                                             <property name="label" translatable="yes">Reset Auto FX</property>
                                             <property name="visible">True</property>
                                             <property name="can-focus">True</property>
                                             <property name="receives-default">False</property>
+                                            <property name="has-tooltip">True</property>
+                                            <property name="tooltip-text" translatable="yes">Forget the current automatic FX mapping and rebuild targets from the current effect chain on the next beat/update. Beat analysis and audio input are not restarted.</property>
                                             <property name="use-underline">True</property>
-                                            <signal name="toggled" handler="on_audio_beat_auto_reset_button_toggled" swapped="no"/>
+                                            <signal name="clicked" handler="on_audio_beat_auto_reset_button_clicked" swapped="no"/>
                                           </object>
                                           <packing>
                                             <property name="expand">True</property>
