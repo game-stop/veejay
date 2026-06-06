@@ -1,5 +1,5 @@
 /*
-Copyright © 1998. The Regents of the University of California (Regents). 
+Copyright ï¿½ 1998. The Regents of the University of California (Regents). 
 All Rights Reserved.
 
 Written by Matt Wright, The Center for New Music and Audio Technologies,
@@ -86,16 +86,18 @@ int OSCPaddedStrlen(const char *s) {
     return (i + 4) & 0xfffffffc;
 }
 
-char *OSCPaddedStrcpy(char *target, const char *source) {
-    while ( *target++ = *source++ ) {
-	/* do nothing */
+char *OSCPaddedStrcpy(char *target, const char *source)
+{
+    char *start = target;
+
+    while ((*target++ = *source++) != '\0') {
+        /* copy including terminating nul */
     }
 
-    /* That copied one null byte */
-    while (((int) target) % 4 != 0) {
-	*target = '\0';
-	target++;
+    while (((target - start) & 3) != 0) {
+        *target++ = '\0';
     }
+
     return target;
 }
 
