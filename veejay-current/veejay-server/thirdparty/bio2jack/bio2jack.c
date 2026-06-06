@@ -32,6 +32,7 @@
 #include <math.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <time.h>
 #include <jack/jack.h>
 #include <jack/ringbuffer.h>
 #include <pthread.h>
@@ -45,12 +46,11 @@
 #include <libavutil/version.h>
 #include "bio2jack.h"
 
-#define DEBUG_OUTPUT 0
 #define RESERVE_PERIODS 1
+#ifndef VJ_JACK_RESAMPLE_SLACK_FRAMES
+#define VJ_JACK_RESAMPLE_SLACK_FRAMES 64
+#endif
 
-#define OUTFILE stderr
-
-#define DEBUG(format, args...) veejay_msg(4, "[AUDIO] " format, ##args);
 #define WARN(format, args...) veejay_msg(1, "[AUDIO] " format, ##args);
 
 #define ERR(format, args...) veejay_msg(0, "[AUDIO] " format, ##args);
@@ -75,6 +75,7 @@
 #define JACK_RECONNECT_INITIAL_DELAY_NS 250000000L
 #define JACK_RECONNECT_MAX_DELAY_NS     8000000000L
 #define JACK_RECONNECT_MAX_ATTEMPTS     6
+#define JACK_MAX_RETIRED_RINGBUFFERS     32
 typedef struct jack_driver_s
 {
   int allocated;
@@ -82,6 +83,8 @@ typedef struct jack_driver_s
   int clientCtr;
   int in_use;
   int cb_active;
+
+  volatile int input_passthrough;
 
   jack_client_t *volatile client;
   jack_port_t *output_port[MAX_OUTPUT_PORTS];
@@ -92,15 +95,15 @@ typedef struct jack_driver_s
   unsigned long jack_output_port_flags;
   unsigned long jack_input_port_flags;
 
-  long jack_sample_rate;   
-  long client_sample_rate; 
+  long jack_sample_rate;
+  long client_sample_rate;
 
   double SPVF;
 
   volatile double output_sample_rate_ratio;
   volatile double input_sample_rate_ratio;
 
-  unsigned long bits_per_channel; 
+  unsigned long bits_per_channel;
   unsigned long num_input_channels;
   unsigned long num_output_channels;
 
@@ -122,6 +125,9 @@ typedef struct jack_driver_s
 
   jack_ringbuffer_t *volatile pRecPtr;
   size_t volatile pRecPtr_size;
+
+  jack_ringbuffer_t *retired_ringbuffers[JACK_MAX_RETIRED_RINGBUFFERS];
+  unsigned int retired_ringbuffer_count;
 
   volatile unsigned long client_bytes;
   volatile unsigned long written_client_bytes;
@@ -158,7 +164,7 @@ typedef struct jack_driver_s
   float *input_resample_buf;
   long input_resample_buf_frames;
 
-} jack_driver_t; 
+} jack_driver_t;
 
 static char *client_name = NULL;
 
@@ -187,7 +193,165 @@ static int JACK_OpenDeviceRaw(jack_driver_t *drv);
 static unsigned long JACK_GetBytesFreeSpaceFromDriver(jack_driver_t *drv);
 static void JACK_ResetFromDriver(jack_driver_t *drv);
 static unsigned long JACK_GetPositionFromDriver(jack_driver_t *drv, int position, int type);
+static long JACK_rescale_client_to_jack_frames_ceil(jack_driver_t *drv, long client_frames);
+static unsigned long JACK_RescaleJackFramesToClientFramesFloor(jack_driver_t *drv, unsigned long jack_frames);
+static unsigned long JACK_RescaleJackFramesToClientFramesRound(jack_driver_t *drv, unsigned long jack_frames);
+static long JACK_get_required_free_frames(jack_driver_t *drv, int client_frames);
 static void JACK_CleanupDriver(jack_driver_t *drv);
+
+static int JACK_PortIsOwnClient(jack_driver_t *drv, const char *port_name)
+{
+  const char *own;
+  size_t n;
+
+  if (!drv || !drv->client || !port_name)
+    return 0;
+
+  own = jack_get_client_name(drv->client);
+  if (!own || !own[0])
+    return 0;
+
+  n = strlen(own);
+  return strncmp(port_name, own, n) == 0 && port_name[n] == ':';
+}
+
+static int JACK_PortHasFlags(jack_driver_t *drv, const char *port_name, unsigned long required_flags)
+{
+  jack_port_t *p;
+  unsigned long flags;
+
+  if (!drv || !drv->client || !port_name)
+    return 0;
+
+  p = jack_port_by_name(drv->client, port_name);
+  if (!p)
+    return 0;
+
+  flags = jack_port_flags(p);
+  return ((flags & required_flags) == required_flags);
+}
+
+static int JACK_PortNameStartsWith(const char *s, const char *prefix)
+{
+  if (!s || !prefix)
+    return 0;
+
+  return strncmp(s, prefix, strlen(prefix)) == 0;
+}
+
+static int JACK_PortNameContains(const char *s, const char *needle)
+{
+  if (!s || !needle)
+    return 0;
+
+  return strstr(s, needle) != NULL;
+}
+
+static int JACK_PortLooksLikePlaybackTarget(const char *port_name)
+{
+  return (JACK_PortNameStartsWith(port_name, "system:playback_") ||
+          JACK_PortNameContains(port_name, ":playback_") ||
+          JACK_PortNameContains(port_name, "playback") ||
+          JACK_PortNameContains(port_name, "Playback"));
+}
+
+static int JACK_PortLooksLikeNonPlaybackTarget(const char *port_name)
+{
+  return (!port_name ||
+          JACK_PortNameContains(port_name, "monitor") ||
+          JACK_PortNameContains(port_name, "Monitor") ||
+          JACK_PortNameContains(port_name, "capture") ||
+          JACK_PortNameContains(port_name, "Capture") ||
+          JACK_PortNameContains(port_name, ":input") ||
+          JACK_PortNameContains(port_name, ":Input") ||
+          JACK_PortNameContains(port_name, ":in_"));
+}
+
+static const char **JACK_GetPortsAudioOrAny(jack_driver_t *drv,
+                                             const char *pattern,
+                                             unsigned long flags)
+{
+  const char **ports;
+
+  if (!drv || !drv->client)
+    return NULL;
+
+  ports = jack_get_ports(drv->client, pattern, JACK_DEFAULT_AUDIO_TYPE, flags);
+  return ports ? ports : jack_get_ports(drv->client, pattern, NULL, flags);
+}
+
+static const char **JACK_GetPreferredPlaybackPorts(jack_driver_t *drv)
+{
+  const char **ports = NULL;
+
+  if (!drv || !drv->client)
+    return NULL;
+
+  ports = JACK_GetPortsAudioOrAny(drv,
+                                  "^system:playback_[0-9]+$",
+                                  JackPortIsInput);
+  if (ports)
+    return ports;
+
+  ports = JACK_GetPortsAudioOrAny(drv,
+                                  "^system:playback_.*$",
+                                  JackPortIsInput);
+  if (ports)
+    return ports;
+
+  ports = JACK_GetPortsAudioOrAny(drv,
+                                  ".*:playback_[Ff][Ll]$",
+                                  JackPortIsInput);
+  if (ports)
+    return ports;
+
+  ports = JACK_GetPortsAudioOrAny(drv,
+                                  ".*playback.*",
+                                  JackPortIsInput);
+  if (ports)
+    return ports;
+
+  ports = JACK_GetPortsAudioOrAny(drv,
+                                  ".*Playback.*",
+                                  JackPortIsInput);
+  if (ports)
+    return ports;
+
+  ports = JACK_GetPortsAudioOrAny(drv,
+                                  NULL,
+                                  JackPortIsPhysical | JackPortIsInput);
+  if (ports)
+    return ports;
+
+  return JACK_GetPortsAudioOrAny(drv, NULL, JackPortIsInput);
+}
+
+static int JACK_PortIsUsable(jack_driver_t *drv, const char *port_name, unsigned long required_flags)
+{
+  if (!port_name)
+    return 0;
+
+  if (JACK_PortIsOwnClient(drv, port_name))
+    return 0;
+
+  return JACK_PortHasFlags(drv, port_name, required_flags);
+}
+
+static const char *JACK_StereoSuffix(unsigned int channel)
+{
+  return (channel == 0) ? "FL" : ((channel == 1) ? "FR" : NULL);
+}
+
+static void JACK_FormatPortName(char *dst, size_t dst_size,
+                                const char *prefix, unsigned int channel)
+{
+  const char *suffix = JACK_StereoSuffix(channel);
+
+  if (suffix)
+    snprintf(dst, dst_size, "%s_%s", prefix, suffix);
+  else
+    snprintf(dst, dst_size, "%s_%u", prefix, channel);
+}
 
 static void
 JACK_RecalculateRatios(jack_driver_t *drv)
@@ -198,19 +362,9 @@ JACK_RecalculateRatios(jack_driver_t *drv)
   long jack_rate = drv->jack_sample_rate;
   long client_rate = drv->client_sample_rate;
 
-  double new_output_ratio;
-  double new_input_ratio;
-
-  if (client_rate != jack_rate && client_rate > 0 && jack_rate > 0)
-  {
-    new_output_ratio = (double)jack_rate / (double)client_rate;
-    new_input_ratio = (double)client_rate / (double)jack_rate;
-  }
-  else
-  {
-    new_output_ratio = 1.0;
-    new_input_ratio = 1.0;
-  }
+  const int resample = (client_rate != jack_rate && client_rate > 0 && jack_rate > 0);
+  const double new_output_ratio = resample ? ((double)jack_rate / (double)client_rate) : 1.0;
+  const double new_input_ratio = resample ? ((double)client_rate / (double)jack_rate) : 1.0;
 
   atomic_exchange_double(&drv->output_sample_rate_ratio, new_output_ratio);
   atomic_exchange_double(&drv->input_sample_rate_ratio, new_input_ratio);
@@ -229,16 +383,29 @@ JACK_CalcRingbufferBytes(jack_driver_t *drv, double SPVF, unsigned long jack_fra
   const uint32_t jack_period = drv->jack_buffer_size > 0 ? drv->jack_buffer_size : 1024;
   const uint32_t frames_per_vframe = (uint32_t)(SPVF * sr + 0.5);
 
+  const uint32_t min_frames = jack_period * 4;
   uint32_t required_frames = (num_video_frames * frames_per_vframe) + jack_period;
 
-  if (required_frames < jack_period * 4)
-    required_frames = jack_period * 4;
+  required_frames = (required_frames < min_frames) ? min_frames : required_frames;
 
   return (size_t)required_frames * jack_frame_bytes;
 }
 
+static void JACK_RetireRingbuffer(jack_driver_t *drv, jack_ringbuffer_t *rb)
+{
+  if (!drv || !rb)
+    return;
+
+  if (drv->retired_ringbuffer_count < JACK_MAX_RETIRED_RINGBUFFERS)
+  {
+    drv->retired_ringbuffers[drv->retired_ringbuffer_count++] = rb;
+    return;
+  }
+}
+
 static void
-JACK_ResizeSingleRingbuffer(jack_ringbuffer_t *volatile *target,
+JACK_ResizeSingleRingbuffer(jack_driver_t *drv,
+                            jack_ringbuffer_t *volatile *target,
                             size_t volatile *target_size,
                             size_t new_size_bytes,
                             const char *label,
@@ -262,7 +429,7 @@ JACK_ResizeSingleRingbuffer(jack_ringbuffer_t *volatile *target,
   *target_size = new_size_bytes;
 
   if (old)
-    jack_ringbuffer_free(old);
+    JACK_RetireRingbuffer(drv, old);
 
   const unsigned long frames = (unsigned long)(new_size_bytes / jack_frame_bytes);
 
@@ -286,6 +453,7 @@ static void JACK_ResizeRingBuffers(jack_driver_t *drv, double SPVF)
         JACK_CalcRingbufferBytes(drv, SPVF, drv->bytes_per_jack_output_frame);
 
     JACK_ResizeSingleRingbuffer(
+        drv,
         &drv->pPlayPtr,
         &drv->pPlayPtr_size,
         play_bytes,
@@ -300,6 +468,7 @@ static void JACK_ResizeRingBuffers(jack_driver_t *drv, double SPVF)
         JACK_CalcRingbufferBytes(drv, SPVF, drv->bytes_per_jack_input_frame);
 
     JACK_ResizeSingleRingbuffer(
+        drv,
         &drv->pRecPtr,
         &drv->pRecPtr_size,
         rec_bytes,
@@ -434,14 +603,22 @@ static void JACK_RecordOpenFailure(jack_driver_t *drv, int retval)
        (double)drv->reconnect_delay_ns / 1000000000.0);
 }
 
-static inline jack_driver_t *getDriver(int deviceID)
+static inline jack_driver_t *JACK_GetDriverRaw(int deviceID)
 {
   if (deviceID < 0 || deviceID >= MAX_OUTDEVICES)
     return NULL;
 
-  jack_driver_t *drv = &outDev[deviceID];
+  return &outDev[deviceID];
+}
 
-  if (drv->jackd_died && drv->client == 0)
+static inline jack_driver_t *JACK_GetDriverReconnect(int deviceID)
+{
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
+
+  if (!drv)
+    return NULL;
+
+  if (drv->allocated && drv->jackd_died && drv->client == 0)
   {
     int retval = JACK_OpenDevice(drv);
     if (retval == ERR_SUCCESS)
@@ -511,7 +688,7 @@ sample_silence_float(sample_t *dst, unsigned long nsamples)
 }
 
 static int
-JACK_xrun_callback(void *arg) 
+JACK_xrun_callback(void *arg)
 {
   jack_driver_t *drv = (jack_driver_t *)arg;
 
@@ -537,17 +714,10 @@ static int JACK_isStarving(jack_driver_t *drv)
 
   unsigned long requiredFrames = drv->jack_buffer_size;
 
-  unsigned long starvationThresholdFrames;
-  starvationThresholdFrames = (unsigned long)(requiredFrames * STARVATION_PERIOD_THRESHOLD);
+  const unsigned long starvationThresholdFrames =
+      (unsigned long)((float)requiredFrames * STARVATION_PERIOD_THRESHOLD);
 
-  if (inputFramesAvailable < starvationThresholdFrames)
-  {
-    DEBUG("STARVATION CHECK: Available frames (%lu) is below threshold (%lu).",
-          inputFramesAvailable, starvationThresholdFrames);
-    return 1; 
-  }
-
-  return 0;
+  return (inputFramesAvailable < starvationThresholdFrames) ? 1 : 0;
 }
 
 static int
@@ -592,7 +762,132 @@ static void JACK_flush(jack_driver_t *drv)
   drv->leftover_frames = 0;
   atomic_exchange_ulong(&drv->captured_client_bytes, 0);
 
-  veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Flush complete, resamplers and ringbuffers reset");
+}
+
+static void JACK_silence_outputs(float **jack_out, int chs, jack_nframes_t nframes)
+{
+  const size_t bytes = (size_t)nframes * sizeof(float);
+
+  for (int ch = 0; ch < chs; ch++)
+    memset(jack_out[ch], 0, bytes);
+}
+
+
+static inline void JACK_deinterleave_stereo(float *dst0,
+                                            float *dst1,
+                                            const float *src,
+                                            long frames)
+{
+  long f = 0;
+  const long limit = frames & ~3L;
+
+  for (; f < limit; f += 4)
+  {
+    const long s = f << 1;
+    dst0[f]     = src[s];
+    dst1[f]     = src[s + 1];
+    dst0[f + 1] = src[s + 2];
+    dst1[f + 1] = src[s + 3];
+    dst0[f + 2] = src[s + 4];
+    dst1[f + 2] = src[s + 5];
+    dst0[f + 3] = src[s + 6];
+    dst1[f + 3] = src[s + 7];
+  }
+
+  for (; f < frames; f++)
+  {
+    const long s = f << 1;
+    dst0[f] = src[s];
+    dst1[f] = src[s + 1];
+  }
+}
+
+static inline void JACK_interleave_stereo(float *dst,
+                                          const float *src0,
+                                          const float *src1,
+                                          long frames)
+{
+  long f = 0;
+  const long limit = frames & ~3L;
+
+  for (; f < limit; f += 4)
+  {
+    const long d = f << 1;
+    dst[d]     = src0[f];
+    dst[d + 1] = src1[f];
+    dst[d + 2] = src0[f + 1];
+    dst[d + 3] = src1[f + 1];
+    dst[d + 4] = src0[f + 2];
+    dst[d + 5] = src1[f + 2];
+    dst[d + 6] = src0[f + 3];
+    dst[d + 7] = src1[f + 3];
+  }
+
+  for (; f < frames; f++)
+  {
+    const long d = f << 1;
+    dst[d] = src0[f];
+    dst[d + 1] = src1[f];
+  }
+}
+
+static inline void JACK_mix_stereo_to_mono(float *dst,
+                                           const float *src0,
+                                           const float *src1,
+                                           long frames)
+{
+  long f = 0;
+  const long limit = frames & ~3L;
+
+  for (; f < limit; f += 4)
+  {
+    dst[f]     = (src0[f]     + src1[f])     * 0.5f;
+    dst[f + 1] = (src0[f + 1] + src1[f + 1]) * 0.5f;
+    dst[f + 2] = (src0[f + 2] + src1[f + 2]) * 0.5f;
+    dst[f + 3] = (src0[f + 3] + src1[f + 3]) * 0.5f;
+  }
+
+  for (; f < frames; f++)
+    dst[f] = (src0[f] + src1[f]) * 0.5f;
+}
+
+static void JACK_drain_playback_ring(jack_driver_t *drv, jack_ringbuffer_t *play)
+{
+  if (!drv || !play || drv->bytes_per_jack_output_frame == 0)
+    return;
+
+  const size_t frame_bytes = drv->bytes_per_jack_output_frame;
+  size_t avail = jack_ringbuffer_read_space(play);
+  avail -= avail % frame_bytes;
+
+  if (avail > 0)
+    jack_ringbuffer_read_advance(play, avail);
+}
+
+static void JACK_update_played_position(jack_driver_t *drv)
+{
+  if (!drv || !drv->client || drv->num_output_channels == 0 ||
+      drv->bytes_per_output_frame == 0 ||
+      drv->jack_sample_rate <= 0 ||
+      drv->client_sample_rate <= 0)
+    return;
+
+  jack_nframes_t current = jack_last_frame_time(drv->client);
+  jack_nframes_t previous =
+      atomic_exchange_uint(&drv->last_callback_frame, current);
+
+  if (previous == 0 || current <= previous)
+    return;
+
+  unsigned long client_frames =
+      JACK_RescaleJackFramesToClientFramesRound(
+          drv,
+          (unsigned long)(current - previous));
+
+  if (client_frames > 0)
+    atomic_add_fetch_ulong(
+        &drv->played_client_bytes,
+        client_frames * drv->bytes_per_output_frame);
 }
 
 static void
@@ -601,24 +896,104 @@ JACK_callback_playback(jack_driver_t *drv, jack_nframes_t nframes)
   if (!drv || drv->num_output_channels == 0)
     return;
 
-  const int chs = drv->num_output_channels;
+  if (drv->num_output_channels > MAX_OUTPUT_PORTS)
+    return;
+
+  const int chs = (int)drv->num_output_channels;
   const size_t frame_bytes = drv->bytes_per_jack_output_frame;
+  const long nframes_long = (long)nframes;
+  const size_t sample_bytes = (size_t)nframes * sizeof(float);
 
   float *jack_out[MAX_OUTPUT_PORTS];
 
   for (int ch = 0; ch < chs; ch++)
   {
+    if (!drv->output_port[ch])
+      return;
+
     jack_out[ch] = (float *)jack_port_get_buffer(drv->output_port[ch], nframes);
     if (!jack_out[ch])
       return;
   }
 
+  /* TODO: apply drv->volume[] / volumeEffectType in the JACK callback output path. */
+
   jack_ringbuffer_t *play = (jack_ringbuffer_t *)drv->pPlayPtr;
+
+  if (atomic_load_int(&drv->input_passthrough))
+  {
+    int ok = 0;
+
+    if (drv->num_input_channels > 0 &&
+        drv->num_input_channels <= MAX_INPUT_PORTS &&
+        drv->bytes_per_jack_input_frame > 0)
+    {
+      float *jack_in[MAX_INPUT_PORTS];
+      ok = 1;
+
+      for (int ch = 0; ch < (int)drv->num_input_channels; ch++)
+      {
+        if (!drv->input_port[ch])
+        {
+          ok = 0;
+          break;
+        }
+
+        jack_in[ch] = (float *)jack_port_get_buffer(drv->input_port[ch], nframes);
+        if (!jack_in[ch])
+        {
+          ok = 0;
+          break;
+        }
+      }
+
+      if (ok)
+      {
+        if (drv->num_input_channels == 1)
+        {
+          for (int ch = 0; ch < chs; ch++)
+            memcpy(jack_out[ch], jack_in[0], sample_bytes);
+        }
+        else if (chs == 1)
+        {
+          JACK_mix_stereo_to_mono(jack_out[0],
+                                  jack_in[0],
+                                  jack_in[1],
+                                  (long)nframes);
+        }
+        else
+        {
+          memcpy(jack_out[0], jack_in[0], sample_bytes);
+          memcpy(jack_out[1], jack_in[1], sample_bytes);
+          for (int ch = 2; ch < chs; ch++)
+            memcpy(jack_out[ch], jack_in[1], sample_bytes);
+        }
+
+        JACK_drain_playback_ring(drv, play);
+        return;
+      }
+    }
+
+    JACK_silence_outputs(jack_out, chs, nframes);
+    JACK_drain_playback_ring(drv, play);
+    return;
+  }
 
   if (!play || frame_bytes == 0)
   {
-    for (int ch = 0; ch < chs; ch++)
-      memset(jack_out[ch], 0, nframes * sizeof(float));
+    JACK_silence_outputs(jack_out, chs, nframes);
+    return;
+  }
+
+  const long available_frames =
+      (long)(jack_ringbuffer_read_space(play) / frame_bytes);
+  const long target_frames =
+      (available_frames < nframes_long) ? available_frames : nframes_long;
+
+  if (target_frames <= 0)
+  {
+    atomic_exchange_long(&drv->underrun_count, 1);
+    JACK_silence_outputs(jack_out, chs, nframes);
     return;
   }
 
@@ -627,11 +1002,11 @@ JACK_callback_playback(jack_driver_t *drv, jack_nframes_t nframes)
 
   long frames_done = 0;
 
-  for (int v = 0; v < 2 && frames_done < (long)nframes; v++)
+  for (int v = 0; v < 2 && frames_done < target_frames; v++)
   {
     const float *src = (const float *)vec[v].buf;
     long vec_frames = vec[v].len / frame_bytes;
-    long remaining = (long)nframes - frames_done;
+    long remaining = target_frames - frames_done;
     long to_copy = (vec_frames < remaining) ? vec_frames : remaining;
 
     if (to_copy <= 0)
@@ -639,14 +1014,16 @@ JACK_callback_playback(jack_driver_t *drv, jack_nframes_t nframes)
 
     if (chs == 2)
     {
-      float *dst0 = jack_out[0] + frames_done;
-      float *dst1 = jack_out[1] + frames_done;
-
-      for (long f = 0; f < to_copy; f++)
-      {
-        dst0[f] = src[(f << 1)];
-        dst1[f] = src[(f << 1) + 1];
-      }
+      JACK_deinterleave_stereo(jack_out[0] + frames_done,
+                               jack_out[1] + frames_done,
+                               src,
+                               to_copy);
+    }
+    else if (chs == 1)
+    {
+      memcpy(jack_out[0] + frames_done,
+             src,
+             (size_t)to_copy * sizeof(float));
     }
     else
     {
@@ -663,11 +1040,11 @@ JACK_callback_playback(jack_driver_t *drv, jack_nframes_t nframes)
     frames_done += to_copy;
   }
 
-  if (frames_done < (long)nframes)
+  if (frames_done < nframes_long)
   {
     atomic_exchange_long(&drv->underrun_count, 1);
 
-    long zero_frames = (long)nframes - frames_done;
+    long zero_frames = nframes_long - frames_done;
     for (int ch = 0; ch < chs; ch++)
       memset(jack_out[ch] + frames_done, 0, zero_frames * sizeof(float));
   }
@@ -675,13 +1052,18 @@ JACK_callback_playback(jack_driver_t *drv, jack_nframes_t nframes)
   jack_ringbuffer_read_advance(play, frames_done * frame_bytes);
 }
 
+
 static void
 JACK_callback_capture(jack_driver_t *drv, jack_nframes_t nframes)
 {
   if (!drv || drv->num_input_channels == 0)
     return;
 
-  const int chs = drv->num_input_channels;
+  if (drv->num_input_channels > MAX_INPUT_PORTS)
+    return;
+
+  const int chs = (int)drv->num_input_channels;
+  const long nframes_long = (long)nframes;
   const size_t frame_bytes = drv->bytes_per_jack_input_frame;
 
   if (frame_bytes == 0)
@@ -691,17 +1073,10 @@ JACK_callback_capture(jack_driver_t *drv, jack_nframes_t nframes)
   if (!rec)
     return;
 
-  float *jack_in[MAX_INPUT_PORTS];
-
-  for (int ch = 0; ch < chs; ch++)
-  {
-    jack_in[ch] = (float *)jack_port_get_buffer(drv->input_port[ch], nframes);
-    if (!jack_in[ch])
-      return;
-  }
-
-  long writable_frames = (long)(jack_ringbuffer_write_space(rec) / frame_bytes);
-  long frames_to_write = ((long)nframes < writable_frames) ? (long)nframes : writable_frames;
+  const long writable_frames =
+      (long)(jack_ringbuffer_write_space(rec) / frame_bytes);
+  const long frames_to_write =
+      (nframes_long < writable_frames) ? nframes_long : writable_frames;
 
   if (frames_to_write <= 0)
   {
@@ -709,8 +1084,20 @@ JACK_callback_capture(jack_driver_t *drv, jack_nframes_t nframes)
     return;
   }
 
-  if (frames_to_write < (long)nframes)
+  if (frames_to_write < nframes_long)
     __sync_add_and_fetch(&drv->input_overrun_count, 1);
+
+  float *jack_in[MAX_INPUT_PORTS];
+
+  for (int ch = 0; ch < chs; ch++)
+  {
+    if (!drv->input_port[ch])
+      return;
+
+    jack_in[ch] = (float *)jack_port_get_buffer(drv->input_port[ch], nframes);
+    if (!jack_in[ch])
+      return;
+  }
 
   jack_ringbuffer_data_t vec[2];
   jack_ringbuffer_get_write_vector(rec, vec);
@@ -729,14 +1116,16 @@ JACK_callback_capture(jack_driver_t *drv, jack_nframes_t nframes)
 
     if (chs == 2)
     {
-      const float *src0 = jack_in[0] + frames_done;
-      const float *src1 = jack_in[1] + frames_done;
-
-      for (long f = 0; f < to_copy; f++)
-      {
-        dst[(f << 1)] = src0[f];
-        dst[(f << 1) + 1] = src1[f];
-      }
+      JACK_interleave_stereo(dst,
+                             jack_in[0] + frames_done,
+                             jack_in[1] + frames_done,
+                             to_copy);
+    }
+    else if (chs == 1)
+    {
+      memcpy(dst,
+             jack_in[0] + frames_done,
+             (size_t)to_copy * sizeof(float));
     }
     else
     {
@@ -760,12 +1149,13 @@ static int JACK_callback(jack_nframes_t nframes, void *arg)
   if (!drv)
     return 0;
 
-  atomic_exchange_int(&drv->cb_active, TRUE);
+  atomic_store_int(&drv->cb_active, TRUE);
 
   if (atomic_exchange_int(&drv->xrun_pending, 0))
     atomic_store_int(&drv->xrun_flag, 1);
 
   atomic_add_fetch_ulong(&drv->last_hw_frame_count, (unsigned long)nframes);
+  JACK_update_played_position(drv);
 
   JACK_callback_capture(drv, nframes);
   JACK_callback_playback(drv, nframes);
@@ -848,7 +1238,6 @@ JACK_OpenDeviceRaw(jack_driver_t *drv)
 
   snprintf(our_client_name, name_len + 1, "%s_%d_%d%02d", client_name, getpid(),
            drv->deviceID, drv->clientCtr++);
-  DEBUG("client name '%s'", our_client_name);
 
   jack_status_t status;
 #ifndef HAVE_JACK2
@@ -1026,8 +1415,7 @@ JACK_OpenDeviceRaw(jack_driver_t *drv)
   for (i = 0; i < drv->num_output_channels; i++)
   {
     char portname[32];
-    snprintf(portname, sizeof(portname), "out_%d", i);
-    veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Jack output port %d is named '%s'", i, portname);
+    JACK_FormatPortName(portname, sizeof(portname), "output", i);
 
     drv->output_port[i] = jack_port_register(drv->client, portname,
                                              JACK_DEFAULT_AUDIO_TYPE,
@@ -1043,8 +1431,7 @@ JACK_OpenDeviceRaw(jack_driver_t *drv)
   for (i = 0; i < drv->num_input_channels; i++)
   {
     char portname[32];
-    snprintf(portname, sizeof(portname), "in_%d", i);
-    veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Jack input port %d is named '%s'", i, portname);
+    JACK_FormatPortName(portname, sizeof(portname), "input", i);
 
     drv->input_port[i] = jack_port_register(drv->client, portname,
                                             JACK_DEFAULT_AUDIO_TYPE,
@@ -1089,14 +1476,11 @@ JACK_OpenDeviceRaw(jack_driver_t *drv)
     char full_portname[64];
     char portname_suffix[32];
 
-    sprintf(portname_suffix, "out_%d", i);
+    JACK_FormatPortName(portname_suffix, sizeof(portname_suffix), "output", i);
 
     snprintf(full_portname, sizeof(full_portname), "%s:%s", client_name_stable, portname_suffix);
 
     jack_port_t *active_port = jack_port_by_name(drv->client, full_portname);
-
-    DEBUG("Port Re-acquisition: full_portname '%s' , portname_suffix '%s' client_name '%s' active_port '%p'",
-          full_portname, portname_suffix, client_name_stable, active_port);
 
     if (active_port != NULL)
     {
@@ -1109,169 +1493,174 @@ JACK_OpenDeviceRaw(jack_driver_t *drv)
     }
   }
 
-  if ((drv->num_output_channels > 0) && (port_connection_mode != CONNECT_NONE))
+  if ((drv->num_output_channels > 0) &&
+      (port_connection_mode == CONNECT_ALL ||
+       port_connection_mode == CONNECT_OUTPUT))
   {
     if ((drv->jack_port_name_count == 0) || (drv->jack_port_name_count == 1))
     {
       if (drv->jack_port_name_count == 0)
       {
-        ports = jack_get_ports(drv->client, NULL, NULL,
-                               drv->jack_output_port_flags);
+
+        ports = JACK_GetPreferredPlaybackPorts(drv);
       }
       else
       {
-        ports = jack_get_ports(drv->client, drv->jack_port_name[0], NULL,
-                               drv->jack_output_port_flags);
+        ports = JACK_GetPortsAudioOrAny(drv,
+                                      drv->jack_port_name[0],
+                                      drv->jack_output_port_flags);
       }
 
-      unsigned int num_ports = 0;
-      if (ports)
+      if (!ports)
       {
+        WARN("No JACK playback target ports found; output ports remain available for manual wiring");
+      }
+      else
+      {
+        unsigned int connected = 0;
+        unsigned int seen_usable = 0;
+        const int default_autoconnect = (drv->jack_port_name_count == 0);
+
         for (i = 0; ports[i]; i++)
         {
-          veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Found jack output port '%s'", ports[i]);
-          num_ports++;
-        }
-      }
+          const int playback_target = JACK_PortLooksLikePlaybackTarget(ports[i]);
 
-      if (!ports || (i < drv->num_output_channels))
-      {
-        DEBUG("ERR: jack_get_ports() failed to find ports with jack port flags of 0x%lX'",
-              drv->jack_output_port_flags);
-#if JACK_CLOSE_HACK
-        JACK_CloseDevice(drv, TRUE);
-#else
-        JACK_CloseDevice(drv);
-#endif
-        return ERR_PORT_NOT_FOUND;
-      }
+          if (!JACK_PortIsUsable(drv, ports[i], JackPortIsInput))
+            continue;
 
-      for (i = 0; i < drv->num_output_channels; i++)
-      {
-        DEBUG("jack_connect() connecting client port '%s' to JACK port '%s'",
-              jack_port_name(drv->output_port[i]), ports[i]);
-
-        if (jack_connect(drv->client, jack_port_name(drv->output_port[i]), ports[i]))
-        {
-          ERR("cannot connect to output port %d('%s')", i, ports[i]);
-          failed = 1;
-        }
-      }
-
-      if (port_connection_mode == CONNECT_ALL)
-      {
-        if (drv->num_output_channels < num_ports)
-        {
-          for (i = drv->num_output_channels; ports[i]; i++)
+          if (default_autoconnect)
           {
-            int n = i % drv->num_output_channels;
-            DEBUG("jack_connect() connecting client port '%s' to additional JACK port '%s'",
-                  jack_port_name(drv->output_port[n]), ports[i]);
-            if (jack_connect(drv->client, jack_port_name(drv->output_port[n]), ports[i]))
-            {
-              ERR("cannot connect to output port %d('%s')", n, ports[i]);
-            }
+            if (!playback_target && JACK_PortLooksLikeNonPlaybackTarget(ports[i]))
+              continue;
+
+            if (connected >= drv->num_output_channels && !playback_target)
+              break;
+          }
+          else if (connected >= drv->num_output_channels)
+          {
+            break;
+          }
+
+          seen_usable++;
+
+          const int n = connected % drv->num_output_channels;
+
+          if (jack_connect(drv->client,
+                           jack_port_name(drv->output_port[n]),
+                           ports[i]))
+          {
+            WARN("cannot connect output channel %d to JACK playback target '%s'",
+                 n, ports[i]);
+          }
+          else
+          {
+            connected++;
           }
         }
-        else if (drv->num_output_channels > num_ports)
-        {
-          for (i = num_ports; i < drv->num_output_channels; i++)
-          {
-            int n = i % num_ports;
-            DEBUG("jack_connect() connecting client port '%s' to additional JACK port '%s'",
-                  jack_port_name(drv->output_port[i]), ports[n]);
-            if (jack_connect(drv->client, jack_port_name(drv->output_port[i]), ports[n]))
-            {
-              ERR("cannot connect to output port %d('%s')", i, ports[n]);
-            }
-          }
-        }
-      }
 
-      free(ports);
+        if (connected == 0)
+        {
+          WARN("No usable JACK playback target ports were connected; output ports remain available for manual wiring");
+        }
+        else if (!default_autoconnect && connected < drv->num_output_channels)
+        {
+          WARN("Only connected %u/%lu JACK playback output channels",
+               connected,
+               drv->num_output_channels);
+        }
+
+        if (seen_usable == 0)
+        {
+          WARN("No usable JACK playback targets found after filtering own/capture/monitor ports");
+        }
+
+        free(ports);
+      }
     }
     else
     {
-      for (i = 0; i < drv->jack_port_name_count; i++)
+      for (i = 0; i < drv->jack_port_name_count && i < drv->num_output_channels; i++)
       {
-        ports = jack_get_ports(drv->client, drv->jack_port_name[i], NULL,
+        ports = JACK_GetPortsAudioOrAny(drv,
+                               drv->jack_port_name[i],
                                drv->jack_output_port_flags);
 
         if (!ports)
         {
-          ERR("jack_get_ports() failed to find ports with jack port flags of 0x%lX'",
-              drv->jack_output_port_flags);
-          return ERR_PORT_NOT_FOUND;
+          WARN("jack_get_ports() found no playback target matching '%s'",
+               drv->jack_port_name[i]);
+          continue;
         }
 
-        if (jack_connect(drv->client, jack_port_name(drv->output_port[i]), ports[0]))
+        if (!JACK_PortIsUsable(drv, ports[0], JackPortIsInput))
         {
-          ERR("cannot connect to output port %d('%s')", 0, ports[0]);
+          WARN("skipping unusable JACK playback target '%s'", ports[0]);
+          free(ports);
+          continue;
+        }
+
+        if (jack_connect(drv->client,
+                         jack_port_name(drv->output_port[i]),
+                         ports[0]))
+        {
+          WARN("cannot connect output channel %u to JACK playback target '%s'",
+               i, ports[0]);
           failed = 1;
         }
+
         free(ports);
       }
     }
   }
 
-  if ((drv->num_input_channels > 0) && (port_connection_mode != CONNECT_NONE))
+  if ((drv->num_input_channels > 0) &&
+      (port_connection_mode == CONNECT_ALL))
   {
     if ((drv->jack_port_name_count == 0) || (drv->jack_port_name_count == 1))
     {
       if (drv->jack_port_name_count == 0)
       {
-        ports = jack_get_ports(drv->client, NULL, NULL, drv->jack_input_port_flags);
+        ports = jack_get_ports(drv->client, NULL, JACK_DEFAULT_AUDIO_TYPE, drv->jack_input_port_flags);
       }
       else
       {
-        ports = jack_get_ports(drv->client, drv->jack_port_name[0], NULL,
+        ports = jack_get_ports(drv->client, drv->jack_port_name[0], JACK_DEFAULT_AUDIO_TYPE,
                                drv->jack_input_port_flags);
       }
 
-      unsigned int num_ports = 0;
-      if (ports)
-      {
-        for (i = 0; ports[i]; i++)
-          num_ports++;
-      }
-
-      if (!ports || num_ports == 0)
+      if (!ports)
       {
         veejay_msg(VEEJAY_MSG_WARNING,
                    "[AUDIO] No JACK capture source ports found; input ports remain available for manual wiring");
-        if (ports)
-          free(ports);
       }
       else
       {
-        unsigned int first_pass = (drv->num_input_channels < num_ports)
-                                      ? drv->num_input_channels
-                                      : num_ports;
+        unsigned int connected = 0;
+        unsigned int seen_usable = 0;
 
-        for (i = 0; i < first_pass; i++)
+        for (i = 0; ports[i]; i++)
         {
-          DEBUG("jack_connect() connecting capture source '%s' to client input '%s'",
-                ports[i], jack_port_name(drv->input_port[i]));
+          if (!JACK_PortIsUsable(drv, ports[i], JackPortIsOutput))
+            continue;
 
-          if (jack_connect(drv->client, ports[i], jack_port_name(drv->input_port[i])))
+          seen_usable++;
+          int n = connected % drv->num_input_channels;
+
+          if (jack_connect(drv->client, ports[i], jack_port_name(drv->input_port[n])))
           {
-            WARN("cannot connect JACK capture source %d('%s')", i, ports[i]);
+            WARN("cannot connect JACK capture source %d('%s')", n, ports[i]);
           }
+
+          connected++;
+
+          if (port_connection_mode != CONNECT_ALL && connected >= drv->num_input_channels)
+            break;
         }
 
-        if (port_connection_mode == CONNECT_ALL && drv->num_input_channels > 0)
+        if (seen_usable == 0)
         {
-          for (i = first_pass; i < num_ports; i++)
-          {
-            int n = i % drv->num_input_channels;
-            DEBUG("jack_connect() connecting additional capture source '%s' to client input '%s'",
-                  ports[i], jack_port_name(drv->input_port[n]));
-
-            if (jack_connect(drv->client, ports[i], jack_port_name(drv->input_port[n])))
-            {
-              WARN("cannot connect additional JACK capture source %d('%s')", n, ports[i]);
-            }
-          }
+          veejay_msg(VEEJAY_MSG_WARNING,
+                     "[AUDIO] No usable external JACK audio capture sources found; input ports remain available for manual wiring");
         }
 
         free(ports);
@@ -1281,7 +1670,7 @@ JACK_OpenDeviceRaw(jack_driver_t *drv)
     {
       for (i = 0; i < drv->jack_port_name_count; i++)
       {
-        ports = jack_get_ports(drv->client, drv->jack_port_name[i], NULL,
+        ports = jack_get_ports(drv->client, drv->jack_port_name[i], JACK_DEFAULT_AUDIO_TYPE,
                                drv->jack_input_port_flags);
 
         if (!ports)
@@ -1292,6 +1681,13 @@ JACK_OpenDeviceRaw(jack_driver_t *drv)
         }
 
         int n = i % drv->num_input_channels;
+
+        if (!JACK_PortIsUsable(drv, ports[0], JackPortIsOutput))
+        {
+          WARN("skipping unusable JACK capture source '%s'", ports[0]);
+          free(ports);
+          continue;
+        }
 
         if (jack_connect(drv->client, ports[0], jack_port_name(drv->input_port[n])))
         {
@@ -1377,8 +1773,6 @@ JACK_CloseDevice(jack_driver_t *drv)
     }
     JACK_CleanupDriver(drv);
 
-    JACK_ResetFromDriver(drv);
-
 #if JACK_CLOSE_HACK
   }
   else
@@ -1396,12 +1790,15 @@ JACK_CloseDevice(jack_driver_t *drv)
 static void
 JACK_ResetFromDriver(jack_driver_t *drv)
 {
+  if (!drv)
+    return;
+
   atomic_exchange_int(&drv->state, RESET);
 }
 
 void JACK_Reset(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   JACK_ResetFromDriver(drv);
 }
 
@@ -1524,7 +1921,7 @@ int JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
 
 int JACK_Close(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   if (!drv || !drv->allocated)
     return -1;
 
@@ -1565,7 +1962,7 @@ int JACK_Close(int deviceID)
 
 void JACK_Flush(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   JACK_flush(drv);
 }
 
@@ -1575,33 +1972,45 @@ static long JACK_RingbufferWriteFrames( jack_driver_t *drv, const float *src, lo
   jack_ringbuffer_get_write_vector(drv->pPlayPtr, vec);
 
   long frames_written = 0;
-  const int chs = drv->num_output_channels;
+  const int chs = (int)drv->num_output_channels;
+  const size_t frame_bytes = drv->bytes_per_jack_output_frame;
 
   for (int v = 0; v < 2 && frames_written < frames; v++)
   {
-    const long vec_frames = vec[v].len / drv->bytes_per_jack_output_frame;
-
-    const long to_copy =(frames - frames_written < vec_frames) ? (frames - frames_written) : vec_frames;
+    const long vec_frames = vec[v].len / frame_bytes;
+    const long remaining = frames - frames_written;
+    const long to_copy = (remaining < vec_frames) ? remaining : vec_frames;
 
     if (to_copy <= 0)
       continue;
 
-    memcpy(
-        vec[v].buf, src + frames_written * chs, to_copy * drv->bytes_per_jack_output_frame);
+    memcpy(vec[v].buf,
+           src + frames_written * chs,
+           (size_t)to_copy * frame_bytes);
 
     frames_written += to_copy;
   }
 
   jack_ringbuffer_write_advance(
       drv->pPlayPtr,
-      frames_written * drv->bytes_per_jack_output_frame);
+      (size_t)frames_written * frame_bytes);
 
   return frames_written;
 }
 
+static void JACK_add_accepted_output_bytes(jack_driver_t *drv,
+                                           unsigned long bytes)
+{
+  if (!drv || bytes == 0)
+    return;
+
+  atomic_add_fetch_ulong(&drv->client_bytes, bytes);
+  atomic_add_fetch_ulong(&drv->written_client_bytes, bytes);
+}
+
 long JACK_Write(int deviceID, unsigned char *data, unsigned long bytes)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverReconnect(deviceID);
 
   if (!drv || !data || bytes == 0)
     return 0;
@@ -1609,10 +2018,12 @@ long JACK_Write(int deviceID, unsigned char *data, unsigned long bytes)
   if (drv->num_output_channels == 0 || !drv->pPlayPtr || !drv->swr_ctx)
     return 0;
 
-  int bytes_per_sample = (drv->bits_per_channel == 16) ? 2 : 1;
-  int bytes_per_frame = bytes_per_sample * drv->num_output_channels;
+  const int output_channels = (int)drv->num_output_channels;
+  const int bytes_per_sample = (drv->bits_per_channel == 16) ? 2 : 1;
+  const int bytes_per_frame = bytes_per_sample * output_channels;
+  const size_t jack_frame_bytes = drv->bytes_per_jack_output_frame;
 
-  if (bytes_per_frame <= 0)
+  if (bytes_per_frame <= 0 || jack_frame_bytes == 0)
     return 0;
 
   const long in_frames = bytes / bytes_per_frame;
@@ -1620,21 +2031,41 @@ long JACK_Write(int deviceID, unsigned char *data, unsigned long bytes)
   if (in_frames <= 0)
     return 0;
 
+  if (atomic_load_int(&drv->input_passthrough))
+  {
+    JACK_add_accepted_output_bytes(
+        drv,
+        (unsigned long)in_frames * (unsigned long)bytes_per_frame);
+    return in_frames;
+  }
+
   if (atomic_exchange_int(&drv->xrun_pending, 0))
     JACK_flush(drv);
 
-  int out_frames_needed = swr_get_out_samples(drv->swr_ctx, in_frames);
+  long out_required = JACK_get_required_free_frames(drv, (int)in_frames);
+  int out_frames_needed = (int)out_required;
+
+  if (out_frames_needed <= 0)
+    return 0;
+
+  if (out_frames_needed > drv->resample_buf_frames)
+  {
+    int upper = swr_get_out_samples(drv->swr_ctx, in_frames);
+    WARN("JACK_Write block too large for resample buffer: client=%ld jack_required=%d upper=%d cap=%ld delay=%" PRId64 " rates=%ld/%ld",
+         in_frames,
+         out_frames_needed,
+         upper,
+         drv->resample_buf_frames,
+         swr_get_delay(drv->swr_ctx, drv->client_sample_rate),
+         drv->client_sample_rate,
+         drv->jack_sample_rate);
+    return 0;
+  }
 
   const size_t rb_write_space = jack_ringbuffer_write_space(drv->pPlayPtr);
-  const long rb_frames_capacity = rb_write_space / drv->bytes_per_jack_output_frame;
+  const long rb_frames_capacity = rb_write_space / jack_frame_bytes;
 
-  long out_frames_cap = out_frames_needed;
-  if (out_frames_cap > rb_frames_capacity)
-    out_frames_cap = rb_frames_capacity;
-  if (out_frames_cap > drv->resample_buf_frames)
-    out_frames_cap = drv->resample_buf_frames;
-
-  if (out_frames_cap <= 0)
+  if (rb_frames_capacity < out_frames_needed)
     return 0;
 
   const uint8_t *in_ptr = data;
@@ -1643,14 +2074,23 @@ long JACK_Write(int deviceID, unsigned char *data, unsigned long bytes)
   const int out_frames = swr_convert(
       drv->swr_ctx,
       (uint8_t **)&out_ptr,
-      out_frames_cap,
+      out_frames_needed,
       (const uint8_t **)&in_ptr,
       in_frames);
 
   if (out_frames <= 0)
     return 0;
 
-  return JACK_RingbufferWriteFrames(drv, out_ptr, out_frames);
+  long jack_frames_written = JACK_RingbufferWriteFrames(drv, out_ptr, out_frames);
+
+  if (jack_frames_written != out_frames)
+    return 0;
+
+  JACK_add_accepted_output_bytes(
+      drv,
+      (unsigned long)in_frames * (unsigned long)bytes_per_frame);
+
+  return in_frames;
 }
 
 static long
@@ -1682,7 +2122,7 @@ JACK_RingbufferReadFramesToFloat(jack_driver_t *drv, float *dst, long frames)
     memcpy(
         dst + frames_read * chs,
         vec[v].buf,
-        to_copy * frame_bytes);
+        (size_t)to_copy * frame_bytes);
 
     frames_read += to_copy;
   }
@@ -1694,7 +2134,7 @@ JACK_RingbufferReadFramesToFloat(jack_driver_t *drv, float *dst, long frames)
 
 long JACK_Read(int deviceID, unsigned char *data, unsigned long bytes)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverReconnect(deviceID);
 
   if (!drv || !data || bytes == 0)
     return 0;
@@ -1705,10 +2145,13 @@ long JACK_Read(int deviceID, unsigned char *data, unsigned long bytes)
   if (drv->bytes_per_jack_input_frame == 0)
     return 0;
 
+  const int input_channels = (int)drv->num_input_channels;
   const int bytes_per_sample = (drv->bits_per_channel == 16) ? 2 : 1;
-  const int bytes_per_frame = bytes_per_sample * drv->num_input_channels;
+  const int bytes_per_frame = bytes_per_sample * input_channels;
+  const size_t jack_frame_bytes = drv->bytes_per_jack_input_frame;
+  const long max_chunk_jack_frames = drv->input_resample_buf_frames;
 
-  if (bytes_per_frame <= 0)
+  if (bytes_per_frame <= 0 || max_chunk_jack_frames <= 0)
     return 0;
 
   const long target_client_frames = bytes / bytes_per_frame;
@@ -1721,30 +2164,23 @@ long JACK_Read(int deviceID, unsigned char *data, unsigned long bytes)
   while (client_frames_done < target_client_frames)
   {
     const size_t available_bytes = jack_ringbuffer_read_space(drv->pRecPtr);
-    long available_jack_frames = available_bytes / drv->bytes_per_jack_input_frame;
+    const long available_jack_frames = (long)(available_bytes / jack_frame_bytes);
 
     if (available_jack_frames <= 0)
       break;
 
-    long remaining_client_frames = target_client_frames - client_frames_done;
+    const long remaining_client_frames = target_client_frames - client_frames_done;
+    const long desired_jack_frames =
+        JACK_rescale_client_to_jack_frames_ceil(drv, remaining_client_frames) + 8;
 
-    long desired_jack_frames =
-        (long)ceil(
-            (double)remaining_client_frames *
-            (double)drv->jack_sample_rate /
-            (double)drv->client_sample_rate) +
-        8;
-
-    if (desired_jack_frames < 1)
-      desired_jack_frames = 1;
-
-    long chunk_jack_frames = available_jack_frames;
-
-    if (chunk_jack_frames > desired_jack_frames)
-      chunk_jack_frames = desired_jack_frames;
-
-    if (chunk_jack_frames > drv->input_resample_buf_frames)
-      chunk_jack_frames = drv->input_resample_buf_frames;
+    long chunk_jack_frames =
+        (available_jack_frames < desired_jack_frames)
+            ? available_jack_frames
+            : desired_jack_frames;
+    chunk_jack_frames =
+        (chunk_jack_frames < max_chunk_jack_frames)
+            ? chunk_jack_frames
+            : max_chunk_jack_frames;
 
     if (chunk_jack_frames <= 0)
       break;
@@ -1800,8 +2236,7 @@ JACK_SetVolumeForChannelFromDriver(jack_driver_t *drv,
   if (!drv || channel >= drv->num_output_channels)
     return 1;
 
-  if (volume > 100)
-    volume = 100;
+  volume = (volume > 100) ? 100 : volume;
 
   atomic_exchange_uint(&drv->volume[channel], volume);
 
@@ -1811,14 +2246,14 @@ JACK_SetVolumeForChannelFromDriver(jack_driver_t *drv,
 int JACK_SetVolumeForChannel(int deviceID, unsigned int channel,
                              unsigned int volume)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   int retval = JACK_SetVolumeForChannelFromDriver(drv, channel, volume);
   return retval;
 }
 
 int JACK_SetAllVolume(int deviceID, unsigned int volume)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   unsigned int i;
 
   if (!drv)
@@ -1838,7 +2273,7 @@ int JACK_SetAllVolume(int deviceID, unsigned int volume)
 void JACK_GetVolumeForChannel(int deviceID, unsigned int channel,
                               unsigned int *volume)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
 
   if (!drv)
     return;
@@ -1858,12 +2293,9 @@ void JACK_GetVolumeForChannel(int deviceID, unsigned int channel,
 
 int JACK_SetVolumeEffectType(int deviceID, int type)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   if (!drv)
     return LINEAR;
-
-  DEBUG("setting type of '%s'",
-        (type == DBATTENUATION ? "dbAttenuation" : "linear"));
 
   int retval = atomic_exchange_int(&drv->volumeEffectType, type);
 
@@ -1872,7 +2304,7 @@ int JACK_SetVolumeEffectType(int deviceID, int type)
 
 int JACK_SetState(int deviceID, int state)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   if (!drv)
     return -1;
 
@@ -1905,7 +2337,7 @@ int JACK_SetState(int deviceID, int state)
 
 int JACK_XRUNHandled(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   if (!drv)
     return -1;
   return atomic_exchange_int(&drv->xrun_flag,0);
@@ -1913,7 +2345,7 @@ int JACK_XRUNHandled(int deviceID)
 
 int JACK_GetCallbackActive(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
 
   if (!drv || !drv->allocated)
   {
@@ -1925,7 +2357,7 @@ int JACK_GetCallbackActive(int deviceID)
 
 int JACK_GetState(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
 
   if (!drv || !drv->allocated)
   {
@@ -1952,7 +2384,7 @@ JACK_GetOutputBytesPerSecondFromDriver(jack_driver_t *drv)
 unsigned long
 JACK_GetOutputBytesPerSecond(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   unsigned long return_val;
 
   return_val = JACK_GetOutputBytesPerSecondFromDriver(drv);
@@ -1975,7 +2407,7 @@ JACK_GetInputBytesPerSecondFromDriver(jack_driver_t *drv)
 unsigned long
 JACK_GetInputBytesPerSecond(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   long return_val;
   ;
   return_val = JACK_GetInputBytesPerSecondFromDriver(drv);
@@ -1987,7 +2419,7 @@ JACK_GetInputBytesPerSecond(int deviceID)
 unsigned long
 JACK_GetBytesPerInputFrame(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
 
   if (!drv)
     return 0;
@@ -1998,7 +2430,7 @@ JACK_GetBytesPerInputFrame(int deviceID)
 unsigned long
 JACK_GetInputBytesStored(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
 
   if (!drv || !drv->pRecPtr || drv->bytes_per_jack_input_frame == 0)
     return 0;
@@ -2007,15 +2439,8 @@ JACK_GetInputBytesStored(int deviceID)
   unsigned long jack_frames =
       (unsigned long)(bytes_in_rb / drv->bytes_per_jack_input_frame);
 
-  if (drv->jack_sample_rate <= 0 || drv->client_sample_rate <= 0)
-    return jack_frames * drv->bytes_per_input_frame;
-
   unsigned long client_frames =
-      (unsigned long)(
-          ((double)jack_frames *
-           (double)drv->client_sample_rate /
-           (double)drv->jack_sample_rate) +
-          0.5);
+      JACK_RescaleJackFramesToClientFramesRound(drv, jack_frames);
 
   return client_frames * drv->bytes_per_input_frame;
 }
@@ -2023,7 +2448,7 @@ JACK_GetInputBytesStored(int deviceID)
 long
 JACK_GetInputOverruns(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
 
   if (!drv)
     return 0;
@@ -2031,75 +2456,115 @@ JACK_GetInputOverruns(int deviceID)
   return atomic_load_long(&drv->input_overrun_count);
 }
 
+static unsigned long
+JACK_RescaleJackFramesToClientFramesFloor(jack_driver_t *drv, unsigned long jack_frames)
+{
+  if (!drv || jack_frames == 0)
+    return 0;
+
+  if (drv->jack_sample_rate <= 0 || drv->client_sample_rate <= 0 ||
+      drv->jack_sample_rate == drv->client_sample_rate)
+    return jack_frames;
+
+  return (unsigned long)(((uint64_t)jack_frames *
+                          (uint64_t)drv->client_sample_rate) /
+                         (uint64_t)drv->jack_sample_rate);
+}
+
+static unsigned long
+JACK_RescaleJackFramesToClientFramesRound(jack_driver_t *drv, unsigned long jack_frames)
+{
+  if (!drv || jack_frames == 0)
+    return 0;
+
+  if (drv->jack_sample_rate <= 0 || drv->client_sample_rate <= 0 ||
+      drv->jack_sample_rate == drv->client_sample_rate)
+    return jack_frames;
+
+  return (unsigned long)((((uint64_t)jack_frames *
+                           (uint64_t)drv->client_sample_rate) +
+                          ((uint64_t)drv->jack_sample_rate / 2ULL)) /
+                         (uint64_t)drv->jack_sample_rate);
+}
+
+static unsigned long
+JACK_JackFramesToClientBytesFloor(jack_driver_t *drv,
+                                  unsigned long jack_frames,
+                                  unsigned long client_frame_size)
+{
+  unsigned long client_frames =
+      JACK_RescaleJackFramesToClientFramesFloor(drv, jack_frames);
+
+  return client_frames * client_frame_size;
+}
+
 static long
 JACK_GetBytesStoredFromDriver(jack_driver_t *drv)
 {
-  if (drv->pPlayPtr == 0)
+  if (!drv || drv->pPlayPtr == 0)
     return 0;
 
   unsigned long jack_frame_size = drv->bytes_per_jack_output_frame;
   unsigned long client_frame_size = drv->bytes_per_output_frame;
 
-  if (jack_frame_size == 0)
+  if (jack_frame_size == 0 || client_frame_size == 0)
     return 0;
 
-  size_t bytes_in_rb = jack_ringbuffer_read_space(drv->pPlayPtr);
+  unsigned long jack_frames =
+      (unsigned long)(jack_ringbuffer_read_space(drv->pPlayPtr) / jack_frame_size);
+  unsigned long reserve_jack_frames =
+      (drv->jack_buffer_size > 0) ? (unsigned long)drv->jack_buffer_size : 0UL;
 
-  size_t reserve_bytes = (size_t)drv->jack_buffer_size;
-
-  long effective_jack_bytes = (long)bytes_in_rb - (long)reserve_bytes;
-
-  if (effective_jack_bytes <= 0)
-  {
+  if (jack_frames <= reserve_jack_frames)
     return 0;
-  }
 
-  long return_val = (effective_jack_bytes / jack_frame_size) * client_frame_size;
+  unsigned long effective_jack_frames = jack_frames - reserve_jack_frames;
+  unsigned long client_bytes =
+      JACK_JackFramesToClientBytesFloor(drv,
+                                        effective_jack_frames,
+                                        client_frame_size);
 
-  return return_val;
+  return (long)client_bytes;
 }
 
 unsigned long
 JACK_GetBytesStored(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   return (unsigned long)JACK_GetBytesStoredFromDriver(drv);
 }
 
 static unsigned long
 JACK_GetBytesFreeSpaceFromDriver(jack_driver_t *drv)
 {
-  if (drv->pPlayPtr == 0)
+  if (!drv || drv->pPlayPtr == 0)
     return 0;
 
   unsigned long jack_frame_size = drv->bytes_per_jack_output_frame;
   unsigned long client_frame_size = drv->bytes_per_output_frame;
 
-  if (jack_frame_size == 0)
+  if (jack_frame_size == 0 || client_frame_size == 0)
     return 0;
 
-  long safety_margin_bytes = (long)drv->jack_buffer_size * jack_frame_size;
+  unsigned long free_jack_frames =
+      (unsigned long)(jack_ringbuffer_write_space(drv->pPlayPtr) / jack_frame_size);
+  unsigned long reserve_jack_frames =
+      (drv->jack_buffer_size > 0) ? (unsigned long)drv->jack_buffer_size : 0UL;
 
-  long available_write_space_bytes = (long)jack_ringbuffer_write_space(drv->pPlayPtr);
+  if (free_jack_frames <= reserve_jack_frames)
+    return 0;
 
-  long return_val = available_write_space_bytes - safety_margin_bytes;
+  free_jack_frames -= reserve_jack_frames;
 
-  if (return_val <= 0)
-  {
-    return_val = 0;
-  }
-  else
-  {
-    return_val = (return_val / jack_frame_size) * client_frame_size;
-  }
-
-  return (return_val > 0) ? (unsigned long)return_val : 0;
+  return JACK_JackFramesToClientBytesFloor(drv,
+                                           free_jack_frames,
+                                           client_frame_size);
 }
 
 unsigned long
 JACK_GetBytesFreeSpace(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   unsigned long return_val;
 
   return_val = JACK_GetBytesFreeSpaceFromDriver(drv);
@@ -2137,21 +2602,23 @@ JACK_GetPositionFromDriver(jack_driver_t *drv, int position, int type)
   {
     return_val = atomic_load_ulong(&drv->played_client_bytes);
 
-    jack_nframes_t current_jack_frame = jack_frame_time(drv->client);
-
-    jack_nframes_t last_cb_frame = atomic_load_uint(&drv->last_callback_frame);
-
-    if (last_cb_frame != 0 && current_jack_frame > last_cb_frame)
+    if (drv->client && drv->jack_sample_rate > 0 && output_bytes_per_sec > 0)
     {
-      jack_nframes_t frames_since_cb = current_jack_frame - last_cb_frame;
+      jack_nframes_t current_jack_frame = jack_frame_time(drv->client);
+      jack_nframes_t last_cb_frame = atomic_load_uint(&drv->last_callback_frame);
 
-      double seconds_since = (double)frames_since_cb / (double)drv->jack_sample_rate;
-      long bytes_since = (long)(seconds_since * (double)output_bytes_per_sec);
+      if (last_cb_frame != 0 && current_jack_frame > last_cb_frame)
+      {
+        const uint64_t frames_since_cb =
+            (uint64_t)(current_jack_frame - last_cb_frame);
+        const uint64_t bytes_since =
+            (frames_since_cb *
+             (uint64_t)drv->client_sample_rate *
+             (uint64_t)drv->bytes_per_output_frame) /
+            (uint64_t)drv->jack_sample_rate;
 
-      return_val += bytes_since;
-
-      DEBUG("Sync: CB_Base=%ld, Hardware_Delta_Bytes=%ld",
-            drv->played_client_bytes, bytes_since);
+        return_val += (long)bytes_since;
+      }
     }
   }
 
@@ -2159,14 +2626,9 @@ JACK_GetPositionFromDriver(jack_driver_t *drv, int position, int type)
 
   if (position == MILLISECONDS)
   {
-    if (output_bytes_per_sec != 0)
-    {
-      return_val = (long)(((double)return_val / (double)output_bytes_per_sec) * 1000.0);
-    }
-    else
-    {
-      return_val = 0;
-    }
+    return_val = (output_bytes_per_sec != 0)
+                     ? (long)(((double)return_val / (double)output_bytes_per_sec) * 1000.0)
+                     : 0;
   }
 
   return return_val;
@@ -2186,17 +2648,18 @@ static double JACK_get_total_latency(jack_driver_t *drv)
 
   jack_latency_range_t range;
   jack_port_get_latency_range(drv->output_port[0], JackPlaybackLatency, &range);
-  double hardware_latency_s = (double)range.max / (double)drv->jack_sample_rate;
 
-  size_t bytes_buffered = jack_ringbuffer_read_space(drv->pPlayPtr);
+  const double inv_jack_rate = 1.0 / (double)drv->jack_sample_rate;
+  const size_t bytes_buffered = jack_ringbuffer_read_space(drv->pPlayPtr);
+  const double ringbuffer_frames =
+      (double)bytes_buffered / (double)drv->bytes_per_jack_output_frame;
+  const jack_nframes_t frames_since_cycle =
+      jack_frames_since_cycle_start(drv->client);
 
-  double ringbuffer_samples = (double)bytes_buffered / (double)drv->bytes_per_jack_output_frame;
-  double ringbuffer_latency_s = ringbuffer_samples / (double)drv->jack_sample_rate;
-
-  jack_nframes_t frames_since_cycle = jack_frames_since_cycle_start(drv->client);
-  double cycle_offset_s = (double)frames_since_cycle / (double)drv->jack_sample_rate;
-
-  return hardware_latency_s + ringbuffer_latency_s + cycle_offset_s;
+  return ((double)range.max +
+          ringbuffer_frames +
+          (double)frames_since_cycle) *
+         inv_jack_rate;
 }
 
 static unsigned long JACK_get_played_frames_from_driver(jack_driver_t *drv)
@@ -2208,7 +2671,7 @@ static unsigned long JACK_get_played_frames_from_driver(jack_driver_t *drv)
 
 long JACK_GetPosition(int deviceID, int position, int type)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   long return_val;
 
   return_val = JACK_GetPositionFromDriver(drv, position, type);
@@ -2219,33 +2682,75 @@ long JACK_GetPosition(int deviceID, int position, int type)
 unsigned long
 JACK_GetPlayedFramesFromDriver(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   return JACK_get_played_frames_from_driver(drv);
 }
 
 long JACK_GetUnderruns(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   return JACK_get_underruns(drv);
 }
 
 double
 JACK_GetTotalLatency(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   return JACK_get_total_latency(drv);
+}
+
+void JACK_SetInputPassthrough(int deviceID, int enabled)
+{
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
+  if (!drv)
+    return;
+
+  const int on = enabled ? TRUE : FALSE;
+  atomic_exchange_int(&drv->input_passthrough, on);
+}
+
+int JACK_GetInputPassthrough(int deviceID)
+{
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
+  if (!drv)
+    return 0;
+  return atomic_load_int(&drv->input_passthrough) ? 1 : 0;
+}
+
+static long JACK_rescale_client_to_jack_frames_ceil(jack_driver_t *drv,
+                                                        long client_frames)
+{
+  if (!drv || client_frames <= 0)
+    return 0;
+
+  if (drv->client_sample_rate <= 0 || drv->jack_sample_rate <= 0)
+    return client_frames;
+
+  if (drv->client_sample_rate == drv->jack_sample_rate)
+    return client_frames;
+
+  return (long)((((uint64_t)client_frames * (uint64_t)drv->jack_sample_rate) +
+                 (uint64_t)drv->client_sample_rate - 1ULL) /
+                (uint64_t)drv->client_sample_rate);
 }
 
 static long JACK_get_required_free_frames(jack_driver_t *drv, int client_frames)
 {
-  if (!drv || drv->client_sample_rate <= 0)
+  long ratio_frames;
+  long required;
+
+  if (!drv || client_frames <= 0)
     return 0;
 
-  const double ratio =
-      (double)drv->jack_sample_rate /
-      (double)drv->client_sample_rate;
+  ratio_frames = JACK_rescale_client_to_jack_frames_ceil(drv, client_frames);
+  required = ratio_frames;
 
-  return (long)(client_frames * ratio + 0.5);
+  required += (drv->client_sample_rate > 0 && drv->jack_sample_rate > 0 &&
+               drv->client_sample_rate != drv->jack_sample_rate)
+                  ? VJ_JACK_RESAMPLE_SLACK_FRAMES
+                  : 0;
+
+  return (required > 0) ? required : client_frames;
 }
 
 int JACK_get_ringbuffer_free_frames(jack_driver_t *drv)
@@ -2257,11 +2762,14 @@ int JACK_get_ringbuffer_free_frames(jack_driver_t *drv)
   if (jack_frame_size == 0)
     return 0;
 
-  size_t write_bytes_available = jack_ringbuffer_write_space(drv->pPlayPtr);
+  unsigned long jack_frames =
+      (unsigned long)(jack_ringbuffer_write_space(drv->pPlayPtr) / jack_frame_size);
+  unsigned long client_frames =
+      JACK_RescaleJackFramesToClientFramesFloor(drv, jack_frames);
 
-  unsigned long frames_available = write_bytes_available / jack_frame_size;
-
-  return (int)frames_available;
+  return (client_frames > (unsigned long)INT32_MAX)
+             ? INT32_MAX
+             : (int)client_frames;
 }
 
 long JACK_get_ringbuffer_used(jack_driver_t *drv)
@@ -2272,11 +2780,15 @@ long JACK_get_ringbuffer_used(jack_driver_t *drv)
   unsigned long jack_frame_size = drv->bytes_per_jack_output_frame;
   unsigned long client_frame_size = drv->bytes_per_output_frame;
 
-  if (jack_frame_size == 0)
+  if (jack_frame_size == 0 || client_frame_size == 0)
     return 0;
 
-  size_t filled_jack_bytes = jack_ringbuffer_read_space(drv->pPlayPtr);
-  return (long)((filled_jack_bytes / jack_frame_size) * client_frame_size);
+  unsigned long jack_frames =
+      (unsigned long)(jack_ringbuffer_read_space(drv->pPlayPtr) / jack_frame_size);
+
+  return (long)JACK_JackFramesToClientBytesFloor(drv,
+                                                jack_frames,
+                                                client_frame_size);
 }
 
 int JACK_get_ringbuffer_size(jack_driver_t *drv)
@@ -2290,24 +2802,21 @@ int JACK_get_ringbuffer_size(jack_driver_t *drv)
 
 int JACK_get_client_to_jack_frames(jack_driver_t *drv, int client_frames)
 {
+  long frames;
+
   if (!drv)
     return 0;
 
-  long client_rate = drv->client_sample_rate;
-  long jack_rate = drv->jack_sample_rate;
-
-  if (client_rate <= 0 || jack_rate <= 0)
+  frames = JACK_rescale_client_to_jack_frames_ceil(drv, client_frames);
+  if (frames <= 0)
     return client_frames;
 
-  if (client_rate == jack_rate)
-    return client_frames;
-
-  return (int)((double)client_frames * (double)jack_rate / (double)client_rate + 0.5);
+  return (int)frames;
 }
 
 int JACK_BufferIsStarving(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   int return_val;
 
   return_val = JACK_isStarving(drv);
@@ -2318,7 +2827,7 @@ int JACK_BufferIsStarving(int deviceID)
 unsigned long
 JACK_GetBytesPerOutputFrame(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
 
   if (!drv)
     return 0;
@@ -2330,7 +2839,7 @@ JACK_GetBytesPerOutputFrame(int deviceID)
 
 void JACK_ResetBuffer(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
 
   if (drv && drv->pPlayPtr)
     jack_ringbuffer_reset(drv->pPlayPtr);
@@ -2338,7 +2847,7 @@ void JACK_ResetBuffer(int deviceID)
 
 void JACK_ResetInputBuffer(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
 
   if (drv && drv->pRecPtr)
     jack_ringbuffer_reset(drv->pRecPtr);
@@ -2352,7 +2861,7 @@ void JACK_ResetInputBuffer(int deviceID)
 
 long JACK_GetSampleRate(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   if (!drv)
     return 0;
 
@@ -2361,7 +2870,7 @@ long JACK_GetSampleRate(int deviceID)
 
 int JACK_GetRingBufferFreeFrames(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   int return_val;
   return_val = JACK_get_ringbuffer_free_frames(drv);
   return return_val;
@@ -2369,7 +2878,7 @@ int JACK_GetRingBufferFreeFrames(int deviceID)
 
 long JACK_GetSampleRateJack(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   if (!drv)
     return 0;
 
@@ -2378,7 +2887,7 @@ long JACK_GetSampleRateJack(int deviceID)
 
 long JACK_GetPeriodSize(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   if (!drv)
     return 0;
 
@@ -2387,7 +2896,7 @@ long JACK_GetPeriodSize(int deviceID)
 
 int JACK_GetClientToJackFrames(int deviceID, int client_frames)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   int return_val;
   return_val = JACK_get_client_to_jack_frames(drv, client_frames);
   return return_val;
@@ -2395,7 +2904,7 @@ int JACK_GetClientToJackFrames(int deviceID, int client_frames)
 
 int JACK_GetRingBufferSize(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   int return_val = 0;
   return_val = JACK_get_ringbuffer_size(drv);
   return return_val;
@@ -2403,7 +2912,7 @@ int JACK_GetRingBufferSize(int deviceID)
 
 long JACK_GetRequiredFreeFrames(int deviceID, int client_frames)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   long return_val = 0;
   return_val = JACK_get_required_free_frames(drv, client_frames);
   return return_val;
@@ -2411,8 +2920,8 @@ long JACK_GetRequiredFreeFrames(int deviceID, int client_frames)
 
 long JACK_GetRingBufferUsed(int deviceID)
 {
-  jack_driver_t *drv = getDriver(deviceID);
-  int return_val = 0;
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
+  long return_val = 0;
   return_val = JACK_get_ringbuffer_used(drv);
   return return_val;
 }
@@ -2425,6 +2934,7 @@ static void JACK_CleanupDriver(jack_driver_t *drv)
   atomic_exchange_int(&drv->state, CLOSED);
   atomic_exchange_int(&drv->in_use, FALSE);
   atomic_exchange_int(&drv->cb_active, FALSE);
+  atomic_exchange_int(&drv->input_passthrough, FALSE);
 
   drv->client = NULL;
 
@@ -2470,6 +2980,14 @@ static void JACK_CleanupDriver(jack_driver_t *drv)
 
   drv->pRecPtr_size = 0;
 
+  for (unsigned int i = 0; i < drv->retired_ringbuffer_count; i++)
+  {
+    if (drv->retired_ringbuffers[i])
+      jack_ringbuffer_free(drv->retired_ringbuffers[i]);
+    drv->retired_ringbuffers[i] = NULL;
+  }
+  drv->retired_ringbuffer_count = 0;
+
   drv->jack_sample_rate = 0;
   drv->jack_buffer_size = 0;
   drv->jackd_died = FALSE;
@@ -2479,6 +2997,8 @@ static void JACK_CleanupDriver(jack_driver_t *drv)
 
   atomic_exchange_long(&drv->input_overrun_count, 0);
   atomic_exchange_ulong(&drv->captured_client_bytes, 0);
+  atomic_exchange_ulong(&drv->played_client_bytes, 0);
+  atomic_exchange_uint(&drv->last_callback_frame, 0);
 
   for (int i = 0; i < MAX_OUTPUT_PORTS; i++)
     drv->output_port[i] = NULL;
@@ -2499,7 +3019,6 @@ void JACK_Init(void)
 
   if (init_done)
   {
-    DEBUG("not initing twice");
     return;
   }
   init_done = 1;
@@ -2530,7 +3049,6 @@ void JACK_Init(void)
   client_name = NULL;
   JACK_SetClientName((char*)"bio2jack");
 
-  DEBUG("JACK System Initialized (Lock-Free Mode)");
 }
 
 void JACK_SetClientName(char *name)
@@ -2553,7 +3071,6 @@ void JACK_SetClientName(char *name)
     if (client_name)
     {
       snprintf(client_name, alloc_size, "%s", name);
-      veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Jack client name set to: %s", client_name);
     }
     else
     {
@@ -2573,7 +3090,7 @@ void JACK_FreeClientName(void)
 
 long JACK_OutputStatus(int deviceID, long *sec, long *nsec)
 {
-  jack_driver_t *drv = getDriver(deviceID);
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
   if (!drv)
     return 0;
 

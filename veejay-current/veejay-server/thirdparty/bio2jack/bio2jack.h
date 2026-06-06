@@ -5,15 +5,6 @@
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 #ifndef _H_JACK_OUT_H
 #define _H_JACK_OUT_H
@@ -43,8 +34,12 @@ extern "C"
 #define ERR_PORT_NAME_OUTPUT_CHANNEL_MISMATCH 6
 #define ERR_PORT_NOT_FOUND 7
 #define ERR_TOO_MANY_INPUT_CHANNELS 8
-#define ERR_PORT_NAME_INPUT_CHANNEL_MISMATCH 9
+#define ERR_PORT_NAME_INPUT_MISMATCH 9
 #define ERR_TOO_MANY_CHANNELS 10
+
+#ifndef ERR_PORT_NAME_INPUT_CHANNEL_MISMATCH
+#define ERR_PORT_NAME_INPUT_CHANNEL_MISMATCH 9
+#endif
 
 #define BYTES 0
 #define MILLISECONDS 1
@@ -114,6 +109,8 @@ void JACK_Flush(int deviceID);
 double JACK_GetTotalLatency(int deviceID);
 int JACK_GetCallbackActive(int deviceID);
 int JACK_XRUNHandled(int deviceID);
+void JACK_SetInputPassthrough(int deviceID, int enabled);
+int JACK_GetInputPassthrough(int deviceID);
 
 #ifdef __cplusplus
 }
