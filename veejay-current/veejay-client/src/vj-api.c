@@ -9815,7 +9815,6 @@ static int auto_connect_to_veejay(char *host, int port_num)
     for( i = port_num; i < 9999; i += 1000 ) {
 
         if( vj_gui_reconnect( hostname, NULL, i ) ) {
-            veejay_msg(VEEJAY_MSG_INFO,"Trying to connect to %s:%d", hostname, i);
             if( multrack_audoadd( info->mt, hostname, i) == -1) {
                 return 0;
             }
