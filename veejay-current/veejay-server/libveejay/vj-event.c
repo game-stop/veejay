@@ -619,6 +619,68 @@ static inline char *append_msg(char *dst, const char *str)
     return dst + len;
 }
 
+static const char vj_event_digits2[] =
+    "00010203040506070809"
+    "10111213141516171819"
+    "20212223242526272829"
+    "30313233343536373839"
+    "40414243444546474849"
+    "50515253545556575859"
+    "60616263646566676869"
+    "70717273747576777879"
+    "80818283848586878889"
+    "90919293949596979899";
+
+static inline void vj_event_write_2digits(char *dst, unsigned v)
+{
+    const char *p = vj_event_digits2 + (v << 1);
+    dst[0] = p[0];
+    dst[1] = p[1];
+}
+
+static inline void vj_event_write_u05(char *dst, size_t v)
+{
+    unsigned x = v > 99999 ? 99999u : (unsigned) v;
+
+    unsigned a = x / 10000u;
+    x -= a * 10000u;
+
+    unsigned b = x / 100u;
+    unsigned c = x - b * 100u;
+
+    dst[0] = (char) ('0' + a);
+    vj_event_write_2digits(dst + 1, b);
+    vj_event_write_2digits(dst + 3, c);
+    dst[5] = '\0';
+}
+
+static inline void vj_event_write_u06(char *dst, size_t v)
+{
+    unsigned x = v > 999999 ? 999999u : (unsigned) v;
+
+    unsigned a = x / 10000u;
+    x -= a * 10000u;
+
+    unsigned b = x / 100u;
+    unsigned c = x - b * 100u;
+
+    vj_event_write_2digits(dst + 0, a);
+    vj_event_write_2digits(dst + 2, b);
+    vj_event_write_2digits(dst + 4, c);
+    dst[6] = '\0';
+}
+
+static void vj_event_free_string_list(char **list)
+{
+    if(!list)
+        return;
+
+    for(int i = 0; list[i] != NULL; i++)
+        free(list[i]);
+
+    free(list);
+}
+
 
 #define FORMAT_MSG(dst,str) format_msg(dst,str)
 #define APPEND_MSG(dst,str) append_msg(dst,str)
@@ -9350,21 +9412,77 @@ void vj_event_audio_beat_status(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t *)ptr;
     vj_audio_beat_shared_t *s;
     vj_audio_beat_snapshot_t snap;
+    int action;
+    int auto_mode;
+    int auto_amount;
+    int bpm100;
+    int level_pct;
+    int envelope_pct;
+    int transient_pct;
+    int flux_pct;
+    int bass_pct;
+    int mid_pct;
+    int high_pct;
 
     (void)format;
     (void)ap;
 
-    if (!vj_event_audio_beat_ready(v))
-        return;
-
-    s = &v->settings->audio_beat;
-
-    if (vj_audio_beat_get_snapshot(s, &snap) < 0)
+    if(!vj_event_audio_beat_ready(v))
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO] Unable to read beat detector status");
+        veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO-BEAT] Beat detector is not available");
         return;
     }
 
+    s = &v->settings->audio_beat;
+
+    if(vj_audio_beat_get_snapshot(s, &snap) < 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO-BEAT] Unable to read beat detector status");
+        return;
+    }
+
+    action = atomic_load_int(&s->action_mode);
+    auto_mode = vj_audio_beat_event_auto_mode_cache;
+    auto_amount = vj_audio_beat_event_auto_amount_cache;
+    bpm100 = vj_audio_beat_event_q100(snap.bpm);
+    level_pct = (vj_audio_beat_event_q1000(snap.level) + 5) / 10;
+    envelope_pct = (vj_audio_beat_event_q1000(snap.envelope) + 5) / 10;
+    transient_pct = (vj_audio_beat_event_q1000(snap.transient) + 5) / 10;
+    flux_pct = (vj_audio_beat_event_q1000(snap.flux) + 5) / 10;
+    bass_pct = (vj_audio_beat_event_q1000(snap.bass) + 5) / 10;
+    mid_pct = (vj_audio_beat_event_q1000(snap.mid) + 5) / 10;
+    high_pct = (vj_audio_beat_event_q1000(snap.high) + 5) / 10;
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-BEAT] status enabled=%d open=%d running=%d paused=%d channels=%d rate=%dHz level=%d%% envelope=%d%% transient=%d%% flux=%d%% bands=%d/%d/%d%% bpm=%d.%02d hits=%ld age=%ldms seq=%d action=%s(%d) freeze=%dms cooldown=%dms threshold=%d pulse=%dms gate=%dms auto_mode=%s(%d) auto_amount=%d",
+               snap.enabled,
+               snap.open,
+               atomic_load_int(&s->running),
+               atomic_load_int(&s->paused_by_beat),
+               snap.channels,
+               snap.sample_rate,
+               level_pct,
+               envelope_pct,
+               transient_pct,
+               flux_pct,
+               bass_pct,
+               mid_pct,
+               high_pct,
+               bpm100 / 100,
+               bpm100 % 100,
+               snap.hits,
+               snap.beat_age_ms,
+               snap.hit_seq,
+               vj_audio_beat_event_action_name(action),
+               action,
+               atomic_load_int(&s->freeze_ms),
+               atomic_load_int(&s->cooldown_ms),
+               atomic_load_int(&s->threshold),
+               atomic_load_int(&s->pulse_ms),
+               atomic_load_int(&s->gate_ms),
+               vj_audio_beat_event_auto_mode_name(auto_mode),
+               auto_mode,
+               auto_amount);
 #else
     (void)ptr;
     (void)format;
@@ -11599,22 +11717,25 @@ void vj_event_send_sample_options   (   void *ptr,  const char format[],    va_l
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
     int id=0;
-    int failed = 1; 
+    int failed = 1;
 
     P_A(args,sizeof(args),NULL,0,format,ap);
-    
+
     char options[256];
     char prefix[4];
+    options[0] = '\0';
+    prefix[0] = '\0';
 
-    char *s_print_buf = get_print_buf(128);
+    size_t s_print_buf_size = 5 + sizeof(prefix) + sizeof(options);
+    char *s_print_buf = get_print_buf((int)s_print_buf_size);
     int values[21];
 
     switch(args[1])
     {
-        case VJ_PLAYBACK_MODE_SAMPLE: 
+        case VJ_PLAYBACK_MODE_SAMPLE:
 
         SAMPLE_DEFAULTS(args[0]);
-        
+
         id = args[0];
 
             if(sample_exists(id))
@@ -11629,20 +11750,20 @@ void vj_event_send_sample_options   (   void *ptr,  const char format[],    va_l
                     int marker_start = si->marker_start;
                     int marker_end = si->marker_end;
                     int effects_on = si->effect_toggle;
-    
+
                     snprintf( options,sizeof(options),"%06d%06d%03d%02d%06d%06d%01d",start,end,speed,loop,marker_start,marker_end,effects_on);
                     failed = 0;
                     snprintf(prefix,sizeof(prefix), "%02d", 0 );
-                }   
+                }
             }
             break;
-        case VJ_PLAYBACK_MODE_TAG:  
+        case VJ_PLAYBACK_MODE_TAG:
 
         STREAM_DEFAULTS(args[0]);
-    
+
         id = args[0];
-    
-        if(vj_tag_exists(id)) 
+
+        if(vj_tag_exists(id))
             {
                 vj_tag *si = vj_tag_get(id);
                 int stream_type = si->source_type;
@@ -11653,14 +11774,14 @@ void vj_event_send_sample_options   (   void *ptr,  const char format[],    va_l
                     col[0] = si->color_r;
                     col[1] = si->color_g;
                     col[2] = si->color_b;
-                
+
                     snprintf( options,sizeof(options),"%03d%03d%03d",col[0],col[1],col[2]);
                     failed = 0;
                 }
                 else if (stream_type == VJ_TAG_TYPE_V4L)
                 {
                     vj_tag_get_v4l_properties(id,values);
-            
+
                     snprintf( options,sizeof(options),
                         "%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d",
                         values[0],
@@ -11687,7 +11808,7 @@ void vj_event_send_sample_options   (   void *ptr,  const char format[],    va_l
                         );
                     failed = 0;
                 }
-                else    
+                else
                 {
                     int effects_on = si->effect_toggle;
                     snprintf( options,sizeof(options), "%01d",effects_on);
@@ -11696,13 +11817,32 @@ void vj_event_send_sample_options   (   void *ptr,  const char format[],    va_l
             }
             break;
         default:
-            break;      
-        }   
+            break;
+        }
 
     if(failed)
-        snprintf(s_print_buf, 128, "%05d", 0);
+    {
+        vj_event_write_u05(s_print_buf, 0);
+    }
     else
-        snprintf(s_print_buf, 128, "%05zu%s%s", strlen(prefix) + strlen(options), prefix, options);
+    {
+        size_t prefix_len = strlen(prefix);
+        size_t options_len = strlen(options);
+        size_t payload_len = prefix_len + options_len;
+
+        if(payload_len + 6 > s_print_buf_size)
+        {
+            veejay_msg(VEEJAY_MSG_ERROR, "Sample options packet too large: %zu bytes", payload_len);
+            vj_event_write_u05(s_print_buf, 0);
+        }
+        else
+        {
+            vj_event_write_u05(s_print_buf, payload_len);
+            memcpy(s_print_buf + 5, prefix, prefix_len);
+            memcpy(s_print_buf + 5 + prefix_len, options, options_len);
+            s_print_buf[5 + payload_len] = '\0';
+        }
+    }
 
     SEND_MSG(v , s_print_buf );
     free(s_print_buf);
@@ -11794,7 +11934,7 @@ void    vj_event_get_srt_list(  void *ptr,  const char format[],    va_list ap  
 {
     veejay_t *v = (veejay_t*)ptr;
     char *str = NULL;
-    int len = 0;
+    size_t len = 0;
 
     if(!v->font)
     {
@@ -11816,33 +11956,46 @@ void    vj_event_get_srt_list(  void *ptr,  const char format[],    va_list ap  
         SEND_MSG(v, "000000" );
         return;
     }
-    
+
     for(i = 0; list[i] != NULL ; i ++ )
     {
-        int k = strlen(list[i]);
-        if(k>0)
-            len += (k+1);
-    }   
-    if(len <= 0)
+        size_t k = strlen(list[i]);
+        if(k > 0)
+            len += (k + 1);
+    }
+    if(len <= 0 || len > 999999)
     {
+        if(len > 999999)
+            veejay_msg(VEEJAY_MSG_ERROR, "SRT list packet too large: %zu bytes", len);
+        vj_event_free_string_list(list);
         SEND_MSG(v, "000000" );
         return;
     }
 
     for ( i = 0; list[i] != NULL; i ++ ) { }
 
-    str = vj_calloc( len + (i*2) + 6 );
+    str = vj_calloc( len + (i*2) + 7 );
+    if(!str)
+    {
+        vj_event_free_string_list(list);
+        SEND_MSG(v, "000000" );
+        return;
+    }
+
     char *p = str;
-    snprintf(p, 7, "%06d", len );
+    vj_event_write_u06(p, len);
     p += 6;
     for(i = 0; list[i] != NULL ; i ++ )
     {
-        snprintf(p, strlen(list[i]) + 2, "%s ", list[i]);
-        p += strlen(list[i]) + 1;
+        size_t k = strlen(list[i]);
+        memcpy(p, list[i], k);
+        p += k;
+        *p++ = ' ';
         free(list[i]);
     }
+    *p = '\0';
     free(list);
-    
+
     SEND_MSG(v , str );
     free(str);
 }
@@ -11851,7 +12004,7 @@ void    vj_event_get_font_list( void *ptr,  const char format[],    va_list ap  
 {
     veejay_t *v = (veejay_t*)ptr;
     char *str = NULL;
-    int len = 0;
+    size_t len = 0;
 
     if(!v->font)
     {
@@ -11867,32 +12020,53 @@ void    vj_event_get_font_list( void *ptr,  const char format[],    va_list ap  
         SEND_MSG(v, "000000" );
         return;
     }
-    
+
     for(i = 0; list[i] != NULL ; i ++ )
     {
-        int k = strlen(list[i]);
-        if(k>0)
-            len += (k+3);
-    }   
-    if(len <= 0)
+        size_t k = strlen(list[i]);
+        if(k > 999)
+        {
+            veejay_msg(VEEJAY_MSG_ERROR, "Font name too long for VIMS font list: %zu bytes", k);
+            vj_event_free_string_list(list);
+            SEND_MSG(v, "000000" );
+            return;
+        }
+        if(k > 0)
+            len += (k + 3);
+    }
+    if(len <= 0 || len > 999999)
     {
+        if(len > 999999)
+            veejay_msg(VEEJAY_MSG_ERROR, "Font list packet too large: %zu bytes", len);
+        vj_event_free_string_list(list);
         SEND_MSG(v, "000000" );
         return;
     }
 
-    str = vj_calloc( len + 20 );
+    str = vj_calloc( len + 7 );
+    if(!str)
+    {
+        vj_event_free_string_list(list);
+        SEND_MSG(v, "000000" );
+        return;
+    }
+
     char *p = str;
-    snprintf(p, 7, "%06d", len );
+    vj_event_write_u06(p, len);
     p += 6;
     for(i = 0; list[i] != NULL ; i ++ )
     {
-        int k = strlen(list[i]);
-        snprintf(p, 4 + strlen(list[i]), "%03d%s", k, list[i]);
+        size_t k = strlen(list[i]);
+        p[0] = '0' + (k / 100) % 10;
+        p[1] = '0' + (k / 10) % 10;
+        p[2] = '0' + (k % 10);
+        memcpy(p + 3, list[i], k);
         p += (k + 3);
         free(list[i]);
     }
+    *p = '\0';
     free(list);
-        
+
     SEND_MSG(v , str );
     free(str);
 
