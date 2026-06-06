@@ -10110,7 +10110,10 @@ void vj_gui_init(const char *glade_file,
     {
         gtk_combo_box_text_insert_text (GTK_COMBO_BOX_TEXT(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]),i ,fx_anim_shape_map[i].description);
     }
+    int osl = info->status_lock;
+    info->status_lock = 1;
     gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]), 0);
+    info->status_lock = osl;
 
     gtk_widget_show_all(curve_container);
 
