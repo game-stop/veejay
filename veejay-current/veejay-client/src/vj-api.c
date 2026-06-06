@@ -1113,15 +1113,6 @@ static const char *audio_sync_source_name(int source)
     }
 }
 
-static const char *audio_sync_target_mode_name(int mode)
-{
-    switch(mode) {
-        case VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP: return "Current clip";
-        case VJ_AUDIO_SYNC_TARGET_MANUAL:
-        default: return "Manual";
-    }
-}
-
 static const char *audio_sync_bridge_state_name(int state)
 {
     switch(state) {
@@ -9183,11 +9174,6 @@ static void enable_fx_entry(void) {
         info->status_lock = osl;
 
         info->uc.selected_parameter_id = active_kf_id;
-        info->uc.reload_hint_checksums[HINT_KF] = -1;
-
-        vj_kf_refresh(TRUE);
-
-        vj_kf_reset_shape_combo();
     }
 
     min = 0; max = 1; value = 0;
@@ -9303,7 +9289,11 @@ static void process_reload_hints(int *history, int pm)
     info->parameter_lock = 1;
     if(info->uc.reload_hint[HINT_ENTRY] == 1)
     {
+        int old_fx_id = entry_tokens[ENTRY_FXID];
+        int old_np = entry_tokens[ENTRY_NUM_PARAMETERS];
+        int old_param = info->uc.selected_parameter_id;
         int lpi = load_parameter_info();
+
         if( lpi == 0 ) {
             if( entry_tokens[ENTRY_FXID] == 0 && gtk_widget_is_sensitive(widget_cache[WIDGET_FRAME_FXTREE2])) {
                 disable_fx_entry();
@@ -9313,7 +9303,11 @@ static void process_reload_hints(int *history, int pm)
         } else if (lpi == 1 ) {
             if (entry_tokens[ENTRY_FXID] != 0 ) {
                 enable_fx_entry();
-                info->uc.reload_hint[HINT_KF] = 1;
+                if(old_fx_id != entry_tokens[ENTRY_FXID] ||
+                   old_np != entry_tokens[ENTRY_NUM_PARAMETERS] ||
+                   old_param < 0 ||
+                   old_param >= entry_tokens[ENTRY_NUM_PARAMETERS])
+                    info->uc.reload_hint[HINT_KF] = 1;
             }
         }
         sync_chain_entry_beat_toggle_from_status();
