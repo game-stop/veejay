@@ -44,8 +44,8 @@ libveejay_la_SOURCES = \
     vjkf.c \
     vj-macro.c \
     audioscratcher.c \
-    vj-event.c \
     vj-eventman.c \
+    vj-event.c \
     vj-perform.c \
     x11misc.c \
     vj-shm.c \
@@ -55,6 +55,7 @@ libveejay_la_SOURCES = \
     vj-font.c \
     vj-pjack.c \
     vj-audio-beat.c \
+    vj-audio-sync.c \
     vj-share.c \
     vj-split.c \
     liblavplayvj.c
