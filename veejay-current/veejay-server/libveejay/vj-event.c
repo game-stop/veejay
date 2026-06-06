@@ -6964,7 +6964,7 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
             if(sample_set_effect_arg( v->uc->sample_id, c,args[0],tval)!=-1 )
             {
                 if(!v->log_suppression)
-                    veejay_msg(VEEJAY_MSG_DEBUG,"Set \"%s\" parameter %d \"%s\" value %d",effect_descr, args[0], effect_param_descr, tval);
+                    veejay_msg(VEEJAY_MSG_INFO,"Set \"%s\" parameter %d \"%s\" value %d",effect_descr, args[0], effect_param_descr, tval);
             }
         }
     }
@@ -6988,7 +6988,7 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
         if(vj_tag_set_effect_arg(v->uc->sample_id, c, args[0], tval) )
         {
             if(!v->log_suppression)
-                veejay_msg(VEEJAY_MSG_DEBUG,"Set \"%s\" parameter %d \"%s\" value %d",effect_descr, args[0], effect_param_descr, tval );
+                veejay_msg(VEEJAY_MSG_INFO,"Set \"%s\" parameter %d \"%s\" value %d",effect_descr, args[0], effect_param_descr, tval );
         }
     }
 }
