@@ -6107,16 +6107,19 @@ static void veejay_audio_beat_prepare_sync_source(veejay_t *info)
         channels = 2;
 
     mode = atomic_load_int(&settings->audio_sync.mode);
+    if(mode == VJ_AUDIO_SYNC_MODE_OFF) {
+        vj_audio_sync_set_mode(&settings->audio_sync,
+                               VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL);
+        mode = VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL;
+    }
+
     source = atomic_load_int(&settings->audio_sync.source);
     current_channels = atomic_load_int(&settings->audio_sync.input_channels_request);
     record_source = atomic_load_int(&settings->record_audio_source);
 
-    if(mode == VJ_AUDIO_SYNC_MODE_OFF)
-        vj_audio_sync_set_mode(&settings->audio_sync,
-                               VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL);
-
     external_mode =
-        (mode == VJ_AUDIO_SYNC_MODE_MONITOR ||
+        (mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL ||
+         mode == VJ_AUDIO_SYNC_MODE_MONITOR ||
          mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
          mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN);
 
@@ -6267,6 +6270,11 @@ int veejay_audio_beat_toggle(veejay_t *info)
     }
 
     veejay_audio_beat_prepare_sync_source(info);
+
+    if(!vj_audio_beat_auto_build_table()) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-BEAT] auto-fx metadata table is not ready while toggling analysis on; detector will run, but auto-FX mapping will have no targets");
+    }
 
     rc = vj_audio_beat_enable(&settings->audio_beat);
     return (rc > 0) ? 1 : -1;
