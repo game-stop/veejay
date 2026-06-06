@@ -476,28 +476,26 @@ void on_audio_beat_auto_amount_value_changed(GtkWidget *widget, gpointer user_da
 
 void on_audio_beat_refresh_button_clicked(GtkWidget *widget, gpointer user_data)
 {
+    (void)widget;
+    (void)user_data;
+
     if(info->status_lock)
         return;
 
     single_vims(VIMS_AUDIO_BEAT_PRINT);
+    vj_msg(VEEJAY_MSG_INFO, "Requested Audio Beat status refresh");
 }
 
-void on_audio_beat_auto_reset_button_toggled(GtkWidget *widget, gpointer user_data)
+void on_audio_beat_auto_reset_button_clicked(GtkWidget *widget, gpointer user_data)
 {
-    int old_lock;
+    (void)widget;
+    (void)user_data;
 
     if(info->status_lock)
         return;
 
-    if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
-        return;
-
     single_vims(VIMS_AUDIO_BEAT_AUTO_RESET);
-
-    old_lock = info->status_lock;
-    info->status_lock = 1;
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), FALSE);
-    info->status_lock = old_lock;
+    vj_msg(VEEJAY_MSG_INFO, "Requested Audio Beat Auto FX mapping reset");
 }
 
 

@@ -1015,8 +1015,8 @@ static struct
     {"Duration of the beat gate signal used for held visual reactions."},
     {"Automatic FX mapping mode. Higher modes use more motion, memory, and chaos-oriented parameter roles."},
     {"Global intensity of automatic FX parameter modulation."},
-    {"Request the latest beat detector state from the backend."},
-    {"Reset automatic FX beat mappings so the backend can rebuild them for the current chain."},
+    {"Restart beat analysis for the current audio source. This clears detector history, beat timing, pulse/gate state, and re-arms the analysis reader; it does not change Auto FX mapping."},
+    {"Forget the current automatic FX mapping and rebuild targets from the current effect chain on the next beat/update. Beat analysis and audio input are not restarted."},
 
     {"Current input level from the JACK analysis stream."},
     {"Smoothed input energy envelope used for stable modulation."},
