@@ -273,8 +273,9 @@
 #include "./effects/tomolight.h"
 #include "./effects/kineticdisplay.h"
 #include "./effects/mechanicalpixels.h"
+#include "./effects/pressurewave.h"
 
-#define VJ_IMAGE_EFFECT_MIN 12
+#define VJ_IMAGE_EFFECT_MIN 11
 #define VJ_IMAGE_EFFECT_MAX 198
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -583,6 +584,7 @@ enum {
     VJ_IMAGE_EFFECT_TOMOLIGHT = 14,
     VJ_IMAGE_EFFECT_KINETICDISPLAY = 13,
     VJ_IMAGE_EFFECT_MECHANICALPIXELS = 12,
+    VJ_IMAGE_EFFECT_PRESSUREWAVE = 11,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
