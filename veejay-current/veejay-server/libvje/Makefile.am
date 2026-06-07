@@ -263,4 +263,6 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/tomolight.c \
     effects/kineticdisplay.c \
     effects/mechanicalpixels.c \
-    effects/pressurewave.c
+    effects/pressurewave.c \
+    effects/tessaract.c \
+    effects/bowshock.c

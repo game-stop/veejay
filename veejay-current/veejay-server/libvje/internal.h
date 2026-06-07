@@ -274,15 +274,16 @@
 #include "./effects/kineticdisplay.h"
 #include "./effects/mechanicalpixels.h"
 #include "./effects/pressurewave.h"
+#include "./effects/tessaract.h"
+#include "./effects/bowshock.h"
 
-#define VJ_IMAGE_EFFECT_MIN 11
+#define VJ_IMAGE_EFFECT_MIN 9
 #define VJ_IMAGE_EFFECT_MAX 198
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 262 // + 1
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN + 1)
-
 
 enum {
     VJ_EFFECT_LUM_RED = 65,
@@ -585,10 +586,10 @@ enum {
     VJ_IMAGE_EFFECT_KINETICDISPLAY = 13,
     VJ_IMAGE_EFFECT_MECHANICALPIXELS = 12,
     VJ_IMAGE_EFFECT_PRESSUREWAVE = 11,
+    VJ_IMAGE_EFFECT_TESSARACT = 10,
+    VJ_IMAGE_EFFECT_BOWSHOCK = 9,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
-
-
 
 #define VJ_EXT_EFFECT   500
 

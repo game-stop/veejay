@@ -16,14 +16,14 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  */
-#ifndef PRESSUREWAVE_H
-#define PRESSUREWAVE_H
+#ifndef TESSARACT_H
+#define TESSARACT_H
 
 #include <libvje/vje.h>
 
-vj_effect *pressurewave_init(int w, int h);
-void *pressurewave_malloc(int w, int h);
-void pressurewave_free(void *ptr);
-void pressurewave_apply(void *ptr, VJFrame *frame, int *args);
+vj_effect *tessaractslide_init(int w, int h);
+void *tessaractslide_malloc(int w, int h);
+void tessaractslide_free(void *ptr);
+void tessaractslide_apply(void *ptr, VJFrame *frame, int *args);
 
 #endif
