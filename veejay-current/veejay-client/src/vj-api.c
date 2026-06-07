@@ -490,6 +490,33 @@ enum {
   WIDGET_AUDIO_SYNC_LIVE_TRACK_FRAME = 346,
   WIDGET_AUDIO_SYNC_PHASE_BAR = 347,
   WIDGET_AUDIO_SYNC_WAV_BROWSE_BUTTON = 348,
+  WIDGET_LABEL_CURRENT_MODE = 349,
+  WIDGET_LABEL_CURRENTSOURCE = 350,
+  WIDGET_ENTRY_SAMPLENAME = 351,
+  WIDGET_CPUMETER = 352,
+  WIDGET_CACHEMETER = 353,
+  WIDGET_SPIN_FRAMEDELAY = 354,
+  WIDGET_ENTRY_HOSTNAME = 355,
+  WIDGET_BUTTON_PORTNUM = 356,
+  WIDGET_MACRO_FRAME_POSITION = 357,
+  WIDGET_MACRO_DUP_POSITION = 358,
+  WIDGET_MACRO_LOOP_POSITION = 359,
+  WIDGET_PRIOUT_WIDTH = 360,
+  WIDGET_PRIOUT_HEIGHT = 361,
+  WIDGET_SPIN_STREAMDURATION = 362,
+  WIDGET_LABEL_STREAMRECORD_DURATION = 363,
+  WIDGET_LABEL_FXENTRY = 364,
+  WIDGET_VIMSVIEW = 365,
+  WIDGET_LABEL_EL_NORM = 366,
+  WIDGET_LABEL_EL_WH = 367,
+  WIDGET_SCREENSHOT_WIDTH = 368,
+  WIDGET_SCREENSHOT_HEIGHT = 369,
+  WIDGET_LABEL_EL_INTER = 370,
+  WIDGET_LABEL_EL_ARATE = 371,
+  WIDGET_LABEL_EL_ACHANS = 372,
+  WIDGET_LABEL_EL_ABITS = 373,
+  WIDGET_LABEL_HOSTNAMEX = 374,
+  WIDGET_LABEL_PORTX = 375,
 };
 
 
@@ -699,6 +726,33 @@ static struct
     { "label_loop_stats",       WIDGET_LABEL_LOOP_STATS },
     { "seqactive",              WIDGET_SEQACTIVE },
     { "label_currentid",        WIDGET_LABEL_CURRENTID },
+    { "label_current_mode",     WIDGET_LABEL_CURRENT_MODE },
+    { "label_currentsource",    WIDGET_LABEL_CURRENTSOURCE },
+    { "entry_samplename",      WIDGET_ENTRY_SAMPLENAME },
+    { "cpumeter",              WIDGET_CPUMETER },
+    { "cachemeter",            WIDGET_CACHEMETER },
+    { "spin_framedelay",       WIDGET_SPIN_FRAMEDELAY },
+    { "entry_hostname",        WIDGET_ENTRY_HOSTNAME },
+    { "button_portnum",        WIDGET_BUTTON_PORTNUM },
+    { "macro_frame_position",  WIDGET_MACRO_FRAME_POSITION },
+    { "macro_dup_position",    WIDGET_MACRO_DUP_POSITION },
+    { "macro_loop_position",   WIDGET_MACRO_LOOP_POSITION },
+    { "priout_width",          WIDGET_PRIOUT_WIDTH },
+    { "priout_height",         WIDGET_PRIOUT_HEIGHT },
+    { "spin_streamduration",   WIDGET_SPIN_STREAMDURATION },
+    { "label_streamrecord_duration", WIDGET_LABEL_STREAMRECORD_DURATION },
+    { "label_fxentry",         WIDGET_LABEL_FXENTRY },
+    { "vimsview",              WIDGET_VIMSVIEW },
+    { "label_el_norm",         WIDGET_LABEL_EL_NORM },
+    { "label_el_wh",           WIDGET_LABEL_EL_WH },
+    { "screenshot_width",      WIDGET_SCREENSHOT_WIDTH },
+    { "screenshot_height",     WIDGET_SCREENSHOT_HEIGHT },
+    { "label_el_inter",        WIDGET_LABEL_EL_INTER },
+    { "label_el_arate",        WIDGET_LABEL_EL_ARATE },
+    { "label_el_achans",       WIDGET_LABEL_EL_ACHANS },
+    { "label_el_abits",        WIDGET_LABEL_EL_ABITS },
+    { "label_hostnamex",       WIDGET_LABEL_HOSTNAMEX },
+    { "label_portx",           WIDGET_LABEL_PORTX },
     { "cali_take_button",       WIDGET_CALI_TAKE_BUTTON },
     { "current_step_label",     WIDGET_CURRENT_STEP_LABEL },
     { "check_samplefx",         WIDGET_CHECK_SAMPLEFX },
@@ -1800,8 +1854,11 @@ static void multi_vims(int id, const char format[],...);
 static void single_vims(int id);
 static gdouble get_numd(const char *name);
 static int get_nums(const char *name);
+static int get_nums2(GtkWidget *w);
 static gchar *get_text(const char *name);
+static gchar *get_text2(GtkWidget *w);
 static void put_text(const char *name, const char *text);
+static void put_text2(GtkWidget *w, const char *text);
 static void set_toggle_button(const char *name, int status);
 static void update_slider_gvalue(const char *name, gdouble value );
 static void update_slider_value2(GtkWidget *w, gint value, gint scale);
@@ -1814,10 +1871,12 @@ static void update_spin_range(const char *name, gint min, gint max, gint val);
 static void update_spin_incr(const char *name, gdouble step, gdouble page);
 
 static void update_spin_value(const char *name, gint value);
+static void update_spin_value2(GtkWidget *w, gint value);
 static void update_label_i2(GtkWidget *label, int num, int prefix);
 static void update_label_i(const char *name, int num, int prefix);
 static void update_label_f(const char *name, float val);
 static void update_label_str(const char *name, gchar *text);
+static void update_label_str2(GtkWidget *label, const char *text);
 static void update_globalinfo(int *his, int p, int k);
 static gint load_parameter_info(void);
 static void load_v4l_info(void);
@@ -1829,7 +1888,7 @@ static void load_sequence_list(void);
 static void load_generator_info(void);
 static void load_samplelist_info(void);
 static int load_editlist_info(void);
-static void set_pm_page_label(int sample_id, int type);
+static void set_pm_page_label(int type);
 static void notebook_set_page(const char *name, int page);
 static void hide_widget(const char *name);
 static void show_widget(const char *name);
@@ -1846,6 +1905,7 @@ int resize_primary_ratio_x(void);
 static void update_rgbkey(void);
 static int count_textview_buffer(const char *name);
 static void clear_textview_buffer(const char *name);
+static void clear_textview_buffer2(GtkWidget *view);
 static void init_recorder(int total_frames, gint mode);
 static void reload_bundles(void);
 static void update_rgbkey_from_slider(void);
@@ -1873,6 +1933,7 @@ static void update_curve_widget( GtkWidget *curve );
 static void reset_tree(const char *name);
 static void indicate_sequence( gboolean active, sequence_gui_slot_t *slot );
 static void set_textview_buffer(const char *name, gchar *utf8text);
+static void set_textview_buffer2(GtkWidget *view, gchar *utf8text);
 void interrupt_cb(void);
 int get_and_draw_frame(int type, char *wid_name);
 GdkPixbuf *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
@@ -2646,9 +2707,9 @@ gboolean vims_macro_selection_func( GtkTreeSelection *sel, GtkTreeModel *model, 
 		macro_line[2] = loop_num;
 		macro_line[3] = seq_no;
 
-		update_spin_value( "macro_frame_position", frame_num );
-		update_spin_value( "macro_dup_position", dup_num );
-		update_spin_value( "macro_loop_position", loop_num );
+		update_spin_value2(widget_cache[WIDGET_MACRO_FRAME_POSITION], frame_num);
+		update_spin_value2(widget_cache[WIDGET_MACRO_DUP_POSITION], dup_num);
+		update_spin_value2(widget_cache[WIDGET_MACRO_LOOP_POSITION], loop_num);
 		put_text( "macro_vims_message", message );
 
 		g_free(message);
@@ -3633,10 +3694,12 @@ gboolean gveejay_quit( GtkWidget *widget, gpointer user_data)
 
 int is_current_track(char *host, int port )
 {
-    char *remote = get_text( "entry_hostname" );
-    int num  = get_nums( "button_portnum" );
-    if( strncasecmp( remote, host, strlen(host)) == 0 && port == num )
+    char *remote = get_text2(widget_cache[WIDGET_ENTRY_HOSTNAME]);
+    int num  = get_nums2(widget_cache[WIDGET_BUTTON_PORTNUM]);
+
+    if(remote && host && strncasecmp(remote, host, strlen(host)) == 0 && port == num)
         return 1;
+
     return 0;
 }
 
@@ -4157,6 +4220,14 @@ static int get_nums(const char *name)
     return (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON( w ) );
 }
 
+static int get_nums2(GtkWidget *w)
+{
+    if(!w)
+        return 0;
+
+    return (int) gtk_spin_button_get_value(GTK_SPIN_BUTTON(w));
+}
+
 static int count_textview_buffer(const char *name)
 {
     GtkWidget *view = glade_xml_get_widget_( info->main_window, name );
@@ -4185,6 +4256,18 @@ static void clear_textview_buffer(const char *name)
         gtk_text_buffer_get_end_iter( tb, &iter2 );
         gtk_text_buffer_delete( tb, &iter1, &iter2 );
     }
+}
+
+static void clear_textview_buffer2(GtkWidget *view)
+{
+    if(!view)
+        return;
+
+    GtkTextBuffer *tb = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
+    GtkTextIter iter1, iter2;
+    gtk_text_buffer_get_start_iter(tb, &iter1);
+    gtk_text_buffer_get_end_iter(tb, &iter2);
+    gtk_text_buffer_delete(tb, &iter1, &iter2);
 }
 
 static gchar *get_textview_buffer(const char *name)
@@ -4223,6 +4306,15 @@ static void set_textview_buffer(const char *name, gchar *utf8text)
     }
 }
 
+static void set_textview_buffer2(GtkWidget *view, gchar *utf8text)
+{
+    if(!view || !utf8text)
+        return;
+
+    GtkTextBuffer *tb = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
+    gtk_text_buffer_set_text(tb, utf8text, -1);
+}
+
 static gchar *get_text(const char *name)
 {
     GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
@@ -4231,6 +4323,14 @@ static gchar *get_text(const char *name)
         return NULL;
     }
     return (gchar*) gtk_entry_get_text( GTK_ENTRY(w));
+}
+
+static gchar *get_text2(GtkWidget *w)
+{
+    if(!w)
+        return NULL;
+
+    return (gchar*) gtk_entry_get_text(GTK_ENTRY(w));
 }
 
 static void put_text(const char *name, const char *text)
@@ -4246,6 +4346,16 @@ static void put_text(const char *name, const char *text)
         gtk_entry_set_text( GTK_ENTRY(w), utf8_text );
         g_free(utf8_text);
     }
+}
+
+static void put_text2(GtkWidget *w, const char *text)
+{
+    if(!w)
+        return;
+
+    gchar *utf8_text = _utf8str(text ? text : "");
+    gtk_entry_set_text(GTK_ENTRY(w), utf8_text);
+    g_free(utf8_text);
 }
 
 int is_button_toggled(const char *name)
@@ -4358,6 +4468,14 @@ static void update_spin_value(const char *name, gint value )
     }
 
     gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble) value );
+}
+
+static void update_spin_value2(GtkWidget *w, gint value)
+{
+    if(!w)
+        return;
+
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(w), (gdouble) value);
 }
 
 static void update_slider_step_and_page_size(GtkWidget *w, gint min, gint max) {
@@ -4505,6 +4623,23 @@ static void update_label_str(const char *name, gchar *text)
     g_free(utf8_text);
 }
 
+static void update_label_str2(GtkWidget *label, const char *text)
+{
+#ifdef STRICT_CHECKING
+    assert(label != NULL);
+#else
+    if(!label || !text)
+        return;
+#endif
+
+    gchar *utf8_text = _utf8str(text);
+    if(!utf8_text)
+        return;
+
+    gtk_label_set_text(GTK_LABEL(label), utf8_text);
+    g_free(utf8_text);
+}
+
 static void label_set_markup(const char *name, gchar *str)
 {
     GtkWidget *label = glade_xml_get_widget_(
@@ -4553,14 +4688,14 @@ static void update_colorselection(void)
 int resize_primary_ratio_y(void)
 {
     float ratio = (float)info->el.width / (float)info->el.height;
-    float result = (float) get_nums( "priout_width" ) / ratio;
+    float result = (float) get_nums2(widget_cache[WIDGET_PRIOUT_WIDTH]) / ratio;
     return (int) result;
 }
 
 int resize_primary_ratio_x(void)
 {
     float ratio = (float)info->el.height / (float)info->el.width;
-    float result = (float) get_nums( "priout_height" ) / ratio;
+    float result = (float) get_nums2(widget_cache[WIDGET_PRIOUT_HEIGHT]) / ratio;
     return (int) result;
 }
 
@@ -4692,10 +4827,10 @@ static void update_record_tab(int pm)
 {
     if(pm == MODE_STREAM)
     {
-        update_spin_value( "spin_streamduration" , 1 );
-        gint n_frames = get_nums( "spin_streamduration" );
+        update_spin_value2(widget_cache[WIDGET_SPIN_STREAMDURATION], 1);
+        gint n_frames = get_nums2(widget_cache[WIDGET_SPIN_STREAMDURATION]);
         char *time = format_time(n_frames, (double) info->el.fps);
-        update_label_str( "label_streamrecord_duration", time );
+        update_label_str2(widget_cache[WIDGET_LABEL_STREAMRECORD_DURATION], time);
         free(time);
     }
     if(pm == MODE_SAMPLE)
@@ -4856,11 +4991,11 @@ static void update_current_slot(int *history, int pm, int last_pm) {
 	if( info->selected_slot != NULL ) {
         	sample_gui_slot_t* gui_slot = find_gui_slot_by_sample(info->selected_slot->sample_id, info->selected_slot->sample_type);
         	if (gui_slot != NULL)
-            		put_text( "entry_samplename", gtk_label_get_text( GTK_LABEL(gui_slot->title)) );
+            		put_text2(widget_cache[WIDGET_ENTRY_SAMPLENAME], gtk_label_get_text(GTK_LABEL(gui_slot->title)));
         	else
-         	   	put_text( "entry_samplename", "" );
+         	   	put_text2(widget_cache[WIDGET_ENTRY_SAMPLENAME], "");
 
-        	set_pm_page_label( info->status_tokens[CURRENT_ID], pm );
+        	set_pm_page_label(pm);
 	}
 
 
@@ -4882,7 +5017,7 @@ static void update_current_slot(int *history, int pm, int last_pm) {
             	info->uc.reload_hint[HINT_GENERATOR] = 1;
         	}
 
-        	update_label_str( "playhint", "Streaming");
+        	update_label_str2(widget_cache[WIDGET_PLAYHINT], "Streaming");
 
         	info->uc.reload_hint[HINT_KF] = 1;
     	}
@@ -4989,7 +5124,7 @@ static void update_current_slot(int *history, int pm, int last_pm) {
         if( history[SAMPLE_SPEED] != info->status_tokens[SAMPLE_SPEED] )
         {
             speed = info->status_tokens[SAMPLE_SPEED];
-            update_slider_value( "speed_slider", speed, 0 );
+            update_slider_value2(widget_cache[WIDGET_SPEED_SLIDER], speed, 0);
 
             if( speed < 0 ) info->play_direction = -1; else info->play_direction = 1;
             if( speed < 0 ) speed *= -1;
@@ -4998,16 +5133,16 @@ static void update_current_slot(int *history, int pm, int last_pm) {
 
             if( pm == MODE_SAMPLE ) {
                 if( speed == 0 )
-                    update_label_str( "playhint", "Paused" );
+                    update_label_str2(widget_cache[WIDGET_PLAYHINT], "Paused");
                 else
-                    update_label_str( "playhint", "Playing");
+                    update_label_str2(widget_cache[WIDGET_PLAYHINT], "Playing");
             }
         }
 
         if( history[FRAME_DUP] != info->status_tokens[FRAME_DUP] )
         {
-            update_spin_value( "spin_framedelay", info->status_tokens[FRAME_DUP]);
-            update_slider_value("slow_slider", info->status_tokens[FRAME_DUP],0);
+            update_spin_value2(widget_cache[WIDGET_SPIN_FRAMEDELAY], info->status_tokens[FRAME_DUP]);
+            update_slider_value2(widget_cache[WIDGET_SLOW_SLIDER], info->status_tokens[FRAME_DUP], 0);
         }
 
         if( (history[SAMPLE_START] != info->status_tokens[SAMPLE_START] ||
@@ -5051,7 +5186,7 @@ static void update_current_slot(int *history, int pm, int last_pm) {
                 sample_gui_slot_t *gui_slot = find_gui_slot_by_sample(info->selected_slot->sample_id,
                                                                     info->selected_slot->sample_type);
                 if (gui_slot != NULL)
-                    put_text("entry_samplename", gtk_label_get_text(GTK_LABEL(gui_slot->title)));
+                    put_text2(widget_cache[WIDGET_ENTRY_SAMPLENAME], gtk_label_get_text(GTK_LABEL(gui_slot->title)));
             }
         }
 
@@ -5264,12 +5399,12 @@ gboolean view_entry_selection_func (GtkTreeSelection *selection,
             }
             info->status_lock = sl;
 
-            update_label_i( "label_fxentry", name, 0 );
+            update_label_i2(widget_cache[WIDGET_LABEL_FXENTRY], name, 0);
             vj_midi_learning_vims_msg( info->midi, NULL, VIMS_CHAIN_SET_ENTRY,name );
 
-            if( get_nums("button_fx_entry") != name ) {
+            if( get_nums2(widget_cache[WIDGET_BUTTON_FX_ENTRY]) != name ) {
                 info->status_lock = 1;
-                update_spin_value( "button_fx_entry", name   );
+                update_spin_value2(widget_cache[WIDGET_BUTTON_FX_ENTRY], name);
                 info->uc.reload_hint[HINT_KF] = 1;
                 info->uc.reload_hint[HINT_ENTRY] = 1;
                 info->status_lock = 0;
@@ -5309,7 +5444,7 @@ gboolean cali_sources_selection_func (GtkTreeSelection *selection,
             if(name[0] != 'S')
             {
                 cali_stream_id = id;
-                update_label_str("current_step_label","Please take an image with the cap on the lens.");
+                update_label_str2(widget_cache[WIDGET_CURRENT_STEP_LABEL], "Please take an image with the cap on the lens.");
                 GtkWidget *nb = glade_xml_get_widget_(info->main_window, "cali_notebook");
                 gtk_notebook_next_page( GTK_NOTEBOOK(nb));
             }
@@ -6699,7 +6834,7 @@ static void load_samplelist_info(void)
                     add_sample_to_effect_sources_list( int_id,0, slot->title, slot->timecode);
                 }
                 if( info->status_tokens[CURRENT_ID] == values[0] && info->status_tokens[PLAY_MODE] == 0 )
-                    put_text( "entry_samplename", title );
+                    put_text2(widget_cache[WIDGET_ENTRY_SAMPLENAME], title);
 
                 free(timecode);
                 g_free(title);
@@ -6787,8 +6922,8 @@ gboolean view_el_selection_func (GtkTreeSelection *selection,
             info->uc.selected_el_entry = num;
             gint frame_num =0;
             frame_num = _el_ref_start_frame( num );
-            update_spin_value( "button_el_selstart", frame_num);
-            update_spin_value( "button_el_selend", _el_ref_end_frame( num ) );
+            update_spin_value2(widget_cache[WIDGET_BUTTON_EL_SELSTART], frame_num);
+            update_spin_value2(widget_cache[WIDGET_BUTTON_EL_SELEND], _el_ref_end_frame(num));
         }
     }
     return TRUE;
@@ -6894,9 +7029,9 @@ gboolean view_bundle_selection_func (GtkTreeSelection *selection,
             info->uc.selected_vims_accel[0] = m;
             info->uc.selected_vims_accel[1] = k;
 
-            clear_textview_buffer( "vimsview" );
+            clear_textview_buffer2(widget_cache[WIDGET_VIMSVIEW]);
             if(text)
-                set_textview_buffer( "vimsview", text );
+                set_textview_buffer2(widget_cache[WIDGET_VIMSVIEW], text);
         }
         if(vimsid) g_free( vimsid );
         if(text) g_free( text );
@@ -7081,7 +7216,7 @@ static void setup_bundles(void)
 
     gtk_tree_view_get_enable_search( GTK_TREE_VIEW(tree) );
 
-    GtkWidget *tv = glade_xml_get_widget_( info->main_window, "vimsview" );
+    GtkWidget *tv = widget_cache[WIDGET_VIMSVIEW];
     gtk_text_view_set_wrap_mode( GTK_TEXT_VIEW(tv), GTK_WRAP_WORD_CHAR );
 }
 
@@ -7800,24 +7935,24 @@ static int load_editlist_info(void)
     }
 
     snprintf(tmp, sizeof(tmp), "%s", norm_str);
-    update_label_str( "label_el_norm", tmp);
+    update_label_str2(widget_cache[WIDGET_LABEL_EL_NORM], tmp);
 
     snprintf(tmp,sizeof(tmp), "%dx%d", values[0], values[1]);
-    update_label_str( "label_el_wh", tmp );
+    update_label_str2(widget_cache[WIDGET_LABEL_EL_WH], tmp);
 
     update_label_f( "label_el_fps", fps );
 
-    update_spin_value( "screenshot_width", info->el.width );
-    update_spin_value( "screenshot_height", info->el.height );
+    update_spin_value2(widget_cache[WIDGET_SCREENSHOT_WIDTH], info->el.width);
+    update_spin_value2(widget_cache[WIDGET_SCREENSHOT_HEIGHT], info->el.height);
 
 
     snprintf( tmp, sizeof(tmp), "%s",
         ( values[2] == 0 ? "progressive" : (values[2] == 1 ? "top first" : "bottom first" ) ) );
-    update_label_str( "label_el_inter", tmp );
+    update_label_str2(widget_cache[WIDGET_LABEL_EL_INTER], tmp);
 
-    update_label_i( "label_el_arate", (int)rate, 0);
-    update_label_i( "label_el_achans", values[7], 0);
-    update_label_i( "label_el_abits", values[5], 0);
+    update_label_i2(widget_cache[WIDGET_LABEL_EL_ARATE], (int)rate, 0);
+    update_label_i2(widget_cache[WIDGET_LABEL_EL_ACHANS], values[7], 0);
+    update_label_i2(widget_cache[WIDGET_LABEL_EL_ABITS], values[5], 0);
 
 
     int button_global_state = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_GLOBAL_TRANSITIONS_TOGGLE ]));
@@ -7880,14 +8015,14 @@ static gboolean update_cpumeter_timeout( gpointer data )
 
     if( ms < lim )
     {
-        update_label_str( "cpumeter", text_msg_[TEXT_REALTIME].text );
+        update_label_str2(widget_cache[WIDGET_CPUMETER], text_msg_[TEXT_REALTIME].text);
     }
     else
     {
         char text[32];
         snprintf(text, sizeof(text), "%2.2f FPS", ( 1.0f / ms ) * 1000.0 );
 
-        update_label_str( "cpumeter", text );
+        update_label_str2(widget_cache[WIDGET_CPUMETER], text);
     }
     return TRUE;
 }
@@ -7897,7 +8032,7 @@ static gboolean update_cachemeter_timeout( gpointer data )
     char text[32];
     gint v = info->status_tokens[TOTAL_MEM];
     snprintf(text, sizeof(text), "%d MB cached", v);
-    update_label_str( "cachemeter", text );
+    update_label_str2(widget_cache[WIDGET_CACHEMETER], text);
 
     return TRUE;
 }
@@ -8158,7 +8293,7 @@ static void update_status_accessibility(int old_pm, int new_pm)
 {
     int i;
 
-    set_pm_page_label(info->status_tokens[CURRENT_ID], new_pm);
+    set_pm_page_label(new_pm);
 
     if( old_pm == new_pm )
         return;
@@ -8244,32 +8379,33 @@ static void update_status_accessibility(int old_pm, int new_pm)
     gtk_notebook_set_current_page( GTK_NOTEBOOK(n), page_needed );
 }
 
-static void set_pm_page_label(int sample_id, int type)
+static void set_pm_page_label(int type)
 {
-    const char *mode_label;
-    gchar tab_label[64];
-    gchar ftitle[80];
+    const char *tab_label = "Plain";
+    gchar ftitle[32];
+    GtkWidget *mode = widget_cache[WIDGET_LABEL_CURRENT_MODE];
+    GtkWidget *source = widget_cache[WIDGET_LABEL_CURRENTSOURCE];
 
     switch(type)
     {
         case MODE_SAMPLE:
-            mode_label = "Sample";
-            snprintf(tab_label, sizeof(tab_label), "%s %d", mode_label, sample_id);
+            tab_label = "Sample";
             break;
         case MODE_STREAM:
-            mode_label = "Stream";
-            snprintf(tab_label, sizeof(tab_label), "%s %d", mode_label, sample_id);
+            tab_label = "Stream";
             break;
         case MODE_PLAIN:
         default:
-            mode_label = "Plain";
-            snprintf(tab_label, sizeof(tab_label), "%s", mode_label);
             break;
     }
 
     snprintf(ftitle, sizeof(ftitle), "<b>%s</b>", tab_label);
-    label_set_markup("label_current_mode", ftitle);
-    update_label_str("label_currentsource", tab_label);
+
+    if(mode)
+        gtk_label_set_markup(GTK_LABEL(mode), ftitle);
+
+    if(source)
+        gtk_label_set_text(GTK_LABEL(source), tab_label);
 }
 
 static inline int normalize_sequence_slot(int raw, int n_slots)
@@ -9098,11 +9234,11 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
             if( plainspeed == 0 )
             {
-                gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_PLAYHINT] ), "Paused" );
+                update_label_str2(widget_cache[WIDGET_PLAYHINT], "Paused");
             }
             else
             {
-                gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_PLAYHINT] ), "Playing" );
+                update_label_str2(widget_cache[WIDGET_PLAYHINT], "Playing");
             }
         }
     }
@@ -9704,8 +9840,8 @@ int vj_img_cb(GdkPixbuf *img )
 void vj_gui_cb(int state, char *hostname, int port_num)
 {
     info->watch.state = STATE_RECONNECT;
-    put_text( "entry_hostname", hostname );
-    update_spin_value( "button_portnum", port_num );
+    put_text2(widget_cache[WIDGET_ENTRY_HOSTNAME], hostname);
+    update_spin_value2(widget_cache[WIDGET_BUTTON_PORTNUM], port_num);
 
 
     int i;
@@ -9945,9 +10081,8 @@ static void reset_connection_widget_state(void)
     if(widget_cache[WIDGET_LABEL_CURRENTID])
         update_label_i2(widget_cache[WIDGET_LABEL_CURRENTID], 0, 0);
 
-    put_text("entry_samplename", "");
-    update_label_str("label_currentsource", "Plain");
-    update_label_str("label_current_mode", "Plain");
+    put_text2(widget_cache[WIDGET_ENTRY_SAMPLENAME], "");
+    set_pm_page_label(MODE_PLAIN);
 
     clear_progress_bar("connecting", 0.0);
     clear_progress_bar("samplerecord_progress", 0.0);
@@ -10006,13 +10141,13 @@ gboolean speed_scroll_event( GtkWidget *widget, GdkEventScroll *ev, gpointer use
     } else if (ev->direction == GDK_SCROLL_DOWN ) {
         plainspeed = plainspeed - 1;
     }
-    update_slider_value( "speed_slider", plainspeed, 0 );
+    update_slider_value2(widget_cache[WIDGET_SPEED_SLIDER], plainspeed, 0);
     return FALSE;
 }
 
 gboolean slow_scroll_event( GtkWidget *widget, GdkEventScroll *ev, gpointer user_data)
 {
-    int plainspeed =  get_slider_val("slow_slider");
+    int plainspeed = get_slider_val2(widget_cache[WIDGET_SLOW_SLIDER]);
     if(ev->direction == GDK_SCROLL_DOWN ) {
         plainspeed = plainspeed - 1;
     } else if (ev->direction == GDK_SCROLL_UP ) {
@@ -10020,7 +10155,7 @@ gboolean slow_scroll_event( GtkWidget *widget, GdkEventScroll *ev, gpointer user
     }
     if(plainspeed < 1 )
         plainspeed = 1;
-    update_slider_value("slow_slider",plainspeed,0);
+    update_slider_value2(widget_cache[WIDGET_SLOW_SLIDER], plainspeed, 0);
     vj_msg(VEEJAY_MSG_INFO, "Slow video to %2.2f fps",
         info->el.fps / (float) plainspeed );
     return FALSE;
@@ -10178,8 +10313,8 @@ static int auto_connect_to_veejay(char *host, int port_num)
             multitrack_set_master_track( info->mt, 0 );
 
 
-            update_spin_value( "button_portnum", i );
-            put_text( "entry_hostname", hostname );
+            update_spin_value2(widget_cache[WIDGET_BUTTON_PORTNUM], i);
+            put_text2(widget_cache[WIDGET_ENTRY_HOSTNAME], hostname);
 
 
             for( j = (i+1000); j < 9999; j+= 1000 )
@@ -10198,8 +10333,8 @@ static int auto_connect_to_veejay(char *host, int port_num)
         }
     }
 
-    update_spin_value( "button_portnum", port_num );
-    put_text( "entry_hostname", hostname );
+    update_spin_value2(widget_cache[WIDGET_BUTTON_PORTNUM], port_num);
+    put_text2(widget_cache[WIDGET_ENTRY_HOSTNAME], hostname);
 
     return 0;
 }
@@ -10335,17 +10470,18 @@ void vj_gui_init(const char *glade_file,
     }
     info = gui;
 
+    init_widget_cache();
+
     for( i = 0; i < MAX_UI_PARAMETERS; i ++ ) {
       add_class_by_name( slider_names_[i].text, "p_slider" );
     }
 
-    add_class_by_name( "speed_slider", "h_slider" );
-    add_class_by_name( "slow_slider", "h_slider" );
+    add_class(widget_cache[WIDGET_SPEED_SLIDER], "h_slider");
+    add_class(widget_cache[WIDGET_SLOW_SLIDER], "h_slider");
     add_class_by_name( "framerate", "h_slider" );
 
     GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
 
-    init_widget_cache();
     init_audio_beat_tooltips();
     init_audio_sync_tooltips();
     init_polish_tooltips();
@@ -10361,12 +10497,8 @@ void vj_gui_init(const char *glade_file,
     }
 
 
-    gtk_entry_set_activates_default(GTK_ENTRY(glade_xml_get_widget_( info->main_window,
-                                                                    "entry_hostname" )),
-                                    TRUE);
-    gtk_entry_set_activates_default(GTK_ENTRY(glade_xml_get_widget_( info->main_window,
-                                                                    "button_portnum" )),
-                                    TRUE);
+    gtk_entry_set_activates_default(GTK_ENTRY(widget_cache[WIDGET_ENTRY_HOSTNAME]), TRUE);
+    gtk_entry_set_activates_default(GTK_ENTRY(widget_cache[WIDGET_BUTTON_PORTNUM]), TRUE);
     GtkWidget *vj_button = glade_xml_get_widget_( info->main_window, "button_veejay" );
     gtk_widget_set_can_default(vj_button,TRUE);
     GtkWidget *connection_dial = glade_xml_get_widget_( info->main_window,
@@ -10493,10 +10625,10 @@ void vj_gui_init(const char *glade_file,
 
     beta__ = beta;
 
-    update_spin_range( "spin_framedelay", 1, MAX_SLOW, 0);
+    update_spin_range2(widget_cache[WIDGET_SPIN_FRAMEDELAY], 1, MAX_SLOW, 0);
     update_spin_range2( widget_cache[WIDGET_SPIN_SAMPLESPEED], -25,25,1);
-    update_slider_range( "speed_slider", -25,25,1,0);
-    update_slider_range( "slow_slider",1,MAX_SLOW,1,0);
+    update_slider_range2(widget_cache[WIDGET_SPEED_SLIDER], -25, 25, 1, 0);
+    update_slider_range2(widget_cache[WIDGET_SLOW_SLIDER], 1, MAX_SLOW, 1, 0);
 
     if( load_midi )
        vj_midi_load(info->midi,midi_file);
@@ -10508,9 +10640,9 @@ void vj_gui_init(const char *glade_file,
         update_slider_range( slider_names_[i].text, 0,1,0,0);
     }
 
-    g_signal_connect(glade_xml_get_widget_(info->main_window, "speed_slider"), "scroll-event",
+    g_signal_connect(widget_cache[WIDGET_SPEED_SLIDER], "scroll-event",
                      G_CALLBACK(speed_scroll_event), NULL );
-    g_signal_connect(glade_xml_get_widget_(info->main_window, "slow_slider"), "scroll-event",
+    g_signal_connect(widget_cache[WIDGET_SLOW_SLIDER], "scroll-event",
                      G_CALLBACK(slow_scroll_event), NULL );
 
         char *have_snoop = getenv( "RELOADED_KEY_SNOOP" );
@@ -10540,9 +10672,9 @@ void vj_gui_init(const char *glade_file,
 
     if(info->watch.state != STATE_PLAYING) {
         if(hostname) {
-            put_text("entry_hostname",hostname);
+            put_text2(widget_cache[WIDGET_ENTRY_HOSTNAME], hostname);
         }
-        update_spin_value( "button_portnum", port_num );
+        update_spin_value2(widget_cache[WIDGET_BUTTON_PORTNUM], port_num);
 
         reloaded_show_launcher ();
     }
@@ -10576,8 +10708,8 @@ void vj_gui_preview(void)
 
     multitrack_get_preview_dimensions( tmp_w,tmp_h, &w, &h );
 
-    update_spin_value( "priout_width", w );
-    update_spin_value( "priout_height", h );
+    update_spin_value2(widget_cache[WIDGET_PRIOUT_WIDTH], w);
+    update_spin_value2(widget_cache[WIDGET_PRIOUT_HEIGHT], h);
 
     update_spin_range( "preview_width", 16, w, w);
     update_spin_range( "preview_height", 16, h, h );
@@ -10694,8 +10826,8 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 
 
-    update_label_str( "label_hostnamex", (hostname == NULL ? group_name: hostname ) );
-    update_label_i( "label_portx",port_num,0);
+    update_label_str2(widget_cache[WIDGET_LABEL_HOSTNAMEX], (hostname == NULL ? group_name : hostname));
+    update_label_i2(widget_cache[WIDGET_LABEL_PORTX], port_num, 0);
 
     info->status_lock = 0;
     info->parameter_lock = 0;
@@ -10816,8 +10948,14 @@ gboolean    is_alive( int *do_sync )
     {
         char *remote;
         int port;
-        remote = get_text( "entry_hostname" );
-        port    = get_nums( "button_portnum" );
+        remote = get_text2(widget_cache[WIDGET_ENTRY_HOSTNAME]);
+        port    = get_nums2(widget_cache[WIDGET_BUTTON_PORTNUM]);
+
+        if(!remote)
+        {
+            reloaded_restart();
+            return TRUE;
+        }
 
         veejay_msg(VEEJAY_MSG_INFO, "Connecting to %s: %d", remote,port );
         if(!vj_gui_reconnect( remote, NULL, port ))
