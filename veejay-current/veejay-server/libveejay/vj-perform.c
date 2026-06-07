@@ -5881,10 +5881,11 @@ int vj_perform_commit_offline_recording(veejay_t *info, int id, char *recording)
         new_id = veejay_edit_addmovie_sample( info, recording, id );
         if(new_id != -1) {
             if(end_pos < sample->last_frame) {
-                sample->first_frame = end_pos;
+                sample_marker_clear(id);
+                sample_set_startframe(id, end_pos);
             }
-            veejay_msg(VEEJAY_MSG_DEBUG, "Sample position set to %ld - %ld to loop newly recorded video %s",
-                    sample->first_frame, sample->last_frame, recording );
+            veejay_msg(VEEJAY_MSG_DEBUG, "Sample position set to %d - %d to loop newly recorded video %s",
+                    sample_get_startFrame(id), sample_get_endFrame(id), recording );
         }
         else {
             veejay_msg(VEEJAY_MSG_ERROR,"Failed to add recording %s to EditList", recording);
@@ -6888,6 +6889,7 @@ static void vj_perform_feed_clip_target_clock(veejay_t *info,
     {
         int sync_mode = atomic_load_int(&info->settings->audio_sync.mode);
         if(sync_mode != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE &&
+           sync_mode != VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW &&
            sync_mode != VJ_AUDIO_SYNC_MODE_TRACK_ALIGN)
             return;
     }
@@ -7223,6 +7225,17 @@ int vj_perform_queue_audio_chunk_ext(
                 &settings->audio_sync,
                 vj_perform_track_align_source_fps(el)
             );
+        }
+
+        if(sync_enabled && sync_mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW &&
+           vj_audio_sync_get_target_mode(&settings->audio_sync) == VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP)
+        {
+            vj_perform_feed_clip_target_clock(info,
+                                              p,
+                                              el,
+                                              target_frame,
+                                              client_frames_to_write,
+                                              frame_bytes);
         }
 
         if (source_wants_jack_playback || auto_wants_external || mode_wants_external_audio) {
@@ -13095,7 +13108,8 @@ static int vj_perform_pingpong_turn_needs_reanchor(veejay_t *info)
     return sync_mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL ||
            sync_mode == VJ_AUDIO_SYNC_MODE_MONITOR ||
            sync_mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
-           sync_mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN;
+           sync_mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN ||
+           sync_mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW;
 #else
     (void)info;
     return 0;

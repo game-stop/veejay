@@ -33,12 +33,6 @@
 #define VJ_AUDIO_SYNC_ALIGN_FEATURES 4096
 
 
-#define VJ_AUDIO_SYNC_BRIDGE_STATE_IDLE         0
-#define VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_SOURCE  1
-#define VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_TARGET  2
-#define VJ_AUDIO_SYNC_BRIDGE_STATE_LOCKED       3
-#define VJ_AUDIO_SYNC_BRIDGE_STATE_HOLD         4
-#define VJ_AUDIO_SYNC_BRIDGE_STATE_FALLBACK     5
 
 #define VJ_AUDIO_SYNC_TRACK_STATE_IDLE          0
 #define VJ_AUDIO_SYNC_TRACK_STATE_WAIT_SOURCE   1
@@ -47,6 +41,10 @@
 #define VJ_AUDIO_SYNC_TRACK_STATE_LOCKED        4
 #define VJ_AUDIO_SYNC_TRACK_STATE_HOLD          5
 #define VJ_AUDIO_SYNC_TRACK_STATE_FALLBACK      6
+
+#ifndef VJ_AUDIO_SYNC_MODE_MAX
+#define VJ_AUDIO_SYNC_MODE_MAX VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW
+#endif
 
 typedef struct
 {
@@ -195,6 +193,13 @@ typedef struct vj_audio_sync_shared_t
     double bridge_source_bpm_latched;
     double bridge_target_bpm_latched;
     int    bridge_bpm_latch_valid;
+
+    double bridge_stretch_segment_start;
+    double bridge_stretch_prev_start;
+    int    bridge_stretch_segment_pos;
+    int    bridge_stretch_prev_valid;
+    int    bridge_stretch_segment_len;
+    int    bridge_stretch_overlap;
 
     /* Track Align / waveform sync feature rings.
      * Source = external master track; target = current clip/original audio.

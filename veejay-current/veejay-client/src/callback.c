@@ -673,12 +673,12 @@ static int audio_sync_get_combo_active(int widget_id, int fallback)
 
 static int audio_sync_mode_combo_to_mode(int active)
 {
-
-
     switch(active) {
-        case 1: return VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE;
-        case 2: return VJ_AUDIO_SYNC_MODE_TRACK_ALIGN;
-        case 3: return VJ_AUDIO_SYNC_MODE_MONITOR;
+        case 1: return VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL;
+        case 2: return VJ_AUDIO_SYNC_MODE_MONITOR;
+        case 3: return VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW;
+        case 4: return VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE;
+        case 5: return VJ_AUDIO_SYNC_MODE_TRACK_ALIGN;
         case 0:
         default: return 0;
     }
@@ -687,12 +687,26 @@ static int audio_sync_mode_combo_to_mode(int active)
 static int audio_sync_mode_combo_from_mode(int mode)
 {
     switch(mode) {
-        case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE: return 1;
-        case VJ_AUDIO_SYNC_MODE_TRACK_ALIGN:  return 2;
-        case VJ_AUDIO_SYNC_MODE_MONITOR:      return 3;
+        case VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL: return 1;
+        case VJ_AUDIO_SYNC_MODE_MONITOR:       return 2;
+        case VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW:  return 3;
+        case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE:  return 4;
+        case VJ_AUDIO_SYNC_MODE_TRACK_ALIGN:   return 5;
         case 0:
         default: return 0;
     }
+}
+
+static int audio_sync_mode_supports_wav(int mode)
+{
+    return (mode == VJ_AUDIO_SYNC_MODE_MONITOR ||
+            mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
+            mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN);
+}
+
+static int audio_sync_mode_is_control_only(int mode)
+{
+    return (mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL);
 }
 
 static void audio_sync_set_mode_combo_guarded(int mode)
@@ -842,7 +856,7 @@ static void audio_sync_send_target_clock(void)
 
 static void audio_sync_send_mode_control(int mode)
 {
-    mode = ui_clampi(mode, 0, VJ_AUDIO_SYNC_MODE_MONITOR);
+    mode = ui_clampi(mode, 0, VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW);
 
     multi_vims(VIMS_AUDIO_SYNC_MODE, "%d", mode);
 }
@@ -858,7 +872,7 @@ static int audio_sync_send_selected_source(void)
 
     audio_sync_send_mode_control(mode);
 
-    if(audio_input_selector_wav_from_ui()) {
+    if(audio_sync_mode_supports_wav(mode) && audio_input_selector_wav_from_ui()) {
         gchar *path;
 
         if(!audio_sync_wav_path_ready(0)) {
@@ -920,6 +934,20 @@ static void audio_sync_deactivate_playback(void)
     multi_vims(VIMS_AUDIO_SYNC_STATUS, "%d", 0);
 }
 
+static void audio_sync_activate_control_only(void)
+{
+    int fallback = audio_sync_non_jack_master_from_status();
+
+    audio_input_selector_set_guarded(audio_input_selector_active_from_record_source(fallback));
+    audio_sync_set_master_wav_options_visible(0);
+    multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", fallback);
+    audio_sync_send_mode_control(VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL);
+    multi_vims(VIMS_AUDIO_SYNC_JACK, "%d %d",
+               VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL,
+               audio_sync_channels_from_ui());
+    multi_vims(VIMS_AUDIO_SYNC_STATUS, "%d", 1);
+}
+
 static int audio_input_selector_use_external_playback(int use_wav, int allow_wav_dialog)
 {
     int mode = audio_sync_mode_from_ui();
@@ -928,6 +956,14 @@ static int audio_input_selector_use_external_playback(int use_wav, int allow_wav
         mode = VJ_AUDIO_SYNC_MODE_MONITOR;
         audio_sync_set_mode_combo_guarded(mode);
     }
+
+    if(audio_sync_mode_is_control_only(mode)) {
+        audio_sync_activate_control_only();
+        return 1;
+    }
+
+    if(!audio_sync_mode_supports_wav(mode))
+        use_wav = 0;
 
     audio_sync_set_external_source_guarded(use_wav);
 
@@ -1033,6 +1069,17 @@ void on_audio_sync_enable_toggle_toggled(GtkWidget *widget, gpointer user_data)
         if(audio_sync_mode_from_ui() == 0)
             audio_sync_set_mode_combo_guarded(VJ_AUDIO_SYNC_MODE_MONITOR);
 
+        if(audio_sync_mode_is_control_only(audio_sync_mode_from_ui())) {
+            audio_sync_activate_control_only();
+            vj_msg(VEEJAY_MSG_INFO, "External tempo analysis enabled as control-only input");
+            return;
+        }
+
+        if(!audio_sync_mode_supports_wav(audio_sync_mode_from_ui())) {
+            active = AUDIO_MASTER_JACK;
+            use_wav = 0;
+        }
+
         audio_input_selector_set_guarded(active);
         if(audio_input_selector_use_external_playback(use_wav, use_wav)) {
             vj_msg(VEEJAY_MSG_INFO, "%s audio sync enabled (%s)",
@@ -1088,9 +1135,14 @@ void on_audio_sync_mode_combo_changed(GtkWidget *widget, gpointer user_data)
         return;
     }
 
+    if(audio_sync_mode_is_control_only(mode)) {
+        audio_sync_activate_control_only();
+        vj_msg(VEEJAY_MSG_INFO, "Audio sync mode: control-only external tempo analysis");
+        return;
+    }
 
-
-    if(audio_input_selector_active_from_ui() != AUDIO_MASTER_WAV)
+    if(!audio_sync_mode_supports_wav(mode) ||
+       audio_input_selector_active_from_ui() != AUDIO_MASTER_WAV)
         audio_input_selector_set_guarded(AUDIO_MASTER_JACK);
 
     multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
@@ -1119,7 +1171,16 @@ void on_audio_sync_source_combo_changed(GtkWidget *widget, gpointer user_data)
         active = gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
 
 
-    if(active == VJ_AUDIO_SYNC_SOURCE_WAV_FILE)
+    if(audio_sync_mode_is_control_only(mode)) {
+        audio_sync_activate_control_only();
+        vj_msg(VEEJAY_MSG_INFO, "Control-only tempo analysis uses JACK input");
+        return;
+    }
+    else if(!audio_sync_mode_supports_wav(mode)) {
+        audio_sync_set_external_source_guarded(0);
+        vj_msg(VEEJAY_MSG_INFO, "%s uses JACK input as external master", audio_sync_mode_name(mode));
+    }
+    else if(active == VJ_AUDIO_SYNC_SOURCE_WAV_FILE)
         audio_sync_set_external_source_guarded(1);
     else if(active == VJ_AUDIO_SYNC_SOURCE_JACK)
         audio_sync_set_external_source_guarded(0);
@@ -1164,7 +1225,7 @@ void on_audio_sync_target_bpm_value_changed(GtkWidget *widget, gpointer user_dat
         int bpm_x10 = audio_sync_bpm_x10_from_ui();
         audio_sync_assert_tempo_bridge_active();
         audio_sync_send_target_clock();
-        vj_msg(VEEJAY_MSG_INFO, "Tempo Bridge target BPM: %d.%d",
+        vj_msg(VEEJAY_MSG_INFO, "Tempo match target BPM: %d.%d",
                bpm_x10 / 10, bpm_x10 % 10);
     }
 }
@@ -1178,7 +1239,7 @@ void on_audio_sync_phase_value_changed(GtkWidget *widget, gpointer user_data)
         int phase = audio_sync_spin_int(WIDGET_AUDIO_SYNC_PHASE_SPIN, 0);
         audio_sync_assert_tempo_bridge_active();
         audio_sync_send_target_clock();
-        vj_msg(VEEJAY_MSG_INFO, "Tempo Bridge phase: %d%%", phase);
+        vj_msg(VEEJAY_MSG_INFO, "Tempo match phase: %d%%", phase);
     }
 }
 
@@ -1191,7 +1252,7 @@ void on_audio_sync_confidence_value_changed(GtkWidget *widget, gpointer user_dat
         int confidence = audio_sync_spin_int(WIDGET_AUDIO_SYNC_CONFIDENCE_SPIN, 100);
         audio_sync_assert_tempo_bridge_active();
         audio_sync_send_target_clock();
-        vj_msg(VEEJAY_MSG_INFO, "Tempo Bridge confidence: %d%%", confidence);
+        vj_msg(VEEJAY_MSG_INFO, "Tempo match confidence: %d%%", confidence);
     }
 }
 
@@ -1204,7 +1265,7 @@ void on_audio_sync_correction_value_changed(GtkWidget *widget, gpointer user_dat
         int correction = audio_sync_clamped_correction_from_ui();
         audio_sync_assert_tempo_bridge_active();
         multi_vims(VIMS_AUDIO_SYNC_CORRECTION, "%d", correction);
-        vj_msg(VEEJAY_MSG_INFO, "Tempo Bridge max correction: %d%%", correction);
+        vj_msg(VEEJAY_MSG_INFO, "Tempo match max correction: %d%%", correction);
     }
 }
 
@@ -1223,6 +1284,12 @@ void on_audio_sync_jack_button_clicked(GtkWidget *widget, gpointer user_data)
     if(mode == 0)
         return;
 
+    if(audio_sync_mode_is_control_only(mode)) {
+        audio_sync_activate_control_only();
+        vj_msg(VEEJAY_MSG_INFO, "External control source: JACK input");
+        return;
+    }
+
     audio_input_selector_use_jack_playback();
     vj_msg(VEEJAY_MSG_INFO, "External master source: JACK input");
 }
@@ -1239,6 +1306,18 @@ void on_audio_sync_wav_button_clicked(GtkWidget *widget, gpointer user_data)
         return;
 
     mode = audio_sync_mode_from_ui();
+    if(audio_sync_mode_is_control_only(mode)) {
+        audio_sync_activate_control_only();
+        vj_msg(VEEJAY_MSG_INFO, "Control-only tempo analysis uses JACK input");
+        return;
+    }
+
+    if(mode != 0 && !audio_sync_mode_supports_wav(mode)) {
+        audio_input_selector_use_jack_playback();
+        vj_msg(VEEJAY_MSG_INFO, "%s uses JACK input as external master", audio_sync_mode_name(mode));
+        return;
+    }
+
     if(mode == 0)
         audio_sync_set_mode_combo_guarded(VJ_AUDIO_SYNC_MODE_MONITOR);
 
@@ -1258,6 +1337,12 @@ void on_audio_sync_wav_browse_button_clicked(GtkWidget *widget, gpointer user_da
     if(!audio_sync_wav_path_ready(1))
         return;
 
+    if(audio_sync_mode_from_ui() != 0 && !audio_sync_mode_supports_wav(audio_sync_mode_from_ui())) {
+        vj_msg(VEEJAY_MSG_INFO, "%s uses JACK input; WAV path stored but not activated",
+               audio_sync_mode_name(audio_sync_mode_from_ui()));
+        return;
+    }
+
     audio_sync_set_external_source_guarded(1);
     audio_input_selector_use_wav_playback(0);
     vj_msg(VEEJAY_MSG_INFO, "WAV master file selected");
@@ -1270,6 +1355,12 @@ void on_audio_sync_wav_path_activate(GtkWidget *widget, gpointer user_data)
 
     if(info->status_lock)
         return;
+
+    if(audio_sync_mode_from_ui() != 0 && !audio_sync_mode_supports_wav(audio_sync_mode_from_ui())) {
+        vj_msg(VEEJAY_MSG_INFO, "%s uses JACK input; WAV path stored but not activated",
+               audio_sync_mode_name(audio_sync_mode_from_ui()));
+        return;
+    }
 
     audio_sync_set_external_source_guarded(1);
     audio_input_selector_use_wav_playback(0);

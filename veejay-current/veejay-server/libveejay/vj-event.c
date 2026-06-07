@@ -1008,6 +1008,17 @@ static  void    constrain_sample( veejay_t *v,int n )
 
 }
 
+static int vj_event_sample_get_real_range(int sample_id, int *start, int *end)
+{
+    if (!start || !end)
+        return 0;
+
+    if (sample_get_el_position(sample_id, start, end) != 1)
+        return 0;
+
+    return (*end > *start) ? 1 : 0;
+}
+
 static  void    constrain_stream( veejay_t *v, int n, long hi )
 {
     vj_font_set_dict(v->font, vj_tag_get_dict(n) );
@@ -4005,20 +4016,47 @@ void vj_event_set_frame_percentage(void *ptr, const char format[], va_list ap)
 {
     int args[1];
     veejay_t *v = (veejay_t*) ptr;
-    if(!STREAM_PLAYING(v))
-    {
-        P_A(args,sizeof(args),NULL,0,format,ap);
-        
-        int len = sample_get_endFrame(v->uc->sample_id) - sample_get_startFrame(v->uc->sample_id);
-        float p = fabs( ( (float)args[0] * 0.01f));
-        int perc = (int) ((len * p) + 0.5f);
-        veejay_set_frame(v, perc);
-    }
-    else
+
+    if(STREAM_PLAYING(v))
     {
         p_invalid_mode();
+        return;
     }
+
+    P_A(args,sizeof(args),NULL,0,format,ap);
+
+    int pct = args[0];
+    if(pct < 0)
+        pct = 0;
+    else if(pct > 100)
+        pct = 100;
+
+    float p = ((float)pct) * 0.01f;
+
+    if(SAMPLE_PLAYING(v))
+    {
+        int start = sample_get_startFrame(v->uc->sample_id);
+        int end   = sample_get_endFrame(v->uc->sample_id);
+
+        if(start < 0 || end < start)
+            return;
+
+        int frame = start + (int)(((float)(end - start) * p) + 0.5f);
+        veejay_set_frame(v, frame);
+        return;
+    }
+
+    if(PLAIN_PLAYING(v))
+    {
+        int end = (v->current_edit_list ? v->current_edit_list->total_frames : 0);
+        int frame = (int)(((float)end * p) + 0.5f);
+        veejay_set_frame(v, frame);
+        return;
+    }
+
+    p_invalid_mode();
 }
+
 
 void    vj_event_projection_dec( void *ptr, const char format[], va_list ap )
 {
@@ -4399,21 +4437,57 @@ void    vj_event_sample_set_position( void *ptr, const char format[], va_list ap
 
     SAMPLE_DEFAULTS(args[0]);
 
+    if(!sample_exists(args[0]))
+    {
+        p_no_sample(args[0]);
+        return;
+    }
+
     int entry = args[1];
     if( entry == -1 )
         entry = sample_get_selected_entry(args[0]);
 
-    sample_get_chain_source(args[0], entry);
+    if(entry < 0 || entry >= SAMPLE_MAX_EFFECTS)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid FX chain entry %d for sample %d", entry, args[0]);
+        return;
+    }
+
+    int src = sample_get_chain_source(args[0], entry);
+    if(src != VJ_TAG_TYPE_NONE)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+            "FX entry %d of sample %d does not use a sample source", entry, args[0]);
+        return;
+    }
+
     int cha = sample_get_chain_channel( args[0], entry );
+    if(!sample_exists(cha))
+    {
+        p_no_sample(cha);
+        return;
+    }
 
     int pos = sample_get_resume( cha );
-            
+    if(pos < 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "Cannot read frame position of sample %d", cha);
+        return;
+    }
+
     pos += args[2];
 
-    sample_set_resume( cha, pos );
+    if(sample_set_resume( cha, pos ) <= 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to change frame position of sample %d", cha);
+        return;
+    }
+
+    pos = sample_get_resume(cha);
 
     veejay_msg(VEEJAY_MSG_INFO, "Changed frame position to %d for sample %d on FX entry %d (only)", pos,cha,entry );
 }
+
 
 void    vj_event_sample_skip_frame(void *ptr, const char format[], va_list ap)
 {
@@ -4422,7 +4496,13 @@ void    vj_event_sample_skip_frame(void *ptr, const char format[], va_list ap)
     P_A(args,sizeof(args),NULL,0,format, ap);
 
     SAMPLE_DEFAULTS(args[0]);
-    
+
+    if(!sample_exists(args[0]))
+    {
+        p_no_sample(args[0]);
+        return;
+    }
+
     int job = sample_highest();
     int i   = 1;
     int k   = 0;
@@ -4430,37 +4510,39 @@ void    vj_event_sample_skip_frame(void *ptr, const char format[], va_list ap)
         sample_info *si = sample_get( i );
         if(!si)
           continue;
-        
+
         //@ find the mixing ID in all effect chains , frame offset is FX chain attribute
         for( k = 0; k < SAMPLE_MAX_EFFECTS; k ++ ) {
             if( si->effect_chain[k]->effect_id > 0 && // active
                     si->effect_chain[k]->source_type == 0 &&     // sample (=0)
                 si->effect_chain[k]->channel == args[0] ) { // ID
                 //@ vars needed for range check
-                int start = sample_get_startFrame(
-                        si->effect_chain[k]->channel );
-                int end   = sample_get_endFrame(
-                        si->effect_chain[k]->channel );
-                int len   = (end - start) + 1;
+                int channel = si->effect_chain[k]->channel;
+                int start = sample_get_startFrame(channel);
+                int end   = sample_get_endFrame(channel);
+
+                if(start < 0 || end < start)
+                    continue;
 
                 //@ skip frame = increment current with offset in args[1]
-                int cur = sample_get_resume( si->effect_chain[k]->channel ) + args[1];
-                
-                //@ check range
-                if( cur > len )
-                    cur = len;
-                else if( cur < 0 )
-                    cur = 0;
-                
-		        sample_set_resume_override( si->effect_chain[k]->channel, cur );
+                int cur = sample_get_resume(channel) + args[1];
+
+                //@ check range, in absolute frame coordinates
+                if( cur > end )
+                    cur = end;
+                else if( cur < start )
+                    cur = start;
+
+                sample_set_resume_override(channel, cur);
 
                 veejay_msg(VEEJAY_MSG_DEBUG,
                     "Set offset of mixing sample #%d (%d-%d) on chain entry %d of sample %d to %d",
-                        si->effect_chain[k]->channel,start,end, k,i, cur );   
+                        channel,start,end, k,i, cur );
             }
         }
     }
 }
+
 
 void vj_event_sample_set_speed(void *ptr, const char format[], va_list ap)
 {
@@ -4550,12 +4632,30 @@ void vj_event_sample_move_marker(void *ptr, const char format[], va_list ap)
         return;
     }
 
-    int span = s->marker_end - s->marker_start + 1;
-    if (span <= 0) {
+    int pos1 = s->marker_start;
+    int pos2 = s->marker_end;
+
+    if (pos1 == 0 && pos2 == 0) {
         veejay_msg(VEEJAY_MSG_ERROR, "No marker set");
         return;
     }
 
+    if (pos2 < pos1) {
+        int tmp = pos1;
+        pos1 = pos2;
+        pos2 = tmp;
+    }
+
+    if (pos1 < first) pos1 = first;
+    if (pos1 > last)  pos1 = last;
+    if (pos2 < first) pos2 = first;
+    if (pos2 > last)  pos2 = last;
+
+    int span = pos2 - pos1 + 1;
+    if (span < 1)
+        span = 1;
+    if (available > 1 && span < 2)
+        span = 2;
     if (span > available)
         span = available;
 
@@ -4587,9 +4687,19 @@ void vj_event_sample_move_marker(void *ptr, const char format[], va_list ap)
     if (marker_end > last)
         marker_end = last;
 
-    s->marker_start = marker_start;
-    s->marker_end = marker_end;
-
+    if (sample_set_marker(args[0], marker_start, marker_end)) {
+        veejay_msg(VEEJAY_MSG_INFO,
+            "Move marker selection to %d - %d",
+            marker_start,
+            marker_end);
+    }
+    else {
+        veejay_msg(VEEJAY_MSG_ERROR,
+            "Cannot move marker selection to %d - %d for sample %d",
+            marker_start,
+            marker_end,
+            args[0]);
+    }
 }
 
 void vj_event_sample_grow_marker(void *ptr, const char format[], va_list ap)
@@ -4639,7 +4749,11 @@ void vj_event_sample_grow_marker(void *ptr, const char format[], va_list ap)
     if (span < 1)
         span = 1;
 
-    int new_span = (span > available / 2) ? available : span * 2;
+    int new_span = span * 2;
+    if (available > 1 && new_span < 2)
+        new_span = 2;
+    if (new_span > available)
+        new_span = available;
 
     const int center2 = pos1 + pos2;
 
@@ -4659,50 +4773,105 @@ void vj_event_sample_grow_marker(void *ptr, const char format[], va_list ap)
     if (npos1 < first) npos1 = first;
     if (npos2 > last)  npos2 = last;
 
-    veejay_msg(VEEJAY_MSG_INFO,
-        "Grow marker selection to %d - %d",
-        npos1,
-        npos2);
-
-    s->marker_start = npos1;
-    s->marker_end = npos2;
+    if (sample_set_marker(args[0], npos1, npos2)) {
+        veejay_msg(VEEJAY_MSG_INFO,
+            "Grow marker selection to %d - %d",
+            npos1,
+            npos2);
+    }
+    else {
+        veejay_msg(VEEJAY_MSG_ERROR,
+            "Cannot grow marker selection to %d - %d for sample %d",
+            npos1,
+            npos2,
+            args[0]);
+    }
 }
 
 void vj_event_sample_shrink_marker(void *ptr, const char format[], va_list ap)
 {
     int args[2];
     veejay_t *v = (veejay_t*)ptr;
-    
-    P_A(args,sizeof(args),NULL,0,format,ap);
-    
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
     SAMPLE_DEFAULTS(args[0]);
 
     sample_info *s = sample_get(args[0]);
-    if( s == NULL ) {
-        p_no_sample( args[0] );
+    if (s == NULL) {
+        p_no_sample(args[0]);
         return;
     }
 
-    int start = s->first_frame;
-    int end = s->last_frame;
+    const int first = s->first_frame;
+    const int last  = s->last_frame;
+    const int available = last - first + 1;
+
+    if (available <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid sample bounds %d - %d", first, last);
+        return;
+    }
+
     int pos1 = s->marker_start;
     int pos2 = s->marker_end;
 
-    if( pos1 == 0 && pos2 == 0 ) {
-        pos1 = start;
-        pos2 = end;
+    if (pos1 == 0 && pos2 == 0) {
+        pos1 = first;
+        pos2 = last;
     }
 
-    int npos1 = (pos1 + pos2) / 2 - (pos2 - pos1) / 4;
-    int npos2 = (pos1 + pos2) / 2 + (pos2 - pos1) / 4;
+    if (pos2 < pos1) {
+        int tmp = pos1;
+        pos1 = pos2;
+        pos2 = tmp;
+    }
 
-    if( npos1 < start ) npos1 = start; else if (npos1 > end) npos1 = end;
-    if( npos2 < start ) npos2 = start; else if (npos2 > end) npos2 = end;
+    if (pos1 < first) pos1 = first;
+    if (pos1 > last)  pos1 = last;
+    if (pos2 < first) pos2 = first;
+    if (pos2 > last)  pos2 = last;
 
-    veejay_msg(VEEJAY_MSG_INFO, "Shrink marker selection to %d - %d", npos1, npos2 );
+    int span = pos2 - pos1 + 1;
+    if (span < 1)
+        span = 1;
 
-    s->marker_start = npos1;
-    s->marker_end = npos2;
+    int new_span = (span + 1) / 2;
+    if (available > 1 && new_span < 2)
+        new_span = 2;
+    if (new_span > available)
+        new_span = available;
+
+    const int center2 = pos1 + pos2;
+
+    int npos1 = (center2 - new_span + 1) / 2;
+    int npos2 = npos1 + new_span - 1;
+
+    if (npos1 < first) {
+        npos1 = first;
+        npos2 = npos1 + new_span - 1;
+    }
+
+    if (npos2 > last) {
+        npos2 = last;
+        npos1 = npos2 - new_span + 1;
+    }
+
+    if (npos1 < first) npos1 = first;
+    if (npos2 > last)  npos2 = last;
+
+    if (sample_set_marker(args[0], npos1, npos2)) {
+        veejay_msg(VEEJAY_MSG_INFO,
+            "Shrink marker selection to %d - %d",
+            npos1,
+            npos2);
+    }
+    else {
+        veejay_msg(VEEJAY_MSG_ERROR,
+            "Cannot shrink marker selection to %d - %d for sample %d",
+            npos1,
+            npos2,
+            args[0]);
+    }
 }
 
 void vj_event_sample_set_marker_start(void *ptr, const char format[], va_list ap) 
@@ -5198,6 +5367,8 @@ void vj_event_sample_rel_start(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t *)ptr;
     int args[4];
+    int real_start;
+    int real_end;
     int s_start;
     int s_end;
 
@@ -5210,22 +5381,48 @@ void vj_event_sample_rel_start(void *ptr, const char format[], va_list ap)
         return;
     }
 
-    s_start = sample_get_startFrame(args[0]) + args[1];
-    s_end = sample_get_endFrame(args[0]) + args[2];
+    if(!vj_event_sample_get_real_range(args[0], &real_start, &real_end))
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "Cannot read real range of sample %d", args[0]);
+        return;
+    }
 
-    if  (sample_set_startframe(args[0],s_start) &&
-        sample_set_endframe(args[0],s_end))
+    s_start = real_start + args[1];
+    s_end   = real_end   + args[2];
+
+    if(s_end <= s_start)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+            "Sample %d range %d-%d is invalid", args[0], s_start, s_end);
+        return;
+    }
+
+    int ok;
+    if(s_end > real_end)
+        ok = sample_set_endframe(args[0], s_end) && sample_set_startframe(args[0], s_start);
+    else
+        ok = sample_set_startframe(args[0], s_start) && sample_set_endframe(args[0], s_end);
+
+    if(ok)
     {
         constrain_sample( v, args[0] );
         veejay_msg(VEEJAY_MSG_INFO, "Sample update start %d end %d",
             s_start,s_end);
     }
+    else
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+            "Unable to update sample %d range to %d-%d", args[0], s_start, s_end);
+    }
 }
 
-void vj_event_sample_set_start(void *ptr, const char format[], va_list ap) 
+
+void vj_event_sample_set_start(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t *)ptr;
     int args[2];
+    int real_start;
+    int real_end;
     P_A(args,sizeof(args),NULL,0,format,ap);
 
     SAMPLE_DEFAULTS(args[0]);
@@ -5236,29 +5433,40 @@ void vj_event_sample_set_start(void *ptr, const char format[], va_list ap)
         return;
     }
 
-    if( args[1] < sample_get_endFrame(args[0])) {
+    if(!vj_event_sample_get_real_range(args[0], &real_start, &real_end))
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "Cannot read real range of sample %d", args[0]);
+        return;
+    }
+
+    if( args[1] < real_end ) {
         if( sample_set_startframe(args[0],args[1] ) ) {
-            veejay_msg(VEEJAY_MSG_INFO, "Sample starting frame updated to frame %d",
-              sample_get_startFrame(args[0]));
+            if(vj_event_sample_get_real_range(args[0], &real_start, &real_end))
+                veejay_msg(VEEJAY_MSG_INFO, "Sample starting frame updated to frame %d", real_start);
+            else
+                veejay_msg(VEEJAY_MSG_INFO, "Sample starting frame updated");
         }
         else
         {
             veejay_msg(VEEJAY_MSG_ERROR, "Unable to update sample %d 's starting position to %d",args[0],args[1]);
         }
     }
-    else 
+    else
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Sample %d's starting position %d must be greater than ending position %d",
-            args[0],args[1], sample_get_endFrame(args[0]));
+        veejay_msg(VEEJAY_MSG_ERROR, "Sample %d's starting position %d must be smaller than ending position %d",
+            args[0],args[1], real_end);
     }
 }
+
 
 void vj_event_sample_set_end(void *ptr, const char format[] , va_list ap)
 {
     veejay_t *v = (veejay_t *)ptr;
     int args[2];
+    int real_start;
+    int real_end;
     P_A(args,sizeof(args),NULL,0,format,ap);
-    
+
     SAMPLE_DEFAULTS(args[0]);
 
     if(!sample_exists(args[0]))
@@ -5269,19 +5477,28 @@ void vj_event_sample_set_end(void *ptr, const char format[] , va_list ap)
 
     if(args[1] == -1)
         args[1] = sample_video_length( args[0] );
-    
+
     if(args[1] <= 0 )
     {
         veejay_msg(0, "Impossible to set ending position %d for sample %d", args[1],args[0] );
         return;
     }
-    if( args[1] >= sample_get_startFrame(args[0]))
+
+    if(!vj_event_sample_get_real_range(args[0], &real_start, &real_end))
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "Cannot read real range of sample %d", args[0]);
+        return;
+    }
+
+    if( args[1] > real_start )
     {
         if(sample_set_endframe(args[0],args[1]))
         {
             constrain_sample( v, args[0] );
-            veejay_msg(VEEJAY_MSG_INFO,"Sample ending frame updated to frame %d",
-                    sample_get_endFrame(args[0]));
+            if(vj_event_sample_get_real_range(args[0], &real_start, &real_end))
+                veejay_msg(VEEJAY_MSG_INFO,"Sample ending frame updated to frame %d", real_end);
+            else
+                veejay_msg(VEEJAY_MSG_INFO,"Sample ending frame updated");
         }
         else
         {
@@ -5293,6 +5510,7 @@ void vj_event_sample_set_end(void *ptr, const char format[] , va_list ap)
         veejay_msg(0, "Ending position must be greater than start position");
     }
 }
+
 
 void vj_event_sample_del(void *ptr, const char format[], va_list ap)
 {
@@ -8386,10 +8604,11 @@ static const char *vj_event_audio_sync_mode_name(int mode)
 {
     switch(mode) {
         case VJ_AUDIO_SYNC_MODE_OFF:           return "off";
-        case VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL: return "live-external";
+        case VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL: return "external-analysis";
         case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE:  return "tempo-bridge";
         case VJ_AUDIO_SYNC_MODE_TRACK_ALIGN:   return "track-align";
         case VJ_AUDIO_SYNC_MODE_MONITOR:       return "monitor";
+        case VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW:  return "tempo-follow";
         default:                               return "unknown";
     }
 }
@@ -8409,8 +8628,8 @@ static int vj_event_audio_sync_clamp_mode(int mode)
 {
     if(mode < VJ_AUDIO_SYNC_MODE_OFF)
         return VJ_AUDIO_SYNC_MODE_OFF;
-    if(mode > VJ_AUDIO_SYNC_MODE_MONITOR)
-        return VJ_AUDIO_SYNC_MODE_MONITOR;
+    if(mode > VJ_AUDIO_SYNC_MODE_MAX)
+        return VJ_AUDIO_SYNC_MODE_MAX;
     return mode;
 }
 
@@ -8825,7 +9044,7 @@ void vj_event_audio_sync_correction(void *ptr, const char format[], va_list ap)
     }
 
     veejay_msg(VEEJAY_MSG_INFO,
-               "[AUDIO-SYNC] Max bridge phase correction set to %d%%",
+               "[AUDIO-SYNC] Max bridge/follow tempo correction set to %d%%",
                pct);
 #else
     (void)ptr; (void)format; (void)ap;

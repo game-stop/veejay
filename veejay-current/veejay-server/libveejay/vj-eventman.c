@@ -2451,7 +2451,7 @@ void		vj_init_vevo_events(void)
 index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
                 "%d",
                 VIMS_AUDIO_SYNC_STATUS,
-                "Enable or disable external audio sync",
+                "Enable or disable audio sync/control",
                 vj_event_audio_sync_status,
                 1,
                 VIMS_ALLOW_ANY,
@@ -2462,22 +2462,22 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
     index_map_[VIMS_AUDIO_SYNC_MODE] = _new_event(
                 "%d",
                 VIMS_AUDIO_SYNC_MODE,
-                "Set external audio sync mode",
+                "Set audio sync/controller mode",
                 vj_event_audio_sync_mode,
                 1,
                 VIMS_ALLOW_ANY,
-                "Mode: 0=off,1=live external,2=tempo bridge,3=track align,4=monitor passthrough",
+                "Mode: 0=off,1=external analysis,2=tempo bridge/master tempo audio,3=track align,4=monitor external passthrough,5=tempo follow controller",
                 1,
                 NULL );
 
     index_map_[VIMS_AUDIO_SYNC_JACK] = _new_event(
                 "%d %d",
                 VIMS_AUDIO_SYNC_JACK,
-                "Use JACK input as external audio sync source",
+                "Use JACK input as audio sync/control source",
                 vj_event_audio_sync_jack,
                 2,
                 VIMS_ALLOW_ANY,
-                "Mode: 1=live external,2=tempo bridge,3=track align,4=monitor passthrough",
+                "Mode: 1=external analysis,2=tempo bridge/master tempo audio,3=track align,4=monitor external passthrough,5=tempo follow controller",
                 1,
                 "Input channel count",
                 2,
@@ -2486,11 +2486,11 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
     index_map_[VIMS_AUDIO_SYNC_WAV] = _new_event(
                 "%d %d %s",
                 VIMS_AUDIO_SYNC_WAV,
-                "Use WAV file as external audio sync source",
+                "Use WAV file as audio sync/control source",
                 vj_event_audio_sync_wav,
                 3,
                 VIMS_LONG_PARAMS,
-                "Mode: 1=live external,2=tempo bridge,3=track align,4=monitor passthrough",
+                "Mode: 1=external analysis,2=tempo bridge/master tempo audio,3=track align,4=monitor external passthrough,5=tempo follow controller",
                 2,
                 "Loop WAV source, 0 or 1",
                 0,
@@ -2501,7 +2501,7 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
     index_map_[VIMS_AUDIO_SYNC_TARGET] = _new_event(
                 "%d %d %d",
                 VIMS_AUDIO_SYNC_TARGET,
-                "Set external audio sync target clock for tempo bridge",
+                "Set target clock for tempo bridge/master-tempo audio or tempo follow",
                 vj_event_audio_sync_target,
                 3,
                 VIMS_ALLOW_ANY,
@@ -2516,18 +2516,18 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
     index_map_[VIMS_AUDIO_SYNC_CORRECTION] = _new_event(
                 "%d",
                 VIMS_AUDIO_SYNC_CORRECTION,
-                "Set tempo bridge phase correction limit",
+                "Set tempo bridge/follow controller correction limit",
                 vj_event_audio_sync_correction,
                 1,
                 VIMS_ALLOW_ANY,
-                "Maximum phase correction percent, 0..25",
+                "Maximum tempo-follow correction percent, 0..25",
                 4,
                 NULL );
 
     index_map_[VIMS_AUDIO_SYNC_PRINT] = _new_event(
                 NULL,
                 VIMS_AUDIO_SYNC_PRINT,
-                "Print external audio sync state",
+                "Print audio sync/control state",
                 vj_event_audio_sync_print,
                 0,
                 VIMS_ALLOW_ANY,
@@ -3692,7 +3692,7 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				"Set sequence play on or off",
 				vj_event_sample_sequencer_active,
 				1,
-				VIMS_ALLOW_ANY,
+				VIMS_REQUIRE_ALL_PARAMS,
 				"Status (On = 1, Off = 0)",
 				0,
 				NULL );
@@ -3798,7 +3798,3 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 
 #endif
 }
-
-
-
-

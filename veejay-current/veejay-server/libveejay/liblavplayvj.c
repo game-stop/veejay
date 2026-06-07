@@ -446,6 +446,52 @@ static inline double vj_runtime_spvf_from_fps(float fps)
     }
 }
 
+
+#ifdef HAVE_JACK
+static inline double vj_runtime_tempo_follow_correction(video_playback_setup *settings)
+{
+    int mode;
+    int state;
+    double correction;
+    double max_corr;
+
+    if(!settings)
+        return 1.0;
+
+    mode = atomic_load_int(&settings->audio_sync.mode);
+    if(mode != VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW &&
+       mode != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE)
+        return 1.0;
+
+    if(!vj_audio_sync_is_enabled(&settings->audio_sync))
+        return 1.0;
+
+    state = atomic_load_int(&settings->audio_sync.bridge_state);
+    if(state != VJ_AUDIO_SYNC_BRIDGE_STATE_LOCKED &&
+       state != VJ_AUDIO_SYNC_BRIDGE_STATE_HOLD)
+        return 1.0;
+
+    correction = settings->audio_sync.bridge_last_correction;
+    if(correction < 0.25 || correction > 4.0)
+        return 1.0;
+
+    max_corr = (double)atomic_load_int(&settings->audio_sync.max_correction_pct) / 100.0;
+    if(max_corr < 0.0)
+        max_corr = 0.0;
+    else if(max_corr > 0.25)
+        max_corr = 0.25;
+
+    if(max_corr <= 0.0)
+        return 1.0;
+
+    if(correction < 1.0 - max_corr)
+        correction = 1.0 - max_corr;
+    else if(correction > 1.0 + max_corr)
+        correction = 1.0 + max_corr;
+
+    return correction;
+}
+#endif
 static inline double vj_runtime_target_time_s(video_playback_setup *settings, long long frame)
 {
     double epoch_s = atomic_load_double(&settings->fps_epoch_s);
@@ -454,6 +500,14 @@ static inline double vj_runtime_target_time_s(video_playback_setup *settings, lo
 
     if (spvf <= 0.0)
         spvf = 1.0 / 25.0;
+
+#ifdef HAVE_JACK
+    {
+        double tempo_follow = vj_runtime_tempo_follow_correction(settings);
+        if(tempo_follow > 0.25 && tempo_follow < 4.0)
+            spvf /= tempo_follow;
+    }
+#endif
 
     if (epoch_s <= 0.0) {
         double anchor = atomic_load_double(&settings->audio_start_offset);
@@ -5884,7 +5938,7 @@ static void veejay_audio_sync_thread_startup(veejay_t *info)
 
     if(veejay_audio_threads_disabled(settings)) {
         veejay_msg(VEEJAY_MSG_INFO,
-                   "[AUDIO-SYNC] External audio sync thread disabled by command line");
+                   "[AUDIO-SYNC] Audio sync/control thread disabled by command line");
         return;
     }
 
@@ -5897,7 +5951,7 @@ static void veejay_audio_sync_thread_startup(veejay_t *info)
     atomic_store_int(&settings->audio_sync.stop_request, 0);
 
     veejay_msg(VEEJAY_MSG_INFO,
-               "[AUDIO-SYNC] Starting External Audio Sync thread");
+               "[AUDIO-SYNC] Starting Audio Sync/Control thread");
 
     ret = pthread_create(
         &(settings->audio_sync_thread),
@@ -5909,7 +5963,7 @@ static void veejay_audio_sync_thread_startup(veejay_t *info)
     if(ret != 0)
     {
         veejay_msg(VEEJAY_MSG_ERROR,
-                   "[AUDIO-SYNC] Failed to start External Audio Sync thread.");
+                   "[AUDIO-SYNC] Failed to start Audio Sync/Control thread.");
         vj_audio_sync_request_stop(&settings->audio_sync);
         settings->audio_sync_thread = 0;
         return;
@@ -6056,8 +6110,8 @@ int veejay_audio_sync_set_mode_control(veejay_t *info, int mode)
 
     if(mode < VJ_AUDIO_SYNC_MODE_OFF)
         mode = VJ_AUDIO_SYNC_MODE_OFF;
-    else if(mode > VJ_AUDIO_SYNC_MODE_MONITOR)
-        mode = VJ_AUDIO_SYNC_MODE_MONITOR;
+    else if(mode > VJ_AUDIO_SYNC_MODE_MAX)
+        mode = VJ_AUDIO_SYNC_MODE_MAX;
 
     settings = info->settings;
 
@@ -6090,7 +6144,8 @@ int veejay_audio_sync_set_mode_control(veejay_t *info, int mode)
         vj_audio_sync_set_source_jack(&settings->audio_sync, 2);
 
     vj_audio_sync_set_mode(&settings->audio_sync, mode);
-    if(mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN)
+    if(mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN ||
+       mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW)
         vj_audio_sync_set_target_mode(&settings->audio_sync,
                                       VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP);
 
@@ -6284,7 +6339,8 @@ static void veejay_audio_beat_prepare_sync_source(veejay_t *info)
         (mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL ||
          mode == VJ_AUDIO_SYNC_MODE_MONITOR ||
          mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
-         mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN);
+         mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN ||
+         mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW);
 
     use_push_source = 0;
     if(record_source == VJ_RECORD_AUDIO_SOURCE_ORIGINAL)
@@ -7525,11 +7581,22 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 		sample_edl = sample_get_editlist( id );
 	}
 
-	// if both, append it to sample's edit list 
+	// if both, append it to sample's edit list
 	if(sample_edl && sample)
 	{
+		int real_start = 0;
+		int real_end = 0;
+
+		if(sample_get_el_position(id, &real_start, &real_end) != 1)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to read real sample range for sample %d", id);
+			if(files[0])
+				free(files[0]);
+			return -1;
+		}
+
 		veejay_msg(VEEJAY_MSG_DEBUG, "Adding video file to existing sample %d", id );
-		long endpos = sample_get_endFrame( id );
+		long endpos = real_end;
 		
 		int res = veejay_edit_addmovie( info, sample_edl, movie, endpos );
 
@@ -7749,7 +7816,8 @@ int veejay_audio_sync_set_external_jack(veejay_t *info, int mode, int channels)
 
     veejay_audio_sync_thread_startup(info);
     vj_audio_sync_set_mode(&settings->audio_sync, mode);
-    if(mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN)
+    if(mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN ||
+       mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW)
         vj_audio_sync_set_target_mode(&settings->audio_sync,
                                       VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP);
     vj_audio_sync_set_source_jack(&settings->audio_sync, channels);
@@ -7807,10 +7875,10 @@ int veejay_audio_sync_set_external_wav(veejay_t *info, const char *path, int loo
     }
 
     if(mode < VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL ||
-       mode > VJ_AUDIO_SYNC_MODE_MONITOR)
+       mode > VJ_AUDIO_SYNC_MODE_MAX)
     {
         veejay_msg(VEEJAY_MSG_WARNING,
-                   "[AUDIO-SYNC][WAV] invalid mode=%d, forcing live-external(%d)",
+                   "[AUDIO-SYNC][WAV] invalid mode=%d, forcing external-analysis(%d)",
                    mode,
                    VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL);
         mode = VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL;
@@ -7871,7 +7939,8 @@ int veejay_audio_sync_set_external_wav(veejay_t *info, const char *path, int loo
 
     vj_audio_sync_set_mode(&settings->audio_sync, mode);
 
-    if(mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN)
+    if(mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN ||
+       mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW)
         vj_audio_sync_set_target_mode(&settings->audio_sync,
                                       VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP);
 

@@ -70,49 +70,6 @@
 #include <src/vmidi.h>
 #include <src/utils-gtk.h>
 
-
-#ifndef VJ_RECORD_AUDIO_SOURCE_AUTO
-#define VJ_RECORD_AUDIO_SOURCE_AUTO      0
-#define VJ_RECORD_AUDIO_SOURCE_ORIGINAL  1
-#define VJ_RECORD_AUDIO_SOURCE_BEAT_JACK 2
-#define VJ_RECORD_AUDIO_SOURCE_SILENCE   3
-#endif
-
-#ifndef VJ_AUDIO_SYNC_MODE_OFF
-#define VJ_AUDIO_SYNC_MODE_OFF           0
-#define VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL 1
-#define VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE  2
-#define VJ_AUDIO_SYNC_MODE_TRACK_ALIGN   3
-#define VJ_AUDIO_SYNC_MODE_MONITOR       4
-#endif
-
-#ifndef VJ_AUDIO_SYNC_SOURCE_NONE
-#define VJ_AUDIO_SYNC_SOURCE_NONE     0
-#define VJ_AUDIO_SYNC_SOURCE_JACK     1
-#define VJ_AUDIO_SYNC_SOURCE_WAV_FILE 2
-#define VJ_AUDIO_SYNC_SOURCE_PUSH     3
-#endif
-
-
-#ifndef VJ_AUDIO_SYNC_BRIDGE_STATE_IDLE
-#define VJ_AUDIO_SYNC_BRIDGE_STATE_IDLE        0
-#define VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_SOURCE 1
-#define VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_TARGET 2
-#define VJ_AUDIO_SYNC_BRIDGE_STATE_LOCKED      3
-#define VJ_AUDIO_SYNC_BRIDGE_STATE_HOLD        4
-#define VJ_AUDIO_SYNC_BRIDGE_STATE_FALLBACK    5
-#endif
-
-#ifndef VJ_AUDIO_SYNC_TRACK_STATE_IDLE
-#define VJ_AUDIO_SYNC_TRACK_STATE_IDLE         0
-#define VJ_AUDIO_SYNC_TRACK_STATE_WAIT_SOURCE  1
-#define VJ_AUDIO_SYNC_TRACK_STATE_WAIT_TARGET  2
-#define VJ_AUDIO_SYNC_TRACK_STATE_SEARCHING    3
-#define VJ_AUDIO_SYNC_TRACK_STATE_LOCKED       4
-#define VJ_AUDIO_SYNC_TRACK_STATE_HOLD         5
-#define VJ_AUDIO_SYNC_TRACK_STATE_FALLBACK     6
-#endif
-
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -1090,14 +1047,14 @@ static struct
     {"Sample rate reported by the JACK beat input."},
     {"Monotonic hit sequence number for detecting new beat events in the UI."},
 
-    {"Enable or disable audible external playback sync. Beat analysis may keep the external provider alive independently."},
-    {"Advanced external sync mode. Live external is provider-only; monitor and tempo bridge are audible playback modes."},
-    {"External sync provider source used by analysis/bridge internals. This is not the main audible output selector."},
+    {"Enable or disable external audio sync. Mode 1 is control-only analysis; modes 4, 5, 2, and 3 can affect audible playback or video transport."},
+    {"Mode guide: 1 analyzes external tempo only; 4 monitors external audio cleanly; 5 makes veejay follow external tempo; 2 tempo-matches external audio with master-tempo style stretching; 3 performs waveform track alignment."},
+    {"External sync provider source used by analysis/bridge internals. Control-only and Tempo follow use JACK input."},
     {"Number of channels to capture from JACK for the external sync source."},
-    {"Target tempo for tempo bridge mode, in beats per minute."},
-    {"Target beat phase sent to the tempo bridge clock."},
-    {"Confidence of the target clock; high confidence allows stronger bridge locking."},
-    {"Maximum tempo bridge phase correction percentage, 0-25."},
+    {"Target tempo for tempo-match mode, in beats per minute."},
+    {"Target beat phase sent to the tempo-match clock."},
+    {"Confidence of the target clock; high confidence allows stronger tempo matching."},
+    {"Maximum tempo-match phase correction percentage, 0-25."},
     {"Path to a clean external WAV file used as sync source."},
     {"Loop the WAV source when it reaches the end."},
     {"Use JACK input as the external sync provider source."},
@@ -1114,20 +1071,20 @@ static struct
     {"Current audio sync source sample rate."},
     {"Measured or target audio sync tempo."},
     {"Current audio sync confidence."},
-    {"Whether external JACK playback is active through monitor or tempo bridge."},
-    {"Current tempo bridge ratio, scaled as 1.000 = neutral. Monitor mode normally stays close to 1.000."},
-    {"Current bridge correction amount reported by the backend."},
-    {"Current tempo bridge target BPM reported by the backend."},
-    {"Current tempo bridge target confidence reported by the backend."},
-    {"Configured maximum tempo bridge correction percentage."},
-    {"Current tempo bridge lock state: idle, waiting, locked, hold, or fallback."},
+    {"Current activity: control-only analysis, audible playback, Tempo follow, or no external sync."},
+    {"Current tempo ratio, scaled as 1.000 = neutral. Monitor mode normally stays close to 1.000."},
+    {"Current tempo correction amount reported by the backend."},
+    {"Current tempo-match target BPM reported by the backend."},
+    {"Current tempo-match target confidence reported by the backend."},
+    {"Configured maximum tempo-match correction percentage."},
+    {"Current tempo-match lock state: idle, waiting, locked, hold, or fallback."},
     {"Whether waveform track alignment is currently locked."},
     {"Waveform alignment offset in milliseconds. Positive means the clip/video is late relative to the external master."},
     {"Waveform correlation confidence for track alignment."},
     {"Current video timing correction requested by track alignment, in parts per million."},
     {"Current waveform track alignment state: idle, waiting, searching, locked, hold, or fallback."},
 
-    {"Choose a WAV file to use as the external master. The selected file can drive Monitor, Tempo bridge, or Track align modes."},
+    {"Choose a WAV file to use as the external master. WAV can drive clean monitor, tempo-match, or track align modes. Control-only and Tempo follow use JACK input."},
     {"Mute or unmute the audible output. Beat analysis and sync providers may continue to run."},
     {"Enable beat-triggered control for the currently selected FX chain entry. Select an entry first."},
     {"Enable the Global FX chain for the current sample or stream. Backend status confirms the final state."},
@@ -1164,12 +1121,16 @@ static const char *audio_sync_master_track_name(int record_source)
 static const char *audio_sync_mode_name(int mode)
 {
     switch(mode) {
+        case VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL:
+            return "Control only";
+        case VJ_AUDIO_SYNC_MODE_MONITOR:
+            return "Clean monitor";
+        case VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW:
+            return "Tempo follow";
         case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE:
-            return "Tempo bridge";
+            return "Tempo match";
         case VJ_AUDIO_SYNC_MODE_TRACK_ALIGN:
             return "Track alignment";
-        case VJ_AUDIO_SYNC_MODE_MONITOR:
-            return "Monitor";
         case 0:
         default:
             return "None";
@@ -1873,7 +1834,6 @@ static void update_spin_incr(const char *name, gdouble step, gdouble page);
 static void update_spin_value(const char *name, gint value);
 static void update_spin_value2(GtkWidget *w, gint value);
 static void update_label_i2(GtkWidget *label, int num, int prefix);
-static void update_label_i(const char *name, int num, int prefix);
 static void update_label_f(const char *name, float val);
 static void update_label_str(const char *name, gchar *text);
 static void update_label_str2(GtkWidget *label, const char *text);
@@ -1932,7 +1892,6 @@ static void update_curve_widget( GtkWidget *curve );
 
 static void reset_tree(const char *name);
 static void indicate_sequence( gboolean active, sequence_gui_slot_t *slot );
-static void set_textview_buffer(const char *name, gchar *utf8text);
 static void set_textview_buffer2(GtkWidget *view, gchar *utf8text);
 void interrupt_cb(void);
 int get_and_draw_frame(int type, char *wid_name);
@@ -2436,6 +2395,73 @@ static void set_tooltip_by_widget(GtkWidget *w, const char *text)
         return;
 
     gtk_widget_set_tooltip_text(w, text);
+}
+
+static int combo_model_string_column(GtkTreeModel *model)
+{
+    int n_columns;
+
+    if(!model)
+        return -1;
+
+    n_columns = gtk_tree_model_get_n_columns(model);
+    for(int i = 0; i < n_columns; i++) {
+        if(gtk_tree_model_get_column_type(model, i) == G_TYPE_STRING)
+            return i;
+    }
+
+    return -1;
+}
+
+static void combo_replace_texts(GtkWidget *combo, const char * const *items, int n_items)
+{
+    GtkTreeModel *model;
+    int column;
+
+    if(!combo || !GTK_IS_COMBO_BOX(combo) || !items || n_items <= 0)
+        return;
+
+    model = gtk_combo_box_get_model(GTK_COMBO_BOX(combo));
+
+    if(GTK_IS_COMBO_BOX_TEXT(combo)) {
+        gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(combo));
+        for(int i = 0; i < n_items; i++)
+            gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combo), items[i]);
+        gtk_combo_box_set_active(GTK_COMBO_BOX(combo), 0);
+        return;
+    }
+
+    if(!model || !GTK_IS_LIST_STORE(model))
+        return;
+
+    column = combo_model_string_column(model);
+    if(column < 0)
+        return;
+
+    gtk_list_store_clear(GTK_LIST_STORE(model));
+    for(int i = 0; i < n_items; i++) {
+        GtkTreeIter iter;
+        gtk_list_store_append(GTK_LIST_STORE(model), &iter);
+        gtk_list_store_set(GTK_LIST_STORE(model), &iter, column, items[i], -1);
+    }
+
+    gtk_combo_box_set_active(GTK_COMBO_BOX(combo), 0);
+}
+
+static void init_audio_sync_mode_combo(void)
+{
+    static const char * const mode_items[] = {
+        "None",
+        "Control only - analyze external tempo",
+        "Monitor - hear external audio cleanly",
+        "Tempo follow - follow external tempo",
+        "Tempo match - master-tempo stretch",
+        "Track align - waveform lock"
+    };
+
+    combo_replace_texts(widget_cache[WIDGET_AUDIO_SYNC_MODE_COMBO],
+                        mode_items,
+                        sizeof(mode_items) / sizeof(mode_items[0]));
 }
 
 static void set_tooltip(const char *name, const char *text)
@@ -4291,21 +4317,6 @@ static gchar *get_textview_buffer(const char *name)
     return NULL;
 }
 
-static void set_textview_buffer(const char *name, gchar *utf8text)
-{
-    GtkWidget *view = glade_xml_get_widget_( info->main_window, name );
-    if(!view) {
-        veejay_msg(VEEJAY_MSG_ERROR, "No such widget (textview): '%s'",name);
-        return;
-    }
-    if(view)
-    {
-        GtkTextBuffer *tb = gtk_text_view_get_buffer(
-                    GTK_TEXT_VIEW(view) );
-        gtk_text_buffer_set_text( tb, utf8text, -1 );
-    }
-}
-
 static void set_textview_buffer2(GtkWidget *view, gchar *utf8text)
 {
     if(!view || !utf8text)
@@ -4572,24 +4583,6 @@ static void update_label_i2(GtkWidget *label, int num, int prefix)
     gtk_label_set_text( GTK_LABEL(label), str);
 }
 
-static void update_label_i(const char *name, int num, int prefix)
-{
-    GtkWidget *label = glade_xml_get_widget_(
-                info->main_window, name);
-    if(!label) {
-        veejay_msg(VEEJAY_MSG_ERROR, "No such widget (label): '%s'",name);
-        return;
-    }
-    char str[20];
-    if(prefix)
-        g_snprintf( str,sizeof(str), "%09d", num );
-    else
-        g_snprintf( str,sizeof(str), "%d",    num );
-    gchar *utf8_value = _utf8str( str );
-    gtk_label_set_text( GTK_LABEL(label), utf8_value);
-    g_free( utf8_value );
-}
-
 static void update_label_f(const char *name, float val )
 {
     GtkWidget *label = glade_xml_get_widget_( info->main_window, name);
@@ -4638,16 +4631,6 @@ static void update_label_str2(GtkWidget *label, const char *text)
 
     gtk_label_set_text(GTK_LABEL(label), utf8_text);
     g_free(utf8_text);
-}
-
-static void label_set_markup(const char *name, gchar *str)
-{
-    GtkWidget *label = glade_xml_get_widget_(
-                info->main_window, name);
-    if(!label)
-        return;
-
-    gtk_label_set_markup( GTK_LABEL(label), str );
 }
 
 static void selection_get_paths(GtkTreeModel *model,
@@ -8678,7 +8661,9 @@ static int audio_sync_ui_enabled_from_status(void)
 
 
     if(!active &&
-       info->status_tokens[AUDIO_SYNC_MODE] == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN &&
+       (info->status_tokens[AUDIO_SYNC_MODE] == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL ||
+        info->status_tokens[AUDIO_SYNC_MODE] == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN ||
+        info->status_tokens[AUDIO_SYNC_MODE] == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW) &&
        info->status_tokens[AUDIO_SYNC_OPEN])
     {
         active = 1;
@@ -8703,13 +8688,17 @@ static void audio_sync_update_mode_sensitivity(int mode, int source, int target_
         -1
     };
 
-    const int external_master = (record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
-    const int wav_master = (external_master && source == VJ_AUDIO_SYNC_SOURCE_WAV_FILE);
+    const int control_only = (mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL);
+    const int tempo_follow = (mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW);
+    const int external_master = (record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK) || control_only;
+    const int wav_master = (external_master && !control_only && !tempo_follow && source == VJ_AUDIO_SYNC_SOURCE_WAV_FILE);
     const int sync_enabled = (external_master && audio_sync_ui_enabled_from_status());
     const int tempo = (sync_enabled && mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE);
     const int track_align = (sync_enabled && mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN);
     const int monitor = (sync_enabled && mode == VJ_AUDIO_SYNC_MODE_MONITOR);
-    const int live_common = (sync_enabled && (tempo || track_align || monitor));
+    const int follow = (sync_enabled && tempo_follow);
+    const int live_tempo = (tempo || follow);
+    const int live_common = (sync_enabled && (control_only || live_tempo || track_align || monitor));
 
     (void) target_mode;
 
@@ -8731,7 +8720,7 @@ static void audio_sync_update_mode_sensitivity(int mode, int source, int target_
     audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_TEMPO_FRAME, tempo);
     audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_TRACK_FRAME, track_align);
     audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_LIVE_COMMON_FRAME, live_common);
-    audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_LIVE_TEMPO_FRAME, tempo);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_LIVE_TEMPO_FRAME, live_tempo);
     audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_LIVE_TRACK_FRAME, track_align);
 
     audio_sync_set_widgets_sensitive(tempo_ids, tempo);
@@ -8740,15 +8729,13 @@ static void audio_sync_update_mode_sensitivity(int mode, int source, int target_
 
 static int audio_sync_mode_combo_from_status(int mode)
 {
-
-
     switch(mode) {
-        case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE: return 1;
-        case VJ_AUDIO_SYNC_MODE_TRACK_ALIGN:  return 2;
-        case VJ_AUDIO_SYNC_MODE_MONITOR:      return 3;
-        case VJ_AUDIO_SYNC_MODE_OFF:          return 0;
-        case VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL:
-            return -1;
+        case VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL: return 1;
+        case VJ_AUDIO_SYNC_MODE_MONITOR:       return 2;
+        case VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW:  return 3;
+        case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE:  return 4;
+        case VJ_AUDIO_SYNC_MODE_TRACK_ALIGN:   return 5;
+        case VJ_AUDIO_SYNC_MODE_OFF:           return 0;
         default: {
             static int warned = 0;
             if(!warned) {
@@ -8847,7 +8834,8 @@ static void update_audio_sync_status_widgets(int *history, int force)
        AS_CHANGED(RECORD_AUDIO_SOURCE))
     {
         audio_beat_set_toggle(WIDGET_AUDIO_SYNC_ENABLE_TOGGLE,
-                              AS_CUR(RECORD_AUDIO_SOURCE) == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK
+                              (AS_CUR(RECORD_AUDIO_SOURCE) == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK ||
+                               AS_CUR(AUDIO_SYNC_MODE) == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL)
                                   ? audio_sync_ui_enabled_from_status()
                                   : 0);
     }
@@ -8855,7 +8843,8 @@ static void update_audio_sync_status_widgets(int *history, int force)
     if(AS_CHANGED(AUDIO_SYNC_MODE) || AS_CHANGED(RECORD_AUDIO_SOURCE)) {
         int mode = AS_CUR(AUDIO_SYNC_MODE);
         int record_source = AS_CUR(RECORD_AUDIO_SOURCE);
-        int mode_combo = (record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK)
+        int mode_combo = (record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK ||
+                          mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL)
             ? audio_sync_mode_combo_from_status(mode)
             : 0;
 
@@ -8941,8 +8930,12 @@ static void update_audio_sync_status_widgets(int *history, int force)
         audio_beat_set_label_s(WIDGET_AUDIO_SYNC_BRIDGE_STATE_VALUE, audio_sync_bridge_state_name(AS_CUR(AUDIO_SYNC_BRIDGE_STATE)));
 
     if(AS_CHANGED(AUDIO_SYNC_BRIDGE_ACTIVE) || AS_CHANGED(AUDIO_SYNC_MODE) || AS_CHANGED(AUDIO_SYNC_OPEN)) {
-        if(AS_CUR(AUDIO_SYNC_MODE) == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN && AS_CUR(AUDIO_SYNC_OPEN))
+        if(AS_CUR(AUDIO_SYNC_MODE) == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL && AS_CUR(AUDIO_SYNC_OPEN))
+            audio_beat_set_label_s(WIDGET_AUDIO_SYNC_BRIDGE_ACTIVE_VALUE, "control only");
+        else if(AS_CUR(AUDIO_SYNC_MODE) == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN && AS_CUR(AUDIO_SYNC_OPEN))
             audio_beat_set_label_s(WIDGET_AUDIO_SYNC_BRIDGE_ACTIVE_VALUE, "track align");
+        else if(AS_CUR(AUDIO_SYNC_MODE) == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW && AS_CUR(AUDIO_SYNC_OPEN))
+            audio_beat_set_label_s(WIDGET_AUDIO_SYNC_BRIDGE_ACTIVE_VALUE, "tempo follow");
         else
             audio_beat_set_label_s(WIDGET_AUDIO_SYNC_BRIDGE_ACTIVE_VALUE, AS_CUR(AUDIO_SYNC_BRIDGE_ACTIVE) ? "playback" : "no");
     }
@@ -10471,6 +10464,7 @@ void vj_gui_init(const char *glade_file,
     info = gui;
 
     init_widget_cache();
+    init_audio_sync_mode_combo();
 
     for( i = 0; i < MAX_UI_PARAMETERS; i ++ ) {
       add_class_by_name( slider_names_[i].text, "p_slider" );
@@ -11854,8 +11848,6 @@ update_sample_slot_data(int page_num,
     gboolean type_changed  = (slot->sample_type != sample_type);
     gboolean title_changed = str_changed(slot->title, title);
     gboolean time_changed  = str_changed(slot->timecode, timecode);
-
-    gboolean becoming_full  = (sample_id > 0  && slot->sample_id <= 0);
 
     gboolean any_model_change =
         id_changed || type_changed || title_changed || time_changed;
