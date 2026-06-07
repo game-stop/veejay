@@ -447,6 +447,9 @@ typedef struct {
 	double pause_cost_ns;
 	volatile int record_audio_source;
 	vj_audio_clock_osd_t audio_osd;
+	volatile int sequence_boundary;
+	int sequence_random_id;
+	int sequence_random_ticks_left;
 } video_playback_setup;
 
 typedef struct {
