@@ -1789,6 +1789,7 @@ static int next_available_absolute_slot = 0;
 static GtkWidget *editlist_tree = NULL;
 static GtkListStore *editlist_store = NULL;
 static GtkTreeModel *editlist_model = NULL;
+static guint periodic_pull_timeout_id = 0;
 
 static int get_slider_val(const char *name);
 static int get_slider_val2(GtkWidget *w);
@@ -1850,6 +1851,7 @@ static void reload_bundles(void);
 static void update_rgbkey_from_slider(void);
 static gchar *get_textview_buffer(const char *name);
 static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h);
+static void samplebank_clear_gui_slot(sample_slot_t *slot, sample_gui_slot_t *gui_slot);
 static void setup_samplebank(gint c, gint r, GtkAllocation *allocation, gint *image_w, gint *image_h);
 static sample_slot_t *update_sample_slot_data(int bank_num, int slot_num, int id, gint sample_type, gchar *title, gchar *timecode);
 static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *event, gpointer user_data);
@@ -1962,6 +1964,13 @@ static gboolean is_fxanim_displayed(void)
 
 gboolean   periodic_pull(gpointer data)
 {
+    (void)data;
+
+    if(!info || !info->client || info->watch.state != STATE_PLAYING) {
+        periodic_pull_timeout_id = 0;
+        return FALSE;
+    }
+
     int deckpage = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK18 ] ));
 
     int pm = info->status_tokens[PLAY_MODE];
@@ -3051,10 +3060,25 @@ gchar *dialog_save_file(const char *title, const char *current_name)
     return NULL;
 }
 
-static void clear_progress_bar( const char *name, gdouble val )
+static gboolean set_progress_bar_fraction_by_name(const char *name, gdouble val)
 {
-    GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
-    gtk_progress_bar_set_fraction( GTK_PROGRESS_BAR(w), val );
+    GtkWidget *w;
+
+    if(!info || !info->main_window || !name)
+        return FALSE;
+
+    w = glade_xml_get_widget_(info->main_window, name);
+    if(!w || !GTK_IS_PROGRESS_BAR(w))
+        return FALSE;
+
+    val = (val < 0.0) ? 0.0 : ((val > 1.0) ? 1.0 : val);
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(w), val);
+    return TRUE;
+}
+
+static void clear_progress_bar(const char *name, gdouble val)
+{
+    (void)set_progress_bar_fraction_by_name(name, val);
 }
 
 static struct
@@ -3566,7 +3590,7 @@ void veejay_quit(void)
     clear_progress_bar( "connecting",0.0 );
     clear_progress_bar( "samplerecord_progress",0.0 );
     clear_progress_bar( "streamrecord_progress",0.0 );
-    clear_progress_bar( "seq_rec_progress",0.0);
+    clear_progress_bar( "rec_seq_progress",0.0);
     exit(0);
 }
 
@@ -3684,6 +3708,7 @@ int veejay_get_sample_image(int id, int type, int wid, int hei)
         slot->pixbuf = vj_gdk_pixbuf_scale_simple(img,wid,hei, GDK_INTERP_NEAREST);
         if( slot->pixbuf)
         {
+            gtk_widget_show(gui_slot->image);
             gtk_image_set_from_pixbuf_( GTK_IMAGE( gui_slot->image ), slot->pixbuf );
             g_object_unref( slot->pixbuf );
             slot->pixbuf = NULL;
@@ -6551,6 +6576,48 @@ static void select_slot( int pm )
     }
 }
 
+static void sequencer_slot_set_content(sequence_gui_slot_t *slot, int sample_id, int sample_type)
+{
+    char seqtext[32];
+
+    if(!slot)
+        return;
+
+    slot->sample_id = sample_id;
+    slot->sample_type = sample_type;
+
+    if(sample_id > 0)
+    {
+        snprintf(seqtext, sizeof(seqtext), "%c%d", (sample_type == 0 ? 'S' : 'T'), sample_id);
+
+        if(slot->image && GTK_IS_LABEL(slot->image))
+        {
+            gtk_label_set_text(GTK_LABEL(slot->image), seqtext);
+            add_class(slot->image, "sequence-filled");
+        }
+
+        if(slot->frame)
+        {
+            add_class(slot->frame, "sequence-filled");
+            gtk_widget_queue_draw(slot->frame);
+        }
+    }
+    else
+    {
+        if(slot->image && GTK_IS_LABEL(slot->image))
+        {
+            gtk_label_set_text(GTK_LABEL(slot->image), NULL);
+            remove_class(slot->image, "sequence-filled");
+        }
+
+        if(slot->frame)
+        {
+            remove_class(slot->frame, "sequence-filled");
+            gtk_widget_queue_draw(slot->frame);
+        }
+    }
+}
+
 static void load_sequence_list(void)
 {
     single_vims( VIMS_SEQUENCE_LIST );
@@ -6580,22 +6647,10 @@ static void load_sequence_list(void)
     {
         int sample_id = 0;
         int type = 0;
-        char seqtext[32];
         sscanf( in + offset, "%04d%02d", &sample_id, &type );
         offset += 6;
-        if( sample_id > 0 )
-        {
-            snprintf(seqtext, sizeof(seqtext), "%c%d", (type == 0 ? 'S' : 'T'), sample_id);
-            gtk_label_set_text(
-                GTK_LABEL(info->sequencer_view->gui_slot[id]->image),
-                seqtext );
-        }
-        else
-        {
-            gtk_label_set_text(
-                    GTK_LABEL(info->sequencer_view->gui_slot[id]->image),
-                    NULL );
-        }
+        if(id < (info->sequencer_col * info->sequencer_row))
+            sequencer_slot_set_content(info->sequencer_view->gui_slot[id], sample_id, type);
 
         id ++;
     }
@@ -7849,71 +7904,70 @@ static gboolean update_cachemeter_timeout( gpointer data )
 
 static gboolean update_sample_record_timeout(gpointer data)
 {
-    if( info->uc.playmode == MODE_SAMPLE )
-    {
-        GtkWidget *w;
-        if( is_button_toggled("seqactive" ) )
-        {
-            w = glade_xml_get_widget_( info->main_window,
-                                      "rec_seq_progress" );
-        }
-        else
-        {
-            w = glade_xml_get_widget_( info->main_window,
-                                      "samplerecord_progress" );
+    (void)data;
 
+    if(!info || !info->main_window || info->watch.state != STATE_PLAYING) {
+        if(info) {
+            info->samplerecording = 0;
+            info->uc.recording[MODE_SAMPLE] = 0;
         }
+        return FALSE;
+    }
+
+    if(info->uc.playmode == MODE_SAMPLE)
+    {
+        const char *progress_name = is_button_toggled("seqactive") ?
+            "rec_seq_progress" : "samplerecord_progress";
+
         gdouble tf = info->status_tokens[STREAM_DURATION];
         gdouble cf = info->status_tokens[STREAM_RECORDED];
+        gdouble fraction = (tf > 0.0) ? (cf / tf) : 0.0;
 
-        gdouble fraction = cf / tf;
-
-        if(!info->status_tokens[STREAM_RECORDING] )
+        if(!info->status_tokens[STREAM_RECORDING])
         {
-            gtk_progress_bar_set_fraction( GTK_PROGRESS_BAR(w), 0.0);
+            clear_progress_bar(progress_name, 0.0);
             info->samplerecording = 0;
             info->uc.recording[MODE_SAMPLE] = 0;
             if(info->uc.render_record)
-            {
                 info->uc.render_record = 0;
-            }
             else
-            {
                 info->uc.reload_hint[HINT_EL] = 1;
-            }
             return FALSE;
         }
-        else
-        {
-            gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(w),
-                                          fraction );
-        }
+
+        clear_progress_bar(progress_name, fraction);
     }
     return TRUE;
 }
 
 static gboolean update_stream_record_timeout(gpointer data)
 {
-    GtkWidget *w = glade_xml_get_widget_( info->main_window,
-                                         "streamrecord_progress" );
-    if( info->uc.playmode == MODE_STREAM )
+    (void)data;
+
+    if(!info || !info->main_window || info->watch.state != STATE_PLAYING) {
+        if(info) {
+            info->streamrecording = 0;
+            info->uc.recording[MODE_STREAM] = 0;
+        }
+        return FALSE;
+    }
+
+    if(info->uc.playmode == MODE_STREAM)
     {
         gdouble tf = info->status_tokens[STREAM_DURATION];
         gdouble cf = info->status_tokens[STREAM_RECORDED];
+        gdouble fraction = (tf > 0.0) ? (cf / tf) : 0.0;
 
-        gdouble fraction = cf / tf;
-        if(!info->status_tokens[STREAM_RECORDING] )
+        if(!info->status_tokens[STREAM_RECORDING])
         {
-            gtk_progress_bar_set_fraction( GTK_PROGRESS_BAR(w), 0.0);
+            clear_progress_bar("streamrecord_progress", 0.0);
             info->streamrecording = 0;
             info->uc.recording[MODE_STREAM] = 0;
             info->uc.reload_hint[HINT_EL] = 1;
             return FALSE;
         }
-        else
-            gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(w),
-                                          fraction );
 
+        clear_progress_bar("streamrecord_progress", fraction);
     }
     return TRUE;
 }
@@ -9619,6 +9673,7 @@ int vj_img_cb(GdkPixbuf *img )
         {
             slot->pixbuf = vj_gdk_pixbuf_scale_simple(img, info->image_dimensions[0],info->image_dimensions[1], GDK_INTERP_NEAREST);
             if(slot->pixbuf) {
+                gtk_widget_show(gui_slot->image);
                 gtk_image_set_from_pixbuf_( GTK_IMAGE( gui_slot->image ), slot->pixbuf );
                 g_object_unref( slot->pixbuf );
                 slot->pixbuf = NULL;
@@ -9720,15 +9775,207 @@ void register_signals(void)
     sigsegfault_handler();
 }
 
+static void reset_reloaded_timeout(guint *id)
+{
+    if(id && *id) {
+        g_source_remove(*id);
+        *id = 0;
+    }
+}
+
+static void reset_reloaded_timeout_gint(gint *id)
+{
+    if(id && *id) {
+        g_source_remove((guint)*id);
+        *id = 0;
+    }
+}
+
+static void reset_reloaded_runtime_ports(void)
+{
+    if(bankport_)
+        vpf(bankport_);
+    bankport_ = vpn(VEVO_ANONYMOUS_PORT);
+    next_available_absolute_slot = 0;
+
+    if(fx_list_)
+        vpf(fx_list_);
+    fx_list_ = (vevo_port_t*) vpn(200);
+}
+
+static void set_activation_of_cache_slot_in_samplebank(sequence_gui_slot_t *gui_slot,
+                                                       gboolean activate)
+{
+    if (activate)
+    {
+        gtk_frame_set_shadow_type(GTK_FRAME(gui_slot->frame),GTK_SHADOW_IN);
+    }
+    else {
+        gtk_frame_set_shadow_type(GTK_FRAME(gui_slot->frame),GTK_SHADOW_ETCHED_IN);
+    }
+}
+
+
+static void reset_quickselect_ui_state(void)
+{
+    if(!info->sequence_view || !info->sequence_view->gui_slot)
+        return;
+
+    for(int i = 0; i < info->sequence_view->envelope_size; i++) {
+        sequence_gui_slot_t *g = info->sequence_view->gui_slot[i];
+        if(!g)
+            continue;
+
+        g->sample_id = -1;
+        g->sample_type = -1;
+        set_activation_of_cache_slot_in_samplebank(g, FALSE);
+
+        if(g->image && GTK_IS_IMAGE(g->image))
+            gtk_image_clear(GTK_IMAGE(g->image));
+    }
+
+    info->current_sequence_slot = -1;
+}
+
+static void reset_sequencer_ui_state(void)
+{
+    if(!info->sequencer_view || !info->sequencer_view->gui_slot)
+        return;
+
+    const int n_slots = info->sequencer_col * info->sequencer_row;
+
+    for(int i = 0; i < n_slots; i++) {
+        sequence_gui_slot_t *g = info->sequencer_view->gui_slot[i];
+        if(!g)
+            continue;
+
+        indicate_sequence(FALSE, g);
+        sequencer_slot_set_content(g, -1, -1);
+    }
+
+    info->sequence_playing = -1;
+
+    if(widget_cache[WIDGET_SEQACTIVE] && GTK_IS_TOGGLE_BUTTON(widget_cache[WIDGET_SEQACTIVE]))
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SEQACTIVE]), FALSE);
+}
+
+static void reset_connection_runtime_state(void)
+{
+    reset_reloaded_timeout(&periodic_pull_timeout_id);
+    reset_reloaded_timeout_gint(&info->streamrecording);
+    reset_reloaded_timeout_gint(&info->samplerecording);
+    reset_reloaded_timeout(&framerate_timeout_id);
+
+    framerate_last_sent_x100 = -1;
+    framerate_pending_x100 = -1;
+    framerate_last_sent_us = 0;
+
+    follow_return_id = 0;
+    follow_return_type = 0;
+    audio_sync_last_non_jack_master = VJ_RECORD_AUDIO_SOURCE_ORIGINAL;
+}
+
+static void reset_connection_data_state(void)
+{
+    if(info->uc.selected_vims_args) {
+        free(info->uc.selected_vims_args);
+        info->uc.selected_vims_args = NULL;
+    }
+
+    _el_entry_reset();
+    _el_ref_reset();
+    _effect_reset();
+
+    veejay_memset(info->status_tokens, 0, sizeof(int) * STATUS_ARRAY_SIZE);
+    veejay_memset(info->sample, 0, sizeof(info->sample));
+    veejay_memset(info->selection, 0, sizeof(info->selection));
+    veejay_memset(&info->el, 0, sizeof(info->el));
+    veejay_memset(&info->uc, 0, sizeof(info->uc));
+    veejay_memset(info->uc.entry_tokens, 0, sizeof(int) * ENTRY_LAST);
+
+    for(int i = 0; i < HISTORY_PLAYMODES; i++) {
+        if(info->history_tokens[i])
+            veejay_memset(info->history_tokens[i], 0, sizeof(int) * STATUS_ARRAY_SIZE);
+    }
+
+    for(int i = 0; i < NUM_HINTS; i++) {
+        info->uc.reload_hint[i] = 0;
+        info->uc.reload_hint_checksums[i] = -1;
+    }
+
+    info->uc.selected_chain_entry = 0;
+    info->uc.selected_fx_param = -1;
+    info->uc.selected_parameter_id = -1;
+    info->uc.selected_effect_id = 0;
+    info->prev_mode = -1;
+    info->status_passed = 0;
+    info->status_frame = 0;
+    info->run_state = 0;
+    info->play_direction = 0;
+    total_frames_ = 0;
+    samplebank_ready_ = 0;
+}
+
+static void reset_connection_widget_state(void)
+{
+    reset_fxtree();
+    reset_tree("tree_chain");
+    reset_tree("tree_sources");
+    reset_tree("cali_sourcetree");
+    reset_tree("editlisttree");
+    reset_tree("tree_bundles");
+    reset_tree("tree_vims");
+    reset_tree("macro_macros");
+
+    reset_samplebank();
+    reset_quickselect_ui_state();
+    reset_sequencer_ui_state();
+
+    disable_fx_entry();
+    vj_kf_reset_panel();
+
+    if(info->curve)
+        reset_curve(info->curve);
+
+    if(info->tl) {
+        timeline_clear_points(info->tl);
+        timeline_set_selection(info->tl, FALSE);
+    }
+
+    if(widget_cache[WIDGET_LABEL_CURRENTID])
+        update_label_i2(widget_cache[WIDGET_LABEL_CURRENTID], 0, 0);
+
+    put_text("entry_samplename", "");
+    update_label_str("label_currentsource", "Plain");
+    update_label_str("label_current_mode", "Plain");
+
+    clear_progress_bar("connecting", 0.0);
+    clear_progress_bar("samplerecord_progress", 0.0);
+    clear_progress_bar("streamrecord_progress", 0.0);
+    clear_progress_bar("rec_seq_progress", 0.0);
+}
+
 void vj_gui_wipe(void)
 {
-    int i;
-    veejay_memset( info->status_tokens, 0, sizeof(int) * STATUS_ARRAY_SIZE );
-    veejay_memset( info->uc.entry_tokens,0, sizeof(int) * ENTRY_LAST);
-    for( i = 0 ; i < 4; i ++ )
-    {
-        veejay_memset(info->history_tokens[i],0, sizeof(int) * STATUS_ARRAY_SIZE);
-    }
+    if(!info)
+        return;
+
+    int old_status_lock = info->status_lock;
+    int old_parameter_lock = info->parameter_lock;
+    int old_entry_lock = info->entry_lock;
+
+    info->status_lock = 1;
+    info->parameter_lock = 1;
+    info->entry_lock = 1;
+
+    reset_connection_runtime_state();
+    reset_connection_widget_state();
+    reset_reloaded_runtime_ports();
+    reset_connection_data_state();
+
+    info->status_lock = old_status_lock;
+    info->parameter_lock = old_parameter_lock;
+    info->entry_lock = old_entry_lock;
 }
 
 GtkWidget *new_bank_pad(GtkWidget *box)
@@ -10469,7 +10716,8 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
     info->uc.reload_hint[HINT_KF] = 1;
 
 
-    g_timeout_add( 1000, periodic_pull, NULL );
+    if(periodic_pull_timeout_id == 0)
+        periodic_pull_timeout_id = g_timeout_add(1000, periodic_pull, NULL);
 
     gettimeofday( &(info->time_last) , 0 );
 
@@ -10614,23 +10862,17 @@ void vj_gui_disconnect(int restart_schedule)
         info->key_id = 0;
     }
 
-
     if(!quitting) {
+        vj_gui_wipe();
 
-
-
-
-        reset_fxtree();
-        reset_tree("tree_chain");
-        reset_tree("tree_sources");
-        reset_tree("editlisttree");
+        if(info->sensitive)
+            vj_gui_disable();
     }
 
-    if (restart_schedule) {
+    if(restart_schedule)
         reloaded_schedule_restart();
-    }
-    else {
-        reset_samplebank();
+
+    if(info->mt) {
         multitrack_close_tracks(info->mt);
         multitrack_disconnect(info->mt);
     }
@@ -10641,7 +10883,6 @@ void vj_gui_disconnect(int restart_schedule)
         vj_client_free(info->client);
         info->client = NULL;
     }
-
 }
 
 void vj_gui_disable(void)
@@ -10734,6 +10975,7 @@ void reset_samplebank(void)
     info->selection_gui_slot = NULL;
     info->selected_slot = NULL;
     info->selected_gui_slot = NULL;
+
     int i,j;
     for( i = 0; i < NUM_BANKS; i ++ )
     {
@@ -10742,6 +10984,8 @@ void reset_samplebank(void)
             for(j = 0; j < NUM_SAMPLES_PER_PAGE ; j ++ )
             {
                 update_sample_slot_data( i,j,-1,-1,NULL,NULL );
+                samplebank_clear_gui_slot(info->sample_banks[i]->slot[j],
+                                          info->sample_banks[i]->gui_slot[j]);
             }
         }
     }
@@ -10923,18 +11167,6 @@ static int find_bank_by_sample(int sample_id, int sample_type, int *slot)
     return bank_page;
 }
 
-static void set_activation_of_cache_slot_in_samplebank(sequence_gui_slot_t *gui_slot,
-                                                       gboolean activate)
-{
-    if (activate)
-    {
-        gtk_frame_set_shadow_type(GTK_FRAME(gui_slot->frame),GTK_SHADOW_IN);
-    }
-    else {
-        gtk_frame_set_shadow_type(GTK_FRAME(gui_slot->frame),GTK_SHADOW_ETCHED_IN);
-    }
-}
-
 static gboolean on_sequencerslot_activated_by_mouse(GtkWidget *widget,
                                                     GdkEventButton *event,
                                                     gpointer user_data)
@@ -10944,8 +11176,7 @@ static gboolean on_sequencerslot_activated_by_mouse(GtkWidget *widget,
     if( event->type == GDK_BUTTON_PRESS && (event->state & GDK_SHIFT_MASK) == GDK_SHIFT_MASK )
     {
         multi_vims( VIMS_SEQUENCE_DEL, "%d", slot_nr );
-        gtk_label_set_text(GTK_LABEL(info->sequencer_view->gui_slot[slot_nr]->image),
-                           NULL );
+        sequencer_slot_set_content(info->sequencer_view->gui_slot[slot_nr], -1, -1);
     }
     else
     if(event->type == GDK_BUTTON_PRESS)
@@ -10958,6 +11189,7 @@ static gboolean on_sequencerslot_activated_by_mouse(GtkWidget *widget,
             type=info->selection_slot->sample_type;
         }
         multi_vims( VIMS_SEQUENCE_ADD, "%d %d %d", slot_nr, id,type );
+        sequencer_slot_set_content(info->sequencer_view->gui_slot[slot_nr], id, type);
         info->uc.reload_hint[HINT_SEQ_ACT] = 1;
     }
     return FALSE;
@@ -11062,6 +11294,10 @@ static void create_sequencer_slots(int nx, int ny)
         gtk_widget_show( GTK_WIDGET(gui_slot->main_vbox) );
 
         gui_slot->image = gtk_label_new(NULL);
+        gtk_label_set_justify(GTK_LABEL(gui_slot->image), GTK_JUSTIFY_CENTER);
+        gtk_widget_set_halign(gui_slot->image, GTK_ALIGN_CENTER);
+        gtk_widget_set_valign(gui_slot->image, GTK_ALIGN_CENTER);
+        add_class(gui_slot->image, "sequencer-slot-label");
         gtk_box_pack_start (GTK_BOX (gui_slot->main_vbox), GTK_WIDGET(gui_slot->image), TRUE, TRUE, 0);
         gtk_widget_show( gui_slot->image);
         gtk_table_attach_defaults ( GTK_TABLE(table), gui_slot->event_box, row, row+1, col, col+1);
@@ -11159,6 +11395,7 @@ static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
     gtk_box_pack_start(GTK_BOX(gui_slot->upper_hbox), gui_slot->timecode, FALSE, FALSE, 2);
 
     gtk_widget_show_all(gui_slot->event_box);
+    gtk_widget_hide(gui_slot->image);
 }
 
 
@@ -11324,6 +11561,40 @@ static void set_selection_of_slot_in_samplebank(gboolean active)
 }
 
 
+static void samplebank_clear_gui_slot(sample_slot_t *slot, sample_gui_slot_t *gui_slot)
+{
+    if(slot && slot->pixbuf) {
+        g_object_unref(slot->pixbuf);
+        slot->pixbuf = NULL;
+    }
+
+    if(!gui_slot)
+        return;
+
+    if(gui_slot->title && GTK_IS_LABEL(gui_slot->title))
+        gtk_label_set_text(GTK_LABEL(gui_slot->title), "");
+
+    if(gui_slot->hotkey && GTK_IS_LABEL(gui_slot->hotkey))
+        gtk_label_set_text(GTK_LABEL(gui_slot->hotkey), "");
+
+    if(gui_slot->timecode && GTK_IS_LABEL(gui_slot->timecode))
+        gtk_label_set_text(GTK_LABEL(gui_slot->timecode), "");
+
+    if(gui_slot->image && GTK_IS_IMAGE(gui_slot->image)) {
+        gtk_image_clear(GTK_IMAGE(gui_slot->image));
+        gtk_widget_hide(gui_slot->image);
+    }
+
+    if(gui_slot->frame) {
+        remove_class(gui_slot->frame, "active");
+        remove_class(gui_slot->frame, "selected");
+        gtk_widget_queue_draw(gui_slot->frame);
+    }
+
+    if(gui_slot->event_box)
+        gtk_widget_set_sensitive(gui_slot->event_box, FALSE);
+}
+
 static void remove_sample_from_slot(void)
 {
     gint bank_nr = -1;
@@ -11358,8 +11629,17 @@ static void remove_sample_from_slot(void)
     update_sample_slot_data( bank_nr, slot_nr, -1, -1, NULL, NULL);
 
     sample_gui_slot_t *gui_slot = info->sample_banks[bank_nr]->gui_slot[slot_nr];
-    if(gui_slot)
-        gtk_image_clear( GTK_IMAGE( gui_slot->image) );
+    sample_slot_t *slot = info->sample_banks[bank_nr]->slot[slot_nr];
+    samplebank_clear_gui_slot(slot, gui_slot);
+
+    if(info->selection_slot == slot) {
+        info->selection_slot = NULL;
+        info->selection_gui_slot = NULL;
+    }
+    if(info->selected_slot == slot) {
+        info->selected_slot = NULL;
+        info->selected_gui_slot = NULL;
+    }
 }
 
 
@@ -11437,14 +11717,22 @@ update_sample_slot_data(int page_num,
     gboolean title_changed = str_changed(slot->title, title);
     gboolean time_changed  = str_changed(slot->timecode, timecode);
 
-    gboolean becoming_empty = (sample_id <= 0 && slot->sample_id > 0);
     gboolean becoming_full  = (sample_id > 0  && slot->sample_id <= 0);
 
     gboolean any_model_change =
         id_changed || type_changed || title_changed || time_changed;
 
-    if (!any_model_change)
+    if (!any_model_change) {
+        if (sample_id <= 0) {
+            samplebank_clear_gui_slot(slot, gui_slot);
+        } else {
+            if(gui_slot->image && GTK_IS_IMAGE(gui_slot->image))
+                gtk_widget_show(gui_slot->image);
+            if(gui_slot->event_box)
+                gtk_widget_set_sensitive(gui_slot->event_box, TRUE);
+        }
         return slot;
+    }
 
     if (id_changed)
         slot->sample_id = sample_id;
@@ -11460,20 +11748,7 @@ update_sample_slot_data(int page_num,
 
     if (sample_id <= 0)
     {
-        if (becoming_empty)
-        {
-            gtk_label_set_text(GTK_LABEL(gui_slot->title), "");
-            gtk_label_set_text(GTK_LABEL(gui_slot->hotkey), "");
-            gtk_label_set_text(GTK_LABEL(gui_slot->timecode), "");
-            gtk_image_set_from_pixbuf(GTK_IMAGE(gui_slot->image), NULL);
-
-            if (slot->pixbuf) {
-                g_object_unref(slot->pixbuf);
-                slot->pixbuf = NULL;
-            }
-
-            gtk_widget_set_sensitive(gui_slot->event_box, FALSE);
-        }
+        samplebank_clear_gui_slot(slot, gui_slot);
         return slot;
     }
 
@@ -11508,10 +11783,11 @@ update_sample_slot_data(int page_num,
             slot->timecode ? slot->timecode : "00:00:00");
     }
 
-    if (becoming_full)
-    {
+    if(gui_slot->image && GTK_IS_IMAGE(gui_slot->image))
+        gtk_widget_show(gui_slot->image);
+
+    if(gui_slot->event_box)
         gtk_widget_set_sensitive(gui_slot->event_box, TRUE);
-    }
 
     return slot;
 }

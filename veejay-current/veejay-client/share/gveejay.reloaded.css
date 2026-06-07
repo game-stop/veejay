@@ -445,3 +445,46 @@ frame.sequencer_slot.sequence-playing > border {
     margin: 0;
     border-width: 0;
 }
+
+.sequencer-slot-label {
+    font-size: 145%;
+    font-weight: bold;
+    color: @text-muted;
+    padding: 1px 2px;
+    background-color: transparent;
+}
+
+.sequencer-slot-label.sequence-filled {
+    color: @slot-playing-color;
+}
+
+frame.sequencer_slot.sequence-filled,
+frame.sequencer_slot.sequence-filled > border,
+.sequencer_slot.sequence-filled {
+    border-color: shade(@slot-playing-color, 0.72);
+    border-width: 1px;
+    border-style: solid;
+    background-color: @panel-color;
+}
+
+frame.sequencer_slot.sequence-filled:hover,
+.sequencer_slot.sequence-filled:hover {
+    border-color: @slot-playing-color;
+    background-color: @hover-color;
+}
+
+frame.sequencer_slot.sequence-playing,
+frame.sequencer_slot.sequence-playing > border,
+.sequencer_slot.sequence-playing {
+    border-color: @slot-playing-color;
+    border-width: 3px;
+    border-style: solid;
+    background-color: @slot-playing-bg;
+}
+
+frame.sequencer_slot.sequence-playing .sequencer-slot-label,
+frame.sequencer_slot.sequence-playing label.sequencer-slot-label,
+.sequencer_slot.sequence-playing .sequencer-slot-label {
+    color: @slot-playing-color;
+    background-color: transparent;
+}
