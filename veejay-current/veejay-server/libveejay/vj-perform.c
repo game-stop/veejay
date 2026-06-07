@@ -13079,6 +13079,118 @@ static int vj_perform_random_loop_ticks(veejay_t *info, int sample_id)
 }
 
 
+static int vj_perform_pingpong_turn_needs_reanchor(veejay_t *info)
+{
+#ifdef HAVE_JACK
+    if (!info || !info->settings || info->audio != AUDIO_PLAY)
+        return 0;
+
+    video_playback_setup *settings = info->settings;
+
+    if (!vj_audio_sync_is_enabled(&settings->audio_sync))
+        return 0;
+
+    const int sync_mode = atomic_load_int(&settings->audio_sync.mode);
+
+    return sync_mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL ||
+           sync_mode == VJ_AUDIO_SYNC_MODE_MONITOR ||
+           sync_mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
+           sync_mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN;
+#else
+    (void)info;
+    return 0;
+#endif
+}
+
+static void vj_perform_set_pingpong_turn_speed(veejay_t *info, int new_speed)
+{
+    if (!info || !info->settings)
+        return;
+
+    video_playback_setup *settings = info->settings;
+
+    if (vj_perform_pingpong_turn_needs_reanchor(info)) {
+        veejay_set_speed(info, new_speed, 1);
+        return;
+    }
+
+    if (info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
+        if (sample_set_speed(info->uc->sample_id, new_speed) != -1)
+            settings->current_playback_speed = new_speed;
+    }
+    else {
+        settings->current_playback_speed = new_speed;
+    }
+
+    atomic_store_int(&settings->audio_slice, 0);
+}
+
+static int vj_perform_maybe_publish_sequence_boundary(veejay_t *info,
+                                                      int mode,
+                                                      int id,
+                                                      int seq_active,
+                                                      int seq_transition_active,
+                                                      long long cur_frame,
+                                                      long long next_frame,
+                                                      long long start,
+                                                      long long end,
+                                                      int speed,
+                                                      int looptype,
+                                                      int edge_type,
+                                                      long long cur_slice,
+                                                      long long max_sfd)
+{
+    if (!info || !info->settings)
+        return 0;
+
+    video_playback_setup *settings = info->settings;
+
+    int loops_before = (mode == VJ_PLAYBACK_MODE_SAMPLE) ?
+        sample_get_loops(id) : vj_tag_get_loops(id);
+    int playback_ended = (mode == VJ_PLAYBACK_MODE_SAMPLE) ?
+        sample_loop_dec(id) : vj_tag_loop_dec(id);
+    int loops_after = (mode == VJ_PLAYBACK_MODE_SAMPLE) ?
+        sample_get_loops(id) : vj_tag_get_loops(id);
+
+    const int pending_before = atomic_load_int(&settings->sequence_boundary);
+    const int publish_boundary =
+        seq_active &&
+        !seq_transition_active &&
+        playback_ended &&
+        !pending_before;
+
+    if (publish_boundary)
+        atomic_store_int(&settings->sequence_boundary, 1);
+
+    if (seq_active || loops_before > 0 || playback_ended) {
+        const long long log_sfd = max_sfd > 0 ? max_sfd : 1;
+        const long long log_slice = max_sfd > 1 ? cur_slice : 1;
+
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[SEQ] boundary mode=%s id=%d cur=%lld next=%lld range=%lld..%lld speed=%d looptype=%d edge=%d loops=%d->%d ended=%d publish=%d pending=%d sfd=%lld/%lld seq=%d slot=%d",
+                   vj_playback_mode_label(mode),
+                   id,
+                   cur_frame,
+                   next_frame,
+                   start,
+                   end,
+                   speed,
+                   looptype,
+                   edge_type,
+                   loops_before,
+                   loops_after,
+                   playback_ended,
+                   publish_boundary,
+                   pending_before,
+                   log_slice,
+                   log_sfd,
+                   seq_active,
+                   info->seq ? info->seq->current : -1);
+    }
+
+    return playback_ended;
+}
+
 void vj_perform_inc_frame(veejay_t *info, int num)
 {
     video_playback_setup *settings = info->settings;
@@ -13090,9 +13202,6 @@ void vj_perform_inc_frame(veejay_t *info, int num)
         atomic_load_int(&settings->transition.global_state);
     int looptype = 1;
     int speed = settings->current_playback_speed;
-
-    if (seq_active && !seq_transition_active && atomic_load_int(&settings->sequence_boundary))
-        return;
 
     long long end = atomic_load_long_long(&settings->max_frame_num);
     long long start = atomic_load_long_long(&settings->min_frame_num);
@@ -13120,11 +13229,13 @@ void vj_perform_inc_frame(veejay_t *info, int num)
         speed = s_speed;
         settings->current_playback_speed = speed;
         cur_dir = (speed < 0) ? -1 : speed > 0 ? 1 : 0;
+        num = speed;
     }
     else {
         looptype = 1;
         speed = settings->current_playback_speed;
         cur_dir = (speed < 0) ? -1 : speed > 0 ? 1 : 0;
+        num = speed;
     }
 
     if (speed == 0) {
@@ -13141,7 +13252,7 @@ void vj_perform_inc_frame(veejay_t *info, int num)
 
     int edge_type = AUDIO_EDGE_NONE;
     int next_dir = cur_dir;
-    int sequence_boundary = 0;
+    int cycle_done = 0;
 
     if (mode == VJ_PLAYBACK_MODE_SAMPLE && looptype == 3) {
         const int sample_id = info->uc->sample_id;
@@ -13157,7 +13268,7 @@ void vj_perform_inc_frame(veejay_t *info, int num)
         settings->sequence_random_ticks_left--;
 
         if (settings->sequence_random_ticks_left <= 0) {
-            sequence_boundary = 1;
+            cycle_done = 1;
             settings->sequence_random_ticks_left =
                 vj_perform_random_loop_ticks(info, sample_id);
         }
@@ -13170,41 +13281,21 @@ void vj_perform_inc_frame(veejay_t *info, int num)
     if (max_sfd > 1 && cur_slice < (max_sfd - 1)) {
         atomic_store_int(&settings->audio_slice, cur_slice + 1);
 
-        if (sequence_boundary && mode != VJ_PLAYBACK_MODE_PLAIN) {
-            const int id = info->uc->sample_id;
-            int loops_before = (mode == VJ_PLAYBACK_MODE_SAMPLE) ?
-                sample_get_loops(id) : vj_tag_get_loops(id);
-            int playback_ended = (mode == VJ_PLAYBACK_MODE_SAMPLE) ?
-                sample_loop_dec(id) : vj_tag_loop_dec(id);
-            int loops_after = (mode == VJ_PLAYBACK_MODE_SAMPLE) ?
-                sample_get_loops(id) : vj_tag_get_loops(id);
-
-            if (seq_active && !seq_transition_active)
-                atomic_store_int(&settings->sequence_boundary, 1);
-
-            if (seq_active || loops_before > 0) {
-                const long long log_sfd = max_sfd > 0 ? max_sfd : 1;
-                const long long log_slice = max_sfd > 1 ? cur_slice + 1 : 1;
-
-                veejay_msg(VEEJAY_MSG_DEBUG,
-                           "[SEQ] boundary mode=%s id=%d cur=%lld next=%lld range=%lld..%lld speed=%d looptype=%d edge=%d loops=%d->%d ended=%d sfd=%lld/%lld seq=%d slot=%d",
-                           vj_playback_mode_label(mode),
-                           id,
-                           cur_frame,
-                           next_frame,
-                           start,
-                           end,
-                           speed,
-                           looptype,
-                           edge_type,
-                           loops_before,
-                           loops_after,
-                           playback_ended,
-                           log_slice,
-                           log_sfd,
-                           seq_active,
-                           info->seq ? info->seq->current : -1);
-            }
+        if (cycle_done && mode != VJ_PLAYBACK_MODE_PLAIN) {
+            vj_perform_maybe_publish_sequence_boundary(info,
+                                                       mode,
+                                                       info->uc->sample_id,
+                                                       seq_active,
+                                                       seq_transition_active,
+                                                       cur_frame,
+                                                       next_frame,
+                                                       start,
+                                                       end,
+                                                       speed,
+                                                       looptype,
+                                                       edge_type,
+                                                       cur_slice + 1,
+                                                       max_sfd);
         }
 
         return;
@@ -13231,17 +13322,18 @@ void vj_perform_inc_frame(veejay_t *info, int num)
             switch (looptype) {
                 case 2:
                     next_dir = -cur_dir;
-                    veejay_set_speed(info, next_dir * abs(speed), 1);
+                    speed = next_dir * abs(speed);
+                    vj_perform_set_pingpong_turn_speed(info, speed);
                     next_frame = end;
                     edge_type = AUDIO_EDGE_DIRECTION;
-                    sequence_boundary = 1;
+                    cycle_done = 1;
                     break;
 
                 case 1:
                     next_frame = start;
                     next_dir = 1;
                     edge_type = AUDIO_EDGE_RESET;
-                    sequence_boundary = 1;
+                    cycle_done = 1;
                     break;
 
                 case 3:
@@ -13259,7 +13351,7 @@ void vj_perform_inc_frame(veejay_t *info, int num)
                     veejay_set_speed(info, 0, 1);
                     next_dir = 0;
                     edge_type = AUDIO_EDGE_SILENCE;
-                    sequence_boundary = 1;
+                    cycle_done = 1;
                     break;
             }
         }
@@ -13267,17 +13359,18 @@ void vj_perform_inc_frame(veejay_t *info, int num)
             switch (looptype) {
                 case 2:
                     next_dir = -cur_dir;
-                    veejay_set_speed(info, next_dir * abs(speed), 1);
+                    speed = next_dir * abs(speed);
+                    vj_perform_set_pingpong_turn_speed(info, speed);
                     next_frame = start;
                     edge_type = AUDIO_EDGE_DIRECTION;
-                    sequence_boundary = 1;
+                    cycle_done = 1;
                     break;
 
                 case 1:
                     next_frame = end;
                     next_dir = -1;
                     edge_type = AUDIO_EDGE_JUMP;
-                    sequence_boundary = 1;
+                    cycle_done = 1;
                     break;
 
                 case 3:
@@ -13295,7 +13388,7 @@ void vj_perform_inc_frame(veejay_t *info, int num)
                     veejay_set_speed(info, 0, 1);
                     next_dir = 0;
                     edge_type = AUDIO_EDGE_SILENCE;
-                    sequence_boundary = 1;
+                    cycle_done = 1;
                     break;
             }
         }
@@ -13318,41 +13411,21 @@ void vj_perform_inc_frame(veejay_t *info, int num)
     if (edge_type != AUDIO_EDGE_NONE)
         vj_perform_initiate_edge_change_ex(info, edge_type, prev_dir, next_dir);
 
-    if (mode != VJ_PLAYBACK_MODE_PLAIN && sequence_boundary) {
-        const int id = info->uc->sample_id;
-        int loops_before = (mode == VJ_PLAYBACK_MODE_SAMPLE) ?
-            sample_get_loops(id) : vj_tag_get_loops(id);
-        int playback_ended = (mode == VJ_PLAYBACK_MODE_SAMPLE) ?
-            sample_loop_dec(id) : vj_tag_loop_dec(id);
-        int loops_after = (mode == VJ_PLAYBACK_MODE_SAMPLE) ?
-            sample_get_loops(id) : vj_tag_get_loops(id);
-
-        if (seq_active && !seq_transition_active)
-            atomic_store_int(&settings->sequence_boundary, 1);
-
-        if (seq_active || loops_before > 0) {
-            const long long log_sfd = max_sfd > 0 ? max_sfd : 1;
-            const long long log_slice = max_sfd > 1 ? cur_slice : 1;
-
-            veejay_msg(VEEJAY_MSG_DEBUG,
-                       "[SEQ] boundary mode=%s id=%d cur=%lld next=%lld range=%lld..%lld speed=%d looptype=%d edge=%d loops=%d->%d ended=%d sfd=%lld/%lld seq=%d slot=%d",
-                       vj_playback_mode_label(mode),
-                       id,
-                       cur_frame,
-                       next_frame,
-                       start,
-                       end,
-                       speed,
-                       looptype,
-                       edge_type,
-                       loops_before,
-                       loops_after,
-                       playback_ended,
-                       log_slice,
-                       log_sfd,
-                       seq_active,
-                       info->seq ? info->seq->current : -1);
-        }
+    if (mode != VJ_PLAYBACK_MODE_PLAIN && cycle_done) {
+        vj_perform_maybe_publish_sequence_boundary(info,
+                                                   mode,
+                                                   info->uc->sample_id,
+                                                   seq_active,
+                                                   seq_transition_active,
+                                                   cur_frame,
+                                                   next_frame,
+                                                   start,
+                                                   end,
+                                                   speed,
+                                                   looptype,
+                                                   edge_type,
+                                                   cur_slice,
+                                                   max_sfd);
     }
 
     atomic_store_long_long(&settings->current_frame_num, next_frame);
