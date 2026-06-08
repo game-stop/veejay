@@ -18659,8 +18659,9 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                   </packing>
                                 </child>
                                 <child>
-                                  <object class="GtkGrid">
-                                    <property name="visible">True</property>
+                                  <object class="GtkGrid" id="timeline_legacy_status_grid">
+                                    <property name="visible">False</property>
+                                    <property name="no-show-all">True</property>
                                     <property name="can-focus">False</property>
                                     <property name="column-spacing">4</property>
                                     <child>

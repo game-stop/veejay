@@ -19,7 +19,7 @@
 
 #ifndef GVRUTILS
 #define GVRUTILS
-int 	status_to_arr( char *status, int *array );
+
 char   *format_time( int pos , double fps);
 void	generator_to_arr( char *line, int *array);
 char   *format_framenum(int pos);

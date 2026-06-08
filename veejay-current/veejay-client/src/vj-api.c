@@ -1904,6 +1904,7 @@ void reportbug(void);
 void select_chain_entry(int entry);
 static void update_slider_state(int slider_num, gboolean animated);
 static void audio_input_selector_sync_from_status(void);
+static void timeline_update_compact_overlay(void);
 
 GtkWidget *glade_xml_get_widget_( GtkBuilder *m, const char *name );
 
@@ -1929,6 +1930,54 @@ gboolean gveejay_idle(gpointer data)
 }
 
 
+static void timeline_hide_label_if_present(int widget_id)
+{
+    GtkWidget *w;
+
+    if(widget_id < 0 || widget_id >= MAX_WIDGET_CACHE)
+        return;
+
+    w = widget_cache[widget_id];
+
+    if(!w)
+        return;
+
+    /*
+     * These values now live inside the timeline drawing itself.  no-show-all
+     * prevents a later gtk_widget_show_all() from resurrecting the compact
+     * spacer row.
+     */
+    gtk_widget_set_no_show_all(w, TRUE);
+    gtk_widget_hide(w);
+}
+
+static void timeline_hide_external_value_labels(void)
+{
+    static const int ids[] = {
+        WIDGET_LABEL_CURFRAME,
+        WIDGET_LABEL_MOUSEAT,
+        WIDGET_LABEL_CURTIME,
+        WIDGET_LABEL_SAMPLEPOSITION,
+        WIDGET_LABEL_MARKEREND,
+        WIDGET_LABEL_MARKERDURATION,
+        WIDGET_LABEL_MARKERSTART,
+        WIDGET_LABEL_TOTFRAMES,
+        WIDGET_LABEL_SAMPLELENGTH,
+        WIDGET_LABEL_TOTALTIME,
+        WIDGET_SAMPLE_LENGTH_LABEL,
+        WIDGET_LABEL_SAMPLEPOS,
+        WIDGET_PLAYHINT,
+        WIDGET_LABEL_LOOP_STAT_STOP,
+        WIDGET_LABEL_LOOP_STATS,
+        WIDGET_LABEL_CURRENTID,
+        WIDGET_LABEL_CURRENTSOURCE,
+        -1
+    };
+
+    for(int i = 0; ids[i] >= 0; i++)
+        timeline_hide_label_if_present(ids[i]);
+}
+
 static void init_widget_cache(void)
 {
 
@@ -1940,6 +1989,108 @@ static void init_widget_cache(void)
             veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' does not exist", widget_map[i].name );
         }
     }
+
+    timeline_hide_external_value_labels();
+}
+
+static void timeline_update_compact_overlay(void)
+{
+    gint pm;
+    gint source_start = 0;
+    gint source_end = 0;
+    gint loop_mode = 0;
+    gint play_speed = 1;
+    gint bpm_x10 = 0;
+    gint phase_pct = 0;
+    gint pulse_pct = 0;
+    gint gate_pct = 0;
+    gint grid_active = 0;
+    gint grid_locked = 0;
+    gint sync_mode = 0;
+
+    if(!info || !info->tl)
+        return;
+
+    pm = info->status_tokens[PLAY_MODE];
+
+    if(pm == MODE_SAMPLE) {
+        source_start = info->status_tokens[SAMPLE_START];
+        source_end = info->status_tokens[SAMPLE_END];
+        loop_mode = info->status_tokens[SAMPLE_LOOP];
+        play_speed = info->status_tokens[SAMPLE_SPEED];
+    }
+    else if(pm == MODE_STREAM) {
+        source_start = 0;
+        source_end = MAX(0, info->status_tokens[SAMPLE_MARKER_END] - 1);
+        loop_mode = 0;
+    }
+    else {
+        source_start = 0;
+        source_end = MAX(0, info->status_tokens[TOTAL_FRAMES] - 1);
+        loop_mode = 0;
+    }
+
+    timeline_set_display_info_full(info->tl,
+                                   pm,
+                                   info->status_tokens[CURRENT_ID],
+                                   source_start,
+                                   source_end,
+                                   loop_mode,
+                                   play_speed,
+                                   (gdouble) info->el.fps);
+
+    if(VIMS_STATUS_TOKENS > AUDIO_BEAT_PULSE)
+        pulse_pct = info->status_tokens[AUDIO_BEAT_PULSE];
+
+    if(VIMS_STATUS_TOKENS > AUDIO_BEAT_GATE)
+        gate_pct = info->status_tokens[AUDIO_BEAT_GATE];
+
+    if(VIMS_STATUS_TOKENS > AUDIO_SYNC_MODE &&
+       VIMS_STATUS_TOKENS > AUDIO_SYNC_BPM_X10 &&
+       VIMS_STATUS_TOKENS > AUDIO_SYNC_PHASE_PCT)
+    {
+        sync_mode = info->status_tokens[AUDIO_SYNC_MODE];
+
+        if(info->status_tokens[AUDIO_SYNC_OPEN] &&
+           info->status_tokens[AUDIO_SYNC_BPM_X10] > 0 &&
+           (sync_mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
+            sync_mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW ||
+            sync_mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN ||
+            sync_mode == VJ_AUDIO_SYNC_MODE_MONITOR ||
+            sync_mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL))
+        {
+            grid_active = 1;
+            bpm_x10 = info->status_tokens[AUDIO_SYNC_BPM_X10];
+            phase_pct = info->status_tokens[AUDIO_SYNC_PHASE_PCT];
+
+            if(VIMS_STATUS_TOKENS > AUDIO_SYNC_BRIDGE_STATE &&
+               info->status_tokens[AUDIO_SYNC_BRIDGE_STATE] == 3)
+                grid_locked = 1;
+
+            if(VIMS_STATUS_TOKENS > AUDIO_SYNC_TRACK_ALIGN_LOCKED &&
+               info->status_tokens[AUDIO_SYNC_TRACK_ALIGN_LOCKED])
+                grid_locked = 1;
+        }
+    }
+
+    if(!grid_active &&
+       VIMS_STATUS_TOKENS > AUDIO_BEAT_BPM_X10 &&
+       info->status_tokens[AUDIO_BEAT_ENABLED] &&
+       info->status_tokens[AUDIO_BEAT_BPM_X10] > 0)
+    {
+        grid_active = 1;
+        bpm_x10 = info->status_tokens[AUDIO_BEAT_BPM_X10];
+        phase_pct = 0;
+        grid_locked = 0;
+    }
+
+    timeline_set_audio_grid(info->tl,
+                            grid_active ? TRUE : FALSE,
+                            grid_locked ? TRUE : FALSE,
+                            bpm_x10,
+                            phase_pct,
+                            pulse_pct,
+                            gate_pct);
 }
 
 
@@ -5057,7 +5208,7 @@ static void update_current_slot(int *history, int pm, int last_pm) {
             }
             else
             {
-                timeline_set_in_and_out_point(info->tl, 0.0, sample_len);
+                timeline_set_in_and_out_point(info->tl, 0.0, (gdouble) MAX(0, sample_len - 1));
                 timeline_set_selection(info->tl, TRUE);
                 marker_duration = sample_len;
                 info->selection[1] = -1;
@@ -8611,6 +8762,8 @@ static void update_audio_beat_status_widgets(int *history, int force)
 
     AB_SET_LABEL(AUDIO_BEAT_HIT_SEQ, WIDGET_AUDIO_BEAT_HIT_SEQ_VALUE, "%d");
 
+    timeline_update_compact_overlay();
+
 #undef AB_SET_LABEL
 #undef AB_SET_BAR
 #undef AB_CHANGED
@@ -8970,6 +9123,8 @@ static void update_audio_sync_status_widgets(int *history, int force)
         audio_beat_set_label_s(WIDGET_AUDIO_SYNC_TRACK_ALIGN_STATE_VALUE,
                                audio_sync_track_align_state_name(AS_CUR(AUDIO_SYNC_TRACK_ALIGN_STATE)));
 
+    timeline_update_compact_overlay();
+
 #undef AS_SET_LABEL
 #undef AS_SET_BAR
 #undef AS_CHANGED
@@ -9035,8 +9190,22 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
     info->status_frame = info->status_tokens[FRAME_NUM];
 
-    timeline_set_pos( info->tl, (gdouble) info->status_frame );
+    {
+        gint timeline_frame = info->status_frame;
+
+        if(pm == MODE_SAMPLE) {
+            const gint sample_start = info->status_tokens[SAMPLE_START];
+            const gint sample_end = info->status_tokens[SAMPLE_END];
+            const gint sample_len = MAX(1, sample_end - sample_start + 1);
+
+            timeline_frame = CLAMP(info->status_frame - sample_start, 0, sample_len - 1);
+        }
+
+        timeline_set_pos(info->tl, (gdouble) timeline_frame);
+    }
+
     curve_set_position(info->curve, (gdouble) info->status_frame);
+    timeline_update_compact_overlay();
 
     char *current_time_ = format_time( info->status_frame, (double) info->el.fps );
     char *mouse_at_time = format_time(
@@ -10504,7 +10673,7 @@ void vj_gui_init(const char *glade_file,
     GtkWidget *frame = glade_xml_get_widget_( info->main_window, "markerframe" );
     info->tl = timeline_new();
     add_class(info->tl, "timeline");
-    set_tooltip_by_widget(info->tl, tooltips[TOOLTIP_TIMELINE].text );
+   // set_tooltip_by_widget(info->tl, tooltips[TOOLTIP_TIMELINE].text );
 
     g_signal_connect( info->tl, "pos_changed",
         (GCallback) on_timeline_value_changed, NULL );

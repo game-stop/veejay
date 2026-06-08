@@ -62,6 +62,30 @@ void        timeline_clear_points( GtkWidget *widget );
 
 void        timeline_set_selection( GtkWidget *widget, gboolean active);
 
+void        timeline_set_display_info(GtkWidget *widget,
+                                      gint display_mode,
+                                      gint source_start,
+                                      gint source_end,
+                                      gint loop_mode,
+                                      gdouble fps);
+
+void        timeline_set_display_info_full(GtkWidget *widget,
+                                           gint display_mode,
+                                           gint current_id,
+                                           gint source_start,
+                                           gint source_end,
+                                           gint loop_mode,
+                                           gint play_speed,
+                                           gdouble fps);
+
+void        timeline_set_audio_grid(GtkWidget *widget,
+                                    gboolean active,
+                                    gboolean locked,
+                                    gint bpm_x10,
+                                    gint phase_pct,
+                                    gint pulse_pct,
+                                    gint gate_pct);
+
 
 #ifdef __cplusplus
 }

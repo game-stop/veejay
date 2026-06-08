@@ -55,6 +55,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <cairo.h>
 #include <veejaycore/vj-msg.h>
 #include "gtktimeselection.h"
@@ -158,6 +159,20 @@ struct _TimelineSelection
   gboolean          has_ghost_selection;
   gdouble           ghost_in;
   gdouble           ghost_out;
+  TimelineAction    hover_action;
+  gdouble           fps;
+  gint              display_mode;
+  gint              current_id;
+  gint              source_start;
+  gint              source_end;
+  gint              loop_mode;
+  gint              play_speed;
+  gboolean          audio_grid_active;
+  gboolean          audio_grid_locked;
+  gint              audio_bpm_x10;
+  gint              audio_phase_pct;
+  gint              audio_pulse_pct;
+  gint              audio_gate_pct;
 };
 
 static void get_property(GObject *object,
@@ -192,13 +207,15 @@ static gint timeline_signals[LAST_SIGNAL] = { 0 };
 #define TIMELINE_STEPPER_HIT_PX     28.0
 #define TIMELINE_SELECTION_HIT_PX   8.0
 #define TIMELINE_MIN_FRAMES         1.0
-#define TIMELINE_MIN_HEIGHT_PX      34
-#define TIMELINE_LABEL_FONT_SIZE    10.0
-#define TIMELINE_INFO_FONT_SIZE     10.0
+#define TIMELINE_MIN_HEIGHT_PX      76
+#define TIMELINE_LABEL_FONT_SIZE    12.0
+#define TIMELINE_INFO_FONT_SIZE     12.0
 #define TIMELINE_DEFAULT_SCROLL_STEP_FRAMES 13
 #define TIMELINE_CTRL_SCROLL_STEP_FRAMES    25
 #define TIMELINE_SHIFT_SCROLL_STEP_FRAMES   50
 #define TIMELINE_SCRATCH_SCROLL_EDGE_STEP_FRAMES 5
+#define TIMELINE_BEAT_GRID_MIN_PX   10.0
+#define TIMELINE_FRAME_RULER_FONT_SIZE 11.0
 
 #ifdef TIMELINE_DEBUG
 static const char *timeline_action_name(TimelineAction action)
@@ -470,6 +487,11 @@ static void timeline_update_cursor(GtkWidget *widget, TimelineAction action)
             cursor = gdk_cursor_new_for_display(display, GDK_FLEUR);
             break;
 
+        case action_in_point:
+        case action_out_point:
+            cursor = gdk_cursor_new_for_display(display, GDK_SB_H_DOUBLE_ARROW);
+            break;
+
         case action_atomic:
             cursor = gdk_cursor_new_for_display(display, GDK_FLEUR);
             break;
@@ -517,9 +539,28 @@ static TimelineAction timeline_pick_action(TimelineSelection *te,
     if (timeline_point_in_stepper_triangle(te, x, y, width))
         return action_pos;
 
-    if (te->has_selection && te->bind && timeline_point_in_selection_span(te, x, width)) {
+    if (te->has_selection && te->out >= te->in && width > 1.0) {
+        gdouble in_f = timeline_clamp_frame(te, te->in);
+        gdouble out_f = timeline_clamp_frame(te, te->out);
+        gdouble in_x = timeline_snap_fill_x(timeline_frame_boundary_to_x(te, in_f, width), width);
+        gdouble out_x = timeline_snap_fill_x(timeline_frame_boundary_to_x(te, out_f + 1.0, width), width);
+
         (void) y;
-        return action_atomic;
+
+        if (out_x < in_x) {
+            gdouble tmp = in_x;
+            in_x = out_x;
+            out_x = tmp;
+        }
+
+        if (timeline_point_near_x(x, in_x, TIMELINE_SELECTION_HIT_PX))
+            return action_in_point;
+
+        if (timeline_point_near_x(x, out_x, TIMELINE_SELECTION_HIT_PX))
+            return action_out_point;
+
+        if (x >= in_x && x <= out_x)
+            return action_atomic;
     }
 
     return action_point;
@@ -906,7 +947,7 @@ static void timeline_init(TimelineSelection *te)
   te->stepper_length = 0;
   te->step_size = TIMELINE_DEFAULT_SCROLL_STEP_FRAMES;
   te->frame_width = 0.0;
-  te->frame_height = 8;
+  te->frame_height = 14;
   te->font_line = 24;
   te->has_selection = FALSE;
   te->move_x = 0.0;
@@ -916,6 +957,20 @@ static void timeline_init(TimelineSelection *te)
   te->has_ghost_selection = FALSE;
   te->ghost_in = 0.0;
   te->ghost_out = 0.0;
+  te->hover_action = action_none;
+  te->fps = 0.0;
+  te->display_mode = 0;
+  te->current_id = 0;
+  te->source_start = 0;
+  te->source_end = 0;
+  te->loop_mode = 0;
+  te->play_speed = 1;
+  te->audio_grid_active = FALSE;
+  te->audio_grid_locked = FALSE;
+  te->audio_bpm_x10 = 0;
+  te->audio_phase_pct = 0;
+  te->audio_pulse_pct = 0;
+  te->audio_gate_pct = 0;
 }
 
 GType timeline_get_type(void)
@@ -1056,6 +1111,7 @@ void timeline_clear_points(GtkWidget *widget)
   te->out = 0.0;
   te->drag_latched = FALSE;
   te->scratch_span = 0;
+  te->hover_action = action_none;
   timeline_clear_selection_ghost(te);
   te->action = action_none;
   te->move_x = 0.0;
@@ -1292,6 +1348,108 @@ gdouble timeline_get_length(TimelineSelection *te)
   return result;
 }
 
+void timeline_set_display_info_full(GtkWidget *widget,
+                                    gint display_mode,
+                                    gint current_id,
+                                    gint source_start,
+                                    gint source_end,
+                                    gint loop_mode,
+                                    gint play_speed,
+                                    gdouble fps)
+{
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
+  gint nframes;
+
+  if (!te)
+      return;
+
+  nframes = timeline_frame_count_i(te);
+
+  if (source_end < source_start)
+      source_end = source_start + nframes - 1;
+
+  if (fps < 0.0)
+      fps = 0.0;
+
+  if (te->display_mode == display_mode &&
+      te->current_id == current_id &&
+      te->source_start == source_start &&
+      te->source_end == source_end &&
+      te->loop_mode == loop_mode &&
+      te->play_speed == play_speed &&
+      fabs(te->fps - fps) < 0.0001)
+  {
+      return;
+  }
+
+  te->display_mode = display_mode;
+  te->current_id = current_id;
+  te->source_start = source_start;
+  te->source_end = source_end;
+  te->loop_mode = loop_mode;
+  te->play_speed = play_speed;
+  te->fps = fps;
+
+  gtk_widget_queue_draw(widget);
+}
+
+void timeline_set_display_info(GtkWidget *widget,
+                               gint display_mode,
+                               gint source_start,
+                               gint source_end,
+                               gint loop_mode,
+                               gdouble fps)
+{
+  timeline_set_display_info_full(widget,
+                                 display_mode,
+                                 0,
+                                 source_start,
+                                 source_end,
+                                 loop_mode,
+                                 1,
+                                 fps);
+}
+
+void timeline_set_audio_grid(GtkWidget *widget,
+                             gboolean active,
+                             gboolean locked,
+                             gint bpm_x10,
+                             gint phase_pct,
+                             gint pulse_pct,
+                             gint gate_pct)
+{
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
+
+  if (!te)
+      return;
+
+  if (bpm_x10 <= 0)
+      active = FALSE;
+
+  phase_pct = CLAMP(phase_pct, 0, 100);
+  pulse_pct = CLAMP(pulse_pct, 0, 100);
+  gate_pct = CLAMP(gate_pct, 0, 100);
+
+  if (te->audio_grid_active == active &&
+      te->audio_grid_locked == locked &&
+      te->audio_bpm_x10 == bpm_x10 &&
+      te->audio_phase_pct == phase_pct &&
+      te->audio_pulse_pct == pulse_pct &&
+      te->audio_gate_pct == gate_pct)
+  {
+      return;
+  }
+
+  te->audio_grid_active = active ? TRUE : FALSE;
+  te->audio_grid_locked = locked ? TRUE : FALSE;
+  te->audio_bpm_x10 = bpm_x10;
+  te->audio_phase_pct = phase_pct;
+  te->audio_pulse_pct = pulse_pct;
+  te->audio_gate_pct = gate_pct;
+
+  gtk_widget_queue_draw(widget);
+}
+
 static void timeline_clear_selection_ghost(TimelineSelection *te)
 {
     te->has_ghost_selection = FALSE;
@@ -1460,6 +1618,7 @@ static void timeline_cancel_drag_mode(GtkWidget *widget)
     te->move_x = 0.0;
     te->drag_latched = FALSE;
     te->scratch_span = 0;
+    te->hover_action = action_none;
     timeline_clear_selection_ghost(te);
 
     timeline_update_cursor(widget, action_none);
@@ -1824,6 +1983,7 @@ static gboolean event_motion(GtkWidget *widget, GdkEventMotion *ev, gpointer use
     TimelineAction hover = timeline_pick_action(te, ev->x, ev->y, width);
 
     te->current_location = MOUSE_WIDGET;
+    te->hover_action = hover;
     timeline_update_cursor(widget, hover);
 
     timeline_set_point(widget, timeline_x_to_pos(te, ev->x, width));
@@ -1846,6 +2006,7 @@ static gboolean event_leave(GtkWidget *widget, GdkEventCrossing *ev, gpointer us
      * still toggles that mode off explicitly.
      */
     te->current_location = MOUSE_OUTSIDE;
+    te->hover_action = action_none;
 
     if (!timeline_latch_visible(te))
         timeline_update_cursor(widget, action_none);
@@ -1918,13 +2079,6 @@ static void cairo_rectangle_round_stroke(cairo_t *cr,
     cairo_stroke(cr);
 }
 
-static gdouble timeline_text_width(cairo_t *cr, const gchar *text)
-{
-    cairo_text_extents_t ext;
-    cairo_text_extents(cr, text, &ext);
-    return ext.width;
-}
-
 static void timeline_draw_text_pill(cairo_t *cr,
                                     const gchar *text,
                                     gdouble center_x,
@@ -1970,9 +2124,485 @@ static void timeline_draw_text_pill(cairo_t *cr,
     cairo_show_text(cr, text);
 }
 
+static const gchar *timeline_loop_label(gint loop_mode)
+{
+
+    switch (loop_mode) {
+        case 1: return "loop";
+        case 2: return "pingpong";
+        case 3: return "random";
+        case 4: return "once";
+        case 0:
+        default: return "";
+    }
+}
+
+static const gchar *timeline_hover_hint(TimelineSelection *te)
+{
+    if (timeline_latch_visible(te))
+        return "Grabbed loop: move mouse | wheel resize | middle-click release";
+
+    switch (te->hover_action) {
+        case action_in_point:  return "Drag IN";
+        case action_out_point: return "Drag OUT";
+        case action_atomic:    return "Middle-click: grab loop";
+        case action_pos:       return "Drag PLAY";
+        case action_point:
+            return "Wheel: step playhead | Ctrl: 1s | Shift: 2s";
+        case action_none:
+        default:
+            return "";
+    }
+}
+
+static void timeline_format_clock(TimelineSelection *te,
+                                  gint frame,
+                                  gchar *buf,
+                                  size_t len)
+{
+    gint fps_i;
+    gint total_seconds;
+    gint h;
+    gint m;
+    gint s;
+    gint f;
+
+    if (!buf || len == 0)
+        return;
+
+    if (te->fps <= 0.01) {
+        snprintf(buf, len, "%d", frame);
+        return;
+    }
+
+    fps_i = (gint) lrint(te->fps);
+    fps_i = CLAMP(fps_i, 1, 240);
+
+    if (frame < 0)
+        frame = 0;
+
+    total_seconds = frame / fps_i;
+    f = frame - (total_seconds * fps_i);
+    h = total_seconds / 3600;
+    m = (total_seconds / 60) % 60;
+    s = total_seconds % 60;
+
+    snprintf(buf, len, "%d:%02d:%02d:%02d", h, m, s, f);
+}
+
+static void timeline_draw_plain_text(cairo_t *cr,
+                                     const gchar *text,
+                                     gdouble x,
+                                     gdouble y,
+                                     const GdkRGBA *fg,
+                                     gdouble alpha)
+{
+    if (!text || !*text)
+        return;
+
+    cairo_set_source_rgba(cr, fg->red, fg->green, fg->blue, alpha);
+    cairo_move_to(cr, floor(x), floor(y));
+    cairo_show_text(cr, text);
+}
+
+
+static void timeline_draw_right_text(cairo_t *cr,
+                                     const gchar *text,
+                                     gdouble right_x,
+                                     gdouble y,
+                                     const GdkRGBA *fg,
+                                     gdouble alpha)
+{
+    cairo_text_extents_t ext;
+
+    if (!text || !*text)
+        return;
+
+    cairo_text_extents(cr, text, &ext);
+    timeline_draw_plain_text(cr,
+                             text,
+                             right_x - ext.width - ext.x_bearing,
+                             y,
+                             fg,
+                             alpha);
+}
+
+static const gchar *timeline_mode_label(gint display_mode)
+{
+    switch (display_mode) {
+        case 0: return "SAMPLE";
+        case 1: return "STREAM";
+        case 2: return "PLAIN";
+        default: return "SRC";
+    }
+}
+
+static void timeline_draw_beat_grid(TimelineSelection *te,
+                                    cairo_t *cr,
+                                    gdouble width,
+                                    gdouble track_y,
+                                    gdouble track_h,
+                                    const GdkRGBA *fg)
+{
+    gdouble beat_frames;
+    gdouble beat_px;
+    gdouble stride_frames;
+    gdouble phase;
+    gdouble first;
+    gdouble f;
+    gdouble ruler_y;
+    gdouble tick_top;
+    gdouble tick_mid;
+    gdouble tick_deep;
+    gint nframes;
+    gint guard;
+    gint stride_beats = 1;
+
+    if (!te->audio_grid_active || te->audio_bpm_x10 <= 0 || te->fps <= 0.01)
+        return;
+
+    nframes = timeline_frame_count_i(te);
+    if (nframes <= 1 || width < 24.0)
+        return;
+
+    beat_frames = (te->fps * 600.0) / (gdouble) te->audio_bpm_x10;
+    if (beat_frames < 1.0)
+        return;
+
+    beat_px = (beat_frames / (gdouble) nframes) * width;
+
+    while (beat_px > 0.0 && beat_px < TIMELINE_BEAT_GRID_MIN_PX) {
+        stride_beats++;
+        beat_px = ((beat_frames * (gdouble) stride_beats) / (gdouble) nframes) * width;
+
+        if ((beat_frames * (gdouble) stride_beats) > (gdouble) nframes)
+            break;
+    }
+
+    stride_frames = beat_frames * (gdouble) stride_beats;
+
+    phase = ((gdouble) CLAMP(te->audio_phase_pct, 0, 100)) / 100.0;
+    first = -phase * beat_frames;
+
+    guard = 0;
+    while (first < 0.0 && guard++ < 8192)
+        first += stride_frames;
+
+    ruler_y = floor(track_y + 2.0) + 0.5;
+    tick_top = ruler_y;
+    tick_mid = floor(track_y + MAX(5.0, track_h * 0.38)) + 0.5;
+    tick_deep = floor(track_y + MAX(7.0, track_h * 0.62)) + 0.5;
+
+    cairo_save(cr);
+
+    cairo_set_line_width(cr, 1.0);
+    cairo_set_source_rgba(cr, fg->red, fg->green, fg->blue,
+                          te->audio_grid_locked ? 0.16 : 0.08);
+    cairo_move_to(cr, 0.0, ruler_y);
+    cairo_line_to(cr, width, ruler_y);
+    cairo_stroke(cr);
+
+    for (f = first; f < (gdouble) nframes; f += stride_frames) {
+        gdouble x = timeline_snap_line_x(timeline_frame_boundary_to_x(te, f, width), width);
+        gint beat_index = (gint) floor((f / beat_frames) + 0.5);
+        gboolean downbeat = ((beat_index % 4) == 0);
+        gdouble tick_bottom = downbeat ? tick_deep : tick_mid;
+        gdouble alpha = downbeat ? 0.30 : 0.18;
+
+        if (!te->audio_grid_locked)
+            alpha *= 0.62;
+
+        cairo_set_line_width(cr, downbeat ? 1.15 : 0.75);
+        cairo_set_source_rgba(cr, fg->red, fg->green, fg->blue, alpha);
+        cairo_move_to(cr, x, tick_top);
+        cairo_line_to(cr, x, tick_bottom);
+        cairo_stroke(cr);
+    }
+
+    if (te->audio_grid_locked && te->has_stepper) {
+        gdouble pulse = ((gdouble) MAX(te->audio_pulse_pct, te->audio_gate_pct)) / 100.0;
+        gdouble x = timeline_snap_line_x(timeline_frame_to_x(te, te->frame_num, width), width);
+        gdouble alpha = 0.24 + pulse * 0.42;
+
+        cairo_set_line_width(cr, 1.0 + pulse * 1.4);
+        cairo_set_source_rgba(cr, fg->red, fg->green, fg->blue, alpha);
+        cairo_move_to(cr, x, tick_top);
+        cairo_line_to(cr, x, tick_deep + 1.0);
+        cairo_stroke(cr);
+
+        cairo_set_source_rgba(cr, fg->red, fg->green, fg->blue, 0.26 + pulse * 0.46);
+        cairo_arc(cr, x, tick_top, 2.0 + pulse * 2.0, 0.0, M_PI * 2.0);
+        cairo_fill(cr);
+    }
+
+    cairo_restore(cr);
+}
+
+static gint timeline_frame_ruler_step(gint nframes, gdouble width)
+{
+    gint max_labels;
+    gint target;
+    gint pow10 = 1;
+    gint base;
+    gint step;
+
+    if (nframes <= 1)
+        return 1;
+
+    /* Small clips are where this matters most: show 1,5,10,15,20 for 20f. */
+    if (nframes <= 30 && width >= 170.0)
+        return 5;
+
+    max_labels = (gint) floor(width / 56.0);
+    if (max_labels < 2)
+        max_labels = 2;
+
+    target = (nframes + max_labels - 2) / (max_labels - 1);
+    if (target < 1)
+        target = 1;
+
+    while ((pow10 * 10) < target)
+        pow10 *= 10;
+
+    base = (target + pow10 - 1) / pow10;
+
+    if (base <= 1)
+        step = 1 * pow10;
+    else if (base <= 2)
+        step = 2 * pow10;
+    else if (base <= 5)
+        step = 5 * pow10;
+    else
+        step = 10 * pow10;
+
+    return MAX(1, step);
+}
+
+static void timeline_draw_frame_ruler_label(TimelineSelection *te,
+                                            cairo_t *cr,
+                                            gint frame_ord,
+                                            gint nframes,
+                                            gdouble width,
+                                            gdouble baseline_y,
+                                            gdouble tick_top,
+                                            gdouble tick_bottom,
+                                            gdouble *last_right,
+                                            gboolean force,
+                                            const GdkRGBA *fg)
+{
+    gchar label[32];
+    cairo_text_extents_t ext;
+    gdouble x;
+    gdouble tx;
+    gdouble alpha;
+
+    if (frame_ord < 1 || frame_ord > nframes)
+        return;
+
+    snprintf(label, sizeof(label), "%d", frame_ord);
+
+    x = timeline_snap_line_x(timeline_frame_to_x(te, (gdouble) (frame_ord - 1), width), width);
+
+    cairo_text_extents(cr, label, &ext);
+    tx = x - (ext.width * 0.5) - ext.x_bearing;
+
+    if (tx < 2.0)
+        tx = 2.0;
+    if ((tx + ext.width) > (width - 2.0))
+        tx = width - 2.0 - ext.width;
+
+    if (!force && last_right && tx < (*last_right + 5.0))
+        return;
+
+    alpha = force ? 0.56 : 0.42;
+
+    cairo_set_line_width(cr, force ? 1.0 : 0.75);
+    cairo_set_source_rgba(cr, fg->red, fg->green, fg->blue, force ? 0.24 : 0.16);
+    cairo_move_to(cr, x, tick_top);
+    cairo_line_to(cr, x, tick_bottom);
+    cairo_stroke(cr);
+
+    cairo_set_source_rgba(cr, fg->red, fg->green, fg->blue, alpha);
+    cairo_move_to(cr, floor(tx), floor(baseline_y));
+    cairo_show_text(cr, label);
+
+    if (last_right)
+        *last_right = tx + ext.width;
+}
+
+static void timeline_draw_frame_ruler(TimelineSelection *te,
+                                      cairo_t *cr,
+                                      gdouble width,
+                                      gdouble track_y,
+                                      gdouble track_h,
+                                      const GdkRGBA *fg)
+{
+    gint nframes = timeline_frame_count_i(te);
+    gint step;
+    gint f;
+    gdouble baseline_y;
+    gdouble tick_top;
+    gdouble tick_bottom;
+    gdouble last_right = -9999.0;
+
+    if (nframes <= 1 || width < 120.0 || track_h < 10.0)
+        return;
+
+    step = timeline_frame_ruler_step(nframes, width);
+
+    baseline_y = floor(track_y + track_h - 3.0);
+    tick_bottom = floor(track_y + track_h - 2.0) + 0.5;
+    tick_top = MAX(track_y + 2.5, tick_bottom - 8.0);
+
+    cairo_save(cr);
+    cairo_select_font_face(cr,
+                           "Sans",
+                           CAIRO_FONT_SLANT_NORMAL,
+                           CAIRO_FONT_WEIGHT_BOLD);
+    cairo_set_font_size(cr, TIMELINE_FRAME_RULER_FONT_SIZE);
+
+    /* Human-facing local frame ruler: 1..N, not the internal 0..N-1 indices. */
+    timeline_draw_frame_ruler_label(te,
+                                    cr,
+                                    1,
+                                    nframes,
+                                    width,
+                                    baseline_y,
+                                    tick_top,
+                                    tick_bottom,
+                                    &last_right,
+                                    TRUE,
+                                    fg);
+
+    for (f = step; f <= nframes; f += step) {
+        if (f == 1)
+            continue;
+
+        timeline_draw_frame_ruler_label(te,
+                                        cr,
+                                        f,
+                                        nframes,
+                                        width,
+                                        baseline_y,
+                                        tick_top,
+                                        tick_bottom,
+                                        &last_right,
+                                        FALSE,
+                                        fg);
+    }
+
+    if (((nframes - 1) % step) != 0) {
+        timeline_draw_frame_ruler_label(te,
+                                        cr,
+                                        nframes,
+                                        nframes,
+                                        width,
+                                        baseline_y,
+                                        tick_top,
+                                        tick_bottom,
+                                        &last_right,
+                                        TRUE,
+                                        fg);
+    }
+
+    cairo_restore(cr);
+}
+
+static void timeline_format_signed_clock(TimelineSelection *te,
+                                         gint frame_delta,
+                                         gchar *buf,
+                                         size_t len)
+{
+    gint abs_delta;
+
+    if (!buf || len == 0)
+        return;
+
+    buf[0] = '\0';
+
+    if (len < 2)
+        return;
+
+    abs_delta = (frame_delta < 0) ? -frame_delta : frame_delta;
+
+    buf[0] = (frame_delta < 0) ? '-' : '+';
+    timeline_format_clock(te, abs_delta, buf + 1, len - 1);
+}
+
+static void timeline_draw_edit_tooltip(TimelineSelection *te,
+                                       cairo_t *cr,
+                                       gdouble width,
+                                       gdouble track_y,
+                                       gdouble track_bottom,
+                                       const GdkRGBA *fg,
+                                       const GdkRGBA *bg)
+{
+    gchar text[96];
+    gchar tc[32];
+    gint frame;
+    gint len_frames = 0;
+    gdouble x;
+    gdouble y;
+
+    if (!te->has_selection)
+        return;
+
+    if (!((te->action == action_in_point && te->grab_button == 1) ||
+          (te->action == action_out_point && te->grab_button == 3)))
+        return;
+
+    if (width < 150.0)
+        return;
+
+    if (te->action == action_in_point) {
+        frame = timeline_clamp_frame_i(te, (gint) llround(te->in));
+        timeline_format_clock(te, frame, tc, sizeof(tc));
+
+        if (width > 285.0)
+            snprintf(text, sizeof(text), "IN %d  %s", frame, tc);
+        else
+            snprintf(text, sizeof(text), "IN %d", frame);
+
+        x = timeline_frame_boundary_to_x(te, (gdouble) frame, width);
+    }
+    else {
+        gint in_f = timeline_clamp_frame_i(te, (gint) llround(te->in));
+
+        frame = timeline_clamp_frame_i(te, (gint) llround(te->out));
+        len_frames = MAX(1, frame - in_f + 1);
+        timeline_format_clock(te, frame, tc, sizeof(tc));
+
+        if (width > 360.0)
+            snprintf(text, sizeof(text), "OUT %d  %s  LEN %d", frame, tc, len_frames);
+        else if (width > 250.0)
+            snprintf(text, sizeof(text), "OUT %d  LEN %d", frame, len_frames);
+        else
+            snprintf(text, sizeof(text), "OUT %d", frame);
+
+        x = timeline_frame_boundary_to_x(te, (gdouble) frame + 1.0, width);
+    }
+
+    x = timeline_snap_line_x(x, width);
+
+    y = track_y - 6.0;
+    if (y < 10.0)
+        y = track_bottom - 4.0;
+
+    timeline_draw_text_pill(cr,
+                            text,
+                            x,
+                            y,
+                            width,
+                            fg,
+                            0.95,
+                            bg,
+                            0.44);
+}
+
 static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
 {
-  gchar text[64];
+  gchar text[160];
+  gchar aux[64];
   TimelineSelection *te = TIMELINE_SELECTION(widget);
 
   double width = gtk_widget_get_allocated_width(widget);
@@ -1998,6 +2628,7 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
 
   GdkRGBA info_fg = { 0.06, 0.05, 0.03, 1.0 };
   GdkRGBA info_bg = { 1.00, 0.78, 0.10, 1.0 };
+  GdkRGBA dim_fg = color;
 
   cairo_set_antialias(cr, CAIRO_ANTIALIAS_FAST);
   cairo_select_font_face(cr,
@@ -2008,7 +2639,10 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
 
   gdouble tri_h = te->has_stepper ? te->stepper_draw_size : 0.0;
   gdouble track_h = marker_height;
-  gdouble label_rows_h = 12.0;
+  gdouble row_gap = 6.0;
+
+  gdouble row_step = 20.0;
+  gdouble label_rows_h = row_gap + (row_step * 2.0) + 12.0;
   gdouble group_h = tri_h + track_h + label_rows_h;
 
   gdouble group_y = floor((height - group_h) * 0.5);
@@ -2018,23 +2652,47 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
   gdouble tri_y = group_y;
   gdouble track_y = floor(group_y + tri_h);
   gdouble track_bottom = track_y + track_h;
-  gdouble marker_label_y = track_bottom + 10.0;
-  gdouble info_label_y = track_y + track_h - 1.0;
-  gdouble handle_w = 3.0;
+  gdouble marker_row_y = track_bottom + row_gap + 10.0;
+  gdouble bottom_row_y = marker_row_y + row_step;
+  gdouble handle_w = 4.0;
 
-  if (marker_label_y > height - 2.0)
-      marker_label_y = height - 2.0;
-
-  if (track_bottom > height) {
-      track_y = MAX(0.0, height - track_h);
-      track_bottom = track_y + track_h;
-      tri_y = MAX(0.0, track_y - tri_h);
-      marker_label_y = MIN(height - 2.0, track_bottom + 9.0);
-      info_label_y = track_y + track_h - 1.0;
+  if (bottom_row_y > height - 3.0) {
+      bottom_row_y = height - 3.0;
+      marker_row_y = MAX(track_bottom + 12.0, bottom_row_y - row_step);
   }
 
-  cairo_set_source_rgba(cr, color.red, color.green, color.blue, 0.25);
+  if (track_bottom > height) {
+      track_y = MAX(0.0, height - track_h - label_rows_h);
+      track_bottom = track_y + track_h;
+      tri_y = MAX(0.0, track_y - tri_h);
+      marker_row_y = MIN(height - row_step - 3.0, track_bottom + row_gap + 10.0);
+      bottom_row_y = MIN(height - 3.0, marker_row_y + row_step);
+  }
+
+  cairo_set_source_rgba(cr, col2.red, col2.green, col2.blue, 0.18);
   cairo_rectangle_round(cr, 0.0, track_y, width, track_h, 10.0);
+
+  timeline_draw_beat_grid(te, cr, width, track_y, track_h, &color);
+
+  if (te->audio_grid_active && te->audio_bpm_x10 > 0 && width > 96.0) {
+      gint bpm10 = te->audio_bpm_x10;
+      gdouble pill_y = MAX(9.0, track_y - 3.0);
+
+      snprintf(text, sizeof(text), "BPM %d.%d", bpm10 / 10, bpm10 % 10);
+      cairo_set_font_size(cr, TIMELINE_INFO_FONT_SIZE);
+
+      timeline_draw_text_pill(cr,
+                              text,
+                              width - 42.0,
+                              pill_y,
+                              width,
+                              &info_fg,
+                              0.95,
+                              &info_bg,
+                              te->audio_grid_locked ? 0.72 : 0.42);
+      cairo_set_font_size(cr, TIMELINE_LABEL_FONT_SIZE);
+  }
+
 
   if (te->has_ghost_selection && te->ghost_out >= te->ghost_in) {
     gdouble ghost_in_f = timeline_clamp_frame(te, te->ghost_in);
@@ -2053,14 +2711,14 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
 
     gdouble ghost_w = MAX(1.0, ghost_out_x - ghost_in_x);
 
-    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.22);
+    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.18);
     cairo_rectangle_round(cr, ghost_in_x, track_y, ghost_w, track_h, 10.0);
 
     cairo_save(cr);
     double ghost_dash[] = { 2.0, 2.0 };
     cairo_set_dash(cr, ghost_dash, 2, 0.0);
     cairo_set_line_width(cr, 1.0);
-    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.42);
+    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.38);
     cairo_rectangle_round_stroke(cr,
                                  floor(ghost_in_x) + 0.5,
                                  floor(track_y) + 0.5,
@@ -2073,7 +2731,7 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
   te->selection.x = 0;
   te->selection.y = (gint) tri_y;
   te->selection.width = 0;
-  te->selection.height = (gint) (marker_label_y - tri_y + 4.0);
+  te->selection.height = (gint) (bottom_row_y - tri_y + 4.0);
 
   if (te->has_selection && te->out >= te->in) {
     gdouble in_f = timeline_clamp_frame(te, te->in);
@@ -2091,91 +2749,86 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
         out_x = MIN(width, in_x + 1.0);
 
     gdouble sel_w = MAX(1.0, out_x - in_x);
+    gboolean grabbed = timeline_latch_visible(te);
 
-    cairo_set_source_rgba(cr, col2.red, col2.green, col2.blue, 0.90);
+    cairo_set_source_rgba(cr, col2.red, col2.green, col2.blue, grabbed ? 0.98 : 0.86);
     cairo_rectangle_round(cr, in_x, track_y, sel_w, track_h, 10.0);
 
-    cairo_set_source_rgba(cr, color.red, color.green, color.blue, 0.90);
+    cairo_set_source_rgba(cr, color.red, color.green, color.blue, grabbed ? 0.98 : 0.84);
     cairo_rectangle_round(cr,
                           in_x - (handle_w * 0.5),
-                          track_y,
+                          track_y - 1.0,
                           handle_w,
-                          track_h,
+                          track_h + 2.0,
                           1.5);
 
     cairo_rectangle_round(cr,
                           out_x - (handle_w * 0.5),
-                          track_y,
+                          track_y - 1.0,
                           handle_w,
-                          track_h,
+                          track_h + 2.0,
                           1.5);
+
+    if (grabbed) {
+        gdouble center_x = in_x + (sel_w * 0.5);
+        gdouble center_y = track_y + (track_h * 0.5);
+        gdouble pulse = ((gdouble) MAX(te->audio_pulse_pct, te->audio_gate_pct)) / 100.0;
+
+        cairo_set_source_rgba(cr, 1.0, 0.78, 0.08, 0.22 + pulse * 0.25);
+        cairo_arc(cr, center_x, center_y, 8.0 + pulse * 3.0, 0.0, M_PI * 2.0);
+        cairo_fill(cr);
+
+        cairo_set_source_rgba(cr, 1.0, 0.90, 0.18, 0.95);
+        cairo_arc(cr, center_x, center_y, 3.0, 0.0, M_PI * 2.0);
+        cairo_fill(cr);
+    }
 
     {
       gint f1 = timeline_clamp_frame_i(te, (gint) llround(in_f));
       gint f2 = timeline_clamp_frame_i(te, (gint) llround(out_f));
-      gchar in_text[32];
-      gchar out_text[32];
-      gchar both_text[64];
-      gdouble in_tw;
-      gdouble out_tw;
-      gboolean split_labels;
+      gint span = MAX(1, f2 - f1 + 1);
+      const gchar *loop = timeline_loop_label(te->loop_mode);
+      gboolean compact = width < 255.0;
 
-      snprintf(in_text, sizeof(in_text), "%d", f1);
-      snprintf(out_text, sizeof(out_text), "%d", f2);
+      if (grabbed) {
+          gint delta = te->has_ghost_selection ? (f1 - timeline_clamp_frame_i(te, (gint) llround(te->ghost_in))) : 0;
+          gchar delta_tc[32];
 
-      in_tw = timeline_text_width(cr, in_text);
-      out_tw = timeline_text_width(cr, out_text);
+          timeline_format_signed_clock(te, delta, delta_tc, sizeof(delta_tc));
 
-      split_labels = (fabs(out_x - in_x) >
-                      ((in_tw + out_tw) * 0.5 + 10.0));
-
-      if (split_labels) {
-          timeline_draw_text_pill(cr,
-                                  in_text,
-                                  in_x,
-                                  marker_label_y,
-                                  width,
-                                  &color,
-                                  0.82,
-                                  &col2,
-                                  0.25);
-
-          timeline_draw_text_pill(cr,
-                                  out_text,
-                                  out_x,
-                                  marker_label_y,
-                                  width,
-                                  &color,
-                                  0.82,
-                                  &col2,
-                                  0.25);
+          if (!compact && delta != 0)
+              snprintf(text, sizeof(text), "IN %d   OUT %d   LEN %d   GRAB %+df  %s", f1, f2, span, delta, delta_tc);
+          else if (!compact)
+              snprintf(text, sizeof(text), "IN %d   OUT %d   LEN %d   GRAB", f1, f2, span);
+          else if (delta != 0)
+              snprintf(text, sizeof(text), "IN %d  OUT %d  LEN %d  %+df", f1, f2, span, delta);
+          else
+              snprintf(text, sizeof(text), "IN %d  OUT %d  LEN %d  GRAB", f1, f2, span);
       }
-      else {
-          snprintf(both_text, sizeof(both_text), "%d - %d", f1, f2);
-          timeline_draw_text_pill(cr,
-                                  both_text,
-                                  in_x + (sel_w * 0.5),
-                                  marker_label_y,
-                                  width,
-                                  &color,
-                                  0.82,
-                                  &col2,
-                                  0.25);
-      }
+      else if (loop && *loop && !compact)
+          snprintf(text, sizeof(text), "IN %d   OUT %d   LEN %d   %s", f1, f2, span, loop);
+      else if (!compact)
+          snprintf(text, sizeof(text), "IN %d   OUT %d   LEN %d", f1, f2, span);
+      else
+          snprintf(text, sizeof(text), "IN %d  OUT %d  LEN %d", f1, f2, span);
+
+      timeline_draw_text_pill(cr,
+                              text,
+                              width * 0.5,
+                              marker_row_y,
+                              width,
+                              &color,
+                              0.84,
+                              &col2,
+                              grabbed ? 0.36 : 0.24);
     }
-
-    /*
-     * Active scratch/move mode is indicated by the dashed outline below.
-     * Do not draw an unlabeled center dot here; it looks like a stray
-     * marker and has no independent interaction meaning.
-     */
 
     te->selection.x = (gint) in_x;
     te->selection.y = (gint) tri_y;
     te->selection.width = (gint) sel_w;
-    te->selection.height = (gint) (marker_label_y - tri_y + 4.0);
+    te->selection.height = (gint) (bottom_row_y - tri_y + 4.0);
 
-    if (timeline_latch_visible(te)) {
+    if (grabbed || te->loop_mode > 0) {
         gdouble box_x = in_x;
         gdouble box_w = sel_w;
         gdouble box_y = tri_y;
@@ -2194,9 +2847,11 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
         cairo_save(cr);
 
         double dash[] = { 4.0, 3.0 };
-        cairo_set_dash(cr, dash, 2, 0.0);
-        cairo_set_line_width(cr, 2.0);
-        cairo_set_source_rgba(cr, 1.0, 0.78, 0.08, 0.98);
+        if (grabbed)
+            cairo_set_dash(cr, dash, 2, 0.0);
+
+        cairo_set_line_width(cr, grabbed ? 2.0 : 1.0);
+        cairo_set_source_rgba(cr, 1.0, 0.78, 0.08, grabbed ? 0.98 : 0.35);
         cairo_rectangle_round_stroke(cr,
                                      floor(box_x) + 0.5,
                                      floor(box_y) + 0.5,
@@ -2205,7 +2860,17 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
                                      3.0);
 
         cairo_restore(cr);
+
     }
+  }
+  else {
+
+      timeline_draw_plain_text(cr,
+                               "IN -   OUT -   LEN -",
+                               4.0,
+                               marker_row_y,
+                               &dim_fg,
+                               0.42);
   }
 
   if (te->has_ghost_selection && te->ghost_out >= te->ghost_in) {
@@ -2215,7 +2880,7 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
     gdouble ghost_out_x = timeline_snap_line_x(timeline_frame_boundary_to_x(te, ghost_out_f + 1.0, width), width);
 
     cairo_set_line_width(cr, 1.0);
-    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.46);
+    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.42);
     cairo_move_to(cr, ghost_in_x, track_y);
     cairo_line_to(cr, ghost_in_x, track_bottom);
     cairo_move_to(cr, ghost_out_x, track_y);
@@ -2223,33 +2888,25 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
     cairo_stroke(cr);
   }
 
-  /*
-   * The hover/current-frame pill is useful in normal mode, but while
-   * scratch/move is latched the mouse is controlling the marker block.
-   * Keeping the old hover point visible then looks like a ghost artifact.
-   */
-  if (te->current_location != MOUSE_OUTSIDE &&
-      !(te->grab_button == 1 && te->current_location == MOUSE_STEPPER) &&
-      !timeline_latch_visible(te))
-  {
-    gdouble point_x = timeline_snap_line_x(timeline_frame_to_x(te, te->point, width), width);
 
-    cairo_set_font_size(cr, TIMELINE_INFO_FONT_SIZE);
-    snprintf(text, sizeof(text), "%d", (gint) llround(te->point));
-    timeline_draw_text_pill(cr,
-                            text,
-                            point_x,
-                            info_label_y,
-                            width,
-                            &info_fg,
-                            0.95,
-                            &info_bg,
-                            0.72);
-    cairo_set_font_size(cr, TIMELINE_LABEL_FONT_SIZE);
-  }
+  if (te->has_selection)
+      timeline_draw_beat_grid(te, cr, width, track_y, track_h, &color);
+
+  timeline_draw_frame_ruler(te, cr, width, track_y, track_h, &color);
+
+  timeline_draw_edit_tooltip(te,
+                             cr,
+                             width,
+                             track_y,
+                             track_bottom,
+                             &info_fg,
+                             &info_bg);
 
   if (te->has_stepper) {
     gdouble pos_x = timeline_snap_line_x(timeline_frame_to_x(te, te->frame_num, width), width);
+    gint pos_f = timeline_clamp_frame_i(te, (gint) llround(te->frame_num));
+    gint abs_f = te->source_start + pos_f;
+    gdouble pulse = te->audio_grid_locked ? ((gdouble) MAX(te->audio_pulse_pct, te->audio_gate_pct)) / 100.0 : 0.0;
 
     te->stepper.x = (gint) (pos_x - (TIMELINE_STEPPER_HIT_PX * 0.5));
     te->stepper.y = (gint) tri_y;
@@ -2272,31 +2929,77 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
                           col2.red * 0.45,
                           col2.green * 0.45,
                           col2.blue * 0.45,
-                          0.95);
+                          0.88 + pulse * 0.12);
 
-    cairo_set_line_width(cr, 1.0);
+    cairo_set_line_width(cr, 1.0 + pulse * 1.4);
     cairo_move_to(cr, pos_x, tri_y + tri_h);
     cairo_line_to(cr, pos_x, track_bottom);
     cairo_stroke(cr);
 
-    if (te->grab_button == 1 && te->current_location == MOUSE_STEPPER) {
-      cairo_set_font_size(cr, TIMELINE_INFO_FONT_SIZE);
-      snprintf(text, sizeof(text), "%d", (gint) llround(te->frame_num));
-      timeline_draw_text_pill(cr,
-                              text,
-                              pos_x,
-                              info_label_y,
-                              width,
-                              &info_fg,
-                              0.98,
-                              &info_bg,
-                              0.84);
-      cairo_set_font_size(cr, TIMELINE_LABEL_FONT_SIZE);
+    timeline_format_clock(te, pos_f, aux, sizeof(aux));
+
+    {
+        const gchar *state = (te->play_speed == 0) ? "PAUSE" : ((te->play_speed < 0) ? "REV" : "PLAY");
+
+        if (te->source_start > 0 && width > 360.0)
+            snprintf(text, sizeof(text), "%s %d/%d  ABS %d  %s", state, pos_f, nframes_i - 1, abs_f, aux);
+        else
+            snprintf(text, sizeof(text), "%s %d/%d  %s", state, pos_f, nframes_i - 1, aux);
     }
+
+    cairo_set_font_size(cr, TIMELINE_INFO_FONT_SIZE);
+    timeline_draw_plain_text(cr, text, 4.0, bottom_row_y, &color, 0.80 + pulse * 0.15);
+    cairo_set_font_size(cr, TIMELINE_LABEL_FONT_SIZE);
+  }
+
+  {
+      gint src_a = te->source_start;
+      gint src_b = te->source_end;
+      const gchar *mode = timeline_mode_label(te->display_mode);
+      gchar total_tc[32];
+
+      if (src_b < src_a)
+          src_b = src_a + nframes_i - 1;
+
+      timeline_format_clock(te, nframes_i, total_tc, sizeof(total_tc));
+
+      if (width > 510.0 && te->current_id > 0)
+          snprintf(text, sizeof(text), "%s %d  SRC %d..%d  LEN %d  TOTAL %s", mode, te->current_id, src_a, src_b, nframes_i, total_tc);
+      else if (width > 390.0 && te->current_id > 0)
+          snprintf(text, sizeof(text), "%s %d  LEN %d / %s", mode, te->current_id, nframes_i, total_tc);
+      else if (width > 300.0)
+          snprintf(text, sizeof(text), "SRC %d..%d  LEN %d / %s", src_a, src_b, nframes_i, total_tc);
+      else if (width > 210.0)
+          snprintf(text, sizeof(text), "LEN %d / %s", nframes_i, total_tc);
+      else
+          snprintf(text, sizeof(text), "%s", total_tc);
+
+      cairo_set_font_size(cr, TIMELINE_INFO_FONT_SIZE);
+      timeline_draw_right_text(cr, text, width - 4.0, bottom_row_y, &dim_fg, 0.58);
+      cairo_set_font_size(cr, TIMELINE_LABEL_FONT_SIZE);
+  }
+
+  if (te->current_location != MOUSE_OUTSIDE && !timeline_latch_visible(te)) {
+      const gchar *hint = timeline_hover_hint(te);
+
+      if (hint && *hint && width > 210.0) {
+          cairo_set_font_size(cr, TIMELINE_INFO_FONT_SIZE);
+          timeline_draw_text_pill(cr,
+                                  hint,
+                                  width * 0.5,
+                                  MAX(10.0, tri_y + 9.0),
+                                  width,
+                                  &color,
+                                  0.76,
+                                  &col2,
+                                  0.16);
+          cairo_set_font_size(cr, TIMELINE_LABEL_FONT_SIZE);
+      }
   }
 
   return FALSE;
 }
+
 
 GtkWidget *timeline_new(void)
 {
