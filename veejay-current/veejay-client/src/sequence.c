@@ -65,7 +65,7 @@ typedef struct
 	uint8_t *status_buffer;
 	int	 track_list[__MAX_TRACKS];
 	int	 track_items;
-	int	 status_tokens[STATUS_ARRAY_SIZE];
+	int	 status_tokens[VJ_STATUS_ARRAY_SIZE];
 	int  active;
 	int  have_frame;
 	int	grey_scale;
@@ -113,9 +113,9 @@ static int gvr_status_to_arr(const char *status, int *tokens)
     if(!status || !tokens)
         return 0;
 
-    veejay_memset(tokens, 0, sizeof(int) * STATUS_ARRAY_SIZE);
+    veejay_memset(tokens, 0, sizeof(int) * VJ_STATUS_ARRAY_SIZE);
 
-    while(*p && count < STATUS_ARRAY_SIZE)
+    while(*p && count < VJ_STATUS_ARRAY_SIZE)
     {
         char *end = NULL;
         long v;
@@ -145,7 +145,7 @@ void	*gvr_preview_init(int max_tracks, int use_threads)
 	int i;
 
     for( i = 0; i < max_tracks; i++ )
-		vp->track_sync->status_tokens[i] = (int*) vj_calloc(sizeof(int) * STATUS_ARRAY_SIZE);
+		vp->track_sync->status_tokens[i] = (int*) vj_calloc(sizeof(int) * VJ_STATUS_ARRAY_SIZE);
 
 	vp->n_tracks = max_tracks;
 
@@ -386,31 +386,48 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 {
     (void) vp;
 
-	unsigned char status_len[6];
+	unsigned char status_len[VJ_STATUS_WIRE_HEADER_LEN + 1];
 	int k = -1;
 	int n = 0;
+
 	while( (k = vj_client_poll( v->fd, V_STATUS )) )
     {
         veejay_memset(status_len, 0, sizeof(status_len));
-        n = vj_client_read(v->fd, V_STATUS, status_len, 5 );
+        n = vj_client_read(v->fd, V_STATUS, status_len, VJ_STATUS_WIRE_HEADER_LEN );
 
 		if( n <= 0 ) {
             veejay_msg(0, "Lost connection with Veejay");
 			return 0;
 		}
 
-        if( n != 5 || status_len[0] != 'V' || status_len[4] != 'S' ) {
-            veejay_msg(0, "Unexpected status header [%s] with %s:%d", status_len, v->hostname, v->port_num);
+        if( n != VJ_STATUS_WIRE_HEADER_LEN ||
+            status_len[0] != 'V' ||
+            status_len[VJ_STATUS_WIRE_HEADER_LEN - 1] != 'S' )
+        {
+            veejay_msg(0,
+                       "Unexpected status header [%s] with %s:%d",
+                       status_len,
+                       v->hostname,
+                       v->port_num);
 			return 0;
 		}
 
-        char sta_len[4];
-        sta_len[0] = *(status_len + 1);
-        sta_len[1] = *(status_len + 2);
-        sta_len[2] = *(status_len + 3);
-        sta_len[3] = '\0';
+        int bytes = 0;
+        for(int i = 1; i < VJ_STATUS_WIRE_HEADER_LEN - 1; i++)
+        {
+            if(status_len[i] < '0' || status_len[i] > '9')
+            {
+                veejay_msg(0,
+                           "Invalid status header length [%s] with %s:%d",
+                           status_len,
+                           v->hostname,
+                           v->port_num);
+                return 0;
+            }
 
-        int bytes = atoi(sta_len);
+            bytes = (bytes * 10) + (status_len[i] - '0');
+        }
+
 		if(bytes > 0 )
 		{
             if(bytes >= STATUS_LENGTH) {
@@ -432,16 +449,12 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
             v->status_buffer[bytes] = '\0';
 
             int token_count = gvr_status_to_arr( (char*) v->status_buffer, v->status_tokens );
-            int min_status_tokens = VIMS_STATUS_TOKENS;
 
-            if(min_status_tokens > 0)
-                min_status_tokens--;
-
-			if( token_count < min_status_tokens )
+			if( token_count < VIMS_STATUS_TOKENS )
 			{
 				veejay_msg(VEEJAY_MSG_WARNING,
                            "Expected at least %d status tokens, got %d: %s",
-                           min_status_tokens,
+                           VIMS_STATUS_TOKENS,
                            token_count,
                            v->status_buffer);
 				return 0;
@@ -953,8 +966,8 @@ static GdkPixbuf	**gvr_grab_images(void *preview)
 
 static	int	*int_dup( int *status )
 {
-	int *res = (int*) vj_calloc( sizeof(int) * STATUS_ARRAY_SIZE );
-    veejay_memcpy( res, status, STATUS_ARRAY_SIZE * sizeof(int));
+	int *res = (int*) vj_calloc( sizeof(int) * VJ_STATUS_ARRAY_SIZE );
+    veejay_memcpy( res, status, VJ_STATUS_ARRAY_SIZE * sizeof(int));
     return res;
 }
 

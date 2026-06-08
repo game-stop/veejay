@@ -19,40 +19,40 @@
 #ifndef GVRCOMMON_H
 #define GVRCOMMON_H
 
-#define STATUS_LENGTH	1024
+#define STATUS_LENGTH 1536
 #define VEEJAY_CODENAME VERSION
 
-#define ELAPSED_TIME	0
-#define PLAY_MODE	2
-#define CURRENT_ID	3
-#define SAMPLE_FX	4
-#define SAMPLE_START	5
-#define SAMPLE_END	6
-#define SAMPLE_SPEED	7
-#define SAMPLE_LOOP	8
+#define ELAPSED_TIME 0
+#define PLAY_MODE 2
+#define CURRENT_ID 3
+#define SAMPLE_FX 4
+#define SAMPLE_START 5
+#define SAMPLE_END 6
+#define SAMPLE_SPEED 7
+#define SAMPLE_LOOP 8
 #define SAMPLE_COUNT 12
 #define SAMPLE_MARKER_START   13
-#define STREAM_TYPE	13
+#define STREAM_TYPE 13
 #define SAMPLE_MARKER_END     14
-#define FRAME_NUM	1
-#define TOTAL_FRAMES	6
-#define TOTAL_SLOTS	16
-#define TOTAL_MEM	17
+#define FRAME_NUM 1
+#define TOTAL_FRAMES 6
+#define TOTAL_SLOTS 16
+#define TOTAL_MEM 17
 #define CURRENT_FPS     18
-#define CYCLE_LO	19
-#define CYCLE_HI	20
-#define SEQ_ACT		21
-#define SEQ_CUR		22
+#define CYCLE_LO 19
+#define CYCLE_HI 20
+#define SEQ_ACT     21
+#define SEQ_CUR     22
 #define CHAIN_FADE      23
-#define FRAME_DUP	24
-#define	MACRO		25
-#define SUBRENDER	26
-#define FADE_METHOD	27
+#define FRAME_DUP   24
+#define MACRO       25
+#define SUBRENDER   26
+#define FADE_METHOD 27
 #define FADE_ENTRY 28
 #define FADE_ALPHA 29
-#define SAMPLE_LOOP_STAT	30
-#define SAMPLE_LOOP_STAT_STOP	31
-#define SAMPLE_INV_COUNT	36
+#define SAMPLE_LOOP_STAT    30
+#define SAMPLE_LOOP_STAT_STOP   31
+#define SAMPLE_INV_COUNT    36
 #define FEEDBACK 35
 #define GLOBAL_CHAIN 37
 #define MESSAGE_FORWARDING 38
@@ -102,17 +102,50 @@
 #define AUDIO_SYNC_TRACK_ALIGN_CORRECTION_PPM 80 /* signed ppm video-rate trim */
 #define AUDIO_SYNC_TRACK_ALIGN_STATE          81 /* 0 idle, 1 wait source, 2 wait target, 3 searching, 4 locked, 5 hold, 6 fallback */
 
+/* Selected chain-entry info pushed by backend status, replacing VIMS_CHAIN_GET_ENTRY polling. */
+#define STATUS_CHAIN_ENTRY_FXID                 82
+#define STATUS_CHAIN_ENTRY_ISVIDEO              83
+#define STATUS_CHAIN_ENTRY_NUM_PARAMETERS       84
+#define STATUS_CHAIN_ENTRY_KF_TYPE              85
+#define STATUS_CHAIN_ENTRY_KF_STATUS            86
+#define STATUS_CHAIN_ENTRY_TRANSITION_ENABLED   87
+#define STATUS_CHAIN_ENTRY_TRANSITION_LOOP      88
+#define STATUS_CHAIN_ENTRY_SOURCE               89
+#define STATUS_CHAIN_ENTRY_CHANNEL              90
+#define STATUS_CHAIN_ENTRY_VIDEO_ENABLED        91
+#define STATUS_CHAIN_ENTRY_BEAT_FLAG            92
+#define STATUS_CHAIN_ENTRY_SUBRENDER_ENTRY      93
+#define STATUS_CHAIN_ENTRY_P0                   94
+#define STATUS_CHAIN_ENTRY_P1                   95
+#define STATUS_CHAIN_ENTRY_P2                   96
+#define STATUS_CHAIN_ENTRY_P3                   97
+#define STATUS_CHAIN_ENTRY_P4                   98
+#define STATUS_CHAIN_ENTRY_P5                   99
+#define STATUS_CHAIN_ENTRY_P6                   100
+#define STATUS_CHAIN_ENTRY_P7                   101
+#define STATUS_CHAIN_ENTRY_P8                   102
+#define STATUS_CHAIN_ENTRY_P9                   103
+#define STATUS_CHAIN_ENTRY_P10                  104
+#define STATUS_CHAIN_ENTRY_P11                  105
+#define STATUS_CHAIN_ENTRY_P12                  106
+#define STATUS_CHAIN_ENTRY_P13                  107
+#define STATUS_CHAIN_ENTRY_P14                  108
+#define STATUS_CHAIN_ENTRY_P15                  109
+#define STATUS_CHAIN_ENTRY_LAST                 110
+#define STATUS_CHAIN_ENTRY_TOKENS \
+    (STATUS_CHAIN_ENTRY_LAST - STATUS_CHAIN_ENTRY_FXID)
+
 #define SAMPLE_TRANSITION_ACTIVE  32
 #define SAMPLE_TRANSITION_LENGTH  33
 #define SAMPLE_TRANSITION_SHAPE  34
-#define CURRENT_ENTRY	15
-#define	MODE_PLAIN	2
-#define MODE_SAMPLE	0
+#define CURRENT_ENTRY 15
+#define MODE_PLAIN  2
+#define MODE_SAMPLE 0
 #define MODE_PATTERN    3
-#define MODE_STREAM	1
-#define STREAM_COL_R	5
-#define STREAM_COL_G	6
-#define STREAM_COL_B	7
+#define MODE_STREAM 1
+#define STREAM_COL_R    5
+#define STREAM_COL_G    6
+#define STREAM_COL_B    7
 #define STREAM_RECORDED  11
 #define STREAM_DURATION  10
 #define STREAM_RECORDING 9
@@ -120,9 +153,6 @@
 #define STREAM_AVF 12
 
 #define __MAX_TRACKS 16
-
-/* One spare slot keeps older loops that use <= highest-index style safe. */
-#define STATUS_ARRAY_SIZE (VIMS_STATUS_TOKENS+1)
 #define HISTORY_PLAYMODES 4
 
 #endif

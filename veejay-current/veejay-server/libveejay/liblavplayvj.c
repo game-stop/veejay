@@ -245,9 +245,27 @@ extern int vj_perform_audio_source_transition_silence_pending(void);
 extern int vj_perform_audio_source_transition_fade_pending(void);
 extern int vj_perform_audio_source_transition_guard_seq_debug(void);
 static int veejay_audio_threads_disabled(video_playback_setup *settings);
+static int veejay_audio_sync_thread_disabled(video_playback_setup *settings);
+static int veejay_audio_beat_thread_disabled(video_playback_setup *settings);
 #endif
 
 static	veejay_t	*veejay_instance_ = NULL;
+
+#ifdef HAVE_JACK
+static int veejay_audio_sync_thread_cli_disabled_ = 0;
+static int veejay_audio_beat_thread_cli_disabled_ = 0;
+
+void veejay_audio_sync_thread_set_enabled(int enabled)
+{
+    __sync_lock_test_and_set(&veejay_audio_sync_thread_cli_disabled_, enabled ? 0 : 1);
+}
+
+void veejay_audio_beat_thread_set_enabled(int enabled)
+{
+    __sync_lock_test_and_set(&veejay_audio_beat_thread_cli_disabled_, enabled ? 0 : 1);
+}
+#endif
+
 
 static void veejay_playback_close(veejay_t *info);
 
@@ -2562,30 +2580,6 @@ static void veejay_screen_update(veejay_t *info, VJFrame *frame_to_display) {
     atomic_store_long_long(&settings->display_frame.seq, frame_to_display->frame_num);
 }
 
-#define VJ_STATUS_BASE_TOKENS 39          /* fixed legacy status fields: 0..38 */
-#define VJ_AUDIO_BEAT_STATUS_TOKENS 18    /* audio beat fields: 39..56 */
-#define VJ_AUDIO_SYNC_STATUS_TOKENS 25    /* audio sync fields: 57..81 */
-
-#define VJ_AUDIO_STATUS_TOKENS \
-    (VJ_AUDIO_BEAT_STATUS_TOKENS + VJ_AUDIO_SYNC_STATUS_TOKENS)
-#define VJ_STATUS_EXPECTED_TOKENS \
-    (VJ_STATUS_BASE_TOKENS + VJ_AUDIO_STATUS_TOKENS)
-
-/*
- * VIMS_STATUS_TOKENS is a count, not the highest token index.
- * We emit status fields 0..81, so the count must be 82.
- */
-#if VJ_STATUS_EXPECTED_TOKENS != VIMS_STATUS_TOKENS
-#error "VIMS_STATUS_TOKENS must be 82 for status fields 0..81"
-#endif
-
-#define VJ_STATUS_REQUIRED_BUF_SIZE \
-    (VJ_STATUS_PREFIX_MAX + (VJ_STATUS_EXPECTED_TOKENS * VJ_INT_FIELD_MAX) + 1)
-
-#if VJ_STATUS_BUF_SIZE < VJ_STATUS_REQUIRED_BUF_SIZE
-#error "VJ_STATUS_BUF_SIZE is too small for the fixed 82-token status packet"
-#endif
-
 static int veejay_pipe_status_token_count(const char *s)
 {
     int count = 0;
@@ -2775,6 +2769,75 @@ static char *veejay_pipe_append_audio_sync_status(veejay_t *info, char *ptr)
     return ptr;
 }
 
+static char *veejay_pipe_append_zero_chain_entry_status(char *ptr)
+{
+    for(int i = 0; i < VJ_CHAIN_ENTRY_STATUS_TOKENS; i++)
+        ptr = vj_sprintf(ptr, 0);
+
+    return ptr;
+}
+
+static char *veejay_pipe_append_chain_entry_status(veejay_t *info, char *ptr)
+{
+    sample_eff_chain **src = NULL;
+    sample_eff_chain *entry = NULL;
+    int current_id;
+    int entry_id = -1;
+    int effect_id;
+    int is_video;
+    int num_params;
+
+    if(!info || !info->uc)
+        return veejay_pipe_append_zero_chain_entry_status(ptr);
+
+    current_id = info->uc->sample_id;
+
+    if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
+        src = sample_get_effect_chain(current_id);
+        entry_id = sample_get_selected_entry(current_id);
+    }
+    else if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG) {
+        src = vj_tag_get_effect_chain(current_id);
+        entry_id = vj_tag_get_selected_entry(current_id);
+    }
+
+    if(!src || entry_id < 0 || entry_id >= SAMPLE_MAX_EFFECTS)
+        return veejay_pipe_append_zero_chain_entry_status(ptr);
+
+    entry = src[entry_id];
+    if(!entry)
+        return veejay_pipe_append_zero_chain_entry_status(ptr);
+
+    effect_id = entry->effect_id;
+    if(effect_id <= 0 || !vje_is_valid(effect_id))
+        return veejay_pipe_append_zero_chain_entry_status(ptr);
+
+    is_video = vje_get_extra_frame(effect_id) ? 1 : 0;
+    num_params = vje_get_num_params(effect_id);
+    if(num_params < 0)
+        num_params = 0;
+    else if(num_params > VJ_STATUS_CHAIN_ENTRY_PARAMETERS)
+        num_params = VJ_STATUS_CHAIN_ENTRY_PARAMETERS;
+
+    ptr = vj_sprintf(ptr, effect_id);              /* 82 */
+    ptr = vj_sprintf(ptr, is_video);               /* 83 */
+    ptr = vj_sprintf(ptr, num_params);             /* 84 */
+    ptr = vj_sprintf(ptr, entry->kf_type);         /* 85 */
+    ptr = vj_sprintf(ptr, entry->kf_status);       /* 86 */
+    ptr = vj_sprintf(ptr, 0);                      /* 87 transition enabled */
+    ptr = vj_sprintf(ptr, 0);                      /* 88 transition loop */
+    ptr = vj_sprintf(ptr, entry->source_type);     /* 89 */
+    ptr = vj_sprintf(ptr, entry->channel);         /* 90 */
+    ptr = vj_sprintf(ptr, entry->e_flag);          /* 91 */
+    ptr = vj_sprintf(ptr, entry->beat_flag);       /* 92 */
+    ptr = vj_sprintf(ptr, entry->is_rendering);    /* 93 */
+
+    for(int i = 0; i < VJ_STATUS_CHAIN_ENTRY_PARAMETERS; i++)
+        ptr = vj_sprintf(ptr, (i < num_params) ? entry->arg[i] : 0); /* 94..109 */
+
+    return ptr;
+}
+
 static void veejay_pipe_write_status(veejay_t * info)
 {
     video_playback_setup *settings = (video_playback_setup *) info->settings;
@@ -2918,17 +2981,18 @@ static void veejay_pipe_write_status(veejay_t * info)
         base_len = VJ_STATUS_BUF_SIZE - 1;
 
     char *ptr = info->status_what + base_len;
-    const size_t audio_tail_room =
-        (size_t)VJ_AUDIO_STATUS_TOKENS * (size_t)VJ_INT_FIELD_MAX;
+    const size_t status_tail_room =
+        (size_t)(VJ_AUDIO_STATUS_TOKENS + VJ_CHAIN_ENTRY_STATUS_TOKENS) *
+        (size_t)VJ_INT_FIELD_MAX;
     const int base_tokens = veejay_pipe_status_token_count(info->status_what);
     static int status_packet_warned = 0;
 
     if (base_tokens != VJ_STATUS_BASE_TOKENS ||
-        base_len > (VJ_STATUS_BUF_SIZE - 1 - audio_tail_room))
+        base_len > (VJ_STATUS_BUF_SIZE - 1 - status_tail_room))
     {
         if(!status_packet_warned) {
             veejay_msg(VEEJAY_MSG_WARNING,
-                       "Status packet base mismatch: got %d fields, expected %d; padding fixed 82-token packet",
+                       "Status packet base mismatch: got %d fields, expected %d; padding fixed 110-token packet",
                        base_tokens, VJ_STATUS_BASE_TOKENS);
             status_packet_warned = 1;
         }
@@ -2938,18 +3002,29 @@ static void veejay_pipe_write_status(veejay_t * info)
 
     ptr = veejay_pipe_append_audio_beat_status(info, ptr);
     ptr = veejay_pipe_append_audio_sync_status(info, ptr);
+    ptr = veejay_pipe_append_chain_entry_status(info, ptr);
 
     *ptr = '\0';
 
     d_len = (int)(ptr - info->status_what);
-    if (d_len > 999) {
-        d_len = 999;
+
+    if (d_len > VJ_STATUS_WIRE_MAX_PAYLOAD) {
+        d_len = VJ_STATUS_WIRE_MAX_PAYLOAD;
         info->status_what[d_len] = '\0';
     }
 
-    info->status_line_len = d_len + 5;
+    if (d_len > (VJ_STATUS_BUF_SIZE - VJ_STATUS_WIRE_HEADER_LEN - 1)) {
+        d_len = VJ_STATUS_BUF_SIZE - VJ_STATUS_WIRE_HEADER_LEN - 1;
+        info->status_what[d_len] = '\0';
+    }
 
-    snprintf(info->status_line, VJ_STATUS_BUF_SIZE, "V%03dS%s", d_len, info->status_what);
+    info->status_line_len = d_len + VJ_STATUS_WIRE_HEADER_LEN;
+
+    snprintf(info->status_line,
+             VJ_STATUS_BUF_SIZE,
+             "V%04dS%s",
+             d_len,
+             info->status_what);
 
     if (info->uc->chain_changed == 1)
         info->uc->chain_changed = 0;
@@ -5936,7 +6011,7 @@ static void veejay_audio_sync_thread_startup(veejay_t *info)
 
     settings = info->settings;
 
-    if(veejay_audio_threads_disabled(settings)) {
+    if(veejay_audio_sync_thread_disabled(settings)) {
         veejay_msg(VEEJAY_MSG_INFO,
                    "[AUDIO-SYNC] Audio sync/control thread disabled by command line");
         return;
@@ -5992,12 +6067,29 @@ static int veejay_audio_sync_mode_is_playback(int mode)
 
 static int veejay_audio_threads_disabled(video_playback_setup *settings)
 {
+    /* Legacy coarse kill-switch kept for older action files/config paths. */
     return settings ? (atomic_load_int(&settings->audio_threads_disabled) ? 1 : 0) : 1;
+}
+
+static int veejay_audio_sync_thread_disabled(video_playback_setup *settings)
+{
+    if(veejay_audio_threads_disabled(settings))
+        return 1;
+
+    return __sync_add_and_fetch(&veejay_audio_sync_thread_cli_disabled_, 0) ? 1 : 0;
+}
+
+static int veejay_audio_beat_thread_disabled(video_playback_setup *settings)
+{
+    if(veejay_audio_threads_disabled(settings))
+        return 1;
+
+    return __sync_add_and_fetch(&veejay_audio_beat_thread_cli_disabled_, 0) ? 1 : 0;
 }
 
 static int veejay_audio_beat_provider_needed(video_playback_setup *settings)
 {
-    if(!settings)
+    if(!settings || veejay_audio_beat_thread_disabled(settings))
         return 0;
 
     return atomic_load_int(&settings->audio_beat.initialized) &&
@@ -6008,7 +6100,7 @@ static int veejay_audio_external_provider_needed(video_playback_setup *settings)
 {
     int source;
 
-    if(!settings || veejay_audio_threads_disabled(settings))
+    if(!settings || veejay_audio_sync_thread_disabled(settings))
         return 0;
 
     if(veejay_audio_beat_provider_needed(settings))
@@ -6070,9 +6162,9 @@ int veejay_audio_sync_set_enabled(veejay_t *info, int enabled)
     settings = info->settings;
     enabled = enabled ? 1 : 0;
 
-    if(veejay_audio_threads_disabled(settings)) {
+    if(veejay_audio_sync_thread_disabled(settings)) {
         veejay_msg(VEEJAY_MSG_WARNING,
-                   "[AUDIO-SYNC] request ignored; audio service threads are disabled");
+                   "[AUDIO-SYNC] request ignored; audio sync/control thread is disabled");
         return -1;
     }
 
@@ -6115,9 +6207,9 @@ int veejay_audio_sync_set_mode_control(veejay_t *info, int mode)
 
     settings = info->settings;
 
-    if(veejay_audio_threads_disabled(settings)) {
+    if(veejay_audio_sync_thread_disabled(settings)) {
         veejay_msg(VEEJAY_MSG_WARNING,
-                   "[AUDIO-SYNC] mode request ignored; audio service threads are disabled");
+                   "[AUDIO-SYNC] mode request ignored; audio sync/control thread is disabled");
         return -1;
     }
 
@@ -6157,9 +6249,9 @@ int veejay_audio_sync_set_bridge_correction(veejay_t *info, int max_pct)
     if(!info || !info->settings)
         return -1;
 
-    if(veejay_audio_threads_disabled(info->settings)) {
+    if(veejay_audio_sync_thread_disabled(info->settings)) {
         veejay_msg(VEEJAY_MSG_WARNING,
-                   "[AUDIO-SYNC] bridge correction request ignored; audio service threads are disabled");
+                   "[AUDIO-SYNC] bridge correction request ignored; audio sync/control thread is disabled");
         return -1;
     }
 
@@ -6185,7 +6277,7 @@ static void veejay_audio_beat_thread_startup(veejay_t *info)
 
     settings = info->settings;
 
-    if(veejay_audio_threads_disabled(settings)) {
+    if(veejay_audio_beat_thread_disabled(settings)) {
         veejay_msg(VEEJAY_MSG_INFO,
                    "[AUDIO-BEAT] Audio beat detector thread disabled by command line");
         return;
@@ -6310,8 +6402,11 @@ static void veejay_audio_beat_prepare_sync_source(veejay_t *info)
 
     settings = info->settings;
 
-    if(veejay_audio_threads_disabled(settings))
+    if(veejay_audio_sync_thread_disabled(settings)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-BEAT] Cannot prepare JACK/push analysis source; audio sync/control thread is disabled");
         return;
+    }
 
     if(!atomic_load_int(&settings->audio_sync.initialized))
         vj_audio_sync_init(&settings->audio_sync, 2);
@@ -6387,6 +6482,12 @@ int veejay_audio_beat_set_enabled(veejay_t *info, int enabled)
     settings = info->settings;
     enabled = enabled ? 1 : 0;
 
+    if(veejay_audio_beat_thread_disabled(settings)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-BEAT] request ignored; audio beat detector thread is disabled");
+        return -1;
+    }
+
     if(!atomic_load_int(&settings->audio_sync.initialized))
         vj_audio_sync_init(&settings->audio_sync, 2);
 
@@ -6451,6 +6552,12 @@ int veejay_audio_beat_toggle(veejay_t *info)
         return -1;
 
     settings = info->settings;
+
+    if(veejay_audio_beat_thread_disabled(settings)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-BEAT] toggle ignored; audio beat detector thread is disabled");
+        return -1;
+    }
 
     if(!atomic_load_int(&settings->audio_sync.initialized))
         vj_audio_sync_init(&settings->audio_sync, 2);
@@ -7808,9 +7915,9 @@ int veejay_audio_sync_set_external_jack(veejay_t *info, int mode, int channels)
 
     settings = info->settings;
 
-    if(veejay_audio_threads_disabled(settings)) {
+    if(veejay_audio_sync_thread_disabled(settings)) {
         veejay_msg(VEEJAY_MSG_WARNING,
-                   "[AUDIO-SYNC] external JACK request ignored; audio service threads are disabled");
+                   "[AUDIO-SYNC] external JACK request ignored; audio sync/control thread is disabled");
         return -1;
     }
 
@@ -7919,9 +8026,9 @@ int veejay_audio_sync_set_external_wav(veejay_t *info, const char *path, int loo
 
     settings = info->settings;
 
-    if(veejay_audio_threads_disabled(settings)) {
+    if(veejay_audio_sync_thread_disabled(settings)) {
         veejay_msg(VEEJAY_MSG_WARNING,
-                   "[AUDIO-SYNC][WAV] request ignored; audio service threads are disabled");
+                   "[AUDIO-SYNC][WAV] request ignored; audio sync/control thread is disabled");
         return -1;
     }
 
@@ -7979,9 +8086,9 @@ int veejay_audio_sync_set_target_clock(veejay_t *info, int bpm_x10, int phase_pc
     if(!info || !info->settings)
         return -1;
 
-    if(veejay_audio_threads_disabled(info->settings)) {
+    if(veejay_audio_sync_thread_disabled(info->settings)) {
         veejay_msg(VEEJAY_MSG_WARNING,
-                   "[AUDIO-SYNC] target clock request ignored; audio service threads are disabled");
+                   "[AUDIO-SYNC] target clock request ignored; audio sync/control thread is disabled");
         return -1;
     }
 
@@ -8070,9 +8177,9 @@ int veejay_set_record_audio_source(veejay_t *info, int source)
 
 #ifdef HAVE_JACK
     if(source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK) {
-        if(veejay_audio_threads_disabled(settings))
+        if(veejay_audio_sync_thread_disabled(settings))
             veejay_msg(VEEJAY_MSG_WARNING,
-                       "[AUDIO-REC] JACK external source ignored; audio service threads are disabled");
+                       "[AUDIO-REC] JACK external source ignored; audio sync/control thread is disabled");
         else
             veejay_record_audio_source_ensure_external_jack(info);
     }

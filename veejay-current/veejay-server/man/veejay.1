@@ -159,8 +159,13 @@ Veejay uses JACK, a low-latency audio server, to transport audio in sync with
 video. This allows you to process veejay's audio output in another sound
 processing application.
 
-Audio playback, audio output mute, and JACK input services are separate
-controls.
+Audio playback, audio output mute, the master-clock producer, JACK sync/control,
+and beat analysis are separate controls.
+
+By default, veejay starts with audio playback output enabled, also in dummy mode.
+In dummy mode there is no source audio, so enabling or muting audio still results
+in silent output, but the master clock remains valid. If JACK output cannot be
+opened, the audio producer can still run and fall back to the monotonic clock.
 
 The
 .BR -a/--audio
@@ -173,21 +178,23 @@ playback, beat analysis, and audio sync keep working.
 
 With
 .BR "-a 0" ,
-veejay starts without playing the original video source audio. JACK input
-services may still be available for external monitor, tempo bridge, track align,
-and beat analysis when JACK support is compiled in.
+veejay starts without playing the original video source audio. The master-clock
+producer may still run for timing, and JACK input services may still be
+available for external monitor, tempo bridge, track align, and beat analysis
+when JACK support is compiled in.
 
-The interactive audio mute control is a global output mute. When muted, all
-audible output routes are silenced: original media audio, generated silence,
-JACK monitor, tempo bridge, track align, WAV playback, and transition audio.
-Muting output does not disable JACK input capture, beat analysis, or audio sync.
+The interactive audio mute control and
+.BR --audio-muted
+are global output mutes. When muted, all audible output routes are silenced:
+original media audio, generated silence, JACK monitor, tempo bridge, track
+align, WAV playback, and transition audio. Muting output does not disable JACK
+input capture, beat analysis, or audio sync.
 
-For video-only installations, use
-.BR --no-audio-threads
+For installations that do not need individual JACK analysis/control workers, use
+.BR --no-audio-sync-thread
 or
-.BR "--audio-threads 0"
-to disable audio service threads completely. This also disables JACK capture,
-external sync, and beat analysis.
+.BR --no-audio-beat-thread
+to disable those workers separately.
 
 .SH GENERAL USAGE
 
@@ -366,21 +373,33 @@ This option does not disable JACK input services when JACK support is compiled
 in. External JACK monitor, tempo bridge, track align, WAV playback, beat
 analysis, and audio sync may still be used with
 .BR "-a 0" .
-Use
-.BR --no-audio-threads
-to disable those services too.
 
 .TP
-.B \--audio-threads [0|1]
-Enable or disable audio service threads. Use 0 to disable JACK capture, external
-audio sync, and beat analysis completely. Use 1 to allow them. Default is 1.
+.B \--audio-muted
+Start with all audio playback output muted. This is equivalent to starting with
+the global audio mute toggle enabled. It does not disable JACK input capture,
+beat analysis, or audio sync. In dummy mode the result is still silent output.
 
 .TP
-.B \--no-audio-threads
-Disable audio service threads. This is equivalent to
-.BR "--audio-threads 0" .
-Use this for video-only installations where JACK input, external sync, and beat
-analysis are not needed.
+.B \--audio-sync-thread [0|1]
+Enable or disable the JACK audio sync/control worker. Use 0 to disable external
+JACK monitor, tempo bridge, track align, WAV sync/control, and target-clock
+control requests. Use 1 to allow them. Default is 1.
+
+.TP
+.B \--no-audio-sync-thread
+Disable the JACK audio sync/control worker. This is equivalent to
+.BR "--audio-sync-thread 0" .
+
+.TP
+.B \--audio-beat-thread [0|1]
+Enable or disable the audio beat detector worker. Use 0 to prevent beat analysis
+and auto-FX beat modulation from starting. Use 1 to allow them. Default is 1.
+
+.TP
+.B \--no-audio-beat-thread
+Disable the audio beat detector worker. This is equivalent to
+.BR "--audio-beat-thread 0" .
 
 .TP
 .B \--pace-correction <ms>
@@ -1152,9 +1171,15 @@ Start veejay in dummy mode, using 352x288 PAL video, without playing source
 audio. JACK input services can still be used if JACK support is compiled in.
 
 .TP
-.B veejay -d -W 352 -H 288 -N 0 -a 0 --no-audio-threads
-Start a video-only dummy instance. Audio playback output, JACK input services,
-external audio sync, and beat analysis are disabled.
+.B veejay -d -W 352 -H 288 -N 0 --audio-muted
+Start veejay in dummy mode with audio enabled but globally muted. Since dummy
+mode has no source audio, the audible result is still silence.
+
+.TP
+.B veejay -d -W 352 -H 288 -N 0 -a 0 --no-audio-beat-thread
+Start a dummy instance without source audio playback and without the beat
+detector worker. The sync/control worker can still be used unless separately
+disabled.
 
 .TP
 .B veejay movie1.avi -a 0

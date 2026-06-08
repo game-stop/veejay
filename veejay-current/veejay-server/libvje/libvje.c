@@ -19,6 +19,8 @@
  *
  */
 #include <config.h>
+#include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <veejaycore/vj-msg.h>
@@ -47,6 +49,10 @@
         return 0;\
 }
 
+
+#define VJE_SUMMARY_VERSION 2
+#define VJE_SUMMARY_BEAT_HINT_WIDTH 61
+#define VJ_BEAT_CLASS_COUNT (VJ_BEAT_LAST + 1)
 
 typedef struct {
     void  (*fx_request_set_private)(void *ptr, void *priv);
@@ -832,38 +838,119 @@ int vje_get_subformat( int fx_id )
     return vj_effect_map [ idx ]->sub_format;
 }
 
+#ifndef VJE_SUMMARY_VERSION
+#define VJE_SUMMARY_VERSION 2
+#endif
+
+#define VJE_SUMMARY_BEAT_HINT_FMT \
+    "%03d%010u%011d%011d%03d%03d%05d%05d%05d%05d"
+
+static const vj_beat_param_hint_t *vje_effect_get_beat_hint(const vj_effect *ve,
+                                                            int parameter_id);
+
+static int vje_summary_beat_hint_len(const vj_beat_param_hint_t *h)
+{
+    return snprintf(NULL, 0, VJE_SUMMARY_BEAT_HINT_FMT,
+                    h->klass,
+                    (unsigned int) h->flags,
+                    h->soft_min,
+                    h->soft_max,
+                    h->normal_depth_pct,
+                    h->climax_depth_pct,
+                    h->attack_ms,
+                    h->release_ms,
+                    h->hold_ms,
+                    h->priority);
+}
+
+static int vje_summary_write(char **ptr, size_t *rem, const char *fmt, ...)
+{
+    va_list ap;
+    int n;
+
+    if(!ptr || !*ptr || !rem || *rem == 0)
+        return -1;
+
+    va_start(ap, fmt);
+    n = vsnprintf(*ptr, *rem, fmt, ap);
+    va_end(ap);
+
+    if(n < 0 || (size_t) n >= *rem)
+        return -1;
+
+    *ptr += n;
+    *rem -= (size_t) n;
+
+    return n;
+}
+
+static int vje_summary_write_beat_hint(char **ptr,
+                                       size_t *rem,
+                                       const vj_beat_param_hint_t *h)
+{
+    return vje_summary_write(ptr, rem, VJE_SUMMARY_BEAT_HINT_FMT,
+                             h->klass,
+                             (unsigned int) h->flags,
+                             h->soft_min,
+                             h->soft_max,
+                             h->normal_depth_pct,
+                             h->climax_depth_pct,
+                             h->attack_ms,
+                             h->release_ms,
+                             h->hold_ms,
+                             h->priority);
+}
+
 int vje_get_summarylen(int fx_id)
 {
     CHECK_BOUNDS(fx_id)
+
+    if(!vj_fx_map || !vj_effect_map)
+        return 0;
+
     int idx = vj_fx_map[fx_id];
-    if (idx == -1 || vj_effect_map[idx] == NULL) return 0;
+
+    if(idx < 0 || idx >= num_fx || vj_effect_map[idx] == NULL)
+        return 0;
 
     vj_effect *fx = vj_effect_map[idx];
     int p = fx->num_params;
     int total = 0;
 
-    // header length
-    total += snprintf(NULL, 0, "%03zu%s%03d%1d%1d%1d%02d",
-                      strlen(fx->description), fx->description, fx_id,
-                      fx->extra_frame, fx->rgb_conv, fx->is_gen, p);
+    total += snprintf(NULL, 0, "%03zu%s%03d%1d%1d%1d%02d%02d",
+                      strlen(fx->description),
+                      fx->description,
+                      fx_id,
+                      fx->extra_frame,
+                      fx->rgb_conv,
+                      fx->is_gen,
+                      p,
+                      VJE_SUMMARY_VERSION);
 
-    // parameters loop
-    for (int i = 0; i < p; i++) {
+    for(int i = 0; i < p; i++) {
+        const vj_beat_param_hint_t *bh =
+            vje_effect_get_beat_hint(fx, i);
+
         total += snprintf(NULL, 0, "%06d%06d%06d%03zu%s",
-                          fx->limits[0][i], fx->limits[1][i], fx->defaults[i],
-                          strlen(fx->param_description[i]), fx->param_description[i]);
+                          fx->limits[0][i],
+                          fx->limits[1][i],
+                          fx->defaults[i],
+                          strlen(fx->param_description[i]),
+                          fx->param_description[i]);
+
+        total += vje_summary_beat_hint_len(bh);
     }
 
-    // hints loop
-    for (int i = 0; i < p; i++) {
+    for(int i = 0; i < p; i++) {
         int limit = fx->limits[1][i];
         int vlen = vje_get_param_hints_length(fx_id, i, limit);
+
         total += snprintf(NULL, 0, "%06d", vlen);
 
-        if (vlen > 0 && fx->hints[i]) {
-            for (int j = 0; j <= limit; j++) {
-                total += snprintf(NULL, 0, "%03zu%s", 
-                                  strlen(fx->hints[i]->description[j]), 
+        if(vlen > 0 && fx->hints && fx->hints[i]) {
+            for(int j = 0; j <= limit; j++) {
+                total += snprintf(NULL, 0, "%03zu%s",
+                                  strlen(fx->hints[i]->description[j]),
                                   fx->hints[i]->description[j]);
             }
         }
@@ -871,48 +958,68 @@ int vje_get_summarylen(int fx_id)
 
     return total;
 }
+
 int vje_get_summary(int fx_id, char *dst, size_t dst_max_len)
 {
     CHECK_BOUNDS(fx_id)
+
+    if(!dst || dst_max_len == 0)
+        return -1;
+
+    if(!vj_fx_map || !vj_effect_map)
+        return 0;
+
     int idx = vj_fx_map[fx_id];
-    if (idx == -1 || vj_effect_map[idx] == NULL) return 0;
+
+    if(idx < 0 || idx >= num_fx || vj_effect_map[idx] == NULL)
+        return 0;
 
     vj_effect *fx = vj_effect_map[idx];
     int p = fx->num_params;
-    
+
     char *ptr = dst;
     size_t rem = dst_max_len;
-    int n;
 
-    n = snprintf(ptr, rem, "%03zu%s%03d%1d%1d%1d%02d",
-                 strlen(fx->description), fx->description, fx_id,
-                 fx->extra_frame, fx->rgb_conv, fx->is_gen, p);
-    if (n < 0 || (size_t)n >= rem) goto overflow; 
-    ptr += n; rem -= n;
+    if(vje_summary_write(&ptr, &rem, "%03zu%s%03d%1d%1d%1d%02d%02d",
+                         strlen(fx->description),
+                         fx->description,
+                         fx_id,
+                         fx->extra_frame,
+                         fx->rgb_conv,
+                         fx->is_gen,
+                         p,
+                         VJE_SUMMARY_VERSION) < 0)
+        goto overflow;
 
-    for (int i = 0; i < p; i++) {
-        n = snprintf(ptr, rem, "%06d%06d%06d%03zu%s",
-                     fx->limits[0][i], fx->limits[1][i], fx->defaults[i],
-                     strlen(fx->param_description[i]), fx->param_description[i]);
-        if (n < 0 || (size_t)n >= rem) goto overflow;
-        ptr += n; rem -= n;
+    for(int i = 0; i < p; i++) {
+        const vj_beat_param_hint_t *bh =
+            vje_effect_get_beat_hint(fx, i);
+
+        if(vje_summary_write(&ptr, &rem, "%06d%06d%06d%03zu%s",
+                             fx->limits[0][i],
+                             fx->limits[1][i],
+                             fx->defaults[i],
+                             strlen(fx->param_description[i]),
+                             fx->param_description[i]) < 0)
+            goto overflow;
+
+        if(vje_summary_write_beat_hint(&ptr, &rem, bh) < 0)
+            goto overflow;
     }
 
-    for (int i = 0; i < p; i++) {
+    for(int i = 0; i < p; i++) {
         int limit = fx->limits[1][i];
         int vlen = vje_get_param_hints_length(fx_id, i, limit);
-        
-        n = snprintf(ptr, rem, "%06d", vlen);
-        if (n < 0 || (size_t)n >= rem) goto overflow;
-        ptr += n; rem -= n;
 
-        if (vlen > 0 && fx->hints[i]) {
-            for (int j = 0; j <= limit; j++) {
-                n = snprintf(ptr, rem, "%03zu%s", 
-                             strlen(fx->hints[i]->description[j]), 
-                             fx->hints[i]->description[j]);
-                if (n < 0 || (size_t)n >= rem) goto overflow;
-                ptr += n; rem -= n;
+        if(vje_summary_write(&ptr, &rem, "%06d", vlen) < 0)
+            goto overflow;
+
+        if(vlen > 0 && fx->hints && fx->hints[i]) {
+            for(int j = 0; j <= limit; j++) {
+                if(vje_summary_write(&ptr, &rem, "%03zu%s",
+                                     strlen(fx->hints[i]->description[j]),
+                                     fx->hints[i]->description[j]) < 0)
+                    goto overflow;
             }
         }
     }
@@ -1106,27 +1213,38 @@ static const vj_beat_param_hint_t vje_beat_hint_reject_default = {
     -1000
 };
 
-const vj_beat_param_hint_t *vje_get_beat_hint(int fx_id, int parameter_id)
+static const vj_beat_param_hint_t *vje_effect_get_beat_hint(const vj_effect *ve,
+                                                            int parameter_id)
 {
-    vj_effect *ve;
-
-    if(parameter_id < 0)
-        return &vje_beat_hint_reject_default;
-
-    int idx = vj_fx_map[ fx_id ];
-    ve = vj_effect_map [ idx ];
-
-
     if(!ve)
         return &vje_beat_hint_reject_default;
 
-    if(parameter_id >= ve->num_params)
+    if(parameter_id < 0 || parameter_id >= ve->num_params)
         return &vje_beat_hint_reject_default;
 
     if(!ve->beat_hints)
         return &vje_beat_hint_reject_default;
 
     return &ve->beat_hints[parameter_id];
+}
+
+const vj_beat_param_hint_t *vje_get_beat_hint(int fx_id, int parameter_id)
+{
+    if(parameter_id < 0)
+        return &vje_beat_hint_reject_default;
+
+    if(fx_id < 0 || fx_id >= MAX_EFFECTS)
+        return &vje_beat_hint_reject_default;
+
+    if(!vj_fx_map || !vj_effect_map)
+        return &vje_beat_hint_reject_default;
+
+    int idx = vj_fx_map[fx_id];
+
+    if(idx < 0 || idx >= num_fx)
+        return &vje_beat_hint_reject_default;
+
+    return vje_effect_get_beat_hint(vj_effect_map[idx], parameter_id);
 }
 
 int vje_get_beat_hint_copy(int fx_id, int parameter_id, vj_beat_param_hint_t *dst)

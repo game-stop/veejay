@@ -5739,11 +5739,54 @@
                                           </object>
                                         </child>
                                         <child type="label">
-                                          <object class="GtkLabel" id="label_p0_ui">
+                                          <object class="GtkBox" id="label_p0_header">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="label" translatable="yes">&lt;b&gt;p0&lt;/b&gt;</property>
-                                            <property name="use-markup">True</property>
+                                            <property name="orientation">horizontal</property>
+                                            <property name="spacing">3</property>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p0_ui">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">&lt;b&gt;p0&lt;/b&gt;</property>
+                                                <property name="use-markup">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">0</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p0_beat">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="has-tooltip">True</property>
+                                                <property name="tooltip-text" translatable="yes">Auto FX beat hint glyph. Colored sliders are controlled by Auto FX.
+
+● Bass
+▬ Mid
+△ High
+▲ Transient
+≈ Flux
+▣ Gate
+◆ Pulse
+~ Envelope
+• Level</property>
+                                                <property name="label"> </property>
+                                                <property name="width-chars">2</property>
+                                                <property name="max-width-chars">2</property>
+                                                <property name="xalign">0.5</property>
+                                                <style>
+                                                  <class name="fx-beat-glyph"/>
+                                                </style>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">1</property>
+                                              </packing>
+                                            </child>
                                           </object>
                                         </child>
                                         <style>
@@ -5883,11 +5926,54 @@
                                           </object>
                                         </child>
                                         <child type="label">
-                                          <object class="GtkLabel" id="label_p1_ui">
+                                          <object class="GtkBox" id="label_p1_header">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="label" translatable="yes">&lt;b&gt;p1&lt;/b&gt;</property>
-                                            <property name="use-markup">True</property>
+                                            <property name="orientation">horizontal</property>
+                                            <property name="spacing">3</property>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p1_ui">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">&lt;b&gt;p1&lt;/b&gt;</property>
+                                                <property name="use-markup">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">0</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p1_beat">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="has-tooltip">True</property>
+                                                <property name="tooltip-text" translatable="yes">Auto FX beat hint glyph. Colored sliders are controlled by Auto FX.
+
+● Bass
+▬ Mid
+△ High
+▲ Transient
+≈ Flux
+▣ Gate
+◆ Pulse
+~ Envelope
+• Level</property>
+                                                <property name="label"> </property>
+                                                <property name="width-chars">2</property>
+                                                <property name="max-width-chars">2</property>
+                                                <property name="xalign">0.5</property>
+                                                <style>
+                                                  <class name="fx-beat-glyph"/>
+                                                </style>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">1</property>
+                                              </packing>
+                                            </child>
                                           </object>
                                         </child>
                                         <style>
@@ -6029,11 +6115,54 @@
                                           </object>
                                         </child>
                                         <child type="label">
-                                          <object class="GtkLabel" id="label_p2_ui">
+                                          <object class="GtkBox" id="label_p2_header">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="label" translatable="yes">&lt;b&gt;p2&lt;/b&gt;</property>
-                                            <property name="use-markup">True</property>
+                                            <property name="orientation">horizontal</property>
+                                            <property name="spacing">3</property>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p2_ui">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">&lt;b&gt;p2&lt;/b&gt;</property>
+                                                <property name="use-markup">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">0</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p2_beat">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="has-tooltip">True</property>
+                                                <property name="tooltip-text" translatable="yes">Auto FX beat hint glyph. Colored sliders are controlled by Auto FX.
+
+● Bass
+▬ Mid
+△ High
+▲ Transient
+≈ Flux
+▣ Gate
+◆ Pulse
+~ Envelope
+• Level</property>
+                                                <property name="label"> </property>
+                                                <property name="width-chars">2</property>
+                                                <property name="max-width-chars">2</property>
+                                                <property name="xalign">0.5</property>
+                                                <style>
+                                                  <class name="fx-beat-glyph"/>
+                                                </style>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">1</property>
+                                              </packing>
+                                            </child>
                                           </object>
                                         </child>
                                         <style>
@@ -6173,11 +6302,54 @@
                                           </object>
                                         </child>
                                         <child type="label">
-                                          <object class="GtkLabel" id="label_p3_ui">
+                                          <object class="GtkBox" id="label_p3_header">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="label" translatable="yes">&lt;b&gt;p3&lt;/b&gt;</property>
-                                            <property name="use-markup">True</property>
+                                            <property name="orientation">horizontal</property>
+                                            <property name="spacing">3</property>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p3_ui">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">&lt;b&gt;p3&lt;/b&gt;</property>
+                                                <property name="use-markup">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">0</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p3_beat">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="has-tooltip">True</property>
+                                                <property name="tooltip-text" translatable="yes">Auto FX beat hint glyph. Colored sliders are controlled by Auto FX.
+
+● Bass
+▬ Mid
+△ High
+▲ Transient
+≈ Flux
+▣ Gate
+◆ Pulse
+~ Envelope
+• Level</property>
+                                                <property name="label"> </property>
+                                                <property name="width-chars">2</property>
+                                                <property name="max-width-chars">2</property>
+                                                <property name="xalign">0.5</property>
+                                                <style>
+                                                  <class name="fx-beat-glyph"/>
+                                                </style>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">1</property>
+                                              </packing>
+                                            </child>
                                           </object>
                                         </child>
                                         <style>
@@ -6317,11 +6489,54 @@
                                           </object>
                                         </child>
                                         <child type="label">
-                                          <object class="GtkLabel" id="label_p4_ui">
+                                          <object class="GtkBox" id="label_p4_header">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="label" translatable="yes">&lt;b&gt;p4&lt;/b&gt;</property>
-                                            <property name="use-markup">True</property>
+                                            <property name="orientation">horizontal</property>
+                                            <property name="spacing">3</property>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p4_ui">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">&lt;b&gt;p4&lt;/b&gt;</property>
+                                                <property name="use-markup">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">0</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p4_beat">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="has-tooltip">True</property>
+                                                <property name="tooltip-text" translatable="yes">Auto FX beat hint glyph. Colored sliders are controlled by Auto FX.
+
+● Bass
+▬ Mid
+△ High
+▲ Transient
+≈ Flux
+▣ Gate
+◆ Pulse
+~ Envelope
+• Level</property>
+                                                <property name="label"> </property>
+                                                <property name="width-chars">2</property>
+                                                <property name="max-width-chars">2</property>
+                                                <property name="xalign">0.5</property>
+                                                <style>
+                                                  <class name="fx-beat-glyph"/>
+                                                </style>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">1</property>
+                                              </packing>
+                                            </child>
                                           </object>
                                         </child>
                                         <style>
@@ -6461,11 +6676,54 @@
                                           </object>
                                         </child>
                                         <child type="label">
-                                          <object class="GtkLabel" id="label_p5_ui">
+                                          <object class="GtkBox" id="label_p5_header">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="label" translatable="yes">&lt;b&gt;p5&lt;/b&gt;</property>
-                                            <property name="use-markup">True</property>
+                                            <property name="orientation">horizontal</property>
+                                            <property name="spacing">3</property>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p5_ui">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">&lt;b&gt;p5&lt;/b&gt;</property>
+                                                <property name="use-markup">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">0</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p5_beat">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="has-tooltip">True</property>
+                                                <property name="tooltip-text" translatable="yes">Auto FX beat hint glyph. Colored sliders are controlled by Auto FX.
+
+● Bass
+▬ Mid
+△ High
+▲ Transient
+≈ Flux
+▣ Gate
+◆ Pulse
+~ Envelope
+• Level</property>
+                                                <property name="label"> </property>
+                                                <property name="width-chars">2</property>
+                                                <property name="max-width-chars">2</property>
+                                                <property name="xalign">0.5</property>
+                                                <style>
+                                                  <class name="fx-beat-glyph"/>
+                                                </style>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">1</property>
+                                              </packing>
+                                            </child>
                                           </object>
                                         </child>
                                         <style>
@@ -6605,11 +6863,54 @@
                                           </object>
                                         </child>
                                         <child type="label">
-                                          <object class="GtkLabel" id="label_p6_ui">
+                                          <object class="GtkBox" id="label_p6_header">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="label" translatable="yes">&lt;b&gt;p6&lt;/b&gt;</property>
-                                            <property name="use-markup">True</property>
+                                            <property name="orientation">horizontal</property>
+                                            <property name="spacing">3</property>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p6_ui">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">&lt;b&gt;p6&lt;/b&gt;</property>
+                                                <property name="use-markup">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">0</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p6_beat">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="has-tooltip">True</property>
+                                                <property name="tooltip-text" translatable="yes">Auto FX beat hint glyph. Colored sliders are controlled by Auto FX.
+
+● Bass
+▬ Mid
+△ High
+▲ Transient
+≈ Flux
+▣ Gate
+◆ Pulse
+~ Envelope
+• Level</property>
+                                                <property name="label"> </property>
+                                                <property name="width-chars">2</property>
+                                                <property name="max-width-chars">2</property>
+                                                <property name="xalign">0.5</property>
+                                                <style>
+                                                  <class name="fx-beat-glyph"/>
+                                                </style>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">1</property>
+                                              </packing>
+                                            </child>
                                           </object>
                                         </child>
                                         <style>
@@ -6749,11 +7050,54 @@
                                           </object>
                                         </child>
                                         <child type="label">
-                                          <object class="GtkLabel" id="label_p7_ui">
+                                          <object class="GtkBox" id="label_p7_header">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="label" translatable="yes">&lt;b&gt;p7&lt;/b&gt;</property>
-                                            <property name="use-markup">True</property>
+                                            <property name="orientation">horizontal</property>
+                                            <property name="spacing">3</property>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p7_ui">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">&lt;b&gt;p7&lt;/b&gt;</property>
+                                                <property name="use-markup">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">0</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p7_beat">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="has-tooltip">True</property>
+                                                <property name="tooltip-text" translatable="yes">Auto FX beat hint glyph. Colored sliders are controlled by Auto FX.
+
+● Bass
+▬ Mid
+△ High
+▲ Transient
+≈ Flux
+▣ Gate
+◆ Pulse
+~ Envelope
+• Level</property>
+                                                <property name="label"> </property>
+                                                <property name="width-chars">2</property>
+                                                <property name="max-width-chars">2</property>
+                                                <property name="xalign">0.5</property>
+                                                <style>
+                                                  <class name="fx-beat-glyph"/>
+                                                </style>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">1</property>
+                                              </packing>
+                                            </child>
                                           </object>
                                         </child>
                                         <style>
@@ -6895,11 +7239,54 @@
                                           </object>
                                         </child>
                                         <child type="label">
-                                          <object class="GtkLabel" id="label_p8_ui">
+                                          <object class="GtkBox" id="label_p8_header">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="label" translatable="yes">&lt;b&gt;p8&lt;/b&gt;</property>
-                                            <property name="use-markup">True</property>
+                                            <property name="orientation">horizontal</property>
+                                            <property name="spacing">3</property>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p8_ui">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">&lt;b&gt;p8&lt;/b&gt;</property>
+                                                <property name="use-markup">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">0</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p8_beat">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="has-tooltip">True</property>
+                                                <property name="tooltip-text" translatable="yes">Auto FX beat hint glyph. Colored sliders are controlled by Auto FX.
+
+● Bass
+▬ Mid
+△ High
+▲ Transient
+≈ Flux
+▣ Gate
+◆ Pulse
+~ Envelope
+• Level</property>
+                                                <property name="label"> </property>
+                                                <property name="width-chars">2</property>
+                                                <property name="max-width-chars">2</property>
+                                                <property name="xalign">0.5</property>
+                                                <style>
+                                                  <class name="fx-beat-glyph"/>
+                                                </style>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">1</property>
+                                              </packing>
+                                            </child>
                                           </object>
                                         </child>
                                         <style>
@@ -7039,11 +7426,54 @@
                                           </object>
                                         </child>
                                         <child type="label">
-                                          <object class="GtkLabel" id="label_p9_ui">
+                                          <object class="GtkBox" id="label_p9_header">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="label" translatable="yes">&lt;b&gt;p9&lt;/b&gt;</property>
-                                            <property name="use-markup">True</property>
+                                            <property name="orientation">horizontal</property>
+                                            <property name="spacing">3</property>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p9_ui">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">&lt;b&gt;p9&lt;/b&gt;</property>
+                                                <property name="use-markup">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">0</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p9_beat">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="has-tooltip">True</property>
+                                                <property name="tooltip-text" translatable="yes">Auto FX beat hint glyph. Colored sliders are controlled by Auto FX.
+
+● Bass
+▬ Mid
+△ High
+▲ Transient
+≈ Flux
+▣ Gate
+◆ Pulse
+~ Envelope
+• Level</property>
+                                                <property name="label"> </property>
+                                                <property name="width-chars">2</property>
+                                                <property name="max-width-chars">2</property>
+                                                <property name="xalign">0.5</property>
+                                                <style>
+                                                  <class name="fx-beat-glyph"/>
+                                                </style>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">1</property>
+                                              </packing>
+                                            </child>
                                           </object>
                                         </child>
                                         <style>
@@ -7183,11 +7613,54 @@
                                           </object>
                                         </child>
                                         <child type="label">
-                                          <object class="GtkLabel" id="label_p10_ui">
+                                          <object class="GtkBox" id="label_p10_header">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="label" translatable="yes">&lt;b&gt;p10&lt;/b&gt;</property>
-                                            <property name="use-markup">True</property>
+                                            <property name="orientation">horizontal</property>
+                                            <property name="spacing">3</property>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p10_ui">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">&lt;b&gt;p10&lt;/b&gt;</property>
+                                                <property name="use-markup">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">0</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p10_beat">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="has-tooltip">True</property>
+                                                <property name="tooltip-text" translatable="yes">Auto FX beat hint glyph. Colored sliders are controlled by Auto FX.
+
+● Bass
+▬ Mid
+△ High
+▲ Transient
+≈ Flux
+▣ Gate
+◆ Pulse
+~ Envelope
+• Level</property>
+                                                <property name="label"> </property>
+                                                <property name="width-chars">2</property>
+                                                <property name="max-width-chars">2</property>
+                                                <property name="xalign">0.5</property>
+                                                <style>
+                                                  <class name="fx-beat-glyph"/>
+                                                </style>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">1</property>
+                                              </packing>
+                                            </child>
                                           </object>
                                         </child>
                                         <style>
@@ -7327,11 +7800,54 @@
                                           </object>
                                         </child>
                                         <child type="label">
-                                          <object class="GtkLabel" id="label_p11_ui">
+                                          <object class="GtkBox" id="label_p11_header">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="label" translatable="yes">&lt;b&gt;p11&lt;/b&gt;</property>
-                                            <property name="use-markup">True</property>
+                                            <property name="orientation">horizontal</property>
+                                            <property name="spacing">3</property>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p11_ui">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">&lt;b&gt;p11&lt;/b&gt;</property>
+                                                <property name="use-markup">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">0</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p11_beat">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="has-tooltip">True</property>
+                                                <property name="tooltip-text" translatable="yes">Auto FX beat hint glyph. Colored sliders are controlled by Auto FX.
+
+● Bass
+▬ Mid
+△ High
+▲ Transient
+≈ Flux
+▣ Gate
+◆ Pulse
+~ Envelope
+• Level</property>
+                                                <property name="label"> </property>
+                                                <property name="width-chars">2</property>
+                                                <property name="max-width-chars">2</property>
+                                                <property name="xalign">0.5</property>
+                                                <style>
+                                                  <class name="fx-beat-glyph"/>
+                                                </style>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">1</property>
+                                              </packing>
+                                            </child>
                                           </object>
                                         </child>
                                         <style>
@@ -7471,11 +7987,54 @@
                                           </object>
                                         </child>
                                         <child type="label">
-                                          <object class="GtkLabel" id="label_p12_ui">
+                                          <object class="GtkBox" id="label_p12_header">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="label" translatable="yes">&lt;b&gt;p12&lt;/b&gt;</property>
-                                            <property name="use-markup">True</property>
+                                            <property name="orientation">horizontal</property>
+                                            <property name="spacing">3</property>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p12_ui">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">&lt;b&gt;p12&lt;/b&gt;</property>
+                                                <property name="use-markup">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">0</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label_p12_beat">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="has-tooltip">True</property>
+                                                <property name="tooltip-text" translatable="yes">Auto FX beat hint glyph. Colored sliders are controlled by Auto FX.
+
+● Bass
+▬ Mid
+△ High
+▲ Transient
+≈ Flux
+▣ Gate
+◆ Pulse
+~ Envelope
+• Level</property>
+                                                <property name="label"> </property>
+                                                <property name="width-chars">2</property>
+                                                <property name="max-width-chars">2</property>
+                                                <property name="xalign">0.5</property>
+                                                <style>
+                                                  <class name="fx-beat-glyph"/>
+                                                </style>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">1</property>
+                                              </packing>
+                                            </child>
                                           </object>
                                         </child>
                                         <style>

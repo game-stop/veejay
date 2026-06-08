@@ -488,3 +488,243 @@ frame.sequencer_slot.sequence-playing label.sequencer-slot-label,
     color: @slot-playing-color;
     background-color: transparent;
 }
+
+
+@define-color autofx-bass       #45d66b;
+@define-color autofx-mid        #d6b545;
+@define-color autofx-high       #48a8ff;
+@define-color autofx-transient  #ff5a4f;
+@define-color autofx-flux       #4fd6e8;
+@define-color autofx-gate       #e0d64f;
+@define-color autofx-pulse      #b65cff;
+@define-color autofx-envelope   #d884ff;
+@define-color autofx-level      #d8d8d8;
+
+.fx-beat-glyph {
+    color: @text-muted;
+    font-size: 115%;
+    font-weight: bold;
+    min-width: 14px;
+    margin-left: 2px;
+    padding-left: 1px;
+    padding-right: 1px;
+    background-color: transparent;
+}
+
+.fx-beat-glyph.fx-auto-bass {
+    color: @autofx-bass;
+}
+
+.fx-beat-glyph.fx-auto-mid {
+    color: @autofx-mid;
+}
+
+.fx-beat-glyph.fx-auto-high {
+    color: @autofx-high;
+}
+
+.fx-beat-glyph.fx-auto-transient {
+    color: @autofx-transient;
+}
+
+.fx-beat-glyph.fx-auto-flux {
+    color: @autofx-flux;
+}
+
+.fx-beat-glyph.fx-auto-gate {
+    color: @autofx-gate;
+}
+
+.fx-beat-glyph.fx-auto-pulse {
+    color: @autofx-pulse;
+}
+
+.fx-beat-glyph.fx-auto-envelope {
+    color: @autofx-envelope;
+}
+
+.fx-beat-glyph.fx-auto-level {
+    color: @autofx-level;
+}
+
+scale.fx-auto-bass contents trough highlight,
+scale.fx-auto-bass.vertical contents trough highlight {
+    background-color: @autofx-bass;
+}
+scale.fx-auto-bass contents slider,
+scale.fx-auto-bass.vertical contents slider {
+    background-color: @autofx-bass;
+    border-color: shade(@autofx-bass, 1.25);
+}
+
+scale.fx-auto-mid contents trough highlight,
+scale.fx-auto-mid.vertical contents trough highlight {
+    background-color: @autofx-mid;
+}
+scale.fx-auto-mid contents slider,
+scale.fx-auto-mid.vertical contents slider {
+    background-color: @autofx-mid;
+    border-color: shade(@autofx-mid, 1.25);
+}
+
+scale.fx-auto-high contents trough highlight,
+scale.fx-auto-high.vertical contents trough highlight {
+    background-color: @autofx-high;
+}
+scale.fx-auto-high contents slider,
+scale.fx-auto-high.vertical contents slider {
+    background-color: @autofx-high;
+    border-color: shade(@autofx-high, 1.25);
+}
+
+scale.fx-auto-transient contents trough highlight,
+scale.fx-auto-transient.vertical contents trough highlight {
+    background-color: @autofx-transient;
+}
+scale.fx-auto-transient contents slider,
+scale.fx-auto-transient.vertical contents slider {
+    background-color: @autofx-transient;
+    border-color: shade(@autofx-transient, 1.25);
+}
+
+scale.fx-auto-flux contents trough highlight,
+scale.fx-auto-flux.vertical contents trough highlight {
+    background-color: @autofx-flux;
+}
+scale.fx-auto-flux contents slider,
+scale.fx-auto-flux.vertical contents slider {
+    background-color: @autofx-flux;
+    border-color: shade(@autofx-flux, 1.25);
+}
+
+scale.fx-auto-gate contents trough highlight,
+scale.fx-auto-gate.vertical contents trough highlight {
+    background-color: @autofx-gate;
+}
+scale.fx-auto-gate contents slider,
+scale.fx-auto-gate.vertical contents slider {
+    background-color: @autofx-gate;
+    border-color: shade(@autofx-gate, 1.25);
+}
+
+scale.fx-auto-pulse contents trough highlight,
+scale.fx-auto-pulse.vertical contents trough highlight {
+    background-color: @autofx-pulse;
+}
+scale.fx-auto-pulse contents slider,
+scale.fx-auto-pulse.vertical contents slider {
+    background-color: @autofx-pulse;
+    border-color: shade(@autofx-pulse, 1.25);
+}
+
+scale.fx-auto-envelope contents trough highlight,
+scale.fx-auto-envelope.vertical contents trough highlight {
+    background-color: @autofx-envelope;
+}
+scale.fx-auto-envelope contents slider,
+scale.fx-auto-envelope.vertical contents slider {
+    background-color: @autofx-envelope;
+    border-color: shade(@autofx-envelope, 1.25);
+}
+
+scale.fx-auto-level contents trough highlight,
+scale.fx-auto-level.vertical contents trough highlight {
+    background-color: @autofx-level;
+}
+scale.fx-auto-level contents slider,
+scale.fx-auto-level.vertical contents slider {
+    background-color: @autofx-level;
+    border-color: shade(@autofx-level, 1.25);
+}
+/* Audio Beat detector meters are GtkLevelBar widgets in the Glade file.
+ * Keep progressbar selectors as a harmless fallback, but the levelbar
+ * selectors are the ones that color the live beat panel.
+ */
+levelbar trough {
+    background-color: @raised-color;
+    border: 1px solid @border-color;
+}
+
+levelbar block.empty,
+levelbar trough block.empty {
+    background-color: @raised-color;
+    border-color: @border-color;
+}
+
+levelbar block.filled,
+levelbar trough block.filled {
+    background-color: @fill-color;
+    border-color: shade(@fill-color, 1.20);
+}
+
+levelbar.fx-auto-bass block.filled,
+levelbar.fx-auto-bass trough block.filled,
+progressbar.fx-auto-bass progress,
+progressbar.fx-auto-bass trough progress {
+    background-color: @autofx-bass;
+    border-color: shade(@autofx-bass, 1.25);
+}
+
+levelbar.fx-auto-mid block.filled,
+levelbar.fx-auto-mid trough block.filled,
+progressbar.fx-auto-mid progress,
+progressbar.fx-auto-mid trough progress {
+    background-color: @autofx-mid;
+    border-color: shade(@autofx-mid, 1.25);
+}
+
+levelbar.fx-auto-high block.filled,
+levelbar.fx-auto-high trough block.filled,
+progressbar.fx-auto-high progress,
+progressbar.fx-auto-high trough progress {
+    background-color: @autofx-high;
+    border-color: shade(@autofx-high, 1.25);
+}
+
+levelbar.fx-auto-transient block.filled,
+levelbar.fx-auto-transient trough block.filled,
+progressbar.fx-auto-transient progress,
+progressbar.fx-auto-transient trough progress {
+    background-color: @autofx-transient;
+    border-color: shade(@autofx-transient, 1.25);
+}
+
+levelbar.fx-auto-flux block.filled,
+levelbar.fx-auto-flux trough block.filled,
+progressbar.fx-auto-flux progress,
+progressbar.fx-auto-flux trough progress {
+    background-color: @autofx-flux;
+    border-color: shade(@autofx-flux, 1.25);
+}
+
+levelbar.fx-auto-gate block.filled,
+levelbar.fx-auto-gate trough block.filled,
+progressbar.fx-auto-gate progress,
+progressbar.fx-auto-gate trough progress {
+    background-color: @autofx-gate;
+    border-color: shade(@autofx-gate, 1.25);
+}
+
+levelbar.fx-auto-pulse block.filled,
+levelbar.fx-auto-pulse trough block.filled,
+progressbar.fx-auto-pulse progress,
+progressbar.fx-auto-pulse trough progress {
+    background-color: @autofx-pulse;
+    border-color: shade(@autofx-pulse, 1.25);
+}
+
+levelbar.fx-auto-envelope block.filled,
+levelbar.fx-auto-envelope trough block.filled,
+progressbar.fx-auto-envelope progress,
+progressbar.fx-auto-envelope trough progress {
+    background-color: @autofx-envelope;
+    border-color: shade(@autofx-envelope, 1.25);
+}
+
+levelbar.fx-auto-level block.filled,
+levelbar.fx-auto-level trough block.filled,
+progressbar.fx-auto-level progress,
+progressbar.fx-auto-level trough progress {
+    background-color: @autofx-level;
+    border-color: shade(@autofx-level, 1.25);
+}

@@ -73,6 +73,11 @@ static int max_mem_ = 0;
 static int live = -1;
 static int ta = -1;
 
+#ifdef HAVE_JACK
+extern void veejay_audio_sync_thread_set_enabled(int enabled);
+extern void veejay_audio_beat_thread_set_enabled(int enabled);
+#endif
+
 static void report_bug(void)
 {
     veejay_msg(VEEJAY_MSG_WARNING, "Please report this error to veejay's issue tracker");
@@ -263,11 +268,13 @@ static void Usage(char *progname)
 
     fprintf(stderr, "Audio:\n");
     fprintf(stderr, "  -a/--audio [0|1]             Enable or disable audio playback output (default: 1)\n");
-    fprintf(stderr, "                                -a 0 keeps JACK input, sync and beat services available\n");
+    fprintf(stderr, "                                -a 0 disables media/JACK output but keeps clock fallback\n");
     fprintf(stderr, "     --audio-muted             Start with all audio playback output muted\n");
     fprintf(stderr, "                                JACK input, sync and beat services remain available\n");
-    fprintf(stderr, "     --audio-threads [0|1]     Enable or disable JACK capture/sync/beat threads\n");
-    fprintf(stderr, "     --no-audio-threads        Disable JACK capture/sync/beat threads\n");
+    fprintf(stderr, "     --audio-sync-thread [0|1] Enable or disable the JACK sync/control thread\n");
+    fprintf(stderr, "     --no-audio-sync-thread    Disable the JACK sync/control thread\n");
+    fprintf(stderr, "     --audio-beat-thread [0|1] Enable or disable the audio beat detector thread\n");
+    fprintf(stderr, "     --no-audio-beat-thread    Disable the audio beat detector thread\n");
     fprintf(stderr, "     --pace-correction <ms>    Audio pace correction offset in milliseconds\n");
     fprintf(stderr, "  -r/--audiorate <num>         Set dummy/sample audio rate (default: 48000 Hz)\n");
     fprintf(stderr, "     --audio-channels <num>    Set dummy/sample audio channel count\n");
@@ -380,14 +387,32 @@ static int set_option(const char *name, char *value)
             info->audio = enabled ? AUDIO_PLAY : NO_AUDIO;
     } else if (strcmp(name, "audio-muted") == 0) {
         atomic_store_int(&info->settings->audio_mute, 1);
-    } else if (strcmp(name, "no-audio-threads") == 0) {
-        atomic_store_int(&info->settings->audio_threads_disabled, 1);
-    } else if (strcmp(name, "audio-threads") == 0) {
+    } else if (strcmp(name, "no-audio-sync-thread") == 0) {
+#ifdef HAVE_JACK
+        veejay_audio_sync_thread_set_enabled(0);
+#endif
+    } else if (strcmp(name, "audio-sync-thread") == 0) {
         int enabled = 0;
-        if(parse_binary_option("--audio-threads", value, &enabled))
+        if(parse_binary_option("--audio-sync-thread", value, &enabled))
             nerr++;
-        else
-            atomic_store_int(&info->settings->audio_threads_disabled, enabled ? 0 : 1);
+        else {
+#ifdef HAVE_JACK
+            veejay_audio_sync_thread_set_enabled(enabled);
+#endif
+        }
+    } else if (strcmp(name, "no-audio-beat-thread") == 0) {
+#ifdef HAVE_JACK
+        veejay_audio_beat_thread_set_enabled(0);
+#endif
+    } else if (strcmp(name, "audio-beat-thread") == 0) {
+        int enabled = 0;
+        if(parse_binary_option("--audio-beat-thread", value, &enabled))
+            nerr++;
+        else {
+#ifdef HAVE_JACK
+            veejay_audio_beat_thread_set_enabled(enabled);
+#endif
+        }
 	} else if (strcmp(name, "pace-correction") == 0 ) {
 	info->settings->pace_correction = atoi( optarg);
 		if( info->settings->pace_correction < 0 ) {
@@ -660,8 +685,10 @@ static int check_command_line_options(int argc, char *argv[])
 	{"preserve-pathnames", 0, 0, 0},	/* -P/--preserve-pathnames    */
 	{"audio", 1, 0, 0},	/* -a/--audio num       */
 	{"audio-muted", 0, 0, 0},
-	{"no-audio-threads", 0, 0, 0},
-	{"audio-threads", 1, 0, 0},
+	{"no-audio-sync-thread", 0, 0, 0},
+	{"audio-sync-thread", 1, 0, 0},
+	{"no-audio-beat-thread", 0, 0, 0},
+	{"audio-beat-thread", 1, 0, 0},
 	{"size", 1, 0, 0},	/* -S/--size            */
 	{"benchmark", 1, 0, 0}, /* --benchmark	 */
 /*#ifdef HAVE_XINERAMA

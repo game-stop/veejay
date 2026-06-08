@@ -24,6 +24,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <limits.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -474,6 +475,20 @@ enum {
   WIDGET_LABEL_EL_ABITS = 373,
   WIDGET_LABEL_HOSTNAMEX = 374,
   WIDGET_LABEL_PORTX = 375,
+
+  WIDGET_LABEL_P0_BEAT = 376,
+  WIDGET_LABEL_P1_BEAT = 377,
+  WIDGET_LABEL_P2_BEAT = 378,
+  WIDGET_LABEL_P3_BEAT = 379,
+  WIDGET_LABEL_P4_BEAT = 380,
+  WIDGET_LABEL_P5_BEAT = 381,
+  WIDGET_LABEL_P6_BEAT = 382,
+  WIDGET_LABEL_P7_BEAT = 383,
+  WIDGET_LABEL_P8_BEAT = 384,
+  WIDGET_LABEL_P9_BEAT = 385,
+  WIDGET_LABEL_P10_BEAT = 386,
+  WIDGET_LABEL_P11_BEAT = 387,
+  WIDGET_LABEL_P12_BEAT = 388,
 };
 
 
@@ -778,6 +793,19 @@ static struct
     { "label_p13",              WIDGET_LABEL_P13 },
     { "label_p14",              WIDGET_LABEL_P14 },
     { "label_p15",              WIDGET_LABEL_P15 },
+    { "label_p0_beat",          WIDGET_LABEL_P0_BEAT },
+    { "label_p1_beat",          WIDGET_LABEL_P1_BEAT },
+    { "label_p2_beat",          WIDGET_LABEL_P2_BEAT },
+    { "label_p3_beat",          WIDGET_LABEL_P3_BEAT },
+    { "label_p4_beat",          WIDGET_LABEL_P4_BEAT },
+    { "label_p5_beat",          WIDGET_LABEL_P5_BEAT },
+    { "label_p6_beat",          WIDGET_LABEL_P6_BEAT },
+    { "label_p7_beat",          WIDGET_LABEL_P7_BEAT },
+    { "label_p8_beat",          WIDGET_LABEL_P8_BEAT },
+    { "label_p9_beat",          WIDGET_LABEL_P9_BEAT },
+    { "label_p10_beat",         WIDGET_LABEL_P10_BEAT },
+    { "label_p11_beat",         WIDGET_LABEL_P11_BEAT },
+    { "label_p12_beat",         WIDGET_LABEL_P12_BEAT },
     { "inc_p0",                 WIDGET_INC_P0 },
     { "inc_p1",                 WIDGET_INC_P1 },
     { "inc_p2",                 WIDGET_INC_P2 },
@@ -1371,6 +1399,46 @@ enum
 
 #define ENTRY_PARAMSET ENTRY_P0
 
+#ifndef STATUS_CHAIN_ENTRY_FXID
+#define STATUS_CHAIN_ENTRY_FXID                 82
+#define STATUS_CHAIN_ENTRY_ISVIDEO              83
+#define STATUS_CHAIN_ENTRY_NUM_PARAMETERS       84
+#define STATUS_CHAIN_ENTRY_KF_TYPE              85
+#define STATUS_CHAIN_ENTRY_KF_STATUS            86
+#define STATUS_CHAIN_ENTRY_TRANSITION_ENABLED   87
+#define STATUS_CHAIN_ENTRY_TRANSITION_LOOP      88
+#define STATUS_CHAIN_ENTRY_SOURCE               89
+#define STATUS_CHAIN_ENTRY_CHANNEL              90
+#define STATUS_CHAIN_ENTRY_VIDEO_ENABLED        91
+#define STATUS_CHAIN_ENTRY_BEAT_FLAG            92
+#define STATUS_CHAIN_ENTRY_SUBRENDER_ENTRY      93
+#define STATUS_CHAIN_ENTRY_P0                   94
+#define STATUS_CHAIN_ENTRY_P1                   95
+#define STATUS_CHAIN_ENTRY_P2                   96
+#define STATUS_CHAIN_ENTRY_P3                   97
+#define STATUS_CHAIN_ENTRY_P4                   98
+#define STATUS_CHAIN_ENTRY_P5                   99
+#define STATUS_CHAIN_ENTRY_P6                   100
+#define STATUS_CHAIN_ENTRY_P7                   101
+#define STATUS_CHAIN_ENTRY_P8                   102
+#define STATUS_CHAIN_ENTRY_P9                   103
+#define STATUS_CHAIN_ENTRY_P10                  104
+#define STATUS_CHAIN_ENTRY_P11                  105
+#define STATUS_CHAIN_ENTRY_P12                  106
+#define STATUS_CHAIN_ENTRY_P13                  107
+#define STATUS_CHAIN_ENTRY_P14                  108
+#define STATUS_CHAIN_ENTRY_P15                  109
+#define STATUS_CHAIN_ENTRY_LAST                 110
+#define STATUS_CHAIN_ENTRY_TOKENS \
+    (STATUS_CHAIN_ENTRY_LAST - STATUS_CHAIN_ENTRY_FXID)
+#endif
+
+#if VJ_STATUS_ARRAY_SIZE <= STATUS_CHAIN_ENTRY_P15
+#error "VJ_STATUS_ARRAY_SIZE is too small for selected FX chain-entry status fields"
+#endif
+
+
+
 enum
 {
     SL_ID = 0,
@@ -1601,6 +1669,63 @@ typedef struct {
 } value_hint;
 
 #define SAMPLE_MAX_PARAMETERS 16
+#define AUTO_FX_BEAT_UI_PARAMETERS 13
+#define UI_VJE_SUMMARY_VERSION_WITH_BEAT_HINTS 2
+#define UI_VJE_SUMMARY_BEAT_HINT_WIDTH 61
+
+#define UI_VJ_BEAT_F_REJECT          (1u << 0)
+#define UI_VJ_BEAT_F_STRUCTURAL      (1u << 3)
+#define UI_VJ_BEAT_F_IMPULSE         (1u << 6)
+#define UI_VJ_BEAT_F_REBUILDS_STATE  (1u << 11)
+
+typedef enum {
+    UI_VJ_BEAT_OFF = 0,
+    UI_VJ_BEAT_TRIGGER,
+    UI_VJ_BEAT_FLOW,
+    UI_VJ_BEAT_DRIFT,
+    UI_VJ_BEAT_WARP,
+    UI_VJ_BEAT_MOTION_REACT,
+    UI_VJ_BEAT_GEOMETRY_AMPLITUDE,
+    UI_VJ_BEAT_GEOMETRY_FREQUENCY,
+    UI_VJ_BEAT_GEOMETRY_PHASE,
+    UI_VJ_BEAT_GRID_SIZE,
+    UI_VJ_BEAT_WINDOW_RADIUS,
+    UI_VJ_BEAT_SPEED,
+    UI_VJ_BEAT_SIGNED_SPEED,
+    UI_VJ_BEAT_SIGNED_CURVE,
+    UI_VJ_BEAT_MEMORY,
+    UI_VJ_BEAT_INERTIA,
+    UI_VJ_BEAT_SOURCE_MIX,
+    UI_VJ_BEAT_COLOR_AMOUNT,
+    UI_VJ_BEAT_COLOR_PHASE,
+    UI_VJ_BEAT_DETAIL,
+    UI_VJ_BEAT_GLOW,
+    UI_VJ_BEAT_SELECTOR,
+    UI_VJ_BEAT_RESET,
+    UI_VJ_BEAT_ALPHA_OR_OPACITY,
+    UI_VJ_BEAT_TRAIL_LENGTH,
+    UI_VJ_BEAT_DENSITY,
+    UI_VJ_BEAT_CONTRAST,
+    UI_VJ_BEAT_INTENSITY,
+    UI_VJ_BEAT_TURBULENCE,
+    UI_VJ_BEAT_KICK,
+    UI_VJ_BEAT_SNARE,
+    UI_VJ_BEAT_HAT,
+    UI_VJ_BEAT_LAST = UI_VJ_BEAT_HAT
+} ui_vj_beat_param_class_t;
+
+typedef struct {
+    int klass;
+    unsigned int flags;
+    int soft_min;
+    int soft_max;
+    int normal_depth_pct;
+    int climax_depth_pct;
+    int attack_ms;
+    int release_ms;
+    int hold_ms;
+    int priority;
+} ui_beat_param_hint_t;
 
 typedef struct {
     int defaults[SAMPLE_MAX_PARAMETERS];
@@ -1609,6 +1734,8 @@ typedef struct {
     char description[150];
     char *param_description[SAMPLE_MAX_PARAMETERS];
     value_hint *hints[SAMPLE_MAX_PARAMETERS];
+    ui_beat_param_hint_t beat_hints[SAMPLE_MAX_PARAMETERS];
+    int summary_version;
     int id;
     int is_video;
     int num_arg;
@@ -1621,7 +1748,7 @@ typedef struct
 {
     GtkBuilder *main_window;
     vj_client   *client;
-    int status_tokens[STATUS_ARRAY_SIZE];
+    int status_tokens[VJ_STATUS_ARRAY_SIZE];
     int *history_tokens[HISTORY_PLAYMODES];
     int status_passed;
     int status_lock;
@@ -2691,6 +2818,37 @@ static void init_audio_beat_tooltips(void)
 }
 
 
+
+static void init_audio_beat_meter_styles(void)
+{
+    static const struct {
+        int widget_id;
+        const char *css_class;
+    } meter_styles[] = {
+        { WIDGET_AUDIO_BEAT_LEVEL_BAR,     "fx-auto-level" },
+        { WIDGET_AUDIO_BEAT_ENVELOPE_BAR,  "fx-auto-envelope" },
+        { WIDGET_AUDIO_BEAT_TRANSIENT_BAR, "fx-auto-transient" },
+        { WIDGET_AUDIO_BEAT_FLUX_BAR,      "fx-auto-flux" },
+        { WIDGET_AUDIO_BEAT_BASS_BAR,      "fx-auto-bass" },
+        { WIDGET_AUDIO_BEAT_MID_BAR,       "fx-auto-mid" },
+        { WIDGET_AUDIO_BEAT_HIGH_BAR,      "fx-auto-high" },
+        { WIDGET_AUDIO_BEAT_GATE_BAR,      "fx-auto-gate" },
+        { WIDGET_AUDIO_BEAT_PULSE_BAR,     "fx-auto-pulse" },
+        { -1, NULL }
+    };
+
+    for(int i = 0; meter_styles[i].widget_id >= 0; i++)
+    {
+        GtkWidget *w = widget_cache[meter_styles[i].widget_id];
+
+        if(!w)
+            continue;
+
+        gtk_style_context_add_class(gtk_widget_get_style_context(w),
+                                    meter_styles[i].css_class);
+    }
+}
+
 static struct
 {
     const int widget_id;
@@ -3152,6 +3310,82 @@ char *_el_get_filename( int pos )
     return NULL;
 }
 
+static void ui_beat_hint_reset(ui_beat_param_hint_t *h)
+{
+    if(!h)
+        return;
+
+    veejay_memset(h, 0, sizeof(*h));
+    h->klass = UI_VJ_BEAT_OFF;
+    h->flags = UI_VJ_BEAT_F_REJECT;
+    h->soft_min = INT_MIN;
+    h->soft_max = INT_MIN;
+    h->priority = -1000;
+}
+
+static int ui_beat_hint_parse(const char *src, ui_beat_param_hint_t *h)
+{
+    if(!src || !h)
+        return 0;
+
+    if(sscanf(src,
+              "%03d%010u%011d%011d%03d%03d%05d%05d%05d%05d",
+              &h->klass,
+              &h->flags,
+              &h->soft_min,
+              &h->soft_max,
+              &h->normal_depth_pct,
+              &h->climax_depth_pct,
+              &h->attack_ms,
+              &h->release_ms,
+              &h->hold_ms,
+              &h->priority) != 10)
+    {
+        ui_beat_hint_reset(h);
+        return 0;
+    }
+
+    if(h->klass < UI_VJ_BEAT_OFF || h->klass > UI_VJ_BEAT_LAST)
+    {
+        ui_beat_hint_reset(h);
+        return 0;
+    }
+
+    return 1;
+}
+
+static const ui_beat_param_hint_t *ui_effect_get_beat_hint(int effect_id, int param)
+{
+    effect_constr *ec;
+
+    if(effect_id < 0 || effect_id >= EFFECT_LIST_SIZE ||
+       param < 0 || param >= SAMPLE_MAX_PARAMETERS)
+        return NULL;
+
+    ec = info->effect_info[effect_id];
+
+    if(!ec || param >= ec->num_arg)
+        return NULL;
+
+    return &ec->beat_hints[param];
+}
+
+static int ui_effect_param_has_beat_hint(int effect_id, int param)
+{
+    const ui_beat_param_hint_t *h = ui_effect_get_beat_hint(effect_id, param);
+
+    if(!h)
+        return 0;
+
+    if(h->klass == UI_VJ_BEAT_OFF)
+        return 0;
+
+    if(h->flags & UI_VJ_BEAT_F_REJECT)
+        return 0;
+
+    return 1;
+}
+
 effect_constr* _effect_new( char *effect_line )
 {
     effect_constr *ec;
@@ -3177,7 +3411,32 @@ effect_constr* _effect_new( char *effect_line )
         return NULL;
     }
 
-    offset = descr_len + 11;
+    if(ec->num_arg < 0 || ec->num_arg > SAMPLE_MAX_PARAMETERS) {
+        veejay_msg(VEEJAY_MSG_ERROR, "FX '%s' has invalid argument count %d", ec->description, ec->num_arg);
+        free(ec);
+        return NULL;
+    }
+
+    ec->summary_version = 1;
+
+    {
+        const int version_pos = descr_len + 3 + 8;
+        if(g_ascii_isdigit(effect_line[version_pos]) &&
+           g_ascii_isdigit(effect_line[version_pos + 1]))
+        {
+            int maybe_version = ((effect_line[version_pos] - '0') * 10) +
+                                (effect_line[version_pos + 1] - '0');
+
+            if(maybe_version >= UI_VJE_SUMMARY_VERSION_WITH_BEAT_HINTS)
+                ec->summary_version = maybe_version;
+        }
+    }
+
+    for(p = 0; p < SAMPLE_MAX_PARAMETERS; p++)
+        ui_beat_hint_reset(&ec->beat_hints[p]);
+
+    offset = descr_len + (ec->summary_version >= UI_VJE_SUMMARY_VERSION_WITH_BEAT_HINTS ? 13 : 11);
+
     for(p=0; p < ec->num_arg; p++)
     {
         int len = 0;
@@ -3191,9 +3450,20 @@ effect_constr* _effect_new( char *effect_line )
         }
         ec->param_description[p] = (char*) vj_calloc(sizeof(char) * (len+1) );
         strncpy( ec->param_description[p], effect_line + offset + 6 + 6 + 6 + 3, len );
-        offset += 3;
-        offset += len;
-        offset+=18;
+        offset += 21 + len;
+
+        if(ec->summary_version >= UI_VJE_SUMMARY_VERSION_WITH_BEAT_HINTS)
+        {
+            if(!ui_beat_hint_parse(effect_line + offset, &ec->beat_hints[p]))
+            {
+                veejay_msg(VEEJAY_MSG_ERROR,
+                    "Parse error in FX '%s' beat hint for p%d", ec->description, p);
+                free(ec);
+                return NULL;
+            }
+
+            offset += UI_VJE_SUMMARY_BEAT_HINT_WIDTH;
+        }
     }
 
     for(p=0; p < ec->num_arg; p++)
@@ -5536,11 +5806,12 @@ gboolean view_entry_selection_func (GtkTreeSelection *selection,
             update_label_i2(widget_cache[WIDGET_LABEL_FXENTRY], name, 0);
             vj_midi_learning_vims_msg( info->midi, NULL, VIMS_CHAIN_SET_ENTRY,name );
 
+            info->uc.reload_hint[HINT_KF] = 1;
+            info->uc.reload_hint[HINT_ENTRY] = 1;
+
             if( get_nums2(widget_cache[WIDGET_BUTTON_FX_ENTRY]) != name ) {
                 info->status_lock = 1;
                 update_spin_value2(widget_cache[WIDGET_BUTTON_FX_ENTRY], name);
-                info->uc.reload_hint[HINT_KF] = 1;
-                info->uc.reload_hint[HINT_ENTRY] = 1;
                 info->status_lock = 0;
             }
 
@@ -5819,51 +6090,64 @@ static void load_v4l_info(void)
     }
 }
 
+static int status_entry_checksum(const int *raw, int n)
+{
+    unsigned int checksum = 0;
+
+    checksum ^= (unsigned int)info->status_tokens[PLAY_MODE] * 131u;
+    checksum ^= (unsigned int)info->status_tokens[CURRENT_ID] * 257u;
+    checksum ^= (unsigned int)info->uc.selected_chain_entry * 389u;
+
+    for(int i = 0; i < n; i++) {
+        unsigned int v = (unsigned int)raw[i];
+        checksum = (checksum >> 1) + ((checksum & 1u) << 15);
+        checksum ^= v + 0x9e3779b9u + (checksum << 6) + (checksum >> 2);
+        checksum &= 0xffffu;
+    }
+
+    return (int)checksum;
+}
+
+static gboolean status_entry_tail_changed(int *history, int force)
+{
+    if(force)
+        return TRUE;
+
+    if(!history)
+        return TRUE;
+
+    for(int i = STATUS_CHAIN_ENTRY_FXID; i < STATUS_CHAIN_ENTRY_LAST; i++) {
+        if(info->status_tokens[i] != history[i])
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
 static gint load_parameter_info(void)
 {
     int *p = &(info->uc.entry_tokens[0]);
-    int len = 0;
-
-    multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0, info->uc.selected_chain_entry );
-
-    gchar *answer = recv_vims(3,&len);
-
-    int checksum = data_checksum(answer,len);
-    if( info->uc.reload_hint_checksums[HINT_ENTRY] == checksum ) {
-        if(answer) free(answer);
-        return -1;
-    }
-
-    info->uc.reload_hint_checksums[HINT_ENTRY] = checksum;
-
-    veejay_memset( p, 0, sizeof(info->uc.entry_tokens));
-
-    if(len <= 0 || answer == NULL )
-    {
-        if(answer) free(answer);
-        if(info->uc.selected_rgbkey )
-            gtk_widget_set_sensitive_( widget_cache[WIDGET_RGBKEY], FALSE );
-        return 0;
-    }
-
-    int raw[ENTRY_LAST];
-    int raw_count = 0;
-    char *ptr = NULL;
-    char *token = NULL;
+    int raw[STATUS_CHAIN_ENTRY_TOKENS];
+    int checksum;
 
     veejay_memset(raw, 0, sizeof(raw));
 
-    token = strtok_r(answer, " ", &ptr);
-    while(token != NULL && raw_count < ENTRY_LAST)
-    {
-        raw[raw_count++] = atoi(token);
-        token = strtok_r(NULL, " ", &ptr);
-    }
+    for(int i = 0; i < STATUS_CHAIN_ENTRY_TOKENS; i++)
+        raw[i] = info->status_tokens[STATUS_CHAIN_ENTRY_FXID + i];
 
-    if(raw_count < 12)
+    checksum = status_entry_checksum(raw, STATUS_CHAIN_ENTRY_TOKENS);
+    if(info->uc.reload_hint_checksums[HINT_ENTRY] == checksum)
+        return -1;
+
+    info->uc.reload_hint_checksums[HINT_ENTRY] = checksum;
+
+    veejay_memset(p, 0, sizeof(info->uc.entry_tokens));
+
+    if(raw[0] <= 0)
     {
-        veejay_msg(VEEJAY_MSG_ERROR,"Invalid reply from %d", VIMS_CHAIN_GET_ENTRY );
-        free(answer);
+        if(info->uc.selected_rgbkey)
+            gtk_widget_set_sensitive_(widget_cache[WIDGET_RGBKEY], FALSE);
+        info->uc.selected_rgbkey = 0;
         return 0;
     }
 
@@ -5872,8 +6156,6 @@ static gint load_parameter_info(void)
         n_params = 0;
     else if(n_params > SAMPLE_MAX_PARAMETERS)
         n_params = SAMPLE_MAX_PARAMETERS;
-
-    int header_tokens = 12;
 
     p[ENTRY_FXID] = raw[0];
     p[ENTRY_ISVIDEO] = raw[1];
@@ -5890,24 +6172,24 @@ static gint load_parameter_info(void)
 
     for(int j = 0; j < n_params; j++)
     {
-        int src_index = header_tokens + j;
+        int src_index = 12 + j;
         int dst_index = ENTRY_PARAMSET + j;
 
-        if(src_index >= raw_count || dst_index >= ENTRY_LAST)
+        if(src_index >= STATUS_CHAIN_ENTRY_TOKENS || dst_index >= ENTRY_LAST)
             break;
 
         p[dst_index] = raw[src_index];
     }
 
-    info->uc.selected_rgbkey = _effect_get_rgb( p[ENTRY_FXID] );
+    info->uc.selected_rgbkey = _effect_get_rgb(p[ENTRY_FXID]);
     if(info->uc.selected_rgbkey)
     {
-        gtk_widget_set_sensitive_( widget_cache[WIDGET_RGBKEY], TRUE );
+        gtk_widget_set_sensitive_(widget_cache[WIDGET_RGBKEY], TRUE);
         update_rgbkey();
     }
     else
     {
-        gtk_widget_set_sensitive_( widget_cache[WIDGET_RGBKEY], FALSE );
+        gtk_widget_set_sensitive_(widget_cache[WIDGET_RGBKEY], FALSE);
         info->uc.selected_rgbkey = 0;
     }
 
@@ -5915,21 +6197,21 @@ static gint load_parameter_info(void)
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_CHAIN_TOGGLEENTRY]), p[ENTRY_KF_STATUS]);
     }
 
-    switch( p[ENTRY_KF_TYPE] )
+    switch(p[ENTRY_KF_TYPE])
     {
         case GTK3_CURVE_TYPE_SPLINE:
             if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPESPLINE]))) {
-                gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPESPLINE]), TRUE );
+                gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPESPLINE]), TRUE);
              }
              break;
         case GTK3_CURVE_TYPE_FREE:
              if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPEFREEHAND]))) {
-                 gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPEFREEHAND]), TRUE );
+                 gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPEFREEHAND]), TRUE);
              }
              break;
         case GTK3_CURVE_TYPE_LINEAR:
             if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPELINEAR]))) {
-                 gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPELINEAR]), TRUE );
+                 gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPELINEAR]), TRUE);
             }
             break;
         default:
@@ -5940,7 +6222,6 @@ static gint load_parameter_info(void)
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SUBRENDER_ENTRY_TOGGLE]), p[ENTRY_SUBRENDER_ENTRY]);
     }
 
-    free(answer);
     return 1;
 }
 
@@ -8333,7 +8614,7 @@ int veejay_update_multitrack( void *ptr )
     int tmp = 0, i;
 
     if( s->status_list[s->master] != NULL ) {
-        for ( i = 0; i < STATUS_ARRAY_SIZE; i ++ )
+        for ( i = 0; i < VJ_STATUS_ARRAY_SIZE; i ++ )
         {
             tmp += s->status_list[s->master][i];
             info->status_tokens[i] = s->status_list[s->master][i];
@@ -8364,7 +8645,7 @@ int veejay_update_multitrack( void *ptr )
 #endif
     int *history = info->history_tokens[pm];
 
-    veejay_memcpy( history, info->status_tokens, sizeof(int) * STATUS_ARRAY_SIZE );
+    veejay_memcpy( history, info->status_tokens, sizeof(int) * VJ_STATUS_ARRAY_SIZE );
 
     for( i = 0; i < s->tracks ; i ++ )
     {
@@ -9447,6 +9728,220 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     update_current_slot(history, pm, last_pm);
 }
 
+static const char *fx_auto_slider_css_classes[] = {
+    "fx-auto-bass",
+    "fx-auto-mid",
+    "fx-auto-high",
+    "fx-auto-transient",
+    "fx-auto-flux",
+    "fx-auto-gate",
+    "fx-auto-pulse",
+    "fx-auto-envelope",
+    "fx-auto-level",
+    NULL
+};
+
+typedef struct
+{
+    const char *glyph;
+    const char *css_class;
+    const char *label;
+} fx_auto_beat_style_t;
+
+static const fx_auto_beat_style_t fx_auto_beat_style_empty = {
+    " ", NULL, "not mapped"
+};
+
+static const fx_auto_beat_style_t *fx_auto_beat_style_for_hint(int klass,
+                                                               unsigned int flags)
+{
+    static const fx_auto_beat_style_t bass      = { "●", "fx-auto-bass",      "Bass / low body" };
+    static const fx_auto_beat_style_t mid       = { "▬", "fx-auto-mid",       "Mid / snare body" };
+    static const fx_auto_beat_style_t high      = { "△", "fx-auto-high",      "High / hat top" };
+    static const fx_auto_beat_style_t transient = { "▲", "fx-auto-transient", "Transient / impact" };
+    static const fx_auto_beat_style_t flux      = { "≈", "fx-auto-flux",      "Flux / flow" };
+    static const fx_auto_beat_style_t gate      = { "▣", "fx-auto-gate",      "Gate / threshold" };
+    static const fx_auto_beat_style_t pulse     = { "◆", "fx-auto-pulse",     "Pulse / trigger" };
+    static const fx_auto_beat_style_t envelope  = { "~", "fx-auto-envelope",  "Envelope / memory" };
+    static const fx_auto_beat_style_t level     = { "•", "fx-auto-level",     "Level / raw input" };
+
+    if(klass <= UI_VJ_BEAT_OFF || klass > UI_VJ_BEAT_LAST)
+        return &fx_auto_beat_style_empty;
+
+    if(flags & UI_VJ_BEAT_F_REJECT)
+        return &fx_auto_beat_style_empty;
+
+    if(flags & (UI_VJ_BEAT_F_STRUCTURAL | UI_VJ_BEAT_F_REBUILDS_STATE))
+        return &gate;
+
+    if(flags & UI_VJ_BEAT_F_IMPULSE)
+        return &pulse;
+
+    switch(klass)
+    {
+        case UI_VJ_BEAT_TRIGGER:
+        case UI_VJ_BEAT_SELECTOR:
+        case UI_VJ_BEAT_RESET:
+            return &pulse;
+
+        case UI_VJ_BEAT_FLOW:
+        case UI_VJ_BEAT_DRIFT:
+        case UI_VJ_BEAT_WARP:
+        case UI_VJ_BEAT_TURBULENCE:
+            return &flux;
+
+        case UI_VJ_BEAT_MOTION_REACT:
+        case UI_VJ_BEAT_SPEED:
+        case UI_VJ_BEAT_SIGNED_SPEED:
+        case UI_VJ_BEAT_SIGNED_CURVE:
+            return &transient;
+
+        case UI_VJ_BEAT_GEOMETRY_AMPLITUDE:
+        case UI_VJ_BEAT_GEOMETRY_FREQUENCY:
+        case UI_VJ_BEAT_GEOMETRY_PHASE:
+        case UI_VJ_BEAT_GRID_SIZE:
+        case UI_VJ_BEAT_WINDOW_RADIUS:
+            return &bass;
+
+        case UI_VJ_BEAT_MEMORY:
+        case UI_VJ_BEAT_INERTIA:
+        case UI_VJ_BEAT_SOURCE_MIX:
+        case UI_VJ_BEAT_TRAIL_LENGTH:
+            return &envelope;
+
+        case UI_VJ_BEAT_DENSITY:
+        case UI_VJ_BEAT_DETAIL:
+            return &flux;
+
+        case UI_VJ_BEAT_COLOR_AMOUNT:
+        case UI_VJ_BEAT_COLOR_PHASE:
+        case UI_VJ_BEAT_GLOW:
+        case UI_VJ_BEAT_CONTRAST:
+        case UI_VJ_BEAT_INTENSITY:
+            return &high;
+
+        case UI_VJ_BEAT_ALPHA_OR_OPACITY:
+            return &level;
+
+        case UI_VJ_BEAT_KICK:
+            return &bass;
+
+        case UI_VJ_BEAT_SNARE:
+            return &mid;
+
+        case UI_VJ_BEAT_HAT:
+            return &high;
+
+        default:
+            return &fx_auto_beat_style_empty;
+    }
+}
+
+static void fx_auto_clear_beat_style(GtkWidget *widget)
+{
+    GtkStyleContext *ctx;
+
+    if(!widget)
+        return;
+
+    ctx = gtk_widget_get_style_context(widget);
+
+    for(int i = 0; fx_auto_slider_css_classes[i]; i++)
+        gtk_style_context_remove_class(ctx, fx_auto_slider_css_classes[i]);
+}
+
+static void fx_auto_clear_param_beat_ui(int param)
+{
+    GtkWidget *slider;
+    GtkWidget *glyph;
+
+    if(param < 0 || param >= AUTO_FX_BEAT_UI_PARAMETERS)
+        return;
+
+    slider = widget_cache[WIDGET_SLIDER_P0 + param];
+    glyph  = widget_cache[WIDGET_LABEL_P0_BEAT + param];
+
+    fx_auto_clear_beat_style(slider);
+    fx_auto_clear_beat_style(glyph);
+
+    if(glyph && GTK_IS_LABEL(glyph))
+    {
+        gtk_label_set_text(GTK_LABEL(glyph), " ");
+        gtk_widget_set_tooltip_text(glyph,
+            "Auto FX beat hint glyph. Colored sliders are controlled by Auto FX.\n\n"
+            "● Bass\n"
+            "▬ Mid\n"
+            "△ High\n"
+            "▲ Transient\n"
+            "≈ Flux\n"
+            "▣ Gate\n"
+            "◆ Pulse\n"
+            "~ Envelope\n"
+            "• Level");
+    }
+}
+
+static void fx_auto_update_param_beat_ui(int effect_id,
+                                         int param,
+                                         int entry_beat_enabled)
+{
+    GtkWidget *slider;
+    GtkWidget *glyph;
+    const ui_beat_param_hint_t *hint;
+    const fx_auto_beat_style_t *style;
+    char tip[384];
+    const char *param_name;
+
+    if(param < 0 || param >= AUTO_FX_BEAT_UI_PARAMETERS)
+        return;
+
+    slider = widget_cache[WIDGET_SLIDER_P0 + param];
+    glyph  = widget_cache[WIDGET_LABEL_P0_BEAT + param];
+
+    fx_auto_clear_param_beat_ui(param);
+
+    if(!entry_beat_enabled || !ui_effect_param_has_beat_hint(effect_id, param))
+        return;
+
+    hint = ui_effect_get_beat_hint(effect_id, param);
+    style = fx_auto_beat_style_for_hint(hint->klass, hint->flags);
+
+    if(!style || !style->css_class)
+        return;
+
+    if(slider)
+        gtk_style_context_add_class(gtk_widget_get_style_context(slider), style->css_class);
+
+    if(glyph)
+        gtk_style_context_add_class(gtk_widget_get_style_context(glyph), style->css_class);
+
+    if(glyph && GTK_IS_LABEL(glyph))
+    {
+        param_name = _effect_get_param_description(effect_id, param);
+        gtk_label_set_text(GTK_LABEL(glyph), style->glyph);
+
+        snprintf(tip, sizeof(tip),
+            "Auto FX controls P%d%s%s\n"
+            "Beat family: %s\n"
+            "Depth: normal %d%%, climax %d%%\n"
+            "Envelope: attack %d ms, hold %d ms, release %d ms\n"
+            "Soft range: %d..%d",
+            param,
+            (param_name && param_name[0]) ? " — " : "",
+            (param_name && param_name[0]) ? param_name : "",
+            style->label,
+            hint->normal_depth_pct,
+            hint->climax_depth_pct,
+            hint->attack_ms,
+            hint->hold_ms,
+            hint->release_ms,
+            hint->soft_min,
+            hint->soft_max);
+
+        gtk_widget_set_tooltip_text(glyph, tip);
+    }
+}
+
 static void disable_fx_entry(void) {
     int i;
     gint min=0,max=1,value=0;
@@ -9494,7 +9989,10 @@ static void disable_fx_entry(void) {
 
         gtk_label_set_text(GTK_LABEL(widget_cache[WIDGET_LABEL_P0 +i ]), "");
 
-        update_slider_state(WIDGET_SLIDER_P0 + i, FALSE);
+        if(i < AUTO_FX_BEAT_UI_PARAMETERS)
+            fx_auto_clear_param_beat_ui(i);
+
+        update_slider_state(i, FALSE);
 
         if( faster_ui_ )
             gtk_widget_hide( widget_cache[WIDGET_FRAME_P0 + i]);
@@ -9601,6 +10099,9 @@ static void enable_fx_entry(void) {
         gtk_widget_set_tooltip_text( widget_cache[WIDGET_SLIDER_P0 + i], tt1 );
         gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_P0 + i ] ), tt1 );
 
+        if(i < AUTO_FX_BEAT_UI_PARAMETERS)
+            fx_auto_update_param_beat_ui(entry_tokens[ENTRY_FXID], i, entry_tokens[ENTRY_BEAT_FLAG]);
+
         if (tt1 != NULL && tt1[0] != '\0' ) {
             gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), tt1);
         }
@@ -9660,6 +10161,9 @@ static void enable_fx_entry(void) {
         gtk_widget_set_tooltip_text( widget_cache[ WIDGET_SLIDER_P0 + i ], "" );
 
         gtk_label_set_text(GTK_LABEL (widget_cache[WIDGET_LABEL_P0 + i]), "");
+
+        if(i < AUTO_FX_BEAT_UI_PARAMETERS)
+            fx_auto_clear_param_beat_ui(i);
     }
 }
 
@@ -9852,6 +10356,9 @@ void update_gui(void)
     update_globalinfo(history, pm, last_pm);
     update_record_audio_source_from_status(history);
 
+    if(status_entry_tail_changed(history, last_pm < 0))
+        info->uc.reload_hint[HINT_ENTRY] = 1;
+
     process_reload_hints(history, pm);
 
     on_vims_messenger();
@@ -10009,7 +10516,7 @@ void vj_gui_cb(int state, char *hostname, int port_num)
     int i;
     for( i = 0; i < 4; i ++ ) {
         int *h = info->history_tokens[i];
-        veejay_memset( h, 0, sizeof(int) * STATUS_ARRAY_SIZE );
+        veejay_memset( h, 0, sizeof(int) * VJ_STATUS_ARRAY_SIZE );
     }
 }
 
@@ -10184,7 +10691,7 @@ static void reset_connection_data_state(void)
     _el_ref_reset();
     _effect_reset();
 
-    veejay_memset(info->status_tokens, 0, sizeof(int) * STATUS_ARRAY_SIZE);
+    veejay_memset(info->status_tokens, 0, sizeof(int) * VJ_STATUS_ARRAY_SIZE);
     veejay_memset(info->sample, 0, sizeof(info->sample));
     veejay_memset(info->selection, 0, sizeof(info->selection));
     veejay_memset(&info->el, 0, sizeof(info->el));
@@ -10193,7 +10700,7 @@ static void reset_connection_data_state(void)
 
     for(int i = 0; i < HISTORY_PLAYMODES; i++) {
         if(info->history_tokens[i])
-            veejay_memset(info->history_tokens[i], 0, sizeof(int) * STATUS_ARRAY_SIZE);
+            veejay_memset(info->history_tokens[i], 0, sizeof(int) * VJ_STATUS_ARRAY_SIZE);
     }
 
     for(int i = 0; i < NUM_HINTS; i++) {
@@ -10552,7 +11059,7 @@ void vj_gui_init(const char *glade_file,
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Loading glade file %s", glade_path);
 
-    const int status_arr_size = sizeof(int) * STATUS_ARRAY_SIZE;
+    const int status_arr_size = sizeof(int) * VJ_STATUS_ARRAY_SIZE;
 
     veejay_memset(gui->status_tokens, 0, status_arr_size);
     veejay_memset( gui->sample, 0, 2 );
@@ -10646,6 +11153,7 @@ void vj_gui_init(const char *glade_file,
     GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
 
     init_audio_beat_tooltips();
+    init_audio_beat_meter_styles();
     init_audio_sync_tooltips();
     init_polish_tooltips();
 
@@ -10901,6 +11409,7 @@ void vj_gui_preview(void)
     for( int i = 0; i < QUICKSELECT_SLOTS; i ++ ) {
         gtk_widget_set_size_request_( info->sequence_view->gui_slot[i]->image, info->sequence_view->w,info->sequence_view->h );
     }
+
 }
 
 void gveejay_preview( int p )
@@ -10917,9 +11426,9 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 {
     int k = 0;
     for( k = 0; k < 4; k ++ )
-        veejay_memset( info->history_tokens[k] , 0, (sizeof(int) * STATUS_ARRAY_SIZE) );
+        veejay_memset( info->history_tokens[k] , 0, (sizeof(int) * VJ_STATUS_ARRAY_SIZE) );
 
-    veejay_memset( info->status_tokens, 0, sizeof(int) * STATUS_ARRAY_SIZE );
+    veejay_memset( info->status_tokens, 0, sizeof(int) * VJ_STATUS_ARRAY_SIZE );
 
     if(!hostname && !group_name )
     {
