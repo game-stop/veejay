@@ -299,21 +299,23 @@ vj_effect *strataflight_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
 
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS,                                                24,  100, 8,  30, 1200, 3000, 0,   45, /* Opacity */
-        VJ_BEAT_WARP,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                               0,   1000,8,  30, 1200, 3000, 0,   45, /* Camera Yaw */
-        VJ_BEAT_WARP,             VJ_BEAT_F_CONTINUOUS,                                                420, 860, 8,  30, 1200, 3000, 0,   45, /* Camera Pitch */
-        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS,                                                180, 860, 8,  30, 1200, 3000, 0,   50, /* View Distance */
-        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS,                                                180, 820, 8,  30, 1200, 3000, 0,   50, /* Flight Height */
-        VJ_BEAT_SPEED,            VJ_BEAT_F_CONTINUOUS,                                                0,   72,  8,  30, 1200, 3000, 0,   55, /* Flight Speed */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS,                                                24,  100, 8,  30, 1200, 3000, 0,    45, /* Opacity */
 
-        VJ_BEAT_SIGNED_CURVE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, 360, 640, 8,  30, 1200, 3000, 500, 40, /* Move Forward Back */
-        VJ_BEAT_SIGNED_CURVE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, 360, 640, 8,  30, 1200, 3000, 500, 40, /* Strafe Left Right */
+        VJ_BEAT_DRIFT,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 380, 620, 3,  12, 2800, 7200, 1600, 22, /* Camera Yaw */
+        VJ_BEAT_DRIFT,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 520, 780, 3,  12, 2600, 6800, 1400, 22, /* Camera Pitch */
 
-        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS,                                                12,  92,  8,  30, 1200, 3000, 0,   55, /* Terrain Height */
-        VJ_BEAT_SOURCE_MIX,       VJ_BEAT_F_CONTINUOUS,                                                0,   92,  10, 38, 1000, 2600, 0,   62, /* Source Deposit */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS,                                                18,  96,  8,  32, 1200, 3200, 0,   55, /* Terrain Memory */
-        VJ_BEAT_TURBULENCE,       VJ_BEAT_F_CONTINUOUS,                                                0,   72,  10, 38, 1000, 2600, 0,   58, /* Erosion */
-        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS,                                                0,   100, 8,  30, 1200, 3000, 0,   45  /* Material Chroma */
+        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS,                                                180, 860, 6,  22, 1600, 4200, 0,    42, /* View Distance */
+        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS,                                                180, 820, 6,  22, 1600, 4200, 0,    42, /* Flight Height */
+        VJ_BEAT_SPEED,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                          0,   56,  4,  16, 1800, 5200, 900,  32, /* Flight Speed */
+
+        VJ_BEAT_SIGNED_CURVE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, 420, 580, 4, 14, 2200, 6200, 1200, 24, /* Move Forward Back */
+        VJ_BEAT_SIGNED_CURVE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, 420, 580, 4, 14, 2200, 6200, 1200, 24, /* Strafe Left Right */
+
+        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS,                                                12,  92,  7,  24, 1400, 3800, 0,    48, /* Terrain Height */
+        VJ_BEAT_SOURCE_MIX,       VJ_BEAT_F_CONTINUOUS,                                                0,   92,  8,  30, 1200, 3200, 0,    54, /* Source Deposit */
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS,                                                18,  96,  7,  26, 1600, 4200, 0,    48, /* Terrain Memory */
+        VJ_BEAT_TURBULENCE,       VJ_BEAT_F_CONTINUOUS,                                                0,   72,  8,  30, 1200, 3200, 0,    50, /* Erosion */
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS,                                                0,   100, 6,  22, 1600, 4200, 0,    40  /* Material Chroma */
     );
 
     (void) w;
