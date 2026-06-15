@@ -36,6 +36,13 @@
     <property name="step-increment">1</property>
     <property name="page-increment">2</property>
   </object>
+  <object class="GtkAdjustment" id="audio_sync_tempo_bend_adj">
+    <property name="lower">-12</property>
+    <property name="upper">12</property>
+    <property name="value">0</property>
+    <property name="step-increment">0.1</property>
+    <property name="page-increment">1</property>
+  </object>
   <object class="GtkAdjustment" id="audio_beat_freeze_adj">
     <property name="lower">0</property>
     <property name="upper">2000</property>
@@ -5355,15 +5362,6 @@
                     <property name="visible">True</property>
                     <property name="can-focus">False</property>
                     <child>
-                      <object class="GtkMenuItem" id="help_donate">
-                        <property name="visible">True</property>
-                        <property name="can-focus">False</property>
-                        <property name="label" translatable="yes">_Donate</property>
-                        <property name="use-underline">True</property>
-                        <signal name="activate" handler="on_donate_activate" swapped="no"/>
-                      </object>
-                    </child>
-                    <child>
                       <object class="GtkMenuItem" id="help_about">
                         <property name="visible">True</property>
                         <property name="can-focus">False</property>
@@ -9906,13 +9904,14 @@
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
                                         <property name="hexpand">True</property>
-                                        <property name="active">2</property>
+                                        <property name="active">0</property>
                                         <signal name="changed" handler="on_audio_beat_action_combo_changed" swapped="no"/>
                                         <items>
                                           <item translatable="yes">None</item>
                                           <item translatable="yes">Freeze</item>
                                           <item translatable="yes">Auto FX</item>
                                           <item translatable="yes">Freeze + Auto FX</item>
+                                          <item translatable="yes">Break Beat</item>
                                         </items>
                                       </object>
                                       <packing>
@@ -11213,7 +11212,7 @@
 <object class="GtkLabel" id="audio_input_selector_label">
   <property name="visible">True</property>
   <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Master audio track</property>
+  <property name="label" translatable="yes">Audio source / sync provider</property>
   <property name="xalign">0</property>
 </object>
   <packing>
@@ -11230,7 +11229,7 @@
   <property name="active">0</property>
   <property name="hexpand">True</property>
   <property name="has-tooltip">True</property>
-  <property name="tooltip-text" translatable="yes">Choose the audio master: original video audio, external JACK, WAV file, or silence.</property>
+  <property name="tooltip-text" translatable="yes">Choose audible audio source or external sync provider. Original/Silence keep output local; JACK/WAV can provide external sync and, in monitor/bridge modes, external playback.</property>
   <items>
     <item translatable="yes">Original video audio</item>
     <item translatable="yes">JACK external</item>
@@ -11307,7 +11306,7 @@
   <property name="can-focus">True</property>
   <property name="receives-default">True</property>
   <property name="has-tooltip">True</property>
-  <property name="tooltip-text" translatable="yes">Choose a WAV file to use as the external master for Monitor, Tempo bridge, or Track align.</property>
+  <property name="tooltip-text" translatable="yes">Choose a WAV file to use as an external sync provider for Analyze, Monitor, Visual Tempo Follow, Tempo Match Bridge, or Track Align.</property>
   <signal name="clicked" handler="on_audio_sync_wav_browse_button_clicked" swapped="no"/>
 </object>
   <packing>
@@ -11363,7 +11362,7 @@
   <property name="hexpand">True</property>
 <child>
 <object class="GtkLabel" id="audio_sync_channels_label">
-  <property name="visible">False</property>
+  <property name="visible">True</property>
   <property name="can-focus">False</property>
   <property name="label" translatable="yes">JACK channels</property>
   <property name="xalign">0</property>
@@ -11377,7 +11376,7 @@
 </child>
 <child>
 <object class="GtkSpinButton" id="audio_sync_channels_spin">
-  <property name="visible">False</property>
+  <property name="visible">True</property>
   <property name="can-focus">True</property>
   <property name="adjustment">audio_sync_channels_adj</property>
   <property name="numeric">True</property>
@@ -11437,13 +11436,16 @@
 <object class="GtkComboBoxText" id="audio_sync_mode_combo">
   <property name="visible">True</property>
   <property name="can-focus">False</property>
-  <property name="active">3</property>
+  <property name="active">0</property>
   <property name="hexpand">True</property>
   <items>
-    <item translatable="yes">None</item>
-    <item translatable="yes">Tempo bridge</item>
-    <item translatable="yes">Track align</item>
-    <item translatable="yes">Monitor</item>
+    <item translatable="yes">Off - no external sync</item>
+    <item translatable="yes">Analyze External Tempo - control only</item>
+    <item translatable="yes">Clean Monitor - play external audio unchanged</item>
+    <item translatable="yes">Monitor + Trickplay - audio follows transport</item>
+    <item translatable="yes">Visual Tempo Follow - drive video/FX only</item>
+    <item translatable="yes">Tempo Match Bridge - stretch external audio</item>
+    <item translatable="yes">Track Align - waveform-lock video to master</item>
   </items>
   <signal name="changed" handler="on_audio_sync_mode_combo_changed" swapped="no"/>
 </object>
@@ -11470,7 +11472,7 @@
     <object class="GtkLabel" id="audio_master_sync_frame_label">
       <property name="visible">True</property>
       <property name="can-focus">False</property>
-      <property name="label" translatable="yes">Audio master track</property>
+      <property name="label" translatable="yes">Audio / External Sync</property>
       <property name="xalign">0</property>
     </object>
   </child>
@@ -11516,7 +11518,7 @@
 <object class="GtkLabel" id="audio_sync_target_bpm_label">
   <property name="visible">True</property>
   <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Target BPM</property>
+  <property name="label" translatable="yes">Clip BPM</property>
   <property name="xalign">0</property>
 </object>
   <packing>
@@ -11543,15 +11545,95 @@
   </packing>
 </child>
 <child>
-<object class="GtkLabel" id="audio_sync_phase_label">
+<object class="GtkButtonBox" id="audio_sync_tempo_target_buttons_box">
   <property name="visible">True</property>
   <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Phase</property>
+  <property name="layout-style">start</property>
+  <property name="spacing">4</property>
+  <child>
+    <object class="GtkButton" id="audio_sync_use_clip_bpm_button">
+      <property name="label" translatable="yes">Use Clip BPM</property>
+      <property name="visible">True</property>
+      <property name="can-focus">True</property>
+      <property name="receives-default">True</property>
+      <signal name="clicked" handler="on_audio_sync_use_clip_bpm_button_clicked" swapped="no"/>
+    </object>
+  </child>
+  <child>
+    <object class="GtkButton" id="audio_sync_latch_clip_bpm_button">
+      <property name="label" translatable="yes">Latch BPM</property>
+      <property name="visible">True</property>
+      <property name="can-focus">True</property>
+      <property name="receives-default">True</property>
+      <signal name="clicked" handler="on_audio_sync_latch_clip_bpm_button_clicked" swapped="no"/>
+    </object>
+  </child>
+</object>
+  <packing>
+    <property name="left-attach">2</property>
+    <property name="top-attach">0</property>
+    <property name="width">1</property>
+    <property name="height">1</property>
+  </packing>
+</child>
+<child>
+<object class="GtkLabel" id="audio_sync_tempo_bend_label">
+  <property name="visible">True</property>
+  <property name="can-focus">False</property>
+  <property name="label" translatable="yes">Pitch / tempo bend</property>
   <property name="xalign">0</property>
 </object>
   <packing>
     <property name="left-attach">0</property>
     <property name="top-attach">1</property>
+    <property name="width">1</property>
+    <property name="height">1</property>
+  </packing>
+</child>
+<child>
+<object class="GtkScale" id="audio_sync_tempo_bend_scale">
+  <property name="visible">True</property>
+  <property name="can-focus">True</property>
+  <property name="orientation">horizontal</property>
+  <property name="adjustment">audio_sync_tempo_bend_adj</property>
+  <property name="digits">1</property>
+  <property name="draw-value">True</property>
+  <property name="value-pos">right</property>
+  <property name="hexpand">True</property>
+  <signal name="value-changed" handler="on_audio_sync_tempo_bend_value_changed" swapped="no"/>
+</object>
+  <packing>
+    <property name="left-attach">1</property>
+    <property name="top-attach">1</property>
+    <property name="width">1</property>
+    <property name="height">1</property>
+  </packing>
+</child>
+<child>
+<object class="GtkButton" id="audio_sync_tempo_bend_reset_button">
+  <property name="label" translatable="yes">Reset bend</property>
+  <property name="visible">True</property>
+  <property name="can-focus">True</property>
+  <property name="receives-default">True</property>
+  <signal name="clicked" handler="on_audio_sync_tempo_bend_reset_button_clicked" swapped="no"/>
+</object>
+  <packing>
+    <property name="left-attach">2</property>
+    <property name="top-attach">1</property>
+    <property name="width">1</property>
+    <property name="height">1</property>
+  </packing>
+</child>
+<child>
+<object class="GtkLabel" id="audio_sync_phase_label">
+  <property name="visible">True</property>
+  <property name="can-focus">False</property>
+  <property name="label" translatable="yes">Override phase</property>
+  <property name="xalign">0</property>
+</object>
+  <packing>
+    <property name="left-attach">0</property>
+    <property name="top-attach">2</property>
     <property name="width">1</property>
     <property name="height">1</property>
   </packing>
@@ -11566,7 +11648,7 @@
 </object>
   <packing>
     <property name="left-attach">1</property>
-    <property name="top-attach">1</property>
+    <property name="top-attach">2</property>
     <property name="width">1</property>
     <property name="height">1</property>
   </packing>
@@ -11575,12 +11657,12 @@
 <object class="GtkLabel" id="audio_sync_confidence_label">
   <property name="visible">True</property>
   <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Confidence</property>
+  <property name="label" translatable="yes">Override confidence</property>
   <property name="xalign">0</property>
 </object>
   <packing>
     <property name="left-attach">0</property>
-    <property name="top-attach">2</property>
+    <property name="top-attach">3</property>
     <property name="width">1</property>
     <property name="height">1</property>
   </packing>
@@ -11595,7 +11677,7 @@
 </object>
   <packing>
     <property name="left-attach">1</property>
-    <property name="top-attach">2</property>
+    <property name="top-attach">3</property>
     <property name="width">1</property>
     <property name="height">1</property>
   </packing>
@@ -11604,12 +11686,12 @@
 <object class="GtkLabel" id="audio_sync_correction_label">
   <property name="visible">True</property>
   <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Correction</property>
+  <property name="label" translatable="yes">Max correction</property>
   <property name="xalign">0</property>
 </object>
   <packing>
     <property name="left-attach">0</property>
-    <property name="top-attach">3</property>
+    <property name="top-attach">4</property>
     <property name="width">1</property>
     <property name="height">1</property>
   </packing>
@@ -11624,8 +11706,23 @@
 </object>
   <packing>
     <property name="left-attach">1</property>
-    <property name="top-attach">3</property>
+    <property name="top-attach">4</property>
     <property name="width">1</property>
+    <property name="height">1</property>
+  </packing>
+</child>
+<child>
+<object class="GtkLabel" id="audio_sync_follow_audio_warning">
+  <property name="visible">False</property>
+  <property name="can-focus">False</property>
+  <property name="label" translatable="yes">Original clip audio is audible: Visual Tempo Follow changes video speed, so the original audio will pitch/tempo-shift. Use Silence or external audio for video-only follow.</property>
+  <property name="wrap">True</property>
+  <property name="xalign">0</property>
+</object>
+  <packing>
+    <property name="left-attach">0</property>
+    <property name="top-attach">5</property>
+    <property name="width">3</property>
     <property name="height">1</property>
   </packing>
 </child>
@@ -11637,7 +11734,7 @@
     <object class="GtkLabel" id="audio_sync_tempo_frame_label">
       <property name="visible">True</property>
       <property name="can-focus">False</property>
-      <property name="label" translatable="yes">Tempo bridge</property>
+      <property name="label" translatable="yes">Tempo lock control</property>
       <property name="xalign">0</property>
     </object>
   </child>
@@ -11668,7 +11765,7 @@
         <object class="GtkLabel" id="audio_sync_track_hint_label">
           <property name="visible">True</property>
           <property name="can-focus">False</property>
-          <property name="label" translatable="yes">Track Align uses the selected master audio track as its external reference.</property>
+          <property name="label" translatable="yes">Track Align uses the selected external sync provider as its waveform reference.</property>
           <property name="wrap">True</property>
           <property name="xalign">0</property>
         </object>
@@ -12103,7 +12200,7 @@
 <object class="GtkLabel" id="audio_sync_bpm_value_label">
   <property name="visible">True</property>
   <property name="can-focus">False</property>
-  <property name="label" translatable="yes">BPM</property>
+  <property name="label" translatable="yes">Source BPM</property>
   <property name="xalign">0</property>
 </object>
   <packing>
@@ -12161,7 +12258,7 @@
 <object class="GtkLabel" id="audio_sync_bridge_active_value_label">
   <property name="visible">True</property>
   <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Bridge</property>
+  <property name="label" translatable="yes">Activity</property>
   <property name="xalign">0</property>
 </object>
   <packing>
@@ -12219,7 +12316,7 @@
 <object class="GtkLabel" id="audio_sync_correction_value_label">
   <property name="visible">True</property>
   <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Correction</property>
+  <property name="label" translatable="yes">Max correction</property>
   <property name="xalign">0</property>
 </object>
   <packing>
@@ -12248,7 +12345,7 @@
 <object class="GtkLabel" id="audio_sync_target_bpm_value_label">
   <property name="visible">True</property>
   <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Target BPM</property>
+  <property name="label" translatable="yes">Clip BPM</property>
   <property name="xalign">0</property>
 </object>
   <packing>
@@ -12335,7 +12432,7 @@
 <object class="GtkLabel" id="audio_sync_bridge_state_value_label">
   <property name="visible">True</property>
   <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Bridge state</property>
+  <property name="label" translatable="yes">Lock state</property>
   <property name="xalign">0</property>
 </object>
   <packing>
@@ -12368,7 +12465,7 @@
     <object class="GtkLabel" id="audio_sync_live_tempo_frame_label">
       <property name="visible">True</property>
       <property name="can-focus">False</property>
-      <property name="label" translatable="yes">Tempo bridge status</property>
+      <property name="label" translatable="yes">Tempo lock status</property>
       <property name="xalign">0</property>
     </object>
   </child>
@@ -22542,28 +22639,15 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                     <property name="can-focus">False</property>
                     <child>
                       <object class="GtkLabel" id="cpumeter">
-                        <property name="width-request">110</property>
+                        <property name="width-request">180</property>
                         <property name="visible">True</property>
                         <property name="can-focus">False</property>
-                        <property name="label" translatable="yes">CPU meter</property>
+                        <property name="label" translatable="yes">Frame time</property>
                       </object>
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">False</property>
                         <property name="position">0</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <object class="GtkLabel" id="cachemeter">
-                        <property name="width-request">96</property>
-                        <property name="visible">True</property>
-                        <property name="can-focus">False</property>
-                        <property name="label" translatable="yes">Cache filled</property>
-                      </object>
-                      <packing>
-                        <property name="expand">False</property>
-                        <property name="fill">False</property>
-                        <property name="position">1</property>
                       </packing>
                     </child>
                   </object>

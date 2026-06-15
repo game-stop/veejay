@@ -1,20 +1,5 @@
 /* Gveejay Reloaded - graphical interface for VeeJay
- * 	     (C) 2002-2005 Niels Elburg <nwelburg@gmail.com> 
- *
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * 	     (C) 2002-2005 Niels Elburg <nwelburg@gmail.com>
  */
 
 #ifndef VJCURVE_H
@@ -35,7 +20,7 @@ void reset_curve( GtkWidget *curve );
 void get_points_from_curve( GtkWidget *curve, int len, float *v );
 void set_initial_curve( GtkWidget *curve, int fx_id, int parameter_id, int start, int end, int value, double fps );
 void curve_set_position ( GtkWidget *curve, double pos);
-void curve_set_predefined_shape( GtkWidget *curve, int fx_id, int parameter_id, int start, int end, 
+void curve_set_predefined_shape( GtkWidget *curve, int fx_id, int parameter_id, int start, int end,
     int shape, int minb, int maxb, int steps, gboolean revers, double fps);
 void gtk3_curve_set_x_timeline(GtkWidget *widget, gfloat min_x, gfloat max_x);
 void gtk3_curve_get_x_timeline(GtkWidget *widget, gfloat *min_x, gfloat *max_x);

@@ -81,6 +81,53 @@ static gpointer castIntToGpointer(int val)
 }
 
 #define MAX_SLOW 25
+
+#ifndef VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY
+#define VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY (VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW + 1)
+#endif
+#undef VJ_AUDIO_SYNC_MODE_MAX
+#define VJ_AUDIO_SYNC_MODE_MAX VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY
+
+static inline int ui_audio_sync_mode_is_control_only(int mode)
+{
+    return mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL;
+}
+
+static inline int ui_audio_sync_mode_is_tempo_follow(int mode)
+{
+    return mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW;
+}
+
+static inline int ui_audio_sync_mode_is_clean_monitor(int mode)
+{
+    return mode == VJ_AUDIO_SYNC_MODE_MONITOR;
+}
+
+static inline int ui_audio_sync_mode_is_trickplay_monitor(int mode)
+{
+    return mode == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY;
+}
+
+static inline int ui_audio_sync_mode_supports_wav_master(int mode)
+{
+    return mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL ||
+           mode == VJ_AUDIO_SYNC_MODE_MONITOR ||
+           mode == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY ||
+           mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW ||
+           mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
+           mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN;
+}
+
+static inline int ui_audio_sync_mode_uses_external_provider(int mode)
+{
+    return mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL ||
+           mode == VJ_AUDIO_SYNC_MODE_MONITOR ||
+           mode == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY ||
+           mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW ||
+           mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
+           mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN;
+}
+
 #define QUICKSELECT_SLOTS 10
 #define MAX_WIDGET_CACHE 512
 
@@ -452,7 +499,6 @@ enum {
   WIDGET_LABEL_CURRENTSOURCE = 350,
   WIDGET_ENTRY_SAMPLENAME = 351,
   WIDGET_CPUMETER = 352,
-  WIDGET_CACHEMETER = 353,
   WIDGET_SPIN_FRAMEDELAY = 354,
   WIDGET_ENTRY_HOSTNAME = 355,
   WIDGET_BUTTON_PORTNUM = 356,
@@ -702,7 +748,6 @@ static struct
     { "label_currentsource",    WIDGET_LABEL_CURRENTSOURCE },
     { "entry_samplename",      WIDGET_ENTRY_SAMPLENAME },
     { "cpumeter",              WIDGET_CPUMETER },
-    { "cachemeter",            WIDGET_CACHEMETER },
     { "spin_framedelay",       WIDGET_SPIN_FRAMEDELAY },
     { "entry_hostname",        WIDGET_ENTRY_HOSTNAME },
     { "button_portnum",        WIDGET_BUTTON_PORTNUM },
@@ -1047,14 +1092,14 @@ static struct
     {"Filter the effects list by any string"},
     {"Shift + Mouse left : Toogle selected fx,\nControl + Mouse left : Toogle selected fx anim"},
 
-    {"Enable or disable the JACK audio beat detector. The detector can stay available even when normal audio playback is disabled."},
-    {"Action performed on beat hits: none, freeze, auto FX modulation, or freeze plus auto FX."},
-    {"Number of JACK input channels analysed by the beat detector."},
+    {"Enable or disable the audio beat detector. It analyses Original video audio when that source is selected, or the selected JACK/WAV external provider."},
+    {"Action performed on beat hits: none, freeze, auto FX modulation, freeze plus auto FX, or Break Beat transport scratching."},
+    {"Number of JACK input channels analysed by the beat detector when JACK is the selected beat source."},
     {"Beat trigger sensitivity. Lower values trigger more easily; higher values require stronger transients."},
     {"Minimum time between accepted beat hits. Increase this to avoid double triggers."},
-    {"How long playback is frozen when the freeze action is active."},
-    {"Duration of the beat pulse signal used for short one-shot visual reactions."},
-    {"Duration of the beat gate signal used for held visual reactions."},
+    {"Freeze action: freeze/open duration. Break Beat: playback burst window after each accepted beat."},
+    {"Duration of the beat pulse signal used for short one-shot visual reactions. Break Beat reuses this as scratch/slice size."},
+    {"Duration of the beat gate signal used for held visual reactions. Break Beat reuses this as the repeat-anchor memory window."},
     {"Automatic FX mapping mode. Higher modes use more motion, memory, and chaos-oriented parameter roles."},
     {"Global intensity of automatic FX parameter modulation."},
     {"Restart beat analysis for the current audio source. This clears detector history, beat timing, pulse/gate state, and re-arms the analysis reader; it does not change Auto FX mapping."},
@@ -1075,14 +1120,14 @@ static struct
     {"Sample rate reported by the JACK beat input."},
     {"Monotonic hit sequence number for detecting new beat events in the UI."},
 
-    {"Enable or disable external audio sync. Mode 1 is control-only analysis; modes 4, 5, 2, and 3 can affect audible playback or video transport."},
-    {"Mode guide: 1 analyzes external tempo only; 4 monitors external audio cleanly; 5 makes veejay follow external tempo; 2 tempo-matches external audio with master-tempo style stretching; 3 performs waveform track alignment."},
-    {"External sync provider source used by analysis/bridge internals. Control-only and Tempo follow use JACK input."},
+    {"Enable or disable external audio sync. Analyze mode listens only; Visual Tempo Follow drives video/FX only; monitor/bridge/align modes may use external audio playback or waveform sync."},
+    {"Mode guide: Off disables external sync. Analyze External Tempo listens only and exports BPM/phase/control. Clean Monitor plays external audio unchanged. Monitor + Trickplay makes external audio follow pause/reverse/speed/SFD/rate. Visual Tempo Follow drives video/FX only. Tempo Match Bridge stretches external audio. Track Align waveform-locks video to the external sync provider."},
+    {"External sync provider source. JACK is for live input; WAV can be used by analyze, monitor, Visual Tempo Follow, Tempo Match Bridge, and Track Align modes."},
     {"Number of channels to capture from JACK for the external sync source."},
     {"Target tempo for tempo-match mode, in beats per minute."},
     {"Target beat phase sent to the tempo-match clock."},
     {"Confidence of the target clock; high confidence allows stronger tempo matching."},
-    {"Maximum tempo-match phase correction percentage, 0-25."},
+    {"Maximum tempo correction percentage, 0-25. Used by Visual Tempo Follow and Tempo Match Bridge."},
     {"Path to a clean external WAV file used as sync source."},
     {"Loop the WAV source when it reaches the end."},
     {"Use JACK input as the external sync provider source."},
@@ -1099,20 +1144,20 @@ static struct
     {"Current audio sync source sample rate."},
     {"Measured or target audio sync tempo."},
     {"Current audio sync confidence."},
-    {"Current activity: control-only analysis, audible playback, Tempo follow, or no external sync."},
-    {"Current tempo ratio, scaled as 1.000 = neutral. Monitor mode normally stays close to 1.000."},
-    {"Current tempo correction amount reported by the backend."},
-    {"Current tempo-match target BPM reported by the backend."},
-    {"Current tempo-match target confidence reported by the backend."},
+    {"Current activity: analyze-only, clean monitor, monitor trickplay, Visual Tempo Follow, Tempo Match Bridge, Track Align, or no external sync."},
+    {"Current tempo ratio, scaled as 1.000 = neutral. Visual Tempo Follow applies this to video timing; Tempo Match Bridge applies it to external audio."},
+    {"Current tempo correction amount reported by the backend; 1.000 is neutral."},
+    {"Current target BPM reported by the backend. In Visual Tempo Follow this is derived from the current clip."},
+    {"Current target-clock confidence reported by the backend."},
     {"Configured maximum tempo-match correction percentage."},
-    {"Current tempo-match lock state: idle, waiting, locked, hold, or fallback."},
+    {"Current tempo lock state: idle, waiting, locked, hold, or fallback."},
     {"Whether waveform track alignment is currently locked."},
-    {"Waveform alignment offset in milliseconds. Positive means the clip/video is late relative to the external master."},
+    {"Waveform alignment offset in milliseconds. Positive means the clip/video is late relative to the external sync provider."},
     {"Waveform correlation confidence for track alignment."},
     {"Current video timing correction requested by track alignment, in parts per million."},
     {"Current waveform track alignment state: idle, waiting, searching, locked, hold, or fallback."},
 
-    {"Choose a WAV file to use as the external master. WAV can drive clean monitor, tempo-match, or track align modes. Control-only and Tempo follow use JACK input."},
+    {"Choose a WAV file to use as the external sync provider. WAV can drive Analyze, Monitor, Monitor + Trickplay, Visual Tempo Follow, Tempo Match Bridge, or Track Align."},
     {"Mute or unmute the audible output. Beat analysis and sync providers may continue to run."},
     {"Enable beat-triggered control for the currently selected FX chain entry. Select an entry first."},
     {"Enable the Global FX chain for the current sample or stream. Backend status confirms the final state."},
@@ -1150,18 +1195,20 @@ static const char *audio_sync_mode_name(int mode)
 {
     switch(mode) {
         case VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL:
-            return "Control only";
+            return "Analyze external tempo";
         case VJ_AUDIO_SYNC_MODE_MONITOR:
             return "Clean monitor";
+        case VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY:
+            return "Monitor + trickplay";
         case VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW:
-            return "Tempo follow";
+            return "Visual tempo follow";
         case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE:
-            return "Tempo match";
+            return "Tempo match bridge";
         case VJ_AUDIO_SYNC_MODE_TRACK_ALIGN:
-            return "Track alignment";
+            return "Track align";
         case 0:
         default:
-            return "None";
+            return "Off";
     }
 }
 
@@ -1171,7 +1218,7 @@ static const char *audio_sync_source_name(int source)
     switch(source) {
         case VJ_AUDIO_SYNC_SOURCE_JACK:     return "JACK";
         case VJ_AUDIO_SYNC_SOURCE_WAV_FILE: return "WAV";
-        case VJ_AUDIO_SYNC_SOURCE_PUSH:     return "Push";
+        case VJ_AUDIO_SYNC_SOURCE_PUSH:     return "Original";
         default: return "None";
     }
 }
@@ -1400,35 +1447,35 @@ enum
 #define ENTRY_PARAMSET ENTRY_P0
 
 #ifndef STATUS_CHAIN_ENTRY_FXID
-#define STATUS_CHAIN_ENTRY_FXID                 82
-#define STATUS_CHAIN_ENTRY_ISVIDEO              83
-#define STATUS_CHAIN_ENTRY_NUM_PARAMETERS       84
-#define STATUS_CHAIN_ENTRY_KF_TYPE              85
-#define STATUS_CHAIN_ENTRY_KF_STATUS            86
-#define STATUS_CHAIN_ENTRY_TRANSITION_ENABLED   87
-#define STATUS_CHAIN_ENTRY_TRANSITION_LOOP      88
-#define STATUS_CHAIN_ENTRY_SOURCE               89
-#define STATUS_CHAIN_ENTRY_CHANNEL              90
-#define STATUS_CHAIN_ENTRY_VIDEO_ENABLED        91
-#define STATUS_CHAIN_ENTRY_BEAT_FLAG            92
-#define STATUS_CHAIN_ENTRY_SUBRENDER_ENTRY      93
-#define STATUS_CHAIN_ENTRY_P0                   94
-#define STATUS_CHAIN_ENTRY_P1                   95
-#define STATUS_CHAIN_ENTRY_P2                   96
-#define STATUS_CHAIN_ENTRY_P3                   97
-#define STATUS_CHAIN_ENTRY_P4                   98
-#define STATUS_CHAIN_ENTRY_P5                   99
-#define STATUS_CHAIN_ENTRY_P6                   100
-#define STATUS_CHAIN_ENTRY_P7                   101
-#define STATUS_CHAIN_ENTRY_P8                   102
-#define STATUS_CHAIN_ENTRY_P9                   103
-#define STATUS_CHAIN_ENTRY_P10                  104
-#define STATUS_CHAIN_ENTRY_P11                  105
-#define STATUS_CHAIN_ENTRY_P12                  106
-#define STATUS_CHAIN_ENTRY_P13                  107
-#define STATUS_CHAIN_ENTRY_P14                  108
-#define STATUS_CHAIN_ENTRY_P15                  109
-#define STATUS_CHAIN_ENTRY_LAST                 110
+#define STATUS_CHAIN_ENTRY_FXID                 83
+#define STATUS_CHAIN_ENTRY_ISVIDEO              84
+#define STATUS_CHAIN_ENTRY_NUM_PARAMETERS       85
+#define STATUS_CHAIN_ENTRY_KF_TYPE              86
+#define STATUS_CHAIN_ENTRY_KF_STATUS            87
+#define STATUS_CHAIN_ENTRY_TRANSITION_ENABLED   88
+#define STATUS_CHAIN_ENTRY_TRANSITION_LOOP      89
+#define STATUS_CHAIN_ENTRY_SOURCE               90
+#define STATUS_CHAIN_ENTRY_CHANNEL              91
+#define STATUS_CHAIN_ENTRY_VIDEO_ENABLED        92
+#define STATUS_CHAIN_ENTRY_BEAT_FLAG            93
+#define STATUS_CHAIN_ENTRY_SUBRENDER_ENTRY      94
+#define STATUS_CHAIN_ENTRY_P0                   95
+#define STATUS_CHAIN_ENTRY_P1                   96
+#define STATUS_CHAIN_ENTRY_P2                   97
+#define STATUS_CHAIN_ENTRY_P3                   98
+#define STATUS_CHAIN_ENTRY_P4                   99
+#define STATUS_CHAIN_ENTRY_P5                   100
+#define STATUS_CHAIN_ENTRY_P6                   101
+#define STATUS_CHAIN_ENTRY_P7                   102
+#define STATUS_CHAIN_ENTRY_P8                   103
+#define STATUS_CHAIN_ENTRY_P9                   104
+#define STATUS_CHAIN_ENTRY_P10                  105
+#define STATUS_CHAIN_ENTRY_P11                  106
+#define STATUS_CHAIN_ENTRY_P12                  107
+#define STATUS_CHAIN_ENTRY_P13                  108
+#define STATUS_CHAIN_ENTRY_P14                  109
+#define STATUS_CHAIN_ENTRY_P15                  110
+#define STATUS_CHAIN_ENTRY_LAST                 111
 #define STATUS_CHAIN_ENTRY_TOKENS \
     (STATUS_CHAIN_ENTRY_LAST - STATUS_CHAIN_ENTRY_FXID)
 #endif
@@ -1674,9 +1721,11 @@ typedef struct {
 #define UI_VJE_SUMMARY_BEAT_HINT_WIDTH 61
 
 #define UI_VJ_BEAT_F_REJECT          (1u << 0)
+#define UI_VJ_BEAT_F_DISCRETE        (1u << 2)
 #define UI_VJ_BEAT_F_STRUCTURAL      (1u << 3)
 #define UI_VJ_BEAT_F_IMPULSE         (1u << 6)
 #define UI_VJ_BEAT_F_REBUILDS_STATE  (1u << 11)
+#define UI_VJ_BEAT_F_INVERTED        (1u << 13)
 
 typedef enum {
     UI_VJ_BEAT_OFF = 0,
@@ -1766,7 +1815,6 @@ typedef struct
     gint connecting;
     gint streamrecording;
     gint samplerecording;
-    gint cachemeter;
     gint image_w;
     gint image_h;
     veejay_el_t el;
@@ -2184,6 +2232,7 @@ static void timeline_update_compact_overlay(void)
             sync_mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW ||
             sync_mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN ||
             sync_mode == VJ_AUDIO_SYNC_MODE_MONITOR ||
+            sync_mode == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY ||
             sync_mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL))
         {
             grid_active = 1;
@@ -2224,7 +2273,11 @@ static void timeline_update_compact_overlay(void)
 static int get_vj_kf_active_parameter(void) {
     GtkWidget* curveparam = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
     gint active_kf_param_num = gtk_combo_box_get_active (GTK_COMBO_BOX(curveparam));
-    return active_kf_param_num;
+
+    if(active_kf_param_num <= 0)
+        return -1;
+
+    return active_kf_param_num - 1;
 }
 
 static void vj_kf_reset_shape_combo(void)
@@ -2729,12 +2782,13 @@ static void combo_replace_texts(GtkWidget *combo, const char * const *items, int
 static void init_audio_sync_mode_combo(void)
 {
     static const char * const mode_items[] = {
-        "None",
-        "Control only - analyze external tempo",
-        "Monitor - hear external audio cleanly",
-        "Tempo follow - follow external tempo",
-        "Tempo match - master-tempo stretch",
-        "Track align - waveform lock"
+        "Off - no external sync",
+        "Analyze External Tempo - control only",
+        "Clean Monitor - play external audio unchanged",
+        "Monitor + Trickplay - audio follows transport",
+        "Visual Tempo Follow - drive video/FX only",
+        "Tempo Match Bridge - stretch external audio",
+        "Track Align - waveform-lock video to master"
     };
 
     combo_replace_texts(widget_cache[WIDGET_AUDIO_SYNC_MODE_COMBO],
@@ -4155,7 +4209,6 @@ void gveejay_popup_err( const char *type, char *msg )
     message_dialog( type, msg );
 }
 
-void donatenow(void);
 void update_gui(void);
 
 int veejay_get_sample_image(int id, int type, int wid, int hei)
@@ -4274,6 +4327,33 @@ static GtkWidget *record_audio_source_widget_for_local(int source, int stream_pa
     }
 }
 
+static int audio_input_selector_active_from_record_source_local(int source)
+{
+    switch(source) {
+        case VJ_RECORD_AUDIO_SOURCE_BEAT_JACK:
+            return 1;
+        case VJ_RECORD_AUDIO_SOURCE_SILENCE:
+            return 3;
+        case VJ_RECORD_AUDIO_SOURCE_AUTO:
+        case VJ_RECORD_AUDIO_SOURCE_ORIGINAL:
+        default:
+            return 0;
+    }
+}
+
+static void audio_input_selector_set_from_record_source_local(int source)
+{
+    GtkWidget *w = widget_cache[WIDGET_AUDIO_INPUT_SELECTOR_COMBO];
+    int active;
+
+    if(!w || !GTK_IS_COMBO_BOX(w))
+        return;
+
+    active = audio_input_selector_active_from_record_source_local(source);
+    if(gtk_combo_box_get_active(GTK_COMBO_BOX(w)) != active)
+        gtk_combo_box_set_active(GTK_COMBO_BOX(w), active);
+}
+
 static void record_audio_source_sync_groups(int source)
 {
     int old_lock;
@@ -4288,7 +4368,7 @@ static void record_audio_source_sync_groups(int source)
 
     record_audio_source_set_radio_local(record_audio_source_widget_for_local(source, 0), 1);
     record_audio_source_set_radio_local(record_audio_source_widget_for_local(source, 1), 1);
-    audio_input_selector_sync_from_status();
+    audio_input_selector_set_from_record_source_local(source);
 
     info->status_lock = old_lock;
 }
@@ -4487,24 +4567,91 @@ static int get_slider_val(const char *name)
     return (int) gtk_adjustment_get_value (a);
 }
 
+static void audio_beat_update_curve_live_traces(gboolean push_samples);
+
+static int vj_kf_timeline_length(void)
+{
+    int pm = info->status_tokens[PLAY_MODE];
+    int len = 0;
+
+    if(pm == MODE_SAMPLE) {
+        int sample_start = info->status_tokens[SAMPLE_START];
+        int sample_end = info->status_tokens[SAMPLE_END];
+
+        if(sample_end < sample_start) {
+            int t = sample_start;
+            sample_start = sample_end;
+            sample_end = t;
+        }
+
+        len = sample_end - sample_start + 1;
+    }
+    else if(pm == MODE_STREAM) {
+        len = info->status_tokens[SAMPLE_MARKER_END];
+    }
+    else {
+        len = info->status_tokens[TOTAL_FRAMES];
+    }
+
+    if(len < 1)
+        len = 1;
+
+    return len;
+}
+
+static int vj_kf_timeline_position(void)
+{
+    int pm = info->status_tokens[PLAY_MODE];
+    int len = vj_kf_timeline_length();
+    int pos = info->status_tokens[FRAME_NUM];
+
+    if(pm == MODE_SAMPLE)
+        pos -= info->status_tokens[SAMPLE_START];
+
+    if(pos < 0)
+        pos = 0;
+    else if(pos >= len)
+        pos = len - 1;
+
+    return pos;
+}
+
 static void vj_kf_reset_panel(void)
 {
     int osl = info->status_lock;
 
     info->status_lock = 1;
     reset_curve( info->curve );
-    int total_frames = (info->status_tokens[PLAY_MODE] == MODE_STREAM ?
-                        info->status_tokens[SAMPLE_MARKER_END] :
-                        ( info->status_tokens[PLAY_MODE] == MODE_SAMPLE ? info->status_tokens[TOTAL_FRAMES]: 0) );
+
+    int total_frames = vj_kf_timeline_length();
+    int max_x = (total_frames > 1 ? total_frames - 1 : 1);
+    int pos = vj_kf_timeline_position();
 
     int lo = (info->selection[0] == info->selection[1] ? 0 : info->selection[0]);
-    int hi = (info->selection[1] > info->selection[0] ? info->selection[1] : total_frames );
+    int hi = (info->selection[1] > info->selection[0] ? info->selection[1] : max_x );
+
+    if(lo < 0)
+        lo = 0;
+    else if(lo > max_x)
+        lo = max_x;
+
+    if(hi < 0)
+        hi = 0;
+    else if(hi > max_x)
+        hi = max_x;
+
     if( lo == hi ) {
         lo = 0;
-        hi = total_frames;
+        hi = max_x;
     }
-    update_spin_range2( widget_cache[WIDGET_CURVE_SPINSTART], 0, total_frames, lo );
-    update_spin_range2( widget_cache[WIDGET_CURVE_SPINEND], 0, total_frames, hi );
+
+    gtk3_curve_set_range(info->curve, 0.0f, (gfloat)max_x, 0.0f, 100.0f);
+    gtk3_curve_set_x_timeline(info->curve, 0.0f, (gfloat)max_x);
+    gtk3_curve_set_x_view(info->curve, 0.0f, (gfloat)max_x);
+    curve_set_position(info->curve, (gdouble)pos);
+
+    update_spin_range2( widget_cache[WIDGET_CURVE_SPINSTART], 0, max_x, lo );
+    update_spin_range2( widget_cache[WIDGET_CURVE_SPINEND], 0, max_x, hi );
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]))) {
         gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE );
@@ -4513,7 +4660,7 @@ static void vj_kf_reset_panel(void)
     GtkWidget* curveparam = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
     gtk_combo_box_set_active (GTK_COMBO_BOX(curveparam),0);
 
-    info->uc.selected_parameter_id = 0;
+    info->uc.selected_parameter_id = -1;
     info->uc.reload_hint_checksums[HINT_KF] = -1;
     vj_kf_reset_shape_combo();
 
@@ -4539,8 +4686,10 @@ static void vj_kf_refresh(gboolean force)
         gtk_widget_set_sensitive_( widget_cache[WIDGET_FRAME_FXTREE3] , TRUE );
         update_curve_widget( info->curve );
     } else {
-        vj_kf_reset_panel();
-        gtk_widget_set_sensitive_( widget_cache[WIDGET_FRAME_FXTREE3], FALSE );
+        gtk_widget_set_sensitive_( widget_cache[WIDGET_FRAME_FXTREE3], TRUE );
+        if(info->uc.selected_parameter_id >= 0)
+            vj_kf_reset_panel();
+        update_curve_widget( info->curve );
     }
 }
 
@@ -4561,6 +4710,78 @@ static void update_curve_widget(GtkWidget *curve)
     int p = -1;
     int shape = 0;
     int status = 0;
+
+    if(info->uc.selected_parameter_id < 0) {
+        static int last_none_pm = INT_MIN;
+        int pm = info->status_tokens[PLAY_MODE];
+        int len = 1;
+        int pos = info->status_tokens[FRAME_NUM];
+        gfloat max_x;
+        gfloat old_min_x = 0.0f;
+        gfloat old_max_x = 1.0f;
+        gboolean have_old_range = FALSE;
+        gboolean domain_changed = TRUE;
+        gboolean clear_for_none = FALSE;
+
+        if(pm == MODE_SAMPLE) {
+            int sample_start = info->status_tokens[SAMPLE_START];
+            int sample_end = info->status_tokens[SAMPLE_END];
+
+            if(sample_end < sample_start) {
+                int t = sample_start;
+                sample_start = sample_end;
+                sample_end = t;
+            }
+
+            len = sample_end - sample_start + 1;
+            pos = info->status_tokens[FRAME_NUM] - sample_start;
+        }
+        else if(pm == MODE_STREAM) {
+            len = info->status_tokens[SAMPLE_MARKER_END];
+        }
+        else {
+            len = info->status_tokens[TOTAL_FRAMES];
+        }
+
+        if(len < 1)
+            len = 1;
+
+        if(pos < 0)
+            pos = 0;
+        else if(pos >= len)
+            pos = len - 1;
+
+        max_x = (gfloat)((len > 1) ? (len - 1) : 1);
+
+        gtk3_curve_get_x_timeline(curve, &old_min_x, &old_max_x);
+        have_old_range = (isfinite(old_min_x) && isfinite(old_max_x) && old_max_x > old_min_x);
+        domain_changed = (!have_old_range ||
+                          last_none_pm != pm ||
+                          fabs((double)old_min_x) > 0.0001 ||
+                          fabs((double)old_max_x - (double)max_x) > 0.0001);
+        clear_for_none = domain_changed || !is_curve_empty();
+
+        if(clear_for_none) {
+            reset_curve(curve);
+            gtk3_curve_live_trace_clear(curve);
+            gtk3_curve_set_range(curve, 0.0f, max_x, 0.0f, 100.0f);
+            gtk3_curve_set_x_timeline(curve, 0.0f, max_x);
+            gtk3_curve_set_x_view(curve, 0.0f, max_x);
+        }
+
+        last_none_pm = pm;
+        curve_set_position(curve, (gdouble)pos);
+
+        if(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM] &&
+           gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM])))
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE);
+        info->uc.reload_hint_checksums[HINT_KF] = -1;
+        vj_kf_reset_shape_combo();
+        for(int k = 0; k < MAX_UI_PARAMETERS; k++)
+            update_slider_state(k, FALSE);
+        audio_beat_update_curve_live_traces(FALSE);
+        return;
+    }
 
     multi_vims( VIMS_SAMPLE_KF_GET, "%d %d",i,info->uc.selected_parameter_id );
 
@@ -4588,12 +4809,18 @@ static void update_curve_widget(GtkWidget *curve)
             hi = info->status_tokens[SAMPLE_END];
         } else {
             lo = 0;
-            hi = info->status_tokens[SAMPLE_MARKER_END];
+            hi = (info->status_tokens[PLAY_MODE] == MODE_STREAM ?
+                  info->status_tokens[SAMPLE_MARKER_END] :
+                  info->status_tokens[TOTAL_FRAMES]);
         }
     }
+
     int total_frames = (info->status_tokens[PLAY_MODE] == MODE_STREAM ?
                         info->status_tokens[SAMPLE_MARKER_END] :
-                        ( info->status_tokens[PLAY_MODE] == MODE_SAMPLE ? info->status_tokens[TOTAL_FRAMES]: 0) );
+                        info->status_tokens[TOTAL_FRAMES]);
+    if(total_frames < 1)
+        total_frames = 1;
+
     update_spin_range2( widget_cache[WIDGET_CURVE_SPINSTART],0, total_frames, lo );
     update_spin_range2( widget_cache[WIDGET_CURVE_SPINEND], 0, total_frames, hi );
 
@@ -5226,6 +5453,21 @@ static gboolean chain_update_row(GtkTreeModel * model,
     return FALSE;
 }
 
+static void refresh_selected_chain_row_from_status(void)
+{
+    GtkWidget *tree = glade_xml_get_widget_(info->main_window, "tree_chain");
+
+    if(!tree || !GTK_IS_TREE_VIEW(tree))
+        return;
+
+    GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(tree));
+
+    if(!model)
+        return;
+
+    gtk_tree_model_foreach(model, chain_update_row, (gpointer) info);
+}
+
 
 static void update_record_tab(int pm)
 {
@@ -5707,17 +5949,6 @@ void reportbug (void)
              "firefox \"https://github.com/game-stop/veejay/issues &" );
 
     puts(URL);
-
-    if( system(URL) <= 0 ) {
-        veejay_msg(VEEJAY_MSG_ERROR, "Unable to open browser to veejay homepage");
-    }
-}
-
-void donatenow(void)
-{
-    char URL[512];
-    snprintf(URL , sizeof(URL),
-             "firefox \"http://www.veejayhq.net/contributing\" &" );
 
     if( system(URL) <= 0 ) {
         veejay_msg(VEEJAY_MSG_ERROR, "Unable to open browser to veejay homepage");
@@ -8442,16 +8673,6 @@ static gboolean update_cpumeter_timeout( gpointer data )
     return TRUE;
 }
 
-static gboolean update_cachemeter_timeout( gpointer data )
-{
-    char text[32];
-    gint v = info->status_tokens[TOTAL_MEM];
-    snprintf(text, sizeof(text), "%d MB cached", v);
-    update_label_str2(widget_cache[WIDGET_CACHEMETER], text);
-
-    return TRUE;
-}
-
 static gboolean update_sample_record_timeout(gpointer data)
 {
     (void)data;
@@ -8942,26 +9163,924 @@ static void audio_beat_set_label_s(int widget_id, const char *txt)
 static void audio_beat_set_toggle(int widget_id, int value)
 {
     GtkWidget *w = widget_cache[widget_id];
+    int old_lock;
 
     if(!w || !GTK_IS_TOGGLE_BUTTON(w))
         return;
 
     value = value ? 1 : 0;
 
-    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) != value)
-        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), value);
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == value)
+        return;
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), value ? TRUE : FALSE);
+    info->status_lock = old_lock;
+}
+
+static void audio_beat_status_set_widget_sensitive(int widget_id, int sensitive)
+{
+    GtkWidget *w = widget_cache[widget_id];
+
+    if(w)
+        gtk_widget_set_sensitive(w, sensitive ? TRUE : FALSE);
+}
+
+static void audio_beat_status_update_action_sensitivity(int action)
+{
+    const int uses_freeze = (action == 1 || action == 3 || action == 4);
+    const int uses_auto = (action == 2 || action == 3 || action == 4);
+
+    audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_FREEZE_SCALE, uses_freeze);
+    audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_FREEZE_SPIN, uses_freeze);
+    audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_MODE_COMBO, uses_auto);
+    audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SCALE, uses_auto);
+    audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SPIN, uses_auto);
+    audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_RESET_BUTTON, uses_auto);
+}
+
+static void audio_beat_set_action_combo_from_status(int action)
+{
+    GtkWidget *w = widget_cache[WIDGET_AUDIO_BEAT_ACTION_COMBO];
+    int old_lock;
+
+    if(action < 0 || action > 4)
+        action = 0;
+
+    audio_beat_status_update_action_sensitivity(action);
+
+    if(!w || !GTK_IS_COMBO_BOX(w))
+        return;
+
+    if(gtk_combo_box_get_active(GTK_COMBO_BOX(w)) == action)
+        return;
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+    gtk_combo_box_set_active(GTK_COMBO_BOX(w), action);
+    info->status_lock = old_lock;
+}
+
+
+static int audio_beat_selected_fx_value_norm(char *label, size_t label_len)
+{
+    int param;
+    int fx_id;
+    int np;
+    int lo = 0;
+    int hi = 0;
+    int value;
+
+    if(label && label_len > 0)
+        g_strlcpy(label, "FX", label_len);
+
+    if(!info)
+        return 0;
+
+    param = info->uc.selected_parameter_id;
+    fx_id = info->uc.entry_tokens[ENTRY_FXID];
+    np = info->uc.entry_tokens[ENTRY_NUM_PARAMETERS];
+
+    if(fx_id <= 0 || param < 0 || param >= np || param >= SAMPLE_MAX_PARAMETERS)
+        return 0;
+
+    value = info->uc.entry_tokens[ENTRY_P0 + param];
+
+    if(!_effect_get_minmax(fx_id, &lo, &hi, param) || hi == lo)
+        return 0;
+
+    if(label && label_len > 0)
+        g_snprintf(label, label_len, "FX p%d", param);
+
+    if(hi < lo) {
+        int t = lo;
+        lo = hi;
+        hi = t;
+    }
+
+    if(value < lo)
+        value = lo;
+    else if(value > hi)
+        value = hi;
+
+    return (int)((((double)value - (double)lo) * 100.0) / ((double)hi - (double)lo) + 0.5);
+}
+
+static int audio_beat_curve_param_has_active_curve(void)
+{
+    if(is_curve_empty())
+        return 0;
+
+    if(!widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM] ||
+       !GTK_IS_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]))
+        return 0;
+
+    return gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM])) ? 1 : 0;
+}
+
+static int audio_beat_trace_value(int token)
+{
+    int v = info->status_tokens[token];
+
+    if(v < 0)
+        return 0;
+    if(v > 100)
+        return 100;
+
+    return v;
+}
+
+#define AUDIO_BEAT_UI_STALE_TICKS 8
+
+static int audio_beat_live_status_ready(void)
+{
+    return (info &&
+            info->status_tokens[AUDIO_BEAT_ENABLED] &&
+            info->status_tokens[AUDIO_BEAT_OPEN] &&
+            info->status_tokens[AUDIO_BEAT_SAMPLE_RATE] > 0);
+}
+
+static int audio_beat_live_widgets_ready(void)
+{
+    return (widget_cache[WIDGET_AUDIO_BEAT_LEVEL_BAR] &&
+            widget_cache[WIDGET_AUDIO_BEAT_ENVELOPE_BAR] &&
+            widget_cache[WIDGET_AUDIO_BEAT_TRANSIENT_BAR] &&
+            widget_cache[WIDGET_AUDIO_BEAT_FLUX_BAR] &&
+            widget_cache[WIDGET_AUDIO_BEAT_BASS_BAR] &&
+            widget_cache[WIDGET_AUDIO_BEAT_MID_BAR] &&
+            widget_cache[WIDGET_AUDIO_BEAT_HIGH_BAR] &&
+            widget_cache[WIDGET_AUDIO_BEAT_GATE_BAR] &&
+            widget_cache[WIDGET_AUDIO_BEAT_PULSE_BAR]);
+}
+
+static int audio_beat_live_payload_changed(int *history, int force)
+{
+    static const int tokens[] = {
+        AUDIO_BEAT_LEVEL,
+        AUDIO_BEAT_ENVELOPE,
+        AUDIO_BEAT_TRANSIENT,
+        AUDIO_BEAT_FLUX,
+        AUDIO_BEAT_BASS,
+        AUDIO_BEAT_MID,
+        AUDIO_BEAT_HIGH,
+        AUDIO_BEAT_GATE,
+        AUDIO_BEAT_PULSE,
+        AUDIO_BEAT_HITS,
+        AUDIO_BEAT_HIT_SEQ
+    };
+
+    if(force)
+        return 1;
+
+    if(!history || !info)
+        return 0;
+
+    for(unsigned int i = 0; i < sizeof(tokens) / sizeof(tokens[0]); i++) {
+        int t = tokens[i];
+        if(info->status_tokens[t] != history[t])
+            return 1;
+    }
+
+    return 0;
+}
+
+static void audio_beat_zero_live_widgets(void)
+{
+    audio_beat_set_bar(WIDGET_AUDIO_BEAT_LEVEL_BAR, 0);
+    audio_beat_set_bar(WIDGET_AUDIO_BEAT_ENVELOPE_BAR, 0);
+    audio_beat_set_bar(WIDGET_AUDIO_BEAT_TRANSIENT_BAR, 0);
+    audio_beat_set_bar(WIDGET_AUDIO_BEAT_FLUX_BAR, 0);
+    audio_beat_set_bar(WIDGET_AUDIO_BEAT_BASS_BAR, 0);
+    audio_beat_set_bar(WIDGET_AUDIO_BEAT_MID_BAR, 0);
+    audio_beat_set_bar(WIDGET_AUDIO_BEAT_HIGH_BAR, 0);
+    audio_beat_set_bar(WIDGET_AUDIO_BEAT_GATE_BAR, 0);
+    audio_beat_set_bar(WIDGET_AUDIO_BEAT_PULSE_BAR, 0);
+}
+
+static void audio_beat_curve_live_stop(void)
+{
+    GtkWidget *curve;
+
+    if(!info)
+        return;
+
+    curve = info->curve;
+    if(!curve || !GTK_IS_WIDGET(curve) || !GTK3_IS_CURVE(curve))
+        return;
+
+    gtk3_curve_live_trace_clear(curve);
+    gtk3_curve_live_trace_set_dot(curve,
+                                  FALSE,
+                                  0.0f,
+                                  0.0f,
+                                  0.0f,
+                                  NULL,
+                                  0.0f,
+                                  0.0f,
+                                  0.0f,
+                                  0.0f);
+    gtk3_curve_live_trace_set_enabled(curve, FALSE);
+}
+
+#define UI_BEAT_HEX_BASS      "#45d66b"
+#define UI_BEAT_HEX_MID       "#d6b545"
+#define UI_BEAT_HEX_HIGH      "#48a8ff"
+#define UI_BEAT_HEX_TRANSIENT "#ff5a4f"
+#define UI_BEAT_HEX_FLUX      "#4fd6e8"
+#define UI_BEAT_HEX_GATE      "#e0d64f"
+#define UI_BEAT_HEX_PULSE     "#b65cff"
+#define UI_BEAT_HEX_ENVELOPE  "#d884ff"
+#define UI_BEAT_HEX_LEVEL     "#d8d8d8"
+
+#define UI_BEAT_RGB_BASS      (69.0f / 255.0f),  (214.0f / 255.0f), (107.0f / 255.0f)
+#define UI_BEAT_RGB_MID       (214.0f / 255.0f), (181.0f / 255.0f), (69.0f / 255.0f)
+#define UI_BEAT_RGB_HIGH      (72.0f / 255.0f),  (168.0f / 255.0f), (255.0f / 255.0f)
+#define UI_BEAT_RGB_TRANSIENT (255.0f / 255.0f), (90.0f / 255.0f),  (79.0f / 255.0f)
+#define UI_BEAT_RGB_FLUX      (79.0f / 255.0f),  (214.0f / 255.0f), (232.0f / 255.0f)
+#define UI_BEAT_RGB_GATE      (224.0f / 255.0f), (214.0f / 255.0f), (79.0f / 255.0f)
+#define UI_BEAT_RGB_PULSE     (182.0f / 255.0f), (92.0f / 255.0f),  (255.0f / 255.0f)
+#define UI_BEAT_RGB_ENVELOPE  (216.0f / 255.0f), (132.0f / 255.0f), (255.0f / 255.0f)
+#define UI_BEAT_RGB_LEVEL     (216.0f / 255.0f), (216.0f / 255.0f), (216.0f / 255.0f)
+
+typedef struct
+{
+    int token;
+    const char *label;
+    float red;
+    float green;
+    float blue;
+    float alpha;
+} audio_beat_curve_source_t;
+
+static const audio_beat_curve_source_t *audio_beat_curve_source_for_token(int token)
+{
+    static const audio_beat_curve_source_t level     = { AUDIO_BEAT_LEVEL,     "Level", UI_BEAT_RGB_LEVEL,     0.50f };
+    static const audio_beat_curve_source_t envelope  = { AUDIO_BEAT_ENVELOPE,  "Env",   UI_BEAT_RGB_ENVELOPE,  0.56f };
+    static const audio_beat_curve_source_t transient = { AUDIO_BEAT_TRANSIENT, "Trans", UI_BEAT_RGB_TRANSIENT, 0.64f };
+    static const audio_beat_curve_source_t flux      = { AUDIO_BEAT_FLUX,      "Flux",  UI_BEAT_RGB_FLUX,      0.60f };
+    static const audio_beat_curve_source_t bass      = { AUDIO_BEAT_BASS,      "Bass",  UI_BEAT_RGB_BASS,      0.62f };
+    static const audio_beat_curve_source_t mid       = { AUDIO_BEAT_MID,       "Mid",   UI_BEAT_RGB_MID,       0.58f };
+    static const audio_beat_curve_source_t high      = { AUDIO_BEAT_HIGH,      "High",  UI_BEAT_RGB_HIGH,      0.60f };
+    static const audio_beat_curve_source_t gate      = { AUDIO_BEAT_GATE,      "Gate",  UI_BEAT_RGB_GATE,      0.52f };
+    static const audio_beat_curve_source_t pulse     = { AUDIO_BEAT_PULSE,     "Pulse", UI_BEAT_RGB_PULSE,     0.68f };
+
+    switch(token)
+    {
+        case AUDIO_BEAT_LEVEL:     return &level;
+        case AUDIO_BEAT_ENVELOPE:  return &envelope;
+        case AUDIO_BEAT_TRANSIENT: return &transient;
+        case AUDIO_BEAT_FLUX:      return &flux;
+        case AUDIO_BEAT_BASS:      return &bass;
+        case AUDIO_BEAT_MID:       return &mid;
+        case AUDIO_BEAT_HIGH:      return &high;
+        case AUDIO_BEAT_GATE:      return &gate;
+        case AUDIO_BEAT_PULSE:     return &pulse;
+        default:                   return NULL;
+    }
+}
+
+static int audio_beat_curve_source_for_hint(const ui_beat_param_hint_t *hint,
+                                            audio_beat_curve_source_t *src)
+{
+    const audio_beat_curve_source_t *source = NULL;
+
+    if(!hint || !src)
+        return 0;
+
+    if(hint->klass <= UI_VJ_BEAT_OFF || hint->klass > UI_VJ_BEAT_LAST)
+        return 0;
+
+    if(hint->flags & UI_VJ_BEAT_F_REJECT)
+        return 0;
+
+    if(hint->flags & (UI_VJ_BEAT_F_STRUCTURAL | UI_VJ_BEAT_F_REBUILDS_STATE))
+        source = audio_beat_curve_source_for_token(AUDIO_BEAT_GATE);
+    else if(hint->flags & UI_VJ_BEAT_F_IMPULSE)
+        source = audio_beat_curve_source_for_token(AUDIO_BEAT_PULSE);
+    else switch(hint->klass)
+    {
+        case UI_VJ_BEAT_TRIGGER:
+        case UI_VJ_BEAT_SELECTOR:
+        case UI_VJ_BEAT_RESET:
+            source = audio_beat_curve_source_for_token(AUDIO_BEAT_PULSE);
+            break;
+
+        case UI_VJ_BEAT_FLOW:
+        case UI_VJ_BEAT_DRIFT:
+        case UI_VJ_BEAT_WARP:
+        case UI_VJ_BEAT_TURBULENCE:
+        case UI_VJ_BEAT_DENSITY:
+        case UI_VJ_BEAT_DETAIL:
+            source = audio_beat_curve_source_for_token(AUDIO_BEAT_FLUX);
+            break;
+
+        case UI_VJ_BEAT_MOTION_REACT:
+        case UI_VJ_BEAT_SPEED:
+        case UI_VJ_BEAT_SIGNED_SPEED:
+        case UI_VJ_BEAT_SIGNED_CURVE:
+            source = audio_beat_curve_source_for_token(AUDIO_BEAT_TRANSIENT);
+            break;
+
+        case UI_VJ_BEAT_GEOMETRY_AMPLITUDE:
+        case UI_VJ_BEAT_GEOMETRY_FREQUENCY:
+        case UI_VJ_BEAT_GEOMETRY_PHASE:
+        case UI_VJ_BEAT_GRID_SIZE:
+        case UI_VJ_BEAT_WINDOW_RADIUS:
+        case UI_VJ_BEAT_KICK:
+            source = audio_beat_curve_source_for_token(AUDIO_BEAT_BASS);
+            break;
+
+        case UI_VJ_BEAT_MEMORY:
+        case UI_VJ_BEAT_INERTIA:
+        case UI_VJ_BEAT_SOURCE_MIX:
+        case UI_VJ_BEAT_TRAIL_LENGTH:
+            source = audio_beat_curve_source_for_token(AUDIO_BEAT_ENVELOPE);
+            break;
+
+        case UI_VJ_BEAT_COLOR_AMOUNT:
+        case UI_VJ_BEAT_COLOR_PHASE:
+        case UI_VJ_BEAT_GLOW:
+        case UI_VJ_BEAT_CONTRAST:
+        case UI_VJ_BEAT_INTENSITY:
+        case UI_VJ_BEAT_HAT:
+            source = audio_beat_curve_source_for_token(AUDIO_BEAT_HIGH);
+            break;
+
+        case UI_VJ_BEAT_ALPHA_OR_OPACITY:
+            source = audio_beat_curve_source_for_token(AUDIO_BEAT_LEVEL);
+            break;
+
+        case UI_VJ_BEAT_SNARE:
+            source = audio_beat_curve_source_for_token(AUDIO_BEAT_MID);
+            break;
+
+        default:
+            break;
+    }
+
+    if(!source)
+        return 0;
+
+    *src = *source;
+    return 1;
+}
+
+static void audio_beat_curve_push_source(GtkWidget *curve,
+                                         gint trace,
+                                         gfloat x,
+                                         const audio_beat_curve_source_t *src,
+                                         gfloat alpha)
+{
+    if(!src)
+        return;
+
+    gtk3_curve_live_trace_push_at(curve,
+                                  trace,
+                                  x,
+                                  audio_beat_trace_value(src->token),
+                                  src->label,
+                                  src->red,
+                                  src->green,
+                                  src->blue,
+                                  alpha);
+}
+
+static int audio_beat_curve_hint_is_mixable(const ui_beat_param_hint_t *hint)
+{
+    unsigned int reject_flags;
+
+    if(!hint)
+        return 0;
+
+    reject_flags = UI_VJ_BEAT_F_REJECT |
+                   UI_VJ_BEAT_F_STRUCTURAL |
+                   UI_VJ_BEAT_F_REBUILDS_STATE |
+                   UI_VJ_BEAT_F_IMPULSE |
+                   UI_VJ_BEAT_F_DISCRETE;
+
+    if(hint->flags & reject_flags)
+        return 0;
+
+    switch(hint->klass)
+    {
+        case UI_VJ_BEAT_FLOW:
+        case UI_VJ_BEAT_DRIFT:
+        case UI_VJ_BEAT_WARP:
+        case UI_VJ_BEAT_MOTION_REACT:
+        case UI_VJ_BEAT_GEOMETRY_AMPLITUDE:
+        case UI_VJ_BEAT_GEOMETRY_FREQUENCY:
+        case UI_VJ_BEAT_MEMORY:
+        case UI_VJ_BEAT_INERTIA:
+        case UI_VJ_BEAT_COLOR_AMOUNT:
+        case UI_VJ_BEAT_DETAIL:
+        case UI_VJ_BEAT_GLOW:
+        case UI_VJ_BEAT_ALPHA_OR_OPACITY:
+        case UI_VJ_BEAT_TRAIL_LENGTH:
+        case UI_VJ_BEAT_DENSITY:
+        case UI_VJ_BEAT_CONTRAST:
+        case UI_VJ_BEAT_INTENSITY:
+        case UI_VJ_BEAT_TURBULENCE:
+        case UI_VJ_BEAT_KICK:
+        case UI_VJ_BEAT_SNARE:
+        case UI_VJ_BEAT_HAT:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+static int audio_beat_curve_selected_param(int *fx_id, int *param, int *np)
+{
+    int p;
+    int fx;
+    int n;
+
+    if(!info)
+        return 0;
+
+    p = info->uc.selected_parameter_id;
+    fx = info->uc.entry_tokens[ENTRY_FXID];
+    n = info->uc.entry_tokens[ENTRY_NUM_PARAMETERS];
+
+    if(fx <= 0 || p < 0 || p >= n || p >= SAMPLE_MAX_PARAMETERS)
+        return 0;
+
+    if(fx_id)
+        *fx_id = fx;
+    if(param)
+        *param = p;
+    if(np)
+        *np = n;
+
+    return 1;
+}
+
+static int audio_beat_curve_estimated_modulated_value(int fx_norm,
+                                                       int beat_value,
+                                                       const ui_beat_param_hint_t *hint)
+{
+    int depth;
+    double signal;
+    double delta;
+    double value;
+
+    if(!hint)
+        return fx_norm;
+
+    depth = hint->normal_depth_pct;
+    if(beat_value >= 76 && hint->climax_depth_pct > depth)
+        depth = hint->climax_depth_pct;
+
+    if(depth <= 0)
+        depth = 24;
+    else if(depth > 100)
+        depth = 100;
+
+    signal = (double)beat_value * 0.01;
+    delta = signal * (double)depth * 0.42;
+
+    if(hint->flags & UI_VJ_BEAT_F_INVERTED)
+        delta = -delta;
+
+    value = (double)fx_norm + delta;
+
+    if(value < 0.0)
+        value = 0.0;
+    else if(value > 100.0)
+        value = 100.0;
+
+    return (int)(value + 0.5);
+}
+
+static int audio_beat_curve_default_domain(gfloat *min_x, gfloat *max_x, gfloat *x_value)
+{
+    int pm;
+    int len = 1;
+    int pos = 0;
+
+    if(!info)
+        return 0;
+
+    pm = info->status_tokens[PLAY_MODE];
+
+    if(pm == MODE_SAMPLE) {
+        int sample_start = info->status_tokens[SAMPLE_START];
+        int sample_end = info->status_tokens[SAMPLE_END];
+
+        if(sample_end < sample_start) {
+            int t = sample_start;
+            sample_start = sample_end;
+            sample_end = t;
+        }
+
+        len = sample_end - sample_start + 1;
+        pos = info->status_tokens[FRAME_NUM] - sample_start;
+    }
+    else if(pm == MODE_STREAM) {
+        len = info->status_tokens[SAMPLE_MARKER_END];
+        pos = info->status_tokens[FRAME_NUM];
+    }
+    else {
+        len = info->status_tokens[TOTAL_FRAMES];
+        pos = info->status_tokens[FRAME_NUM];
+    }
+
+    if(len < 1)
+        len = 1;
+
+    if(pos < 0)
+        pos = 0;
+    else if(pos >= len)
+        pos = len - 1;
+
+    if(min_x)
+        *min_x = 0.0f;
+    if(max_x)
+        *max_x = (gfloat)((len > 1) ? (len - 1) : 1);
+    if(x_value)
+        *x_value = (gfloat)pos;
+
+    return 1;
+}
+
+static void audio_beat_curve_set_default_domain(GtkWidget *curve, gfloat min_x, gfloat max_x, int reset_view)
+{
+    if(!curve)
+        return;
+
+    gtk3_curve_set_range(curve, min_x, max_x, 0.0f, 100.0f);
+    gtk3_curve_set_x_timeline(curve, min_x, max_x);
+
+    if(reset_view)
+        gtk3_curve_set_x_view(curve, min_x, max_x);
+}
+
+
+static int audio_beat_curve_is_timeline_wrap(gfloat min_x, gfloat max_x, gfloat last_x, gfloat x)
+{
+    gfloat span;
+    gfloat margin;
+
+    if(!isfinite(min_x) || !isfinite(max_x) || !isfinite(last_x) || !isfinite(x))
+        return 0;
+
+    if(max_x <= min_x)
+        return 0;
+
+    if(x >= last_x - 0.0001f)
+        return 0;
+
+    span = max_x - min_x;
+    margin = span * 0.02f;
+
+    if(margin < 2.0f)
+        margin = span > 4.0f ? 2.0f : span * 0.25f;
+    else if(margin > 24.0f)
+        margin = 24.0f;
+
+    if(margin > span * 0.25f)
+        margin = span * 0.25f;
+
+    return (last_x >= max_x - margin && x <= min_x + margin);
+}
+
+static void audio_beat_curve_follow_x_if_zoomed(GtkWidget *curve, gfloat x)
+{
+    gfloat tl_lo = 0.0f;
+    gfloat tl_hi = 1.0f;
+    gfloat view_lo = 0.0f;
+    gfloat view_hi = 1.0f;
+    gfloat domain_span;
+    gfloat view_span;
+    gfloat margin;
+    gfloat new_lo;
+
+    if(!curve || !isfinite(x))
+        return;
+
+    gtk3_curve_get_x_timeline(curve, &tl_lo, &tl_hi);
+    gtk3_curve_get_x_view(curve, &view_lo, &view_hi);
+
+    if(!isfinite(tl_lo) || !isfinite(tl_hi) || tl_hi <= tl_lo)
+        return;
+    if(!isfinite(view_lo) || !isfinite(view_hi) || view_hi <= view_lo)
+        return;
+
+    domain_span = tl_hi - tl_lo;
+    view_span = view_hi - view_lo;
+
+    if(domain_span <= 1.0f || view_span <= 0.0f)
+        return;
+
+    if(view_span >= domain_span - 0.0001f)
+        return;
+
+    if(x < tl_lo)
+        x = tl_lo;
+    else if(x > tl_hi)
+        x = tl_hi;
+
+    margin = view_span * 0.12f;
+    if(margin < 1.0f)
+        margin = (view_span > 2.0f ? 1.0f : view_span * 0.25f);
+    if(margin > view_span * 0.45f)
+        margin = view_span * 0.45f;
+
+    if(x < view_lo + margin)
+        new_lo = x - margin;
+    else if(x > view_hi - margin)
+        new_lo = x + margin - view_span;
+    else
+        return;
+
+    if(new_lo < tl_lo)
+        new_lo = tl_lo;
+    else if(new_lo + view_span > tl_hi)
+        new_lo = tl_hi - view_span;
+
+    if(new_lo < tl_lo)
+        new_lo = tl_lo;
+
+    gtk3_curve_set_x_view(curve, new_lo, new_lo + view_span);
+}
+
+static int audio_beat_curve_selected_domain(GtkWidget *curve, gfloat *min_x, gfloat *max_x, gfloat *x_value)
+{
+    gfloat lo = 0.0f;
+    gfloat hi = 1.0f;
+    gfloat x = 0.0f;
+
+    if(!info || !curve)
+        return 0;
+
+    gtk3_curve_get_x_timeline(curve, &lo, &hi);
+
+    if(!isfinite(lo) || !isfinite(hi) || hi <= lo) {
+        lo = 0.0f;
+        hi = 1.0f;
+    }
+
+    x = (gfloat)info->status_frame;
+
+    if(!isfinite(x))
+        x = lo;
+
+    if(min_x)
+        *min_x = lo;
+    if(max_x)
+        *max_x = hi;
+    if(x_value)
+        *x_value = x;
+
+    return 1;
+}
+
+static void audio_beat_curve_push_overview(GtkWidget *curve, int reset_sequence, gboolean push_samples)
+{
+    static int have_last = 0;
+    static int last_pm = INT_MIN;
+    static gfloat last_x = 0.0f;
+    static gfloat last_min_x = 0.0f;
+    static gfloat last_max_x = 0.0f;
+    gfloat min_x = 0.0f;
+    gfloat max_x = 1.0f;
+    gfloat x = 0.0f;
+    int pm;
+    int range_changed;
+
+    if(!audio_beat_curve_default_domain(&min_x, &max_x, &x)) {
+        gtk3_curve_live_trace_clear(curve);
+        have_last = 0;
+        last_pm = INT_MIN;
+        return;
+    }
+
+    pm = info->status_tokens[PLAY_MODE];
+
+    range_changed = (!have_last ||
+                     pm != last_pm ||
+                     fabs((double)min_x - (double)last_min_x) > 0.0001 ||
+                     fabs((double)max_x - (double)last_max_x) > 0.0001);
+
+    if(reset_sequence || range_changed) {
+        gtk3_curve_live_trace_clear(curve);
+        audio_beat_curve_set_default_domain(curve, min_x, max_x, 1);
+        have_last = 0;
+    }
+    else if(have_last && audio_beat_curve_is_timeline_wrap(min_x, max_x, last_x, x)) {
+        gtk3_curve_live_trace_clear(curve);
+        have_last = 0;
+    }
+
+    audio_beat_curve_follow_x_if_zoomed(curve, x);
+    curve_set_position(curve, (gdouble)x);
+
+    if(!push_samples)
+        return;
+
+    audio_beat_curve_push_source(curve, 0, x, audio_beat_curve_source_for_token(AUDIO_BEAT_LEVEL),     0.38f);
+    audio_beat_curve_push_source(curve, 1, x, audio_beat_curve_source_for_token(AUDIO_BEAT_ENVELOPE),  0.40f);
+    audio_beat_curve_push_source(curve, 2, x, audio_beat_curve_source_for_token(AUDIO_BEAT_TRANSIENT), 0.48f);
+    audio_beat_curve_push_source(curve, 3, x, audio_beat_curve_source_for_token(AUDIO_BEAT_FLUX),      0.40f);
+    audio_beat_curve_push_source(curve, 4, x, audio_beat_curve_source_for_token(AUDIO_BEAT_BASS),      0.43f);
+    audio_beat_curve_push_source(curve, 5, x, audio_beat_curve_source_for_token(AUDIO_BEAT_MID),       0.40f);
+    audio_beat_curve_push_source(curve, 6, x, audio_beat_curve_source_for_token(AUDIO_BEAT_HIGH),      0.40f);
+    audio_beat_curve_push_source(curve, 7, x, audio_beat_curve_source_for_token(AUDIO_BEAT_GATE),      0.36f);
+    audio_beat_curve_push_source(curve, GTK3_CURVE_LIVE_TRACE_MAX - 1, x,
+                                 audio_beat_curve_source_for_token(AUDIO_BEAT_PULSE),                 0.52f);
+
+    last_x = x;
+    last_min_x = min_x;
+    last_max_x = max_x;
+    last_pm = pm;
+    have_last = 1;
+}
+
+static void audio_beat_update_curve_live_traces(gboolean push_samples)
+{
+    static int last_signature = INT_MIN;
+    static int selected_have_domain = 0;
+    static int selected_have_last = 0;
+    static gfloat selected_last_x = 0.0f;
+    static gfloat selected_last_min_x = 0.0f;
+    static gfloat selected_last_max_x = 0.0f;
+    int fx_value;
+    int fx_id = -1;
+    int param = -1;
+    int signature;
+    int signature_changed;
+    int have_selected_param;
+    int beat_value;
+    int dot_value;
+    int curve_active;
+    int mixable;
+    char beat_label[48];
+    GtkWidget *curve;
+    const ui_beat_param_hint_t *hint = NULL;
+    audio_beat_curve_source_t src;
+
+    if(!info)
+        return;
+
+    curve = info->curve;
+    if(!curve || !GTK_IS_WIDGET(curve) || !GTK3_IS_CURVE(curve))
+        return;
+
+    if(!info->status_tokens[AUDIO_BEAT_ENABLED] ||
+       !info->status_tokens[AUDIO_BEAT_OPEN] ||
+       info->status_tokens[AUDIO_BEAT_SAMPLE_RATE] <= 0)
+    {
+        gtk3_curve_live_trace_set_enabled(curve, FALSE);
+        last_signature = INT_MIN;
+        return;
+    }
+
+    have_selected_param = audio_beat_curve_selected_param(&fx_id, &param, NULL);
+
+    if(have_selected_param)
+        hint = ui_effect_get_beat_hint(fx_id, param);
+
+    gtk3_curve_live_trace_set_enabled(curve, TRUE);
+
+    if(have_selected_param && audio_beat_curve_source_for_hint(hint, &src)) {
+        gfloat min_x = 0.0f;
+        gfloat max_x = 1.0f;
+        gfloat x = 0.0f;
+        int have_x;
+        int range_changed;
+
+        curve_active = audio_beat_curve_param_has_active_curve();
+        signature = (1 << 29) ^ (fx_id << 8) ^ (param << 1) ^
+                    (hint->klass << 16) ^ ((int)hint->flags & 0xffff) ^
+                    (curve_active ? (1 << 27) : 0);
+
+        have_x = audio_beat_curve_selected_domain(curve, &min_x, &max_x, &x);
+        range_changed = (!selected_have_domain ||
+                         fabs((double)min_x - (double)selected_last_min_x) > 0.0001 ||
+                         fabs((double)max_x - (double)selected_last_max_x) > 0.0001);
+
+        if(signature != last_signature ||
+           range_changed ||
+           (have_x && selected_have_last &&
+            audio_beat_curve_is_timeline_wrap(min_x, max_x, selected_last_x, x)))
+        {
+            gtk3_curve_live_trace_clear(curve);
+            selected_have_last = 0;
+            selected_have_domain = have_x ? 1 : 0;
+            selected_last_min_x = min_x;
+            selected_last_max_x = max_x;
+            last_signature = signature;
+        }
+
+        if(!push_samples) {
+            gtk3_curve_live_trace_set_dot(curve,
+                                          FALSE,
+                                          0.0f,
+                                          0.0f,
+                                          0.0f,
+                                          NULL,
+                                          0.0f,
+                                          0.0f,
+                                          0.0f,
+                                          0.0f);
+            return;
+        }
+
+        beat_value = audio_beat_trace_value(src.token);
+        fx_value = audio_beat_selected_fx_value_norm(NULL, 0);
+        dot_value = audio_beat_curve_estimated_modulated_value(fx_value, beat_value, hint);
+
+        g_snprintf(beat_label, sizeof(beat_label), "%s -> p%d", src.label, param);
+
+        mixable = audio_beat_curve_hint_is_mixable(hint);
+
+        if(have_x && x >= min_x && x <= max_x) {
+            audio_beat_curve_follow_x_if_zoomed(curve, x);
+            gtk3_curve_live_trace_push_at(curve,
+                                          GTK3_CURVE_LIVE_TRACE_MAX - 1,
+                                          x,
+                                          dot_value,
+                                          beat_label,
+                                          src.red,
+                                          src.green,
+                                          src.blue,
+                                          MIN(1.0f, src.alpha + 0.10f));
+
+            gtk3_curve_live_trace_set_dot(curve,
+                                          TRUE,
+                                          x,
+                                          (curve_active && mixable) ? (gfloat)fx_value : (gfloat)dot_value,
+                                          (gfloat)dot_value,
+                                          beat_label,
+                                          src.red,
+                                          src.green,
+                                          src.blue,
+                                          MIN(1.0f, src.alpha + 0.36f));
+
+            selected_last_x = x;
+            selected_last_min_x = min_x;
+            selected_last_max_x = max_x;
+            selected_have_domain = 1;
+            selected_have_last = 1;
+        } else {
+            gtk3_curve_live_trace_set_dot(curve,
+                                          FALSE,
+                                          0.0f,
+                                          0.0f,
+                                          0.0f,
+                                          NULL,
+                                          0.0f,
+                                          0.0f,
+                                          0.0f,
+                                          0.0f);
+        }
+
+        return;
+    }
+
+    signature = have_selected_param ? ((2 << 29) ^ (fx_id << 8) ^ param) : (3 << 29);
+    signature_changed = (signature != last_signature);
+    if(signature_changed) {
+        gtk3_curve_live_trace_clear(curve);
+        selected_have_domain = 0;
+        selected_have_last = 0;
+        last_signature = signature;
+    }
+
+    gtk3_curve_live_trace_set_dot(curve, FALSE, 0.0f, 0.0f, 0.0f, NULL, 0.0f, 0.0f, 0.0f, 0.0f);
+
+    if(!have_selected_param)
+        audio_beat_curve_push_overview(curve, signature_changed, push_samples);
 }
 
 static void update_audio_beat_status_widgets(int *history, int force)
 {
+    static int live_widgets_seen = 0;
+    static int stale_ticks = 0;
     char txt[64];
+    int local_force;
+    int live_ready;
+    int live_changed;
+    int live_fresh;
+    int widgets_ready;
 
     if(!history)
         return;
 
+    widgets_ready = audio_beat_live_widgets_ready();
+    local_force = force;
+    if(widgets_ready && !live_widgets_seen) {
+        local_force = 1;
+        live_widgets_seen = 1;
+    }
+    else if(!widgets_ready) {
+        live_widgets_seen = 0;
+    }
+
 #define AB_CUR(tok_)      (info->status_tokens[(tok_)])
 #define AB_OLD(tok_)      (history[(tok_)])
-#define AB_CHANGED(tok_)  (force || AB_CUR(tok_) != AB_OLD(tok_))
+#define AB_CHANGED(tok_)  (local_force || AB_CUR(tok_) != AB_OLD(tok_))
 
 #define AB_SET_BAR(tok_, wid_)                                      \
     do {                                                            \
@@ -8981,30 +10100,51 @@ static void update_audio_beat_status_widgets(int *history, int force)
     const int open    = AB_CUR(AUDIO_BEAT_OPEN) ? 1 : 0;
     const int muted   = AB_CUR(AUDIO_MUTED) ? 1 : 0;
 
+    live_ready = audio_beat_live_status_ready();
+    live_changed = live_ready ? audio_beat_live_payload_changed(history, local_force) : 0;
 
-    if(AB_CHANGED(AUDIO_BEAT_ENABLED)) {
+    if(live_ready) {
+        if(live_changed)
+            stale_ticks = 0;
+        else if(stale_ticks < AUDIO_BEAT_UI_STALE_TICKS)
+            stale_ticks++;
+    }
+    else {
+        stale_ticks = 0;
+    }
+
+    live_fresh = live_ready && live_changed;
+
+    if(AB_CHANGED(AUDIO_BEAT_ENABLED))
         audio_beat_set_toggle(WIDGET_AUDIO_BEAT_ENABLE_TOGGLE, enabled);
+
+    if(AB_CHANGED(AUDIO_BEAT_ENABLED) || AB_CHANGED(AUDIO_BEAT_ACTION)) {
+        int action = enabled ? AB_CUR(AUDIO_BEAT_ACTION) : 0;
+        if(action < 0 || action > 4)
+            action = 0;
+        audio_beat_set_action_combo_from_status(action);
     }
 
-    if(AB_CHANGED(AUDIO_MUTED)) {
+    if(AB_CHANGED(AUDIO_MUTED))
         audio_beat_set_toggle(WIDGET_AUDIO_MUTE_TOGGLE, muted);
-    }
 
-    if(AB_CHANGED(AUDIO_BEAT_OPEN)) {
-
-
+    if(AB_CHANGED(AUDIO_BEAT_OPEN))
         (void)open;
-    }
 
-    AB_SET_BAR(AUDIO_BEAT_LEVEL,     WIDGET_AUDIO_BEAT_LEVEL_BAR);
-    AB_SET_BAR(AUDIO_BEAT_ENVELOPE,  WIDGET_AUDIO_BEAT_ENVELOPE_BAR);
-    AB_SET_BAR(AUDIO_BEAT_TRANSIENT, WIDGET_AUDIO_BEAT_TRANSIENT_BAR);
-    AB_SET_BAR(AUDIO_BEAT_FLUX,      WIDGET_AUDIO_BEAT_FLUX_BAR);
-    AB_SET_BAR(AUDIO_BEAT_BASS,      WIDGET_AUDIO_BEAT_BASS_BAR);
-    AB_SET_BAR(AUDIO_BEAT_MID,       WIDGET_AUDIO_BEAT_MID_BAR);
-    AB_SET_BAR(AUDIO_BEAT_HIGH,      WIDGET_AUDIO_BEAT_HIGH_BAR);
-    AB_SET_BAR(AUDIO_BEAT_GATE,      WIDGET_AUDIO_BEAT_GATE_BAR);
-    AB_SET_BAR(AUDIO_BEAT_PULSE,     WIDGET_AUDIO_BEAT_PULSE_BAR);
+    if(live_ready && stale_ticks < AUDIO_BEAT_UI_STALE_TICKS) {
+        AB_SET_BAR(AUDIO_BEAT_LEVEL,     WIDGET_AUDIO_BEAT_LEVEL_BAR);
+        AB_SET_BAR(AUDIO_BEAT_ENVELOPE,  WIDGET_AUDIO_BEAT_ENVELOPE_BAR);
+        AB_SET_BAR(AUDIO_BEAT_TRANSIENT, WIDGET_AUDIO_BEAT_TRANSIENT_BAR);
+        AB_SET_BAR(AUDIO_BEAT_FLUX,      WIDGET_AUDIO_BEAT_FLUX_BAR);
+        AB_SET_BAR(AUDIO_BEAT_BASS,      WIDGET_AUDIO_BEAT_BASS_BAR);
+        AB_SET_BAR(AUDIO_BEAT_MID,       WIDGET_AUDIO_BEAT_MID_BAR);
+        AB_SET_BAR(AUDIO_BEAT_HIGH,      WIDGET_AUDIO_BEAT_HIGH_BAR);
+        AB_SET_BAR(AUDIO_BEAT_GATE,      WIDGET_AUDIO_BEAT_GATE_BAR);
+        AB_SET_BAR(AUDIO_BEAT_PULSE,     WIDGET_AUDIO_BEAT_PULSE_BAR);
+    }
+    else {
+        audio_beat_zero_live_widgets();
+    }
 
     AB_SET_LABEL(AUDIO_BEAT_HITS,    WIDGET_AUDIO_BEAT_HITS_VALUE, "%d");
 
@@ -9043,6 +10183,14 @@ static void update_audio_beat_status_widgets(int *history, int force)
 
     AB_SET_LABEL(AUDIO_BEAT_HIT_SEQ, WIDGET_AUDIO_BEAT_HIT_SEQ_VALUE, "%d");
 
+    if(live_fresh)
+        audio_beat_update_curve_live_traces(TRUE);
+    else
+        audio_beat_update_curve_live_traces(FALSE);
+
+    if(!live_ready || stale_ticks >= AUDIO_BEAT_UI_STALE_TICKS)
+        audio_beat_curve_live_stop();
+
     timeline_update_compact_overlay();
 
 #undef AB_SET_LABEL
@@ -9056,6 +10204,7 @@ static void update_audio_beat_status_widgets(int *history, int force)
 static void audio_sync_set_combo(int widget_id, int active)
 {
     GtkWidget *w = widget_cache[widget_id];
+    int old_lock;
 
     if(!w || !GTK_IS_COMBO_BOX(w))
         return;
@@ -9063,8 +10212,13 @@ static void audio_sync_set_combo(int widget_id, int active)
     if(active < 0)
         return;
 
-    if(gtk_combo_box_get_active(GTK_COMBO_BOX(w)) != active)
-        gtk_combo_box_set_active(GTK_COMBO_BOX(w), active);
+    if(gtk_combo_box_get_active(GTK_COMBO_BOX(w)) == active)
+        return;
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+    gtk_combo_box_set_active(GTK_COMBO_BOX(w), active);
+    info->status_lock = old_lock;
 }
 
 static void audio_sync_set_widget_sensitive(int widget_id, int sensitive)
@@ -9089,15 +10243,75 @@ static void audio_sync_set_widget_visible(int widget_id, int visible)
         gtk_widget_set_visible(w, visible ? TRUE : FALSE);
 }
 
+static GtkWidget *vj_api_audio_sync_named_widget(const char *name)
+{
+    if(!info || !info->main_window || !name)
+        return NULL;
+
+    return glade_xml_get_widget_(info->main_window, name);
+}
+
+static void audio_sync_set_named_widget_visible(const char *name, int visible)
+{
+    GtkWidget *w = vj_api_audio_sync_named_widget(name);
+
+    if(w)
+        gtk_widget_set_visible(w, visible ? TRUE : FALSE);
+}
+
+static void audio_sync_set_named_widget_sensitive(const char *name, int sensitive)
+{
+    GtkWidget *w = vj_api_audio_sync_named_widget(name);
+
+    if(w)
+        gtk_widget_set_sensitive(w, sensitive ? TRUE : FALSE);
+}
+
+static void audio_sync_set_named_label(const char *name, const char *text)
+{
+    GtkWidget *w = vj_api_audio_sync_named_widget(name);
+
+    if(w && GTK_IS_LABEL(w))
+        gtk_label_set_text(GTK_LABEL(w), text ? text : "");
+}
+
+static int audio_sync_status_is_internal_push_analysis(void)
+{
+    const int record_source = info->status_tokens[RECORD_AUDIO_SOURCE];
+    const int source = info->status_tokens[AUDIO_SYNC_SOURCE];
+
+    return source == VJ_AUDIO_SYNC_SOURCE_PUSH &&
+           (record_source == VJ_RECORD_AUDIO_SOURCE_ORIGINAL ||
+            record_source == VJ_RECORD_AUDIO_SOURCE_AUTO);
+}
+
 static int audio_sync_ui_enabled_from_status(void)
 {
-    int active = info->status_tokens[AUDIO_SYNC_BRIDGE_ACTIVE] ? 1 : 0;
+    const int mode = info->status_tokens[AUDIO_SYNC_MODE];
+    const int record_source = info->status_tokens[RECORD_AUDIO_SOURCE];
+    int active;
 
+    if(record_source != VJ_RECORD_AUDIO_SOURCE_BEAT_JACK)
+        return 0;
+
+    if(mode == 0)
+        return 0;
+
+    if(!ui_audio_sync_mode_uses_external_provider(mode))
+        return 0;
+
+    active = info->status_tokens[AUDIO_SYNC_ENABLED] ? 1 : 0;
+
+    if(!active)
+        active = info->status_tokens[AUDIO_SYNC_BRIDGE_ACTIVE] ? 1 : 0;
 
     if(!active &&
-       (info->status_tokens[AUDIO_SYNC_MODE] == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL ||
-        info->status_tokens[AUDIO_SYNC_MODE] == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN ||
-        info->status_tokens[AUDIO_SYNC_MODE] == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW) &&
+       (mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL ||
+        mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN ||
+        mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW ||
+        mode == VJ_AUDIO_SYNC_MODE_MONITOR ||
+        mode == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY ||
+        mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE) &&
        info->status_tokens[AUDIO_SYNC_OPEN])
     {
         active = 1;
@@ -9108,11 +10322,10 @@ static int audio_sync_ui_enabled_from_status(void)
 
 static void audio_sync_update_mode_sensitivity(int mode, int source, int target_mode, int record_source)
 {
-    const int tempo_ids[] = {
+    const int tempo_target_ids[] = {
         WIDGET_AUDIO_SYNC_TARGET_BPM_SPIN,
         WIDGET_AUDIO_SYNC_PHASE_SPIN,
         WIDGET_AUDIO_SYNC_CONFIDENCE_SPIN,
-        WIDGET_AUDIO_SYNC_CORRECTION_SPIN,
         -1
     };
     const int master_wav_ids[] = {
@@ -9122,53 +10335,100 @@ static void audio_sync_update_mode_sensitivity(int mode, int source, int target_
         -1
     };
 
-    const int control_only = (mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL);
-    const int tempo_follow = (mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW);
-    const int external_master = (record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK) || control_only;
-    const int wav_master = (external_master && !control_only && !tempo_follow && source == VJ_AUDIO_SYNC_SOURCE_WAV_FILE);
-    const int sync_enabled = (external_master && audio_sync_ui_enabled_from_status());
+    const int push_analysis = source == VJ_AUDIO_SYNC_SOURCE_PUSH &&
+                              (record_source == VJ_RECORD_AUDIO_SOURCE_ORIGINAL ||
+                               record_source == VJ_RECORD_AUDIO_SOURCE_AUTO);
+    const int external_master = (record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
+    const int external_provider_mode = external_master &&
+                                       ui_audio_sync_mode_uses_external_provider(mode) &&
+                                       !push_analysis;
+    const int control_only = external_provider_mode && ui_audio_sync_mode_is_control_only(mode);
+    const int tempo_follow = external_provider_mode && ui_audio_sync_mode_is_tempo_follow(mode);
+    const int wav_master = (external_provider_mode &&
+                            ui_audio_sync_mode_supports_wav_master(mode) &&
+                            source == VJ_AUDIO_SYNC_SOURCE_WAV_FILE);
+    const int jack_provider = (external_provider_mode && !wav_master);
+    const int sync_enabled = (external_provider_mode && audio_sync_ui_enabled_from_status());
     const int tempo = (sync_enabled && mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE);
     const int track_align = (sync_enabled && mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN);
-    const int monitor = (sync_enabled && mode == VJ_AUDIO_SYNC_MODE_MONITOR);
+    const int monitor = (sync_enabled &&
+                         (ui_audio_sync_mode_is_clean_monitor(mode) ||
+                          ui_audio_sync_mode_is_trickplay_monitor(mode)));
     const int follow = (sync_enabled && tempo_follow);
     const int live_tempo = (tempo || follow);
     const int live_common = (sync_enabled && (control_only || live_tempo || track_align || monitor));
+    const int show_tempo_targets = tempo;
+    const int show_correction = tempo || follow;
+    const int show_follow_audio_warning = follow &&
+                                          (record_source == VJ_RECORD_AUDIO_SOURCE_ORIGINAL ||
+                                           record_source == VJ_RECORD_AUDIO_SOURCE_AUTO);
 
     (void) target_mode;
 
     audio_sync_set_widget_sensitive(WIDGET_AUDIO_INPUT_SELECTOR_COMBO, 1);
 
+    audio_sync_set_named_label("audio_master_sync_frame_label", push_analysis ? "Audio / Beat Analysis" : "Audio / External Sync");
+    audio_sync_set_named_label("audio_input_selector_label", push_analysis ? "Audio source" : "Audio source / sync provider");
+    audio_sync_set_named_label("audio_sync_tempo_frame_label", follow ? "Visual tempo follow" : "Tempo match bridge");
+    audio_sync_set_named_label("audio_sync_live_tempo_frame_label", "Tempo lock status");
+    audio_sync_set_named_label("audio_sync_bpm_value_label", push_analysis ? "Beat BPM" : "Source BPM");
+    audio_sync_set_named_label("audio_sync_bridge_active_value_label", "Activity");
+    audio_sync_set_named_label("audio_sync_bridge_state_value_label", "Lock state");
+    audio_sync_set_named_label("audio_sync_target_bpm_value_label", (tempo || follow) ? "Clip BPM" : "Target BPM");
+    audio_sync_set_named_label("audio_sync_target_bpm_label", tempo ? "Manual target BPM" : "Target BPM");
+    audio_sync_set_named_label("audio_sync_tempo_bend_label", "Pitch / tempo bend");
+    audio_sync_set_named_label("audio_sync_phase_label", tempo ? "Override phase" : "Phase");
+    audio_sync_set_named_label("audio_sync_confidence_label", tempo ? "Override confidence" : "Confidence");
+    audio_sync_set_named_label("audio_sync_correction_label", follow ? "Max video tempo pull" : "Max correction");
 
-
-    audio_sync_set_widget_visible(WIDGET_AUDIO_MASTER_JACK_OPTIONS_GRID, external_master);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MASTER_JACK_OPTIONS_GRID, jack_provider);
     audio_sync_set_widget_visible(WIDGET_AUDIO_MASTER_WAV_OPTIONS_GRID, wav_master);
     audio_sync_set_widget_sensitive(WIDGET_AUDIO_SYNC_ENABLE_TOGGLE, external_master);
     audio_sync_set_widget_sensitive(WIDGET_AUDIO_SYNC_MODE_COMBO, external_master);
     audio_sync_set_widget_sensitive(WIDGET_AUDIO_SYNC_REFRESH_BUTTON, external_master);
 
+    audio_sync_set_named_widget_visible("audio_sync_channels_label", jack_provider);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_CHANNELS_SPIN, jack_provider);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_SYNC_CHANNELS_SPIN, jack_provider);
 
-
-    audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_CHANNELS_SPIN, 0);
-    audio_sync_set_widget_sensitive(WIDGET_AUDIO_SYNC_CHANNELS_SPIN, 0);
-
-    audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_TEMPO_FRAME, tempo);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_TEMPO_FRAME, tempo || follow);
     audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_TRACK_FRAME, track_align);
     audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_LIVE_COMMON_FRAME, live_common);
     audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_LIVE_TEMPO_FRAME, live_tempo);
     audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_LIVE_TRACK_FRAME, track_align);
 
-    audio_sync_set_widgets_sensitive(tempo_ids, tempo);
+    audio_sync_set_named_widget_visible("audio_sync_target_bpm_label", show_tempo_targets);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_TARGET_BPM_SPIN, show_tempo_targets);
+    audio_sync_set_named_widget_visible("audio_sync_tempo_target_buttons_box", show_tempo_targets);
+    audio_sync_set_named_widget_visible("audio_sync_tempo_bend_label", tempo);
+    audio_sync_set_named_widget_visible("audio_sync_tempo_bend_scale", tempo);
+    audio_sync_set_named_widget_visible("audio_sync_tempo_bend_reset_button", tempo);
+    audio_sync_set_named_widget_visible("audio_sync_phase_label", show_tempo_targets);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_PHASE_SPIN, show_tempo_targets);
+    audio_sync_set_named_widget_visible("audio_sync_confidence_label", show_tempo_targets);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_CONFIDENCE_SPIN, show_tempo_targets);
+    audio_sync_set_named_widget_visible("audio_sync_correction_label", show_correction);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_CORRECTION_SPIN, show_correction);
+    audio_sync_set_named_widget_visible("audio_sync_follow_audio_warning", show_follow_audio_warning);
+
+    audio_sync_set_widgets_sensitive(tempo_target_ids, show_tempo_targets);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_SYNC_CORRECTION_SPIN, show_correction);
+    audio_sync_set_named_widget_sensitive("audio_sync_use_clip_bpm_button", show_tempo_targets);
+    audio_sync_set_named_widget_sensitive("audio_sync_latch_clip_bpm_button", show_tempo_targets);
+    audio_sync_set_named_widget_sensitive("audio_sync_tempo_bend_scale", tempo);
+    audio_sync_set_named_widget_sensitive("audio_sync_tempo_bend_reset_button", tempo);
     audio_sync_set_widgets_sensitive(master_wav_ids, wav_master);
 }
 
 static int audio_sync_mode_combo_from_status(int mode)
 {
     switch(mode) {
-        case VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL: return 1;
-        case VJ_AUDIO_SYNC_MODE_MONITOR:       return 2;
-        case VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW:  return 3;
-        case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE:  return 4;
-        case VJ_AUDIO_SYNC_MODE_TRACK_ALIGN:   return 5;
+        case VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL:      return 1;
+        case VJ_AUDIO_SYNC_MODE_MONITOR:            return 2;
+        case VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY:  return 3;
+        case VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW:       return 4;
+        case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE:       return 5;
+        case VJ_AUDIO_SYNC_MODE_TRACK_ALIGN:        return 6;
         case VJ_AUDIO_SYNC_MODE_OFF:           return 0;
         default: {
             static int warned = 0;
@@ -9182,15 +10442,34 @@ static int audio_sync_mode_combo_from_status(int mode)
     }
 }
 
-static void audio_sync_set_spin_i(int widget_id, int value)
+static void audio_sync_set_spin_d(int widget_id, gdouble value)
 {
     GtkWidget *w = widget_cache[widget_id];
+    int old_lock;
 
     if(!w || !GTK_IS_SPIN_BUTTON(w))
         return;
 
-    if((int)gtk_spin_button_get_value(GTK_SPIN_BUTTON(w)) != value)
-        gtk_spin_button_set_value(GTK_SPIN_BUTTON(w), (gdouble)value);
+    if(fabs(gtk_spin_button_get_value(GTK_SPIN_BUTTON(w)) - value) < 0.0001)
+        return;
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(w), value);
+    info->status_lock = old_lock;
+}
+
+static void audio_sync_set_spin_i(int widget_id, int value)
+{
+    audio_sync_set_spin_d(widget_id, (gdouble)value);
+}
+
+static void audio_sync_set_spin_bpm_x10(int widget_id, int bpm_x10)
+{
+    if(bpm_x10 <= 0)
+        return;
+
+    audio_sync_set_spin_d(widget_id, ((gdouble)bpm_x10) / 10.0);
 }
 
 static int audio_input_selector_from_status(void)
@@ -9205,14 +10484,12 @@ static int audio_input_selector_from_status(void)
             return 3;
         case VJ_RECORD_AUDIO_SOURCE_AUTO:
         case VJ_RECORD_AUDIO_SOURCE_ORIGINAL:
-
-
             return 0;
         default: {
             static int warned = 0;
             if(!warned) {
                 veejay_msg(VEEJAY_MSG_WARNING,
-                    "Unexpected RECORD_AUDIO_SOURCE status token value %d; defaulting Audio master track to Original video audio", record_source);
+                    "Unexpected RECORD_AUDIO_SOURCE status token value %d; defaulting audio source to Original video audio", record_source);
                 warned = 1;
             }
             return 0;
@@ -9237,7 +10514,7 @@ static void update_audio_sync_status_widgets(int *history, int force)
         static int warned_audio_status_contract = 0;
         if(!warned_audio_status_contract) {
             veejay_msg(VEEJAY_MSG_WARNING,
-                "Backend status token contract is missing Audio master/JACK mode fields; Audio panel will keep safe defaults");
+                "Backend status token contract is missing audio source/sync mode fields; Audio panel will keep safe defaults");
             warned_audio_status_contract = 1;
         }
         return;
@@ -9268,40 +10545,50 @@ static void update_audio_sync_status_widgets(int *history, int force)
        AS_CHANGED(RECORD_AUDIO_SOURCE))
     {
         audio_beat_set_toggle(WIDGET_AUDIO_SYNC_ENABLE_TOGGLE,
-                              (AS_CUR(RECORD_AUDIO_SOURCE) == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK ||
-                               AS_CUR(AUDIO_SYNC_MODE) == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL)
+                              AS_CUR(RECORD_AUDIO_SOURCE) == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK
                                   ? audio_sync_ui_enabled_from_status()
                                   : 0);
     }
 
-    if(AS_CHANGED(AUDIO_SYNC_MODE) || AS_CHANGED(RECORD_AUDIO_SOURCE)) {
+    if(AS_CHANGED(AUDIO_SYNC_MODE) || AS_CHANGED(AUDIO_SYNC_SOURCE) || AS_CHANGED(RECORD_AUDIO_SOURCE)) {
         int mode = AS_CUR(AUDIO_SYNC_MODE);
         int record_source = AS_CUR(RECORD_AUDIO_SOURCE);
-        int mode_combo = (record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK ||
-                          mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL)
-            ? audio_sync_mode_combo_from_status(mode)
-            : 0;
+        int external_master = (record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
+        int mode_combo = external_master ? audio_sync_mode_combo_from_status(mode) : 0;
 
         if(mode_combo >= 0)
             audio_sync_set_combo(WIDGET_AUDIO_SYNC_MODE_COMBO, mode_combo);
 
-        if(AS_CHANGED(AUDIO_SYNC_MODE))
-            audio_beat_set_label_s(WIDGET_AUDIO_SYNC_MODE_VALUE, audio_sync_mode_name(mode));
+        audio_beat_set_label_s(WIDGET_AUDIO_SYNC_MODE_VALUE,
+                               external_master ? audio_sync_mode_name(mode) : "Off - no external sync");
     }
 
-    if(AS_CHANGED(AUDIO_SYNC_SOURCE)) {
+    if(AS_CHANGED(AUDIO_SYNC_SOURCE) || AS_CHANGED(RECORD_AUDIO_SOURCE)) {
         int source = AS_CUR(AUDIO_SYNC_SOURCE);
-        audio_beat_set_label_s(WIDGET_AUDIO_SYNC_SOURCE_VALUE, audio_sync_source_name(source));
+        int record_source = AS_CUR(RECORD_AUDIO_SOURCE);
+
+        if(record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK)
+            audio_beat_set_label_s(WIDGET_AUDIO_SYNC_SOURCE_VALUE, audio_sync_source_name(source));
+        else if(record_source == VJ_RECORD_AUDIO_SOURCE_SILENCE)
+            audio_beat_set_label_s(WIDGET_AUDIO_SYNC_SOURCE_VALUE, "Silence");
+        else
+            audio_beat_set_label_s(WIDGET_AUDIO_SYNC_SOURCE_VALUE, "Original audio");
     }
 
     if(AS_CHANGED(AUDIO_SYNC_MODE) || AS_CHANGED(AUDIO_SYNC_SOURCE) || AS_CHANGED(RECORD_AUDIO_SOURCE))
         audio_input_selector_sync_from_status();
 
-    if(AS_CHANGED(AUDIO_SYNC_CHANNELS))
+    if(AS_CHANGED(AUDIO_SYNC_CHANNELS) && AS_CUR(AUDIO_SYNC_CHANNELS) > 0)
         audio_sync_set_spin_i(WIDGET_AUDIO_SYNC_CHANNELS_SPIN, AS_CUR(AUDIO_SYNC_CHANNELS));
 
+    if(AS_CHANGED(AUDIO_SYNC_TARGET_BPM_X10))
+        audio_sync_set_spin_bpm_x10(WIDGET_AUDIO_SYNC_TARGET_BPM_SPIN, AS_CUR(AUDIO_SYNC_TARGET_BPM_X10));
+
+    if(AS_CHANGED(AUDIO_SYNC_TARGET_CONFIDENCE))
+        audio_sync_set_spin_i(WIDGET_AUDIO_SYNC_CONFIDENCE_SPIN, ui_clampi(AS_CUR(AUDIO_SYNC_TARGET_CONFIDENCE), 0, 100));
+
     if(AS_CHANGED(AUDIO_SYNC_MAX_CORRECTION))
-        audio_sync_set_spin_i(WIDGET_AUDIO_SYNC_CORRECTION_SPIN, AS_CUR(AUDIO_SYNC_MAX_CORRECTION));
+        audio_sync_set_spin_i(WIDGET_AUDIO_SYNC_CORRECTION_SPIN, ui_clampi(AS_CUR(AUDIO_SYNC_MAX_CORRECTION), 0, 25));
 
     if(AS_CHANGED(AUDIO_SYNC_MODE) || AS_CHANGED(AUDIO_SYNC_SOURCE) ||
        AS_CHANGED(AUDIO_SYNC_TARGET_MODE) || AS_CHANGED(RECORD_AUDIO_SOURCE) ||
@@ -9313,11 +10600,17 @@ static void update_audio_sync_status_widgets(int *history, int force)
                                            AS_CUR(RECORD_AUDIO_SOURCE));
     }
 
-    if(AS_CHANGED(AUDIO_SYNC_ENABLED))
-        audio_beat_set_label_s(WIDGET_AUDIO_SYNC_ENABLED_VALUE, AS_CUR(AUDIO_SYNC_ENABLED) ? "provider" : "no");
+    if(AS_CHANGED(AUDIO_SYNC_ENABLED) || AS_CHANGED(AUDIO_SYNC_SOURCE) || AS_CHANGED(RECORD_AUDIO_SOURCE))
+        audio_beat_set_label_s(WIDGET_AUDIO_SYNC_ENABLED_VALUE,
+                               AS_CUR(RECORD_AUDIO_SOURCE) == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK
+                                   ? (AS_CUR(AUDIO_SYNC_ENABLED) ? "provider" : "no")
+                                   : (audio_sync_status_is_internal_push_analysis() ? "internal" : "no"));
 
-    if(AS_CHANGED(AUDIO_SYNC_OPEN))
-        audio_beat_set_label_s(WIDGET_AUDIO_SYNC_OPEN_VALUE, AS_CUR(AUDIO_SYNC_OPEN) ? "yes" : "no");
+    if(AS_CHANGED(AUDIO_SYNC_OPEN) || AS_CHANGED(AUDIO_SYNC_SOURCE) || AS_CHANGED(RECORD_AUDIO_SOURCE))
+        audio_beat_set_label_s(WIDGET_AUDIO_SYNC_OPEN_VALUE,
+                               AS_CUR(RECORD_AUDIO_SOURCE) == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK
+                                   ? (AS_CUR(AUDIO_SYNC_OPEN) ? "yes" : "no")
+                                   : (audio_sync_status_is_internal_push_analysis() ? "beat" : "no"));
 
     if(AS_CHANGED(AUDIO_SYNC_RUNNING))
         audio_beat_set_label_s(WIDGET_AUDIO_SYNC_RUNNING_VALUE, AS_CUR(AUDIO_SYNC_RUNNING) ? "yes" : "no");
@@ -9370,6 +10663,10 @@ static void update_audio_sync_status_widgets(int *history, int force)
             audio_beat_set_label_s(WIDGET_AUDIO_SYNC_BRIDGE_ACTIVE_VALUE, "track align");
         else if(AS_CUR(AUDIO_SYNC_MODE) == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW && AS_CUR(AUDIO_SYNC_OPEN))
             audio_beat_set_label_s(WIDGET_AUDIO_SYNC_BRIDGE_ACTIVE_VALUE, "tempo follow");
+        else if(AS_CUR(AUDIO_SYNC_MODE) == VJ_AUDIO_SYNC_MODE_MONITOR && AS_CUR(AUDIO_SYNC_OPEN))
+            audio_beat_set_label_s(WIDGET_AUDIO_SYNC_BRIDGE_ACTIVE_VALUE, "clean monitor");
+        else if(AS_CUR(AUDIO_SYNC_MODE) == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY && AS_CUR(AUDIO_SYNC_OPEN))
+            audio_beat_set_label_s(WIDGET_AUDIO_SYNC_BRIDGE_ACTIVE_VALUE, "monitor + trickplay");
         else
             audio_beat_set_label_s(WIDGET_AUDIO_SYNC_BRIDGE_ACTIVE_VALUE, AS_CUR(AUDIO_SYNC_BRIDGE_ACTIVE) ? "playback" : "no");
     }
@@ -9471,21 +10768,20 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
     info->status_frame = info->status_tokens[FRAME_NUM];
 
-    {
-        gint timeline_frame = info->status_frame;
+    gint timeline_frame = info->status_frame;
 
-        if(pm == MODE_SAMPLE) {
-            const gint sample_start = info->status_tokens[SAMPLE_START];
-            const gint sample_end = info->status_tokens[SAMPLE_END];
-            const gint sample_len = MAX(1, sample_end - sample_start + 1);
+    if(pm == MODE_SAMPLE) {
+        const gint sample_start = info->status_tokens[SAMPLE_START];
+        const gint sample_end = info->status_tokens[SAMPLE_END];
+        const gint sample_len = MAX(1, sample_end - sample_start + 1);
 
-            timeline_frame = CLAMP(info->status_frame - sample_start, 0, sample_len - 1);
-        }
-
-        timeline_set_pos(info->tl, (gdouble) timeline_frame);
+        timeline_frame = CLAMP(info->status_frame - sample_start, 0, sample_len - 1);
     }
 
-    curve_set_position(info->curve, (gdouble) info->status_frame);
+    timeline_set_pos(info->tl, (gdouble) timeline_frame);
+
+    curve_set_position(info->curve,
+                       (gdouble)((info->uc.selected_parameter_id < 0) ? timeline_frame : info->status_frame));
     timeline_update_compact_overlay();
 
     char *current_time_ = format_time( info->status_frame, (double) info->el.fps );
@@ -9746,24 +11042,25 @@ typedef struct
     const char *glyph;
     const char *css_class;
     const char *label;
+    const char *label_color;
 } fx_auto_beat_style_t;
 
 static const fx_auto_beat_style_t fx_auto_beat_style_empty = {
-    " ", NULL, "not mapped"
+    " ", NULL, "not mapped", NULL
 };
 
 static const fx_auto_beat_style_t *fx_auto_beat_style_for_hint(int klass,
                                                                unsigned int flags)
 {
-    static const fx_auto_beat_style_t bass      = { "●", "fx-auto-bass",      "Bass / low body" };
-    static const fx_auto_beat_style_t mid       = { "▬", "fx-auto-mid",       "Mid / snare body" };
-    static const fx_auto_beat_style_t high      = { "△", "fx-auto-high",      "High / hat top" };
-    static const fx_auto_beat_style_t transient = { "▲", "fx-auto-transient", "Transient / impact" };
-    static const fx_auto_beat_style_t flux      = { "≈", "fx-auto-flux",      "Flux / flow" };
-    static const fx_auto_beat_style_t gate      = { "▣", "fx-auto-gate",      "Gate / threshold" };
-    static const fx_auto_beat_style_t pulse     = { "◆", "fx-auto-pulse",     "Pulse / trigger" };
-    static const fx_auto_beat_style_t envelope  = { "~", "fx-auto-envelope",  "Envelope / memory" };
-    static const fx_auto_beat_style_t level     = { "•", "fx-auto-level",     "Level / raw input" };
+    static const fx_auto_beat_style_t bass      = { "●", "fx-auto-bass",      "Bass / low body",      UI_BEAT_HEX_BASS };
+    static const fx_auto_beat_style_t mid       = { "▬", "fx-auto-mid",       "Mid / snare body",      UI_BEAT_HEX_MID };
+    static const fx_auto_beat_style_t high      = { "△", "fx-auto-high",      "High / hat top",       UI_BEAT_HEX_HIGH };
+    static const fx_auto_beat_style_t transient = { "▲", "fx-auto-transient", "Transient / impact",   UI_BEAT_HEX_TRANSIENT };
+    static const fx_auto_beat_style_t flux      = { "≈", "fx-auto-flux",      "Flux / flow",           UI_BEAT_HEX_FLUX };
+    static const fx_auto_beat_style_t gate      = { "▣", "fx-auto-gate",      "Gate / threshold",     UI_BEAT_HEX_GATE };
+    static const fx_auto_beat_style_t pulse     = { "◆", "fx-auto-pulse",     "Pulse / trigger",      UI_BEAT_HEX_PULSE };
+    static const fx_auto_beat_style_t envelope  = { "~", "fx-auto-envelope",  "Envelope / memory",    UI_BEAT_HEX_ENVELOPE };
+    static const fx_auto_beat_style_t level     = { "•", "fx-auto-level",     "Level / raw input",    UI_BEAT_HEX_LEVEL };
 
     if(klass <= UI_VJ_BEAT_OFF || klass > UI_VJ_BEAT_LAST)
         return &fx_auto_beat_style_empty;
@@ -9850,19 +11147,71 @@ static void fx_auto_clear_beat_style(GtkWidget *widget)
         gtk_style_context_remove_class(ctx, fx_auto_slider_css_classes[i]);
 }
 
+static GtkWidget *fx_auto_param_name_label(int param)
+{
+    static const int label_ids[AUTO_FX_BEAT_UI_PARAMETERS] = {
+        WIDGET_LABEL_P0,  WIDGET_LABEL_P1,  WIDGET_LABEL_P2,
+        WIDGET_LABEL_P3,  WIDGET_LABEL_P4,  WIDGET_LABEL_P5,
+        WIDGET_LABEL_P6,  WIDGET_LABEL_P7,  WIDGET_LABEL_P8,
+        WIDGET_LABEL_P9,  WIDGET_LABEL_P10, WIDGET_LABEL_P11,
+        WIDGET_LABEL_P12
+    };
+    GtkWidget *label;
+    char name[16];
+
+    if(param < 0 || param >= AUTO_FX_BEAT_UI_PARAMETERS)
+        return NULL;
+
+    label = widget_cache[label_ids[param]];
+    if(label)
+        return label;
+
+    snprintf(name, sizeof(name), "label_p%d", param);
+    label = glade_xml_get_widget_(info->main_window, name);
+    if(label)
+        widget_cache[label_ids[param]] = label;
+
+    return label;
+}
+
+static void fx_auto_clear_param_name_label_style(GtkWidget *label)
+{
+    fx_auto_clear_beat_style(label);
+
+    if(label)
+        gtk_widget_override_color(label, GTK_STATE_FLAG_NORMAL, NULL);
+}
+
+static void fx_auto_apply_param_name_label_style(GtkWidget *label,
+                                                 const fx_auto_beat_style_t *style)
+{
+    GdkRGBA color;
+
+    if(!label || !style || !style->css_class)
+        return;
+
+    gtk_style_context_add_class(gtk_widget_get_style_context(label), style->css_class);
+
+    if(style->label_color && gdk_rgba_parse(&color, style->label_color))
+        gtk_widget_override_color(label, GTK_STATE_FLAG_NORMAL, &color);
+}
+
 static void fx_auto_clear_param_beat_ui(int param)
 {
     GtkWidget *slider;
     GtkWidget *glyph;
+    GtkWidget *label;
 
     if(param < 0 || param >= AUTO_FX_BEAT_UI_PARAMETERS)
         return;
 
     slider = widget_cache[WIDGET_SLIDER_P0 + param];
     glyph  = widget_cache[WIDGET_LABEL_P0_BEAT + param];
+    label  = fx_auto_param_name_label(param);
 
     fx_auto_clear_beat_style(slider);
     fx_auto_clear_beat_style(glyph);
+    fx_auto_clear_param_name_label_style(label);
 
     if(glyph && GTK_IS_LABEL(glyph))
     {
@@ -9887,6 +11236,7 @@ static void fx_auto_update_param_beat_ui(int effect_id,
 {
     GtkWidget *slider;
     GtkWidget *glyph;
+    GtkWidget *label;
     const ui_beat_param_hint_t *hint;
     const fx_auto_beat_style_t *style;
     char tip[384];
@@ -9897,6 +11247,7 @@ static void fx_auto_update_param_beat_ui(int effect_id,
 
     slider = widget_cache[WIDGET_SLIDER_P0 + param];
     glyph  = widget_cache[WIDGET_LABEL_P0_BEAT + param];
+    label  = fx_auto_param_name_label(param);
 
     fx_auto_clear_param_beat_ui(param);
 
@@ -9914,6 +11265,8 @@ static void fx_auto_update_param_beat_ui(int effect_id,
 
     if(glyph)
         gtk_style_context_add_class(gtk_widget_get_style_context(glyph), style->css_class);
+
+    fx_auto_apply_param_name_label_style(label, style);
 
     if(glyph && GTK_IS_LABEL(glyph))
     {
@@ -9942,6 +11295,67 @@ static void fx_auto_update_param_beat_ui(int effect_id,
     }
 }
 
+
+static gint kf_param_combo_cached_fx_id = -1;
+static gint kf_param_combo_cached_np = -1;
+
+static void kf_param_combo_invalidate(void)
+{
+    kf_param_combo_cached_fx_id = -1;
+    kf_param_combo_cached_np = -1;
+}
+
+static void kf_param_combo_set_active_guarded(GtkWidget *kf_param, gint active)
+{
+    int old_lock;
+
+    if(!kf_param || !GTK_IS_COMBO_BOX(kf_param))
+        return;
+
+    if(gtk_combo_box_get_active(GTK_COMBO_BOX(kf_param)) == active)
+        return;
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+    gtk_combo_box_set_active(GTK_COMBO_BOX(kf_param), active);
+    info->status_lock = old_lock;
+}
+
+static void kf_param_combo_rebuild_if_needed(GtkWidget *kf_param, int fx_id, int np)
+{
+    int old_lock;
+    char kf_param_text[20];
+
+    if(!kf_param || !GTK_IS_COMBO_BOX_TEXT(kf_param))
+        return;
+
+    if(kf_param_combo_cached_fx_id == fx_id &&
+       kf_param_combo_cached_np == np)
+        return;
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+
+    gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(kf_param));
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), "None");
+
+    for(int i = 0; i < np; i++) {
+        gchar *tt1 = _effect_get_param_description(fx_id, i);
+
+        if(tt1 != NULL && tt1[0] != '\0') {
+            gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), tt1);
+        } else {
+            snprintf(kf_param_text, sizeof(kf_param_text), "p%d", i);
+            gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), kf_param_text);
+        }
+    }
+
+    info->status_lock = old_lock;
+
+    kf_param_combo_cached_fx_id = fx_id;
+    kf_param_combo_cached_np = np;
+}
+
 static void disable_fx_entry(void) {
     int i;
     gint min=0,max=1,value=0;
@@ -9953,6 +11367,7 @@ static void disable_fx_entry(void) {
     gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_EFFECTNAME] ), "");
     gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_EFFECTANIM_NAME] ), "");
     gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_VALUE_FRIENDLYNAME ] ), FX_PARAMETER_VALUE_DEFAULT_HINT );
+    fx_auto_clear_beat_style(widget_cache[WIDGET_VALUE_FRIENDLYNAME]);
 
     if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON( widget_cache[WIDGET_BUTTON_ENTRY_TOGGLE] ) ))
     {
@@ -9979,7 +11394,9 @@ static void disable_fx_entry(void) {
     }
 
     GtkWidget *kf_param = widget_cache[ WIDGET_COMBO_CURVE_FX_PARAM ];
+    kf_param_combo_invalidate();
     gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(kf_param));
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), "None");
 
     for( i = 0; i < MAX_UI_PARAMETERS; i ++ )
     {
@@ -10012,6 +11429,7 @@ static void enable_fx_entry(void) {
 
     gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_EFFECTNAME] ),fx_name );
     gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_EFFECTANIM_NAME] ), fx_name );
+    fx_auto_clear_beat_style(widget_cache[WIDGET_VALUE_FRIENDLYNAME]);
 
 
     if( info->uc.selected_fx_param != -1 )
@@ -10077,14 +11495,10 @@ static void enable_fx_entry(void) {
 
     GtkWidget *kf_param = widget_cache[ WIDGET_COMBO_CURVE_FX_PARAM ];
 
-    gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(kf_param));
-
-
-
     int np = _effect_get_np( entry_tokens[ENTRY_FXID] );
     gint min,max,value;
 
-    char kf_param_text[20];
+    kf_param_combo_rebuild_if_needed(kf_param, entry_tokens[ENTRY_FXID], np);
 
     for( i = 0; i < np ; i ++ )
     {
@@ -10102,17 +11516,6 @@ static void enable_fx_entry(void) {
         if(i < AUTO_FX_BEAT_UI_PARAMETERS)
             fx_auto_update_param_beat_ui(entry_tokens[ENTRY_FXID], i, entry_tokens[ENTRY_BEAT_FLAG]);
 
-        if (tt1 != NULL && tt1[0] != '\0' ) {
-            gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), tt1);
-        }
-        else
-        {
-
-            snprintf(kf_param_text,sizeof(kf_param_text), "p%d",i);
-            gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), kf_param_text);
-        }
-
-
         value = entry_tokens[ENTRY_PARAMSET + i];
         if( _effect_get_minmax( entry_tokens[ENTRY_FXID], &min,&max, i ))
         {
@@ -10127,22 +11530,17 @@ static void enable_fx_entry(void) {
     }
 
     if(np) {
-        gint active_kf_id = get_vj_kf_active_parameter();
-
-        if(active_kf_id < 0)
-            active_kf_id = info->uc.selected_parameter_id;
+        gint active_kf_id = info->uc.selected_parameter_id;
 
         if(active_kf_id < 0 || active_kf_id >= np)
-            active_kf_id = 0;
+            active_kf_id = -1;
 
-        int osl = info->status_lock;
-        info->status_lock = 1;
-
-        gtk_combo_box_set_active(GTK_COMBO_BOX(kf_param), active_kf_id);
-
-        info->status_lock = osl;
+        kf_param_combo_set_active_guarded(kf_param, active_kf_id + 1);
 
         info->uc.selected_parameter_id = active_kf_id;
+    } else {
+        kf_param_combo_set_active_guarded(kf_param, 0);
+        info->uc.selected_parameter_id = -1;
     }
 
     min = 0; max = 1; value = 0;
@@ -10165,6 +11563,8 @@ static void enable_fx_entry(void) {
         if(i < AUTO_FX_BEAT_UI_PARAMETERS)
             fx_auto_clear_param_beat_ui(i);
     }
+
+    audio_beat_update_curve_live_traces(FALSE);
 }
 
 static void sync_chain_entry_beat_toggle_from_status(void)
@@ -10272,6 +11672,7 @@ static void process_reload_hints(int *history, int pm)
                 info->uc.selected_fx_param = -1;
                 info->uc.reload_hint[HINT_KF] = 1;
             }
+            refresh_selected_chain_row_from_status();
         } else if (lpi == 1 ) {
             if (entry_tokens[ENTRY_FXID] != 0 ) {
                 enable_fx_entry();
@@ -10281,6 +11682,7 @@ static void process_reload_hints(int *history, int pm)
                    old_param >= entry_tokens[ENTRY_NUM_PARAMETERS])
                     info->uc.reload_hint[HINT_KF] = 1;
             }
+            refresh_selected_chain_row_from_status();
         }
         sync_chain_entry_beat_toggle_from_status();
     }
@@ -10364,7 +11766,6 @@ void update_gui(void)
     on_vims_messenger();
 
     update_cpumeter_timeout(NULL);
-    update_cachemeter_timeout(NULL);
 
     info->status_lock = old_status_lock;
 }

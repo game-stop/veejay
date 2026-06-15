@@ -75,63 +75,64 @@
 #define AUDIO_BEAT_HIT_SEQ      54
 #define AUDIO_MUTED             55
 #define RECORD_AUDIO_SOURCE     56
+#define AUDIO_BEAT_ACTION       57  /* 0 none, 1 freeze, 2 auto FX, 3 freeze+auto FX, 4 break beat */
 
-#define AUDIO_SYNC_ENABLED       57
-#define AUDIO_SYNC_OPEN          58
-#define AUDIO_SYNC_RUNNING       59
-#define AUDIO_SYNC_MODE          60
-#define AUDIO_SYNC_SOURCE        61
-#define AUDIO_SYNC_CHANNELS      62
-#define AUDIO_SYNC_SAMPLE_RATE   63
-#define AUDIO_SYNC_LEVEL_PCT     64
-#define AUDIO_SYNC_TRANSIENT_PCT 65
-#define AUDIO_SYNC_BPM_X10       66
-#define AUDIO_SYNC_PHASE_PCT     67
-#define AUDIO_SYNC_CONFIDENCE    68
-#define AUDIO_SYNC_BRIDGE_ACTIVE 69
-#define AUDIO_SYNC_RATIO_X1000   70
-#define AUDIO_SYNC_CORRECTION    71  /* actual applied bridge pull, x100; 100 == 1.00 */
-#define AUDIO_SYNC_TARGET_MODE   72  /* 0 manual, 1 current clip */
-#define AUDIO_SYNC_TARGET_BPM_X10 73 /* target BPM * 10 */
-#define AUDIO_SYNC_TARGET_CONFIDENCE 74 /* 0..100 */
-#define AUDIO_SYNC_MAX_CORRECTION 75 /* configured max correction %, 0..25 */
-#define AUDIO_SYNC_BRIDGE_STATE  76  /* 0 idle, 1 wait source, 2 wait target, 3 locked, 4 hold, 5 fallback */
-#define AUDIO_SYNC_TRACK_ALIGN_LOCKED         77 /* 0/1 */
-#define AUDIO_SYNC_TRACK_ALIGN_OFFSET_MS      78 /* signed ms: positive means video/reference is late */
-#define AUDIO_SYNC_TRACK_ALIGN_CONFIDENCE     79 /* 0..100 */
-#define AUDIO_SYNC_TRACK_ALIGN_CORRECTION_PPM 80 /* signed ppm video-rate trim */
-#define AUDIO_SYNC_TRACK_ALIGN_STATE          81 /* 0 idle, 1 wait source, 2 wait target, 3 searching, 4 locked, 5 hold, 6 fallback */
+#define AUDIO_SYNC_ENABLED       58
+#define AUDIO_SYNC_OPEN          59
+#define AUDIO_SYNC_RUNNING       60
+#define AUDIO_SYNC_MODE          61
+#define AUDIO_SYNC_SOURCE        62
+#define AUDIO_SYNC_CHANNELS      63
+#define AUDIO_SYNC_SAMPLE_RATE   64
+#define AUDIO_SYNC_LEVEL_PCT     65
+#define AUDIO_SYNC_TRANSIENT_PCT 66
+#define AUDIO_SYNC_BPM_X10       67
+#define AUDIO_SYNC_PHASE_PCT     68
+#define AUDIO_SYNC_CONFIDENCE    69
+#define AUDIO_SYNC_BRIDGE_ACTIVE 70
+#define AUDIO_SYNC_RATIO_X1000   71
+#define AUDIO_SYNC_CORRECTION    72  /* actual applied bridge pull, x100; 100 == 1.00 */
+#define AUDIO_SYNC_TARGET_MODE   73  /* 0 manual, 1 current clip */
+#define AUDIO_SYNC_TARGET_BPM_X10 74 /* target BPM * 10 */
+#define AUDIO_SYNC_TARGET_CONFIDENCE 75 /* 0..100 */
+#define AUDIO_SYNC_MAX_CORRECTION 76 /* configured max correction %, 0..25 */
+#define AUDIO_SYNC_BRIDGE_STATE  77  /* 0 idle, 1 wait source, 2 wait target, 3 locked, 4 hold, 5 fallback */
+#define AUDIO_SYNC_TRACK_ALIGN_LOCKED         78 /* 0/1 */
+#define AUDIO_SYNC_TRACK_ALIGN_OFFSET_MS      79 /* signed ms: positive means video/reference is late */
+#define AUDIO_SYNC_TRACK_ALIGN_CONFIDENCE     80 /* 0..100 */
+#define AUDIO_SYNC_TRACK_ALIGN_CORRECTION_PPM 81 /* signed ppm video-rate trim */
+#define AUDIO_SYNC_TRACK_ALIGN_STATE          82 /* 0 idle, 1 wait source, 2 wait target, 3 searching, 4 locked, 5 hold, 6 fallback */
 
 /* Selected chain-entry info pushed by backend status, replacing VIMS_CHAIN_GET_ENTRY polling. */
-#define STATUS_CHAIN_ENTRY_FXID                 82
-#define STATUS_CHAIN_ENTRY_ISVIDEO              83
-#define STATUS_CHAIN_ENTRY_NUM_PARAMETERS       84
-#define STATUS_CHAIN_ENTRY_KF_TYPE              85
-#define STATUS_CHAIN_ENTRY_KF_STATUS            86
-#define STATUS_CHAIN_ENTRY_TRANSITION_ENABLED   87
-#define STATUS_CHAIN_ENTRY_TRANSITION_LOOP      88
-#define STATUS_CHAIN_ENTRY_SOURCE               89
-#define STATUS_CHAIN_ENTRY_CHANNEL              90
-#define STATUS_CHAIN_ENTRY_VIDEO_ENABLED        91
-#define STATUS_CHAIN_ENTRY_BEAT_FLAG            92
-#define STATUS_CHAIN_ENTRY_SUBRENDER_ENTRY      93
-#define STATUS_CHAIN_ENTRY_P0                   94
-#define STATUS_CHAIN_ENTRY_P1                   95
-#define STATUS_CHAIN_ENTRY_P2                   96
-#define STATUS_CHAIN_ENTRY_P3                   97
-#define STATUS_CHAIN_ENTRY_P4                   98
-#define STATUS_CHAIN_ENTRY_P5                   99
-#define STATUS_CHAIN_ENTRY_P6                   100
-#define STATUS_CHAIN_ENTRY_P7                   101
-#define STATUS_CHAIN_ENTRY_P8                   102
-#define STATUS_CHAIN_ENTRY_P9                   103
-#define STATUS_CHAIN_ENTRY_P10                  104
-#define STATUS_CHAIN_ENTRY_P11                  105
-#define STATUS_CHAIN_ENTRY_P12                  106
-#define STATUS_CHAIN_ENTRY_P13                  107
-#define STATUS_CHAIN_ENTRY_P14                  108
-#define STATUS_CHAIN_ENTRY_P15                  109
-#define STATUS_CHAIN_ENTRY_LAST                 110
+#define STATUS_CHAIN_ENTRY_FXID                 83
+#define STATUS_CHAIN_ENTRY_ISVIDEO              84
+#define STATUS_CHAIN_ENTRY_NUM_PARAMETERS       85
+#define STATUS_CHAIN_ENTRY_KF_TYPE              86
+#define STATUS_CHAIN_ENTRY_KF_STATUS            87
+#define STATUS_CHAIN_ENTRY_TRANSITION_ENABLED   88
+#define STATUS_CHAIN_ENTRY_TRANSITION_LOOP      89
+#define STATUS_CHAIN_ENTRY_SOURCE               90
+#define STATUS_CHAIN_ENTRY_CHANNEL              91
+#define STATUS_CHAIN_ENTRY_VIDEO_ENABLED        92
+#define STATUS_CHAIN_ENTRY_BEAT_FLAG            93
+#define STATUS_CHAIN_ENTRY_SUBRENDER_ENTRY      94
+#define STATUS_CHAIN_ENTRY_P0                   95
+#define STATUS_CHAIN_ENTRY_P1                   96
+#define STATUS_CHAIN_ENTRY_P2                   97
+#define STATUS_CHAIN_ENTRY_P3                   98
+#define STATUS_CHAIN_ENTRY_P4                   99
+#define STATUS_CHAIN_ENTRY_P5                   100
+#define STATUS_CHAIN_ENTRY_P6                   101
+#define STATUS_CHAIN_ENTRY_P7                   102
+#define STATUS_CHAIN_ENTRY_P8                   103
+#define STATUS_CHAIN_ENTRY_P9                   104
+#define STATUS_CHAIN_ENTRY_P10                  105
+#define STATUS_CHAIN_ENTRY_P11                  106
+#define STATUS_CHAIN_ENTRY_P12                  107
+#define STATUS_CHAIN_ENTRY_P13                  108
+#define STATUS_CHAIN_ENTRY_P14                  109
+#define STATUS_CHAIN_ENTRY_P15                  110
+#define STATUS_CHAIN_ENTRY_LAST                 111
 #define STATUS_CHAIN_ENTRY_TOKENS \
     (STATUS_CHAIN_ENTRY_LAST - STATUS_CHAIN_ENTRY_FXID)
 

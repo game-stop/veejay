@@ -83,9 +83,20 @@ static GtkDrawingAreaClass *gtk3_curve_parent_class = NULL;
                           GDK_SCROLL_MASK | \
                           GDK_SMOOTH_SCROLL_MASK)
 
-#define CURVE_X_LABEL_HEIGHT 16
+#define CURVE_X_LABEL_HEIGHT 18
 #define CURVE_X_NAV_HEIGHT   18
-#define CURVE_LEGEND_HEIGHT  22
+#define CURVE_LEGEND_HEIGHT  24
+#define CURVE_LIVE_TRACE_Y_PAD 2.0
+
+#ifndef GTK3_CURVE_LIVE_TRACE_MAX
+#define GTK3_CURVE_LIVE_TRACE_MAX 10
+#endif
+#ifndef GTK3_CURVE_LIVE_TRACE_LEN
+#define GTK3_CURVE_LIVE_TRACE_LEN 8192
+#endif
+#ifndef GTK3_CURVE_LIVE_TRACE_LABEL
+#define GTK3_CURVE_LIVE_TRACE_LABEL 32
+#endif
 
 struct _Gtk3CurvePrivate
 {
@@ -159,6 +170,33 @@ struct _Gtk3CurvePrivate
   gint     frame_vector_len;
   gfloat   frame_vector_min_x;
   gfloat   frame_vector_max_x;
+
+  gboolean live_trace_enabled;
+  gint     live_trace_pos;
+  gint     live_trace_count;
+  gboolean live_trace_active[GTK3_CURVE_LIVE_TRACE_MAX];
+  gfloat (*live_trace_values)[GTK3_CURVE_LIVE_TRACE_LEN];
+  gfloat (*live_trace_x)[GTK3_CURVE_LIVE_TRACE_LEN];
+  gboolean (*live_trace_point_used)[GTK3_CURVE_LIVE_TRACE_LEN];
+  gboolean *live_trace_slot_used;
+  gint     live_trace_last_slot;
+  gint     live_trace_last_slot_for[GTK3_CURVE_LIVE_TRACE_MAX];
+  gboolean live_trace_have_source_x;
+  gfloat   live_trace_last_source_x;
+  Gtk3CurveColor live_trace_color[GTK3_CURVE_LIVE_TRACE_MAX];
+  gchar    live_trace_label[GTK3_CURVE_LIVE_TRACE_MAX][GTK3_CURVE_LIVE_TRACE_LABEL];
+  gfloat   live_trace_auto_x;
+  gfloat   live_trace_last_input_x;
+  gfloat   live_trace_pending_x;
+  gboolean live_trace_have_last_input;
+  gboolean live_trace_pending_valid;
+  gboolean live_trace_clear_on_next_push;
+  gboolean live_trace_dot_enabled;
+  gfloat   live_trace_dot_x;
+  gfloat   live_trace_dot_base_value;
+  gfloat   live_trace_dot_value;
+  Gtk3CurveColor live_trace_dot_color;
+  gchar    live_trace_dot_label[GTK3_CURVE_LIVE_TRACE_LABEL];
 };
 
 enum
@@ -232,6 +270,16 @@ static void gtk3_curve_draw_line            (cairo_t              *cr,
                                              gdouble               y1,
                                              gdouble               x2,
                                              gdouble               y2);
+static void gtk3_curve_draw_live_traces     (GtkWidget           *widget,
+                                             cairo_t             *cr,
+                                             gint                 allocation_width,
+                                             gint                 graph_width,
+                                             gint                 graph_height);
+static gboolean gtk3_curve_live_trace_use_local_axis(Gtk3CurvePrivate *priv);
+static gfloat gtk3_curve_live_axis_min_x(Gtk3CurvePrivate *priv);
+static gfloat gtk3_curve_live_axis_max_x(Gtk3CurvePrivate *priv);
+static gfloat gtk3_curve_live_trace_jump_threshold(Gtk3CurvePrivate *priv);
+static void gtk3_curve_live_trace_clear_samples(Gtk3CurvePrivate *priv);
 static void gtk3_curve_class_init           (Gtk3CurveClass       *klass);
 static void gtk3_curve_init                 (Gtk3Curve            *self);
 
@@ -270,6 +318,16 @@ static void gtk3_curve_draw_cursor_legend(GtkWidget *widget,
                                           gint       allocation_height,
                                           gint       graph_width,
                                           gint       graph_height);
+
+static Gtk3CurveColor gtk3_curve_legend_background_color(GtkWidget *widget,
+                                                             Gtk3CurvePrivate *priv,
+                                                             gfloat alpha);
+static Gtk3CurveColor gtk3_curve_legend_border_color(GtkWidget *widget,
+                                                     Gtk3CurvePrivate *priv,
+                                                     gfloat alpha);
+static Gtk3CurveColor gtk3_curve_legend_text_color(GtkWidget *widget,
+                                                   Gtk3CurvePrivate *priv,
+                                                   gfloat alpha);
 
 static const char *gtk3_curve_type_name(Gtk3CurveType type);
 
@@ -596,6 +654,39 @@ gtk3_curve_init (Gtk3Curve* self)
   priv->frame_vector_min_x = priv->min_x;
   priv->frame_vector_max_x = priv->max_x;
 
+  priv->live_trace_values = (gfloat (*)[GTK3_CURVE_LIVE_TRACE_LEN])
+    g_new0(gfloat, GTK3_CURVE_LIVE_TRACE_MAX * GTK3_CURVE_LIVE_TRACE_LEN);
+  priv->live_trace_x = (gfloat (*)[GTK3_CURVE_LIVE_TRACE_LEN])
+    g_new0(gfloat, GTK3_CURVE_LIVE_TRACE_MAX * GTK3_CURVE_LIVE_TRACE_LEN);
+  priv->live_trace_point_used = (gboolean (*)[GTK3_CURVE_LIVE_TRACE_LEN])
+    g_new0(gboolean, GTK3_CURVE_LIVE_TRACE_MAX * GTK3_CURVE_LIVE_TRACE_LEN);
+  priv->live_trace_slot_used = g_new0(gboolean, GTK3_CURVE_LIVE_TRACE_LEN);
+
+  priv->live_trace_enabled = FALSE;
+  priv->live_trace_pos = 0;
+  priv->live_trace_count = 0;
+  memset(priv->live_trace_active, 0, sizeof(priv->live_trace_active));
+  priv->live_trace_last_slot = -1;
+  for (gint t = 0; t < GTK3_CURVE_LIVE_TRACE_MAX; t++)
+    priv->live_trace_last_slot_for[t] = -1;
+  priv->live_trace_have_source_x = FALSE;
+  priv->live_trace_last_source_x = 0.0f;
+  memset(priv->live_trace_label, 0, sizeof(priv->live_trace_label));
+  priv->live_trace_auto_x = NAN;
+  priv->live_trace_last_input_x = 0.0f;
+  priv->live_trace_pending_x = NAN;
+  priv->live_trace_have_last_input = FALSE;
+  priv->live_trace_pending_valid = FALSE;
+  priv->live_trace_clear_on_next_push = FALSE;
+  priv->live_trace_have_source_x = FALSE;
+  priv->live_trace_last_source_x = 0.0f;
+  priv->live_trace_dot_enabled = FALSE;
+  priv->live_trace_dot_x = 0.0f;
+  priv->live_trace_dot_base_value = 0.0f;
+  priv->live_trace_dot_value = 0.0f;
+  memset(&priv->live_trace_dot_color, 0, sizeof(priv->live_trace_dot_color));
+  priv->live_trace_dot_label[0] = '\0';
+
   gtk3_curve_set_color_background_rgba (GTK_WIDGET(self), 1.0, 1.0, 1.0, 1.0);
   gtk3_curve_set_color_curve_rgba (GTK_WIDGET(self), 0.0, 0.0, 0.0, 1.0);
   gtk3_curve_set_color_grid_rgba (GTK_WIDGET(self), 0.0, 0.0, 0.0, 1.0);
@@ -623,6 +714,9 @@ gtk3_curve_handle_scroll(GtkWidget *widget, GdkEventScroll *ev)
     return FALSE;
 
   priv = GTK3_CURVE(widget)->priv;
+
+  if (gtk3_curve_live_trace_use_local_axis(priv))
+    return TRUE;
 
   gtk_widget_get_allocation(widget, &allocation);
   width = gtk3_curve_graph_width_from_allocation(allocation.width);
@@ -749,25 +843,10 @@ scale_pos_value(Gtk3CurvePrivate *priv, gfloat x, gfloat width)
 }
 
 static gint
-gtk3_curve_nice_x_grid_step(gint frame_count, gdouble fps)
+gtk3_curve_next_nice_x_step(gint min_step, gdouble fps)
 {
-  gint target_divisions = 10;
-  gint raw_step;
-
-  if (frame_count <= 0)
+  if (min_step <= 1)
     return 1;
-
-  raw_step = frame_count / target_divisions;
-
-  if (raw_step < 1)
-    raw_step = 1;
-
-
-  if (frame_count <= 50)
-    return 5;
-
-  if (frame_count <= 100)
-    return 10;
 
   if (fps > 1.0) {
     static const gdouble nice_seconds[] = {
@@ -785,12 +864,9 @@ gtk3_curve_nice_x_grid_step(gint frame_count, gdouble fps)
 
     for (guint i = 0; i < G_N_ELEMENTS(nice_seconds); i++) {
       gint step = (gint)(nice_seconds[i] * fps + 0.5);
-
-      if (step >= raw_step)
-        return step;
+      if (step >= min_step)
+        return MAX(1, step);
     }
-
-    return (gint)(600.0 * fps + 0.5);
   }
 
   {
@@ -799,18 +875,215 @@ gtk3_curve_nice_x_grid_step(gint frame_count, gdouble fps)
       10, 20, 25, 50,
       100, 125, 250, 500,
       1000, 1500, 2500, 5000,
-      10000
+      10000, 20000, 50000, 100000
     };
 
     for (guint i = 0; i < G_N_ELEMENTS(nice_frames); i++) {
-      if (nice_frames[i] >= raw_step)
+      if (nice_frames[i] >= min_step)
         return nice_frames[i];
     }
   }
 
-  return raw_step;
+  return min_step;
 }
 
+static gint
+gtk3_curve_nice_x_grid_step(gint frame_count, gdouble fps)
+{
+  gint raw_step;
+
+  if (frame_count <= 0)
+    return 1;
+
+  raw_step = frame_count / 10;
+
+  if (raw_step < 1)
+    raw_step = 1;
+
+  return gtk3_curve_next_nice_x_step(raw_step, fps);
+}
+
+static gint
+gtk3_curve_visible_x_grid_step(Gtk3CurvePrivate *priv, gint graph_width)
+{
+  gint frame_count;
+  gint max_labels;
+  gint min_step;
+  gint step;
+
+  if (!priv)
+    return 1;
+
+  step = priv->x_grid_step > 0 ? priv->x_grid_step : 1;
+
+  if (graph_width <= 0)
+    return step;
+
+  frame_count = (gint)(fabs((gdouble)priv->max_x -
+                            (gdouble)priv->min_x) + 0.5);
+  if (frame_count <= 1)
+    return step;
+
+  max_labels = graph_width / 42;
+  if (max_labels < 2)
+    max_labels = 2;
+  else if (max_labels > 16)
+    max_labels = 16;
+
+  min_step = (frame_count + max_labels - 1) / max_labels;
+  if (min_step < 1)
+    min_step = 1;
+
+  if (step < min_step)
+    step = gtk3_curve_next_nice_x_step(min_step, priv->fps);
+
+  return step > 0 ? step : 1;
+}
+
+static inline gboolean
+gtk3_curve_color_is_near_black(Gtk3CurveColor c)
+{
+  return c.red < 0.035f && c.green < 0.035f && c.blue < 0.035f;
+}
+
+static inline gboolean
+gtk3_curve_color_is_near_white(Gtk3CurveColor c)
+{
+  return c.red > 0.94f && c.green > 0.94f && c.blue > 0.94f;
+}
+
+static inline gboolean
+gtk3_curve_color_is_usable(Gtk3CurveColor c)
+{
+  return c.alpha > 0.001f &&
+         !gtk3_curve_color_is_near_black(c) &&
+         !gtk3_curve_color_is_near_white(c);
+}
+
+static inline Gtk3CurveColor
+gtk3_curve_color_from_rgba(GdkRGBA rgba, gfloat alpha)
+{
+  Gtk3CurveColor c;
+  c.red = rgba.red;
+  c.green = rgba.green;
+  c.blue = rgba.blue;
+  c.alpha = alpha;
+  return c;
+}
+
+static inline Gtk3CurveColor
+gtk3_curve_color_rgba(gfloat r, gfloat g, gfloat b, gfloat a)
+{
+  Gtk3CurveColor c;
+  c.red = r;
+  c.green = g;
+  c.blue = b;
+  c.alpha = a;
+  return c;
+}
+
+static Gtk3CurveColor
+gtk3_curve_legend_background_color(GtkWidget *widget,
+                                   Gtk3CurvePrivate *priv,
+                                   gfloat alpha)
+{
+  Gtk3CurveColor c;
+
+  if (widget) {
+    GtkStyleContext *sc = gtk_widget_get_style_context(widget);
+    GdkRGBA rgba;
+
+    vj_gtk_context_get_color(sc,
+                             "background-color",
+                             gtk_style_context_get_state(sc),
+                             &rgba);
+
+    c = gtk3_curve_color_from_rgba(rgba, alpha);
+    if (gtk3_curve_color_is_usable(c))
+      return c;
+  }
+
+  if (priv) {
+    c = priv->background;
+    c.alpha = alpha;
+    if (gtk3_curve_color_is_usable(c))
+      return c;
+  }
+
+  return gtk3_curve_color_rgba(45.0f / 255.0f,
+                               46.0f / 255.0f,
+                               54.0f / 255.0f,
+                               alpha);
+}
+
+static Gtk3CurveColor
+gtk3_curve_legend_border_color(GtkWidget *widget,
+                               Gtk3CurvePrivate *priv,
+                               gfloat alpha)
+{
+  Gtk3CurveColor c;
+
+  if (widget) {
+    GtkStyleContext *sc = gtk_widget_get_style_context(widget);
+    GdkRGBA rgba;
+
+    vj_gtk_context_get_color(sc,
+                             "border-color",
+                             gtk_style_context_get_state(sc),
+                             &rgba);
+
+    c = gtk3_curve_color_from_rgba(rgba, alpha);
+    if (gtk3_curve_color_is_usable(c) || gtk3_curve_color_is_near_white(c))
+      return c;
+  }
+
+  if (priv) {
+    c = priv->cpoint;
+    c.alpha = alpha;
+    if (gtk3_curve_color_is_usable(c))
+      return c;
+
+    c = priv->grid;
+    c.alpha = alpha;
+    if (gtk3_curve_color_is_usable(c))
+      return c;
+  }
+
+  return gtk3_curve_color_rgba(50.0f / 255.0f,
+                               53.0f / 255.0f,
+                               64.0f / 255.0f,
+                               alpha);
+}
+
+static Gtk3CurveColor
+gtk3_curve_legend_text_color(GtkWidget *widget,
+                             Gtk3CurvePrivate *priv,
+                             gfloat alpha)
+{
+  Gtk3CurveColor c;
+
+  if (widget) {
+    GtkStyleContext *sc = gtk_widget_get_style_context(widget);
+    GdkRGBA rgba;
+
+    gtk_style_context_get_color(sc,
+                                gtk_style_context_get_state(sc),
+                                &rgba);
+
+    c = gtk3_curve_color_from_rgba(rgba, alpha);
+    if (c.alpha > 0.001f)
+      return c;
+  }
+
+  if (priv) {
+    c = priv->curve;
+    c.alpha = alpha;
+    if (c.alpha > 0.001f)
+      return c;
+  }
+
+  return gtk3_curve_color_rgba(1.0f, 1.0f, 1.0f, alpha);
+}
 
 static void
 gtk3_curve_draw_cursor_legend(GtkWidget *widget,
@@ -833,22 +1106,34 @@ gtk3_curve_draw_cursor_legend(GtkWidget *widget,
     return;
 
   if (priv->in_curve) {
-    x_value = scale_pos_value(priv,
-                              CLAMP(priv->last_x, 0.0f, (gfloat)(graph_width - 1)),
-                              (gfloat) graph_width);
+    if (gtk3_curve_live_trace_use_local_axis(priv)) {
+      gdouble t = CLAMP(priv->last_x, 0.0f, (gfloat)(graph_width - 1)) /
+                  MAX(1.0, (gdouble)(graph_width - 1));
+      x_value = (gfloat)(t * (GTK3_CURVE_LIVE_TRACE_LEN - 1));
+    } else {
+      x_value = scale_pos_value(priv,
+                                CLAMP(priv->last_x, 0.0f, (gfloat)(graph_width - 1)),
+                                (gfloat) graph_width);
+    }
 
     y_value = scale_param_value(priv,
                                 CLAMP(priv->last_y, 0.0f, (gfloat)(graph_height - 1)),
                                 (gfloat) graph_height);
 
-    timecode = format_selection_time(priv->min_x, x_value);
-
-    g_snprintf(left,
-               sizeof(left),
-               "Frame %.0f%s%s",
-               x_value,
-               timecode ? " / " : "",
-               timecode ? timecode : "");
+    if (gtk3_curve_live_trace_use_local_axis(priv)) {
+      g_snprintf(left,
+                 sizeof(left),
+                 "Live %.0f",
+                 x_value);
+    } else {
+      timecode = format_selection_time(priv->min_x, x_value);
+      g_snprintf(left,
+                 sizeof(left),
+                 "Frame %.0f%s%s",
+                 x_value,
+                 timecode ? " / " : "",
+                 timecode ? timecode : "");
+    }
 
     g_snprintf(right,
                sizeof(right),
@@ -858,7 +1143,7 @@ gtk3_curve_draw_cursor_legend(GtkWidget *widget,
   } else {
     g_snprintf(left,
                sizeof(left),
-               "Frame");
+               gtk3_curve_live_trace_use_local_axis(priv) ? "Live" : "Frame");
 
     g_snprintf(right,
                sizeof(right),
@@ -901,16 +1186,22 @@ gtk3_curve_draw_cursor_legend(GtkWidget *widget,
                         priv->grid.blue,
                         priv->grid.alpha * 0.90);
 
-  cairo_move_to(cr, 6.0, y + 15.0);
+  cairo_text_extents_t left_ext;
+  cairo_text_extents_t right_ext;
+
+  cairo_text_extents(cr, left, &left_ext);
+  cairo_text_extents(cr, right, &right_ext);
+
+  cairo_move_to(cr, 6.0, y + 16.0);
   cairo_show_text(cr, left);
 
-  cairo_text_extents_t ext;
-  cairo_text_extents(cr, right, &ext);
-
-  cairo_move_to(cr,
-                allocation_width - ext.width - 8.0,
-                y + 15.0);
-  cairo_show_text(cr, right);
+  if (6.0 + left_ext.width + 20.0 <
+      allocation_width - right_ext.width - 8.0) {
+    cairo_move_to(cr,
+                  allocation_width - right_ext.width - 8.0,
+                  y + 16.0);
+    cairo_show_text(cr, right);
+  }
 
   cairo_restore(cr);
 }
@@ -1099,6 +1390,552 @@ static void gtk3_curve_draw_line (cairo_t   *cr,
   cairo_stroke (cr);
 }
 
+
+typedef struct
+{
+  gdouble x;
+  gdouble y;
+  gdouble w;
+  gdouble h;
+  gdouble x1;
+  gdouble y1;
+} Gtk3CurveGraphRect;
+
+static gboolean
+gtk3_curve_live_trace_use_local_axis(Gtk3CurvePrivate *priv)
+{
+  (void) priv;
+  return FALSE;
+}
+
+static gfloat
+gtk3_curve_live_axis_min_x(Gtk3CurvePrivate *priv)
+{
+  return priv ? priv->min_x : 0.0f;
+}
+
+static gfloat
+gtk3_curve_live_axis_max_x(Gtk3CurvePrivate *priv)
+{
+  return priv ? priv->max_x : 1.0f;
+}
+
+static gfloat
+gtk3_curve_live_domain_min_x(Gtk3CurvePrivate *priv)
+{
+  if (!priv)
+    return 0.0f;
+
+  if (isfinite(priv->timeline_min_x) &&
+      isfinite(priv->timeline_max_x) &&
+      priv->timeline_max_x > priv->timeline_min_x)
+    return priv->timeline_min_x;
+
+  if (isfinite(priv->min_x))
+    return priv->min_x;
+
+  return 0.0f;
+}
+
+static gfloat
+gtk3_curve_live_domain_max_x(Gtk3CurvePrivate *priv)
+{
+  if (!priv)
+    return 1.0f;
+
+  if (isfinite(priv->timeline_min_x) &&
+      isfinite(priv->timeline_max_x) &&
+      priv->timeline_max_x > priv->timeline_min_x)
+    return priv->timeline_max_x;
+
+  if (isfinite(priv->max_x))
+    return priv->max_x;
+
+  return 1.0f;
+}
+
+static gint
+gtk3_curve_live_trace_slot_for_x(Gtk3CurvePrivate *priv,
+                                 gfloat            x_value)
+{
+  gfloat min_x;
+  gfloat max_x;
+  gdouble t;
+  gint slot;
+
+  if (!priv || !isfinite(x_value))
+    return 0;
+
+  min_x = gtk3_curve_live_domain_min_x(priv);
+  max_x = gtk3_curve_live_domain_max_x(priv);
+
+  if (!isfinite(min_x))
+    min_x = 0.0f;
+  if (!isfinite(max_x) || max_x <= min_x)
+    max_x = min_x + 1.0f;
+
+  if (x_value <= min_x)
+    return 0;
+  if (x_value >= max_x)
+    return GTK3_CURVE_LIVE_TRACE_LEN - 1;
+
+  t = ((gdouble)x_value - (gdouble)min_x) /
+      ((gdouble)max_x - (gdouble)min_x);
+  slot = (gint)((t * (GTK3_CURVE_LIVE_TRACE_LEN - 1)) + 0.5);
+
+  if (slot < 0)
+    slot = 0;
+  else if (slot >= GTK3_CURVE_LIVE_TRACE_LEN)
+    slot = GTK3_CURVE_LIVE_TRACE_LEN - 1;
+
+  return slot;
+}
+
+static gboolean
+gtk3_curve_live_graph_rect(gint graph_width,
+                           gint graph_height,
+                           Gtk3CurveGraphRect *r)
+{
+  if (!r || graph_width <= 1 || graph_height <= 1)
+    return FALSE;
+
+  r->x = (gdouble) RADIUS;
+  r->y = (gdouble) RADIUS;
+  r->w = (gdouble) graph_width;
+  r->h = (gdouble) graph_height;
+  r->x1 = r->x + r->w - 1.0;
+  r->y1 = r->y + r->h - 1.0;
+
+  return TRUE;
+}
+
+static gboolean
+gtk3_curve_live_project_x(Gtk3CurvePrivate      *priv,
+                          const Gtk3CurveGraphRect *r,
+                          gfloat                 value,
+                          gdouble               *x)
+{
+  gdouble t;
+
+  if (!priv || !r || !x)
+    return FALSE;
+
+  gfloat min_x = gtk3_curve_live_axis_min_x(priv);
+  gfloat max_x = gtk3_curve_live_axis_max_x(priv);
+
+  if (!isfinite(value) || max_x <= min_x)
+    return FALSE;
+
+  t = ((gdouble)value - (gdouble)min_x) /
+      ((gdouble)max_x - (gdouble)min_x);
+
+  if (t < 0.0 || t > 1.0)
+    return FALSE;
+
+  *x = r->x + (t * (r->w - 1.0));
+  return TRUE;
+}
+
+static gdouble
+gtk3_curve_live_project_y_norm(const Gtk3CurveGraphRect *r,
+                               gfloat                    value)
+{
+  gdouble t;
+
+  if (!r)
+    return 0.0;
+
+  if (!isfinite(value))
+    value = 0.0f;
+
+  if (value < 0.0f)
+    value = 0.0f;
+  else if (value > 100.0f)
+    value = 100.0f;
+
+  t = (gdouble)value * 0.01;
+
+  {
+    gdouble pad = CURVE_LIVE_TRACE_Y_PAD;
+    gdouble span;
+
+    if (r->h <= (pad * 2.0) + 2.0)
+      pad = 0.0;
+
+    span = (r->h - 1.0) - (pad * 2.0);
+    if (span < 1.0)
+      span = r->h - 1.0;
+
+    return (r->y1 - pad) - (t * span);
+  }
+}
+
+static void
+gtk3_curve_draw_live_dot(Gtk3CurvePrivate *priv,
+                         cairo_t          *cr,
+                         const Gtk3CurveGraphRect *r)
+{
+  gdouble x;
+  gdouble y0;
+  gdouble y1;
+  gdouble radius = 3.8;
+
+  if (!priv || !cr || !r)
+    return;
+
+  if (!priv->live_trace_dot_enabled)
+    return;
+
+  if (!gtk3_curve_live_project_x(priv, r, priv->live_trace_dot_x, &x))
+    return;
+
+  (void)y0;
+  y1 = gtk3_curve_live_project_y_norm(r, priv->live_trace_dot_value);
+
+  if (x < r->x + radius)
+    x = r->x + radius;
+  else if (x > r->x1 - radius)
+    x = r->x1 - radius;
+
+  if (y1 < r->y + radius)
+    y1 = r->y + radius;
+  else if (y1 > r->y1 - radius)
+    y1 = r->y1 - radius;
+
+  cairo_save(cr);
+  cairo_set_source_rgba(cr,
+                        priv->live_trace_dot_color.red,
+                        priv->live_trace_dot_color.green,
+                        priv->live_trace_dot_color.blue,
+                        MIN(1.0, priv->live_trace_dot_color.alpha + 0.20));
+  cairo_arc(cr, x, y1, radius, 0.0, 2.0 * M_PI);
+  cairo_fill_preserve(cr);
+
+  cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.42);
+  cairo_set_line_width(cr, 1.0);
+  cairo_stroke(cr);
+  cairo_restore(cr);
+}
+
+
+static void
+gtk3_curve_draw_live_trace_current_dot(Gtk3CurvePrivate *priv,
+                                       cairo_t          *cr,
+                                       const Gtk3CurveGraphRect *r,
+                                       gint              trace,
+                                       gint              idx)
+{
+  gdouble x;
+  gdouble y;
+  gdouble radius = 2.8;
+
+  if (!priv || !cr || !r)
+    return;
+
+  if (trace < 0 || trace >= GTK3_CURVE_LIVE_TRACE_MAX)
+    return;
+
+  if (idx < 0 || idx >= GTK3_CURVE_LIVE_TRACE_LEN)
+    return;
+
+  if (!priv->live_trace_active[trace])
+    return;
+
+  if (!priv->live_trace_point_used || !priv->live_trace_point_used[trace][idx])
+    return;
+
+  if (!gtk3_curve_live_project_x(priv, r, priv->live_trace_x[trace][idx], &x))
+    return;
+
+  y = gtk3_curve_live_project_y_norm(r, priv->live_trace_values[trace][idx]);
+
+  if (x < r->x + radius)
+    x = r->x + radius;
+  else if (x > r->x1 - radius)
+    x = r->x1 - radius;
+
+  if (y < r->y + radius)
+    y = r->y + radius;
+  else if (y > r->y1 - radius)
+    y = r->y1 - radius;
+
+  cairo_save(cr);
+  cairo_set_source_rgba(cr,
+                        priv->live_trace_color[trace].red,
+                        priv->live_trace_color[trace].green,
+                        priv->live_trace_color[trace].blue,
+                        MIN(1.0, priv->live_trace_color[trace].alpha + 0.26));
+  cairo_arc(cr, x, y, radius, 0.0, 2.0 * M_PI);
+  cairo_fill_preserve(cr);
+  cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.36);
+  cairo_set_line_width(cr, 0.8);
+  cairo_stroke(cr);
+  cairo_restore(cr);
+}
+
+static void
+gtk3_curve_draw_live_trace_segment(cairo_t       *cr,
+                                   Gtk3CurveType  type,
+                                   gdouble       *x,
+                                   gdouble       *y,
+                                   gint           n)
+{
+  if (!cr || !x || !y || n <= 0)
+    return;
+
+  cairo_move_to(cr, x[0], y[0]);
+
+  if (type == GTK3_CURVE_TYPE_SPLINE && n > 2) {
+    for (gint i = 0; i < n - 1; i++) {
+      gint i0 = (i > 0) ? i - 1 : i;
+      gint i1 = i;
+      gint i2 = i + 1;
+      gint i3 = (i + 2 < n) ? i + 2 : i + 1;
+      gdouble c1x = x[i1] + (x[i2] - x[i0]) / 6.0;
+      gdouble c1y = y[i1] + (y[i2] - y[i0]) / 6.0;
+      gdouble c2x = x[i2] - (x[i3] - x[i1]) / 6.0;
+      gdouble c2y = y[i2] - (y[i3] - y[i1]) / 6.0;
+      cairo_curve_to(cr, c1x, c1y, c2x, c2y, x[i2], y[i2]);
+    }
+  } else {
+    for (gint i = 1; i < n; i++)
+      cairo_line_to(cr, x[i], y[i]);
+  }
+
+  cairo_stroke(cr);
+}
+
+static void
+gtk3_curve_live_trace_clear_samples(Gtk3CurvePrivate *priv)
+{
+  if (!priv)
+    return;
+
+  priv->live_trace_pos = 0;
+  priv->live_trace_count = 0;
+  memset(priv->live_trace_active, 0, sizeof(priv->live_trace_active));
+  if (priv->live_trace_values)
+    memset(priv->live_trace_values[0], 0, sizeof(gfloat) * GTK3_CURVE_LIVE_TRACE_MAX * GTK3_CURVE_LIVE_TRACE_LEN);
+  if (priv->live_trace_x)
+    memset(priv->live_trace_x[0], 0, sizeof(gfloat) * GTK3_CURVE_LIVE_TRACE_MAX * GTK3_CURVE_LIVE_TRACE_LEN);
+  if (priv->live_trace_point_used)
+    memset(priv->live_trace_point_used[0], 0, sizeof(gboolean) * GTK3_CURVE_LIVE_TRACE_MAX * GTK3_CURVE_LIVE_TRACE_LEN);
+  if (priv->live_trace_slot_used)
+    memset(priv->live_trace_slot_used, 0, sizeof(gboolean) * GTK3_CURVE_LIVE_TRACE_LEN);
+  priv->live_trace_last_slot = -1;
+  for (gint t = 0; t < GTK3_CURVE_LIVE_TRACE_MAX; t++)
+    priv->live_trace_last_slot_for[t] = -1;
+  priv->live_trace_have_source_x = FALSE;
+  priv->live_trace_last_source_x = 0.0f;
+  memset(priv->live_trace_color, 0, sizeof(priv->live_trace_color));
+  memset(priv->live_trace_label, 0, sizeof(priv->live_trace_label));
+  priv->live_trace_pending_x = NAN;
+  priv->live_trace_pending_valid = FALSE;
+  priv->live_trace_clear_on_next_push = FALSE;
+}
+
+static gboolean
+gtk3_curve_live_trace_label_is_drawn(Gtk3CurvePrivate *priv,
+                                      const gchar      *label)
+{
+  if (!priv || !label || label[0] == '\0')
+    return FALSE;
+
+  for (gint t = 0; t < GTK3_CURVE_LIVE_TRACE_MAX; t++) {
+    if (!priv->live_trace_active[t])
+      continue;
+    if (priv->live_trace_label[t][0] == '\0')
+      continue;
+    if (g_strcmp0(priv->live_trace_label[t], label) == 0)
+      return TRUE;
+  }
+
+  return FALSE;
+}
+
+static void
+gtk3_curve_draw_live_traces(GtkWidget *widget,
+                            cairo_t   *cr,
+                            gint       allocation_width,
+                            gint       graph_width,
+                            gint       graph_height)
+{
+  Gtk3CurvePrivate *priv = GTK3_CURVE(widget)->priv;
+  Gtk3CurveGraphRect gr;
+
+  if (!priv->live_trace_enabled || priv->live_trace_count <= 0)
+    return;
+
+  if (!gtk3_curve_live_graph_rect(graph_width, graph_height, &gr))
+    return;
+
+  cairo_save(cr);
+  cairo_rectangle(cr, gr.x, gr.y, gr.w, gr.h);
+  cairo_clip(cr);
+
+  for (gint t = 0; t < GTK3_CURVE_LIVE_TRACE_MAX; t++) {
+    gdouble sx[GTK3_CURVE_LIVE_TRACE_LEN];
+    gdouble sy[GTK3_CURVE_LIVE_TRACE_LEN];
+    gint n = 0;
+
+    if (!priv->live_trace_active[t])
+      continue;
+
+    cairo_set_line_width(cr, (t == GTK3_CURVE_LIVE_TRACE_MAX - 1) ? 1.85 : 1.20);
+    cairo_set_source_rgba(cr,
+                          priv->live_trace_color[t].red,
+                          priv->live_trace_color[t].green,
+                          priv->live_trace_color[t].blue,
+                          priv->live_trace_color[t].alpha);
+
+    gfloat last_value_x = 0.0f;
+    gboolean have_last_value_x = FALSE;
+    gfloat jump_threshold = gtk3_curve_live_trace_jump_threshold(priv);
+
+    for (gint idx = 0; idx < GTK3_CURVE_LIVE_TRACE_LEN; idx++) {
+      gdouble x;
+      gdouble y;
+      gfloat value_x;
+
+      if (!priv->live_trace_point_used || !priv->live_trace_point_used[t][idx])
+        continue;
+
+      value_x = priv->live_trace_x[t][idx];
+
+      if (have_last_value_x && fabsf(value_x - last_value_x) > jump_threshold) {
+        gtk3_curve_draw_live_trace_segment(cr, GTK3_CURVE_TYPE_LINEAR, sx, sy, n);
+        n = 0;
+        have_last_value_x = FALSE;
+      }
+
+      if (!gtk3_curve_live_project_x(priv, &gr, value_x, &x)) {
+        gtk3_curve_draw_live_trace_segment(cr, GTK3_CURVE_TYPE_LINEAR, sx, sy, n);
+        n = 0;
+        have_last_value_x = FALSE;
+        continue;
+      }
+
+      y = gtk3_curve_live_project_y_norm(&gr, priv->live_trace_values[t][idx]);
+
+      if (n > 0 && x < sx[n - 1] - 0.5) {
+        gtk3_curve_draw_live_trace_segment(cr, GTK3_CURVE_TYPE_LINEAR, sx, sy, n);
+        n = 0;
+        have_last_value_x = FALSE;
+      }
+
+      if (n > 0 && fabs(x - sx[n - 1]) <= 0.5) {
+        sy[n - 1] = y;
+        continue;
+      }
+
+      sx[n] = x;
+      sy[n] = y;
+      n++;
+      last_value_x = value_x;
+      have_last_value_x = TRUE;
+    }
+
+    gtk3_curve_draw_live_trace_segment(cr, GTK3_CURVE_TYPE_LINEAR, sx, sy, n);
+
+    if (priv->live_trace_last_slot_for[t] >= 0)
+      gtk3_curve_draw_live_trace_current_dot(priv, cr, &gr, t, priv->live_trace_last_slot_for[t]);
+  }
+
+  gtk3_curve_draw_live_dot(priv, cr, &gr);
+
+  cairo_restore(cr);
+
+  cairo_save(cr);
+  cairo_select_font_face(cr,
+                         "Sans",
+                         CAIRO_FONT_SLANT_NORMAL,
+                         CAIRO_FONT_WEIGHT_NORMAL);
+  cairo_set_font_size(cr, 9.5);
+
+  {
+    gchar labels[GTK3_CURVE_LIVE_TRACE_MAX + 1][GTK3_CURVE_LIVE_TRACE_LABEL];
+    Gtk3CurveColor colors[GTK3_CURVE_LIVE_TRACE_MAX + 1];
+    gint label_count = 0;
+    gdouble max_w = 0.0;
+    cairo_text_extents_t ext;
+
+    for (gint t = 0; t < GTK3_CURVE_LIVE_TRACE_MAX; t++) {
+      if (!priv->live_trace_active[t] || priv->live_trace_label[t][0] == '\0')
+        continue;
+
+      g_strlcpy(labels[label_count],
+                priv->live_trace_label[t],
+                GTK3_CURVE_LIVE_TRACE_LABEL);
+      colors[label_count] = priv->live_trace_color[t];
+      cairo_text_extents(cr, labels[label_count], &ext);
+      if (ext.width > max_w)
+        max_w = ext.width;
+      label_count++;
+      if (label_count >= GTK3_CURVE_LIVE_TRACE_MAX)
+        break;
+    }
+
+    if (priv->live_trace_dot_enabled &&
+        priv->live_trace_dot_label[0] != '\0' &&
+        !gtk3_curve_live_trace_label_is_drawn(priv, priv->live_trace_dot_label) &&
+        label_count < GTK3_CURVE_LIVE_TRACE_MAX + 1) {
+      g_strlcpy(labels[label_count],
+                priv->live_trace_dot_label,
+                GTK3_CURVE_LIVE_TRACE_LABEL);
+      colors[label_count] = priv->live_trace_dot_color;
+      cairo_text_extents(cr, labels[label_count], &ext);
+      if (ext.width > max_w)
+        max_w = ext.width;
+      label_count++;
+    }
+
+    if (label_count > 0) {
+      gdouble box_w = MIN((gdouble)allocation_width - 12.0, max_w + 14.0);
+      gdouble box_h = MIN((gdouble)label_count * 11.0 + 8.0, gr.h - 8.0);
+      gdouble box_x = MAX(gr.x + 4.0, gr.x1 - box_w - 5.0);
+      gdouble box_y = gr.y + 5.0;
+      gint max_rows = (gint)((box_h - 8.0) / 11.0);
+
+      if (max_rows < 1)
+        max_rows = 1;
+
+      Gtk3CurveColor legend_bg =
+        gtk3_curve_legend_background_color(widget, priv, 0.88f);
+      Gtk3CurveColor legend_border =
+        gtk3_curve_legend_border_color(widget, priv, 0.72f);
+
+      cairo_set_source_rgba(cr,
+                            legend_bg.red,
+                            legend_bg.green,
+                            legend_bg.blue,
+                            legend_bg.alpha);
+      cairo_rectangle(cr, box_x, box_y, box_w, box_h);
+      cairo_fill(cr);
+
+      cairo_set_source_rgba(cr,
+                            legend_border.red,
+                            legend_border.green,
+                            legend_border.blue,
+                            legend_border.alpha);
+      cairo_set_line_width(cr, 0.5);
+      cairo_rectangle(cr, box_x + 0.5, box_y + 0.5, box_w - 1.0, box_h - 1.0);
+      cairo_stroke(cr);
+
+      for (gint i = 0; i < label_count && i < max_rows; i++) {
+        cairo_set_source_rgba(cr,
+                              colors[i].red,
+                              colors[i].green,
+                              colors[i].blue,
+                              MIN(1.0, colors[i].alpha + 0.25));
+        cairo_move_to(cr, box_x + 7.0, box_y + 14.0 + ((gdouble)i * 11.0));
+        cairo_show_text(cr, labels[i]);
+      }
+    }
+  }
+
+  cairo_restore(cr);
+}
+
 static gboolean
 gtk3_curve_x_nav_hit(GtkWidget *widget,
                      gint       tx,
@@ -1133,6 +1970,9 @@ gtk3_curve_x_nav_hit(GtkWidget *widget,
     return FALSE;
 
   priv = GTK3_CURVE(widget)->priv;
+
+  if (gtk3_curve_live_trace_use_local_axis(priv))
+    return FALSE;
 
   gtk_widget_get_allocation(widget, &allocation);
 
@@ -1197,6 +2037,9 @@ gtk3_curve_draw_x_zoom_indicators(GtkWidget *widget,
   gdouble box_h;
 
   if (!cr || graph_width <= 1 || graph_height <= 1)
+    return;
+
+  if (gtk3_curve_live_trace_use_local_axis(priv))
     return;
 
   if (priv->timeline_max_x <= priv->timeline_min_x)
@@ -1359,18 +2202,24 @@ gtk3_curve_draw_labels(GtkWidget *widget,
   gfloat hm = graph_height;
 
   {
-    gint min_frame = (gint)(priv->min_x + 0.5f);
-    gint max_frame = (gint)(priv->max_x + 0.5f);
-    gint step = priv->x_grid_step;
-    gdouble label_y = RADIUS + hm + 12.0;
+    gfloat label_min_x = gtk3_curve_live_axis_min_x(priv);
+    gfloat label_max_x = gtk3_curve_live_axis_max_x(priv);
+    gint min_frame = (gint)(label_min_x + 0.5f);
+    gint max_frame = (gint)(label_max_x + 0.5f);
+    gint frame_count = MAX(1, (gint)(fabsf(label_max_x - label_min_x) + 0.5f));
+    gint step = gtk3_curve_live_trace_use_local_axis(priv) ?
+                gtk3_curve_nice_x_grid_step(frame_count, 0.0) :
+                gtk3_curve_visible_x_grid_step(priv, graph_width);
+    gdouble label_y = RADIUS + hm + 13.0;
+    gdouble last_label_right = -1000000.0;
 
     if (step <= 0)
       step = 1;
 
     for (gint frame = min_frame; frame <= max_frame; frame += step) {
       gdouble x1 = RADIUS + project((gfloat) frame,
-                                    priv->min_x,
-                                    priv->max_x,
+                                    label_min_x,
+                                    label_max_x,
                                     (gint) wm);
 
       snprintf(text, sizeof(text), "%d", frame);
@@ -1384,15 +2233,18 @@ gtk3_curve_draw_labels(GtkWidget *widget,
         else if (lx + extents.width > allocation_width - 2.0)
           lx = allocation_width - extents.width - 2.0;
 
-        cairo_move_to(cr, lx, label_y);
+        if (lx >= last_label_right + 6.0 || frame == min_frame) {
+          cairo_move_to(cr, lx, label_y);
+          cairo_show_text(cr, text);
+          last_label_right = lx + extents.width;
+        }
       }
-      cairo_show_text(cr, text);
     }
 
     if (((max_frame - min_frame) % step) != 0) {
       gdouble x1 = RADIUS + project((gfloat) max_frame,
-                                    priv->min_x,
-                                    priv->max_x,
+                                    label_min_x,
+                                    label_max_x,
                                     (gint) wm);
 
       snprintf(text, sizeof(text), "%d", max_frame);
@@ -1406,9 +2258,12 @@ gtk3_curve_draw_labels(GtkWidget *widget,
         else if (lx + extents.width > allocation_width - 2.0)
           lx = allocation_width - extents.width - 2.0;
 
-        cairo_move_to(cr, lx, label_y);
+        if (lx >= last_label_right + 6.0) {
+          cairo_move_to(cr, lx, label_y);
+          cairo_show_text(cr, text);
+          last_label_right = lx + extents.width;
+        }
       }
-      cairo_show_text(cr, text);
     }
   }
 
@@ -1593,16 +2448,37 @@ gtk3_curve_draw_hover_label(GtkWidget *widget,
   if (box_y + box_h > allocation_height - 2.0)
     box_y = allocation_height - box_h - 2.0;
 
-  cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.78);
-  cairo_rectangle(cr, box_x, box_y, box_w, box_h);
-  cairo_fill(cr);
+  {
+    Gtk3CurveColor legend_bg =
+      gtk3_curve_legend_background_color(widget, priv, 0.90f);
+    Gtk3CurveColor legend_border =
+      gtk3_curve_legend_border_color(widget, priv, 0.72f);
+    Gtk3CurveColor legend_text =
+      gtk3_curve_legend_text_color(widget, priv, 0.95f);
 
-  cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 0.25);
-  cairo_rectangle(cr, box_x + 0.5, box_y + 0.5, box_w - 1.0, box_h - 1.0);
-  cairo_set_line_width(cr, 1.0);
-  cairo_stroke(cr);
+    cairo_set_source_rgba(cr,
+                          legend_bg.red,
+                          legend_bg.green,
+                          legend_bg.blue,
+                          legend_bg.alpha);
+    cairo_rectangle(cr, box_x, box_y, box_w, box_h);
+    cairo_fill(cr);
 
-  cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 0.95);
+    cairo_set_source_rgba(cr,
+                          legend_border.red,
+                          legend_border.green,
+                          legend_border.blue,
+                          legend_border.alpha);
+    cairo_rectangle(cr, box_x + 0.5, box_y + 0.5, box_w - 1.0, box_h - 1.0);
+    cairo_set_line_width(cr, 1.0);
+    cairo_stroke(cr);
+
+    cairo_set_source_rgba(cr,
+                          legend_text.red,
+                          legend_text.green,
+                          legend_text.blue,
+                          legend_text.alpha);
+  }
 
   cairo_move_to(cr, box_x + 7.0, box_y + 14.0);
   cairo_show_text(cr, line1);
@@ -1748,17 +2624,22 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
   }
 
   {
-    gint min_frame = (gint)(priv->min_x + 0.5f);
-    gint max_frame = (gint)(priv->max_x + 0.5f);
-    gint step = priv->x_grid_step;
+    gfloat grid_min_x = gtk3_curve_live_axis_min_x(priv);
+    gfloat grid_max_x = gtk3_curve_live_axis_max_x(priv);
+    gint min_frame = (gint)(grid_min_x + 0.5f);
+    gint max_frame = (gint)(grid_max_x + 0.5f);
+    gint frame_count = MAX(1, (gint)(fabsf(grid_max_x - grid_min_x) + 0.5f));
+    gint step = gtk3_curve_live_trace_use_local_axis(priv) ?
+                gtk3_curve_nice_x_grid_step(frame_count, 0.0) :
+                gtk3_curve_visible_x_grid_step(priv, width);
 
     if (step <= 0)
       step = 1;
 
     for (gint frame = min_frame; frame <= max_frame; frame += step) {
       gdouble gx = RADIUS + project((gfloat) frame,
-                                    priv->min_x,
-                                    priv->max_x,
+                                    grid_min_x,
+                                    grid_max_x,
                                     (gint) wm);
 
       gtk3_curve_draw_line(cr, gx, RADIUS, gx, hm + RADIUS);
@@ -1766,8 +2647,8 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
 
     if (((max_frame - min_frame) % step) != 0) {
       gdouble gx = RADIUS + project((gfloat) max_frame,
-                                    priv->min_x,
-                                    priv->max_x,
+                                    grid_min_x,
+                                    grid_max_x,
                                     (gint) wm);
 
       gtk3_curve_draw_line(cr, gx, RADIUS, gx, hm + RADIUS);
@@ -1853,6 +2734,12 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
       cairo_fill(cr);
     }
   }
+
+  gtk3_curve_draw_live_traces(widget,
+                              cr,
+                              allocation.width,
+                              width,
+                              height);
 
   if (priv->hover_cpoint >= 0) {
     gtk3_curve_draw_hover_label(widget,
@@ -2507,6 +3394,10 @@ gtk3_curve_finalize (GObject *object)
     g_free (priv->curve_data.d_cpoints);
   if (priv->frame_vector)
     g_free(priv->frame_vector);
+  g_free(priv->live_trace_values);
+  g_free(priv->live_trace_x);
+  g_free(priv->live_trace_point_used);
+  g_free(priv->live_trace_slot_used);
 
   G_OBJECT_CLASS (gtk3_curve_parent_class)->finalize (object);
 }
@@ -2548,6 +3439,21 @@ gtk3_curve_clear(GtkWidget *widget)
 
     priv->width = 0;
     priv->height = 0;
+
+    if (priv->live_trace_enabled) {
+        gtk3_curve_live_trace_clear_samples(priv);
+        priv->live_trace_auto_x = NAN;
+        priv->live_trace_last_input_x = 0.0f;
+        priv->live_trace_pending_x = NAN;
+        priv->live_trace_have_last_input = FALSE;
+        priv->live_trace_pending_valid = FALSE;
+        priv->live_trace_dot_enabled = FALSE;
+        priv->live_trace_dot_x = 0.0f;
+        priv->live_trace_dot_base_value = 0.0f;
+        priv->live_trace_dot_value = 0.0f;
+        memset(&priv->live_trace_dot_color, 0, sizeof(priv->live_trace_dot_color));
+        priv->live_trace_dot_label[0] = '\0';
+    }
 
     if (gtk_widget_is_visible(widget))
         gtk_widget_queue_draw(widget);
@@ -3099,6 +4005,8 @@ gtk3_curve_set_range_internal(GtkWidget *widget,
     gfloat old_max_x = priv->max_x;
     gfloat old_min_y = priv->min_y;
     gfloat old_max_y = priv->max_y;
+    gfloat old_timeline_min_x = priv->timeline_min_x;
+    gfloat old_timeline_max_x = priv->timeline_max_x;
 
     gboolean had_curve =
         ((priv->curve_data.d_point &&
@@ -3140,6 +4048,10 @@ gtk3_curve_set_range_internal(GtkWidget *widget,
     gint new_x_len = (gint)(fabsf(max_x - min_x) + 0.5f);
 
     gboolean x_len_changed = (old_x_len != new_x_len);
+    gboolean timeline_changed =
+        update_timeline &&
+        (old_timeline_min_x != min_x ||
+         old_timeline_max_x != max_x);
 
     gboolean range_changed =
         old_min_x != min_x ||
@@ -3175,6 +4087,9 @@ gtk3_curve_set_range_internal(GtkWidget *widget,
         gtk3_curve_auto_y_grid_resolution(priv->min_y, priv->max_y);
 
     gtk3_curve_update_x_grid(priv);
+
+    if (timeline_changed && priv->live_trace_enabled)
+        gtk3_curve_live_trace_clear(widget);
 
     if (had_curve && range_changed) {
         gint width  = gtk3_curve_graph_width_from_allocation(gtk_widget_get_allocated_width(widget));
@@ -3245,8 +4160,15 @@ gtk3_curve_set_x_timeline(GtkWidget *widget, gfloat min_x, gfloat max_x)
     if (max_x <= min_x)
         max_x = min_x + 1.0f;
 
+    gboolean timeline_changed =
+        (priv->timeline_min_x != min_x ||
+         priv->timeline_max_x != max_x);
+
     priv->timeline_min_x = min_x;
     priv->timeline_max_x = max_x;
+
+    if (timeline_changed && priv->live_trace_enabled)
+        gtk3_curve_live_trace_clear(widget);
 
     gtk3_curve_set_x_view(widget, priv->min_x, priv->max_x);
 }
@@ -4120,6 +5042,511 @@ gtk3_curve_reset_vector(GtkWidget *widget)
 
   if (gtk_widget_is_visible(GTK_WIDGET(curve)))
     gtk_widget_queue_draw(GTK_WIDGET(curve));
+}
+
+
+static gfloat
+gtk3_curve_live_trace_prepare_x(Gtk3CurvePrivate *priv,
+                                gfloat            input_x)
+{
+  gfloat min_x;
+  gfloat max_x;
+  gfloat x;
+
+  if (!priv)
+    return 0.0f;
+
+  min_x = gtk3_curve_live_domain_min_x(priv);
+  max_x = gtk3_curve_live_domain_max_x(priv);
+
+  if (!isfinite(min_x))
+    min_x = 0.0f;
+  if (!isfinite(max_x) || max_x <= min_x)
+    max_x = min_x + 1.0f;
+
+  x = input_x;
+  if (!isfinite(x))
+    x = (gfloat) priv->current_position;
+  if (!isfinite(x))
+    x = min_x;
+
+  if (x < min_x)
+    x = min_x;
+  else if (x > max_x)
+    x = max_x;
+
+  if (priv->live_trace_pending_valid &&
+      fabsf(x - priv->live_trace_pending_x) <= 0.0001f)
+    return priv->live_trace_pending_x;
+
+  priv->live_trace_auto_x = x;
+  priv->live_trace_pending_x = x;
+  priv->live_trace_pending_valid = TRUE;
+  priv->live_trace_clear_on_next_push = FALSE;
+
+  return x;
+}
+
+static gboolean
+gtk3_curve_live_trace_slot_is_in_range(gint slot,
+                                       gint first,
+                                       gint last)
+{
+  if (first > last) {
+    gint tmp = first;
+    first = last;
+    last = tmp;
+  }
+
+  return slot >= first && slot <= last;
+}
+
+static void
+gtk3_curve_live_trace_clear_slot_range(Gtk3CurvePrivate *priv,
+                                       gint              first,
+                                       gint              last)
+{
+  if (!priv || !priv->live_trace_slot_used)
+    return;
+
+  if (first > last) {
+    gint tmp = first;
+    first = last;
+    last = tmp;
+  }
+
+  if (first < 0)
+    first = 0;
+  if (last >= GTK3_CURVE_LIVE_TRACE_LEN)
+    last = GTK3_CURVE_LIVE_TRACE_LEN - 1;
+
+  for (gint idx = first; idx <= last; idx++) {
+    if (!priv->live_trace_slot_used[idx])
+      continue;
+
+    for (gint t = 0; t < GTK3_CURVE_LIVE_TRACE_MAX; t++) {
+      if (priv->live_trace_point_used)
+        priv->live_trace_point_used[t][idx] = FALSE;
+      if (priv->live_trace_values)
+        priv->live_trace_values[t][idx] = 0.0f;
+      if (priv->live_trace_x)
+        priv->live_trace_x[t][idx] = 0.0f;
+      if (priv->live_trace_last_slot_for[t] == idx)
+        priv->live_trace_last_slot_for[t] = -1;
+    }
+
+    priv->live_trace_slot_used[idx] = FALSE;
+    if (priv->live_trace_count > 0)
+      priv->live_trace_count--;
+  }
+
+  if (gtk3_curve_live_trace_slot_is_in_range(priv->live_trace_last_slot, first, last))
+    priv->live_trace_last_slot = -1;
+}
+
+static gfloat
+gtk3_curve_live_trace_jump_threshold(Gtk3CurvePrivate *priv)
+{
+  gfloat min_x;
+  gfloat max_x;
+  gfloat span;
+  gfloat threshold;
+
+  if (!priv)
+    return 2.0f;
+
+  min_x = gtk3_curve_live_domain_min_x(priv);
+  max_x = gtk3_curve_live_domain_max_x(priv);
+
+  if (!isfinite(min_x))
+    min_x = 0.0f;
+  if (!isfinite(max_x) || max_x <= min_x)
+    max_x = min_x + 1.0f;
+
+  span = max_x - min_x;
+  if (span < 1.0f)
+    span = 1.0f;
+
+  threshold = MAX(2.0f, span * 0.02f);
+  if (threshold > 96.0f)
+    threshold = 96.0f;
+
+  return threshold;
+}
+
+static void
+gtk3_curve_live_trace_clear_overwrite(Gtk3CurvePrivate *priv,
+                                      gfloat            x_value)
+{
+  gfloat delta;
+  gfloat jump_threshold;
+  gint previous_slot;
+  gint current_slot;
+
+  if (!priv || !isfinite(x_value))
+    return;
+
+  current_slot = gtk3_curve_live_trace_slot_for_x(priv, x_value);
+
+  if (!priv->live_trace_have_source_x) {
+    gtk3_curve_live_trace_clear_slot_range(priv, current_slot, current_slot);
+    priv->live_trace_last_source_x = x_value;
+    priv->live_trace_have_source_x = TRUE;
+    return;
+  }
+
+  delta = x_value - priv->live_trace_last_source_x;
+
+  if (fabsf(delta) <= 0.0001f)
+    return;
+
+  previous_slot = gtk3_curve_live_trace_slot_for_x(priv, priv->live_trace_last_source_x);
+  jump_threshold = gtk3_curve_live_trace_jump_threshold(priv);
+
+  if (delta < -jump_threshold)
+    gtk3_curve_live_trace_clear_slot_range(priv, current_slot, GTK3_CURVE_LIVE_TRACE_LEN - 1);
+  else if (delta < -0.0001f)
+    gtk3_curve_live_trace_clear_slot_range(priv, current_slot, current_slot);
+  else if (delta > jump_threshold)
+    gtk3_curve_live_trace_clear_slot_range(priv, previous_slot + 1, current_slot);
+  else
+    gtk3_curve_live_trace_clear_slot_range(priv, current_slot, current_slot);
+
+  priv->live_trace_last_source_x = x_value;
+  priv->live_trace_have_source_x = TRUE;
+}
+
+static gboolean G_GNUC_UNUSED
+gtk3_curve_live_trace_is_explicit_wrap(Gtk3CurvePrivate *priv,
+                                      gint              trace,
+                                      gfloat            x_value)
+{
+  gfloat min_x;
+  gfloat max_x;
+  gboolean wrapped;
+
+  (void) trace;
+
+  if (!priv || !isfinite(x_value))
+    return FALSE;
+
+  min_x = gtk3_curve_live_domain_min_x(priv);
+  max_x = gtk3_curve_live_domain_max_x(priv);
+
+  if (!isfinite(min_x))
+    min_x = 0.0f;
+  if (!isfinite(max_x) || max_x <= min_x)
+    max_x = min_x + 1.0f;
+
+  if (x_value < min_x)
+    x_value = min_x;
+  else if (x_value > max_x)
+    x_value = max_x;
+
+  if (!priv->live_trace_have_last_input) {
+    priv->live_trace_last_input_x = x_value;
+    priv->live_trace_have_last_input = TRUE;
+    return FALSE;
+  }
+
+  wrapped = FALSE;
+
+  if (x_value < priv->live_trace_last_input_x - 0.0001f) {
+    gfloat span = max_x - min_x;
+    gfloat margin = span * 0.02f;
+
+    if (margin < 2.0f)
+      margin = span > 4.0f ? 2.0f : span * 0.25f;
+    else if (margin > 24.0f)
+      margin = 24.0f;
+
+    if (margin > span * 0.25f)
+      margin = span * 0.25f;
+
+    wrapped = (priv->live_trace_last_input_x >= max_x - margin &&
+               x_value <= min_x + margin);
+  }
+
+  priv->live_trace_last_input_x = x_value;
+
+  return wrapped;
+}
+
+static Gtk3CurvePrivate *
+gtk3_curve_live_trace_priv(GtkWidget *widget)
+{
+  Gtk3Curve *curve;
+
+  if (!widget || !GTK_IS_WIDGET(widget) || !GTK3_IS_CURVE(widget))
+    return NULL;
+
+  curve = GTK3_CURVE(widget);
+  if (!curve || !curve->priv)
+    return NULL;
+
+  return curve->priv;
+}
+
+static void
+gtk3_curve_live_trace_sanitize(Gtk3CurvePrivate *priv)
+{
+  if (!priv)
+    return;
+
+  if (priv->live_trace_pos < 0 ||
+      priv->live_trace_pos >= GTK3_CURVE_LIVE_TRACE_LEN)
+    priv->live_trace_pos = 0;
+
+  if (priv->live_trace_last_slot < -1 ||
+      priv->live_trace_last_slot >= GTK3_CURVE_LIVE_TRACE_LEN)
+    priv->live_trace_last_slot = -1;
+
+  for (gint t = 0; t < GTK3_CURVE_LIVE_TRACE_MAX; t++) {
+    if (priv->live_trace_last_slot_for[t] < -1 ||
+        priv->live_trace_last_slot_for[t] >= GTK3_CURVE_LIVE_TRACE_LEN)
+      priv->live_trace_last_slot_for[t] = -1;
+  }
+
+  if (priv->live_trace_count < 0)
+    priv->live_trace_count = 0;
+  else if (priv->live_trace_count > GTK3_CURVE_LIVE_TRACE_LEN)
+    priv->live_trace_count = GTK3_CURVE_LIVE_TRACE_LEN;
+}
+
+void
+gtk3_curve_live_trace_clear(GtkWidget *widget)
+{
+  Gtk3CurvePrivate *priv = gtk3_curve_live_trace_priv(widget);
+
+  if (!priv)
+    return;
+
+  gtk3_curve_live_trace_clear_samples(priv);
+  priv->live_trace_auto_x = NAN;
+  priv->live_trace_last_input_x = 0.0f;
+  priv->live_trace_pending_x = NAN;
+  priv->live_trace_have_last_input = FALSE;
+  priv->live_trace_pending_valid = FALSE;
+  priv->live_trace_clear_on_next_push = FALSE;
+  priv->live_trace_have_source_x = FALSE;
+  priv->live_trace_last_source_x = 0.0f;
+  priv->live_trace_dot_enabled = FALSE;
+  priv->live_trace_dot_x = 0.0f;
+  priv->live_trace_dot_base_value = 0.0f;
+  priv->live_trace_dot_value = 0.0f;
+  memset(&priv->live_trace_dot_color, 0, sizeof(priv->live_trace_dot_color));
+  priv->live_trace_dot_label[0] = '\0';
+
+  if (gtk_widget_is_visible(widget))
+    gtk_widget_queue_draw(widget);
+}
+
+void
+gtk3_curve_live_trace_set_enabled(GtkWidget *widget, gboolean enabled)
+{
+  Gtk3CurvePrivate *priv = gtk3_curve_live_trace_priv(widget);
+
+  if (!priv)
+    return;
+
+  enabled = enabled ? TRUE : FALSE;
+  if (priv->live_trace_enabled == enabled)
+    return;
+
+  priv->live_trace_enabled = enabled;
+
+  if (!enabled)
+    gtk3_curve_live_trace_clear(widget);
+  else if (gtk_widget_is_visible(widget))
+    gtk_widget_queue_draw(widget);
+}
+
+void
+gtk3_curve_live_trace_push_at(GtkWidget   *widget,
+                              gint         trace,
+                              gfloat       x_value,
+                              gfloat       value,
+                              const gchar *label,
+                              gfloat       red,
+                              gfloat       green,
+                              gfloat       blue,
+                              gfloat       alpha)
+{
+  Gtk3CurvePrivate *priv = gtk3_curve_live_trace_priv(widget);
+
+  if (!priv)
+    return;
+
+  if (trace < 0 || trace >= GTK3_CURVE_LIVE_TRACE_MAX)
+    return;
+
+  gtk3_curve_live_trace_sanitize(priv);
+
+  if (!priv->live_trace_enabled)
+    return;
+
+  if (!isfinite(x_value))
+    x_value = gtk3_curve_live_trace_prepare_x(priv, NAN);
+
+  {
+    gfloat min_x = gtk3_curve_live_domain_min_x(priv);
+    gfloat max_x = gtk3_curve_live_domain_max_x(priv);
+
+    if (!isfinite(min_x))
+      min_x = 0.0f;
+    if (!isfinite(max_x) || max_x <= min_x)
+      max_x = min_x + 1.0f;
+
+    if (x_value < min_x)
+      x_value = min_x;
+    else if (x_value > max_x)
+      x_value = max_x;
+  }
+
+  if (!isfinite(value))
+    value = 0.0f;
+
+  if (value < 0.0f)
+    value = 0.0f;
+  else if (value > 100.0f)
+    value = 100.0f;
+
+  priv->live_trace_clear_on_next_push = FALSE;
+
+  gtk3_curve_live_trace_clear_overwrite(priv, x_value);
+
+  gint write_pos = gtk3_curve_live_trace_slot_for_x(priv, x_value);
+  gboolean replace_previous = priv->live_trace_slot_used[write_pos];
+
+  priv->live_trace_slot_used[write_pos] = TRUE;
+  if (priv->live_trace_point_used)
+    priv->live_trace_point_used[trace][write_pos] = TRUE;
+  priv->live_trace_last_slot = write_pos;
+  priv->live_trace_last_slot_for[trace] = write_pos;
+  priv->live_trace_pos = write_pos;
+
+  if (!replace_previous && priv->live_trace_count < GTK3_CURVE_LIVE_TRACE_LEN)
+    priv->live_trace_count++;
+
+  priv->live_trace_x[trace][write_pos] = x_value;
+  priv->live_trace_values[trace][write_pos] = value;
+  priv->live_trace_active[trace] = TRUE;
+  priv->live_trace_color[trace].red = CLAMP(red, 0.0f, 1.0f);
+  priv->live_trace_color[trace].green = CLAMP(green, 0.0f, 1.0f);
+  priv->live_trace_color[trace].blue = CLAMP(blue, 0.0f, 1.0f);
+  priv->live_trace_color[trace].alpha = CLAMP(alpha, 0.0f, 1.0f);
+
+  if (label && label[0] != '\0')
+    g_strlcpy(priv->live_trace_label[trace], label, sizeof(priv->live_trace_label[trace]));
+  else
+    priv->live_trace_label[trace][0] = '\0';
+
+  if (trace == GTK3_CURVE_LIVE_TRACE_MAX - 1 && gtk_widget_is_visible(widget))
+    gtk_widget_queue_draw(widget);
+}
+
+void
+gtk3_curve_live_trace_push(GtkWidget   *widget,
+                           gint         trace,
+                           gfloat       value,
+                           const gchar *label,
+                           gfloat       red,
+                           gfloat       green,
+                           gfloat       blue,
+                           gfloat       alpha)
+{
+  Gtk3CurvePrivate *priv = gtk3_curve_live_trace_priv(widget);
+  gfloat x_value = priv ? gtk3_curve_live_trace_prepare_x(priv, (gfloat)priv->current_position) : 0.0f;
+
+  gtk3_curve_live_trace_push_at(widget,
+                                trace,
+                                x_value,
+                                value,
+                                label,
+                                red,
+                                green,
+                                blue,
+                                alpha);
+
+  if (priv && trace == GTK3_CURVE_LIVE_TRACE_MAX - 1)
+    priv->live_trace_pending_valid = FALSE;
+}
+
+void
+gtk3_curve_live_trace_set_dot(GtkWidget   *widget,
+                              gboolean     enabled,
+                              gfloat       x_value,
+                              gfloat       base_value,
+                              gfloat       value,
+                              const gchar *label,
+                              gfloat       red,
+                              gfloat       green,
+                              gfloat       blue,
+                              gfloat       alpha)
+{
+  Gtk3CurvePrivate *priv = gtk3_curve_live_trace_priv(widget);
+
+  if (!priv)
+    return;
+
+  enabled = enabled ? TRUE : FALSE;
+  priv->live_trace_dot_enabled = enabled;
+
+  if (!enabled) {
+    priv->live_trace_dot_label[0] = '\0';
+    if (gtk_widget_is_visible(widget))
+      gtk_widget_queue_draw(widget);
+    return;
+  }
+
+  {
+    gfloat domain_min_x = gtk3_curve_live_domain_min_x(priv);
+    gfloat domain_max_x = gtk3_curve_live_domain_max_x(priv);
+
+    if (!isfinite(domain_min_x))
+      domain_min_x = 0.0f;
+    if (!isfinite(domain_max_x) || domain_max_x <= domain_min_x)
+      domain_max_x = domain_min_x + 1.0f;
+
+    if (isfinite(x_value)) {
+      if (x_value < domain_min_x)
+        x_value = domain_min_x;
+      else if (x_value > domain_max_x)
+        x_value = domain_max_x;
+    }
+  }
+
+  if (!isfinite(x_value)) {
+    if (priv->live_trace_count > 0) {
+      gint idx = priv->live_trace_pos - 1;
+      if (idx < 0)
+        idx += GTK3_CURVE_LIVE_TRACE_LEN;
+      x_value = priv->live_trace_x[GTK3_CURVE_LIVE_TRACE_MAX - 1][idx];
+    } else {
+      x_value = gtk3_curve_live_trace_use_local_axis(priv) ? 0.0f : (gfloat) priv->current_position;
+    }
+  }
+
+  if (!isfinite(base_value))
+    base_value = 0.0f;
+  if (!isfinite(value))
+    value = base_value;
+
+  priv->live_trace_dot_x = x_value;
+  priv->live_trace_dot_base_value = CLAMP(base_value, 0.0f, 100.0f);
+  priv->live_trace_dot_value = CLAMP(value, 0.0f, 100.0f);
+  priv->live_trace_dot_color.red = CLAMP(red, 0.0f, 1.0f);
+  priv->live_trace_dot_color.green = CLAMP(green, 0.0f, 1.0f);
+  priv->live_trace_dot_color.blue = CLAMP(blue, 0.0f, 1.0f);
+  priv->live_trace_dot_color.alpha = CLAMP(alpha, 0.0f, 1.0f);
+
+  if (label && label[0] != '\0')
+    g_strlcpy(priv->live_trace_dot_label, label, sizeof(priv->live_trace_dot_label));
+  else
+    priv->live_trace_dot_label[0] = '\0';
+
+  if (gtk_widget_is_visible(widget))
+    gtk_widget_queue_draw(widget);
 }
 
 void

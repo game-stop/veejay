@@ -4,14 +4,6 @@
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation version
  * 2.1 of the License.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef __GTK3_CURVE__H__
@@ -27,6 +19,7 @@
 #define GTK3_CURVE_GET_CLASS(obj)        (G_TYPE_INSTANCE_GET_CLASS  ((obj), GTK3_TYPE_CURVE, Gtk3CurveClass))
 
 #define GTK3_TYPE_CURVE_TYPE             (gtk3_curve_type_get_type ())
+#define GTK3_CURVE_LIVE_TRACE_MAX        10
 
 typedef enum
 {
@@ -37,12 +30,11 @@ typedef enum
   GTK3_CURVE_GRID_XLARGE
 } Gtk3CurveGridSize;
 
-
 typedef enum
 {
-  GTK3_CURVE_TYPE_LINEAR,       /* linear interpolation */
-  GTK3_CURVE_TYPE_SPLINE,       /* spline interpolation */
-  GTK3_CURVE_TYPE_FREE          /* free form curve */
+  GTK3_CURVE_TYPE_LINEAR,
+  GTK3_CURVE_TYPE_SPLINE,
+  GTK3_CURVE_TYPE_FREE
 } Gtk3CurveType;
 
 typedef struct _Gtk3Curve           Gtk3Curve;
@@ -76,12 +68,9 @@ struct _Gtk3CurveVector
 struct _Gtk3CurveData
 {
   gchar            *description;
-
   Gtk3CurveType     curve_type;
-
   gint              n_points;
   Gtk3CurvePoint   *d_point;
-
   gint              n_cpoints;
   Gtk3CurveVector  *d_cpoints;
 };
@@ -95,10 +84,7 @@ struct _Gtk3Curve
 struct _Gtk3CurveClass
 {
   GtkWidgetClass parent_class;
-
   void (* curve_type_changed) (Gtk3Curve *curve);
-
-  /* Padding for future expansion */
   void (*_gtk_reserved1) (void);
   void (*_gtk_reserved2) (void);
   void (*_gtk_reserved3) (void);
@@ -113,12 +99,12 @@ void gtk3_curve_reset                             (GtkWidget         *widget);
 void gtk3_curve_set_gamma                         (GtkWidget         *widget,
                                                    gfloat             gamma_);
 void gtk3_curve_set_position                      (GtkWidget         *widget,
-                                                   gdouble            position);/* VEEJAY NEEDS */
+                                                   gdouble            position);
 void gtk3_curve_set_grid_resolution               (GtkWidget         *widget,
-                                                   gint               grid_resolution);/* VEEJAY NEEDS */
-void gtk3_curve_set_x_lo                          (GtkWidget         *widget, /* VEEJAY NEEDS */
+                                                   gint               grid_resolution);
+void gtk3_curve_set_x_lo                          (GtkWidget         *widget,
                                                    gfloat             min_x);
-void gtk3_curve_set_x_hi                          (GtkWidget         *widget, /* VEEJAY NEEDS */
+void gtk3_curve_set_x_hi                          (GtkWidget         *widget,
                                                    gfloat             max_x);
 void gtk3_curve_set_range                         (GtkWidget         *widget,
                                                    gfloat             min_x,
@@ -183,4 +169,34 @@ Gtk3CurveData gtk3_curve_load                     (gchar              *filename)
 void gtk3_curve_set_fps(GtkWidget *widget, gdouble fps);
 void gtk3_curve_clear(GtkWidget *widget);
 
-#endif /* __GTK3_CURVE__H__ */
+void gtk3_curve_live_trace_clear(GtkWidget *widget);
+void gtk3_curve_live_trace_set_enabled(GtkWidget *widget, gboolean enabled);
+void gtk3_curve_live_trace_push(GtkWidget   *widget,
+                                gint         trace,
+                                gfloat       value,
+                                const gchar *label,
+                                gfloat       red,
+                                gfloat       green,
+                                gfloat       blue,
+                                gfloat       alpha);
+void gtk3_curve_live_trace_push_at(GtkWidget   *widget,
+                                   gint         trace,
+                                   gfloat       x_value,
+                                   gfloat       value,
+                                   const gchar *label,
+                                   gfloat       red,
+                                   gfloat       green,
+                                   gfloat       blue,
+                                   gfloat       alpha);
+void gtk3_curve_live_trace_set_dot(GtkWidget   *widget,
+                                   gboolean     enabled,
+                                   gfloat       x_value,
+                                   gfloat       base_value,
+                                   gfloat       value,
+                                   const gchar *label,
+                                   gfloat       red,
+                                   gfloat       green,
+                                   gfloat       blue,
+                                   gfloat       alpha);
+
+#endif

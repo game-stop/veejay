@@ -45,6 +45,7 @@ void	reset_curve( GtkWidget *curve )
   {
     gtk3_curve_clear(curve);
   }
+  gtk3_curve_live_trace_clear(curve);
   curve_is_empty = 1;
   gtk_widget_queue_draw(curve);
 }
