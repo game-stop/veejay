@@ -2362,7 +2362,7 @@ void		vj_init_vevo_events(void)
 				vj_event_audio_beat_action,
 				1,
 				VIMS_REQUIRE_ALL_PARAMS,
-				"Action: 0=none, 1=freeze, 2=auto-fx, 3=freeze+auto-fx",
+				"Action: 0=none, 1=freeze, 2=auto-fx, 3=freeze+auto-fx, 4=break-beat",
 				2,
 				NULL );
 
@@ -2428,7 +2428,7 @@ void		vj_init_vevo_events(void)
 				VIMS_REQUIRE_ALL_PARAMS,
 				"Enabled state, 0 or 1",
 				1,
-				"Action: 0=none, 1=freeze, 2=auto-fx, 3=freeze+auto-fx",
+				"Action: 0=none, 1=freeze, 2=auto-fx, 3=freeze+auto-fx, 4=break-beat",
 				2,
 				"Freeze duration in milliseconds",
 				90,

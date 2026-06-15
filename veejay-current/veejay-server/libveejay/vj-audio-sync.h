@@ -32,19 +32,52 @@
 
 #define VJ_AUDIO_SYNC_ALIGN_FEATURES 4096
 
+static inline int vj_audio_sync_mode_is_control_only(int mode)
+{
+    return mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL;
+}
 
+static inline int vj_audio_sync_mode_is_tempo_follow(int mode)
+{
+    return mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW;
+}
 
-#define VJ_AUDIO_SYNC_TRACK_STATE_IDLE          0
-#define VJ_AUDIO_SYNC_TRACK_STATE_WAIT_SOURCE   1
-#define VJ_AUDIO_SYNC_TRACK_STATE_WAIT_TARGET   2
-#define VJ_AUDIO_SYNC_TRACK_STATE_SEARCHING     3
-#define VJ_AUDIO_SYNC_TRACK_STATE_LOCKED        4
-#define VJ_AUDIO_SYNC_TRACK_STATE_HOLD          5
-#define VJ_AUDIO_SYNC_TRACK_STATE_FALLBACK      6
+static inline int vj_audio_sync_mode_is_clean_monitor(int mode)
+{
+    return mode == VJ_AUDIO_SYNC_MODE_MONITOR;
+}
 
-#ifndef VJ_AUDIO_SYNC_MODE_MAX
-#define VJ_AUDIO_SYNC_MODE_MAX VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW
-#endif
+static inline int vj_audio_sync_mode_is_trickplay_monitor(int mode)
+{
+    return mode == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY;
+}
+
+static inline int vj_audio_sync_mode_uses_external_playback(int mode)
+{
+    return mode == VJ_AUDIO_SYNC_MODE_MONITOR ||
+           mode == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY ||
+           mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
+           mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN;
+}
+
+static inline int vj_audio_sync_mode_uses_transport_driven_playback(int mode)
+{
+    return mode == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY ||
+           mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
+           mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN;
+}
+
+static inline int vj_audio_sync_mode_supports_wav_master(int mode)
+{
+    return vj_audio_sync_mode_uses_external_playback(mode);
+}
+
+static inline int vj_audio_sync_mode_is_audio_sync_family(int mode)
+{
+    return mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL ||
+           mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW ||
+           vj_audio_sync_mode_uses_external_playback(mode);
+}
 
 typedef struct
 {
@@ -97,20 +130,12 @@ typedef struct
     int track_align_correction_ppm;
     int track_align_state;
 
-    /* Internal wide-search snap suggestion, consumed by the playback loop.
-     * Not part of the public status token contract.
-     */
     int track_align_snap_pending;
     int track_align_snap_delta_frames;
     int track_align_snap_confidence_pct;
 } vj_audio_sync_snapshot_t;
 
 
-/* Full shared state is intentionally defined here because video_playback_setup
- * embeds vj_audio_sync_shared_t directly.  Do not include vj-lib.h from the
- * audio synchronizer: modules that only need pointers can forward-declare this
- * typedef, while vj-lib.h includes this header to get the complete size.
- */
 typedef struct vj_audio_sync_shared_t
 {
     volatile int initialized;
@@ -186,10 +211,6 @@ typedef struct vj_audio_sync_shared_t
     long bridge_latch_updated_ms;
     volatile int bridge_state;
 
-    /* Tempo Bridge transport clock.
-     * Keep BPM estimates latched and slow-moving so the audible read-head
-     * behaves like a stable transport, not like a phase-chasing cassette motor.
-     */
     double bridge_source_bpm_latched;
     double bridge_target_bpm_latched;
     int    bridge_bpm_latch_valid;
@@ -201,10 +222,6 @@ typedef struct vj_audio_sync_shared_t
     int    bridge_stretch_segment_len;
     int    bridge_stretch_overlap;
 
-    /* Track Align / waveform sync feature rings.
-     * Source = external master track; target = current clip/original audio.
-     * Features are low-rate onset/envelope values, updated by capture/push paths.
-     */
     float align_source_feat[VJ_AUDIO_SYNC_ALIGN_FEATURES];
     float align_target_feat[VJ_AUDIO_SYNC_ALIGN_FEATURES];
     int   align_source_pos;
@@ -227,7 +244,6 @@ typedef struct vj_audio_sync_shared_t
     int   align_snap_cooldown_ms;
     volatile int align_video_fps_x1000;
 
-    /* Worker-thread live snap consensus state. */
     int  align_live_candidate_delta;
     int  align_live_candidate_conf_min;
     int  align_live_candidate_conf_sum;
@@ -236,28 +252,20 @@ typedef struct vj_audio_sync_shared_t
     long align_live_last_snap_ms;
     int  align_live_last_snap_delta;
 
-    /* Rough, non-authoritative live basin exported to performer wide search. */
     int  align_rough_hint_offset_ms;
     int  align_rough_hint_conf;
     int  align_rough_hint_count;
     long align_rough_hint_ms;
 
-    /* Current-clip target audio queue.  Producer enqueues PCM cheaply;
-     * audio_sync_thread drains it and runs target clock/Track Align analysis.
-     */
+
     uint8_t *target_ring;
     int target_ring_frames;
     int target_ring_write_frame;
     long long target_write_frame_abs;
 
-    /* Oldest retained target frame in the ring.  This is no longer the
-     * worker consume cursor: Track Align needs retained target history for
-     * stable correlation, while the worker still needs to process each
-     * target block exactly once.
-     */
+
     long long target_read_frame_abs;
 
-    /* Next target frame the sync worker must process into clock/features. */
     long long target_process_frame_abs;
 
     int target_channels;
@@ -280,16 +288,18 @@ typedef struct vj_audio_sync_shared_t
     volatile int wav_limit_ms;
     volatile int wav_silence_after_eof;
 
-    /* PLAIN+WAV Track Align cache. Once a strong WAV/video lock is found,
-     * replay can snap immediately without re-running wide target analysis.
-     * The cache is generation-bound, so changing the WAV path/source clears it.
-     */
     volatile int wav_plain_lock_valid;
     volatile int wav_plain_lock_generation;
     volatile int wav_plain_lock_delta_frames;
     volatile int wav_plain_lock_confidence_pct;
 
-    /* internal source detector state; only sync thread / push path writes it */
+
+    volatile int  jack_connect_failures;
+    volatile int  jack_connect_giveup;
+    volatile long jack_connect_first_fail_ms;
+    volatile long jack_connect_next_retry_ms;
+    volatile long jack_connect_last_log_ms;
+
     double fast_energy;
     double slow_energy;
     double envelope;
@@ -297,7 +307,6 @@ typedef struct vj_audio_sync_shared_t
     double beat_period_ms;
     long last_analysis_ms;
 
-    /* internal target-clock detector state for current-clip auto target */
     double target_fast_energy;
     double target_slow_energy;
     double target_envelope;
@@ -371,10 +380,7 @@ void vj_audio_sync_track_align_reset_acquisition(vj_audio_sync_shared_t *s);
 int vj_audio_sync_track_align_source_ready(vj_audio_sync_shared_t *s, int min_source_features);
 int vj_audio_sync_track_align_last_snap(vj_audio_sync_shared_t *s, long *snap_ms, int *delta_frames);
 
-/* Wide waveform snap support.
- * Probe candidate original-audio windows against the recent external master
- * feature window, then offer/consume a one-shot video-frame snap.
- */
+
 int  vj_audio_sync_track_align_probe_target_audio(vj_audio_sync_shared_t *s,
                                                   const uint8_t *src,
                                                   int frames,

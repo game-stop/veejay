@@ -56,6 +56,9 @@
 #include <libveejay/vj-jack.h>
 #include <libveejay/vj-audio-beat.h>
 #include <libveejay/vj-audio-sync.h>
+#ifndef VJ_AUDIO_BEAT_ACTION_BREAK_BEAT
+#define VJ_AUDIO_BEAT_ACTION_BREAK_BEAT 4
+#endif
 #endif
 #include <libstream/vj-tag.h>
 #include <libstream/vj-vloopback.h>
@@ -8670,6 +8673,8 @@ static const char *vj_audio_beat_event_action_name(int action)
             return "auto-fx";
         case VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX:
             return "freeze+auto-fx";
+        case VJ_AUDIO_BEAT_ACTION_BREAK_BEAT:
+            return "break-beat";
         default:
             return "unknown";
     }
@@ -9229,7 +9234,7 @@ void vj_event_audio_beat_ui_config(void *ptr, const char format[], va_list ap)
     if(!vj_event_audio_beat_ready(v))
         return;
 
-    args[1] = vj_audio_beat_event_clampi(args[1], VJ_AUDIO_BEAT_ACTION_NONE, VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX);
+    args[1] = vj_audio_beat_event_clampi(args[1], VJ_AUDIO_BEAT_ACTION_NONE, VJ_AUDIO_BEAT_ACTION_BREAK_BEAT);
     args[8] = vj_audio_beat_event_clampi(args[8], VJ_AUDIO_BEAT_AUTO_OFF, VJ_AUDIO_BEAT_AUTO_CHAOS);
     args[9] = vj_audio_beat_event_clampi(args[9], 0, 100);
 
@@ -9405,7 +9410,7 @@ void vj_event_audio_beat_action(void *ptr, const char format[], va_list ap)
 
     args[0] = vj_audio_beat_event_clampi(args[0],
                                         VJ_AUDIO_BEAT_ACTION_NONE,
-                                        VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX);
+                                        VJ_AUDIO_BEAT_ACTION_BREAK_BEAT);
 
     {
         int freeze = -1;

@@ -24,21 +24,18 @@
 
 #ifdef HAVE_JACK
 
-/* Keep this public header independent from vj-lib.h and vj-audio-sync.h.
- * Only pointer types are used here, so forward declarations are enough.
- * The complete vj_audio_beat_shared_t and veejay_t definitions live in
- * vj-lib.h; vj_audio_sync_shared_t lives in vj-audio-sync.h.
- */
 typedef struct vj_audio_beat_shared_t vj_audio_beat_shared_t;
 typedef struct vj_audio_sync_shared_t vj_audio_sync_shared_t;
 typedef struct veejay_t veejay_t;
+typedef struct sample_eff_t sample_eff_chain;
 
 typedef enum
 {
     VJ_AUDIO_BEAT_ACTION_NONE = 0,
     VJ_AUDIO_BEAT_ACTION_FREEZE = 1,
     VJ_AUDIO_BEAT_ACTION_AUTO_FX = 2,
-    VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX = 3
+    VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX = 3,
+    VJ_AUDIO_BEAT_ACTION_BREAK_BEAT = 4
 } vj_audio_beat_action_t;
 
 typedef enum
@@ -131,6 +128,7 @@ typedef struct
 typedef int (*vj_audio_beat_get_fx_id_func)(void *ctx, int chain_pos);
 typedef int (*vj_audio_beat_get_fx_arg_func)(void *ctx, int chain_pos, int param_nr);
 typedef int (*vj_audio_beat_set_fx_arg_func)(void *ctx, int chain_pos, int param_nr, int value);
+typedef sample_eff_chain *(*vj_audio_beat_get_fx_entry_func)(void *ctx, int chain_pos);
 
 void vj_audio_beat_init(vj_audio_beat_shared_t *s, int input_channels);
 void vj_audio_beat_bind_sync(vj_audio_beat_shared_t *s, vj_audio_sync_shared_t *sync);
@@ -147,6 +145,9 @@ int vj_audio_beat_is_enabled(vj_audio_beat_shared_t *s);
 int vj_audio_beat_is_running(vj_audio_beat_shared_t *s);
 int vj_audio_beat_is_open(vj_audio_beat_shared_t *s);
 int vj_audio_beat_is_paused_by_beat(vj_audio_beat_shared_t *s);
+int vj_audio_beat_transport_is_internal(vj_audio_beat_shared_t *s);
+void vj_audio_beat_user_transport_override(veejay_t *v, vj_audio_beat_shared_t *s,
+                                           int requested_speed);
 
 void vj_audio_beat_set_freeze_ms(vj_audio_beat_shared_t *s, int ms);
 void vj_audio_beat_set_cooldown_ms(vj_audio_beat_shared_t *s, int ms);
@@ -170,6 +171,23 @@ int vj_audio_beat_auto_apply_chain(
     vj_audio_beat_get_fx_arg_func get_arg,
     vj_audio_beat_set_fx_arg_func set_arg
 );
+int vj_audio_beat_auto_apply_chain_ex(
+    vj_audio_beat_shared_t *s,
+    void *ctx,
+    int chain_len,
+    vj_audio_beat_get_fx_id_func get_fx_id,
+    vj_audio_beat_get_fx_arg_func get_arg,
+    vj_audio_beat_set_fx_arg_func set_arg,
+    vj_audio_beat_get_fx_entry_func get_entry
+);
+int vj_audio_beat_auto_modulate_args(
+    vj_audio_beat_shared_t *s,
+    sample_eff_chain *entry,
+    int effect_id,
+    int *args,
+    int n_params,
+    long long n_frame
+);
 
 int vj_audio_beat_copy_record_audio(
     vj_audio_beat_shared_t *s,
@@ -189,6 +207,12 @@ int vj_audio_beat_get_action(vj_audio_beat_shared_t *s);
 int vj_audio_beat_get_snapshot(vj_audio_beat_shared_t *s, vj_audio_beat_snapshot_t *dst);
 float vj_audio_beat_get_signal(vj_audio_beat_shared_t *s, int signal);
 int vj_audio_beat_map_signal(vj_audio_beat_shared_t *s, int signal, int min_value, int max_value, int invert);
+
+int vj_audio_beat_disable_for_transport(veejay_t *v, vj_audio_beat_shared_t *s);
+int vj_audio_beat_release_transport(veejay_t *v, vj_audio_beat_shared_t *s);
+void vj_audio_beat_set_action_for_transport(veejay_t *v,
+                                            vj_audio_beat_shared_t *s,
+                                            int action);
 
 #endif
 

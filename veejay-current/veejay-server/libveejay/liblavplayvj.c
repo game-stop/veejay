@@ -477,8 +477,7 @@ static inline double vj_runtime_tempo_follow_correction(video_playback_setup *se
         return 1.0;
 
     mode = atomic_load_int(&settings->audio_sync.mode);
-    if(mode != VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW &&
-       mode != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE)
+    if(mode != VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW)
         return 1.0;
 
     if(!vj_audio_sync_is_enabled(&settings->audio_sync))
@@ -510,13 +509,15 @@ static inline double vj_runtime_tempo_follow_correction(video_playback_setup *se
     return correction;
 }
 #endif
-static inline double vj_runtime_target_time_s(video_playback_setup *settings, long long frame)
+static inline double vj_runtime_effective_spvf(video_playback_setup *settings)
 {
-    double epoch_s = atomic_load_double(&settings->fps_epoch_s);
-    long long epoch_frame = atomic_load_long_long(&settings->fps_epoch_frame);
-    double spvf = settings->spvf;
+    double spvf;
 
-    if (spvf <= 0.0)
+    if(!settings)
+        return 1.0 / 25.0;
+
+    spvf = settings->spvf;
+    if(spvf <= 0.0)
         spvf = 1.0 / 25.0;
 
 #ifdef HAVE_JACK
@@ -526,6 +527,18 @@ static inline double vj_runtime_target_time_s(video_playback_setup *settings, lo
             spvf /= tempo_follow;
     }
 #endif
+
+    if(spvf <= 0.0)
+        spvf = 1.0 / 25.0;
+
+    return spvf;
+}
+
+static inline double vj_runtime_target_time_s(video_playback_setup *settings, long long frame)
+{
+    double epoch_s = atomic_load_double(&settings->fps_epoch_s);
+    long long epoch_frame = atomic_load_long_long(&settings->fps_epoch_frame);
+    double spvf = vj_runtime_effective_spvf(settings);
 
     if (epoch_s <= 0.0) {
         double anchor = atomic_load_double(&settings->audio_start_offset);
@@ -561,19 +574,10 @@ static void vj_runtime_reanchor_clock(veejay_t *info,
     master_frame = atomic_load_long_long(&settings->master_frame_num);
     master_s = vj_runtime_master_clock_now_s(info, &using_audio_clock);
 
-    anchor_frame = requested_frame;
-    if(using_audio_clock && master_frame >= 0)
-        anchor_frame = master_frame;
+    anchor_frame = (master_frame >= 0) ? master_frame : requested_frame;
 
     atomic_store_double(&settings->fps_epoch_s, master_s);
     atomic_store_long_long(&settings->fps_epoch_frame, anchor_frame);
-
-    veejay_msg(VEEJAY_MSG_DEBUG,
-               "[CLOCK] transport clock re-anchored at frame %lld requested=%lld reason=%s domain=%s",
-               anchor_frame,
-               requested_frame,
-               reason ? reason : "transport-discontinuity",
-               using_audio_clock ? "jack-audio" : "monotonic");
 }
 
 static void vj_runtime_update_frame_fps(veejay_t *info, float fps)
@@ -1612,6 +1616,32 @@ static inline void safe_join(pthread_t *t, const char *name)
     }
 }
 
+static void veejay_wake_playback_waiters(veejay_t *info)
+{
+    if (!info || !info->settings)
+        return;
+
+    video_playback_setup *settings = (video_playback_setup*) info->settings;
+
+    atomic_store_int(&settings->first_audio_frame_ready, 1);
+    atomic_store_int(&info->audio_running, 0);
+
+#ifdef HAVE_JACK
+    vj_audio_beat_request_stop(&settings->audio_beat);
+    vj_audio_sync_request_stop(&settings->audio_sync);
+#endif
+
+    pthread_mutex_lock(&settings->mutex);
+    pthread_cond_broadcast(&settings->producer_wait_cv);
+    pthread_cond_broadcast(&settings->renderer_wait_cv);
+    pthread_cond_broadcast(&settings->data_ready_cv);
+    pthread_mutex_unlock(&settings->mutex);
+
+    pthread_mutex_lock(&settings->start_mutex);
+    pthread_cond_broadcast(&settings->start_cond);
+    pthread_mutex_unlock(&settings->start_mutex);
+}
+
 void veejay_busy(veejay_t * info)
 {
 	if (!info || !info->settings) {
@@ -1621,10 +1651,8 @@ void veejay_busy(veejay_t * info)
 	video_playback_setup *settings = (video_playback_setup*)(info->settings);
 
     veejay_msg(VEEJAY_MSG_DEBUG, "Waiting for threads to finish...");
-#ifdef HAVE_JACK
-    vj_audio_beat_request_stop(&settings->audio_beat);
-    vj_audio_sync_request_stop(&settings->audio_sync);
-#endif
+    veejay_change_state(info, LAVPLAY_STATE_STOP);
+    veejay_wake_playback_waiters(info);
 
     safe_join(&settings->renderer_thread, "Renderer");
     safe_join(&settings->producer_thread, "Producer");
@@ -1639,7 +1667,8 @@ void veejay_busy(veejay_t * info)
 
 void veejay_quit(veejay_t * info)
 {
-	veejay_change_state(info, LAVPLAY_STATE_STOP);
+    veejay_change_state(info, LAVPLAY_STATE_STOP);
+    veejay_wake_playback_waiters(info);
 }
 
 
@@ -1867,8 +1896,6 @@ void	veejay_set_framerate( veejay_t *info , float fps )
         vj_audio_sync_set_track_align_video_fps(&settings->audio_sync,
                                                 veejay_track_align_media_fps(info));
 #endif
-
-    veejay_msg(VEEJAY_MSG_INFO, "Playback engine is now playing at %.2f FPS", fps);
 }
 
 
@@ -2397,6 +2424,22 @@ void veejay_stop_sampling(veejay_t * info)
     info->current_edit_list = info->edit_list;
 }
 
+static int veejay_cond_wait_stop_poll(video_playback_setup *settings, pthread_cond_t *cv)
+{
+    struct timespec ts;
+
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    ts.tv_nsec += 50000000L;
+    if (ts.tv_nsec >= 1000000000L) {
+        ts.tv_nsec -= 1000000000L;
+        ts.tv_sec++;
+    }
+
+    pthread_cond_timedwait(cv, &settings->mutex, &ts);
+
+    return atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP;
+}
+
 VJFrame *veejay_video_queue_reserve_buffer(veejay_t *info)
 {
     video_playback_setup *settings = info->settings;
@@ -2416,7 +2459,10 @@ VJFrame *veejay_video_queue_reserve_buffer(veejay_t *info)
             pthread_mutex_unlock(&settings->mutex);
             return NULL;
         }
-        pthread_cond_wait(&settings->producer_wait_cv, &settings->mutex);
+        if (veejay_cond_wait_stop_poll(settings, &settings->producer_wait_cv)) {
+            pthread_mutex_unlock(&settings->mutex);
+            return NULL;
+        }
     }
 
     settings->states[idx] = BUFFER_RESERVED;
@@ -2458,8 +2504,10 @@ VJFrame *veejay_video_queue_get_frame(veejay_t *info)
             pthread_mutex_unlock(&settings->mutex);
             return NULL;
         }
-		// wait is here
-        pthread_cond_wait(&settings->renderer_wait_cv, &settings->mutex);
+        if (veejay_cond_wait_stop_poll(settings, &settings->renderer_wait_cv)) {
+            pthread_mutex_unlock(&settings->mutex);
+            return NULL;
+        }
     }
 
     settings->states[idx] = BUFFER_IN_RENDER;
@@ -2673,7 +2721,13 @@ static char *veejay_pipe_append_audio_beat_status(veejay_t *info, char *ptr)
     ptr = vj_sprintf(ptr, ok ? AB_POS(snap.sample_rate) : 0);       /* 53 */
     ptr = vj_sprintf(ptr, ok ? AB_POS(snap.hit_seq) : 0);           /* 54 */
     ptr = vj_sprintf(ptr, audio_mute);                              /* 55 */
-    ptr = vj_sprintf(ptr, record_audio_source);
+    ptr = vj_sprintf(ptr, record_audio_source);                     /* 56 */
+    {
+        int action = ok ? vj_audio_beat_get_action(&info->settings->audio_beat) : 0;
+        if(action < 0 || action > 4)
+            action = 0;
+        ptr = vj_sprintf(ptr, action);                              /* 57 */
+    }
 #undef AB_POS
 #undef AB_AGE
 #undef AB_BPM10
@@ -2697,7 +2751,8 @@ static char *veejay_pipe_append_audio_beat_status(veejay_t *info, char *ptr)
     ptr = vj_sprintf(ptr, 0);       /* 53 sample_rate */
     ptr = vj_sprintf(ptr, 0);       /* 54 hit_seq */
     ptr = vj_sprintf(ptr, 1);       /* 55 muted */
-    ptr = vj_sprintf(ptr, record_audio_source);
+    ptr = vj_sprintf(ptr, record_audio_source); /* 56 */
+    ptr = vj_sprintf(ptr, 0);       /* 57 action */
 #endif
 
     return ptr;
@@ -2727,32 +2782,31 @@ static char *veejay_pipe_append_audio_sync_status(veejay_t *info, char *ptr)
 #define AS_CORR100(v_) \
     ((int)((((v_) < 0.0) ? 0.0 : (((v_) > 9.999) ? 9.999 : (v_))) * 100.0) + 0.5)
 
-    ptr = vj_sprintf(ptr, ok ? snap.enabled : 0);                         /* 57 */
-    ptr = vj_sprintf(ptr, ok ? snap.open : 0);                            /* 58 */
-    ptr = vj_sprintf(ptr, ok ? snap.running : 0);                         /* 59 */
-    ptr = vj_sprintf(ptr, ok ? snap.mode : 0);                            /* 60 */
-    ptr = vj_sprintf(ptr, ok ? snap.source : 0);                          /* 61 */
-    ptr = vj_sprintf(ptr, ok ? AS_POS(snap.channels) : 0);                /* 62 */
-    ptr = vj_sprintf(ptr, ok ? AS_POS(snap.sample_rate) : 0);             /* 63 */
-    ptr = vj_sprintf(ptr, ok ? AS_PCT(snap.level) : 0);                   /* 64 */
-    ptr = vj_sprintf(ptr, ok ? AS_PCT(snap.transient) : 0);               /* 65 */
-    ptr = vj_sprintf(ptr, ok ? AS_BPM10(snap.bpm) : 0);                   /* 66 */
-    ptr = vj_sprintf(ptr, ok ? AS_PCT(snap.beat_phase) : 0);              /* 67 */
-    ptr = vj_sprintf(ptr, ok ? AS_PCT(snap.confidence) : 0);              /* 68 */
-    ptr = vj_sprintf(ptr, ok ? (((snap.mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
-                                  snap.mode == VJ_AUDIO_SYNC_MODE_MONITOR) && snap.open) ? 1 : 0) : 0); /* 69 external playback active */
-    ptr = vj_sprintf(ptr, ok ? AS_RATIO1000(snap.bridge_ratio) : 1000);   /* 70 */
-    ptr = vj_sprintf(ptr, ok ? AS_CORR100(snap.bridge_correction) : 100); /* 71 */
-    ptr = vj_sprintf(ptr, ok ? snap.target_mode : 0);                     /* 72 */
-    ptr = vj_sprintf(ptr, ok ? AS_BPM10(snap.target_bpm) : 0);            /* 73 */
-    ptr = vj_sprintf(ptr, ok ? AS_PCT(snap.target_confidence) : 0);       /* 74 */
-    ptr = vj_sprintf(ptr, ok ? AS_POS(snap.max_correction_pct) : 0);      /* 75 */
-    ptr = vj_sprintf(ptr, ok ? AS_POS(snap.bridge_state) : 0);            /* 76 */
-    ptr = vj_sprintf(ptr, ok ? AS_POS(snap.track_align_locked) : 0);      /* 77 */
-    ptr = vj_sprintf(ptr, ok ? snap.track_align_offset_ms : 0);           /* 78 */
-    ptr = vj_sprintf(ptr, ok ? AS_POS(snap.track_align_confidence_pct) : 0); /* 79 */
-    ptr = vj_sprintf(ptr, ok ? snap.track_align_correction_ppm : 0);      /* 80 */
-    ptr = vj_sprintf(ptr, ok ? AS_POS(snap.track_align_state) : 0);       /* 81 */
+    ptr = vj_sprintf(ptr, ok ? snap.enabled : 0);                         /* 58 */
+    ptr = vj_sprintf(ptr, ok ? snap.open : 0);                            /* 59 */
+    ptr = vj_sprintf(ptr, ok ? snap.running : 0);                         /* 60 */
+    ptr = vj_sprintf(ptr, ok ? snap.mode : 0);                            /* 61 */
+    ptr = vj_sprintf(ptr, ok ? snap.source : 0);                          /* 62 */
+    ptr = vj_sprintf(ptr, ok ? AS_POS(snap.channels) : 0);                /* 63 */
+    ptr = vj_sprintf(ptr, ok ? AS_POS(snap.sample_rate) : 0);             /* 64 */
+    ptr = vj_sprintf(ptr, ok ? AS_PCT(snap.level) : 0);                   /* 65 */
+    ptr = vj_sprintf(ptr, ok ? AS_PCT(snap.transient) : 0);               /* 66 */
+    ptr = vj_sprintf(ptr, ok ? AS_BPM10(snap.bpm) : 0);                   /* 67 */
+    ptr = vj_sprintf(ptr, ok ? AS_PCT(snap.beat_phase) : 0);              /* 68 */
+    ptr = vj_sprintf(ptr, ok ? AS_PCT(snap.confidence) : 0);              /* 69 */
+    ptr = vj_sprintf(ptr, ok ? ((snap.mode != VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW && vj_audio_sync_mode_uses_external_playback(snap.mode) && snap.open) ? 1 : 0) : 0); /* 70 external playback active */
+    ptr = vj_sprintf(ptr, ok ? AS_RATIO1000(snap.bridge_ratio) : 1000);   /* 71 */
+    ptr = vj_sprintf(ptr, ok ? AS_CORR100(snap.bridge_correction) : 100); /* 72 */
+    ptr = vj_sprintf(ptr, ok ? snap.target_mode : 0);                     /* 73 */
+    ptr = vj_sprintf(ptr, ok ? AS_BPM10(snap.target_bpm) : 0);            /* 74 */
+    ptr = vj_sprintf(ptr, ok ? AS_PCT(snap.target_confidence) : 0);       /* 75 */
+    ptr = vj_sprintf(ptr, ok ? AS_POS(snap.max_correction_pct) : 0);      /* 76 */
+    ptr = vj_sprintf(ptr, ok ? AS_POS(snap.bridge_state) : 0);            /* 77 */
+    ptr = vj_sprintf(ptr, ok ? AS_POS(snap.track_align_locked) : 0);      /* 78 */
+    ptr = vj_sprintf(ptr, ok ? snap.track_align_offset_ms : 0);           /* 79 */
+    ptr = vj_sprintf(ptr, ok ? AS_POS(snap.track_align_confidence_pct) : 0); /* 80 */
+    ptr = vj_sprintf(ptr, ok ? snap.track_align_correction_ppm : 0);      /* 81 */
+    ptr = vj_sprintf(ptr, ok ? AS_POS(snap.track_align_state) : 0);       /* 82 */
 
 #undef AS_CORR100
 #undef AS_RATIO1000
@@ -2819,21 +2873,21 @@ static char *veejay_pipe_append_chain_entry_status(veejay_t *info, char *ptr)
     else if(num_params > VJ_STATUS_CHAIN_ENTRY_PARAMETERS)
         num_params = VJ_STATUS_CHAIN_ENTRY_PARAMETERS;
 
-    ptr = vj_sprintf(ptr, effect_id);              /* 82 */
-    ptr = vj_sprintf(ptr, is_video);               /* 83 */
-    ptr = vj_sprintf(ptr, num_params);             /* 84 */
-    ptr = vj_sprintf(ptr, entry->kf_type);         /* 85 */
-    ptr = vj_sprintf(ptr, entry->kf_status);       /* 86 */
-    ptr = vj_sprintf(ptr, 0);                      /* 87 transition enabled */
-    ptr = vj_sprintf(ptr, 0);                      /* 88 transition loop */
-    ptr = vj_sprintf(ptr, entry->source_type);     /* 89 */
-    ptr = vj_sprintf(ptr, entry->channel);         /* 90 */
-    ptr = vj_sprintf(ptr, entry->e_flag);          /* 91 */
-    ptr = vj_sprintf(ptr, entry->beat_flag);       /* 92 */
-    ptr = vj_sprintf(ptr, entry->is_rendering);    /* 93 */
+    ptr = vj_sprintf(ptr, effect_id);              /* 83 */
+    ptr = vj_sprintf(ptr, is_video);               /* 84 */
+    ptr = vj_sprintf(ptr, num_params);             /* 85 */
+    ptr = vj_sprintf(ptr, entry->kf_type);         /* 86 */
+    ptr = vj_sprintf(ptr, entry->kf_status);       /* 87 */
+    ptr = vj_sprintf(ptr, 0);                      /* 88 transition enabled */
+    ptr = vj_sprintf(ptr, 0);                      /* 89 transition loop */
+    ptr = vj_sprintf(ptr, entry->source_type);     /* 90 */
+    ptr = vj_sprintf(ptr, entry->channel);         /* 91 */
+    ptr = vj_sprintf(ptr, entry->e_flag);          /* 92 */
+    ptr = vj_sprintf(ptr, entry->beat_flag);       /* 93 */
+    ptr = vj_sprintf(ptr, entry->is_rendering);    /* 94 */
 
     for(int i = 0; i < VJ_STATUS_CHAIN_ENTRY_PARAMETERS; i++)
-        ptr = vj_sprintf(ptr, (i < num_params) ? entry->arg[i] : 0); /* 94..109 */
+        ptr = vj_sprintf(ptr, (i < num_params) ? entry->arg[i] : 0); /* 95..110 */
 
     return ptr;
 }
@@ -2992,8 +3046,8 @@ static void veejay_pipe_write_status(veejay_t * info)
     {
         if(!status_packet_warned) {
             veejay_msg(VEEJAY_MSG_WARNING,
-                       "Status packet base mismatch: got %d fields, expected %d; padding fixed 110-token packet",
-                       base_tokens, VJ_STATUS_BASE_TOKENS);
+                       "Status packet base mismatch: got %d fields, expected %d; padding fixed %d-token packet",
+                       base_tokens, VJ_STATUS_BASE_TOKENS, VIMS_STATUS_TOKENS);
             status_packet_warned = 1;
         }
 
@@ -3200,6 +3254,10 @@ void veejay_handle_signal(int sig, siginfo_t *si, void *unused)
         case SIGINT:
         case SIGQUIT:
             veejay_change_state(info, LAVPLAY_STATE_STOP);
+            if (info && info->settings) {
+                atomic_store_int(&info->audio_running, 0);
+                atomic_store_int(&info->settings->first_audio_frame_ready, 1);
+            }
             break;
 
         case SIGSEGV:
@@ -3614,7 +3672,7 @@ void *veejay_display_renderer_thread(void *arg)
 		}
 
 		double audio_master = atomic_load_double(&settings->audio_master_s);
-        double spvf = settings->spvf;
+        double spvf = vj_runtime_effective_spvf(settings);
         double target_time_s = vj_runtime_target_time_s(settings, frame->frame_num);
 		double delay_s = target_time_s - audio_master;
 
@@ -3723,11 +3781,14 @@ int veejay_open(veejay_t * info)
     int i;
     
     pthread_mutex_init(&(settings->control_mutex), NULL);
-    
+    pthread_mutex_init(&(settings->start_mutex), NULL);
+
     pthread_mutex_init(&settings->mutex, NULL);
-    pthread_cond_init(&settings->producer_wait_cv, NULL);
+    pthread_cond_init(&settings->producer_wait_cv, &attr);
     pthread_cond_init(&settings->renderer_wait_cv, &attr);
-	pthread_cond_init(&settings->data_ready_cv, &attr);
+    pthread_cond_init(&settings->data_ready_cv, &attr);
+    pthread_cond_init(&settings->start_cond, &attr);
+    pthread_condattr_destroy(&attr);
     
     settings->producer_index = 0;
     settings->renderer_index = 0;
@@ -3804,15 +3865,7 @@ int veejay_close(veejay_t *info)
     int success = 1;
 
     veejay_change_state_save(info, LAVPLAY_STATE_STOP);
-#ifdef HAVE_JACK
-    vj_audio_beat_request_stop(&settings->audio_beat);
-    vj_audio_sync_request_stop(&settings->audio_sync);
-#endif
-
-    pthread_mutex_lock(&settings->mutex);
-    pthread_cond_broadcast(&settings->producer_wait_cv);
-    pthread_cond_broadcast(&settings->renderer_wait_cv);
-    pthread_mutex_unlock(&settings->mutex);
+    veejay_wake_playback_waiters(info);
 
     safe_join(&settings->renderer_thread, "Renderer");
     safe_join(&settings->producer_thread, "Producer");
@@ -3824,8 +3877,12 @@ int veejay_close(veejay_t *info)
 #endif
 
     pthread_mutex_destroy(&settings->mutex);
+    pthread_mutex_destroy(&settings->control_mutex);
+    pthread_mutex_destroy(&settings->start_mutex);
     pthread_cond_destroy(&settings->producer_wait_cv);
     pthread_cond_destroy(&settings->renderer_wait_cv);
+    pthread_cond_destroy(&settings->data_ready_cv);
+    pthread_cond_destroy(&settings->start_cond);
 
     for (int i = 0; i < VIDEO_QUEUE_LEN; i++)
         if (settings->buffers[i]) veejay_free_frame_buffer(settings->buffers[i]);
@@ -4746,7 +4803,7 @@ static inline double vj_audio_producer_pace_sleep_s(long client_rate,
                                                 settings,
                                                 budget);
 }
-static inline int vj_audio_is_external_jack_monitor_source(
+static inline int vj_audio_uses_external_audio_playback_source(
     video_playback_setup *settings,
     int audio_source,
     int sync_mode,
@@ -4757,9 +4814,10 @@ static inline int vj_audio_is_external_jack_monitor_source(
     if(!settings || !sync_enabled)
         return 0;
 
-    if(sync_mode != VJ_AUDIO_SYNC_MODE_MONITOR &&
-       sync_mode != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE &&
-       sync_mode != VJ_AUDIO_SYNC_MODE_TRACK_ALIGN)
+    if(sync_mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW)
+        return 0;
+
+    if(!vj_audio_sync_mode_uses_external_playback(sync_mode))
         return 0;
 
     source = atomic_load_int(&settings->audio_sync.source);
@@ -4798,7 +4856,7 @@ static int vj_tempo_bridge_reverse_should_reanchor(
     if(!vj_audio_sync_is_enabled(&settings->audio_sync))
         return 0;
 
-    if(!vj_audio_is_external_jack_monitor_source(
+    if(!vj_audio_uses_external_audio_playback_source(
            settings,
            atomic_load_int(&settings->record_audio_source),
            sync_mode,
@@ -4896,7 +4954,7 @@ static inline int vj_audio_should_pace_direct_jack_monitor(
     if(!settings)
         return 0;
 
-    external_monitor = vj_audio_is_external_jack_monitor_source(
+    external_monitor = vj_audio_uses_external_audio_playback_source(
         settings, audio_source, sync_mode, sync_enabled
     );
 
@@ -4907,7 +4965,10 @@ static inline int vj_audio_should_pace_direct_jack_monitor(
     mute = atomic_load_int(&settings->audio_mute);
 
     external_tape = external_monitor && !mute &&
-        (sync_mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE || !neutral);
+        vj_audio_sync_mode_uses_transport_driven_playback(sync_mode) &&
+        (sync_mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
+         sync_mode == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY ||
+         !neutral);
 
     if(external_tape_source)
         *external_tape_source = external_tape;
@@ -5380,7 +5441,7 @@ void *veejay_audio_producer_thread(void *arg)
                     sfd_dbg
                 );
             int external_monitor_audio =
-                vj_audio_is_external_jack_monitor_source(
+                vj_audio_uses_external_audio_playback_source(
                     settings,
                     audio_source_dbg,
                     audio_sync_mode_dbg,
@@ -5388,7 +5449,9 @@ void *veejay_audio_producer_thread(void *arg)
                 );
             external_tape_source_dbg =
                 external_monitor_audio &&
+                vj_audio_sync_mode_uses_transport_driven_playback(audio_sync_mode_dbg) &&
                 (audio_sync_mode_dbg == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
+                 audio_sync_mode_dbg == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY ||
                  !external_tape_neutral_dbg);
             int external_live_source_dbg =
                 external_monitor_audio && !external_tape_source_dbg;
@@ -5883,13 +5946,16 @@ void *veejay_audio_producer_thread(void *arg)
 
         } else {
 #endif
-			double spvf = settings->spvf;
+			double spvf = vj_runtime_effective_spvf(settings);
 			const double next_frame_target = vj_runtime_target_time_s(settings, (long long)(loop_count + 1));
 
 			double now = monotonic_now_s();
 			double remaining_s = next_frame_target - now;
 
 			if (remaining_s > 0.0) {
+				if (remaining_s > spvf)
+					remaining_s = spvf;
+
 				usleep_hybrid((long long)(remaining_s * 1e6), settings);
 			}
 
@@ -5993,7 +6059,8 @@ static void veejay_producer_thread_audio_startup(veejay_t *info)
         return;
     }
 
-    while (!atomic_load_int(&info->audio_running))
+    while (!atomic_load_int(&info->audio_running) &&
+           atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP)
         usleep_accurate(200,settings);
 
 }
@@ -6060,9 +6127,9 @@ static void veejay_audio_sync_thread_startup(veejay_t *info)
 
 static int veejay_audio_sync_mode_is_playback(int mode)
 {
-    return mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
-           mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN  ||
-           mode == VJ_AUDIO_SYNC_MODE_MONITOR;
+    if(mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW)
+        return 0;
+    return vj_audio_sync_mode_uses_external_playback(mode);
 }
 
 static int veejay_audio_threads_disabled(video_playback_setup *settings)
@@ -6237,7 +6304,8 @@ int veejay_audio_sync_set_mode_control(veejay_t *info, int mode)
 
     vj_audio_sync_set_mode(&settings->audio_sync, mode);
     if(mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN ||
-       mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW)
+       mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW ||
+       mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE)
         vj_audio_sync_set_target_mode(&settings->audio_sync,
                                       VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP);
 
@@ -6430,12 +6498,7 @@ static void veejay_audio_beat_prepare_sync_source(veejay_t *info)
     current_channels = atomic_load_int(&settings->audio_sync.input_channels_request);
     record_source = atomic_load_int(&settings->record_audio_source);
 
-    external_mode =
-        (mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL ||
-         mode == VJ_AUDIO_SYNC_MODE_MONITOR ||
-         mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
-         mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN ||
-         mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW);
+    external_mode = vj_audio_sync_mode_is_audio_sync_family(mode);
 
     use_push_source = 0;
     if(record_source == VJ_RECORD_AUDIO_SOURCE_ORIGINAL)
@@ -6737,9 +6800,13 @@ static void *veejay_producer_thread_loop(void *ptr)
     sigaddset(&mask, SIGPIPE);
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
-    while (atomic_load_int(&settings->warmup_active)) {
+    while (atomic_load_int(&settings->warmup_active) &&
+           atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
         usleep_accurate(100, settings);
     }
+
+    if (atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP)
+        pthread_exit(NULL);
 
     atomic_store_long_long(&settings->current_frame_num, -1);
     atomic_store_int(&settings->audio_mode, AUDIO_MODE_SILENCE_FILL);
@@ -6747,16 +6814,24 @@ static void *veejay_producer_thread_loop(void *ptr)
 	if(info->audio) {
 #ifdef HAVE_JACK
     	veejay_msg(VEEJAY_MSG_DEBUG, "[PRODUCER] waiting for audio anchor");
-    	while (atomic_load_double(&settings->audio_start_offset) <= 0.0) {
+    	while (atomic_load_double(&settings->audio_start_offset) <= 0.0 &&
+               atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
         	usleep_accurate(100, settings);
     	}
+
+        if (atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP)
+            pthread_exit(NULL);
 #endif
 	}
 
     veejay_msg(VEEJAY_MSG_DEBUG, "[PRODUCER] waiting for first audio frame ready");
-    while (atomic_load_int(&settings->first_audio_frame_ready) == 0) {
+    while (atomic_load_int(&settings->first_audio_frame_ready) == 0 &&
+           atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
         usleep_accurate(100, settings);
     }
+
+    if (atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP)
+        pthread_exit(NULL);
 
     veejay_msg(VEEJAY_MSG_DEBUG, "[PRODUCER] Wait for playback to reach anchor");
 
@@ -6790,7 +6865,8 @@ static void *veejay_producer_thread_loop(void *ptr)
             int beat_action = vj_audio_beat_get_action(&settings->audio_beat);
 
             if(beat_action == VJ_AUDIO_BEAT_ACTION_FREEZE ||
-               beat_action == VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX)
+               beat_action == VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX ||
+               beat_action == VJ_AUDIO_BEAT_ACTION_BREAK_BEAT)
             {
                 vj_audio_beat_consume(info, &settings->audio_beat);
             }
@@ -7377,9 +7453,13 @@ int veejay_main(veejay_t *info)
     veejay_producer_thread_audio_startup(info);
 
 
-    while (atomic_load_int(&settings->first_audio_frame_ready) == 0) {
+    while (atomic_load_int(&settings->first_audio_frame_ready) == 0 &&
+           atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
         usleep_accurate(5000, settings);
     }
+
+    if (atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP)
+        return 0;
 
     Welcome(info);
 
@@ -7985,10 +8065,18 @@ int veejay_audio_sync_set_external_wav(veejay_t *info, const char *path, int loo
        mode > VJ_AUDIO_SYNC_MODE_MAX)
     {
         veejay_msg(VEEJAY_MSG_WARNING,
-                   "[AUDIO-SYNC][WAV] invalid mode=%d, forcing external-analysis(%d)",
+                   "[AUDIO-SYNC][WAV] invalid mode=%d, forcing clean monitor(%d)",
                    mode,
-                   VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL);
-        mode = VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL;
+                   VJ_AUDIO_SYNC_MODE_MONITOR);
+        mode = VJ_AUDIO_SYNC_MODE_MONITOR;
+    }
+
+    if(!vj_audio_sync_mode_supports_wav_master(mode)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-SYNC][WAV] mode=%d does not support a WAV master, forcing clean monitor(%d)",
+                   mode,
+                   VJ_AUDIO_SYNC_MODE_MONITOR);
+        mode = VJ_AUDIO_SYNC_MODE_MONITOR;
     }
 
     loop = loop ? 1 : 0;

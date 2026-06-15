@@ -17,17 +17,17 @@
  *
  */
 #include <config.h>
+
 #ifdef HAVE_JACK
 
-#include <errno.h>
-#include <sched.h>
-#include <time.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <math.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include <veejaycore/defs.h>
 #include <veejaycore/atomic.h>
@@ -58,10 +58,7 @@
 #endif
 
 #ifndef VJ_AUDIO_SYNC_MAX_BPM
-#define VJ_AUDIO_SYNC_MAX_BPM 300.0
-#elif VJ_AUDIO_SYNC_MAX_BPM < 300
-#undef VJ_AUDIO_SYNC_MAX_BPM
-#define VJ_AUDIO_SYNC_MAX_BPM 300.0
+#define VJ_AUDIO_SYNC_MAX_BPM 240.0
 #endif
 
 #ifndef VJ_AUDIO_SYNC_MIN_PERIOD_MS
@@ -75,12 +72,8 @@
 #ifndef VJ_AUDIO_SYNC_BRIDGE_LATENCY_MS
 #define VJ_AUDIO_SYNC_BRIDGE_LATENCY_MS 80
 #endif
-
-#ifndef VJ_AUDIO_SYNC_BRIDGE_STRETCH_SEGMENT_FRAMES
-#define VJ_AUDIO_SYNC_BRIDGE_STRETCH_SEGMENT_FRAMES 1024
-#endif
-#ifndef VJ_AUDIO_SYNC_BRIDGE_STRETCH_OVERLAP_FRAMES
-#define VJ_AUDIO_SYNC_BRIDGE_STRETCH_OVERLAP_FRAMES 128
+#ifndef VJ_AUDIO_SYNC_BRIDGE_MAX_LATENCY_MS
+#define VJ_AUDIO_SYNC_BRIDGE_MAX_LATENCY_MS 260
 #endif
 
 #ifndef VJ_AUDIO_SYNC_ALIGN_HOP_MS
@@ -95,7 +88,7 @@
 #endif
 
 #ifndef VJ_AUDIO_SYNC_ALIGN_MAX_LAG_MS
-#define VJ_AUDIO_SYNC_ALIGN_MAX_LAG_MS 30000
+#define VJ_AUDIO_SYNC_ALIGN_MAX_LAG_MS 8000
 #endif
 
 #ifndef VJ_AUDIO_SYNC_ALIGN_LOCK_CONF
@@ -116,30 +109,7 @@
 #endif
 
 #ifndef VJ_AUDIO_SYNC_ALIGN_HOLD_BLOCKS
-#define VJ_AUDIO_SYNC_ALIGN_HOLD_BLOCKS 96
-#endif
-
-
-#ifndef VJ_AUDIO_SYNC_ALIGN_LOCK_HOLD_CONF
-#define VJ_AUDIO_SYNC_ALIGN_LOCK_HOLD_CONF 42
-#endif
-#ifndef VJ_AUDIO_SYNC_ALIGN_LOCK_HOLD_SCORE
-#define VJ_AUDIO_SYNC_ALIGN_LOCK_HOLD_SCORE 0.68
-#endif
-#ifndef VJ_AUDIO_SYNC_ALIGN_LOCK_HOLD_SEPARATION
-#define VJ_AUDIO_SYNC_ALIGN_LOCK_HOLD_SEPARATION 0.020
-#endif
-#ifndef VJ_AUDIO_SYNC_ALIGN_LOCK_HYSTERESIS_MS
-#define VJ_AUDIO_SYNC_ALIGN_LOCK_HYSTERESIS_MS 900
-#endif
-#ifndef VJ_AUDIO_SYNC_ALIGN_LOCK_LOST_BLOCKS
-#define VJ_AUDIO_SYNC_ALIGN_LOCK_LOST_BLOCKS 24
-#endif
-#ifndef VJ_AUDIO_SYNC_ALIGN_LOCK_OFFSET_BLEND
-#define VJ_AUDIO_SYNC_ALIGN_LOCK_OFFSET_BLEND 0.10
-#endif
-#ifndef VJ_AUDIO_SYNC_ALIGN_HOLD_OFFSET_BLEND
-#define VJ_AUDIO_SYNC_ALIGN_HOLD_OFFSET_BLEND 0.025
+#define VJ_AUDIO_SYNC_ALIGN_HOLD_BLOCKS 24
 #endif
 
 #ifndef VJ_AUDIO_SYNC_ALIGN_PROBE_MAX_FEATURES
@@ -150,7 +120,7 @@
 #endif
 
 #ifndef VJ_AUDIO_SYNC_TARGET_RING_SECONDS
-#define VJ_AUDIO_SYNC_TARGET_RING_SECONDS 30
+#define VJ_AUDIO_SYNC_TARGET_RING_SECONDS 4
 #endif
 #ifndef VJ_AUDIO_SYNC_TARGET_MIN_RING_BYTES
 #define VJ_AUDIO_SYNC_TARGET_MIN_RING_BYTES 65536
@@ -163,11 +133,11 @@
 #define VJ_AUDIO_SYNC_TARGET_MIN_HISTORY_MS 250
 #endif
 #ifndef VJ_AUDIO_SYNC_TARGET_WANTED_HISTORY_MS
-#define VJ_AUDIO_SYNC_TARGET_WANTED_HISTORY_MS 30000
+#define VJ_AUDIO_SYNC_TARGET_WANTED_HISTORY_MS 750
 #endif
 
 #ifndef VJ_AUDIO_SYNC_LIVE_SNAP_MIN_OFFSET_MS
-#define VJ_AUDIO_SYNC_LIVE_SNAP_MIN_OFFSET_MS 650
+#define VJ_AUDIO_SYNC_LIVE_SNAP_MIN_OFFSET_MS 900
 #endif
 #ifndef VJ_AUDIO_SYNC_LIVE_SNAP_MIN_CONF
 #define VJ_AUDIO_SYNC_LIVE_SNAP_MIN_CONF 88
@@ -191,11 +161,9 @@
 #define VJ_AUDIO_SYNC_LIVE_SNAP_TICK_MS 500L
 #endif
 
-
 #ifndef VJ_AUDIO_SYNC_LIVE_SNAP_MIN_OBSERVE_MS
 #define VJ_AUDIO_SYNC_LIVE_SNAP_MIN_OBSERVE_MS 180L
 #endif
-
 
 #ifndef VJ_AUDIO_SYNC_LIVE_SNAP_SETTLE_MAX_FRAMES
 #define VJ_AUDIO_SYNC_LIVE_SNAP_SETTLE_MAX_FRAMES 36
@@ -203,7 +171,6 @@
 #ifndef VJ_AUDIO_SYNC_LIVE_SNAP_REACQUIRE_CONF
 #define VJ_AUDIO_SYNC_LIVE_SNAP_REACQUIRE_CONF 92
 #endif
-
 
 #ifndef VJ_AUDIO_SYNC_ALIGN_MIN_SCORE
 #define VJ_AUDIO_SYNC_ALIGN_MIN_SCORE 0.001
@@ -214,34 +181,6 @@
 #ifndef VJ_AUDIO_SYNC_ALIGN_MIN_VARIANCE
 #define VJ_AUDIO_SYNC_ALIGN_MIN_VARIANCE 1.0e-7
 #endif
-
-
-#ifndef VJ_AUDIO_SYNC_ALIGN_LIVE_WINDOW_FEATURES
-#define VJ_AUDIO_SYNC_ALIGN_LIVE_WINDOW_FEATURES 128
-#endif
-#ifndef VJ_AUDIO_SYNC_ALIGN_ACQUIRE_WINDOW_FEATURES
-#define VJ_AUDIO_SYNC_ALIGN_ACQUIRE_WINDOW_FEATURES 512
-#endif
-#ifndef VJ_AUDIO_SYNC_ALIGN_ACQUIRE_MIN_FEATURES
-#define VJ_AUDIO_SYNC_ALIGN_ACQUIRE_MIN_FEATURES 192
-#endif
-#ifndef VJ_AUDIO_SYNC_ALIGN_ACQUIRE_SHORT_WINDOW_FEATURES
-#define VJ_AUDIO_SYNC_ALIGN_ACQUIRE_SHORT_WINDOW_FEATURES 128
-#endif
-#ifndef VJ_AUDIO_SYNC_ALIGN_ACQUIRE_MID_WINDOW_FEATURES
-#define VJ_AUDIO_SYNC_ALIGN_ACQUIRE_MID_WINDOW_FEATURES 256
-#endif
-
-
-#ifndef VJ_AUDIO_SYNC_ALIGN_SETTLED_MIN_FEATURES
-#define VJ_AUDIO_SYNC_ALIGN_SETTLED_MIN_FEATURES 192
-#endif
-
-
-#ifndef VJ_AUDIO_SYNC_ALIGN_SETTLED_MAX_LAG_MS
-#define VJ_AUDIO_SYNC_ALIGN_SETTLED_MAX_LAG_MS 1500
-#endif
-
 
 #ifndef VJ_AUDIO_SYNC_ROUGH_HINT_MIN_CONF
 #define VJ_AUDIO_SYNC_ROUGH_HINT_MIN_CONF 18
@@ -265,10 +204,6 @@
 #define VJ_AUDIO_SYNC_QUIET_LIVE_LOG_MS 1500L
 #endif
 
-#ifndef VJ_AUDIO_SYNC_PUBLISH_DIAG_LOG_MS
-#define VJ_AUDIO_SYNC_PUBLISH_DIAG_LOG_MS 1000L
-#endif
-
 #ifndef VJ_AUDIO_SYNC_LIVE_LOCK_LOG_DELTA_MS
 #define VJ_AUDIO_SYNC_LIVE_LOCK_LOG_DELTA_MS 80
 #endif
@@ -278,14 +213,6 @@
 #ifndef VJ_AUDIO_SYNC_SETTLED_BACKWARD_SNAP_BLOCK_MS
 #define VJ_AUDIO_SYNC_SETTLED_BACKWARD_SNAP_BLOCK_MS 1000
 #endif
-
-#ifndef VJ_AUDIO_SYNC_TRACK_ALIGN_PUBLISH_MIN_MS
-#define VJ_AUDIO_SYNC_TRACK_ALIGN_PUBLISH_MIN_MS 40L
-#endif
-
-#define SYNC_NSEC_PER_SEC  1000000000L
-#define SYNC_USEC_PER_SEC  1000000L
-#define SYNC_NSEC_PER_USEC 1000L
 
 static inline int sync_load_i(const volatile int *p) { return atomic_load_int(p); }
 static inline long sync_load_l(const volatile long *p) { return atomic_load_long(p); }
@@ -300,135 +227,26 @@ static long sync_now_ms(void)
     return ((long)ts.tv_sec * 1000L) + ((long)ts.tv_nsec / 1000000L);
 }
 
-static volatile long sync_track_align_last_publish_gate_ms = 0;
-
-static inline int sync_track_align_publish_gate_ready(void)
-{
-    long now_ms = sync_now_ms();
-    long last_ms = sync_load_l(&sync_track_align_last_publish_gate_ms);
-
-    if(last_ms <= 0 || (now_ms - last_ms) >= VJ_AUDIO_SYNC_TRACK_ALIGN_PUBLISH_MIN_MS) {
-        sync_store_l(&sync_track_align_last_publish_gate_ms, now_ms);
-        return 1;
-    }
-
-    return 0;
-}
-
-static inline void sync_cpu_relax(void)
-{
-#if defined(__i386__) || defined(__x86_64__)
-    __builtin_ia32_pause();
-#elif defined(__arm__) || defined(__aarch64__)
-    __asm__ volatile("yield");
-#elif defined(__GNUC__) || defined(__clang__)
-    __asm__ volatile("" ::: "memory");
-#else
-    sched_yield();
-#endif
-}
-
-static inline void sync_add_us_to_timespec(struct timespec *ts, long usec)
-{
-    long sec = usec / SYNC_USEC_PER_SEC;
-    long rem = usec - sec * SYNC_USEC_PER_SEC;
-
-    ts->tv_sec  += sec;
-    ts->tv_nsec += rem * SYNC_NSEC_PER_USEC;
-
-    if(ts->tv_nsec >= SYNC_NSEC_PER_SEC)
-    {
-        ts->tv_nsec -= SYNC_NSEC_PER_SEC;
-        ts->tv_sec++;
-    }
-}
 
 static void sync_sleep_us(long usec)
 {
+    struct timespec ts;
     if(usec <= 0)
         return;
-
-#if defined(CLOCK_MONOTONIC) && defined(TIMER_ABSTIME)
-    struct timespec deadline;
-
-    if(clock_gettime(CLOCK_MONOTONIC, &deadline) == 0)
-    {
-        int saved_errno = errno;
-
-        sync_add_us_to_timespec(&deadline, usec);
-
-        while(clock_nanosleep(CLOCK_MONOTONIC,
-                              TIMER_ABSTIME,
-                              &deadline,
-                              NULL) == EINTR)
-        {
-        }
-
-        errno = saved_errno;
-        return;
-    }
-#endif
-
-    long sec = usec / SYNC_USEC_PER_SEC;
-    long rem = usec - sec * SYNC_USEC_PER_SEC;
-
-    struct timespec ts;
-    ts.tv_sec  = sec;
-    ts.tv_nsec = rem * SYNC_NSEC_PER_USEC;
-
-    int saved_errno = errno;
-
-    while(nanosleep(&ts, &ts) == -1 && errno == EINTR)
-    {
-    }
-
-    errno = saved_errno;
-}
-
-static inline int sync_try_lock(vj_audio_sync_shared_t *s)
-{
-#if defined(__GNUC__) || defined(__clang__)
-    if(__atomic_load_n(&s->ring_lock, __ATOMIC_RELAXED) != 0)
-        return 0;
-
-    return __atomic_exchange_n(&s->ring_lock, 1, __ATOMIC_ACQUIRE) == 0;
-#else
-    return __sync_lock_test_and_set(&s->ring_lock, 1) == 0;
-#endif
+    ts.tv_sec = usec / 1000000L;
+    ts.tv_nsec = (usec % 1000000L) * 1000L;
+    while(nanosleep(&ts, &ts) == -1 && errno == EINTR) { }
 }
 
 static inline void sync_lock(vj_audio_sync_shared_t *s)
 {
-    int rounds = 0;
-
-    while(!sync_try_lock(s))
-    {
-        if(rounds < 256)
-        {
-            for(int i = 0; i < 32; i++)
-                sync_cpu_relax();
-
-            rounds++;
-        }
-        else if(rounds < 512)
-        {
-            sched_yield();
-            rounds++;
-        }
-        else
-        {
-            sync_sleep_us(50);
-        }
-    }
+    while(__sync_lock_test_and_set(&s->ring_lock, 1))
+        sync_sleep_us(50);
 }
 
-static inline void sync_unlock(vj_audio_sync_shared_t *s)
+static inline int sync_try_lock(vj_audio_sync_shared_t *s)
 {
-#if defined(__GNUC__) || defined(__clang__)
-    __atomic_store_n(&s->ring_lock, 0, __ATOMIC_RELEASE);
-#else
-    __sync_lock_release(&s->ring_lock);
-#endif
+    return (__sync_lock_test_and_set(&s->ring_lock, 1) == 0);
 }
 
 static inline int sync_try_lock_for_us(vj_audio_sync_shared_t *s, long max_wait_us)
@@ -455,6 +273,10 @@ static inline int sync_try_lock_for_us(vj_audio_sync_shared_t *s, long max_wait_
     return 0;
 }
 
+static inline void sync_unlock(vj_audio_sync_shared_t *s)
+{
+    __sync_lock_release(&s->ring_lock);
+}
 
 static inline double sync_clampd(double v, double lo, double hi)
 {
@@ -476,7 +298,8 @@ static inline float sync_from_q15(int v)
 
 static inline int sync_q8_bpm(double bpm)
 {
-    bpm = bpm < 0.0 ? 0.0 : (bpm > 9999.0 ? 9999.0 : bpm);
+    if(bpm < 0.0) bpm = 0.0;
+    if(bpm > 9999.0) bpm = 9999.0;
     return (int)(bpm * 256.0 + 0.5);
 }
 
@@ -516,15 +339,18 @@ static inline int sync_clampi(int v, int lo, int hi)
 static inline int sync_align_hop_frames(int sample_rate)
 {
     int hop;
-    sample_rate = sample_rate <= 0 ? 44100 : sample_rate;
+    if(sample_rate <= 0)
+        sample_rate = 44100;
     hop = (sample_rate * VJ_AUDIO_SYNC_ALIGN_HOP_MS) / 1000;
-    hop = hop < 64 ? 64 : hop;
+    if(hop < 64)
+        hop = 64;
     return hop;
 }
 
 static void sync_track_align_clear_live_candidate_locked(vj_audio_sync_shared_t *s);
 static void sync_track_align_clear_rough_hint_locked(vj_audio_sync_shared_t *s);
 static void sync_clear_target_queue_locked(vj_audio_sync_shared_t *s);
+static void sync_wav_side_clear(vj_audio_sync_shared_t *s);
 
 static void sync_track_align_clear_locked(vj_audio_sync_shared_t *s)
 {
@@ -564,9 +390,9 @@ static void sync_track_align_clear_locked(vj_audio_sync_shared_t *s)
     sync_store_i(&s->track_align_correction_ppm, 0);
     sync_store_i(&s->track_align_state, VJ_AUDIO_SYNC_TRACK_STATE_IDLE);
     sync_store_l(&s->track_align_last_update_ms, 0);
-    s->track_align_snap_pending = 0;
-    s->track_align_snap_delta_frames = 0;
-    s->track_align_snap_confidence_pct = 0;
+    sync_store_i(&s->track_align_snap_pending, 0);
+    sync_store_i(&s->track_align_snap_delta_frames, 0);
+    sync_store_i(&s->track_align_snap_confidence_pct, 0);
 }
 
 static void sync_track_align_clear_target_locked(vj_audio_sync_shared_t *s)
@@ -597,9 +423,9 @@ static void sync_track_align_clear_target_locked(vj_audio_sync_shared_t *s)
                     VJ_AUDIO_SYNC_TRACK_STATE_WAIT_TARGET :
                     VJ_AUDIO_SYNC_TRACK_STATE_WAIT_SOURCE);
     sync_store_l(&s->track_align_last_update_ms, sync_now_ms());
-    s->track_align_snap_pending = 0;
-    s->track_align_snap_delta_frames = 0;
-    s->track_align_snap_confidence_pct = 0;
+    sync_store_i(&s->track_align_snap_pending, 0);
+    sync_store_i(&s->track_align_snap_delta_frames, 0);
+    sync_store_i(&s->track_align_snap_confidence_pct, 0);
 }
 
 static inline float sync_align_ring_get(const float *ring, int pos, int count, int newest_back)
@@ -647,9 +473,6 @@ static void sync_track_align_append_feature_locked(vj_audio_sync_shared_t *s,
     if(rise < 0.0)
         rise = 0.0;
 
-
-
-
     feat = (level * 3.0) + (rise * 10.0);
     feat = sync_clampd(feat, 0.0, 1.0);
 
@@ -660,263 +483,179 @@ static void sync_track_align_append_feature_locked(vj_audio_sync_shared_t *s,
 
     *prev = (0.85 * (*prev)) + (0.15 * level);
 }
+
+static const char *sync_track_align_state_name_dbg(int state)
+{
+    switch(state) {
+        case VJ_AUDIO_SYNC_TRACK_STATE_IDLE: return "idle";
+        case VJ_AUDIO_SYNC_TRACK_STATE_WAIT_SOURCE: return "wait-source";
+        case VJ_AUDIO_SYNC_TRACK_STATE_WAIT_TARGET: return "wait-target";
+        case VJ_AUDIO_SYNC_TRACK_STATE_SEARCHING: return "searching";
+        case VJ_AUDIO_SYNC_TRACK_STATE_LOCKED: return "locked";
+        case VJ_AUDIO_SYNC_TRACK_STATE_HOLD: return "hold";
+        case VJ_AUDIO_SYNC_TRACK_STATE_FALLBACK: return "fallback";
+        default: return "unknown";
+    }
+}
+
+
 typedef struct
 {
-    int window;
-    int min_overlap;
-    int max_lag_steps;
-    int best_lag;
-    int best_overlap;
-    int valid_lags;
-    int edge_lag;
-    int no_valid_score;
-    double best_score;
-    double second_score;
-    double peak_sep;
-    double conf;
-    const char *quality_reason;
-} sync_track_align_live_score_t;
+    int n;
+    double mean;
+    double min;
+    double max;
+    double variance;
+    double sd;
+    double energy;
+    int near_zero;
+} sync_track_align_feature_stats_t;
 
-static void sync_track_align_score_clear(sync_track_align_live_score_t *r)
+static void sync_track_align_stats_clear(sync_track_align_feature_stats_t *st)
 {
-    if(!r)
+    if(!st)
         return;
-    r->window = 0;
-    r->min_overlap = 0;
-    r->max_lag_steps = 0;
-    r->best_lag = 0;
-    r->best_overlap = 0;
-    r->valid_lags = 0;
-    r->edge_lag = 0;
-    r->no_valid_score = 1;
-    r->best_score = 0.0;
-    r->second_score = 0.0;
-    r->peak_sep = 0.0;
-    r->conf = 0.0;
-    r->quality_reason = "no-valid-score";
+    st->n = 0;
+    st->mean = 0.0;
+    st->min = 0.0;
+    st->max = 0.0;
+    st->variance = 0.0;
+    st->sd = 0.0;
+    st->energy = 0.0;
+    st->near_zero = 0;
 }
 
-static void sync_track_align_score_window(const float *source_feat,
-                                          int source_pos,
-                                          int source_count,
-                                          const float *target_feat,
-                                          int target_pos,
-                                          int target_count,
-                                          int window,
-                                          int max_lag_ms,
-                                          sync_track_align_live_score_t *r)
+static void sync_track_align_feature_stats_array(const float *v,
+                                                 int n,
+                                                 sync_track_align_feature_stats_t *st)
 {
-    int total_lags = 0;
-    int overlap_rejects = 0;
-    int lowvar_rejects = 0;
-    int lowscore_rejects = 0;
-    int lowvar_source_rejects = 0;
-    int lowvar_target_rejects = 0;
-    int max_lag_steps;
-    int best_lag = 0;
-    int best_overlap = 0;
-    int valid_lags = 0;
-    int edge_lag = 0;
-    int no_valid_score = 0;
-    int min_overlap;
-    double best_score = -1.0;
-    double second_score = -1.0;
-    double peak_sep;
-    const char *quality_reason = "ok";
+    double sum = 0.0;
+    double sum2 = 0.0;
 
-    sync_track_align_score_clear(r);
+    sync_track_align_stats_clear(st);
 
-    if(!r || !source_feat || !target_feat || source_count <= 0 || target_count <= 0)
+    if(!v || !st || n <= 0)
         return;
 
-    if(window > source_count)
-        window = source_count;
-    if(window > target_count)
-        window = target_count;
-    if(window < VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES)
+    st->n = n;
+    st->min = (double)v[0];
+    st->max = (double)v[0];
+
+    for(int i = 0; i < n; i++) {
+        double x = (double)v[i];
+        sum += x;
+        sum2 += x * x;
+        if(x < st->min)
+            st->min = x;
+        if(x > st->max)
+            st->max = x;
+        if(x > -0.000001 && x < 0.000001)
+            st->near_zero++;
+    }
+
+    st->mean = sum / (double)n;
+    st->energy = sum2 / (double)n;
+    st->variance = st->energy - (st->mean * st->mean);
+    if(st->variance < 0.0)
+        st->variance = 0.0;
+    st->sd = sqrt(st->variance);
+}
+
+static void sync_track_align_feature_stats_ring(const float *ring,
+                                                int pos,
+                                                int count,
+                                                int window,
+                                                sync_track_align_feature_stats_t *st)
+{
+    float tmp[256];
+
+    if(window > (int)(sizeof(tmp) / sizeof(tmp[0])))
+        window = (int)(sizeof(tmp) / sizeof(tmp[0]));
+    if(window > count)
+        window = count;
+    if(window < 0)
+        window = 0;
+
+    for(int i = 0; i < window; i++)
+        tmp[i] = sync_align_ring_get(ring, pos, count, i);
+
+    sync_track_align_feature_stats_array(tmp, window, st);
+}
+
+static void sync_track_align_pcm_stats(const uint8_t *data,
+                                       int frames,
+                                       int frame_bytes,
+                                       int channels,
+                                       int bits,
+                                       double *rms,
+                                       double *peak,
+                                       int *nonzero)
+{
+    int sample_bytes;
+    double sum2 = 0.0;
+    double pk = 0.0;
+    int nz = 0;
+
+    if(rms)
+        *rms = 0.0;
+    if(peak)
+        *peak = 0.0;
+    if(nonzero)
+        *nonzero = 0;
+
+    if(!data || frames <= 0 || frame_bytes <= 0 || channels <= 0 ||
+       (bits != 8 && bits != 16))
         return;
 
-    min_overlap = (window * VJ_AUDIO_SYNC_ALIGN_MIN_OVERLAP_PCT + 99) / 100;
-    if(min_overlap < VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES)
-        min_overlap = VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES;
-    if(min_overlap > window)
-        min_overlap = window;
-
-    max_lag_steps = max_lag_ms / VJ_AUDIO_SYNC_ALIGN_HOP_MS;
-    if(max_lag_steps > source_count - min_overlap)
-        max_lag_steps = source_count - min_overlap;
-    if(max_lag_steps > target_count - min_overlap)
-        max_lag_steps = target_count - min_overlap;
-    if(max_lag_steps < 2)
-        max_lag_steps = 2;
-
-    for(int lag = -max_lag_steps; lag <= max_lag_steps; lag++) {
-        double sum_x = 0.0, sum_y = 0.0;
-        double sum_xx = 0.0, sum_yy = 0.0, sum_xy = 0.0;
-        int n = 0;
-
-        total_lags++;
-
-        for(int i = 0; i < window; i++) {
-            int src_back = i;
-            int tgt_back = i - lag;
-            if(tgt_back < 0 || tgt_back >= target_count)
-                continue;
-            if(src_back < 0 || src_back >= source_count)
-                continue;
-
-            double x = sync_align_ring_get(source_feat,
-                                           source_pos,
-                                           source_count,
-                                           src_back);
-            double y = sync_align_ring_get(target_feat,
-                                           target_pos,
-                                           target_count,
-                                           tgt_back);
-            sum_x += x;
-            sum_y += y;
-            sum_xx += x * x;
-            sum_yy += y * y;
-            sum_xy += x * y;
-            n++;
-        }
-
-        if(n < min_overlap) {
-            overlap_rejects++;
-            continue;
-        }
-
-        {
-            double nf = (double)n;
-            double cov = sum_xy - (sum_x * sum_y / nf);
-            double vx = sum_xx - (sum_x * sum_x / nf);
-            double vy = sum_yy - (sum_y * sum_y / nf);
-            double score = 0.0;
-
-            if(vx <= VJ_AUDIO_SYNC_ALIGN_MIN_VARIANCE ||
-               vy <= VJ_AUDIO_SYNC_ALIGN_MIN_VARIANCE)
-            {
-                if(vx <= VJ_AUDIO_SYNC_ALIGN_MIN_VARIANCE)
-                    lowvar_source_rejects++;
-                if(vy <= VJ_AUDIO_SYNC_ALIGN_MIN_VARIANCE)
-                    lowvar_target_rejects++;
-                lowvar_rejects++;
-                continue;
-            }
-
-            score = cov / sqrt(vx * vy);
-            if(score < 0.0)
-                score = 0.0;
-            else if(score > 1.0)
-                score = 1.0;
-
-            if(score < VJ_AUDIO_SYNC_ALIGN_MIN_SCORE) {
-                lowscore_rejects++;
-                continue;
-            }
-
-            valid_lags++;
-
-            if(score > best_score) {
-                second_score = best_score;
-                best_score = score;
-                best_lag = lag;
-                best_overlap = n;
-            } else if(score > second_score) {
-                second_score = score;
-            }
-        }
-    }
-
-    if(valid_lags <= 0 || best_score < VJ_AUDIO_SYNC_ALIGN_MIN_SCORE) {
-        no_valid_score = 1;
-        best_lag = 0;
-        best_score = 0.0;
-        second_score = 0.0;
-        best_overlap = 0;
-        quality_reason = (lowvar_rejects > 0 && lowvar_rejects >= overlap_rejects) ?
-                         "low-variance" :
-                         (overlap_rejects > 0 ? "low-overlap" :
-                          (lowscore_rejects > 0 || total_lags > 0 ? "weak-score" : "no-valid-score"));
-    } else if(second_score < 0.0) {
-        second_score = 0.0;
-    }
-
-    peak_sep = best_score - second_score;
-    if(peak_sep < 0.0)
-        peak_sep = 0.0;
-
-    edge_lag = (!no_valid_score &&
-                abs(best_lag) >= (max_lag_steps - VJ_AUDIO_SYNC_ALIGN_EDGE_GUARD_STEPS));
-
-    r->window = window;
-    r->min_overlap = min_overlap;
-    r->max_lag_steps = max_lag_steps;
-    r->best_lag = best_lag;
-    r->best_overlap = best_overlap;
-    r->valid_lags = valid_lags;
-    r->edge_lag = edge_lag;
-    r->no_valid_score = no_valid_score;
-    r->best_score = best_score;
-    r->second_score = second_score;
-    r->peak_sep = peak_sep;
-    r->quality_reason = quality_reason;
-
-    if(no_valid_score) {
-        r->conf = 0.0;
+    sample_bytes = bits / 8;
+    if(sample_bytes <= 0 || frame_bytes < sample_bytes * channels)
         return;
+
+    for(int i = 0; i < frames; i++) {
+        const uint8_t *f = data + ((size_t)i * (size_t)frame_bytes);
+        double mono = 0.0;
+
+        for(int c = 0; c < channels; c++) {
+            int v = sync_read_sample(f + (c * sample_bytes), sample_bytes);
+            mono += (double)v * (1.0 / 32768.0);
+        }
+
+        mono /= (double)channels;
+        if(mono < 0.0)
+            mono = -mono;
+        if(mono > pk)
+            pk = mono;
+        if(mono > 0.000030)
+            nz++;
+        sum2 += mono * mono;
     }
 
-    r->conf = best_score * 100.0;
-    r->conf *= sync_clampd(peak_sep * 4.0 + 0.45, 0.0, 1.0);
+    if(rms)
+        *rms = sqrt(sum2 / (double)frames);
+    if(peak)
+        *peak = pk;
+    if(nonzero)
+        *nonzero = nz;
+}
 
-    if(edge_lag && !(best_score >= 0.90 && peak_sep >= 0.12)) {
-        r->conf *= 0.25;
-        r->quality_reason = "edge";
-    }
+static int sync_track_align_probe_debug_should_log(const char *reason, int confidence_pct)
+{
+    static long last_log_ms = 0;
+    long now_ms = sync_now_ms();
 
-    if(best_score < VJ_AUDIO_SYNC_ALIGN_MIN_LOCK_SCORE ||
-       peak_sep < VJ_AUDIO_SYNC_ALIGN_MIN_LOCK_SEPARATION)
+    if(confidence_pct >= 70)
+        return 1;
+
+    if(reason && strcmp(reason, "ok") != 0 &&
+       (last_log_ms == 0 || (now_ms - last_log_ms) >= 2500L))
     {
-        r->conf *= 0.55;
-        if(!edge_lag)
-            r->quality_reason = (best_score < VJ_AUDIO_SYNC_ALIGN_MIN_LOCK_SCORE) ?
-                                "weak-score" : "weak-separation";
+        last_log_ms = now_ms;
+        return 1;
     }
 
-    (void)lowvar_source_rejects;
-    (void)lowvar_target_rejects;
+    return 0;
 }
 
-static int sync_track_align_score_is_better(const sync_track_align_live_score_t *a,
-                                            const sync_track_align_live_score_t *b)
-{
-    if(!a || a->window <= 0)
-        return 0;
-    if(!b || b->window <= 0)
-        return 1;
-
-    if(a->no_valid_score && !b->no_valid_score)
-        return 0;
-    if(!a->no_valid_score && b->no_valid_score)
-        return 1;
-
-    if(a->no_valid_score && b->no_valid_score)
-        return a->window > b->window;
-
-
-
-
-    if(a->conf > b->conf + 1.0)
-        return 1;
-    if(a->conf + 1.0 < b->conf)
-        return 0;
-    if(a->peak_sep > b->peak_sep + 0.005)
-        return 1;
-    if(a->peak_sep + 0.005 < b->peak_sep)
-        return 0;
-    return a->window > b->window;
-}
 
 static void sync_track_align_clear_live_candidate_locked(vj_audio_sync_shared_t *s)
 {
@@ -974,29 +713,47 @@ static int sync_track_align_offer_snap_ex_locked(vj_audio_sync_shared_t *s,
     if(cooldown_ms <= 0)
         cooldown_ms = VJ_AUDIO_SYNC_TRACK_SNAP_OFFER_COOLDOWN_MS;
 
-    if(tiny_servo && delta_frames != -1 && delta_frames != 1) return 0;
+    if(tiny_servo && delta_frames != -1 && delta_frames != 1) {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[TRACK-ALIGN][SNAP-OFFER] ignored invalid-servo delta=%+d conf=%d%% reason=%s",
+                   delta_frames,
+                   conf_clamped,
+                   reason ? reason : "servo");
+        return 0;
+    }
 
-    pending = s->track_align_snap_pending;
-    if(pending) return 0;
+    pending = sync_load_i(&s->track_align_snap_pending);
+    if(pending) {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[TRACK-ALIGN][SNAP-OFFER] suppressed pending delta=%+d conf=%d%% pending=1 reason=%s",
+                   delta_frames,
+                   conf_clamped,
+                   reason ? reason : (tiny_servo ? "servo" : "worker"));
+        return 0;
+    }
 
     if(!tiny_servo &&
        s->align_last_snap_ms != 0 &&
        (now_ms - s->align_last_snap_ms) < cooldown_ms)
     {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[TRACK-ALIGN][SNAP-OFFER] suppressed cooldown delta=%+d conf=%d%% since_last=%ldms cooldown=%ldms pending=0 reason=%s",
+                   delta_frames,
+                   conf_clamped,
+                   since,
+                   cooldown_ms,
+                   reason ? reason : "worker");
         return 0;
     }
 
-    seq = s->track_align_snap_seq + 1;
-    s->track_align_snap_delta_frames = delta_frames;
-    s->track_align_snap_confidence_pct = conf_clamped;
-    s->track_align_snap_pending = 1;
-    s->track_align_snap_seq = seq;
+    seq = sync_load_i(&s->track_align_snap_seq) + 1;
+    sync_store_i(&s->track_align_snap_delta_frames, delta_frames);
+    sync_store_i(&s->track_align_snap_confidence_pct, conf_clamped);
+    sync_store_i(&s->track_align_snap_pending, 1);
+    sync_store_i(&s->track_align_snap_seq, seq);
 
     if(!tiny_servo) {
         s->align_last_snap_ms = now_ms;
-
-
-
         s->align_live_last_snap_ms = now_ms;
         s->align_live_last_snap_delta = delta_frames;
     }
@@ -1006,7 +763,21 @@ static int sync_track_align_offer_snap_ex_locked(vj_audio_sync_shared_t *s,
     else
         snprintf(since_buf, sizeof(since_buf), "%ldms", since);
 
-
+    if(tiny_servo) {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[TRACK-ALIGN][SNAP-OFFER] accepted servo delta=%+d conf=%d%% seq=%d since_hard=%s reason=%s",
+                   delta_frames,
+                   conf_clamped,
+                   seq,
+                   since_buf,
+                   reason ? reason : "servo");
+    }
+    else {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[TRACK-ALIGN][SNAP-OFFER] accepted delta=%+d conf=%d%% seq=%d since_last=%s cooldown=%ldms reason=%s",
+                   delta_frames, conf_clamped, seq, since_buf, cooldown_ms,
+                   reason ? reason : "worker");
+    }
     return 1;
 }
 
@@ -1048,18 +819,15 @@ static void sync_track_align_live_requirements_locked(vj_audio_sync_shared_t *s,
 
     (void)confidence_pct;
 
-
-
-
-    if(first_acquire && abs_ms >= VJ_AUDIO_SYNC_LIVE_SNAP_MIN_OFFSET_MS) {
-        int urgency = abs_ms - VJ_AUDIO_SYNC_LIVE_SNAP_MIN_OFFSET_MS;
+    if(first_acquire && abs_ms >= 1800) {
+        int urgency = abs_ms - 1800;
         if(urgency < 0)
             urgency = 0;
-        if(urgency > 4100)
-            urgency = 4100;
+        if(urgency > 3200)
+            urgency = 3200;
 
-
-        req_conf = 72 - ((urgency * 14) / 4100);
+        /* 1800ms -> about 76%, 5000ms+ -> about 58%. */
+        req_conf = 76 - ((urgency * 18) / 3200);
         if(req_conf < 58)
             req_conf = 58;
         if(req_conf > VJ_AUDIO_SYNC_LIVE_SNAP_MIN_CONF)
@@ -1119,10 +887,7 @@ static void sync_track_align_try_live_snap_locked(vj_audio_sync_shared_t *s,
     if(sync_load_i(&s->target_mode) != VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP)
         return;
 
-
-
-
-    if(s->track_align_snap_pending) {
+    if(sync_load_i(&s->track_align_snap_pending)) {
         if(s->align_live_candidate_count > 0)
             sync_track_align_clear_live_candidate_locked(s);
         return;
@@ -1168,20 +933,20 @@ static void sync_track_align_try_live_snap_locked(vj_audio_sync_shared_t *s,
 
     abs_delta_frames = delta_frames < 0 ? -delta_frames : delta_frames;
 
-
-
-
     if(s->align_live_last_snap_ms != 0 &&
        delta_frames < 0 &&
        abs_ms < VJ_AUDIO_SYNC_SETTLED_BACKWARD_SNAP_BLOCK_MS)
     {
         if(s->align_live_candidate_count > 0)
             sync_track_align_clear_live_candidate_locked(s);
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[TRACK-ALIGN] live settled backward snap held delta=%+d from %+dms conf=%d%% block_ms=%d reason=sync-worker",
+                   delta_frames,
+                   (int)(raw_offset_ms + (raw_offset_ms >= 0.0 ? 0.5 : -0.5)),
+                   confidence_pct,
+                   VJ_AUDIO_SYNC_SETTLED_BACKWARD_SNAP_BLOCK_MS);
         return;
     }
-
-
-
 
     if(s->align_live_last_snap_ms != 0 &&
        abs_delta_frames > VJ_AUDIO_SYNC_LIVE_SNAP_SETTLE_MAX_FRAMES &&
@@ -1189,6 +954,13 @@ static void sync_track_align_try_live_snap_locked(vj_audio_sync_shared_t *s,
     {
         if(s->align_live_candidate_count > 0)
             sync_track_align_clear_live_candidate_locked(s);
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[TRACK-ALIGN] live offset reacquire suppressed delta=%+d from %+dms conf=%d%% need_conf=%d%% settle_max=%d reason=sync-worker",
+                   delta_frames,
+                   (int)(raw_offset_ms + (raw_offset_ms >= 0.0 ? 0.5 : -0.5)),
+                   confidence_pct,
+                   VJ_AUDIO_SYNC_LIVE_SNAP_REACQUIRE_CONF,
+                   VJ_AUDIO_SYNC_LIVE_SNAP_SETTLE_MAX_FRAMES);
         return;
     }
 
@@ -1209,9 +981,6 @@ static void sync_track_align_try_live_snap_locked(vj_audio_sync_shared_t *s,
     {
         same_candidate = 1;
 
-
-
-
         if(elapsed_ms < required_observe_ms) {
             static long last_hold_log_ms = 0;
             static int last_hold_delta = 0;
@@ -1219,6 +988,15 @@ static void sync_track_align_try_live_snap_locked(vj_audio_sync_shared_t *s,
                now_ms - last_hold_log_ms >= 200L ||
                last_hold_delta != s->align_live_candidate_delta)
             {
+                veejay_msg(VEEJAY_MSG_DEBUG,
+                           "[TRACK-ALIGN] live consensus holding %+d frames from %+dms stable=%d/%d elapsed=%ld/%ldms conf=%d%%",
+                           s->align_live_candidate_delta,
+                           (int)(raw_offset_ms + (raw_offset_ms >= 0.0 ? 0.5 : -0.5)),
+                           s->align_live_candidate_count,
+                           required_stable,
+                           elapsed_ms,
+                           required_observe_ms,
+                           confidence_pct);
                 last_hold_log_ms = now_ms;
                 last_hold_delta = s->align_live_candidate_delta;
             }
@@ -1246,6 +1024,20 @@ static void sync_track_align_try_live_snap_locked(vj_audio_sync_shared_t *s,
     if(!same_candidate ||
        s->align_live_candidate_count < required_stable)
     {
+        int avg_dbg = (s->align_live_candidate_count > 0) ?
+            sync_clampi(s->align_live_candidate_conf_sum / s->align_live_candidate_count, 0, 100) : confidence_pct;
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[TRACK-ALIGN] live offset consensus candidate %+d frames from %+dms conf_min=%d%% conf_cur=%d%% conf_avg=%d%% stable=%d/%d need_conf=%d%% observe=%ldms first=%d reason=sync-worker",
+                   s->align_live_candidate_delta,
+                   (int)(raw_offset_ms + (raw_offset_ms >= 0.0 ? 0.5 : -0.5)),
+                   sync_clampi(s->align_live_candidate_conf_min, 0, 100),
+                   confidence_pct,
+                   avg_dbg,
+                   s->align_live_candidate_count,
+                   required_stable,
+                   required_conf,
+                   required_observe_ms,
+                   s->align_live_last_snap_ms == 0);
         return;
     }
 
@@ -1279,9 +1071,6 @@ static void sync_track_align_try_live_snap_locked(vj_audio_sync_shared_t *s,
             s->align_live_last_snap_delta = s->align_live_candidate_delta;
             sync_track_align_clear_live_candidate_locked(s);
         } else {
-
-
-
             sync_track_align_clear_live_candidate_locked(s);
         }
     }
@@ -1296,12 +1085,18 @@ static void sync_track_align_publish_locked(vj_audio_sync_shared_t *s)
     int target_pos;
     int source_count;
     int target_count;
+    int source_rate;
+    int target_rate;
     long long target_queue_frames = 0;
+    long target_overruns = 0;
+    long target_reads = 0;
     int target_queue_ms = 0;
 
     int min_count;
+    int max_lag_steps;
     int best_lag = 0;
     double best_score = -1.0;
+    double second_score = -1.0;
     int window;
     int min_overlap;
     int state;
@@ -1313,20 +1108,26 @@ static void sync_track_align_publish_locked(vj_audio_sync_shared_t *s)
     double correction_ppm;
     int lock_eligible;
     int published_locked;
-    int previous_locked = 0;
-    int hold_publish_eligible = 0;
-    int first_acquire = 1;
-    int window_cap;
-    int min_publish_features = VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES;
+    int valid_lags = 0;
+    int overlap_rejects = 0;
+    int lowvar_rejects = 0;
+    int lowvar_source_rejects = 0;
+    int lowvar_target_rejects = 0;
+    int lowscore_rejects = 0;
+    int total_lags = 0;
     int best_overlap = 0;
     int no_valid_score = 0;
-    sync_track_align_live_score_t selected_score;
+    double min_src_var = 0.0;
+    double min_tgt_var = 0.0;
+    double max_src_var = 0.0;
+    double max_tgt_var = 0.0;
+    int var_seen = 0;
+    sync_track_align_feature_stats_t src_stats;
+    sync_track_align_feature_stats_t tgt_stats;
+    const char *quality_reason = "ok";
 
     if(!s)
         return;
-
-
-
 
     sync_lock(s);
     if(sync_load_i(&s->mode) != VJ_AUDIO_SYNC_MODE_TRACK_ALIGN) {
@@ -1336,46 +1137,16 @@ static void sync_track_align_publish_locked(vj_audio_sync_shared_t *s)
         return;
     }
 
-    first_acquire = (s->align_live_last_snap_ms == 0);
-    if(first_acquire) {
-        min_publish_features = VJ_AUDIO_SYNC_ALIGN_ACQUIRE_MIN_FEATURES;
-        if(min_publish_features < VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES)
-            min_publish_features = VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES;
-        if(min_publish_features > VJ_AUDIO_SYNC_ALIGN_FEATURES)
-            min_publish_features = VJ_AUDIO_SYNC_ALIGN_FEATURES;
-    } else {
-        min_publish_features = VJ_AUDIO_SYNC_ALIGN_SETTLED_MIN_FEATURES;
-        if(min_publish_features < VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES)
-            min_publish_features = VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES;
-        if(min_publish_features > VJ_AUDIO_SYNC_ALIGN_FEATURES)
-            min_publish_features = VJ_AUDIO_SYNC_ALIGN_FEATURES;
-    }
-
-    target_queue_frames = 0;
-    target_queue_ms = 0;
-    if(s->target_write_frame_abs > s->target_read_frame_abs)
-        target_queue_frames = s->target_write_frame_abs - s->target_read_frame_abs;
-    if(s->target_sample_rate > 0 && target_queue_frames > 0) {
-        long long qms = (target_queue_frames * 1000LL) / (long long)s->target_sample_rate;
-        if(qms > 999999LL)
-            qms = 999999LL;
-        target_queue_ms = (int)qms;
-    }
-
-    if(s->align_source_count < min_publish_features) {
+    if(s->align_source_count < VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES) {
         sync_store_i(&s->track_align_locked, 0);
         sync_store_i(&s->track_align_state, VJ_AUDIO_SYNC_TRACK_STATE_WAIT_SOURCE);
-if(!first_acquire)
-            sync_track_align_clear_rough_hint_locked(s);
         sync_unlock(s);
         return;
     }
 
-    if(s->align_target_count < min_publish_features) {
+    if(s->align_target_count < VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES) {
         sync_store_i(&s->track_align_locked, 0);
         sync_store_i(&s->track_align_state, VJ_AUDIO_SYNC_TRACK_STATE_WAIT_TARGET);
-if(!first_acquire)
-            sync_track_align_clear_rough_hint_locked(s);
         sync_unlock(s);
         return;
     }
@@ -1384,11 +1155,15 @@ if(!first_acquire)
     target_pos = s->align_target_pos;
     source_count = s->align_source_count;
     target_count = s->align_target_count;
+    source_rate = s->align_source_rate;
+    target_rate = s->align_target_rate;
     memcpy(source_feat, s->align_source_feat, sizeof(source_feat));
     memcpy(target_feat, s->align_target_feat, sizeof(target_feat));
 
     if(s->target_write_frame_abs > s->target_read_frame_abs)
         target_queue_frames = s->target_write_frame_abs - s->target_read_frame_abs;
+    target_overruns = sync_load_l(&s->target_queue_overruns);
+    target_reads = sync_load_l(&s->target_queue_reads);
     if(s->target_sample_rate > 0 && target_queue_frames > 0) {
         long long qms = (target_queue_frames * 1000LL) / (long long)s->target_sample_rate;
         if(qms > 999999LL)
@@ -1398,8 +1173,7 @@ if(!first_acquire)
     sync_unlock(s);
 
     if(target_queue_ms < VJ_AUDIO_SYNC_TARGET_MIN_HISTORY_MS ||
-       target_count < VJ_AUDIO_SYNC_ALIGN_LOCK_MIN_TARGET_FEATURES ||
-       (!first_acquire && target_count < min_publish_features))
+       target_count < VJ_AUDIO_SYNC_ALIGN_LOCK_MIN_TARGET_FEATURES)
     {
         sync_lock(s);
         if(sync_load_i(&s->mode) == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN) {
@@ -1407,8 +1181,6 @@ if(!first_acquire)
             sync_store_i(&s->track_align_state, VJ_AUDIO_SYNC_TRACK_STATE_WAIT_TARGET);
             sync_store_i(&s->track_align_confidence_pct,
                          sync_clampi((int)(s->align_conf_smooth + 0.5), 0, 100));
-if(!first_acquire)
-                sync_track_align_clear_rough_hint_locked(s);
             sync_store_l(&s->track_align_last_update_ms, sync_now_ms());
         }
         sync_unlock(s);
@@ -1416,198 +1188,9 @@ if(!first_acquire)
     }
 
     min_count = source_count < target_count ? source_count : target_count;
-    window_cap = first_acquire ?
-                 VJ_AUDIO_SYNC_ALIGN_ACQUIRE_WINDOW_FEATURES :
-                 VJ_AUDIO_SYNC_ALIGN_LIVE_WINDOW_FEATURES;
-    if(window_cap < VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES)
-        window_cap = VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES;
-    if(window_cap > VJ_AUDIO_SYNC_ALIGN_FEATURES)
-        window_cap = VJ_AUDIO_SYNC_ALIGN_FEATURES;
-
     window = min_count;
-    if(window > window_cap)
-        window = window_cap;
-    if(window < VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES) {
-        sync_lock(s);
-        sync_store_i(&s->track_align_locked, 0);
-        sync_store_i(&s->track_align_state, VJ_AUDIO_SYNC_TRACK_STATE_SEARCHING);
-sync_unlock(s);
-        return;
-    }
-
-    sync_track_align_score_clear(&selected_score);
-
-    if(first_acquire) {
-        int acquire_windows[5];
-        int acquire_window_count = 0;
-        sync_track_align_live_score_t acquire_scores[5];
-        int acquire_score_count = 0;
-
-        acquire_windows[acquire_window_count++] = VJ_AUDIO_SYNC_ALIGN_ACQUIRE_SHORT_WINDOW_FEATURES;
-        acquire_windows[acquire_window_count++] = VJ_AUDIO_SYNC_ALIGN_ACQUIRE_MIN_FEATURES;
-        acquire_windows[acquire_window_count++] = VJ_AUDIO_SYNC_ALIGN_ACQUIRE_MID_WINDOW_FEATURES;
-        acquire_windows[acquire_window_count++] = (VJ_AUDIO_SYNC_ALIGN_ACQUIRE_MID_WINDOW_FEATURES + VJ_AUDIO_SYNC_ALIGN_ACQUIRE_WINDOW_FEATURES) / 2;
-        acquire_windows[acquire_window_count++] = VJ_AUDIO_SYNC_ALIGN_ACQUIRE_WINDOW_FEATURES;
-
-        for(int wi = 0; wi < acquire_window_count; wi++) {
-            sync_track_align_live_score_t candidate;
-            int candidate_window = acquire_windows[wi];
-
-            if(candidate_window < VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES)
-                candidate_window = VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES;
-            if(candidate_window > window_cap)
-                candidate_window = window_cap;
-            if(candidate_window > min_count)
-                continue;
-
-
-            int duplicate = 0;
-            for(int pi = 0; pi < wi; pi++) {
-                int prev_window = acquire_windows[pi];
-                if(prev_window < VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES)
-                    prev_window = VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES;
-                if(prev_window > window_cap)
-                    prev_window = window_cap;
-                if(prev_window == candidate_window) {
-                    duplicate = 1;
-                    break;
-                }
-            }
-            if(duplicate)
-                continue;
-
-            sync_track_align_score_window(source_feat,
-                                          source_pos,
-                                          source_count,
-                                          target_feat,
-                                          target_pos,
-                                          target_count,
-                                          candidate_window,
-                                          VJ_AUDIO_SYNC_ALIGN_MAX_LAG_MS,
-                                          &candidate);
-
-            if(acquire_score_count < 5)
-                acquire_scores[acquire_score_count++] = candidate;
-
-            if(sync_track_align_score_is_better(&candidate, &selected_score))
-                selected_score = candidate;
-        }
-
-
-
-
-        if(min_count > VJ_AUDIO_SYNC_ALIGN_ACQUIRE_MIN_FEATURES &&
-           min_count < VJ_AUDIO_SYNC_ALIGN_ACQUIRE_WINDOW_FEATURES)
-        {
-            sync_track_align_live_score_t candidate;
-            int candidate_window = min_count;
-            if(candidate_window > window_cap)
-                candidate_window = window_cap;
-            if(candidate_window >= VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES) {
-                sync_track_align_score_window(source_feat,
-                                              source_pos,
-                                              source_count,
-                                              target_feat,
-                                              target_pos,
-                                              target_count,
-                                              candidate_window,
-                                              VJ_AUDIO_SYNC_ALIGN_MAX_LAG_MS,
-                                              &candidate);
-                if(acquire_score_count < 5)
-                    acquire_scores[acquire_score_count++] = candidate;
-                if(sync_track_align_score_is_better(&candidate, &selected_score))
-                    selected_score = candidate;
-            }
-        }
-
-
-
-
-        if(acquire_score_count > 1) {
-            int best_cluster_count = 0;
-            int best_cluster_conf_sum = 0;
-            int best_cluster_idx = -1;
-            int tolerance_steps = VJ_AUDIO_SYNC_ROUGH_HINT_TOLERANCE_MS / VJ_AUDIO_SYNC_ALIGN_HOP_MS;
-            if(tolerance_steps < 8)
-                tolerance_steps = 8;
-
-            for(int i = 0; i < acquire_score_count; i++) {
-                sync_track_align_live_score_t *a = &acquire_scores[i];
-                int cluster_count = 0;
-                int cluster_conf_sum = 0;
-
-                if(a->no_valid_score || a->edge_lag)
-                    continue;
-                if(a->best_score < VJ_AUDIO_SYNC_ROUGH_HINT_MIN_SCORE ||
-                   a->peak_sep < VJ_AUDIO_SYNC_ROUGH_HINT_MIN_SEPARATION)
-                    continue;
-
-                for(int j = 0; j < acquire_score_count; j++) {
-                    sync_track_align_live_score_t *b = &acquire_scores[j];
-                    int d;
-                    if(b->no_valid_score || b->edge_lag)
-                        continue;
-                    if(b->best_score < VJ_AUDIO_SYNC_ROUGH_HINT_MIN_SCORE ||
-                       b->peak_sep < VJ_AUDIO_SYNC_ROUGH_HINT_MIN_SEPARATION)
-                        continue;
-                    d = b->best_lag - a->best_lag;
-                    if(d < 0)
-                        d = -d;
-                    if(d <= tolerance_steps) {
-                        cluster_count++;
-                        cluster_conf_sum += sync_clampi((int)(b->conf + 0.5), 0, 100);
-                    }
-                }
-
-                if(cluster_count > best_cluster_count ||
-                   (cluster_count == best_cluster_count && cluster_conf_sum > best_cluster_conf_sum))
-                {
-                    best_cluster_count = cluster_count;
-                    best_cluster_conf_sum = cluster_conf_sum;
-                    best_cluster_idx = i;
-                }
-            }
-
-            if(best_cluster_idx >= 0 && best_cluster_count >= 2) {
-                sync_track_align_live_score_t basin = acquire_scores[best_cluster_idx];
-                int avg_conf = best_cluster_conf_sum / best_cluster_count;
-                if(avg_conf > (int)(basin.conf + 0.5))
-                    basin.conf = (double)avg_conf;
-                basin.conf += (double)(best_cluster_count - 1) * 3.0;
-                if(basin.conf > 100.0)
-                    basin.conf = 100.0;
-                basin.peak_sep += 0.010 * (double)(best_cluster_count - 1);
-                basin.quality_reason = "acquire-basin";
-
-
-
-
-                if(sync_track_align_score_is_better(&basin, &selected_score) ||
-                   selected_score.conf < basin.conf + 6.0)
-                    selected_score = basin;
-            }
-        }
-    } else {
-        sync_track_align_score_window(source_feat,
-                                      source_pos,
-                                      source_count,
-                                      target_feat,
-                                      target_pos,
-                                      target_count,
-                                      window,
-                                      VJ_AUDIO_SYNC_ALIGN_SETTLED_MAX_LAG_MS,
-                                      &selected_score);
-    }
-
-    window = selected_score.window;
-    min_overlap = selected_score.min_overlap;
-    best_lag = selected_score.best_lag;
-    best_score = selected_score.best_score;
-    peak_sep = selected_score.peak_sep;
-    edge_lag = selected_score.edge_lag;
-    no_valid_score = selected_score.no_valid_score;
-    best_overlap = selected_score.best_overlap;
-    conf = selected_score.conf;
+    if(window > 128)
+        window = 128;
     if(window < VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES) {
         sync_lock(s);
         sync_store_i(&s->track_align_locked, 0);
@@ -1615,6 +1198,162 @@ sync_unlock(s);
         sync_unlock(s);
         return;
     }
+
+    sync_track_align_feature_stats_ring(source_feat,
+                                        source_pos,
+                                        source_count,
+                                        window,
+                                        &src_stats);
+    sync_track_align_feature_stats_ring(target_feat,
+                                        target_pos,
+                                        target_count,
+                                        window,
+                                        &tgt_stats);
+
+    min_overlap = (window * VJ_AUDIO_SYNC_ALIGN_MIN_OVERLAP_PCT + 99) / 100;
+    if(min_overlap < VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES)
+        min_overlap = VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES;
+    if(min_overlap > window)
+        min_overlap = window;
+
+    max_lag_steps = VJ_AUDIO_SYNC_ALIGN_MAX_LAG_MS / VJ_AUDIO_SYNC_ALIGN_HOP_MS;
+    if(max_lag_steps > source_count - min_overlap)
+        max_lag_steps = source_count - min_overlap;
+    if(max_lag_steps > target_count - min_overlap)
+        max_lag_steps = target_count - min_overlap;
+    if(max_lag_steps < 2)
+        max_lag_steps = 2;
+
+    for(int lag = -max_lag_steps; lag <= max_lag_steps; lag++) {
+        double sum_x = 0.0, sum_y = 0.0;
+        double sum_xx = 0.0, sum_yy = 0.0, sum_xy = 0.0;
+        int n = 0;
+
+        total_lags++;
+
+        for(int i = 0; i < window; i++) {
+            int src_back = i;
+            int tgt_back = i - lag;
+            if(tgt_back < 0 || tgt_back >= target_count)
+                continue;
+            if(src_back < 0 || src_back >= source_count)
+                continue;
+
+            double x = sync_align_ring_get(source_feat,
+                                           source_pos,
+                                           source_count,
+                                           src_back);
+            double y = sync_align_ring_get(target_feat,
+                                           target_pos,
+                                           target_count,
+                                           tgt_back);
+            sum_x += x;
+            sum_y += y;
+            sum_xx += x * x;
+            sum_yy += y * y;
+            sum_xy += x * y;
+            n++;
+        }
+
+        if(n < min_overlap) {
+            overlap_rejects++;
+            continue;
+        }
+
+        {
+            double nf = (double)n;
+            double cov = sum_xy - (sum_x * sum_y / nf);
+            double vx = sum_xx - (sum_x * sum_x / nf);
+            double vy = sum_yy - (sum_y * sum_y / nf);
+            double score = 0.0;
+
+            if(!var_seen) {
+                min_src_var = vx;
+                min_tgt_var = vy;
+                max_src_var = vx;
+                max_tgt_var = vy;
+                var_seen = 1;
+            } else {
+                if(vx < min_src_var) min_src_var = vx;
+                if(vy < min_tgt_var) min_tgt_var = vy;
+                if(vx > max_src_var) max_src_var = vx;
+                if(vy > max_tgt_var) max_tgt_var = vy;
+            }
+
+            if(vx <= VJ_AUDIO_SYNC_ALIGN_MIN_VARIANCE ||
+               vy <= VJ_AUDIO_SYNC_ALIGN_MIN_VARIANCE)
+            {
+                if(vx <= VJ_AUDIO_SYNC_ALIGN_MIN_VARIANCE)
+                    lowvar_source_rejects++;
+                if(vy <= VJ_AUDIO_SYNC_ALIGN_MIN_VARIANCE)
+                    lowvar_target_rejects++;
+                lowvar_rejects++;
+                continue;
+            }
+
+            score = cov / sqrt(vx * vy);
+            if(score < 0.0)
+                score = 0.0;
+            else if(score > 1.0)
+                score = 1.0;
+
+            if(score < VJ_AUDIO_SYNC_ALIGN_MIN_SCORE) {
+                lowscore_rejects++;
+                continue;
+            }
+
+            valid_lags++;
+
+            if(score > best_score) {
+                second_score = best_score;
+                best_score = score;
+                best_lag = lag;
+                best_overlap = n;
+            } else if(score > second_score) {
+                second_score = score;
+            }
+        }
+    }
+
+    if(valid_lags <= 0 || best_score < VJ_AUDIO_SYNC_ALIGN_MIN_SCORE) {
+        no_valid_score = 1;
+        best_lag = 0;
+        best_score = 0.0;
+        second_score = 0.0;
+        best_overlap = 0;
+        quality_reason = (lowvar_rejects > 0 && lowvar_rejects >= overlap_rejects) ?
+                         "low-variance" :
+                         (overlap_rejects > 0 ? "low-overlap" : "no-valid-score");
+    } else if(second_score < 0.0) {
+        second_score = 0.0;
+    }
+
+    peak_sep = best_score - second_score;
+    if(peak_sep < 0.0)
+        peak_sep = 0.0;
+
+    edge_lag = (!no_valid_score &&
+                abs(best_lag) >= (max_lag_steps - VJ_AUDIO_SYNC_ALIGN_EDGE_GUARD_STEPS));
+
+    conf = best_score * 100.0;
+    conf *= sync_clampd(peak_sep * 4.0 + 0.45, 0.0, 1.0);
+
+    if(edge_lag && !(best_score >= 0.90 && peak_sep >= 0.12)) {
+        conf *= 0.25;
+        quality_reason = "edge";
+    }
+
+    if(best_score < VJ_AUDIO_SYNC_ALIGN_MIN_LOCK_SCORE ||
+       peak_sep < VJ_AUDIO_SYNC_ALIGN_MIN_LOCK_SEPARATION)
+    {
+        conf *= 0.55;
+        if(!no_valid_score && !edge_lag)
+            quality_reason = (best_score < VJ_AUDIO_SYNC_ALIGN_MIN_LOCK_SCORE) ?
+                             "weak-score" : "weak-separation";
+    }
+
+    if(no_valid_score)
+        conf = 0.0;
 
     offset_ms = no_valid_score ? 0.0 : ((double)best_lag * (double)VJ_AUDIO_SYNC_ALIGN_HOP_MS);
     raw_offset_ms = offset_ms;
@@ -1640,67 +1379,25 @@ sync_unlock(s);
         return;
     }
 
-    previous_locked = sync_load_i(&s->track_align_locked);
-    s->align_conf_smooth = (0.82 * s->align_conf_smooth) + (0.18 * conf);
-
-    hold_publish_eligible = 0;
-    if(!no_valid_score && !edge_lag &&
-       best_score >= (double)VJ_AUDIO_SYNC_ALIGN_LOCK_HOLD_SCORE &&
-       conf >= (double)VJ_AUDIO_SYNC_ALIGN_LOCK_HOLD_CONF &&
-       peak_sep >= (double)VJ_AUDIO_SYNC_ALIGN_LOCK_HOLD_SEPARATION)
-    {
-        int raw_ms = sync_clampi((int)(raw_offset_ms +
-                                      (raw_offset_ms >= 0.0 ? 0.5 : -0.5)),
-                                 -VJ_AUDIO_SYNC_ALIGN_MAX_LAG_MS,
-                                 VJ_AUDIO_SYNC_ALIGN_MAX_LAG_MS);
-        int smooth_ms = sync_clampi((int)(s->align_offset_smooth_ms +
-                                         (s->align_offset_smooth_ms >= 0.0 ? 0.5 : -0.5)),
-                                    -VJ_AUDIO_SYNC_ALIGN_MAX_LAG_MS,
-                                    VJ_AUDIO_SYNC_ALIGN_MAX_LAG_MS);
-        int delta_ms = raw_ms - smooth_ms;
-        if(delta_ms < 0)
-            delta_ms = -delta_ms;
-
-        if(!previous_locked ||
-           s->align_hold_blocks > 0 ||
-           delta_ms <= VJ_AUDIO_SYNC_ALIGN_LOCK_HYSTERESIS_MS)
-            hold_publish_eligible = 1;
-    }
+    s->align_conf_smooth = (0.80 * s->align_conf_smooth) + (0.20 * conf);
 
     if(lock_eligible &&
        s->align_conf_smooth >= (double)VJ_AUDIO_SYNC_ALIGN_LOCK_CONF) {
-        const double blend = VJ_AUDIO_SYNC_ALIGN_LOCK_OFFSET_BLEND;
-        s->align_offset_smooth_ms = ((1.0 - blend) * s->align_offset_smooth_ms) +
-                                    (blend * offset_ms);
+        s->align_offset_smooth_ms = (0.86 * s->align_offset_smooth_ms) +
+                                    (0.14 * offset_ms);
         s->align_hold_blocks = VJ_AUDIO_SYNC_ALIGN_HOLD_BLOCKS;
         state = VJ_AUDIO_SYNC_TRACK_STATE_LOCKED;
-    } else if(hold_publish_eligible && (previous_locked || s->align_hold_blocks > 0)) {
-        const double blend = VJ_AUDIO_SYNC_ALIGN_HOLD_OFFSET_BLEND;
-        s->align_offset_smooth_ms = ((1.0 - blend) * s->align_offset_smooth_ms) +
-                                    (blend * offset_ms);
-
-        if(s->align_hold_blocks > 0)
-            s->align_hold_blocks--;
-
-
-
-
-        if(previous_locked && s->align_hold_blocks < VJ_AUDIO_SYNC_ALIGN_LOCK_LOST_BLOCKS)
-            s->align_hold_blocks = VJ_AUDIO_SYNC_ALIGN_LOCK_LOST_BLOCKS;
-
+    } else if(!no_valid_score && !edge_lag && s->align_hold_blocks > 0) {
+        s->align_hold_blocks--;
         state = VJ_AUDIO_SYNC_TRACK_STATE_HOLD;
     } else {
-        if(s->align_hold_blocks > 0)
-            s->align_hold_blocks--;
         state = (s->align_conf_smooth > 25.0) ?
                 VJ_AUDIO_SYNC_TRACK_STATE_SEARCHING :
                 VJ_AUDIO_SYNC_TRACK_STATE_FALLBACK;
     }
 
-    published_locked = (state == VJ_AUDIO_SYNC_TRACK_STATE_LOCKED ||
-                        (state == VJ_AUDIO_SYNC_TRACK_STATE_HOLD &&
-                         hold_publish_eligible &&
-                         (previous_locked || s->align_hold_blocks > 0))) ? 1 : 0;
+    published_locked = (lock_eligible &&
+                        state == VJ_AUDIO_SYNC_TRACK_STATE_LOCKED) ? 1 : 0;
 
     {
         double export_offset_ms = 0.0;
@@ -1708,10 +1405,9 @@ sync_unlock(s);
         long hint_now_ms = sync_now_ms();
         int raw_hint_ms = sync_clampi((int)(raw_offset_ms +
                                            (raw_offset_ms >= 0.0 ? 0.5 : -0.5)),
-                                      -VJ_AUDIO_SYNC_ALIGN_MAX_LAG_MS, VJ_AUDIO_SYNC_ALIGN_MAX_LAG_MS);
+                                      -8000, 8000);
         int raw_hint_conf = sync_clampi((int)(conf + 0.5), 0, 100);
-        int rough_usable = (first_acquire &&
-                            !no_valid_score && !edge_lag &&
+        int rough_usable = (!no_valid_score && !edge_lag &&
                             abs(raw_hint_ms) >= VJ_AUDIO_SYNC_ROUGH_HINT_MIN_OFFSET_MS &&
                             raw_hint_conf >= VJ_AUDIO_SYNC_ROUGH_HINT_MIN_CONF &&
                             best_score >= VJ_AUDIO_SYNC_ROUGH_HINT_MIN_SCORE &&
@@ -1762,7 +1458,7 @@ sync_unlock(s);
         sync_store_i(&s->track_align_offset_ms,
                      sync_clampi((int)(export_offset_ms +
                                        (export_offset_ms >= 0.0 ? 0.5 : -0.5)),
-                                 -VJ_AUDIO_SYNC_ALIGN_MAX_LAG_MS, VJ_AUDIO_SYNC_ALIGN_MAX_LAG_MS));
+                                 -8000, 8000));
         sync_store_i(&s->track_align_confidence_pct,
                      sync_clampi((int)(export_conf + 0.5), 0, 100));
     }
@@ -1823,10 +1519,41 @@ sync_unlock(s);
 
         if(should_log) {
             if(locked_dbg) {
-} else if(s->align_rough_hint_ms > 0 &&
+                veejay_msg(VEEJAY_MSG_DEBUG,
+                           "[TRACK-ALIGN][LIVE-LOCK] off=%+dms conf=%d%% raw=%+.0fms best=%.3f sep=%.3f src_feat=%d tgt_feat=%d reason=%s",
+                           hint_dbg,
+                           conf_dbg,
+                           raw_offset_ms,
+                           best_score,
+                           peak_sep,
+                           source_count,
+                           target_count,
+                           quality_reason);
+            } else if(s->align_rough_hint_ms > 0 &&
                       (now_dbg_ms - s->align_rough_hint_ms) <= VJ_AUDIO_SYNC_ROUGH_HINT_HOLD_MS) {
-} else {
-}
+                veejay_msg(VEEJAY_MSG_DEBUG,
+                           "[TRACK-ALIGN][LIVE-HINT] hint=%+dms conf=%d%% raw=%+.0fms best=%.3f sep=%.3f count=%d src_feat=%d tgt_feat=%d state=%s reason=%s",
+                           hint_dbg,
+                           conf_dbg,
+                           raw_offset_ms,
+                           best_score,
+                           peak_sep,
+                           s->align_rough_hint_count,
+                           source_count,
+                           target_count,
+                           sync_track_align_state_name_dbg(state),
+                           quality_reason);
+            } else {
+                veejay_msg(VEEJAY_MSG_DEBUG,
+                           "[TRACK-ALIGN][LIVE] state=%s src_feat=%d tgt_feat=%d conf=%.1f%% best=%.3f sep=%.3f reason=%s",
+                           sync_track_align_state_name_dbg(state),
+                           source_count,
+                           target_count,
+                           s->align_conf_smooth,
+                           best_score,
+                           peak_sep,
+                           quality_reason);
+            }
             dbg_last_state = state;
             dbg_last_locked = locked_dbg;
             dbg_last_hint = hint_dbg;
@@ -1842,9 +1569,6 @@ static void sync_track_align_publish(vj_audio_sync_shared_t *s)
 {
     if(!s)
         return;
-
-
-
 
     sync_track_align_publish_locked(s);
 }
@@ -1884,20 +1608,17 @@ static int sync_track_align_extract_features_from_audio(const uint8_t *data,
             n = 1;
 
         double sum = 0.0;
-        if(channels == 1) {
-            for(int i = 0; i < n; i++) {
-                const uint8_t *f = data + ((size_t)(done + i) * (size_t)frame_bytes);
-                double m = (double)sync_read_sample(f, sample_bytes) * (1.0 / 32768.0);
-                sum += m * m;
+        for(int i = 0; i < n; i++) {
+            const uint8_t *f = data + ((size_t)(done + i) * (size_t)frame_bytes);
+            int l, r;
+            if(channels == 1) {
+                l = r = sync_read_sample(f, sample_bytes);
+            } else {
+                l = sync_read_sample(f, sample_bytes);
+                r = sync_read_sample(f + sample_bytes, sample_bytes);
             }
-        } else {
-            for(int i = 0; i < n; i++) {
-                const uint8_t *f = data + ((size_t)(done + i) * (size_t)frame_bytes);
-                int l = sync_read_sample(f, sample_bytes);
-                int r = sync_read_sample(f + sample_bytes, sample_bytes);
-                double m = ((double)l + (double)r) * (1.0 / 65536.0);
-                sum += m * m;
-            }
+            double m = ((double)l + (double)r) * (1.0 / 65536.0);
+            sum += m * m;
         }
 
         accum += sum;
@@ -1905,7 +1626,7 @@ static int sync_track_align_extract_features_from_audio(const uint8_t *data,
         done += n;
 
         if(accum_frames >= hop) {
-            double level = sqrtf((float)(accum / (double)accum_frames));
+            double level = sqrt(accum / (double)accum_frames);
             double rise;
             double feat;
             if(!prev_initialized) {
@@ -1936,9 +1657,6 @@ static int sync_track_align_master_latency_steps(vj_audio_sync_shared_t *s)
 
     if(latency_s < 0.0)
         latency_s = 0.0;
-
-
-
 
     if(latency_s > 0.500)
         latency_s = 0.500;
@@ -1997,7 +1715,7 @@ static double sync_track_align_feature_contrast(const float *v, int n)
         double d = (double)v[i] - mean;
         var += d * d;
     }
-    var = sqrtf((float)(var / (double)n)) * 8.0;
+    var = sqrt(var / (double)n) * 8.0;
     return sync_clampd(var, 0.0, 1.0);
 }
 
@@ -2095,20 +1813,39 @@ int vj_audio_sync_track_align_probe_target_audio(vj_audio_sync_shared_t *s,
     float master[VJ_AUDIO_SYNC_ALIGN_PROBE_MAX_FEATURES];
     int tgt_count;
     int n;
-    int latency_steps;
-    int source_needed;
+    int latency_steps = 0;
     double score;
     double contrast;
     double conf;
-    double dscore;
-    double tgt_contrast;
-    double src_contrast;
+    double dscore = 0.0;
+    double tgt_contrast = 0.0;
+    double src_contrast = 0.0;
+    double pcm_rms = 0.0;
+    double pcm_peak = 0.0;
+    int pcm_nonzero = 0;
+    int source_count_snapshot = 0;
+    int source_needed = 0;
+    const char *reject_reason = "ok";
+    sync_track_align_feature_stats_t tgt_stats;
+    sync_track_align_feature_stats_t master_stats;
+
+    sync_track_align_stats_clear(&tgt_stats);
+    sync_track_align_stats_clear(&master_stats);
 
     if(confidence_pct)
         *confidence_pct = 0;
 
     if(!s || !src || frames <= 0 || frame_bytes <= 0 || channels <= 0)
         return 0;
+
+    sync_track_align_pcm_stats(src,
+                               frames,
+                               frame_bytes,
+                               channels,
+                               bits_per_channel,
+                               &pcm_rms,
+                               &pcm_peak,
+                               &pcm_nonzero);
 
     tgt_count = sync_track_align_extract_features_from_audio(src,
                                                              frames,
@@ -2118,17 +1855,37 @@ int vj_audio_sync_track_align_probe_target_audio(vj_audio_sync_shared_t *s,
                                                              sample_rate,
                                                              tgt,
                                                              VJ_AUDIO_SYNC_ALIGN_PROBE_MAX_FEATURES);
-    if(tgt_count < VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES)
+    sync_track_align_feature_stats_array(tgt, tgt_count, &tgt_stats);
+
+    if(tgt_count < VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES) {
+        reject_reason = "few-target-features";
+        if(sync_track_align_probe_debug_should_log(reject_reason, 0))
+            veejay_msg(VEEJAY_MSG_DEBUG,
+                       "[TRACK-ALIGN][PROBE] reject=%s frames=%d pcm_rms=%.6f pcm_peak=%.6f pcm_nonzero=%d/%d tgt_feat=%d tgt_mean=%.5f tgt_sd=%.8f need_feat=%d",
+                       reject_reason, frames, pcm_rms, pcm_peak, pcm_nonzero, frames,
+                       tgt_count, tgt_stats.mean, tgt_stats.sd,
+                       VJ_AUDIO_SYNC_ALIGN_MIN_FEATURES);
         return 0;
+    }
 
     latency_steps = sync_track_align_master_latency_steps(s);
 
     sync_lock(s);
+    source_count_snapshot = s->align_source_count;
     source_needed = tgt_count + latency_steps;
     if(sync_load_i(&s->mode) != VJ_AUDIO_SYNC_MODE_TRACK_ALIGN ||
        s->align_source_count < source_needed)
     {
+        int mode_snapshot = sync_load_i(&s->mode);
         sync_unlock(s);
+        reject_reason = (mode_snapshot != VJ_AUDIO_SYNC_MODE_TRACK_ALIGN) ?
+                        "wrong-mode" : "wait-source-features";
+        if(sync_track_align_probe_debug_should_log(reject_reason, 0))
+            veejay_msg(VEEJAY_MSG_DEBUG,
+                       "[TRACK-ALIGN][PROBE] reject=%s frames=%d pcm_rms=%.6f pcm_peak=%.6f pcm_nonzero=%d/%d tgt_feat=%d tgt_mean=%.5f tgt_sd=%.8f src_feat=%d need_src=%d latency_steps=%d mode=%d",
+                       reject_reason, frames, pcm_rms, pcm_peak, pcm_nonzero, frames,
+                       tgt_count, tgt_stats.mean, tgt_stats.sd,
+                       source_count_snapshot, source_needed, latency_steps, mode_snapshot);
         return 0;
     }
 
@@ -2138,27 +1895,50 @@ int vj_audio_sync_track_align_probe_target_audio(vj_audio_sync_shared_t *s,
     if(n > VJ_AUDIO_SYNC_ALIGN_PROBE_MAX_FEATURES)
         n = VJ_AUDIO_SYNC_ALIGN_PROBE_MAX_FEATURES;
 
-    for(int i = 0; i < n; i++)
+    for(int i = 0; i < n; i++) {
         master[n - 1 - i] = sync_align_ring_get(s->align_source_feat,
                                                 s->align_source_pos,
                                                 s->align_source_count,
                                                 i + latency_steps);
+    }
     sync_unlock(s);
 
-    score = sync_track_align_score_feature_vectors(master, tgt, n);
-    tgt_contrast = sync_track_align_feature_contrast(tgt, n);
-    src_contrast = sync_track_align_feature_contrast(master, n);
-    dscore = sync_track_align_score_feature_deltas(master, tgt, n);
-    contrast = tgt_contrast < src_contrast ? tgt_contrast : src_contrast;
-    if(contrast < VJ_AUDIO_SYNC_ALIGN_PROBE_MIN_CONTRAST)
-        contrast *= 0.35;
+    sync_track_align_feature_stats_array(master, n, &master_stats);
 
-    score = (0.68 * score) + (0.32 * dscore);
+    score = sync_track_align_score_feature_vectors(master, tgt, n);
+
+    {
+        tgt_contrast = sync_track_align_feature_contrast(tgt, n);
+        src_contrast = sync_track_align_feature_contrast(master, n);
+        dscore = sync_track_align_score_feature_deltas(master, tgt, n);
+        contrast = tgt_contrast < src_contrast ? tgt_contrast : src_contrast;
+        if(contrast < VJ_AUDIO_SYNC_ALIGN_PROBE_MIN_CONTRAST)
+            contrast *= 0.35;
+        score = (0.68 * score) + (0.32 * dscore);
+    }
+
     conf = score * 100.0;
     conf *= (0.35 + 0.65 * contrast);
 
     if(confidence_pct)
         *confidence_pct = sync_clampi((int)(conf + 0.5), 0, 100);
+
+    if(conf < 1.0)
+        reject_reason = (contrast < VJ_AUDIO_SYNC_ALIGN_PROBE_MIN_CONTRAST) ?
+                        "low-contrast" : "low-confidence";
+
+    if(sync_track_align_probe_debug_should_log(reject_reason,
+                                               sync_clampi((int)(conf + 0.5), 0, 100)))
+    {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[TRACK-ALIGN][PROBE] %s frames=%d pcm_rms=%.6f pcm_peak=%.6f pcm_nonzero=%d/%d feat=%d n=%d src_feat=%d latency_steps=%d score=%.3f dscore=%.3f conf=%.1f%% contrast=%.3f src_contrast=%.3f tgt_contrast=%.3f src_mean=%.5f src_sd=%.8f src_minmax=%.5f..%.5f tgt_mean=%.5f tgt_sd=%.8f tgt_minmax=%.5f..%.5f",
+                   (conf >= 1.0) ? "ok" : reject_reason,
+                   frames, pcm_rms, pcm_peak, pcm_nonzero, frames,
+                   tgt_count, n, source_count_snapshot, latency_steps,
+                   score, dscore, conf, contrast, src_contrast, tgt_contrast,
+                   master_stats.mean, master_stats.sd, master_stats.min, master_stats.max,
+                   tgt_stats.mean, tgt_stats.sd, tgt_stats.min, tgt_stats.max);
+    }
 
     return (conf >= 1.0) ? 1 : 0;
 }
@@ -2170,8 +1950,12 @@ void vj_audio_sync_track_align_offer_snap(vj_audio_sync_shared_t *s,
     if(!s)
         return;
 
-    if(delta_frames == 0 || confidence_pct < 1)
+    if(delta_frames == 0 || confidence_pct < 1) {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[TRACK-ALIGN][SNAP-OFFER] ignored invalid delta=%+d conf=%d%%",
+                   delta_frames, confidence_pct);
         return;
+    }
 
     sync_lock(s);
     if(sync_load_i(&s->mode) == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN) {
@@ -2182,7 +1966,11 @@ void vj_audio_sync_track_align_offer_snap(vj_audio_sync_shared_t *s,
             sync_track_align_clear_live_candidate_locked(s);
     }
     else {
-}
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[TRACK-ALIGN][SNAP-OFFER] ignored mode=%d delta=%+d conf=%d%%",
+                   sync_load_i(&s->mode), delta_frames,
+                   sync_clampi(confidence_pct, 0, 100));
+    }
     sync_unlock(s);
 }
 
@@ -2195,7 +1983,12 @@ int vj_audio_sync_track_align_offer_servo_nudge(vj_audio_sync_shared_t *s,
     if(!s)
         return 0;
 
-    if((delta_frames != -1 && delta_frames != 1) || confidence_pct < 1) return 0;
+    if((delta_frames != -1 && delta_frames != 1) || confidence_pct < 1) {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[TRACK-ALIGN][SNAP-OFFER] ignored invalid servo delta=%+d conf=%d%%",
+                   delta_frames, confidence_pct);
+        return 0;
+    }
 
     sync_lock(s);
     if(sync_load_i(&s->mode) == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN) {
@@ -2207,7 +2000,11 @@ int vj_audio_sync_track_align_offer_servo_nudge(vj_audio_sync_shared_t *s,
             sync_track_align_clear_live_candidate_locked(s);
     }
     else {
-}
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[TRACK-ALIGN][SNAP-OFFER] ignored mode=%d servo delta=%+d conf=%d%%",
+                   sync_load_i(&s->mode), delta_frames,
+                   sync_clampi(confidence_pct, 0, 100));
+    }
     sync_unlock(s);
 
     return accepted;
@@ -2228,17 +2025,20 @@ int vj_audio_sync_track_align_consume_snap(vj_audio_sync_shared_t *s,
         return 0;
 
     sync_lock(s);
-    pending = s->track_align_snap_pending;
+    pending = sync_load_i(&s->track_align_snap_pending);
     if(pending) {
-        int d = s->track_align_snap_delta_frames;
-        int c = s->track_align_snap_confidence_pct;
+        int d = sync_load_i(&s->track_align_snap_delta_frames);
+        int c = sync_load_i(&s->track_align_snap_confidence_pct);
         if(delta_frames)
             *delta_frames = d;
         if(confidence_pct)
             *confidence_pct = c;
-        s->track_align_snap_pending = 0;
-        s->track_align_snap_delta_frames = 0;
-        s->track_align_snap_confidence_pct = 0;
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[TRACK-ALIGN][SNAP-CONSUME] pending=1 delta=%+d conf=%d%% seq=%d",
+                   d, c, sync_load_i(&s->track_align_snap_seq));
+        sync_store_i(&s->track_align_snap_pending, 0);
+        sync_store_i(&s->track_align_snap_delta_frames, 0);
+        sync_store_i(&s->track_align_snap_confidence_pct, 0);
         sync_track_align_clear_live_candidate_locked(s);
     }
     sync_unlock(s);
@@ -2276,20 +2076,17 @@ static void sync_track_align_push_block(vj_audio_sync_shared_t *s,
             n = 1;
 
         double sum = 0.0;
-        if(channels == 1) {
-            for(int i = 0; i < n; i++) {
-                const uint8_t *f = data + ((size_t)(done + i) * (size_t)frame_bytes);
-                double m = (double)sync_read_sample(f, sample_bytes) * (1.0 / 32768.0);
-                sum += m * m;
+        for(int i = 0; i < n; i++) {
+            const uint8_t *f = data + ((size_t)(done + i) * (size_t)frame_bytes);
+            int l, r;
+            if(channels == 1) {
+                l = r = sync_read_sample(f, sample_bytes);
+            } else {
+                l = sync_read_sample(f, sample_bytes);
+                r = sync_read_sample(f + sample_bytes, sample_bytes);
             }
-        } else {
-            for(int i = 0; i < n; i++) {
-                const uint8_t *f = data + ((size_t)(done + i) * (size_t)frame_bytes);
-                int l = sync_read_sample(f, sample_bytes);
-                int r = sync_read_sample(f + sample_bytes, sample_bytes);
-                double m = ((double)l + (double)r) * (1.0 / 65536.0);
-                sum += m * m;
-            }
+            double m = ((double)l + (double)r) * (1.0 / 65536.0);
+            sum += m * m;
         }
 
         *accum += sum;
@@ -2297,19 +2094,14 @@ static void sync_track_align_push_block(vj_audio_sync_shared_t *s,
         done += n;
 
         if(*accum_frames >= hop) {
-            double level = sqrtf((float)(*accum / (double)(*accum_frames)));
+            double level = sqrt(*accum / (double)(*accum_frames));
             sync_track_align_append_feature_locked(s, is_target, level, sample_rate);
             *accum = 0.0;
             *accum_frames = 0;
 
-
-
-
-            if(sync_track_align_publish_gate_ready()) {
-                sync_unlock(s);
-                sync_track_align_publish(s);
-                sync_lock(s);
-            }
+            sync_unlock(s);
+            sync_track_align_publish(s);
+            sync_lock(s);
         }
     }
     sync_unlock(s);
@@ -2367,9 +2159,6 @@ static void sync_clear_monitor_transport_locked(vj_audio_sync_shared_t *s)
     if(!s)
         return;
 
-
-
-
     s->monitor_read_pos = 0.0;
     s->monitor_read_valid = 0;
     s->monitor_last_l = 0;
@@ -2379,37 +2168,6 @@ static void sync_clear_monitor_transport_locked(vj_audio_sync_shared_t *s)
     s->monitor_last_debug_ms = 0;
 }
 
-
-static void sync_bridge_clear_stretch_locked(vj_audio_sync_shared_t *s)
-{
-    if(!s)
-        return;
-
-    s->bridge_stretch_segment_start = 0.0;
-    s->bridge_stretch_prev_start = 0.0;
-    s->bridge_stretch_segment_pos = 0;
-    s->bridge_stretch_prev_valid = 0;
-    s->bridge_stretch_segment_len = VJ_AUDIO_SYNC_BRIDGE_STRETCH_SEGMENT_FRAMES;
-    s->bridge_stretch_overlap = VJ_AUDIO_SYNC_BRIDGE_STRETCH_OVERLAP_FRAMES;
-}
-
-static void sync_bridge_clear_locked(vj_audio_sync_shared_t *s, int state)
-{
-    if(!s)
-        return;
-
-    s->bridge_read_pos = 0.0;
-    s->bridge_read_valid = 0;
-    s->bridge_ratio_smooth = 0.0;
-    s->bridge_last_correction = 1.0;
-    s->bridge_latch_updated_ms = 0;
-    s->bridge_source_bpm_latched = 0.0;
-    s->bridge_target_bpm_latched = 0.0;
-    s->bridge_bpm_latch_valid = 0;
-    sync_bridge_clear_stretch_locked(s);
-    sync_store_i(&s->bridge_active, 0);
-    sync_store_i(&s->bridge_state, state);
-}
 static void sync_monitor_hold_last(vj_audio_sync_shared_t *s,
                                    uint8_t *dst,
                                    int dst_frames,
@@ -2451,11 +2209,10 @@ void vj_audio_sync_init(vj_audio_sync_shared_t *s, int input_channels)
     sync_store_i(&s->mode, VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL);
     sync_store_i(&s->source, VJ_AUDIO_SYNC_SOURCE_JACK);
     sync_store_i(&s->target_mode, VJ_AUDIO_SYNC_TARGET_MANUAL);
-    sync_store_i(&s->max_correction_pct, 8);
+    sync_store_i(&s->max_correction_pct, 4);
     s->bridge_source_bpm_latched = 0.0;
     s->bridge_target_bpm_latched = 0.0;
     s->bridge_bpm_latch_valid = 0;
-    sync_bridge_clear_stretch_locked(s);
     sync_track_align_clear_locked(s);
     sync_store_i(&s->initialized, 1);
 }
@@ -2497,10 +2254,10 @@ void vj_audio_sync_free(vj_audio_sync_shared_t *s)
     s->bridge_source_bpm_latched = 0.0;
     s->bridge_target_bpm_latched = 0.0;
     s->bridge_bpm_latch_valid = 0;
-    sync_bridge_clear_stretch_locked(s);
     sync_clear_monitor_transport_locked(s);
     sync_track_align_clear_locked(s);
     sync_unlock(s);
+    sync_wav_side_clear(s);
 }
 
 void vj_audio_sync_request_stop(vj_audio_sync_shared_t *s)
@@ -2540,10 +2297,10 @@ static int sync_prepare_ring_locked(vj_audio_sync_shared_t *s,
 
     if(s->ring &&
        s->ring_frames >= ring_frames &&
-       s->channels == channels &&
-       s->bytes_per_frame == frame_bytes &&
-       s->bits_per_channel == bits &&
-       s->sample_rate == rate)
+       sync_load_i(&s->channels) == channels &&
+       sync_load_i(&s->bytes_per_frame) == frame_bytes &&
+       sync_load_i(&s->bits_per_channel) == bits &&
+       sync_load_i(&s->sample_rate) == rate)
         return 1;
 
     ring = (uint8_t*)vj_malloc(ring_bytes);
@@ -2570,14 +2327,20 @@ static int sync_prepare_ring_locked(vj_audio_sync_shared_t *s,
     s->bridge_bpm_latch_valid = 0;
     sync_store_i(&s->bridge_state, VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_SOURCE);
     sync_clear_monitor_transport_locked(s);
-    sync_bridge_clear_stretch_locked(s);
+    s->bridge_ratio_smooth = 1.0;
+    s->bridge_last_correction = 1.0;
+    s->bridge_latch_updated_ms = 0;
+    s->bridge_source_bpm_latched = 0.0;
+    s->bridge_target_bpm_latched = 0.0;
+    s->bridge_bpm_latch_valid = 0;
+    sync_store_i(&s->bridge_state, VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_SOURCE);
 
     sync_track_align_clear_locked(s);
 
-    s->channels = channels;
-    s->bytes_per_frame = frame_bytes;
-    s->bits_per_channel = bits;
-    s->sample_rate = rate;
+    sync_store_i(&s->channels, channels);
+    sync_store_i(&s->bytes_per_frame, frame_bytes);
+    sync_store_i(&s->bits_per_channel, bits);
+    sync_store_i(&s->sample_rate, rate);
 
     s->record_channels = channels;
     s->record_bytes_per_frame = frame_bytes;
@@ -2616,13 +2379,11 @@ static void sync_publish_audio(vj_audio_sync_shared_t *s,
     if(!sync_prepare_ring(s, channels, bits, rate))
         return;
 
-    sync_lock(s);
-
-    frame_bytes = s->bytes_per_frame;
-    if(frame_bytes <= 0) {
-        sync_unlock(s);
+    frame_bytes = sync_load_i(&s->bytes_per_frame);
+    if(frame_bytes <= 0)
         return;
-    }
+
+    sync_lock(s);
 
     if(frames > s->ring_frames) {
         src += (size_t)(frames - s->ring_frames) * (size_t)frame_bytes;
@@ -2708,9 +2469,6 @@ static int sync_prepare_target_ring_locked(vj_audio_sync_shared_t *s,
     s->target_sample_rate = rate;
     sync_store_l(&s->target_queue_overruns, 0);
     sync_store_l(&s->target_queue_reads, 0);
-    sync_store_l(&s->target_queue_lock_drops, 0);
-    sync_store_l(&s->target_queue_overflow_events, 0);
-    sync_store_l(&s->target_queue_dropped_frames, 0);
     return 1;
 }
 
@@ -2739,8 +2497,18 @@ static int sync_enqueue_target_audio(vj_audio_sync_shared_t *s,
         return 0;
 
     if(!sync_try_lock_for_us(s, 50)) {
-        sync_add_l(&s->target_queue_overruns, 1);
-        sync_add_l(&s->target_queue_lock_drops, 1);
+        long drops = sync_add_l(&s->target_queue_overruns, 1);
+        static long dbg_last_target_enqueue_drop_ms = 0;
+        long now_dbg_ms = sync_now_ms();
+        if(dbg_last_target_enqueue_drop_ms == 0 ||
+           (now_dbg_ms - dbg_last_target_enqueue_drop_ms) >= 1000 ||
+           drops <= 8 || (drops % 16) == 0)
+        {
+            veejay_msg(VEEJAY_MSG_DEBUG,
+                       "[TRACK-ALIGN][TARGET-Q] enqueue drop reason=lock-contention frames=%d fmt=%dch/%dbit/%dHz drops=%ld wait_us=50",
+                       frames, channels, bits, sample_rate, drops);
+            dbg_last_target_enqueue_drop_ms = now_dbg_ms;
+        }
         return 0;
     }
 
@@ -2755,12 +2523,9 @@ static int sync_enqueue_target_audio(vj_audio_sync_shared_t *s,
     }
 
     if(frames > s->target_ring_frames) {
-        int drop = frames - s->target_ring_frames;
-        src += (size_t)drop * (size_t)frame_bytes;
+        src += (size_t)(frames - s->target_ring_frames) * (size_t)frame_bytes;
         frames = s->target_ring_frames;
         sync_add_l(&s->target_queue_overruns, 1);
-        sync_add_l(&s->target_queue_overflow_events, 1);
-        sync_add_l(&s->target_queue_dropped_frames, drop);
     }
 
     remaining = frames;
@@ -2787,21 +2552,19 @@ static int sync_enqueue_target_audio(vj_audio_sync_shared_t *s,
        (long long)s->target_ring_frames)
     {
         long long old_read = s->target_read_frame_abs;
-        long long drop_frames;
-
         s->target_read_frame_abs =
             s->target_write_frame_abs - (long long)s->target_ring_frames;
         if(s->target_process_frame_abs < s->target_read_frame_abs)
             s->target_process_frame_abs = s->target_read_frame_abs;
-
-        drop_frames = s->target_read_frame_abs - old_read;
-        if(drop_frames < 0)
-            drop_frames = 0;
-
         sync_add_l(&s->target_queue_overruns, 1);
-        sync_add_l(&s->target_queue_overflow_events, 1);
-        if(drop_frames > 0)
-            sync_add_l(&s->target_queue_dropped_frames, (long)drop_frames);
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[TRACK-ALIGN][TARGET-Q] overflow drop=%lldfr write=%lld read:%lld->%lld process=%lld ring=%dfr",
+                   s->target_read_frame_abs - old_read,
+                   s->target_write_frame_abs,
+                   old_read,
+                   s->target_read_frame_abs,
+                   s->target_process_frame_abs,
+                   s->target_ring_frames);
     }
 
     sync_unlock(s);
@@ -2838,28 +2601,14 @@ static int sync_dequeue_target_audio(vj_audio_sync_shared_t *s,
         return 0;
     }
 
-
-
-
     retained_avail = s->target_write_frame_abs - s->target_read_frame_abs;
     if(retained_avail > (long long)s->target_ring_frames) {
-        long long old_read = s->target_read_frame_abs;
-        long long drop_frames;
-
         s->target_read_frame_abs =
             s->target_write_frame_abs - (long long)s->target_ring_frames;
         if(s->target_process_frame_abs < s->target_read_frame_abs)
             s->target_process_frame_abs = s->target_read_frame_abs;
         retained_avail = s->target_write_frame_abs - s->target_read_frame_abs;
-
-        drop_frames = s->target_read_frame_abs - old_read;
-        if(drop_frames < 0)
-            drop_frames = 0;
-
         sync_add_l(&s->target_queue_overruns, 1);
-        sync_add_l(&s->target_queue_overflow_events, 1);
-        if(drop_frames > 0)
-            sync_add_l(&s->target_queue_dropped_frames, (long)drop_frames);
     }
 
     if(s->target_process_frame_abs < s->target_read_frame_abs)
@@ -2913,6 +2662,45 @@ static int sync_dequeue_target_audio(vj_audio_sync_shared_t *s,
     *frame_bytes = s->target_bytes_per_frame;
     sync_add_l(&s->target_queue_reads, 1);
 
+    {
+        static long dbg_last_target_q_ms = 0;
+        static long dbg_last_target_q_drops = -1;
+        long now_dbg_ms = sync_now_ms();
+        long long after_new_avail = s->target_write_frame_abs - s->target_process_frame_abs;
+        long long before_new_avail = after_new_avail + frames;
+        long long retained_after = s->target_write_frame_abs - s->target_read_frame_abs;
+        long reads_dbg = sync_load_l(&s->target_queue_reads);
+        long drops_dbg = sync_load_l(&s->target_queue_overruns);
+        int before_ms = 0;
+        int retained_ms = 0;
+        if(s->target_sample_rate > 0) {
+            before_ms = (int)((before_new_avail * 1000LL) / (long long)s->target_sample_rate);
+            retained_ms = (int)((retained_after * 1000LL) / (long long)s->target_sample_rate);
+        }
+        if(dbg_last_target_q_ms == 0 ||
+           (now_dbg_ms - dbg_last_target_q_ms) >= 1000 ||
+           retained_ms < VJ_AUDIO_SYNC_TARGET_MIN_HISTORY_MS ||
+           retained_ms > VJ_AUDIO_SYNC_TARGET_WANTED_HISTORY_MS ||
+           drops_dbg != dbg_last_target_q_drops)
+        {
+            veejay_msg(VEEJAY_MSG_DEBUG,
+                       "[TRACK-ALIGN][TARGET-Q] processed=%d new_before=%lldfr/%dms new_after=%lldfr retained=%lldfr/%dms ring=%dfr reads=%ld drops=%ld fmt=%dch/%dbit/%dHz",
+                       frames,
+                       before_new_avail,
+                       before_ms,
+                       after_new_avail,
+                       retained_after,
+                       retained_ms,
+                       s->target_ring_frames,
+                       reads_dbg,
+                       drops_dbg,
+                       s->target_channels,
+                       s->target_bits_per_channel,
+                       s->target_sample_rate);
+            dbg_last_target_q_ms = now_dbg_ms;
+            dbg_last_target_q_drops = drops_dbg;
+        }
+    }
 
     sync_unlock(s);
     return frames;
@@ -2940,23 +2728,22 @@ static void sync_update_clock_from_block(vj_audio_sync_shared_t *s,
     if(!s || !data || frames <= 0 || frame_bytes <= 0 || channels <= 0)
         return;
 
-    if(channels == 1) {
-        for(int i = 0; i < frames; i++) {
-            const uint8_t *f = data + ((size_t)i * (size_t)frame_bytes);
-            double m = (double)sync_read_sample(f, sample_bytes) * (1.0 / 32768.0);
-            sum += m * m;
+    for(int i = 0; i < frames; i++) {
+        const uint8_t *f = data + ((size_t)i * (size_t)frame_bytes);
+        int l, r;
+        if(channels == 1) {
+            l = r = sync_read_sample(f, sample_bytes);
+        } else {
+            l = sync_read_sample(f, sample_bytes);
+            r = sync_read_sample(f + sample_bytes, sample_bytes);
         }
-    } else {
-        for(int i = 0; i < frames; i++) {
-            const uint8_t *f = data + ((size_t)i * (size_t)frame_bytes);
-            int l = sync_read_sample(f, sample_bytes);
-            int r = sync_read_sample(f + sample_bytes, sample_bytes);
+        {
             double m = ((double)l + (double)r) * (1.0 / 65536.0);
             sum += m * m;
         }
     }
 
-    level = sqrtf((float)(sum / (double)frames));
+    level = sqrt(sum / (double)frames);
     s->envelope = (level > s->envelope) ? (0.65 * s->envelope + 0.35 * level)
                                         : (0.94 * s->envelope + 0.06 * level);
 
@@ -3043,23 +2830,22 @@ static void sync_update_target_clock_from_block(vj_audio_sync_shared_t *s,
     if(!s || !data || frames <= 0 || frame_bytes <= 0 || channels <= 0)
         return;
 
-    if(channels == 1) {
-        for(int i = 0; i < frames; i++) {
-            const uint8_t *f = data + ((size_t)i * (size_t)frame_bytes);
-            double m = (double)sync_read_sample(f, sample_bytes) * (1.0 / 32768.0);
-            sum += m * m;
+    for(int i = 0; i < frames; i++) {
+        const uint8_t *f = data + ((size_t)i * (size_t)frame_bytes);
+        int l, r;
+        if(channels == 1) {
+            l = r = sync_read_sample(f, sample_bytes);
+        } else {
+            l = sync_read_sample(f, sample_bytes);
+            r = sync_read_sample(f + sample_bytes, sample_bytes);
         }
-    } else {
-        for(int i = 0; i < frames; i++) {
-            const uint8_t *f = data + ((size_t)i * (size_t)frame_bytes);
-            int l = sync_read_sample(f, sample_bytes);
-            int r = sync_read_sample(f + sample_bytes, sample_bytes);
+        {
             double m = ((double)l + (double)r) * (1.0 / 65536.0);
             sum += m * m;
         }
     }
 
-    level = sqrtf((float)(sum / (double)frames));
+    level = sqrt(sum / (double)frames);
 
     s->target_envelope = (level > s->target_envelope)
         ? (0.80 * s->target_envelope + 0.20 * level)
@@ -3078,10 +2864,15 @@ static void sync_update_target_clock_from_block(vj_audio_sync_shared_t *s,
 
     last_hit = s->target_last_hit_ms;
 
+    double min_level = 0.020;
+    double min_transient = 0.32;
 
+    if(sync_load_i(&s->mode) == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW) {
+        min_level = 0.008;
+        min_transient = 0.16;
+    }
 
-
-    if(level > 0.020 && transient > 0.32) {
+    if(level > min_level && transient > min_transient) {
         long interval = last_hit > 0 ? now - last_hit : 0;
         int accept = 0;
 
@@ -3101,7 +2892,6 @@ static void sync_update_target_clock_from_block(vj_audio_sync_shared_t *s,
                     s->target_beat_period_ms = candidate;
                 } else {
                     double ratio = candidate / s->target_beat_period_ms;
-
 
                     if(ratio < 0.58)
                         candidate *= 2.0;
@@ -3137,7 +2927,7 @@ static void sync_update_target_clock_from_block(vj_audio_sync_shared_t *s,
         sync_store_i(&s->target_phase_q15, sync_q15(phase));
 
         confidence = sync_from_q15(sync_load_i(&s->target_confidence_q15));
-        confidence += (transient > 0.28) ? 0.006 : 0.0005;
+        confidence += (transient > (min_transient * 0.875)) ? 0.006 : 0.0005;
         confidence *= 0.9985;
         sync_store_i(&s->target_confidence_q15, sync_q15(confidence));
     } else {
@@ -3186,10 +2976,7 @@ static int sync_configure_jack(vj_audio_sync_shared_t *s)
     else if(!vj_jack_has_input()) {
         long now = sync_now_ms();
 
-        if(vj_jack_init_capture(req_ch, 16, 0)) {
-            vj_jack_enable();
-        }
-        else if(!vj_jack_has_output()) {
+        if(!vj_jack_has_output()) {
             vj_jack_stop();
             vj_jack_initialize();
             if(!vj_jack_init_capture(req_ch, 16, 0)) {
@@ -3207,7 +2994,7 @@ static int sync_configure_jack(vj_audio_sync_shared_t *s)
             if(last_fail_ms == 0 || (now - last_fail_ms) >= 2000) {
                 last_fail_ms = now;
                 veejay_msg(VEEJAY_MSG_WARNING,
-                           "[AUDIO-SYNC] JACK playback client has no capture ports and adding capture ports failed");
+                           "[AUDIO-SYNC] JACK is open for playback but has no capture ports; start JACK in duplex/capture mode");
             }
             sync_store_i(&s->open, 0);
             return 0;
@@ -3255,12 +3042,6 @@ typedef struct
     long data_start;
     long data_bytes;
     long data_pos;
-
-
-
-
-    long limit_bytes;
-    long virtual_pos;
 } sync_wav_t;
 
 static uint32_t wav_u32le(const uint8_t b[4])
@@ -3281,6 +3062,7 @@ static void sync_wav_close(sync_wav_t *w)
         w->fp = NULL;
     }
 }
+
 static int sync_wav_open(sync_wav_t *w, const char *path)
 {
     uint8_t hdr[12];
@@ -3290,145 +3072,183 @@ static int sync_wav_open(sync_wav_t *w, const char *path)
     uint16_t channels = 0;
     uint16_t bits = 0;
     uint32_t sample_rate = 0;
-    char why[192];
 
-    why[0] = '\0';
-
-#define WAV_FAIL(...) do {                                      \
-        snprintf(why, sizeof(why), __VA_ARGS__);                \
-        goto fail;                                              \
-    } while(0)
-
-    if(!w)
+    if(!w || !path || !path[0])
         return 0;
 
-    if(!path || !path[0])
-        WAV_FAIL("empty path");
-
     memset(w, 0, sizeof(*w));
-
     w->fp = fopen(path, "rb");
     if(!w->fp)
-        WAV_FAIL("fopen failed: %s", strerror(errno));
+        return 0;
 
     if(fread(hdr, 1, sizeof(hdr), w->fp) != sizeof(hdr))
-        WAV_FAIL("short RIFF/WAVE header");
+        goto fail;
 
     if(memcmp(hdr, "RIFF", 4) != 0 || memcmp(hdr + 8, "WAVE", 4) != 0)
-        WAV_FAIL("not a RIFF/WAVE file");
+        goto fail;
 
     while(!got_data) {
         uint8_t chdr[8];
         uint32_t sz;
-        long here;
         long next;
 
         if(fread(chdr, 1, sizeof(chdr), w->fp) != sizeof(chdr))
             break;
 
         sz = wav_u32le(chdr + 4);
-        here = ftell(w->fp);
-        if(here < 0)
-            WAV_FAIL("ftell failed while reading chunk header");
-
-        next = here + (long)sz + (long)(sz & 1U);
+        next = ftell(w->fp) + (long)sz + (long)(sz & 1U);
 
         if(memcmp(chdr, "fmt ", 4) == 0) {
             uint8_t fmt[40];
             size_t n = sz < sizeof(fmt) ? sz : sizeof(fmt);
-
-            if(n < 16)
-                WAV_FAIL("fmt chunk too small: %u bytes", (unsigned)sz);
-
             if(fread(fmt, 1, n, w->fp) != n)
-                WAV_FAIL("short fmt chunk");
-
-            audio_format = wav_u16le(fmt + 0);
-            channels = wav_u16le(fmt + 2);
-            sample_rate = wav_u32le(fmt + 4);
-            bits = wav_u16le(fmt + 14);
-            got_fmt = 1;
+                goto fail;
+            if(n >= 16) {
+                audio_format = wav_u16le(fmt + 0);
+                channels = wav_u16le(fmt + 2);
+                sample_rate = wav_u32le(fmt + 4);
+                bits = wav_u16le(fmt + 14);
+                got_fmt = 1;
+            }
         }
         else if(memcmp(chdr, "data", 4) == 0) {
             if(!got_fmt)
-                WAV_FAIL("data chunk appeared before fmt chunk");
-
+                goto fail;
             w->data_start = ftell(w->fp);
-            if(w->data_start < 0)
-                WAV_FAIL("ftell failed at data chunk");
-
             w->data_bytes = (long)sz;
             w->data_pos = 0;
             got_data = 1;
         }
 
         if(fseek(w->fp, next, SEEK_SET) != 0)
-            WAV_FAIL("failed to seek to next WAV chunk");
+            break;
     }
 
-    if(!got_fmt)
-        WAV_FAIL("missing fmt chunk");
-
-    if(!got_data)
-        WAV_FAIL("missing data chunk");
-
-    if(audio_format != 1)
-        WAV_FAIL("unsupported WAV format=%u, only PCM format=1 is supported",
-                 (unsigned)audio_format);
-
-    if(channels < 1 || channels > 2)
-        WAV_FAIL("unsupported channel count=%u, expected mono/stereo",
-                 (unsigned)channels);
-
-    if(bits != 16) {
-
-
-
-        WAV_FAIL("unsupported bit depth=%u, expected 16-bit PCM",
-                 (unsigned)bits);
-    }
-
-    if(sample_rate == 0)
-        WAV_FAIL("invalid sample rate=0");
+    if(!got_fmt || !got_data)
+        goto fail;
+    if(audio_format != 1 || (channels < 1 || channels > 2) ||
+       (bits != 8 && bits != 16) || sample_rate == 0)
+        goto fail;
 
     w->channels = channels;
     w->bits = bits;
     w->sample_rate = (int)sample_rate;
     w->frame_bytes = (bits / 8) * channels;
-    w->limit_bytes = 0;
-    w->virtual_pos = 0;
-
-    if(w->frame_bytes <= 0)
-        WAV_FAIL("invalid frame size");
-
-    if(fseek(w->fp, w->data_start, SEEK_SET) != 0)
-        WAV_FAIL("failed to seek to WAV data start");
-
-    veejay_msg(VEEJAY_MSG_INFO,
-               "[AUDIO-SYNC][WAV] validated '%s': %dch %dHz %dbit data=%ld bytes frame_bytes=%d",
-               path,
-               w->channels,
-               w->sample_rate,
-               w->bits,
-               w->data_bytes,
-               w->frame_bytes);
-
-#undef WAV_FAIL
+    fseek(w->fp, w->data_start, SEEK_SET);
     return 1;
 
 fail:
-    veejay_msg(VEEJAY_MSG_WARNING,
-               "[AUDIO-SYNC][WAV] rejected '%s': %s",
-               path ? path : "(null)",
-               why[0] ? why : "unknown error");
     sync_wav_close(w);
-#undef WAV_FAIL
     return 0;
 }
+
+
+#ifndef VJ_AUDIO_SYNC_WAV_SIDE_SLOTS
+#define VJ_AUDIO_SYNC_WAV_SIDE_SLOTS 8
+#endif
+
+typedef struct {
+    vj_audio_sync_shared_t *owner;
+    int wav_limit_ms;
+    int plain_lock_valid;
+    int plain_lock_delta_frames;
+    int plain_lock_confidence_pct;
+} sync_wav_side_t;
+
+static sync_wav_side_t sync_wav_side_[VJ_AUDIO_SYNC_WAV_SIDE_SLOTS];
+static volatile int sync_wav_side_lock_ = 0;
+
+static void sync_wav_side_lock(void)
+{
+    while(__sync_lock_test_and_set(&sync_wav_side_lock_, 1))
+        sync_sleep_us(50);
+}
+
+static void sync_wav_side_unlock(void)
+{
+    __sync_lock_release(&sync_wav_side_lock_);
+}
+
+static sync_wav_side_t *sync_wav_side_get_locked(vj_audio_sync_shared_t *s, int create)
+{
+    int i;
+    int free_slot = -1;
+
+    if(!s)
+        return NULL;
+
+    for(i = 0; i < VJ_AUDIO_SYNC_WAV_SIDE_SLOTS; i++) {
+        if(sync_wav_side_[i].owner == s)
+            return &sync_wav_side_[i];
+        if(!sync_wav_side_[i].owner && free_slot < 0)
+            free_slot = i;
+    }
+
+    if(create && free_slot >= 0) {
+        memset(&sync_wav_side_[free_slot], 0, sizeof(sync_wav_side_[free_slot]));
+        sync_wav_side_[free_slot].owner = s;
+        return &sync_wav_side_[free_slot];
+    }
+
+    return NULL;
+}
+
+static void sync_wav_side_clear(vj_audio_sync_shared_t *s)
+{
+    sync_wav_side_t *side;
+
+    sync_wav_side_lock();
+    side = sync_wav_side_get_locked(s, 0);
+    if(side)
+        memset(side, 0, sizeof(*side));
+    sync_wav_side_unlock();
+}
+
+static void sync_wav_side_set_limit(vj_audio_sync_shared_t *s, int limit_ms)
+{
+    sync_wav_side_t *side;
+
+    if(limit_ms < 0)
+        limit_ms = 0;
+
+    sync_wav_side_lock();
+    side = sync_wav_side_get_locked(s, 1);
+    if(side)
+        side->wav_limit_ms = limit_ms;
+    sync_wav_side_unlock();
+}
+
+static int sync_wav_side_get_limit(vj_audio_sync_shared_t *s)
+{
+    sync_wav_side_t *side;
+    int limit_ms = 0;
+
+    sync_wav_side_lock();
+    side = sync_wav_side_get_locked(s, 0);
+    if(side)
+        limit_ms = side->wav_limit_ms;
+    sync_wav_side_unlock();
+
+    return limit_ms;
+}
+
+static void sync_wav_plain_lock_clear(vj_audio_sync_shared_t *s)
+{
+    sync_wav_side_t *side;
+
+    sync_wav_side_lock();
+    side = sync_wav_side_get_locked(s, 0);
+    if(side) {
+        side->plain_lock_valid = 0;
+        side->plain_lock_delta_frames = 0;
+        side->plain_lock_confidence_pct = 0;
+    }
+    sync_wav_side_unlock();
+}
+
 static int sync_wav_read(sync_wav_t *w, uint8_t *dst, int max_bytes, int loop)
 {
     int done = 0;
-    long logical_bytes;
 
     if(!w || !w->fp || !dst || max_bytes <= 0 || w->frame_bytes <= 0)
         return 0;
@@ -3437,54 +3257,17 @@ static int sync_wav_read(sync_wav_t *w, uint8_t *dst, int max_bytes, int loop)
     if(max_bytes <= 0)
         return 0;
 
-    logical_bytes = (w->limit_bytes > 0) ? w->limit_bytes : w->data_bytes;
-    logical_bytes -= logical_bytes % w->frame_bytes;
-
-    if(logical_bytes <= 0)
-        return 0;
-
     while(done < max_bytes) {
-        long left;
+        long left = w->data_bytes - w->data_pos;
         int want;
         int got;
 
-        if(!loop && w->virtual_pos >= logical_bytes) {
-
-
-
-            memset(dst + done, 0, (size_t)(max_bytes - done));
-            done = max_bytes;
-            break;
-        }
-
-        if(loop && w->data_pos >= w->data_bytes) {
-            w->data_pos = 0;
-            w->virtual_pos = 0;
-            if(fseek(w->fp, w->data_start, SEEK_SET) != 0)
-                break;
-        }
-
-        left = w->data_bytes - w->data_pos;
-        if(!loop) {
-            long logical_left = logical_bytes - w->virtual_pos;
-            if(logical_left < left)
-                left = logical_left;
-        }
-
         if(left <= 0) {
-            if(loop) {
-                w->data_pos = 0;
-                w->virtual_pos = 0;
-                if(fseek(w->fp, w->data_start, SEEK_SET) != 0)
-                    break;
-                continue;
-            }
-
-
-            memset(dst + done, 0, (size_t)(max_bytes - done));
-            w->virtual_pos += (long)(max_bytes - done);
-            done = max_bytes;
-            break;
+            if(!loop)
+                break;
+            w->data_pos = 0;
+            fseek(w->fp, w->data_start, SEEK_SET);
+            left = w->data_bytes;
         }
 
         want = max_bytes - done;
@@ -3495,21 +3278,12 @@ static int sync_wav_read(sync_wav_t *w, uint8_t *dst, int max_bytes, int loop)
             break;
 
         got = (int)fread(dst + done, 1, (size_t)want, w->fp);
-        if(got <= 0) {
-            if(loop)
-                break;
-
-            memset(dst + done, 0, (size_t)want);
-            got = want;
-        }
-
-        got -= got % w->frame_bytes;
         if(got <= 0)
             break;
+        got -= got % w->frame_bytes;
 
         done += got;
         w->data_pos += got;
-        w->virtual_pos += got;
     }
 
     return done;
@@ -3550,17 +3324,13 @@ static int sync_read_cursor_audio(vj_audio_sync_shared_t *s,
 
     if(!s || !dst || !cursor_ptr || max_bytes <= 0)
         return 0;
-    {
-        int enabled = sync_load_i(&s->enabled);
-        int open = sync_load_i(&s->open);
-        if(!enabled || !open)
-            return 0;
-    }
+    if(!sync_load_i(&s->enabled) || !sync_load_i(&s->open))
+        return 0;
 
     if(!sync_try_lock(s))
         return 0;
 
-    frame_bytes = s->bytes_per_frame;
+    frame_bytes = sync_load_i(&s->bytes_per_frame);
     if(!s->ring || s->ring_frames <= 0 || frame_bytes <= 0) {
         sync_unlock(s);
         return 0;
@@ -3577,9 +3347,6 @@ static int sync_read_cursor_audio(vj_audio_sync_shared_t *s,
         oldest = 0;
 
     cursor = *cursor_ptr;
-
-
-
 
     if(cursor <= 0 || cursor < oldest) {
         long long live_start = s->write_frame_abs - (long long)(max_frames * 2);
@@ -3661,12 +3428,8 @@ int vj_audio_sync_copy_record_audio(vj_audio_sync_shared_t *s,
     if(!s || !dst || dst_frames <= 0 || dst_frame_bytes <= 0 ||
        dst_channels <= 0 || dst_channels > 2 || dst_sample_rate <= 0)
         return 0;
-    {
-        int enabled = sync_load_i(&s->enabled);
-        int open = sync_load_i(&s->open);
-        if(!enabled || !open)
-            return 0;
-    }
+    if(!sync_load_i(&s->enabled) || !sync_load_i(&s->open))
+        return 0;
 
     if(!sync_try_lock(s))
         return 0;
@@ -3836,80 +3599,8 @@ static double sync_fold_bpm_near(double bpm, double ref)
     return bpm;
 }
 
-static double sync_fold_bpm_octave_near(double bpm, double ref)
-{
-    if(bpm <= 0.0 || ref <= 0.0)
-        return bpm;
 
-    while(bpm < ref * 0.64 && bpm * 2.0 <= VJ_AUDIO_SYNC_MAX_BPM)
-        bpm *= 2.0;
-    while(bpm > ref * 1.56 && bpm * 0.5 >= VJ_AUDIO_SYNC_MIN_BPM)
-        bpm *= 0.5;
-
-    return bpm;
-}
-
-static double sync_bpm_ratio_distance(double a, double b)
-{
-    double r;
-
-    if(a <= 0.0 || b <= 0.0)
-        return 999.0;
-
-    r = a / b;
-    if(r < 1.0)
-        r = 1.0 / r;
-
-    return r;
-}
-
-static void sync_bridge_normalize_tempo_pair(double *source_bpm,
-                                             double *target_bpm,
-                                             int target_mode)
-{
-    double source;
-    double target;
-    double folded_source;
-    double old_dist;
-    double new_dist;
-    double ratio;
-
-    if(!source_bpm || !target_bpm)
-        return;
-
-    source = *source_bpm;
-    target = *target_bpm;
-
-    if(source <= 0.0 || target <= 0.0)
-        return;
-
-    ratio = target / source;
-    if(ratio > 0.64 && ratio < 1.56)
-        return;
-
-    folded_source = sync_fold_bpm_octave_near(source, target);
-    old_dist = sync_bpm_ratio_distance(target, source);
-    new_dist = sync_bpm_ratio_distance(target, folded_source);
-
-    if(new_dist < old_dist)
-        source = folded_source;
-
-    if(target_mode != VJ_AUDIO_SYNC_TARGET_MANUAL) {
-        double folded_target = sync_fold_bpm_octave_near(target, source);
-        double target_dist = sync_bpm_ratio_distance(folded_target, source);
-
-        if(target_dist + 0.025 < sync_bpm_ratio_distance(target, source))
-            target = folded_target;
-    }
-
-    *source_bpm = source;
-    *target_bpm = target;
-}
-
-
-static double sync_bridge_update_controller_locked(vj_audio_sync_shared_t *s,
-                                                   long now_ms,
-                                                   int *state_out)
+static void sync_tempo_follow_publish(vj_audio_sync_shared_t *s)
 {
     int source_bpm_q8;
     int target_bpm_q8;
@@ -3921,19 +3612,29 @@ static double sync_bridge_update_controller_locked(vj_audio_sync_shared_t *s,
     double target_bpm;
     double source_confidence;
     double target_confidence;
-    double tempo_ratio = 1.0;
-    double controller_correction = 1.0;
     double max_corr;
     double live_pull;
     double stale_pull_scale = 1.0;
-    double correction_alpha;
+    double desired_ratio = 1.0;
+    double ratio;
+    long now_ms;
     long latch_age_ms = 0;
 
-    if(state_out)
-        *state_out = VJ_AUDIO_SYNC_BRIDGE_STATE_IDLE;
-
     if(!s)
-        return 1.0;
+        return;
+
+    if(!sync_load_i(&s->enabled) ||
+       sync_load_i(&s->mode) != VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW)
+        return;
+
+    now_ms = sync_now_ms();
+
+    sync_lock(s);
+    if(!sync_load_i(&s->enabled) ||
+       sync_load_i(&s->mode) != VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW) {
+        sync_unlock(s);
+        return;
+    }
 
     max_corr = (double)sync_load_i(&s->max_correction_pct) / 100.0;
     if(max_corr < 0.0) max_corr = 0.0;
@@ -3963,11 +3664,9 @@ static double sync_bridge_update_controller_locked(vj_audio_sync_shared_t *s,
 
     if(have_source_clock && have_target_clock) {
         const double src_alpha =
-            (target_mode == VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP) ? 0.006 : 0.012;
+            (target_mode == VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP) ? 0.010 : 0.020;
         const double dst_alpha =
-            (target_mode == VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP) ? 0.004 : 0.035;
-
-        sync_bridge_normalize_tempo_pair(&source_bpm, &target_bpm, target_mode);
+            (target_mode == VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP) ? 0.008 : 0.030;
 
         if(!s->bridge_bpm_latch_valid ||
            s->bridge_source_bpm_latched <= 0.0 ||
@@ -4024,7 +3723,231 @@ static double sync_bridge_update_controller_locked(vj_audio_sync_shared_t *s,
             s->bridge_source_bpm_latched = 0.0;
             s->bridge_target_bpm_latched = 0.0;
             s->bridge_bpm_latch_valid = 0;
-            sync_bridge_clear_stretch_locked(s);
+            s->bridge_latch_updated_ms = 0;
+            source_bpm = 0.0;
+            target_bpm = 0.0;
+            bridge_state = VJ_AUDIO_SYNC_BRIDGE_STATE_FALLBACK;
+        }
+    }
+    else
+    {
+        source_bpm = 0.0;
+        target_bpm = 0.0;
+        bridge_state = have_source_clock ?
+            VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_TARGET :
+            VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_SOURCE;
+    }
+
+    live_pull = max_corr;
+    if(live_pull <= 0.0001)
+        live_pull = 0.0;
+    live_pull *= stale_pull_scale;
+
+    if(live_pull > 0.0 && source_bpm > 0.0 && target_bpm > 0.0) {
+        desired_ratio = target_bpm / source_bpm;
+        desired_ratio = sync_clampd(desired_ratio,
+                                    1.0 - live_pull,
+                                    1.0 + live_pull);
+    }
+
+    if(desired_ratio < 0.25) desired_ratio = 0.25;
+    if(desired_ratio > 4.0) desired_ratio = 4.0;
+
+    if(s->bridge_ratio_smooth <= 0.0)
+        ratio = desired_ratio;
+    else {
+        const double ratio_alpha =
+            (target_mode == VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP) ? 0.012 : 0.025;
+        ratio = s->bridge_ratio_smooth + ratio_alpha * (desired_ratio - s->bridge_ratio_smooth);
+    }
+
+    if(ratio < 0.25) ratio = 0.25;
+    if(ratio > 4.0) ratio = 4.0;
+
+    s->bridge_ratio_smooth = ratio;
+    s->bridge_last_correction = ratio;
+    sync_store_i(&s->bridge_active,
+                 (bridge_state == VJ_AUDIO_SYNC_BRIDGE_STATE_LOCKED ||
+                  bridge_state == VJ_AUDIO_SYNC_BRIDGE_STATE_HOLD) ? 1 : 0);
+    sync_store_i(&s->bridge_state, bridge_state);
+    sync_unlock(s);
+}
+
+
+int vj_audio_sync_render_bridge_s16(vj_audio_sync_shared_t *s,
+                                    uint8_t *dst,
+                                    int dst_frames,
+                                    int dst_frame_bytes,
+                                    int dst_channels,
+                                    int dst_sample_rate)
+{
+    int src_rate;
+    int src_channels;
+    int src_frame_bytes;
+    int src_sample_bytes;
+    int dst_sample_bytes;
+    int source_bpm_q8;
+    int target_bpm_q8;
+    int target_mode;
+    int have_source_clock;
+    int have_target_clock;
+    int bridge_state = VJ_AUDIO_SYNC_BRIDGE_STATE_IDLE;
+    double source_bpm;
+    double target_bpm;
+    double source_confidence;
+    double target_confidence;
+    double rate_ratio;
+    double desired_ratio;
+    double tempo_ratio = 1.0;
+    double ratio;
+    double max_corr;
+    double live_pull;
+    double stale_pull_scale = 1.0;
+    double pull_amount;
+    double read_pos;
+    long now_ms;
+    long latch_age_ms = 0;
+    long long oldest;
+    long long newest;
+    long long latency_frames;
+    long long guard_frames;
+    long long latency_ms;
+    long long target_read;
+
+    if(!s || !dst || dst_frames <= 0 || dst_frame_bytes <= 0 ||
+       dst_channels <= 0 || dst_channels > 2 || dst_sample_rate <= 0)
+        return 0;
+
+    if(!sync_load_i(&s->enabled) ||
+       !sync_load_i(&s->open) ||
+       sync_load_i(&s->mode) != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE)
+        return 0;
+
+    if(!sync_try_lock(s))
+        return 0;
+
+    if(!s->ring || s->ring_frames <= 8 || s->channels <= 0 ||
+       s->bytes_per_frame <= 0 || s->sample_rate <= 0) {
+        sync_store_i(&s->bridge_active, 0);
+        sync_store_i(&s->bridge_state, VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_SOURCE);
+        sync_unlock(s);
+        return 0;
+    }
+
+    src_rate = s->sample_rate;
+    src_channels = s->channels;
+    src_frame_bytes = s->bytes_per_frame;
+    src_sample_bytes = src_frame_bytes / src_channels;
+    dst_sample_bytes = dst_frame_bytes / dst_channels;
+
+    if(src_sample_bytes != 2 || dst_sample_bytes != 2) {
+        sync_store_i(&s->bridge_active, 0);
+        sync_store_i(&s->bridge_state, VJ_AUDIO_SYNC_BRIDGE_STATE_FALLBACK);
+        sync_unlock(s);
+        return 0;
+    }
+
+    oldest = s->write_frame_abs - (long long)s->ring_frames;
+    if(oldest < 0)
+        oldest = 0;
+    newest = s->write_frame_abs - 2;
+    if(newest <= oldest + 4) {
+        sync_add_l(&s->underruns, 1);
+        sync_store_i(&s->bridge_active, 0);
+        sync_store_i(&s->bridge_state, VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_SOURCE);
+        sync_unlock(s);
+        return 0;
+    }
+
+    now_ms = sync_now_ms();
+
+    max_corr = (double)sync_load_i(&s->max_correction_pct) / 100.0;
+    if(max_corr < 0.0) max_corr = 0.0;
+    if(max_corr > 0.25) max_corr = 0.25;
+
+    source_bpm_q8 = sync_load_i(&s->source_bpm_q8);
+    target_bpm_q8 = sync_load_i(&s->target_bpm_q8);
+    target_mode = sync_load_i(&s->target_mode);
+    source_confidence = sync_from_q15(sync_load_i(&s->confidence_q15));
+    target_confidence = sync_from_q15(sync_load_i(&s->target_confidence_q15));
+    source_bpm = sync_bpm_from_q8(source_bpm_q8);
+    target_bpm = sync_bpm_from_q8(target_bpm_q8);
+
+    if(source_bpm < VJ_AUDIO_SYNC_MIN_BPM || source_bpm > VJ_AUDIO_SYNC_MAX_BPM)
+        source_bpm = 0.0;
+    if(source_confidence < 0.38)
+        source_bpm = 0.0;
+
+    if(target_bpm < VJ_AUDIO_SYNC_MIN_BPM || target_bpm > VJ_AUDIO_SYNC_MAX_BPM)
+        target_bpm = 0.0;
+
+    if(target_mode == VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP && target_confidence < 0.68)
+        target_bpm = 0.0;
+
+    have_source_clock = (source_bpm > 0.0);
+    have_target_clock = (target_bpm > 0.0);
+
+    if(have_source_clock && have_target_clock) {
+        const double src_alpha =
+            (target_mode == VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP) ? 0.006 : 0.012;
+        const double dst_alpha =
+            (target_mode == VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP) ? 0.004 : 0.035;
+
+        if(!s->bridge_bpm_latch_valid ||
+           s->bridge_source_bpm_latched <= 0.0 ||
+           s->bridge_target_bpm_latched <= 0.0)
+        {
+            s->bridge_source_bpm_latched = source_bpm;
+            s->bridge_target_bpm_latched = target_bpm;
+            s->bridge_bpm_latch_valid = 1;
+        }
+        else
+        {
+            double folded_source = sync_fold_bpm_near(source_bpm,
+                                                      s->bridge_source_bpm_latched);
+            double folded_target = sync_fold_bpm_near(target_bpm,
+                                                      s->bridge_target_bpm_latched);
+            double src_rel = fabs(folded_source - s->bridge_source_bpm_latched) /
+                             ((s->bridge_source_bpm_latched > 1.0) ? s->bridge_source_bpm_latched : 1.0);
+            double dst_rel = fabs(folded_target - s->bridge_target_bpm_latched) /
+                             ((s->bridge_target_bpm_latched > 1.0) ? s->bridge_target_bpm_latched : 1.0);
+
+            if(src_rel < 0.18)
+                s->bridge_source_bpm_latched +=
+                    src_alpha * (folded_source - s->bridge_source_bpm_latched);
+
+            if(dst_rel < 0.22 || target_mode == VJ_AUDIO_SYNC_TARGET_MANUAL)
+                s->bridge_target_bpm_latched +=
+                    dst_alpha * (folded_target - s->bridge_target_bpm_latched);
+        }
+
+        s->bridge_latch_updated_ms = now_ms;
+        source_bpm = s->bridge_source_bpm_latched;
+        target_bpm = s->bridge_target_bpm_latched;
+        bridge_state = VJ_AUDIO_SYNC_BRIDGE_STATE_LOCKED;
+    }
+    else if(s->bridge_bpm_latch_valid &&
+            s->bridge_source_bpm_latched > 0.0 &&
+            s->bridge_target_bpm_latched > 0.0)
+    {
+        latch_age_ms = now_ms - s->bridge_latch_updated_ms;
+        if(latch_age_ms < 0)
+            latch_age_ms = 0;
+
+        if(latch_age_ms <= 8000L) {
+            source_bpm = s->bridge_source_bpm_latched;
+            target_bpm = s->bridge_target_bpm_latched;
+            bridge_state = VJ_AUDIO_SYNC_BRIDGE_STATE_HOLD;
+
+            if(latch_age_ms > 3000L) {
+                stale_pull_scale = 1.0 - ((double)(latch_age_ms - 3000L) / 5000.0);
+                if(stale_pull_scale < 0.0)
+                    stale_pull_scale = 0.0;
+            }
+        } else {
+            s->bridge_source_bpm_latched = 0.0;
+            s->bridge_target_bpm_latched = 0.0;
+            s->bridge_bpm_latch_valid = 0;
             s->bridge_latch_updated_ms = 0;
             source_bpm = 0.0;
             target_bpm = 0.0;
@@ -4046,96 +3969,133 @@ static double sync_bridge_update_controller_locked(vj_audio_sync_shared_t *s,
     else if(target_mode == VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP) {
         if(live_pull > 0.035)
             live_pull = 0.035;
-    } else {
-        if(live_pull > 0.080)
-            live_pull = 0.080;
     }
     live_pull *= stale_pull_scale;
 
-    if((bridge_state == VJ_AUDIO_SYNC_BRIDGE_STATE_LOCKED ||
-        bridge_state == VJ_AUDIO_SYNC_BRIDGE_STATE_HOLD) &&
-       live_pull > 0.0 && source_bpm > 0.0 && target_bpm > 0.0)
-    {
+    rate_ratio = (double)src_rate / (double)dst_sample_rate;
+    desired_ratio = rate_ratio;
+
+    if(live_pull > 0.0 && source_bpm > 0.0 && target_bpm > 0.0) {
         tempo_ratio = target_bpm / source_bpm;
-        controller_correction = sync_clampd(tempo_ratio,
-                                            1.0 - live_pull,
-                                            1.0 + live_pull);
-
-        correction_alpha =
-            (target_mode == VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP) ? 0.010 : 0.035;
-        if(stale_pull_scale < 1.0)
-            correction_alpha *= stale_pull_scale;
-        if(correction_alpha < 0.002)
-            correction_alpha = 0.002;
-
-        if(s->bridge_last_correction <= 0.0)
-            s->bridge_last_correction = controller_correction;
-        else
-            s->bridge_last_correction +=
-                correction_alpha * (controller_correction - s->bridge_last_correction);
-
-        controller_correction = s->bridge_last_correction;
-        if(controller_correction < 0.25) controller_correction = 0.25;
-        if(controller_correction > 4.0) controller_correction = 4.0;
+        tempo_ratio = sync_clampd(tempo_ratio,
+                                  1.0 - live_pull,
+                                  1.0 + live_pull);
+        desired_ratio = rate_ratio * tempo_ratio;
     }
-    else
+
+    if(desired_ratio < 0.25) desired_ratio = 0.25;
+    if(desired_ratio > 4.0) desired_ratio = 4.0;
+
+    if(s->bridge_ratio_smooth <= 0.0)
+        ratio = desired_ratio;
+    else {
+        const double ratio_alpha =
+            (target_mode == VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP) ? 0.0060 : 0.1800;
+        ratio = s->bridge_ratio_smooth + ratio_alpha * (desired_ratio - s->bridge_ratio_smooth);
+    }
+
+    if(ratio < 0.25) ratio = 0.25;
+    if(ratio > 4.0) ratio = 4.0;
+
+    pull_amount = fabs(tempo_ratio - 1.0) * stale_pull_scale;
+
+    latency_ms = VJ_AUDIO_SYNC_BRIDGE_LATENCY_MS + (long long)(pull_amount * 4500.0);
+    if(latency_ms < VJ_AUDIO_SYNC_BRIDGE_LATENCY_MS)
+        latency_ms = VJ_AUDIO_SYNC_BRIDGE_LATENCY_MS;
+    if(latency_ms > VJ_AUDIO_SYNC_BRIDGE_MAX_LATENCY_MS)
+        latency_ms = VJ_AUDIO_SYNC_BRIDGE_MAX_LATENCY_MS;
+
+    latency_frames = ((long long)src_rate * latency_ms) / 1000LL;
+    if(latency_frames < (long long)dst_frames * 4)
+        latency_frames = (long long)dst_frames * 4;
+    if(latency_frames < 16)
+        latency_frames = 16;
+    if(latency_frames > (long long)s->ring_frames / 2)
+        latency_frames = (long long)s->ring_frames / 2;
+
+    guard_frames = ((long long)src_rate * 35LL) / 1000LL;
+    if(guard_frames < (long long)dst_frames * 2)
+        guard_frames = (long long)dst_frames * 2;
+    if(guard_frames > latency_frames / 2)
+        guard_frames = latency_frames / 2;
+    if(guard_frames < 8)
+        guard_frames = 8;
+
+    target_read = s->write_frame_abs - latency_frames;
+    if(target_read < oldest + guard_frames)
+        target_read = oldest + guard_frames;
+    if(target_read > newest - guard_frames)
+        target_read = newest - guard_frames;
+
+    if(!s->bridge_read_valid) {
+        s->bridge_read_pos = (double)target_read;
+        s->bridge_read_valid = 1;
+    }
+
+    read_pos = s->bridge_read_pos;
+
+    if(read_pos < (double)(oldest + guard_frames) ||
+       read_pos > (double)(newest - guard_frames)) {
+        read_pos = (double)target_read;
+        sync_add_l(&s->underruns, 1);
+    }
+
     {
-        controller_correction = 1.0;
+        double max_end = (double)(newest - guard_frames);
+        double min_end = (double)(oldest + guard_frames);
+        double max_ratio = (max_end - read_pos) / (double)dst_frames;
+        double min_ratio = (min_end - read_pos) / (double)dst_frames;
+
+        if(max_ratio < 0.25)
+            max_ratio = 0.25;
+        if(min_ratio < 0.25)
+            min_ratio = 0.25;
+
+        if(ratio > max_ratio) {
+            ratio = max_ratio;
+            sync_add_l(&s->underruns, 1);
+        }
+
+        if(read_pos + ((double)dst_frames * ratio) < min_end) {
+            double catchup_ratio = ((double)target_read - read_pos) / (double)dst_frames;
+            if(catchup_ratio < 0.25)
+                catchup_ratio = 0.25;
+            if(catchup_ratio > 4.0)
+                catchup_ratio = 4.0;
+            if(catchup_ratio > ratio)
+                ratio = catchup_ratio;
+        }
     }
 
-    s->bridge_last_correction = controller_correction;
+    for(int i = 0; i < dst_frames; i++) {
+        uint8_t *df = dst + ((size_t)i * (size_t)dst_frame_bytes);
+        if(dst_channels == 1) {
+            int v = sync_sample_at_locked(s, read_pos, 0, 1);
+            sync_write_sample(df, 2, v);
+        } else {
+            int l = sync_sample_at_locked(s, read_pos, 0, 2);
+            int r = sync_sample_at_locked(s, read_pos, 1, 2);
+            sync_write_sample(df, 2, l);
+            sync_write_sample(df + 2, 2, r);
+        }
+        read_pos += ratio;
+    }
+
+    s->bridge_read_pos = read_pos;
+    s->bridge_ratio_smooth = ratio;
+    s->bridge_last_correction = (rate_ratio > 0.0) ? (ratio / rate_ratio) : 1.0;
+    if(s->bridge_last_correction < 0.25)
+        s->bridge_last_correction = 0.25;
+    if(s->bridge_last_correction > 4.0)
+        s->bridge_last_correction = 4.0;
+    sync_store_i(&s->bridge_active, 1);
     sync_store_i(&s->bridge_state, bridge_state);
-    sync_store_i(&s->bridge_active,
-                 (bridge_state == VJ_AUDIO_SYNC_BRIDGE_STATE_LOCKED ||
-                  bridge_state == VJ_AUDIO_SYNC_BRIDGE_STATE_HOLD) ? 1 : 0);
-
-    if(state_out)
-        *state_out = bridge_state;
-
-    return controller_correction;
-}
-
-int vj_audio_sync_render_bridge_s16(vj_audio_sync_shared_t *s,
-                                    uint8_t *dst,
-                                    int dst_frames,
-                                    int dst_frame_bytes,
-                                    int dst_channels,
-                                    int dst_sample_rate)
-{
-    int bridge_state = VJ_AUDIO_SYNC_BRIDGE_STATE_IDLE;
-
-    if(!s || !dst || dst_frames <= 0 || dst_frame_bytes <= 0 ||
-       dst_channels <= 0 || dst_channels > 2 || dst_sample_rate <= 0)
-        return 0;
-
-    {
-        int enabled = sync_load_i(&s->enabled);
-        int open = sync_load_i(&s->open);
-        int mode = sync_load_i(&s->mode);
-        if(!enabled || !open || mode != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE)
-            return 0;
-    }
-
-    if(sync_try_lock_for_us(s, 500)) {
-        (void)sync_bridge_update_controller_locked(s,
-                                                   sync_now_ms(),
-                                                   &bridge_state);
-        sync_store_i(&s->bridge_active,
-                     (bridge_state == VJ_AUDIO_SYNC_BRIDGE_STATE_LOCKED ||
-                      bridge_state == VJ_AUDIO_SYNC_BRIDGE_STATE_HOLD) ? 1 : 0);
-        sync_unlock(s);
-    }
-
-    return vj_audio_sync_render_monitor_s16(s,
-                                            dst,
-                                            dst_frames,
-                                            dst_frame_bytes,
-                                            dst_channels,
-                                            dst_sample_rate);
+    sync_unlock(s);
+    return dst_frames;
 }
 
 #ifndef VJ_AUDIO_SYNC_MONITOR_LATENCY_MS
-#define VJ_AUDIO_SYNC_MONITOR_LATENCY_MS 180
+#define VJ_AUDIO_SYNC_MONITOR_LATENCY_MS 70
 #endif
 
 int vj_audio_sync_render_monitor_s16(vj_audio_sync_shared_t *s,
@@ -4150,7 +4110,6 @@ int vj_audio_sync_render_monitor_s16(vj_audio_sync_shared_t *s,
     int src_frame_bytes;
     int src_sample_bytes;
     int dst_sample_bytes;
-    int mode;
     double ratio;
     double read_pos;
     long long oldest;
@@ -4166,18 +4125,15 @@ int vj_audio_sync_render_monitor_s16(vj_audio_sync_shared_t *s,
         return 0;
 
     {
-        int enabled = sync_load_i(&s->enabled);
-        int open = sync_load_i(&s->open);
-        mode = sync_load_i(&s->mode);
-        if(!enabled || !open ||
+        int mode = sync_load_i(&s->mode);
+        if(!sync_load_i(&s->enabled) ||
+           !sync_load_i(&s->open) ||
            (mode != VJ_AUDIO_SYNC_MODE_MONITOR &&
-            mode != VJ_AUDIO_SYNC_MODE_TRACK_ALIGN &&
-            mode != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE))
+            mode != VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY &&
+            mode != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE &&
+            mode != VJ_AUDIO_SYNC_MODE_TRACK_ALIGN))
             return 0;
     }
-
-
-
 
     if(!sync_try_lock_for_us(s, 3000)) {
         sync_add_l(&s->underruns, 1);
@@ -4230,12 +4186,12 @@ int vj_audio_sync_render_monitor_s16(vj_audio_sync_shared_t *s,
 
     ratio = (double)src_rate / (double)dst_sample_rate;
 
-
-
-
     {
         long long block_src_frames = (long long)(((double)dst_frames * ratio) + 0.999);
-        long long min_latency = (block_src_frames * 8) + 1024;
+        long long min_latency = block_src_frames + 512;
+
+        if(min_latency < 1024)
+            min_latency = 1024;
 
         latency_frames = ((long long)src_rate * VJ_AUDIO_SYNC_MONITOR_LATENCY_MS) / 1000LL;
         if(latency_frames < min_latency)
@@ -4287,9 +4243,6 @@ int vj_audio_sync_render_monitor_s16(vj_audio_sync_shared_t *s,
             sync_add_l(&s->underruns, 1);
         }
         else {
-
-
-
             double err = target - read_pos;
             double pull = err / ((double)latency_frames * 12.0);
             if(pull > 0.0025)
@@ -4313,9 +4266,6 @@ int vj_audio_sync_render_monitor_s16(vj_audio_sync_shared_t *s,
         }
 
         if(resync && have_old_last && i < 128) {
-
-
-
             int a = i + 1;
             int b = 128 - i;
             l = ((old_last_l * b) + (l * a)) >> 7;
@@ -4337,13 +4287,7 @@ int vj_audio_sync_render_monitor_s16(vj_audio_sync_shared_t *s,
     }
 
     s->monitor_read_pos = read_pos;
-
-
-
-
-    if(mode != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE)
-        sync_store_i(&s->bridge_active, 0);
-
+    sync_store_i(&s->bridge_active, 0);
     sync_unlock(s);
     return dst_frames;
 }
@@ -4359,6 +4303,9 @@ void *vj_audio_sync_thread(void *arg)
     int last_reset = -1;
     int last_source = -1;
     int last_file_generation = -1;
+    int last_wav_limit_ms = 0;
+    long long wav_limit_frames = 0;
+    long long wav_read_frames_total = 0;
     sync_wav_t wav;
 
     memset(&wav, 0, sizeof(wav));
@@ -4371,11 +4318,11 @@ void *vj_audio_sync_thread(void *arg)
 
     sync_store_i(&s->stop_request, 0);
     sync_store_i(&s->running, 1);
-    
+    veejay_msg(VEEJAY_MSG_INFO, "[AUDIO-SYNC] external audio sync thread started");
+
     while(!sync_load_i(&s->stop_request)) {
         int source;
         int mode;
-        int enabled;
         int reset_seq;
         int got = 0;
         int ch = 0;
@@ -4385,10 +4332,7 @@ void *vj_audio_sync_thread(void *arg)
         int target_frames;
         int target_bytes;
 
-        enabled = sync_load_i(&s->enabled);
-        mode = sync_load_i(&s->mode);
-
-        if(enabled) {
+        if(sync_load_i(&s->enabled)) {
             int tq_ch = 0, tq_bits = 0, tq_rate = 0, tq_frame_bytes = 0;
             int tq_frames = sync_dequeue_target_audio(s,
                                                        &target_buffer,
@@ -4405,7 +4349,9 @@ void *vj_audio_sync_thread(void *arg)
                                                     tq_ch,
                                                     tq_bits,
                                                     tq_rate);
-                if(mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN)
+                if(sync_load_i(&s->mode) == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW)
+                    sync_tempo_follow_publish(s);
+                if(sync_load_i(&s->mode) == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN)
                     sync_track_align_push_block(s,
                                                 target_buffer,
                                                 tq_frames,
@@ -4415,20 +4361,15 @@ void *vj_audio_sync_thread(void *arg)
                                                 tq_rate,
                                                 1);
             }
-            if(enabled && (mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW ||
-                           mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE)) {
-                if(sync_try_lock_for_us(s, 500)) {
-                    sync_bridge_update_controller_locked(s, sync_now_ms(), NULL);
-                    sync_unlock(s);
-                }
-            }
         }
 
-        if(!enabled || mode == VJ_AUDIO_SYNC_MODE_OFF) {
+        if(!sync_load_i(&s->enabled) || sync_load_i(&s->mode) == VJ_AUDIO_SYNC_MODE_OFF) {
             sync_store_i(&s->open, 0);
             sync_sleep_us(20000);
             continue;
         }
+
+        mode = sync_load_i(&s->mode);
         source = sync_load_i(&s->source);
         reset_seq = sync_load_i(&s->reset_seq);
 
@@ -4444,7 +4385,6 @@ void *vj_audio_sync_thread(void *arg)
             s->bridge_source_bpm_latched = 0.0;
             s->bridge_target_bpm_latched = 0.0;
             s->bridge_bpm_latch_valid = 0;
-            sync_bridge_clear_stretch_locked(s);
             sync_store_i(&s->bridge_state, VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_SOURCE);
             s->write_frame_abs = 0;
             s->ring_write_frame = 0;
@@ -4452,6 +4392,9 @@ void *vj_audio_sync_thread(void *arg)
             sync_clear_target_queue_locked(s);
             sync_unlock(s);
             sync_wav_close(&wav);
+            wav_limit_frames = 0;
+            wav_read_frames_total = 0;
+            last_wav_limit_ms = 0;
             sync_store_i(&s->open, 0);
             last_reset = reset_seq;
             last_source = source;
@@ -4479,7 +4422,7 @@ void *vj_audio_sync_thread(void *arg)
             }
             bits = (frame_bytes * 8) / ch;
 
-            target_frames = (rate / 1000) * 8;
+            target_frames = (rate / 1000) * 8; /* ~8ms */
             if(target_frames < VJ_AUDIO_SYNC_ANALYSIS_FRAMES)
                 target_frames = VJ_AUDIO_SYNC_ANALYSIS_FRAMES;
             if(target_frames > VJ_AUDIO_SYNC_MAX_ANALYSIS_FRAMES)
@@ -4521,78 +4464,38 @@ void *vj_audio_sync_thread(void *arg)
             int gen = sync_load_i(&s->file_generation);
             if(!wav.fp || gen != last_file_generation) {
                 char path[VJ_AUDIO_SYNC_PATH_MAX];
-                int limit_ms;
                 sync_lock(s);
                 strncpy(path, s->wav_path, sizeof(path) - 1);
                 path[sizeof(path) - 1] = '\0';
-                limit_ms = sync_load_i(&s->wav_limit_ms);
                 sync_unlock(s);
 
                 sync_wav_close(&wav);
-
-                veejay_msg(VEEJAY_MSG_INFO,
-                           "[AUDIO-SYNC][WAV] opening gen=%d loop=%d limit=%dms path='%s'",
-                           gen,
-                           sync_load_i(&s->wav_loop),
-                           limit_ms,
-                           path);
-
                 if(!sync_wav_open(&wav, path)) {
-                    sync_store_i(&s->open, 0);
-                    sync_sleep_us(1000000);
-                    last_file_generation = gen;
-                    continue;
-                }
-
-                if(limit_ms > 0 && wav.sample_rate > 0 && wav.frame_bytes > 0) {
-                    long long limit_frames =
-                        ((long long)limit_ms * (long long)wav.sample_rate) / 1000LL;
-                    long long limit_bytes = limit_frames * (long long)wav.frame_bytes;
-
-                    if(limit_bytes > 0x7fffffffL)
-                        limit_bytes = 0x7fffffffL;
-
-                    wav.limit_bytes = (long)limit_bytes;
-                    wav.limit_bytes -= wav.limit_bytes % wav.frame_bytes;
-                } else {
-                    wav.limit_bytes = 0;
-                }
-                wav.virtual_pos = 0;
-
-                if(!sync_prepare_ring(s, wav.channels, wav.bits, wav.sample_rate)) {
                     veejay_msg(VEEJAY_MSG_WARNING,
-                               "[AUDIO-SYNC][WAV] unable to prepare ring for '%s' %dch %dHz %dbit",
-                               path,
-                               wav.channels,
-                               wav.sample_rate,
-                               wav.bits);
-                    sync_wav_close(&wav);
+                               "[AUDIO-SYNC] unable to open WAV source '%s'",
+                               path);
                     sync_store_i(&s->open, 0);
                     sync_sleep_us(1000000);
                     last_file_generation = gen;
                     continue;
                 }
-
                 last_file_generation = gen;
-
+                last_wav_limit_ms = sync_wav_side_get_limit(s);
+                wav_limit_frames = 0;
+                wav_read_frames_total = 0;
+                if(last_wav_limit_ms > 0 && wav.sample_rate > 0)
+                    wav_limit_frames = ((long long)wav.sample_rate * (long long)last_wav_limit_ms) / 1000LL;
+                sync_prepare_ring(s, wav.channels, wav.bits, wav.sample_rate);
                 veejay_msg(VEEJAY_MSG_INFO,
-                           "[AUDIO-SYNC][WAV] source ready gen=%d loop=%d '%s' %dch %dHz %dbit frame_bytes=%d data=%ld limit=%ld",
-                           gen,
-                           sync_load_i(&s->wav_loop),
-                           path,
-                           wav.channels,
-                           wav.sample_rate,
-                           wav.bits,
-                           wav.frame_bytes,
-                           wav.data_bytes,
-                           wav.limit_bytes);
+                           "[AUDIO-SYNC] WAV source ready: '%s' %dch %dHz %dbit",
+                           path, wav.channels, wav.sample_rate, wav.bits);
             }
 
             ch = wav.channels;
             bits = wav.bits;
             rate = wav.sample_rate;
             frame_bytes = wav.frame_bytes;
-            target_frames = (rate / 1000) * 10;
+            target_frames = (rate / 1000) * 10; /* ~10ms */
             if(target_frames < VJ_AUDIO_SYNC_ANALYSIS_FRAMES)
                 target_frames = VJ_AUDIO_SYNC_ANALYSIS_FRAMES;
             if(target_frames > VJ_AUDIO_SYNC_MAX_ANALYSIS_FRAMES)
@@ -4602,9 +4505,6 @@ void *vj_audio_sync_thread(void *arg)
             if(buffer_size < target_bytes) {
                 uint8_t *nb = (uint8_t*)vj_malloc((size_t)target_bytes);
                 if(!nb) {
-                    veejay_msg(VEEJAY_MSG_WARNING,
-                               "[AUDIO-SYNC][WAV] unable to allocate read buffer bytes=%d",
-                               target_bytes);
                     sync_sleep_us(100000);
                     continue;
                 }
@@ -4613,28 +4513,33 @@ void *vj_audio_sync_thread(void *arg)
                 buffer_size = target_bytes;
             }
 
+            if(wav_limit_frames > 0) {
+                long long remaining_frames = wav_limit_frames - wav_read_frames_total;
+
+                if(remaining_frames <= 0) {
+                    sync_store_i(&s->open, 0);
+                    sync_store_i(&s->enabled, 0);
+                    continue;
+                }
+
+                if((long long)target_bytes > remaining_frames * (long long)frame_bytes)
+                    target_bytes = (int)(remaining_frames * (long long)frame_bytes);
+            }
+
             got = sync_wav_read(&wav, buffer, target_bytes, sync_load_i(&s->wav_loop));
             if(got <= 0) {
-                veejay_msg(VEEJAY_MSG_INFO,
-                           "[AUDIO-SYNC][WAV] EOF/no-data gen=%d loop=%d pos=%ld/%ld limit=%ld, disabling source",
-                           gen,
-                           sync_load_i(&s->wav_loop),
-                           wav.data_pos,
-                           wav.data_bytes,
-                           wav.limit_bytes);
                 sync_store_i(&s->open, 0);
                 sync_store_i(&s->enabled, 0);
                 continue;
             }
 
+            if(frame_bytes > 0)
+                wav_read_frames_total += got / frame_bytes;
 
             if(rate > 0 && frame_bytes > 0)
                 sync_sleep_us(((long long)(got / frame_bytes) * 1000000LL) / rate);
         }
         else if(source == VJ_AUDIO_SYNC_SOURCE_PUSH) {
-
-
-
             sync_sleep_us(2000);
             continue;
         }
@@ -4648,18 +4553,10 @@ void *vj_audio_sync_thread(void *arg)
             int frames = got / frame_bytes;
             sync_publish_audio(s, buffer, frames, ch, bits, rate);
             sync_update_clock_from_block(s, buffer, frames, frame_bytes, ch, bits, rate);
+            if(sync_load_i(&s->mode) == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW)
+                sync_tempo_follow_publish(s);
             if(sync_load_i(&s->mode) == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN)
                 sync_track_align_push_block(s, buffer, frames, frame_bytes, ch, bits, rate, 0);
-            {
-                int cur_mode = sync_load_i(&s->mode);
-                if(cur_mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW ||
-                   cur_mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE) {
-                    if(sync_try_lock_for_us(s, 500)) {
-                        sync_bridge_update_controller_locked(s, sync_now_ms(), NULL);
-                        sync_unlock(s);
-                    }
-                }
-            }
             sync_add_l(&s->reads, 1);
         }
 
@@ -4675,7 +4572,7 @@ void *vj_audio_sync_thread(void *arg)
     vj_audio_sync_free(s);
     sync_store_i(&s->open, 0);
     sync_store_i(&s->running, 0);
-    veejay_msg(VEEJAY_MSG_INFO, "Audio sync thread finished");
+    veejay_msg(VEEJAY_MSG_INFO, "[AUDIO-SYNC] external audio sync thread stopped");
     return NULL;
 }
 
@@ -4734,26 +4631,33 @@ void vj_audio_sync_set_mode(vj_audio_sync_shared_t *s, int mode)
     sync_lock(s);
     old_mode = sync_load_i(&s->mode);
 
-
-
-
     if(old_mode != mode) {
+        sync_store_i(&s->reset_seq, sync_load_i(&s->reset_seq) + 1);
+
         if(old_mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
            mode     == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
            old_mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW ||
            mode     == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW)
         {
-            sync_bridge_clear_locked(s,
-                (mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
-                 mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW) ?
-                VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_SOURCE :
-                VJ_AUDIO_SYNC_BRIDGE_STATE_IDLE);
+            s->bridge_read_valid = 0;
+            s->bridge_ratio_smooth = 0.0;
+            s->bridge_last_correction = 1.0;
+            s->bridge_latch_updated_ms = 0;
+            s->bridge_source_bpm_latched = 0.0;
+            s->bridge_target_bpm_latched = 0.0;
+            s->bridge_bpm_latch_valid = 0;
+            sync_store_i(&s->bridge_active, 0);
+            sync_store_i(&s->bridge_state,
+                         (mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
+                          mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW) ?
+                         VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_SOURCE :
+                         VJ_AUDIO_SYNC_BRIDGE_STATE_IDLE);
         }
 
         if(old_mode == VJ_AUDIO_SYNC_MODE_MONITOR ||
            mode     == VJ_AUDIO_SYNC_MODE_MONITOR ||
-           old_mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW ||
-           mode     == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW ||
+           old_mode == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY ||
+           mode     == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY ||
            old_mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN ||
            mode     == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN)
         {
@@ -4764,14 +4668,8 @@ void vj_audio_sync_set_mode(vj_audio_sync_shared_t *s, int mode)
            mode     == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN)
         {
             sync_track_align_clear_locked(s);
-
-
-
             sync_store_i(&s->reset_seq, sync_load_i(&s->reset_seq) + 1);
             if(mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN) {
-
-
-
                 sync_store_i(&s->target_mode, VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP);
                 sync_store_i(&s->track_align_state, VJ_AUDIO_SYNC_TRACK_STATE_WAIT_SOURCE);
             } else {
@@ -4842,7 +4740,6 @@ void vj_audio_sync_set_source_jack(vj_audio_sync_shared_t *s, int channels)
     s->bridge_source_bpm_latched = 0.0;
     s->bridge_target_bpm_latched = 0.0;
     s->bridge_bpm_latch_valid = 0;
-    sync_bridge_clear_stretch_locked(s);
     sync_clear_monitor_transport_locked(s);
     sync_store_i(&s->bridge_active, 0);
     sync_store_i(&s->bridge_state, VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_SOURCE);
@@ -4876,21 +4773,20 @@ void vj_audio_sync_set_source_push(vj_audio_sync_shared_t *s,
     if(sample_rate <= 0)
         sample_rate = 44100;
 
-    sync_lock(s);
-
     old_source = sync_load_i(&s->source);
-    old_channels = s->channels;
-    old_bits = s->bits_per_channel;
-    old_rate = s->sample_rate;
+    old_channels = sync_load_i(&s->channels);
+    old_bits = sync_load_i(&s->bits_per_channel);
+    old_rate = sync_load_i(&s->sample_rate);
 
     if(old_source == VJ_AUDIO_SYNC_SOURCE_PUSH &&
        old_channels == channels &&
        old_bits == bits_per_channel &&
        old_rate == sample_rate)
     {
-        sync_unlock(s);
         return;
     }
+
+    sync_lock(s);
     sync_store_i(&s->source, VJ_AUDIO_SYNC_SOURCE_PUSH);
     sync_store_i(&s->input_channels_request, channels);
     sync_store_i(&s->reset_seq, sync_load_i(&s->reset_seq) + 1);
@@ -4904,7 +4800,6 @@ void vj_audio_sync_set_source_push(vj_audio_sync_shared_t *s,
     s->bridge_source_bpm_latched = 0.0;
     s->bridge_target_bpm_latched = 0.0;
     s->bridge_bpm_latch_valid = 0;
-    sync_bridge_clear_stretch_locked(s);
     sync_clear_monitor_transport_locked(s);
     sync_store_i(&s->bridge_active, 0);
     sync_store_i(&s->bridge_state, VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_SOURCE);
@@ -4949,40 +4844,34 @@ int vj_audio_sync_push_audio(vj_audio_sync_shared_t *s,
     sync_add_l(&s->reads, 1);
     return frames;
 }
+
 int vj_audio_sync_set_source_wav_limited(vj_audio_sync_shared_t *s,
-                                          const char *path,
-                                          int loop,
-                                          int limit_ms)
+                                         const char *path,
+                                         int loop,
+                                         int limit_ms);
+
+int vj_audio_sync_set_source_wav(vj_audio_sync_shared_t *s, const char *path, int loop)
 {
-    int old_source;
-    int old_generation;
-    int new_generation;
+    return vj_audio_sync_set_source_wav_limited(s, path, loop, 0);
+}
 
-    if(!s || !path || !path[0]) {
-        veejay_msg(VEEJAY_MSG_WARNING,
-                   "[AUDIO-SYNC][WAV] source-select rejected: empty state/path");
+int vj_audio_sync_set_source_wav_limited(vj_audio_sync_shared_t *s,
+                                         const char *path,
+                                         int loop,
+                                         int limit_ms)
+{
+    if(!s || !path || !path[0])
         return 0;
-    }
 
-    old_source = sync_load_i(&s->source);
-    old_generation = sync_load_i(&s->file_generation);
-    new_generation = old_generation + 1;
-    if(new_generation <= 0)
-        new_generation = 1;
-
-    if(limit_ms < 0)
-        limit_ms = 0;
+    sync_wav_side_set_limit(s, loop ? 0 : limit_ms);
+    sync_wav_plain_lock_clear(s);
 
     sync_lock(s);
-
     strncpy(s->wav_path, path, sizeof(s->wav_path) - 1);
     s->wav_path[sizeof(s->wav_path) - 1] = '\0';
-
     sync_store_i(&s->wav_loop, loop ? 1 : 0);
-    sync_store_i(&s->wav_limit_ms, loop ? 0 : limit_ms);
-    sync_store_i(&s->wav_silence_after_eof, loop ? 0 : 1);
     sync_store_i(&s->source, VJ_AUDIO_SYNC_SOURCE_WAV_FILE);
-    sync_store_i(&s->file_generation, new_generation);
+    sync_store_i(&s->file_generation, sync_load_i(&s->file_generation) + 1);
     sync_store_i(&s->reset_seq, sync_load_i(&s->reset_seq) + 1);
 
     s->analysis_read_frame = 0;
@@ -4995,39 +4884,86 @@ int vj_audio_sync_set_source_wav_limited(vj_audio_sync_shared_t *s,
     s->bridge_source_bpm_latched = 0.0;
     s->bridge_target_bpm_latched = 0.0;
     s->bridge_bpm_latch_valid = 0;
-
-    sync_bridge_clear_stretch_locked(s);
     sync_clear_monitor_transport_locked(s);
-    sync_track_align_clear_locked(s);
-    sync_clear_target_queue_locked(s);
-    sync_clear_clock(s);
-
     sync_store_i(&s->bridge_active, 0);
     sync_store_i(&s->bridge_state, VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_SOURCE);
-
-    sync_store_i(&s->wav_plain_lock_valid, 0);
-    sync_store_i(&s->wav_plain_lock_generation, 0);
-    sync_store_i(&s->wav_plain_lock_delta_frames, 0);
-    sync_store_i(&s->wav_plain_lock_confidence_pct, 0);
-
+    sync_clear_clock(s);
+    sync_track_align_clear_locked(s);
     sync_unlock(s);
-
-    veejay_msg(VEEJAY_MSG_INFO,
-               "[AUDIO-SYNC][WAV] source-select old_source=%d new_source=%d gen=%d->%d loop=%d limit=%dms path='%s'",
-               old_source,
-               VJ_AUDIO_SYNC_SOURCE_WAV_FILE,
-               old_generation,
-               new_generation,
-               loop ? 1 : 0,
-               limit_ms,
-               path);
-
     return 1;
 }
 
-int vj_audio_sync_set_source_wav(vj_audio_sync_shared_t *s, const char *path, int loop)
+void vj_audio_sync_wav_restart(vj_audio_sync_shared_t *s)
 {
-    return vj_audio_sync_set_source_wav_limited(s, path, loop, 0);
+    if(!s)
+        return;
+
+    sync_lock(s);
+    sync_store_i(&s->file_generation, sync_load_i(&s->file_generation) + 1);
+    sync_store_i(&s->reset_seq, sync_load_i(&s->reset_seq) + 1);
+    s->analysis_read_frame = 0;
+    s->beat_read_frame = 0;
+    s->record_read_frame = 0;
+    s->bridge_read_valid = 0;
+    s->bridge_ratio_smooth = 0.0;
+    s->bridge_last_correction = 1.0;
+    s->bridge_latch_updated_ms = 0;
+    s->bridge_source_bpm_latched = 0.0;
+    s->bridge_target_bpm_latched = 0.0;
+    s->bridge_bpm_latch_valid = 0;
+    sync_clear_monitor_transport_locked(s);
+    sync_store_i(&s->bridge_active, 0);
+    sync_store_i(&s->bridge_state, VJ_AUDIO_SYNC_BRIDGE_STATE_WAIT_SOURCE);
+    sync_clear_clock(s);
+    sync_track_align_clear_locked(s);
+    sync_unlock(s);
+}
+
+void vj_audio_sync_wav_plain_lock_store(vj_audio_sync_shared_t *s,
+                                        int delta_frames,
+                                        int confidence_pct)
+{
+    sync_wav_side_t *side;
+
+    if(confidence_pct < 0)
+        confidence_pct = 0;
+    else if(confidence_pct > 100)
+        confidence_pct = 100;
+
+    sync_wav_side_lock();
+    side = sync_wav_side_get_locked(s, 1);
+    if(side) {
+        side->plain_lock_valid = 1;
+        side->plain_lock_delta_frames = delta_frames;
+        side->plain_lock_confidence_pct = confidence_pct;
+    }
+    sync_wav_side_unlock();
+}
+
+int vj_audio_sync_wav_plain_lock_get(vj_audio_sync_shared_t *s,
+                                     int *delta_frames,
+                                     int *confidence_pct)
+{
+    sync_wav_side_t *side;
+    int valid = 0;
+
+    sync_wav_side_lock();
+    side = sync_wav_side_get_locked(s, 0);
+    if(side && side->plain_lock_valid) {
+        if(delta_frames)
+            *delta_frames = side->plain_lock_delta_frames;
+        if(confidence_pct)
+            *confidence_pct = side->plain_lock_confidence_pct;
+        valid = 1;
+    }
+    sync_wav_side_unlock();
+
+    return valid;
+}
+
+int vj_audio_sync_wav_plain_lock_valid(vj_audio_sync_shared_t *s)
+{
+    return vj_audio_sync_wav_plain_lock_get(s, NULL, NULL);
 }
 
 void vj_audio_sync_set_target_clock(vj_audio_sync_shared_t *s,
@@ -5049,13 +4985,10 @@ void vj_audio_sync_set_target_clock(vj_audio_sync_shared_t *s,
     sync_store_i(&s->target_phase_q15, sync_q15((double)phase));
     sync_store_i(&s->target_confidence_q15, sync_q15((double)confidence));
 
-
-
-
     s->bridge_target_bpm_latched = 0.0;
     s->bridge_bpm_latch_valid = 0;
-    sync_bridge_clear_stretch_locked(s);
     s->bridge_latch_updated_ms = 0;
+    s->bridge_ratio_smooth = 0.0;
     s->bridge_last_correction = 1.0;
     sync_store_i(&s->bridge_active, 0);
     sync_store_i(&s->bridge_state,
@@ -5084,12 +5017,11 @@ void vj_audio_sync_set_target_mode(vj_audio_sync_shared_t *s, int mode)
     if(mode == VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP)
         sync_clear_target_clock(s);
 
-
-
-
+    /* Target mode changes invalidate the BPM latch, but keep the live
+     * read-head continuous to avoid audible capstan jumps.
+     */
     s->bridge_target_bpm_latched = 0.0;
     s->bridge_bpm_latch_valid = 0;
-    sync_bridge_clear_stretch_locked(s);
     s->bridge_latch_updated_ms = 0;
     s->bridge_last_correction = 1.0;
     sync_store_i(&s->bridge_active, 0);
@@ -5107,6 +5039,7 @@ int vj_audio_sync_get_target_mode(vj_audio_sync_shared_t *s)
 void vj_audio_sync_set_track_align_video_fps(vj_audio_sync_shared_t *s, double fps)
 {
     int q;
+    int old_q;
 
     if(!s)
         return;
@@ -5115,7 +5048,23 @@ void vj_audio_sync_set_track_align_video_fps(vj_audio_sync_shared_t *s, double f
     else if(fps > 240.0)
         fps = 240.0;
     q = (int)(fps * 1000.0 + 0.5);
+    old_q = sync_load_i(&s->align_video_fps_x1000);
     sync_store_i(&s->align_video_fps_x1000, q);
+
+    if(old_q != q) {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[FPSDBG][SYNC] track-align video fps %.3f->%.3f mode=%d target=%d "
+                   "state=%d locked=%d offset=%dms conf=%d%% reset_seq=%d",
+                   old_q > 0 ? ((double)old_q / 1000.0) : 0.0,
+                   (double)q / 1000.0,
+                   sync_load_i(&s->mode),
+                   sync_load_i(&s->target_mode),
+                   sync_load_i(&s->track_align_state),
+                   sync_load_i(&s->track_align_locked),
+                   sync_load_i(&s->track_align_offset_ms),
+                   sync_load_i(&s->track_align_confidence_pct),
+                   sync_load_i(&s->reset_seq));
+    }
 }
 
 void vj_audio_sync_reset_target_clock(vj_audio_sync_shared_t *s)
@@ -5123,12 +5072,24 @@ void vj_audio_sync_reset_target_clock(vj_audio_sync_shared_t *s)
     if(!s)
         return;
 
+    {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[FPSDBG][SYNC] reset target clock before write=%lld read=%lld process=%lld "
+                   "overruns=%ld reads=%ld mode=%d target=%d state=%d",
+                   s->target_write_frame_abs,
+                   s->target_read_frame_abs,
+                   s->target_process_frame_abs,
+                   sync_load_l(&s->target_queue_overruns),
+                   sync_load_l(&s->target_queue_reads),
+                   sync_load_i(&s->mode),
+                   sync_load_i(&s->target_mode),
+                   sync_load_i(&s->track_align_state));
+    }
 
     sync_lock(s);
     sync_clear_target_clock(s);
     s->bridge_target_bpm_latched = 0.0;
     s->bridge_bpm_latch_valid = 0;
-    sync_bridge_clear_stretch_locked(s);
     s->bridge_latch_updated_ms = 0;
     s->bridge_last_correction = 1.0;
     sync_store_i(&s->bridge_active, 0);
@@ -5162,9 +5123,6 @@ int vj_audio_sync_push_target_audio(vj_audio_sync_shared_t *s,
     if(bits != 8 && bits != 16)
         return 0;
 
-
-
-
     return sync_enqueue_target_audio(s,
                                      src,
                                      frames,
@@ -5183,9 +5141,6 @@ void vj_audio_sync_set_bridge_correction(vj_audio_sync_shared_t *s, int max_pct)
 
     sync_lock(s);
     sync_store_i(&s->max_correction_pct, max_pct);
-
-
-
 
     s->bridge_last_correction = 1.0;
     sync_unlock(s);
@@ -5223,138 +5178,11 @@ void vj_audio_sync_track_align_reset_acquisition(vj_audio_sync_shared_t *s)
     s->align_live_last_snap_ms = 0;
     s->align_live_last_snap_delta = 0;
     s->align_snap_cooldown_ms = VJ_AUDIO_SYNC_TRACK_SNAP_OFFER_COOLDOWN_MS;
-    s->track_align_snap_pending = 0;
-    s->track_align_snap_delta_frames = 0;
-    s->track_align_snap_confidence_pct = 0;
+    sync_store_i(&s->track_align_snap_pending, 0);
+    sync_store_i(&s->track_align_snap_delta_frames, 0);
+    sync_store_i(&s->track_align_snap_confidence_pct, 0);
     sync_unlock(s);
 }
-
-void vj_audio_sync_wav_restart(vj_audio_sync_shared_t *s)
-{
-    int old_generation;
-    int new_generation;
-
-    if(!s)
-        return;
-
-    if(sync_load_i(&s->source) != VJ_AUDIO_SYNC_SOURCE_WAV_FILE)
-        return;
-
-    old_generation = sync_load_i(&s->file_generation);
-    new_generation = old_generation + 1;
-    if(new_generation <= 0)
-        new_generation = 1;
-
-    sync_lock(s);
-
-    sync_store_i(&s->file_generation, new_generation);
-    sync_store_i(&s->reset_seq, sync_load_i(&s->reset_seq) + 1);
-
-    s->analysis_read_frame = 0;
-    s->beat_read_frame = 0;
-    s->record_read_frame = 0;
-    s->bridge_read_valid = 0;
-    s->bridge_ratio_smooth = 0.0;
-    s->bridge_last_correction = 1.0;
-    s->bridge_latch_updated_ms = 0;
-    s->bridge_source_bpm_latched = 0.0;
-    s->bridge_target_bpm_latched = 0.0;
-    s->bridge_bpm_latch_valid = 0;
-
-    sync_bridge_clear_stretch_locked(s);
-    sync_clear_monitor_transport_locked(s);
-    sync_track_align_clear_locked(s);
-    sync_clear_clock(s);
-
-
-
-
-    if(sync_load_i(&s->wav_plain_lock_valid) &&
-       sync_load_i(&s->wav_plain_lock_generation) == old_generation)
-    {
-        sync_store_i(&s->wav_plain_lock_generation, new_generation);
-    }
-
-    sync_unlock(s);
-
-    veejay_msg(VEEJAY_MSG_INFO,
-               "[AUDIO-SYNC][WAV] restart requested gen=%d->%d",
-               old_generation,
-               new_generation);
-}
-
-int vj_audio_sync_wav_plain_lock_valid(vj_audio_sync_shared_t *s)
-{
-    int valid;
-    int generation;
-    int lock_generation;
-
-    if(!s)
-        return 0;
-
-    if(sync_load_i(&s->source) != VJ_AUDIO_SYNC_SOURCE_WAV_FILE)
-        return 0;
-
-    valid = sync_load_i(&s->wav_plain_lock_valid);
-    generation = sync_load_i(&s->file_generation);
-    lock_generation = sync_load_i(&s->wav_plain_lock_generation);
-
-    return (valid && generation == lock_generation);
-}
-
-int vj_audio_sync_wav_plain_lock_get(vj_audio_sync_shared_t *s,
-                                      int *delta_frames,
-                                      int *confidence_pct)
-{
-    if(!vj_audio_sync_wav_plain_lock_valid(s))
-        return 0;
-
-    if(delta_frames)
-        *delta_frames = sync_load_i(&s->wav_plain_lock_delta_frames);
-    if(confidence_pct)
-        *confidence_pct = sync_load_i(&s->wav_plain_lock_confidence_pct);
-
-    return 1;
-}
-
-void vj_audio_sync_wav_plain_lock_store(vj_audio_sync_shared_t *s,
-                                        int delta_frames,
-                                        int confidence_pct)
-{
-    int generation;
-
-    if(!s)
-        return;
-
-    if(sync_load_i(&s->source) != VJ_AUDIO_SYNC_SOURCE_WAV_FILE)
-        return;
-
-    confidence_pct = sync_clampi(confidence_pct, 0, 100);
-    generation = sync_load_i(&s->file_generation);
-
-    sync_store_i(&s->wav_plain_lock_generation, generation);
-    sync_store_i(&s->wav_plain_lock_delta_frames, delta_frames);
-    sync_store_i(&s->wav_plain_lock_confidence_pct, confidence_pct);
-    sync_store_i(&s->wav_plain_lock_valid, 1);
-
-    veejay_msg(VEEJAY_MSG_INFO,
-               "[AUDIO-SYNC][WAV] cached PLAIN lock gen=%d delta=%+dfr conf=%d%%",
-               generation,
-               delta_frames,
-               confidence_pct);
-}
-
-void vj_audio_sync_wav_plain_lock_clear(vj_audio_sync_shared_t *s)
-{
-    if(!s)
-        return;
-
-    sync_store_i(&s->wav_plain_lock_valid, 0);
-    sync_store_i(&s->wav_plain_lock_generation, 0);
-    sync_store_i(&s->wav_plain_lock_delta_frames, 0);
-    sync_store_i(&s->wav_plain_lock_confidence_pct, 0);
-}
-
 
 int vj_audio_sync_track_align_frame_action(vj_audio_sync_shared_t *s,
                                            double video_fps,
@@ -5369,9 +5197,6 @@ int vj_audio_sync_track_align_frame_action(vj_audio_sync_shared_t *s,
     if(current_speed < 0)
         return 1;
 
-
-
-
     sync_store_i(&s->track_align_correction_ppm, 0);
     s->align_last_frame_action = 1;
     return 1;
@@ -5383,27 +5208,17 @@ int vj_audio_sync_get_format(vj_audio_sync_shared_t *s,
                              int *bits_per_channel,
                              int *sample_rate)
 {
-    int ch;
-    int bpf;
-    int bits;
-    int rate;
-
     if(!s || !sync_load_i(&s->open))
         return 0;
 
-    sync_lock(s);
-    ch = s->channels;
-    bpf = s->bytes_per_frame;
-    bits = s->bits_per_channel;
-    rate = s->sample_rate;
-    sync_unlock(s);
+    if(channels) *channels = sync_load_i(&s->channels);
+    if(bytes_per_frame) *bytes_per_frame = sync_load_i(&s->bytes_per_frame);
+    if(bits_per_channel) *bits_per_channel = sync_load_i(&s->bits_per_channel);
+    if(sample_rate) *sample_rate = sync_load_i(&s->sample_rate);
 
-    if(channels) *channels = ch;
-    if(bytes_per_frame) *bytes_per_frame = bpf;
-    if(bits_per_channel) *bits_per_channel = bits;
-    if(sample_rate) *sample_rate = rate;
-
-    return ch > 0 && bpf > 0 && rate > 0;
+    return sync_load_i(&s->channels) > 0 &&
+           sync_load_i(&s->bytes_per_frame) > 0 &&
+           sync_load_i(&s->sample_rate) > 0;
 }
 
 int vj_audio_sync_get_snapshot(vj_audio_sync_shared_t *s,
@@ -5419,6 +5234,10 @@ int vj_audio_sync_get_snapshot(vj_audio_sync_shared_t *s,
     dst->mode = sync_load_i(&s->mode);
     dst->source = sync_load_i(&s->source);
     dst->target_mode = sync_load_i(&s->target_mode);
+    dst->channels = sync_load_i(&s->channels);
+    dst->bytes_per_frame = sync_load_i(&s->bytes_per_frame);
+    dst->bits_per_channel = sync_load_i(&s->bits_per_channel);
+    dst->sample_rate = sync_load_i(&s->sample_rate);
     dst->level = sync_from_q15(sync_load_i(&s->level_q15));
     dst->envelope = sync_from_q15(sync_load_i(&s->envelope_q15));
     dst->transient = sync_from_q15(sync_load_i(&s->transient_q15));
@@ -5433,11 +5252,6 @@ int vj_audio_sync_get_snapshot(vj_audio_sync_shared_t *s,
     dst->overruns = sync_load_l(&s->overruns);
     dst->underruns = sync_load_l(&s->underruns);
     dst->reads = sync_load_l(&s->reads);
-    dst->target_queue_overruns = sync_load_l(&s->target_queue_overruns);
-    dst->target_queue_reads = sync_load_l(&s->target_queue_reads);
-    dst->target_queue_lock_drops = sync_load_l(&s->target_queue_lock_drops);
-    dst->target_queue_overflow_events = sync_load_l(&s->target_queue_overflow_events);
-    dst->target_queue_dropped_frames = sync_load_l(&s->target_queue_dropped_frames);
     dst->max_correction_pct = sync_load_i(&s->max_correction_pct);
     dst->bridge_state = sync_load_i(&s->bridge_state);
     dst->track_align_locked = sync_load_i(&s->track_align_locked);
@@ -5445,38 +5259,16 @@ int vj_audio_sync_get_snapshot(vj_audio_sync_shared_t *s,
     dst->track_align_confidence_pct = sync_load_i(&s->track_align_confidence_pct);
     dst->track_align_correction_ppm = sync_load_i(&s->track_align_correction_ppm);
     dst->track_align_state = sync_load_i(&s->track_align_state);
+    dst->track_align_snap_pending = sync_load_i(&s->track_align_snap_pending);
+    dst->track_align_snap_delta_frames = sync_load_i(&s->track_align_snap_delta_frames);
+    dst->track_align_snap_confidence_pct = sync_load_i(&s->track_align_snap_confidence_pct);
 
     sync_lock(s);
-    dst->channels = s->channels;
-    dst->bytes_per_frame = s->bytes_per_frame;
-    dst->bits_per_channel = s->bits_per_channel;
-    dst->sample_rate = s->sample_rate;
-    dst->track_align_snap_pending = s->track_align_snap_pending;
-    dst->track_align_snap_delta_frames = s->track_align_snap_delta_frames;
-    dst->track_align_snap_confidence_pct = s->track_align_snap_confidence_pct;
     dst->bridge_ratio = s->bridge_ratio_smooth;
     dst->bridge_correction = s->bridge_last_correction;
-
-    if(s->target_sample_rate > 0) {
-        long long pending = s->target_write_frame_abs - s->target_process_frame_abs;
-        long long retained = s->target_write_frame_abs - s->target_read_frame_abs;
-
-        if(pending < 0)
-            pending = 0;
-        if(retained < 0)
-            retained = 0;
-
-        dst->target_queue_pending_ms =
-            (int)((pending * 1000LL) / (long long)s->target_sample_rate);
-        dst->target_queue_retained_ms =
-            (int)((retained * 1000LL) / (long long)s->target_sample_rate);
-        dst->target_queue_ring_ms =
-            (int)(((long long)s->target_ring_frames * 1000LL) /
-                  (long long)s->target_sample_rate);
-    }
     sync_unlock(s);
 
     return 1;
 }
 
-#endif
+#endif /* HAVE_JACK */

@@ -44,7 +44,6 @@ enum {
     LAVPLAY_STATE_PLAYING = 2	/* speed != 0 */
 };
 
-/* nmacro recorder, 5 lines code for play back of what you changed at navigation */
 enum {
     VJ_MACRO_PLAIN_RECORD = 0,
     VJ_MACRO_PLAIN_PLAY = 1,
@@ -56,10 +55,6 @@ enum {
 #define AUDIO_MODE_SILENCE_FILL 0
 #define AUDIO_MODE_CONTENT 1
 
-/* Coherent recording audio source selection.
- * AUTO follows the active audible external path when one is selected,
- * otherwise it records the original media audio.
- */
 #define VJ_RECORD_AUDIO_SOURCE_AUTO      0
 #define VJ_RECORD_AUDIO_SOURCE_ORIGINAL  1
 #define VJ_RECORD_AUDIO_SOURCE_BEAT_JACK 2
@@ -70,7 +65,6 @@ enum {
 #define DUMMY_DEFAULT_HEIGHT 288
 #define DUMMY_DEFAULT_FPS 25
 
-/* Video Playback Setup, necessary items for reading and playing video */
 struct mjpeg_sync
 {
    unsigned long frame;      /* Frame (0 - n) for double buffer */
@@ -225,15 +219,34 @@ typedef struct vj_audio_beat_shared_t
     volatile long record_underruns;
 
 #ifdef HAVE_JACK
-    /*
-     * External capture/clock provider.
-     * Beat consumes this instead of owning JACK input directly.
-     * NULL keeps legacy direct-JACK capture alive during transition.
-     */
     vj_audio_sync_shared_t *sync;
 #endif
 
 } vj_audio_beat_shared_t;
+
+
+#define VJ_SCENE_ANALYSIS_MAX_SIDE 64
+#define VJ_SCENE_ANALYSIS_MAX_PIXELS (VJ_SCENE_ANALYSIS_MAX_SIDE * VJ_SCENE_ANALYSIS_MAX_SIDE)
+
+typedef struct vj_scene_detect_t
+{
+    volatile int valid;
+    volatile long long frame;
+    volatile int scene_id;
+    volatile long long last_cut_frame;
+    volatile int scene_age_frames;
+    volatile int hard_cut;
+    volatile int cut_score_q15;
+    volatile int diff_q15;
+    volatile int mean_q15;
+    volatile int analysis_w;
+    volatile int analysis_h;
+    int prev_ready;
+    double diff_ema;
+    double diff_var;
+    double mean_ema;
+    uint8_t prev[VJ_SCENE_ANALYSIS_MAX_PIXELS];
+} vj_scene_detect_t;
 
 typedef struct vj_audio_clock_osd_t {
     volatile long long prod_loops;
@@ -298,6 +311,7 @@ typedef struct {
 	vj_audio_sync_shared_t audio_sync;
 #endif
 	vj_audio_beat_shared_t audio_beat;
+	vj_scene_detect_t scene_detect;
 
 	volatile int audio_mode;
 	volatile int state;
@@ -310,13 +324,6 @@ typedef struct {
 	volatile double runtime_playback_rate;
 	volatile long long anchor_frame;
 #ifdef HAVE_JACK
-	/* Track Align re-anchor bookkeeping.  When the user scratches, reverses,
-	 * pauses, or changes runtime FPS, the external JACK/master track keeps
-	 * moving forward.  On return to normal +1 playback we can estimate the
-	 * expected media frame linearly from the audio clock, then let waveform
-	 * align fine-tune it.  track_align_reacquire_seq lets performer-side wide
-	 * acquisition clear stale buckets without coupling libveejay to performer_t.
-	 */
 	volatile int track_align_reacquire_seq;
 	volatile int track_align_linear_active;
 	volatile long long track_align_linear_anchor_frame;
@@ -326,13 +333,7 @@ typedef struct {
 	volatile double track_align_linear_frame_accum;
 	volatile int track_align_linear_mode;
 	volatile int track_align_linear_id;
-	/* Track Align correction edge handling.
-	 * Current Track Align corrections use the normal AUDIO_EDGE_JUMP
-	 * crossfade/declick path for arbitrary corrected seeks. AUDIO_EDGE_RESET
-	 * stays reserved for real reset boundaries such as sample start/min-frame
-	 * handling. These fields are kept for ABI/source compatibility with earlier
-	 * experimental builds; playback no longer mutes on track_align_audio_guard.
-	 */
+
 	volatile int track_align_force_audio_edge_reset;
 	volatile long long track_align_audio_guard_until_ms;
 #endif
