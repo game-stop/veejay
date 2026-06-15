@@ -21,78 +21,105 @@
 #include "common.h"
 #include "gamma.h"
 
+#include <math.h>
+
 typedef struct {
-    int gamma_flag;
+    int gamma_key;
     uint8_t table[256];
     int n_threads;
 } gamma_t;
 
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
 vj_effect *gamma_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
+    if(!ve)
+        return NULL;
+
     ve->num_params = 1;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->defaults[0] = 124;
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 500;
+
     ve->description = "Gamma Correction";
     ve->sub_format = -1;
-	ve->param_description = vje_build_param_list(ve->num_params, "Gamma");
+    ve->extra_frame = 0;
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(ve->num_params, "Gamma");
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_CONTRAST, VJ_BEAT_F_CONTINUOUS, 45, 220, 8, 34, 900, 2400, 0, 58 /* Gamma */
+        VJ_BEAT_CONTRAST, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 45, 260, 14, 54, 800, 3000, 0, 78
     );
-	return ve;
+    
+    return ve;
 }
 
-void *gamma_malloc(int w, int h) {
-    gamma_t *g = (gamma_t*) vj_calloc( sizeof(gamma_t) );
-    if(!g) {
+void *gamma_malloc(int w, int h)
+{
+    gamma_t *g = (gamma_t*) vj_calloc(sizeof(gamma_t));
+
+    if(!g)
         return NULL;
-    }
-    g->n_threads = vje_advise_num_threads(w*h);
+
+    g->gamma_key = -1;
+    g->n_threads = vje_advise_num_threads(w * h);
+
     return (void*) g;
 }
 
-void gamma_free(void *ptr) {
-    gamma_t *g = (gamma_t*) ptr;
-    free(g);
-}
-
-static void gamma_setup(gamma_t *g, int width, int height, double gamma_value)
+void gamma_free(void *ptr)
 {
-    int i;
-    double val;
-
-    for (i = 0; i < 256; i++) {
-		val = i / 255.0;
-		val = pow(val, gamma_value);
-		val = 255.0 * val;
-		g->table[i] = (uint8_t) ((val < 0) ? 0 : ((val > 255 ) ? 255: val));
-    }
+    free(ptr);
 }
 
-void gamma_apply(void *ptr, VJFrame *frame, int *args ) {
-    int gamma_value = args[0];
+static void gamma_setup(gamma_t *g, int gamma_value)
+{
+    const double gamma_f = (double)gamma_value * 0.01;
 
+    for(int i = 0; i < 256; i++) {
+        double v = (double)i * (1.0 / 255.0);
+        int y = (int)(pow(v, gamma_f) * 255.0 + 0.5);
+
+        g->table[i] = (uint8_t)clampi(y, 0, 255);
+    }
+
+    g->gamma_key = gamma_value;
+}
+
+void gamma_apply(void *ptr, VJFrame *frame, int *args)
+{
     gamma_t *g = (gamma_t*) ptr;
 
-	unsigned int i;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-    
-    if (gamma_value != g->gamma_flag) {
-		gamma_setup(g, frame->width, frame->height, (double) (gamma_value / 100.0));
-		g->gamma_flag = gamma_value;
-	}
+    const int gamma_value = args[0];
+    const int len = frame->len;
 
-    uint8_t *table = g->table;
+    if(gamma_value != g->gamma_key)
+        gamma_setup(g, gamma_value);
 
-    #pragma omp parallel for schedule(static) num_threads(g->n_threads)
-    for (i = 0; i < len; i++) {
-		Y[i] = (uint8_t) table[Y[i]];
-    }
+    uint8_t *restrict Y = frame->data[0];
+    const uint8_t *restrict table = g->table;
+
+#pragma omp parallel for schedule(static) num_threads(g->n_threads)
+    for(int i = 0; i < len; i++)
+        Y[i] = table[Y[i]];
 }

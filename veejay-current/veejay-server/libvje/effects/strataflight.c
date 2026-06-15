@@ -19,6 +19,9 @@
  */
 
 #include "common.h"
+#include <math.h>
+#include <stdint.h>
+#include <veejaycore/vjmem.h>
 #include "strataflight.h"
 
 #define STRATAFLIGHT_PARAMS 13
@@ -71,16 +74,31 @@ typedef struct {
 
     int *z_lut;
     int *z_fog_lut;
+
+    float eff_opacity;
+    float eff_yaw;
+    float eff_pitch;
+    float eff_distance;
+    float eff_flightheight;
+    float eff_flightspeed;
+    float eff_freeforward;
+    float eff_strafe;
+    float eff_height;
+    float eff_deposit;
+    float eff_memory;
+    float eff_erosion;
+    float eff_chroma;
+    int eff_ready;
 } strataflight_t;
 
-static inline int sf_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
 }
 
 static inline uint8_t sf_u8(int v)
 {
-    return (uint8_t) sf_clampi(v, 0, 255);
+    return (uint8_t) clampi(v, 0, 255);
 }
 
 static inline int sf_abs_i(int v)
@@ -91,6 +109,18 @@ static inline int sf_abs_i(int v)
 static inline int sf_blend(int oldv, int newv, int alpha)
 {
     return (oldv * (256 - alpha) + newv * alpha) >> 8;
+}
+
+static inline int sf_smooth_i(float *state, int target, float attack, float release)
+{
+    float cur = *state;
+    float diff = (float) target - cur;
+    float step = diff >= 0.0f ? attack : release;
+    float out = cur + diff * step;
+
+    *state = out;
+
+    return (int) (out + (out >= 0.0f ? 0.5f : -0.5f));
 }
 
 static inline int sf_wrap_i_fast(int v, int max)
@@ -249,7 +279,6 @@ vj_effect *strataflight_init(int w, int h)
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->parallel = 0;
 
     ve->defaults[P_OPACITY]      = 100;
     ve->defaults[P_YAW]          = 500;
@@ -298,28 +327,20 @@ vj_effect *strataflight_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS,                                                24,  100, 8,  30, 1200, 3000, 0,    45, /* Opacity */
-
-        VJ_BEAT_DRIFT,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 380, 620, 3,  12, 2800, 7200, 1600, 22, /* Camera Yaw */
-        VJ_BEAT_DRIFT,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 520, 780, 3,  12, 2600, 6800, 1400, 22, /* Camera Pitch */
-
-        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS,                                                180, 860, 6,  22, 1600, 4200, 0,    42, /* View Distance */
-        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS,                                                180, 820, 6,  22, 1600, 4200, 0,    42, /* Flight Height */
-        VJ_BEAT_SPEED,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                          0,   56,  4,  16, 1800, 5200, 900,  32, /* Flight Speed */
-
-        VJ_BEAT_SIGNED_CURVE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, 420, 580, 4, 14, 2200, 6200, 1200, 24, /* Move Forward Back */
-        VJ_BEAT_SIGNED_CURVE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, 420, 580, 4, 14, 2200, 6200, 1200, 24, /* Strafe Left Right */
-
-        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS,                                                12,  92,  7,  24, 1400, 3800, 0,    48, /* Terrain Height */
-        VJ_BEAT_SOURCE_MIX,       VJ_BEAT_F_CONTINUOUS,                                                0,   92,  8,  30, 1200, 3200, 0,    54, /* Source Deposit */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS,                                                18,  96,  7,  26, 1600, 4200, 0,    48, /* Terrain Memory */
-        VJ_BEAT_TURBULENCE,       VJ_BEAT_F_CONTINUOUS,                                                0,   72,  8,  30, 1200, 3200, 0,    50, /* Erosion */
-        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS,                                                0,   100, 6,  22, 1600, 4200, 0,    40  /* Material Chroma */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                 18,  100,  8, 30, 900,  2600, 0, 48,
+        VJ_BEAT_DRIFT,           VJ_BEAT_F_CONTINUOUS,                                           0,   1000, 8, 28, 900,  2600, 0, 42,
+        VJ_BEAT_DRIFT,           VJ_BEAT_F_CONTINUOUS,                                           220, 940,  8, 28, 900,  2600, 0, 38,
+        VJ_BEAT_WINDOW_RADIUS,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                 80,  1000, 8, 28, 1000, 3000, 0, 40,
+        VJ_BEAT_WINDOW_RADIUS,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                 80,  1000, 8, 28, 1000, 3000, 0, 40,
+        VJ_BEAT_SPEED,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                 4,   100,  8, 30, 700,  2200, 0, 46,
+        VJ_BEAT_SIGNED_CURVE,    VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,                  160, 840,  8, 28, 900,  2800, 0, 32,
+        VJ_BEAT_SIGNED_CURVE,    VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,                  180, 820,  8, 28, 900,  2800, 0, 30,
+        VJ_BEAT_WINDOW_RADIUS,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                 6,   100,  8, 28, 1000, 3000, 0, 38,
+        VJ_BEAT_SOURCE_MIX,      VJ_BEAT_F_CONTINUOUS,                                           0,   100,  8, 28, 900,  2600, 0, 36,
+        VJ_BEAT_MEMORY,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                 8,   98,   8, 28, 1200, 3200, 0, 32,
+        VJ_BEAT_TURBULENCE,      VJ_BEAT_F_CONTINUOUS,                                           0,   100,  8, 28, 900,  2400, 0, 34,
+        VJ_BEAT_COLOR_AMOUNT,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                 8,   100,  8, 28, 900,  2600, 0, 36
     );
-
-    (void) w;
-    (void) h;
 
     return ve;
 }
@@ -333,9 +354,6 @@ void *strataflight_malloc(int w, int h)
     size_t total_u8;
     size_t total_int;
 
-    if (w <= 0 || h <= 0)
-        return NULL;
-
     c = (strataflight_t *) vj_calloc(sizeof(strataflight_t));
     if (!c)
         return NULL;
@@ -347,6 +365,7 @@ void *strataflight_malloc(int w, int h)
 
     c->seeded = 0;
     c->frame = 0;
+    c->eff_ready = 0;
 
     c->cam_x_fp = w << 7;
     c->cam_y_fp = h << 7;
@@ -413,15 +432,8 @@ void strataflight_free(void *ptr)
 {
     strataflight_t *c = (strataflight_t *) ptr;
 
-    if (!c)
-        return;
-
-    if (c->region)
-        free(c->region);
-
-    if (c->int_region)
-        free(c->int_region);
-
+    free(c->region);
+    free(c->int_region);
     free(c);
 }
 
@@ -511,29 +523,10 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
 
     int do_seed;
 
-    if (!c || !frame || !frame->data[0] || !frame->data[1] || !frame->data[2] || !args)
-        return;
-
     w = c->w;
     h = c->h;
-
-    if (w <= 0 || h <= 0 || c->len <= 0)
-        return;
-
-    plen = frame->len;
-    if (plen > c->len)
-        plen = c->len;
-
-    rows = plen / w;
-    if (rows <= 0)
-        return;
-
-    if (rows > h)
-        rows = h;
-
-    plen = rows * w;
-    if (plen <= 0)
-        return;
+    plen = c->len;
+    rows = h;
 
     Y = frame->data[0];
     U = frame->data[1];
@@ -553,19 +546,64 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
     z_lut = c->z_lut;
     z_fog_lut = c->z_fog_lut;
 
-    opacity      = sf_clampi(args[P_OPACITY],      0, 100);
-    yaw          = sf_clampi(args[P_YAW],          0, 1000);
-    pitch        = sf_clampi(args[P_PITCH],        0, 1000);
-    distance     = sf_clampi(args[P_DISTANCE],     0, 1000);
-    flightheight = sf_clampi(args[P_FLIGHTHEIGHT], 0, 1000);
-    flightspeed  = sf_clampi(args[P_FLIGHTSPEED],  0, 100);
-    freeforward  = sf_clampi(args[P_FREEFORWARD],  0, 1000);
-    strafe       = sf_clampi(args[P_STRAFE],       0, 1000);
-    height_scale = sf_clampi(args[P_HEIGHT],       0, 100);
-    deposit      = sf_clampi(args[P_DEPOSIT],      0, 100);
-    memory       = sf_clampi(args[P_MEMORY],       0, 100);
-    erosion      = sf_clampi(args[P_EROSION],      0, 100);
-    chroma       = sf_clampi(args[P_CHROMA],       0, 100);
+    opacity      = args[P_OPACITY];
+    yaw          = args[P_YAW];
+    pitch        = args[P_PITCH];
+    distance     = args[P_DISTANCE];
+    flightheight = args[P_FLIGHTHEIGHT];
+    flightspeed  = args[P_FLIGHTSPEED];
+    freeforward  = args[P_FREEFORWARD];
+    strafe       = args[P_STRAFE];
+    height_scale = args[P_HEIGHT];
+    deposit      = args[P_DEPOSIT];
+    memory       = args[P_MEMORY];
+    erosion      = args[P_EROSION];
+    chroma       = args[P_CHROMA];
+
+    if (!c->eff_ready) {
+        c->eff_opacity      = (float) opacity;
+        c->eff_yaw          = (float) yaw;
+        c->eff_pitch        = (float) pitch;
+        c->eff_distance     = (float) distance;
+        c->eff_flightheight = (float) flightheight;
+        c->eff_flightspeed  = (float) flightspeed;
+        c->eff_freeforward  = (float) freeforward;
+        c->eff_strafe       = (float) strafe;
+        c->eff_height       = (float) height_scale;
+        c->eff_deposit      = (float) deposit;
+        c->eff_memory       = (float) memory;
+        c->eff_erosion      = (float) erosion;
+        c->eff_chroma       = (float) chroma;
+        c->eff_ready = 1;
+    } else {
+        opacity      = sf_smooth_i(&c->eff_opacity,      opacity,      0.180f, 0.130f);
+        yaw          = sf_smooth_i(&c->eff_yaw,          yaw,          0.090f, 0.070f);
+        pitch        = sf_smooth_i(&c->eff_pitch,        pitch,        0.080f, 0.060f);
+        distance     = sf_smooth_i(&c->eff_distance,     distance,     0.075f, 0.052f);
+        flightheight = sf_smooth_i(&c->eff_flightheight, flightheight, 0.075f, 0.052f);
+        flightspeed  = sf_smooth_i(&c->eff_flightspeed,  flightspeed,  0.145f, 0.095f);
+        freeforward  = sf_smooth_i(&c->eff_freeforward,  freeforward,  0.130f, 0.085f);
+        strafe       = sf_smooth_i(&c->eff_strafe,       strafe,       0.130f, 0.085f);
+        height_scale = sf_smooth_i(&c->eff_height,       height_scale, 0.080f, 0.055f);
+        deposit      = sf_smooth_i(&c->eff_deposit,      deposit,      0.090f, 0.060f);
+        memory       = sf_smooth_i(&c->eff_memory,       memory,       0.060f, 0.045f);
+        erosion      = sf_smooth_i(&c->eff_erosion,      erosion,      0.085f, 0.060f);
+        chroma       = sf_smooth_i(&c->eff_chroma,       chroma,       0.120f, 0.080f);
+    }
+
+    opacity      = clampi(opacity,      0, 100);
+    yaw          = clampi(yaw,          0, 1000);
+    pitch        = clampi(pitch,        0, 1000);
+    distance     = clampi(distance,     0, 1000);
+    flightheight = clampi(flightheight, 0, 1000);
+    flightspeed  = clampi(flightspeed,  0, 100);
+    freeforward  = clampi(freeforward,  0, 1000);
+    strafe       = clampi(strafe,       0, 1000);
+    height_scale = clampi(height_scale, 0, 100);
+    deposit      = clampi(deposit,      0, 100);
+    memory       = clampi(memory,       0, 100);
+    erosion      = clampi(erosion,      0, 100);
+    chroma       = clampi(chroma,       0, 100);
 
     alpha = (opacity * 256 + 50) / 100;
     chroma_q = (chroma * 256 + 50) / 100;
@@ -576,7 +614,7 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
     smooth_gain = 4 + ((erosion * 82) / 100);
 
     feed = 8 + ((deposit * (150 - (memory >> 1))) / 100);
-    feed = sf_clampi(feed, 0, 180);
+    feed = clampi(feed, 0, 180);
 
     mfeed = 4 + ((deposit * (120 - (memory >> 1))) / 100);
     if (mfeed > 140)
@@ -588,7 +626,7 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
     dist_far = (distance + dist_curve) >> 1;
 
     worldzoom = (distance * distance) / 750;
-    worldzoom = sf_clampi(worldzoom, 0, 1000);
+    worldzoom = clampi(worldzoom, 0, 1000);
 
     flight_curve = (flightheight * flightheight) / 1000;
     flight_far = (flightheight + flight_curve) >> 1;
@@ -600,7 +638,7 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
                   ((worldzoom * 520) / 1000) +
                   ((wz_curve * 1336) / 1000);
 
-        world_q = sf_clampi(world_q, 160, 2048);
+        world_q = clampi(world_q, 160, 2048);
     }
 
     use_feather = 0;
@@ -652,11 +690,9 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
         steps = SF_ZLUT_MAX - 1;
 
     fov_q = 3400 - ((dist_far * 1350) / 1000);
-    fov_q = sf_clampi(fov_q, 1750, 3500);
+    fov_q = clampi(fov_q, 1750, 3500);
 
     half_w = w >> 1;
-    if (half_w <= 0)
-        half_w = 1;
 
     side_start_q12 = -fov_q << 12;
     side_step_q12 = (fov_q << 12) / half_w;
@@ -774,7 +810,7 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
                 upheaval = (motion * upheaval_gain) >> 7;
 
                 target = (int) Y[i] + ridge + upheaval - 24;
-                target = sf_clampi(target, 0, 255);
+                target = clampi(target, 0, 255);
 
                 smoothed = old_h + (((avg_h - old_h) * smooth_gain) >> 8);
 
@@ -870,7 +906,7 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
                 int wx1 = cam_x_fp + ((ray_x_lut[w - 1] * z) >> 4);
                 int wy1 = cam_y_fp + ((ray_y_lut[w - 1] * z) >> 4);
 
-                int denom = w > 1 ? w - 1 : 1;
+                int denom = w - 1;
 
                 int64_t wx_q16 = ((int64_t) wx0) << 16;
                 int64_t wy_q16 = ((int64_t) wy0) << 16;
@@ -897,7 +933,7 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
                     shade >>= 8;
 
                     base_y = h0 + shade - 6 + row_bright;
-                    base_y = sf_clampi(base_y, 0, 255);
+                    base_y = clampi(base_y, 0, 255);
 
                     base_u =
                         128 +
@@ -907,8 +943,8 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
                         128 +
                         ((sf_sample_plane(render_mv, tx, ty, w, rows, use_feather, seam_feather) - 128) * chroma_q >> 8);
 
-                    base_u = sf_clampi(base_u, 0, 255);
-                    base_v = sf_clampi(base_v, 0, 255);
+                    base_u = clampi(base_u, 0, 255);
+                    base_v = clampi(base_v, 0, 255);
 
                     base_y = ((base_y * (256 - fog)) + (haze_y * fog)) >> 8;
                     base_u = ((base_u * (256 - fog)) + (128 * fog)) >> 8;
@@ -974,7 +1010,7 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
                         shade >>= 8;
 
                         base_y = h0 + shade + 10;
-                        base_y = sf_clampi(base_y, 0, 255);
+                        base_y = clampi(base_y, 0, 255);
 
                         base_u =
                             128 +
@@ -984,8 +1020,8 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
                             128 +
                             ((sf_sample_plane(render_mv, tx, ty, w, rows, use_feather, seam_feather) - 128) * chroma_q >> 8);
 
-                        base_u = sf_clampi(base_u, 0, 255);
-                        base_v = sf_clampi(base_v, 0, 255);
+                        base_u = clampi(base_u, 0, 255);
+                        base_v = clampi(base_v, 0, 255);
 
                         base_y = ((base_y * (256 - fog)) + (56 * fog)) >> 8;
                         base_u = ((base_u * (256 - fog)) + (128 * fog)) >> 8;
@@ -1014,7 +1050,7 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
 
                                     dark_acc += dark_step;
 
-                                    Y[oi] = (uint8_t) sf_clampi(ey, 0, 255);
+                                    Y[oi] = (uint8_t) clampi(ey, 0, 255);
                                     U[oi] = (uint8_t) base_u;
                                     V[oi] = (uint8_t) base_v;
                                 }
@@ -1027,7 +1063,7 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
 
                                     dark_acc += dark_step;
 
-                                    ey = sf_clampi(ey, 0, 255);
+                                    ey = clampi(ey, 0, 255);
 
                                     Y[oi] = (uint8_t) sf_blend((int) Y[oi], ey, alpha);
                                     U[oi] = (uint8_t) sf_blend((int) U[oi], base_u, alpha);

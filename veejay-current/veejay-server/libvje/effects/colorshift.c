@@ -23,251 +23,198 @@
 vj_effect *colorshift_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 5;
-    ve->defaults[1] = 235;
 
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 9;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
+    ve->num_params = 2;
+    ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    ve->limits[0][0] = 0; ve->limits[1][0] = 9;   ve->defaults[0] = 5;
+    ve->limits[0][1] = 0; ve->limits[1][1] = 255; ve->defaults[1] = 235;
+
     ve->description = "Shift pixel values YCbCr";
     ve->sub_format = -1;
     ve->extra_frame = 0;
-	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Value" );
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Value");
+    ve->hints = vje_init_value_hint_list(ve->num_params);
 
-	ve->hints = vje_init_value_hint_list( ve->num_params );
-	
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
-		"Luma (OR)", "Chroma Blue (OR)", "Chroma Red (OR)", "Chroma Blue and Red (OR)",
-		"All Channels (OR)", "All Channels (AND)", "Luma (AND)", "Chroma Blue (AND)",
-		"Chroma Red (AND)", "Chroma Blue and Red (AND)"
-	);
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][0],
+        0,
+        "Luma (OR)",
+        "Chroma Blue (OR)",
+        "Chroma Red (OR)",
+        "Chroma Blue and Red (OR)",
+        "All Channels (OR)",
+        "All Channels (AND)",
+        "Luma (AND)",
+        "Chroma Blue (AND)",
+        "Chroma Red (AND)",
+        "Chroma Blue and Red (AND)"
+    );
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000, /* Mode */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000  /* Value - bitmask */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 32,                 255,                4,  16, 2600, 7600, 1800, 24
     );
 
     return ve;
 }
 
-static void softmask2_apply(VJFrame *frame, int paramt)
+static void colorshift_or_plane(uint8_t *restrict p, int len, uint8_t value)
+{
+    if(!p || len <= 0)
+        return;
+
+    const int n_threads = vje_advise_num_threads(len);
+
+    #pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int i = 0; i < len; i++)
+        p[i] = (uint8_t)(p[i] | value);
+}
+
+static void colorshift_and_plane(uint8_t *restrict p, int len, uint8_t value)
+{
+    if(!p || len <= 0)
+        return;
+
+    const int n_threads = vje_advise_num_threads(len);
+
+    #pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int i = 0; i < len; i++)
+        p[i] = (uint8_t)(p[i] & value);
+}
+
+static void colorshift_or_2planes(uint8_t *restrict p0, uint8_t *restrict p1, int len, uint8_t value)
+{
+    if(!p0 || !p1 || len <= 0)
+        return;
+
+    const int n_threads = vje_advise_num_threads(len);
+
+    #pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int i = 0; i < len; i++) {
+        p0[i] = (uint8_t)(p0[i] | value);
+        p1[i] = (uint8_t)(p1[i] | value);
+    }
+}
+
+static void colorshift_and_2planes(uint8_t *restrict p0, uint8_t *restrict p1, int len, uint8_t value)
+{
+    if(!p0 || !p1 || len <= 0)
+        return;
+
+    const int n_threads = vje_advise_num_threads(len);
+
+    #pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int i = 0; i < len; i++) {
+        p0[i] = (uint8_t)(p0[i] & value);
+        p1[i] = (uint8_t)(p1[i] & value);
+    }
+}
+
+static void colorshift_or_ycbcr(VJFrame *frame, uint8_t value)
 {
     const int len = frame->len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
+
     uint8_t *restrict Y = frame->data[0];
-    const int n_threads = vje_advise_num_threads(len);
-
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for (int x = 0; x < len; x++) {
-#pragma omp simd
-        for (int i = x; i < x + 1; i++)
-            Y[i] &= paramt;
-    }
-}
-
-static void softmask2_applycb(VJFrame *frame, int paramt)
-{
-    const int len = (frame->ssm ? frame->len : frame->uv_len);
-    uint8_t *restrict Cb = frame->data[1];
-    const int n_threads = vje_advise_num_threads(len);
-
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for (int x = 0; x < len; x++) {
-#pragma omp simd
-        for (int i = x; i < x + 1; i++)
-            Cb[i] &= paramt;
-    }
-}
-
-static void softmask2_applycr(VJFrame *frame, int paramt)
-{
-    const int len = (frame->ssm ? frame->len : frame->uv_len);
-    uint8_t *restrict Cr = frame->data[2];
-    const int n_threads = vje_advise_num_threads(len);
-
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for (int x = 0; x < len; x++) {
-#pragma omp simd
-        for (int i = x; i < x + 1; i++)
-            Cr[i] &= paramt;
-    }
-}
-
-static void softmask2_applycbcr(VJFrame *frame, int paramt)
-{
-    const int len = (frame->ssm ? frame->len : frame->uv_len);
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
+
+    if(!Y || !Cb || !Cr || len <= 0)
+        return;
+
     const int n_threads = vje_advise_num_threads(len);
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for (int x = 0; x < len; x++) {
-#pragma omp simd
-        for (int i = x; i < x + 1; i++) {
-            Cb[i] &= paramt;
-            Cr[i] &= paramt;
+    #pragma omp parallel num_threads(n_threads)
+    {
+        #pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+            Y[i] = (uint8_t)(Y[i] | value);
+
+        #pragma omp for schedule(static)
+        for(int i = 0; i < uv_len; i++) {
+            Cb[i] = (uint8_t)(Cb[i] | value);
+            Cr[i] = (uint8_t)(Cr[i] | value);
         }
     }
 }
 
-static void softmask2_applyycbcr(VJFrame *frame, int paramt)
+static void colorshift_and_ycbcr(VJFrame *frame, uint8_t value)
 {
     const int len = frame->len;
-    const int uv_len = (frame->ssm ? len : frame->uv_len);
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
-    uint8_t *restrict Y  = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
-
-    const int n_threads_y  = vje_advise_num_threads(len);
-    const int n_threads_uv = vje_advise_num_threads(uv_len);
-
-#pragma omp parallel for num_threads(n_threads_y) schedule(static)
-    for (int x = 0; x < len; x++) {
-#pragma omp simd
-        for (int i = x; i < x + 1; i++)
-            Y[i] &= paramt;
-    }
-
-#pragma omp parallel for num_threads(n_threads_uv) schedule(static)
-    for (int x = 0; x < uv_len; x++) {
-#pragma omp simd
-        for (int i = x; i < x + 1; i++) {
-            Cb[i] &= paramt;
-            Cr[i] &= paramt;
-        }
-    }
-}
-
-static void softmask_apply(VJFrame *frame, int paramt)
-{
-    const int len = frame->len;
     uint8_t *restrict Y = frame->data[0];
-    const int n_threads = vje_advise_num_threads(len);
-
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for (int x = 0; x < len; x++) {
-#pragma omp simd
-        for (int i = x; i < x + 1; i++)
-            Y[i] |= paramt;
-    }
-}
-
-static void softmask_applycb(VJFrame *frame, int paramt)
-{
-    const int len = (frame->ssm ? frame->len : frame->uv_len);
-    uint8_t *restrict Cb = frame->data[1];
-    const int n_threads = vje_advise_num_threads(len);
-
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for (int x = 0; x < len; x++) {
-#pragma omp simd
-        for (int i = x; i < x + 1; i++)
-            Cb[i] |= paramt;
-    }
-}
-
-static void softmask_applycr(VJFrame *frame, int paramt)
-{
-    const int len = (frame->ssm ? frame->len : frame->uv_len);
-    uint8_t *restrict Cr = frame->data[2];
-    const int n_threads = vje_advise_num_threads(len);
-
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for (int x = 0; x < len; x++) {
-#pragma omp simd
-        for (int i = x; i < x + 1; i++)
-            Cr[i] |= paramt;
-    }
-}
-
-static void softmask_applycbcr(VJFrame *frame, int paramt)
-{
-    const int len = (frame->ssm ? frame->len : frame->uv_len);
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
+
+    if(!Y || !Cb || !Cr || len <= 0)
+        return;
+
     const int n_threads = vje_advise_num_threads(len);
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for (int x = 0; x < len; x++) {
-#pragma omp simd
-        for (int i = x; i < x + 1; i++) {
-            Cb[i] |= paramt;
-            Cr[i] |= paramt;
+    #pragma omp parallel num_threads(n_threads)
+    {
+        #pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+            Y[i] = (uint8_t)(Y[i] & value);
+
+        #pragma omp for schedule(static)
+        for(int i = 0; i < uv_len; i++) {
+            Cb[i] = (uint8_t)(Cb[i] & value);
+            Cr[i] = (uint8_t)(Cr[i] & value);
         }
     }
 }
 
-static void softmask_applyycbcr(VJFrame *frame, int paramt)
+void colorshift_apply(void *ptr, VJFrame *frame, int *args)
 {
+    (void) ptr;
+
+    const int type = args[0];
+    const uint8_t value = args[1];
     const int len = frame->len;
-    const int uv_len = (frame->ssm ? len : frame->uv_len);
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
-    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    const int n_threads_y  = vje_advise_num_threads(len);
-    const int n_threads_uv = vje_advise_num_threads(uv_len);
-
-#pragma omp parallel for num_threads(n_threads_y) schedule(static)
-    for (int x = 0; x < len; x++) {
-#pragma omp simd
-        for (int i = x; i < x + 1; i++)
-            Y[i] |= paramt;
+    switch(type) {
+        case 0:
+            colorshift_or_plane(Y, len, value);
+            break;
+        case 1:
+            colorshift_or_plane(Cb, uv_len, value);
+            break;
+        case 2:
+            colorshift_or_plane(Cr, uv_len, value);
+            break;
+        case 3:
+            colorshift_or_2planes(Cb, Cr, uv_len, value);
+            break;
+        case 4:
+            colorshift_or_ycbcr(frame, value);
+            break;
+        case 5:
+            colorshift_and_ycbcr(frame, value);
+            break;
+        case 6:
+            colorshift_and_plane(Y, len, value);
+            break;
+        case 7:
+            colorshift_and_plane(Cb, uv_len, value);
+            break;
+        case 8:
+            colorshift_and_plane(Cr, uv_len, value);
+            break;
+        case 9:
+            colorshift_and_2planes(Cb, Cr, uv_len, value);
+            break;
     }
-
-#pragma omp parallel for num_threads(n_threads_uv) schedule(static)
-    for (int x = 0; x < uv_len; x++) {
-#pragma omp simd
-        for (int i = x; i < x + 1; i++) {
-            Cb[i] |= paramt;
-            Cr[i] |= paramt;
-        }
-    }
-}
-
-void colorshift_apply(void *ptr, VJFrame *frame, int *args ) {
-    int type = args[0];
-    int value = args[1];
-
-    switch (type) {
-    case 0:
-       softmask_apply(frame, value);
-       break;
-    case 1:
-       softmask_applycb(frame, value);
-       break;
-    case 2:
-       softmask_applycr(frame, value);
-       break;
-    case 3:
-       softmask_applycbcr(frame, value);
-       break;
-    case 4:
-       softmask_applyycbcr(frame, value);
-       break;
-    case 5:
-       softmask2_apply(frame, value);
-       break;
-    case 6:
-       softmask2_applycb(frame, value);
-       break;
-    case 7:
-       softmask2_applycr(frame, value);
-       break;
-    case 8:
-       softmask2_applycbcr(frame, value);
-       break;
-    case 9:
-       softmask2_applyycbcr(frame, value);
-       break;
-	}
 }

@@ -6,10 +6,9 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  * You should have received a copy of the GNU General Public License
@@ -18,10 +17,11 @@
  */
 
 #include "common.h"
-#include "warppers.h"
 
 #include <math.h>
 #include <stdint.h>
+#include <veejaycore/vjmem.h>
+#include "warppers.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -29,22 +29,21 @@
 
 #define LUT_SIZE 3600
 
-#define WARPPERS_PARAMS 12
+#define WARPPERS_PARAMS 10
 
-#define P_X_ANGLE        0
-#define P_Y_ANGLE        1
-#define P_ZOOM           2
-#define P_X_CENTER       3
-#define P_Y_CENTER       4
-#define P_FALLOFF        5
-#define P_STRENGTH       6
-#define P_SPIN_SPEED     7
-#define P_BEAT_ZOOM      8
-#define P_BEAT_WARP      9
-#define P_BEAT_PUSH     10
-#define P_BEAT_SMOOTH   11
+#define P_X_ANGLE      0
+#define P_Y_ANGLE      1
+#define P_ZOOM         2
+#define P_X_CENTER     3
+#define P_Y_CENTER     4
+#define P_FALLOFF      5
+#define P_STRENGTH     6
+#define P_SPIN_SPEED   7
+#define P_ZOOM_DRIVE   8
+#define P_WARP_DRIVE   9
 
 typedef struct {
+    uint8_t *region;
     uint8_t *buf[3];
     double *lut;
     double *cos_lut;
@@ -53,9 +52,18 @@ typedef struct {
     int w;
     int h;
     double spin_phase;
-    double beat_env;
-    double beat_kick;
-    double beat_prev;
+
+    double x_angle_env;
+    double y_angle_env;
+    double zoom_env;
+    double x_center_env;
+    double y_center_env;
+    double falloff_env;
+    double strength_env;
+    double spin_speed_env;
+    double zoom_drive_env;
+    double warp_drive_env;
+    int env_ready;
 } warppers_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -75,9 +83,6 @@ static inline int warppers_wrap_lut(int v)
 
 static inline double warppers_wrap_phase(double v)
 {
-    if(!isfinite(v))
-        return 0.0;
-
     while(v >= (double)LUT_SIZE)
         v -= (double)LUT_SIZE;
 
@@ -87,11 +92,30 @@ static inline double warppers_wrap_phase(double v)
     return v;
 }
 
+static inline double warppers_smooth(double oldv, double target, double alpha)
+{
+    return oldv + (target - oldv) * alpha;
+}
+
+static inline double warppers_smooth_angle(double oldv, double target, double alpha)
+{
+    double d;
+
+    target = warppers_wrap_phase(target);
+    oldv = warppers_wrap_phase(oldv);
+
+    d = target - oldv;
+
+    if(d > (double)LUT_SIZE * 0.5)
+        d -= (double)LUT_SIZE;
+    else if(d < -(double)LUT_SIZE * 0.5)
+        d += (double)LUT_SIZE;
+
+    return warppers_wrap_phase(oldv + d * alpha);
+}
+
 static inline int warppers_wrap_double(double v, int max)
 {
-    if(max <= 1 || !isfinite(v))
-        return 0;
-
     if(v > 2147480000.0 || v < -2147480000.0) {
         v = fmod(v, (double)max);
         if(v < 0.0)
@@ -114,18 +138,7 @@ static inline int warppers_wrap_double(double v, int max)
     return iv;
 }
 
-static inline int warppers_beat_shape(int beat_push)
-{
-    int lin;
-    int sq;
 
-    beat_push = clampi(beat_push, 0, 1000);
-
-    lin = beat_push;
-    sq = (beat_push * beat_push + 500) / 1000;
-
-    return clampi((lin * 32 + sq * 68 + 50) / 100, 0, 1000);
-}
 
 static void warppers_init_trig_lut(warppers_t *f)
 {
@@ -150,36 +163,30 @@ vj_effect *warppers_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
     if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
         free(ve);
         return NULL;
     }
 
-    const int max_x = w > 0 ? w - 1 : 0;
-    const int max_y = h > 0 ? h - 1 : 0;
+    const int max_x = w - 1;
+    const int max_y = h - 1;
 
-    ve->limits[0][P_X_ANGLE]    = 0;     ve->limits[1][P_X_ANGLE]    = 3600; ve->defaults[P_X_ANGLE]    = 15;
-    ve->limits[0][P_Y_ANGLE]    = 0;     ve->limits[1][P_Y_ANGLE]    = 3600; ve->defaults[P_Y_ANGLE]    = 0;
-    ve->limits[0][P_ZOOM]       = 1;     ve->limits[1][P_ZOOM]       = 1000; ve->defaults[P_ZOOM]       = 100;
-    ve->limits[0][P_X_CENTER]   = 0;     ve->limits[1][P_X_CENTER]   = max_x; ve->defaults[P_X_CENTER]   = w > 0 ? w / 2 : 0;
-    ve->limits[0][P_Y_CENTER]   = 0;     ve->limits[1][P_Y_CENTER]   = max_y; ve->defaults[P_Y_CENTER]   = h > 0 ? h / 2 : 0;
-    ve->limits[0][P_FALLOFF]    = 0;     ve->limits[1][P_FALLOFF]    = 1000; ve->defaults[P_FALLOFF]    = 0;
-    ve->limits[0][P_STRENGTH]   = 0;     ve->limits[1][P_STRENGTH]   = 1000; ve->defaults[P_STRENGTH]   = 0;
-    ve->limits[0][P_SPIN_SPEED] = -1000; ve->limits[1][P_SPIN_SPEED] = 1000; ve->defaults[P_SPIN_SPEED] = 0;
-    ve->limits[0][P_BEAT_ZOOM]  = 0;     ve->limits[1][P_BEAT_ZOOM]  = 1000; ve->defaults[P_BEAT_ZOOM]  = 420;
-    ve->limits[0][P_BEAT_WARP]  = 0;     ve->limits[1][P_BEAT_WARP]  = 1000; ve->defaults[P_BEAT_WARP]  = 480;
-    ve->limits[0][P_BEAT_PUSH]  = 0;     ve->limits[1][P_BEAT_PUSH]  = 1000; ve->defaults[P_BEAT_PUSH]  = 0;
-    ve->limits[0][P_BEAT_SMOOTH]= 0;     ve->limits[1][P_BEAT_SMOOTH]= 1000; ve->defaults[P_BEAT_SMOOTH]= 520;
+    ve->limits[0][P_X_ANGLE]    = 0;     ve->limits[1][P_X_ANGLE]    = 3600; ve->defaults[P_X_ANGLE]    = 180;
+    ve->limits[0][P_Y_ANGLE]    = 0;     ve->limits[1][P_Y_ANGLE]    = 3600; ve->defaults[P_Y_ANGLE]    = 70;
+    ve->limits[0][P_ZOOM]       = 1;     ve->limits[1][P_ZOOM]       = 1000; ve->defaults[P_ZOOM]       = 105;
+    ve->limits[0][P_X_CENTER]   = 0;     ve->limits[1][P_X_CENTER]   = max_x; ve->defaults[P_X_CENTER]   = w / 2;
+    ve->limits[0][P_Y_CENTER]   = 0;     ve->limits[1][P_Y_CENTER]   = max_y; ve->defaults[P_Y_CENTER]   = h / 2;
+    ve->limits[0][P_FALLOFF]    = 0;     ve->limits[1][P_FALLOFF]    = 1000; ve->defaults[P_FALLOFF]    = 180;
+    ve->limits[0][P_STRENGTH]   = 0;     ve->limits[1][P_STRENGTH]   = 1000; ve->defaults[P_STRENGTH]   = 260;
+    ve->limits[0][P_SPIN_SPEED] = -1000; ve->limits[1][P_SPIN_SPEED] = 1000; ve->defaults[P_SPIN_SPEED] = 8;
+    ve->limits[0][P_ZOOM_DRIVE] = 0;     ve->limits[1][P_ZOOM_DRIVE] = 1000; ve->defaults[P_ZOOM_DRIVE] = 420;
+    ve->limits[0][P_WARP_DRIVE] = 0;     ve->limits[1][P_WARP_DRIVE] = 1000; ve->defaults[P_WARP_DRIVE] = 480;
 
     ve->description = "Warp Perspective";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
     ve->has_user = 0;
 
     ve->param_description = vje_build_param_list(
@@ -192,73 +199,70 @@ vj_effect *warppers_init(int w, int h)
         "Distance Falloff",
         "Perspective Strength",
         "Spin Speed",
-        "Beat Zoom",
-        "Beat Warp",
-        "Beat Push",
-        "Beat Smooth"
+        "Zoom Drive",
+        "Warp Drive"
     );
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                                0,                  3600,               8,  30, 1200, 3000, 0,    48,    /* X Angle */
-        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                                0,                  3600,               8,  30, 1200, 3000, 0,    48,    /* Y Angle */
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                                                 40,                 420,                8,  30, 1200, 3000, 0,    46,    /* Zoom */
-        VJ_BEAT_DRIFT,         VJ_BEAT_F_PHRASE_ONLY,                                                0,                  max_x,              5,  18, 2200, 5200, 1200, 18,    /* X Center */
-        VJ_BEAT_DRIFT,         VJ_BEAT_F_PHRASE_ONLY,                                                0,                  max_y,              5,  18, 2200, 5200, 1200, 18,    /* Y Center */
-        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                                                 0,                  560,                8,  30, 1200, 3000, 0,    42,    /* Distance Falloff */
-        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                                                 0,                  520,                8,  30, 1200, 3000, 0,    42,    /* Perspective Strength */
-        VJ_BEAT_SIGNED_SPEED,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -360,               360,                10, 42, 900,  2400, 0,    58,    /* Spin Speed */
-
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_REJECT,                                                     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Beat Zoom */
-        VJ_BEAT_WARP,          VJ_BEAT_F_REJECT,                                                     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Beat Warp */
-
-        VJ_BEAT_KICK,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                             0,                  780,                18, 68, 80,   760,  0,    100,   /* Beat Push */
-        VJ_BEAT_MEMORY,        VJ_BEAT_F_PHRASE_ONLY,                                                260,                840,                5,  18, 2200, 5200, 1200, 18     /* Beat Smooth */
+        VJ_BEAT_GEOMETRY_PHASE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,                 90,                 310,                3,  10, 4200, 11000, 3400, 18,
+        VJ_BEAT_GEOMETRY_PHASE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,                 30,                 170,                3,  10, 4600, 12400, 3800, 16,
+        VJ_BEAT_WINDOW_RADIUS,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                      82,                 235,                8,  30, 1600, 5200, 0,    46,
+        VJ_BEAT_DRIFT,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                                           (w * 7) / 16,       (w * 9) / 16,       3,  9,  5200, 14000, 4200, 20,
+        VJ_BEAT_DRIFT,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                                           (h * 7) / 16,       (h * 9) / 16,       3,  9,  6200, 16000, 5200, 18,
+        VJ_BEAT_WARP,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                      18,                 145,                6,  22, 2200, 7200, 0,    26,
+        VJ_BEAT_WARP,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                      90,                 340,                8,  32, 1600, 5600, 0,    54,
+        VJ_BEAT_SIGNED_SPEED,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,                -18,                18,                 5,  18, 3400, 11000, 0,    12,
+        VJ_BEAT_WINDOW_RADIUS,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                      0,                  90,                 5,  18, 2600, 9000, 0,    22,
+        VJ_BEAT_WARP,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                      0,                  72,                 5,  18, 3000, 10000, 0,    24
     );
     return ve;
 }
 
 void *warppers_malloc(int w, int h)
 {
-    if(w <= 0 || h <= 0)
-        return NULL;
-
     warppers_t *s = (warppers_t*) vj_calloc(sizeof(warppers_t));
     if(!s)
         return NULL;
 
     const size_t len = (size_t)w * (size_t)h;
+    const size_t frame_bytes = len * 3u;
+    const size_t lut_bytes = sizeof(double) * (size_t)LUT_SIZE * 2u;
+    const size_t total = frame_bytes + lut_bytes + 16u;
 
-    s->buf[0] = (uint8_t*) vj_malloc(len * 3u);
-    if(!s->buf[0]) {
+    s->region = (uint8_t*) vj_malloc(total);
+    if(!s->region) {
         free(s);
         return NULL;
     }
 
+    s->buf[0] = s->region;
     s->buf[1] = s->buf[0] + len;
     s->buf[2] = s->buf[1] + len;
 
-    s->lut = (double*) vj_malloc(sizeof(double) * (size_t)LUT_SIZE * 2u);
-    if(!s->lut) {
-        free(s->buf[0]);
-        free(s);
-        return NULL;
-    }
+    uint8_t *p = s->buf[2] + len;
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
 
+    s->lut = (double*)p;
     s->sin_lut = s->lut;
     s->cos_lut = s->sin_lut + LUT_SIZE;
 
     s->w = w;
     s->h = h;
     s->spin_phase = 0.0;
-    s->beat_env = 0.0;
-    s->beat_kick = 0.0;
-    s->beat_prev = 0.0;
+    s->x_angle_env = 0.0;
+    s->y_angle_env = 0.0;
+    s->zoom_env = 0.0;
+    s->x_center_env = 0.0;
+    s->y_center_env = 0.0;
+    s->falloff_env = 0.0;
+    s->strength_env = 0.0;
+    s->spin_speed_env = 0.0;
+    s->zoom_drive_env = 0.0;
+    s->warp_drive_env = 0.0;
+    s->env_ready = 0;
 
     s->n_threads = vje_advise_num_threads((int)len);
-    if(s->n_threads < 1)
-        s->n_threads = 1;
 
     warppers_init_trig_lut(s);
 
@@ -269,15 +273,7 @@ void warppers_free(void *ptr)
 {
     warppers_t *s = (warppers_t*) ptr;
 
-    if(!s)
-        return;
-
-    if(s->buf[0])
-        free(s->buf[0]);
-
-    if(s->lut)
-        free(s->lut);
-
+    free(s->region);
     free(s);
 }
 
@@ -285,83 +281,82 @@ void warppers_apply(void *ptr, VJFrame *frame, int *args)
 {
     warppers_t *warp = (warppers_t*) ptr;
 
-    if(!warp || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
     const int w = frame->width;
     const int h = frame->height;
-    const int len = frame->len;
 
-    if(w <= 0 || h <= 0 || len <= 0)
-        return;
+    const int x_angle_arg = args[P_X_ANGLE];
+    const int y_angle_arg = args[P_Y_ANGLE];
+    const int zoom_arg = args[P_ZOOM];
+    const int x_center_arg = args[P_X_CENTER];
+    const int y_center_arg = args[P_Y_CENTER];
+    const int falloff_arg_in = args[P_FALLOFF];
+    const int strength_arg_in = args[P_STRENGTH];
+    const int spin_arg_in = args[P_SPIN_SPEED];
+    const int zoom_drive_in = args[P_ZOOM_DRIVE];
+    const int warp_drive_in = args[P_WARP_DRIVE];
 
-    if(w != warp->w || h != warp->h)
-        return;
+    const double angle_alpha = 0.115;
+    const double center_alpha = 0.092;
+    const double scalar_alpha = 0.152;
+    const double drive_alpha = 0.218;
 
-    const int x_angle_arg = warppers_wrap_lut(clampi(args[P_X_ANGLE], 0, 3600));
-    const int y_angle_arg = warppers_wrap_lut(clampi(args[P_Y_ANGLE], 0, 3600));
-    const int zoom_arg = clampi(args[P_ZOOM], 1, 1000);
-    const int x_center = clampi(args[P_X_CENTER], 0, w - 1);
-    const int y_center = clampi(args[P_Y_CENTER], 0, h - 1);
-    int falloff_arg = clampi(args[P_FALLOFF], 0, 1000);
-    int strength_arg = clampi(args[P_STRENGTH], 0, 1000);
-    const int spin_arg = clampi(args[P_SPIN_SPEED], -1000, 1000);
-    const int beat_zoom = clampi(args[P_BEAT_ZOOM], 0, 1000);
-    const int beat_warp = clampi(args[P_BEAT_WARP], 0, 1000);
-    const int beat_push = clampi(args[P_BEAT_PUSH], 0, 1000);
-    const int smooth_arg = clampi(args[P_BEAT_SMOOTH], 0, 1000);
+    if(!warp->env_ready) {
+        warp->x_angle_env = (double)x_angle_arg;
+        warp->y_angle_env = (double)y_angle_arg;
+        warp->zoom_env = (double)zoom_arg;
+        warp->x_center_env = (double)x_center_arg;
+        warp->y_center_env = (double)y_center_arg;
+        warp->falloff_env = (double)falloff_arg_in;
+        warp->strength_env = (double)strength_arg_in;
+        warp->spin_speed_env = (double)spin_arg_in;
+        warp->zoom_drive_env = (double)zoom_drive_in;
+        warp->warp_drive_env = (double)warp_drive_in;
+        warp->env_ready = 1;
+    }
+    else {
+        warp->x_angle_env = warppers_smooth_angle(warp->x_angle_env, (double)x_angle_arg, angle_alpha);
+        warp->y_angle_env = warppers_smooth_angle(warp->y_angle_env, (double)y_angle_arg, angle_alpha);
+        warp->zoom_env = warppers_smooth(warp->zoom_env, (double)zoom_arg, scalar_alpha);
+        warp->x_center_env = warppers_smooth(warp->x_center_env, (double)x_center_arg, center_alpha);
+        warp->y_center_env = warppers_smooth(warp->y_center_env, (double)y_center_arg, center_alpha);
+        warp->falloff_env = warppers_smooth(warp->falloff_env, (double)falloff_arg_in, scalar_alpha);
+        warp->strength_env = warppers_smooth(warp->strength_env, (double)strength_arg_in, scalar_alpha);
+        warp->spin_speed_env = warppers_smooth(warp->spin_speed_env, (double)spin_arg_in, scalar_alpha);
+        warp->zoom_drive_env = warppers_smooth(warp->zoom_drive_env, (double)zoom_drive_in, drive_alpha);
+        warp->warp_drive_env = warppers_smooth(warp->warp_drive_env, (double)warp_drive_in, drive_alpha);
+    }
 
-    const int shaped = warppers_beat_shape(beat_push);
-    const double target = (double)shaped * 0.001;
-    const double smooth = (double)smooth_arg * 0.001;
-    const double attack = 0.16 + (1.0 - smooth) * 0.36;
-    const double release = 0.025 + (1.0 - smooth) * 0.095;
+    const int x_angle_base = warppers_wrap_lut((int)(warp->x_angle_env + 0.5));
+    const int y_angle_base = warppers_wrap_lut((int)(warp->y_angle_env + 0.5));
+    const int zoom_base = clampi((int)(warp->zoom_env + 0.5), 1, 1000);
+    const int x_center = clampi((int)(warp->x_center_env + 0.5), 0, w - 1);
+    const int y_center = clampi((int)(warp->y_center_env + 0.5), 0, h - 1);
+    int falloff_arg = clampi((int)(warp->falloff_env + 0.5), 0, 1000);
+    int strength_arg = clampi((int)(warp->strength_env + 0.5), 0, 1000);
+    const int spin_arg = clampi((int)(warp->spin_speed_env + (warp->spin_speed_env >= 0.0 ? 0.5 : -0.5)), -1000, 1000);
+    const int zoom_drive = clampi((int)(warp->zoom_drive_env + 0.5), 0, 1000);
+    const int warp_drive = clampi((int)(warp->warp_drive_env + 0.5), 0, 1000);
 
-    if(target > warp->beat_env)
-        warp->beat_env += (target - warp->beat_env) * attack;
-    else
-        warp->beat_env += (target - warp->beat_env) * release;
-
-    if(warp->beat_env < 0.0001)
-        warp->beat_env = 0.0;
-    else if(warp->beat_env > 1.0)
-        warp->beat_env = 1.0;
-
-    const double rise = target - warp->beat_prev;
-    if(rise > warp->beat_kick)
-        warp->beat_kick = rise;
-
-    warp->beat_prev = target;
-    warp->beat_kick *= 0.56 + smooth * 0.22;
-
-    if(warp->beat_kick < 0.0001)
-        warp->beat_kick = 0.0;
-    else if(warp->beat_kick > 1.0)
-        warp->beat_kick = 1.0;
-
-    const double beat_env = warp->beat_env;
-    const double beat_kick = warp->beat_kick;
-    const double beat_drive = beat_env * beat_env;
-    const double kick_drive = beat_kick * beat_kick;
+    const double zoom_t = (double)zoom_drive * 0.001;
+    const double warp_t = (double)warp_drive * 0.001;
 
     const double spin_step = (double)spin_arg * 0.018;
-    const double beat_spin = ((double)beat_warp * 0.001) * (beat_drive * 8.0 + kick_drive * 22.0);
+    const double drive_spin = warp_t * 15.5;
 
-    warp->spin_phase = warppers_wrap_phase(warp->spin_phase + spin_step + beat_spin);
+    warp->spin_phase = warppers_wrap_phase(warp->spin_phase + spin_step + drive_spin);
 
     const int spin_i = (int)(warp->spin_phase + 0.5);
-    const int beat_angle = (int)(((double)beat_warp * 0.001) * (beat_env * 18.0 + beat_kick * 46.0) + 0.5);
+    const int drive_angle = (int)(warp_t * 112.0 + 0.5);
 
-    const int x_angle = warppers_wrap_lut(x_angle_arg + spin_i + beat_angle);
-    const int y_angle = warppers_wrap_lut(y_angle_arg + (spin_i * 7) / 10 - (beat_angle * 3) / 5);
+    const int x_angle = warppers_wrap_lut(x_angle_base + spin_i + drive_angle);
+    const int y_angle = warppers_wrap_lut(y_angle_base + (spin_i * 7) / 10 - (drive_angle * 3) / 5);
 
-    const double zoom_drive = ((double)beat_zoom * 0.001) * (beat_env * 0.45 + beat_kick * 0.55);
-    int zoom_eff = zoom_arg + (int)(((1200 - zoom_arg) > 0 ? (1200 - zoom_arg) : 0) * zoom_drive * 0.72 + 0.5);
-    zoom_eff = clampi(zoom_eff, 1, 1400);
+    int zoom_eff = zoom_base + (int)(((1450 - zoom_base) > 0 ? (1450 - zoom_base) : 0) * zoom_t * 0.82 + 0.5);
+    zoom_eff = clampi(zoom_eff, 1, 1500);
 
-    const int warp_q = clampi((int)(((beat_drive * 0.65 + kick_drive * 0.35) * (double)beat_warp) + 0.5), 0, 1000);
-    falloff_arg = clampi(falloff_arg + (warp_q * 130 + 500) / 1000, 0, 1000);
-    strength_arg = clampi(strength_arg + (warp_q * 240 + 500) / 1000, 0, 1000);
+    const int warp_q = clampi(warp_drive, 0, 1000);
+    falloff_arg = clampi(falloff_arg + (warp_q * 210 + 500) / 1000, 0, 1000);
+    strength_arg = clampi(strength_arg + (warp_q * 320 + 500) / 1000, 0, 1000);
 
     uint8_t *restrict dstY = frame->data[0];
     uint8_t *restrict dstU = frame->data[1];
@@ -389,11 +384,7 @@ void warppers_apply(void *ptr, VJFrame *frame, int *args)
 
     int64_t half_w = w >> 1;
     int64_t half_h = h >> 1;
-    int64_t max_dist_i = half_w * half_w + half_h * half_h;
-
-    if(max_dist_i <= 0)
-        max_dist_i = 1;
-
+    const int64_t max_dist_i = half_w * half_w + half_h * half_h;
     const double inv_max_dist = 1.0 / (double)max_dist_i;
 
 #pragma omp parallel for schedule(static) num_threads(warp->n_threads)

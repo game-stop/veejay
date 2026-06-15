@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,7 +21,7 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "neighbours4.h"
-#include <math.h>
+#include <stdint.h>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -30,9 +30,12 @@
 #define NB4_THREAD_ID() 0
 #endif
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
+#define NEIGHBOURS4_PARAMS 4
+
+#define P_RADIUS     0
+#define P_DEPTH      1
+#define P_SMOOTHNESS 2
+#define P_MODE       3
 
 #define NB4_BINS 256
 #define NB4_MAX_POINTS 2048
@@ -40,144 +43,29 @@
 #define NB4_SCRATCH_STRIDE (NB4_BINS * NB4_SCRATCH_PLANES)
 
 typedef struct {
-    double x;
-    double y;
-} relpoint_t;
+    int16_t x;
+    int16_t y;
+} nb4_point_t;
 
 typedef struct {
     uint8_t y;
     uint8_t u;
     uint8_t v;
-} pixel_t;
+} nb4_pixel_t;
 
 typedef struct {
     uint8_t *src[3];
     uint8_t *bin;
     int *scratch;
-    relpoint_t points[NB4_MAX_POINTS];
-    int width;
-    int height;
+    nb4_point_t points[NB4_MAX_POINTS];
     int last_radius;
     int last_depth;
     int n_threads;
 } nb4_t;
 
-vj_effect *neighbours4_init(int w, int h)
-{
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
-
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-    ve->limits[0][0] = 2;
-    ve->limits[1][0] = 32;
-    ve->defaults[0] = 4;
-
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 200;
-    ve->defaults[1] = 4;
-
-    ve->limits[0][2] = 1;
-    ve->limits[1][2] = 255;
-    ve->defaults[2] = 8;
-
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 1;
-    ve->defaults[3] = 1;
-
-    ve->description = "ZArtistic Filter (Round Brush)";
-    ve->sub_format = 1;
-    ve->extra_frame = 0;
-    ve->has_user = 0;
-
-    ve->param_description = vje_build_param_list(
-        ve->num_params,
-        "Radius",
-        "Distance from center",
-        "Smoothness",
-        "Mode"
-    );
-
-    ve->hints = vje_init_value_hint_list(ve->num_params);
-    vje_build_value_hint_list(
-        ve->hints,
-        ve->limits[1][3],
-        3,
-        "Luma Only",
-        "Luma and Chroma"
-    );
-
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 2,                  24,                 6, 22, 1800, 4200, 900, 30,    /* Radius */
-        VJ_BEAT_DENSITY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 8,                  160,                6, 22, 1800, 4200, 900, 30,    /* Distance from center */
-        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                          8,                  180,                6, 22, 1600, 3400, 700, 30,    /* Smoothness */
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Mode */
-    );
-    (void) w;
-    (void) h;
-
-    return ve;
-}
-
-void *neighbours4_malloc(int w, int h)
-{
-    nb4_t *n = (nb4_t*) vj_calloc(sizeof(nb4_t));
-    if(!n)
-        return NULL;
-
-    const int len = w * h;
-
-    n->width = w;
-    n->height = h;
-    n->last_radius = -1;
-    n->last_depth = -1;
-
-    n->n_threads = vje_advise_num_threads(len);
-    if(n->n_threads < 1)
-        n->n_threads = 1;
-
-    n->src[0] = (uint8_t*) vj_malloc((size_t) len * 4u);
-    if(!n->src[0]) {
-        free(n);
-        return NULL;
-    }
-
-    n->src[1] = n->src[0] + len;
-    n->src[2] = n->src[1] + len;
-    n->bin    = n->src[2] + len;
-
-    n->scratch = (int*) vj_calloc(sizeof(int) * NB4_SCRATCH_STRIDE * n->n_threads);
-    if(!n->scratch) {
-        free(n->src[0]);
-        free(n);
-        return NULL;
-    }
-
-    return (void*) n;
-}
-
-void neighbours4_free(void *ptr)
-{
-    nb4_t *n = (nb4_t*) ptr;
-    if(!n)
-        return;
-
-    if(n->src[0])
-        free(n->src[0]);
-
-    if(n->scratch)
-        free(n->scratch);
-
-    free(n);
-}
-
 static inline int nb4_clampi(int v, int lo, int hi)
 {
-    return (v < lo) ? lo : (v > hi ? hi : v);
+    return v < lo ? lo : (v > hi ? hi : v);
 }
 
 static inline uint8_t nb4_quant_luma(uint8_t y, int smoothness)
@@ -185,41 +73,26 @@ static inline uint8_t nb4_quant_luma(uint8_t y, int smoothness)
     return (uint8_t)(((int)y * smoothness + 127) / 255);
 }
 
-static void nb4_create_circle(nb4_t *n, int radius, int depth)
+static inline void nb4_clear_luma_scratch(int *hist, int *sum_y, int active_bins)
 {
-    if(radius == n->last_radius && depth == n->last_depth)
-        return;
-
-    for(int i = 0; i < depth; i++) {
-        const double angle = 2.0 * M_PI * (double)i / (double)depth;
-        n->points[i].x = a_cos(angle) * (double)radius;
-        n->points[i].y = a_sin(angle) * (double)radius;
-    }
-
-    n->last_radius = radius;
-    n->last_depth = depth;
+    veejay_memset(hist, 0, sizeof(int) * active_bins);
+    veejay_memset(sum_y, 0, sizeof(int) * active_bins);
 }
 
-static inline void nb4_clear_luma_scratch(int *hist, int *sum_y)
+static inline void nb4_clear_color_scratch(int *hist, int *sum_y, int *sum_u, int *sum_v, int active_bins)
 {
-    veejay_memset(hist, 0, sizeof(int) * NB4_BINS);
-    veejay_memset(sum_y, 0, sizeof(int) * NB4_BINS);
+    veejay_memset(hist, 0, sizeof(int) * active_bins);
+    veejay_memset(sum_y, 0, sizeof(int) * active_bins);
+    veejay_memset(sum_u, 0, sizeof(int) * active_bins);
+    veejay_memset(sum_v, 0, sizeof(int) * active_bins);
 }
 
-static inline void nb4_clear_color_scratch(int *hist, int *sum_y, int *sum_u, int *sum_v)
-{
-    veejay_memset(hist, 0, sizeof(int) * NB4_BINS);
-    veejay_memset(sum_y, 0, sizeof(int) * NB4_BINS);
-    veejay_memset(sum_u, 0, sizeof(int) * NB4_BINS);
-    veejay_memset(sum_v, 0, sizeof(int) * NB4_BINS);
-}
-
-static inline int nb4_peak_bin(const int *hist)
+static inline int nb4_peak_bin(const int *hist, int active_bins)
 {
     int peak_count = hist[0];
     int peak_bin = 0;
 
-    for(int i = 1; i < NB4_BINS; i++) {
+    for(int i = 1; i < active_bins; i++) {
         if(hist[i] > peak_count) {
             peak_count = hist[i];
             peak_bin = i;
@@ -229,62 +102,205 @@ static inline int nb4_peak_bin(const int *hist)
     return peak_bin;
 }
 
-static inline uint8_t nb4_eval_luma(
-    int x,
-    int y,
-    int depth,
-    const relpoint_t *restrict pts,
-    const uint8_t *restrict src_y,
-    const uint8_t *restrict bin,
-    int *restrict hist,
-    int *restrict sum_y,
-    int width,
-    int height
-) {
-    nb4_clear_luma_scratch(hist, sum_y);
+static inline void nb4_emit_point(nb4_point_t *points, int *count, int x, int y)
+{
+    if(*count < NB4_MAX_POINTS) {
+        points[*count].x = (int16_t)x;
+        points[*count].y = (int16_t)y;
+        (*count)++;
+    }
+}
+
+static inline void nb4_emit_octants(nb4_point_t *points, int *count, int x, int y)
+{
+    nb4_emit_point(points, count,  x,  y);
+    nb4_emit_point(points, count,  y,  x);
+    nb4_emit_point(points, count, -y,  x);
+    nb4_emit_point(points, count, -x,  y);
+    nb4_emit_point(points, count, -x, -y);
+    nb4_emit_point(points, count, -y, -x);
+    nb4_emit_point(points, count,  y, -x);
+    nb4_emit_point(points, count,  x, -y);
+}
+
+static void nb4_create_circle(nb4_t *n, int radius, int depth)
+{
+    if(radius == n->last_radius && depth == n->last_depth)
+        return;
+
+    nb4_point_t candidates[NB4_MAX_POINTS];
+    int count = 0;
+    int x = radius;
+    int y = 0;
+    int err = 0;
+
+    while(x >= y) {
+        nb4_emit_octants(candidates, &count, x, y);
+
+        y++;
+        err += 1 + (y << 1);
+
+        if(((err - x) << 1) + 1 > 0) {
+            x--;
+            err += 1 - (x << 1);
+        }
+    }
 
     for(int i = 0; i < depth; i++) {
-        int dx = nb4_clampi((int)(pts[i].x + (double)x), 0, width - 1);
-        int dy = nb4_clampi((int)(pts[i].y + (double)y), 0, height - 1);
-        int idx = dy * width + dx;
-        int b = bin[idx];
+        const int k = ((i * count) + (depth >> 1)) / depth;
+
+        n->points[i] = candidates[k < count ? k : count - 1];
+    }
+
+    n->last_radius = radius;
+    n->last_depth = depth;
+}
+
+vj_effect *neighbours4_init(int w, int h)
+{
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
+    if(!ve)
+        return NULL;
+
+    ve->num_params = NEIGHBOURS4_PARAMS;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
+    ve->limits[0][P_RADIUS] = 2;     ve->limits[1][P_RADIUS] = 32;      ve->defaults[P_RADIUS] = 4;
+    ve->limits[0][P_DEPTH] = 1;      ve->limits[1][P_DEPTH] = 200;      ve->defaults[P_DEPTH] = 4;
+    ve->limits[0][P_SMOOTHNESS] = 1; ve->limits[1][P_SMOOTHNESS] = 255; ve->defaults[P_SMOOTHNESS] = 8;
+    ve->limits[0][P_MODE] = 0;       ve->limits[1][P_MODE] = 1;         ve->defaults[P_MODE] = 1;
+
+    ve->description = "ZArtistic Filter (Round Brush)";
+    ve->sub_format = 1;
+    ve->extra_frame = 0;
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(ve->num_params, "Radius", "Distance from center", "Smoothness", "Mode");
+
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_MODE], P_MODE, "Luma Only", "Luma and Chroma");
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_NO_ZERO_CROSS, 4,                  28,                 4,  14, 3000, 8200, 2200, 22,
+        VJ_BEAT_DENSITY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_NO_ZERO_CROSS, 18,                 170,                4,  14, 3200, 8600, 2400, 20,
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,                            4,                  150,                14, 54,  800, 3000, 0,    80,
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                                        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
+    );
+
+    return ve;
+}
+
+void neighbours4_free(void *ptr)
+{
+    nb4_t *n = (nb4_t*) ptr;
+
+    free(n->src[0]);
+    free(n->scratch);
+    free(n);
+}
+
+void *neighbours4_malloc(int w, int h)
+{
+    nb4_t *n = (nb4_t*) vj_calloc(sizeof(nb4_t));
+
+    if(!n)
+        return NULL;
+
+    const int len = w * h;
+
+    n->n_threads = vje_advise_num_threads(len);
+    n->last_radius = -1;
+    n->last_depth = -1;
+    n->src[0] = (uint8_t*) vj_malloc((size_t)len * 4u);
+
+    if(!n->src[0]) {
+        free(n);
+        return NULL;
+    }
+
+    n->src[1] = n->src[0] + len;
+    n->src[2] = n->src[1] + len;
+    n->bin = n->src[2] + len;
+    n->scratch = (int*) vj_calloc(sizeof(int) * NB4_SCRATCH_STRIDE * n->n_threads);
+
+    if(!n->scratch) {
+        neighbours4_free(n);
+        return NULL;
+    }
+
+    return (void*) n;
+}
+
+static inline uint8_t nb4_eval_luma(int x,
+                                    int y,
+                                    int depth,
+                                    const nb4_point_t *restrict points,
+                                    const uint8_t *restrict src_y,
+                                    const uint8_t *restrict bin,
+                                    int *restrict hist,
+                                    int *restrict sum_y,
+                                    int width,
+                                    int height,
+                                    int active_bins)
+{
+    nb4_clear_luma_scratch(hist, sum_y, active_bins);
+
+    for(int i = 0; i < depth; i++) {
+        const int sx = nb4_clampi(x + points[i].x, 0, width - 1);
+        const int sy = nb4_clampi(y + points[i].y, 0, height - 1);
+        const int idx = sy * width + sx;
+        const int b = bin[idx];
 
         hist[b]++;
         sum_y[b] += src_y[idx];
     }
 
-    const int peak = nb4_peak_bin(hist);
+    const int peak = nb4_peak_bin(hist, active_bins);
     const int count = hist[peak];
+    const int idx = y * width + x;
 
-    return count > 15
-        ? (uint8_t)(sum_y[peak] / count)
-        : src_y[y * width + x];
+    return count > 15 ? (uint8_t)(sum_y[peak] / count) : src_y[idx];
 }
 
-static inline pixel_t nb4_eval_color(
-    int x,
-    int y,
-    int depth,
-    const relpoint_t *restrict pts,
-    const uint8_t *restrict src_y,
-    const uint8_t *restrict src_u,
-    const uint8_t *restrict src_v,
-    const uint8_t *restrict bin,
-    int *restrict hist,
-    int *restrict sum_y,
-    int *restrict sum_u,
-    int *restrict sum_v,
-    int width,
-    int height
-) {
-    pixel_t out;
-    nb4_clear_color_scratch(hist, sum_y, sum_u, sum_v);
+static inline nb4_pixel_t nb4_eval_color(int x,
+                                         int y,
+                                         int depth,
+                                         const nb4_point_t *restrict points,
+                                         const uint8_t *restrict src_y,
+                                         const uint8_t *restrict src_u,
+                                         const uint8_t *restrict src_v,
+                                         const uint8_t *restrict bin,
+                                         int *restrict hist,
+                                         int *restrict sum_y,
+                                         int *restrict sum_u,
+                                         int *restrict sum_v,
+                                         int width,
+                                         int height,
+                                         int active_bins)
+{
+    nb4_pixel_t out;
+
+    nb4_clear_color_scratch(hist, sum_y, sum_u, sum_v, active_bins);
 
     for(int i = 0; i < depth; i++) {
-        int dx = nb4_clampi((int)(pts[i].x + (double)x), 0, width - 1);
-        int dy = nb4_clampi((int)(pts[i].y + (double)y), 0, height - 1);
-        int idx = dy * width + dx;
-        int b = bin[idx];
+        const int sx = nb4_clampi(x + points[i].x, 0, width - 1);
+        const int sy = nb4_clampi(y + points[i].y, 0, height - 1);
+        const int idx = sy * width + sx;
+        const int b = bin[idx];
 
         hist[b]++;
         sum_y[b] += src_y[idx];
@@ -292,7 +308,7 @@ static inline pixel_t nb4_eval_color(
         sum_v[b] += src_v[idx];
     }
 
-    const int peak = nb4_peak_bin(hist);
+    const int peak = nb4_peak_bin(hist, active_bins);
     const int count = hist[peak];
     const int idx = y * width + x;
 
@@ -300,7 +316,8 @@ static inline pixel_t nb4_eval_color(
         out.y = (uint8_t)(sum_y[peak] / count);
         out.u = (uint8_t)(sum_u[peak] / count);
         out.v = (uint8_t)(sum_v[peak] / count);
-    } else {
+    }
+    else {
         out.y = src_y[idx];
         out.u = src_u[idx];
         out.v = src_v[idx];
@@ -309,16 +326,16 @@ static inline pixel_t nb4_eval_color(
     return out;
 }
 
-static void nb4_apply_luma(
-    nb4_t *n,
-    uint8_t *restrict dst_y,
-    const uint8_t *restrict src_y,
-    const uint8_t *restrict bin,
-    int width,
-    int height,
-    int depth
-) {
-    const relpoint_t *restrict pts = n->points;
+static void nb4_apply_luma(nb4_t *n,
+                           uint8_t *restrict dst_y,
+                           const uint8_t *restrict src_y,
+                           const uint8_t *restrict bin,
+                           int width,
+                           int height,
+                           int depth,
+                           int active_bins)
+{
+    const nb4_point_t *restrict points = n->points;
 
 #pragma omp parallel for schedule(static) num_threads(n->n_threads)
     for(int y = 0; y < height; y++) {
@@ -327,31 +344,25 @@ static void nb4_apply_luma(
         int *hist = scratch;
         int *sum_y = scratch + NB4_BINS;
 
-        for(int x = 0; x < width; x++) {
-            dst_y[y * width + x] = nb4_eval_luma(
-                x, y, depth, pts,
-                src_y, bin,
-                hist, sum_y,
-                width, height
-            );
-        }
+        for(int x = 0; x < width; x++)
+            dst_y[y * width + x] = nb4_eval_luma(x, y, depth, points, src_y, bin, hist, sum_y, width, height, active_bins);
     }
 }
 
-static void nb4_apply_color(
-    nb4_t *n,
-    uint8_t *restrict dst_y,
-    uint8_t *restrict dst_u,
-    uint8_t *restrict dst_v,
-    const uint8_t *restrict src_y,
-    const uint8_t *restrict src_u,
-    const uint8_t *restrict src_v,
-    const uint8_t *restrict bin,
-    int width,
-    int height,
-    int depth
-) {
-    const relpoint_t *restrict pts = n->points;
+static void nb4_apply_color(nb4_t *n,
+                            uint8_t *restrict dst_y,
+                            uint8_t *restrict dst_u,
+                            uint8_t *restrict dst_v,
+                            const uint8_t *restrict src_y,
+                            const uint8_t *restrict src_u,
+                            const uint8_t *restrict src_v,
+                            const uint8_t *restrict bin,
+                            int width,
+                            int height,
+                            int depth,
+                            int active_bins)
+{
+    const nb4_point_t *restrict points = n->points;
 
 #pragma omp parallel for schedule(static) num_threads(n->n_threads)
     for(int y = 0; y < height; y++) {
@@ -364,16 +375,27 @@ static void nb4_apply_color(
 
         for(int x = 0; x < width; x++) {
             const int idx = y * width + x;
-            pixel_t tmp = nb4_eval_color(
-                x, y, depth, pts,
-                src_y, src_u, src_v, bin,
-                hist, sum_y, sum_u, sum_v,
-                width, height
+            nb4_pixel_t p = nb4_eval_color(
+                x,
+                y,
+                depth,
+                points,
+                src_y,
+                src_u,
+                src_v,
+                bin,
+                hist,
+                sum_y,
+                sum_u,
+                sum_v,
+                width,
+                height,
+                active_bins
             );
 
-            dst_y[idx] = tmp.y;
-            dst_u[idx] = tmp.u;
-            dst_v[idx] = tmp.v;
+            dst_y[idx] = p.y;
+            dst_u[idx] = p.u;
+            dst_v[idx] = p.v;
         }
     }
 }
@@ -381,20 +403,16 @@ static void nb4_apply_color(
 void neighbours4_apply(void *ptr, VJFrame *frame, int *args)
 {
     nb4_t *n = (nb4_t*) ptr;
-    if(!n || !frame || !args)
-        return;
 
     const int width = frame->width;
     const int height = frame->height;
     const int len = frame->len;
-
-    if(width <= 0 || height <= 0 || len <= 0)
-        return;
-
-    int radius = nb4_clampi(args[0], 2, 32);
-    int depth = nb4_clampi(args[1], 1, 200);
-    int smoothness = nb4_clampi(args[2], 1, 255);
-    int mode = nb4_clampi(args[3], 0, 1);
+    const int uv_len = frame->ssm ? len : frame->uv_len;
+    const int radius = args[P_RADIUS];
+    const int depth = args[P_DEPTH];
+    const int smoothness = args[P_SMOOTHNESS];
+    const int mode = args[P_MODE];
+    const int active_bins = smoothness + 1;
 
     uint8_t *restrict dst_y = frame->data[0];
     uint8_t *restrict dst_u = frame->data[1];
@@ -415,17 +433,15 @@ void neighbours4_apply(void *ptr, VJFrame *frame, int *args)
     }
 
 #pragma omp parallel for schedule(static) num_threads(n->n_threads)
-    for(int i = 0; i < len; i++) {
+    for(int i = 0; i < len; i++)
         bin[i] = nb4_quant_luma(src_y[i], smoothness);
+
+    if(mode) {
+        nb4_apply_color(n, dst_y, dst_u, dst_v, src_y, src_u, src_v, bin, width, height, depth, active_bins);
     }
-
-    if(!mode) {
-        const int uv_len = frame->ssm ? len : frame->uv_len;
-
-        nb4_apply_luma(n, dst_y, src_y, bin, width, height, depth);
+    else {
+        nb4_apply_luma(n, dst_y, src_y, bin, width, height, depth, active_bins);
         veejay_memset(dst_u, 128, uv_len);
         veejay_memset(dst_v, 128, uv_len);
-    } else {
-        nb4_apply_color(n, dst_y, dst_u, dst_v, src_y, src_u, src_v, bin, width, height, depth);
     }
 }

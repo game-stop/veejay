@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -19,28 +19,56 @@
  */
 
 #include "common.h"
+#include <veejaycore/vjmem.h>
 #include "opacitythreshold.h"
+
+#define OPACITYTHRESHOLD_PARAMS 3
+
+#define P_OPACITY 0
+#define P_MIN_T   1
+#define P_MAX_T   2
+
+typedef struct {
+    uint16_t *hblur;
+    int n_threads;
+} op_thres_t;
+
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline uint8_t opacitythreshold_div255(int v)
+{
+    return (uint8_t)(((v + 128) + ((v + 128) >> 8)) >> 8);
+}
 
 vj_effect *opacitythreshold_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
 
+    if(!ve)
+        return NULL;
+
+    ve->num_params = OPACITYTHRESHOLD_PARAMS;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 255;
-    ve->defaults[0] = 180;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
-    ve->defaults[1] = 50;
-
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
-    ve->defaults[2] = 255;
+    ve->limits[0][P_OPACITY] = 0; ve->limits[1][P_OPACITY] = 255; ve->defaults[P_OPACITY] = 180;
+    ve->limits[0][P_MIN_T] = 0;   ve->limits[1][P_MIN_T] = 255;   ve->defaults[P_MIN_T] = 50;
+    ve->limits[0][P_MAX_T] = 0;   ve->limits[1][P_MAX_T] = 255;   ve->defaults[P_MAX_T] = 255;
 
     ve->description = "Soft Luma Key (edge smoothing)";
     ve->sub_format = 1;
@@ -56,134 +84,117 @@ vj_effect *opacitythreshold_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                       24,                 235,                10, 38, 900,  2400, 0, 65, /* Opacity */
-        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 8,                  120,                6,  22, 1600, 3400, 700, 35, /* Min Threshold */
-        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 135,                245,                6,  22, 1600, 3400, 700, 35  /* Max Threshold */
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     18,                 245,                16, 62,  700, 2800, 0,    86,
+        VJ_BEAT_DETAIL,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 8,                  118,                12, 46, 1000, 3600, 0,    64,
+        VJ_BEAT_CONTRAST,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 118,                245,                12, 46, 1000, 3600, 0,    68
     );
-
-    (void) w;
-    (void) h;
 
     return ve;
 }
 
-typedef struct {
-    uint16_t *hblur;
-    int n_threads;
-} op_thres_t;
+void opacitythreshold_free(void *ptr)
+{
+    op_thres_t *opt = (op_thres_t*) ptr;
+
+    free(opt->hblur);
+    free(opt);
+}
 
 void *opacitythreshold_malloc(int w, int h)
 {
     op_thres_t *opt = (op_thres_t*) vj_calloc(sizeof(op_thres_t));
+
     if(!opt)
         return NULL;
 
-    opt->hblur = (uint16_t*) vj_calloc(sizeof(uint16_t) * w * h);
+    opt->hblur = (uint16_t*) vj_calloc(sizeof(uint16_t) * (size_t)w * (size_t)h);
+
     if(!opt->hblur) {
         free(opt);
         return NULL;
     }
 
     opt->n_threads = vje_advise_num_threads(w * h);
-    if(opt->n_threads < 1)
-        opt->n_threads = 1;
 
     return (void*) opt;
-}
-
-void opacitythreshold_free(void *ptr)
-{
-    op_thres_t *opt = (op_thres_t*) ptr;
-    if(opt) {
-        if(opt->hblur)
-            free(opt->hblur);
-        free(opt);
-    }
 }
 
 void opacitythreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     op_thres_t *opt = (op_thres_t*) ptr;
-    if(!opt || !frame || !frame2 || !args)
-        return;
 
-    int opacity = args[0];
-    int tmin = args[1];
-    int tmax = args[2];
-
-    if(opacity < 0)
-        opacity = 0;
-    else if(opacity > 255)
-        opacity = 255;
+    const int opacity = args[P_OPACITY];
+    int tmin = args[P_MIN_T];
+    int tmax = args[P_MAX_T];
 
     if(tmax < tmin) {
-        int tmp_t = tmin;
+        const int tmp_t = tmin;
         tmin = tmax;
         tmax = tmp_t;
     }
 
-    const int w = frame->width;
-    const int h = frame->height;
-
-    if(w < 2 || h < 3)
+    if(opacity <= 0)
         return;
 
-    uint8_t *restrict Y   = frame->data[0];
-    uint8_t *restrict Cb  = frame->data[1];
-    uint8_t *restrict Cr  = frame->data[2];
+    const int w = frame->width;
+    const int h = frame->height;
+    const int t_diff = tmax > tmin ? tmax - tmin : 1;
+    const int n_threads = opt->n_threads;
 
-    uint8_t *restrict Y2  = frame2->data[0];
-    uint8_t *restrict Cb2 = frame2->data[1];
-    uint8_t *restrict Cr2 = frame2->data[2];
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
 
     uint16_t *restrict tmp = opt->hblur;
 
-    const int t_diff = (tmax > tmin) ? (tmax - tmin) : 1;
-
-#pragma omp parallel num_threads(opt->n_threads)
+#pragma omp parallel num_threads(n_threads)
     {
 #pragma omp for schedule(static)
         for(int y = 0; y < h; y++) {
             const int row = y * w;
+            const int last = row + w - 1;
 
             tmp[row] = (uint16_t)((Y[row] + (Y[row] << 1) + Y[row + 1]) >> 2);
 
             for(int x = 1; x < w - 1; x++) {
                 const int idx = row + x;
+
                 tmp[idx] = (uint16_t)((Y[idx - 1] + (Y[idx] << 1) + Y[idx + 1]) >> 2);
             }
 
-            tmp[row + w - 1] = (uint16_t)((Y[row + w - 2] + (Y[row + w - 1] << 1) + Y[row + w - 1]) >> 2);
+            tmp[last] = (uint16_t)((Y[last - 1] + (Y[last] << 1) + Y[last]) >> 2);
         }
 
 #pragma omp for schedule(static)
         for(int y = 1; y < h - 1; y++) {
             const int row = y * w;
-            const int up  = row - w;
-            const int dn  = row + w;
+            const int up = row - w;
+            const int dn = row + w;
 
             for(int x = 1; x < w - 1; x++) {
                 const int idx = row + x;
-
                 const int blur = (tmp[up + x] + (tmp[idx] << 1) + tmp[dn + x]) >> 2;
-
                 int mask;
+
                 if(blur <= tmin)
                     mask = 0;
                 else if(blur >= tmax)
-                    mask = 256;
+                    mask = 255;
                 else
-                    mask = ((blur - tmin) * 256) / t_diff;
+                    mask = ((blur - tmin) * 255 + (t_diff >> 1)) / t_diff;
 
-                mask = (mask * opacity) >> 8;
+                const int w2 = opacitythreshold_div255(mask * opacity);
 
-                if(mask > 0) {
-                    const int inv = 256 - mask;
+                if(w2 > 0) {
+                    const int w1 = 255 - w2;
 
-                    Y[idx]  = (uint8_t)((inv * Y[idx]  + mask * Y2[idx]  + 128) >> 8);
-                    Cb[idx] = (uint8_t)((inv * Cb[idx] + mask * Cb2[idx] + 128) >> 8);
-                    Cr[idx] = (uint8_t)((inv * Cr[idx] + mask * Cr2[idx] + 128) >> 8);
+                    Y[idx] = opacitythreshold_div255(w1 * Y[idx] + w2 * Y2[idx]);
+                    Cb[idx] = opacitythreshold_div255(w1 * Cb[idx] + w2 * Cb2[idx]);
+                    Cr[idx] = opacitythreshold_div255(w1 * Cr[idx] + w2 * Cr2[idx]);
                 }
             }
         }

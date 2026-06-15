@@ -25,137 +25,152 @@ typedef struct {
     uint8_t *ghost_buf[4];
     uint8_t *diff_map;
     int diff_period;
+    int n_threads;
 } ghost_t;
+
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline uint8_t ghost_blend255(uint8_t a, uint8_t b, int opacity)
+{
+    const int inv = 255 - opacity;
+    const int x = (int)a * inv + (int)b * opacity;
+    return (uint8_t)(((x + 1) + (x >> 8)) >> 8);
+}
 
 vj_effect *ghost_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
+    if(!ve)
+        return NULL;
+
     ve->num_params = 1;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][0] = 16; 
-    ve->limits[1][0] = 255;  // opacity
+    ve->limits[1][0] = 255;
     ve->defaults[0] = 134;
+
     ve->description = "Motion Ghost";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-	ve->has_user =0;
-	ve->param_description = vje_build_param_list(ve->num_params, "Opacity" );
-	ve->beat_hints = vje_build_beat_hint_list(
-		ve->num_params,
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(ve->num_params, "Opacity");
 
-		VJ_BEAT_KICK, VJ_BEAT_F_CONTINUOUS, 32, 220, 14, 58, 90, 720, 0, 82 /* Opacity */
-	);
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+        VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 28, 235, 18, 68, 650, 2600, 0, 90
+    );
+
     return ve;
 }
 
 void *ghost_malloc(int w, int h)
 {
     ghost_t *g = (ghost_t*) vj_calloc(sizeof(ghost_t));
-    if(!g) {
+
+    if(!g)
         return NULL;
-    }
 
-	const int len = (w * h);
-    const int total_len = (len * 4);
+    const int len = w * h;
 
-	g->ghost_buf[0] = vj_malloc( sizeof(uint8_t) * total_len);
+    g->ghost_buf[0] = (uint8_t*) vj_malloc((size_t)len * 4u);
+
     if(!g->ghost_buf[0]) {
         free(g);
         return NULL;
     }
 
-	g->ghost_buf[1] = g->ghost_buf[0] + len;
-	g->ghost_buf[2] = g->ghost_buf[1] + len;
+    g->ghost_buf[1] = g->ghost_buf[0] + len;
+    g->ghost_buf[2] = g->ghost_buf[1] + len;
     g->diff_map = g->ghost_buf[2] + len;
-	g->diff_period = 0;
+    g->diff_period = 0;
+    g->n_threads = vje_advise_num_threads(len);
 
-	return (void*) g;
+    return (void*) g;
 }
 
 void ghost_free(void *ptr)
 {
     ghost_t *g = (ghost_t*) ptr;
 
-	free(g->ghost_buf[0]);
+    free(g->ghost_buf[0]);
     free(g);
 }
 
-void ghost_apply(void *ptr, VJFrame *frame, int *args ) {
-    int opacity = args[0];
-
+void ghost_apply(void *ptr, VJFrame *frame, int *args)
+{
     ghost_t *g = (ghost_t*) ptr;
 
-	register int q,z=0;
-	int x,y,i;
-	const unsigned int width = frame->width;
-	const int len = frame->len;
-	const unsigned int op_a = opacity;
-	const unsigned int op_b = 255 - op_a;
-	uint8_t *srcY = frame->data[0];
-	uint8_t *srcCb= frame->data[1];
-	uint8_t *srcCr= frame->data[2];
-	uint8_t *dY  = g->ghost_buf[0];
-	uint8_t *dCb = g->ghost_buf[1];
-	uint8_t *dCr = g->ghost_buf[2];
-	uint8_t *bm = g->diff_map;
+    const int opacity = args[0];
+    const int width = frame->width;
+    const int height = frame->height;
+    const int len = frame->len;
 
-	const uint8_t kernel[9] =
-	{
-		1,1,1,1,1,1,1,1,1
-	};
-	// first time running 
-	if(g->diff_period == 0)
-	{
-		int strides[4] = { len, len, len, 0 };
-		vj_frame_copy( frame->data, g->ghost_buf, strides );
-		g->diff_period = 1;
-		return;
-	}
+    uint8_t *restrict srcY = frame->data[0];
+    uint8_t *restrict srcU = frame->data[1];
+    uint8_t *restrict srcV = frame->data[2];
 
+    uint8_t *restrict dY = g->ghost_buf[0];
+    uint8_t *restrict dU = g->ghost_buf[1];
+    uint8_t *restrict dV = g->ghost_buf[2];
+    uint8_t *restrict bm = g->diff_map;
 
-	// absolute difference on threshold
-	#pragma omp simd
-	for (i = 0; i < len; i++) {
-		int diff = srcY[i] - dY[i];
+    if(g->diff_period == 0) {
+        int strides[4] = { len, len, len, 0 };
+        vj_frame_copy(frame->data, g->ghost_buf, strides);
+        g->diff_period = 1;
+        return;
+    }
 
-		int abs_diff = (diff ^ (diff >> 31)) - (diff >> 31);
+#pragma omp parallel num_threads(g->n_threads)
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            const int diff = (int)srcY[i] - (int)dY[i];
+            const int abs_diff = (diff ^ (diff >> 31)) - (diff >> 31);
 
-		bm[i] = (uint8_t)(-(abs_diff > 0));
-	}
+            bm[i] = (uint8_t)(-(abs_diff > 0));
+        }
 
+#pragma omp for schedule(static)
+        for(int y = 1; y < height - 1; y++) {
+            const int row = y * width;
 
-	for( y = width; y < (len-width); y += width )
-	{
-		for( x = 1; x < width - 1; x ++ ) 
-		{
-			// input matrix
-			uint8_t mt[9] = {
-				bm[ x-1+y-width],	bm[ x+y-width],		bm[x+1+y-width],
-				bm[ x-1+y ],		bm[ x+y ],			bm[x+1+y],
-				bm[ x-1+y+width],	bm[ x+y+width ],	bm[x+1+y+width]
-				};
+#pragma omp simd
+            for(int x = 1; x < width - 1; x++) {
+                const int i = row + x;
+                const int active =
+                    bm[i - width - 1] | bm[i - width] | bm[i - width + 1] |
+                    bm[i - 1]         | bm[i]         | bm[i + 1] |
+                    bm[i + width - 1] | bm[i + width] | bm[i + width + 1];
 
-			for( q = 0; q < 9; q ++ )
-			{
-				if( kernel[q] && mt[q] ) // dilation
-					{ z ++; break; }
-			}
+                if(active) {
+                    dY[i] = ghost_blend255(dY[i], srcY[i], opacity);
+                    dU[i] = ghost_blend255(dU[i], srcU[i], opacity);
+                    dV[i] = ghost_blend255(dV[i], srcV[i], opacity);
 
-			if( z > 0 ) // accept 
-			{
-				// new pixel value back in ghost buf (feedback)
-				dY[x+y] = ( (op_a * srcY[x+y]  ) + (op_b * dY[x+y]) ) >> 8;
-				dCb[x+y] = ((op_a * srcCb[x+y] ) + (op_b * dCb[x+y])) >> 8;
-				dCr[x+y] = ((op_a * srcCr[x+y] ) + (op_b * dCr[x+y])) >> 8;
-				// put result to screen
-				srcY[x+y] = dY[x+y];
-				srcCb[x+y]= dCb[x+y];
-				srcCr[x+y] = dCr[x+y];
-			}
-
-			z = 0;
-		}
-	}
+                    srcY[i] = dY[i];
+                    srcU[i] = dU[i];
+                    srcV[i] = dV[i];
+                }
+            }
+        }
+    }
 }

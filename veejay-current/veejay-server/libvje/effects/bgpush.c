@@ -102,8 +102,7 @@ int bgpush_prepare(void *ptr, VJFrame *frame)
     return 1;
 }
 
-//FIXME: issue #78 , background frame in 4:4:4
-//alpha channel should be cleared according to info->settings->alpha_value
+
 void bgpush_apply( void *ptr, VJFrame *frame, int *args )
 {
 }

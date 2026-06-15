@@ -21,77 +21,62 @@
 #include "common.h"
 #include "color.h"
 
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
 
 vj_effect *color_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
 
     ve->num_params = 3;
-
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->defaults[0] = 128;
-    ve->defaults[1] = 128;
-    ve->defaults[2] = 128;
-
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 255;
-
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
-
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
+    ve->limits[0][0] = 0; ve->limits[1][0] = 255; ve->defaults[0] = 128;
+    ve->limits[0][1] = 0; ve->limits[1][1] = 255; ve->defaults[1] = 128;
+    ve->limits[0][2] = 0; ve->limits[1][2] = 255; ve->defaults[2] = 128;
 
     ve->sub_format = -1;
-
     ve->description = "Color Vibrance";
-
-    ve->param_description =
-        vje_build_param_list(
-            ve->num_params,
-            "Vibrance",
-            "Blue/Yellow Bias",
-            "Red/Green Bias"
-        );
-
+    ve->param_description = vje_build_param_list(ve->num_params, "Vibrance", "Blue/Yellow Bias", "Red/Green Bias");
     ve->has_user = 0;
     ve->extra_frame = 0;
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_KICK,  VJ_BEAT_F_CONTINUOUS,  32, 235, 14, 58, 90,  720, 0, 82, /* Vibrance */
-        VJ_BEAT_HAT,   VJ_BEAT_F_CONTINUOUS,  72, 210, 4,  24, 80,  520, 0, 48, /* Blue/Yellow Bias */
-        VJ_BEAT_SNARE, VJ_BEAT_F_CONTINUOUS,  72, 220, 8,  36, 120, 900, 0, 64  /* Red/Green Bias */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 48,  255, 16, 62,  700, 2800, 0,    86,
+        VJ_BEAT_COLOR_PHASE,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 64,  255, 12, 46, 1000, 3400, 0,    58,
+        VJ_BEAT_COLOR_PHASE,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 64,  255, 12, 46, 1000, 3400, 0,    58
     );
+
     return ve;
 }
 
 void color_apply(void *ptr, VJFrame *frame, int *args)
 {
+    (void) ptr;
     const int vibrance = args[0];
-    const int bias_u   = args[1];
-    const int bias_v   = args[2];
-    int n_threads = vje_advise_num_threads(frame->len);
+    const int bias_u = args[1];
+    const int bias_v = args[2];
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
-    const int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+    const int n_threads = vje_advise_num_threads(uv_len);
 
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
     for(int i = 0; i < uv_len; i++)
     {
-        int cb = Cb[i] - 128;
-        int cr = Cr[i] - 128;
-
-        int mag = abs(cb) + abs(cr);
-        int norm = mag >> 1;
-        int curve = 255 - ((norm * norm) >> 8);
-
-        int boost = (vibrance * curve) >> 8;
+        int cb = (int)Cb[i] - 128;
+        int cr = (int)Cr[i] - 128;
+        const int mag = abs(cb) + abs(cr);
+        const int norm = mag >> 1;
+        const int curve = 255 - ((norm * norm) >> 8);
+        const int boost = (vibrance * curve) >> 8;
 
         cb += (cb * boost) >> 8;
         cr += (cr * boost) >> 8;
@@ -99,15 +84,7 @@ void color_apply(void *ptr, VJFrame *frame, int *args)
         cb = (cb * bias_u) >> 8;
         cr = (cr * bias_v) >> 8;
 
-        cb += 128;
-        cr += 128;
-
-        if(cb < 0) cb = 0;
-        if(cb > 255) cb = 255;
-        if(cr < 0) cr = 0;
-        if(cr > 255) cr = 255;
-
-        Cb[i] = (uint8_t)cb;
-        Cr[i] = (uint8_t)cr;
+        Cb[i] = (uint8_t)clampi(cb + 128, 0, 255);
+        Cr[i] = (uint8_t)clampi(cr + 128, 0, 255);
     }
 }

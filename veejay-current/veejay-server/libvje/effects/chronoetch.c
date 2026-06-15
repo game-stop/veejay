@@ -20,7 +20,7 @@
 #include "common.h"
 #include "chronoetch.h"
 
-#define CHRONOETCHPARAMS 12
+#define CHRONOETCHPARAMS 11
 #define TAS_MAX_FRAMES 8
 
 #define P_OPACITY        0
@@ -34,7 +34,6 @@
 #define P_CHROMA_TEAR    8
 #define P_TRAIL          9
 #define P_STROKE_CHROMA 10
-#define P_BEAT_PUSH     11
 
 typedef struct {
     int w;
@@ -388,7 +387,6 @@ vj_effect *chronoetch_init(int w, int h)
     ve->defaults[P_CHROMA_TEAR]   = 280;
     ve->defaults[P_TRAIL]         = 980;
     ve->defaults[P_STROKE_CHROMA] = 500;
-    ve->defaults[P_BEAT_PUSH]     = 0;
 
     ve->limits[0][P_OPACITY]       = 0;
     ve->limits[1][P_OPACITY]       = 100;
@@ -423,8 +421,6 @@ vj_effect *chronoetch_init(int w, int h)
     ve->limits[0][P_STROKE_CHROMA] = 0;
     ve->limits[1][P_STROKE_CHROMA] = 1000;
 
-    ve->limits[0][P_BEAT_PUSH]     = 0;
-    ve->limits[1][P_BEAT_PUSH]     = 1000;
 
     ve->description = "Chrono Etch";
 
@@ -444,25 +440,21 @@ vj_effect *chronoetch_init(int w, int h)
         "Age Violence",
         "Chroma Time Tear",
         "Trail Memory",
-        "Stroke Chroma",
-        "Beat Push"
+        "Stroke Chroma"
     );
-
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                                        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Opacity */
-        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,   3,                  8,                  5,  14,  1800, 4200, 1200, 12,    /* Step Size */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,   1,                  7,                  6,  20,  1800, 4200, 1000, 30,    /* Time Depth */
-        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                                                    16,                 96,                 14, 58,  90,   720,  0,    82,    /* Rib Length */
-        VJ_BEAT_SNARE,            VJ_BEAT_F_CONTINUOUS,                                                    360,                1000,               10, 46,  120,  900,  0,    78,    /* Edge Sensitivity */
-        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                                                    160,                940,                14, 58,  90,   760,  0,    82,    /* Motion Ageing */
-        VJ_BEAT_SNARE,            VJ_BEAT_F_CONTINUOUS,                                                    120,                920,                10, 46,  120,  900,  0,    72,    /* Bone Density */
-        VJ_BEAT_HAT,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY,                            0,                  840,                4,  24,  120,  900,  400,  38,    /* Age Violence */
-        VJ_BEAT_SNARE,            VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY,                            0,                  820,                8,  34,  120,  980,  400,  48,    /* Chroma Time Tear */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY,                                                   720,                1000,               5,  20,  2000, 5200, 1200, 30,    /* Trail Memory */
-        VJ_BEAT_SNARE,            VJ_BEAT_F_CONTINUOUS,                                                    120,                960,                8,  36,  120,  900,  0,    62,    /* Stroke Chroma */
-        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                                0,                  1000,               24, 96,  60,   360,  0,    100     /* Beat Push */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                                       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,    0,   -1000,
+        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,    0,   -1000,
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,                            1,   8,   64, 100,  80,  900, 120, 100,
+        VJ_BEAT_FLOW,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          16,  96,  62, 100,  60,  720, 0,   100,
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         620,1000, 48, 100,  70,  820, 0,    96,
+        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         180,1000, 62, 100,  60,  720, 0,   100,
+        VJ_BEAT_DENSITY,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         180,1000, 54, 100,  80,  840, 0,    96,
+        VJ_BEAT_TURBULENCE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          60, 860, 46,  98, 100, 1000, 0,    88,
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         180,1000, 62, 100,  60,  720, 0,   100,
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                           0,1000, 76, 100,  70,  900, 0,   100,
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         180,1000, 48,  98, 100, 1000, 0,    90
     );
 
     return ve;
@@ -578,9 +570,6 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
     int stroke_chroma;
     int stroke_chroma_q8;
     int color_bias;
-    int beat_push;
-    int stroke_gain_q8;
-    int color_energy_q8;
 
     int chroma_gain_age_q8[TAS_MAX_FRAMES];
 
@@ -624,21 +613,7 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
     chroma_tear   = tas_scale_1000_to_100(args[P_CHROMA_TEAR]);
     trail         = tas_scale_1000_to_100(args[P_TRAIL]);
     stroke_chroma = tas_scale_1000_to_100(args[P_STROKE_CHROMA]);
-    beat_push     = tas_clampi(args[P_BEAT_PUSH],     0, 1000);
     color_bias    = 0;
-
-    edge_sens    = tas_clampi(edge_sens    + (beat_push * 18) / 1000, 0, 100);
-    motion_age   = tas_clampi(motion_age   + (beat_push * 26) / 1000, 0, 100);
-    bone_density = tas_clampi(bone_density + (beat_push * 36) / 1000, 0, 100);
-    age_violence = tas_clampi(age_violence + (beat_push * 32) / 1000, 0, 100);
-    chroma_tear  = tas_clampi(chroma_tear  + (beat_push * 28) / 1000, 0, 100);
-    trail        = tas_clampi(trail        + (beat_push * 6)  / 1000, 0, 100);
-    rib_length   = tas_clampi(rib_length + ((rib_length * beat_push) / 2500) + (beat_push / 160), 2, 96);
-
-    stroke_gain_q8 = 256 + ((beat_push * 96 + 500) / 1000);
-    color_energy_q8 = 256 + ((beat_push * 80 + 500) / 1000);
-    stroke_gain_q8 = tas_clampi(stroke_gain_q8, 128, 512);
-    color_energy_q8 = tas_clampi(color_energy_q8, 128, 512);
 
     opacity_q8 = (opacity * 255 + 50) / 100;
 
@@ -649,7 +624,6 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
     else
         stroke_chroma_q8 = 256 + (((stroke_chroma - 50) * 384 + 25) / 50);
 
-    stroke_chroma_q8 = (stroke_chroma_q8 * color_energy_q8 + 128) >> 8;
     stroke_chroma_q8 = tas_clampi(stroke_chroma_q8, 0, 2048);
 
     for (a = 0; a < TAS_MAX_FRAMES; a++) {
@@ -677,15 +651,15 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
     if (max_age > available - 1)
         max_age = available - 1;
 
-    edge_threshold_base = 250 - edge_sens * 2 - ((beat_push * 18) / 1000);
+    edge_threshold_base = 250 - edge_sens * 2;
 
-    seed_floor = 32 - (edge_sens / 7) - ((beat_push * 4) / 1000);
+    seed_floor = 32 - (edge_sens / 7);
     seed_floor = tas_clampi(seed_floor, 8, 32);
 
-    motion_min = 18 + ((100 - motion_age) / 4) - ((beat_push * 6) / 1000);
+    motion_min = 18 + ((100 - motion_age) / 4);
     motion_min = tas_clampi(motion_min, 6, 42);
-    motion_fracture_keep = 3 + (bone_density / 7) + (motion_age / 10) + ((beat_push * 18) / 1000);
-    current_keep_base = 18 + (bone_density / 2) + ((beat_push * 22) / 1000);
+    motion_fracture_keep = 3 + (bone_density / 7) + (motion_age / 10);
+    current_keep_base = 18 + (bone_density / 2);
 
 #pragma omp parallel for schedule(static) num_threads(c->n_threads)
     for (int i = 0; i < process_len; i++) {
@@ -802,7 +776,7 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
 
                 strength = tas_ramp255(edge_core + motion_boost, 180);
 
-                keep = 10 + bone_density + (strength >> 2) + ((beat_push * 42) / 1000);
+                keep = 10 + bone_density + (strength >> 2);
 
                 if (edge > 180)
                     keep += (edge - 180) >> 2;
@@ -837,11 +811,6 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
                 } else {
                     strength = 0;
                 }
-            }
-
-            if (strength > 0) {
-                strength = (strength * stroke_gain_q8 + 128) >> 8;
-                strength = tas_clampi(strength, 0, 255);
             }
 
             if (!accepted || strength <= 0)

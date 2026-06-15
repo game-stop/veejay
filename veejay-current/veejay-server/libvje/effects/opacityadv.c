@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,106 +21,116 @@
 #include "common.h"
 #include "opacityadv.h"
 
+#define OPACITYADV_PARAMS 3
+
+#define P_OPACITY 0
+#define P_MIN_T   1
+#define P_MAX_T   2
+
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline uint8_t opacityadv_div255(int v)
+{
+    return (uint8_t)(((v + 128) + ((v + 128) >> 8)) >> 8);
+}
+
 vj_effect *opacityadv_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 255;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
-    ve->defaults[0] = 150;
-    ve->defaults[1] = 40;
-    ve->defaults[2] = 176;
-	ve->description = "Soft-Edge Luma Key";
+
+    if(!ve)
+        return NULL;
+
+    ve->num_params = OPACITYADV_PARAMS;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
+    ve->limits[0][P_OPACITY] = 0; ve->limits[1][P_OPACITY] = 255; ve->defaults[P_OPACITY] = 150;
+    ve->limits[0][P_MIN_T] = 0;   ve->limits[1][P_MIN_T] = 255;   ve->defaults[P_MIN_T] = 40;
+    ve->limits[0][P_MAX_T] = 0;   ve->limits[1][P_MAX_T] = 255;   ve->defaults[P_MAX_T] = 176;
+
+    ve->description = "Soft-Edge Luma Key";
     ve->sub_format = 1;
     ve->extra_frame = 1;
-	ve->has_user =0;
-	ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Min Threshold", "Max Threshold");
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Min Threshold", "Max Threshold");
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                       24,                 235,                10, 38, 900,  2400, 0, 65, /* Opacity */
-        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 8,                  120,                6,  22, 1600, 3400, 700, 35, /* Min Threshold */
-        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 135,                245,                6,  22, 1600, 3400, 700, 35  /* Max Threshold */
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                    18,                 245,                16, 62,  700, 2800, 0,    86,
+        VJ_BEAT_DETAIL,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 8,                  118,                12, 46, 1000, 3600, 0,    64,
+        VJ_BEAT_DETAIL,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                    132,                248,                12, 46, 1000, 3600, 0,    64
     );
+
     return ve;
 }
 
-typedef struct {
-	int n_threads;
-} opacityadv_t;
+void opacityadv_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
+{
+    (void)ptr;
 
-void *opacityadv_malloc(int w, int h) {
-	opacityadv_t *opa = (opacityadv_t*) vj_malloc(sizeof(opacityadv_t));
-	if(!opa)
-		return NULL;
-	opa->n_threads = vje_advise_num_threads( w * h );
-	return (void*) opa;
-}
-
-void opacityadv_free(void *ptr) {
-	opacityadv_t *opa = (opacityadv_t*) ptr;
-	if(opa) {
-		free(opa);
-	}
-}
-
-void opacityadv_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
-
-	opacityadv_t *opa = (opacityadv_t*) ptr;
-
-    const int opacity = args[0];
-    int tmin = args[1];
-    int tmax = args[2];
+    const int opacity = clampi(args[P_OPACITY], 0, 255);
+    int tmin = clampi(args[P_MIN_T], 0, 255);
+    int tmax = clampi(args[P_MAX_T], 0, 255);
 
     if(tmax < tmin) {
-        int tmp = tmin;
+        const int tmp = tmin;
         tmin = tmax;
         tmax = tmp;
     }
-    const int width   = frame->width;
-    const int height  = frame->height;
-    const int len     = width * height;
 
-    uint8_t *Y1 = frame->data[0],  *Y2 = frame2->data[0];
-    uint8_t *U1 = frame->data[1],  *U2 = frame2->data[1];
-    uint8_t *V1 = frame->data[2],  *V2 = frame2->data[2];
+    const int len = frame->len;
+    const int n_threads = vje_advise_num_threads(len);
 
-    const int global_weight = (opacity >= 255) ? 256 : (opacity < 0 ? 0 : opacity);
+    uint8_t *restrict Y1 = frame->data[0];
+    uint8_t *restrict U1 = frame->data[1];
+    uint8_t *restrict V1 = frame->data[2];
 
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict U2 = frame2->data[1];
+    const uint8_t *restrict V2 = frame2->data[2];
 
+    if(opacity <= 0)
+        return;
 
-    #pragma omp parallel num_threads(opa->n_threads)
-    {
-        #pragma omp for schedule(static)
-        for (int i = 0; i < len; i++) {
-            int y_val = Y1[i];
-            int local_mask = 0;
+#pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int i = 0; i < len; i++) {
+        const int y = Y1[i];
+        int mask = 0;
 
-            if (y_val >= tmin && y_val <= tmax) {
-                local_mask = 256;
-            }
-            else if (y_val > tmin - 4 && y_val < tmin) {
-                local_mask = (y_val - (tmin - 4)) << 6;
-            }
-            else if (y_val > tmax && y_val < tmax + 4) {
-                local_mask = ((tmax + 4) - y_val) << 6;
-            }
+        if(y >= tmin && y <= tmax)
+            mask = 255;
+        else if(y > tmin - 4 && y < tmin)
+            mask = (y - (tmin - 4)) * 64;
+        else if(y > tmax && y < tmax + 4)
+            mask = ((tmax + 4) - y) * 64;
 
-            int final_w2 = (local_mask * global_weight) >> 8;
-            int final_w1 = 256 - final_w2;
+        if(mask > 255)
+            mask = 255;
 
-            if (final_w2 > 0) {
-                Y1[i] = (final_w1 * Y1[i] + final_w2 * Y2[i] + 128) >> 8;
-                U1[i] = (final_w1 * U1[i] + final_w2 * U2[i] + 128) >> 8;
-                V1[i] = (final_w1 * V1[i] + final_w2 * V2[i] + 128) >> 8;
-            }
+        const int w2 = opacityadv_div255(mask * opacity);
+
+        if(w2 > 0) {
+            const int w1 = 255 - w2;
+
+            Y1[i] = opacityadv_div255(w1 * Y1[i] + w2 * Y2[i]);
+            U1[i] = opacityadv_div255(w1 * U1[i] + w2 * U2[i]);
+            V1[i] = opacityadv_div255(w1 * V1[i] + w2 * V2[i]);
         }
     }
 }

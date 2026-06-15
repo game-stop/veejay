@@ -38,308 +38,327 @@ static void *proj_[255];
 
 typedef struct
 {
-	uint32_t *data;
-	uint8_t *bitmap;
-	uint8_t *current;
+    uint32_t *data;
+    uint8_t *bitmap;
+    uint8_t *current;
 } contourextract_data;
 
 typedef struct
 {
-	int x;
-	int y;
+    int x;
+    int y;
 } point_t;
 
-static 	point_t **points = NULL;
+static point_t **points = NULL;
 
+static inline int contour_clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
 
 vj_effect *contourextract_init(int width, int height)
 {
-    //int i,j;
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
+    if(!ve)
+        return NULL;
+
     ve->num_params = 6;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1])
+    {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
-    ve->limits[0][1] = 0;	/* reverse */
+    ve->limits[0][1] = 0;
     ve->limits[1][1] = 1;
-    ve->limits[0][2] = 0;	/* show thresholded image / contour */
+    ve->limits[0][2] = 0;
     ve->limits[1][2] = 1;
-    ve->limits[0][3] = 0;	/* Take background */
+    ve->limits[0][3] = 0;
     ve->limits[1][3] = 1;
-    ve->limits[0][4] = 1;	/* thinning */
+    ve->limits[0][4] = 1;
     ve->limits[1][4] = 100;
-    ve->limits[0][5] = 1;	/* minimum blob weight */
+    ve->limits[0][5] = 1;
     ve->limits[1][5] = 5000;
-    
+
     ve->defaults[0] = 30;
     ve->defaults[1] = 0;
     ve->defaults[2] = 0;
     ve->defaults[3] = 0;
     ve->defaults[4] = 3;
     ve->defaults[5] = 200;
-    
+
     ve->description = "Contour extraction";
     ve->extra_frame = 0;
     ve->sub_format = -1;
     ve->has_user = 1;
-    ve->user_data = NULL;
-	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Mode", "Show image/contour", "Take background", "Thinning", "Min weight" );
 
-	ve->hints = vje_init_value_hint_list (ve->num_params);
-	vje_build_value_hint_list (ve->hints, ve->limits[1][1],1,
-	                           "Normal",	//0
-	                           "Reverse");	//1
+    ve->param_description = vje_build_param_list(ve->num_params, "Threshold", "Mode", "Show image/contour", "Take background", "Thinning", "Min weight");
 
-	vje_build_value_hint_list (ve->hints, ve->limits[1][2],2,
-	                           "Image",		//0
-	                           "Contour");	//1
-
-	vje_build_value_hint_list (ve->hints, ve->limits[1][3],3,
-	                           "Do not take background",		//0
-	                           "Take background");	//1
-
-	ve->beat_hints = vje_build_beat_hint_list(
-		ve->num_params,
-
-		VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS,                              8,                  120,                8,  32,  1200, 2800, 0,    55,    /* Threshold */
-		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Mode */
-		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Show image/contour */
-		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Take background - unused in apply */
-		VJ_BEAT_DETAIL,   VJ_BEAT_F_REJECT,                                   VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Thinning - currently unused */
-		VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,         40,                 1200,               6,  22,  1800, 4200, 900,  30     /* Min weight */
-	);
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+    vje_build_value_hint_list(ve->hints, ve->limits[1][1], 1, "Normal", "Reverse");
+    vje_build_value_hint_list(ve->hints, ve->limits[1][2], 2, "Image", "Contour");
+    vje_build_value_hint_list(ve->hints, ve->limits[1][3], 3, "Do not take background", "Take background");
 
     return ve;
 }
 
-void	contourextract_destroy(void)
+void contourextract_destroy(void)
 {
-	if(static_bg)
-		free(static_bg);
-	if(dt_map)
-		free(dt_map);
-	static_bg = NULL;
-	dt_map = NULL;
-	
+    if(static_bg)
+        free(static_bg);
+
+    if(dt_map)
+        free(dt_map);
+
+    static_bg = NULL;
+    dt_map = NULL;
 }
 
-static int	nearest_div(int val )
+static int nearest_div(int val)
 {
-	int r = val % 8;
-	while(r--)
-		val--;
-	return val;
+    int r = val % 8;
+
+    while(r--)
+        val--;
+
+    return val > 0 ? val : 8;
 }
+
 int contourextract_malloc(void **d, int width, int height)
 {
-	contourextract_data *my;
-	*d = (void*) vj_calloc(sizeof(contourextract_data));
-	my = (contourextract_data*) *d;
+    if(!d || width <= 0 || height <= 0)
+        return 0;
 
-	dw_ = nearest_div( width / 8  );
-	dh_ = nearest_div( height / 8 );
+    contourextract_data *my = (contourextract_data*) vj_calloc(sizeof(contourextract_data));
 
-	my->current = (uint8_t*) vj_calloc( sizeof(uint8_t) * ( dw_ * dh_ * 3 ));
-	my->bitmap = (uint8_t*) vj_calloc( sizeof(uint8_t) * ( width * height ));
-	
-	if(static_bg == NULL)	
-		static_bg = (uint8_t*) vj_calloc( sizeof(uint8_t) * ( (width * height + (width*2)) )   );
-	if(dt_map == NULL )
-		dt_map = (uint32_t*) vj_calloc( sizeof(uint32_t) * ( width * height ));
+    if(!my)
+        return 0;
 
-	veejay_memset( &template_, 0, sizeof(sws_template) );
-	veejay_memset( proj_, 0, sizeof(proj_) );
-	
-	template_.flags = 1;
+    *d = my;
 
-	vj_get_yuvgrey_template( &to_shrink_, width, height );
-	vj_get_yuvgrey_template( &shrinked_ , dw_, dh_ );
+    dw_ = nearest_div(width / 8);
+    dh_ = nearest_div(height / 8);
 
-	shrink_ = yuv_init_swscaler(
-			&(to_shrink_),
-			&(shrinked_),
-			&template_ ,
-			yuv_sws_get_cpu_flags() );
+    my->current = (uint8_t*) vj_calloc(sizeof(uint8_t) * (dw_ * dh_ * 3));
+    my->bitmap = (uint8_t*) vj_calloc(sizeof(uint8_t) * (width * height));
 
-	points = (point_t**) vj_calloc( sizeof(point_t*) * 12000 );
-	int i;
-	for( i = 0; i < 12000; i ++ )
-	{
-		points[i] = (point_t*) vj_calloc( sizeof(point_t) );
-	}
+    if(!my->current || !my->bitmap)
+    {
+        contourextract_free(my);
+        *d = NULL;
+        return 0;
+    }
 
-	veejay_memset( x_, 0, sizeof(x_) );
-	veejay_memset( y_, 0, sizeof(y_) );
-	
-	return 1;
+    if(static_bg == NULL)
+        static_bg = (uint8_t*) vj_calloc(sizeof(uint8_t) * (width * height + (width * 2)));
+
+    if(dt_map == NULL)
+        dt_map = (uint32_t*) vj_calloc(sizeof(uint32_t) * width * height);
+
+    if(!static_bg || !dt_map)
+    {
+        contourextract_free(my);
+        contourextract_destroy();
+        *d = NULL;
+        return 0;
+    }
+
+    veejay_memset(&template_, 0, sizeof(sws_template));
+    veejay_memset(proj_, 0, sizeof(proj_));
+
+    template_.flags = 1;
+
+    vj_get_yuvgrey_template(&to_shrink_, width, height);
+    vj_get_yuvgrey_template(&shrinked_, dw_, dh_);
+
+    shrink_ = yuv_init_swscaler(
+        &(to_shrink_),
+        &(shrinked_),
+        &template_,
+        yuv_sws_get_cpu_flags()
+    );
+
+    if(!shrink_)
+    {
+        contourextract_free(my);
+        *d = NULL;
+        return 0;
+    }
+
+    points = (point_t**) vj_calloc(sizeof(point_t*) * 12000);
+
+    if(!points)
+    {
+        contourextract_free(my);
+        *d = NULL;
+        return 0;
+    }
+
+    for(int i = 0; i < 12000; i++)
+    {
+        points[i] = (point_t*) vj_calloc(sizeof(point_t));
+
+        if(!points[i])
+        {
+            contourextract_free(my);
+            *d = NULL;
+            return 0;
+        }
+    }
+
+    veejay_memset(x_, 0, sizeof(x_));
+    veejay_memset(y_, 0, sizeof(y_));
+
+    return 1;
 }
 
 void contourextract_free(void *d)
 {
-	if(d)
-	{
-		contourextract_data *my = (contourextract_data*) d;
-		if(my->current) free(my->current);
-		if(my->bitmap) free(my->bitmap);
-		free(d);
-	}
+    if(d)
+    {
+        contourextract_data *my = (contourextract_data*) d;
 
-	if( shrink_ )
-	{	
-		yuv_free_swscaler( shrink_ );
-		shrink_ = NULL;
-	}
+        if(my->current)
+            free(my->current);
 
-	int i;
-	for( i = 0; i < 255; i++ )
-		if( proj_[i] )
-			viewport_destroy( proj_[i] );
-	for( i = 0; i < 12000; i ++ )
-	{
-		if(points[i])
-			free(points[i]);
-	}
-	free(points);
+        if(my->bitmap)
+            free(my->bitmap);
 
-	d = NULL;
+        free(d);
+    }
+
+    if(shrink_)
+    {
+        yuv_free_swscaler(shrink_);
+        shrink_ = NULL;
+    }
+
+    for(int i = 0; i < 255; i++)
+    {
+        if(proj_[i])
+        {
+            viewport_destroy(proj_[i]);
+            proj_[i] = NULL;
+        }
+    }
+
+    if(points)
+    {
+        for(int i = 0; i < 12000; i++)
+        {
+            if(points[i])
+                free(points[i]);
+        }
+
+        free(points);
+        points = NULL;
+    }
 }
 
 int contourextract_prepare(uint8_t *map[4], int width, int height)
 {
-	if(!static_bg )
-	{
-		return 0;
-	}
+    if(!static_bg || !map || !map[0] || width <= 0 || height <= 0)
+        return 0;
 
-	vj_frame_copy1( map[0], static_bg, (width*height));	
-	
-	VJFrame tmp;
-	veejay_memset( &tmp, 0, sizeof(VJFrame));
-	tmp.data[0] = static_bg;
-	tmp.width = width;
-	tmp.height = height;
-	softblur_apply_internal( &tmp );
+    vj_frame_copy1(map[0], static_bg, width * height);
 
-	veejay_msg(2, "Contour extraction: Snapped background frame");
-	return 1;
+    VJFrame tmp;
+    veejay_memset(&tmp, 0, sizeof(VJFrame));
+
+    tmp.data[0] = static_bg;
+    tmp.width = width;
+    tmp.height = height;
+    tmp.len = width * height;
+
+    softblur_apply_internal(&tmp);
+
+    veejay_msg(2, "Contour extraction: Snapped background frame");
+
+    return 1;
 }
 
 void contourextract_apply(void *ed, VJFrame *frame, int threshold, int reverse,
                           int mode, int take_bg, int feather, int min_blob_weight)
 {
-	unsigned int i;
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-	const int len = frame->len;
-	const int uv_len = frame->uv_len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
+    (void) take_bg;
+    (void) feather;
 
-	uint32_t cx[256];
-	uint32_t cy[256];
-	uint32_t xsize[256];
-	uint32_t ysize[256];
-	uint32_t blobs[255];
+    const unsigned int width = frame->width;
+    const unsigned int height = frame->height;
+    const int len = frame->len;
+    const int uv_len = frame->uv_len;
 
-	veejay_memset( cx,0,sizeof(cx));
-	veejay_memset( cy,0,sizeof(cy));
-	veejay_memset( xsize,0,sizeof(xsize));
-	veejay_memset( ysize,0,sizeof(ysize));
-	veejay_memset( blobs, 0, sizeof(blobs) );
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
 
-	contourextract_data *ud = (contourextract_data*) ed;
-	
-	//@ clear distance transform map
-	veejay_memset( dt_map, 0 , len * sizeof(uint32_t) );
+    uint32_t cx[256];
+    uint32_t cy[256];
+    uint32_t xsize[256];
+    uint32_t ysize[256];
+    uint32_t blobs[255];
 
-	binarify_1src( ud->bitmap, frame->data[0], threshold, reverse, width, height );
+    veejay_memset(cx, 0, sizeof(cx));
+    veejay_memset(cy, 0, sizeof(cy));
+    veejay_memset(xsize, 0, sizeof(xsize));
+    veejay_memset(ysize, 0, sizeof(ysize));
+    veejay_memset(blobs, 0, sizeof(blobs));
 
-	if(mode==1)
-	{
-		//@ show difference image in grayscale
-		vj_frame_copy1( ud->bitmap, Y, len );
-		vj_frame_clear1( Cb, 128, uv_len );
-		vj_frame_clear1( Cr, 128, uv_len );
-		return;
-	}
+    contourextract_data *ud = (contourextract_data*) ed;
 
-	//@ calculate distance map
-	veejay_distance_transform8( ud->bitmap, width, height, dt_map );
+    threshold = contour_clampi(threshold, 0, 255);
+    reverse = contour_clampi(reverse, 0, 1);
+    mode = contour_clampi(mode, 0, 1);
+    min_blob_weight = contour_clampi(min_blob_weight, 1, 5000);
 
-	to_shrink_.data[0] = ud->bitmap;
-	shrinked_.data[0] = ud->current;
+    veejay_memset(dt_map, 0, len * sizeof(uint32_t));
 
-	yuv_convert_and_scale_grey( shrink_, &to_shrink_, &shrinked_ );
+    binarify_1src(ud->bitmap, frame->data[0], threshold, reverse, width, height);
 
-	uint32_t labels = 
-		veejay_component_labeling_8(dw_,dh_, shrinked_.data[0], blobs, cx,cy,xsize,ysize,min_blob_weight);
+    if(mode == 1)
+    {
+        vj_frame_copy1(ud->bitmap, Y, len);
+        vj_frame_clear1(Cb, 128, uv_len);
+        vj_frame_clear1(Cr, 128, uv_len);
+        return;
+    }
 
-	veejay_memset( Y, 0, len );
-	veejay_memset( Cb , 128, uv_len);
-	veejay_memset( Cr , 128, uv_len );  
+    veejay_distance_transform8(ud->bitmap, width, height, dt_map);
 
-	int num_objects = 0;
-	for( i = 1 ; i <= labels; i ++ )
-		if( blobs[i] ) 
-			num_objects ++;
-	
-	
-	//@ Iterate over blob's bounding boxes and extract contours
-	//@ use snippet below to get center of blob --> parameter extraction TODO
-	/*
-	for( i = 1; i <= labels; i ++ )
-	{
-		if( blobs[i] > 0 )
-		{
-			int nx = cx[i] * sx;
-			int ny = cy[i] * sy;
-			int size_x = xsize[i] * sx;
-			int size_y = ysize[i] * sy * 0.5; 
-			int x1 = nx - size_x;
-			int y1 = ny - size_y;
-			int x2 = nx + size_y;
-			int y2 = ny + size_y;
-			int n_points = 0;
-			int center = 0;
+    to_shrink_.data[0] = ud->bitmap;
+    shrinked_.data[0] = ud->current;
 
-			if( x1 < 0 ) x1 = 0; else if ( x1 > width ) x1 = width;
-			if( x2 < 0 ) x2 = 0; else if ( x2 > width ) x2 = width;
-			if( y1 < 0 ) y1 = 0; else if ( y1 >= height ) y1 = height -1;
-			if( y2 < 0 ) y2 = 0; else if ( y2 >= height ) y2 = height -1;
+    yuv_convert_and_scale_grey(shrink_, &to_shrink_, &shrinked_);
 
+    uint32_t labels = veejay_component_labeling_8(dw_, dh_, shrinked_.data[0], blobs, cx, cy, xsize, ysize, min_blob_weight);
 
-			for( k = y1; k < y2; k ++ )
-			{
-				for( j = x1; j < x2; j ++ )
-				{
-					//@ use distance transform map to find centroid (fuzzy)
-					if( dt_map[ (k * width + j) ] > center )
-					{
-						center = dt_map[ (k* width +j) ];
-					}
-					if( dt_map[ (k * width + j) ] == feather )
-					{
-						Y[ (k * width +j)] = 0xff;
-						points[ n_points ]->x = j;
-						points[ n_points ]->y = k;
-						n_points++;
-						if( n_points >= 11999 )
-						{
-							veejay_msg(0, "Too many points in contour");	
-							return;
-						}
-					}
-				}
-			}
-		}
-	}
-	*/
+    veejay_memset(Y, 0, len);
+    veejay_memset(Cb, 128, uv_len);
+    veejay_memset(Cr, 128, uv_len);
 
+    if(labels > 254)
+        labels = 254;
+
+    int num_objects = 0;
+
+    for(unsigned int i = 1; i <= labels; i++)
+    {
+        if(blobs[i])
+            num_objects++;
+    }
+
+    (void) num_objects;
 }
-
-
-
-

@@ -22,139 +22,144 @@
 #include "colmorphology.h"
 
 static const uint8_t kernels[8][9] = {
-    { 0xFF, 0xFF, 0xFF,  0xFF, 0xFF, 0xFF,  0xFF, 0xFF, 0xFF }, // square
-    { 0x00, 0xFF, 0x00,  0xFF, 0xFF, 0xFF,  0x00, 0xFF, 0x00 }, // cross
-    { 0x00, 0x00, 0x00,  0xFF, 0xFF, 0xFF,  0x00, 0x00, 0x00 }, // horizontal
-    { 0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00 }, // vertical
-    { 0x00, 0x00, 0xFF,  0x00, 0xFF, 0x00,  0xFF, 0x00, 0x00 }, // diagonal 1
-    { 0xFF, 0x00, 0x00,  0x00, 0xFF, 0x00,  0x00, 0x00, 0xFF }, // diagonal 2
-    { 0xFF, 0xFF, 0xFF,  0x00, 0x00, 0x00,  0x00, 0x00, 0x00 }, // top edge
-    { 0x00, 0x00, 0x00,  0x00, 0x00, 0x00,  0xFF, 0xFF, 0xFF }  // bottom edge
+    { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff },
+    { 0x00, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00, 0xff, 0x00 },
+    { 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00 },
+    { 0x00, 0xff, 0x00, 0x00, 0xff, 0x00, 0x00, 0xff, 0x00 },
+    { 0x00, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0x00 },
+    { 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff },
+    { 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+    { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff }
 };
 
 typedef struct {
     uint8_t *binary_img;
-	int n_threads;
+    int n_threads;
 } colmorph_t;
 
 vj_effect *colmorphology_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
 
+    ve->num_params = 3;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 255;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 7;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 1;
-    ve->defaults[0] = 140;
-    ve->defaults[1] = 1;
-    ve->defaults[2] = 0;
+    ve->limits[0][0] = 0; ve->limits[1][0] = 255; ve->defaults[0] = 140;
+    ve->limits[0][1] = 0; ve->limits[1][1] = 7;   ve->defaults[1] = 1;
+    ve->limits[0][2] = 0; ve->limits[1][2] = 1;   ve->defaults[2] = 0;
 
     ve->description = "Colored Morphology";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Threshold", "Kernel", "Dilate or Erode");
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    36,                 235,                10, 42, 120, 900, 0, 72,    /* Threshold */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0, -1000, /* Kernel */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0, -1000  /* Dilate or Erode */
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 64,                 220,                12, 46,  900, 3200, 0,    68,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
     );
+
     return ve;
 }
 
 void *colmorphology_malloc(int w, int h)
 {
     colmorph_t *c = (colmorph_t*) vj_calloc(sizeof(colmorph_t));
-    if(!c) return NULL;
+
+    if(!c)
+        return NULL;
 
     c->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w * h));
+
     if(!c->binary_img) {
         free(c);
         return NULL;
     }
 
-	c->n_threads = vje_advise_num_threads(w*h);
-    return (void*) c;
+    c->n_threads = vje_advise_num_threads(w * h);
+    return c;
 }
 
 void colmorphology_free(void *ptr)
 {
     colmorph_t *c = (colmorph_t*) ptr;
-    free(c->binary_img);
+
+    if(!c)
+        return;
+
+    if(c->binary_img)
+        free(c->binary_img);
+
     free(c);
 }
 
 static inline uint8_t do_dilate(const uint8_t *k, const uint8_t *r0, const uint8_t *r1, const uint8_t *r2, int x)
 {
-    uint8_t match = (k[0] & r0[x-1]) | (k[1] & r0[x]) | (k[2] & r0[x+1]) |
-                    (k[3] & r1[x-1]) | (k[4] & r1[x]) | (k[5] & r1[x+1]) |
-                    (k[6] & r2[x-1]) | (k[7] & r2[x]) | (k[8] & r2[x+1]);
+    uint8_t match = (k[0] & r0[x - 1]) | (k[1] & r0[x]) | (k[2] & r0[x + 1]) |
+                    (k[3] & r1[x - 1]) | (k[4] & r1[x]) | (k[5] & r1[x + 1]) |
+                    (k[6] & r2[x - 1]) | (k[7] & r2[x]) | (k[8] & r2[x + 1]);
+
     return match ? pixel_Y_hi_ : pixel_Y_lo_;
 }
 
 static inline uint8_t do_erode(const uint8_t *k, const uint8_t *r0, const uint8_t *r1, const uint8_t *r2, int x)
 {
-    uint8_t shrink = (k[0] & ~r0[x-1]) | (k[1] & ~r0[x]) | (k[2] & ~r0[x+1]) |
-                     (k[3] & ~r1[x-1]) | (k[4] & ~r1[x]) | (k[5] & ~r1[x+1]) |
-                     (k[6] & ~r2[x-1]) | (k[7] & ~r2[x]) | (k[8] & ~r2[x+1]);
+    uint8_t shrink = (k[0] & ~r0[x - 1]) | (k[1] & ~r0[x]) | (k[2] & ~r0[x + 1]) |
+                     (k[3] & ~r1[x - 1]) | (k[4] & ~r1[x]) | (k[5] & ~r1[x + 1]) |
+                     (k[6] & ~r2[x - 1]) | (k[7] & ~r2[x]) | (k[8] & ~r2[x + 1]);
+
     return shrink ? pixel_Y_lo_ : pixel_Y_hi_;
 }
 
 void colmorphology_apply(void *ptr, VJFrame *frame, int *args)
 {
-    int threshold = args[0];
-    int type = args[1] % 8;
-    int passes = args[2];
-
     colmorph_t *c = (colmorph_t*) ptr;
-    const unsigned int width = frame->width;
-    const unsigned int height = frame->height;
-    int len = frame->len;
+    const int threshold = args[0];
+    const int type = args[1];
+    const int erode = args[2];
+    const int width = frame->width;
+    const int height = frame->height;
+    const int len = frame->len;
 
-    uint8_t *Y = frame->data[0];
-    uint8_t *binary_img = c->binary_img;
-    const uint8_t *k = kernels[type];
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict binary_img = c->binary_img;
+    const uint8_t *restrict k = kernels[type];
 
-    #pragma omp simd
-    for(int i = 0; i < len; i++) {
-        binary_img[i] = (Y[i] < threshold) ? 0x00 : 0xFF;
+    #pragma omp parallel for simd schedule(static) num_threads(c->n_threads)
+    for(int i = 0; i < len; i++)
+        binary_img[i] = Y[i] < threshold ? 0x00 : 0xff;
+
+    if(width < 3 || height < 3) {
+        veejay_memset(Y, pixel_Y_lo_, len);
+        return;
     }
 
-    for(int i = 0; i < width; i++) {
-        Y[i] = pixel_Y_lo_;
-        Y[len - width + i] = pixel_Y_lo_;
+    #pragma omp parallel for simd schedule(static) num_threads(c->n_threads)
+    for(int x = 0; x < width; x++)
+    {
+        Y[x] = pixel_Y_lo_;
+        Y[len - width + x] = pixel_Y_lo_;
     }
 
-    if (passes == 0)
+    if(!erode)
     {
         #pragma omp parallel for schedule(static) num_threads(c->n_threads)
         for(int y = 1; y < height - 1; y++)
         {
-            const uint8_t *r0 = binary_img + (y - 1) * width;
-            const uint8_t *r1 = binary_img + y * width;
-            const uint8_t *r2 = binary_img + (y + 1) * width;
-            uint8_t *dst_row  = Y + y * width;
+            const uint8_t *restrict r0 = binary_img + (y - 1) * width;
+            const uint8_t *restrict r1 = binary_img + y * width;
+            const uint8_t *restrict r2 = binary_img + (y + 1) * width;
+            uint8_t *restrict dst_row = Y + y * width;
 
             dst_row[0] = pixel_Y_lo_;
             dst_row[width - 1] = pixel_Y_lo_;
 
             for(int x = 1; x < width - 1; x++)
-            {
-                if (r1[x] == 0xFF) {
-                    dst_row[x] = pixel_Y_hi_;
-                } else {
-                    dst_row[x] = do_dilate(k, r0, r1, r2, x);
-                }
-            }
+                dst_row[x] = r1[x] == 0xff ? pixel_Y_hi_ : do_dilate(k, r0, r1, r2, x);
         }
     }
     else
@@ -162,22 +167,16 @@ void colmorphology_apply(void *ptr, VJFrame *frame, int *args)
         #pragma omp parallel for schedule(static) num_threads(c->n_threads)
         for(int y = 1; y < height - 1; y++)
         {
-            const uint8_t *r0 = binary_img + (y - 1) * width;
-            const uint8_t *r1 = binary_img + y * width;
-            const uint8_t *r2 = binary_img + (y + 1) * width;
-            uint8_t *dst_row  = Y + y * width;
+            const uint8_t *restrict r0 = binary_img + (y - 1) * width;
+            const uint8_t *restrict r1 = binary_img + y * width;
+            const uint8_t *restrict r2 = binary_img + (y + 1) * width;
+            uint8_t *restrict dst_row = Y + y * width;
 
             dst_row[0] = pixel_Y_lo_;
             dst_row[width - 1] = pixel_Y_lo_;
 
             for(int x = 1; x < width - 1; x++)
-            {
-                if (r1[x] == 0x00) {
-                    dst_row[x] = pixel_Y_lo_;
-                } else {
-                    dst_row[x] = do_erode(k, r0, r1, r2, x);
-                }
-            }
+                dst_row[x] = r1[x] == 0x00 ? pixel_Y_lo_ : do_erode(k, r0, r1, r2, x);
         }
     }
 }

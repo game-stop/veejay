@@ -22,136 +22,141 @@
 #include "softblur.h"
 #include "diffmap.h"
 
-typedef int (*morph_func)(uint8_t *kernel, uint8_t mt[9] );
+typedef struct {
+    uint8_t *binary_img;
+    int n_threads;
+} diffmap_t;
 
 vj_effect *differencemap_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;  // threshold
-    ve->limits[1][0] = 255;
-    ve->limits[0][1] = 0;  // reverse
-    ve->limits[1][1] = 1;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 1; // show map
-    ve->defaults[0] = 40;
-    ve->defaults[1] = 0;
-    ve->defaults[2] = 1;
+    ve->num_params = 3;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    ve->limits[0][0] = 0; ve->limits[1][0] = 255; ve->defaults[0] = 40;
+    ve->limits[0][1] = 0; ve->limits[1][1] = 1;   ve->defaults[1] = 0;
+    ve->limits[0][2] = 0; ve->limits[1][2] = 1;   ve->defaults[2] = 1;
+
     ve->description = "Map B to A (bitmask)";
     ve->sub_format = 1;
     ve->extra_frame = 1;
     ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Reverse", "Show");
-	ve->beat_hints = vje_build_beat_hint_list(
-		ve->num_params,
+    ve->param_description = vje_build_param_list(ve->num_params, "Threshold", "Reverse", "Show");
 
-		VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    8,                  150,                8, 36, 120, 900, 0,   70,    /* Threshold */
-		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,   0,   0,   -1000, /* Reverse */
-		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,   0,   0,   -1000  /* Show */
-	);
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 8,                  150,                12, 46,  900, 3200, 0,    76,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
+    );
+
     return ve;
 }
 
-typedef struct {
-    uint8_t *binary_img;
-} diffmap_t;
-
-void *differencemap_malloc(int w, int h )
+void *differencemap_malloc(int w, int h)
 {
     diffmap_t *d = (diffmap_t*) vj_calloc(sizeof(diffmap_t));
-    if(!d) {
-        return NULL;
-    }
 
-	d->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * ( (w*h*2) + (w*2)) );
-	if(!d->binary_img) {
+    if(!d)
+        return NULL;
+
+    const int len = w * h;
+
+    if(len <= 0) {
         free(d);
         return NULL;
     }
 
-    return (void*) d;
+    d->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * ((len * 2) + (w * 2)));
+
+    if(!d->binary_img) {
+        free(d);
+        return NULL;
+    }
+
+    d->n_threads = vje_advise_num_threads(len);
+
+    return d;
 }
 
-void		differencemap_free(void *ptr)
+void differencemap_free(void *ptr)
 {
     diffmap_t *d = (diffmap_t*) ptr;
-    free(d->binary_img);
+
+    if(!d)
+        return;
+
+    if(d->binary_img)
+        free(d->binary_img);
+
     free(d);
 }
 
-#ifndef MIN
-#define MIN(a,b) ( (a)>(b) ? (b) : (a) )
-#endif
-#ifndef MAX
-#define MAX(a,b) ( (a)>(b) ? (a) : (b) )
-#endif
-
-void differencemap_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
-    int threshold = args[0];
-    int reverse = args[1];
-	int show = args[2];
-    
+void differencemap_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
+{
     diffmap_t *d = (diffmap_t*) ptr;
 
-	unsigned int x,y;
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-	int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2=frame2->data[1];
-	uint8_t *Cr2=frame2->data[2];
-    uint8_t *binary_img = d->binary_img;
+    const int threshold = args[0];
+    const int reverse = args[1];
+    const int show = args[2];
+    const int width = frame->width;
+    const int height = frame->height;
+    const int len = frame->len;
+    const int uv_len = frame->uv_len;
 
-//	morph_func	p = _dilate_kernel3x3;
-	uint8_t *previous_img = binary_img + len;
-//@	take copy of image
-	vj_frame_copy1( Y, previous_img, len );
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
-	VJFrame tmp;
-	veejay_memcpy(&tmp, frame, sizeof(VJFrame));
-	tmp.data[0] = previous_img;
-	softblur_apply_internal( &tmp );
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
 
-	binarify_1src( binary_img,previous_img,threshold,reverse, width,height);
-	//@ clear image
+    uint8_t *restrict binary_img = d->binary_img;
+    uint8_t *restrict previous_img = binary_img + len;
 
-	if(show)
-	{
-		vj_frame_copy1( binary_img, frame->data[0], len );
-		vj_frame_clear1( frame->data[1],128, len);
-		vj_frame_clear1(frame->data[2],128, len);
-		return;
-	}
+    vj_frame_copy1(Y, previous_img, len);
 
-	veejay_memset( Y, 0, width );
-	veejay_memset( Cb, 128, width );
-	veejay_memset( Cr, 128, width );
+    VJFrame tmp;
+    veejay_memcpy(&tmp, frame, sizeof(VJFrame));
+    tmp.data[0] = previous_img;
 
-	len -= width;
+    softblur_apply_internal(&tmp);
+    binarify_1src(binary_img, previous_img, threshold, reverse, width, height);
 
-	for(y = width; y < len; y += width  )
-	{	
-		for(x = 1; x < width-1; x ++)
-        {	
-			if(binary_img[x+y]) //@ found white pixel
-			{
-				Y[x+y] = Y2[x+y];
-		    	Cb[x+y] = Cb2[x+y];
-				Cr[x+y] = Cr2[x+y];
-			}
-			else
-			{
-	    		Y[x+y] = pixel_Y_lo_;
-				Cb[x+y] = 128;
-				Cr[x+y] = 128;
-			}
-		}
-	}
+    if(show)
+    {
+        vj_frame_copy1(binary_img, Y, len);
+        vj_frame_clear1(Cb, 128, uv_len);
+        vj_frame_clear1(Cr, 128, uv_len);
+        return;
+    }
+
+    veejay_memset(Y, pixel_Y_lo_, len);
+    veejay_memset(Cb, 128, uv_len);
+    veejay_memset(Cr, 128, uv_len);
+
+    if(height < 3 || width < 3)
+        return;
+
+    #pragma omp parallel for schedule(static) num_threads(d->n_threads)
+    for(int y = 1; y < height - 1; y++)
+    {
+        const int row = y * width;
+
+        for(int x = 1; x < width - 1; x++)
+        {
+            const int i = row + x;
+
+            if(binary_img[i])
+            {
+                Y[i] = Y2[i];
+                Cb[i] = Cb2[i];
+                Cr[i] = Cr2[i];
+            }
+        }
+    }
 }

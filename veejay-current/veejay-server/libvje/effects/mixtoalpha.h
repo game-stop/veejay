@@ -21,7 +21,5 @@
 #ifndef MIX2ALPHA_H
 #define MIX2ALPHA_H
 vj_effect *mixtoalpha_init(int w, int h);
-void *mixtoalpha_malloc(int w, int h);
-void mixtoalpha_free(void *ptr);
 void mixtoalpha_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

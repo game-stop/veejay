@@ -21,11 +21,10 @@
 #include "common.h"
 #include "ghostwash.h"
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
+#include <math.h>
+#include <stdint.h>
 
-#define GHOSTWASH_PARAMS 12
+#define GHOSTWASH_PARAMS 11
 
 #define P_SOURCE          0
 #define P_DRIFT           1
@@ -38,7 +37,6 @@
 #define P_COLOR_STRENGTH  8
 #define P_COLOR_MODE      9
 #define P_GEOMETRY       10
-#define P_BEAT_PUSH      11
 
 typedef struct {
     uint8_t *canvas_y;
@@ -98,16 +96,6 @@ static inline float param1000_to_float(int v)
     return (float)v * 0.001f;
 }
 
-static inline float ghostwash_beat_shape(float v)
-{
-    v = clampf_local(v, 0.0f, 1.0f);
-    return v * v;
-}
-
-static inline float ghostwash_push01(float base, float drive, float amount)
-{
-    return clampf_local(base + (1.0f - base) * drive * amount, 0.0f, 1.0f);
-}
 
 static inline uint8_t avg2_u8(uint8_t a, uint8_t b)
 {
@@ -208,30 +196,15 @@ static inline uint8_t downsample_src_plane_2x2(const uint8_t *restrict plane, in
 
 static int ghostwash_grid_required(int w, int h, int cell)
 {
-    if (w <= 0 || h <= 0 || cell <= 0)
-        return 0;
-
     const int gw = (w + cell - 1) / cell + 2;
     const int gh = (h + cell - 1) / cell + 2;
-
-    if (gw <= 0 || gh <= 0)
-        return 0;
-
-    if (gw > INT_MAX / gh)
-        return 0;
 
     return gw * gh;
 }
 
 static int ghostwash_ensure_grid(ghostwash_t *p, int w, int h, int cell)
 {
-    if (!p)
-        return 0;
-
     const int required = ghostwash_grid_required(w, h, cell);
-
-    if (required <= 0)
-        return 0;
 
     if (required <= p->grid_capacity && p->grid_x && p->grid_y)
         return 1;
@@ -343,12 +316,11 @@ vj_effect *ghostwash_init(int w, int h)
     ve->limits[1][P_GEOMETRY] = 9;
     ve->defaults[P_GEOMETRY] = 0;
 
-    ve->limits[0][P_BEAT_PUSH] = 0;
-    ve->limits[1][P_BEAT_PUSH] = 1000;
-    ve->defaults[P_BEAT_PUSH] = 0;
-
     ve->description = "Ghost Wash";
     ve->sub_format = 1;
+    ve->extra_frame = 0;
+    ve->has_user = 0;
+    ve->parallel = 0;
     ve->param_description = vje_build_param_list(
         ve->num_params,
         "Source",
@@ -361,8 +333,7 @@ vj_effect *ghostwash_init(int w, int h)
         "Motion Pull",
         "Color Strength",
         "Color Mode",
-        "Geometry",
-        "Beat Push"
+        "Geometry"
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
@@ -393,23 +364,18 @@ vj_effect *ghostwash_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                       40,                 360,                8,  30, 900,  2400, 0,    42,    /* Source */
-        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                       120,                940,                14, 58, 90,   720,  0,    82,    /* Drift */
-        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                       80,                 920,                14, 58, 90,   720,  0,    80,    /* Warp */
-        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                       100,                820,                10, 42, 120,  900,  0,    70,    /* Detail */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                      540,                980,                6,  24, 2200, 5200, 1400, 36,    /* Persistence */
-        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,                 680,                4,  26, 120,  900,  500,  40,    /* Instability */
-        VJ_BEAT_GRID_SIZE,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  180,                880,                5,  20, 2200, 5200, 1800, 20,    /* Flow Size */
-        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                       180,                940,                10, 46, 120,  900,  0,    74,    /* Motion Pull */
-        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS,                       240,                1000,               4,  28, 80,   620,  0,    52,    /* Color Strength */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,   -1000, /* Color Mode */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,   -1000, /* Geometry */
-        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,    0,                  900,                22, 88, 60,   360,  0,    100    /* Beat Push */
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       32,                 420,                12, 46, 1000, 3600, 0,    58,
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       160,                920,                18, 68,  650, 2600, 0,    92,
+        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       90,                 880,                18, 68,  650, 2600, 0,    90,
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       80,                 760,                14, 54,  850, 3200, 0,    72,
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       720,                1000,               18, 68,  700, 3000, 0,    94,
+        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       40,                 760,                14, 54,  800, 3200, 0,    74,
+        VJ_BEAT_GRID_SIZE,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 280, 900, 4, 14, 3200, 8600, 2400, 18,
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       160,                920,                18, 66,  650, 2600, 0,    88,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       220,                960,                16, 62,  700, 2800, 0,    82,
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
     );
-
-    (void)w;
-    (void)h;
 
     return ve;
 }
@@ -417,9 +383,6 @@ vj_effect *ghostwash_init(int w, int h)
 void ghostwash_free(void *ptr)
 {
     ghostwash_t *p = (ghostwash_t *)ptr;
-
-    if (!p)
-        return;
 
     if (p->canvas_y) free(p->canvas_y);
     if (p->canvas_u) free(p->canvas_u);
@@ -442,16 +405,9 @@ void ghostwash_free(void *ptr)
 
 void *ghostwash_malloc(int w, int h)
 {
-    if (w <= 2 || h <= 2)
-        return NULL;
-
     const int cw = (w + 1) >> 1;
     const int ch = (h + 1) >> 1;
-    const size_t len_sz = (size_t)w * (size_t)h;
     const size_t clen_sz = (size_t)cw * (size_t)ch;
-
-    if (len_sz == 0 || len_sz > (size_t)INT_MAX || clen_sz == 0 || clen_sz > (size_t)INT_MAX)
-        return NULL;
 
     ghostwash_t *p = (ghostwash_t *)vj_calloc(sizeof(ghostwash_t));
 
@@ -460,11 +416,6 @@ void *ghostwash_malloc(int w, int h)
 
     const int min_cell = 7;
     const int capacity = ghostwash_grid_required(cw, ch, min_cell);
-
-    if (capacity <= 0) {
-        free(p);
-        return NULL;
-    }
 
     p->w = w;
     p->h = h;
@@ -513,9 +464,6 @@ void *ghostwash_malloc(int w, int h)
     p->maturity = 0.0f;
     p->frame_no = 0;
     p->n_threads = vje_advise_num_threads((int)clen_sz);
-
-    if (p->n_threads <= 0)
-        p->n_threads = 1;
 
     return (void *)p;
 }
@@ -892,35 +840,14 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
 {
     ghostwash_t *p = (ghostwash_t *)ptr;
 
-    if (!p || !frame || !args)
-        return;
-
-    if (!frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
     const int w = frame->width;
     const int h = frame->height;
     const int cw = (w + 1) >> 1;
     const int ch = (h + 1) >> 1;
 
-    if (w <= 2 || h <= 2 || cw <= 1 || ch <= 1)
-        return;
-
-    const size_t len_sz = (size_t)w * (size_t)h;
-    const size_t clen_sz = (size_t)cw * (size_t)ch;
-
-    if (len_sz == 0 || len_sz > (size_t)INT_MAX || clen_sz == 0 || clen_sz > (size_t)INT_MAX)
-        return;
-
-    if (p->w != w || p->h != h || p->cw != cw || p->ch != ch)
-        return;
-
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
-
-    if (frame->uv_len > 0 && frame->uv_len < (int)len_sz)
-        return;
 
     if (!p->initialized) {
         for (int y = 0; y < ch; y++) {
@@ -953,7 +880,6 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     float motion_param = param1000_to_float(args[P_MOTION_PULL]);
     float color_strength_param = param1000_to_float(args[P_COLOR_STRENGTH]);
     const int mono_mode = (args[P_COLOR_MODE] != 0);
-    float beat_drive = ghostwash_beat_shape(param1000_to_float(args[P_BEAT_PUSH]));
 
     int geometry_mode = args[P_GEOMETRY];
 
@@ -961,13 +887,6 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
         geometry_mode = 0;
     else if (geometry_mode > 9)
         geometry_mode = 9;
-
-    drift_param = ghostwash_push01(drift_param, beat_drive, 0.42f);
-    warp_param = ghostwash_push01(warp_param, beat_drive, 0.38f);
-    detail_param = ghostwash_push01(detail_param, beat_drive, 0.46f);
-    instability_param = ghostwash_push01(instability_param, beat_drive, 0.26f);
-    motion_param = ghostwash_push01(motion_param, beat_drive, 0.48f);
-    color_strength_param = ghostwash_push01(color_strength_param, beat_drive, 0.34f);
 
     const float bleed_param = clampf_local(color_strength_param * 0.72f, 0.0f, 1.0f);
 

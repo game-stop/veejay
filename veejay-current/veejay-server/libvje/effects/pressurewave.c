@@ -18,44 +18,19 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  */
+
 #include "common.h"
 #include "pressurewave.h"
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
-#include <limits.h>
 
 #include <veejaycore/vjmem.h>
 #include <libvje/vje.h>
 
 #ifndef PW_PI
 #define PW_PI 3.14159265358979323846
-#endif
-
-#ifndef VJ_BEAT_SOFT_UNSET
-#define VJ_BEAT_SOFT_UNSET INT_MIN
-#endif
-
-#ifndef VJ_BEAT_F_PHRASE_ONLY
-#define VJ_BEAT_F_PHRASE_ONLY 0
-#endif
-
-#ifndef VJ_BEAT_F_SQUARED
-#define VJ_BEAT_F_SQUARED 0
-#endif
-
-#ifndef VJ_BEAT_F_IMPULSE
-#define VJ_BEAT_F_IMPULSE 0
-#endif
-
-#ifdef VJ_BEAT_F_REJECT
-#ifndef VJ_BEAT_SPEED
-#define VJ_BEAT_SPEED VJ_BEAT_DRIFT
-#endif
-#ifndef VJ_BEAT_INERTIA
-#define VJ_BEAT_INERTIA VJ_BEAT_SOURCE_MIX
-#endif
 #endif
 
 #define PW_MAX_WAVES 4
@@ -116,6 +91,10 @@ typedef struct {
     float last_shock;
     float last_snare;
 
+    int impact_cooldown;
+    int shock_cooldown;
+    int snare_cooldown;
+
     int wave_slot;
     uint32_t frame_count;
 } pressurewave_t;
@@ -152,6 +131,7 @@ static inline uint32_t pw_hash_u32(uint32_t x)
     x ^= x >> 15;
     x *= 0x846ca68bU;
     x ^= x >> 16;
+
     return x;
 }
 
@@ -169,9 +149,6 @@ static void pw_spawn_wave(pressurewave_t *s,
                           int speed,
                           int center_drift)
 {
-    if(!s)
-        return;
-
     const int w = s->w;
     const int h = s->h;
 
@@ -224,48 +201,35 @@ vj_effect *pressurewave_init(int w, int h)
     ve->description = "Pressure Wave";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
+    ve->has_user = 0;
 
-    ve->defaults[PW_DISPLACE]     = 72;
-    ve->defaults[PW_IMPACT]       = 0;
-    ve->defaults[PW_SHOCKWAVE]    = 0;
-    ve->defaults[PW_WAVE_WIDTH]   = 34;
-    ve->defaults[PW_WAVE_SPEED]   = 42;
-    ve->defaults[PW_REFRACTION]   = 86;
-    ve->defaults[PW_FLOW_SWING]   = 28;
+    ve->defaults[PW_DISPLACE] = 72;
+    ve->defaults[PW_IMPACT] = 0;
+    ve->defaults[PW_SHOCKWAVE] = 0;
+    ve->defaults[PW_WAVE_WIDTH] = 34;
+    ve->defaults[PW_WAVE_SPEED] = 42;
+    ve->defaults[PW_REFRACTION] = 86;
+    ve->defaults[PW_FLOW_SWING] = 28;
     ve->defaults[PW_CENTER_DRIFT] = 34;
-    ve->defaults[PW_RING_GLOW]    = 70;
-    ve->defaults[PW_SNARE_FLASH]  = 0;
-    ve->defaults[PW_HAT_SPARKLE]  = 42;
-    ve->defaults[PW_CHROMA_PUSH]  = 32;
-    ve->defaults[PW_DECAY]        = 74;
+    ve->defaults[PW_RING_GLOW] = 70;
+    ve->defaults[PW_SNARE_FLASH] = 0;
+    ve->defaults[PW_HAT_SPARKLE] = 42;
+    ve->defaults[PW_CHROMA_PUSH] = 32;
+    ve->defaults[PW_DECAY] = 74;
 
-    ve->limits[0][PW_DISPLACE]     = 0;
-    ve->limits[1][PW_DISPLACE]     = 200;
-    ve->limits[0][PW_IMPACT]       = 0;
-    ve->limits[1][PW_IMPACT]       = 100;
-    ve->limits[0][PW_SHOCKWAVE]    = 0;
-    ve->limits[1][PW_SHOCKWAVE]    = 100;
-    ve->limits[0][PW_WAVE_WIDTH]   = 4;
-    ve->limits[1][PW_WAVE_WIDTH]   = 96;
-    ve->limits[0][PW_WAVE_SPEED]   = 0;
-    ve->limits[1][PW_WAVE_SPEED]   = 100;
-    ve->limits[0][PW_REFRACTION]   = 0;
-    ve->limits[1][PW_REFRACTION]   = 160;
-    ve->limits[0][PW_FLOW_SWING]   = 0;
-    ve->limits[1][PW_FLOW_SWING]   = 128;
-    ve->limits[0][PW_CENTER_DRIFT] = 0;
-    ve->limits[1][PW_CENTER_DRIFT] = 100;
-    ve->limits[0][PW_RING_GLOW]    = 0;
-    ve->limits[1][PW_RING_GLOW]    = 200;
-    ve->limits[0][PW_SNARE_FLASH]  = 0;
-    ve->limits[1][PW_SNARE_FLASH]  = 100;
-    ve->limits[0][PW_HAT_SPARKLE]  = 0;
-    ve->limits[1][PW_HAT_SPARKLE]  = 200;
-    ve->limits[0][PW_CHROMA_PUSH]  = 0;
-    ve->limits[1][PW_CHROMA_PUSH]  = 120;
-    ve->limits[0][PW_DECAY]        = 0;
-    ve->limits[1][PW_DECAY]        = 100;
+    ve->limits[0][PW_DISPLACE] = 0;     ve->limits[1][PW_DISPLACE] = 200;
+    ve->limits[0][PW_IMPACT] = 0;       ve->limits[1][PW_IMPACT] = 100;
+    ve->limits[0][PW_SHOCKWAVE] = 0;    ve->limits[1][PW_SHOCKWAVE] = 100;
+    ve->limits[0][PW_WAVE_WIDTH] = 4;   ve->limits[1][PW_WAVE_WIDTH] = 96;
+    ve->limits[0][PW_WAVE_SPEED] = 0;   ve->limits[1][PW_WAVE_SPEED] = 100;
+    ve->limits[0][PW_REFRACTION] = 0;   ve->limits[1][PW_REFRACTION] = 160;
+    ve->limits[0][PW_FLOW_SWING] = 0;   ve->limits[1][PW_FLOW_SWING] = 128;
+    ve->limits[0][PW_CENTER_DRIFT] = 0; ve->limits[1][PW_CENTER_DRIFT] = 100;
+    ve->limits[0][PW_RING_GLOW] = 0;    ve->limits[1][PW_RING_GLOW] = 200;
+    ve->limits[0][PW_SNARE_FLASH] = 0;  ve->limits[1][PW_SNARE_FLASH] = 100;
+    ve->limits[0][PW_HAT_SPARKLE] = 0;  ve->limits[1][PW_HAT_SPARKLE] = 200;
+    ve->limits[0][PW_CHROMA_PUSH] = 0;  ve->limits[1][PW_CHROMA_PUSH] = 120;
+    ve->limits[0][PW_DECAY] = 0;        ve->limits[1][PW_DECAY] = 100;
 
     ve->param_description = vje_build_param_list(
         PW_NUM_PARAMS,
@@ -284,42 +248,31 @@ vj_effect *pressurewave_init(int w, int h)
         "Decay"
     );
 
-#ifdef VJ_BEAT_F_REJECT
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_WARP,             0,                     35,  145, 38, 82, 25,  540,  0,   108,
-        VJ_BEAT_KICK,             VJ_BEAT_F_IMPULSE,     0,   100, 86, 100,8,   420,  80,  175,
-        VJ_BEAT_KICK,             VJ_BEAT_F_IMPULSE,     0,   100, 82, 100,10,  720,  130, 180,
-        VJ_BEAT_DRIFT,            VJ_BEAT_F_PHRASE_ONLY, 18,  62,  18, 42, 120, 2200, 0,   34,
-        VJ_BEAT_SPEED,            0,                     24,  82,  26, 64, 60,  1300, 0,   72,
-        VJ_BEAT_WARP,             0,                     45,  145, 42, 86, 25,  520,  0,   122,
-        VJ_BEAT_DRIFT,            0,                     12,  96,  30, 70, 70,  1600, 0,   78,
-        VJ_BEAT_DRIFT,            VJ_BEAT_F_PHRASE_ONLY, 8,   86,  20, 54, 140, 2600, 0,   48,
-        VJ_BEAT_GLOW,             0,                     30,  175, 36, 84, 12,  380,  35,  96,
-        VJ_BEAT_SNARE,            VJ_BEAT_F_IMPULSE,     0,   100, 80, 100,8,   340,  45,  150,
-        VJ_BEAT_HAT,              VJ_BEAT_F_SQUARED,     16,  165, 28, 68, 8,   220,  20,  86,
-        VJ_BEAT_COLOR_AMOUNT,     0,                     0,   105, 24, 60, 35,  680,  0,   62,
-        VJ_BEAT_INERTIA,          VJ_BEAT_F_REJECT,      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000
+        VJ_BEAT_MOTION_REACT,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      54, 200, 42, 100, 180, 1300, 0,    96,
+        VJ_BEAT_KICK,          VJ_BEAT_F_IMPULSE,                                                    0,  100, 100,100, 1,   130,  28,  240,
+        VJ_BEAT_INTENSITY,     VJ_BEAT_F_IMPULSE,                                                    0,  100, 96, 100, 1,   180,  38,  220,
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 12, 64,  18, 58,  900, 2800, 700,   46,
+        VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      24, 100, 40, 100, 160, 1200, 0,    94,
+        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      62, 160, 38, 100, 180, 1400, 0,    92,
+        VJ_BEAT_FLOW,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      18, 124, 38, 100, 220, 1600, 0,    86,
+        VJ_BEAT_DRIFT,         VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,  4,  58,  10, 36, 1800, 5200, 1600,  28,
+        VJ_BEAT_GLOW,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      44, 176, 36, 94,  200, 1600, 0,    86,
+        VJ_BEAT_SNARE,         VJ_BEAT_F_IMPULSE,                                                    0,  100, 100,100, 1,   120,  24,  210,
+        VJ_BEAT_HAT,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      28, 200, 34, 100, 120, 1000, 30,   82,
+        VJ_BEAT_COLOR_AMOUNT,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      18, 120, 34, 96,  220, 1500, 0,    78,
+        VJ_BEAT_MEMORY,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      56, 100, 30, 90,  700, 3200, 200,  68
     );
-#endif
-
-    (void)w;
-    (void)h;
-
     return ve;
 }
 
 void *pressurewave_malloc(int w, int h)
 {
-    if(w <= 0 || h <= 0)
-        return NULL;
-
     const int len = w * h;
-    const int n_threads = vje_advise_num_threads(len);
     const size_t plane = (size_t)len;
     const size_t map_bytes = plane * sizeof(int16_t);
-    const size_t total = sizeof(pressurewave_t) + plane * 3 + map_bytes * 5 + 64;
+    const size_t total = sizeof(pressurewave_t) + plane * 3u + map_bytes * 5u + 64u;
 
     pressurewave_t *s = (pressurewave_t *)vj_calloc(total);
 
@@ -329,7 +282,7 @@ void *pressurewave_malloc(int w, int h)
     s->w = w;
     s->h = h;
     s->len = len;
-    s->n_threads = n_threads < 1 ? 1 : n_threads;
+    s->n_threads = vje_advise_num_threads(len);
 
     uint8_t *p = (uint8_t *)(s + 1);
 
@@ -352,28 +305,13 @@ void *pressurewave_malloc(int w, int h)
     p += map_bytes;
     s->map_pull = (int16_t *)p;
 
-    s->impact_env = 0.0f;
-    s->shock_env = 0.0f;
-    s->snare_env = 0.0f;
-    s->hat_env = 0.0f;
-    s->swing_phase = 0.0f;
-
-    s->last_impact = 0.0f;
-    s->last_shock = 0.0f;
-    s->last_snare = 0.0f;
-
     s->wave_slot = 0;
-    s->frame_count = 0;
 
     for(int i = 0; i < PW_MAX_WAVES; i++) {
-        s->waves[i].pos = 0.0f;
-        s->waves[i].amp = 0.0f;
-        s->waves[i].speed = 0.0f;
         s->waves[i].cx = w >> 1;
         s->waves[i].cy = h >> 1;
         s->waves[i].width = 32;
         s->waves[i].polarity = 1;
-        s->waves[i].active = 0;
     }
 
     return s;
@@ -381,107 +319,140 @@ void *pressurewave_malloc(int w, int h)
 
 void pressurewave_free(void *ptr)
 {
-    if(ptr)
-        free(ptr);
+    free(ptr);
 }
 
-#define PW_ACCUM_WAVE_NB(K) do {                                        \
-    const int dx0 = x - ax[(K)];                                         \
-    const int dy0 = y - ay[(K)];                                         \
-    const int adx = dx0 < 0 ? -dx0 : dx0;                                \
-    const int ady = dy0 < 0 ? -dy0 : dy0;                                \
-    const int mx = adx > ady ? adx : ady;                                \
-    const int mn = adx > ady ? ady : adx;                                \
-    const int dist = mx + (mn >> 1);                                     \
-    int front = aw[(K)] - pw_absi(dist - ap[(K)]);                       \
-    int tail = aw[(K)] - pw_absi(dist - atail[(K)]);                     \
-    front = front > 0 ? front : 0;                                       \
-    tail = tail > 0 ? tail : 0;                                          \
-    const int wr = (((front - (tail >> 1)) * ascale[(K)]) >> 8) * apol[(K)]; \
-    const int push = (wr * push_scale) >> 15;                            \
-    dx_acc += (dx0 * push) >> 8;                                         \
-    dy_acc += (dy0 * push) >> 8;                                         \
-    wave_sum += wr;                                                      \
-    pull_sum += wr < 0 ? -wr : wr;                                       \
-    glow_sum += wr > 0 ? wr : (wr >> 2);                                 \
+#define PW_ACCUM_WAVE_NB(K) do {                                             \
+    const int dx0 = x - ax[(K)];                                              \
+    const int dy0 = y - ay[(K)];                                              \
+    const int adx = dx0 < 0 ? -dx0 : dx0;                                     \
+    const int ady = dy0 < 0 ? -dy0 : dy0;                                     \
+    const int mx = adx > ady ? adx : ady;                                     \
+    const int mn = adx > ady ? ady : adx;                                     \
+    const int dist = mx + (mn >> 1);                                          \
+    int front = aw[(K)] - pw_absi(dist - ap[(K)]);                            \
+    int tail = aw[(K)] - pw_absi(dist - atail[(K)]);                          \
+    front = front > 0 ? front : 0;                                            \
+    tail = tail > 0 ? tail : 0;                                               \
+    const int wr = (((front - (tail >> 1)) * ascale[(K)]) >> 8) * apol[(K)];   \
+    const int push = (wr * push_scale) >> 15;                                 \
+    dx_acc += (dx0 * push) >> 8;                                              \
+    dy_acc += (dy0 * push) >> 8;                                              \
+    wave_sum += wr;                                                           \
+    pull_sum += wr < 0 ? -wr : wr;                                            \
+    glow_sum += wr > 0 ? wr : (wr >> 2);                                      \
 } while(0)
 
-#define PW_STORE_MAP() do {                                              \
-    const int i = row + x;                                               \
-    map_dx[i] = pw_i16(dx_acc);                                          \
-    map_dy[i] = pw_i16(dy_acc);                                          \
-    map_wave[i] = pw_i16(wave_sum);                                      \
-    map_glow[i] = pw_i16(glow_sum);                                      \
-    map_pull[i] = pw_i16(pull_sum);                                      \
+#define PW_STORE_MAP() do {                                                   \
+    const int i = row + x;                                                    \
+    map_dx[i] = pw_i16(dx_acc);                                               \
+    map_dy[i] = pw_i16(dy_acc);                                               \
+    map_wave[i] = pw_i16(wave_sum);                                           \
+    map_glow[i] = pw_i16(glow_sum);                                           \
+    map_pull[i] = pw_i16(pull_sum);                                           \
 } while(0)
 
 void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
 {
     pressurewave_t *s = (pressurewave_t *)ptr;
 
-    if(!s || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict U = frame->data[1];
+    uint8_t *restrict V = frame->data[2];
 
-    uint8_t * restrict Y = frame->data[0];
-    uint8_t * restrict U = frame->data[1];
-    uint8_t * restrict V = frame->data[2];
+    uint8_t *restrict src_y = s->src_y;
+    uint8_t *restrict src_u = s->src_u;
+    uint8_t *restrict src_v = s->src_v;
 
-    uint8_t * restrict src_y = s->src_y;
-    uint8_t * restrict src_u = s->src_u;
-    uint8_t * restrict src_v = s->src_v;
-
-    int16_t * restrict map_dx = s->map_dx;
-    int16_t * restrict map_dy = s->map_dy;
-    int16_t * restrict map_wave = s->map_wave;
-    int16_t * restrict map_glow = s->map_glow;
-    int16_t * restrict map_pull = s->map_pull;
+    int16_t *restrict map_dx = s->map_dx;
+    int16_t *restrict map_dy = s->map_dy;
+    int16_t *restrict map_wave = s->map_wave;
+    int16_t *restrict map_glow = s->map_glow;
+    int16_t *restrict map_pull = s->map_pull;
 
     const int w = s->w;
     const int h = s->h;
     const int len = s->len;
     const int threads = s->n_threads;
 
-    const int displace_arg = clampi(args[PW_DISPLACE], 0, 200);
-    const int impact_arg = clampi(args[PW_IMPACT], 0, 100);
-    const int shock_arg = clampi(args[PW_SHOCKWAVE], 0, 100);
-    const int width_arg = clampi(args[PW_WAVE_WIDTH], 4, 96);
-    const int speed_arg = clampi(args[PW_WAVE_SPEED], 0, 100);
-    const int refraction_arg = clampi(args[PW_REFRACTION], 0, 160);
-    const int swing_arg = clampi(args[PW_FLOW_SWING], 0, 128);
-    const int center_arg = clampi(args[PW_CENTER_DRIFT], 0, 100);
-    const int glow_arg = clampi(args[PW_RING_GLOW], 0, 200);
-    const int snare_arg = clampi(args[PW_SNARE_FLASH], 0, 100);
-    const int hat_arg = clampi(args[PW_HAT_SPARKLE], 0, 200);
-    const int chroma_arg = clampi(args[PW_CHROMA_PUSH], 0, 120);
-    const int decay_arg = clampi(args[PW_DECAY], 0, 100);
+    const int displace_arg = args[PW_DISPLACE];
+    const int impact_arg = args[PW_IMPACT];
+    const int shock_arg = args[PW_SHOCKWAVE];
+    const int width_arg = args[PW_WAVE_WIDTH];
+    const int speed_arg = args[PW_WAVE_SPEED];
+    const int refraction_arg = args[PW_REFRACTION];
+    const int swing_arg = args[PW_FLOW_SWING];
+    const int center_arg = args[PW_CENTER_DRIFT];
+    const int glow_arg = args[PW_RING_GLOW];
+    const int snare_arg = args[PW_SNARE_FLASH];
+    const int hat_arg = args[PW_HAT_SPARKLE];
+    const int chroma_arg = args[PW_CHROMA_PUSH];
+    const int decay_arg = args[PW_DECAY];
 
     const float impact_target = (float)impact_arg * 0.01f;
     const float shock_target = (float)shock_arg * 0.01f;
     const float snare_target = (float)snare_arg * 0.01f;
     const float hat_target = clampf((float)hat_arg * (1.0f / 200.0f), 0.0f, 1.0f);
 
+    const float impact_delta = impact_target - s->last_impact;
+    const float shock_delta  = shock_target  - s->last_shock;
+    const float snare_delta  = snare_target  - s->last_snare;
+
     const int impact_rise =
-        (impact_target > 0.50f && s->last_impact < 0.28f) ||
-        ((impact_target - s->last_impact) > 0.22f);
+        s->impact_cooldown <= 0 &&
+        (
+            (impact_target > 0.34f && s->last_impact < 0.22f) ||
+            impact_delta > 0.12f
+        );
 
     const int shock_rise =
-        (shock_target > 0.46f && s->last_shock < 0.25f) ||
-        ((shock_target - s->last_shock) > 0.20f);
+        s->shock_cooldown <= 0 &&
+        (
+            (shock_target > 0.30f && s->last_shock < 0.18f) ||
+            shock_delta > 0.10f ||
+            (impact_rise && shock_target > 0.18f)
+        );
 
     const int snare_rise =
-        (snare_target > 0.48f && s->last_snare < 0.28f) ||
-        ((snare_target - s->last_snare) > 0.24f);
+        s->snare_cooldown <= 0 &&
+        (
+            (snare_target > 0.32f && s->last_snare < 0.20f) ||
+            snare_delta > 0.12f
+        );
 
-    s->impact_env = pw_env(s->impact_env, impact_target, 0.76f, 0.090f);
-    s->shock_env = pw_env(s->shock_env, shock_target, 0.72f, 0.070f);
-    s->snare_env = pw_env(s->snare_env, snare_target, 0.82f, 0.190f);
+    s->impact_env = pw_env(s->impact_env, impact_target, 0.82f, 0.105f);
+    s->shock_env = pw_env(s->shock_env, shock_target, 0.78f, 0.085f);
+    s->snare_env = pw_env(s->snare_env, snare_target, 0.86f, 0.220f);
     s->hat_env = pw_env(s->hat_env, hat_target, 0.70f, 0.360f);
 
-    if(impact_rise || shock_rise)
+    if(impact_rise) {
         pw_spawn_wave(s, impact_target, shock_target, width_arg, speed_arg, center_arg);
+        s->impact_cooldown = 3;
+    }
 
-    if(snare_rise && shock_arg > 12)
-        pw_spawn_wave(s, impact_target * 0.45f, shock_target * 0.62f + snare_target * 0.38f, width_arg >> 1, speed_arg + 12, center_arg);
+    if(shock_rise && !impact_rise) {
+        pw_spawn_wave(s, impact_target * 0.65f, shock_target, width_arg, speed_arg + 8, center_arg);
+        s->shock_cooldown = 4;
+    }
+
+    if(snare_rise) {
+        pw_spawn_wave(
+            s,
+            impact_target * 0.35f,
+            shock_target * 0.42f + snare_target * 0.58f,
+            width_arg >> 1,
+            speed_arg + 12,
+            center_arg
+        );
+        s->snare_cooldown = 3;
+    }
+
+    if(s->impact_cooldown > 0)
+        s->impact_cooldown--;
+    if(s->shock_cooldown > 0)
+        s->shock_cooldown--;
+    if(s->snare_cooldown > 0)
+        s->snare_cooldown--;
 
     const float decay = 0.855f + ((float)decay_arg * 0.00125f);
     const float max_dist = (float)(w > h ? w : h) * 1.55f;
@@ -579,7 +550,6 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
                 const int row_up = (y > 0 ? y - 1 : y) * w;
                 const int row_dn = (y < h - 1 ? y + 1 : y) * w;
 
-#pragma omp simd
                 for(int x = 0; x < w; x++) {
                     const int i = row + x;
                     const int xm = x > 0 ? x - 1 : x;
@@ -625,7 +595,6 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
 
             switch(nactive) {
                 case 1:
-#pragma omp simd
                     for(int x = 0; x < w; x++) {
                         int dx_acc = 0;
                         int dy_acc = 0;
@@ -638,7 +607,6 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
                     break;
 
                 case 2:
-#pragma omp simd
                     for(int x = 0; x < w; x++) {
                         int dx_acc = 0;
                         int dy_acc = 0;
@@ -652,7 +620,6 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
                     break;
 
                 case 3:
-#pragma omp simd
                     for(int x = 0; x < w; x++) {
                         int dx_acc = 0;
                         int dy_acc = 0;
@@ -667,7 +634,6 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
                     break;
 
                 default:
-#pragma omp simd
                     for(int x = 0; x < w; x++) {
                         int dx_acc = 0;
                         int dy_acc = 0;
@@ -693,7 +659,6 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
             const int frame_a = (int)s->frame_count * 23;
             const int frame_b = (int)s->frame_count * 19;
 
-#pragma omp simd
             for(int x = 0; x < w; x++) {
                 const int i = row + x;
                 const int xm = x > 0 ? x - 1 : x;
@@ -730,11 +695,13 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
                     const int edge_active = edge_gate > 22 ? edge_gate - 22 : 0;
                     const int pull_active = pull_sum > 2 ? 1 : 0;
                     const int pat = ((x * 13 + spark_y + frame_a) & 31) - 8;
+
                     yy += (pat * hat_i * edge_active * pull_active) >> 13;
                 }
 
                 if(chroma_push > 0) {
                     const int cp = (wave_sum * chroma_push) >> 8;
+
                     uu += cp;
                     vv -= cp >> 1;
 
@@ -742,6 +709,7 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
                         const int edge_active = edge_gate > 36 ? edge_gate - 36 : 0;
                         const int pat = ((x * 11 + spark_y + frame_b) & 31) - 15;
                         const int flick = (pat * hat_i * edge_active) >> 12;
+
                         uu += flick;
                         vv -= flick >> 1;
                     }

@@ -19,14 +19,15 @@
  */
 
 #include "common.h"
-#include "virtualcamera.h"
 #include <math.h>
 #include <stdint.h>
+#include <veejaycore/vjmem.h>
+#include "virtualcamera.h"
 
 #define FP 16
 #define FP_ONE (1 << FP)
 
-#define VIRTUALCAMERA_PARAMS 11
+#define VIRTUALCAMERA_PARAMS 10
 
 #define P_TARGET_X     0
 #define P_TARGET_Y     1
@@ -36,17 +37,21 @@
 #define P_ZOOM_PUNCH   5
 #define P_PAN_IMPACT   6
 #define P_SHAKE        7
-#define P_BEAT_PUSH    8
-#define P_LOCK_ASPECT  9
-#define P_EDGE_MODE   10
+#define P_LOCK_ASPECT  8
+#define P_EDGE_MODE    9
 
 typedef struct {
+    uint8_t *region;
     uint8_t *buf[3];
     int *xmap;
     float current_x;
     float current_y;
     float current_fov_w;
     float current_fov_h;
+    float speed_env;
+    float zoom_env;
+    float pan_env;
+    float shake_env;
     uint32_t frame_no;
     int is_initialized;
     int n_threads;
@@ -82,12 +87,13 @@ static inline float virtualcamera_param1000_to_unit(int v)
     return (float)v * 0.001f;
 }
 
-static inline int virtualcamera_beat_shape_q8(int beat_push)
+
+
+static inline float virtualcamera_smoothf(float oldv, float target, float attack, float release)
 {
-    int q;
-    beat_push = clampi(beat_push, 0, 1000);
-    q = (beat_push * beat_push * 255 + 500000) / 1000000;
-    return clampi(q, 0, 255);
+    return target > oldv
+        ? oldv + (target - oldv) * attack
+        : oldv + (target - oldv) * release;
 }
 
 static inline uint32_t virtualcamera_hash_u32(uint32_t x)
@@ -107,9 +113,6 @@ static inline float virtualcamera_hash_signed(uint32_t x)
 
 static inline int virtualcamera_mirror_coord(int v, int max)
 {
-    if(max <= 1)
-        return 0;
-
     const int period = max << 1;
 
     v %= period;
@@ -133,12 +136,9 @@ vj_effect *virtualcamera_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
     if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
         free(ve);
         return NULL;
     }
@@ -153,15 +153,15 @@ vj_effect *virtualcamera_init(int w, int h)
 
     ve->limits[0][P_MOVE_SPEED] = 0;
     ve->limits[1][P_MOVE_SPEED] = 1000;
-    ve->defaults[P_MOVE_SPEED] = virtualcamera_percent_to_param1000(15);
+    ve->defaults[P_MOVE_SPEED] = virtualcamera_percent_to_param1000(18);
 
     ve->limits[0][P_FOV_WIDTH] = 10;
     ve->limits[1][P_FOV_WIDTH] = 4000;
-    ve->defaults[P_FOV_WIDTH] = virtualcamera_percent10_to_param(100);
+    ve->defaults[P_FOV_WIDTH] = virtualcamera_percent10_to_param(92);
 
     ve->limits[0][P_FOV_HEIGHT] = 10;
     ve->limits[1][P_FOV_HEIGHT] = 4000;
-    ve->defaults[P_FOV_HEIGHT] = virtualcamera_percent10_to_param(100);
+    ve->defaults[P_FOV_HEIGHT] = virtualcamera_percent10_to_param(92);
 
     ve->limits[0][P_ZOOM_PUNCH] = 0;
     ve->limits[1][P_ZOOM_PUNCH] = 1000;
@@ -175,13 +175,9 @@ vj_effect *virtualcamera_init(int w, int h)
     ve->limits[1][P_SHAKE] = 1000;
     ve->defaults[P_SHAKE] = 0;
 
-    ve->limits[0][P_BEAT_PUSH] = 0;
-    ve->limits[1][P_BEAT_PUSH] = 1000;
-    ve->defaults[P_BEAT_PUSH] = 0;
-
     ve->limits[0][P_LOCK_ASPECT] = 0;
     ve->limits[1][P_LOCK_ASPECT] = 1;
-    ve->defaults[P_LOCK_ASPECT] = 1;
+    ve->defaults[P_LOCK_ASPECT] = 0;
 
     ve->limits[0][P_EDGE_MODE] = 0;
     ve->limits[1][P_EDGE_MODE] = 1;
@@ -190,8 +186,6 @@ vj_effect *virtualcamera_init(int w, int h)
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->parallel = 0;
-
     ve->description = "Camera";
     ve->param_description = vje_build_param_list(
         ve->num_params,
@@ -203,7 +197,6 @@ vj_effect *virtualcamera_init(int w, int h)
         "Zoom Punch",
         "Pan Impact",
         "Shake",
-        "Beat Push",
         "Lock Aspect",
         "Edge Mode"
     );
@@ -225,71 +218,62 @@ vj_effect *virtualcamera_init(int w, int h)
         "Mirror",
         "Black"
     );
-
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_DRIFT,         VJ_BEAT_F_PHRASE_ONLY,                   240,                760,                5,  18, 2200, 5200, 1800, 18,    /* Target X */
-        VJ_BEAT_DRIFT,         VJ_BEAT_F_PHRASE_ONLY,                   240,                760,                5,  18, 2200, 5200, 1800, 18,    /* Target Y */
-        VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS,                    80,                 620,                8,  30, 1000, 2800, 0,    42,    /* Move Speed */
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                    420,                1850,               8,  30, 1000, 2800, 0,    42,    /* FOV Width */
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                    420,                1850,               8,  30, 1000, 2800, 0,    42,    /* FOV Height */
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 0,                  760,                16, 72, 80,   720,  0,    82,    /* Zoom Punch */
-        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS,                    0,                  640,                10, 42, 800,  2400, 0,    48,    /* Pan Impact */
-
-        VJ_BEAT_TURBULENCE,    VJ_BEAT_F_REJECT,                        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Shake */
-
-        VJ_BEAT_KICK,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 0,                  760,                18, 80, 60,   650,  0,    100,   /* Beat Push */
-
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Lock Aspect */
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000  /* Edge Mode */
+        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS,                           240,                760,                7,  22, 1600, 5200, 0,    24,
+        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS,                           240,                760,                7,  22, 1600, 5200, 0,    24,
+        VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,  60,                 560,                8,  28,  900, 3400, 0,    44,
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0, 0,    -1000,
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0, 0,    -1000,
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,  80,                 780,                18, 82,   45,  520, 0,    96,
+        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,  80,                 760,                12, 52,  420, 1900, 0,    78,
+        VJ_BEAT_TURBULENCE,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,  40,                 640,                10, 48,   45,  720, 0,    62,
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0, 0,    -1000,
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0, 0,    -1000
     );
-
-    (void) w;
-    (void) h;
 
     return ve;
 }
 
 void *virtualcamera_malloc(int w, int h)
 {
-    if(w <= 0 || h <= 0)
-        return NULL;
-
     virtualcam_t *c = (virtualcam_t*) vj_calloc(sizeof(virtualcam_t));
     if(!c)
         return NULL;
 
     const size_t plane_size = (size_t)w * (size_t)h;
+    const size_t frame_bytes = plane_size * 3u;
+    const size_t map_bytes = sizeof(int) * (size_t)w;
+    const size_t total = frame_bytes + map_bytes + 16u;
 
-    c->buf[0] = (uint8_t*) vj_malloc(plane_size * 3u);
-    if(!c->buf[0]) {
+    c->region = (uint8_t*) vj_malloc(total);
+    if(!c->region) {
         free(c);
         return NULL;
     }
 
-    c->xmap = (int*) vj_malloc(sizeof(int) * (size_t)w);
-    if(!c->xmap) {
-        free(c->buf[0]);
-        free(c);
-        return NULL;
-    }
-
+    c->buf[0] = c->region;
     c->buf[1] = c->buf[0] + plane_size;
     c->buf[2] = c->buf[1] + plane_size;
+
+    uint8_t *p = c->buf[2] + plane_size;
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
+    c->xmap = (int*)p;
 
     c->current_x = 0.0f;
     c->current_y = 0.0f;
     c->current_fov_w = 0.0f;
     c->current_fov_h = 0.0f;
+    c->speed_env = 0.0f;
+    c->zoom_env = 0.0f;
+    c->pan_env = 0.0f;
+    c->shake_env = 0.0f;
     c->frame_no = 0;
     c->is_initialized = 0;
     c->w = w;
     c->h = h;
 
     c->n_threads = vje_advise_num_threads((int)plane_size);
-    if(c->n_threads <= 0)
-        c->n_threads = 1;
 
     return (void*) c;
 }
@@ -298,15 +282,7 @@ void virtualcamera_free(void *ptr)
 {
     virtualcam_t *c = (virtualcam_t*) ptr;
 
-    if(!c)
-        return;
-
-    if(c->buf[0])
-        free(c->buf[0]);
-
-    if(c->xmap)
-        free(c->xmap);
-
+    free(c->region);
     free(c);
 }
 
@@ -331,63 +307,61 @@ void virtualcamera_apply(void *ptr, VJFrame *frame, int *args)
 {
     virtualcam_t *c = (virtualcam_t*) ptr;
 
-    if(!c || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
     const int w = frame->width;
     const int h = frame->height;
-    const int len = frame->len;
 
-    if(w <= 0 || h <= 0 || len <= 0)
-        return;
-
-    if(w != c->w || h != c->h)
-        return;
-
-    const int target_x_arg = clampi(args[P_TARGET_X], 0, 1000);
-    const int target_y_arg = clampi(args[P_TARGET_Y], 0, 1000);
-    const int speed_arg    = clampi(args[P_MOVE_SPEED], 0, 1000);
-    const int fov_w_arg    = clampi(args[P_FOV_WIDTH], 10, 4000);
-    const int fov_h_arg    = clampi(args[P_FOV_HEIGHT], 10, 4000);
-    const int zoom_arg     = clampi(args[P_ZOOM_PUNCH], 0, 1000);
-    const int pan_arg      = clampi(args[P_PAN_IMPACT], 0, 1000);
-    const int shake_arg    = clampi(args[P_SHAKE], 0, 1000);
-    const int beat_push    = clampi(args[P_BEAT_PUSH], 0, 1000);
+    const int target_x_arg = args[P_TARGET_X];
+    const int target_y_arg = args[P_TARGET_Y];
+    const int speed_arg    = args[P_MOVE_SPEED];
+    const int fov_w_arg    = args[P_FOV_WIDTH];
+    const int fov_h_arg    = args[P_FOV_HEIGHT];
+    const int zoom_arg     = args[P_ZOOM_PUNCH];
+    const int pan_arg      = args[P_PAN_IMPACT];
+    const int shake_arg    = args[P_SHAKE];
     const int lock_aspect  = args[P_LOCK_ASPECT] ? 1 : 0;
     const int edge_black   = args[P_EDGE_MODE] ? 1 : 0;
 
+    if(!c->is_initialized) {
+        c->speed_env = (float)speed_arg;
+        c->zoom_env = (float)zoom_arg;
+        c->pan_env = (float)pan_arg;
+        c->shake_env = (float)shake_arg;
+    } else {
+        c->speed_env = virtualcamera_smoothf(c->speed_env, (float)speed_arg, 0.16f, 0.10f);
+        c->zoom_env = virtualcamera_smoothf(c->zoom_env, (float)zoom_arg, 0.28f, 0.090f);
+        c->pan_env = virtualcamera_smoothf(c->pan_env, (float)pan_arg, 0.18f, 0.075f);
+        c->shake_env = virtualcamera_smoothf(c->shake_env, (float)shake_arg, 0.42f, 0.120f);
+    }
+
     const float target_x_base = ((float)target_x_arg * (float)w) * 0.001f;
     const float target_y_base = ((float)target_y_arg * (float)h) * 0.001f;
-    const float speed = virtualcamera_param1000_to_unit(speed_arg);
-
-    const int beat_drive_q8 = virtualcamera_beat_shape_q8(beat_push);
-    const float beat_t = (float)beat_drive_q8 * (1.0f / 255.0f);
-    const float zoom_t = virtualcamera_param1000_to_unit(zoom_arg);
-    const float pan_t = virtualcamera_param1000_to_unit(pan_arg);
-    const float shake_t = virtualcamera_param1000_to_unit(shake_arg);
+    const float speed = virtualcamera_param1000_to_unit((int)(c->speed_env + 0.5f));
+    const float zoom_t = virtualcamera_param1000_to_unit((int)(c->zoom_env + 0.5f));
+    const float pan_t = virtualcamera_param1000_to_unit((int)(c->pan_env + 0.5f));
+    const float shake_t = virtualcamera_param1000_to_unit((int)(c->shake_env + 0.5f));
 
     const float fov_w_base = ((float)fov_w_arg * (float)w) * 0.001f;
     const float fov_h_base = lock_aspect
         ? fov_w_base * ((float)h / (float)w)
         : ((float)fov_h_arg * (float)h) * 0.001f;
 
-    const float phase = (float)(c->frame_no & 4095U) * 0.013671875f;
+    const float phase = (float)(c->frame_no & 4095U) *
+        (0.010f + speed * 0.035f + pan_t * 0.024f);
     const float pan_wave_x = sinf(phase * 1.37f + 0.71f);
     const float pan_wave_y = cosf(phase * 1.11f + 1.37f);
-    const float beat_pan = (0.012f + pan_t * 0.060f) * beat_t;
-    const float manual_pan = pan_t * 0.012f;
-    const float target_x = target_x_base + pan_wave_x * (float)w * (beat_pan + manual_pan);
-    const float target_y = target_y_base + pan_wave_y * (float)h * (beat_pan + manual_pan);
 
-    const float zoom_curve = zoom_t * zoom_t;
-    float zoom_punch = zoom_curve * 0.32f + beat_t * 0.26f;
-    if(zoom_punch > 0.48f)
-        zoom_punch = 0.48f;
+    const float manual_pan = pan_t * 0.105f;
+    const float target_x = target_x_base + pan_wave_x * (float)w * manual_pan;
+    const float target_y = target_y_base + pan_wave_y * (float)h * manual_pan;
+
+    float zoom_punch = zoom_t * 0.58f;
+    if(zoom_punch > 0.72f)
+        zoom_punch = 0.72f;
 
     const float fov_w_target = clampf(fov_w_base * (1.0f - zoom_punch), 1.0f, (float)w * 4.0f);
     const float fov_h_target = clampf(fov_h_base * (1.0f - zoom_punch), 1.0f, (float)h * 4.0f);
 
-    const float fov_speed = clampf(0.18f + speed * 0.62f + beat_t * 0.16f, 0.02f, 0.94f);
+    const float fov_speed = clampf(0.12f + speed * 0.58f + zoom_t * 0.24f, 0.015f, 0.94f);
 
     if(!c->is_initialized) {
         c->current_x = target_x;
@@ -405,9 +379,10 @@ void virtualcamera_apply(void *ptr, VJFrame *frame, int *args)
     float sample_x = c->current_x;
     float sample_y = c->current_y;
 
-    if(shake_t > 0.0f || beat_t > 0.0f) {
-        const float shake_amp_x = (float)w * (0.002f + shake_t * 0.028f) * beat_t;
-        const float shake_amp_y = (float)h * (0.002f + shake_t * 0.028f) * beat_t;
+    if(shake_t > 0.0f) {
+        const float shake_drive = shake_t * 0.032f;
+        const float shake_amp_x = (float)w * shake_drive;
+        const float shake_amp_y = (float)h * shake_drive;
         const float sx = virtualcamera_hash_signed(c->frame_no * 2U + 0x1337U);
         const float sy = virtualcamera_hash_signed(c->frame_no * 2U + 0x8331U);
 

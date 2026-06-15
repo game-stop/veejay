@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -22,76 +22,104 @@
 #include <veejaycore/vjmem.h>
 #include "negatechannel.h"
 
+#define NEGATECHANNEL_PARAMS 2
+
+#define P_MODE  0
+#define P_VALUE 1
+
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
 vj_effect *negatechannel_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 3;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 0xff;
-    ve->defaults[0] = 0;
-    ve->defaults[1] = 0xff;
+    if(!ve)
+        return NULL;
+
+    ve->num_params = NEGATECHANNEL_PARAMS;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
+    ve->limits[0][P_MODE] = 0;  ve->limits[1][P_MODE] = 3;   ve->defaults[P_MODE] = 0;
+    ve->limits[0][P_VALUE] = 0; ve->limits[1][P_VALUE] = 255; ve->defaults[P_VALUE] = 255;
+
     ve->description = "Negate a channel";
-	ve->sub_format = -1;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Value" );
+    ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Value");
 
-	ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_MODE], P_MODE, "Luminance", "Chroma Blue", "Chroma Red", "Chroma Red and Blue");
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Mode */
-        VJ_BEAT_CONTRAST,  VJ_BEAT_F_CONTINUOUS,                     160,                255,                8, 30, 1000, 2600, 0,   52     /* Value */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_CONTRAST, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,           145,                255,                14, 54,  800, 3000, 0,    78
     );
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "Luminance" ,"Chroma Blue", "Chroma Red", "Chroma Red and Blue" );
 
     return ve;
 }
 
-void negatechannel_apply(void *ptr, VJFrame *frame, int *args) {
-    const int chan = args[0];
-    const int val = args[1];
+static void negatechannel_plane(uint8_t *restrict p, int len, int val, int n_threads)
+{
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for(int i = 0; i < len; i++)
+        p[i] = (uint8_t)(val - p[i]);
+}
+
+static void negatechannel_uv_planes(uint8_t *restrict cb,
+                                    uint8_t *restrict cr,
+                                    int len,
+                                    int val,
+                                    int n_threads)
+{
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for(int i = 0; i < len; i++) {
+        cb[i] = (uint8_t)(val - cb[i]);
+        cr[i] = (uint8_t)(val - cr[i]);
+    }
+}
+
+void negatechannel_apply(void *ptr, VJFrame *frame, int *args)
+{
+    (void)ptr;
+
+    const int mode = args[P_MODE];
+    const int val = args[P_VALUE];
     const int len = frame->len;
-    const int uv_len = (frame->ssm ? len : frame->uv_len);
+    const int uv_len = frame->ssm ? len : frame->uv_len;
 
-    uint8_t *Y  = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
-
-    const int n_threads = vje_advise_num_threads((chan == 0) ? len : uv_len);
-
-    switch (chan) {
+    switch(mode) {
         case 0:
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-            for (int i = 0; i < len; i++) {
-                Y[i] = (uint8_t)(val - Y[i]);
-            }
+            negatechannel_plane(frame->data[0], len, val, vje_advise_num_threads(len));
             break;
-            
+
         case 1:
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-            for (int i = 0; i < uv_len; i++) {
-                Cb[i] = (uint8_t)(val - Cb[i]);
-            }
+            negatechannel_plane(frame->data[1], uv_len, val, vje_advise_num_threads(uv_len));
             break;
+
         case 2:
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-            for (int i = 0; i < uv_len; i++) {
-                Cr[i] = (uint8_t)(val - Cr[i]);
-            }
+            negatechannel_plane(frame->data[2], uv_len, val, vje_advise_num_threads(uv_len));
             break;
+
         case 3:
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-            for (int i = 0; i < uv_len; i++) {
-                Cb[i] = (uint8_t)(val - Cb[i]);
-                Cr[i] = (uint8_t)(val - Cr[i]);
-            }
+            negatechannel_uv_planes(frame->data[1], frame->data[2], uv_len, val, vje_advise_num_threads(uv_len));
             break;
     }
 }

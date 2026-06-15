@@ -10,8 +10,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
@@ -24,108 +23,117 @@
 
 vj_effect *fibdownscale_init(int w, int h)
 {
-	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-	ve->num_params = 2;
-	ve->description = "Fibonacci Downscaler";
-	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-	ve->defaults[0] = 0;
-	ve->defaults[1] = 1;
-	ve->limits[0][0] = 0;
-	ve->limits[0][1] = 1;
-	ve->limits[1][0] = 1;
-	ve->limits[1][1] = 8;
-	ve->sub_format = -1;
-	ve->extra_frame = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Fib" );
-	ve->has_user = 0;
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
 
-	ve->hints = vje_init_value_hint_list( ve->num_params );
+    if(!ve)
+        return NULL;
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "Down", "Rectangle" );
-	ve->beat_hints = vje_build_beat_hint_list(
-		ve->num_params,
+    ve->num_params = 2;
+    ve->description = "Fibonacci Downscaler";
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-		VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Mode */
-		VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,           1,                  5,                  6, 20, 2200, 5200, 1200, 20     /* Fib */
-	);
-	return ve;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
+    ve->defaults[0] = 0;
+    ve->defaults[1] = 1;
+
+    ve->limits[0][0] = 0; ve->limits[1][0] = 1;
+    ve->limits[0][1] = 1; ve->limits[1][1] = 8;
+
+    ve->sub_format = -1;
+    ve->extra_frame = 0;
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Fib");
+
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+    vje_build_value_hint_list(ve->hints, ve->limits[1][0], 0, "Down", "Rectangle");
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 1,                  6,                  4,  14, 2800, 7800, 2200, 22
+    );
+
+    return ve;
 }
 
-static void fibdownscale1_apply(VJFrame *frame, VJFrame *frame2)
+static void fibdownscale1_apply(VJFrame *frame)
 {
-	unsigned i, f1;
-	const int len = frame->len >> 1;
-	const int uv_len = (frame->ssm ? frame->len : frame->uv_len) >> 1;
+    const int len = frame->len >> 1;
+    const int uv_len = (frame->ssm ? frame->len : frame->uv_len) >> 1;
 
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
+    if(len > 2) {
+        for(int i = 2; i < len; i++) {
+            const int f1 = i << 1;
+            Y[i] = Y[f1];
+        }
 
-	/* do fib over half of image. (now we have 2 squares in upper half) */
-	for (i = 2; i < len; i++)
-	{
-		f1 = (i + 1) + (i - 1);
-		Y[i] = Y2[f1];
-	}
+        veejay_memcpy(Y + len, Y, len);
+    }
 
-	/* copy over first half (we could use veejay_memcpy) */
-	veejay_memcpy( Y + len, Y, len ); 
+    if(uv_len > 2) {
+        for(int i = 2; i < uv_len; i++) {
+            const int f1 = i << 1;
+            Cb[i] = Cb[f1];
+            Cr[i] = Cr[f1];
+        }
 
-	/* do the same thing for UV to get correct image */
-	for (i = 2; i < uv_len; i++)
-	{
-		f1 = (i + 1) + (i - 1);
-		Cb[i] = Cb2[f1];
-		Cr[i] = Cr2[f1];
-	}
-
-	veejay_memcpy( Cb + uv_len, Cb , uv_len );
-	veejay_memcpy( Cr + uv_len, Cr , uv_len );
-}
-
-static void fibrectangle1_apply(VJFrame *frame, VJFrame *frame2)
-{
-	unsigned int i, f1;
-	const int len = frame->len>>1;
-	const int uv_len = (frame->ssm ? frame->len: frame->uv_len)>>1;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
-
-	for (i = 2; i < len; i++)
-	{
-		f1 = (i - 1) + (i - 2);
-		Y[i] = Y2[f1];
-	}
-
-	for (i = 2; i < uv_len; i++)
-	{
-		f1 = (i - 1) + (i - 2);
-		Cb[i] = Cb2[f1];
-		Cr[i] = Cr2[f1];
-	}
-}
-
-void fibdownscale_apply(void *ptr, VJFrame *frame, int *args ) {
-    int n = args[0];
-    int repeat = args[1];
-
-    VJFrame *frame2 = frame;
-
-    for( int i = 0; i < repeat ; i ++ ) {
-	    if (n == 0)
-		    fibdownscale1_apply(frame, frame2);
-	    if (n == 1)
-		    fibrectangle1_apply(frame, frame2);
+        veejay_memcpy(Cb + uv_len, Cb, uv_len);
+        veejay_memcpy(Cr + uv_len, Cr, uv_len);
     }
 }
 
+static void fibrectangle1_apply(VJFrame *frame)
+{
+    const int len = frame->len >> 1;
+    const int uv_len = (frame->ssm ? frame->len : frame->uv_len) >> 1;
+
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+
+    if(len > 2) {
+        for(int i = 2; i < len; i++) {
+            const int f1 = (i << 1) - 3;
+            Y[i] = Y[f1];
+        }
+    }
+
+    if(uv_len > 2) {
+        for(int i = 2; i < uv_len; i++) {
+            const int f1 = (i << 1) - 3;
+            Cb[i] = Cb[f1];
+            Cr[i] = Cr[f1];
+        }
+    }
+}
+
+void fibdownscale_apply(void *ptr, VJFrame *frame, int *args)
+{
+    (void) ptr;
+
+    const int mode = args[0];
+    const int repeat = args[1];
+
+    for(int i = 0; i < repeat; i++) {
+        if(mode == 0)
+            fibdownscale1_apply(frame);
+        else
+            fibrectangle1_apply(frame);
+    }
+}

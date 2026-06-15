@@ -337,10 +337,10 @@ vj_effect *colortap_init(int w, int h)
 
     vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
 		"Sepia", "Heat", "Red-Green", "Old Photo", "XRay", "Esses", "Yellow-Blue", "XPro");
+    
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000 /* Mode */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000
     );
     return ve;
 }
@@ -362,10 +362,15 @@ typedef struct
 	int last_mode;
 } colortap_t;
 
-void *colortap_malloc(int w, int h) {
-    colortap_t *s = (colortap_t*) vj_malloc(sizeof(colortap_t));
-    if(!s) return NULL;
-    s->lut[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * 256 * 3 );
+void *colortap_malloc(int w, int h)
+{
+    colortap_t *s = (colortap_t*) vj_calloc(sizeof(colortap_t));
+
+    if(!s)
+        return NULL;
+
+    s->lut[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * 256 * 3);
+
     if(!s->lut[0]) {
         free(s);
         return NULL;
@@ -373,15 +378,24 @@ void *colortap_malloc(int w, int h) {
 
     s->lut[1] = s->lut[0] + 256;
     s->lut[2] = s->lut[1] + 256;
+    s->last_mode = -1;
 
-	s->last_mode = -1;
+    (void) w;
+    (void) h;
 
-    return (void*) s;
+    return s;
 }
 
-void colortap_free(void *ptr) {
+void colortap_free(void *ptr)
+{
     colortap_t *s = (colortap_t*) ptr;
-    free(s->lut[0]);
+
+    if(!s)
+        return;
+
+    if(s->lut[0])
+        free(s->lut[0]);
+
     free(s);
 }
 
@@ -391,6 +405,7 @@ void colortap_apply(void *ptr, VJFrame *frame, int *args)
 
     const int mode = args[0];
     const int len = frame->len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -400,15 +415,13 @@ void colortap_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict tU = s->lut[1];
     uint8_t *restrict tV = s->lut[2];
 
-    if (s->last_mode != mode)
+    if(s->last_mode != mode)
     {
+        const uint8_t *table = color_tables[mode];
+
         s->last_mode = mode;
 
-        const uint8_t *table = color_tables[0];
-        if (mode >= 0 && mode < 8)
-            table = color_tables[mode];
-
-        for (int i = 0; i < 256; i++)
+        for(int i = 0; i < 256; i++)
         {
             const int j = i * 3;
 
@@ -425,11 +438,17 @@ void colortap_apply(void *ptr, VJFrame *frame, int *args)
 
     const int n_threads = vje_advise_num_threads(len);
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for (int i = 0; i < len; i++)
+    #pragma omp parallel num_threads(n_threads)
     {
-        Y[i] = tY[Y[i]];
-        U[i] = tU[U[i]];
-        V[i] = tV[V[i]];
+        #pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+            Y[i] = tY[Y[i]];
+
+        #pragma omp for schedule(static)
+        for(int i = 0; i < uv_len; i++)
+        {
+            U[i] = tU[U[i]];
+            V[i] = tV[V[i]];
+        }
     }
 }

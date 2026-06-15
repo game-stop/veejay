@@ -22,4 +22,6 @@
 #define SQUARES_H
 vj_effect *squares_init(int w, int h);
 void squares_apply( void *ptr, VJFrame *frame, int *args);
+void *squares_malloc(int w, int h);
+void squares_free(void *ptr);
 #endif

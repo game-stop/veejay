@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#define EH_PARAMS 11
+#define EH_PARAMS 10
 
 #define P_SOURCE    0
 #define P_DRIFT     1
@@ -18,7 +18,6 @@
 #define P_COLOR     7
 #define P_SPEED     8
 #define P_SOFT      9
-#define P_BEAT_PUSH 10
 
 
 #define EH_TRIG_SIZE 1024
@@ -101,30 +100,6 @@ static inline int eh_param1000_to_signed100(int v)
     return (v * 100 + 500) / 1000;
 }
 
-static inline int eh_mix_i100(int a, int b, int q)
-{
-    int d;
-
-    q = eh_clampi(q, 0, 100);
-    d = (b - a) * q;
-
-    if (d < 0)
-        return a + ((d - 50) / 100);
-
-    return a + ((d + 50) / 100);
-}
-
-static inline int eh_beat_shape100(int beat_push)
-{
-    int q;
-    int shaped;
-
-    beat_push = eh_clampi(beat_push, 0, 1000);
-    q = (beat_push * 255 + 500) / 1000;
-    shaped = (q * q + 127) / 255;
-
-    return (shaped * 100 + 127) / 255;
-}
 
 static inline int eh_absi(int v)
 {
@@ -583,7 +558,6 @@ vj_effect *chromadrift_init(int w, int h)
     ve->limits[0][P_COLOR] = 0; ve->limits[1][P_COLOR] = 1000; ve->defaults[P_COLOR] = 540;
     ve->limits[0][P_SPEED] = -1000; ve->limits[1][P_SPEED] = 1000; ve->defaults[P_SPEED] = 300;
     ve->limits[0][P_SOFT] = 0; ve->limits[1][P_SOFT] = 1000; ve->defaults[P_SOFT] = 460;
-    ve->limits[0][P_BEAT_PUSH] = 0; ve->limits[1][P_BEAT_PUSH] = 1000; ve->defaults[P_BEAT_PUSH] = 0;
 
     ve->description = "Spectral Ink Current";
     ve->sub_format = 1;
@@ -593,7 +567,7 @@ vj_effect *chromadrift_init(int w, int h)
 
     ve->param_description = vje_build_param_list(
         ve->num_params,
-        "Source Feed",
+        "Opacity",
         "Ink Drift",
         "Contour Current",
         "Aurora Glow",
@@ -602,26 +576,22 @@ vj_effect *chromadrift_init(int w, int h)
         "Trail Memory",
         "Pastel Palette",
         "Motion Speed",
-        "Surface Softness",
-        "Beat Push"
+        "Surface Softness"
     );
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_REJECT,                                      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Source Feed */
-        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS,                                  80,                 760,                4,  22,  80,   520,  0,    46,    /* Ink Drift */
-        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                                  180,                960,                12, 50,  100,  820,  0,    82,    /* Contour Current */
-        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                                  100,                900,                14, 58,  90,   680,  0,    86,    /* Aurora Glow */
-        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                                  80,                 900,                10, 42,  120,  900,  0,    72,    /* Luma Pull */
-        VJ_BEAT_DRIFT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                  -760,               760,                8,  26,  1200, 3000, 400,  34,    /* Curl Direction */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                                 360,                900,                6,  22,  1800, 4200, 1200, 30,    /* Trail Memory */
-        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS,                                  120,                900,                4,  24,  100,  680,  0,    48,    /* Pastel Palette */
-        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                  -760,               760,                4,  22,  80,   520,  400,  42,    /* Motion Speed */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS,                                  80,                 760,                6,  26,  1000, 2600, 0,    30,    /* Surface Softness */
-        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                                  0,                  950,                18, 80,  70,   620,  0,    100     /* Beat Push */
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_REJECT,                                                       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,   -1000,
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         80,  980,  42, 100, 120, 1100, 0,     92,
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                        360, 1000, 50, 100,  90,  850, 0,    100,
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                        120,  760, 36,  94, 140, 1200, 0,     86,
+        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                        180, 1000, 42, 100, 120, 1000, 0,     96,
+        VJ_BEAT_SIGNED_CURVE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -920,  920, 28,  82, 320, 2200, 0,     58,
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                        520, 1000, 36,  96, 320, 2400, 300,   88,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                        220,  940, 34,  92, 180, 1500, 0,     82,
+        VJ_BEAT_SIGNED_SPEED, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -940,  940, 44, 100, 100,  900, 0,     94,
+        VJ_BEAT_INERTIA,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,    120,  760, 28,  84, 420, 2600, 0,     64
     );
-    (void) w;
-    (void) h;
+
     return ve;
 }
 
@@ -651,8 +621,6 @@ void *chromadrift_malloc(int w, int h)
     e->seeded = 0;
     e->frame = 0;
     e->n_threads = vje_advise_num_threads((int) len);
-    if (e->n_threads <= 0)
-        e->n_threads = 1;
 
     gridcap = (size_t) (((w + 7) / 8) + 2) * (size_t) (((h + 7) / 8) + 2);
     total = len * 10 + sizeof(float) * gridcap * 3 + 128;
@@ -1130,8 +1098,6 @@ void chromadrift_apply(void *ptr, VJFrame *frame, int *args)
     int color_i;
     int speed_i;
     int soft_i;
-    int beat_push_i;
-    int beat_drive_i;
     int source_user_i;
     int drift_user_i;
     int contour_user_i;
@@ -1188,16 +1154,10 @@ void chromadrift_apply(void *ptr, VJFrame *frame, int *args)
     int force_update;
     int cell_changed;
 
-    if (!e || !frame || !args)
-        return;
-    if (!frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
     w = frame->width;
     h = frame->height;
     len = w * h;
-    if (w != e->w || h != e->h || len != e->len || w < 4 || h < 4)
-        return;
+
 
     Y = frame->data[0];
     U = frame->data[1];
@@ -1217,29 +1177,16 @@ void chromadrift_apply(void *ptr, VJFrame *frame, int *args)
     speed_user_i = eh_param1000_to_signed100(args[P_SPEED]);
     soft_user_i = eh_param1000_to_100(args[P_SOFT]);
 
-    beat_push_i = eh_clampi(args[P_BEAT_PUSH], 0, 1000);
-    beat_drive_i = eh_beat_shape100(beat_push_i);
-
     source_i = source_user_i;
+    drift_i = drift_user_i;
+    contour_i = contour_user_i;
+    glow_i = glow_user_i;
+    pull_i = pull_user_i;
+    curl_i = curl_user_i;
     trail_i = trail_user_i;
-
-    drift_i = eh_mix_i100(drift_user_i, 78, beat_drive_i);
-    contour_i = eh_mix_i100(contour_user_i, 94, beat_drive_i);
-    glow_i = eh_mix_i100(glow_user_i, 82, beat_drive_i);
-    pull_i = eh_mix_i100(pull_user_i, 86, beat_drive_i);
-    color_i = eh_mix_i100(color_user_i, 88, beat_drive_i);
-
-    if (curl_user_i < 0)
-        curl_i = eh_mix_i100(curl_user_i, -82, beat_drive_i);
-    else
-        curl_i = eh_mix_i100(curl_user_i, 82, beat_drive_i);
-
-    if (speed_user_i < 0)
-        speed_i = eh_mix_i100(speed_user_i, -76, beat_drive_i);
-    else
-        speed_i = eh_mix_i100(speed_user_i, 76, beat_drive_i);
-
-    soft_i = eh_mix_i100(soft_user_i, 22, beat_drive_i >> 1);
+    color_i = color_user_i;
+    speed_i = speed_user_i;
+    soft_i = soft_user_i;
 
     drift_i = eh_clampi(drift_i, 0, 100);
     contour_i = eh_clampi(contour_i, 0, 100);

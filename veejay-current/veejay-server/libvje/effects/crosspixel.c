@@ -22,52 +22,56 @@
 #include "crosspixel.h"
 
 typedef struct {
-    uint8_t *cross_pixels[4];
+    uint8_t *cross_pixels[3];
+    int n_threads;
 } crosspixel_t;
 
 vj_effect *crosspixel_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 1;
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 40;
-    ve->defaults[0] = 0;
-    ve->defaults[1] = 2;
+    ve->num_params = 2;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    ve->limits[0][0] = 0; ve->limits[1][0] = 1;  ve->defaults[0] = 0;
+    ve->limits[0][1] = 1; ve->limits[1][1] = 40; ve->defaults[1] = 2;
+
     ve->description = "Pixel Raster";
     ve->sub_format = 0;
     ve->extra_frame = 0;
-	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Size" );
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Size");
+    ve->hints = vje_init_value_hint_list(ve->num_params);
 
-	ve->hints = vje_init_value_hint_list( ve->num_params );
-	
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,"Black", "White" );
+    vje_build_value_hint_list(ve->hints, ve->limits[1][0], 0, "Black", "White");
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Mode */
-        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                 1,                  24,                 6,  22,  1800, 4200, 900,  30     /* Size */
+        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                                    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 1,                  24,                 4,  16, 3000, 8200, 2200, 24
     );
+
     return ve;
 }
 
 void *crosspixel_malloc(int w, int h)
 {
     crosspixel_t *c = (crosspixel_t*) vj_calloc(sizeof(crosspixel_t));
-    if(!c) {
+
+    if(!c)
+        return NULL;
+
+    const int len = w * h;
+
+    if(len <= 0) {
+        free(c);
         return NULL;
     }
 
-    const int total_len = ( w * h * 3 );
-    const int len = (w * h);
+    c->cross_pixels[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * len * 3);
 
-    c->cross_pixels[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * total_len );
     if(!c->cross_pixels[0]) {
         free(c);
         return NULL;
@@ -75,103 +79,78 @@ void *crosspixel_malloc(int w, int h)
 
     c->cross_pixels[1] = c->cross_pixels[0] + len;
     c->cross_pixels[2] = c->cross_pixels[1] + len;
+    c->n_threads = vje_advise_num_threads(len);
 
-    return (void*) c;
+    return c;
 }
 
-void crosspixel_free(void *ptr) {
-    
+void crosspixel_free(void *ptr)
+{
     crosspixel_t *c = (crosspixel_t*) ptr;
-    free(c->cross_pixels[0]);
+
+    if(!c)
+        return;
+
+    if(c->cross_pixels[0])
+        free(c->cross_pixels[0]);
+
     free(c);
 }
 
-void crosspixel_apply(void *ptr, VJFrame *frame, int *args) {
-    int t = args[0];
-    int v = args[1];
+static void crosspixel_copy_raster_rows(uint8_t *restrict dst,
+                                        const uint8_t *restrict src,
+                                        int width,
+                                        int height,
+                                        unsigned int step,
+                                        int n_threads)
+{
+    if(!dst || !src || width <= 0 || height <= 0 || step == 0)
+        return;
 
-    crosspixel_t *c = (crosspixel_t*) ptr;
-
-    unsigned int x,y,pos;
-    const unsigned int vv = v * 2; // only even numbers 
-    const unsigned int u_vv = vv >> frame->shift_h; // sfhit = / 2, shift_v = 2
-
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-	const int len = frame->len;
-	const int uv_len = frame->uv_len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-    const unsigned int uv_width = frame->uv_width;
-	const unsigned int uv_height = frame->uv_height;
-
-    unsigned int p = 0;
-
-    uint8_t **cross_pixels = c->cross_pixels;
-
-   	int strides[4] = { len, uv_len, uv_len ,0};
-	vj_frame_copy( frame->data, cross_pixels, strides );
-
-    if(t==0) {
-	    vj_frame_clear1(Y, pixel_Y_lo_, len);
-	    vj_frame_clear1(Cb, 128, uv_len);
-	    vj_frame_clear1(Cr, 128, uv_len);
-    }
-    else
+    #pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int y = 0; y < height; y++)
     {
-	    vj_frame_clear1(Y, pixel_Y_hi_, len);
-	    vj_frame_clear1(Cb, 128, uv_len);
-	    vj_frame_clear1(Cr, 128, uv_len);
+        if(((unsigned int)y % step) == 1u)
+        {
+            veejay_memcpy(dst + ((size_t)y * (size_t)width),
+                          src + ((size_t)y * (size_t)width),
+                          width);
+        }
     }
-
-    for(y=0; y < (height>>1); y++) {
-	if( (y%vv)==1) {
-	  for(x=0; x < width; x+=vv) {	
-	  	  for(p=0; p < vv; p++) {
-		    pos = (x+p) + ( y * width ); 	 
-		    Y[(x+(y*width))] = cross_pixels[0][pos];  
-		  }
-	  }
-	}
-    }
-
-    for(y=0; y < (uv_height >> frame->shift_v); y++) {
-	if( (y%u_vv)==1) {
-	  for(x=0; x < uv_width; x+=u_vv) {	
-	  	  for(p=0; p < u_vv; p++) {
-		    pos = (x+p) + ( y * uv_width ); 	 
-		    Cb[(x+(y*uv_width))] = cross_pixels[1][pos];
-		    Cr[(x+(y*uv_width))] = cross_pixels[2][pos];	
-		  }
-	  }
-	}
-    }
-
-
-    for(y=(height>>1); y < height; y++) {
-	if( (y%vv)==1) {
-	  for(x=0; x < width; x+=vv) {	
-	  	  for(p=0; p < vv; p++) {
-		    pos = (x+p) + ( y * width ); 	 
-		    Y[(x+(y*width))] = cross_pixels[0][pos];  
-		  }
-	  }
-	}
-    }
-    for(y=(uv_height >> frame->shift_v); y < uv_height; y++) {
-	if( (y%u_vv)==1) {
-	  for(x=0; x < uv_width; x+=u_vv) {	
-	  	  for(p=0; p < u_vv; p++) {
-		    pos = (x+p) + ( y * uv_width ); 	 
-		    Cb[(x+(y*uv_width))] = cross_pixels[1][pos];
-		    Cr[(x+(y*uv_width))] = cross_pixels[2][pos];	
-		  }
-	  }
-	}
-    }
-
-
 }
 
+void crosspixel_apply(void *ptr, VJFrame *frame, int *args)
+{
+    crosspixel_t *c = (crosspixel_t*) ptr;
 
+    const int mode = args[0];
+    const int size = args[1];
+    const int width = frame->width;
+    const int height = frame->height;
+    const int len = frame->len;
+    const int uv_width = frame->uv_width;
+    const int uv_height = frame->uv_height;
+    const int uv_len = frame->uv_len;
+
+    const unsigned int step_y = (unsigned int)size * 2u;
+    unsigned int step_uv = step_y >> frame->shift_h;
+
+    if(step_uv == 0)
+        step_uv = 1;
+
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+
+    int strides[4] = { len, uv_len, uv_len, 0 };
+
+    vj_frame_copy(frame->data, c->cross_pixels, strides);
+
+    vj_frame_clear1(Y, mode == 0 ? pixel_Y_lo_ : pixel_Y_hi_, len);
+    vj_frame_clear1(Cb, 128, uv_len);
+    vj_frame_clear1(Cr, 128, uv_len);
+
+    crosspixel_copy_raster_rows(Y, c->cross_pixels[0], width, height, step_y, c->n_threads);
+    crosspixel_copy_raster_rows(Cb, c->cross_pixels[1], uv_width, uv_height, step_uv, c->n_threads);
+    crosspixel_copy_raster_rows(Cr, c->cross_pixels[2], uv_width, uv_height, step_uv, c->n_threads);
+}

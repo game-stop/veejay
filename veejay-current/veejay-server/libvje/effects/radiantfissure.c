@@ -19,6 +19,7 @@
  */
 
 #include "common.h"
+#include <veejaycore/vjmem.h>
 #include "radiantfissure.h"
 
 #define RADIANTFISSURE_PARAMS 13
@@ -36,7 +37,7 @@
 #define P_TRAIL          9
 #define P_STROKE_CHROMA 10
 #define P_COLOR_BIAS    11
-#define P_BEAT_PUSH     12
+#define P_STROKE_BUDGET 12
 
 typedef struct {
     int w;
@@ -60,31 +61,37 @@ typedef struct {
     uint8_t *trail_v;
 } radiantfissure_t;
 
-static inline int wba_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
 }
 
 static inline uint8_t wba_u8(int v)
 {
-    return (uint8_t) wba_clampi(v, 0, 255);
+    return (uint8_t) clampi(v, 0, 255);
+}
+
+static inline int wba_div255(int v)
+{
+    v += 128;
+    return (v + (v >> 8)) >> 8;
 }
 
 static inline int wba_param1000_to_100(int v)
 {
-    v = wba_clampi(v, 0, 1000);
+    v = clampi(v, 0, 1000);
     return (v * 100 + 500) / 1000;
 }
 
 static inline int wba_100_to_param1000(int v)
 {
-    v = wba_clampi(v, 0, 100);
+    v = clampi(v, 0, 100);
     return v * 10;
 }
 
 static inline int wba_range1000_to_i(int v, int lo, int hi)
 {
-    v = wba_clampi(v, 0, 1000);
+    v = clampi(v, 0, 1000);
     return lo + ((hi - lo) * v + 500) / 1000;
 }
 
@@ -93,49 +100,59 @@ static inline int wba_i_to_range1000(int v, int lo, int hi)
     int d = hi - lo;
     if(d <= 0)
         return 0;
-    v = wba_clampi(v, lo, hi);
+    v = clampi(v, lo, hi);
     return ((v - lo) * 1000 + d / 2) / d;
 }
 
-static inline int wba_beat_shape1000_to_100(int v)
+static inline int wba_music_drive(int bone_length, int edge_sens, int motion_age, int bone_density, int white_forge, int fissure, int stroke_chroma)
 {
-    v = wba_clampi(v, 0, 1000);
-    return (v * v + 5000) / 10000;
+    int d = 0;
+
+    d += clampi(motion_age - 36, 0, 64) * 38;
+    d += clampi(bone_density - 50, 0, 50) * 28;
+    d += clampi(fissure - 28, 0, 72) * 24;
+    d += clampi(edge_sens - 72, 0, 28) * 24;
+    d += clampi(bone_length - 50, 0, 46) * 20;
+    d += clampi(white_forge - 78, 0, 22) * 18;
+    d += clampi(stroke_chroma - 8, 0, 92) * 12;
+
+    return clampi((d + 60) / 120, 0, 100);
 }
 
-static inline int wba_beat_density_gate(int beat_drive, int density, int length_comp_q8)
+static inline int wba_launch_density_gate(int launch_drive, int density, int length_comp_q8)
 {
     int k;
 
-    beat_drive = wba_clampi(beat_drive, 0, 100);
-    density = wba_clampi(density, 0, 100);
+    launch_drive = clampi(launch_drive, 0, 100);
+    density = clampi(density, 0, 100);
 
-    k = 3 + ((beat_drive * (12 + (density >> 2)) + 50) / 100);
+    k = 3 + ((launch_drive * (12 + (density >> 2)) + 50) / 100);
     k = (k * length_comp_q8 + 128) >> 8;
 
-    return wba_clampi(k, 2, 32);
+    return clampi(k, 2, 32);
 }
 
-static inline int wba_beat_event_strength(int beat_drive, int edge, int motion, int density)
+static inline int wba_launch_event_strength(int launch_drive, int edge, int motion, int density)
 {
     int s;
 
-    beat_drive = wba_clampi(beat_drive, 0, 100);
-    edge = wba_clampi(edge, 0, 255);
-    motion = wba_clampi(motion, 0, 255);
-    density = wba_clampi(density, 0, 100);
+    launch_drive = clampi(launch_drive, 0, 100);
+    edge = clampi(edge, 0, 255);
+    motion = clampi(motion, 0, 255);
+    density = clampi(density, 0, 100);
 
-    s = 30 + ((beat_drive * 92 + 50) / 100);
+    s = 30 + ((launch_drive * 92 + 50) / 100);
     s += (edge * (24 + (density >> 3)) + 127) >> 8;
-    s += (motion * (34 + (beat_drive >> 1)) + 127) >> 8;
+    s += (motion * (34 + (launch_drive >> 1)) + 127) >> 8;
 
-    return wba_clampi(s, 0, 208);
+    return clampi(s, 0, 208);
 }
+
 
 static inline int wba_mix100(int a, int b, int q)
 {
     int d;
-    q = wba_clampi(q, 0, 100);
+    q = clampi(q, 0, 100);
     d = b - a;
     return a + (d * q + (d >= 0 ? 50 : -50)) / 100;
 }
@@ -147,7 +164,7 @@ static inline int wba_soft_ceiling_y(int y)
         if(y > 248)
             y = 248;
     }
-    return wba_clampi(y, 0, 255);
+    return clampi(y, 0, 255);
 }
 
 static inline int wba_absi(int v)
@@ -209,31 +226,24 @@ static inline void wba_blend_canvas_pixel(
     int yy;
     int uu;
     int vv;
-    int inv;
-
-    alpha = wba_clampi(alpha, 0, 255);
 
     if (alpha <= 0)
         return;
-
-    sy = wba_clampi(sy, 0, 255);
-    su = wba_clampi(su, 0, 255);
-    sv = wba_clampi(sv, 0, 255);
 
     if (alpha >= 255) {
         yy = sy;
         uu = su;
         vv = sv;
     } else {
-        inv = 255 - alpha;
-        yy = (c->trail_y[idx] * inv + sy * alpha + 127) / 255;
-        uu = (c->trail_u[idx] * inv + su * alpha + 127) / 255;
-        vv = (c->trail_v[idx] * inv + sv * alpha + 127) / 255;
+        const int inv = 255 - alpha;
+        yy = wba_div255(c->trail_y[idx] * inv + sy * alpha);
+        uu = wba_div255(c->trail_u[idx] * inv + su * alpha);
+        vv = wba_div255(c->trail_v[idx] * inv + sv * alpha);
     }
 
     yy = wba_soft_ceiling_y(yy);
-    uu = wba_clampi(uu, 0, 255);
-    vv = wba_clampi(vv, 0, 255);
+    uu = clampi(uu, 0, 255);
+    vv = clampi(vv, 0, 255);
 
     c->trail_y[idx] = (uint8_t) yy;
     c->trail_u[idx] = (uint8_t) uu;
@@ -269,7 +279,8 @@ static inline void wba_draw_stroke(
     int color_bias,
     unsigned int shape_hash,
     int black_mode,
-    int fast_long
+    int fast_long,
+    int load_shed
 ) {
     int w = c->w;
     int h = rows;
@@ -293,18 +304,30 @@ static inline void wba_draw_stroke(
 
     int ax_q8;
     int ay_q8;
+    int src_base_x_q8;
+    int src_base_y_q8;
 
     int age_fade;
     int color_push;
     int t_step;
+    int thickness;
+    int edge_fall_scale;
+    int taper_scale_q8;
+    int inv_half_sq_q16;
+    int fray_scale_q8;
+    int forge_alpha;
+    int black_alpha_q8;
 
     int t;
 
     if (mag <= 0)
         return;
 
-    dx_q8 = (tx * 256) / mag;
-    dy_q8 = (ty * 256) / mag;
+    {
+        const int inv_mag_q16 = 65536 / mag;
+        dx_q8 = (tx * inv_mag_q16) >> 8;
+        dy_q8 = (ty * inv_mag_q16) >> 8;
+    }
 
     nx_q8 = -dy_q8;
     ny_q8 = dx_q8;
@@ -315,7 +338,7 @@ static inline void wba_draw_stroke(
         bone_length = (bone_length * (48 + fissure)) / 150;
     }
 
-    bone_length = wba_clampi(bone_length, 2, 96);
+    bone_length = clampi(bone_length, 2, 96);
 
     half = bone_length >> 1;
     if (half < 1)
@@ -325,7 +348,17 @@ static inline void wba_draw_stroke(
     if (half_sq < 1)
         half_sq = 1;
 
-    t_step = fast_long ? 2 : 1;
+    if (fast_long) {
+        t_step = bone_length >= 72 ? 3 : 2;
+        if (black_mode)
+            t_step = 3;
+        if (load_shed > 58)
+            t_step++;
+        if (load_shed > 78)
+            t_step++;
+    } else {
+        t_step = (load_shed > 66 && bone_length >= 52) ? 2 : 1;
+    }
 
     age_push = ((motion_age + fissure) * (age + 1) * (2 + (bone_length >> 2))) / 235;
 
@@ -335,8 +368,10 @@ static inline void wba_draw_stroke(
     if (motion_age > 0 && age > 0) {
         int nmag = wba_maxi(wba_absi(gx), wba_absi(gy));
         if (nmag > 0) {
-            jx += (gx * age * motion_age) / (nmag * 20 + 1);
-            jy += (gy * age * motion_age) / (nmag * 20 + 1);
+            const int inv_nmag_q16 = 65536 / (nmag * 20 + 1);
+            const int age_motion = age * motion_age;
+            jx += (gx * age_motion * inv_nmag_q16) >> 16;
+            jy += (gy * age_motion * inv_nmag_q16) >> 16;
         }
     }
 
@@ -345,50 +380,55 @@ static inline void wba_draw_stroke(
 
     ax_q8 = (cx + jx) << 8;
     ay_q8 = (cy + jy) << 8;
+    src_base_x_q8 = cx << 8;
+    src_base_y_q8 = cy << 8;
 
     if (max_age > 0)
         age_fade = 255 - ((age * 108) / (max_age + 1));
     else
         age_fade = 255;
 
-    age_fade = wba_clampi(age_fade, 116, 255);
+    age_fade = clampi(age_fade, 116, 255);
 
     color_push = (color_bias * (strength + 64 + age * 16)) >> 8;
-    color_push = wba_clampi(color_push, -72, 72);
+    color_push = clampi(color_push, -72, 72);
+
+    if (black_mode) {
+        thickness = 1;
+    } else {
+        thickness = 1 + ((age + (white_forge_q8 >= 470)) > 0);
+        if (!fast_long && white_forge_q8 > 220 && age > 1)
+            thickness++;
+    }
+
+    if (fast_long && thickness > 1)
+        thickness = 1;
+
+    thickness = clampi(thickness, 1, 3);
+    edge_fall_scale = 122 / (thickness + 1);
+    taper_scale_q8 = (150 << 8) / (half + 1);
+    inv_half_sq_q16 = 65536 / half_sq;
+    fray_scale_q8 = ((motion_age + fissure) * (age + 1) * 256) / (half * 260 + 1);
+    forge_alpha = (white_forge_q8 * (strength + 92)) >> 8;
+    forge_alpha = clampi(forge_alpha, 0, 255);
+    black_alpha_q8 = ((110 + fissure) * 256 + 110) / 220;
 
     for (t = -half; t <= half; t += t_step) {
         int t_abs = wba_absi(t);
-        int curve_px = ((half_sq - (t * t)) * bend_px) / half_sq;
+        int curve_px = (((half_sq - (t * t)) * bend_px * inv_half_sq_q16) >> 16);
 
         int base_x_q8 = ax_q8 + dx_q8 * t + nx_q8 * curve_px;
         int base_y_q8 = ay_q8 + dy_q8 * t + ny_q8 * curve_px;
 
-        int src_x_q8 = (cx << 8) + dx_q8 * t;
-        int src_y_q8 = (cy << 8) + dy_q8 * t;
-
         int taper;
         int q;
-        int thickness;
 
-        if (black_mode) {
-            thickness = 1;
-        } else {
-            thickness = 1 + ((age + white_forge_q8 / 470) > 0);
-            if (!fast_long && white_forge_q8 > 220 && age > 1)
-                thickness++;
-        }
-
-        if (fast_long && thickness > 1)
-            thickness = 1;
-
-        thickness = wba_clampi(thickness, 1, 3);
-
-        taper = 255 - ((t_abs * 150) / (half + 1));
-        taper = wba_clampi(taper, 70, 255);
+        taper = 255 - ((t_abs * taper_scale_q8) >> 8);
+        taper = clampi(taper, 70, 255);
 
         if (!fast_long && t_abs > (half >> 1)) {
             unsigned int eh = wba_hash3(cx + t, cy - t, (int)(shape_hash & 32767));
-            int fray = ((motion_age + fissure) * (age + 1) * t_abs) / (half * 260 + 1);
+            int fray = (fray_scale_q8 * t_abs) >> 8;
 
             base_x_q8 += ((((int)(eh & 255)) - 128) * fray);
             base_y_q8 += ((((int)((eh >> 8) & 255)) - 128) * fray);
@@ -399,45 +439,34 @@ static inline void wba_draw_stroke(
 
             int ox = (base_x_q8 + nx_q8 * q + 128) >> 8;
             int oy = (base_y_q8 + ny_q8 * q + 128) >> 8;
-
-            int sx = (src_x_q8 + nx_q8 * q + 128) >> 8;
-            int sy = (src_y_q8 + ny_q8 * q + 128) >> 8;
-
             int oi;
-            int si;
-
             int yy;
             int uu;
             int vv;
-
             int alpha;
             int edge_fall;
 
             if (ox < 0 || ox >= w || oy < 0 || oy >= h)
                 continue;
 
-            sx = wba_clampi(sx, 0, w - 1);
-            sy = wba_clampi(sy, 0, h - 1);
-
             oi = oy * w + ox;
-            si = sy * w + sx;
 
-            alpha = (strength * taper + 127) / 255;
-            alpha = (alpha * age_fade + 127) / 255;
+            alpha = wba_div255(strength * taper);
+            alpha = wba_div255(alpha * age_fade);
 
-            edge_fall = (q_abs * 122) / (thickness + 1);
-            alpha = (alpha * (255 - edge_fall) + 127) / 255;
+            edge_fall = q_abs * edge_fall_scale;
+            alpha = wba_div255(alpha * (255 - edge_fall));
 
             if (q_abs == 0)
-                alpha = wba_clampi(alpha + 22, 0, 255);
+                alpha = clampi(alpha + 22, 0, 255);
 
             if (fast_long)
-                alpha = wba_clampi((alpha * 118) / 100, 0, 255);
+                alpha = clampi((alpha * 302 + 128) >> 8, 0, 255);
 
             alpha = (alpha * opacity_q8 + 128) >> 8;
 
             if (black_mode) {
-                alpha = (alpha * (110 + fissure)) / 220;
+                alpha = (alpha * black_alpha_q8 + 128) >> 8;
                 if (alpha <= 0)
                     continue;
 
@@ -448,22 +477,29 @@ static inline void wba_draw_stroke(
             if (alpha <= 0)
                 continue;
 
-            yy = srcY[si];
-
-            if (chroma_gain_q8 <= 40) {
-                uu = 128 + color_push;
-                vv = 128 - color_push;
-            } else {
-                uu = 128 + (((srcU[si] - 128) * chroma_gain_q8) >> 8) + color_push;
-                vv = 128 + (((srcV[si] - 128) * chroma_gain_q8) >> 8) - color_push;
-            }
-
             {
-                int forge_alpha = (white_forge_q8 * (strength + 92)) >> 8;
-                forge_alpha = wba_clampi(forge_alpha, 0, 255);
-                yy = yy + (((255 - yy) * forge_alpha) >> 8);
-                yy = wba_clampi(yy, 0, 255);
+                int src_x_q8 = src_base_x_q8 + dx_q8 * t;
+                int src_y_q8 = src_base_y_q8 + dy_q8 * t;
+                int sx = (src_x_q8 + nx_q8 * q + 128) >> 8;
+                int sy = (src_y_q8 + ny_q8 * q + 128) >> 8;
+                int si;
+
+                sx = clampi(sx, 0, w - 1);
+                sy = clampi(sy, 0, h - 1);
+                si = sy * w + sx;
+                yy = srcY[si];
+
+                if (chroma_gain_q8 <= 40) {
+                    uu = 128 + color_push;
+                    vv = 128 - color_push;
+                } else {
+                    uu = 128 + (((srcU[si] - 128) * chroma_gain_q8) >> 8) + color_push;
+                    vv = 128 + (((srcV[si] - 128) * chroma_gain_q8) >> 8) - color_push;
+                }
             }
+
+            yy = yy + (((255 - yy) * forge_alpha) >> 8);
+            yy = clampi(yy, 0, 255);
 
             wba_blend_canvas_pixel(c, Y, U, V, oi, yy, uu, vv, alpha);
         }
@@ -483,6 +519,17 @@ vj_effect *radiantfissure_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if (!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if (ve->defaults)
+            free(ve->defaults);
+        if (ve->limits[0])
+            free(ve->limits[0]);
+        if (ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->defaults[P_OPACITY]       = 100;
     ve->defaults[P_STEP]          = 3;
     ve->defaults[P_TIME_DEPTH]    = 4;
@@ -495,7 +542,7 @@ vj_effect *radiantfissure_init(int w, int h)
     ve->defaults[P_TRAIL]         = wba_100_to_param1000(98);
     ve->defaults[P_STROKE_CHROMA] = wba_100_to_param1000(5);
     ve->defaults[P_COLOR_BIAS]    = wba_100_to_param1000(95);
-    ve->defaults[P_BEAT_PUSH]     = 0;
+    ve->defaults[P_STROKE_BUDGET] = wba_100_to_param1000(62);
 
     ve->limits[0][P_OPACITY]       = 0;
     ve->limits[1][P_OPACITY]       = 100;
@@ -533,8 +580,8 @@ vj_effect *radiantfissure_init(int w, int h)
     ve->limits[0][P_COLOR_BIAS]    = 0;
     ve->limits[1][P_COLOR_BIAS]    = 1000;
 
-    ve->limits[0][P_BEAT_PUSH]     = 0;
-    ve->limits[1][P_BEAT_PUSH]     = 1000;
+    ve->limits[0][P_STROKE_BUDGET] = 0;
+    ve->limits[1][P_STROKE_BUDGET] = 5000;
 
     ve->description = "Radiant Fissure";
 
@@ -554,24 +601,23 @@ vj_effect *radiantfissure_init(int w, int h)
         "Trail Memory",
         "Stroke Chroma",
         "Color Bias",
-        "Beat Push"
+        "Stroke Budget"
     );
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Opacity */
-        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                 3,                  7,                  6,  22, 2200, 5200, 1800, 25,    /* Step Size */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                 2,                  7,                  6,  22, 1800, 4200, 900,  30,    /* Time Depth */
-        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                 240,                860,                6,  22, 1800, 4200, 900,  28,    /* Bone Length */
-        VJ_BEAT_DETAIL,           VJ_BEAT_F_CONTINUOUS,                                       420,                980,                10, 38, 1000, 2600, 0,    58,    /* Edge Sensitivity */
-        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS,                                       100,                860,                10, 38, 1000, 2600, 0,    62,    /* Motion Ageing */
-        VJ_BEAT_DENSITY,          VJ_BEAT_F_CONTINUOUS,                                       240,                960,                10, 38, 1000, 2600, 0,    64,    /* Bone Density */
-        VJ_BEAT_GLOW,             VJ_BEAT_F_CONTINUOUS,                                       280,                940,                10, 38, 1000, 2600, 0,    58,    /* White Forge */
-        VJ_BEAT_TURBULENCE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY,               100,                880,                8,  32, 1200, 3200, 500,  38,    /* Fissure Amount */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY,                                      760,                1000,               6,  24, 1800, 4200, 1200, 34,    /* Trail Memory */
-        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS,                                       0,                  520,                8,  30, 1200, 3000, 0,    42,    /* Stroke Chroma */
-        VJ_BEAT_COLOR_PHASE,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, 620,       1000,               8,  30, 1200, 3000, 0,    42,    /* Color Bias */
-        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                   0,                  850,                18, 78, 80,   650,  0,    100    /* Beat Push */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                                       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,    0,   -1000,
+        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,    0,   -1000,
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,                            2,   8,   44, 100, 100, 1500, 250,  96,
+        VJ_BEAT_TRAIL_LENGTH,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         420,1000, 58, 100,  60,  760,   0, 100,
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         700,1000, 56, 100,  60,  760,   0, 100,
+        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         260,1000, 62, 100,  50,  700,   0, 100,
+        VJ_BEAT_DENSITY,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         420,1000, 58, 100,  60,  760,   0, 100,
+        VJ_BEAT_GLOW,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         620, 960, 42,  92,  80, 1000,   0,  84,
+        VJ_BEAT_TURBULENCE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         260,1000, 56, 100,  60,  800,   0,  96,
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         900,1000, 50, 100, 120, 2800, 300, 100,
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          30, 760, 44,  96, 100, 1000,   0,  86,
+        VJ_BEAT_COLOR_PHASE,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         680,1000, 28,  84, 220, 1600,   0,  58,
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT,                                                       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,    0,   -1000
     );
     return ve;
 }
@@ -583,11 +629,6 @@ void *radiantfissure_malloc(int w, int h)
     size_t total;
     uint8_t *p;
     int s;
-    int i;
-
-    if (w <= 0 || h <= 0)
-        return NULL;
-
     c = (radiantfissure_t *) vj_calloc(sizeof(radiantfissure_t));
     if (!c)
         return NULL;
@@ -625,21 +666,16 @@ void *radiantfissure_malloc(int w, int h)
     c->trail_v = p;
 
     for (s = 0; s < WBA_MAX_FRAMES; s++) {
-        for (i = 0; i < c->len; i++) {
-            c->ring_y[s][i] = 0;
-            c->ring_u[s][i] = 128;
-            c->ring_v[s][i] = 128;
-        }
+        veejay_memset(c->ring_y[s], 0, len);
+        veejay_memset(c->ring_u[s], 128, len);
+        veejay_memset(c->ring_v[s], 128, len);
     }
 
-    for (i = 0; i < c->len; i++) {
-        c->stable_y[i] = 0;
-        c->last_stable_y[i] = 0;
-
-        c->trail_y[i] = 0;
-        c->trail_u[i] = 128;
-        c->trail_v[i] = 128;
-    }
+    veejay_memset(c->stable_y, 0, len);
+    veejay_memset(c->last_stable_y, 0, len);
+    veejay_memset(c->trail_y, 0, len);
+    veejay_memset(c->trail_u, 128, len);
+    veejay_memset(c->trail_v, 128, len);
 
     return (void *) c;
 }
@@ -648,12 +684,7 @@ void radiantfissure_free(void *ptr)
 {
     radiantfissure_t *c = (radiantfissure_t *) ptr;
 
-    if (!c)
-        return;
-
-    if (c->region)
-        free(c->region);
-
+    free(c->region);
     free(c);
 }
 
@@ -687,8 +718,8 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
     int stroke_chroma;
     int stroke_chroma_q8;
     int color_bias;
-    int beat_push;
-    int beat_drive;
+    int stroke_budget;
+    int launch_drive;
 
     int chroma_gain_age_q8[WBA_MAX_FRAMES];
 
@@ -704,41 +735,39 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
     int motion_min;
     int motion_fracture_keep;
     int current_keep_base;
-    int beat_edge_floor;
-    int beat_seed_keep;
-    int beat_strength_boost;
-    int beat_fissure_boost;
+    int launch_edge_floor;
+    int launch_seed_keep;
+    int launch_strength_boost;
+    int launch_fissure_boost;
 
     int long_dense_fast;
     int length_comp_q8;
+    int load_shed;
+    int keep_cap;
+    int current_strength_floor;
+    int area_q8;
+    int grid_cells;
+    int main_gate;
+    int optional_gate;
+    int main_stroke_limit;
+    int optional_stroke_limit;
+    int main_strokes_used;
+    int optional_strokes_used;
 
     int a;
     int y;
-
-    if (!c || !frame || !args)
-        return;
 
     Y = frame->data[0];
     U = frame->data[1];
     V = frame->data[2];
 
-    if (!Y || !U || !V)
-        return;
-
     w = c->w;
-
     process_len = c->len;
-    if (frame->len > 0 && frame->len < process_len)
-        process_len = frame->len;
+    rows = c->h;
 
-    rows = process_len / w;
-
-    if (rows < 3 || w < 3)
-        return;
-
-    opacity       = wba_clampi(args[P_OPACITY],       0, 100);
-    step          = wba_clampi(args[P_STEP],          3, 14);
-    time_depth    = wba_clampi(args[P_TIME_DEPTH],    1, WBA_MAX_FRAMES);
+    opacity       = args[P_OPACITY];
+    step          = args[P_STEP];
+    time_depth    = args[P_TIME_DEPTH];
     bone_length   = wba_range1000_to_i(args[P_BONE_LENGTH], 2, 96);
     edge_sens     = wba_param1000_to_100(args[P_EDGE]);
     motion_age    = wba_param1000_to_100(args[P_MOTION_AGE]);
@@ -748,16 +777,20 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
     trail         = wba_param1000_to_100(args[P_TRAIL]);
     stroke_chroma = wba_param1000_to_100(args[P_STROKE_CHROMA]);
     color_bias    = wba_param1000_to_100(args[P_COLOR_BIAS]) - 50;
-    beat_push     = wba_clampi(args[P_BEAT_PUSH], 0, 1000);
-    beat_drive    = wba_beat_shape1000_to_100(beat_push);
+    stroke_budget = wba_param1000_to_100(args[P_STROKE_BUDGET]);
 
-    bone_length = wba_clampi(bone_length + ((beat_drive * 18 + 50) / 100), 2, 96);
-    edge_sens = wba_mix100(edge_sens, 100, (beat_drive * 45 + 50) / 100);
-    motion_age = wba_mix100(motion_age, 100, (beat_drive * 62 + 50) / 100);
-    bone_density = wba_mix100(bone_density, 100, (beat_drive * 58 + 50) / 100);
-    white_forge = wba_mix100(white_forge, 94, (beat_drive * 38 + 50) / 100);
-    fissure = wba_mix100(fissure, 100, (beat_drive * 72 + 50) / 100);
-    stroke_chroma = wba_mix100(stroke_chroma, 82, (beat_drive * 34 + 50) / 100);
+    opacity = clampi(opacity, 0, 100);
+    step = clampi(step, 3, 14);
+    time_depth = clampi(time_depth, 1, WBA_MAX_FRAMES);
+    launch_drive = wba_music_drive(bone_length, edge_sens, motion_age, bone_density, white_forge, fissure, stroke_chroma);
+
+    bone_length = clampi(bone_length + ((launch_drive * 16 + 50) / 100), 2, 96);
+    edge_sens = wba_mix100(edge_sens, 100, (launch_drive * 38 + 50) / 100);
+    motion_age = wba_mix100(motion_age, 100, (launch_drive * 56 + 50) / 100);
+    bone_density = wba_mix100(bone_density, 100, (launch_drive * 54 + 50) / 100);
+    white_forge = wba_mix100(white_forge, 94, (launch_drive * 32 + 50) / 100);
+    fissure = wba_mix100(fissure, 100, (launch_drive * 68 + 50) / 100);
+    stroke_chroma = wba_mix100(stroke_chroma, 82, (launch_drive * 32 + 50) / 100);
 
     opacity_q8 = (opacity * 255 + 50) / 100;
     white_forge_q8 = (white_forge * 256 + 50) / 100;
@@ -774,7 +807,7 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
         int gain_q8 = (base * 256 + 50) / 100;
 
         gain_q8 = (gain_q8 * stroke_chroma_q8 + 128) >> 8;
-        chroma_gain_age_q8[a] = wba_clampi(gain_q8, 0, 2048);
+        chroma_gain_age_q8[a] = clampi(gain_q8, 0, 2048);
     }
 
     write_slot = c->frame % WBA_MAX_FRAMES;
@@ -797,39 +830,92 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
     edge_threshold_base = 250 - edge_sens * 2;
 
     seed_floor = 32 - (edge_sens / 7);
-    seed_floor = wba_clampi(seed_floor, 10, 32);
+    seed_floor = clampi(seed_floor, 10, 32);
 
     motion_min = 18 + ((100 - motion_age) / 4);
 
     length_comp_q8 = (48 * 256) / (bone_length + 32);
-    length_comp_q8 = wba_clampi(length_comp_q8, 96, 256);
+    length_comp_q8 = clampi(length_comp_q8, 96, 256);
 
     motion_fracture_keep = 2 + (((bone_density / 7) + (motion_age / 10)) * length_comp_q8 >> 8);
     current_keep_base = 8 + (((bone_density / 4) + 6) * length_comp_q8 >> 8);
 
-    if(beat_drive > 0) {
-        int beat_motion_lift = (beat_drive * 9 + 50) / 100;
+    if(launch_drive > 0) {
+        int launch_motion_lift = (launch_drive * 9 + 50) / 100;
 
-        motion_min -= beat_motion_lift;
+        motion_min -= launch_motion_lift;
         if(motion_min < 6)
             motion_min = 6;
 
-        motion_fracture_keep += wba_beat_density_gate(beat_drive, bone_density, length_comp_q8);
-        current_keep_base += (beat_drive * 10 + 50) / 100;
+        motion_fracture_keep += wba_launch_density_gate(launch_drive, bone_density, length_comp_q8);
+        current_keep_base += (launch_drive * 10 + 50) / 100;
     }
 
-    motion_fracture_keep = wba_clampi(motion_fracture_keep, 1, 58);
-    current_keep_base = wba_clampi(current_keep_base, 4, 74);
+    motion_fracture_keep = clampi(motion_fracture_keep, 1, 58);
+    current_keep_base = clampi(current_keep_base, 4, 74);
 
-    beat_edge_floor = 6 + ((100 - edge_sens) / 12);
-    beat_edge_floor -= (beat_drive * 4 + 50) / 100;
-    beat_edge_floor = wba_clampi(beat_edge_floor, 4, 18);
+    launch_edge_floor = 6 + ((100 - edge_sens) / 12);
+    launch_edge_floor -= (launch_drive * 4 + 50) / 100;
+    launch_edge_floor = clampi(launch_edge_floor, 4, 18);
 
-    beat_seed_keep = wba_beat_density_gate(beat_drive, bone_density, length_comp_q8);
-    beat_strength_boost = (beat_drive * (34 + (white_forge >> 1)) + 50) / 100;
-    beat_fissure_boost = (beat_drive * 18 + 50) / 100;
+    load_shed = 0;
+    if (step <= 4)
+        load_shed += 22;
+    if (bone_length >= 56)
+        load_shed += (bone_length - 52) >> 1;
+    if (bone_density >= 62)
+        load_shed += (bone_density - 58) >> 1;
+    if (fissure >= 48)
+        load_shed += (fissure - 44) >> 1;
+    if (launch_drive >= 54)
+        load_shed += (launch_drive - 50) >> 1;
+    if (time_depth >= 5)
+        load_shed += (time_depth - 4) * 4;
+    if (stroke_budget < 62)
+        load_shed += (62 - stroke_budget) >> 1;
+    else
+        load_shed -= (stroke_budget - 62) >> 2;
+    load_shed = clampi(load_shed, 0, 84);
 
-    long_dense_fast = (step <= 4 && bone_length >= 48 && bone_density >= 50);
+    long_dense_fast = (step <= 4 && bone_length >= 44 && bone_density >= 44) || (load_shed >= 34);
+    keep_cap = 218 - load_shed;
+    if (keep_cap < 124)
+        keep_cap = 124;
+    current_strength_floor = 148 + (load_shed >> 1);
+    if (current_strength_floor > 186)
+        current_strength_floor = 186;
+
+    area_q8 = (process_len * 256 + 207360) / 414720;
+    area_q8 = clampi(area_q8, 128, 768);
+
+    grid_cells = ((rows + step - 1) / step) * ((w + step - 1) / step);
+    if (grid_cells < 1)
+        grid_cells = 1;
+
+    main_stroke_limit = ((160 + stroke_budget * 6) * area_q8 + 128) >> 8;
+    if (step <= 4 && time_depth >= 7 && bone_density >= 90 && fissure >= 90)
+        main_stroke_limit = (main_stroke_limit * 3) >> 2;
+    if (main_stroke_limit < 96)
+        main_stroke_limit = 96;
+
+    optional_stroke_limit = (main_stroke_limit * (10 + stroke_budget / 5) + 50) / 100;
+    if (optional_stroke_limit < 24)
+        optional_stroke_limit = 24;
+
+    main_gate = (main_stroke_limit * 255 + (grid_cells >> 1)) / grid_cells;
+    main_gate = clampi(main_gate + 10 + (bone_density >> 3), 4, 255);
+
+    optional_gate = (optional_stroke_limit * 255 + (grid_cells >> 1)) / grid_cells;
+    optional_gate = clampi(optional_gate + 4 + (fissure >> 4), 2, 192);
+
+    main_strokes_used = 0;
+    optional_strokes_used = 0;
+
+    launch_seed_keep = wba_launch_density_gate(launch_drive, bone_density, length_comp_q8);
+    if (load_shed > 28)
+        launch_seed_keep = (launch_seed_keep * (228 - load_shed) + 128) >> 8;
+    launch_strength_boost = (launch_drive * (34 + (white_forge >> 1)) + 50) / 100;
+    launch_fissure_boost = (launch_drive * 18 + 50) / 100;
 
 #pragma omp parallel for schedule(static) num_threads(c->n_threads)
     for (int i = 0; i < process_len; i++) {
@@ -863,9 +949,9 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
         uu = 128 + ((((int)c->trail_u[i] - 128) * trail_q8) >> 8);
         vv = 128 + ((((int)c->trail_v[i] - 128) * trail_q8) >> 8);
 
-        yy = wba_clampi(yy, 0, 255);
-        uu = wba_clampi(uu, 0, 255);
-        vv = wba_clampi(vv, 0, 255);
+        yy = clampi(yy, 0, 255);
+        uu = clampi(uu, 0, 255);
+        vv = clampi(vv, 0, 255);
 
         c->trail_y[i] = (uint8_t) yy;
         c->trail_u[i] = (uint8_t) uu;
@@ -876,18 +962,15 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
         V[i] = (uint8_t) vv;
     }
 
-    for (y = 1; y < rows - 1; y += step) {
+    for (y = 1, a = 0; y < rows - 1; y += step, a++) {
         int x;
         int row = y * w;
-        int ycell = y / step;
-        int row_phase = (ycell & 1) ? (step >> 1) : 0;
+        int row_phase = (a & 1) ? (step >> 1) : 0;
         int x_start = 1 + row_phase;
-        int xcell;
+        int xcell = 0;
 
         if (x_start >= w - 1)
             x_start = 1;
-
-        xcell = x_start / step;
 
         for (x = x_start; x < w - 1; x += step, xcell++) {
             int idx = row + x;
@@ -903,8 +986,8 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
             int edge = wba_absi(gx) + wba_absi(gy);
             int motion = 0;
 
-            unsigned int spatial_hash = wba_hash3(xcell, ycell, 7331);
-            unsigned int shape_hash = wba_hash3(xcell, ycell, 9917);
+            unsigned int spatial_hash = wba_hash3(xcell, a, 7331);
+            unsigned int shape_hash = wba_hash3(xcell, a, 9917);
 
             int hnoise;
             int edge_threshold;
@@ -914,7 +997,7 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
 
             int accepted = 0;
             int motion_fracture = 0;
-            int beat_seed = 0;
+            int launch_seed = 0;
 
             int age = 0;
             int y_age;
@@ -936,7 +1019,7 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
             hnoise = (int)(spatial_hash & 63) - 31;
 
             edge_threshold = edge_threshold_base + hnoise;
-            edge_threshold = wba_clampi(edge_threshold, 32, 275);
+            edge_threshold = clampi(edge_threshold, 32, 275);
 
             if (edge >= seed_floor) {
                 int keep;
@@ -955,14 +1038,14 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
                 if (strength > 225)
                     keep += 12;
 
-                if (beat_drive > 0) {
-                    keep += (beat_drive * (10 + (strength >> 5)) + 50) / 100;
-                    strength += beat_strength_boost;
+                if (launch_drive > 0) {
+                    keep += (launch_drive * (10 + (strength >> 5)) + 50) / 100;
+                    strength += launch_strength_boost;
                     if(strength > 255)
                         strength = 255;
                 }
 
-                keep = wba_clampi(keep, 6, 218);
+                keep = clampi(keep, 6, keep_cap);
 
                 density_hash = (int)((spatial_hash >> 8) & 255);
 
@@ -984,23 +1067,23 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
                             gx = 1;
 
                         strength = 46 + ((motion * motion_age) / 190);
-                        strength += (beat_strength_boost * 3) >> 2;
-                        strength = wba_clampi(strength, 0, 176);
+                        strength += (launch_strength_boost * 3) >> 2;
+                        strength = clampi(strength, 0, 176);
                     }
                 } else {
                     strength = 0;
                 }
             }
 
-            if ((!accepted || strength <= 0) && beat_drive > 0) {
-                int beat_hash = (int)((spatial_hash >> 20) & 255);
-                int beat_edge = edge >= beat_edge_floor;
-                int beat_motion = motion >= (motion_min >> 1);
+            if ((!accepted || strength <= 0) && launch_drive > 0) {
+                int launch_hash = (int)((spatial_hash >> 20) & 255);
+                int launch_edge = edge >= launch_edge_floor;
+                int launch_motion = motion >= (motion_min >> 1);
 
-                if ((beat_edge || beat_motion) && beat_hash <= beat_seed_keep) {
+                if ((launch_edge || launch_motion) && launch_hash <= launch_seed_keep) {
                     accepted = 1;
-                    beat_seed = 1;
-                    strength = wba_beat_event_strength(beat_drive, edge, motion, bone_density);
+                    launch_seed = 1;
+                    strength = wba_launch_event_strength(launch_drive, edge, motion, bone_density);
 
                     if (edge < seed_floor || gx == 0 || gy == 0) {
                         gx = (int)((shape_hash >> 16) & 255) - 128;
@@ -1015,8 +1098,8 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
             if (!accepted || strength <= 0)
                 continue;
 
-            if(beat_drive > 0 && !beat_seed) {
-                strength += beat_strength_boost >> 1;
+            if(launch_drive > 0 && !launch_seed) {
+                strength += launch_strength_boost >> 1;
                 if(strength > 255)
                     strength = 255;
             }
@@ -1032,13 +1115,13 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
 
                 age = motion_part + jitter_part;
 
-                if(beat_seed) {
-                    int beat_age = (beat_drive * max_age + 70) / 140;
-                    if(beat_age > age)
-                        age = beat_age;
+                if(launch_seed) {
+                    int launch_age = (launch_drive * max_age + 70) / 140;
+                    if(launch_age > age)
+                        age = launch_age;
                 }
 
-                age = wba_clampi(age, 0, max_age);
+                age = clampi(age, 0, max_age);
             } else {
                 age = 0;
             }
@@ -1048,8 +1131,8 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
             u_age = age + (((int)((spatial_hash >> 10) & 1) * stroke_chroma) / 100);
             v_age = age + (((int)((spatial_hash >> 12) & 1) * stroke_chroma) / 100);
 
-            u_age = wba_clampi(u_age, 0, max_age);
-            v_age = wba_clampi(v_age, 0, max_age);
+            u_age = clampi(u_age, 0, max_age);
+            v_age = clampi(v_age, 0, max_age);
 
             y_slot = wba_slot_for_age(write_slot, y_age);
             u_slot = wba_slot_for_age(write_slot, u_age);
@@ -1060,14 +1143,27 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
                 int jx = ((((int)(shape_hash & 15)) - 8) * jlim) / 8;
                 int jy = ((((int)((shape_hash >> 4) & 15)) - 8) * jlim) / 8;
 
-                draw_x = wba_clampi(x + jx, 1, w - 2);
-                draw_y = wba_clampi(y + jy, 1, rows - 2);
+                draw_x = clampi(x + jx, 1, w - 2);
+                draw_y = clampi(y + jy, 1, rows - 2);
             }
 
             local_length = bone_length + (((int)((shape_hash >> 6) & 15) - 7) * bone_length) / 64;
-            if(beat_seed)
-                local_length += (beat_drive * 18 + 50) / 100;
-            local_length = wba_clampi(local_length, 2, 96);
+            if(launch_seed)
+                local_length += (launch_drive * 18 + 50) / 100;
+            local_length = clampi(local_length, 2, 96);
+
+            if(load_shed > 68 && local_length > 64)
+                local_length = 64 + ((local_length - 64) >> 1);
+            if(load_shed > 80 && local_length > 56)
+                local_length = 56 + ((local_length - 56) >> 1);
+
+            if (main_strokes_used >= main_stroke_limit)
+                continue;
+
+            if (main_gate < 255 && (int)((spatial_hash >> 24) & 255) > main_gate)
+                continue;
+
+            main_strokes_used++;
 
             wba_draw_stroke(
                 c,
@@ -1090,40 +1186,50 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
                 color_bias,
                 shape_hash ^ ((unsigned int)age * 0x45d9f3bU),
                 0,
-                long_dense_fast
+                long_dense_fast,
+                load_shed
             );
 
-            if (age > 0 && !motion_fracture && strength > 148) {
-                if ((int)((spatial_hash >> 2) & 255) <= current_keep_base) {
+            if (age > 0 && !motion_fracture && strength > current_strength_floor) {
+                int cur_gate = current_keep_base;
+                if (load_shed > 34)
+                    cur_gate = (cur_gate * (224 - load_shed) + 128) >> 8;
+                if ((int)((spatial_hash >> 2) & 255) <= cur_gate) {
                     int cur_strength = (strength * 58) / 100;
                     int cur_length = (local_length * 2) / 3;
 
                     if (cur_length < 2)
                         cur_length = 2;
 
-                    wba_draw_stroke(
-                        c,
-                        Y, U, V,
-                        c->ring_y[write_slot],
-                        c->ring_u[write_slot],
-                        c->ring_v[write_slot],
-                        rows,
-                        draw_x, draw_y,
-                        gx, gy,
-                        cur_strength,
-                        cur_length,
-                        opacity_q8,
-                        0,
-                        max_age,
-                        motion_age / 2,
-                        white_forge_q8,
-                        fissure,
-                        chroma_gain_age_q8[0],
-                        color_bias,
-                        shape_hash ^ 0x91e10da5U,
-                        0,
-                        long_dense_fast
-                    );
+                    if (optional_strokes_used < optional_stroke_limit &&
+                        (optional_gate >= 255 || (int)((spatial_hash >> 23) & 255) <= optional_gate)) {
+                        optional_strokes_used++;
+
+                        wba_draw_stroke(
+                            c,
+                            Y, U, V,
+                            c->ring_y[write_slot],
+                            c->ring_u[write_slot],
+                            c->ring_v[write_slot],
+                            rows,
+                            draw_x, draw_y,
+                            gx, gy,
+                            cur_strength,
+                            cur_length,
+                            opacity_q8,
+                            0,
+                            max_age,
+                            motion_age / 2,
+                            white_forge_q8,
+                            fissure,
+                            chroma_gain_age_q8[0],
+                            color_bias,
+                            shape_hash ^ 0x91e10da5U,
+                            0,
+                            long_dense_fast,
+                            load_shed
+                        );
+                    }
                 }
             }
 
@@ -1134,23 +1240,31 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
                 if (edge > 220)
                     fiss_keep += 12;
 
-                if(beat_drive > 0)
-                    fiss_keep += beat_fissure_boost;
+                if(launch_drive > 0)
+                    fiss_keep += launch_fissure_boost;
 
-                if(beat_seed)
+                if(launch_seed)
                     fiss_keep += 8;
 
                 if (long_dense_fast)
-                    fiss_keep = (fiss_keep * 3) >> 2;
+                    fiss_keep = (fiss_keep * (load_shed > 42 ? 140 : 176)) >> 8;
 
-                fiss_keep = wba_clampi(fiss_keep, 0, 96);
+                fiss_keep = clampi(fiss_keep, 0, load_shed > 42 ? 64 : 88);
 
                 if (fiss_hash <= fiss_keep) {
                     int fiss_strength = (strength * (62 + fissure)) / 170;
                     int fiss_len = (local_length * (36 + fissure)) / 170;
 
-                    fiss_strength = wba_clampi(fiss_strength, 0, 220);
-                    fiss_len = wba_clampi(fiss_len, 2, 42);
+                    if (optional_strokes_used >= optional_stroke_limit)
+                        continue;
+
+                    if (optional_gate < 255 && (int)((spatial_hash >> 21) & 255) > optional_gate)
+                        continue;
+
+                    optional_strokes_used++;
+
+                    fiss_strength = clampi(fiss_strength, 0, 220);
+                    fiss_len = clampi(fiss_len, 2, 42);
 
                     wba_draw_stroke(
                         c,
@@ -1173,7 +1287,8 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
                         0,
                         shape_hash ^ 0xb5297a4dU,
                         1,
-                        long_dense_fast
+                        long_dense_fast,
+                        load_shed
                     );
                 }
             }

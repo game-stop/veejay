@@ -22,4 +22,6 @@
 #define ALEVELCORRECTION_H
 void levelcorrection_apply(void *ptr, VJFrame *frame, int *args);
 vj_effect *levelcorrection_init(int w,int h);
+void *levelcorrection_malloc(int w, int h);
+void levelcorrection_free(void *ptr);
 #endif

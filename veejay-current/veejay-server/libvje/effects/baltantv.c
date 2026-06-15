@@ -26,82 +26,54 @@
 #include "common.h"
 #include "baltantv.h"
 
-
 #define PLANES 64
 #define MAX_TAPS 8
+#define PLANE_MASK (PLANES - 1)
 
 typedef struct
 {
     uint8_t *historyY;
     int16_t *historyU;
     int16_t *historyV;
-
     int plane;
     int frame_size;
     int uv_size;
-
     int n_threads;
 } baltantv_t;
+
+static inline int baltan_plane_index(int plane, int t, int stride)
+{
+    return (plane - (t * stride) + (PLANES * MAX_TAPS)) & PLANE_MASK;
+}
 
 vj_effect *baltantv_init(int w, int h)
 {
     vj_effect *ve = (vj_effect*) vj_calloc(sizeof(vj_effect));
 
     ve->num_params = 5;
-
     ve->defaults = (int*) vj_calloc(sizeof(int) * ve->num_params);
-
     ve->limits[0] = (int*) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int*) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 32;
-    ve->defaults[0] = 8;
-
-    ve->limits[0][1] = 2;
-    ve->limits[1][1] = MAX_TAPS;
-    ve->defaults[1] = 4;
-
-    ve->limits[0][2] = 32;
-    ve->limits[1][2] = 255;
-    ve->defaults[2] = 180;
-
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 255;
-    ve->defaults[3] = 128;
-
-    ve->limits[0][4] = 0;
-    ve->limits[1][4] = 255;
-    ve->defaults[4] = 96;
+    ve->limits[0][0] = 1;   ve->limits[1][0] = 32;       ve->defaults[0] = 8;
+    ve->limits[0][1] = 2;   ve->limits[1][1] = MAX_TAPS; ve->defaults[1] = 4;
+    ve->limits[0][2] = 32;  ve->limits[1][2] = 255;      ve->defaults[2] = 180;
+    ve->limits[0][3] = 0;   ve->limits[1][3] = 255;      ve->defaults[3] = 128;
+    ve->limits[0][4] = 0;   ve->limits[1][4] = 255;      ve->defaults[4] = 96;
 
     ve->description = "BaltanTV";
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-
-    ve->param_description =
-        vje_build_param_list(
-            ve->num_params,
-            "Stride",
-            "Temporal Taps",
-            "Decay",
-            "Feedback",
-            "Chroma Persistence"
-        );
+    ve->param_description = vje_build_param_list(ve->num_params, "Stride", "Temporal Taps", "Decay", "Feedback", "Chroma Persistence");
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,    1,   24,  8,  24,  1800, 3600, 900,  32,  /* Stride */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,    2,   6,   6,  18,  2200, 4200, 1200, 22,  /* Temporal Taps */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS,                          110, 242, 10, 38,  1200, 3400, 0,    54,  /* Decay */
-        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                          48,  230, 14, 58,  90,   720,  0,    84,  /* Feedback */
-        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_PHRASE_ONLY,   56,  235, 8,  36,  500,  2400, 700,  46   /* Chroma Persistence */
+        VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_LOG, 3, 420, 10, 48, 1200, 4200, 0, 76
     );
 
     return ve;
 }
-
 
 void *baltantv_malloc(int w, int h)
 {
@@ -114,10 +86,8 @@ void *baltantv_malloc(int w, int h)
 
     b->frame_size = len;
     b->uv_size = len;
-
     b->historyY = (uint8_t*) vj_calloc(sizeof(uint8_t) * len * PLANES);
     b->historyU = (int16_t*) vj_calloc(sizeof(int16_t) * len * PLANES);
-
     b->historyV = (int16_t*) vj_calloc(sizeof(int16_t) * len * PLANES);
 
     if(!b->historyY || !b->historyU || !b->historyV)
@@ -138,9 +108,12 @@ void baltantv_free(void *ptr)
     if(!b)
         return;
 
-    free(b->historyY);
-    free(b->historyU);
-    free(b->historyV);
+    if(b->historyY)
+        free(b->historyY);
+    if(b->historyU)
+        free(b->historyU);
+    if(b->historyV)
+        free(b->historyV);
 
     free(b);
 }
@@ -149,41 +122,37 @@ void baltantv_apply(void *ptr, VJFrame *frame, int *args)
 {
     baltantv_t *b = (baltantv_t*) ptr;
 
-    const int stride        = args[0];
-    const int taps          = args[1];
-    const int decay         = args[2];
-    const int feedback      = args[3];
+    const int stride = args[0];
+    const int taps = args[1];
+    const int decay = args[2];
+    const int feedback = args[3];
     const int chromaPersist = args[4];
 
-    const int len    = frame->len;
+    const int len = frame->len;
     const int uv_len = frame->uv_len;
 
     uint8_t *Y = frame->data[0];
     uint8_t *U = frame->data[1];
     uint8_t *V = frame->data[2];
 
-    uint8_t *inY = Y;
-    uint8_t *inU = U;
-    uint8_t *inV = V;
-
     uint8_t *restrict dstY = b->historyY + (b->plane * len);
     int16_t *restrict dstU = b->historyU + (b->plane * uv_len);
     int16_t *restrict dstV = b->historyV + (b->plane * uv_len);
 
     const int plane = b->plane;
+    const int inv_taps_q16 = 65536 / taps;
 
     #pragma omp parallel num_threads(b->n_threads)
     {
-    
         #pragma omp for simd schedule(static)
         for(int i = 0; i < len; i++)
-            dstY[i] = inY[i];
+            dstY[i] = Y[i];
 
         #pragma omp for simd schedule(static)
         for(int i = 0; i < uv_len; i++)
         {
-            dstU[i] = inU[i] - 128;
-            dstV[i] = inV[i] - 128;
+            dstU[i] = (int16_t)((int)U[i] - 128);
+            dstV[i] = (int16_t)((int)V[i] - 128);
         }
 
         #pragma omp for schedule(static)
@@ -193,15 +162,14 @@ void baltantv_apply(void *ptr, VJFrame *frame, int *args)
 
             for(int t = 0; t < taps; t++)
             {
-                int idx = (plane - (t * stride) + PLANES) & (PLANES - 1);
+                const int idx = baltan_plane_index(plane, t, stride);
                 accumY += b->historyY[idx * len + i];
             }
 
+            accumY = ((accumY * inv_taps_q16) >> 16);
             accumY = (accumY * decay) >> 8;
 
-            int finalY =
-                ((inY[i] * (255 - feedback)) +
-                 (accumY * feedback / taps)) >> 8;
+            const int finalY = ((int)Y[i] * (255 - feedback) + accumY * feedback) >> 8;
 
             Y[i] = CLAMP_Y(finalY);
         }
@@ -214,14 +182,14 @@ void baltantv_apply(void *ptr, VJFrame *frame, int *args)
 
             for(int t = 0; t < taps; t++)
             {
-                int idx = (plane - (t * stride) + PLANES) & (PLANES - 1);
+                const int idx = baltan_plane_index(plane, t, stride);
 
                 accumU += b->historyU[idx * uv_len + i];
                 accumV += b->historyV[idx * uv_len + i];
             }
 
-            accumU /= taps;
-            accumV /= taps;
+            accumU = ((accumU * inv_taps_q16) >> 16);
+            accumV = ((accumV * inv_taps_q16) >> 16);
 
             accumU = (accumU * chromaPersist) >> 8;
             accumV = (accumV * chromaPersist) >> 8;
@@ -231,5 +199,5 @@ void baltantv_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    b->plane = (plane + 1) & (PLANES - 1);
+    b->plane = (plane + 1) & PLANE_MASK;
 }

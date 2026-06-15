@@ -28,19 +28,22 @@
 #include <veejaycore/vjmem.h>
 #include "tripplicity.h"
 
-#define TRIPPLICITY_PARAMS 7
+#define TRIPPLICITY_PARAMS 5
 
 #define P_OPACITY_Y      0
 #define P_OPACITY_CB     1
 #define P_OPACITY_CR     2
-#define P_BEAT_MIX       3
-#define P_BEAT_CHROMA    4
-#define P_BEAT_PUSH      5
-#define P_BEAT_SMOOTH    6
+#define P_MIX_DRIVE      3
+#define P_CHROMA_DRIVE   4
 
 typedef struct {
-    float beat_env;
-    float beat_kick;
+    float op_y_env;
+    float op_cb_env;
+    float op_cr_env;
+    float mix_drive_env;
+    float chroma_drive_env;
+    int initialized;
+
     int n_threads;
 } tripplicity_t;
 
@@ -51,6 +54,7 @@ static inline int tripplicity_clampi(int v, int lo, int hi)
 
 static inline uint8_t tripplicity_mix_u8(uint8_t a, uint8_t b, int q8)
 {
+    q8 = tripplicity_clampi(q8, 0, 256);
     return (uint8_t)((((int)a * (256 - q8)) + ((int)b * q8) + 128) >> 8);
 }
 
@@ -60,31 +64,21 @@ static inline int tripplicity_to_q8(int v)
     return (v * 256 + 127) / 255;
 }
 
-static inline int tripplicity_shape_beat(int beat_push)
+
+
+
+
+static inline float tripplicity_slew(float oldv, float target, float coeff)
 {
-    beat_push = tripplicity_clampi(beat_push, 0, 1000);
-
-    const int sq = (beat_push * beat_push + 500) / 1000;
-    const int shaped = (beat_push * 30 + sq * 70 + 50) / 100;
-
-    return tripplicity_clampi(shaped, 0, 1000);
+    return oldv + (target - oldv) * coeff;
 }
 
-static inline float tripplicity_unit(int v)
+static inline int tripplicity_add_q8(int q8, int add)
 {
-    return (float)tripplicity_clampi(v, 0, 1000) * 0.001f;
+    return tripplicity_clampi(q8 + add, 0, 256);
 }
 
-static inline int tripplicity_apply_beat_lift(int base_q8, int amount, float drive)
-{
-    amount = tripplicity_clampi(amount, 0, 1000);
-    base_q8 = tripplicity_clampi(base_q8, 0, 256);
 
-    const int headroom = 256 - base_q8;
-    const int lift = (int)((float)headroom * ((float)amount * 0.001f) * drive + 0.5f);
-
-    return tripplicity_clampi(base_q8 + lift, 0, 256);
-}
 
 vj_effect *tripplicity_init(int w, int h)
 {
@@ -98,13 +92,19 @@ vj_effect *tripplicity_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][P_OPACITY_Y]   = 0; ve->limits[1][P_OPACITY_Y]   = 255;  ve->defaults[P_OPACITY_Y]   = 150;
-    ve->limits[0][P_OPACITY_CB]  = 0; ve->limits[1][P_OPACITY_CB]  = 255;  ve->defaults[P_OPACITY_CB]  = 150;
-    ve->limits[0][P_OPACITY_CR]  = 0; ve->limits[1][P_OPACITY_CR]  = 255;  ve->defaults[P_OPACITY_CR]  = 150;
-    ve->limits[0][P_BEAT_MIX]    = 0; ve->limits[1][P_BEAT_MIX]    = 1000; ve->defaults[P_BEAT_MIX]    = 260;
-    ve->limits[0][P_BEAT_CHROMA] = 0; ve->limits[1][P_BEAT_CHROMA] = 1000; ve->defaults[P_BEAT_CHROMA] = 180;
-    ve->limits[0][P_BEAT_PUSH]   = 0; ve->limits[1][P_BEAT_PUSH]   = 1000; ve->defaults[P_BEAT_PUSH]   = 0;
-    ve->limits[0][P_BEAT_SMOOTH] = 0; ve->limits[1][P_BEAT_SMOOTH] = 1000; ve->defaults[P_BEAT_SMOOTH] = 520;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
+    ve->limits[0][P_OPACITY_Y]    = 0; ve->limits[1][P_OPACITY_Y]    = 255;  ve->defaults[P_OPACITY_Y]    = 150;
+    ve->limits[0][P_OPACITY_CB]   = 0; ve->limits[1][P_OPACITY_CB]   = 255;  ve->defaults[P_OPACITY_CB]   = 150;
+    ve->limits[0][P_OPACITY_CR]   = 0; ve->limits[1][P_OPACITY_CR]   = 255;  ve->defaults[P_OPACITY_CR]   = 150;
+    ve->limits[0][P_MIX_DRIVE]    = 0; ve->limits[1][P_MIX_DRIVE]    = 1000; ve->defaults[P_MIX_DRIVE]    = 260;
+    ve->limits[0][P_CHROMA_DRIVE] = 0; ve->limits[1][P_CHROMA_DRIVE] = 1000; ve->defaults[P_CHROMA_DRIVE] = 180;
 
     ve->description = "Normal Overlay (per Channel)";
     ve->sub_format = -1;
@@ -116,26 +116,18 @@ vj_effect *tripplicity_init(int w, int h)
         "Opacity Y",
         "Opacity Cb",
         "Opacity Cr",
-        "Beat Mix",
-        "Beat Chroma",
-        "Beat Push",
-        "Beat Smooth"
+        "Mix Drive",
+        "Chroma Drive"
     );
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS,                       32,                 220,                8,  30, 1200, 3000, 0,    45,    /* Opacity Y */
-        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS,                       32,                 220,                8,  30, 1200, 3000, 0,    42,    /* Opacity Cb */
-        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS,                       32,                 220,                8,  30, 1200, 3000, 0,    42,    /* Opacity Cr */
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Beat Mix - user tuning */
-        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_REJECT,                           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Beat Chroma - user tuning */
-        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,   0,                  760,                18, 76, 80,   760,  0,    100,   /* Beat Push */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY,                      260,                820,                5,  18, 2200, 5200, 1200, 18     /* Beat Smooth */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 48,  255,  12, 64, 120, 1600, 0, 82,
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 32,  255,  12, 58, 120, 1600, 0, 72,
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 32,  255,  12, 58, 120, 1600, 0, 72,
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 120, 1000, 18, 72, 80,  1300, 0, 94,
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 120, 1000, 18, 72, 80,  1300, 0, 90
     );
-
-    (void) w;
-    (void) h;
 
     return ve;
 }
@@ -146,8 +138,13 @@ void *tripplicity_malloc(int w, int h)
     if(!t)
         return NULL;
 
-    t->beat_env = 0.0f;
-    t->beat_kick = 0.0f;
+    t->op_y_env = 0.0f;
+    t->op_cb_env = 0.0f;
+    t->op_cr_env = 0.0f;
+    t->mix_drive_env = 0.0f;
+    t->chroma_drive_env = 0.0f;
+    t->initialized = 0;
+
     t->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) t;
@@ -155,62 +152,54 @@ void *tripplicity_malloc(int w, int h)
 
 void tripplicity_free(void *ptr)
 {
-    if(ptr)
-        free(ptr);
+    free(ptr);
 }
 
 void tripplicity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     tripplicity_t *t = (tripplicity_t*) ptr;
 
-    const int beat_mix = tripplicity_clampi(args[P_BEAT_MIX], 0, 1000);
-    const int beat_chroma = tripplicity_clampi(args[P_BEAT_CHROMA], 0, 1000);
-    const int beat_push = tripplicity_clampi(args[P_BEAT_PUSH], 0, 1000);
-    const int beat_smooth = tripplicity_clampi(args[P_BEAT_SMOOTH], 0, 1000);
+    const int len = frame->len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
-    const float target = (float)tripplicity_shape_beat(beat_push) * 0.001f;
+    const int op_y_arg = args[P_OPACITY_Y];
+    const int op_cb_arg = args[P_OPACITY_CB];
+    const int op_cr_arg = args[P_OPACITY_CR];
+    const int mix_drive_arg = args[P_MIX_DRIVE];
+    const int chroma_drive_arg = args[P_CHROMA_DRIVE];
 
-    float beat_env = 0.0f;
-    float beat_kick = 0.0f;
+    if(!t->initialized) {
+        t->op_y_env = (float)op_y_arg;
+        t->op_cb_env = (float)op_cb_arg;
+        t->op_cr_env = (float)op_cr_arg;
+        t->mix_drive_env = (float)mix_drive_arg;
+        t->chroma_drive_env = (float)chroma_drive_arg;
+        t->initialized = 1;
+    }
 
-    const float old_env = t->beat_env;
-    const float smooth = tripplicity_unit(beat_smooth);
-    const float attack = 0.52f - smooth * 0.34f;
-    const float release = 0.16f - smooth * 0.105f;
-    const float kick_decay = 0.42f + smooth * 0.34f;
+    const float op_fast = 0.30f;
+    const float drive_fast = 0.24f;
 
-    if(target > t->beat_env)
-        t->beat_env += (target - t->beat_env) * attack;
-    else
-        t->beat_env += (target - t->beat_env) * release;
+    t->op_y_env = tripplicity_slew(t->op_y_env, (float)op_y_arg, op_fast);
+    t->op_cb_env = tripplicity_slew(t->op_cb_env, (float)op_cb_arg, op_fast * 0.90f);
+    t->op_cr_env = tripplicity_slew(t->op_cr_env, (float)op_cr_arg, op_fast * 0.90f);
+    t->mix_drive_env = tripplicity_slew(t->mix_drive_env, (float)mix_drive_arg, drive_fast);
+    t->chroma_drive_env = tripplicity_slew(t->chroma_drive_env, (float)chroma_drive_arg, drive_fast);
 
-    if(t->beat_env < 0.0001f)
-        t->beat_env = 0.0f;
-    else if(t->beat_env > 1.0f)
-        t->beat_env = 1.0f;
+    const int mix_drive = tripplicity_clampi((int)(t->mix_drive_env + 0.5f), 0, 1000);
+    const int chroma_drive = tripplicity_clampi((int)(t->chroma_drive_env + 0.5f), 0, 1000);
 
-    if(t->beat_env > old_env)
-        t->beat_kick += (t->beat_env - old_env) * 1.45f;
+    int qY  = tripplicity_to_q8((int)(t->op_y_env + 0.5f));
+    int qCb = tripplicity_to_q8((int)(t->op_cb_env + 0.5f));
+    int qCr = tripplicity_to_q8((int)(t->op_cr_env + 0.5f));
 
-    t->beat_kick *= kick_decay;
-    if(t->beat_kick > 1.0f)
-        t->beat_kick = 1.0f;
-    else if(t->beat_kick < 0.0001f)
-        t->beat_kick = 0.0f;
+    qY  += ((256 - qY) * mix_drive + 500) / 1000;
+    qCb += ((256 - qCb) * chroma_drive + 500) / 1000;
+    qCr += ((256 - qCr) * chroma_drive + 500) / 1000;
 
-    beat_env = t->beat_env;
-    beat_kick = t->beat_kick;
-
-
-    const float drive = beat_env * beat_env + beat_kick * 0.55f;
-
-    int qY  = tripplicity_to_q8(args[P_OPACITY_Y]);
-    int qCb = tripplicity_to_q8(args[P_OPACITY_CB]);
-    int qCr = tripplicity_to_q8(args[P_OPACITY_CR]);
-
-    qY  = tripplicity_apply_beat_lift(qY,  beat_mix, drive);
-    qCb = tripplicity_apply_beat_lift(qCb, beat_chroma, drive);
-    qCr = tripplicity_apply_beat_lift(qCr, beat_chroma, drive);
+    qY = tripplicity_clampi(qY, 0, 256);
+    qCb = tripplicity_clampi(qCb, 0, 256);
+    qCr = tripplicity_clampi(qCr, 0, 256);
 
     uint8_t *restrict Y1  = frame->data[0];
     uint8_t *restrict Cb1 = frame->data[1];
@@ -220,8 +209,6 @@ void tripplicity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-    const int len = frame->len;
-    const int uv_len = frame->uv_len;
 #pragma omp parallel num_threads(t->n_threads)
     {
 #pragma omp for schedule(static)

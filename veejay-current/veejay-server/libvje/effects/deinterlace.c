@@ -21,13 +21,11 @@
 #include "common.h"
 #include "deinterlace.h"
 
-
 vj_effect *deinterlace_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
 
     ve->num_params = 1;
-
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
@@ -40,52 +38,38 @@ vj_effect *deinterlace_init(int w, int h)
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-
     ve->param_description = vje_build_param_list(ve->num_params, "Motion threshold");
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
 
-        VJ_BEAT_MOTION_REACT,
-        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
-        2, 48,
-        6, 22, 1600, 3600, 900, 30 /* Motion threshold */
-    );
     return ve;
 }
 
-static void deinterlace(uint8_t *restrict src, int w, int h, int threshold)
+static void deinterlace_plane(uint8_t *restrict src, int w, int h, int threshold)
 {
-    if (h < 3) return;
-
-    for (int y = 1; y < h - 1; y++)
+    for(int y = 1; y < h - 1; y++)
     {
         uint8_t *restrict prev = src + (y - 1) * w;
         uint8_t *restrict curr = src + y * w;
         uint8_t *restrict next = src + (y + 1) * w;
 
-        int x = 0;
-
-        for (; x < w; x++)
+        for(int x = 0; x < w; x++)
         {
-            unsigned p = prev[x];
-            unsigned n = next[x];
+            const unsigned p = prev[x];
+            const unsigned n = next[x];
+            const unsigned diff = (p > n) ? (p - n) : (n - p);
 
-            unsigned diff = (p > n) ? (p - n) : (n - p);
-
-            unsigned avg = (p + n) >> 1;
-
-            if (diff >= (unsigned)threshold)
-                curr[x] = (uint8_t)avg;
+            if(diff >= (unsigned)threshold)
+                curr[x] = (uint8_t)((p + n) >> 1);
         }
     }
 }
 
 void deinterlace_apply(void *ptr, VJFrame *frame, int *args)
 {
-    int threshold = args[0];
+    (void) ptr;
 
-    deinterlace(frame->data[0], frame->width, frame->height, threshold);
-    deinterlace(frame->data[1], frame->uv_width, frame->uv_height, threshold);
-    deinterlace(frame->data[2], frame->uv_width, frame->uv_height, threshold);
+    const int threshold = args[0];
+
+    deinterlace_plane(frame->data[0], frame->width, frame->height, threshold);
+    deinterlace_plane(frame->data[1], frame->uv_width, frame->uv_height, threshold);
+    deinterlace_plane(frame->data[2], frame->uv_width, frame->uv_height, threshold);
 }
-

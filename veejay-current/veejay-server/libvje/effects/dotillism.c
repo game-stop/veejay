@@ -179,20 +179,20 @@ vj_effect *dotillism_init(int w, int h)
         "Motion React",
         "Chroma Gain"
     );
+    
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_KICK,        VJ_BEAT_F_CONTINUOUS,                       18, 88, 14, 58, 90,   720,  0,   82, /* Build Speed */
-        VJ_BEAT_SOURCE_MIX,  VJ_BEAT_F_CONTINUOUS,                       4,  58, 8,  30, 900,  2400, 0,   42, /* Source Feed */
-        VJ_BEAT_KICK,        VJ_BEAT_F_CONTINUOUS,                       14, 96, 14, 58, 90,   720,  0,   86, /* Flow */
-        VJ_BEAT_SNARE,       VJ_BEAT_F_CONTINUOUS,                       0,  82, 10, 42, 120,  900,  0,   70, /* Swirl */
-        VJ_BEAT_SNARE,       VJ_BEAT_F_CONTINUOUS,                       24, 98, 10, 40, 120,  900,  0,   64, /* Color Bleed */
-        VJ_BEAT_SNARE,       VJ_BEAT_F_CONTINUOUS,                       12, 84, 8,  36, 120,  900,  0,   68, /* Detail */
-        VJ_BEAT_MEMORY,      VJ_BEAT_F_PHRASE_ONLY,                      45, 96, 8,  28, 1800, 4200, 900, 38, /* Trail */
-        VJ_BEAT_HAT,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0, 76, 4,  28, 120,  900,  500, 40, /* Turbulence */
-        VJ_BEAT_GRID_SIZE,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  10, 75, 6,  22, 2200, 5200, 1800,24, /* Flow Scale */
-        VJ_BEAT_SNARE,       VJ_BEAT_F_CONTINUOUS,                       20, 96, 10, 46, 120,  900,  0,   72, /* Motion React */
-        VJ_BEAT_KICK,        VJ_BEAT_F_CONTINUOUS,                       32, 98, 14, 58, 90,   720,  0,   76  /* Chroma Gain */
+        VJ_BEAT_SPEED,        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                                             8,                  72,                 18, 64,  850,  3000, 0,    54,
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                  12,                 100,                34, 100, 420,  1800, 0,    98,
+        VJ_BEAT_DRIFT,        VJ_BEAT_F_CONTINUOUS,                                             8,                  98,                 28, 92,  520,  2200, 0,    86,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                                             12,                 92,                 20, 74,  850,  3200, 0,    66,
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                  18,                 100,                30, 92,  620,  2500, 0,    82,
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                  58,                 100,                34, 100, 500,  2200, 0,    96,
+        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS,                                             0,                  100,                42, 100, 160,  1350, 80,   100,
+        VJ_BEAT_GRID_SIZE,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 0,               100,                42, 100, 260,  1500, 0,    98,
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                  10,                 100,                30, 96,  520,  2300, 0,    92,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                  22,                 100,                28, 90,  620,  2600, 0,    84
     );
     return ve;
 }
@@ -200,7 +200,14 @@ vj_effect *dotillism_init(int w, int h)
 void *dotillism_malloc(int w, int h)
 {
     fluid_paint_t *p = (fluid_paint_t *)vj_calloc(sizeof(fluid_paint_t));
+    if (!p) return NULL;
+
     const int len = w * h;
+    if (len <= 0) {
+        free(p);
+        return NULL;
+    }
+
     const int min_cell = 8;
     const int max_gw = (w + min_cell - 1) / min_cell + 2;
     const int max_gh = (h + min_cell - 1) / min_cell + 2;
@@ -217,6 +224,11 @@ void *dotillism_malloc(int w, int h)
     p->grid_capacity = max_gw * max_gh;
     p->grid_x = (float *)vj_malloc(sizeof(float) * p->grid_capacity);
     p->grid_y = (float *)vj_malloc(sizeof(float) * p->grid_capacity);
+
+    if (!p->canvas_y || !p->canvas_u || !p->canvas_v || !p->next_y || !p->next_u || !p->next_v || !p->prev_src_y || !p->grid_x || !p->grid_y) {
+        dotillism_free(p);
+        return NULL;
+    }
 
     veejay_memset(p->canvas_y, 0, len);
     veejay_memset(p->canvas_u, 128, len);
@@ -255,20 +267,16 @@ void dotillism_free(void *ptr)
 void dotillism_apply(void *ptr, VJFrame *frame, int *args)
 {
     fluid_paint_t *p = (fluid_paint_t *)ptr;
-    if (!p || !frame || !args) return;
-    if (!frame->data[0] || !frame->data[1] || !frame->data[2]) return;
 
     const int w = frame->width;
     const int h = frame->height;
     const int len = w * h;
 
-    if (w <= 2 || h <= 2) return;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
 
-    if (p->w != w || p->h != h) return;
 
     if (!p->initialized) {
         veejay_memcpy(p->canvas_y, Y, len);

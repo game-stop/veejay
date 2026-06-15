@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -19,9 +19,26 @@
  */
 
 #include "common.h"
+#include <stdint.h>
+#include <veejaycore/vjmem.h>
 #include "slicer.h"
 
+#define SLICER_PARAMS 11
+
+#define P_WIDTH        0
+#define P_HEIGHT       1
+#define P_SHATTER      2
+#define P_PERIOD       3
+#define P_MODE         4
+#define P_SMOOTHNESS   5
+#define P_DOMINANCE    6
+#define P_BLOCK_SIZE   7
+#define P_SLICE_DRIVE   8
+#define P_SHATTER_DRIVE 9
+#define P_MIX_DRIVE     10
+
 typedef struct {
+    uint8_t *block;
     int *slice_xshift;
     int *slice_yshift;
     int *prev_slice_xshift;
@@ -35,49 +52,78 @@ typedef struct {
 
     uint32_t seed;
     int n_threads;
+
+    int smooth_ready;
+    float sm_width;
+    float sm_height;
+    float sm_shatter;
+    float sm_period;
+    float sm_smoothness;
+    float sm_dominance;
+    float sm_block;
+    float sm_slice_drive;
+    float sm_shatter_drive;
+    float sm_mix_drive;
 } slicer_t;
 
-static inline int slicer_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
-    return (v < lo) ? lo : (v > hi ? hi : v);
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline uint8_t slicer_blend_u8(uint8_t a, uint8_t b, int q8)
+{
+    return (uint8_t)((((int)a * (256 - q8)) + ((int)b * q8) + 128) >> 8);
 }
 
 static inline uint32_t slicer_rand(uint32_t *state)
 {
     uint32_t x = *state;
+
     x ^= x << 13;
     x ^= x >> 17;
     x ^= x << 5;
+
     *state = x ? x : 0x6d2b79f5u;
+
     return *state;
 }
 
 static inline int slicer_rand_range(uint32_t *state, int lo, int hi)
 {
-    if(hi <= lo)
-        return lo;
-
     return lo + (int)(slicer_rand(state) % (uint32_t)(hi - lo + 1));
+}
+
+
+static inline float slicer_smooth_value(float current, float target, float speed)
+{
+    return current + ((target - current) * speed);
 }
 
 vj_effect *slicer_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 8;
+    vj_effect *ve = (vj_effect *)vj_calloc(sizeof(vj_effect));
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    if(!ve)
+        return NULL;
 
-    ve->limits[0][0] = 1; ve->limits[1][0] = w;
-    ve->limits[0][1] = 1; ve->limits[1][1] = h;
-    ve->limits[0][2] = 0; ve->limits[1][2] = 128;
-    ve->limits[0][3] = 0; ve->limits[1][3] = 500;
-    ve->limits[0][4] = 0; ve->limits[1][4] = 1;
-    ve->limits[0][5] = 0; ve->limits[1][5] = 100;
-    ve->limits[0][6] = 0; ve->limits[1][6] = 100;
+    ve->num_params = SLICER_PARAMS;
+    ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
-    int min_dim = (w < h) ? w : h;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
+    int min_dim = w < h ? w : h;
     int max_block_size = min_dim / 2;
 
     if(max_block_size < 4)
@@ -96,20 +142,18 @@ vj_effect *slicer_init(int w, int h)
 
     if(max_shift < 2)
         max_shift = 2;
-    if(max_shift > 9)
-        max_shift = 9;
 
-    ve->limits[0][7] = 2;
-    ve->limits[1][7] = max_shift;
-
-    ve->defaults[0] = 16;
-    ve->defaults[1] = 16;
-    ve->defaults[2] = 8;
-    ve->defaults[3] = 0;
-    ve->defaults[4] = 0;
-    ve->defaults[5] = 0;
-    ve->defaults[6] = 50;
-    ve->defaults[7] = 5;
+    ve->limits[0][P_WIDTH] = 1;        ve->limits[1][P_WIDTH] = w;              ve->defaults[P_WIDTH] = w >= 16 ? 16 : w;
+    ve->limits[0][P_HEIGHT] = 1;       ve->limits[1][P_HEIGHT] = h;             ve->defaults[P_HEIGHT] = h >= 16 ? 16 : h;
+    ve->limits[0][P_SHATTER] = 0;      ve->limits[1][P_SHATTER] = 128;          ve->defaults[P_SHATTER] = 8;
+    ve->limits[0][P_PERIOD] = 0;       ve->limits[1][P_PERIOD] = 500;           ve->defaults[P_PERIOD] = 0;
+    ve->limits[0][P_MODE] = 0;         ve->limits[1][P_MODE] = 1;               ve->defaults[P_MODE] = 0;
+    ve->limits[0][P_SMOOTHNESS] = 0;   ve->limits[1][P_SMOOTHNESS] = 100;       ve->defaults[P_SMOOTHNESS] = 0;
+    ve->limits[0][P_DOMINANCE] = 0;    ve->limits[1][P_DOMINANCE] = 100;        ve->defaults[P_DOMINANCE] = 50;
+    ve->limits[0][P_BLOCK_SIZE] = 2;   ve->limits[1][P_BLOCK_SIZE] = max_shift; ve->defaults[P_BLOCK_SIZE] = clampi(5, 2, max_shift);
+    ve->limits[0][P_SLICE_DRIVE] = 0;   ve->limits[1][P_SLICE_DRIVE] = 1000;     ve->defaults[P_SLICE_DRIVE] = 0;
+    ve->limits[0][P_SHATTER_DRIVE] = 0; ve->limits[1][P_SHATTER_DRIVE] = 1000;   ve->defaults[P_SHATTER_DRIVE] = 0;
+    ve->limits[0][P_MIX_DRIVE] = 0;     ve->limits[1][P_MIX_DRIVE] = 1000;       ve->defaults[P_MIX_DRIVE] = 0;
 
     ve->description = "Slicer";
     ve->sub_format = 1;
@@ -125,71 +169,57 @@ vj_effect *slicer_init(int w, int h)
         "Mode",
         "Smoothness",
         "Dominance",
-        "Block Size"
+        "Block Size",
+        "Slice Drive",
+        "Shatter Drive",
+        "Mix Drive"
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
-
-    vje_build_value_hint_list(
-        ve->hints,
-        ve->limits[1][4],
-        4,
-        "Clip",
-        "Wrap"
-    );
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_MODE], P_MODE, "Clip", "Wrap");
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_WARP,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 4,                  96,                 6,  22, 1800, 4200, 900,  30,    /* Width */
-        VJ_BEAT_WARP,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 4,                  96,                 6,  22, 1800, 4200, 900,  30,    /* Height */
-        VJ_BEAT_TURBULENCE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 0,                  96,                 6,  22, 1800, 4200, 900,  30,    /* Shatter */
-        VJ_BEAT_SPEED,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                            0,                  240,                6,  22, 1800, 4200, 900,  30,    /* Period */
-        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                               VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Mode */
-        VJ_BEAT_MEMORY,     VJ_BEAT_F_CONTINUOUS,                                                  0,                  82,                 8,  32, 1200, 3200, 0,    50,    /* Smoothness */
-        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                                                  0,                  100,                8,  30, 1200, 3000, 0,    45,    /* Dominance */
-        VJ_BEAT_GRID_SIZE,  VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                            2,                  max_shift,          6,  22, 2200, 5200, 1800, 25     /* Block Size */
+        VJ_BEAT_WARP,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_NO_ZERO_CROSS,                      4,                  w,                  14, 54,  800, 3000, 0,    82,
+        VJ_BEAT_WARP,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_NO_ZERO_CROSS,                      4,                  h,                  14, 54,  800, 3000, 0,    82,
+        VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_NO_ZERO_CROSS,                      8,                  128,                16, 62,  700, 2800, 0,    90,
+        VJ_BEAT_SPEED,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED,                                                      0,                  360,                10, 38, 1200, 4200, 0,    58,
+        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                                       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_MEMORY,     VJ_BEAT_F_CONTINUOUS,                                                                          12,                 88,                 10, 38, 1200, 4200, 0,    54,
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                                30,                 100,                12, 46, 1000, 3600, 0,    72,
+        VJ_BEAT_GRID_SIZE,  VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,     2,                  max_shift,          4,  14, 3200, 8600, 2400, 20,
+        VJ_BEAT_WARP,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_NO_ZERO_CROSS,                      140,                1000,               16, 62,  700, 2800, 0,    94,
+        VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_NO_ZERO_CROSS,                      140,                1000,               16, 62,  700, 2800, 0,    92,
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                                120,                1000,               14, 54,  800, 3200, 0,    84
     );
 
     return ve;
 }
 
-static void slicer_free_fields(slicer_t *s)
+static void recalc(slicer_t *s,
+                   int w,
+                   int h,
+                   const uint8_t *restrict Yinp,
+                   int v1,
+                   int v2,
+                   int shatter,
+                   uint32_t seed,
+                   int smoothness)
 {
-    if(!s)
-        return;
-
-    if(s->slice_xshift)      free(s->slice_xshift);
-    if(s->slice_yshift)      free(s->slice_yshift);
-    if(s->prev_slice_xshift) free(s->prev_slice_xshift);
-    if(s->prev_slice_yshift) free(s->prev_slice_yshift);
-    if(s->tmp[0])            free(s->tmp[0]);
-}
-
-static void recalc(
-    slicer_t *s,
-    int w,
-    int h,
-    const uint8_t *restrict Yinp,
-    int v1,
-    int v2,
-    int shatter,
-    uint32_t seed,
-    int smoothness
-) {
     uint32_t state = seed ? seed : 0x1234abcdU;
 
-    v1 = slicer_clampi(v1, 1, w);
-    v2 = slicer_clampi(v2, 1, h);
-    shatter = slicer_clampi(shatter, 0, 128);
-    smoothness = slicer_clampi(smoothness, 0, 100);
+    v1 = clampi(v1, 1, w);
+    v2 = clampi(v2, 1, h);
+    shatter = clampi(shatter, 0, 128);
+    smoothness = clampi(smoothness, 0, 100);
 
     if(s->have_shift) {
-        veejay_memcpy(s->prev_slice_xshift, s->slice_xshift, sizeof(int) * h);
-        veejay_memcpy(s->prev_slice_yshift, s->slice_yshift, sizeof(int) * w);
-    } else {
-        veejay_memset(s->prev_slice_xshift, 0, sizeof(int) * h);
-        veejay_memset(s->prev_slice_yshift, 0, sizeof(int) * w);
+        veejay_memcpy(s->prev_slice_xshift, s->slice_xshift, sizeof(int) * (size_t)h);
+        veejay_memcpy(s->prev_slice_yshift, s->slice_yshift, sizeof(int) * (size_t)w);
+    }
+    else {
+        veejay_memset(s->prev_slice_xshift, 0, sizeof(int) * (size_t)h);
+        veejay_memset(s->prev_slice_yshift, 0, sizeof(int) * (size_t)w);
     }
 
     const int half_x = v1 >> 1;
@@ -202,12 +232,13 @@ static void recalc(
     for(int x = 0; x < w; x++) {
         if(run <= 0) {
             const int base = slicer_rand_range(&state, -half_x, half_x);
-            shift = (base * scale_num) / 100;
+            const int sample = Yinp[x];
+            const int span = half_x > 0 ? half_x : 1;
 
-            int sample = Yinp ? Yinp[x] : 0;
-            int span = half_x > 0 ? half_x : 1;
+            shift = (base * scale_num) / 100;
             run = 1 + (sample % span);
-        } else {
+        }
+        else {
             run--;
         }
 
@@ -222,12 +253,13 @@ static void recalc(
     for(int y = 0; y < h; y++) {
         if(run <= 0) {
             const int base = slicer_rand_range(&state, -half_y, half_y);
-            shift = (base * scale_num) / 100;
+            const int sample = Yinp[y * w];
+            const int span = half_y > 0 ? half_y : 1;
 
-            int sample = Yinp ? Yinp[y * w] : 0;
-            int span = half_y > 0 ? half_y : 1;
+            shift = (base * scale_num) / 100;
             run = 1 + (sample % span);
-        } else {
+        }
+        else {
             run--;
         }
 
@@ -241,64 +273,81 @@ static void recalc(
 
 void *slicer_malloc(int width, int height)
 {
-    slicer_t *s = (slicer_t*) vj_calloc(sizeof(slicer_t));
+    slicer_t *s = (slicer_t*)vj_calloc(sizeof(slicer_t));
+
     if(!s)
         return NULL;
 
     const size_t frame_sz = (size_t)width * (size_t)height;
+    const size_t frame_bytes = frame_sz * 3u;
+    const size_t x_bytes = sizeof(int) * (size_t)height;
+    const size_t y_bytes = sizeof(int) * (size_t)width;
+    const size_t total = frame_bytes + (x_bytes * 2u) + (y_bytes * 2u) + 64u;
 
-    s->slice_xshift      = (int*) vj_malloc(sizeof(int) * height);
-    s->slice_yshift      = (int*) vj_malloc(sizeof(int) * width);
-    s->prev_slice_xshift = (int*) vj_malloc(sizeof(int) * height);
-    s->prev_slice_yshift = (int*) vj_malloc(sizeof(int) * width);
+    s->block = (uint8_t*)vj_malloc(total);
 
-    s->tmp[0] = (uint8_t*) vj_malloc(frame_sz * 3u);
-    if(s->tmp[0]) {
-        s->tmp[1] = s->tmp[0] + frame_sz;
-        s->tmp[2] = s->tmp[1] + frame_sz;
-    }
-
-    if(!s->slice_xshift || !s->slice_yshift ||
-       !s->prev_slice_xshift || !s->prev_slice_yshift ||
-       !s->tmp[0])
-    {
-        slicer_free_fields(s);
+    if(!s->block) {
         free(s);
         return NULL;
     }
 
-    veejay_memset(s->slice_xshift, 0, sizeof(int) * height);
-    veejay_memset(s->slice_yshift, 0, sizeof(int) * width);
-    veejay_memset(s->prev_slice_xshift, 0, sizeof(int) * height);
-    veejay_memset(s->prev_slice_yshift, 0, sizeof(int) * width);
+    uint8_t *p = s->block;
+
+    s->tmp[0] = p;
+    s->tmp[1] = s->tmp[0] + frame_sz;
+    s->tmp[2] = s->tmp[1] + frame_sz;
+    p += frame_bytes;
+
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
+    s->slice_xshift = (int*)p;
+    p += x_bytes;
+
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
+    s->prev_slice_xshift = (int*)p;
+    p += x_bytes;
+
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
+    s->slice_yshift = (int*)p;
+    p += y_bytes;
+
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
+    s->prev_slice_yshift = (int*)p;
+
+    veejay_memset(s->slice_xshift, 0, x_bytes);
+    veejay_memset(s->slice_yshift, 0, y_bytes);
+    veejay_memset(s->prev_slice_xshift, 0, x_bytes);
+    veejay_memset(s->prev_slice_yshift, 0, y_bytes);
 
     s->last_period = -1;
     s->current_period = 0;
     s->have_shift = 0;
     s->seed = 0x6d2b79f5u ^ (uint32_t)(width * 73856093u) ^ (uint32_t)(height * 19349663u);
-
+    s->smooth_ready = 0;
+    s->sm_width = 16.0f;
+    s->sm_height = 16.0f;
+    s->sm_shatter = 8.0f;
+    s->sm_period = 0.0f;
+    s->sm_smoothness = 0.0f;
+    s->sm_dominance = 50.0f;
+    s->sm_block = 5.0f;
+    s->sm_slice_drive = 0.0f;
+    s->sm_shatter_drive = 0.0f;
+    s->sm_mix_drive = 0.0f;
     s->n_threads = vje_advise_num_threads((int)frame_sz);
-    if(s->n_threads < 1)
-        s->n_threads = 1;
 
     return s;
 }
 
 void slicer_free(void *ptr)
 {
-    slicer_t *s = (slicer_t*) ptr;
+    slicer_t *s = (slicer_t*)ptr;
 
-    if(s) {
-        slicer_free_fields(s);
-        free(s);
-    }
+    free(s->block);
+    free(s);
 }
 
 static inline int slicer_wrapi(int v, int max)
 {
-    if(max <= 1)
-        return 0;
-
     v %= max;
 
     if(v < 0)
@@ -309,39 +358,85 @@ static inline int slicer_wrapi(int v, int max)
 
 void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    slicer_t *s = (slicer_t*) ptr;
+    slicer_t *s = (slicer_t*)ptr;
 
-    if(!s || !frame || !frame2 || !args ||
-       !frame->data[0] || !frame->data[1] || !frame->data[2] ||
-       !frame2->data[0] || !frame2->data[1] || !frame2->data[2])
-        return;
-
-    const int width  = frame->width;
+    const int width = frame->width;
     const int height = frame->height;
-    const int len    = frame->len;
+    const int len = frame->len;
+    const int base_w = args[P_WIDTH];
+    const int base_h = args[P_HEIGHT];
+    const int base_shatter = args[P_SHATTER];
+    const int base_period = args[P_PERIOD];
+    const int mode = args[P_MODE] ? 1 : 0;
+    const int base_smooth = args[P_SMOOTHNESS];
+    const int base_dom = args[P_DOMINANCE];
+    const int base_block = args[P_BLOCK_SIZE];
+    const int slice_drive_arg = args[P_SLICE_DRIVE];
+    const int shatter_drive_arg = args[P_SHATTER_DRIVE];
+    const int mix_drive_arg = args[P_MIX_DRIVE];
 
-    if(width <= 0 || height <= 0 || len <= 0)
-        return;
+    const float param_step = 0.24f;
 
-    int val1        = slicer_clampi(args[0], 1, width);
-    int val2        = slicer_clampi(args[1], 1, height);
-    int shatter     = slicer_clampi(args[2], 0, 128);
-    int period      = slicer_clampi(args[3], 0, 500);
-    int mode        = args[4] ? 1 : 0;
-    int smoothness  = slicer_clampi(args[5], 0, 100);
-    int dominance   = slicer_clampi(args[6], 0, 100);
-    int block_shift = slicer_clampi(args[7], 2, 9);
+    if(!s->smooth_ready) {
+        s->sm_width = (float)base_w;
+        s->sm_height = (float)base_h;
+        s->sm_shatter = (float)base_shatter;
+        s->sm_period = (float)base_period;
+        s->sm_smoothness = (float)base_smooth;
+        s->sm_dominance = (float)base_dom;
+        s->sm_block = (float)base_block;
+        s->sm_slice_drive = (float)slice_drive_arg;
+        s->sm_shatter_drive = (float)shatter_drive_arg;
+        s->sm_mix_drive = (float)mix_drive_arg;
+        s->smooth_ready = 1;
+    }
+    else {
+        s->sm_width = slicer_smooth_value(s->sm_width, (float)base_w, param_step);
+        s->sm_height = slicer_smooth_value(s->sm_height, (float)base_h, param_step);
+        s->sm_shatter = slicer_smooth_value(s->sm_shatter, (float)base_shatter, param_step);
+        s->sm_period = slicer_smooth_value(s->sm_period, (float)base_period, param_step);
+        s->sm_smoothness = slicer_smooth_value(s->sm_smoothness, (float)base_smooth, param_step);
+        s->sm_dominance = slicer_smooth_value(s->sm_dominance, (float)base_dom, param_step);
+        s->sm_block = slicer_smooth_value(s->sm_block, (float)base_block, param_step);
+        s->sm_slice_drive = slicer_smooth_value(s->sm_slice_drive, (float)slice_drive_arg, param_step);
+        s->sm_shatter_drive = slicer_smooth_value(s->sm_shatter_drive, (float)shatter_drive_arg, param_step);
+        s->sm_mix_drive = slicer_smooth_value(s->sm_mix_drive, (float)mix_drive_arg, param_step);
+    }
+
+    const int slice_drive = clampi((int)(s->sm_slice_drive + 0.5f), 0, 1000);
+    const int shatter_drive = clampi((int)(s->sm_shatter_drive + 0.5f), 0, 1000);
+    const int mix_drive = clampi((int)(s->sm_mix_drive + 0.5f), 0, 1000);
+
+    int val1 = clampi((int)(s->sm_width + 0.5f), 1, width);
+    int val2 = clampi((int)(s->sm_height + 0.5f), 1, height);
+    int shatter = clampi((int)(s->sm_shatter + 0.5f), 0, 128);
+    int period = clampi((int)(s->sm_period + 0.5f), 0, 500);
+    int smoothness = clampi((int)(s->sm_smoothness + 0.5f), 0, 100);
+    int dominance = clampi((int)(s->sm_dominance + 0.5f), 0, 100);
+    int block_shift = clampi((int)(s->sm_block + 0.5f), 2, 9);
+
+    val1 = clampi(val1 + (((width - val1) * slice_drive + 500) / 1000), 1, width);
+    val2 = clampi(val2 + (((height - val2) * slice_drive + 500) / 1000), 1, height);
+    shatter = clampi(shatter + (((128 - shatter) * shatter_drive + 500) / 1000), 0, 128);
+
+
+    dominance = clampi(dominance + (((100 - dominance) * mix_drive + 500) / 1000), 0, 100);
+    block_shift = clampi(block_shift - ((mix_drive + 333) / 500), 2, 9);
+
+    const int extra_mix_q8 = clampi((mix_drive * 88 + 500) / 1000, 0, 96);
 
     if(s->last_period != period) {
         s->last_period = period;
         s->current_period = 0;
     }
 
+
     if(s->current_period <= 0 || !s->have_shift) {
         s->seed ^= (uint32_t)(frame->timecode * 1000003.0);
         s->seed ^= (uint32_t)(val1 * 0x45d9f3bu);
         s->seed ^= (uint32_t)(val2 * 0x119de1f3u);
         s->seed ^= (uint32_t)(shatter * 0x27d4eb2du);
+        s->seed ^= (uint32_t)((slice_drive + (shatter_drive << 1) + (mix_drive << 2)) * 0x9e3779b9u);
 
         recalc(s, width, height, frame->data[0], val1, val2, shatter, s->seed, smoothness);
 
@@ -350,19 +445,19 @@ void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     s->current_period--;
 
-    uint8_t *restrict dY  = frame->data[0];
+    uint8_t *restrict dY = frame->data[0];
     uint8_t *restrict dCb = frame->data[1];
     uint8_t *restrict dCr = frame->data[2];
 
-    veejay_memcpy(s->tmp[0], dY,  len);
+    veejay_memcpy(s->tmp[0], dY, len);
     veejay_memcpy(s->tmp[1], dCb, len);
     veejay_memcpy(s->tmp[2], dCr, len);
 
-    const uint8_t *restrict s1Y  = s->tmp[0];
+    const uint8_t *restrict s1Y = s->tmp[0];
     const uint8_t *restrict s1Cb = s->tmp[1];
     const uint8_t *restrict s1Cr = s->tmp[2];
 
-    const uint8_t *restrict s2Y  = frame2->data[0];
+    const uint8_t *restrict s2Y = frame2->data[0];
     const uint8_t *restrict s2Cb = frame2->data[1];
     const uint8_t *restrict s2Cr = frame2->data[2];
 
@@ -379,35 +474,55 @@ void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
             int iy = y + sy_col[x];
 
             const int dst = row + x;
+            uint8_t out_y = s1Y[dst];
+            uint8_t out_cb = s1Cb[dst];
+            uint8_t out_cr = s1Cr[dst];
 
             if(mode == 0) {
-                if((unsigned)ix >= (unsigned)width ||
-                   (unsigned)iy >= (unsigned)height)
-                {
-                    dY[dst]  = s1Y[dst];
-                    dCb[dst] = s1Cb[dst];
-                    dCr[dst] = s1Cr[dst];
-                    continue;
+                if((unsigned)ix < (unsigned)width && (unsigned)iy < (unsigned)height) {
+                    const int src = iy * width + ix;
+                    const int chunk_x = ix >> block_shift;
+                    const int chunk_y = iy >> block_shift;
+                    const uint32_t hash = ((uint32_t)chunk_x * 104729u) ^ ((uint32_t)chunk_y * 131071u);
+                    const int use_s2 = (int)(hash % 100u) < dominance;
+
+                    const uint8_t *restrict srcY = use_s2 ? s2Y : s1Y;
+                    const uint8_t *restrict srcCb = use_s2 ? s2Cb : s1Cb;
+                    const uint8_t *restrict srcCr = use_s2 ? s2Cr : s1Cr;
+
+                    out_y = srcY[src];
+                    out_cb = srcCb[src];
+                    out_cr = srcCr[src];
                 }
-            } else {
+            }
+            else {
                 ix = slicer_wrapi(ix, width);
                 iy = slicer_wrapi(iy, height);
+
+                const int src = iy * width + ix;
+                const int chunk_x = ix >> block_shift;
+                const int chunk_y = iy >> block_shift;
+                const uint32_t hash = ((uint32_t)chunk_x * 104729u) ^ ((uint32_t)chunk_y * 131071u);
+                const int use_s2 = (int)(hash % 100u) < dominance;
+
+                const uint8_t *restrict srcY = use_s2 ? s2Y : s1Y;
+                const uint8_t *restrict srcCb = use_s2 ? s2Cb : s1Cb;
+                const uint8_t *restrict srcCr = use_s2 ? s2Cr : s1Cr;
+
+                out_y = srcY[src];
+                out_cb = srcCb[src];
+                out_cr = srcCr[src];
             }
 
-            const int src = iy * width + ix;
+            if(extra_mix_q8 > 0) {
+                out_y = slicer_blend_u8(out_y, s2Y[dst], extra_mix_q8);
+                out_cb = slicer_blend_u8(out_cb, s2Cb[dst], extra_mix_q8);
+                out_cr = slicer_blend_u8(out_cr, s2Cr[dst], extra_mix_q8);
+            }
 
-            const int chunk_x = ix >> block_shift;
-            const int chunk_y = iy >> block_shift;
-            const uint32_t hash = ((uint32_t)chunk_x * 104729u) ^ ((uint32_t)chunk_y * 131071u);
-            const int use_s2 = (int)(hash % 100u) < dominance;
-
-            const uint8_t *restrict srcY  = use_s2 ? s2Y  : s1Y;
-            const uint8_t *restrict srcCb = use_s2 ? s2Cb : s1Cb;
-            const uint8_t *restrict srcCr = use_s2 ? s2Cr : s1Cr;
-
-            dY[dst]  = srcY[src];
-            dCb[dst] = srcCb[src];
-            dCr[dst] = srcCr[src];
+            dY[dst] = out_y;
+            dCb[dst] = out_cb;
+            dCr[dst] = out_cr;
         }
     }
 }

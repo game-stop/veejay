@@ -22,7 +22,7 @@
 #include "hyperfold.h"
 
 
-#define AFM_PARAMS 11
+#define AFM_PARAMS 10
 
 #define P_MODE        0
 #define P_MINWIDTH    1
@@ -32,9 +32,8 @@
 #define P_SPEED       5
 #define P_MONO        6
 #define P_BG          7
-#define P_BEAT_PUSH   8
-#define P_CONTRAST    9
-#define P_TURBULENCE 10
+#define P_CONTRAST    8
+#define P_TURBULENCE 9
 
 #define AFM_MODE_VERTICAL             0
 #define AFM_MODE_BARCODE             1
@@ -160,7 +159,7 @@ typedef struct {
     float time;
 } mirrormadness_t;
 
-static inline int afm_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
 }
@@ -186,7 +185,7 @@ static inline float afm_absf(float x)
 
 static inline uint8_t afm_u8i(int v)
 {
-    return (uint8_t) afm_clampi(v, 0, 255);
+    return (uint8_t) clampi(v, 0, 255);
 }
 
 static inline float afm_lerpf(float a, float b, float t)
@@ -427,8 +426,8 @@ static inline void afm_fill_full_segment(float *src,
                                         int flip,
                                         float seam_width)
 {
-    int x0 = afm_clampi((int) floorf(start), 0, n - 1);
-    int x1 = afm_clampi((int) ceilf(start + width), 0, n - 1);
+    int x0 = clampi((int) floorf(start), 0, n - 1);
+    int x1 = clampi((int) ceilf(start + width), 0, n - 1);
     int x;
     float inv_w;
 
@@ -835,15 +834,15 @@ static void afm_add_panel(mirrormadness_t *m,
     p->src_y = src_y;
     p->src_w = src_w;
     p->src_h = src_h;
-    p->x0 = afm_clampi((int) floorf(x), 0, m->w - 1);
-    p->y0 = afm_clampi((int) floorf(y), 0, m->h - 1);
-    p->x1 = afm_clampi((int) ceilf(x + ww), 0, m->w);
-    p->y1 = afm_clampi((int) ceilf(y + hh), 0, m->h);
+    p->x0 = clampi((int) floorf(x), 0, m->w - 1);
+    p->y0 = clampi((int) floorf(y), 0, m->h - 1);
+    p->x1 = clampi((int) ceilf(x + ww), 0, m->w);
+    p->y1 = clampi((int) ceilf(y + hh), 0, m->h);
     p->flip_x = (uint8_t) (flip_x ? 1 : 0);
     p->flip_y = (uint8_t) (flip_y ? 1 : 0);
     p->mono = (uint8_t) (mono ? 1 : 0);
     p->round = (uint8_t) (round ? 1 : 0);
-    p->shade = (uint8_t) afm_clampi(shade, 0, 255);
+    p->shade = (uint8_t) clampi(shade, 0, 255);
 }
 
 static void afm_build_panel_layout(mirrormadness_t *m,
@@ -1009,7 +1008,7 @@ static void afm_render_panels(mirrormadness_t *m,
 
                 afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
 
-                out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+                out_y = m->tone_lut[clampi(out_y, 0, 255)];
                 out_y -= (int) ((float) p->shade * (0.08f + seam_t * 0.34f));
 
                 if (edge_dist < seam_px) {
@@ -1118,7 +1117,7 @@ static void afm_render_circular_mirror(mirrormadness_t *m,
             center_gain = 1.0f - afm_clampf(r / (ring_w * 1.45f), 0.0f, 1.0f);
             center_gain = afm_smooth01(center_gain);
 
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             out_y -= (int) (edge * (12.0f + seam_t * 72.0f));
             out_y += (int) (center_gain * (4.0f + seam_t * 8.0f));
 
@@ -1277,7 +1276,7 @@ static void afm_render_staircase_mirror(mirrormadness_t *m,
                 float syf = afm_reflect_coord((float) y + (float) band * step_y, (float) (h - 1));
                 float edge = (float) m->x_edge[x] * (1.0f / 255.0f);
                 afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-                out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+                out_y = m->tone_lut[clampi(out_y, 0, 255)];
                 out_y -= (int) (edge * (8.0f + seam_t * 68.0f));
                 afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 2);
             }
@@ -1347,7 +1346,7 @@ static void afm_render_tunnel_mirror(mirrormadness_t *m,
             int out_u;
             int out_v;
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (rect_w * (0.10f + seam_t * 0.22f) + 0.00001f), 0.0f, 1.0f));
             out_y -= (int) (edge * (12.0f + seam_t * 84.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
@@ -1426,7 +1425,7 @@ static void afm_render_iris_mirror(mirrormadness_t *m,
             int out_u;
             int out_v;
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             ring_edge = 1.0f - afm_smooth01(afm_clampf(ring_edge / (1.4f + seam_t * 8.0f), 0.0f, 1.0f));
             sector_edge = 1.0f - afm_smooth01(afm_clampf(sector_edge / (sector_w * (0.12f + seam_t * 0.10f)), 0.0f, 1.0f));
             out_y -= (int) ((ring_edge * 58.0f + sector_edge * 34.0f) * (0.25f + seam_t));
@@ -1492,7 +1491,7 @@ static void afm_render_shutter_mirror(mirrormadness_t *m,
             int out_u;
             int out_v;
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (blade_w * (0.11f + seam_t * 0.12f)), 0.0f, 1.0f));
             out_y -= (int) (edge * (16.0f + seam_t * 78.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
@@ -1707,7 +1706,7 @@ static void afm_render_diagonal_slats(mirrormadness_t *m,
             int out_v;
 
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (1.2f + seam_t * 7.0f), 0.0f, 1.0f));
             out_y -= (int) (edge * (10.0f + seam_t * 70.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
@@ -1786,7 +1785,7 @@ static void afm_render_serpentine_slits(mirrormadness_t *m,
             syf = afm_reflect_coord(syf, (float) (h - 1));
 
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (1.2f + seam_t * 6.5f), 0.0f, 1.0f));
             out_y -= (int) (edge * (8.0f + seam_t * 64.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
@@ -1862,7 +1861,7 @@ static void afm_render_quad_portal(mirrormadness_t *m,
             sx = afm_reflect_coord(sx, (float) (w - 1));
             syf = afm_reflect_coord(syf, (float) (h - 1));
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (1.4f + seam_t * 8.0f), 0.0f, 1.0f));
             out_y -= (int) (edge * (9.0f + seam_t * 68.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
@@ -1933,7 +1932,7 @@ static void afm_render_moebius_ribbon(mirrormadness_t *m,
             int out_v;
 
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (1.3f + seam_t * 7.0f), 0.0f, 1.0f));
             out_y -= (int) (edge * (9.0f + seam_t * 70.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
@@ -2062,7 +2061,7 @@ static void afm_render_triangle_mirror(mirrormadness_t *m,
             int pos = y * w + x;
             int out_y, out_u, out_v;
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge_a = 1.0f - afm_smooth01(afm_clampf(edge_a / (sector_w * (0.08f + seam_t * 0.13f)), 0.0f, 1.0f));
             edge_r = 1.0f - afm_smooth01(afm_clampf(edge_r / (1.0f + seam_t * 7.0f), 0.0f, 1.0f));
             out_y -= (int) ((edge_a * 42.0f + edge_r * 36.0f) * (0.28f + seam_t));
@@ -2134,7 +2133,7 @@ static void afm_render_hex_mirror(mirrormadness_t *m,
             sx = afm_reflect_coord(sx, (float) (w - 1));
             syf = afm_reflect_coord(syf, (float) (h - 1));
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge * cell / (1.0f + seam_t * 7.5f), 0.0f, 1.0f));
             out_y -= (int) (edge * (10.0f + seam_t * 72.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
@@ -2194,7 +2193,7 @@ static void afm_render_tunnel_xl(mirrormadness_t *m,
             int pos = y * w + x;
             int out_y, out_u, out_v;
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (band * (0.035f + seam_t * 0.10f)), 0.0f, 1.0f));
             out_y -= (int) (edge * (16.0f + seam_t * 92.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
@@ -2283,7 +2282,7 @@ static void afm_render_wave_bars(mirrormadness_t *m,
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
 
             edge = 1.0f - afm_smooth01(afm_clampf(edge * inv_seam_px, 0.0f, 1.0f));
-            out_y = tone[afm_clampi(out_y, 0, 255)];
+            out_y = tone[clampi(out_y, 0, 255)];
             out_y -= (int) (edge * (float) seam_dark);
 
             afm_apply_mono_amount(&out_u, &out_v, mono_amount);
@@ -2368,7 +2367,7 @@ static void afm_render_corner_pull(mirrormadness_t *m,
             int pos = y * w + x;
             int out_y, out_u, out_v;
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (1.2f + seam_t * 8.0f), 0.0f, 1.0f));
             out_y -= (int) (edge * (13.0f + seam_t * 78.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
@@ -2441,7 +2440,7 @@ static void afm_render_slit_scan(mirrormadness_t *m,
         sx_tab[x] = afm_reflect_coord(band_start + ml, wmax);
         yshift_fp[x] = (int) (sy_shift * 256.0f);
         edge = 1.0f - afm_smooth01(afm_clampf(edge * inv_seam_px, 0.0f, 1.0f));
-        edge_tab[x] = (uint8_t) afm_clampi((int) (edge * 255.0f + 0.5f), 0, 255);
+        edge_tab[x] = (uint8_t) clampi((int) (edge * 255.0f + 0.5f), 0, 255);
     }
 
 #pragma omp parallel for schedule(static) num_threads(m->n_threads)
@@ -2460,7 +2459,7 @@ static void afm_render_slit_scan(mirrormadness_t *m,
 
             afm_sample_yuv_layer(sy, su, sv, w, h, sx_tab[xx], syf, &out_y, &out_u, &out_v);
 
-            out_y = tone[afm_clampi(out_y, 0, 255)];
+            out_y = tone[clampi(out_y, 0, 255)];
             out_y -= (edge_i * seam_dark + 127) / 255;
 
             afm_apply_mono_amount(&out_u, &out_v, mono_amount);
@@ -2591,7 +2590,7 @@ static void afm_render_venetian_fan(mirrormadness_t *m,
             int pos = y * w + x;
             int out_y, out_u, out_v;
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (blade_w * (0.10f + seam_t * 0.14f)), 0.0f, 1.0f));
             out_y -= (int) (edge * (12.0f + seam_t * 70.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
@@ -2650,7 +2649,7 @@ static void afm_render_hourglass_mirror(mirrormadness_t *m,
             int pos = y * w + x;
             int out_y, out_u, out_v;
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (1.2f + seam_t * 7.2f), 0.0f, 1.0f));
             out_y -= (int) (edge * (8.0f + seam_t * 64.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 2);
@@ -2710,7 +2709,7 @@ static void afm_render_pinwheel_panels(mirrormadness_t *m,
             int pos = y * w + x;
             int out_y, out_u, out_v;
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (pane_w * (0.09f + seam_t * 0.12f)), 0.0f, 1.0f));
             out_y -= (int) (edge * (10.0f + seam_t * 72.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
@@ -2764,7 +2763,7 @@ static void afm_render_accordion_mirror(mirrormadness_t *m,
             int pos = y * w + x;
             int out_y, out_u, out_v;
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             out_y += (int) ((hinge - 0.5f) * (8.0f + seam_t * 14.0f));
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (0.8f + seam_t * 6.5f), 0.0f, 1.0f));
             out_y -= (int) (edge * (12.0f + seam_t * 70.0f));
@@ -2863,7 +2862,7 @@ static void afm_render_corner_kaleido(mirrormadness_t *m,
             int pos = y * w + x;
             int out_y, out_u, out_v;
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (sector_w * (0.12f + seam_t * 0.12f)), 0.0f, 1.0f));
             out_y -= (int) (edge * (12.0f + seam_t * 74.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
@@ -3002,7 +3001,7 @@ static void afm_render_elastic_strip_mirror(mirrormadness_t *m,
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
 
             edge = 1.0f - afm_smooth01(afm_clampf(edge * inv_seam_px, 0.0f, 1.0f));
-            out_y = tone[afm_clampi(out_y, 0, 255)];
+            out_y = tone[clampi(out_y, 0, 255)];
             out_y -= (int) (edge * (float) seam_dark);
 
             afm_apply_mono_amount(&out_u, &out_v, mono_amount);
@@ -3093,7 +3092,7 @@ static void afm_render_sliced_lens_mirror(mirrormadness_t *m,
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, sy_base, &out_y, &out_u, &out_v);
 
             edge = 1.0f - afm_smooth01(afm_clampf(edge * inv_seam_px, 0.0f, 1.0f));
-            out_y = tone[afm_clampi(out_y, 0, 255)];
+            out_y = tone[clampi(out_y, 0, 255)];
             out_y -= (int) (edge * (float) seam_dark);
             out_y += (int) ((1.0f - afm_absf(f)) * (float) lens_gain);
 
@@ -3178,7 +3177,7 @@ static void afm_render_torn_poster_mirror(mirrormadness_t *m,
 
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
 
-            out_y = tone[afm_clampi(out_y, 0, 255)];
+            out_y = tone[clampi(out_y, 0, 255)];
             out_y -= (int) (edge * (float) seam_dark);
 
             afm_apply_mono_amount(&out_u, &out_v, mono_amount);
@@ -3290,7 +3289,7 @@ static void afm_render_spiral_stair_mirror(mirrormadness_t *m,
             int out_v;
 
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (1.2f + seam_t * 8.0f), 0.0f, 1.0f));
             out_y -= (int) (edge * (16.0f + seam_t * 88.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
@@ -3530,7 +3529,7 @@ static void afm_render_waterfall_strips(mirrormadness_t *m,
             int out_v;
 
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, sy_base, &out_y, &out_u, &out_v);
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+            out_y = m->tone_lut[clampi(out_y, 0, 255)];
             out_y -= (int) (ed * (12.0f + seam_t * 70.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount);
             Y[pos] = afm_u8i(out_y);
@@ -3617,7 +3616,7 @@ static void afm_render_fan_blades(mirrormadness_t *m,
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
             edge = local < blade_w - local ? local : blade_w - local;
             edge = 1.0f - afm_smooth01(afm_clampf(edge / seam_ang, 0.0f, 1.0f));
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)] - (int) (edge * (10.0f + seam_t * 64.0f));
+            out_y = m->tone_lut[clampi(out_y, 0, 255)] - (int) (edge * (10.0f + seam_t * 64.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount);
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
@@ -3695,7 +3694,7 @@ static void afm_render_diamond_tunnel(mirrormadness_t *m,
             syf = afm_reflect_coord(syf, (float) (h - 1));
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
             edge = 1.0f - afm_smooth01(afm_clampf(edge / seam_px, 0.0f, 1.0f));
-            out_y = m->tone_lut[afm_clampi(out_y, 0, 255)] - (int) (edge * (12.0f + seam_t * 74.0f));
+            out_y = m->tone_lut[clampi(out_y, 0, 255)] - (int) (edge * (12.0f + seam_t * 74.0f));
             if (d < band_w * 0.80f)
                 out_y += (int) ((1.0f - d / (band_w * 0.80f)) * 12.0f);
             afm_apply_mono_amount(&out_u, &out_v, mono_amount);
@@ -3727,7 +3726,7 @@ static inline void afm_emit_sample(mirrormadness_t *m,
     syf = afm_reflect_coord(syf, (float) (m->h - 1));
 
     afm_sample_yuv_layer(m->src_y, m->src_u, m->src_v, m->w, m->h, sx, syf, &out_y, &out_u, &out_v);
-    out_y = m->tone_lut[afm_clampi(out_y, 0, 255)];
+    out_y = m->tone_lut[clampi(out_y, 0, 255)];
     out_y -= (int) (edge * (10.0f + seam_t * 72.0f));
     out_y -= extra_shade;
     afm_apply_mono_amount(&out_u, &out_v, mono_amount);
@@ -4287,7 +4286,6 @@ vj_effect *hyperfold_init(int w, int h)
     ve->limits[0][P_SPEED] = -1000; ve->limits[1][P_SPEED] = 1000; ve->defaults[P_SPEED] = 0;
     ve->limits[0][P_MONO] = 0; ve->limits[1][P_MONO] = 1000; ve->defaults[P_MONO] = 0;
     ve->limits[0][P_BG] = 0; ve->limits[1][P_BG] = 1; ve->defaults[P_BG] = 0;
-    ve->limits[0][P_BEAT_PUSH] = 0; ve->limits[1][P_BEAT_PUSH] = 1000; ve->defaults[P_BEAT_PUSH] = 0;
     ve->limits[0][P_CONTRAST] = 0; ve->limits[1][P_CONTRAST] = 1000; ve->defaults[P_CONTRAST] = 580;
     ve->limits[0][P_TURBULENCE] = 0; ve->limits[1][P_TURBULENCE] = 1000; ve->defaults[P_TURBULENCE] = 0;
 
@@ -4307,7 +4305,6 @@ vj_effect *hyperfold_init(int w, int h)
         "Motion Speed",
         "Chroma Damp",
         "Background",
-        "Beat Push",
         "Tone Contrast",
         "Micro Turbulence"
     );
@@ -4377,26 +4374,20 @@ vj_effect *hyperfold_init(int w, int h)
         "Black",
         "Original Source"
     );
-
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Mode */
-        VJ_BEAT_GRID_SIZE,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                       40,                 360,                6,  22, 2200, 5200, 1800, 24,    /* Minimum Fold Size */
-        VJ_BEAT_GRID_SIZE,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                       420,                980,                6,  22, 2200, 5200, 1800, 28,    /* Maximum Fold Size */
-        VJ_BEAT_GEOMETRY_PHASE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                            0,                  1000,               8,  32, 900,  2400, 0,    58,    /* Fold Phase */
-        VJ_BEAT_SNARE,          VJ_BEAT_F_CONTINUOUS,                                             120,                920,                8,  36, 120,  900,  0,    70,    /* Edge Darkness */
-        VJ_BEAT_HAT,            VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -620,             620,                4,  26, 80,   620,  0,    52,    /* Motion Speed */
-        VJ_BEAT_COLOR_AMOUNT,   VJ_BEAT_F_CONTINUOUS,                                             0,                  780,                6,  28, 900,  2400, 0,    42,    /* Chroma Damp */
-        VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Background */
-        VJ_BEAT_KICK,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                         0,                  900,                22, 88, 60,   360,  0,    100,   /* Beat Push */
-        VJ_BEAT_CONTRAST,       VJ_BEAT_F_CONTINUOUS,                                             260,                980,                10, 42, 900,  2400, 0,    64,    /* Tone Contrast */
-        VJ_BEAT_HAT,            VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY,                     0,                  820,                4,  26, 120,  900,  500,  44     /* Micro Turbulence */
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,   -1000,
+        VJ_BEAT_GRID_SIZE,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,   48,      240,                18, 56,  900, 3600, 0,    54,
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      500,      860,                16, 58, 1000, 4200, 0,    56,
+        VJ_BEAT_INTENSITY,          VJ_BEAT_F_CONTINUOUS,                                                 80,      920,                70, 100, 260, 1800, 0,   100,
+        VJ_BEAT_CONTRAST,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      340,      760,                14, 48,  900, 2600, 0,    42,
+        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      420,      900,                28, 82,  400, 1800, 0,    76,
+        VJ_BEAT_COLOR_AMOUNT,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,    0,      440,                20, 64,  900, 3000, 0,    44,
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,   -1000,
+        VJ_BEAT_CONTRAST,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      430,      820,                14, 50, 1000, 3400, 0,    40,
+        VJ_BEAT_TURBULENCE,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       30,      520,                22, 68,  520, 2600, 60,   62
     );
-     
 
-    (void) w;
-    (void) h;
     return ve;
 }
 void *hyperfold_malloc(int w, int h)
@@ -4412,15 +4403,12 @@ void *hyperfold_malloc(int w, int h)
     size_t int_count;
     int i;
 
-    if (w <= 0 || h <= 0)
-        return NULL;
-
     if ((size_t) w > ((size_t) -1) / (size_t) h)
         return NULL;
 
     len = (size_t) w * (size_t) h;
 
-    if (len == 0 || len > (size_t) 0x7fffffff)
+    if (len > (size_t) 0x7fffffff)
         return NULL;
 
     axis = (size_t) w + (size_t) h;
@@ -4467,8 +4455,6 @@ void *hyperfold_malloc(int w, int h)
     m->time = 0.0f;
 
     m->n_threads = vje_advise_num_threads((int) len);
-    if (m->n_threads <= 0)
-        m->n_threads = 1;
 
     m->region = vj_malloc(byte_size);
     if (!m->region) {
@@ -4637,11 +4623,11 @@ typedef struct {
     float speed_push;
     float contrast_push;
     float turbulence_push;
-} afm_beat_profile_t;
+} afm_motion_profile_t;
 
-static inline afm_beat_profile_t afm_mode_beat_profile(int mode)
+static inline afm_motion_profile_t afm_mode_motion_profile(int mode)
 {
-    afm_beat_profile_t p = { 0.14f, 0.10f, 0.22f, 0.70f, 0.24f, 0.12f };
+    afm_motion_profile_t p = { 0.14f, 0.10f, 0.22f, 0.70f, 0.24f, 0.12f };
 
     switch (mode) {
         case AFM_MODE_VERTICAL:
@@ -4773,7 +4759,6 @@ void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
     int speed_i;
     int mono_i;
     int background_i;
-    int beatpush_i;
     int contrast_i;
     int turbulence_i;
 
@@ -4783,22 +4768,13 @@ void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
     float seam_t;
     float speed_t;
     float mono_t;
-    float beatpush_t;
     float turbulence_t;
     float time;
-    afm_beat_profile_t beat_profile;
+    afm_motion_profile_t motion_profile;
 
-    if (!m || !frame || !args)
-        return;
-    if (!frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
-    w = frame->width;
-    h = frame->height;
-    len = w * h;
-
-    if (w != m->w || h != m->h || len != m->len || w < 4 || h < 4)
-        return;
+    w = m->w;
+    h = m->h;
+    len = m->len;
 
     Y = frame->data[0];
     U = frame->data[1];
@@ -4807,17 +4783,16 @@ void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
     if (!m->seeded)
         afm_seed(m, frame);
 
-    mode_i = afm_clampi(args[P_MODE], AFM_MODE_VERTICAL, AFM_MODE_LAST);
-    minwidth_i = afm_clampi(args[P_MINWIDTH], 0, 1000);
-    maxwidth_i = afm_clampi(args[P_MAXWIDTH], 0, 1000);
-    offset_i = afm_clampi(args[P_OFFSET], 0, 1000);
-    seam_i = afm_clampi(args[P_SEAM], 0, 1000);
-    speed_i = afm_clampi(args[P_SPEED], -1000, 1000);
-    mono_i = afm_clampi(args[P_MONO], 0, 1000);
-    background_i = afm_clampi(args[P_BG], 0, 1);
-    beatpush_i = afm_clampi(args[P_BEAT_PUSH], 0, 1000);
-    contrast_i = afm_clampi(args[P_CONTRAST], 0, 1000);
-    turbulence_i = afm_clampi(args[P_TURBULENCE], 0, 1000);
+    mode_i = args[P_MODE];
+    minwidth_i = args[P_MINWIDTH];
+    maxwidth_i = args[P_MAXWIDTH];
+    offset_i = args[P_OFFSET];
+    seam_i = args[P_SEAM];
+    speed_i = args[P_SPEED];
+    mono_i = args[P_MONO];
+    background_i = args[P_BG];
+    contrast_i = args[P_CONTRAST];
+    turbulence_i = args[P_TURBULENCE];
 
     minwidth_t = (float) minwidth_i * 0.001f;
     maxwidth_t = (float) maxwidth_i * 0.001f;
@@ -4825,39 +4800,26 @@ void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
     seam_t = (float) seam_i * 0.001f;
     speed_t = (float) speed_i * 0.001f;
     mono_t = (float) mono_i * 0.001f;
-    beatpush_t = (float) beatpush_i * 0.001f;
     turbulence_t = (float) turbulence_i * 0.001f;
 
     speed_t = (speed_t < 0.0f ? -1.0f : 1.0f) * afm_absf(speed_t) * afm_absf(speed_t);
     if (speed_i == 0)
         speed_t = 0.0f;
 
-    beat_profile = afm_mode_beat_profile(mode_i);
+    motion_profile = afm_mode_motion_profile(mode_i);
 
-    {
-        float push = beatpush_t * beatpush_t * (3.0f - 2.0f * beatpush_t);
-        float turb_lfo = 0.0f;
+    if (turbulence_t > 0.0f) {
+        float a = afm_lut_sin(m, m->time * 1.73f + (float) m->frame * 0.013f);
+        float b = afm_lut_sin(m, m->time * 2.41f + 2.10f);
+        float turb_lfo = (a * 0.63f + b * 0.37f) * turbulence_t;
+        float tw = afm_absf(turb_lfo);
 
-        if (turbulence_t > 0.0f) {
-            float a = afm_lut_sin(m, m->time * 1.73f + (float) m->frame * 0.013f);
-            float b = afm_lut_sin(m, m->time * 2.41f + 2.10f);
-            turb_lfo = (a * 0.63f + b * 0.37f) * turbulence_t;
-        }
-
-        if (push > 0.0f || turbulence_t > 0.0f) {
-            float tw = afm_absf(turb_lfo);
-            minwidth_t = afm_clampf(minwidth_t - push * beat_profile.width_push * 0.45f -
-                                    tw * beat_profile.turbulence_push * 0.13f, 0.0f, 1.0f);
-            maxwidth_t = afm_clampf(maxwidth_t + push * beat_profile.width_push * 0.55f +
-                                    tw * beat_profile.turbulence_push * 0.18f, 0.0f, 1.0f);
-            offset_t += push * beat_profile.phase_push + turb_lfo * beat_profile.turbulence_push * 0.55f;
-            seam_t = afm_clampf(seam_t + push * beat_profile.seam_push +
-                                tw * beat_profile.turbulence_push * 0.25f, 0.0f, 1.65f);
-            speed_t *= 1.0f + push * beat_profile.speed_push + tw * 0.65f;
-            contrast_i += (int) (push * beat_profile.contrast_push * 320.0f +
-                                 tw * beat_profile.turbulence_push * 160.0f + 0.5f);
-            contrast_i = afm_clampi(contrast_i, 0, 1000);
-        }
+        minwidth_t = afm_clampf(minwidth_t - tw * motion_profile.width_push * 0.13f, 0.0f, 1.0f);
+        maxwidth_t = afm_clampf(maxwidth_t + tw * motion_profile.width_push * 0.18f, 0.0f, 1.0f);
+        offset_t += turb_lfo * motion_profile.phase_push * 0.55f;
+        seam_t = afm_clampf(seam_t + tw * motion_profile.seam_push * 0.25f, 0.0f, 1.65f);
+        speed_t *= 1.0f + tw * motion_profile.speed_push * 0.65f;
+        contrast_i = clampi(contrast_i + (int)(tw * motion_profile.contrast_push * 220.0f + 0.5f), 0, 1000);
     }
 
     afm_build_luts(m, contrast_i);

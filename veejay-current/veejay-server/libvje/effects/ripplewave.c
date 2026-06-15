@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -19,37 +19,108 @@
  */
 
 #include "common.h"
+#include <veejaycore/vjmem.h>
+#include <stdint.h>
 #include "ripplewave.h"
+
+#define RIPPLEWAVE_PARAMS 9
+
+#define P_FREQ_X      0
+#define P_FREQ_Y      1
+#define P_AMP         2
+#define P_SPEED       3
+#define P_MIX         4
+#define P_CHROMA      5
+#define P_PHASE       6
+#define P_AMP_DRIVE   7
+#define P_PHASE_DRIVE 8
+
+#define RIPPLE_PI2 6.28318530718f
+
+typedef struct {
+    uint8_t *block;
+    uint8_t *buf[3];
+    float *lut_x;
+    float *lut_y;
+    int width;
+    int height;
+    float phase;
+    float sm_freq_x;
+    float sm_freq_y;
+    float sm_amp;
+    float sm_speed;
+    float sm_mix;
+    float sm_chroma;
+    float sm_phase;
+    float sm_amp_drive;
+    float sm_phase_drive;
+    int have_smooth;
+    int n_threads;
+} ripplewave_t;
+
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline float clampf(float v, float lo, float hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline uint8_t ripplewave_mix_u8(uint8_t a, uint8_t b, int q8)
+{
+    return (uint8_t)((((int)a * (256 - q8)) + ((int)b * q8) + 128) >> 8);
+}
+
+static inline int ripplewave_q8_from_1000(int v)
+{
+    return (clampi(v, 0, 1000) * 256 + 500) / 1000;
+}
+
+
+
+static inline float ripplewave_smooth_to(float cur, float target, float k)
+{
+    return cur + (target - cur) * k;
+}
 
 vj_effect *ripplewave_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *)vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
 
+    if(!ve)
+        return NULL;
+
+    ve->num_params = RIPPLEWAVE_PARAMS;
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 100;
-    ve->defaults[0] = 10;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 100;
-    ve->defaults[1] = 15;
-
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 45;
-    ve->defaults[2] = 30;
-
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 100;
-    ve->defaults[3] = 10;
+    ve->limits[0][P_FREQ_X] = 0;      ve->limits[1][P_FREQ_X] = 100;       ve->defaults[P_FREQ_X] = 10;
+    ve->limits[0][P_FREQ_Y] = 1;      ve->limits[1][P_FREQ_Y] = 100;       ve->defaults[P_FREQ_Y] = 15;
+    ve->limits[0][P_AMP] = 0;         ve->limits[1][P_AMP] = 45;           ve->defaults[P_AMP] = 30;
+    ve->limits[0][P_SPEED] = 0;       ve->limits[1][P_SPEED] = 100;        ve->defaults[P_SPEED] = 10;
+    ve->limits[0][P_MIX] = 0;         ve->limits[1][P_MIX] = 1000;         ve->defaults[P_MIX] = 1000;
+    ve->limits[0][P_CHROMA] = 0;      ve->limits[1][P_CHROMA] = 1000;      ve->defaults[P_CHROMA] = 1000;
+    ve->limits[0][P_PHASE] = 0;       ve->limits[1][P_PHASE] = 1000;       ve->defaults[P_PHASE] = 0;
+    ve->limits[0][P_AMP_DRIVE] = 0;   ve->limits[1][P_AMP_DRIVE] = 1000;   ve->defaults[P_AMP_DRIVE] = 0;
+    ve->limits[0][P_PHASE_DRIVE] = 0; ve->limits[1][P_PHASE_DRIVE] = 1000; ve->defaults[P_PHASE_DRIVE] = 0;
 
     ve->description = "Wave Patterns (H/V)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
     ve->has_user = 0;
 
     ve->param_description = vje_build_param_list(
@@ -57,126 +128,147 @@ vj_effect *ripplewave_init(int w, int h)
         "Frequency X",
         "Frequency Y",
         "Amplitude",
-        "Speed"
+        "Speed",
+        "Mix",
+        "Chroma Amount",
+        "Phase",
+        "Amp Drive",
+        "Phase Drive"
     );
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_WARP,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 0, 72, 6, 22, 1800, 4200, 900, 30, /* Frequency X */
-        VJ_BEAT_WARP,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1, 72, 6, 22, 1800, 4200, 900, 30, /* Frequency Y */
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                       0, 38, 8, 30, 1200, 3000, 0,   45, /* Amplitude */
-        VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS,                       0, 64, 8, 30, 1200, 3000, 0,   45  /* Speed */
+        VJ_BEAT_WARP,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 3,   82,   14, 54, 800,  3000, 0, 76,
+        VJ_BEAT_WARP,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 4,   88,   14, 54, 800,  3000, 0, 76,
+        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 8,   45,   16, 62, 700,  2800, 0, 90,
+        VJ_BEAT_SPEED,            VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 4,   96,   16, 62, 700,  2800, 0, 84,
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 520, 1000, 12, 46, 1000, 3600, 0, 72,
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 520, 1000, 12, 46, 1000, 3600, 0, 68,
+        VJ_BEAT_GEOMETRY_PHASE,   VJ_BEAT_F_CONTINUOUS,                           0,   1000, 12, 46, 1000, 3600, 0, 64,
+        VJ_BEAT_INTENSITY,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 160, 1000, 16, 62, 700,  2800, 0, 94,
+        VJ_BEAT_GEOMETRY_PHASE,   VJ_BEAT_F_CONTINUOUS,                           0,   1000, 16, 62, 700,  2800, 0, 88
     );
-
-    (void) w;
-    (void) h;
 
     return ve;
 }
 
-typedef struct {
-    uint8_t *buf[3];
-    float *lut_x;
-    float *lut_y;
-    int width;
-    int height;
-    float phase;
-    int n_threads;
-} ripplewave_t;
-
 void *ripplewave_malloc(int w, int h)
 {
-    ripplewave_t *data = (ripplewave_t*) vj_calloc(sizeof(ripplewave_t));
+    ripplewave_t *data = (ripplewave_t*)vj_calloc(sizeof(ripplewave_t));
+
     if(!data)
         return NULL;
 
     const int len = w * h;
+    const size_t data_bytes = (size_t)len * 3u;
+    const size_t lut_x_bytes = sizeof(float) * (size_t)w;
+    const size_t lut_y_bytes = sizeof(float) * (size_t)h;
+    const size_t total = data_bytes + lut_x_bytes + lut_y_bytes + 64u;
 
-    data->buf[0] = (uint8_t*) vj_malloc((size_t)len * 3u);
-    if(!data->buf[0]) {
+    data->block = (uint8_t*)vj_malloc(total);
+
+    if(!data->block) {
         free(data);
         return NULL;
     }
 
-    data->lut_x = (float*) vj_malloc(sizeof(float) * w);
-    if(!data->lut_x) {
-        free(data->buf[0]);
-        free(data);
-        return NULL;
-    }
+    uint8_t *p = data->block;
 
-    data->lut_y = (float*) vj_malloc(sizeof(float) * h);
-    if(!data->lut_y) {
-        free(data->lut_x);
-        free(data->buf[0]);
-        free(data);
-        return NULL;
-    }
+    data->buf[0] = p;
+    p += (size_t)len;
+    data->buf[1] = p;
+    p += (size_t)len;
+    data->buf[2] = p;
+    p += (size_t)len;
 
-    data->buf[1] = data->buf[0] + len;
-    data->buf[2] = data->buf[1] + len;
+    p = (uint8_t*)(((uintptr_t)p + 15U) & ~(uintptr_t)15U);
+    data->lut_x = (float*)p;
+    p += lut_x_bytes;
+
+    p = (uint8_t*)(((uintptr_t)p + 15U) & ~(uintptr_t)15U);
+    data->lut_y = (float*)p;
 
     data->width = w;
     data->height = h;
     data->phase = 0.0f;
-
+    data->have_smooth = 0;
     data->n_threads = vje_advise_num_threads(len);
-    if(data->n_threads < 1)
-        data->n_threads = 1;
 
-    return (void*) data;
+    return (void*)data;
 }
 
 void ripplewave_free(void *ptr)
 {
-    ripplewave_t *data = (ripplewave_t*) ptr;
-    if(!data)
-        return;
+    ripplewave_t *data = (ripplewave_t*)ptr;
 
-    if(data->buf[0])
-        free(data->buf[0]);
-    if(data->lut_x)
-        free(data->lut_x);
-    if(data->lut_y)
-        free(data->lut_y);
-
+    free(data->block);
     free(data);
-}
-
-static inline int ripplewave_clampi(int v, int lo, int hi)
-{
-    return (v < lo) ? lo : (v > hi ? hi : v);
 }
 
 void ripplewave_apply(void *ptr, VJFrame *frame, int *args)
 {
     ripplewave_t *data = (ripplewave_t*)ptr;
 
-    if(!data || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
     const int width = frame->width;
     const int height = frame->height;
     const int len = frame->len;
 
-    if(width <= 0 || height <= 0 || len <= 0)
-        return;
+    const int freq_x_arg = args[P_FREQ_X];
+    const int freq_y_arg = args[P_FREQ_Y];
+    const int amp_arg = args[P_AMP];
+    const int speed_arg = args[P_SPEED];
+    const int mix_arg = args[P_MIX];
+    const int chroma_arg = args[P_CHROMA];
+    const int phase_arg = args[P_PHASE];
+    const int amp_drive_arg = args[P_AMP_DRIVE];
+    const int phase_drive_arg = args[P_PHASE_DRIVE];
 
-    int freq_x_arg = ripplewave_clampi(args[0], 0, 100);
-    int freq_y_arg = ripplewave_clampi(args[1], 1, 100);
-    int amp_arg    = ripplewave_clampi(args[2], 0, 45);
-    int speed_arg  = ripplewave_clampi(args[3], 0, 100);
+    const float param_k = 0.34f;
 
-    const float frequency_x = (float)freq_x_arg * 0.01f;
-    const float frequency_y = (float)freq_y_arg * 0.01f;
-    const float amplitude = (float)amp_arg;
+    if(!data->have_smooth) {
+        data->sm_freq_x = (float)freq_x_arg;
+        data->sm_freq_y = (float)freq_y_arg;
+        data->sm_amp = (float)amp_arg;
+        data->sm_speed = (float)speed_arg;
+        data->sm_mix = (float)mix_arg;
+        data->sm_chroma = (float)chroma_arg;
+        data->sm_phase = (float)phase_arg;
+        data->sm_amp_drive = (float)amp_drive_arg;
+        data->sm_phase_drive = (float)phase_drive_arg;
+        data->have_smooth = 1;
+    }
+    else {
+        data->sm_freq_x = ripplewave_smooth_to(data->sm_freq_x, (float)freq_x_arg, param_k);
+        data->sm_freq_y = ripplewave_smooth_to(data->sm_freq_y, (float)freq_y_arg, param_k);
+        data->sm_amp = ripplewave_smooth_to(data->sm_amp, (float)amp_arg, param_k);
+        data->sm_speed = ripplewave_smooth_to(data->sm_speed, (float)speed_arg, param_k);
+        data->sm_mix = ripplewave_smooth_to(data->sm_mix, (float)mix_arg, param_k);
+        data->sm_chroma = ripplewave_smooth_to(data->sm_chroma, (float)chroma_arg, param_k);
+        data->sm_phase = ripplewave_smooth_to(data->sm_phase, (float)phase_arg, param_k);
+        data->sm_amp_drive = ripplewave_smooth_to(data->sm_amp_drive, (float)amp_drive_arg, param_k);
+        data->sm_phase_drive = ripplewave_smooth_to(data->sm_phase_drive, (float)phase_drive_arg, param_k);
+    }
 
-    if(speed_arg > 0) {
-        data->phase += (float)speed_arg * 0.01f;
+    const float amp_drive = clampf(data->sm_amp_drive * 0.001f, 0.0f, 1.0f);
+    const float phase_drive = clampf(data->sm_phase_drive * 0.001f, 0.0f, 1.0f);
+    const float drive = clampf(amp_drive * 0.62f + phase_drive * 0.38f, 0.0f, 1.0f);
+    const float frequency_x = data->sm_freq_x * 0.01f;
+    const float frequency_y = data->sm_freq_y * 0.01f;
+    const float amplitude = clampf(data->sm_amp + amp_drive * 72.0f, 0.0f, 96.0f);
+    const float speed = clampf(data->sm_speed + phase_drive * 72.0f + amp_drive * 24.0f, 0.0f, 172.0f);
+
+    if(speed > 0.0001f) {
+        data->phase += speed * 0.01f;
+
         if(data->phase > 628.3185f)
             data->phase -= 628.3185f;
     }
+
+    const float phase_offset =
+        (data->sm_phase * 0.001f * RIPPLE_PI2) +
+        (phase_drive * RIPPLE_PI2 * 1.35f);
+
+    const float render_phase = data->phase + phase_offset;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -190,14 +282,12 @@ void ripplewave_apply(void *ptr, VJFrame *frame, int *args)
     float *restrict lut_y = data->lut_y;
 
 #pragma omp parallel for schedule(static) num_threads(data->n_threads)
-    for(int y = 0; y < height; y++) {
-        lut_y[y] = a_sin(frequency_y * (float)y + data->phase);
-    }
+    for(int y = 0; y < height; y++)
+        lut_y[y] = a_sin(frequency_y * (float)y + render_phase);
 
 #pragma omp parallel for schedule(static) num_threads(data->n_threads)
-    for(int x = 0; x < width; x++) {
-        lut_x[x] = a_cos(frequency_x * (float)x + data->phase);
-    }
+    for(int x = 0; x < width; x++)
+        lut_x[x] = a_cos(frequency_x * (float)x + render_phase * 0.93f);
 
 #pragma omp parallel for schedule(static) num_threads(data->n_threads)
     for(int y = 0; y < height; y++) {
@@ -210,8 +300,8 @@ void ripplewave_apply(void *ptr, VJFrame *frame, int *args)
             int sx = x + offset_x;
             int sy = y + offset_y;
 
-            sx = ripplewave_clampi(sx, 0, width - 1);
-            sy = ripplewave_clampi(sy, 0, height - 1);
+            sx = clampi(sx, 0, width - 1);
+            sy = clampi(sy, 0, height - 1);
 
             const int src = sy * width + sx;
             const int dst = row + x;
@@ -222,7 +312,24 @@ void ripplewave_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    veejay_memcpy(Y, dstY, len);
-    veejay_memcpy(U, dstU, len);
-    veejay_memcpy(V, dstV, len);
+    const int mix_q8 = ripplewave_q8_from_1000((int)(data->sm_mix + drive * (1000.0f - data->sm_mix) * 0.50f + 0.5f));
+    const int chroma_amount = clampi((int)(data->sm_chroma + drive * (1000.0f - data->sm_chroma) * 0.42f + 0.5f), 0, 1000);
+    const int chroma_q8 = (mix_q8 * chroma_amount + 500) / 1000;
+
+    if(mix_q8 >= 256 && chroma_q8 >= 256) {
+        veejay_memcpy(Y, dstY, len);
+        veejay_memcpy(U, dstU, len);
+        veejay_memcpy(V, dstV, len);
+        return;
+    }
+
+    if(mix_q8 <= 0 && chroma_q8 <= 0)
+        return;
+
+#pragma omp parallel for schedule(static) num_threads(data->n_threads)
+    for(int i = 0; i < len; i++) {
+        Y[i] = ripplewave_mix_u8(Y[i], dstY[i], mix_q8);
+        U[i] = ripplewave_mix_u8(U[i], dstU[i], chroma_q8);
+        V[i] = ripplewave_mix_u8(V[i], dstV[i], chroma_q8);
+    }
 }

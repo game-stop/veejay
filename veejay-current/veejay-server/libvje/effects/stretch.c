@@ -1,4 +1,4 @@
-/* 
+/*
  * Linux VeeJay
  *
  * Copyright(C)2019 Niels Elburg <nwelburg@gmail.com>
@@ -19,21 +19,25 @@
  */
 
 #include "common.h"
+#include <veejaycore/vjmem.h>
 #include "stretch.h"
 
-#define STRETCH_PARAMS 7
+#define STRETCH_PARAMS 5
 
 #define P_UPPER_BOUND   0
 #define P_LOWER_BOUND   1
 #define P_GAIN_FACTOR   2
 #define P_SAT_AMP       3
-#define P_BEAT_CHROMA   4
-#define P_BEAT_PUSH     5
-#define P_BEAT_SMOOTH   6
+#define P_CHROMA_DRIVE  4
 
 typedef struct {
-    float beat_env;
-    float beat_kick;
+    float eff_upper;
+    float eff_lower;
+    float eff_gain;
+    float eff_sat;
+    float eff_chroma_drive;
+    int initialized;
+    int n_threads;
 } stretch_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -44,14 +48,6 @@ static inline int clampi(int v, int lo, int hi)
 static inline uint8_t stretch_u8(int v)
 {
     return (uint8_t)clampi(v, 0, 255);
-}
-
-static inline int stretch_beat_shape(int beat_push)
-{
-    beat_push = clampi(beat_push, 0, 1000);
-
-    const int sq = (beat_push * beat_push + 500) / 1000;
-    return clampi((beat_push * 38 + sq * 62 + 50) / 100, 0, 1000);
 }
 
 static inline uint8_t stretch_soft_chroma_u8(int v)
@@ -71,14 +67,40 @@ static inline uint8_t stretch_soft_chroma_u8(int v)
     return stretch_u8(128 + c);
 }
 
+
+
+static inline int stretch_smooth_i(float *state, int target, float attack, float release)
+{
+    const float cur = *state;
+    const float diff = (float)target - cur;
+    const float step = (diff > 0.0f) ? attack : release;
+    const float out = cur + diff * step;
+
+    *state = out;
+    return (int)(out + (out >= 0.0f ? 0.5f : -0.5f));
+}
+
+
+
 vj_effect *stretch_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    if(!ve)
+        return NULL;
+
     ve->num_params = STRETCH_PARAMS;
 
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults) free(ve->defaults);
+        if(ve->limits[0]) free(ve->limits[0]);
+        if(ve->limits[1]) free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_UPPER_BOUND] = 0;
     ve->limits[1][P_UPPER_BOUND] = 255;
@@ -96,17 +118,9 @@ vj_effect *stretch_init(int w, int h)
     ve->limits[1][P_SAT_AMP] = 1000;
     ve->defaults[P_SAT_AMP] = 0;
 
-    ve->limits[0][P_BEAT_CHROMA] = 0;
-    ve->limits[1][P_BEAT_CHROMA] = 1000;
-    ve->defaults[P_BEAT_CHROMA] = 420;
-
-    ve->limits[0][P_BEAT_PUSH] = 0;
-    ve->limits[1][P_BEAT_PUSH] = 1000;
-    ve->defaults[P_BEAT_PUSH] = 0;
-
-    ve->limits[0][P_BEAT_SMOOTH] = 0;
-    ve->limits[1][P_BEAT_SMOOTH] = 1000;
-    ve->defaults[P_BEAT_SMOOTH] = 520;
+    ve->limits[0][P_CHROMA_DRIVE] = 0;
+    ve->limits[1][P_CHROMA_DRIVE] = 1000;
+    ve->defaults[P_CHROMA_DRIVE] = 0;
 
     ve->description = "Chroma Stretch";
     ve->sub_format = 1;
@@ -119,25 +133,17 @@ vj_effect *stretch_init(int w, int h)
         "Lower bound",
         "Gain factor",
         "Saturation Amplifier",
-        "Beat Chroma",
-        "Beat Push",
-        "Beat Smooth"
+        "Chroma Drive"
     );
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 96,                 255,                6,  22, 1800, 4200, 900,  24,    /* Upper bound */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 0,                  160,                6,  22, 1800, 4200, 900,  24,    /* Lower bound */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                       0,                  420,                8,  30, 1200, 3000, 0,    45,    /* Gain factor */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                       0,                  620,                8,  30, 1200, 3000, 0,    42,    /* Saturation Amplifier */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_REJECT,                           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Beat Chroma */
-        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,   0,                  760,                18, 72, 80,   760,  0,    100,   /* Beat Push */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                      260,                820,                5,  18, 2200, 5200, 1200, 18     /* Beat Smooth */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS,                           16,  255,  10, 38, 1000, 3600, 0, 52,
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS,                           0,   220,  10, 38, 1000, 3600, 0, 52,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 80,  1000, 12, 46, 900,  3000, 0, 76,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                           0,   1000, 12, 46, 900,  3000, 0, 70,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 120, 1000, 16, 62, 700,  2800, 0, 92
     );
-
-    (void) w;
-    (void) h;
 
     return ve;
 }
@@ -149,39 +155,64 @@ void *stretch_malloc(int w, int h)
     if(!s)
         return NULL;
 
-    s->beat_env = 0.0f;
-    s->beat_kick = 0.0f;
+    s->eff_upper = 255.0f;
+    s->eff_lower = 0.0f;
+    s->eff_gain = 40.0f;
+    s->eff_sat = 0.0f;
+    s->eff_chroma_drive = 0.0f;
+    s->initialized = 0;
 
-    (void) w;
-    (void) h;
+    s->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) s;
 }
 
 void stretch_free(void *ptr)
 {
-    if(ptr)
-        free(ptr);
+    free(ptr);
 }
 
 void stretch_apply(void *ptr, VJFrame *frame, int *args)
 {
     stretch_t *s = (stretch_t*) ptr;
 
-    if(!frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
     const int len = frame->len;
-    if(len <= 0)
-        return;
 
-    int upper = clampi(args[P_UPPER_BOUND], 0, 255);
-    int lower = clampi(args[P_LOWER_BOUND], 0, 255);
-    int gain = clampi(args[P_GAIN_FACTOR], 0, 1000);
-    int gain_saturation = clampi(args[P_SAT_AMP], 0, 1000);
-    const int beat_chroma = clampi(args[P_BEAT_CHROMA], 0, 1000);
-    const int beat_push = clampi(args[P_BEAT_PUSH], 0, 1000);
-    const int beat_smooth = clampi(args[P_BEAT_SMOOTH], 0, 1000);
+    int upper_target = args[P_UPPER_BOUND];
+    int lower_target = args[P_LOWER_BOUND];
+    const int gain_target = args[P_GAIN_FACTOR];
+    const int sat_target = args[P_SAT_AMP];
+    const int chroma_drive_target = args[P_CHROMA_DRIVE];
+
+    if(lower_target > upper_target) {
+        const int t = lower_target;
+        lower_target = upper_target;
+        upper_target = t;
+    }
+
+    if(!s->initialized) {
+        s->eff_upper = (float)upper_target;
+        s->eff_lower = (float)lower_target;
+        s->eff_gain = (float)gain_target;
+        s->eff_sat = (float)sat_target;
+        s->eff_chroma_drive = (float)chroma_drive_target;
+        s->initialized = 1;
+    }
+
+    const float fast = 0.165f;
+    const float slow = 0.072f;
+
+    int upper = stretch_smooth_i(&s->eff_upper, upper_target, fast, slow);
+    int lower = stretch_smooth_i(&s->eff_lower, lower_target, fast, slow);
+    int gain = stretch_smooth_i(&s->eff_gain, gain_target, fast, slow);
+    int gain_saturation = stretch_smooth_i(&s->eff_sat, sat_target, fast, slow);
+    int chroma_drive = stretch_smooth_i(&s->eff_chroma_drive, chroma_drive_target, fast, slow);
+
+    upper = clampi(upper, 0, 255);
+    lower = clampi(lower, 0, 255);
+    gain = clampi(gain, 0, 1000);
+    gain_saturation = clampi(gain_saturation, 0, 1000);
+    chroma_drive = clampi(chroma_drive, 0, 1000);
 
     if(lower > upper) {
         const int t = lower;
@@ -189,8 +220,18 @@ void stretch_apply(void *ptr, VJFrame *frame, int *args)
         upper = t;
     }
 
-    if(lower == upper)
-        return;
+    if(chroma_drive > 0) {
+        const int spread = ((chroma_drive * (12 + ((chroma_drive * 20) / 1000))) + 500) / 1000;
+        lower = clampi(lower - spread, 0, 255);
+        upper = clampi(upper + spread, 0, 255);
+    }
+
+    if(lower >= upper) {
+        if(upper < 255)
+            upper++;
+        else if(lower > 0)
+            lower--;
+    }
 
     int fixed_gain = gain_saturation > 0
         ? (gain * gain_saturation * 256) / 10000
@@ -198,60 +239,18 @@ void stretch_apply(void *ptr, VJFrame *frame, int *args)
 
     fixed_gain = clampi(fixed_gain, 0, 32768);
 
-    int beat_q = 0;
-    int kick_q = 0;
+    const int direct_extra_gain = (chroma_drive * 896 + 500) / 1000;
+    const int effective_gain = clampi(fixed_gain + direct_extra_gain, 0, 32768);
 
-    if(s) {
-        const int shaped = stretch_beat_shape(beat_push);
-        const float target = (float)shaped * 0.001f;
-        const float smooth = (float)beat_smooth * 0.001f;
-        const float attack = 0.18f + (1.0f - smooth) * 0.38f;
-        const float release = 0.026f + (1.0f - smooth) * 0.105f;
-        const float prev_env = s->beat_env;
+    const int beat_twist_q8 = clampi((chroma_drive * 62 + 500) / 1000, 0, 192);
 
-        if(target > s->beat_env)
-            s->beat_env += (target - s->beat_env) * attack;
-        else
-            s->beat_env += (target - s->beat_env) * release;
-
-        if(s->beat_env < 0.0001f)
-            s->beat_env = 0.0f;
-        else if(s->beat_env > 1.0f)
-            s->beat_env = 1.0f;
-
-        const float rise = s->beat_env - prev_env;
-        if(rise > s->beat_kick)
-            s->beat_kick += (rise - s->beat_kick) * 0.78f;
-        else
-            s->beat_kick *= 0.56f;
-
-        if(s->beat_kick < 0.0001f)
-            s->beat_kick = 0.0f;
-        else if(s->beat_kick > 1.0f)
-            s->beat_kick = 1.0f;
-
-        beat_q = clampi((int)(s->beat_env * 1000.0f + 0.5f), 0, 1000);
-        kick_q = clampi((int)(s->beat_kick * 1000.0f + 0.5f), 0, 1000);
-    } else if(beat_push > 0) {
-        beat_q = stretch_beat_shape(beat_push);
-        kick_q = beat_q >> 1;
-    }
-
-    const int beat_drive_q = clampi(((beat_q * 680) + (kick_q * 420) + 500) / 1000, 0, 1000);
-    const int beat_extra_gain = (beat_chroma * beat_drive_q * 1536 + 500000) / 1000000;
-    const int beat_twist_q8 = (beat_chroma * beat_drive_q * 96 + 500000) / 1000000;
-    const int effective_gain = clampi(fixed_gain + beat_extra_gain, 0, 32768);
-    const int use_soft_guard = (beat_drive_q > 0);
+    const int use_soft_guard = (chroma_drive > 0 || gain_saturation > 0);
 
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    int n_threads = vje_advise_num_threads(len);
-    if(n_threads < 1)
-        n_threads = 1;
-
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp parallel for schedule(static) num_threads(s->n_threads)
     for(int i = 0; i < len; i++) {
         const int y = Y[i];
 

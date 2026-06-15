@@ -19,9 +19,11 @@
  */
 
 #include "common.h"
+#include <stdint.h>
+#include <veejaycore/vjmem.h>
 #include "vintagefilm.h"
 
-#define VINTAGEFILM_PARAMS 11
+#define VINTAGEFILM_PARAMS 9
 
 #define P_SCRATCH_INTENSITY 0
 #define P_DUST_INTENSITY    1
@@ -30,18 +32,27 @@
 #define P_GRAIN_STRENGTH    4
 #define P_VIGNETTE_STRENGTH 5
 #define P_SCRATCH_LIFESPAN  6
-#define P_BEAT_DIRT         7
-#define P_BEAT_FLICKER      8
-#define P_BEAT_PUSH         9
-#define P_BEAT_SMOOTH      10
+#define P_DIRT_DRIVE        7
+#define P_FLICKER_DRIVE     8
 
 typedef struct {
+    uint8_t *region;
     int framecounter;
     uint8_t *scratch_map;
     uint16_t *vignette_lut;
     uint32_t rng_state;
-    float beat_env;
-    float beat_kick;
+
+    float scratch_env;
+    float dust_env;
+    float flicker_env;
+    float flicker_freq_env;
+    float grain_env;
+    float vignette_env;
+    float lifespan_env;
+    float dirt_drive_env;
+    float flicker_drive_env;
+    int smooth_ready;
+
     int n_threads;
     int width;
     int height;
@@ -84,14 +95,13 @@ static inline uint32_t vintagefilm_hash(uint32_t input)
     return (word >> 22u) ^ word;
 }
 
-static inline int vintagefilm_beat_shape(int beat_push)
+
+
+static inline float vintagefilm_smoothf(float oldv, float target, float attack, float release)
 {
-    int sq;
-
-    beat_push = clampi(beat_push, 0, 1000);
-    sq = (beat_push * beat_push + 500) / 1000;
-
-    return clampi((beat_push * 35 + sq * 65 + 50) / 100, 0, 1000);
+    return target > oldv
+        ? oldv + (target - oldv) * attack
+        : oldv + (target - oldv) * release;
 }
 
 static void vintagefilm_build_vignette(vintagefilm_t *vf, int w, int h)
@@ -99,9 +109,7 @@ static void vintagefilm_build_vignette(vintagefilm_t *vf, int w, int h)
     const int cx = w >> 1;
     const int cy = h >> 1;
 
-    int64_t max_d2 = (int64_t)cx * (int64_t)cx + (int64_t)cy * (int64_t)cy;
-    if(max_d2 <= 0)
-        max_d2 = 1;
+    const int64_t max_d2 = (int64_t)cx * (int64_t)cx + (int64_t)cy * (int64_t)cy;
 
 #pragma omp parallel for schedule(static) num_threads(vf->n_threads)
     for(int y = 0; y < h; y++) {
@@ -135,12 +143,9 @@ vj_effect *vintagefilm_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
     if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
         free(ve);
         return NULL;
     }
@@ -152,10 +157,8 @@ vj_effect *vintagefilm_init(int w, int h)
     ve->defaults[P_GRAIN_STRENGTH]    = 5;
     ve->defaults[P_VIGNETTE_STRENGTH] = 10;
     ve->defaults[P_SCRATCH_LIFESPAN]  = 5;
-    ve->defaults[P_BEAT_DIRT]         = 45;
-    ve->defaults[P_BEAT_FLICKER]      = 35;
-    ve->defaults[P_BEAT_PUSH]         = 0;
-    ve->defaults[P_BEAT_SMOOTH]       = 520;
+    ve->defaults[P_DIRT_DRIVE]        = 620;
+    ve->defaults[P_FLICKER_DRIVE]     = 560;
 
     ve->limits[0][P_SCRATCH_INTENSITY] = 0;   ve->limits[1][P_SCRATCH_INTENSITY] = 100;
     ve->limits[0][P_DUST_INTENSITY]    = 0;   ve->limits[1][P_DUST_INTENSITY]    = 100;
@@ -164,17 +167,13 @@ vj_effect *vintagefilm_init(int w, int h)
     ve->limits[0][P_GRAIN_STRENGTH]    = 0;   ve->limits[1][P_GRAIN_STRENGTH]    = 50;
     ve->limits[0][P_VIGNETTE_STRENGTH] = 0;   ve->limits[1][P_VIGNETTE_STRENGTH] = 100;
     ve->limits[0][P_SCRATCH_LIFESPAN]  = 0;   ve->limits[1][P_SCRATCH_LIFESPAN]  = 50;
-    ve->limits[0][P_BEAT_DIRT]         = 0;   ve->limits[1][P_BEAT_DIRT]         = 100;
-    ve->limits[0][P_BEAT_FLICKER]      = 0;   ve->limits[1][P_BEAT_FLICKER]      = 100;
-    ve->limits[0][P_BEAT_PUSH]         = 0;   ve->limits[1][P_BEAT_PUSH]         = 1000;
-    ve->limits[0][P_BEAT_SMOOTH]       = 0;   ve->limits[1][P_BEAT_SMOOTH]       = 1000;
+    ve->limits[0][P_DIRT_DRIVE]        = 0;   ve->limits[1][P_DIRT_DRIVE]        = 1000;
+    ve->limits[0][P_FLICKER_DRIVE]     = 0;   ve->limits[1][P_FLICKER_DRIVE]     = 1000;
 
     ve->description = "Vintage Film";
     ve->extra_frame = 0;
     ve->sub_format = 1;
     ve->has_user = 0;
-    ve->parallel = 0;
-
     ve->param_description = vje_build_param_list(
         ve->num_params,
         "Scratch Intensity",
@@ -184,70 +183,67 @@ vj_effect *vintagefilm_init(int w, int h)
         "Grain Strength",
         "Vignette Strength",
         "Scratch Lifespan",
-        "Beat Dirt",
-        "Beat Flicker",
-        "Beat Push",
-        "Beat Smooth"
+        "Dirt Drive",
+        "Flicker Drive"
     );
-
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_TURBULENCE, VJ_BEAT_F_PHRASE_ONLY,                     0,                  60,                 6,  22, 1800, 4200, 900,  22,    /* Scratch Intensity */
-        VJ_BEAT_TURBULENCE, VJ_BEAT_F_PHRASE_ONLY,                     0,                  70,                 6,  22, 1800, 4200, 900,  24,    /* Dust Intensity */
-        VJ_BEAT_GLOW,       VJ_BEAT_F_PHRASE_ONLY,                     0,                  26,                 6,  22, 1800, 4200, 900,  24,    /* Flicker Intensity */
-        VJ_BEAT_SPEED,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 4,                  160,                6,  22, 1800, 4200, 900,  26,    /* Flicker Frequency */
-        VJ_BEAT_TURBULENCE, VJ_BEAT_F_PHRASE_ONLY,                     0,                  30,                 6,  22, 1800, 4200, 900,  22,    /* Grain Strength */
-        VJ_BEAT_CONTRAST,   VJ_BEAT_F_PHRASE_ONLY,                     0,                  60,                 5,  18, 1800, 4200, 900,  18,    /* Vignette Strength */
-        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1,                  36,                 6,  22, 1800, 4200, 900,  24,    /* Scratch Lifespan */
-
-        VJ_BEAT_TURBULENCE, VJ_BEAT_F_REJECT,                          VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Beat Dirt */
-        VJ_BEAT_GLOW,       VJ_BEAT_F_REJECT,                          VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Beat Flicker */
-
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,   0,                  780,                18, 72, 80,   760,  0,    100,   /* Beat Push */
-        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                     260,                820,                5,  18, 2200, 5200, 1200, 18     /* Beat Smooth */
+        VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      0,   100,  36,  86, 120, 1200, 0,   76,
+        VJ_BEAT_DETAIL,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      0,   100,  76, 100,  45,  520, 0,  100,
+        VJ_BEAT_GLOW,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      0,    50,  72, 100,  35,  420, 0,  100,
+        VJ_BEAT_SPEED,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,  6,   420,  28,  78, 160, 1400, 0,   68,
+        VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      0,    50,  44,  90, 100, 1000, 0,   78,
+        VJ_BEAT_CONTRAST,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      0,   100,  74, 100,  50,  620, 0,   98,
+        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 1,    42,  12,  44, 900, 3600, 500, 38,
+        VJ_BEAT_TURBULENCE, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000,
+        VJ_BEAT_GLOW,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      0,  1000,  88, 100,  24,  360, 0,  100
     );
-
-    (void) w;
-    (void) h;
 
     return ve;
 }
 
 void *vintagefilm_malloc(int w, int h)
 {
-    if(w <= 0 || h <= 0)
-        return NULL;
-
     vintagefilm_t *vf = (vintagefilm_t *) vj_calloc(sizeof(vintagefilm_t));
     if(!vf)
         return NULL;
 
     const int len = w * h;
+    const size_t scratch_bytes = (size_t)w;
+    const size_t vignette_bytes = sizeof(uint16_t) * (size_t)len;
+    const size_t total = scratch_bytes + vignette_bytes + 16u;
 
-    vf->scratch_map = (uint8_t*) vj_calloc((size_t)w);
-    if(!vf->scratch_map) {
+    vf->region = (uint8_t*) vj_malloc(total);
+    if(!vf->region) {
         free(vf);
         return NULL;
     }
 
-    vf->vignette_lut = (uint16_t*) vj_malloc(sizeof(uint16_t) * (size_t)len);
-    if(!vf->vignette_lut) {
-        free(vf->scratch_map);
-        free(vf);
-        return NULL;
-    }
+    vf->scratch_map = vf->region;
+    uint8_t *p = vf->scratch_map + scratch_bytes;
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
+    vf->vignette_lut = (uint16_t*)p;
+
+    veejay_memset(vf->scratch_map, 0, scratch_bytes);
 
     vf->framecounter = 0;
     vf->rng_state = 123456789u;
-    vf->beat_env = 0.0f;
-    vf->beat_kick = 0.0f;
+
+    vf->scratch_env = 0.0f;
+    vf->dust_env = 0.0f;
+    vf->flicker_env = 0.0f;
+    vf->flicker_freq_env = 0.0f;
+    vf->grain_env = 0.0f;
+    vf->vignette_env = 0.0f;
+    vf->lifespan_env = 0.0f;
+    vf->dirt_drive_env = 0.0f;
+    vf->flicker_drive_env = 0.0f;
+    vf->smooth_ready = 0;
+
     vf->width = w;
     vf->height = h;
 
     vf->n_threads = vje_advise_num_threads(len);
-    if(vf->n_threads < 1)
-        vf->n_threads = 1;
 
     vintagefilm_build_vignette(vf, w, h);
 
@@ -258,15 +254,7 @@ void vintagefilm_free(void *ptr)
 {
     vintagefilm_t *vf = (vintagefilm_t*) ptr;
 
-    if(!vf)
-        return;
-
-    if(vf->scratch_map)
-        free(vf->scratch_map);
-
-    if(vf->vignette_lut)
-        free(vf->vignette_lut);
-
+    free(vf->region);
     free(vf);
 }
 
@@ -274,69 +262,60 @@ void vintagefilm_apply(void *ptr, VJFrame *frame, int *args)
 {
     vintagefilm_t *vf = (vintagefilm_t*) ptr;
 
-    if(!vf || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
     const int width = frame->width;
     const int height = frame->height;
-    const int len = frame->len;
 
-    if(width <= 0 || height <= 0 || len <= 0)
-        return;
+    const int scratch_arg = args[P_SCRATCH_INTENSITY];
+    const int dust_arg = args[P_DUST_INTENSITY];
+    const int flicker_arg = args[P_FLICKER_INTENSITY];
+    const int flicker_freq_arg = args[P_FLICKER_FREQUENCY];
+    const int grain_arg = args[P_GRAIN_STRENGTH];
+    const int vignette_arg = args[P_VIGNETTE_STRENGTH];
+    const int lifespan_arg = args[P_SCRATCH_LIFESPAN];
+    const int dirt_drive_arg = args[P_DIRT_DRIVE];
+    const int flicker_drive_arg = args[P_FLICKER_DRIVE];
 
-    if(width != vf->width || height != vf->height)
-        return;
+    const float fast = 0.245f;
+    const float slow = 0.118f;
 
-    int scratch_intensity = clampi(args[P_SCRATCH_INTENSITY], 0, 100);
-    int dust_intensity    = clampi(args[P_DUST_INTENSITY], 0, 100);
-    int flicker_intensity = clampi(args[P_FLICKER_INTENSITY], 0, 50);
-    const int flicker_freq = clampi(args[P_FLICKER_FREQUENCY], 0, 500);
-    int grain_strength    = clampi(args[P_GRAIN_STRENGTH], 0, 50);
-    int vignette_strength = clampi(args[P_VIGNETTE_STRENGTH], 0, 100);
-    const int scratch_lifespan = clampi(args[P_SCRATCH_LIFESPAN], 0, 50);
-    const int beat_dirt   = clampi(args[P_BEAT_DIRT], 0, 100);
-    const int beat_flicker = clampi(args[P_BEAT_FLICKER], 0, 100);
-    const int beat_push   = clampi(args[P_BEAT_PUSH], 0, 1000);
-    const int beat_smooth = clampi(args[P_BEAT_SMOOTH], 0, 1000);
+    if(!vf->smooth_ready) {
+        vf->scratch_env = (float)scratch_arg;
+        vf->dust_env = (float)dust_arg;
+        vf->flicker_env = (float)flicker_arg;
+        vf->flicker_freq_env = (float)flicker_freq_arg;
+        vf->grain_env = (float)grain_arg;
+        vf->vignette_env = (float)vignette_arg;
+        vf->lifespan_env = (float)lifespan_arg;
+        vf->dirt_drive_env = (float)dirt_drive_arg;
+        vf->flicker_drive_env = (float)flicker_drive_arg;
+        vf->smooth_ready = 1;
+    } else {
+        vf->scratch_env = vintagefilm_smoothf(vf->scratch_env, (float)scratch_arg, fast, slow);
+        vf->dust_env = vintagefilm_smoothf(vf->dust_env, (float)dust_arg, fast, slow);
+        vf->flicker_env = vintagefilm_smoothf(vf->flicker_env, (float)flicker_arg, fast * 1.16f, slow);
+        vf->flicker_freq_env = vintagefilm_smoothf(vf->flicker_freq_env, (float)flicker_freq_arg, fast * 0.62f, slow);
+        vf->grain_env = vintagefilm_smoothf(vf->grain_env, (float)grain_arg, fast * 1.05f, slow);
+        vf->vignette_env = vintagefilm_smoothf(vf->vignette_env, (float)vignette_arg, fast * 0.62f, slow);
+        vf->lifespan_env = vintagefilm_smoothf(vf->lifespan_env, (float)lifespan_arg, fast * 0.72f, slow);
+        vf->dirt_drive_env = vintagefilm_smoothf(vf->dirt_drive_env, (float)dirt_drive_arg, fast * 1.22f, slow);
+        vf->flicker_drive_env = vintagefilm_smoothf(vf->flicker_drive_env, (float)flicker_drive_arg, fast * 1.36f, slow);
+    }
 
-    const int beat_shaped = vintagefilm_beat_shape(beat_push);
-    const float target = (float)beat_shaped * 0.001f;
-    const float smooth_t = (float)beat_smooth * 0.001f;
-    const float attack = 0.16f + (1.0f - smooth_t) * 0.34f;
-    const float release = 0.020f + (1.0f - smooth_t) * 0.085f;
-    const float prev_env = vf->beat_env;
+    int scratch_intensity = clampi((int)(vf->scratch_env + 0.5f), 0, 100);
+    int dust_intensity    = clampi((int)(vf->dust_env + 0.5f), 0, 100);
+    int flicker_intensity = clampi((int)(vf->flicker_env + 0.5f), 0, 50);
+    const int flicker_freq = clampi((int)(vf->flicker_freq_env + 0.5f), 0, 500);
+    int grain_strength    = clampi((int)(vf->grain_env + 0.5f), 0, 50);
+    int vignette_strength = clampi((int)(vf->vignette_env + 0.5f), 0, 100);
+    const int scratch_lifespan = clampi((int)(vf->lifespan_env + 0.5f), 0, 50);
+    const int dirt_q = clampi((int)(vf->dirt_drive_env + 0.5f), 0, 1000);
+    const int flicker_q = clampi((int)(vf->flicker_drive_env + 0.5f), 0, 1000);
 
-    if(target > vf->beat_env)
-        vf->beat_env += (target - vf->beat_env) * attack;
-    else
-        vf->beat_env += (target - vf->beat_env) * release;
-
-    if(target > prev_env)
-        vf->beat_kick += (target - prev_env) * (0.70f + (1.0f - smooth_t) * 0.25f);
-
-    vf->beat_kick *= 0.58f + smooth_t * 0.22f;
-
-    if(vf->beat_env < 0.0001f)
-        vf->beat_env = 0.0f;
-    else if(vf->beat_env > 1.0f)
-        vf->beat_env = 1.0f;
-
-    if(vf->beat_kick < 0.0001f)
-        vf->beat_kick = 0.0f;
-    else if(vf->beat_kick > 1.0f)
-        vf->beat_kick = 1.0f;
-
-    const int beat_q = clampi((int)(vf->beat_env * 1000.0f + 0.5f), 0, 1000);
-    const int kick_q = clampi((int)(vf->beat_kick * 1000.0f + 0.5f), 0, 1000);
-    const int dirt_drive = clampi((beat_q * 35 + kick_q * 65 + 50) / 100, 0, 1000);
-    const int dirt_q = clampi((dirt_drive * beat_dirt + 50) / 100, 0, 1000);
-    const int flicker_q = clampi(((beat_q * 35 + kick_q * 65 + 50) / 100) * beat_flicker / 100, 0, 1000);
-
-    scratch_intensity = clampi(scratch_intensity + (dirt_q * 36 + 500) / 1000, 0, 100);
-    dust_intensity    = clampi(dust_intensity    + (dirt_q * 48 + 500) / 1000, 0, 100);
-    grain_strength    = clampi(grain_strength    + (dirt_q * 24 + 500) / 1000, 0, 50);
-    vignette_strength = clampi(vignette_strength + (flicker_q * 12 + 500) / 1000, 0, 100);
-    flicker_intensity = clampi(flicker_intensity + (flicker_q * 14 + 500) / 1000, 0, 50);
+    scratch_intensity = clampi(scratch_intensity + (dirt_q * 62 + 500) / 1000, 0, 100);
+    dust_intensity    = clampi(dust_intensity    + (dirt_q * 72 + 500) / 1000, 0, 100);
+    grain_strength    = clampi(grain_strength    + (dirt_q * 34 + 500) / 1000, 0, 50);
+    vignette_strength = clampi(vignette_strength + (flicker_q * 24 + 500) / 1000, 0, 100);
+    flicker_intensity = clampi(flicker_intensity + (flicker_q * 30 + 500) / 1000, 0, 50);
 
     uint8_t *restrict Yp = frame->data[0];
     uint8_t *restrict Up = frame->data[1];
@@ -357,13 +336,13 @@ void vintagefilm_apply(void *ptr, VJFrame *frame, int *args)
     }
 
     if(flicker_q > 0) {
-        int beat_mod = (flicker_q * 26 + 500) / 1000;
-        const uint32_t beat_noise = vintagefilm_hash((uint32_t)vf->framecounter ^ 0x9e3779b9u);
+        int drive_mod = (flicker_q * 40 + 500) / 1000;
+        const uint32_t drive_noise = vintagefilm_hash((uint32_t)vf->framecounter ^ 0x9e3779b9u);
 
-        if(beat_noise & 1u)
-            beat_mod = -(beat_mod >> 1);
+        if(drive_noise & 1u)
+            drive_mod = -(drive_mod >> 1);
 
-        global_gain += (256 * beat_mod) / 100;
+        global_gain += (256 * drive_mod) / 100;
     }
 
     global_gain = clampi(global_gain, 72, 384);
@@ -378,7 +357,7 @@ void vintagefilm_apply(void *ptr, VJFrame *frame, int *args)
         int num_scratches = (width * scratch_intensity) / 5000;
 
         if(dirt_q > 0)
-            num_scratches += (width * dirt_q + 12000) / 24000;
+            num_scratches += (width * dirt_q + 8000) / 16000;
 
         if(num_scratches < 1 && (int)(vintagefilm_rng(&vf->rng_state) % 100u) < scratch_intensity)
             num_scratches = 1;
@@ -390,8 +369,8 @@ void vintagefilm_apply(void *ptr, VJFrame *frame, int *args)
             const int x = (int)(vintagefilm_rng(&vf->rng_state) % (uint32_t)width);
             int life = 1 + scratch_lifespan + (int)(vintagefilm_rng(&vf->rng_state) % 3u);
 
-            if(kick_q > 0)
-                life += (kick_q * 5 + 500) / 1000;
+            if(dirt_q > 0)
+                life += (dirt_q * 4 + 500) / 1000;
 
             scratch_map[x] = (uint8_t)clampi(life, 1, 255);
         }
@@ -399,8 +378,8 @@ void vintagefilm_apply(void *ptr, VJFrame *frame, int *args)
 
     const uint32_t frame_seed = vintagefilm_rng(&vf->rng_state);
     const int vignette_q8 = (vignette_strength * 256 + 50) / 100;
-    const int dust_gate = dust_intensity * 5;
-    const int scratch_cut = 50 - ((kick_q * 18 + 500) / 1000);
+    const int dust_gate = dust_intensity * 5 + (dirt_q >> 2);
+    const int scratch_cut = 46 - ((dirt_q * 18 + 500) / 1000);
 
 #pragma omp parallel for schedule(static) num_threads(vf->n_threads)
     for(int y = 0; y < height; y++) {
@@ -426,10 +405,10 @@ void vintagefilm_apply(void *ptr, VJFrame *frame, int *args)
             const uint32_t p_noise = vintagefilm_hash(line_noise ^ ((uint32_t)x * 0x1234567u));
 
             if(scratch_map[x] > 0 && ((p_noise & 0xffu) > (uint32_t)scratch_cut))
-                yv -= 30 + (int)(p_noise % 30u) + ((kick_q * 12 + 500) / 1000);
+                yv -= 30 + (int)(p_noise % 30u) + ((dirt_q * 10 + 500) / 1000);
 
             if(dust_intensity > 0 && (p_noise & 0x7fffu) < (uint32_t)dust_gate) {
-                const int dust_span = 40 + ((kick_q * 18 + 500) / 1000);
+                const int dust_span = 40 + ((dirt_q * 16 + 500) / 1000);
                 const int dust = (int)((p_noise >> 16) % (uint32_t)(dust_span * 2 + 1)) - dust_span;
 
                 yv += dust;

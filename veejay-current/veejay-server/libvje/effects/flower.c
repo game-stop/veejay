@@ -38,14 +38,12 @@
 #define TWO_PI_F 6.28318530717958647692f
 #define INV_TWO_PI_F 0.15915494309189533577f
 
-#define FLOWER_PARAMS 7
+#define FLOWER_PARAMS 5
 #define P_PETAL_COUNT  0
 #define P_PETAL_LENGTH 1
 #define P_PETAL_BLOOM  2
 #define P_ROTATION     3
 #define P_SPIN_SPEED   4
-#define P_BEAT_PUSH    5
-#define P_BEAT_SMOOTH  6
 
 typedef struct
 {
@@ -58,14 +56,14 @@ typedef struct
 
     int last_petal_count;
     int last_petal_length;
+    int max_petal_length;
 
     float phase;
-    float beat_env;
 
     int n_threads;
 } flower_t;
 
-static inline int flower_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : (v > hi ? hi : v);
 }
@@ -79,19 +77,11 @@ static inline int flower_fast_clamp(int x, int max_val)
 
 static inline float flower_wrap_phase(float p)
 {
-    if(p >= TWO_PI_F)
+    while(p >= TWO_PI_F)
         p -= TWO_PI_F;
-    else if(p < 0.0f)
+    while(p < 0.0f)
         p += TWO_PI_F;
     return p;
-}
-
-static inline int flower_beat_shape(int beat_push)
-{
-    beat_push = flower_clampi(beat_push, 0, 1000);
-
-    const int sq = (beat_push * beat_push + 500) / 1000;
-    return flower_clampi((beat_push * 38 + sq * 62 + 50) / 100, 0, 1000);
 }
 
 static void flower_build_cos_lut(flower_t *s, int petal_count)
@@ -126,7 +116,7 @@ vj_effect *flower_init(int w, int h)
     if(!ve)
         return NULL;
 
-    const int max_len = flower_clampi(((w < h) ? w : h) / 2, 1, LUT_SIZE - 1);
+    const int max_len = clampi(((w < h) ? w : h) / 2, 1, LUT_SIZE - 1);
     const int def_len = max_len;
 
     ve->num_params = FLOWER_PARAMS;
@@ -151,8 +141,6 @@ vj_effect *flower_init(int w, int h)
     ve->limits[0][P_PETAL_BLOOM]  = 0;     ve->limits[1][P_PETAL_BLOOM]  = 1000;    ve->defaults[P_PETAL_BLOOM]  = 500;
     ve->limits[0][P_ROTATION]     = 0;     ve->limits[1][P_ROTATION]     = 360;     ve->defaults[P_ROTATION]     = 0;
     ve->limits[0][P_SPIN_SPEED]   = -1000; ve->limits[1][P_SPIN_SPEED]   = 1000;    ve->defaults[P_SPIN_SPEED]   = 0;
-    ve->limits[0][P_BEAT_PUSH]    = 0;     ve->limits[1][P_BEAT_PUSH]    = 1000;    ve->defaults[P_BEAT_PUSH]    = 0;
-    ve->limits[0][P_BEAT_SMOOTH]  = 0;     ve->limits[1][P_BEAT_SMOOTH]  = 1000;    ve->defaults[P_BEAT_SMOOTH]  = 520;
 
     ve->description = "Flower";
     ve->sub_format = 1;
@@ -166,21 +154,16 @@ vj_effect *flower_init(int w, int h)
         "Petal Length",
         "Petal Bloom",
         "Rotation",
-        "Spin Speed",
-        "Beat Push",
-        "Beat Smooth"
+        "Spin Speed"
     );
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 2,                  32,      6,  20, 2200, 5200, 1800, 25,  /* Petal Count */
-        VJ_BEAT_WINDOW_RADIUS,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 8,                  max_len, 6,  22, 1800, 4200, 900,  32,  /* Petal Length */
-        VJ_BEAT_KICK,               VJ_BEAT_F_CONTINUOUS,                                                  220,                940,     14, 58, 90,   720,  0,    82,  /* Petal Bloom */
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_WRAP,                                0,                  360,     5,  18, 1800, 4200, 900,  18,  /* Rotation */
-        VJ_BEAT_HAT,                VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -420,                420,     4,  26, 80,   620,  0,    52,  /* Spin Speed */
-        VJ_BEAT_KICK,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                              0,                  860,     22, 88, 60,   360,  0,    100, /* Beat Push */
-        VJ_BEAT_MEMORY,             VJ_BEAT_F_PHRASE_ONLY,                                                 260,                820,     5,  18, 2200, 5200, 1200, 18   /* Beat Smooth */
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_WINDOW_RADIUS,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                             180,                1000,               20, 74,  520, 2200, 0,    94,
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                                   VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_SIGNED_SPEED,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,                       -180,               180,                10, 38, 1600, 5200, 0,    58
     );
 
     return ve;
@@ -193,10 +176,6 @@ void *flower_malloc(int w, int h)
         return NULL;
 
     const int len = w * h;
-    if(len <= 0) {
-        free(s);
-        return NULL;
-    }
 
     s->buf[0] = (uint8_t*) vj_malloc((size_t)len * 3u);
     if(!s->buf[0]) {
@@ -218,8 +197,6 @@ void *flower_malloc(int w, int h)
     s->dist_idx = s->atan2_idx + len;
 
     s->n_threads = vje_advise_num_threads(len);
-    if(s->n_threads < 1)
-        s->n_threads = 1;
 
     const int cx = w >> 1;
     const int cy = h >> 1;
@@ -254,8 +231,8 @@ void *flower_malloc(int w, int h)
 
     s->last_petal_count = -1;
     s->last_petal_length = -1;
+    s->max_petal_length = clampi(((w < h) ? w : h) / 2, 1, LUT_SIZE - 1);
     s->phase = 0.0f;
-    s->beat_env = 0.0f;
 
     return (void*) s;
 }
@@ -263,39 +240,30 @@ void *flower_malloc(int w, int h)
 void flower_free(void *ptr)
 {
     flower_t *s = (flower_t*) ptr;
-    if(s) {
-        free(s->buf[0]);
-        free(s->atan2_idx);
-        free(s);
-    }
+
+    free(s->buf[0]);
+    free(s->atan2_idx);
+    free(s);
 }
 
 void flower_apply(void *ptr, VJFrame *frame, int *args)
 {
     flower_t *s = (flower_t*)ptr;
 
-    if(!s || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
     const int width = frame->width;
     const int height = frame->height;
     const int len = frame->len;
-
-    if(width <= 1 || height <= 1 || len <= 0)
-        return;
 
     const int w_limit = width - 1;
     const int h_limit = height - 1;
     const int cx = width >> 1;
     const int cy = height >> 1;
 
-    const int petal_count = flower_clampi(args[P_PETAL_COUNT], 1, 200);
-    const int petal_length = flower_clampi(args[P_PETAL_LENGTH], 1, LUT_SIZE - 1);
-    int bloom_i = flower_clampi(args[P_PETAL_BLOOM], 0, 1000);
-    const int rotation_i = flower_clampi(args[P_ROTATION], 0, 360);
-    const int spin_i = flower_clampi(args[P_SPIN_SPEED], -1000, 1000);
-    const int beat_push_i = flower_clampi(args[P_BEAT_PUSH], 0, 1000);
-    const int smooth_i = flower_clampi(args[P_BEAT_SMOOTH], 0, 1000);
+    const int petal_count = args[P_PETAL_COUNT];
+    const int petal_length = clampi(args[P_PETAL_LENGTH], 1, s->max_petal_length);
+    const int bloom_i = args[P_PETAL_BLOOM];
+    const int rotation_i = args[P_ROTATION];
+    const int spin_i = args[P_SPIN_SPEED];
 
     uint8_t *restrict srcY = frame->data[0];
     uint8_t *restrict srcU = frame->data[1];
@@ -314,34 +282,10 @@ void flower_apply(void *ptr, VJFrame *frame, int *args)
     if(petal_length != s->last_petal_length)
         flower_build_exp_lut(s, petal_length);
 
-    const int beat_shaped = flower_beat_shape(beat_push_i);
-    const float beat_target = (float)beat_shaped * 0.001f;
-    const float smooth_t = (float)smooth_i * 0.001f;
-    const float attack = 0.16f + (1.0f - smooth_t) * 0.34f;
-    const float release = 0.030f + (1.0f - smooth_t) * 0.090f;
-
-    if(beat_target > s->beat_env)
-        s->beat_env += (beat_target - s->beat_env) * attack;
-    else
-        s->beat_env += (beat_target - s->beat_env) * release;
-
-    if(s->beat_env < 0.0001f)
-        s->beat_env = 0.0f;
-    else if(s->beat_env > 1.0f)
-        s->beat_env = 1.0f;
-
-    const int beat_q = flower_clampi((int)(s->beat_env * 1000.0f + 0.5f), 0, 1000);
-    const float beat_drive = s->beat_env * s->beat_env;
-
-    bloom_i = flower_clampi(bloom_i + ((beat_q * 330 + 500) / 1000), 0, 1000);
-
     const int bloom_fp = (FP_MULT >> 1) + (int)(((int64_t)bloom_i * FP_MULT + 500) / 1000);
-
     const float spin_step = (float)spin_i * 0.000070f;
-    const float beat_dir = (spin_i < 0) ? -1.0f : 1.0f;
-    const float beat_spin = beat_dir * beat_drive * 0.045f;
 
-    s->phase = flower_wrap_phase(s->phase + spin_step + beat_spin);
+    s->phase = flower_wrap_phase(s->phase + spin_step);
 
     const float base_phase = ((float)rotation_i * (TWO_PI_F / 360.0f)) + s->phase;
     const int phase_idx = (int)(base_phase * ((float)LUT_SIZE * INV_TWO_PI_F)) & LUT_MASK;

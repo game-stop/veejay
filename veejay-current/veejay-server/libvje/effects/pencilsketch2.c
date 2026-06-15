@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -19,59 +19,73 @@
  */
 
 #include "common.h"
+#include <veejaycore/vjmem.h>
+#include <math.h>
 #include "pencilsketch2.h"
 
-#define PS2_CLAMP_8BIT(x) ((x) < 0 ? 0 : ((x) > 255 ? 255 : (x)))
+#define PENCILSKETCH2_PARAMS 6
+
+#define P_RADIUS    0
+#define P_GAMMA     1
+#define P_STRENGTH  2
+#define P_CONTRAST  3
+#define P_LEVELS    4
+#define P_GRAYSCALE 5
 
 typedef struct {
     uint8_t *blur_tmp;
     uint8_t *blur_final;
     void *histogram_;
-
     uint8_t master_lut[256][256];
-
     int prev_gamma_arg;
     int prev_contrast;
     int prev_levels;
     int n_threads;
 } pencilsketch_t;
 
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline uint8_t ps2_u8(int v)
+{
+    return (uint8_t)clampi(v, 0, 255);
+}
+
 static void rebuild_master_lut(pencilsketch_t *p, int gamma_arg, int contrast, int levels)
 {
     uint8_t gamma_table[256];
-
-    if(gamma_arg < 1)
-        gamma_arg = 1;
-
     const double gamma_val = (double)gamma_arg / 1000.0;
 
     for(int i = 0; i < 256; i++) {
-        double val = pow((double)i / 255.0, gamma_val) * 255.0;
-        gamma_table[i] = (uint8_t)PS2_CLAMP_8BIT((int)(val + 0.5));
+        const double val = pow((double)i * (1.0 / 255.0), gamma_val) * 255.0;
+
+        gamma_table[i] = ps2_u8((int)(val + 0.5));
     }
 
     for(int orig = 0; orig < 256; orig++) {
         for(int blur_inv = 0; blur_inv < 256; blur_inv++) {
             int result;
 
-            if(blur_inv >= 255) {
+            if(blur_inv >= 255)
                 result = 255;
-            } else {
-                result = (orig * 255) / (255 - blur_inv);
-                result = PS2_CLAMP_8BIT(result);
-            }
+            else
+                result = ps2_u8((orig * 255) / (255 - blur_inv));
 
             if(levels > 1) {
                 int factor = 256 / levels;
+
                 if(factor < 1)
                     factor = 1;
-                result = result - (result % factor);
+
+                result -= result % factor;
             }
 
             if(contrast > 0) {
-                int m = result - 128;
-                m = (m * contrast + 50) / 100;
-                result = PS2_CLAMP_8BIT(m + 128);
+                const int m = result - 128;
+
+                result = ps2_u8(((m * contrast + 50) / 100) + 128);
             }
 
             p->master_lut[orig][blur_inv] = gamma_table[result];
@@ -86,35 +100,32 @@ static void rebuild_master_lut(pencilsketch_t *p, int gamma_arg, int contrast, i
 vj_effect *pencilsketch2_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 6;
 
+    if(!ve)
+        return NULL;
+
+    ve->num_params = PENCILSKETCH2_PARAMS;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 3;
-    ve->limits[1][0] = 128;
-    ve->defaults[0] = 24;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 9000;
-    ve->defaults[1] = 1000;
-
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
-    ve->defaults[2] = 0;
-
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 255;
-    ve->defaults[3] = 0;
-
-    ve->limits[0][4] = 0;
-    ve->limits[1][4] = 255;
-    ve->defaults[4] = 0;
-
-    ve->limits[0][5] = 0;
-    ve->limits[1][5] = 1;
-    ve->defaults[5] = 1;
+    ve->limits[0][P_RADIUS] = 3;    ve->limits[1][P_RADIUS] = 128;    ve->defaults[P_RADIUS] = 24;
+    ve->limits[0][P_GAMMA] = 1;     ve->limits[1][P_GAMMA] = 9000;    ve->defaults[P_GAMMA] = 1000;
+    ve->limits[0][P_STRENGTH] = 0;  ve->limits[1][P_STRENGTH] = 255;  ve->defaults[P_STRENGTH] = 0;
+    ve->limits[0][P_CONTRAST] = 0;  ve->limits[1][P_CONTRAST] = 255;  ve->defaults[P_CONTRAST] = 0;
+    ve->limits[0][P_LEVELS] = 0;    ve->limits[1][P_LEVELS] = 255;    ve->defaults[P_LEVELS] = 0;
+    ve->limits[0][P_GRAYSCALE] = 0; ve->limits[1][P_GRAYSCALE] = 1;   ve->defaults[P_GRAYSCALE] = 1;
 
     ve->description = "Sketchify";
     ve->sub_format = -1;
@@ -131,63 +142,56 @@ vj_effect *pencilsketch2_init(int w, int h)
         "Grayscale"
     );
 
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_GRAYSCALE], P_GRAYSCALE, "Color", "Grayscale");
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                                 6,                  72,                 6, 22, 1800, 4200, 900, 30,    /* Blur Radius */
-        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,       450,                2400,               6, 22, 1800, 4200, 900, 30,    /* Gamma Compression */
-        VJ_BEAT_DETAIL,        VJ_BEAT_F_CONTINUOUS,                                                       0,                  180,                8, 30, 1200, 3000, 0,   45,    /* Strength */
-        VJ_BEAT_CONTRAST,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,       0,                  180,                6, 22, 1800, 4200, 900, 30,    /* Contrast */
-        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,       0,                  24,                 6, 22, 1600, 3400, 700, 30,    /* Levels */
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Grayscale */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,                            10,                 72,                 4,  14, 3000, 8200, 2200, 22,
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_NO_ZERO_CROSS, 520,                2400,               4,  14, 3200, 8600, 2400, 18,
+        VJ_BEAT_INTENSITY,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                                 8,                  210,                16, 62,  700, 2800, 0,    86,
+        VJ_BEAT_CONTRAST,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,                           0,                  190,                4,  14, 3200, 8600, 2400, 20,
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_NO_ZERO_CROSS, 2,                  36,                 4,  14, 3600, 9200, 2600, 16,
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                                       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
     );
-
-    (void) w;
-    (void) h;
-
     return ve;
 }
 
 void pencilsketch2_free(void *ptr)
 {
     pencilsketch_t *p = (pencilsketch_t*) ptr;
-    if(p) {
-        if(p->blur_tmp)
-            free(p->blur_tmp);
-        if(p->blur_final)
-            free(p->blur_final);
-        if(p->histogram_)
-            veejay_histogram_del(p->histogram_);
-        free(p);
-    }
+
+    free(p->blur_tmp);
+    veejay_histogram_del(p->histogram_);
+    free(p);
 }
 
 void *pencilsketch2_malloc(int w, int h)
 {
     pencilsketch_t *p = (pencilsketch_t*) vj_calloc(sizeof(pencilsketch_t));
+
     if(!p)
         return NULL;
 
     const int len = w * h;
 
-    p->blur_tmp = (uint8_t*) vj_malloc(sizeof(uint8_t) * len);
-    p->blur_final = (uint8_t*) vj_malloc(sizeof(uint8_t) * len);
+    p->blur_tmp = (uint8_t*) vj_malloc(sizeof(uint8_t) * (size_t)len * 2u);
 
-    if(!p->blur_tmp || !p->blur_final) {
-        pencilsketch2_free(p);
+    if(!p->blur_tmp) {
+        free(p);
         return NULL;
     }
 
+    p->blur_final = p->blur_tmp + len;
     p->histogram_ = veejay_histogram_new();
+
     if(!p->histogram_) {
-        pencilsketch2_free(p);
+        free(p->blur_tmp);
+        free(p);
         return NULL;
     }
 
     p->n_threads = vje_advise_num_threads(len);
-    if(p->n_threads < 1)
-        p->n_threads = 1;
-
     p->prev_gamma_arg = -1;
     p->prev_contrast = -1;
     p->prev_levels = -1;
@@ -195,74 +199,68 @@ void *pencilsketch2_malloc(int w, int h)
     return (void*) p;
 }
 
-static void rhblur_apply(uint8_t *dst, const uint8_t *src, int w, int h, int r, int n_threads)
+static void ps2_hblur(uint8_t *restrict dst,
+                      const uint8_t *restrict src,
+                      int w,
+                      int h,
+                      int radius,
+                      int n_threads)
 {
 #pragma omp parallel for schedule(static) num_threads(n_threads)
-    for(int y = 0; y < h; y++) {
-        veejay_blur(dst + y * w, src + y * w, w, r, 1, 1);
-    }
+    for(int y = 0; y < h; y++)
+        veejay_blur(dst + y * w, src + y * w, w, radius, 1, 1);
 }
 
-static void rvblur_apply(uint8_t *dst, const uint8_t *src, int w, int h, int r, int n_threads)
+static void ps2_vblur(uint8_t *restrict dst,
+                      const uint8_t *restrict src,
+                      int w,
+                      int h,
+                      int radius,
+                      int n_threads)
 {
 #pragma omp parallel for schedule(static) num_threads(n_threads)
-    for(int x = 0; x < w; x++) {
-        veejay_blur(dst + x, src + x, h, r, w, w);
-    }
-}
-
-static inline int ps2_clampi(int v, int lo, int hi)
-{
-    return (v < lo) ? lo : (v > hi ? hi : v);
+    for(int x = 0; x < w; x++)
+        veejay_blur(dst + x, src + x, h, radius, w, w);
 }
 
 void pencilsketch2_apply(void *ptr, VJFrame *frame, int *args)
 {
     pencilsketch_t *p = (pencilsketch_t*) ptr;
-    if(!p || !frame || !args)
-        return;
 
     const int len = frame->len;
     const int w = frame->width;
     const int h = frame->height;
-
-    if(len <= 0 || w <= 0 || h <= 0)
-        return;
-
-    int radius = ps2_clampi(args[0], 3, 128);
-    int gamma_arg = ps2_clampi(args[1], 1, 9000);
-    int strength = ps2_clampi(args[2], 0, 255);
-    int contrast = ps2_clampi(args[3], 0, 255);
-    int levels = ps2_clampi(args[4], 0, 255);
-    int grayscale = ps2_clampi(args[5], 0, 1);
+    int radius = args[P_RADIUS];
+    const int gamma_arg = args[P_GAMMA];
+    const int strength = args[P_STRENGTH];
+    const int contrast = args[P_CONTRAST];
+    const int levels = args[P_LEVELS];
+    const int grayscale = args[P_GRAYSCALE];;
 
     if(radius > w)
         radius = w;
     if(radius > h)
         radius = h;
 
-    if(gamma_arg != p->prev_gamma_arg || contrast != p->prev_contrast || levels != p->prev_levels) {
+    if(gamma_arg != p->prev_gamma_arg || contrast != p->prev_contrast || levels != p->prev_levels)
         rebuild_master_lut(p, gamma_arg, contrast, levels);
-    }
 
     uint8_t *restrict y_plane = frame->data[0];
     uint8_t *restrict tmp_buf = p->blur_tmp;
     uint8_t *restrict blur_buf = p->blur_final;
 
 #pragma omp parallel for schedule(static) num_threads(p->n_threads)
-    for(int i = 0; i < len; i++) {
-        tmp_buf[i] = 0xff - y_plane[i];
-    }
+    for(int i = 0; i < len; i++)
+        tmp_buf[i] = (uint8_t)(255 - y_plane[i]);
 
-    rhblur_apply(blur_buf, tmp_buf, w, h, radius, p->n_threads);
-    rvblur_apply(tmp_buf, blur_buf, w, h, radius, p->n_threads);
-    rhblur_apply(blur_buf, tmp_buf, w, h, radius, p->n_threads);
-    rvblur_apply(tmp_buf, blur_buf, w, h, radius, p->n_threads);
+    ps2_hblur(blur_buf, tmp_buf, w, h, radius, p->n_threads);
+    ps2_vblur(tmp_buf, blur_buf, w, h, radius, p->n_threads);
+    ps2_hblur(blur_buf, tmp_buf, w, h, radius, p->n_threads);
+    ps2_vblur(tmp_buf, blur_buf, w, h, radius, p->n_threads);
 
 #pragma omp parallel for schedule(static) num_threads(p->n_threads)
-    for(int i = 0; i < len; i++) {
+    for(int i = 0; i < len; i++)
         y_plane[i] = p->master_lut[y_plane[i]][tmp_buf[i]];
-    }
 
     if(strength > 0) {
         veejay_histogram_analyze(p->histogram_, frame, 0);
@@ -271,6 +269,7 @@ void pencilsketch2_apply(void *ptr, VJFrame *frame, int *args)
 
     if(grayscale) {
         const int uv_len = frame->ssm ? len : frame->uv_len;
+
         veejay_memset(frame->data[1], 128, uv_len);
         veejay_memset(frame->data[2], 128, uv_len);
     }

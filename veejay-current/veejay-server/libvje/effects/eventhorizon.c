@@ -146,7 +146,7 @@ typedef struct {
     float pal_haze_gain;
 } eventhorizon_t;
 
-static inline int eh_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
 }
@@ -172,7 +172,7 @@ static inline float eh_absf(float x)
 
 static inline uint8_t eh_u8i(int v)
 {
-    return (uint8_t) eh_clampi(v, 0, 255);
+    return (uint8_t) clampi(v, 0, 255);
 }
 
 static inline uint8_t eh_u8f(float v)
@@ -1065,7 +1065,7 @@ vj_effect *eventhorizon_init(int w, int h)
     ve->param_description = vje_build_param_list(
         ve->num_params,
         "Build Speed",
-        "Source Feed",
+        "Opacity",
         "Liquid Flow",
         "Swirl Memory",
         "Ignition",
@@ -1081,24 +1081,20 @@ vj_effect *eventhorizon_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                                      30,                 96,  14, 58, 90,   720,  0,   82, /* Build Speed */
-        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                                      12,                 100, 8,  30, 900,  2400, 0,   42, /* Source Feed */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                                      8,                  86,  14, 58, 90,   720,  0,   86, /* Liquid Flow */
-        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                                      0,                  78,  10, 42, 120,  900,  0,   70, /* Swirl Memory */
-        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                  42,                 100, 16, 68, 80,   520,  0,   92, /* Ignition */
-        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                                     50,                 96,  8,  28, 1800, 4200, 900, 38, /* Decay */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                                      36,                 100, 14, 58, 90,   720,  0,   84, /* Density */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                                      12,                 84,  14, 58, 90,   720,  0,   82, /* Light Gravity */
-        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                                      16,                 94,  10, 46, 120,  900,  0,   76, /* River Detail */
-        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -100,      100, 4,  26, 80,   620,  0,   52, /* Well Spin */
-        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                                     30,                 92,  8,  28, 1800, 4200, 900, 36, /* Trail Memory */
-        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS,                                      24,                 98,  4,  26, 80,   620,  0,   50, /* Nebula Palette */
-        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -80,       80,  4,  26, 80,   620,  0,   52  /* Motion Speed */
+        VJ_BEAT_INERTIA,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,  56, 100, 12, 36, 1800, 5200, 1400,  24,
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_REJECT,                                                       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000,
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          18, 100, 56,100,   70,  760,    0, 100,
+        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          18, 100, 48,100,   90,  900,    0,  94,
+        VJ_BEAT_KICK,         VJ_BEAT_F_IMPULSE | VJ_BEAT_F_NO_ZERO_CROSS,                             34, 100,100,100,    1,  150,   34, 220,
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          56,  98, 34, 92,  220, 1600,  180,  82,
+        VJ_BEAT_DENSITY,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,     42, 100, 34, 92,  180, 1400,    0,  78,
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          20,  92, 56,100,   80,  820,    0, 100,
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          32, 100, 42, 96,  180, 1300,    0,  88,
+        VJ_BEAT_SIGNED_CURVE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,   -100, 100, 36, 94,  120, 1000,    0,  86,
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          38,  96, 40,100,  240, 2000,  240,  92,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          28, 100, 38, 94,  140, 1200,    0,  84,
+        VJ_BEAT_SIGNED_SPEED, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,   -100, 100, 58,100,   60,  700,    0, 100
     );
-
-    (void) w;
-    (void) h;
     return ve;
 }
 
@@ -1112,12 +1108,7 @@ void *eventhorizon_malloc(int w, int h)
     size_t gridcap;
     int i;
 
-    if (w <= 0 || h <= 0)
-        return NULL;
-
     len = (size_t) w * (size_t) h;
-    if (len == 0)
-        return NULL;
 
     e = (eventhorizon_t *) vj_calloc(sizeof(eventhorizon_t));
     if (!e)
@@ -1129,8 +1120,6 @@ void *eventhorizon_malloc(int w, int h)
     e->seeded = 0;
     e->frame = 0;
     e->n_threads = vje_advise_num_threads((int) len);
-    if (e->n_threads <= 0)
-        e->n_threads = 1;
 
     gridcap = (size_t) (((w + 7) / 8) + 2) * (size_t) (((h + 7) / 8) + 2);
     total = len * 15 + sizeof(float) * ((size_t) w + gridcap * 9 + ((size_t) w + (size_t) h) * 4) + sizeof(uint16_t) * ((size_t) w + (size_t) h) * 4 + 128;
@@ -1263,10 +1252,8 @@ void *eventhorizon_malloc(int w, int h)
 void eventhorizon_free(void *ptr)
 {
     eventhorizon_t *e = (eventhorizon_t *) ptr;
-    if (!e)
-        return;
-    if (e->region)
-        free(e->region);
+
+    free(e->region);
     free(e);
 }
 
@@ -1492,15 +1479,15 @@ static inline void eh_render_from_sample(eventhorizon_t *e,
     float out_vs;
     float smoke_alpha;
 
-    smoke_y = eh_clampi(smoke_y, 0, 255);
+    smoke_y = clampi(smoke_y, 0, 255);
 
     ring = (int) (local_ring * ring_scale * bridge_gate);
     if (local_ring > 0.001f)
         ring += (int) ((disk_wave * 0.5f + 0.5f) * local_ring * lens_curve * (2.0f + chroma_t * 3.0f) * bridge_gate);
-    ring = eh_clampi(ring, 0, 90);
+    ring = clampi(ring, 0, 90);
 
     shadow = (int) (local_core * shadow_scale);
-    shadow = eh_clampi(shadow, 0, 96);
+    shadow = clampi(shadow, 0, 96);
 
     smoke_alpha = ((float) active * (1.0f / 255.0f)) * (0.001f + smoke_t * smoke_t * 0.050f) * (1.0f - local_core * lens_curve * 0.88f);
     smoke_alpha = eh_clampf(smoke_alpha, 0.0f, 0.120f);
@@ -1938,15 +1925,15 @@ static inline __attribute__((always_inline)) void eh_render_area_sampled(eventho
                                  smoke_t, trail_t, chroma_t, lens_curve, drop_cohesion, active);
 
     smoke_y = (plume >> 1) + (vl >> 3) - (e->density_lut[vl] >> 4);
-    smoke_y = eh_clampi(smoke_y, 0, 255);
+    smoke_y = clampi(smoke_y, 0, 255);
 
     ring = (int) (local_ring * ring_scale * bridge_gate);
     if (local_ring > 0.001f)
         ring += (int) ((disk_wave * 0.5f + 0.5f) * local_ring * lens_curve * (2.0f + chroma_t * 3.0f) * bridge_gate);
-    ring = eh_clampi(ring, 0, 90);
+    ring = clampi(ring, 0, 90);
 
     shadow = (int) (local_core * shadow_scale);
-    shadow = eh_clampi(shadow, 0, 96);
+    shadow = clampi(shadow, 0, 96);
 
     smoke_alpha = ((float) active * (1.0f / 255.0f)) * (0.001f + smoke_t * smoke_t * 0.050f) * (1.0f - local_core * lens_curve * 0.88f);
     drop_cohesion = eh_clampf(drop_cohesion, 0.0f, 1.0f);
@@ -1969,13 +1956,13 @@ static inline __attribute__((always_inline)) void eh_render_area_sampled(eventho
     display_add = (float) ring * 0.15f - redshift * 0.56f - (float) shadow * 0.68f;
     display_floor = 1.0f + local_ring * lens_curve * 1.7f;
     if (drop_cohesion > 0.145f)
-        tension_q = eh_clampi((int) ((drop_cohesion - 0.120f) * (118.0f + trail_t * 138.0f + local * 32.0f) + 0.5f), 0, 260);
+        tension_q = clampi((int) ((drop_cohesion - 0.120f) * (118.0f + trail_t * 138.0f + local * 32.0f) + 0.5f), 0, 260);
     else
         tension_q = 0;
     inv_tension_q = 1024 - tension_q;
     tension_safe = (x > 0 && y > 0 && x + bw < w && y + bh < h);
     if (drop_cohesion > 0.220f)
-        uv_tension_q = eh_clampi((int) ((drop_cohesion - 0.180f) * (52.0f + trail_t * 92.0f) + 0.5f), 0, 116);
+        uv_tension_q = clampi((int) ((drop_cohesion - 0.180f) * (52.0f + trail_t * 92.0f) + 0.5f), 0, 116);
     else
         uv_tension_q = 0;
 
@@ -1991,7 +1978,7 @@ static inline __attribute__((always_inline)) void eh_render_area_sampled(eventho
     }
 
     if (drop_cohesion > 0.050f)
-        escape_q = eh_clampi((int) ((drop_cohesion - 0.035f) * (168.0f + trail_t * 150.0f + local * 58.0f) + 0.5f), 0, 342);
+        escape_q = clampi((int) ((drop_cohesion - 0.035f) * (168.0f + trail_t * 150.0f + local * 58.0f) + 0.5f), 0, 342);
     else
         escape_q = 0;
 
@@ -2751,16 +2738,9 @@ void eventhorizon_apply(void *ptr, VJFrame *frame, int *args)
     int qy;
     int i;
 
-    if (!e || !frame || !args)
-        return;
-    if (!frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
     w = frame->width;
     h = frame->height;
     len = w * h;
-    if (w != e->w || h != e->h || len != e->len || w < 4 || h < 4)
-        return;
 
     Y = frame->data[0];
     U = frame->data[1];
@@ -2769,19 +2749,19 @@ void eventhorizon_apply(void *ptr, VJFrame *frame, int *args)
     if (!e->seeded)
         eh_seed(e, frame);
 
-    build_i = eh_clampi(args[P_BUILD], 0, 100);
-    source_i = eh_clampi(args[P_SOURCE], 0, 100);
-    flow_i = eh_clampi(args[P_FLOW], 0, 100);
-    swirl_i = eh_clampi(args[P_SWIRL], 0, 100);
-    smoke_i = eh_clampi(args[P_SMOKE], 0, 100);
-    decay_i = eh_clampi(args[P_DECAY], 0, 100);
-    density_i = eh_clampi(args[P_DENSITY], 0, 100);
-    lens_i = eh_clampi(args[P_LENS], 0, 100);
-    folds_i = eh_clampi(args[P_FOLDS], 0, 100);
-    spin_i = eh_clampi(args[P_SPIN], -100, 100);
-    trail_i = eh_clampi(args[P_TRAIL], 0, 100);
-    chroma_i = eh_clampi(args[P_CHROMA], 0, 100);
-    speed_i = eh_clampi(args[P_SPEED], -100, 100);
+    build_i = args[P_BUILD];
+    source_i = args[P_SOURCE];
+    flow_i = args[P_FLOW];
+    swirl_i = args[P_SWIRL];
+    smoke_i = args[P_SMOKE];
+    decay_i = args[P_DECAY];
+    density_i = args[P_DENSITY];
+    lens_i = args[P_LENS];
+    folds_i = args[P_FOLDS];
+    spin_i = args[P_SPIN];
+    trail_i = args[P_TRAIL];
+    chroma_i = args[P_CHROMA];
+    speed_i = args[P_SPEED];
 
     build_t = (float) build_i * 0.01f;
     source_t = (float) source_i * 0.01f;
@@ -2850,7 +2830,7 @@ void eventhorizon_apply(void *ptr, VJFrame *frame, int *args)
     half_y_step = 1.0f / (float) h;
 
     tone_mix = (int) (lens_curve * 168.0f + chroma_t * 6.0f + 0.5f);
-    tone_mix = eh_clampi(tone_mix, 0, 255);
+    tone_mix = clampi(tone_mix, 0, 255);
     if (!e->tone_lut_valid || e->last_tone_mix != tone_mix) {
         for (i = 0; i < 256; i++) {
             int g = e->gamma_lut[i];

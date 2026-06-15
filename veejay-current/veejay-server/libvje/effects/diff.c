@@ -25,192 +25,210 @@
 typedef struct {
     uint8_t *static_bg;
     uint32_t *dt_map;
-	uint8_t *data;
-	uint8_t *current;
+    uint8_t *data;
+    uint8_t *current;
+    int n_threads;
 } diff_t;
+
+static inline int diff_clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
 
 vj_effect *diff_init(int width, int height)
 {
-	//int i,j;
-	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-	ve->num_params = 4;
-	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-	ve->limits[0][0] = 0;
-	ve->limits[1][0] = 255;
-	ve->limits[0][1] = 0;	/* reverse */
-	ve->limits[1][1] = 1;
-	ve->limits[0][2] = 0;	/* show mask */
-	ve->limits[1][2] = 2;
-	ve->limits[0][3] = 1;	/* thinning */
-	ve->limits[1][3] = 100;
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
 
-	ve->defaults[0] = 30;
-	ve->defaults[1] = 0;
-	ve->defaults[2] = 2;
-	ve->defaults[3] = 5;
+    ve->num_params = 4;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-	ve->description = "Map B to A (subtract background mask)";
-	ve->extra_frame = 1;
-	ve->sub_format = 1;
-	ve->has_user = 1;
+    ve->limits[0][0] = 0; ve->limits[1][0] = 255; ve->defaults[0] = 30;
+    ve->limits[0][1] = 0; ve->limits[1][1] = 1;   ve->defaults[1] = 0;
+    ve->limits[0][2] = 0; ve->limits[1][2] = 2;   ve->defaults[2] = 2;
+    ve->limits[0][3] = 1; ve->limits[1][3] = 100; ve->defaults[3] = 5;
+
+    ve->description = "Map B to A (subtract background mask)";
+    ve->extra_frame = 1;
+    ve->sub_format = 1;
+    ve->has_user = 1;
     ve->static_bg = 1;
+    ve->param_description = vje_build_param_list(ve->num_params, "Threshold", "Mode", "Show mask/image", "Thinning");
+    ve->hints = vje_init_value_hint_list(ve->num_params);
 
-	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Mode", "Show mask/image", "Thinning" );
-	ve->hints = vje_init_value_hint_list( ve->num_params );
-	ve->beat_hints = vje_build_beat_hint_list(
-		ve->num_params,
+    vje_build_value_hint_list(ve->hints, ve->limits[1][2], 2, "Show Difference", "Show Distance Map", "Normal");
 
-		VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    8,                  120,                8,  36, 120, 900, 0,   70,    /* Threshold */
-		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Mode */
-		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Show mask/image */
-		VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    1,                  42,                 14, 58, 90,  720, 0,   78     /* Thinning */
-	);
-	vje_build_value_hint_list( ve->hints, ve->limits[1][2],2, "Show Difference", "Show Distance Map", "Normal" );
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 8,                  150,                12, 46,  900, 3200, 0,    76,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 1,                  42,                 8,  30, 1200, 3800, 0,    54
+    );
 
-	return ve;
+    return ve;
 }
 
 void *diff_malloc(int width, int height)
 {
-	diff_t *d = (diff_t*) vj_calloc(sizeof(diff_t));
-    if(!d) {
+    diff_t *d = (diff_t*) vj_calloc(sizeof(diff_t));
+
+    if(!d)
+        return NULL;
+
+    const int len = width * height;
+
+    if(len <= 0) {
+        free(d);
         return NULL;
     }
 
-	d->data = (uint8_t*) vj_calloc( (sizeof(uint8_t) * width * height + width) );
-    if(!d->data) {
-        diff_free(d);
-        return NULL;
-    }
-	d->static_bg = (uint8_t*) vj_calloc( sizeof(uint8_t) * ( width * height ) + (width * 2));
-	if(!d->static_bg) {
+    d->data = (uint8_t*) vj_calloc(sizeof(uint8_t) * (len + width));
+    d->static_bg = (uint8_t*) vj_calloc(sizeof(uint8_t) * (len + (width * 2)));
+    d->dt_map = (uint32_t*) vj_calloc(sizeof(uint32_t) * (len + (width * 2)));
+    d->n_threads = vje_advise_num_threads(len);
+
+    if(d->n_threads < 1)
+        d->n_threads = 1;
+
+    if(!d->data || !d->static_bg || !d->dt_map) {
         diff_free(d);
         return NULL;
     }
 
-	d->dt_map = (uint32_t*) vj_calloc( sizeof(uint32_t) * (width * height) + (width * 2));
-	if(!d->dt_map) {
-        diff_free(d);
-        return NULL;
-    }
-
-    return (void*) d;
+    return d;
 }
 
 void diff_free(void *ptr)
 {
     diff_t *d = (diff_t*) ptr;
-    if(d->data) {
+
+    if(!d)
+        return;
+
+    if(d->data)
         free(d->data);
-    }
-    if(d->static_bg) {
+
+    if(d->static_bg)
         free(d->static_bg);
-    }
-    if(d->dt_map) {
+
+    if(d->dt_map)
         free(d->dt_map);
-    }
+
     free(d);
 }
 
-int diff_prepare(void *ptr, VJFrame *frame )
+int diff_prepare(void *ptr, VJFrame *frame)
 {
     diff_t *d = (diff_t*) ptr;
-	veejay_memcpy( d->static_bg, frame->data[0], frame->len );
-	
-	VJFrame tmp;
-	veejay_memset( &tmp, 0, sizeof(VJFrame));
-	tmp.data[0] = d->static_bg;
+
+    if(!d || !frame || !frame->data[0] || !d->static_bg)
+        return 0;
+
+    veejay_memcpy(d->static_bg, frame->data[0], frame->len);
+
+    VJFrame tmp;
+    veejay_memset(&tmp, 0, sizeof(VJFrame));
+
+    tmp.data[0] = d->static_bg;
     tmp.len = frame->len;
     tmp.width = frame->width;
     tmp.height = frame->height;
-	softblur_apply_internal( &tmp );
-	veejay_msg(2 , "Map B to A: Snapped background frame");
 
-	return 1;
+    softblur_apply_internal(&tmp);
+
+    veejay_msg(2, "Map B to A: Snapped background frame");
+
+    return 1;
 }
 
-// Frame difference binarify, SIMD-friendly
-static inline void diff_binarify_mask(uint8_t *dst,
-                                      const uint8_t *frameA,
-                                      const uint8_t *frameB,
+static inline void diff_binarify_mask(uint8_t *restrict dst,
+                                      const uint8_t *restrict frameA,
+                                      const uint8_t *restrict frameB,
                                       int threshold,
                                       int reverse,
-                                      size_t len)
+                                      int len,
+                                      int n_threads)
 {
-#pragma omp simd
-    for (size_t i = 0; i < len; i++) {
-        int diff = (int)frameA[i] - (int)frameB[i];
-        diff = diff < 0 ? -diff : diff;  // absolute difference
-        uint8_t mask = (uint8_t)(-(diff > threshold)); // 0xFF if diff > threshold, else 0x00
-        dst[i] = reverse ? ~mask : mask;
+    #pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int i = 0; i < len; i++)
+    {
+        int d = (int)frameA[i] - (int)frameB[i];
+
+        d = (d ^ (d >> 31)) - (d >> 31);
+
+        uint8_t mask = (uint8_t)(-(d > threshold));
+
+        dst[i] = reverse ? (uint8_t)~mask : mask;
     }
 }
 
-void diff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
-    int threshold = args[0];
-    int reverse   = args[1];
-    int mode      = args[2];
-    int feather   = args[3];
-
+void diff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
+{
     diff_t *d = (diff_t*) ptr;
-    const size_t len = (size_t)frame->len;
 
-    uint8_t *Y  = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
+    const int threshold = args[0];
+    const int reverse = args[1];
+    const int mode = args[2];
+    const int feather = args[3];
+    const int len = frame->len;
+    const int uv_len = frame->uv_len;
 
-    const uint8_t *Y2  = frame2->data[0];
-    const uint8_t *Cb2 = frame2->data[1];
-    const uint8_t *Cr2 = frame2->data[2];
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
-    uint8_t *data   = d->data;
-    uint32_t *dt_map = d->dt_map;
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
 
-    vj_frame_clear1((uint8_t*)dt_map, 0, len * sizeof(uint32_t));
+    uint8_t *restrict data = d->data;
+    uint32_t *restrict dt_map = d->dt_map;
 
-    diff_binarify_mask(data, Y, Y2, threshold, reverse, len);
+    veejay_memset(dt_map, 0, len * sizeof(uint32_t));
+
+    diff_binarify_mask(data, Y, Y2, threshold, reverse, len, d->n_threads);
 
     veejay_distance_transform8(data, frame->width, frame->height, dt_map);
 
-    if (mode == 1) {
+    if(mode == 1)
+    {
         veejay_memcpy(Y, data, len);
-        veejay_memset(Cb, 128, len);
-        veejay_memset(Cr, 128, len);
+        veejay_memset(Cb, 128, uv_len);
+        veejay_memset(Cr, 128, uv_len);
         return;
-    } 
-    else if (mode == 2) {
-#pragma omp simd
-        for (size_t i = 0; i < len; i++) {
-            uint32_t dt = dt_map[i];
-            uint8_t val_gt = 128 + (uint8_t)(dt % 128);
-            uint8_t val = 0;
-            uint8_t mask_feather = (dt == (uint32_t)feather);
-            uint8_t mask_gt_feather = (dt > (uint32_t)feather);
-            uint8_t mask_one = (dt == 1);
+    }
 
-            val = mask_gt_feather ? val_gt : val;
-            val = mask_feather ? 0xFF : val;
-            val = mask_one ? 0xFF : val;
+    if(mode == 2)
+    {
+        #pragma omp parallel for schedule(static) num_threads(d->n_threads)
+        for(int i = 0; i < len; i++)
+        {
+            const uint32_t dt = dt_map[i];
+            uint8_t val = 0;
+
+            if(dt > (uint32_t)feather)
+                val = (uint8_t)(128 + (dt & 127u));
+
+            if(dt == (uint32_t)feather || dt == 1u)
+                val = 0xff;
 
             Y[i] = val;
-            Cb[i] = 128;
-            Cr[i] = 128;
         }
+
+        veejay_memset(Cb, 128, uv_len);
+        veejay_memset(Cr, 128, uv_len);
         return;
     }
 
-#pragma omp simd
-    for (size_t i = 0; i < len; i++) {
-        uint32_t dt = dt_map[i];
-        uint32_t mask = -(dt >= (uint32_t)feather);
+    #pragma omp parallel for schedule(static) num_threads(d->n_threads)
+    for(int i = 0; i < len; i++)
+    {
+        const uint32_t mask = -(dt_map[i] >= (uint32_t)feather);
 
-        Y[i]  = (Y2[i] & mask) | (pixel_Y_lo_ & ~mask);
-        Cb[i] = (Cb2[i] & mask) | (128 & ~mask);
-        Cr[i] = (Cr2[i] & mask) | (128 & ~mask);
+        Y[i] = (uint8_t)((Y2[i] & mask) | (pixel_Y_lo_ & ~mask));
+        Cb[i] = (uint8_t)((Cb2[i] & mask) | (128 & ~mask));
+        Cr[i] = (uint8_t)((Cr2[i] & mask) | (128 & ~mask));
     }
 }
-
-
-

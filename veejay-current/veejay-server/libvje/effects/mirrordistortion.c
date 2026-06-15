@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,127 +21,221 @@
 #include "common.h"
 #include "mirrordistortion.h"
 
-vj_effect *mirrordistortion_init(int w, int h)
-{
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
-    ve->defaults[0] = 10;
-    ve->defaults[1] = w;
-    ve->defaults[2] = h;
-    ve->description = "Mirror Distortion";
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 100;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = w * 2;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = h * 2;
-    ve->sub_format = 1;
-    ve->param_description = vje_build_param_list( ve->num_params, "Distortion", "Offset X", "Offset Y" );
+#include <stdint.h>
 
-    ve->hints = vje_init_value_hint_list( ve->num_params );
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
+#define MIRRORDISTORTION_PARAMS 3
 
-        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 2,          72,         6,  22, 2200, 5200, 1800, 24, /* Distortion */
-        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  w + 8,      (w * 3) / 2, 12, 46, 900,  2400, 0,    70, /* Offset X */
-        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  h + 8,      (h * 3) / 2, 12, 46, 900,  2400, 0,    65  /* Offset Y */
-    );
-    return ve;
-}
+#define P_DISTORTION 0
+#define P_OFFSET_X   1
+#define P_OFFSET_Y   2
 
-#define TABLE_SIZE 360
-#define TABLE_RESOLUTION 10000
+#define MD_TRIG_SHIFT 14
+#define MD_TRIG_SCALE (1 << MD_TRIG_SHIFT)
 
 typedef struct {
-    float *sin_lut;
-    float *cos_lut;
-    float distortion;
+    int16_t *sin_y;
+    int16_t *cos_x;
+    int *dx_y;
+    int *dy_x;
     uint8_t *buf[3];
-    int strides[4];
+    int distortion_key;
+    int offset_x_key;
+    int offset_y_key;
     int n_threads;
 } mirror_distortion_t;
 
-void *mirrordistortion_malloc(int w, int h) {
-    mirror_distortion_t *m = (mirror_distortion_t*) vj_malloc(sizeof(mirror_distortion_t));
-    if(!m) return NULL;
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
 
-    m->distortion = -1.0f;
-    m->cos_lut = (float*) vj_malloc(sizeof(float) * w);
-    m->sin_lut = (float*) vj_malloc(sizeof(float) * h);
+static inline int mirrordistortion_mul_q14(int a, int b)
+{
+    const int p = a * b;
+    return (p + (p >= 0 ? (MD_TRIG_SCALE >> 1) : -(MD_TRIG_SCALE >> 1))) >> MD_TRIG_SHIFT;
+}
 
-    m->buf[0] = (uint8_t*) vj_malloc(w * h * 3);
+vj_effect *mirrordistortion_init(int w, int h)
+{
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
 
-    if(!m->cos_lut || !m->sin_lut || !m->buf[0]) {
-        if(m->cos_lut) free(m->cos_lut);
-        if(m->sin_lut) free(m->sin_lut);
-        if(m->buf[0]) free(m->buf[0]);
-        free(m);
+    if(!ve)
+        return NULL;
+
+    ve->num_params = MIRRORDISTORTION_PARAMS;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
         return NULL;
     }
 
-    m->buf[1] = m->buf[0] + (w * h);
-    m->buf[2] = m->buf[1] + (w * h);
-    m->n_threads = vje_advise_num_threads(w * h);
+    ve->limits[0][P_DISTORTION] = 0; ve->limits[1][P_DISTORTION] = 100;   ve->defaults[P_DISTORTION] = 10;
+    ve->limits[0][P_OFFSET_X] = 0;   ve->limits[1][P_OFFSET_X] = w * 2;   ve->defaults[P_OFFSET_X] = w;
+    ve->limits[0][P_OFFSET_Y] = 0;   ve->limits[1][P_OFFSET_Y] = h * 2;   ve->defaults[P_OFFSET_Y] = h;
+
+    ve->description = "Mirror Distortion";
+    ve->sub_format = 1;
+    ve->extra_frame = 0;
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(ve->num_params, "Distortion", "Offset X", "Offset Y");
+
+    int x_lo = w - (w >> 2);
+    int x_hi = w + (w >> 2);
+    int y_lo = h - (h >> 2);
+    int y_hi = h + (h >> 2);
+
+    if(x_lo < 0)
+        x_lo = 0;
+    if(x_hi > w * 2)
+        x_hi = w * 2;
+    if(y_lo < 0)
+        y_lo = 0;
+    if(y_hi > h * 2)
+        y_hi = h * 2;
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_NO_ZERO_CROSS, 4,    78,   14, 54,  800, 3000, 0,    78,
+        VJ_BEAT_DRIFT,              VJ_BEAT_F_CONTINUOUS,                                                          w / 2, w + (w / 2), 12, 46,  900, 3400, 0,    64,
+        VJ_BEAT_DRIFT,              VJ_BEAT_F_CONTINUOUS,                                                          h / 2, h + (h / 2), 12, 46,  900, 3400, 0,    64
+    );
+
+    return ve;
+}
+
+void mirrordistortion_free(void *ptr)
+{
+    mirror_distortion_t *m = (mirror_distortion_t*) ptr;
+
+    if(m) {
+        free(m->sin_y);
+        free(m->dx_y);
+        free(m->buf[0]);
+        free(m);
+    }
+}
+
+void *mirrordistortion_malloc(int w, int h)
+{
+    mirror_distortion_t *m = (mirror_distortion_t*) vj_calloc(sizeof(mirror_distortion_t));
+
+    if(!m)
+        return NULL;
+
+    const int len = w * h;
+
+    m->sin_y = (int16_t*) vj_malloc(sizeof(int16_t) * (size_t)(w + h));
+    m->dx_y = (int*) vj_malloc(sizeof(int) * (size_t)(w + h));
+    m->buf[0] = (uint8_t*) vj_malloc((size_t)len * 3u);
+
+    if(!m->sin_y || !m->dx_y || !m->buf[0]) {
+        mirrordistortion_free(m);
+        return NULL;
+    }
+
+    m->cos_x = m->sin_y + h;
+    m->dy_x = m->dx_y + h;
+    m->buf[1] = m->buf[0] + len;
+    m->buf[2] = m->buf[1] + len;
+    m->distortion_key = -1;
+    m->offset_x_key = 0x7fffffff;
+    m->offset_y_key = 0x7fffffff;
+    m->n_threads = vje_advise_num_threads(len);
 
     return (void*) m;
 }
 
-void mirrordistortion_free(void *ptr) {
-    mirror_distortion_t *m = (mirror_distortion_t*) ptr;
-    if(m) {
-        if(m->sin_lut)
-            free(m->sin_lut);
-        if(m->cos_lut)
-            free(m->cos_lut);
-        if(m->buf[0])
-            free(m->buf[0]);
-        free(m);
+static void mirrordistortion_update_trig(mirror_distortion_t *m, int w, int h, int distortion)
+{
+    const float dist = (float)distortion * 0.01f;
+
+    for(int y = 0; y < h; y++)
+        m->sin_y[y] = (int16_t)(a_sin((float)y * dist) * (float)MD_TRIG_SCALE);
+
+    for(int x = 0; x < w; x++)
+        m->cos_x[x] = (int16_t)(a_cos((float)x * dist) * (float)MD_TRIG_SCALE);
+
+    m->distortion_key = distortion;
+    m->offset_x_key = 0x7fffffff;
+    m->offset_y_key = 0x7fffffff;
+}
+
+static void mirrordistortion_update_offsets(mirror_distortion_t *m, int w, int h, int offset_x, int offset_y)
+{
+    if(offset_x != m->offset_x_key) {
+        for(int y = 0; y < h; y++)
+            m->dx_y[y] = mirrordistortion_mul_q14(offset_x, m->sin_y[y]);
+
+        m->offset_x_key = offset_x;
+    }
+
+    if(offset_y != m->offset_y_key) {
+        for(int x = 0; x < w; x++)
+            m->dy_x[x] = mirrordistortion_mul_q14(offset_y, m->cos_x[x]);
+
+        m->offset_y_key = offset_y;
     }
 }
-void mirrordistortion_apply(void *ptr, VJFrame *frame, int *args) {
+
+void mirrordistortion_apply(void *ptr, VJFrame *frame, int *args)
+{
     mirror_distortion_t *m = (mirror_distortion_t*) ptr;
+
     const int w = frame->width;
     const int h = frame->height;
+    const int len = frame->len;
+    const int distortion = args[P_DISTORTION];
+    const int offset_x = clampi(args[P_OFFSET_X], 0, w * 2) - w;
+    const int offset_y = clampi(args[P_OFFSET_Y], 0, h * 2) - h;
+    const int w1 = w - 1;
+    const int h1 = h - 1;
 
-    float dist = args[0] * 0.01f;
-    float offX = (float)(args[1] - w);
-    float offY = (float)(args[2] - h);
+    uint8_t *restrict dstY = frame->data[0];
+    uint8_t *restrict dstU = frame->data[1];
+    uint8_t *restrict dstV = frame->data[2];
 
-    if(dist != m->distortion) {
-        for(int i = 0; i < w; i++) m->cos_lut[i] = a_cos(i * dist);
-        for(int i = 0; i < h; i++) m->sin_lut[i] = a_sin(i * dist);
-        m->distortion = dist;
-    }
+    uint8_t *restrict srcY = m->buf[0];
+    uint8_t *restrict srcU = m->buf[1];
+    uint8_t *restrict srcV = m->buf[2];
 
-    veejay_memcpy(m->buf[0], frame->data[0], w * h);
-    veejay_memcpy(m->buf[1], frame->data[1], w * h);
-    veejay_memcpy(m->buf[2], frame->data[2], w * h);
+    if(distortion != m->distortion_key)
+        mirrordistortion_update_trig(m, w, h, distortion);
 
-    uint8_t * restrict srcY = m->buf[0];
-    uint8_t * restrict srcU = m->buf[1];
-    uint8_t * restrict srcV = m->buf[2];
+    mirrordistortion_update_offsets(m, w, h, offset_x, offset_y);
 
-    #pragma omp parallel for num_threads(m->n_threads) schedule(static)
-    for (int i = 0; i < h; i++) {
-        uint8_t *dstY = frame->data[0] + (i * w);
-        uint8_t *dstU = frame->data[1] + (i * w);
-        uint8_t *dstV = frame->data[2] + (i * w);
+    veejay_memcpy(srcY, dstY, len);
+    veejay_memcpy(srcU, dstU, len);
+    veejay_memcpy(srcV, dstV, len);
 
-        float s_sin = m->sin_lut[i];
-        for (int j = 0; j < w; j++) {
-            int sx = j + (int)(offX * s_sin);
-            int sy = i + (int)(offY * m->cos_lut[j]);
-            sx = (sx < 0) ? 0 : (sx >= w ? w - 1 : sx);
-            sy = (sy < 0) ? 0 : (sy >= h ? h - 1 : sy);
+#pragma omp parallel for num_threads(m->n_threads) schedule(static)
+    for(int y = 0; y < h; y++) {
+        const int row = y * w;
+        const int dx = m->dx_y[y];
+        uint8_t *restrict outY = dstY + row;
+        uint8_t *restrict outU = dstU + row;
+        uint8_t *restrict outV = dstV + row;
 
-            int srcIdx = sy * w + sx;
+        for(int x = 0; x < w; x++) {
+            int sx = x + dx;
+            int sy = y + m->dy_x[x];
 
-            dstY[j] = srcY[srcIdx];
-            dstU[j] = srcU[srcIdx];
-            dstV[j] = srcV[srcIdx];
+            sx = sx < 0 ? 0 : (sx > w1 ? w1 : sx);
+            sy = sy < 0 ? 0 : (sy > h1 ? h1 : sy);
+
+            const int src_idx = sy * w + sx;
+
+            outY[x] = srcY[src_idx];
+            outU[x] = srcU[src_idx];
+            outV[x] = srcV[src_idx];
         }
     }
 }

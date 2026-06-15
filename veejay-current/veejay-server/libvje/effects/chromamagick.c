@@ -61,11 +61,10 @@ vj_effect *chromamagick_init(int w, int h)
 
 	ve->beat_hints = vje_build_beat_hint_list(
 		ve->num_params,
-
-		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,   0,    0, -1000, /* Mode */
-		VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    24,                 235,                14, 58, 90,  680,  0, 86     /* Value */
+		VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,    -1000,
+		VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS,                     32,                 224,                6, 24, 1600, 4400, 0,    36
 	);
-    
+
 	return ve;
 }
 
@@ -1588,5 +1587,3 @@ void chromamagick_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
 	break;	
 	}
 }
-
-

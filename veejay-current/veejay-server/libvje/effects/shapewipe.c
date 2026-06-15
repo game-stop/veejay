@@ -6,12 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -43,6 +38,52 @@
 
 #define MAX_NUMBER_OF_SHAPES 10000
 
+#define SHAPEWIPE_PARAMS 8
+
+#define P_SHAPE       0
+#define P_THRESHOLD   1
+#define P_DIRECTION   2
+#define P_AUTOMATIC   3
+#define P_SOFTNESS    4
+#define P_EDGE_GLOW   5
+#define P_WIPE_DRIVE  6
+#define P_MIX_DRIVE   7
+
+typedef struct {
+    char **shapelist;
+    int shapeidx;
+    int currentshape;
+    void *selected_shape;
+    int shape_min;
+    int shape_max;
+    int shape_completed;
+
+    int n_threads;
+    int have_smooth;
+    float sm_threshold;
+    float sm_softness;
+    float sm_glow;
+    float sm_wipe_drive;
+    float sm_mix_drive;
+} shape_t;
+
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline uint8_t shapewipe_u8(int v)
+{
+    return (uint8_t)clampi(v, 0, 255);
+}
+
+
+
+static inline void shapewipe_smooth_to(float *v, float target, float a)
+{
+    *v += (target - *v) * a;
+}
+
 static int is_img(const char *file)
 {
     if(!file)
@@ -67,6 +108,7 @@ static int find_shape_file(char *path, char **shapelist, int *shapeidx, int maxs
         return 0;
 
     struct stat l;
+
     veejay_memset(&l, 0, sizeof(struct stat));
 
     if(lstat(path, &l) < 0)
@@ -74,6 +116,7 @@ static int find_shape_file(char *path, char **shapelist, int *shapeidx, int maxs
 
     if(S_ISLNK(l.st_mode)) {
         veejay_memset(&l, 0, sizeof(struct stat));
+
         if(stat(path, &l) < 0)
             return 0;
     }
@@ -81,12 +124,11 @@ static int find_shape_file(char *path, char **shapelist, int *shapeidx, int maxs
     if(S_ISDIR(l.st_mode))
         return 1;
 
-    if(S_ISREG(l.st_mode) && is_img(path)) {
-        if(*shapeidx < maxshapes) {
-            shapelist[*shapeidx] = strdup(path);
-            if(shapelist[*shapeidx])
-                *shapeidx = *shapeidx + 1;
-        }
+    if(S_ISREG(l.st_mode) && is_img(path) && *shapeidx < maxshapes) {
+        shapelist[*shapeidx] = strdup(path);
+
+        if(shapelist[*shapeidx])
+            *shapeidx = *shapeidx + 1;
     }
 
     return 0;
@@ -111,10 +153,8 @@ static int find_shapes(char *path, char **shapelist, int *shapeidx, int maxshape
         {
             snprintf(tmp, sizeof(tmp), "%s/%s", path, files[n]->d_name);
 
-            if(find_shape_file(tmp, shapelist, shapeidx, maxshapes)) {
-                if(*shapeidx < maxshapes)
-                    find_shapes(tmp, shapelist, shapeidx, maxshapes);
-            }
+            if(find_shape_file(tmp, shapelist, shapeidx, maxshapes) && *shapeidx < maxshapes)
+                find_shapes(tmp, shapelist, shapeidx, maxshapes);
         }
 
         free(files[n]);
@@ -139,23 +179,15 @@ static void load_shapes(char **shapelist, int *shapeidx, int maxshapes)
     find_shapes("/usr/share/veejay/shapes", shapelist, shapeidx, maxshapes);
 }
 
-typedef struct {
-    char **shapelist;
-    int shapeidx;
-    int currentshape;
-    void *selected_shape;
-    int shape_min;
-    int shape_max;
-    int shape_completed;
-} shape_t;
-
 static shape_t *init_shape_loader(void)
 {
-    shape_t *s = (shape_t*) vj_calloc(sizeof(shape_t));
+    shape_t *s = (shape_t*)vj_calloc(sizeof(shape_t));
+
     if(!s)
         return NULL;
 
-    s->shapelist = (char**) vj_calloc(sizeof(char*) * MAX_NUMBER_OF_SHAPES);
+    s->shapelist = (char**)vj_calloc(sizeof(char*) * MAX_NUMBER_OF_SHAPES);
+
     if(!s->shapelist) {
         free(s);
         return NULL;
@@ -165,6 +197,8 @@ static shape_t *init_shape_loader(void)
     s->shape_min = 0;
     s->shape_max = 255;
     s->shape_completed = 0;
+    s->n_threads = 1;
+    s->have_smooth = 0;
 
     load_shapes(s->shapelist, &(s->shapeidx), MAX_NUMBER_OF_SHAPES);
 
@@ -190,10 +224,11 @@ static void free_shape_loader(shape_t *s)
 
 static void *change_shape(shape_t *s, void *oldshape, int shape, int w, int h)
 {
-    if(!s || shape < 0 || shape >= s->shapeidx || !s->shapelist[shape])
+    if(shape < 0 || shape >= s->shapeidx || !s->shapelist[shape])
         return oldshape;
 
     void *newshape = vj_picture_open(s->shapelist[shape], w, h, PIX_FMT_GRAY8);
+
     if(!newshape)
         return oldshape;
 
@@ -208,7 +243,8 @@ static char **get_shapelist_hints(char **shapelist, int count)
     if(count <= 0)
         return NULL;
 
-    char **result = (char**) vj_calloc(sizeof(char*) * (count + 1));
+    char **result = (char**)vj_calloc(sizeof(char*) * (count + 1));
+
     if(!result)
         return NULL;
 
@@ -307,9 +343,72 @@ static void shape_wipe_2(uint8_t *dst[4], uint8_t *src[4], uint8_t *pattern, con
     }
 }
 
+static void shape_wipe_musical(shape_t *s,
+                               uint8_t *dst[4],
+                               uint8_t *src[4],
+                               const uint8_t *restrict pattern,
+                               int len,
+                               int threshold,
+                               int direction,
+                               int softness,
+                               int edge_glow,
+                               int beat_mix_q8)
+{
+    uint8_t *restrict d0 = dst[0];
+    uint8_t *restrict d1 = dst[1];
+    uint8_t *restrict d2 = dst[2];
+
+    const uint8_t *restrict s0 = src[0];
+    const uint8_t *restrict s1 = src[1];
+    const uint8_t *restrict s2 = src[2];
+
+    threshold = clampi(threshold, 0, 256);
+    softness = clampi(softness, 0, 128);
+    edge_glow = clampi(edge_glow, 0, 255);
+    beat_mix_q8 = clampi(beat_mix_q8, 0, 256);
+
+    const int edge_span = softness > 0 ? softness : (edge_glow > 0 ? 8 : 1);
+    const int denom = edge_span << 1;
+
+#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+    for(int i = 0; i < len; i++) {
+        const int p = pattern[i];
+        const int edge = direction ? (threshold - p) : (p - threshold);
+        int q8;
+
+        if(softness <= 0) {
+            q8 = edge > 0 ? 256 : 0;
+        }
+        else {
+            q8 = ((edge + edge_span) * 256 + (denom >> 1)) / denom;
+            q8 = clampi(q8, 0, 256);
+        }
+
+        if(beat_mix_q8 > 0)
+            q8 += ((256 - q8) * beat_mix_q8 + 128) >> 8;
+
+        if(q8 > 0) {
+            d0[i] = (uint8_t)((((int)d0[i] * (256 - q8)) + ((int)s0[i] * q8) + 128) >> 8);
+            d1[i] = (uint8_t)((((int)d1[i] * (256 - q8)) + ((int)s1[i] * q8) + 128) >> 8);
+            d2[i] = (uint8_t)((((int)d2[i] * (256 - q8)) + ((int)s2[i] * q8) + 128) >> 8);
+        }
+
+        if(edge_glow > 0) {
+            const int ae = edge < 0 ? -edge : edge;
+
+            if(ae < edge_span) {
+                const int g = (edge_glow * (edge_span - ae) + (edge_span >> 1)) / edge_span;
+
+                d0[i] = shapewipe_u8((int)d0[i] + g);
+            }
+        }
+    }
+}
+
 int shapewipe_get_num_shapes(void *ptr)
 {
-    shape_t *s = (shape_t*) ptr;
+    shape_t *s = (shape_t*)ptr;
+
     if(!s || s->shapeidx <= 0)
         return 0;
 
@@ -318,10 +417,10 @@ int shapewipe_get_num_shapes(void *ptr)
 
 int shapewipe_ready(void *ptr, int w, int h)
 {
-    shape_t *s = (shape_t*) ptr;
+    shape_t *s = (shape_t*)ptr;
 
-    (void) w;
-    (void) h;
+    (void)w;
+    (void)h;
 
     return s ? s->shape_completed : 0;
 }
@@ -329,41 +428,46 @@ int shapewipe_ready(void *ptr, int w, int h)
 vj_effect *shapewipe_init(int w, int h)
 {
     shape_t *s = init_shape_loader();
+
     if(!s)
         return NULL;
 
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *)vj_calloc(sizeof(vj_effect));
+
     if(!ve) {
         free_shape_loader(s);
         return NULL;
     }
 
-    ve->num_params = 4;
+    ve->num_params = SHAPEWIPE_PARAMS;
+    ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        free_shape_loader(s);
+        return NULL;
+    }
 
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = s->shapeidx > 0 ? s->shapeidx - 1 : 0;
-    ve->defaults[0] = 0;
-
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 256;
-    ve->defaults[1] = 0;
-
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 1;
-    ve->defaults[2] = 0;
-
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 1;
-    ve->defaults[3] = 1;
+    ve->limits[0][P_SHAPE] = 0;       ve->limits[1][P_SHAPE] = s->shapeidx > 0 ? s->shapeidx - 1 : 0; ve->defaults[P_SHAPE] = 0;
+    ve->limits[0][P_THRESHOLD] = 0;   ve->limits[1][P_THRESHOLD] = 256;                               ve->defaults[P_THRESHOLD] = 0;
+    ve->limits[0][P_DIRECTION] = 0;   ve->limits[1][P_DIRECTION] = 1;                                 ve->defaults[P_DIRECTION] = 0;
+    ve->limits[0][P_AUTOMATIC] = 0;   ve->limits[1][P_AUTOMATIC] = 1;                                 ve->defaults[P_AUTOMATIC] = 1;
+    ve->limits[0][P_SOFTNESS] = 0;    ve->limits[1][P_SOFTNESS] = 128;                                ve->defaults[P_SOFTNESS] = 0;
+    ve->limits[0][P_EDGE_GLOW] = 0;   ve->limits[1][P_EDGE_GLOW] = 255;                               ve->defaults[P_EDGE_GLOW] = 0;
+    ve->limits[0][P_WIPE_DRIVE] = 0;  ve->limits[1][P_WIPE_DRIVE] = 1000;                             ve->defaults[P_WIPE_DRIVE] = 0;
+    ve->limits[0][P_MIX_DRIVE] = 0;   ve->limits[1][P_MIX_DRIVE] = 1000;                              ve->defaults[P_MIX_DRIVE] = 0;
 
     ve->description = "Shape Wipe";
     ve->sub_format = 1;
     ve->extra_frame = 1;
-    ve->parallel = 0;
     ve->has_user = 0;
 
     ve->param_description = vje_build_param_list(
@@ -371,7 +475,11 @@ vj_effect *shapewipe_init(int w, int h)
         "Shape",
         "Threshold",
         "Direction",
-        "Automatic"
+        "Automatic",
+        "Softness",
+        "Edge Glow",
+        "Wipe Drive",
+        "Mix Drive"
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
@@ -380,47 +488,22 @@ vj_effect *shapewipe_init(int w, int h)
         char **hints = get_shapelist_hints(s->shapelist, s->shapeidx);
 
         if(hints) {
-            vje_build_value_hint_list_array(
-                ve->hints,
-                s->shapeidx - 1,
-                0,
-                hints
-            );
-
+            vje_build_value_hint_list_array(ve->hints, s->shapeidx - 1, P_SHAPE, hints);
             free_shapelist_hints(hints, s->shapeidx);
         }
     }
 
-    vje_build_value_hint_list(
-        ve->hints,
-        ve->limits[1][2],
-        2,
-        "White to Black",
-        "Black to White"
-    );
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_DIRECTION], P_DIRECTION, "White to Black", "Black to White");
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_AUTOMATIC], P_AUTOMATIC, "Manual", "Automatic");
 
-    vje_build_value_hint_list(
-        ve->hints,
-        ve->limits[1][3],
-        3,
-        "Manual",
-        "Automatic"
-    );
-
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Shape */
-        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 0,                  256,                6, 22, 1600, 3400, 700, 35,    /* Threshold */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Direction */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000  /* Automatic */
-    );
 
     char *home = getenv("HOME");
+
     if(home)
         veejay_msg(VEEJAY_MSG_DEBUG, "Put your shape transition files (png, pgm, tiff) in %s/.veejay/shapes", home);
     else
         veejay_msg(VEEJAY_MSG_DEBUG, "Put your shape transition files (png, pgm, tiff) in ~/.veejay/shapes");
+
 
     ve->is_transition_ready_func = shapewipe_ready;
 
@@ -428,25 +511,27 @@ vj_effect *shapewipe_init(int w, int h)
 
     free_shape_loader(s);
 
-    (void) w;
-    (void) h;
+    (void)w;
+    (void)h;
 
     return ve;
 }
 
 void *shapewipe_malloc(int w, int h)
 {
-    (void) w;
-    (void) h;
+    shape_t *s = init_shape_loader();
 
-    return init_shape_loader();
+    if(!s)
+        return NULL;
+
+    s->n_threads = vje_advise_num_threads(w * h);
+
+    return s;
 }
 
 void shapewipe_free(void *ptr)
 {
-    shape_t *s = (shape_t*) ptr;
-    if(!s)
-        return;
+    shape_t *s = (shape_t*)ptr;
 
     if(s->selected_shape)
         vj_picture_cleanup(s->selected_shape);
@@ -454,33 +539,32 @@ void shapewipe_free(void *ptr)
     free_shape_loader(s);
 }
 
-static inline int shapewipe_clampi(int v, int lo, int hi)
+static int shapewipe_apply1(void *ptr,
+                            VJFrame *frame,
+                            VJFrame *frame2,
+                            double timecode,
+                            int shape,
+                            int threshold,
+                            int direction,
+                            int automatic,
+                            int softness,
+                            int edge_glow,
+                            int wipe_drive,
+                            int mix_drive)
 {
-    return (v < lo) ? lo : (v > hi ? hi : v);
-}
-
-static int shapewipe_apply1(
-    void *ptr,
-    VJFrame *frame,
-    VJFrame *frame2,
-    double timecode,
-    int shape,
-    int threshold,
-    int direction,
-    int automatic
-) {
-    shape_t *s = (shape_t*) ptr;
-
-    if(!s || !frame || !frame2 || !frame->data[0] || !frame2->data[0])
-        return 0;
+    shape_t *s = (shape_t*)ptr;
 
     if(s->shapeidx <= 0)
         return 0;
 
-    shape = shapewipe_clampi(shape, 0, s->shapeidx - 1);
-    threshold = shapewipe_clampi(threshold, 0, 256);
+    shape = clampi(shape, 0, s->shapeidx - 1);
+    threshold = clampi(threshold, 0, 256);
     direction = direction ? 1 : 0;
     automatic = automatic ? 1 : 0;
+    softness = clampi(softness, 0, 128);
+    edge_glow = clampi(edge_glow, 0, 255);
+    wipe_drive = clampi(wipe_drive, 0, 1000);
+    mix_drive = clampi(mix_drive, 0, 1000);
 
     if(shape != s->currentshape) {
         void *newshape = change_shape(s, s->selected_shape, shape, frame->width, frame->height);
@@ -492,8 +576,10 @@ static int shapewipe_apply1(
 
         s->selected_shape = newshape;
         s->currentshape = shape;
+        s->have_smooth = 0;
 
         VJFrame *tmp = vj_picture_get(s->selected_shape);
+
         if(!tmp || !tmp->data[0])
             return 0;
 
@@ -501,10 +587,12 @@ static int shapewipe_apply1(
     }
 
     VJFrame *src = vj_picture_get(s->selected_shape);
+
     if(!src || !src->data[0])
         return 0;
 
-    int auto_threshold = threshold;
+    int base_threshold = threshold;
+    int done_threshold = threshold;
     int range = s->shape_max - s->shape_min;
 
     if(range <= 0)
@@ -516,63 +604,128 @@ static int shapewipe_apply1(
         timecode = 1.0;
 
     if(direction) {
-        if(automatic)
-            auto_threshold = (int)(timecode * (double)range) + s->shape_min;
-
-        auto_threshold = shapewipe_clampi(auto_threshold, 0, 256);
-
-        shape_wipe_1(frame->data, frame2->data, src->data[0], frame->len, auto_threshold);
-
-        if(auto_threshold >= s->shape_max)
-            return 1;
-    } else {
-        if(automatic)
-            auto_threshold = (int)((1.0 - timecode) * (double)range) + s->shape_min;
-
-        auto_threshold = shapewipe_clampi(auto_threshold, 0, 256);
-
-        shape_wipe_2(frame->data, frame2->data, src->data[0], frame->len, auto_threshold);
-
-        if(auto_threshold <= s->shape_min)
-            return 1;
+        if(automatic) {
+            done_threshold = (int)(timecode * (double)range) + s->shape_min;
+            base_threshold = done_threshold + threshold;
+        }
+    }
+    else {
+        if(automatic) {
+            done_threshold = (int)((1.0 - timecode) * (double)range) + s->shape_min;
+            base_threshold = done_threshold - threshold;
+        }
     }
 
-    return 0;
+    base_threshold = clampi(base_threshold, 0, 256);
+    done_threshold = clampi(done_threshold, 0, 256);
+
+    const int musical_active = softness > 0 || edge_glow > 0 ||
+                               wipe_drive > 0 || mix_drive > 0 ||
+                               threshold > 0;
+
+    if(!musical_active) {
+        if(direction) {
+            shape_wipe_1(frame->data, frame2->data, src->data[0], frame->len, done_threshold);
+
+            return done_threshold >= s->shape_max;
+        }
+
+        shape_wipe_2(frame->data, frame2->data, src->data[0], frame->len, done_threshold);
+
+        return done_threshold <= s->shape_min;
+    }
+
+    const float lane_a = 0.26f;
+
+    if(!s->have_smooth) {
+        s->sm_threshold = (float)base_threshold;
+        s->sm_softness = (float)softness;
+        s->sm_glow = (float)edge_glow;
+        s->sm_wipe_drive = (float)wipe_drive;
+        s->sm_mix_drive = (float)mix_drive;
+        s->have_smooth = 1;
+    }
+
+    shapewipe_smooth_to(&s->sm_threshold, (float)base_threshold, lane_a);
+    shapewipe_smooth_to(&s->sm_softness, (float)softness, lane_a);
+    shapewipe_smooth_to(&s->sm_glow, (float)edge_glow, lane_a);
+    shapewipe_smooth_to(&s->sm_wipe_drive, (float)wipe_drive, lane_a);
+    shapewipe_smooth_to(&s->sm_mix_drive, (float)mix_drive, lane_a);
+
+    const int wipe_q = clampi((int)(s->sm_wipe_drive + 0.5f), 0, 1000);
+    const int advance = ((wipe_q * range) + 500) / 1000;
+
+    int effective_threshold = clampi((int)(s->sm_threshold + 0.5f), 0, 256);
+
+    effective_threshold += direction ? advance : -advance;
+    effective_threshold = clampi(effective_threshold, 0, 256);
+
+    int effective_softness = clampi((int)(s->sm_softness + 0.5f), 0, 128);
+
+    effective_softness += ((wipe_q * 32) + 500) / 1000;
+    effective_softness = clampi(effective_softness, 0, 128);
+
+    int effective_glow = clampi((int)(s->sm_glow + 0.5f), 0, 255);
+
+    effective_glow += ((wipe_q * 96) + 500) / 1000;
+    effective_glow = clampi(effective_glow, 0, 255);
+
+    int effective_mix = clampi((int)(s->sm_mix_drive + 0.5f), 0, 1000);
+
+    effective_mix += ((wipe_q * 180) + 500) / 1000;
+    effective_mix = clampi(effective_mix, 0, 1000);
+
+    const int mix_q8 = (effective_mix * 256 + 500) / 1000;
+
+    shape_wipe_musical(
+        s,
+        frame->data,
+        frame2->data,
+        src->data[0],
+        frame->len,
+        effective_threshold,
+        direction,
+        effective_softness,
+        effective_glow,
+        mix_q8
+    );
+
+    if(direction)
+        return done_threshold >= s->shape_max;
+
+    return done_threshold <= s->shape_min;
 }
 
 void shapewipe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    if(!ptr || !frame || !frame2 || !args)
-        return;
-
-    shape_t *s = (shape_t*) ptr;
+    shape_t *s = (shape_t*)ptr;
 
     s->shape_completed = shapewipe_apply1(
         ptr,
         frame,
         frame2,
         frame->timecode,
-        args[0],
-        args[1],
-        args[2],
-        args[3]
+        args[P_SHAPE],
+        args[P_THRESHOLD],
+        args[P_DIRECTION],
+        args[P_AUTOMATIC],
+        args[P_SOFTNESS],
+        args[P_EDGE_GLOW],
+        args[P_WIPE_DRIVE],
+        args[P_MIX_DRIVE]
     );
 }
 
-int shapewipe_process(
-    void *ptr,
-    VJFrame *frame,
-    VJFrame *frame2,
-    double timecode,
-    int shape,
-    int threshold,
-    int direction,
-    int automatic
-) {
-    if(!ptr || !frame || !frame2)
-        return 0;
-
-    shape_t *s = (shape_t*) ptr;
+int shapewipe_process(void *ptr,
+                      VJFrame *frame,
+                      VJFrame *frame2,
+                      double timecode,
+                      int shape,
+                      int threshold,
+                      int direction,
+                      int automatic)
+{
+    shape_t *s = (shape_t*)ptr;
 
     s->shape_completed = shapewipe_apply1(
         ptr,
@@ -582,7 +735,11 @@ int shapewipe_process(
         shape,
         threshold,
         direction,
-        automatic
+        automatic,
+        0,
+        0,
+        0,
+        0
     );
 
     return s->shape_completed;

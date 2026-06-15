@@ -28,54 +28,53 @@ typedef struct {
 vj_effect *average_blend_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
     ve->num_params = 2;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 32;
-    ve->defaults[0] = 1;
-    
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
-    ve->defaults[1] = 128;
+
+    ve->limits[0][0] = 1; ve->limits[1][0] = 32;  ve->defaults[0] = 1;
+    ve->limits[0][1] = 0; ve->limits[1][1] = 255; ve->defaults[1] = 128;
+
     ve->description = "Average Mixer";
     ve->sub_format = 1;
     ve->extra_frame = 1;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Recursions", "Mix Weight");
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_INTENSITY,
-        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
-        1, 12,
-        6, 22, 1800, 4200, 900, 28, /* Recursions */
-
-        VJ_BEAT_ALPHA_OR_OPACITY,
-        VJ_BEAT_F_CONTINUOUS,
-        16, 220,
-        8, 30, 1200, 3000, 0, 45 /* Mix Weight */
+        VJ_BEAT_INERTIA,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1, 6,   2,  8, 3200, 8200, 2400, 10,
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                      24, 196, 12, 48,  900, 2800, 0,    70
     );
+
     return ve;
 }
 
-void *average_blend_malloc(int w, int h) {
-    avgblend_t *t = (avgblend_t*) vj_calloc(sizeof(avgblend_t));
+void *average_blend_malloc(int w, int h)
+{
+    avgblend_t *t = (avgblend_t *) vj_calloc(sizeof(avgblend_t));
+
+    if(!t)
+        return NULL;
+
     t->n_threads = vje_advise_num_threads(w * h);
-    return (void*)t;
+
+    return t;
 }
 
-void average_blend_free(void *ptr) {
-    if(ptr) free(ptr);
+void average_blend_free(void *ptr)
+{
+    if(ptr)
+        free(ptr);
 }
 
 void average_blend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    avgblend_t *t = (avgblend_t*) ptr;
+    avgblend_t *t = (avgblend_t *) ptr;
 
-    const int recursions = args[0];
+    const int recursions = args[0] < 1 ? 1 : args[0];
     const int weight = args[1];
     const int n_threads = t->n_threads;
     const int len = frame->len;
@@ -88,14 +87,16 @@ void average_blend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict U2 = frame2->data[1];
     const uint8_t *restrict V2 = frame2->data[2];
 
-#pragma omp parallel num_threads(n_threads)
+    #pragma omp parallel num_threads(n_threads)
     {
-        for (int r = 0; r < recursions; r++) {
-#pragma omp for schedule(static)
-            for (int i = 0; i < len; i++) {
-                int y = Y1[i];
-                int u = U1[i];
-                int v = V1[i];
+        for(int r = 0; r < recursions; r++)
+        {
+            #pragma omp for schedule(static)
+            for(int i = 0; i < len; i++)
+            {
+                const int y = Y1[i];
+                const int u = U1[i];
+                const int v = V1[i];
 
                 Y1[i] = (uint8_t)(y + ((weight * ((int)Y2[i] - y)) >> 8));
                 U1[i] = (uint8_t)(u + ((weight * ((int)U2[i] - u)) >> 8));
@@ -105,6 +106,7 @@ void average_blend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     }
 }
 
-void average_blend_applyN(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+void average_blend_applyN(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
+{
     average_blend_apply(ptr, frame, frame2, args);
 }

@@ -23,9 +23,12 @@
  */
 
 #include "common.h"
+#include <stdint.h>
+#include <veejaycore/vjmem.h>
 #include "water.h"
 
 typedef struct {
+    uint8_t *region;
     uint8_t *src_img;
     uint8_t *diff_img;
     uint8_t *bg_img;
@@ -52,8 +55,11 @@ typedef struct {
     int n_threads;
     int frame_counter;
 
-    float beat_env;
-    float beat_kick;
+    float loop_env;
+    float decay_env;
+    float threshold_env;
+    float drops_env;
+    float power_env;
 
     unsigned int wfastrand_val;
 
@@ -105,86 +111,69 @@ static void water_set_table(water_t *w)
     }
 }
 
-#define WATER_PARAMS 9
+#define WATER_PARAMS 7
 #define P_REFRESH_FREQ 0
 #define P_WAVESPEED    1
 #define P_DECAY        2
 #define P_MODE         3
 #define P_THRESHOLD    4
-#define P_BEAT_DROPS   5
-#define P_BEAT_POWER   6
-#define P_BEAT_PUSH    7
-#define P_BEAT_SMOOTH  8
+#define P_DROP_DRIVE   5
+#define P_RIPPLE_POWER 6
 
-static inline int water_beat_shape(int beat_push)
+
+
+static inline float water_env(float oldv, float target, float attack, float release)
 {
-    beat_push = clampi(beat_push, 0, 1000);
-
-    const int sq = (beat_push * beat_push + 500) / 1000;
-    return clampi((beat_push * 32 + sq * 68 + 50) / 100, 0, 1000);
+    return target > oldv
+        ? oldv + (target - oldv) * attack
+        : oldv + (target - oldv) * release;
 }
 
-static inline void water_update_beat(water_t *w, int beat_push, int smooth, int *beat_q, int *kick_q)
+static inline int water_env_i(float *state, int target, int lo, int hi, float attack, float release)
 {
-    const int shaped = water_beat_shape(beat_push);
-    const float target = (float)shaped * 0.001f;
-    const float smooth_t = (float)clampi(smooth, 0, 1000) * 0.001f;
-    const float attack = 0.20f + (1.0f - smooth_t) * 0.34f;
-    const float release = 0.030f + (1.0f - smooth_t) * 0.090f;
-    const float prev = w->beat_env;
+    if(*state < (float)lo - 0.5f || *state > (float)hi + 0.5f)
+        *state = (float)target;
 
-    if(target > w->beat_env) {
-        const float rise = target - w->beat_env;
-        w->beat_env += rise * attack;
-        w->beat_kick += rise * 0.72f;
-    }
-    else {
-        w->beat_env += (target - w->beat_env) * release;
-    }
+    *state = water_env(*state, (float)target, attack, release);
 
-    w->beat_kick *= 0.58f;
-
-    if(w->beat_env < 0.0001f)
-        w->beat_env = 0.0f;
-    else if(w->beat_env > 1.0f)
-        w->beat_env = 1.0f;
-
-    if(w->beat_kick < 0.0001f)
-        w->beat_kick = 0.0f;
-    else if(w->beat_kick > 1.0f)
-        w->beat_kick = 1.0f;
-
-    (void)prev;
-
-    *beat_q = clampi((int)(w->beat_env * 1000.0f + 0.5f), 0, 1000);
-    *kick_q = clampi((int)(w->beat_kick * 1000.0f + 0.5f), 0, 1000);
+    return clampi((int)(*state + 0.5f), lo, hi);
 }
+
+
 
 vj_effect *water_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    if(!ve)
+        return NULL;
+
     ve->num_params = WATER_PARAMS;
 
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][P_REFRESH_FREQ] = 1;    ve->limits[1][P_REFRESH_FREQ] = 3600; ve->defaults[P_REFRESH_FREQ] = 10;
     ve->limits[0][P_WAVESPEED]    = 1;    ve->limits[1][P_WAVESPEED]    = 16;   ve->defaults[P_WAVESPEED]    = 1;
     ve->limits[0][P_DECAY]        = 1;    ve->limits[1][P_DECAY]        = 31;   ve->defaults[P_DECAY]        = 10;
     ve->limits[0][P_MODE]         = 0;    ve->limits[1][P_MODE]         = 6;    ve->defaults[P_MODE]         = 0;
     ve->limits[0][P_THRESHOLD]    = 0;    ve->limits[1][P_THRESHOLD]    = 255;  ve->defaults[P_THRESHOLD]    = 45;
-    ve->limits[0][P_BEAT_DROPS]   = 0;    ve->limits[1][P_BEAT_DROPS]   = 12;   ve->defaults[P_BEAT_DROPS]   = 3;
-    ve->limits[0][P_BEAT_POWER]   = 0;    ve->limits[1][P_BEAT_POWER]   = 1000; ve->defaults[P_BEAT_POWER]   = 650;
-    ve->limits[0][P_BEAT_PUSH]    = 0;    ve->limits[1][P_BEAT_PUSH]    = 1000; ve->defaults[P_BEAT_PUSH]    = 0;
-    ve->limits[0][P_BEAT_SMOOTH]  = 0;    ve->limits[1][P_BEAT_SMOOTH]  = 1000; ve->defaults[P_BEAT_SMOOTH]  = 520;
+    ve->limits[0][P_DROP_DRIVE]   = 0;    ve->limits[1][P_DROP_DRIVE]   = 1000; ve->defaults[P_DROP_DRIVE]   = 360;
+    ve->limits[0][P_RIPPLE_POWER] = 0;    ve->limits[1][P_RIPPLE_POWER] = 1000; ve->defaults[P_RIPPLE_POWER] = 650;
 
     ve->description = "Water ripples";
     ve->sub_format = -1;
     ve->extra_frame = 1;
     ve->has_user = 1;
     ve->motion = 1;
-    ve->parallel = 0;
 
     ve->param_description = vje_build_param_list(
         ve->num_params,
@@ -193,10 +182,8 @@ vj_effect *water_init(int width, int height)
         "Decay",
         "Mode",
         "Threshold (motion)",
-        "Beat Drops",
-        "Beat Power",
-        "Beat Push",
-        "Beat Smooth"
+        "Drop Drive",
+        "Ripple Power"
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
@@ -216,72 +203,59 @@ vj_effect *water_init(int width, int height)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SPEED,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 1,                  240,                6,  22, 1800, 4200, 900, 24,    /* Refresh Frequency */
-        VJ_BEAT_SPEED,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                             1,                  8,                  6,  22, 1800, 4200, 900, 28,    /* Wavespeed */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                             3,                  24,                 6,  22, 1800, 4200, 900, 24,    /* Decay */
-
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                 VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Mode */
-
-        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                              10,                 150,                6,  22, 1600, 3600, 900, 26,    /* Threshold */
-
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_REJECT,                                                        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Beat Drops */
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_REJECT,                                                        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Beat Power */
-
-        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                                0,                  820,                18, 72, 80,   760,  0,   100,   /* Beat Push */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                                                   280,                820,                5,  18, 2200, 5200, 1200,18     /* Beat Smooth */
+        VJ_BEAT_SPEED,        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,  -1000,
+        VJ_BEAT_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 1,                  16,                 16, 68,  120,  1200, 0,  86,
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 1,                  31,                 10, 42,  420,  2400, 0,  58,
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,  -1000,
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS,                                                0,                  255,                16, 54,  380,  1800, 0,  62,
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      120,                1000,               26, 82,  80,   720,  0,  96,
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      120,                1000,               22, 76,  90,   780,  0,  94
     );
-
-    (void) width;
-    (void) height;
 
     return ve;
 }
 
 void *water_malloc(int width, int height)
 {
-    if(width <= 0 || height <= 0)
-        return NULL;
-
     water_t *w = (water_t*) vj_calloc(sizeof(water_t));
     if(!w)
         return NULL;
 
     const int len = width * height;
 
-    w->src_img = (uint8_t*) vj_calloc((size_t)len * 4u);
-    if(!w->src_img) {
-        free(w);
-        return NULL;
-    }
-
-    w->diff_img = w->src_img + len;
-    w->bg_img   = w->diff_img + len;
-    w->blur_img = w->bg_img + len;
-
     w->map_h = height / 2 + 1;
     w->map_w = width / 2 + 1;
 
     const int map_len = w->map_h * w->map_w;
+    const size_t img_bytes = (size_t)len * 4u;
+    const size_t map_bytes = sizeof(int) * (size_t)map_len * 3u;
+    const size_t vtable_bytes = sizeof(int8_t) * (size_t)map_len * 2u;
+    const size_t total = img_bytes + map_bytes + vtable_bytes + 32u;
 
-    w->map = (int*) vj_calloc(sizeof(int) * (size_t)map_len * 3u);
-    if(!w->map) {
-        free(w->src_img);
+    w->region = (uint8_t*) vj_calloc(total);
+    if(!w->region) {
         free(w);
         return NULL;
     }
 
+    uint8_t *p = w->region;
+
+    w->src_img = p;
+    w->diff_img = w->src_img + len;
+    w->bg_img   = w->diff_img + len;
+    w->blur_img = w->bg_img + len;
+
+    p += img_bytes;
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
+
+    w->map = (int*)p;
     w->map1 = w->map;
     w->map2 = w->map1 + map_len;
     w->map3 = w->map2 + map_len;
 
-    w->vtable = (int8_t*) vj_calloc(sizeof(int8_t) * (size_t)map_len * 2u);
-    if(!w->vtable) {
-        free(w->map);
-        free(w->src_img);
-        free(w);
-        return NULL;
-    }
+    p += map_bytes;
+
+    w->vtable = (int8_t*)p;
 
     water_set_table(w);
 
@@ -291,8 +265,11 @@ void *water_malloc(int width, int height)
     w->lastmode = -1;
     w->last_fresh_rate = -1;
     w->wfastrand_val = 0x12345678u;
-    w->beat_env = 0.0f;
-    w->beat_kick = 0.0f;
+    w->loop_env = -1.0f;
+    w->decay_env = -1.0f;
+    w->threshold_env = -1.0f;
+    w->drops_env = -1.0f;
+    w->power_env = -1.0f;
 
     w->n_threads = vje_advise_num_threads(len);
 
@@ -303,26 +280,12 @@ void water_free(void *ptr)
 {
     water_t *w = (water_t*) ptr;
 
-    if(!w)
-        return;
-
-    if(w->vtable)
-        free(w->vtable);
-
-    if(w->map)
-        free(w->map);
-
-    if(w->src_img)
-        free(w->src_img);
-
+    free(w->region);
     free(w);
 }
 
 static void water_clear_maps(water_t *w)
 {
-    if(!w || !w->map)
-        return;
-
     const int map_len = w->map_w * w->map_h;
 
     veejay_memset(w->map, 0, sizeof(int) * (size_t)map_len * 3u);
@@ -356,30 +319,32 @@ static void water_drop(water_t *w, int power)
     }
 }
 
-static void water_inject_beat_drops(water_t *w, int beat_drops, int beat_power, int beat_q, int kick_q)
+static void water_inject_drive_drops(water_t *w, int drop_drive, int ripple_power)
 {
-    if(!w || beat_drops <= 0 || (beat_q <= 0 && kick_q <= 0))
+    drop_drive = clampi(drop_drive, 0, 1000);
+    ripple_power = clampi(ripple_power, 0, 1000);
+
+    if(drop_drive <= 0 || ripple_power <= 0)
         return;
 
-    beat_drops = clampi(beat_drops, 0, 12);
-    beat_power = clampi(beat_power, 0, 1000);
-    beat_q = clampi(beat_q, 0, 1000);
-    kick_q = clampi(kick_q, 0, 1000);
+    const int max_drops = 1 + ((drop_drive * 15 + 500) / 1000);
+    int count = (drop_drive * max_drops + 900) / 1800;
 
-    int count = ((beat_drops * beat_q) + 700) / 1000;
+    const int chance = drop_drive - 100;
+    if(chance > 0 && (int)((wfastrand(w) >> 8) % 1000u) < chance)
+        count++;
 
-    if(kick_q > 180)
-        count += 1 + ((beat_drops * kick_q) / 1800);
+    if(drop_drive > 760)
+        count += (drop_drive - 700) / 150;
 
-    if(count > beat_drops + 3)
-        count = beat_drops + 3;
+    if(count > 22)
+        count = 22;
 
     if(count <= 0)
         return;
 
-    const int magnitude = 2 + ((beat_power * 14 + 500) / 1000);
-    const int kick_boost = (kick_q * 3 + 500) / 1000;
-    const int power = -((magnitude + kick_boost) << w->point);
+    const int magnitude = 2 + ((ripple_power * 24 + 500) / 1000);
+    const int power = -(magnitude << w->point);
 
     for(int i = 0; i < count; i++)
         water_drop(w, power);
@@ -742,39 +707,31 @@ void water_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     water_t *w = (water_t*) ptr;
 
-    if(!w || !frame || !args || !frame->data[0])
-        return;
-
     const int len = frame->len;
-    const int width = frame->width;
-    const int height = frame->height;
 
-    if(len <= 0 || width <= 0 || height <= 0)
-        return;
+    const int fresh_rate = args[P_REFRESH_FREQ];
+    const int loopnum_arg = args[P_WAVESPEED];
+    const int decay_arg = args[P_DECAY];
+    const int mode = args[P_MODE];
+    const int threshold_arg = args[P_THRESHOLD];
+    const int drop_drive_arg = args[P_DROP_DRIVE];
+    const int ripple_power_arg = args[P_RIPPLE_POWER];
 
-    const int fresh_rate = clampi(args[P_REFRESH_FREQ], 1, 3600);
-    const int loopnum = clampi(args[P_WAVESPEED], 1, 16);
-    const int decay = clampi(args[P_DECAY], 1, 31);
-    const int mode = clampi(args[P_MODE], 0, 6);
-    const int threshold = clampi(args[P_THRESHOLD], 0, 255);
-    const int beat_drops = clampi(args[P_BEAT_DROPS], 0, 12);
-    const int beat_power = clampi(args[P_BEAT_POWER], 0, 1000);
-    const int beat_push = clampi(args[P_BEAT_PUSH], 0, 1000);
-    const int beat_smooth = clampi(args[P_BEAT_SMOOTH], 0, 1000);
+    const int drive_q = clampi(drop_drive_arg, 0, 1000);
+    const int power_q = clampi(ripple_power_arg, 0, 1000);
 
-    int beat_q = 0;
-    int kick_q = 0;
-    water_update_beat(w, beat_push, beat_smooth, &beat_q, &kick_q);
+    const int loop_target = clampi(loopnum_arg + ((drive_q * 5 + 500) / 1000), 1, 16);
+    const int decay_target = clampi(decay_arg + ((drive_q * 8 + 500) / 1000) - ((drive_q * power_q + 500000) / 1000000), 1, 31);
 
-    const int threshold_drop = ((18 + ((beat_power * 54 + 500) / 1000)) * beat_q + 500) / 1000;
-    const int threshold_eff = clampi(threshold - threshold_drop, 0, 255);
+    const int threshold_drop =
+        ((12 + ((power_q * 72 + 500) / 1000)) * drive_q + 500) / 1000;
+    const int threshold_target = clampi(threshold_arg - threshold_drop, 0, 255);
 
-    int loopnum_eff = loopnum + ((beat_q * 2 + 500) / 1000);
-    if(kick_q > 520)
-        loopnum_eff++;
-    loopnum_eff = clampi(loopnum_eff, 1, 16);
-
-    const int decay_eff = clampi(decay + ((beat_q * 3 + 500) / 1000), 1, 31);
+    const int loopnum_eff = water_env_i(&w->loop_env, loop_target, 1, 16, 0.34f, 0.105f);
+    const int decay_eff = water_env_i(&w->decay_env, decay_target, 1, 31, 0.26f, 0.070f);
+    const int threshold_eff = water_env_i(&w->threshold_env, threshold_target, 0, 255, 0.42f, 0.115f);
+    const int drop_drive = water_env_i(&w->drops_env, drop_drive_arg, 0, 1000, 0.40f, 0.130f);
+    const int ripple_power = water_env_i(&w->power_env, ripple_power_arg, 0, 1000, 0.36f, 0.120f);
 
     if(w->last_fresh_rate != fresh_rate) {
         w->last_fresh_rate = fresh_rate;
@@ -800,9 +757,6 @@ void water_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         water_raindrop(w, fresh_rate);
         veejay_memcpy(w->bg_img, frame->data[0], len);
     } else {
-        if(!frame2 || !frame2->data[0])
-            return;
-
         switch(mode) {
             case 1:
                 water_motiondetect(frame, frame2, threshold_eff, w, 0);
@@ -837,7 +791,7 @@ void water_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         }
     }
 
-    water_inject_beat_drops(w, beat_drops, beat_power, beat_q, kick_q);
+    water_inject_drive_drops(w, drop_drive, ripple_power);
 
     w->loopnum = loopnum_eff;
 

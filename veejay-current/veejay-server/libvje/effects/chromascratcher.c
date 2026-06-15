@@ -27,223 +27,260 @@ typedef struct {
     int cnframe;
     int cnreverse;
     int chroma_restart;
+    int n_threads;
     VJFrame _tmp;
 } chromascratcher_t;
+
+static inline int chromascratcher_clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
 
 vj_effect *chromascratcher_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = (MAX_SCRATCH_FRAMES-1); /* uses the chromamagick effect for scratchign */
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 29;
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 1;
 
-    ve->defaults[0] = 1;
-    ve->defaults[1] = 150;
-    ve->defaults[2] = 8;
-    ve->defaults[3] = 1;
+    ve->num_params = 4;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    ve->limits[0][0] = 0; ve->limits[1][0] = MAX_SCRATCH_FRAMES - 1; ve->defaults[0] = 1;
+    ve->limits[0][1] = 0; ve->limits[1][1] = 255;                    ve->defaults[1] = 150;
+    ve->limits[0][2] = 0; ve->limits[1][2] = 29;                     ve->defaults[2] = 8;
+    ve->limits[0][3] = 0; ve->limits[1][3] = 1;                      ve->defaults[3] = 1;
+
     ve->description = "Matte Scratcher";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-	ve->has_user =0;
-	ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Frames", "Mode", "Pingpong" );
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(ve->num_params, "Frames", "Opacity", "Mode", "Pingpong");
+    ve->hints = vje_init_value_hint_list(ve->num_params);
 
-	ve->hints = vje_init_value_hint_list( ve->num_params );
+    vje_build_value_hint_list(ve->hints, ve->limits[1][2], 2,
+        "Appearing", "Dissapearing", "Appearing suppressed", "Dissappearing suppressed",
+        "Add Subselect Luma", "Select Min", "Select Max", "Select Difference",
+        "Select Difference Negate", "Add Luma", "Select Unfreeze", "Exclusive",
+        "Difference Negate", "Additive", "Basecolor", "Freeze", "Unfreeze",
+        "Hardlight", "Multiply", "Divide", "Subtract", "Add", "Screen",
+        "Difference", "Softlight", "Dodge", "Reflect", "Difference Replace",
+        "Darken", "Lighten", "Modulo Add"
+    );
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][2],2,
-		"Appearing", "Dissapearing","Appearing suppressed", "Dissappearing suppressed",	
-		"Add Subselect Luma", "Select Min", "Select Max", "Select Difference",
-		"Select Difference Negate", "Add Luma", "Select Unfreeze", "Exclusive",
-		"Difference Negate", "Additive", "Basecolor", "Freeze", "Unfreeze",
-		"Hardlight", "Multiply", "Divide", "Subtract", "Add", "Screen",
-		"Difference", "Softlight", "Dodge", "Reflect", "Difference Replace",
-		"Darken", "Lighten", "Modulo Add" 
-	);
     ve->beat_hints = vje_build_beat_hint_list(
-		ve->num_params,
+        ve->num_params,
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 2,                  128,                4,  14, 3600, 9400, 2600, 22,
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                           48,                 255,                12, 48,  900, 3000, 0,    76,
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                                  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,                       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
+    );
 
-		VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 1,                  96,                 6,  20,  2200, 5200, 1800, 22,    /* Frames */
-		VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                                                        32,                 235,                14, 58,  90,   680,  0,    86,    /* Opacity */
-		VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Mode */
-		VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Pingpong */
-	);
-	return ve;
+    return ve;
 }
 
 void *chromascratcher_malloc(int w, int h)
 {
     chromascratcher_t *c = (chromascratcher_t*) vj_calloc(sizeof(chromascratcher_t));
-    if(!c) {
-        return NULL;
-    }
 
-    c->cframe[0] = (uint8_t *) vj_malloc( w * h * 3 * MAX_SCRATCH_FRAMES * sizeof(uint8_t) );
+    if(!c)
+        return NULL;
+
+    const int len = w * h;
+    const int plane_bank = len * MAX_SCRATCH_FRAMES;
+
+    c->cframe[0] = (uint8_t *) vj_malloc(plane_bank * 3 * sizeof(uint8_t));
+
     if(!c->cframe[0]) {
         free(c);
         return NULL;
     }
 
-    c->cframe[1] = c->cframe[0] + ( w * h * MAX_SCRATCH_FRAMES );
-    c->cframe[2] = c->cframe[1] + ( w * h * MAX_SCRATCH_FRAMES );
+    c->cframe[1] = c->cframe[0] + plane_bank;
+    c->cframe[2] = c->cframe[1] + plane_bank;
+    c->cframe[3] = NULL;
+    c->n_threads = vje_advise_num_threads(len);
 
+    vj_frame_clear1(c->cframe[0], pixel_Y_lo_, plane_bank);
+    vj_frame_clear1(c->cframe[1], 128, plane_bank);
+    vj_frame_clear1(c->cframe[2], 128, plane_bank);
 
-    int strides[4] = { w * h * MAX_SCRATCH_FRAMES, w * h * MAX_SCRATCH_FRAMES, w * h * MAX_SCRATCH_FRAMES, 0 };
-    
-    vj_frame_clear( c->cframe, strides, 128 );
-
-    return (void*) c;
+    return c;
 }
 
-void chromascratcher_free(void *ptr) {
-
+void chromascratcher_free(void *ptr)
+{
     chromascratcher_t *c = (chromascratcher_t*) ptr;
-    free(c->cframe[0]);
+
+    if(!c)
+        return;
+
+    if(c->cframe[0])
+        free(c->cframe[0]);
+
     free(c);
 }
 
-static void chromastore_frame(chromascratcher_t *c, VJFrame *src, int w, int h, int n, int no_reverse)
+static void chromastore_frame(chromascratcher_t *c, VJFrame *src, int n, int no_reverse)
 {
-	int strides[4] = { (w * h), (w*h), (w*h) , 0 };
+    const int len = src->len;
     int cnframe = c->cnframe;
-    uint8_t **cframe = c->cframe;
     int cnreverse = c->cnreverse;
 
-	uint8_t *dest[4] = {
-		cframe[0] + (w*h*cnframe),
-		cframe[1] + (w*h*cnframe),
-		cframe[2] + (w*h*cnframe),
-       		NULL	};
+    if(n <= 0)
+        return;
 
-	if (!cnreverse) {
-		vj_frame_copy( src->data, dest, strides ); 
-    } else {
-		vj_frame_copy( dest, src->data, strides );
-   	}
+    cnframe = chromascratcher_clampi(cnframe, 0, n - 1);
 
-	if (cnreverse)
-		cnframe--;
-	else
-		cnframe++;
+    uint8_t *dest[4] = {
+        c->cframe[0] + (len * cnframe),
+        c->cframe[1] + (len * cnframe),
+        c->cframe[2] + (len * cnframe),
+        NULL
+    };
 
-	if (cnframe >= n) {
-		if (no_reverse == 0) {
-		    cnreverse = 1;
-		    cnframe = n - 1;
-			if(cnframe < 0 )
-				cnframe = 0;
-		} else {
-		    cnframe = 0;
-		}
-    	}
+    int strides[4] = { len, len, len, 0 };
 
-   	if (cnframe == 0)
-		cnreverse = 0;
+    if(!cnreverse)
+        vj_frame_copy(src->data, dest, strides);
+    else
+        vj_frame_copy(dest, src->data, strides);
+
+    if(cnreverse)
+        cnframe--;
+    else
+        cnframe++;
+
+    if(cnframe >= n) {
+        if(no_reverse == 0) {
+            cnreverse = 1;
+            cnframe = n - 1;
+        }
+        else {
+            cnframe = 0;
+        }
+    }
+
+    if(cnframe <= 0) {
+        cnframe = 0;
+        cnreverse = 0;
+    }
 
     c->cnreverse = cnreverse;
     c->cnframe = cnframe;
-
 }
 
+static void chromascratcher_apply_simple(chromascratcher_t *c, VJFrame *frame, int mode, int opacity, int offset)
+{
+    const int len = frame->len;
+    const int n_threads = c->n_threads;
+    const int op_a = opacity;
+    const int op_b = 255 - op_a;
 
-void chromascratcher_apply(void *ptr, VJFrame *frame, int *args) {
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+
+    uint8_t *restrict SY = c->cframe[0] + offset;
+    uint8_t *restrict SU = c->cframe[1] + offset;
+    uint8_t *restrict SV = c->cframe[2] + offset;
+
+    switch(mode)
+    {
+        case 0:
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
+            for(int i = 0; i < len; i++)
+            {
+                if(SY[i] < Y[i]) {
+                    Y[i] = SY[i];
+                    Cb[i] = SU[i];
+                    Cr[i] = SV[i];
+                }
+            }
+            break;
+
+        case 1:
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
+            for(int i = 0; i < len; i++)
+            {
+                if(SY[i] > Y[i]) {
+                    Y[i] = SY[i];
+                    Cb[i] = SU[i];
+                    Cr[i] = SV[i];
+                }
+            }
+            break;
+
+        case 2:
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
+            for(int i = 0; i < len; i++)
+            {
+                if((SY[i] * op_a) < (Y[i] * op_b)) {
+                    Y[i] = SY[i];
+                    Cb[i] = SU[i];
+                    Cr[i] = SV[i];
+                }
+            }
+            break;
+
+        case 3:
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
+            for(int i = 0; i < len; i++)
+            {
+                if((SY[i] * op_a) > (Y[i] * op_b)) {
+                    Y[i] = SY[i];
+                    Cb[i] = SU[i];
+                    Cr[i] = SV[i];
+                }
+            }
+            break;
+    }
+}
+
+void chromascratcher_apply(void *ptr, VJFrame *frame, int *args)
+{
+    chromascratcher_t *c = (chromascratcher_t*) ptr;
+
+    const int len = frame->len;
+
+
     int n = args[0];
     int opacity = args[1];
     int mode = args[2];
-    int no_reverse = (args[3] == 0) ? 1 : 0;
+    int no_reverse = args[3] == 0 ? 1 : 0;
 
-    chromascratcher_t *c = (chromascratcher_t*) ptr;
-
-    int cnframe = c->cnframe;
-    uint8_t **cframe = c->cframe;
-    int chroma_restart = c->chroma_restart;
-
-    unsigned int i;
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-    const int len = frame->len;
-    const unsigned int op_a = (opacity > 255) ? 255 : opacity;
-    const unsigned int op_b = 255 - op_a;
-    const int offset = len * cnframe;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-    VJFrame _tmp;
-    veejay_memcpy( &_tmp, frame, (sizeof(VJFrame)));
-	_tmp.data[0] = cframe[0];
-	_tmp.data[1] = cframe[1];
-	_tmp.data[2] = cframe[2];
-
-    if(no_reverse != chroma_restart)
-    {
-		chroma_restart = no_reverse;
-		cnframe = n;
+    if(n <= 0) {
+        c->cnframe = 0;
+        c->cnreverse = 0;
+        c->chroma_restart = no_reverse;
+        return;
     }
 
-    if( cnframe == 0 ) {
-	_tmp.data[0] = frame->data[0];
-	_tmp.data[1] = frame->data[1];
-	_tmp.data[2] = frame->data[2];
+    if(no_reverse != c->chroma_restart) {
+        c->chroma_restart = no_reverse;
+        c->cnreverse = 0;
+        c->cnframe = 0;
     }
 
-    if(mode>3) {
-	   int matte_mode = mode - 3;
-       int ch_args[2] = { matte_mode, opacity };
-   	   chromamagick_apply( NULL,frame,&_tmp,ch_args);
+    c->cnframe = chromascratcher_clampi(c->cnframe, 0, n - 1);
+
+    const int offset = len * c->cnframe;
+
+    veejay_memcpy(&c->_tmp, frame, sizeof(VJFrame));
+    c->_tmp.data[0] = c->cframe[0] + offset;
+    c->_tmp.data[1] = c->cframe[1] + offset;
+    c->_tmp.data[2] = c->cframe[2] + offset;
+    c->_tmp.data[3] = NULL;
+    c->_tmp.len = len;
+    c->_tmp.uv_len = len;
+    c->_tmp.ssm = 1;
+
+    if(mode > 3) {
+        int ch_args[2] = { mode - 3, opacity };
+        chromamagick_apply(NULL, frame, &c->_tmp, ch_args);
     }
     else {
-	    switch (mode) {		/* scratching with a sequence of frames (no scene changes) */
+        chromascratcher_apply_simple(c, frame, mode, opacity, offset);
+    }
 
-		case 0:
-			/* moving parts will dissapear over time */
-			for (i = 0; i < len; i++) {
-			    if (cframe[0][offset + i] < Y[i]) {
-					Y[i] = cframe[0][offset + i];
-					Cb[i] = cframe[1][offset + i];
-					Cr[i] = cframe[2][offset + i];
-			    }
-			}
-			break;
-   		 case 1:
-			for (i = 0; i < len; i++) {
-			    /* moving parts will remain visible */
-			    if (cframe[0][offset + i] > Y[i]) {
-					Y[i] = cframe[0][offset + i];
-					Cb[i] = cframe[1][offset + i];
-					Cr[i] = cframe[2][offset + i];
-		    		}
-			}
-		break;
-  	  case 2:
-		for (i = 0; i < len; i++) {
-		    if ((cframe[0][offset + i] * op_a) < (Y[i] * op_b)) {
-				Y[i] = cframe[0][offset + i];
-				Cb[i] = cframe[1][offset + i];
-					Cr[i] = cframe[2][offset + i];
-	 	   }
-		}
-		break;
-	   case 3:
-		for (i = 0; i < len; i++) {
-		    /* moving parts will remain visible */
-		    if ((cframe[0][offset + i] * op_a) > (Y[i] * op_b)) {
-			Y[i] = cframe[0][offset + i];
-			Cb[i] = cframe[1][offset + i];
-			Cr[i] = cframe[2][offset + i];
-		    }
-		}
-		break;
-    
-		}
-	}
-
-	chromastore_frame(c, frame, width, height, n, no_reverse);
-    c->chroma_restart = chroma_restart;
+    chromastore_frame(c, frame, n, no_reverse);
 }

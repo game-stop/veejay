@@ -21,7 +21,7 @@
 #include "common.h"
 #include "chronocortex.h"
 
-#define CHRONOFOLD_PARAMS 11
+#define CHRONOFOLD_PARAMS 10
 
 #define P_THRESHOLD      0
 #define P_EXCITATION     1
@@ -31,9 +31,8 @@
 #define P_POLARITY_DRIFT 5
 #define P_SOURCE_BLEED   6
 #define P_COLOR_MODE     7
-#define P_BEAT_PUSH      8
-#define P_CORTEX_GAIN    9
-#define P_COLOR_ENERGY  10
+#define P_CORTEX_GAIN    8
+#define P_COLOR_ENERGY   9
 
 #define CF_COLOR_POLARITY 0
 #define CF_COLOR_THERMAL  1
@@ -174,9 +173,6 @@ vj_effect *chronocortex_init(int w, int h)
     ve->limits[1][P_COLOR_MODE] = 4;
     ve->defaults[P_COLOR_MODE] = CF_COLOR_POLARITY;
 
-    ve->limits[0][P_BEAT_PUSH] = 0;
-    ve->limits[1][P_BEAT_PUSH] = 1000;
-    ve->defaults[P_BEAT_PUSH] = 0;
 
     ve->limits[0][P_CORTEX_GAIN] = 0;
     ve->limits[1][P_CORTEX_GAIN] = 1000;
@@ -189,7 +185,6 @@ vj_effect *chronocortex_init(int w, int h)
     ve->description = "Chronofold Cortex";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
     ve->has_user = 0;
 
     ve->param_description = vje_build_param_list(
@@ -202,25 +197,24 @@ vj_effect *chronocortex_init(int w, int h)
         "Polarity Drift",
         "Source Bleed",
         "Color Mode",
-        "Beat Push",
         "Cortex Gain",
         "Color Energy"
     );
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                         20,                 380,                6,  22,  1600, 3400, 700,  34,    /* Trigger Gate */
-        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,       250,                960,                20, 82,  70,   420,  0,    92,    /* Neural Excitation */
-        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                          60,                 700,                10, 42,  120,  900,  0,    68,    /* Lateral Inhibition */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                         470,                1000,               8,  30,  1800, 4200, 900,  48,    /* Memory Decay */
-        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                          80,                 860,                12, 52,  120,  980,  0,    78,    /* Branching */
-        VJ_BEAT_HAT,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,     0,                  760,                4,  22,  1200, 3200, 900,  30,    /* Polarity Drift */
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                          0,                  340,                8,  30,  900,  2400, 0,    42,    /* Source Bleed */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
-        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,       0,                  1000,               24, 96,  60,   360,  0,    100,   /* Beat Push */
-        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                          240,                1000,               16, 68,  90,   720,  0,    86,    /* Cortex Gain */
-        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                          180,                1000,               10, 46,  120,  900,  0,    64     /* Color Energy */
+        VJ_BEAT_TRIGGER,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,   0,                  140,                74, 100,  45,  520, 0,    100,
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       160,                1000,               68, 100,  45,  580, 0,    100,
+        VJ_BEAT_CONTRAST,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                        80,                880,                46,  94,  80,  900, 0,     82,
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,                1000,               76, 100,  60,  620, 0,    100,
+        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                        80,                1000,               64, 100,  55,  680, 0,     96,
+        VJ_BEAT_DRIFT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_NO_ZERO_CROSS,  0,                 760,                28,  72, 280, 2200, 0,     54,
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,   0,   -1000,
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,   0,   -1000,
+        VJ_BEAT_GLOW,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       220,                900,                56, 100,  70,  900, 80,    90,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       220,                1000,               62, 100,  50,  680, 0,    100
     );
+
     return ve;
 }
 
@@ -243,8 +237,6 @@ void *chronocortex_malloc(int w, int h)
     c->lut_valid = 0;
 
     c->n_threads = vje_advise_num_threads(w * h);
-    if(c->n_threads <= 0)
-        c->n_threads = 1;
 
     c->ref_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
     c->on_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
@@ -1415,7 +1407,6 @@ void chronocortex_apply(void *ptr, VJFrame *frame, int *args)
     int polarity_drift;
     int source_bleed;
     int color_mode;
-    int beat_push;
     int cortex_gain;
     int color_energy;
 
@@ -1434,8 +1425,6 @@ void chronocortex_apply(void *ptr, VJFrame *frame, int *args)
     if(!c->seeded)
         cf_seed(c, frame);
 
-    beat_push = cf_clampi(args[P_BEAT_PUSH], 0, 1000);
-
     threshold_ui      = cf_clampi(args[P_THRESHOLD], 0, 1000);
     excitation_ui     = cf_clampi(args[P_EXCITATION], 0, 1000);
     inhibition_ui     = cf_clampi(args[P_INHIBITION], 0, 1000);
@@ -1446,16 +1435,6 @@ void chronocortex_apply(void *ptr, VJFrame *frame, int *args)
     cortex_gain_ui    = cf_clampi(args[P_CORTEX_GAIN], 0, 1000);
     color_energy_ui   = cf_clampi(args[P_COLOR_ENERGY], 0, 1000);
     color_mode        = cf_clampi(args[P_COLOR_MODE], 0, 4);
-
-    threshold_ui      = cf_clampi(threshold_ui - (beat_push / 3), 0, 1000);
-    excitation_ui     = cf_clampi(excitation_ui + ((beat_push * 45) / 100), 0, 1000);
-    inhibition_ui     = cf_clampi(inhibition_ui - (beat_push / 6), 0, 1000);
-    decay_ui          = cf_clampi(decay_ui + (beat_push / 20), 0, 1000);
-    branching_ui      = cf_clampi(branching_ui + ((beat_push * 40) / 100), 0, 1000);
-    polarity_drift_ui = cf_clampi(polarity_drift_ui + (beat_push / 5), 0, 1000);
-    source_bleed_ui   = cf_clampi(source_bleed_ui + (beat_push / 8), 0, 1000);
-    cortex_gain_ui    = cf_clampi(cortex_gain_ui + ((beat_push * 45) / 100), 0, 1000);
-    color_energy_ui   = cf_clampi(color_energy_ui + ((beat_push * 35) / 100), 0, 1000);
 
     threshold      = cf_ui1000_to_u8(threshold_ui);
     excitation     = cf_ui1000_to_u8(excitation_ui);

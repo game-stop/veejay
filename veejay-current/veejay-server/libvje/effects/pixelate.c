@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,111 +21,123 @@
 #include "common.h"
 #include "pixelate.h"
 
+#define PIXELATE_PARAMS 1
+
+#define P_PIXEL_SIZE 0
+
+static inline int pixelate_clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
 vj_effect *pixelate_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
 
+    if(!ve)
+        return NULL;
+
+    ve->num_params = PIXELATE_PARAMS;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = (width < height ? width : height);
-    ve->defaults[0] = 8;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
+    const int max_size = width < height ? width : height;
+
+    ve->limits[0][P_PIXEL_SIZE] = 1;
+    ve->limits[1][P_PIXEL_SIZE] = max_size;
+    ve->defaults[P_PIXEL_SIZE] = max_size < 8 ? max_size : 8;
 
     ve->description = "Pixelate";
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->parallel = 0;
 
-    ve->param_description = vje_build_param_list(
-        ve->num_params,
-        "Pixel Size"
-    );
+    ve->param_description = vje_build_param_list(ve->num_params, "Pixel Size");
+
+    int pixel_hi = max_size;
+
+    if(pixel_hi > 40)
+        pixel_hi = 40;
+    if(pixel_hi < 2)
+        pixel_hi = max_size;
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 2, 48, 6, 22, 2200, 5200, 1800, 25 /* Pixel Size */
+        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 2, pixel_hi, 4, 14, 3000, 8200, 2200, 24
     );
 
     return ve;
 }
 
-static inline int pixelate_clampi(int v, int lo, int hi)
+static void pixelate_plane(uint8_t *restrict plane,
+                           int width,
+                           int height,
+                           int block_w,
+                           int block_h,
+                           int n_threads)
 {
-    return (v < lo) ? lo : (v > hi ? hi : v);
-}
+    const int blocks_x = (width + block_w - 1) / block_w;
+    const int blocks_y = (height + block_h - 1) / block_h;
+    const int blocks = blocks_x * blocks_y;
 
-static void pixelate_plane(uint8_t *plane, int width, int height, int block_w, int block_h)
-{
-    if(!plane || width <= 0 || height <= 0 || block_w <= 0 || block_h <= 0)
-        return;
+#pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int b = 0; b < blocks; b++) {
+        const int by = (b / blocks_x) * block_h;
+        const int bx = (b - ((b / blocks_x) * blocks_x)) * block_w;
+        const int y_end = by + block_h < height ? by + block_h : height;
+        const int x_end = bx + block_w < width ? bx + block_w : width;
+        const int area = (y_end - by) * (x_end - bx);
+        int total = 0;
 
-    for(int by = 0; by < height; by += block_h) {
-        const int y_end = (by + block_h < height) ? (by + block_h) : height;
+        for(int y = by; y < y_end; y++) {
+            const int row = y * width;
 
-        for(int bx = 0; bx < width; bx += block_w) {
-            const int x_end = (bx + block_w < width) ? (bx + block_w) : width;
+            for(int x = bx; x < x_end; x++)
+                total += plane[row + x];
+        }
 
-            int total = 0;
-            int count = 0;
+        const uint8_t avg = (uint8_t)((total + (area >> 1)) / area);
 
-            for(int y = by; y < y_end; y++) {
-                const int row = y * width;
+        for(int y = by; y < y_end; y++) {
+            uint8_t *restrict dst = plane + y * width + bx;
 
-                for(int x = bx; x < x_end; x++) {
-                    total += plane[row + x];
-                    count++;
-                }
-            }
-
-            if(count <= 0)
-                continue;
-
-            const uint8_t avg = (uint8_t)(total / count);
-
-            for(int y = by; y < y_end; y++) {
-                const int row = y * width;
-
-                for(int x = bx; x < x_end; x++) {
-                    plane[row + x] = avg;
-                }
-            }
+            for(int x = bx; x < x_end; x++)
+                *dst++ = avg;
         }
     }
 }
 
 void pixelate_apply(void *ptr, VJFrame *frame, int *args)
 {
-    (void) ptr;
-
-    if(!frame || !args)
-        return;
+    (void)ptr;
 
     const int width = frame->width;
     const int height = frame->height;
+    const int pixel_size = pixelate_clampi(args[P_PIXEL_SIZE], 1, width < height ? width : height);
+    const int n_threads = vje_advise_num_threads(frame->len);
 
-    if(width <= 0 || height <= 0)
+    if(pixel_size <= 1)
         return;
 
-    int pixel_size = pixelate_clampi(args[0], 1, (width < height ? width : height));
-
-    uint8_t *dstY = frame->data[0];
-    uint8_t *dstU = frame->data[1];
-    uint8_t *dstV = frame->data[2];
-
-    pixelate_plane(dstY, width, height, pixel_size, pixel_size);
+    pixelate_plane(frame->data[0], width, height, pixel_size, pixel_size, n_threads);
 
     if(frame->ssm) {
-        pixelate_plane(dstU, width, height, pixel_size, pixel_size);
-        pixelate_plane(dstV, width, height, pixel_size, pixel_size);
-    } else {
-        const int uv_w = frame->uv_width;
-        const int uv_h = frame->uv_height;
-
+        pixelate_plane(frame->data[1], width, height, pixel_size, pixel_size, n_threads);
+        pixelate_plane(frame->data[2], width, height, pixel_size, pixel_size, n_threads);
+    }
+    else {
         int uv_block_w = pixel_size >> frame->shift_h;
         int uv_block_h = pixel_size >> frame->shift_v;
 
@@ -134,7 +146,11 @@ void pixelate_apply(void *ptr, VJFrame *frame, int *args)
         if(uv_block_h < 1)
             uv_block_h = 1;
 
-        pixelate_plane(dstU, uv_w, uv_h, uv_block_w, uv_block_h);
-        pixelate_plane(dstV, uv_w, uv_h, uv_block_w, uv_block_h);
+        if(uv_block_w > 1 || uv_block_h > 1) {
+            const int uv_threads = vje_advise_num_threads(frame->uv_len);
+
+            pixelate_plane(frame->data[1], frame->uv_width, frame->uv_height, uv_block_w, uv_block_h, uv_threads);
+            pixelate_plane(frame->data[2], frame->uv_width, frame->uv_height, uv_block_w, uv_block_h, uv_threads);
+        }
     }
 }

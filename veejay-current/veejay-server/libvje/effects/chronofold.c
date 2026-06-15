@@ -21,7 +21,7 @@
 #include "common.h"
 #include "chronocortex.h"
 
-#define CHRONOFOLD_PARAMS 11
+#define CHRONOFOLD_PARAMS 10
 
 #define P_THRESHOLD     0
 #define P_DECAY         1
@@ -31,9 +31,8 @@
 #define P_COLOR_MODE    5
 #define P_NOISE         6
 #define P_SOURCE_BLEED  7
-#define P_BEAT_PUSH     8
-#define P_FLASH_GAIN    9
-#define P_COLOR_ENERGY 10
+#define P_FLASH_GAIN    8
+#define P_COLOR_ENERGY  9
 
 #define CF_COLOR_WHITE      0
 #define CF_COLOR_POLARITY   1
@@ -118,21 +117,6 @@ static inline int cf_old_default_1000(int v)
     return (v * 1000 + 127) / 255;
 }
 
-static inline int cf_push_add_255(int base, int push, int amount)
-{
-    return cf_clampi(base + ((push * amount + 127) / 255), 0, 255);
-}
-
-static inline int cf_push_sub_255(int base, int push, int amount)
-{
-    return cf_clampi(base - ((push * amount + 127) / 255), 0, 255);
-}
-
-static inline int cf_push_add_1000(int base, int push, int amount)
-{
-    return cf_clampi(base + ((push * amount + 127) / 255), 0, 1000);
-}
-
 static inline uint32_t cf_hash_u32(uint32_t x)
 {
     x ^= x >> 16;
@@ -180,7 +164,6 @@ vj_effect *chronofold_init(int w, int h)
      * Event Gain: temporal-difference amplification.
      * Retina Memory: adaptive reference speed.
      * Neural Trail: neighbor event diffusion / smear.
-     * Beat Push: safe musical impact macro.
      * Flash Gain: output-only event brightness.
      * Color Energy: output-only chroma strength.
      */
@@ -216,10 +199,6 @@ vj_effect *chronofold_init(int w, int h)
     ve->limits[1][P_SOURCE_BLEED] = 1000;
     ve->defaults[P_SOURCE_BLEED] = cf_old_default_1000(8);
 
-    ve->limits[0][P_BEAT_PUSH] = 0;
-    ve->limits[1][P_BEAT_PUSH] = 1000;
-    ve->defaults[P_BEAT_PUSH] = 0;
-
     ve->limits[0][P_FLASH_GAIN] = 0;
     ve->limits[1][P_FLASH_GAIN] = 1000;
     ve->defaults[P_FLASH_GAIN] = 500;
@@ -242,26 +221,24 @@ vj_effect *chronofold_init(int w, int h)
         "Color Mode",
         "Neural Noise",
         "Source Bleed",
-        "Beat Push",
         "Flash Gain",
         "Color Energy"
     );
     
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY,                    16,                 375,                20, 64,  1600, 3400, 700,  30,    /* Trigger Gate */
-        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                    470,                1000,               18, 64,  1800, 4200, 900,  48,    /* Event Decay */
-        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 260,                960,                16, 72,  100,  820,  0,    82,    /* Event Gain */
-        VJ_BEAT_INERTIA,    VJ_BEAT_F_PHRASE_ONLY,                    45,                 705,                18, 70,  1800, 4200, 900,  34,    /* Retina Memory */
-        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     80,                 860,                12, 52,  120,  980,  0,    74,    /* Neural Trail */
-        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
-        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,              320,                4,  24,  120,  900,  500,  32,    /* Neural Noise */
-        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                     0,                  420,                8,  30,  900,  2400, 0,    42,    /* Source Bleed */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 0,                  1000,               24, 96,  60,   360,  0,    100,   /* Beat Push */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     240,                1000,               16, 68,  90,   720,  0,    86,    /* Flash Gain */
-        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     180,                1000,               10, 46,  120,  900,  0,    64     /* Color Energy */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,   0,                  180,                72, 100,  45,  520, 0,    100,
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,                1000,               76, 100,  55,  620, 0,    100,
+        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       220,                1000,               68, 100,  45,  580, 0,    100,
+        VJ_BEAT_INERTIA,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,    4,                 620,                42,  92, 160, 1400, 0,     72,
+        VJ_BEAT_FLOW,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,                1000,               68, 100,  55,  680, 0,     96,
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,   0,   -1000,
+        VJ_BEAT_TURBULENCE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,                420,                28,  78, 240, 1800, 0,     54,
+        VJ_BEAT_SOURCE_MIX,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,   0,   -1000,
+        VJ_BEAT_GLOW,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       180,                920,                58, 100,  60,  720, 80,    92,
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       180,                1000,               62, 100,  50,  680, 0,    100
     );
+
     return ve;
 }
 
@@ -285,8 +262,6 @@ void *chronofold_malloc(int w, int h)
     c->last_color_mode = -1;
 
     c->n_threads = vje_advise_num_threads(w * h);
-    if(c->n_threads <= 0)
-        c->n_threads = 1;
 
     c->ref_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
 
@@ -904,7 +879,6 @@ void chronofold_apply(void *ptr, VJFrame *frame, int *args)
     int color_mode;
     int noise;
     int source_bleed;
-    int beat_push;
     int flash_gain;
     int color_energy;
 
@@ -917,8 +891,6 @@ void chronofold_apply(void *ptr, VJFrame *frame, int *args)
     if(!c->seeded)
         cf_seed(c, frame);
 
-    beat_push = cf_scale_1000_to_255(args[P_BEAT_PUSH]);
-
     threshold    = cf_scale_1000_to_255(args[P_THRESHOLD]);
     decay        = cf_scale_1000_to_255(args[P_DECAY]);
     gain         = cf_scale_1000_to_255(args[P_GAIN]);
@@ -929,15 +901,6 @@ void chronofold_apply(void *ptr, VJFrame *frame, int *args)
     source_bleed = cf_scale_1000_to_255(args[P_SOURCE_BLEED]);
     flash_gain   = cf_clampi(args[P_FLASH_GAIN], 0, 1000);
     color_energy = cf_clampi(args[P_COLOR_ENERGY], 0, 1000);
-
-    threshold    = cf_push_sub_255(threshold, beat_push, 42);
-    decay        = cf_push_add_255(decay, beat_push, 10);
-    gain         = cf_push_add_255(gain, beat_push, 64);
-    trail        = cf_push_add_255(trail, beat_push, 72);
-    noise        = cf_push_add_255(noise, beat_push, 8);
-    source_bleed = cf_push_add_255(source_bleed, beat_push, 34);
-    flash_gain   = cf_push_add_1000(flash_gain, beat_push, 220);
-    color_energy = cf_push_add_1000(color_energy, beat_push, 180);
 
     use_white = (color_mode == CF_COLOR_WHITE);
     use_trail = (trail > 0);

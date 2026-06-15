@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,55 +18,62 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-/*
-    This effect uses libpostproc , it should be enabled at compile time
-    (--with-swscaler) if you want to use this Effect.
- */
-
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include <veejaycore/yuvconv.h>
 #include <libavutil/pixfmt.h>
 #include "picinpic.h"
 
-extern void vj_get_yuv444_template(VJFrame *src, int w, int h);
+#define PICINPIC_PARAMS 4
+
+#define P_WIDTH  0
+#define P_HEIGHT 1
+#define P_X      2
+#define P_Y      3
 
 typedef struct {
     void *scaler;
     VJFrame *frame;
     sws_template template;
-    void *sampler;
-    int cached;
+    uint8_t *private_data[3];
     int w;
     int h;
+    int pixfmt;
 } pic_t;
 
-static int nearest_div(int val)
+static inline int clampi(int v, int lo, int hi)
 {
-    if(val < 0)
-        val = 0;
-
-    return val - (val % 8);
+    return v < lo ? lo : (v > hi ? hi : v);
 }
 
-static inline int pip_clampi(int v, int lo, int hi)
+static inline int pip_floor8(int v)
 {
-    return (v < lo) ? lo : (v > hi ? hi : v);
+    return v & ~7;
+}
+
+static inline int pip_size8(int v)
+{
+    v = pip_floor8(v);
+    return v < 8 ? 8 : v;
+}
+
+static inline int pip_pos8(int v)
+{
+    v = pip_floor8(v);
+    return v < 0 ? 0 : v;
 }
 
 static void picinpic_release_frame(pic_t *picture)
 {
-    if(!picture)
-        return;
+    free(picture->private_data[0]);
+    picture->private_data[0] = NULL;
+    picture->private_data[1] = NULL;
+    picture->private_data[2] = NULL;
 
     if(picture->frame) {
-        for(int i = 0; i < 3; i++) {
-            if(picture->frame->data[i]) {
-                free(picture->frame->data[i]);
-                picture->frame->data[i] = NULL;
-            }
-        }
-
+        picture->frame->data[0] = NULL;
+        picture->frame->data[1] = NULL;
+        picture->frame->data[2] = NULL;
         free(picture->frame);
         picture->frame = NULL;
     }
@@ -78,25 +85,36 @@ static void picinpic_release_frame(pic_t *picture)
 
     picture->w = 0;
     picture->h = 0;
+    picture->pixfmt = 0;
 }
 
 static int picinpic_alloc_frame(pic_t *picture, int view_width, int view_height, int pixfmt)
 {
-    const int plane_len = view_width * view_height;
+    const size_t plane_len = (size_t)view_width * (size_t)view_height;
 
     picture->frame = yuv_yuv_template(NULL, NULL, NULL, view_width, view_height, pixfmt);
+
     if(!picture->frame)
         return 0;
 
-    for(int i = 0; i < 3; i++) {
-        picture->frame->data[i] = (uint8_t*) vj_malloc(sizeof(uint8_t) * plane_len);
-        if(!picture->frame->data[i]) {
-            picinpic_release_frame(picture);
-            return 0;
-        }
+    picture->private_data[0] = (uint8_t*) vj_malloc(plane_len * 3u);
 
-        veejay_memset(picture->frame->data[i], (i == 0 ? pixel_Y_lo_ : 128), plane_len);
+    if(!picture->private_data[0]) {
+        free(picture->frame);
+        picture->frame = NULL;
+        return 0;
     }
+
+    picture->private_data[1] = picture->private_data[0] + plane_len;
+    picture->private_data[2] = picture->private_data[1] + plane_len;
+
+    picture->frame->data[0] = picture->private_data[0];
+    picture->frame->data[1] = picture->private_data[1];
+    picture->frame->data[2] = picture->private_data[2];
+
+    veejay_memset(picture->frame->data[0], pixel_Y_lo_, plane_len);
+    veejay_memset(picture->frame->data[1], 128, plane_len);
+    veejay_memset(picture->frame->data[2], 128, plane_len);
 
     return 1;
 }
@@ -104,28 +122,35 @@ static int picinpic_alloc_frame(pic_t *picture, int view_width, int view_height,
 vj_effect *picinpic_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
 
+    if(!ve)
+        return NULL;
+
+    ve->num_params = PICINPIC_PARAMS;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->defaults[0] = width / 8;
-    ve->defaults[1] = height / 8;
-    ve->defaults[2] = width / 2;
-    ve->defaults[3] = height / 2;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
-    ve->limits[0][0] = 8;
-    ve->limits[1][0] = width;
+    ve->limits[0][P_WIDTH] = 8;  ve->limits[1][P_WIDTH] = width;  ve->defaults[P_WIDTH] = width / 8;
+    ve->limits[0][P_HEIGHT] = 8; ve->limits[1][P_HEIGHT] = height; ve->defaults[P_HEIGHT] = height / 8;
+    ve->limits[0][P_X] = 0;      ve->limits[1][P_X] = width;       ve->defaults[P_X] = width / 2;
+    ve->limits[0][P_Y] = 0;      ve->limits[1][P_Y] = height;      ve->defaults[P_Y] = height / 2;
 
-    ve->limits[0][1] = 8;
-    ve->limits[1][1] = height;
-
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = width;
-
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = height;
+    if(ve->defaults[P_WIDTH] < 8)
+        ve->defaults[P_WIDTH] = 8;
+    if(ve->defaults[P_HEIGHT] < 8)
+        ve->defaults[P_HEIGHT] = 8;
 
     ve->description = "Picture in picture";
     ve->sub_format = 1;
@@ -140,78 +165,103 @@ vj_effect *picinpic_init(int width, int height)
         "Y offset"
     );
 
+    int w_hi = width >> 1;
+    int h_hi = height >> 1;
+
+    if(w_hi < 8)
+        w_hi = 8;
+    if(h_hi < 8)
+        h_hi = 8;
+    if(w_hi > 360)
+        w_hi = 360;
+    if(h_hi > 288)
+        h_hi = 288;
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 32, width / 2,  6, 22, 1800, 4200, 900, 30, /* Width */
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 32, height / 2, 6, 22, 1800, 4200, 900, 30, /* Height */
-        VJ_BEAT_DRIFT,         VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                          0,  width,      6, 22, 1800, 4200, 900, 25, /* X offset */
-        VJ_BEAT_DRIFT,         VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                          0,  height,     6, 22, 1800, 4200, 900, 25  /* Y offset */
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_NO_ZERO_CROSS, 32, w_hi,   4,  14, 3200, 8600, 2400, 22,
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_NO_ZERO_CROSS, 32, h_hi,   4,  14, 3200, 8600, 2400, 22,
+        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE,                                                0,  width,  10, 38, 1000, 3600, 0,    58,
+        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE,                                                0,  height, 10, 38, 1000, 3600, 0,    58
     );
-
     return ve;
 }
 
 void *picinpic_malloc(int w, int h)
 {
-    pic_t *my = (pic_t*) vj_calloc(sizeof(pic_t));
-    if(!my)
+    pic_t *picture = (pic_t*) vj_calloc(sizeof(pic_t));
+
+    if(!picture)
         return NULL;
 
-    my->scaler = NULL;
-    my->template.flags = 1;
-    my->sampler = NULL;
-    my->cached = 0;
-    my->w = 0;
-    my->h = 0;
-    my->frame = NULL;
+    picture->template.flags = 1;
 
-    (void) w;
-    (void) h;
+    (void)w;
+    (void)h;
 
-    return (void*) my;
+    return (void*) picture;
+}
+
+void picinpic_free(void *ptr)
+{
+    pic_t *picture = (pic_t*) ptr;
+
+    picinpic_release_frame(picture);
+    free(picture);
+}
+
+static int picinpic_rebuild(pic_t *picture, VJFrame *src, int view_width, int view_height, int pixfmt)
+{
+    picinpic_release_frame(picture);
+
+    picture->w = view_width;
+    picture->h = view_height;
+    picture->pixfmt = pixfmt;
+
+    if(!picinpic_alloc_frame(picture, view_width, view_height, pixfmt)) {
+        picture->w = 0;
+        picture->h = 0;
+        picture->pixfmt = 0;
+        return 0;
+    }
+
+    picture->scaler = yuv_init_swscaler(
+        src,
+        picture->frame,
+        &(picture->template),
+        yuv_sws_get_cpu_flags()
+    );
+
+    if(!picture->scaler) {
+        picinpic_release_frame(picture);
+        return 0;
+    }
+
+    return 1;
 }
 
 void picinpic_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     pic_t *picture = (pic_t*) ptr;
-    if(!picture || !frame || !frame2 || !args)
-        return;
-
     const int width = frame->width;
     const int height = frame->height;
 
-    if(width <= 0 || height <= 0)
-        return;
+    int view_width = pip_size8(clampi(args[P_WIDTH], 8, width));
+    int view_height = pip_size8(clampi(args[P_HEIGHT], 8, height));
+    int dx = pip_pos8(clampi(args[P_X], 0, width - 1));
+    int dy = pip_pos8(clampi(args[P_Y], 0, height - 1));
 
-    int twidth = pip_clampi(args[0], 8, width);
-    int theight = pip_clampi(args[1], 8, height);
-    int x1 = pip_clampi(args[2], 0, width - 1);
-    int y1 = pip_clampi(args[3], 0, height - 1);
+    if(view_width > width)
+        view_width = pip_floor8(width);
+    if(view_height > height)
+        view_height = pip_floor8(height);
 
-    int view_width = nearest_div(twidth);
-    int view_height = nearest_div(theight);
-    int dx = nearest_div(x1);
-    int dy = nearest_div(y1);
+    if(dx + view_width > width)
+        dx = pip_pos8(width - view_width);
+    if(dy + view_height > height)
+        dy = pip_pos8(height - view_height);
 
-    if(dx >= width || dy >= height)
-        return;
-
-    if((dx + view_width) > width)
-        view_width = width - dx;
-
-    if((dy + view_height) > height)
-        view_height = height - dy;
-
-    view_width = nearest_div(view_width);
-    view_height = nearest_div(view_height);
-
-    if(view_width < 8 || view_height < 8)
-        return;
-
-    const int pixfmt = (frame->format == AV_PIX_FMT_YUVJ422P)
-        ? AV_PIX_FMT_YUVJ444P
-        : AV_PIX_FMT_YUV444P;
+    const int pixfmt = frame->format == AV_PIX_FMT_YUVJ422P ? AV_PIX_FMT_YUVJ444P : AV_PIX_FMT_YUV444P;
 
     VJFrame src;
     veejay_memcpy(&src, frame2, sizeof(VJFrame));
@@ -219,63 +269,27 @@ void picinpic_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     src.stride[1] = src.width;
     src.stride[2] = src.width;
 
-    if(picture->w != view_width || picture->h != view_height || !picture->frame || !picture->scaler) {
-        picinpic_release_frame(picture);
-
-        picture->w = view_width;
-        picture->h = view_height;
-
-        if(!picinpic_alloc_frame(picture, view_width, view_height, pixfmt)) {
-            picture->w = 0;
-            picture->h = 0;
+    if(picture->w != view_width || picture->h != view_height || picture->pixfmt != pixfmt || !picture->frame || !picture->scaler) {
+        if(!picinpic_rebuild(picture, &src, view_width, view_height, pixfmt))
             return;
-        }
-
-        picture->scaler = yuv_init_swscaler(
-            &src,
-            picture->frame,
-            &(picture->template),
-            yuv_sws_get_cpu_flags()
-        );
-
-        if(!picture->scaler) {
-            picinpic_release_frame(picture);
-            return;
-        }
     }
 
     yuv_convert_and_scale(picture->scaler, &src, picture->frame);
 
-    uint8_t *sY  = picture->frame->data[0];
-    uint8_t *sCb = picture->frame->data[1];
-    uint8_t *sCr = picture->frame->data[2];
+    const uint8_t *restrict sY = picture->frame->data[0];
+    const uint8_t *restrict sCb = picture->frame->data[1];
+    const uint8_t *restrict sCr = picture->frame->data[2];
 
-    uint8_t *dY  = frame->data[0];
-    uint8_t *dCb = frame->data[1];
-    uint8_t *dCr = frame->data[2];
+    uint8_t *restrict dY = frame->data[0];
+    uint8_t *restrict dCb = frame->data[1];
+    uint8_t *restrict dCr = frame->data[2];
 
     for(int y = 0; y < view_height; y++) {
-        uint8_t *dst_y  = dY  + (dy + y) * width + dx;
-        uint8_t *dst_cb = dCb + (dy + y) * width + dx;
-        uint8_t *dst_cr = dCr + (dy + y) * width + dx;
+        const int dst_off = (dy + y) * width + dx;
+        const int src_off = y * view_width;
 
-        uint8_t *src_y  = sY  + y * view_width;
-        uint8_t *src_cb = sCb + y * view_width;
-        uint8_t *src_cr = sCr + y * view_width;
-
-        veejay_memcpy(dst_y,  src_y,  view_width);
-        veejay_memcpy(dst_cb, src_cb, view_width);
-        veejay_memcpy(dst_cr, src_cr, view_width);
+        veejay_memcpy(dY + dst_off, sY + src_off, view_width);
+        veejay_memcpy(dCb + dst_off, sCb + src_off, view_width);
+        veejay_memcpy(dCr + dst_off, sCr + src_off, view_width);
     }
-}
-
-void picinpic_free(void *d)
-{
-    if(!d)
-        return;
-
-    pic_t *my = (pic_t*) d;
-
-    picinpic_release_frame(my);
-    free(my);
 }

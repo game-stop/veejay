@@ -20,105 +20,171 @@
 #include "common.h"
 #include "buffer.h"
 
-/* very simple effect that stores frames in a buffer and plays them once a certain number of frames are stored,
- * effectively introducing a time delay
- * the frames played are freed after use, memory usage is (frame_delay * frame_size).
- * MAX_FRAMES is based on 25 fps * 60 seconds
- */
-
 #define MAX_FRAMES 1500
 
-vj_effect *buffer_init(int w, int h)
-{
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
-
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = MAX_FRAMES;
-    ve->defaults[0] = 50;
-    ve->description = "Frame Delay";
-    ve->sub_format = -1;
-    ve->param_description = vje_build_param_list( ve->num_params, "Frame Delay" );
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-
-        VJ_BEAT_MEMORY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 0, 300, 6, 24, 2200, 5200, 2000, 25 /* Frame Delay */
-    );
-    return ve;
-}
+typedef struct {
+    VJFrame frame;
+    uint8_t *data;
+    size_t capacity;
+    int valid;
+} buffer_slot_t;
 
 typedef struct {
-    VJFrame **frames;
-    int last_size;
+    buffer_slot_t *slots;
     int write_pos;
     int read_pos;
     int ready;
     int length;
+    int filled;
 } buffer_t;
 
+static void buffer_reset(buffer_t *b)
+{
+    if(!b || !b->slots)
+        return;
+
+    for(int i = 0; i < MAX_FRAMES; i++)
+        b->slots[i].valid = 0;
+
+    b->write_pos = 0;
+    b->read_pos = 0;
+    b->ready = 0;
+    b->length = 0;
+    b->filled = 0;
+}
+
+static void buffer_release(buffer_t *b)
+{
+    if(!b || !b->slots)
+        return;
+
+    for(int i = 0; i < MAX_FRAMES; i++)
+    {
+        if(b->slots[i].data)
+            free(b->slots[i].data);
+
+        b->slots[i].data = NULL;
+        b->slots[i].capacity = 0;
+        b->slots[i].valid = 0;
+    }
+}
+
+vj_effect *buffer_init(int w, int h)
+{
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
+    ve->num_params = 1;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    ve->limits[0][0] = 0;
+    ve->limits[1][0] = MAX_FRAMES;
+    ve->defaults[0] = 50;
+
+    ve->description = "Frame Delay";
+    ve->sub_format = -1;
+    ve->extra_frame = 0;
+    ve->has_user = 0;
+    ve->parallel = 0;
+    ve->param_description = vje_build_param_list(ve->num_params, "Frame Delay");
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+        VJ_BEAT_MEMORY, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000
+    );
+
+    return ve;
+}
 
 void *buffer_malloc(int w, int h)
 {
     buffer_t *b = (buffer_t*) vj_calloc(sizeof(buffer_t));
-    if(!b) {
-        return NULL;
-    }
 
-    b->frames = (VJFrame**) vj_calloc(sizeof(VJFrame*) * MAX_FRAMES );
-    if(!b->frames) {
+    if(!b)
+        return NULL;
+
+    b->slots = (buffer_slot_t*) vj_calloc(sizeof(buffer_slot_t) * MAX_FRAMES);
+
+    if(!b->slots) {
         free(b);
         return NULL;
     }
-    return (void*) b;
+
+    (void) w;
+    (void) h;
+
+    return b;
 }
 
-void buffer_free( void *ptr )
+void buffer_free(void *ptr)
 {
-    buffer_t* b = (buffer_t*) ptr;
-    int i;
-    for( i = 0; i < MAX_FRAMES; i++ ) {
-        if(b->frames[i]) {
-            free(b->frames[i]->data[0]);
-            free(b->frames[i]);
-            b->frames[i] = NULL;
-        }
-    }
-    free(b->frames);
+    buffer_t *b = (buffer_t*) ptr;
+
+    if(!b)
+        return;
+
+    buffer_release(b);
+
+    if(b->slots)
+        free(b->slots);
+
     free(b);
 }
 
-static int put_frame( buffer_t *b, VJFrame *frame )
+static int put_frame(buffer_t *b, VJFrame *frame)
 {
-    VJFrame *dst = (VJFrame*) vj_calloc( sizeof(VJFrame) );
-    if(!dst) {
+    if(!b || !frame || !b->slots || b->length <= 0)
         return 0;
-    }
-    
-    dst->data[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * (frame->len + frame->uv_len + frame->uv_len + frame->len) );
-    if(!dst->data[0]) {
-        free(dst);
+
+    buffer_slot_t *slot = &b->slots[b->write_pos];
+
+    const int has_alpha = frame->data[3] != NULL;
+    const size_t y_len = (size_t)frame->len;
+    const size_t uv_len = (size_t)frame->uv_len;
+    const size_t a_len = has_alpha ? y_len : 0;
+    const size_t total = y_len + uv_len + uv_len + a_len;
+
+    if(total == 0)
         return 0;
+
+    if(slot->capacity < total)
+    {
+        uint8_t *data = (uint8_t*) vj_malloc(total);
+
+        if(!data)
+            return 0;
+
+        if(slot->data)
+            free(slot->data);
+
+        slot->data = data;
+        slot->capacity = total;
     }
-    dst->data[1] = dst->data[0] + frame->len;
-    dst->data[2] = dst->data[1] + frame->uv_len;
-    dst->data[3] = dst->data[2] + frame->uv_len;
 
-    veejay_memcpy( dst->data[0], frame->data[0], frame->len );
-    veejay_memcpy( dst->data[1], frame->data[1], frame->uv_len );
-    veejay_memcpy( dst->data[2], frame->data[2], frame->uv_len );
-    veejay_memcpy( dst->data[3], frame->data[3], frame->len );
+    veejay_memcpy(&slot->frame, frame, sizeof(VJFrame));
 
-    dst->stride[3] = frame->stride[3];
-    dst->len = frame->len;
-    dst->uv_len = frame->uv_len;
-    dst->ssm = frame->ssm;
+    slot->frame.data[0] = slot->data;
+    slot->frame.data[1] = slot->frame.data[0] + y_len;
+    slot->frame.data[2] = slot->frame.data[1] + uv_len;
+    slot->frame.data[3] = has_alpha ? (slot->frame.data[2] + uv_len) : NULL;
 
-    b->frames[ b->write_pos ] = dst;
-    
-    if(b->write_pos == (b->length-1) )
+    veejay_memcpy(slot->frame.data[0], frame->data[0], frame->len);
+    veejay_memcpy(slot->frame.data[1], frame->data[1], frame->uv_len);
+    veejay_memcpy(slot->frame.data[2], frame->data[2], frame->uv_len);
+
+    if(has_alpha)
+        veejay_memcpy(slot->frame.data[3], frame->data[3], frame->len);
+
+    slot->frame.len = frame->len;
+    slot->frame.uv_len = frame->uv_len;
+    slot->frame.ssm = frame->ssm;
+    slot->valid = 1;
+
+    if(b->filled < b->length)
+        b->filled++;
+
+    if(b->filled >= b->length)
         b->ready = 1;
 
     b->write_pos = (b->write_pos + 1) % b->length;
@@ -126,60 +192,79 @@ static int put_frame( buffer_t *b, VJFrame *frame )
     return 1;
 }
 
-static void get_frame( buffer_t *b, VJFrame *dst)
+static int get_frame(buffer_t *b, VJFrame *dst)
 {
-    int pos = b->read_pos;
+    if(!b || !dst || !b->slots || b->length <= 0)
+        return 0;
 
-    veejay_memcpy( dst->data[0], b->frames[ pos ]->data[0], b->frames[ pos ]->len );
-    veejay_memcpy( dst->data[1], b->frames[ pos ]->data[1], b->frames[ pos ]->uv_len );
-    veejay_memcpy( dst->data[2], b->frames[ pos ]->data[2], b->frames[ pos ]->uv_len );
-    veejay_memcpy( dst->data[3], b->frames[ pos ]->data[3], b->frames[ pos ]->len );
+    buffer_slot_t *slot = &b->slots[b->read_pos];
 
-    dst->len        = b->frames[ pos ]->len;
-    dst->uv_len     = b->frames[ pos ]->uv_len;
-    dst->stride[3]  = b->frames[ pos ]->stride[3];
-    dst->ssm        = b->frames[ pos ]->ssm;
+    if(!slot->valid || !slot->data)
+        return 0;
 
-    free( b->frames[ pos ]->data[0] );
-    free( b->frames[ pos ] );
+    VJFrame *src = &slot->frame;
 
-    b->frames[ pos ] = NULL;
+    if(dst->data[0] && src->data[0])
+        veejay_memcpy(dst->data[0], src->data[0], src->len);
 
-    b->read_pos = (pos + 1) % b->length;
+    if(dst->data[1] && src->data[1])
+        veejay_memcpy(dst->data[1], src->data[1], src->uv_len);
+
+    if(dst->data[2] && src->data[2])
+        veejay_memcpy(dst->data[2], src->data[2], src->uv_len);
+
+    if(dst->data[3] && src->data[3])
+        veejay_memcpy(dst->data[3], src->data[3], src->len);
+
+    dst->len = src->len;
+    dst->uv_len = src->uv_len;
+    dst->stride[3] = src->stride[3];
+    dst->ssm = src->ssm;
+
+    b->read_pos = (b->read_pos + 1) % b->length;
+
+    return 1;
 }
 
-void buffer_apply( void *ptr, VJFrame *frame, int *args )
+static void buffer_black(VJFrame *frame)
+{
+    veejay_memset(frame->data[0], pixel_Y_lo_, frame->len);
+    veejay_memset(frame->data[1], 128, frame->uv_len);
+    veejay_memset(frame->data[2], 128, frame->uv_len);
+
+    if(frame->data[3])
+        veejay_memset(frame->data[3], 0, frame->len);
+}
+
+void buffer_apply(void *ptr, VJFrame *frame, int *args)
 {
     buffer_t *b = (buffer_t*) ptr;
+    int delay = args[0];
 
-    if( args[0] == 0 ) 
+    if(delay < 0)
+        delay = 0;
+    else if(delay > MAX_FRAMES)
+        delay = MAX_FRAMES;
+
+    if(delay == 0) {
+        if(b->length != 0)
+            buffer_reset(b);
         return;
-
-    if( b->length != args[0] ) {
-        int i;
-        for( i = 0; i < MAX_FRAMES; i ++ ) {
-            if(b->frames[i]) {
-                free(b->frames[i]->data[0]);
-                free(b->frames[i]);
-                b->frames[i] = NULL;
-            }
-        }
-        b->length = args[0];
-        b->write_pos = 0;
-        b->read_pos = 0;
-        b->ready = 0;
     }
 
+    if(b->length != delay) {
+        buffer_reset(b);
+        b->length = delay;
+    }
 
-    if(!put_frame( b, frame ))
+    if(!put_frame(b, frame))
         return;
 
-    if( b->ready ) {
-        get_frame( b, frame );
+    if(b->ready) {
+        if(!get_frame(b, frame))
+            buffer_black(frame);
     }
     else {
-        veejay_memset( frame->data[0], pixel_Y_lo_, frame->len );
-        veejay_memset( frame->data[1], 128, frame->uv_len );
-        veejay_memset( frame->data[2], 128, frame->uv_len );
+        buffer_black(frame);
     }
 }

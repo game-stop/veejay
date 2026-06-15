@@ -29,35 +29,6 @@
 #include <veejaycore/vjmem.h>
 #include <libvje/vje.h>
 
-#ifndef BS_PI
-#define BS_PI 3.14159265358979323846
-#endif
-
-#ifndef VJ_BEAT_SOFT_UNSET
-#define VJ_BEAT_SOFT_UNSET INT_MIN
-#endif
-
-#ifndef VJ_BEAT_F_PHRASE_ONLY
-#define VJ_BEAT_F_PHRASE_ONLY 0
-#endif
-
-#ifndef VJ_BEAT_F_SQUARED
-#define VJ_BEAT_F_SQUARED 0
-#endif
-
-#ifndef VJ_BEAT_F_IMPULSE
-#define VJ_BEAT_F_IMPULSE 0
-#endif
-
-#ifdef VJ_BEAT_F_REJECT
-#ifndef VJ_BEAT_SPEED
-#define VJ_BEAT_SPEED VJ_BEAT_DRIFT
-#endif
-#ifndef VJ_BEAT_INERTIA
-#define VJ_BEAT_INERTIA VJ_BEAT_SOURCE_MIX
-#endif
-#endif
-
 #define BS_MAX_WAVES 4
 
 enum {
@@ -124,6 +95,10 @@ typedef struct {
     float last_shock;
     float last_snare;
 
+    int impact_cooldown;
+    int shock_cooldown;
+    int snare_cooldown;
+
     int wave_slot;
     uint32_t frame_count;
 } bowshock_t;
@@ -138,7 +113,7 @@ static const int bs_dir_y[16] = {
        0,  -98, -181, -237, -256, -237, -181,  -98
 };
 
-static inline int bs_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
 }
@@ -150,12 +125,12 @@ static inline float bs_clampf(float v, float lo, float hi)
 
 static inline uint8_t bs_u8(int v)
 {
-    return (uint8_t)bs_clampi(v, 0, 255);
+    return (uint8_t)clampi(v, 0, 255);
 }
 
 static inline int16_t bs_i16(int v)
 {
-    return (int16_t)bs_clampi(v, -32768, 32767);
+    return (int16_t)clampi(v, -32768, 32767);
 }
 
 static inline int bs_absi(int v)
@@ -210,12 +185,12 @@ static void bs_spawn_wave(bowshock_t *s,
     const int jitter_x = (rx * w * center_drift) / (128 * 240);
     const int jitter_y = (ry * h * center_drift) / (128 * 240);
 
-    wv->cx = bs_clampi((w >> 1) + jitter_x, 0, w - 1);
-    wv->cy = bs_clampi((h >> 1) + jitter_y, 0, h - 1);
+    wv->cx = clampi((w >> 1) + jitter_x, 0, w - 1);
+    wv->cy = clampi((h >> 1) + jitter_y, 0, h - 1);
     wv->pos = mode == BS_MODE_BOW ? (float)(-width) : 0.0f;
     wv->amp = bs_clampf(0.62f + impact * 0.46f + shock * 0.62f, 0.0f, 1.55f);
     wv->speed = 2.1f + ((float)speed * 0.118f) + impact * 6.5f + shock * 10.0f;
-    wv->width = bs_clampi(width + (int)(shock * 18.0f), 4, 120);
+    wv->width = clampi(width + (int)(shock * 18.0f), 4, 120);
     wv->polarity = (hv & 0x10000U) ? 1 : -1;
     wv->dir_x = bs_dir_x[dir_idx];
     wv->dir_y = bs_dir_y[dir_idx];
@@ -307,29 +282,23 @@ vj_effect *bowshock_init(int w, int h)
         "Hat Sparkle",
         "Chroma Push"
     );
-
-#ifdef VJ_BEAT_F_REJECT
+    
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_INERTIA,          VJ_BEAT_F_REJECT,      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000,
-        VJ_BEAT_WARP,             0,                     35,  145, 38, 82, 25,  540,  0,   108,
-        VJ_BEAT_KICK,             VJ_BEAT_F_IMPULSE,     0,   100, 86, 100,8,   420,  80,  175,
-        VJ_BEAT_KICK,             VJ_BEAT_F_IMPULSE,     0,   100, 82, 100,10,  720,  130, 180,
-        VJ_BEAT_DRIFT,            VJ_BEAT_F_PHRASE_ONLY, 18,  62,  18, 42, 120, 2200, 0,   34,
-        VJ_BEAT_SPEED,            0,                     24,  82,  26, 64, 60,  1300, 0,   72,
-        VJ_BEAT_WARP,             0,                     45,  145, 42, 86, 25,  520,  0,   122,
-        VJ_BEAT_DRIFT,            0,                     12,  96,  30, 70, 70,  1600, 0,   78,
-        VJ_BEAT_DRIFT,            VJ_BEAT_F_PHRASE_ONLY, 8,   86,  20, 54, 140, 2600, 0,   48,
-        VJ_BEAT_GLOW,             0,                     30,  175, 36, 84, 12,  380,  35,  96,
-        VJ_BEAT_SNARE,            VJ_BEAT_F_IMPULSE,     0,   100, 80, 100,8,   340,  45,  150,
-        VJ_BEAT_HAT,              VJ_BEAT_F_SQUARED,     16,  165, 28, 68, 8,   220,  20,  86,
-        VJ_BEAT_COLOR_AMOUNT,     0,                     0,   105, 24, 60, 35,  680,  0,   62
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,   0,   0,    0,    0,    -1000,
+        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       48,                 168,                18,  66,  700,  2400, 0,    86,
+        VJ_BEAT_TRIGGER,       VJ_BEAT_F_IMPULSE,                                                     0,                  100,                96,  100, 1,    85,   18,   230,
+        VJ_BEAT_KICK,          VJ_BEAT_F_IMPULSE,                                                     0,                  100,                92,  100, 1,    105,  22,   220,
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                            12,                 76,                 5,   16,  3600, 9000, 2600, 20,
+        VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       16,                 82,                 14,  56,  850,  3200, 0,    80,
+        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       54,                 150,                16,  64,  750,  2600, 0,    88,
+        VJ_BEAT_TURBULENCE,    VJ_BEAT_F_CONTINUOUS,                                                  22,                 116,                12,  48,  1200, 3800, 0,    66,
+        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS,                                                  8,                  78,                 9,   34,  1500, 4600, 0,    48,
+        VJ_BEAT_GLOW,          VJ_BEAT_F_CONTINUOUS,                                                  34,                 154,                14,  52,  760,  2600, 0,    76,
+        VJ_BEAT_SNARE,         VJ_BEAT_F_IMPULSE,                                                     0,                  92,                 88,  100, 1,    90,   18,   205,
+        VJ_BEAT_HAT,           VJ_BEAT_F_CONTINUOUS,                                                  18,                 148,                12,  42,  260,  1500, 36,   62,
+        VJ_BEAT_COLOR_AMOUNT,  VJ_BEAT_F_CONTINUOUS,                                                  8,                  98,                 10,  42,  760,  2800, 0,    60
     );
-#endif
-
-    (void)w;
-    (void)h;
 
     return ve;
 }
@@ -353,7 +322,7 @@ void *bowshock_malloc(int w, int h)
     s->w = w;
     s->h = h;
     s->len = len;
-    s->n_threads = n_threads < 1 ? 1 : n_threads;
+    s->n_threads = n_threads;
 
     uint8_t *p = (uint8_t *)(s + 1);
 
@@ -385,6 +354,10 @@ void *bowshock_malloc(int w, int h)
     s->last_impact = 0.0f;
     s->last_shock = 0.0f;
     s->last_snare = 0.0f;
+
+    s->impact_cooldown = 0;
+    s->shock_cooldown = 0;
+    s->snare_cooldown = 0;
 
     s->wave_slot = 0;
     s->frame_count = 0;
@@ -573,9 +546,6 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
 {
     bowshock_t *s = (bowshock_t *)ptr;
 
-    if(!s || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
     uint8_t * restrict Y = frame->data[0];
     uint8_t * restrict U = frame->data[1];
     uint8_t * restrict V = frame->data[2];
@@ -595,47 +565,84 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
     const int len = s->len;
     const int threads = s->n_threads;
 
-    const int mode_arg = bs_clampi(args[BS_MODE], 0, 2);
-    const int displace_arg = bs_clampi(args[BS_DISPLACE], 0, 200);
-    const int impact_arg = bs_clampi(args[BS_IMPACT], 0, 100);
-    const int shock_arg = bs_clampi(args[BS_SHOCKWAVE], 0, 100);
-    const int width_arg = bs_clampi(args[BS_FRONT_WIDTH], 4, 96);
-    const int speed_arg = bs_clampi(args[BS_FRONT_SPEED], 0, 100);
-    const int refraction_arg = bs_clampi(args[BS_REFRACTION], 0, 160);
-    const int geometry_arg = bs_clampi(args[BS_GEOMETRY], 0, 128);
-    const int center_arg = bs_clampi(args[BS_CENTER_DRIFT], 0, 100);
-    const int glow_arg = bs_clampi(args[BS_FRONT_GLOW], 0, 200);
-    const int snare_arg = bs_clampi(args[BS_SNARE_FLASH], 0, 100);
-    const int hat_arg = bs_clampi(args[BS_HAT_SPARKLE], 0, 200);
-    const int chroma_arg = bs_clampi(args[BS_CHROMA_PUSH], 0, 120);
+    const int mode_arg = args[BS_MODE];
+    const int displace_arg = args[BS_DISPLACE];
+    const int impact_arg = args[BS_IMPACT];
+    const int shock_arg = args[BS_SHOCKWAVE];
+    const int width_arg = args[BS_FRONT_WIDTH];
+    const int speed_arg = args[BS_FRONT_SPEED];
+    const int refraction_arg = args[BS_REFRACTION];
+    const int geometry_arg = args[BS_GEOMETRY];
+    const int center_arg = args[BS_CENTER_DRIFT];
+    const int glow_arg = args[BS_FRONT_GLOW];
+    const int snare_arg = args[BS_SNARE_FLASH];
+    const int hat_arg = args[BS_HAT_SPARKLE];
+    const int chroma_arg = args[BS_CHROMA_PUSH];
 
     const float impact_target = (float)impact_arg * 0.01f;
     const float shock_target = (float)shock_arg * 0.01f;
     const float snare_target = (float)snare_arg * 0.01f;
     const float hat_target = bs_clampf((float)hat_arg * (1.0f / 200.0f), 0.0f, 1.0f);
 
+    const float impact_delta = impact_target - s->last_impact;
+    const float shock_delta = shock_target - s->last_shock;
+    const float snare_delta = snare_target - s->last_snare;
+
     const int impact_rise =
-        (impact_target > 0.50f && s->last_impact < 0.28f) ||
-        ((impact_target - s->last_impact) > 0.22f);
+        s->impact_cooldown <= 0 &&
+        (
+            (impact_target > 0.34f && s->last_impact < 0.22f) ||
+            impact_delta > 0.12f
+        );
 
     const int shock_rise =
-        (shock_target > 0.46f && s->last_shock < 0.25f) ||
-        ((shock_target - s->last_shock) > 0.20f);
+        s->shock_cooldown <= 0 &&
+        (
+            (shock_target > 0.30f && s->last_shock < 0.18f) ||
+            shock_delta > 0.10f ||
+            (impact_rise && shock_target > 0.18f)
+        );
 
     const int snare_rise =
-        (snare_target > 0.48f && s->last_snare < 0.28f) ||
-        ((snare_target - s->last_snare) > 0.24f);
+        s->snare_cooldown <= 0 &&
+        (
+            (snare_target > 0.32f && s->last_snare < 0.20f) ||
+            snare_delta > 0.12f
+        );
 
-    s->impact_env = bs_env(s->impact_env, impact_target, 0.76f, 0.090f);
-    s->shock_env = bs_env(s->shock_env, shock_target, 0.72f, 0.070f);
-    s->snare_env = bs_env(s->snare_env, snare_target, 0.82f, 0.190f);
+    s->impact_env = bs_env(s->impact_env, impact_target, 0.82f, 0.095f);
+    s->shock_env = bs_env(s->shock_env, shock_target, 0.78f, 0.075f);
+    s->snare_env = bs_env(s->snare_env, snare_target, 0.86f, 0.190f);
     s->hat_env = bs_env(s->hat_env, hat_target, 0.70f, 0.360f);
 
-    if(impact_rise || shock_rise)
+    if(impact_rise) {
         bs_spawn_wave(s, impact_target, shock_target, width_arg, speed_arg, center_arg, geometry_arg, mode_arg);
+        s->impact_cooldown = 3;
+    }
 
-    if(snare_rise && shock_arg > 12)
-        bs_spawn_wave(s, impact_target * 0.45f, shock_target * 0.62f + snare_target * 0.38f, width_arg >> 1, speed_arg + 12, center_arg, geometry_arg + 17, mode_arg);
+    if(shock_rise && !impact_rise) {
+        bs_spawn_wave(s, impact_target * 0.65f, shock_target, width_arg, speed_arg + 8, center_arg, geometry_arg, mode_arg);
+        s->shock_cooldown = 4;
+    }
+
+    if(snare_rise) {
+        bs_spawn_wave(s,
+                      impact_target * 0.35f,
+                      shock_target * 0.42f + snare_target * 0.58f,
+                      width_arg >> 1,
+                      speed_arg + 12,
+                      center_arg,
+                      geometry_arg + 17,
+                      mode_arg);
+        s->snare_cooldown = 3;
+    }
+
+    if(s->impact_cooldown > 0)
+        s->impact_cooldown--;
+    if(s->shock_cooldown > 0)
+        s->shock_cooldown--;
+    if(s->snare_cooldown > 0)
+        s->snare_cooldown--;
 
     const float decay = 0.9475f;
     const float max_dist = (float)(w > h ? w : h) * (mode_arg == BS_MODE_BOW ? 2.25f : 1.55f);
@@ -661,8 +668,8 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
         s->snare_env * 0.030f +
         s->hat_env * 0.012f;
 
-    if(s->swing_phase > (float)(BS_PI * 2.0))
-        s->swing_phase -= (float)(BS_PI * 2.0);
+    if(s->swing_phase > (float)(M_PI * 2.0))
+        s->swing_phase -= (float)(M_PI * 2.0);
 
     s->last_impact = impact_target;
     s->last_shock = shock_target;
@@ -674,10 +681,10 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
     const int snare_i = (int)(s->snare_env * 256.0f);
     const int hat_i = (int)(s->hat_env * 256.0f);
 
-    const int displace = bs_clampi(displace_arg + ((impact_i * 46) >> 8) + ((shock_i * 54) >> 8), 0, 260);
-    const int refraction = bs_clampi(refraction_arg + ((impact_i * 42) >> 8), 0, 220);
-    const int front_glow = bs_clampi(glow_arg + ((snare_i * 120) >> 8), 0, 320);
-    const int chroma_push = bs_clampi(chroma_arg + ((hat_i * 24) >> 8) + ((snare_i * 16) >> 8), 0, 180);
+    const int displace = clampi(displace_arg + ((impact_i * 46) >> 8) + ((shock_i * 54) >> 8), 0, 260);
+    const int refraction = clampi(refraction_arg + ((impact_i * 42) >> 8), 0, 220);
+    const int front_glow = clampi(glow_arg + ((snare_i * 120) >> 8), 0, 320);
+    const int chroma_push = clampi(chroma_arg + ((hat_i * 24) >> 8) + ((snare_i * 16) >> 8), 0, 180);
     const int hat_mix = hat_i > 10 ? hat_i : 0;
     const int push_scale = displace * refraction;
 
@@ -685,7 +692,7 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
     const int bow_shear = 28 + (geometry_arg >> 2);
     const int bow_side_cap = 384 + (width_arg << 2);
     const int torsion_twist = 48 + geometry_arg;
-    const int map_limit = bs_clampi(16 + (push_scale >> 8), 8, 160);
+    const int map_limit = clampi(16 + (push_scale >> 8), 8, 160);
     const int signal_limit = 1024;
 
     const int swing_x = (int)lrintf(sinf(s->swing_phase) * (float)(geometry_arg >> 3));
@@ -708,7 +715,7 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
         if(!wv->active || wv->amp <= 0.0f)
             continue;
 
-        const int width = bs_clampi(wv->width, 4, 120);
+        const int width = clampi(wv->width, 4, 120);
         const int amp = (int)(wv->amp * 192.0f);
 
         if(amp <= 0)

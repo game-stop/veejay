@@ -17,173 +17,201 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+
 #include "common.h"
 #include "flashopacity.h"
-#ifdef HAVE_ARM
-#include <arm_neon.h>
-#endif
+
+#include <math.h>
+#include <stdint.h>
+
+#define TABLE_SIZE 256
+
+typedef struct {
+    int currentFrame;
+    int last_exposure;
+    int n_threads;
+    uint16_t explut[TABLE_SIZE];
+} flash_t;
+
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline uint8_t flashopacity_u8(int v)
+{
+    return (uint8_t) clampi(v, 0, 255);
+}
+
+static inline uint8_t flashopacity_blend255(uint8_t a, uint8_t b, int opacity)
+{
+    const int inv = 255 - opacity;
+    const int x = (int)a * inv + (int)b * opacity;
+    return (uint8_t)(((x + 1) + (x >> 8)) >> 8);
+}
+
+static void flashopacity_build_lut(flash_t *f, int exposure)
+{
+    const float exposureValue = (float)exposure * 0.01f;
+
+    for(int i = 0; i < TABLE_SIZE; i++) {
+        const float t = (float)i * (1.0f / (float)(TABLE_SIZE - 1));
+        int v = (int)(powf(2.0f, t * exposureValue) * 256.0f + 0.5f);
+
+        if(v < 256)
+            v = 256;
+        else if(v > 1024)
+            v = 1024;
+
+        f->explut[i] = (uint16_t)v;
+    }
+
+    f->last_exposure = exposure;
+}
 
 vj_effect *flashopacity_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
+    if(!ve)
+        return NULL;
+
     ve->num_params = 5;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 100;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
-
-    ve->limits[0][3] = 1;
-    ve->limits[1][3] = 500;
-
-    ve->limits[0][4] = 0;
-    ve->limits[1][4] = 1;
-
-    ve->defaults[0] = 5;
-    ve->defaults[1] = 100;
-    ve->defaults[2] = 255;
-    ve->defaults[3] = 10;
-    ve->defaults[4] = 0;
+    ve->limits[0][0] = 1; ve->limits[1][0] = 100; ve->defaults[0] = 5;
+    ve->limits[0][1] = 0; ve->limits[1][1] = 255; ve->defaults[1] = 100;
+    ve->limits[0][2] = 0; ve->limits[1][2] = 255; ve->defaults[2] = 255;
+    ve->limits[0][3] = 1; ve->limits[1][3] = 500; ve->defaults[3] = 10;
+    ve->limits[0][4] = 0; ve->limits[1][4] = 1;   ve->defaults[4] = 0;
 
     ve->description = "Flash Opacity";
     ve->sub_format = -1;
     ve->extra_frame = 1;
     ve->parallel = 0;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Exposure", "Start Opacity", "End Opacity" , "Interval", "Mode");
+    ve->param_description = vje_build_param_list(ve->num_params, "Exposure", "Start Opacity", "End Opacity", "Interval", "Mode");
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                       4,                  82,                 14, 58, 90,   720,  0,   84,    /* Exposure */
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_PHRASE_ONLY,                      0,                  160,                6,  22, 1800, 4200, 900, 26,    /* Start Opacity */
-        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                       96,                 255,                14, 58, 90,   720,  0,   82,    /* End Opacity */
-        VJ_BEAT_SPEED,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 4,                  96,                 6,  22, 1800, 4200, 900, 30,    /* Interval */
-        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Mode */
+        VJ_BEAT_KICK,             VJ_BEAT_F_IMPULSE | VJ_BEAT_F_NO_ZERO_CROSS,                                    3,                  92,                 86, 100, 1,    360,  48,   190,
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS,                                                            0,                  180,                12, 46, 1000, 3600, 0,    58,
+        VJ_BEAT_SOURCE_MIX,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                  140,                255,                16, 62,  700, 2800, 0,    84,
+        VJ_BEAT_SPEED,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 4, 96, 4, 14, 3000, 8200, 2200, 22,
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
     );
 
     return ve;
 }
 
-#define TABLE_SIZE 256
-
-typedef struct
+void *flashopacity_malloc(int w, int h)
 {
-   int currentFrame;
-   int exposure;
-   float maxExposure;
-   float explut[TABLE_SIZE];
-} flash_t;
+    flash_t *f = (flash_t*) vj_calloc(sizeof(flash_t));
 
-
-void *flashopacity_malloc( int w, int h )
-{
-    flash_t *f = (flash_t*) vj_malloc(sizeof(flash_t));
     if(!f)
         return NULL;
-    f->exposure = 0.0f;
+
     f->currentFrame = 0;
-    f->maxExposure = 100.0f;
-    return (void*) f;
+    f->last_exposure = -1;
+    f->n_threads = vje_advise_num_threads(w * h);
+
+    return f;
 }
 
-void flashopacity_free(void *ptr) {
-    flash_t *f = (flash_t*) ptr;
-    free(f);
+void flashopacity_free(void *ptr)
+{
+    free(ptr);
 }
 
-
-static inline int32_t min_int(int32_t a, int32_t b) {
-    return b + ((a - b) & ((a - b) >> 31));
-}
-
-static inline int32_t max_int(int32_t a, int32_t b) {
-    return a - ((a - b) & ((a - b) >> 31));
-}
-
-void flashopacity_apply( void *ptr,  VJFrame *frame, VJFrame *frame2, int *args )
+void flashopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     flash_t *f = (flash_t*) ptr;
-    const int len = frame->len;
-    const int uv_len = frame->uv_len;
 
-    const float exposureValue = (float) args[0] / 100.0f;
+    const int len = frame->len;
+    const int uv_len = frame->ssm ? len : frame->uv_len;
+    const int exposure = args[0];
     const int opacityStart = args[1];
     const int opacityEnd = args[2];
     const int interval = args[3];
     const int mode = args[4];
 
-    const int hInterval = interval / 2;
+    if(f->last_exposure != exposure)
+        flashopacity_build_lut(f, exposure);
+
     int currentFrame = f->currentFrame;
 
-    if (f->maxExposure != exposureValue) {
-        for (int i = 0; i < TABLE_SIZE; i++) {
-            float exposureFactor = (float)i / (float)(TABLE_SIZE - 1) * exposureValue;
-            f->explut[i] = (int)(powf(2, exposureFactor) * 256.0f);
-        }
-        f->maxExposure = exposureValue;
-    }
+    if(currentFrame < 0 || currentFrame >= interval)
+        currentFrame %= interval;
+    if(currentFrame < 0)
+        currentFrame = 0;
+
+    const int hInterval = interval >> 1;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
-    uint8_t *restrict Y2 = frame2->data[0];
-    uint8_t *restrict U2 = frame2->data[1];
-    uint8_t *restrict V2 = frame2->data[2];
 
-    if (currentFrame < hInterval) {
-        float ratio = (float)currentFrame / (float)hInterval;
-        int index = (int)(ratio * (TABLE_SIZE - 1));
-        int fp_multiplier = (int)f->explut[index];
-        
-        #pragma omp simd
-        for (int i = 0; i < len; i++) {
-            int val = (Y[i] * fp_multiplier) >> 8;
-            Y[i] = (uint8_t)min_int(val, 255);
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict U2 = frame2->data[1];
+    const uint8_t *restrict V2 = frame2->data[2];
+
+    if(hInterval > 0 && currentFrame < hInterval) {
+        const int index = (currentFrame * (TABLE_SIZE - 1) + (hInterval >> 1)) / hInterval;
+        const int fp_multiplier = f->explut[index];
+
+#pragma omp parallel for schedule(static) num_threads(f->n_threads)
+        for(int i = 0; i < len; i++) {
+            int v = ((int)Y[i] * fp_multiplier) >> 8;
+            Y[i] = flashopacity_u8(v);
         }
 
-        if (mode == 1) {
-            int lerp_fp = (currentFrame << 8) / hInterval; 
-           
-#pragma omp simd
-            for (int i = 0; i < uv_len; i++) {
-                // 1. Load as signed to avoid unsigned underflow wrap-around
-                int u1 = (int)U[i];
-                int v1 = (int)V[i];
-                int u2 = (int)U2[i];
-                int v2 = (int)V2[i];
+        if(mode == 1) {
+            const int lerp = (currentFrame * 255 + (hInterval >> 1)) / hInterval;
 
-                // 2. Linear interpolation: start + ((end - start) * factor) >> 8
-                int resU = u1 + (((u2 - u1) * lerp_fp) >> 8);
-                int resV = v1 + (((v2 - v1) * lerp_fp) >> 8);
-
-                // 3. Branchless saturation to [0, 255]
-                U[i] = (uint8_t)max_int(0, min_int(resU, 255));
-                V[i] = (uint8_t)max_int(0, min_int(resV, 255));
+#pragma omp parallel for schedule(static) num_threads(f->n_threads)
+            for(int i = 0; i < uv_len; i++) {
+                U[i] = flashopacity_blend255(U[i], U2[i], lerp);
+                V[i] = flashopacity_blend255(V[i], V2[i], lerp);
             }
         }
-    } 
+    }
     else {
-        int t = currentFrame - hInterval;
-        int opacity = opacityStart + (t * (opacityEnd - opacityStart)) / (interval - hInterval);
-        int inv_opacity = 0xff - opacity;
+        const int denom = interval - hInterval;
+        const int t = currentFrame - hInterval;
+        int opacity;
 
-        #pragma omp simd
-        for (int i = 0; i < len; i++) {
-            Y[i] = (Y[i] * inv_opacity + Y2[i] * opacity) >> 8;
-        }
-        #pragma omp simd
-        for (int i = 0; i < uv_len; i++) {
-            U[i] = (U[i] * inv_opacity + U2[i] * opacity) >> 8;
-            V[i] = (V[i] * inv_opacity + V2[i] * opacity) >> 8;
+        if(denom <= 1)
+            opacity = opacityEnd;
+        else
+            opacity = opacityStart + (t * (opacityEnd - opacityStart) + ((opacityEnd >= opacityStart) ? (denom >> 1) : -(denom >> 1))) / (denom - 1);
+
+        opacity = clampi(opacity, 0, 255);
+
+#pragma omp parallel for schedule(static) num_threads(f->n_threads)
+        for(int i = 0; i < len; i++)
+            Y[i] = flashopacity_blend255(Y[i], Y2[i], opacity);
+
+#pragma omp parallel for schedule(static) num_threads(f->n_threads)
+        for(int i = 0; i < uv_len; i++) {
+            U[i] = flashopacity_blend255(U[i], U2[i], opacity);
+            V[i] = flashopacity_blend255(V[i], V2[i], opacity);
         }
     }
 
-    f->currentFrame = (currentFrame + 1) % interval;
+    f->currentFrame = currentFrame + 1;
+    if(f->currentFrame >= interval)
+        f->currentFrame = 0;
 }
-

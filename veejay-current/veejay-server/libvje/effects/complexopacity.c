@@ -23,117 +23,137 @@
 
 #define DIV255(x) (((x) + 1 + ((x) >> 8)) >> 8)
 
+static inline int complexopacity_clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
 vj_effect *complexopacity_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
     ve->num_params = 7;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->defaults[0] = 4500; /* Hue Angle */
-    ve->defaults[1] = 0;    /* Red */
-    ve->defaults[2] = 255;  /* Green */
-    ve->defaults[3] = 0;    /* Blue */
-    ve->defaults[4] = 40;   /* Threshold (Black Clip) */
-    ve->defaults[5] = 160;  /* Solidity (White Clip) */
-    ve->defaults[6] = 0;    /* Swap Selection */
+    ve->defaults[0] = 4500;
+    ve->defaults[1] = 0;
+    ve->defaults[2] = 255;
+    ve->defaults[3] = 0;
+    ve->defaults[4] = 40;
+    ve->defaults[5] = 160;
+    ve->defaults[6] = 0;
 
-    ve->limits[0][0] = 500;  ve->limits[1][0] = 8500;
-    ve->limits[0][1] = 0;    ve->limits[1][1] = 255;
-    ve->limits[0][2] = 0;    ve->limits[1][2] = 255;
-    ve->limits[0][3] = 0;    ve->limits[1][3] = 255;
-    ve->limits[0][4] = 0;    ve->limits[1][4] = 255;
-    ve->limits[0][5] = 1;    ve->limits[1][5] = 255;
-    ve->limits[0][6] = 0;    ve->limits[1][6] = 1;
+    ve->limits[0][0] = 500; ve->limits[1][0] = 8500;
+    ve->limits[0][1] = 0;   ve->limits[1][1] = 255;
+    ve->limits[0][2] = 0;   ve->limits[1][2] = 255;
+    ve->limits[0][3] = 0;   ve->limits[1][3] = 255;
+    ve->limits[0][4] = 0;   ve->limits[1][4] = 255;
+    ve->limits[0][5] = 1;   ve->limits[1][5] = 255;
+    ve->limits[0][6] = 0;   ve->limits[1][6] = 1;
 
     ve->description = "Complex Overlay (Advanced)";
-    ve->param_description = vje_build_param_list(ve->num_params,
-        "Hue Angle", "Red", "Green", "Blue", "Threshold", "Solidity", "Swap Selection");
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-
-        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    800,                6500,               10, 42, 120, 900, 0, 68,    /* Hue Angle */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0, -1000, /* Red */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0, -1000, /* Green */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0, -1000, /* Blue */
-        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    0,                  180,                8,  36, 120, 900, 0, 72,    /* Threshold */
-        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    80,                 255,                14, 58, 90,  720, 0, 82,    /* Solidity */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0, -1000  /* Swap Selection */
-    );
+    ve->param_description = vje_build_param_list(ve->num_params, "Hue Angle", "Red", "Green", "Blue", "Threshold", "Solidity", "Swap Selection");
     ve->has_user = 0;
     ve->extra_frame = 1;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
+
     return ve;
 }
 
-void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
-    int iy, iu, iv;
-    int n_threads = vje_advise_num_threads(frame->len);
+void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
+{
+    (void) ptr;
 
-    _rgb2yuv(args[1], args[2], args[3], iy, iu, iv);
+    const int angle_arg = args[0];
+    const int r_arg = args[1];
+    const int g_arg = args[2];
+    const int b_arg = args[3];
+    const int threshold_arg = args[4];
+    const int solidity_arg = args[5];
+    const int swap_arg = args[6];
 
-    const int SCALE = 4096;
+    const int angle = complexopacity_clampi(angle_arg, 500, 8500);
+    const int r = complexopacity_clampi(r_arg, 0, 255);
+    const int g = complexopacity_clampi(g_arg, 0, 255);
+    const int b = complexopacity_clampi(b_arg, 0, 255);
+    const int threshold = complexopacity_clampi(threshold_arg, 0, 255);
+    const int solidity = complexopacity_clampi(solidity_arg, 1, 255);
+    const int swap = complexopacity_clampi(swap_arg, 0, 1);
+    const int len = frame->len;
+
+    int iy = 0;
+    int iu = 128;
+    int iv = 128;
+
+    _rgb2yuv(r, g, b, iy, iu, iv);
+
+    const int scale = 4096;
     const float ut_f = (float)iu - 128.0f;
     const float vt_f = (float)iv - 128.0f;
-
     float mag_f = sqrtf(ut_f * ut_f + vt_f * vt_f);
-    if (mag_f < 1.0f) mag_f = 1.0f;
 
-    const int mag_fp   = (int)(mag_f * SCALE);
-    const int cos_q_fp = (int)((ut_f / mag_f) * SCALE);
-    const int sin_q_fp = (int)((vt_f / mag_f) * SCALE);
+    if(mag_f < 1.0f)
+        mag_f = 1.0f;
 
-    const float angle_rad = ((float)args[0] / 100.0f) * (M_PI / 180.0f);
-    const int inv_wedge_slope_fp = (int)((1.0f / tanf(angle_rad)) * SCALE);
+    const int mag_fp = (int)(mag_f * (float)scale);
+    const int cos_q_fp = (int)((ut_f / mag_f) * (float)scale);
+    const int sin_q_fp = (int)((vt_f / mag_f) * (float)scale);
+    const float angle_rad = ((float)angle / 100.0f) * (float)(M_PI / 180.0f);
+    float tan_v = tanf(angle_rad);
 
-    const float diff = (float)args[5] - (float)args[4];
-    const int inv_range_fp = (int)((255.0f / (diff < 1.0f ? 1.0f : diff)) * (1 << 8));
-    const int black_clip_fp = (int)(args[4] * SCALE);
+    if(tan_v > -0.0001f && tan_v < 0.0001f)
+        tan_v = tan_v < 0.0f ? -0.0001f : 0.0001f;
 
-    const int swap = args[6];
+    const int inv_wedge_slope_fp = (int)((1.0f / tan_v) * (float)scale);
+    float diff = (float)solidity - (float)threshold;
+
+    if(diff < 1.0f)
+        diff = 1.0f;
+
+    const int inv_range_fp = (int)((255.0f / diff) * (float)(1 << 8));
+    const int black_clip_fp = threshold * scale;
+    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
+
     const uint8_t *restrict Y2 = frame2->data[0];
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-    const int len = frame->len;
-
-    #pragma omp parallel num_threads(n_threads)
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for(int pos = 0; pos < len; pos++)
     {
-        #pragma omp for schedule(static)
-        for (int pos = 0; pos < len; pos++) {
-            int uc = (int)Cb[pos] - 128;
-            int vc = (int)Cr[pos] - 128;
+        const int uc = (int)Cb[pos] - 128;
+        const int vc = (int)Cr[pos] - 128;
+        const int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
+        const int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
+        const int abs_yy = yy < 0 ? -yy : yy;
+        const int64_t dist_fp = ((int64_t)mag_fp - ((int64_t)xx << 12)) + ((int64_t)abs_yy * (int64_t)inv_wedge_slope_fp);
+        int alpha = (int)(((dist_fp - (int64_t)black_clip_fp) * (int64_t)inv_range_fp) >> 20);
 
-            int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
-            int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
-            int abs_yy = (yy < 0) ? -yy : yy;
+        alpha = complexopacity_clampi(alpha, 0, 255);
 
-            int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
-            int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
+        if(swap)
+            alpha = 255 - alpha;
 
-            if (alpha < 0) alpha = 0;
-            if (alpha > 255) alpha = 255;
+        if(alpha <= 0)
+        {
+            Y[pos] = Y2[pos];
+            Cb[pos] = Cb2[pos];
+            Cr[pos] = Cr2[pos];
+        }
+        else if(alpha < 255)
+        {
+            const int invA = 255 - alpha;
 
-
-            if (swap) alpha = 255 - alpha;
-
-
-            if (alpha <= 0) {
-                Y[pos] = Y2[pos]; Cb[pos] = Cb2[pos]; Cr[pos] = Cr2[pos];
-            } else if (alpha >= 255) {
-
-            } else {
-                const int invA = 255 - alpha;
-                Y[pos]  = DIV255(Y[pos]  * alpha + Y2[pos]  * invA);
-                Cb[pos] = DIV255(Cb[pos] * alpha + Cb2[pos] * invA);
-                Cr[pos] = DIV255(Cr[pos] * alpha + Cr2[pos] * invA);
-            }
+            Y[pos] = (uint8_t)DIV255((int)Y[pos] * alpha + (int)Y2[pos] * invA);
+            Cb[pos] = (uint8_t)DIV255((int)Cb[pos] * alpha + (int)Cb2[pos] * invA);
+            Cr[pos] = (uint8_t)DIV255((int)Cr[pos] * alpha + (int)Cr2[pos] * invA);
         }
     }
 }

@@ -20,7 +20,7 @@
 #include "common.h"
 #include "chronoglass.h"
 
-#define CHRONOSILT_PARAMS 11
+#define CHRONOSILT_PARAMS 10
 
 #define P_THRESHOLD      0
 #define P_FLOW           1
@@ -30,9 +30,8 @@
 #define P_SOURCE_BLEED   5
 #define P_COLOR_MODE     6
 #define P_TURBULENCE     7
-#define P_BEAT_PUSH      8
-#define P_SILT_GAIN      9
-#define P_COLOR_ENERGY  10
+#define P_SILT_GAIN      8
+#define P_COLOR_ENERGY   9
 
 #define CS_COLOR_SILT     0
 #define CS_COLOR_THERMAL  1
@@ -102,21 +101,6 @@ static inline int cs_ui_to_u8(int v)
 {
     v = cs_clampi(v, 0, CS_UI_MAX);
     return (v * 255 + (CS_UI_MAX >> 1)) / CS_UI_MAX;
-}
-
-static inline int cs_push_add_u8(int base, int push, int amount)
-{
-    return cs_clampi(base + ((cs_clampi(push, 0, CS_UI_MAX) * amount + 500) / CS_UI_MAX), 0, 255);
-}
-
-static inline int cs_push_sub_u8(int base, int push, int amount)
-{
-    return cs_clampi(base - ((cs_clampi(push, 0, CS_UI_MAX) * amount + 500) / CS_UI_MAX), 0, 255);
-}
-
-static inline int cs_push_add_ui(int base, int push, int amount)
-{
-    return cs_clampi(base + ((cs_clampi(push, 0, CS_UI_MAX) * amount + 500) / CS_UI_MAX), 0, CS_UI_MAX);
 }
 
 static inline uint8_t cs_blend_fast_u8(uint8_t a, uint8_t b, int amount)
@@ -193,11 +177,6 @@ vj_effect *chronoglass_init(int w, int h)
     ve->limits[0][P_TURBULENCE] = 0;
     ve->limits[1][P_TURBULENCE] = CS_UI_MAX;
     ve->defaults[P_TURBULENCE] = 204;
-
-    ve->limits[0][P_BEAT_PUSH] = 0;
-    ve->limits[1][P_BEAT_PUSH] = CS_UI_MAX;
-    ve->defaults[P_BEAT_PUSH] = 0;
-
     ve->limits[0][P_SILT_GAIN] = 0;
     ve->limits[1][P_SILT_GAIN] = CS_UI_MAX;
     ve->defaults[P_SILT_GAIN] = 500;
@@ -209,7 +188,6 @@ vj_effect *chronoglass_init(int w, int h)
     ve->description = "Chronosilt";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
     ve->has_user = 0;
 
     ve->param_description = vje_build_param_list(
@@ -222,29 +200,23 @@ vj_effect *chronoglass_init(int w, int h)
         "Source Bleed",
         "Color Mode",
         "Turbulence",
-        "Beat Push",
         "Silt Gain",
         "Color Energy"
     );
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY,                    20,                 380,                20, 70,  1600, 3400, 700,  30,    /* Trigger Gate */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     180,                940,                14, 58,  90,   720,  0,    84,    /* Sediment Flow */
-        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     60,                 820,                10, 46,  120,  900,  0,    76,    /* Erosion */
-        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                    520,                980,                8,  26,  1800, 4200, 900,  42,    /* Memory Decay */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     220,                940,                14, 60,  90,   760,  0,    78,    /* Sediment Load */
-        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                     0,                  400,                8,  30,  900,  2400, 0,    42,    /* Source Bleed */
-        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
-        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,              780,                4,  28,  120,  900,  500,  38,    /* Turbulence */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 0,                  1000,               24, 96,  60,   360,  0,    100,   /* Beat Push */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     240,                1000,               16, 68,  90,   720,  0,    86,    /* Silt Gain */
-        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     160,                1000,               10, 46,  120,  900,  0,    64     /* Color Energy */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED,                  0,                  120,                20, 72, 220,  1600, 0,    92,
+        VJ_BEAT_FLOW,             VJ_BEAT_F_CONTINUOUS,                                      120,                1000,               26, 82, 260,  2200, 0,    90,
+        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS,                                      40,                 900,                24, 78, 300,  2400, 0,    84,
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS,                                      520,                1000,               14, 46, 900,  6200, 0,    58,
+        VJ_BEAT_DENSITY,          VJ_BEAT_F_CONTINUOUS,                                      160,                980,                24, 78, 360,  2600, 0,    86,
+        VJ_BEAT_SOURCE_MIX,       VJ_BEAT_F_CONTINUOUS,                                      0,                  460,                16, 54, 700,  4200, 0,    56,
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                   VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,
+        VJ_BEAT_TURBULENCE,       VJ_BEAT_F_CONTINUOUS,                                      0,                  880,                24, 78, 260,  2200, 0,    84,
+        VJ_BEAT_KICK,             VJ_BEAT_F_IMPULSE,                                         260,                920,                34, 92, 80,   760,  70,   94,
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS,                                      180,                1000,               24, 78, 260,  2200, 0,    84
     );
-
-    (void) w;
-    (void) h;
 
     return ve;
 }
@@ -268,8 +240,6 @@ void *chronoglass_malloc(int w, int h)
     c->lut_valid = 0;
 
     c->n_threads = vje_advise_num_threads(w * h);
-    if(c->n_threads <= 0)
-        c->n_threads = 1;
 
     c->prev_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
     c->ref_y  = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
@@ -1277,25 +1247,22 @@ void chronoglass_apply(void *ptr, VJFrame *frame, int *args)
     int source_bleed;
     int color_mode;
     int turbulence;
-    int beat_push;
     int silt_gain;
     int color_energy;
 
     if(!c->seeded)
         cs_seed(c, frame);
 
-    beat_push = cs_clampi(args[P_BEAT_PUSH], 0, CS_UI_MAX);
-
-    threshold    = cs_push_sub_u8(cs_ui_to_u8(args[P_THRESHOLD]), beat_push, 34);
-    flow         = cs_push_add_u8(cs_ui_to_u8(args[P_FLOW]), beat_push, 54);
-    erosion      = cs_push_add_u8(cs_ui_to_u8(args[P_EROSION]), beat_push, 46);
-    decay        = cs_push_add_u8(cs_ui_to_u8(args[P_DECAY]), beat_push, 14);
-    sediment     = cs_push_add_u8(cs_ui_to_u8(args[P_SEDIMENT]), beat_push, 58);
-    source_bleed = cs_push_add_u8(cs_ui_to_u8(args[P_SOURCE_BLEED]), beat_push, 36);
+    threshold    = cs_ui_to_u8(args[P_THRESHOLD]);
+    flow         = cs_ui_to_u8(args[P_FLOW]);
+    erosion      = cs_ui_to_u8(args[P_EROSION]);
+    decay        = cs_ui_to_u8(args[P_DECAY]);
+    sediment     = cs_ui_to_u8(args[P_SEDIMENT]);
+    source_bleed = cs_ui_to_u8(args[P_SOURCE_BLEED]);
     color_mode   = cs_clampi(args[P_COLOR_MODE], 0, 4);
-    turbulence   = cs_push_add_u8(cs_ui_to_u8(args[P_TURBULENCE]), beat_push, 74);
-    silt_gain    = cs_push_add_ui(cs_clampi(args[P_SILT_GAIN], 0, CS_UI_MAX), beat_push, 300);
-    color_energy = cs_push_add_ui(cs_clampi(args[P_COLOR_ENERGY], 0, CS_UI_MAX), beat_push, 180);
+    turbulence   = cs_ui_to_u8(args[P_TURBULENCE]);
+    silt_gain    = cs_clampi(args[P_SILT_GAIN], 0, CS_UI_MAX);
+    color_energy = cs_clampi(args[P_COLOR_ENERGY], 0, CS_UI_MAX);
 
     cs_build_luts_if_needed(
         c,

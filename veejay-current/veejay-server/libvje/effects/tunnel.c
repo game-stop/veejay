@@ -41,7 +41,7 @@
 #define EH_TWO_PI 6.28318530717958647692f
 #define EH_INV_TWO_PI 0.15915494309189533577f
 
-#define TUNNEL_PARAMS 13
+#define TUNNEL_PARAMS 12
 
 #define P_SPEED        0
 #define P_A            1
@@ -52,10 +52,9 @@
 #define P_FEEDBACK     6
 #define P_SHAPE        7
 #define P_HIGH_QUALITY 8
-#define P_BEAT_PUSH    9
-#define P_BEAT_TRAVEL 10
-#define P_BEAT_ZOOM   11
-#define P_CHROMA_FLOW 12
+#define P_TRAVEL_DRIVE 9
+#define P_ZOOM_DRIVE  10
+#define P_CHROMA_FLOW 11
 
 enum {
     MODE_RECT = 0,
@@ -67,6 +66,8 @@ enum {
 };
 
 typedef struct {
+    uint8_t *region;
+
     uint8_t *dstY;
     uint8_t *dstU;
     uint8_t *dstV;
@@ -101,10 +102,13 @@ typedef struct {
     float phase;
     float phase_vel;
 
-    float beat_env;
-    float beat_kick;
-    float beat_prev;
-    float beat_phase;
+    float drive_phase;
+
+    float travel_drive_state;
+    float zoom_drive_state;
+    float chroma_flow_state;
+    float feedback_state;
+    int drive_state_ready;
 
     float zoom_state;
     float zoom_vel;
@@ -164,50 +168,9 @@ static inline int bilerp_i(int p00, int p10, int p01, int p11, int fx, int fy)
     return a + (((b - a) * fy) >> FP_SHIFT);
 }
 
-static inline int tunnel_beat_shape1000(int beat_push)
-{
-    int lin;
-    int sq;
 
-    beat_push = tunnel_clampi(beat_push, 0, 1000);
-    lin = beat_push;
-    sq = (beat_push * beat_push + 500) / 1000;
 
-    return tunnel_clampi((lin * 42 + sq * 58 + 50) / 100, 0, 1000);
-}
 
-static inline void tunnel_update_beat_state(box_tunnel_t *restrict t,
-                                            int beat_push,
-                                            int *restrict env_out,
-                                            int *restrict kick_out)
-{
-    const int shaped = tunnel_beat_shape1000(beat_push);
-    const float target = (float)shaped;
-    const float diff = target - t->beat_prev;
-    float kick_target;
-
-    if(target > t->beat_env)
-        t->beat_env += (target - t->beat_env) * 0.34f;
-    else
-        t->beat_env += (target - t->beat_env) * 0.075f;
-
-    kick_target = (diff > 0.0f) ? (diff * 0.66f + target * 0.07f) : 0.0f;
-
-    if(kick_target > t->beat_kick)
-        t->beat_kick += (kick_target - t->beat_kick) * 0.42f;
-    else
-        t->beat_kick *= 0.74f;
-
-    t->beat_prev += (target - t->beat_prev) * 0.28f;
-
-    if(t->beat_env < 0.5f)
-        t->beat_env = 0.0f;
-    if(t->beat_kick < 0.5f)
-        t->beat_kick = 0.0f;
-
-    *env_out = tunnel_clampi((int)(t->beat_env + 0.5f), 0, 1000);
-    *kick_out = tunnel_clampi((int)(t->beat_kick + 0.5f), 0, 1000);
-}
 
 static inline void tunnel_limit_chroma_i(int *u, int *v, int limit)
 {
@@ -355,32 +318,20 @@ static void tunnel_build_value_hints(vj_effect *ve)
 
 static void tunnel_build_beat_hints(vj_effect *ve)
 {
-    /*
-     * Single beat-hint set for both public initializers.
-     *
-     * tunnel_init1(): P_A/P_B/P_SWIRL are "Twist", "Swirl Linear", "Swirl Sine".
-     * tunnel_init() : P_A/P_B/P_SWIRL are "Curve Int", "Curve Speed", "Swirl".
-     *
-     * Keep the shared ranges inside both variants' limits.  This avoids the old
-     * split where one branch could push signed values into parameters that are
-     * unsigned in the other initializer.
-     */
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SIGNED_SPEED,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -90,                90,                 10, 38,  700,  2200, 0,    68,     /* Speed */
-        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                                                0,                  72,                 8,  32,  900,  2600, 0,    48,     /* Twist / Curve Int */
-        VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS,                                                0,                  72,                 8,  32,  900,  2600, 0,    50,     /* Swirl Linear / Curve Speed */
-        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS,                                                0,                  78,                 8,  30,  900,  2600, 0,    52,     /* Swirl Sine / Swirl */
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                                                80,                 360,                8,  32,  900,  2600, 0,    50,     /* Zoom */
-        VJ_BEAT_COLOR_PHASE,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                               0,                  820,                8,  30,  1000, 3000, 0,    42,     /* Offset */
-        VJ_BEAT_MEMORY,        VJ_BEAT_F_PHRASE_ONLY,                                               12,                 82,                 5,  20,  2200, 5200, 1200, 22,     /* Feedback */
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Shape */
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* High Quality */
-        VJ_BEAT_KICK,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                            0,                  880,                18, 84,  50,   620,  0,    100,    /* Beat Push */
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT,                                                    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Beat Travel */
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT,                                                    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Beat Zoom */
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT,                                                    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000   /* Chroma Flow */
+        VJ_BEAT_SIGNED_SPEED,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,   0,   -1000,
+        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          12,                 96,                 62, 100,  55,  680, 0,     96,
+        VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                           4,                 52,                 44,  90, 120, 1100, 0,     72,
+        VJ_BEAT_SIGNED_CURVE,  VJ_BEAT_F_CONTINUOUS,                                                   -82,                 82,                 54,  96,  80,  900, 0,     86,
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,   0,   -1000,
+        VJ_BEAT_GEOMETRY_PHASE,VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_WRAP,                                  0,                1600,                18,  64, 900, 3600, 800,   58,
+        VJ_BEAT_MEMORY,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          38,                 88,                 42,  92, 140, 1300, 120,   82,
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,   0,   -1000,
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,   0,   -1000,
+        VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                           0,                100,                82, 100,  45,  520, 0,    100,
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,   0,   -1000,
+        VJ_BEAT_COLOR_AMOUNT,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          80,                900,                58, 100,  60,  720, 0,     94
     );
 }
 
@@ -392,8 +343,8 @@ static void precompute_warp_luts(box_tunnel_t *t)
     float cx = (float)w * 0.5f;
     float cy = (float)h * 0.5f;
 
-    float inv_cx = (cx != 0.0f) ? (1.0f / cx) : 1.0f;
-    float inv_cy = (cy != 0.0f) ? (1.0f / cy) : 1.0f;
+    float inv_cx = 1.0f / cx;
+    float inv_cy = 1.0f / cy;
 
 #pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for(int y = 0; y < h; y++) {
@@ -422,8 +373,8 @@ static void generate_geometry(box_tunnel_t *t, int shape)
     float cx = (float)w * 0.5f;
     float cy = (float)h * 0.5f;
 
-    float inv_cx = (cx != 0.0f) ? (1.0f / cx) : 1.0f;
-    float inv_cy = (cy != 0.0f) ? (1.0f / cy) : 1.0f;
+    float inv_cx = 1.0f / cx;
+    float inv_cy = 1.0f / cy;
 
 #pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for(int y = 0; y < h; y++) {
@@ -531,86 +482,6 @@ static void generate_geometry(box_tunnel_t *t, int shape)
     t->last_shape = shape;
 }
 
-vj_effect *tunnel_init1(int width, int height)
-{
-    vj_effect *ve = (vj_effect*) vj_calloc(sizeof(vj_effect));
-    if(!ve)
-        return NULL;
-
-    ve->num_params = TUNNEL_PARAMS;
-
-    ve->defaults  = (int*) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[0] = (int*) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[1] = (int*) vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults) free(ve->defaults);
-        if(ve->limits[0]) free(ve->limits[0]);
-        if(ve->limits[1]) free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
-    ve->defaults[P_SPEED] = 5;
-    ve->defaults[P_A] = 0;
-    ve->defaults[P_B] = 40;
-    ve->defaults[P_SWIRL] = 15;
-    ve->defaults[P_ZOOM] = 100;
-    ve->defaults[P_OFFSET] = 0;
-    ve->defaults[P_FEEDBACK] = 62;
-    ve->defaults[P_SHAPE] = 0;
-    ve->defaults[P_HIGH_QUALITY] = 1;
-    ve->defaults[P_BEAT_PUSH] = 0;
-    ve->defaults[P_BEAT_TRAVEL] = 650;
-    ve->defaults[P_BEAT_ZOOM] = 260;
-    ve->defaults[P_CHROMA_FLOW] = 180;
-
-    ve->limits[0][P_SPEED] = -100;       ve->limits[1][P_SPEED] = 100;
-    ve->limits[0][P_A] = -100;           ve->limits[1][P_A] = 100;
-    ve->limits[0][P_B] = -100;           ve->limits[1][P_B] = 100;
-    ve->limits[0][P_SWIRL] = 0;          ve->limits[1][P_SWIRL] = 100;
-    ve->limits[0][P_ZOOM] = 0;           ve->limits[1][P_ZOOM] = 800;
-    ve->limits[0][P_OFFSET] = 0;         ve->limits[1][P_OFFSET] = 2000;
-    ve->limits[0][P_FEEDBACK] = 0;       ve->limits[1][P_FEEDBACK] = 100;
-    ve->limits[0][P_SHAPE] = 0;          ve->limits[1][P_SHAPE] = 5;
-    ve->limits[0][P_HIGH_QUALITY] = 0;   ve->limits[1][P_HIGH_QUALITY] = 1;
-    ve->limits[0][P_BEAT_PUSH] = 0;      ve->limits[1][P_BEAT_PUSH] = 1000;
-    ve->limits[0][P_BEAT_TRAVEL] = 0;    ve->limits[1][P_BEAT_TRAVEL] = 1000;
-    ve->limits[0][P_BEAT_ZOOM] = 0;      ve->limits[1][P_BEAT_ZOOM] = 1000;
-    ve->limits[0][P_CHROMA_FLOW] = 0;    ve->limits[1][P_CHROMA_FLOW] = 1000;
-
-    ve->description = "Tunnel";
-    ve->sub_format = 1;
-    ve->extra_frame = 0;
-    ve->has_user = 0;
-    ve->parallel = 0;
-
-    ve->param_description = vje_build_param_list(
-        ve->num_params,
-        "Speed",
-        "Twist",
-        "Swirl Linear",
-        "Swirl Sine",
-        "Zoom",
-        "Offset",
-        "Feedback",
-        "Shape",
-        "High Quality",
-        "Beat Push",
-        "Beat Travel",
-        "Beat Zoom",
-        "Chroma Flow"
-    );
-
-    tunnel_build_value_hints(ve);
-    tunnel_build_beat_hints(ve);
-
-    (void) width;
-    (void) height;
-
-    return ve;
-}
-
 vj_effect *tunnel_init(int width, int height)
 {
     vj_effect *ve = (vj_effect*) vj_calloc(sizeof(vj_effect));
@@ -624,9 +495,9 @@ vj_effect *tunnel_init(int width, int height)
     ve->limits[1] = (int*) vj_calloc(sizeof(int) * ve->num_params);
 
     if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults) free(ve->defaults);
-        if(ve->limits[0]) free(ve->limits[0]);
-        if(ve->limits[1]) free(ve->limits[1]);
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
         free(ve);
         return NULL;
     }
@@ -640,9 +511,8 @@ vj_effect *tunnel_init(int width, int height)
     ve->defaults[P_FEEDBACK] = 58;
     ve->defaults[P_SHAPE] = 1;
     ve->defaults[P_HIGH_QUALITY] = 1;
-    ve->defaults[P_BEAT_PUSH] = 0;
-    ve->defaults[P_BEAT_TRAVEL] = 650;
-    ve->defaults[P_BEAT_ZOOM] = 260;
+    ve->defaults[P_TRAVEL_DRIVE] = 650;
+    ve->defaults[P_ZOOM_DRIVE] = 260;
     ve->defaults[P_CHROMA_FLOW] = 180;
 
     ve->limits[0][P_SPEED] = -100;       ve->limits[1][P_SPEED] = 100;
@@ -654,17 +524,14 @@ vj_effect *tunnel_init(int width, int height)
     ve->limits[0][P_FEEDBACK] = 0;       ve->limits[1][P_FEEDBACK] = 100;
     ve->limits[0][P_SHAPE] = 0;          ve->limits[1][P_SHAPE] = 5;
     ve->limits[0][P_HIGH_QUALITY] = 0;   ve->limits[1][P_HIGH_QUALITY] = 1;
-    ve->limits[0][P_BEAT_PUSH] = 0;      ve->limits[1][P_BEAT_PUSH] = 1000;
-    ve->limits[0][P_BEAT_TRAVEL] = 0;    ve->limits[1][P_BEAT_TRAVEL] = 1000;
-    ve->limits[0][P_BEAT_ZOOM] = 0;      ve->limits[1][P_BEAT_ZOOM] = 1000;
+    ve->limits[0][P_TRAVEL_DRIVE] = 0;   ve->limits[1][P_TRAVEL_DRIVE] = 1000;
+    ve->limits[0][P_ZOOM_DRIVE] = 0;     ve->limits[1][P_ZOOM_DRIVE] = 1000;
     ve->limits[0][P_CHROMA_FLOW] = 0;    ve->limits[1][P_CHROMA_FLOW] = 1000;
 
-    ve->description = "Beat Tunnel";
+    ve->description = "Tunnel";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->parallel = 0;
-
     ve->param_description = vje_build_param_list(
         ve->num_params,
         "Speed",
@@ -676,26 +543,19 @@ vj_effect *tunnel_init(int width, int height)
         "Feedback",
         "Shape",
         "High Quality",
-        "Beat Push",
-        "Beat Travel",
-        "Beat Zoom",
+        "Travel Drive",
+        "Zoom Drive",
         "Chroma Flow"
     );
 
     tunnel_build_value_hints(ve);
     tunnel_build_beat_hints(ve);
 
-    (void) width;
-    (void) height;
-
     return ve;
 }
 
 void *tunnel_malloc(int width, int height)
 {
-    if(width <= 1 || height <= 1)
-        return NULL;
-
     box_tunnel_t *t = (box_tunnel_t*) vj_calloc(sizeof(box_tunnel_t));
     if(!t)
         return NULL;
@@ -704,51 +564,49 @@ void *tunnel_malloc(int width, int height)
     t->height = height;
 
     const int size = width * height;
+    const size_t map_bytes = sizeof(int) * (size_t)size * 3u;
+    const size_t hist_bytes = sizeof(int) * (size_t)size * 3u;
+    const size_t dst_bytes = (size_t)size * 3u;
+    const size_t warp_bytes = sizeof(float) * (size_t)size * 3u;
+    const size_t total = map_bytes + hist_bytes + dst_bytes + warp_bytes + 128u;
 
-    t->n_threads = vje_advise_num_threads(size);
-    t->last_shape = -1;
-
-    t->u_lut = (int*) vj_malloc(sizeof(int) * (size_t)size * 3u);
-    if(!t->u_lut) {
+    t->region = (uint8_t*) vj_malloc(total);
+    if(!t->region) {
         free(t);
         return NULL;
     }
 
+    uint8_t *p = (uint8_t*)(((uintptr_t)t->region + 15u) & ~(uintptr_t)15u);
+
+    t->u_lut = (int*)p;
     t->v_lut = t->u_lut + size;
     t->shade_lut = t->v_lut + size;
 
-    t->histY = (int*) vj_calloc(sizeof(int) * (size_t)size * 3u);
-    if(!t->histY) {
-        free(t->u_lut);
-        free(t);
-        return NULL;
-    }
+    p += map_bytes;
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
 
+    t->histY = (int*)p;
     t->histU = t->histY + size;
     t->histV = t->histU + size;
 
-    t->dstY = (uint8_t*) vj_malloc((size_t)size * 3u);
-    if(!t->dstY) {
-        free(t->histY);
-        free(t->u_lut);
-        free(t);
-        return NULL;
-    }
+    p += hist_bytes;
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
 
+    t->dstY = p;
     t->dstU = t->dstY + size;
     t->dstV = t->dstU + size;
 
-    t->warp_pos_lut = (float*) vj_malloc(sizeof(float) * (size_t)size * 3u);
-    if(!t->warp_pos_lut) {
-        free(t->dstY);
-        free(t->histY);
-        free(t->u_lut);
-        free(t);
-        return NULL;
-    }
+    p += dst_bytes;
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
 
+    t->warp_pos_lut = (float*)p;
     t->warp_neg_lut = t->warp_pos_lut + size;
     t->wave_lut = t->warp_neg_lut + size;
+
+    veejay_memset(t->histY, 0, hist_bytes);
+
+    t->n_threads = vje_advise_num_threads(size);
+    t->last_shape = -1;
 
     for(int i = 0; i < SIN_LUT_SIZE; i++)
         t->sin_lut[i] = sinf((float)i * EH_TWO_PI / (float)SIN_LUT_SIZE);
@@ -771,21 +629,7 @@ void tunnel_free(void *ptr)
 {
     box_tunnel_t *t = (box_tunnel_t*) ptr;
 
-    if(!t)
-        return;
-
-    if(t->warp_pos_lut)
-        free(t->warp_pos_lut);
-
-    if(t->u_lut)
-        free(t->u_lut);
-
-    if(t->histY)
-        free(t->histY);
-
-    if(t->dstY)
-        free(t->dstY);
-
+    free(t->region);
     free(t);
 }
 
@@ -793,69 +637,74 @@ void tunnel_apply(void *ptr, VJFrame *frame, int *args)
 {
     box_tunnel_t *t = (box_tunnel_t*) ptr;
 
-    if(!t || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
     const int w = t->width;
     const int h = t->height;
     const int size = w * h;
 
-    if(w <= 1 || h <= 1 || size <= 0)
-        return;
-
-    const int speed_arg = tunnel_clampi(args[P_SPEED], -100, 100);
-    const int p1_arg = tunnel_clampi(args[P_A], -100, 100);
-    const int p2_arg = tunnel_clampi(args[P_B], -100, 100);
-    const int swirl_arg = tunnel_clampi(args[P_SWIRL], -100, 100);
-    const int zoom_arg = tunnel_clampi(args[P_ZOOM], 0, 800);
-    const int offset_arg = tunnel_clampi(args[P_OFFSET], 0, 2000);
-    int feedback = tunnel_clampi(args[P_FEEDBACK], 0, 100);
-    const int shape = tunnel_clampi(args[P_SHAPE], 0, MODE_FLOW_TURBULENCE);
+    const int speed_arg = args[P_SPEED];
+    const int p1_arg = args[P_A];
+    const int p2_arg = args[P_B];
+    const int swirl_arg = args[P_SWIRL];
+    const int zoom_arg = args[P_ZOOM];
+    const int offset_arg = args[P_OFFSET];
+    int feedback = args[P_FEEDBACK];
+    const int shape = args[P_SHAPE];
     const int high_quality = args[P_HIGH_QUALITY] ? 1 : 0;
-    const int beat_push = tunnel_clampi(args[P_BEAT_PUSH], 0, 1000);
-    const int beat_travel = tunnel_clampi(args[P_BEAT_TRAVEL], 0, 1000);
-    const int beat_zoom = tunnel_clampi(args[P_BEAT_ZOOM], 0, 1000);
-    const int chroma_flow = tunnel_clampi(args[P_CHROMA_FLOW], 0, 1000);
-
-    int beat_env_i;
-    int beat_kick_i;
+    const int travel_drive = args[P_TRAVEL_DRIVE];
+    const int zoom_drive = args[P_ZOOM_DRIVE];
+    const int chroma_flow = args[P_CHROMA_FLOW];
 
     if(shape != t->last_shape)
         generate_geometry(t, shape);
 
-    tunnel_update_beat_state(t, beat_push, &beat_env_i, &beat_kick_i);
+    const float travel_target = (float)travel_drive * 0.001f;
+    const float zoom_target_drive = (float)zoom_drive * 0.001f;
+    const float chroma_flow_target = (float)chroma_flow * 0.001f;
+    const float feedback_target = (float)feedback;
 
-    const float beat_env = (float)beat_env_i * 0.001f;
-    const float beat_kick = (float)beat_kick_i * 0.001f;
-    const float beat_travel_f = (float)beat_travel * 0.001f;
-    const float beat_zoom_f = (float)beat_zoom * 0.001f;
-    const float chroma_flow_f = (float)chroma_flow * 0.001f;
+    if(!t->drive_state_ready) {
+        t->travel_drive_state = travel_target;
+        t->zoom_drive_state = zoom_target_drive;
+        t->chroma_flow_state = chroma_flow_target;
+        t->feedback_state = feedback_target;
+        t->drive_state_ready = 1;
+    } else {
+        t->travel_drive_state += (travel_target - t->travel_drive_state) * 0.115f;
+        t->zoom_drive_state += (zoom_target_drive - t->zoom_drive_state) * 0.105f;
+        t->chroma_flow_state += (chroma_flow_target - t->chroma_flow_state) * 0.105f;
+        t->feedback_state += (feedback_target - t->feedback_state) * 0.075f;
+    }
+
+    const float travel_f = t->travel_drive_state;
+    const float zoom_drive_f = t->zoom_drive_state;
+    const float chroma_flow_f = t->chroma_flow_state;
+
+    feedback = tunnel_clampi((int)(t->feedback_state + 0.5f), 0, 100);
 
     float raw_speed = (float)speed_arg * 0.01f;
     float base_vel = ((float)speed_arg * 0.005f) + (raw_speed * raw_speed * raw_speed * 0.15f);
-    float beat_dir = (base_vel < 0.0f) ? -1.0f : 1.0f;
-    float beat_vel = beat_dir * beat_travel_f * (beat_env * 0.075f + beat_kick * 0.155f);
-    float speed_target = base_vel + beat_vel;
-    float speed_slew = 0.105f + beat_kick * 0.16f;
+    float drive_dir = (base_vel < 0.0f) ? -1.0f : 1.0f;
+    float drive_vel = drive_dir * travel_f * 0.145f;
+    float speed_target = base_vel + drive_vel;
 
-    t->vel_state += (speed_target - t->vel_state) * speed_slew;
+    t->vel_state += (speed_target - t->vel_state) * 0.135f;
     t->time += t->vel_state;
 
     float ci_target = tanhf((float)p1_arg * 0.015f) * 0.75f;
-    ci_target += beat_travel_f * (beat_env * 0.075f + beat_kick * 0.040f) * ((ci_target < 0.0f) ? -1.0f : 1.0f);
-    t->acc_state += (ci_target - t->acc_state) * (0.055f + beat_kick * 0.040f);
+    ci_target += travel_f * 0.125f * ((ci_target < 0.0f) ? -1.0f : 1.0f);
+    t->acc_state += (ci_target - t->acc_state) * 0.070f;
     float curve_int = t->acc_state;
 
     float cs_input = (float)p2_arg * 0.01f;
     float cs_target = 0.2f * cs_input * cs_input + 0.02f;
-    cs_target += beat_travel_f * (beat_env * 0.012f + beat_kick * 0.018f);
+    cs_target += travel_f * 0.032f;
 
-    t->phase_vel += (cs_target - t->phase_vel) * (0.045f + beat_kick * 0.035f);
+    t->phase_vel += (cs_target - t->phase_vel) * 0.055f;
     float curve_spd = t->phase_vel;
 
     float swirl_target = tanhf((float)swirl_arg * 0.02f) * 1.2f;
-    swirl_target += beat_travel_f * (beat_env * 0.080f + beat_kick * 0.045f) * ((swirl_target < 0.0f) ? -1.0f : 1.0f);
-    t->swirl_state += (swirl_target - t->swirl_state) * (0.12f + beat_kick * 0.08f);
+    swirl_target += travel_f * 0.115f * ((swirl_target < 0.0f) ? -1.0f : 1.0f);
+    t->swirl_state += (swirl_target - t->swirl_state) * 0.135f;
     float swirl = t->swirl_state;
     float swirl_sin = swirl * 0.7f;
 
@@ -866,28 +715,25 @@ void tunnel_apply(void *ptr, VJFrame *frame, int *args)
         t->state_ready = 1;
     }
 
-    float zoom_target = zoom_base * (1.0f + beat_zoom_f * beat_env * 0.055f);
+    float zoom_target = zoom_base * (1.0f + zoom_drive_f * 0.110f);
     float z_force = zoom_target - t->zoom_state;
 
-    t->zoom_vel += z_force * (0.055f + beat_kick * 0.030f);
+    t->zoom_vel += z_force * 0.060f;
     t->zoom_vel *= 0.84f;
     t->zoom_state += t->zoom_vel;
 
-    float zoom_pulse = 1.0f - beat_zoom_f * beat_kick * 0.070f;
-    if(zoom_pulse < 0.86f)
-        zoom_pulse = 0.86f;
-
-    float zoom = t->zoom_state * zoom_pulse;
+    float zoom_breathe = 1.0f + zoom_drive_f * 0.030f * FAST_SIN_T(t, t->drive_phase * 0.37f + (float)t->time * 0.63f);
+    float zoom = t->zoom_state * zoom_breathe;
 
     float po_target = (float)offset_arg * 0.002f;
-    po_target += beat_travel_f * beat_env * 0.18f;
-    t->phase += (po_target - t->phase) * (0.045f + beat_kick * 0.025f);
+    po_target += travel_f * 0.165f;
+    t->phase += (po_target - t->phase) * 0.055f;
     float phase_offset = t->phase;
 
-    t->beat_phase += t->vel_state * 0.35f + beat_env * 0.035f + beat_kick * 0.075f;
+    t->drive_phase += t->vel_state * 0.35f + travel_f * 0.030f + zoom_drive_f * 0.012f;
 
-    if(beat_kick > 0.001f) {
-        int fb_drop = (int)(beat_kick * beat_travel_f * 9.0f + 0.5f);
+    if(travel_f > 0.001f) {
+        int fb_drop = (int)(travel_f * 8.0f + 0.5f);
         feedback = tunnel_clampi(feedback - fb_drop, 0, 96);
     }
 
@@ -911,14 +757,14 @@ void tunnel_apply(void *ptr, VJFrame *frame, int *args)
     float v_phase_time = timef * 0.5f;
     float swirl_time = timef * 0.8f;
     float layer_step = phase_offset * 0.25f;
-    float chroma_phase = t->beat_phase + timef * 0.21f;
+    float chroma_phase = t->drive_phase + timef * 0.21f;
 
     int swirl_active = (swirl > 0.00001f || swirl < -0.00001f);
     int phase_active = (phase_offset > 0.00001f || phase_offset < -0.00001f);
     int layer_active = two_layers && (layer_step > 0.00001f || layer_step < -0.00001f);
-    int chroma_active = (chroma_flow > 0) && (beat_env > 0.0001f || beat_kick > 0.0001f);
-    int chroma_bias = (int)(chroma_flow_f * (beat_env * 8.0f + beat_kick * 15.0f) + 0.5f);
-    int chroma_limit = 112 - (int)(beat_kick * 10.0f);
+    int chroma_active = chroma_flow_f > 0.0001f;
+    int chroma_bias = (int)(chroma_flow_f * (3.0f + travel_f * 24.0f) + 0.5f);
+    int chroma_limit = 112 - (int)(travel_f * 8.0f);
 
     if(chroma_limit < 96)
         chroma_limit = 96;

@@ -21,45 +21,51 @@
 #include "common.h"
 #include "borders.h"
 
-vj_effect *borders_init(int width,int height)
+static inline int borders_clampi(int v, int lo, int hi)
 {
-	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-	ve->num_params = 2;
-	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-
-	ve->defaults[0] = 41;
-	ve->defaults[1] = 0;
-	ve->limits[0][0] = 1;
-	ve->limits[1][0] = (height / 2);
-	ve->limits[0][1] = 0;
-	ve->limits[1][1] = 7;
-	ve->description = "Colored Border Translation";
-	ve->sub_format = 0;
-	ve->extra_frame = 0;
-	ve->has_user = 0;	
-	ve->param_description = vje_build_param_list( ve->num_params, "Size", "Color");
-
-	ve->hints = vje_init_value_hint_list (ve->num_params);
-	vje_build_value_hint_list (ve->hints, ve->limits[1][1],1,
-	                           "White", "Black", "Green", "Light Blue", "Rose",
-	                           "Blue", "Red", "Yellow");
-	ve->beat_hints = vje_build_beat_hint_list(
-		ve->num_params,
-
-		VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE,    2,                  height / 3,          14, 56,  90,   680,  0,    84,    /* Size */
-		VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Color */
-	);
-	return ve;
+    return v < lo ? lo : (v > hi ? hi : v);
 }
 
-void borders_apply( void *ptr, VJFrame *frame, int *args ) {
-    int size = args[0];
-    int color = args[1];
+vj_effect *borders_init(int width, int height)
+{
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
 
-	blackborder_yuvdata(frame->data[0], frame->data[1], frame->data[2],
-						frame->width, frame->height, (size), (size), (size), (size),
-						frame->shift_h, frame->shift_v,color);
+    ve->num_params = 2;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    ve->limits[0][0] = 1; ve->limits[1][0] = height / 2; ve->defaults[0] = borders_clampi(41, 1, height / 2);
+    ve->limits[0][1] = 0; ve->limits[1][1] = 7;          ve->defaults[1] = 0;
+
+    ve->description = "Colored Border Translation";
+    ve->sub_format = 0;
+    ve->extra_frame = 0;
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(ve->num_params, "Size", "Color");
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+
+    vje_build_value_hint_list(ve->hints, ve->limits[1][1], 1, "White", "Black", "Green", "Light Blue", "Rose", "Blue", "Red", "Yellow");
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_IMPULSE | VJ_BEAT_F_DISCRETE, 2,                  borders_clampi(height / 3, 8, height / 2), 42, 92, 55, 420, 120, 82,
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,                 0,  0,  0,   0,   0, -1000
+    );
+
+    return ve;
+}
+
+void borders_apply(void *ptr, VJFrame *frame, int *args)
+{
+    (void) ptr;
+
+    const int max_size = frame->height > 1 ? frame->height / 2 : 1;
+    const int size = borders_clampi(args[0], 1, max_size);
+    const int color = args[1];
+
+    blackborder_yuvdata(frame->data[0], frame->data[1], frame->data[2],
+                        frame->width, frame->height,
+                        size, size, size, size,
+                        frame->shift_h, frame->shift_v, color);
 }

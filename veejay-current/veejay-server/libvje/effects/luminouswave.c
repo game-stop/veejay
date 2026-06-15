@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -20,145 +20,199 @@
 
 #include "common.h"
 #include "luminouswave.h"
+#include <stdint.h>
 
-vj_effect *luminouswave_init(int w, int h) {
+#define LW_PARAMS 7
+
+#define P_FREQ_X 0
+#define P_FREQ_Y 1
+#define P_AMPLITUDE 2
+#define P_SPEED 3
+#define P_ANGLE_X 4
+#define P_ANGLE_Y 5
+#define P_BREAK 6
+
+#define LW_LUT_SIZE 1024
+#define LW_LUT_MASK 1023
+#define LW_Q14 16384
+#define LW_PHASE_K_Q16 106807
+
+typedef struct {
+    int16_t sin_lut[LW_LUT_SIZE] __attribute__((aligned(64)));
+    int16_t cos_lut[LW_LUT_SIZE] __attribute__((aligned(64)));
+    int width;
+    int height;
+    int speed;
+    int n_threads;
+} luminouswave_t;
+
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline int luminouswave_angle_idx(int deg)
+{
+    return ((deg * LW_LUT_SIZE) / 360) & LW_LUT_MASK;
+}
+
+static inline int luminouswave_phase_step_q16(int freq, int trig_q14)
+{
+    return (int)(((int64_t)freq * (int64_t)trig_q14 * (int64_t)LW_PHASE_K_Q16) / LW_Q14);
+}
+
+static inline int luminouswave_phase_base_q16(int freq, int y, int trig_q14, int speed)
+{
+    return (int)((((int64_t)freq * (int64_t)y * (int64_t)trig_q14) + ((int64_t)speed * LW_Q14)) * (int64_t)LW_PHASE_K_Q16 / LW_Q14);
+}
+
+vj_effect *luminouswave_init(int w, int h)
+{
     vj_effect *ve = (vj_effect *)vj_calloc(sizeof(vj_effect));
-    ve->num_params = 7;
 
+    if(!ve)
+        return NULL;
+
+    ve->num_params = LW_PARAMS;
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 0;     
-    ve->limits[1][0] = 100;
-    ve->defaults[0] = 4; 
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 100;
-    ve->defaults[1] = 5;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 45; 
-    ve->defaults[2] = 30;
-
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 100;
-    ve->defaults[3] = 10;
-
-    ve->limits[0][4] = 0;
-    ve->limits[1][4] = 360;
-    ve->defaults[4] = 33;
-
-    ve->limits[0][5] = 0;
-    ve->limits[1][5] = 360;
-    ve->defaults[5] = 10;
-
-    ve->limits[0][6] = 1;
-    ve->limits[1][6] = 500;
-    ve->defaults[6] = 100;
+    ve->limits[0][P_FREQ_X] = 0;     ve->limits[1][P_FREQ_X] = 100;   ve->defaults[P_FREQ_X] = 4;
+    ve->limits[0][P_FREQ_Y] = 1;     ve->limits[1][P_FREQ_Y] = 100;   ve->defaults[P_FREQ_Y] = 5;
+    ve->limits[0][P_AMPLITUDE] = 0;  ve->limits[1][P_AMPLITUDE] = 45; ve->defaults[P_AMPLITUDE] = 30;
+    ve->limits[0][P_SPEED] = 0;      ve->limits[1][P_SPEED] = 100;    ve->defaults[P_SPEED] = 10;
+    ve->limits[0][P_ANGLE_X] = 0;    ve->limits[1][P_ANGLE_X] = 360;  ve->defaults[P_ANGLE_X] = 33;
+    ve->limits[0][P_ANGLE_Y] = 0;    ve->limits[1][P_ANGLE_Y] = 360;  ve->defaults[P_ANGLE_Y] = 10;
+    ve->limits[0][P_BREAK] = 1;      ve->limits[1][P_BREAK] = 500;    ve->defaults[P_BREAK] = 100;
 
     ve->description = "Luminous Wave";
     ve->sub_format = 1;
-    ve->param_description = vje_build_param_list(ve->num_params, "Frequency X", "Frequency Y", "Amplitude", "Speed", "Angle X", "Angle Y", "Break" );
+    ve->extra_frame = 0;
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Frequency X",
+        "Frequency Y",
+        "Amplitude",
+        "Speed",
+        "Angle X",
+        "Angle Y",
+        "Break"
+    );
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_CONTINUOUS,                       2,   55,  10, 38, 1000, 2600, 0,   55, /* Frequency X */
-        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_CONTINUOUS,                       2,   60,  10, 38, 1000, 2600, 0,   55, /* Frequency Y */
-        VJ_BEAT_KICK,               VJ_BEAT_F_CONTINUOUS,                       4,   44,  14, 58, 90,   720,  0,   82, /* Amplitude */
-        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS,                       2,   86,  12, 46, 900,  2400, 0,   70, /* Speed */
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,       0,   360, 10, 38, 1000, 2600, 0,   55, /* Angle X */
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,       0,   360, 10, 38, 1000, 2600, 0,   55, /* Angle Y */
-        VJ_BEAT_SPEED,              VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  12,  220, 6,  22, 1800, 4200, 900, 30  /* Break */
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 0,   32,  4, 16,2600, 7200, 1800, 14,
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1,   36,  4, 16,2600, 7200, 1800, 14,
+        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SQUARED,  6,   42,  8, 38,1200, 3200, 0,    48,
+        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS,                      4,   84,  8, 36,1300, 3600, 0,    44,
+        VJ_BEAT_DRIFT,              VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 0,   240, 4, 16,2600, 7200, 1800, 16,
+        VJ_BEAT_DRIFT,              VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 0,   240, 4, 16,2600, 7200, 1800, 16,
+        VJ_BEAT_INERTIA,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 55,  320, 4, 14,3000, 8200, 2200, 12
     );
+
     return ve;
 }
 
-typedef struct {
-    float sin_lut[1024] __attribute__((aligned(64)));
-    float cos_lut[1024] __attribute__((aligned(64)));
-    int width;
-    int height;
-    int speed;
-    int update;
-    int n_threads;
-} luminouswave_t;
-
-#define SIN_TABLE_SIZE 360
-void* luminouswave_malloc(int w, int h) {
+void *luminouswave_malloc(int w, int h)
+{
     luminouswave_t *data = (luminouswave_t*) vj_malloc(sizeof(luminouswave_t));
-    if (!data) return NULL;
+
+    if(!data)
+        return NULL;
 
     data->width = w;
     data->height = h;
     data->speed = 0;
+    data->n_threads = vje_advise_num_threads(w * h);
 
-    for(int i = 0; i < 1024; i++) {
-        float val = (i / 1024.0f) * (2.0f * M_PI);
-        data->sin_lut[i] = a_sin(val);
-        data->cos_lut[i] = a_cos(val);
+    for(int i = 0; i < LW_LUT_SIZE; i++) {
+        const float a = ((float)i / (float)LW_LUT_SIZE) * 6.28318530718f;
+        data->sin_lut[i] = (int16_t)(a_sin(a) * (float)LW_Q14);
+        data->cos_lut[i] = (int16_t)(a_cos(a) * (float)LW_Q14);
     }
-
-    data->n_threads = vje_advise_num_threads(w*h);
 
     return data;
 }
 
-void luminouswave_free(void *ptr) {
-    luminouswave_t *data = (luminouswave_t*) ptr;
-    if (data != NULL) {
-        free(data);
-    }
+void luminouswave_free(void *ptr)
+{
+    free(ptr);
 }
-void luminouswave_apply(void *ptr, VJFrame *frame, int *args) {
+
+void luminouswave_apply(void *ptr, VJFrame *frame, int *args)
+{
     luminouswave_t *data = (luminouswave_t*)ptr;
+
     const int width = frame->width;
     const int height = frame->height;
-    uint8_t *Y = frame->data[0];
+    const int freq_x = args[P_FREQ_X];
+    const int freq_y = args[P_FREQ_Y];
+    const int amplitude = args[P_AMPLITUDE];
+    const int min_speed = args[P_SPEED];
+    const int angle_x = args[P_ANGLE_X];
+    const int angle_y = args[P_ANGLE_Y];
+    const int break_speed = args[P_BREAK];
 
-    const float freqX = args[0] * 0.01f;
-    const float freqY = args[1] * 0.01f;
-    const float amplitude = (float)args[2];
-    const int min_speed = args[3];
-    const int break_speed = args[6];
+    const int ax = luminouswave_angle_idx(angle_x);
+    const int ay = luminouswave_angle_idx(angle_y);
 
-    const float sX = data->sin_lut[(args[4] * 1024 / 360) & 1023];
-    const float cX = data->cos_lut[(args[4] * 1024 / 360) & 1023];
-    const float sY = data->sin_lut[(args[5] * 1024 / 360) & 1023];
-    const float cY = data->cos_lut[(args[5] * 1024 / 360) & 1023];
+    const int sx = data->sin_lut[ax];
+    const int cx = data->cos_lut[ax];
+    const int sy = data->sin_lut[ay];
+    const int cy = data->cos_lut[ay];
 
-    const int max_speed = (args[0] * width > args[1] * height) ? (args[0] * width) : (args[1] * height);
-    int next_speed = data->speed + (max_speed / (break_speed * 10));
-    if (next_speed > max_speed) next_speed = min_speed;
-    data->speed = next_speed;
+    const int max_x = freq_x * width;
+    const int max_y = freq_y * height;
+    const int max_speed = max_x > max_y ? max_x : max_y;
+    int step = max_speed / (break_speed * 10);
 
-    const float f_speed = (min_speed + next_speed) * 0.01f;
-    const float rad_to_idx = 1024.0f / (2.0f * M_PI);
+    if(step < 1)
+        step = 1;
 
-    const float stepY = freqY * sX;
-    const float stepX = freqX * cX;
-    const int offset = (frame->jobnum * height);
+    data->speed += step;
 
+    if(data->speed > max_speed)
+        data->speed = min_speed;
 
-    #pragma omp parallel for num_threads(data->n_threads) schedule(static)
-    for (int y = 0; y < height; y++) {
-        uint8_t *restrict row = &Y[y * width];
+    const int speed = min_speed + data->speed;
+    const int inc_y_q16 = luminouswave_phase_step_q16(freq_y, sx);
+    const int inc_x_q16 = luminouswave_phase_step_q16(freq_x, cx);
+    const int offset = frame->jobnum * height;
+
+    uint8_t *restrict Y = frame->data[0];
+
+#pragma omp parallel for num_threads(data->n_threads) schedule(static)
+    for(int y = 0; y < height; y++) {
+        uint8_t *restrict row = Y + y * width;
         const int actual_y = y + offset;
-        
-        const float base_Y = (freqY * actual_y * cY + f_speed) * rad_to_idx;
-        const float base_X = (freqX * actual_y * sY + f_speed) * rad_to_idx;
-        const float sY_inc = stepY * rad_to_idx;
-        const float sX_inc = stepX * rad_to_idx;
+        const int base_y_q16 = luminouswave_phase_base_q16(freq_y, actual_y, cy, speed);
+        const int base_x_q16 = luminouswave_phase_base_q16(freq_x, actual_y, sy, speed);
 
-        for (int x = 0; x < width; x++) {
-            int idxY = (int)(x * sY_inc + base_Y) & 1023;
-            int idxX = (int)(x * sX_inc + base_X) & 1023;
-            
-            float off = amplitude * (data->sin_lut[idxY] + data->sin_lut[idxX]);
-            int luma = row[x] + (int)off;
-            
-            if (luma < pixel_Y_lo_) luma = pixel_Y_lo_;
-            else if (luma > pixel_Y_hi_) luma = pixel_Y_hi_;
-            
+        for(int x = 0; x < width; x++) {
+            const int idx_y = (base_y_q16 + x * inc_y_q16) >> 16;
+            const int idx_x = (base_x_q16 + x * inc_x_q16) >> 16;
+            const int wave = (int)data->sin_lut[idx_y & LW_LUT_MASK] + (int)data->sin_lut[idx_x & LW_LUT_MASK];
+            const int off = (amplitude * wave + (wave >= 0 ? (LW_Q14 >> 1) : -(LW_Q14 >> 1))) >> 14;
+            int luma = (int)row[x] + off;
+
+            if(luma < pixel_Y_lo_)
+                luma = pixel_Y_lo_;
+            else if(luma > pixel_Y_hi_)
+                luma = pixel_Y_hi_;
+
             row[x] = (uint8_t)luma;
         }
     }

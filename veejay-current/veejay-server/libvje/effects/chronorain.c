@@ -21,7 +21,7 @@
 #include "common.h"
 #include "chronorain.h"
 
-#define CHRONOFOLD_PARAMS 11
+#define CHRONOFOLD_PARAMS 10
 
 #define P_TRIGGER_GATE    0
 #define P_GRAVITY         1
@@ -31,9 +31,8 @@
 #define P_SOURCE_BLEED    5
 #define P_COLOR_MODE      6
 #define P_STORM           7
-#define P_BEAT_PUSH       8
-#define P_TRAIL_GAIN      9
-#define P_COLOR_ENERGY   10
+#define P_TRAIL_GAIN      8
+#define P_COLOR_ENERGY    9
 
 #define CF_COLOR_POLARITY 0
 #define CF_COLOR_THERMAL  1
@@ -78,7 +77,6 @@ typedef struct {
     int last_decay;
     int last_source_bleed;
     int last_storm;
-    int last_beat_push;
     int last_trail_gain;
     int last_color_energy;
 } chronorain_t;
@@ -98,11 +96,6 @@ static inline int cf_u8_to_param1000(int v)
 {
     v = cf_clampi(v, 0, 255);
     return (v * 1000 + 127) / 255;
-}
-
-static inline int cf_mix_u8(int a, int b, int q)
-{
-    return a + (((b - a) * q + 127) / 255);
 }
 
 static inline int cf_absi(int v)
@@ -141,13 +134,7 @@ static inline int cf_event_energy_limited(int on, int off)
     return ev > 255 ? 255 : ev;
 }
 
-static inline int cf_beat_shape_u8(int beat_push)
-{
-    beat_push = cf_clampi(beat_push, 0, 255);
-    return (beat_push * beat_push + 127) / 255;
-}
-
-static int cf_density_render_gain_q8(chronorain_t *c, int beat_push)
+static int cf_density_render_gain_q8(chronorain_t *c)
 {
     int len = c->len;
     int i;
@@ -155,7 +142,6 @@ static int cf_density_render_gain_q8(chronorain_t *c, int beat_push)
     int hot_pct;
     int avg_penalty = 0;
     int hot_penalty = 0;
-    int beat_penalty;
     int gain;
 
     uint64_t sum = 0;
@@ -192,9 +178,7 @@ static int cf_density_render_gain_q8(chronorain_t *c, int beat_push)
     if(hot_penalty > 128)
         hot_penalty = 128;
 
-    beat_penalty = (beat_push * 36 + 127) / 255;
-
-    gain = 256 - avg_penalty - hot_penalty - beat_penalty;
+    gain = 256 - avg_penalty - hot_penalty;
 
     if(gain < 48)
         gain = 48;
@@ -266,7 +250,7 @@ vj_effect *chronorain_init(int w, int h)
     ve->defaults[P_CONDUCTIVITY] = cf_u8_to_param1000(115);
 
     ve->limits[0][P_DECAY] = 0;
-    ve->limits[1][P_DECAY] = 1000;
+    ve->limits[1][P_DECAY] = 575;
     ve->defaults[P_DECAY] = cf_u8_to_param1000(140);
 
     ve->limits[0][P_POLARITY_SPLIT] = 0;
@@ -282,12 +266,8 @@ vj_effect *chronorain_init(int w, int h)
     ve->defaults[P_COLOR_MODE] = CF_COLOR_POLARITY;
 
     ve->limits[0][P_STORM] = 0;
-    ve->limits[1][P_STORM] = 1000;
+    ve->limits[1][P_STORM] = 512;
     ve->defaults[P_STORM] = cf_u8_to_param1000(90);
-
-    ve->limits[0][P_BEAT_PUSH] = 0;
-    ve->limits[1][P_BEAT_PUSH] = 1000;
-    ve->defaults[P_BEAT_PUSH] = 0;
 
     ve->limits[0][P_TRAIL_GAIN] = 0;
     ve->limits[1][P_TRAIL_GAIN] = 1000;
@@ -300,7 +280,6 @@ vj_effect *chronorain_init(int w, int h)
     ve->description = "Chronofold Synaptic Rain";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
     ve->has_user = 0;
 
     ve->param_description = vje_build_param_list(
@@ -310,28 +289,25 @@ vj_effect *chronorain_init(int w, int h)
         "Conductivity",
         "Memory Decay",
         "Polarity Split",
-        "Source Bleed",
+        "Opacity",
         "Color Mode",
         "Storm Spread",
-        "Beat Push",
         "Trail Gain",
         "Color Energy"
     );
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY,                    35,                 230,                5,  16,  1800, 4200, 1200, -22,    /* Trigger Gate */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     200,                940,                14, 58,  90,   720,  0,    84,     /* Rain Gravity */
-        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     80,                 820,                10, 42,  120,  900,  300,  62,     /* Conductivity */
-        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                    360,                920,                6,  22,  2200, 5200, 1400, 30,     /* Memory Decay */
-        VJ_BEAT_DRIFT,      VJ_BEAT_F_PHRASE_ONLY,                    120,                940,                5,  18,  2200, 5200, 1600, 18,     /* Polarity Split */
-        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_REJECT,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Source Bleed */
-        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Color Mode */
-        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,              620,                4,  26,  120,  900,  500,  38,     /* Storm Spread */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 0,                  900,                22, 88,  60,   360,  0,    100,    /* Beat Push */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     260,                860,                14, 58,  90,   720,  200,  78,     /* Trail Gain */
-        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     300,                1000,               10, 46,  120,  900,  400,  64      /* Color Energy */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,   0,                  220,                72, 100,  45,  520, 0,    100,
+        VJ_BEAT_FLOW,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       200,                1000,               72, 100,  45,  540, 0,    100,
+        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       120,                1000,               62, 100,  55,  680, 0,     96,
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,                575,                76, 100,  55,  520, 0,    100,
+        VJ_BEAT_DRIFT,            VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                        60,                940,                34,  88, 220, 1600, 0,     62,
+        VJ_BEAT_SOURCE_MIX,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,   0,   -1000,
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,   0,   -1000,
+        VJ_BEAT_TURBULENCE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                        70,                512,                66, 100,  45,  580, 0,     98,
+        VJ_BEAT_GLOW,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       260,                1000,               56, 100,  70,  900, 80,    90,
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       260,                1000,               66, 100,  45,  620, 0,    100
     );
 
     return ve;
@@ -355,8 +331,6 @@ void *chronorain_malloc(int w, int h)
     c->lut_valid = 0;
 
     c->n_threads = vje_advise_num_threads(w * h);
-    if(c->n_threads <= 0)
-        c->n_threads = 1;
 
     c->prev_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
     c->ref_y  = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
@@ -440,7 +414,6 @@ static void cf_build_luts_if_needed(chronorain_t *c,
                                     int decay,
                                     int source_bleed,
                                     int storm,
-                                    int beat_push,
                                     int trail_gain,
                                     int color_energy)
 {
@@ -456,7 +429,6 @@ static void cf_build_luts_if_needed(chronorain_t *c,
        c->last_decay == decay &&
        c->last_source_bleed == source_bleed &&
        c->last_storm == storm &&
-       c->last_beat_push == beat_push &&
        c->last_trail_gain == trail_gain &&
        c->last_color_energy == color_energy) {
         return;
@@ -478,7 +450,7 @@ static void cf_build_luts_if_needed(chronorain_t *c,
 
         if(i > trigger_gate) {
             excess = i - trigger_gate;
-            gain = 132 + (gravity >> 3) + (storm >> 2) + ((beat_push * 96 + 127) / 255);
+            gain = 132 + (gravity >> 3) + (storm >> 2);
             event_strength = (excess * gain + denom / 2) / denom;
 
             if(event_strength > 255)
@@ -519,7 +491,6 @@ static void cf_build_luts_if_needed(chronorain_t *c,
     c->last_decay = decay;
     c->last_source_bleed = source_bleed;
     c->last_storm = storm;
-    c->last_beat_push = beat_push;
     c->last_trail_gain = trail_gain;
     c->last_color_energy = color_energy;
     c->lut_valid = 1;
@@ -1530,24 +1501,12 @@ void chronorain_apply(void *ptr, VJFrame *frame, int *args)
     int source_bleed;
     int color_mode;
     int storm;
-    int beat_push;
-    int beat_drive;
     int trail_gain;
     int color_energy;
-
-    int trigger_gate_eff;
-    int gravity_eff;
-    int conductivity_eff;
-    int storm_eff;
-    int trail_gain_eff;
-    int color_energy_eff;
     int render_gain_q8;
 
     int use_conduct;
     int use_storm;
-
-    if(!c || !frame || !args)
-        return;
 
     if(!c->seeded)
         cf_seed(c, frame);
@@ -1560,57 +1519,24 @@ void chronorain_apply(void *ptr, VJFrame *frame, int *args)
     source_bleed   = cf_param1000_to_u8(args[P_SOURCE_BLEED]);
     color_mode     = cf_clampi(args[P_COLOR_MODE], 0, 4);
     storm          = cf_param1000_to_u8(args[P_STORM]);
-    beat_push      = cf_param1000_to_u8(args[P_BEAT_PUSH]);
-    beat_drive     = cf_beat_shape_u8(beat_push);
     trail_gain     = cf_clampi(args[P_TRAIL_GAIN], 0, 1000);
     color_energy   = cf_clampi(args[P_COLOR_ENERGY], 0, 1000);
 
-    trigger_gate_eff = trigger_gate - ((trigger_gate * beat_drive + 765) / 1530);
-    if(trigger_gate_eff < 0)
-        trigger_gate_eff = 0;
-
-    gravity_eff = cf_mix_u8(
-        gravity,
-        230,
-        (beat_drive * 52 + 127) / 255
-    );
-
-    conductivity_eff = cf_mix_u8(
-        conductivity,
-        190,
-        (beat_drive * 18 + 127) / 255
-    );
-
-    storm_eff = cf_mix_u8(
-        storm,
-        190,
-        (beat_drive * 54 + 127) / 255
-    );
-
-    trail_gain_eff = trail_gain + ((beat_drive * 72 + 127) / 255);
-    if(trail_gain_eff > 780)
-        trail_gain_eff = 780;
-
-    color_energy_eff = color_energy + ((beat_drive * 54 + 127) / 255);
-    if(color_energy_eff > 1000)
-        color_energy_eff = 1000;
-
     cf_build_luts_if_needed(
         c,
-        trigger_gate_eff,
-        gravity_eff,
-        conductivity_eff,
+        trigger_gate,
+        gravity,
+        conductivity,
         decay,
         source_bleed,
-        storm_eff,
-        beat_drive,
-        trail_gain_eff,
-        color_energy_eff
+        storm,
+        trail_gain,
+        color_energy
     );
 
     {
-        int conduct_power = conductivity_eff * decay;
-        int storm_span_hint = (storm_eff * 5 + 127) / 255;
+        int conduct_power = conductivity * decay;
+        int storm_span_hint = (storm * 5 + 127) / 255;
 
         use_conduct = (conduct_power >= 128);
         use_storm = (storm_span_hint > 0);
@@ -1618,20 +1544,20 @@ void chronorain_apply(void *ptr, VJFrame *frame, int *args)
 
     if(use_conduct) {
         if(use_storm)
-            cf_compute_rain_full(c, frame, gravity_eff, polarity_split, storm_eff);
+            cf_compute_rain_full(c, frame, gravity, polarity_split, storm);
         else
-            cf_compute_rain_conduct(c, frame, gravity_eff, polarity_split, storm_eff);
+            cf_compute_rain_conduct(c, frame, gravity, polarity_split, storm);
     }
     else {
         if(use_storm)
-            cf_compute_rain_storm(c, frame, gravity_eff, polarity_split, storm_eff);
+            cf_compute_rain_storm(c, frame, gravity, polarity_split, storm);
         else
-            cf_compute_rain_plain(c, frame, gravity_eff, polarity_split, storm_eff);
+            cf_compute_rain_plain(c, frame, gravity, polarity_split, storm);
     }
 
     cf_swap_fields(c);
 
-    render_gain_q8 = cf_density_render_gain_q8(c, beat_push);
+    render_gain_q8 = cf_density_render_gain_q8(c);
 
     cf_render(
         c,

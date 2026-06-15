@@ -1,4 +1,4 @@
-/* 
+/*
  * Linux VeeJay
  *
  * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
@@ -19,8 +19,18 @@
  */
 
 #include "common.h"
+#include <veejaycore/vjmem.h>
 #include "smear.h"
 #include "motionmap.h"
+
+#define SMEAR_PARAMS 6
+
+#define P_MODE        0
+#define P_VALUE       1
+#define P_LENGTH      2
+#define P_MIX         3
+#define P_CHROMA      4
+#define P_SMEAR_DRIVE 5
 
 typedef struct {
     uint8_t *tmp[3];
@@ -28,29 +38,84 @@ typedef struct {
     int N__;
     int n_threads;
     void *motionmap;
+
+    float eff_value;
+    float eff_length;
+    float eff_mix;
+    float eff_chroma;
+    float eff_smear_drive;
+    int initialized;
 } smear_t;
 
-static inline int smear_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : (v > hi ? hi : v);
 }
 
+static inline uint8_t smear_blend_y(uint8_t a, uint8_t b, int q8)
+{
+    q8 = clampi(q8, 0, 256);
+    return (uint8_t)((((int)a * (256 - q8)) + ((int)b * q8) + 128) >> 8);
+}
+
+static inline uint8_t smear_blend_uv(uint8_t a, uint8_t b, int q8)
+{
+    q8 = clampi(q8, 0, 256);
+
+    const int ac = (int)a - 128;
+    const int bc = (int)b - 128;
+    const int v = (((ac * (256 - q8)) + (bc * q8) + 128) >> 8) + 128;
+
+    return (uint8_t)CLAMP_UV(v);
+}
+
+static inline int smear_to_q8_1000(int v)
+{
+    v = clampi(v, 0, 1000);
+    return (v * 256 + 500) / 1000;
+}
+
+
+
+static inline int smear_smooth_i(float *state, int target, float attack, float release)
+{
+    const float cur = *state;
+    const float diff = (float)target - cur;
+    const float step = (diff > 0.0f) ? attack : release;
+    const float out = cur + diff * step;
+
+    *state = out;
+    return (int)(out + (out >= 0.0f ? 0.5f : -0.5f));
+}
+
+
+
 vj_effect *smear_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
+    if(!ve)
+        return NULL;
+
+    ve->num_params = SMEAR_PARAMS;
 
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 3;
-    ve->defaults[0] = 0;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults) free(ve->defaults);
+        if(ve->limits[0]) free(ve->limits[0]);
+        if(ve->limits[1]) free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
-    ve->defaults[1] = 1;
+    ve->limits[0][P_MODE] = 0;        ve->limits[1][P_MODE] = 3;        ve->defaults[P_MODE] = 0;
+    ve->limits[0][P_VALUE] = 0;       ve->limits[1][P_VALUE] = 255;     ve->defaults[P_VALUE] = 1;
+    ve->limits[0][P_LENGTH] = 0;      ve->limits[1][P_LENGTH] = 3000;   ve->defaults[P_LENGTH] = 1000;
+    ve->limits[0][P_MIX] = 0;         ve->limits[1][P_MIX] = 1000;      ve->defaults[P_MIX] = 1000;
+    ve->limits[0][P_CHROMA] = 0;      ve->limits[1][P_CHROMA] = 1000;   ve->defaults[P_CHROMA] = 1000;
+    ve->limits[0][P_SMEAR_DRIVE] = 0; ve->limits[1][P_SMEAR_DRIVE] = 1000; ve->defaults[P_SMEAR_DRIVE] = 0;
 
     ve->description = "Pixel Smear";
     ve->sub_format = 1;
@@ -61,15 +126,19 @@ vj_effect *smear_init(int w, int h)
     ve->param_description = vje_build_param_list(
         ve->num_params,
         "Mode",
-        "Value"
+        "Value",
+        "Smear Length",
+        "Mix",
+        "Chroma Amount",
+        "Smear Drive"
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
 
     vje_build_value_hint_list(
         ve->hints,
-        ve->limits[1][0],
-        0,
+        ve->limits[1][P_MODE],
+        P_MODE,
         "Horizontal",
         "Horizontal Average",
         "Vertical",
@@ -78,13 +147,13 @@ vj_effect *smear_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Mode */
-        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 4,                  180,                6, 22, 1600, 3400, 700, 35     /* Value */
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000,
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED,      4,   180,  12, 46, 1000, 3600, 0, 68,
+        VJ_BEAT_TURBULENCE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 180, 3000, 16, 62, 700,  2800, 0, 92,
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 320, 1000, 12, 46, 1000, 3600, 0, 76,
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 360, 1000, 12, 46, 1000, 3600, 0, 72,
+        VJ_BEAT_TURBULENCE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 140, 1000, 16, 62, 700,  2800, 0, 94
     );
-
-    (void) w;
-    (void) h;
 
     return ve;
 }
@@ -109,10 +178,9 @@ void *smear_malloc(int w, int h)
     s->n__ = 0;
     s->N__ = 0;
     s->motionmap = NULL;
+    s->initialized = 0;
 
     s->n_threads = vje_advise_num_threads(len);
-    if(s->n_threads < 1)
-        s->n_threads = 1;
 
     return (void*) s;
 }
@@ -120,12 +188,8 @@ void *smear_malloc(int w, int h)
 void smear_free(void *ptr)
 {
     smear_t *s = (smear_t*) ptr;
-    if(!s)
-        return;
 
-    if(s->tmp[0])
-        free(s->tmp[0]);
-
+    free(s->tmp[0]);
     free(s);
 }
 
@@ -138,7 +202,14 @@ static void smear_snapshot(smear_t *s, VJFrame *frame)
     veejay_memcpy(s->tmp[2], frame->data[2], len);
 }
 
-static void smear_apply_x(smear_t *s, VJFrame *frame, int val)
+static void smear_apply_axis(smear_t *s,
+                             VJFrame *frame,
+                             int val,
+                             int length_q,
+                             int mix_q8,
+                             int chroma_mix_q8,
+                             int vertical,
+                             int average)
 {
     const int width = frame->width;
     const int height = frame->height;
@@ -159,125 +230,45 @@ static void smear_apply_x(smear_t *s, VJFrame *frame, int val)
             const int idx = row + x;
             const int j = sY[idx];
 
-            if(j >= val) {
-                int sx = x + j;
-                if(sx >= width)
-                    sx = width - 1;
+            if(j < val)
+                continue;
 
-                const int src = row + sx;
+            int dist = (j * length_q + 500) / 1000;
+            if(dist < 1 && length_q > 0)
+                dist = 1;
 
-                Y[idx]  = sY[src];
-                Cb[idx] = sCb[src];
-                Cr[idx] = sCr[src];
-            }
-        }
-    }
-}
+            int sx = x;
+            int sy = y;
 
-static void smear_apply_x_avg(smear_t *s, VJFrame *frame, int val)
-{
-    const int width = frame->width;
-    const int height = frame->height;
-
-    uint8_t *restrict Y  = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
-
-    const uint8_t *restrict sY  = s->tmp[0];
-    const uint8_t *restrict sCb = s->tmp[1];
-    const uint8_t *restrict sCr = s->tmp[2];
-
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-    for(int y = 0; y < height; y++) {
-        const int row = y * width;
-
-        for(int x = 0; x < width; x++) {
-            const int idx = row + x;
-            const int j = sY[idx];
-
-            if(j >= val) {
-                int sx = x + j;
-                if(sx >= width)
-                    sx = width - 1;
-
-                const int src = row + sx;
-
-                Y[idx]  = (uint8_t)(((int)sY[src]  + (int)sY[idx])  >> 1);
-                Cb[idx] = (uint8_t)((((int)sCb[src] - 128 + (int)sCb[idx] - 128) >> 1) + 128);
-                Cr[idx] = (uint8_t)((((int)sCr[src] - 128 + (int)sCr[idx] - 128) >> 1) + 128);
-            }
-        }
-    }
-}
-
-static void smear_apply_y(smear_t *s, VJFrame *frame, int val)
-{
-    const int width = frame->width;
-    const int height = frame->height;
-
-    uint8_t *restrict Y  = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
-
-    const uint8_t *restrict sY  = s->tmp[0];
-    const uint8_t *restrict sCb = s->tmp[1];
-    const uint8_t *restrict sCr = s->tmp[2];
-
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-    for(int y = 0; y < height; y++) {
-        const int row = y * width;
-
-        for(int x = 0; x < width; x++) {
-            const int idx = row + x;
-            const int j = sY[idx];
-
-            if(j >= val) {
-                int sy = y + j;
+            if(vertical) {
+                sy += dist;
                 if(sy >= height)
                     sy = height - 1;
-
-                const int src = sy * width + x;
-
-                Y[idx]  = sY[src];
-                Cb[idx] = sCb[src];
-                Cr[idx] = sCr[src];
+            } else {
+                sx += dist;
+                if(sx >= width)
+                    sx = width - 1;
             }
-        }
-    }
-}
 
-static void smear_apply_y_avg(smear_t *s, VJFrame *frame, int val)
-{
-    const int width = frame->width;
-    const int height = frame->height;
+            const int src = sy * width + sx;
 
-    uint8_t *restrict Y  = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
+            int out_y;
+            int out_u;
+            int out_v;
 
-    const uint8_t *restrict sY  = s->tmp[0];
-    const uint8_t *restrict sCb = s->tmp[1];
-    const uint8_t *restrict sCr = s->tmp[2];
-
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-    for(int y = 0; y < height; y++) {
-        const int row = y * width;
-
-        for(int x = 0; x < width; x++) {
-            const int idx = row + x;
-            const int j = sY[idx];
-
-            if(j >= val) {
-                int sy = y + j;
-                if(sy >= height)
-                    sy = height - 1;
-
-                const int src = sy * width + x;
-
-                Y[idx]  = (uint8_t)(((int)sY[src]  + (int)sY[idx])  >> 1);
-                Cb[idx] = (uint8_t)((((int)sCb[src] - 128 + (int)sCb[idx] - 128) >> 1) + 128);
-                Cr[idx] = (uint8_t)((((int)sCr[src] - 128 + (int)sCr[idx] - 128) >> 1) + 128);
+            if(average) {
+                out_y = ((int)sY[src] + (int)sY[idx] + 1) >> 1;
+                out_u = (((int)sCb[src] - 128 + (int)sCb[idx] - 128) >> 1) + 128;
+                out_v = (((int)sCr[src] - 128 + (int)sCr[idx] - 128) >> 1) + 128;
+            } else {
+                out_y = sY[src];
+                out_u = sCb[src];
+                out_v = sCr[src];
             }
+
+            Y[idx]  = smear_blend_y(sY[idx],  (uint8_t)CLAMP_Y(out_y),  mix_q8);
+            Cb[idx] = smear_blend_uv(sCb[idx], (uint8_t)CLAMP_UV(out_u), chroma_mix_q8);
+            Cr[idx] = smear_blend_uv(sCr[idx], (uint8_t)CLAMP_UV(out_v), chroma_mix_q8);
         }
     }
 }
@@ -291,29 +282,22 @@ void smear_set_motionmap(void *ptr, void *priv)
 {
     smear_t *s = (smear_t*) ptr;
 
-    if(s)
-        s->motionmap = priv;
+    s->motionmap = priv;
 }
 
 void smear_apply(void *ptr, VJFrame *frame, int *args)
 {
     smear_t *s = (smear_t*) ptr;
 
-    if(!s || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
-    const int width = frame->width;
-    const int height = frame->height;
-    const int len = frame->len;
-
-    if(width <= 0 || height <= 0 || len <= 0)
-        return;
-
-    int mode = smear_clampi(args[0], 0, 3);
-    int val = smear_clampi(args[1], 0, 255);
+    int mode = args[P_MODE];
+    int value = args[P_VALUE];
+    int length = args[P_LENGTH];
+    int mix = args[P_MIX];
+    int chroma = args[P_CHROMA];
+    int smear_drive = args[P_SMEAR_DRIVE];
 
     int tmp1 = mode;
-    int tmp2 = val;
+    int tmp2 = value;
     int motion = 0;
     int interpolate = 0;
 
@@ -330,8 +314,8 @@ void smear_apply(void *ptr, VJFrame *frame, int *args)
             &(s->N__)
         );
 
-        val = smear_clampi(tmp2, 0, 255);
-        mode = smear_clampi(tmp1, 0, 3);
+        value = clampi(tmp2, 0, 255);
+        mode = clampi(tmp1, 0, 3);
 
         motion = 1;
         interpolate = !(s->n__ == s->N__ || s->n__ == 0);
@@ -340,20 +324,54 @@ void smear_apply(void *ptr, VJFrame *frame, int *args)
         s->n__ = 0;
     }
 
+    const float fast = 0.28f;
+    const float slow = 0.115f;
+
+    if(!s->initialized) {
+        s->eff_value = (float)value;
+        s->eff_length = (float)length;
+        s->eff_mix = (float)mix;
+        s->eff_chroma = (float)chroma;
+        s->eff_smear_drive = (float)smear_drive;
+        s->initialized = 1;
+    } else {
+        value = smear_smooth_i(&s->eff_value, value, fast, slow);
+        length = smear_smooth_i(&s->eff_length, length, fast * 0.72f, slow);
+        mix = smear_smooth_i(&s->eff_mix, mix, fast * 0.80f, slow);
+        chroma = smear_smooth_i(&s->eff_chroma, chroma, fast * 0.72f, slow);
+        smear_drive = smear_smooth_i(&s->eff_smear_drive, smear_drive, fast, slow);
+    }
+
+    mode = clampi(mode, 0, 3);
+    value = clampi(value, 0, 255);
+    length = clampi(length, 0, 3000);
+    mix = clampi(mix, 0, 1000);
+    chroma = clampi(chroma, 0, 1000);
+    smear_drive = clampi(smear_drive, 0, 1000);
+
+    const int effective_value = clampi(value - ((smear_drive * 96 + 500) / 1000), 0, 255);
+    const int effective_length = clampi(length + ((smear_drive * 2000 + 500) / 1000), 0, 3000);
+    const int effective_mix = clampi(mix + (((1000 - mix) * smear_drive + 500) / 1000), 0, 1000);
+    const int effective_chroma = clampi(chroma + (((1000 - chroma) * smear_drive + 500) / 1000), 0, 1000);
+
+    const int mix_q8 = smear_to_q8_1000(effective_mix);
+    const int chroma_q8 = smear_to_q8_1000(effective_chroma);
+    const int chroma_mix_q8 = (mix_q8 * chroma_q8 + 128) >> 8;
+
     smear_snapshot(s, frame);
 
     switch(mode) {
         case 0:
-            smear_apply_x(s, frame, val);
+            smear_apply_axis(s, frame, effective_value, effective_length, mix_q8, chroma_mix_q8, 0, 0);
             break;
         case 1:
-            smear_apply_x_avg(s, frame, val);
+            smear_apply_axis(s, frame, effective_value, effective_length, mix_q8, chroma_mix_q8, 0, 1);
             break;
         case 2:
-            smear_apply_y(s, frame, val);
+            smear_apply_axis(s, frame, effective_value, effective_length, mix_q8, chroma_mix_q8, 1, 0);
             break;
         case 3:
-            smear_apply_y_avg(s, frame, val);
+            smear_apply_axis(s, frame, effective_value, effective_length, mix_q8, chroma_mix_q8, 1, 1);
             break;
         default:
             break;

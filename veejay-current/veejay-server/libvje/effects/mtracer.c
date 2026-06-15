@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -24,736 +24,241 @@
 #include "magicoverlays.h"
 #include "internal.h"
 
+#define MTRACER_PARAMS 7
+
+#define P_MODE           0
+#define P_STRENGTH       1
+#define P_CLASSIC        2
+#define P_CHARACTER      3
+#define P_DECAY          4
+#define P_MOTION_ONLY    5
+#define P_FRAME2_OPACITY 6
+
+#define MTRACER_MAX_MODE 34
+
 typedef struct {
     uint8_t *mtrace_buffer[4];
-    int mtrace_counter;
+    uint8_t *mode_buffer;
     int started;
-    int prev_n;
     int mode_transition;
     int mode_transition_len;
-    uint8_t *mode_buffer;
     int prev_mode;
     int n_threads;
 } m_tracer_t;
 
-#define DIV255(x) (((x) + 128 + (((x) + 128) >> 8)) >> 8)
-#define BLEND_SM(a, b) (uint8_t)((a * b) / 255)
-#define BLEND_SCR(a, b) (uint8_t)(255 - (((255 - a) * (255 - b)) / 255))
-
 static inline int mtracer_clampi(int v, int lo, int hi)
 {
-    return (v < lo) ? lo : (v > hi ? hi : v);
+    return v < lo ? lo : (v > hi ? hi : v);
 }
 
-static inline void overlaymagic1_motion_mask_parallel(
-    const uint8_t *restrict cur,
-    const uint8_t *restrict prev,
-    uint8_t *restrict out,
-    int len,
-    int n_threads
-) {
+static inline int mtracer_absi(int v)
+{
+    const int m = v >> 31;
+    return (v + m) ^ m;
+}
+
+static inline uint8_t mtracer_y(int v)
+{
+    return (uint8_t)CLAMP_Y(v);
+}
+
+static inline uint8_t mtracer_u8(int v)
+{
+    return (uint8_t)mtracer_clampi(v, 0, 255);
+}
+
+static inline uint8_t mtracer_div255(int v)
+{
+    return (uint8_t)(((v + 128) + ((v + 128) >> 8)) >> 8);
+}
+
+static inline uint8_t mtracer_blend255(uint8_t a, uint8_t b, int opacity)
+{
+    const int inv = 255 - opacity;
+    return mtracer_div255((int)a * inv + (int)b * opacity);
+}
+
+static inline uint8_t mtracer_screen(int a, int b)
+{
+    return (uint8_t)(255 - mtracer_div255((255 - a) * (255 - b)));
+}
+
+static inline uint8_t mtracer_multiply(int a, int b)
+{
+    return mtracer_div255(a * b);
+}
+
+static inline uint8_t mtracer_overlay_pixel(int mode, int a, int b)
+{
+    int c;
+
+    switch(mode) {
+        case VJ_EFFECT_BLEND_ADDITIVE:
+            return mtracer_u8(a + b);
+
+        case VJ_EFFECT_BLEND_SUBSTRACTIVE:
+            return mtracer_y(a - b);
+
+        case VJ_EFFECT_BLEND_MULTIPLY:
+            return mtracer_multiply(a, b);
+
+        case VJ_EFFECT_BLEND_DIVIDE:
+            return b > pixel_Y_lo_ ? (uint8_t)(a / b) : (uint8_t)a;
+
+        case VJ_EFFECT_BLEND_LIGHTEN:
+            return (uint8_t)(a > b ? a : b);
+
+        case VJ_EFFECT_BLEND_DIFFERENCE:
+            return (uint8_t)mtracer_absi(a - b);
+
+        case VJ_EFFECT_BLEND_DIFFNEGATE:
+            return (uint8_t)(255 - mtracer_absi((255 - a) - b));
+
+        case VJ_EFFECT_BLEND_EXCLUSIVE:
+            return mtracer_u8(a + b - ((2 * a * b) / 255));
+
+        case VJ_EFFECT_BLEND_BASECOLOR:
+            c = (a * b) >> 8;
+            return mtracer_y(c + ((a * ((255 - (((255 - a) * (255 - b)) >> 8)) - c)) >> 8));
+
+        case VJ_EFFECT_BLEND_FREEZE:
+            return b > pixel_Y_lo_ ? mtracer_y(255 - (((255 - a) * (255 - a)) / b)) : (uint8_t)a;
+
+        case VJ_EFFECT_BLEND_UNFREEZE:
+            return a > pixel_Y_lo_ ? mtracer_y(255 - (((255 - b) * (255 - b)) / a)) : (uint8_t)a;
+
+        case VJ_EFFECT_BLEND_RELADD:
+            return (uint8_t)((a >> 1) + (b >> 1));
+
+        case VJ_EFFECT_BLEND_RELSUB:
+            return (uint8_t)((a - b + 255) >> 1);
+
+        case VJ_EFFECT_BLEND_RELADDLUM:
+            return mtracer_y((a >> 1) + (b >> 1));
+
+        case VJ_EFFECT_BLEND_RELSUBLUM:
+            return (uint8_t)((a - b + 255) >> 1);
+
+        case VJ_EFFECT_BLEND_MAXSEL:
+            return (uint8_t)(b > a ? b : a);
+
+        case VJ_EFFECT_BLEND_MINSEL:
+            return (uint8_t)(b < a ? b : a);
+
+        case VJ_EFFECT_BLEND_MINSUBSEL:
+            return (uint8_t)((b < a) ? ((b - a + 255) >> 1) : ((a - b + 255) >> 1));
+
+        case VJ_EFFECT_BLEND_MAXSUBSEL:
+            return (uint8_t)((b > a) ? ((b - a + 255) >> 1) : ((a - b + 255) >> 1));
+
+        case VJ_EFFECT_BLEND_ADDSUBSEL:
+            return (uint8_t)((b < a) ? ((a + b) >> 1) : a);
+
+        case VJ_EFFECT_BLEND_ADDAVG:
+            return (uint8_t)((a + b) >> 1);
+
+        case VJ_EFFECT_BLEND_ADDTEST2:
+            return mtracer_y(a + (((2 * b) - 255) >> 1));
+
+        case VJ_EFFECT_BLEND_ADDTEST3:
+            return mtracer_y(a + (2 * b) - 255);
+
+        case VJ_EFFECT_BLEND_ADDTEST4:
+            b -= 255;
+            return b <= pixel_Y_lo_ ? (uint8_t)a : (uint8_t)((a * a) / b);
+
+        case VJ_EFFECT_BLEND_MULSUB:
+            b = 255 - b;
+            return b > pixel_Y_lo_ ? (uint8_t)(a / b) : (uint8_t)a;
+
+        case VJ_EFFECT_BLEND_SOFTBURN:
+            return b == 0 ? 0 : mtracer_u8(255 - (((255 - a) << 8) / b));
+
+        case VJ_EFFECT_BLEND_INVERSEBURN:
+            return a <= pixel_Y_lo_ ? (uint8_t)pixel_Y_lo_ : mtracer_y(255 - (((255 - b) >> 8) / a));
+
+        case VJ_EFFECT_BLEND_COLORDODGE:
+            return b == 255 ? 255 : mtracer_u8((a << 8) / (255 - b));
+
+        case VJ_EFFECT_BLEND_ADDDISTORT:
+            return mtracer_y(a + b);
+
+        case VJ_EFFECT_BLEND_SUBDISTORT:
+            return mtracer_y(a - b);
+
+        case VJ_EFFECT_BLEND_ADDTEST5:
+            if(a <= pixel_Y_lo_)
+                c = pixel_Y_lo_;
+            else
+                c = 255 - ((256 - a) * (256 - a)) / a;
+            if(c <= pixel_Y_lo_)
+                c = pixel_Y_lo_;
+            if(b <= pixel_Y_lo_)
+                return (uint8_t)pixel_Y_lo_;
+            return mtracer_y(255 - ((256 - c) * (256 - b)) / b);
+
+        case VJ_EFFECT_BLEND_NEGDIV:
+            return mtracer_screen(a, b);
+
+        case VJ_EFFECT_BLEND_SCREEN:
+            return mtracer_screen(a, b);
+
+        case VJ_EFFECT_BLEND_HARDLIGHT:
+            return (uint8_t)(b < 128 ? ((2 * a * b) / 255) : (255 - ((2 * (255 - a) * (255 - b)) / 255)));
+
+        default:
+            return (uint8_t)(a < 128 ? ((2 * a * b) / 255) : (255 - ((2 * (255 - a) * (255 - b)) / 255)));
+    }
+}
+
+static void overlaymagic1_apply_n(VJFrame *frame, VJFrame *frame2, int mode, int n_threads)
+{
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    const uint8_t *restrict Y2 = frame2->data[0];
+
 #pragma omp parallel for schedule(static) num_threads(n_threads)
-    for (int i = 0; i < len; i++) {
-        int diff = (int)cur[i] - (int)prev[i];
-        int abs_diff = (diff < 0) ? -diff : diff;
-        out[i] = (abs_diff > 255) ? 255 : (uint8_t)abs_diff;
-    }
-}
-
-static inline void overlaymagic1_decay(uint8_t *restrict buffer, int len, int decay_val)
-{
-    if (decay_val >= 255)
-        return;
-
-    if (decay_val <= 0) {
-        veejay_memset(buffer, 0, len);
-        return;
-    }
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        buffer[i] = (uint8_t)((buffer[i] * decay_val) >> 8);
-    }
-}
-
-/* copied back from old version: buggy overlay modes that clip/saturate pixels */
-void overlaymagic1_adddistorted(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = CLAMP_Y(Y[i] + Y2[i]);
-    }
-}
-
-void overlaymagic1_add_distorted(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = (Y[i] + Y2[i]) >> 1;
-    }
-}
-
-void overlaymagic1_subdistorted(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = CLAMP_Y(Y[i] - Y2[i]);
-    }
-}
-
-void overlaymagic1_sub_distorted(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = Y2[i] - Y[i];
-    }
-}
-
-void overlaymagic1_multiply(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = (Y[i] * Y2[i]) / 255;
-    }
-}
-
-void overlaymagic1_simpledivide(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        if (Y2[i] > pixel_Y_lo_)
-            Y[i] = Y[i] / Y2[i];
-    }
-}
-
-void overlaymagic1_divide(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = BLEND_SCR(Y[i], Y2[i]);
-    }
-}
-
-void overlaymagic1_additive(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        int res = Y[i] + Y2[i];
-        Y[i] = (res > 255) ? 255 : res;
-    }
-}
-
-void overlaymagic1_substractive(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = CLAMP_Y(Y[i] - Y2[i]);
-    }
-}
-
-void overlaymagic1_softburn(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        int base = Y[i];
-        int blend = Y2[i];
-
-        if (blend == 0) {
-            Y[i] = 0;
-        } else {
-            int res = 255 - (((255 - base) << 8) / blend);
-            Y[i] = (res < 0) ? 0 : res;
-        }
-    }
-}
-
-void overlaymagic1_inverseburn(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        int a = Y[i];
-        int b = Y2[i];
-        int c;
-
-        if (a <= pixel_Y_lo_)
-            c = pixel_Y_lo_;
-        else
-            c = 255 - (((255 - b) >> 8) / a);
-
-        Y[i] = CLAMP_Y(c);
-    }
-}
-
-void overlaymagic1_colordodge(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        int base = Y[i];
-        int blend = Y2[i];
-
-        if (blend == 255) {
-            Y[i] = 255;
-        } else {
-            int res = (base << 8) / (255 - blend);
-            Y[i] = (res > 255) ? 255 : res;
-        }
-    }
-}
-
-void overlaymagic1_mulsub(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        int a = Y[i];
-        int b = 255 - Y2[i];
-
-        if (b > pixel_Y_lo_)
-            Y[i] = a / b;
-    }
-}
-
-void overlaymagic1_lighten(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = (Y[i] > Y2[i]) ? Y[i] : Y2[i];
-    }
-}
-
-void overlaymagic1_difference(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        int res = Y[i] - Y2[i];
-        Y[i] = (res < 0) ? -res : res;
-    }
-}
-
-void overlaymagic1_diffnegate(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = 255 - abs((255 - Y[i]) - Y2[i]);
-    }
-}
-
-void overlaymagic1_exclusive(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        int a = Y[i];
-        int b = Y2[i];
-        Y[i] = a + b - ((2 * a * b) / 255);
-    }
-}
-
-void overlaymagic1_basecolor(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        int a = Y[i];
-        int b = Y2[i];
-        int c = (a * b) >> 8;
-        int d = c + ((a * ((255 - (((255 - a) * (255 - b)) >> 8)) - c)) >> 8);
-        Y[i] = CLAMP_Y(d);
-    }
-}
-
-void overlaymagic1_freeze(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        int a = Y[i];
-        int b = Y2[i];
-
-        if (b > pixel_Y_lo_)
-            Y[i] = CLAMP_Y(255 - (((255 - a) * (255 - a)) / b));
-    }
-}
-
-void overlaymagic1_unfreeze(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        int a = Y[i];
-        int b = Y2[i];
-
-        if (a > pixel_Y_lo_)
-            Y[i] = CLAMP_Y(255 - (((255 - b) * (255 - b)) / a));
-    }
-}
-
-void overlaymagic1_hardlight(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        int a = Y[i];
-        int b = Y2[i];
-
-        if (b < 128)
-            Y[i] = (2 * a * b) / 255;
-        else
-            Y[i] = 255 - ((2 * (255 - a) * (255 - b)) / 255);
-    }
-}
-
-void overlaymagic1_relativeaddlum(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = CLAMP_Y((Y[i] >> 1) + (Y2[i] >> 1));
-    }
-}
-
-void overlaymagic1_relativesublum(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = (Y[i] - Y2[i] + 255) >> 1;
-    }
-}
-
-void overlaymagic1_relativeadd(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = (Y[i] >> 1) + (Y2[i] >> 1);
-    }
-}
-
-void overlaymagic1_relativesub(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = (Y[i] - Y2[i] + 255) >> 1;
-    }
-}
-
-void overlaymagic1_minsubselect(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = (Y2[i] < Y[i])
-            ? (Y2[i] - Y[i] + 255) >> 1
-            : (Y[i] - Y2[i] + 255) >> 1;
-    }
-}
-
-void overlaymagic1_maxsubselect(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = (Y2[i] > Y[i])
-            ? (Y2[i] - Y[i] + 255) >> 1
-            : (Y[i] - Y2[i] + 255) >> 1;
-    }
-}
-
-void overlaymagic1_addsubselect(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = (Y2[i] < Y[i]) ? ((Y[i] + Y2[i]) >> 1) : Y[i];
-    }
-}
-
-void overlaymagic1_maxselect(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = (Y2[i] > Y[i]) ? Y2[i] : Y[i];
-    }
-}
-
-void overlaymagic1_minselect(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = (Y2[i] < Y[i]) ? Y2[i] : Y[i];
-    }
-}
-
-void overlaymagic1_addtest(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = CLAMP_Y(Y[i] + (((2 * Y2[i]) - 255) >> 1));
-    }
-}
-
-void overlaymagic1_addtest2(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = CLAMP_Y(Y[i] + (2 * Y2[i]) - 255);
-    }
-}
-
-void overlaymagic1_addtest4(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        int a = Y[i];
-        int b = Y2[i] - 255;
-
-        if (b <= pixel_Y_lo_)
-            Y[i] = a;
-        else
-            Y[i] = (a * a) / b;
-    }
-}
-
-void overlaymagic1_screen(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        Y[i] = 255 - (((255 - Y[i]) * (255 - Y2[i])) / 255);
-    }
-}
-
-void overlaymagic1_overlay(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        int a = Y[i];
-        int b = Y2[i];
-
-        Y[i] = (a < 128)
-            ? (2 * a * b) / 255
-            : 255 - ((2 * (255 - a) * (255 - b)) / 255);
-    }
-}
-
-void overlaymagic1_try(VJFrame *frame, VJFrame *frame2)
-{
-    const int len = frame->len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
-
-#pragma omp simd
-    for (int i = 0; i < len; i++) {
-        int a, b, p, q;
-
-        a = Y[i];
-        b = Y[i];
-
-        if (b <= pixel_Y_lo_)
-            p = pixel_Y_lo_;
-        else
-            p = 255 - ((256 - a) * (256 - a)) / b;
-
-        if (p <= pixel_Y_lo_)
-            p = pixel_Y_lo_;
-
-        a = Y2[i];
-        b = Y2[i];
-
-        if (b <= pixel_Y_lo_)
-            q = pixel_Y_lo_;
-        else
-            q = 255 - ((256 - a) * (256 - a)) / b;
-
-        if (b <= pixel_Y_lo_)
-            q = pixel_Y_lo_;
-
-        if (q <= pixel_Y_lo_)
-            q = pixel_Y_lo_;
-        else
-            q = 255 - ((256 - p) * (256 - a)) / q;
-
-        Y[i] = q;
-    }
+    for(int i = 0; i < len; i++)
+        Y[i] = mtracer_overlay_pixel(mode, Y[i], Y2[i]);
 }
 
 void overlaymagic1_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int n)
 {
-    (void) ptr;
+    (void)ptr;
 
-    switch (n)
-    {
-        case VJ_EFFECT_BLEND_ADDITIVE:
-            overlaymagic1_additive(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_SUBSTRACTIVE:
-            overlaymagic1_substractive(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_MULTIPLY:
-            overlaymagic1_multiply(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_DIVIDE:
-            overlaymagic1_simpledivide(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_LIGHTEN:
-            overlaymagic1_lighten(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_DIFFERENCE:
-            overlaymagic1_difference(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_DIFFNEGATE:
-            overlaymagic1_diffnegate(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_EXCLUSIVE:
-            overlaymagic1_exclusive(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_BASECOLOR:
-            overlaymagic1_basecolor(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_FREEZE:
-            overlaymagic1_freeze(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_UNFREEZE:
-            overlaymagic1_unfreeze(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_RELADD:
-            overlaymagic1_relativeadd(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_RELSUB:
-            overlaymagic1_relativesub(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_RELADDLUM:
-            overlaymagic1_relativeaddlum(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_RELSUBLUM:
-            overlaymagic1_relativesublum(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_MAXSEL:
-            overlaymagic1_maxselect(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_MINSEL:
-            overlaymagic1_minselect(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_MINSUBSEL:
-            overlaymagic1_minsubselect(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_MAXSUBSEL:
-            overlaymagic1_maxsubselect(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_ADDSUBSEL:
-            overlaymagic1_addsubselect(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_ADDAVG:
-            overlaymagic1_add_distorted(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_ADDTEST2:
-            overlaymagic1_addtest(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_ADDTEST3:
-            overlaymagic1_addtest2(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_ADDTEST4:
-            overlaymagic1_addtest4(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_MULSUB:
-            overlaymagic1_mulsub(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_SOFTBURN:
-            overlaymagic1_softburn(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_INVERSEBURN:
-            overlaymagic1_inverseburn(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_COLORDODGE:
-            overlaymagic1_colordodge(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_ADDDISTORT:
-            overlaymagic1_adddistorted(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_SUBDISTORT:
-            overlaymagic1_subdistorted(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_ADDTEST5:
-            overlaymagic1_try(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_NEGDIV:
-            overlaymagic1_divide(frame, frame2);
-            break;
-        case VJ_EFFECT_BLEND_SCREEN:
-            overlaymagic1_screen(frame, frame2);
-            break;
-        default:
-            overlaymagic1_overlay(frame, frame2);
-            break;
-    }
+    overlaymagic1_apply_n(frame, frame2, n, vje_advise_num_threads(frame->len));
 }
 
 vj_effect *mtracer_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    if (!ve)
+
+    if(!ve)
         return NULL;
 
-    ve->num_params = 7;
-
+    ve->num_params = MTRACER_PARAMS;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if (!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if (ve->defaults)
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
             free(ve->defaults);
-        if (ve->limits[0])
+        if(ve->limits[0])
             free(ve->limits[0]);
-        if (ve->limits[1])
+        if(ve->limits[1])
             free(ve->limits[1]);
         free(ve);
         return NULL;
     }
 
-    ve->limits[0][0] = 0;   ve->limits[1][0] = 34;
-    ve->limits[0][1] = 1;   ve->limits[1][1] = 255;
-    ve->limits[0][2] = 0;   ve->limits[1][2] = 1;
-    ve->limits[0][3] = 0;   ve->limits[1][3] = 255;
-    ve->limits[0][4] = 1;   ve->limits[1][4] = 255;
-    ve->limits[0][5] = 0;   ve->limits[1][5] = 1;
-    ve->limits[0][6] = 0;   ve->limits[1][6] = 255;
-
-    ve->defaults[0] = 0;
-    ve->defaults[1] = 200;
-    ve->defaults[2] = 0;
-    ve->defaults[3] = 128;
-    ve->defaults[4] = 11;
-    ve->defaults[5] = 0;
-    ve->defaults[6] = 128;
+    ve->limits[0][P_MODE] = 0;           ve->limits[1][P_MODE] = MTRACER_MAX_MODE; ve->defaults[P_MODE] = 0;
+    ve->limits[0][P_STRENGTH] = 1;       ve->limits[1][P_STRENGTH] = 255;          ve->defaults[P_STRENGTH] = 200;
+    ve->limits[0][P_CLASSIC] = 0;        ve->limits[1][P_CLASSIC] = 1;             ve->defaults[P_CLASSIC] = 0;
+    ve->limits[0][P_CHARACTER] = 0;      ve->limits[1][P_CHARACTER] = 255;         ve->defaults[P_CHARACTER] = 128;
+    ve->limits[0][P_DECAY] = 1;          ve->limits[1][P_DECAY] = 255;             ve->defaults[P_DECAY] = 11;
+    ve->limits[0][P_MOTION_ONLY] = 0;    ve->limits[1][P_MOTION_ONLY] = 1;         ve->defaults[P_MOTION_ONLY] = 0;
+    ve->limits[0][P_FRAME2_OPACITY] = 0; ve->limits[1][P_FRAME2_OPACITY] = 255;    ve->defaults[P_FRAME2_OPACITY] = 128;
 
     ve->description = "Magic Tracer";
     ve->sub_format = -1;
@@ -772,7 +277,7 @@ vj_effect *mtracer_init(int w, int h)
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
-    vje_build_value_hint_list(ve->hints, ve->limits[1][0], 0,
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_MODE], P_MODE,
         "Additive","Subtractive","Multiply","Divide","Lighten","Hardlight",
         "Difference","Difference Negate","Exclusive","Base","Freeze",
         "Unfreeze","Relative Add","Relative Subtract","Max select","Min select",
@@ -781,114 +286,104 @@ vj_effect *mtracer_init(int w, int h)
         "Multisub","Softburn","Inverse Burn","Dodge","Distorted Add","Distorted Subtract",
         "Experimental 4","Negation Divide","Screen","Overlay"
     );
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_CLASSIC], P_CLASSIC, "Off", "On");
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_MOTION_ONLY], P_MOTION_ONLY, "Off", "On");
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Mode */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,     24,                 240,                22, 88, 60,   360,  0,   96,    /* Strength */
-        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Use Classic Blend */
-        VJ_BEAT_DETAIL,     VJ_BEAT_F_CONTINUOUS,                         36,                 225,                8,  30, 1200, 3000, 0,   45,    /* Character */
-        VJ_BEAT_MEMORY,     VJ_BEAT_F_CONTINUOUS,                         4,                  160,                8,  32, 1200, 3200, 0,   55,    /* Decay Strength */
-        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Motion Only */
-        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                         24,                 230,                10, 38, 1000, 2600, 0,   55     /* Frame2 Opacity */
+        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_INTENSITY,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       48,                 238,                18, 68,  650, 2600, 0,    90,
+        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_CONTRAST,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       56,                 235,                14, 54,  800, 3000, 0,    78,
+        VJ_BEAT_MEMORY,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       18,                 230,                18, 68,  700, 3000, 0,    88,
+        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       28,                 235,                14, 54,  800, 3000, 0,    76
     );
-
-    (void) w;
-    (void) h;
 
     return ve;
 }
 
+void mtracer_free(void *ptr)
+{
+    m_tracer_t *m = (m_tracer_t*) ptr;
+
+    free(m->mtrace_buffer[0]);
+    free(m);
+}
+
 void *mtracer_malloc(int w, int h)
 {
-    const size_t buflen = (size_t) w * h;
-    const size_t total_buffers = 5;
-    const size_t total_size = buflen * total_buffers;
+    const size_t buflen = (size_t)w * (size_t)h;
 
     m_tracer_t *m = (m_tracer_t*) vj_calloc(sizeof(m_tracer_t));
-    if (!m)
+
+    if(!m)
         return NULL;
 
-    uint8_t *block = (uint8_t*) vj_malloc(total_size);
-    if (!block) {
+    uint8_t *block = (uint8_t*) vj_malloc(buflen * 4u);
+
+    if(!block) {
         free(m);
         return NULL;
     }
 
     m->mtrace_buffer[0] = block;
     m->mtrace_buffer[1] = block + buflen;
-    m->mtrace_buffer[2] = block + (buflen * 2);
-    m->mtrace_buffer[3] = block + (buflen * 3);
-    m->mode_buffer      = block + (buflen * 4);
+    m->mtrace_buffer[2] = block + buflen * 2u;
+    m->mtrace_buffer[3] = block + buflen * 3u;
+    m->mode_buffer = m->mtrace_buffer[3];
 
-    veejay_memset(m->mtrace_buffer[0], pixel_Y_lo_, buflen);
-    veejay_memset(m->mtrace_buffer[1], pixel_Y_lo_, buflen);
-    veejay_memset(m->mtrace_buffer[2], pixel_Y_lo_, buflen);
-    veejay_memset(m->mtrace_buffer[3], pixel_Y_lo_, buflen);
-    veejay_memset(m->mode_buffer,      pixel_Y_lo_, buflen);
+    veejay_memset(block, pixel_Y_lo_, buflen * 4u);
 
     m->mode_transition = 0;
     m->mode_transition_len = 12;
     m->prev_mode = 0;
     m->n_threads = vje_advise_num_threads(w * h);
 
-    if (m->n_threads <= 0)
-        m->n_threads = 1;
-
     return (void*) m;
 }
 
-void mtracer_free(void *ptr)
+static void mtracer_motion_mask(const uint8_t *restrict cur,
+                                const uint8_t *restrict prev,
+                                uint8_t *restrict out,
+                                int len,
+                                int n_threads)
 {
-    if (!ptr)
-        return;
-
-    m_tracer_t *m = (m_tracer_t*) ptr;
-
-    if (m->mtrace_buffer[0])
-        free(m->mtrace_buffer[0]);
-
-    free(m);
+#pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int i = 0; i < len; i++)
+        out[i] = (uint8_t)mtracer_absi((int)cur[i] - (int)prev[i]);
 }
 
 void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     m_tracer_t *m = (m_tracer_t*) ptr;
 
-    if (!m || !frame || !frame2 || !args)
-        return;
-
     const int len = frame->len;
-    if (len <= 0)
-        return;
-
-    uint8_t *Y = frame->data[0];
-    uint8_t *U = frame->data[1];
-    uint8_t *V = frame->data[2];
-
-    if (!Y || !U || !V || !frame2->data[0])
-        return;
-
-    int mode           = mtracer_clampi(args[0], 0, 34);
-    int length         = mtracer_clampi(args[1], 1, 255);
-    int classic        = mtracer_clampi(args[2], 0, 1);
-    int character      = mtracer_clampi(args[3], 0, 255);
-    int decay_val      = mtracer_clampi(args[4], 1, 255);
-    int motion_only    = mtracer_clampi(args[5], 0, 1);
-    int frame2_opacity = mtracer_clampi(args[6], 0, 255);
-
-    uint8_t *feedback_buf   = m->mtrace_buffer[0];
-    uint8_t *blended_result = m->mtrace_buffer[1];
-    uint8_t *prev_frame     = m->mtrace_buffer[2];
-
+    const int uv_len = frame->ssm ? len : frame->uv_len;
     const int n_threads = m->n_threads;
 
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict U = frame->data[1];
+    uint8_t *restrict V = frame->data[2];
+
+    const int mode = args[P_MODE];
+    const int strength = args[P_STRENGTH];
+    const int classic = args[P_CLASSIC];
+    const int character = args[P_CHARACTER];
+    const int decay_val = args[P_DECAY];
+    const int motion_only = args[P_MOTION_ONLY];
+    const int frame2_opacity = args[P_FRAME2_OPACITY];
+
+    uint8_t *restrict feedback_buf = m->mtrace_buffer[0];
+    uint8_t *restrict blended_result = m->mtrace_buffer[1];
+    uint8_t *restrict prev_frame = m->mtrace_buffer[2];
+
     VJFrame tmp_frame;
+
     veejay_memcpy(&tmp_frame, frame, sizeof(VJFrame));
     tmp_frame.data[0] = blended_result;
 
-    if (!m->started) {
+    if(!m->started) {
         veejay_memcpy(feedback_buf, Y, len);
         veejay_memcpy(prev_frame, Y, len);
         m->prev_mode = mode;
@@ -896,75 +391,60 @@ void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         m->started = 1;
     }
 
-    if (mode != m->prev_mode) {
+    if(mode != m->prev_mode) {
         veejay_memcpy(m->mode_buffer, feedback_buf, len);
         m->mode_transition = m->mode_transition_len;
         m->prev_mode = mode;
     }
 
     veejay_memcpy(blended_result, Y, len);
-    overlaymagic1_apply(NULL, &tmp_frame, frame2, mode);
+    overlaymagic1_apply_n(&tmp_frame, frame2, mode, n_threads);
 
-    if (frame2_opacity < 255) {
-        const int inv_opacity = 255 - frame2_opacity;
-
+    if(frame2_opacity < 255) {
 #pragma omp parallel for schedule(static) num_threads(n_threads)
-        for (int i = 0; i < len; i++) {
-            int b = blended_result[i];
-            blended_result[i] = (uint8_t)(((Y[i] * inv_opacity) + (b * frame2_opacity)) >> 8);
-        }
+        for(int i = 0; i < len; i++)
+            blended_result[i] = mtracer_blend255(Y[i], blended_result[i], frame2_opacity);
     }
 
-    if (m->mode_transition > 0) {
+    if(m->mode_transition > 0) {
         const int t = m->mode_transition_len - m->mode_transition;
         const int x = (t << 8) / m->mode_transition_len;
         const int alpha = (x * x * (768 - (x << 1))) >> 16;
-        const int inv_alpha = 255 - alpha;
-        uint8_t *mode_buf = m->mode_buffer;
+        uint8_t *restrict mode_buf = m->mode_buffer;
 
 #pragma omp parallel for schedule(static) num_threads(n_threads)
-        for (int i = 0; i < len; i++) {
-            int b = blended_result[i];
-            blended_result[i] = (uint8_t)((mode_buf[i] * inv_alpha + b * alpha) >> 8);
-        }
+        for(int i = 0; i < len; i++)
+            blended_result[i] = mtracer_blend255(mode_buf[i], blended_result[i], alpha);
 
         m->mode_transition--;
     }
 
-    if (motion_only) {
-        overlaymagic1_motion_mask_parallel(
-            blended_result,
-            prev_frame,
-            blended_result,
-            len,
-            n_threads
-        );
-    }
+    if(motion_only)
+        mtracer_motion_mask(blended_result, prev_frame, blended_result, len, n_threads);
 
-    int combined_scale = (length * character) / 255;
-    combined_scale = mtracer_clampi(combined_scale, 1, 255);
-
+    const int combined_scale = mtracer_clampi((strength * character + 127) / 255, 1, 255);
     const int decay = 256 - (256 / decay_val);
-    const int blend = 256 - decay;
+    const int inject = 256 - decay;
 
 #pragma omp parallel for schedule(static) num_threads(n_threads)
-    for (int i = 0; i < len; i++) {
-        int f = feedback_buf[i];
-        int b = blended_result[i];
-        int accum = ((f * decay) + ((b * combined_scale * blend) >> 8)) >> 8;
+    for(int i = 0; i < len; i++) {
+        const int f = feedback_buf[i];
+        const int b = blended_result[i];
+        const int accum = ((f * decay + 128) >> 8) + ((b * combined_scale * inject + 32768) >> 16);
 
-        feedback_buf[i] = (uint8_t)mtracer_clampi(accum, 0, 255);
+        feedback_buf[i] = mtracer_u8(accum);
     }
 
     veejay_memcpy(prev_frame, Y, len);
 
-    if (classic) {
+    if(classic) {
         tmp_frame.data[0] = feedback_buf;
-        overlaymagic1_apply(NULL, frame, &tmp_frame, mode);
-    } else {
+        overlaymagic1_apply_n(frame, &tmp_frame, mode, n_threads);
+    }
+    else {
         veejay_memcpy(Y, feedback_buf, len);
     }
 
-    veejay_memset(U, 128, frame->uv_len);
-    veejay_memset(V, 128, frame->uv_len);
+    veejay_memset(U, 128, uv_len);
+    veejay_memset(V, 128, uv_len);
 }

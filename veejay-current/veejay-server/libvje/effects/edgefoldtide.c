@@ -538,21 +538,18 @@ vj_effect *edgefoldtide_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                                      8,                  72,  8,  30, 900,  2400, 0,   42, /* Source Presence */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                                      18,                 94,  14, 58, 90,   720,  0,   86, /* Contour Flow */
-        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                                      16,                 96,  10, 46, 120,  900,  0,   76, /* Cathedral Geometry */
-        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                                      20,                 94,  10, 42, 120,  900,  0,   68, /* Mirror Depth */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                                      8,                  92,  14, 58, 90,   720,  0,   82, /* Biolume Glow */
-        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                                      8,                  84,  10, 40, 120,  900,  0,   68, /* Contour Pull */
-        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                                     45,                 96,  8,  28, 1800, 4200, 900, 38, /* Trail Memory */
-        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS,                                      18,                 94,  4,  26, 80,   620,  0,   50, /* Pastel Color */
-        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -80,       80,  4,  26, 80,   620,  0,   52, /* Motion Speed */
-        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY,                                     20,                 92,  6,  22, 1800, 4200, 900, 28  /* Surface Softness */
+        VJ_BEAT_SOURCE_MIX,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,  6,   58,  24,  72,  260, 1800, 0,    62,
+        VJ_BEAT_FLOW,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     20,  100,  68, 100,   45,  560, 0,   100,
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     28,  100,  56, 100,   60,  760, 0,    94,
+        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     24,  100,  60, 100,   55,  680, 0,    96,
+        VJ_BEAT_GLOW,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     18,   92,  54, 100,   70,  900, 80,   90,
+        VJ_BEAT_MOTION_REACT,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     12,  100,  62, 100,   55,  680, 0,    96,
+        VJ_BEAT_MEMORY,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     24,  100,  56, 100,   90, 1100, 120,  92,
+        VJ_BEAT_COLOR_AMOUNT,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     20,  100,  58, 100,   60,  720, 0,    96,
+        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,-76,  76,  34,  82,  180, 1400, 0,    70,
+        VJ_BEAT_INERTIA,            VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 12,   86,  32,  82,  220, 1600, 0,    64
     );
 
-    (void) w;
-    (void) h;
     return ve;
 }
 
@@ -565,10 +562,7 @@ void *edgefoldtide_malloc(int w, int h)
     size_t off;
     size_t gridcap;
     int i;
-
-    if (w <= 0 || h <= 0) return NULL;
     len = (size_t) w * (size_t) h;
-    if (len == 0) return NULL;
 
     e = (edgefoldtide_t *) vj_calloc(sizeof(edgefoldtide_t));
     if (!e) return NULL;
@@ -579,7 +573,6 @@ void *edgefoldtide_malloc(int w, int h)
     e->seeded = 0;
     e->frame = 0;
     e->n_threads = vje_advise_num_threads((int) len);
-    if (e->n_threads <= 0) e->n_threads = 1;
 
     gridcap = (size_t) (((w + 7) / 8) + 3) * (size_t) (((h + 7) / 8) + 3);
     total = len * 10 + sizeof(float) * gridcap * 3 + 128;
@@ -835,13 +828,9 @@ void edgefoldtide_apply(void *ptr, VJFrame *frame, int *args)
     float source_delta_base;
     float glow_display_scale;
 
-    if (!e || !frame || !args) return;
-    if (!frame->data[0] || !frame->data[1] || !frame->data[2]) return;
-
     w = frame->width;
     h = frame->height;
     len = w * h;
-    if (w != e->w || h != e->h || len != e->len || w < 8 || h < 8) return;
 
     Y = frame->data[0];
     U = frame->data[1];
@@ -849,17 +838,16 @@ void edgefoldtide_apply(void *ptr, VJFrame *frame, int *args)
 
     if (!e->seeded)
         eh_seed(e, frame);
-
-    source_i = eh_clampi(args[P_SOURCE], 0, 100);
-    flow_i = eh_clampi(args[P_FLOW], 0, 100);
-    geom_i = eh_clampi(args[P_GEOM], 0, 100);
-    mirror_i = eh_clampi(args[P_MIRROR], 0, 100);
-    glow_i = eh_clampi(args[P_GLOW], 0, 100);
-    pull_i = eh_clampi(args[P_PULL], 0, 100);
-    trail_i = eh_clampi(args[P_TRAIL], 0, 100);
-    color_i = eh_clampi(args[P_COLOR], 0, 100);
-    speed_i = eh_clampi(args[P_SPEED], -100, 100);
-    soft_i = eh_clampi(args[P_SOFT], 0, 100);
+    source_i = args[P_SOURCE];
+    flow_i = args[P_FLOW];
+    geom_i = args[P_GEOM];
+    mirror_i = args[P_MIRROR];
+    glow_i = args[P_GLOW];
+    pull_i = args[P_PULL];
+    trail_i = args[P_TRAIL];
+    color_i = args[P_COLOR];
+    speed_i = args[P_SPEED];
+    soft_i = args[P_SOFT];
     do_soft = soft_i > 0;
 
     source_t = (float) source_i * 0.01f;

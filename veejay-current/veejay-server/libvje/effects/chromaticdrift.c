@@ -37,7 +37,7 @@
 #define CD_IDX_FP 12
 #define CD_IDX_ONE (1 << CD_IDX_FP)
 
-#define CHROMATICDRIFT_PARAMS 13
+#define CHROMATICDRIFT_PARAMS 11
 
 #define P_GLOBAL_HUE    0
 #define P_RAINBOW_WRAP  1
@@ -50,8 +50,6 @@
 #define P_LUMA_CONTRAST 8
 #define P_DIRECTION     9
 #define P_CHROMA_GUARD 10
-#define P_BEAT_PUSH    11
-#define P_BEAT_SMOOTH  12
 
 static inline int clampi(int v, int lo, int hi)
 {
@@ -78,29 +76,6 @@ static inline int percent_to_param(int v)
     return (v * 1000 + 127) / 255;
 }
 
-static inline int beat_shape(int beat_push)
-{
-    int lin;
-    int sq;
-
-    beat_push = clampi(beat_push, 0, 1000);
-
-    lin = beat_push;
-    sq = (beat_push * beat_push + 500) / 1000;
-
-    return clampi((lin * 35 + sq * 65 + 50) / 100, 0, 1000);
-}
-
-static inline int add_clamped(int v, int add)
-{
-    return clampi(v + add, 0, 1000);
-}
-
-static inline int mix_towards(int v, int target, int q)
-{
-    q = clampi(q, 0, 1000);
-    return clampi(v + (((target - v) * q + ((target >= v) ? 500 : -500)) / 1000), 0, 1000);
-}
 
 static inline void cd_limit_chroma_i32(int32_t *u, int32_t *v, int limit)
 {
@@ -141,7 +116,6 @@ typedef struct
     int w;
     int h;
     float time;
-    float beat_env;
     uint8_t *srcY_copy;
     int16_t sin_lut_fp[SIN_LUT_SIZE];
     uint8_t contrast_lut[256];
@@ -190,8 +164,6 @@ vj_effect *chromaticdrift_init(int w, int h)
     ve->defaults[P_LUMA_CONTRAST] = percent_to_param(85);
     ve->defaults[P_DIRECTION]     = 1;
     ve->defaults[P_CHROMA_GUARD]  = 720;
-    ve->defaults[P_BEAT_PUSH]     = 0;
-    ve->defaults[P_BEAT_SMOOTH]   = 520;
 
     ve->limits[0][P_GLOBAL_HUE]    = 0;     ve->limits[1][P_GLOBAL_HUE]    = 1000;
     ve->limits[0][P_RAINBOW_WRAP]  = 0;     ve->limits[1][P_RAINBOW_WRAP]  = 1000;
@@ -204,11 +176,9 @@ vj_effect *chromaticdrift_init(int w, int h)
     ve->limits[0][P_LUMA_CONTRAST] = 0;     ve->limits[1][P_LUMA_CONTRAST] = 1000;
     ve->limits[0][P_DIRECTION]     = -1;    ve->limits[1][P_DIRECTION]     = 1;
     ve->limits[0][P_CHROMA_GUARD]  = 0;     ve->limits[1][P_CHROMA_GUARD]  = 1000;
-    ve->limits[0][P_BEAT_PUSH]     = 0;     ve->limits[1][P_BEAT_PUSH]     = 1000;
-    ve->limits[0][P_BEAT_SMOOTH]   = 0;     ve->limits[1][P_BEAT_SMOOTH]   = 1000;
 
     ve->sub_format = 1;
-    ve->description = "Chromatic Drift Guard";
+    ve->description = "Chromatic Drift";
 
     ve->param_description = vje_build_param_list(
         ve->num_params,
@@ -222,31 +192,23 @@ vj_effect *chromaticdrift_init(int w, int h)
         "White Protect",
         "Luma Contrast",
         "Direction",
-        "Chroma Guard",
-        "Beat Push",
-        "Beat Smooth"
+        "Chroma Guard"
     );
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,   0,                  1000,               4,  22, 80,   520,  0,    48,    /* Global Hue */
-        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                    0,                  620,                8,  34, 120,  820,  250,  42,    /* Rainbow Wrap */
-        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                    100,                760,                12, 48, 90,   680,  0,    74,    /* Vibrance */
-        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                    0,                  520,                10, 42, 120,  820,  100,  62,    /* Pastel Glow */
-        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS,                    0,                  760,                4,  24, 80,   520,  0,    56,    /* Flux Speed */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                   0,                  620,                5,  18, 1800, 4200, 900,  20,    /* Edge Softness */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                   140,                560,                5,  18, 1800, 4200, 900,  18,    /* Black Protect */
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY,                   640,                1000,               5,  18, 1800, 4200, 900,  16,    /* White Protect */
-        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                    240,                620,                8,  36, 120,  900,  0,    58,    /* Luma Contrast */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Direction */
-        VJ_BEAT_CONTRAST,     VJ_BEAT_F_REJECT,                        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Chroma Guard */
-        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                    0,                  880,                18, 80, 70,   620,  0,    100,   /* Beat Push */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                   360,                860,                5,  18, 2200, 5200, 1200, 18     /* Beat Smooth */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,   -1000,
+        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       120,                900,                34, 96,  160, 1500, 80,   100,
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       360,                1000,               32, 92,  140, 1200, 0,     96,
+        VJ_BEAT_GLOW,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                        80,                760,                28, 84,  180, 1600, 0,     86,
+        VJ_BEAT_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       160,                820,                34, 96,  120, 1100, 0,     98,
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,    80,                540,                18, 62,  420, 2400, 0,     54,
+        VJ_BEAT_CONTRAST,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED,      60,                300,                 6, 22, 3200, 8000, 2200,  18,
+        VJ_BEAT_CONTRAST,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_CONTINUOUS,                         720,                1000,                6, 20, 3200, 8200, 2200,  16,
+        VJ_BEAT_CONTRAST,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       420,                960,                22, 76,  360, 2200, 0,     76,
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,   -1000,
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       620,                1000,               22, 78,  220, 1800, 0,     82
     );
-
-    (void)w;
-    (void)h;
 
     return ve;
 }
@@ -260,7 +222,6 @@ void *chromaticdrift_malloc(int w, int h)
     c->w = w;
     c->h = h;
     c->time = 0.0f;
-    c->beat_env = 0.0f;
 
     c->srcY_copy = (uint8_t *) vj_malloc((size_t)w * (size_t)h);
     if(!c->srcY_copy) {
@@ -282,8 +243,6 @@ void *chromaticdrift_malloc(int w, int h)
     c->last_wprot_param = -1;
 
     c->n_threads = vje_advise_num_threads(w * h);
-    if(c->n_threads <= 0)
-        c->n_threads = 1;
 
     return c;
 }
@@ -303,58 +262,23 @@ void chromaticdrift_apply(void *ptr, VJFrame *frame, int *args)
 {
     chromaticdrift_t *n = (chromaticdrift_t *) ptr;
 
-    if(!n || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
     const int w = n->w;
     const int h = n->h;
-
-    if(w <= 2 || h <= 2)
-        return;
 
     const int w_sub_1 = w - 1;
     const int h_sub_1 = h - 1;
 
-    int hue_i       = clampi(args[P_GLOBAL_HUE], 0, 1000);
-    int rainbow_i   = clampi(args[P_RAINBOW_WRAP], 0, 1000);
-    int vibrance_i  = clampi(args[P_VIBRANCE], 0, 1000);
-    int pastel_i    = clampi(args[P_PASTEL_GLOW], 0, 1000);
-    int flux_i      = clampi(args[P_FLUX_SPEED], 0, 1000);
-    int softness_i  = clampi(args[P_EDGE_SOFTNESS], 0, 1000);
-    int bprot_i     = clampi(args[P_BLACK_PROTECT], 0, 1000);
-    int wprot_i     = clampi(args[P_WHITE_PROTECT], 0, 1000);
-    int contrast_i  = clampi(args[P_LUMA_CONTRAST], 0, 1000);
-    int direction_i = clampi(args[P_DIRECTION], -1, 1);
-    int guard_i     = clampi(args[P_CHROMA_GUARD], 0, 1000);
-    int beat_push_i = clampi(args[P_BEAT_PUSH], 0, 1000);
-    int smooth_i    = clampi(args[P_BEAT_SMOOTH], 0, 1000);
-
-    const int shaped = beat_shape(beat_push_i);
-    const float target = (float)shaped * 0.001f;
-    const float smooth_t = (float)smooth_i * 0.001f;
-    const float attack = 0.18f + (1.0f - smooth_t) * 0.34f;
-    const float release = 0.025f + (1.0f - smooth_t) * 0.095f;
-
-    if(target > n->beat_env)
-        n->beat_env += (target - n->beat_env) * attack;
-    else
-        n->beat_env += (target - n->beat_env) * release;
-
-    if(n->beat_env < 0.0001f)
-        n->beat_env = 0.0f;
-    else if(n->beat_env > 1.0f)
-        n->beat_env = 1.0f;
-
-    const int beat_q = clampi((int)(n->beat_env * 1000.0f + 0.5f), 0, 1000);
-
-    if(beat_q > 0) {
-        vibrance_i = clampi(vibrance_i + (beat_q * 150 + 500) / 1000, 0, 760);
-        pastel_i = clampi(pastel_i + (beat_q * 105 + 500) / 1000, 0, 540);
-        flux_i = add_clamped(flux_i, (beat_q * 210 + 500) / 1000);
-        softness_i = add_clamped(softness_i, (beat_q * 145 + 500) / 1000);
-        bprot_i = mix_towards(bprot_i, 300, (beat_q * 140 + 500) / 1000);
-        contrast_i = mix_towards(contrast_i, 455, (beat_q * 180 + 500) / 1000);
-    }
+    int hue_i       = args[P_GLOBAL_HUE];
+    int rainbow_i   = args[P_RAINBOW_WRAP];
+    int vibrance_i  = args[P_VIBRANCE];
+    int pastel_i    = args[P_PASTEL_GLOW];
+    int flux_i      = args[P_FLUX_SPEED];
+    int softness_i  = args[P_EDGE_SOFTNESS];
+    int bprot_i     = args[P_BLACK_PROTECT];
+    int wprot_i     = args[P_WHITE_PROTECT];
+    int contrast_i  = args[P_LUMA_CONTRAST];
+    int direction_i = args[P_DIRECTION];
+    int guard_i     = args[P_CHROMA_GUARD];
 
     const float global_hue   = (float)hue_i * 0.001f * PI_X2;
     const float rainbow_idx  = (float)rainbow_i * (3.20f * (float)SIN_LUT_SIZE / 1000.0f);
@@ -363,9 +287,9 @@ void chromaticdrift_apply(void *ptr, VJFrame *frame, int *args)
     const float contrast_val = 0.72f + ((float)contrast_i * 0.00090f);
     const float dir          = (float) direction_i;
     const int chroma_limit   = 42 + ((guard_i * 82 + 500) / 1000);
-    const int luma_floor     = 4 + ((bprot_i * 20 + 500) / 1000) + ((beat_q * 8 + 500) / 1000);
+    const int luma_floor     = 4 + ((bprot_i * 20 + 500) / 1000);
     const int luma_knee      = 28 + ((bprot_i * 92 + 500) / 1000);
-    const int luma_guard_q8  = clampi(112 + ((bprot_i * 96 + 500) / 1000) + ((beat_q * 36 + 500) / 1000), 0, 256);
+    const int luma_guard_q8  = clampi(112 + ((bprot_i * 96 + 500) / 1000), 0, 256);
 
     uint8_t *restrict py = frame->data[0];
     uint8_t *restrict pu = frame->data[1];

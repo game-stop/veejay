@@ -19,19 +19,18 @@
  */
 
 #include "common.h"
+#include <veejaycore/vjmem.h>
 #include "vbar.h"
 
-#define VBAR_PARAMS       9
+#define VBAR_PARAMS       7
 
 #define P_DIVIDER         0
 #define P_TOP_Y           1
 #define P_BOT_Y           2
 #define P_TOP_X           3
 #define P_BOT_X           4
-#define P_BEAT_SLIDE      5
+#define P_SLIDE_DRIVE     5
 #define P_EDGE_GLOW       6
-#define P_BEAT_PUSH       7
-#define P_BEAT_SMOOTH     8
 
 typedef struct {
     int bar_top_auto;
@@ -39,10 +38,16 @@ typedef struct {
     int bar_top_vert;
     int bar_bot_vert;
 
-    float beat_env;
-    float beat_kick;
-    float beat_prev;
+    float top_y_env;
+    float bot_y_env;
+    float top_x_env;
+    float bot_x_env;
+    float slide_env;
+    float glow_env;
 
+    float slide_phase;
+
+    int initialized;
     int n_threads;
 } vbar_t;
 
@@ -61,9 +66,6 @@ static inline uint8_t clamp_u8(int v)
 
 static inline int wrapi(int v, int max)
 {
-    if(max <= 0)
-        return 0;
-
     v %= max;
 
     if(v < 0)
@@ -74,91 +76,68 @@ static inline int wrapi(int v, int max)
 
 static inline int wrap_add(int cur, int delta, int max)
 {
-    if(max <= 0)
-        return 0;
-
     return wrapi(cur + delta, max);
 }
 
-static inline int vbar_beat_shape_q8(int beat_push)
+static inline float vbar_smooth(float oldv, float target, float attack, float release)
 {
-    beat_push = clampi(beat_push, 0, 1000);
-
-    const int sq = (beat_push * beat_push + 500) / 1000;
-    const int shaped = (beat_push * 30 + sq * 70 + 50) / 100;
-
-    return (shaped * 255 + 500) / 1000;
+    const float c = target > oldv ? attack : release;
+    return oldv + (target - oldv) * c;
 }
 
-static void vbar_update_beat(vbar_t *vbar, int beat_push, int beat_smooth)
+static inline int vbar_tri_signed_q8(int phase)
 {
-    const int drive_q8 = vbar_beat_shape_q8(beat_push);
-    const float target = (float)drive_q8 * (1.0f / 255.0f);
-    const float smooth = (float)clampi(beat_smooth, 0, 1000) * 0.001f;
+    int p = phase & 1023;
+    int tri = p < 512 ? p : 1023 - p;
 
-    const float attack = 0.52f - smooth * 0.34f;
-    const float release = 0.16f - smooth * 0.12f;
-    const float coef = (target > vbar->beat_env) ? attack : release;
-
-    float delta = target - vbar->beat_prev;
-    if(delta < 0.0f)
-        delta = 0.0f;
-
-    vbar->beat_env += (target - vbar->beat_env) * coef;
-
-    if(vbar->beat_env < 0.0001f)
-        vbar->beat_env = 0.0f;
-    else if(vbar->beat_env > 1.0f)
-        vbar->beat_env = 1.0f;
-
-    if(delta > vbar->beat_kick)
-        vbar->beat_kick = delta;
-    else
-        vbar->beat_kick *= 0.68f + smooth * 0.18f;
-
-    if(vbar->beat_kick < 0.0001f)
-        vbar->beat_kick = 0.0f;
-    else if(vbar->beat_kick > 1.0f)
-        vbar->beat_kick = 1.0f;
-
-    vbar->beat_prev = target;
+    return tri - 256;
 }
+
+
+
+
 
 vj_effect *vbar_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    if(!ve)
+        return NULL;
+
     ve->num_params = VBAR_PARAMS;
 
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    int max_w = width  > 0 ? width  : 1;
-    int max_h = height > 0 ? height : 1;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
+    int max_w = width;
+    int max_h = height;
 
     ve->defaults[P_DIVIDER]     = 4;
     ve->defaults[P_TOP_Y]       = 1;
     ve->defaults[P_BOT_Y]       = 3;
     ve->defaults[P_TOP_X]       = 0;
     ve->defaults[P_BOT_X]       = 0;
-    ve->defaults[P_BEAT_SLIDE]  = 220;
+    ve->defaults[P_SLIDE_DRIVE] = 0;
     ve->defaults[P_EDGE_GLOW]   = 0;
-    ve->defaults[P_BEAT_PUSH]   = 0;
-    ve->defaults[P_BEAT_SMOOTH] = 420;
 
     ve->limits[0][P_DIVIDER]     = 1; ve->limits[1][P_DIVIDER]     = max_w;
     ve->limits[0][P_TOP_Y]       = 0; ve->limits[1][P_TOP_Y]       = max_h;
     ve->limits[0][P_BOT_Y]       = 0; ve->limits[1][P_BOT_Y]       = max_h;
     ve->limits[0][P_TOP_X]       = 0; ve->limits[1][P_TOP_X]       = max_w;
     ve->limits[0][P_BOT_X]       = 0; ve->limits[1][P_BOT_X]       = max_w;
-    ve->limits[0][P_BEAT_SLIDE]  = 0; ve->limits[1][P_BEAT_SLIDE]  = 1000;
+    ve->limits[0][P_SLIDE_DRIVE] = 0; ve->limits[1][P_SLIDE_DRIVE] = 1000;
     ve->limits[0][P_EDGE_GLOW]   = 0; ve->limits[1][P_EDGE_GLOW]   = 1000;
-    ve->limits[0][P_BEAT_PUSH]   = 0; ve->limits[1][P_BEAT_PUSH]   = 1000;
-    ve->limits[0][P_BEAT_SMOOTH] = 0; ve->limits[1][P_BEAT_SMOOTH] = 1000;
 
     ve->description = "Vertical Sliding Bars";
     ve->sub_format = 1;
-    ve->parallel = 0;
     ve->extra_frame = 1;
     ve->has_user = 0;
 
@@ -169,24 +148,18 @@ vj_effect *vbar_init(int width, int height)
         "Bot Y",
         "Top X",
         "Bot X",
-        "Beat Slide",
-        "Edge Glow",
-        "Beat Push",
-        "Beat Smooth"
+        "Slide Drive",
+        "Edge Glow"
     );
-
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1,                  max_w > 32 ? 32 : max_w, 6,  22, 2200, 5200, 1800, 22,    /* Divider */
-        VJ_BEAT_SPEED,     VJ_BEAT_F_CONTINUOUS,                       0,                  max_h > 72 ? 72 : max_h, 8,  30, 1000, 2600, 0,    42,    /* Top Y */
-        VJ_BEAT_SPEED,     VJ_BEAT_F_CONTINUOUS,                       0,                  max_h > 72 ? 72 : max_h, 8,  30, 1000, 2600, 0,    42,    /* Bot Y */
-        VJ_BEAT_DRIFT,     VJ_BEAT_F_CONTINUOUS,                       0,                  max_w > 72 ? 72 : max_w, 8,  30, 1000, 2600, 0,    34,    /* Top X */
-        VJ_BEAT_DRIFT,     VJ_BEAT_F_CONTINUOUS,                       0,                  max_w > 72 ? 72 : max_w, 8,  30, 1000, 2600, 0,    34,    /* Bot X */
-        VJ_BEAT_SPEED,     VJ_BEAT_F_REJECT,                           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,    0,  0,  0,    0,    0,    -1000, /* Beat Slide */
-        VJ_BEAT_GLOW,      VJ_BEAT_F_CONTINUOUS,                       0,                  620,                8,  30, 1000, 2600, 0,    34,    /* Edge Glow */
-        VJ_BEAT_KICK,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,   0,                  760,                16, 72, 80,   720,  0,    100,   /* Beat Push */
-        VJ_BEAT_MEMORY,    VJ_BEAT_F_PHRASE_ONLY,                      220,                820,                5,  18, 2200, 5200, 1200, 18     /* Beat Smooth */
+        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,   0,    0, -1000,
+        VJ_BEAT_SPEED,     VJ_BEAT_F_CONTINUOUS,                          0,                  max_h,              10, 48, 120, 1200, 0, 64,
+        VJ_BEAT_SPEED,     VJ_BEAT_F_CONTINUOUS,                          0,                  max_h,              10, 48, 120, 1200, 0, 62,
+        VJ_BEAT_DRIFT,     VJ_BEAT_F_CONTINUOUS,                          0,                  max_w,              10, 44, 160, 1400, 0, 52,
+        VJ_BEAT_DRIFT,     VJ_BEAT_F_CONTINUOUS,                          0,                  max_w,              10, 44, 160, 1400, 0, 50,
+        VJ_BEAT_DRIFT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 120,                1000,               24, 88, 70,  820,  0, 94,
+        VJ_BEAT_GLOW,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 120,                1000,               18, 76, 70,  780,  0, 82
     );
 
     return ve;
@@ -202,21 +175,23 @@ void *vbar_malloc(int w, int h)
     v->bar_bot_auto = 0;
     v->bar_top_vert = 0;
     v->bar_bot_vert = 0;
-    v->beat_env = 0.0f;
-    v->beat_kick = 0.0f;
-    v->beat_prev = 0.0f;
+    v->top_y_env = 0.0f;
+    v->bot_y_env = 0.0f;
+    v->top_x_env = 0.0f;
+    v->bot_x_env = 0.0f;
+    v->slide_env = 0.0f;
+    v->glow_env = 0.0f;
+    v->slide_phase = 0.0f;
+    v->initialized = 0;
 
     v->n_threads = vje_advise_num_threads(w * h);
-    if(v->n_threads < 1)
-        v->n_threads = 1;
 
     return (void*) v;
 }
 
 void vbar_free(void *ptr)
 {
-    if(ptr)
-        free(ptr);
+    free(ptr);
 }
 
 static void vbar_copy_region(VJFrame *frame,
@@ -240,9 +215,6 @@ static void vbar_copy_region(VJFrame *frame,
 
     x0 = clampi(x0, 0, width);
     x1 = clampi(x1, 0, width);
-
-    if(x1 <= x0)
-        return;
 
 #pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int y = 0; y < height; y++) {
@@ -268,14 +240,8 @@ static void vbar_apply_divider_glow(VJFrame *frame,
                                     int glow_strength,
                                     int n_threads)
 {
-    if(!frame || !frame->data[0] || glow_width <= 0 || glow_strength <= 0)
-        return;
-
     const int width = frame->width;
     const int height = frame->height;
-
-    if(width <= 0 || height <= 0 || divider_x <= 0 || divider_x >= width)
-        return;
 
     const int x0 = clampi(divider_x - glow_width, 0, width);
     const int x1 = clampi(divider_x + glow_width + 1, 0, width);
@@ -307,44 +273,66 @@ void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     vbar_t *vbar = (vbar_t*) ptr;
 
-    if(!vbar || !frame || !frame2 || !args ||
-       !frame->data[0] || !frame->data[1] || !frame->data[2] ||
-       !frame2->data[0] || !frame2->data[1] || !frame2->data[2])
-        return;
-
     const int width = frame->width;
     const int height = frame->height;
-    const int len = frame->len;
 
-    if(width <= 0 || height <= 0 || len <= 0)
-        return;
+    const int divider = args[P_DIVIDER];
+    const int top_y_delta = args[P_TOP_Y];
+    const int bot_y_delta = args[P_BOT_Y];
+    const int top_x_delta = args[P_TOP_X];
+    const int bot_x_delta = args[P_BOT_X];
+    const int slide_drive = args[P_SLIDE_DRIVE];
+    const int edge_glow = args[P_EDGE_GLOW];
 
-    const int divider = clampi(args[P_DIVIDER], 1, width);
-    const int top_y_delta = clampi(args[P_TOP_Y], 0, height);
-    const int bot_y_delta = clampi(args[P_BOT_Y], 0, height);
-    const int top_x_delta = clampi(args[P_TOP_X], 0, width);
-    const int bot_x_delta = clampi(args[P_BOT_X], 0, width);
-    const int beat_slide = clampi(args[P_BEAT_SLIDE], 0, 1000);
-    const int edge_glow = clampi(args[P_EDGE_GLOW], 0, 1000);
-    const int beat_push = clampi(args[P_BEAT_PUSH], 0, 1000);
-    const int beat_smooth = clampi(args[P_BEAT_SMOOTH], 0, 1000);
+    const float fast = 0.245f;
+    const float slow = 0.112f;
 
-    vbar_update_beat(vbar, beat_push, beat_smooth);
+    if(!vbar->initialized) {
+        vbar->top_y_env = (float)top_y_delta;
+        vbar->bot_y_env = (float)bot_y_delta;
+        vbar->top_x_env = (float)top_x_delta;
+        vbar->bot_x_env = (float)bot_x_delta;
+        vbar->slide_env = (float)slide_drive;
+        vbar->glow_env = (float)edge_glow;
+        vbar->initialized = 1;
+    } else {
+        vbar->top_y_env = vbar_smooth(vbar->top_y_env, (float)top_y_delta, fast, slow);
+        vbar->bot_y_env = vbar_smooth(vbar->bot_y_env, (float)bot_y_delta, fast, slow);
+        vbar->top_x_env = vbar_smooth(vbar->top_x_env, (float)top_x_delta, fast * 0.90f, slow);
+        vbar->bot_x_env = vbar_smooth(vbar->bot_x_env, (float)bot_x_delta, fast * 0.90f, slow);
+        vbar->slide_env = vbar_smooth(vbar->slide_env, (float)slide_drive, fast * 1.18f, slow);
+        vbar->glow_env = vbar_smooth(vbar->glow_env, (float)edge_glow, fast, slow);
+    }
 
-    const float beat_drive = vbar->beat_env * vbar->beat_env;
-    const float beat_kick = vbar->beat_kick;
-    const int slide_limit_x = width > height ? width : height;
-    const int beat_extra = (int)(((beat_drive * 0.080f) + (beat_kick * 0.150f)) * (float)beat_slide + 0.5f);
-    const int max_extra = slide_limit_x >> 2;
-    const int extra = beat_extra > max_extra ? max_extra : beat_extra;
+    const int top_y_base = clampi((int)(vbar->top_y_env + 0.5f), 0, height);
+    const int bot_y_base = clampi((int)(vbar->bot_y_env + 0.5f), 0, height);
+    const int top_x_base = clampi((int)(vbar->top_x_env + 0.5f), 0, width);
+    const int bot_x_base = clampi((int)(vbar->bot_x_env + 0.5f), 0, width);
+    const int slide_q = clampi((int)(vbar->slide_env + 0.5f), 0, 1000);
+    const int glow_q = clampi((int)(vbar->glow_env + 0.5f), 0, 1000);
 
-    const int extra_y = height > 0 ? clampi(extra, 0, height) : 0;
-    const int extra_x = width  > 0 ? clampi(extra, 0, width)  : 0;
+    const int slide_limit = width > height ? width : height;
+    const int slide_depth_q = slide_q;
 
-    const int top_y_eff = top_y_delta + extra_y;
-    const int bot_y_eff = bot_y_delta + (extra_y >> 1);
-    const int top_x_eff = top_x_delta + extra_x;
-    const int bot_x_eff = bot_x_delta - extra_x;
+    if(slide_depth_q > 0) {
+        vbar->slide_phase += 2.0f + (float)slide_depth_q * 0.072f;
+        if(vbar->slide_phase > 8192.0f)
+            vbar->slide_phase -= 8192.0f;
+    }
+
+    const int phase_i = (int)vbar->slide_phase;
+    const int wave_x = vbar_tri_signed_q8(phase_i);
+    const int wave_y = vbar_tri_signed_q8(phase_i + 256);
+
+    const int slide_amp = clampi((slide_limit * slide_depth_q + 9000) / 18000, 0, slide_limit >> 2);
+
+    const int lfo_x = (slide_amp * wave_x) >> 8;
+    const int lfo_y = (slide_amp * wave_y) >> 8;
+
+    const int top_y_eff = top_y_base + lfo_y;
+    const int bot_y_eff = bot_y_base - (lfo_y >> 1);
+    const int top_x_eff = top_x_base + lfo_x;
+    const int bot_x_eff = bot_x_base - lfo_x;
 
     const int left_width = width / divider;
 
@@ -373,12 +361,11 @@ void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         vbar->n_threads
     );
 
-    if(edge_glow > 0 || beat_push > 0) {
-        const int glow_width = 1 + ((edge_glow * 7 + 500) / 1000) + (int)(beat_drive * 5.0f + beat_kick * 3.0f);
-        int glow_strength = (edge_glow * 90 + 500) / 1000;
+    if(glow_q > 0) {
+        const int glow_width = 1 + ((glow_q * 13 + 500) / 1000);
+        int glow_strength = (glow_q * 150 + 500) / 1000;
 
-        glow_strength += (int)(beat_drive * 62.0f + beat_kick * 42.0f);
-        glow_strength = clampi(glow_strength, 0, 180);
+        glow_strength = clampi(glow_strength, 0, 240);
 
         vbar_apply_divider_glow(frame, left_width, glow_width, glow_strength, vbar->n_threads);
     }

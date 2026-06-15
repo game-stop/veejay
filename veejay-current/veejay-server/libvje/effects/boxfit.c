@@ -20,8 +20,6 @@
 #include "common.h"
 #include "boxfit.h"
 
-#define CLAMP(x, min, max) ((x < (min)) ? (min) : ((x > (max)) ? (max) : (x)))
-
 typedef struct
 {
     uint8_t *buf[3];
@@ -31,170 +29,232 @@ typedef struct
     int n_threads;
 } boxfit_t;
 
+static inline int boxfit_clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline int boxfit_maxi(int a, int b)
+{
+    return a > b ? a : b;
+}
+
 vj_effect *boxfit_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
     ve->num_params = 4;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 2;
-    ve->limits[1][0] = w/8;
-    ve->limits[0][1] = 4;
-    ve->limits[1][1] = w/4;
-    ve->limits[0][2] = 1;
-    ve->limits[1][2] = 255;
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 1;
+    const int min_hi = boxfit_maxi(2, w / 8);
+    const int max_hi = boxfit_maxi(4, w / 4);
 
-    ve->defaults[0] = 8;
-    ve->defaults[1] = 40;
-    ve->defaults[2] = 128;
-    ve->defaults[3] = 1;
+    ve->limits[0][0] = 2; ve->limits[1][0] = min_hi; ve->defaults[0] = boxfit_clampi(8, 2, min_hi);
+    ve->limits[0][1] = 4; ve->limits[1][1] = max_hi; ve->defaults[1] = boxfit_clampi(40, 4, max_hi);
+    ve->limits[0][2] = 1; ve->limits[1][2] = 255;    ve->defaults[2] = 128;
+    ve->limits[0][3] = 0; ve->limits[1][3] = 1;      ve->defaults[3] = 1;
 
     ve->description = "Box Accumulator";
     ve->sub_format = 1;
-    ve->param_description = vje_build_param_list(ve->num_params, "Min Size", "Max Size", "Sensitivity", "Borders" );
+    ve->param_description = vje_build_param_list(ve->num_params, "Min Size", "Max Size", "Sensitivity", "Borders");
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,       2,                  w / 12,             6,  18,  1800, 3800, 900,  26,    /* Min Size */
-        VJ_BEAT_DENSITY,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,       8,                  w / 5,              8,  26,  1800, 4200, 900,  36,    /* Max Size */
-        VJ_BEAT_SNARE,     VJ_BEAT_F_CONTINUOUS,                             42,                 235,                10, 46,  120,  820,  0,    76,    /* Sensitivity */
-        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,          VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Borders */
+        VJ_BEAT_GRID_SIZE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_STRUCTURAL, 2,                  boxfit_clampi(w / 10, 2, min_hi), 4,  14, 3400, 8800, 2400, 18,
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_STRUCTURAL, 8,                  boxfit_clampi(w / 4,  8, max_hi), 5,  18, 3400, 8800, 2400, 24,
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_CONTINUOUS,                                                32,                 235,                         12, 48, 1000, 3200, 0,    68,
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,          0,  0,    0,    0,    0,    -1000
     );
+
     return ve;
 }
 
 void *boxfit_malloc(int w, int h)
 {
     boxfit_t *s = (boxfit_t *)vj_calloc(sizeof(boxfit_t));
-    if (!s) return NULL;
 
-    s->buf[0] = (uint8_t *)vj_malloc(w * h * 3);
-    s->integralY = (uint32_t *)vj_malloc(sizeof(uint32_t) * (w + 1) * (h + 1) * 3);
-    s->integralU = s->integralY + ((w + 1) * (h + 1));
-    s->integralV = s->integralU + ((w + 1) * (h + 1));
-    s->n_threads = vje_advise_num_threads(w * h);
+    if(!s)
+        return NULL;
 
-    if (!s->buf[0] || !s->integralY) {
-        if(s->buf[0]) free(s->buf[0]);
-        if(s->integralY) free(s->integralY);
+    const int plane_size = w * h;
+    const int integral_size = (w + 1) * (h + 1);
+
+    s->buf[0] = (uint8_t *)vj_malloc(plane_size * 3);
+    s->integralY = (uint32_t *)vj_malloc(sizeof(uint32_t) * integral_size * 3);
+
+    if(!s->buf[0] || !s->integralY) {
+        if(s->buf[0])
+            free(s->buf[0]);
+        if(s->integralY)
+            free(s->integralY);
         free(s);
         return NULL;
     }
 
-    s->buf[1] = s->buf[0] + (w * h);
-    s->buf[2] = s->buf[1] + (w * h);
-    return (void *)s;
+    s->buf[1] = s->buf[0] + plane_size;
+    s->buf[2] = s->buf[1] + plane_size;
+    s->integralU = s->integralY + integral_size;
+    s->integralV = s->integralU + integral_size;
+    s->n_threads = vje_advise_num_threads(plane_size);
+
+    return s;
 }
 
 void boxfit_free(void *ptr)
 {
     boxfit_t *s = (boxfit_t *)ptr;
-    if(s) {
+
+    if(!s)
+        return;
+
+    if(s->buf[0])
         free(s->buf[0]);
+
+    if(s->integralY)
         free(s->integralY);
-        free(s);
-    }
+
+    free(s);
 }
 
-static inline uint32_t get_rect_sum(uint32_t *intC, int stride, int x, int y, int rw, int rh)
+static inline uint32_t get_rect_sum(const uint32_t *intC, int stride, int x, int y, int rw, int rh)
 {
-    int x2 = x + rw;
-    int y2 = y + rh;
+    const int x2 = x + rw;
+    const int y2 = y + rh;
+
     return intC[y2 * stride + x2] - intC[y * stride + x2] - intC[y2 * stride + x] + intC[y * stride + x];
 }
 
 void boxfit_apply(void *ptr, VJFrame *frame, int *args)
 {
     boxfit_t *s = (boxfit_t *)ptr;
-    const int min_s = args[0];
-    const int max_s = args[1];
-    const int sensitivity = CLAMP(args[2], 1, 255);
-    const int show_borders = args[3];
 
     const int width = frame->width;
     const int height = frame->height;
+    const int len = frame->len;
+
+    int min_s = boxfit_clampi(args[0], 2, boxfit_maxi(2, width / 8));
+    int max_s = boxfit_clampi(args[1], 4, boxfit_maxi(4, width / 4));
+    const int sensitivity = args[2];
+    const int show_borders = args[3];
+
+    if(max_s < min_s)
+        max_s = min_s;
+
     const int stride = width + 1;
 
     int size_lut[256];
-    for (int i = 0; i < 256; i++) {
-        float avg = (float)i + 0.001f;
-        float s_f = (float)sensitivity;
-        float detail = (avg > s_f) ? (s_f / avg) : (avg / s_f);
-        int sz = (((int)(max_s * detail) + 2) >> 2) << 2;
-        size_lut[i] = CLAMP(sz, min_s, max_s);
+
+    for(int i = 0; i < 256; i++)
+    {
+        const float avg = (float)i + 0.001f;
+        const float s_f = (float)sensitivity;
+        const float detail = avg > s_f ? (s_f / avg) : (avg / s_f);
+        const int sz = (((int)((float)max_s * detail) + 2) >> 2) << 2;
+
+        size_lut[i] = boxfit_clampi(sz, min_s, max_s);
     }
 
     #pragma omp parallel for num_threads(s->n_threads) schedule(static)
-    for (int c = 0; c < 3; c++) {
-        uint8_t *src = frame->data[c];
-        uint32_t *intC = (c == 0) ? s->integralY : (c == 1 ? s->integralU : s->integralV);
+    for(int c = 0; c < 3; c++)
+    {
+        const uint8_t *restrict src = frame->data[c];
+        uint32_t *restrict intC = c == 0 ? s->integralY : (c == 1 ? s->integralU : s->integralV);
 
-        for (int x = 0; x <= width; x++) intC[x] = 0;
+        for(int x = 0; x <= width; x++)
+            intC[x] = 0;
 
-        for (int y = 0; y < height; y++) {
+        for(int y = 0; y < height; y++)
+        {
             uint32_t row_sum = 0;
-            uint32_t *curr = &intC[(y+1) * stride];
-            uint32_t *prev = &intC[y * stride];
+            uint32_t *restrict curr = intC + (y + 1) * stride;
+            const uint32_t *restrict prev = intC + y * stride;
+
             curr[0] = 0;
-            for (int x = 0; x < width; x++) {
+
+            for(int x = 0; x < width; x++)
+            {
                 row_sum += src[y * width + x];
-                curr[x+1] = prev[x+1] + row_sum;
+                curr[x + 1] = prev[x + 1] + row_sum;
             }
         }
     }
 
     int i = 0;
-    while (i < height) {
-        int rem_h = height - i;
-        int sh = (min_s < rem_h ? min_s : rem_h);
-        int r_avg = get_rect_sum(s->integralY, stride, 0, i, (min_s < width ? min_s : width), sh) / 
-                    ((min_s < width ? min_s : width) * sh);
-        int row_h = size_lut[r_avg]; 
-        if (row_h > rem_h) row_h = rem_h;
+
+    while(i < height)
+    {
+        const int rem_h = height - i;
+        const int sh = min_s < rem_h ? min_s : rem_h;
+        const int sw0 = min_s < width ? min_s : width;
+        const int r_area = sw0 * sh;
+        int r_avg = get_rect_sum(s->integralY, stride, 0, i, sw0, sh) / r_area;
+        int row_h = size_lut[r_avg];
+
+        if(row_h > rem_h)
+            row_h = rem_h;
 
         int j = 0;
-        while (j < width) {
-            int rem_w = width - j;
-            int sw = (min_s < rem_w ? min_s : rem_w);
-            int b_avg = get_rect_sum(s->integralY, stride, j, i, sw, row_h) / (sw * row_h);
+
+        while(j < width)
+        {
+            const int rem_w = width - j;
+            const int sw = min_s < rem_w ? min_s : rem_w;
+            const int b_area = sw * row_h;
+            int b_avg = get_rect_sum(s->integralY, stride, j, i, sw, row_h) / b_area;
             int box_w = size_lut[b_avg];
-            if (box_w > rem_w) box_w = rem_w;
 
-            uint32_t area = box_w * row_h;
-            uint8_t valY = (uint8_t)(get_rect_sum(s->integralY, stride, j, i, box_w, row_h) / area);
-            uint8_t valU = (uint8_t)(get_rect_sum(s->integralU, stride, j, i, box_w, row_h) / area);
-            uint8_t valV = (uint8_t)(get_rect_sum(s->integralV, stride, j, i, box_w, row_h) / area);
-            uint8_t borderY = valY >> 1;
+            if(box_w > rem_w)
+                box_w = rem_w;
 
-            for (int bi = 0; bi < row_h; bi++) {
-                int row_off = (i + bi) * width + j;
-                uint8_t *pY = frame->data[0] + row_off;
-                uint8_t *pU = frame->data[1] + row_off;
-                uint8_t *pV = frame->data[2] + row_off;
+            const uint32_t area = (uint32_t)box_w * (uint32_t)row_h;
+            const uint8_t valY = (uint8_t)(get_rect_sum(s->integralY, stride, j, i, box_w, row_h) / area);
+            const uint8_t valU = (uint8_t)(get_rect_sum(s->integralU, stride, j, i, box_w, row_h) / area);
+            const uint8_t valV = (uint8_t)(get_rect_sum(s->integralV, stride, j, i, box_w, row_h) / area);
+            const uint8_t borderY = valY >> 1;
 
-                if (show_borders) {
-                    if (bi == 0 || bi == row_h - 1) {
-                        for (int bk = 0; bk < box_w; bk++) pY[bk] = borderY;
-                    } else {
+            for(int bi = 0; bi < row_h; bi++)
+            {
+                const int row_off = (i + bi) * width + j;
+
+                uint8_t *restrict pY = frame->data[0] + row_off;
+                uint8_t *restrict pU = frame->data[1] + row_off;
+                uint8_t *restrict pV = frame->data[2] + row_off;
+
+                if(show_borders)
+                {
+                    if(bi == 0 || bi == row_h - 1 || box_w <= 2)
+                    {
+                        for(int bk = 0; bk < box_w; bk++)
+                            pY[bk] = borderY;
+                    }
+                    else
+                    {
                         pY[0] = borderY;
-                        for (int bk = 1; bk < box_w - 1; bk++) pY[bk] = valY;
+
+                        for(int bk = 1; bk < box_w - 1; bk++)
+                            pY[bk] = valY;
+
                         pY[box_w - 1] = borderY;
                     }
-                } else {
-                    for (int bk = 0; bk < box_w; bk++) pY[bk] = valY;
+                }
+                else
+                {
+                    for(int bk = 0; bk < box_w; bk++)
+                        pY[bk] = valY;
                 }
 
-                for (int bk = 0; bk < box_w; bk++) {
+                for(int bk = 0; bk < box_w; bk++)
+                {
                     pU[bk] = valU;
                     pV[bk] = valV;
                 }
             }
+
             j += box_w;
         }
+
         i += row_h;
     }
 }

@@ -20,9 +20,10 @@
 
 #include <config.h>
 #include "common.h"
+#include <math.h>
+#include <stdint.h>
 #include <veejaycore/vjmem.h>
 #include "trimirror.h"
-#include <math.h>
 
 #define TRIMIRROR_MAX_SEGMENTS 48
 #define TRIMIRROR_TWO_PI 6.28318530718f
@@ -38,14 +39,13 @@ enum {
     P_ZOOM,
     P_CENTER_X,
     P_CENTER_Y,
-    P_BEAT_SPIN,
-    P_BEAT_ZOOM,
-    P_BEAT_PUSH,
-    P_BEAT_SMOOTH,
+    P_SPIN_DRIVE,
+    P_ZOOM_DRIVE,
     TRIMIRROR_PARAMS
 };
 
 typedef struct {
+    uint8_t *region;
     uint8_t *buf[3];
     float *vec_x;
     float *vec_y;
@@ -53,7 +53,16 @@ typedef struct {
     int h;
     int n_threads;
     float phase;
-    float beat_env;
+
+    float segment_state;
+    float rotation_state;
+    float spin_state;
+    float zoom_state;
+    float center_x_state;
+    float center_y_state;
+    float spin_drive_state;
+    float zoom_drive_state;
+    int state_ready;
 } trimirror_t;
 
 static inline int trimirror_clampi(int v, int lo, int hi)
@@ -91,11 +100,11 @@ static inline float trimirror_wrap_angle(float a)
     return a;
 }
 
-static inline int trimirror_beat_shape(int v)
+
+
+static inline float trimirror_smooth(float current, float target, float coeff)
 {
-    v = trimirror_clampi(v, 0, 1000);
-    const int sq = (v * v + 500) / 1000;
-    return trimirror_clampi((v * 40 + sq * 60 + 50) / 100, 0, 1000);
+    return current + (target - current) * coeff;
 }
 
 vj_effect *trimirror_init(int w, int h)
@@ -111,9 +120,9 @@ vj_effect *trimirror_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
     if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults) free(ve->defaults);
-        if(ve->limits[0]) free(ve->limits[0]);
-        if(ve->limits[1]) free(ve->limits[1]);
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
         free(ve);
         return NULL;
     }
@@ -124,15 +133,12 @@ vj_effect *trimirror_init(int w, int h)
     ve->limits[0][P_ZOOM]        = 250;   ve->limits[1][P_ZOOM]        = 2000;                    ve->defaults[P_ZOOM]        = 1000;
     ve->limits[0][P_CENTER_X]    = -1000; ve->limits[1][P_CENTER_X]    = 1000;                    ve->defaults[P_CENTER_X]    = 0;
     ve->limits[0][P_CENTER_Y]    = -1000; ve->limits[1][P_CENTER_Y]    = 1000;                    ve->defaults[P_CENTER_Y]    = 0;
-    ve->limits[0][P_BEAT_SPIN]   = 0;     ve->limits[1][P_BEAT_SPIN]   = 1000;                    ve->defaults[P_BEAT_SPIN]   = 520;
-    ve->limits[0][P_BEAT_ZOOM]   = 0;     ve->limits[1][P_BEAT_ZOOM]   = 1000;                    ve->defaults[P_BEAT_ZOOM]   = 420;
-    ve->limits[0][P_BEAT_PUSH]   = 0;     ve->limits[1][P_BEAT_PUSH]   = 1000;                    ve->defaults[P_BEAT_PUSH]   = 0;
-    ve->limits[0][P_BEAT_SMOOTH] = 0;     ve->limits[1][P_BEAT_SMOOTH] = 1000;                    ve->defaults[P_BEAT_SMOOTH] = 460;
+    ve->limits[0][P_SPIN_DRIVE]  = 0;     ve->limits[1][P_SPIN_DRIVE]  = 1000;                    ve->defaults[P_SPIN_DRIVE]  = 520;
+    ve->limits[0][P_ZOOM_DRIVE]  = 0;     ve->limits[1][P_ZOOM_DRIVE]  = 1000;                    ve->defaults[P_ZOOM_DRIVE]  = 420;
 
     ve->description = "Kaleidoscope";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
     ve->has_user = 0;
 
     ve->param_description = vje_build_param_list(
@@ -143,29 +149,21 @@ vj_effect *trimirror_init(int w, int h)
         "Zoom",
         "Center X",
         "Center Y",
-        "Beat Spin",
-        "Beat Zoom",
-        "Beat Push",
-        "Beat Smooth"
+        "Spin Drive",
+        "Zoom Drive"
     );
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_GRID_SIZE,          VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                           2,                  16,                 6,  22, 2200, 5200, 1800, 24,    /* Segments */
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                                0,                  360,                8,  32, 1200, 3200, 0,    48,    /* Rotation */
-        VJ_BEAT_SIGNED_SPEED,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -70,                70,                 10, 40, 900,  2400, 0,    62,    /* Spin Speed */
-        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS,                                                 720,                1420,               8,  34, 1000, 2800, 0,    46,    /* Zoom */
-        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_SIGN_LOCK,                          -320,               320,                5,  18, 2200, 5200, 1200, 18,    /* Center X */
-        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_SIGN_LOCK,                          -320,               320,                5,  18, 2200, 5200, 1200, 18,    /* Center Y */
-        VJ_BEAT_SPEED,              VJ_BEAT_F_REJECT,                                                      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Beat Spin */
-        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_REJECT,                                                      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Beat Zoom */
-        VJ_BEAT_KICK,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                              0,                  860,                18, 72, 80,   760,  0,    100,   /* Beat Push */
-        VJ_BEAT_MEMORY,             VJ_BEAT_F_PHRASE_ONLY,                                                 220,                820,                5,  18, 2200, 5200, 1200, 16     /* Beat Smooth */
+        VJ_BEAT_GRID_SIZE,          VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,             2,                  TRIMIRROR_MAX_SEGMENTS, 8,  30, 1400, 4200, 1000, 42,
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS,                                      0,                  360,                  10, 42,  800, 3000, 0,    58,
+        VJ_BEAT_SIGNED_SPEED,       VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,             -100,                100,                  12, 48,  600, 2400, 0,    76,
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,             420,                1800,                 14, 54,  700, 2600, 0,    82,
+        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_SIGN_LOCK,                                       -180,                180,                  8,  24, 1800, 5200, 0,    22,
+        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_SIGN_LOCK,                                       -180,                180,                  8,  24, 1800, 5200, 0,    22,
+        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,             120,                1000,                 16, 62,  500, 2200, 0,    94,
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,             120,                1000,                 16, 62,  500, 2200, 0,    90
     );
-
-    (void) w;
-    (void) h;
 
     return ve;
 }
@@ -199,36 +197,40 @@ void *trimirror_malloc(int w, int h)
         return NULL;
 
     const int len = w * h;
+    const size_t frame_bytes = (size_t)len * 3u;
+    const size_t vec_bytes = sizeof(float) * (size_t)len * 2u;
+    const size_t total = frame_bytes + vec_bytes + 32u;
 
-    if(len <= 0) {
+    s->region = (uint8_t*) vj_malloc(total);
+    if(!s->region) {
         free(s);
         return NULL;
     }
 
-    s->buf[0] = (uint8_t*) vj_malloc((size_t)len * 3u);
-    if(!s->buf[0]) {
-        free(s);
-        return NULL;
-    }
+    uint8_t *p = (uint8_t*)(((uintptr_t)s->region + 15u) & ~(uintptr_t)15u);
 
+    s->buf[0] = p;
     s->buf[1] = s->buf[0] + len;
     s->buf[2] = s->buf[1] + len;
 
-    s->vec_x = (float*) vj_malloc(sizeof(float) * (size_t)len * 2u);
-    if(!s->vec_x) {
-        free(s->buf[0]);
-        free(s);
-        return NULL;
-    }
+    p += frame_bytes;
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
 
+    s->vec_x = (float*)p;
     s->vec_y = s->vec_x + len;
 
     s->n_threads = vje_advise_num_threads(len);
-    if(s->n_threads < 1)
-        s->n_threads = 1;
 
     s->phase = 0.0f;
-    s->beat_env = 0.0f;
+    s->segment_state = 3.0f;
+    s->rotation_state = 0.0f;
+    s->spin_state = 0.0f;
+    s->zoom_state = 1000.0f;
+    s->center_x_state = 0.0f;
+    s->center_y_state = 0.0f;
+    s->spin_drive_state = 0.0f;
+    s->zoom_drive_state = 0.0f;
+    s->state_ready = 0;
 
     trimirror_build_vectors(s, w, h);
 
@@ -239,15 +241,7 @@ void trimirror_free(void *ptr)
 {
     trimirror_t *s = (trimirror_t*) ptr;
 
-    if(!s)
-        return;
-
-    if(s->vec_x)
-        free(s->vec_x);
-
-    if(s->buf[0])
-        free(s->buf[0]);
-
+    free(s->region);
     free(s);
 }
 
@@ -255,20 +249,47 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args)
 {
     trimirror_t *s = (trimirror_t*) ptr;
 
-    if(!s || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
     const int w = frame->width;
     const int h = frame->height;
     const int len = frame->len;
 
-    if(w <= 0 || h <= 0 || len <= 0)
-        return;
+    const int raw_segments = args[P_SEGMENTS];
+    const int raw_rotation = args[P_ROTATION];
+    const int raw_spin = args[P_SPIN_SPEED];
+    const int raw_zoom = args[P_ZOOM];
+    const int raw_center_x = args[P_CENTER_X];
+    const int raw_center_y = args[P_CENTER_Y];
+    const int raw_spin_drive = args[P_SPIN_DRIVE];
+    const int raw_zoom_drive = args[P_ZOOM_DRIVE];
 
-    if(s->w != w || s->h != h)
-        trimirror_build_vectors(s, w, h);
+    if(!s->state_ready) {
+        s->segment_state = (float)raw_segments;
+        s->rotation_state = (float)raw_rotation;
+        s->spin_state = (float)raw_spin;
+        s->zoom_state = (float)raw_zoom;
+        s->center_x_state = (float)raw_center_x;
+        s->center_y_state = (float)raw_center_y;
+        s->spin_drive_state = (float)raw_spin_drive;
+        s->zoom_drive_state = (float)raw_zoom_drive;
+        s->state_ready = 1;
+    }
 
-    const int segments = trimirror_clampi(args[P_SEGMENTS], 1, TRIMIRROR_MAX_SEGMENTS);
+    const float geom_fast = 0.210f;
+    const float geom_slow = 0.105f;
+
+    s->segment_state = trimirror_smooth(s->segment_state, (float)raw_segments, geom_slow);
+    s->rotation_state = trimirror_smooth(s->rotation_state, (float)raw_rotation, geom_fast);
+    s->spin_state = trimirror_smooth(s->spin_state, (float)raw_spin, geom_fast);
+    s->zoom_state = trimirror_smooth(s->zoom_state, (float)raw_zoom, geom_slow);
+    s->center_x_state = trimirror_smooth(s->center_x_state, (float)raw_center_x, geom_slow);
+    s->center_y_state = trimirror_smooth(s->center_y_state, (float)raw_center_y, geom_slow);
+    s->spin_drive_state = trimirror_smooth(s->spin_drive_state, (float)raw_spin_drive, geom_fast);
+    s->zoom_drive_state = trimirror_smooth(s->zoom_drive_state, (float)raw_zoom_drive, geom_fast);
+
+    int segments = trimirror_clampi((int)(s->segment_state + 0.5f), 1, TRIMIRROR_MAX_SEGMENTS);
+
+    const float spin_drive = s->spin_drive_state * 0.001f;
+    const float zoom_drive = s->zoom_drive_state * 0.001f;
 
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict U  = frame->data[1];
@@ -278,46 +299,27 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict srcU = s->buf[1];
     uint8_t *restrict srcV = s->buf[2];
 
-    if(segments <= 1 && args[P_ROTATION] == 0 && args[P_SPIN_SPEED] == 0 && args[P_BEAT_PUSH] == 0 && args[P_ZOOM] == 1000 && args[P_CENTER_X] == 0 && args[P_CENTER_Y] == 0)
-        return;
-
     veejay_memcpy(srcY, Y, len);
     veejay_memcpy(srcU, U, len);
     veejay_memcpy(srcV, V, len);
 
-    const int beat_push = trimirror_clampi(args[P_BEAT_PUSH], 0, 1000);
-    const int shaped = trimirror_beat_shape(beat_push);
-    const float target = (float)shaped * 0.001f;
-    const float smooth_t = (float)trimirror_clampi(args[P_BEAT_SMOOTH], 0, 1000) * 0.001f;
-    const float attack = 0.22f + (1.0f - smooth_t) * 0.34f;
-    const float release = 0.035f + (1.0f - smooth_t) * 0.090f;
+    const float spin = s->spin_state * 0.00125f;
+    const float direct_spin = spin_drive * 0.0125f;
 
-    if(target > s->beat_env)
-        s->beat_env += (target - s->beat_env) * attack;
-    else
-        s->beat_env += (target - s->beat_env) * release;
+    s->phase = trimirror_wrap_angle(s->phase + spin + direct_spin);
 
-    s->beat_env = trimirror_clampf(s->beat_env, 0.0f, 1.0f);
-    if(s->beat_env < 0.0001f)
-        s->beat_env = 0.0f;
+    const float user_rot = s->rotation_state * (TRIMIRROR_TWO_PI / 360.0f);
+    const float base_angle = trimirror_wrap_angle(user_rot + s->phase + spin_drive * 0.16f * sinf(s->phase * 1.37f));
 
-    const float beat_drive = s->beat_env * s->beat_env;
-    const float beat_spin = (float)trimirror_clampi(args[P_BEAT_SPIN], 0, 1000) * 0.001f;
-    const float beat_zoom = (float)trimirror_clampi(args[P_BEAT_ZOOM], 0, 1000) * 0.001f;
-
-    const float spin = (float)trimirror_clampi(args[P_SPIN_SPEED], -100, 100) * 0.00125f;
-    s->phase = trimirror_wrap_angle(s->phase + spin + beat_drive * beat_spin * 0.045f);
-
-    const float user_rot = ((float)trimirror_clampi(args[P_ROTATION], 0, 360) * (TRIMIRROR_TWO_PI / 360.0f));
-    const float base_angle = trimirror_wrap_angle(user_rot + s->phase + beat_drive * beat_spin * 0.12f);
-
-    const float zoom_base = (float)trimirror_clampi(args[P_ZOOM], 250, 2000) * 0.001f;
-    const float zoom = zoom_base * (1.0f + beat_drive * beat_zoom * 0.28f);
+    const float zoom_base = s->zoom_state * 0.001f;
+    const float zoom_breathe = 1.0f + zoom_drive * 0.055f * sinf(s->phase * 2.10f);
+    const float zoom_pulse = 1.0f + zoom_drive * 0.34f;
+    const float zoom = trimirror_clampf(zoom_base * zoom_breathe * zoom_pulse, 0.10f, 3.00f);
 
     const float cx = ((float)w - 1.0f) * 0.5f;
     const float cy = ((float)h - 1.0f) * 0.5f;
-    const float sample_cx = cx + ((float)trimirror_clampi(args[P_CENTER_X], -1000, 1000) * 0.001f) * cx;
-    const float sample_cy = cy + ((float)trimirror_clampi(args[P_CENTER_Y], -1000, 1000) * 0.001f) * cy;
+    const float sample_cx = cx + (s->center_x_state * 0.001f) * cx;
+    const float sample_cy = cy + (s->center_y_state * 0.001f) * cy;
 
     float m00[TRIMIRROR_MAX_SEGMENTS];
     float m01[TRIMIRROR_MAX_SEGMENTS];

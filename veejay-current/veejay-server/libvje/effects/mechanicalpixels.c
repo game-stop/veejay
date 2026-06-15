@@ -21,9 +21,6 @@
 #include "common.h"
 #include "mechanicalpixels.h"
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
 
 #define KD_PARAMS 9
 
@@ -49,14 +46,14 @@
 #define KD_PALETTE_NEON        5
 
 #define KD_WAVES 8
-#define KD_MODE_ROW            0  /* horizontal scan, top -> bottom */
-#define KD_MODE_COLUMN         1  /* vertical scan, left -> right */
-#define KD_MODE_DIAGONAL       2  /* diagonal sweep */
-#define KD_MODE_CROSS_DIAGONAL 3  /* opposite diagonal sweep */
-#define KD_MODE_RADIAL         4  /* centre-out rings */
-#define KD_MODE_SPIRAL         5  /* rotating radial sweep */
-#define KD_MODE_CHECKER        6  /* interleaved mechanical checker bank */
-#define KD_MODE_SOLENOIDS      7  /* stable randomized solenoid bank */
+#define KD_MODE_ROW            0
+#define KD_MODE_COLUMN         1
+#define KD_MODE_DIAGONAL       2
+#define KD_MODE_CROSS_DIAGONAL 3
+#define KD_MODE_RADIAL         4
+#define KD_MODE_SPIRAL         5
+#define KD_MODE_CHECKER        6
+#define KD_MODE_SOLENOIDS      7
 
 #define KD_STEP_Q 21
 #define KD_MOTOR_Q 8
@@ -67,7 +64,7 @@ typedef struct {
     int len;
     int n_threads;
     int frame;
-    int motor_q8;        /* 8.8 governor phase. Speed 0 leaves this unchanged. */
+    int motor_q8;
     int seeded;
     int last_reset;
     int last_cell_size;
@@ -81,20 +78,20 @@ typedef struct {
     uint8_t *region;
     uint8_t *prev_y;
 
-    uint8_t *cell_value;    /* current physical height */
-    uint8_t *cell_target;   /* last actuator target */
-    uint8_t *cell_delay;    /* delayed solenoid release */
-    uint8_t *cell_phase;    /* distance to target / stress */
-    uint8_t *cell_rand;     /* stable mechanical variation */
-    uint8_t *cell_wave;     /* precomputed render-mode phase for current grid/mode */
+    uint8_t *cell_value;
+    uint8_t *cell_target;
+    uint8_t *cell_delay;
+    uint8_t *cell_phase;
+    uint8_t *cell_rand;
+    uint8_t *cell_wave;
     uint8_t *cell_avg_y;
     uint8_t *cell_avg_u;
     uint8_t *cell_avg_v;
-    uint8_t *cell_motion;   /* filtered source motion */
-    uint8_t *cell_slow_y;   /* slow exposure/luma envelope */
-    uint8_t *cell_pressure; /* stored source pressure, released by governor */
-    uint8_t *cell_impact;   /* actuator hit flash / mechanical stress */
-    uint8_t *cell_detail;   /* filtered intra-cell contrast, keeps large cells alive */
+    uint8_t *cell_motion;
+    uint8_t *cell_slow_y;
+    uint8_t *cell_pressure;
+    uint8_t *cell_impact;
+    uint8_t *cell_detail;
 } kinetic_t;
 
 typedef struct {
@@ -107,9 +104,15 @@ typedef struct {
     int face_y1;
 } kd_geom_t;
 
-static inline int kd_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : (v > hi ? hi : v);
+}
+
+static inline int kd_absi(int v)
+{
+    const int m = v >> 31;
+    return (v + m) ^ m;
 }
 
 static inline uint8_t kd_clip_u8(int v)
@@ -142,20 +145,20 @@ static inline int kd_blend_q8(int src, int fx, int aq)
 
 static inline int kd_circular_dist8(int a, int b)
 {
-    int d = abs(a - b) & 255;
+    int d = kd_absi(a - b) & 255;
     return (d > 128) ? (256 - d) : d;
 }
 
 static inline int kd_quantize_height(int v)
 {
     int q = ((v + (KD_STEP_Q / 2)) / KD_STEP_Q) * KD_STEP_Q;
-    return kd_clampi(q, 0, 255);
+    return clampi(q, 0, 255);
 }
 
 static inline int kd_approach_shift(int cur, int target, int rise_shift, int fall_shift)
 {
-    cur = kd_clampi(cur, 0, 255);
-    target = kd_clampi(target, 0, 255);
+    cur = clampi(cur, 0, 255);
+    target = clampi(target, 0, 255);
 
     if(target > cur) {
         const int d = target - cur;
@@ -165,17 +168,12 @@ static inline int kd_approach_shift(int cur, int target, int rise_shift, int fal
         cur -= (d + ((1 << fall_shift) - 1)) >> fall_shift;
     }
 
-    return kd_clampi(cur, 0, 255);
+    return clampi(cur, 0, 255);
 }
 
-/*
- * Non-linear fixed-point governor speed.
- * 0 means a fully frozen motor phase.
- * 1 is a very slow crawl; 100 is close to the old fastest rate.
- */
 static inline int kd_motor_inc_q8(int speed)
 {
-    speed = kd_clampi(speed, 0, 100);
+    speed = clampi(speed, 0, 100);
     if(speed <= 0)
         return 0;
 
@@ -184,7 +182,7 @@ static inline int kd_motor_inc_q8(int speed)
 
 static void kd_configure_grid(kinetic_t *k, int cell_size)
 {
-    cell_size = kd_clampi(cell_size, KD_CELL_MIN, KD_CELL_MAX);
+    cell_size = clampi(cell_size, KD_CELL_MIN, KD_CELL_MAX);
     k->cols = (k->w + cell_size - 1) / cell_size;
     k->rows = (k->h + cell_size - 1) / cell_size;
     k->last_cell_size = cell_size;
@@ -247,7 +245,7 @@ static inline void kd_palette_color(int palette, int value, int avg_u, int avg_v
             du = (du * boost) >> 8;
             dv = (dv * boost) >> 8;
 
-            if(abs(du) + abs(dv) < 18) {
+            if(kd_absi(du) + kd_absi(dv) < 18) {
                 du += ((rnd & 1) ? 28 : -24);
                 dv += ((rnd & 2) ? 34 : -30);
             }
@@ -264,21 +262,21 @@ static inline void kd_palette_color(int palette, int value, int avg_u, int avg_v
             break;
     }
 
-    *u = kd_clampi(*u, 16, 240);
-    *v = kd_clampi(*v, 16, 240);
+    *u = clampi(*u, 16, 240);
+    *v = clampi(*v, 16, 240);
 }
 
 static inline int kd_phase_from_axis(int v, int max_v)
 {
     if(max_v <= 0)
         return 0;
-    return kd_clampi((v * 255 + (max_v >> 1)) / max_v, 0, 255);
+    return clampi((v * 255 + (max_v >> 1)) / max_v, 0, 255);
 }
 
 static inline int kd_pseudo_angle_phase(int dx, int dy)
 {
-    const int ax = abs(dx);
-    const int ay = abs(dy);
+    const int ax = kd_absi(dx);
+    const int ay = kd_absi(dy);
     const int sum = ax + ay;
 
     if(sum <= 0)
@@ -297,17 +295,14 @@ static inline int kd_radial_phase_for_cell(int cx, int cy, int cols, int rows)
 {
     const int max_x = (cols > 1) ? (cols - 1) : 1;
     const int max_y = (rows > 1) ? (rows - 1) : 1;
-    const int dx = abs((cx << 1) - (cols - 1));
-    const int dy = abs((cy << 1) - (rows - 1));
-    const int nx = kd_clampi((dx * 255 + (max_x >> 1)) / max_x, 0, 255);
-    const int ny = kd_clampi((dy * 255 + (max_y >> 1)) / max_y, 0, 255);
+    const int dx = kd_absi((cx << 1) - (cols - 1));
+    const int dy = kd_absi((cy << 1) - (rows - 1));
+    const int nx = clampi((dx * 255 + (max_x >> 1)) / max_x, 0, 255);
+    const int ny = clampi((dy * 255 + (max_y >> 1)) / max_y, 0, 255);
     const int hi = (nx > ny) ? nx : ny;
     const int lo = (nx > ny) ? ny : nx;
 
-    /* Approximate Euclidean distance, scaled so corners reach the full 0..255 range.
-     * The previous radial mode only covered about half the phase space, leaving a
-     * visible dead half-cycle. */
-    return kd_clampi(((hi + (lo >> 1)) * 2 + 1) / 3, 0, 255);
+    return clampi(((hi + (lo >> 1)) * 2 + 1) / 3, 0, 255);
 }
 
 static inline int kd_wave_phase_for_cell(int wave, int cx, int cy, int cols, int rows, int rnd)
@@ -411,8 +406,8 @@ static inline kd_geom_t kd_make_geometry(int cw, int ch, int depth, int value)
         }
     }
 
-    const int min_face_w = kd_clampi((inner_w * 55 + 50) / 100, 3, inner_w);
-    const int min_face_h = kd_clampi((inner_h * 55 + 50) / 100, 3, inner_h);
+    const int min_face_w = clampi((inner_w * 55 + 50) / 100, 3, inner_w);
+    const int min_face_h = clampi((inner_h * 55 + 50) / 100, 3, inner_h);
 
     int max_side_x = inner_w - min_face_w;
     int max_side_y = inner_h - min_face_h;
@@ -452,6 +447,17 @@ vj_effect *mechanicalpixels_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][P_AMOUNT] = 0;       ve->limits[1][P_AMOUNT] = 100;       ve->defaults[P_AMOUNT] = 100;
     ve->limits[0][P_CELL_SIZE] = 6;    ve->limits[1][P_CELL_SIZE] = 80;     ve->defaults[P_CELL_SIZE] = 28;
     ve->limits[0][P_DEPTH] = 0;        ve->limits[1][P_DEPTH] = 100;        ve->defaults[P_DEPTH] = 88;
@@ -464,6 +470,8 @@ vj_effect *mechanicalpixels_init(int w, int h)
 
     ve->description = "Mechanical Pixels";
     ve->sub_format = 1;
+    ve->extra_frame = 0;
+    ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params,
         "Amount",
         "Pixel Size",
@@ -476,22 +484,25 @@ vj_effect *mechanicalpixels_init(int w, int h)
         "Reset State"
     );
 
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_WAVE], P_WAVE,
+        "Rows", "Columns", "Diagonal", "Cross Diagonal", "Radial", "Spiral", "Checker", "Solenoids");
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_PALETTE], P_PALETTE,
+        "Wood", "Source Soft", "Steel", "Amber", "Source Full", "Neon");
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_RESET], P_RESET, "Off", "Reset");
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_KICK,                VJ_BEAT_F_CONTINUOUS,                                                       35,                 100,                14, 58, 90,   720,  0,    82,    /* Amount */
-        VJ_BEAT_GRID_SIZE,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,      14,                 42,                 6,  22, 2200, 5200, 1800, 25,    /* Pixel Size */
-        VJ_BEAT_GEOMETRY_AMPLITUDE,  VJ_BEAT_F_CONTINUOUS,                                                       58,                 100,                14, 58, 90,   720,  0,    70,    /* 3D Depth */
-        VJ_BEAT_SPEED,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SQUARED,                                   10,                 86,                 12, 46, 900,  2400, 0,    78,    /* Cycle Speed */
-        VJ_BEAT_KICK,                VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                                   8,                  46,                 22, 88, 60,   360,  0,    100,   /* Trigger */
-        VJ_BEAT_SELECTOR,            VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Render Mode */
-        VJ_BEAT_INERTIA,             VJ_BEAT_F_CONTINUOUS,                                                       24,                 92,                 10, 38, 1000, 2800, 0,    60,    /* Mechanical Inertia */
-        VJ_BEAT_SELECTOR,            VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Palette */
-        VJ_BEAT_RESET,               VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,          VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000  /* Reset State */
+        VJ_BEAT_SOURCE_MIX,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                  62,                 100,                16, 62,  700, 2800, 0,    86,
+        VJ_BEAT_GRID_SIZE,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 10, 48, 4, 14, 3200, 8600, 2400, 20,
+        VJ_BEAT_GEOMETRY_AMPLITUDE,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                  58,                 100,                18, 68,  650, 2600, 0,    92,
+        VJ_BEAT_SPEED,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                  8,                  82,                 16, 62,  700, 2800, 0,    84,
+        VJ_BEAT_MOTION_REACT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,             14,                 68,                 14, 54,  850, 3200, 0,    72,
+        VJ_BEAT_SELECTOR,            VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_INERTIA,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,             22,                 92,                 12, 46, 1000, 3600, 0,    58,
+        VJ_BEAT_SELECTOR,            VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_RESET,               VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
     );
-
-    (void) w;
-    (void) h;
     return ve;
 }
 
@@ -553,7 +564,7 @@ void *mechanicalpixels_malloc(int w, int h)
 void mechanicalpixels_free(void *ptr)
 {
     kinetic_t *k = (kinetic_t *) ptr;
-    if(!k) return;
+
     free(k->region);
     free(k);
 }
@@ -599,8 +610,6 @@ static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
                 }
             }
 
-            if(count <= 0) count = 1;
-
             const int ay = sum_y / count;
             const int initial = 28 + (ay >> 4);
             k->cell_avg_y[idx] = (uint8_t) ay;
@@ -608,13 +617,13 @@ static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
             k->cell_avg_v[idx] = (uint8_t) (sum_v / count);
             k->cell_motion[idx] = 0;
             k->cell_slow_y[idx] = (uint8_t) ay;
-            k->cell_pressure[idx] = (uint8_t) kd_clampi(initial, 0, 255);
+            k->cell_pressure[idx] = (uint8_t) clampi(initial, 0, 255);
             k->cell_value[idx] = (uint8_t) kd_quantize_height(initial);
             k->cell_target[idx] = k->cell_value[idx];
             k->cell_delay[idx] = 0;
             k->cell_phase[idx] = 0;
             k->cell_impact[idx] = 0;
-            k->cell_detail[idx] = (uint8_t) kd_clampi(max_y - min_y, 0, 255);
+            k->cell_detail[idx] = (uint8_t) clampi(max_y - min_y, 0, 255);
         }
     }
 }
@@ -630,15 +639,14 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
     const int max_cols = k->max_cols;
     const int motor_phase = (k->motor_q8 >> KD_MOTOR_Q) & 255;
 
-    /* Width is no longer the speed. This keeps high speed from turning the whole wall on at once. */
-    const int wave_width = 2 + ((100 - trigger) / 38) + ((motor_speed > 65) ? 1 : 0); /* 2..6 */
-    const int deadband = 7 + (trigger * 29) / 100;                                    /* 7..36 */
-    const int slow_shift = 5 + (trigger / 34);                                        /* 5..7 */
-    const int release_slop = 9 + (trigger / 5);                                       /* 9..29 */
-    const int actuator_step = 1 + ((100 - inertia) * 7) / 100;                        /* 1..8 */
+    const int wave_width = 2 + ((100 - trigger) / 38) + ((motor_speed > 65) ? 1 : 0);
+    const int deadband = 7 + (trigger * 29) / 100;                                   
+    const int slow_shift = 5 + (trigger / 34);                                       
+    const int release_slop = 9 + (trigger / 5);                                      
+    const int actuator_step = 1 + ((100 - inertia) * 7) / 100;                       
     const int fall_step = (actuator_step > 1) ? (actuator_step - 1) : 1;
     const int pressure_decay = 26 + (inertia >> 2);
-    const int motion_gain_q8 = 240 + kd_clampi((cell_size - 10) * 11, 0, 224);
+    const int motion_gain_q8 = 240 + clampi((cell_size - 10) * 11, 0, 224);
 
     uint8_t *prev_y = k->prev_y;
 
@@ -669,14 +677,12 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
                     sum_y += yy;
                     sum_u += U[p];
                     sum_v += V[p];
-                    sum_m += abs(yy - old);
+                    sum_m += kd_absi(yy - old);
                     if(yy < min_y) min_y = yy;
                     if(yy > max_y) max_y = yy;
                     count++;
                 }
             }
-
-            if(count <= 0) count = 1;
 
             const int ay = sum_y / count;
             const int au = sum_u / count;
@@ -689,11 +695,11 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
             k->cell_avg_v[idx] = (uint8_t) av;
 
             int slow_y = k->cell_slow_y[idx];
-            const int luma_delta = abs(ay - slow_y);
+            const int luma_delta = kd_absi(ay - slow_y);
             slow_y = kd_approach_shift(slow_y, ay, slow_shift, slow_shift);
             k->cell_slow_y[idx] = (uint8_t) slow_y;
 
-            const int raw_detail = kd_clampi(max_y - min_y, 0, 255);
+            const int raw_detail = clampi(max_y - min_y, 0, 255);
             int detail = k->cell_detail[idx];
             detail = kd_approach_shift(detail, raw_detail, 3, 4);
             k->cell_detail[idx] = (uint8_t) detail;
@@ -707,7 +713,7 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
             } else {
                 fm -= ((fm - motion_energy) + 21) / 22;
             }
-            fm = kd_clampi(fm, 0, 255);
+            fm = clampi(fm, 0, 255);
             k->cell_motion[idx] = (uint8_t) fm;
 
             int base_relief = 18 + ((slow_y * 44) >> 8) + (detail >> 4);
@@ -728,7 +734,7 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
             }
 
             int desired_pressure = base_relief + luma_impulse + motion_impulse + detail_impulse;
-            desired_pressure = kd_clampi(desired_pressure, 0, 255);
+            desired_pressure = clampi(desired_pressure, 0, 255);
 
             int pressure = k->cell_pressure[idx];
             if(desired_pressure > pressure) {
@@ -736,7 +742,7 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
             } else {
                 pressure -= ((pressure - desired_pressure) + pressure_decay - 1) / pressure_decay;
             }
-            pressure = kd_clampi(pressure, 0, 255);
+            pressure = clampi(pressure, 0, 255);
             k->cell_pressure[idx] = (uint8_t) pressure;
 
             int impact = k->cell_impact[idx];
@@ -757,14 +763,13 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
                     qtarget += (((rnd & 7) - 3) * KD_STEP_Q) / 8;
                     qtarget = kd_quantize_height(qtarget);
 
-                    if(abs(qtarget - (int) k->cell_target[idx]) >= release_slop) {
-                        const int hit = abs(qtarget - (int) k->cell_value[idx]);
+                    if(kd_absi(qtarget - (int) k->cell_target[idx]) >= release_slop) {
+                        const int hit = kd_absi(qtarget - (int) k->cell_value[idx]);
                         k->cell_target[idx] = (uint8_t) qtarget;
                         impact += 66 + (hit >> 1);
                         if(detail > 32) impact += detail >> 4;
                         if(impact > 255) impact = 255;
 
-                        /* Speed 0 never reaches here. Low speed gets small stagger; high speed gets near-zero delay. */
                         k->cell_delay[idx] = (uint8_t) ((rnd * (100 - motor_speed)) / 950);
                     }
                 }
@@ -775,7 +780,7 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
             const int diff = target - value;
             const int step = (diff >= 0) ? actuator_step : fall_step;
 
-            if(abs(diff) <= step) {
+            if(kd_absi(diff) <= step) {
                 value = target;
             } else if(diff > 0) {
                 value += step;
@@ -783,9 +788,9 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
                 value -= step;
             }
 
-            value = kd_clampi(value, 0, 255);
+            value = clampi(value, 0, 255);
             k->cell_value[idx] = (uint8_t) value;
-            k->cell_phase[idx] = (uint8_t) kd_clampi(abs(target - value), 0, 255);
+            k->cell_phase[idx] = (uint8_t) clampi(kd_absi(target - value), 0, 255);
             k->cell_impact[idx] = (uint8_t) impact;
         }
     }
@@ -816,7 +821,6 @@ static void kd_render_wall(kinetic_t *k, VJFrame *frame, int cell_size,
             const int y1 = (y0 + cell_size < h) ? y0 + cell_size : h;
             const int cw = x1 - x0;
             const int ch = y1 - y0;
-            if(cw <= 0 || ch <= 0) continue;
 
             const int value = kd_quantize_height(k->cell_value[idx]);
             const int phase = k->cell_phase[idx];
@@ -859,7 +863,7 @@ static void kd_render_wall(kinetic_t *k, VJFrame *frame, int cell_size,
                 face_y += (avg_y - 128) >> 4;
             }
 
-            face_y = kd_clampi(face_y, 0, 255);
+            face_y = clampi(face_y, 0, 255);
 
             int face_u = 128;
             int face_v = 128;
@@ -901,8 +905,8 @@ static void kd_render_wall(kinetic_t *k, VJFrame *frame, int cell_size,
                         const int bevel_y = (ly == g.face_y0 || ly == g.face_y1 - 1);
 
                         int grad = ((rel_x * grad_x_q8) + (rel_y * grad_y_q8)) >> 8;
-                        int ax = (abs(rel_x) * ax_q8) >> 8;
-                        int ay = (abs(rel_y) * ay_q8) >> 8;
+                        int ax = (kd_absi(rel_x) * ax_q8) >> 8;
+                        int ay = (kd_absi(rel_y) * ay_q8) >> 8;
                         int pillow = 34 - ((ax + ay) >> 3);
                         if(pillow < -18) pillow = -18;
 
@@ -938,8 +942,8 @@ static void kd_render_wall(kinetic_t *k, VJFrame *frame, int cell_size,
                         fv = face_v;
                         if(impact > 48 &&
                            (palette == KD_PALETTE_SOURCE_FULL || palette == KD_PALETTE_NEON)) {
-                            fu = kd_clampi(fu + (((face_u - 128) * impact) >> 10), 16, 240);
-                            fv = kd_clampi(fv + (((face_v - 128) * impact) >> 10), 16, 240);
+                            fu = clampi(fu + (((face_u - 128) * impact) >> 10), 16, 240);
+                            fv = clampi(fv + (((face_v - 128) * impact) >> 10), 16, 240);
                         }
                     } else if(g.side > 0 &&
                               lx >= g.face_x1 && lx < g.face_x1 + g.side &&
@@ -979,25 +983,20 @@ static void kd_render_wall(kinetic_t *k, VJFrame *frame, int cell_size,
 void mechanicalpixels_apply(void *ptr, VJFrame *frame, int *args)
 {
     kinetic_t *k = (kinetic_t *) ptr;
-    if(!k || !frame || !args) return;
 
     uint8_t *Y = frame->data[0];
     uint8_t *U = frame->data[1];
     uint8_t *V = frame->data[2];
-    if(!Y || !U || !V) return;
 
-    const int len = frame->width * frame->height;
-    if(frame->width != k->w || frame->height != k->h || len != k->len) return;
-
-    const int amount = kd_clampi(args[P_AMOUNT], 0, 100);
-    const int cell_size = kd_clampi(args[P_CELL_SIZE], KD_CELL_MIN, KD_CELL_MAX);
-    const int depth = kd_clampi(args[P_DEPTH], 0, 100);
-    const int motor_speed = kd_clampi(args[P_MOTOR], 0, 100);
-    const int trigger = kd_clampi(args[P_TRIGGER], 0, 100);
-    const int wave = kd_clampi(args[P_WAVE], 0, KD_WAVES - 1);
-    const int inertia = kd_clampi(args[P_INERTIA], 0, 100);
-    const int palette = kd_clampi(args[P_PALETTE], 0, KD_PALETTES - 1);
-    const int reset = kd_clampi(args[P_RESET], 0, 1);
+    const int amount = args[P_AMOUNT];
+    const int cell_size = clampi(args[P_CELL_SIZE], KD_CELL_MIN, KD_CELL_MAX);
+    const int depth = args[P_DEPTH];
+    const int motor_speed = args[P_MOTOR];
+    const int trigger = args[P_TRIGGER];
+    const int wave = clampi(args[P_WAVE], 0, KD_WAVES - 1);
+    const int inertia = args[P_INERTIA];
+    const int palette = clampi(args[P_PALETTE], 0, KD_PALETTES - 1);
+    const int reset = args[P_RESET];
 
     if(cell_size != k->last_cell_size) {
         kd_configure_grid(k, cell_size);

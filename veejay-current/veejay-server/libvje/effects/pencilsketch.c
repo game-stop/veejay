@@ -1,4 +1,4 @@
-/*
+/* 
  * Linux VeeJay
  *
  * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,35 +21,129 @@
 #include "common.h"
 #include "pencilsketch.h"
 
-typedef uint8_t (*_pcf)(uint8_t a, uint8_t b, int t_max);
-typedef uint8_t (*_pcbcr)(uint8_t a, uint8_t b);
+#define PENCILSKETCH_PARAMS 4
+
+#define P_MODE  0
+#define P_MIN_T 1
+#define P_MAX_T 2
+#define P_MASK  3
+
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline int ps_absi(int v)
+{
+    const int m = v >> 31;
+    return (v + m) ^ m;
+}
+
+static inline uint8_t ps_u8(int v)
+{
+    return (uint8_t)clampi(v, 0, 255);
+}
+
+static inline uint8_t ps_eval_none(uint8_t a, int t_max)
+{
+    return (a >= pixel_Y_lo_ && a <= t_max) ? (uint8_t)pixel_Y_lo_ : (uint8_t)pixel_Y_hi_;
+}
+
+static inline uint8_t ps_eval(int type, uint8_t a, uint8_t b, int t_max)
+{
+    int p;
+    int q;
+
+    switch(type) {
+        case 0:
+            p = 255 - ps_absi((255 - ps_absi((255 - a) - a)) - (255 - ps_absi((255 - b) - b)));
+            p = ps_absi(ps_absi(p - b) - b);
+            return (uint8_t)p;
+
+        case 1:
+            p = b < a ? b : a;
+            p = 255 - ps_absi((255 - p) - b);
+            return (uint8_t)p;
+
+        case 2:
+            p = b > a ? b : a;
+            p = CLAMP_Y(p);
+
+            if(p == 0)
+                p = 1;
+
+            return ps_u8(255 - (((255 - b) * (255 - b)) / p));
+
+        case 3:
+            return a > b ? a : b;
+
+        case 5:
+            a = CLAMP_Y(a);
+            b = CLAMP_Y(b);
+
+            if(a == 0)
+                a = 1;
+            if(b == 0)
+                b = 1;
+
+            p = 255 - (((255 - a) * (255 - a)) / a);
+            q = 255 - (((255 - b) * (255 - b)) / b);
+
+            if(q == 0)
+                q = 1;
+
+            return ps_u8(255 - (((255 - p) * (255 - a)) / q));
+
+        case 6:
+            return (uint8_t)(255 - ps_absi((255 - a) - b));
+
+        case 7:
+            p = 255 - ps_absi((255 - ps_absi((255 - a) - a)) - (255 - ps_absi((255 - b) - b)));
+            p = ps_absi(ps_absi(p - b) - b);
+            p = p + b - ((p * b) >> 8);
+            return ps_u8(p);
+
+        default:
+            return ps_eval_none(a, t_max);
+    }
+}
+
+static inline uint8_t ps_chroma_color(uint8_t a, uint8_t b)
+{
+    const int p = (int)a - 128;
+    const int q = (int)b - 128;
+    const int r = p + q - ((p * q) >> 8);
+
+    return ps_u8(r + 128);
+}
 
 vj_effect *pencilsketch_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
 
-    ve->num_params = 4;
+    if(!ve)
+        return NULL;
 
+    ve->num_params = PENCILSKETCH_PARAMS;
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->defaults[0] = 0;
-    ve->defaults[1] = pixel_Y_lo_;
-    ve->defaults[2] = pixel_Y_hi_;
-    ve->defaults[3] = 0;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 8;
-
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
-
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
-
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 1;
+    ve->limits[0][P_MODE] = 0;  ve->limits[1][P_MODE] = 8;   ve->defaults[P_MODE] = 0;
+    ve->limits[0][P_MIN_T] = 0; ve->limits[1][P_MIN_T] = 255; ve->defaults[P_MIN_T] = pixel_Y_lo_;
+    ve->limits[0][P_MAX_T] = 0; ve->limits[1][P_MAX_T] = 255; ve->defaults[P_MAX_T] = pixel_Y_hi_;
+    ve->limits[0][P_MASK] = 0;  ve->limits[1][P_MASK] = 1;    ve->defaults[P_MASK] = 0;
 
     ve->param_description = vje_build_param_list(
         ve->num_params,
@@ -65,11 +159,10 @@ vj_effect *pencilsketch_init(int w, int h)
     ve->has_user = 0;
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
-
     vje_build_value_hint_list(
         ve->hints,
-        ve->limits[1][0],
-        0,
+        ve->limits[1][P_MODE],
+        P_MODE,
         "Absolute",
         "Minimum",
         "Maximum",
@@ -80,226 +173,83 @@ vj_effect *pencilsketch_init(int w, int h)
         "Chromatic",
         "Fallthrough"
     );
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_MASK], P_MASK, "Normalize", "Mask");
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,   0,  0,    0,    0,   -1000, /* Sketch Mode */
-        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 8,                  120,                6,  22, 1600, 3400, 700,  35,    /* Min Threshold */
-        VJ_BEAT_DETAIL,   VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 135,                245,                6,  22, 1600, 3400, 700,  35,    /* Max Threshold */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,   0,  0,    0,    0,   -1000  /* Mask */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 8,                  118,                12, 46, 1000, 3600, 0,    64,
+        VJ_BEAT_CONTRAST, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                    132,                248,                12, 46, 1000, 3600, 0,    68,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
     );
-
-    (void) w;
-    (void) h;
 
     return ve;
 }
 
-static inline int ps_clampi(int v, int lo, int hi)
-{
-    return (v < lo) ? lo : (v > hi ? hi : v);
-}
-
-static inline uint8_t ps_u8(int v)
-{
-    return (uint8_t) ps_clampi(v, 0, 255);
-}
-
-static uint8_t _pcf_dneg(uint8_t a, uint8_t b, int t_max)
-{
-    uint8_t p =
-        0xff - abs((0xff - abs((0xff - a) - a)) - (0xff - abs((0xff - b) - b)));
-
-    (void) t_max;
-
-    p = abs(abs(p - b) - b);
-
-    return p;
-}
-
-static uint8_t _pcf_lghtn(uint8_t a, uint8_t b, int t_max)
-{
-    (void) t_max;
-    return (a > b ? a : b);
-}
-
-static uint8_t _pcf_dneg2(uint8_t a, uint8_t b, int t_max)
-{
-    (void) t_max;
-    return (uint8_t)(0xff - abs((0xff - a) - b));
-}
-
-static uint8_t _pcf_min(uint8_t a, uint8_t b, int t_max)
-{
-    uint8_t p = (b < a) ? b : a;
-
-    (void) t_max;
-
-    p = (uint8_t)(0xff - abs((0xff - p) - b));
-
-    return p;
-}
-
-static uint8_t _pcf_max(uint8_t a, uint8_t b, int t_max)
-{
-    int p = (b > a) ? b : a;
-
-    (void) t_max;
-
-    p = CLAMP_Y(p);
-    if(p == 0)
-        p = 1;
-
-    p = 0xff - (((0xff - b) * (0xff - b)) / p);
-
-    return ps_u8(p);
-}
-
-static uint8_t _pcf_pq(uint8_t a, uint8_t b, int t_max)
-{
-    int p;
-    int q;
-
-    (void) t_max;
-
-    a = CLAMP_Y(a);
-    b = CLAMP_Y(b);
-
-    if(a == 0)
-        a = 1;
-    if(b == 0)
-        b = 1;
-
-    p = 0xff - (((0xff - a) * (0xff - a)) / a);
-    q = 0xff - (((0xff - b) * (0xff - b)) / b);
-
-    if(q == 0)
-        q = 1;
-
-    p = 0xff - (((0xff - p) * (0xff - a)) / q);
-
-    return ps_u8(p);
-}
-
-static uint8_t _pcf_color(uint8_t a, uint8_t b, int t_max)
-{
-    int p =
-        0xff - abs((0xff - abs((0xff - a) - a)) - (0xff - abs((0xff - b) - b)));
-
-    (void) t_max;
-
-    p = abs(abs(p - b) - b);
-    p = p + b - ((p * b) >> 8);
-
-    return ps_u8(p);
-}
-
-static uint8_t _pcbcr_color(uint8_t a, uint8_t b)
-{
-    int p = (int)a - 128;
-    int q = (int)b - 128;
-    int r = p + q - ((p * q) >> 8);
-
-    return ps_u8(r + 128);
-}
-
-static uint8_t _pcf_none(uint8_t a, uint8_t b, int t_max)
-{
-    (void) b;
-
-    return (a >= pixel_Y_lo_ && a <= t_max) ? pixel_Y_lo_ : pixel_Y_hi_;
-}
-
-static _pcf _get_pcf(int type)
-{
-    switch(type) {
-        case 0: return &_pcf_dneg;
-        case 1: return &_pcf_min;
-        case 2: return &_pcf_max;
-        case 3: return &_pcf_lghtn;
-        case 5: return &_pcf_pq;
-        case 6: return &_pcf_dneg2;
-        case 7: return &_pcf_color;
-    }
-
-    return &_pcf_none;
-}
-
 void pencilsketch_apply(void *ptr, VJFrame *frame, int *args)
 {
-    int type = args[0];
-    int threshold_min = args[1];
-    int threshold_max = args[2];
-    int mode = args[3];
+    (void)ptr;
 
-    const size_t len = (size_t) frame->len;
-    const size_t uv_len = frame->ssm ? len : (size_t) frame->uv_len;
-
-    uint8_t *restrict Y  = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
-
-    _pcf pff;
-    int n_threads;
-
-    (void) ptr;
-
-    type = ps_clampi(type, 0, 8);
-    mode = ps_clampi(mode, 0, 1);
-
-    threshold_min = ps_clampi(threshold_min, 0, 255);
-    threshold_max = ps_clampi(threshold_max, 0, 255);
+    const int type = args[P_MODE];
+    int threshold_min = args[P_MIN_T];
+    int threshold_max = args[P_MAX_T];
+    const int mask_mode = args[P_MASK];
+    const int len = frame->len;
+    const int uv_len = frame->ssm ? len : frame->uv_len;
+    const int n_threads = vje_advise_num_threads(len);
 
     if(threshold_max < threshold_min) {
-        int tmp = threshold_min;
+        const int tmp = threshold_min;
         threshold_min = threshold_max;
         threshold_max = tmp;
     }
 
-    pff = _get_pcf(type);
-    n_threads = vje_advise_num_threads((int)len);
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
 #pragma omp parallel num_threads(n_threads)
     {
-        if(mode == 1) {
+        if(mask_mode) {
 #pragma omp for schedule(static)
-            for(size_t i = 0; i < len; i++) {
+            for(int i = 0; i < len; i++) {
                 const uint8_t y = Y[i];
 
                 Y[i] = (y >= threshold_min && y <= threshold_max)
-                    ? pff(y, (uint8_t)(0xff - y), threshold_max)
-                    : pixel_Y_hi_;
+                    ? ps_eval(type, y, (uint8_t)(255 - y), threshold_max)
+                    : (uint8_t)pixel_Y_hi_;
             }
-        } else {
-            const int range = (threshold_max > threshold_min) ? (threshold_max - threshold_min) : 1;
+        }
+        else {
+            const int range = threshold_max > threshold_min ? threshold_max - threshold_min : 1;
 
 #pragma omp for schedule(static)
-            for(size_t i = 0; i < len; i++) {
-                const uint8_t y_orig = Y[i];
+            for(int i = 0; i < len; i++) {
+                const uint8_t y = Y[i];
 
-                if(y_orig >= threshold_min && y_orig <= threshold_max) {
-                    const int normalized = ((int)(y_orig - threshold_min) * 255) / range;
-                    const uint8_t y_val = ps_u8(normalized);
+                if(y >= threshold_min && y <= threshold_max) {
+                    const uint8_t yn = ps_u8(((int)(y - threshold_min) * 255) / range);
 
-                    Y[i] = pff(y_val, y_orig, threshold_max);
-                } else {
-                    Y[i] = pixel_Y_hi_;
+                    Y[i] = ps_eval(type, yn, y, threshold_max);
+                }
+                else {
+                    Y[i] = (uint8_t)pixel_Y_hi_;
                 }
             }
         }
 
-        if(type != 7) {
+        if(type == 7) {
 #pragma omp for schedule(static)
-            for(size_t i = 0; i < uv_len; i++) {
+            for(int i = 0; i < uv_len; i++) {
+                Cb[i] = ps_chroma_color(128, Cb[i]);
+                Cr[i] = ps_chroma_color(128, Cr[i]);
+            }
+        }
+        else {
+#pragma omp for schedule(static)
+            for(int i = 0; i < uv_len; i++) {
                 Cb[i] = 128;
                 Cr[i] = 128;
-            }
-        } else {
-#pragma omp for schedule(static)
-            for(size_t i = 0; i < uv_len; i++) {
-                Cb[i] = _pcbcr_color(128, Cb[i]);
-                Cr[i] = _pcbcr_color(128, Cr[i]);
             }
         }
     }

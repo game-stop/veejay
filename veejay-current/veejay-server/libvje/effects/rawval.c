@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -22,19 +22,45 @@
 #include <veejaycore/vjmem.h>
 #include "rawval.h"
 
+#define RAWVAL_PARAMS 4
+
+#define P_OLD_CB 0
+#define P_OLD_CR 1
+#define P_NEW_CB 2
+#define P_NEW_CR 3
+
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
 vj_effect *rawval_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
+    vj_effect *ve = (vj_effect *)vj_calloc(sizeof(vj_effect));
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    if(!ve)
+        return NULL;
 
-    ve->defaults[0] = 232;
-    ve->defaults[1] = 16;
-    ve->defaults[2] = 16;
-    ve->defaults[3] = 16;
+    ve->num_params = RAWVAL_PARAMS;
+    ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
+    ve->defaults[P_OLD_CB] = 232;
+    ve->defaults[P_OLD_CR] = 16;
+    ve->defaults[P_NEW_CB] = 16;
+    ve->defaults[P_NEW_CR] = 16;
 
     for(int i = 0; i < ve->num_params; i++) {
         ve->limits[0][i] = 0;
@@ -54,51 +80,29 @@ vj_effect *rawval_init(int w, int h)
         "New Cr"
     );
 
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Old Cb */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0,   -1000, /* Old Cr */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                                     64,                 192,                8, 30, 1200, 3000, 0,   45,    /* New Cb */
-        VJ_BEAT_COLOR_PHASE,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                    64,                 192,                8, 30, 1200, 3000, 0,   45     /* New Cr */
-    );
-
-    (void) w;
-    (void) h;
-
     return ve;
-}
-
-static inline int rawval_clampi(int v, int lo, int hi)
-{
-    return (v < lo) ? lo : (v > hi ? hi : v);
 }
 
 void rawval_apply(void *ptr, VJFrame *frame, int *args)
 {
-    (void) ptr;
+    (void)ptr;
 
-    if(!frame || !args || !frame->data[1] || !frame->data[2])
-        return;
-
-    const uint8_t old_cb = (uint8_t)rawval_clampi(args[0], 0, 255);
-    const uint8_t old_cr = (uint8_t)rawval_clampi(args[1], 0, 255);
-    const uint8_t new_cb = (uint8_t)rawval_clampi(args[2], 0, 255);
-    const uint8_t new_cr = (uint8_t)rawval_clampi(args[3], 0, 255);
+    const uint8_t old_cb = (uint8_t)args[P_OLD_CB];
+    const uint8_t old_cr = (uint8_t)args[P_OLD_CR];
+    const uint8_t new_cb = (uint8_t)args[P_NEW_CB];
+    const uint8_t new_cr = (uint8_t)args[P_NEW_CR];
 
     const int uv_len = frame->ssm ? frame->len : frame->uv_len;
-
-    if(uv_len <= 0)
-        return;
+    const int n_threads = vje_advise_num_threads(uv_len);
 
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    const int n_threads = vje_advise_num_threads(uv_len);
-
 #pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int i = 0; i < uv_len; i++) {
-        if(Cb[i] == old_cb && Cr[i] == old_cr) {
+        const int match = (Cb[i] == old_cb) & (Cr[i] == old_cr);
+
+        if(match) {
             Cb[i] = new_cb;
             Cr[i] = new_cr;
         }

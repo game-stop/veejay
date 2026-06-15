@@ -23,20 +23,20 @@
  */
 
 #include "common.h"
-#include "waterrippletv.h"
 #include <stdint.h>
+#include <veejaycore/vjmem.h>
+#include "waterrippletv.h"
 
-#define WATERRIPPLETV_PARAMS 7
+#define WATERRIPPLETV_PARAMS 5
 
 #define P_REFRESH_FREQ 0
 #define P_WAVESPEED    1
 #define P_DECAY        2
-#define P_BEAT_DROPS   3
-#define P_BEAT_POWER   4
-#define P_BEAT_PUSH    5
-#define P_BEAT_SMOOTH  6
+#define P_DROP_DRIVE   3
+#define P_RIPPLE_POWER 4
 
 typedef struct {
+    uint8_t *region;
     uint8_t *ripple_data[3];
 
     int8_t *vtable;
@@ -66,9 +66,11 @@ typedef struct {
     int drops_per_frame;
     int drop_power;
 
-    float beat_env;
-    float beat_kick;
-    float beat_prev;
+    float wavespeed_env;
+    float decay_env;
+    float drops_env;
+    float power_env;
+    int smooth_ready;
 } ripple_tv;
 
 static inline int clampi(int v, int lo, int hi)
@@ -82,13 +84,7 @@ static inline unsigned int wfastrand(ripple_tv *r)
     return r->wfastrand_val;
 }
 
-static inline int waterripple_beat_shape(int beat_push)
-{
-    beat_push = clampi(beat_push, 0, 1000);
 
-    const int sq = (beat_push * beat_push + 500) / 1000;
-    return clampi((beat_push * 35 + sq * 65 + 50) / 100, 0, 1000);
-}
 
 static void setTable(ripple_tv *r)
 {
@@ -113,12 +109,9 @@ vj_effect *waterrippletv_init(int width, int height)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
     if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
         free(ve);
         return NULL;
     }
@@ -135,114 +128,78 @@ vj_effect *waterrippletv_init(int width, int height)
     ve->limits[1][P_DECAY] = 31;
     ve->defaults[P_DECAY] = 8;
 
-    ve->limits[0][P_BEAT_DROPS] = 0;
-    ve->limits[1][P_BEAT_DROPS] = 1000;
-    ve->defaults[P_BEAT_DROPS] = 420;
+    ve->limits[0][P_DROP_DRIVE] = 0;
+    ve->limits[1][P_DROP_DRIVE] = 1000;
+    ve->defaults[P_DROP_DRIVE] = 420;
 
-    ve->limits[0][P_BEAT_POWER] = 0;
-    ve->limits[1][P_BEAT_POWER] = 1000;
-    ve->defaults[P_BEAT_POWER] = 620;
+    ve->limits[0][P_RIPPLE_POWER] = 0;
+    ve->limits[1][P_RIPPLE_POWER] = 1000;
+    ve->defaults[P_RIPPLE_POWER] = 620;
 
-    ve->limits[0][P_BEAT_PUSH] = 0;
-    ve->limits[1][P_BEAT_PUSH] = 1000;
-    ve->defaults[P_BEAT_PUSH] = 0;
-
-    ve->limits[0][P_BEAT_SMOOTH] = 0;
-    ve->limits[1][P_BEAT_SMOOTH] = 1000;
-    ve->defaults[P_BEAT_SMOOTH] = 520;
-
-    ve->description = "RippleTV Beat Drops";
+    ve->description = "RippleTV Drop Drive";
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->parallel = 0;
-
     ve->param_description = vje_build_param_list(
         ve->num_params,
         "Refresh Frequency",
         "Wavespeed",
         "Decay",
-        "Beat Drops",
-        "Beat Power",
-        "Beat Push",
-        "Beat Smooth"
+        "Drop Drive",
+        "Ripple Power"
     );
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SPEED,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,
-        1, 240, 6, 22, 1800, 4200, 900, 24, /* Refresh Frequency */
-
-        VJ_BEAT_SPEED,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
-        1, 8, 6, 22, 1800, 4200, 900, 26, /* Wavespeed */
-
-        VJ_BEAT_MEMORY,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
-        3, 22, 6, 22, 1800, 4200, 900, 26, /* Decay */
-
-        VJ_BEAT_DETAIL,    VJ_BEAT_F_REJECT,
-        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
-        0, 0, 0, 0, 0, -1000, /* Beat Drops */
-
-        VJ_BEAT_INTENSITY, VJ_BEAT_F_REJECT,
-        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
-        0, 0, 0, 0, 0, -1000, /* Beat Power */
-
-        VJ_BEAT_KICK,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,
-        0, 760, 18, 68, 80, 760, 0, 100, /* Beat Push */
-
-        VJ_BEAT_MEMORY,    VJ_BEAT_F_PHRASE_ONLY,
-        260, 840, 5, 18, 2200, 5200, 1200, 18 /* Beat Smooth */
+        VJ_BEAT_SPEED,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,   0,    0,  -1000,
+        VJ_BEAT_SPEED,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 1,                  16,                 18, 72,  120, 900,  0,  86,
+        VJ_BEAT_MEMORY,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 1,                  31,                 10, 44,  900, 2800, 0,  48,
+        VJ_BEAT_DETAIL,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       120,                1000,               18, 76,  90,  900,  0,  96,
+        VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       120,                1000,               20, 82,  80,  820,  0,  94
     );
-
-    (void) width;
-    (void) height;
 
     return ve;
 }
 
 void *waterrippletv_malloc(int width, int height)
 {
-    if(width <= 0 || height <= 0)
-        return NULL;
-
     ripple_tv *r = (ripple_tv*) vj_calloc(sizeof(ripple_tv));
     if(!r)
         return NULL;
 
     const int len = width * height;
 
-    r->ripple_data[0] = (uint8_t*) vj_malloc((size_t)len);
-    if(!r->ripple_data[0]) {
-        free(r);
-        return NULL;
-    }
-
-    veejay_memset(r->ripple_data[0], pixel_Y_lo_, len);
-
     r->map_h = height / 2 + 1;
     r->map_w = width / 2 + 1;
 
     const int map_len = r->map_h * r->map_w;
+    const size_t ripple_bytes = (size_t)len;
+    const size_t map_bytes = sizeof(int) * (size_t)map_len * 3u;
+    const size_t vtable_bytes = sizeof(int8_t) * (size_t)map_len * 2u;
+    const size_t total = ripple_bytes + map_bytes + vtable_bytes + 32u;
 
-    r->map = (int*) vj_calloc(sizeof(int) * (size_t)map_len * 3u);
-    if(!r->map) {
-        free(r->ripple_data[0]);
+    r->region = (uint8_t*) vj_calloc(total);
+    if(!r->region) {
         free(r);
         return NULL;
     }
 
+    uint8_t *p = r->region;
+
+    r->ripple_data[0] = p;
+    veejay_memset(r->ripple_data[0], pixel_Y_lo_, len);
+
+    p += ripple_bytes;
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
+
+    r->map = (int*)p;
     r->map1 = r->map;
     r->map2 = r->map1 + map_len;
     r->map3 = r->map2 + map_len;
 
-    r->vtable = (int8_t*) vj_calloc(sizeof(int8_t) * (size_t)map_len * 2u);
-    if(!r->vtable) {
-        free(r->map);
-        free(r->ripple_data[0]);
-        free(r);
-        return NULL;
-    }
+    p += map_bytes;
+
+    r->vtable = (int8_t*)p;
 
     setTable(r);
 
@@ -250,13 +207,13 @@ void *waterrippletv_malloc(int width, int height)
     r->tick = 0;
     r->last_fresh_rate = -1;
     r->wfastrand_val = 0x12345678u;
-    r->beat_env = 0.0f;
-    r->beat_kick = 0.0f;
-    r->beat_prev = 0.0f;
+    r->wavespeed_env = 1.0f;
+    r->decay_env = 8.0f;
+    r->drops_env = 420.0f;
+    r->power_env = 620.0f;
+    r->smooth_ready = 0;
 
     r->n_threads = vje_advise_num_threads(len);
-    if(r->n_threads < 1)
-        r->n_threads = 1;
 
     return (void*) r;
 }
@@ -265,26 +222,12 @@ void waterrippletv_free(void *ptr)
 {
     ripple_tv *r = (ripple_tv*) ptr;
 
-    if(!r)
-        return;
-
-    if(r->ripple_data[0])
-        free(r->ripple_data[0]);
-
-    if(r->map)
-        free(r->map);
-
-    if(r->vtable)
-        free(r->vtable);
-
+    free(r->region);
     free(r);
 }
 
 static void waterripple_clear_maps(ripple_tv *r)
 {
-    if(!r || !r->map || !r->vtable)
-        return;
-
     const int map_len = r->map_w * r->map_h;
 
     veejay_memset(r->map, 0, sizeof(int) * (size_t)map_len * 3u);
@@ -326,70 +269,47 @@ static inline void drop(ripple_tv *r, int power)
     *(q + r->map_w + 1) = power >> 2;
 }
 
-static void waterripple_update_beat(ripple_tv *r, int beat_push, int smooth)
+
+
+static inline int waterripple_smooth_i(float *env, int target, float attack, float release)
 {
-    const int shaped = waterripple_beat_shape(beat_push);
-    const float target = (float)shaped * 0.001f;
-    const float smooth_t = (float)clampi(smooth, 0, 1000) * 0.001f;
+    const float t = (float)target;
 
-    const float attack = 0.18f + (1.0f - smooth_t) * 0.36f;
-    const float release = 0.030f + (1.0f - smooth_t) * 0.095f;
-
-    if(target > r->beat_env)
-        r->beat_env += (target - r->beat_env) * attack;
+    if(t > *env)
+        *env += (t - *env) * attack;
     else
-        r->beat_env += (target - r->beat_env) * release;
+        *env += (t - *env) * release;
 
-    if(r->beat_env < 0.0001f)
-        r->beat_env = 0.0f;
-    else if(r->beat_env > 1.0f)
-        r->beat_env = 1.0f;
-
-    const float rise = target - r->beat_prev;
-    r->beat_prev = target;
-
-    r->beat_kick *= 0.58f + smooth_t * 0.18f;
-
-    if(rise > 0.015f)
-        r->beat_kick += rise * (0.90f + (1.0f - smooth_t) * 0.35f);
-
-    if(r->beat_kick > 1.0f)
-        r->beat_kick = 1.0f;
-    else if(r->beat_kick < 0.0001f)
-        r->beat_kick = 0.0f;
+    return (int)(*env + 0.5f);
 }
 
-static void waterripple_inject_beat_drops(ripple_tv *r,
-                                           int beat_drops,
-                                           int beat_power,
-                                           int beat_q,
-                                           int kick_q)
+static void waterripple_inject_drive_drops(ripple_tv *r,
+                                            int drop_drive,
+                                            int ripple_power)
 {
-    if(!r || (beat_q <= 0 && kick_q <= 0))
+    drop_drive = clampi(drop_drive, 0, 1000);
+    ripple_power = clampi(ripple_power, 0, 1000);
+
+    if(drop_drive <= 0 || ripple_power <= 0)
         return;
 
-    beat_drops = clampi(beat_drops, 0, 1000);
-    beat_power = clampi(beat_power, 0, 1000);
+    const int max_drops = 1 + ((drop_drive * 17 + 500) / 1000);
+    int drops = (drop_drive * max_drops + 850) / 1700;
 
-    if(beat_drops <= 0 || beat_power <= 0)
-        return;
+    const int chance = drop_drive - 80;
+    if(chance > 0 && (int)((wfastrand(r) >> 8) % 1000u) < chance)
+        drops++;
 
-    const int max_drops = 1 + ((beat_drops * 11 + 500) / 1000);
-    int drops = 0;
+    if(drop_drive > 760)
+        drops += (drop_drive - 700) / 150;
 
-    if(kick_q > 18)
-        drops += 1 + ((kick_q * max_drops + 700) / 1000);
-
-    if(beat_q > 440 && ((r->tick & 1) == 0))
-        drops += (beat_q * (1 + (max_drops >> 2)) + 1500) / 3000;
-
-    if(drops > 18)
-        drops = 18;
+    if(drops > 24)
+        drops = 24;
 
     if(drops <= 0)
         return;
 
-    const int power_units = 2 + ((beat_power * 20 + 500) / 1000) + ((kick_q * 8 + 500) / 1000);
+    const int power_units = 2 + ((ripple_power * 30 + 500) / 1000);
     const int power = -(power_units << r->point);
 
     for(int i = 0; i < drops; i++)
@@ -572,9 +492,6 @@ static void waterripple_render(VJFrame *frame, ripple_tv *rip)
     const int width = frame->width;
     const int height = frame->height;
 
-    if(width <= 0 || height <= 0 || rip->map_w <= 1 || rip->map_h <= 1)
-        return;
-
     const uint8_t *restrict src = rip->ripple_data[0];
     uint8_t *restrict dst = frame->data[0];
     const int8_t *restrict vt = rip->vtable;
@@ -639,35 +556,35 @@ void waterrippletv_apply(void *ptr, VJFrame *frame, int *args)
 {
     ripple_tv *rip = (ripple_tv*) ptr;
 
-    if(!rip || !frame || !args || !frame->data[0])
-        return;
-
     const int len = frame->len;
-    const int width = frame->width;
-    const int height = frame->height;
 
-    if(len <= 0 || width <= 0 || height <= 0)
-        return;
+    const int fresh_rate = args[P_REFRESH_FREQ];
+    const int loopnum_arg = args[P_WAVESPEED];
+    const int decay_arg = args[P_DECAY];
+    const int drop_drive_arg = args[P_DROP_DRIVE];
+    const int ripple_power_arg = args[P_RIPPLE_POWER];
 
-    const int fresh_rate = clampi(args[P_REFRESH_FREQ], 1, 3600);
-    const int loopnum = clampi(args[P_WAVESPEED], 1, 16);
-    const int decay = clampi(args[P_DECAY], 1, 32);
-    const int beat_drops = clampi(args[P_BEAT_DROPS], 0, 1000);
-    const int beat_power = clampi(args[P_BEAT_POWER], 0, 1000);
-    const int beat_push = clampi(args[P_BEAT_PUSH], 0, 1000);
-    const int beat_smooth = clampi(args[P_BEAT_SMOOTH], 0, 1000);
+    const float fast = 0.235f;
+    const float slow = 0.118f;
 
-    waterripple_update_beat(rip, beat_push, beat_smooth);
+    if(!rip->smooth_ready) {
+        rip->wavespeed_env = (float)loopnum_arg;
+        rip->decay_env = (float)decay_arg;
+        rip->drops_env = (float)drop_drive_arg;
+        rip->power_env = (float)ripple_power_arg;
+        rip->smooth_ready = 1;
+    }
 
-    const int beat_q = clampi((int)(rip->beat_env * 1000.0f + 0.5f), 0, 1000);
-    const int kick_q = clampi((int)(rip->beat_kick * 1000.0f + 0.5f), 0, 1000);
+    const int loopnum = clampi(waterripple_smooth_i(&rip->wavespeed_env, loopnum_arg, fast * 0.76f, slow), 1, 16);
+    const int decay = clampi(waterripple_smooth_i(&rip->decay_env, decay_arg, fast * 0.58f, slow), 1, 32);
+    const int drop_drive = clampi(waterripple_smooth_i(&rip->drops_env, drop_drive_arg, fast * 1.08f, slow), 0, 1000);
+    const int ripple_power = clampi(waterripple_smooth_i(&rip->power_env, ripple_power_arg, fast, slow), 0, 1000);
 
     if(rip->last_fresh_rate != fresh_rate || rip->tick > fresh_rate) {
         rip->last_fresh_rate = fresh_rate;
         rip->tick = 0;
         rip->rain_period = 0;
         waterripple_clear_maps(rip);
-        rip->beat_kick = 0.0f;
     }
 
     rip->tick++;
@@ -675,13 +592,14 @@ void waterrippletv_apply(void *ptr, VJFrame *frame, int *args)
     veejay_memcpy(rip->ripple_data[0], frame->data[0], len);
 
     raindrop(rip);
-    waterripple_inject_beat_drops(rip, beat_drops, beat_power, beat_q, kick_q);
+    waterripple_inject_drive_drops(rip, drop_drive, ripple_power);
 
-    int effective_loopnum = loopnum + ((beat_q * 2 + 500) / 1000);
-    if(kick_q > 220)
+    int effective_loopnum = loopnum + ((drop_drive * 3 + 500) / 1000);
+    if(drop_drive > 760)
         effective_loopnum++;
 
-    int effective_decay = decay + ((beat_q * 4 + 500) / 1000);
+    int effective_decay = decay + ((drop_drive * 3 + 500) / 1000) - ((drop_drive * ripple_power + 500000) / 1000000);
+    effective_decay = clampi(effective_decay, 1, 32);
 
     waterripple_simulate(rip, effective_loopnum, effective_decay);
     waterripple_calc_vtable(rip);

@@ -21,50 +21,78 @@
 #include "common.h"
 #include "dissolve.h"
 
+static inline uint8_t dissolve_blend255(uint8_t a, uint8_t b, int q)
+{
+    const int iq = 255 - q;
+
+    return (uint8_t)(((int)a * iq + (int)b * q + 127) / 255);
+}
+
 vj_effect *dissolve_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
     ve->num_params = 1;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
     ve->defaults[0] = 150;
+
     ve->description = "Dissolve Overlay";
     ve->sub_format = 1;
     ve->extra_frame = 1;
-	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Opacity" );
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(ve->num_params, "Opacity");
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_KICK, VJ_BEAT_F_CONTINUOUS, 32, 235, 14, 58, 90, 720, 0, 82 /* Opacity */
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 24, 248, 16, 62, 700, 2600, 0, 86
     );
     return ve;
 }
 
-void dissolve_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+void dissolve_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
+{
+    (void) ptr;
+
     const int opacity = args[0];
-    const size_t len = (size_t)frame->len;
+    const int len = frame->len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
-    const int op1 = (opacity > 255) ? 255 : opacity;
-    const int op0 = 255 - op1;
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
 
-    uint8_t *Y  = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
+    if(opacity == 0)
+        return;
 
-    uint8_t *Y2  = frame2->data[0];
-    uint8_t *Cb2 = frame2->data[1];
-    uint8_t *Cr2 = frame2->data[2];
+    if(opacity == 255)
+    {
+        veejay_memcpy(Y, Y2, len);
+        veejay_memcpy(Cb, Cb2, uv_len);
+        veejay_memcpy(Cr, Cr2, uv_len);
+        return;
+    }
 
-    const int n_threads = vje_advise_num_threads((int)len);
+    const int n_threads = vje_advise_num_threads(len);
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for (size_t i = 0; i < len; i++) {
-        Y[i]  = (uint8_t)((op0 * Y[i]  + op1 * Y2[i])  >> 8);
-        Cb[i] = (uint8_t)((op0 * Cb[i] + op1 * Cb2[i]) >> 8);
-        Cr[i] = (uint8_t)((op0 * Cr[i] + op1 * Cr2[i]) >> 8);
+    #pragma omp parallel num_threads(n_threads)
+    {
+        #pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+            Y[i] = dissolve_blend255(Y[i], Y2[i], opacity);
+
+        #pragma omp for schedule(static)
+        for(int i = 0; i < uv_len; i++)
+        {
+            Cb[i] = dissolve_blend255(Cb[i], Cb2[i], opacity);
+            Cr[i] = dissolve_blend255(Cr[i], Cr2[i], opacity);
+        }
     }
 }

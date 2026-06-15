@@ -21,68 +21,66 @@
 #include "common.h"
 #include "colormap.h"
 
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
 vj_effect *colormap_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
 
+    ve->num_params = 3;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 255;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
 
-    ve->defaults[0] = 46;
-    ve->defaults[1] = 109;
-    ve->defaults[2] = 92;
+    ve->limits[0][0] = 0; ve->limits[1][0] = 255; ve->defaults[0] = 46;
+    ve->limits[0][1] = 0; ve->limits[1][1] = 255; ve->defaults[1] = 109;
+    ve->limits[0][2] = 0; ve->limits[1][2] = 255; ve->defaults[2] = 92;
 
     ve->description = "Color Harmony";
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Red","Green","Blue" );
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
+    ve->param_description = vje_build_param_list(ve->num_params, "Red", "Green", "Blue");
 
-        VJ_BEAT_KICK,  VJ_BEAT_F_CONTINUOUS,  24, 180, 14, 58, 90,  720, 0, 78, /* Red */
-        VJ_BEAT_SNARE, VJ_BEAT_F_CONTINUOUS,  40, 190, 8,  38, 120, 900, 0, 64, /* Green */
-        VJ_BEAT_HAT,   VJ_BEAT_F_CONTINUOUS,  32, 190, 4,  26, 80,  520, 0, 50  /* Blue */
+        ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+        VJ_BEAT_COLOR_PHASE,  VJ_BEAT_F_CONTINUOUS, 12,  238, 12, 50,  900, 3000, 0,    76,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS, 16,  230, 10, 42, 1100, 3400, 0,    62,
+        VJ_BEAT_COLOR_PHASE,  VJ_BEAT_F_CONTINUOUS, 12,  238, 12, 50,  900, 3000, 0,    76
     );
+
     return ve;
 }
 
-void colormap_apply(void *ptr, VJFrame *frame, int *args) {
-    int r = args[0];
-    int g = args[1];
-    int b = args[2];
+void colormap_apply(void *ptr, VJFrame *frame, int *args)
+{
+    (void) ptr;
 
-    int n_threads = vje_advise_num_threads(frame->len);
+    const int r = args[0];
+    const int g = args[1];
+    const int b = args[2];
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
-    const int uv_len = frame->uv_len;
+    const int n_threads = vje_advise_num_threads(uv_len);
+
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
     uint8_t u_table[256];
     uint8_t v_table[256];
 
-    for (int i = 0; i < 256; i++) {
-        int u = i + b - g;
-        int v = i + r - g;
-
-        u &= ~(u >> 31);
-        v &= ~(v >> 31);
-        int diff_u = u - 255;
-        int diff_v = v - 255;
-        u_table[i] = (uint8_t)(255 + (diff_u & (diff_u >> 31)));
-        v_table[i] = (uint8_t)(255 + (diff_v & (diff_v >> 31)));
+    for(int i = 0; i < 256; i++)
+    {
+        u_table[i] = (uint8_t)clampi(i + b - g, 0, 255);
+        v_table[i] = (uint8_t)clampi(i + r - g, 0, 255);
     }
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for (int i = 0; i < uv_len; i++) {
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
+    for(int i = 0; i < uv_len; i++)
+    {
         Cb[i] = u_table[Cb[i]];
         Cr[i] = v_table[Cr[i]];
     }

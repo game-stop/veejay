@@ -22,153 +22,300 @@
 #include <veejaycore/vjmem.h>
 #include <math.h>
 
-typedef uint8_t (*blend_func)(uint8_t a, uint8_t b);
+#define KEYSELECT_PARAMS 8
 
-#define DIV255(x) (((x) + 1 + ((x) >> 8)) >> 8)
+#define P_HUE_ANGLE 0
+#define P_RED       1
+#define P_GREEN     2
+#define P_BLUE      3
+#define P_THRESHOLD 4
+#define P_SOLIDITY  5
+#define P_BLENDMODE 6
+#define P_SWAP      7
 
-static uint8_t blend_func1(uint8_t a, uint8_t b) { return 0xff - abs(0xff - a - b); }
-static uint8_t blend_func2(uint8_t a, uint8_t b) { return (a == 0) ? 0 : CLAMP_Y(255 - ((255-b) * (255-b))/a); }
-static uint8_t blend_func3(uint8_t a, uint8_t b) { return (uint8_t)(((uint16_t)a * b) >> 8); }
-static uint8_t blend_func4(uint8_t a, uint8_t b) { int c = 0xff - b; return (c == 0) ? 0xff : CLAMP_Y((a*a)/c); }
-static uint8_t blend_func5(uint8_t a, uint8_t b) { int c = 0xff - b; return (c == 0) ? b : CLAMP_Y(b * 0xff / c); }
-static uint8_t blend_func6(uint8_t a, uint8_t b) { return CLAMP_Y(a + (b - 0xff)); }
-static uint8_t blend_func7(uint8_t a, uint8_t b) { return CLAMP_Y(a + (2 * b) - 255); }
-static uint8_t blend_func8(uint8_t a, uint8_t b) {
-    int c = (b < 128) ? (a * b) >> 7 : 255 - (((255 - b) * (255 - a)) >> 7);
-    return CLAMP_Y(c);
+#define KEYSELECT_SCALE 4096
+#define KEYSELECT_PI    3.14159265358979323846f
+
+typedef struct {
+    int n_threads;
+    int last[KEYSELECT_PARAMS];
+    int mag_fp;
+    int cos_q_fp;
+    int sin_q_fp;
+    int inv_wedge_slope_fp;
+    int inv_range_fp;
+    int black_clip_fp;
+    int blend_mode;
+    int swap;
+} keyselect_t;
+
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
 }
 
-static blend_func get_blend_func(int mode) {
+static inline int keyselect_absi(int v)
+{
+    const int m = v >> 31;
+    return (v + m) ^ m;
+}
+
+static inline uint8_t keyselect_u8(int v)
+{
+    return (uint8_t)clampi(v, 0, 255);
+}
+
+static inline uint8_t keyselect_blend255(uint8_t a, uint8_t b, int opacity)
+{
+    const int inv = 255 - opacity;
+    const int x = (int)a * opacity + (int)b * inv;
+    return (uint8_t)(((x + 1) + (x >> 8)) >> 8);
+}
+
+static inline uint8_t keyselect_blend_mode(int mode, uint8_t a, uint8_t b)
+{
     switch(mode) {
-        case 0: return blend_func1; case 1: return blend_func2;
-        case 2: return blend_func3; case 3: return blend_func4;
-        case 4: return blend_func5; case 5: return blend_func6;
-        case 6: return blend_func7; case 7: return blend_func8;
-        default: return blend_func1;
+        case 1:
+            return (a == 0) ? 0 : keyselect_u8(255 - (((255 - (int)b) * (255 - (int)b)) / (int)a));
+        case 2:
+            return (uint8_t)(((uint16_t)a * (uint16_t)b) >> 8);
+        case 3: {
+            const int c = 255 - (int)b;
+            return (c == 0) ? 255 : keyselect_u8(((int)a * (int)a) / c);
+        }
+        case 4: {
+            const int c = 255 - (int)b;
+            return (c == 0) ? b : keyselect_u8(((int)b * 255) / c);
+        }
+        case 5:
+            return keyselect_u8((int)a + (int)b - 255);
+        case 6:
+            return keyselect_u8((int)a + ((int)b << 1) - 255);
+        case 7: {
+            const int c = (b < 128) ? (((int)a * (int)b) >> 7)
+                                    : 255 - ((((255 - (int)b) * (255 - (int)a))) >> 7);
+            return keyselect_u8(c);
+        }
+        case 0:
+        default:
+            return (uint8_t)(255 - keyselect_absi(255 - (int)a - (int)b));
     }
 }
 
-vj_effect *keyselect_init(int w, int h) {
+vj_effect *keyselect_init(int w, int h)
+{
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 8;
+
+    if(!ve)
+        return NULL;
+
+    ve->num_params = KEYSELECT_PARAMS;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->defaults[0] = 4500; /* Hue Angle */
-    ve->defaults[1] = 0;    /* R */
-    ve->defaults[2] = 0;    /* G */
-    ve->defaults[3] = 255;  /* B */
-    ve->defaults[4] = 40;   /* Threshold */
-    ve->defaults[5] = 160;  /* Solidity */
-    ve->defaults[6] = 3;    /* Blend mode */
-    ve->defaults[7] = 0;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
-    ve->limits[0][0] = 500;  ve->limits[1][0] = 8500;
-    ve->limits[0][1] = 0;    ve->limits[1][1] = 255;
-    ve->limits[0][2] = 0;    ve->limits[1][2] = 255;
-    ve->limits[0][3] = 0;    ve->limits[1][3] = 255;
-    ve->limits[0][4] = 0;    ve->limits[1][4] = 255;
-    ve->limits[0][5] = 1;    ve->limits[1][5] = 255;
-    ve->limits[0][6] = 0;    ve->limits[1][6] = 7;
-    ve->limits[0][7] = 0;    ve->limits[1][7] = 1;
+    ve->defaults[P_HUE_ANGLE] = 4500;
+    ve->defaults[P_RED] = 0;
+    ve->defaults[P_GREEN] = 0;
+    ve->defaults[P_BLUE] = 255;
+    ve->defaults[P_THRESHOLD] = 40;
+    ve->defaults[P_SOLIDITY] = 160;
+    ve->defaults[P_BLENDMODE] = 3;
+    ve->defaults[P_SWAP] = 0;
+
+    ve->limits[0][P_HUE_ANGLE] = 500; ve->limits[1][P_HUE_ANGLE] = 8500;
+    ve->limits[0][P_RED] = 0;         ve->limits[1][P_RED] = 255;
+    ve->limits[0][P_GREEN] = 0;       ve->limits[1][P_GREEN] = 255;
+    ve->limits[0][P_BLUE] = 0;        ve->limits[1][P_BLUE] = 255;
+    ve->limits[0][P_THRESHOLD] = 0;   ve->limits[1][P_THRESHOLD] = 255;
+    ve->limits[0][P_SOLIDITY] = 1;    ve->limits[1][P_SOLIDITY] = 255;
+    ve->limits[0][P_BLENDMODE] = 0;   ve->limits[1][P_BLENDMODE] = 7;
+    ve->limits[0][P_SWAP] = 0;        ve->limits[1][P_SWAP] = 1;
 
     ve->description = "Blend by Color Key (Advanced)";
-    ve->param_description = vje_build_param_list(ve->num_params,
-        "Hue Angle", "Red", "Green", "Blue", "Threshold", "Solidity", "Blend mode", "Swap Selection");
-    ve->beat_hints = vje_build_beat_hint_list(
+    ve->param_description = vje_build_param_list(
         ve->num_params,
-
-        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    1500,               7200,               8,  36, 120, 900, 0,   64,    /* Hue Angle */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Red */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Green */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Blue */
-        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    12,                 120,                8,  36, 120, 900, 0,   70,    /* Threshold */
-        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    96,                 235,                14, 58, 90,  720, 0,   74,    /* Solidity */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Blend mode */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000  /* Swap Selection */
+        "Hue Angle",
+        "Red",
+        "Green",
+        "Blue",
+        "Threshold",
+        "Solidity",
+        "Blend mode",
+        "Swap Selection"
     );
-    ve->has_user = 0;
+
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+    vje_build_value_hint_list(
+        ve->hints,
+        ve->limits[1][P_BLENDMODE],
+        P_BLENDMODE,
+        "Softburn",
+        "Color Dodge",
+        "Multiply",
+        "Color Burn",
+        "Lighten Burn",
+        "Subtract",
+        "Linear Burn",
+        "Overlay"
+    );
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_SWAP], P_SWAP, "Normal", "Swap");
+
     ve->extra_frame = 1;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
+
     return ve;
 }
 
-void keyselect_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+void *keyselect_malloc(int w, int h)
+{
+    keyselect_t *s = (keyselect_t*) vj_malloc(sizeof(keyselect_t));
 
-    int iy, iu, iv;
-    int n_threads = vje_advise_num_threads(frame->len);
+    if(!s)
+        return NULL;
 
-    _rgb2yuv(args[1], args[2], args[3], iy, iu, iv);
+    for(int i = 0; i < KEYSELECT_PARAMS; i++)
+        s->last[i] = -1000000;
 
-    const int SCALE = 4096;
+    s->mag_fp = KEYSELECT_SCALE;
+    s->cos_q_fp = KEYSELECT_SCALE;
+    s->sin_q_fp = 0;
+    s->inv_wedge_slope_fp = KEYSELECT_SCALE;
+    s->inv_range_fp = 255 << 8;
+    s->black_clip_fp = 0;
+    s->blend_mode = 3;
+    s->swap = 0;
+    s->n_threads = vje_advise_num_threads(w * h);
+
+    return (void*) s;
+}
+
+void keyselect_free(void *ptr)
+{
+    free(ptr);
+}
+
+static void keyselect_update_cache(keyselect_t *s, const int *args)
+{
+    int changed = 0;
+
+    for(int i = 0; i < KEYSELECT_PARAMS; i++) {
+        if(args[i] != s->last[i]) {
+            changed = 1;
+            break;
+        }
+    }
+
+    if(!changed)
+        return;
+
+    const int angle = clampi(args[P_HUE_ANGLE], 500, 8500);
+    const int red = clampi(args[P_RED], 0, 255);
+    const int green = clampi(args[P_GREEN], 0, 255);
+    const int blue = clampi(args[P_BLUE], 0, 255);
+    const int threshold = clampi(args[P_THRESHOLD], 0, 255);
+    const int solidity = clampi(args[P_SOLIDITY], 1, 255);
+    const int range = solidity > threshold ? solidity - threshold : 1;
+
+    int iy = 0;
+    int iu = 128;
+    int iv = 128;
+
+    _rgb2yuv(red, green, blue, iy, iu, iv);
+
     const float ut_f = (float)iu - 128.0f;
     const float vt_f = (float)iv - 128.0f;
     float mag_f = sqrtf(ut_f * ut_f + vt_f * vt_f);
-    if (mag_f < 1.0f) mag_f = 1.0f;
 
-    const int mag_fp   = (int)(mag_f * SCALE);
-    const int cos_q_fp = (int)((ut_f / mag_f) * SCALE);
-    const int sin_q_fp = (int)((vt_f / mag_f) * SCALE);
+    if(mag_f < 1.0f)
+        mag_f = 1.0f;
 
-    const float angle_rad = ((float)args[0] / 100.0f) * (M_PI / 180.0f);
-    const int inv_wedge_slope_fp = (int)((1.0f / tanf(angle_rad)) * SCALE);
+    const float angle_rad = ((float)angle * 0.01f) * (KEYSELECT_PI / 180.0f);
+    const float t = tanf(angle_rad);
 
-    const float diff = (float)args[5] - (float)args[4];
-    const int inv_range_fp = (int)((255.0f / (diff < 1.0f ? 1.0f : diff)) * (1 << 8));
-    const int black_clip_fp = (int)(args[4] * SCALE);
+    s->mag_fp = (int)(mag_f * (float)KEYSELECT_SCALE + 0.5f);
+    s->cos_q_fp = (int)((ut_f / mag_f) * (float)KEYSELECT_SCALE + (ut_f >= 0.0f ? 0.5f : -0.5f));
+    s->sin_q_fp = (int)((vt_f / mag_f) * (float)KEYSELECT_SCALE + (vt_f >= 0.0f ? 0.5f : -0.5f));
+    s->inv_wedge_slope_fp = (int)((1.0f / t) * (float)KEYSELECT_SCALE + 0.5f);
+    s->inv_range_fp = (int)((255.0f / (float)range) * 256.0f + 0.5f);
+    s->black_clip_fp = threshold * KEYSELECT_SCALE;
+    s->blend_mode = clampi(args[P_BLENDMODE], 0, 7);
+    s->swap = args[P_SWAP] ? 1 : 0;
 
-    blend_func blend_pixel = get_blend_func(args[6]);
-    const int swap = args[7];
+    for(int i = 0; i < KEYSELECT_PARAMS; i++)
+        s->last[i] = args[i];
+}
+
+void keyselect_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
+{
+    keyselect_t *s = (keyselect_t*) ptr;
+
+    keyselect_update_cache(s, args);
+
+    const int mag_fp = s->mag_fp;
+    const int cos_q_fp = s->cos_q_fp;
+    const int sin_q_fp = s->sin_q_fp;
+    const int inv_wedge_slope_fp = s->inv_wedge_slope_fp;
+    const int inv_range_fp = s->inv_range_fp;
+    const int black_clip_fp = s->black_clip_fp;
+    const int blend_mode = s->blend_mode;
+    const int swap = s->swap;
+    const int len = frame->len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    uint8_t *src_Y = swap ? frame2->data[0] : frame->data[0];
-    uint8_t *src_Cb = swap ? frame2->data[1] : frame->data[1];
-    uint8_t *src_Cr = swap ? frame2->data[2] : frame->data[2];
+    const uint8_t *restrict src_Y = swap ? frame2->data[0] : frame->data[0];
+    const uint8_t *restrict src_Cb = swap ? frame2->data[1] : frame->data[1];
+    const uint8_t *restrict src_Cr = swap ? frame2->data[2] : frame->data[2];
 
-    const uint8_t *bg_Y = swap ? frame->data[0] : frame2->data[0];
-    const uint8_t *bg_U = swap ? frame->data[1] : frame2->data[1];
-    const uint8_t *bg_V = swap ? frame->data[2] : frame2->data[2];
+    const uint8_t *restrict bg_Y = swap ? frame->data[0] : frame2->data[0];
+    const uint8_t *restrict bg_U = swap ? frame->data[1] : frame2->data[1];
+    const uint8_t *restrict bg_V = swap ? frame->data[2] : frame2->data[2];
 
-    const int len = frame->len;
+#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+    for(int pos = 0; pos < len; pos++) {
+        const int uc = (int)Cb[pos] - 128;
+        const int vc = (int)Cr[pos] - 128;
 
-    #pragma omp parallel num_threads(n_threads)
-    {
-        #pragma omp for schedule(static)
-        for (int pos = 0; pos < len; pos++) {
-            int uc = (int)Cb[pos] - 128;
-            int vc = (int)Cr[pos] - 128;
+        const int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
+        const int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
+        const int abs_yy = keyselect_absi(yy);
 
-            int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
-            int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
-            int abs_yy = (yy < 0) ? -yy : yy;
+        const int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
+        int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
 
-            int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
-            int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
+        alpha = clampi(alpha, 0, 255);
 
-            if (alpha < 0) alpha = 0;
-            if (alpha > 255) alpha = 255;
+        const int alpha_inv = 255 - alpha;
 
-            int alpha_inv = 255 - alpha;
+        if(alpha_inv > 0) {
+            const uint8_t blended_y = keyselect_blend_mode(blend_mode, src_Y[pos], bg_Y[pos]);
+            const uint8_t b_cb = keyselect_u8(((int)bg_Y[pos] * ((int)src_Cb[pos] - (int)bg_U[pos]) >> 8) + (int)src_Cb[pos]);
+            const uint8_t b_cr = keyselect_u8(((int)bg_Y[pos] * ((int)src_Cr[pos] - (int)bg_V[pos]) >> 8) + (int)src_Cr[pos]);
 
-            if (alpha_inv > 0) {
-                uint8_t blended_Y = blend_pixel(src_Y[pos], bg_Y[pos]);
-                uint8_t b_Cb = CLAMP_Y(((bg_Y[pos] * (src_Cb[pos] - bg_U[pos])) >> 8) + src_Cb[pos]);
-                uint8_t b_Cr = CLAMP_Y(((bg_Y[pos] * (src_Cr[pos] - bg_V[pos])) >> 8) + src_Cr[pos]);
-
-                if (alpha_inv == 255) {
-                    Y[pos]  = blended_Y;
-                    Cb[pos] = b_Cb;
-                    Cr[pos] = b_Cr;
-                } else {
-                    Y[pos]  = DIV255(blended_Y * alpha_inv + Y[pos]  * alpha);
-                    Cb[pos] = DIV255(b_Cb      * alpha_inv + Cb[pos] * alpha);
-                    Cr[pos] = DIV255(b_Cr      * alpha_inv + Cr[pos] * alpha);
-                }
+            if(alpha_inv == 255) {
+                Y[pos] = blended_y;
+                Cb[pos] = b_cb;
+                Cr[pos] = b_cr;
+            }
+            else {
+                Y[pos] = keyselect_blend255(blended_y, Y[pos], alpha_inv);
+                Cb[pos] = keyselect_blend255(b_cb, Cb[pos], alpha_inv);
+                Cr[pos] = keyselect_blend255(b_cr, Cr[pos], alpha_inv);
             }
         }
     }

@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -20,151 +20,162 @@
 
 #include "common.h"
 #include <veejaycore/vjmem.h>
+#include <stdint.h>
 #include "overclock.h"
+
+#define OVERCLOCK_PARAMS 2
+
+#define P_RADIUS 0
+#define P_VALUE  1
+
+typedef struct {
+    uint8_t *oc_buf;
+    uint32_t seed;
+    int n_threads;
+} overclock_t;
+
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline uint32_t overclock_next_u32(overclock_t *o)
+{
+    o->seed = o->seed * 1664525u + 1013904223u;
+    return o->seed;
+}
+
+static inline int overclock_rand_bounded(overclock_t *o, int max)
+{
+    return (int)(((uint64_t)overclock_next_u32(o) * (uint64_t)max) >> 32);
+}
 
 vj_effect *overclock_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
 
+    if(!ve)
+        return NULL;
+
+    ve->num_params = OVERCLOCK_PARAMS;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 2;
-    ve->limits[1][0] = h / 8;
-    ve->defaults[0] = 5;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 90;
-    ve->defaults[1] = 2;
+    int radius_hi = h >> 3;
+
+    if(radius_hi < 2)
+        radius_hi = 2;
+
+    ve->limits[0][P_RADIUS] = 2;
+    ve->limits[1][P_RADIUS] = radius_hi;
+    ve->defaults[P_RADIUS] = radius_hi < 5 ? radius_hi : 5;
+
+    ve->limits[0][P_VALUE] = 1;
+    ve->limits[1][P_VALUE] = 90;
+    ve->defaults[P_VALUE] = 2;
 
     ve->description = "Radial cubics";
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
 
-    ve->param_description = vje_build_param_list(
-        ve->num_params,
-        "Radius",
-        "Value"
-    );
+    ve->param_description = vje_build_param_list(ve->num_params, "Radius", "Value");
+
+    int r_hi = h / 14;
+
+    if(r_hi > 32)
+        r_hi = 32;
+    if(r_hi < 2)
+        r_hi = 2;
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_GRID_SIZE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 2,  (h / 12 > 2 ? h / 12 : 2), 6, 22, 2200, 5200, 1800, 25, /* Radius */
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1,  32,                         6, 22, 1800, 4200, 900,  25  /* Value */
+        VJ_BEAT_GRID_SIZE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 2, r_hi, 4, 14, 3000, 8200, 2200, 22,
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     2, 58,   14, 54,  800, 3000, 0,    78
     );
 
-    (void) w;
-
     return ve;
-}
-
-typedef struct {
-    uint8_t *oc_buf;
-} overclock_t;
-
-void *overclock_malloc(int w, int h)
-{
-    overclock_t *o = (overclock_t*) vj_calloc(sizeof(overclock_t));
-    if(!o)
-        return NULL;
-
-    o->oc_buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h);
-    if(!o->oc_buf) {
-        free(o);
-        return NULL;
-    }
-
-    return (void*) o;
 }
 
 void overclock_free(void *ptr)
 {
     overclock_t *o = (overclock_t*) ptr;
-    if(!o)
-        return;
 
-    if(o->oc_buf)
-        free(o->oc_buf);
-
+    free(o->oc_buf);
     free(o);
 }
 
-static inline int overclock_clampi(int v, int lo, int hi)
+void *overclock_malloc(int w, int h)
 {
-    return (v < lo) ? lo : (v > hi ? hi : v);
+    overclock_t *o = (overclock_t*) vj_calloc(sizeof(overclock_t));
+
+    if(!o)
+        return NULL;
+
+    const int len = w * h;
+
+    o->oc_buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * (size_t)len);
+
+    if(!o->oc_buf) {
+        free(o);
+        return NULL;
+    }
+
+    o->seed = 0x0c0ffeeu ^ (uint32_t)w ^ ((uint32_t)h << 16);
+    o->n_threads = vje_advise_num_threads(len);
+
+    return (void*) o;
 }
 
 void overclock_apply(void *ptr, VJFrame *frame, int *args)
 {
     overclock_t *o = (overclock_t*) ptr;
-    if(!o || !frame || !args)
-        return;
 
     const int width = frame->width;
     const int height = frame->height;
     const int len = frame->len;
+    const int radius_hi = (height >> 3) < 2 ? 2 : (height >> 3);
+    const int n = clampi(args[P_RADIUS], 2, radius_hi);
+    const int radius = args[P_VALUE];
+    const int max_block = width < height ? width : height;
+    int N = n << 1;
 
-    if(width <= 1 || height <= 1 || len <= 0)
-        return;
+    if(N > max_block)
+        N = max_block;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict B = o->oc_buf;
 
-    int n = args[0];
-    int radius = args[1];
-
-    n = overclock_clampi(n, 1, height / 8 > 1 ? height / 8 : 1);
-    radius = overclock_clampi(radius, 1, 90);
-
-    int N = n << 1;
-    if(N < 2)
-        N = 2;
-
-    const int max_block = width < height ? width : height;
-    if(N > max_block)
-        N = max_block;
-
-    if(N < 1)
-        return;
-
-    for(int y = 0; y < height; y++) {
-        veejay_blur2(
-            B + (y * width),
-            Y + (y * width),
-            width,
-            radius,
-            1,
-            1,
-            1
-        );
-    }
-
-    if(height <= (N << 1))
-        return;
+#pragma omp parallel for schedule(static) num_threads(o->n_threads)
+    for(int y = 0; y < height; y++)
+        veejay_blur2(B + (y * width), Y + (y * width), width, radius, 1, 1, 1);
 
     for(int y = N; y < height - N; ) {
-        const int r = 1 + (rand() % N);
+        const int r = 1 + overclock_rand_bounded(o, N);
 
         for(int x = 0; x < width; x += r) {
-            const int bw = (x + N <= width) ? N : (width - x);
-            const int bh = (y + N <= height) ? N : (height - y);
-
-            if(bw <= 0 || bh <= 0)
-                break;
-
-            int sum = 0;
+            const int bw = x + N <= width ? N : width - x;
+            const int bh = y + N <= height ? N : height - y;
             const int area = bw * bh;
+            int sum = 0;
 
             for(int dy = 0; dy < bh; dy++) {
                 const int row = (y + dy) * width + x;
 
-                for(int dx = 0; dx < bw; dx++) {
+                for(int dx = 0; dx < bw; dx++)
                     sum += B[row + dx];
-                }
             }
 
             const uint8_t t = (uint8_t)(sum / area);
@@ -174,11 +185,14 @@ void overclock_apply(void *ptr, VJFrame *frame, int *args)
 
                 for(int dx = 0; dx < bw; dx++) {
                     const int i = row + dx;
-                    Y[i] = (B[i] > Y[i]) ? (uint8_t)((Y[i] + t) >> 1) : t;
+
+                    Y[i] = B[i] > Y[i] ? (uint8_t)((Y[i] + t) >> 1) : t;
                 }
             }
         }
 
-        y += 1 + (rand() % N);
+        y += 1 + overclock_rand_bounded(o, N);
     }
+
+    (void)len;
 }

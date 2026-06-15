@@ -20,91 +20,82 @@
 #include "common.h"
 #include "coloradjust.h"
 
+static inline int coloradjust_clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
 vj_effect *coloradjust_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
     ve->num_params = 3;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 360;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 256;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-	ve->limits[0][2] = 0;
-	ve->limits[1][2] = 1024;
+    ve->limits[0][0] = 0; ve->limits[1][0] = 360;  ve->defaults[0] = 50;
+    ve->limits[0][1] = 0; ve->limits[1][1] = 256;  ve->defaults[1] = 50;
+    ve->limits[0][2] = 0; ve->limits[1][2] = 1024; ve->defaults[2] = 256;
 
-    ve->defaults[0] = 50;
-    ve->defaults[1] = 50;
-	ve->defaults[2] = 256;
-
-    ve->param_description = vje_build_param_list( ve->num_params, "Degrees", "Intensity", "Exposure" );
+    ve->param_description = vje_build_param_list(ve->num_params, "Degrees", "Intensity", "Exposure");
     ve->description = "Exposure, Hue and Saturation";
     ve->extra_frame = 0;
     ve->sub_format = -1;
     ve->has_user = 0;
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_HAT,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,  0,   360, 4,  24, 80,  520,  0, 48, /* Degrees */
-        VJ_BEAT_SNARE, VJ_BEAT_F_CONTINUOUS,                    12,  220, 8,  38, 120, 900,  0, 68, /* Intensity */
-        VJ_BEAT_KICK,  VJ_BEAT_F_CONTINUOUS,                    180, 620, 14, 58, 90,  720,  0, 82  /* Exposure */
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 48,  255, 16, 62,  700, 2800, 0,    86,
+        VJ_BEAT_COLOR_PHASE,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 64,  255, 12, 46, 1000, 3400, 0,    58,
+        VJ_BEAT_COLOR_PHASE,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 64,  255, 12, 46, 1000, 3400, 0,    58
     );
+
     return ve;
 }
 
 void coloradjust_apply(void *ptr, VJFrame *frame, int *args)
 {
-    const int val           = args[0];
-    const int _degrees      = args[1];
+    (void) ptr;
+    const int val = args[0];
+    const int intensity = args[1];
     const int exposureValue = args[2];
-
     const int len = frame->len;
-    const int n_threads = vje_advise_num_threads(len);
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
-    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
     const float hue = ((float)val / 180.0f) * (float)M_PI;
-    const float sat = ((float)_degrees * 0.01f);
-
+    const float sat = (float)intensity * 0.01f;
     const int s = (int)rintf(a_sin(hue) * (1 << 16) * sat);
     const int c = (int)rintf(a_cos(hue) * (1 << 16) * sat);
+    const int do_exp = exposureValue != 256;
+    const int n_threads = vje_advise_num_threads(len);
 
-    const float powValue = (exposureValue > 0) ? ((float)exposureValue / 256.0f) : 1.0f;
-    const int do_exp = (exposureValue > 0);
-
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for (int i = 0; i < len; i++)
+    if(do_exp)
     {
-        if (do_exp)
+        const float powValue = exposureValue > 0 ? ((float)exposureValue / 256.0f) : 1.0f;
+
+        #pragma omp parallel for num_threads(n_threads) schedule(static)
+        for(int i = 0; i < len; i++)
         {
-            int y = (int)(Y[i] * powValue);
-            y &= ~(y >> 31);
-            int diff = y - 255;
-            y = 255 + (diff & (diff >> 31));
+            int y = (int)((float)Y[i] * powValue);
 
-            Y[i] = (uint8_t)y;
+            Y[i] = (uint8_t)coloradjust_clampi(y, 0, 255);
         }
+    }
 
-        int u = (int)Cb[i] - 128;
-        int v = (int)Cr[i] - 128;
+    #pragma omp parallel for num_threads(vje_advise_num_threads(uv_len)) schedule(static)
+    for(int i = 0; i < uv_len; i++)
+    {
+        const int u = (int)Cb[i] - 128;
+        const int v = (int)Cr[i] - 128;
+        const int new_u = (c * u - s * v + (1 << 15) + (128 << 16)) >> 16;
+        const int new_v = (s * u + c * v + (1 << 15) + (128 << 16)) >> 16;
 
-        int new_u = (c * u - s * v + (1 << 15) + (128 << 16)) >> 16;
-        int new_v = (s * u + c * v + (1 << 15) + (128 << 16)) >> 16;
-
-        new_u &= ~(new_u >> 31);
-        new_v &= ~(new_v >> 31);
-
-        int diff_u = new_u - 255;
-        int diff_v = new_v - 255;
-
-        new_u = 255 + (diff_u & (diff_u >> 31));
-        new_v = 255 + (diff_v & (diff_v >> 31));
-
-        Cb[i] = (uint8_t)new_u;
-        Cr[i] = (uint8_t)new_v;
+        Cb[i] = (uint8_t)coloradjust_clampi(new_u, 0, 255);
+        Cr[i] = (uint8_t)coloradjust_clampi(new_v, 0, 255);
     }
 }

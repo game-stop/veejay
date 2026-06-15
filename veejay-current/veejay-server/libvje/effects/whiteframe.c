@@ -19,104 +19,216 @@
  */
 
 #include "common.h"
+#include <stdint.h>
+#include <stdlib.h>
 #include <veejaycore/vjmem.h>
 #include "whiteframe.h"
 
+#define WHITEFRAME_PARAMS 4
+
+#define P_THRESHOLD    0
+#define P_SOFTNESS     1
+#define P_EDGE_GLOW    2
+#define P_CHROMA_EDGE  3
+
 typedef struct {
-  int n_threads;
+    int n_threads;
+    int env_ready;
+    float threshold_env;
+    float softness_env;
+    float glow_env;
+    float chroma_env;
 } whiteframe_t;
 
-vj_effect *whiteframe_init(int w,int h)
+static inline int clampi(int v, int lo, int hi)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
-    ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-    ve->limits[0][0] = 0;    ve->limits[1][0] = 255; ve->defaults[0] = 220;
-    ve->limits[0][1] = 1;    ve->limits[1][1] = 128; ve->defaults[1] = 24;
-    ve->description = "Replace White";
-    ve->sub_format  = 1;
-    ve->extra_frame = 1;
-    ve->param_description = vje_build_param_list(
-        ve->num_params,
-        "Threshold",
-        "Softness"
-    );
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-
-        VJ_BEAT_DETAIL, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
-        160, 250, 6, 22, 1600, 3400, 900, 30, /* Threshold */
-
-        VJ_BEAT_DETAIL, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
-        4, 64, 6, 22, 1800, 4200, 900, 24 /* Softness */
-    );
-    return ve;
+    return (v < lo) ? lo : ((v > hi) ? hi : v);
 }
 
-void *whiteframe_malloc(int w, int h) {
-    whiteframe_t *wf = (whiteframe_t*) vj_calloc(sizeof(whiteframe_t));
-    if(!wf)
-        return NULL;
-    wf->n_threads = vje_advise_num_threads(w*h);
-    return (void*) wf;
+static inline uint8_t whiteframe_u8(int v)
+{
+    return (uint8_t)clampi(v, 0, 255);
 }
 
-void whiteframe_free(void *ptr) {
-    whiteframe_t *wf = (whiteframe_t*) ptr;
-    if(wf) {
-        free(wf);
-    }
+static inline int whiteframe_abs_i(int v)
+{
+    const int m = v >> 31;
+    return (v + m) ^ m;
 }
 
 static inline uint8_t blend_u8(uint8_t a, uint8_t b, int t)
 {
-    return (uint8_t)((a * (255 - t) + b * t) >> 8);
+    return (uint8_t)((((int)a * (255 - t)) + ((int)b * t) + 127) / 255);
+}
+
+static inline float whiteframe_slew(float oldv, float target, float attack, float release)
+{
+    return target > oldv
+        ? oldv + (target - oldv) * attack
+        : oldv + (target - oldv) * release;
+}
+
+vj_effect *whiteframe_init(int w, int h)
+{
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
+    if(!ve)
+        return NULL;
+
+    ve->num_params = WHITEFRAME_PARAMS;
+    ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
+    ve->limits[0][P_THRESHOLD]   = 0;    ve->limits[1][P_THRESHOLD]   = 255; ve->defaults[P_THRESHOLD]   = 220;
+    ve->limits[0][P_SOFTNESS]    = 1;    ve->limits[1][P_SOFTNESS]    = 128; ve->defaults[P_SOFTNESS]    = 24;
+    ve->limits[0][P_EDGE_GLOW]   = 0;    ve->limits[1][P_EDGE_GLOW]   = 255; ve->defaults[P_EDGE_GLOW]   = 0;
+    ve->limits[0][P_CHROMA_EDGE] = 0;    ve->limits[1][P_CHROMA_EDGE] = 255; ve->defaults[P_CHROMA_EDGE] = 0;
+
+    ve->description = "Replace White";
+    ve->sub_format  = 1;
+    ve->extra_frame = 1;
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Threshold",
+        "Softness",
+        "Edge Glow",
+        "Chroma Edge"
+    );
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS | VJ_BEAT_F_INVERTED, 120, 255, 16, 74, 240, 1100, 0,  92,
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     8,   128, 18, 70, 280, 1300, 0,  76,
+        VJ_BEAT_GLOW,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     32,  255, 22, 82, 80,  720,  0,  94,
+        VJ_BEAT_COLOR_AMOUNT,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     24,  255, 16, 66, 120, 940,  0,  78
+    );
+
+    return ve;
+}
+
+void *whiteframe_malloc(int w, int h)
+{
+    whiteframe_t *wf = (whiteframe_t*) vj_calloc(sizeof(whiteframe_t));
+
+    if(!wf)
+        return NULL;
+
+    wf->n_threads = vje_advise_num_threads(w * h);
+
+    wf->env_ready = 0;
+    wf->threshold_env = 220.0f;
+    wf->softness_env = 24.0f;
+    wf->glow_env = 0.0f;
+    wf->chroma_env = 0.0f;
+
+    return (void*) wf;
+}
+
+void whiteframe_free(void *ptr)
+{
+    whiteframe_t *wf = (whiteframe_t*) ptr;
+
+    free(wf);
 }
 
 void whiteframe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     whiteframe_t *wf = (whiteframe_t*) ptr;
-    const int threshold = args[0];
-    const int softness  = args[1];
-    const int len       = frame->len;
+
+    const int len = frame->len;
+
+    const int threshold_arg = args[P_THRESHOLD];
+    const int softness_arg = args[P_SOFTNESS];
+    const int glow_arg = args[P_EDGE_GLOW];
+    const int chroma_arg = args[P_CHROMA_EDGE];
+
+    if(!wf->env_ready) {
+        wf->threshold_env = (float)threshold_arg;
+        wf->softness_env = (float)softness_arg;
+        wf->glow_env = (float)glow_arg;
+        wf->chroma_env = (float)chroma_arg;
+        wf->env_ready = 1;
+    }
+    else {
+        wf->threshold_env = whiteframe_slew(wf->threshold_env, (float)threshold_arg, 0.265f, 0.092f);
+        wf->softness_env = whiteframe_slew(wf->softness_env, (float)softness_arg, 0.245f, 0.088f);
+        wf->glow_env = whiteframe_slew(wf->glow_env, (float)glow_arg, 0.325f, 0.115f);
+        wf->chroma_env = whiteframe_slew(wf->chroma_env, (float)chroma_arg, 0.285f, 0.105f);
+    }
+
+    const int threshold = (int)(wf->threshold_env + 0.5f);
+    const int softness = (int)(wf->softness_env + 0.5f);
+    const int edge_glow = (int)(wf->glow_env + 0.5f);
+    const int chroma_edge = (int)(wf->chroma_env + 0.5f);
     const int n_threads = wf->n_threads;
 
-    const int full = threshold - softness;
-    const int edge = threshold + softness;
+    int full = threshold - softness;
+    int edge = threshold + softness;
+
+    if(full < 0)
+        full = 0;
+    if(edge > 255)
+        edge = 255;
+    if(edge <= full)
+        edge = full + 1;
+
     const int denom = edge - full;
 
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    uint8_t *restrict Y2  = frame2->data[0];
-    uint8_t *restrict Cb2 = frame2->data[1];
-    uint8_t *restrict Cr2 = frame2->data[2];
+    const uint8_t *restrict Y2  = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
 
 #pragma omp parallel for num_threads(n_threads) schedule(static)
     for(int i = 0; i < len; i++)
     {
-        int y  = Y[i];
-        int cb = Cb[i];
-        int cr = Cr[i];
+        const int y  = Y[i];
+        const int cb = Cb[i];
+        const int cr = Cr[i];
 
-        int cbd = cb - 128;
-        int crd = cr - 128;
-        int abs_cb = (cbd ^ (cbd >> 31)) - (cbd >> 31);
-        int abs_cr = (crd ^ (crd >> 31)) - (crd >> 31);
+        const int abs_cb = whiteframe_abs_i(cb - 128);
+        const int abs_cr = whiteframe_abs_i(cr - 128);
 
-        int k = 2;
-        int light = y - (int)(k * (abs_cb + abs_cr));
+        const int light = y - ((abs_cb + abs_cr) << 1);
 
         int t = ((light - full) * 255) / denom;
-        if(t < 0) t = 0;
-        if(t > 255) t = 255;
+        if(t < 0)
+            t = 0;
+        else if(t > 255)
+            t = 255;
 
-        Y[i]  = blend_u8(Y[i],  Y2[i], t);
-        Cb[i] = blend_u8(Cb[i], Cb2[i], t);
-        Cr[i] = blend_u8(Cr[i], Cr2[i], t);
+        int out_y  = blend_u8((uint8_t)y,  Y2[i],  t);
+        int out_cb = blend_u8((uint8_t)cb, Cb2[i], t);
+        int out_cr = blend_u8((uint8_t)cr, Cr2[i], t);
+
+        if(edge_glow > 0 || chroma_edge > 0) {
+            const int rim = (t * (255 - t) + 127) / 255;
+
+            if(edge_glow > 0)
+                out_y += (rim * edge_glow + 127) / 255;
+
+            if(chroma_edge > 0) {
+                const int cq = (rim * chroma_edge + 127) / 255;
+                out_cb = blend_u8((uint8_t)out_cb, Cb2[i], cq);
+                out_cr = blend_u8((uint8_t)out_cr, Cr2[i], cq);
+            }
+        }
+
+        Y[i]  = whiteframe_u8(out_y);
+        Cb[i] = whiteframe_u8(out_cb);
+        Cr[i] = whiteframe_u8(out_cr);
     }
 }

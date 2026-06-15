@@ -22,8 +22,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
-#include <limits.h>
-
 #include <veejaycore/vjmem.h>
 #include <libvje/vje.h>
 
@@ -31,30 +29,6 @@
 #define ATS_PI 3.14159265358979323846f
 #endif
 
-#ifndef VJ_BEAT_SOFT_UNSET
-#define VJ_BEAT_SOFT_UNSET INT_MIN
-#endif
-
-#ifndef VJ_BEAT_F_PHRASE_ONLY
-#define VJ_BEAT_F_PHRASE_ONLY 0
-#endif
-
-#ifndef VJ_BEAT_F_SQUARED
-#define VJ_BEAT_F_SQUARED 0
-#endif
-
-#ifndef VJ_BEAT_F_IMPULSE
-#define VJ_BEAT_F_IMPULSE 0
-#endif
-
-#ifdef VJ_BEAT_F_REJECT
-#ifndef VJ_BEAT_SPEED
-#define VJ_BEAT_SPEED VJ_BEAT_DRIFT
-#endif
-#ifndef VJ_BEAT_INERTIA
-#define VJ_BEAT_INERTIA VJ_BEAT_WARP
-#endif
-#endif
 
 #define ATS_FP 14
 #define ATS_ONE (1 << ATS_FP)
@@ -140,6 +114,21 @@ typedef struct {
     float axis_spin;
     float axis_spin_vel;
     float slice_width_f;
+    float axis_angle_f;
+    float depth_push_f;
+    float slab_scale_f;
+    float slide_speed_f;
+    float edge_flash_f;
+    float hat_flicker_f;
+    float hinge_fold_f;
+
+    float last_impact;
+    float last_snare;
+    float last_hat;
+    int impact_cooldown;
+    int snare_cooldown;
+    int hat_cooldown;
+    int smooth_ready;
 
     float axis_phase;
     int phase_fp;
@@ -158,7 +147,7 @@ typedef struct {
     uint32_t frame_count;
 } ats_t;
 
-static inline int ats_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
 }
@@ -170,7 +159,7 @@ static inline float ats_clampf(float v, float lo, float hi)
 
 static inline uint8_t ats_u8(int v)
 {
-    return (uint8_t)ats_clampi(v, 0, 255);
+    return (uint8_t)clampi(v, 0, 255);
 }
 
 static inline int ats_absi(int v)
@@ -197,9 +186,6 @@ static inline float ats_env(float oldv, float target, float attack, float releas
 
 static void ats_reseed_bands(ats_t *s, float impact, float snare)
 {
-    if(!s)
-        return;
-
     uint32_t base =
         ats_hash_u32((uint32_t)s->seed ^
                      (s->frame_count * 747796405U) ^
@@ -287,13 +273,11 @@ static void ats_update_projection(ats_t *s,
     int * restrict y_proj = s->y_proj;
     int * restrict y_proj2 = s->y_proj2;
 
-#pragma omp simd
     for(int x = 0; x < w; x++) {
         x_proj[x] = x * nx;
         x_proj2[x] = x * sx;
     }
 
-#pragma omp simd
     for(int y = 0; y < h; y++) {
         y_proj[y] = y * ny;
         y_proj2[y] = y * sy;
@@ -311,8 +295,8 @@ static void ats_update_bands(ats_t *s,
                              int snare_i,
                              int hat_i)
 {
-    const int layer_count = ats_clampi(layers, 2, 16);
-    const int motion = ats_clampi(46 + impact_i + ((snare_i * 72) >> 8), 0, 370);
+    const int layer_count = clampi(layers, 2, 16);
+    const int motion = clampi(46 + impact_i + ((snare_i * 72) >> 8), 0, 370);
 
     const int nx = s->nx;
     const int ny = s->ny;
@@ -327,7 +311,7 @@ static void ats_update_bands(ats_t *s,
         const float layer_wave = (float)layer_wave_i * (1.0f / 1024.0f);
         const int layer_weight = 52 + ((layer_abs_i * 64) >> 10);
         const int layer_depth = ((layer_wave_i * 96) >> 10) + (b->base_depth >> 3);
-        const int energy = ats_clampi((b->base_energy * motion) >> 8, 0, 560);
+        const int energy = clampi((b->base_energy * motion) >> 8, 0, 560);
 
         const int slide_px = (int)(((int64_t)b->base_slide *
                                     (int64_t)depth_push *
@@ -383,15 +367,15 @@ static void ats_update_bands(ats_t *s,
                    (int64_t)hinge_fold *
                    (int64_t)energy) >> 16);
 
-        b->subshift = ats_clampi(
+        b->subshift = clampi(
             (int)(((int64_t)b->base_sub *
                    (int64_t)depth_push *
                    (int64_t)energy) >> 20),
             -96,
             96);
 
-        b->glow = ats_clampi(edge_flash + ((snare_i * 155) >> 8), 0, 390);
-        b->flicker = ats_clampi(hat_flicker + ((hat_i * 95) >> 8), 0, 310);
+        b->glow = clampi(edge_flash + ((snare_i * 155) >> 8), 0, 390);
+        b->flicker = clampi(hat_flicker + ((hat_i * 95) >> 8), 0, 310);
         b->energy = energy;
     }
 }
@@ -419,24 +403,20 @@ vj_effect *tessaractslide_init(int w, int h)
         return NULL;
     }
 
-    const int rw = w > 0 ? w : 720;
-    const int rh = h > 0 ? h : 576;
-    const int min_dim = rw < rh ? rw : rh;
-    const int max_dim = rw > rh ? rw : rh;
+    const int min_dim = w < h ? w : h;
+    const int max_dim = w > h ? w : h;
 
-    const int def_slice = ats_clampi(min_dim / 12, 32, 72);
-    const int def_depth = ats_clampi((min_dim * 145) / 576, 95, 175);
-    const int def_scale = ats_clampi((min_dim * 86) / 576, 58, 118);
-    const int def_edge = ats_clampi((min_dim * 82) / 576, 48, 110);
-    const int def_hat = ats_clampi((min_dim * 54) / 576, 28, 74);
-    const int def_hinge = ats_clampi((min_dim * 82) / 576, 48, 118);
+    const int def_slice = clampi(min_dim / 12, 32, 72);
+    const int def_depth = clampi((min_dim * 145) / 576, 95, 175);
+    const int def_scale = clampi((min_dim * 86) / 576, 58, 118);
+    const int def_edge = clampi((min_dim * 82) / 576, 48, 110);
+    const int def_hat = clampi((min_dim * 54) / 576, 28, 74);
+    const int def_hinge = clampi((min_dim * 82) / 576, 48, 118);
     const int def_layers = max_dim >= 1280 ? 9 : (min_dim <= 360 ? 5 : 7);
 
     ve->description = "Tesseract Slice";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
-
     ve->defaults[ATS_SLICE_WIDTH] = def_slice;
     ve->defaults[ATS_IMPACT] = 0;
     ve->defaults[ATS_AXIS_ANGLE] = 28;
@@ -491,33 +471,27 @@ vj_effect *tessaractslide_init(int w, int h)
         "Settle"
     );
 
-#ifdef VJ_BEAT_F_REJECT
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_INERTIA,          VJ_BEAT_F_REJECT,      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000,
-        VJ_BEAT_KICK,             VJ_BEAT_F_IMPULSE,     0,   100, 78, 98,  10,  620,  45,  145,
-        VJ_BEAT_DRIFT,            VJ_BEAT_F_PHRASE_ONLY, 0,   360, 12, 42, 180, 4200, 0,   34,
-        VJ_BEAT_KICK,             0,                     64,  210, 46, 96,  28,  1050, 15,  138,
-        VJ_BEAT_WARP,             0,                     24,  145, 30, 68,  36,  1300, 0,   82,
-        VJ_BEAT_SPEED,            0,                     55,  145, 68, 108, 70,  2200, 0,   100,
-        VJ_BEAT_GLOW,             0,                     18,  165, 26, 72,  18,  680,  10,  86,
-        VJ_BEAT_SNARE,            VJ_BEAT_F_IMPULSE,     0,   100, 72, 96,  9,   440,  35,  130,
-        VJ_BEAT_HAT,              VJ_BEAT_F_SQUARED,     8,   125, 20, 50,  12,  360,  10,  58,
-        VJ_BEAT_INERTIA,          VJ_BEAT_F_REJECT,      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000,
-        VJ_BEAT_WARP,             0,                     22,  150, 28, 72,  36,  1400, 0,   82,
-        VJ_BEAT_INERTIA,          VJ_BEAT_F_REJECT,      VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000
+        VJ_BEAT_GRID_SIZE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, ATS_MIN_SLICE, ATS_MAX_SLICE, 18, 72,  500, 2200, 0, 78,
+        VJ_BEAT_TRIGGER,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                         0,             100,           100,100,1,   170, 35,230,
+        VJ_BEAT_MOTION_REACT,  VJ_BEAT_F_CONTINUOUS,                                             0,             360,           12, 58,  600, 3200, 0, 58,
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                   36,            280,           18, 76,  500, 2200, 0, 84,
+        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                   42,            240,           18, 72,  500, 2400, 0, 76,
+        VJ_BEAT_SIGNED_SPEED,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                   24,            220,           20, 82,  360, 1800, 0, 88,
+        VJ_BEAT_INTENSITY,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                   32,            260,           24, 88,  300, 1600, 15,94,
+        VJ_BEAT_SNARE,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                         0,             100,           100,100,1,   170, 35,220,
+        VJ_BEAT_HAT,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                   24,            220,           24, 92,  180, 1200, 0, 86,
+        VJ_BEAT_GRID_SIZE,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                          VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000,
+        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                   36,            240,           18, 78,  500, 2400, 0, 82,
+        VJ_BEAT_MEMORY,        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                          VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000
     );
-#endif
 
     return ve;
 }
 
 void *tessaractslide_malloc(int w, int h)
 {
-    if(w <= 0 || h <= 0)
-        return NULL;
-
     const int len = w * h;
     const int n_threads = vje_advise_num_threads(len);
 
@@ -538,12 +512,12 @@ void *tessaractslide_malloc(int w, int h)
         return NULL;
 
     const int min_dim = w < h ? w : h;
-    const int init_slice = ats_clampi(min_dim / 12, 32, 72);
+    const int init_slice = clampi(min_dim / 12, 32, 72);
 
     s->w = w;
     s->h = h;
     s->len = len;
-    s->n_threads = n_threads < 1 ? 1 : n_threads;
+    s->n_threads = n_threads;
     s->seed = 0x51ed270bU ^ (uint32_t)(w * 73856093U) ^ (uint32_t)(h * 19349663U);
 
     uint8_t *p = (uint8_t *)(s + 1);
@@ -573,6 +547,22 @@ void *tessaractslide_malloc(int w, int h)
     s->axis_spin = 0.0f;
     s->axis_spin_vel = 0.0f;
     s->slice_width_f = (float)init_slice;
+    s->axis_angle_f = 28.0f;
+    s->depth_push_f = (float)clampi((min_dim * 145) / 576, 95, 175);
+    s->slab_scale_f = (float)clampi((min_dim * 86) / 576, 58, 118);
+    s->slide_speed_f = 100.0f;
+    s->edge_flash_f = (float)clampi((min_dim * 82) / 576, 48, 110);
+    s->hat_flicker_f = (float)clampi((min_dim * 54) / 576, 28, 74);
+    s->hinge_fold_f = (float)clampi((min_dim * 82) / 576, 48, 118);
+
+    s->last_impact = 0.0f;
+    s->last_snare = 0.0f;
+    s->last_hat = 0.0f;
+    s->impact_cooldown = 0;
+    s->snare_cooldown = 0;
+    s->hat_cooldown = 0;
+    s->smooth_ready = 0;
+
     s->axis_phase = 0.0f;
     s->phase_fp = 0;
     s->phase2_fp = 0;
@@ -596,16 +586,12 @@ void *tessaractslide_malloc(int w, int h)
 
 void tessaractslide_free(void *ptr)
 {
-    if(ptr)
-        free(ptr);
+    free(ptr);
 }
 
 void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
 {
     ats_t *s = (ats_t *)ptr;
-
-    if(!s || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
 
     uint8_t * restrict Y = frame->data[0];
     uint8_t * restrict U = frame->data[1];
@@ -620,44 +606,107 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
     const int len = s->len;
     const int threads = s->n_threads;
 
-    const int slice_target = ats_clampi(args[ATS_SLICE_WIDTH], ATS_MIN_SLICE, ATS_MAX_SLICE);
-    const int impact_arg = ats_clampi(args[ATS_IMPACT], 0, 100);
-    const int axis_arg = ats_clampi(args[ATS_AXIS_ANGLE], 0, 360);
-    const int depth_push_arg = ats_clampi(args[ATS_DEPTH_PUSH], 0, 280);
-    const int slab_scale_arg = ats_clampi(args[ATS_SLAB_SCALE], 0, 240);
-    const int slide_speed_arg = ats_clampi(args[ATS_SLIDE_SPEED], 0, 220);
-    const int edge_flash_arg = ats_clampi(args[ATS_EDGE_FLASH], 0, 260);
-    const int snare_arg = ats_clampi(args[ATS_SNARE_FLASH], 0, 100);
-    const int hat_arg = ats_clampi(args[ATS_HAT_FLICKER], 0, 220);
-    const int layers_arg = ats_clampi(args[ATS_LAYERS], 2, 16);
-    const int hinge_arg = ats_clampi(args[ATS_HINGE_FOLD], 0, 240);
-    const int settle_arg = ats_clampi(args[ATS_SETTLE], 0, 100);
+    const int slice_target = args[ATS_SLICE_WIDTH];
+    const int impact_arg = args[ATS_IMPACT];
+    const int axis_arg = args[ATS_AXIS_ANGLE];
+    const int depth_push_arg = args[ATS_DEPTH_PUSH];
+    const int slab_scale_arg = args[ATS_SLAB_SCALE];
+    const int slide_speed_arg = args[ATS_SLIDE_SPEED];
+    const int edge_flash_arg = args[ATS_EDGE_FLASH];
+    const int snare_arg = args[ATS_SNARE_FLASH];
+    const int hat_arg = args[ATS_HAT_FLICKER];
+    const int layers_arg = args[ATS_LAYERS];
+    const int hinge_arg = args[ATS_HINGE_FOLD];
+    const int settle_arg = args[ATS_SETTLE];
 
-    s->slice_width_f = s->slice_width_f < (float)ATS_MIN_SLICE
-        ? (float)slice_target
-        : s->slice_width_f;
-
-    s->slice_width_f += ((float)slice_target - s->slice_width_f) * 0.075f;
-
-    const int slice_width = ats_clampi((int)lrintf(s->slice_width_f), ATS_MIN_SLICE, ATS_MAX_SLICE);
+    if(!s->smooth_ready) {
+        s->slice_width_f = (float)slice_target;
+        s->axis_angle_f = (float)axis_arg;
+        s->depth_push_f = (float)depth_push_arg;
+        s->slab_scale_f = (float)slab_scale_arg;
+        s->slide_speed_f = (float)slide_speed_arg;
+        s->edge_flash_f = (float)edge_flash_arg;
+        s->hat_flicker_f = (float)hat_arg;
+        s->hinge_fold_f = (float)hinge_arg;
+        s->smooth_ready = 1;
+    }
 
     const float impact_target = (float)impact_arg * 0.01f;
     const float snare_target = (float)snare_arg * 0.01f;
     const float hat_target = ats_clampf((float)hat_arg * (1.0f / 220.0f), 0.0f, 1.0f);
 
+    const int impact_rise =
+        s->impact_cooldown <= 0 &&
+        ((impact_target > 0.30f && s->last_impact < 0.18f) ||
+         ((impact_target - s->last_impact) > 0.12f));
+
+    const int snare_rise =
+        s->snare_cooldown <= 0 &&
+        ((snare_target > 0.30f && s->last_snare < 0.18f) ||
+         ((snare_target - s->last_snare) > 0.12f));
+
+    const int hat_rise =
+        s->hat_cooldown <= 0 &&
+        ((hat_target > 0.24f && s->last_hat < 0.12f) ||
+         ((hat_target - s->last_hat) > 0.10f));
+
     const float release = 0.010f + ((float)(100 - settle_arg) * 0.00105f);
 
-    s->impact_env = ats_env(s->impact_env, impact_target, 0.58f, release);
-    s->snare_env = ats_env(s->snare_env, snare_target, 0.68f, 0.125f);
-    s->hat_env = ats_env(s->hat_env, hat_target, 0.42f, 0.235f);
+    s->impact_env = ats_env(s->impact_env, impact_target, 0.82f, release);
+    s->snare_env = ats_env(s->snare_env, snare_target, 0.86f, 0.130f);
+    s->hat_env = ats_env(s->hat_env, hat_target, 0.74f, 0.280f);
+
+    if(impact_rise || snare_rise) {
+        const float reseed_impact = impact_target > 0.22f ? impact_target : s->impact_env;
+        const float reseed_snare = snare_target > 0.22f ? snare_target : s->snare_env;
+        ats_reseed_bands(s, reseed_impact, reseed_snare);
+        s->impact_cooldown = impact_rise ? 4 : s->impact_cooldown;
+        s->snare_cooldown = snare_rise ? 4 : s->snare_cooldown;
+    }
+
+    if(hat_rise)
+        s->hat_cooldown = 2;
+
+    if(s->impact_cooldown > 0)
+        s->impact_cooldown--;
+    if(s->snare_cooldown > 0)
+        s->snare_cooldown--;
+    if(s->hat_cooldown > 0)
+        s->hat_cooldown--;
+
+    const float slice_alpha = (float)slice_target > s->slice_width_f ? 0.160f : 0.070f;
+    s->slice_width_f += ((float)slice_target - s->slice_width_f) * slice_alpha;
+    s->axis_angle_f += ((float)axis_arg - s->axis_angle_f) * 0.055f;
+    s->depth_push_f = ats_env(s->depth_push_f, (float)depth_push_arg, 0.260f, 0.085f);
+    s->slab_scale_f = ats_env(s->slab_scale_f, (float)slab_scale_arg, 0.235f, 0.080f);
+    s->slide_speed_f = ats_env(s->slide_speed_f, (float)slide_speed_arg, 0.280f, 0.095f);
+    s->edge_flash_f = ats_env(s->edge_flash_f, (float)edge_flash_arg, 0.360f, 0.150f);
+    s->hat_flicker_f = ats_env(s->hat_flicker_f, (float)hat_arg, 0.420f, 0.230f);
+    s->hinge_fold_f = ats_env(s->hinge_fold_f, (float)hinge_arg, 0.245f, 0.085f);
+
+    const int slice_width = clampi((int)lrintf(s->slice_width_f), ATS_MIN_SLICE, ATS_MAX_SLICE);
+    const int axis_eff = clampi((int)lrintf(s->axis_angle_f), 0, 360);
+    const int depth_push_eff = clampi((int)lrintf(s->depth_push_f), 0, 280);
+    const int slab_scale_eff = clampi((int)lrintf(s->slab_scale_f), 0, 240);
+    const int slide_speed_base = clampi((int)lrintf(s->slide_speed_f), 0, 220);
+    const int edge_flash_eff = clampi((int)lrintf(s->edge_flash_f), 0, 260);
+    const int hat_flicker_eff = clampi((int)lrintf(s->hat_flicker_f), 0, 220);
+    const int hinge_eff = clampi((int)lrintf(s->hinge_fold_f), 0, 240);
 
     const int impact_i = (int)(s->impact_env * 256.0f);
     const int snare_i = (int)(s->snare_env * 256.0f);
     const int hat_i = (int)(s->hat_env * 256.0f);
 
+    s->last_impact = impact_target;
+    s->last_snare = snare_target;
+    s->last_hat = hat_target;
+
     const int beat_activity = impact_i > snare_i ? impact_i : snare_i;
-    const int speed_gate = ats_clampi((beat_activity - 4) * 2, 0, 256);
-    const int slide_speed_eff = 1 + (((slide_speed_arg - 1) * speed_gate) >> 8);
+    const int speed_gate = clampi((beat_activity - 4) * 2, 0, 256);
+    const int slide_speed_eff = clampi(
+        1 + ((slide_speed_base * (64 + (speed_gate >> 1))) >> 8) + (impact_i >> 5),
+        1,
+        320);
 
     const int phase_target =
         ((7 + slide_speed_eff * 2 + (impact_i >> 3) + (snare_i >> 4)) << ATS_FP) >> 5;
@@ -696,16 +745,16 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
         ? s->axis_spin - 360.0f
         : (s->axis_spin < 0.0f ? s->axis_spin + 360.0f : s->axis_spin);
 
-    ats_update_projection(s, axis_arg, layers_arg);
+    ats_update_projection(s, axis_eff, layers_arg);
 
     ats_update_bands(
         s,
         layers_arg,
-        ats_clampi(depth_push_arg + ((impact_i * 80) >> 8), 0, 340),
-        ats_clampi(slab_scale_arg + ((snare_i * 42) >> 8), 0, 280),
-        ats_clampi(hinge_arg + ((impact_i * 54) >> 8), 0, 310),
-        ats_clampi(edge_flash_arg + ((snare_i * 120) >> 8), 0, 380),
-        ats_clampi(hat_arg + ((hat_i * 85) >> 8), 0, 320),
+        clampi(depth_push_eff + ((impact_i * 118) >> 8) + ((snare_i * 32) >> 8), 0, 360),
+        clampi(slab_scale_eff + ((snare_i * 86) >> 8) + ((impact_i * 42) >> 8), 0, 310),
+        clampi(hinge_eff + ((impact_i * 96) >> 8) + ((snare_i * 62) >> 8), 0, 340),
+        clampi(edge_flash_eff + ((snare_i * 175) >> 8) + ((impact_i * 55) >> 8), 0, 420),
+        clampi(hat_flicker_eff + ((hat_i * 140) >> 8), 0, 360),
         impact_i,
         snare_i,
         hat_i
@@ -717,29 +766,25 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
     const int hh = h >> 1;
 
     const int slice_fp = slice_width << ATS_FP;
-    const int slice2_width = ats_clampi(slice_width + (slice_width >> 1) + layers_arg * 2, 12, 200);
+    const int slice2_width = clampi(slice_width + (slice_width >> 1) + layers_arg * 2, 12, 200);
     const int slice2_fp = slice2_width << ATS_FP;
 
     const int phase_wrap = slice_fp * ATS_PHASE_BANDS;
     const int phase2_wrap = slice2_fp * ATS_PHASE_BANDS;
 
-    if(phase_wrap > 0) {
-        if(s->phase_fp >= phase_wrap || s->phase_fp < 0)
-            s->phase_fp %= phase_wrap;
+    if(s->phase_fp >= phase_wrap || s->phase_fp < 0)
+        s->phase_fp %= phase_wrap;
 
-        if(s->phase_fp < 0)
-            s->phase_fp += phase_wrap;
-    }
+    if(s->phase_fp < 0)
+        s->phase_fp += phase_wrap;
 
-    if(phase2_wrap > 0) {
-        if(s->phase2_fp >= phase2_wrap || s->phase2_fp < 0)
-            s->phase2_fp %= phase2_wrap;
+    if(s->phase2_fp >= phase2_wrap || s->phase2_fp < 0)
+        s->phase2_fp %= phase2_wrap;
 
-        if(s->phase2_fp < 0)
-            s->phase2_fp += phase2_wrap;
-    }
+    if(s->phase2_fp < 0)
+        s->phase2_fp += phase2_wrap;
 
-    const int edge_width = 2 + (slice_width >> 6);
+    const int edge_width = clampi(2 + (slice_width >> 5) + ((edge_flash_eff + snare_i) >> 7), 2, 8);
 
     const int q_offset = (w + h + slice_width * ATS_PHASE_BANDS + 512) << ATS_FP;
     const int q2_offset = (w + h + slice2_width * ATS_PHASE_BANDS + 512) << ATS_FP;
@@ -752,19 +797,19 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
     const int * restrict y_proj2 = s->y_proj2;
     const ats_band_t * restrict bands = s->bands;
     const int16_t * restrict wave_lut = s->wave_lut;
-    const int edge_glow_active = edge_flash_arg > 0;
+    const int edge_glow_active = edge_flash_eff > 0;
 
 #pragma omp parallel num_threads(threads)
     {
-#pragma omp for simd schedule(static) nowait
+#pragma omp for schedule(static) nowait
         for(int i = 0; i < len; i++)
             src_y[i] = Y[i];
 
-#pragma omp for simd schedule(static) nowait
+#pragma omp for schedule(static) nowait
         for(int i = 0; i < len; i++)
             src_u[i] = U[i];
 
-#pragma omp for simd schedule(static)
+#pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
             src_v[i] = V[i];
 
@@ -776,7 +821,6 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
             const int yq = y_proj[y];
             const int yq2 = y_proj2[y];
 
-#pragma omp simd
             for(int x = 0; x < w; x++) {
                 const int i = row + x;
 
@@ -849,7 +893,7 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
                         5 + (int)(((uint32_t)(x * 13 + y * 17 + b->base_phase) + frame_a) & 7U);
 
                     int glint =
-                        (edge_total * edge_flash_arg * (14 + (b->energy >> 6))) >> 12;
+                        (edge_total * edge_flash_eff * (14 + (b->energy >> 6))) >> 12;
 
                     glint += texture > 0
                         ? ((edge_total * texture * snare_i * b->glow) >> 17)
@@ -858,11 +902,16 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
                     yy += (glint * break_mask) >> 3;
                 }
 
-                if(b->flicker > 0 && hat_i > 10 && edge_total > 0) {
+                if(b->flicker > 0 && hat_i > 10) {
                     const int pat =
                         (int)(((uint32_t)(x * 13 + y * 17 + b->base_phase) + frame_a) & 31U) - 15;
+                    const int flicker_gate = 5 + edge_total * 12;
+                    const int flicker_y = (pat * hat_i * b->flicker * flicker_gate) >> 18;
+                    const int flicker_uv = (pat * hat_i * b->flicker) >> 18;
 
-                    yy += (pat * hat_i * b->flicker * (8 + edge_total * 11)) >> 19;
+                    yy += flicker_y;
+                    uu += flicker_uv;
+                    vv -= flicker_uv >> 1;
                 }
 
                 Y[i] = ats_u8(yy);

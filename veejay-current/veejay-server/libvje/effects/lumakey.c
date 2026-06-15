@@ -22,155 +22,161 @@
 #include <veejaycore/vjmem.h>
 #include "lumakey.h"
 
+#define LUMAKEY_PARAMS 5
+
+#define P_OPACITY  0
+#define P_LUMA_MIN 1
+#define P_LUMA_MAX 2
+#define P_SOFTNESS 3
+#define P_INVERT   4
+
+typedef struct {
+    int n_threads;
+} lumakey_t;
+
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline uint8_t lumakey_mix_q8(uint8_t a, uint8_t b, int aq)
+{
+    return (uint8_t)(((int)a * aq + (int)b * (256 - aq) + 128) >> 8);
+}
+
 vj_effect *lumakey_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 5;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
 
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 255;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 255;
-    ve->limits[0][4] = 0;
-    ve->limits[1][4] = 1;
-    ve->defaults[0] = 255;
-    ve->defaults[1] = 0;
-    ve->defaults[2] = 50;
-    ve->defaults[3] = 20;
-    ve->defaults[4] = 0;
+    if(!ve)
+        return NULL;
+
+    ve->num_params = LUMAKEY_PARAMS;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
+    ve->limits[0][P_OPACITY] = 0;  ve->limits[1][P_OPACITY] = 255;  ve->defaults[P_OPACITY] = 255;
+    ve->limits[0][P_LUMA_MIN] = 0; ve->limits[1][P_LUMA_MIN] = 255; ve->defaults[P_LUMA_MIN] = 0;
+    ve->limits[0][P_LUMA_MAX] = 0; ve->limits[1][P_LUMA_MAX] = 255; ve->defaults[P_LUMA_MAX] = 50;
+    ve->limits[0][P_SOFTNESS] = 0; ve->limits[1][P_SOFTNESS] = 255; ve->defaults[P_SOFTNESS] = 20;
+    ve->limits[0][P_INVERT] = 0;   ve->limits[1][P_INVERT] = 1;     ve->defaults[P_INVERT] = 0;
+
     ve->description = "Luma Key Mixer";
     ve->extra_frame = 1;
     ve->sub_format = 1;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Luma Min", "Luma Max", "Softness", "Invert");
-    ve->hints = vje_init_value_hint_list( ve->num_params );
+
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_INVERT], P_INVERT, "Normal", "Invert");
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                       48,                 235,                14, 58, 90,   720,  0,   78,    /* Opacity */
-        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 0,                  110,                6,  22, 1600, 3400, 700, 35,    /* Luma Min */
-        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 135,                255,                6,  22, 1600, 3400, 700, 35,    /* Luma Max */
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 4,                  96,                 6,  22, 1800, 4200, 900, 30,    /* Softness */
-        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Invert */
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS,                    48,                 235,                8, 34,1200, 3200, 0,    46,
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0,    0,    0,   -1000,
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0,    0,    0,   -1000,
+        VJ_BEAT_INERTIA,          VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0,    0,    0,   -1000,
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0,    0,    0,   -1000
     );
 
     return ve;
 }
 
-typedef struct {
-	int n_threads;
-} lumakey_t;
-
-void *lumakey_malloc(int w, int h ) {
-	lumakey_t *lk = (lumakey_t*) vj_malloc(sizeof(lumakey_t));
-	if(!lk) return NULL;
-	lk->n_threads = vje_advise_num_threads(w * h);
-	return (void*) lk;
-}
-
-void lumakey_free(void *ptr) {
-	lumakey_t *lk = (lumakey_t*) ptr;
-	if(lk) {
-		free(lk);
-	}
-}
-
-static inline void lumakey_process(lumakey_t *lk, uint8_t *yuv1[3], uint8_t *yuv2[3], int width, int height,
-                            int opacity, int luma_min, int luma_max, int softness, int invert)
+void *lumakey_malloc(int w, int h)
 {
-    const unsigned int len = width * height;
+    lumakey_t *lk = (lumakey_t*) vj_malloc(sizeof(lumakey_t));
 
-    uint8_t *restrict Y1  = yuv1[0];
-    uint8_t *restrict Cb1 = yuv1[1];
-    uint8_t *restrict Cr1 = yuv1[2];
+    if(!lk)
+        return NULL;
 
-    uint8_t *restrict Y2  = yuv2[0];
-    uint8_t *restrict Cb2 = yuv2[1];
-    uint8_t *restrict Cr2 = yuv2[2];
+    lk->n_threads = vje_advise_num_threads(w * h);
 
-	int alpha_lut[256];
+    return (void*) lk;
+}
 
-    const float inv_soft = (softness > 0) ? 255.0f / (float)softness : 0.0f;
-    const float op_scale = (float)opacity / 255.0f;
+void lumakey_free(void *ptr)
+{
+    free(ptr);
+}
 
-	if(invert) {
-		for (int i = 0; i < 256; i++) {
-			int a;
+static void lumakey_build_lut(uint16_t *restrict alpha_lut,
+                              int opacity,
+                              int luma_min,
+                              int luma_max,
+                              int softness,
+                              int invert)
+{
+    const int t1 = luma_min < luma_max ? luma_min : luma_max;
+    const int t2 = luma_min < luma_max ? luma_max : luma_min;
+    const int lo = t1 - softness;
+    const int hi = t2 + softness;
 
-			if (i >= luma_min && i <= luma_max) {
-				a = 0;
-			}
-			else if (softness > 0 && i >= (luma_min - softness) && i < luma_min) {
-				a = 255 - (int)((i - (luma_min - softness)) * inv_soft);
-			}
-			else if (softness > 0 && i > luma_max && i <= (luma_max + softness)) {
-				a = (int)((i - luma_max) * inv_soft);
-			}
-			else {
-				a = 255;
-			}
+    for(int i = 0; i < 256; i++) {
+        int a;
 
-			if (a < 0) a = 0;
-			if (a > 255) a = 255;
+        if(i >= t1 && i <= t2) {
+            a = 0;
+        }
+        else if(softness > 0 && i >= lo && i < t1) {
+            a = 255 - (((i - lo) * 255 + (softness >> 1)) / softness);
+        }
+        else if(softness > 0 && i > t2 && i <= hi) {
+            a = ((i - t2) * 255 + (softness >> 1)) / softness;
+        }
+        else {
+            a = 255;
+        }
 
-			a = 255 - a;
+        a = clampi(a, 0, 255);
 
-			alpha_lut[i] = (int)(a * op_scale);
-		}
-	}
-	else {
-		for (int i = 0; i < 256; i++) {
-			int a;
+        if(invert)
+            a = 255 - a;
 
-			if (i >= luma_min && i <= luma_max) {
-				a = 0;
-			}
-			else if (softness > 0 && i >= (luma_min - softness) && i < luma_min) {
-				a = 255 - (int)((i - (luma_min - softness)) * inv_soft);
-			}
-			else if (softness > 0 && i > luma_max && i <= (luma_max + softness)) {
-				a = (int)((i - luma_max) * inv_soft);
-			}
-			else {
-				a = 255;
-			}
-
-			if (a < 0) a = 0;
-			if (a > 255) a = 255;
-
-			alpha_lut[i] = (int)(a * op_scale);
-		}
-	}
-
-#pragma omp parallel for simd schedule(static) num_threads(lk->n_threads)
-    for (unsigned int pos = 0; pos < len; pos++) {
-        uint8_t y_val = Y1[pos];
-
-        uint16_t alpha = alpha_lut[y_val];
-        uint16_t inv_alpha = 256 - alpha;
-
-        Y1[pos]  = (uint8_t)((Y1[pos]  * alpha + Y2[pos]  * inv_alpha) >> 8);
-        Cb1[pos] = (uint8_t)((Cb1[pos] * alpha + Cb2[pos] * inv_alpha) >> 8);
-        Cr1[pos] = (uint8_t)((Cr1[pos] * alpha + Cr2[pos] * inv_alpha) >> 8);
+        alpha_lut[i] = (uint16_t)(((uint32_t)a * (uint32_t)opacity * 256u + 32512u) / 65025u);
     }
 }
 
-void lumakey_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args )
+void lumakey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-	lumakey_t *lk = (lumakey_t*) ptr;
+    lumakey_t *lk = (lumakey_t*) ptr;
 
-    int opacity   = args[0];
-    int luma_min  = args[1];
-    int luma_max  = args[2];
-    int softness  = args[3];
-    int invert    = args[4];
+    const int opacity = args[P_OPACITY];
+    const int luma_min = args[P_LUMA_MIN];
+    const int luma_max = args[P_LUMA_MAX];
+    const int softness = args[P_SOFTNESS];
+    const int invert = args[P_INVERT];
+    const int len = frame->len;
 
-    lumakey_process(lk, frame->data, frame2->data, frame->width, frame->height,opacity, luma_min, luma_max, softness, invert);
+    uint16_t alpha_lut[256];
+
+    lumakey_build_lut(alpha_lut, opacity, luma_min, luma_max, softness, invert);
+
+    uint8_t *restrict Y1 = frame->data[0];
+    uint8_t *restrict Cb1 = frame->data[1];
+    uint8_t *restrict Cr1 = frame->data[2];
+
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
+
+#pragma omp parallel for schedule(static) num_threads(lk->n_threads)
+    for(int pos = 0; pos < len; pos++) {
+        const int aq = alpha_lut[Y1[pos]];
+
+        Y1[pos]  = lumakey_mix_q8(Y1[pos],  Y2[pos],  aq);
+        Cb1[pos] = lumakey_mix_q8(Cb1[pos], Cb2[pos], aq);
+        Cr1[pos] = lumakey_mix_q8(Cr1[pos], Cr2[pos], aq);
+    }
 }

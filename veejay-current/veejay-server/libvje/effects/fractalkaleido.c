@@ -19,7 +19,6 @@
 
 #include "common.h"
 #include "fractalkaleido.h"
-
 #define TWO_PI 6.28318530718f
 #define ONE_PI2 1.57079632679f
 
@@ -30,6 +29,9 @@
 
 
 typedef struct {
+    int w;
+    int h;
+    int len;
     int *map;
     float *atan_lut;
     float *sqrt_lut;
@@ -41,9 +43,6 @@ typedef struct {
     int smooth_args[10];
     int smooth_init;
     int map_ready;
-    float beat_env;
-    float beat_kick;
-    float beat_prev;
     uint8_t *buf[3];
 } fractalkaleido_t;
 
@@ -51,7 +50,7 @@ vj_effect *fractalkaleido_init(int w, int h)
 {
     vj_effect *ve = (vj_effect*) vj_calloc(sizeof(vj_effect));
 
-    ve->num_params = 11;
+    ve->num_params = 10;
 
     ve->defaults = (int*) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int*) vj_calloc(sizeof(int) * ve->num_params);
@@ -107,15 +106,10 @@ vj_effect *fractalkaleido_init(int w, int h)
     ve->limits[1][9] = 5;
     ve->defaults[9]  = 0;
 
-    // Beat Push
-    ve->limits[0][10] = 0;
-    ve->limits[1][10] = 1000;
-    ve->defaults[10]  = 0;
 
     ve->description = "Fractal Kaleido";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
     ve->has_user = 0;
 
     ve->param_description = vje_build_param_list(
@@ -129,8 +123,7 @@ vj_effect *fractalkaleido_init(int w, int h)
         "Spin Speed",
         "Twist Energy",
         "Chaos Field",
-        "Twist Mode",
-        "Beat Push"
+        "Twist Mode"
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
@@ -144,21 +137,18 @@ vj_effect *fractalkaleido_init(int w, int h)
         "Vortex Collapse Twist",
         "Inversion Twist"
     );
-
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 3,                  20,                 6,  20, 2200, 5200, 1800, 25,    /* Segment Count */
-        VJ_BEAT_HAT,                VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                                  0,                  360,                4,  26, 80,   620,  0,    52,    /* Global Rotation */
-        VJ_BEAT_KICK,               VJ_BEAT_F_CONTINUOUS,                                                   60,                 680,                14, 58, 90,   720,  0,    82,    /* Zoom */
-        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -90,                 90,                 6,  24, 1800, 4200, 900,  24,    /* Center X */
-        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -90,                 90,                 6,  24, 1800, 4200, 900,  24,    /* Center Y */
-        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Mirror Mode */
-        VJ_BEAT_HAT,                VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,   -90,                 90,                 4,  26, 80,   620,  0,    52,    /* Spin Speed */
-        VJ_BEAT_SNARE,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,   -240,                240,                10, 42, 120,  900,  0,    74,    /* Twist Energy */
-        VJ_BEAT_SNARE,              VJ_BEAT_F_CONTINUOUS,                                                   0,                  90,                 8,  36, 120,  900,  0,    68,    /* Chaos Field */
-        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Twist Mode */
-        VJ_BEAT_KICK,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                               0,                  900,                22, 88, 60,   360,  0,    100    /* Beat Push */
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,     0,    0,    -1000,
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,     0,    0,    -1000,
+        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       70, 1000,  78, 100,   40,   520,  0,    100,
+        VJ_BEAT_DRIFT,              VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_SIGN_LOCK,                        -120,  120,  22,  92,   80,  2200,  0,     72,
+        VJ_BEAT_DRIFT,              VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_SIGN_LOCK,                        -120,  120,  22,  92,   80,  2200,  0,     72,
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,     0,    0,    -1000,
+        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,-100,  100,  48,  94,  120,  1100,  0,     78,
+        VJ_BEAT_MOTION_REACT,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,-300,  300,  84, 100,   35,   420,  0,    100,
+        VJ_BEAT_TURBULENCE,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       8,   100,  58, 100,   55,   680,  0,     92,
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,     0,    0,    -1000
     );
     return ve;
 }
@@ -187,6 +177,7 @@ static void init_sqrtatan_lut(fractalkaleido_t *f, int w, int h, int cx, int cy,
 static void init_sin_cos_lut(fractalkaleido_t *f, int n_threads)
 {
     const float step = TWO_PI / LUT_SIZE;
+#pragma omp parallel for num_threads(n_threads) schedule(static)
     for(int i = 0; i < LUT_SIZE; i++) {
         float a = i * step;
         f->sin_lut[i] = sinf(a);
@@ -197,9 +188,16 @@ static void init_sin_cos_lut(fractalkaleido_t *f, int n_threads)
 void *fractalkaleido_malloc(int w, int h)
 {
     fractalkaleido_t *s = (fractalkaleido_t*) vj_calloc(sizeof(fractalkaleido_t));
-    if(!s) return NULL;
+    if(!s)
+        return NULL;
 
-    size_t num_pixels = w * h;
+
+    size_t num_pixels = (size_t)w * (size_t)h;
+
+
+    s->w = w;
+    s->h = h;
+    s->len = (int)num_pixels;
     size_t total_floats = (num_pixels * 2) + (LUT_SIZE * 2);
 
     s->atan_lut = (float*) vj_malloc(sizeof(float) * total_floats);
@@ -229,7 +227,7 @@ void *fractalkaleido_malloc(int w, int h)
         return NULL;
     }
 
-    s->n_threads = vje_advise_num_threads(num_pixels);
+    s->n_threads = vje_advise_num_threads((int)num_pixels);
 
     init_sqrtatan_lut(s, w, h, w/2, h/2, s->n_threads);
     init_sin_cos_lut(s, s->n_threads);
@@ -240,19 +238,13 @@ void *fractalkaleido_malloc(int w, int h)
 void fractalkaleido_free(void *ptr)
 {
     fractalkaleido_t *s = (fractalkaleido_t*) ptr;
-    if(s) {
-        free(s->atan_lut);
-        free(s->buf[0]);
-        free(s->map);
-        free(s);
-    }
+
+    free(s->atan_lut);
+    free(s->buf[0]);
+    free(s->map);
+    free(s);
 }
 
-static inline float wrap_angle2(float a)
-{
-    float k = floorf(a * INV_TWO_PI);
-    return a - k * TWO_PI;
-}
 
 static inline float wrap_angle(float a)
 {
@@ -286,21 +278,9 @@ static inline float chaos_spectral(float input)
     return low  * 0.55f * mid  * 0.30f + high * 0.15f;
 }
 
-static inline int fk_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : ((v > hi) ? hi : v);
-}
-
-static inline int fk_absi(int v)
-{
-    return (v < 0) ? -v : v;
-}
-
-static inline int fk_beat_shape_q1000(int beat_push)
-{
-    int bp = fk_clampi(beat_push, 0, 1000);
-    int sq = (bp * bp + 500) / 1000;
-    return fk_clampi(((sq * 560) + (bp * 440) + 500) / 1000, 0, 1000);
 }
 
 static inline int fk_smooth_i(int current, int target, int num, int den)
@@ -317,59 +297,6 @@ static inline int fk_smooth_i(int current, int target, int num, int den)
         step = (diff > 0) ? 1 : -1;
 
     return current + step;
-}
-
-static inline int fk_push_towards(int v, int target, int drive, int strength)
-{
-    int q = fk_clampi((drive * strength + 500) / 1000, 0, 1000);
-    return v + (((target - v) * q + ((target >= v) ? 500 : -500)) / 1000);
-}
-
-static inline int fk_push_signed_abs(int v, int target_abs, int drive, int strength)
-{
-    int sign = (v < 0) ? -1 : 1;
-    int av = fk_absi(v);
-    int q = fk_clampi((drive * strength + 500) / 1000, 0, 1000);
-    int out = av + (((target_abs - av) * q + ((target_abs >= av) ? 500 : -500)) / 1000);
-
-    if (out < 0)
-        out = 0;
-
-    if (v == 0)
-        sign = 1;
-
-    return sign * out;
-}
-
-static inline void fk_update_beat_state(fractalkaleido_t *s, int beat_push, int *env_out, int *kick_out)
-{
-    int shaped = fk_beat_shape_q1000(beat_push);
-    float target = (float) shaped;
-    float diff = target - s->beat_prev;
-    float kick_target;
-
-    if (target > s->beat_env)
-        s->beat_env += (target - s->beat_env) * 0.34f;
-    else
-        s->beat_env += (target - s->beat_env) * 0.12f;
-
-    kick_target = (diff > 0.0f) ? (diff * 0.42f + target * 0.08f) : 0.0f;
-
-    if (kick_target > s->beat_kick)
-        s->beat_kick += (kick_target - s->beat_kick) * 0.46f;
-    else
-        s->beat_kick *= 0.68f;
-
-    s->beat_prev += (target - s->beat_prev) * 0.30f;
-
-    if (s->beat_env < 0.5f)
-        s->beat_env = 0.0f;
-
-    if (s->beat_kick < 0.5f)
-        s->beat_kick = 0.0f;
-
-    *env_out = fk_clampi((int)(s->beat_env + 0.5f), 0, 1000);
-    *kick_out = fk_clampi((int)(s->beat_kick + 0.5f), 0, 1000);
 }
 
 static inline int fk_wrap_index(float tx, float ty, float inv_w, float inv_h, int w, int h)
@@ -408,8 +335,8 @@ static void fractalkaleido_apply1_twistinversion(void *ptr, VJFrame *frame, int 
 {
     fractalkaleido_t *s = (fractalkaleido_t*) ptr;
 
-    const int w = frame->out_width;
-    const int h = frame->out_height;
+    const int w = frame->width;
+    const int h = frame->height;
     const int hw = w >> 1;
     const int hh = h >> 1;
 
@@ -529,8 +456,8 @@ static void fractalkaleido_apply1(void *ptr, VJFrame *frame, int *args, float ba
 {
     fractalkaleido_t *s = (fractalkaleido_t*) ptr;
 
-    const int w = frame->out_width;
-    const int h = frame->out_height;
+    const int w = frame->width;
+    const int h = frame->height;
     const int hw = w >> 1;
     const int hh = h >> 1;
 
@@ -650,8 +577,8 @@ static void fractalkaleido_apply1_segcouple(void *ptr, VJFrame *frame, int *args
 {
     fractalkaleido_t *s = (fractalkaleido_t*) ptr;
 
-    const int w = frame->out_width;
-    const int h = frame->out_height;
+    const int w = frame->width;
+    const int h = frame->height;
     const int hw = w >> 1;
     const int hh = h >> 1;
 
@@ -782,8 +709,8 @@ static void fractalkaleido_apply1_vortex(void *ptr, VJFrame *frame, int *args, f
 {
     fractalkaleido_t *s = (fractalkaleido_t*) ptr;
 
-    const int w = frame->out_width;
-    const int h = frame->out_height;
+    const int w = frame->width;
+    const int h = frame->height;
     const int hw = w >> 1;
     const int hh = h >> 1;
 
@@ -906,8 +833,8 @@ static void fractalkaleido_apply1_wave(void *ptr, VJFrame *frame, int *args, flo
 {
     fractalkaleido_t *s = (fractalkaleido_t*) ptr;
 
-    const int w = frame->out_width;
-    const int h = frame->out_height;
+    const int w = frame->width;
+    const int h = frame->height;
     const int hw = w >> 1;
     const int hh = h >> 1;
 
@@ -1098,8 +1025,8 @@ static void fractalkaleido_apply1_radialclassic(void *ptr, VJFrame *frame, int *
 {
     fractalkaleido_t *s = (fractalkaleido_t*) ptr;
 
-    const int w = frame->out_width;
-    const int h = frame->out_height;
+    const int w = frame->width;
+    const int h = frame->height;
     const int hw = w >> 1;
     const int hh = h >> 1;
 
@@ -1196,6 +1123,12 @@ static void fractalkaleido_apply1_radialclassic(void *ptr, VJFrame *frame, int *
 void fractalkaleido_apply(void *ptr, VJFrame *frame, int *args) {
     fractalkaleido_t *s = (fractalkaleido_t*) ptr;
 
+
+    const int w = frame->width;
+    const int h = frame->height;
+    const int len = frame->len;
+
+
     uint8_t *restrict srcY = frame->data[0];
     uint8_t *restrict srcU = frame->data[1];
     uint8_t *restrict srcV = frame->data[2];
@@ -1203,47 +1136,22 @@ void fractalkaleido_apply(void *ptr, VJFrame *frame, int *args) {
     uint8_t *restrict outU = s->buf[1];
     uint8_t *restrict outV = s->buf[2];
 
-    const int w = frame->out_width;
-    const int h = frame->out_height;
-    const int len = w * h;
-
-    int eff[11];
+    int eff[10];
     int map_args[10];
-    int beat_env;
-    int beat_kick;
-    int beat_drive;
     int needs_update;
     int changed;
 
-    eff[0]  = fk_clampi(args[0], 2, 48);
-    eff[1]  = fk_clampi(args[1], 0, 360);
-    eff[2]  = fk_clampi(args[2], 1, 1000);
-    eff[3]  = fk_clampi(args[3], -200, 200);
-    eff[4]  = fk_clampi(args[4], -200, 200);
+    eff[0]  = args[0];
+    eff[1]  = args[1];
+    eff[2]  = args[2];
+    eff[3]  = args[3];
+    eff[4]  = args[4];
     eff[5]  = args[5] ? 1 : 0;
-    eff[6]  = fk_clampi(args[6], -100, 100);
-    eff[7]  = fk_clampi(args[7], -300, 300);
-    eff[8]  = fk_clampi(args[8], 0, 100);
-    eff[9]  = fk_clampi(args[9], 0, 5);
-    eff[10] = fk_clampi(args[10], 0, 1000);
+    eff[6]  = args[6];
+    eff[7]  = args[7];
+    eff[8]  = args[8];
+    eff[9]  = args[9];
 
-    fk_update_beat_state(s, eff[10], &beat_env, &beat_kick);
-
-    beat_drive = fk_clampi(beat_env + (beat_kick >> 1), 0, 1000);
-
-    if (beat_drive > 0) {
-        int sign = (eff[7] < 0) ? -1 : 1;
-
-        eff[1] = fk_clampi(eff[1] + ((beat_env * 10 + beat_kick * 16 + 500) / 1000), 0, 360);
-        eff[2] = fk_clampi(fk_push_towards(eff[2], 360, beat_drive, 280), 1, 1000);
-        eff[6] = fk_clampi(fk_push_signed_abs(eff[6], 82, beat_drive, 330), -100, 100);
-
-        if (eff[7] == 0)
-            sign = 1;
-
-        eff[7] = fk_clampi(sign * fk_absi(fk_push_signed_abs(eff[7], 205, beat_drive, 430)), -300, 300);
-        eff[8] = fk_clampi(fk_push_towards(eff[8], 78, beat_drive, 390), 0, 100);
-    }
 
     if (!s->smooth_init) {
         for (int i = 0; i < 10; i++)
@@ -1252,14 +1160,14 @@ void fractalkaleido_apply(void *ptr, VJFrame *frame, int *args) {
         s->smooth_init = 1;
     } else {
         s->smooth_args[0] = eff[0];
-        s->smooth_args[1] = fk_smooth_i(s->smooth_args[1], eff[1], 4, 10);
-        s->smooth_args[2] = fk_smooth_i(s->smooth_args[2], eff[2], 3, 10);
-        s->smooth_args[3] = fk_smooth_i(s->smooth_args[3], eff[3], 2, 10);
-        s->smooth_args[4] = fk_smooth_i(s->smooth_args[4], eff[4], 2, 10);
+        s->smooth_args[1] = eff[1];
+        s->smooth_args[2] = fk_smooth_i(s->smooth_args[2], eff[2], 5, 10);
+        s->smooth_args[3] = fk_smooth_i(s->smooth_args[3], eff[3], 1, 10);
+        s->smooth_args[4] = fk_smooth_i(s->smooth_args[4], eff[4], 1, 10);
         s->smooth_args[5] = eff[5];
-        s->smooth_args[6] = fk_smooth_i(s->smooth_args[6], eff[6], 3, 10);
-        s->smooth_args[7] = fk_smooth_i(s->smooth_args[7], eff[7], 3, 10);
-        s->smooth_args[8] = fk_smooth_i(s->smooth_args[8], eff[8], 3, 10);
+        s->smooth_args[6] = fk_smooth_i(s->smooth_args[6], eff[6], 4, 10);
+        s->smooth_args[7] = fk_smooth_i(s->smooth_args[7], eff[7], 5, 10);
+        s->smooth_args[8] = fk_smooth_i(s->smooth_args[8], eff[8], 5, 10);
         s->smooth_args[9] = eff[9];
     }
 
@@ -1285,11 +1193,11 @@ void fractalkaleido_apply(void *ptr, VJFrame *frame, int *args) {
         base_angle = wrap_angle(s->angle + (map_args[1] / 360.0f) * TWO_PI);
 
         switch(mode) {
-            case 4: fractalkaleido_apply1(s, frame, map_args, base_angle); break;
-            case 3: fractalkaleido_apply1_twistinversion(s, frame, map_args, base_angle); break;
-            case 2: fractalkaleido_apply1_segcouple(s, frame, map_args, base_angle); break;
             case 1: fractalkaleido_apply1_wave(s, frame, map_args, base_angle); break;
-            case 5: fractalkaleido_apply1_vortex(s, frame, map_args, base_angle); break;
+            case 2: fractalkaleido_apply1(s, frame, map_args, base_angle); break;
+            case 3: fractalkaleido_apply1_segcouple(s, frame, map_args, base_angle); break;
+            case 4: fractalkaleido_apply1_vortex(s, frame, map_args, base_angle); break;
+            case 5: fractalkaleido_apply1_twistinversion(s, frame, map_args, base_angle); break;
             case 0:
             default:
                 fractalkaleido_apply1_radialclassic(s, frame, map_args, base_angle);
@@ -1310,7 +1218,7 @@ void fractalkaleido_apply(void *ptr, VJFrame *frame, int *args) {
         outV[i] = srcV[idx];
     }
 
-    veejay_memcpy(frame->data[0], outY, frame->len);
-    veejay_memcpy(frame->data[1], outU, frame->uv_len);
-    veejay_memcpy(frame->data[2], outV, frame->uv_len);
+    veejay_memcpy(frame->data[0], outY, len);
+    veejay_memcpy(frame->data[1], outU, len);
+    veejay_memcpy(frame->data[2], outV, len);
 }

@@ -21,103 +21,100 @@
 #include "common.h"
 #include "cosmichue.h"
 
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
 vj_effect *cosmichue_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
     ve->num_params = 4;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 2000;
-    ve->defaults[0] = 100;
-
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 2000;
-    ve->defaults[1] = 100;
-
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
-    ve->defaults[2] = 100;
-
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 3600;
-    ve->defaults[3] = 0;
+    ve->limits[0][0] = 0; ve->limits[1][0] = 2000; ve->defaults[0] = 100;
+    ve->limits[0][1] = 0; ve->limits[1][1] = 2000; ve->defaults[1] = 100;
+    ve->limits[0][2] = 0; ve->limits[1][2] = 255;  ve->defaults[2] = 100;
+    ve->limits[0][3] = 0; ve->limits[1][3] = 3600; ve->defaults[3] = 0;
 
     ve->description = "Cosmic Hue";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Amplitude", "Frequency", "Opacity", "Hue Shift" );
+    ve->param_description = vje_build_param_list(ve->num_params, "Amplitude", "Frequency", "Opacity", "Hue Shift");
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_KICK,              VJ_BEAT_F_CONTINUOUS,                    80,  1100, 14, 58, 90,   720,  0,   84, /* Amplitude */
-        VJ_BEAT_GEOMETRY_FREQUENCY,VJ_BEAT_F_PHRASE_ONLY,                   40,  760,  6,  22, 1800, 4200, 900, 30, /* Frequency */
-        VJ_BEAT_KICK,              VJ_BEAT_F_CONTINUOUS,                    80,  255,  14, 58, 90,   720,  0,   82, /* Opacity */
-        VJ_BEAT_HAT,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,   0,   3600, 4,  24, 80,   520,  0,   48  /* Hue Shift */
+        VJ_BEAT_COLOR_AMOUNT,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                100,  1650, 18, 68,  650, 2600, 0,    90,
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 60,  1250, 5,  18, 3200, 8600, 2400, 20,
+        VJ_BEAT_SOURCE_MIX,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                72,   255,  16, 62,  700, 2600, 0,    84,
+        VJ_BEAT_COLOR_PHASE,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                         0,    3600, 14, 58,  800, 2800, 0,    78
     );
+
     return ve;
 }
 
 void cosmichue_apply(void *ptr, VJFrame *frame, int *args)
 {
+    (void) ptr;
+
+    const int amplitude_arg = args[0];
+    const int frequency_arg = args[1];
     const int opacity = args[2];
+    const int hue_arg = args[3];
     const int len = frame->len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
+    const int n_threads = vje_advise_num_threads(uv_len);
 
-    const int n_threads = vje_advise_num_threads(len);
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict U = frame->data[1];
+    uint8_t *restrict V = frame->data[2];
 
-    uint8_t *Y = frame->data[0];
-    uint8_t *U = frame->data[1];
-    uint8_t *V = frame->data[2];
-
-    const float amplitude = args[0] * 0.1f;
-    const float frequency = args[1] * 0.1f;
-
-    float hue_shift = args[3] * 0.1f;
-    hue_shift *= (float)(M_PI / 180.0);
-    hue_shift = fmodf(hue_shift, (float)(2.0 * M_PI));
-    if (hue_shift < 0.0f)
-        hue_shift += (float)(2.0 * M_PI);
-
+    const float amplitude = (float)amplitude_arg * 0.1f;
+    const float frequency = (float)frequency_arg * 0.1f;
     float sin_lut[256];
     float cos_lut[256];
-    float hsin_lut[256];
-    float hcos_lut[256];
-    const float angle_step = (float)(2.0 * M_PI / 256.0);
 
-    for (int i = 0; i < 256; i++) {
-        float luminance = i / 255.0f;
-        float angle = i * angle_step;
-        sin_lut[i]  = amplitude * a_sin(frequency * luminance);
-        cos_lut[i]  = amplitude * a_cos(frequency * luminance);
-        hsin_lut[i] = a_sin(angle);
-        hcos_lut[i] = a_cos(angle);
+    for(int i = 0; i < 256; i++)
+    {
+        const float luminance = (float)i * (1.0f / 255.0f);
+        const float phase = frequency * luminance;
+
+        sin_lut[i] = amplitude * a_sin(phase);
+        cos_lut[i] = amplitude * a_cos(phase);
     }
 
-    const int angle_index = (int)((hue_shift / (float)(2.0 * M_PI)) * 256.0f) & 0xFF;
-    const float cos_val = hcos_lut[angle_index];
-    const float sin_val = hsin_lut[angle_index];
+    float hue_shift = (float)hue_arg * 0.1f;
+    hue_shift *= (float)(M_PI / 180.0);
+    hue_shift = fmodf(hue_shift, (float)(2.0 * M_PI));
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for (int i = 0; i < len; i++) {
+    if(hue_shift < 0.0f)
+        hue_shift += (float)(2.0 * M_PI);
+
+    const float cos_val = a_cos(hue_shift);
+    const float sin_val = a_sin(hue_shift);
+    const int inv_opacity = 255 - opacity;
+
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
+    for(int i = 0; i < uv_len; i++)
+    {
         int u = (int)U[i] - 128;
         int v = (int)V[i] - 128;
+        const uint8_t y = Y[i];
 
-        float u_offset = sin_lut[Y[i]];
-        float v_offset = cos_lut[Y[i]];
+        u = (int)((float)u + sin_lut[y]);
+        v = (int)((float)v + cos_lut[y]);
 
-        u = (int)(u + u_offset);
-        v = (int)(v + v_offset);
+        int u_rot = 128 + (int)((float)u * cos_val - (float)v * sin_val);
+        int v_rot = 128 + (int)((float)u * sin_val + (float)v * cos_val);
 
-        int u_rot = 128 + (int)(u * cos_val - v * sin_val);
-        int v_rot = 128 + (int)(u * sin_val + v * cos_val);
+        u_rot = clampi(u_rot, 0, 255);
+        v_rot = clampi(v_rot, 0, 255);
 
-        u_rot = (u_rot < 0) ? 0 : (u_rot > 255 ? 255 : u_rot);
-        v_rot = (v_rot < 0) ? 0 : (v_rot > 255 ? 255 : v_rot);
-
-        U[i] = (uint8_t)((opacity * u_rot + (255 - opacity) * U[i]) >> 8);
-        V[i] = (uint8_t)((opacity * v_rot + (255 - opacity) * V[i]) >> 8);
+        U[i] = (uint8_t)((opacity * u_rot + inv_opacity * (int)U[i]) >> 8);
+        V[i] = (uint8_t)((opacity * v_rot + inv_opacity * (int)V[i]) >> 8);
     }
 }

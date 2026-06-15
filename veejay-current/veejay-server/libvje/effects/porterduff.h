@@ -22,6 +22,4 @@
 #define PORTERDUFF_H
 vj_effect *porterduff_init(int w, int h);
 void porterduff_apply( void *ptr, VJFrame *frame, VJFrame *frame2,int *args );
-void *porterduff_malloc(int w, int h);
-void porterduff_free(void *ptr);
 #endif

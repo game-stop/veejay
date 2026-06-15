@@ -79,14 +79,14 @@ typedef struct {
     float p2_y;
 } blackhole_t;
 
-static inline int st_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
 }
 
 static inline uint8_t st_u8(int v)
 {
-    return (uint8_t) st_clampi(v, 0, 255);
+    return (uint8_t) clampi(v, 0, 255);
 }
 
 static inline float st_clampf(float v, float lo, float hi)
@@ -313,10 +313,10 @@ static inline int st_bilinear_sample_clamp(
     wx = (int) ((fx - (float) ix) * 256.0f);
     wy = (int) ((fy - (float) iy) * 256.0f);
 
-    x0 = st_clampi(ix, 0, w - 1);
-    y0 = st_clampi(iy, 0, rows - 1);
-    x1 = st_clampi(ix + 1, 0, w - 1);
-    y1 = st_clampi(iy + 1, 0, rows - 1);
+    x0 = clampi(ix, 0, w - 1);
+    y0 = clampi(iy, 0, rows - 1);
+    x1 = clampi(ix + 1, 0, w - 1);
+    y1 = clampi(iy + 1, 0, rows - 1);
 
     p00 = src[y0 * w + x0];
     p10 = src[y0 * w + x1];
@@ -364,13 +364,13 @@ static inline void st_apply_pixel_from_index(
     int fb_use;
     int inv_use;
 
-    yv = st_clampi(yv - redshift - shadow + ring, 0, 255);
+    yv = clampi(yv - redshift - shadow + ring, 0, 255);
 
     fb_use = fb;
     if (local_fb > fb_use)
         fb_use = local_fb;
 
-    fb_use = st_clampi(fb_use, 0, 255);
+    fb_use = clampi(fb_use, 0, 255);
     inv_use = 255 - fb_use;
 
     if (fb_use > 0) {
@@ -428,13 +428,13 @@ static inline void st_apply_pixel_bilinear_y(
     int inv_use;
 
     yv = tone_lut[yv];
-    yv = st_clampi(yv - redshift - shadow + ring, 0, 255);
+    yv = clampi(yv - redshift - shadow + ring, 0, 255);
 
     fb_use = fb;
     if (local_fb > fb_use)
         fb_use = local_fb;
 
-    fb_use = st_clampi(fb_use, 0, 255);
+    fb_use = clampi(fb_use, 0, 255);
     inv_use = 255 - fb_use;
 
     if (fb_use > 0) {
@@ -841,17 +841,16 @@ vj_effect *blackhole_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SIGNED_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -900, 900,  10, 38,  900,  2400, 0,    62, /* Accretion Speed */
-        VJ_BEAT_KICK,                VJ_BEAT_F_CONTINUOUS,                                             22,   96,   18, 68,  90,   760,  0,    92, /* Lens Mass */
-        VJ_BEAT_GEOMETRY_FREQUENCY,  VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                        0,    8,    8,  26,  1800, 3800, 1200, 30, /* Caustic Folds */
-        VJ_BEAT_SIGNED_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -70,  70,   8,  32,  1000, 2600, 0,    48, /* Spin Drag */
-        VJ_BEAT_SIGNED_CURVE,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -70,  70,   8,  30,  1200, 2800, 0,    44, /* Accretion Pitch */
-        VJ_BEAT_MEMORY,              VJ_BEAT_F_CONTINUOUS,                                             0,    52,   8,  34,  1400, 3600, 0,    42, /* Echo Memory */
-        VJ_BEAT_KICK,                VJ_BEAT_F_PHRASE_ONLY,                                            8,    68,   8,  30,  1600, 3800, 900,  36, /* Core Size */
-        VJ_BEAT_MOTION_REACT,        VJ_BEAT_F_CONTINUOUS,                                             0,    62,   10, 38,  900,  2400, 0,    58, /* Source Gravity */
-        VJ_BEAT_SNARE,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                             0,    300,  10, 42,  120,  900,  0,    76, /* Merger Cycle */
-        VJ_BEAT_SNARE,               VJ_BEAT_F_CONTINUOUS,                                             16,   96,   14, 58,  100,  780,  0,    86  /* Caustic Strength */
+        VJ_BEAT_SIGNED_SPEED,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -980, 980, 14, 54,  900, 3000, 0,    76,
+        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         32,  94,  14, 58,  900, 2800, 0,    82,
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                             1,   10,  3,  8,  3600, 9400, 2600, 14,
+        VJ_BEAT_SIGNED_SPEED,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -76,  76,  10, 42, 1100, 3400, 0,    58,
+        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -82,  82,  9,  34, 1300, 4200, 0,    52,
+        VJ_BEAT_MEMORY,             VJ_BEAT_F_CONTINUOUS,                                                   4,   68,  10, 42, 1200, 4200, 0,    66,
+        VJ_BEAT_WINDOW_RADIUS,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_CONTINUOUS,                            10,  58,  4,  14, 3400, 9000, 2400, 16,
+        VJ_BEAT_MOTION_REACT,       VJ_BEAT_F_CONTINUOUS,                                                   0,   72,  8,  30, 1600, 4800, 0,    44,
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,           35,  285, 4,  14, 4200, 11000, 3000, 18,
+        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS,                                                   24,  94,  12, 52,  900, 3000, 0,    74
     );
 
     return ve;
@@ -881,9 +880,6 @@ void *blackhole_malloc(int w, int h)
     t->seeded = 0;
     t->frame = 0;
     t->n_threads = vje_advise_num_threads(w * h);
-
-    if (t->n_threads <= 0)
-        t->n_threads = 1;
 
     t->region = vj_malloc(total);
     if (!t->region) {
@@ -1125,16 +1121,16 @@ void blackhole_apply(void *ptr, VJFrame *frame, int *args)
 
     process_len = rows * w;
 
-    speed      = st_clampi(args[P_SPEED],    -2000, 2000);
-    lens       = st_clampi(args[P_LENS],     0, 100);
-    folds_i    = st_clampi(args[P_FOLDS],    0, 12);
-    spin_i     = st_clampi(args[P_SPIN],     -100, 100);
-    spiral_i   = st_clampi(args[P_SPIRAL],   -100, 100);
-    feedback_i = st_clampi(args[P_FEEDBACK], 0, 100);
-    core_i     = st_clampi(args[P_CORE],     1, 100);
-    saliency   = st_clampi(args[P_SALIENCY], 0, 100);
-    merger_i   = st_clampi(args[P_MERGER],   0, 300);
-    strength_i = st_clampi(args[P_STRENGTH], 0, 100);
+    speed      = args[P_SPEED];
+    lens       = args[P_LENS];
+    folds_i    = args[P_FOLDS];
+    spin_i     = args[P_SPIN];
+    spiral_i   = args[P_SPIRAL];
+    feedback_i = args[P_FEEDBACK];
+    core_i     = args[P_CORE];
+    saliency   = args[P_SALIENCY];
+    merger_i   = args[P_MERGER];
+    strength_i = args[P_STRENGTH];
 
     if (lens <= 0) {
         veejay_memcpy(fb_y, Y, process_len);
@@ -1250,10 +1246,10 @@ void blackhole_apply(void *ptr, VJFrame *frame, int *args)
     fb = (feedback_i * 255) / 100;
     fb = (int) ((float) fb * lens_curve);
     fb += (int) (collision_pulse * 18.0f);
-    fb = st_clampi(fb, 0, 255);
+    fb = clampi(fb, 0, 255);
 
     tone_mix = (int) (lens_curve * 255.0f + 0.5f);
-    tone_mix = st_clampi(tone_mix, 0, 255);
+    tone_mix = clampi(tone_mix, 0, 255);
 
     for (i = 0; i < 256; i++) {
         int g = t->gamma_lut[i];
@@ -1511,7 +1507,7 @@ void blackhole_apply(void *ptr, VJFrame *frame, int *args)
                     float light = light_wave * 0.5f + 0.5f;
 
                     caustic_glint = (int) (light * local_ring * accretion_glint_scale);
-                    caustic_glint = st_clampi(caustic_glint, 0, 40);
+                    caustic_glint = clampi(caustic_glint, 0, 40);
                 }
             }
             else {
@@ -1521,7 +1517,7 @@ void blackhole_apply(void *ptr, VJFrame *frame, int *args)
                     float light = light_wave * 0.5f + 0.5f;
 
                     caustic_glint = (int) (light * local_ring * (2.0f + 9.0f * lens_curve) * speed_amt);
-                    caustic_glint = st_clampi(caustic_glint, 0, 12);
+                    caustic_glint = clampi(caustic_glint, 0, 12);
                 }
             }
 
@@ -1534,26 +1530,26 @@ void blackhole_apply(void *ptr, VJFrame *frame, int *args)
             redshift = (int) ((inv1 + inv2) * redshift_scale);
             redshift += (int) (collision_pulse * local * 34.0f);
             redshift += (int) (rd_neg * local * 18.0f);
-            redshift = st_clampi(redshift, 0, 104);
+            redshift = clampi(redshift, 0, 104);
 
             merger_glow = (int) (merger_glow_scale * local_ring);
-            merger_glow = st_clampi(merger_glow, 0, 58);
+            merger_glow = clampi(merger_glow, 0, 58);
 
             event_shadow = (int) (event_shadow_scale * local_core);
             event_shadow += (int) (collision_pulse * local_core * 34.0f);
-            event_shadow = st_clampi(event_shadow, 0, 96);
+            event_shadow = clampi(event_shadow, 0, 96);
 
             ringdown_shadow_i = (int) (rd_neg * local_core * 28.0f);
-            ringdown_shadow_i = st_clampi(ringdown_shadow_i, 0, 32);
+            ringdown_shadow_i = clampi(ringdown_shadow_i, 0, 32);
 
             event_shadow += ringdown_shadow_i;
-            event_shadow = st_clampi(event_shadow, 0, 112);
+            event_shadow = clampi(event_shadow, 0, 112);
 
             photon_rim = (int) (local_ring * (8.0f + 20.0f * lens_curve + 24.0f * collision_pulse));
-            photon_rim = st_clampi(photon_rim, 0, 52);
+            photon_rim = clampi(photon_rim, 0, 52);
 
             ringdown_glow_i = (int) (rd_pos * ringdown_glow_scale * (0.35f + 0.65f * local_ring));
-            ringdown_glow_i = st_clampi(ringdown_glow_i, 0, 54);
+            ringdown_glow_i = clampi(ringdown_glow_i, 0, 54);
 
             {
                 float bare1 = r21 - core2;
@@ -1573,7 +1569,7 @@ void blackhole_apply(void *ptr, VJFrame *frame, int *args)
                 ring += caustic_glint;
                 ring += merger_glow;
                 ring += ringdown_glow_i;
-                ring = st_clampi(ring, 0, 126);
+                ring = clampi(ring, 0, 126);
             }
 
             local_fb = fb + (int) (collision_pulse * local * 82.0f);
@@ -1581,7 +1577,7 @@ void blackhole_apply(void *ptr, VJFrame *frame, int *args)
             if (ringdown_active)
                 local_fb += (int) (rd_env * ringdown_amp * local * 52.0f);
 
-            local_fb = st_clampi(local_fb, 0, 255);
+            local_fb = clampi(local_fb, 0, 255);
 
             use_bilinear_y = base_bilinear_y
                            || (local_core > 0.18f)

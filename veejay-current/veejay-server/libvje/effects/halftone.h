@@ -23,4 +23,6 @@
 
 vj_effect *halftone_init(int w, int h);
 void halftone_apply(void *ptr, VJFrame *frame, int *args );
+void *halftone_malloc(int w, int h);
+void halftone_free(void *ptr);
 #endif

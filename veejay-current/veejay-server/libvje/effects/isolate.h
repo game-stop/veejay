@@ -22,4 +22,6 @@
 #define ISOLATE_H
 vj_effect *isolate_init(int w, int h);
 void isolate_apply( void *ptr, VJFrame *frame, int *args );
+void *isolate_malloc(int w, int h);
+void isolate_free(void *ptr);
 #endif

@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -22,14 +22,34 @@
 #include <veejaycore/vjmem.h>
 #include "rgbchannel.h"
 
+#define RGBCHANNEL_PARAMS 3
+
+#define P_RED   0
+#define P_GREEN 1
+#define P_BLUE  2
+
 vj_effect *rgbchannel_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
+    vj_effect *ve = (vj_effect *)vj_calloc(sizeof(vj_effect));
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    if(!ve)
+        return NULL;
+
+    ve->num_params = RGBCHANNEL_PARAMS;
+    ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     for(int i = 0; i < ve->num_params; i++) {
         ve->limits[0][i] = 0;
@@ -51,54 +71,42 @@ vj_effect *rgbchannel_init(int w, int h)
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_RED],   P_RED,   "Keep", "Suppress");
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_GREEN], P_GREEN, "Keep", "Suppress");
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_BLUE],  P_BLUE,  "Keep", "Suppress");
 
-    vje_build_value_hint_list(ve->hints, ve->limits[1][0], 0, "Keep", "Suppress");
-    vje_build_value_hint_list(ve->hints, ve->limits[1][1], 1, "Keep", "Suppress");
-    vje_build_value_hint_list(ve->hints, ve->limits[1][2], 2, "Keep", "Suppress");
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000, /* Red */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000, /* Green */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000  /* Blue */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000
     );
-
-    (void) w;
-    (void) h;
 
     return ve;
 }
 
 void rgbchannel_apply(void *ptr, VJFrame *frame, int *args)
 {
-    (void) ptr;
+    (void)ptr;
 
-    if(!frame || !args || !frame->data[0])
-        return;
+    const uint8_t r_mask = args[P_RED]   ? 0x00 : 0xff;
+    const uint8_t g_mask = args[P_GREEN] ? 0x00 : 0xff;
+    const uint8_t b_mask = args[P_BLUE]  ? 0x00 : 0xff;
 
-    const int kill_r = args[0] ? 1 : 0;
-    const int kill_g = args[1] ? 1 : 0;
-    const int kill_b = args[2] ? 1 : 0;
-
-    if(!kill_r && !kill_g && !kill_b)
+    if((r_mask & g_mask & b_mask) == 0xff)
         return;
 
     const int pixels = frame->width * frame->height;
-    if(pixels <= 0)
-        return;
+    const int n_threads = vje_advise_num_threads(pixels);
 
     uint8_t *restrict rgba = frame->data[0];
-    const int n_threads = vje_advise_num_threads(pixels);
 
 #pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int i = 0; i < pixels; i++) {
-        uint8_t *p = rgba + (i << 2);
+        uint8_t *restrict p = rgba + (i << 2);
 
-        if(kill_r)
-            p[0] = 0;
-        if(kill_g)
-            p[1] = 0;
-        if(kill_b)
-            p[2] = 0;
+        p[0] &= r_mask;
+        p[1] &= g_mask;
+        p[2] &= b_mask;
     }
 }

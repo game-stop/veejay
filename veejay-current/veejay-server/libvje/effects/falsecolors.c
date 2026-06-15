@@ -20,9 +20,10 @@
 
 #include "common.h"
 #include "falsecolors.h"
+#include <math.h>
 #include <omp.h>
 
-#define FALSECOLORS_PARAMS 8
+#define FALSECOLORS_PARAMS 6
 
 #define P_MOTION_SENS   0
 #define P_CYCLE_SPEED   1
@@ -30,22 +31,19 @@
 #define P_GAMMA         3
 #define P_TRAIL_DECAY   4
 #define P_MOTION_GAIN   5
-#define P_BEAT_PUSH     6
-#define P_BEAT_SMOOTH   7
 
 typedef struct {
-    uint8_t *buf[6];
+    uint8_t *buf[3];
     uint8_t *blur;
     uint8_t rainbow[256][3];
     uint8_t gamma_lut[256];
     int timestamp;
     int n_threads;
     float phase;
-    float beat_env;
     float gamma;
 } thermal_t;
 
-static inline int fc_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
 }
@@ -53,27 +51,6 @@ static inline int fc_clampi(int v, int lo, int hi)
 static inline int fc_absi(int v)
 {
     return v < 0 ? -v : v;
-}
-
-static inline uint8_t clamp_u8(int x)
-{
-    if ((unsigned)x > 255U)
-        x = (~x >> 31) & 255;
-    return (uint8_t)x;
-}
-
-static inline int fc_beat_shape_1000(int beat_push)
-{
-    beat_push = fc_clampi(beat_push, 0, 1000);
-
-    const int sq = (beat_push * beat_push + 500) / 1000;
-    return fc_clampi((beat_push * 38 + sq * 62 + 50) / 100, 0, 1000);
-}
-
-static inline int fc_mix_towards(int v, int target, int q)
-{
-    q = fc_clampi(q, 0, 1000);
-    return fc_clampi(v + (((target - v) * q + ((target >= v) ? 500 : -500)) / 1000), 0, 1000);
 }
 
 static void build_gamma_lut(uint8_t lut[256], float gamma)
@@ -120,15 +97,12 @@ static void falsecolors_build_beat_hints(vj_effect *ve)
 {
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_PHRASE_ONLY,                    48,  178, 5,  22, 1800, 4200, 900, 24,  /* Motion Sensitivity */
-        VJ_BEAT_HAT,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,    0,   48,  4,  26, 80,   620,  0,   52,  /* Cycle Speed */
-        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS,                     128, 255, 14, 58, 90,   720,  0,   78,  /* Opacity / Heat Mix */
-        VJ_BEAT_CONTRAST,     VJ_BEAT_F_PHRASE_ONLY,                    42,  132, 5,  20, 1800, 4200, 900, 20,  /* Gamma */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                    6,   64,  5,  20, 2200, 5200, 1200,24,  /* Trail Decay */
-        VJ_BEAT_SNARE,        VJ_BEAT_F_CONTINUOUS,                     96,  820, 10, 46, 120,  900,  0,   72,  /* Motion Gain */
-        VJ_BEAT_KICK,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 0,   900, 22, 88, 60,   360,  0,   100, /* Beat Push */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY,                    260, 820, 5,  18, 2200, 5200, 1200,18   /* Beat Smooth */
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 36,  190, 14, 54,  850, 3200, 0, 76,
+        VJ_BEAT_SPEED,        VJ_BEAT_F_CONTINUOUS,                                                 0,   42,  12, 46, 1000, 3600, 0, 62,
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       120, 255, 16, 62,  700, 2800, 0, 84,
+        VJ_BEAT_CONTRAST,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,  36,  126, 10, 38, 1200, 4200, 0, 52,
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       18,  112, 16, 62,  750, 3000, 0, 86,
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       128, 900, 18, 68,  650, 2600, 0, 92
     );
 }
 
@@ -158,8 +132,6 @@ vj_effect *falsecolors_init(int w, int h)
     ve->defaults[P_GAMMA]       = 64;
     ve->defaults[P_TRAIL_DECAY] = 16;
     ve->defaults[P_MOTION_GAIN] = 256;
-    ve->defaults[P_BEAT_PUSH]   = 0;
-    ve->defaults[P_BEAT_SMOOTH] = 520;
 
     ve->limits[0][P_MOTION_SENS] = 0;    ve->limits[1][P_MOTION_SENS] = 255;
     ve->limits[0][P_CYCLE_SPEED] = 0;    ve->limits[1][P_CYCLE_SPEED] = 64;
@@ -167,8 +139,6 @@ vj_effect *falsecolors_init(int w, int h)
     ve->limits[0][P_GAMMA]       = 1;    ve->limits[1][P_GAMMA]       = 255;
     ve->limits[0][P_TRAIL_DECAY] = 1;    ve->limits[1][P_TRAIL_DECAY] = 128;
     ve->limits[0][P_MOTION_GAIN] = 0;    ve->limits[1][P_MOTION_GAIN] = 1024;
-    ve->limits[0][P_BEAT_PUSH]   = 0;    ve->limits[1][P_BEAT_PUSH]   = 1000;
-    ve->limits[0][P_BEAT_SMOOTH] = 0;    ve->limits[1][P_BEAT_SMOOTH] = 1000;
 
     ve->description = "False Color Map";
 
@@ -183,9 +153,7 @@ vj_effect *falsecolors_init(int w, int h)
         "Opacity",
         "Gamma",
         "Trail Decay",
-        "Motion Gain",
-        "Beat Push",
-        "Beat Smooth"
+        "Motion Gain"
     );
 
     falsecolors_build_beat_hints(ve);
@@ -203,10 +171,6 @@ void *falsecolors_malloc(int w, int h)
         return NULL;
 
     const int len = w * h;
-    if(len <= 0) {
-        free(s);
-        return NULL;
-    }
 
     s->buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (size_t)len * 3u);
     if(!s->buf[0]) {
@@ -222,8 +186,6 @@ void *falsecolors_malloc(int w, int h)
     veejay_memset(s->buf[2], 0, len);
 
     s->n_threads = vje_advise_num_threads(len);
-    if(s->n_threads <= 0)
-        s->n_threads = 1;
 
     thermal_build_palette(s->rainbow, 0.8f);
 
@@ -237,7 +199,6 @@ void *falsecolors_malloc(int w, int h)
 
     s->gamma = -1.0f;
     s->phase = 0.0f;
-    s->beat_env = 0.0f;
     s->timestamp = 0;
 
     return s;
@@ -247,70 +208,39 @@ void falsecolors_free(void *ptr)
 {
     thermal_t *s = (thermal_t*) ptr;
 
-    if(s) {
-        if(s->buf[0])
-            free(s->buf[0]);
-        if(s->blur)
-            free(s->blur);
-        free(s);
-    }
+    free(s->buf[0]);
+    free(s->blur);
+    free(s);
 }
 
 void falsecolors_apply(void *ptr, VJFrame *frame, int *args)
 {
     thermal_t *s = (thermal_t*) ptr;
-    if(!s || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
 
     const int w   = frame->width;
     const int h   = frame->height;
     const int len = frame->len;
+    const int opacity_user = args[P_OPACITY];
+    const int cycle_user   = args[P_CYCLE_SPEED];
+    const int sens_user    = args[P_MOTION_SENS];
+    const int gamma_user   = args[P_GAMMA];
+    const int trail_user   = args[P_TRAIL_DECAY];
+    const int gain_user    = args[P_MOTION_GAIN];
 
-    if(w <= 1 || h <= 1 || len <= 0)
-        return;
+    int sensitivity = sens_user;
+    int motion_gain = gain_user;
+    int cycle_speed = cycle_user;
+    int opacity = opacity_user;
+    int trail_decay = trail_user;
 
-    const int opacity_user = fc_clampi(args[P_OPACITY], 0, 255);
-    const int cycle_user   = fc_clampi(args[P_CYCLE_SPEED], 0, 64);
-    const int sens_user    = fc_clampi(args[P_MOTION_SENS], 0, 255);
-    const int gamma_user   = fc_clampi(args[P_GAMMA], 1, 255);
-    const int trail_user   = fc_clampi(args[P_TRAIL_DECAY], 1, 128);
-    const int gain_user    = fc_clampi(args[P_MOTION_GAIN], 0, 1024);
-    const int beat_push    = fc_clampi(args[P_BEAT_PUSH], 0, 1000);
-    const int smooth_user  = fc_clampi(args[P_BEAT_SMOOTH], 0, 1000);
-
-    const int shaped = fc_beat_shape_1000(beat_push);
-    const float beat_target = (float)shaped * 0.001f;
-    const float smooth_t = (float)smooth_user * 0.001f;
-    const float attack = 0.20f + (1.0f - smooth_t) * 0.34f;
-    const float release = 0.035f + (1.0f - smooth_t) * 0.090f;
-
-    if(beat_target > s->beat_env)
-        s->beat_env += (beat_target - s->beat_env) * attack;
-    else
-        s->beat_env += (beat_target - s->beat_env) * release;
-
-    if(s->beat_env < 0.0001f)
-        s->beat_env = 0.0f;
-    else if(s->beat_env > 1.0f)
-        s->beat_env = 1.0f;
-
-    const int beat_q = fc_clampi((int)(s->beat_env * 1000.0f + 0.5f), 0, 1000);
-
-    int sensitivity = sens_user - ((beat_q * 72 + 500) / 1000);
-    int motion_gain = gain_user + ((beat_q * 280 + 500) / 1000);
-    int cycle_speed = cycle_user + ((beat_q * 12 + 500) / 1000);
-    int opacity = opacity_user + ((beat_q * 18 + 500) / 1000);
-    int trail_decay = trail_user + ((beat_q * 10 + 500) / 1000);
-
-    sensitivity = fc_clampi(sensitivity, 0, 255);
-    motion_gain = fc_clampi(motion_gain, 0, 1024);
-    cycle_speed = fc_clampi(cycle_speed, 0, 64);
-    opacity = fc_clampi(opacity, 0, 255);
-    trail_decay = fc_clampi(trail_decay, 1, 128);
+    sensitivity = clampi(sensitivity, 0, 255);
+    motion_gain = clampi(motion_gain, 0, 1024);
+    cycle_speed = clampi(cycle_speed, 0, 64);
+    opacity = clampi(opacity, 0, 255);
+    trail_decay = clampi(trail_decay, 1, 128);
 
     const int inv_opacity = 256 - opacity;
-    const int heat_boost = (beat_q * 42 + 500) / 1000;
-    const int decay_step = fc_clampi((256 + (trail_decay >> 1)) / trail_decay, 2, 256);
+    const int decay_step = clampi((256 + (trail_decay >> 1)) / trail_decay, 2, 256);
     const float gamma = ((float)gamma_user / 64.0f) + 0.1f;
 
     uint8_t *restrict Y = frame->data[0];
@@ -388,9 +318,6 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args)
 
         int heat = (((lum - global_min) * scale_fp) >> 16) + ((motion * motion_gain) >> 7);
 
-        if(heat_boost > 0)
-            heat += heat_boost;
-
         if(heat > 255)
             heat = 255;
         else if(heat < 0)
@@ -413,7 +340,6 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args)
         if(motion > 0) {
             int jump = (motion > 48) ? 64 : (motion << 6) / 48;
 
-            jump += (beat_q * 18 + 500) / 1000;
             lut_idx = (lut_idx + jump) & 0xFF;
         }
 

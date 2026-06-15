@@ -22,124 +22,230 @@
 #include <veejaycore/vjmem.h>
 #include <math.h>
 
-typedef struct
-{
+#define GREYSELECT_PARAMS 7
+
+#define P_HUE_ANGLE 0
+#define P_RED       1
+#define P_GREEN     2
+#define P_BLUE      3
+#define P_THRESHOLD 4
+#define P_SOLIDITY  5
+#define P_SWAP      6
+
+#define GREYSELECT_SCALE 4096
+
+typedef struct {
     int n_threads;
+    int last[GREYSELECT_PARAMS];
+    int mag_fp;
+    int cos_q_fp;
+    int sin_q_fp;
+    int inv_wedge_slope_fp;
+    int inv_range_fp;
+    int black_clip_fp;
+    int swap;
 } greyselect_t;
 
-#define DIV255(x) (((x) + 1 + ((x) >> 8)) >> 8)
+static inline int greyselect_clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline int greyselect_absi(int v)
+{
+    const int m = v >> 31;
+    return (v + m) ^ m;
+}
+
+static inline int greyselect_mul255_signed(int v, int a)
+{
+    const int x = v * a;
+
+    if(x >= 0)
+        return ((x + 1 + (x >> 8)) >> 8);
+
+    {
+        const int y = -x;
+        return -((y + 1 + (y >> 8)) >> 8);
+    }
+}
 
 vj_effect *greyselect_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 7;
+
+    if(!ve)
+        return NULL;
+
+    ve->num_params = GREYSELECT_PARAMS;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->defaults[0] = 4500; /* Hue Angle */
-    ve->defaults[1] = 255;  /* Red */
-    ve->defaults[2] = 0;    /* Green */
-    ve->defaults[3] = 0;    /* Blue */
-    ve->defaults[4] = 40;   /* Threshold (Min saturation) */
-    ve->defaults[5] = 160;  /* Solidity (Max saturation) */
-    ve->defaults[6] = 0;    /* Swap */
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
-    ve->limits[0][0] = 500;  ve->limits[1][0] = 8500;
-    ve->limits[0][1] = 0;    ve->limits[1][1] = 255;
-    ve->limits[0][2] = 0;    ve->limits[1][2] = 255;
-    ve->limits[0][3] = 0;    ve->limits[1][3] = 255;
-    ve->limits[0][4] = 0;    ve->limits[1][4] = 255;
-    ve->limits[0][5] = 1;    ve->limits[1][5] = 255;
-    ve->limits[0][6] = 0;    ve->limits[1][6] = 1;
+    ve->defaults[P_HUE_ANGLE] = 4500;
+    ve->defaults[P_RED] = 255;
+    ve->defaults[P_GREEN] = 0;
+    ve->defaults[P_BLUE] = 0;
+    ve->defaults[P_THRESHOLD] = 40;
+    ve->defaults[P_SOLIDITY] = 160;
+    ve->defaults[P_SWAP] = 0;
+
+    ve->limits[0][P_HUE_ANGLE] = 500;  ve->limits[1][P_HUE_ANGLE] = 8500;
+    ve->limits[0][P_RED] = 0;          ve->limits[1][P_RED] = 255;
+    ve->limits[0][P_GREEN] = 0;        ve->limits[1][P_GREEN] = 255;
+    ve->limits[0][P_BLUE] = 0;         ve->limits[1][P_BLUE] = 255;
+    ve->limits[0][P_THRESHOLD] = 0;    ve->limits[1][P_THRESHOLD] = 255;
+    ve->limits[0][P_SOLIDITY] = 1;     ve->limits[1][P_SOLIDITY] = 255;
+    ve->limits[0][P_SWAP] = 0;         ve->limits[1][P_SWAP] = 1;
 
     ve->description = "Grayscale by Color Key (Advanced)";
-    ve->param_description = vje_build_param_list(ve->num_params,
-        "Hue Angle", "Red", "Green", "Blue", "Threshold", "Solidity", "Swap");
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Hue Angle",
+        "Red",
+        "Green",
+        "Blue",
+        "Threshold",
+        "Solidity",
+        "Swap"
+    );
 
     ve->has_user = 0;
     ve->extra_frame = 0;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
 
-        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    1500,               7200,               8,  36, 120, 900, 0,   64,    /* Hue Angle */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Red */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Green */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000, /* Blue */
-        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    12,                 120,                8,  36, 120, 900, 0,   70,    /* Threshold */
-        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS,                    96,                 235,                14, 58, 90,  720, 0,   74,    /* Solidity */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,   0,   -1000  /* Swap */
-    );
     return ve;
 }
 
-void *greyselect_malloc(int w, int h) {
+void *greyselect_malloc(int w, int h)
+{
     greyselect_t *g = (greyselect_t*) vj_malloc(sizeof(greyselect_t));
-    if(!g) return NULL;
+
+    if(!g)
+        return NULL;
+
+    for(int i = 0; i < GREYSELECT_PARAMS; i++)
+        g->last[i] = -1000000;
+
+    g->mag_fp = GREYSELECT_SCALE;
+    g->cos_q_fp = GREYSELECT_SCALE;
+    g->sin_q_fp = 0;
+    g->inv_wedge_slope_fp = GREYSELECT_SCALE;
+    g->inv_range_fp = 255 << 8;
+    g->black_clip_fp = 0;
+    g->swap = 0;
     g->n_threads = vje_advise_num_threads(w * h);
+
     return (void*) g;
 }
 
-void greyselect_free(void *ptr) {
-    if(ptr) free(ptr);
+void greyselect_free(void *ptr)
+{
+    free(ptr);
 }
 
-void greyselect_apply(void *ptr, VJFrame *frame, int *args) {
-    greyselect_t *gs = (greyselect_t*) ptr;
-    int iy, iu, iv;
-    int n_threads = gs->n_threads;
-    _rgb2yuv(args[1], args[2], args[3], iy, iu, iv);
+static void greyselect_update_cache(greyselect_t *g, const int *args)
+{
+    int changed = 0;
 
-    const int SCALE = 4096;
+    for(int i = 0; i < GREYSELECT_PARAMS; i++) {
+        if(args[i] != g->last[i]) {
+            changed = 1;
+            break;
+        }
+    }
+
+    if(!changed)
+        return;
+
+    const int angle = greyselect_clampi(args[P_HUE_ANGLE], 500, 8500);
+    const int red = greyselect_clampi(args[P_RED], 0, 255);
+    const int green = greyselect_clampi(args[P_GREEN], 0, 255);
+    const int blue = greyselect_clampi(args[P_BLUE], 0, 255);
+    const int threshold = greyselect_clampi(args[P_THRESHOLD], 0, 255);
+    const int solidity = greyselect_clampi(args[P_SOLIDITY], 1, 255);
+
+    int iy = 0;
+    int iu = 128;
+    int iv = 128;
+
+    _rgb2yuv(red, green, blue, iy, iu, iv);
+
     const float ut_f = (float)iu - 128.0f;
     const float vt_f = (float)iv - 128.0f;
-
     float mag_f = sqrtf(ut_f * ut_f + vt_f * vt_f);
-    if (mag_f < 1.0f) mag_f = 1.0f;
 
-    const int mag_fp   = (int)(mag_f * SCALE);
-    const int cos_q_fp = (int)((ut_f / mag_f) * SCALE);
-    const int sin_q_fp = (int)((vt_f / mag_f) * SCALE);
+    if(mag_f < 1.0f)
+        mag_f = 1.0f;
 
-    const float angle_rad = ((float)args[0] / 100.0f) * (3.14159265f / 180.0f);
-    const int inv_wedge_slope_fp = (int)((1.0f / tanf(angle_rad)) * SCALE);
+    const float angle_rad = ((float)angle * 0.01f) * (3.14159265358979323846f / 180.0f);
+    const float t = tanf(angle_rad);
+    const int range = solidity > threshold ? solidity - threshold : 1;
 
-    const float diff = (float)args[5] - (float)args[4];
-    const int inv_range_fp = (int)((255.0f / (diff < 1.0f ? 1.0f : diff)) * (1 << 8));
-    const int black_clip_fp = (int)(args[4] * SCALE);
+    g->mag_fp = (int)(mag_f * (float)GREYSELECT_SCALE + 0.5f);
+    g->cos_q_fp = (int)((ut_f / mag_f) * (float)GREYSELECT_SCALE + (ut_f >= 0.0f ? 0.5f : -0.5f));
+    g->sin_q_fp = (int)((vt_f / mag_f) * (float)GREYSELECT_SCALE + (vt_f >= 0.0f ? 0.5f : -0.5f));
+    g->inv_wedge_slope_fp = (int)((1.0f / t) * (float)GREYSELECT_SCALE + 0.5f);
+    g->inv_range_fp = (int)((255.0f / (float)range) * 256.0f + 0.5f);
+    g->black_clip_fp = threshold * GREYSELECT_SCALE;
+    g->swap = args[P_SWAP] ? 1 : 0;
 
-    const int swap = args[6];
+    for(int i = 0; i < GREYSELECT_PARAMS; i++)
+        g->last[i] = args[i];
+}
+
+void greyselect_apply(void *ptr, VJFrame *frame, int *args)
+{
+    greyselect_t *g = (greyselect_t*) ptr;
+
+    greyselect_update_cache(g, args);
+
+    const int mag_fp = g->mag_fp;
+    const int cos_q_fp = g->cos_q_fp;
+    const int sin_q_fp = g->sin_q_fp;
+    const int inv_wedge_slope_fp = g->inv_wedge_slope_fp;
+    const int inv_range_fp = g->inv_range_fp;
+    const int black_clip_fp = g->black_clip_fp;
+    const int swap = g->swap;
+    const int len = frame->len;
 
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
-    const int len = frame->len;
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
-    for (int pos = 0; pos < len; pos++) {
-        int uc = (int)Cb[pos] - 128;
-        int vc = (int)Cr[pos] - 128;
+#pragma omp parallel for schedule(static) num_threads(g->n_threads)
+    for(int pos = 0; pos < len; pos++) {
+        const int uc = (int)Cb[pos] - 128;
+        const int vc = (int)Cr[pos] - 128;
 
-        int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
-        int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
-        int abs_yy = (yy < 0) ? -yy : yy;
+        const int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
+        const int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
+        const int abs_yy = greyselect_absi(yy);
 
-        int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
+        const int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
         int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
 
-        if (alpha < 0) alpha = 0;
-        if (alpha > 255) alpha = 255;
+        if(!swap)
+            alpha = 255 - alpha;
 
-        if (!swap) alpha = 255 - alpha;
-        if (alpha == 0) {
+        if(alpha == 0) {
             Cb[pos] = 128;
             Cr[pos] = 128;
-        } else if (alpha < 255) {
-            Cb[pos] = 128 + DIV255(uc * alpha);
-            Cr[pos] = 128 + DIV255(vc * alpha);
         }
-
+        else if(alpha < 255) {
+            Cb[pos] = (uint8_t)greyselect_clampi(128 + greyselect_mul255_signed(uc, alpha), 0, 255);
+            Cr[pos] = (uint8_t)greyselect_clampi(128 + greyselect_mul255_signed(vc, alpha), 0, 255);
+        }
     }
-    
 }

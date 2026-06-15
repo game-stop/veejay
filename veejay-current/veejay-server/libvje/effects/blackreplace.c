@@ -24,94 +24,59 @@
 vj_effect *blackreplace_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 5;
 
-    ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->num_params = 5;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 512;
-    ve->defaults[0]  = 120;
-
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 128;
-    ve->defaults[1]  = 24;
-
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
-    ve->defaults[2]  = 150;
-
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 255;
-    ve->defaults[3]  = 120;
-
-    ve->limits[0][4] = 0;
-    ve->limits[1][4] = 255;
-    ve->defaults[4]  = 250;
+    ve->limits[0][0] = 0; ve->limits[1][0] = 512; ve->defaults[0] = 120;
+    ve->limits[0][1] = 1; ve->limits[1][1] = 128; ve->defaults[1] = 24;
+    ve->limits[0][2] = 0; ve->limits[1][2] = 255; ve->defaults[2] = 150;
+    ve->limits[0][3] = 0; ve->limits[1][3] = 255; ve->defaults[3] = 120;
+    ve->limits[0][4] = 0; ve->limits[1][4] = 255; ve->defaults[4] = 250;
 
     ve->description = "Replace Black with Color (Darkness Key)";
-    ve->sub_format  = 1;
+    ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel    = 0;
-    ve->has_user    = 0;
+    ve->parallel = 0;
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(ve->num_params, "Threshold", "Softness", "Red", "Green", "Blue");
 
-    ve->param_description = vje_build_param_list(
-        ve->num_params,
-        "Threshold",
-        "Softness",
-        "Red",
-        "Green",
-        "Blue"
-    );
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_MOTION_REACT,
-        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
-        24, 220,
-        6, 22, 1600, 3600, 900, 30, /* Threshold */
-
-        VJ_BEAT_DETAIL,
-        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,
-        4, 72,
-        6, 22, 1800, 4200, 900, 24, /* Softness */
-
-        VJ_BEAT_COLOR_AMOUNT,
-        VJ_BEAT_F_PHRASE_ONLY,
-        32, 255,
-        5, 18, 2200, 5200, 1200, 18, /* Red */
-
-        VJ_BEAT_COLOR_AMOUNT,
-        VJ_BEAT_F_PHRASE_ONLY,
-        32, 220,
-        5, 18, 2200, 5200, 1200, 18, /* Green */
-
-        VJ_BEAT_COLOR_AMOUNT,
-        VJ_BEAT_F_PHRASE_ONLY,
-        64, 255,
-        5, 18, 2200, 5200, 1200, 18 /* Blue */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 48,  320, 12, 48, 1000, 3200, 0,    72,
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 6,   92,  8,  30, 1200, 3800, 0,    44,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                           24,  255, 14, 58,  900, 2800, 0,    70,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                           16,  238, 12, 50,  900, 3000, 0,    62,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                           48,  255, 14, 60,  900, 2800, 0,    74
     );
+
     return ve;
 }
 
 typedef struct {
-  int n_threads;
+    int n_threads;
 } blackreplace_t;
 
-void *blackreplace_malloc(int w, int h) {
+void *blackreplace_malloc(int w, int h)
+{
     blackreplace_t *br = (blackreplace_t*) vj_calloc(sizeof(blackreplace_t));
+
     if(!br)
         return NULL;
-    br->n_threads = vje_advise_num_threads(w*h);
-    return (void*) br;
+
+    br->n_threads = vje_advise_num_threads(w * h);
+
+    return br;
 }
 
-void blackreplace_free(void *ptr ) {
+void blackreplace_free(void *ptr)
+{
     blackreplace_t *br = (blackreplace_t*) ptr;
-    if(br) {
+
+    if(br)
         free(br);
-    }
 }
 
 static inline uint8_t blend_u8(uint8_t a, uint8_t b, int t)
@@ -122,19 +87,23 @@ static inline uint8_t blend_u8(uint8_t a, uint8_t b, int t)
 void blackreplace_apply(void *ptr, VJFrame *frame, int *args)
 {
     blackreplace_t *br = (blackreplace_t*) ptr;
+
     const int threshold = args[0];
-    const int softness  = args[1];
-    const int red   = args[2];
+    const int softness = args[1];
+    const int red = args[2];
     const int green = args[3];
-    const int blue  = args[4];
+    const int blue = args[4];
     const int len = frame->len;
     const int n_threads = br->n_threads;
 
-    uint8_t *Y  = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
-    int colorY = 0, colorCb = 128, colorCr = 128;
+    int colorY = 0;
+    int colorCb = 128;
+    int colorCr = 128;
+
     _rgb2yuv(red, green, blue, colorY, colorCb, colorCr);
 
     const int full = threshold - softness;
@@ -142,35 +111,36 @@ void blackreplace_apply(void *ptr, VJFrame *frame, int *args)
     const int denom = edge - full;
     const int mul = (255 << 16) / denom;
 
-#pragma omp parallel for simd num_threads(n_threads) schedule(static)
-    for (int i = 0; i < len; ++i) {
-        int y  = Y[i];
-        int cb = Cb[i];
-        int cr = Cr[i];
+    #pragma omp parallel for simd num_threads(n_threads) schedule(static)
+    for(int i = 0; i < len; i++)
+    {
+        const int y = Y[i];
+        const int cb = Cb[i];
+        const int cr = Cr[i];
 
-        int cbd = cb - 128;
-        int crd = cr - 128;
-        int abs_cb = (cbd ^ (cbd >> 31)) - (cbd >> 31);
-        int abs_cr = (crd ^ (crd >> 31)) - (crd >> 31);
+        const int cbd = cb - 128;
+        const int crd = cr - 128;
+        const int abs_cb = (cbd ^ (cbd >> 31)) - (cbd >> 31);
+        const int abs_cr = (crd ^ (crd >> 31)) - (crd >> 31);
 
-        int dark = y + abs_cb + abs_cr;
-        int diff = edge - dark;
+        const int dark = y + abs_cb + abs_cr;
+        const int diff = edge - dark;
+
         int raw_t = (int)(((int64_t)diff * (int64_t)mul) >> 16);
         raw_t = raw_t & ~(raw_t >> 31);
 
-        
-        int tmp = 255 - raw_t;
-        int gt = tmp >> 31;
-        
-        raw_t = raw_t + (gt & (255 - raw_t));
-        
-        int mask_edge = (dark - edge) >> 31;
-        int mask_full = (dark - full) >> 31;
-        int chosen_t = (mask_full & 255) | (~mask_full & raw_t);
-        int t = mask_edge & chosen_t;
+        const int tmp = 255 - raw_t;
+        const int gt = tmp >> 31;
 
-        Y[i]  = blend_u8((uint8_t)Y[i],  (uint8_t)colorY,  t);
-        Cb[i] = blend_u8((uint8_t)Cb[i], (uint8_t)colorCb, t);
-        Cr[i] = blend_u8((uint8_t)Cr[i], (uint8_t)colorCr, t);
+        raw_t = raw_t + (gt & (255 - raw_t));
+
+        const int mask_edge = (dark - edge) >> 31;
+        const int mask_full = (dark - full) >> 31;
+        const int chosen_t = (mask_full & 255) | (~mask_full & raw_t);
+        const int t = mask_edge & chosen_t;
+
+        Y[i] = blend_u8((uint8_t)y, (uint8_t)colorY, t);
+        Cb[i] = blend_u8((uint8_t)cb, (uint8_t)colorCb, t);
+        Cr[i] = blend_u8((uint8_t)cr, (uint8_t)colorCr, t);
     }
 }

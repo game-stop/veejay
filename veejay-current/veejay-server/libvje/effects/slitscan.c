@@ -19,6 +19,9 @@
  */
 
 #include "common.h"
+#include <math.h>
+#include <stdint.h>
+#include <veejaycore/vjmem.h>
 #include "slitscan.h"
 
 #define SS_PARAMS       12
@@ -176,6 +179,14 @@ static inline float ss_value_noise(int x, int y, int scale, uint32_t seed)
     return ss_lerpf(ab, cd, fy);
 }
 
+
+
+static inline float ss_smooth_param(float current, float target, float attack, float release)
+{
+    const float rate = (target > current) ? attack : release;
+    return current + (target - current) * rate;
+}
+
 typedef struct {
     int w;
     int h;
@@ -187,6 +198,16 @@ typedef struct {
     int last_reset;
     int last_depth;
     int last_mode;
+    int smooth_ready;
+
+    float sm_amount;
+    float sm_depth;
+    float sm_source_gain;
+    float sm_motion;
+    float sm_time_offset;
+    float sm_time_scale;
+    float sm_time_blend;
+    float sm_chroma;
 
     uint8_t *region;
     uint8_t *history;
@@ -1353,22 +1374,19 @@ vj_effect *slitscan_init(int w, int h)
     );
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Sculpture Mode */
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS,                                              18,                 100,                10, 38, 1000, 2600, 0,   65,    /* Time Amount */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                        4,                  28,                 6,  22, 1800, 4200, 900, 30,    /* Time Depth */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Time Source */
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS,                                              8,                  88,                 8,  30, 1200, 3000, 0,   48,    /* Source Mix */
-        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS,                                              8,                  92,                 10, 38, 1000, 2600, 0,   62,    /* Motion Reactivity */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Time Animation */
-        VJ_BEAT_COLOR_PHASE,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                             0,                  1000,               8,  30, 1200, 3000, 0,   45,    /* Time Offset */
-        VJ_BEAT_SPEED,        VJ_BEAT_F_CONTINUOUS,                                              35,                 220,                8,  30, 1200, 3000, 0,   50,    /* Time Scale */
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS,                                              0,                  82,                 8,  32, 1200, 3200, 0,   50,    /* Temporal Smoothing */
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                                              0,                  100,                8,  30, 1200, 3000, 0,   45,    /* Chroma Amount */
-        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Reset Memory */
+        VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_INTENSITY,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     18,                 100,                14, 54,  800, 3000, 0,    84,
+        VJ_BEAT_MEMORY,         VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 4,                  SS_HISTORY_MAX,     4,  14, 3200, 8600, 2400, 24,
+        VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_SOURCE_MIX,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     24,                 100,                12, 46, 1000, 3600, 0,    76,
+        VJ_BEAT_MOTION_REACT,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     12,                 100,                16, 62,  700, 2800, 0,    88,
+        VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_GEOMETRY_PHASE, VJ_BEAT_F_CONTINUOUS,                                               0,                  1000,               14, 54,  800, 3000, 0,    78,
+        VJ_BEAT_SPEED,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     36,                 360,                14, 54,  800, 3000, 0,    82,
+        VJ_BEAT_MEMORY,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     10,                 100,                10, 38, 1200, 4200, 0,    62,
+        VJ_BEAT_COLOR_AMOUNT,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     28,                 100,                12, 46, 1000, 3600, 0,    72,
+        VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
     );
-    (void) w;
-    (void) h;
     return ve;
 }
 
@@ -1417,6 +1435,16 @@ void *slitscan_malloc(int w, int h)
     s->last_reset = 0;
     s->last_depth = -1;
     s->last_mode = -1;
+    s->smooth_ready = 0;
+
+    s->sm_amount = 100.0f;
+    s->sm_depth = 16.0f;
+    s->sm_source_gain = 55.0f;
+    s->sm_motion = 55.0f;
+    s->sm_time_offset = 0.0f;
+    s->sm_time_scale = 100.0f;
+    s->sm_time_blend = 45.0f;
+    s->sm_chroma = 100.0f;
 
     ss_refresh_history_planes(s);
     ss_build_math_luts(s);
@@ -1429,7 +1457,7 @@ void *slitscan_malloc(int w, int h)
 void slitscan_free(void *ptr)
 {
     slitscan_t *s = (slitscan_t*)ptr;
-    if(!s) return;
+
     free(s->region);
     free(s);
 }
@@ -1437,24 +1465,66 @@ void slitscan_free(void *ptr)
 void slitscan_apply(void *ptr, VJFrame *frame, int *args)
 {
     slitscan_t *s = (slitscan_t*)ptr;
-    if(!s) return;
 
     const int len = s->len;
-    const int amount = ss_clampi(args[P_AMOUNT], 0, 100);
-    const int depth = ss_clampi(args[P_DEPTH], 1, SS_HISTORY_MAX);
-    const int mode = ss_clampi(args[P_MODE], 0, SS_GEOM_MODES - 1);
-    const int source = ss_clampi(args[P_SOURCE], 0, 4);
-    const int source_gain = ss_clampi(args[P_SOURCE_GAIN], 0, 100);
-    const int motion = ss_clampi(args[P_MOTION], 0, 100);
-    const int time_offset = ss_clampi(args[P_TIME_OFFSET], 0, 1000);
-    const int time_scale = ss_clampi(args[P_TIME_SCALE], 10, 400);
-    const int time_blend = ss_clampi(args[P_TIME_BLEND], 0, 100);
-    const int chroma = ss_clampi(args[P_CHROMA], 0, 100);
-    const int time_motion = ss_clampi(args[P_TIME_MOTION], 0, 4);
+    int amount = args[P_AMOUNT];
+    int depth = args[P_DEPTH];
+    const int mode = args[P_MODE];
+    const int source = args[P_SOURCE];
+    int source_gain = args[P_SOURCE_GAIN];
+    int motion = args[P_MOTION];
+    int time_offset = args[P_TIME_OFFSET];
+    int time_scale = args[P_TIME_SCALE];
+    int time_blend = args[P_TIME_BLEND];
+    int chroma = args[P_CHROMA];
+    const int time_motion = args[P_TIME_MOTION];
     const int reset = args[P_RESET] ? 1 : 0;
+
+    int target_amount = ss_clampi(amount, 0, 100);
+    int target_depth = ss_clampi(depth, 1, SS_HISTORY_MAX);
+    int target_source_gain = ss_clampi(source_gain, 0, 100);
+    int target_motion = ss_clampi(motion, 0, 100);
+    int target_time_offset = ss_clampi(time_offset, 0, 1000);
+    int target_time_scale = ss_clampi(time_scale, 10, 400);
+    int target_time_blend = ss_clampi(time_blend, 0, 100);
+    int target_chroma = ss_clampi(chroma, 0, 100);
+
+    if(!s->smooth_ready) {
+        s->sm_amount = (float)target_amount;
+        s->sm_depth = (float)target_depth;
+        s->sm_source_gain = (float)target_source_gain;
+        s->sm_motion = (float)target_motion;
+        s->sm_time_offset = (float)target_time_offset;
+        s->sm_time_scale = (float)target_time_scale;
+        s->sm_time_blend = (float)target_time_blend;
+        s->sm_chroma = (float)target_chroma;
+        s->smooth_ready = 1;
+    } else {
+        const float fast = 0.30f;
+        const float slow = 0.095f;
+
+        s->sm_amount = ss_smooth_param(s->sm_amount, (float)target_amount, fast, slow);
+        s->sm_depth = ss_smooth_param(s->sm_depth, (float)target_depth, fast, slow);
+        s->sm_source_gain = ss_smooth_param(s->sm_source_gain, (float)target_source_gain, fast, slow);
+        s->sm_motion = ss_smooth_param(s->sm_motion, (float)target_motion, fast, slow);
+        s->sm_time_offset = ss_smooth_param(s->sm_time_offset, (float)target_time_offset, fast, slow);
+        s->sm_time_scale = ss_smooth_param(s->sm_time_scale, (float)target_time_scale, fast, slow);
+        s->sm_time_blend = ss_smooth_param(s->sm_time_blend, (float)target_time_blend, fast, slow);
+        s->sm_chroma = ss_smooth_param(s->sm_chroma, (float)target_chroma, fast, slow);
+    }
+
+    amount = ss_clampi((int)(s->sm_amount + 0.5f), 0, 100);
+    depth = ss_clampi((int)(s->sm_depth + 0.5f), 1, SS_HISTORY_MAX);
+    source_gain = ss_clampi((int)(s->sm_source_gain + 0.5f), 0, 100);
+    motion = ss_clampi((int)(s->sm_motion + 0.5f), 0, 100);
+    time_offset = ss_clampi((int)(s->sm_time_offset + 0.5f), 0, 1000);
+    time_scale = ss_clampi((int)(s->sm_time_scale + 0.5f), 10, 400);
+    time_blend = ss_clampi((int)(s->sm_time_blend + 0.5f), 0, 100);
+    chroma = ss_clampi((int)(s->sm_chroma + 0.5f), 0, 100);
 
     if(!s->seeded || (reset && !s->last_reset)) {
         ss_seed_history(s, frame);
+        s->smooth_ready = 0;
     }
     s->last_reset = reset;
 

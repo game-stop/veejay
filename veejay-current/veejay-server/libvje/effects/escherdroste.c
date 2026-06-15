@@ -50,7 +50,7 @@ static void generate_geometry(box_escherdroste_t *t) {
     float cx = t->width * 0.5f;
     float cy = t->height * 0.5f;
 
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int y = 0; y < t->height; y++) {
         for (int x = 0; x < t->width; x++) {
             int i = y * t->width + x;
@@ -115,16 +115,15 @@ vj_effect *escherdroste_init(int width, int height) {
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_HAT,                VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -70,                70,                 4,  26, 80,   620,  0,    52,    /* Speed */
-        VJ_BEAT_KICK,               VJ_BEAT_F_CONTINUOUS,                                            32,                 450,                14, 58, 90,   720,  0,    82,    /* Scale Factor */
-        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                      1,                  9,                  6,  20, 2200, 5200, 1800, 24,    /* Branches */
-        VJ_BEAT_SNARE,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -90,                90,                 10, 42, 120,  900,  0,    70,    /* Swirl */
-        VJ_BEAT_HAT,                VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -90,                90,                 4,  26, 80,   620,  0,    52,    /* Rot Speed */
-        VJ_BEAT_MEMORY,             VJ_BEAT_F_PHRASE_ONLY,                                           18,                 88,                 8,  28, 1800, 4200, 900,  38,    /* Feedback */
-        VJ_BEAT_SNARE,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -180,               180,                8,  36, 120,  900,  0,    58,    /* Pitch */
-        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* High Quality */
-        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Mode */
+        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,            -42,                42,                 14, 54,  800, 3000, 0,    74,
+        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                  48,                 420,                16, 62,  700, 2800, 0,    86,
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,             1,                  10,                 4,  14, 3600, 9000, 2600, 18,
+        VJ_BEAT_DRIFT,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,            -72,                72,                 14, 54,  800, 3200, 0,    72,
+        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,            -38,                38,                 12, 48,  900, 3400, 0,    66,
+        VJ_BEAT_MEMORY,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                  28,                 92,                 16, 62,  700, 3000, 0,    84,
+        VJ_BEAT_DRIFT,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,            -180,               180,                12, 46, 1000, 3800, 0,    62,
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
     );
 
     return ve;
@@ -235,7 +234,6 @@ static inline int32_t sample_bilinear_uv(const uint8_t *buf, int32_t u_fp, int32
 
 void escherdroste_free(void *ptr) {
     box_escherdroste_t *t = (box_escherdroste_t*) ptr;
-    if (!t) return;
 
     free(t->u_lut);
     free(t->histY);
@@ -252,9 +250,9 @@ static void escherdroste_apply1(void *ptr, VJFrame *frame, int *args) {
     t->time += args[0] * 0.0025f;
     t->phase += args[4] * 0.00125f;
 
-    const float branches = (float) args[2];
+    const float branches = (float)(args[2] < 1 ? 1 : (args[2] > 20 ? 20 : args[2]));
     const float swirl = args[3] * 0.01f;
-    const int use_high_quality = args[7] == 1;
+    const int use_high_quality = args[7] != 0;
 
     const float zoom_intensity = 0.8f + ((float) args[1] / 500.0f) * 12.0f;
     const float factor = branches / zoom_intensity;
@@ -333,9 +331,9 @@ static void escherdroste_apply2(void *ptr, VJFrame *frame, int *args) {
     t->time += args[0] * 0.000725f;
     t->phase += args[4] * 0.000725f;
 
-    const float branches = (float) args[2];
+    const float branches = (float)(args[2] < 1 ? 1 : (args[2] > 20 ? 20 : args[2]));
     const float swirl = args[3] * 0.01f;
-    const int use_high_quality = args[7] == 1;
+    const int use_high_quality = args[7] != 0;
 
     const float zoom_intensity = 0.8f + ((float) args[1] / 500.0f) * 12.0f;
     const float factor = branches / zoom_intensity;
@@ -414,9 +412,9 @@ static void escherdroste_apply3(void *ptr, VJFrame *frame, int *args) {
     t->time += args[0] * 0.000725f;
     t->phase += args[4] * 0.000725f;
 
-    const float branches = (float) args[2];
+    const float branches = (float)(args[2] < 1 ? 1 : (args[2] > 20 ? 20 : args[2]));
     const float swirl = args[3] * 0.01f;
-    const int use_high_quality = args[7] == 1;
+    const int use_high_quality = args[7] != 0;
 
     const float zoom_intensity = 0.8f + ((float) args[1] / 500.0f) * 12.0f;
     const float factor = branches / zoom_intensity;
@@ -487,7 +485,15 @@ static void escherdroste_apply3(void *ptr, VJFrame *frame, int *args) {
 }
 
 void escherdroste_apply(void *ptr, VJFrame *frame, int *args) {
-    switch (args[8]) {
+    box_escherdroste_t *t = (box_escherdroste_t*) ptr;
+
+    int mode = args[8];
+    if (mode < 0)
+        mode = 0;
+    else if (mode > 2)
+        mode = 2;
+
+    switch (mode) {
         case 0:
             escherdroste_apply1(ptr, frame, args);
             break;

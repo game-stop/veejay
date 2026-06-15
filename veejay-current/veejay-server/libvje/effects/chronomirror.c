@@ -20,7 +20,7 @@
 #include "common.h"
 #include "chronomirror.h"
 
-#define CHRONOSMOKE_PARAMS 11
+#define CHRONOSMOKE_PARAMS 10
 
 #define P_TRIGGER_GATE  0
 #define P_RISE          1
@@ -30,9 +30,8 @@
 #define P_SOURCE_BLEED  5
 #define P_COLOR_MODE    6
 #define P_TURBULENCE    7
-#define P_BEAT_PUSH     8
-#define P_PLUME_GAIN    9
-#define P_COLOR_ENERGY 10
+#define P_PLUME_GAIN    8
+#define P_COLOR_ENERGY  9
 
 #define CS_COLOR_POLARITY 0
 #define CS_COLOR_THERMAL  1
@@ -113,19 +112,6 @@ static inline int cs_u8_to_param1000(int v)
     v = cs_clampi(v, 0, 255);
     return (v * 1000 + 127) / 255;
 }
-
-static inline int cs_mix_u8(int a, int b, int q)
-{
-    return a + (((b - a) * q + 127) / 255);
-}
-
-static inline int cs_push_u8(int a, int b, int q)
-{
-    if(b <= a)
-        return a;
-    return cs_mix_u8(a, b, q);
-}
-
 static inline uint8_t cs_u8(int v)
 {
     return (uint8_t) cs_clampi(v, 0, 255);
@@ -250,9 +236,6 @@ vj_effect *chronomirror_init(int w, int h)
     ve->limits[1][P_TURBULENCE] = 1000;
     ve->defaults[P_TURBULENCE] = cs_u8_to_param1000(80);
 
-    ve->limits[0][P_BEAT_PUSH] = 0;
-    ve->limits[1][P_BEAT_PUSH] = 1000;
-    ve->defaults[P_BEAT_PUSH] = 0;
 
     ve->limits[0][P_PLUME_GAIN] = 0;
     ve->limits[1][P_PLUME_GAIN] = 1000;
@@ -265,7 +248,6 @@ vj_effect *chronomirror_init(int w, int h)
     ve->description = "Chronosmoke";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
     ve->has_user = 0;
 
     ve->param_description = vje_build_param_list(
@@ -278,27 +260,22 @@ vj_effect *chronomirror_init(int w, int h)
         "Source Bleed",
         "Color Mode",
         "Turbulence",
-        "Beat Push",
         "Plume Gain",
         "Color Energy"
     );
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_DETAIL,     VJ_BEAT_F_PHRASE_ONLY,                    24,                 260,                5,  16,  1800, 4200, 1200, -24,    /* Trigger Gate */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     200,                940,                14, 58,  90,   720,  0,    84,     /* Smoke Rise */
-        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     80,                 860,                10, 42,  120,  900,  0,    70,     /* Curl Flow */
-        VJ_BEAT_MEMORY,     VJ_BEAT_F_PHRASE_ONLY,                    460,                1000,               5,  22,  2200, 5200, 1400, 30,     /* Memory Decay */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     180,                960,                14, 58,  90,   760,  0,    78,     /* Smoke Density */
-        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,                     0,                  360,                6,  26,  900,  2400, 0,    36,     /* Source Bleed */
-        VJ_BEAT_SELECTOR,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,  /* Color Mode */
-        VJ_BEAT_HAT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY, 0,              820,                4,  28,  120,  900,  500,  42,     /* Turbulence */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE, 0,                  1000,               24, 96,  60,   360,  0,    100,    /* Beat Push */
-        VJ_BEAT_KICK,       VJ_BEAT_F_CONTINUOUS,                     260,                1000,               16, 68,  90,   720,  0,    86,     /* Plume Gain */
-        VJ_BEAT_SNARE,      VJ_BEAT_F_CONTINUOUS,                     260,                1000,               10, 46,  120,  900,  400,  64      /* Color Energy */
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,   0,                  200,                72, 100,  45,  520, 0,    100,
+        VJ_BEAT_FLOW,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       180,                1000,               72, 100,  45,  560, 0,    100,
+        VJ_BEAT_DRIFT,            VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                        60,                1000,               54,  96,  80,  900, 0,     88,
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,                1000,               76, 100,  55,  620, 0,    100,
+        VJ_BEAT_DENSITY,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       180,                1000,               64, 100,  55,  680, 0,     96,
+        VJ_BEAT_SOURCE_MIX,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,   0,   -1000,
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,   0,   -1000,
+        VJ_BEAT_TURBULENCE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                        80,                1000,               66, 100,  45,  580, 0,     98,
+        VJ_BEAT_GLOW,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       220,                1000,               58, 100,  70,  900, 80,    92,
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       220,                1000,               62, 100,  50,  680, 0,    100
     );
-    (void) w;
-    (void) h;
 
     return ve;
 }
@@ -325,8 +302,6 @@ void *chronomirror_malloc(int w, int h)
     c->render_lut_valid = 0;
 
     c->n_threads = vje_advise_num_threads(w * h);
-    if(c->n_threads <= 0)
-        c->n_threads = 1;
 
     for(i = 0; i < 256; i++) {
         int dx;
@@ -2212,22 +2187,8 @@ void chronomirror_apply(void *ptr, VJFrame *frame, int *args)
     int source_bleed;
     int color_mode;
     int turbulence;
-    int beat_push;
     int plume_gain;
     int color_energy;
-
-    int trigger_gate_eff;
-    int rise_eff;
-    int curl_eff;
-    int decay_eff;
-    int density_eff;
-    int source_bleed_eff;
-    int turbulence_eff;
-    int plume_gain_eff;
-    int color_energy_eff;
-
-    if(!c || !frame || !args)
-        return;
 
     if(!c->seeded)
         cs_seed(c, frame);
@@ -2240,75 +2201,28 @@ void chronomirror_apply(void *ptr, VJFrame *frame, int *args)
     source_bleed = cs_param1000_to_u8(args[P_SOURCE_BLEED]);
     color_mode   = cs_clampi(args[P_COLOR_MODE], 0, 4);
     turbulence   = cs_param1000_to_u8(args[P_TURBULENCE]);
-    beat_push    = cs_param1000_to_u8(args[P_BEAT_PUSH]);
     plume_gain   = cs_clampi(args[P_PLUME_GAIN], 0, 1000);
     color_energy = cs_clampi(args[P_COLOR_ENERGY], 0, 1000);
 
-    trigger_gate_eff = trigger_gate - ((trigger_gate * beat_push + 510) / 1020);
-    if(trigger_gate_eff < 0)
-        trigger_gate_eff = 0;
-
-    rise_eff = cs_push_u8(
-        rise,
-        255,
-        (beat_push * 100 + 127) / 255
-    );
-
-    curl_eff = cs_push_u8(
-        curl,
-        235,
-        (beat_push * 80 + 127) / 255
-    );
-
-    decay_eff = cs_push_u8(
-        decay,
-        255,
-        (beat_push * 18 + 127) / 255
-    );
-
-    density_eff = cs_push_u8(
-        density,
-        255,
-        (beat_push * 150 + 127) / 255
-    );
-
-    source_bleed_eff = source_bleed + ((beat_push * 44 + 127) / 255);
-    if(source_bleed_eff > 255)
-        source_bleed_eff = 255;
-
-    turbulence_eff = cs_push_u8(
-        turbulence,
-        255,
-        (beat_push * 150 + 127) / 255
-    );
-
-    plume_gain_eff = plume_gain + ((beat_push * 300 + 127) / 255);
-    if(plume_gain_eff > 1000)
-        plume_gain_eff = 1000;
-
-    color_energy_eff = color_energy + ((beat_push * 220 + 127) / 255);
-    if(color_energy_eff > 1000)
-        color_energy_eff = 1000;
-
     cs_build_luts_if_needed(
         c,
-        trigger_gate_eff,
-        rise_eff,
-        curl_eff,
-        decay_eff,
-        density_eff,
-        source_bleed_eff,
-        turbulence_eff,
-        plume_gain_eff,
-        color_energy_eff
+        trigger_gate,
+        rise,
+        curl,
+        decay,
+        density,
+        source_bleed,
+        turbulence,
+        plume_gain,
+        color_energy
     );
 
     cs_compute_smoke(
         c,
         frame,
-        rise_eff,
-        curl_eff,
-        turbulence_eff
+        rise,
+        curl,
+        turbulence
     );
 
     cs_swap_fields(c);
@@ -2316,7 +2230,7 @@ void chronomirror_apply(void *ptr, VJFrame *frame, int *args)
     cs_render(
         c,
         frame,
-        source_bleed_eff,
+        source_bleed,
         color_mode
     );
 

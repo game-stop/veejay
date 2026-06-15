@@ -19,18 +19,43 @@
  */
 
 #include "common.h"
+#include <math.h>
+#include <stdint.h>
+#include <veejaycore/vjmem.h>
 #include "spectralmotion.h"
+
+#define SPECTRALMOTION_PARAMS 8
+
+#define P_TRIGGER            0
+#define P_CYCLE_SPEED        1
+#define P_OPACITY            2
+#define P_MODE               3
+#define P_STROBE_RATE        4
+#define P_TRAIL_PERSISTENCE  5
+#define P_MOTION_PERSISTENCE 6
+#define P_MOTION_GAIN        7
 
 typedef struct {
     uint8_t *buf[5];
     uint8_t rainbow[256][3];
+
     int timestamp;
     int n_threads;
+
     float smooth_threshold;
     float phase;
+
+    float eff_trigger;
+    float eff_cycle_speed;
+    float eff_opacity;
+    float eff_strobe_rate;
+    float eff_trail_persistence;
+    float eff_motion_persistence;
+    float eff_motion_gain;
+    int eff_initialized;
 } spectralmotion_t;
 
-static inline int spectralmotion_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : (v > hi ? hi : v);
 }
@@ -43,16 +68,50 @@ static inline int spectralmotion_abs_i(int v)
 
 static inline uint8_t spectralmotion_blend_y(uint8_t a, uint8_t b, int q8)
 {
+    q8 = clampi(q8, 0, 256);
     return (uint8_t)((((int)a * (256 - q8)) + ((int)b * q8) + 128) >> 8);
 }
 
 static inline uint8_t spectralmotion_blend_uv(uint8_t a, uint8_t b, int q8)
 {
+    q8 = clampi(q8, 0, 256);
+
     int ac = (int)a - 128;
     int bc = (int)b - 128;
     int v = (((ac * (256 - q8)) + (bc * q8) + 128) >> 8) + 128;
 
     return (uint8_t)CLAMP_UV(v);
+}
+
+
+static inline int spectralmotion_smooth_i(float *restrict state,
+                                          int target,
+                                          float attack,
+                                          float release)
+{
+    const float cur = *state;
+    const float diff = (float)target - cur;
+    const float k = (diff >= 0.0f) ? attack : release;
+    const float out = cur + diff * k;
+
+    *state = out;
+
+    return (int)(out + (out >= 0.0f ? 0.5f : -0.5f));
+}
+
+static inline int spectralmotion_smooth_discrete_i(float *restrict state,
+                                                   int target,
+                                                   float attack,
+                                                   float release)
+{
+    const float cur = *state;
+    const float diff = (float)target - cur;
+    const float k = (diff >= 0.0f) ? attack : release;
+    const float out = cur + diff * k;
+
+    *state = out;
+
+    return (int)(out + (out >= 0.0f ? 0.5f : -0.5f));
 }
 
 static void spectralmotion_build_rainbow(uint8_t lut[256][3])
@@ -73,36 +132,45 @@ static void spectralmotion_build_rainbow(uint8_t lut[256][3])
 vj_effect *spectralmotion_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 8;
+    if(!ve)
+        return NULL;
+
+    ve->num_params = SPECTRALMOTION_PARAMS;
 
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->defaults[0] = 150;
-    ve->defaults[1] = 10;
-    ve->defaults[2] = 150;
-    ve->defaults[3] = 0;
-    ve->defaults[4] = 8;
-    ve->defaults[5] = 200;
-    ve->defaults[6] = 180;
-    ve->defaults[7] = 256;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults) free(ve->defaults);
+        if(ve->limits[0]) free(ve->limits[0]);
+        if(ve->limits[1]) free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
-    ve->limits[0][0] = 0;    ve->limits[1][0] = 255;
-    ve->limits[0][1] = 0;    ve->limits[1][1] = 255;
-    ve->limits[0][2] = 0;    ve->limits[1][2] = 255;
-    ve->limits[0][3] = 0;    ve->limits[1][3] = 2;
-    ve->limits[0][4] = 1;    ve->limits[1][4] = 120;
-    ve->limits[0][5] = 0;    ve->limits[1][5] = 255;
-    ve->limits[0][6] = 0;    ve->limits[1][6] = 255;
-    ve->limits[0][7] = 0;    ve->limits[1][7] = 1024;
+    ve->defaults[P_TRIGGER]            = 150;
+    ve->defaults[P_CYCLE_SPEED]        = 10;
+    ve->defaults[P_OPACITY]            = 150;
+    ve->defaults[P_MODE]               = 0;
+    ve->defaults[P_STROBE_RATE]        = 8;
+    ve->defaults[P_TRAIL_PERSISTENCE]  = 200;
+    ve->defaults[P_MOTION_PERSISTENCE] = 180;
+    ve->defaults[P_MOTION_GAIN]        = 256;
+
+    ve->limits[0][P_TRIGGER]            = 0; ve->limits[1][P_TRIGGER]            = 255;
+    ve->limits[0][P_CYCLE_SPEED]        = 0; ve->limits[1][P_CYCLE_SPEED]        = 255;
+    ve->limits[0][P_OPACITY]            = 0; ve->limits[1][P_OPACITY]            = 255;
+    ve->limits[0][P_MODE]               = 0; ve->limits[1][P_MODE]               = 2;
+    ve->limits[0][P_STROBE_RATE]        = 1; ve->limits[1][P_STROBE_RATE]        = 120;
+    ve->limits[0][P_TRAIL_PERSISTENCE]  = 0; ve->limits[1][P_TRAIL_PERSISTENCE]  = 255;
+    ve->limits[0][P_MOTION_PERSISTENCE] = 0; ve->limits[1][P_MOTION_PERSISTENCE] = 255;
+    ve->limits[0][P_MOTION_GAIN]        = 0; ve->limits[1][P_MOTION_GAIN]        = 1024;
 
     ve->description = "Spectral Motion Trail";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->parallel = 0;
-
     ve->param_description = vje_build_param_list(
         ve->num_params,
         "Trigger",
@@ -119,8 +187,8 @@ vj_effect *spectralmotion_init(int w, int h)
 
     vje_build_value_hint_list(
         ve->hints,
-        ve->limits[1][3],
-        3,
+        ve->limits[1][P_MODE],
+        P_MODE,
         "Full Trail",
         "Overlay",
         "Motion Debug"
@@ -128,19 +196,15 @@ vj_effect *spectralmotion_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS,                       72,                 230,                10, 38, 1000, 2600, 0,   62,    /* Trigger */
-        VJ_BEAT_SPEED,            VJ_BEAT_F_CONTINUOUS,                       0,                  180,                8,  30, 1200, 3000, 0,   50,    /* Cycle Speed */
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS,                       64,                 255,                8,  30, 1200, 3000, 0,   45,    /* Opacity */
-        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000, /* Mode */
-        VJ_BEAT_SPEED,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, 1,                  32,                 6,  22, 1800, 4200, 900, 30,    /* Strobe Rate */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS,                       96,                 255,                8,  32, 1200, 3200, 0,   55,    /* Trail Persistence */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS,                       0,                  240,                8,  32, 1200, 3200, 0,   50,    /* Motion Persistence */
-        VJ_BEAT_INTENSITY,        VJ_BEAT_F_CONTINUOUS,                       96,                 768,                10, 38, 1000, 2600, 0,   65     /* Motion Gain */
+        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         72,                 255,                24, 82,  300, 1800, 0,    86,
+        VJ_BEAT_COLOR_PHASE,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         8,                  255,                20, 70,  360, 2400, 0,    62,
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         72,                 255,                16, 54,  500, 2800, 0,    54,
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_SPEED,            VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 1, 48, 20, 68, 300, 1800, 0, 72,
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         96,                 255,                20, 68,  800, 5200, 0,    70,
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         48,                 255,                18, 58,  800, 4800, 0,    62,
+        VJ_BEAT_INTENSITY,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         192,                1024,               28, 92,  240, 1800, 0,    88
     );
-
-    (void) w;
-    (void) h;
 
     return ve;
 }
@@ -174,9 +238,16 @@ void *spectralmotion_malloc(int w, int h)
     s->smooth_threshold = 0.0f;
     s->phase = 0.0f;
 
+    s->eff_trigger = 150.0f;
+    s->eff_cycle_speed = 10.0f;
+    s->eff_opacity = 150.0f;
+    s->eff_strobe_rate = 8.0f;
+    s->eff_trail_persistence = 200.0f;
+    s->eff_motion_persistence = 180.0f;
+    s->eff_motion_gain = 256.0f;
+    s->eff_initialized = 0;
+
     s->n_threads = vje_advise_num_threads(len);
-    if(s->n_threads < 1)
-        s->n_threads = 1;
 
     spectralmotion_build_rainbow(s->rainbow);
 
@@ -187,12 +258,7 @@ void spectralmotion_free(void *ptr)
 {
     spectralmotion_t *s = (spectralmotion_t*) ptr;
 
-    if(!s)
-        return;
-
-    if(s->buf[0])
-        free(s->buf[0]);
-
+    free(s->buf[0]);
     free(s);
 }
 
@@ -267,22 +333,46 @@ void spectralmotion_apply(void *ptr, VJFrame *frame, int *args)
 {
     spectralmotion_t *s = (spectralmotion_t*) ptr;
 
-    if(!s || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
     const int len = frame->len;
 
-    if(len <= 0)
-        return;
+    const int raw_trigger     = args[P_TRIGGER];
+    const int raw_cycle       = args[P_CYCLE_SPEED];
+    const int raw_opacity     = args[P_OPACITY];
+    const int mode            = args[P_MODE];
+    const int raw_strobe      = args[P_STROBE_RATE];
+    const int raw_trail       = args[P_TRAIL_PERSISTENCE];
+    const int raw_motion_pers = args[P_MOTION_PERSISTENCE];
+    const int raw_motion_gain = args[P_MOTION_GAIN];
 
-    const int sensitivity    = spectralmotion_clampi(args[0], 0, 255);
-    const int cycle_speed    = spectralmotion_clampi(args[1], 0, 255);
-    const int opacity        = spectralmotion_clampi(args[2], 0, 255);
-    const int mode           = spectralmotion_clampi(args[3], 0, 2);
-    const int strobe_rate    = spectralmotion_clampi(args[4], 1, 120);
-    const int persistence    = spectralmotion_clampi(args[5], 0, 255);
-    const int energy_persist = spectralmotion_clampi(args[6], 0, 255);
-    const int motion_gain    = spectralmotion_clampi(args[7], 0, 1024);
+    const float param_attack = 0.46f;
+    const float param_release = 0.14f;
+
+    if(!s->eff_initialized) {
+        s->eff_trigger = (float)raw_trigger;
+        s->eff_cycle_speed = (float)raw_cycle;
+        s->eff_opacity = (float)raw_opacity;
+        s->eff_strobe_rate = (float)raw_strobe;
+        s->eff_trail_persistence = (float)raw_trail;
+        s->eff_motion_persistence = (float)raw_motion_pers;
+        s->eff_motion_gain = (float)raw_motion_gain;
+        s->eff_initialized = 1;
+    }
+
+    int sensitivity = spectralmotion_smooth_i(&s->eff_trigger, raw_trigger, param_attack, param_release);
+    int cycle_speed = spectralmotion_smooth_i(&s->eff_cycle_speed, raw_cycle, param_attack, param_release);
+    int opacity = spectralmotion_smooth_i(&s->eff_opacity, raw_opacity, param_attack, param_release);
+    int strobe_rate = spectralmotion_smooth_discrete_i(&s->eff_strobe_rate, raw_strobe, 0.34f, 0.10f);
+    int persistence = spectralmotion_smooth_i(&s->eff_trail_persistence, raw_trail, param_attack, param_release);
+    int energy_persist = spectralmotion_smooth_i(&s->eff_motion_persistence, raw_motion_pers, param_attack, param_release);
+    int motion_gain = spectralmotion_smooth_i(&s->eff_motion_gain, raw_motion_gain, param_attack, param_release);
+
+    sensitivity = clampi(sensitivity, 0, 255);
+    cycle_speed = clampi(cycle_speed, 0, 255);
+    opacity = clampi(opacity, 0, 255);
+    strobe_rate = clampi(strobe_rate, 1, 120);
+    persistence = clampi(persistence, 0, 255);
+    energy_persist = clampi(energy_persist, 0, 255);
+    motion_gain = clampi(motion_gain, 0, 1024);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -309,14 +399,13 @@ void spectralmotion_apply(void *ptr, VJFrame *frame, int *args)
     s->smooth_threshold = (s->smooth_threshold * 0.85f) + ((float)raw_threshold * 0.15f);
 
     int cutoff = (int)s->smooth_threshold + (128 - sensitivity);
-    cutoff = spectralmotion_clampi(cutoff, 0, 255);
+    cutoff = clampi(cutoff, 0, 255);
 
     const int is_flash_frame = ((s->timestamp % strobe_rate) == 0);
-    const int adaptation = 256 - sensitivity;
+    const int adaptation = clampi(256 - sensitivity, 1, 256);
 
     const float cycle = powf(2.0f, ((float)cycle_speed - 128.0f) * (1.0f / 64.0f));
-
-    const int color_idx = (int)s->phase & 255;
+    const int color_idx = ((int)s->phase) & 255;
 
     s->phase += cycle;
     if(s->phase >= 256.0f)
@@ -346,6 +435,8 @@ void spectralmotion_apply(void *ptr, VJFrame *frame, int *args)
 
         int excitation = (((int)exc[i] * energy_persist) + (excitation_raw * (256 - energy_persist))) >> 8;
         excitation = (excitation * flash_q8) >> 8;
+        if(excitation > 255)
+            excitation = 255;
 
         exc[i] = (uint8_t)excitation;
 

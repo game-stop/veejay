@@ -70,7 +70,7 @@ static size_t dm_align_size(size_t n, size_t a)
     return (n + (a - 1)) & ~(a - 1);
 }
 
-static inline int dm_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : ((v > hi) ? hi : v);
 }
@@ -367,21 +367,19 @@ vj_effect *datamosh_init(int w, int h)
     );
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Flow Mode */
-        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                                                  34,                 98,                 16, 64,  90,   720,  0,    88,    /* Mosh Amount */
-        VJ_BEAT_SNARE,            VJ_BEAT_F_CONTINUOUS,                                                  18,                 94,                 10, 46,  120,  900,  0,    74,    /* Motion Reactivity */
-        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE, 6,                  32,                 6,  20,  2200, 5200, 1800, 24,    /* Block Size */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                            4,                  22,                 6,  22,  1800, 4200, 900,  32,    /* Time Depth */
-        VJ_BEAT_HAT,              VJ_BEAT_F_CONTINUOUS,                                                  8,                  92,                 4,  28,  80,   620,  0,    52,    /* Time Slip */
-        VJ_BEAT_INERTIA,          VJ_BEAT_F_PHRASE_ONLY,                                                 55,                 98,                 8,  28,  1800, 4200, 900,  38,    /* Persistence */
-        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS,                                                  0,                  90,                 14, 58,  90,   720,  0,    82,    /* Flow Strength */
-        VJ_BEAT_HAT,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_CLIMAX_ONLY,                          0,                  76,                 4,  28,  120,  900,  500,  40,    /* Tear/Jitter */
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS,                                                  0,                  42,                 10, 40,  120,  900,  0,    48,    /* Source Opacity */
-        VJ_BEAT_TRIGGER,          VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                               VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Reset Memory */
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,                 VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                     32,                 100,                18, 68,  650, 2600, 0,    92,
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                     22,                 100,                16, 62,  700, 2800, 0,    84,
+        VJ_BEAT_GRID_SIZE,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 6, 44, 4, 14, 3400, 9000, 2600, 18,
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,                6,                  24,                 5,  18, 3200, 8600, 2400, 24,
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                     18,                 100,                16, 62,  700, 3000, 0,    82,
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                     62,                 100,                14, 56,  900, 3600, 0,    88,
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                     12,                 100,                16, 62,  700, 2800, 0,    80,
+        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS,                                                              4,                  92,                 14, 54,  300, 2200, 180,  72,
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED,                                          0,                  55,                 10, 38, 1000, 3600, 0,    42,
+        VJ_BEAT_TRIGGER,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,                 VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
     );
-    (void) w;
-    (void) h;
+
     return ve;
 }
 
@@ -478,15 +476,10 @@ void *datamosh_malloc(int w, int h)
 void datamosh_apply(void *ptr, VJFrame *frame, int *args)
 {
     datamosh_t *d = (datamosh_t *) ptr;
-    if (!d)
-        return;
 
     const int w = frame->width;
     const int h = frame->height;
-    const int len = w * h;
-
-    if (w != d->w || h != d->h || len != d->len)
-        return;
+    const int len = w * h;;
 
     uint8_t * restrict frame_y = frame->data[0];
     uint8_t * restrict frame_u = frame->data[1];
@@ -507,16 +500,16 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
 
     d->last_reset = reset;
 
-    const int strength = dm_clampi(args[P_MOSH], 0, 100);
-    const int history_depth = dm_clampi(args[P_HISTORY], 1, DM_HISTORY_MAX);
-    const int block = dm_clampi(args[P_BLOCK], DM_MIN_BLOCK, 64);
-    const int motion = dm_clampi(args[P_MOTION], 0, 100);
-    const int persist = dm_clampi(args[P_PERSIST], 0, 100);
-    const int tear = dm_clampi(args[P_TEAR], 0, 100);
-    const int slip = dm_clampi(args[P_SLIP], 0, 100);
-    const int flow_mode = dm_clampi(args[P_FLOW], 0, 7);
-    const int flow_strength = dm_clampi(args[P_FLOW_AMT], 0, 100);
-    const int source_opacity = dm_clampi(args[P_SRC_OPAC], 0, 100);
+    const int strength = args[P_MOSH];
+    const int history_depth = args[P_HISTORY];
+    const int block = args[P_BLOCK];
+    const int motion = args[P_MOTION];
+    const int persist = args[P_PERSIST];
+    const int tear = args[P_TEAR];
+    const int slip = args[P_SLIP];
+    const int flow_mode = args[P_FLOW];
+    const int flow_strength = args[P_FLOW_AMT];
+    const int source_opacity = args[P_SRC_OPAC];
 
     if (block != d->last_block || flow_mode != d->last_flow) {
         dm_clear_fields(d);
@@ -585,12 +578,12 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
         hist_mix_q_lut[e] = (uint16_t) ((slip * e * 256 + 12750) / 25500);
 
         const int ey = 76 + ((e * 24) / 255);
-        const int local_strength = dm_clampi((strength * ey + 50) / 100, 0, 100);
+        const int local_strength = clampi((strength * ey + 50) / 100, 0, 100);
         const int old_q = dm_percent_to_q8(local_strength);
         out_mix_q_lut[e] = (uint16_t) (256 - (((256 - old_q) * source_opacity_q + 128) >> 8));
 
         jitter_q_lut[e] = (int16_t) ((tear * (48 + e) * DM_FP_ONE * 8) / (100 * 303));
-        follow_lut[e] = (uint8_t) dm_clampi(28 + ((e * (motion + 48)) / 380) + flow_follow_lut, 20, 180);
+        follow_lut[e] = (uint8_t) clampi(28 + ((e * (motion + 48)) / 380) + flow_follow_lut, 20, 180);
     }
 
     const int read_ping = d->canvas_ping;
@@ -665,7 +658,7 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
                 const int improve = (zero_sad - best_sad) / samples;
                 act = (mean_zero - threshold) * motion * 3 / 100;
                 act += (improve > 0) ? (improve * (motion + 35) / 72) : 0;
-                act = dm_clampi(act, 0, 255);
+                act = clampi(act, 0, 255);
             }
         }
 
@@ -706,7 +699,7 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
             const int tear_drive = (tear * (strength + 40) + 70) / 140;
             drive = (drive < tear_drive) ? tear_drive : drive;
         }
-        drive = dm_clampi(drive, 0, 255);
+        drive = clampi(drive, 0, 255);
 
         if (tear > 0 && drive > 0) {
             const uint32_t hv = dm_hash_u32((uint32_t) bi * 1103515245u + (uint32_t) d->frame * 12345u);
@@ -729,14 +722,14 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
             new_y = (old_y * field_keep) / 255;
         }
 
-        const int fx = dm_clampi(new_x, -32768, 32767);
-        const int fy = dm_clampi(new_y, -32768, 32767);
+        const int fx = clampi(new_x, -32768, 32767);
+        const int fy = clampi(new_y, -32768, 32767);
         d->field_x[bi] = (int16_t) fx;
         d->field_y[bi] = (int16_t) fy;
 
         const int old_e = d->energy[bi];
         const int decayed_e = (old_e * energy_keep) / 255;
-        const int e = dm_clampi((drive > decayed_e) ? drive : decayed_e, 0, 255);
+        const int e = clampi((drive > decayed_e) ? drive : decayed_e, 0, 255);
         d->energy[bi] = (uint8_t) e;
 
         const int back = back_lut[e];

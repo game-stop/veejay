@@ -28,33 +28,8 @@
 #include "chameleon.h"
 #include "motionmap.h"
 
-vj_effect *chameleon_init(int w, int h)
-{
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
-
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 1;
-    ve->defaults[0] = 0;
-
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 32;
-    ve->defaults[1] = 8;
-
-    ve->description = "ChameleonTV (EffectTV)";
-    ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Sensitivity");
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,   0,    0, -1000, /* Mode */
-        VJ_BEAT_SNARE,    VJ_BEAT_F_CONTINUOUS,                    2,                  28,                 8,  38, 100, 820,  0, 72     /* Sensitivity */
-    );
-    return ve;
-}
+#define PLANES_DEPTH 6
+#define PLANES (1 << PLANES_DEPTH)
 
 typedef struct {
     int last_mode_;
@@ -66,51 +41,124 @@ typedef struct {
     uint8_t *timebuffer;
     uint8_t *tmpimage[4];
     int plane;
-    uint8_t	*bgimage[4];
-	int n_threads;
+    uint8_t *bgimage[4];
+    int n_threads;
 } chameleon_t;
 
-#define PLANES_DEPTH 6
-#define	PLANES (1<< PLANES_DEPTH)
+static inline int chameleon_clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
 
-int	chameleon_prepare( void *ptr, VJFrame *frame )
+static void chameleon_reset_history(chameleon_t *c, int len)
+{
+    if(!c)
+        return;
+
+    if(c->sum)
+        veejay_memset(c->sum, 0, sizeof(int32_t) * len);
+
+    if(c->timebuffer)
+        veejay_memset(c->timebuffer, 0, len * PLANES);
+
+    c->plane = 0;
+}
+
+vj_effect *chameleon_init(int w, int h)
+{
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
+    ve->num_params = 2;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    ve->limits[0][0] = 0; ve->limits[1][0] = 1;  ve->defaults[0] = 0;
+    ve->limits[0][1] = 1; ve->limits[1][1] = 32; ve->defaults[1] = 8;
+
+    ve->description = "ChameleonTV (EffectTV)";
+    ve->sub_format = 1;
+    ve->extra_frame = 0;
+    ve->has_user = 0;
+    ve->motion = 1;
+    ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Sensitivity");
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+        VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 3,                  30,                 10, 42, 1000, 3200, 0,    64
+    );
+
+    return ve;
+}
+
+int chameleon_prepare(void *ptr, VJFrame *frame)
 {
     chameleon_t *c = (chameleon_t*) ptr;
 
-	int strides[4] = { frame->len, frame->len, frame->len, 0  };
-	vj_frame_copy( frame->data, c->bgimage, strides );	
-	
-	VJFrame tmp;
-	veejay_memset( &tmp, 0, sizeof(VJFrame));
-	tmp.data[0] = c->bgimage[0];
-	tmp.width = frame->width;
-	tmp.height = frame->height;
-    tmp.len = frame->len;
-	//@ 3x3 blur
-	softblur_apply_internal( &tmp );
+    if(!c || !frame || !frame->data[0] || !frame->data[1] || !frame->data[2])
+        return 0;
 
-	veejay_msg(2, "ChameleonTV: Snapped background frame");
-	return 1;
+    int strides[4] = { frame->len, frame->len, frame->len, 0 };
+    vj_frame_copy(frame->data, c->bgimage, strides);
+
+    VJFrame tmp;
+    veejay_memset(&tmp, 0, sizeof(VJFrame));
+    tmp.data[0] = c->bgimage[0];
+    tmp.width = frame->width;
+    tmp.height = frame->height;
+    tmp.len = frame->len;
+
+    softblur_apply_internal(&tmp);
+
+    c->has_bg = 1;
+    chameleon_reset_history(c, frame->len);
+
+    veejay_msg(2, "ChameleonTV: Snapped background frame");
+
+    return 1;
 }
 
 void *chameleon_malloc(int w, int h)
 {
-    int i;
     chameleon_t *c = (chameleon_t*) vj_calloc(sizeof(chameleon_t));
-    if(!c) {
-        return NULL;
-    }
 
-    const int len = (w*h);
-    const int safe_zone = (w*2);
-    c->bgimage[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * (len + safe_zone) * 3 );
+    if(!c)
+        return NULL;
+
+    const int len = w * h;
+    const int safe_zone = w * 2;
+
+    c->bgimage[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (len + safe_zone) * 3);
+
     if(!c->bgimage[0]) {
         free(c);
         return NULL;
     }
-    c->tmpimage[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * (len * 3));
+
+    c->tmpimage[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * len * 3);
+
     if(!c->tmpimage[0]) {
         free(c->bgimage[0]);
+        free(c);
+        return NULL;
+    }
+
+    c->sum = (int32_t*) vj_calloc(len * sizeof(int32_t));
+
+    if(!c->sum) {
+        free(c->bgimage[0]);
+        free(c->tmpimage[0]);
+        free(c);
+        return NULL;
+    }
+
+    c->timebuffer = (uint8_t*) vj_calloc(len * PLANES);
+
+    if(!c->timebuffer) {
+        free(c->bgimage[0]);
+        free(c->tmpimage[0]);
+        free(c->sum);
         free(c);
         return NULL;
     }
@@ -120,178 +168,197 @@ void *chameleon_malloc(int w, int h)
     c->tmpimage[1] = c->tmpimage[0] + len;
     c->tmpimage[2] = c->tmpimage[1] + len;
 
-	vj_frame_clear1( c->bgimage[0], pixel_Y_lo_, len + safe_zone);
-	vj_frame_clear1( c->tmpimage[0], pixel_Y_lo_, len);
-    
-	for( i = 1; i < 3; i ++ ) {
-		vj_frame_clear1( c->bgimage[i], 128, len + safe_zone);
-		vj_frame_clear1( c->tmpimage[i], 128, len);
-	}
-	
-	c->sum = (int32_t*) vj_calloc( len * sizeof(int32_t));
-    if(!c->sum) {
-        free(c->bgimage[0]);
-        free(c->tmpimage[0]);
-        free(c);
-        return NULL;
+    vj_frame_clear1(c->bgimage[0], pixel_Y_lo_, len + safe_zone);
+    vj_frame_clear1(c->tmpimage[0], pixel_Y_lo_, len);
+
+    for(int i = 1; i < 3; i++) {
+        vj_frame_clear1(c->bgimage[i], 128, len + safe_zone);
+        vj_frame_clear1(c->tmpimage[i], 128, len);
     }
 
-	c->timebuffer = (uint8_t*) vj_calloc( len * PLANES );
-    if(!c->timebuffer) {
-        free(c->bgimage[0]);
-        free(c->tmpimage[0]);
-        free(c->sum);
-        free(c);
-        return NULL;
-    }
+    c->last_mode_ = -1;
+    c->n_threads = vje_advise_num_threads(len);
 
-	c->last_mode_ = -1;
-	c->n_threads = vje_advise_num_threads(len);
-
-	return (void*) c;
+    return c;
 }
 
-void	chameleon_free(void *ptr)
+void chameleon_free(void *ptr)
 {
     chameleon_t *c = (chameleon_t*) ptr;
 
-    free(c->bgimage[0]);
-    free(c->tmpimage[0]);
-    free(c->timebuffer);
-    free(c->sum);
+    if(!c)
+        return;
+
+    if(c->bgimage[0])
+        free(c->bgimage[0]);
+    if(c->tmpimage[0])
+        free(c->tmpimage[0]);
+    if(c->timebuffer)
+        free(c->timebuffer);
+    if(c->sum)
+        free(c->sum);
+
     free(c);
 }
 
-static void drawAppearing(chameleon_t *cb, VJFrame *src, VJFrame *dest,int sensitivity)
+static void drawAppearing(chameleon_t *cb, VJFrame *src, VJFrame *dest, int sensitivity)
 {
     const int video_area = src->len;
     uint8_t *restrict time_p = cb->timebuffer + (cb->plane * video_area);
-    int32_t *restrict sum_s  = cb->sum;
+    int32_t *restrict sum_s = cb->sum;
 
-    uint8_t *restrict bgY = cb->bgimage[0], *restrict bgU = cb->bgimage[1], *restrict bgV = cb->bgimage[2];
-    uint8_t *restrict srcY = src->data[0], *restrict srcU = src->data[1], *restrict srcV = src->data[2];
-    uint8_t *restrict dstY = dest->data[0], *restrict dstU = dest->data[1], *restrict dstV = dest->data[2];
+    uint8_t *restrict bgY = cb->bgimage[0];
+    uint8_t *restrict bgU = cb->bgimage[1];
+    uint8_t *restrict bgV = cb->bgimage[2];
+    uint8_t *restrict srcY = src->data[0];
+    uint8_t *restrict srcU = src->data[1];
+    uint8_t *restrict srcV = src->data[2];
+    uint8_t *restrict dstY = dest->data[0];
+    uint8_t *restrict dstU = dest->data[1];
+    uint8_t *restrict dstV = dest->data[2];
 
     #pragma omp parallel for num_threads(cb->n_threads) schedule(static)
     for(int i = 0; i < video_area; i++)
     {
-        const int Y = srcY[i];        
-        int current_sum = sum_s[i] - time_p[i] + Y;
+        const int y = srcY[i];
+        const int current_sum = sum_s[i] - time_p[i] + y;
+
         sum_s[i] = current_sum;
-        time_p[i] = Y;
+        time_p[i] = (uint8_t)y;
 
-        int diff = (Y << PLANES_DEPTH) - current_sum;
-        if (diff < 0) diff = -diff;
-        
-        uint32_t dist = diff * sensitivity; 
-        uint32_t a_calc = (dist >> PLANES_DEPTH);
-        
-        uint8_t alpha = (a_calc > 255) ? 255 : (uint8_t)a_calc;
+        int diff = (y << PLANES_DEPTH) - current_sum;
 
-        dstY[i] = Y + (((bgY[i] - Y) * alpha) >> 8);
-        dstU[i] = srcU[i] + (((bgU[i] - srcU[i]) * alpha) >> 8);
-        dstV[i] = srcV[i] + (((bgV[i] - srcV[i]) * alpha) >> 8);
+        if(diff < 0)
+            diff = -diff;
 
+        const uint32_t dist = (uint32_t)diff * (uint32_t)sensitivity;
+        const uint32_t a_calc = dist >> PLANES_DEPTH;
+        const int alpha = a_calc > 255 ? 255 : (int)a_calc;
+
+        dstY[i] = (uint8_t)(y + ((((int)bgY[i] - y) * alpha) >> 8));
+        dstU[i] = (uint8_t)((int)srcU[i] + ((((int)bgU[i] - (int)srcU[i]) * alpha) >> 8));
+        dstV[i] = (uint8_t)((int)srcV[i] + ((((int)bgV[i] - (int)srcV[i]) * alpha) >> 8));
     }
+
     cb->plane = (cb->plane + 1) & (PLANES - 1);
 }
 
-static void drawDisappearing(chameleon_t *cb, VJFrame *src, VJFrame *dest,int sensitivity)
+static void drawDisappearing(chameleon_t *cb, VJFrame *src, VJFrame *dest, int sensitivity)
 {
     const int video_area = src->len;
     uint8_t *restrict time_p = cb->timebuffer + (cb->plane * video_area);
-    int32_t *restrict sum_s  = cb->sum;
+    int32_t *restrict sum_s = cb->sum;
 
-    uint8_t *restrict bgY = cb->bgimage[0], *restrict bgU = cb->bgimage[1], *restrict bgV = cb->bgimage[2];
-    uint8_t *restrict srcY = src->data[0], *restrict srcU = src->data[1], *restrict srcV = src->data[2];
-    uint8_t *restrict dstY = dest->data[0], *restrict dstU = dest->data[1], *restrict dstV = dest->data[2];
+    uint8_t *restrict bgY = cb->bgimage[0];
+    uint8_t *restrict bgU = cb->bgimage[1];
+    uint8_t *restrict bgV = cb->bgimage[2];
+    uint8_t *restrict srcY = src->data[0];
+    uint8_t *restrict srcU = src->data[1];
+    uint8_t *restrict srcV = src->data[2];
+    uint8_t *restrict dstY = dest->data[0];
+    uint8_t *restrict dstU = dest->data[1];
+    uint8_t *restrict dstV = dest->data[2];
 
     #pragma omp parallel for num_threads(cb->n_threads) schedule(static)
     for(int i = 0; i < video_area; i++)
     {
-        const int Y = srcY[i];
-        
-        int current_sum = sum_s[i] - time_p[i] + Y;
+        const int y = srcY[i];
+        const int current_sum = sum_s[i] - time_p[i] + y;
+
         sum_s[i] = current_sum;
-        time_p[i] = Y;
+        time_p[i] = (uint8_t)y;
 
-        int diff = (Y << PLANES_DEPTH) - current_sum;
-        if (diff < 0) diff = -diff;
-        
-        uint32_t dist = diff * sensitivity; 
-        uint32_t a_calc = (dist >> PLANES_DEPTH);    
-        uint8_t alpha = (a_calc > 255) ? 255 : (uint8_t)a_calc;
+        int diff = (y << PLANES_DEPTH) - current_sum;
 
-        dstY[i] = bgY[i] + (((Y - bgY[i]) * alpha) >> 8);
-        dstU[i] = bgU[i] + (((srcU[i] - bgU[i]) * alpha) >> 8);
-        dstV[i] = bgV[i] + (((srcV[i] - bgV[i]) * alpha) >> 8);
+        if(diff < 0)
+            diff = -diff;
+
+        const uint32_t dist = (uint32_t)diff * (uint32_t)sensitivity;
+        const uint32_t a_calc = dist >> PLANES_DEPTH;
+        const int alpha = a_calc > 255 ? 255 : (int)a_calc;
+
+        dstY[i] = (uint8_t)((int)bgY[i] + (((y - (int)bgY[i]) * alpha) >> 8));
+        dstU[i] = (uint8_t)((int)bgU[i] + ((((int)srcU[i] - (int)bgU[i]) * alpha) >> 8));
+        dstV[i] = (uint8_t)((int)bgV[i] + ((((int)srcV[i] - (int)bgV[i]) * alpha) >> 8));
     }
+
     cb->plane = (cb->plane + 1) & (PLANES - 1);
 }
 
-void chameleon_apply( void *ptr, VJFrame *frame, int *args ){
+void chameleon_apply(void *ptr, VJFrame *frame, int *args)
+{
+    chameleon_t *c = (chameleon_t*) ptr;
     const int mode = args[0];
     const int sensitivity = args[1];
-    chameleon_t *c = (chameleon_t*) ptr;
+    const int len = frame->len;
 
-	const int len = frame->len;
-	VJFrame source;
-	int strides[4] = { len, len, len, 0 };
-	vj_frame_copy( frame->data, c->tmpimage, strides );
+    if(len <= 0)
+        return;
 
-	source.data[0] = c->tmpimage[0];
-	source.data[1] = c->tmpimage[1];
-	source.data[2] = c->tmpimage[2];
-	source.len = len;
+    if(!c->has_bg)
+        chameleon_prepare(c, frame);
 
-	uint32_t activity = 0;
-	int auto_switch = 0;
-	int tmp1,tmp2;
-
-	if( motionmap_active(c->motionmap) )
-	{
-		motionmap_scale_to(c->motionmap, 32,32,1,1, &tmp1,&tmp2, &(c->n__), &(c->N__) );
-		auto_switch = 1;
-		activity = motionmap_activity(c->motionmap);
-	}
-	else
-	{
-		c->N__ = 0;
-		c->n__ = 0;
-	}
-
-	if( c->n__ == c->N__ || c->n__ == 0 )
-		auto_switch = 0;
-	
-	if(auto_switch)
-	{
-		if( activity <= 40 )
-		{
-			// into the wall
-			drawDisappearing(c, &source, frame, sensitivity );
-		}
-		else
-		{
-			// out of the wall
-			drawAppearing(c, &source, frame, sensitivity );
-		}
-	}
-    else {
-
-	    if( mode == 0 )
-		    drawDisappearing(c, &source, frame, sensitivity );
-	    else
-		    drawAppearing(c, &source, frame,sensitivity );
+    if(c->last_mode_ != mode) {
+        chameleon_reset_history(c, len);
+        c->last_mode_ = mode;
     }
 
+    VJFrame source;
+    int strides[4] = { len, len, len, 0 };
+
+    vj_frame_copy(frame->data, c->tmpimage, strides);
+
+    veejay_memset(&source, 0, sizeof(VJFrame));
+    source.data[0] = c->tmpimage[0];
+    source.data[1] = c->tmpimage[1];
+    source.data[2] = c->tmpimage[2];
+    source.len = len;
+
+    uint32_t activity = 0;
+    int auto_switch = 0;
+    int tmp1 = 0;
+    int tmp2 = 0;
+
+    if(c->motionmap && motionmap_active(c->motionmap))
+    {
+        motionmap_scale_to(c->motionmap, 32, 32, 1, 1, &tmp1, &tmp2, &(c->n__), &(c->N__));
+        auto_switch = 1;
+        activity = motionmap_activity(c->motionmap);
+    }
+    else
+    {
+        c->N__ = 0;
+        c->n__ = 0;
+    }
+
+    if(c->n__ == c->N__ || c->n__ == 0)
+        auto_switch = 0;
+
+    if(auto_switch)
+    {
+        if(activity <= 40)
+            drawDisappearing(c, &source, frame, sensitivity);
+        else
+            drawAppearing(c, &source, frame, sensitivity);
+    }
+    else
+    {
+        if(mode == 0)
+            drawDisappearing(c, &source, frame, sensitivity);
+        else
+            drawAppearing(c, &source, frame, sensitivity);
+    }
 }
 
-int chameleon_request_fx(void) {
+int chameleon_request_fx(void)
+{
     return VJ_IMAGE_EFFECT_MOTIONMAP_ID;
 }
 
-void chameleon_set_motionmap(void *ptr, void *priv) {
+void chameleon_set_motionmap(void *ptr, void *priv)
+{
     chameleon_t *c = (chameleon_t*) ptr;
-    c->motionmap = priv;
-}
 
+    if(c)
+        c->motionmap = priv;
+}

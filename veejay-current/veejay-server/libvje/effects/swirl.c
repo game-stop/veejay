@@ -23,30 +23,31 @@
 #include "swirl.h"
 #include <math.h>
 
-#define SWIRL_PARAMS 5
+#define SWIRL_PARAMS 3
 
 #define P_DEGREES     0
 #define P_MODE        1
-#define P_BEAT_SWIRL  2
-#define P_BEAT_PUSH   3
-#define P_BEAT_SMOOTH 4
+#define P_SWIRL_DRIVE 2
 
 typedef struct {
+    uint8_t *region;
+
     double *polar_map;
     double *fish_angle;
 
     int *cached_coords;
-    int *beat_coords;
+    int *drive_coords;
 
     uint8_t *buf[3];
 
     int v;
     int mode;
-    int beat_v;
-    int beat_swirl;
+    int drive_v;
+    int drive_swirl;
 
-    float beat_env;
-    float beat_kick;
+    float eff_degrees;
+    float eff_swirl_drive;
+    int eff_ready;
 
     int n_threads;
     int w;
@@ -63,28 +64,27 @@ static inline uint8_t mix_u8(uint8_t a, uint8_t b, int q8)
     return (uint8_t)((((int)a * (256 - q8)) + ((int)b * q8) + 128) >> 8);
 }
 
-static inline int swirl_beat_shape(int beat_push)
-{
-    beat_push = clampi(beat_push, 0, 1000);
 
-    const int sq = (beat_push * beat_push + 500) / 1000;
-    return clampi((beat_push * 30 + sq * 70 + 50) / 100, 0, 1000);
+
+static inline int swirl_smooth_i(float *state, int target, float attack, float release)
+{
+    const float cur = *state;
+    const float diff = (float)target - cur;
+    const float step = (diff > 0.0f) ? attack : release;
+    const float out = cur + diff * step;
+
+    *state = out;
+
+    return (int)(out + (out >= 0.0f ? 0.5f : -0.5f));
 }
 
-static inline int swirl_beat_degrees(int degrees, int beat_swirl)
+static inline int swirl_drive_degrees(int degrees, int swirl_drive)
 {
-    beat_swirl = clampi(beat_swirl, 0, 1000);
+    swirl_drive = clampi(swirl_drive, 0, 1000);
 
-    /*
-     * Lower degree values make the original swirl formula stronger:
-     *     a + (r / degrees)
-     *
-     * Beat Swirl therefore prepares a second, stronger coordinate map.
-     * Beat Push only crossfades toward that map; it does not rebuild maps.
-     */
-    int delta = (beat_swirl * 220 + 500) / 1000;
+    int delta = (swirl_drive * 220 + 500) / 1000;
 
-    if(delta < 1 && beat_swirl > 0)
+    if(delta < 1 && swirl_drive > 0)
         delta = 1;
 
     return clampi(degrees - delta, 1, 360);
@@ -121,17 +121,9 @@ vj_effect *swirl_init(int w, int h)
     ve->limits[1][P_MODE] = 1;
     ve->defaults[P_MODE] = 0;
 
-    ve->limits[0][P_BEAT_SWIRL] = 0;
-    ve->limits[1][P_BEAT_SWIRL] = 1000;
-    ve->defaults[P_BEAT_SWIRL] = 320;
-
-    ve->limits[0][P_BEAT_PUSH] = 0;
-    ve->limits[1][P_BEAT_PUSH] = 1000;
-    ve->defaults[P_BEAT_PUSH] = 0;
-
-    ve->limits[0][P_BEAT_SMOOTH] = 0;
-    ve->limits[1][P_BEAT_SMOOTH] = 1000;
-    ve->defaults[P_BEAT_SMOOTH] = 520;
+    ve->limits[0][P_SWIRL_DRIVE] = 0;
+    ve->limits[1][P_SWIRL_DRIVE] = 1000;
+    ve->defaults[P_SWIRL_DRIVE] = 0;
 
     ve->description = "Swirl";
     ve->sub_format = 1;
@@ -142,9 +134,7 @@ vj_effect *swirl_init(int w, int h)
         ve->num_params,
         "Degrees",
         "Mode",
-        "Beat Swirl",
-        "Beat Push",
-        "Beat Smooth"
+        "Swirl Drive"
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
@@ -157,27 +147,20 @@ vj_effect *swirl_init(int w, int h)
         "Mirrored"
     );
 
+    
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_WARP,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 24,                 360,                6,  22, 1800, 4200, 900,  30,    /* Degrees */
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,    -1000, /* Mode */
-        VJ_BEAT_WARP,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 0,                  760,                5,  18, 1800, 4200, 900,  24,    /* Beat Swirl */
-        VJ_BEAT_KICK,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                               0,                  760,                18, 72, 70,   720,  0,    100,   /* Beat Push */
-        VJ_BEAT_MEMORY,   VJ_BEAT_F_PHRASE_ONLY,                                                   260,                820,                5,  18, 2200, 5200, 1200, 18     /* Beat Smooth */
+        VJ_BEAT_WARP,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 24,                 360,                12, 46, 1000, 3600, 0,    72,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_WARP,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       140,                1000,               16, 62,  700, 2800, 0,    94
     );
 
-    (void) w;
-    (void) h;
 
     return ve;
 }
 
 void *swirl_malloc(int w, int h)
 {
-    if(w <= 0 || h <= 0)
-        return NULL;
-
     swirl_t *s = (swirl_t*) vj_calloc(sizeof(swirl_t));
     if(!s)
         return NULL;
@@ -185,39 +168,37 @@ void *swirl_malloc(int w, int h)
     const int len = w * h;
     const int w2 = w >> 1;
     const int h2 = h >> 1;
+    const size_t dbytes = sizeof(double) * (size_t)len;
+    const size_t ibytes = sizeof(int) * (size_t)len;
+    const size_t fbytes = (size_t)len * 3u;
+    const size_t total = dbytes + dbytes + ibytes + ibytes + fbytes + 96u;
 
-    s->polar_map = (double*) vj_malloc(sizeof(double) * (size_t)len);
-    if(!s->polar_map) {
+    s->region = (uint8_t*) vj_malloc(total);
+    if(!s->region) {
         free(s);
         return NULL;
     }
 
-    s->fish_angle = (double*) vj_malloc(sizeof(double) * (size_t)len);
-    if(!s->fish_angle) {
-        free(s->polar_map);
-        free(s);
-        return NULL;
-    }
+    uint8_t *p = s->region;
 
-    s->cached_coords = (int*) vj_malloc(sizeof(int) * (size_t)len * 2u);
-    if(!s->cached_coords) {
-        free(s->fish_angle);
-        free(s->polar_map);
-        free(s);
-        return NULL;
-    }
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
+    s->polar_map = (double*)p;
+    p += dbytes;
 
-    s->beat_coords = s->cached_coords + len;
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
+    s->fish_angle = (double*)p;
+    p += dbytes;
 
-    s->buf[0] = (uint8_t*) vj_malloc((size_t)len * 3u);
-    if(!s->buf[0]) {
-        free(s->cached_coords);
-        free(s->fish_angle);
-        free(s->polar_map);
-        free(s);
-        return NULL;
-    }
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
+    s->cached_coords = (int*)p;
+    p += ibytes;
 
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
+    s->drive_coords = (int*)p;
+    p += ibytes;
+
+    p = (uint8_t*)(((uintptr_t)p + 15u) & ~(uintptr_t)15u);
+    s->buf[0] = p;
     s->buf[1] = s->buf[0] + len;
     s->buf[2] = s->buf[1] + len;
 
@@ -232,22 +213,21 @@ void *swirl_malloc(int w, int h)
             s->polar_map[i] = sqrt((double)(dy * dy + dx * dx));
             s->fish_angle[i] = atan2((double)dy, (double)dx);
             s->cached_coords[i] = i;
-            s->beat_coords[i] = i;
+            s->drive_coords[i] = i;
         }
     }
 
     s->v = -1;
     s->mode = -1;
-    s->beat_v = -1;
-    s->beat_swirl = -1;
-    s->beat_env = 0.0f;
-    s->beat_kick = 0.0f;
+    s->drive_v = -1;
+    s->drive_swirl = -1;
+    s->eff_degrees = 250.0f;
+    s->eff_swirl_drive = 0.0f;
+    s->eff_ready = 0;
     s->w = w;
     s->h = h;
 
     s->n_threads = vje_advise_num_threads(len);
-    if(s->n_threads < 1)
-        s->n_threads = 1;
 
     return (void*) s;
 }
@@ -256,18 +236,7 @@ void swirl_free(void *ptr)
 {
     swirl_t *s = (swirl_t*) ptr;
 
-    if(!s)
-        return;
-
-    if(s->polar_map)
-        free(s->polar_map);
-    if(s->fish_angle)
-        free(s->fish_angle);
-    if(s->cached_coords)
-        free(s->cached_coords);
-    if(s->buf[0])
-        free(s->buf[0]);
-
+    free(s->region);
     free(s);
 }
 
@@ -336,82 +305,54 @@ static void swirl_rebuild_caches(swirl_t *s,
                                  int height,
                                  int degrees,
                                  int mode,
-                                 int beat_degrees,
-                                 int beat_swirl)
+                                 int drive_degrees,
+                                 int swirl_drive)
 {
     if(s->v != degrees || s->mode != mode)
         swirl_rebuild_map(s, width, height, degrees, mode, s->cached_coords);
 
-    if(s->beat_v != beat_degrees || s->mode != mode || s->beat_swirl != beat_swirl)
-        swirl_rebuild_map(s, width, height, beat_degrees, mode, s->beat_coords);
+    if(s->drive_v != drive_degrees || s->mode != mode || s->drive_swirl != swirl_drive)
+        swirl_rebuild_map(s, width, height, drive_degrees, mode, s->drive_coords);
 
     s->v = degrees;
     s->mode = mode;
-    s->beat_v = beat_degrees;
-    s->beat_swirl = beat_swirl;
+    s->drive_v = drive_degrees;
+    s->drive_swirl = swirl_drive;
 }
 
 void swirl_apply(void *ptr, VJFrame *frame, int *args)
 {
     swirl_t *s = (swirl_t*) ptr;
 
-    if(!s || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
-
     const int width = frame->width;
     const int height = frame->height;
     const int len = frame->len;
 
-    if(width <= 0 || height <= 0 || len <= 0)
-        return;
+    const int degrees_arg = args[P_DEGREES];
+    const int mode = args[P_MODE];
+    const int swirl_drive_arg = args[P_SWIRL_DRIVE];
 
-    if(width != s->w || height != s->h)
-        return;
 
-    const int degrees = clampi(args[P_DEGREES], 1, 360);
-    const int mode = args[P_MODE] ? 1 : 0;
-    const int beat_swirl = clampi(args[P_BEAT_SWIRL], 0, 1000);
-    const int beat_push = clampi(args[P_BEAT_PUSH], 0, 1000);
-    const int beat_smooth = clampi(args[P_BEAT_SMOOTH], 0, 1000);
+    const float param_attack = 0.28f;
+    const float param_release = 0.095f;
 
-    const int beat_degrees = swirl_beat_degrees(degrees, beat_swirl);
+    if(!s->eff_ready) {
+        s->eff_degrees = (float)degrees_arg;
+        s->eff_swirl_drive = (float)swirl_drive_arg;
+        s->eff_ready = 1;
+    } else {
+        swirl_smooth_i(&s->eff_degrees, degrees_arg, param_attack, param_release);
+        swirl_smooth_i(&s->eff_swirl_drive, swirl_drive_arg, param_attack * 1.16f, param_release);
+    }
 
-    swirl_rebuild_caches(s, width, height, degrees, mode, beat_degrees, beat_swirl);
+    const int degrees = clampi((int)(s->eff_degrees + 0.5f), 1, 360);
+    const int swirl_drive = clampi((int)(s->eff_swirl_drive + 0.5f), 0, 1000);
+    const int drive_degrees = swirl_drive_degrees(degrees, swirl_drive);
 
-    const int beat_shaped = swirl_beat_shape(beat_push);
-    const float beat_target = (float)beat_shaped * 0.001f;
-    const float smooth = (float)beat_smooth * 0.001f;
+    swirl_rebuild_caches(s, width, height, degrees, mode, drive_degrees, swirl_drive);
 
-    const float prev_env = s->beat_env;
-    const float attack = 0.44f - smooth * 0.27f;
-    const float release = 0.060f - smooth * 0.040f;
-
-    if(beat_target > s->beat_env)
-        s->beat_env += (beat_target - s->beat_env) * attack;
-    else
-        s->beat_env += (beat_target - s->beat_env) * release;
-
-    if(beat_target > prev_env)
-        s->beat_kick += (beat_target - prev_env) * 0.62f;
-
-    s->beat_kick *= 0.54f + smooth * 0.34f;
-
-    if(s->beat_env < 0.0001f)
-        s->beat_env = 0.0f;
-    else if(s->beat_env > 1.0f)
-        s->beat_env = 1.0f;
-
-    if(s->beat_kick < 0.0001f)
-        s->beat_kick = 0.0f;
-    else if(s->beat_kick > 1.0f)
-        s->beat_kick = 1.0f;
-
-    float drive = s->beat_env * 0.70f + s->beat_kick * 0.30f;
-    if(drive > 1.0f)
-        drive = 1.0f;
-
-    int beat_q8 = (int)(drive * 256.0f + 0.5f);
-    beat_q8 = clampi(beat_q8, 0, 256);
+    int drive_q8 = (swirl_drive * 256 + 500) / 1000;
+    drive_q8 = clampi(drive_q8, 0, 256);
 
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -426,9 +367,9 @@ void swirl_apply(void *ptr, VJFrame *frame, int *args)
     veejay_memcpy(srcCr, Cr, len);
 
     int *restrict base_coords = s->cached_coords;
-    int *restrict beat_coords = s->beat_coords;
+    int *restrict drive_coords = s->drive_coords;
 
-    if(beat_q8 <= 0 || beat_degrees == degrees) {
+    if(drive_q8 <= 0 || drive_degrees == degrees) {
 #pragma omp parallel for schedule(static) num_threads(s->n_threads)
         for(int i = 0; i < len; i++) {
             const int idx = base_coords[i];
@@ -441,11 +382,11 @@ void swirl_apply(void *ptr, VJFrame *frame, int *args)
 #pragma omp parallel for schedule(static) num_threads(s->n_threads)
         for(int i = 0; i < len; i++) {
             const int a = base_coords[i];
-            const int b = beat_coords[i];
+            const int b = drive_coords[i];
 
-            Y[i]  = mix_u8(srcY[a],  srcY[b],  beat_q8);
-            Cb[i] = mix_u8(srcCb[a], srcCb[b], beat_q8);
-            Cr[i] = mix_u8(srcCr[a], srcCr[b], beat_q8);
+            Y[i]  = mix_u8(srcY[a],  srcY[b],  drive_q8);
+            Cb[i] = mix_u8(srcCb[a], srcCb[b], drive_q8);
+            Cr[i] = mix_u8(srcCr[a], srcCr[b], drive_q8);
         }
     }
 }

@@ -19,12 +19,28 @@
  */
 
 #include "common.h"
-#include "smartblur.h"
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <omp.h>
+#include <veejaycore/vjmem.h>
+#include "smartblur.h"
+
+#define SMARTBLUR_PARAMS 7
+
+#define P_RADIUS         0
+#define P_SHARPNESS      1
+#define P_CHROMA         2
+#define P_MIX            3
+#define P_RADIUS_DRIVE    4
+#define P_SHARPNESS_DRIVE 5
+#define P_MIX_DRIVE       6
 
 typedef struct {
     uint8_t *region;
     uint8_t *small_src;
+    uint8_t *orig_plane;
+
     float *a_buf;
     float *b_buf;
     float *tmp_mu;
@@ -32,8 +48,18 @@ typedef struct {
     float *mI;
     float *mII;
     float *inv_counts;
+
+    float sm_radius;
+    float sm_sharpness;
+    float sm_chroma;
+    float sm_mix;
+    float sm_radius_drive;
+    float sm_sharpness_drive;
+    float sm_mix_drive;
+
     int w;
     int h;
+    int len;
     int sw;
     int sh;
     int small_len;
@@ -41,7 +67,7 @@ typedef struct {
     int n_threads;
 } smartblur_t;
 
-static inline int smartblur_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : (v > hi ? hi : v);
 }
@@ -49,7 +75,7 @@ static inline int smartblur_clampi(int v, int lo, int hi)
 static inline uint8_t smartblur_u8(float v)
 {
     int iv = (int)(v + 0.5f);
-    return (uint8_t)smartblur_clampi(iv, 0, 255);
+    return (uint8_t)clampi(iv, 0, 255);
 }
 
 static inline uintptr_t smartblur_align_up(uintptr_t p, uintptr_t a)
@@ -57,26 +83,84 @@ static inline uintptr_t smartblur_align_up(uintptr_t p, uintptr_t a)
     return (p + (a - 1u)) & ~(a - 1u);
 }
 
+static inline uint8_t smartblur_blend_y(uint8_t a, uint8_t b, int q8)
+{
+    q8 = clampi(q8, 0, 256);
+    return (uint8_t)((((int)a * (256 - q8)) + ((int)b * q8) + 128) >> 8);
+}
+
+static inline uint8_t smartblur_blend_uv(uint8_t a, uint8_t b, int q8)
+{
+    q8 = clampi(q8, 0, 256);
+
+    const int ac = (int)a - 128;
+    const int bc = (int)b - 128;
+    const int v = (((ac * (256 - q8)) + (bc * q8) + 128) >> 8) + 128;
+
+    return (uint8_t)CLAMP_UV(v);
+}
+
+static inline float smartblur_smooth_lane(float oldv, float target, float smooth, float fast)
+{
+    if(oldv < -900000.0f)
+        return target;
+
+    float a = fast + (1.0f - smooth) * (0.46f - fast);
+    if(a < 0.035f)
+        a = 0.035f;
+    else if(a > 0.62f)
+        a = 0.62f;
+
+    return oldv + (target - oldv) * a;
+}
+
 vj_effect *smartblur_init(int w, int h)
 {
     vj_effect *ve = (vj_effect*) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
+    if(!ve)
+        return NULL;
+
+    ve->num_params = SMARTBLUR_PARAMS;
 
     ve->defaults  = (int*) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int*) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int*) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 100;
-    ve->defaults[0] = 8;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults) free(ve->defaults);
+        if(ve->limits[0]) free(ve->limits[0]);
+        if(ve->limits[1]) free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 1000;
-    ve->defaults[1] = 200;
+    ve->limits[0][P_RADIUS] = 1;
+    ve->limits[1][P_RADIUS] = 100;
+    ve->defaults[P_RADIUS] = 8;
 
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 100;
-    ve->defaults[2] = 50;
+    ve->limits[0][P_SHARPNESS] = 1;
+    ve->limits[1][P_SHARPNESS] = 1000;
+    ve->defaults[P_SHARPNESS] = 200;
+
+    ve->limits[0][P_CHROMA] = 0;
+    ve->limits[1][P_CHROMA] = 100;
+    ve->defaults[P_CHROMA] = 50;
+
+    ve->limits[0][P_MIX] = 0;
+    ve->limits[1][P_MIX] = 1000;
+    ve->defaults[P_MIX] = 1000;
+
+    ve->limits[0][P_RADIUS_DRIVE] = 0;
+    ve->limits[1][P_RADIUS_DRIVE] = 1000;
+    ve->defaults[P_RADIUS_DRIVE] = 0;
+
+    ve->limits[0][P_SHARPNESS_DRIVE] = 0;
+    ve->limits[1][P_SHARPNESS_DRIVE] = 1000;
+    ve->defaults[P_SHARPNESS_DRIVE] = 0;
+
+    ve->limits[0][P_MIX_DRIVE] = 0;
+    ve->limits[1][P_MIX_DRIVE] = 1000;
+    ve->defaults[P_MIX_DRIVE] = 0;
 
     ve->sub_format = 1;
     ve->extra_frame = 0;
@@ -87,51 +171,65 @@ vj_effect *smartblur_init(int w, int h)
         ve->num_params,
         "Radius",
         "Sharpness",
-        "Chroma"
+        "Chroma",
+        "Mix",
+        "Radius Drive",
+        "Sharpness Drive",
+        "Mix Drive"
     );
+
+    const int sw = (w > 0) ? ((w + 1) >> 1) : 320;
+    const int sh = (h > 0) ? ((h + 1) >> 1) : 240;
+    int radius_hi = ((sw < sh) ? sw : sh) - 1;
+
+    if(radius_hi > 100)
+        radius_hi = 100;
+    if(radius_hi < 2)
+        radius_hi = 2;
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS, 2,  36,  8, 30, 1200, 3000, 0, 45, /* Radius */
-        VJ_BEAT_CONTRAST,      VJ_BEAT_F_CONTINUOUS, 60, 460, 8, 30, 1200, 3000, 0, 50, /* Sharpness */
-        VJ_BEAT_COLOR_AMOUNT,  VJ_BEAT_F_CONTINUOUS, 0,  100, 8, 30, 1200, 3000, 0, 45  /* Chroma */
+        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 2,                  radius_hi,          12, 46, 1000, 3600, 0,    70,
+        VJ_BEAT_CONTRAST,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 24,                 880,                12, 46, 1000, 3600, 0,    72,
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 12,                 100,                10, 38, 1200, 4200, 0,    56,
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 240,                1000,               12, 46, 1000, 3600, 0,    70,
+        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 120,                1000,               16, 62,  700, 2800, 0,    90,
+        VJ_BEAT_CONTRAST,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 100,                1000,               14, 54,  800, 3000, 0,    82,
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED,       0,                  760,                12, 46, 1000, 3600, 0,    64
     );
-
-    (void) w;
-    (void) h;
 
     return ve;
 }
 
 void *smartblur_malloc(int w, int h)
 {
-    if(w <= 0 || h <= 0)
-        return NULL;
-
     smartblur_t *s = (smartblur_t*) vj_calloc(sizeof(*s));
     if(!s)
         return NULL;
 
     s->w = w;
     s->h = h;
+    s->len = w * h;
     s->sw = (w + 1) >> 1;
     s->sh = (h + 1) >> 1;
     s->small_len = s->sw * s->sh;
     s->max_sdim = (s->sw > s->sh) ? s->sw : s->sh;
 
-    s->n_threads = vje_advise_num_threads(w * h);
-    if(s->n_threads < 1)
-        s->n_threads = 1;
+    s->n_threads = vje_advise_num_threads(s->len);
 
     const size_t small_bytes = (size_t)s->small_len;
+    const size_t plane_bytes = (size_t)s->len;
     const size_t plane_floats = (size_t)s->small_len;
     const size_t prefix_floats = (size_t)s->n_threads * (size_t)(s->max_sdim + 1);
     const size_t inv_floats = (size_t)(s->max_sdim + 2);
 
     uintptr_t off = 0;
+
     const uintptr_t small_off = off;
     off += small_bytes;
+
+    const uintptr_t orig_off = off;
+    off += plane_bytes;
 
     off = smartblur_align_up(off, (uintptr_t)sizeof(float));
     const uintptr_t a_off = off;
@@ -162,6 +260,7 @@ void *smartblur_malloc(int w, int h)
     }
 
     s->small_src  = s->region + small_off;
+    s->orig_plane = s->region + orig_off;
     s->a_buf      = (float*)(void*)(s->region + a_off);
     s->b_buf      = (float*)(void*)(s->region + b_off);
     s->tmp_mu     = (float*)(void*)(s->region + tmp_mu_off);
@@ -173,18 +272,22 @@ void *smartblur_malloc(int w, int h)
     for(int i = 0; i < s->max_sdim + 2; i++)
         s->inv_counts[i] = (i > 0) ? (1.0f / (float)i) : 1.0f;
 
+    s->sm_radius = -1000000.0f;
+    s->sm_sharpness = -1000000.0f;
+    s->sm_chroma = -1000000.0f;
+    s->sm_mix = -1000000.0f;
+    s->sm_radius_drive = -1000000.0f;
+    s->sm_sharpness_drive = -1000000.0f;
+    s->sm_mix_drive = -1000000.0f;
+
     return (void*) s;
 }
 
 void smartblur_free(void *ptr)
 {
     smartblur_t *s = (smartblur_t*) ptr;
-    if(!s)
-        return;
 
-    if(s->region)
-        free(s->region);
-
+    free(s->region);
     free(s);
 }
 
@@ -342,27 +445,99 @@ static void smartblur_plane(smartblur_t *s,
                             float strength,
                             int luma_only)
 {
-    if(!data || strength <= 0.001f)
+    if(strength <= 0.001f)
         return;
 
     const int max_r = ((s->sw < s->sh) ? s->sw : s->sh) - 1;
-    const int r = smartblur_clampi(radius, 1, (max_r > 1) ? max_r : 1);
+    const int r = clampi(radius, 1, (max_r > 1) ? max_r : 1);
 
     smartblur_downsample_2x(s, data);
     smartblur_build_coefficients(s, r, eps, offset);
     smartblur_apply_coefficients(s, data, offset, strength, luma_only);
 }
 
+static void smartblur_mix_plane(smartblur_t *s,
+                                uint8_t *restrict data,
+                                int len,
+                                int mix_q8,
+                                int chroma)
+{
+    if(mix_q8 >= 256)
+        return;
+
+    const uint8_t *restrict src = s->orig_plane;
+
+    if(mix_q8 <= 0) {
+        veejay_memcpy(data, src, len);
+        return;
+    }
+
+    if(chroma) {
+#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+        for(int i = 0; i < len; i++)
+            data[i] = smartblur_blend_uv(src[i], data[i], mix_q8);
+    } else {
+#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+        for(int i = 0; i < len; i++)
+            data[i] = smartblur_blend_y(src[i], data[i], mix_q8);
+    }
+}
+
+static void smartblur_process_plane(smartblur_t *s,
+                                    uint8_t *restrict data,
+                                    int len,
+                                    int radius,
+                                    float eps,
+                                    float offset,
+                                    float strength,
+                                    int luma_only,
+                                    int mix_q8,
+                                    int chroma)
+{
+    if(mix_q8 < 256)
+        veejay_memcpy(s->orig_plane, data, len);
+
+    smartblur_plane(s, data, radius, eps, offset, strength, luma_only);
+
+    if(mix_q8 < 256)
+        smartblur_mix_plane(s, data, len, mix_q8, chroma);
+}
+
 void smartblur_apply(void *ptr, VJFrame *frame, int *args)
 {
     smartblur_t *s = (smartblur_t*) ptr;
 
-    if(!s || !frame || !args || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return;
+    const int radius_arg = args[P_RADIUS];
+    const int sharpness_arg = args[P_SHARPNESS];
+    const int chroma_arg = args[P_CHROMA];
+    const int mix_arg = args[P_MIX];
+    const int radius_drive_arg = args[P_RADIUS_DRIVE];
+    const int sharpness_drive_arg = args[P_SHARPNESS_DRIVE];
+    const int mix_drive_arg = args[P_MIX_DRIVE];
+    const float lane_smooth = 0.52f;
 
-    int radius = smartblur_clampi(args[0], 1, 100);
-    int sharpness = smartblur_clampi(args[1], 1, 1000);
-    int chroma = smartblur_clampi(args[2], 0, 100);
+    s->sm_radius = smartblur_smooth_lane(s->sm_radius, (float)radius_arg, lane_smooth, 0.11f);
+    s->sm_sharpness = smartblur_smooth_lane(s->sm_sharpness, (float)sharpness_arg, lane_smooth, 0.13f);
+    s->sm_chroma = smartblur_smooth_lane(s->sm_chroma, (float)chroma_arg, lane_smooth, 0.13f);
+    s->sm_mix = smartblur_smooth_lane(s->sm_mix, (float)mix_arg, lane_smooth, 0.13f);
+    s->sm_radius_drive = smartblur_smooth_lane(s->sm_radius_drive, (float)radius_drive_arg, lane_smooth, 0.16f);
+    s->sm_sharpness_drive = smartblur_smooth_lane(s->sm_sharpness_drive, (float)sharpness_drive_arg, lane_smooth, 0.16f);
+    s->sm_mix_drive = smartblur_smooth_lane(s->sm_mix_drive, (float)mix_drive_arg, lane_smooth, 0.16f);
+
+    const int radius_boost = (int)((s->sm_radius_drive * 38.0f) * 0.001f + 0.5f);
+    int radius = (int)(s->sm_radius + 0.5f) + radius_boost;
+    radius = clampi(radius, 1, 100);
+
+    const int sharpness_boost = (int)((s->sm_sharpness_drive * 820.0f) * 0.001f + 0.5f);
+    int sharpness = (int)(s->sm_sharpness + 0.5f) + sharpness_boost;
+    sharpness = clampi(sharpness, 1, 1000);
+
+    int chroma = (int)(s->sm_chroma + 0.5f);
+    chroma = clampi(chroma, 0, 100);
+
+    int mix = (int)(s->sm_mix + 0.5f);
+    mix -= (int)((s->sm_mix_drive * 420.0f) * 0.001f + 0.5f);
+    mix = clampi(mix, 0, 1000);
 
     float eps = (float)sharpness * 0.1f;
     eps *= eps;
@@ -371,8 +546,9 @@ void smartblur_apply(void *ptr, VJFrame *frame, int *args)
         eps = 0.0001f;
 
     const float chroma_strength = (float)chroma * 0.01f;
+    const int mix_q8 = (mix * 256 + 500) / 1000;
 
-    smartblur_plane(s, frame->data[0], radius, eps, 0.0f,   1.0f,            1);
-    smartblur_plane(s, frame->data[1], radius, eps, 128.0f, chroma_strength, 0);
-    smartblur_plane(s, frame->data[2], radius, eps, 128.0f, chroma_strength, 0);
+    smartblur_process_plane(s, frame->data[0], s->len, radius, eps, 0.0f,   1.0f,            1, mix_q8, 0);
+    smartblur_process_plane(s, frame->data[1], s->len, radius, eps, 128.0f, chroma_strength, 0, mix_q8, 1);
+    smartblur_process_plane(s, frame->data[2], s->len, radius, eps, 128.0f, chroma_strength, 0, mix_q8, 1);
 }

@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -22,304 +22,376 @@
 #include "motionmap.h"
 #include "magicmirror.h"
 
+#define MAGICMIRROR_PARAMS 5
+
+#define P_X_DISPLACE 0
+#define P_Y_DISPLACE 1
+#define P_X_WAVE     2
+#define P_Y_WAVE     3
+#define P_ALPHA      4
+
 typedef struct {
     uint8_t *magicmirrorbuf[4];
-    double *funhouse_x;
-    double *funhouse_y;
-    unsigned int *cache_x;
-    unsigned int *cache_y;
-    unsigned int last[4]; // {0,0,20,20};
+    float *wave_x;
+    float *wave_y;
+    int *cache_x;
+    int *cache_y;
+    int last_x_wave;
+    int last_y_wave;
     int cx1;
     int cx2;
     int n__;
     int N__;
+    int n_threads;
     void *motionmap;
 } magicmirror_t;
 
+static inline int magicmirror_clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
 vj_effect *magicmirror_init(int w, int h)
 {
-	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-	ve->num_params = 5;
-	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
 
-	ve->defaults[0] = w/4;
-	ve->defaults[1] = h/4;
-	ve->defaults[2] = 20;
-	ve->defaults[3] = 20;
-	ve->defaults[4] = 0;
+    if(!ve)
+        return NULL;
 
-	ve->limits[0][0] = 0;
-	ve->limits[1][0] = w/2;
-	ve->limits[0][1] = 0;
-	ve->limits[1][1] = h/2;
-	ve->limits[0][2] = 0;
-	ve->limits[1][2] = 100;
-	ve->limits[0][3] = 0;
-	ve->limits[1][3] = 100;
-	ve->limits[0][4] = 0;
-	ve->limits[1][4] = 2;
+    ve->num_params = MAGICMIRROR_PARAMS;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-	ve->motion = 1;
-	ve->sub_format = 1;
-	ve->description = "Magic Mirror Surface";
-	ve->has_user =0;
-	ve->extra_frame = 0;
-	ve->alpha = FLAG_ALPHA_SRC_A | FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
-	ve->param_description = vje_build_param_list(ve->num_params, "X", "Y", "X","Y", "Alpha" );
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
-	ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->defaults[P_X_DISPLACE] = w / 4;
+    ve->defaults[P_Y_DISPLACE] = h / 4;
+    ve->defaults[P_X_WAVE] = 20;
+    ve->defaults[P_Y_WAVE] = 20;
+    ve->defaults[P_ALPHA] = 0;
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][4], 4, "Normal", "Alpha Mirror Mask", "Alpha Mirror Mask Only" );
-	ve->beat_hints = vje_build_beat_hint_list(
-		ve->num_params,
+    ve->limits[0][P_X_DISPLACE] = 0; ve->limits[1][P_X_DISPLACE] = w / 2;
+    ve->limits[0][P_Y_DISPLACE] = 0; ve->limits[1][P_Y_DISPLACE] = h / 2;
+    ve->limits[0][P_X_WAVE] = 0;     ve->limits[1][P_X_WAVE] = 100;
+    ve->limits[0][P_Y_WAVE] = 0;     ve->limits[1][P_Y_WAVE] = 100;
+    ve->limits[0][P_ALPHA] = 0;      ve->limits[1][P_ALPHA] = 2;
 
-		VJ_BEAT_KICK,               VJ_BEAT_F_CONTINUOUS,                                                       0,                  w / 3,              14, 58, 90,   720,  0,    82,    /* X displacement */
-		VJ_BEAT_SNARE,              VJ_BEAT_F_CONTINUOUS,                                                       0,                  h / 3,              10, 42, 120,  900,  0,    70,    /* Y displacement */
-		VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,       2,                  70,                 6,  22, 2200, 5200, 1200, 24,    /* X wave */
-		VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE,       2,                  70,                 6,  22, 2200, 5200, 1200, 24,    /* Y wave */
-		VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                    VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,  0,    0,    0,   -1000  /* Alpha */
-	);
+    ve->motion = 1;
+    ve->sub_format = 1;
+    ve->description = "Magic Mirror Surface";
+    ve->has_user = 0;
+    ve->extra_frame = 0;
+    ve->alpha = FLAG_ALPHA_SRC_A | FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "X Displacement",
+        "Y Displacement",
+        "X Wave",
+        "Y Wave",
+        "Alpha"
+    );
 
-	return ve;
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_ALPHA], P_ALPHA, "Normal", "Alpha Mirror Mask", "Alpha Mirror Mask Only");
+
+    int x_hi = w / 4;
+    int y_hi = h / 4;
+
+    if(x_hi < 1)
+        x_hi = 1;
+    if(y_hi < 1)
+        y_hi = 1;
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+        VJ_BEAT_KICK,               VJ_BEAT_F_CONTINUOUS,                              0,                  x_hi,               10,46,160,  1050, 0,    66,
+        VJ_BEAT_SNARE,              VJ_BEAT_F_CONTINUOUS,                              0,                  y_hi,               8, 40,200,  1250, 0,    60,
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,        3,                  58,                 4, 16,2600, 7600, 1800, 16,
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,        3,                  58,                 4, 16,2600, 7600, 1800, 16,
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0,    0,    0,   -1000
+    );
+    return ve;
 }
 
 void *magicmirror_malloc(int w, int h)
 {
     magicmirror_t *m = (magicmirror_t*) vj_calloc(sizeof(magicmirror_t));
-    if(!m) {
-        return NULL;
-    }
 
-	m->magicmirrorbuf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t)*(w*h*4));
-	if(!m->magicmirrorbuf[0]) {
-		free(m);
+    if(!m)
         return NULL;
-    }
 
-	m->magicmirrorbuf[1] = m->magicmirrorbuf[0] + (w*h);
-	m->magicmirrorbuf[2] = m->magicmirrorbuf[1] + (w*h);
-	m->magicmirrorbuf[3] = m->magicmirrorbuf[2] + (w*h);
-	
-	for( int i = 0; i < h; i ++ ) {
-	m->magicmirrorbuf[1][0 + i * w] = 128;
-	m->magicmirrorbuf[2][0 + i * w] = 128;
-	m->magicmirrorbuf[1][w -1 + i * w] = 128;
-	m->magicmirrorbuf[2][w -1 + i * w] = 128;
-	}
-	
-	m->funhouse_x = (double*)vj_calloc(sizeof(double) * w );
-	if(!m->funhouse_x) {
-        free(m->magicmirrorbuf[0]);
+    const int len = w * h;
+
+    m->magicmirrorbuf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (size_t)len * 4);
+
+    if(!m->magicmirrorbuf[0]) {
         free(m);
         return NULL;
     }
 
-	m->cache_x = (unsigned int *)vj_calloc(sizeof(unsigned int)*w);
-	if(!m->cache_x) {
-        free(m->magicmirrorbuf[0]);
-        free(m->funhouse_x);
-        free(m);
+    m->magicmirrorbuf[1] = m->magicmirrorbuf[0] + len;
+    m->magicmirrorbuf[2] = m->magicmirrorbuf[1] + len;
+    m->magicmirrorbuf[3] = m->magicmirrorbuf[2] + len;
+
+    m->wave_x = (float*) vj_malloc(sizeof(float) * (size_t)w);
+    m->wave_y = (float*) vj_malloc(sizeof(float) * (size_t)h);
+    m->cache_x = (int*) vj_malloc(sizeof(int) * (size_t)w);
+    m->cache_y = (int*) vj_malloc(sizeof(int) * (size_t)h);
+
+    if(!m->wave_x || !m->wave_y || !m->cache_x || !m->cache_y) {
+        magicmirror_free(m);
         return NULL;
     }
 
-	m->funhouse_y = (double*)vj_calloc(sizeof(double) * h );
-	if(!m->funhouse_y) {
-        free(m->magicmirrorbuf[0]);
-        free(m->funhouse_x);
-        free(m->cache_x);
-        free(m);
-        return NULL;
-    }
+    veejay_memset(m->magicmirrorbuf[0], pixel_Y_lo_, len);
+    veejay_memset(m->magicmirrorbuf[1], 128, len);
+    veejay_memset(m->magicmirrorbuf[2], 128, len);
+    veejay_memset(m->magicmirrorbuf[3], 0, len);
 
-	m->cache_y = (unsigned int*)vj_calloc(sizeof(unsigned int)*h);
-	if(!m->cache_y) {
-        free(m->magicmirrorbuf[0]);
-        free(m->funhouse_x);
-        free(m->funhouse_y);
-        free(m->cache_x);
-        free(m);
-        return NULL;
-    }   
+    m->last_x_wave = -1;
+    m->last_y_wave = -1;
+    m->n_threads = vje_advise_num_threads(len);
 
-    m->last[2] = 20;
-    m->last[3] = 20;
-
-	return (void*) m;
+    return (void*) m;
 }
 
 void magicmirror_free(void *ptr)
 {
     magicmirror_t *m = (magicmirror_t*) ptr;
 
-    free(m->magicmirrorbuf[0]);
-    free(m->funhouse_x);
-    free(m->funhouse_y);
-    free(m->cache_x);
-    free(m->cache_y);
-    free(m);
+    if(m) {
+        free(m->magicmirrorbuf[0]);
+        free(m->wave_x);
+        free(m->wave_y);
+        free(m->cache_x);
+        free(m->cache_y);
+        free(m);
+    }
 }
 
-void magicmirror_apply( void *ptr, VJFrame *frame, int *args) {
-    int vx = args[0];
-    int vy = args[1];
-    int d = args[2];
-    int n = args[3];
-    int alpha = args[4];
-    
+static void magicmirror_update_wave_x(magicmirror_t *m, int width, int x_wave)
+{
+    const float scale = (float)x_wave * 0.001f;
+
+#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+    for(int x = 0; x < width; x++)
+        fast_sin(m->wave_x[x], (float)x * scale);
+
+    m->last_x_wave = x_wave;
+}
+
+static void magicmirror_update_wave_y(magicmirror_t *m, int height, int y_wave)
+{
+    const float scale = (float)y_wave * 0.001f;
+
+#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+    for(int y = 0; y < height; y++)
+        fast_sin(m->wave_y[y], (float)y * scale);
+
+    m->last_y_wave = y_wave;
+}
+
+static void magicmirror_update_cache_x(magicmirror_t *m, int width, int x_displace)
+{
+#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+    for(int x = 0; x < width; x++) {
+        int dx = x + (int)(m->wave_x[x] * (float)x_displace);
+
+        if(dx < 0)
+            dx += width;
+        if(dx < 0)
+            dx = 0;
+        else if(dx >= width)
+            dx = width - 1;
+
+        m->cache_x[x] = dx;
+    }
+}
+
+static void magicmirror_update_cache_y(magicmirror_t *m, int height, int y_displace)
+{
+#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+    for(int y = 0; y < height; y++) {
+        int dy = y + (int)(m->wave_y[y] * (float)y_displace);
+
+        if(dy < 0)
+            dy += height;
+        if(dy < 0)
+            dy = 0;
+        else if(dy >= height)
+            dy = height - 1;
+
+        m->cache_y[y] = dy;
+    }
+}
+
+static void magicmirror_apply_yuv(magicmirror_t *m, VJFrame *frame)
+{
+    const int width = frame->width;
+    const int height = frame->height;
+
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+
+    const uint8_t *restrict sY = m->magicmirrorbuf[0];
+    const uint8_t *restrict sCb = m->magicmirrorbuf[1];
+    const uint8_t *restrict sCr = m->magicmirrorbuf[2];
+
+    const int *restrict cache_x = m->cache_x;
+    const int *restrict cache_y = m->cache_y;
+
+#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+    for(int y = 1; y < height - 1; y++) {
+        const int row = y * width;
+        const int src_row = cache_y[y] * width;
+
+        for(int x = 1; x < width - 1; x++) {
+            const int q = row + x;
+            const int p = src_row + cache_x[x];
+
+            Y[q] = sY[p];
+            Cb[q] = sCb[p];
+            Cr[q] = sCr[p];
+        }
+    }
+}
+
+static void magicmirror_apply_alpha_only(magicmirror_t *m, VJFrame *frame)
+{
+    const int width = frame->width;
+    const int height = frame->height;
+
+    uint8_t *restrict A = frame->data[3];
+    const uint8_t *restrict sA = m->magicmirrorbuf[3];
+
+    const int *restrict cache_x = m->cache_x;
+    const int *restrict cache_y = m->cache_y;
+
+#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+    for(int y = 1; y < height - 1; y++) {
+        const int row = y * width;
+        const int src_row = cache_y[y] * width;
+
+        for(int x = 1; x < width - 1; x++)
+            A[row + x] = sA[src_row + cache_x[x]];
+    }
+}
+
+static void magicmirror_apply_alpha_mask(magicmirror_t *m, VJFrame *frame)
+{
+    const int width = frame->width;
+    const int height = frame->height;
+
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict A = frame->data[3];
+
+    const uint8_t *restrict sY = m->magicmirrorbuf[0];
+    const uint8_t *restrict sCb = m->magicmirrorbuf[1];
+    const uint8_t *restrict sCr = m->magicmirrorbuf[2];
+    const uint8_t *restrict sA = m->magicmirrorbuf[3];
+
+    const int *restrict cache_x = m->cache_x;
+    const int *restrict cache_y = m->cache_y;
+
+#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+    for(int y = 1; y < height - 1; y++) {
+        const int row = y * width;
+        const int src_row = cache_y[y] * width;
+
+        for(int x = 1; x < width - 1; x++) {
+            const int q = row + x;
+            const int p = src_row + cache_x[x];
+            const uint8_t a = sA[p];
+
+            A[q] = a;
+
+            if(a) {
+                Y[q] = sY[p];
+                Cb[q] = sCb[p];
+                Cr[q] = sCr[p];
+            }
+        }
+    }
+}
+
+void magicmirror_apply(void *ptr, VJFrame *frame, int *args)
+{
     magicmirror_t *m = (magicmirror_t*) ptr;
 
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-	const int len = frame->len;
-	double c1 = (double)vx;
-	double c2 = (double)vy;
-	int motion = 0;
-	int interpolate = 1;
+    int vx = magicmirror_clampi(args[P_X_DISPLACE], 0, frame->width / 2);
+    int vy = magicmirror_clampi(args[P_Y_DISPLACE], 0, frame->height / 2);
+    int x_wave = magicmirror_clampi(args[P_X_WAVE], 0, 100);
+    int y_wave = magicmirror_clampi(args[P_Y_WAVE], 0, 100);
+    const int alpha = magicmirror_clampi(args[P_ALPHA], 0, 2);
+    int motion = 0;
+    int interpolate = 1;
 
-	if( motionmap_active(m->motionmap))
-	{
-		if( motionmap_is_locked(m->motionmap) ) {
-			d = m->cx1;
-			n = m->cx2;
-		} else {
-			motionmap_scale_to( m->motionmap, 100,100,0,0, &d, &n, &(m->n__), &(m->N__) );
-			m->cx1 = d;
-			m->cx2 = n;
-		}
-		motion = 1;
-	}
-	else
-	{
-		m->n__ = 0;
-		m->N__ = 0;
-	}
+    if(motionmap_active(m->motionmap)) {
+        if(motionmap_is_locked(m->motionmap)) {
+            x_wave = m->cx1;
+            y_wave = m->cx2;
+        }
+        else {
+            motionmap_scale_to(m->motionmap, 100, 100, 0, 0, &x_wave, &y_wave, &(m->n__), &(m->N__));
+            m->cx1 = x_wave;
+            m->cx2 = y_wave;
+        }
+        motion = 1;
+    }
+    else {
+        m->n__ = 0;
+        m->N__ = 0;
+    }
 
-	if( m->N__ == m->n__ || m->n__ == 0 )
-		interpolate = 0;
+    if(m->N__ == m->n__ || m->n__ == 0)
+        interpolate = 0;
 
-	double c3 = (double)d * 0.001;
-	unsigned int dx,dy,x,y,p,q;
-	double c4 = (double)n * 0.001;
-	int changed = 0;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-	uint8_t *A = frame->data[3];
-    double *funhouse_x = m->funhouse_x;
-    double *funhouse_y = m->funhouse_y;
-    unsigned int *cache_x = m->cache_x;
-    unsigned int *cache_y = m->cache_y;
-    uint8_t **magicmirrorbuf = m->magicmirrorbuf;
+    if(x_wave != m->last_x_wave)
+        magicmirror_update_wave_x(m, frame->width, x_wave);
 
-	if( d != m->last[1] ) {
-		changed = 1; m->last[1] =d;
-	}
-	if( n != m->last[0] ) {
-		changed = 1; m->last[0] = n;
-	}
+    if(y_wave != m->last_y_wave)
+        magicmirror_update_wave_y(m, frame->height, y_wave);
 
-	m->last[2] = vx;
-	m->last[3] = vy;
+    magicmirror_update_cache_x(m, frame->width, vx);
+    magicmirror_update_cache_y(m, frame->height, vy);
 
-	if(changed==1)
-	{	
-		// degrees x or y changed, need new sin
-		for(x=0; x < width ; x++)
-		{
-			double res;
-			fast_sin(res,(double)(c3*x));
-			funhouse_x[x] = res;
-		}
-		for(y=0; y < height; y++)
-		{
-			double res;
-			fast_sin(res,(double)(c4*y));
-			funhouse_y[y] = res;
-		}
-	}
-	for(x=0; x < width; x++)
-	{
-		dx = x + funhouse_x[x] * c1;
-		if(dx < 0) dx += width;
-		if(dx < 0) dx = 0; else if (dx >= width) dx = width-1;
-		cache_x[x] = dx;
-	}
-	for(y=0; y < height; y++)
-	{
-		dy = y + funhouse_y[y] * c2;
-		if(dy < 0) dy += height;
-		if(dy < 0) dy = 0; else if (dy >= height) dy = height-1;
-		cache_y[y] = dy;
-	}
+    const int len = frame->len;
+    int strides[4] = { len, len, len, alpha ? len : 0 };
 
-	veejay_memcpy( magicmirrorbuf[0], frame->data[0], len );
-	veejay_memcpy( magicmirrorbuf[1], frame->data[1], len );
-	veejay_memcpy( magicmirrorbuf[2], frame->data[2], len );
+    vj_frame_copy(frame->data, m->magicmirrorbuf, strides);
 
-	if( alpha ) {
-		veejay_memcpy( magicmirrorbuf[3], frame->data[3], len );
-		/* apply on alpha first */
-		for(y=1; y < height-1; y++)
-		{
-			for(x=1; x < width-1; x++)
-			{
-				q = y * width + x;
-				p = cache_y[y] * width + cache_x[x];
-				A[q] = magicmirrorbuf[3][p];
-			}
-		}
+    if(alpha == 0) {
+        magicmirror_apply_yuv(m, frame);
+    }
+    else if(alpha == 1) {
+        magicmirror_apply_alpha_mask(m, frame);
+    }
+    else {
+        magicmirror_apply_alpha_only(m, frame);
+    }
 
-		uint8_t *Am = magicmirrorbuf[3];
-		
-		switch(alpha) {
-				case 1:
-					for(y=1; y < height-1; y++)
-					{
-						for(x=1; x < width-1; x++)
-						{
-							q = y * width + x;
-							p = cache_y[y] * width + cache_x[x];
-							if( Am[p] || A[q] ) { 
-								Y[q] = magicmirrorbuf[0][p];
-								Cb[q] = magicmirrorbuf[1][p];
-								Cr[q] = magicmirrorbuf[2][p];
-							}
-						}
-					}
-					break;
-		}
-	}
-	else {
-		for(y=1; y < height-1; y++)
-		{
-			for(x=1; x < width-1; x++)
-			{
-				q = y * width + x;
-				p = cache_y[y] * width + cache_x[x];
-	
-				Y[q] = magicmirrorbuf[0][p];
-				Cb[q] = magicmirrorbuf[1][p];
-				Cr[q] = magicmirrorbuf[2][p];
-			}
-		}
-	}
+    if(interpolate)
+        motionmap_interpolate_frame(m->motionmap, frame, m->N__, m->n__);
 
-
-	if( interpolate )
-	{
-		motionmap_interpolate_frame( m->motionmap, frame, m->N__, m->n__ );
-	}
-
-	if( motion )
-	{
-		motionmap_store_frame( m->motionmap, frame );
-	}
-
+    if(motion)
+        motionmap_store_frame(m->motionmap, frame);
 }
 
-int magicmirror_request_fx(void) {
+int magicmirror_request_fx(void)
+{
     return VJ_IMAGE_EFFECT_MOTIONMAP_ID;
 }
 
@@ -328,4 +400,3 @@ void magicmirror_set_motionmap(void *ptr, void *priv)
     magicmirror_t *m = (magicmirror_t*) ptr;
     m->motionmap = priv;
 }
-

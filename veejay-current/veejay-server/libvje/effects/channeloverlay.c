@@ -24,69 +24,131 @@
 vj_effect *channeloverlay_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
     ve->num_params = 1;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 0; 
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    ve->defaults[0] = 0;
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 7;
-    
+
     ve->sub_format = 1;
     ve->description = "Channel Overlay";
     ve->extra_frame = 1;
-	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Operator" );
-	ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(ve->num_params, "Operator");
+    ve->hints = vje_init_value_hint_list(ve->num_params);
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0,
-					"Luminance B",
-					"Negative Luminance B",
-					"Chroma Blue B",
-					"Negative Chroma Blue B",
-					"Chroma Red B",
-					"Negative Chroma Red B",
-					"Alpha B",
-					"Negative Alpha B" );
+    vje_build_value_hint_list(ve->hints, ve->limits[1][0], 0,
+                              "Luminance B",
+                              "Negative Luminance B",
+                              "Chroma Blue B",
+                              "Negative Chroma Blue B",
+                              "Chroma Red B",
+                              "Negative Chroma Red B",
+                              "Alpha B",
+                              "Negative Alpha B");
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000
+    );
 
     return ve;
 }
 
-void channeloverlay_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
-    int mode = args[0];
-    int n_threads = vje_advise_num_threads(frame->len);
+#define PROCESS_PIXEL_VALUE(op0_) do {                  \
+    const unsigned int op0 = (unsigned int)(op0_);       \
+    const unsigned int op1 = 255u - op0;                 \
+    Y[i]  = (uint8_t)((op0 * Y[i]  + op1 * Y2[i])  >> 8); \
+    Cb[i] = (uint8_t)((op0 * Cb[i] + op1 * Cb2[i]) >> 8); \
+    Cr[i] = (uint8_t)((op0 * Cr[i] + op1 * Cr2[i]) >> 8); \
+} while(0)
+
+void channeloverlay_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
+{
+    (void) ptr;
+
     const int len = frame->len;
 
-    const uint8_t *restrict Y2  = frame2->data[0];
-    const uint8_t *restrict Cb2 = frame2->data[1];
-    const uint8_t *restrict Cr2 = frame2->data[2];
-    const uint8_t *restrict A2  = frame2->data[3];
+    const int mode = args[0];
+    const int n_threads = vje_advise_num_threads(len);
 
-    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    #define PROCESS_PIXEL(val) do { \
-        unsigned int op0 = (val); \
-        unsigned int op1 = 255 - op0; \
-        Y[i]  = (op0 * Y[i]  + op1 * Y2[i]) >> 8; \
-        Cb[i] = (op0 * Cb[i] + op1 * Cb2[i]) >> 8; \
-        Cr[i] = (op0 * Cr[i] + op1 * Cr2[i]) >> 8; \
-    } while(0)
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
+    const uint8_t *restrict A2 = frame2->data[3];
 
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
-    for(int i = 0; i < len; i++) {
-        switch(mode) {
-            case 0: PROCESS_PIXEL(Y2[i]); break;
-            case 1: PROCESS_PIXEL(0xff - Y2[i]); break;
-            case 2: PROCESS_PIXEL(Cb2[i]); break;
-            case 3: PROCESS_PIXEL(0xff - Cb2[i]); break;
-            case 4: PROCESS_PIXEL(Cr2[i]); break;
-            case 5: PROCESS_PIXEL(0xff - Cr2[i]); break;
-            case 6: PROCESS_PIXEL(A2[i]); break;
-            case 7: PROCESS_PIXEL(0xff - A2[i]); break;
-            default:
-			break;
-        }
+    switch(mode)
+    {
+        case 0:
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
+            for(int i = 0; i < len; i++)
+                PROCESS_PIXEL_VALUE(Y2[i]);
+            break;
+
+        case 1:
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
+            for(int i = 0; i < len; i++)
+                PROCESS_PIXEL_VALUE(255 - Y2[i]);
+            break;
+
+        case 2:
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
+            for(int i = 0; i < len; i++)
+                PROCESS_PIXEL_VALUE(Cb2[i]);
+            break;
+
+        case 3:
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
+            for(int i = 0; i < len; i++)
+                PROCESS_PIXEL_VALUE(255 - Cb2[i]);
+            break;
+
+        case 4:
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
+            for(int i = 0; i < len; i++)
+                PROCESS_PIXEL_VALUE(Cr2[i]);
+            break;
+
+        case 5:
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
+            for(int i = 0; i < len; i++)
+                PROCESS_PIXEL_VALUE(255 - Cr2[i]);
+            break;
+
+        case 6:
+            if(A2) {
+                #pragma omp parallel for num_threads(n_threads) schedule(static)
+                for(int i = 0; i < len; i++)
+                    PROCESS_PIXEL_VALUE(A2[i]);
+            }
+            else {
+                #pragma omp parallel for num_threads(n_threads) schedule(static)
+                for(int i = 0; i < len; i++)
+                    PROCESS_PIXEL_VALUE(255);
+            }
+            break;
+
+        case 7:
+            if(A2) {
+                #pragma omp parallel for num_threads(n_threads) schedule(static)
+                for(int i = 0; i < len; i++)
+                    PROCESS_PIXEL_VALUE(255 - A2[i]);
+            }
+            else {
+                #pragma omp parallel for num_threads(n_threads) schedule(static)
+                for(int i = 0; i < len; i++)
+                    PROCESS_PIXEL_VALUE(0);
+            }
+            break;
     }
 }
+
+#undef PROCESS_PIXEL_VALUE

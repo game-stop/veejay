@@ -23,92 +23,72 @@
 #include <veejaycore/yuvconv.h>
 #include <libavutil/pixfmt.h>
 
-vj_effect *colorhis_init(int w, int h)
-{
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
-
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 3;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 1;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 255;
-
-    ve->defaults[0] = 0; // r only, g only, b only, rgb
-    ve->defaults[1] = 0; // draw
-    ve->defaults[2] = 200; // intensity
-    ve->defaults[3] = 132; // strength
-	ve->param_description = vje_build_param_list ( ve->num_params, "Mode (R,G,B,All)", "Draw","Intensity", "Strength" );
-    ve->description = "Color Histogram";
-    ve->sub_format = 0;
-    ve->extra_frame = 0;
-    ve->has_user = 0;
-
-	ve->hints = vje_init_value_hint_list( ve->num_params );
-	
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
-		"Red Channel", "Green Channel", "Blue Channel", "All Channels"
-	);
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-
-        VJ_BEAT_SELECTOR,
-        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
-        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
-        0, 0, 0, 0, 0, -1000, /* Mode */
-
-        VJ_BEAT_SELECTOR,
-        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
-        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
-        0, 0, 0, 0, 0, -1000, /* Draw */
-
-        VJ_BEAT_COLOR_AMOUNT,
-        VJ_BEAT_F_CONTINUOUS,
-        64, 240,
-        8, 30, 1200, 3000, 0, 50, /* Intensity */
-
-        VJ_BEAT_CONTRAST,
-        VJ_BEAT_F_CONTINUOUS,
-        32, 220,
-        8, 30, 1200, 3000, 0, 48 /* Strength */
-    );
-    return ve;
-}
-
 typedef struct {
-    void	*histogram_;
+    void *histogram_;
     VJFrame *rgb_frame_;
     uint8_t *rgb_;
     void *convert_yuv;
     void *convert_rgb;
 } colorhis_t;
 
+vj_effect *colorhis_init(int w, int h)
+{
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
+    ve->num_params = 4;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    ve->limits[0][0] = 0; ve->limits[1][0] = 3;   ve->defaults[0] = 0;
+    ve->limits[0][1] = 0; ve->limits[1][1] = 1;   ve->defaults[1] = 0;
+    ve->limits[0][2] = 0; ve->limits[1][2] = 255; ve->defaults[2] = 200;
+    ve->limits[0][3] = 0; ve->limits[1][3] = 255; ve->defaults[3] = 132;
+
+    ve->param_description = vje_build_param_list(ve->num_params, "Mode (R,G,B,All)", "Draw", "Intensity", "Strength");
+    ve->description = "Color Histogram";
+    ve->sub_format = 0;
+    ve->extra_frame = 0;
+    ve->has_user = 0;
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+
+    vje_build_value_hint_list(ve->hints, ve->limits[1][0], 0, "Red Channel", "Green Channel", "Blue Channel", "All Channels");
+
+    ve->beat_hints = vje_build_beat_hint_list(
+        ve->num_params,
+        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 72,                 245,                14, 56,  800, 2800, 0,    78,
+        VJ_BEAT_CONTRAST,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 56,                 240,                12, 48,  900, 3200, 0,    66
+    );
+
+    return ve;
+}
+
 void *colorhis_malloc(int w, int h)
 {
     colorhis_t *c = (colorhis_t*) vj_calloc(sizeof(colorhis_t));
-    if(!c) {
+
+    if(!c)
         return NULL;
-    }
-	c->histogram_ = veejay_histogram_new();
+
+    c->histogram_ = veejay_histogram_new();
+
     if(!c->histogram_) {
         free(c);
         return NULL;
     }
 
-	c->rgb_ = vj_malloc(sizeof(uint8_t) * (w * h * 3) );
+    c->rgb_ = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w * h * 3));
+
     if(!c->rgb_) {
         veejay_histogram_del(c->histogram_);
         free(c);
         return NULL;
     }
-	
-    c->rgb_frame_ = yuv_rgb_template( c->rgb_, w, h, AV_PIX_FMT_RGB24 );
+
+    c->rgb_frame_ = yuv_rgb_template(c->rgb_, w, h, AV_PIX_FMT_RGB24);
+
     if(!c->rgb_frame_) {
         veejay_histogram_del(c->histogram_);
         free(c->rgb_);
@@ -116,48 +96,65 @@ void *colorhis_malloc(int w, int h)
         return NULL;
     }
 
-	return (void*) c;
+    return c;
 }
 
-void	colorhis_free(void *ptr)
+void colorhis_free(void *ptr)
 {
     colorhis_t *c = (colorhis_t*) ptr;
-	veejay_histogram_del(c->histogram_);
-	free(c->rgb_);
-	free(c->rgb_frame_);
+
+    if(!c)
+        return;
+
+    if(c->histogram_)
+        veejay_histogram_del(c->histogram_);
+
     if(c->convert_yuv)
-		yuv_fx_context_destroy( c->convert_yuv );
-	if(c->convert_rgb )
-		yuv_fx_context_destroy( c->convert_rgb );
+        yuv_fx_context_destroy(c->convert_yuv);
+
+    if(c->convert_rgb)
+        yuv_fx_context_destroy(c->convert_rgb);
+
+    if(c->rgb_)
+        free(c->rgb_);
+
+    if(c->rgb_frame_)
+        free(c->rgb_frame_);
+
     free(c);
 }
 
-
-void colorhis_apply( void *ptr, VJFrame *frame, int *args) {
-    int mode = args[0];
-    int val = args[1];
-    int intensity = args[2];
-    int strength = args[3];
-
+void colorhis_apply(void *ptr, VJFrame *frame, int *args)
+{
     colorhis_t *c = (colorhis_t*) ptr;
 
-	if(!c->convert_yuv)
-		c->convert_yuv = yuv_fx_context_create( frame, c->rgb_frame_ );
+    const int mode = args[0];
+    const int draw = args[1];
+    const int intensity = args[2];
+    const int strength = args[3];
 
-	yuv_fx_context_process( c->convert_yuv, frame, c->rgb_frame_ );
+    if(!c->convert_yuv)
+        c->convert_yuv = yuv_fx_context_create(frame, c->rgb_frame_);
 
-	if( val == 0 )
-	{
-		veejay_histogram_draw_rgb( c->histogram_, frame, c->rgb_, intensity, strength, mode );
-	}
-	else
-	{
-		veejay_histogram_analyze_rgb( c->histogram_,c->rgb_, frame );
-		veejay_histogram_equalize_rgb( c->histogram_, frame, c->rgb_, intensity, strength, mode );
+    if(!c->convert_yuv)
+        return;
 
-		if(!c->convert_rgb )
-			c->convert_rgb = yuv_fx_context_create( c->rgb_frame_, frame);
-		yuv_fx_context_process( c->convert_rgb, c->rgb_frame_, frame );
-	}
+    yuv_fx_context_process(c->convert_yuv, frame, c->rgb_frame_);
+
+    if(draw == 0)
+    {
+        veejay_histogram_draw_rgb(c->histogram_, frame, c->rgb_, intensity, strength, mode);
+        return;
+    }
+
+    veejay_histogram_analyze_rgb(c->histogram_, c->rgb_, frame);
+    veejay_histogram_equalize_rgb(c->histogram_, frame, c->rgb_, intensity, strength, mode);
+
+    if(!c->convert_rgb)
+        c->convert_rgb = yuv_fx_context_create(c->rgb_frame_, frame);
+
+    if(!c->convert_rgb)
+        return;
+
+    yuv_fx_context_process(c->convert_rgb, c->rgb_frame_, frame);
 }
-

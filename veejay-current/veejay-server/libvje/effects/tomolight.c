@@ -26,7 +26,7 @@
 #include <string.h>
 #include <omp.h>
 
-#define TL_PARAMS 12
+#define TL_PARAMS 13
 
 /* UI parameter order: choose the look first, then strength/memory,
  * then depth/slice/scan controls, then color/reset. */
@@ -42,6 +42,7 @@
 #define P_SCAN_MOTION      9
 #define P_COLOR_MODE      10
 #define P_RESET           11
+#define P_LIGHT_DRIVE    12
 
 #define TL_SRC_LUMA        0
 #define TL_SRC_INV_LUMA    1
@@ -98,7 +99,7 @@
 #define TL_DIV5(v)         (((v) * 205 + 512) >> 10)
 #define TL_DIV6(v)         (((v) * 171 + 512) >> 10)
 
-static inline int tl_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : ((v > hi) ? hi : v);
 }
@@ -112,6 +113,8 @@ static inline uint8_t tl_blend_q8_u8(int a, int b, int q)
 {
     return (uint8_t)(a + (((b - a) * q) >> 8));
 }
+
+
 
 typedef struct {
     int w;
@@ -138,6 +141,16 @@ typedef struct {
     int last_apply_render_mode;
     int last_color_mode;
     int last_static_chroma;
+
+    float eff_light_drive;
+    float eff_amount;
+    float eff_light;
+    float eff_residue;
+    float eff_depth_scale;
+    float eff_slices;
+    float eff_scan_pos;
+    float eff_scan_width;
+    int eff_initialized;
 
     uint8_t contour_lut[256];
     uint8_t contour_relief_lut[256];
@@ -198,21 +211,63 @@ typedef struct {
     int *blur_y_ap;
 } tomolight_t;
 
+
+
+static inline int tl_smooth_i(float *state, int target, float attack, float release)
+{
+    const float cur = *state;
+    const float diff = (float)target - cur;
+    const float step = (diff > 0.0f) ? attack : release;
+    const float out = cur + diff * step;
+
+    *state = out;
+
+    return (int)(out + (out >= 0.0f ? 0.5f : -0.5f));
+}
+
+static inline int tl_smooth_wrap1000_i(float *state, int target, float step)
+{
+    float cur = *state;
+    float diff = (float)target - cur;
+
+    if(diff > 500.0f)
+        diff -= 1000.0f;
+    else if(diff < -500.0f)
+        diff += 1000.0f;
+
+    cur += diff * step;
+
+    while(cur < 0.0f)
+        cur += 1000.0f;
+    while(cur >= 1000.0f)
+        cur -= 1000.0f;
+
+    *state = cur;
+
+    return clampi((int)(cur + 0.5f), 0, 1000);
+}
+
 vj_effect *tomolight_init(int w, int h)
 {
     (void) w;
     (void) h;
 
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    if(!ve) return NULL;
+    if(!ve)
+        return NULL;
 
     ve->num_params = TL_PARAMS;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1])
-        return ve;
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_RENDER_MODE] = 0;
     ve->limits[1][P_RENDER_MODE] = 9;
@@ -262,6 +317,10 @@ vj_effect *tomolight_init(int w, int h)
     ve->limits[1][P_RESET] = 1;
     ve->defaults[P_RESET] = 0;
 
+    ve->limits[0][P_LIGHT_DRIVE] = 0;
+    ve->limits[1][P_LIGHT_DRIVE] = 1000;
+    ve->defaults[P_LIGHT_DRIVE] = 0;
+
     ve->sub_format = 1;
     ve->description = "Tomographic Light Sculpture";
     ve->param_description = vje_build_param_list(ve->num_params,
@@ -276,29 +335,24 @@ vj_effect *tomolight_init(int w, int h)
         "Scan Width",
         "Scan Motion",
         "Color Mode",
-        "Reset Memory"
+        "Reset Memory",
+        "Light Drive"
     );
-
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Render Mode */
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE,                      24,                 100,                8,  30,  1200, 3000, 0,    45,    /* Opacity */
-
-        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE,                             28,                 100,                18, 66,  90,   520,  0,    95,    /* Light Strength */
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS,                                                 62,                 98,                 8,  26,  1800, 4200, 700,  35,    /* Residue Memory */
-
-        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Depth Source */
-
-        VJ_BEAT_KICK,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_IMPULSE | VJ_BEAT_F_REBUILDS_STATE,   55,                 255,                12, 48,  120,  900,  0,    82,    /* Depth Scale */
-        VJ_BEAT_DETAIL,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE, 4,                  48,                 6,  22,  1800, 3600, 1200, 20,    /* Slice Count */
-
-        VJ_BEAT_HAT,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                                0,                  1000,               4,  22,  70,   420,  0,    48,    /* Scan Position */
-        VJ_BEAT_SNARE,            VJ_BEAT_F_CONTINUOUS,                                                 4,                  68,                 10, 42,  80,   650,  0,    72,    /* Scan Width */
-
-        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Scan Motion */
-        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Color Mode */
-        VJ_BEAT_RESET,            VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Reset Memory */
+        VJ_BEAT_SELECTOR,          VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,
+        VJ_BEAT_ALPHA_OR_OPACITY,  VJ_BEAT_F_REJECT,                                                       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,
+        VJ_BEAT_INTENSITY,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       24,                 72,                 30, 86,  160, 1300, 0,     84,
+        VJ_BEAT_MEMORY,            VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,   58,                 92,                 20, 70,  900, 4200, 400,   66,
+        VJ_BEAT_SELECTOR,          VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,
+        VJ_BEAT_GEOMETRY_AMPLITUDE,VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       55,                 210,                24, 78,  220, 1800, 0,     78,
+        VJ_BEAT_DETAIL,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_NO_ZERO_CROSS, 8, 30, 12, 40, 1600, 4200, 900, 42,
+        VJ_BEAT_MOTION_REACT,      VJ_BEAT_F_CONTINUOUS,                                                  60,                 940,                46, 100, 120, 1000, 0,     100,
+        VJ_BEAT_WINDOW_RADIUS,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       5,                  18,                 28, 82,  180, 1500, 0,     58,
+        VJ_BEAT_SELECTOR,          VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,
+        VJ_BEAT_SELECTOR,          VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,
+        VJ_BEAT_RESET,             VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,
+        VJ_BEAT_INTENSITY,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       40,                 360,                30, 92,  160, 1400, 0,     88
     );
 
     return ve;
@@ -318,7 +372,7 @@ static inline int tl_scan_center(int frame, int pos, int motion)
         case TL_MOTION_PULSE:
             phase = (frame * 4) & 511;
             tri = (phase < 256) ? phase : 511 - phase;
-            return tl_clampi(base + ((tri - 128) >> 1), 0, 255);
+            return clampi(base + ((tri - 128) >> 1), 0, 255);
         case TL_MOTION_BOUNCE:
             phase = (frame * 3) & 511;
             return (phase < 256) ? phase : 511 - phase;
@@ -920,7 +974,7 @@ void *tomolight_malloc(int w, int h)
 void tomolight_free(void *ptr)
 {
     tomolight_t *t = (tomolight_t*) ptr;
-    if(!t) return;
+
     free(t->map_region);
     free(t->region);
     free(t);
@@ -1255,7 +1309,6 @@ void tomolight_free(void *ptr)
 void tomolight_apply(void *ptr, VJFrame *frame, int *args)
 {
     tomolight_t *t = (tomolight_t*) ptr;
-    if(!t || !frame || !args) return;
 
     const int len = t->len;
     const int reset = args[P_RESET] ? 1 : 0;
@@ -1265,10 +1318,57 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
 
     t->last_reset = reset;
 
-    const int depth_source = tl_clampi(args[P_DEPTH_SOURCE], 0, 4);
+    const int depth_source = clampi(args[P_DEPTH_SOURCE], 0, 4);
     const int use_motion = (depth_source == TL_SRC_MOTION || depth_source == TL_SRC_LUMA_MOTION);
+    const int light_drive_arg = clampi(args[P_LIGHT_DRIVE], 0, 1000);
 
-    if(args[P_AMOUNT] <= 0) {
+    const int w = t->w;
+    const int h = t->h;
+    const int gw = t->gw;
+    const int gh = t->gh;
+    const int frame_no = t->frame;
+
+    int amount_arg = args[P_AMOUNT];
+    int light_arg = args[P_LIGHT];
+    int residue_arg = args[P_RESIDUE];
+    int depth_arg = args[P_DEPTH_SCALE];
+    int slices_arg = args[P_SLICES];
+    int scan_pos_arg = args[P_SCAN_POS];
+    int scan_width_arg = args[P_SCAN_WIDTH];
+
+    if(!t->eff_initialized)
+        t->eff_light_drive = (float)light_drive_arg;
+
+    const int light_drive = clampi(tl_smooth_i(&t->eff_light_drive, light_drive_arg, 0.24f, 0.090f), 0, 1000);
+
+    amount_arg = clampi(amount_arg + (((100 - amount_arg) * light_drive * 18 + 50000) / 100000), 0, 100);
+    light_arg = clampi(light_arg + (((100 - light_arg) * light_drive * 32 + 50000) / 100000), 0, 100);
+    residue_arg = clampi(residue_arg + ((light_drive * 4 + 500) / 1000), 0, 99);
+    depth_arg = clampi(depth_arg + (((300 - depth_arg) * light_drive * 22 + 50000) / 100000), 0, 300);
+    slices_arg = clampi(slices_arg + ((light_drive * 3 + 500) / 1000), 2, 64);
+    scan_pos_arg = clampi(scan_pos_arg + ((light_drive * 54 + 500) / 1000), 0, 1000);
+    scan_width_arg = clampi(scan_width_arg + (((100 - scan_width_arg) * light_drive * 18 + 50000) / 100000), 1, 100);
+
+    if(!t->eff_initialized) {
+        t->eff_amount = (float)amount_arg;
+        t->eff_light = (float)light_arg;
+        t->eff_residue = (float)residue_arg;
+        t->eff_depth_scale = (float)depth_arg;
+        t->eff_slices = (float)slices_arg;
+        t->eff_scan_pos = (float)scan_pos_arg;
+        t->eff_scan_width = (float)scan_width_arg;
+        t->eff_initialized = 1;
+    }
+
+    const int amount_eff = clampi(tl_smooth_i(&t->eff_amount, amount_arg, 0.20f, 0.090f), 0, 100);
+    const int light_strength = clampi(tl_smooth_i(&t->eff_light, light_arg, 0.24f, 0.115f), 0, 100);
+    const int residue_eff = clampi(tl_smooth_i(&t->eff_residue, residue_arg, 0.120f, 0.060f), 0, 99);
+    depth_arg = clampi(tl_smooth_i(&t->eff_depth_scale, depth_arg, 0.145f, 0.070f), 0, 300);
+    const int slices = clampi(tl_smooth_i(&t->eff_slices, slices_arg, 0.110f, 0.055f), 2, 64);
+    const int scan_pos_eff = tl_smooth_wrap1000_i(&t->eff_scan_pos, scan_pos_arg, 0.185f);
+    const int scan_width_eff = clampi(tl_smooth_i(&t->eff_scan_width, scan_width_arg, 0.180f, 0.080f), 1, 100);
+
+    if(amount_eff <= 0) {
         if(use_motion) {
             memcpy(t->prev_y, frame->data[0], (size_t) len);
             t->prev_valid = 1;
@@ -1279,22 +1379,13 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
         return;
     }
 
-    const int w = t->w;
-    const int h = t->h;
-    const int gw = t->gw;
-    const int gh = t->gh;
-    const int frame_no = t->frame;
-
-    const int amount_q8 = (tl_clampi(args[P_AMOUNT], 0, 100) * 256 + 50) / 100;
-    const int residue_q8 = (tl_clampi(args[P_RESIDUE], 0, 99) * 256 + 50) / 100;
+    const int amount_q8 = (amount_eff * 256 + 50) / 100;
+    const int residue_q8 = (residue_eff * 256 + 50) / 100;
     const int inject_q8 = 256 - residue_q8;
-    const int light_strength = tl_clampi(args[P_LIGHT], 0, 100);
-    const int depth_arg = tl_clampi(args[P_DEPTH_SCALE], 0, 300);
     const int depth_scale_q8 = (depth_arg * 256 + 50) / 100;
-    const int motion_react_q8 = ((tl_clampi(50 + (depth_arg / 5), 50, 110)) * 256 + 50) / 100;
-    const int slices = tl_clampi(args[P_SLICES], 2, 64);
-    const int render_mode = tl_clampi(args[P_RENDER_MODE], 0, 9);
-    const int color_mode = tl_clampi(args[P_COLOR_MODE], 0, 8);
+    const int motion_react_q8 = ((clampi(50 + (depth_arg / 5), 50, 110)) * 256 + 50) / 100;
+    const int render_mode = clampi(args[P_RENDER_MODE], 0, 9);
+    const int color_mode = clampi(args[P_COLOR_MODE], 0, 8);
     const int fog_mode = (render_mode == TL_MODE_FOG);
     const int mode_radar = (render_mode == TL_MODE_RADAR);
     const int soft_depth_mode = fog_mode ||
@@ -1308,11 +1399,11 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
         (render_mode == TL_MODE_LIGHTSHEET) ||
         fog_mode;
     const int center = scan_dependent_mode ?
-        tl_scan_center(frame_no, tl_clampi(args[P_SCAN_POS], 0, 1000),
-                       tl_clampi(args[P_SCAN_MOTION], 0, 5)) :
+        tl_scan_center(frame_no, scan_pos_eff,
+                       clampi(args[P_SCAN_MOTION], 0, 5)) :
         ((t->last_center >= 0) ? t->last_center : 128);
     int width = scan_dependent_mode ?
-        ((tl_clampi(args[P_SCAN_WIDTH], 1, 100) * 255 + 50) / 100) :
+        ((scan_width_eff * 255 + 50) / 100) :
         ((t->last_width >= 1) ? t->last_width : 46);
     width = (width < 1) ? 1 : width;
 

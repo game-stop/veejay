@@ -21,76 +21,88 @@
 #include "common.h"
 #include "cartonize.h"
 
+static inline int cartonize_chroma_step(int v)
+{
+    if(v <= 0)
+        return 0;
+
+    int s = v - 128;
+
+    if(s < 0)
+        s = -s;
+
+    return s < 1 ? 1 : s;
+}
+
 vj_effect *cartonize_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
 
+    ve->num_params = 3;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 255;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
 
-    ve->defaults[0] = 64;
-    ve->defaults[1] = 0;
-    ve->defaults[2] = 0;
+    ve->limits[0][0] = 1; ve->limits[1][0] = 255; ve->defaults[0] = 64;
+    ve->limits[0][1] = 0; ve->limits[1][1] = 255; ve->defaults[1] = 0;
+    ve->limits[0][2] = 0; ve->limits[1][2] = 255; ve->defaults[2] = 0;
 
     ve->description = "Cartoon";
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Damp Y", "Damp U", "Damp V" );
+    ve->param_description = vje_build_param_list(ve->num_params, "Damp Y", "Damp U", "Damp V");
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SNARE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE,  4,  112, 10, 42,  100,  820,  0, 76, /* Damp Y */
-        VJ_BEAT_HAT,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE,  0,  88,  4,  22,  80,   520,  0, 46, /* Damp U */
-        VJ_BEAT_SNARE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE,  0,  96,  6,  28,  120,  760,  0, 58  /* Damp V */
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     8,  148, 12, 50,  900, 3000, 0,    74,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 8,  108, 10, 40, 1100, 3400, 0,    58,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 8,  116, 10, 42, 1100, 3400, 0,    62
     );
+
     return ve;
 }
 
-void cartonize_apply(void *ptr, VJFrame *frame, int *args) {
-    int b1 = args[0];
-    int b2 = args[1];
-    int b3 = args[2];
-    int n_threads = vje_advise_num_threads(frame->len);
+void cartonize_apply(void *ptr, VJFrame *frame, int *args)
+{
+    (void) ptr;
 
+    const int b1 = args[0];
+    const int b2 = args[1];
+    const int b3 = args[2];
+    const int ubase = cartonize_chroma_step(b2);
+    const int vbase = cartonize_chroma_step(b3);
     const int len = frame->len;
     const int uv_len = frame->ssm ? len : frame->uv_len;
+    const int n_threads = vje_advise_num_threads(len);
 
-    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    int ubase = (b2 - 128 == 0) ? 1 : b2 - 128;
-    int vbase = (b3 - 128 == 0) ? 1 : b3 - 128;
-
-#pragma omp parallel num_threads(n_threads)
+    #pragma omp parallel num_threads(n_threads)
     {
-#pragma omp for schedule(static)
-        for (int i = 0; i < len; i++) {
-            Y[i] = (Y[i] / b1) * b1;
-        }
+        #pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+            Y[i] = (uint8_t)((Y[i] / b1) * b1);
 
-        if (b2 > 0) {
-#pragma omp for schedule(static)
-            for (int i = 0; i < uv_len; i++) {
-                int p = Cb[i] - 128;
-                Cb[i] = (p / ubase) * ubase + 128;
+        if(ubase > 0)
+        {
+            #pragma omp for schedule(static)
+            for(int i = 0; i < uv_len; i++)
+            {
+                const int p = (int)Cb[i] - 128;
+                Cb[i] = (uint8_t)((p / ubase) * ubase + 128);
             }
         }
 
-        if (b3 > 0) {
-#pragma omp for schedule(static)
-            for (int i = 0; i < uv_len; i++) {
-                int p = Cr[i] - 128;
-                Cr[i] = (p / vbase) * vbase + 128;
+        if(vbase > 0)
+        {
+            #pragma omp for schedule(static)
+            for(int i = 0; i < uv_len; i++)
+            {
+                const int p = (int)Cr[i] - 128;
+                Cr[i] = (uint8_t)((p / vbase) * vbase + 128);
             }
         }
     }

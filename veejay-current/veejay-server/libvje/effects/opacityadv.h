@@ -22,6 +22,4 @@
 #define OPACITYADV_H
 vj_effect *opacityadv_init(int w, int h);
 void opacityadv_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args );
-void *opacityadv_malloc(int w, int h);
-void opacityadv_free(void *ptr);
 #endif

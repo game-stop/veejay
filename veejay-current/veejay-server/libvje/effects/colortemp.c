@@ -48,10 +48,9 @@ vj_effect *colortemp_init(int w, int h)
     ve->param_description = vje_build_param_list( ve->num_params, "Temperature", "Automatic", "Opacity" );
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_COLOR_PHASE,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,  64,                 520,                6,  24,  1800, 4200, 900,  35,    /* Temperature */
-        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000, /* Automatic */
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000  /* Opacity */
+        VJ_BEAT_COLOR_PHASE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 24,                 720,                14, 56,  800, 3000, 0,    82,
+        VJ_BEAT_SELECTOR,    VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_SOURCE_MIX,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 24,                 245,                14, 54,  800, 3000, 0,    78
     );
     return ve;
 }
@@ -846,47 +845,59 @@ static struct {
     { 155 , 188 , 255 }
 };
 
-void colortemp_apply( void *ptr, VJFrame *frame, int *args ) {
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+void colortemp_apply(void *ptr, VJFrame *frame, int *args)
+{
+    (void) ptr;
+
     const int temperature = args[0];
     const int mode = args[1];
-    const int n_threads = vje_advise_num_threads(frame->len);
     int opacity = args[2];
+    const int len = frame->len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
-    int i;
-    uint8_t *Y = frame->data[0];    
-    uint8_t *U = frame->data[1];
-    uint8_t *V = frame->data[2];
+
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict U = frame->data[1];
+    uint8_t *restrict V = frame->data[2];
 
     int iy = pixel_Y_lo_;
     int iu = 128;
     int iv = 128;
 
-    _rgb2yuv( blackbody_t[temperature].r,
-              blackbody_t[temperature].g,
-              blackbody_t[temperature].b,
-              iy, iu, iv );
+    _rgb2yuv(blackbody_t[temperature].r, blackbody_t[temperature].g, blackbody_t[temperature].b, iy, iu, iv);
 
     iu -= 128;
     iv -= 128;
 
-    if( mode == 1 ) {
+    if(mode == 1)
+    {
         uint64_t sum = 0;
-#pragma omp parallel for reduction(+:sum) num_threads(n_threads) schedule(static)
-        for( i = 0; i < frame->len; i ++ ) {
+        const int n_threads_y = vje_advise_num_threads(len);
+
+        #pragma omp parallel for reduction(+:sum) num_threads(n_threads_y) schedule(static)
+        for(int i = 0; i < len; i++)
             sum += Y[i];
-        }
-        opacity = sum / frame->len;
+
+        opacity = (int)(sum / (uint64_t)len);
     }
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for ( i = 0; i < frame->len; i++) {
-        int u = U[i] - 128;
-        int v = V[i] - 128;
+    const int n_threads_uv = vje_advise_num_threads(uv_len);
 
-        u = 128 + ((opacity * (u - iu) >> 8 ) + u);
-        v = 128 + ((opacity * (v - iv) >> 8 ) + v);
-    
-        U[i] = (uint8_t) ((u < 0) ? 0 : (u > 255) ? 255 : u);
-        V[i] = (uint8_t) ((v < 0) ? 0 : (v > 255) ? 255 : v);
+    #pragma omp parallel for num_threads(n_threads_uv) schedule(static)
+    for(int i = 0; i < uv_len; i++)
+    {
+        int u = (int)U[i] - 128;
+        int v = (int)V[i] - 128;
+
+        u = 128 + (((opacity * (u - iu)) >> 8) + u);
+        v = 128 + (((opacity * (v - iv)) >> 8) + v);
+
+        U[i] = (uint8_t)clampi(u, 0, 255);
+        V[i] = (uint8_t)clampi(v, 0, 255);
     }
 }

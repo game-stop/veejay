@@ -24,81 +24,70 @@
 vj_effect *autoeq_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
     ve->num_params = 3;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 1;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
-
-    ve->defaults[0] = 0; // show histogram
-    ve->defaults[1] = 200; // intensity
-    ve->defaults[2] = 132; // strength
+    ve->limits[0][0] = 0; ve->limits[1][0] = 1;   ve->defaults[0] = 1;
+    ve->limits[0][1] = 0; ve->limits[1][1] = 255; ve->defaults[1] = 200;
+    ve->limits[0][2] = 0; ve->limits[1][2] = 255; ve->defaults[2] = 132;
 
     ve->description = "Automatic Histogram Equalizer";
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Mode","Intensity","Strength");
-    ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Intensity", "Strength");
+    ve->hints = vje_init_value_hint_list(ve->num_params);
 
-    vje_build_value_hint_list( ve->hints, ve->limits[1][0],0,
-		    "Show Histogram", "Equalize Frame" );
+    vje_build_value_hint_list(ve->hints, ve->limits[1][0], 0, "Show Histogram", "Equalize Frame");
+
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SELECTOR,
-        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
-        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
-        0, 0, 0, 0, 0, -1000, /* Mode */
-
-        VJ_BEAT_INTENSITY,
-        VJ_BEAT_F_CONTINUOUS,
-        64, 240,
-        8, 30, 1200, 3000, 0, 50, /* Intensity */
-
-        VJ_BEAT_CONTRAST,
-        VJ_BEAT_F_CONTINUOUS,
-        32, 220,
-        8, 30, 1200, 3000, 0, 48 /* Strength */
+        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,  0,    0,    0, -1000,
+        VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS,                     64,                 232,                10, 42, 1000, 3000, 0, 66,
+        VJ_BEAT_CONTRAST,  VJ_BEAT_F_CONTINUOUS,                     56,                 208,                10, 38, 1100, 3200, 0, 58
     );
+
     return ve;
 }
 
 typedef struct {
-    void	*histogram_;
+    void *histogram_;
     uint8_t *tmp;
 } autoeq_t;
 
 void *autoeq_malloc(int w, int h)
 {
-    autoeq_t *a = (autoeq_t*) vj_calloc(sizeof(autoeq_t));
-    if(!a) {
+    autoeq_t *a = (autoeq_t *) vj_calloc(sizeof(autoeq_t));
+
+    if(!a)
         return NULL;
-    }
-    a->tmp = (uint8_t*) vj_calloc(sizeof(uint8_t) * (w*h));
-    if(!a->tmp) {
+
+    a->tmp = (uint8_t *) vj_calloc(sizeof(uint8_t) * (w * h));
+
+    if(!a->tmp)
+    {
         free(a);
         return NULL;
     }
 
-	a->histogram_ = veejay_histogram_new();
-    if(!a->histogram_) {
+    a->histogram_ = veejay_histogram_new();
+
+    if(!a->histogram_)
+    {
         free(a->tmp);
         free(a);
         return NULL;
     }
-	return (void*) a;
+
+    return a;
 }
 
 void autoeq_free(void *ptr)
 {
-    autoeq_t *a = (autoeq_t*) ptr;
+    autoeq_t *a = (autoeq_t *) ptr;
 
     if(!a)
         return;
@@ -112,29 +101,31 @@ void autoeq_free(void *ptr)
     free(a);
 }
 
-void autoeq_apply( void *ptr, VJFrame *frame,int *args) {
-    int val = args[0];
-    int intensity = args[1];
-    int strength = args[2];
-    autoeq_t *a = (autoeq_t*) ptr;
+void autoeq_apply(void *ptr, VJFrame *frame, int *args)
+{
+    autoeq_t *a = (autoeq_t *) ptr;
 
-	const int len = frame->len;
-	const int uv_len = frame->uv_len;
-	if( val == 0 )
-	{
-		VJFrame tmp;
-		veejay_memcpy( &tmp, frame, sizeof(VJFrame));
-		tmp.data[0] = a->tmp;
-		vj_frame_copy1( frame->data[0], tmp.data[0], len );
+    const int val = args[0];
+    const int intensity = args[1];
+    const int strength = args[2];
+    const int len = frame->len;
+    const int uv_len = frame->uv_len;
 
-		veejay_histogram_draw( a->histogram_,&tmp, frame, intensity, strength );
+    if(val == 0)
+    {
+        VJFrame tmp;
 
-		vj_frame_clear1( frame->data[1], 128, uv_len );
-		vj_frame_clear1( frame->data[2], 128, uv_len );
-	}
-	else
-	{
-		veejay_histogram_analyze( a->histogram_, frame, 0 );
-		veejay_histogram_equalize( a->histogram_, frame, intensity, strength );
-	}
+        veejay_memcpy(&tmp, frame, sizeof(VJFrame));
+        tmp.data[0] = a->tmp;
+
+        vj_frame_copy1(frame->data[0], tmp.data[0], len);
+        veejay_histogram_draw(a->histogram_, &tmp, frame, intensity, strength);
+        vj_frame_clear1(frame->data[1], 128, uv_len);
+        vj_frame_clear1(frame->data[2], 128, uv_len);
+    }
+    else
+    {
+        veejay_histogram_analyze(a->histogram_, frame, 0);
+        veejay_histogram_equalize(a->histogram_, frame, intensity, strength);
+    }
 }

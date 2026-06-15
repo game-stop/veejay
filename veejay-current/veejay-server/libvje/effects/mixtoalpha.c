@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2015 Niels Elburg <nwewlburg@gmail.com>
+ * Copyright(C)2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -22,102 +22,94 @@
 #include <veejaycore/vjmem.h>
 #include "mixtoalpha.h"
 
+#define MIXTOALPHA_PARAMS 2
+
+#define P_MODE  0
+#define P_SCALE 1
+
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline uint8_t mixtoalpha_scale_full(uint8_t v)
+{
+    const int y = (int)v;
+
+    if(y <= 16)
+        return 0;
+
+    if(y >= 235)
+        return 255;
+
+    return (uint8_t)(((y - 16) * 255 + 109) / 219);
+}
+
 vj_effect *mixtoalpha_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
+
+    if(!ve)
+        return NULL;
+
+    ve->num_params = MIXTOALPHA_PARAMS;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
+    ve->limits[0][P_MODE] = 0;  ve->limits[1][P_MODE] = 1;  ve->defaults[P_MODE] = 0;
+    ve->limits[0][P_SCALE] = 0; ve->limits[1][P_SCALE] = 1; ve->defaults[P_SCALE] = !yuv_use_auto_ccir_jpeg();
+
     ve->description = "Alpha: Set from Mixing source";
     ve->sub_format = -1;
     ve->extra_frame = 1;
+    ve->has_user = 0;
+    ve->alpha = FLAG_ALPHA_OUT;
+    ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Scale to full range");
 
-	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);     /* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 1;
-	ve->limits[0][1] = 0;
-	ve->limits[1][1] =1;
-    ve->defaults[0] = 0;
-	ve->defaults[1] = !yuv_use_auto_ccir_jpeg();
-    ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Scale to full range" );
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_MODE], P_MODE, "Copy Luminance from B", "Copy Alpha from B");
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_SCALE], P_SCALE, "Off", "On");
 
-	ve->alpha = FLAG_ALPHA_OUT;
-
-	ve->hints = vje_init_value_hint_list( ve->num_params );
-
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0, "Copy Luminance from B", "Copy Alpha from B"	);
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
-        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
-        0, 0, 0, 0, 0, -1000, /* Mode */
-
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
-        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,
-        0, 0, 0, 0, 0, -1000  /* Scale to full range */
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000
     );
+
     return ve;
 }
 
-typedef struct {
-    uint8_t *lookup_table;
-    int n_threads;
-} mixtoalpha_t;
-
-void *mixtoalpha_malloc(int w, int h)
+void mixtoalpha_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    mixtoalpha_t *m = (mixtoalpha_t*) vj_calloc(sizeof(mixtoalpha_t));
-    if(!m) {
-        return NULL;
+    (void)ptr;
+
+    const int mode = clampi(args[P_MODE], 0, 1);
+    const int scale = clampi(args[P_SCALE], 0, 1);
+    const int len = frame->len;
+
+    uint8_t *restrict A = frame->data[3];
+    const uint8_t *restrict src = mode == 0 ? frame2->data[0] : frame2->data[3];
+
+    if(scale && frame->range == 0) {
+        const int n_threads = vje_advise_num_threads(len);
+
+#pragma omp parallel for schedule(static) num_threads(n_threads)
+        for(int i = 0; i < len; i++)
+            A[i] = mixtoalpha_scale_full(src[i]);
     }
-
-    m->lookup_table = (uint8_t*) vj_malloc(sizeof(uint8_t) * 256 );
-    if(!m->lookup_table) {
-        free(m);
-        return NULL;
-    }
-
-    __init_lookup_table( m->lookup_table, 256, 16.0f,235.0f, 0, 255 );
-
-    m->n_threads = vje_advise_num_threads(w*h);
-
-    return (void*) m;
-}
-
-void mixtoalpha_free(void *ptr) {
-    mixtoalpha_t *m = (mixtoalpha_t*) ptr;
-    free(m->lookup_table);
-    free(m);
-}
-
-
-void mixtoalpha_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
-    int mode = args[0];
-    int scale = args[1];
-    int range = frame->range;
-	const int len = frame->len;
-	uint8_t *a = frame->data[3];
-	const uint8_t *Y = frame2->data[0];
-
-    mixtoalpha_t *m = (mixtoalpha_t*) ptr;
-
-	const uint8_t *T = (const uint8_t*) m->lookup_table;
-	
-	if( mode == 0 ) {
-		veejay_memcpy(a, Y, len );
-	}
-	else if (mode == 1) {
-		veejay_memcpy(a, frame2->data[3], len );
-	}
-
-    if (scale && range == 0)
-    {
-        #pragma omp parallel for schedule(static) num_threads(m->n_threads)
-        for (int i = 0; i < len; i++)
-        {
-            a[i] = T[a[i]];
-        }
+    else {
+        veejay_memcpy(A, src, len);
     }
 }
-
