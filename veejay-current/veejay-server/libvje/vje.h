@@ -102,6 +102,7 @@ typedef enum {
 #define VJ_BEAT_F_SQUARED         (1u << 10)
 #define VJ_BEAT_F_REBUILDS_STATE  (1u << 11)
 #define VJ_BEAT_F_NO_ZERO_CROSS   (1u << 12)
+#define VJ_BEAT_F_INVERTED        (1u << 13)
 
 typedef struct {
     int klass;
