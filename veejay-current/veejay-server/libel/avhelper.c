@@ -41,6 +41,13 @@
 #include <veejaycore/av.h>
 #include <veejaycore/hash.h>
 
+#if LIBAVCODEC_VERSION_MAJOR >= 57
+#ifndef CODEC_ID_HAP
+#define CODEC_ID_HAP AV_CODEC_ID_HAP
+#endif
+#define VEEJAY_HAVE_FFMPEG_HAP 1
+#endif
+
 static struct
 {
         const char *name;
@@ -50,6 +57,13 @@ static struct
 	{ "vj20", CODEC_ID_YUV420F	},
 	{ "vj22", CODEC_ID_YUV422F	},
 	{ "qoiy", CODEC_ID_QOIY },
+#ifdef VEEJAY_HAVE_FFMPEG_HAP
+	{ "hap1", CODEC_ID_HAP	},
+	{ "hap5", CODEC_ID_HAP	},
+	{ "hapy", CODEC_ID_HAP	},
+	{ "hapa", CODEC_ID_HAP	},
+	{ "hapm", CODEC_ID_HAP	},
+#endif
 #if LIBAVACODEC_VERSION_MAJOR >= 59  
     // ffmpeg has support for QOI since 59
 	{ "qoif" , AV_CODEC_ID_QOI},

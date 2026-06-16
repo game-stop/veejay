@@ -217,6 +217,16 @@ void lav_set_default_chroma(int _chroma)
         _lav_io_default_chroma = _chroma;
 }
 
+static int lav_is_hap_fourcc(const char *video_comp)
+{
+    return video_comp &&
+        (strncasecmp(video_comp, "hap1", 4) == 0 ||
+         strncasecmp(video_comp, "hap5", 4) == 0 ||
+         strncasecmp(video_comp, "hapy", 4) == 0 ||
+         strncasecmp(video_comp, "hapa", 4) == 0 ||
+         strncasecmp(video_comp, "hapm", 4) == 0);
+}
+
 
 lav_file_t *lav_open_output_file(char *filename, char format,
                     int width, int height, int interlaced, double fps,
@@ -1353,6 +1363,14 @@ lav_file_t *lav_open_input_file(char *filename, size_t mmap_size)
     {
         lav_fd->MJPG_chroma = CHROMA422;
         lav_fd->interlacing = LAV_NOT_INTERLACED;
+        return lav_fd;
+    }
+
+    if( lav_is_hap_fourcc(video_comp) )
+    {
+        lav_fd->MJPG_chroma = CHROMA444;
+        lav_fd->interlacing = LAV_NOT_INTERLACED;
+        veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] HAP video stream detected (%s)", video_comp);
         return lav_fd;
     }
 
