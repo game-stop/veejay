@@ -4316,7 +4316,6 @@ void *vj_audio_sync_thread(void *arg)
     if(!sync_load_i(&s->initialized))
         vj_audio_sync_init(s, 2);
 
-    sync_store_i(&s->stop_request, 0);
     sync_store_i(&s->running, 1);
     veejay_msg(VEEJAY_MSG_INFO, "[AUDIO-SYNC] external audio sync thread started");
 

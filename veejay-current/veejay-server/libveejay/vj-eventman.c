@@ -44,6 +44,11 @@ static  int *requires_id_map_ = NULL;
 /* define the function pointer to any event */
 typedef void (*vevo_event)(void *ptr, const char format[], va_list ap);
 
+void vj_event_get_sample_sequences_all(void *ptr, const char format[], va_list ap);
+void vj_event_sequence_select(void *ptr, const char format[], va_list ap);
+void vj_event_sequence_copy(void *ptr, const char format[], va_list ap);
+void vj_event_sequence_clear_all(void *ptr, const char format[], va_list ap);
+
 
 static	void		dump_event_stderr(vevo_port_t *event)
 {
@@ -3679,7 +3684,7 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 
 	index_map_[ VIMS_SEQUENCE_LIST ]		=	_new_event(
 				NULL,
-				VIMS_SRT_INFO,
+				VIMS_SEQUENCE_LIST,
 				"GUI: Get list of sample sequences",
 				vj_event_get_sample_sequences,
 				0,
@@ -3721,6 +3726,48 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				VIMS_REQUIRE_ALL_PARAMS,
 				"Seq ID",
 				0,
+				NULL );
+
+	index_map_[ VIMS_SEQUENCE_SELECT ]			=	_new_event(
+				"%d",
+				VIMS_SEQUENCE_SELECT,
+				"Select sample sequence bank",
+				vj_event_sequence_select,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Sequence bank (0..3)",
+				0,
+				NULL );
+
+	index_map_[ VIMS_SEQUENCE_COPY ]			=	_new_event(
+				"%d %d",
+				VIMS_SEQUENCE_COPY,
+				"Copy one sample sequence bank to another",
+				vj_event_sequence_copy,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Source bank",
+				0,
+				"Destination bank",
+				1,
+				NULL );
+
+	index_map_[ VIMS_SEQUENCE_CLEAR_ALL ]		=	_new_event(
+				NULL,
+				VIMS_SEQUENCE_CLEAR_ALL,
+				"Clear all sample sequence banks",
+				vj_event_sequence_clear_all,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
+	index_map_[ VIMS_SEQUENCE_LIST_ALL ]		=	_new_event(
+				NULL,
+				VIMS_SEQUENCE_LIST_ALL,
+				"GUI: Get all sample sequence banks",
+				vj_event_get_sample_sequences_all,
+				0,
+				VIMS_ALLOW_ANY,
 				NULL );
 
 	index_map_[ VIMS_GET_IMAGE ]			=	_new_event(

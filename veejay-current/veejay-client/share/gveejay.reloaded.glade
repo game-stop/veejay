@@ -12724,11 +12724,11 @@
                                     <property name="orientation">vertical</property>
                                     <child>
                                       <object class="GtkBox" id="hbox894">
-                                        <property name="visible">True</property>
+                                        <property name="visible">False</property>
                                         <property name="can-focus">False</property>
                                         <child>
                                           <object class="GtkBox" id="hbox833">
-                                            <property name="visible">True</property>
+                                            <property name="visible">False</property>
                                             <property name="can-focus">False</property>
                                             <child>
                                               <object class="GtkCheckButton" id="seqactive">
@@ -12751,7 +12751,7 @@
                                                 <property name="visible">True</property>
                                                 <property name="can-focus">True</property>
                                                 <property name="receives-default">True</property>
-                                                <property name="tooltip-text" translatable="yes">Clear all sequencer slots</property>
+                                                <property name="tooltip-text" translatable="yes">Clear all sequence banks</property>
                                                 <signal name="clicked" handler="on_button_seq_clearall_clicked" swapped="no"/>
                                                 <child>
                                                   <object class="GtkBox" id="hbox48">
@@ -12787,7 +12787,7 @@
                                         </child>
                                         <child>
                                           <object class="GtkFrame" id="frame302">
-                                            <property name="visible">True</property>
+                                            <property name="visible">False</property>
                                             <property name="can-focus">False</property>
                                             <property name="label-xalign">0</property>
                                             <child>
@@ -12942,19 +12942,6 @@
                                         <property name="expand">True</property>
                                         <property name="fill">True</property>
                                         <property name="position">1</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="label858">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="label" translatable="yes">Click an empty slot to place the currently selected sample.
-Shift-click a slot to remove the sample.</property>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">False</property>
-                                        <property name="position">2</property>
                                       </packing>
                                     </child>
                                   </object>
@@ -14022,54 +14009,63 @@ Shift-click a slot to remove the sample.</property>
                               <object class="GtkBox" id="sampleproperties">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
+                                <property name="margin-left">8</property>
+                                <property name="margin-right">8</property>
+                                <property name="margin-top">8</property>
+                                <property name="margin-bottom">8</property>
                                 <property name="orientation">vertical</property>
+                                <property name="spacing">8</property>
                                 <child>
                                   <object class="GtkFrame" id="frame295">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
                                     <property name="label-xalign">0</property>
                                     <child>
-                                      <object class="GtkAlignment" id="alignment501">
+                                      <object class="GtkBox" id="hbox742">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
-                                        <property name="top-padding">15</property>
-                                        <property name="left-padding">12</property>
-                                        <property name="right-padding">51</property>
+                                        <property name="margin-left">8</property>
+                                        <property name="margin-right">8</property>
+                                        <property name="margin-top">8</property>
+                                        <property name="margin-bottom">8</property>
+                                        <property name="spacing">8</property>
                                         <child>
-                                          <object class="GtkBox" id="hbox742">
+                                          <object class="GtkEntry" id="entry_samplename">
                                             <property name="visible">True</property>
-                                            <property name="can-focus">False</property>
-                                            <child>
-                                              <object class="GtkEntry" id="entry_samplename">
-                                                <property name="visible">True</property>
-                                                <property name="can-focus">True</property>
-                                                <property name="text" translatable="yes">Untitled</property>
-                                                <property name="primary-icon-activatable">False</property>
-                                                <property name="secondary-icon-activatable">False</property>
-                                              </object>
-                                              <packing>
-                                                <property name="expand">True</property>
-                                                <property name="fill">True</property>
-                                                <property name="position">0</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkButton" id="entry_samplename_button">
-                                                <property name="label" translatable="yes">Change title</property>
-                                                <property name="visible">True</property>
-                                                <property name="can-focus">True</property>
-                                                <property name="receives-default">False</property>
-                                                <property name="use-underline">True</property>
-                                                <signal name="clicked" handler="on_entry_samplename_button_clicked" swapped="no"/>
-                                              </object>
-                                              <packing>
-                                                <property name="expand">False</property>
-                                                <property name="fill">True</property>
-                                                <property name="position">1</property>
-                                              </packing>
-                                            </child>
+                                            <property name="can-focus">True</property>
+                                            <property name="hexpand">True</property>
+                                            <property name="text" translatable="yes">Untitled</property>
+                                            <property name="primary-icon-activatable">False</property>
+                                            <property name="secondary-icon-activatable">False</property>
                                           </object>
+                                          <packing>
+                                            <property name="expand">True</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
                                         </child>
+                                        <child>
+                                          <object class="GtkButton" id="entry_samplename_button">
+                                            <property name="label" translatable="yes">Change title</property>
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="receives-default">False</property>
+                                            <property name="use-underline">True</property>
+                                            <signal name="clicked" handler="on_entry_samplename_button_clicked" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Sample title</property>
                                       </object>
                                     </child>
                                   </object>
@@ -14083,26 +14079,24 @@ Shift-click a slot to remove the sample.</property>
                                   <object class="GtkFrame" id="frame294">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
-                                    <property name="margin-left">8</property>
-                                    <property name="margin-right">8</property>
-                                    <property name="margin-top">8</property>
                                     <property name="label-xalign">0</property>
                                     <child>
                                       <object class="GtkGrid">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
                                         <property name="margin-left">8</property>
-                                        <property name="row-spacing">4</property>
+                                        <property name="margin-right">8</property>
+                                        <property name="margin-top">8</property>
+                                        <property name="margin-bottom">8</property>
+                                        <property name="row-spacing">6</property>
                                         <property name="column-spacing">8</property>
-                                        <property name="row-homogeneous">True</property>
                                         <child>
                                           <object class="GtkLabel" id="label117">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
                                             <property name="tooltip-text" translatable="yes">Change starting position of the sample</property>
                                             <property name="label" translatable="yes">Start position</property>
-                                            <property name="justify">right</property>
-                                            <property name="track-visited-links">False</property>
+                                            <property name="width-chars">22</property>
                                             <property name="xalign">0</property>
                                           </object>
                                           <packing>
@@ -14112,7 +14106,7 @@ Shift-click a slot to remove the sample.</property>
                                         </child>
                                         <child>
                                           <object class="GtkSpinButton" id="spin_samplestart">
-                                            <property name="width-request">200</property>
+                                            <property name="width-request">140</property>
                                             <property name="visible">True</property>
                                             <property name="can-focus">True</property>
                                             <property name="halign">start</property>
@@ -14129,11 +14123,35 @@ Shift-click a slot to remove the sample.</property>
                                           </packing>
                                         </child>
                                         <child>
+                                          <object class="GtkButton" id="button_samplestart_reset">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="receives-default">True</property>
+                                            <property name="tooltip-text" translatable="yes">Reset start position</property>
+                                            <property name="halign">start</property>
+                                            <property name="valign">center</property>
+                                            <signal name="clicked" handler="on_button_samplestart_value_refresh_clicked" swapped="no"/>
+                                            <child>
+                                              <object class="GtkImage" id="image62">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="tooltip-text" translatable="yes">Reset start position</property>
+                                                <property name="pixbuf">icon_refresh.png</property>
+                                              </object>
+                                            </child>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">2</property>
+                                            <property name="top-attach">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
                                           <object class="GtkLabel" id="label118">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
                                             <property name="tooltip-text" translatable="yes">Change ending position of the sample</property>
                                             <property name="label" translatable="yes">End position</property>
+                                            <property name="width-chars">22</property>
                                             <property name="xalign">0</property>
                                           </object>
                                           <packing>
@@ -14143,7 +14161,7 @@ Shift-click a slot to remove the sample.</property>
                                         </child>
                                         <child>
                                           <object class="GtkSpinButton" id="spin_sampleend">
-                                            <property name="width-request">200</property>
+                                            <property name="width-request">140</property>
                                             <property name="visible">True</property>
                                             <property name="can-focus">True</property>
                                             <property name="halign">start</property>
@@ -14160,11 +14178,35 @@ Shift-click a slot to remove the sample.</property>
                                           </packing>
                                         </child>
                                         <child>
+                                          <object class="GtkButton" id="button_sampleend_reset">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="receives-default">True</property>
+                                            <property name="tooltip-text" translatable="yes">Reset end position</property>
+                                            <property name="halign">start</property>
+                                            <property name="valign">center</property>
+                                            <signal name="clicked" handler="on_button_sampleend_value_reset_clicked" swapped="no"/>
+                                            <child>
+                                              <object class="GtkImage" id="image63">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="tooltip-text" translatable="yes">Reset end position</property>
+                                                <property name="pixbuf">icon_refresh.png</property>
+                                              </object>
+                                            </child>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">2</property>
+                                            <property name="top-attach">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
                                           <object class="GtkLabel" id="label706">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
                                             <property name="tooltip-text" translatable="yes">Change playback speed</property>
                                             <property name="label" translatable="yes">Playback speed</property>
+                                            <property name="width-chars">22</property>
                                             <property name="xalign">0</property>
                                           </object>
                                           <packing>
@@ -14178,9 +14220,6 @@ Shift-click a slot to remove the sample.</property>
                                             <property name="can-focus">True</property>
                                             <property name="halign">start</property>
                                             <property name="width-chars">6</property>
-                                            <property name="text" translatable="yes">0</property>
-                                            <property name="primary-icon-activatable">False</property>
-                                            <property name="secondary-icon-activatable">False</property>
                                             <property name="adjustment">speed</property>
                                             <property name="climb-rate">1</property>
                                             <signal name="value-changed" handler="on_spin_samplespeed_value_changed" swapped="no"/>
@@ -14196,7 +14235,7 @@ Shift-click a slot to remove the sample.</property>
                                             <property name="can-focus">False</property>
                                             <property name="tooltip-text" translatable="yes">Duplicate every frame a number of times. Frames are interpolated</property>
                                             <property name="label" translatable="yes">Slow motion multiplier</property>
-                                            <property name="justify">center</property>
+                                            <property name="width-chars">22</property>
                                             <property name="xalign">0</property>
                                           </object>
                                           <packing>
@@ -14205,27 +14244,11 @@ Shift-click a slot to remove the sample.</property>
                                           </packing>
                                         </child>
                                         <child>
-                                          <object class="GtkLabel" id="label_transitions">
-                                            <property name="visible">True</property>
-                                            <property name="can-focus">False</property>
-                                            <property name="tooltip-text" translatable="yes">Enable Transitions</property>
-                                            <property name="label" translatable="yes">Transitions</property>
-                                            <property name="xalign">0</property>
-                                          </object>
-                                          <packing>
-                                            <property name="left-attach">0</property>
-                                            <property name="top-attach">4</property>
-                                          </packing>
-                                        </child>
-                                        <child>
                                           <object class="GtkSpinButton" id="spin_framedelay">
                                             <property name="visible">True</property>
                                             <property name="can-focus">True</property>
                                             <property name="halign">start</property>
                                             <property name="width-chars">6</property>
-                                            <property name="text" translatable="yes">0</property>
-                                            <property name="primary-icon-activatable">False</property>
-                                            <property name="secondary-icon-activatable">False</property>
                                             <property name="adjustment">frame_dup</property>
                                             <property name="climb-rate">1</property>
                                             <signal name="value-changed" handler="on_spin_framedelay_value_changed" swapped="no"/>
@@ -14240,8 +14263,9 @@ Shift-click a slot to remove the sample.</property>
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
                                             <property name="tooltip-text" translatable="yes">Set loop stop boundary</property>
-                                            <property name="halign">start</property>
                                             <property name="label" translatable="yes">Loop stop</property>
+                                            <property name="width-chars">22</property>
+                                            <property name="xalign">0</property>
                                           </object>
                                           <packing>
                                             <property name="left-attach">0</property>
@@ -14263,46 +14287,54 @@ Shift-click a slot to remove the sample.</property>
                                             <property name="top-attach">4</property>
                                           </packing>
                                         </child>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel" id="label941">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Playback</property>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">1</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkFrame" id="frame_sample_transitions">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <child>
+                                      <object class="GtkGrid" id="sample_transition_grid">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="margin-left">8</property>
+                                        <property name="margin-right">8</property>
+                                        <property name="margin-top">8</property>
+                                        <property name="margin-bottom">8</property>
+                                        <property name="row-spacing">6</property>
+                                        <property name="column-spacing">8</property>
                                         <child>
-                                          <object class="GtkLabel">
+                                          <object class="GtkLabel" id="label_transitions">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="halign">start</property>
+                                            <property name="tooltip-text" translatable="yes">Enable Transitions</property>
                                             <property name="label" translatable="yes">Transition</property>
+                                            <property name="width-chars">22</property>
+                                            <property name="xalign">0</property>
                                           </object>
                                           <packing>
                                             <property name="left-attach">0</property>
-                                            <property name="top-attach">5</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkLabel">
-                                            <property name="visible">True</property>
-                                            <property name="can-focus">False</property>
-                                            <property name="halign">start</property>
-                                            <property name="label" translatable="yes">Transition shape</property>
-                                          </object>
-                                          <packing>
-                                            <property name="left-attach">0</property>
-                                            <property name="top-attach">6</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkLabel">
-                                            <property name="visible">True</property>
-                                            <property name="can-focus">False</property>
-                                            <property name="halign">start</property>
-                                            <property name="label" translatable="yes">Transition length</property>
-                                          </object>
-                                          <packing>
-                                            <property name="left-attach">0</property>
-                                            <property name="top-attach">7</property>
+                                            <property name="top-attach">0</property>
                                           </packing>
                                         </child>
                                         <child>
                                           <object class="GtkCheckButton" id="transition_active">
                                             <property name="label" translatable="yes">Enabled</property>
-                                            <property name="name">transition_active</property>
                                             <property name="visible">True</property>
                                             <property name="can-focus">True</property>
                                             <property name="receives-default">False</property>
@@ -14312,12 +14344,24 @@ Shift-click a slot to remove the sample.</property>
                                           </object>
                                           <packing>
                                             <property name="left-attach">1</property>
-                                            <property name="top-attach">5</property>
+                                            <property name="top-attach">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">Transition shape</property>
+                                            <property name="width-chars">22</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">1</property>
                                           </packing>
                                         </child>
                                         <child>
                                           <object class="GtkSpinButton" id="transition_shape">
-                                            <property name="name">transition_shape</property>
                                             <property name="visible">True</property>
                                             <property name="can-focus">True</property>
                                             <property name="halign">start</property>
@@ -14330,13 +14374,25 @@ Shift-click a slot to remove the sample.</property>
                                           </object>
                                           <packing>
                                             <property name="left-attach">1</property>
-                                            <property name="top-attach">6</property>
+                                            <property name="top-attach">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">Transition length</property>
+                                            <property name="width-chars">22</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">2</property>
                                           </packing>
                                         </child>
                                         <child>
                                           <object class="GtkSpinButton" id="transition_length">
-                                            <property name="name">transition_length</property>
-                                            <property name="width-request">200</property>
+                                            <property name="width-request">140</property>
                                             <property name="visible">True</property>
                                             <property name="can-focus">True</property>
                                             <property name="input-purpose">number</property>
@@ -14347,112 +14403,65 @@ Shift-click a slot to remove the sample.</property>
                                           </object>
                                           <packing>
                                             <property name="left-attach">1</property>
-                                            <property name="top-attach">7</property>
+                                            <property name="top-attach">2</property>
                                           </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkButton" id="button_samplestart_reset">
-                                            <property name="visible">True</property>
-                                            <property name="can-focus">True</property>
-                                            <property name="receives-default">True</property>
-                                            <property name="tooltip-text" translatable="yes">Reset start position</property>
-                                            <property name="halign">start</property>
-                                            <property name="valign">start</property>
-                                            <signal name="clicked" handler="on_button_samplestart_value_refresh_clicked" swapped="no"/>
-                                            <child>
-                                              <object class="GtkImage" id="image62">
-                                                <property name="visible">True</property>
-                                                <property name="can-focus">False</property>
-                                                <property name="tooltip-text" translatable="yes">Reset start position</property>
-                                                <property name="pixbuf">icon_refresh.png</property>
-                                              </object>
-                                            </child>
-                                          </object>
-                                          <packing>
-                                            <property name="left-attach">2</property>
-                                            <property name="top-attach">0</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkButton" id="button_sampleend_reset">
-                                            <property name="visible">True</property>
-                                            <property name="can-focus">True</property>
-                                            <property name="receives-default">True</property>
-                                            <property name="tooltip-text" translatable="yes">Reset end position</property>
-                                            <property name="halign">start</property>
-                                            <property name="valign">start</property>
-                                            <signal name="clicked" handler="on_button_sampleend_value_reset_clicked" swapped="no"/>
-                                            <child>
-                                              <object class="GtkImage" id="image63">
-                                                <property name="visible">True</property>
-                                                <property name="can-focus">False</property>
-                                                <property name="tooltip-text" translatable="yes">Reset end position</property>
-                                                <property name="pixbuf">icon_refresh.png</property>
-                                              </object>
-                                            </child>
-                                          </object>
-                                          <packing>
-                                            <property name="left-attach">2</property>
-                                            <property name="top-attach">1</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <placeholder/>
-                                        </child>
-                                        <child>
-                                          <placeholder/>
-                                        </child>
-                                        <child>
-                                          <placeholder/>
-                                        </child>
-                                        <child>
-                                          <placeholder/>
-                                        </child>
-                                        <child>
-                                          <placeholder/>
-                                        </child>
-                                        <child>
-                                          <placeholder/>
                                         </child>
                                       </object>
                                     </child>
                                     <child type="label">
-                                      <object class="GtkLabel" id="label941">
+                                      <object class="GtkLabel">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
-                                        <property name="use-markup">True</property>
+                                        <property name="label" translatable="yes">Transitions</property>
                                       </object>
                                     </child>
                                   </object>
                                   <packing>
                                     <property name="expand">False</property>
-                                    <property name="fill">False</property>
-                                    <property name="position">1</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">2</property>
                                   </packing>
                                 </child>
                                 <child>
-                                  <object class="GtkFrame">
+                                  <object class="GtkFrame" id="frame_sample_stream_buffering">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
                                     <property name="label-xalign">0</property>
-                                    <property name="shadow-type">none</property>
                                     <child>
-                                      <object class="GtkGrid">
+                                      <object class="GtkGrid" id="sample_stream_buffering_grid">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
+                                        <property name="margin-left">8</property>
+                                        <property name="margin-right">8</property>
                                         <property name="margin-top">8</property>
-                                        <property name="row-spacing">4</property>
+                                        <property name="margin-bottom">8</property>
+                                        <property name="row-spacing">6</property>
                                         <property name="column-spacing">8</property>
                                         <child>
                                           <object class="GtkLabel">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
                                             <property name="label" translatable="yes">Number of frames to record</property>
+                                            <property name="width-chars">22</property>
                                             <property name="xalign">0</property>
                                           </object>
                                           <packing>
                                             <property name="left-attach">0</property>
-                                            <property name="top-attach">1</property>
+                                            <property name="top-attach">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="spin_bufferedstreamlength">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="width-chars">8</property>
+                                            <property name="adjustment">streamlength</property>
+                                            <property name="climb-rate">1</property>
+                                            <signal name="value-changed" handler="on_spin_bufferedstreamlength_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">1</property>
+                                            <property name="top-attach">0</property>
                                           </packing>
                                         </child>
                                         <child>
@@ -14460,6 +14469,34 @@ Shift-click a slot to remove the sample.</property>
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
                                             <property name="label" translatable="yes">Link to Stream ID</property>
+                                            <property name="width-chars">22</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="spin_bufferedstreamid">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="width-chars">8</property>
+                                            <property name="adjustment">streamids</property>
+                                            <property name="climb-rate">1</property>
+                                            <signal name="value-changed" handler="on_spin_bufferedstreamid_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">1</property>
+                                            <property name="top-attach">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">Actions</property>
+                                            <property name="width-chars">22</property>
                                             <property name="xalign">0</property>
                                           </object>
                                           <packing>
@@ -14468,38 +14505,10 @@ Shift-click a slot to remove the sample.</property>
                                           </packing>
                                         </child>
                                         <child>
-                                          <object class="GtkSpinButton" id="spin_bufferedstreamlength">
-                                            <property name="visible">True</property>
-                                            <property name="can-focus">True</property>
-                                            <property name="width-chars">10</property>
-                                            <property name="text" translatable="yes">1</property>
-                                            <property name="adjustment">streamlength</property>
-                                            <property name="value">1</property>
-                                            <signal name="value-changed" handler="on_spin_bufferedstreamlength_value_changed" swapped="no"/>
-                                          </object>
-                                          <packing>
-                                            <property name="left-attach">1</property>
-                                            <property name="top-attach">1</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkSpinButton" id="spin_bufferedstreamid">
-                                            <property name="visible">True</property>
-                                            <property name="can-focus">True</property>
-                                            <property name="text" translatable="yes">1</property>
-                                            <property name="adjustment">streamids</property>
-                                            <property name="value">1</property>
-                                            <signal name="value-changed" handler="on_spin_bufferedstreamid_value_changed" swapped="no"/>
-                                          </object>
-                                          <packing>
-                                            <property name="left-attach">1</property>
-                                            <property name="top-attach">2</property>
-                                          </packing>
-                                        </child>
-                                        <child>
                                           <object class="GtkBox">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
+                                            <property name="spacing">4</property>
                                             <child>
                                               <object class="GtkButton" id="button_offline_start_sample">
                                                 <property name="width-request">32</property>
@@ -14571,29 +14580,8 @@ Shift-click a slot to remove the sample.</property>
                                           </object>
                                           <packing>
                                             <property name="left-attach">1</property>
-                                            <property name="top-attach">3</property>
+                                            <property name="top-attach">2</property>
                                           </packing>
-                                        </child>
-                                        <child>
-                                          <placeholder/>
-                                        </child>
-                                        <child>
-                                          <placeholder/>
-                                        </child>
-                                        <child>
-                                          <placeholder/>
-                                        </child>
-                                        <child>
-                                          <placeholder/>
-                                        </child>
-                                        <child>
-                                          <placeholder/>
-                                        </child>
-                                        <child>
-                                          <placeholder/>
-                                        </child>
-                                        <child>
-                                          <placeholder/>
                                         </child>
                                       </object>
                                     </child>
@@ -14608,11 +14596,10 @@ Shift-click a slot to remove the sample.</property>
                                   <packing>
                                     <property name="expand">False</property>
                                     <property name="fill">True</property>
-                                    <property name="padding">16</property>
-                                    <property name="position">2</property>
+                                    <property name="position">3</property>
                                   </packing>
                                 </child>
-                              </object>
+                              </object>>
                               <packing>
                                 <property name="position">1</property>
                               </packing>

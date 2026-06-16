@@ -69,7 +69,18 @@
 #include <libvje/libvje.h>
 #include <veejaycore/vims.h>
 #include <libveejay/audioscratcher.h>
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
+#include <build.h>
+#ifndef SAMPLE_FMT_S16
+#define SAMPLE_FMT_S16 AV_SAMPLE_FMT_S16
+#endif
 
+#define PRIMARY_FRAMES 6
+#define FADE_LUT_SIZE 256
+
+#include <libvje/effects/shapewipe.h>
 #ifdef HAVE_JACK
 #include <libveejay/vj-jack.h>
 #include <libveejay/vj-audio-sync.h>
@@ -457,18 +468,7 @@ int vj_audio_render_slow_stream_velocity_turn_s16(uint8_t *dst,
                                                   int phase_offset_start,
                                                   int phase_offset_end,
                                                   int frame_bytes);
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
-#include <build.h>
-#ifndef SAMPLE_FMT_S16
-#define SAMPLE_FMT_S16 AV_SAMPLE_FMT_S16
-#endif
 
-#define PRIMARY_FRAMES 6
-#define FADE_LUT_SIZE 256
-
-#include <libvje/effects/shapewipe.h>
 
 typedef struct {
     uint8_t *Y;
@@ -1924,6 +1924,14 @@ static inline int vj_seq_type_to_playback_mode(int type)
         : VJ_PLAYBACK_MODE_TAG;
 }
 
+static inline void vj_perform_sequence_set_current(veejay_t *info, int slot)
+{
+    info->seq->current = slot;
+
+    if(info->seq->active_bank >= 0 && info->seq->active_bank < VJ_SEQUENCE_BANKS)
+        info->seq->banks[info->seq->active_bank].current = slot;
+}
+
 static int vj_perform_sequence_transition_still_valid(veejay_t *info)
 {
     if (!info || !info->settings || !info->seq || !info->seq->active)
@@ -2164,7 +2172,7 @@ int vj_perform_try_sequence(veejay_t *info)
                atomic_load_long_long(&settings->current_frame_num));
 
     if (!global_transition_on || !armed_transition_active) {
-        info->seq->current = next_slot;
+        vj_perform_sequence_set_current(info, next_slot);
         veejay_change_playback_mode(info, playback_mode, next_id);
     }
 
@@ -13447,7 +13455,7 @@ static void vj_perform_end_transition(veejay_t *info, int mode, int sample)
         );
 
         target_id = info->seq->samples[target_slot].sample_id;
-        info->seq->current = target_slot;
+        vj_perform_sequence_set_current(info, target_slot);
     }
 
     vj_perform_reset_transition(info);

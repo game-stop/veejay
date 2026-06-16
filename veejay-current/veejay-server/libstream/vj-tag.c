@@ -989,6 +989,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     tag->index = stream_nr;
     tag->active = 0;
     tag->n_frames = 50;
+    tag->loop_stat_stop = 1;
     tag->sequence_num = 0;
     tag->encoder_format = 0;
     tag->encoder_active = 0;
@@ -2891,10 +2892,13 @@ void     vj_tag_set_loops(int t1, int loops) {
 
 int     vj_tag_loop_dec(int t1) {
     vj_tag *tag = vj_tag_get(t1);
-    if(tag && tag->loops > 0) {
+    if(!tag)
+        return 0;
+
+    if(tag->loops > 0)
         tag->loops --;
-    }
-    return tag->loops;
+
+    return (tag->loops == 0 ? 1 : 0);
 }
 
 int     vj_tag_at_next_loop(int t1)
@@ -4013,7 +4017,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
     char *source_file = NULL;
     char *extra_data = NULL;
     int col[3] = {0,0,0};
-    int fader_active=0, fader_val=0, fader_dir=0, fade_method=0,fade_alpha = 0,fade_entry = -1,opacity=0, nframes=0, loop_stat_stop=0;
+    int fader_active=0, fader_val=0, fader_dir=0, fade_method=0,fade_alpha = 0,fade_entry = -1,opacity=0, nframes=0, loop_stat_stop=1;
     xmlNodePtr fx[32];
     veejay_memset( fx, 0, sizeof(fx));
     int k = 0;
@@ -4147,8 +4151,10 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
             tag->fader_direction = fader_dir;
             tag->opacity = opacity;
             tag->nframes = nframes;
+            if(nframes > 0)
+                tag->n_frames = nframes;
             tag->subrender = subrender;
-            tag->loop_stat_stop = loop_stat_stop;
+            tag->loop_stat_stop = (loop_stat_stop < 1 ? 1 : loop_stat_stop);
             tag->transition_active = transition_active;
             tag->transition_shape = transition_shape;
             tag->transition_length = transition_length;
@@ -4285,7 +4291,7 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp)
     put_xml_int( node, "green", tag->color_g );
     put_xml_int( node, "blue", tag->color_b );
 
-    put_xml_int( node, "nframes", tag->nframes );
+    put_xml_int( node, "nframes", tag->n_frames );
     put_xml_int( node, "opacity", tag->opacity );
 
     put_xml_int( node, XMLTAG_TRANSITION_SHAPE, tag->transition_shape);

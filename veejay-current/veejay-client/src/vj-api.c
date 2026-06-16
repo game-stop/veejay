@@ -66,6 +66,7 @@
 #include <src/common.h>
 #include <src/utils.h>
 #include <src/sequence.h>
+#include <src/gtksequencebankview.h>
 #include <veejaycore/yuvconv.h>
 #include <veejaycore/libvevo.h>
 #include <src/vmidi.h>
@@ -87,6 +88,21 @@ static gpointer castIntToGpointer(int val)
 #endif
 #undef VJ_AUDIO_SYNC_MODE_MAX
 #define VJ_AUDIO_SYNC_MODE_MAX VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY
+
+#ifndef VJ_SEQUENCE_BANKS
+#define VJ_SEQUENCE_BANKS 4
+#endif
+#ifndef STATUS_SEQUENCE_ACTIVE_BANK
+#define STATUS_SEQUENCE_ACTIVE_BANK       111
+#define STATUS_SEQUENCE_REVISION          112
+#define STATUS_SEQUENCE_SIZE              113
+#define STATUS_SEQUENCE_BANK0_REVISION    114
+#define STATUS_SEQUENCE_BANK1_REVISION    115
+#define STATUS_SEQUENCE_BANK2_REVISION    116
+#define STATUS_SEQUENCE_BANK3_REVISION    117
+#define STATUS_SEQUENCE_LAST              118
+#define STATUS_SEQUENCE_UPDATED           STATUS_SEQUENCE_REVISION
+#endif
 
 static inline int ui_audio_sync_mode_is_control_only(int mode)
 {
@@ -1831,6 +1847,7 @@ typedef struct
     GtkWidget   *sample_bank_pad;
     GtkWidget   *quick_select;
     GtkWidget   *sample_sequencer;
+    GtkWidget   *sequence_bank_view;
     sample_bank_t   **sample_banks;
     sample_slot_t   *selected_slot;
     sample_slot_t   *selection_slot;
@@ -2020,6 +2037,9 @@ static void load_effectchain_info(void);
 static void set_feedback_status(void);
 static void load_effectlist_info(void);
 static void load_sequence_list(void);
+static int sequence_ui_active_bank(void);
+static inline int normalize_sequence_slot(int raw, int n_slots);
+static void sequence_bank_view_set_active_status(void);
 static void load_generator_info(void);
 static void load_samplelist_info(void);
 static int load_editlist_info(void);
@@ -2074,6 +2094,7 @@ GdkPixbuf *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterp
 static void vj_kf_select_parameter(int id);
 static void vj_kf_refresh(gboolean force);
 static void veejay_show_main_ui(vj_gui_t *gui);
+static void reloaded_present_window(GtkWidget *w);
 void reload_macros(void);
 void reportbug(void);
 void select_chain_entry(int entry);
@@ -5549,19 +5570,21 @@ const char *get_stream_prefix(int type)
 {
     switch (type)
     {
-        case STREAM_CALI:          return "calibrate";
-        case STREAM_VIDEO4LINUX:   return "v4l2";
-        case STREAM_WHITE:         return "solid";
-        case STREAM_MCAST:         return "multicast";
-        case STREAM_NETWORK:       return "unicast";
         case STREAM_YUV4MPEG:      return "yuv4mpeg";
-        case STREAM_DV1394:        return "dv1394";
-        case STREAM_PICTURE:       return "image";
-        case STREAM_GENERATOR:     return "generator";
-        case STREAM_CLONE:         return "T";
+        case STREAM_VIDEO4LINUX:   return "v4l2";
         case STREAM_VLOOP:         return "vloopback";
-        case STREAM_AVF:           return "stream";
-        default:                   return "???";
+        case STREAM_WHITE:         return "solid color";
+        case STREAM_PICTURE:       return "image";
+        case STREAM_CALI:          return "calibrate";
+        case STREAM_GENERATOR:     return "generator";
+        case STREAM_GREEN:         return "splitter";
+        case 11:                   return "shared memory";
+        case STREAM_AVFORMAT:      return "avformat";
+        case STREAM_NETWORK:       return "unicast";
+        case STREAM_MCAST:         return "multicast";
+        case STREAM_CLONE:         return "clone";
+        case STREAM_DV1394:        return "dv1394";
+        default:                   return "unknown";
     }
 }
 
@@ -7399,7 +7422,104 @@ static void sequencer_slot_set_content(sequence_gui_slot_t *slot, int sample_id,
     }
 }
 
-static void load_sequence_list(void)
+static int sequence_parse_fixed_int(const char *text, int width)
+{
+    char tmp[16];
+
+    if(width <= 0)
+        return 0;
+    if(width >= (int)sizeof(tmp))
+        width = (int)sizeof(tmp) - 1;
+
+    memcpy(tmp, text, width);
+    tmp[width] = '\0';
+    return atoi(tmp);
+}
+
+static unsigned int sequence_parse_fixed_uint(const char *text, int width)
+{
+    char tmp[16];
+
+    if(width <= 0)
+        return 0;
+    if(width >= (int)sizeof(tmp))
+        width = (int)sizeof(tmp) - 1;
+
+    memcpy(tmp, text, width);
+    tmp[width] = '\0';
+    return (unsigned int)strtoul(tmp, NULL, 10);
+}
+
+static int sequence_ui_requested_bank = 0;
+static int sequence_ui_bank_select_pending = 0;
+
+static int sequence_ui_active_bank(void)
+{
+    int bank = info->status_tokens[STATUS_SEQUENCE_ACTIVE_BANK];
+
+    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
+        bank = 0;
+
+    return bank;
+}
+
+static void sequence_ui_request_bank(int bank)
+{
+    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
+        return;
+
+    sequence_ui_requested_bank = bank;
+    sequence_ui_bank_select_pending = (bank != sequence_ui_active_bank());
+}
+
+static void sequence_ui_status_bank_seen(int bank)
+{
+    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
+        bank = 0;
+
+    if(!sequence_ui_bank_select_pending || bank == sequence_ui_requested_bank) {
+        sequence_ui_requested_bank = bank;
+        sequence_ui_bank_select_pending = 0;
+    }
+}
+
+static int sequence_ui_target_bank(void)
+{
+    if(sequence_ui_requested_bank < 0 || sequence_ui_requested_bank >= VJ_SEQUENCE_BANKS)
+        sequence_ui_requested_bank = sequence_ui_active_bank();
+
+    return sequence_ui_requested_bank;
+}
+
+static int sequence_ui_confirm_clear_bank(int bank)
+{
+    char msg[160];
+
+    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
+        bank = 0;
+
+    snprintf(msg, sizeof(msg),
+             "Clear sequence bank %d?\nThis cannot be undone.",
+             bank + 1);
+
+    return prompt_dialog("Clear Sequence Bank", msg) == GTK_RESPONSE_ACCEPT;
+}
+
+static void sequence_bank_view_set_active_status(void)
+{
+    if(!info->sequence_bank_view)
+        return;
+
+    int bank = sequence_ui_active_bank();
+    int playing = normalize_sequence_slot(info->status_tokens[SEQ_CUR], SEQUENCER_COL * SEQUENCER_ROW);
+
+    sequence_ui_status_bank_seen(bank);
+    gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+    gvr_sequence_bank_view_set_sequence_active(info->sequence_bank_view, info->status_tokens[SEQ_ACT] != 0);
+    gvr_sequence_bank_view_set_current_slot(info->sequence_bank_view, bank, playing);
+}
+
+static void load_sequence_list_legacy(void)
 {
     single_vims( VIMS_SEQUENCE_LIST );
     gint len = 0;
@@ -7408,18 +7528,30 @@ static void load_sequence_list(void)
         return;
 
     int checksum = data_checksum(text,len);
+    checksum ^= info->status_tokens[STATUS_SEQUENCE_ACTIVE_BANK] * 131;
+    checksum ^= info->status_tokens[STATUS_SEQUENCE_REVISION] * 257;
+
     if( info->uc.reload_hint_checksums[HINT_SEQ_ACT] == checksum ) {
         if(text) free(text);
         return;
     }
     info->uc.reload_hint_checksums[HINT_SEQ_ACT] = checksum;
 
-
     int playing=0;
     int size =0;
     int active=0;
+    int bank = sequence_ui_active_bank();
 
     sscanf( text, "%04d%04d%4d",&playing,&size,&active );
+
+    if(info->sequence_bank_view) {
+        gvr_sequence_bank_view_clear_bank(info->sequence_bank_view, bank);
+        gvr_sequence_bank_view_set_bank_size(info->sequence_bank_view, bank, size);
+        gvr_sequence_bank_view_set_sequence_active(info->sequence_bank_view, active != 0);
+        gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+        gvr_sequence_bank_view_set_current_slot(info->sequence_bank_view, bank, playing);
+    }
+
     int nlen = len - 12;
     int offset = 0;
     int id = 0;
@@ -7430,12 +7562,87 @@ static void load_sequence_list(void)
         int type = 0;
         sscanf( in + offset, "%04d%02d", &sample_id, &type );
         offset += 6;
-        if(id < (info->sequencer_col * info->sequencer_row))
+        if(info->sequence_bank_view)
+            gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, id, sample_id, type);
+        if(info->sequencer_view && info->sequencer_view->gui_slot && id < (info->sequencer_col * info->sequencer_row))
             sequencer_slot_set_content(info->sequencer_view->gui_slot[id], sample_id, type);
-
         id ++;
     }
     free(text);
+}
+
+static void load_sequence_list(void)
+{
+    single_vims( VIMS_SEQUENCE_LIST_ALL );
+    gint len = 0;
+    gchar *text = recv_vims( 6, &len );
+    const int bank_payload = 22 + (SEQUENCER_COL * SEQUENCER_ROW * 6);
+    const int min_payload = 18 + (VJ_SEQUENCE_BANKS * bank_payload);
+
+    if( len >= min_payload && text != NULL ) {
+        int checksum = data_checksum(text,len);
+        checksum ^= info->status_tokens[STATUS_SEQUENCE_ACTIVE_BANK] * 131;
+        checksum ^= info->status_tokens[STATUS_SEQUENCE_REVISION] * 257;
+
+        if( info->uc.reload_hint_checksums[HINT_SEQ_ACT] == checksum ) {
+            free(text);
+            return;
+        }
+        info->uc.reload_hint_checksums[HINT_SEQ_ACT] = checksum;
+
+        int active_bank = sequence_parse_fixed_int(text, 4);
+        int seq_active = sequence_parse_fixed_int(text + 4, 4);
+        unsigned int global_revision = sequence_parse_fixed_uint(text + 8, 10);
+        int offset = 18;
+
+        (void)global_revision;
+
+        if(active_bank < 0 || active_bank >= VJ_SEQUENCE_BANKS)
+            active_bank = 0;
+
+        if(info->sequence_bank_view) {
+            gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, active_bank);
+            gvr_sequence_bank_view_set_sequence_active(info->sequence_bank_view, seq_active != 0);
+        }
+
+        for(int bank_i = 0; bank_i < VJ_SEQUENCE_BANKS; bank_i++) {
+            int bank = sequence_parse_fixed_int(text + offset, 4);
+            int current = sequence_parse_fixed_int(text + offset + 4, 4);
+            int size = sequence_parse_fixed_int(text + offset + 8, 4);
+            unsigned int revision = sequence_parse_fixed_uint(text + offset + 12, 10);
+            offset += 22;
+
+            if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
+                bank = bank_i;
+
+            if(info->sequence_bank_view) {
+                gvr_sequence_bank_view_clear_bank(info->sequence_bank_view, bank);
+                gvr_sequence_bank_view_set_bank_size(info->sequence_bank_view, bank, size);
+                gvr_sequence_bank_view_set_bank_revision(info->sequence_bank_view, bank, revision);
+                gvr_sequence_bank_view_set_current_slot(info->sequence_bank_view, bank, current);
+            }
+
+            for(int slot = 0; slot < (SEQUENCER_COL * SEQUENCER_ROW); slot++) {
+                int sample_id = sequence_parse_fixed_int(text + offset, 4);
+                int type = sequence_parse_fixed_int(text + offset + 4, 2);
+                offset += 6;
+
+                if(info->sequence_bank_view)
+                    gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, slot, sample_id, type);
+
+                if(bank == active_bank && info->sequencer_view && info->sequencer_view->gui_slot && slot < (info->sequencer_col * info->sequencer_row))
+                    sequencer_slot_set_content(info->sequencer_view->gui_slot[slot], sample_id, type);
+            }
+        }
+
+        sequence_bank_view_set_active_status();
+        free(text);
+        return;
+    }
+
+    if(text)
+        free(text);
+    load_sequence_list_legacy();
 }
 
 static void load_samplelist_info(void)
@@ -9054,10 +9261,20 @@ static inline int normalize_sequence_slot(int raw, int n_slots)
 
 static void update_sequence_playing_from_status(void)
 {
+    const int n_slots = info->sequencer_col * info->sequencer_row;
+
+    if(info->sequence_bank_view) {
+        int bank = sequence_ui_active_bank();
+        int playing = normalize_sequence_slot(info->status_tokens[SEQ_CUR], n_slots);
+        sequence_ui_status_bank_seen(bank);
+        gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+        gvr_sequence_bank_view_set_sequence_active(info->sequence_bank_view, info->status_tokens[SEQ_ACT] != 0);
+        gvr_sequence_bank_view_set_current_slot(info->sequence_bank_view, bank, playing);
+    }
+
     if(!info->sequencer_view || !info->sequencer_view->gui_slot)
         return;
 
-    const int n_slots = info->sequencer_col * info->sequencer_row;
 
     const int seq_cur_raw = info->status_tokens[SEQ_CUR];
     const int seq_act_raw = info->status_tokens[SEQ_ACT];
@@ -10926,13 +11143,20 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 	    update_label_i2( widget_cache[ WIDGET_LABEL_LOOP_STATS ], info->status_tokens[SAMPLE_LOOP_STAT], 0);
     }
 
-    if( info->status_tokens[SEQ_ACT] != history[SEQ_ACT] )
+    if( info->status_tokens[SEQ_ACT] != history[SEQ_ACT] ||
+        info->status_tokens[STATUS_SEQUENCE_ACTIVE_BANK] != history[STATUS_SEQUENCE_ACTIVE_BANK] ||
+        info->status_tokens[STATUS_SEQUENCE_REVISION] != history[STATUS_SEQUENCE_REVISION] ||
+        info->status_tokens[STATUS_SEQUENCE_BANK0_REVISION] != history[STATUS_SEQUENCE_BANK0_REVISION] ||
+        info->status_tokens[STATUS_SEQUENCE_BANK1_REVISION] != history[STATUS_SEQUENCE_BANK1_REVISION] ||
+        info->status_tokens[STATUS_SEQUENCE_BANK2_REVISION] != history[STATUS_SEQUENCE_BANK2_REVISION] ||
+        info->status_tokens[STATUS_SEQUENCE_BANK3_REVISION] != history[STATUS_SEQUENCE_BANK3_REVISION] )
     {
         info->uc.reload_hint[HINT_SEQ_ACT] = 1;
     }
 
     if(info->status_tokens[SEQ_CUR]   != history[SEQ_CUR] ||
     info->status_tokens[SEQ_ACT]   != history[SEQ_ACT] ||
+    info->status_tokens[STATUS_SEQUENCE_ACTIVE_BANK] != history[STATUS_SEQUENCE_ACTIVE_BANK] ||
     info->status_tokens[PLAY_MODE] != history[PLAY_MODE])
     {
         update_sequence_playing_from_status();
@@ -12045,6 +12269,12 @@ static void reset_quickselect_ui_state(void)
 
 static void reset_sequencer_ui_state(void)
 {
+    if(info->sequence_bank_view) {
+        gvr_sequence_bank_view_clear_all(info->sequence_bank_view);
+        gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, 0);
+        gvr_sequence_bank_view_set_sequence_active(info->sequence_bank_view, FALSE);
+    }
+
     if(!info->sequencer_view || !info->sequencer_view->gui_slot)
         return;
 
@@ -12943,9 +13173,22 @@ static void veejay_show_main_ui(vj_gui_t *gui)
     gtk_widget_hide(veejay_conncection_window);
     GtkWidget *mw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
 
-    gtk_widget_show( mw );
+    gtk_widget_show(mw);
     if( geo_pos_[0] >= 0 && geo_pos_[1] >= 0 )
         gtk_window_move( GTK_WINDOW(mw), geo_pos_[0], geo_pos_[1] );
+    reloaded_present_window(mw);
+}
+
+static guint32 reloaded_present_time(void)
+{
+    guint32 ts = gtk_get_current_event_time();
+    return ts ? ts : GDK_CURRENT_TIME;
+}
+
+static void reloaded_present_window(GtkWidget *w)
+{
+    gtk_window_deiconify(GTK_WINDOW(w));
+    gtk_window_present_with_time(GTK_WINDOW(w), reloaded_present_time());
 }
 
 void reloaded_launcher(void)
@@ -12960,8 +13203,14 @@ void reloaded_show_launcher(void)
 
     GtkWidget *veejay_connection = glade_xml_get_widget_(info->main_window,"veejay_connection" );
     GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
-    gtk_window_set_transient_for(GTK_WINDOW(veejay_connection),GTK_WINDOW(mainw));
+
+    if(mainw && gtk_widget_get_visible(mainw))
+        gtk_window_set_transient_for(GTK_WINDOW(veejay_connection),GTK_WINDOW(mainw));
+    else
+        gtk_window_set_transient_for(GTK_WINDOW(veejay_connection),NULL);
+
     gtk_widget_show(veejay_connection);
+    reloaded_present_window(veejay_connection);
 }
 
 void reloaded_schedule_restart(void)
@@ -12969,7 +13218,7 @@ void reloaded_schedule_restart(void)
     info->watch.state = STATE_STOPPED;
 }
 
-void reloaded_restart(void)
+static void reloaded_restart_common(gboolean wipe)
 {
     GtkWidget *mw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
 
@@ -12977,9 +13226,15 @@ void reloaded_restart(void)
         vj_gui_disable();
     gtk_widget_hide( mw );
 
-    vj_gui_wipe();
+    if(wipe)
+        vj_gui_wipe();
 
     reloaded_show_launcher();
+}
+
+void reloaded_restart(void)
+{
+    reloaded_restart_common(TRUE);
 }
 
 gboolean    is_alive( int *do_sync )
@@ -12989,8 +13244,8 @@ gboolean    is_alive( int *do_sync )
 
     if( gui->watch.state == STATE_STOPPED )
     {
-       vj_gui_disconnect(TRUE);
-       reloaded_restart();
+       vj_gui_disconnect(FALSE);
+       reloaded_restart_common(FALSE);
        gui->watch.state = STATE_WAIT_FOR_USER;
        return TRUE;
     }
@@ -13003,8 +13258,7 @@ gboolean    is_alive( int *do_sync )
 
     if( gui->watch.state == STATE_RECONNECT )
     {
-        vj_gui_disconnect(TRUE);
-        vj_gui_wipe();
+        vj_gui_disconnect(FALSE);
         gui->watch.state = STATE_CONNECT;
         return TRUE;
     }
@@ -13039,8 +13293,8 @@ gboolean    is_alive( int *do_sync )
 
 
         if( multrack_audoadd( info->mt, remote, port ) == -1 ) {
-            vj_gui_disconnect(TRUE);
-            reloaded_restart();
+            vj_gui_disconnect(FALSE);
+            reloaded_restart_common(FALSE);
             return TRUE;
         }
 
@@ -13393,12 +13647,22 @@ static gboolean on_sequencerslot_activated_by_mouse(GtkWidget *widget,
     if(event->type == GDK_BUTTON_PRESS)
     {
         int id = info->status_tokens[CURRENT_ID];
-        int type=info->status_tokens[STREAM_TYPE];
+        int pm = info->status_tokens[PLAY_MODE];
+        int type = (pm == MODE_STREAM ? info->status_tokens[STREAM_TYPE] : MODE_SAMPLE);
 
         if( info->selection_slot ) {
             id = info->selection_slot->sample_id;
             type=info->selection_slot->sample_type;
         }
+
+        if(id <= 0)
+            return FALSE;
+
+        if(info->sequencer_view && info->sequencer_view->gui_slot &&
+           info->sequencer_view->gui_slot[slot_nr] &&
+           info->sequencer_view->gui_slot[slot_nr]->sample_id > 0)
+            return FALSE;
+
         multi_vims( VIMS_SEQUENCE_ADD, "%d %d %d", slot_nr, id,type );
         sequencer_slot_set_content(info->sequencer_view->gui_slot[slot_nr], id, type);
         info->uc.reload_hint[HINT_SEQ_ACT] = 1;
@@ -13453,69 +13717,545 @@ static gboolean on_cacheslot_activated_by_mouse (GtkWidget *widget, GdkEventButt
     return FALSE;
 }
 
+static void on_sequence_bank_button_clicked(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    int bank = GPOINTER_TO_INT(user_data);
+
+    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
+        return;
+
+    sequence_ui_request_bank(bank);
+    multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
+    if(info->sequence_bank_view)
+        gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+static void on_sequence_bank_refresh_clicked(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+    info->uc.reload_hint_checksums[HINT_SEQ_ACT] = -1;
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+static void on_sequence_bank_clear_clicked(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+    int bank = sequence_ui_target_bank();
+
+    if(!sequence_ui_confirm_clear_bank(bank))
+        return;
+
+    if(bank != sequence_ui_active_bank()) {
+        sequence_ui_request_bank(bank);
+        multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
+    }
+
+    multi_vims(VIMS_SEQUENCE_DEL, "-1");
+    if(info->sequence_bank_view) {
+        gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+        gvr_sequence_bank_view_clear_bank(info->sequence_bank_view, bank);
+    }
+    info->sequence_playing = -1;
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+static void on_sequence_bank_view_bank_selected(GtkWidget *widget, gint bank, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
+        return;
+
+    sequence_ui_request_bank(bank);
+    multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
+    if(info->sequence_bank_view)
+        gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+static void on_sequence_bank_view_slot_assign(GtkWidget *widget, gint bank, gint slot, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    if(bank != sequence_ui_active_bank()) {
+        sequence_ui_request_bank(bank);
+        multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
+        if(info->sequence_bank_view)
+            gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+    }
+
+    int id = info->status_tokens[CURRENT_ID];
+    int pm = info->status_tokens[PLAY_MODE];
+    int type = (pm == MODE_STREAM ? info->status_tokens[STREAM_TYPE] : MODE_SAMPLE);
+
+    if(info->selection_slot) {
+        id = info->selection_slot->sample_id;
+        type = info->selection_slot->sample_type;
+    }
+
+    if(id <= 0)
+        return;
+
+    int old_id = 0;
+    int old_type = 0;
+    if(info->sequence_bank_view &&
+       gvr_sequence_bank_view_get_slot(info->sequence_bank_view, bank, slot, &old_id, &old_type) &&
+       old_id > 0)
+        return;
+
+    multi_vims(VIMS_SEQUENCE_ADD, "%d %d %d", slot, id, type);
+    if(info->sequence_bank_view)
+        gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, slot, id, type);
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+static void on_sequence_bank_view_slot_delete(GtkWidget *widget, gint bank, gint slot, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    if(bank != sequence_ui_active_bank()) {
+        sequence_ui_request_bank(bank);
+        multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
+        if(info->sequence_bank_view)
+            gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+    }
+
+    multi_vims(VIMS_SEQUENCE_DEL, "%d", slot);
+    if(info->sequence_bank_view)
+        gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, slot, -1, -1);
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+static void sequence_bank_view_send_slot_update(int slot, int sample_id, int sample_type)
+{
+    if(sample_id > 0)
+        multi_vims(VIMS_SEQUENCE_ADD, "%d %d %d", slot, sample_id, sample_type);
+    else
+        multi_vims(VIMS_SEQUENCE_DEL, "%d", slot);
+}
+
+static void on_sequence_bank_view_slot_reorder(GtkWidget *widget, gint bank, gint from_slot, gint to_slot, gpointer user_data)
+{
+    (void)user_data;
+
+    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS ||
+       from_slot < 0 || from_slot >= MAX_SEQUENCES ||
+       to_slot < 0 || to_slot >= MAX_SEQUENCES ||
+       from_slot == to_slot)
+        return;
+
+    if(bank != sequence_ui_active_bank()) {
+        sequence_ui_request_bank(bank);
+        multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
+        if(info->sequence_bank_view)
+            gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+        info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+        return;
+    }
+
+    int from_id = -1;
+    int from_type = -1;
+    int to_id = -1;
+    int to_type = -1;
+
+    if(!gvr_sequence_bank_view_get_slot(widget, bank, from_slot, &from_id, &from_type))
+        return;
+
+    if(!gvr_sequence_bank_view_get_slot(widget, bank, to_slot, &to_id, &to_type))
+        return;
+
+    if(from_id <= 0)
+        return;
+
+    sequence_bank_view_send_slot_update(from_slot, to_id, to_type);
+    sequence_bank_view_send_slot_update(to_slot, from_id, from_type);
+
+    if(info->sequence_bank_view) {
+        gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, from_slot, to_id, to_type);
+        gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, to_slot, from_id, from_type);
+    }
+
+    vj_msg(VEEJAY_MSG_INFO,
+           "Swapped sequence bank %d slots %d and %d",
+           bank + 1,
+           from_slot + 1,
+           to_slot + 1);
+
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+static void sequence_bank_view_copy_bank_to_target(int src_bank, int dst_bank)
+{
+    if(src_bank < 0 || src_bank >= VJ_SEQUENCE_BANKS ||
+       dst_bank < 0 || dst_bank >= VJ_SEQUENCE_BANKS)
+        return;
+
+    if(src_bank == dst_bank) {
+        vj_msg(VEEJAY_MSG_INFO,
+               "Sequence bank copy %d -> %d ignored",
+               src_bank + 1,
+               dst_bank + 1);
+        return;
+    }
+
+    multi_vims(VIMS_SEQUENCE_COPY, "%d %d", src_bank, dst_bank);
+
+    if(info->sequence_bank_view)
+        gvr_sequence_bank_view_copy_bank(info->sequence_bank_view, src_bank, dst_bank);
+
+    vj_msg(VEEJAY_MSG_INFO,
+           "Copied sequence bank %d to bank %d",
+           src_bank + 1,
+           dst_bank + 1);
+
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+static void on_sequence_bank_copy_clicked(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    int bank = sequence_ui_target_bank();
+
+    if(info->sequence_bank_view)
+        gvr_sequence_bank_view_set_bank_clipboard(info->sequence_bank_view, bank);
+
+    vj_msg(VEEJAY_MSG_INFO, "Copied sequence bank %d", bank + 1);
+}
+
+static void on_sequence_bank_paste_clicked(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    int src = -1;
+    int dst = sequence_ui_target_bank();
+
+    if(!info->sequence_bank_view || !gvr_sequence_bank_view_get_bank_clipboard(info->sequence_bank_view, &src)) {
+        vj_msg(VEEJAY_MSG_INFO, "No sequence bank copied");
+        return;
+    }
+
+    sequence_bank_view_copy_bank_to_target(src, dst);
+}
+
+static void on_sequence_bank_view_bank_paste(GtkWidget *widget, gint src_bank, gint dst_bank, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+    sequence_bank_view_copy_bank_to_target(src_bank, dst_bank);
+}
+
+static void on_sequence_bank_view_bank_clear(GtkWidget *widget, gint bank, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
+        return;
+
+    if(!sequence_ui_confirm_clear_bank(bank))
+        return;
+
+    sequence_ui_request_bank(bank);
+
+    if(bank != sequence_ui_active_bank())
+        multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
+
+    multi_vims(VIMS_SEQUENCE_DEL, "-1");
+
+    if(info->sequence_bank_view) {
+        gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+        gvr_sequence_bank_view_clear_bank(info->sequence_bank_view, bank);
+    }
+
+    info->sequence_playing = -1;
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+static void on_sequence_bank_view_slot_paste(GtkWidget *widget, gint bank, gint slot, gint sample_id, gint sample_type, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS ||
+       slot < 0 || slot >= MAX_SEQUENCES ||
+       sample_id <= 0)
+        return;
+
+    if(bank != sequence_ui_active_bank()) {
+        sequence_ui_request_bank(bank);
+        multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
+        if(info->sequence_bank_view)
+            gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+    }
+
+    sequence_bank_view_send_slot_update(slot, sample_id, sample_type);
+
+    if(info->sequence_bank_view)
+        gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, slot, sample_id, sample_type);
+
+    vj_msg(VEEJAY_MSG_INFO,
+           "Pasted sequence entry to bank %d slot %d",
+           bank + 1,
+           slot + 1);
+
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+static void on_sequence_bank_view_refresh(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+    info->uc.reload_hint_checksums[HINT_SEQ_ACT] = -1;
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+static gboolean on_sequence_bank_view_query_tooltip(GtkWidget *widget,
+                                                    gint x,
+                                                    gint y,
+                                                    gboolean keyboard_mode,
+                                                    GtkTooltip *tooltip,
+                                                    gpointer user_data)
+{
+    (void)keyboard_mode;
+    (void)user_data;
+
+    int bank = -1;
+    int slot = -1;
+    gboolean header = FALSE;
+
+    if(!gvr_sequence_bank_view_get_cell_at(widget, x, y, &bank, &slot, &header))
+        return FALSE;
+
+    if(header || bank < 0 || slot < 0)
+        return FALSE;
+
+    int sample_id = 0;
+    int sample_type = 0;
+
+    if(!gvr_sequence_bank_view_get_slot(widget, bank, slot, &sample_id, &sample_type))
+        return FALSE;
+
+    if(sample_id <= 0) {
+        gtk_tooltip_set_text(tooltip,
+            "Empty sequence slot\n"
+            "Left click / Enter: add current sample/stream\n"
+            "Cursor keys: move selection\n"
+            "Ctrl+cursor: add cells in arrow direction\n"
+            "Mouse drag: select cells\n"
+            "Ctrl+mouse drag: add/remove selected cells\n"
+            "Alt+1..4: select/target bank\n"
+            "Delete: clear selected filled slot(s)\n"
+            "Ctrl+C / Ctrl+X / Ctrl+V: copy/cut/paste selected slot(s)\n"
+            "Ctrl+Shift+C / Ctrl+Shift+V: copy/paste whole bank\n"
+            "Alt+drag: swap filled slots\n"
+            "Right click: actions menu, including copy to bank");
+        return TRUE;
+    }
+
+    sample_slot_t *source_slot = find_slot_by_sample(sample_id, sample_type);
+    const char *title = (source_slot && source_slot->title && source_slot->title[0])
+        ? source_slot->title
+        : "not in sample bank";
+
+    char text[512];
+
+    if(sample_type == MODE_SAMPLE) {
+        const char *length = (source_slot && source_slot->timecode && source_slot->timecode[0])
+            ? source_slot->timecode
+            : "unknown";
+
+        snprintf(text, sizeof(text),
+                 "Sample %d\n"
+                 "Title: %s\n"
+                 "Length: %s\n"
+                 "Sequence: bank %d, slot %d",
+                 sample_id,
+                 title,
+                 length,
+                 bank + 1,
+                 slot + 1);
+    }
+    else {
+        const char *stream_type = (source_slot && source_slot->timecode && source_slot->timecode[0])
+            ? source_slot->timecode
+            : get_stream_prefix(sample_type);
+
+        snprintf(text, sizeof(text),
+                 "Stream %d\n"
+                 "Title: %s\n"
+                 "Type: %s (%d)\n"
+                 "Sequence: bank %d, slot %d",
+                 sample_id,
+                 title,
+                 stream_type,
+                 sample_type,
+                 bank + 1,
+                 slot + 1);
+    }
+
+    gtk_tooltip_set_text(tooltip, text);
+    return TRUE;
+}
+
+static GtkWidget *sequence_toolbar_pack_existing(GtkWidget *toolbar,
+                                                   const char *name,
+                                                   gboolean expand,
+                                                   gboolean fill,
+                                                   guint padding)
+{
+    GtkWidget *widget = glade_xml_get_widget_(info->main_window, name);
+
+    if(!widget)
+        return NULL;
+
+    GtkWidget *parent = gtk_widget_get_parent(widget);
+
+    if(parent) {
+        g_object_ref(widget);
+        gtk_container_remove(GTK_CONTAINER(parent), widget);
+        gtk_box_pack_start(GTK_BOX(toolbar), widget, expand, fill, padding);
+        g_object_unref(widget);
+    }
+    else {
+        gtk_box_pack_start(GTK_BOX(toolbar), widget, expand, fill, padding);
+    }
+
+    gtk_widget_show(widget);
+    return widget;
+}
+
+static void sequence_toolbar_add_separator(GtkWidget *toolbar)
+{
+    GtkWidget *sep = gtk_separator_new(GTK_ORIENTATION_VERTICAL);
+    gtk_box_pack_start(GTK_BOX(toolbar), sep, FALSE, FALSE, 4);
+    gtk_widget_show(sep);
+}
+
+static void sequence_toolbar_hide_legacy_row(void)
+{
+    const char *names[] = { "hbox894", "hbox833", "frame302" };
+
+    for(unsigned int i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+        GtkWidget *widget = glade_xml_get_widget_(info->main_window, names[i]);
+
+        if(widget) {
+            gtk_widget_set_no_show_all(widget, TRUE);
+            gtk_widget_hide(widget);
+        }
+    }
+}
+
 static void create_sequencer_slots(int nx, int ny)
 {
     GtkWidget *vbox = glade_xml_get_widget_ (info->main_window, "SampleSequencerBox");
+    GtkWidget *outer;
+    GtkWidget *toolbar;
+    GtkWidget *button;
+
     info->sample_sequencer = gtk_frame_new(NULL);
     add_class(info->sample_sequencer, "sequencer");
-    gtk_box_pack_start( GTK_BOX( vbox ), GTK_WIDGET(info->sample_sequencer), TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), GTK_WIDGET(info->sample_sequencer), TRUE, TRUE, 0);
     gtk_widget_show(info->sample_sequencer);
 
-    info->sequencer_view = (sequence_envelope*) vj_calloc(sizeof(sequence_envelope) );
-    info->sequencer_view->gui_slot = (sequence_gui_slot_t**) vj_calloc(sizeof(sequence_gui_slot_t*) * ( nx * ny + 1 ) );
+    outer = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
+    gtk_container_add(GTK_CONTAINER(info->sample_sequencer), outer);
+    gtk_widget_show(outer);
 
-    GtkWidget *table = gtk_table_new( nx, ny, TRUE );
+    toolbar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
+    gtk_box_pack_start(GTK_BOX(outer), toolbar, FALSE, FALSE, 2);
+    gtk_widget_show(toolbar);
 
-    gtk_container_add( GTK_CONTAINER(info->sample_sequencer), table );
-    gtk_widget_show(table);
+    sequence_toolbar_hide_legacy_row();
+
+    button = sequence_toolbar_pack_existing(toolbar, "seqactive", FALSE, FALSE, 0);
+    if(button) {
+        gtk_button_set_label(GTK_BUTTON(button), "Play grid");
+        gtk_widget_set_tooltip_text(button, "Play and repeat the selected sequence bank");
+    }
+
+    sequence_toolbar_add_separator(toolbar);
+
+    button = sequence_toolbar_pack_existing(toolbar, "rec_seq_start", FALSE, FALSE, 0);
+    if(button)
+        gtk_widget_set_tooltip_text(button, "Play and record this sequence to a new sample");
+
+    button = sequence_toolbar_pack_existing(toolbar, "seq_rec_stop", FALSE, FALSE, 0);
+    if(button)
+        gtk_widget_set_tooltip_text(button, "Stop recording from this sequence");
+
+    button = sequence_toolbar_pack_existing(toolbar, "rec_seq_progress", TRUE, TRUE, 4);
+    if(button) {
+        gtk_widget_set_size_request(button, 120, -1);
+        gtk_widget_set_tooltip_text(button, "Sequence recording progress");
+    }
+
+    sequence_toolbar_add_separator(toolbar);
+
+    for(int bank = 0; bank < VJ_SEQUENCE_BANKS; bank++) {
+        char label[16];
+        snprintf(label, sizeof(label), "Bank %d", bank + 1);
+        button = gtk_button_new_with_label(label);
+        gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
+        g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_button_clicked), GINT_TO_POINTER(bank));
+        gtk_widget_set_tooltip_text(button, "Select sequence bank");
+        gtk_widget_show(button);
+    }
+
+    button = gtk_button_new_with_label("Clear Bank");
+    gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
+    g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_clear_clicked), NULL);
+    gtk_widget_set_tooltip_text(button, "Clear the selected/active sequence bank");
+    gtk_widget_show(button);
+
+    button = sequence_toolbar_pack_existing(toolbar, "button_seq_clearall", FALSE, FALSE, 0);
+    if(button)
+        gtk_widget_set_tooltip_text(button, "Clear all sequence banks");
+
+    button = gtk_button_new_with_label("Copy Bank");
+    gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
+    g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_copy_clicked), NULL);
+    gtk_widget_set_tooltip_text(button, "Copy the selected sequence bank");
+    gtk_widget_show(button);
+
+    button = gtk_button_new_with_label("Paste Bank");
+    gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
+    g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_paste_clicked), NULL);
+    gtk_widget_set_tooltip_text(button, "Paste copied sequence bank into the selected bank");
+    gtk_widget_show(button);
+
+    button = gtk_button_new_with_label("Refresh");
+    gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
+    g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_refresh_clicked), NULL);
+    gtk_widget_set_tooltip_text(button, "Refresh all sequence banks");
+    gtk_widget_show(button);
+
+    info->sequence_bank_view = gvr_sequence_bank_view_new();
+    gtk_box_pack_start(GTK_BOX(outer), info->sequence_bank_view, TRUE, TRUE, 2);
+    g_signal_connect(G_OBJECT(info->sequence_bank_view), "bank-selected", G_CALLBACK(on_sequence_bank_view_bank_selected), NULL);
+    g_signal_connect(G_OBJECT(info->sequence_bank_view), "slot-assign-requested", G_CALLBACK(on_sequence_bank_view_slot_assign), NULL);
+    g_signal_connect(G_OBJECT(info->sequence_bank_view), "slot-delete-requested", G_CALLBACK(on_sequence_bank_view_slot_delete), NULL);
+    g_signal_connect(G_OBJECT(info->sequence_bank_view), "slot-reorder-requested", G_CALLBACK(on_sequence_bank_view_slot_reorder), NULL);
+    g_signal_connect(G_OBJECT(info->sequence_bank_view), "slot-paste-requested", G_CALLBACK(on_sequence_bank_view_slot_paste), NULL);
+    g_signal_connect(G_OBJECT(info->sequence_bank_view), "bank-paste-requested", G_CALLBACK(on_sequence_bank_view_bank_paste), NULL);
+    g_signal_connect(G_OBJECT(info->sequence_bank_view), "bank-clear-requested", G_CALLBACK(on_sequence_bank_view_bank_clear), NULL);
+    g_signal_connect(G_OBJECT(info->sequence_bank_view), "refresh-requested", G_CALLBACK(on_sequence_bank_view_refresh), NULL);
+    g_signal_connect(G_OBJECT(info->sequence_bank_view), "query-tooltip", G_CALLBACK(on_sequence_bank_view_query_tooltip), NULL);
+    gtk_widget_show(info->sequence_bank_view);
 
     info->sequencer_col = nx;
     info->sequencer_row = ny;
-
-    gint col=0;
-    gint row=0;
-    gint k = 0;
-    for( col = 0; col < ny; col ++ )
-    for( row = 0; row < nx; row ++ )
-    {
-        sequence_gui_slot_t *gui_slot = (sequence_gui_slot_t*)vj_calloc(sizeof(sequence_gui_slot_t));
-        info->sequencer_view->gui_slot[k] = gui_slot;
-
-        gui_slot->event_box = gtk_event_box_new();
-        gtk_event_box_set_visible_window(GTK_EVENT_BOX(gui_slot->event_box), TRUE);
-        gtk_widget_set_can_focus(gui_slot->event_box, TRUE);
-
-        g_signal_connect( G_OBJECT(gui_slot->event_box),
-            "button_press_event",
-            G_CALLBACK(on_sequencerslot_activated_by_mouse),
-            (gpointer) castIntToGpointer(k)
-            );
-        gtk_widget_show(GTK_WIDGET(gui_slot->event_box));
-
-        gui_slot->frame = gtk_frame_new(NULL);
-        gtk_container_set_border_width (GTK_CONTAINER(gui_slot->frame),0);
-        gtk_frame_set_shadow_type(GTK_FRAME( gui_slot->frame), GTK_SHADOW_IN );
-        gtk_widget_show(GTK_WIDGET(gui_slot->frame));
-        gtk_container_add (GTK_CONTAINER (gui_slot->event_box), gui_slot->frame);
-        add_class(gui_slot->frame, "sequencer_slot");
-
-
-        gui_slot->main_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL,0);
-        gtk_container_add (GTK_CONTAINER (gui_slot->frame), gui_slot->main_vbox);
-        gtk_widget_show( GTK_WIDGET(gui_slot->main_vbox) );
-
-        gui_slot->image = gtk_label_new(NULL);
-        gtk_label_set_justify(GTK_LABEL(gui_slot->image), GTK_JUSTIFY_CENTER);
-        gtk_widget_set_halign(gui_slot->image, GTK_ALIGN_CENTER);
-        gtk_widget_set_valign(gui_slot->image, GTK_ALIGN_CENTER);
-        add_class(gui_slot->image, "sequencer-slot-label");
-        gtk_box_pack_start (GTK_BOX (gui_slot->main_vbox), GTK_WIDGET(gui_slot->image), TRUE, TRUE, 0);
-        gtk_widget_show( gui_slot->image);
-        gtk_table_attach_defaults ( GTK_TABLE(table), gui_slot->event_box, row, row+1, col, col+1);
-        k++;
-    }
-
-
+    info->sequence_playing = -1;
+    info->current_sequence_slot = -1;
 }
 
 static void create_ref_slots(int envelope_size)

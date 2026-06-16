@@ -1,20 +1,5 @@
 /* Gveejay Reloaded - graphical interface for VeeJay
- * 	     (C) 2002-2005 Niels Elburg <nwelburg@gmail.com> 
- *
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *      (C) 2002-2005 Niels Elburg <nwelburg@gmail.com>
  */
 #ifndef GVRCOMMON_H
 #define GVRCOMMON_H
@@ -58,24 +43,24 @@
 #define MESSAGE_FORWARDING 38
 #define AUDIO_BEAT_ENABLED      39
 #define AUDIO_BEAT_OPEN         40
-#define AUDIO_BEAT_LEVEL        41  /* 0..100 */
-#define AUDIO_BEAT_TRANSIENT    42  /* 0..100 */
+#define AUDIO_BEAT_LEVEL        41
+#define AUDIO_BEAT_TRANSIENT    42
 #define AUDIO_BEAT_HITS         43
 
-#define AUDIO_BEAT_ENVELOPE     44  /* 0..100 */
-#define AUDIO_BEAT_FLUX         45  /* 0..100 */
-#define AUDIO_BEAT_BASS         46  /* 0..100 */
-#define AUDIO_BEAT_MID          47  /* 0..100 */
-#define AUDIO_BEAT_HIGH         48  /* 0..100 */
-#define AUDIO_BEAT_PULSE        49  /* 0..100 */
-#define AUDIO_BEAT_GATE         50  /* 0..100 */
-#define AUDIO_BEAT_BPM_X10      51  /* BPM * 10 */
+#define AUDIO_BEAT_ENVELOPE     44
+#define AUDIO_BEAT_FLUX         45
+#define AUDIO_BEAT_BASS         46
+#define AUDIO_BEAT_MID          47
+#define AUDIO_BEAT_HIGH         48
+#define AUDIO_BEAT_PULSE        49
+#define AUDIO_BEAT_GATE         50
+#define AUDIO_BEAT_BPM_X10      51
 #define AUDIO_BEAT_AGE_MS       52
 #define AUDIO_BEAT_SAMPLE_RATE  53
 #define AUDIO_BEAT_HIT_SEQ      54
 #define AUDIO_MUTED             55
 #define RECORD_AUDIO_SOURCE     56
-#define AUDIO_BEAT_ACTION       57  /* 0 none, 1 freeze, 2 auto FX, 3 freeze+auto FX, 4 break beat */
+#define AUDIO_BEAT_ACTION       57
 
 #define AUDIO_SYNC_ENABLED       58
 #define AUDIO_SYNC_OPEN          59
@@ -91,19 +76,18 @@
 #define AUDIO_SYNC_CONFIDENCE    69
 #define AUDIO_SYNC_BRIDGE_ACTIVE 70
 #define AUDIO_SYNC_RATIO_X1000   71
-#define AUDIO_SYNC_CORRECTION    72  /* actual applied bridge pull, x100; 100 == 1.00 */
-#define AUDIO_SYNC_TARGET_MODE   73  /* 0 manual, 1 current clip */
-#define AUDIO_SYNC_TARGET_BPM_X10 74 /* target BPM * 10 */
-#define AUDIO_SYNC_TARGET_CONFIDENCE 75 /* 0..100 */
-#define AUDIO_SYNC_MAX_CORRECTION 76 /* configured max correction %, 0..25 */
-#define AUDIO_SYNC_BRIDGE_STATE  77  /* 0 idle, 1 wait source, 2 wait target, 3 locked, 4 hold, 5 fallback */
-#define AUDIO_SYNC_TRACK_ALIGN_LOCKED         78 /* 0/1 */
-#define AUDIO_SYNC_TRACK_ALIGN_OFFSET_MS      79 /* signed ms: positive means video/reference is late */
-#define AUDIO_SYNC_TRACK_ALIGN_CONFIDENCE     80 /* 0..100 */
-#define AUDIO_SYNC_TRACK_ALIGN_CORRECTION_PPM 81 /* signed ppm video-rate trim */
-#define AUDIO_SYNC_TRACK_ALIGN_STATE          82 /* 0 idle, 1 wait source, 2 wait target, 3 searching, 4 locked, 5 hold, 6 fallback */
+#define AUDIO_SYNC_CORRECTION    72
+#define AUDIO_SYNC_TARGET_MODE   73
+#define AUDIO_SYNC_TARGET_BPM_X10 74
+#define AUDIO_SYNC_TARGET_CONFIDENCE 75
+#define AUDIO_SYNC_MAX_CORRECTION 76
+#define AUDIO_SYNC_BRIDGE_STATE  77
+#define AUDIO_SYNC_TRACK_ALIGN_LOCKED         78
+#define AUDIO_SYNC_TRACK_ALIGN_OFFSET_MS      79
+#define AUDIO_SYNC_TRACK_ALIGN_CONFIDENCE     80
+#define AUDIO_SYNC_TRACK_ALIGN_CORRECTION_PPM 81
+#define AUDIO_SYNC_TRACK_ALIGN_STATE          82
 
-/* Selected chain-entry info pushed by backend status, replacing VIMS_CHAIN_GET_ENTRY polling. */
 #define STATUS_CHAIN_ENTRY_FXID                 83
 #define STATUS_CHAIN_ENTRY_ISVIDEO              84
 #define STATUS_CHAIN_ENTRY_NUM_PARAMETERS       85
@@ -135,6 +119,16 @@
 #define STATUS_CHAIN_ENTRY_LAST                 111
 #define STATUS_CHAIN_ENTRY_TOKENS \
     (STATUS_CHAIN_ENTRY_LAST - STATUS_CHAIN_ENTRY_FXID)
+
+#define STATUS_SEQUENCE_ACTIVE_BANK       111
+#define STATUS_SEQUENCE_REVISION          112
+#define STATUS_SEQUENCE_SIZE              113
+#define STATUS_SEQUENCE_BANK0_REVISION    114
+#define STATUS_SEQUENCE_BANK1_REVISION    115
+#define STATUS_SEQUENCE_BANK2_REVISION    116
+#define STATUS_SEQUENCE_BANK3_REVISION    117
+#define STATUS_SEQUENCE_LAST              118
+#define STATUS_SEQUENCE_UPDATED           STATUS_SEQUENCE_REVISION
 
 #define SAMPLE_TRANSITION_ACTIVE  32
 #define SAMPLE_TRANSITION_LENGTH  33

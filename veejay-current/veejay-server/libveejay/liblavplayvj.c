@@ -1616,6 +1616,25 @@ static inline void safe_join(pthread_t *t, const char *name)
     }
 }
 
+static void veejay_request_stop_fast(veejay_t *info)
+{
+    if (!info || !info->settings)
+        return;
+
+    video_playback_setup *settings = (video_playback_setup*) info->settings;
+
+    atomic_store_int(&settings->state, LAVPLAY_STATE_STOP);
+    atomic_store_int(&settings->first_audio_frame_ready, 1);
+    atomic_store_int(&info->audio_running, 0);
+
+#ifdef HAVE_JACK
+    atomic_store_int(&settings->audio_beat.stop_request, 1);
+    atomic_store_int(&settings->audio_beat.enabled, 0);
+    atomic_store_int(&settings->audio_sync.stop_request, 1);
+    atomic_store_int(&settings->audio_sync.enabled, 0);
+#endif
+}
+
 static void veejay_wake_playback_waiters(veejay_t *info)
 {
     if (!info || !info->settings)
@@ -1623,13 +1642,7 @@ static void veejay_wake_playback_waiters(veejay_t *info)
 
     video_playback_setup *settings = (video_playback_setup*) info->settings;
 
-    atomic_store_int(&settings->first_audio_frame_ready, 1);
-    atomic_store_int(&info->audio_running, 0);
-
-#ifdef HAVE_JACK
-    vj_audio_beat_request_stop(&settings->audio_beat);
-    vj_audio_sync_request_stop(&settings->audio_sync);
-#endif
+    veejay_request_stop_fast(info);
 
     pthread_mutex_lock(&settings->mutex);
     pthread_cond_broadcast(&settings->producer_wait_cv);
@@ -1651,15 +1664,15 @@ void veejay_busy(veejay_t * info)
 	video_playback_setup *settings = (video_playback_setup*)(info->settings);
 
     veejay_msg(VEEJAY_MSG_DEBUG, "Waiting for threads to finish...");
-    veejay_change_state(info, LAVPLAY_STATE_STOP);
     veejay_wake_playback_waiters(info);
 
     safe_join(&settings->renderer_thread, "Renderer");
     safe_join(&settings->producer_thread, "Producer");
     safe_join(&settings->audio_playback_thread, "Audio playback");
 #ifdef HAVE_JACK
-    safe_join(&settings->audio_sync_thread, "Audio sync");
     safe_join(&settings->audio_beat_thread, "Audio beat");
+    safe_join(&settings->audio_sync_thread, "Audio sync");
+    vj_perform_audio_stop(info);
 #endif
 
     veejay_msg(VEEJAY_MSG_INFO, "Playback engine terminated.");
@@ -1667,7 +1680,6 @@ void veejay_busy(veejay_t * info)
 
 void veejay_quit(veejay_t * info)
 {
-    veejay_change_state(info, LAVPLAY_STATE_STOP);
     veejay_wake_playback_waiters(info);
 }
 
@@ -2892,6 +2904,26 @@ static char *veejay_pipe_append_chain_entry_status(veejay_t *info, char *ptr)
     return ptr;
 }
 
+static char *veejay_pipe_append_sequence_status(veejay_t *info, char *ptr)
+{
+    sequencer_t *seq = info->seq;
+
+    if(!seq) {
+        for(int i = 0; i < VJ_SEQUENCE_STATUS_TOKENS; i++)
+            ptr = vj_sprintf(ptr, 0);
+        return ptr;
+    }
+
+    ptr = vj_sprintf(ptr, seq->active_bank);
+    ptr = vj_sprintf(ptr, (int)seq->revision);
+    ptr = vj_sprintf(ptr, seq->size);
+
+    for(int i = 0; i < VJ_SEQUENCE_BANKS; i++)
+        ptr = vj_sprintf(ptr, (int)seq->banks[i].revision);
+
+    return ptr;
+}
+
 static void veejay_pipe_write_status(veejay_t * info)
 {
     video_playback_setup *settings = (video_playback_setup *) info->settings;
@@ -3036,7 +3068,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 
     char *ptr = info->status_what + base_len;
     const size_t status_tail_room =
-        (size_t)(VJ_AUDIO_STATUS_TOKENS + VJ_CHAIN_ENTRY_STATUS_TOKENS) *
+        (size_t)(VJ_AUDIO_STATUS_TOKENS + VJ_CHAIN_ENTRY_STATUS_TOKENS + VJ_SEQUENCE_STATUS_TOKENS) *
         (size_t)VJ_INT_FIELD_MAX;
     const int base_tokens = veejay_pipe_status_token_count(info->status_what);
     static int status_packet_warned = 0;
@@ -3057,6 +3089,7 @@ static void veejay_pipe_write_status(veejay_t * info)
     ptr = veejay_pipe_append_audio_beat_status(info, ptr);
     ptr = veejay_pipe_append_audio_sync_status(info, ptr);
     ptr = veejay_pipe_append_chain_entry_status(info, ptr);
+    ptr = veejay_pipe_append_sequence_status(info, ptr);
 
     *ptr = '\0';
 
@@ -3253,11 +3286,7 @@ void veejay_handle_signal(int sig, siginfo_t *si, void *unused)
     switch (sig) {
         case SIGINT:
         case SIGQUIT:
-            veejay_change_state(info, LAVPLAY_STATE_STOP);
-            if (info && info->settings) {
-                atomic_store_int(&info->audio_running, 0);
-                atomic_store_int(&info->settings->first_audio_frame_ready, 1);
-            }
+            veejay_request_stop_fast(info);
             break;
 
         case SIGSEGV:
@@ -3864,17 +3893,19 @@ int veejay_close(veejay_t *info)
     video_playback_setup *settings = (video_playback_setup *)info->settings;
     int success = 1;
 
-    veejay_change_state_save(info, LAVPLAY_STATE_STOP);
     veejay_wake_playback_waiters(info);
 
     safe_join(&settings->renderer_thread, "Renderer");
     safe_join(&settings->producer_thread, "Producer");
     safe_join(&settings->audio_playback_thread, "Audio playback");
 #ifdef HAVE_JACK
-    safe_join(&settings->audio_sync_thread, "Audio sync");
     safe_join(&settings->audio_beat_thread, "Audio beat");
+    safe_join(&settings->audio_sync_thread, "Audio sync");
+    vj_perform_audio_stop(info);
     vj_audio_sync_free(&settings->audio_sync);
 #endif
+
+    veejay_change_state_save(info, LAVPLAY_STATE_STOP);
 
     pthread_mutex_destroy(&settings->mutex);
     pthread_mutex_destroy(&settings->control_mutex);

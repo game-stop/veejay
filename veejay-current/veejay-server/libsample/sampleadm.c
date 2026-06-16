@@ -3030,41 +3030,108 @@ static void LoadCurrentPlaying( xmlDocPtr doc, xmlNodePtr cur , int *id, int *mo
 
 }
 
+static int sampleadm_sequence_bank_valid(int bank)
+{
+    return bank >= 0 && bank < VJ_SEQUENCE_BANKS;
+}
+
+static int sampleadm_sequence_count_slots(seq_sample_t *samples)
+{
+    int count = 0;
+
+    for(int i = 0; i < MAX_SEQUENCES; i++)
+        if(samples[i].sample_id > 0)
+            count++;
+
+    return count;
+}
+
+static void sampleadm_sequence_store_active_bank(sequencer_t *s)
+{
+    int bank = s->active_bank;
+
+    if(!sampleadm_sequence_bank_valid(bank))
+        bank = 0;
+
+    veejay_memcpy(s->banks[bank].samples, s->samples, sizeof(seq_sample_t) * MAX_SEQUENCES);
+    s->banks[bank].size = sampleadm_sequence_count_slots(s->samples);
+    s->banks[bank].current = s->current;
+
+    if(s->banks[bank].revision == 0 && s->banks[bank].size > 0)
+        s->banks[bank].revision = 1;
+
+    s->size = s->banks[bank].size;
+}
+
+static void sampleadm_sequence_load_bank(sequencer_t *s, int bank)
+{
+    if(!sampleadm_sequence_bank_valid(bank))
+        bank = 0;
+
+    s->active_bank = bank;
+    veejay_memcpy(s->samples, s->banks[bank].samples, sizeof(seq_sample_t) * MAX_SEQUENCES);
+    s->size = sampleadm_sequence_count_slots(s->samples);
+    s->current = s->banks[bank].current;
+
+    if(s->current < 0 || s->current >= MAX_SEQUENCES)
+        s->current = 0;
+
+    if(s->revision == 0)
+        s->revision = 1;
+}
+
 static void LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq, int n_samples )
 {
     sequencer_t *s = (sequencer_t*) seq;
     seq_sample_t tmp_seq[MAX_SEQUENCES];
-
-    int i;
+    int bank = 0;
+    int current = 0;
+    unsigned int revision = 0;
     int tmp_idx = 0;
 
-    veejay_memset( &tmp_seq, 0, sizeof(tmp_seq));  
+    (void)n_samples;
+
+    veejay_memset(&tmp_seq, 0, sizeof(tmp_seq));
 
     while (cur != NULL)
     {
-        if (!xmlStrcmp(cur->name, (const xmlChar *) "TYPE")) {
-            tmp_seq[ tmp_idx ].type = get_xml_int( doc, cur );
+        if (!xmlStrcmp(cur->name, (const xmlChar *) "BANK")) {
+            bank = get_xml_int(doc, cur);
+        }
+        else if (!xmlStrcmp(cur->name, (const xmlChar *) "CURRENT")) {
+            current = get_xml_int(doc, cur);
+        }
+        else if (!xmlStrcmp(cur->name, (const xmlChar *) "REVISION")) {
+            revision = (unsigned int)get_xml_int(doc, cur);
+        }
+        else if (!xmlStrcmp(cur->name, (const xmlChar *) "TYPE")) {
+            if(tmp_idx < MAX_SEQUENCES)
+                tmp_seq[tmp_idx].type = get_xml_int(doc, cur);
+        }
+        else if (!xmlStrcmp(cur->name, (const xmlChar *) "SEQ_ID")) {
+            if(tmp_idx < MAX_SEQUENCES) {
+                tmp_seq[tmp_idx].sample_id = get_xml_int(doc, cur);
+                tmp_idx++;
+            }
         }
 
-        if (!xmlStrcmp(cur->name, (const xmlChar *) "SEQ_ID")) {
-            tmp_seq[ tmp_idx ].sample_id = get_xml_int( doc, cur );
-            tmp_idx ++;
-        }
         cur = cur->next;
     }
 
-    if( tmp_idx == 0 )
-        return;
+    if(!sampleadm_sequence_bank_valid(bank))
+        bank = 0;
 
-    for( i = 0; i < tmp_idx; i ++ ) {
-        s->samples[i].sample_id = tmp_seq[i].sample_id;
-        s->samples[i].type = tmp_seq[i].type;
-    }
-    for( i = s->size; i < MAX_SEQUENCES; i ++ ) {
-        s->samples[i].sample_id = 0;
-        s->samples[i].type = 0;
-    }
-    s->size = tmp_idx;
+    veejay_memset(s->banks[bank].samples, 0, sizeof(seq_sample_t) * MAX_SEQUENCES);
+
+    for(int i = 0; i < tmp_idx && i < MAX_SEQUENCES; i++)
+        s->banks[bank].samples[i] = tmp_seq[i];
+
+    s->banks[bank].size = sampleadm_sequence_count_slots(s->banks[bank].samples);
+    s->banks[bank].current = current;
+    s->banks[bank].revision = revision;
+
+    if(s->banks[bank].revision == 0 && s->banks[bank].size > 0)
+        s->banks[bank].revision = 1;
 }
 
 
@@ -3421,6 +3488,7 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
 
     int desired_pm = -1;
     int desired_id = -1;
+    int desired_seq_bank = 0;
 
     while (cur != NULL)
     {
@@ -3456,6 +3524,10 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
             LoadCurrentPlaying(doc, cur->xmlChildrenNode, &desired_id, &desired_pm);
         }
 
+        if (!xmlStrcmp(cur->name, (const xmlChar *) "SEQUENCE_ACTIVE_BANK")) {
+            desired_seq_bank = get_xml_int(doc, cur);
+        }
+
         if (!xmlStrcmp(cur->name, (const xmlChar *) "SEQUENCE")) {
             LoadSequences(doc, cur->xmlChildrenNode, seq, start_at);
         }
@@ -3466,6 +3538,9 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
 
         cur = cur->next;
     }
+
+    if(seq)
+        sampleadm_sequence_load_bank((sequencer_t*)seq, desired_seq_bank);
 
     if (desired_id > 0 && desired_pm >= 0) {
         if (desired_pm == 0 && sample_exists(desired_id)) {
@@ -3542,16 +3617,49 @@ void CreateEffects(xmlNodePtr node, sample_eff_chain ** effects)
     }
 }
 
-static void SaveSequences( xmlNodePtr node, void *seq )
+static void SaveSequenceBank(xmlNodePtr root, sequencer_t *s, int bank)
 {
-    int i = 0;
+    xmlNodePtr node;
+    seq_sample_t *samples;
+    int current;
+    unsigned int revision;
+
+    if(!sampleadm_sequence_bank_valid(bank))
+        return;
+
+    node = xmlNewChild(root, NULL, (const xmlChar*) "SEQUENCE", NULL);
+
+    if(bank == s->active_bank) {
+        samples = s->samples;
+        current = s->current;
+        revision = s->banks[bank].revision;
+    }
+    else {
+        samples = s->banks[bank].samples;
+        current = s->banks[bank].current;
+        revision = s->banks[bank].revision;
+    }
+
+    put_xml_int(node, "BANK", bank);
+    put_xml_int(node, "CURRENT", current);
+    put_xml_int(node, "REVISION", (int)revision);
+
+    for(int i = 0; i < MAX_SEQUENCES; i++) {
+        put_xml_int(node, "TYPE", samples[i].type);
+        put_xml_int(node, "SEQ_ID", samples[i].sample_id);
+    }
+}
+
+static void SaveSequences( xmlNodePtr root, void *seq )
+{
     sequencer_t *s = (sequencer_t*) seq;
-    for( i = 0; i < MAX_SEQUENCES; i ++ )
-    {
-        put_xml_int( node, "TYPE", s->samples[i].type );
-        put_xml_int( node, "SEQ_ID", s->samples[i].sample_id );
-    }   
-        
+
+    sampleadm_sequence_store_active_bank(s);
+
+    put_xml_int(root, "SEQUENCE_ACTIVE_BANK", s->active_bank);
+
+    for(int bank = 0; bank < VJ_SEQUENCE_BANKS; bank++)
+        SaveSequenceBank(root, s, bank);
 }
 
 static void SaveCurrentPlaying( xmlNodePtr node, int id, int mode )
@@ -3731,8 +3839,7 @@ int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id,
         put_xml_int( rootnode, "audio_bits", veejay_info->edit_list->audio_bits);
     }
 
-    childnode = xmlNewChild( rootnode, NULL,(const xmlChar*) "SEQUENCE", NULL );
-    SaveSequences( childnode, seq );
+    SaveSequences( rootnode, seq );
   
     childnode = xmlNewChild( rootnode, NULL, (const xmlChar*) "CURRENT" , NULL );
     

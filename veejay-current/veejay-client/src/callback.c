@@ -3455,7 +3455,11 @@ void	on_check_autowhitebalance_toggled(GtkWidget *widget, gpointer user_data)
 
 void on_button_seq_clearall_clicked(GtkWidget *w, gpointer data)
 {
-    multi_vims(VIMS_SEQUENCE_DEL, "-1");
+    if(prompt_dialog("Clear All Sequence Banks",
+                     "Clear all sequence banks?\nThis cannot be undone.") != GTK_RESPONSE_ACCEPT)
+        return;
+
+    single_vims(VIMS_SEQUENCE_CLEAR_ALL);
 
     if(info->sequencer_view && info->sequencer_view->gui_slot)
     {
@@ -3492,7 +3496,10 @@ void on_button_seq_clearall_clicked(GtkWidget *w, gpointer data)
 
 	info->status_lock = old_lock;
 
-    vj_msg(VEEJAY_MSG_INFO, "Sequencer cleared");
+    info->uc.reload_hint_checksums[HINT_SEQ_ACT] = -1;
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+
+    vj_msg(VEEJAY_MSG_INFO, "All sequence banks cleared");
 
 	info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
@@ -3517,16 +3524,15 @@ void	on_rec_seq_start_clicked( GtkWidget *w, gpointer data )
 		format = NULL;
 	}
 
-    if( is_button_toggled("sample_mulloop") ) {
-        multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0);
-    }
-
 	multi_vims( VIMS_SAMPLE_REC_START,
 		"%d %d",
 		0,
 		0 );
 
 	vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SAMPLE_REC_START, 0, 0 );
+
+	if(gformat)
+		g_free(gformat);
 }
 
 void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
@@ -5500,10 +5506,14 @@ static gboolean timeline_send_marker_move_now(void)
     info->selection[1] = sample_start + marker_start;
     info->selection[0] = sample_start + marker_end;
 
-    multi_vims(VIMS_SAMPLE_MOVE_MARKER,
-        "%d %d",
+    const gint marker_start_backend = sample_start + marker_start;
+    const gint marker_end_backend = sample_start + marker_end;
+
+    multi_vims(VIMS_SAMPLE_SET_MARKER,
+        "%d %d %d",
         sample_id,
-        marker_center_backend);
+        marker_start_backend,
+        marker_end_backend);
 
     timeline_marker_last_sent_sample = sample_id;
     timeline_marker_last_sent_center = marker_center_backend;

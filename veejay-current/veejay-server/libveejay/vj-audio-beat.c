@@ -3314,7 +3314,6 @@ void *vj_audio_beat_thread(void *arg)
     if(!ab_load_i(&s->initialized))
         vj_audio_beat_init(s, 2);
 
-    ab_store_i(&s->stop_request, 0);
     ab_store_i(&s->running, 1);
 
     veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO-BEAT] analysis thread started");

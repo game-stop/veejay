@@ -21,6 +21,7 @@
 #define VJ_LIB_H
 #include <config.h>
 #include <sys/time.h>
+#include <veejaycore/vims.h>
 #include <libsample/sampleadm.h>
 #include <veejaycore/vj-server.h>
 #include <veejaycore/vj-client.h>
@@ -124,11 +125,22 @@ typedef struct
 
 typedef struct
 {
-	int   active;
-	int   current;
-	int   size;
-	seq_sample_t	samples[MAX_SEQUENCES];
-	int	rec_id;
+	int current;
+	int size;
+	unsigned int revision;
+	seq_sample_t samples[MAX_SEQUENCES];
+} sequence_bank_t;
+
+typedef struct
+{
+	int active;
+	int current;
+	int size;
+	seq_sample_t samples[MAX_SEQUENCES];
+	int rec_id;
+	int active_bank;
+	unsigned int revision;
+	sequence_bank_t banks[VJ_SEQUENCE_BANKS];
 } sequencer_t;
 
 
