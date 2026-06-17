@@ -99,7 +99,7 @@ static struct {
     { timedistort_init,timedistort_malloc,timedistort_free,NULL,NULL,timedistort_apply,NULL,NULL,timedistort_request_fx,timedistort_set_motionmap, VJ_IMAGE_EFFECT_TIMEDISTORT },
     { threshold_init,threshold_malloc,threshold_free,NULL,NULL,NULL,threshold_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_THRESHOLD },
     { swirl_init,swirl_malloc,swirl_free,NULL,NULL,swirl_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SWIRL },
-    { stretch_init,NULL,NULL,NULL,NULL,stretch_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_CREATIVESTRETCH },
+    { stretch_init,stretch_malloc,stretch_free,NULL,NULL,stretch_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_CREATIVESTRETCH },
     { squares_init,squares_malloc,squares_free,NULL,NULL,squares_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SQUARES},
     { split_init,split_malloc,split_free,NULL,NULL,NULL,split_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_SPLIT},
     { solarize_init,NULL,NULL,NULL,NULL,solarize_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SOLARIZE},
