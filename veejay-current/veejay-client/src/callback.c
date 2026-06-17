@@ -6577,12 +6577,16 @@ void	on_osdbutton_clicked(GtkWidget *w, gpointer data )
 	single_vims(VIMS_OSD);
 }
 
+extern void sequence_ui_set_play_grid_requested(int enabled);
+
 void on_seqactive_toggled(GtkWidget *w, gpointer data)
 {
     if(info->status_lock)
         return;
 
     int enabled = is_button_toggled("seqactive");
+
+    sequence_ui_set_play_grid_requested(enabled);
 
     multi_vims(VIMS_SEQUENCE_STATUS, "%d", enabled);
     vj_midi_learning_vims_msg(info->midi, NULL, VIMS_SEQUENCE_STATUS, enabled);

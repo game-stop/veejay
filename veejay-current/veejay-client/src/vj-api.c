@@ -7452,6 +7452,26 @@ static unsigned int sequence_parse_fixed_uint(const char *text, int width)
 
 static int sequence_ui_requested_bank = 0;
 static int sequence_ui_bank_select_pending = 0;
+static int sequence_ui_play_grid_requested = 0;
+
+void sequence_ui_set_play_grid_requested(int enabled)
+{
+    sequence_ui_play_grid_requested = enabled ? 1 : 0;
+}
+
+static gboolean sequence_ui_wants_play_grid(void)
+{
+    GtkWidget *w = widget_cache[WIDGET_SEQACTIVE];
+
+    if(sequence_ui_play_grid_requested)
+        return TRUE;
+
+    if(w && GTK_IS_TOGGLE_BUTTON(w) &&
+       gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)))
+        return TRUE;
+
+    return info->status_tokens[SEQ_ACT] != 0;
+}
 
 static int sequence_ui_active_bank(void)
 {
@@ -7489,6 +7509,43 @@ static int sequence_ui_target_bank(void)
         sequence_ui_requested_bank = sequence_ui_active_bank();
 
     return sequence_ui_requested_bank;
+}
+
+static gboolean sequence_bank_view_bank_has_content(int bank)
+{
+    if(!info->sequence_bank_view || bank < 0 || bank >= VJ_SEQUENCE_BANKS)
+        return FALSE;
+
+    int n_slots = info->sequencer_col * info->sequencer_row;
+    if(n_slots <= 0 || n_slots > MAX_SEQUENCES)
+        n_slots = MAX_SEQUENCES;
+
+    for(int slot = 0; slot < n_slots; slot++) {
+        int sample_id = 0;
+        int sample_type = 0;
+
+        if(gvr_sequence_bank_view_get_slot(info->sequence_bank_view, bank, slot, &sample_id, &sample_type) &&
+           sample_id > 0)
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+static void sequence_ui_rearm_play_grid_for_bank(int bank)
+{
+    if(!sequence_ui_wants_play_grid())
+        return;
+
+    if(!sequence_bank_view_bank_has_content(bank))
+        return;
+
+    multi_vims(VIMS_SEQUENCE_STATUS, "%d", 1);
+
+    if(info->sequence_bank_view)
+        gvr_sequence_bank_view_set_sequence_active(info->sequence_bank_view, TRUE);
+
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
 static int sequence_ui_confirm_clear_bank(int bank)
@@ -9281,6 +9338,9 @@ static void update_sequence_playing_from_status(void)
 
     const int playing = normalize_sequence_slot(seq_cur_raw, n_slots);
     const gboolean active = (seq_act_raw != 0);
+
+    if(active)
+        sequence_ui_set_play_grid_requested(1);
 
     if(playing == info->sequence_playing) {
         info->status_lock = 1;
@@ -12309,6 +12369,7 @@ static void reset_connection_runtime_state(void)
     follow_return_id = 0;
     follow_return_type = 0;
     audio_sync_last_non_jack_master = VJ_RECORD_AUDIO_SOURCE_ORIGINAL;
+    sequence_ui_set_play_grid_requested(0);
 }
 
 static void reset_connection_data_state(void)
@@ -13729,6 +13790,7 @@ static void on_sequence_bank_button_clicked(GtkWidget *widget, gpointer user_dat
     multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+    sequence_ui_rearm_play_grid_for_bank(bank);
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
@@ -13775,6 +13837,7 @@ static void on_sequence_bank_view_bank_selected(GtkWidget *widget, gint bank, gp
     multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+    sequence_ui_rearm_play_grid_for_bank(bank);
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
@@ -13812,6 +13875,7 @@ static void on_sequence_bank_view_slot_assign(GtkWidget *widget, gint bank, gint
     multi_vims(VIMS_SEQUENCE_ADD, "%d %d %d", slot, id, type);
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, slot, id, type);
+    sequence_ui_rearm_play_grid_for_bank(bank);
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
@@ -14002,6 +14066,8 @@ static void on_sequence_bank_view_slot_paste(GtkWidget *widget, gint bank, gint 
 
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, slot, sample_id, sample_type);
+
+    sequence_ui_rearm_play_grid_for_bank(bank);
 
     vj_msg(VEEJAY_MSG_INFO,
            "Pasted sequence entry to bank %d slot %d",
