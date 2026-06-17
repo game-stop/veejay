@@ -22,4 +22,6 @@
 #define STRETCH_H
 vj_effect *stretch_init(int w, int h);
 void stretch_apply( void *ptr, VJFrame *frame, int *args);
+void *stretch_malloc( int w, int h);
+void stretch_free(void *ptr);
 #endif
