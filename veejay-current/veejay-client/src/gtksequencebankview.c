@@ -622,6 +622,46 @@ static gboolean gvr_sequence_bank_view_slot_in_selection(GvrSequenceBankView *vi
            view->selected_cells[slot];
 }
 
+static gboolean gvr_sequence_bank_view_has_slot_target(GvrSequenceBankView *view)
+{
+    return view &&
+           view->selected_bank >= 0 &&
+           view->selected_bank < GVR_SEQUENCE_BANKS &&
+           view->selected_slot >= 0 &&
+           view->selected_slot < GVR_SEQUENCE_SLOTS;
+}
+
+static gboolean gvr_sequence_bank_view_slot_is_filled(GvrSequenceBankView *view, int bank, int slot)
+{
+    return view &&
+           bank >= 0 && bank < GVR_SEQUENCE_BANKS &&
+           slot >= 0 && slot < GVR_SEQUENCE_SLOTS &&
+           view->banks[bank].cells[slot].sample_id > 0;
+}
+
+static gboolean gvr_sequence_bank_view_selection_has_filled_cells(GvrSequenceBankView *view)
+{
+    int bank;
+
+    if(!view)
+        return FALSE;
+
+    bank = view->selected_bank;
+    if(bank < 0 || bank >= GVR_SEQUENCE_BANKS)
+        return FALSE;
+
+    if(view->selected_count > 0) {
+        for(int slot = 0; slot < GVR_SEQUENCE_SLOTS; slot++)
+            if(view->selected_cells[slot] &&
+               view->banks[bank].cells[slot].sample_id > 0)
+                return TRUE;
+
+        return FALSE;
+    }
+
+    return gvr_sequence_bank_view_slot_is_filled(view, bank, view->selected_slot);
+}
+
 static void gvr_sequence_bank_view_collapse_selection(GvrSequenceBankView *view)
 {
     if(!view)
@@ -679,7 +719,15 @@ static int gvr_sequence_bank_view_copy_selection(GvrSequenceBankView *view, gboo
     if(!view)
         return 0;
 
-    gvr_sequence_bank_view_ensure_selection(view);
+    if(whole_bank) {
+        if(view->selected_bank < 0 || view->selected_bank >= GVR_SEQUENCE_BANKS)
+            view->selected_bank = gvr_clampi(view->active_bank, 0, GVR_SEQUENCE_BANKS - 1);
+    }
+    else {
+        gvr_sequence_bank_view_ensure_selection(view);
+        if(!gvr_sequence_bank_view_selection_has_filled_cells(view))
+            return 0;
+    }
 
     bank = view->selected_bank;
     if(bank < 0 || bank >= GVR_SEQUENCE_BANKS)
@@ -841,7 +889,8 @@ static void gvr_sequence_bank_view_copy_selection_to_bank(GtkWidget *widget, Gvr
     if(!view || dst_bank < 0 || dst_bank >= GVR_SEQUENCE_BANKS)
         return;
 
-    gvr_sequence_bank_view_copy_selection(view, FALSE);
+    if(gvr_sequence_bank_view_copy_selection(view, FALSE) <= 0)
+        return;
 
     if(!view->copy_valid || view->copy_count <= 0)
         return;
@@ -860,7 +909,9 @@ static void gvr_sequence_bank_view_paste_bank(GtkWidget *widget, GvrSequenceBank
     if(!view->bank_copy_valid)
         return;
 
-    gvr_sequence_bank_view_ensure_selection(view);
+    if(view->selected_bank < 0 || view->selected_bank >= GVR_SEQUENCE_BANKS)
+        view->selected_bank = gvr_clampi(view->active_bank, 0, GVR_SEQUENCE_BANKS - 1);
+
     dst = view->selected_bank;
 
     if(dst < 0 || dst >= GVR_SEQUENCE_BANKS)
@@ -990,7 +1041,8 @@ static gboolean gvr_sequence_bank_view_key_press(GtkWidget *widget, GdkEventKey 
 }
 
 enum {
-    GVR_SEQUENCE_MENU_DELETE = 1,
+    GVR_SEQUENCE_MENU_ASSIGN = 1,
+    GVR_SEQUENCE_MENU_DELETE,
     GVR_SEQUENCE_MENU_COPY,
     GVR_SEQUENCE_MENU_CUT,
     GVR_SEQUENCE_MENU_PASTE,
@@ -1007,7 +1059,21 @@ typedef struct {
     int bank;
 } GvrSequenceMenuAction;
 
-static void gvr_sequence_bank_view_menu_deactivate(GtkWidget *menu, gpointer user_data)
+static void gvr_sequence_bank_view_menu_action_free(gpointer user_data, GClosure *closure)
+{
+    (void)closure;
+    GvrSequenceMenuAction *data = (GvrSequenceMenuAction *)user_data;
+
+    if(!data)
+        return;
+
+    if(data->widget)
+        g_object_unref(data->widget);
+
+    g_free(data);
+}
+
+static void gvr_sequence_bank_view_menu_done(GtkWidget *menu, gpointer user_data)
 {
     (void)user_data;
     gtk_widget_destroy(menu);
@@ -1024,16 +1090,25 @@ static void gvr_sequence_bank_view_menu_action(GtkMenuItem *item, gpointer user_
     GvrSequenceBankView *view = GVR_SEQUENCE_BANK_VIEW(data->widget);
 
     switch(data->action) {
+        case GVR_SEQUENCE_MENU_ASSIGN:
+            if(gvr_sequence_bank_view_has_slot_target(view))
+                g_signal_emit(view,
+                              gvr_sequence_bank_view_signals[SIGNAL_SLOT_ASSIGN_REQUESTED],
+                              0,
+                              view->selected_bank,
+                              view->selected_slot);
+            gtk_widget_queue_draw(data->widget);
+            break;
         case GVR_SEQUENCE_MENU_DELETE:
             gvr_sequence_bank_view_delete_selection(data->widget, view);
             break;
         case GVR_SEQUENCE_MENU_COPY:
-            gvr_sequence_bank_view_copy_selection(view, FALSE);
-            gtk_widget_queue_draw(data->widget);
+            if(gvr_sequence_bank_view_copy_selection(view, FALSE) > 0)
+                gtk_widget_queue_draw(data->widget);
             break;
         case GVR_SEQUENCE_MENU_CUT:
-            gvr_sequence_bank_view_copy_selection(view, FALSE);
-            gvr_sequence_bank_view_delete_selection(data->widget, view);
+            if(gvr_sequence_bank_view_copy_selection(view, FALSE) > 0)
+                gvr_sequence_bank_view_delete_selection(data->widget, view);
             break;
         case GVR_SEQUENCE_MENU_PASTE:
             gvr_sequence_bank_view_paste_cells(data->widget, view);
@@ -1049,9 +1124,9 @@ static void gvr_sequence_bank_view_menu_action(GtkMenuItem *item, gpointer user_
             gvr_sequence_bank_view_copy_selection_to_bank(data->widget, view, data->bank);
             break;
         case GVR_SEQUENCE_MENU_CLEAR_BANK:
-            gvr_sequence_bank_view_ensure_selection(view);
             if(view->selected_bank >= 0 && view->selected_bank < GVR_SEQUENCE_BANKS)
                 g_signal_emit(view, gvr_sequence_bank_view_signals[SIGNAL_BANK_CLEAR_REQUESTED], 0, view->selected_bank);
+            gtk_widget_queue_draw(data->widget);
             break;
         case GVR_SEQUENCE_MENU_REFRESH:
             g_signal_emit(view, gvr_sequence_bank_view_signals[SIGNAL_REFRESH_REQUESTED], 0);
@@ -1071,7 +1146,7 @@ static GtkWidget *gvr_sequence_bank_view_menu_item(GtkWidget *menu,
     GtkWidget *item = gtk_menu_item_new_with_label(label);
     GvrSequenceMenuAction *data = g_new0(GvrSequenceMenuAction, 1);
 
-    data->widget = widget;
+    data->widget = g_object_ref(widget);
     data->action = action;
     data->bank = bank;
 
@@ -1081,7 +1156,7 @@ static GtkWidget *gvr_sequence_bank_view_menu_item(GtkWidget *menu,
                           "activate",
                           G_CALLBACK(gvr_sequence_bank_view_menu_action),
                           data,
-                          (GClosureNotify)g_free,
+                          gvr_sequence_bank_view_menu_action_free,
                           0);
     gtk_widget_show(item);
 
@@ -1094,23 +1169,34 @@ static void gvr_sequence_bank_view_popup_menu(GtkWidget *widget,
                                               gboolean bank_only)
 {
     GtkWidget *menu = gtk_menu_new();
-    gboolean have_selection = (view->selected_count > 0) ||
-                              (view->selected_slot >= 0 && view->selected_slot < GVR_SEQUENCE_SLOTS);
-    gboolean can_paste = view->copy_valid && view->copy_count > 0 &&
-                         view->selected_slot >= 0 && view->selected_slot < GVR_SEQUENCE_SLOTS;
+    gboolean bank_valid = view->selected_bank >= 0 &&
+                          view->selected_bank < GVR_SEQUENCE_BANKS;
+    gboolean have_slot_target = gvr_sequence_bank_view_has_slot_target(view);
+    gboolean have_filled_selection = gvr_sequence_bank_view_selection_has_filled_cells(view);
+    gboolean selected_slot_empty = have_slot_target &&
+                                   !gvr_sequence_bank_view_slot_is_filled(view,
+                                                                          view->selected_bank,
+                                                                          view->selected_slot);
+    gboolean can_paste = view->copy_valid &&
+                         !view->copy_is_bank &&
+                         view->copy_count > 0 &&
+                         have_slot_target;
     gboolean can_paste_bank = view->bank_copy_valid &&
                               view->bank_copy_source >= 0 &&
-                              view->bank_copy_source < GVR_SEQUENCE_BANKS;
+                              view->bank_copy_source < GVR_SEQUENCE_BANKS &&
+                              bank_valid &&
+                              view->bank_copy_source != view->selected_bank;
 
     if(!bank_only) {
-        gvr_sequence_bank_view_menu_item(menu, "Delete selected", widget, GVR_SEQUENCE_MENU_DELETE, -1, have_selection);
-        gvr_sequence_bank_view_menu_item(menu, "Copy selected", widget, GVR_SEQUENCE_MENU_COPY, -1, have_selection);
-        gvr_sequence_bank_view_menu_item(menu, "Cut selected", widget, GVR_SEQUENCE_MENU_CUT, -1, have_selection);
+        gvr_sequence_bank_view_menu_item(menu, "Assign sample here", widget, GVR_SEQUENCE_MENU_ASSIGN, -1, selected_slot_empty);
+        gvr_sequence_bank_view_menu_item(menu, "Delete selected", widget, GVR_SEQUENCE_MENU_DELETE, -1, have_filled_selection);
+        gvr_sequence_bank_view_menu_item(menu, "Copy selected", widget, GVR_SEQUENCE_MENU_COPY, -1, have_filled_selection);
+        gvr_sequence_bank_view_menu_item(menu, "Cut selected", widget, GVR_SEQUENCE_MENU_CUT, -1, have_filled_selection);
         gvr_sequence_bank_view_menu_item(menu, "Paste here", widget, GVR_SEQUENCE_MENU_PASTE, -1, can_paste);
 
         GtkWidget *copy_menu = gtk_menu_new();
         GtkWidget *copy_root = gtk_menu_item_new_with_label("Copy selected to bank");
-        gtk_widget_set_sensitive(copy_root, have_selection);
+        gtk_widget_set_sensitive(copy_root, have_filled_selection);
         gtk_menu_item_set_submenu(GTK_MENU_ITEM(copy_root), copy_menu);
         gtk_menu_shell_append(GTK_MENU_SHELL(menu), copy_root);
         gtk_widget_show(copy_root);
@@ -1123,7 +1209,7 @@ static void gvr_sequence_bank_view_popup_menu(GtkWidget *widget,
                                              widget,
                                              GVR_SEQUENCE_MENU_COPY_TO_BANK,
                                              b,
-                                             have_selection && b != view->selected_bank);
+                                             have_filled_selection && b != view->selected_bank);
         }
 
         GtkWidget *sep = gtk_separator_menu_item_new();
@@ -1131,9 +1217,9 @@ static void gvr_sequence_bank_view_popup_menu(GtkWidget *widget,
         gtk_widget_show(sep);
     }
 
-    gvr_sequence_bank_view_menu_item(menu, "Copy whole bank", widget, GVR_SEQUENCE_MENU_COPY_BANK, -1, view->selected_bank >= 0);
+    gvr_sequence_bank_view_menu_item(menu, "Copy whole bank", widget, GVR_SEQUENCE_MENU_COPY_BANK, -1, bank_valid);
     gvr_sequence_bank_view_menu_item(menu, "Paste bank here", widget, GVR_SEQUENCE_MENU_PASTE_BANK, -1, can_paste_bank);
-    gvr_sequence_bank_view_menu_item(menu, "Clear bank", widget, GVR_SEQUENCE_MENU_CLEAR_BANK, -1, view->selected_bank >= 0);
+    gvr_sequence_bank_view_menu_item(menu, "Clear bank", widget, GVR_SEQUENCE_MENU_CLEAR_BANK, -1, bank_valid);
 
     GtkWidget *sep = gtk_separator_menu_item_new();
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), sep);
@@ -1141,8 +1227,15 @@ static void gvr_sequence_bank_view_popup_menu(GtkWidget *widget,
 
     gvr_sequence_bank_view_menu_item(menu, "Refresh", widget, GVR_SEQUENCE_MENU_REFRESH, -1, TRUE);
 
-    g_signal_connect(G_OBJECT(menu), "deactivate", G_CALLBACK(gvr_sequence_bank_view_menu_deactivate), NULL);
-    gtk_menu_popup(GTK_MENU(menu), NULL, NULL, NULL, NULL, event ? event->button : 0, event ? event->time : gtk_get_current_event_time());
+    g_signal_connect(G_OBJECT(menu), "selection-done", G_CALLBACK(gvr_sequence_bank_view_menu_done), NULL);
+    gtk_widget_show_all(menu);
+    gtk_menu_popup(GTK_MENU(menu),
+                   NULL,
+                   NULL,
+                   NULL,
+                   NULL,
+                   event ? event->button : 0,
+                   event ? event->time : gtk_get_current_event_time());
 }
 
 static gboolean gvr_sequence_bank_view_button_press(GtkWidget *widget, GdkEventButton *event)
