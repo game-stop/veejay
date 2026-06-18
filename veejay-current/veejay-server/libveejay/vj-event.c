@@ -196,6 +196,10 @@ int vj_event_get_video_format(void)
     return _recorder_format;
 }
 
+#ifdef HAVE_JACK
+extern void vj_perform_record_output_audio_tap_reset(veejay_t *info);
+#endif
+
 enum {
     VJ_ERROR_NONE=0,    
     VJ_ERROR_MODE=1,
@@ -294,7 +298,7 @@ static struct {                 /* hardcoded keyboard layout (the default keys) 
     { VIMS_SAMPLE_MIX_SET_DUP,      SDL_SCANCODE_J,         VIMS_MOD_ALT_SHIFT,   "7" },
     { VIMS_SAMPLE_MIX_SET_DUP,      SDL_SCANCODE_K,         VIMS_MOD_ALT_SHIFT,   "8" },
     { VIMS_SAMPLE_MIX_SET_DUP,      SDL_SCANCODE_L,         VIMS_MOD_ALT_SHIFT,   "9" },
-    #ifdef HAVE_SDL
+#ifdef HAVE_SDL
     { VIMS_FULLSCREEN,              SDL_SCANCODE_F,         VIMS_MOD_CTRL,  "2"    },
 #endif  
     { VIMS_CHAIN_ENTRY_DOWN,        SDL_SCANCODE_KP_MINUS,  VIMS_MOD_NONE,  "1" },
@@ -1094,7 +1098,7 @@ void vj_format_keycombo(char *out, size_t out_size, int key, KEYMod mod, int is_
 
     *p = '\0';
 
-    #define APPEND_KEYNAME(txt) do { \
+#define APPEND_KEYNAME(txt) do { \
         int n = snprintf(p, remaining, "%s", txt); \
         if (n < 0 || (size_t)n >= remaining) return; \
         p += n; \
@@ -1126,7 +1130,7 @@ void vj_format_keycombo(char *out, size_t out_size, int key, KEYMod mod, int is_
         }
     }
 
-    #undef APPEND_KEYNAME
+#undef APPEND_KEYNAME
 }
 
 int         del_keyboard_event(int id )
@@ -5191,7 +5195,7 @@ static const char *vj_event_record_audio_source_name(int source)
             return "original";
 
         case VJ_RECORD_AUDIO_SOURCE_BEAT_JACK:
-            return "external-jack";
+            return "sync-source";
 
         case VJ_RECORD_AUDIO_SOURCE_SILENCE:
             return "silence";
@@ -5223,12 +5227,16 @@ void vj_event_record_audio_source(void *ptr, const char format[], va_list ap)
     else if(source > VJ_RECORD_AUDIO_SOURCE_SILENCE)
         source = VJ_RECORD_AUDIO_SOURCE_SILENCE;
 
-    veejay_set_record_audio_source(v, source );    
+    veejay_set_record_audio_source(v, source );
 
     veejay_msg(VEEJAY_MSG_INFO,
-               "[REC] Audio recording source set to %s(%d)",
+               "[REC] Audio recording policy set to %s(%d); sync enabled=%d source=%d mode=%d mute=%d",
                vj_event_record_audio_source_name(source),
-               source);
+               source,
+               vj_audio_sync_is_enabled(&v->settings->audio_sync),
+               atomic_load_int(&v->settings->audio_sync.source),
+               atomic_load_int(&v->settings->audio_sync.mode),
+               atomic_load_int(&v->settings->audio_mute));
 }
 
 void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
@@ -5320,6 +5328,11 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
     if( sample_init_encoder( v->uc->sample_id, tmp, format_, v->effect_frame1, v->current_edit_list, args[0]) == 1)
     {
         video_playback_setup *s = v->settings;
+#ifdef HAVE_JACK
+        vj_perform_record_output_audio_tap_reset(v);
+#endif
+        if(v->recording)
+            atomic_store_int(&v->recording->video.valid, 0);
         s->sample_record_switch = args[1];
         result = 1;
         if(v->use_osd)
@@ -8440,6 +8453,11 @@ static void _vj_event_tag_record( veejay_t *v , int *args )
     else
         v->settings->tag_record_switch = 1;
 
+#ifdef HAVE_JACK
+    vj_perform_record_output_audio_tap_reset(v);
+#endif
+    if(v->recording)
+        atomic_store_int(&v->recording->video.valid, 0);
     v->settings->tag_record = 1;
 }
 
@@ -8726,6 +8744,42 @@ static const char *vj_audio_beat_event_action_name(int action)
     }
 }
 
+static int vj_audio_beat_event_action_needs_external_sync(int action)
+{
+    return action == VJ_AUDIO_BEAT_ACTION_FREEZE ||
+           action == VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX ||
+           action == VJ_AUDIO_BEAT_ACTION_BREAK_BEAT;
+}
+
+static int vj_event_audio_beat_has_external_sync_source(veejay_t *v)
+{
+    video_playback_setup *settings = v->settings;
+    int source;
+
+    if(!vj_audio_sync_is_enabled(&settings->audio_sync))
+        return 0;
+
+    source = atomic_load_int(&settings->audio_sync.source);
+    return source == VJ_AUDIO_SYNC_SOURCE_JACK ||
+           source == VJ_AUDIO_SYNC_SOURCE_WAV_FILE;
+}
+
+static int vj_event_audio_beat_sanitize_action(veejay_t *v, int action)
+{
+    if(vj_audio_beat_event_action_needs_external_sync(action) &&
+       !vj_event_audio_beat_has_external_sync_source(v))
+    {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-BEAT] %s(%d) needs active JACK/WAV audio-sync source; keeping source unchanged and using auto-fx(%d)",
+                   vj_audio_beat_event_action_name(action),
+                   action,
+                   VJ_AUDIO_BEAT_ACTION_AUTO_FX);
+        return VJ_AUDIO_BEAT_ACTION_AUTO_FX;
+    }
+
+    return action;
+}
+
 static const char *vj_audio_beat_event_auto_mode_name(int mode)
 {
     switch(mode)
@@ -8870,6 +8924,12 @@ void vj_event_audio_beat_enable(void *ptr, const char format[], va_list ap)
         return;
 
     enabled = args[0] ? 1 : 0;
+    if(enabled) {
+        int action = atomic_load_int(&v->settings->audio_beat.action_mode);
+        int safe_action = vj_event_audio_beat_sanitize_action(v, action);
+        if(safe_action != action)
+            vj_audio_beat_set_action(&v->settings->audio_beat, safe_action);
+    }
     rc = veejay_audio_beat_set_enabled(v, enabled);
 
     if(rc < 0)
@@ -9281,6 +9341,7 @@ void vj_event_audio_beat_ui_config(void *ptr, const char format[], va_list ap)
         return;
 
     args[1] = vj_audio_beat_event_clampi(args[1], VJ_AUDIO_BEAT_ACTION_NONE, VJ_AUDIO_BEAT_ACTION_BREAK_BEAT);
+    args[1] = vj_event_audio_beat_sanitize_action(v, args[1]);
     args[8] = vj_audio_beat_event_clampi(args[8], VJ_AUDIO_BEAT_AUTO_OFF, VJ_AUDIO_BEAT_AUTO_CHAOS);
     args[9] = vj_audio_beat_event_clampi(args[9], 0, 100);
 
@@ -9302,6 +9363,12 @@ void vj_event_audio_beat_ui_config(void *ptr, const char format[], va_list ap)
     vj_audio_beat_event_auto_amount_cache = args[9];
 
     enabled = args[0] ? 1 : 0;
+    if(enabled) {
+        int action = atomic_load_int(&v->settings->audio_beat.action_mode);
+        int safe_action = vj_event_audio_beat_sanitize_action(v, action);
+        if(safe_action != action)
+            vj_audio_beat_set_action(&v->settings->audio_beat, safe_action);
+    }
     rc = veejay_audio_beat_set_enabled(v, enabled);
 
     if(rc < 0)
@@ -9457,6 +9524,7 @@ void vj_event_audio_beat_action(void *ptr, const char format[], va_list ap)
     args[0] = vj_audio_beat_event_clampi(args[0],
                                         VJ_AUDIO_BEAT_ACTION_NONE,
                                         VJ_AUDIO_BEAT_ACTION_BREAK_BEAT);
+    args[0] = vj_event_audio_beat_sanitize_action(v, args[0]);
 
     {
         int freeze = -1;

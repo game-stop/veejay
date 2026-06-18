@@ -20,6 +20,7 @@
 #ifndef VJ_LIB_H
 #define VJ_LIB_H
 #include <config.h>
+#include <stddef.h>
 #include <sys/time.h>
 #include <veejaycore/vims.h>
 #include <libsample/sampleadm.h>
@@ -173,6 +174,44 @@ typedef struct {
 	volatile long long seq;
 	volatile int current_write;
 } display_frame_t;
+
+
+typedef struct {
+    VJFrame frame;
+    uint8_t *planes[4];
+    int plane_size[4];
+    int pix_fmt;
+    int width;
+    int height;
+    volatile long long display_seq;
+    volatile long long source_frame;
+    volatile int sample_id;
+    volatile int playback_mode;
+    volatile int playback_speed;
+    volatile int valid;
+} vj_record_video_frame_t;
+
+typedef struct {
+    uint8_t *buffer;
+    size_t capacity_frames;
+    volatile long long write_pos;
+    volatile long long read_pos;
+    volatile int frame_bytes;
+    volatile int active;
+    volatile int last_source;
+    volatile int last_mode;
+    volatile long long underruns;
+} vj_record_audio_tap_t;
+
+typedef struct {
+    vj_record_video_frame_t video;
+    vj_record_audio_tap_t output_audio;
+    vj_record_audio_tap_t sync_audio;
+    volatile long long video_writes;
+    volatile long long video_records;
+    volatile long long audio_records;
+    volatile long long audio_silence_records;
+} video_recording_setup;
 
 
 typedef struct vj_audio_beat_shared_t
@@ -599,6 +638,7 @@ typedef struct veejay_t
     int render_entry;
     int render_continue;
     video_playback_setup *settings;
+    video_recording_setup *recording;
 	video_playback_stats stats;
     int real_fps;
     int dump;

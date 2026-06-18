@@ -88,7 +88,11 @@ int vj_perform_seq_setup_transition(veejay_t *info);
 
 void vj_perform_initiate_edge_change(veejay_t *info, int edge_type, int prev_dir, int cur_dir);
 
-int vj_perform_play_audio( video_playback_setup *settings, uint8_t *source, int len, uint8_t *silence );
+int vj_perform_play_audio(veejay_t *info,
+                          video_playback_setup *settings,
+                          uint8_t *source,
+                          int len,
+                          uint8_t *silence);
 
 int vj_perform_queue_audio_chunk_ext(veejay_t *info, int client_frames_to_write, long long target_frame, int fade_in, uint8_t *dst_buf);
 int vj_perform_queue_audio_chunk_crossfade(
@@ -109,5 +113,24 @@ long vj_calc_next_subframe(veejay_t *info, int b);
 void vj_perform_global_chain_reset(veejay_t *info);
 
 void vj_perform_record_audio_source_reset(veejay_t *info);
+
+void vj_perform_record_audio_source_reset(veejay_t *info);
+void vj_perform_record_output_audio_tap_configure(veejay_t *info, int frame_bytes, int sample_rate);
+
+void vj_perform_record_audio_source_reset(veejay_t *info);
+
+#ifdef HAVE_JACK
+void vj_perform_audio_source_transition_guard(int blocks);
+void vj_perform_audio_source_transition_guard_ex(int blocks,
+                                                        const char *reason,
+                                                        int old_source,
+                                                        int new_source,
+                                                        int sync_mode,
+                                                        int mute);
+int vj_perform_audio_source_transition_guard_pending(void);
+int vj_perform_audio_source_transition_silence_pending(void);
+int vj_perform_audio_source_transition_fade_pending(void);
+int vj_perform_audio_source_transition_guard_seq_debug(void);
+#endif
 
 #endif
