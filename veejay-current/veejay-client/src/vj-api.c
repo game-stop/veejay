@@ -9477,6 +9477,35 @@ static void audio_beat_status_update_action_sensitivity(int action)
     audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_RESET_BUTTON, uses_auto);
 }
 
+static int audio_beat_status_action_allowed_for_record_source(int record_source, int action)
+{
+    if(action < 0 || action > 4)
+        return 0;
+
+    switch(record_source) {
+        case VJ_RECORD_AUDIO_SOURCE_BEAT_JACK:
+            return 1;
+        case VJ_RECORD_AUDIO_SOURCE_ORIGINAL:
+        case VJ_RECORD_AUDIO_SOURCE_AUTO:
+            return (action == 0 || action == 2);
+        case VJ_RECORD_AUDIO_SOURCE_SILENCE:
+        default:
+            return (action == 0);
+    }
+}
+
+static int audio_beat_status_safe_action_for_record_source(int record_source, int action)
+{
+    if(audio_beat_status_action_allowed_for_record_source(record_source, action))
+        return action;
+
+    if(record_source == VJ_RECORD_AUDIO_SOURCE_ORIGINAL ||
+       record_source == VJ_RECORD_AUDIO_SOURCE_AUTO)
+        return 2;
+
+    return 0;
+}
+
 static void audio_beat_set_action_combo_from_status(int action)
 {
     GtkWidget *w = widget_cache[WIDGET_AUDIO_BEAT_ACTION_COMBO];
@@ -10395,10 +10424,11 @@ static void update_audio_beat_status_widgets(int *history, int force)
     if(AB_CHANGED(AUDIO_BEAT_ENABLED))
         audio_beat_set_toggle(WIDGET_AUDIO_BEAT_ENABLE_TOGGLE, enabled);
 
-    if(AB_CHANGED(AUDIO_BEAT_ENABLED) || AB_CHANGED(AUDIO_BEAT_ACTION)) {
+    if(AB_CHANGED(AUDIO_BEAT_ENABLED) || AB_CHANGED(AUDIO_BEAT_ACTION) || AB_CHANGED(RECORD_AUDIO_SOURCE)) {
         int action = enabled ? AB_CUR(AUDIO_BEAT_ACTION) : 0;
         if(action < 0 || action > 4)
             action = 0;
+        action = audio_beat_status_safe_action_for_record_source(AB_CUR(RECORD_AUDIO_SOURCE), action);
         audio_beat_set_action_combo_from_status(action);
     }
 

@@ -473,10 +473,75 @@ enum {
 };
 
 static int audio_input_selector_active_from_ui(void);
+static const char *audio_input_selector_name_from_active(int active);
 static void audio_sync_set_mode_combo_guarded(int mode);
 static void audio_sync_set_enable_toggle_guarded(int enabled);
 static void audio_sync_set_master_wav_options_visible(int visible);
 static void audio_sync_deactivate_playback(void);
+
+static int audio_beat_action_allowed_for_master(int master, int action)
+{
+    if(action < 0 || action > 4)
+        return 0;
+
+    switch(master) {
+        case AUDIO_MASTER_JACK:
+        case AUDIO_MASTER_WAV:
+            return 1;
+        case AUDIO_MASTER_ORIGINAL:
+            return (action == 0 || action == 2);
+        case AUDIO_MASTER_SILENCE:
+        default:
+            return (action == 0);
+    }
+}
+
+static int audio_beat_safe_action_for_master(int master, int action)
+{
+    if(audio_beat_action_allowed_for_master(master, action))
+        return action;
+
+    return (master == AUDIO_MASTER_ORIGINAL) ? 2 : 0;
+}
+
+static void audio_beat_set_action_combo_guarded(int action)
+{
+    GtkWidget *w = widget_cache[WIDGET_AUDIO_BEAT_ACTION_COMBO];
+    int old_lock;
+
+    if(!w || !GTK_IS_COMBO_BOX(w))
+        return;
+
+    if(gtk_combo_box_get_active(GTK_COMBO_BOX(w)) == action)
+        return;
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+    gtk_combo_box_set_active(GTK_COMBO_BOX(w), action);
+    info->status_lock = old_lock;
+}
+
+static void audio_beat_enforce_action_for_master(int master, int notify)
+{
+    int action = audio_beat_widget_int_value(widget_cache[WIDGET_AUDIO_BEAT_ACTION_COMBO]);
+    int safe_action = audio_beat_safe_action_for_master(master, action);
+
+    if(action == safe_action) {
+        audio_beat_update_action_sensitivity(action);
+        return;
+    }
+
+    audio_beat_set_action_combo_guarded(safe_action);
+    audio_beat_update_action_sensitivity(safe_action);
+    multi_vims(VIMS_AUDIO_BEAT_ACTION, "%d", safe_action);
+
+    if(notify)
+        vj_msg(VEEJAY_MSG_WARNING,
+               "%s cannot use %s; using %s",
+               audio_input_selector_name_from_active(master),
+               audio_beat_action_name(action),
+               audio_beat_action_name(safe_action));
+}
 
 void on_audio_beat_enable_toggle_toggled(GtkToggleButton *togglebutton, gpointer user_data)
 {
@@ -506,6 +571,7 @@ void on_audio_beat_enable_toggle_toggled(GtkToggleButton *togglebutton, gpointer
             multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", VJ_RECORD_AUDIO_SOURCE_ORIGINAL);
         }
 
+        audio_beat_enforce_action_for_master(active, 1);
         audio_beat_enable_chain_entry_toggle_guarded(1);
     }
 
@@ -524,6 +590,21 @@ void on_audio_beat_action_combo_changed(GtkWidget *widget, gpointer user_data)
     mode = gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
     if(mode < 0)
         return;
+
+    const int master = audio_input_selector_active_from_ui();
+    const int safe_mode = audio_beat_safe_action_for_master(master, mode);
+
+    if(mode != safe_mode) {
+        audio_beat_set_action_combo_guarded(safe_mode);
+        audio_beat_update_action_sensitivity(safe_mode);
+        multi_vims(VIMS_AUDIO_BEAT_ACTION, "%d", safe_mode);
+        vj_msg(VEEJAY_MSG_WARNING,
+               "%s cannot use %s; using %s",
+               audio_input_selector_name_from_active(master),
+               audio_beat_action_name(mode),
+               audio_beat_action_name(safe_mode));
+        return;
+    }
 
     multi_vims(VIMS_AUDIO_BEAT_ACTION, "%d", mode);
     audio_beat_update_action_sensitivity(mode);
@@ -1278,6 +1359,7 @@ void on_audio_input_selector_combo_changed(GtkWidget *widget, gpointer user_data
             multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", record_source);
             audio_sync_deactivate_playback();
             audio_sync_set_master_wav_options_visible(0);
+            audio_beat_enforce_action_for_master(active, 1);
             vj_msg(VEEJAY_MSG_INFO, "Audio source / sync provider: %s",
                    audio_input_selector_name_from_active(active));
             break;
