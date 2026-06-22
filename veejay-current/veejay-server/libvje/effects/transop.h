@@ -22,4 +22,6 @@
 #define TRANSOP_H
 vj_effect *transop_init(int width, int height);
 void transop_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
+void *transop_malloc(int w, int h);
+void transop_free(void *ptr);
 #endif

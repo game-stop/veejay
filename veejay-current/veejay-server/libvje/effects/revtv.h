@@ -22,4 +22,6 @@
 #define REVTV_H
 vj_effect *revtv_init(int max_width, int max_height);
 void revtv_apply(void *ptr, VJFrame *frame, int *args);
+void *revtv_malloc(int w, int h);
+void revtv_free(void *ptr);
 #endif

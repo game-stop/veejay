@@ -22,4 +22,6 @@
 #define TRANSFORM_H
 vj_effect *transform_init(int w, int height);
 void transform_apply(void *ptr, VJFrame *frame, int *args);
+void *transform_malloc(int w, int h);
+void transform_free(void *ptr);
 #endif
