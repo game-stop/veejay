@@ -22,27 +22,23 @@
 #include <veejaycore/vjmem.h>
 #include "tiler.h"
 
-#define TILER_PARAMS 7
+#define TILER_PARAMS 5
 
 #define P_TILES       0
-#define P_OPACITY     1
-#define P_PHASE_X     2
-#define P_PHASE_Y     3
-#define P_DRIFT_SPEED 4
-#define P_TILE_DRIVE  5
-#define P_MIX_DRIVE   6
+#define P_PHASE_X     1
+#define P_PHASE_Y     2
+#define P_DRIFT_SPEED 3
+#define P_OPACITY     4
 
 typedef struct {
     uint8_t *buf[3];
     int n_threads;
 
     float tiles_s;
-    float opacity_s;
     float phase_x_s;
     float phase_y_s;
     float drift_s;
-    float tile_drive_s;
-    float mix_drive_s;
+    float opacity_s;
 
     float drift_phase;
     int initialized;
@@ -110,10 +106,6 @@ vj_effect *tiler_init(int w, int h)
     ve->limits[1][P_TILES] = max_tiles;
     ve->defaults[P_TILES] = 2;
 
-    ve->limits[0][P_OPACITY] = 0;
-    ve->limits[1][P_OPACITY] = 255;
-    ve->defaults[P_OPACITY] = 0;
-
     ve->limits[0][P_PHASE_X] = 0;
     ve->limits[1][P_PHASE_X] = 1000;
     ve->defaults[P_PHASE_X] = 0;
@@ -126,13 +118,9 @@ vj_effect *tiler_init(int w, int h)
     ve->limits[1][P_DRIFT_SPEED] = 1000;
     ve->defaults[P_DRIFT_SPEED] = 0;
 
-    ve->limits[0][P_TILE_DRIVE] = 0;
-    ve->limits[1][P_TILE_DRIVE] = 1000;
-    ve->defaults[P_TILE_DRIVE] = 0;
-
-    ve->limits[0][P_MIX_DRIVE] = 0;
-    ve->limits[1][P_MIX_DRIVE] = 1000;
-    ve->defaults[P_MIX_DRIVE] = 0;
+    ve->limits[0][P_OPACITY] = 0;
+    ve->limits[1][P_OPACITY] = 255;
+    ve->defaults[P_OPACITY] = 255;
 
     ve->description = "Tiler";
     ve->sub_format = 1;
@@ -142,23 +130,19 @@ vj_effect *tiler_init(int w, int h)
     ve->param_description = vje_build_param_list(
         ve->num_params,
         "Tiles",
-        "Opacity",
         "Phase X",
         "Phase Y",
         "Drift Speed",
-        "Tile Drive",
-        "Mix Drive"
+        "Opacity"
     );
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 2,                  max_tiles,           12, 46,  700, 2800, 0,    76,
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       32,                 255,                 12, 46,  700, 2800, 0,    68,
-        VJ_BEAT_GEOMETRY_PHASE,   VJ_BEAT_F_CONTINUOUS,                                                  0,                  1000,                12, 46, 1000, 3600, 0,    58,
-        VJ_BEAT_GEOMETRY_PHASE,   VJ_BEAT_F_CONTINUOUS,                                                  0,                  1000,                12, 46, 1000, 3600, 0,    58,
-        VJ_BEAT_SIGNED_SPEED,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,   -1000,              1000,                12, 46,  900, 3200, 0,    62,
-        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                        140,                1000,                16, 62,  700, 2800, 0,    94,
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                        120,                1000,                14, 54,  800, 3200, 0,    86
+        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,                                2,     max_tiles, 10, 42,  700, 2800, 0, 76,
+        VJ_BEAT_GEOMETRY_PHASE,   VJ_BEAT_F_CONTINUOUS,                                                        0,     1000,      8, 34, 1000, 3600, 0, 46,
+        VJ_BEAT_GEOMETRY_PHASE,   VJ_BEAT_F_CONTINUOUS,                                                        0,     1000,      8, 34, 1000, 3600, 0, 46,
+        VJ_BEAT_SIGNED_SPEED,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,        -1000, 1000,     12, 48,  800, 3200, 0, 68,
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                              80,    255,      14, 56,  500, 2200, 0, 92
     );
 
     return ve;
@@ -184,12 +168,10 @@ void *tiler_malloc(int w, int h)
     s->n_threads = vje_advise_num_threads(len);
 
     s->tiles_s = 2.0f;
-    s->opacity_s = 0.0f;
     s->phase_x_s = 0.0f;
     s->phase_y_s = 0.0f;
     s->drift_s = 0.0f;
-    s->tile_drive_s = 0.0f;
-    s->mix_drive_s = 0.0f;
+    s->opacity_s = 255.0f;
     s->drift_phase = 0.0f;
     s->initialized = 0;
 
@@ -216,58 +198,44 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
         max_tiles = 2;
 
     const int tiles_arg = args[P_TILES];
-    const int opacity_arg = args[P_OPACITY];
     const int phase_x_arg = args[P_PHASE_X];
     const int phase_y_arg = args[P_PHASE_Y];
     const int drift_arg = args[P_DRIFT_SPEED];
-    const int tile_drive_arg = args[P_TILE_DRIVE];
-    const int mix_drive_arg = args[P_MIX_DRIVE];
+    const int opacity_arg = args[P_OPACITY];
 
     const float fast_a = 0.34f;
     const float slow_r = 0.085f;
 
     if(!s->initialized) {
         s->tiles_s = (float)tiles_arg;
-        s->opacity_s = (float)opacity_arg;
         s->phase_x_s = (float)phase_x_arg;
         s->phase_y_s = (float)phase_y_arg;
         s->drift_s = (float)drift_arg;
-        s->tile_drive_s = (float)tile_drive_arg;
-        s->mix_drive_s = (float)mix_drive_arg;
+        s->opacity_s = (float)opacity_arg;
         s->initialized = 1;
     }
 
-    int base_tiles = tiler_smooth_to(&s->tiles_s, tiles_arg, fast_a, slow_r);
-    int base_opacity = tiler_smooth_to(&s->opacity_s, opacity_arg, fast_a, slow_r);
+    int tiles = tiler_smooth_to(&s->tiles_s, tiles_arg, fast_a, slow_r);
     int phase_x = tiler_smooth_to(&s->phase_x_s, phase_x_arg, fast_a * 0.56f, slow_r);
     int phase_y = tiler_smooth_to(&s->phase_y_s, phase_y_arg, fast_a * 0.56f, slow_r);
     int drift = tiler_smooth_to(&s->drift_s, drift_arg, fast_a * 0.48f, slow_r);
-    int tile_drive = tiler_smooth_to(&s->tile_drive_s, tile_drive_arg, fast_a * 0.82f, slow_r);
-    int mix_drive = tiler_smooth_to(&s->mix_drive_s, mix_drive_arg, fast_a * 0.82f, slow_r);
+    int opacity = tiler_smooth_to(&s->opacity_s, opacity_arg, fast_a * 0.82f, slow_r);
 
-    base_tiles = tiler_clampi(base_tiles, 2, max_tiles);
-    base_opacity = tiler_clampi(base_opacity, 0, 255);
+    tiles = tiler_clampi(tiles, 2, max_tiles);
     phase_x = tiler_clampi(phase_x, 0, 1000);
     phase_y = tiler_clampi(phase_y, 0, 1000);
     drift = tiler_clampi(drift, -1000, 1000);
-    tile_drive = tiler_clampi(tile_drive, 0, 1000);
-    mix_drive = tiler_clampi(mix_drive, 0, 1000);
+    opacity = tiler_clampi(opacity, 0, 255);
 
-    const float tile_drive_f = (float)tile_drive * 0.001f;
-    const float mix_drive_f = (float)mix_drive * 0.001f;
-
-    int tiles = base_tiles + (int)(((float)(max_tiles - base_tiles) * tile_drive_f * 0.90f) + 0.5f);
-    tiles = tiler_clampi(tiles, 2, max_tiles);
-
-    int effective_opacity = base_opacity + (int)((255.0f - (float)base_opacity) * mix_drive_f * 0.78f + 0.5f);
-    effective_opacity = tiler_clampi(effective_opacity, 0, 255);
-
-    s->drift_phase += (float)drift * 0.018f + tile_drive_f * 0.75f;
+    s->drift_phase += (float)drift * 0.018f;
     if(s->drift_phase > 32768.0f || s->drift_phase < -32768.0f)
         s->drift_phase = 0.0f;
 
-    const int phase_px = tiler_wrapi(((phase_x * width) + 500) / 1000 + (int)s->drift_phase + (int)(tile_drive_f * (float)width * 0.045f), width);
-    const int phase_py = tiler_wrapi(((phase_y * height) + 500) / 1000 + (int)(s->drift_phase * 0.618f) - (int)(tile_drive_f * (float)height * 0.032f), height);
+    if(opacity <= 0)
+        return;
+
+    const int phase_px = tiler_wrapi(((phase_x * width) + 500) / 1000 + (int)s->drift_phase, width);
+    const int phase_py = tiler_wrapi(((phase_y * height) + 500) / 1000 + (int)(s->drift_phase * 0.618f), height);
 
     const int small_w = (width  + tiles - 1) / tiles;
     const int small_h = (height + tiles - 1) / tiles;
@@ -296,10 +264,7 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    if(effective_opacity >= 255)
-        return;
-
-    const int tile_q8 = 256 - ((effective_opacity * 256 + 127) / 255);
+    const int tile_q8 = (opacity * 256 + 127) / 255;
     const int tile_off_x = (phase_px / tiles) % small_w;
     const int tile_off_y = (phase_py / tiles) % small_h;
 

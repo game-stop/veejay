@@ -24,25 +24,27 @@
 
 #define STROBO_PARAMS 7
 
-#define P_THRESHOLD   0
-#define P_DURATION    1
-#define P_OPACITY     2
-#define P_ECHOES      3
-#define P_MODE        4
-#define P_DELAY       5
-#define P_COLOR_DRIVE 6
+#define P_THRESHOLD    0
+#define P_COLOR_HOLD   1
+#define P_OPACITY      2
+#define P_TRAIL        3
+#define P_MODE         4
+#define P_INTERVAL     5
+#define P_COLOR_OFFSET 6
 
 typedef struct {
     uint8_t *buf[3];
     int timestamp;
+    int pulse_count;
+    int strobe_countdown;
     int n_threads;
 
     float eff_threshold;
-    float eff_duration;
+    float eff_color_hold;
     float eff_opacity;
-    float eff_echoes;
-    float eff_delay;
-    float eff_color;
+    float eff_trail;
+    float eff_interval;
+    float eff_color_offset;
     int eff_ready;
 } strobo_t;
 
@@ -102,8 +104,6 @@ static inline int strobo_smooth_i(float *state, int target, float attack, float 
     return strobo_roundf_i(out);
 }
 
-
-
 vj_effect *strobo_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -127,21 +127,21 @@ vj_effect *strobo_init(int w, int h)
         return NULL;
     }
 
-    ve->defaults[P_THRESHOLD]   = 70;
-    ve->defaults[P_DURATION]    = 10;
-    ve->defaults[P_OPACITY]     = 150;
-    ve->defaults[P_ECHOES]      = 3;
-    ve->defaults[P_MODE]        = 0;
-    ve->defaults[P_DELAY]       = 0;
-    ve->defaults[P_COLOR_DRIVE] = 0;
+    ve->defaults[P_THRESHOLD]    = 96;
+    ve->defaults[P_COLOR_HOLD]   = 12;
+    ve->defaults[P_OPACITY]      = 180;
+    ve->defaults[P_TRAIL]        = 34;
+    ve->defaults[P_MODE]         = 0;
+    ve->defaults[P_INTERVAL]     = 4;
+    ve->defaults[P_COLOR_OFFSET] = 0;
 
-    ve->limits[0][P_THRESHOLD]   = 0; ve->limits[1][P_THRESHOLD]   = 255;
-    ve->limits[0][P_DURATION]    = 1; ve->limits[1][P_DURATION]    = 1500;
-    ve->limits[0][P_OPACITY]     = 0; ve->limits[1][P_OPACITY]     = 255;
-    ve->limits[0][P_ECHOES]      = 1; ve->limits[1][P_ECHOES]      = 100;
-    ve->limits[0][P_MODE]        = 0; ve->limits[1][P_MODE]        = 1;
-    ve->limits[0][P_DELAY]       = 0; ve->limits[1][P_DELAY]       = 1500;
-    ve->limits[0][P_COLOR_DRIVE] = 0; ve->limits[1][P_COLOR_DRIVE] = 1000;
+    ve->limits[0][P_THRESHOLD]    = 0; ve->limits[1][P_THRESHOLD]    = 255;
+    ve->limits[0][P_COLOR_HOLD]   = 1; ve->limits[1][P_COLOR_HOLD]   = 1500;
+    ve->limits[0][P_OPACITY]      = 0; ve->limits[1][P_OPACITY]      = 255;
+    ve->limits[0][P_TRAIL]        = 0; ve->limits[1][P_TRAIL]        = 100;
+    ve->limits[0][P_MODE]         = 0; ve->limits[1][P_MODE]         = 1;
+    ve->limits[0][P_INTERVAL]     = 1; ve->limits[1][P_INTERVAL]     = 1500;
+    ve->limits[0][P_COLOR_OFFSET] = 0; ve->limits[1][P_COLOR_OFFSET] = 13;
 
     ve->description = "Strobotsu";
     ve->sub_format = 1;
@@ -149,13 +149,13 @@ vj_effect *strobo_init(int w, int h)
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(
         ve->num_params,
-        "Threshold",
-        "Duration",
+        "Threshold Bias",
+        "Color Hold",
         "Opacity",
-        "Echoes",
+        "Trail",
         "Mode",
-        "Delay",
-        "Color Drive"
+        "Strobe Interval",
+        "Color Offset"
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
@@ -170,13 +170,13 @@ vj_effect *strobo_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         18,                 190,                10, 38,  900, 3600, 0,    58,
-        VJ_BEAT_SPEED,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 2, 180, 4, 14, 2600, 9000, 1800, 28,
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         72,                 210,                10, 38, 1000, 3800, 0,    54,
-        VJ_BEAT_MEMORY,           VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,     2,                  28,                 4,  14, 2800, 9200, 1800, 26,
-        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
-        VJ_BEAT_SPEED,            VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 0, 240, 4, 14, 3200, 11000, 2400, 18,
-        VJ_BEAT_COLOR_PHASE,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,                  320,                8,  30, 1600, 5600, 0,    38
+        VJ_BEAT_MOTION_REACT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         48,                 170,                10, 38,  700, 2600, 0,    52,
+        VJ_BEAT_COLOR_PHASE,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,    4,                  96,                 3,  12, 2600, 8200, 1800, 22,
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         96,                 255,                14, 56,  450, 2000, 0,    86,
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         10,                 92,                 8,  32,  700, 2800, 0,    74,
+        VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0,    0,    0,    0,    -1000,
+        VJ_BEAT_SPEED,            VJ_BEAT_F_DISCRETE | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,       1,                  48,                 3,  18,  450, 2200, 0,    96,
+        VJ_BEAT_COLOR_PHASE,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,    0,                  13,                 3,  10, 2600, 8200, 1800, 18
     );
 
     (void) w;
@@ -202,17 +202,19 @@ void *strobo_malloc(int w, int h)
     s->buf[1] = s->buf[0] + len;
     s->buf[2] = s->buf[1] + len;
 
-    veejay_memset(s->buf[0], 0,   len);
+    veejay_memset(s->buf[0], 0, len);
     veejay_memset(s->buf[1], 128, len);
     veejay_memset(s->buf[2], 128, len);
 
     s->timestamp = 0;
-    s->eff_threshold = 70.0f;
-    s->eff_duration = 10.0f;
-    s->eff_opacity = 150.0f;
-    s->eff_echoes = 3.0f;
-    s->eff_delay = 0.0f;
-    s->eff_color = 0.0f;
+    s->pulse_count = 0;
+    s->strobe_countdown = 0;
+    s->eff_threshold = 96.0f;
+    s->eff_color_hold = 12.0f;
+    s->eff_opacity = 180.0f;
+    s->eff_trail = 34.0f;
+    s->eff_interval = 4.0f;
+    s->eff_color_offset = 0.0f;
     s->eff_ready = 0;
 
     s->n_threads = vje_advise_num_threads(len);
@@ -228,15 +230,26 @@ void strobo_free(void *ptr)
     free(s);
 }
 
-static void strobo_build_lookup(uint8_t lookup[256], int skew)
+static inline int strobo_clock_tick(strobo_t *s, int interval)
 {
-    skew = clampi(skew, 0, 255);
+    int update_now;
 
-    for(int i = 0; i < 256; i++)
-        lookup[i] = (uint8_t)((i * skew + 127) / 255);
+    if(s->strobe_countdown >= interval)
+        s->strobe_countdown = interval - 1;
+
+    if(s->strobe_countdown <= 0) {
+        update_now = 1;
+        s->strobe_countdown = interval;
+        s->pulse_count++;
+    }
+    else {
+        update_now = 0;
+    }
+
+    s->strobe_countdown--;
+
+    return update_now;
 }
-
-
 
 void strobo_apply(void *ptr, VJFrame *frame, int *args)
 {
@@ -246,42 +259,41 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args)
 
     const float fast_a = 0.30f;
     const float fast_r = 0.12f;
-    const float slow_a = 0.15f;
-    const float slow_r = 0.070f;
+    const float slow_a = 0.13f;
+    const float slow_r = 0.060f;
 
     const int threshold_arg = args[P_THRESHOLD];
-    const int duration_arg = args[P_DURATION];
+    const int color_hold_arg = args[P_COLOR_HOLD];
     const int opacity_arg = args[P_OPACITY];
-    const int echoes_arg = args[P_ECHOES];
-    const int delay_arg = args[P_DELAY];
-    const int color_drive_arg = args[P_COLOR_DRIVE];
+    const int trail_arg = args[P_TRAIL];
+    const int interval_arg = args[P_INTERVAL];
+    const int color_offset_arg = args[P_COLOR_OFFSET];
 
     if(!s->eff_ready) {
         s->eff_threshold = (float)threshold_arg;
-        s->eff_duration = (float)duration_arg;
+        s->eff_color_hold = (float)color_hold_arg;
         s->eff_opacity = (float)opacity_arg;
-        s->eff_echoes = (float)echoes_arg;
-        s->eff_delay = (float)delay_arg;
-        s->eff_color = (float)color_drive_arg;
+        s->eff_trail = (float)trail_arg;
+        s->eff_interval = (float)interval_arg;
+        s->eff_color_offset = (float)color_offset_arg;
         s->eff_ready = 1;
     }
 
-    int skew = strobo_smooth_i(&s->eff_threshold, threshold_arg, fast_a, fast_r);
-    int duration = strobo_smooth_i(&s->eff_duration, duration_arg, slow_a, slow_r);
+    int threshold_bias = strobo_smooth_i(&s->eff_threshold, threshold_arg, fast_a, fast_r);
+    int color_hold = strobo_smooth_i(&s->eff_color_hold, color_hold_arg, slow_a, slow_r);
     int opacity = strobo_smooth_i(&s->eff_opacity, opacity_arg, fast_a, fast_r);
-    int echoes = strobo_smooth_i(&s->eff_echoes, echoes_arg, slow_a, slow_r);
-    int delay = strobo_smooth_i(&s->eff_delay, delay_arg, slow_a, slow_r);
-    int color_drive = strobo_smooth_i(&s->eff_color, color_drive_arg, fast_a, fast_r);
+    int trail = strobo_smooth_i(&s->eff_trail, trail_arg, slow_a, slow_r);
+    int interval = strobo_smooth_i(&s->eff_interval, interval_arg, slow_a, slow_r);
+    int color_offset = strobo_smooth_i(&s->eff_color_offset, color_offset_arg, slow_a, slow_r);
 
-    skew = clampi(skew, 0, 255);
-    duration = clampi(duration, 1, 1500);
+    threshold_bias = clampi(threshold_bias, 0, 255);
+    color_hold = clampi(color_hold, 1, 1500);
     opacity = clampi(opacity, 0, 255);
-    echoes = clampi(echoes, 1, 100);
-    delay = clampi(delay, 0, 1500);
-    color_drive = clampi(color_drive, 0, 1000);
+    trail = clampi(trail, 0, 100);
+    interval = clampi(interval, 1, 1500);
+    color_offset = clampi(color_offset, 0, 13);
 
     const int mode = args[P_MODE] ? 1 : 0;
-    const int direct_q = color_drive;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -299,13 +311,11 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args)
         histogram[Y[i]]++;
 
     const int base_threshold = (int)otsu_method(histogram);
-    const int threshold = clampi(base_threshold + ((skew - 128) >> 1), 0, 255);
-
+    const int threshold = clampi(base_threshold + ((threshold_bias - 128) >> 1), 0, 255);
     const int color_total = (int)(sizeof(strobo_rainbow) / sizeof(strobo_rainbow[0]));
-    const int color_hold = duration < 1 ? 1 : duration;
     const int base_color_index = (s->timestamp / color_hold) % color_total;
-    const int color_direct = (color_drive * color_total + 500) / 1000;
-    const int color_index = (base_color_index + color_direct) % color_total;
+    const int color_index = (base_color_index + color_offset) % color_total;
+    const int update_now = strobo_clock_tick(s, interval);
 
     int cy = 0;
     int cu = 128;
@@ -324,14 +334,10 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args)
     cu = CLAMP_UV(cu);
     cv = CLAMP_UV(cv);
 
-    const int update_now = (delay == 0 || (s->timestamp % delay) == 0);
+    int persist_q8 = 16 + ((trail * 234 + 50) / 100);
+    persist_q8 = clampi(persist_q8, 16, 250);
 
-    int persist_q8 = 96 + ((echoes * 152 + 50) / 100);
-    persist_q8 = clampi(persist_q8, 64, 250);
-
-    const int color_lift = (direct_q * 22 + 500) / 1000;
-    const int deposit_lift = (direct_q * 36 + 500) / 1000;
-    const int deposit_q8 = update_now ? clampi(opacity + deposit_lift, 0, 255) : 0;
+    const int deposit_q8 = update_now ? opacity : 0;
     const int out_q8 = opacity;
 
 #pragma omp parallel for schedule(static) num_threads(s->n_threads)
@@ -341,8 +347,7 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args)
         int tv = 128 + ((((int)bV[i] - 128) * persist_q8) >> 8);
 
         if(deposit_q8 > 0 && Y[i] <= threshold) {
-            const int dy = CLAMP_Y(cy + color_lift);
-            ty = blend_y((uint8_t)clampi(ty, 0, 255), (uint8_t)dy, deposit_q8);
+            ty = blend_y((uint8_t)clampi(ty, 0, 255), (uint8_t)cy, deposit_q8);
             tu = blend_uv((uint8_t)CLAMP_UV(tu), (uint8_t)cu, deposit_q8);
             tv = blend_uv((uint8_t)CLAMP_UV(tv), (uint8_t)cv, deposit_q8);
         }

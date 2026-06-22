@@ -24,6 +24,10 @@
 
 #ifdef HAVE_JACK
 
+#ifndef VJ_AUDIO_BEAT_MONITOR_LATENCY_DEFAULT_MS
+#define VJ_AUDIO_BEAT_MONITOR_LATENCY_DEFAULT_MS -1
+#endif
+
 typedef struct vj_audio_beat_shared_t vj_audio_beat_shared_t;
 typedef struct vj_audio_sync_shared_t vj_audio_sync_shared_t;
 typedef struct veejay_t veejay_t;
@@ -32,9 +36,8 @@ typedef struct sample_eff_t sample_eff_chain;
 typedef enum
 {
     VJ_AUDIO_BEAT_ACTION_NONE = 0,
-    VJ_AUDIO_BEAT_ACTION_FREEZE = 1,
     VJ_AUDIO_BEAT_ACTION_AUTO_FX = 2,
-    VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX = 3,
+    VJ_AUDIO_BEAT_ACTION_BREAK_BEAT_AUTO_FX = 3,
     VJ_AUDIO_BEAT_ACTION_BREAK_BEAT = 4
 } vj_audio_beat_action_t;
 
@@ -56,7 +59,10 @@ typedef enum
     VJ_AUDIO_CTRL_DENSITY = 13,
     VJ_AUDIO_CTRL_KICK = 14,
     VJ_AUDIO_CTRL_SNARE = 15,
-    VJ_AUDIO_CTRL_HAT = 16
+    VJ_AUDIO_CTRL_HAT = 16,
+    VJ_AUDIO_CTRL_SCRATCH_ENVELOPE = 17,
+    VJ_AUDIO_CTRL_SCRATCH_DIRECTION = 18,
+    VJ_AUDIO_CTRL_SCRATCH_SIGNED = 19
 } vj_audio_beat_signal_t;
 
 #define VJ_AUDIO_BEAT_AUTO_MAX_TARGETS 16
@@ -153,6 +159,25 @@ void vj_audio_beat_set_freeze_ms(vj_audio_beat_shared_t *s, int ms);
 void vj_audio_beat_set_cooldown_ms(vj_audio_beat_shared_t *s, int ms);
 void vj_audio_beat_set_threshold(vj_audio_beat_shared_t *s, int threshold);
 void vj_audio_beat_set_input_channels(vj_audio_beat_shared_t *s, int channels);
+void vj_audio_beat_set_scratch_sensitivity(vj_audio_beat_shared_t *s, int sensitivity);
+void vj_audio_beat_set_source_loss_pause(vj_audio_beat_shared_t *s, int enabled);
+void vj_audio_beat_set_output_latency_ms(vj_audio_beat_shared_t *s, int ms);
+int vj_audio_beat_get_output_latency_ms(vj_audio_beat_shared_t *s);
+void vj_audio_beat_set_heard_latency_ms(vj_audio_beat_shared_t *s, int ms);
+int vj_audio_beat_get_heard_latency_ms(vj_audio_beat_shared_t *s);
+void vj_audio_beat_set_monitor_latency_ms(vj_audio_beat_shared_t *s, int ms);
+int vj_audio_beat_get_monitor_latency_ms(vj_audio_beat_shared_t *s);
+int vj_audio_beat_get_effective_latency_ms(vj_audio_beat_shared_t *s);
+int vj_audio_beat_get_freeze_ms(vj_audio_beat_shared_t *s);
+int vj_audio_beat_get_cooldown_ms(vj_audio_beat_shared_t *s);
+int vj_audio_beat_get_threshold(vj_audio_beat_shared_t *s);
+int vj_audio_beat_get_input_channels(vj_audio_beat_shared_t *s);
+int vj_audio_beat_get_pulse_ms(vj_audio_beat_shared_t *s);
+int vj_audio_beat_get_gate_ms(vj_audio_beat_shared_t *s);
+int vj_audio_beat_get_auto_mode(vj_audio_beat_shared_t *s);
+int vj_audio_beat_get_auto_amount(vj_audio_beat_shared_t *s);
+int vj_audio_beat_get_scratch_sensitivity(vj_audio_beat_shared_t *s);
+int vj_audio_beat_get_source_loss_pause(vj_audio_beat_shared_t *s);
 
 void vj_audio_beat_set_action(vj_audio_beat_shared_t *s, int action);
 void vj_audio_beat_set_pulse_ms(vj_audio_beat_shared_t *s, int ms);

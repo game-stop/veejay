@@ -841,16 +841,16 @@ vj_effect *blackhole_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_SIGNED_SPEED,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -980, 980, 14, 54,  900, 3000, 0,    76,
-        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         32,  94,  14, 58,  900, 2800, 0,    82,
-        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                             1,   10,  3,  8,  3600, 9400, 2600, 14,
-        VJ_BEAT_SIGNED_SPEED,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -76,  76,  10, 42, 1100, 3400, 0,    58,
-        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -82,  82,  9,  34, 1300, 4200, 0,    52,
-        VJ_BEAT_MEMORY,             VJ_BEAT_F_CONTINUOUS,                                                   4,   68,  10, 42, 1200, 4200, 0,    66,
-        VJ_BEAT_WINDOW_RADIUS,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_CONTINUOUS,                            10,  58,  4,  14, 3400, 9000, 2400, 16,
-        VJ_BEAT_MOTION_REACT,       VJ_BEAT_F_CONTINUOUS,                                                   0,   72,  8,  30, 1600, 4800, 0,    44,
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,           35,  285, 4,  14, 4200, 11000, 3000, 18,
-        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS,                                                   24,  94,  12, 52,  900, 3000, 0,    74
+        VJ_BEAT_SIGNED_SPEED,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, -2000, 2000, 18, 72,  520, 2400, 0,    78,
+        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,  100, 24, 88,  260, 1800, 0,    96,
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,    0,   12,  4, 14, 2600, 7600, 1800, 38,
+        VJ_BEAT_SIGNED_SPEED,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -100, 100, 14, 62,  520, 2400, 0,    72,
+        VJ_BEAT_SIGNED_CURVE,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,  -100, 100, 12, 56,  700, 3000, 0,    66,
+        VJ_BEAT_MEMORY,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,  100, 18, 78,  700, 3400, 200,  82,
+        VJ_BEAT_WINDOW_RADIUS,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,  1,  100,  8, 30, 2600, 8200, 1800, 34,
+        VJ_BEAT_MOTION_REACT,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,  100, 10, 42, 1200, 4200, 0,    46,
+        VJ_BEAT_DRIFT,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                                  0,  300, 18, 72,  700, 3200, 0,    86,
+        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,  100, 22, 86,  300, 1900, 0,    94
     );
 
     return ve;

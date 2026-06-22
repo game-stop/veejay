@@ -23,17 +23,15 @@
 #include <stdint.h>
 #include "ripplewave.h"
 
-#define RIPPLEWAVE_PARAMS 9
+#define RIPPLEWAVE_PARAMS 7
 
-#define P_FREQ_X      0
-#define P_FREQ_Y      1
-#define P_AMP         2
-#define P_SPEED       3
-#define P_MIX         4
-#define P_CHROMA      5
-#define P_PHASE       6
-#define P_AMP_DRIVE   7
-#define P_PHASE_DRIVE 8
+#define P_FREQ_X 0
+#define P_FREQ_Y 1
+#define P_AMP    2
+#define P_SPEED  3
+#define P_MIX    4
+#define P_CHROMA 5
+#define P_PHASE  6
 
 #define RIPPLE_PI2 6.28318530718f
 
@@ -52,8 +50,6 @@ typedef struct {
     float sm_mix;
     float sm_chroma;
     float sm_phase;
-    float sm_amp_drive;
-    float sm_phase_drive;
     int have_smooth;
     int n_threads;
 } ripplewave_t;
@@ -77,8 +73,6 @@ static inline int ripplewave_q8_from_1000(int v)
 {
     return (clampi(v, 0, 1000) * 256 + 500) / 1000;
 }
-
-
 
 static inline float ripplewave_smooth_to(float cur, float target, float k)
 {
@@ -108,15 +102,13 @@ vj_effect *ripplewave_init(int w, int h)
         return NULL;
     }
 
-    ve->limits[0][P_FREQ_X] = 0;      ve->limits[1][P_FREQ_X] = 100;       ve->defaults[P_FREQ_X] = 10;
-    ve->limits[0][P_FREQ_Y] = 1;      ve->limits[1][P_FREQ_Y] = 100;       ve->defaults[P_FREQ_Y] = 15;
-    ve->limits[0][P_AMP] = 0;         ve->limits[1][P_AMP] = 45;           ve->defaults[P_AMP] = 30;
-    ve->limits[0][P_SPEED] = 0;       ve->limits[1][P_SPEED] = 100;        ve->defaults[P_SPEED] = 10;
-    ve->limits[0][P_MIX] = 0;         ve->limits[1][P_MIX] = 1000;         ve->defaults[P_MIX] = 1000;
-    ve->limits[0][P_CHROMA] = 0;      ve->limits[1][P_CHROMA] = 1000;      ve->defaults[P_CHROMA] = 1000;
-    ve->limits[0][P_PHASE] = 0;       ve->limits[1][P_PHASE] = 1000;       ve->defaults[P_PHASE] = 0;
-    ve->limits[0][P_AMP_DRIVE] = 0;   ve->limits[1][P_AMP_DRIVE] = 1000;   ve->defaults[P_AMP_DRIVE] = 0;
-    ve->limits[0][P_PHASE_DRIVE] = 0; ve->limits[1][P_PHASE_DRIVE] = 1000; ve->defaults[P_PHASE_DRIVE] = 0;
+    ve->limits[0][P_FREQ_X] = 0;   ve->limits[1][P_FREQ_X] = 100;  ve->defaults[P_FREQ_X] = 10;
+    ve->limits[0][P_FREQ_Y] = 1;   ve->limits[1][P_FREQ_Y] = 100;  ve->defaults[P_FREQ_Y] = 15;
+    ve->limits[0][P_AMP] = 0;      ve->limits[1][P_AMP] = 45;      ve->defaults[P_AMP] = 30;
+    ve->limits[0][P_SPEED] = 0;    ve->limits[1][P_SPEED] = 100;   ve->defaults[P_SPEED] = 10;
+    ve->limits[0][P_MIX] = 0;      ve->limits[1][P_MIX] = 1000;    ve->defaults[P_MIX] = 1000;
+    ve->limits[0][P_CHROMA] = 0;   ve->limits[1][P_CHROMA] = 1000; ve->defaults[P_CHROMA] = 1000;
+    ve->limits[0][P_PHASE] = 0;    ve->limits[1][P_PHASE] = 1000;  ve->defaults[P_PHASE] = 0;
 
     ve->description = "Wave Patterns (H/V)";
     ve->sub_format = 1;
@@ -129,24 +121,20 @@ vj_effect *ripplewave_init(int w, int h)
         "Frequency Y",
         "Amplitude",
         "Speed",
-        "Mix",
+        "Opacity",
         "Chroma Amount",
-        "Phase",
-        "Amp Drive",
-        "Phase Drive"
+        "Phase"
     );
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_WARP,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 3,   82,   14, 54, 800,  3000, 0, 76,
-        VJ_BEAT_WARP,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 4,   88,   14, 54, 800,  3000, 0, 76,
-        VJ_BEAT_WINDOW_RADIUS,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 8,   45,   16, 62, 700,  2800, 0, 90,
-        VJ_BEAT_SPEED,            VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 4,   96,   16, 62, 700,  2800, 0, 84,
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 520, 1000, 12, 46, 1000, 3600, 0, 72,
-        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 520, 1000, 12, 46, 1000, 3600, 0, 68,
-        VJ_BEAT_GEOMETRY_PHASE,   VJ_BEAT_F_CONTINUOUS,                           0,   1000, 12, 46, 1000, 3600, 0, 64,
-        VJ_BEAT_INTENSITY,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 160, 1000, 16, 62, 700,  2800, 0, 94,
-        VJ_BEAT_GEOMETRY_PHASE,   VJ_BEAT_F_CONTINUOUS,                           0,   1000, 16, 62, 700,  2800, 0, 88
+        VJ_BEAT_WARP,             VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_WARP,             VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_WARP,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SQUARED | VJ_BEAT_F_NO_ZERO_CROSS,  8,                  45,                 18, 72,  450, 1800, 0,    96,
+        VJ_BEAT_SPEED,            VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      4,                  96,                 12, 54,  650, 2600, 0,    74,
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                                                     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_REJECT,                                                     VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_GEOMETRY_PHASE,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
     );
 
     return ve;
@@ -220,8 +208,6 @@ void ripplewave_apply(void *ptr, VJFrame *frame, int *args)
     const int mix_arg = args[P_MIX];
     const int chroma_arg = args[P_CHROMA];
     const int phase_arg = args[P_PHASE];
-    const int amp_drive_arg = args[P_AMP_DRIVE];
-    const int phase_drive_arg = args[P_PHASE_DRIVE];
 
     const float param_k = 0.34f;
 
@@ -233,8 +219,6 @@ void ripplewave_apply(void *ptr, VJFrame *frame, int *args)
         data->sm_mix = (float)mix_arg;
         data->sm_chroma = (float)chroma_arg;
         data->sm_phase = (float)phase_arg;
-        data->sm_amp_drive = (float)amp_drive_arg;
-        data->sm_phase_drive = (float)phase_drive_arg;
         data->have_smooth = 1;
     }
     else {
@@ -245,17 +229,12 @@ void ripplewave_apply(void *ptr, VJFrame *frame, int *args)
         data->sm_mix = ripplewave_smooth_to(data->sm_mix, (float)mix_arg, param_k);
         data->sm_chroma = ripplewave_smooth_to(data->sm_chroma, (float)chroma_arg, param_k);
         data->sm_phase = ripplewave_smooth_to(data->sm_phase, (float)phase_arg, param_k);
-        data->sm_amp_drive = ripplewave_smooth_to(data->sm_amp_drive, (float)amp_drive_arg, param_k);
-        data->sm_phase_drive = ripplewave_smooth_to(data->sm_phase_drive, (float)phase_drive_arg, param_k);
     }
 
-    const float amp_drive = clampf(data->sm_amp_drive * 0.001f, 0.0f, 1.0f);
-    const float phase_drive = clampf(data->sm_phase_drive * 0.001f, 0.0f, 1.0f);
-    const float drive = clampf(amp_drive * 0.62f + phase_drive * 0.38f, 0.0f, 1.0f);
     const float frequency_x = data->sm_freq_x * 0.01f;
     const float frequency_y = data->sm_freq_y * 0.01f;
-    const float amplitude = clampf(data->sm_amp + amp_drive * 72.0f, 0.0f, 96.0f);
-    const float speed = clampf(data->sm_speed + phase_drive * 72.0f + amp_drive * 24.0f, 0.0f, 172.0f);
+    const float amplitude = clampf(data->sm_amp, 0.0f, 45.0f);
+    const float speed = clampf(data->sm_speed, 0.0f, 100.0f);
 
     if(speed > 0.0001f) {
         data->phase += speed * 0.01f;
@@ -264,10 +243,7 @@ void ripplewave_apply(void *ptr, VJFrame *frame, int *args)
             data->phase -= 628.3185f;
     }
 
-    const float phase_offset =
-        (data->sm_phase * 0.001f * RIPPLE_PI2) +
-        (phase_drive * RIPPLE_PI2 * 1.35f);
-
+    const float phase_offset = data->sm_phase * 0.001f * RIPPLE_PI2;
     const float render_phase = data->phase + phase_offset;
 
     uint8_t *restrict Y = frame->data[0];
@@ -312,8 +288,8 @@ void ripplewave_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    const int mix_q8 = ripplewave_q8_from_1000((int)(data->sm_mix + drive * (1000.0f - data->sm_mix) * 0.50f + 0.5f));
-    const int chroma_amount = clampi((int)(data->sm_chroma + drive * (1000.0f - data->sm_chroma) * 0.42f + 0.5f), 0, 1000);
+    const int mix_q8 = ripplewave_q8_from_1000((int)(data->sm_mix + 0.5f));
+    const int chroma_amount = clampi((int)(data->sm_chroma + 0.5f), 0, 1000);
     const int chroma_q8 = (mix_q8 * chroma_amount + 500) / 1000;
 
     if(mix_q8 >= 256 && chroma_q8 >= 256) {

@@ -1,4 +1,5 @@
 /*
+dlclose( handle );	
  * Linux VeeJay
  *
  * Copyright(C)2002-2008 Niels Elburg <nwelburg@gmail.com>
@@ -56,6 +57,9 @@
 #include <libveejay/vj-jack.h>
 #include <libveejay/vj-audio-beat.h>
 #include <libveejay/vj-audio-sync.h>
+#ifndef VJ_AUDIO_BEAT_ACTION_BREAK_BEAT_AUTO_FX
+#define VJ_AUDIO_BEAT_ACTION_BREAK_BEAT_AUTO_FX 3
+#endif
 #ifndef VJ_AUDIO_BEAT_ACTION_BREAK_BEAT
 #define VJ_AUDIO_BEAT_ACTION_BREAK_BEAT 4
 #endif
@@ -184,6 +188,15 @@ static unsigned int vj_sequence_next_revision(unsigned int revision);
 extern void veejay_pipe_write_status(veejay_t *info);
 extern int  _vj_server_del_client(vj_server * vje, int link_id);
 extern int       vj_event_exists( int id );
+#ifdef HAVE_JACK
+extern int veejay_audio_beat_push_config_ex(veejay_t *info,
+                                            int freeze_ms,
+                                            int cooldown_ms,
+                                            int threshold,
+                                            int input_channels,
+                                            int scratch_sensitivity,
+                                            int source_loss_pause);
+#endif
 
 static char *to_master_buf = NULL;
 static int to_master_size = 0;
@@ -3746,6 +3759,20 @@ void    vj_event_promote_me( void *ptr, const char format[], va_list ap )
     vj_server_client_promote( v->vjs[VEEJAY_PORT_CMD], v->uc->current_link );
 }
 
+
+static void vj_event_audio_beat_user_transport_override(veejay_t *v, int requested_speed)
+{
+#ifdef HAVE_JACK
+    if(!v || !v->settings)
+        return;
+
+    vj_audio_beat_user_transport_override(v, &v->settings->audio_beat, requested_speed);
+#else
+    (void)v;
+    (void)requested_speed;
+#endif
+}
+
 void vj_event_play_stop(void *ptr, const char format[], va_list ap) 
 {
     veejay_t *v = (veejay_t*) ptr;
@@ -3756,11 +3783,13 @@ void vj_event_play_stop(void *ptr, const char format[], va_list ap)
         {
             v->settings->previous_playback_speed = speed;
             veejay_set_speed(v, 0,0 );
+            vj_event_audio_beat_user_transport_override(v, 0);
             veejay_msg(VEEJAY_MSG_INFO,"Video is paused");
         }
         else
         {
             veejay_set_speed(v, v->settings->previous_playback_speed,0 );
+            vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
             veejay_msg(VEEJAY_MSG_INFO,"Video is playing (resumed at speed %d)", v->settings->previous_playback_speed);
         }
     }
@@ -3799,12 +3828,14 @@ void vj_event_play_stop_all(void *ptr, const char format[], va_list ap)
         {
             v->settings->previous_playback_speed = speed;
             veejay_set_speed(v, 0,0 );
+            vj_event_audio_beat_user_transport_override(v, 0);
             sample_set_chain_paused( v->uc->sample_id, 1);
             veejay_msg(VEEJAY_MSG_INFO,"Video is paused");
         }
         else
         {
             veejay_set_speed(v, v->settings->previous_playback_speed,0 );
+            vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
             sample_set_chain_paused( v->uc->sample_id, 0);
             veejay_msg(VEEJAY_MSG_INFO,"Video is playing (resumed at speed %d)", v->settings->previous_playback_speed);
         }
@@ -3891,6 +3922,7 @@ void vj_event_play_reverse(void *ptr, const char format[], va_list ap)
         }
 
         veejay_set_speed(v, speed, 0);
+        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
 
         int sfd = v->settings->sfd;
         if (sfd <= 0)
@@ -3931,6 +3963,7 @@ void vj_event_play_forward(void *ptr, const char format[], va_list ap)
             speed = -speed;
 
         veejay_set_speed(v, speed, 0);
+        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
 
         int sfd = v->settings->sfd;
         if (sfd <= 0)
@@ -3958,6 +3991,7 @@ void vj_event_play_speed(void *ptr, const char format[], va_list ap)
         int speed = 0;
         P_A(args,sizeof(args),NULL,0,format,ap);
         veejay_set_speed(v, args[0],0 );
+        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
         speed = v->settings->current_playback_speed;
         veejay_msg(VEEJAY_MSG_INFO, "Video is playing at speed %d now (%s)",
             speed, speed == 0 ? "paused" : speed < 0 ? "reverse" : "forward" );
@@ -4000,6 +4034,7 @@ void vj_event_play_speed_kb(void *ptr, const char format[], va_list ap)
             veejay_set_speed( v, -1 * speed,0 );
         else
             veejay_set_speed(v, speed,0 );
+        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
         speed = v->settings->current_playback_speed;
         veejay_msg(VEEJAY_MSG_INFO, "Video is playing at speed %d now (%s)",
             speed, speed == 0 ? "paused" : speed < 0 ? "reverse" : "forward" );
@@ -8725,18 +8760,22 @@ static inline int vj_audio_beat_event_q100(float v)
     return (int)(v * 100.0f + 0.5f);
 }
 
+static inline int vj_audio_beat_event_action_is_breakbeat(int action)
+{
+    return action == VJ_AUDIO_BEAT_ACTION_BREAK_BEAT ||
+           action == VJ_AUDIO_BEAT_ACTION_BREAK_BEAT_AUTO_FX;
+}
+
 static const char *vj_audio_beat_event_action_name(int action)
 {
     switch(action)
     {
         case VJ_AUDIO_BEAT_ACTION_NONE:
             return "none";
-        case VJ_AUDIO_BEAT_ACTION_FREEZE:
-            return "freeze";
         case VJ_AUDIO_BEAT_ACTION_AUTO_FX:
             return "auto-fx";
-        case VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX:
-            return "freeze+auto-fx";
+        case VJ_AUDIO_BEAT_ACTION_BREAK_BEAT_AUTO_FX:
+            return "break-beat+auto-fx";
         case VJ_AUDIO_BEAT_ACTION_BREAK_BEAT:
             return "break-beat";
         default:
@@ -8746,9 +8785,7 @@ static const char *vj_audio_beat_event_action_name(int action)
 
 static int vj_audio_beat_event_action_needs_external_sync(int action)
 {
-    return action == VJ_AUDIO_BEAT_ACTION_FREEZE ||
-           action == VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX ||
-           action == VJ_AUDIO_BEAT_ACTION_BREAK_BEAT;
+    return vj_audio_beat_event_action_is_breakbeat(action);
 }
 
 static int vj_event_audio_beat_has_external_sync_source(veejay_t *v)
@@ -8766,15 +8803,36 @@ static int vj_event_audio_beat_has_external_sync_source(veejay_t *v)
 
 static int vj_event_audio_beat_sanitize_action(veejay_t *v, int action)
 {
+    switch(action)
+    {
+        case VJ_AUDIO_BEAT_ACTION_NONE:
+        case VJ_AUDIO_BEAT_ACTION_AUTO_FX:
+        case VJ_AUDIO_BEAT_ACTION_BREAK_BEAT_AUTO_FX:
+        case VJ_AUDIO_BEAT_ACTION_BREAK_BEAT:
+            break;
+        default:
+            action = VJ_AUDIO_BEAT_ACTION_NONE;
+            break;
+    }
+
     if(vj_audio_beat_event_action_needs_external_sync(action) &&
        !vj_event_audio_beat_has_external_sync_source(v))
     {
+        if(action == VJ_AUDIO_BEAT_ACTION_BREAK_BEAT_AUTO_FX)
+        {
+            veejay_msg(VEEJAY_MSG_WARNING,
+                       "[AUDIO-BEAT] %s(%d) needs active JACK/WAV audio-sync source; using auto-fx(%d)",
+                       vj_audio_beat_event_action_name(action),
+                       action,
+                       VJ_AUDIO_BEAT_ACTION_AUTO_FX);
+            return VJ_AUDIO_BEAT_ACTION_AUTO_FX;
+        }
+
         veejay_msg(VEEJAY_MSG_WARNING,
-                   "[AUDIO-BEAT] %s(%d) needs active JACK/WAV audio-sync source; keeping source unchanged and using auto-fx(%d)",
+                   "[AUDIO-BEAT] %s(%d) needs active JACK/WAV audio-sync source; using none(0)",
                    vj_audio_beat_event_action_name(action),
-                   action,
-                   VJ_AUDIO_BEAT_ACTION_AUTO_FX);
-        return VJ_AUDIO_BEAT_ACTION_AUTO_FX;
+                   action);
+        return VJ_AUDIO_BEAT_ACTION_NONE;
     }
 
     return action;
@@ -9203,123 +9261,32 @@ void vj_event_audio_sync_print(void *ptr, const char format[], va_list ap)
 }
 
 
-#ifdef HAVE_JACK
-
-static int vj_audio_beat_event_is_freeze_action(int action)
-{
-    return action == VJ_AUDIO_BEAT_ACTION_FREEZE ||
-           action == VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX;
-}
-
-static int vj_event_audio_beat_freeze_guard_ms(veejay_t *v)
-{
-    double spvf = 0.04;
-    int guard;
-
-    if(v && v->settings && v->settings->spvf > 0.0)
-        spvf = (double)v->settings->spvf;
-
-    /*
-     * settings->spvf is seconds per video frame.
-     *
-     * 25 fps: 0.04 * 1000 = 40 ms
-     */
-    guard = (int)((spvf * 1000.0) + 0.5);
-
-    if(guard < 10)
-        guard = 10;
-    else if(guard > 250)
-        guard = 250;
-
-    return guard;
-}
-
-static void vj_event_audio_beat_clamp_freeze_config(
-    veejay_t *v,
-    int action,
-    int *freeze_ms,
-    int *cooldown_ms
-)
-{
-    int cur_freeze;
-    int cur_cooldown;
-    int f;
-    int c;
-    int min_cooldown;
-    int guard;
-
-    if(!v || !v->settings || !freeze_ms || !cooldown_ms)
-        return;
-
-    if(!vj_audio_beat_event_is_freeze_action(action))
-        return;
-
-    cur_freeze = atomic_load_int(&v->settings->audio_beat.freeze_ms);
-    cur_cooldown = atomic_load_int(&v->settings->audio_beat.cooldown_ms);
-
-    f = (*freeze_ms >= 0) ? *freeze_ms : cur_freeze;
-    c = (*cooldown_ms >= 0) ? *cooldown_ms : cur_cooldown;
-
-    /*
-     * Match setter limits.
-     */
-    f = vj_audio_beat_event_clampi(f, 20, 1000);
-    c = vj_audio_beat_event_clampi(c, 40, 2000);
-
-    guard = vj_event_audio_beat_freeze_guard_ms(v);
-    min_cooldown = f + guard;
-
-    if(min_cooldown > 2000)
-        min_cooldown = 2000;
-
-    /*
-     * Preserve the requested/current freeze length and raise cooldown.
-     * This avoids a stored state where freeze >= cooldown.
-     */
-    if(c < min_cooldown)
-    {
-        c = min_cooldown;
-        *cooldown_ms = c;
-
-        if(*freeze_ms >= 0)
-            *freeze_ms = f;
-
-        veejay_msg(VEEJAY_MSG_INFO,
-                   "[AUDIO-BEAT] freeze cooldown clamp: action=%d freeze_ms=%d cooldown_ms=%d guard=%dms",
-                   action,
-                   f,
-                   c,
-                   guard);
-    }
-}
-
-#endif
-
 void vj_event_audio_beat_config(void *ptr, const char format[], va_list ap)
 {
 #ifdef HAVE_JACK
     veejay_t *v = (veejay_t *)ptr;
-    int args[4] = { -1, -1, -1, -1 };
+    int args[6] = { -1, -1, -1, -1, -1, -1 };
 
     P_A(args, sizeof(args), NULL, 0, format, ap);
 
     if(!vj_event_audio_beat_ready(v))
         return;
 
-    {
-        int action = atomic_load_int(&v->settings->audio_beat.action_mode);
 
-        vj_event_audio_beat_clamp_freeze_config(v, action, &args[0], &args[1]);
-    }
-
-    if(veejay_audio_beat_push_config(v, args[0], args[1], args[2], args[3]) < 0)
+    if(veejay_audio_beat_push_config_ex(v,
+                                      args[0],
+                                      args[1],
+                                      args[2],
+                                      args[3],
+                                      args[4],
+                                      args[5]) < 0)
     {
         veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO] Unable to apply beat detector config");
         return;
     }
     veejay_msg(VEEJAY_MSG_INFO,
-               "[AUDIO] Beat detector config freeze=%d cooldown=%d threshold=%d channels=%d",
-               args[0], args[1], args[2], args[3]);
+               "[AUDIO] Beat detector config hold=%d cooldown=%d threshold=%d channels=%d scratch=%d source_loss_pause=%d",
+               args[0], args[1], args[2], args[3], args[4], args[5]);
 #else
     (void)ptr;
     (void)format;
@@ -9331,23 +9298,44 @@ void vj_event_audio_beat_ui_config(void *ptr, const char format[], va_list ap)
 {
 #ifdef HAVE_JACK
     veejay_t *v = (veejay_t *)ptr;
-    int args[10] = { 1, 2, 90, 240, 145, 2, 180, 90, 2, 75 };
+    int args[13] = { 1, 2, 90, 240, 145, 2, 180, 90, 2, 75, 50, 1, -1 };
     int enabled;
     int rc;
+    int parsed_args = 0;
+    const char *fmtp = format;
+
+    while(fmtp && *fmtp) {
+        if(*fmtp == 'd')
+            parsed_args++;
+        fmtp++;
+    }
 
     P_A(args, sizeof(args), NULL, 0, format, ap);
 
     if(!vj_event_audio_beat_ready(v))
         return;
 
-    args[1] = vj_audio_beat_event_clampi(args[1], VJ_AUDIO_BEAT_ACTION_NONE, VJ_AUDIO_BEAT_ACTION_BREAK_BEAT);
+    if(parsed_args < 13)
+        args[12] = vj_audio_beat_get_monitor_latency_ms(&v->settings->audio_beat);
+
     args[1] = vj_event_audio_beat_sanitize_action(v, args[1]);
     args[8] = vj_audio_beat_event_clampi(args[8], VJ_AUDIO_BEAT_AUTO_OFF, VJ_AUDIO_BEAT_AUTO_CHAOS);
     args[9] = vj_audio_beat_event_clampi(args[9], 0, 100);
+    args[10] = vj_audio_beat_event_clampi(args[10], 0, 100);
+    args[11] = args[11] ? 1 : 0;
+    if(args[12] >= 0)
+        args[12] = vj_audio_beat_event_clampi(args[12], 0, 64);
+    else
+        args[12] = -1;
 
-    vj_event_audio_beat_clamp_freeze_config(v, args[1], &args[2], &args[3]);
 
-    if(veejay_audio_beat_push_config(v, args[2], args[3], args[4], args[5]) < 0)
+    if(veejay_audio_beat_push_config_ex(v,
+                                      args[2],
+                                      args[3],
+                                      args[4],
+                                      args[5],
+                                      args[10],
+                                      args[11]) < 0)
     {
         veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO-BEAT] Unable to apply UI beat detector config");
         return;
@@ -9358,6 +9346,7 @@ void vj_event_audio_beat_ui_config(void *ptr, const char format[], va_list ap)
     vj_audio_beat_set_gate_ms(&v->settings->audio_beat, args[7]);
     vj_audio_beat_set_auto_mode(&v->settings->audio_beat, args[8]);
     vj_audio_beat_set_auto_amount(&v->settings->audio_beat, args[9]);
+    vj_audio_beat_set_monitor_latency_ms(&v->settings->audio_beat, args[12]);
 
     vj_audio_beat_event_auto_mode_cache = args[8];
     vj_audio_beat_event_auto_amount_cache = args[9];
@@ -9380,7 +9369,7 @@ void vj_event_audio_beat_ui_config(void *ptr, const char format[], va_list ap)
     }
 
     veejay_msg(VEEJAY_MSG_INFO,
-               "[AUDIO-BEAT] UI config enabled=%d action=%s(%d) freeze=%dms cooldown=%dms threshold=%d channels=%d pulse=%dms gate=%dms auto_mode=%s(%d) auto_amount=%d",
+               "[AUDIO-BEAT] UI config enabled=%d action=%s(%d) hold=%dms cooldown=%dms threshold=%d channels=%d pulse=%dms gate=%dms auto_mode=%s(%d) auto_amount=%d scratch=%d source_loss_pause=%d monitor_latency=%d",
                rc,
                vj_audio_beat_event_action_name(args[1]),
                args[1],
@@ -9388,7 +9377,10 @@ void vj_event_audio_beat_ui_config(void *ptr, const char format[], va_list ap)
                args[6], args[7],
                vj_audio_beat_event_auto_mode_name(args[8]),
                args[8],
-               args[9]);
+               args[9],
+               args[10],
+               args[11],
+               vj_audio_beat_get_monitor_latency_ms(&v->settings->audio_beat));
 #else
     (void)ptr;
     (void)format;
@@ -9407,20 +9399,13 @@ void vj_event_audio_beat_freeze(void *ptr, const char format[], va_list ap)
     if(!vj_event_audio_beat_ready(v))
         return;
 
+    if(veejay_audio_beat_push_config(v, args[0], -1, -1, -1) < 0)
     {
-        int cooldown = -1;
-        int action = atomic_load_int(&v->settings->audio_beat.action_mode);
-
-        vj_event_audio_beat_clamp_freeze_config(v, action, &args[0], &cooldown);
-
-        if(veejay_audio_beat_push_config(v, args[0], cooldown, -1, -1) < 0)
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO] Unable to set beat freeze time");
-            return;
-        }
+        veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO] Unable to set beat hold time");
+        return;
     }
 
-    veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] Beat freeze time set to %d ms", args[0]);
+    veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] Beat hold time set to %d ms", args[0]);
 #else
     (void)ptr;
     (void)format;
@@ -9439,17 +9424,10 @@ void vj_event_audio_beat_cooldown(void *ptr, const char format[], va_list ap)
     if(!vj_event_audio_beat_ready(v))
         return;
 
+    if(veejay_audio_beat_push_config(v, -1, args[0], -1, -1) < 0)
     {
-        int freeze = -1;
-        int action = atomic_load_int(&v->settings->audio_beat.action_mode);
-
-        vj_event_audio_beat_clamp_freeze_config(v, action, &freeze, &args[0]);
-
-        if(veejay_audio_beat_push_config(v, freeze, args[0], -1, -1) < 0)
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO] Unable to set beat cooldown");
-            return;
-        }
+        veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO] Unable to set beat cooldown");
+        return;
     }
 
     veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] Beat cooldown set to %d ms", args[0]);
@@ -9478,6 +9456,85 @@ void vj_event_audio_beat_threshold(void *ptr, const char format[], va_list ap)
     }
 
     veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] Beat threshold set to %d", args[0]);
+#else
+    (void)ptr;
+    (void)format;
+    (void)ap;
+#endif
+}
+
+void vj_event_audio_beat_scratch_sensitivity(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t *)ptr;
+    int args[1] = { 50 };
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if(!vj_event_audio_beat_ready(v))
+        return;
+
+    args[0] = vj_audio_beat_event_clampi(args[0], 0, 100);
+    vj_audio_beat_set_scratch_sensitivity(&v->settings->audio_beat, args[0]);
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-BEAT] Scratch sensitivity set to %d",
+               args[0]);
+#else
+    (void)ptr;
+    (void)format;
+    (void)ap;
+#endif
+}
+
+void vj_event_audio_beat_source_loss_pause(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t *)ptr;
+    int args[1] = { 1 };
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if(!vj_event_audio_beat_ready(v))
+        return;
+
+    args[0] = args[0] ? 1 : 0;
+    vj_audio_beat_set_source_loss_pause(&v->settings->audio_beat, args[0]);
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-BEAT] Source-loss pause %s",
+               args[0] ? "enabled" : "disabled");
+#else
+    (void)ptr;
+    (void)format;
+    (void)ap;
+#endif
+}
+
+void vj_event_audio_beat_monitor_latency(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t *)ptr;
+    int args[1] = { -1 };
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if(!vj_event_audio_beat_ready(v))
+        return;
+
+    if(args[0] >= 0)
+        args[0] = vj_audio_beat_event_clampi(args[0], 0, 64);
+    else
+        args[0] = -1;
+
+    vj_audio_beat_set_monitor_latency_ms(&v->settings->audio_beat, args[0]);
+
+    if(args[0] < 0)
+        veejay_msg(VEEJAY_MSG_INFO, "[AUDIO-BEAT] Monitor latency set to auto");
+    else
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[AUDIO-BEAT] Monitor latency set to %d ms",
+                   args[0]);
 #else
     (void)ptr;
     (void)format;
@@ -9521,26 +9578,7 @@ void vj_event_audio_beat_action(void *ptr, const char format[], va_list ap)
     if(!vj_event_audio_beat_ready(v))
         return;
 
-    args[0] = vj_audio_beat_event_clampi(args[0],
-                                        VJ_AUDIO_BEAT_ACTION_NONE,
-                                        VJ_AUDIO_BEAT_ACTION_BREAK_BEAT);
     args[0] = vj_event_audio_beat_sanitize_action(v, args[0]);
-
-    {
-        int freeze = -1;
-        int cooldown = -1;
-
-        vj_event_audio_beat_clamp_freeze_config(v, args[0], &freeze, &cooldown);
-
-
-        if(freeze >= 0 || cooldown >= 0) {
-            if(veejay_audio_beat_push_config(v, freeze, cooldown, -1, -1) < 0) {
-                veejay_msg(VEEJAY_MSG_ERROR,
-                        "[AUDIO-BEAT] Unable to clamp freeze/cooldown before action change");
-                return;
-            }
-        }
-    }
 
     vj_audio_beat_set_action(&v->settings->audio_beat, args[0]);
 
@@ -9680,8 +9718,8 @@ void vj_event_audio_beat_state(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t *)ptr;
     vj_audio_beat_shared_t *s;
     vj_audio_beat_snapshot_t snap;
-    char payload[768];
-    char fline[832];
+    char payload[832];
+    char fline[896];
     int n;
 
     (void)format;
@@ -9707,7 +9745,7 @@ void vj_event_audio_beat_state(void *ptr, const char format[], va_list ap)
                  sizeof(payload),
                  "%d %d %d %d %d %d %d %ld %ld "
                  "%d %d %d %d %d %d %d %d %d %d %d %d "
-                 "%d %d %d %d %d %d %d %d %d %d %d",
+                 "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
                  snap.enabled,
                  snap.open,
                  atomic_load_int(&s->running),
@@ -9739,7 +9777,11 @@ void vj_event_audio_beat_state(void *ptr, const char format[], va_list ap)
                  atomic_load_int(&s->pulse_ms),
                  atomic_load_int(&s->gate_ms),
                  vj_audio_beat_event_auto_mode_cache,
-                 vj_audio_beat_event_auto_amount_cache);
+                 vj_audio_beat_event_auto_amount_cache,
+                 vj_audio_beat_get_scratch_sensitivity(s),
+                 vj_audio_beat_get_source_loss_pause(s),
+                 vj_audio_beat_get_monitor_latency_ms(s),
+                 vj_audio_beat_get_effective_latency_ms(s));
 
     if(n < 0 || n >= (int)sizeof(payload))
     {
@@ -9810,7 +9852,7 @@ void vj_event_audio_beat_status(void *ptr, const char format[], va_list ap)
     high_pct = (vj_audio_beat_event_q1000(snap.high) + 5) / 10;
 
     veejay_msg(VEEJAY_MSG_INFO,
-               "[AUDIO-BEAT] status enabled=%d open=%d running=%d paused=%d channels=%d rate=%dHz level=%d%% envelope=%d%% transient=%d%% flux=%d%% bands=%d/%d/%d%% bpm=%d.%02d hits=%ld age=%ldms seq=%d action=%s(%d) freeze=%dms cooldown=%dms threshold=%d pulse=%dms gate=%dms auto_mode=%s(%d) auto_amount=%d",
+               "[AUDIO-BEAT] status enabled=%d open=%d running=%d paused=%d channels=%d rate=%dHz level=%d%% envelope=%d%% transient=%d%% flux=%d%% bands=%d/%d/%d%% bpm=%d.%02d hits=%ld age=%ldms seq=%d action=%s(%d) hold=%dms cooldown=%dms threshold=%d scratch=%d source_loss_pause=%d monitor_latency=%d heard_latency=%dms pulse=%dms gate=%dms auto_mode=%s(%d) auto_amount=%d",
                snap.enabled,
                snap.open,
                atomic_load_int(&s->running),
@@ -9834,6 +9876,10 @@ void vj_event_audio_beat_status(void *ptr, const char format[], va_list ap)
                atomic_load_int(&s->freeze_ms),
                atomic_load_int(&s->cooldown_ms),
                atomic_load_int(&s->threshold),
+               vj_audio_beat_get_scratch_sensitivity(s),
+               vj_audio_beat_get_source_loss_pause(s),
+               vj_audio_beat_get_monitor_latency_ms(s),
+               vj_audio_beat_get_effective_latency_ms(s),
                atomic_load_int(&s->pulse_ms),
                atomic_load_int(&s->gate_ms),
                vj_audio_beat_event_auto_mode_name(auto_mode),
@@ -13238,6 +13284,7 @@ void vj_event_sample_sequencer_active(void *ptr, const char format[], va_list ap
             if(resume_speed == 0)
                 resume_speed = 1;
             veejay_set_speed(v, resume_speed, 0);
+            vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
         }
 
         veejay_msg(VEEJAY_MSG_INFO,"Sample sequencer disabled; current source keeps looping");
@@ -13292,6 +13339,7 @@ void vj_event_sample_sequencer_active(void *ptr, const char format[], va_list ap
         if(resume_speed == 0)
             resume_speed = 1;
         veejay_set_speed(v, resume_speed, 0);
+        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
     }
 
     veejay_reset_sample_positions(v, -1);

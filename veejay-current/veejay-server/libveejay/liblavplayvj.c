@@ -234,6 +234,19 @@ extern int vj_event_single_fire(void *ptr, SDL_Event event, int pressed);
 static	veejay_t	*veejay_instance_ = NULL;
 
 #ifdef HAVE_JACK
+#ifndef VJ_AUDIO_BEAT_ACTION_BREAK_BEAT_AUTO_FX
+#define VJ_AUDIO_BEAT_ACTION_BREAK_BEAT_AUTO_FX 3
+#endif
+#ifndef VJ_AUDIO_BEAT_ACTION_BREAK_BEAT
+#define VJ_AUDIO_BEAT_ACTION_BREAK_BEAT 4
+#endif
+
+static inline int veejay_audio_beat_action_is_breakbeat(int action)
+{
+    return action == VJ_AUDIO_BEAT_ACTION_BREAK_BEAT ||
+           action == VJ_AUDIO_BEAT_ACTION_BREAK_BEAT_AUTO_FX;
+}
+
 static int veejay_audio_sync_thread_cli_disabled_ = 0;
 static int veejay_audio_beat_thread_cli_disabled_ = 0;
 
@@ -2634,6 +2647,52 @@ static void veejay_screen_update(veejay_t *info, VJFrame *frame_to_display) {
     atomic_store_long_long(&settings->display_frame.seq, frame_to_display->frame_num);
 }
 
+
+#ifndef VJ_AUDIO_BEAT_CONFIG_STATUS_TOKENS
+#define VJ_AUDIO_BEAT_CONFIG_STATUS_TOKENS 12
+#endif
+
+#ifndef VJ_AUDIO_BEAT_MONITOR_LATENCY_DEFAULT_MS
+#define VJ_AUDIO_BEAT_MONITOR_LATENCY_DEFAULT_MS -1
+#endif
+
+#ifndef VJ_STATUS_AUDIO_BEAT_HOLD_MS
+#define VJ_STATUS_AUDIO_BEAT_HOLD_MS 119
+#endif
+#ifndef VJ_STATUS_AUDIO_BEAT_COOLDOWN_MS
+#define VJ_STATUS_AUDIO_BEAT_COOLDOWN_MS 120
+#endif
+#ifndef VJ_STATUS_AUDIO_BEAT_THRESHOLD
+#define VJ_STATUS_AUDIO_BEAT_THRESHOLD 121
+#endif
+#ifndef VJ_STATUS_AUDIO_BEAT_CHANNELS
+#define VJ_STATUS_AUDIO_BEAT_CHANNELS 122
+#endif
+#ifndef VJ_STATUS_AUDIO_BEAT_PULSE_MS
+#define VJ_STATUS_AUDIO_BEAT_PULSE_MS 123
+#endif
+#ifndef VJ_STATUS_AUDIO_BEAT_GATE_MS
+#define VJ_STATUS_AUDIO_BEAT_GATE_MS 124
+#endif
+#ifndef VJ_STATUS_AUDIO_BEAT_AUTO_MODE
+#define VJ_STATUS_AUDIO_BEAT_AUTO_MODE 125
+#endif
+#ifndef VJ_STATUS_AUDIO_BEAT_AUTO_AMOUNT
+#define VJ_STATUS_AUDIO_BEAT_AUTO_AMOUNT 126
+#endif
+#ifndef VJ_STATUS_AUDIO_BEAT_SCRATCH_SENSITIVITY
+#define VJ_STATUS_AUDIO_BEAT_SCRATCH_SENSITIVITY 127
+#endif
+#ifndef VJ_STATUS_AUDIO_BEAT_SOURCE_LOSS_PAUSE
+#define VJ_STATUS_AUDIO_BEAT_SOURCE_LOSS_PAUSE 128
+#endif
+#ifndef VJ_STATUS_AUDIO_BEAT_MONITOR_LATENCY
+#define VJ_STATUS_AUDIO_BEAT_MONITOR_LATENCY 129
+#endif
+#ifndef VJ_STATUS_AUDIO_BEAT_EFFECTIVE_LATENCY
+#define VJ_STATUS_AUDIO_BEAT_EFFECTIVE_LATENCY 130
+#endif
+
 static int veejay_pipe_status_token_count(const char *s)
 {
     int count = 0;
@@ -2666,6 +2725,18 @@ static char *veejay_pipe_write_zero_base_status(char *ptr)
     return ptr;
 }
 
+static char *veejay_pipe_pad_status_tokens(char *start, char *ptr, int expected_tokens)
+{
+    int tokens = veejay_pipe_status_token_count(start);
+
+    while(tokens < expected_tokens) {
+        ptr = vj_sprintf(ptr, 0);
+        tokens++;
+    }
+
+    return ptr;
+}
+
 static inline int veejay_record_audio_source_status(video_playback_setup *settings)
 {
 #ifndef HAVE_JACK
@@ -2684,6 +2755,23 @@ static inline int veejay_record_audio_source_status(video_playback_setup *settin
             : source);
 
     return source;
+}
+
+static inline int veejay_audio_beat_runtime_action(int action)
+{
+#ifdef HAVE_JACK
+    switch(action) {
+        case VJ_AUDIO_BEAT_ACTION_AUTO_FX:
+        case VJ_AUDIO_BEAT_ACTION_BREAK_BEAT_AUTO_FX:
+        case VJ_AUDIO_BEAT_ACTION_BREAK_BEAT:
+            return action;
+        default:
+            return VJ_AUDIO_BEAT_ACTION_NONE;
+    }
+#else
+    (void)action;
+    return 0;
+#endif
 }
 
 static char *veejay_pipe_append_audio_beat_status(veejay_t *info, char *ptr)
@@ -2730,9 +2818,7 @@ static char *veejay_pipe_append_audio_beat_status(veejay_t *info, char *ptr)
     ptr = vj_sprintf(ptr, record_audio_source);                     /* 56 */
     {
         int action = ok ? vj_audio_beat_get_action(&info->settings->audio_beat) : 0;
-        if(action < 0 || action > 4)
-            action = 0;
-        ptr = vj_sprintf(ptr, action);                              /* 57 */
+        ptr = vj_sprintf(ptr, veejay_audio_beat_runtime_action(action)); /* 57 */
     }
 #undef AB_POS
 #undef AB_AGE
@@ -2915,6 +3001,45 @@ static char *veejay_pipe_append_sequence_status(veejay_t *info, char *ptr)
     for(int i = 0; i < VJ_SEQUENCE_BANKS; i++)
         ptr = vj_sprintf(ptr, (int)seq->banks[i].revision);
 
+    ptr = vj_sprintf(ptr, 0);
+
+    return ptr;
+}
+
+static char *veejay_pipe_append_audio_beat_config_status(veejay_t *info, char *ptr)
+{
+#ifdef HAVE_JACK
+    vj_audio_beat_shared_t *s = NULL;
+
+    if(info && info->settings)
+        s = &info->settings->audio_beat;
+
+    ptr = vj_sprintf(ptr, s ? vj_audio_beat_get_freeze_ms(s) : 90);
+    ptr = vj_sprintf(ptr, s ? vj_audio_beat_get_cooldown_ms(s) : 240);
+    ptr = vj_sprintf(ptr, s ? vj_audio_beat_get_threshold(s) : 145);
+    ptr = vj_sprintf(ptr, s ? vj_audio_beat_get_input_channels(s) : 2);
+    ptr = vj_sprintf(ptr, s ? vj_audio_beat_get_pulse_ms(s) : 180);
+    ptr = vj_sprintf(ptr, s ? vj_audio_beat_get_gate_ms(s) : 90);
+    ptr = vj_sprintf(ptr, s ? vj_audio_beat_get_auto_mode(s) : 2);
+    ptr = vj_sprintf(ptr, s ? vj_audio_beat_get_auto_amount(s) : 75);
+    ptr = vj_sprintf(ptr, s ? vj_audio_beat_get_scratch_sensitivity(s) : 50);
+    ptr = vj_sprintf(ptr, s ? vj_audio_beat_get_source_loss_pause(s) : 1);
+    ptr = vj_sprintf(ptr, s ? vj_audio_beat_get_monitor_latency_ms(s) : VJ_AUDIO_BEAT_MONITOR_LATENCY_DEFAULT_MS);
+    ptr = vj_sprintf(ptr, s ? vj_audio_beat_get_effective_latency_ms(s) : -1);
+#else
+    ptr = vj_sprintf(ptr, 90);
+    ptr = vj_sprintf(ptr, 240);
+    ptr = vj_sprintf(ptr, 145);
+    ptr = vj_sprintf(ptr, 2);
+    ptr = vj_sprintf(ptr, 180);
+    ptr = vj_sprintf(ptr, 90);
+    ptr = vj_sprintf(ptr, 2);
+    ptr = vj_sprintf(ptr, 75);
+    ptr = vj_sprintf(ptr, 50);
+    ptr = vj_sprintf(ptr, 1);
+    ptr = vj_sprintf(ptr, VJ_AUDIO_BEAT_MONITOR_LATENCY_DEFAULT_MS);
+    ptr = vj_sprintf(ptr, -1);
+#endif
     return ptr;
 }
 
@@ -3062,7 +3187,10 @@ static void veejay_pipe_write_status(veejay_t * info)
 
     char *ptr = info->status_what + base_len;
     const size_t status_tail_room =
-        (size_t)(VJ_AUDIO_STATUS_TOKENS + VJ_CHAIN_ENTRY_STATUS_TOKENS + VJ_SEQUENCE_STATUS_TOKENS) *
+        (size_t)(VJ_AUDIO_STATUS_TOKENS +
+                 VJ_CHAIN_ENTRY_STATUS_TOKENS +
+                 VJ_SEQUENCE_STATUS_TOKENS +
+                 VJ_AUDIO_BEAT_CONFIG_STATUS_TOKENS) *
         (size_t)VJ_INT_FIELD_MAX;
     const int base_tokens = veejay_pipe_status_token_count(info->status_what);
     static int status_packet_warned = 0;
@@ -3084,6 +3212,8 @@ static void veejay_pipe_write_status(veejay_t * info)
     ptr = veejay_pipe_append_audio_sync_status(info, ptr);
     ptr = veejay_pipe_append_chain_entry_status(info, ptr);
     ptr = veejay_pipe_append_sequence_status(info, ptr);
+    ptr = veejay_pipe_append_audio_beat_config_status(info, ptr);
+    ptr = veejay_pipe_pad_status_tokens(info->status_what, ptr, VIMS_STATUS_TOKENS);
 
     *ptr = '\0';
 
@@ -4828,6 +4958,120 @@ static inline double vj_audio_producer_pace_sleep_s(long client_rate,
                                                 settings,
                                                 budget);
 }
+
+#ifndef VJ_AUDIO_MONITOR_AUTO_FALLBACK_RATE
+#define VJ_AUDIO_MONITOR_AUTO_FALLBACK_RATE 48000
+#endif
+#ifndef VJ_AUDIO_MONITOR_AUTO_FALLBACK_PERIOD
+#define VJ_AUDIO_MONITOR_AUTO_FALLBACK_PERIOD 256
+#endif
+#ifndef VJ_AUDIO_MONITOR_AUTO_FALLBACK_FPS
+#define VJ_AUDIO_MONITOR_AUTO_FALLBACK_FPS 25.0f
+#endif
+#ifndef VJ_AUDIO_MONITOR_AUTO_PERIODS
+#define VJ_AUDIO_MONITOR_AUTO_PERIODS 2.0
+#endif
+#ifndef VJ_AUDIO_MONITOR_LATENCY_MAX_MS
+#define VJ_AUDIO_MONITOR_LATENCY_MAX_MS 64
+#endif
+
+static inline float vj_audio_monitor_nominal_video_fps(veejay_t *info,
+                                                       video_playback_setup *settings)
+{
+    editlist *el = NULL;
+
+    if(info && info->dummy && info->dummy->fps > 0.0f)
+        return vj_runtime_clamp_fps(info->dummy->fps);
+
+    if(info)
+        el = info->current_edit_list ? info->current_edit_list : info->edit_list;
+    if(el && el->video_fps > 0.0)
+        return vj_runtime_clamp_fps((float)el->video_fps);
+
+    if(settings && settings->output_fps > 0.0f)
+        return vj_runtime_clamp_fps(settings->output_fps);
+
+    return VJ_AUDIO_MONITOR_AUTO_FALLBACK_FPS;
+}
+
+static inline int vj_audio_monitor_auto_latency_ms(veejay_t *info,
+                                                   video_playback_setup *settings)
+{
+    int rate = vj_jack_get_rate();
+    int period = vj_jack_get_period_size();
+    float fps = vj_audio_monitor_nominal_video_fps(info, settings);
+    int frame_ms;
+    int ms;
+
+    if(rate <= 0)
+        rate = VJ_AUDIO_MONITOR_AUTO_FALLBACK_RATE;
+    if(period <= 0)
+        period = VJ_AUDIO_MONITOR_AUTO_FALLBACK_PERIOD;
+
+    frame_ms = vj_clampi((int)((1000.0f / fps) + 0.5f),
+                         1,
+                         VJ_AUDIO_MONITOR_LATENCY_MAX_MS);
+
+    ms = (int)(((double)period * VJ_AUDIO_MONITOR_AUTO_PERIODS * 1000.0 / (double)rate) + 0.5);
+    return vj_clampi(ms, 0, frame_ms);
+}
+
+static inline int vj_audio_monitor_configured_latency_ms(video_playback_setup *settings)
+{
+    int ms = VJ_AUDIO_BEAT_MONITOR_LATENCY_DEFAULT_MS;
+
+    if(settings)
+        ms = vj_audio_beat_get_monitor_latency_ms(&settings->audio_beat);
+
+    return ms < 0 ? -1 : vj_clampi(ms, 0, VJ_AUDIO_MONITOR_LATENCY_MAX_MS);
+}
+
+static inline int vj_audio_monitor_passthrough_heard_latency_ms(veejay_t *info,
+                                                                  video_playback_setup *settings)
+{
+    int ms = vj_audio_monitor_configured_latency_ms(settings);
+
+    if(ms >= 0)
+        return ms;
+
+    return vj_audio_monitor_auto_latency_ms(info, settings);
+}
+
+static inline int vj_audio_uses_external_audio_playback_source(
+    video_playback_setup *settings,
+    int audio_source,
+    int sync_mode,
+    int sync_enabled
+);
+
+static inline int vj_audio_monitor_direct_heard_latency_ms(veejay_t *info,
+                                                           video_playback_setup *settings,
+                                                           int audio_source,
+                                                           int sync_mode,
+                                                           int sync_enabled)
+{
+    if(!vj_audio_uses_external_audio_playback_source(settings,
+                                                     audio_source,
+                                                     sync_mode,
+                                                     sync_enabled))
+        return -1;
+
+    if(sync_mode != VJ_AUDIO_SYNC_MODE_MONITOR)
+        return -1;
+
+    if(atomic_load_int(&settings->audio_sync.source) != VJ_AUDIO_SYNC_SOURCE_JACK)
+        return -1;
+
+    {
+        int configured_ms = vj_audio_monitor_configured_latency_ms(settings);
+        if(configured_ms >= 0)
+            return configured_ms;
+    }
+
+    return vj_jack_get_input_passthrough() ?
+           vj_audio_monitor_passthrough_heard_latency_ms(info, settings) : 0;
+}
+
 static inline int vj_audio_uses_external_audio_playback_source(
     video_playback_setup *settings,
     int audio_source,
@@ -5880,6 +6124,35 @@ void *veejay_audio_producer_thread(void *arg)
                 predicted = queued_before_s;
             vj_runtime_publish_audio_clocks(settings, played_hw, predicted);
 
+            if(settings) {
+                double queued_ms = (predicted - played_hw) * 1000.0;
+                double jack_total_ms = vj_jack_get_total_latency() * 1000.0;
+                int output_latency_ms;
+                int heard_latency_ms;
+                int monitor_heard_ms;
+
+                if(queued_ms < 0.0)
+                    queued_ms = 0.0;
+                else if(queued_ms > 5000.0)
+                    queued_ms = 5000.0;
+
+                output_latency_ms = (int)(queued_ms + 0.5);
+                heard_latency_ms = output_latency_ms;
+
+                monitor_heard_ms = vj_audio_monitor_direct_heard_latency_ms(info,
+                                                                            settings,
+                                                                            audio_source_dbg,
+                                                                            audio_sync_mode_dbg,
+                                                                            audio_sync_enabled_dbg);
+                if(monitor_heard_ms >= 0)
+                    heard_latency_ms = monitor_heard_ms;
+                else if(jack_total_ms > 0.0 && jack_total_ms < 5000.0)
+                    heard_latency_ms = (int)(jack_total_ms + 0.5);
+
+                vj_audio_beat_set_output_latency_ms(&settings->audio_beat, output_latency_ms);
+                vj_audio_beat_set_heard_latency_ms(&settings->audio_beat, heard_latency_ms);
+            }
+
             {
                 double audio_loop_elapsed_ms = (monotonic_now_s() - audio_loop_start_s) * 1000.0;
                 long long predicted_ms = (long long)(predicted * 1000.0 + 0.5);
@@ -6701,7 +6974,13 @@ int veejay_audio_beat_toggle(veejay_t *info)
 }
 
 
-int veejay_audio_beat_push_config(veejay_t *info, int freeze_ms, int cooldown_ms, int threshold, int input_channels)
+int veejay_audio_beat_push_config_ex(veejay_t *info,
+                                      int hold_ms,
+                                      int cooldown_ms,
+                                      int threshold,
+                                      int input_channels,
+                                      int scratch_sensitivity,
+                                      int source_loss_pause)
 {
 #ifdef HAVE_JACK
     video_playback_setup *settings;
@@ -6712,11 +6991,13 @@ int veejay_audio_beat_push_config(veejay_t *info, int freeze_ms, int cooldown_ms
     settings = info->settings;
 
     veejay_msg(VEEJAY_MSG_INFO,
-               "[AUDIO-BEAT] push_config request: freeze_ms=%d cooldown_ms=%d threshold=%d input_channels=%d initialized=%d enabled=%d open=%d running=%d action=%d audio=%d",
-               freeze_ms,
+               "[AUDIO-BEAT] push_config request: hold_ms=%d cooldown_ms=%d threshold=%d input_channels=%d scratch=%d source_loss_pause=%d initialized=%d enabled=%d open=%d running=%d action=%d audio=%d",
+               hold_ms,
                cooldown_ms,
                threshold,
                input_channels,
+               scratch_sensitivity,
+               source_loss_pause,
                atomic_load_int(&settings->audio_beat.initialized),
                atomic_load_int(&settings->audio_beat.enabled),
                atomic_load_int(&settings->audio_beat.open),
@@ -6734,8 +7015,8 @@ int veejay_audio_beat_push_config(veejay_t *info, int freeze_ms, int cooldown_ms
         vj_audio_beat_bind_sync(&settings->audio_beat, &settings->audio_sync);
 
 
-    if(freeze_ms >= 0)
-        vj_audio_beat_set_freeze_ms(&settings->audio_beat, freeze_ms);
+    if(hold_ms >= 0)
+        vj_audio_beat_set_freeze_ms(&settings->audio_beat, hold_ms);
 
     if(cooldown_ms >= 0)
         vj_audio_beat_set_cooldown_ms(&settings->audio_beat, cooldown_ms);
@@ -6746,12 +7027,20 @@ int veejay_audio_beat_push_config(veejay_t *info, int freeze_ms, int cooldown_ms
     if(input_channels > 0)
         vj_audio_beat_set_input_channels(&settings->audio_beat, input_channels);
 
+    if(scratch_sensitivity >= 0)
+        vj_audio_beat_set_scratch_sensitivity(&settings->audio_beat, scratch_sensitivity);
+
+    if(source_loss_pause >= 0)
+        vj_audio_beat_set_source_loss_pause(&settings->audio_beat, source_loss_pause);
+
     veejay_msg(VEEJAY_MSG_INFO,
-               "[AUDIO-BEAT] push_config applied: freeze_ms=%d cooldown_ms=%d threshold=%d input_channels=%d action=%d enabled=%d open=%d running=%d reset_seq=%d",
+               "[AUDIO-BEAT] push_config applied: hold_ms=%d cooldown_ms=%d threshold=%d input_channels=%d scratch=%d source_loss_pause=%d action=%d enabled=%d open=%d running=%d reset_seq=%d",
                atomic_load_int(&settings->audio_beat.freeze_ms),
                atomic_load_int(&settings->audio_beat.cooldown_ms),
                atomic_load_int(&settings->audio_beat.threshold),
                atomic_load_int(&settings->audio_beat.input_channels_request),
+               vj_audio_beat_get_scratch_sensitivity(&settings->audio_beat),
+               vj_audio_beat_get_source_loss_pause(&settings->audio_beat),
                atomic_load_int(&settings->audio_beat.action_mode),
                atomic_load_int(&settings->audio_beat.enabled),
                atomic_load_int(&settings->audio_beat.open),
@@ -6761,12 +7050,29 @@ int veejay_audio_beat_push_config(veejay_t *info, int freeze_ms, int cooldown_ms
     return 1;
 #else
     (void)info;
-    (void)freeze_ms;
+    (void)hold_ms;
     (void)cooldown_ms;
     (void)threshold;
     (void)input_channels;
+    (void)scratch_sensitivity;
+    (void)source_loss_pause;
     return -1;
 #endif
+}
+
+int veejay_audio_beat_push_config(veejay_t *info,
+                                  int hold_ms,
+                                  int cooldown_ms,
+                                  int threshold,
+                                  int input_channels)
+{
+    return veejay_audio_beat_push_config_ex(info,
+                                            hold_ms,
+                                            cooldown_ms,
+                                            threshold,
+                                            input_channels,
+                                            -1,
+                                            -1);
 }
 
 
@@ -6889,18 +7195,13 @@ static void *veejay_producer_thread_loop(void *ptr)
 
 #ifdef HAVE_JACK
         {
-            int beat_action = vj_audio_beat_get_action(&settings->audio_beat);
+            int beat_action = veejay_audio_beat_runtime_action(
+                vj_audio_beat_get_action(&settings->audio_beat));
 
-            if(beat_action == VJ_AUDIO_BEAT_ACTION_FREEZE ||
-               beat_action == VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX ||
-               beat_action == VJ_AUDIO_BEAT_ACTION_BREAK_BEAT)
-            {
+            if(veejay_audio_beat_action_is_breakbeat(beat_action))
                 vj_audio_beat_consume(info, &settings->audio_beat);
-            }
             else
-            {
                 vj_audio_beat_resume_if_due(info, &settings->audio_beat);
-            }
         }
 #endif
 

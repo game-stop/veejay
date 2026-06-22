@@ -85,6 +85,9 @@
 #include <libveejay/vj-jack.h>
 #include <libveejay/vj-audio-sync.h>
 #include <libveejay/vj-audio-beat.h>
+#ifndef VJ_AUDIO_BEAT_ACTION_BREAK_BEAT_AUTO_FX
+#define VJ_AUDIO_BEAT_ACTION_BREAK_BEAT_AUTO_FX 3
+#endif
 #endif
 #define PERFORM_AUDIO_SIZE 16384
 #define AUDIO_TURN_HISTORY_BYTES 4096
@@ -1954,6 +1957,12 @@ static int vj_perform_audio_beat_playmode_has_fx_chain(int playmode)
     return playmode == VJ_PLAYBACK_MODE_SAMPLE ||
            playmode == VJ_PLAYBACK_MODE_TAG;
 }
+static int vj_perform_audio_beat_action_uses_auto_fx(int action)
+{
+    return action == VJ_AUDIO_BEAT_ACTION_AUTO_FX ||
+           action == VJ_AUDIO_BEAT_ACTION_BREAK_BEAT_AUTO_FX;
+}
+
 static int vj_perform_audio_beat_global_chain_is_rendered(
     veejay_t *info,
     int sample_id,
@@ -2038,9 +2047,7 @@ static int vj_perform_audio_beat_apply_render_chains(
     action = atomic_load_int(&settings->audio_beat.action_mode);
 
 
-    if(action != VJ_AUDIO_BEAT_ACTION_AUTO_FX &&
-       action != VJ_AUDIO_BEAT_ACTION_FREEZE_AND_AUTO_FX &&
-       action != VJ_AUDIO_BEAT_ACTION_BREAK_BEAT)
+    if(!vj_perform_audio_beat_action_uses_auto_fx(action))
         return 0;
 
     if(!vj_perform_audio_beat_playmode_has_fx_chain(playmode))
@@ -12856,10 +12863,10 @@ static char *osd_performance_indicator(double render_duration, double spvf) {
 
     const double skip_threshold = 1.5 * spvf;
     const char *status;
-    if (ema_duration > skip_threshold) status = "FX3";
-    else if (ema_duration > spvf)      status = "FX2";
-    else if (ema_duration > 0.85*spvf) status = "FX1";
-    else                               status = "FX0";
+    if (ema_duration > skip_threshold) status = "OVLD";
+    else if (ema_duration > spvf)      status = "LAG ";
+    else if (ema_duration > 0.85*spvf) status = "WARN";
+    else                               status = "OK  ";
 
     double load = ema_load_pct;
     if (load < 0.0)
@@ -12894,7 +12901,7 @@ static char *osd_performance_indicator(double render_duration, double spvf) {
         display_load = 999;
 
     snprintf(buf, sizeof(buf),
-             "%s[%s] t%04d l%03d%%",
+             "%s[%s] %4dms %3d%%",
              status, spark, display_ms, display_load);
 
     return buf;
@@ -12902,7 +12909,7 @@ static char *osd_performance_indicator(double render_duration, double spvf) {
 
 static char *osd_xrun_indicator(long underruns, long xruns)
 {
-    static char buf[16];
+    static char buf[32];
     static long last_u = 0;
     static long last_x = 0;
     static double severity = 0.0;
@@ -12925,23 +12932,25 @@ static char *osd_xrun_indicator(long underruns, long xruns)
 
     int bars = (int)(severity + 0.5);
 
-    buf[0] = '[';
+    buf[0] = 'X';
+    buf[1] = 'R';
+    buf[2] = '[';
     for (int i = 0; i < len; i++)
     {
         if (i < bars)
         {
             if (severity > 3.5)
-                buf[i + 1] = '!';
+                buf[i + 3] = '!';
             else if (severity > 1.5)
-                buf[i + 1] = '+';
+                buf[i + 3] = '+';
             else
-                buf[i + 1] = '#';
+                buf[i + 3] = '#';
         }
         else
-            buf[i + 1] = '-';
+            buf[i + 3] = '-';
     }
-    buf[len + 1] = ']';
-    buf[len + 2] = '\0';
+    buf[len + 3] = ']';
+    buf[len + 4] = '\0';
 
     return buf;
 }
@@ -13177,10 +13186,6 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
     const int speed = atomic_load_int(&settings->audio_osd.last_speed);
     const int sfd = atomic_load_int(&settings->audio_osd.last_sfd);
     const int q_ms = atomic_load_int(&settings->audio_osd.last_qdepth_ms);
-    const int sleep_ms = atomic_load_int(&settings->audio_osd.last_sleep_ms);
-    const int written = atomic_load_int(&settings->audio_osd.last_written);
-    const int decoded = atomic_load_int(&settings->audio_osd.last_decoded);
-    const int pending = atomic_load_int(&settings->audio_osd.last_pending);
     const long long drop_pending = atomic_load_long_long(&settings->audio_osd.prod_pending_drop_frames);
     const long long drop_video = atomic_load_long_long(&settings->audio_osd.prod_video_drop_frames);
     const long long slow = atomic_load_long_long(&settings->audio_osd.prod_slow_renders);
@@ -13190,30 +13195,22 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
 
     if(drop_pending || drop_video || slow || anomalies) {
         snprintf(engine, sizeof(engine),
-                 "A:%s v%s sf%02d q%03d sl%02d io%04d/%04d p%02d d%03lld/%03lld slow%03lld err%03lld",
+                 "A:%s v%s sf%02d q%03d drop%03lld/%03lld slow%03lld err%03lld",
                  osd_audio_source_name(audio_src),
                  audio_speed,
                  osd_display_clampi(sfd, 0, 99),
                  osd_display_clampi(q_ms, 0, 999),
-                 osd_display_clampi(sleep_ms, 0, 99),
-                 osd_display_clampi(written, 0, 9999),
-                 osd_display_clampi(decoded, 0, 9999),
-                 osd_display_clampi(pending, 0, 99),
                  osd_display_clampll(drop_pending, 0, 999),
                  osd_display_clampll(drop_video, 0, 999),
                  osd_display_clampll(slow, 0, 999),
                  osd_display_clampll(anomalies, 0, 999));
     } else {
         snprintf(engine, sizeof(engine),
-                 "A:%s v%s sf%02d q%03d sl%02d io%04d/%04d p%02d",
+                 "A:%s v%s sf%02d q%03d",
                  osd_audio_source_name(audio_src),
                  audio_speed,
                  osd_display_clampi(sfd, 0, 99),
-                 osd_display_clampi(q_ms, 0, 999),
-                 osd_display_clampi(sleep_ms, 0, 99),
-                 osd_display_clampi(written, 0, 9999),
-                 osd_display_clampi(decoded, 0, 9999),
-                 osd_display_clampi(pending, 0, 99));
+                 osd_display_clampi(q_ms, 0, 999));
     }
 
     if(!have_sync || !snap.enabled || snap.mode == 0) {
@@ -13229,23 +13226,25 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
        snap.mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
        snap.mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN)
     {
-        snprintf(queue, sizeof(queue),
-                 " tq%03d/%03d d%02ld/%02ld",
-                 osd_display_clampi(snap.target_queue_retained_ms, 0, 999),
-                 osd_display_clampi(snap.target_queue_ring_ms, 0, 999),
-                 (long)osd_display_clampll(snap.target_queue_overflow_events + snap.target_queue_lock_drops, 0, 99),
-                 (long)osd_display_clampll(snap.target_queue_dropped_frames, 0, 99));
+        long queue_errors = (long)osd_display_clampll(snap.target_queue_overflow_events + snap.target_queue_lock_drops, 0, 99);
+        long queue_drops = (long)osd_display_clampll(snap.target_queue_dropped_frames, 0, 99);
+        if(queue_errors || queue_drops) {
+            snprintf(queue, sizeof(queue),
+                     " tq%03d/%03d drop%02ld/%02ld",
+                     osd_display_clampi(snap.target_queue_retained_ms, 0, 999),
+                     osd_display_clampi(snap.target_queue_ring_ms, 0, 999),
+                     queue_errors,
+                     queue_drops);
+        }
     }
 
     switch(snap.mode) {
         case VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL:
             snprintf(dst, dst_len,
-                     "S:ana %s %s r%d ch%d %dHz bpm%s c%03d ph%03d l%03d tr%03d | %s",
+                     "S:ana %s %s r%d bpm%s c%03d ph%03d l%03d tr%03d | %s",
                      osd_sync_source_name(snap.source),
                      osd_audio_open_name(snap.open),
                      snap.running,
-                     snap.channels,
-                     snap.sample_rate,
                      source_bpm,
                      osd_pct100(snap.confidence),
                      osd_pct100(snap.beat_phase),
@@ -13257,13 +13256,11 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
         case VJ_AUDIO_SYNC_MODE_MONITOR:
         case VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY:
             snprintf(dst, dst_len,
-                     "S:%s %s %s r%d ch%d %dHz bpm%s c%03d l%03d tr%03d | %s",
+                     "S:%s %s %s r%d bpm%s c%03d l%03d tr%03d | %s",
                      osd_sync_mode_name(snap.mode),
                      osd_sync_source_name(snap.source),
                      osd_audio_open_name(snap.open),
                      snap.running,
-                     snap.channels,
-                     snap.sample_rate,
                      source_bpm,
                      osd_pct100(snap.confidence),
                      osd_pct100(snap.level),
@@ -13448,23 +13445,36 @@ static char *vj_perform_osd_status(veejay_t *info)
     snprintf(fps_text, sizeof(fps_text), "%06.2f", effective_fps);
 
     const char *mode_str = "Plain";
+    int mode_total = 1;
     switch (info->uc->playback_mode) {
-        case VJ_PLAYBACK_MODE_SAMPLE: mode_str = "Sample"; break;
-        case VJ_PLAYBACK_MODE_TAG:    mode_str = "Tag";    break;
+        case VJ_PLAYBACK_MODE_SAMPLE:
+            mode_str = "Sample";
+            mode_total = sample_size();
+            break;
+        case VJ_PLAYBACK_MODE_TAG:
+            mode_str = "Stream";
+            mode_total = vj_tag_size();
+            break;
     }
+
+    long long skipped = (long long)stats->total_frames_skipped;
+    if(skipped < 0)
+        skipped = 0;
+    else if(skipped > 9999)
+        skipped = 9999;
 
     char buf[1024];
     if(info->video_output_width < 1920)
         snprintf(buf, sizeof(buf),
-            "%s |%s |%s S%d/%d F%lld\nSk%lld Sp%sx eFPS%s %s %s\n%s",
+            "OUT %s | SRC %s | %s %03d/%03d F%08lld\n"
+            "DROP%04lld SP%sx FPS%s %s %s\n%s",
             master_timecode,
             timecode,
             mode_str,
             info->uc->sample_id,
-            (mode_str[0] == 'S') ? sample_size() :
-            (mode_str[0] == 'T') ? vj_tag_size() : 1,
+            mode_total,
             (long long)stats->current_frame,
-            (long long)stats->total_frames_skipped,
+            skipped,
             speed_text,
             fps_text,
             osd_drift_indicator(stats->delta_s, settings->spvf),
@@ -13473,16 +13483,15 @@ static char *vj_perform_osd_status(veejay_t *info)
         );
     else
         snprintf(buf, sizeof(buf),
-            "%s |%s |%s S%d/%d F%lld Sk%lld "
-            "Sp%sx eFPS%s %s %s %s",
+            "OUT %s | SRC %s | %s %03d/%03d F%08lld "
+            "DROP%04lld SP%sx FPS%s %s %s %s",
             master_timecode,
             timecode,
             mode_str,
             info->uc->sample_id,
-            (mode_str[0] == 'S') ? sample_size() :
-            (mode_str[0] == 'T') ? vj_tag_size() : 1,
+            mode_total,
             (long long)stats->current_frame,
-            (long long)stats->total_frames_skipped,
+            skipped,
             speed_text,
             fps_text,
             osd_drift_indicator(stats->delta_s, settings->spvf),
@@ -14526,6 +14535,10 @@ static void vj_perform_scene_detect_frame(video_playback_setup *settings, VJFram
     atomic_store_int(&sd->valid, 1);
 }
 
+
+#ifdef HAVE_JACK
+#endif
+
 int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
 {
     performer_global_t *g = (performer_global_t*) info->performer;
@@ -14578,8 +14591,10 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
     vj_perform_sample_tick_reset(g);
 
     long long cur_frame = atomic_load_long_long(&info->settings->current_frame_num);
+    long long render_frame = cur_frame;
 
-    vj_perform_queue_video_frames( info, info->effect_frame1, info->effect_frame2, g->A, info->uc->sample_id, info->uc->playback_mode, cur_frame);
+
+    vj_perform_queue_video_frames( info, info->effect_frame1, info->effect_frame2, g->A, info->uc->sample_id, info->uc->playback_mode, render_frame);
 
     int transition_enabled = atomic_load_int(&settings->transition.active) && atomic_load_int(&settings->transition.global_state);
     if (transition_enabled && !vj_perform_sequence_transition_still_valid(info)) {
@@ -14635,7 +14650,7 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
 }
     }
 
-    vj_perform_scene_detect_frame(settings, info->effect_frame1, cur_frame);
+    vj_perform_scene_detect_frame(settings, info->effect_frame1, render_frame);
 
     vj_perform_render_font( info, settings, info->effect_frame1);
 

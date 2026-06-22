@@ -104,59 +104,6 @@ static inline int wba_i_to_range1000(int v, int lo, int hi)
     return ((v - lo) * 1000 + d / 2) / d;
 }
 
-static inline int wba_music_drive(int bone_length, int edge_sens, int motion_age, int bone_density, int white_forge, int fissure, int stroke_chroma)
-{
-    int d = 0;
-
-    d += clampi(motion_age - 36, 0, 64) * 38;
-    d += clampi(bone_density - 50, 0, 50) * 28;
-    d += clampi(fissure - 28, 0, 72) * 24;
-    d += clampi(edge_sens - 72, 0, 28) * 24;
-    d += clampi(bone_length - 50, 0, 46) * 20;
-    d += clampi(white_forge - 78, 0, 22) * 18;
-    d += clampi(stroke_chroma - 8, 0, 92) * 12;
-
-    return clampi((d + 60) / 120, 0, 100);
-}
-
-static inline int wba_launch_density_gate(int launch_drive, int density, int length_comp_q8)
-{
-    int k;
-
-    launch_drive = clampi(launch_drive, 0, 100);
-    density = clampi(density, 0, 100);
-
-    k = 3 + ((launch_drive * (12 + (density >> 2)) + 50) / 100);
-    k = (k * length_comp_q8 + 128) >> 8;
-
-    return clampi(k, 2, 32);
-}
-
-static inline int wba_launch_event_strength(int launch_drive, int edge, int motion, int density)
-{
-    int s;
-
-    launch_drive = clampi(launch_drive, 0, 100);
-    edge = clampi(edge, 0, 255);
-    motion = clampi(motion, 0, 255);
-    density = clampi(density, 0, 100);
-
-    s = 30 + ((launch_drive * 92 + 50) / 100);
-    s += (edge * (24 + (density >> 3)) + 127) >> 8;
-    s += (motion * (34 + (launch_drive >> 1)) + 127) >> 8;
-
-    return clampi(s, 0, 208);
-}
-
-
-static inline int wba_mix100(int a, int b, int q)
-{
-    int d;
-    q = clampi(q, 0, 100);
-    d = b - a;
-    return a + (d * q + (d >= 0 ? 50 : -50)) / 100;
-}
-
 static inline int wba_soft_ceiling_y(int y)
 {
     if(y > 238) {
@@ -719,7 +666,6 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
     int stroke_chroma_q8;
     int color_bias;
     int stroke_budget;
-    int launch_drive;
 
     int chroma_gain_age_q8[WBA_MAX_FRAMES];
 
@@ -735,10 +681,6 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
     int motion_min;
     int motion_fracture_keep;
     int current_keep_base;
-    int launch_edge_floor;
-    int launch_seed_keep;
-    int launch_strength_boost;
-    int launch_fissure_boost;
 
     int long_dense_fast;
     int length_comp_q8;
@@ -782,15 +724,6 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
     opacity = clampi(opacity, 0, 100);
     step = clampi(step, 3, 14);
     time_depth = clampi(time_depth, 1, WBA_MAX_FRAMES);
-    launch_drive = wba_music_drive(bone_length, edge_sens, motion_age, bone_density, white_forge, fissure, stroke_chroma);
-
-    bone_length = clampi(bone_length + ((launch_drive * 16 + 50) / 100), 2, 96);
-    edge_sens = wba_mix100(edge_sens, 100, (launch_drive * 38 + 50) / 100);
-    motion_age = wba_mix100(motion_age, 100, (launch_drive * 56 + 50) / 100);
-    bone_density = wba_mix100(bone_density, 100, (launch_drive * 54 + 50) / 100);
-    white_forge = wba_mix100(white_forge, 94, (launch_drive * 32 + 50) / 100);
-    fissure = wba_mix100(fissure, 100, (launch_drive * 68 + 50) / 100);
-    stroke_chroma = wba_mix100(stroke_chroma, 82, (launch_drive * 32 + 50) / 100);
 
     opacity_q8 = (opacity * 255 + 50) / 100;
     white_forge_q8 = (white_forge * 256 + 50) / 100;
@@ -840,23 +773,8 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
     motion_fracture_keep = 2 + (((bone_density / 7) + (motion_age / 10)) * length_comp_q8 >> 8);
     current_keep_base = 8 + (((bone_density / 4) + 6) * length_comp_q8 >> 8);
 
-    if(launch_drive > 0) {
-        int launch_motion_lift = (launch_drive * 9 + 50) / 100;
-
-        motion_min -= launch_motion_lift;
-        if(motion_min < 6)
-            motion_min = 6;
-
-        motion_fracture_keep += wba_launch_density_gate(launch_drive, bone_density, length_comp_q8);
-        current_keep_base += (launch_drive * 10 + 50) / 100;
-    }
-
     motion_fracture_keep = clampi(motion_fracture_keep, 1, 58);
     current_keep_base = clampi(current_keep_base, 4, 74);
-
-    launch_edge_floor = 6 + ((100 - edge_sens) / 12);
-    launch_edge_floor -= (launch_drive * 4 + 50) / 100;
-    launch_edge_floor = clampi(launch_edge_floor, 4, 18);
 
     load_shed = 0;
     if (step <= 4)
@@ -867,8 +785,6 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
         load_shed += (bone_density - 58) >> 1;
     if (fissure >= 48)
         load_shed += (fissure - 44) >> 1;
-    if (launch_drive >= 54)
-        load_shed += (launch_drive - 50) >> 1;
     if (time_depth >= 5)
         load_shed += (time_depth - 4) * 4;
     if (stroke_budget < 62)
@@ -910,12 +826,6 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
 
     main_strokes_used = 0;
     optional_strokes_used = 0;
-
-    launch_seed_keep = wba_launch_density_gate(launch_drive, bone_density, length_comp_q8);
-    if (load_shed > 28)
-        launch_seed_keep = (launch_seed_keep * (228 - load_shed) + 128) >> 8;
-    launch_strength_boost = (launch_drive * (34 + (white_forge >> 1)) + 50) / 100;
-    launch_fissure_boost = (launch_drive * 18 + 50) / 100;
 
 #pragma omp parallel for schedule(static) num_threads(c->n_threads)
     for (int i = 0; i < process_len; i++) {
@@ -997,7 +907,6 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
 
             int accepted = 0;
             int motion_fracture = 0;
-            int launch_seed = 0;
 
             int age = 0;
             int y_age;
@@ -1038,13 +947,6 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
                 if (strength > 225)
                     keep += 12;
 
-                if (launch_drive > 0) {
-                    keep += (launch_drive * (10 + (strength >> 5)) + 50) / 100;
-                    strength += launch_strength_boost;
-                    if(strength > 255)
-                        strength = 255;
-                }
-
                 keep = clampi(keep, 6, keep_cap);
 
                 density_hash = (int)((spatial_hash >> 8) & 255);
@@ -1067,7 +969,6 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
                             gx = 1;
 
                         strength = 46 + ((motion * motion_age) / 190);
-                        strength += (launch_strength_boost * 3) >> 2;
                         strength = clampi(strength, 0, 176);
                     }
                 } else {
@@ -1075,34 +976,8 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
 
-            if ((!accepted || strength <= 0) && launch_drive > 0) {
-                int launch_hash = (int)((spatial_hash >> 20) & 255);
-                int launch_edge = edge >= launch_edge_floor;
-                int launch_motion = motion >= (motion_min >> 1);
-
-                if ((launch_edge || launch_motion) && launch_hash <= launch_seed_keep) {
-                    accepted = 1;
-                    launch_seed = 1;
-                    strength = wba_launch_event_strength(launch_drive, edge, motion, bone_density);
-
-                    if (edge < seed_floor || gx == 0 || gy == 0) {
-                        gx = (int)((shape_hash >> 16) & 255) - 128;
-                        gy = (int)((shape_hash >> 24) & 255) - 128;
-
-                        if(gx == 0 && gy == 0)
-                            gx = 1;
-                    }
-                }
-            }
-
             if (!accepted || strength <= 0)
                 continue;
-
-            if(launch_drive > 0 && !launch_seed) {
-                strength += launch_strength_boost >> 1;
-                if(strength > 255)
-                    strength = 255;
-            }
 
             if (max_age > 0) {
                 int motion_part = (motion * motion_age * max_age) / 7800;
@@ -1114,12 +989,6 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
                 }
 
                 age = motion_part + jitter_part;
-
-                if(launch_seed) {
-                    int launch_age = (launch_drive * max_age + 70) / 140;
-                    if(launch_age > age)
-                        age = launch_age;
-                }
 
                 age = clampi(age, 0, max_age);
             } else {
@@ -1148,8 +1017,6 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
             }
 
             local_length = bone_length + (((int)((shape_hash >> 6) & 15) - 7) * bone_length) / 64;
-            if(launch_seed)
-                local_length += (launch_drive * 18 + 50) / 100;
             local_length = clampi(local_length, 2, 96);
 
             if(load_shed > 68 && local_length > 64)
@@ -1239,12 +1106,6 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
 
                 if (edge > 220)
                     fiss_keep += 12;
-
-                if(launch_drive > 0)
-                    fiss_keep += launch_fissure_boost;
-
-                if(launch_seed)
-                    fiss_keep += 8;
 
                 if (long_dense_fast)
                     fiss_keep = (fiss_keep * (load_shed > 42 ? 140 : 176)) >> 8;

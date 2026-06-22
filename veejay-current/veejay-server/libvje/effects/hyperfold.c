@@ -4376,16 +4376,16 @@ vj_effect *hyperfold_init(int w, int h)
     );
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,   -1000,
-        VJ_BEAT_GRID_SIZE,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,   48,      240,                18, 56,  900, 3600, 0,    54,
-        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      500,      860,                16, 58, 1000, 4200, 0,    56,
-        VJ_BEAT_INTENSITY,          VJ_BEAT_F_CONTINUOUS,                                                 80,      920,                70, 100, 260, 1800, 0,   100,
-        VJ_BEAT_CONTRAST,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      340,      760,                14, 48,  900, 2600, 0,    42,
-        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      420,      900,                28, 82,  400, 1800, 0,    76,
-        VJ_BEAT_COLOR_AMOUNT,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,    0,      440,                20, 64,  900, 3000, 0,    44,
-        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,   -1000,
-        VJ_BEAT_CONTRAST,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      430,      820,                14, 50, 1000, 3400, 0,    40,
-        VJ_BEAT_TURBULENCE,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       30,      520,                22, 68,  520, 2600, 60,   62
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_DETAIL,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 0,                  1000,               18, 68,  520, 2600, 0,    72,
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  1000,               18, 72,  700, 3200, 0,    74,
+        VJ_BEAT_DRIFT,              VJ_BEAT_F_CONTINUOUS,                                               0,                  1000,               30, 94,  220, 1600, 0,    96,
+        VJ_BEAT_INTENSITY,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  1000,               24, 86,  260, 1800, 0,    90,
+        VJ_BEAT_SPEED,              VJ_BEAT_F_CONTINUOUS,                                              -1000,               1000,               18, 76,  300, 1900, 0,    82,
+        VJ_BEAT_COLOR_AMOUNT,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  1000,               12, 52,  900, 3200, 0,    46,
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_CONTRAST,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  1000,               14, 58,  700, 2600, 0,    58,
+        VJ_BEAT_TURBULENCE,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  1000,               22, 86,  260, 1900, 80,   88
     );
 
     return ve;

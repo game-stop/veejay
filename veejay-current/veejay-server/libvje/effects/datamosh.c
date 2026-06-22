@@ -368,15 +368,15 @@ vj_effect *datamosh_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
         VJ_BEAT_SELECTOR,     VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,                 VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
-        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                     32,                 100,                18, 68,  650, 2600, 0,    92,
-        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                     22,                 100,                16, 62,  700, 2800, 0,    84,
-        VJ_BEAT_GRID_SIZE,    VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 6, 44, 4, 14, 3400, 9000, 2600, 18,
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,                6,                  24,                 5,  18, 3200, 8600, 2400, 24,
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                     18,                 100,                16, 62,  700, 3000, 0,    82,
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                     62,                 100,                14, 56,  900, 3600, 0,    88,
-        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                     12,                 100,                16, 62,  700, 2800, 0,    80,
-        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS,                                                              4,                  92,                 14, 54,  300, 2200, 180,  72,
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED,                                          0,                  55,                 10, 38, 1000, 3600, 0,    42,
+        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                     0,                  100,                30, 94,  220, 1500, 0,    100,
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                     0,                  100,                26, 86,  300, 1800, 0,    92,
+        VJ_BEAT_GRID_SIZE,    VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,                 VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,                                       1,                  DM_HISTORY_MAX,     8,  36, 1800, 6200, 1200, 52,
+        VJ_BEAT_DRIFT,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                     0,                  100,                30, 92,  260, 1800, 0,    96,
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                     0,                  100,                18, 78,  800, 3600, 300,  76,
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                                     0,                  100,                22, 84,  300, 1900, 0,    86,
+        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS,                                                              0,                  100,                16, 72,  180, 1400, 120,  82,
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_REJECT,                                                                  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
         VJ_BEAT_TRIGGER,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,                 VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
     );
 

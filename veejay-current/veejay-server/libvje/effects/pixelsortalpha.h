@@ -33,4 +33,6 @@
 #define PIXELSORTALPHA_H
 vj_effect *pixelsortalpha_init(int w, int h);
 void pixelsortalpha_apply( void *ptr, VJFrame *frame, int *args );
+void *pixelsortalpha_malloc(int w, int h);
+void pixelsortalpha_free(void *ptr);
 #endif

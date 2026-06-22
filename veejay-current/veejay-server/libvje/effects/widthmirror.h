@@ -22,4 +22,6 @@
 #define WIDTHMIRROR_H
 vj_effect *widthmirror_init(int max_width, int h);
 void widthmirror_apply(void *ptr, VJFrame *frame, int *args);
+void *widthmirror_malloc(int w, int h);
+void widthmirror_free(void *ptr);
 #endif

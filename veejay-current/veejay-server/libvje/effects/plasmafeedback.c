@@ -355,17 +355,17 @@ vj_effect *plasmafeedback_init(int w, int h)
     );
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          38, 100, 18, 72, 300,  1650, 0,    92,
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          62, 100, 14, 58, 1000, 5200, 420,  84,
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          6,  82,  12, 52, 520,  2200, 120,  66,
-        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          28, 100, 18, 74, 420,  2100, 80,   94,
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          38, 100, 16, 66, 420,  2100, 80,   86,
-        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          12, 100, 14, 64, 700,  3600, 360,  78,
-        VJ_BEAT_GLOW,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          28, 100, 18, 70, 260,  1600, 0,    88,
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                 VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000,
-        VJ_BEAT_COLOR_PHASE,  VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_WRAP,                                  1,  100, 8,  34, 1800, 7200, 1200, 46,
-        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          22, 100, 18, 76, 220,  1500, 0,    96,
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                          10, 100, 12, 48, 1200, 5200, 700,  58
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,                  100,                28, 92,  220, 1500, 0,    98,
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,                  100,                18, 78,  800, 4200, 300,  82,
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,     0,                  100,                10, 54,  520, 2400, 120,  58,
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,                  100,                28, 94,  260, 1700, 0,    96,
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,                  100,                24, 88,  300, 1900, 0,    86,
+        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,                  100,                20, 86,  360, 2400, 160,  84,
+        VJ_BEAT_GLOW,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,                  100,                24, 90,  220, 1500, 0,    92,
+        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                                VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_COLOR_PHASE,  VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_WRAP | VJ_BEAT_F_NO_ZERO_CROSS,        1,                  100,                 8, 42, 1800, 7200, 1200, 48,
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,                  100,                30, 96,  180, 1300, 0,    100,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                         0,                  100,                10, 54, 1000, 5200, 700,  54
     );
 
     return ve;

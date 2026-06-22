@@ -1375,17 +1375,17 @@ vj_effect *slitscan_init(int w, int h)
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
         VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
-        VJ_BEAT_INTENSITY,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     18,                 100,                14, 54,  800, 3000, 0,    84,
-        VJ_BEAT_MEMORY,         VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 4,                  SS_HISTORY_MAX,     4,  14, 3200, 8600, 2400, 24,
+        VJ_BEAT_INTENSITY,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  100,                28, 86,  320, 1800, 0,    96,
+        VJ_BEAT_MEMORY,         VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,                       1,                  SS_HISTORY_MAX,    10, 44, 1800, 6200, 1200, 58,
         VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
-        VJ_BEAT_SOURCE_MIX,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     24,                 100,                12, 46, 1000, 3600, 0,    76,
-        VJ_BEAT_MOTION_REACT,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     12,                 100,                16, 62,  700, 2800, 0,    88,
         VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
-        VJ_BEAT_GEOMETRY_PHASE, VJ_BEAT_F_CONTINUOUS,                                               0,                  1000,               14, 54,  800, 3000, 0,    78,
-        VJ_BEAT_SPEED,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     36,                 360,                14, 54,  800, 3000, 0,    82,
-        VJ_BEAT_MEMORY,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     10,                 100,                10, 38, 1200, 4200, 0,    62,
-        VJ_BEAT_COLOR_AMOUNT,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     28,                 100,                12, 46, 1000, 3600, 0,    72,
-        VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
+        VJ_BEAT_MOTION_REACT,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  100,                30, 92,  220, 1400, 0,    98,
+        VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_DRIFT,          VJ_BEAT_F_CONTINUOUS,                                               0,                  1000,               34, 96,  260, 1800, 0,    94,
+        VJ_BEAT_SPEED,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     10,                 400,                22, 78,  420, 2200, 0,    82,
+        VJ_BEAT_FLOW,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  100,                22, 72,  520, 2600, 0,    78,
+        VJ_BEAT_COLOR_AMOUNT,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  100,                10, 46,  900, 3200, 0,    42,
+        VJ_BEAT_SELECTOR,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
     );
     return ve;
 }

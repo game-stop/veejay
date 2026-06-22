@@ -93,11 +93,11 @@ vj_effect *chromawarp_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                  5,                  54,                 12, 52,  900, 3200, 0,    86,
-        VJ_BEAT_DRIFT,        VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                         VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                  VJ_BEAT_SOFT_UNSET,                VJ_BEAT_SOFT_UNSET,                0, 0, 0, 0, 0,    70,
-        VJ_BEAT_INERTIA,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 96,              230,                8,  30, 1800, 5600, 0,    38,
-        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                  0,                  190,                10, 42, 1100, 3800, 0,    58
+        VJ_BEAT_WARP,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,   64,  30, 100, 120, 1100, 0,   100,
+        VJ_BEAT_DRIFT,            VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                              0,  360,  22,  86, 180, 1600, 0,    88,
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                   160,  255,  18,  72, 240, 1800, 0,    72,
+        VJ_BEAT_INERTIA,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 0, 255,  22,  90, 180, 1500, 80,   84,
+        VJ_BEAT_FLOW,             VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,  255,  24,  92, 180, 1500, 80,   86
     );
 
     return ve;

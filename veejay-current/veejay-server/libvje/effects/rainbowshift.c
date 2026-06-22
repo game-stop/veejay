@@ -93,8 +93,8 @@ vj_effect *rainbowshift_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      12, 190, 16, 62,  700, 2800, 0,    86,
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 1,  8,   4,  14, 3000, 8200, 2200, 22
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 8,                  128,                18, 72, 500, 2200, 0,    94,
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,   0,    0,    -1000
     );
     rainbowshift_init_lut();
 

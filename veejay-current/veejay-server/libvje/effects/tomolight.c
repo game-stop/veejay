@@ -26,7 +26,7 @@
 #include <string.h>
 #include <omp.h>
 
-#define TL_PARAMS 13
+#define TL_PARAMS 12
 
 /* UI parameter order: choose the look first, then strength/memory,
  * then depth/slice/scan controls, then color/reset. */
@@ -42,7 +42,6 @@
 #define P_SCAN_MOTION      9
 #define P_COLOR_MODE      10
 #define P_RESET           11
-#define P_LIGHT_DRIVE    12
 
 #define TL_SRC_LUMA        0
 #define TL_SRC_INV_LUMA    1
@@ -142,7 +141,6 @@ typedef struct {
     int last_color_mode;
     int last_static_chroma;
 
-    float eff_light_drive;
     float eff_amount;
     float eff_light;
     float eff_residue;
@@ -317,9 +315,6 @@ vj_effect *tomolight_init(int w, int h)
     ve->limits[1][P_RESET] = 1;
     ve->defaults[P_RESET] = 0;
 
-    ve->limits[0][P_LIGHT_DRIVE] = 0;
-    ve->limits[1][P_LIGHT_DRIVE] = 1000;
-    ve->defaults[P_LIGHT_DRIVE] = 0;
 
     ve->sub_format = 1;
     ve->description = "Tomographic Light Sculpture";
@@ -335,8 +330,7 @@ vj_effect *tomolight_init(int w, int h)
         "Scan Width",
         "Scan Motion",
         "Color Mode",
-        "Reset Memory",
-        "Light Drive"
+        "Reset Memory"
     );
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
@@ -351,8 +345,7 @@ vj_effect *tomolight_init(int w, int h)
         VJ_BEAT_WINDOW_RADIUS,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       5,                  18,                 28, 82,  180, 1500, 0,     58,
         VJ_BEAT_SELECTOR,          VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,
         VJ_BEAT_SELECTOR,          VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,
-        VJ_BEAT_RESET,             VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000,
-        VJ_BEAT_INTENSITY,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       40,                 360,                30, 92,  160, 1400, 0,     88
+        VJ_BEAT_RESET,             VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,   0,    0,    0,    -1000
     );
 
     return ve;
@@ -1320,7 +1313,6 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
 
     const int depth_source = clampi(args[P_DEPTH_SOURCE], 0, 4);
     const int use_motion = (depth_source == TL_SRC_MOTION || depth_source == TL_SRC_LUMA_MOTION);
-    const int light_drive_arg = clampi(args[P_LIGHT_DRIVE], 0, 1000);
 
     const int w = t->w;
     const int h = t->h;
@@ -1336,18 +1328,6 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
     int scan_pos_arg = args[P_SCAN_POS];
     int scan_width_arg = args[P_SCAN_WIDTH];
 
-    if(!t->eff_initialized)
-        t->eff_light_drive = (float)light_drive_arg;
-
-    const int light_drive = clampi(tl_smooth_i(&t->eff_light_drive, light_drive_arg, 0.24f, 0.090f), 0, 1000);
-
-    amount_arg = clampi(amount_arg + (((100 - amount_arg) * light_drive * 18 + 50000) / 100000), 0, 100);
-    light_arg = clampi(light_arg + (((100 - light_arg) * light_drive * 32 + 50000) / 100000), 0, 100);
-    residue_arg = clampi(residue_arg + ((light_drive * 4 + 500) / 1000), 0, 99);
-    depth_arg = clampi(depth_arg + (((300 - depth_arg) * light_drive * 22 + 50000) / 100000), 0, 300);
-    slices_arg = clampi(slices_arg + ((light_drive * 3 + 500) / 1000), 2, 64);
-    scan_pos_arg = clampi(scan_pos_arg + ((light_drive * 54 + 500) / 1000), 0, 1000);
-    scan_width_arg = clampi(scan_width_arg + (((100 - scan_width_arg) * light_drive * 18 + 50000) / 100000), 1, 100);
 
     if(!t->eff_initialized) {
         t->eff_amount = (float)amount_arg;

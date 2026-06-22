@@ -48,9 +48,9 @@ vj_effect *colortemp_init(int w, int h)
     ve->param_description = vje_build_param_list( ve->num_params, "Temperature", "Automatic", "Opacity" );
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_COLOR_PHASE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 24,                 720,                14, 56,  800, 3000, 0,    82,
-        VJ_BEAT_SELECTOR,    VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
-        VJ_BEAT_SOURCE_MIX,  VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 24,                 245,                14, 54,  800, 3000, 0,    78
+        VJ_BEAT_COLOR_PHASE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 24,                 720,                18, 72, 500, 2200, 0,    92,
+        VJ_BEAT_SELECTOR,    VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                           VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,   0,    0,    -1000,
+        VJ_BEAT_SOURCE_MIX,  VJ_BEAT_F_REJECT,                                                  VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,   0,    0,    -1000
     );
     return ve;
 }

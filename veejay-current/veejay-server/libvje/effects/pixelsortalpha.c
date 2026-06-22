@@ -588,6 +588,9 @@ static inline void psa_columns(pixelsortalpha_t *p,
 void pixelsortalpha_apply(void *ptr, VJFrame *frame, int *args)
 {
     pixelsortalpha_t *p = (pixelsortalpha_t*) ptr;
+    if(!frame->data[3])
+        return;
+
     uint8_t *P[4] = {
         frame->data[0],
         frame->data[1],

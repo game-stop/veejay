@@ -257,6 +257,10 @@ typedef struct vj_audio_beat_shared_t
     volatile long read_errors;
     volatile long reads;
 
+	volatile int scratch_sensitivity;
+	volatile int source_loss_pause;
+	volatile int source_loss_paused;
+
     volatile int record_lock;
     uint8_t *record_ring;
     int record_ring_size;
@@ -268,6 +272,7 @@ typedef struct vj_audio_beat_shared_t
     int record_sample_rate;
     volatile long record_overruns;
     volatile long record_underruns;
+
 
 #ifdef HAVE_JACK
     vj_audio_sync_shared_t *sync;
@@ -298,6 +303,7 @@ typedef struct vj_scene_detect_t
     double mean_ema;
     uint8_t prev[VJ_SCENE_ANALYSIS_MAX_PIXELS];
 } vj_scene_detect_t;
+
 
 typedef struct vj_audio_clock_osd_t {
     volatile long long prod_loops;

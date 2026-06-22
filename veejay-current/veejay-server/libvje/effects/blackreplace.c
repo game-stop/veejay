@@ -45,11 +45,11 @@ vj_effect *blackreplace_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 48,  320, 12, 48, 1000, 3200, 0,    72,
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 6,   92,  8,  30, 1200, 3800, 0,    44,
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                           24,  255, 14, 58,  900, 2800, 0,    70,
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                           16,  238, 12, 50,  900, 3000, 0,    62,
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                           48,  255, 14, 60,  900, 2800, 0,    74
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 64,                 340,                16, 62, 600, 2400, 0,    90,
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,   0,    0,    -1000,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,   0,    0,    -1000,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,   0,    0,    -1000,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,   0,    0,    -1000
     );
 
     return ve;

@@ -23,14 +23,13 @@
 #include <veejaycore/vjmem.h>
 #include "sobel.h"
 
-#define SOBEL_PARAMS 6
+#define SOBEL_PARAMS 5
 
 #define P_THRESHOLD    0
 #define P_MODE         1
 #define P_MIX          2
 #define P_EDGE_GAIN    3
 #define P_CHROMA_EDGE  4
-#define P_DETAIL_DRIVE 5
 
 typedef struct {
     uint8_t *buf[3];
@@ -41,7 +40,6 @@ typedef struct {
     float eff_mix;
     float eff_gain;
     float eff_chroma;
-    float eff_detail;
     int eff_initialized;
 } sobel_t;
 
@@ -123,7 +121,6 @@ vj_effect *sobel_init(int w, int h)
     ve->limits[0][P_MIX] = 0;          ve->limits[1][P_MIX] = 1000;       ve->defaults[P_MIX] = 1000;
     ve->limits[0][P_EDGE_GAIN] = 0;    ve->limits[1][P_EDGE_GAIN] = 2000; ve->defaults[P_EDGE_GAIN] = 1000;
     ve->limits[0][P_CHROMA_EDGE] = 0;  ve->limits[1][P_CHROMA_EDGE] = 1000; ve->defaults[P_CHROMA_EDGE] = 0;
-    ve->limits[0][P_DETAIL_DRIVE] = 0;  ve->limits[1][P_DETAIL_DRIVE] = 1000; ve->defaults[P_DETAIL_DRIVE] = 0;
 
     ve->description = "Sobel";
     ve->sub_format = -1;
@@ -134,10 +131,9 @@ vj_effect *sobel_init(int w, int h)
         ve->num_params,
         "Threshold",
         "Mode",
-        "Mix",
+        "Opacity",
         "Edge Gain",
-        "Chroma Edge",
-        "Detail Drive"
+        "Chroma Edge"
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
@@ -153,12 +149,11 @@ vj_effect *sobel_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_DETAIL,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED,      4,                  180,                12, 46, 1000, 3600, 0,    68,
+        VJ_BEAT_DETAIL,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
         VJ_BEAT_SELECTOR,         VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 260,                1000,               12, 46, 1000, 3600, 0,    72,
-        VJ_BEAT_INTENSITY,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 420,                2000,               14, 54,  800, 3000, 0,    82,
-        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 80,                 1000,               12, 46, 1000, 3600, 0,    68,
-        VJ_BEAT_DETAIL,           VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 140,                1000,               16, 62,  700, 2800, 0,    92
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_REJECT,                               VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_INTENSITY,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 520,                2000,               16, 64,  500, 2200, 0,    96,
+        VJ_BEAT_COLOR_AMOUNT,     VJ_BEAT_F_REJECT,                               VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
     );
 
     (void) w;
@@ -355,7 +350,6 @@ void sobel_apply(void *ptr, VJFrame *frame, int *args)
     int mix = args[P_MIX];
     int gain = args[P_EDGE_GAIN];
     int chroma = args[P_CHROMA_EDGE];
-    int detail_drive = args[P_DETAIL_DRIVE];
 
     const float param_fast = 0.30f;
     const float param_slow = 0.085f;
@@ -365,25 +359,18 @@ void sobel_apply(void *ptr, VJFrame *frame, int *args)
         s->eff_mix = (float)mix;
         s->eff_gain = (float)gain;
         s->eff_chroma = (float)chroma;
-        s->eff_detail = (float)detail_drive;
         s->eff_initialized = 1;
     } else {
         threshold    = sobel_smooth_i(&s->eff_threshold, threshold,    param_fast, param_slow);
         mix          = sobel_smooth_i(&s->eff_mix,       mix,          param_fast * 0.88f, param_slow);
         gain         = sobel_smooth_i(&s->eff_gain,      gain,         param_fast * 0.88f, param_slow);
         chroma       = sobel_smooth_i(&s->eff_chroma,    chroma,       param_fast * 0.80f, param_slow);
-        detail_drive = sobel_smooth_i(&s->eff_detail,    detail_drive, param_fast, param_slow);
     }
 
     threshold = clampi(threshold, 0, 255);
     mix = clampi(mix, 0, 1000);
     gain = clampi(gain, 0, 2000);
     chroma = clampi(chroma, 0, 1000);
-    detail_drive = clampi(detail_drive, 0, 1000);
-
-    threshold = clampi(threshold - ((detail_drive * 86 + 500) / 1000), 0, 255);
-    gain = clampi(gain + ((detail_drive * 760 + 500) / 1000), 0, 2200);
-    chroma = clampi(chroma + (((1000 - chroma) * detail_drive + 500) / 1000), 0, 1000);
 
     uint8_t *restrict Y = frame->data[0];
 

@@ -1,4 +1,4 @@
-/* 
+/*
  * Linux VeeJay
  *
  * Copyright(C)2019 Niels Elburg <nwelburg@gmail.com>
@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,6 +21,11 @@
 #include "buffer.h"
 
 #define MAX_FRAMES 1500
+#define BUFFER_PARAMS 3
+
+#define P_DELAY    0
+#define P_OPACITY  1
+#define P_FEEDBACK 2
 
 typedef struct {
     VJFrame frame;
@@ -32,26 +37,9 @@ typedef struct {
 typedef struct {
     buffer_slot_t *slots;
     int write_pos;
-    int read_pos;
-    int ready;
-    int length;
     int filled;
+    int n_threads;
 } buffer_t;
-
-static void buffer_reset(buffer_t *b)
-{
-    if(!b || !b->slots)
-        return;
-
-    for(int i = 0; i < MAX_FRAMES; i++)
-        b->slots[i].valid = 0;
-
-    b->write_pos = 0;
-    b->read_pos = 0;
-    b->ready = 0;
-    b->length = 0;
-    b->filled = 0;
-}
 
 static void buffer_release(buffer_t *b)
 {
@@ -67,32 +55,48 @@ static void buffer_release(buffer_t *b)
         b->slots[i].capacity = 0;
         b->slots[i].valid = 0;
     }
+
+    b->write_pos = 0;
+    b->filled = 0;
 }
 
 vj_effect *buffer_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
 
-    ve->num_params = 1;
+    ve->num_params = BUFFER_PARAMS;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = MAX_FRAMES;
-    ve->defaults[0] = 50;
+    ve->limits[0][P_DELAY] = 0;
+    ve->limits[1][P_DELAY] = MAX_FRAMES;
+    ve->defaults[P_DELAY] = 50;
+
+    ve->limits[0][P_OPACITY] = 0;
+    ve->limits[1][P_OPACITY] = 255;
+    ve->defaults[P_OPACITY] = 255;
+
+    ve->limits[0][P_FEEDBACK] = 0;
+    ve->limits[1][P_FEEDBACK] = 255;
+    ve->defaults[P_FEEDBACK] = 0;
 
     ve->description = "Frame Delay";
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->parallel = 0;
-    ve->param_description = vje_build_param_list(ve->num_params, "Frame Delay");
+    ve->param_description = vje_build_param_list(ve->num_params, "Memory Tap", "Opacity", "Feedback");
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_MEMORY, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 1,                  MAX_FRAMES,          18, 72, 500, 2200, 0,    96,
+        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 64,                 255,                 14, 56, 450, 2000, 0,    88,
+        VJ_BEAT_MEMORY,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,       VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,   0,    0,    -1000
     );
+
+    (void) w;
+    (void) h;
 
     return ve;
 }
@@ -111,8 +115,9 @@ void *buffer_malloc(int w, int h)
         return NULL;
     }
 
-    (void) w;
-    (void) h;
+    b->write_pos = 0;
+    b->filled = 0;
+    b->n_threads = vje_advise_num_threads(w * h);
 
     return b;
 }
@@ -132,13 +137,8 @@ void buffer_free(void *ptr)
     free(b);
 }
 
-static int put_frame(buffer_t *b, VJFrame *frame)
+static int buffer_store_slot(buffer_slot_t *slot, VJFrame *frame)
 {
-    if(!b || !frame || !b->slots || b->length <= 0)
-        return 0;
-
-    buffer_slot_t *slot = &b->slots[b->write_pos];
-
     const int has_alpha = frame->data[3] != NULL;
     const size_t y_len = (size_t)frame->len;
     const size_t uv_len = (size_t)frame->uv_len;
@@ -181,37 +181,56 @@ static int put_frame(buffer_t *b, VJFrame *frame)
     slot->frame.ssm = frame->ssm;
     slot->valid = 1;
 
-    if(b->filled < b->length)
-        b->filled++;
-
-    if(b->filled >= b->length)
-        b->ready = 1;
-
-    b->write_pos = (b->write_pos + 1) % b->length;
-
     return 1;
 }
 
-static int get_frame(buffer_t *b, VJFrame *dst)
+static int buffer_put_frame(buffer_t *b, VJFrame *frame)
 {
-    if(!b || !dst || !b->slots || b->length <= 0)
-        return 0;
+    buffer_slot_t *slot = &b->slots[b->write_pos];
+    const int pos = b->write_pos;
 
-    buffer_slot_t *slot = &b->slots[b->read_pos];
+    if(!buffer_store_slot(slot, frame))
+        return -1;
+
+    b->write_pos++;
+    if(b->write_pos >= MAX_FRAMES)
+        b->write_pos = 0;
+
+    if(b->filled < MAX_FRAMES)
+        b->filled++;
+
+    return pos;
+}
+
+static buffer_slot_t *buffer_get_tap(buffer_t *b, int delay)
+{
+    if(delay <= 0 || delay > b->filled)
+        return NULL;
+
+    int pos = b->write_pos - delay;
+    if(pos < 0)
+        pos += MAX_FRAMES;
+
+    buffer_slot_t *slot = &b->slots[pos];
 
     if(!slot->valid || !slot->data)
-        return 0;
+        return NULL;
 
+    return slot;
+}
+
+static inline uint8_t buffer_blend_u8(uint8_t a, uint8_t b, int opacity)
+{
+    return (uint8_t)((((int)a * (255 - opacity)) + ((int)b * opacity) + 127) / 255);
+}
+
+static void buffer_copy_slot(buffer_slot_t *slot, VJFrame *dst)
+{
     VJFrame *src = &slot->frame;
 
-    if(dst->data[0] && src->data[0])
-        veejay_memcpy(dst->data[0], src->data[0], src->len);
-
-    if(dst->data[1] && src->data[1])
-        veejay_memcpy(dst->data[1], src->data[1], src->uv_len);
-
-    if(dst->data[2] && src->data[2])
-        veejay_memcpy(dst->data[2], src->data[2], src->uv_len);
+    veejay_memcpy(dst->data[0], src->data[0], src->len);
+    veejay_memcpy(dst->data[1], src->data[1], src->uv_len);
+    veejay_memcpy(dst->data[2], src->data[2], src->uv_len);
 
     if(dst->data[3] && src->data[3])
         veejay_memcpy(dst->data[3], src->data[3], src->len);
@@ -220,10 +239,82 @@ static int get_frame(buffer_t *b, VJFrame *dst)
     dst->uv_len = src->uv_len;
     dst->stride[3] = src->stride[3];
     dst->ssm = src->ssm;
+}
 
-    b->read_pos = (b->read_pos + 1) % b->length;
+static void buffer_mix_slot(buffer_t *b, buffer_slot_t *slot, VJFrame *dst, int opacity)
+{
+    VJFrame *src = &slot->frame;
+    const int len = dst->len;
+    const int uv_len = dst->uv_len;
+    uint8_t *restrict dstY = dst->data[0];
+    uint8_t *restrict dstU = dst->data[1];
+    uint8_t *restrict dstV = dst->data[2];
+    const uint8_t *restrict srcY = src->data[0];
+    const uint8_t *restrict srcU = src->data[1];
+    const uint8_t *restrict srcV = src->data[2];
 
-    return 1;
+#pragma omp parallel num_threads(b->n_threads)
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+            dstY[i] = buffer_blend_u8(dstY[i], srcY[i], opacity);
+
+#pragma omp for schedule(static)
+        for(int i = 0; i < uv_len; i++) {
+            dstU[i] = buffer_blend_u8(dstU[i], srcU[i], opacity);
+            dstV[i] = buffer_blend_u8(dstV[i], srcV[i], opacity);
+        }
+
+        if(dst->data[3] && src->data[3]) {
+            uint8_t *restrict dstA = dst->data[3];
+            const uint8_t *restrict srcA = src->data[3];
+
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++)
+                dstA[i] = buffer_blend_u8(dstA[i], srcA[i], opacity);
+        }
+    }
+}
+
+static void buffer_feedback_slot(buffer_t *b, buffer_slot_t *slot, VJFrame *frame, int feedback)
+{
+    VJFrame *dst = &slot->frame;
+    const int len = frame->len;
+    const int uv_len = frame->uv_len;
+
+    if(feedback >= 255) {
+        buffer_store_slot(slot, frame);
+        return;
+    }
+
+    uint8_t *restrict dstY = dst->data[0];
+    uint8_t *restrict dstU = dst->data[1];
+    uint8_t *restrict dstV = dst->data[2];
+    const uint8_t *restrict srcY = frame->data[0];
+    const uint8_t *restrict srcU = frame->data[1];
+    const uint8_t *restrict srcV = frame->data[2];
+
+#pragma omp parallel num_threads(b->n_threads)
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+            dstY[i] = buffer_blend_u8(dstY[i], srcY[i], feedback);
+
+#pragma omp for schedule(static)
+        for(int i = 0; i < uv_len; i++) {
+            dstU[i] = buffer_blend_u8(dstU[i], srcU[i], feedback);
+            dstV[i] = buffer_blend_u8(dstV[i], srcV[i], feedback);
+        }
+
+        if(dst->data[3] && frame->data[3]) {
+            uint8_t *restrict dstA = dst->data[3];
+            const uint8_t *restrict srcA = frame->data[3];
+
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++)
+                dstA[i] = buffer_blend_u8(dstA[i], srcA[i], feedback);
+        }
+    }
 }
 
 static void buffer_black(VJFrame *frame)
@@ -239,32 +330,35 @@ static void buffer_black(VJFrame *frame)
 void buffer_apply(void *ptr, VJFrame *frame, int *args)
 {
     buffer_t *b = (buffer_t*) ptr;
-    int delay = args[0];
+    int delay = args[P_DELAY];
+    const int opacity = args[P_OPACITY];
+    const int feedback = args[P_FEEDBACK];
 
     if(delay < 0)
         delay = 0;
     else if(delay > MAX_FRAMES)
         delay = MAX_FRAMES;
 
-    if(delay == 0) {
-        if(b->length != 0)
-            buffer_reset(b);
-        return;
-    }
-
-    if(b->length != delay) {
-        buffer_reset(b);
-        b->length = delay;
-    }
-
-    if(!put_frame(b, frame))
+    const int write_slot = buffer_put_frame(b, frame);
+    if(write_slot < 0)
         return;
 
-    if(b->ready) {
-        if(!get_frame(b, frame))
+    if(delay == 0)
+        return;
+
+    buffer_slot_t *tap = buffer_get_tap(b, delay);
+
+    if(!tap) {
+        if(opacity >= 255)
             buffer_black(frame);
+        return;
     }
-    else {
-        buffer_black(frame);
-    }
+
+    if(opacity >= 255)
+        buffer_copy_slot(tap, frame);
+    else if(opacity > 0)
+        buffer_mix_slot(b, tap, frame, opacity);
+
+    if(feedback > 0)
+        buffer_feedback_slot(b, &b->slots[write_slot], frame, feedback);
 }

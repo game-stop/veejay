@@ -104,11 +104,15 @@ vj_effect *mirrordistortion_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_NO_ZERO_CROSS, 4,    78,   14, 54,  800, 3000, 0,    78,
-        VJ_BEAT_DRIFT,              VJ_BEAT_F_CONTINUOUS,                                                          w / 2, w + (w / 2), 12, 46,  900, 3400, 0,    64,
-        VJ_BEAT_DRIFT,              VJ_BEAT_F_CONTINUOUS,                                                          h / 2, h + (h / 2), 12, 46,  900, 3400, 0,    64
-    );
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,
+        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000,
 
+        VJ_BEAT_WARP, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,
+        w, w + (w / 2), 16, 62, 600, 2400, 0, 92,
+
+        VJ_BEAT_WARP, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,
+        h, h + (h / 3), 12, 46, 800, 3000, 0, 68
+    );
     return ve;
 }
 

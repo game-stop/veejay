@@ -48,6 +48,10 @@ void vj_event_get_sample_sequences_all(void *ptr, const char format[], va_list a
 void vj_event_sequence_select(void *ptr, const char format[], va_list ap);
 void vj_event_sequence_copy(void *ptr, const char format[], va_list ap);
 void vj_event_sequence_clear_all(void *ptr, const char format[], va_list ap);
+void vj_event_audio_beat_scratch_sensitivity(void *ptr, const char format[], va_list ap);
+void vj_event_audio_beat_source_loss_pause(void *ptr, const char format[], va_list ap);
+void vj_event_audio_beat_monitor_latency(void *ptr, const char format[], va_list ap);
+
 
 
 static	void		dump_event_stderr(vevo_port_t *event)
@@ -2306,7 +2310,7 @@ void		vj_init_vevo_events(void)
 				vj_event_audio_beat_config,
 				4,
 				VIMS_REQUIRE_ALL_PARAMS,
-				"Freeze duration in milliseconds",
+				"Hold duration in milliseconds",
 				90,
 				"Cooldown duration in milliseconds",
 				240,
@@ -2319,11 +2323,11 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_AUDIO_BEAT_FREEZE]		=	_new_event(
 				"%d",
 				VIMS_AUDIO_BEAT_FREEZE,
-				"Set JACK audio beat freeze duration",
+				"Set JACK audio beat hold duration",
 				vj_event_audio_beat_freeze,
 				1,
 				VIMS_REQUIRE_ALL_PARAMS,
-				"Freeze duration in milliseconds",
+				"Hold duration in milliseconds",
 				90,
 				NULL );
 
@@ -2367,7 +2371,7 @@ void		vj_init_vevo_events(void)
 				vj_event_audio_beat_action,
 				1,
 				VIMS_REQUIRE_ALL_PARAMS,
-				"Action: 0=none, 1=freeze, 2=auto-fx, 3=freeze+auto-fx, 4=break-beat",
+				"Action: 0=none, 2=auto-fx, 3=break-beat+auto-fx, 4=break-beat",
 				2,
 				NULL );
 
@@ -2425,17 +2429,17 @@ void		vj_init_vevo_events(void)
 				NULL );
 
 	index_map_[VIMS_AUDIO_BEAT_UI_CONFIG]	=	_new_event(
-				"%d %d %d %d %d %d %d %d %d %d",
+				"%d %d %d %d %d %d %d %d %d %d %d %d %d",
 				VIMS_AUDIO_BEAT_UI_CONFIG,
 				"Configure JACK audio beat detector for UI",
 				vj_event_audio_beat_ui_config,
-				10,
-				VIMS_REQUIRE_ALL_PARAMS,
+				13,
+				VIMS_ALLOW_ANY,
 				"Enabled state, 0 or 1",
 				1,
-				"Action: 0=none, 1=freeze, 2=auto-fx, 3=freeze+auto-fx, 4=break-beat",
+				"Action: 0=none, 2=auto-fx, 3=break-beat+auto-fx, 4=break-beat",
 				2,
-				"Freeze duration in milliseconds",
+				"Hold duration in milliseconds",
 				90,
 				"Cooldown duration in milliseconds",
 				240,
@@ -2451,6 +2455,12 @@ void		vj_init_vevo_events(void)
 				2,
 				"Auto-fx amount, 0-100",
 				75,
+				"Scratch sensitivity, 0-100",
+				50,
+				"Source-loss pause, 0 or 1",
+				1,
+				"Monitor latency in milliseconds (-1=auto, 0-64=manual)",
+				-1,
 				NULL );
 
 index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
@@ -2538,6 +2548,39 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
                 VIMS_ALLOW_ANY,
                 NULL );
 
+
+	index_map_[VIMS_AUDIO_BEAT_SCRATCH_SENSITIVITY]	=	_new_event(
+				"%d",
+				VIMS_AUDIO_BEAT_SCRATCH_SENSITIVITY,
+				"Set JACK audio beat scratch sensitivity",
+				vj_event_audio_beat_scratch_sensitivity,
+				1,
+				VIMS_ALLOW_ANY,
+				"Scratch sensitivity, 0-100",
+				50,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_SOURCE_LOSS_PAUSE]	=	_new_event(
+				"%d",
+				VIMS_AUDIO_BEAT_SOURCE_LOSS_PAUSE,
+				"Set JACK audio beat source-loss pause",
+				vj_event_audio_beat_source_loss_pause,
+				1,
+				VIMS_ALLOW_ANY,
+				"Source-loss pause, 0 or 1",
+				1,
+				NULL );
+
+	index_map_[VIMS_AUDIO_BEAT_MONITOR_LATENCY]	=	_new_event(
+				"%d",
+				VIMS_AUDIO_BEAT_MONITOR_LATENCY,
+				"Set JACK monitor heard latency for audio beat (-1=auto)",
+				vj_event_audio_beat_monitor_latency,
+				1,
+				VIMS_ALLOW_ANY,
+				"Monitor latency in milliseconds (-1=auto, 0-64=manual)",
+				-1,
+				NULL );
 
 	index_map_[VIMS_AUDIO_BEAT_STATE]		=	_new_event(
 				NULL,

@@ -228,16 +228,16 @@ vj_effect *spherize_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_INTENSITY,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      6,                  100,                12, 46, 1000, 3600, 0,    78,
-        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS,                                                0,                  360,                12, 46, 1000, 3600, 0,    62,
-        VJ_BEAT_WINDOW_RADIUS,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      8,                  radius_hi,          14, 54,  900, 3600, 0,    72,
-        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      30,                 190,                10, 38, 1200, 4200, 0,    52,
-        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      30,                 190,                10, 38, 1200, 4200, 0,    52,
-        VJ_BEAT_DRIFT,              VJ_BEAT_F_CONTINUOUS,                                                0,                  w,                  8,  28, 1800, 6200, 0,    34,
-        VJ_BEAT_DRIFT,              VJ_BEAT_F_CONTINUOUS,                                                0,                  h,                  8,  28, 1800, 6200, 0,    34,
-        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
-        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      140,                1000,               16, 62,  700, 2800, 0,    94,
-        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      120,                1000,               14, 54,  800, 3200, 0,    86
+        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       0,                  100,                30, 100, 120, 1100, 0,    96,
+        VJ_BEAT_GEOMETRY_PHASE,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                                0,                  360,                18, 78,  260, 1800, 0,    78,
+        VJ_BEAT_WINDOW_RADIUS,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       1,                  radius_hi,          20, 86,  260, 1900, 0,    84,
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      30,                 200,                10, 48,  900, 3600, 400,  42,
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                      30,                 200,                10, 48,  900, 3600, 400,  42,
+        VJ_BEAT_DRIFT,              VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_CONTINUOUS,                         0,                  w,                   6, 24, 2600, 8200, 1800, 26,
+        VJ_BEAT_DRIFT,              VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_CONTINUOUS,                         0,                  h,                   6, 24, 2600, 8200, 1800, 26,
+        VJ_BEAT_SELECTOR,           VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000,
+        VJ_BEAT_WARP,               VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       0,                  1000,               34, 100,  80,  900, 0,    100,
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       0,                  1000,               28, 96,  120, 1100, 0,    94
     );
 
     return ve;

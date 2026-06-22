@@ -97,8 +97,8 @@ vj_effect *gradientfield_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,             3,  24,  4,  14, 3000, 8200, 2200, 22,
-        VJ_BEAT_SOURCE_MIX,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED,                                      0,  210, 14, 54,  800, 3000, 0,    78
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 3,                  24,                 4,  18,  900, 3600, 0,    74,
+        VJ_BEAT_SOURCE_MIX,    VJ_BEAT_F_REJECT,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,     0,    0,    0,    -1000
     );
 
     return ve;

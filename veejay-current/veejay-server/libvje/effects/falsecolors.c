@@ -97,15 +97,14 @@ static void falsecolors_build_beat_hints(vj_effect *ve)
 {
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 36,  190, 14, 54,  850, 3200, 0, 76,
-        VJ_BEAT_SPEED,        VJ_BEAT_F_CONTINUOUS,                                                 0,   42,  12, 46, 1000, 3600, 0, 62,
-        VJ_BEAT_SOURCE_MIX,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       120, 255, 16, 62,  700, 2800, 0, 84,
-        VJ_BEAT_CONTRAST,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS,  36,  126, 10, 38, 1200, 4200, 0, 52,
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       18,  112, 16, 62,  750, 3000, 0, 86,
-        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       128, 900, 18, 68,  650, 2600, 0, 92
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 0,                  255,                18, 72,  420, 2200, 0,   84,
+        VJ_BEAT_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  64,                 18, 78,  260, 1600, 0,   82,
+        VJ_BEAT_INTENSITY,    VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  255,                28, 92,  220, 1500, 0,   94,
+        VJ_BEAT_CONTRAST,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 1,                  255,                14, 62,  700, 3000, 0,   58,
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     1,                  128,                18, 82,  520, 2600, 120, 88,
+        VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  1024,               28, 96,  220, 1500, 0,   100
     );
 }
-
 vj_effect *falsecolors_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));

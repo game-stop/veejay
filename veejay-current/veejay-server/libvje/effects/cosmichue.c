@@ -48,10 +48,10 @@ vj_effect *cosmichue_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_COLOR_AMOUNT,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                100,  1650, 18, 68,  650, 2600, 0,    90,
-        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 60,  1250, 5,  18, 3200, 8600, 2400, 20,
-        VJ_BEAT_SOURCE_MIX,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                72,   255,  16, 62,  700, 2600, 0,    84,
-        VJ_BEAT_COLOR_PHASE,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,                         0,    3600, 14, 58,  800, 2800, 0,    78
+        VJ_BEAT_COLOR_AMOUNT,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 220,  2000, 18, 72,  450, 2000, 0, 94,
+        VJ_BEAT_GEOMETRY_FREQUENCY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 80,   1900, 14, 58,  600, 2600, 0, 82,
+        VJ_BEAT_SOURCE_MIX,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 96,   255,  14, 56,  500, 2200, 0, 70,
+        VJ_BEAT_COLOR_PHASE,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP,          0,    3600, 18, 76,  450, 1800, 0, 90
     );
 
     return ve;

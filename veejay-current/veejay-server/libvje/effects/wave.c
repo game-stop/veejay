@@ -39,13 +39,12 @@
 #include "wave.h"
 #include <stdint.h>
 
-#define WAVE_PARAMS 5
+#define WAVE_PARAMS 4
 
-#define P_FACTOR     0
-#define P_SPEED      1
-#define P_DEFORM_X   2
-#define P_DEFORM_Y   3
-#define P_WARP_DRIVE 4
+#define P_FACTOR   0
+#define P_SPEED    1
+#define P_DEFORM_X 2
+#define P_DEFORM_Y 3
 
 typedef struct {
     uint8_t *region;
@@ -57,7 +56,6 @@ typedef struct {
     float phase;
     float factor_env;
     float speed_env;
-    float warp_env;
     int env_init;
     int n_threads;
 } wave_t;
@@ -66,8 +64,6 @@ static inline int wave_clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : (v > hi ? hi : v);
 }
-
-
 
 static inline float wave_follow_f(float oldv, float target, float attack, float release)
 {
@@ -98,11 +94,11 @@ vj_effect *wave_init(int w, int h)
 
     ve->limits[0][P_FACTOR] = 1;
     ve->limits[1][P_FACTOR] = 100;
-    ve->defaults[P_FACTOR] = 10;
+    ve->defaults[P_FACTOR] = 18;
 
     ve->limits[0][P_SPEED] = 1;
     ve->limits[1][P_SPEED] = 100;
-    ve->defaults[P_SPEED] = 1;
+    ve->defaults[P_SPEED] = 8;
 
     ve->limits[0][P_DEFORM_X] = 0;
     ve->limits[1][P_DEFORM_X] = 1;
@@ -111,10 +107,6 @@ vj_effect *wave_init(int w, int h)
     ve->limits[0][P_DEFORM_Y] = 0;
     ve->limits[1][P_DEFORM_Y] = 1;
     ve->defaults[P_DEFORM_Y] = 1;
-
-    ve->limits[0][P_WARP_DRIVE] = 0;
-    ve->limits[1][P_WARP_DRIVE] = 1000;
-    ve->defaults[P_WARP_DRIVE] = 520;
 
     ve->description = "Wave";
     ve->sub_format = 1;
@@ -125,8 +117,7 @@ vj_effect *wave_init(int w, int h)
         "Factor",
         "Speed",
         "DeformX",
-        "DeformY",
-        "Warp Drive"
+        "DeformY"
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
@@ -149,11 +140,10 @@ vj_effect *wave_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_WARP,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 8,                  82,                 34, 88,  420, 2400, 0,  94,
-        VJ_BEAT_SPEED,    VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,   0,    0,  -1000,
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,   0,    0,  -1000,
-        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,        VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,   0,    0,  -1000,
-        VJ_BEAT_WARP,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 80,                 760,                38, 96,  520, 2600, 0,  98
+        VJ_BEAT_WARP,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SQUARED | VJ_BEAT_F_NO_ZERO_CROSS, 8,                  72,                 16, 64,  800, 3200, 0,    86,
+        VJ_BEAT_SPEED,    VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0, 0,    -1000,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0, 0,    -1000,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                            VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0, 0,    -1000
     );
     return ve;
 }
@@ -188,9 +178,8 @@ void *wave_malloc(int w, int h)
     data->width = w;
     data->height = h;
     data->phase = 0.0f;
-    data->factor_env = 10.0f;
-    data->speed_env = 1.0f;
-    data->warp_env = 520.0f;
+    data->factor_env = 18.0f;
+    data->speed_env = 8.0f;
     data->env_init = 0;
 
     data->n_threads = vje_advise_num_threads(len);
@@ -213,13 +202,15 @@ static void wave_build_maps(wave_t *data,
                             int deform_x,
                             int deform_y)
 {
-    const float amplitude = (float)factor_arg * 0.1f;
-    const float pulsation = 0.5f / amplitude;
+    const float factor = (float)factor_arg;
+    const float amplitude = factor * 0.22f;
+    const float wavelength = 28.0f + factor * 2.10f;
+    const float pulsation = 6.28318530718f / wavelength;
     const float phase = data->phase;
 
     if(deform_y) {
         for(int x = 0; x < width; x++) {
-            const int off = (int)(a_sin((pulsation * (float)x * 2.0f) + phase) * amplitude);
+            const int off = (int)(a_sin((pulsation * (float)x) + phase) * amplitude);
             data->map_x[x] = wave_clampi(x + off, 0, width - 1);
         }
     } else {
@@ -229,7 +220,7 @@ static void wave_build_maps(wave_t *data,
 
     if(deform_x) {
         for(int y = 0; y < height; y++) {
-            const int off = (int)(a_sin(pulsation * (float)y + phase) * amplitude);
+            const int off = (int)(a_sin((pulsation * (float)y * 0.73f) + phase * 0.81f) * amplitude);
             data->map_y[y] = wave_clampi(y + off, 0, height - 1);
         }
     } else {
@@ -250,7 +241,6 @@ void wave_apply(void *ptr, VJFrame *frame, int *args)
     const int base_speed = args[P_SPEED];
     const int deform_x = args[P_DEFORM_X] ? 1 : 0;
     const int deform_y = args[P_DEFORM_Y] ? 1 : 0;
-    const int warp_drive_arg = args[P_WARP_DRIVE];
 
     if(!deform_x && !deform_y)
         return;
@@ -258,26 +248,16 @@ void wave_apply(void *ptr, VJFrame *frame, int *args)
     if(!data->env_init) {
         data->factor_env = (float)base_factor;
         data->speed_env = (float)base_speed;
-        data->warp_env = (float)warp_drive_arg;
         data->env_init = 1;
     }
 
-    data->factor_env = wave_follow_f(data->factor_env, (float)base_factor, 0.165f, 0.085f);
-    data->speed_env  = wave_follow_f(data->speed_env,  (float)base_speed,  0.150f, 0.078f);
-    data->warp_env   = wave_follow_f(data->warp_env,   (float)warp_drive_arg, 0.205f, 0.092f);
+    data->factor_env = wave_follow_f(data->factor_env, (float)base_factor, 0.115f, 0.060f);
+    data->speed_env  = wave_follow_f(data->speed_env,  (float)base_speed,  0.105f, 0.055f);
 
-    const int warp_q = wave_clampi((int)(data->warp_env + 0.5f), 0, 1000);
-    const int factor_base_i = wave_clampi((int)(data->factor_env + 0.5f), 1, 100);
-    const int speed_base_i = wave_clampi((int)(data->speed_env + 0.5f), 1, 100);
+    const int factor = wave_clampi((int)(data->factor_env + 0.5f), 1, 100);
+    const int speed = wave_clampi((int)(data->speed_env + 0.5f), 1, 100);
 
-    const int factor_add = (warp_q * 86 + 500) / 1000;
-    const int speed_add = (warp_q * 58 + 500) / 1000;
-
-    const int factor = wave_clampi(factor_base_i + factor_add, 1, 100);
-    const int speed = wave_clampi(speed_base_i + speed_add, 1, 100);
-
-    data->phase += (float)speed * 0.015f;
-    data->phase += (float)warp_q * 0.00072f;
+    data->phase += (float)speed * 0.0065f;
 
     if(data->phase > 4096.0f)
         data->phase -= 4096.0f;

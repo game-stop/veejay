@@ -62,12 +62,11 @@ vj_effect *boxfit_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_GRID_SIZE,     VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_STRUCTURAL, 2,                  boxfit_clampi(w / 10, 2, min_hi), 4,  14, 3400, 8800, 2400, 18,
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_STRUCTURAL, 8,                  boxfit_clampi(w / 4,  8, max_hi), 5,  18, 3400, 8800, 2400, 24,
-        VJ_BEAT_DETAIL,        VJ_BEAT_F_CONTINUOUS,                                                32,                 235,                         12, 48, 1000, 3200, 0,    68,
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                             VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET,          0,  0,    0,    0,    0,    -1000
+        VJ_BEAT_GRID_SIZE,     VJ_BEAT_F_DISCRETE,    2,                  boxfit_clampi(w / 12, 4, min_hi), 2,  18, 700,  2400, 0, 74,
+        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_DISCRETE,    8,                  boxfit_clampi(w / 4,  8, max_hi), 4,  30, 900,  3200, 0, 82,
+        VJ_BEAT_DETAIL,        VJ_BEAT_F_CONTINUOUS,  24,                 240,                         14, 56, 600,  2600, 0, 90,
+        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000
     );
-
     return ve;
 }
 

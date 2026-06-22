@@ -177,14 +177,14 @@ vj_effect *edgefold_init(int w, int h)
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 40,  460, 14, 54, 900, 3200, 0,   78,
-        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     620, 980, 18, 66, 700, 3000, 0,   88,
-        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     180, 920, 18, 68, 650, 2600, 0,   92,
-        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS,                                               40,  680, 14, 54, 850, 3200, 0,   72,
-        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     220, 940, 18, 68, 650, 2600, 0,   90,
-        VJ_BEAT_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     180, 860, 14, 56, 800, 3000, 0,   76,
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,                                               60,  760, 14, 54, 800, 3000, 0,   70,
-        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS,                                               20,  820, 14, 56, 300, 2200, 180, 76
+        VJ_BEAT_DETAIL,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 0,                  1000,               18, 74,  420, 2200, 0,    82,
+        VJ_BEAT_MEMORY,       VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  1000,               22, 90,  600, 3000, 200,  90,
+        VJ_BEAT_WARP,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  1000,               28, 96,  220, 1600, 0,    100,
+        VJ_BEAT_FLOW,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  1000,               16, 70,  700, 3000, 120,  70,
+        VJ_BEAT_GEOMETRY_AMPLITUDE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,               0,                  1000,               24, 90,  260, 1800, 0,    92,
+        VJ_BEAT_SPEED,        VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  1000,               14, 62,  700, 3000, 0,    66,
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  1000,               10, 58,  800, 3200, 200,  58,
+        VJ_BEAT_TURBULENCE,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     0,                  1000,               20, 84,  260, 1900, 80,   86
     );
     return ve;
 }
