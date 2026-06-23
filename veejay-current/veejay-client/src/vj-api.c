@@ -92,7 +92,17 @@ static gpointer castIntToGpointer(int val)
 #ifndef VJ_SEQUENCE_BANKS
 #define VJ_SEQUENCE_BANKS 4
 #endif
-#ifndef STATUS_SEQUENCE_ACTIVE_BANK
+#undef STATUS_SEQUENCE_ACTIVE_BANK
+#undef STATUS_SEQUENCE_REVISION
+#undef STATUS_SEQUENCE_SIZE
+#undef STATUS_SEQUENCE_BANK0_REVISION
+#undef STATUS_SEQUENCE_BANK1_REVISION
+#undef STATUS_SEQUENCE_BANK2_REVISION
+#undef STATUS_SEQUENCE_BANK3_REVISION
+#undef STATUS_SEQUENCE_RESERVED
+#undef STATUS_SEQUENCE_LAST
+#undef STATUS_SEQUENCE_END
+#undef STATUS_SEQUENCE_UPDATED
 #define STATUS_SEQUENCE_ACTIVE_BANK       111
 #define STATUS_SEQUENCE_REVISION          112
 #define STATUS_SEQUENCE_SIZE              113
@@ -100,9 +110,10 @@ static gpointer castIntToGpointer(int val)
 #define STATUS_SEQUENCE_BANK1_REVISION    115
 #define STATUS_SEQUENCE_BANK2_REVISION    116
 #define STATUS_SEQUENCE_BANK3_REVISION    117
+#define STATUS_SEQUENCE_RESERVED          118
 #define STATUS_SEQUENCE_LAST              118
+#define STATUS_SEQUENCE_END               119
 #define STATUS_SEQUENCE_UPDATED           STATUS_SEQUENCE_REVISION
-#endif
 
 static inline int ui_audio_sync_mode_is_control_only(int mode)
 {
@@ -551,6 +562,18 @@ enum {
   WIDGET_LABEL_P10_BEAT = 386,
   WIDGET_LABEL_P11_BEAT = 387,
   WIDGET_LABEL_P12_BEAT = 388,
+  WIDGET_AUDIO_BEAT_SCRATCH_SENSITIVITY_SCALE = 389,
+  WIDGET_AUDIO_BEAT_SCRATCH_SENSITIVITY_SPIN = 390,
+  WIDGET_AUDIO_BEAT_SOURCE_LOSS_PAUSE_TOGGLE = 391,
+  WIDGET_AUDIO_BEAT_MONITOR_LATENCY_SCALE = 392,
+  WIDGET_AUDIO_BEAT_MONITOR_LATENCY_SPIN = 393,
+  WIDGET_AUDIO_BEAT_MONITOR_LATENCY_AUTO_TOGGLE = 394,
+  WIDGET_AUDIO_BEAT_LATENCY_VALUE = 395,
+  WIDGET_AUDIO_BEAT_THRESHOLD_LABEL = 396,
+  WIDGET_AUDIO_BEAT_COOLDOWN_LABEL = 397,
+  WIDGET_AUDIO_BEAT_FREEZE_LABEL = 398,
+  WIDGET_AUDIO_BEAT_PULSE_LABEL = 399,
+  WIDGET_AUDIO_BEAT_GATE_LABEL = 400,
 };
 
 
@@ -1006,9 +1029,20 @@ static struct
     { "audio_beat_pulse_spin", WIDGET_AUDIO_BEAT_PULSE_SPIN },
     { "audio_beat_gate_scale", WIDGET_AUDIO_BEAT_GATE_SCALE },
     { "audio_beat_gate_spin", WIDGET_AUDIO_BEAT_GATE_SPIN },
+    { "audio_beat_threshold_label", WIDGET_AUDIO_BEAT_THRESHOLD_LABEL },
+    { "audio_beat_cooldown_label", WIDGET_AUDIO_BEAT_COOLDOWN_LABEL },
+    { "audio_beat_freeze_label", WIDGET_AUDIO_BEAT_FREEZE_LABEL },
+    { "audio_beat_pulse_label", WIDGET_AUDIO_BEAT_PULSE_LABEL },
+    { "audio_beat_gate_label", WIDGET_AUDIO_BEAT_GATE_LABEL },
     { "audio_beat_auto_mode_combo", WIDGET_AUDIO_BEAT_AUTO_MODE_COMBO },
     { "audio_beat_auto_amount_scale", WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SCALE },
     { "audio_beat_auto_amount_spin", WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SPIN },
+    { "audio_beat_scratch_sensitivity_scale", WIDGET_AUDIO_BEAT_SCRATCH_SENSITIVITY_SCALE },
+    { "audio_beat_scratch_sensitivity_spin", WIDGET_AUDIO_BEAT_SCRATCH_SENSITIVITY_SPIN },
+    { "audio_beat_source_loss_pause_toggle", WIDGET_AUDIO_BEAT_SOURCE_LOSS_PAUSE_TOGGLE },
+    { "audio_beat_monitor_latency_scale", WIDGET_AUDIO_BEAT_MONITOR_LATENCY_SCALE },
+    { "audio_beat_monitor_latency_spin", WIDGET_AUDIO_BEAT_MONITOR_LATENCY_SPIN },
+    { "audio_beat_monitor_latency_auto_toggle", WIDGET_AUDIO_BEAT_MONITOR_LATENCY_AUTO_TOGGLE },
     { "audio_beat_refresh_button", WIDGET_AUDIO_BEAT_REFRESH_BUTTON },
     { "audio_beat_auto_reset_button", WIDGET_AUDIO_BEAT_AUTO_RESET_BUTTON },
 
@@ -1027,6 +1061,7 @@ static struct
     { "audio_beat_age_value", WIDGET_AUDIO_BEAT_AGE_VALUE },
     { "audio_beat_sample_rate_value", WIDGET_AUDIO_BEAT_SAMPLE_RATE_VALUE },
     { "audio_beat_hit_seq_value", WIDGET_AUDIO_BEAT_HIT_SEQ_VALUE },
+    { "audio_beat_latency_value", WIDGET_AUDIO_BEAT_LATENCY_VALUE },
 
     { "record_audio_source_sample_auto",      WIDGET_RECORD_AUDIO_SOURCE_SAMPLE_AUTO },
     { "record_audio_source_sample_original",  WIDGET_RECORD_AUDIO_SOURCE_SAMPLE_ORIGINAL },
@@ -1109,15 +1144,19 @@ static struct
     {"Shift + Mouse left : Toogle selected fx,\nControl + Mouse left : Toogle selected fx anim"},
 
     {"Enable or disable the audio beat detector. It analyses Original video audio when that source is selected, or the selected JACK/WAV external provider."},
-    {"Action performed on beat hits: none, freeze, auto FX modulation, freeze plus auto FX, or Break Beat transport scratching."},
+    {"Action performed on beat hits: none, Auto FX modulation, Break Beat with Auto FX, or pure Break Beat transport scratching."},
     {"Number of JACK input channels analysed by the beat detector when JACK is the selected beat source."},
     {"Beat trigger sensitivity. Lower values trigger more easily; higher values require stronger transients."},
     {"Minimum time between accepted beat hits. Increase this to avoid double triggers."},
-    {"Freeze action: freeze/open duration. Break Beat: playback burst window after each accepted beat."},
+    {"Break Beat hold window after each accepted beat. Inactive for Auto FX only."},
     {"Duration of the beat pulse signal used for short one-shot visual reactions. Break Beat reuses this as scratch/slice size."},
     {"Duration of the beat gate signal used for held visual reactions. Break Beat reuses this as the repeat-anchor memory window."},
     {"Automatic FX mapping mode. Higher modes use more motion, memory, and chaos-oriented parameter roles."},
     {"Global intensity of automatic FX parameter modulation."},
+    {"Break Beat scratch sensitivity. 50 is neutral; lower values suppress weak scratches, higher values admit more scratch gestures."},
+    {"When enabled, Break Beat parks video at speed 0 when the external beat source disappears. Manual resume is still possible."},
+    {"Break Beat monitor latency override in milliseconds. Disabled while Auto is enabled."},
+    {"Automatically estimate monitor latency from the JACK monitor path. Disable for manual calibration."},
     {"Restart beat analysis for the current audio source. This clears detector history, beat timing, pulse/gate state, and re-arms the analysis reader; it does not change Auto FX mapping."},
     {"Forget the current automatic FX mapping and rebuild targets from the current effect chain on the next beat/update. Beat analysis and audio input are not restarted."},
 
@@ -1135,6 +1174,7 @@ static struct
     {"Milliseconds since the last accepted beat hit."},
     {"Sample rate reported by the JACK beat input."},
     {"Monotonic hit sequence number for detecting new beat events in the UI."},
+    {"Effective heard latency currently used by Break Beat compensation."},
 
     {"Enable or disable external audio sync. Analyze mode listens only; Visual Tempo Follow drives video/FX only; monitor/bridge/align modes may use external audio playback or waveform sync."},
     {"Mode guide: Off disables external sync. Analyze External Tempo listens only and exports BPM/phase/control. Clean Monitor plays external audio unchanged. Monitor + Trickplay makes external audio follow pause/reverse/speed/SFD/rate. Visual Tempo Follow drives video/FX only. Tempo Match Bridge stretches external audio. Track Align waveform-locks video to the external sync provider."},
@@ -1197,10 +1237,11 @@ static const char *audio_sync_master_track_name(int record_source)
 {
     switch(record_source) {
         case VJ_RECORD_AUDIO_SOURCE_BEAT_JACK:
-            return "JACK external";
+            return "External provider";
         case VJ_RECORD_AUDIO_SOURCE_SILENCE:
             return "Silence";
         case VJ_RECORD_AUDIO_SOURCE_AUTO:
+            return "Auto";
         case VJ_RECORD_AUDIO_SOURCE_ORIGINAL:
         default:
             return "Original video audio";
@@ -1321,6 +1362,10 @@ enum
     TOOLTIP_AUDIO_BEAT_GATE,
     TOOLTIP_AUDIO_BEAT_AUTO_MODE,
     TOOLTIP_AUDIO_BEAT_AUTO_AMOUNT,
+    TOOLTIP_AUDIO_BEAT_SCRATCH_SENSITIVITY,
+    TOOLTIP_AUDIO_BEAT_SOURCE_LOSS_PAUSE,
+    TOOLTIP_AUDIO_BEAT_MONITOR_LATENCY,
+    TOOLTIP_AUDIO_BEAT_MONITOR_LATENCY_AUTO,
     TOOLTIP_AUDIO_BEAT_REFRESH,
     TOOLTIP_AUDIO_BEAT_AUTO_RESET,
 
@@ -1338,6 +1383,7 @@ enum
     TOOLTIP_AUDIO_BEAT_AGE,
     TOOLTIP_AUDIO_BEAT_SAMPLE_RATE,
     TOOLTIP_AUDIO_BEAT_HIT_SEQ,
+    TOOLTIP_AUDIO_BEAT_LATENCY,
 
     TOOLTIP_AUDIO_SYNC_ENABLE,
     TOOLTIP_AUDIO_SYNC_MODE,
@@ -2853,6 +2899,12 @@ static struct
     { WIDGET_AUDIO_BEAT_AUTO_MODE_COMBO, TOOLTIP_AUDIO_BEAT_AUTO_MODE },
     { WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SCALE, TOOLTIP_AUDIO_BEAT_AUTO_AMOUNT },
     { WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SPIN, TOOLTIP_AUDIO_BEAT_AUTO_AMOUNT },
+    { WIDGET_AUDIO_BEAT_SCRATCH_SENSITIVITY_SCALE, TOOLTIP_AUDIO_BEAT_SCRATCH_SENSITIVITY },
+    { WIDGET_AUDIO_BEAT_SCRATCH_SENSITIVITY_SPIN, TOOLTIP_AUDIO_BEAT_SCRATCH_SENSITIVITY },
+    { WIDGET_AUDIO_BEAT_SOURCE_LOSS_PAUSE_TOGGLE, TOOLTIP_AUDIO_BEAT_SOURCE_LOSS_PAUSE },
+    { WIDGET_AUDIO_BEAT_MONITOR_LATENCY_SCALE, TOOLTIP_AUDIO_BEAT_MONITOR_LATENCY },
+    { WIDGET_AUDIO_BEAT_MONITOR_LATENCY_SPIN, TOOLTIP_AUDIO_BEAT_MONITOR_LATENCY },
+    { WIDGET_AUDIO_BEAT_MONITOR_LATENCY_AUTO_TOGGLE, TOOLTIP_AUDIO_BEAT_MONITOR_LATENCY_AUTO },
     { WIDGET_AUDIO_BEAT_REFRESH_BUTTON, TOOLTIP_AUDIO_BEAT_REFRESH },
     { WIDGET_AUDIO_BEAT_AUTO_RESET_BUTTON, TOOLTIP_AUDIO_BEAT_AUTO_RESET },
 
@@ -2871,6 +2923,7 @@ static struct
     { WIDGET_AUDIO_BEAT_AGE_VALUE, TOOLTIP_AUDIO_BEAT_AGE },
     { WIDGET_AUDIO_BEAT_SAMPLE_RATE_VALUE, TOOLTIP_AUDIO_BEAT_SAMPLE_RATE },
     { WIDGET_AUDIO_BEAT_HIT_SEQ_VALUE, TOOLTIP_AUDIO_BEAT_HIT_SEQ },
+    { WIDGET_AUDIO_BEAT_LATENCY_VALUE, TOOLTIP_AUDIO_BEAT_LATENCY },
 
     { -1, -1 }
 };
@@ -4352,7 +4405,7 @@ static int audio_input_selector_active_from_record_source_local(int source)
 {
     switch(source) {
         case VJ_RECORD_AUDIO_SOURCE_BEAT_JACK:
-            return 1;
+            return (info->status_tokens[AUDIO_SYNC_SOURCE] == VJ_AUDIO_SYNC_SOURCE_WAV_FILE) ? 2 : 1;
         case VJ_RECORD_AUDIO_SOURCE_SILENCE:
             return 3;
         case VJ_RECORD_AUDIO_SOURCE_AUTO:
@@ -9456,6 +9509,32 @@ static void audio_beat_set_toggle(int widget_id, int value)
     info->status_lock = old_lock;
 }
 
+static void audio_beat_set_control_value_raw(int widget_id, int value)
+{
+    GtkWidget *w = widget_cache[widget_id];
+    int old_lock;
+
+    if(!w)
+        return;
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+
+    if(GTK_IS_RANGE(w))
+        gtk_range_set_value(GTK_RANGE(w), (gdouble)value);
+    else if(GTK_IS_SPIN_BUTTON(w))
+        gtk_spin_button_set_value(GTK_SPIN_BUTTON(w), (gdouble)value);
+    else if(GTK_IS_COMBO_BOX(w))
+        gtk_combo_box_set_active(GTK_COMBO_BOX(w), value);
+
+    info->status_lock = old_lock;
+}
+
+static void audio_beat_set_control_value(int widget_id, int value)
+{
+    audio_beat_set_control_value_raw(widget_id, ui_clampi(value, 0, 100));
+}
+
 static void audio_beat_status_set_widget_sensitive(int widget_id, int sensitive)
 {
     GtkWidget *w = widget_cache[widget_id];
@@ -9464,27 +9543,170 @@ static void audio_beat_status_set_widget_sensitive(int widget_id, int sensitive)
         gtk_widget_set_sensitive(w, sensitive ? TRUE : FALSE);
 }
 
+static void audio_beat_status_set_action_label(int widget_id, const char *text)
+{
+    GtkWidget *w = widget_cache[widget_id];
+
+    if(w && GTK_IS_LABEL(w))
+        gtk_label_set_text(GTK_LABEL(w), text);
+}
+
+static void audio_beat_status_set_action_tooltip(int widget_id, const char *text)
+{
+    GtkWidget *w = widget_cache[widget_id];
+
+    if(w)
+        set_tooltip_by_widget(w, text);
+}
+
+static void audio_beat_status_set_control_tooltip(int label_id, int scale_id, int spin_id, const char *text)
+{
+    audio_beat_status_set_action_tooltip(label_id, text);
+    audio_beat_status_set_action_tooltip(scale_id, text);
+    audio_beat_status_set_action_tooltip(spin_id, text);
+}
+
+static int audio_beat_status_action_sanitize(int action)
+{
+    switch(action) {
+        case 2:
+        case 3:
+        case 4:
+            return action;
+        case 0:
+        case 1:
+        default:
+            return 0;
+    }
+}
+
+static int audio_beat_status_combo_index_from_action(int action)
+{
+    switch(audio_beat_status_action_sanitize(action)) {
+        case 2: return 1;
+        case 3: return 2;
+        case 4: return 3;
+        case 0:
+        default: return 0;
+    }
+}
+
+static void audio_beat_status_update_action_labels(int action)
+{
+    const char *threshold = "Detect Threshold";
+    const char *cooldown = "Detect Cooldown";
+    const char *hold = "Hold Window (inactive)";
+    const char *pulse = "Pulse Width";
+    const char *gate = "Gate Hold";
+    const char *threshold_tip = "Minimum transient strength needed to register a beat event.";
+    const char *cooldown_tip = "Minimum time between accepted beat events. Higher values suppress double triggers.";
+    const char *hold_tip = "Beat hold duration. Used by Break Beat only.";
+    const char *pulse_tip = "Length of the short beat pulse sent to beat-aware FX.";
+    const char *gate_tip = "Length of the held beat gate sent to beat-aware FX.";
+
+    switch(audio_beat_status_action_sanitize(action)) {
+        case 2:
+            threshold = "FX Threshold";
+            cooldown = "FX Cooldown";
+            hold = "Hold Window (inactive)";
+            pulse = "FX Pulse";
+            gate = "FX Gate";
+            threshold_tip = "Transient threshold that drives automatic FX modulation.";
+            cooldown_tip = "Minimum time between Auto FX modulation hits.";
+            hold_tip = "Hold window is not used by Auto FX only.";
+            pulse_tip = "Length of the Auto FX pulse envelope.";
+            gate_tip = "Length of the Auto FX gate envelope.";
+            break;
+        case 3:
+            threshold = "Break FX Threshold";
+            cooldown = "Break FX Cooldown";
+            hold = "Hold Window";
+            pulse = "Scratch Pulse";
+            gate = "Scratch Gate";
+            threshold_tip = "Hit threshold for Break Beat transport while Auto FX remains active.";
+            cooldown_tip = "Minimum turn/hit spacing for Break Beat. Auto FX modulation still follows beat hints.";
+            hold_tip = "Open/hold window used for Break Beat transport bursts.";
+            pulse_tip = "Scratch pulse/slice duration for Break Beat and Auto FX pulse modulation.";
+            gate_tip = "Scratch gate and repeat-memory window; Auto FX gate modulation stays active.";
+            break;
+        case 4:
+            threshold = "Hit Threshold";
+            cooldown = "Turn Cooldown";
+            hold = "Hold Window";
+            pulse = "Scratch Pulse";
+            gate = "Scratch Gate";
+            threshold_tip = "Hit threshold for Break Beat transport and scratch events.";
+            cooldown_tip = "Minimum turn/hit spacing for Break Beat. Lower values admit faster scratching.";
+            hold_tip = "Open/hold window used for Break Beat transport bursts.";
+            pulse_tip = "Scratch pulse/slice emphasis duration for visual and transport response.";
+            gate_tip = "Scratch gate and repeat-memory window for held Break Beat response.";
+            break;
+        case 0:
+        default:
+            break;
+    }
+
+    audio_beat_status_set_action_label(WIDGET_AUDIO_BEAT_THRESHOLD_LABEL, threshold);
+    audio_beat_status_set_action_label(WIDGET_AUDIO_BEAT_COOLDOWN_LABEL, cooldown);
+    audio_beat_status_set_action_label(WIDGET_AUDIO_BEAT_FREEZE_LABEL, hold);
+    audio_beat_status_set_action_label(WIDGET_AUDIO_BEAT_PULSE_LABEL, pulse);
+    audio_beat_status_set_action_label(WIDGET_AUDIO_BEAT_GATE_LABEL, gate);
+
+    audio_beat_status_set_control_tooltip(WIDGET_AUDIO_BEAT_THRESHOLD_LABEL, WIDGET_AUDIO_BEAT_THRESHOLD_SCALE, WIDGET_AUDIO_BEAT_THRESHOLD_SPIN, threshold_tip);
+    audio_beat_status_set_control_tooltip(WIDGET_AUDIO_BEAT_COOLDOWN_LABEL, WIDGET_AUDIO_BEAT_COOLDOWN_SCALE, WIDGET_AUDIO_BEAT_COOLDOWN_SPIN, cooldown_tip);
+    audio_beat_status_set_control_tooltip(WIDGET_AUDIO_BEAT_FREEZE_LABEL, WIDGET_AUDIO_BEAT_FREEZE_SCALE, WIDGET_AUDIO_BEAT_FREEZE_SPIN, hold_tip);
+    audio_beat_status_set_control_tooltip(WIDGET_AUDIO_BEAT_PULSE_LABEL, WIDGET_AUDIO_BEAT_PULSE_SCALE, WIDGET_AUDIO_BEAT_PULSE_SPIN, pulse_tip);
+    audio_beat_status_set_control_tooltip(WIDGET_AUDIO_BEAT_GATE_LABEL, WIDGET_AUDIO_BEAT_GATE_SCALE, WIDGET_AUDIO_BEAT_GATE_SPIN, gate_tip);
+}
+
+static int audio_beat_status_monitor_latency_auto_active(void)
+{
+    GtkWidget *w = widget_cache[WIDGET_AUDIO_BEAT_MONITOR_LATENCY_AUTO_TOGGLE];
+
+    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+        return 1;
+
+    return gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) ? 1 : 0;
+}
+
+static void audio_beat_status_update_monitor_latency_sensitivity(int action)
+{
+    const int active = (action == 3 || action == 4);
+    const int manual = active && !audio_beat_status_monitor_latency_auto_active();
+
+    audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_MONITOR_LATENCY_AUTO_TOGGLE, active);
+    audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_MONITOR_LATENCY_SCALE, manual);
+    audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_MONITOR_LATENCY_SPIN, manual);
+}
+
 static void audio_beat_status_update_action_sensitivity(int action)
 {
-    const int uses_freeze = (action == 1 || action == 3 || action == 4);
-    const int uses_auto = (action == 2 || action == 3 || action == 4);
+    action = audio_beat_status_action_sanitize(action);
 
-    audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_FREEZE_SCALE, uses_freeze);
-    audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_FREEZE_SPIN, uses_freeze);
+    const int uses_break = (action == 3 || action == 4);
+    const int uses_hold = uses_break;
+    const int uses_auto = (action == 2 || action == 3);
+
+    audio_beat_status_update_action_labels(action);
+    audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_FREEZE_SCALE, uses_hold);
+    audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_FREEZE_SPIN, uses_hold);
     audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_MODE_COMBO, uses_auto);
     audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SCALE, uses_auto);
     audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SPIN, uses_auto);
     audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_RESET_BUTTON, uses_auto);
+    audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_SCRATCH_SENSITIVITY_SCALE, uses_break);
+    audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_SCRATCH_SENSITIVITY_SPIN, uses_break);
+    audio_beat_status_set_widget_sensitive(WIDGET_AUDIO_BEAT_SOURCE_LOSS_PAUSE_TOGGLE, uses_break);
+    audio_beat_status_update_monitor_latency_sensitivity(action);
 }
 
 static int audio_beat_status_action_allowed_for_record_source(int record_source, int action)
 {
-    if(action < 0 || action > 4)
-        return 0;
+    action = audio_beat_status_action_sanitize(action);
 
     switch(record_source) {
         case VJ_RECORD_AUDIO_SOURCE_BEAT_JACK:
-            return 1;
+            return (action == 0 || action == 2 || action == 3 || action == 4);
         case VJ_RECORD_AUDIO_SOURCE_ORIGINAL:
         case VJ_RECORD_AUDIO_SOURCE_AUTO:
             return (action == 0 || action == 2);
@@ -9511,20 +9733,21 @@ static void audio_beat_set_action_combo_from_status(int action)
     GtkWidget *w = widget_cache[WIDGET_AUDIO_BEAT_ACTION_COMBO];
     int old_lock;
 
-    if(action < 0 || action > 4)
-        action = 0;
+    action = audio_beat_status_action_sanitize(action);
 
     audio_beat_status_update_action_sensitivity(action);
 
     if(!w || !GTK_IS_COMBO_BOX(w))
         return;
 
-    if(gtk_combo_box_get_active(GTK_COMBO_BOX(w)) == action)
+    const int combo_index = audio_beat_status_combo_index_from_action(action);
+
+    if(gtk_combo_box_get_active(GTK_COMBO_BOX(w)) == combo_index)
         return;
 
     old_lock = info->status_lock;
     info->status_lock = 1;
-    gtk_combo_box_set_active(GTK_COMBO_BOX(w), action);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(w), combo_index);
     info->status_lock = old_lock;
 }
 
@@ -10426,10 +10649,80 @@ static void update_audio_beat_status_widgets(int *history, int force)
 
     if(AB_CHANGED(AUDIO_BEAT_ENABLED) || AB_CHANGED(AUDIO_BEAT_ACTION) || AB_CHANGED(RECORD_AUDIO_SOURCE)) {
         int action = enabled ? AB_CUR(AUDIO_BEAT_ACTION) : 0;
-        if(action < 0 || action > 4)
-            action = 0;
+        action = audio_beat_status_action_sanitize(action);
         action = audio_beat_status_safe_action_for_record_source(AB_CUR(RECORD_AUDIO_SOURCE), action);
         audio_beat_set_action_combo_from_status(action);
+    }
+
+    if(AB_CHANGED(AUDIO_BEAT_FREEZE_MS)) {
+        audio_beat_set_control_value_raw(WIDGET_AUDIO_BEAT_FREEZE_SCALE, AB_CUR(AUDIO_BEAT_FREEZE_MS));
+        audio_beat_set_control_value_raw(WIDGET_AUDIO_BEAT_FREEZE_SPIN, AB_CUR(AUDIO_BEAT_FREEZE_MS));
+    }
+
+    if(AB_CHANGED(AUDIO_BEAT_COOLDOWN_MS)) {
+        audio_beat_set_control_value_raw(WIDGET_AUDIO_BEAT_COOLDOWN_SCALE, AB_CUR(AUDIO_BEAT_COOLDOWN_MS));
+        audio_beat_set_control_value_raw(WIDGET_AUDIO_BEAT_COOLDOWN_SPIN, AB_CUR(AUDIO_BEAT_COOLDOWN_MS));
+    }
+
+    if(AB_CHANGED(AUDIO_BEAT_THRESHOLD_CFG)) {
+        audio_beat_set_control_value_raw(WIDGET_AUDIO_BEAT_THRESHOLD_SCALE, AB_CUR(AUDIO_BEAT_THRESHOLD_CFG));
+        audio_beat_set_control_value_raw(WIDGET_AUDIO_BEAT_THRESHOLD_SPIN, AB_CUR(AUDIO_BEAT_THRESHOLD_CFG));
+    }
+
+    if(AB_CHANGED(AUDIO_BEAT_CHANNELS_CFG))
+        audio_beat_set_control_value_raw(WIDGET_AUDIO_BEAT_CHANNELS_SPIN, AB_CUR(AUDIO_BEAT_CHANNELS_CFG));
+
+    if(AB_CHANGED(AUDIO_BEAT_PULSE_MS)) {
+        audio_beat_set_control_value_raw(WIDGET_AUDIO_BEAT_PULSE_SCALE, AB_CUR(AUDIO_BEAT_PULSE_MS));
+        audio_beat_set_control_value_raw(WIDGET_AUDIO_BEAT_PULSE_SPIN, AB_CUR(AUDIO_BEAT_PULSE_MS));
+    }
+
+    if(AB_CHANGED(AUDIO_BEAT_GATE_MS)) {
+        audio_beat_set_control_value_raw(WIDGET_AUDIO_BEAT_GATE_SCALE, AB_CUR(AUDIO_BEAT_GATE_MS));
+        audio_beat_set_control_value_raw(WIDGET_AUDIO_BEAT_GATE_SPIN, AB_CUR(AUDIO_BEAT_GATE_MS));
+    }
+
+    if(AB_CHANGED(AUDIO_BEAT_AUTO_MODE_CFG))
+        audio_beat_set_control_value_raw(WIDGET_AUDIO_BEAT_AUTO_MODE_COMBO, AB_CUR(AUDIO_BEAT_AUTO_MODE_CFG));
+
+    if(AB_CHANGED(AUDIO_BEAT_AUTO_AMOUNT_CFG)) {
+        audio_beat_set_control_value_raw(WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SCALE, AB_CUR(AUDIO_BEAT_AUTO_AMOUNT_CFG));
+        audio_beat_set_control_value_raw(WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SPIN, AB_CUR(AUDIO_BEAT_AUTO_AMOUNT_CFG));
+    }
+
+    if(AB_CHANGED(AUDIO_BEAT_SCRATCH_SENSITIVITY)) {
+        int scratch = ui_clampi(AB_CUR(AUDIO_BEAT_SCRATCH_SENSITIVITY), 0, 100);
+        audio_beat_set_control_value(WIDGET_AUDIO_BEAT_SCRATCH_SENSITIVITY_SCALE, scratch);
+        audio_beat_set_control_value(WIDGET_AUDIO_BEAT_SCRATCH_SENSITIVITY_SPIN, scratch);
+    }
+
+    if(AB_CHANGED(AUDIO_BEAT_SOURCE_LOSS_PAUSE))
+        audio_beat_set_toggle(WIDGET_AUDIO_BEAT_SOURCE_LOSS_PAUSE_TOGGLE, AB_CUR(AUDIO_BEAT_SOURCE_LOSS_PAUSE));
+
+    if(AB_CHANGED(AUDIO_BEAT_MONITOR_LATENCY) || AB_CHANGED(AUDIO_BEAT_EFFECTIVE_LATENCY)) {
+        int monitor_latency = AB_CUR(AUDIO_BEAT_MONITOR_LATENCY);
+        int effective_latency_raw = AB_CUR(AUDIO_BEAT_EFFECTIVE_LATENCY);
+        int effective_latency = ui_clampi(effective_latency_raw, 0, 5000);
+        int auto_latency = monitor_latency < 0;
+        int shown_latency = auto_latency ? (effective_latency_raw < 0 ? 24 : ui_clampi(effective_latency, 0, 64))
+                                         : ui_clampi(monitor_latency, 0, 64);
+
+        audio_beat_set_toggle(WIDGET_AUDIO_BEAT_MONITOR_LATENCY_AUTO_TOGGLE, auto_latency);
+        audio_beat_set_control_value_raw(WIDGET_AUDIO_BEAT_MONITOR_LATENCY_SCALE, shown_latency);
+        audio_beat_set_control_value_raw(WIDGET_AUDIO_BEAT_MONITOR_LATENCY_SPIN, shown_latency);
+
+        if(auto_latency) {
+            if(effective_latency_raw < 0)
+                snprintf(txt, sizeof(txt), "-- auto");
+            else
+                snprintf(txt, sizeof(txt), "%d ms auto", effective_latency);
+        }
+        else {
+            snprintf(txt, sizeof(txt), "%d ms manual", shown_latency);
+        }
+
+        audio_beat_set_label_s(WIDGET_AUDIO_BEAT_LATENCY_VALUE, txt);
+        audio_beat_status_update_monitor_latency_sensitivity(audio_beat_status_action_sanitize(AB_CUR(AUDIO_BEAT_ACTION)));
     }
 
     if(AB_CHANGED(AUDIO_MUTED))

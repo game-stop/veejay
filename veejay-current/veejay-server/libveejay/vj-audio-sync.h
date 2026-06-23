@@ -67,16 +67,16 @@ static inline int vj_audio_sync_mode_uses_transport_driven_playback(int mode)
            mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN;
 }
 
-static inline int vj_audio_sync_mode_supports_wav_master(int mode)
-{
-    return vj_audio_sync_mode_uses_external_playback(mode);
-}
-
 static inline int vj_audio_sync_mode_is_audio_sync_family(int mode)
 {
     return mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL ||
            mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW ||
            vj_audio_sync_mode_uses_external_playback(mode);
+}
+
+static inline int vj_audio_sync_mode_supports_wav_master(int mode)
+{
+    return vj_audio_sync_mode_is_audio_sync_family(mode);
 }
 
 typedef struct
@@ -414,6 +414,7 @@ int  vj_audio_sync_read_beat_audio(vj_audio_sync_shared_t *s,
                                    int max_bytes);
 
 void vj_audio_sync_reset_beat_reader(vj_audio_sync_shared_t *s);
+void vj_audio_sync_reset_record_reader(vj_audio_sync_shared_t *s);
 
 int  vj_audio_sync_copy_record_audio(vj_audio_sync_shared_t *s,
                                      uint8_t *dst,

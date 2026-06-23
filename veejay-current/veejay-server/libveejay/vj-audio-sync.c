@@ -3407,6 +3407,16 @@ void vj_audio_sync_reset_beat_reader(vj_audio_sync_shared_t *s)
     sync_unlock(s);
 }
 
+void vj_audio_sync_reset_record_reader(vj_audio_sync_shared_t *s)
+{
+    if(!s)
+        return;
+
+    sync_lock(s);
+    s->record_read_frame = 0;
+    sync_unlock(s);
+}
+
 int vj_audio_sync_copy_record_audio(vj_audio_sync_shared_t *s,
                                     uint8_t *dst,
                                     int dst_frames,
@@ -3431,7 +3441,7 @@ int vj_audio_sync_copy_record_audio(vj_audio_sync_shared_t *s,
     if(!sync_load_i(&s->enabled) || !sync_load_i(&s->open))
         return 0;
 
-    if(!sync_try_lock(s))
+    if(!sync_try_lock_for_us(s, 3000))
         return 0;
 
     if(!s->ring || s->ring_frames <= 0 || s->bytes_per_frame <= 0 ||

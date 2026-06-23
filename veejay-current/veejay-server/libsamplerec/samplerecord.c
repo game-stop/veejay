@@ -146,14 +146,9 @@ static int sample_start_encoder(sample_info *si, VJFrame *frame, editlist *el, i
 
 	si->encoder_active = 1;
 	si->encoder_format = format;
-
-	if( si->encoder_total_frames_recorded == 0 ) {
-   	 si->encoder_frames_to_record = nframes;
-   	 si->encoder_frames_recorded  = 0;
-    }
-	else {
-	 si->encoder_frames_recorded = 0;
-	}
+	si->encoder_frames_to_record = nframes;
+	si->encoder_frames_recorded = 0;
+	si->encoder_total_frames_recorded = 0;
 
 	int tmp = frame->len;
 	int tmp1 = frame->uv_len;
@@ -192,6 +187,7 @@ static int sample_start_encoder(sample_info *si, VJFrame *frame, editlist *el, i
 			lav_strerror());
 			vj_avcodec_close_encoder( si->encoder );
 			si->encoder = NULL;
+			si->encoder_active = 0;
 			return -1;
 		}
 
@@ -216,12 +212,12 @@ int sample_init_encoder(int sample_id, char *filename, int format, VJFrame *fram
 	{
 		 return -1;
 	}
-	if(format < 0 || format > NUM_ENCODERS)
+	if(format < 0 || format >= NUM_ENCODERS)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid format!");
 		return -1;
 	}
-	if(nframes <= 0) return -1;
+	if(nframes < 0) return -1;
 	if(!el || !frame) return -1;
 
 	if(si->encoder_active) {
@@ -244,21 +240,22 @@ int sample_continue_record( int s1 )
 	sample_info *si = sample_get(s1);
 	if(!si) return -1;
 
-	long	bytesRemaining = lav_bytes_remain( si->encoder_file );
-	if( bytesRemaining >= 0 && bytesRemaining < (512 * 1024) ) {
-		si->sequence_num ++;
-		veejay_msg(VEEJAY_MSG_WARNING, "Auto splitting file, %ld frames left to record", 
-			( si->encoder_frames_to_record - si->encoder_total_frames_recorded ) );
-		si->encoder_frames_recorded= 0;	
-		return 2;
+	if( si->encoder_frames_to_record > 0 &&
+	    si->encoder_total_frames_recorded >= si->encoder_frames_to_record ) {
+		veejay_msg(VEEJAY_MSG_INFO, "Recorded %ld frames", si->encoder_total_frames_recorded );
+		return 1;
 	}
 
-	if( si->encoder_total_frames_recorded >= si->encoder_frames_to_record ) {
-		veejay_msg(VEEJAY_MSG_INFO, "Recorded %ld frames", si->encoder_total_frames_recorded );
-		if(!vj_avcodec_is_internal(si->encoder_format)) {
-			vj_avcodec_flush_frame(si->encoder, vj_avcodec_get_buf(si->encoder), si->encoder_max_size );
-		}
-		return 1;
+	long bytesRemaining = si->encoder_file ? lav_bytes_remain( si->encoder_file ) : -1;
+	if( bytesRemaining >= 0 && bytesRemaining < (512 * 1024) ) {
+		si->sequence_num ++;
+		if( si->encoder_frames_to_record > 0 )
+			veejay_msg(VEEJAY_MSG_WARNING, "Auto splitting file, %ld frames left to record",
+				( si->encoder_frames_to_record - si->encoder_total_frames_recorded ) );
+		else
+			veejay_msg(VEEJAY_MSG_WARNING, "Auto splitting continuous recording" );
+		si->encoder_frames_recorded = 0;
+		return 2;
 	}
 
 	return 0;
@@ -285,7 +282,7 @@ int sample_record_frame(int s1, uint8_t *buffer[4], uint8_t *abuff, int audio_si
    }
 
    if(buf_len == 0) {
-		return (sample_continue_record(s1));
+		return sample_continue_record(s1);
    }
 
 
@@ -305,7 +302,7 @@ int sample_record_frame(int s1, uint8_t *buffer[4], uint8_t *abuff, int audio_si
 			return -1;
 	}
 
-	if(audio_size > 0)
+	if(audio_size > 0 && abuff)
 	{
 		if(lav_write_audio( (lav_file_t*) si->encoder_file, (uint8_t*)abuff, audio_size))
 		{
@@ -348,19 +345,25 @@ int sample_stop_encoder(int s1) {
 void sample_reset_encoder(int s1) {
 	sample_info *si = sample_get(s1);
 	if(!si) return;
-	  /* added sample */
- 	si->encoder_active = 0;
+
+	if(si->encoder) {
+		vj_avcodec_stop(si->encoder, si->encoder_format);
+		si->encoder = NULL;
+	}
+	if(si->encoder_file) {
+		lav_close((lav_file_t*)si->encoder_file);
+		si->encoder_file = NULL;
+	}
+
+	si->encoder_active = 0;
 	si->encoder_format = 0;
 	si->encoder_width = 0;
 	si->encoder_height = 0;
 	si->encoder_max_size = 0;
-	si->encoder_active = 0;
 //	si->rec_total_bytes = 0;
-	si->encoder_file = NULL;
-	si->encoder = NULL;
 	si->encoder_total_frames_recorded = 0;
 	si->encoder_frames_recorded = 0;
-	si->encoder_frames_to_record =0;
+	si->encoder_frames_to_record = 0;
 }
 
 
@@ -391,6 +394,9 @@ long sample_get_frames_left(int s1)
 {
 	sample_info *si= sample_get(s1);
 	if(!si) return 0;
+
+	if(si->encoder_frames_to_record <= 0)
+		return 0;
 
 	return ( si->encoder_frames_to_record - 
 		     si->encoder_total_frames_recorded );

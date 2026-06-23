@@ -31,13 +31,6 @@ static gchar *config_file = NULL;
 
 #define FRAMERATE_SEND_MIN_US 40000
 
-#ifndef VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY
-#define VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY (VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW + 1)
-#endif
-#undef VJ_AUDIO_SYNC_MODE_MAX
-#define VJ_AUDIO_SYNC_MODE_MAX VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY
-
-
 static int framerate_last_sent_x100 = -1;
 static int framerate_pending_x100 = -1;
 static gint64 framerate_last_sent_us = 0;
@@ -400,12 +393,53 @@ static void audio_beat_send_int(GtkWidget *widget, int vims_id)
     multi_vims(vims_id, "%d", audio_beat_widget_int_value(widget));
 }
 
+static int audio_beat_action_sanitize(int action)
+{
+    switch(action) {
+        case 2:
+        case 3:
+        case 4:
+            return action;
+        case 0:
+        case 1:
+        default:
+            return 0;
+    }
+}
+
+static int audio_beat_action_from_combo_index(int idx)
+{
+    switch(idx) {
+        case 1: return 2;
+        case 2: return 3;
+        case 3: return 4;
+        case 0:
+        default: return 0;
+    }
+}
+
+static int audio_beat_combo_index_from_action(int action)
+{
+    switch(audio_beat_action_sanitize(action)) {
+        case 2: return 1;
+        case 3: return 2;
+        case 4: return 3;
+        case 0:
+        default: return 0;
+    }
+}
+
+static int audio_beat_current_action_from_combo(void)
+{
+    return audio_beat_action_from_combo_index(
+        audio_beat_widget_int_value(widget_cache[WIDGET_AUDIO_BEAT_ACTION_COMBO]));
+}
+
 static const char *audio_beat_action_name(int mode)
 {
-    switch(mode) {
-        case 1: return "freeze";
+    switch(audio_beat_action_sanitize(mode)) {
         case 2: return "auto FX";
-        case 3: return "freeze + auto FX";
+        case 3: return "break beat (Auto FX)";
         case 4: return "break beat";
         case 0:
         default: return "none";
@@ -432,17 +466,136 @@ static void audio_beat_set_widget_sensitive(int widget_id, int sensitive)
         gtk_widget_set_sensitive(w, sensitive ? TRUE : FALSE);
 }
 
+static void audio_beat_set_label_text(int widget_id, const char *text)
+{
+    GtkWidget *w = widget_cache[widget_id];
+
+    if(w && GTK_IS_LABEL(w))
+        gtk_label_set_text(GTK_LABEL(w), text);
+}
+
+static void audio_beat_set_widget_tooltip(int widget_id, const char *text)
+{
+    GtkWidget *w = widget_cache[widget_id];
+
+    if(w)
+        gtk_widget_set_tooltip_text(w, text);
+}
+
+static void audio_beat_set_control_tooltip(int label_id, int scale_id, int spin_id, const char *text)
+{
+    audio_beat_set_widget_tooltip(label_id, text);
+    audio_beat_set_widget_tooltip(scale_id, text);
+    audio_beat_set_widget_tooltip(spin_id, text);
+}
+
+static void audio_beat_update_action_labels(int action)
+{
+    const char *threshold = "Detect Threshold";
+    const char *cooldown = "Detect Cooldown";
+    const char *hold = "Hold Window (inactive)";
+    const char *pulse = "Pulse Width";
+    const char *gate = "Gate Hold";
+    const char *threshold_tip = "Minimum transient strength needed to register a beat event.";
+    const char *cooldown_tip = "Minimum time between accepted beat events. Higher values suppress double triggers.";
+    const char *hold_tip = "Beat hold duration. Used by Break Beat only.";
+    const char *pulse_tip = "Length of the short beat pulse sent to beat-aware FX.";
+    const char *gate_tip = "Length of the held beat gate sent to beat-aware FX.";
+
+    switch(audio_beat_action_sanitize(action)) {
+        case 2:
+            threshold = "FX Threshold";
+            cooldown = "FX Cooldown";
+            hold = "Hold Window (inactive)";
+            pulse = "FX Pulse";
+            gate = "FX Gate";
+            threshold_tip = "Transient threshold that drives automatic FX modulation.";
+            cooldown_tip = "Minimum time between Auto FX modulation hits.";
+            hold_tip = "Hold window is not used by Auto FX only.";
+            pulse_tip = "Length of the Auto FX pulse envelope.";
+            gate_tip = "Length of the Auto FX gate envelope.";
+            break;
+        case 3:
+            threshold = "Break FX Threshold";
+            cooldown = "Break FX Cooldown";
+            hold = "Hold Window";
+            pulse = "Scratch Pulse";
+            gate = "Scratch Gate";
+            threshold_tip = "Hit threshold for Break Beat transport while Auto FX remains active.";
+            cooldown_tip = "Minimum turn/hit spacing for Break Beat. Auto FX modulation still follows beat hints.";
+            hold_tip = "Open/hold window used for Break Beat transport bursts.";
+            pulse_tip = "Scratch pulse/slice duration for Break Beat and Auto FX pulse modulation.";
+            gate_tip = "Scratch gate and repeat-memory window; Auto FX gate modulation stays active.";
+            break;
+        case 4:
+            threshold = "Hit Threshold";
+            cooldown = "Turn Cooldown";
+            hold = "Hold Window";
+            pulse = "Scratch Pulse";
+            gate = "Scratch Gate";
+            threshold_tip = "Hit threshold for Break Beat transport and scratch events.";
+            cooldown_tip = "Minimum turn/hit spacing for Break Beat. Lower values admit faster scratching.";
+            hold_tip = "Open/hold window used for Break Beat transport bursts.";
+            pulse_tip = "Scratch pulse/slice emphasis duration for visual and transport response.";
+            gate_tip = "Scratch gate and repeat-memory window for held Break Beat response.";
+            break;
+        case 0:
+        default:
+            break;
+    }
+
+    audio_beat_set_label_text(WIDGET_AUDIO_BEAT_THRESHOLD_LABEL, threshold);
+    audio_beat_set_label_text(WIDGET_AUDIO_BEAT_COOLDOWN_LABEL, cooldown);
+    audio_beat_set_label_text(WIDGET_AUDIO_BEAT_FREEZE_LABEL, hold);
+    audio_beat_set_label_text(WIDGET_AUDIO_BEAT_PULSE_LABEL, pulse);
+    audio_beat_set_label_text(WIDGET_AUDIO_BEAT_GATE_LABEL, gate);
+
+    audio_beat_set_control_tooltip(WIDGET_AUDIO_BEAT_THRESHOLD_LABEL, WIDGET_AUDIO_BEAT_THRESHOLD_SCALE, WIDGET_AUDIO_BEAT_THRESHOLD_SPIN, threshold_tip);
+    audio_beat_set_control_tooltip(WIDGET_AUDIO_BEAT_COOLDOWN_LABEL, WIDGET_AUDIO_BEAT_COOLDOWN_SCALE, WIDGET_AUDIO_BEAT_COOLDOWN_SPIN, cooldown_tip);
+    audio_beat_set_control_tooltip(WIDGET_AUDIO_BEAT_FREEZE_LABEL, WIDGET_AUDIO_BEAT_FREEZE_SCALE, WIDGET_AUDIO_BEAT_FREEZE_SPIN, hold_tip);
+    audio_beat_set_control_tooltip(WIDGET_AUDIO_BEAT_PULSE_LABEL, WIDGET_AUDIO_BEAT_PULSE_SCALE, WIDGET_AUDIO_BEAT_PULSE_SPIN, pulse_tip);
+    audio_beat_set_control_tooltip(WIDGET_AUDIO_BEAT_GATE_LABEL, WIDGET_AUDIO_BEAT_GATE_SCALE, WIDGET_AUDIO_BEAT_GATE_SPIN, gate_tip);
+}
+
+static int audio_beat_monitor_latency_auto_active(void)
+{
+    GtkWidget *w = widget_cache[WIDGET_AUDIO_BEAT_MONITOR_LATENCY_AUTO_TOGGLE];
+
+    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+        return 1;
+
+    return gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) ? 1 : 0;
+}
+
+static void audio_beat_update_monitor_latency_sensitivity(int action)
+{
+    const int active = (action == 3 || action == 4);
+    const int manual = active && !audio_beat_monitor_latency_auto_active();
+
+    audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_MONITOR_LATENCY_AUTO_TOGGLE, active);
+    audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_MONITOR_LATENCY_SCALE, manual);
+    audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_MONITOR_LATENCY_SPIN, manual);
+}
+
 static void audio_beat_update_action_sensitivity(int action)
 {
-    const int uses_freeze = (action == 1 || action == 3 || action == 4);
-    const int uses_auto = (action == 2 || action == 3 || action == 4);
+    action = audio_beat_action_sanitize(action);
 
-    audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_FREEZE_SCALE, uses_freeze);
-    audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_FREEZE_SPIN, uses_freeze);
+    const int uses_break = (action == 3 || action == 4);
+    const int uses_hold = uses_break;
+    const int uses_auto = (action == 2 || action == 3);
+
+    audio_beat_update_action_labels(action);
+    audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_FREEZE_SCALE, uses_hold);
+    audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_FREEZE_SPIN, uses_hold);
     audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_MODE_COMBO, uses_auto);
     audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SCALE, uses_auto);
     audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_AMOUNT_SPIN, uses_auto);
     audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_AUTO_RESET_BUTTON, uses_auto);
+    audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_SCRATCH_SENSITIVITY_SCALE, uses_break);
+    audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_SCRATCH_SENSITIVITY_SPIN, uses_break);
+    audio_beat_set_widget_sensitive(WIDGET_AUDIO_BEAT_SOURCE_LOSS_PAUSE_TOGGLE, uses_break);
+    audio_beat_update_monitor_latency_sensitivity(action);
 }
 
 static void audio_beat_enable_chain_entry_toggle_guarded(int active)
@@ -481,13 +634,12 @@ static void audio_sync_deactivate_playback(void);
 
 static int audio_beat_action_allowed_for_master(int master, int action)
 {
-    if(action < 0 || action > 4)
-        return 0;
+    action = audio_beat_action_sanitize(action);
 
     switch(master) {
         case AUDIO_MASTER_JACK:
         case AUDIO_MASTER_WAV:
-            return 1;
+            return (action == 0 || action == 2 || action == 3 || action == 4);
         case AUDIO_MASTER_ORIGINAL:
             return (action == 0 || action == 2);
         case AUDIO_MASTER_SILENCE:
@@ -512,18 +664,20 @@ static void audio_beat_set_action_combo_guarded(int action)
     if(!w || !GTK_IS_COMBO_BOX(w))
         return;
 
-    if(gtk_combo_box_get_active(GTK_COMBO_BOX(w)) == action)
+    const int combo_index = audio_beat_combo_index_from_action(action);
+
+    if(gtk_combo_box_get_active(GTK_COMBO_BOX(w)) == combo_index)
         return;
 
     old_lock = info->status_lock;
     info->status_lock = 1;
-    gtk_combo_box_set_active(GTK_COMBO_BOX(w), action);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(w), combo_index);
     info->status_lock = old_lock;
 }
 
 static void audio_beat_enforce_action_for_master(int master, int notify)
 {
-    int action = audio_beat_widget_int_value(widget_cache[WIDGET_AUDIO_BEAT_ACTION_COMBO]);
+    int action = audio_beat_current_action_from_combo();
     int safe_action = audio_beat_safe_action_for_master(master, action);
 
     if(action == safe_action) {
@@ -575,40 +729,43 @@ void on_audio_beat_enable_toggle_toggled(GtkToggleButton *togglebutton, gpointer
         audio_beat_enable_chain_entry_toggle_guarded(1);
     }
 
-    audio_beat_update_action_sensitivity(audio_beat_widget_int_value(widget_cache[WIDGET_AUDIO_BEAT_ACTION_COMBO]));
+    audio_beat_update_action_sensitivity(audio_beat_current_action_from_combo());
 
     multi_vims(VIMS_AUDIO_BEAT_STATUS, "%d", enabled);
     vj_msg(VEEJAY_MSG_INFO, "Audio beat detector %s requested", enabled ? "enabled" : "disabled");
 }
 void on_audio_beat_action_combo_changed(GtkWidget *widget, gpointer user_data)
 {
-    int mode;
+    int combo_index;
+    int action;
 
     if(info->status_lock)
         return;
 
-    mode = gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
-    if(mode < 0)
+    combo_index = gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
+    if(combo_index < 0)
         return;
 
-    const int master = audio_input_selector_active_from_ui();
-    const int safe_mode = audio_beat_safe_action_for_master(master, mode);
+    action = audio_beat_action_from_combo_index(combo_index);
 
-    if(mode != safe_mode) {
-        audio_beat_set_action_combo_guarded(safe_mode);
-        audio_beat_update_action_sensitivity(safe_mode);
-        multi_vims(VIMS_AUDIO_BEAT_ACTION, "%d", safe_mode);
+    const int master = audio_input_selector_active_from_ui();
+    const int safe_action = audio_beat_safe_action_for_master(master, action);
+
+    if(action != safe_action) {
+        audio_beat_set_action_combo_guarded(safe_action);
+        audio_beat_update_action_sensitivity(safe_action);
+        multi_vims(VIMS_AUDIO_BEAT_ACTION, "%d", safe_action);
         vj_msg(VEEJAY_MSG_WARNING,
                "%s cannot use %s; using %s",
                audio_input_selector_name_from_active(master),
-               audio_beat_action_name(mode),
-               audio_beat_action_name(safe_mode));
+               audio_beat_action_name(action),
+               audio_beat_action_name(safe_action));
         return;
     }
 
-    multi_vims(VIMS_AUDIO_BEAT_ACTION, "%d", mode);
-    audio_beat_update_action_sensitivity(mode);
-    vj_msg(VEEJAY_MSG_INFO, "Audio beat action: %s", audio_beat_action_name(mode));
+    multi_vims(VIMS_AUDIO_BEAT_ACTION, "%d", action);
+    audio_beat_update_action_sensitivity(action);
+    vj_msg(VEEJAY_MSG_INFO, "Audio beat action: %s", audio_beat_action_name(action));
 }
 
 void on_audio_beat_channels_spin_value_changed(GtkWidget *widget, gpointer user_data)
@@ -659,6 +816,62 @@ void on_audio_beat_auto_mode_combo_changed(GtkWidget *widget, gpointer user_data
 void on_audio_beat_auto_amount_value_changed(GtkWidget *widget, gpointer user_data)
 {
     audio_beat_send_int(widget, VIMS_AUDIO_BEAT_AUTO_AMOUNT);
+}
+
+void on_audio_beat_scratch_sensitivity_value_changed(GtkWidget *widget, gpointer user_data)
+{
+    (void)user_data;
+    audio_beat_send_int(widget, VIMS_AUDIO_BEAT_SCRATCH_SENSITIVITY);
+}
+
+void on_audio_beat_source_loss_pause_toggled(GtkWidget *widget, gpointer user_data)
+{
+    (void)user_data;
+
+    if(info->status_lock)
+        return;
+
+    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+        return;
+
+    multi_vims(VIMS_AUDIO_BEAT_SOURCE_LOSS_PAUSE,
+               "%d",
+               gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? 1 : 0);
+}
+
+void on_audio_beat_monitor_latency_value_changed(GtkWidget *widget, gpointer user_data)
+{
+    (void)user_data;
+
+    if(info->status_lock)
+        return;
+
+    if(audio_beat_monitor_latency_auto_active())
+        return;
+
+    multi_vims(VIMS_AUDIO_BEAT_MONITOR_LATENCY, "%d", audio_beat_widget_int_value(widget));
+}
+
+void on_audio_beat_monitor_latency_auto_toggled(GtkWidget *widget, gpointer user_data)
+{
+    int action;
+
+    (void)user_data;
+
+    if(info->status_lock)
+        return;
+
+    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+        return;
+
+    action = audio_beat_current_action_from_combo();
+    audio_beat_update_monitor_latency_sensitivity(action);
+
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
+        multi_vims(VIMS_AUDIO_BEAT_MONITOR_LATENCY, "%d", -1);
+    else
+        multi_vims(VIMS_AUDIO_BEAT_MONITOR_LATENCY, "%d",
+                   audio_beat_widget_int_value(widget_cache[WIDGET_AUDIO_BEAT_MONITOR_LATENCY_SPIN]));
 }
 
 void on_audio_beat_refresh_button_clicked(GtkWidget *widget, gpointer user_data)
@@ -3619,12 +3832,19 @@ void	on_rec_seq_start_clicked( GtkWidget *w, gpointer data )
 
 void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 {
-
 	gint nframes = get_nums( "spin_streamduration");
 	gint autoplay = is_button_toggled("button_stream_autoplay");
 	GtkComboBoxText *combo = GTK_COMBO_BOX_TEXT( glade_xml_get_widget_(info->main_window,"combo_streamcodec"));
-	gchar *gformat = (gchar*)gtk_combo_box_text_get_active_text(combo) ;
+	gchar *gformat = (gchar*)gtk_combo_box_text_get_active_text(combo);
 	gchar *format = gformat;
+
+	if(nframes <= 0) {
+		vj_msg(VEEJAY_MSG_WARNING, "Stream recorder needs a positive duration");
+		if(gformat)
+			g_free(gformat);
+		return;
+	}
+
 	if(format != NULL && strlen(format) > 2)
 	{
 		multi_vims( VIMS_RECORD_DATAFORMAT,"%s",
@@ -3648,7 +3868,8 @@ void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 		vj_msg(VEEJAY_MSG_INFO, "Recording in default format (MJPEG) , duration: %s", time1);
 
 	free(time1);
-	g_free(format);
+	if(gformat)
+		g_free(gformat);
 }
 
 void	on_stream_recordstop_clicked(GtkWidget *widget, gpointer user_data)
@@ -4360,6 +4581,9 @@ free(test);
 void on_button_offline_start_clicked(GtkWidget *widget, gpointer user_data)
 {
 	int stream_id = 0;
+	int n_frames = get_nums("spin_offlineduration1");
+	int autoplay = is_button_toggled("button_offline_autoplay1");
+
 	if( info->selection_slot ) {
 		stream_id = info->selection_slot->sample_type != 0 ? info->selection_slot->sample_id : 0;
 	}
@@ -4367,13 +4591,18 @@ void on_button_offline_start_clicked(GtkWidget *widget, gpointer user_data)
 		stream_id = info->selected_slot->sample_type != 0 ? info->selected_slot->sample_id : 0;
 	}
 
-	if( stream_id > 0 ) {
-		multi_vims( VIMS_STREAM_OFFLINE_REC_START, "%d %d %d %d", stream_id, get_nums("spin_offlineduration1" ), is_button_toggled("button_offline_autoplay1"),-1);
-	    vj_msg(VEEJAY_MSG_INFO, "Started offline recording from stream %d", stream_id );
-    }
-	else {
-		vj_msg(VEEJAY_MSG_INFO, "You can only use this recorder on streams, not samples!");
+	if( stream_id <= 0 ) {
+		vj_msg(VEEJAY_MSG_INFO, "Select a stream slot for offline recording; samples are not valid here");
+		return;
 	}
+
+	if( n_frames <= 0 ) {
+		vj_msg(VEEJAY_MSG_WARNING, "Offline recorder needs a positive duration");
+		return;
+	}
+
+	multi_vims( VIMS_STREAM_OFFLINE_REC_START, "%d %d %d %d", stream_id, n_frames, autoplay, -1);
+	vj_msg(VEEJAY_MSG_INFO, "Started video-only offline recording: stream %d, %d frames", stream_id, n_frames );
 }
 void on_button_offline_stop_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -6966,9 +7195,24 @@ void on_button_offline_start_sample_clicked(GtkWidget *widget, gpointer user_dat
     int n_frames = (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON( widget_cache[ WIDGET_BUFFEREDSTREAMLENGTH ] ));
     int cur_id = info->status_tokens[ CURRENT_ID ];
 
-    multi_vims( VIMS_STREAM_OFFLINE_REC_START, "%d %d 0 %d", stream_id, n_frames, cur_id );
+    if(info->status_tokens[PLAY_MODE] != MODE_SAMPLE || cur_id <= 0) {
+        vj_msg(VEEJAY_MSG_WARNING, "Select the sample that should receive the offline stream recording first");
+        return;
+    }
 
-    vj_msg(VEEJAY_MSG_INFO, "Signalled offline stream recorder to loop-record %d frames from stream %d and append the recording to sample %d",
+    if(stream_id <= 0) {
+        vj_msg(VEEJAY_MSG_WARNING, "Offline sample recorder needs a valid source stream ID");
+        return;
+    }
+
+    if(n_frames <= 0) {
+        vj_msg(VEEJAY_MSG_WARNING, "Offline sample recorder needs a positive duration");
+        return;
+    }
+
+    multi_vims( VIMS_STREAM_OFFLINE_REC_START, "%d %d %d %d", stream_id, n_frames, 0, cur_id );
+
+    vj_msg(VEEJAY_MSG_INFO, "Signalled video-only offline recorder to loop-record %d frames from stream %d and append the recording to sample %d",
             n_frames, stream_id, cur_id );
 }
 
@@ -6978,6 +7222,53 @@ void on_spin_bufferedstreamid_value_changed(GtkWidget *widget, gpointer user_dat
 
 void on_spin_bufferedstreamlength_value_changed(GtkWidget *widget, gpointer user_data)
 {
+}
+
+static int record_audio_source_enable_external_provider(void)
+{
+    int active = audio_input_selector_active_from_ui();
+    int use_wav;
+    int mode;
+
+    if(active != AUDIO_MASTER_JACK && active != AUDIO_MASTER_WAV) {
+        active = AUDIO_MASTER_JACK;
+        audio_input_selector_set_guarded(active);
+    }
+
+    mode = audio_sync_mode_from_ui();
+    if(mode == 0) {
+        mode = VJ_AUDIO_SYNC_MODE_MONITOR;
+        audio_sync_set_mode_combo_guarded(mode);
+    }
+
+    use_wav = (active == AUDIO_MASTER_WAV);
+    if(use_wav && !audio_sync_mode_supports_wav(mode)) {
+        use_wav = 0;
+        audio_input_selector_set_guarded(AUDIO_MASTER_JACK);
+    }
+
+    audio_sync_set_master_wav_options_visible(use_wav);
+    audio_sync_set_external_source_guarded(use_wav);
+
+    if(use_wav && !audio_sync_wav_path_ready(1)) {
+        audio_input_selector_set_guarded(AUDIO_MASTER_JACK);
+        audio_sync_set_master_wav_options_visible(0);
+        use_wav = 0;
+        audio_sync_set_external_source_guarded(0);
+    }
+
+    multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
+
+    if(!audio_sync_send_selected_source())
+        return 0;
+
+    audio_sync_send_mode_settings_if_needed(mode);
+    multi_vims(VIMS_AUDIO_SYNC_STATUS, "%d", 1);
+
+    vj_msg(VEEJAY_MSG_INFO, "Recording audio from external %s provider (%s)",
+           use_wav ? "WAV" : "JACK",
+           audio_sync_mode_name(mode));
+    return 1;
 }
 
 static void record_audio_source_changed(GtkWidget *widget, int source)
@@ -6990,6 +7281,30 @@ static void record_audio_source_changed(GtkWidget *widget, int source)
 
     if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
         return;
+
+    if(source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK) {
+        record_audio_source_sync_groups(source);
+        if(!record_audio_source_enable_external_provider()) {
+            source = VJ_RECORD_AUDIO_SOURCE_ORIGINAL;
+            audio_sync_set_mode_combo_guarded(0);
+            audio_sync_set_enable_toggle_guarded(0);
+            audio_sync_deactivate_playback();
+            audio_sync_set_master_wav_options_visible(0);
+            record_audio_source_sync_groups(source);
+            multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", source);
+            vj_msg(VEEJAY_MSG_WARNING, "External recorder provider was not available; restored Original audio");
+        }
+        return;
+    }
+
+    if(source == VJ_RECORD_AUDIO_SOURCE_ORIGINAL ||
+       source == VJ_RECORD_AUDIO_SOURCE_SILENCE)
+        audio_sync_remember_non_jack_master(source);
+
+    audio_sync_set_mode_combo_guarded(0);
+    audio_sync_set_enable_toggle_guarded(0);
+    audio_sync_deactivate_playback();
+    audio_sync_set_master_wav_options_visible(0);
 
     record_audio_source_sync_groups(source);
 

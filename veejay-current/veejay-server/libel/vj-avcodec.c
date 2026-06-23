@@ -402,6 +402,12 @@ void		vj_avcodec_close_encoder( vj_encoder *av )
 			avcodec_close( av->context );
 #endif
 		}
+#if LIBAVCODEC_VERSION_MAJOR >= 60
+		if(av->packet)
+			av_packet_free( &(av->packet) );
+		if(av->frame)
+			av_frame_free( &(av->frame) );
+#endif
 		if(av->data[0])
 			free(av->data[0]);
 		if(av->lzo)
@@ -552,16 +558,7 @@ int		vj_avcodec_stop( void *encoder , int fmt)
 		return 1;
 	}
 
-#if LIBAVCODEC_MAJOR >= 60 
-	
-#endif
-
 	vj_avcodec_close_encoder( env );
-
-#if LIBAVCODEC_MAJOR >= 60
-	av_packet_free( &(env->packet) );
-	av_frame_free( &(env->frame) );
-#endif
 
 	encoder = NULL;
 	return 1;

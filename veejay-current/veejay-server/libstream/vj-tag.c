@@ -312,6 +312,26 @@ int vj_tag_get_uvlen(void) {
     return vj_tag_input->uv_len;
 }
 
+static void vj_tag_init_cleanup(void)
+{
+    for(int i = 0; i < 3; i++) {
+        if(_temp_buffer[i]) {
+            free(_temp_buffer[i]);
+            _temp_buffer[i] = NULL;
+        }
+    }
+
+    if(vj_tag_input) {
+        free(vj_tag_input);
+        vj_tag_input = NULL;
+    }
+
+    if(TagHash) {
+        hash_destroy(TagHash);
+        TagHash = NULL;
+    }
+}
+
 int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
 {
     TagHash = hash_create(HASHCOUNT_T_MAX, int_tag_compare, int_tag_hash);
@@ -321,13 +341,15 @@ int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
 
     if (width <= 0 || height <= 0) {
         veejay_msg(VEEJAY_MSG_ERROR, "No video dimensions setup");
+        vj_tag_init_cleanup();
         return -1;
     }
     
-    vj_tag_input = (vj_tag_data *) vj_malloc(sizeof(vj_tag_data));
+    vj_tag_input = (vj_tag_data *) vj_calloc(sizeof(vj_tag_data));
 
     if (vj_tag_input == NULL) {
         veejay_msg(VEEJAY_MSG_ERROR, "Error Allocating Memory for stream data\n");
+        vj_tag_init_cleanup();
         return -1;
     }
 
@@ -335,6 +357,7 @@ int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
 
     VJFrame *tmp = yuv_yuv_template( NULL,NULL,NULL, width,height, format );
     if( tmp == NULL ) {
+        vj_tag_init_cleanup();
         return -1;
     }
 
@@ -344,7 +367,6 @@ int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
     vj_tag_input->pix_fmt = pix_fmt; 
 
     video_driver_ = video_driver;
-    video_driver_ = 1;
 
     vj_tag_input->uv_len = tmp->uv_len;
 
@@ -352,9 +374,16 @@ int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
     
     veejay_memcpy( &_tmp, tmp, sizeof(VJFrame));
     
-   _temp_buffer[0] = (uint8_t*) vj_calloc(sizeof(uint8_t)* tmp->len);
-   _temp_buffer[1] = (uint8_t*) vj_calloc(sizeof(uint8_t)* tmp->len);
-   _temp_buffer[2] = (uint8_t*) vj_calloc(sizeof(uint8_t)* tmp->len);
+   _temp_buffer[0] = (uint8_t*) vj_calloc(tmp->len);
+   _temp_buffer[1] = (uint8_t*) vj_calloc(tmp->len);
+   _temp_buffer[2] = (uint8_t*) vj_calloc(tmp->len);
+    if(!_temp_buffer[0] || !_temp_buffer[1] || !_temp_buffer[2]) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Error Allocating Memory for stream temp buffers");
+        free(tmp);
+        vj_tag_init_cleanup();
+        return -1;
+    }
+
     veejay_memset( tag_cache,0,sizeof(tag_cache));
     veejay_memset( avail_tag, 0, sizeof(avail_tag));
 
@@ -517,7 +546,7 @@ static  int cali_write_file( char *file, vj_tag *tag , editlist *el)
 
     if( fwrite( fileheader,strlen(fileheader),1, f ) <= 0 ) {
         veejay_msg(0 ,"Error while writing file header");
-        return 0;
+        goto CALIERR;
     }   
     int n = 0;
 
@@ -594,10 +623,11 @@ static int  cali_read_file( cali_tag_t *p, char *file,int w, int h )
 
     double  mean[3];
 
-    if(sscanf(header, "%3d %8d %8d %8d %8d %lf %lf %lf",&offset, &w,&h,&len,&uv_len,
+    if(!header || sscanf(header, "%3d %8d %8d %8d %8d %lf %lf %lf",&offset, &w,&h,&len,&uv_len,
             &mean[0],&mean[1],&mean[2] ) != 8  )
     {
         veejay_msg(VEEJAY_MSG_ERROR, "Invalid header");
+        fclose(f);
         return 0;
     }
 
@@ -614,6 +644,11 @@ static int  cali_read_file( cali_tag_t *p, char *file,int w, int h )
     }
 
     p->data = (uint8_t*) vj_malloc(sizeof(uint8_t) * 3 * (len+uv_len+uv_len));
+    if(!p->data) {
+        fclose(f);
+        return 0;
+    }
+
     p->bf = p->data;
     p->lf = p->data + (len + (2*uv_len));
     p->mf = p->lf + (len + (2*uv_len));
@@ -642,10 +677,19 @@ static int  cali_read_file( cali_tag_t *p, char *file,int w, int h )
 
     veejay_msg(VEEJAY_MSG_INFO, "Image calibration data loaded");
 
+    fclose(f);
     return 1;
 
 CALIREADERR:
     veejay_msg(VEEJAY_MSG_ERROR, "Only got %d bytes",n);
+    fclose(f);
+    if(p->data) {
+        free(p->data);
+        p->data = NULL;
+        p->bf = NULL;
+        p->lf = NULL;
+        p->mf = NULL;
+    }
     return 0;
 }
 
@@ -668,6 +712,8 @@ static int  _vj_tag_new_cali( vj_tag *tag, int stream_nr, int w, int h )
     p->ptr = cali_malloc(0,0);
     if(!p->ptr) {
         veejay_msg(VEEJAY_MSG_ERROR, "Failed to allocate");
+        if(p->data)
+            free(p->data);
         free(p);
         return 0;
     }
@@ -975,6 +1021,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
 
     sample_eff_chain *fx_chain = (sample_eff_chain*) vj_calloc(sizeof(sample_eff_chain) * SAMPLE_MAX_EFFECTS );
     if(!fx_chain) {
+        free(tag->source_name);
+        free(tag);
         return -1;
     }
 
@@ -1237,7 +1285,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
         tag->effect_chain[i]->is_rendering = 1;
         tag->effect_chain[i]->kf = vpn( VEVO_ANONYMOUS_PORT );
     }
-    if (!vj_tag_put(tag))   
+    if (vj_tag_put(tag) <= 0)   
     {
         veejay_msg(0, "Unable to store stream %d - Internal Error", tag->id);
         goto TAG_NEW_FAILED;
@@ -1348,12 +1396,18 @@ int vj_tag_verify_delete(int id, int type )
     return 1;
 }
 
-int vj_tag_del_internal(vj_tag *tag, int skip_cleanup)
+static void vj_tag_close_encoder_resources(vj_tag *tag);
+
+static int vj_tag_del_internal_ex(vj_tag *tag, int skip_cleanup, int recycle_id)
 {
     if(!tag)
         return 0;
+
+    int old_id = tag->id;
+
 #ifdef HAVE_FREETYPE
     vj_font_dictionary_destroy(_tag_info->font ,tag->dict);
+    tag->dict = NULL;
 #endif
     
     /* stop streaming in first */
@@ -1367,6 +1421,7 @@ int vj_tag_del_internal(vj_tag *tag, int skip_cleanup)
                     tag2->clone --;
             }
         }
+        break;
     case VJ_TAG_TYPE_V4L: 
 #ifdef HAVE_V4L2
         if( no_v4l2_threads_ ) {
@@ -1374,6 +1429,7 @@ int vj_tag_del_internal(vj_tag *tag, int skip_cleanup)
         } else {
             v4l2_thread_stop( v4l2_thread_info_get(vj_tag_input->v4l2[tag->index]));
         }
+        vj_tag_input->v4l2[tag->index] = NULL;
 #endif
     
         break;
@@ -1382,6 +1438,7 @@ int vj_tag_del_internal(vj_tag *tag, int skip_cleanup)
             tag->source_name,tag->id);
         vj_yuv_stream_stop_read(vj_tag_input->stream[tag->index]);
 //      vj_yuv4mpeg_free( vj_tag_input->stream[tag->index]);
+        vj_tag_input->stream[tag->index] = NULL;
      break;
      case VJ_TAG_TYPE_AVFORMAT:
         avformat_thread_stop(tag);
@@ -1389,6 +1446,7 @@ int vj_tag_del_internal(vj_tag *tag, int skip_cleanup)
 #ifdef SUPPORT_READ_DV2
       case VJ_TAG_TYPE_DV1394:
         vj_dv1394_close( vj_tag_input->dv1394[tag->index] );
+        vj_tag_input->dv1394[tag->index] = NULL;
         break;
 #endif
 #ifdef USE_GDK_PIXBUF
@@ -1428,7 +1486,7 @@ int vj_tag_del_internal(vj_tag *tag, int skip_cleanup)
         break;
     }
   
-    vj_tag_chain_free( tag->id,1 );
+    vj_tag_chain_free(old_id, 1);
 
     if(tag->blackframe)free(tag->blackframe);
     if( tag->bf ) free(tag->bf);
@@ -1439,9 +1497,17 @@ int vj_tag_del_internal(vj_tag *tag, int skip_cleanup)
     if( tag->lfv ) free(tag->lfv);
     if(tag->extra) free(tag->extra);
 
-    if(!skip_cleanup && (tag->encoder || tag->encoder_file)) {
-        vj_tag_stop_encoder( tag->id );
-    }
+    tag->blackframe = NULL;
+    tag->bf = NULL;
+    tag->bfu = NULL;
+    tag->bfv = NULL;
+    tag->lf = NULL;
+    tag->lfu = NULL;
+    tag->lfv = NULL;
+    tag->extra = NULL;
+
+    if(!skip_cleanup && (tag->encoder || tag->encoder_file))
+        vj_tag_close_encoder_resources(tag);
 
     if(tag->source_name) {
         free(tag->source_name);
@@ -1455,8 +1521,10 @@ int vj_tag_del_internal(vj_tag *tag, int skip_cleanup)
     }
 
     for (int i = 0; i < SAMPLE_MAX_EFFECTS; i++)  {
-        if( tag->effect_chain[i]->kf )
+        if(tag->effect_chain[i] && tag->effect_chain[i]->kf) {
             vpf(tag->effect_chain[i]->kf);
+            tag->effect_chain[i]->kf = NULL;
+        }
     }
 
     if(tag->main_fx) {
@@ -1464,15 +1532,28 @@ int vj_tag_del_internal(vj_tag *tag, int skip_cleanup)
        tag->main_fx = NULL;
     }
 
-    vj_macro_free( tag->macro );
+    if(tag->macro) {
+        vj_macro_free(tag->macro);
+        tag->macro = NULL;
+    }
 
-    _recyle_id(tag->id);
+    tag->id = 0;
+
+    if(old_id >= 0 && old_id < SAMPLE_MAX_SAMPLES)
+        tag_cache[old_id] = NULL;
+
+    if(recycle_id && old_id > 0 && old_id < SAMPLE_MAX_SAMPLES)
+        _recyle_id(old_id);
     
     free(tag);
-    tag = NULL;
    
 
     return 1;
+}
+
+int vj_tag_del_internal(vj_tag *tag, int skip_cleanup)
+{
+    return vj_tag_del_internal_ex(tag, skip_cleanup, 1);
 }
 
 void vj_tag_sanity_scan(void) {
@@ -1554,9 +1635,7 @@ int vj_tag_del(int id, int skip_cleanup)
         hnode_destroy(node);
     }
 
-    tag_cache[id] = NULL;
-
-    vj_tag_del_internal(tag,skip_cleanup);
+    vj_tag_del_internal_ex(tag, skip_cleanup, 1);
 
     recount_hash = 1;
 
@@ -1577,11 +1656,17 @@ void vj_tag_close_all(void)
         vj_tag *tag = (vj_tag *) hnode_get(node);
         hash_scan_delete(TagHash, node);
 
-        vj_tag_del_internal(tag,0);
+        vj_tag_del_internal_ex(tag, 0, 0);
+
+        hnode_destroy(node);
     }
 
     veejay_memset(avail_tag, 0, sizeof(avail_tag));
+    veejay_memset(tag_cache, 0, sizeof(tag_cache));
+    avail_head = 0;
+    avail_tail = 0;
     this_tag_id = 0;
+    last_added_tag = 0;
 
     hash_free_nodes(TagHash);
 
@@ -1669,12 +1754,14 @@ int vj_tag_set_description(int t1, char *description)
 {
     if(!description)
         return 0;
-    description = '\0';
 
     vj_tag *tag = vj_tag_get(t1);
     if(!tag) return 0;
 
-    snprintf( tag->descr, TAG_MAX_DESCR_LEN, "%s","Untitled");
+    if(description[0] == '\0')
+        snprintf(tag->descr, TAG_MAX_DESCR_LEN, "%s", "Untitled");
+    else
+        snprintf(tag->descr, TAG_MAX_DESCR_LEN, "%s", description);
 
     return 1;
 }
@@ -1776,6 +1863,24 @@ int vj_tag_set_fader_active(int t1, int nframes , int direction) {
   return 1;
 }
 
+static void vj_tag_close_encoder_resources(vj_tag *tag)
+{
+    if(!tag)
+        return;
+
+    if(tag->encoder) {
+        vj_avcodec_stop(tag->encoder, tag->encoder_format);
+        tag->encoder = NULL;
+    }
+
+    if(tag->encoder_file) {
+        lav_close(tag->encoder_file);
+        tag->encoder_file = NULL;
+    }
+
+    tag->encoder_active = 0;
+}
+
 int vj_tag_stop_encoder(int t1) {
    vj_tag *tag = vj_tag_get(t1);
    if(!tag)
@@ -1783,20 +1888,8 @@ int vj_tag_stop_encoder(int t1) {
         veejay_msg(VEEJAY_MSG_ERROR, "Tag %d does not exist", t1);
         return 0;
    }
-   
-   if(tag->encoder_file) {
-        lav_close(tag->encoder_file);
-        tag->encoder_file = NULL;
-    }
-    
-    if(tag->encoder) {
-        vj_avcodec_stop( tag->encoder, tag->encoder_format );
-        tag->encoder = NULL;
-    }
 
-    tag->encoder = NULL;
-    tag->encoder_file = NULL; 
-    tag->encoder_active = 0;
+    vj_tag_close_encoder_resources(tag);
 
     return 1;
 }
@@ -1805,11 +1898,13 @@ void vj_tag_reset_encoder(int t1)
 {
    vj_tag *tag = vj_tag_get(t1);
    if(!tag) return;
+
+   vj_tag_close_encoder_resources(tag);
+
    tag->encoder_format = 0;
    tag->encoder_width = 0;
    tag->encoder_height = 0;
    tag->encoder_max_size = 0;
-   tag->encoder_active = 0;
    tag->encoder_total_frames_recorded = 0;
    tag->encoder_frames_to_record = 0;
    tag->encoder_frames_recorded = 0;
@@ -1917,15 +2012,9 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
             break;
         }
 
-    if(tag->encoder_total_frames_recorded == 0)
-    {
-        tag->encoder_frames_to_record = nframes ; 
-        tag->encoder_frames_recorded = 0;
-    }
-    else
-    {
-        tag->encoder_frames_recorded = 0;
-    }
+    tag->encoder_frames_to_record = nframes;
+    tag->encoder_frames_recorded = 0;
+    tag->encoder_total_frames_recorded = 0;
 
     if( cformat != 'S' ) {
         tag->encoder_file = lav_open_output_file(
@@ -1944,10 +2033,7 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
         if(!tag->encoder_file)
         {
             veejay_msg(VEEJAY_MSG_ERROR,"Cannot write to %s (No permissions?)",tag->encoder_destination);
-            if(tag->encoder)
-                vj_avcodec_close_encoder( tag->encoder );
-            tag->encoder = NULL;
-            tag->encoder_active = 0;
+            vj_tag_close_encoder_resources(tag);
             return 0;
         }
     }
@@ -1997,27 +2083,33 @@ int vj_tag_continue_record( int t1 )
     vj_tag *tag = vj_tag_get(t1);
     if(!tag) return -1;
 
-    long bytesRemaining = lav_bytes_remain( tag->encoder_file );
-    if( bytesRemaining >= 0 && bytesRemaining < (512 * 1024) ) {
-        tag->sequence_num ++;
-        veejay_msg(VEEJAY_MSG_WARNING,
-            "Auto splitting file, %ld frames left to record",
-            (tag->encoder_frames_to_record - tag->encoder_total_frames_recorded ));
-        tag->encoder_frames_recorded=0;
-
-        return 2;
-    }
-    
-    if( tag->encoder_total_frames_recorded >= tag->encoder_frames_to_record)
+    if(tag->encoder_frames_to_record > 0 &&
+       tag->encoder_total_frames_recorded >= tag->encoder_frames_to_record)
     {
         veejay_msg(VEEJAY_MSG_INFO, "Recorded %ld frames",
             tag->encoder_total_frames_recorded );
         return 1;
     }
-    
+
+    long bytesRemaining = tag->encoder_file ? lav_bytes_remain(tag->encoder_file) : -1;
+    if( bytesRemaining >= 0 && bytesRemaining < (512 * 1024) ) {
+        tag->sequence_num ++;
+        if(tag->encoder_frames_to_record > 0)
+            veejay_msg(VEEJAY_MSG_WARNING,
+                "Auto splitting file, %ld frames left to record",
+                (tag->encoder_frames_to_record - tag->encoder_total_frames_recorded ));
+        else
+            veejay_msg(VEEJAY_MSG_WARNING,
+                "Auto splitting continuous recording" );
+        tag->encoder_frames_recorded=0;
+
+        return 2;
+    }
+
     return 0;
 
 }
+
 int vj_tag_set_brightness(int t1, int value)
 {
     vj_tag *tag = vj_tag_get(t1);
@@ -3025,8 +3117,12 @@ int vj_tag_reset_autosplit(int s1)
 long vj_tag_get_frames_left(int s1)
 {
     vj_tag *si= vj_tag_get(s1);
+    long left;
     if(!si) return 0;
-    return ( si->encoder_frames_to_record - si->encoder_total_frames_recorded );
+    if(si->encoder_frames_to_record <= 0)
+        return 0;
+    left = si->encoder_frames_to_record - si->encoder_total_frames_recorded;
+    return left > 0 ? left : 0;
 }
 
 int vj_tag_encoder_active(int s1)
@@ -3067,7 +3163,6 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[4], uint8_t *abuff, int audio_si
     }
 
     if( ret == 0 ) {
-        veejay_msg(VEEJAY_MSG_DEBUG, "Failed to encode frame %ld", nframe );
         return (vj_tag_continue_record(t1));
     }
 
@@ -3082,7 +3177,7 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[4], uint8_t *abuff, int audio_si
             return -1;
         }
     
-        if(audio_size > 0)
+        if(audio_size > 0 && abuff)
         {
             if(lav_write_audio(tag->encoder_file, abuff, audio_size))
             {

@@ -1,5 +1,4 @@
 /*
-dlclose( handle );	
  * Linux VeeJay
  *
  * Copyright(C)2002-2008 Niels Elburg <nwelburg@gmail.com>
@@ -188,6 +187,8 @@ static unsigned int vj_sequence_next_revision(unsigned int revision);
 extern void veejay_pipe_write_status(veejay_t *info);
 extern int  _vj_server_del_client(vj_server * vje, int link_id);
 extern int       vj_event_exists( int id );
+extern void vj_perform_record_offline_disarm(veejay_t *info);
+extern const char *vj_perform_record_effective_audio_source_name(veejay_t *info);
 #ifdef HAVE_JACK
 extern int veejay_audio_beat_push_config_ex(veejay_t *info,
                                             int freeze_ms,
@@ -196,6 +197,12 @@ extern int veejay_audio_beat_push_config_ex(veejay_t *info,
                                             int input_channels,
                                             int scratch_sensitivity,
                                             int source_loss_pause);
+extern void vj_perform_audio_source_transition_guard_ex(int blocks,
+                                                        const char *reason,
+                                                        int old_source,
+                                                        int new_source,
+                                                        int sync_mode,
+                                                        int mute);
 #endif
 
 static char *to_master_buf = NULL;
@@ -210,7 +217,7 @@ int vj_event_get_video_format(void)
 }
 
 #ifdef HAVE_JACK
-extern void vj_perform_record_output_audio_tap_reset(veejay_t *info);
+extern void vj_perform_record_audio_source_reset(veejay_t *info);
 #endif
 
 enum {
@@ -399,7 +406,7 @@ static struct {                 /* hardcoded keyboard layout (the default keys) 
     { VIMS_RESUME_ID,               SDL_SCANCODE_F11,       VIMS_MOD_SHIFT,  "11"    },
     { VIMS_RESUME_ID,               SDL_SCANCODE_F12,       VIMS_MOD_SHIFT,  "12"    },
     { VIMS_SET_PLAIN_MODE,          SDL_SCANCODE_KP_DIVIDE, VIMS_MOD_NONE,  NULL    },
-    { VIMS_REC_AUTO_START,          SDL_SCANCODE_E,         VIMS_MOD_CTRL,  "100"   },
+    { VIMS_REC_AUTO_START,          SDL_SCANCODE_E,         VIMS_MOD_CTRL,  NULL    },
     { VIMS_REC_STOP,                SDL_SCANCODE_T,         VIMS_MOD_CTRL,  NULL    },
     { VIMS_REC_START,               SDL_SCANCODE_R,         VIMS_MOD_CTRL,  NULL    },
     { VIMS_CHAIN_TOGGLE,            SDL_SCANCODE_END,       VIMS_MOD_NONE,  NULL    },
@@ -5265,9 +5272,10 @@ void vj_event_record_audio_source(void *ptr, const char format[], va_list ap)
     veejay_set_record_audio_source(v, source );
 
     veejay_msg(VEEJAY_MSG_INFO,
-               "[REC] Audio recording policy set to %s(%d); sync enabled=%d source=%d mode=%d mute=%d",
+               "[REC] audio-policy=%s(%d) effective=%s sync-enabled=%d source=%d mode=%d mute=%d",
                vj_event_record_audio_source_name(source),
                source,
+               vj_perform_record_effective_audio_source_name(v),
                vj_audio_sync_is_enabled(&v->settings->audio_sync),
                atomic_load_int(&v->settings->audio_sync.source),
                atomic_load_int(&v->settings->audio_sync.mode),
@@ -5364,7 +5372,7 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
     {
         video_playback_setup *s = v->settings;
 #ifdef HAVE_JACK
-        vj_perform_record_output_audio_tap_reset(v);
+        vj_perform_record_audio_source_reset(v);
 #endif
         if(v->recording)
             atomic_store_int(&v->recording->video.valid, 0);
@@ -5375,8 +5383,19 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
             veejay_msg(VEEJAY_MSG_INFO,"Turned off OSD, recording now");
             v->use_osd = 0;
         }
+#ifdef HAVE_JACK
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[REC] sample start id=%d frames=%d format=%s audio=%s policy=%s autoplay=%d",
+                   s->sample_record_id,
+                   args[0],
+                   vj_avcodec_get_encoder_name(format_),
+                   vj_perform_record_effective_audio_source_name(v),
+                   vj_event_record_audio_source_name(atomic_load_int(&s->record_audio_source)),
+                   args[1]);
+#else
         veejay_msg(VEEJAY_MSG_INFO, "Sample recording started , record %d frames from sample %d and %s",
                 args[0],s->sample_record_id, (args[1] == 1 ? "play new sample" : "dont play new sample" ));
+#endif
     }
     else
     {
@@ -5412,7 +5431,7 @@ void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap)
     char avi_file[1024];
     veejay_t *v = (veejay_t*)ptr;
     
-    if( SAMPLE_PLAYING(v)) 
+    if( SAMPLE_PLAYING(v) || v->seq->rec_id ) 
     {
         video_playback_setup *s = v->settings;
         int stop_sample = v->uc->sample_id;
@@ -5432,8 +5451,14 @@ void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap)
             {
                 // add to new sample
                 int ns = veejay_edit_addmovie_sample(v,avi_file,0 );
-                if(ns > 0)
+                if(ns > 0) {
                     veejay_msg(VEEJAY_MSG_INFO, "Loaded file '%s' to new sample %d",avi_file, ns);
+                    veejay_msg(VEEJAY_MSG_INFO,
+                               "[REC] sample stop id=%d frames=%d file=%s",
+                               stop_sample,
+                               sample_get_encoded_frames(stop_sample),
+                               avi_file);
+                }
                 if(ns <= 0 )
                     veejay_msg(VEEJAY_MSG_ERROR, "Unable to append file %s to EDL",avi_file);
             
@@ -8489,11 +8514,28 @@ static void _vj_event_tag_record( veejay_t *v , int *args )
         v->settings->tag_record_switch = 1;
 
 #ifdef HAVE_JACK
-    vj_perform_record_output_audio_tap_reset(v);
+    vj_perform_record_audio_source_reset(v);
 #endif
     if(v->recording)
         atomic_store_int(&v->recording->video.valid, 0);
     v->settings->tag_record = 1;
+#ifdef HAVE_JACK
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[REC] stream start id=%d frames=%d format=%s audio=%s policy=%s autoplay=%d",
+               v->uc->sample_id,
+               args[0],
+               vj_avcodec_get_encoder_name(format),
+               vj_perform_record_effective_audio_source_name(v),
+               vj_event_record_audio_source_name(atomic_load_int(&v->settings->record_audio_source)),
+               args[1]);
+#else
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[REC] stream start id=%d frames=%d format=%s autoplay=%d",
+               v->uc->sample_id,
+               args[0],
+               vj_avcodec_get_encoder_name(format),
+               args[1]);
+#endif
 }
 
 void vj_event_tag_rec_start(void *ptr, const char format[], va_list ap)
@@ -8535,7 +8577,11 @@ void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap)
             veejay_msg(VEEJAY_MSG_ERROR, "Cannot add videofile %s to EditList",avi_file);
         }
 
-        veejay_msg(VEEJAY_MSG_ERROR, "Stopped recording from stream %d", v->uc->sample_id);
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[REC] stream stop id=%d frames=%d file=%s",
+                   v->uc->sample_id,
+                   vj_tag_get_encoded_frames(v->uc->sample_id),
+                   avi_file);
         vj_tag_reset_encoder( v->uc->sample_id);
         s->tag_record = 0;
         s->tag_record_switch = 0;
@@ -8599,19 +8645,19 @@ void vj_event_tag_rec_offline_stop(void *ptr, const char format[], va_list ap)
 
             int new_id = vj_perform_commit_offline_recording(v, id, avi_file );
 
-            vj_tag_reset_encoder(s->offline_tag_id);
-
             if(s->offline_created_sample && new_id > 0 )
             {
                 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d now ",new_id );
                 veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE,new_id );
             }
 
-            veejay_msg(VEEJAY_MSG_INFO, "Stopped offline recorder");
+            veejay_msg(VEEJAY_MSG_INFO,
+                       "[OFFLINE-REC] stop stream=%d linked-sample=%d file=%s",
+                       s->offline_tag_id,
+                       s->offline_linked_sample_id,
+                       avi_file);
         }
-        s->offline_record = 0;
-        s->offline_tag_id = 0;
-        s->offline_created_sample = 0;
+        vj_perform_record_offline_disarm(v);
     }
     else {
         veejay_msg(0, "(Offline) recorder not active" );
@@ -8629,17 +8675,37 @@ void vj_event_output_y4m_stop(void *ptr, const char format[], va_list ap)
     veejay_msg(0, "Y4M out stream: obsolete - use recorder");
 }
 
-void vj_event_enable_audio(void *ptr, const char format[], va_list ap)
-{
 #ifdef HAVE_JACK
-    veejay_t *v = (veejay_t*)ptr;
+static void vj_event_set_audio_mute_state(veejay_t *v, int enabled)
+{
     if (!atomic_load_int(&v->audio_running))
     {
         veejay_msg(0,"Veejay was started without audio");
         return;
     }
 
-    atomic_store_int(&v->settings->audio_mute, 0);
+    enabled = enabled ? 1 : 0;
+    int old_enabled = atomic_load_int(&v->settings->audio_mute) ? 1 : 0;
+
+    atomic_exchange_int(&v->settings->audio_mute, enabled);
+
+    if(old_enabled != enabled)
+        vj_perform_audio_source_transition_guard_ex(2,
+                                                    enabled ? "audio-mute" : "audio-unmute",
+                                                    -1,
+                                                    -1,
+                                                    -1,
+                                                    enabled);
+
+    veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Audio is now %s", enabled ? "muted" : "unmuted");
+}
+#endif
+
+void vj_event_enable_audio(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t*)ptr;
+    vj_event_set_audio_mute_state(v, 0);
 #endif  
 }
 
@@ -8647,8 +8713,7 @@ void vj_event_disable_audio(void *ptr, const char format[], va_list ap)
 {
 #ifdef HAVE_JACK
     veejay_t *v = (veejay_t *)ptr;
-
-    atomic_store_int(&v->settings->audio_mute, 1);
+    vj_event_set_audio_mute_state(v, 1);
 #endif
 }
 
@@ -8656,12 +8721,6 @@ void vj_event_toggle_audio_mute(void *ptr, const char format[], va_list ap)
 {
 #ifdef HAVE_JACK
     veejay_t *v = (veejay_t *)ptr;
-    if (!atomic_load_int(&v->audio_running))
-    {
-        veejay_msg(0,"Veejay was started without audio");
-        return;
-    }
-
     int args[4];
 
     P_A(args, sizeof(args), NULL, 0, format, ap);
@@ -8669,8 +8728,7 @@ void vj_event_toggle_audio_mute(void *ptr, const char format[], va_list ap)
     int enabled = args[0];
     if(enabled < 0 ) enabled = 0; else if (enabled > 1 ) enabled = 1;
 
-    atomic_exchange_int(&v->settings->audio_mute, enabled);
-    veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO] Audio is now %s", (enabled == 1 ? "muted" : "unmuted"));
+    vj_event_set_audio_mute_state(v, enabled);
 #endif
 }
 
@@ -8710,6 +8768,7 @@ static const char *vj_event_audio_sync_mode_name(int mode)
         case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE:  return "tempo-bridge";
         case VJ_AUDIO_SYNC_MODE_TRACK_ALIGN:   return "track-align";
         case VJ_AUDIO_SYNC_MODE_MONITOR:       return "monitor";
+        case VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY: return "monitor+trickplay";
         case VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW:  return "tempo-follow";
         default:                               return "unknown";
     }
@@ -10013,17 +10072,73 @@ void vj_event_effect_add(void *ptr, const char format[], va_list ap)
 
 }
 
+static void vj_event_misc_record_dispatch_start(veejay_t *v, int autoplay)
+{
+    int frames = 0;
+
+    if(!v || !v->settings)
+        return;
+
+    autoplay = autoplay ? 1 : 0;
+
+    if(v->settings->sample_record || v->settings->tag_record || v->settings->offline_record) {
+        veejay_msg(VEEJAY_MSG_WARNING, "[REC] Recorder is already active");
+        return;
+    }
+
+    if(v->seq->active || SAMPLE_PLAYING(v)) {
+        vj_event_trigger_function(v, vj_event_sample_rec_start, 2, "%d %d", &frames, &autoplay);
+        return;
+    }
+
+    if(STREAM_PLAYING(v)) {
+        frames = vj_tag_get_n_frames(v->uc->sample_id);
+        vj_event_trigger_function(v, vj_event_tag_rec_start, 2, "%d %d", &frames, &autoplay);
+        return;
+    }
+
+    p_invalid_mode();
+}
+
 void vj_event_misc_start_rec_auto(void *ptr, const char format[], va_list ap)
 {
- 
+    (void)format;
+    (void)ap;
+    vj_event_misc_record_dispatch_start((veejay_t*)ptr, 1);
 }
+
 void vj_event_misc_start_rec(void *ptr, const char format[], va_list ap)
 {
-
+    (void)format;
+    (void)ap;
+    vj_event_misc_record_dispatch_start((veejay_t*)ptr, 0);
 }
+
 void vj_event_misc_stop_rec(void *ptr, const char format[], va_list ap)
 {
+    (void)format;
+    (void)ap;
 
+    veejay_t *v = (veejay_t*)ptr;
+    if(!v || !v->settings)
+        return;
+
+    if(v->settings->sample_record || v->seq->rec_id) {
+        vj_event_trigger_function(v, vj_event_sample_rec_stop, 0, "");
+        return;
+    }
+
+    if(v->settings->tag_record) {
+        vj_event_trigger_function(v, vj_event_tag_rec_stop, 0, "");
+        return;
+    }
+
+    if(v->settings->offline_record) {
+        vj_event_trigger_function(v, vj_event_tag_rec_offline_stop, 0, "");
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_WARNING, "[REC] Recorder is not active");
 }
 
 

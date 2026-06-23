@@ -92,6 +92,20 @@
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
   </object>
+  <object class="GtkAdjustment" id="audio_beat_scratch_sensitivity_adj">
+    <property name="lower">0</property>
+    <property name="upper">100</property>
+    <property name="value">50</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="audio_beat_monitor_latency_adj">
+    <property name="lower">0</property>
+    <property name="upper">64</property>
+    <property name="value">24</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">4</property>
+  </object>
   <object class="GtkWindow">
     <property name="can-focus">False</property>
     <child>
@@ -9908,9 +9922,8 @@
                                         <signal name="changed" handler="on_audio_beat_action_combo_changed" swapped="no"/>
                                         <items>
                                           <item translatable="yes">None</item>
-                                          <item translatable="yes">Freeze</item>
                                           <item translatable="yes">Auto FX</item>
-                                          <item translatable="yes">Freeze + Auto FX</item>
+                                          <item translatable="yes">Break Beat (Auto FX)</item>
                                           <item translatable="yes">Break Beat</item>
                                         </items>
                                       </object>
@@ -10076,7 +10089,7 @@
                                           <object class="GtkLabel" id="audio_beat_freeze_label">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="label" translatable="yes">Freeze</property>
+                                            <property name="label" translatable="yes">Hold Window</property>
                                             <property name="xalign">0</property>
                                           </object>
                                           <packing>
@@ -10418,6 +10431,155 @@
                                       </packing>
                                     </child>
                                     <child>
+                                      <object class="GtkBox" id="audio_beat_scratch_sensitivity_label_box">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="spacing">4</property>
+                                        <property name="hexpand">True</property>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_beat_scratch_sensitivity_label">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">Scratch sensitivity</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">False</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkScale" id="audio_beat_scratch_sensitivity_scale">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="hexpand">True</property>
+                                            <property name="adjustment">audio_beat_scratch_sensitivity_adj</property>
+                                            <property name="draw-value">False</property>
+                                            <signal name="value-changed" handler="on_audio_beat_scratch_sensitivity_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">True</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="audio_beat_scratch_sensitivity_spin">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="width-request">64</property>
+                                            <property name="adjustment">audio_beat_scratch_sensitivity_adj</property>
+                                            <property name="climb-rate">1</property>
+                                            <property name="numeric">True</property>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">False</property>
+                                            <property name="position">2</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">0</property>
+                                        <property name="top-attach">2</property>
+                                        <property name="width">2</property>
+                                        <property name="height">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkCheckButton" id="audio_beat_source_loss_pause_toggle">
+                                        <property name="label" translatable="yes">Pause video when beat source is lost</property>
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="receives-default">False</property>
+                                        <property name="active">True</property>
+                                        <property name="draw-indicator">True</property>
+                                        <signal name="toggled" handler="on_audio_beat_source_loss_pause_toggled" swapped="no"/>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">0</property>
+                                        <property name="top-attach">3</property>
+                                        <property name="width">2</property>
+                                        <property name="height">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkBox" id="audio_beat_monitor_latency_label_box">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="spacing">4</property>
+                                        <property name="hexpand">True</property>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_beat_monitor_latency_label">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">Monitor latency (ms)</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">False</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkCheckButton" id="audio_beat_monitor_latency_auto_toggle">
+                                            <property name="label" translatable="yes">Auto</property>
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="receives-default">False</property>
+                                            <property name="active">True</property>
+                                            <property name="draw-indicator">True</property>
+                                            <signal name="toggled" handler="on_audio_beat_monitor_latency_auto_toggled" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">False</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkScale" id="audio_beat_monitor_latency_scale">
+                                            <property name="visible">True</property>
+                                            <property name="sensitive">False</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="hexpand">True</property>
+                                            <property name="adjustment">audio_beat_monitor_latency_adj</property>
+                                            <property name="draw-value">False</property>
+                                            <signal name="value-changed" handler="on_audio_beat_monitor_latency_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">True</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">2</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="audio_beat_monitor_latency_spin">
+                                            <property name="visible">True</property>
+                                            <property name="sensitive">False</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="width-request">64</property>
+                                            <property name="adjustment">audio_beat_monitor_latency_adj</property>
+                                            <property name="climb-rate">1</property>
+                                            <property name="numeric">True</property>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">False</property>
+                                            <property name="position">3</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">0</property>
+                                        <property name="top-attach">4</property>
+                                        <property name="width">2</property>
+                                        <property name="height">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
                                       <object class="GtkLabel" id="audio_beat_auto_hint">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
@@ -10427,7 +10589,7 @@
                                       </object>
                                       <packing>
                                         <property name="left-attach">0</property>
-                                        <property name="top-attach">2</property>
+                                        <property name="top-attach">5</property>
                                         <property name="width">2</property>
                                         <property name="height">1</property>
                                       </packing>
@@ -10895,7 +11057,7 @@
                             </child>
                           </object>
                           <packing>
-                            <property name="expand">True</property>
+                            <property name="expand">False</property>
                             <property name="fill">True</property>
                             <property name="position">0</property>
                           </packing>
@@ -11120,6 +11282,47 @@
                                       </object>
                                       <packing>
                                         <property name="left-attach">0</property>
+                                        <property name="top-attach">2</property>
+                                        <property name="width">1</property>
+                                        <property name="height">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkBox" id="audio_beat_latency_label_box">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="spacing">4</property>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_beat_latency_label">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="xalign">0</property>
+                                            <property name="width-chars">8</property>
+                                            <property name="label" translatable="yes">Latency:</property>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">False</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_beat_latency_value">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="xalign">1</property>
+                                            <property name="label">--</property>
+                                            <property name="width-chars">11</property>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">False</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">1</property>
                                         <property name="top-attach">2</property>
                                         <property name="width">1</property>
                                         <property name="height">1</property>
@@ -13895,7 +14098,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">True</property>
                                                     <property name="receives-default">False</property>
-                                                    <property name="tooltip-text" translatable="yes">Record beat detector JACK input when active, otherwise record original source audio</property>
+                                                    <property name="tooltip-text" translatable="yes">Auto: record the backend-selected audio source; usually original audio unless external monitoring is active</property>
                                                     <property name="active">True</property>
                                                     <property name="draw-indicator">True</property>
                                                     <signal name="toggled" handler="on_record_audio_source_sample_auto_toggled" swapped="no"/>
@@ -13925,11 +14128,11 @@
                                                 </child>
                                                 <child>
                                                   <object class="GtkRadioButton" id="record_audio_source_sample_beat_jack">
-                                                    <property name="label" translatable="yes">JACK input</property>
+                                                    <property name="label" translatable="yes">External</property>
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">True</property>
                                                     <property name="receives-default">False</property>
-                                                    <property name="tooltip-text" translatable="yes">Record the selected external JACK input</property>
+                                                    <property name="tooltip-text" translatable="yes">Record the selected external provider, JACK or WAV</property>
                                                     <property name="group">record_audio_source_sample_auto</property>
                                                     <property name="draw-indicator">True</property>
                                                     <signal name="toggled" handler="on_record_audio_source_sample_beat_jack_toggled" swapped="no"/>
@@ -15653,7 +15856,7 @@
                                     <property name="label-xalign">0</property>
                                     <child>
                                       <object class="GtkComboBoxText" id="combo_streamcodec">
-                                        <property name="name">combo_samplecodec</property>
+                                        <property name="name">combo_streamcodec</property>
                                         <property name="visible">True</property>
                                         <property name="can-focus">True</property>
                                         <property name="active">2</property>
@@ -15843,7 +16046,7 @@
                                         <property name="visible">True</property>
                                         <property name="can-focus">True</property>
                                         <property name="receives-default">False</property>
-                                        <property name="tooltip-text" translatable="yes">Record beat detector JACK input when active, otherwise record original source audio</property>
+                                        <property name="tooltip-text" translatable="yes">Auto: record the backend-selected audio source; usually original audio unless external monitoring is active</property>
                                         <property name="active">True</property>
                                         <property name="draw-indicator">True</property>
                                         <signal name="toggled" handler="on_record_audio_source_stream_auto_toggled" swapped="no"/>
@@ -15873,11 +16076,11 @@
                                     </child>
                                     <child>
                                       <object class="GtkRadioButton" id="record_audio_source_stream_beat_jack">
-                                        <property name="label" translatable="yes">JACK input</property>
+                                        <property name="label" translatable="yes">External</property>
                                         <property name="visible">True</property>
                                         <property name="can-focus">True</property>
                                         <property name="receives-default">False</property>
-                                        <property name="tooltip-text" translatable="yes">Record the selected external JACK input</property>
+                                        <property name="tooltip-text" translatable="yes">Record the selected external provider, JACK or WAV</property>
                                         <property name="group">record_audio_source_stream_auto</property>
                                         <property name="draw-indicator">True</property>
                                         <signal name="toggled" handler="on_record_audio_source_stream_beat_jack_toggled" swapped="no"/>

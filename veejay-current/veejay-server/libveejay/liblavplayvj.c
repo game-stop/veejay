@@ -30,6 +30,7 @@
 
 #include <config.h>
 #include <stdint.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -295,6 +296,8 @@ static void veejay_free_frame_buffer(VJFrame *f)
 
 static	VJFrame *veejay_allocate_frame_buffer(veejay_t *info) {
 	VJFrame *buf = yuv_yuv_template( NULL,NULL,NULL, info->video_output_width, info->video_output_height, vj_to_pixfmt(info->pixel_format) );
+	if(!buf)
+		return NULL;
 	buf->fps = info->settings->output_fps;
 	size_t padding = 256;
 	size_t len = sizeof(uint8_t) * ( buf->len + buf->uv_len + buf->uv_len);
@@ -2646,52 +2649,6 @@ static void veejay_screen_update(veejay_t *info, VJFrame *frame_to_display) {
     settings->display_frame.pixels[write_index] = pixels;
     atomic_store_long_long(&settings->display_frame.seq, frame_to_display->frame_num);
 }
-
-
-#ifndef VJ_AUDIO_BEAT_CONFIG_STATUS_TOKENS
-#define VJ_AUDIO_BEAT_CONFIG_STATUS_TOKENS 12
-#endif
-
-#ifndef VJ_AUDIO_BEAT_MONITOR_LATENCY_DEFAULT_MS
-#define VJ_AUDIO_BEAT_MONITOR_LATENCY_DEFAULT_MS -1
-#endif
-
-#ifndef VJ_STATUS_AUDIO_BEAT_HOLD_MS
-#define VJ_STATUS_AUDIO_BEAT_HOLD_MS 119
-#endif
-#ifndef VJ_STATUS_AUDIO_BEAT_COOLDOWN_MS
-#define VJ_STATUS_AUDIO_BEAT_COOLDOWN_MS 120
-#endif
-#ifndef VJ_STATUS_AUDIO_BEAT_THRESHOLD
-#define VJ_STATUS_AUDIO_BEAT_THRESHOLD 121
-#endif
-#ifndef VJ_STATUS_AUDIO_BEAT_CHANNELS
-#define VJ_STATUS_AUDIO_BEAT_CHANNELS 122
-#endif
-#ifndef VJ_STATUS_AUDIO_BEAT_PULSE_MS
-#define VJ_STATUS_AUDIO_BEAT_PULSE_MS 123
-#endif
-#ifndef VJ_STATUS_AUDIO_BEAT_GATE_MS
-#define VJ_STATUS_AUDIO_BEAT_GATE_MS 124
-#endif
-#ifndef VJ_STATUS_AUDIO_BEAT_AUTO_MODE
-#define VJ_STATUS_AUDIO_BEAT_AUTO_MODE 125
-#endif
-#ifndef VJ_STATUS_AUDIO_BEAT_AUTO_AMOUNT
-#define VJ_STATUS_AUDIO_BEAT_AUTO_AMOUNT 126
-#endif
-#ifndef VJ_STATUS_AUDIO_BEAT_SCRATCH_SENSITIVITY
-#define VJ_STATUS_AUDIO_BEAT_SCRATCH_SENSITIVITY 127
-#endif
-#ifndef VJ_STATUS_AUDIO_BEAT_SOURCE_LOSS_PAUSE
-#define VJ_STATUS_AUDIO_BEAT_SOURCE_LOSS_PAUSE 128
-#endif
-#ifndef VJ_STATUS_AUDIO_BEAT_MONITOR_LATENCY
-#define VJ_STATUS_AUDIO_BEAT_MONITOR_LATENCY 129
-#endif
-#ifndef VJ_STATUS_AUDIO_BEAT_EFFECTIVE_LATENCY
-#define VJ_STATUS_AUDIO_BEAT_EFFECTIVE_LATENCY 130
-#endif
 
 static int veejay_pipe_status_token_count(const char *s)
 {
@@ -7522,8 +7479,9 @@ veejay_t *veejay_malloc()
 		return NULL;
 
     info->recording = (video_recording_setup *) vj_calloc(sizeof(video_recording_setup));
-    if (!(info->recording))
+    if (!(info->recording)) {
         return NULL;
+    }
 	info->settings->fxdepth = 1; //@ default to on (VEEJAY_CLASSIC env turns it off)
 	info->settings->color_vibrance = 98;
 	
@@ -7711,25 +7669,30 @@ int veejay_main(veejay_t *info)
 {
     video_playback_setup *settings = (video_playback_setup *)info->settings;
     pthread_attr_t attr;
+    pthread_attr_t *attrp = NULL;
     cpu_set_t cpuset;
+    int attr_inited = 0;
     int err;
-
-    veejay_memset(&attr, 0, sizeof(attr));
 
     if (vj_task_get_num_cpus() > 1) {
         CPU_ZERO(&cpuset);
         CPU_SET(1, &cpuset);
 
         err = pthread_attr_init(&attr);
-        if (err == ENOMEM) {
-            veejay_msg(VEEJAY_MSG_ERROR, "Out of memory initializing thread attributes.");
-            return 0;
-        }
-
-        if (pthread_attr_setaffinity_np(&attr, sizeof(cpuset), &cpuset) != 0) {
-            veejay_msg(VEEJAY_MSG_WARNING, "[DISPLAY] Unable to pin display/renderer thread to CPU #1.");
+        if (err != 0) {
+            veejay_msg(err == ENOMEM ? VEEJAY_MSG_ERROR : VEEJAY_MSG_WARNING,
+                       "[DISPLAY] Unable to initialize thread attributes, code %d", err);
+            if (err == ENOMEM)
+                return 0;
         } else {
-            veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Thread affinity set to CPU #1.");
+            attr_inited = 1;
+            attrp = &attr;
+
+            if (pthread_attr_setaffinity_np(&attr, sizeof(cpuset), &cpuset) != 0) {
+                veejay_msg(VEEJAY_MSG_WARNING, "[DISPLAY] Unable to pin display/renderer thread to CPU #1.");
+            } else {
+                veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Thread affinity set to CPU #1.");
+            }
         }
     }
 
@@ -7763,15 +7726,17 @@ int veejay_main(veejay_t *info)
     }
 
     veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] Starting Video Renderer Thread (Display)");
-    err = pthread_create(&settings->renderer_thread, &attr,
+    err = pthread_create(&settings->renderer_thread, attrp,
                          veejay_display_renderer_thread, (void *)info);
     if (err != 0) {
         veejay_msg(VEEJAY_MSG_ERROR, "Failed to create Renderer thread, code %d", err);
-        pthread_attr_destroy(&attr);
+        if (attr_inited)
+            pthread_attr_destroy(&attr);
         return 0;
     }
 
-    pthread_attr_destroy(&attr);
+    if (attr_inited)
+        pthread_attr_destroy(&attr);
     veejay_msg(VEEJAY_MSG_DEBUG, "[PRODUCER] Starting Video Producer Thread (Decode/Effects)");
     if (pthread_create(&settings->producer_thread, NULL,
                        veejay_producer_thread_loop, (void *)info) != 0) {
@@ -7810,13 +7775,30 @@ static void	veejay_reset_el_buffer( veejay_t *info )
     settings->save_list_len = 0;
 }
 
+static int veejay_edit_range_valid(editlist *el, long start, long end, const char *what)
+{
+    if(!el || el->is_empty || !el->frame_list || el->video_frames <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "No frames in EDL to %s", what ? what : "edit");
+        return 0;
+    }
+
+    if(start < 0 || end < start || (uint64_t)end >= (uint64_t)el->video_frames) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Incorrect parameters for %s frames: %ld - %ld, range is 0 - %llu",
+                   what ? what : "editing",
+                   start,
+                   end,
+                   (unsigned long long)(el->video_frames > 0 ? el->video_frames - 1 : 0));
+        return 0;
+    }
+
+    return 1;
+}
+
 int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 {
-    if(el->is_empty)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "No frames in EDL to copy");
-		return 0;
-	}
+    if(!veejay_edit_range_valid(el, start, end, "copy"))
+        return 0;
 
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
@@ -7824,13 +7806,17 @@ int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
     uint64_t k, i;
     uint64_t n1 = (uint64_t) start;
     uint64_t n2 = (uint64_t) end;
-    if (settings->save_list)
-		free(settings->save_list);
+    uint64_t copy_len = n2 - n1 + 1;
 
-    settings->save_list =
-		(uint64_t *) vj_calloc((n2 - n1 + 1) * sizeof(uint64_t));
+    if(copy_len > (uint64_t)SIZE_MAX / sizeof(uint64_t)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Copy range is too large");
+        return 0;
+    }
 
-	if (!settings->save_list)
+    uint64_t *new_save_list =
+		(uint64_t *) vj_calloc((size_t)(copy_len * sizeof(uint64_t)));
+
+	if (!new_save_list)
 	{
 		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
 		return 0;
@@ -7840,12 +7826,21 @@ int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 
 #pragma omp simd
     for (i = n1; i <= n2; i++) {
-	settings->save_list[k] = el->frame_list[i];
+	new_save_list[k] = el->frame_list[i];
         k++;
     }
-    settings->save_list_len = (n2 - n1 + 1);
 
-    veejay_msg(VEEJAY_MSG_DEBUG, "Copied frames %d - %d to buffer (of size %d)",n1,n2,k );
+    if (settings->save_list)
+		free(settings->save_list);
+
+    settings->save_list = new_save_list;
+    settings->save_list_len = copy_len;
+
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "Copied frames %ld - %ld to buffer (of size %llu)",
+               start,
+               end,
+               (unsigned long long)k );
 
     return 1;
 }
@@ -7890,62 +7885,86 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 
 int veejay_edit_delete(veejay_t *info, editlist *el, long start, long end)
 {
-    if (el->is_empty) {
-        veejay_msg(VEEJAY_MSG_ERROR, "Nothing in EDL to delete");
+    if(!veejay_edit_range_valid(el, start, end, "delete"))
         return 0;
-    }
 
     video_playback_setup *settings = (video_playback_setup *)info->settings;
-
-    uint64_t i;
-    uint64_t n1 = (uint64_t)start;
-    uint64_t n2 = (uint64_t)end;
 
     if (info->dummy->active) {
         veejay_msg(VEEJAY_MSG_ERROR, "Playing dummy video");
         return 0;
     }
 
-    if (n2 < n1 || n1 > el->total_frames || n2 > el->total_frames) {
-        veejay_msg(VEEJAY_MSG_ERROR, "Incorrect parameters for deleting frames");
-        return 0;
-    }
+    uint64_t i;
+    uint64_t n1 = (uint64_t)start;
+    uint64_t n2 = (uint64_t)end;
+    uint64_t removed = n2 - n1 + 1;
+    uint64_t old_count = (uint64_t)el->video_frames;
+    uint64_t new_count = old_count - removed;
 
-    for (i = n2 + 1; i < el->video_frames; i++) {
-        el->frame_list[i - (n2 - n1 + 1)] = el->frame_list[i];
+    for (i = n2 + 1; i < old_count; i++) {
+        el->frame_list[i - removed] = el->frame_list[i];
 	}
 
 	long long min_fn = atomic_load_long_long(&settings->min_frame_num);
 	long long max_fn = atomic_load_long_long(&settings->max_frame_num);
+    long long cur = atomic_load_long_long(&settings->current_frame_num);
+    long long s_n1 = (long long)n1;
+    long long s_n2 = (long long)n2;
+    long long s_removed = (long long)removed;
 
-    if (n1 - 1 < min_fn) {
-        if (n2 < min_fn)
-            min_fn -= (n2 - n1 + 1);
+    if (s_n1 - 1 < min_fn) {
+        if (s_n2 < min_fn)
+            min_fn -= s_removed;
         else
-            min_fn = n1;
+            min_fn = s_n1;
     }
 
-    if (n1 - 1 < max_fn) {
-        if (n2 <= max_fn)
-            max_fn -= (n2 - n1 + 1);
+    if (s_n1 - 1 < max_fn) {
+        if (s_n2 <= max_fn)
+            max_fn -= s_removed;
         else
-            max_fn = n1 - 1;
+            max_fn = s_n1 - 1;
+    }
+
+    if (s_n1 <= cur) {
+        if (cur <= s_n2)
+            cur = s_n1;
+        else
+            cur -= s_removed;
+    }
+
+    el->video_frames = (long)new_count;
+    el->total_frames = new_count > 0 ? (new_count - 1) : 0;
+    el->is_empty = new_count == 0 ? 1 : 0;
+
+    long long new_max = new_count > 0 ? (long long)(new_count - 1) : 0;
+
+    if(min_fn < 0) {
+        min_fn = 0;
+    }
+    
+    if(min_fn > new_max) {
+        min_fn = new_max;
+    }
+
+    if(max_fn < 0) {
+        max_fn = 0;
+    }
+    if(max_fn > new_max) {
+        max_fn = new_max;
+    }
+
+    if(cur < min_fn) {
+        cur = min_fn;
+    }
+    if(cur > max_fn) {
+        cur = max_fn;
     }
 
 	atomic_store_long_long(&settings->min_frame_num, min_fn);
 	atomic_store_long_long(&settings->max_frame_num, max_fn);
-
-    long long cur = atomic_load_long_long(&settings->current_frame_num);
-    if (n1 <= cur) {
-        if (cur <= n2) {
-            atomic_store_long_long(&settings->current_frame_num, n1);
-        } else {
-            atomic_store_long_long(&settings->current_frame_num, cur - (n2 - n1 + 1));
-        }
-    }
-
-    el->video_frames -= (n2 - n1 + 1);
-    el->total_frames -= (n2 - n1 + 1);
+    atomic_store_long_long(&settings->current_frame_num, cur);
 
     return 1;
 }
@@ -7969,7 +7988,7 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 {
 	video_playback_setup *settings =
 		(video_playback_setup *) info->settings;
-	uint64_t i, k;
+	uint64_t i;
 
 	if (!settings->save_list_len || !settings->save_list)
 	{
@@ -7977,6 +7996,11 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 			    "No frames in the buffer to paste");
 		return 0;
 	 }
+
+	if(!el) {
+		veejay_msg(VEEJAY_MSG_ERROR, "No Edit List to paste into");
+		return 0;
+	}
 
 	if(el->is_empty)
 	{
@@ -7995,49 +8019,50 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
     		}
 	}
 
-    el->frame_list = (uint64_t*)realloc(el->frame_list,
-	    ((el->is_empty ? 0 :el->video_frames) +
-		settings->save_list_len) *
-		sizeof(uint64_t));
+    uint64_t old_count = el->is_empty ? 0 : (uint64_t)el->video_frames;
+    uint64_t add_count = settings->save_list_len;
+    uint64_t new_count = old_count + add_count;
 
-	if (!el->frame_list)
+    if(new_count < old_count ||
+       new_count > (uint64_t)LONG_MAX ||
+       new_count > (uint64_t)SIZE_MAX / sizeof(uint64_t))
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "Paste would make the Edit List too large");
+        return 0;
+    }
+
+    uint64_t *new_frame_list = (uint64_t*)realloc(el->frame_list,
+        (size_t)(new_count * sizeof(uint64_t)));
+
+	if (!new_frame_list)
 	{
 		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
 		return 0;
    	}
 
-   	k = (uint64_t)settings->save_list_len;
-    for (i = el->total_frames; i >= destination && i > 0; i--)
-		el->frame_list[i + k] = el->frame_list[i];
-    
-    k = destination;
-	for (i = 0; i < settings->save_list_len; i++)
-	{
-		el->frame_list[k] = settings->save_list[i];
-		k++;
-	}
+    el->frame_list = new_frame_list;
 
-    if( destination < settings->min_frame_num ) {
-        settings->min_frame_num = destination;
+    uint64_t dst = (uint64_t)destination;
+    for (i = old_count; i > dst; i--)
+		el->frame_list[(i - 1) + add_count] = el->frame_list[i - 1];
+
+	for (i = 0; i < add_count; i++)
+		el->frame_list[dst + i] = settings->save_list[i];
+
+    long long min_fn = atomic_load_long_long(&settings->min_frame_num);
+    if( destination < min_fn ) {
+        atomic_store_long_long(&settings->min_frame_num, destination);
     }
+	el->video_frames = (long)new_count;
+	el->total_frames = new_count - 1;
+	el->is_empty = 0;
 
-	el->video_frames += settings->save_list_len;
-
-	el->total_frames += settings->save_list_len;
-
-	long long max_fn = atomic_load_long_long(&settings->max_frame_num);
-    if( el->total_frames < max_fn ) {
-        atomic_store_long_long(&settings->max_frame_num, (long long) el->total_frames);
-    }
-
+    atomic_store_long_long(&settings->max_frame_num, (long long)el->total_frames);
     atomic_store_long_long(&settings->current_frame_num, destination);
 
-	if(el->is_empty)
-		el->is_empty = 0;
-
 	veejay_msg(VEEJAY_MSG_DEBUG,
-		"Pasted %lld frames from buffer into position %ld in movie",
-			settings->save_list_len, destination );
+		"Pasted %llu frames from buffer into position %ld in movie",
+			(unsigned long long)settings->save_list_len, destination );
 	return 1;
 }
 

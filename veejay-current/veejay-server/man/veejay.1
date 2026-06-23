@@ -302,15 +302,15 @@ Commands are received on port offset + 4.
 .TP
 .B \-m/--memory <num>
 Set maximum memory to use for cache, as a percentage of total system RAM.
-Use 0 to disable. Valid range is 0-80. Default is 30.
+Use 0 to disable. Valid range is 0-100. Default is 30.
 
 .TP
 .B \-j/--max_cache <num>
 Divide cache memory over at most N samples. Valid range is 0-100. Default is 0.
 
 .TP
-.B \-Y/--yuv [0|1]
-Force YCbCr mode. Use 0 for YUV 4:2:2 Rec. 601 or 1 for YUV 4:2:2 JPEG/JFIF.
+.B \-Y/--yuv [0|1|2]
+Force YCbCr mode. Use 0 for the default detected/output mode, 1 for limited-range YUV 4:2:2 Rec. 601, or 2 for full-range YUV 4:2:2 JPEG/JFIF.
 
 .TP
 .B \-t/--timer <num>
@@ -382,13 +382,13 @@ beat analysis, or audio sync. In dummy mode the result is still silent output.
 
 .TP
 .B \--audio-sync-thread [0|1]
-Enable or disable the JACK audio sync/control worker. Use 0 to disable external
+Enable or disable the audio sync/control worker. Use 0 to disable external
 JACK monitor, tempo bridge, track align, WAV sync/control, and target-clock
 control requests. Use 1 to allow them. Default is 1.
 
 .TP
 .B \--no-audio-sync-thread
-Disable the JACK audio sync/control worker. This is equivalent to
+Disable the audio sync/control worker. This is equivalent to
 .BR "--audio-sync-thread 0" .
 
 .TP
@@ -403,7 +403,7 @@ Disable the audio beat detector worker. This is equivalent to
 
 .TP
 .B \--pace-correction <ms>
-Set audio pace correction offset in milliseconds. The value must be positive.
+Set audio pace correction offset in milliseconds. The value must be non-negative.
 
 .TP
 .B \-c/--synchronization [0|1]
@@ -502,11 +502,23 @@ Set input video height for dummy/capture input.
 .TP
 .B \-f/--fps <num>
 Override the default frame rate. By default, the frame rate is read from the
-first loaded file. Using this option disables audio.
+first loaded file. This may affect source audio playback and source audio/video
+sync. Use
+.BR "-a 0"
+to start without source audio playback. External JACK/WAV
+sync and beat services are controlled separately.
 
 .TP
 .B \-r/--audiorate <num>
-Set audio rate. Default is 48 kHz.
+Set dummy/sample audio rate. The value must be greater than zero. Default is 48 kHz.
+
+.TP
+.B \--audio-channels <num>
+Set dummy/sample audio channel count. The value must be greater than zero.
+
+.TP
+.B \--audio-bits <num>
+Set dummy/sample audio bits per sample. The value must be greater than zero.
 
 .TP
 .B \-I/--deinterlace
@@ -1183,8 +1195,9 @@ disabled.
 
 .TP
 .B veejay movie1.avi -a 0
-Start veejay without playing the movie's original audio. External JACK input can
-still be used for monitor, tempo bridge, track align, or beat analysis.
+Start veejay without playing the movie's original audio. External JACK/WAV sync
+services can still be used for monitor, tempo bridge, track align, or beat
+analysis.
 
 .TP
 .B veejay movie1.avi -M 224.0.0.50 -p 5000 -n -v

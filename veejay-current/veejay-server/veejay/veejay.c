@@ -268,14 +268,14 @@ static void Usage(char *progname)
 
     fprintf(stderr, "Audio:\n");
     fprintf(stderr, "  -a/--audio [0|1]             Enable or disable audio playback output (default: 1)\n");
-    fprintf(stderr, "                                -a 0 disables media/JACK output but keeps clock fallback\n");
+    fprintf(stderr, "                                -a 0 disables source/media playback audio; clock and external input services can remain available\n");
     fprintf(stderr, "     --audio-muted             Start with all audio playback output muted\n");
     fprintf(stderr, "                                JACK input, sync and beat services remain available\n");
-    fprintf(stderr, "     --audio-sync-thread [0|1] Enable or disable the JACK sync/control thread\n");
-    fprintf(stderr, "     --no-audio-sync-thread    Disable the JACK sync/control thread\n");
+    fprintf(stderr, "     --audio-sync-thread [0|1] Enable or disable the audio sync/control thread\n");
+    fprintf(stderr, "     --no-audio-sync-thread    Disable the audio sync/control thread\n");
     fprintf(stderr, "     --audio-beat-thread [0|1] Enable or disable the audio beat detector thread\n");
     fprintf(stderr, "     --no-audio-beat-thread    Disable the audio beat detector thread\n");
-    fprintf(stderr, "     --pace-correction <ms>    Audio pace correction offset in milliseconds\n");
+    fprintf(stderr, "     --pace-correction <ms>    Audio pace correction offset in milliseconds (>= 0)\n");
     fprintf(stderr, "  -r/--audiorate <num>         Set dummy/sample audio rate (default: 48000 Hz)\n");
     fprintf(stderr, "     --audio-channels <num>    Set dummy/sample audio channel count\n");
     fprintf(stderr, "     --audio-bits <num>        Set dummy/sample audio bits per sample\n");
@@ -288,7 +288,7 @@ static void Usage(char *progname)
     fprintf(stderr, "  -W/--input-width <num>       Set input video width\n");
     fprintf(stderr, "  -H/--input-height <num>      Set input video height\n");
     fprintf(stderr, "  -N/--norm <num>              Set norm: 0=PAL, 1=NTSC, 2=SECAM (default: PAL)\n");
-    fprintf(stderr, "  -Y/--yuv [0|1]               Force YCbCr mode (default: YUV)\n");
+    fprintf(stderr, "  -Y/--yuv [0|1|2]             Force YCbCr mode: 0=default, 1=limited, 2=full-range\n");
     fprintf(stderr, "  -e/--swap-range              Swap YUV range 0-255 <-> 16-235 on video files\n");
     fprintf(stderr, "  -I/--deinterlace             Deinterlace interlaced video\n");
     fprintf(stderr, "\n");
@@ -416,7 +416,7 @@ static int set_option(const char *name, char *value)
 	} else if (strcmp(name, "pace-correction") == 0 ) {
 	info->settings->pace_correction = atoi( optarg);
 		if( info->settings->pace_correction < 0 ) {
-			fprintf(stderr, "Audio pace correction must be a positive value\n");
+			fprintf(stderr, "Audio pace correction must be a non-negative value\n");
 			nerr++;
 		}
     } else if ( strcmp(name, "A" ) == 0 || strcmp(name, "capture-device" ) == 0 ) {
@@ -463,7 +463,11 @@ static int set_option(const char *name, char *value)
 		el_cache_configure(max_mem_);
 
     } else if (strcmp(name, "synchronization") == 0 || strcmp(name, "c") == 0) {
-		info->sync_correction = atoi(optarg);
+        int enabled = 0;
+        if(parse_binary_option("-c/--synchronization", value, &enabled))
+            nerr++;
+        else
+            info->sync_correction = enabled;
 	} else if (strcmp(name, "version") == 0 )
 	{ printf("Veejay %s\n", VERSION); exit(0); 
     } else if (strcmp(name, "graphics-driver") == 0
@@ -489,7 +493,7 @@ static int set_option(const char *name, char *value)
 	} else if ( strcmp(name, "output-file" ) == 0 || strcmp(name, "o") == 0 ) {
 		check_val(optarg,name);
 		veejay_strncpy(info->y4m_file,(char*) optarg, strlen( (char*) optarg));
-    } else if (strcmp(name, "preserve-pathnames") == 0 ) {
+    } else if (strcmp(name, "preserve-pathnames") == 0 || strcmp(name, "P") == 0 ) {
 		info->preserve_pathnames = 1;
 	} else if (strcmp(name, "benchmark" ) == 0 ) {
 		int w=0,h=0;
@@ -582,12 +586,16 @@ static int set_option(const char *name, char *value)
 	}
 	else if(strcmp(name, "norm") == 0 || strcmp(name, "N") == 0 ) {
 		int val = atoi(optarg);
-		if(val == 1 )	
-			override_norm = 'n';
-		if(val == 0 )
+		if(val == 0)
 			override_norm = 'p';
-		if(val == 2 )
+		else if(val == 1)
+			override_norm = 'n';
+		else if(val == 2)
 			override_norm = 's';
+		else {
+			fprintf(stderr, "-N/--norm must be 0=PAL, 1=NTSC or 2=SECAM\n");
+			nerr++;
+		}
 	}
 	else if(strcmp(name, "D") == 0 || strcmp(name, "composite") == 0)
 	{
@@ -602,6 +610,10 @@ static int set_option(const char *name, char *value)
 	else if(strcmp(name, "audiorate") == 0 || strcmp(name, "r") == 0 )
 	{
 		info->dummy->arate = atoi(optarg);
+		if(info->dummy->arate <= 0) {
+			fprintf(stderr, "Audio rate must be greater than zero\n");
+			nerr++;
+		}
 	}
 	else if(strcmp(name, "audio-channels") == 0 )
 	{
@@ -625,8 +637,10 @@ static int set_option(const char *name, char *value)
 	else if(strcmp(name,"yuv")==0 || strcmp(name,"Y")==0)
 	{
 		override_pix_fmt = atoi(optarg);
-		if( override_pix_fmt < 0 || override_pix_fmt > 2 )
-			override_pix_fmt = 0;
+		if( override_pix_fmt < 0 || override_pix_fmt > 2 ) {
+			fprintf(stderr, "-Y/--yuv must be 0=default, 1=limited or 2=full-range\n");
+			nerr++;
+		}
 	}
 	else if(strcmp(name, "swap-range") == 0 || strcmp(name, "e") == 0 )
 	{
@@ -680,7 +694,6 @@ static int check_command_line_options(int argc, char *argv[])
 	{"verbose", 0, 0, 0},	/* -v/--verbose         */
 	{"master", 0 ,0 ,0},
 	{"connect", 1, 0, 0},
-	{"skip", 1, 0, 0},	/* -s/--skip            */
 	{"synchronization", 1, 0, 0},	/* -c/--synchronization */
 	{"preserve-pathnames", 0, 0, 0},	/* -P/--preserve-pathnames    */
 	{"audio", 1, 0, 0},	/* -a/--audio num       */
@@ -707,7 +720,6 @@ static int check_command_line_options(int argc, char *argv[])
 	{"deinterlace",0,0,0},
 	{"clip-as-sample",0,0,0},
 	{"port", 1, 0, 0},
-	{"sample-mode",1,0,0},
 	{"dummy",0,0,0},
 	{"geometry-x",1,0,0},
 	{"geometry-y",1,0,0},
@@ -758,12 +770,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:T:F:Z:C:nKILPVDugvBdibjqeM:S:X?",
+			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:W:T:F:Z:C:M:S:nKILPDugvBbedXq?",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:T:F:Z:C:KnILPVDugvBdibjqeM:S:X?"
+		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:W:T:F:Z:C:M:S:nKILPDugvBbedXq?"
 						   )) != EOF)
 #endif
     {
@@ -876,7 +888,7 @@ int main(int argc, char **argv)
 		veejay_set_timestamp(0);
 		veejay_set_label(0);
         vj_event_init(NULL);
-        vje_init(info->video_output_width <= 0 ? 720 : info->video_output_width, info->video_output_height <= 0 ? 576 : info->video_output_width);
+        vje_init(info->video_output_width <= 0 ? 720 : info->video_output_width, info->video_output_height <= 0 ? 576 : info->video_output_height);
 
         vj_event_dump();
 

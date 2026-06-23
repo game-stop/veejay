@@ -1164,7 +1164,7 @@ void		vj_init_vevo_events(void)
                 vj_event_record_audio_source,
                 1,
                 VIMS_REQUIRE_ALL_PARAMS,
-                "Audio source: 0=auto, 1=original source, 2=JACK capture input, 3=silence",
+                "Audio source: 0=auto, 1=original source, 2=external sync source, 3=silence",
                 VJ_RECORD_AUDIO_SOURCE_AUTO,
                 NULL );
 
@@ -1860,7 +1860,7 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 	index_map_[VIMS_STREAM_REC_STOP]			=	_new_event(
-				"%d %d",
+				NULL,
 				VIMS_STREAM_REC_STOP,
 				"Stop recording from this stream",
 				vj_event_tag_rec_stop,
