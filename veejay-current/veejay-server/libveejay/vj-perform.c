@@ -8382,65 +8382,72 @@ int vj_perform_queue_audio_chunk_ext(
             }
 
 
+            const double transport_rate_abs = fabs(transport_rate);
+
             if(speed < 0) {
-                double reverse_rate = fabs(transport_rate);
-                int rendered = 0;
-                int edge_reset = 0;
+                const int use_reverse_deck =
+                    (sync_mode != VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY) ||
+                    (transport_rate_abs > 1.0005);
 
-                if(reverse_rate < 1.0)
-                    reverse_rate = 1.0;
-                if(reverse_rate > (double)MAX_SPEED)
-                    reverse_rate = (double)MAX_SPEED;
+                if(use_reverse_deck) {
+                    double reverse_rate = transport_rate_abs;
+                    int rendered = 0;
+                    int edge_reset = 0;
 
-                if(sync_mode == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY) {
-                    rendered = vj_external_audio_render_live_reverse_deck(
-                        p,
-                        audio_payload_chunk,
-                        client_frames_to_write,
-                        frame_bytes,
-                        reverse_rate,
-                        client_rate,
-                        VJ_EXTERNAL_AUDIO_LIVE_REVERSE_LATENCY_MS,
-                        VJ_EXTERNAL_AUDIO_LIVE_REVERSE_PREROLL_MS,
-                        &edge_reset
-                    );
-                } else {
-                    p->external_audio_live_reverse_valid = 0;
-                    rendered = vj_external_audio_render_reverse_deck(
-                        p,
-                        audio_payload_chunk,
-                        client_frames_to_write,
-                        frame_bytes,
-                        reverse_rate,
-                        client_rate,
-                        VJ_EXTERNAL_AUDIO_REVERSE_LATENCY_MS,
-                        0,
-                        &edge_reset
-                    );
-                }
+                    if(reverse_rate < 1.0)
+                        reverse_rate = 1.0;
+                    if(reverse_rate > (double)MAX_SPEED)
+                        reverse_rate = (double)MAX_SPEED;
 
-                if(rendered > 0) {
-                    vj_external_audio_smooth_block_start(p,
-                                                         audio_payload_chunk,
-                                                         client_frames_to_write,
-                                                         frame_bytes,
-                                                         edge_reset);
-                    vj_audio_declick_observe(p,
-                                             audio_payload_chunk,
-                                             client_frames_to_write,
-                                             frame_bytes,
-                                             AUDIO_PATH_DIRECT,
-                                             speed,
-                                             -1);
-                    vj_perform_record_sync_audio_tap_write(info, audio_payload_chunk,
-                                                       client_frames_to_write,
-                                                       sync_source_now,
-                                                       sync_mode);
-                return client_frames_to_write;
+                    if(sync_mode == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY) {
+                        rendered = vj_external_audio_render_live_reverse_deck(
+                            p,
+                            audio_payload_chunk,
+                            client_frames_to_write,
+                            frame_bytes,
+                            reverse_rate,
+                            client_rate,
+                            VJ_EXTERNAL_AUDIO_LIVE_REVERSE_LATENCY_MS,
+                            VJ_EXTERNAL_AUDIO_LIVE_REVERSE_PREROLL_MS,
+                            &edge_reset
+                        );
+                    } else {
+                        p->external_audio_live_reverse_valid = 0;
+                        rendered = vj_external_audio_render_reverse_deck(
+                            p,
+                            audio_payload_chunk,
+                            client_frames_to_write,
+                            frame_bytes,
+                            reverse_rate,
+                            client_rate,
+                            VJ_EXTERNAL_AUDIO_REVERSE_LATENCY_MS,
+                            0,
+                            &edge_reset
+                        );
+                    }
+
+                    if(rendered > 0) {
+                        vj_external_audio_smooth_block_start(p,
+                                                             audio_payload_chunk,
+                                                             client_frames_to_write,
+                                                             frame_bytes,
+                                                             edge_reset);
+                        vj_audio_declick_observe(p,
+                                                 audio_payload_chunk,
+                                                 client_frames_to_write,
+                                                 frame_bytes,
+                                                 AUDIO_PATH_DIRECT,
+                                                 speed,
+                                                 -1);
+                        vj_perform_record_sync_audio_tap_write(info, audio_payload_chunk,
+                                                           client_frames_to_write,
+                                                           sync_source_now,
+                                                           sync_mode);
+                    return client_frames_to_write;
+                    }
                 }
             }
 
-            const double transport_rate_abs = fabs(transport_rate);
             const int external_pitch_route =
                 (transport_rate_abs > 1.0005) &&
                 (speed > 0 || sync_mode != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE);
