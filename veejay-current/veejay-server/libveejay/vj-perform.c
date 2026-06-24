@@ -8440,13 +8440,13 @@ int vj_perform_queue_audio_chunk_ext(
                 }
             }
 
+            const double transport_rate_abs = fabs(transport_rate);
             const int external_pitch_route =
-                (speed > 1) ||
-                (speed <= -2 && sync_mode != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE) ||
-                (speed == 1 && effective_rate > 1.0005);
+                (transport_rate_abs > 1.0005) &&
+                (speed > 0 || sync_mode != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE);
 
             if (external_pitch_route) {
-                double pitch_rate = fabs(transport_rate);
+                double pitch_rate = transport_rate_abs;
                 int pitch_ready;
                 int rendered;
 
