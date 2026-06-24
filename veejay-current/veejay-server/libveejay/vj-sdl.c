@@ -168,38 +168,58 @@ void *vj_sdl_allocate(VJFrame *frame, int use_key, int use_mouse, int show_curso
 void vj_sdl_resize( void *ptr ,int x, int y, int scaled_width, int scaled_height, int fs )
 {
     vj_sdl *vjsdl = (vj_sdl*) ptr;
-	if (scaled_width)
-		vjsdl->sw_scale_width = scaled_width;
-	if (scaled_height)
-		vjsdl->sw_scale_height = scaled_height;
+    uint32_t fs_flags;
 
-    if( x >= 0 ) {
+    if(!vjsdl || !vjsdl->screen)
+        return;
+
+    if (scaled_width > 0)
+        vjsdl->sw_scale_width = scaled_width;
+    if (scaled_height > 0)
+        vjsdl->sw_scale_height = scaled_height;
+
+    if( x >= 0 )
         vjsdl->x = x;
-    }
-    if( y >=0 ) {
+    if( y >= 0 )
         vjsdl->y = y;
+
+    fs_flags = fs ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
+    if(fs != vjsdl->fs) {
+        if(SDL_SetWindowFullscreen(vjsdl->screen, fs_flags) != 0) {
+            veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] Fullscreen resize failed: %s", SDL_GetError());
+            return;
+        }
+        vjsdl->fs = fs;
     }
 
-    if(vjsdl->screen) {
-        SDL_DestroyWindow(vjsdl->screen);
+    if(!fs) {
+        if(vjsdl->sw_scale_width > 0 && vjsdl->sw_scale_height > 0)
+            SDL_SetWindowSize(vjsdl->screen, vjsdl->sw_scale_width, vjsdl->sw_scale_height);
+
+        SDL_SetWindowPosition(vjsdl->screen,
+                              (vjsdl->x >= 0 ? vjsdl->x : SDL_WINDOWPOS_UNDEFINED),
+                              (vjsdl->y >= 0 ? vjsdl->y : SDL_WINDOWPOS_UNDEFINED));
     }
 
-    int flags = (fs ? SDL_WINDOW_FULLSCREEN : (vjsdl->borderless ? SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS : SDL_WINDOW_OPENGL ) );
+    if(vjsdl->renderer)
+        SDL_RenderSetLogicalSize(vjsdl->renderer, vjsdl->width, vjsdl->height);
 
-    vjsdl->screen = SDL_CreateWindow( vjsdl->caption, 
-            (vjsdl->x >= 0 ? vjsdl->x : SDL_WINDOWPOS_UNDEFINED ),
-            (vjsdl->y >= 0 ? vjsdl->y : SDL_WINDOWPOS_UNDEFINED ),
-            vjsdl->sw_scale_width, vjsdl->sw_scale_height, flags );
-
-	veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Changed video window to size %d x %d, position x=%d, y=%d",
-			vjsdl->sw_scale_width,vjsdl->sw_scale_height, vjsdl->x, vjsdl->y);
+    veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Changed video window to size %d x %d, position x=%d, y=%d%s",
+               vjsdl->sw_scale_width, vjsdl->sw_scale_height, vjsdl->x, vjsdl->y,
+               fs ? " fullscreen" : "");
 }
 
 void vj_sdl_get_position( void *ptr, int *x, int *y )
 {
     vj_sdl *vjsdl = (vj_sdl*) ptr;
-    *x = vjsdl->x;
-    *y = vjsdl->y;
+    if(!vjsdl) {
+        if(x) *x = 0;
+        if(y) *y = 0;
+        return;
+    }
+
+    if(x) *x = vjsdl->x;
+    if(y) *y = vjsdl->y;
 }
 
 
@@ -323,19 +343,21 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
         } else {
             veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] Valid values for VEEJAY_SDL_DRIVER are: \"software\", \"accelerated\", \"vsync\"");
             SDL_DestroyWindow(vjsdl->screen);
+            vjsdl->screen = NULL;
             return 0;
         }
     }
 
     if(!vjsdl->renderer) {
         veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] %s", SDL_GetError());
-        SDL_DestroyWindow( vjsdl->screen );
+        SDL_DestroyWindow(vjsdl->screen);
+        vjsdl->screen = NULL;
         return 0;
     }
     
     SDL_RendererInfo info;
-    if(SDL_GetRenderDriverInfo(i, &info) == 0 ) {
-        veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Using SDL driver %s", info.name);
+    if(SDL_GetRendererInfo(vjsdl->renderer, &info) == 0 ) {
+        veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Using SDL renderer %s", info.name);
         veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] The renderer uses hardware acceleration: %s", (info.flags & SDL_RENDERER_ACCELERATED) ? "yes" : "no");
         veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] Present is synchronized with the refresh rate: %s", (info.flags & SDL_RENDERER_PRESENTVSYNC) ? "yes": "no" );
         veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] Set VEEJAY_SDL_DRIVER to select another driver");
@@ -348,6 +370,10 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
     vjsdl->texture = SDL_CreateTexture( vjsdl->renderer, SDL_PIXELFORMAT_YUY2, SDL_TEXTUREACCESS_STREAMING, vjsdl->width,vjsdl->height);
     if(!vjsdl->texture) {
         veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] Unable to create SDL texture: %s", SDL_GetError());
+        SDL_DestroyRenderer(vjsdl->renderer);
+        SDL_DestroyWindow(vjsdl->screen);
+        vjsdl->renderer = NULL;
+        vjsdl->screen = NULL;
         return 0;
     }
 
@@ -394,11 +420,16 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
     SDL_DisplayMode mode;
     int display_index = SDL_GetWindowDisplayIndex(vjsdl->screen);
     double vsync_interval = 1.0 / 60.0;
-    if(SDL_GetDisplayMode(display_index,0,&mode)) {
+
+    if(vsync)
+        *vsync = vsync_interval;
+
+    if(display_index >= 0 && SDL_GetDisplayMode(display_index, 0, &mode) == 0) {
         int hz = (mode.refresh_rate > 0) ? mode.refresh_rate : 60;
         vsync_interval = 1.0 / (double) hz;
-        *vsync = vsync_interval;
-        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] SDL V-Sync refresh rate is %f", vsync_interval);
+        if(vsync)
+            *vsync = vsync_interval;
+        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] SDL V-Sync refresh interval is %f", vsync_interval);
     }
 
 	return 1;
@@ -407,6 +438,9 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
 void vj_sdl_set_fullscreen(void *ptr, int enabled) {
     uint32_t flags = enabled ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
     vj_sdl *vjsdl = (vj_sdl*) ptr;
+
+    if(!vjsdl || !vjsdl->screen)
+        return;
 
     if (SDL_SetWindowFullscreen(vjsdl->screen, flags) == 0) {
         vjsdl->fs = enabled;
@@ -423,10 +457,10 @@ void vj_sdl_set_window_size(void *ptr, int w, int h, int x, int y) {
     if (!vjsdl || !vjsdl->screen) return;
 
     SDL_SetWindowSize(vjsdl->screen, w, h);
-    
     SDL_SetWindowPosition(vjsdl->screen, x, y);
 
-    SDL_RenderSetLogicalSize(vjsdl->renderer, vjsdl->width, vjsdl->height);
+    if(vjsdl->renderer)
+        SDL_RenderSetLogicalSize(vjsdl->renderer, vjsdl->width, vjsdl->height);
 
     vjsdl->sw_scale_width = w;
     vjsdl->sw_scale_height = h;
@@ -441,8 +475,9 @@ void    vj_sdl_enable_screensaver(void)
 
 void	vj_sdl_grab(void *ptr, int status)
 {
-	SDL_SetRelativeMouseMode( (status==1? SDL_TRUE : SDL_FALSE) );
-	veejay_msg(VEEJAY_MSG_DEBUG, "%s", status == 1 ? "[DISPLAY] Released mouse focus": "[DISPLAY] Grabbed mouse focus");
+    (void) ptr;
+    SDL_SetRelativeMouseMode((status == 1 ? SDL_TRUE : SDL_FALSE));
+    veejay_msg(VEEJAY_MSG_DEBUG, "%s", status == 1 ? "[DISPLAY] Released mouse focus": "[DISPLAY] Grabbed mouse focus");
 }
 
 void vj_sdl_put_to_screen(void *ptr, uint8_t *pixels_to_render)
@@ -562,10 +597,16 @@ void vj_sdl_free(void *ptr)
 {
     vj_sdl *vjsdl = (vj_sdl*) ptr;
 
-    SDL_DestroyTexture( vjsdl->texture );
-    SDL_DestroyRenderer( vjsdl->renderer );
-    SDL_DestroyWindow( vjsdl->screen );
+    if(!vjsdl)
+        return;
 
+    if(vjsdl->texture)
+        SDL_DestroyTexture(vjsdl->texture);
+    if(vjsdl->renderer)
+        SDL_DestroyRenderer(vjsdl->renderer);
+    if(vjsdl->screen)
+        SDL_DestroyWindow(vjsdl->screen);
+	
 	if( vjsdl->scaler ) 
 	   yuv_free_swscaler(vjsdl->scaler);
 

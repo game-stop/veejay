@@ -4737,6 +4737,22 @@ void	on_samplerand_toggled(GtkWidget *widget, gpointer user_data)
 	}
 }
 
+void	on_sample_hold_button_clicked(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		int frames = get_nums("sample_hold_frames");
+
+		if(frames < 0)
+			frames = 0;
+
+		multi_vims(VIMS_SAMPLE_HOLD_FRAME, "%d %d %d", 0, 0, frames);
+		vj_midi_learning_vims_msg(info->midi, NULL, VIMS_SAMPLE_HOLD_FRAME, frames);
+		vj_msg(VEEJAY_MSG_INFO, "Requested full output hold for %d frame%s",
+		       frames, frames == 1 ? "" : "s");
+	}
+}
+
 
 void on_openConnection_activate (GtkMenuItem     *menuitem,
                                  gpointer         user_data)

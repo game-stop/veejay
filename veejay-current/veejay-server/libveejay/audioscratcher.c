@@ -2025,6 +2025,68 @@ int vj_audio_render_slow_stream_velocity_turn_s16(uint8_t *dst,
     return dst_samples;
 }
 
+static inline int16_t vj_audio_box_sample_s16(const int16_t *in,
+                                                int src_samples,
+                                                int words,
+                                                int channel,
+                                                double left,
+                                                double right)
+{
+    if(right < left) {
+        double t = left;
+        left = right;
+        right = t;
+    }
+
+    if(left < 0.0)
+        left = 0.0;
+    if(right > (double)src_samples)
+        right = (double)src_samples;
+
+    double width = right - left;
+    if(width <= 0.000001) {
+        int idx = (int)floor((left + right) * 0.5);
+        if(idx < 0)
+            idx = 0;
+        else if(idx >= src_samples)
+            idx = src_samples - 1;
+        return in[(idx * words) + channel];
+    }
+
+    int j0 = (int)floor(left);
+    int j1 = (int)ceil(right) - 1;
+
+    if(j0 < 0)
+        j0 = 0;
+    if(j1 >= src_samples)
+        j1 = src_samples - 1;
+
+    double acc = 0.0;
+    double wsum = 0.0;
+
+    for(int j = j0; j <= j1; j++) {
+        double a = (left > (double)j) ? left : (double)j;
+        double b = (right < (double)(j + 1)) ? right : (double)(j + 1);
+        double w = b - a;
+
+        if(w > 0.0) {
+            acc += (double)in[(j * words) + channel] * w;
+            wsum += w;
+        }
+    }
+
+    if(wsum <= 0.0)
+        return 0;
+
+    int v = (int)((acc / wsum) + (acc >= 0.0 ? 0.5 : -0.5));
+    if(v < -32768)
+        v = -32768;
+    else if(v > 32767)
+        v = 32767;
+
+    return (int16_t)v;
+}
+
 int vj_audio_resample_block_s16(uint8_t *dst,
                                 int expected_samples,
                                 const uint8_t *src,
@@ -2055,35 +2117,39 @@ int vj_audio_resample_block_s16(uint8_t *dst,
 
     const int reverse = (speed < 0.0);
 
-    for (int i = 0; i < expected_samples; i++) {
-        double pos = reverse ? ((double)(src_samples - 1) - ((double)i * rate))
-                             : ((double)i * rate);
+    if(rate <= 1.000001) {
+        for(int i = 0; i < expected_samples; i++) {
+            int si = reverse ? (src_samples - 1 - i) : i;
+            if(si < 0)
+                si = 0;
+            else if(si >= src_samples)
+                si = src_samples - 1;
 
-        if (pos < 0.0)
-            pos = 0.0;
-        else if (pos > (double)(src_samples - 1))
-            pos = (double)(src_samples - 1);
-
-        int i0 = (int)pos;
-        int i1 = i0 + 1;
-
-        if (i1 >= src_samples)
-            i1 = src_samples - 1;
-
-        const float frac = (float)(pos - (double)i0);
-        const float a_gain = 1.0f - frac;
-        const float b_gain = frac;
-
-        const int in0 = i0 * words;
-        const int in1 = i1 * words;
-        const int oi = i * words;
-
-        for (int c = 0; c < words; c++) {
-            const float a = (float)in[in0 + c];
-            const float b = (float)in[in1 + c];
-            out[oi + c] = vj_audio_clip16_from_float((a * a_gain) + (b * b_gain));
+            const int bi = si * words;
+            const int bo = i * words;
+            for(int c = 0; c < words; c++)
+                out[bo + c] = in[bi + c];
         }
+        return expected_samples;
+    }
+
+    for (int i = 0; i < expected_samples; i++) {
+        double left;
+        double right;
+
+        if(reverse) {
+            left  = (double)src_samples - ((double)(i + 1) * rate);
+            right = (double)src_samples - ((double)i * rate);
+        } else {
+            left  = (double)i * rate;
+            right = (double)(i + 1) * rate;
+        }
+
+        const int bo = i * words;
+        for (int c = 0; c < words; c++)
+            out[bo + c] = vj_audio_box_sample_s16(in, src_samples, words, c, left, right);
     }
 
     return expected_samples;
 }
+

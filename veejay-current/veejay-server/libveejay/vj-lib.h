@@ -490,6 +490,11 @@ typedef struct {
 	int feedback_stage;
 	int hold_fx;
 	int hold_fx_prev;
+	int output_hold_active;
+	int output_hold_capture;
+	int output_hold_ready;
+	int output_hold_frames_left;
+	int output_hold_frames_total;
 	int hold_pos;
 	int	hold_resume;
 	int hold_status;

@@ -28,6 +28,7 @@
 #include <math.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sched.h>
 
 #include <veejaycore/defs.h>
 #include <veejaycore/atomic.h>
@@ -238,15 +239,41 @@ static void sync_sleep_us(long usec)
     while(nanosleep(&ts, &ts) == -1 && errno == EINTR) { }
 }
 
-static inline void sync_lock(vj_audio_sync_shared_t *s)
+static inline void sync_cpu_relax(void)
 {
-    while(__sync_lock_test_and_set(&s->ring_lock, 1))
-        sync_sleep_us(50);
+#if defined(__i386__) || defined(__x86_64__)
+    __builtin_ia32_pause();
+#elif defined(__arm__) || defined(__aarch64__)
+    __asm__ volatile("yield");
+#else
+    __asm__ volatile("" ::: "memory");
+#endif
 }
 
 static inline int sync_try_lock(vj_audio_sync_shared_t *s)
 {
+#if defined(__GNUC__) || defined(__clang__)
+    if(__atomic_load_n(&s->ring_lock, __ATOMIC_RELAXED) != 0)
+        return 0;
+    return (__atomic_exchange_n(&s->ring_lock, 1, __ATOMIC_ACQUIRE) == 0);
+#else
     return (__sync_lock_test_and_set(&s->ring_lock, 1) == 0);
+#endif
+}
+
+static inline void sync_lock(vj_audio_sync_shared_t *s)
+{
+    int rounds = 0;
+
+    while(!sync_try_lock(s)) {
+        if(rounds < 256) {
+            sync_cpu_relax();
+            rounds++;
+        }
+        else {
+            sync_sleep_us(25);
+        }
+    }
 }
 
 static inline int sync_try_lock_for_us(vj_audio_sync_shared_t *s, long max_wait_us)
@@ -275,7 +302,11 @@ static inline int sync_try_lock_for_us(vj_audio_sync_shared_t *s, long max_wait_
 
 static inline void sync_unlock(vj_audio_sync_shared_t *s)
 {
+#if defined(__GNUC__) || defined(__clang__)
+    __atomic_store_n(&s->ring_lock, 0, __ATOMIC_RELEASE);
+#else
     __sync_lock_release(&s->ring_lock);
+#endif
 }
 
 static inline double sync_clampd(double v, double lo, double hi)
@@ -473,8 +504,14 @@ static void sync_track_align_append_feature_locked(vj_audio_sync_shared_t *s,
     if(rise < 0.0)
         rise = 0.0;
 
-    feat = (level * 3.0) + (rise * 10.0);
-    feat = sync_clampd(feat, 0.0, 1.0);
+    {
+        double rel_rise = rise / (*prev + 0.0015);
+        double level_soft = log1p(level * 48.0) / log(49.0);
+        double rise_soft = log1p(rel_rise * 6.0) / log(7.0);
+
+        feat = (level_soft * 0.42) + (rise_soft * 0.58);
+        feat = sync_clampd(feat, 0.0, 1.0);
+    }
 
     ring[*pos] = (float)feat;
     *pos = (*pos + 1) % VJ_AUDIO_SYNC_ALIGN_FEATURES;

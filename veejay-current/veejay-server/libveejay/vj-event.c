@@ -39,6 +39,7 @@
 #include <libsubsample/subsample.h>
 #include <libveejay/vj-lib.h>
 #include <libveejay/vj-perform.h>
+#include <libveejay/audioscratcher.h>
 #include <libveejay/libveejay.h>
 #include <libveejay/vj-viewport.h>
 #include <libveejay/vj-composite.h>
@@ -250,13 +251,12 @@ static int vims_logging = 0;
 #define EVENT_QUEUE_SIZE 384
 typedef struct {
     SDL_Event events[EVENT_QUEUE_SIZE];
-	int mod_state;
+    int mods[EVENT_QUEUE_SIZE];
     volatile int head;
     volatile int tail;
 } sdl_event_t;
 
 static sdl_event_t EVENT_QUEUE;
-static int EVENT_MOD_STATE = 0;
 
 static struct {                 /* hardcoded keyboard layout (the default keys) */
     int event_id;           
@@ -598,54 +598,28 @@ static void init_vims_forward_cache(void) {
     }
 }
 
+static inline int vims_cache_slot_valid(int vims_id)
+{
+    return (vims_id > 0 && vims_id < (int)(sizeof(never_forward_vims_cache_) / sizeof(never_forward_vims_cache_[0])));
+}
+
 static inline int consume_vims_sample_id(int vims_id) {
-    if( atomic_vims_cache_[ vims_id] )
+    if( vims_cache_slot_valid(vims_id) && atomic_vims_cache_[ vims_id] )
         return 1;
     return 0;
 }
 
 static inline int is_forwarding_allowed(int vims_id, int vims_mirror) {
 
-    if( never_forward_vims_cache_[vims_id] )
+    if( vims_cache_slot_valid(vims_id) && never_forward_vims_cache_[vims_id] )
         return 0;
 
     if(!vims_mirror) {
-        if(maybe_forward_vims_cache_[vims_id] )
+        if(vims_cache_slot_valid(vims_id) && maybe_forward_vims_cache_[vims_id] )
             return 0;
     }
     
     return 1;
-}
-
-static inline char *format_msg(char *dst, const char *str)
-{
-    size_t len = strlen(str);
-    if(len > 999) len = 999;
-
-    dst[0] = '0' + (len / 100) % 10;
-    dst[1] = '0' + (len / 10)  % 10;
-    dst[2] = '0' + (len % 10);
-
-    memcpy(dst + 3, str, len);
-    dst[ 3 + len ] = '\0';
-    return dst + 3 + len;
-}
-
-static inline char *format_msg_safe(char *dst, size_t dst_max, const char *str)
-{
-    size_t len = strlen(str);
-    if (len > 999) len = 999; // protocol limit: 3-digit max
-
-    int written = snprintf(dst, dst_max, "%03zu%s", len, str);
-    return dst + written;
-}
-
-static inline char *append_msg(char *dst, const char *str)
-{
-    size_t len = strlen(str);
-    memcpy(dst, str, len);
-    dst[len] = '\0';
-    return dst + len;
 }
 
 static const char vj_event_digits2[] =
@@ -667,36 +641,92 @@ static inline void vj_event_write_2digits(char *dst, unsigned v)
     dst[1] = p[1];
 }
 
+static inline unsigned vj_event_take_digit(unsigned *x, unsigned unit)
+{
+    unsigned v = *x;
+    unsigned d = 0;
+
+    if(v >= unit * 5u) { v -= unit * 5u; d += 5u; }
+    if(v >= unit * 3u) { v -= unit * 3u; d += 3u; }
+    if(v >= unit * 2u) { v -= unit * 2u; d += 2u; }
+    if(v >= unit)      { v -= unit;      d += 1u; }
+
+    *x = v;
+    return d;
+}
+
+static inline void vj_event_write_u03(char *dst, size_t v)
+{
+    unsigned x = v > 999 ? 999u : (unsigned)v;
+    dst[0] = (char)('0' + vj_event_take_digit(&x, 100u));
+    vj_event_write_2digits(dst + 1, x);
+}
+
 static inline void vj_event_write_u05(char *dst, size_t v)
 {
-    unsigned x = v > 99999 ? 99999u : (unsigned) v;
+    unsigned x = v > 99999 ? 99999u : (unsigned)v;
 
-    unsigned a = x / 10000u;
-    x -= a * 10000u;
-
-    unsigned b = x / 100u;
-    unsigned c = x - b * 100u;
-
-    dst[0] = (char) ('0' + a);
-    vj_event_write_2digits(dst + 1, b);
-    vj_event_write_2digits(dst + 3, c);
+    dst[0] = (char)('0' + vj_event_take_digit(&x, 10000u));
+    dst[1] = (char)('0' + vj_event_take_digit(&x, 1000u));
+    vj_event_write_u03(dst + 2, x);
     dst[5] = '\0';
 }
 
 static inline void vj_event_write_u06(char *dst, size_t v)
 {
-    unsigned x = v > 999999 ? 999999u : (unsigned) v;
+    unsigned x = v > 999999 ? 999999u : (unsigned)v;
 
-    unsigned a = x / 10000u;
-    x -= a * 10000u;
+    dst[0] = (char)('0' + vj_event_take_digit(&x, 100000u));
+    vj_event_write_u05(dst + 1, x);
+}
 
-    unsigned b = x / 100u;
-    unsigned c = x - b * 100u;
+static inline char *format_msg(char *dst, const char *str)
+{
+    size_t len = strlen(str);
+    if(len > 999) len = 999;
 
-    vj_event_write_2digits(dst + 0, a);
-    vj_event_write_2digits(dst + 2, b);
-    vj_event_write_2digits(dst + 4, c);
-    dst[6] = '\0';
+    vj_event_write_u03(dst, len);
+
+    memcpy(dst + 3, str, len);
+    dst[ 3 + len ] = '\0';
+    return dst + 3 + len;
+}
+
+static inline char *format_msg_safe(char *dst, size_t dst_max, const char *str)
+{
+    if(!dst || dst_max == 0)
+        return dst;
+
+    if(!str)
+        str = "";
+
+    size_t len = strlen(str);
+    if(len > 999)
+        len = 999;
+
+    if(dst_max <= 4) {
+        dst[0] = '\0';
+        return dst;
+    }
+
+    const size_t max_payload = dst_max - 4;
+    if(len > max_payload)
+        len = max_payload;
+
+    vj_event_write_u03(dst, len);
+
+    memcpy(dst + 3, str, len);
+    dst[3 + len] = '\0';
+
+    return dst + 3 + len;
+}
+
+static inline char *append_msg(char *dst, const char *str)
+{
+    size_t len = strlen(str);
+    memcpy(dst, str, len);
+    dst[len] = '\0';
+    return dst + len;
 }
 
 static void vj_event_free_string_list(char **list)
@@ -828,11 +858,22 @@ static inline void validate_send_buffer(const char *buf, const char *label, cons
 }
 #endif
 
+static inline int vj_event_current_link_valid(veejay_t *v)
+{
+    if(!v || !v->uc)
+        return 0;
+
+    return v->uc->current_link >= 0 && v->uc->current_link < VJ_MAX_CONNECTIONS;
+}
+
 static inline int vj_get_playback_mode(veejay_t *v)
 {
+    if(!v || !v->uc)
+        return VJ_PLAYBACK_MODE_PLAIN;
+
     int link = v->uc->current_link;
 
-    if(link >= 0 && v->rmodes[link] != -1)
+    if(vj_event_current_link_valid(v) && v->rmodes && v->rmodes[link] != -1)
         return v->rmodes[link];
 
     return v->uc->playback_mode;
@@ -891,36 +932,46 @@ static inline void P_A(int *args, size_t argsize, char *str, size_t strsize, con
     }
 #endif
 
-    for( index = 0; index < num_args ; index ++ )
-            args[index] = 0;
+    for( index = 0; index < (unsigned int)num_args ; index ++ )
+        args[index] = 0;
 
     index = 0;
 
-    while(*format) {
+    while(format && *format) {
         switch(*format++) {
             case 's':
-                if( str == NULL )
-                    break;
-                veejay_memset( str, 0, strsize );
+            {
                 char *tmp = (char*)va_arg(ap, char*);
-                if(tmp != NULL ) {
-                    int tmplen= strlen(tmp);
-                    if(tmplen > strsize) {
-                            veejay_msg(VEEJAY_MSG_WARNING, "Truncated user input (%d bytes needed, have room for %d bytes)", tmplen, strsize);
-                            tmplen = strsize;
+
+                if(str == NULL || strsize == 0)
+                    break;
+
+                veejay_memset(str, 0, strsize);
+
+                if(tmp != NULL) {
+                    size_t tmplen = strlen(tmp);
+                    if(tmplen >= strsize) {
+                        veejay_msg(VEEJAY_MSG_WARNING,
+                                   "Truncated user input (%zu bytes needed, have room for %zu bytes)",
+                                   tmplen, strsize - 1);
+                        tmplen = strsize - 1;
                     }
-                    strncpy( str, tmp, tmplen );
+                    if(tmplen > 0)
+                        memcpy(str, tmp, tmplen);
+                    str[tmplen] = '\0';
                 }
                 break;
+            }
             case 'd':
-                if( args == NULL)
-                    break;
-                args[index] = *( va_arg(ap, int*));
-                index ++;
+            {
+                int *val = va_arg(ap, int*);
+                if(args != NULL && index < (unsigned int)num_args && val != NULL)
+                    args[index] = *val;
+                index++;
                 break;
+            }
         }
     }
-
 }
 
 #define CLAMPVAL(a) { if(a<0)a=0; else if(a >255) a =255; }
@@ -1046,6 +1097,25 @@ static int vj_event_sample_get_real_range(int sample_id, int *start, int *end)
         return 0;
 
     return (*end > *start) ? 1 : 0;
+}
+
+static void vj_event_mark_sample_audio_jump(veejay_t *v, int sample_id)
+{
+    if(!v || !v->uc || v->uc->playback_mode != VJ_PLAYBACK_MODE_SAMPLE)
+        return;
+
+    if(v->uc->sample_id != sample_id)
+        return;
+
+    int speed = 0;
+    if(v->settings)
+        speed = v->settings->current_playback_speed;
+
+    if(speed == 0)
+        speed = sample_get_speed(sample_id);
+
+    const int dir = (speed < 0) ? -1 : ((speed > 0) ? 1 : 0);
+    vj_perform_initiate_edge_change(v, AUDIO_EDGE_JUMP, dir, dir);
 }
 
 static void vj_event_reanchor_live_sequence_marker(veejay_t *v, int sample_id)
@@ -1473,11 +1543,19 @@ static  void    dump_arguments_(int net_id,int arglen, int np, int prefixed, cha
     free(name);
 }
 
-static  int vj_event_verify_args( int *fx, int net_id , int arglen, int np, int prefixed, char *fmt )
+static  int vj_event_verify_args( int *fx, int net_id , int arglen, int np, int prefixed, char *fmt, int flags )
 {
     if(net_id != VIMS_CHAIN_ENTRY_SET_PRESET )
     {   
-        if( arglen != np )  
+        if( flags & VIMS_ALLOW_ANY )
+        {
+            if( arglen > np )
+            {
+                dump_arguments_(net_id,arglen, np, prefixed, fmt);
+                return 0;
+            }
+        }
+        else if( arglen != np )  
         {
             dump_arguments_(net_id,arglen, np, prefixed, fmt);
             return 0;
@@ -1507,10 +1585,30 @@ void    vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *arg
     int flags = vj_event_vevo_get_flags( net_id );
     int fmt_offset = 1; 
     vims_arg_t  vims_arguments[MAX_VIMS_ARGUMENTS + 5];
+    int default_arguments[MAX_VIMS_ARGUMENTS + 5];
 
     veejay_memset(vims_arguments, 0, sizeof(vims_arguments));
+    veejay_memset(default_arguments, 0, sizeof(default_arguments));
 
-    if(!vj_event_verify_args(args , net_id, arglen, np, prefixed, fmt ))
+    if(np > 20) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "VIMS '%03d' has too many inline arguments (%d, max 20)",
+                   net_id,
+                   np);
+        if(fmt)
+            free(fmt);
+        return;
+    }
+
+    if(np > 0 && fmt == NULL) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "VIMS '%03d' has %d arguments but no format string",
+                   net_id,
+                   np);
+        return;
+    }
+
+    if(!vj_event_verify_args(args , net_id, arglen, np, prefixed, fmt, flags ))
     {
         if(fmt) free(fmt);
         return;
@@ -1544,6 +1642,7 @@ void    vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *arg
                 if( strlen((char*)vims_arguments[i].value) <= 0 )
                 {
                     veejay_msg(VEEJAY_MSG_ERROR, "Argument %d is not a string",i );
+                    free( vims_arguments[i].value );
                     if(fmt)free(fmt);
                     return;
                 }
@@ -1556,13 +1655,13 @@ void    vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *arg
 
     while( i < np )
     {
-        int dv = vj_event_vevo_get_default_value( net_id, i);
+        default_arguments[i] = vj_event_vevo_get_default_value( net_id, i);
         if( fmt[fmt_offset] == 'd' )
         {
-            vims_arguments[i].value = (void*) &(dv);
+            vims_arguments[i].value = (void*) &(default_arguments[i]);
         }
         i++;
-    fmt_offset += 3;
+        fmt_offset += 3;
     }
 
     while( i < MAX_VIMS_ARGUMENTS ) {
@@ -1716,7 +1815,7 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
                 v->remote_id = v->uc->sample_id; // fallback
             }
 
-            if ( v->uc->current_link >= 0)
+            if(vj_event_current_link_valid(v) && v->rmodes)
                 v->rmodes[v->uc->current_link] = rmode;
             
             v->uc->key_effect = remote_fx_list_entry;
@@ -1851,7 +1950,7 @@ static int vj_parse_and_queue_to_master(
 
             if(end == colon && ((vims_id > 0 && vims_id < VIMS_MAX ) && (vims_id < 400 || vims_id > 500)))
             {
-                if(v->uc->vims_mirror)
+                if(v->uc->vims_mirror && is_forwarding_allowed((int)vims_id, v->uc->vims_mirror))
                 {
                     should_forward = 1;
 
@@ -2156,8 +2255,8 @@ int     vj_event_push(void *eptr, int mod )
 
     SDL_Event *e = (SDL_Event*) eptr;
 
-    EVENT_MOD_STATE = mod;
     EVENT_QUEUE.events[tail] = *e;
+    EVENT_QUEUE.mods[tail] = mod;
 
     atomic_store_int(&EVENT_QUEUE.tail, next );
     return 1;
@@ -2173,7 +2272,8 @@ int     vj_event_pop(void *eptr, int *mod_state)
     SDL_Event *e = (SDL_Event*) eptr;
 
     *e = EVENT_QUEUE.events[head];
-    *mod_state = EVENT_MOD_STATE;
+    if(mod_state)
+        *mod_state = EVENT_QUEUE.mods[head];
 
     atomic_store_int(&EVENT_QUEUE.head, (head+1) % EVENT_QUEUE_SIZE);
     return 1;
@@ -2938,10 +3038,15 @@ void    vj_event_destroy(void *ptr)
 #ifdef HAVE_SDL
     //let's not destroy keyboard mappings, we are shutting down anyway so why bother
 #endif
-    if(BundleHash) vj_event_destroy_bundles( BundleHash );
+    if(BundleHash) {
+        vj_event_destroy_bundles(BundleHash);
+        BundleHash = NULL;
+    }
 
-    if(sample_image_buffer)
+    if(sample_image_buffer) {
         free(sample_image_buffer);
+        sample_image_buffer = NULL;
+    }
 
     vj_picture_free();  
 
@@ -2951,15 +3056,20 @@ void    vj_event_destroy(void *ptr)
 
 void vj_event_linkclose(void *ptr, const char format[], va_list ap)
 {
+    (void)format;
+    (void)ap;
+
     veejay_t *v = (veejay_t*)ptr;
     veejay_msg(VEEJAY_MSG_INFO, "Remote requested session-end");
+
     int i = v->uc->current_link;
-    if( v->vjs[0] )
-        _vj_server_del_client( v->vjs[0], i );
-    if( v->vjs[1] )
-        _vj_server_del_client( v->vjs[1], i );
-    if( v->vjs[2] )
-        _vj_server_del_client( v->vjs[3], i );
+
+    if(v->vjs[VEEJAY_PORT_CMD])
+        _vj_server_del_client(v->vjs[VEEJAY_PORT_CMD], i);
+    if(v->vjs[VEEJAY_PORT_STA])
+        _vj_server_del_client(v->vjs[VEEJAY_PORT_STA], i);
+    if(v->vjs[VEEJAY_PORT_DAT])
+        _vj_server_del_client(v->vjs[VEEJAY_PORT_DAT], i);
 }
 
 void vj_event_quit(void *ptr, const char format[], va_list ap)
@@ -3465,8 +3575,7 @@ void vj_event_tag_select(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[1];
-    char *s = NULL; 
-    P_A( args, 1, s ,0, format, ap);
+    P_A(args, sizeof(args), NULL, 0, format, ap);
     STREAM_DEFAULTS(args[0]);
     if(vj_tag_exists(args[0]))
     {
@@ -3818,7 +3927,16 @@ void vj_event_set_freeze(void *ptr, const char format[], va_list ap)
         fx_hold = 0;
     }
     v->settings->hold_fx = fx_hold;
-    veejay_msg(VEEJAY_MSG_INFO, "%s FX Chain", (fx_hold == 0 ? "Unfreeze" : "Freeze"));
+    if(fx_hold) {
+        v->settings->hold_fx_prev = 0;
+        v->settings->output_hold_capture = 1;
+    }
+    else {
+        v->settings->hold_fx_prev = 0;
+        if(!v->settings->output_hold_active)
+            v->settings->output_hold_ready = 0;
+    }
+    veejay_msg(VEEJAY_MSG_INFO, "%s final output", (fx_hold == 0 ? "Unfreeze" : "Freeze"));
 }
 
 void vj_event_play_stop_all(void *ptr, const char format[], va_list ap) 
@@ -4014,15 +4132,15 @@ void    vj_event_hold_frame( void *ptr, const char format[], va_list ap )
     int args[3];
     veejay_t *v = (veejay_t*) ptr;
 
-    if(SAMPLE_PLAYING(v)||PLAIN_PLAYING(v)) {
+    if(SAMPLE_PLAYING(v) || PLAIN_PLAYING(v) || STREAM_PLAYING(v)) {
         P_A( args,sizeof(args),NULL,0,format, ap);
-        if(args[1] <= 0 )
-            args[1] = 1;
-        if(args[2] <= 0 )
-            args[2] = 1;
-        if(args[2] >= 300)
-            args[2] = 1;
-        veejay_hold_frame(v,args[1],args[2]);
+
+        if(args[2] < 0)
+            args[2] = 0;
+        else if(args[2] > 999)
+            args[2] = 999;
+
+        veejay_hold_frame(v, 0, args[2]);
     } else {
         p_invalid_mode();
     }
@@ -4639,12 +4757,6 @@ void vj_event_sample_set_speed(void *ptr, const char format[], va_list ap)
 
     SAMPLE_DEFAULTS(args[0]);
 
-    if(v->seq && v->seq->active && args[1] == 0) {
-        args[1] = v->settings->previous_playback_speed;
-        if(args[1] == 0)
-            args[1] = 1;
-    }
-
     if( sample_set_speed(args[0], args[1]) != -1)
     {
         veejay_msg(VEEJAY_MSG_INFO, "Changed speed of sample %d to %d",args[0],args[1]);
@@ -5055,11 +5167,17 @@ void vj_event_sample_set_marker_clear(void *ptr, const char format[],va_list ap)
 
     SAMPLE_DEFAULTS(args[0]);
 
-    if( sample_exists(args[0]) )
+    sample_info *s = sample_get(args[0]);
+    if(s)
     {
+        const int had_marker = (s->marker_end > 0 && s->marker_start >= 0);
         if( sample_marker_clear( args[0] ) )
         {
             veejay_msg(VEEJAY_MSG_INFO, "Sample %d marker cleared", args[0]);
+            if(had_marker) {
+                vj_event_mark_sample_audio_jump(v, args[0]);
+                vj_event_reanchor_live_sequence_marker(v, args[0]);
+            }
         }
     }
     else
@@ -5083,13 +5201,6 @@ void vj_event_sample_set_dup(void *ptr, const char format[], va_list ap)
         if( sample_set_framedup( args[0], args[1] ) != -1) 
         {
             veejay_msg(VEEJAY_MSG_INFO, "Sample %d frame repeat set to %d", args[0],args[1]);
-            if( args[0] == v->uc->sample_id)
-            {
-                if(veejay_set_framedup(v, args[1]))
-                        {
-                             veejay_msg(VEEJAY_MSG_INFO, "Video frame will be duplicated %d to output",args[1]);
-                        }
-            }
         }
         else
         {
@@ -10635,11 +10746,7 @@ void vj_event_send_track_list(void *ptr, const char format[], va_list ap)
 
         size_t total_len = q - print_buf;
 
-        s_print_buf[0] = '0' + (total_len / 10000) % 10;
-        s_print_buf[1] = '0' + (total_len / 1000)  % 10;
-        s_print_buf[2] = '0' + (total_len / 100)   % 10;
-        s_print_buf[3] = '0' + (total_len / 10)    % 10;
-        s_print_buf[4] = '0' + (total_len % 10);
+        vj_event_write_u05(s_print_buf, total_len);
 
         p = APPEND_MSG(p, print_buf);
 
@@ -10711,11 +10818,7 @@ void vj_event_send_tag_list(void *ptr, const char format[], va_list ap)
 
         size_t total_len = q - print_buf;
 
-        s_print_buf[0] = '0' + (total_len / 10000) % 10;
-        s_print_buf[1] = '0' + (total_len / 1000)  % 10;
-        s_print_buf[2] = '0' + (total_len / 100)   % 10;
-        s_print_buf[3] = '0' + (total_len / 10)    % 10;
-        s_print_buf[4] = '0' + (total_len % 10);
+        vj_event_write_u05(s_print_buf, total_len);
 
         p = APPEND_MSG(p, print_buf);
         free(print_buf);
@@ -10754,10 +10857,14 @@ static char *_vj_event_gatter_sample_info(veejay_t *v, int id)
              tc.h, tc.m, tc.s, tc.f);
 
     size_t dlen = strlen(description);
+    if(dlen > 999) dlen = 999;
     size_t tlen = strlen(timecode);
+    if(tlen > 999) tlen = 999;
     int body_len = 3 + (int)dlen + 3 + (int)tlen + 1 + 4;
 
     char *s_print_buf = get_print_buf(8 + body_len + 1);
+    if(!s_print_buf) return NULL;
+
     char *p = s_print_buf;
     size_t rem = 8 + body_len + 1;
 
@@ -11336,11 +11443,7 @@ void vj_event_send_generator_list(void *ptr, const char format[], va_list ap)
     size_t total_len = p - print_buf;
 
     char *s_print_buf = get_print_buf(5 + total_len + 1);
-    s_print_buf[0] = '0' + (total_len / 10000) % 10;
-    s_print_buf[1] = '0' + (total_len / 1000)  % 10;
-    s_print_buf[2] = '0' + (total_len / 100)   % 10;
-    s_print_buf[3] = '0' + (total_len / 10)    % 10;
-    s_print_buf[4] = '0' + (total_len % 10);
+    vj_event_write_u05(s_print_buf, total_len);
 
     memcpy(s_print_buf + 5, print_buf, total_len);
     s_print_buf[5 + total_len] = '\0';
@@ -11486,9 +11589,7 @@ void vj_event_send_shm_info(void *ptr, const char format[], va_list ap)
     }
 
     int msg_len = n;
-    buf[0] = '0' + (msg_len / 100) % 10;
-    buf[1] = '0' + (msg_len / 10) % 10;
-    buf[2] = '0' + (msg_len % 10);
+    vj_event_write_u03(buf, msg_len);
 
     SEND_MSG(v, buf);
     free(buf);
@@ -11841,7 +11942,7 @@ void    vj_event_send_frame             (   void *ptr, const char format[], va_l
     
     for( i = 0; i < VJ_MAX_CONNECTIONS; i ++ ) {
         if( v->rlinks[i] == -1 ) {
-            v->rlinks[i] = v->uc->current_link;
+            v->rlinks[i] = vj_event_current_link_valid(v) ? v->uc->current_link : -1;
             if( v->splitter ) {
                 v->splitted_screens[ i ] = args[0];
             }
@@ -12574,9 +12675,7 @@ void    vj_event_get_font_list( void *ptr,  const char format[],    va_list ap  
     for(i = 0; list[i] != NULL ; i ++ )
     {
         size_t k = strlen(list[i]);
-        p[0] = '0' + (k / 100) % 10;
-        p[1] = '0' + (k / 10) % 10;
-        p[2] = '0' + (k % 10);
+        vj_event_write_u03(p, k);
         memcpy(p + 3, list[i], k);
         p += (k + 3);
         free(list[i]);

@@ -179,6 +179,13 @@
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
   </object>
+  <object class="GtkAdjustment" id="sample_hold_frames_adj">
+    <property name="lower">0</property>
+    <property name="upper">999</property>
+    <property name="value">5</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">5</property>
+  </object>
   <object class="GtkAdjustment" id="fx_anim_end">
     <property name="upper">1000000</property>
     <property name="step-increment">1</property>
@@ -11373,1519 +11380,1518 @@
                 </child>
                 <child>
                   <object class="GtkBox" id="audio_sync_panel_compact">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="orientation">vertical</property>
-  <property name="margin-left">6</property>
-  <property name="margin-right">6</property>
-  <property name="margin-top">6</property>
-  <property name="margin-bottom">6</property>
-  <property name="spacing">6</property>
-  <child>
-<object class="GtkGrid" id="audio_sync_top_grid">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="column-spacing">18</property>
-  <property name="row-spacing">8</property>
-  <property name="hexpand">True</property>
-<child>
-<object class="GtkFrame" id="audio_master_sync_frame">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label-xalign">0</property>
-  <property name="shadow-type">none</property>
-  <property name="hexpand">True</property>
-  <property name="vexpand">False</property>
-  <child>
-    <object class="GtkAlignment" id="audio_master_sync_frame_align">
-      <property name="visible">True</property>
-      <property name="can-focus">False</property>
-      <property name="top-padding">4</property>
-      <property name="bottom-padding">4</property>
-      <property name="left-padding">6</property>
-      <property name="right-padding">6</property>
-      <child>
-<object class="GtkGrid" id="audio_master_sync_grid">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="column-spacing">8</property>
-  <property name="row-spacing">4</property>
-  <property name="hexpand">True</property>
-<child>
-<object class="GtkLabel" id="audio_input_selector_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Audio source / sync provider</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkComboBoxText" id="audio_input_selector_combo">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="active">0</property>
-  <property name="hexpand">True</property>
-  <property name="has-tooltip">True</property>
-  <property name="tooltip-text" translatable="yes">Choose audible audio source or external sync provider. Original/Silence keep output local; JACK/WAV can provide external sync and, in monitor/bridge modes, external playback.</property>
-  <items>
-    <item translatable="yes">Original video audio</item>
-    <item translatable="yes">JACK external</item>
-    <item translatable="yes">WAV file</item>
-    <item translatable="yes">Silence</item>
-  </items>
-  <signal name="changed" handler="on_audio_input_selector_combo_changed" swapped="no"/>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">0</property>
-    <property name="width">2</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-
-<child>
-<object class="GtkButton" id="audio_sync_refresh_button">
-  <property name="label" translatable="yes">Refresh</property>
-  <property name="visible">True</property>
-  <property name="can-focus">True</property>
-  <property name="receives-default">False</property>
-  <property name="has-tooltip">True</property>
-  <property name="tooltip-text" translatable="yes">Print the current Audio Sync backend state and refresh visible status values.</property>
-  <signal name="clicked" handler="on_audio_sync_refresh_button_clicked" swapped="no"/>
-</object>
-  <packing>
-    <property name="left-attach">3</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkGrid" id="audio_master_wav_options_grid">
-  <property name="visible">False</property>
-  <property name="can-focus">False</property>
-  <property name="column-spacing">8</property>
-  <property name="row-spacing">4</property>
-  <property name="hexpand">True</property>
-<child>
-<object class="GtkLabel" id="audio_sync_wav_path_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">WAV path</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkEntry" id="audio_sync_wav_path">
-  <property name="visible">True</property>
-  <property name="can-focus">True</property>
-  <property name="placeholder-text" translatable="yes">/path/to/master.wav</property>
-  <property name="hexpand">True</property>
-  <signal name="activate" handler="on_audio_sync_wav_path_activate" swapped="no"/>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkButton" id="audio_sync_wav_browse_button">
-  <property name="label" translatable="yes">Browse…</property>
-  <property name="visible">True</property>
-  <property name="can-focus">True</property>
-  <property name="receives-default">True</property>
-  <property name="has-tooltip">True</property>
-  <property name="tooltip-text" translatable="yes">Choose a WAV file to use as an external sync provider for Analyze, Monitor, Visual Tempo Follow, Tempo Match Bridge, or Track Align.</property>
-  <signal name="clicked" handler="on_audio_sync_wav_browse_button_clicked" swapped="no"/>
-</object>
-  <packing>
-    <property name="left-attach">2</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_wav_loop_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Loop WAV</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">1</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkCheckButton" id="audio_sync_wav_loop_toggle">
-  <property name="visible">True</property>
-  <property name="can-focus">True</property>
-  <property name="receives-default">False</property>
-  <property name="draw-indicator">True</property>
-  <signal name="toggled" handler="on_audio_sync_wav_loop_toggle_toggled" swapped="no"/>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">1</property>
-    <property name="width">2</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">1</property>
-    <property name="width">3</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkGrid" id="audio_master_jack_options_grid">
-  <property name="visible">False</property>
-  <property name="can-focus">False</property>
-  <property name="column-spacing">8</property>
-  <property name="row-spacing">4</property>
-  <property name="hexpand">True</property>
-<child>
-<object class="GtkLabel" id="audio_sync_channels_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">JACK channels</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkSpinButton" id="audio_sync_channels_spin">
-  <property name="visible">True</property>
-  <property name="can-focus">True</property>
-  <property name="adjustment">audio_sync_channels_adj</property>
-  <property name="numeric">True</property>
-  <signal name="value-changed" handler="on_audio_sync_channels_spin_value_changed" swapped="no"/>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_enable_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Audio sync</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">1</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkCheckButton" id="audio_sync_enable_toggle">
-  <property name="label" translatable="yes">Enable</property>
-  <property name="visible">True</property>
-  <property name="can-focus">True</property>
-  <property name="receives-default">False</property>
-  <signal name="toggled" handler="on_audio_sync_enable_toggle_toggled" swapped="no"/>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">1</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_mode_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Sync mode</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">2</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkComboBoxText" id="audio_sync_mode_combo">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="active">0</property>
-  <property name="hexpand">True</property>
-  <items>
-    <item translatable="yes">Off - no external sync</item>
-    <item translatable="yes">Analyze External Tempo - control only</item>
-    <item translatable="yes">Clean Monitor - play external audio unchanged</item>
-    <item translatable="yes">Monitor + Trickplay - audio follows transport</item>
-    <item translatable="yes">Visual Tempo Follow - drive video/FX only</item>
-    <item translatable="yes">Tempo Match Bridge - stretch external audio</item>
-    <item translatable="yes">Track Align - waveform-lock video to master</item>
-  </items>
-  <signal name="changed" handler="on_audio_sync_mode_combo_changed" swapped="no"/>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">2</property>
-    <property name="width">2</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">1</property>
-    <property name="width">3</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-</object>
-      </child>
-    </object>
-  </child>
-  <child type="label">
-    <object class="GtkLabel" id="audio_master_sync_frame_label">
-      <property name="visible">True</property>
-      <property name="can-focus">False</property>
-      <property name="label" translatable="yes">Audio / External Sync</property>
-      <property name="xalign">0</property>
-    </object>
-  </child>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkBox" id="audio_sync_mode_detail_box">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="orientation">vertical</property>
-  <property name="spacing">6</property>
-  <property name="hexpand">True</property>
-  <child>
-<object class="GtkFrame" id="audio_sync_tempo_frame">
-  <property name="visible">False</property>
-  <property name="can-focus">False</property>
-  <property name="label-xalign">0</property>
-  <property name="shadow-type">none</property>
-  <property name="hexpand">True</property>
-  <property name="vexpand">False</property>
-  <child>
-    <object class="GtkAlignment" id="audio_sync_tempo_frame_align">
-      <property name="visible">True</property>
-      <property name="can-focus">False</property>
-      <property name="top-padding">4</property>
-      <property name="bottom-padding">4</property>
-      <property name="left-padding">6</property>
-      <property name="right-padding">6</property>
-      <child>
-<object class="GtkGrid" id="audio_sync_tempo_grid">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="column-spacing">8</property>
-  <property name="row-spacing">4</property>
-  <property name="hexpand">True</property>
-<child>
-<object class="GtkLabel" id="audio_sync_target_bpm_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Clip BPM</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkSpinButton" id="audio_sync_target_bpm_spin">
-  <property name="visible">True</property>
-  <property name="can-focus">True</property>
-  <property name="adjustment">audio_sync_target_bpm_adj</property>
-  <property name="digits">1</property>
-  <property name="numeric">True</property>
-  <signal name="value-changed" handler="on_audio_sync_target_bpm_value_changed" swapped="no"/>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkButtonBox" id="audio_sync_tempo_target_buttons_box">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="layout-style">start</property>
-  <property name="spacing">4</property>
-  <child>
-    <object class="GtkButton" id="audio_sync_use_clip_bpm_button">
-      <property name="label" translatable="yes">Use Clip BPM</property>
-      <property name="visible">True</property>
-      <property name="can-focus">True</property>
-      <property name="receives-default">True</property>
-      <signal name="clicked" handler="on_audio_sync_use_clip_bpm_button_clicked" swapped="no"/>
-    </object>
-  </child>
-  <child>
-    <object class="GtkButton" id="audio_sync_latch_clip_bpm_button">
-      <property name="label" translatable="yes">Latch BPM</property>
-      <property name="visible">True</property>
-      <property name="can-focus">True</property>
-      <property name="receives-default">True</property>
-      <signal name="clicked" handler="on_audio_sync_latch_clip_bpm_button_clicked" swapped="no"/>
-    </object>
-  </child>
-</object>
-  <packing>
-    <property name="left-attach">2</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_tempo_bend_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Pitch / tempo bend</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">1</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkScale" id="audio_sync_tempo_bend_scale">
-  <property name="visible">True</property>
-  <property name="can-focus">True</property>
-  <property name="orientation">horizontal</property>
-  <property name="adjustment">audio_sync_tempo_bend_adj</property>
-  <property name="digits">1</property>
-  <property name="draw-value">True</property>
-  <property name="value-pos">right</property>
-  <property name="hexpand">True</property>
-  <signal name="value-changed" handler="on_audio_sync_tempo_bend_value_changed" swapped="no"/>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">1</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkButton" id="audio_sync_tempo_bend_reset_button">
-  <property name="label" translatable="yes">Reset bend</property>
-  <property name="visible">True</property>
-  <property name="can-focus">True</property>
-  <property name="receives-default">True</property>
-  <signal name="clicked" handler="on_audio_sync_tempo_bend_reset_button_clicked" swapped="no"/>
-</object>
-  <packing>
-    <property name="left-attach">2</property>
-    <property name="top-attach">1</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_phase_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Override phase</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">2</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkSpinButton" id="audio_sync_phase_spin">
-  <property name="visible">True</property>
-  <property name="can-focus">True</property>
-  <property name="adjustment">audio_sync_phase_adj</property>
-  <property name="numeric">True</property>
-  <signal name="value-changed" handler="on_audio_sync_phase_value_changed" swapped="no"/>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">2</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_confidence_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Override confidence</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">3</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkSpinButton" id="audio_sync_confidence_spin">
-  <property name="visible">True</property>
-  <property name="can-focus">True</property>
-  <property name="adjustment">audio_sync_confidence_adj</property>
-  <property name="numeric">True</property>
-  <signal name="value-changed" handler="on_audio_sync_confidence_value_changed" swapped="no"/>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">3</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_correction_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Max correction</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">4</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkSpinButton" id="audio_sync_correction_spin">
-  <property name="visible">True</property>
-  <property name="can-focus">True</property>
-  <property name="adjustment">audio_sync_correction_adj</property>
-  <property name="numeric">True</property>
-  <signal name="value-changed" handler="on_audio_sync_correction_value_changed" swapped="no"/>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">4</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_follow_audio_warning">
-  <property name="visible">False</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Original clip audio is audible: Visual Tempo Follow changes video speed, so the original audio will pitch/tempo-shift. Use Silence or external audio for video-only follow.</property>
-  <property name="wrap">True</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">5</property>
-    <property name="width">3</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-</object>
-      </child>
-    </object>
-  </child>
-  <child type="label">
-    <object class="GtkLabel" id="audio_sync_tempo_frame_label">
-      <property name="visible">True</property>
-      <property name="can-focus">False</property>
-      <property name="label" translatable="yes">Tempo lock control</property>
-      <property name="xalign">0</property>
-    </object>
-  </child>
-</object>
-    <packing>
-      <property name="expand">False</property>
-      <property name="fill">True</property>
-      <property name="position">0</property>
-    </packing>
-  </child>
-  <child>
-<object class="GtkFrame" id="audio_sync_track_frame">
-  <property name="visible">False</property>
-  <property name="can-focus">False</property>
-  <property name="label-xalign">0</property>
-  <property name="shadow-type">none</property>
-  <property name="hexpand">True</property>
-  <property name="vexpand">False</property>
-  <child>
-    <object class="GtkAlignment" id="audio_sync_track_frame_align">
-      <property name="visible">True</property>
-      <property name="can-focus">False</property>
-      <property name="top-padding">4</property>
-      <property name="bottom-padding">4</property>
-      <property name="left-padding">6</property>
-      <property name="right-padding">6</property>
-      <child>
-        <object class="GtkLabel" id="audio_sync_track_hint_label">
-          <property name="visible">True</property>
-          <property name="can-focus">False</property>
-          <property name="label" translatable="yes">Track Align uses the selected external sync provider as its waveform reference.</property>
-          <property name="wrap">True</property>
-          <property name="xalign">0</property>
-        </object>
-      </child>
-    </object>
-  </child>
-  <child type="label">
-    <object class="GtkLabel" id="audio_sync_track_frame_label">
-      <property name="visible">True</property>
-      <property name="can-focus">False</property>
-      <property name="label" translatable="yes">Track align</property>
-      <property name="xalign">0</property>
-    </object>
-  </child>
-</object>
-    <packing>
-      <property name="expand">False</property>
-      <property name="fill">True</property>
-      <property name="position">1</property>
-    </packing>
-  </child>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-</object>
-    <packing>
-      <property name="expand">False</property>
-      <property name="fill">True</property>
-      <property name="position">0</property>
-    </packing>
-  </child>
-  <child>
-    <object class="GtkBox" id="audio_sync_spacer">
-      <property name="visible">True</property>
-      <property name="can-focus">False</property>
-      <property name="orientation">vertical</property>
-      <property name="vexpand">True</property>
-    </object>
-    <packing>
-      <property name="expand">True</property>
-      <property name="fill">True</property>
-      <property name="position">1</property>
-    </packing>
-  </child>
-  <child>
-<object class="GtkFrame" id="audio_sync_live_frame">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label-xalign">0</property>
-  <property name="shadow-type">none</property>
-  <property name="hexpand">True</property>
-  <property name="vexpand">False</property>
-  <child>
-    <object class="GtkAlignment" id="audio_sync_live_frame_align">
-      <property name="visible">True</property>
-      <property name="can-focus">False</property>
-      <property name="top-padding">4</property>
-      <property name="bottom-padding">4</property>
-      <property name="left-padding">6</property>
-      <property name="right-padding">6</property>
-      <child>
-<object class="GtkBox" id="audio_sync_live_box">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="orientation">vertical</property>
-  <property name="spacing">6</property>
-  <property name="hexpand">True</property>
-  <child>
-<object class="GtkFrame" id="audio_sync_live_common_frame">
-  <property name="visible">False</property>
-  <property name="can-focus">False</property>
-  <property name="label-xalign">0</property>
-  <property name="shadow-type">none</property>
-  <property name="hexpand">True</property>
-  <property name="vexpand">False</property>
-  <child>
-    <object class="GtkAlignment" id="audio_sync_live_common_frame_align">
-      <property name="visible">True</property>
-      <property name="can-focus">False</property>
-      <property name="top-padding">4</property>
-      <property name="bottom-padding">4</property>
-      <property name="left-padding">6</property>
-      <property name="right-padding">6</property>
-      <child>
-<object class="GtkGrid" id="audio_sync_live_common_grid">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="column-spacing">8</property>
-  <property name="row-spacing">4</property>
-  <property name="hexpand">True</property>
-<child>
-<object class="GtkLabel" id="audio_sync_level_bar_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Level</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLevelBar" id="audio_sync_level_bar">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="min-value">0</property>
-  <property name="max-value">100</property>
-  <property name="value">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">0</property>
-    <property name="width">3</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_transient_bar_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Transient</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">1</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLevelBar" id="audio_sync_transient_bar">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="min-value">0</property>
-  <property name="max-value">100</property>
-  <property name="value">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">1</property>
-    <property name="width">3</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_phase_bar_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Phase</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">2</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLevelBar" id="audio_sync_phase_bar">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="min-value">0</property>
-  <property name="max-value">100</property>
-  <property name="value">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">2</property>
-    <property name="width">3</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_enabled_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Enabled</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">3</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_enabled_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">no</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">3</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_open_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Open</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">2</property>
-    <property name="top-attach">3</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_open_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">no</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">3</property>
-    <property name="top-attach">3</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_running_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Running</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">4</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_running_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">no</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">4</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_mode_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Mode</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">2</property>
-    <property name="top-attach">4</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_mode_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">Off</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">3</property>
-    <property name="top-attach">4</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_source_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Source</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">5</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_source_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">None</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">5</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_channels_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Channels</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">2</property>
-    <property name="top-attach">5</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_channels_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">0</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">3</property>
-    <property name="top-attach">5</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_sample_rate_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Rate</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">6</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_sample_rate_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">-</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">6</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-</object>
-      </child>
-    </object>
-  </child>
-  <child type="label">
-    <object class="GtkLabel" id="audio_sync_live_common_frame_label">
-      <property name="visible">True</property>
-      <property name="can-focus">False</property>
-      <property name="label" translatable="yes">Live input</property>
-      <property name="xalign">0</property>
-    </object>
-  </child>
-</object>
-    <packing>
-      <property name="expand">False</property>
-      <property name="fill">True</property>
-      <property name="position">0</property>
-    </packing>
-  </child>
-  <child>
-<object class="GtkFrame" id="audio_sync_live_tempo_frame">
-  <property name="visible">False</property>
-  <property name="can-focus">False</property>
-  <property name="label-xalign">0</property>
-  <property name="shadow-type">none</property>
-  <property name="hexpand">True</property>
-  <property name="vexpand">False</property>
-  <child>
-    <object class="GtkAlignment" id="audio_sync_live_tempo_frame_align">
-      <property name="visible">True</property>
-      <property name="can-focus">False</property>
-      <property name="top-padding">4</property>
-      <property name="bottom-padding">4</property>
-      <property name="left-padding">6</property>
-      <property name="right-padding">6</property>
-      <child>
-<object class="GtkGrid" id="audio_sync_live_tempo_grid">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="column-spacing">8</property>
-  <property name="row-spacing">4</property>
-  <property name="hexpand">True</property>
-<child>
-<object class="GtkLabel" id="audio_sync_bpm_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Source BPM</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_bpm_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">-</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_confidence_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Confidence</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">2</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_confidence_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">0%</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">3</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_bridge_active_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Activity</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">1</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_bridge_active_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">no</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">1</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_ratio_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Ratio</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">2</property>
-    <property name="top-attach">1</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_ratio_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">1.000</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">3</property>
-    <property name="top-attach">1</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_correction_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Max correction</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">2</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_correction_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">-</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">2</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_target_bpm_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Clip BPM</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">2</property>
-    <property name="top-attach">2</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_target_bpm_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">-</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">3</property>
-    <property name="top-attach">2</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_target_confidence_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Target confidence</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">3</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_target_confidence_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">0%</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">3</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_max_correction_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Max correction</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">2</property>
-    <property name="top-attach">3</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_max_correction_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">4%</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">3</property>
-    <property name="top-attach">3</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_bridge_state_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Lock state</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">4</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_bridge_state_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">idle</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">4</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-</object>
-      </child>
-    </object>
-  </child>
-  <child type="label">
-    <object class="GtkLabel" id="audio_sync_live_tempo_frame_label">
-      <property name="visible">True</property>
-      <property name="can-focus">False</property>
-      <property name="label" translatable="yes">Tempo lock status</property>
-      <property name="xalign">0</property>
-    </object>
-  </child>
-</object>
-    <packing>
-      <property name="expand">False</property>
-      <property name="fill">True</property>
-      <property name="position">1</property>
-    </packing>
-  </child>
-  <child>
-<object class="GtkFrame" id="audio_sync_live_track_frame">
-  <property name="visible">False</property>
-  <property name="can-focus">False</property>
-  <property name="label-xalign">0</property>
-  <property name="shadow-type">none</property>
-  <property name="hexpand">True</property>
-  <property name="vexpand">False</property>
-  <child>
-    <object class="GtkAlignment" id="audio_sync_live_track_frame_align">
-      <property name="visible">True</property>
-      <property name="can-focus">False</property>
-      <property name="top-padding">4</property>
-      <property name="bottom-padding">4</property>
-      <property name="left-padding">6</property>
-      <property name="right-padding">6</property>
-      <child>
-<object class="GtkGrid" id="audio_sync_live_track_grid">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="column-spacing">8</property>
-  <property name="row-spacing">4</property>
-  <property name="hexpand">True</property>
-<child>
-<object class="GtkLabel" id="audio_sync_track_align_locked_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Track locked</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_track_align_locked_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">no</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_track_align_offset_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Track offset</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">2</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_track_align_offset_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">0 ms</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">3</property>
-    <property name="top-attach">0</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_track_align_confidence_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Track confidence</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">1</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_track_align_confidence_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">0%</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">1</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_track_align_correction_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Track correction</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">2</property>
-    <property name="top-attach">1</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_track_align_correction_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">0 ppm</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">3</property>
-    <property name="top-attach">1</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_track_align_state_value_label">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label" translatable="yes">Track state</property>
-  <property name="xalign">0</property>
-</object>
-  <packing>
-    <property name="left-attach">0</property>
-    <property name="top-attach">2</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-<child>
-<object class="GtkLabel" id="audio_sync_track_align_state_value">
-  <property name="visible">True</property>
-  <property name="can-focus">False</property>
-  <property name="label">idle</property>
-  <property name="xalign">0</property>
-  <property name="hexpand">True</property>
-</object>
-  <packing>
-    <property name="left-attach">1</property>
-    <property name="top-attach">2</property>
-    <property name="width">1</property>
-    <property name="height">1</property>
-  </packing>
-</child>
-</object>
-      </child>
-    </object>
-  </child>
-  <child type="label">
-    <object class="GtkLabel" id="audio_sync_live_track_frame_label">
-      <property name="visible">True</property>
-      <property name="can-focus">False</property>
-      <property name="label" translatable="yes">Track align status</property>
-      <property name="xalign">0</property>
-    </object>
-  </child>
-</object>
-    <packing>
-      <property name="expand">False</property>
-      <property name="fill">True</property>
-      <property name="position">2</property>
-    </packing>
-  </child>
-</object>
-      </child>
-    </object>
-  </child>
-  <child type="label">
-    <object class="GtkLabel" id="audio_sync_live_frame_label">
-      <property name="visible">True</property>
-      <property name="can-focus">False</property>
-      <property name="label" translatable="yes">Live stats</property>
-      <property name="xalign">0</property>
-    </object>
-  </child>
-</object>
-    <packing>
-      <property name="expand">False</property>
-      <property name="fill">True</property>
-      <property name="position">2</property>
-    </packing>
-  </child>
-</object>
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="orientation">vertical</property>
+                    <property name="margin-left">6</property>
+                    <property name="margin-right">6</property>
+                    <property name="margin-top">6</property>
+                    <property name="margin-bottom">6</property>
+                    <property name="spacing">6</property>
+                    <child>
+                      <object class="GtkGrid" id="audio_sync_top_grid">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="column-spacing">18</property>
+                        <property name="row-spacing">8</property>
+                        <property name="hexpand">True</property>
+                        <child>
+                          <object class="GtkFrame" id="audio_master_sync_frame">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label-xalign">0</property>
+                            <property name="shadow-type">none</property>
+                            <property name="hexpand">True</property>
+                            <property name="vexpand">False</property>
+                            <child>
+                              <object class="GtkAlignment" id="audio_master_sync_frame_align">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="top-padding">4</property>
+                                <property name="bottom-padding">4</property>
+                                <property name="left-padding">6</property>
+                                <property name="right-padding">6</property>
+                                <child>
+                                  <object class="GtkGrid" id="audio_master_sync_grid">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="column-spacing">8</property>
+                                    <property name="row-spacing">4</property>
+                                    <property name="hexpand">True</property>
+                                    <child>
+                                      <object class="GtkLabel" id="audio_input_selector_label">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Audio source / sync provider</property>
+                                        <property name="xalign">0</property>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">0</property>
+                                        <property name="top-attach">0</property>
+                                        <property name="width">1</property>
+                                        <property name="height">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkComboBoxText" id="audio_input_selector_combo">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="active">0</property>
+                                        <property name="hexpand">True</property>
+                                        <property name="has-tooltip">True</property>
+                                        <property name="tooltip-text" translatable="yes">Choose audible audio source or external sync provider. Original/Silence keep output local; JACK/WAV can provide external sync and, in monitor/bridge modes, external playback.</property>
+                                        <items>
+                                          <item translatable="yes">Original video audio</item>
+                                          <item translatable="yes">JACK external</item>
+                                          <item translatable="yes">WAV file</item>
+                                          <item translatable="yes">Silence</item>
+                                        </items>
+                                        <signal name="changed" handler="on_audio_input_selector_combo_changed" swapped="no"/>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">1</property>
+                                        <property name="top-attach">0</property>
+                                        <property name="width">2</property>
+                                        <property name="height">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkButton" id="audio_sync_refresh_button">
+                                        <property name="label" translatable="yes">Refresh</property>
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="receives-default">False</property>
+                                        <property name="has-tooltip">True</property>
+                                        <property name="tooltip-text" translatable="yes">Print the current Audio Sync backend state and refresh visible status values.</property>
+                                        <signal name="clicked" handler="on_audio_sync_refresh_button_clicked" swapped="no"/>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">3</property>
+                                        <property name="top-attach">0</property>
+                                        <property name="width">1</property>
+                                        <property name="height">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkGrid" id="audio_master_wav_options_grid">
+                                        <property name="visible">False</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="column-spacing">8</property>
+                                        <property name="row-spacing">4</property>
+                                        <property name="hexpand">True</property>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_sync_wav_path_label">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">WAV path</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">0</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkEntry" id="audio_sync_wav_path">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="placeholder-text" translatable="yes">/path/to/master.wav</property>
+                                            <property name="hexpand">True</property>
+                                            <signal name="activate" handler="on_audio_sync_wav_path_activate" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">1</property>
+                                            <property name="top-attach">0</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkButton" id="audio_sync_wav_browse_button">
+                                            <property name="label" translatable="yes">Browse…</property>
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="receives-default">True</property>
+                                            <property name="has-tooltip">True</property>
+                                            <property name="tooltip-text" translatable="yes">Choose a WAV file to use as an external sync provider for Analyze, Monitor, Visual Tempo Follow, Tempo Match Bridge, or Track Align.</property>
+                                            <signal name="clicked" handler="on_audio_sync_wav_browse_button_clicked" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">2</property>
+                                            <property name="top-attach">0</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_sync_wav_loop_label">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">Loop WAV</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">1</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkCheckButton" id="audio_sync_wav_loop_toggle">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="receives-default">False</property>
+                                            <property name="draw-indicator">True</property>
+                                            <signal name="toggled" handler="on_audio_sync_wav_loop_toggle_toggled" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">1</property>
+                                            <property name="top-attach">1</property>
+                                            <property name="width">2</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">0</property>
+                                        <property name="top-attach">1</property>
+                                        <property name="width">3</property>
+                                        <property name="height">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkGrid" id="audio_master_jack_options_grid">
+                                        <property name="visible">False</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="column-spacing">8</property>
+                                        <property name="row-spacing">4</property>
+                                        <property name="hexpand">True</property>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_sync_channels_label">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">JACK channels</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">0</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="audio_sync_channels_spin">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="adjustment">audio_sync_channels_adj</property>
+                                            <property name="numeric">True</property>
+                                            <signal name="value-changed" handler="on_audio_sync_channels_spin_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">1</property>
+                                            <property name="top-attach">0</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_sync_enable_label">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">Audio sync</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">1</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkCheckButton" id="audio_sync_enable_toggle">
+                                            <property name="label" translatable="yes">Enable</property>
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="receives-default">False</property>
+                                            <signal name="toggled" handler="on_audio_sync_enable_toggle_toggled" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">1</property>
+                                            <property name="top-attach">1</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_sync_mode_label">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">Sync mode</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">2</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkComboBoxText" id="audio_sync_mode_combo">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="active">0</property>
+                                            <property name="hexpand">True</property>
+                                            <items>
+                                              <item translatable="yes">Off - no external sync</item>
+                                              <item translatable="yes">Analyze External Tempo - control only</item>
+                                              <item translatable="yes">Clean Monitor - play external audio unchanged</item>
+                                              <item translatable="yes">Monitor + Trickplay - audio follows transport</item>
+                                              <item translatable="yes">Visual Tempo Follow - drive video/FX only</item>
+                                              <item translatable="yes">Tempo Match Bridge - stretch external audio</item>
+                                              <item translatable="yes">Track Align - waveform-lock video to master</item>
+                                            </items>
+                                            <signal name="changed" handler="on_audio_sync_mode_combo_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">1</property>
+                                            <property name="top-attach">2</property>
+                                            <property name="width">2</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">0</property>
+                                        <property name="top-attach">1</property>
+                                        <property name="width">3</property>
+                                        <property name="height">1</property>
+                                      </packing>
+                                    </child>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            <child type="label">
+                              <object class="GtkLabel" id="audio_master_sync_frame_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Audio / External Sync</property>
+                                <property name="xalign">0</property>
+                              </object>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="left-attach">0</property>
+                            <property name="top-attach">0</property>
+                            <property name="width">1</property>
+                            <property name="height">1</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkBox" id="audio_sync_mode_detail_box">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">6</property>
+                            <property name="hexpand">True</property>
+                            <child>
+                              <object class="GtkFrame" id="audio_sync_tempo_frame">
+                                <property name="visible">False</property>
+                                <property name="can-focus">False</property>
+                                <property name="label-xalign">0</property>
+                                <property name="shadow-type">none</property>
+                                <property name="hexpand">True</property>
+                                <property name="vexpand">False</property>
+                                <child>
+                                  <object class="GtkAlignment" id="audio_sync_tempo_frame_align">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="top-padding">4</property>
+                                    <property name="bottom-padding">4</property>
+                                    <property name="left-padding">6</property>
+                                    <property name="right-padding">6</property>
+                                    <child>
+                                      <object class="GtkGrid" id="audio_sync_tempo_grid">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="column-spacing">8</property>
+                                        <property name="row-spacing">4</property>
+                                        <property name="hexpand">True</property>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_sync_target_bpm_label">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">Clip BPM</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">0</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="audio_sync_target_bpm_spin">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="adjustment">audio_sync_target_bpm_adj</property>
+                                            <property name="digits">1</property>
+                                            <property name="numeric">True</property>
+                                            <signal name="value-changed" handler="on_audio_sync_target_bpm_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">1</property>
+                                            <property name="top-attach">0</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkButtonBox" id="audio_sync_tempo_target_buttons_box">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="layout-style">start</property>
+                                            <property name="spacing">4</property>
+                                            <child>
+                                              <object class="GtkButton" id="audio_sync_use_clip_bpm_button">
+                                                <property name="label" translatable="yes">Use Clip BPM</property>
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">True</property>
+                                                <property name="receives-default">True</property>
+                                                <signal name="clicked" handler="on_audio_sync_use_clip_bpm_button_clicked" swapped="no"/>
+                                              </object>
+                                            </child>
+                                            <child>
+                                              <object class="GtkButton" id="audio_sync_latch_clip_bpm_button">
+                                                <property name="label" translatable="yes">Latch BPM</property>
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">True</property>
+                                                <property name="receives-default">True</property>
+                                                <signal name="clicked" handler="on_audio_sync_latch_clip_bpm_button_clicked" swapped="no"/>
+                                              </object>
+                                            </child>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">2</property>
+                                            <property name="top-attach">0</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_sync_tempo_bend_label">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">Pitch / tempo bend</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">1</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkScale" id="audio_sync_tempo_bend_scale">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="orientation">horizontal</property>
+                                            <property name="adjustment">audio_sync_tempo_bend_adj</property>
+                                            <property name="digits">1</property>
+                                            <property name="draw-value">True</property>
+                                            <property name="value-pos">right</property>
+                                            <property name="hexpand">True</property>
+                                            <signal name="value-changed" handler="on_audio_sync_tempo_bend_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">1</property>
+                                            <property name="top-attach">1</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkButton" id="audio_sync_tempo_bend_reset_button">
+                                            <property name="label" translatable="yes">Reset bend</property>
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="receives-default">True</property>
+                                            <signal name="clicked" handler="on_audio_sync_tempo_bend_reset_button_clicked" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">2</property>
+                                            <property name="top-attach">1</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_sync_phase_label">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">Override phase</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">2</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="audio_sync_phase_spin">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="adjustment">audio_sync_phase_adj</property>
+                                            <property name="numeric">True</property>
+                                            <signal name="value-changed" handler="on_audio_sync_phase_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">1</property>
+                                            <property name="top-attach">2</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_sync_confidence_label">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">Override confidence</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">3</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="audio_sync_confidence_spin">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="adjustment">audio_sync_confidence_adj</property>
+                                            <property name="numeric">True</property>
+                                            <signal name="value-changed" handler="on_audio_sync_confidence_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">1</property>
+                                            <property name="top-attach">3</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_sync_correction_label">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">Max correction</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">4</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="audio_sync_correction_spin">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="adjustment">audio_sync_correction_adj</property>
+                                            <property name="numeric">True</property>
+                                            <signal name="value-changed" handler="on_audio_sync_correction_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">1</property>
+                                            <property name="top-attach">4</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_sync_follow_audio_warning">
+                                            <property name="visible">False</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">Original clip audio is audible: Visual Tempo Follow changes video speed, so the original audio will pitch/tempo-shift. Use Silence or external audio for video-only follow.</property>
+                                            <property name="wrap">True</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">5</property>
+                                            <property name="width">3</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </child>
+                                <child type="label">
+                                  <object class="GtkLabel" id="audio_sync_tempo_frame_label">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label" translatable="yes">Tempo lock control</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                </child>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkFrame" id="audio_sync_track_frame">
+                                <property name="visible">False</property>
+                                <property name="can-focus">False</property>
+                                <property name="label-xalign">0</property>
+                                <property name="shadow-type">none</property>
+                                <property name="hexpand">True</property>
+                                <property name="vexpand">False</property>
+                                <child>
+                                  <object class="GtkAlignment" id="audio_sync_track_frame_align">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="top-padding">4</property>
+                                    <property name="bottom-padding">4</property>
+                                    <property name="left-padding">6</property>
+                                    <property name="right-padding">6</property>
+                                    <child>
+                                      <object class="GtkLabel" id="audio_sync_track_hint_label">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Track Align uses the selected external sync provider as its waveform reference.</property>
+                                        <property name="wrap">True</property>
+                                        <property name="xalign">0</property>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </child>
+                                <child type="label">
+                                  <object class="GtkLabel" id="audio_sync_track_frame_label">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label" translatable="yes">Track align</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                </child>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="left-attach">1</property>
+                            <property name="top-attach">0</property>
+                            <property name="width">1</property>
+                            <property name="height">1</property>
+                          </packing>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkBox" id="audio_sync_spacer">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="orientation">vertical</property>
+                        <property name="vexpand">True</property>
+                      </object>
+                      <packing>
+                        <property name="expand">True</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkFrame" id="audio_sync_live_frame">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label-xalign">0</property>
+                        <property name="shadow-type">none</property>
+                        <property name="hexpand">True</property>
+                        <property name="vexpand">False</property>
+                        <child>
+                          <object class="GtkAlignment" id="audio_sync_live_frame_align">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="top-padding">4</property>
+                            <property name="bottom-padding">4</property>
+                            <property name="left-padding">6</property>
+                            <property name="right-padding">6</property>
+                            <child>
+                              <object class="GtkBox" id="audio_sync_live_box">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="orientation">vertical</property>
+                                <property name="spacing">6</property>
+                                <property name="hexpand">True</property>
+                                <child>
+                                  <object class="GtkFrame" id="audio_sync_live_common_frame">
+                                    <property name="visible">False</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <property name="shadow-type">none</property>
+                                    <property name="hexpand">True</property>
+                                    <property name="vexpand">False</property>
+                                    <child>
+                                      <object class="GtkAlignment" id="audio_sync_live_common_frame_align">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="top-padding">4</property>
+                                        <property name="bottom-padding">4</property>
+                                        <property name="left-padding">6</property>
+                                        <property name="right-padding">6</property>
+                                        <child>
+                                          <object class="GtkGrid" id="audio_sync_live_common_grid">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="column-spacing">8</property>
+                                            <property name="row-spacing">4</property>
+                                            <property name="hexpand">True</property>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_level_bar_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Level</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">0</property>
+                                                <property name="top-attach">0</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLevelBar" id="audio_sync_level_bar">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="min-value">0</property>
+                                                <property name="max-value">100</property>
+                                                <property name="value">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">1</property>
+                                                <property name="top-attach">0</property>
+                                                <property name="width">3</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_transient_bar_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Transient</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">0</property>
+                                                <property name="top-attach">1</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLevelBar" id="audio_sync_transient_bar">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="min-value">0</property>
+                                                <property name="max-value">100</property>
+                                                <property name="value">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">1</property>
+                                                <property name="top-attach">1</property>
+                                                <property name="width">3</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_phase_bar_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Phase</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">0</property>
+                                                <property name="top-attach">2</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLevelBar" id="audio_sync_phase_bar">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="min-value">0</property>
+                                                <property name="max-value">100</property>
+                                                <property name="value">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">1</property>
+                                                <property name="top-attach">2</property>
+                                                <property name="width">3</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_enabled_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Enabled</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">0</property>
+                                                <property name="top-attach">3</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_enabled_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">no</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">1</property>
+                                                <property name="top-attach">3</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_open_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Open</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">2</property>
+                                                <property name="top-attach">3</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_open_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">no</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">3</property>
+                                                <property name="top-attach">3</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_running_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Running</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">0</property>
+                                                <property name="top-attach">4</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_running_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">no</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">1</property>
+                                                <property name="top-attach">4</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_mode_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Mode</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">2</property>
+                                                <property name="top-attach">4</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_mode_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">Off</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">3</property>
+                                                <property name="top-attach">4</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_source_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Source</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">0</property>
+                                                <property name="top-attach">5</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_source_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">None</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">1</property>
+                                                <property name="top-attach">5</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_channels_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Channels</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">2</property>
+                                                <property name="top-attach">5</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_channels_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">0</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">3</property>
+                                                <property name="top-attach">5</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_sample_rate_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Rate</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">0</property>
+                                                <property name="top-attach">6</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_sample_rate_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">-</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">1</property>
+                                                <property name="top-attach">6</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                          </object>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel" id="audio_sync_live_common_frame_label">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Live input</property>
+                                        <property name="xalign">0</property>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkFrame" id="audio_sync_live_tempo_frame">
+                                    <property name="visible">False</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <property name="shadow-type">none</property>
+                                    <property name="hexpand">True</property>
+                                    <property name="vexpand">False</property>
+                                    <child>
+                                      <object class="GtkAlignment" id="audio_sync_live_tempo_frame_align">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="top-padding">4</property>
+                                        <property name="bottom-padding">4</property>
+                                        <property name="left-padding">6</property>
+                                        <property name="right-padding">6</property>
+                                        <child>
+                                          <object class="GtkGrid" id="audio_sync_live_tempo_grid">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="column-spacing">8</property>
+                                            <property name="row-spacing">4</property>
+                                            <property name="hexpand">True</property>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_bpm_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Source BPM</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">0</property>
+                                                <property name="top-attach">0</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_bpm_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">-</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">1</property>
+                                                <property name="top-attach">0</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_confidence_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Confidence</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">2</property>
+                                                <property name="top-attach">0</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_confidence_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">0%</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">3</property>
+                                                <property name="top-attach">0</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_bridge_active_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Activity</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">0</property>
+                                                <property name="top-attach">1</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_bridge_active_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">no</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">1</property>
+                                                <property name="top-attach">1</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_ratio_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Ratio</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">2</property>
+                                                <property name="top-attach">1</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_ratio_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">1.000</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">3</property>
+                                                <property name="top-attach">1</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_correction_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Max correction</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">0</property>
+                                                <property name="top-attach">2</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_correction_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">-</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">1</property>
+                                                <property name="top-attach">2</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_target_bpm_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Clip BPM</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">2</property>
+                                                <property name="top-attach">2</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_target_bpm_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">-</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">3</property>
+                                                <property name="top-attach">2</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_target_confidence_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Target confidence</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">0</property>
+                                                <property name="top-attach">3</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_target_confidence_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">0%</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">1</property>
+                                                <property name="top-attach">3</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_max_correction_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Max correction</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">2</property>
+                                                <property name="top-attach">3</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_max_correction_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">4%</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">3</property>
+                                                <property name="top-attach">3</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_bridge_state_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Lock state</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">0</property>
+                                                <property name="top-attach">4</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_bridge_state_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">idle</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">1</property>
+                                                <property name="top-attach">4</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                          </object>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel" id="audio_sync_live_tempo_frame_label">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Tempo lock status</property>
+                                        <property name="xalign">0</property>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">1</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkFrame" id="audio_sync_live_track_frame">
+                                    <property name="visible">False</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <property name="shadow-type">none</property>
+                                    <property name="hexpand">True</property>
+                                    <property name="vexpand">False</property>
+                                    <child>
+                                      <object class="GtkAlignment" id="audio_sync_live_track_frame_align">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="top-padding">4</property>
+                                        <property name="bottom-padding">4</property>
+                                        <property name="left-padding">6</property>
+                                        <property name="right-padding">6</property>
+                                        <child>
+                                          <object class="GtkGrid" id="audio_sync_live_track_grid">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="column-spacing">8</property>
+                                            <property name="row-spacing">4</property>
+                                            <property name="hexpand">True</property>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_track_align_locked_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Track locked</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">0</property>
+                                                <property name="top-attach">0</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_track_align_locked_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">no</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">1</property>
+                                                <property name="top-attach">0</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_track_align_offset_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Track offset</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">2</property>
+                                                <property name="top-attach">0</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_track_align_offset_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">0 ms</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">3</property>
+                                                <property name="top-attach">0</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_track_align_confidence_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Track confidence</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">0</property>
+                                                <property name="top-attach">1</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_track_align_confidence_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">0%</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">1</property>
+                                                <property name="top-attach">1</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_track_align_correction_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Track correction</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">2</property>
+                                                <property name="top-attach">1</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_track_align_correction_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">0 ppm</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">3</property>
+                                                <property name="top-attach">1</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_track_align_state_value_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Track state</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">0</property>
+                                                <property name="top-attach">2</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="audio_sync_track_align_state_value">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label">idle</property>
+                                                <property name="xalign">0</property>
+                                                <property name="hexpand">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left-attach">1</property>
+                                                <property name="top-attach">2</property>
+                                                <property name="width">1</property>
+                                                <property name="height">1</property>
+                                              </packing>
+                                            </child>
+                                          </object>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel" id="audio_sync_live_track_frame_label">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Track align status</property>
+                                        <property name="xalign">0</property>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">2</property>
+                                  </packing>
+                                </child>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        <child type="label">
+                          <object class="GtkLabel" id="audio_sync_live_frame_label">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label" translatable="yes">Live stats</property>
+                            <property name="xalign">0</property>
+                          </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">2</property>
+                      </packing>
+                    </child>
+                  </object>
                   <packing>
                     <property name="position">3</property>
                   </packing>
@@ -14143,7 +14149,24 @@
                                                     <property name="position">2</property>
                                                   </packing>
                                                 </child>
-                                              <child><object class="GtkRadioButton" id="record_audio_source_sample_silence"><property name="label" translatable="yes">Silence</property><property name="visible">True</property><property name="can-focus">True</property><property name="receives-default">False</property><property name="tooltip-text" translatable="yes">Record silence while keeping the video recorder running</property><property name="group">record_audio_source_sample_auto</property><property name="draw-indicator">True</property><signal name="toggled" handler="on_record_audio_source_sample_silence_toggled" swapped="no"/></object><packing><property name="expand">False</property><property name="fill">False</property><property name="position">3</property></packing></child></object>
+                                                <child>
+                                                  <object class="GtkRadioButton" id="record_audio_source_sample_silence">
+                                                    <property name="label" translatable="yes">Silence</property>
+                                                    <property name="visible">True</property>
+                                                    <property name="can-focus">True</property>
+                                                    <property name="receives-default">False</property>
+                                                    <property name="tooltip-text" translatable="yes">Record silence while keeping the video recorder running</property>
+                                                    <property name="group">record_audio_source_sample_auto</property>
+                                                    <property name="draw-indicator">True</property>
+                                                    <signal name="toggled" handler="on_record_audio_source_sample_silence_toggled" swapped="no"/>
+                                                  </object>
+                                                  <packing>
+                                                    <property name="expand">False</property>
+                                                    <property name="fill">False</property>
+                                                    <property name="position">3</property>
+                                                  </packing>
+                                                </child>
+                                              </object>
                                             </child>
                                             <child type="label">
                                               <object class="GtkLabel" id="record_audio_source_sample_label">
@@ -14802,7 +14825,7 @@
                                     <property name="position">3</property>
                                   </packing>
                                 </child>
-                              </object>>
+                              </object>&gt;
                               <packing>
                                 <property name="position">1</property>
                               </packing>
@@ -16091,7 +16114,24 @@
                                         <property name="position">2</property>
                                       </packing>
                                     </child>
-                                  <child><object class="GtkRadioButton" id="record_audio_source_stream_silence"><property name="label" translatable="yes">Silence</property><property name="visible">True</property><property name="can-focus">True</property><property name="receives-default">False</property><property name="tooltip-text" translatable="yes">Record silence while keeping the stream recorder running</property><property name="group">record_audio_source_stream_auto</property><property name="draw-indicator">True</property><signal name="toggled" handler="on_record_audio_source_stream_silence_toggled" swapped="no"/></object><packing><property name="expand">False</property><property name="fill">False</property><property name="position">3</property></packing></child></object>
+                                    <child>
+                                      <object class="GtkRadioButton" id="record_audio_source_stream_silence">
+                                        <property name="label" translatable="yes">Silence</property>
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="receives-default">False</property>
+                                        <property name="tooltip-text" translatable="yes">Record silence while keeping the stream recorder running</property>
+                                        <property name="group">record_audio_source_stream_auto</property>
+                                        <property name="draw-indicator">True</property>
+                                        <signal name="toggled" handler="on_record_audio_source_stream_silence_toggled" swapped="no"/>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">False</property>
+                                        <property name="position">3</property>
+                                      </packing>
+                                    </child>
+                                  </object>
                                 </child>
                                 <child type="label">
                                   <object class="GtkLabel" id="record_audio_source_stream_label">
@@ -22405,27 +22445,31 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                         <property name="can-focus">False</property>
                         <property name="margin-right">10</property>
                         <property name="margin-top">8</property>
+                        <property name="spacing">2</property>
                         <child>
                           <object class="GtkBox" id="hbox891">
                             <property name="visible">True</property>
                             <property name="can-focus">False</property>
+                            <property name="spacing">2</property>
                             <child>
                               <object class="GtkBox" id="hbox921">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
+                                <property name="spacing">2</property>
                                 <child>
                                   <object class="GtkBox" id="hbox709">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
+                                    <property name="spacing">2</property>
                                     <child>
                                       <object class="GtkCheckButton" id="freestyle">
-                                        <property name="label" translatable="yes">Freestyle</property>
                                         <property name="visible">True</property>
                                         <property name="can-focus">True</property>
                                         <property name="receives-default">False</property>
-                                        <property name="tooltip-text" translatable="yes">Randomize sample duration; use free cut-off</property>
+                                        <property name="tooltip-text" translatable="yes">Freestyle randomizer cutoff</property>
                                         <property name="use-underline">True</property>
                                         <property name="draw-indicator">True</property>
+                                        <property name="width-request">18</property>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
@@ -22459,7 +22503,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                   </object>
                                   <packing>
                                     <property name="expand">False</property>
-                                    <property name="fill">True</property>
+                                    <property name="fill">False</property>
                                     <property name="position">0</property>
                                   </packing>
                                 </child>
@@ -22472,11 +22516,12 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                       <object class="GtkAlignment" id="alignment505">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
-                                        <property name="left-padding">12</property>
+                                        <property name="left-padding">0</property>
                                         <child>
                                           <object class="GtkBox" id="hbox840">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
+                                            <property name="spacing">2</property>
                                             <child>
                                               <object class="GtkRadioButton" id="macrostop">
                                                 <property name="visible">True</property>
@@ -22605,22 +22650,22 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                     </child>
                                   </object>
                                   <packing>
-                                    <property name="expand">True</property>
-                                    <property name="fill">True</property>
+                                    <property name="expand">False</property>
+                                    <property name="fill">False</property>
                                     <property name="position">1</property>
                                   </packing>
                                 </child>
                               </object>
                               <packing>
-                                <property name="expand">True</property>
-                                <property name="fill">True</property>
+                                <property name="expand">False</property>
+                                <property name="fill">False</property>
                                 <property name="position">0</property>
                               </packing>
                             </child>
                           </object>
                           <packing>
-                            <property name="expand">True</property>
-                            <property name="fill">True</property>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
                             <property name="position">0</property>
                           </packing>
                         </child>
@@ -22629,11 +22674,12 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                             <property name="visible">True</property>
                             <property name="can-focus">False</property>
                             <property name="yscale">0</property>
-                            <property name="left-padding">12</property>
+                            <property name="left-padding">6</property>
                             <child>
                               <object class="GtkBox" id="vjframerate">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
+                                <property name="spacing">2</property>
                                 <child>
                                   <object class="GtkButton" id="framerate_dec">
                                     <property name="width-request">24</property>
@@ -22682,7 +22728,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                 </child>
                                 <child>
                                   <object class="GtkScale" id="framerate">
-                                    <property name="width-request">150</property>
+                                    <property name="width-request">112</property>
                                     <property name="visible">True</property>
                                     <property name="can-focus">True</property>
                                     <property name="tooltip-text" translatable="yes">Change playback engine frame rate</property>
@@ -22721,9 +22767,69 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                             </child>
                           </object>
                           <packing>
-                            <property name="expand">True</property>
-                            <property name="fill">True</property>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
                             <property name="position">1</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkAlignment" id="alignment_sample_hold">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="yscale">0</property>
+                            <property name="left-padding">6</property>
+                            <child>
+                              <object class="GtkBox" id="sample_hold_hbox">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="spacing">2</property>
+                                <child>
+                                  <object class="GtkSpinButton" id="sample_hold_frames">
+                                    <property name="width-request">48</property>
+                                    <property name="height-request">24</property>
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="tooltip-text" translatable="yes">Number of output frames to freeze; 0 releases timed hold</property>
+                                    <property name="invisible-char">●</property>
+                                    <property name="text" translatable="yes">5</property>
+                                    <property name="caps-lock-warning">False</property>
+                                    <property name="primary-icon-activatable">False</property>
+                                    <property name="secondary-icon-activatable">False</property>
+                                    <property name="adjustment">sample_hold_frames_adj</property>
+                                    <property name="climb-rate">1</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">5</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">False</property>
+                                    <property name="position">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkButton" id="sample_hold_button">
+                                    <property name="width-request">44</property>
+                                    <property name="height-request">24</property>
+                                    <property name="label" translatable="yes">Hold</property>
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="receives-default">False</property>
+                                    <property name="tooltip-text" translatable="yes">Freeze the final rendered output for the selected number of frames</property>
+                                    <signal name="clicked" handler="on_sample_hold_button_clicked" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">False</property>
+                                    <property name="position">1</property>
+                                  </packing>
+                                </child>
+                              </object>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">2</property>
                           </packing>
                         </child>
                       </object>

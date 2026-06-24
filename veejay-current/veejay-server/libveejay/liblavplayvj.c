@@ -1156,10 +1156,49 @@ static inline int playback_retime_audio_slice(int old_sfd, int new_sfd, int old_
     return vj_clampi((old_slice * new_sfd) / old_sfd, 0, new_sfd - 1);
 }
 
+static void veejay_output_hold_release_timed(veejay_t *info, const char *reason, int log_release)
+{
+    if(!info || !info->settings)
+        return;
+
+    video_playback_setup *settings = (video_playback_setup*) info->settings;
+
+    if(!settings->output_hold_active && !settings->output_hold_capture &&
+       settings->output_hold_frames_left <= 0 && settings->hold_status <= 0)
+        return;
+
+    settings->output_hold_active = 0;
+    settings->output_hold_capture = 0;
+    settings->output_hold_frames_left = 0;
+    settings->output_hold_frames_total = 0;
+    settings->hold_status = 0;
+    settings->hold_pos = 0;
+    settings->hold_resume = 0;
+
+    if(!settings->hold_fx)
+        settings->output_hold_ready = 0;
+
+    atomic_store_double(&settings->smoothed_drift_us, 0.0);
+
+    if(log_release) {
+        if(reason && reason[0])
+            veejay_msg(VEEJAY_MSG_INFO, "HOLD: Released full output freeze (%s)", reason);
+        else
+            veejay_msg(VEEJAY_MSG_INFO, "HOLD: Released full output freeze");
+    }
+}
+
+static inline void veejay_output_hold_release_on_transport(veejay_t *info)
+{
+    veejay_output_hold_release_timed(info, "transport", 1);
+}
+
 
 int veejay_set_framedup(veejay_t *info, int n)
 {
     video_playback_setup *settings = info->settings;
+
+    veejay_output_hold_release_on_transport(info);
 
     if (n < 1)
         n = 1;
@@ -1275,6 +1314,8 @@ int veejay_set_speed(veejay_t *info, int speed, int force_seek)
     video_playback_setup *settings =
         (video_playback_setup *)info->settings;
 
+    veejay_output_hold_release_on_transport(info);
+
     int len = 0;
 
     speed = vj_clampi(speed, -MAX_SPEED, MAX_SPEED);
@@ -1387,35 +1428,37 @@ int veejay_set_speed(veejay_t *info, int speed, int force_seek)
 
 int veejay_hold_frame(veejay_t * info, int rel_resume_pos, int hold_pos)
 {
+    (void) rel_resume_pos;
+
+    if(!info || !info->settings)
+        return 0;
+
     video_playback_setup *settings = (video_playback_setup *) info->settings;
 
-    if( rel_resume_pos > 0 )
-    {
-        if( settings->hold_status == 1 )
-        {
-            settings->hold_pos += rel_resume_pos;
-            settings->hold_resume ++;
-            if(settings->hold_resume < hold_pos )
-                settings->hold_resume = hold_pos;
-        } 
-        else
-        {
-            settings->hold_pos = hold_pos + rel_resume_pos;
-            settings->hold_resume = hold_pos;  
-        }
-        settings->hold_status = 1;
-    } 
-    else 
-    {
-        if (settings->hold_status == 1) 
-        {
-            atomic_store_double(&settings->smoothed_drift_us, 0.0);
-            
-            
-            settings->hold_status = 0;
-            veejay_msg(VEEJAY_MSG_INFO, "HOLD: Released. Sync re-anchored to T=0.");
-        }
+    if(hold_pos <= 0) {
+        veejay_output_hold_release_timed(info, NULL, 1);
+        return 1;
     }
+
+    int frames = hold_pos;
+    if(frames < 1)
+        frames = 1;
+    else if(frames > 999)
+        frames = 999;
+
+    if(!settings->output_hold_active)
+        settings->output_hold_capture = 1;
+
+    settings->output_hold_active = 1;
+    settings->output_hold_frames_left = frames;
+    settings->output_hold_frames_total = frames;
+    settings->hold_status = 1;
+    settings->hold_pos = frames;
+    settings->hold_resume = 0;
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "HOLD: Full output freeze for %d frame%s",
+               frames, frames == 1 ? "" : "s");
 
     return 1;
 }
@@ -1698,6 +1741,8 @@ int veejay_set_frame(veejay_t *info, long framenum)
 {
     video_playback_setup *settings = (video_playback_setup *)info->settings;
 
+    veejay_output_hold_release_on_transport(info);
+
     long long min_frame = atomic_load_long_long(&settings->min_frame_num);
     long long max_frame = atomic_load_long_long(&settings->max_frame_num);
 
@@ -1795,11 +1840,13 @@ void	veejay_auto_loop(veejay_t *info)
 		char sam[32];
 		int len;
 
-		len = sprintf(sam, "%03d:0 -1;", VIMS_SAMPLE_NEW);
-		vj_event_parse_msg(info, sam, len);
+        len = snprintf(sam, sizeof(sam), "%03d:0 -1;", VIMS_SAMPLE_NEW);
+        if(len > 0 && len < (int)sizeof(sam))
+            vj_event_parse_msg(info, sam, len);
 
-		len = sprintf(sam, "%03d:-1;", VIMS_SAMPLE_SELECT);
-		vj_event_parse_msg(info,sam,len);
+        len = snprintf(sam, sizeof(sam), "%03d:-1;", VIMS_SAMPLE_SELECT);
+        if(len > 0 && len < (int)sizeof(sam))
+            vj_event_parse_msg(info, sam, len);
 	}
 }
 
@@ -2227,6 +2274,8 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
             return;
         }
     }
+
+    veejay_output_hold_release_on_transport(info);
 
     if (current_pm == VJ_PLAYBACK_MODE_SAMPLE) {
         if (cur_id == sample_id && new_pm == VJ_PLAYBACK_MODE_SAMPLE) {
@@ -6410,6 +6459,8 @@ static void veejay_producer_thread_audio_startup(veejay_t *info)
             vj_perform_audio_stop(info);
             info->audio = NO_AUDIO;
         }
+        atomic_store_int(&settings->audio_threads_disabled, 1);
+        veejay_wake_playback_waiters(info);
         return;
     }
 
@@ -7743,6 +7794,7 @@ int veejay_main(veejay_t *info)
         veejay_msg(VEEJAY_MSG_ERROR, "Failed to create Producer thread");
         veejay_change_state(info, LAVPLAY_STATE_STOP);
         pthread_join(settings->renderer_thread, NULL);
+        settings->renderer_thread = 0;
         return 0;
     }
 
@@ -8817,12 +8869,12 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 
 	char text[24];
 	switch(info->pixel_format) {
-		case FMT_422:
-			sprintf(text, "4:2:2 [16-235][16-240]");
-			break;
-		case FMT_422F:	
-			sprintf(text, "4:2:2 [0-255]");
-			break;
+        case FMT_422:
+            snprintf(text, sizeof(text), "4:2:2 [16-235][16-240]");
+            break;
+        case FMT_422F:
+            snprintf(text, sizeof(text), "4:2:2 [0-255]");
+            break;
 		default:
 			veejay_msg(VEEJAY_MSG_ERROR, "Unsupported pixel format selected"); 
 			return 0;

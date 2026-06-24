@@ -2393,21 +2393,19 @@ static int ab_thread_prepare_buffer(vj_audio_beat_thread_t *t)
     if(t->buffer && t->buffer_size >= min_size)
         return 1;
 
-    if(t->buffer)
     {
-        free(t->buffer);
-        t->buffer = NULL;
+        uint8_t *new_buffer = (uint8_t *)vj_malloc((size_t)min_size);
+
+        if(!new_buffer)
+            return 0;
+
+        if(t->buffer)
+            free(t->buffer);
+
+        t->buffer = new_buffer;
+        t->buffer_size = min_size;
     }
 
-    t->buffer = (uint8_t *)vj_malloc((size_t)min_size);
-
-    if(!t->buffer)
-    {
-        t->buffer_size = 0;
-        return 0;
-    }
-
-    t->buffer_size = min_size;
     return 1;
 }
 

@@ -857,6 +857,8 @@ typedef struct
     size_t pribuf_len;
     uint8_t *fx_chain_buffer;
     size_t fx_chain_buflen;
+    uint8_t *output_hold_buffer;
+    size_t output_hold_buflen;
 
     VJFrame *tmp1;
     VJFrame *tmp2;
@@ -3154,6 +3156,12 @@ static void vj_perform_free_performer(performer_t *p)
         free(p->fx_chain_buffer);
    }
 
+   if(p->output_hold_buffer) {
+       free(p->output_hold_buffer);
+       p->output_hold_buffer = NULL;
+       p->output_hold_buflen = 0;
+   }
+
    if(p->pribuf_area)
    {
        munlock(p->pribuf_area, p->pribuf_len);
@@ -3892,6 +3900,35 @@ static inline void normal_ctx_sample_frame_s16(const uint8_t *ctx,
     }
 }
 
+
+static inline double normal_turn_hermite_pos(double start_pos,
+                                             double end_pos,
+                                             double v0,
+                                             double v1,
+                                             int i,
+                                             int turn_samples)
+{
+    if(turn_samples <= 1)
+        return end_pos;
+
+    const double T = (double)(turn_samples - 1);
+    double t = (double)i / T;
+    if(t < 0.0)
+        t = 0.0;
+    else if(t > 1.0)
+        t = 1.0;
+
+    const double t2 = t * t;
+    const double t3 = t2 * t;
+    const double h00 = (2.0 * t3) - (3.0 * t2) + 1.0;
+    const double h10 = t3 - (2.0 * t2) + t;
+    const double h01 = (-2.0 * t3) + (3.0 * t2);
+    const double h11 = t3 - t2;
+
+    return (h00 * start_pos) + (h10 * T * v0) +
+           (h01 * end_pos)   + (h11 * T * v1);
+}
+
 static int normal_ctx_turn_candidate_cost_s16(const uint8_t *ctx,
                                               int ctx_samples,
                                               double ctx_abs_start,
@@ -3919,14 +3956,16 @@ static int normal_ctx_turn_candidate_cost_s16(const uint8_t *ctx,
         frame_bytes <= 0 || (frame_bytes & 1))
         return 0x3fffffff;
 
+    if (turn_samples < 8)
+        turn_samples = 8;
+
     const int words = frame_bytes / 2;
     const int local_words = (words > 8) ? 8 : words;
     const int preview = (turn_samples < 32) ? turn_samples : 32;
+    const double end_pos = base_pos + (v1 * (double)(turn_samples - 1));
     const int16_t *prev = (const int16_t*)prev_frame;
     const int16_t *prev2 = (const int16_t*)prev_prev_frame;
     int16_t cur[8];
-    int16_t oldv[8];
-    int16_t newv[8];
     int16_t last[8];
     int have_last = 0;
     int value_delta = 0;
@@ -3947,32 +3986,27 @@ static int normal_ctx_turn_candidate_cost_s16(const uint8_t *ctx,
     have_last = 1;
 
     for (int i = 1; i < preview; i++) {
-        const double u = (turn_samples > 1) ? ((double)i / (double)(turn_samples - 1)) : 1.0;
-        const double w = u * u * (3.0 - (2.0 * u));
+        const double pos = normal_turn_hermite_pos(start_pos, end_pos, v0, v1,
+                                                   i, turn_samples);
         normal_ctx_sample_frame_s16(ctx, ctx_samples, ctx_abs_start, ctx_map,
-                                    start_pos + (v0 * (double)i),
-                                    frame_bytes, oldv, local_words);
-        normal_ctx_sample_frame_s16(ctx, ctx_samples, ctx_abs_start, ctx_map,
-                                    base_pos + (v1 * (double)i),
-                                    frame_bytes, newv, local_words);
+                                    pos, frame_bytes, cur, local_words);
         for (int c = 0; c < local_words; c++) {
-            const double mixed = ((1.0 - w) * (double)oldv[c]) + (w * (double)newv[c]);
-            int sample = (int)((mixed >= 0.0) ? (mixed + 0.5) : (mixed - 0.5));
-            if (sample < -32768) sample = -32768;
-            if (sample >  32767) sample =  32767;
+            const int sample = (int)cur[c];
             if (have_last) {
                 int st = sample - (int)last[c];
                 st = (st < 0) ? -st : st;
                 if (st > step_max)
                     step_max = st;
             }
-            last[c] = (int16_t)sample;
+            last[c] = cur[c];
         }
     }
 
     if (prev_prev_frame != NULL) {
+        const double pos1 = normal_turn_hermite_pos(start_pos, end_pos, v0, v1,
+                                                    1, turn_samples);
         normal_ctx_sample_frame_s16(ctx, ctx_samples, ctx_abs_start, ctx_map,
-                                    start_pos + v0, frame_bytes, cur, local_words);
+                                    pos1, frame_bytes, cur, local_words);
         for (int c = 0; c < local_words; c++) {
             int old_slope = (int)prev[c] - (int)prev2[c];
             int new_slope = (int)cur[c] - (int)prev[c];
@@ -4034,9 +4068,9 @@ static int perform_normal_turn_render_s16(uint8_t *dst,
 
     const int words = frame_bytes / 2;
     const int local_words = (words > 8) ? 8 : words;
+    const double end_pos = base_pos + (v1 * (double)(turn_samples - 1));
     int16_t *out = (int16_t*)dst;
-    int16_t oldv[8];
-    int16_t newv[8];
+    int16_t sample_words[8];
     int16_t prev_words[8];
     int prev_valid = 0;
     int step_peak = 0;
@@ -4046,56 +4080,37 @@ static int perform_normal_turn_render_s16(uint8_t *dst,
     for (int i = 0; i < dst_samples; i++) {
         const int bo = i * words;
         int frame_step = 0;
+        double pos;
 
-        if (i < turn_samples) {
-            const double u = (turn_samples > 1) ? ((double)i / (double)(turn_samples - 1)) : 1.0;
-            const double w = u * u * (3.0 - (2.0 * u));
-            normal_ctx_sample_frame_s16(ctx, ctx_samples, ctx_abs_start, ctx_map,
-                                        start_pos + (v0 * (double)i),
-                                        frame_bytes, oldv, local_words);
-            normal_ctx_sample_frame_s16(ctx, ctx_samples, ctx_abs_start, ctx_map,
-                                        base_pos + (v1 * (double)i),
-                                        frame_bytes, newv, local_words);
+        if (i < turn_samples)
+            pos = normal_turn_hermite_pos(start_pos, end_pos, v0, v1,
+                                          i, turn_samples);
+        else
+            pos = base_pos + (v1 * (double)i);
 
-            if (words <= 8) {
-                for (int c = 0; c < words; c++) {
-                    const double mixed = ((1.0 - w) * (double)oldv[c]) + (w * (double)newv[c]);
-                    int sample = (int)((mixed >= 0.0) ? (mixed + 0.5) : (mixed - 0.5));
-                    if (sample < -32768) sample = -32768;
-                    if (sample >  32767) sample =  32767;
-                    out[bo + c] = (int16_t)sample;
-                    if (prev_valid) {
-                        int d = sample - (int)prev_words[c];
-                        d = (d < 0) ? -d : d;
-                        if (d > frame_step)
-                            frame_step = d;
-                    }
-                    prev_words[c] = (int16_t)sample;
+        if (words <= 8) {
+            normal_ctx_sample_frame_s16(ctx, ctx_samples, ctx_abs_start, ctx_map,
+                                        pos, frame_bytes, sample_words, words);
+            for (int c = 0; c < words; c++) {
+                out[bo + c] = sample_words[c];
+                if (prev_valid) {
+                    int d = (int)sample_words[c] - (int)prev_words[c];
+                    d = (d < 0) ? -d : d;
+                    if (d > frame_step)
+                        frame_step = d;
                 }
-            } else {
-                for (int c = 0; c < words; c++) {
-                    int16_t a[1];
-                    int16_t b[1];
-                    normal_ctx_sample_frame_s16(ctx, ctx_samples, ctx_abs_start, ctx_map,
-                                                start_pos + (v0 * (double)i),
-                                                frame_bytes, a, 1);
-                    normal_ctx_sample_frame_s16(ctx, ctx_samples, ctx_abs_start, ctx_map,
-                                                base_pos + (v1 * (double)i),
-                                                frame_bytes, b, 1);
-                    const double mixed = ((1.0 - w) * (double)a[0]) + (w * (double)b[0]);
-                    int sample = (int)((mixed >= 0.0) ? (mixed + 0.5) : (mixed - 0.5));
-                    if (sample < -32768) sample = -32768;
-                    if (sample >  32767) sample =  32767;
-                    out[bo + c] = (int16_t)sample;
-                }
+                prev_words[c] = sample_words[c];
             }
         } else {
-            int16_t sample_words[8];
+            for (int c = 0; c < words; c++) {
+                int16_t one[1];
+                normal_ctx_sample_frame_s16(ctx, ctx_samples, ctx_abs_start, ctx_map,
+                                            pos, frame_bytes, one, 1);
+                out[bo + c] = one[0];
+            }
             normal_ctx_sample_frame_s16(ctx, ctx_samples, ctx_abs_start, ctx_map,
-                                        base_pos + (v1 * (double)i),
-                                        frame_bytes, sample_words, local_words);
+                                        pos, frame_bytes, sample_words, local_words);
             for (int c = 0; c < local_words; c++) {
-                out[bo + c] = sample_words[c];
                 if (prev_valid) {
                     int d = (int)sample_words[c] - (int)prev_words[c];
                     d = (d < 0) ? -d : d;
@@ -4283,43 +4298,20 @@ static int perform_normal_direction_turn(veejay_t *info,
 
     const double start_pos = base_pos + (double)phase_shift;
 
-    int step_max = 0;
-    int step_avg = 0;
     int copied = perform_normal_turn_render_s16(audio_buf, out_samples,
                                                 ctx_buf, ctx_samples,
                                                 ctx_abs_start, &ctx_map,
                                                 base_pos, start_pos, v0, v1,
                                                 turn_samples,
                                                 frame_bytes,
-                                                &step_max, &step_avg);
+                                                NULL, NULL);
     if (copied <= 0)
         return 0;
 
-    int edge_delta = -1;
-    if (sample_ptr->audio_diag_valid && sample_ptr->audio_diag_frame_bytes == frame_bytes) {
-        edge_delta = vj_audio_frame_delta_s16(audio_buf,
-                                              sample_ptr->audio_diag_last_frame,
-                                              frame_bytes);
-    }
-
-    const int peak = vj_audio_peak_s16(audio_buf, copied, frame_bytes);
     const int declick_path = (turn_speed > 1) ? AUDIO_PATH_FAST : AUDIO_PATH_DIRECT;
-    const int hard_turn_boundary =
-        (edge_delta >= 3072 ||
-         phase_slope >= 8192 ||
-         phase_step >= 512 ||
-         step_max >= 1024 ||
-         peak >= 32760);
-
-    if (hard_turn_boundary) {
-        vj_audio_declick_apply(p, audio_buf, copied, frame_bytes,
-                               declick_path, sample_ptr->speed, cur_dir,
-                               AUDIO_EDGE_DIRECTION, 1);
-    } else {
-        vj_audio_declick_observe(p, audio_buf, copied, frame_bytes,
-                                 declick_path, sample_ptr->speed, cur_dir);
-    }
-
+    vj_audio_declick_apply(p, audio_buf, copied, frame_bytes,
+                           declick_path, sample_ptr->speed, cur_dir,
+                           AUDIO_EDGE_DIRECTION, 1);
 
     sample_ptr->scratch_initialized = 0;
     sample_ptr->scratch_pos = 0.0;
@@ -6594,11 +6586,21 @@ int vj_perform_commit_offline_recording(veejay_t *info, int id, char *recording)
 
     if( id > 0 && sample != NULL ) {
         long end_pos = sample->last_frame;
+        const int had_marker = (sample->marker_end > 0 && sample->marker_start >= 0);
+        const int marker_start = sample->marker_start;
+        const int marker_end = sample->marker_end;
+
         new_id = veejay_edit_addmovie_sample( info, recording, id );
         if(new_id != -1) {
             if(end_pos < sample->last_frame) {
-                sample_marker_clear(id);
-                sample_set_startframe(id, end_pos);
+                if(!had_marker) {
+                    sample_set_startframe(id, end_pos);
+                }
+                else {
+                    veejay_msg(VEEJAY_MSG_DEBUG,
+                               "Sample %d marker preserved while appending recording (%d - %d)",
+                               id, marker_start, marker_end);
+                }
             }
             veejay_msg(VEEJAY_MSG_DEBUG, "Sample position set to %d - %d to loop newly recorded video %s",
                     sample_get_startFrame(id), sample_get_endFrame(id), recording );
@@ -9654,11 +9656,18 @@ static int vj_external_audio_render_tape_deck(performer_t *p,
     if(safe_newest <= safe_oldest + (long long)(dst_frames * 4))
         return 0;
 
-    const int mode_key = reverse ? -2 : 2;
+    const int target_dir = reverse ? -1 : 1;
+    const int prev_dir = (p->external_audio_read_vel < -0.01) ? -1 :
+                         ((p->external_audio_read_vel > 0.01) ? 1 : 0);
+    const int mode_key = 2;
     const int rate_key = (int)(deck_rate * 1000.0 + 0.5);
     const int hard_reset = (!p->external_audio_transport_active ||
                             p->external_audio_last_speed != mode_key ||
                             !p->external_audio_tape_feed_valid);
+    const int sign_change = (!hard_reset &&
+                             p->external_audio_transport_active &&
+                             prev_dir != 0 &&
+                             prev_dir != target_dir);
 
     int feed_frames = (int)ceil((double)dst_frames * deck_rate) + 8;
     if(feed_frames < dst_frames)
@@ -9721,37 +9730,39 @@ static int vj_external_audio_render_tape_deck(performer_t *p,
        last_abs < safe_oldest || last_abs > safe_newest)
         return 0;
 
+    const long long copy_first_abs = reverse ? last_abs : first_abs;
+
     if(vj_external_audio_copy_history_window(p,
                                              p->external_audio_context,
                                              feed_frames,
                                              frame_bytes,
-                                             first_abs,
-                                             reverse) != feed_frames)
+                                             copy_first_abs,
+                                             0) != feed_frames)
         return 0;
 
     if(hard_reset) {
         vj_scratch_reset(p->audio_scratcher);
-        p->external_audio_read_pos = 0.0;
+        p->external_audio_read_pos = reverse ? (double)(feed_frames - 1) : 0.0;
         p->external_audio_read_vel = reverse ? -deck_rate : deck_rate;
         p->external_audio_transport_active = 1;
         p->external_audio_last_speed = mode_key;
         p->external_audio_last_rate_key = rate_key;
     } else {
         const double target_vel = reverse ? -deck_rate : deck_rate;
-        double alpha = 0.18;
+        double alpha = sign_change ? 0.12 : 0.18;
         if(fabs(target_vel - p->external_audio_read_vel) > 1.0)
-            alpha = 0.35;
+            alpha = sign_change ? 0.22 : 0.35;
         p->external_audio_read_vel += (target_vel - p->external_audio_read_vel) * alpha;
         p->external_audio_last_rate_key = rate_key;
         if(reanchor)
             vj_scratch_soft_reset(p->audio_scratcher);
     }
 
-    double scratch_rate = fabs(p->external_audio_read_vel);
-    if(scratch_rate < 1.0)
-        scratch_rate = 1.0;
+    double scratch_rate = p->external_audio_read_vel;
     if(scratch_rate > (double)MAX_SPEED)
         scratch_rate = (double)MAX_SPEED;
+    else if(scratch_rate < -(double)MAX_SPEED)
+        scratch_rate = -(double)MAX_SPEED;
 
     int produced = vj_scratch_process(p->audio_scratcher,
                                       (short*)dst,
@@ -9779,12 +9790,26 @@ static int vj_external_audio_render_tape_deck(performer_t *p,
     if(produced < dst_frames)
         vj_audio_pad_exact_tail(dst, produced, dst_frames, frame_bytes);
 
+    if(sign_change) {
+        int edge_speed = (int)(deck_rate + 0.5);
+        if(edge_speed < 1)
+            edge_speed = 1;
+        if(edge_speed > MAX_SPEED)
+            edge_speed = MAX_SPEED;
+        if(target_dir < 0)
+            edge_speed = -edge_speed;
+
+        vj_audio_declick_apply(p, dst, dst_frames, frame_bytes,
+                               AUDIO_PATH_DIRECT, edge_speed, target_dir,
+                               AUDIO_EDGE_DIRECTION, 1);
+    }
+
     if(reverse)
         p->external_audio_tape_feed_abs -= (long long)feed_frames;
     else
         p->external_audio_tape_feed_abs += (long long)feed_frames;
 
-    p->external_audio_read_pos += (reverse ? -scratch_rate : scratch_rate) * (double)dst_frames;
+    p->external_audio_read_pos += scratch_rate * (double)dst_frames;
 
     const double phase_limit = (double)sample_rate * 60.0;
     if(p->external_audio_read_pos > phase_limit || p->external_audio_read_pos < -phase_limit)
@@ -13902,42 +13927,113 @@ static  void    vj_perform_render_osd( veejay_t *info, video_playback_setup *set
     }
 }
 
-static inline void vj_fx_hold_update(veejay_t *info, VJFrame *current_fx)
+static inline size_t vj_output_hold_frame_size(const VJFrame *frame, int plane_sizes[4])
 {
-    performer_global_t *g = (performer_global_t*) info->performer;
-    performer_t *p = g->A;
+    plane_sizes[0] = frame->len;
+    plane_sizes[1] = frame->uv_len;
+    plane_sizes[2] = frame->uv_len;
+    plane_sizes[3] = (frame->data[3] && frame->stride[3] > 0) ? frame->stride[3] * frame->height : 0;
 
+    return (size_t)plane_sizes[0] +
+           (size_t)plane_sizes[1] +
+           (size_t)plane_sizes[2] +
+           (size_t)plane_sizes[3];
+}
+
+static inline int vj_output_hold_ensure_buffer(performer_t *p, size_t need)
+{
+    if(p->output_hold_buffer && p->output_hold_buflen >= need)
+        return 1;
+
+    uint8_t *buf = (uint8_t*) vj_malloc(need);
+    if(!buf) {
+        veejay_msg(VEEJAY_MSG_ERROR, "HOLD: Unable to allocate final output freeze buffer");
+        return 0;
+    }
+
+    if(p->output_hold_buffer)
+        free(p->output_hold_buffer);
+
+    p->output_hold_buffer = buf;
+    p->output_hold_buflen = need;
+    return 1;
+}
+
+static inline void vj_output_hold_planes(performer_t *p, const int plane_sizes[4], uint8_t *planes[4])
+{
+    planes[0] = p->output_hold_buffer;
+    planes[1] = planes[0] + plane_sizes[0];
+    planes[2] = planes[1] + plane_sizes[1];
+    planes[3] = plane_sizes[3] > 0 ? (planes[2] + plane_sizes[2]) : NULL;
+}
+
+static inline void vj_perform_output_hold_update(veejay_t *info, performer_t *p, VJFrame *dst)
+{
     video_playback_setup *s = info->settings;
+    const int manual = s->hold_fx ? 1 : 0;
+    const int timed = s->output_hold_active ? 1 : 0;
 
-    uint8_t slot = 5;
-
-    if (!s->hold_fx) {
+    if(!manual && !timed) {
         s->hold_fx_prev = 0;
+        s->output_hold_capture = 0;
         return;
     }
 
-    int plane_sizes[4] = {
-        current_fx->len, current_fx->uv_len, current_fx->uv_len, current_fx->stride[3] * current_fx->height
-    };
-
-    if (!s->hold_fx_prev && s->hold_fx) {
-
-        uint8_t *pri5[4] = {
-            p->primary_buffer[slot]->Y,
-            p->primary_buffer[slot]->Cb,
-            p->primary_buffer[slot]->Cr,
-            p->primary_buffer[slot]->alpha
-        };
-
-        vj_frame_copy(current_fx->data, pri5, plane_sizes);
-        if(current_fx->ssm) {
-            chroma_subsample(info->settings->sample_mode, current_fx, pri5);
-        }
+    int plane_sizes[4];
+    size_t need = vj_output_hold_frame_size(dst, plane_sizes);
+    if(need == 0 || !vj_output_hold_ensure_buffer(p, need)) {
+        s->output_hold_active = 0;
+        s->output_hold_capture = 0;
+        s->output_hold_frames_left = 0;
+        s->hold_status = 0;
+        s->hold_pos = 0;
+        s->hold_resume = 0;
+        return;
     }
 
+    uint8_t *hold_planes[4];
+    vj_output_hold_planes(p, plane_sizes, hold_planes);
 
-    s->hold_fx_prev = 1;
+    const int capture = s->output_hold_capture || !s->output_hold_ready || (manual && !s->hold_fx_prev);
+
+    if(capture) {
+        vj_frame_copy(dst->data, hold_planes, plane_sizes);
+        s->output_hold_capture = 0;
+        s->output_hold_ready = 1;
+        if(manual)
+            s->hold_fx_prev = 1;
+    }
+    else {
+        vj_frame_copy(hold_planes, dst->data, plane_sizes);
+    }
+
+    if(timed) {
+        if(s->output_hold_frames_left > 0)
+            s->output_hold_frames_left--;
+
+        s->hold_pos = s->output_hold_frames_left;
+        s->hold_resume++;
+
+        if(s->output_hold_frames_left <= 0) {
+            s->output_hold_active = 0;
+            s->output_hold_capture = 0;
+            s->output_hold_frames_left = 0;
+            s->output_hold_frames_total = 0;
+            s->hold_status = 0;
+            s->hold_pos = 0;
+            s->hold_resume = 0;
+
+            if(!manual) {
+                s->output_hold_ready = 0;
+                s->hold_fx_prev = 0;
+            }
+
+            atomic_store_double(&s->smoothed_drift_us, 0.0);
+            veejay_msg(VEEJAY_MSG_INFO, "HOLD: Released full output freeze");
+        }
+    }
 }
+
 
 static  void    vj_perform_finish_chain( veejay_t *info,performer_t *p,VJFrame *frame, int sample_id, int source_type )
 {
@@ -14501,8 +14597,6 @@ void vj_perform_render_video_frames(veejay_t *info, performer_t *p, vjp_kf *effe
 
             vj_perform_finish_chain( info,p,a,sample_id,source_type );
 
-            vj_fx_hold_update(info, a);
-
             break;
 
         case VJ_PLAYBACK_MODE_PLAIN:
@@ -14559,8 +14653,6 @@ void vj_perform_render_video_frames(veejay_t *info, performer_t *p, vjp_kf *effe
             }
 
             vj_perform_finish_chain( info,p,a,sample_id,source_type );
-
-            vj_fx_hold_update(info, a);
 
             break;
         default:
@@ -14906,34 +14998,7 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
     }
 #endif
 
-    if (info->settings->hold_fx && info->settings->hold_fx_prev)
-    {
-        performer_global_t *g = (performer_global_t*) info->performer;
-        performer_t *p = g->A;
 
-        uint8_t slot = 5;
-
-        uint8_t *fx_hold_data[4] = {
-            p->primary_buffer[slot]->Y,
-            p->primary_buffer[slot]->Cb,
-            p->primary_buffer[slot]->Cr,
-            p->primary_buffer[slot]->alpha
-        };
-
-        int plane_sizes[4] = {
-            dst->len,
-            dst->uv_len,
-            dst->uv_len,
-            0,
-        };
-
-        vj_frame_copy( fx_hold_data, dst->data, plane_sizes);
-
-        if(vj_perform_record_presented_video_frame(info, dst))
-            vj_perform_record_video_frame(info);
-
-        return 1;
-    }
 
     vj_perform_sample_tick_reset(g);
 
@@ -15026,6 +15091,8 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
     int strides[4] = {info->effect_frame1->len, info->effect_frame1->uv_len,info->effect_frame1->uv_len,0};
     uint8_t *input[4] = { p->primary_buffer[0]->Y, p->primary_buffer[0]->Cb, p->primary_buffer[0]->Cr, NULL };
     vj_frame_copy( input, dst->data, strides );
+
+    vj_perform_output_hold_update(info, p, dst);
 
     if(vj_perform_record_presented_video_frame(info, dst))
         vj_perform_record_video_frame(info);
@@ -15150,7 +15217,7 @@ static int vj_perform_maybe_publish_sequence_boundary(veejay_t *info,
     if (publish_boundary)
         atomic_store_int(&settings->sequence_boundary, 1);
 
-    if (seq_active || loops_before > 0 || playback_ended) {
+    /*if (seq_active || loops_before > 0 || playback_ended) {
         const long long log_sfd = max_sfd > 0 ? max_sfd : 1;
         const long long log_slice = max_sfd > 1 ? cur_slice : 1;
 
@@ -15174,7 +15241,7 @@ static int vj_perform_maybe_publish_sequence_boundary(veejay_t *info,
                    log_sfd,
                    seq_active,
                    info->seq ? info->seq->current : -1);
-    }
+    }*/
 
     return playback_ended;
 }

@@ -17,7 +17,8 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #include <string.h>
-#include <stdlib.h> // added by NiVofHiR MAR, 07 2026 <--- added this to get bye free() errors.
+#include <stdlib.h>
+#include <stdio.h>
 #include <veejaycore/vevo.h>
 #include <libveejay/vj-event.h>
 #include <veejaycore/vims.h>
@@ -41,6 +42,69 @@
 static	vevo_port_t **index_map_ = NULL;
 static  int *requires_id_map_ = NULL;
 
+static inline int vj_event_vevo_valid_id(int id)
+{
+    return id >= 0 && id < MAX_INDEX && index_map_ != NULL && index_map_[id] != NULL;
+}
+
+static const char *vj_event_vevo_indexed_key(const char *const *lut,
+                                             int lut_len,
+                                             const char *prefix,
+                                             int index,
+                                             char *fallback,
+                                             size_t fallback_len)
+{
+    if(index < 0)
+        return NULL;
+
+    if(index < lut_len)
+        return lut[index];
+
+    if(fallback_len == 0)
+        return NULL;
+
+    if(snprintf(fallback, fallback_len, "%s%d", prefix, index) < 0) {
+        fallback[0] = '\0';
+        return NULL;
+    }
+
+    return fallback;
+}
+
+static const char *vj_event_vevo_argument_key(int index, char *fallback, size_t fallback_len)
+{
+    static const char *const keys[] = {
+        "argument_0", "argument_1", "argument_2", "argument_3",
+        "argument_4", "argument_5", "argument_6", "argument_7",
+        "argument_8", "argument_9", "argument_10", "argument_11",
+        "argument_12", "argument_13", "argument_14", "argument_15"
+    };
+
+    return vj_event_vevo_indexed_key(keys,
+                                     (int)(sizeof(keys) / sizeof(keys[0])),
+                                     "argument_",
+                                     index,
+                                     fallback,
+                                     fallback_len);
+}
+
+static const char *vj_event_vevo_help_key(int index, char *fallback, size_t fallback_len)
+{
+    static const char *const keys[] = {
+        "help_0", "help_1", "help_2", "help_3",
+        "help_4", "help_5", "help_6", "help_7",
+        "help_8", "help_9", "help_10", "help_11",
+        "help_12", "help_13", "help_14", "help_15"
+    };
+
+    return vj_event_vevo_indexed_key(keys,
+                                     (int)(sizeof(keys) / sizeof(keys[0])),
+                                     "help_",
+                                     index,
+                                     fallback,
+                                     fallback_len);
+}
+
 /* define the function pointer to any event */
 typedef void (*vevo_event)(void *ptr, const char format[], va_list ap);
 
@@ -62,7 +126,7 @@ static	void		dump_event_stderr(vevo_port_t *event)
  	int  vims_id = 0;
 	char *param = NULL;
 	int i;
-	char key[16];
+	char keybuf[32];
 
 	size_t len = vevo_property_element_size(event, "format", 0 );
 	if(len > 0 )
@@ -82,7 +146,9 @@ static	void		dump_event_stderr(vevo_port_t *event)
 	
 	for( i = 0; i < n_arg; i ++ )
 	{
-		snprintf(key,sizeof(key), "help_%d", i );
+		const char *key = vj_event_vevo_help_key(i, keybuf, sizeof(keybuf));
+		if(!key)
+			continue;
 		size_t len2 = vevo_property_element_size( event, key, 0 );
 		if(len2 > 0 )
 		{
@@ -93,14 +159,19 @@ static	void		dump_event_stderr(vevo_port_t *event)
 		}
 	}
 	
-	if(fmt) free(fmt);
-	free(name);
+    if(fmt)
+        free(fmt);
+    if(name)
+        free(name);
 }
 
 static int	vj_event_vevo_list_size(void)
 {
 	int i;	
 	int len =0;
+
+    if(!index_map_)
+        return 0;
 	for ( i = 0; i < MAX_INDEX ;i ++ )
 	{
 		if( index_map_[i] != NULL )
@@ -119,22 +190,31 @@ static int	vj_event_vevo_list_size(void)
 
 char	*vj_event_vevo_help_vims( int id, int n )
 {
-	char *help = NULL;
-	char key[10];
-	snprintf(key, sizeof(key), "help_%d", n);
-	size_t len = vevo_property_element_size( index_map_[id], key, 0  );
-	if(len > 0 )
-	{
-		help = (char*) vj_malloc(sizeof(char) * len );
-		vevo_property_get( index_map_[id], key, 0, &help );
-	}
-	return help;
+    char *help = NULL;
+    char keybuf[32];
+
+    if(!vj_event_vevo_valid_id(id) || n < 0)
+        return NULL;
+
+    const char *key = vj_event_vevo_help_key(n, keybuf, sizeof(keybuf));
+    if(!key)
+        return NULL;
+
+    size_t len = vevo_property_element_size(index_map_[id], key, 0);
+    if(len > 0) {
+        help = (char*) vj_malloc(sizeof(char) * len);
+        if(help && vevo_property_get(index_map_[id], key, 0, &help) != VEVO_NO_ERROR) {
+            free(help);
+            help = NULL;
+        }
+    }
+    return help;
 }
 
 char *vj_event_vevo_list_serialize(void)
 {
     int len = vj_event_vevo_list_size();
-    size_t cap = (size_t) len + 6;
+    size_t cap = (size_t) len + 6u;
 
     char *res = (char*) vj_calloc(sizeof(char) * cap);
     if (!res)
@@ -147,6 +227,10 @@ char *vj_event_vevo_list_serialize(void)
         return res;
 
     off = (size_t)n;
+
+    if(!index_map_) {
+        return res;
+    }
 
     for (int i = 0; i < MAX_INDEX; i++)
     {
@@ -193,25 +277,28 @@ char *vj_event_vevo_list_serialize(void)
 
 void	vj_event_vevo_inline_fire(void *super, int vims_id, const char *format, ... )
 {
-	va_list ap;
-	va_start( ap, format );
-	void *func = NULL;
-	if( vevo_property_get( index_map_[vims_id], "function", 0, &func ) == VEVO_NO_ERROR )
-	{
-		vevo_event f = (vevo_event) func;
-		f( super, format, ap );
-	}
-	va_end( ap );
+    va_list ap;
+    void *func = NULL;
+
+    if(!vj_event_vevo_valid_id(vims_id))
+        return;
+
+    va_start(ap, format);
+    if(vevo_property_get(index_map_[vims_id], "function", 0, &func) == VEVO_NO_ERROR) {
+        vevo_event f = (vevo_event) func;
+        f(super, format, ap);
+    }
+    va_end(ap);
 }
 
 void		vj_event_vevo_inline_fire_default( void *super, int vims_id, const char *format )
 {
-	char key[20];
+	char keybuf[32];
 	int i = 0;
 	int n = 0;
 	int dval[VIMS_DEFAULT_ARG_MAX];
 
-	if(!index_map_[vims_id])
+	if(!vj_event_vevo_valid_id(vims_id))
 	{
 		veejay_msg(0, "No such event: %d", vims_id);
 		return;
@@ -233,8 +320,9 @@ void		vj_event_vevo_inline_fire_default( void *super, int vims_id, const char *f
 
 	for(i = 0; i < n; i++)
 	{
-		snprintf(key,sizeof(key), "argument_%d", i );
-		vevo_property_get( index_map_[vims_id], key, 0, &dval[i] );
+		const char *key = vj_event_vevo_argument_key(i, keybuf, sizeof(keybuf));
+		if(key)
+			vevo_property_get( index_map_[vims_id], key, 0, &dval[i] );
 	}
 
 	switch(n)
@@ -304,10 +392,14 @@ static vevo_port_t	*_new_event(
 {
 	int n = 0;
 	int it = 1;
-	char param_name[32];
-	char descr_name[255];
+	char param_name_buf[32];
+	char descr_name_buf[32];
 
 	vevo_port_t *p = (void*) vpn( VEVO_EVENT_PORT );
+    if(!p) {
+        return NULL;
+    }
+
 	if( format )
 		vevo_property_set( p, "format", VEVO_ATOM_TYPE_STRING, 1, &format );
 	else
@@ -327,12 +419,24 @@ static vevo_port_t	*_new_event(
 		int dd   = 0;
 		char *ds = NULL;
 
-		snprintf(param_name,sizeof(param_name), "argument_%d", n );
+		const char *param_name = vj_event_vevo_argument_key(n, param_name_buf, sizeof(param_name_buf));
 		const char *arg = va_arg( ap, const char*);
-		char *descr = (char*) vj_strdup( arg );
-		snprintf(descr_name,sizeof(descr_name), "help_%d", n );
+		char *descr = arg ? (char*) vj_strdup( arg ) : NULL;
+		const char *descr_name = vj_event_vevo_help_key(n, descr_name_buf, sizeof(descr_name_buf));
+		char fmtc = (format && format[it]) ? format[it] : 'd';
 		
-		if (format[it] == 'd')
+        if(!param_name || !descr_name) {
+            if(fmtc == 'd')
+                (void) va_arg( ap, int );
+            else
+                (void) va_arg( ap, char* );
+            if(descr)
+                free(descr);
+            it += 3;
+            continue;
+        }
+
+		if (fmtc == 'd')
 		{
 			dd = va_arg( ap, int );
 			vevo_property_set( p, param_name, VEVO_ATOM_TYPE_INT,1, &dd );
@@ -346,12 +450,13 @@ static vevo_port_t	*_new_event(
 			 vevo_property_set( p, param_name, VEVO_ATOM_TYPE_STRING,1, &ds );
 		}
 
-		vevo_property_set( p, descr_name, VEVO_ATOM_TYPE_STRING, 1,&descr );
+		if(descr)
+			vevo_property_set( p, descr_name, VEVO_ATOM_TYPE_STRING, 1,&descr );
+		else
+			vevo_property_set( p, descr_name, VEVO_ATOM_TYPE_STRING, 0,NULL );
 
 		it += 3;
 
-		if( ds )
-			free( ds);
 		if( descr )
 			free( descr );
 	}
@@ -363,74 +468,78 @@ static vevo_port_t	*_new_event(
 
 void *		vj_event_vevo_get_event_function( int id )
 {
-	void *func = NULL;
-	if( index_map_[id] ) {
-		vevo_property_get( index_map_[id] , "function", 0, &func );
-    }
-	return func;
+    void *func = NULL;
+    if(vj_event_vevo_valid_id(id))
+        vevo_property_get(index_map_[id], "function", 0, &func);
+    return func;
 }
 
 char	*vj_event_vevo_get_event_name( int id )
 {
-	char *descr = NULL;
-	if( index_map_[id] == NULL )
-		return NULL;
+    char *descr = NULL;
 
-	size_t len = vevo_property_element_size( index_map_[id], "description", 0  );
-	if(len > 0 )
-	{
-		descr = (char*) vj_calloc(sizeof(char) * len );
-        if(descr == NULL) 
+    if(!vj_event_vevo_valid_id(id))
+        return NULL;
+
+    size_t len = vevo_property_element_size(index_map_[id], "description", 0);
+    if(len > 0) {
+        descr = (char*) vj_calloc(sizeof(char) * len);
+        if(descr == NULL)
             return NULL;
 
-		if( vevo_property_get( index_map_[id], "description", 0, &descr ) != VEVO_NO_ERROR ) {
-            veejay_msg(0,"Error getting name of VIMS %d", id );
+        if(vevo_property_get(index_map_[id], "description", 0, &descr) != VEVO_NO_ERROR) {
+            veejay_msg(0,"Error getting name of VIMS %d", id);
+            free(descr);
             return NULL;
         }
-	}
-	return descr;
+    }
+    return descr;
 }
 char	*vj_event_vevo_get_event_format( int id )
 {
-	char *fmt = NULL;
-	if(!index_map_[id])
-		return NULL;
-	size_t len = vevo_property_element_size( index_map_[id], "format", 0 );
-	if(len > 0 )
-	{
-		fmt = (char*) vj_calloc(sizeof(char) * len );
-        if(fmt == NULL) 
+    char *fmt = NULL;
+
+    if(!vj_event_vevo_valid_id(id))
+        return NULL;
+
+    size_t len = vevo_property_element_size(index_map_[id], "format", 0);
+    if(len > 0) {
+        fmt = (char*) vj_calloc(sizeof(char) * len);
+        if(fmt == NULL)
             return NULL;
 
-		if(vevo_property_get( index_map_[id], "format", 0, &fmt ) != VEVO_NO_ERROR ) {
-            veejay_msg(0, "Error getting format specifier for VIMS %d", id );
+        if(vevo_property_get(index_map_[id], "format", 0, &fmt) != VEVO_NO_ERROR) {
+            veejay_msg(0, "Error getting format specifier for VIMS %d", id);
+            free(fmt);
             return NULL;
         }
-	}
-	return fmt;
+    }
+    return fmt;
 }
 
 int	vj_event_exists( int id )
 {
-	if( index_map_[id])
-		return 1;
-	return 0;	
+    return vj_event_vevo_valid_id(id) ? 1 : 0;
 }
 
 
 int	vj_event_vevo_get_default_value(int id, int p)
 {
 	int n =0;
-	if(!index_map_[id])
+	if(!vj_event_vevo_valid_id(id))
 		return 0;
-	char key[16];
-	snprintf(key,sizeof(key), "argument_%d",p);
+	if(p < 0)
+		return 0;
+	char keybuf[32];
+	const char *key = vj_event_vevo_argument_key(p, keybuf, sizeof(keybuf));
+	if(!key)
+		return 0;
 	vevo_property_get(index_map_[id], key, 0, &n );
 	return n;
 }
 int	vj_event_vevo_get_num_args(int id)
 {
-	if(!index_map_[id])
+	if(!vj_event_vevo_valid_id(id))
 		return 0;
 	int n =0;
 	vevo_property_get(index_map_[id], "arguments", 0, &n );
@@ -438,7 +547,7 @@ int	vj_event_vevo_get_num_args(int id)
 }
 int		vj_event_vevo_get_flags( int id )
 {
-	if(!index_map_[id])
+	if(!vj_event_vevo_valid_id(id))
 		return 0;
 	int flags = 0;
 	vevo_property_get( index_map_[id], "flags", 0, &flags );
@@ -447,7 +556,7 @@ int		vj_event_vevo_get_flags( int id )
 
 int		vj_event_vevo_get_vims_id( int id )
 {
-	if(!index_map_[id])
+	if(!vj_event_vevo_valid_id(id))
 		return 0;
 	int vims_id = 0;
 	vevo_property_get( index_map_[id], "vims_id", 0, &vims_id );
@@ -481,9 +590,14 @@ void		vj_event_vevo_free(void)
 	if( index_map_ ) {
 		for( i = 0 ; i < MAX_INDEX  ; i ++ ) {
 		  if( index_map_[i] ) vpf( index_map_[i] );
-		} 
+		}
 		free(index_map_);
+        index_map_ = NULL;
 	}
+    if(requires_id_map_) {
+        free(requires_id_map_);
+        requires_id_map_ = NULL;
+    }
 }	
 
 void		vj_init_vevo_events(void)
@@ -633,7 +747,7 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_VIDEO_SET_FREEZE]    =   _new_event(
 				NULL,
 				VIMS_VIDEO_SET_FREEZE,
-				"Pause and hold FX chain (freeze)",
+				"Toggle final output freeze",
 				vj_event_set_freeze,
 				0,
 				VIMS_ALLOW_ANY,
@@ -1273,15 +1387,15 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_SAMPLE_HOLD_FRAME]	=	_new_event(
 				"%d %d %d",
 				VIMS_SAMPLE_HOLD_FRAME,
-				"Hold frame (pause and resume from frame position + pause duration)",
+				"Hold/freeze the final output frame after all FX",
 				vj_event_hold_frame,
 				3,
 				VIMS_ALLOW_ANY,
-				SAMPLE_ID_HELP,
+				"Compatibility argument (ignored; use 0)",
 				0,
-				"Minimum delay offset (0=1 frame)",
+				"Compatibility argument (ignored; use 0)",
 				0,
-				"Initial delay ( > 4 frames < 300 )",
+				"Hold duration in presented output frames (1-999, 0=release)",
 				5,
 				NULL );
 
