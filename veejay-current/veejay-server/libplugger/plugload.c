@@ -981,7 +981,7 @@ int	plug_instance_get_num_parameters(void *instance)
 void	plug_sys_set_palette( int pref_palette )
 {
 	base_fmt_ = pref_palette;
-	livido_set_pref_palette( yuv_to_alpha_fmt(base_fmt_) );
+	livido_set_pref_palette( base_fmt_ );
 }
 
 void	plug_push_frame( void *instance, int out, int seq_num, void *frame_info )

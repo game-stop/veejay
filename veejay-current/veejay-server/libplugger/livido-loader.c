@@ -116,6 +116,42 @@ int		lvd_livido_palette(int v)
 	return -1;
 }
 
+static int match_palette(livido_port_t *ptr, int palette);
+
+static int livido_palette_from_vjframe(const VJFrame *frame)
+{
+	if(!frame)
+		return pref_palette_;
+
+	if(frame->width > 0 && frame->height > 0 && frame->uv_width > 0 && frame->uv_height > 0) {
+		if(frame->uv_width == frame->width && frame->uv_height == frame->height)
+			return LIVIDO_PALETTE_YUV444P;
+		if(frame->uv_width == ((frame->width + 1) >> 1) && frame->uv_height == frame->height)
+			return LIVIDO_PALETTE_YUV422P;
+		if(frame->uv_width == ((frame->width + 1) >> 1) && frame->uv_height == ((frame->height + 1) >> 1))
+			return LIVIDO_PALETTE_YUV420P;
+	}
+
+	switch(frame->format) {
+		case PIX_FMT_YUV420P:
+		case PIX_FMT_YUVJ420P:
+		case PIX_FMT_YUVA420P:
+			return LIVIDO_PALETTE_YUV420P;
+		case PIX_FMT_YUV422P:
+		case PIX_FMT_YUVJ422P:
+		case PIX_FMT_YUVA422P:
+			return LIVIDO_PALETTE_YUV422P;
+		case PIX_FMT_YUV444P:
+		case PIX_FMT_YUVJ444P:
+		case PIX_FMT_YUVA444P:
+			return LIVIDO_PALETTE_YUV444P;
+		default:
+			break;
+	}
+
+	return pref_palette_;
+}
+
 static	int	configure_channel( void *instance, const char *name, int channel_id, VJFrame *frame )
 {
 	void *channel = NULL;
@@ -127,6 +163,16 @@ static	int	configure_channel( void *instance, const char *name, int channel_id, 
 	int	rowstrides[4] = { frame->width, frame->uv_width, frame->uv_width, frame->stride[3] };
 	vevo_property_set( channel  , "rowstrides", LIVIDO_ATOM_TYPE_INT,4, &rowstrides );
 	vevo_property_set( channel  , "timecode", LIVIDO_ATOM_TYPE_DOUBLE,1, &(frame->timecode));
+
+	int actual_palette = livido_palette_from_vjframe(frame);
+	void *parent_template = NULL;
+	if( vevo_property_get( channel, "parent_template", 0, &parent_template ) == VEVO_NO_ERROR ) {
+		if( match_palette((livido_port_t*) parent_template, actual_palette) )
+			vevo_property_set( channel, "current_palette", LIVIDO_ATOM_TYPE_INT,1, &actual_palette );
+	}
+	else {
+		vevo_property_set( channel, "current_palette", LIVIDO_ATOM_TYPE_INT,1, &actual_palette );
+	}
 
 	pd[0] = (void*) frame->data[0];
 	pd[1] = (void*) frame->data[1];
@@ -850,6 +896,7 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ , int org_fmt_, 
 	void *filter_templ = NULL;
 	
     read_plugin_configuration = read_plug_cfg;
+	(void) base_fmt_;
 
 	if( vevo_property_get( plugin, "instance", 0, &plug_info) != VEVO_NO_ERROR ) {
 		veejay_msg(0, "Not a Livido plugin");
@@ -886,7 +933,7 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ , int org_fmt_, 
 	//@ call livido init
 	livido_init_f init_f;
 	vevo_property_get( filter_templ, "init_func", 0, &init_f );
-	int fullrange = ( (org_fmt_ == PIX_FMT_YUVJ422P || org_fmt_ == PIX_FMT_YUVJ444P) ? 1: 0 );
+	int fullrange = ( (org_fmt_ == PIX_FMT_YUVJ420P || org_fmt_ == PIX_FMT_YUVJ422P || org_fmt_ == PIX_FMT_YUVJ444P) ? 1: 0 );
 	vevo_property_set( filter_instance, 
 					"HOST_fullrange",
 					VEVO_ATOM_TYPE_INT,
@@ -897,7 +944,7 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ , int org_fmt_, 
 					"HOST_format",
 					VEVO_ATOM_TYPE_INT,
 					1,
-					&base_fmt_);
+					&org_fmt_);
 
 	int shmid = 0;
 	if( vevo_property_get( filter_templ, "HOST_shmid", 0,&shmid ) == VEVO_NO_ERROR )
@@ -1391,6 +1438,7 @@ static int		host_to_palette( int pref_palette )
 			return LIVIDO_PALETTE_YUV422P;
         case PIX_FMT_YUV444P:
         case PIX_FMT_YUVJ444P:
+        case PIX_FMT_YUVA444P:
             return LIVIDO_PALETTE_YUV444P;
 		default:
 			return LIVIDO_PALETTE_YUVA8888;
