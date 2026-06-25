@@ -50,6 +50,7 @@
 #include <sys/sysinfo.h>
 #include <unistd.h>
 #include <libveejay/vj-OSC.h>
+#include <libveejay/vj-split.h>
 #include <build.h>
 #include <libvje/libvje.h>
 
@@ -326,7 +327,7 @@ static void Usage(char *progname)
     fprintf(stderr, "  -t/--timer <num>             Select timer: 0=none, 1=default (default: 1)\n");
     fprintf(stderr, "  -S/--scene-detection <num>   Create samples using scene detection threshold\n");
     fprintf(stderr, "  -X/--dynamic-fx-chain        Do not keep FX chain buffers in RAM\n");
-    fprintf(stderr, "     --split-screen            Load split-screen configuration\n");
+    fprintf(stderr, "     --split-screen <file>     Load video-wall split-screen configuration\n");
     fprintf(stderr, "     --fx-custom-default-values\n");
     fprintf(stderr, "                                Read FX defaults from ~/.veejay/livido and frei0r\n");
     fprintf(stderr, "     --benchmark WxH           Run benchmark at the given resolution\n");
@@ -358,6 +359,21 @@ static int parse_binary_option(const char *name, const char *value, int *dst)
 
     fprintf(stderr, "%s must be 0 or 1\n", name ? name : "option");
     return 1;
+}
+
+static int parse_split_screen_option(const char *value)
+{
+    if(!value || value[0] == '\0') {
+        fprintf(stderr, "--split-screen requires a configuration file\n");
+        return 1;
+    }
+
+    snprintf(info->settings->split_screen_file,
+             sizeof(info->settings->split_screen_file),
+             "%s",
+             value);
+    info->settings->splitscreen = 1;
+    return 0;
 }
 
 #define check_val(val,msg) {\
@@ -668,7 +684,7 @@ static int set_option(const char *name, char *value)
 	}
 	else if (strcmp(name, "split-screen" ) == 0 )
 	{
-		info->settings->splitscreen = 1;
+		nerr += parse_split_screen_option(value);
 	}
     else if (strcmp(name, "fx-custom-default-values" ) == 0 )
     {
@@ -755,7 +771,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"scene-detection",1,0,0},
 	{"dynamic-fx-chain",0,0,0},
 	{"pace-correction",1,0,0},
-	{"split-screen",0,0,0},
+	{"split-screen",1,0,0},
     {"fx-custom-default-values",0,0,0},
     {"help",0,0,0},
 	{0, 0, 0, 0}
@@ -995,6 +1011,27 @@ int main(int argc, char **argv)
         veejay_msg(VEEJAY_MSG_ERROR, "Cannot start Veejay");
         main_ret = 1;
         goto VEEJAY_MAIN_EXIT;
+    }
+
+    if (settings->splitscreen) {
+        if(settings->split_screen_file[0] == '\0') {
+            veejay_msg(VEEJAY_MSG_ERROR, "Split-screen mode requires a configuration file");
+            main_ret = 1;
+            goto VEEJAY_MAIN_EXIT;
+        }
+
+        vj_split_set_master(info->uc->port);
+        info->splitter = vj_split_new_from_file(settings->split_screen_file,
+                                                info->video_output_width,
+                                                info->video_output_height,
+                                                info->pixel_format);
+        if(!info->splitter) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Unable to load split-screen configuration '%s'",
+                       settings->split_screen_file);
+            main_ret = 1;
+            goto VEEJAY_MAIN_EXIT;
+        }
     }
 
     if (auto_loop) veejay_auto_loop(info);

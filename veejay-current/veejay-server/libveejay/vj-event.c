@@ -12528,24 +12528,25 @@ void    vj_event_connect_split_shm( void *ptr, const char format[], va_list ap )
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
     P_A(args,sizeof(args), NULL,0,format,ap);
-    
-    int32_t key = args[0];
-    int safe_key = vj_shm_get_id();
 
-    vj_shm_set_id( key );
+    int32_t key = args[0];
+
+    if( key <= 0 ) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid split shared memory key %d", key);
+        return;
+    }
 
     veejay_msg(VEEJAY_MSG_INFO,"Connect to shared memory resource %x (%d)", key,key);
 
     int id = veejay_create_tag( v, VJ_TAG_TYPE_GENERATOR, "lvd_shmin.so", v->nstreams, 0, key);
-    
-    vj_shm_set_id( safe_key );
-    
     if( id <= 0 ) {
         veejay_msg(0, "Unable to connect to shared resource id %d", key );
+        return;
     }
 
     veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG ,id);
 }
+
 
 #ifdef HAVE_FREETYPE
 void    vj_event_get_srt_list(  void *ptr,  const char format[],    va_list ap  )

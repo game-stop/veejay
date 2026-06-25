@@ -122,6 +122,7 @@ int32_t			vj_share_pull_master( void *shm, char *master_host, int master_port )
 int	vj_share_get_info( char *host, int port, int *width, int *height, int *format, int *key, int screen_id )
 {
 	char tmp[128];
+	int ok = 0;
 	vj_client *c = vj_share_connect( host, port );
 	if(!c) {
 		veejay_msg(0, "Error connecting to %s:%d",host,port );
@@ -132,23 +133,28 @@ int	vj_share_get_info( char *host, int port, int *width, int *height, int *forma
 	vj_client_send( c, V_CMD, (unsigned char*) tmp );
 
 	memset(tmp,0,sizeof(tmp));
-	vj_client_read( c, V_CMD, (unsigned char*) tmp, 3 ); //@ get SHM id from
-
-	int msg_len = 0;
-	if( sscanf( tmp, "%d", &msg_len ) ) {
-
-		vj_client_read( c, V_CMD, (unsigned char*) tmp, msg_len );
-
-		sscanf( tmp, "%d %d %d %d",
-				width,height,format,key );
-
-		veejay_msg(VEEJAY_MSG_DEBUG, "Veejay %s:%d has a shared memory resource at %x (%d) in %dx%d@%d", host,port, *key,*key, *width,*height,*format);
+	int nb = vj_client_read( c, V_CMD, (unsigned char*) tmp, 3 );
+	if(nb == 3) {
+		tmp[3] = '\0';
+		int msg_len = 0;
+		if( sscanf( tmp, "%d", &msg_len ) == 1 && msg_len > 0 && msg_len < (int) sizeof(tmp) ) {
+			memset(tmp,0,sizeof(tmp));
+			nb = vj_client_read( c, V_CMD, (unsigned char*) tmp, msg_len );
+			if(nb == msg_len) {
+				tmp[msg_len] = '\0';
+				if(sscanf( tmp, "%d %d %d %d", width,height,format,key ) == 4) {
+					ok = (*width > 0 && *height > 0);
+					if(ok)
+						veejay_msg(VEEJAY_MSG_DEBUG, "Veejay %s:%d has a shared memory resource at %x (%d) in %dx%d@%d", host,port, *key,*key, *width,*height,*format);
+				}
+			}
+		}
 	}
-	vj_client_close( c );
 
+	vj_client_close( c );
 	vj_client_free( c );
 
-	return 1;
+	return ok;
 }
 
 
@@ -175,6 +181,8 @@ int	vj_share_start_slave( char *host, int port, int shm_id)
 int	vj_share_start_net( char *host, int port, char *master_host, int master_port)
 {
 	char tmp[64];
+	if(master_host == NULL)
+		master_host = "127.0.0.1";
 	vj_client *c = vj_share_connect( host,port );
 	if(!c) {
 		veejay_msg(0, "Error connecting to %s:%d",host, port );

@@ -21,15 +21,15 @@
 #ifndef V_SPLITSCREEN_H
 #define V_SPLITSCREEN_H
 
-
 void *vj_split_new_from_file(char *filename, int w, int h, int fmt);
-void vj_split_render( void *ptr );
-void vj_split_process( void *ptr, VJFrame *src );
-int vj_split_auto_configure_screen( void *ptr );
-int	vj_split_add_screen( void *ptr,char *hostname, int port, int row, int col, int out_w, int out_h, int fmt );
-int vj_split_configure_screen( void *ptr, int screen_id, int edge_x, int edge_y, int left, int right, int top, int bottom, int w, int h );
-void vj_split_free( void *ptr );
-void *vj_split_init(int r, int c );
+void vj_split_render(void *ptr);
+void vj_split_process(void *ptr, VJFrame *src);
+int vj_split_auto_configure_screen(void *ptr);
+int vj_split_add_screen(void *ptr, char *hostname, int port, int row, int col, int out_w, int out_h, int fmt);
+int vj_split_configure_screen(void *ptr, int screen_id, int edge_x, int edge_y, int left, int right, int top, int bottom, int w, int h);
+void vj_split_free(void *ptr);
+void *vj_split_init(int r, int c);
 void vj_split_set_master(int port);
 VJFrame *vj_split_get_screen(void *ptr, int screen_id);
+
 #endif

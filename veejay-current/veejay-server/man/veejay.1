@@ -556,8 +556,11 @@ Do not keep FX chain buffers in RAM. Use this option if you prefer dynamic
 allocation instead. This is slower, but reserves less RAM.
 
 .TP
-.B \--split-screen
-Load split-screen configuration.
+.B \--split-screen <file>
+Load a video-wall split-screen configuration file. The master instance divides
+the rendered output into tiles and sends each tile to the veejay instance
+listed for that screen. Localhost screens use shared memory; remote hosts use
+the configured host and port.
 
 .TP
 .B \--fx-custom-default-values
@@ -569,6 +572,130 @@ and
 .TP
 .B \-q/--quit
 Quit at the end of the file.
+
+.SH VIDEO WALL SPLIT-SCREEN CONFIGURATION
+
+The
+.BR --split-screen
+option expects a configuration file. The first non-empty line declares the wall
+layout as rows by columns:
+
+.PP
+.RS
+.nf
+\fBscreen=<rows>x<columns>\fR
+.fi
+.RE
+
+Each following screen line maps one zero-based row and column to a running
+veejay output instance:
+
+.PP
+.RS
+.nf
+\fBrow=<row> col=<column> port=<port> hostname=<host>\fR
+.fi
+.RE
+
+The slave/output instances must already be running on the listed ports. The
+.B port
+field is the receiver's base VIMS command port, the same value passed with
+.BR -p/--port .
+A running veejay instance also owns the neighbouring status and data sockets,
+so reserve the whole port block for that instance. In the usual layout,
+.B 3490
+means command on 3490, status on 3491, and data on 3492. Do not start wall
+nodes on 3490, 3491, and 3492. Use separated base ports such as 3490, 4490,
+5490, and 6490.
+
+The receiver window/output size is queried from the receiver, so projectors
+with different resolutions can be used. Use
+.B localhost
+or
+.B 127.0.0.1
+for local shared-memory projectors. Use a network hostname or address for a
+remote output node.
+
+Optional overlap and edge-blending fields can be appended to each screen line.
+Use
+.B overlap_x
+and
+.B overlap_y
+to extend neighbouring tiles into each other and fade the overlap band. The
+aliases
+.BR edge_x ,
+.BR edge_y ,
+.BR edge_h ,
+.BR edge_v ,
+.BR blend_x ,
+and
+.B blend_y
+are also accepted. Values are source-canvas pixels.
+
+.SS Two horizontal projectors
+
+.PP
+.RS
+.nf
+screen=1x2
+row=0 col=0 port=3490 hostname=localhost
+row=0 col=1 port=4490 hostname=localhost
+.fi
+.RE
+
+Start two local projector/output instances on +1000 spaced base ports, then
+start the master with the configuration file. The master also needs its own
+free base port. For a 1 by 2 wall using receivers 3490 and 4490, 5490 is a
+suitable master base port:
+
+.PP
+.RS
+.nf
+veejay -d -p 3490 -w 1024 -h 768
+veejay -d -p 4490 -w 1024 -h 768
+veejay --master -p 5490 --split-screen wall-1x2.conf -w 1920 -h 768 video.avi
+.fi
+.RE
+
+.SS Two horizontal projectors with overlap blending
+
+.PP
+.RS
+.nf
+screen=1x2
+row=0 col=0 port=3490 hostname=localhost overlap_x=80
+row=0 col=1 port=4490 hostname=localhost overlap_x=80
+.fi
+.RE
+
+This gives both projectors an 80-pixel horizontal overlap region and fades the
+edge of each tile inside that overlap.
+
+.SS Four projectors in a 2 by 2 wall
+
+.PP
+.RS
+.nf
+screen=2x2
+row=0 col=0 port=3490 hostname=localhost overlap_x=64 overlap_y=48
+row=0 col=1 port=4490 hostname=localhost overlap_x=64 overlap_y=48
+row=1 col=0 port=5490 hostname=localhost overlap_x=64 overlap_y=48
+row=1 col=1 port=6490 hostname=localhost overlap_x=64 overlap_y=48
+.fi
+.RE
+
+For this four-node example, start the master on another free base port, for
+example
+.BR "-p 7490" .
+
+Manual crop coordinates may be used instead of automatic row/column tiling by
+adding all four fields
+.BR left ,
+.BR right ,
+.BR top ,
+and
+.BR bottom
+to a screen line. Coordinates are source-canvas pixels.
 
 .SH ENVIRONMENT VARIABLES
 

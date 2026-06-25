@@ -502,6 +502,7 @@ typedef struct {
 	int pace_correction;
 	long pace_correction_us;
 	int	splitscreen;
+	char split_screen_file[1024];
 	int clear_alpha;
 	int alpha_value;
 	int audiostats;

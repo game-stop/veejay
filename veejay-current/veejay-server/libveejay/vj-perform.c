@@ -3385,6 +3385,12 @@ void    vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast
                     continue;
 
                 VJFrame *frame = vj_split_get_screen( info->splitter, screen_id );
+                if(!frame) {
+                    info->rlinks[i] = -1;
+                    info->splitted_screens[i] = -1;
+                    continue;
+                }
+
                 int data_len = vj_perform_compress_primary_frame_s2( info, frame );
                 if(data_len <= 0)
                     continue;
@@ -14162,6 +14168,9 @@ static  void    vj_perform_finish_render( veejay_t *info,performer_t *p,VJFrame 
         free(more_text);
     if( audio_top_text)
         free(audio_top_text);
+
+    if(settings->splitscreen && info->splitter)
+        vj_split_render(info->splitter);
 
     if(!settings->composite && info->uc->mouse[0] > 0 && info->uc->mouse[1] > 0)
     {
