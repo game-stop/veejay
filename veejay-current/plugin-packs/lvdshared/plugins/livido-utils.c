@@ -42,11 +42,14 @@
 
 /////////////////////////////////////////////////////////////////
 
+#ifndef LIVIDO_UTILS_STATIC_INLINE_C
+#define LIVIDO_UTILS_STATIC_INLINE_C
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "livido.h"
 
-int livido_has_property (livido_port_t *port, const char *key) {
+static inline int livido_has_property (livido_port_t *port, const char *key) {
   if (livido_property_get(port,key,0,NULL)==LIVIDO_ERROR_NOSUCH_PROPERTY) return 0;
   return 1;
 }
@@ -54,32 +57,32 @@ int livido_has_property (livido_port_t *port, const char *key) {
 /////////////////////////////////////////////////////////////////
 // property setters
 
-int livido_set_int_value (livido_port_t *port, const char *key, int value) {
+static inline int livido_set_int_value (livido_port_t *port, const char *key, int value) {
   // returns a LIVIDO_ERROR
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_INT,1,&value);
 }
 
-int livido_set_double_value (livido_port_t *port, const char *key, double value) {
+static inline int livido_set_double_value (livido_port_t *port, const char *key, double value) {
   // returns a LIVIDO_ERROR
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_DOUBLE,1,&value);
 }
 
-int livido_set_boolean_value (livido_port_t *port, const char *key, int value) {
+static inline int livido_set_boolean_value (livido_port_t *port, const char *key, int value) {
   // returns a LIVIDO_ERROR
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_BOOLEAN,1,&value);
 }
 
-int livido_set_string_value (livido_port_t *port, const char *key, char *value) {
+static inline int livido_set_string_value (livido_port_t *port, const char *key, char *value) {
   // returns a LIVIDO_ERROR
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_STRING,1,&value);
 }
 
-int livido_set_portptr_value (livido_port_t *port, const char *key, void *value) {
+static inline int livido_set_portptr_value (livido_port_t *port, const char *key, void *value) {
   // returns a LIVIDO_ERROR
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_PORTPTR,1,&value);
 }
 
-int livido_set_voidptr_value (livido_port_t *port, const char *key, void *value) {
+static inline int livido_set_voidptr_value (livido_port_t *port, const char *key, void *value) {
   // returns a LIVIDO_ERROR
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_VOIDPTR,1,&value);
 }
@@ -91,14 +94,14 @@ int livido_set_voidptr_value (livido_port_t *port, const char *key, void *value)
 //////////////////////////////////////////////////////////////////////////////////////////////////
 // general property getter
 
-int livido_get_value (livido_port_t *port, const char *key, void *value) {
+static inline int livido_get_value (livido_port_t *port, const char *key, void *value) {
   // returns a LIVIDO_ERROR
   return livido_property_get( port, key, 0, value);
 }
 
 ////////////////////////////////////////////////////////////
 
-int livido_get_int_value (livido_port_t *port, const char *key, int *error) {
+static inline int livido_get_int_value (livido_port_t *port, const char *key, int *error) {
   int retval=0;
   if (livido_has_property(port,key)&&livido_property_atom_type(port,key)!=LIVIDO_ATOM_TYPE_INT) {
     *error=LIVIDO_ERROR_WRONG_ATOM_TYPE;
@@ -108,7 +111,7 @@ int livido_get_int_value (livido_port_t *port, const char *key, int *error) {
   return retval;
 }
 
-double livido_get_double_value (livido_port_t *port, const char *key, int *error) {
+static inline double livido_get_double_value (livido_port_t *port, const char *key, int *error) {
   double retval=0.;
   if (livido_has_property(port,key)&&livido_property_atom_type(port,key)!=LIVIDO_ATOM_TYPE_DOUBLE) {
     *error=LIVIDO_ERROR_WRONG_ATOM_TYPE;
@@ -118,7 +121,7 @@ double livido_get_double_value (livido_port_t *port, const char *key, int *error
   return retval;
 }
 
-int livido_get_boolean_value (livido_port_t *port, const char *key, int *error) {
+static inline int livido_get_boolean_value (livido_port_t *port, const char *key, int *error) {
   int retval=0;
   if (livido_has_property(port,key)&&livido_property_atom_type(port,key)!=LIVIDO_ATOM_TYPE_BOOLEAN) {
     *error=LIVIDO_ERROR_WRONG_ATOM_TYPE;
@@ -128,7 +131,7 @@ int livido_get_boolean_value (livido_port_t *port, const char *key, int *error) 
   return retval;
 }
 
-char *livido_get_string_value (livido_port_t *port, const char *key, int *error) {
+static inline char *livido_get_string_value (livido_port_t *port, const char *key, int *error) {
   char *retval=NULL;
   if (livido_has_property(port,key)&&livido_property_atom_type(port,key)!=LIVIDO_ATOM_TYPE_STRING) {
     *error=LIVIDO_ERROR_WRONG_ATOM_TYPE;
@@ -145,7 +148,7 @@ char *livido_get_string_value (livido_port_t *port, const char *key, int *error)
   return retval;
 }
 
-void *livido_get_voidptr_value (livido_port_t *port, const char *key, int *error) {
+static inline void *livido_get_voidptr_value (livido_port_t *port, const char *key, int *error) {
   void *retval=NULL;
   if (livido_has_property(port,key)&&livido_property_atom_type(port,key)!=LIVIDO_ATOM_TYPE_VOIDPTR) {
     *error=LIVIDO_ERROR_WRONG_ATOM_TYPE;
@@ -155,7 +158,7 @@ void *livido_get_voidptr_value (livido_port_t *port, const char *key, int *error
   return retval;
 }
 
-livido_port_t *livido_get_portptr_value (livido_port_t *port, const char *key, int *error) {
+static inline livido_port_t *livido_get_portptr_value (livido_port_t *port, const char *key, int *error) {
   livido_port_t *retval=NULL;
   if (livido_has_property(port,key)&&livido_property_atom_type(port,key)!=LIVIDO_ATOM_TYPE_PORTPTR) {
     *error=LIVIDO_ERROR_WRONG_ATOM_TYPE;
@@ -168,7 +171,7 @@ livido_port_t *livido_get_portptr_value (livido_port_t *port, const char *key, i
 
 ////////////////////////////////////////////////////////////
 
-int *livido_get_int_array (livido_port_t *port, const char *key, int *error) {
+static inline int *livido_get_int_array (livido_port_t *port, const char *key, int *error) {
   int i;
   int num_elems;
   int *retval;
@@ -194,7 +197,7 @@ int *livido_get_int_array (livido_port_t *port, const char *key, int *error) {
   return retval;
 }
 
-double *livido_get_double_array (livido_port_t *port, const char *key, int *error) {
+static inline double *livido_get_double_array (livido_port_t *port, const char *key, int *error) {
   int i;
   int num_elems;
   double *retval;
@@ -219,7 +222,7 @@ double *livido_get_double_array (livido_port_t *port, const char *key, int *erro
   return retval;
 }
 
-int *livido_get_boolean_array (livido_port_t *port, const char *key, int *error) {
+static inline int *livido_get_boolean_array (livido_port_t *port, const char *key, int *error) {
   int i;
   int num_elems;
   int *retval;
@@ -245,7 +248,7 @@ int *livido_get_boolean_array (livido_port_t *port, const char *key, int *error)
   return retval;
 }
 
-char **livido_get_string_array (livido_port_t *port, const char *key, int *error) {
+static inline char **livido_get_string_array (livido_port_t *port, const char *key, int *error) {
   int i;
   int num_elems;
   char **retval;
@@ -278,7 +281,7 @@ char **livido_get_string_array (livido_port_t *port, const char *key, int *error
   return retval;
 }
 
-void **livido_get_voidptr_array (livido_port_t *port, const char *key, int *error) {
+static inline void **livido_get_voidptr_array (livido_port_t *port, const char *key, int *error) {
   int i;
   int num_elems;
   void **retval;
@@ -304,7 +307,7 @@ void **livido_get_voidptr_array (livido_port_t *port, const char *key, int *erro
   return retval;
 }
 
-livido_port_t **livido_get_portptr_array (livido_port_t *port, const char *key, int *error) {
+static inline livido_port_t **livido_get_portptr_array (livido_port_t *port, const char *key, int *error) {
   int i;
   int num_elems;
   livido_port_t **retval;
@@ -332,27 +335,29 @@ livido_port_t **livido_get_portptr_array (livido_port_t *port, const char *key, 
 
 /////////////////////////////////////////////////////
 
-int livido_set_int_array (livido_port_t *port, const char *key, int num_elems, int *values) {
+static inline int livido_set_int_array (livido_port_t *port, const char *key, int num_elems, int *values) {
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_INT,num_elems,values);
 }
 
-int livido_set_double_array (livido_port_t *port, const char *key, int num_elems, double *values) {
+static inline int livido_set_double_array (livido_port_t *port, const char *key, int num_elems, double *values) {
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_DOUBLE,num_elems,values);
 }
 
-int livido_set_boolean_array (livido_port_t *port, const char *key, int num_elems, int *values) {
+static inline int livido_set_boolean_array (livido_port_t *port, const char *key, int num_elems, int *values) {
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_BOOLEAN,num_elems,values);
 }
 
-int livido_set_string_array (livido_port_t *port, const char *key, int num_elems, char **values) {
+static inline int livido_set_string_array (livido_port_t *port, const char *key, int num_elems, char **values) {
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_STRING,num_elems,values);
 }
 
-int livido_set_voidptr_array (livido_port_t *port, const char *key, int num_elems, void **values) {
+static inline int livido_set_voidptr_array (livido_port_t *port, const char *key, int num_elems, void **values) {
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_VOIDPTR,num_elems,values);
 }
 
-int livido_set_portptr_array (livido_port_t *port, const char *key, int num_elems, livido_port_t **values) {
+static inline int livido_set_portptr_array (livido_port_t *port, const char *key, int num_elems, livido_port_t **values) {
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_PORTPTR,num_elems,values);
 }
 
+
+#endif /* LIVIDO_UTILS_STATIC_INLINE_C */
