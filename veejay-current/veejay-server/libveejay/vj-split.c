@@ -43,6 +43,10 @@
 #define LOCALHOST "127.0.0.1"
 #define SHM_ADDR_OFFSET 4096
 
+#ifndef VJ_SPLIT_SCALER_TYPE
+#define VJ_SPLIT_SCALER_TYPE 1
+#endif
+
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
 #define VJ_SPLIT_RESTRICT restrict
 #else
@@ -92,6 +96,14 @@ typedef struct
     int *map_y0;
     uint16_t *map_gx;
     uint16_t *map_gy;
+
+    void *scaler;
+    int scaler_src_w;
+    int scaler_src_h;
+    int scaler_dst_w;
+    int scaler_dst_h;
+    int scaler_src_fmt;
+    int scaler_dst_fmt;
 } v_screen_t;
 
 typedef struct
@@ -195,6 +207,49 @@ static inline int vj_split_axis_gain(int pos, int len, int fade0, int fade1)
     }
 
     return vj_split_clampi(gain, 0, 256);
+}
+
+
+static inline void vj_split_gather_row_444(uint8_t *VJ_SPLIT_RESTRICT dy,
+                                           uint8_t *VJ_SPLIT_RESTRICT du,
+                                           uint8_t *VJ_SPLIT_RESTRICT dv,
+                                           const uint8_t *VJ_SPLIT_RESTRICT sy,
+                                           const uint8_t *VJ_SPLIT_RESTRICT su,
+                                           const uint8_t *VJ_SPLIT_RESTRICT sv,
+                                           const int *VJ_SPLIT_RESTRICT map_x,
+                                           int dst_w)
+{
+    int x;
+    for(x = 0; x < dst_w; x++) {
+        const int sx = map_x[x];
+        dy[x] = sy[sx];
+        du[x] = su[sx];
+        dv[x] = sv[sx];
+    }
+}
+
+static inline void vj_split_apply_hgain_row_444(uint8_t *VJ_SPLIT_RESTRICT dy,
+                                                uint8_t *VJ_SPLIT_RESTRICT du,
+                                                uint8_t *VJ_SPLIT_RESTRICT dv,
+                                                const uint16_t *VJ_SPLIT_RESTRICT gx_map,
+                                                int x0, int x1)
+{
+    int x;
+    for(x = x0; x < x1; x++) {
+        const int gain = gx_map[x];
+        if(gain >= 256)
+            continue;
+        if(gain <= 0) {
+            dy[x] = 0;
+            du[x] = 128;
+            dv[x] = 128;
+        }
+        else {
+            dy[x] = vj_split_gain_y_[gain][dy[x]];
+            du[x] = vj_split_gain_uv_[gain][du[x]];
+            dv[x] = vj_split_gain_uv_[gain][dv[x]];
+        }
+    }
 }
 
 static void vj_split_free_map(v_screen_t *box)
@@ -658,6 +713,11 @@ static void vj_split_free_screen(vj_split_t *x, int screen_id)
 
         vj_split_free_map(x->screens[screen_id]);
 
+        if(x->screens[screen_id]->scaler) {
+            yuv_free_swscaler(x->screens[screen_id]->scaler);
+            x->screens[screen_id]->scaler = NULL;
+        }
+
         if(x->screens[screen_id]->data) {
             free(x->screens[screen_id]->data);
             x->screens[screen_id]->data = NULL;
@@ -775,6 +835,7 @@ static inline int __advise_num_threads(const int len) {
 
     return nthreads;
 }
+
 
 static int vj_split_allocate_screen(void *ptr, int screen_id, int wid, int hei, int fmt)
 {
@@ -986,6 +1047,185 @@ int vj_split_add_screen(void *ptr, char *hostname, int port, int row, int col, i
     return 1;
 }
 
+
+static inline void vj_split_apply_vgain_row_444(uint8_t *VJ_SPLIT_RESTRICT dy,
+                                                uint8_t *VJ_SPLIT_RESTRICT du,
+                                                uint8_t *VJ_SPLIT_RESTRICT dv,
+                                                int dst_w,
+                                                int gain)
+{
+    if(gain >= 256)
+        return;
+
+    if(gain <= 0) {
+        memset(dy, 0, (size_t)dst_w);
+        memset(du, 128, (size_t)dst_w);
+        memset(dv, 128, (size_t)dst_w);
+        return;
+    }
+
+    const uint8_t *VJ_SPLIT_RESTRICT lut_y = vj_split_gain_y_[gain];
+    const uint8_t *VJ_SPLIT_RESTRICT lut_uv = vj_split_gain_uv_[gain];
+    int x;
+
+    for(x = 0; x < dst_w; x++) {
+        dy[x] = lut_y[dy[x]];
+        du[x] = lut_uv[du[x]];
+        dv[x] = lut_uv[dv[x]];
+    }
+}
+
+static void vj_split_apply_edge_blend_444(VJFrame *VJ_SPLIT_RESTRICT dst,
+                                          v_screen_t *VJ_SPLIT_RESTRICT box)
+{
+    const int dst_w = dst->width;
+    const int dst_h = dst->height;
+    const int x_blend = box->blend_left || box->blend_right;
+    const int y_blend = box->blend_top || box->blend_bottom;
+
+    if(!x_blend && !y_blend)
+        return;
+
+    const uint16_t *VJ_SPLIT_RESTRICT gx_map = box->map_gx;
+    const uint16_t *VJ_SPLIT_RESTRICT gy_map = box->map_gy;
+    if((x_blend && !gx_map) || (y_blend && !gy_map))
+        return;
+
+    uint8_t *VJ_SPLIT_RESTRICT DY = dst->data[0];
+    uint8_t *VJ_SPLIT_RESTRICT DU = dst->data[1];
+    uint8_t *VJ_SPLIT_RESTRICT DV = dst->data[2];
+    const int left_end = box->blend_left > 0 ? box->blend_left : 0;
+    const int right_start = box->blend_right > 0 ? (dst_w - box->blend_right) : dst_w;
+    int y;
+
+#pragma omp parallel for schedule(static) num_threads(box->n_threads)
+    for(y = 0; y < dst_h; y++) {
+        const int d_row = y * dst_w;
+        uint8_t *VJ_SPLIT_RESTRICT dy = DY + d_row;
+        uint8_t *VJ_SPLIT_RESTRICT du = DU + d_row;
+        uint8_t *VJ_SPLIT_RESTRICT dv = DV + d_row;
+
+        if(y_blend)
+            vj_split_apply_vgain_row_444(dy, du, dv, dst_w, gy_map[y]);
+
+        if(x_blend) {
+            if(left_end > 0)
+                vj_split_apply_hgain_row_444(dy, du, dv, gx_map, 0, left_end);
+            if(right_start < dst_w)
+                vj_split_apply_hgain_row_444(dy, du, dv, gx_map, right_start, dst_w);
+        }
+    }
+}
+
+static void vj_split_free_scaler(v_screen_t *box)
+{
+    if(!box || !box->scaler)
+        return;
+
+    yuv_free_swscaler(box->scaler);
+    box->scaler = NULL;
+    box->scaler_src_w = 0;
+    box->scaler_src_h = 0;
+    box->scaler_dst_w = 0;
+    box->scaler_dst_h = 0;
+    box->scaler_src_fmt = 0;
+    box->scaler_dst_fmt = 0;
+}
+
+static int vj_split_scaler_matches(const v_screen_t *box,
+                                   int src_w, int src_h,
+                                   int dst_w, int dst_h,
+                                   int src_fmt, int dst_fmt)
+{
+    return box->scaler &&
+           box->scaler_src_w == src_w &&
+           box->scaler_src_h == src_h &&
+           box->scaler_dst_w == dst_w &&
+           box->scaler_dst_h == dst_h &&
+           box->scaler_src_fmt == src_fmt &&
+           box->scaler_dst_fmt == dst_fmt;
+}
+
+static int vj_split_yuv_scale_444(VJFrame *VJ_SPLIT_RESTRICT src,
+                                  VJFrame *VJ_SPLIT_RESTRICT dst,
+                                  v_screen_t *VJ_SPLIT_RESTRICT box,
+                                  int left, int right, int top, int bottom)
+{
+    const int src_w = src->width;
+    const int dst_w = dst->width;
+    const int dst_h = dst->height;
+    const int crop_w = right - left;
+    const int crop_h = bottom - top;
+    const int src_stride = src->stride[0] > 0 ? src->stride[0] : src_w;
+    const int dst_stride = dst->stride[0] > 0 ? dst->stride[0] : dst_w;
+    const int src_fmt = src->range ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P;
+    const int dst_fmt = dst->range ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P;
+
+    VJFrame crop;
+    VJFrame out;
+    veejay_memset(&crop, 0, sizeof(VJFrame));
+    veejay_memset(&out, 0, sizeof(VJFrame));
+
+    crop.data[0] = src->data[0] + ((size_t)top * (size_t)src_stride) + (size_t)left;
+    crop.data[1] = src->data[1] + ((size_t)top * (size_t)src_stride) + (size_t)left;
+    crop.data[2] = src->data[2] + ((size_t)top * (size_t)src_stride) + (size_t)left;
+    crop.width = crop_w;
+    crop.height = crop_h;
+    crop.out_width = crop_w;
+    crop.out_height = crop_h;
+    crop.uv_width = crop_w;
+    crop.uv_height = crop_h;
+    crop.len = crop_w * crop_h;
+    crop.uv_len = crop.len;
+    crop.stride[0] = src_stride;
+    crop.stride[1] = src->stride[1] > 0 ? src->stride[1] : src_stride;
+    crop.stride[2] = src->stride[2] > 0 ? src->stride[2] : src_stride;
+    crop.format = src_fmt;
+    crop.yuv_fmt = src_fmt;
+    crop.range = src->range;
+
+    out.data[0] = dst->data[0];
+    out.data[1] = dst->data[1];
+    out.data[2] = dst->data[2];
+    out.width = dst_w;
+    out.height = dst_h;
+    out.out_width = dst_w;
+    out.out_height = dst_h;
+    out.uv_width = dst_w;
+    out.uv_height = dst_h;
+    out.len = dst_w * dst_h;
+    out.uv_len = out.len;
+    out.stride[0] = dst_stride;
+    out.stride[1] = dst->stride[1] > 0 ? dst->stride[1] : dst_stride;
+    out.stride[2] = dst->stride[2] > 0 ? dst->stride[2] : dst_stride;
+    out.format = dst_fmt;
+    out.yuv_fmt = dst_fmt;
+    out.range = dst->range;
+
+    if(!vj_split_scaler_matches(box, crop_w, crop_h, dst_w, dst_h, src_fmt, dst_fmt)) {
+        sws_template templ;
+        veejay_memset(&templ, 0, sizeof(sws_template));
+        templ.flags = VJ_SPLIT_SCALER_TYPE;
+
+        vj_split_free_scaler(box);
+        box->scaler = yuv_init_swscaler(&crop, &out, &templ, yuv_sws_get_cpu_flags());
+        if(!box->scaler) {
+            veejay_msg(VEEJAY_MSG_ERROR, "Unable to create split-screen scaler");
+            return 0;
+        }
+
+        box->scaler_src_w = crop_w;
+        box->scaler_src_h = crop_h;
+        box->scaler_dst_w = dst_w;
+        box->scaler_dst_h = dst_h;
+        box->scaler_src_fmt = src_fmt;
+        box->scaler_dst_fmt = dst_fmt;
+    }
+
+    yuv_convert_and_scale(box->scaler, &crop, &out);
+    return 1;
+}
+
 static void vj_split_copy_region(VJFrame *VJ_SPLIT_RESTRICT src,
                                  VJFrame *VJ_SPLIT_RESTRICT dst,
                                  v_screen_t *VJ_SPLIT_RESTRICT box)
@@ -1002,9 +1242,7 @@ static void vj_split_copy_region(VJFrame *VJ_SPLIT_RESTRICT src,
 
     const int crop_w = right - left;
     const int crop_h = bottom - top;
-    const int x_blend = box->blend_left || box->blend_right;
-    const int y_blend = box->blend_top || box->blend_bottom;
-    const int do_blend = x_blend || y_blend;
+    const int do_blend = box->blend_left || box->blend_right || box->blend_top || box->blend_bottom;
     const int same_w = (crop_w == dst_w);
     const int same_h = (crop_h == dst_h);
 
@@ -1022,7 +1260,13 @@ static void vj_split_copy_region(VJFrame *VJ_SPLIT_RESTRICT src,
     const uint8_t *VJ_SPLIT_RESTRICT SU = src->data[1];
     const uint8_t *VJ_SPLIT_RESTRICT SV = src->data[2];
 
-    if(same_w && same_h && !do_blend) {
+    if(!vj_split_build_map(box, src_w, src_h, dst_w, dst_h,
+                           left, right, top, bottom,
+                           box->blend_left, box->blend_right,
+                           box->blend_top, box->blend_bottom))
+        return;
+
+    if(same_w && same_h) {
         int y;
 #pragma omp parallel for schedule(static) num_threads(box->n_threads)
         for(y = 0; y < dst_h; y++) {
@@ -1032,21 +1276,14 @@ static void vj_split_copy_region(VJFrame *VJ_SPLIT_RESTRICT src,
             memcpy(DU + d_off, SU + s_off, (size_t)dst_w);
             memcpy(DV + d_off, SV + s_off, (size_t)dst_w);
         }
+
+        if(do_blend)
+            vj_split_apply_edge_blend_444(dst, box);
         return;
     }
 
-    if(!vj_split_build_map(box, src_w, src_h, dst_w, dst_h,
-                           left, right, top, bottom,
-                           box->blend_left, box->blend_right,
-                           box->blend_top, box->blend_bottom))
-        return;
-
-    const int *VJ_SPLIT_RESTRICT map_x = box->map_x0;
-    const int *VJ_SPLIT_RESTRICT map_y = box->map_y0;
-    const uint16_t *VJ_SPLIT_RESTRICT gx_map = box->map_gx;
-    const uint16_t *VJ_SPLIT_RESTRICT gy_map = box->map_gy;
-
     if(same_w && !do_blend) {
+        const int *VJ_SPLIT_RESTRICT map_y = box->map_y0;
         int y;
 #pragma omp parallel for schedule(static) num_threads(box->n_threads)
         for(y = 0; y < dst_h; y++) {
@@ -1059,216 +1296,11 @@ static void vj_split_copy_region(VJFrame *VJ_SPLIT_RESTRICT src,
         return;
     }
 
-    if(!do_blend) {
-        int y;
-#pragma omp parallel for schedule(static) num_threads(box->n_threads)
-        for(y = 0; y < dst_h; y++) {
-            const int sy = map_y[y];
-            const int s_row = sy * src_w;
-            const int d_row = y * dst_w;
-            uint8_t *VJ_SPLIT_RESTRICT dy = DY + d_row;
-            uint8_t *VJ_SPLIT_RESTRICT du = DU + d_row;
-            uint8_t *VJ_SPLIT_RESTRICT dv = DV + d_row;
-            int x;
-
-            for(x = 0; x < dst_w; x++) {
-                const int si = s_row + map_x[x];
-                dy[x] = SY[si];
-                du[x] = SU[si];
-                dv[x] = SV[si];
-            }
-        }
+    if(!vj_split_yuv_scale_444(src, dst, box, left, right, top, bottom))
         return;
-    }
 
-    if(!x_blend) {
-        int y;
-#pragma omp parallel for schedule(static) num_threads(box->n_threads)
-        for(y = 0; y < dst_h; y++) {
-            const int gy = gy_map[y];
-            const int sy = map_y[y];
-            const int s_row = sy * src_w;
-            const int d_row = y * dst_w;
-            uint8_t *VJ_SPLIT_RESTRICT dy = DY + d_row;
-            uint8_t *VJ_SPLIT_RESTRICT du = DU + d_row;
-            uint8_t *VJ_SPLIT_RESTRICT dv = DV + d_row;
-            int x;
-
-            if(gy >= 256) {
-                if(same_w) {
-                    const size_t s_off = (size_t)s_row + (size_t)left;
-                    memcpy(dy, SY + s_off, (size_t)dst_w);
-                    memcpy(du, SU + s_off, (size_t)dst_w);
-                    memcpy(dv, SV + s_off, (size_t)dst_w);
-                }
-                else {
-                    for(x = 0; x < dst_w; x++) {
-                        const int si = s_row + map_x[x];
-                        dy[x] = SY[si];
-                        du[x] = SU[si];
-                        dv[x] = SV[si];
-                    }
-                }
-            }
-            else if(gy <= 0) {
-                memset(dy, 0, (size_t)dst_w);
-                memset(du, 128, (size_t)dst_w);
-                memset(dv, 128, (size_t)dst_w);
-            }
-            else {
-                const uint8_t *VJ_SPLIT_RESTRICT lut_y = vj_split_gain_y_[gy];
-                const uint8_t *VJ_SPLIT_RESTRICT lut_uv = vj_split_gain_uv_[gy];
-                if(same_w) {
-                    const uint8_t *VJ_SPLIT_RESTRICT sy0 = SY + s_row + left;
-                    const uint8_t *VJ_SPLIT_RESTRICT su0 = SU + s_row + left;
-                    const uint8_t *VJ_SPLIT_RESTRICT sv0 = SV + s_row + left;
-                    for(x = 0; x < dst_w; x++) {
-                        dy[x] = lut_y[sy0[x]];
-                        du[x] = lut_uv[su0[x]];
-                        dv[x] = lut_uv[sv0[x]];
-                    }
-                }
-                else {
-                    for(x = 0; x < dst_w; x++) {
-                        const int si = s_row + map_x[x];
-                        dy[x] = lut_y[SY[si]];
-                        du[x] = lut_uv[SU[si]];
-                        dv[x] = lut_uv[SV[si]];
-                    }
-                }
-            }
-        }
-        return;
-    }
-
-    if(!y_blend) {
-        int y;
-#pragma omp parallel for schedule(static) num_threads(box->n_threads)
-        for(y = 0; y < dst_h; y++) {
-            const int sy = map_y[y];
-            const int s_row = sy * src_w;
-            const int d_row = y * dst_w;
-            uint8_t *VJ_SPLIT_RESTRICT dy = DY + d_row;
-            uint8_t *VJ_SPLIT_RESTRICT du = DU + d_row;
-            uint8_t *VJ_SPLIT_RESTRICT dv = DV + d_row;
-            int x;
-
-            if(same_w) {
-                const uint8_t *VJ_SPLIT_RESTRICT sy0 = SY + s_row + left;
-                const uint8_t *VJ_SPLIT_RESTRICT su0 = SU + s_row + left;
-                const uint8_t *VJ_SPLIT_RESTRICT sv0 = SV + s_row + left;
-                for(x = 0; x < dst_w; x++) {
-                    const int gain = gx_map[x];
-                    if(gain >= 256) {
-                        dy[x] = sy0[x];
-                        du[x] = su0[x];
-                        dv[x] = sv0[x];
-                    }
-                    else if(gain <= 0) {
-                        dy[x] = 0;
-                        du[x] = 128;
-                        dv[x] = 128;
-                    }
-                    else {
-                        dy[x] = vj_split_gain_y_[gain][sy0[x]];
-                        du[x] = vj_split_gain_uv_[gain][su0[x]];
-                        dv[x] = vj_split_gain_uv_[gain][sv0[x]];
-                    }
-                }
-            }
-            else {
-                for(x = 0; x < dst_w; x++) {
-                    const int si = s_row + map_x[x];
-                    const int gain = gx_map[x];
-                    if(gain >= 256) {
-                        dy[x] = SY[si];
-                        du[x] = SU[si];
-                        dv[x] = SV[si];
-                    }
-                    else if(gain <= 0) {
-                        dy[x] = 0;
-                        du[x] = 128;
-                        dv[x] = 128;
-                    }
-                    else {
-                        dy[x] = vj_split_gain_y_[gain][SY[si]];
-                        du[x] = vj_split_gain_uv_[gain][SU[si]];
-                        dv[x] = vj_split_gain_uv_[gain][SV[si]];
-                    }
-                }
-            }
-        }
-        return;
-    }
-
-    {
-        int y;
-#pragma omp parallel for schedule(static) num_threads(box->n_threads)
-        for(y = 0; y < dst_h; y++) {
-            const int gy = gy_map[y];
-            const int sy = map_y[y];
-            const int s_row = sy * src_w;
-            const int d_row = y * dst_w;
-            uint8_t *VJ_SPLIT_RESTRICT dy = DY + d_row;
-            uint8_t *VJ_SPLIT_RESTRICT du = DU + d_row;
-            uint8_t *VJ_SPLIT_RESTRICT dv = DV + d_row;
-            int x;
-
-            if(gy <= 0) {
-                memset(dy, 0, (size_t)dst_w);
-                memset(du, 128, (size_t)dst_w);
-                memset(dv, 128, (size_t)dst_w);
-                continue;
-            }
-
-            if(same_w) {
-                const uint8_t *VJ_SPLIT_RESTRICT sy0 = SY + s_row + left;
-                const uint8_t *VJ_SPLIT_RESTRICT su0 = SU + s_row + left;
-                const uint8_t *VJ_SPLIT_RESTRICT sv0 = SV + s_row + left;
-                for(x = 0; x < dst_w; x++) {
-                    int gain = gx_map[x];
-                    gain = (gain * gy + 128) >> 8;
-                    if(gain >= 256) {
-                        dy[x] = sy0[x];
-                        du[x] = su0[x];
-                        dv[x] = sv0[x];
-                    }
-                    else if(gain <= 0) {
-                        dy[x] = 0;
-                        du[x] = 128;
-                        dv[x] = 128;
-                    }
-                    else {
-                        dy[x] = vj_split_gain_y_[gain][sy0[x]];
-                        du[x] = vj_split_gain_uv_[gain][su0[x]];
-                        dv[x] = vj_split_gain_uv_[gain][sv0[x]];
-                    }
-                }
-            }
-            else {
-                for(x = 0; x < dst_w; x++) {
-                    const int si = s_row + map_x[x];
-                    int gain = gx_map[x];
-                    gain = (gain * gy + 128) >> 8;
-                    if(gain >= 256) {
-                        dy[x] = SY[si];
-                        du[x] = SU[si];
-                        dv[x] = SV[si];
-                    }
-                    else if(gain <= 0) {
-                        dy[x] = 0;
-                        du[x] = 128;
-                        dv[x] = 128;
-                    }
-                    else {
-                        dy[x] = vj_split_gain_y_[gain][SY[si]];
-                        du[x] = vj_split_gain_uv_[gain][SU[si]];
-                        dv[x] = vj_split_gain_uv_[gain][SV[si]];
-                    }
-                }
-            }
-        }
-    }
+    if(do_blend)
+        vj_split_apply_edge_blend_444(dst, box);
 }
 
 static int vj_split_process_shm(v_screen_t *VJ_SPLIT_RESTRICT screen,
