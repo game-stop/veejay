@@ -25,6 +25,7 @@
 #define VJ_PORT 3490
 #define VJ_MAX_CONNECTIONS 8
 #define VJ_MAX_PENDING_MSG 128
+#define VJ_MAX_LISTEN_SOCKETS 16
 
 #define VEEJAY_SERVER_LOG "/tmp/veejay.net.log"
 
@@ -32,6 +33,9 @@ typedef struct vj_server_t {
     struct sockaddr_in myself;
     struct sockaddr_in remote;
     int handle;
+    int listen_handles[VJ_MAX_LISTEN_SOCKETS];
+    struct sockaddr_in listen_addr[VJ_MAX_LISTEN_SOCKETS];
+    int n_listen_handles;
     int nr_of_connections;
     void **link;
     fd_set	fds;
@@ -47,6 +51,7 @@ typedef struct vj_server_t {
     int mcast_gray;
     FILE *logfd; 
     unsigned int recv_bufsize;
+    char bind_address[INET_ADDRSTRLEN];
 } vj_server;
 
 typedef struct {

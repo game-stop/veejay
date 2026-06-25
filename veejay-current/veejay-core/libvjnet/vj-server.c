@@ -31,6 +31,7 @@
 #include <netdb.h>
 #include <errno.h>
 #include <ifaddrs.h>
+#include <net/if.h>
 #include <arpa/inet.h>
 
 #include <libavutil/avutil.h>
@@ -189,101 +190,227 @@ static	int	_vj_server_multicast( vj_server *v, char *group_name, int port )
 	return 1;
 }
 
-static int	_vj_server_classic(vj_server *vjs, int port_offset)
+static int vj_server_env_enabled(const char *name)
+{
+	char *v = getenv(name);
+	if(!v || !*v)
+		return 0;
+	if(!strcasecmp(v, "1") || !strcasecmp(v, "yes") || !strcasecmp(v, "true") || !strcasecmp(v, "on"))
+		return 1;
+	return 0;
+}
+
+static int vj_server_addr_loopback(struct in_addr addr)
+{
+	uint32_t a = ntohl(addr.s_addr);
+	return ((a & 0xff000000U) == 0x7f000000U);
+}
+
+static int vj_server_addr_linklocal(struct in_addr addr)
+{
+	uint32_t a = ntohl(addr.s_addr);
+	return ((a & 0xffff0000U) == 0xa9fe0000U);
+}
+
+static int vj_server_addr_private_lan(struct in_addr addr)
+{
+	uint32_t a = ntohl(addr.s_addr);
+	if((a & 0xff000000U) == 0x0a000000U)
+		return 1;
+	if((a & 0xfff00000U) == 0xac100000U)
+		return 1;
+	if((a & 0xffff0000U) == 0xc0a80000U)
+		return 1;
+	return 0;
+}
+
+static int vj_server_addr_allowed(struct in_addr addr, int allow_internet)
+{
+	if(vj_server_addr_loopback(addr))
+		return 1;
+	if(vj_server_addr_private_lan(addr))
+		return 1;
+	if(vj_server_addr_linklocal(addr))
+		return 1;
+	return allow_internet ? 1 : 0;
+}
+
+static int vj_server_have_listener(vj_server *vjs, struct in_addr addr)
+{
+	int i;
+	for(i = 0; i < vjs->n_listen_handles; i ++ ) {
+		if(vjs->listen_addr[i].sin_addr.s_addr == addr.s_addr)
+			return 1;
+	}
+	return 0;
+}
+
+static int vj_server_bind_listener(vj_server *vjs, struct in_addr addr, int port_num, int required)
 {
 	int on = 1;
-	int port_num = 0;   
-	vj_link **link;
-	int i = 0;
-	if ((vjs->handle = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create a socket: %s", strerror(errno));
+	int fd = -1;
+	struct sockaddr_in sa;
+	char addr_text[INET_ADDRSTRLEN];
+	int send_size = 1024 * 1024;
+	unsigned int tmp = sizeof(int);
+	int flag = 1;
+	struct timeval timeout;
+
+	if(vjs->n_listen_handles >= VJ_MAX_LISTEN_SOCKETS)
 		return 0;
+
+	if(vj_server_have_listener(vjs, addr))
+		return 1;
+
+	if(!inet_ntop(AF_INET, &addr, addr_text, sizeof(addr_text)))
+		snprintf(addr_text, sizeof(addr_text), "<invalid>");
+
+	fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if(fd == -1) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create a socket: %s", strerror(errno));
+		return required ? 0 : 1;
 	}
 
-    	if (setsockopt( vjs->handle, SOL_SOCKET, SO_REUSEADDR, (const char*) &on, sizeof(on) )== -1)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
-		return 0;
-   	}
+	if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char*) &on, sizeof(on)) == -1) {
+		veejay_msg(required ? VEEJAY_MSG_ERROR : VEEJAY_MSG_DEBUG, "%s", strerror(errno));
+		close(fd);
+		return required ? 0 : 1;
+	}
 
-	vjs->myself.sin_family = AF_INET;
-	vjs->myself.sin_addr.s_addr = INADDR_ANY;
+	veejay_memset(&sa, 0, sizeof(sa));
+	sa.sin_family = AF_INET;
+	sa.sin_addr = addr;
+	sa.sin_port = htons(port_num);
+
+	if(bind(fd, (struct sockaddr*) &sa, sizeof(sa)) == -1) {
+		veejay_msg(required ? VEEJAY_MSG_ERROR : VEEJAY_MSG_DEBUG,
+			"Cannot bind VIMS socket to %s:%d: %s", addr_text, port_num, strerror(errno));
+		close(fd);
+		return required ? 0 : 1;
+	}
+
+	if(listen(fd, VJ_MAX_CONNECTIONS) == -1) {
+		veejay_msg(required ? VEEJAY_MSG_ERROR : VEEJAY_MSG_DEBUG,
+			"Cannot listen on %s:%d: %s", addr_text, port_num, strerror(errno));
+		close(fd);
+		return required ? 0 : 1;
+	}
+
+	if(setsockopt(fd, SOL_SOCKET, SO_SNDBUF, (const char*) &send_size, sizeof(send_size)) == -1)
+		veejay_msg(0, "Cannot set send buffer size: %s", strerror(errno));
+
+	if(getsockopt(fd, SOL_SOCKET, SO_SNDBUF, (unsigned char*) &(vjs->send_size), &tmp) == -1) {
+		veejay_msg(0, "Cannot read socket buffer size: %s", strerror(errno));
+		close(fd);
+		return required ? 0 : 1;
+	}
+
+	if(setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (const char*) &send_size, sizeof(send_size)) == -1) {
+		veejay_msg(0, "Cannot set recv buffer size:%s", strerror(errno));
+		close(fd);
+		return required ? 0 : 1;
+	}
+
+	if(getsockopt(fd, SOL_SOCKET, SO_RCVBUF, (unsigned char*) &(vjs->recv_size), &tmp) == -1) {
+		veejay_msg(0, "Cannot read socket buffer receive size %s" , strerror(errno));
+		close(fd);
+		return required ? 0 : 1;
+	}
+
+	if(setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char*) &flag, sizeof(int)) == -1) {
+		veejay_msg(0, "Cannot disable Nagle buffering algorithm: %s", strerror(errno));
+		close(fd);
+		return required ? 0 : 1;
+	}
+
+	timeout.tv_sec = default_timeout_sec;
+	timeout.tv_usec = 0;
+
+	if(setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char*) &timeout, sizeof(timeout)) == -1)
+		veejay_msg(0, "Cannot set receive timeout");
+
+	if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char*) &timeout, sizeof(timeout)) == -1)
+		veejay_msg(0,"Cannot set send timeout");
+
+	vjs->listen_handles[vjs->n_listen_handles] = fd;
+	vjs->listen_addr[vjs->n_listen_handles] = sa;
+	vjs->n_listen_handles ++;
+
+	if(vjs->handle <= 0) {
+		vjs->handle = fd;
+		vjs->myself = sa;
+		snprintf(vjs->bind_address, sizeof(vjs->bind_address), "%s", addr_text);
+	}
+	if(vjs->nr_of_connections < fd)
+		vjs->nr_of_connections = fd;
+
+	veejay_msg(VEEJAY_MSG_INFO, "VIMS listener bound to %s:%d", addr_text, port_num);
+	veejay_msg(VEEJAY_MSG_DEBUG, "Port: %d [ receive buffer is %d bytes, send buffer is %d bytes ]", port_num, vjs->recv_size, vjs->send_size);
+
+	if(vjs->logfd) {
+		fprintf(vjs->logfd, "selected port %d on %s, maximum connections is %d\n", port_num, addr_text, VJ_MAX_CONNECTIONS);
+		fprintf(vjs->logfd, "socket send buffer size is %d bytes\n", vjs->send_size);
+		fprintf(vjs->logfd, "socket recv buffer size is %d bytes\n", vjs->recv_size);
+	}
+
+	return 1;
+}
+
+
+static int	_vj_server_classic(vj_server *vjs, int port_offset)
+{
+	int port_num = 0;
+	vj_link **link;
+	int i = 0;
+	struct in_addr loopback_addr;
+	struct ifaddrs *ifaddr = NULL;
+	struct ifaddrs *ifa;
+	int allow_internet = vj_server_env_enabled("VEEJAY_ALLOW_BIND_INTERNET");
+
+	vjs->handle = -1;
+	vjs->n_listen_handles = 0;
+	vjs->nr_of_connections = -1;
+	veejay_memset(vjs->listen_handles, 0, sizeof(vjs->listen_handles));
+	veejay_memset(vjs->listen_addr, 0, sizeof(vjs->listen_addr));
+	veejay_memset(&(vjs->myself), 0, sizeof(vjs->myself));
 
 	if( vjs->server_type == V_CMD )
 		port_num = port_offset + VJ_CMD_PORT;
 	if( vjs->server_type == V_STATUS )
 		port_num = port_offset + VJ_STA_PORT;
 
-	vjs->myself.sin_port = htons(port_num);
-	veejay_memset(&(vjs->myself.sin_zero), 0, sizeof(vjs->myself.sin_zero));
-	
-	if (bind(vjs->handle, (struct sockaddr *) &(vjs->myself), sizeof(vjs->myself) ) == -1 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
+	if(!inet_pton(AF_INET, "127.0.0.1", &loopback_addr)) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to prepare loopback bind address");
 		return 0;
 	}
 
-	if (listen(vjs->handle, VJ_MAX_CONNECTIONS) == -1)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
+	if(!vj_server_bind_listener(vjs, loopback_addr, port_num, 1))
 		return 0;
-   	}
+
+	if(getifaddrs(&ifaddr) == 0) {
+		for(ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+			struct sockaddr_in *sin;
+			if(!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET)
+				continue;
+			if(!(ifa->ifa_flags & IFF_UP))
+				continue;
+
+			sin = (struct sockaddr_in*) ifa->ifa_addr;
+			if(vj_server_addr_loopback(sin->sin_addr))
+				continue;
+			if(!vj_server_addr_allowed(sin->sin_addr, allow_internet))
+				continue;
+
+			vj_server_bind_listener(vjs, sin->sin_addr, port_num, 0);
+		}
+		freeifaddrs(ifaddr);
+	}
+
+	if(vjs->n_listen_handles <= 0)
+		return 0;
 
 	if(vjs->logfd) {
-		fprintf( vjs->logfd, "selected port %d, maximum connections is %d\n", port_num, VJ_MAX_CONNECTIONS );
-	}
-
-	int send_size = 1024 * 1024;
-	if( setsockopt( vjs->handle, SOL_SOCKET, SO_SNDBUF, (const char*) &send_size, sizeof(send_size) ) == - 1)
-	{
-		veejay_msg(0, "Cannot set send buffer size: %s", strerror(errno));
-	}
-	unsigned int tmp = sizeof(int);
-	if( getsockopt( vjs->handle, SOL_SOCKET, SO_SNDBUF,(unsigned char*) &(vjs->send_size), &tmp) == -1 )
-	{
-		veejay_msg(0, "Cannot read socket buffer size: %s", strerror(errno));
-		return 0;
-	}
-	if(vjs->logfd) {
-		fprintf( vjs->logfd, "socket send buffer size is %d bytes\n", vjs->send_size );
-	}
-
-	if( setsockopt( vjs->handle, SOL_SOCKET, SO_RCVBUF, (const char*) &send_size, sizeof(send_size)) == 1 )
-	{
-		veejay_msg(0, "Cannot set recv buffer size:%s", strerror(errno));
-		return 0;
-	}
-	if( getsockopt( vjs->handle, SOL_SOCKET, SO_RCVBUF, (unsigned char*) &(vjs->recv_size), &tmp) == -1 )
-	{
-		veejay_msg(0, "Cannot read socket buffer receive size %s" , strerror(errno));
-		return 0;
-	}
-	if(vjs->logfd) {
-		fprintf( vjs->logfd, "socket recv buffer size is %d bytes\n", vjs->recv_size );
-	}
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "Port: %d [ receive buffer is %d bytes, send buffer is %d bytes ]", port_num, vjs->recv_size, vjs->send_size );
-
-	int flag = 1;
-	if( setsockopt( vjs->handle, IPPROTO_TCP, TCP_NODELAY, (char*) &flag, sizeof(int)) == -1 )
-	{
-		veejay_msg(0, "Cannot disable Nagle buffering algorithm: %s", strerror(errno));
-		return 0;
-	}
-
-	struct timeval timeout;
-	timeout.tv_sec = default_timeout_sec;
-	timeout.tv_usec = 0;
-
-	if( setsockopt( vjs->handle, SOL_SOCKET, SO_RCVTIMEO, (char*) &timeout, sizeof(timeout) ) == -1)
-	{
-		veejay_msg(0, "Cannot set receive timeout");
-	}
-
-	if( setsockopt( vjs->handle, SOL_SOCKET, SO_SNDTIMEO, (char*) &timeout, sizeof(timeout) ) == -1)
-	{
-		veejay_msg(0,"Cannot set send timeout");
+		fprintf( vjs->logfd, "allocated queue for max %d connctions\n", VJ_MAX_CONNECTIONS );
 	}
 
 	link = (vj_link **) vj_malloc(sizeof(vj_link *) * VJ_MAX_CONNECTIONS);
@@ -312,10 +439,6 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 		link[i]->n_retrieved = 0;		
 	}
 	vjs->link = (void**) link;
-	vjs->nr_of_connections = vjs->handle;
-	if(vjs->logfd) {
-		fprintf( vjs->logfd, "allocated queue for max %d connctions\n", VJ_MAX_CONNECTIONS );
-	}
 
 	switch(vjs->server_type )
 	{
@@ -330,6 +453,9 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 		default:
 		break;
 	}
+
+	if(!allow_internet)
+		veejay_msg(VEEJAY_MSG_INFO, "Internet-routable VIMS bind disabled; set VEEJAY_ALLOW_BIND_INTERNET=1 to allow public interfaces");
 
 	return 1;
 }
@@ -644,6 +770,7 @@ int vj_server_poll(vj_server * vje)
 	int status = 0;
 	struct timeval t = (struct timeval) { 0 };
 	int i;
+	int max_fd = -1;
 
 	if( vje->use_mcast )
 	{
@@ -653,9 +780,16 @@ int vj_server_poll(vj_server * vje)
 
 	FD_ZERO( &(vje->fds) );
     	FD_ZERO( &(vje->wds) );
+	FD_ZERO( &(vje->eds) );
 
-	FD_SET( vje->handle, &(vje->fds) );
-	FD_SET( vje->handle, &(vje->wds) );
+	for( i = 0; i < vje->n_listen_handles; i ++ ) {
+		if( vje->listen_handles[i] <= 0 )
+			continue;
+		FD_SET( vje->listen_handles[i], &(vje->fds) );
+		FD_SET( vje->listen_handles[i], &(vje->wds) );
+		if( max_fd < vje->listen_handles[i] )
+			max_fd = vje->listen_handles[i];
+	}
 
 	for( i = 0; i < VJ_MAX_CONNECTIONS; i ++ )
 	{
@@ -665,9 +799,15 @@ int vj_server_poll(vj_server * vje)
 		FD_SET( Link[i]->handle, &(vje->fds) );
 		FD_SET( Link[i]->handle, &(vje->wds) );	
 		FD_SET( Link[i]->handle, &(vje->eds) );
+		if( max_fd < Link[i]->handle )
+			max_fd = Link[i]->handle;
 	}		
 
-	status = select(vje->nr_of_connections + 1, &(vje->fds), &(vje->wds), NULL, &t);
+	vje->nr_of_connections = max_fd;
+	if( max_fd < 0 )
+		return 0;
+
+	status = select(max_fd + 1, &(vje->fds), &(vje->wds), NULL, &t);
 
 	if( status == -1 ) {
 		veejay_msg(0, "Error while polling socket: %s", strerror(errno));
@@ -679,17 +819,17 @@ int vj_server_poll(vj_server * vje)
 static void	_vj_server_empty_queue(vj_server *vje, int link_id)
 {
 	vj_link **Link = (vj_link**) vje->link;
-	
-	veejay_memset( Link[link_id]->lin_queue, 0, sizeof(vj_message) * VJ_MAX_PENDING_MSG );
-
-	vj_simple_pool_reset( Link[link_id]->pool );
-
     int n = Link[link_id]->n_queued;
     int i;
+
     for( i = 0; i < n; i ++ ) {
-        if( Link[link_id]->m_queue[i]->allocated )
+        if( Link[link_id]->m_queue[i]->allocated && Link[link_id]->m_queue[i]->msg )
             free( Link[link_id]->m_queue[i]->msg );
     }
+
+	veejay_memset( Link[link_id]->lin_queue, 0, sizeof(vj_message) * VJ_MAX_PENDING_MSG );
+	if( Link[link_id]->pool )
+		vj_simple_pool_reset( Link[link_id]->pool );
 
 	Link[link_id]->n_queued = 0;
 	Link[link_id]->n_retrieved = 0;
@@ -711,46 +851,54 @@ static  void _vj_put_kf_msg(vj_server *vje, int link_id, char *buf, int buf_len,
 
     v[num_msg]->msg = buf;
     v[num_msg]->len = buf_len;
+    v[num_msg]->allocated = 0;
 }
 
 int	vj_server_new_connection(vj_server *vje)
 {
-	if( FD_ISSET( vje->handle, &(vje->fds) ) )
+	int i;
+	for( i = 0; i < vje->n_listen_handles; i ++ )
 	{
-		unsigned int addr_len = sizeof(vje->remote);
-		int n = 0;
-		int fd = accept( vje->handle, (struct sockaddr*) &(vje->remote), &addr_len );
-		if(fd == -1)
+		if( vje->listen_handles[i] <= 0 )
+			continue;
+		if( FD_ISSET( vje->listen_handles[i], &(vje->fds) ) )
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error accepting connection: %s",
-						strerror(errno));
+			unsigned int addr_len = sizeof(vje->remote);
+			int n = 0;
+			int fd = accept( vje->listen_handles[i], (struct sockaddr*) &(vje->remote), &addr_len );
+			if(fd == -1)
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Error accepting connection: %s",
+							strerror(errno));
 
-			return 0;
-		}	
+				return 0;
+			}	
 
-		char *host = inet_ntoa( vje->remote.sin_addr ); 
+			char *host = inet_ntoa( vje->remote.sin_addr ); 
 
-		if( vje->nr_of_connections < fd )
-			vje->nr_of_connections = fd;
+			if( vje->nr_of_connections < fd )
+				vje->nr_of_connections = fd;
 
-		n = _vj_server_new_client(vje, fd); 
-		if( n >= VJ_MAX_CONNECTIONS )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR,
-					"No more connections allowed");
-			close(fd);
-			return 0;
+			n = _vj_server_new_client(vje, fd); 
+			if( n >= VJ_MAX_CONNECTIONS )
+			{
+				veejay_msg(VEEJAY_MSG_ERROR,
+						"No more connections allowed");
+				close(fd);
+				return 0;
+			}
+
+			//veejay_msg(VEEJAY_MSG_INFO, "Link %d connected with %s on port %d", n,host,vje->remote.sin_port);
+			(void) host;
+
+			if( vje->logfd ) {
+				fprintf(vje->logfd, "new connection, socket=%d, max connections=%d\n",
+					fd, vje->nr_of_connections );
+			}
+
+			FD_CLR( fd, &(vje->fds) );
+			return 1;
 		}
-
-		//veejay_msg(VEEJAY_MSG_INFO, "Link %d connected with %s on port %d", n,host,vje->remote.sin_port);
-
-		if( vje->logfd ) {
-			fprintf(vje->logfd, "new connection, socket=%d, max connections=%d\n",
-				fd, vje->nr_of_connections );
-		}
-
-		FD_CLR( fd, &(vje->fds) );
-		return 1;
 	}
 	return 0;
 }
@@ -815,7 +963,7 @@ static int vj_server_socket_consume(vj_server *vje, int sock_fd, int link_id, ch
     }
 
     if( vje->logfd ) {
-        vj_server_log_msg( vje, link_id, buffer, buf_size );
+        vj_server_log_msg( vje, link_id, buffer, (int) n );
     }
     return (int) n;
 }
@@ -823,6 +971,7 @@ static int vj_server_socket_consume(vj_server *vje, int sock_fd, int link_id, ch
 
 static int vj_server_update_get_msg_kf(vj_server *vje, int sock_fd, int link_id, int *num_msg)
 {
+	vj_link **Link = (vj_link**) vje->link;
     char t_hdr[KF_HEADER_LEN];
     int buf_size = vj_server_socket_consume( vje, sock_fd, link_id, t_hdr, KF_HEADER_LEN, 0 );
     if( buf_size <= 0 )
@@ -848,6 +997,7 @@ static int vj_server_update_get_msg_kf(vj_server *vje, int sock_fd, int link_id,
     }
 
     _vj_put_kf_msg(vje, link_id, buf, msg_size, *num_msg);
+    Link[link_id]->m_queue[*num_msg]->allocated = 1;
 
     *num_msg = *num_msg + 1;
     
@@ -979,7 +1129,7 @@ gremlin_pool:
 int	vj_server_update( vj_server *vje, int id )
 {
 	vj_link **Link = (vj_link**) vje->link;
-	if( Link[id]->pool )
+	if( Link[id]->pool || Link[id]->n_queued > 0 )
 		_vj_server_empty_queue(vje, id);
 
     int sock_fd = vj_server_msg_pending( vje,id );
@@ -1003,6 +1153,12 @@ void vj_server_shutdown(vj_server *vje)
     
 	for(i=0; i < k; i++)
 	{
+		int j;
+		for( j = 0; j < Link[i]->n_queued; j ++ ) {
+			if( Link[i]->m_queue[j]->allocated && Link[i]->m_queue[j]->msg )
+				free( Link[i]->m_queue[j]->msg );
+		}
+
 		if( Link[i]->in_use) 
 			close(Link[i]->handle);
 		if( Link[i]->pool)
@@ -1016,7 +1172,10 @@ void vj_server_shutdown(vj_server *vje)
 
 	if(!vje->use_mcast)	
 	{
-	    close(vje->handle);
+		for(i = 0; i < vje->n_listen_handles; i ++ ) {
+			if( vje->listen_handles[i] > 0 )
+				close(vje->listen_handles[i]);
+		}
 	}
 	else
 	{
@@ -1065,13 +1224,14 @@ char *vj_server_retrieve_msg(vj_server *vje, int id, int *str_len )
 }
 
 static int score_ip_address(const char *ip) {
-    if (strncmp(ip, "127.", 4) == 0) return 0;
-    if (strncmp(ip, "169.254.", 8) == 0) return 1;
-	if (strncmp(ip, "192.168.", 8) == 0 || 
-        strncmp(ip, "10.", 3) == 0 || 
-        strncmp(ip, "172.", 4) == 0) return 3;
-
-	return 2;
+	struct in_addr addr;
+	int allow_internet = vj_server_env_enabled("VEEJAY_ALLOW_BIND_INTERNET");
+	if(inet_pton(AF_INET, ip, &addr) != 1)
+		return -1;
+	if(vj_server_addr_loopback(addr)) return 0;
+	if(vj_server_addr_linklocal(addr)) return 1;
+	if(vj_server_addr_private_lan(addr)) return 3;
+	return allow_internet ? 2 : -1;
 }
 
 char *vj_server_find_best_ip()
@@ -1089,6 +1249,7 @@ char *vj_server_find_best_ip()
         if (inet_ntop(AF_INET, &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr, 
                       host, sizeof(host))) {
             int score = score_ip_address(host);
+            if (score < 0) continue;
             if (score > best_score) {
                 best_score = score;
                 if (best_ip) free(best_ip);

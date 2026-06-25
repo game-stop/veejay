@@ -36,10 +36,13 @@
 
 static int sock_connect(const char *name, int port) {
 
-    char service[5];
-    snprintf(service,sizeof(service), "%d", port );
+    char service[6];
+    if( snprintf(service,sizeof(service), "%d", port ) >= (int) sizeof(service) ) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid port %d", port);
+        return -1;
+    }
 
-    int sock_fd;
+    int sock_fd = -1;
     struct addrinfo hints, *servinfo, *p;
 
     memset( &hints, 0, sizeof(hints) );
@@ -47,8 +50,9 @@ static int sock_connect(const char *name, int port) {
     hints.ai_family = AF_UNSPEC; 
     hints.ai_socktype = SOCK_STREAM;
 
-    if( getaddrinfo( name, service, &hints, &servinfo ) != 0 ) {
-        veejay_msg(0, "Failed to resolve %s:%d :%s", name, port, strerror(errno));
+    int gai = getaddrinfo( name, service, &hints, &servinfo );
+    if( gai != 0 ) {
+        veejay_msg(0, "Failed to resolve %s:%d :%s", name, port, gai_strerror(gai));
         return -1;
     }
 
@@ -69,6 +73,7 @@ static int sock_connect(const char *name, int port) {
 
     if( p == NULL ) {
         veejay_msg(VEEJAY_MSG_ERROR, "Failed to connect to %s:%d :%s", name, port, strerror(errno));
+        freeaddrinfo(servinfo);
         return -1;
     }
 
@@ -84,12 +89,16 @@ vj_sock_t	*alloc_sock_t(void)
 	vj_sock_t *s = (vj_sock_t*) malloc(sizeof(vj_sock_t));
 	if(!s) return NULL;
 	memset( s, 0, sizeof(vj_sock_t));
+	s->sock_fd = -1;
 	return s;
 }
 
 void		sock_t_free(vj_sock_t *s )
 {
-	if(s) free(s);
+	if(s) {
+		sock_t_close(s);
+		free(s);
+	}
 }
 
 int			sock_t_connect( vj_sock_t *s, char *host, int port )
@@ -98,17 +107,19 @@ int			sock_t_connect( vj_sock_t *s, char *host, int port )
 	if(s->sock_fd < 0)
 		return 0;
 	
-    unsigned int tmp = sizeof(int);
+    socklen_t tmp = sizeof(int);
 	if( getsockopt( s->sock_fd , SOL_SOCKET, SO_SNDBUF, (unsigned char*) &(s->send_size), &tmp) < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to get buffer size for output: %s", strerror(errno));
         close( s->sock_fd );
+        s->sock_fd = -1;
 		return 0;
 	}
 	if( getsockopt( s->sock_fd, SOL_SOCKET, SO_RCVBUF, (unsigned char*) &(s->recv_size), &tmp) < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to get buffer size for input: %s", strerror(errno));
         close( s->sock_fd );
+        s->sock_fd = -1;
 		return 0;
 	}
 
@@ -117,6 +128,7 @@ int			sock_t_connect( vj_sock_t *s, char *host, int port )
     if( setsockopt( s->sock_fd, SOL_SOCKET, SO_NOSIGPIPE, (void*) &opt, sizeof(int)) < 0 ) {
         veejay_msg(VEEJAY_MSG_ERROR, "Unable to set SO_NOSIGPIPE: %s", strerror(errno));
         close(s->sock_fd);
+        s->sock_fd = -1;
         return 0;
     }
 #endif
@@ -138,6 +150,8 @@ int			sock_t_rds_isset( vj_sock_t *s ) {
 int			sock_t_poll( vj_sock_t *s )
 {
 	int	status;
+	if( s->sock_fd < 0 )
+		return -1;
 	struct timeval no_wait;
 	//memset( &no_wait, 0, sizeof(no_wait) );
     no_wait.tv_sec = 0;
@@ -202,6 +216,8 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 	while( length > 0 ) {
 		n = send( s->sock_fd, buf, length , MSG_NOSIGNAL );
 		if( n == -1 ) {
+			if( errno == EINTR )
+				continue;
 			return -1;
 		}
 		if( n == 0 ) {
@@ -219,10 +235,15 @@ int sock_t_send_fd(int fd, int send_size, unsigned char *buf, int len) {
     int n;
     int done = 0;
 
+    (void) send_size;
+
     while (done < len) {
         n = send(fd, buf + done, len - done, MSG_NOSIGNAL);
 
         if (n < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 usleep(1000);
                 continue;
@@ -245,7 +266,7 @@ void			sock_t_close( vj_sock_t *s )
 {
 	if(s)
 	{
-		if( s->sock_fd ) {
+		if( s->sock_fd >= 0 ) {
 			close(s->sock_fd);
 			s->sock_fd = -1;
 		}
