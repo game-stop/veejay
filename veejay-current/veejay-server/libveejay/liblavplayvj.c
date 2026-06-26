@@ -2208,12 +2208,9 @@ static void veejay_seq_prepare_sample_position(veejay_t *info, int sample_id)
     const long long old_frame = info && info->settings ?
         atomic_load_long_long(&info->settings->current_frame_num) : -1;
 
+    sample_set_loop_stats(sample_id, 0);
     sample_set_loops(sample_id, -1);
-
-    if (loop == 2 && speed < 0) {
-        sample_set_speed(sample_id, -speed);
-        speed = -speed;
-    }
+    sample_set_resume_override(sample_id, -1);
 
     const int resume = (speed < 0) ? end : start;
     sample_set_resume(sample_id, resume);
@@ -2384,13 +2381,10 @@ void veejay_sample_set_initial_positions(veejay_t *info)
             continue;
 
         int id = info->seq->samples[i].sample_id;
-
         if(id <= 0 || !sample_exists(id))
             continue;
 
-        sample_set_loops(id, -1);
-
-        sample_set_resume_override(id, -1);
+        veejay_seq_prepare_sample_position(info, id);
     }
 
     if(first_sample >= 0)
@@ -2404,45 +2398,31 @@ void veejay_sample_set_initial_positions(veejay_t *info)
     }
 }
 
-void veejay_prepare_sample_positions(int id) {
-    int stats[4] = { 0,0,0,0 };
-    
-    sample_set_loops(id,-1);
-    sample_get_short_info( id, &stats[0],&stats[1],&stats[2],&stats[3]);
-    if( stats[2] == 2 ) {
-        if( stats[3] < 0 ) { 
-		  		sample_set_speed(id, -1 * stats[3]);
-            sample_set_resume(id, stats[0]);
-        }
-    } 
-    else {
-        if( stats[3] < 0 ) { 
-            sample_set_resume(id, stats[1]);
-        }
-        else if(stats[3] > 0) {
-            sample_set_resume(id, stats[0]);
-        }
-    } 
+void veejay_prepare_sample_positions(int id)
+{
+    veejay_seq_prepare_sample_position(NULL, id);
 }
 
 void veejay_reset_sample_positions(veejay_t *info, int sample_id)
 {
-	if( sample_id == -1 ) {
-		int i;
-		for( i = 0; i < MAX_SEQUENCES; i ++ ) {
-			if( info->seq->samples[i].type != 0 ) 
-				continue;
-			int id = info->seq->samples[i].sample_id;
+    if(sample_id == -1) {
+        for(int i = 0; i < MAX_SEQUENCES; i++) {
+            if(info->seq->samples[i].type != 0)
+                continue;
+
+            int id = info->seq->samples[i].sample_id;
             if(id <= 0 || !sample_exists(id))
                 continue;
-            veejay_prepare_sample_positions(id);
+
+            veejay_seq_prepare_sample_position(info, id);
         }
-	}
-	else {
+    }
+    else {
         if(sample_id <= 0 || !sample_exists(sample_id))
             return;
-        veejay_prepare_sample_positions(sample_id);
-	}
+
+        veejay_seq_prepare_sample_position(info, sample_id);
+    }
 }
 
 void veejay_set_sample(veejay_t * info, int sampleid)
