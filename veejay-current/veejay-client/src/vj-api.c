@@ -574,6 +574,9 @@ enum {
   WIDGET_AUDIO_BEAT_FREEZE_LABEL = 398,
   WIDGET_AUDIO_BEAT_PULSE_LABEL = 399,
   WIDGET_AUDIO_BEAT_GATE_LABEL = 400,
+  WIDGET_SAMPLE_HOLD_HBOX = 401,
+  WIDGET_SAMPLE_HOLD_FRAMES = 402,
+  WIDGET_SAMPLE_HOLD_BUTTON = 403,
 };
 
 
@@ -588,6 +591,7 @@ enum {
  SAMPLE_WIDGET_BUTTON_200,
  SAMPLE_WIDGET_FRAME_FXTREE,
  SAMPLE_WIDGET_VJFRAMERATE,
+ SAMPLE_WIDGET_SAMPLE_HOLD_HBOX,
  SAMPLE_WIDGET_SCROLLEDWINDOW49,
  SAMPLE_WIDGET_SAMPLEGRID_FRAME,
  SAMPLE_WIDGET_MARKERFRAME,
@@ -610,6 +614,7 @@ enum {
   PLAIN_WIDGET_SPEED_SLIDER,
   PLAIN_WIDGET_SLOW_SLIDER,
   PLAIN_WIDGET_VJFRAMERATE,
+  PLAIN_WIDGET_SAMPLE_HOLD_HBOX,
   PLAIN_WIDGET_MARKERFRAME,
   PLAIN_WIDGET_NONE,
 };
@@ -699,6 +704,7 @@ static struct
     {  SAMPLE_WIDGET_BUTTON_200,                WIDGET_BUTTON_200 },
     {  SAMPLE_WIDGET_FRAME_FXTREE,              WIDGET_FRAME_FXTREE },
     {  SAMPLE_WIDGET_VJFRAMERATE,               WIDGET_VJFRAMERATE },
+    {  SAMPLE_WIDGET_SAMPLE_HOLD_HBOX,          WIDGET_SAMPLE_HOLD_HBOX },
     {  SAMPLE_WIDGET_SAMPLEGRID_FRAME,          WIDGET_SAMPLEGRID_FRAME },
     {  SAMPLE_WIDGET_MARKERFRAME,               WIDGET_MARKERFRAME },
     {  SAMPLE_WIDGET_FXPANEL,                   WIDGET_FXPANEL },
@@ -725,6 +731,7 @@ static struct
     { PLAIN_WIDGET_SPEED_SLIDER,                WIDGET_SPEED_SLIDER },
     { PLAIN_WIDGET_SLOW_SLIDER,                 WIDGET_SLOW_SLIDER },
     { PLAIN_WIDGET_VJFRAMERATE,                 WIDGET_VJFRAMERATE },
+    { PLAIN_WIDGET_SAMPLE_HOLD_HBOX,            WIDGET_SAMPLE_HOLD_HBOX },
     { PLAIN_WIDGET_MARKERFRAME,                 WIDGET_MARKERFRAME },
     { PLAIN_WIDGET_NONE,                        -1 },
 };
@@ -963,6 +970,9 @@ static struct
     {"frame_fxtree",             WIDGET_FRAME_FXTREE},
     {"fxpanel",                  WIDGET_FXPANEL},
     {"vjframerate",              WIDGET_VJFRAMERATE },
+    {"sample_hold_hbox",         WIDGET_SAMPLE_HOLD_HBOX },
+    {"sample_hold_frames",       WIDGET_SAMPLE_HOLD_FRAMES },
+    {"sample_hold_button",       WIDGET_SAMPLE_HOLD_BUTTON },
     {"samplegrid_frame",         WIDGET_SAMPLEGRID_FRAME },
     {"markerframe",              WIDGET_MARKERFRAME },
     {"fxanimcontrols",           WIDGET_FXANIMCONTROLS },
@@ -3280,18 +3290,30 @@ char *_effect_get_description(int effect_id)
 
 char *_effect_get_hint(int effect_id, int p, int v)
 {
-    effect_constr *ec = info->effect_info[effect_id];
-    if(ec != NULL)
-    {
-        if( ec->hints[p] == NULL)
-            return FX_PARAMETER_VALUE_DEFAULT_HINT;
-        if( ec->hints[p]->description == NULL ||
-            ec->hints[p]->description[v] == NULL )
-            return FX_PARAMETER_VALUE_DEFAULT_HINT;
+    if(effect_id < 0 || effect_id >= EFFECT_LIST_SIZE)
+        return FX_PARAMETER_VALUE_DEFAULT_HINT;
 
-        return ec->hints[p]->description[v];
-    }
-    return FX_PARAMETER_VALUE_DEFAULT_HINT;
+    effect_constr *ec = info->effect_info[effect_id];
+
+    if(ec == NULL)
+        return FX_PARAMETER_VALUE_DEFAULT_HINT;
+
+    if(p < 0 || p >= ec->num_arg || p >= SAMPLE_MAX_PARAMETERS)
+        return FX_PARAMETER_VALUE_DEFAULT_HINT;
+
+    if(v < ec->min[p] || v > ec->max[p])
+        return FX_PARAMETER_VALUE_DEFAULT_HINT;
+
+    if(ec->hints[p] == NULL)
+        return FX_PARAMETER_VALUE_DEFAULT_HINT;
+
+    if(ec->hints[p]->description == NULL)
+        return FX_PARAMETER_VALUE_DEFAULT_HINT;
+
+    if(ec->hints[p]->description[v] == NULL)
+        return FX_PARAMETER_VALUE_DEFAULT_HINT;
+
+    return ec->hints[p]->description[v];
 }
 
 el_constr *_el_entry_new( int pos, char *file, int nf , char *fourcc)
@@ -12041,14 +12063,22 @@ static void enable_fx_entry(void) {
 
     if( info->uc.selected_fx_param != -1 )
     {
-        i = 0;
+        int param = info->uc.selected_fx_param - WIDGET_SLIDER_P0;
+        int np = _effect_get_np(entry_tokens[ENTRY_FXID]);
 
+        i = 0;
         while (( widget_map[i].id != info->uc.selected_fx_param ) && ( widget_map[i].id != -1 ) ) i++;
 
-        gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_VALUE_FRIENDLYNAME] ),
-                                       _effect_get_hint( entry_tokens[ENTRY_FXID],
-                                                         info->uc.selected_fx_param - WIDGET_SLIDER_P0,
-                                                         get_slider_val(widget_map[i].name )));
+        if(widget_map[i].id == -1 || param < 0 || param >= np || param >= SAMPLE_MAX_PARAMETERS) {
+            info->uc.selected_fx_param = -1;
+            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_VALUE_FRIENDLYNAME] ), FX_PARAMETER_VALUE_DEFAULT_HINT );
+        }
+        else {
+            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_VALUE_FRIENDLYNAME] ),
+                                           _effect_get_hint( entry_tokens[ENTRY_FXID],
+                                                             param,
+                                                             get_slider_val(widget_map[i].name )));
+        }
      }
      else
         gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_VALUE_FRIENDLYNAME] ), FX_PARAMETER_VALUE_DEFAULT_HINT );
