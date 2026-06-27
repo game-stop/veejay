@@ -27,6 +27,10 @@ void    vj_midi_save(void *vv, const char *filename);
 void	vj_midi_reset( void *vv );
 void    vj_midi_learning_vims( void *vv, char *widget, char *msg, int extra );
 void    vj_midi_learning_vims_simple( void *vv, char *widget, int id );
+void    vj_midi_learning_vims_toggle( void *vv, char *widget, int id );
+void    vj_midi_learning_vims_toggle2( void *vv, char *widget, int id, int arg );
+void    vj_midi_learning_vims_toggle3( void *vv, char *widget, int id, int arg0, int arg1 );
+void    vj_midi_learning_vims_dual_toggle( void *vv, char *widget, int off_id, int on_id, int arg );
 void    vj_midi_learning_vims_complex( void *vv, char *widget, int id, int first , int extra );
 void    vj_midi_learning_vims_fx( void *vv, int widget, int id, int a, int b, int c, int extra );
 void    vj_midi_learning_vims_msg2(void *vv, char *widget, int id, int arg, int b );
@@ -43,6 +47,10 @@ void    vj_midi_save(void *vv, const char *filename) {}
 void	vj_midi_reset( void *vv ) {}
 void    vj_midi_learning_vims( void *vv, char *widget, char *msg, int extra ) {}
 void    vj_midi_learning_vims_simple( void *vv, char *widget, int id ) {}
+void    vj_midi_learning_vims_toggle( void *vv, char *widget, int id ) {}
+void    vj_midi_learning_vims_toggle2( void *vv, char *widget, int id, int arg ) {}
+void    vj_midi_learning_vims_toggle3( void *vv, char *widget, int id, int arg0, int arg1 ) {}
+void    vj_midi_learning_vims_dual_toggle( void *vv, char *widget, int off_id, int on_id, int arg ) {}
 void    vj_midi_learning_vims_complex( void *vv, char *widget, int id, int first , int extra ) {}
 void    vj_midi_learning_vims_fx( void *vv, int widget, int id, int a, int b, int c, int extra ) {}
 void    vj_midi_learning_vims_msg2(void *vv, char *widget, int id, int arg, int b ) {}

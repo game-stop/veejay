@@ -21,7 +21,7 @@ void get_points_from_curve( GtkWidget *curve, int len, float *v );
 void set_initial_curve( GtkWidget *curve, int fx_id, int parameter_id, int start, int end, int value, double fps );
 void curve_set_position ( GtkWidget *curve, double pos);
 void curve_set_predefined_shape( GtkWidget *curve, int fx_id, int parameter_id, int start, int end,
-    int shape, int minb, int maxb, int steps, gboolean revers, double fps);
+    int shape, int minb, int maxb, int steps, int seed, int detail, gboolean revers, double fps);
 void gtk3_curve_set_x_timeline(GtkWidget *widget, gfloat min_x, gfloat max_x);
 void gtk3_curve_get_x_timeline(GtkWidget *widget, gfloat *min_x, gfloat *max_x);
 

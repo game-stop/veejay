@@ -95,6 +95,7 @@
 #include <veejaycore/vj-task.h>
 #include <libveejay/vj-split.h>
 #include <libveejay/vj-macro.h>
+#include <libveejay/vjkf.h>
 #include <libplugger/plugload.h>
 #include <libstream/vj-vloopback.h>
 #include <veejaycore/vims.h>
@@ -2217,7 +2218,7 @@ static void veejay_seq_prepare_sample_position(veejay_t *info, int sample_id)
 
     if (info && info->settings) {
         veejay_msg(VEEJAY_MSG_DEBUG,
-                   "[SEQ] seed sample=%d range=%d..%d speed=%d loop=%s old_resume=%ld new_resume=%d old_transport=%lld slot=%d",
+                   "[SEQ] seed sample=%d range=%d..%d speed=%d loop=%s old_resume=%ld new_resume=%d old_transport=%lld bank=%d slot=%d",
                    sample_id,
                    start,
                    end,
@@ -2226,7 +2227,95 @@ static void veejay_seq_prepare_sample_position(veejay_t *info, int sample_id)
                    old_resume,
                    resume,
                    old_frame,
+                   info->seq ? info->seq->active_bank : -1,
                    info->seq ? info->seq->current : -1);
+    }
+}
+
+static int veejay_sequence_bank_valid(int bank)
+{
+    return bank >= 0 && bank < VJ_SEQUENCE_BANKS;
+}
+
+static int veejay_sequence_selected_bank_mask(veejay_t *info)
+{
+    sequencer_t *seq = info ? info->seq : NULL;
+    int active_bank;
+    int mask;
+
+    if(!seq)
+        return 0;
+
+    active_bank = seq->active_bank;
+    if(!veejay_sequence_bank_valid(active_bank))
+        active_bank = 0;
+
+    mask = seq->selected_bank_mask & ((1 << VJ_SEQUENCE_BANKS) - 1);
+    if(mask == 0)
+        mask = (1 << active_bank);
+
+    mask |= (1 << active_bank);
+    seq->selected_bank_mask = mask;
+
+    return mask;
+}
+
+static int veejay_sequence_count_slots(const seq_sample_t *samples)
+{
+    int count = 0;
+
+    for(int i = 0; i < MAX_SEQUENCES; i++)
+        if(samples[i].sample_id > 0)
+            count++;
+
+    return count;
+}
+
+static void veejay_sequence_store_active_bank(veejay_t *info)
+{
+    sequencer_t *seq = info ? info->seq : NULL;
+    int bank;
+
+    if(!seq)
+        return;
+
+    bank = seq->active_bank;
+    if(!veejay_sequence_bank_valid(bank))
+        bank = 0;
+
+    veejay_memcpy(seq->banks[bank].samples,
+                  seq->samples,
+                  sizeof(seq_sample_t) * MAX_SEQUENCES);
+    seq->banks[bank].size = veejay_sequence_count_slots(seq->samples);
+    seq->banks[bank].current = seq->current;
+    seq->size = seq->banks[bank].size;
+}
+
+static void veejay_sequence_prepare_selected_sample_positions(veejay_t *info)
+{
+    int mask = veejay_sequence_selected_bank_mask(info);
+
+    if(!info || !info->seq)
+        return;
+
+    veejay_sequence_store_active_bank(info);
+
+    for(int bank = 0; bank < VJ_SEQUENCE_BANKS; bank++) {
+        if(!(mask & (1 << bank)))
+            continue;
+
+        for(int i = 0; i < MAX_SEQUENCES; i++) {
+            seq_sample_t *entry = &info->seq->banks[bank].samples[i];
+
+            if(entry->type != 0)
+                continue;
+
+            int id = entry->sample_id;
+            if(id <= 0 || !sample_exists(id))
+                continue;
+
+            veejay_seq_prepare_sample_position(info, id);
+        }
     }
 }
 
@@ -2351,16 +2440,18 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
         }
 
         int next_id = sample_id;
+        int next_bank = info->seq->active_bank;
         int next_slot = info->seq->current;
         int next_mode = new_pm;
 
-        next_id = vj_perform_next_sequence(info, &next_mode, &next_slot);
+        next_id = vj_perform_next_sequence(info, &next_mode, &next_bank, &next_slot);
 
         vj_perform_setup_transition(info,
                                     next_id,
                                     next_mode,
                                     sample_id,
                                     new_pm,
+                                    next_bank,
                                     next_slot);
     }
     else if (new_pm == VJ_PLAYBACK_MODE_SAMPLE) {
@@ -2370,32 +2461,29 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
 
 void veejay_sample_set_initial_positions(veejay_t *info)
 {
-    int first_sample = -1;
+    int first_type = 0;
+    int first_slot = 0;
+    int first_id;
 
-    for(int i = 0; i < MAX_SEQUENCES; i++)
-    {
-        if(info->seq->samples[i].sample_id > 0 && first_sample == -1)
-            first_sample = i;
+    if(!info || !info->seq)
+        return;
 
-        if(info->seq->samples[i].type != 0)
-            continue;
+    veejay_sequence_prepare_selected_sample_positions(info);
 
-        int id = info->seq->samples[i].sample_id;
-        if(id <= 0 || !sample_exists(id))
-            continue;
+    first_id = vj_perform_get_next_sequence_id(info, &first_type, 0, &first_slot);
+    if(first_id <= 0)
+        return;
 
-        veejay_seq_prepare_sample_position(info, id);
-    }
+    info->seq->current = first_slot;
+    if(veejay_sequence_bank_valid(info->seq->active_bank))
+        info->seq->banks[info->seq->active_bank].current = first_slot;
 
-    if(first_sample >= 0)
-    {
-        veejay_change_playback_mode(
-            info,
-            (info->seq->samples[first_sample].type == 0
-                ? VJ_PLAYBACK_MODE_SAMPLE
-                : VJ_PLAYBACK_MODE_TAG),
-            info->seq->samples[first_sample].sample_id);
-    }
+    veejay_change_playback_mode(
+        info,
+        (first_type == 0 || first_type == VJ_PLAYBACK_MODE_SAMPLE
+            ? VJ_PLAYBACK_MODE_SAMPLE
+            : VJ_PLAYBACK_MODE_TAG),
+        first_id);
 }
 
 void veejay_prepare_sample_positions(int id)
@@ -2406,16 +2494,7 @@ void veejay_prepare_sample_positions(int id)
 void veejay_reset_sample_positions(veejay_t *info, int sample_id)
 {
     if(sample_id == -1) {
-        for(int i = 0; i < MAX_SEQUENCES; i++) {
-            if(info->seq->samples[i].type != 0)
-                continue;
-
-            int id = info->seq->samples[i].sample_id;
-            if(id <= 0 || !sample_exists(id))
-                continue;
-
-            veejay_seq_prepare_sample_position(info, id);
-        }
+        veejay_sequence_prepare_selected_sample_positions(info);
     }
     else {
         if(sample_id <= 0 || !sample_exists(sample_id))
@@ -2909,6 +2988,21 @@ static char *veejay_pipe_append_zero_chain_entry_status(char *ptr)
     return ptr;
 }
 
+static int veejay_pipe_chain_entry_display_arg(veejay_t *info, sample_eff_chain *entry, int param_nr)
+{
+    int value = entry->arg[param_nr];
+
+    if(info && info->settings && entry->kf_status && entry->kf) {
+        int kf_value = value;
+        long long n_frame = atomic_load_long_long(&info->settings->current_frame_num);
+
+        if(get_keyframe_value(entry->kf, n_frame, param_nr, &kf_value))
+            value = kf_value;
+    }
+
+    return value;
+}
+
 static char *veejay_pipe_append_chain_entry_status(veejay_t *info, char *ptr)
 {
     sample_eff_chain **src = NULL;
@@ -2964,8 +3058,14 @@ static char *veejay_pipe_append_chain_entry_status(veejay_t *info, char *ptr)
     ptr = vj_sprintf(ptr, entry->beat_flag);       /* 93 */
     ptr = vj_sprintf(ptr, entry->is_rendering);    /* 94 */
 
-    for(int i = 0; i < VJ_STATUS_CHAIN_ENTRY_PARAMETERS; i++)
-        ptr = vj_sprintf(ptr, (i < num_params) ? entry->arg[i] : 0); /* 95..110 */
+    for(int i = 0; i < VJ_STATUS_CHAIN_ENTRY_PARAMETERS; i++) {
+        int value = 0;
+
+        if(i < num_params)
+            value = veejay_pipe_chain_entry_display_arg(info, entry, i);
+
+        ptr = vj_sprintf(ptr, value); /* 95..110 */
+    }
 
     return ptr;
 }
@@ -2987,7 +3087,14 @@ static char *veejay_pipe_append_sequence_status(veejay_t *info, char *ptr)
     for(int i = 0; i < VJ_SEQUENCE_BANKS; i++)
         ptr = vj_sprintf(ptr, (int)seq->banks[i].revision);
 
-    ptr = vj_sprintf(ptr, 0);
+    int active_bank = seq->active_bank;
+    if(active_bank < 0 || active_bank >= VJ_SEQUENCE_BANKS)
+        active_bank = 0;
+    int selected_mask = seq->selected_bank_mask & ((1 << VJ_SEQUENCE_BANKS) - 1);
+    if(selected_mask == 0)
+        selected_mask = (1 << active_bank);
+    selected_mask |= (1 << active_bank);
+    ptr = vj_sprintf(ptr, selected_mask);
 
     return ptr;
 }
@@ -7557,6 +7664,10 @@ veejay_t *veejay_malloc()
 		return NULL;
 	
 	info->seq = (sequencer_t*) vj_calloc(sizeof( sequencer_t) );
+    if(info->seq)
+        info->seq->selected_bank_mask = 1;
+    if(info->settings)
+        info->settings->transition.seq_bank = -1;
     info->audio = AUDIO_PLAY;
     info->continuous = 1;
     info->sync_correction = 1;

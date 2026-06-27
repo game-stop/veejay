@@ -112,9 +112,6 @@ typedef struct
 
     long target_queue_overruns;
     long target_queue_reads;
-    long target_queue_lock_drops;
-    long target_queue_overflow_events;
-    long target_queue_dropped_frames;
     int  target_queue_pending_ms;
     int  target_queue_retained_ms;
     int  target_queue_ring_ms;
@@ -166,14 +163,12 @@ typedef struct vj_audio_sync_shared_t
     volatile int target_phase_q15;
     volatile int target_confidence_q15;
     volatile int max_correction_pct;
-    volatile int bridge_active;
 
     volatile int track_align_locked;
     volatile int track_align_offset_ms;
     volatile int track_align_confidence_pct;
     volatile int track_align_correction_ppm;
     volatile int track_align_state;
-    volatile long track_align_last_update_ms;
 
     volatile int track_align_snap_pending;
     volatile int track_align_snap_delta_frames;
@@ -215,12 +210,6 @@ typedef struct vj_audio_sync_shared_t
     double bridge_target_bpm_latched;
     int    bridge_bpm_latch_valid;
 
-    double bridge_stretch_segment_start;
-    double bridge_stretch_prev_start;
-    int    bridge_stretch_segment_pos;
-    int    bridge_stretch_prev_valid;
-    int    bridge_stretch_segment_len;
-    int    bridge_stretch_overlap;
 
     float align_source_feat[VJ_AUDIO_SYNC_ALIGN_FEATURES];
     float align_target_feat[VJ_AUDIO_SYNC_ALIGN_FEATURES];
@@ -234,12 +223,9 @@ typedef struct vj_audio_sync_shared_t
     int   align_target_accum_frames;
     double align_source_prev_level;
     double align_target_prev_level;
-    int   align_source_rate;
-    int   align_target_rate;
     double align_offset_smooth_ms;
     double align_conf_smooth;
     int   align_hold_blocks;
-    int   align_last_frame_action;
     long  align_last_snap_ms;
     int   align_snap_cooldown_ms;
     volatile int align_video_fps_x1000;
@@ -274,31 +260,17 @@ typedef struct vj_audio_sync_shared_t
     int target_sample_rate;
     volatile long target_queue_overruns;
     volatile long target_queue_reads;
-    volatile long target_queue_lock_drops;
-    volatile long target_queue_overflow_events;
-    volatile long target_queue_dropped_frames;
 
-    int record_channels;
-    int record_bytes_per_frame;
-    int record_bits_per_channel;
-    int record_sample_rate;
 
     char wav_path[VJ_AUDIO_SYNC_PATH_MAX];
     volatile int wav_loop;
     volatile int wav_limit_ms;
-    volatile int wav_silence_after_eof;
 
     volatile int wav_plain_lock_valid;
-    volatile int wav_plain_lock_generation;
     volatile int wav_plain_lock_delta_frames;
     volatile int wav_plain_lock_confidence_pct;
 
 
-    volatile int  jack_connect_failures;
-    volatile int  jack_connect_giveup;
-    volatile long jack_connect_first_fail_ms;
-    volatile long jack_connect_next_retry_ms;
-    volatile long jack_connect_last_log_ms;
 
     double fast_energy;
     double slow_energy;
@@ -355,7 +327,6 @@ int  vj_audio_sync_wav_plain_lock_get(vj_audio_sync_shared_t *s,
 void vj_audio_sync_wav_plain_lock_store(vj_audio_sync_shared_t *s,
                                         int delta_frames,
                                         int confidence_pct);
-void vj_audio_sync_wav_plain_lock_clear(vj_audio_sync_shared_t *s);
 void vj_audio_sync_set_target_clock(vj_audio_sync_shared_t *s,
                                     float bpm,
                                     float phase,
@@ -436,6 +407,17 @@ int  vj_audio_sync_render_monitor_s16(vj_audio_sync_shared_t *s,
                                       int dst_frame_bytes,
                                       int dst_channels,
                                       int dst_sample_rate);
+
+int  vj_audio_sync_render_monitor_s16_latency(vj_audio_sync_shared_t *s,
+                                              uint8_t *dst,
+                                              int dst_frames,
+                                              int dst_frame_bytes,
+                                              int dst_channels,
+                                              int dst_sample_rate,
+                                              int latency_ms,
+                                              int force_retarget);
+
+void vj_audio_sync_reset_monitor_transport(vj_audio_sync_shared_t *s);
 
 int  vj_audio_sync_get_snapshot(vj_audio_sync_shared_t *s,
                                 vj_audio_sync_snapshot_t *dst);

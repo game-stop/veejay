@@ -225,8 +225,6 @@ int vj_audio_beat_copy_record_audio(
 
 float vj_audio_beat_get_level(vj_audio_beat_shared_t *s);
 float vj_audio_beat_get_transient(vj_audio_beat_shared_t *s);
-float vj_audio_beat_get_trail_length(vj_audio_beat_shared_t *s);
-float vj_audio_beat_get_density(vj_audio_beat_shared_t *s);
 long vj_audio_beat_get_hits(vj_audio_beat_shared_t *s);
 int vj_audio_beat_get_action(vj_audio_beat_shared_t *s);
 int vj_audio_beat_get_snapshot(vj_audio_beat_shared_t *s, vj_audio_beat_snapshot_t *dst);

@@ -60,6 +60,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <string.h>
+#include <strings.h>
 #include <stdint.h>
 #include <dirent.h>
 #include <pthread.h>
@@ -1649,7 +1650,7 @@ uint32_t				v4l2_get_property_id( const char *name )
 {
 		int i;
 		for( i = 0; property_list[i].key != NULL; i ++ ) {
-			if(strncasecmp( property_list[i].key, name, strlen(property_list[i].key) ) == 0 )
+			if(strcasecmp( property_list[i].key, name ) == 0 )
 				return property_list[i].id;
 		}
 		return 0;

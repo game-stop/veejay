@@ -63,6 +63,11 @@ enum {
 #define VJ_RECORD_AUDIO_SOURCE_EXTERNAL  VJ_RECORD_AUDIO_SOURCE_BEAT_JACK
 #define VJ_RECORD_AUDIO_SOURCE_SILENCE   3
 
+#define VJ_AUDIO_MIX_FOLLOW_ROUTE        0
+#define VJ_AUDIO_MIX_ORIGINAL_ONLY       1
+#define VJ_AUDIO_MIX_EXTERNAL_ONLY       2
+#define VJ_AUDIO_MIX_ORIGINAL_EXTERNAL   3
+
 //classic vars
 #define DUMMY_DEFAULT_WIDTH 352
 #define DUMMY_DEFAULT_HEIGHT 288
@@ -141,6 +146,7 @@ typedef struct
 	seq_sample_t samples[MAX_SEQUENCES];
 	int rec_id;
 	int active_bank;
+	int selected_bank_mask;
 	unsigned int revision;
 	sequence_bank_t banks[VJ_SEQUENCE_BANKS];
 } sequencer_t;
@@ -160,6 +166,7 @@ typedef struct
     int ready;
     volatile int global_state;
 	int skip_audio_edge;
+	int seq_bank;
 	int seq_index;
 } transition_t;
 
@@ -405,6 +412,8 @@ typedef struct {
 	volatile int audio_direction_changed;
 	volatile int audio_flush_request;
 	volatile int audio_mute;
+	volatile int audio_mix_mode;
+	volatile int audio_mix_crossfade;
 	volatile int audio_threads_disabled;
 	volatile int audio_last_stretched_samples;
 	volatile long long audio_wrap_offset;

@@ -772,6 +772,26 @@ static void JACK_silence_outputs(float **jack_out, int chs, jack_nframes_t nfram
     memset(jack_out[ch], 0, bytes);
 }
 
+static void JACK_apply_output_volume(jack_driver_t *drv, float **jack_out, int chs, jack_nframes_t nframes)
+{
+  if (!drv || !jack_out || chs <= 0 || nframes == 0)
+    return;
+
+  for (int ch = 0; ch < chs; ch++)
+  {
+    unsigned int volume = atomic_load_uint(&drv->volume[ch]);
+
+    if (volume >= 100)
+      continue;
+
+    float gain = (volume == 0) ? 0.0f : ((float)volume * 0.01f);
+    float *dst = jack_out[ch];
+
+    for (jack_nframes_t f = 0; f < nframes; f++)
+      dst[f] *= gain;
+  }
+}
+
 
 static inline void JACK_deinterleave_stereo(float *dst0,
                                             float *dst1,
@@ -916,8 +936,6 @@ JACK_callback_playback(jack_driver_t *drv, jack_nframes_t nframes)
       return;
   }
 
-  /* TODO: apply drv->volume[] / volumeEffectType in the JACK callback output path. */
-
   jack_ringbuffer_t *play = (jack_ringbuffer_t *)drv->pPlayPtr;
 
   if (atomic_load_int(&drv->input_passthrough))
@@ -969,6 +987,7 @@ JACK_callback_playback(jack_driver_t *drv, jack_nframes_t nframes)
             memcpy(jack_out[ch], jack_in[1], sample_bytes);
         }
 
+        JACK_apply_output_volume(drv, jack_out, chs, nframes);
         JACK_drain_playback_ring(drv, play);
         return;
       }
@@ -1049,6 +1068,7 @@ JACK_callback_playback(jack_driver_t *drv, jack_nframes_t nframes)
       memset(jack_out[ch] + frames_done, 0, zero_frames * sizeof(float));
   }
 
+  JACK_apply_output_volume(drv, jack_out, chs, nframes);
   jack_ringbuffer_read_advance(play, frames_done * frame_bytes);
 }
 

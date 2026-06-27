@@ -62,6 +62,91 @@ typedef struct
     char        *msg;
 } dvims_t;
 
+#define VJ_MIDI_EXTRA_TOGGLE 6
+#define VJ_MIDI_EXTRA_DUAL_TOGGLE 7
+
+static int vj_midi_event_is_release_like(const int *data)
+{
+    if(data[0] == SND_SEQ_EVENT_NOTEOFF)
+        return 1;
+
+    if((data[0] == SND_SEQ_EVENT_CONTROLLER || data[0] == SND_SEQ_EVENT_KEYPRESS) && data[2] <= 0)
+        return 1;
+
+    return 0;
+}
+
+static void vj_midi_send_toggle_vims(vmidi_t *v, dvims_t *d, int *data)
+{
+    if(vj_midi_event_is_release_like(data))
+        return;
+
+    if(!d->msg || !d->widget) {
+        vj_msg(VEEJAY_MSG_ERROR, "MIDI %x:%x,%x -> learned toggle has no widget",
+               data[0], data[1], data[2]);
+        return;
+    }
+
+    GtkWidget *toggle = glade_xml_get_widget_(v->mw, d->widget);
+    if(!toggle || !GTK_IS_TOGGLE_BUTTON(toggle)) {
+        vj_msg(VEEJAY_MSG_ERROR, "MIDI %x:%x,%x -> learned widget '%s' is not a toggle button",
+               data[0], data[1], data[2], d->widget);
+        return;
+    }
+
+    int next = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle)) ? 0 : 1;
+    char vims_msg[64];
+
+    snprintf(vims_msg, sizeof(vims_msg), "%s%d;", d->msg, next);
+    msg_vims(vims_msg);
+
+    vj_msg(VEEJAY_MSG_INFO, "MIDI %x:%x,%x -> toggle %s %s",
+           data[0], data[1], data[2], d->widget, next ? "on" : "off");
+}
+
+static void vj_midi_send_dual_toggle_vims(vmidi_t *v, dvims_t *d, int *data)
+{
+    if(vj_midi_event_is_release_like(data))
+        return;
+
+    if(!d->msg || !d->widget) {
+        vj_msg(VEEJAY_MSG_ERROR, "MIDI %x:%x,%x -> learned dual-toggle has no widget",
+               data[0], data[1], data[2]);
+        return;
+    }
+
+    GtkWidget *toggle = glade_xml_get_widget_(v->mw, d->widget);
+    if(!toggle || !GTK_IS_TOGGLE_BUTTON(toggle)) {
+        vj_msg(VEEJAY_MSG_ERROR, "MIDI %x:%x,%x -> learned widget '%s' is not a toggle button",
+               data[0], data[1], data[2], d->widget);
+        return;
+    }
+
+    int off_id = 0;
+    int off_arg = 0;
+    int on_id = 0;
+    int on_arg = 0;
+
+    if(sscanf(d->msg, "%d:%d;%d:%d;", &off_id, &off_arg, &on_id, &on_arg) != 4) {
+        vj_msg(VEEJAY_MSG_ERROR, "MIDI %x:%x,%x -> invalid dual-toggle mapping '%s'",
+               data[0], data[1], data[2], d->msg);
+        return;
+    }
+
+    int next = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle)) ? 0 : 1;
+    char vims_msg[64];
+
+    if(next)
+        snprintf(vims_msg, sizeof(vims_msg), "%03d:%d;", on_id, on_arg);
+    else
+        snprintf(vims_msg, sizeof(vims_msg), "%03d:%d;", off_id, off_arg);
+
+    msg_vims(vims_msg);
+
+    vj_msg(VEEJAY_MSG_INFO, "MIDI %x:%x,%x -> toggle %s %s",
+           data[0], data[1], data[2], d->widget, next ? "on" : "off");
+}
+
 
 void    vj_midi_learn( void *vv , int start)
 {
@@ -344,6 +429,34 @@ void    vj_midi_learning_vims_simple( void *vv, char *widget, int id )
     vj_midi_learning_vims( vv, widget, message, (widget == NULL ? 0 : 1 ) );
 }
 
+void    vj_midi_learning_vims_toggle( void *vv, char *widget, int id )
+{
+    char message[8];
+    snprintf(message, sizeof(message), "%03d:", id);
+    vj_midi_learning_vims(vv, widget, message, VJ_MIDI_EXTRA_TOGGLE);
+}
+
+void    vj_midi_learning_vims_toggle2( void *vv, char *widget, int id, int arg )
+{
+    char message[16];
+    snprintf(message, sizeof(message), "%03d:%d ", id, arg);
+    vj_midi_learning_vims(vv, widget, message, VJ_MIDI_EXTRA_TOGGLE);
+}
+
+void    vj_midi_learning_vims_toggle3( void *vv, char *widget, int id, int arg0, int arg1 )
+{
+    char message[24];
+    snprintf(message, sizeof(message), "%03d:%d %d ", id, arg0, arg1);
+    vj_midi_learning_vims(vv, widget, message, VJ_MIDI_EXTRA_TOGGLE);
+}
+
+void    vj_midi_learning_vims_dual_toggle( void *vv, char *widget, int off_id, int on_id, int arg )
+{
+    char message[32];
+    snprintf(message, sizeof(message), "%03d:%d;%03d:%d;", off_id, arg, on_id, arg);
+    vj_midi_learning_vims(vv, widget, message, VJ_MIDI_EXTRA_DUAL_TOGGLE);
+}
+
 void    vj_midi_learning_vims_spin( void *vv, char *widget, int id )
 {
     char message[8];
@@ -434,6 +547,16 @@ static  void    vj_midi_send_vims_now( vmidi_t *v, int *data )
 
     if( d != NULL && error == VEVO_NO_ERROR )
     {
+        if(d->extra == VJ_MIDI_EXTRA_TOGGLE) {
+            vj_midi_send_toggle_vims(v, d, data);
+            return;
+        }
+
+        if(d->extra == VJ_MIDI_EXTRA_DUAL_TOGGLE) {
+            vj_midi_send_dual_toggle_vims(v, d, data);
+            return;
+        }
+
         if( d->extra )
         {   //@ argument is dynamic
             double min = 0.0;

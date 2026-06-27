@@ -37,6 +37,8 @@ GType      gvr_sequence_bank_view_get_type(void);
 GtkWidget *gvr_sequence_bank_view_new(void);
 
 void gvr_sequence_bank_view_set_active_bank(GtkWidget *widget, int bank);
+void gvr_sequence_bank_view_set_selected_bank(GtkWidget *widget, int bank);
+int  gvr_sequence_bank_view_get_selected_bank(GtkWidget *widget);
 void gvr_sequence_bank_view_set_sequence_active(GtkWidget *widget, gboolean active);
 void gvr_sequence_bank_view_set_current_slot(GtkWidget *widget, int bank, int slot);
 void gvr_sequence_bank_view_set_bank_revision(GtkWidget *widget, int bank, unsigned int revision);

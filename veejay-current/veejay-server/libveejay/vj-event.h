@@ -44,6 +44,8 @@ void    vj_event_xml_new_keyb_event		( 	void *v,	xmlDocPtr doc, 	xmlNodePtr cur 
 #endif
 #endif
 int vj_event_get_video_format(void);
+void    vj_event_audio_mix_mode(void *ptr, const char format[], va_list ap);
+void    vj_event_audio_mix_crossfade(void *ptr, const char format[], va_list ap);
 int vj_event_get_num_args(int net_id);
 void vj_event_update_remote(void *ptr);
 void    vj_event_vims_message_forwarding( void *ptr, const char format[], va_list ap);
@@ -139,6 +141,7 @@ void	vj_event_sample_set_rand_loop		(	void *ptr, 	const char format[],	va_list a
 void 	vj_event_sample_set_position			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_sample_skip_frame		(	void *ptr,	const char format[], 	va_list ap	);
 void 	vj_event_sample_set_speed			(	void *ptr,	const char format[],	va_list ap	);
+void 	vj_event_sample_set_volume			(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_sample_set_nl			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_sample_set_no			(	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_sample_set_num_loops		(	void *ptr, 	const char format[], 	va_list ap	); 

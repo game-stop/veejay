@@ -115,6 +115,8 @@ void vj_event_sequence_clear_all(void *ptr, const char format[], va_list ap);
 void vj_event_audio_beat_scratch_sensitivity(void *ptr, const char format[], va_list ap);
 void vj_event_audio_beat_source_loss_pause(void *ptr, const char format[], va_list ap);
 void vj_event_audio_beat_monitor_latency(void *ptr, const char format[], va_list ap);
+void vj_event_audio_mix_mode(void *ptr, const char format[], va_list ap);
+void vj_event_audio_mix_crossfade(void *ptr, const char format[], va_list ap);
 
 
 
@@ -1382,6 +1384,19 @@ void		vj_init_vevo_events(void)
 				0,
 				"Speed (0=pause, > 0  and < (end-start)",
 				1,
+				NULL );
+
+	index_map_[VIMS_SAMPLE_SET_VOLUME]	=	_new_event(
+				"%d %d",
+				VIMS_SAMPLE_SET_VOLUME,
+				"Set sample audio volume",
+				vj_event_sample_set_volume,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				"Volume 0-100",
+				100,
 				NULL );
 
 	index_map_[VIMS_SAMPLE_HOLD_FRAME]	=	_new_event(
@@ -2696,6 +2711,29 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				-1,
 				NULL );
 
+
+	index_map_[VIMS_AUDIO_MIX_MODE]		=	_new_event(
+				"%d",
+				VIMS_AUDIO_MIX_MODE,
+				"Set audio mixer mode",
+				vj_event_audio_mix_mode,
+				1,
+				VIMS_ALLOW_ANY,
+				"Mode: 0=follow route, 1=original only, 2=JACK external only, 3=original + JACK external",
+				0,
+				NULL );
+
+	index_map_[VIMS_AUDIO_MIX_CROSSFADE]	=	_new_event(
+				"%d",
+				VIMS_AUDIO_MIX_CROSSFADE,
+				"Set original/JACK external audio crossfade",
+				vj_event_audio_mix_crossfade,
+				1,
+				VIMS_ALLOW_ANY,
+				"Crossfade 0=original, 50=equal-power blend, 100=JACK external",
+				0,
+				NULL );
+
 	index_map_[VIMS_AUDIO_BEAT_STATE]		=	_new_event(
 				NULL,
 				VIMS_AUDIO_BEAT_STATE,
@@ -3270,7 +3308,7 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 	index_map_[VIMS_STREAM_SET_V4LCTRL]		=	_new_event(
 				"%d %d %s",
 				VIMS_STREAM_SET_V4LCTRL,
-				"Set v4l property [brightness,contrast,saturation,hue,gain,gamma,red_balance,blue_balance,green_balance,auto_white,sharpness,bl_compensate,auto_gain,auto_hue,temperature,fliph,exposure]",
+				"Set v4l property [brightness,contrast,saturation,hue,gain,gamma,red_balance,blue_balance,auto_white,sharpness,bl_compensate,auto_gain,auto_hue,temperature,fliph,flipv,exposure,black_level,whiteness]",
 				vj_event_v4l_set_property,
 				3,
 				VIMS_REQUIRE_ALL_PARAMS,
@@ -3284,7 +3322,7 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 
 	index_map_[VIMS_STREAM_SET_HUE]			=	_new_event(
 				"%d %d",
-				VIMS_STREAM_SET_BRIGHTNESS,
+				VIMS_STREAM_SET_HUE,
 				"Set hue value for Video4linux stream",
 				vj_event_v4l_set_hue,
 				2,
@@ -3309,7 +3347,7 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				NULL );
 	index_map_[VIMS_STREAM_SET_SATURATION]			=	_new_event(
 				"%d %d",
-				VIMS_STREAM_SET_WHITE,
+				VIMS_STREAM_SET_SATURATION,
 				"Set saturation value for Video4linux stream",
 				vj_event_v4l_set_saturation,
 				2,
@@ -3886,14 +3924,16 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				NULL );
 
 	index_map_[ VIMS_SEQUENCE_SELECT ]			=	_new_event(
-				"%d",
+				"%d %d",
 				VIMS_SEQUENCE_SELECT,
-				"Select sample sequence bank",
+				"Select sample sequence bank and optional selected-bank mask",
 				vj_event_sequence_select,
-				1,
-				VIMS_REQUIRE_ALL_PARAMS,
+				2,
+				VIMS_ALLOW_ANY,
 				"Sequence bank (0..3)",
 				0,
+				"Selected bank bitmask (optional, 1..15)",
+				1,
 				NULL );
 
 	index_map_[ VIMS_SEQUENCE_COPY ]			=	_new_event(

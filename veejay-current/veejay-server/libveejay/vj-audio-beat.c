@@ -103,50 +103,8 @@ static inline int ab_action_uses_auto_fx(int action)
 }
 
 
-//#define VEEJAY_AUDIO_BEAT_DEBUG 1
-//#define VEEJAY_AUDIO_BEAT_AUTO_DEBUG 1
-//#define VEEJAY_AUDIO_BEAT_TRACE_REJECTS 1
-
-#ifndef VEEJAY_AUDIO_BEAT_DEBUG_INTERVAL_MS
-#define VEEJAY_AUDIO_BEAT_DEBUG_INTERVAL_MS 1000L
-#endif
-
-#ifdef VEEJAY_AUDIO_BEAT_DEBUG
-#define AB_DBG(fmt, ...) \
-    veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO-BEAT-DBG] " fmt, ##__VA_ARGS__)
-#else
-#define AB_DBG(fmt, ...) do { } while(0)
-#endif
-
-#ifndef VEEJAY_AUDIO_BEAT_AUTO_DEBUG_INTERVAL_MS
-#define VEEJAY_AUDIO_BEAT_AUTO_DEBUG_INTERVAL_MS 700L
-#endif
-
 #ifndef VEEJAY_AUDIO_BEAT_AUTO_SIG_CHECK_MS
 #define VEEJAY_AUDIO_BEAT_AUTO_SIG_CHECK_MS 250L
-#endif
-
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-#define AB_AUTO_DBG(fmt, ...) \
-    veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO-BEAT-AUTO-DBG] " fmt, ##__VA_ARGS__)
-#else
-#define AB_AUTO_DBG(fmt, ...) do { } while(0)
-#endif
-
-#ifndef VEEJAY_AUDIO_BEAT_BREAKBEAT_FRAME_DEBUG
-#define VEEJAY_AUDIO_BEAT_BREAKBEAT_FRAME_DEBUG 0
-#endif
-
-#ifndef VEEJAY_AUDIO_BEAT_BREAKBEAT_TRACE
-#define VEEJAY_AUDIO_BEAT_BREAKBEAT_TRACE 0
-#endif
-
-#ifndef VEEJAY_AUDIO_BEAT_BREAKBEAT_TRACE_INTERVAL_MS
-#define VEEJAY_AUDIO_BEAT_BREAKBEAT_TRACE_INTERVAL_MS 250L
-#endif
-
-#ifndef VEEJAY_AUDIO_BEAT_LATENCY_TRACE
-#define VEEJAY_AUDIO_BEAT_LATENCY_TRACE 1
 #endif
 
 #ifndef VEEJAY_AUDIO_BEAT_WINDOW_MIN_MS
@@ -181,22 +139,6 @@ static inline int ab_action_uses_auto_fx(int action)
 #endif
 
 
-#if VEEJAY_AUDIO_BEAT_BREAKBEAT_TRACE
-#define AB_BREAK_TRACE(fmt, ...) \
-    veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO-BEAT][BREAK] " fmt, ##__VA_ARGS__)
-#else
-#define AB_BREAK_TRACE(fmt, ...) do { } while(0)
-#endif
-
-
-#if VEEJAY_AUDIO_BEAT_BREAKBEAT_FRAME_DEBUG
-#define AB_BREAK_FRAME_DBG(fmt, ...) \
-    veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO-BEAT][BREAK-FRAME] " fmt, ##__VA_ARGS__)
-#else
-#define AB_BREAK_FRAME_DBG(fmt, ...) do { } while(0)
-#endif
-
-
 #ifndef VEEJAY_AUDIO_BEAT_ARM_BLOCKS
 #define VEEJAY_AUDIO_BEAT_ARM_BLOCKS 10
 #endif
@@ -215,14 +157,6 @@ static inline int ab_action_uses_auto_fx(int action)
 
 #ifndef VEEJAY_AUDIO_BEAT_FIRST_HIT_MIN_RMS
 #define VEEJAY_AUDIO_BEAT_FIRST_HIT_MIN_RMS 0.0200
-#endif
-
-#ifndef VEEJAY_AUDIO_BEAT_MIN_AUTO_COOLDOWN_MS
-#define VEEJAY_AUDIO_BEAT_MIN_AUTO_COOLDOWN_MS 170L
-#endif
-
-#ifndef VEEJAY_AUDIO_BEAT_MAX_AUTO_COOLDOWN_MS
-#define VEEJAY_AUDIO_BEAT_MAX_AUTO_COOLDOWN_MS 520L
 #endif
 
 #ifndef VEEJAY_AUDIO_BEAT_MAX_ANALYSIS_FRAMES
@@ -521,34 +455,6 @@ typedef struct
     int sync_read_probe_source;
     int sync_read_probe_seq;
 
-#ifdef VEEJAY_AUDIO_BEAT_DEBUG
-    long last_debug_ms;
-    long debug_blocks;
-    long debug_candidates;
-    long debug_accepted;
-    long debug_cooldown_rejects;
-    long debug_silence_rejects;
-    long debug_flux_rejects;
-    long debug_score_rejects;
-
-    double dbg_energy;
-    double dbg_flux;
-    double dbg_block_level;
-    double dbg_level;
-    double dbg_envelope;
-    double dbg_bass;
-    double dbg_mid;
-    double dbg_high;
-    double dbg_energy_ratio;
-    double dbg_flux_ratio;
-    double dbg_score;
-    double dbg_min_hit_level;
-    double dbg_min_hit_flux;
-    int dbg_threshold;
-    int dbg_audible;
-    int dbg_transient_present;
-    int dbg_hit_candidate;
-#endif
 } vj_audio_beat_thread_t;
 
 
@@ -1251,37 +1157,6 @@ static void ab_breakbeat_hit_queue_push(vj_audio_beat_shared_t *s,
                                         long block_ms);
 static int ab_breakbeat_hit_queue_pop_after(int consumed_seq, ab_breakbeat_hit_event_t *dst);
 
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-typedef struct
-{
-    int lo;
-    int hi;
-    int span;
-    int direction;
-    int capacity;
-    int min_delta;
-    float depth;
-    float drive;
-    float delta;
-    const char *reason;
-} ab_auto_calc_debug_t;
-
-static ab_auto_calc_debug_t ab_auto_calc_dbg;
-
-static void ab_auto_calc_debug_reset(void)
-{
-    ab_auto_calc_dbg.lo = 0;
-    ab_auto_calc_dbg.hi = 0;
-    ab_auto_calc_dbg.span = 0;
-    ab_auto_calc_dbg.direction = 0;
-    ab_auto_calc_dbg.capacity = 0;
-    ab_auto_calc_dbg.min_delta = 0;
-    ab_auto_calc_dbg.depth = 0.0f;
-    ab_auto_calc_dbg.drive = 0.0f;
-    ab_auto_calc_dbg.delta = 0.0f;
-    ab_auto_calc_dbg.reason = "init";
-}
-#endif
 
 static inline int ab_load_i(const volatile int *p)
 {
@@ -1551,11 +1426,6 @@ static inline long ab_target_analysis_bytes(const vj_audio_beat_thread_t *t)
         frames = VEEJAY_AUDIO_BEAT_MAX_ANALYSIS_FRAMES;
 
     return frames * (long)t->bytes_per_frame;
-}
-
-static inline double ab_absd(double v)
-{
-    return v < 0.0 ? -v : v;
 }
 
 static inline double ab_clampd(double v, double lo, double hi)
@@ -2036,17 +1906,6 @@ static inline long ab_effective_snapshot_window_ms(int configured_ms, float bpm,
     return (long)(value + 0.5);
 }
 
-static inline double ab_sample_s16(const uint8_t *p)
-{
-    int16_t v = (int16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
-    return (double)v * (1.0 / 32768.0);
-}
-
-static inline double ab_sample_u8(const uint8_t *p)
-{
-    return ((double)p[0] - 128.0) * (1.0 / 128.0);
-}
-
 static const char *ab_action_name(int action)
 {
     switch(action)
@@ -2314,34 +2173,6 @@ static void ab_thread_reset(vj_audio_beat_thread_t *t)
     t->sync_read_probe_seq = 0;
     ab_thread_publish_cache_reset(t);
 
-#ifdef VEEJAY_AUDIO_BEAT_DEBUG
-    t->last_debug_ms = 0;
-    t->debug_blocks = 0;
-    t->debug_candidates = 0;
-    t->debug_accepted = 0;
-    t->debug_cooldown_rejects = 0;
-    t->debug_silence_rejects = 0;
-    t->debug_flux_rejects = 0;
-    t->debug_score_rejects = 0;
-
-    t->dbg_energy = 0.0;
-    t->dbg_flux = 0.0;
-    t->dbg_block_level = 0.0;
-    t->dbg_level = 0.0;
-    t->dbg_envelope = 0.0;
-    t->dbg_bass = 0.0;
-    t->dbg_mid = 0.0;
-    t->dbg_high = 0.0;
-    t->dbg_energy_ratio = 0.0;
-    t->dbg_flux_ratio = 0.0;
-    t->dbg_score = 0.0;
-    t->dbg_min_hit_level = 0.0;
-    t->dbg_min_hit_flux = 0.0;
-    t->dbg_threshold = 0;
-    t->dbg_audible = 0;
-    t->dbg_transient_present = 0;
-    t->dbg_hit_candidate = 0;
-#endif
 }
 
 static void ab_clear_published_control(vj_audio_beat_shared_t *s)
@@ -3134,9 +2965,6 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
     double flux_z;
     double onset_z;
     double onset_threshold_z;
-#ifdef VEEJAY_AUDIO_BEAT_DEBUG
-    double onset_score;
-#endif
     double level;
     double transient_norm;
     double flux_norm;
@@ -3193,9 +3021,6 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
     int dense_body_onset;
     int kick_onset;
     int snare_onset;
-#if defined(VEEJAY_AUDIO_BEAT_DEBUG) || defined(VEEJAY_AUDIO_BEAT_TRACE_REJECTS)
-    const char *reject_reason;
-#endif
 
     if(!s || !t || !data || bytes <= 0 || t->bytes_per_frame <= 0 || t->channels <= 0)
         return 0;
@@ -3354,31 +3179,10 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
                                 t->envelope,
                                 0.0);
 
-#ifdef VEEJAY_AUDIO_BEAT_DEBUG
-        t->debug_blocks++;
-        {
-            long now = ab_now_ms();
-
-            if(t->last_debug_ms == 0 || (now - t->last_debug_ms) >= VEEJAY_AUDIO_BEAT_DEBUG_INTERVAL_MS)
-            {
-                t->last_debug_ms = now;
-
-                AB_DBG("warmup frames=%d energy=%.8f rms=%.6f flux=%.8f adaptive_settle=%d",
-                    frames,
-                    energy,
-                    block_level,
-                    flux,
-                    VEEJAY_AUDIO_BEAT_ADAPT_WARMUP_BLOCKS + VEEJAY_AUDIO_BEAT_SETTLE_BLOCKS);
-            }
-        }
-#endif
 
         return 0;
     }
 
-#ifdef VEEJAY_AUDIO_BEAT_DEBUG
-    t->debug_blocks++;
-#endif
 
     threshold = ab_load_i(&s->threshold);
 
@@ -3404,9 +3208,6 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
 
     onset_z = (rise_z * 0.45) + (flux_z * 0.55);
     onset_threshold_z = ab_threshold_to_sigma(threshold);
-#ifdef VEEJAY_AUDIO_BEAT_DEBUG
-    onset_score = onset_z * 100.0;
-#endif
 
     threshold_norm = ((double)threshold - 30.0) / 370.0;
 
@@ -3820,9 +3621,6 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
         band_balance = 0.0;
         transient_norm = 0.0;
         flux_norm = 0.0;
-#ifdef VEEJAY_AUDIO_BEAT_DEBUG
-        onset_score = 0.0;
-#endif
         kick_score = 0.0;
         snare_score = 0.0;
         hat_score = 0.0;
@@ -3894,14 +3692,6 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
             t->last_hit_kind = AB_HIT_FULL;
     }
 
-#if defined(VEEJAY_AUDIO_BEAT_DEBUG) || defined(VEEJAY_AUDIO_BEAT_TRACE_REJECTS)
-    reject_reason = !armed ? "arming" :
-        (!settled ? "settling" :
-        (!first_hit_ready ? "first-hit-level" :
-        (!audible ? "silence" :
-        (!coherent_onset && !scratch_candidate ? "coherence" :
-        (!scratch_candidate && !absolute_onset && !tempo_onset && !dense_body_onset && onset_z < onset_threshold_z ? "novelty" : "score")))));
-#endif
 
     stat_alpha = !settled ? 0.055 :
                  (hit_candidate ? 0.0015 :
@@ -3911,117 +3701,6 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
     ab_ewstat_update(&t->flux_mean, &t->flux_var, flux_feature, stat_alpha);
     ab_ewstat_update(&t->onset_mean, &t->onset_var, onset_z, stat_alpha);
 
-#ifdef VEEJAY_AUDIO_BEAT_TRACE_REJECTS
-    if(!hit_candidate)
-    {
-        static long last_plain_analysis_log_ms = 0;
-        long now_dbg = ab_now_ms();
-
-        if(last_plain_analysis_log_ms == 0 ||
-           (now_dbg - last_plain_analysis_log_ms) >= VEEJAY_AUDIO_BEAT_DEBUG_INTERVAL_MS)
-        {
-            last_plain_analysis_log_ms = now_dbg;
-            veejay_msg(VEEJAY_MSG_INFO,
-                       "[AUDIO-BEAT] analyse reject: reason=%s onset=%.2f sigma=%.2f threshold=%d rms=%.6f gate=%.6f flux=%.8f rise_z=%.3f flux_z=%.3f blocks=%d",
-                       reject_reason,
-                       onset_z,
-                       onset_threshold_z,
-                       threshold,
-                       block_level,
-                       min_hit_level,
-                       flux,
-                       rise_z,
-                       flux_z,
-                       t->blocks_seen);
-        }
-    }
-#endif
-
-#ifdef VEEJAY_AUDIO_BEAT_DEBUG
-    t->dbg_energy = energy;
-    t->dbg_flux = flux;
-    t->dbg_block_level = block_level;
-    t->dbg_level = level;
-    t->dbg_envelope = t->envelope;
-    t->dbg_bass = bass_norm;
-    t->dbg_mid = mid_norm;
-    t->dbg_high = high_norm;
-    t->dbg_energy_ratio = rise_z;
-    t->dbg_flux_ratio = flux_z;
-    t->dbg_score = onset_score;
-    t->dbg_min_hit_level = min_hit_level;
-    t->dbg_min_hit_flux = onset_threshold_z;
-    t->dbg_threshold = threshold;
-    t->dbg_audible = audible;
-    t->dbg_transient_present = coherent_onset && settled;
-    t->dbg_hit_candidate = hit_candidate;
-
-    if(hit_candidate)
-    {
-        t->debug_candidates++;
-
-        AB_DBG("candidate onset=%.3f sigma=%.3f score=%.2f thr=%d rms=%.6f gate=%.6f flux=%.8f rise_z=%.3f flux_z=%.3f bass=%.3f mid=%.3f high=%.3f rise_mu=%.6f flux_mu=%.6f level=%.6f env=%.6f blocks=%d",
-            onset_z,
-            onset_threshold_z,
-            onset_score,
-            threshold,
-            block_level,
-            min_hit_level,
-            flux,
-            rise_z,
-            flux_z,
-            bass_norm,
-            mid_norm,
-            high_norm,
-            t->rise_mean,
-            t->flux_mean,
-            level,
-            t->envelope,
-            t->blocks_seen);
-    }
-    else
-    {
-        if(!audible)
-            t->debug_silence_rejects++;
-        else if(!coherent_onset || !armed)
-            t->debug_flux_rejects++;
-        else
-            t->debug_score_rejects++;
-
-        {
-            long now = ab_now_ms();
-
-            if(t->last_debug_ms == 0 || (now - t->last_debug_ms) >= VEEJAY_AUDIO_BEAT_DEBUG_INTERVAL_MS)
-            {
-                t->last_debug_ms = now;
-
-                AB_DBG("reject reason=%s onset=%.3f sigma=%.3f score=%.2f thr=%d rms=%.6f gate=%.6f flux=%.8f rise_z=%.3f flux_z=%.3f bass=%.3f mid=%.3f high=%.3f rise_mu=%.6f flux_mu=%.6f blocks=%d cand=%ld acc=%ld coolrej=%ld silrej=%ld fluxrej=%ld scorerej=%ld",
-                    reject_reason,
-                    onset_z,
-                    onset_threshold_z,
-                    onset_score,
-                    threshold,
-                    block_level,
-                    min_hit_level,
-                    flux,
-                    rise_z,
-                    flux_z,
-                    bass_norm,
-                    mid_norm,
-                    high_norm,
-                    t->rise_mean,
-                    t->flux_mean,
-                    t->blocks_seen,
-                    t->debug_candidates,
-                    t->debug_accepted,
-                    t->debug_cooldown_rejects,
-                    t->debug_silence_rejects,
-                    t->debug_flux_rejects,
-                    t->debug_score_rejects);
-            }
-        }
-    }
-#endif
 
     return hit_candidate;
 }
@@ -4971,102 +4650,6 @@ static void ab_breakbeat_note_accepted_body(vj_audio_beat_shared_t *s,
     t->body_last_kind = hit_kind;
 }
 
-#if VEEJAY_AUDIO_BEAT_BREAKBEAT_TRACE
-static const char *ab_scratch_reject_name(int reject)
-{
-    switch(reject)
-    {
-        case AB_SCRATCH_REJECT_NONE: return "none";
-        case AB_SCRATCH_REJECT_RAW: return "raw";
-        case AB_SCRATCH_REJECT_DOMINANCE: return "dom";
-        case AB_SCRATCH_REJECT_COLD: return "cold";
-        case AB_SCRATCH_REJECT_TAIL: return "tail";
-        case AB_SCRATCH_REJECT_CYCLE: return "cycle";
-        default: return "?";
-    }
-}
-
-static void ab_breakbeat_trace_detector(vj_audio_beat_shared_t *s,
-                                        const vj_audio_beat_thread_t *t,
-                                        const char *path,
-                                        int hit_seq,
-                                        long hit_ms,
-                                        long publish_ms,
-                                        long block_ms,
-                                        long cooldown_ms,
-                                        long since_last_ms,
-                                        double score)
-{
-    double bpm = 0.0;
-    double body_bpm = 0.0;
-    double level = 0.0;
-    long body_since_ms = 0;
-    long cold_probe_age_ms = 0;
-
-    if(!s || !ab_action_is_breakbeat(ab_load_i(&s->action_mode)))
-        return;
-
-    if(t && t->beat_period_ms > 1.0)
-        bpm = 60000.0 / t->beat_period_ms;
-
-    if(t)
-    {
-        if(t->body_period_ms > 1.0)
-            body_bpm = 60000.0 / t->body_period_ms;
-
-        if(t->body_last_hit_ms > 0 && hit_ms >= t->body_last_hit_ms)
-            body_since_ms = hit_ms - t->body_last_hit_ms;
-
-        if(t->body_cold_probe_ms > 0 && hit_ms >= t->body_cold_probe_ms)
-            cold_probe_age_ms = hit_ms - t->body_cold_probe_ms;
-
-        level = ab_from_q15(t->pub_level_q15 == INT_MIN ? 0 : t->pub_level_q15);
-    }
-
-    AB_BREAK_TRACE(
-        "detector path=%s seq=%d kind=%s hit=%ld pub=%ld age=%ld block=%ld cooldown=%ld since=%ld body_since=%ld bpm=%.1f body_bpm=%.1f score=%.3f lvl=%.3f prev=%.3f prevlvl=%.3f cold_age=%ld cold_prev=%ld cold_gap=%ld cold_min=%ld cold_first=%ld cold_meter=%.0f cold_mcnt=%d cold_mint=%ld cold_kind=%s seed=%d k=%.3f sn=%.3f hat=%.3f scr=%.3f scrv=%.3f scrb=%.3f scrraw=%d scrdom=%d scrcand=%d srej=%s dir=%d",
-        path ? path : "hit",
-        hit_seq,
-        ab_hit_kind_name(t ? t->last_hit_kind : AB_HIT_NONE),
-        hit_ms,
-        publish_ms,
-        publish_ms >= hit_ms ? publish_ms - hit_ms : 0L,
-        block_ms,
-        cooldown_ms,
-        since_last_ms,
-        body_since_ms,
-        bpm,
-        body_bpm,
-        score,
-        level,
-        t ? t->last_accept_score : 0.0,
-        t ? t->last_accept_level : 0.0,
-        cold_probe_age_ms,
-        t ? t->body_cold_gap_ms : 0L,
-        t ? t->body_cold_dbg_gap_ms : 0L,
-        t ? t->body_cold_dbg_min_ms : 0L,
-        t ? t->body_cold_dbg_first_ms : 0L,
-        t ? t->body_cold_meter_period_ms : 0.0,
-        t ? t->body_cold_meter_count : 0,
-        t ? t->body_cold_meter_dbg_interval_ms : 0L,
-        ab_hit_kind_name(t ? t->body_cold_probe_kind : AB_HIT_NONE),
-        t ? t->body_seed_count : 0,
-        t ? t->last_kick_score : 0.0,
-        t ? t->last_snare_score : 0.0,
-        t ? t->last_hat_score : 0.0,
-        t ? t->last_scratch_score : 0.0,
-        ab_from_q15(ab_load_i(&ab_scratch_velocity_q15)),
-        ab_from_q15(ab_load_i(&ab_scratch_burst_q15)),
-        t ? t->last_scratch_candidate_raw : 0,
-        t ? t->last_scratch_dominant : 0,
-        t ? t->last_scratch_candidate : 0,
-        ab_scratch_reject_name(t ? t->last_scratch_reject : AB_SCRATCH_REJECT_RAW),
-        ab_load_i(&ab_scratch_dir) < 0 ? -1 : 1);
-}
-#else
-#define ab_breakbeat_trace_detector(s, t, path, hit_seq, hit_ms, publish_ms, block_ms, cooldown_ms, since_last_ms, score) do { } while(0)
-#endif
-
 
 typedef struct
 {
@@ -5364,7 +4947,6 @@ static void ab_breakbeat_detector_accept(vj_audio_beat_shared_t *s,
     ab_store_i(&s->beat_toggle_q15, t->beat_toggle_state);
 
     ab_breakbeat_hit_queue_push(s, t, hit_seq, d->hit_ms, now_ms, d->block_ms);
-    ab_breakbeat_trace_detector(s, t, d->accept_path, hit_seq, d->hit_ms, now_ms, d->block_ms, d->cooldown_ms, d->candidate_since_ms, d->hit_confidence);
 }
 
 static void ab_breakbeat_process_detector_hit(vj_audio_beat_shared_t *s,
@@ -5380,7 +4962,6 @@ static void ab_breakbeat_process_detector_hit(vj_audio_beat_shared_t *s,
 
     if(!d.body_gate.keep)
     {
-        ab_breakbeat_trace_detector(s, t, d.body_gate.reason, ab_load_i(&s->hit_seq), d.hit_ms, now_ms, d.block_ms, d.cooldown_ms, d.candidate_since_ms, d.hit_confidence);
     }
     else if(d.candidate_since_ms >= d.cooldown_ms)
     {
@@ -5388,7 +4969,6 @@ static void ab_breakbeat_process_detector_hit(vj_audio_beat_shared_t *s,
     }
     else
     {
-        ab_breakbeat_trace_detector(s, t, "cooldown", ab_load_i(&s->hit_seq), d.hit_ms, now_ms, d.block_ms, d.cooldown_ms, d.candidate_since_ms, d.hit_confidence);
     }
 }
 
@@ -8312,25 +7892,6 @@ static inline int ab_breakbeat_max_repeats(vj_audio_beat_shared_t *s)
     return repeats;
 }
 
-static inline int ab_breakbeat_seek_projected(veejay_t *v, long long frame, int *dir)
-{
-    int park = 0;
-
-    frame = ab_breakbeat_project_frame(v, frame, dir, &park);
-
-    if(frame > LONG_MAX)
-        frame = LONG_MAX;
-
-    veejay_set_frame(v, (long)frame);
-
-    return park;
-}
-
-static inline void ab_breakbeat_seek(veejay_t *v, long long frame)
-{
-    (void)ab_breakbeat_seek_projected(v, frame, NULL);
-}
-
 static void ab_breakbeat_release_transport(veejay_t *v, vj_audio_beat_shared_t *s)
 {
     int user_parked = 0;
@@ -8539,593 +8100,6 @@ static int ab_breakbeat_fallback_if_due(veejay_t *v, vj_audio_beat_shared_t *s, 
 }
 
 
-
-#if VEEJAY_AUDIO_BEAT_BREAKBEAT_TRACE
-static void ab_breakbeat_trace_consume(vj_audio_beat_shared_t *s,
-                                       const char *path,
-                                       const char *block_reason,
-                                       const vj_audio_beat_snapshot_t *snap,
-                                       long now,
-                                       long event_ms,
-                                       long publish_ms,
-                                       long block_ms,
-                                       long stale_ms,
-                                       long open_ms,
-                                       long repeat_ms,
-                                       int repeated,
-                                       int tonal,
-                                       int allowed,
-                                       int base_speed,
-                                       int run_speed,
-                                       int slice_frames,
-                                       int max_repeats,
-                                       long long cur,
-                                       long long target,
-                                       float target_fps)
-{
-    static long last_trace_ms = 0;
-    static int last_seq = -1;
-    long event_age_ms;
-    long publish_age_ms;
-    long consume_age_ms;
-    long center_age_ms;
-    int seq;
-    int qread;
-    int qwrite;
-    int qdepth;
-    float scratch_visual_env;
-    int scratch_visual_dir;
-    float scratch_visual_dir_signal;
-    float scratch_visual_signed;
-    long scratch_visual_last_ms;
-    long scratch_visual_hold_until_ms;
-    long scratch_visual_decay_until_ms;
-    long scratch_visual_age_ms;
-    long scratch_visual_hold_ms;
-    long scratch_visual_decay_ms;
-    long output_latency_ms;
-    long heard_latency_ms;
-    long monitor_latency_ms;
-    long speaker_offset_ms;
-    float latency_frames;
-    float speaker_offset_frames;
-    float effective_late_frames;
-
-    if(!s || !ab_action_is_breakbeat(ab_load_i(&s->action_mode)))
-        return;
-
-    seq = snap ? snap->hit_seq : 0;
-    if(seq == last_seq && last_trace_ms > 0 &&
-       (now - last_trace_ms) < VEEJAY_AUDIO_BEAT_BREAKBEAT_TRACE_INTERVAL_MS)
-        return;
-
-    last_seq = seq;
-    last_trace_ms = now;
-
-    event_age_ms = event_ms > 0 && now >= event_ms ? now - event_ms : 0;
-    if(publish_ms <= 0 || publish_ms < event_ms)
-        publish_ms = event_ms;
-    publish_age_ms = publish_ms >= event_ms ? publish_ms - event_ms : 0;
-    consume_age_ms = now >= publish_ms ? now - publish_ms : 0;
-    center_age_ms = block_ms > 0 ? event_age_ms + (block_ms / 2L) : event_age_ms;
-    latency_frames = ab_breakbeat_latency_frames_from_age(event_age_ms);
-    output_latency_ms = atomic_load_int(&ab_output_latency_ms);
-    heard_latency_ms = atomic_load_int(&ab_heard_latency_ms);
-    monitor_latency_ms = atomic_load_int(&ab_monitor_latency_ms);
-    if(heard_latency_ms < 0)
-        speaker_offset_ms = 0;
-    else
-        speaker_offset_ms = event_age_ms - heard_latency_ms;
-    speaker_offset_frames = heard_latency_ms < 0 ? 0.0f : ab_breakbeat_signed_frames_from_ms(speaker_offset_ms);
-    effective_late_frames = ab_breakbeat_effective_late_frames(event_age_ms);
-    qread = ab_breakbeat_hit_queue_read;
-    qwrite = ab_breakbeat_hit_queue_write;
-    qdepth = qwrite >= qread ? qwrite - qread : AB_BREAKBEAT_HIT_QUEUE_SIZE - qread + qwrite;
-
-    scratch_visual_env = ab_scratch_visual_env_now(now);
-    scratch_visual_dir = ab_scratch_visual_dir_now(now);
-    scratch_visual_dir_signal = ab_scratch_visual_direction_signal(now);
-    scratch_visual_signed = ab_scratch_visual_signed_signal(now);
-    scratch_visual_last_ms = ab_load_l(&ab_scratch_visual_last_ms);
-    scratch_visual_hold_until_ms = ab_load_l(&ab_scratch_visual_hold_until_ms);
-    scratch_visual_decay_until_ms = ab_load_l(&ab_scratch_visual_decay_until_ms);
-    scratch_visual_age_ms = scratch_visual_last_ms > 0 && now >= scratch_visual_last_ms ? now - scratch_visual_last_ms : 0;
-    scratch_visual_hold_ms = scratch_visual_hold_until_ms > now ? scratch_visual_hold_until_ms - now : 0;
-    scratch_visual_decay_ms = scratch_visual_decay_until_ms > now ? scratch_visual_decay_until_ms - now : 0;
-
-    AB_BREAK_TRACE(
-        "consume path=%s seq=%d kind=%s age=%ld latblk=%ld latpub=%ld latcons=%ld latcenter=%ld latframes=%.2f audq=%ld moncfg=%ld hearq=%ld spkoff=%ld spkframes=%.2f effframes=%.2f stale=%ld open=%ld repeat=%ld rep=%d tonal=%d allow=%d block=%s active=%d dir=%d repcnt=%d loop=%d base=%d run=%d slice=%d maxrep=%d cur=%lld target=%lld fps=%.2f bpm=%.1f lvl=%.3f env=%.3f flux=%.3f tr=%.3f k=%.3f sn=%.3f hat=%.3f bass=%.3f mid=%.3f high=%.3f pulse=%.3f gate=%.3f dens=%.3f senv=%.3f sdir=%d sdirsig=%.3f ssigned=%.3f shold=%ld sdecay=%ld sage=%ld rdens=%.3f reg=%.3f accent=%.3f accel=%.3f tempo=%.3f groove=%.3f phrase=%.3f climax=%.3f q=%d/%d/%d",
-        path ? path : "event",
-        seq,
-        ab_hit_kind_name(snap ? snap->hit_kind : AB_HIT_NONE),
-        event_age_ms,
-        block_ms,
-        publish_age_ms,
-        consume_age_ms,
-        center_age_ms,
-        latency_frames,
-        output_latency_ms,
-        monitor_latency_ms,
-        heard_latency_ms,
-        speaker_offset_ms,
-        speaker_offset_frames,
-        effective_late_frames,
-        stale_ms,
-        open_ms,
-        repeat_ms,
-        repeated,
-        tonal,
-        allowed,
-        block_reason ? block_reason : "none",
-        ab_breakbeat_state.active,
-        ab_breakbeat_state.direction,
-        ab_breakbeat_state.repeat_count,
-        ab_breakbeat_state.local_loop_active,
-        base_speed,
-        run_speed,
-        slice_frames,
-        max_repeats,
-        cur,
-        target,
-        target_fps,
-        snap ? snap->bpm : 0.0f,
-        snap ? snap->level : 0.0f,
-        snap ? snap->envelope : 0.0f,
-        snap ? snap->flux : 0.0f,
-        snap ? snap->transient : 0.0f,
-        snap ? snap->kick : 0.0f,
-        snap ? snap->snare : 0.0f,
-        snap ? snap->hat : 0.0f,
-        snap ? snap->bass : 0.0f,
-        snap ? snap->mid : 0.0f,
-        snap ? snap->high : 0.0f,
-        snap ? snap->beat_pulse : 0.0f,
-        snap ? snap->beat_gate : 0.0f,
-        snap ? snap->beat_density : 0.0f,
-        scratch_visual_env,
-        scratch_visual_dir,
-        scratch_visual_dir_signal,
-        scratch_visual_signed,
-        scratch_visual_hold_ms,
-        scratch_visual_decay_ms,
-        scratch_visual_age_ms,
-        ab_breakbeat_state.rhythm_density,
-        ab_breakbeat_state.rhythm_regularity,
-        ab_breakbeat_state.rhythm_accent,
-        ab_breakbeat_state.rhythm_accel,
-        ab_breakbeat_state.tempo_drive,
-        ab_breakbeat_state.music_groove,
-        ab_breakbeat_state.music_phrase,
-        ab_breakbeat_state.music_climax,
-        qread,
-        qwrite,
-        qdepth);
-}
-#else
-#define ab_breakbeat_trace_consume(s, path, block_reason, snap, now, event_ms, publish_ms, block_ms, stale_ms, open_ms, repeat_ms, repeated, tonal, allowed, base_speed, run_speed, slice_frames, max_repeats, cur, target, target_fps) do { } while(0)
-#endif
-
-#if VEEJAY_AUDIO_BEAT_BREAKBEAT_FRAME_DEBUG
-static inline const char *ab_breakbeat_debug_hit_name(int hit_kind)
-{
-    return ab_hit_kind_name(hit_kind);
-}
-
-static inline float ab_breakbeat_debug_body_drive(const vj_audio_beat_snapshot_t *snap)
-{
-    float percussive;
-    float motion;
-    float tonal;
-    float groove;
-    float body;
-
-    if(!snap)
-        return 0.0f;
-
-    percussive = ab_breakbeat_percussive_drive(snap, snap->hit_kind);
-    motion = snap->transient * 0.28f + snap->flux * 0.18f +
-             snap->beat_pulse * 0.22f + snap->beat_density * 0.10f;
-    tonal = ab_breakbeat_tonal_bias(snap) * 0.06f;
-    groove = ab_breakbeat_state.rhythm_accent * 0.08f +
-             ab_breakbeat_state.rhythm_accel * 0.08f +
-             ab_breakbeat_state.tempo_drive * 0.06f;
-
-    body = percussive * 0.38f + motion + tonal + groove;
-    return ab_breakbeat_clampf(body);
-}
-
-static inline float ab_breakbeat_debug_body_gate(const vj_audio_beat_snapshot_t *snap, int hit_kind)
-{
-    float gate = 0.34f;
-
-    if(ab_is_body_hit(hit_kind))
-        gate -= 0.045f;
-    if(snap && snap->beat_gate > 0.5f)
-        gate -= 0.030f;
-    if(snap)
-        gate -= ab_breakbeat_clampf(snap->beat_density) * 0.030f;
-    gate -= ab_breakbeat_state.rhythm_accent * 0.030f;
-    gate -= ab_breakbeat_state.rhythm_accel * 0.025f;
-    gate += ab_breakbeat_regular_drive() * 0.020f;
-
-    if(gate < 0.20f)
-        gate = 0.20f;
-    else if(gate > 0.42f)
-        gate = 0.42f;
-
-    return gate;
-}
-
-static inline float ab_breakbeat_debug_section_energy(const vj_audio_beat_snapshot_t *snap)
-{
-    float body;
-    float percussive;
-    float tone;
-    float rhythm;
-    float state;
-
-    if(!snap)
-        return 0.0f;
-
-    body = ab_breakbeat_debug_body_drive(snap);
-    percussive = ab_breakbeat_percussive_drive(snap, snap->hit_kind);
-    tone = ab_breakbeat_tonal_bias(snap);
-    rhythm = ab_breakbeat_state.rhythm_density * 0.26f +
-             ab_breakbeat_state.rhythm_regularity * 0.14f +
-             ab_breakbeat_state.rhythm_accent * 0.18f +
-             ab_breakbeat_state.rhythm_accel * 0.20f +
-             ab_breakbeat_state.tempo_drive * 0.12f;
-    state = ab_breakbeat_state.music_groove * 0.14f +
-            ab_breakbeat_state.music_phrase * 0.16f +
-            ab_breakbeat_state.music_climax * 0.24f;
-
-    return ab_breakbeat_clampf(body * 0.44f + percussive * 0.20f +
-                               snap->beat_pulse * 0.16f + rhythm + state +
-                               tone * 0.04f);
-}
-
-static inline float ab_breakbeat_debug_section_gate(const vj_audio_beat_snapshot_t *snap)
-{
-    float regular = ab_breakbeat_regular_drive();
-    float accel = ab_breakbeat_accel_drive();
-    float density = ab_breakbeat_clampf(ab_breakbeat_state.rhythm_density);
-    float gate = 0.30f + regular * 0.04f - accel * 0.035f - density * 0.025f;
-
-    if(snap && snap->beat_gate > 0.5f)
-        gate -= 0.020f;
-    if(gate < 0.22f)
-        gate = 0.22f;
-    else if(gate > 0.38f)
-        gate = 0.38f;
-
-    return gate;
-}
-
-static inline float ab_breakbeat_debug_forward_drive(const vj_audio_beat_snapshot_t *snap)
-{
-    float body;
-    float section;
-    float velocity;
-    float expression;
-
-    if(!snap)
-        return 0.0f;
-
-    body = ab_breakbeat_debug_body_drive(snap);
-    section = ab_breakbeat_debug_section_energy(snap);
-    velocity = ab_breakbeat_velocity(snap);
-    expression = ab_breakbeat_expression_drive();
-
-    return ab_breakbeat_clampf(body * 0.30f + section * 0.34f +
-                               velocity * 0.16f + expression * 0.12f +
-                               ab_breakbeat_state.tempo_drive * 0.08f);
-}
-
-static inline float ab_breakbeat_debug_forward_gate(const vj_audio_beat_snapshot_t *snap)
-{
-    float regular = ab_breakbeat_regular_drive();
-    float expression = ab_breakbeat_expression_drive();
-    float gate = 0.54f + regular * 0.10f - expression * 0.06f;
-
-    if(snap && snap->bpm > 210.0f)
-        gate += 0.035f;
-    if(gate < 0.46f)
-        gate = 0.46f;
-    else if(gate > 0.68f)
-        gate = 0.68f;
-
-    return gate;
-}
-
-typedef struct
-{
-    const char *path;
-    int event_valid;
-    int hit_kind;
-    int repeated;
-    int tonal;
-    int forward;
-    int allowed;
-    int base_speed;
-    int run_speed;
-    int slice_frames;
-    int max_repeats;
-    long open_ms;
-    long repeat_ms;
-    long stale_ms;
-    long event_age_ms;
-    long long cur = 0;
-    long long target = 0;
-    float target_fps;
-    float body_drive;
-    float body_gate;
-    float section_energy;
-    float section_gate;
-    float forward_drive;
-    float forward_gate;
-    int section_hot;
-} ab_breakbeat_frame_debug_t;
-
-static ab_breakbeat_frame_debug_t ab_breakbeat_frame_debug;
-
-static inline void ab_breakbeat_debug_reset_frame(void)
-{
-    memset(&ab_breakbeat_frame_debug, 0, sizeof(ab_breakbeat_frame_debug));
-    ab_breakbeat_frame_debug.path = "idle";
-    ab_breakbeat_frame_debug.hit_kind = AB_HIT_NONE;
-    ab_breakbeat_frame_debug.allowed = 1;
-}
-
-static inline void ab_breakbeat_debug_note_simple(const char *path)
-{
-    ab_breakbeat_frame_debug.path = path ? path : "idle";
-}
-
-static inline void ab_breakbeat_debug_note_event(const char *path,
-                                                 const vj_audio_beat_snapshot_t *snap,
-                                                 int repeated,
-                                                 int tonal,
-                                                 int forward,
-                                                 int allowed,
-                                                 int base_speed,
-                                                 int run_speed,
-                                                 int slice_frames,
-                                                 int max_repeats,
-                                                 long open_ms,
-                                                 long repeat_ms,
-                                                 long stale_ms,
-                                                 long event_age_ms,
-                                                 long long cur,
-                                                 long long target,
-                                                 float target_fps)
-{
-    ab_breakbeat_frame_debug.path = path ? path : "event";
-    ab_breakbeat_frame_debug.event_valid = 1;
-    ab_breakbeat_frame_debug.hit_kind = snap ? snap->hit_kind : AB_HIT_NONE;
-    ab_breakbeat_frame_debug.repeated = repeated;
-    ab_breakbeat_frame_debug.tonal = tonal;
-    ab_breakbeat_frame_debug.forward = forward;
-    ab_breakbeat_frame_debug.allowed = allowed;
-    ab_breakbeat_frame_debug.base_speed = base_speed;
-    ab_breakbeat_frame_debug.run_speed = run_speed;
-    ab_breakbeat_frame_debug.slice_frames = slice_frames;
-    ab_breakbeat_frame_debug.max_repeats = max_repeats;
-    ab_breakbeat_frame_debug.open_ms = open_ms;
-    ab_breakbeat_frame_debug.repeat_ms = repeat_ms;
-    ab_breakbeat_frame_debug.stale_ms = stale_ms;
-    ab_breakbeat_frame_debug.event_age_ms = event_age_ms;
-    ab_breakbeat_frame_debug.cur = cur;
-    ab_breakbeat_frame_debug.target = target;
-    ab_breakbeat_frame_debug.target_fps = target_fps;
-
-    if(snap)
-    {
-        ab_breakbeat_frame_debug.body_drive = ab_breakbeat_debug_body_drive(snap);
-        ab_breakbeat_frame_debug.body_gate = ab_breakbeat_debug_body_gate(snap, snap->hit_kind);
-        ab_breakbeat_frame_debug.section_energy = ab_breakbeat_debug_section_energy(snap);
-        ab_breakbeat_frame_debug.section_gate = ab_breakbeat_debug_section_gate(snap);
-        ab_breakbeat_frame_debug.forward_drive = ab_breakbeat_debug_forward_drive(snap);
-        ab_breakbeat_frame_debug.forward_gate = ab_breakbeat_debug_forward_gate(snap);
-        ab_breakbeat_frame_debug.section_hot =
-            ab_breakbeat_frame_debug.section_energy >= ab_breakbeat_frame_debug.section_gate;
-    }
-}
-
-static void ab_breakbeat_debug_trace_frame(veejay_t *v,
-                                           vj_audio_beat_shared_t *s,
-                                           long now,
-                                           int result,
-                                           int hit_seq_before,
-                                           int consumed_seq_before)
-{
-    vj_audio_beat_snapshot_t snap;
-    long long frame = 0;
-    long hold_until = 0;
-    long hold_left = 0;
-    long hit_age = -1L;
-    long action_age = -1L;
-    long burst_left = 0L;
-    int speed = 0;
-    int resume_speed = 0;
-    int paused = 0;
-    int hit_seq_after = 0;
-    int consumed_seq_after = 0;
-    int action = 0;
-    int qread;
-    int qwrite;
-    int qdepth;
-    int dbg_kind;
-    float runtime_fps = 0.0f;
-    float base_fps = 0.0f;
-    float current_fps = 0.0f;
-    float target_fps = 0.0f;
-    float burst_fps = 0.0f;
-    float effective = 0.0f;
-    float target_effective = 0.0f;
-    float body;
-    float body_gate;
-    float section;
-    float section_gate;
-    float forward_drive;
-    float forward_gate;
-    float fallback_fps;
-    float recent_fps;
-    double transport_period;
-    double transport_bpm;
-
-    memset(&snap, 0, sizeof(snap));
-
-    if(v && v->settings)
-    {
-        frame = ab_breakbeat_current_frame(v);
-        speed = v->settings->current_playback_speed;
-    }
-
-    if(s)
-    {
-        vj_audio_beat_get_snapshot(s, &snap);
-        hold_until = ab_load_l(&s->hold_until_ms);
-        hold_left = hold_until > now ? hold_until - now : 0;
-        resume_speed = ab_load_i(&s->resume_speed);
-        paused = ab_load_i(&s->paused_by_beat);
-        hit_seq_after = ab_load_i(&s->hit_seq);
-        consumed_seq_after = ab_load_i(&s->consumed_seq);
-        action = ab_load_i(&s->action_mode);
-    }
-
-    if(ab_breakbeat_state.last_hit_ms > 0)
-        hit_age = now - ab_breakbeat_state.last_hit_ms;
-    if(ab_breakbeat_state.last_transport_action_ms > 0)
-        action_age = now - ab_breakbeat_state.last_transport_action_ms;
-    if(ab_breakbeat_state.burst_until_ms > now)
-        burst_left = ab_breakbeat_state.burst_until_ms - now;
-
-    qread = ab_breakbeat_hit_queue_read;
-    qwrite = ab_breakbeat_hit_queue_write;
-    qdepth = qwrite >= qread ? qwrite - qread : AB_BREAKBEAT_HIT_QUEUE_SIZE - qread + qwrite;
-
-    runtime_fps = ab_breakbeat_runtime_fps(v);
-    base_fps = ab_breakbeat_base_fps(v);
-    current_fps = ab_breakbeat_state.current_fps;
-    target_fps = ab_breakbeat_state.target_fps;
-    burst_fps = ab_breakbeat_state.burst_fps;
-
-    if(current_fps <= 0.01f)
-        current_fps = runtime_fps;
-    if(target_fps <= 0.01f)
-        target_fps = current_fps;
-
-    effective = (float)(speed < 0 ? -speed : speed) * runtime_fps;
-    target_effective = (float)(resume_speed < 0 ? -resume_speed : resume_speed) * target_fps;
-
-    dbg_kind = ab_breakbeat_frame_debug.event_valid ? ab_breakbeat_frame_debug.hit_kind : snap.hit_kind;
-    body = ab_breakbeat_frame_debug.event_valid ? ab_breakbeat_frame_debug.body_drive : ab_breakbeat_debug_body_drive(&snap);
-    body_gate = ab_breakbeat_frame_debug.event_valid ? ab_breakbeat_frame_debug.body_gate : ab_breakbeat_debug_body_gate(&snap, dbg_kind);
-    section = ab_breakbeat_frame_debug.event_valid ? ab_breakbeat_frame_debug.section_energy : ab_breakbeat_debug_section_energy(&snap);
-    section_gate = ab_breakbeat_frame_debug.event_valid ? ab_breakbeat_frame_debug.section_gate : ab_breakbeat_debug_section_gate(&snap);
-    forward_drive = ab_breakbeat_frame_debug.event_valid ? ab_breakbeat_frame_debug.forward_drive : ab_breakbeat_debug_forward_drive(&snap);
-    forward_gate = ab_breakbeat_frame_debug.event_valid ? ab_breakbeat_frame_debug.forward_gate : ab_breakbeat_debug_forward_gate(&snap);
-
-    transport_period = ab_breakbeat_transport_period_ms(&snap);
-    transport_bpm = transport_period > 1.0 ? 60000.0 / transport_period : 0.0;
-    fallback_fps = ab_breakbeat_fallback_fps(v, &snap);
-    recent_fps = ab_breakbeat_recent_fallback_floor(v, fallback_fps, now, &snap);
-
-    AB_BREAK_FRAME_DBG(
-        "t=%ld frame=%lld rc=%d path=%s action=%s(%d) hs=%d->%d cs=%d->%d spd=%d resume=%d paused=%d hold=%ld active=%d dir=%d repcnt=%d loop=%d fb=%d fps=%.2f fps_cur=%.2f fps_tgt=%.2f fps_burst=%.2f fps_base=%.2f eff=%.2f teff=%.2f kind=%s ev=%d age=%ld stale=%ld open=%ld repeat=%ld rep=%d tonal=%d fw=%d allow=%d base_spd=%d run=%d slice=%d maxrep=%d ev_cur=%lld ev_target=%lld bpm=%.1f tbpm=%.1f tper=%.1f rawper=%.1f ri=%.1f prevint=%ld hitage=%ld actage=%ld burstleft=%ld q=%d/%d/%d lvl=%.3f env=%.3f flux=%.3f tr=%.3f k=%.3f sn=%.3f hat=%.3f bass=%.3f mid=%.3f high=%.3f pulse=%.3f gate=%.3f dens=%.3f rhythm_dens=%.3f reg=%.3f accent=%.3f accel=%.3f tempo=%.3f groove=%.3f phrase=%.3f climax=%.3f body=%.3f bgate=%.3f sect=%.3f sectgate=%.3f shot=%d fdrive=%.3f fgate=%.3f fb_fps=%.2f recent_fps=%.2f override=%ld",
-        now,
-        frame,
-        result,
-        ab_breakbeat_frame_debug.path ? ab_breakbeat_frame_debug.path : "idle",
-        ab_action_name(action),
-        action,
-        hit_seq_before,
-        hit_seq_after,
-        consumed_seq_before,
-        consumed_seq_after,
-        speed,
-        resume_speed,
-        paused,
-        hold_left,
-        ab_breakbeat_state.active,
-        ab_breakbeat_state.direction,
-        ab_breakbeat_state.repeat_count,
-        ab_breakbeat_state.local_loop_active,
-        ab_breakbeat_state.fallback_active,
-        runtime_fps,
-        current_fps,
-        target_fps,
-        burst_fps,
-        base_fps,
-        effective,
-        target_effective,
-        ab_breakbeat_debug_hit_name(dbg_kind),
-        ab_breakbeat_frame_debug.event_valid,
-        ab_breakbeat_frame_debug.event_valid ? ab_breakbeat_frame_debug.event_age_ms : (long)snap.beat_age_ms,
-        ab_breakbeat_frame_debug.stale_ms,
-        ab_breakbeat_frame_debug.open_ms,
-        ab_breakbeat_frame_debug.repeat_ms,
-        ab_breakbeat_frame_debug.repeated,
-        ab_breakbeat_frame_debug.tonal,
-        ab_breakbeat_frame_debug.forward,
-        ab_breakbeat_frame_debug.allowed,
-        ab_breakbeat_frame_debug.base_speed,
-        ab_breakbeat_frame_debug.run_speed,
-        ab_breakbeat_frame_debug.slice_frames,
-        ab_breakbeat_frame_debug.max_repeats,
-        ab_breakbeat_frame_debug.cur,
-        ab_breakbeat_frame_debug.target,
-        snap.bpm,
-        transport_bpm,
-        transport_period,
-        snap.bpm > 1.0f ? 60000.0f / snap.bpm : 0.0f,
-        ab_breakbeat_state.rhythm_interval_ema_ms,
-        ab_breakbeat_state.tempo_prev_interval_ms,
-        hit_age,
-        action_age,
-        burst_left,
-        qread,
-        qwrite,
-        qdepth,
-        snap.level,
-        snap.envelope,
-        snap.flux,
-        snap.transient,
-        snap.kick,
-        snap.snare,
-        snap.hat,
-        snap.bass,
-        snap.mid,
-        snap.high,
-        snap.beat_pulse,
-        snap.beat_gate,
-        snap.beat_density,
-        ab_breakbeat_state.rhythm_density,
-        ab_breakbeat_state.rhythm_regularity,
-        ab_breakbeat_state.rhythm_accent,
-        ab_breakbeat_state.rhythm_accel,
-        ab_breakbeat_state.tempo_drive,
-        ab_breakbeat_state.music_groove,
-        ab_breakbeat_state.music_phrase,
-        ab_breakbeat_state.music_climax,
-        body,
-        body_gate,
-        section,
-        section_gate,
-        section >= section_gate,
-        forward_drive,
-        forward_gate,
-        fallback_fps,
-        recent_fps,
-        ab_load_l(&ab_breakbeat_user_override_until_ms));
-}
-#else
-#define ab_breakbeat_debug_reset_frame() do { } while(0)
-#define ab_breakbeat_debug_note_simple(path) do { } while(0)
-#define ab_breakbeat_debug_note_event(path, snap, repeated, tonal, forward, allowed, base_speed, run_speed, slice_frames, max_repeats, open_ms, repeat_ms, stale_ms, event_age_ms, cur, target, target_fps) do { } while(0)
-#define ab_breakbeat_debug_trace_frame(v, s, now, result, hit_seq_before, consumed_seq_before) do { } while(0)
-#endif
-
 static int ab_breakbeat_consume(veejay_t *v, vj_audio_beat_shared_t *s,
                                 long now, int hit_seq, int consumed_seq)
 {
@@ -9167,7 +8141,6 @@ static int ab_breakbeat_consume(veejay_t *v, vj_audio_beat_shared_t *s,
     {
         if(hit_seq == consumed_seq)
         {
-            ab_breakbeat_debug_note_simple("fallback");
             return ab_breakbeat_fallback_if_due(v, s, now);
         }
 
@@ -9189,7 +8162,6 @@ static int ab_breakbeat_consume(veejay_t *v, vj_audio_beat_shared_t *s,
 
     if(hit_seq <= consumed_seq)
     {
-        ab_breakbeat_debug_note_simple("late-event");
         return ab_breakbeat_fallback_if_due(v, s, now);
     }
 
@@ -9250,8 +8222,6 @@ static int ab_breakbeat_consume(veejay_t *v, vj_audio_beat_shared_t *s,
     if(event_age_ms > stale_ms)
     {
         ab_store_i(&s->consumed_seq, hit_seq);
-        ab_breakbeat_trace_consume(s, "stale", "stale", &snap, now, event_ms, event_publish_ms, event_block_ms, stale_ms, 0L, 0L, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0f);
-        ab_breakbeat_debug_note_event("stale", &snap, 0, 0, 0, 0, 0, 0, 0, 0, 0L, 0L, stale_ms, event_age_ms, 0, 0, 0.0f);
         return ab_breakbeat_fallback_if_due(v, s, now);
     }
 
@@ -9325,8 +8295,6 @@ static int ab_breakbeat_consume(veejay_t *v, vj_audio_beat_shared_t *s,
             ab_breakbeat_apply_transport(v, 1);
         }
 
-        ab_breakbeat_trace_consume(s, "state-only", "state-only", &snap, now, event_ms, event_publish_ms, event_block_ms, stale_ms, open_ms, repeat_ms, 0, tonal_transport_hit, 0, base_speed, 0, slice_frames, max_repeats, cur, cur, state_fps);
-        ab_breakbeat_debug_note_event("state-only", &snap, 0, tonal_transport_hit, 0, 0, base_speed, 0, slice_frames, max_repeats, open_ms, repeat_ms, stale_ms, event_age_ms, cur, cur, state_fps);
         return 1;
     }
 
@@ -9429,16 +8397,12 @@ static int ab_breakbeat_consume(veejay_t *v, vj_audio_beat_shared_t *s,
             ab_breakbeat_apply_transport(v, 1);
         }
 
-        ab_breakbeat_trace_consume(s, "scratch-vlate-visual", "vlate-visual", &snap, now, event_ms, event_publish_ms, event_block_ms, stale_ms, open_ms, repeat_ms, repeated, tonal_transport_hit, 1, base_speed, ab_breakbeat_state.active ? 1 : 0, slice_frames, max_repeats, cur, cur, safe_fps);
-        ab_breakbeat_debug_note_event("scratch-vlate-visual", &snap, repeated, tonal_transport_hit, 0, 1, base_speed, ab_breakbeat_state.active ? 1 : 0, slice_frames, max_repeats, open_ms, repeat_ms, stale_ms, event_age_ms, cur, cur, safe_fps);
         return 1;
     }
 
     if(!transport_allowed)
     {
         ab_store_i(&s->consumed_seq, hit_seq);
-        ab_breakbeat_trace_consume(s, "blocked", block_reason, &snap, now, event_ms, event_publish_ms, event_block_ms, stale_ms, open_ms, repeat_ms, repeated, tonal_transport_hit, 0, base_speed, 0, slice_frames, max_repeats, cur, cur, 0.0f);
-        ab_breakbeat_debug_note_event("blocked", &snap, repeated, tonal_transport_hit, 0, 0, base_speed, 0, slice_frames, max_repeats, open_ms, repeat_ms, stale_ms, event_age_ms, cur, cur, 0.0f);
         return ab_breakbeat_fallback_if_due(v, s, now);
     }
 
@@ -9609,8 +8573,6 @@ static int ab_breakbeat_consume(veejay_t *v, vj_audio_beat_shared_t *s,
     ab_store_l(&s->hold_until_ms, now + open_ms);
     ab_breakbeat_apply_transport(v, run_speed);
 
-    ab_breakbeat_trace_consume(s, consume_path, block_reason, &snap, now, event_ms, event_publish_ms, event_block_ms, stale_ms, open_ms, repeat_ms, repeated, tonal_transport_hit, 1, base_speed, run_speed, slice_frames, max_repeats, cur, target, target_fps);
-    ab_breakbeat_debug_note_event(consume_path, &snap, repeated, tonal_transport_hit, 0, 1, base_speed, run_speed, slice_frames, max_repeats, open_ms, repeat_ms, stale_ms, event_age_ms, cur, target, target_fps);
 
     return 1;
 }
@@ -9789,11 +8751,9 @@ int vj_audio_beat_consume(veejay_t *v, vj_audio_beat_shared_t *s)
     {
         int break_result = 0;
 
-        ab_breakbeat_debug_reset_frame();
 
         if(ab_breakbeat_source_loss_pause(v, s, now, hit_seq))
         {
-            ab_breakbeat_debug_note_simple("source-loss-pause");
             break_result = 1;
         }
         else if(ab_breakbeat_source_loss_hold_active(v, s, now))
@@ -9801,22 +8761,18 @@ int vj_audio_beat_consume(veejay_t *v, vj_audio_beat_shared_t *s)
             if(hit_seq != consumed_seq)
                 ab_store_i(&s->consumed_seq, hit_seq);
             ab_breakbeat_hit_queue_clear();
-            ab_breakbeat_debug_note_simple("source-loss-hold");
             break_result = 0;
         }
         else if(ab_breakbeat_resume_owned_pause(v, s, now, hit_seq))
         {
-            ab_breakbeat_debug_note_simple("resume-owned");
             break_result = 1;
         }
         else if(ab_breakbeat_respect_user_pause(v, s, hit_seq))
         {
-            ab_breakbeat_debug_note_simple("respect-pause");
             break_result = 0;
         }
         else if(ab_breakbeat_detect_user_resume(v, s, now, hit_seq))
         {
-            ab_breakbeat_debug_note_simple("detect-resume");
             break_result = 0;
         }
         else if(ab_breakbeat_user_pause_override_active())
@@ -9824,7 +8780,6 @@ int vj_audio_beat_consume(veejay_t *v, vj_audio_beat_shared_t *s)
             if(hit_seq != consumed_seq)
                 ab_store_i(&s->consumed_seq, hit_seq);
             ab_breakbeat_hit_queue_clear();
-            ab_breakbeat_debug_note_simple("override");
             break_result = 0;
         }
         else
@@ -9832,7 +8787,6 @@ int vj_audio_beat_consume(veejay_t *v, vj_audio_beat_shared_t *s)
             break_result = ab_breakbeat_consume(v, s, now, hit_seq, consumed_seq);
         }
 
-        ab_breakbeat_debug_trace_frame(v, s, now, break_result, hit_seq, consumed_seq);
         return break_result;
     }
 
@@ -10853,55 +9807,6 @@ static int ab_auto_is_memory_name(const char *name)
 }
 
 
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-static const char *ab_auto_hint_class_name(int klass)
-{
-#ifdef VJ_BEAT_F_REJECT
-    switch(klass)
-    {
-        case VJ_BEAT_OFF:                return "off";
-        case VJ_BEAT_TRIGGER:            return "trigger";
-        case VJ_BEAT_FLOW:               return "flow";
-        case VJ_BEAT_DRIFT:              return "drift";
-        case VJ_BEAT_WARP:               return "warp";
-        case VJ_BEAT_MOTION_REACT:       return "motion-react";
-        case VJ_BEAT_GEOMETRY_AMPLITUDE: return "geometry-amplitude";
-        case VJ_BEAT_GEOMETRY_FREQUENCY: return "geometry-frequency";
-        case VJ_BEAT_GEOMETRY_PHASE:     return "geometry-phase";
-        case VJ_BEAT_GRID_SIZE:          return "grid-size";
-        case VJ_BEAT_WINDOW_RADIUS:      return "window-radius";
-        case VJ_BEAT_SPEED:              return "speed";
-        case VJ_BEAT_SIGNED_SPEED:       return "signed-speed";
-        case VJ_BEAT_SIGNED_CURVE:       return "signed-curve";
-        case VJ_BEAT_MEMORY:             return "memory";
-        case VJ_BEAT_INERTIA:            return "inertia";
-        case VJ_BEAT_SOURCE_MIX:         return "source-mix";
-        case VJ_BEAT_COLOR_AMOUNT:       return "color-amount";
-        case VJ_BEAT_COLOR_PHASE:        return "color-phase";
-        case VJ_BEAT_DETAIL:             return "detail";
-        case VJ_BEAT_GLOW:               return "glow";
-        case VJ_BEAT_INTENSITY:          return "intensity";
-        case VJ_BEAT_CONTRAST:           return "contrast";
-        case VJ_BEAT_TURBULENCE:         return "turbulence";
-        case VJ_BEAT_KICK:               return "kick";
-        case VJ_BEAT_SNARE:              return "snare";
-        case VJ_BEAT_HAT:                return "hat";
-#ifdef VJ_BEAT_SOURCE
-        case VJ_BEAT_SOURCE:             return "source";
-#endif
-        case VJ_BEAT_SELECTOR:           return "selector";
-        case VJ_BEAT_RESET:              return "reset";
-        case VJ_BEAT_ALPHA_OR_OPACITY:   return "alpha-opacity";
-        default:                         return "unknown";
-    }
-#else
-    (void)klass;
-    return "none";
-#endif
-}
-#endif
-
-
 #ifdef VJ_BEAT_F_REJECT
 static inline int ab_auto_hint_class_is_binary_impulse(int klass)
 {
@@ -11612,29 +10517,6 @@ static int ab_auto_role_priority(int role)
     }
 }
 
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-static const char *ab_auto_role_name(int role)
-{
-    switch(role)
-    {
-        case VJ_AUDIO_BEAT_AUTO_ROLE_TRIGGER:   return "trigger";
-        case VJ_AUDIO_BEAT_AUTO_ROLE_AMOUNT:    return "amount";
-        case VJ_AUDIO_BEAT_AUTO_ROLE_MOTION:    return "motion";
-        case VJ_AUDIO_BEAT_AUTO_ROLE_FLOW:      return "flow";
-        case VJ_AUDIO_BEAT_AUTO_ROLE_MEMORY:    return "memory";
-        case VJ_AUDIO_BEAT_AUTO_ROLE_SPEED:     return "speed";
-        case VJ_AUDIO_BEAT_AUTO_ROLE_SOURCE:    return "source";
-        case VJ_AUDIO_BEAT_AUTO_ROLE_SPATIAL:   return "spatial";
-        case VJ_AUDIO_BEAT_AUTO_ROLE_TEXTURE:   return "texture";
-        case VJ_AUDIO_BEAT_AUTO_ROLE_CONTRAST:  return "contrast";
-        case VJ_AUDIO_BEAT_AUTO_ROLE_COLOR:     return "color";
-        case VJ_AUDIO_BEAT_AUTO_ROLE_GEOMETRY:  return "geometry";
-        case VJ_AUDIO_BEAT_AUTO_ROLE_THRESHOLD: return "threshold";
-        case VJ_AUDIO_BEAT_AUTO_ROLE_BEAT_TIME: return "beat-time";
-        default:                                return "unknown";
-    }
-}
-#endif
 
 static int ab_auto_sanitize_soft_range_values(
     int hard_min,
@@ -12505,11 +11387,6 @@ static int ab_auto_insert_numeric_fallback(
 
 static void ab_auto_trim_macro_state_on_map_change(void)
 {
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-    float old_groove = ab_auto_groove_level;
-    float old_phrase = ab_auto_phrase_level;
-    float old_climax = ab_auto_climax_level;
-#endif
 
     ab_auto_groove_level *= 0.64f;
     ab_auto_phrase_level *= 0.58f;
@@ -12522,15 +11399,6 @@ static void ab_auto_trim_macro_state_on_map_change(void)
     if(ab_auto_climax_level > 0.42f)
         ab_auto_climax_level = 0.42f;
 
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-    AB_AUTO_DBG("macro-trim map-change groove=%.3f->%.3f phrase=%.3f->%.3f climax=%.3f->%.3f",
-                old_groove,
-                ab_auto_groove_level,
-                old_phrase,
-                ab_auto_phrase_level,
-                old_climax,
-                ab_auto_climax_level);
-#endif
 }
 
 static int ab_auto_rebuild_map(void *ctx, int chain_len, vj_audio_beat_get_fx_id_func get_fx_id, vj_audio_beat_get_fx_arg_func get_arg, vj_audio_beat_get_fx_entry_func get_entry)
@@ -14498,10 +13366,6 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
     if(!t || !t->valid)
         return 0;
 
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-    ab_auto_calc_debug_reset();
-    ab_auto_calc_dbg.reason = "start";
-#endif
 
     if(global_amount < 0)
         global_amount = 0;
@@ -14576,9 +13440,6 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
 
     if(span <= 0)
     {
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-        ab_auto_calc_dbg.reason = "empty-soft-range";
-#endif
         return t->base_value;
     }
 
@@ -14591,17 +13452,9 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
 
     if(span <= 0)
     {
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-        ab_auto_calc_dbg.reason = "empty-expanded-range";
-#endif
         return t->base_value;
     }
 
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-    ab_auto_calc_dbg.lo = lo;
-    ab_auto_calc_dbg.hi = hi;
-    ab_auto_calc_dbg.span = span;
-#endif
 
 #ifdef VJ_BEAT_F_REJECT
     if(ab_auto_target_is_continuous_impulse(t))
@@ -14617,14 +13470,6 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
 
         if(signal <= 0.002f)
         {
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-            ab_auto_calc_dbg.drive = signal;
-            ab_auto_calc_dbg.depth = 0.0f;
-            ab_auto_calc_dbg.capacity = 0;
-            ab_auto_calc_dbg.direction = impulse_direction;
-            ab_auto_calc_dbg.delta = 0.0f;
-            ab_auto_calc_dbg.reason = "impulse-idle";
-#endif
             return t->base_value;
         }
 
@@ -14659,14 +13504,6 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
 
         if(impulse_capacity <= 0)
         {
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-            ab_auto_calc_dbg.drive = signal;
-            ab_auto_calc_dbg.depth = impulse_depth;
-            ab_auto_calc_dbg.capacity = impulse_capacity;
-            ab_auto_calc_dbg.direction = impulse_direction;
-            ab_auto_calc_dbg.delta = 0.0f;
-            ab_auto_calc_dbg.reason = "impulse-no-capacity";
-#endif
             return t->base_value;
         }
 
@@ -14690,14 +13527,6 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
 
         impulse_value = ab_auto_quantize_discrete_value(t, impulse_value, lo, hi);
 
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-        ab_auto_calc_dbg.drive = signal;
-        ab_auto_calc_dbg.depth = impulse_depth;
-        ab_auto_calc_dbg.capacity = impulse_capacity;
-        ab_auto_calc_dbg.direction = impulse_direction;
-        ab_auto_calc_dbg.delta = impulse_delta;
-        ab_auto_calc_dbg.reason = "impulse-continuous";
-#endif
         return ab_auto_apply_global_amount_value(t, impulse_value, global_amount, lo, hi);
     }
 #endif
@@ -14709,14 +13538,6 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
 #endif
     {
         float trigger_threshold = 0.55f;
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-        ab_auto_calc_dbg.drive = signal;
-        ab_auto_calc_dbg.depth = 1.0f;
-        ab_auto_calc_dbg.capacity = span;
-        ab_auto_calc_dbg.direction = t->invert ? -1 : 1;
-        ab_auto_calc_dbg.delta = signal >= trigger_threshold ? (float)span : 0.0f;
-        ab_auto_calc_dbg.reason = signal >= trigger_threshold ? "trigger-hit" : "trigger-idle";
-#endif
         if(signal >= trigger_threshold)
             return ab_auto_apply_global_amount_value(t, t->invert ? lo : hi, global_amount, lo, hi);
 
@@ -15093,14 +13914,6 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
 
         if(step <= 0)
         {
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-            ab_auto_calc_dbg.direction = direction;
-            ab_auto_calc_dbg.capacity = span;
-            ab_auto_calc_dbg.depth = depth;
-            ab_auto_calc_dbg.drive = drive;
-            ab_auto_calc_dbg.delta = 0.0f;
-            ab_auto_calc_dbg.reason = "wrap-idle";
-#endif
             return origin;
         }
 
@@ -15122,14 +13935,6 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
 
         value = ab_auto_quantize_discrete_value(t, value, lo, hi);
 
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-        ab_auto_calc_dbg.direction = direction;
-        ab_auto_calc_dbg.capacity = span;
-        ab_auto_calc_dbg.depth = depth;
-        ab_auto_calc_dbg.drive = drive;
-        ab_auto_calc_dbg.delta = (float)step;
-        ab_auto_calc_dbg.reason = "wrap";
-#endif
         return ab_auto_apply_global_amount_value(t, value, global_amount, lo, hi);
     }
 #endif
@@ -15160,13 +13965,6 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
 
     if(capacity <= 0)
     {
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-        ab_auto_calc_dbg.direction = direction;
-        ab_auto_calc_dbg.capacity = capacity;
-        ab_auto_calc_dbg.depth = depth;
-        ab_auto_calc_dbg.drive = drive;
-        ab_auto_calc_dbg.reason = "no-capacity";
-#endif
         return t->base_value;
     }
 
@@ -15187,23 +13985,12 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
     else if(value > t->max_value)
         value = t->max_value;
 
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-    ab_auto_calc_dbg.direction = direction;
-    ab_auto_calc_dbg.capacity = capacity;
-    ab_auto_calc_dbg.depth = depth;
-    ab_auto_calc_dbg.drive = drive;
-    ab_auto_calc_dbg.delta = delta;
-    ab_auto_calc_dbg.reason = "continuous";
-#endif
 
     {
         int min_visible = ab_auto_min_visible_delta(t, span, signal, macro_open);
         int actual_delta = value - t->base_value;
         int actual_abs = actual_delta < 0 ? -actual_delta : actual_delta;
 
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-        ab_auto_calc_dbg.min_delta = min_visible;
-#endif
 
         if(min_visible > 0 && actual_abs < min_visible && capacity >= min_visible)
         {
@@ -15219,9 +14006,6 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
             else if(value > t->max_value)
                 value = t->max_value;
 
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-            ab_auto_calc_dbg.reason = "visible-floor";
-#endif
         }
     }
 
@@ -15269,10 +14053,6 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
         else if(value > t->max_value)
             value = t->max_value;
 
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-        ab_auto_calc_dbg.min_delta = nudge;
-        ab_auto_calc_dbg.reason = "fallback-nudge";
-#endif
     }
 
     value = ab_auto_quantize_discrete_value(t, value, lo, hi);
@@ -15377,10 +14157,6 @@ int vj_audio_beat_auto_apply_chain_ex(
     long now;
     ab_auto_frame_signal_t frame_sig;
     int changed = 0;
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-    long auto_dbg_now = 0;
-    int auto_dbg_emit = 0;
-#endif
 
     if(!s || !ctx || !get_fx_id || !get_arg || !set_arg || chain_len <= 0)
         return 0;
@@ -15473,42 +14249,6 @@ int vj_audio_beat_auto_apply_chain_ex(
     climax = ab_auto_update_climax(&snap);
     ab_auto_build_frame_signal(&snap, climax, &frame_sig);
 
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-    auto_dbg_now = now;
-    if(ab_auto_debug_last_apply_ms == 0 ||
-       (auto_dbg_now - ab_auto_debug_last_apply_ms) >= VEEJAY_AUDIO_BEAT_AUTO_DEBUG_INTERVAL_MS)
-    {
-        auto_dbg_emit = 1;
-        ab_auto_debug_last_apply_ms = auto_dbg_now;
-        AB_AUTO_DBG("snapshot mapper=v32 hit_seq=%d hits=%ld age=%ldms bpm=%.2f kind=%d level=%.3f env=%.3f trans=%.3f flux=%.3f bass=%.3f mid=%.3f high=%.3f kick=%.3f snare=%.3f hat=%.3f body=%.3f density=%.3f fast=%.3f slow=%.3f rest=%.3f activity=%.3f groove=%.3f phrase=%.3f climax=%.3f amount=%d targets=%d",
-                    snap.hit_seq,
-                    snap.hits,
-                    snap.beat_age_ms,
-                    snap.bpm,
-                    snap.hit_kind,
-                    snap.level,
-                    snap.envelope,
-                    snap.transient,
-                    snap.flux,
-                    snap.bass,
-                    snap.mid,
-                    snap.high,
-                    snap.kick,
-                    snap.snare,
-                    snap.hat,
-                    frame_sig.body,
-                    frame_sig.density,
-                    frame_sig.tempo_fast,
-                    frame_sig.tempo_slow,
-                    frame_sig.restraint,
-                    frame_sig.activity,
-                    ab_auto_groove_level,
-                    ab_auto_phrase_level,
-                    climax,
-                    amount,
-                    ab_auto_target_count);
-    }
-#endif
 
     for(int i = 0; i < ab_auto_target_count; i++)
     {
@@ -15548,18 +14288,6 @@ int vj_audio_beat_auto_apply_chain_ex(
            current != t->base_value &&
            vje_is_param_value_valid(t->effect_id, t->param_nr, current))
         {
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-            if(auto_dbg_emit)
-                AB_AUTO_DBG("target-rebase chain=%d fx=%d param=%d old_base=%d old_last=%d current=%d role=%s hint=%s",
-                            t->chain_pos,
-                            t->effect_id,
-                            t->param_nr,
-                            t->base_value,
-                            t->last_value,
-                            current,
-                            ab_auto_role_name(t->role),
-                            t->has_hint ? ab_auto_hint_class_name(t->hint_class) : "fallback");
-#endif
             t->base_value = current;
             t->last_value = current;
             t->active = 0;
@@ -15594,66 +14322,8 @@ int vj_audio_beat_auto_apply_chain_ex(
         }
 
         signal = ab_auto_signal_for_target(&snap, t, climax, &frame_sig);
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-        {
-            float role_signal = signal;
-            signal = ab_auto_slew_signal(t, signal, now);
-            value = ab_auto_compute_value(t, signal, amount, climax);
-
-            if(auto_dbg_emit && (t->role == VJ_AUDIO_BEAT_AUTO_ROLE_GEOMETRY || t->has_hint))
-            {
-                float pos = 0.0f;
-                int span = t->max_value - t->min_value;
-
-                if(span > 0)
-                    pos = (float)(value - t->min_value) / (float)span;
-
-                float activity = frame_sig.activity;
-                float keep = ab_auto_low_activity_keep(t->role, frame_sig.groove, frame_sig.phrase, climax, activity, snap.beat_age_ms);
-                float gate_dbg = activity + keep;
-
-                gate_dbg = gate_dbg > 1.0f ? 1.0f : gate_dbg;
-
-                AB_AUTO_DBG("target=%d chain=%d fx=%d param=%d role=%s hint=%s flags=0x%x base=%d current=%d value=%d pos=%.3f range=%d..%d soft=%d..%d role_signal=%.3f activity=%.3f keep=%.3f gate=%.3f slewed=%.3f expanded=%.3f climax=%.3f amount_pct=%d invert=%d hold=%dms calc_drive=%.3f depth=%.3f delta=%.2f cap=%d dir=%d floor=%d why=%s edge=%s",
-                            i,
-                            t->chain_pos,
-                            t->effect_id,
-                            t->param_nr,
-                            ab_auto_role_name(t->role),
-                            t->has_hint ? ab_auto_hint_class_name(t->hint_class) : "fallback",
-                            t->hint_flags,
-                            t->base_value,
-                            current,
-                            value,
-                            pos,
-                            t->min_value,
-                            t->max_value,
-                            t->soft_min,
-                            t->soft_max,
-                            role_signal,
-                            activity,
-                            keep,
-                            gate_dbg,
-                            signal,
-                            t->raw_value,
-                            climax,
-                            t->amount_pct,
-                            t->invert,
-                            t->hold_ms,
-                            ab_auto_calc_dbg.drive,
-                            ab_auto_calc_dbg.depth,
-                            ab_auto_calc_dbg.delta,
-                            ab_auto_calc_dbg.capacity,
-                            ab_auto_calc_dbg.direction,
-                            ab_auto_calc_dbg.min_delta,
-                            ab_auto_calc_dbg.reason ? ab_auto_calc_dbg.reason : "?",
-                            value >= t->max_value ? "MAX" : (value <= t->min_value ? "MIN" : "ok"));
-            }
-        }
-#else
         signal = ab_auto_slew_signal(t, signal, now);
         value = ab_auto_compute_value(t, signal, amount, climax);
-#endif
 
         if(signal <= 0.002f && !ab_auto_role_should_hold(t->role))
             value = t->base_value;
@@ -15665,10 +14335,6 @@ int vj_audio_beat_auto_apply_chain_ex(
             int diff = ab_auto_absi(value - current);
             int deadband_ok;
             int valid_value;
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-            int written = 0;
-            const char *skip_reason = "none";
-#endif
 
             if(t->hold_ms > 0 &&
                t->last_change_ms > 0 &&
@@ -15695,67 +14361,23 @@ int vj_audio_beat_auto_apply_chain_ex(
                 if(set_arg(ctx, t->chain_pos, t->param_nr, value))
                 {
                     changed++;
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-                    if(auto_dbg_emit && (t->has_hint || t->role == VJ_AUDIO_BEAT_AUTO_ROLE_GEOMETRY))
-                        AB_AUTO_DBG("target-write chain=%d fx=%d param=%d old=%d new=%d base=%d calc=%s",
-                                    t->chain_pos,
-                                    t->effect_id,
-                                    t->param_nr,
-                                    current,
-                                    value,
-                                    t->base_value,
-                                    ab_auto_calc_dbg.reason ? ab_auto_calc_dbg.reason : "?");
-#endif
                     current = value;
                     t->last_change_ms = now;
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-                    written = 1;
-#endif
                 }
                 else
                 {
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-                    skip_reason = "set-arg-failed";
-#endif
                 }
             }
             else if(!hold_ok)
             {
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-                skip_reason = "hold";
-#endif
             }
             else if(!deadband_ok)
             {
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-                skip_reason = "deadband";
-#endif
             }
             else if(!valid_value)
             {
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-                skip_reason = "invalid-value";
-#endif
             }
 
-#ifdef VEEJAY_AUDIO_BEAT_AUTO_DEBUG
-            if(auto_dbg_emit && !written && (t->has_hint || t->role == VJ_AUDIO_BEAT_AUTO_ROLE_GEOMETRY))
-            {
-                AB_AUTO_DBG("target-skip chain=%d fx=%d param=%d base=%d current=%d wanted=%d diff=%d deadband=%d hold_ok=%d valid=%d reason=%s calc=%s",
-                            t->chain_pos,
-                            t->effect_id,
-                            t->param_nr,
-                            t->base_value,
-                            current,
-                            value,
-                            diff,
-                            deadband,
-                            hold_ok,
-                            valid_value,
-                            skip_reason,
-                            ab_auto_calc_dbg.reason ? ab_auto_calc_dbg.reason : "?");
-            }
-#endif
         }
 
         t->last_value = current;

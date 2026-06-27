@@ -98,6 +98,15 @@ static void sample_del_internal_ex(sample_info *si, int skip_edl_close, int recy
 static void sample_del_internal(sample_info *si, int skip_edl_close);
 static void sample_normalize_marker_info(sample_info *sample);
 
+static inline int sample_clamp_audio_volume(int volume)
+{
+    if(volume < 0)
+        return 0;
+    if(volume > 100)
+        return 100;
+    return volume;
+}
+
 unsigned int sample_size(void)
 {
     if(recount_hash) {
@@ -433,7 +442,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->resume_pos = (si->speed < 0) ? endFrame : startFrame;
     
     si->looptype = 1; // normal looping
-    si->audio_volume = 50;
+    si->audio_volume = 100;
     si->marker_start = 0;
     si->effect_toggle = 1;
     si->fade_method = 0;
@@ -2269,11 +2278,7 @@ int sample_set_audio_volume(int s1, int volume)
     sample_info *sample = sample_get(s1);
     if(sample == NULL)
         return -1;
-    if (volume < 0)
-    volume = 0;
-    if (volume > 100)
-    volume = 100;
-    sample->audio_volume = volume;
+    sample->audio_volume = sample_clamp_audio_volume(volume);
     return 1;
 }
 
@@ -3169,7 +3174,7 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, void *
             skel->first_frame = get_xml_int(doc, node);
         }
         else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_VOL)) {
-            skel->audio_volume = get_xml_int(doc, node);
+            skel->audio_volume = sample_clamp_audio_volume(get_xml_int(doc, node));
         }
         else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_LASTFRAME)) {
             skel->last_frame = get_xml_int(doc, node);

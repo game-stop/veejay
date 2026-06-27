@@ -154,6 +154,8 @@ struct _Gtk3CurvePrivate
   gdouble  marker_y;
   gfloat   marker_value;
   gboolean marker_hover;
+  gboolean marker_live_trace;
+  Gtk3CurveColor marker_live_color;
 
   gint x_grid_step;
 
@@ -172,6 +174,7 @@ struct _Gtk3CurvePrivate
   gfloat   frame_vector_max_x;
 
   gboolean live_trace_enabled;
+  gboolean live_trace_user_override;
   gint     live_trace_pos;
   gint     live_trace_count;
   gboolean live_trace_active[GTK3_CURVE_LIVE_TRACE_MAX];
@@ -185,6 +188,11 @@ struct _Gtk3CurvePrivate
   gfloat   live_trace_last_source_x;
   Gtk3CurveColor live_trace_color[GTK3_CURVE_LIVE_TRACE_MAX];
   gchar    live_trace_label[GTK3_CURVE_LIVE_TRACE_MAX][GTK3_CURVE_LIVE_TRACE_LABEL];
+  Gtk3CurveLiveTraceDomain live_trace_domain;
+  gfloat   live_trace_local_min_x;
+  gfloat   live_trace_local_max_x;
+  gfloat   live_trace_view_min_x;
+  gfloat   live_trace_view_max_x;
   gfloat   live_trace_auto_x;
   gfloat   live_trace_last_input_x;
   gfloat   live_trace_pending_x;
@@ -252,7 +260,15 @@ static int project                          (gfloat                value,
                                              gfloat                min,
                                              gfloat                max,
                                              int                   norm);
+static gdouble projectd                     (gfloat                value,
+                                             gfloat                min,
+                                             gfloat                max,
+                                             int                   norm);
 static gfloat unproject                     (gint                  value,
+                                             gfloat                min,
+                                             gfloat                max,
+                                             int                   norm);
+static gfloat unprojectd                    (gdouble               value,
                                              gfloat                min,
                                              gfloat                max,
                                              int                   norm);
@@ -274,12 +290,16 @@ static void gtk3_curve_draw_live_traces     (GtkWidget           *widget,
                                              cairo_t             *cr,
                                              gint                 allocation_width,
                                              gint                 graph_width,
-                                             gint                 graph_height);
+                                             gint                 graph_height,
+                                             gboolean             as_underlay);
 static gboolean gtk3_curve_live_trace_use_local_axis(Gtk3CurvePrivate *priv);
 static gfloat gtk3_curve_live_axis_min_x(Gtk3CurvePrivate *priv);
 static gfloat gtk3_curve_live_axis_max_x(Gtk3CurvePrivate *priv);
 static gfloat gtk3_curve_live_trace_jump_threshold(Gtk3CurvePrivate *priv);
+static gfloat gtk3_curve_live_trace_draw_jump_threshold(Gtk3CurvePrivate *priv);
+static Gtk3CurvePrivate *gtk3_curve_live_trace_priv(GtkWidget *widget);
 static void gtk3_curve_live_trace_clear_samples(Gtk3CurvePrivate *priv);
+static void gtk3_curve_live_trace_disable_for_user_edit(GtkWidget *widget);
 static void gtk3_curve_class_init           (Gtk3CurveClass       *klass);
 static void gtk3_curve_init                 (Gtk3Curve            *self);
 
@@ -637,6 +657,8 @@ gtk3_curve_init (Gtk3Curve* self)
   priv->marker_y = 0.0;
   priv->marker_value = 0.0f;
   priv->marker_hover = FALSE;
+  priv->marker_live_trace = FALSE;
+  memset(&priv->marker_live_color, 0, sizeof(priv->marker_live_color));
 
   priv->state = FALSE;
   priv->in_curve = FALSE;
@@ -663,6 +685,7 @@ gtk3_curve_init (Gtk3Curve* self)
   priv->live_trace_slot_used = g_new0(gboolean, GTK3_CURVE_LIVE_TRACE_LEN);
 
   priv->live_trace_enabled = FALSE;
+  priv->live_trace_user_override = FALSE;
   priv->live_trace_pos = 0;
   priv->live_trace_count = 0;
   memset(priv->live_trace_active, 0, sizeof(priv->live_trace_active));
@@ -672,6 +695,11 @@ gtk3_curve_init (Gtk3Curve* self)
   priv->live_trace_have_source_x = FALSE;
   priv->live_trace_last_source_x = 0.0f;
   memset(priv->live_trace_label, 0, sizeof(priv->live_trace_label));
+  priv->live_trace_domain = GTK3_CURVE_LIVE_TRACE_DOMAIN_FRAME;
+  priv->live_trace_local_min_x = 0.0f;
+  priv->live_trace_local_max_x = (gfloat)(GTK3_CURVE_LIVE_TRACE_LEN - 1);
+  priv->live_trace_view_min_x = priv->live_trace_local_min_x;
+  priv->live_trace_view_max_x = priv->live_trace_local_max_x;
   priv->live_trace_auto_x = NAN;
   priv->live_trace_last_input_x = 0.0f;
   priv->live_trace_pending_x = NAN;
@@ -715,9 +743,6 @@ gtk3_curve_handle_scroll(GtkWidget *widget, GdkEventScroll *ev)
 
   priv = GTK3_CURVE(widget)->priv;
 
-  if (gtk3_curve_live_trace_use_local_axis(priv))
-    return TRUE;
-
   gtk_widget_get_allocation(widget, &allocation);
   width = gtk3_curve_graph_width_from_allocation(allocation.width);
 
@@ -730,8 +755,16 @@ gtk3_curve_handle_scroll(GtkWidget *widget, GdkEventScroll *ev)
   else if (ex > (gdouble)(width - 1))
     ex = (gdouble)(width - 1);
 
-  center = scale_pos_value(priv, (gfloat) ex, (gfloat) width);
-  span = priv->max_x - priv->min_x;
+  if (gtk3_curve_live_trace_use_local_axis(priv)) {
+    gfloat axis_min_x = gtk3_curve_live_axis_min_x(priv);
+    gfloat axis_max_x = gtk3_curve_live_axis_max_x(priv);
+    gdouble t = ex / MAX(1.0, (gdouble)(width - 1));
+    center = axis_min_x + (gfloat)(t * (axis_max_x - axis_min_x));
+    span = axis_max_x - axis_min_x;
+  } else {
+    center = scale_pos_value(priv, (gfloat) ex, (gfloat) width);
+    span = priv->max_x - priv->min_x;
+  }
 
   if (span <= 0.0f)
     span = 1.0f;
@@ -1107,9 +1140,11 @@ gtk3_curve_draw_cursor_legend(GtkWidget *widget,
 
   if (priv->in_curve) {
     if (gtk3_curve_live_trace_use_local_axis(priv)) {
+      gfloat axis_min_x = gtk3_curve_live_axis_min_x(priv);
+      gfloat axis_max_x = gtk3_curve_live_axis_max_x(priv);
       gdouble t = CLAMP(priv->last_x, 0.0f, (gfloat)(graph_width - 1)) /
                   MAX(1.0, (gdouble)(graph_width - 1));
-      x_value = (gfloat)(t * (GTK3_CURVE_LIVE_TRACE_LEN - 1));
+      x_value = axis_min_x + (gfloat)(t * (axis_max_x - axis_min_x));
     } else {
       x_value = scale_pos_value(priv,
                                 CLAMP(priv->last_x, 0.0f, (gfloat)(graph_width - 1)),
@@ -1404,20 +1439,73 @@ typedef struct
 static gboolean
 gtk3_curve_live_trace_use_local_axis(Gtk3CurvePrivate *priv)
 {
-  (void) priv;
-  return FALSE;
+  return priv && priv->live_trace_domain == GTK3_CURVE_LIVE_TRACE_DOMAIN_CLOCK;
+}
+
+static gboolean
+gtk3_curve_curve_is_visually_flat(Gtk3CurvePrivate *priv)
+{
+  if (!priv)
+    return TRUE;
+
+  if (priv->curve_data.d_point && priv->curve_data.n_points > 1) {
+    gint y0 = priv->curve_data.d_point[0].y;
+
+    for (gint i = 1; i < priv->curve_data.n_points; i++) {
+      if (abs(priv->curve_data.d_point[i].y - y0) > 1)
+        return FALSE;
+    }
+
+    return TRUE;
+  }
+
+  if (priv->curve_data.d_cpoints && priv->curve_data.n_cpoints > 1) {
+    gfloat y0 = priv->curve_data.d_cpoints[0].y;
+
+    for (gint i = 1; i < priv->curve_data.n_cpoints; i++) {
+      if (fabsf(priv->curve_data.d_cpoints[i].y - y0) > 0.001f)
+        return FALSE;
+    }
+
+    return TRUE;
+  }
+
+  return TRUE;
 }
 
 static gfloat
 gtk3_curve_live_axis_min_x(Gtk3CurvePrivate *priv)
 {
-  return priv ? priv->min_x : 0.0f;
+  if (!priv)
+    return 0.0f;
+
+  if (gtk3_curve_live_trace_use_local_axis(priv) &&
+      isfinite(priv->live_trace_view_min_x))
+    return priv->live_trace_view_min_x;
+
+  if (isfinite(priv->min_x))
+    return priv->min_x;
+
+  return 0.0f;
 }
 
 static gfloat
 gtk3_curve_live_axis_max_x(Gtk3CurvePrivate *priv)
 {
-  return priv ? priv->max_x : 1.0f;
+  if (!priv)
+    return 1.0f;
+
+  if (gtk3_curve_live_trace_use_local_axis(priv) &&
+      isfinite(priv->live_trace_view_min_x) &&
+      isfinite(priv->live_trace_view_max_x) &&
+      priv->live_trace_view_max_x > priv->live_trace_view_min_x)
+    return priv->live_trace_view_max_x;
+
+  if (isfinite(priv->max_x) &&
+      (!isfinite(priv->min_x) || priv->max_x > priv->min_x))
+    return priv->max_x;
+
+  return gtk3_curve_live_axis_min_x(priv) + 1.0f;
 }
 
 static gfloat
@@ -1425,6 +1513,12 @@ gtk3_curve_live_domain_min_x(Gtk3CurvePrivate *priv)
 {
   if (!priv)
     return 0.0f;
+
+  if (gtk3_curve_live_trace_use_local_axis(priv)) {
+    if (isfinite(priv->live_trace_local_min_x))
+      return priv->live_trace_local_min_x;
+    return 0.0f;
+  }
 
   if (isfinite(priv->timeline_min_x) &&
       isfinite(priv->timeline_max_x) &&
@@ -1442,6 +1536,14 @@ gtk3_curve_live_domain_max_x(Gtk3CurvePrivate *priv)
 {
   if (!priv)
     return 1.0f;
+
+  if (gtk3_curve_live_trace_use_local_axis(priv)) {
+    if (isfinite(priv->live_trace_local_min_x) &&
+        isfinite(priv->live_trace_local_max_x) &&
+        priv->live_trace_local_max_x > priv->live_trace_local_min_x)
+      return priv->live_trace_local_max_x;
+    return gtk3_curve_live_domain_min_x(priv) + 1.0f;
+  }
 
   if (isfinite(priv->timeline_min_x) &&
       isfinite(priv->timeline_max_x) &&
@@ -1536,24 +1638,71 @@ gtk3_curve_live_project_x(Gtk3CurvePrivate      *priv,
   return TRUE;
 }
 
+static void
+gtk3_curve_live_value_range(Gtk3CurvePrivate *priv,
+                            gfloat           *min_y,
+                            gfloat           *max_y)
+{
+  gfloat lo = 0.0f;
+  gfloat hi = 100.0f;
+
+  if (priv && !gtk3_curve_live_trace_use_local_axis(priv)) {
+    lo = priv->min_y;
+    hi = priv->max_y;
+
+    if (!isfinite(lo))
+      lo = 0.0f;
+    if (!isfinite(hi) || hi <= lo)
+      hi = lo + 1.0f;
+  }
+
+  if (min_y)
+    *min_y = lo;
+  if (max_y)
+    *max_y = hi;
+}
+
+static gfloat
+gtk3_curve_live_clamp_value(Gtk3CurvePrivate *priv,
+                            gfloat            value)
+{
+  gfloat min_y;
+  gfloat max_y;
+
+  gtk3_curve_live_value_range(priv, &min_y, &max_y);
+
+  if (!isfinite(value))
+    value = min_y;
+
+  if (value < min_y)
+    value = min_y;
+  else if (value > max_y)
+    value = max_y;
+
+  return value;
+}
+
 static gdouble
-gtk3_curve_live_project_y_norm(const Gtk3CurveGraphRect *r,
+gtk3_curve_live_project_y_norm(Gtk3CurvePrivate          *priv,
+                               const Gtk3CurveGraphRect *r,
                                gfloat                    value)
 {
   gdouble t;
+  gfloat min_y;
+  gfloat max_y;
 
   if (!r)
     return 0.0;
 
-  if (!isfinite(value))
-    value = 0.0f;
+  gtk3_curve_live_value_range(priv, &min_y, &max_y);
+  value = gtk3_curve_live_clamp_value(priv, value);
 
-  if (value < 0.0f)
-    value = 0.0f;
-  else if (value > 100.0f)
-    value = 100.0f;
+  t = ((gdouble)value - (gdouble)min_y) / ((gdouble)max_y - (gdouble)min_y);
 
-  t = (gdouble)value * 0.01;
+  if (t < 0.0)
+    t = 0.0;
+  else if (t > 1.0)
+    t = 1.0;
 
   {
     gdouble pad = CURVE_LIVE_TRACE_Y_PAD;
@@ -1578,7 +1727,7 @@ gtk3_curve_draw_live_dot(Gtk3CurvePrivate *priv,
   gdouble x;
   gdouble y0;
   gdouble y1;
-  gdouble radius = 3.8;
+  gdouble radius = 5.0;
 
   if (!priv || !cr || !r)
     return;
@@ -1590,7 +1739,7 @@ gtk3_curve_draw_live_dot(Gtk3CurvePrivate *priv,
     return;
 
   (void)y0;
-  y1 = gtk3_curve_live_project_y_norm(r, priv->live_trace_dot_value);
+  y1 = gtk3_curve_live_project_y_norm(priv, r, priv->live_trace_dot_value);
 
   if (x < r->x + radius)
     x = r->x + radius;
@@ -1647,7 +1796,7 @@ gtk3_curve_draw_live_trace_current_dot(Gtk3CurvePrivate *priv,
   if (!gtk3_curve_live_project_x(priv, r, priv->live_trace_x[trace][idx], &x))
     return;
 
-  y = gtk3_curve_live_project_y_norm(r, priv->live_trace_values[trace][idx]);
+  y = gtk3_curve_live_project_y_norm(priv, r, priv->live_trace_values[trace][idx]);
 
   if (x < r->x + radius)
     x = r->x + radius;
@@ -1734,6 +1883,21 @@ gtk3_curve_live_trace_clear_samples(Gtk3CurvePrivate *priv)
   priv->live_trace_clear_on_next_push = FALSE;
 }
 
+
+static void
+gtk3_curve_live_trace_disable_for_user_edit(GtkWidget *widget)
+{
+  Gtk3CurvePrivate *priv = gtk3_curve_live_trace_priv(widget);
+
+  if (!priv)
+    return;
+
+  priv->live_trace_user_override = TRUE;
+
+  if (gtk_widget_is_visible(widget))
+    gtk_widget_queue_draw(widget);
+}
+
 static gboolean
 gtk3_curve_live_trace_label_is_drawn(Gtk3CurvePrivate *priv,
                                       const gchar      *label)
@@ -1758,7 +1922,8 @@ gtk3_curve_draw_live_traces(GtkWidget *widget,
                             cairo_t   *cr,
                             gint       allocation_width,
                             gint       graph_width,
-                            gint       graph_height)
+                            gint       graph_height,
+                            gboolean   as_underlay)
 {
   Gtk3CurvePrivate *priv = GTK3_CURVE(widget)->priv;
   Gtk3CurveGraphRect gr;
@@ -1781,16 +1946,24 @@ gtk3_curve_draw_live_traces(GtkWidget *widget,
     if (!priv->live_trace_active[t])
       continue;
 
-    cairo_set_line_width(cr, (t == GTK3_CURVE_LIVE_TRACE_MAX - 1) ? 1.85 : 1.20);
+    gdouble trace_alpha = priv->live_trace_color[t].alpha;
+    gdouble trace_width = (t == GTK3_CURVE_LIVE_TRACE_MAX - 1) ? 1.85 : 1.20;
+
+    if (as_underlay) {
+      trace_alpha *= 0.52;
+      trace_width = (t == GTK3_CURVE_LIVE_TRACE_MAX - 1) ? 1.35 : 0.95;
+    }
+
+    cairo_set_line_width(cr, trace_width);
     cairo_set_source_rgba(cr,
                           priv->live_trace_color[t].red,
                           priv->live_trace_color[t].green,
                           priv->live_trace_color[t].blue,
-                          priv->live_trace_color[t].alpha);
+                          CLAMP(trace_alpha, 0.0, 1.0));
 
     gfloat last_value_x = 0.0f;
     gboolean have_last_value_x = FALSE;
-    gfloat jump_threshold = gtk3_curve_live_trace_jump_threshold(priv);
+    gfloat jump_threshold = gtk3_curve_live_trace_draw_jump_threshold(priv);
 
     for (gint idx = 0; idx < GTK3_CURVE_LIVE_TRACE_LEN; idx++) {
       gdouble x;
@@ -1815,7 +1988,7 @@ gtk3_curve_draw_live_traces(GtkWidget *widget,
         continue;
       }
 
-      y = gtk3_curve_live_project_y_norm(&gr, priv->live_trace_values[t][idx]);
+      y = gtk3_curve_live_project_y_norm(priv, &gr, priv->live_trace_values[t][idx]);
 
       if (n > 0 && x < sx[n - 1] - 0.5) {
         gtk3_curve_draw_live_trace_segment(cr, GTK3_CURVE_TYPE_LINEAR, sx, sy, n);
@@ -1837,13 +2010,17 @@ gtk3_curve_draw_live_traces(GtkWidget *widget,
 
     gtk3_curve_draw_live_trace_segment(cr, GTK3_CURVE_TYPE_LINEAR, sx, sy, n);
 
-    if (priv->live_trace_last_slot_for[t] >= 0)
+    if (!as_underlay && priv->live_trace_last_slot_for[t] >= 0)
       gtk3_curve_draw_live_trace_current_dot(priv, cr, &gr, t, priv->live_trace_last_slot_for[t]);
   }
 
-  gtk3_curve_draw_live_dot(priv, cr, &gr);
+  if (!as_underlay && gtk3_curve_live_trace_use_local_axis(priv))
+    gtk3_curve_draw_live_dot(priv, cr, &gr);
 
   cairo_restore(cr);
+
+  if (as_underlay)
+    return;
 
   cairo_save(cr);
   cairo_select_font_face(cr,
@@ -1971,9 +2148,6 @@ gtk3_curve_x_nav_hit(GtkWidget *widget,
 
   priv = GTK3_CURVE(widget)->priv;
 
-  if (gtk3_curve_live_trace_use_local_axis(priv))
-    return FALSE;
-
   gtk_widget_get_allocation(widget, &allocation);
 
   width = gtk3_curve_graph_width_from_allocation(allocation.width);
@@ -1991,11 +2165,18 @@ gtk3_curve_x_nav_hit(GtkWidget *widget,
   if (in_nav)
     *in_nav = TRUE;
 
-  if (priv->timeline_max_x <= priv->timeline_min_x)
-    return FALSE;
+  {
+    gfloat domain_min = gtk3_curve_live_trace_use_local_axis(priv) ? priv->live_trace_local_min_x : priv->timeline_min_x;
+    gfloat domain_max = gtk3_curve_live_trace_use_local_axis(priv) ? priv->live_trace_local_max_x : priv->timeline_max_x;
+    gfloat view_min = gtk3_curve_live_axis_min_x(priv);
+    gfloat view_max = gtk3_curve_live_axis_max_x(priv);
 
-  can_left = (priv->min_x > priv->timeline_min_x + 0.5f);
-  can_right = (priv->max_x < priv->timeline_max_x - 0.5f);
+    if (domain_max <= domain_min)
+      return FALSE;
+
+    can_left = (view_min > domain_min + 0.5f);
+    can_right = (view_max < domain_max - 0.5f);
+  }
 
   left_x0 = RADIUS + 4;
   left_x1 = left_x0 + 24;
@@ -2039,14 +2220,18 @@ gtk3_curve_draw_x_zoom_indicators(GtkWidget *widget,
   if (!cr || graph_width <= 1 || graph_height <= 1)
     return;
 
-  if (gtk3_curve_live_trace_use_local_axis(priv))
-    return;
+  {
+    gfloat domain_min = gtk3_curve_live_trace_use_local_axis(priv) ? priv->live_trace_local_min_x : priv->timeline_min_x;
+    gfloat domain_max = gtk3_curve_live_trace_use_local_axis(priv) ? priv->live_trace_local_max_x : priv->timeline_max_x;
+    gfloat view_min = gtk3_curve_live_axis_min_x(priv);
+    gfloat view_max = gtk3_curve_live_axis_max_x(priv);
 
-  if (priv->timeline_max_x <= priv->timeline_min_x)
-    return;
+    if (domain_max <= domain_min)
+      return;
 
-  has_left = (priv->min_x > priv->timeline_min_x + 0.5f);
-  has_right = (priv->max_x < priv->timeline_max_x - 0.5f);
+    has_left = (view_min > domain_min + 0.5f);
+    has_right = (view_max < domain_max - 0.5f);
+  }
 
   if (!has_left && !has_right)
     return;
@@ -2319,6 +2504,493 @@ gtk3_curve_draw_labels(GtkWidget *widget,
   cairo_restore(cr);
 }
 
+
+static gint
+gtk3_curve_live_trace_primary_trace(Gtk3CurvePrivate *priv)
+{
+  if (!priv)
+    return -1;
+
+  if (priv->live_trace_active[GTK3_CURVE_LIVE_TRACE_MAX - 1])
+    return GTK3_CURVE_LIVE_TRACE_MAX - 1;
+
+  for (gint t = GTK3_CURVE_LIVE_TRACE_MAX - 2; t >= 0; t--) {
+    if (priv->live_trace_active[t])
+      return t;
+  }
+
+  return -1;
+}
+
+static gboolean
+gtk3_curve_curve_value_at_x(Gtk3CurvePrivate *priv,
+                            gfloat            x_value,
+                            gfloat           *value)
+{
+  gfloat ry = 0.0f;
+
+  if (!priv || !value || !isfinite(x_value))
+    return FALSE;
+
+  if (!isfinite(priv->min_x) || !isfinite(priv->max_x) ||
+      priv->max_x <= priv->min_x)
+    return FALSE;
+
+  if (!isfinite(priv->min_y) || !isfinite(priv->max_y) ||
+      priv->max_y <= priv->min_y)
+    return FALSE;
+
+  if (x_value < priv->min_x || x_value > priv->max_x)
+    return FALSE;
+
+  switch (priv->curve_data.curve_type) {
+    case GTK3_CURVE_TYPE_FREE:
+      if (priv->frame_vector && priv->frame_vector_len > 0) {
+        gfloat src_min = priv->frame_vector_min_x;
+        gfloat src_max = priv->frame_vector_max_x;
+        gfloat src_span = src_max - src_min;
+        gfloat src_pos;
+        gint idx0;
+        gint idx1;
+        gfloat frac;
+        gfloat y0;
+        gfloat y1;
+
+        if (!isfinite(src_min))
+          src_min = priv->min_x;
+        if (!isfinite(src_max) || src_max <= src_min)
+          src_max = priv->max_x;
+
+        src_span = src_max - src_min;
+
+        if (priv->frame_vector_len == 1 || src_span <= 0.0f) {
+          ry = priv->frame_vector[0];
+          break;
+        }
+
+        src_pos = ((x_value - src_min) / src_span) *
+                  (gfloat)(priv->frame_vector_len - 1);
+
+        if (src_pos < 0.0f)
+          src_pos = 0.0f;
+        else if (src_pos > (gfloat)(priv->frame_vector_len - 1))
+          src_pos = (gfloat)(priv->frame_vector_len - 1);
+
+        idx0 = (gint) floorf(src_pos);
+        idx1 = idx0 + 1;
+        frac = src_pos - (gfloat) idx0;
+
+        if (idx0 < 0)
+          idx0 = 0;
+        else if (idx0 >= priv->frame_vector_len)
+          idx0 = priv->frame_vector_len - 1;
+
+        if (idx1 < 0)
+          idx1 = 0;
+        else if (idx1 >= priv->frame_vector_len)
+          idx1 = priv->frame_vector_len - 1;
+
+        y0 = priv->frame_vector[idx0];
+        y1 = priv->frame_vector[idx1];
+        ry = y0 + ((y1 - y0) * frac);
+      }
+      else if (priv->curve_data.d_point &&
+               priv->curve_data.n_points > 0 &&
+               priv->height > 1)
+      {
+        gfloat src_pos;
+        gint idx0;
+        gint idx1;
+        gfloat frac;
+        gfloat y0;
+        gfloat y1;
+
+        if (priv->curve_data.n_points == 1) {
+          ry = unproject(RADIUS + priv->height - priv->curve_data.d_point[0].y,
+                         priv->min_y,
+                         priv->max_y,
+                         priv->height);
+          break;
+        }
+
+        src_pos = ((x_value - priv->min_x) / (priv->max_x - priv->min_x)) *
+                  (gfloat)(priv->curve_data.n_points - 1);
+
+        if (src_pos < 0.0f)
+          src_pos = 0.0f;
+        else if (src_pos > (gfloat)(priv->curve_data.n_points - 1))
+          src_pos = (gfloat)(priv->curve_data.n_points - 1);
+
+        idx0 = (gint) floorf(src_pos);
+        idx1 = idx0 + 1;
+        frac = src_pos - (gfloat) idx0;
+
+        if (idx0 < 0)
+          idx0 = 0;
+        else if (idx0 >= priv->curve_data.n_points)
+          idx0 = priv->curve_data.n_points - 1;
+
+        if (idx1 < 0)
+          idx1 = 0;
+        else if (idx1 >= priv->curve_data.n_points)
+          idx1 = priv->curve_data.n_points - 1;
+
+        y0 = unproject(RADIUS + priv->height - priv->curve_data.d_point[idx0].y,
+                       priv->min_y,
+                       priv->max_y,
+                       priv->height);
+        y1 = unproject(RADIUS + priv->height - priv->curve_data.d_point[idx1].y,
+                       priv->min_y,
+                       priv->max_y,
+                       priv->height);
+
+        ry = y0 + ((y1 - y0) * frac);
+      }
+      else {
+        ry = priv->min_y;
+      }
+      break;
+
+    case GTK3_CURVE_TYPE_LINEAR:
+    case GTK3_CURVE_TYPE_SPLINE:
+    default:
+    {
+      gint count = 0;
+      gint first = -1;
+      gfloat prev = priv->min_x - 1.0f;
+
+      for (gint i = 0; i < priv->curve_data.n_cpoints; i++) {
+        if (priv->curve_data.d_cpoints[i].x > prev) {
+          if (first < 0)
+            first = i;
+          prev = priv->curve_data.d_cpoints[i].x;
+          count++;
+        }
+      }
+
+      if (count <= 0) {
+        ry = priv->min_y;
+        break;
+      }
+
+      if (count == 1) {
+        ry = priv->curve_data.d_cpoints[first].y;
+        break;
+      }
+
+      if (priv->curve_data.curve_type == GTK3_CURVE_TYPE_SPLINE) {
+        gfloat *mem = g_malloc(3 * count * sizeof(gfloat));
+        gfloat *xv;
+        gfloat *yv;
+        gfloat *y2v;
+        gint dst = 0;
+
+        if (!mem) {
+          ry = priv->min_y;
+          break;
+        }
+
+        xv = mem;
+        yv = mem + count;
+        y2v = mem + (2 * count);
+
+        prev = priv->min_x - 1.0f;
+        for (gint i = 0; i < priv->curve_data.n_cpoints; i++) {
+          if (priv->curve_data.d_cpoints[i].x > prev) {
+            prev = priv->curve_data.d_cpoints[i].x;
+            xv[dst] = priv->curve_data.d_cpoints[i].x;
+            yv[dst] = priv->curve_data.d_cpoints[i].y;
+            if (yv[dst] < priv->min_y)
+              yv[dst] = priv->min_y;
+            else if (yv[dst] > priv->max_y)
+              yv[dst] = priv->max_y;
+            dst++;
+          }
+        }
+
+        spline_solve(count, xv, yv, y2v);
+        ry = spline_eval(count, xv, yv, y2v, x_value);
+        g_free(mem);
+      }
+      else {
+        gfloat *mem = g_malloc(2 * count * sizeof(gfloat));
+        gfloat *xv;
+        gfloat *yv;
+        gint dst = 0;
+        gint seg = 0;
+
+        if (!mem) {
+          ry = priv->min_y;
+          break;
+        }
+
+        xv = mem;
+        yv = mem + count;
+
+        prev = priv->min_x - 1.0f;
+        for (gint i = 0; i < priv->curve_data.n_cpoints; i++) {
+          if (priv->curve_data.d_cpoints[i].x > prev) {
+            prev = priv->curve_data.d_cpoints[i].x;
+            xv[dst] = priv->curve_data.d_cpoints[i].x;
+            yv[dst] = priv->curve_data.d_cpoints[i].y;
+            if (yv[dst] < priv->min_y)
+              yv[dst] = priv->min_y;
+            else if (yv[dst] > priv->max_y)
+              yv[dst] = priv->max_y;
+            dst++;
+          }
+        }
+
+        xv[0] = priv->min_x;
+        xv[count - 1] = priv->max_x;
+
+        while (seg + 1 < count - 1 && x_value > xv[seg + 1])
+          seg++;
+
+        if (x_value <= xv[0]) {
+          ry = yv[0];
+        }
+        else if (x_value >= xv[count - 1]) {
+          ry = yv[count - 1];
+        }
+        else {
+          gfloat x0 = xv[seg];
+          gfloat x1 = xv[seg + 1];
+          gfloat y0 = yv[seg];
+          gfloat y1 = yv[seg + 1];
+          gfloat den = x1 - x0;
+
+          if (den <= 0.0f) {
+            ry = y0;
+          }
+          else {
+            gfloat t = (x_value - x0) / den;
+            if (t < 0.0f)
+              t = 0.0f;
+            else if (t > 1.0f)
+              t = 1.0f;
+            ry = y0 + ((y1 - y0) * t);
+          }
+        }
+
+        g_free(mem);
+      }
+      break;
+    }
+  }
+
+  if (!isfinite(ry))
+    ry = priv->min_y;
+
+  if (ry < priv->min_y)
+    ry = priv->min_y;
+  else if (ry > priv->max_y)
+    ry = priv->max_y;
+
+  *value = ry;
+  return TRUE;
+}
+
+
+static gboolean
+gtk3_curve_display_curve_value_at_position(Gtk3CurvePrivate *priv,
+                                            gint              width,
+                                            gint              height,
+                                            gfloat            x_value,
+                                            gdouble          *mx,
+                                            gdouble          *my,
+                                            gfloat           *value)
+{
+  gdouble screen_x;
+  gdouble screen_y;
+  gfloat v;
+
+  if (!priv || !value || width <= 1 || height <= 1)
+    return FALSE;
+
+  if (!priv->curve_data.d_point || priv->curve_data.n_points <= 0)
+    return FALSE;
+
+  if (!isfinite(x_value) || !isfinite(priv->min_x) || !isfinite(priv->max_x) ||
+      !isfinite(priv->min_y) || !isfinite(priv->max_y) ||
+      priv->max_x <= priv->min_x || priv->max_y <= priv->min_y)
+    return FALSE;
+
+  if (x_value < priv->min_x || x_value > priv->max_x)
+    return FALSE;
+
+  screen_x = RADIUS + projectd(x_value, priv->min_x, priv->max_x, width);
+
+  if (screen_x <= priv->curve_data.d_point[0].x) {
+    screen_x = priv->curve_data.d_point[0].x;
+    screen_y = priv->curve_data.d_point[0].y;
+  }
+  else if (screen_x >= priv->curve_data.d_point[priv->curve_data.n_points - 1].x) {
+    screen_x = priv->curve_data.d_point[priv->curve_data.n_points - 1].x;
+    screen_y = priv->curve_data.d_point[priv->curve_data.n_points - 1].y;
+  }
+  else {
+    gint left = 0;
+    gint right = priv->curve_data.n_points - 1;
+
+    while (right - left > 1) {
+      gint mid = left + ((right - left) / 2);
+      if ((gdouble)priv->curve_data.d_point[mid].x <= screen_x)
+        left = mid;
+      else
+        right = mid;
+    }
+
+    {
+      gdouble x0 = priv->curve_data.d_point[left].x;
+      gdouble y0 = priv->curve_data.d_point[left].y;
+      gdouble x1 = priv->curve_data.d_point[right].x;
+      gdouble y1 = priv->curve_data.d_point[right].y;
+      gdouble den = x1 - x0;
+      gdouble t = 0.0;
+
+      if (den > 0.000001)
+        t = (screen_x - x0) / den;
+
+      if (t < 0.0)
+        t = 0.0;
+      else if (t > 1.0)
+        t = 1.0;
+
+      screen_y = y0 + ((y1 - y0) * t);
+    }
+  }
+
+  v = unprojectd((RADIUS + height) - screen_y,
+                 priv->min_y,
+                 priv->max_y,
+                 height);
+
+  if (!isfinite(v))
+    v = priv->min_y;
+
+  if (v < priv->min_y)
+    v = priv->min_y;
+  else if (v > priv->max_y)
+    v = priv->max_y;
+
+  if (mx)
+    *mx = screen_x;
+  if (my)
+    *my = screen_y;
+
+  *value = v;
+  return TRUE;
+}
+
+static gboolean
+gtk3_curve_live_trace_value_at_x(Gtk3CurvePrivate *priv,
+                                 gfloat            x_value,
+                                 gfloat           *value,
+                                 Gtk3CurveColor   *color)
+{
+  gint trace;
+  gboolean have_left = FALSE;
+  gboolean have_right = FALSE;
+  gboolean have_nearest = FALSE;
+  gfloat left_x = 0.0f;
+  gfloat right_x = 0.0f;
+  gfloat nearest_x = 0.0f;
+  gfloat left_v = 0.0f;
+  gfloat right_v = 0.0f;
+  gfloat nearest_v = 0.0f;
+  gfloat nearest_d = G_MAXFLOAT;
+  gfloat jump_threshold;
+
+  if (!priv || !value || !priv->live_trace_enabled ||
+      !priv->live_trace_point_used || !priv->live_trace_x ||
+      !priv->live_trace_values || !isfinite(x_value))
+    return FALSE;
+
+  trace = gtk3_curve_live_trace_primary_trace(priv);
+  if (trace < 0)
+    return FALSE;
+
+  jump_threshold = gtk3_curve_live_trace_draw_jump_threshold(priv);
+  if (jump_threshold < 1.0f)
+    jump_threshold = 1.0f;
+
+  for (gint idx = 0; idx < GTK3_CURVE_LIVE_TRACE_LEN; idx++) {
+    gfloat px;
+    gfloat pv;
+    gfloat d;
+
+    if (!priv->live_trace_point_used[trace][idx])
+      continue;
+
+    px = priv->live_trace_x[trace][idx];
+    pv = priv->live_trace_values[trace][idx];
+
+    if (!isfinite(px) || !isfinite(pv))
+      continue;
+
+    d = fabsf(px - x_value);
+    if (!have_nearest || d < nearest_d) {
+      have_nearest = TRUE;
+      nearest_d = d;
+      nearest_x = px;
+      nearest_v = pv;
+    }
+
+    if (px <= x_value) {
+      if (!have_left || px > left_x) {
+        have_left = TRUE;
+        left_x = px;
+        left_v = pv;
+      }
+    }
+
+    if (px >= x_value) {
+      if (!have_right || px < right_x) {
+        have_right = TRUE;
+        right_x = px;
+        right_v = pv;
+      }
+    }
+  }
+
+  if (have_left && have_right) {
+    gfloat span = right_x - left_x;
+
+    if (fabsf(span) <= 0.0001f) {
+      *value = right_v;
+    }
+    else if (span <= jump_threshold) {
+      gfloat t = (x_value - left_x) / span;
+      if (t < 0.0f)
+        t = 0.0f;
+      else if (t > 1.0f)
+        t = 1.0f;
+      *value = left_v + ((right_v - left_v) * t);
+    }
+    else if (have_nearest && nearest_d <= jump_threshold) {
+      *value = nearest_v;
+    }
+    else {
+      return FALSE;
+    }
+  }
+  else if (have_nearest && nearest_d <= jump_threshold) {
+    (void)nearest_x;
+    *value = nearest_v;
+  }
+  else {
+    return FALSE;
+  }
+
+  *value = gtk3_curve_live_clamp_value(priv, *value);
+
+  if (color)
+    *color = priv->live_trace_color[trace];
+
+  return TRUE;
+}
+
 static gboolean
 gtk3_curve_get_position_marker(GtkWidget *widget,
                                gint       width,
@@ -2332,11 +3004,41 @@ gtk3_curve_get_position_marker(GtkWidget *widget,
   if (!priv->draw_position)
     return FALSE;
 
-  if (!priv->curve_data.d_point || priv->curve_data.n_points <= 0)
-    return FALSE;
+  priv->marker_live_trace = FALSE;
 
   if (width <= 1 || height <= 1)
     return FALSE;
+
+  gdouble pos = priv->current_position;
+
+  if (priv->live_trace_enabled && !priv->live_trace_user_override) {
+    if (gtk3_curve_live_trace_use_local_axis(priv))
+      return FALSE;
+
+    Gtk3CurveGraphRect gr;
+    gfloat live_value = 0.0f;
+    Gtk3CurveColor live_color;
+    gdouble px;
+
+    memset(&live_color, 0, sizeof(live_color));
+
+    if (gtk3_curve_live_graph_rect(width, height, &gr) &&
+        gtk3_curve_live_trace_value_at_x(priv, (gfloat)pos, &live_value, &live_color) &&
+        gtk3_curve_live_project_x(priv, &gr, (gfloat)pos, &px)) {
+      if (mx)
+        *mx = px;
+      if (my)
+        *my = gtk3_curve_live_project_y_norm(priv, &gr, live_value);
+      if (value)
+        *value = live_value;
+
+      priv->marker_live_trace = TRUE;
+      priv->marker_live_color = live_color;
+      return TRUE;
+    }
+
+    return FALSE;
+  }
 
   if (priv->max_x <= priv->min_x)
     return FALSE;
@@ -2344,32 +3046,34 @@ gtk3_curve_get_position_marker(GtkWidget *widget,
   if (priv->max_y <= priv->min_y)
     return FALSE;
 
-  gdouble pos = priv->current_position;
-
   if (pos < priv->min_x || pos > priv->max_x) {
     priv->marker_hover = FALSE;
     return FALSE;
   }
 
+  gfloat v = 0.0f;
+  gdouble px = 0.0;
+  gdouble py = 0.0;
+
+  if (gtk3_curve_display_curve_value_at_position(priv, width, height, (gfloat)pos, &px, &py, &v)) {
+    if (mx)
+      *mx = px;
+    if (my)
+      *my = py;
+    if (value)
+      *value = v;
+
+    return TRUE;
+  }
+
+  if (!gtk3_curve_curve_value_at_x(priv, (gfloat)pos, &v))
+    return FALSE;
+
   gint x = project((gfloat) pos, priv->min_x, priv->max_x, width);
+  gint y = project(v, priv->min_y, priv->max_y, height);
 
-  if (x < 0)
-    x = 0;
-  else if (x >= priv->curve_data.n_points)
-    x = priv->curve_data.n_points - 1;
-
-  gdouble px = priv->curve_data.d_point[x].x;
-  gdouble py = priv->curve_data.d_point[x].y;
-
-  gfloat v = unproject((gint)(RADIUS + height - py + 0.5),
-                       priv->min_y,
-                       priv->max_y,
-                       height);
-
-  if (v < priv->min_y)
-    v = priv->min_y;
-  else if (v > priv->max_y)
-    v = priv->max_y;
+  px = RADIUS + x;
+  py = RADIUS + height - y;
 
   if (mx)
     *mx = px;
@@ -2514,18 +3218,39 @@ gtk3_curve_draw_position_marker(GtkWidget *widget,
 
   cairo_save(cr);
 
+  Gtk3CurveColor marker_color;
+  if (priv->marker_live_trace) {
+    marker_color = priv->marker_live_color;
+    if (marker_color.alpha <= 0.0f)
+      marker_color.alpha = 0.95f;
+  } else {
+    marker_color.red = 1.000000f;
+    marker_color.green = 0.517647f;
+    marker_color.blue = 0.000000f;
+    marker_color.alpha = 0.95f;
+  }
 
-  cairo_set_source_rgba(cr, 0.352941, 0.427451, 0.549020, 0.18);
+  cairo_set_source_rgba(cr,
+                        marker_color.red,
+                        marker_color.green,
+                        marker_color.blue,
+                        0.18);
   cairo_arc(cr, mx, my, 8.0, 0.0, 2.0 * M_PI);
   cairo_fill(cr);
 
-
-  cairo_set_source_rgba(cr, 1.000000, 0.517647, 0.000000, 0.95);
+  cairo_set_source_rgba(cr,
+                        marker_color.red,
+                        marker_color.green,
+                        marker_color.blue,
+                        MIN(1.0, marker_color.alpha + 0.25));
   cairo_arc(cr, mx, my, 4.5, 0.0, 2.0 * M_PI);
   cairo_fill(cr);
 
-
-  cairo_set_source_rgba(cr, 0.55, 0.25, 0.00, 0.95);
+  cairo_set_source_rgba(cr,
+                        marker_color.red * 0.45,
+                        marker_color.green * 0.45,
+                        marker_color.blue * 0.45,
+                        0.95);
   cairo_arc(cr, mx, my, 5.5, 0.0, 2.0 * M_PI);
   cairo_set_line_width(cr, 1.0);
   cairo_stroke(cr);
@@ -2552,9 +3277,21 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
   GdkRGBA           color;
   GtkAllocation     allocation;
   Gtk3Curve        *curve;
+  gboolean          live_scope;
+  gboolean          hide_curve_for_live_trace;
+  gboolean          live_trace_underlay;
 
   curve = GTK3_CURVE(widget);
   priv = curve->priv;
+  live_scope = priv->live_trace_enabled && gtk3_curve_live_trace_use_local_axis(priv);
+  hide_curve_for_live_trace = live_scope ||
+                              (!priv->live_trace_user_override &&
+                               priv->live_trace_enabled &&
+                               !gtk3_curve_live_trace_use_local_axis(priv) &&
+                               gtk3_curve_curve_is_visually_flat(priv));
+  live_trace_underlay = priv->live_trace_enabled &&
+                        !gtk3_curve_live_trace_use_local_axis(priv) &&
+                        !hide_curve_for_live_trace;
 
   if (!cr)
     return TRUE;
@@ -2678,7 +3415,15 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
                                     width,
                                     height);
 
-  if (priv->curve_data.d_point && priv->curve_data.n_points > 1) {
+  if (live_trace_underlay)
+    gtk3_curve_draw_live_traces(widget,
+                                cr,
+                                allocation.width,
+                                width,
+                                height,
+                                TRUE);
+
+  if (!hide_curve_for_live_trace && priv->curve_data.d_point && priv->curve_data.n_points > 1) {
     cairo_set_line_width(cr, 1.25);
     cairo_set_source_rgba(cr,
                           priv->curve.red,
@@ -2700,7 +3445,7 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
     }
   }
 
-  if (priv->curve_data.curve_type != GTK3_CURVE_TYPE_FREE) {
+  if (!hide_curve_for_live_trace && priv->curve_data.curve_type != GTK3_CURVE_TYPE_FREE) {
     for (int i = 0; i < priv->curve_data.n_cpoints; ++i) {
       gdouble x, y;
 
@@ -2735,13 +3480,15 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
     }
   }
 
-  gtk3_curve_draw_live_traces(widget,
-                              cr,
-                              allocation.width,
-                              width,
-                              height);
+  if (!live_trace_underlay)
+    gtk3_curve_draw_live_traces(widget,
+                                cr,
+                                allocation.width,
+                                width,
+                                height,
+                                FALSE);
 
-  if (priv->hover_cpoint >= 0) {
+  if (!hide_curve_for_live_trace && priv->hover_cpoint >= 0) {
     gtk3_curve_draw_hover_label(widget,
                                 cr,
                                 priv->hover_cpoint_x,
@@ -2917,6 +3664,8 @@ gtk3_curve_button_press(GtkWidget *widget, GdkEventButton *event)
       ty < RADIUS ||
       ty >= RADIUS + height)
     return FALSE;
+
+  gtk3_curve_live_trace_disable_for_user_edit(widget);
 
   gtk_grab_add(widget);
 
@@ -3355,6 +4104,9 @@ gtk3_curve_motion_notify(GtkWidget *widget, GdkEventMotion *event)
     gdk_window_set_cursor(gtk_widget_get_window(widget), cursor);
     g_object_unref(cursor);
   }
+
+  if (changed)
+    gtk3_curve_live_trace_disable_for_user_edit(widget);
 
   if ((changed || hover_changed || priv->in_curve) && gtk_widget_is_visible(widget))
     gtk_widget_queue_draw(widget);
@@ -3872,23 +4624,35 @@ spline_eval(int n, gfloat x[], gfloat y[], gfloat y2[], gfloat val)
 
 static int project(gfloat value, gfloat min, gfloat max, int norm)
 {
+  return (int)(projectd(value, min, max, norm) + 0.5);
+}
+
+static gdouble projectd(gfloat value, gfloat min, gfloat max, int norm)
+{
+  gdouble t;
+
   if (norm <= 1)
-    return 0;
+    return 0.0;
 
   if (max == min)
-    return 0;
+    return 0.0;
 
-  gfloat t = (value - min) / (max - min);
+  t = ((gdouble)value - (gdouble)min) / ((gdouble)max - (gdouble)min);
 
-  if (t < 0.0f)
-    t = 0.0f;
-  else if (t > 1.0f)
-    t = 1.0f;
+  if (t < 0.0)
+    t = 0.0;
+  else if (t > 1.0)
+    t = 1.0;
 
-  return (int) ((norm - 1) * t + 0.5f);
+  return ((gdouble)norm - 1.0) * t;
 }
 
 static gfloat unproject(gint value, gfloat min, gfloat max, int norm)
+{
+  return unprojectd((gdouble)value, min, max, norm);
+}
+
+static gfloat unprojectd(gdouble value, gfloat min, gfloat max, int norm)
 {
   if (norm <= 1)
     return min;
@@ -3896,12 +4660,12 @@ static gfloat unproject(gint value, gfloat min, gfloat max, int norm)
   if (max == min)
     return min;
 
-  if (value < 0)
-    value = 0;
-  else if (value > norm - 1)
-    value = norm - 1;
+  if (value < 0.0)
+    value = 0.0;
+  else if (value > (gdouble)(norm - 1))
+    value = (gdouble)(norm - 1);
 
-  return ((gfloat) value / (gfloat) (norm - 1)) * (max - min) + min;
+  return (gfloat)((value / (gdouble)(norm - 1)) * ((gdouble)max - (gdouble)min) + (gdouble)min);
 }
 
 void
@@ -4206,6 +4970,47 @@ gtk3_curve_set_x_view(GtkWidget *widget, gfloat min_x, gfloat max_x)
     curve = GTK3_CURVE(widget);
     priv = curve->priv;
 
+    if (gtk3_curve_live_trace_use_local_axis(priv)) {
+        gfloat domain_min = priv->live_trace_local_min_x;
+        gfloat domain_max = priv->live_trace_local_max_x;
+        gfloat span;
+        gfloat domain_span;
+
+        if (!isfinite(domain_min))
+            domain_min = 0.0f;
+        if (!isfinite(domain_max) || domain_max <= domain_min)
+            domain_max = domain_min + 1.0f;
+        if (max_x <= min_x)
+            max_x = min_x + 1.0f;
+
+        domain_span = domain_max - domain_min;
+        span = max_x - min_x;
+
+        if (span >= domain_span) {
+            min_x = domain_min;
+            max_x = domain_max;
+        } else {
+            if (min_x < domain_min) {
+                max_x += domain_min - min_x;
+                min_x = domain_min;
+            }
+            if (max_x > domain_max) {
+                min_x -= max_x - domain_max;
+                max_x = domain_max;
+            }
+            if (min_x < domain_min)
+                min_x = domain_min;
+            if (max_x > domain_max)
+                max_x = domain_max;
+        }
+
+        priv->live_trace_view_min_x = min_x;
+        priv->live_trace_view_max_x = max_x;
+        if (gtk_widget_is_visible(widget))
+            gtk_widget_queue_draw(widget);
+        return;
+    }
+
     if (priv->timeline_max_x <= priv->timeline_min_x) {
         priv->timeline_min_x = priv->min_x;
         priv->timeline_max_x = priv->max_x;
@@ -4261,6 +5066,14 @@ gtk3_curve_get_x_view(GtkWidget *widget, gfloat *min_x, gfloat *max_x)
 
     curve = GTK3_CURVE(widget);
     priv = curve->priv;
+
+    if (gtk3_curve_live_trace_use_local_axis(priv)) {
+        if (min_x)
+            *min_x = priv->live_trace_view_min_x;
+        if (max_x)
+            *max_x = priv->live_trace_view_max_x;
+        return;
+    }
 
     if (min_x)
         *min_x = priv->min_x;
@@ -4318,6 +5131,10 @@ gtk3_curve_is_x_zoomed(GtkWidget *widget)
     curve = GTK3_CURVE(widget);
     priv = curve->priv;
 
+    if (gtk3_curve_live_trace_use_local_axis(priv))
+        return (priv->live_trace_view_min_x > priv->live_trace_local_min_x + 0.5f ||
+                priv->live_trace_view_max_x < priv->live_trace_local_max_x - 0.5f);
+
     return (priv->min_x > priv->timeline_min_x + 0.5f ||
             priv->max_x < priv->timeline_max_x - 0.5f);
 }
@@ -4327,6 +5144,10 @@ gtk3_curve_zoom_x(GtkWidget *widget, gfloat center_x, gfloat factor)
 {
     Gtk3Curve *curve;
     Gtk3CurvePrivate *priv;
+    gfloat old_min;
+    gfloat old_max;
+    gfloat domain_min;
+    gfloat domain_max;
     gfloat old_span;
     gfloat new_span;
     gfloat domain_span;
@@ -4340,16 +5161,27 @@ gtk3_curve_zoom_x(GtkWidget *widget, gfloat center_x, gfloat factor)
     curve = GTK3_CURVE(widget);
     priv = curve->priv;
 
-    if (priv->timeline_max_x <= priv->timeline_min_x) {
-        priv->timeline_min_x = priv->min_x;
-        priv->timeline_max_x = priv->max_x;
-    }
-
     if (factor <= 0.0f || factor == 1.0f)
         return;
 
-    old_span = priv->max_x - priv->min_x;
-    domain_span = priv->timeline_max_x - priv->timeline_min_x;
+    if (gtk3_curve_live_trace_use_local_axis(priv)) {
+        old_min = priv->live_trace_view_min_x;
+        old_max = priv->live_trace_view_max_x;
+        domain_min = priv->live_trace_local_min_x;
+        domain_max = priv->live_trace_local_max_x;
+    } else {
+        if (priv->timeline_max_x <= priv->timeline_min_x) {
+            priv->timeline_min_x = priv->min_x;
+            priv->timeline_max_x = priv->max_x;
+        }
+        old_min = priv->min_x;
+        old_max = priv->max_x;
+        domain_min = priv->timeline_min_x;
+        domain_max = priv->timeline_max_x;
+    }
+
+    old_span = old_max - old_min;
+    domain_span = domain_max - domain_min;
 
     if (old_span <= 1.0f)
         old_span = 1.0f;
@@ -4364,12 +5196,12 @@ gtk3_curve_zoom_x(GtkWidget *widget, gfloat center_x, gfloat factor)
     else if (new_span > domain_span)
         new_span = domain_span;
 
-    if (center_x < priv->min_x)
-        center_x = priv->min_x;
-    else if (center_x > priv->max_x)
-        center_x = priv->max_x;
+    if (center_x < old_min)
+        center_x = old_min;
+    else if (center_x > old_max)
+        center_x = old_max;
 
-    t = (old_span > 0.0f) ? ((center_x - priv->min_x) / old_span) : 0.5f;
+    t = (old_span > 0.0f) ? ((center_x - old_min) / old_span) : 0.5f;
 
     if (t < 0.0f)
         t = 0.0f;
@@ -4385,18 +5217,16 @@ gtk3_curve_zoom_x(GtkWidget *widget, gfloat center_x, gfloat factor)
 void
 gtk3_curve_pan_x(GtkWidget *widget, gfloat delta)
 {
-    Gtk3Curve *curve;
-    Gtk3CurvePrivate *priv;
+    gfloat view_min;
+    gfloat view_max;
 
     if (!widget || delta == 0.0f)
         return;
 
-    curve = GTK3_CURVE(widget);
-    priv = curve->priv;
-
+    gtk3_curve_get_x_view(widget, &view_min, &view_max);
     gtk3_curve_set_x_view(widget,
-                          priv->min_x + delta,
-                          priv->max_x + delta);
+                          view_min + delta,
+                          view_max + delta);
 }
 
 void
@@ -4410,6 +5240,13 @@ gtk3_curve_reset_x_zoom(GtkWidget *widget)
 
     curve = GTK3_CURVE(widget);
     priv = curve->priv;
+
+    if (gtk3_curve_live_trace_use_local_axis(priv)) {
+        gtk3_curve_set_x_view(widget,
+                              priv->live_trace_local_min_x,
+                              priv->live_trace_local_max_x);
+        return;
+    }
 
     gtk3_curve_set_x_view(widget,
                           priv->timeline_min_x,
@@ -5174,6 +6011,50 @@ gtk3_curve_live_trace_jump_threshold(Gtk3CurvePrivate *priv)
   return threshold;
 }
 
+static gfloat
+gtk3_curve_live_trace_draw_jump_threshold(Gtk3CurvePrivate *priv)
+{
+  gfloat min_x;
+  gfloat max_x;
+  gfloat span;
+  gfloat threshold;
+
+  if (!priv)
+    return 8.0f;
+
+  min_x = gtk3_curve_live_domain_min_x(priv);
+  max_x = gtk3_curve_live_domain_max_x(priv);
+
+  if (!isfinite(min_x))
+    min_x = 0.0f;
+  if (!isfinite(max_x) || max_x <= min_x)
+    max_x = min_x + 1.0f;
+
+  span = max_x - min_x;
+  if (span < 1.0f)
+    span = 1.0f;
+
+  if (gtk3_curve_live_trace_use_local_axis(priv)) {
+    threshold = MAX(4.0f, span * 0.06f);
+    if (threshold > 96.0f)
+      threshold = 96.0f;
+  }
+  else {
+    if (span <= 64.0f)
+      threshold = span + 1.0f;
+    else
+      threshold = MAX(16.0f, span * 0.15f);
+
+    if (threshold > 384.0f)
+      threshold = 384.0f;
+  }
+
+  if (threshold < 1.0f)
+    threshold = 1.0f;
+
+  return threshold;
+}
+
 static void
 gtk3_curve_live_trace_clear_overwrite(Gtk3CurvePrivate *priv,
                                       gfloat            x_value)
@@ -5196,6 +6077,13 @@ gtk3_curve_live_trace_clear_overwrite(Gtk3CurvePrivate *priv,
   }
 
   delta = x_value - priv->live_trace_last_source_x;
+
+  if (gtk3_curve_live_trace_use_local_axis(priv) && delta < -0.0001f) {
+    gtk3_curve_live_trace_clear_slot_range(priv, current_slot, current_slot);
+    priv->live_trace_last_source_x = x_value;
+    priv->live_trace_have_source_x = TRUE;
+    return;
+  }
 
   if (fabsf(delta) <= 0.0001f)
     return;
@@ -5341,6 +6229,34 @@ gtk3_curve_live_trace_clear(GtkWidget *widget)
     gtk_widget_queue_draw(widget);
 }
 
+
+gboolean
+gtk3_curve_live_trace_get_user_override(GtkWidget *widget)
+{
+  Gtk3CurvePrivate *priv = gtk3_curve_live_trace_priv(widget);
+
+  return priv ? priv->live_trace_user_override : FALSE;
+}
+
+void
+gtk3_curve_live_trace_set_user_override(GtkWidget *widget, gboolean enabled)
+{
+  Gtk3CurvePrivate *priv = gtk3_curve_live_trace_priv(widget);
+
+  if (!priv)
+    return;
+
+  enabled = enabled ? TRUE : FALSE;
+
+  if (priv->live_trace_user_override == enabled)
+    return;
+
+  priv->live_trace_user_override = enabled;
+
+  if (gtk_widget_is_visible(widget))
+    gtk_widget_queue_draw(widget);
+}
+
 void
 gtk3_curve_live_trace_set_enabled(GtkWidget *widget, gboolean enabled)
 {
@@ -5350,13 +6266,67 @@ gtk3_curve_live_trace_set_enabled(GtkWidget *widget, gboolean enabled)
     return;
 
   enabled = enabled ? TRUE : FALSE;
-  if (priv->live_trace_enabled == enabled)
+
+  if (priv->live_trace_enabled == enabled) {
+    if (!enabled && priv->live_trace_domain != GTK3_CURVE_LIVE_TRACE_DOMAIN_FRAME) {
+      priv->live_trace_domain = GTK3_CURVE_LIVE_TRACE_DOMAIN_FRAME;
+      priv->live_trace_local_min_x = 0.0f;
+      priv->live_trace_local_max_x = (gfloat)(GTK3_CURVE_LIVE_TRACE_LEN - 1);
+      priv->live_trace_view_min_x = priv->live_trace_local_min_x;
+      priv->live_trace_view_max_x = priv->live_trace_local_max_x;
+      if (gtk_widget_is_visible(widget))
+        gtk_widget_queue_draw(widget);
+    }
     return;
+  }
 
   priv->live_trace_enabled = enabled;
 
-  if (!enabled)
+  if (!enabled) {
+    priv->live_trace_domain = GTK3_CURVE_LIVE_TRACE_DOMAIN_FRAME;
+    priv->live_trace_local_min_x = 0.0f;
+    priv->live_trace_local_max_x = (gfloat)(GTK3_CURVE_LIVE_TRACE_LEN - 1);
+    priv->live_trace_view_min_x = priv->live_trace_local_min_x;
+    priv->live_trace_view_max_x = priv->live_trace_local_max_x;
     gtk3_curve_live_trace_clear(widget);
+  }
+  else if (gtk_widget_is_visible(widget))
+    gtk_widget_queue_draw(widget);
+}
+
+void
+gtk3_curve_live_trace_set_domain(GtkWidget              *widget,
+                                  Gtk3CurveLiveTraceDomain domain,
+                                  gfloat                  min_x,
+                                  gfloat                  max_x)
+{
+  Gtk3CurvePrivate *priv = gtk3_curve_live_trace_priv(widget);
+  gboolean changed;
+
+  if (!priv)
+    return;
+
+  if (domain != GTK3_CURVE_LIVE_TRACE_DOMAIN_CLOCK)
+    domain = GTK3_CURVE_LIVE_TRACE_DOMAIN_FRAME;
+
+  if (!isfinite(min_x))
+    min_x = 0.0f;
+  if (!isfinite(max_x) || max_x <= min_x)
+    max_x = min_x + 1.0f;
+
+  changed = (priv->live_trace_domain != domain ||
+             fabsf(priv->live_trace_local_min_x - min_x) > 0.0001f ||
+             fabsf(priv->live_trace_local_max_x - max_x) > 0.0001f);
+
+  priv->live_trace_domain = domain;
+  priv->live_trace_local_min_x = min_x;
+  priv->live_trace_local_max_x = max_x;
+
+  if (changed) {
+    priv->live_trace_view_min_x = min_x;
+    priv->live_trace_view_max_x = max_x;
+    gtk3_curve_live_trace_clear(widget);
+  }
   else if (gtk_widget_is_visible(widget))
     gtk_widget_queue_draw(widget);
 }
@@ -5403,13 +6373,7 @@ gtk3_curve_live_trace_push_at(GtkWidget   *widget,
       x_value = max_x;
   }
 
-  if (!isfinite(value))
-    value = 0.0f;
-
-  if (value < 0.0f)
-    value = 0.0f;
-  else if (value > 100.0f)
-    value = 100.0f;
+  value = gtk3_curve_live_clamp_value(priv, value);
 
   priv->live_trace_clear_on_next_push = FALSE;
 
@@ -5490,6 +6454,7 @@ gtk3_curve_live_trace_set_dot(GtkWidget   *widget,
     return;
 
   enabled = enabled ? TRUE : FALSE;
+
   priv->live_trace_dot_enabled = enabled;
 
   if (!enabled) {
@@ -5533,8 +6498,8 @@ gtk3_curve_live_trace_set_dot(GtkWidget   *widget,
     value = base_value;
 
   priv->live_trace_dot_x = x_value;
-  priv->live_trace_dot_base_value = CLAMP(base_value, 0.0f, 100.0f);
-  priv->live_trace_dot_value = CLAMP(value, 0.0f, 100.0f);
+  priv->live_trace_dot_base_value = gtk3_curve_live_clamp_value(priv, base_value);
+  priv->live_trace_dot_value = gtk3_curve_live_clamp_value(priv, value);
   priv->live_trace_dot_color.red = CLAMP(red, 0.0f, 1.0f);
   priv->live_trace_dot_color.green = CLAMP(green, 0.0f, 1.0f);
   priv->live_trace_dot_color.blue = CLAMP(blue, 0.0f, 1.0f);

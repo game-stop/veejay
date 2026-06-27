@@ -21,6 +21,11 @@ void vj_perform_free(veejay_t *info);
 
 int vj_perform_audio_start(veejay_t * info);
 
+int vj_perform_set_audio_mix_mode(veejay_t *info, int mode);
+int vj_perform_get_audio_mix_mode(veejay_t *info);
+int vj_perform_set_audio_mix_crossfade(veejay_t *info, int crossfade);
+int vj_perform_get_audio_mix_crossfade(veejay_t *info);
+
 void vj_perform_audio_status(struct timeval tmpstmp, unsigned int nb_out,
 			     unsigned int nb_err);
 int vj_perform_transition_sample( veejay_t *info, VJFrame *a, VJFrame *b );
@@ -77,9 +82,9 @@ int vj_perform_try_sequence(veejay_t *info);
 
 int vj_perform_get_next_sequence_id(veejay_t *info, int *type, int current, int *new_current);
 
-int vj_perform_next_sequence( veejay_t *info, int *type, int *next_slot );
+int vj_perform_next_sequence( veejay_t *info, int *type, int *next_bank, int *next_slot );
 
-void vj_perform_setup_transition(veejay_t *info, int next_sample_id, int next_type, int sample_id, int current_type, int next_seq_idx );
+void vj_perform_setup_transition(veejay_t *info, int next_sample_id, int next_type, int sample_id, int current_type, int next_seq_bank, int next_seq_idx );
 
 void    vj_perform_reset_transition(veejay_t *info);
 

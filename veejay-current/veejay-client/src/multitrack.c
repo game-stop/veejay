@@ -870,14 +870,19 @@ int		multitrack_add_track( void *data )
 int         multitrack_get_track_status(void *data, int track )
 {
     multitracker_t *mt = (multitracker_t*) data;
-    if(track < 0 || track > __MAX_TRACKS)
+
+    if(!mt || track < 0 || track >= __MAX_TRACKS)
         return 0;
+
     return mt->track_status[ track ];
 }
 
 void		multitrack_cleanup_track( void *data, int track )
 {
 	multitracker_t *mt = (multitracker_t*) data;
+
+	if(!mt || track < 0 || track >= MAX_TRACKS || !mt->view[track])
+		return;
 
 	mt->view[track]->status_lock = 1;
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(mt->view[track]->toggle), FALSE );
@@ -919,6 +924,10 @@ void		multitrack_disconnect(void *data)
 void    multitrack_set_master_track(void *data, int track)
 {
 	multitracker_t *mt = (multitracker_t*) data;
+
+	if(!mt || track < 0 || track >= MAX_TRACKS)
+		return;
+
     gvr_set_master( mt->preview, track );
 }
 
@@ -964,6 +973,9 @@ int		multitrack_locked( void *data)
 {
 	multitracker_t *mt = (multitracker_t*) data;
 
+	if(!mt || mt->master_track < 0 || mt->master_track >= MAX_TRACKS || !mt->view[mt->master_track])
+		return 1;
+
 	return mt->view[mt->master_track]->status_lock;
 }
 
@@ -1007,19 +1019,31 @@ void		multitrack_set_quality( void *data , int quality )
 void		multitrack_set_logo(void *data , GtkWidget *img)
 {
 	multitracker_t *mt = (multitracker_t*) data;
+
+	if(!mt || !img)
+		return;
+
 	gtk_image_set_from_pixbuf_( GTK_IMAGE(img), mt->logo );
 }
 
 void		multitrack_toggle_preview( void *data, int track_id, int status, GtkWidget *img )
 {
 	multitracker_t *mt = (multitracker_t*) data;
+	int applied = 0;
+
+	if(!mt)
+		return;
+
 	if(track_id == -1 )
-	{
-		gvr_track_toggle_preview( mt->preview, mt->master_track, status );
-		veejay_msg(VEEJAY_MSG_INFO, "Veejay grabber: master preview %s", (status ? "enabled" : "disabled") );
-		if( status == 0 )
-			multitrack_set_logo( data, img );
-	}
+		applied = gvr_track_toggle_preview( mt->preview, mt->master_track, status );
+	else
+		applied = gvr_track_toggle_preview( mt->preview, track_id, status );
+
+	if(applied)
+		veejay_msg(VEEJAY_MSG_INFO, "Veejay grabber: preview %s", (status ? "enabled" : "disabled") );
+
+	if( status == 0 )
+		multitrack_set_logo( data, img );
 }
 
 void		multitrack_release_track(void *data, int id, int release_this )
@@ -1038,10 +1062,10 @@ void		multitrack_bind_track( void *data, int id, int bind_this )
 {
 	multitracker_t *mt = (multitracker_t*) data;
 
-	if( bind_this < 0 || bind_this > MAX_TRACKS )
+	if( bind_this < 0 || bind_this >= MAX_TRACKS )
 		return;
 
-	if( id < 0 || id > MAX_TRACKS )
+	if( id < 0 || id >= MAX_TRACKS )
 		return;
 
 	char *host = gvr_track_get_hostname( mt->preview, bind_this );

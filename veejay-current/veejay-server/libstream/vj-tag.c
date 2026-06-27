@@ -2134,7 +2134,7 @@ int vj_tag_set_white(int t1, int value)
         return -1;
     }
 #ifdef HAVE_V4L2
-    v4l2_set_gamma( vj_tag_input->v4l2[tag->index],0,value);
+    v4l2_set_whiteness( vj_tag_input->v4l2[tag->index],0,value);
 #endif
     return 1;
 }
@@ -2174,11 +2174,27 @@ int vj_tag_set_color(int t1, int value)
     if(!tag) return -1;
     if(value < 0 || value > 65535)
     {
-        veejay_msg(VEEJAY_MSG_ERROR,"Contrast valid range is 0 - 65535");
+        veejay_msg(VEEJAY_MSG_ERROR,"Color valid range is 0 - 65535");
         return -1;
     }
 #ifdef HAVE_V4L2
-    v4l2_set_whiteness( vj_tag_input->v4l2[tag->index], 0,value );
+    v4l2_set_saturation( vj_tag_input->v4l2[tag->index], 0,value );
+#endif
+    return 1;
+}
+
+int vj_tag_set_saturation(int t1, int value)
+{
+    vj_tag *tag = vj_tag_get(t1);
+
+    if(!tag) return -1;
+    if(value < 0 || value > 65535)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,"Saturation valid range is 0 - 65535");
+        return -1;
+    }
+#ifdef HAVE_V4L2
+    v4l2_set_saturation( vj_tag_input->v4l2[tag->index], 0,value );
 #endif
     return 1;
 }

@@ -154,6 +154,18 @@ void	*gvr_preview_init(int max_tracks, int use_threads)
 	return (void*) vp;
 }
 
+static inline int gvr_track_index_valid(veejay_preview_t *vp, int track_num)
+{
+	return (vp && track_num >= 0 && track_num < vp->n_tracks);
+}
+
+static inline veejay_track_t *gvr_track_ptr(veejay_preview_t *vp, int track_num)
+{
+	if(!gvr_track_index_valid(vp, track_num))
+		return NULL;
+	return vp->tracks[track_num];
+}
+
 static	void	gvr_close_connection( veejay_track_t *v )
 {
     if(v != NULL) {
@@ -580,9 +592,14 @@ void		gvr_set_master(void *data, int master_track )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) data;
 	int i;
+
+	if(!gvr_track_ptr(vp, master_track))
+		return;
+
 	for( i = 0; i < vp->n_tracks; i ++ )
 		if( vp->tracks[i] )
 			vp->tracks[i]->is_master = 0;
+
 	vp->tracks[master_track]->is_master = 1;
 }
 
@@ -609,9 +626,7 @@ static	int	track_exists( veejay_preview_t *vp, const char *hostname, int port_nu
 int		gvr_track_test( void *preview, int track_id )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
-	if( track_id < 0 || track_id > vp->n_tracks )
-		return 0;
-	return (vp->tracks[track_id]  ? 1:0);
+	return gvr_track_ptr(vp, track_id) ? 1 : 0;
 }
 
 static	int	track_find(  veejay_preview_t *vp )
@@ -632,19 +647,17 @@ static	int	track_find(  veejay_preview_t *vp )
 char*		gvr_track_get_hostname( void *preview , int num )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
+	veejay_track_t *v = gvr_track_ptr(vp, num);
 
-	if( vp->tracks[num] )
-		return vp->tracks[num]->hostname;
-	return NULL;
+	return v ? v->hostname : NULL;
 }
 
 int		gvr_track_get_portnum( void *preview, int num)
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
+	veejay_track_t *v = gvr_track_ptr(vp, num);
 
-	if( vp->tracks[num] )
-		return vp->tracks[num]->port_num;
-	return 0;
+	return v ? v->port_num : 0;
 }
 
 int		gvr_track_already_open( void *preview, const char *hostname,
@@ -781,6 +794,9 @@ void		gvr_queue_cxvims( void *preview, int track_id, int vims_id, int val1,unsig
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 	int i;
 
+	if(!vp)
+		return;
+
 	if( track_id == -1 )
 	{
 		for( i = 0; i < vp->n_tracks; i ++ )
@@ -789,8 +805,9 @@ void		gvr_queue_cxvims( void *preview, int track_id, int vims_id, int val1,unsig
 	}
 	else
 	{
-		if( vp->tracks[track_id] && vp->tracks[track_id]->active)
-			gvr_multivx_queue_vims( vp->tracks[track_id], vims_id,val1,val2 );
+		veejay_track_t *v = gvr_track_ptr(vp, track_id);
+		if( v && v->active)
+			gvr_multivx_queue_vims( v, vims_id,val1,val2 );
 	}
 }
 
@@ -798,6 +815,9 @@ void		gvr_queue_vims( void *preview, int track_id, int vims_id )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 	int i;
+
+	if(!vp)
+		return;
 
 	if( track_id == -1 )
 	{
@@ -807,8 +827,9 @@ void		gvr_queue_vims( void *preview, int track_id, int vims_id )
 	}
 	else
 	{
-		if( vp->tracks[track_id] && vp->tracks[track_id]->active)
-			gvr_single_queue_vims( vp->tracks[track_id], vims_id );
+		veejay_track_t *v = gvr_track_ptr(vp, track_id);
+		if( v && v->active)
+			gvr_single_queue_vims( v, vims_id );
 	}
 }
 
@@ -816,6 +837,9 @@ void		gvr_queue_mvims( void *preview, int track_id, int vims_id, int val )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 	int i;
+
+	if(!vp)
+		return;
 
 	if( track_id == -1 )
 	{
@@ -825,15 +849,17 @@ void		gvr_queue_mvims( void *preview, int track_id, int vims_id, int val )
 	}
 	else
 	{
-		if( vp->tracks[track_id] && vp->tracks[track_id]->active )
-			gvr_multi_queue_vims( vp->tracks[track_id], vims_id,val );
+		veejay_track_t *v = gvr_track_ptr(vp, track_id);
+		if( v && v->active )
+			gvr_multi_queue_vims( v, vims_id,val );
 	}
 }
 
 void		gvr_need_track_list( void *preview, int track_id )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
-	veejay_track_t *v = vp->tracks[track_id];
+	veejay_track_t *v = gvr_track_ptr(vp, track_id);
+
 	if(v)
 		v->need_track_list = 1;
 }
@@ -843,6 +869,9 @@ void		gvr_queue_mmvims( void *preview, int track_id, int vims_id, int val1,int v
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 	int i;
 
+	if(!vp)
+		return;
+
 	if( track_id == -1 )
 	{
 		for( i = 0; i < vp->n_tracks; i ++ )
@@ -851,8 +880,9 @@ void		gvr_queue_mmvims( void *preview, int track_id, int vims_id, int val1,int v
 	}
 	else
 	{
-		if( vp->tracks[track_id] && vp->tracks[track_id]->active)
-			gvr_multiv_queue_vims( vp->tracks[track_id], vims_id,val1,val2 );
+		veejay_track_t *v = gvr_track_ptr(vp, track_id);
+		if( v && v->active)
+			gvr_multiv_queue_vims( v, vims_id,val1,val2 );
 	}
 }
 
@@ -860,6 +890,9 @@ void		gvr_queue_mmmvims( void *preview, int track_id, int vims_id, int val1,int 
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 	int i;
+
+	if(!vp)
+		return;
 
 	if( track_id == -1 )
 	{
@@ -869,20 +902,32 @@ void		gvr_queue_mmmvims( void *preview, int track_id, int vims_id, int val1,int 
 	}
 	else
 	{
-		if( vp->tracks[track_id] && vp->tracks[track_id]->active)
-			gvr_multivvv_queue_vims( vp->tracks[track_id], vims_id,val1,val2,val3 );
+		veejay_track_t *v = gvr_track_ptr(vp, track_id);
+		if( v && v->active)
+			gvr_multivvv_queue_vims( v, vims_id,val1,val2,val3 );
 	}
 }
 
 void		gvr_track_disconnect( void *preview, int track_num )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
-	veejay_track_t *v = vp->tracks[ track_num ];
+	veejay_track_t *v;
+
+	if(!gvr_track_index_valid(vp, track_num))
+		return;
+
+	v = vp->tracks[track_num];
+	if(!v) {
+		if(vp->track_sync)
+			vp->track_sync->active_list[track_num] = 0;
+		return;
+	}
 
     gvr_close_connection( v );
 
     vp->tracks[ track_num ] = NULL;
-	vp->track_sync->active_list[ track_num ] = 0;
+	if(vp->track_sync)
+		vp->track_sync->active_list[ track_num ] = 0;
 
     veejay_msg(VEEJAY_MSG_INFO,"Closed track %d", track_num);
 }
@@ -890,14 +935,21 @@ void		gvr_track_disconnect( void *preview, int track_num )
 int		gvr_track_configure( void *preview, int track_num, int wid, int hei )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
+	veejay_track_t *v;
+	int w;
+	int h;
 
-	int w = (wid > MAX_PREVIEW_WIDTH ? MAX_PREVIEW_WIDTH : wid );
-	int h = (hei > MAX_PREVIEW_HEIGHT ? MAX_PREVIEW_HEIGHT : hei );
+	if(!gvr_track_index_valid(vp, track_num))
+		return 0;
 
-	if( vp->tracks[track_num] )
+	w = (wid > MAX_PREVIEW_WIDTH ? MAX_PREVIEW_WIDTH : wid );
+	h = (hei > MAX_PREVIEW_HEIGHT ? MAX_PREVIEW_HEIGHT : hei );
+
+	v = vp->tracks[track_num];
+	if( v )
 	{
-		vp->tracks[ track_num ]->width  = w;
-		vp->tracks[ track_num ]->height = h;
+		v->width  = w;
+		v->height = h;
 	}
 
 	if( vp->track_sync ) {
@@ -905,9 +957,9 @@ int		gvr_track_configure( void *preview, int track_num, int wid, int hei )
 		vp->track_sync->heights[track_num] = h;
 	}
 
-	if( vp->tracks[track_num]) {
-		veejay_memset(vp->tracks[track_num]->data_buffer , 0, w * h );
-		veejay_memset(vp->tracks[track_num]->data_buffer + (w*h), 128, (w * h * 2) );
+	if( v ) {
+		veejay_memset(v->data_buffer , 0, w * h );
+		veejay_memset(v->data_buffer + (w*h), 128, (w * h * 2) );
 	}
 	return 1;
 }
@@ -915,29 +967,38 @@ int		gvr_track_configure( void *preview, int track_num, int wid, int hei )
 int		gvr_get_preview_status( void *preview, int track_num )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
-	if(!vp->tracks[track_num] )
-		return 0;
-	return vp->tracks[track_num]->preview;
+	veejay_track_t *v = gvr_track_ptr(vp, track_num);
+
+	return v ? v->preview : 0;
 }
 
 
 int		gvr_track_toggle_preview( void *preview, int track_num, int status )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
-	if( track_num < vp->n_tracks ) {
-        vp->tracks[ track_num ]->preview = status;
+	veejay_track_t *v = gvr_track_ptr(vp, track_num);
 
-	    veejay_msg(VEEJAY_MSG_INFO, "Live view %dx%d with %s:%d on track %d %s",
-		    vp->tracks[ track_num ]->width,
-		    vp->tracks[ track_num ]->height,
-		    vp->tracks[ track_num ]->hostname,
-		    vp->tracks[ track_num ]->port_num,
-		    track_num,
-		    (status ? "enabled" : "disabled") );
-    }
-    else {
-        veejay_msg(0, "Track %d is not valid (valid range: 0-%d)", track_num, vp->n_tracks );
-    }
+	if(!gvr_track_index_valid(vp, track_num)) {
+		veejay_msg(0, "Track %d is not valid", track_num);
+		return 0;
+	}
+
+	if(!v) {
+		veejay_msg(VEEJAY_MSG_DEBUG,
+			"Ignoring preview toggle for unopened track %d", track_num);
+		return 0;
+	}
+
+    v->preview = status;
+
+    veejay_msg(VEEJAY_MSG_INFO, "Live view %dx%d with %s:%d on track %d %s",
+	    v->width,
+	    v->height,
+	    v->hostname,
+	    v->port_num,
+	    track_num,
+	    (status ? "enabled" : "disabled") );
+
 	return status;
 }
 
@@ -1094,8 +1155,7 @@ static	void	gvr_parse_track_list( veejay_preview_t *vp, veejay_track_t *v, unsig
 int		gvr_get_stream_id( void  *data, int id )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) data;
-
-	veejay_track_t *v = vp->tracks[id];
+	veejay_track_t *v = gvr_track_ptr(vp, id);
 
 	if(v)
 		return v->track_list[id];

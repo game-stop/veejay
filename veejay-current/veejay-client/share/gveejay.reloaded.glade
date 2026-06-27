@@ -106,6 +106,27 @@
     <property name="step-increment">1</property>
     <property name="page-increment">4</property>
   </object>
+  <object class="GtkAdjustment" id="sample_volume_adj">
+    <property name="lower">0</property>
+    <property name="upper">100</property>
+    <property name="value">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="audio_master_jack_volume_adj">
+    <property name="lower">0</property>
+    <property name="upper">100</property>
+    <property name="value">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="audio_mixer_crossfade_adj">
+    <property name="lower">0</property>
+    <property name="upper">100</property>
+    <property name="value">50</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
   <object class="GtkWindow">
     <property name="can-focus">False</property>
     <child>
@@ -131,6 +152,19 @@
     <property name="value">1</property>
     <property name="step-increment">1</property>
     <property name="page-increment">5</property>
+  </object>
+  <object class="GtkAdjustment" id="curve_animation_seed">
+    <property name="lower">0</property>
+    <property name="upper">999999</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">100</property>
+  </object>
+  <object class="GtkAdjustment" id="curve_animation_detail">
+    <property name="lower">1</property>
+    <property name="upper">64</property>
+    <property name="value">8</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">4</property>
   </object>
   <object class="GtkAdjustment" id="dummy_duration">
     <property name="upper">1000000</property>
@@ -3754,6 +3788,26 @@
     <property name="page-increment">100</property>
   </object>
   <object class="GtkAdjustment" id="v4l_sharpnes">
+    <property name="upper">65535</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">100</property>
+  </object>
+  <object class="GtkAdjustment" id="v4l_temperaturea">
+    <property name="upper">65535</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">100</property>
+  </object>
+  <object class="GtkAdjustment" id="v4l_exposurea">
+    <property name="upper">65535</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">100</property>
+  </object>
+  <object class="GtkAdjustment" id="v4l_black_levela">
+    <property name="upper">65535</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">100</property>
+  </object>
+  <object class="GtkAdjustment" id="v4l_whitenessa">
     <property name="upper">65535</property>
     <property name="step-increment">1</property>
     <property name="page-increment">100</property>
@@ -9595,8 +9649,8 @@
                             <property name="visible">True</property>
                             <property name="can-focus">False</property>
                             <property name="halign">end</property>
-                            <property name="margin-top">8</property>
-                            <property name="margin-bottom">8</property>
+                            <property name="margin-top">2</property>
+                            <property name="margin-bottom">2</property>
                             <child>
                               <object class="GtkRadioButton" id="curve_typelinear">
                                 <property name="label" translatable="yes">Linear</property>
@@ -9834,6 +9888,97 @@
                         <property name="expand">False</property>
                         <property name="fill">True</property>
                         <property name="position">3</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkBox" id="fxanim_shape_seed_controls">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">end</property>
+                        <property name="spacing">4</property>
+                        <property name="margin-bottom">2</property>
+                        <child>
+                          <object class="GtkLabel" id="curve_label_animation_seed">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="tooltip-text" translatable="yes">Deterministic seed for random animation shapes</property>
+                            <property name="label" translatable="yes">Seed</property>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">0</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkSpinButton" id="curve_spin_animation_seed">
+                            <property name="width-request">76</property>
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="tooltip-text" translatable="yes">Seed used by deterministic random shapes</property>
+                            <property name="adjustment">curve_animation_seed</property>
+                            <property name="snap-to-ticks">True</property>
+                            <property name="numeric">True</property>
+                            <property name="wrap">True</property>
+                            <signal name="value-changed" handler="on_curve_animation_changed" swapped="no"/>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">1</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="curve_button_animation_shuffle">
+                            <property name="label" translatable="yes">Shuffle</property>
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="receives-default">False</property>
+                            <property name="tooltip-text" translatable="yes">Pick another deterministic seed</property>
+                            <signal name="clicked" handler="on_curve_button_animation_shuffle_clicked" swapped="no"/>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">2</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkLabel" id="curve_label_animation_detail">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="tooltip-text" translatable="yes">Detail controls random motif density and stepped levels</property>
+                            <property name="label" translatable="yes">Detail</property>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">3</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkSpinButton" id="curve_spin_animation_detail">
+                            <property name="width-request">54</property>
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="tooltip-text" translatable="yes">Detail for random and stepped shapes</property>
+                            <property name="adjustment">curve_animation_detail</property>
+                            <property name="snap-to-ticks">True</property>
+                            <property name="numeric">True</property>
+                            <property name="wrap">True</property>
+                            <signal name="value-changed" handler="on_curve_animation_changed" swapped="no"/>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">4</property>
+                          </packing>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">4</property>
                       </packing>
                     </child>
                   </object>
@@ -11662,6 +11807,147 @@
                                             <property name="left-attach">1</property>
                                             <property name="top-attach">2</property>
                                             <property name="width">2</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_master_jack_volume_label">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">JACK volume</property>
+                                            <property name="tooltip-text" translatable="yes">Output volume for JACK external audio playback.</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">3</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkScale" id="audio_master_jack_volume_scale">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="tooltip-text" translatable="yes">Set JACK external audio volume, from muted to full level.</property>
+                                            <property name="hexpand">True</property>
+                                            <property name="adjustment">audio_master_jack_volume_adj</property>
+                                            <property name="round-digits">0</property>
+                                            <property name="digits">0</property>
+                                            <property name="draw-value">False</property>
+                                            <signal name="value-changed" handler="on_audio_master_jack_volume_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">1</property>
+                                            <property name="top-attach">3</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="audio_master_jack_volume_spin">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="tooltip-text" translatable="yes">Set JACK external audio volume, from muted to full level.</property>
+                                            <property name="adjustment">audio_master_jack_volume_adj</property>
+                                            <property name="numeric">True</property>
+                                            <property name="width-chars">6</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">2</property>
+                                            <property name="top-attach">3</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_mixer_mode_label">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">Audio mixer</property>
+                                            <property name="tooltip-text" translatable="yes">Choose how original video audio and JACK external input are routed to the output.</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">4</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkComboBoxText" id="audio_mixer_mode_combo">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="active">0</property>
+                                            <property name="hexpand">True</property>
+                                            <property name="tooltip-text" translatable="yes">Manual master mixer mode. Follow current route keeps the existing audio behaviour; the crossfade slider drives Original only, blended mix, and JACK external only.</property>
+                                            <items>
+                                              <item translatable="yes">Follow current route</item>
+                                              <item translatable="yes">Original only</item>
+                                              <item translatable="yes">JACK external only</item>
+                                              <item translatable="yes">Original + JACK external</item>
+                                            </items>
+                                            <signal name="changed" handler="on_audio_mixer_mode_combo_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">1</property>
+                                            <property name="top-attach">4</property>
+                                            <property name="width">2</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="audio_mixer_crossfade_label">
+                                            <property name="visible">True</property>
+                                            <property name="sensitive">False</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="label" translatable="yes">Crossfade</property>
+                                            <property name="tooltip-text" translatable="yes">Equal-power mixer crossfade: 0 switches to Original only, 1-99 blends Original + JACK external, and 100 switches to JACK external only.</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">5</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkScale" id="audio_mixer_crossfade_scale">
+                                            <property name="visible">True</property>
+                                            <property name="sensitive">False</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="tooltip-text" translatable="yes">Move left for original audio, right for JACK external input; endpoints switch mixer mode automatically.</property>
+                                            <property name="hexpand">True</property>
+                                            <property name="adjustment">audio_mixer_crossfade_adj</property>
+                                            <property name="round-digits">0</property>
+                                            <property name="digits">0</property>
+                                            <property name="draw-value">False</property>
+                                            <signal name="value-changed" handler="on_audio_mixer_crossfade_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">1</property>
+                                            <property name="top-attach">5</property>
+                                            <property name="width">1</property>
+                                            <property name="height">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="audio_mixer_crossfade_spin">
+                                            <property name="visible">True</property>
+                                            <property name="sensitive">False</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="tooltip-text" translatable="yes">Move left for original audio, right for JACK external input; endpoints switch mixer mode automatically.</property>
+                                            <property name="adjustment">audio_mixer_crossfade_adj</property>
+                                            <property name="numeric">True</property>
+                                            <property name="width-chars">6</property>
+                                            <signal name="value-changed" handler="on_audio_mixer_crossfade_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">2</property>
+                                            <property name="top-attach">5</property>
+                                            <property name="width">1</property>
                                             <property name="height">1</property>
                                           </packing>
                                         </child>
@@ -14513,6 +14799,52 @@
                                             <property name="top-attach">4</property>
                                           </packing>
                                         </child>
+                                        <child>
+                                          <object class="GtkLabel" id="sample_volume_label">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="tooltip-text" translatable="yes">Per-sample audio attenuation. This controls the selected sample's original video/audio volume.</property>
+                                            <property name="label" translatable="yes">Sample volume</property>
+                                            <property name="width-chars">22</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">0</property>
+                                            <property name="top-attach">5</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkScale" id="sample_volume_scale">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="tooltip-text" translatable="yes">Set volume for the current sample, from muted to full level.</property>
+                                            <property name="hexpand">True</property>
+                                            <property name="adjustment">sample_volume_adj</property>
+                                            <property name="round-digits">0</property>
+                                            <property name="digits">0</property>
+                                            <property name="draw-value">False</property>
+                                            <signal name="value-changed" handler="on_sample_volume_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">1</property>
+                                            <property name="top-attach">5</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="sample_volume_spin">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="tooltip-text" translatable="yes">Set volume for the current sample, from muted to full level.</property>
+                                            <property name="halign">start</property>
+                                            <property name="width-chars">6</property>
+                                            <property name="adjustment">sample_volume_adj</property>
+                                            <property name="numeric">True</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left-attach">2</property>
+                                            <property name="top-attach">5</property>
+                                          </packing>
+                                        </child>
                                       </object>
                                     </child>
                                     <child type="label">
@@ -16812,6 +17144,7 @@
                                                       <object class="GtkScale" id="v4l_temperature">
                                                         <property name="visible">True</property>
                                                         <property name="can-focus">True</property>
+                                                        <property name="adjustment">v4l_temperaturea</property>
                                                         <property name="round-digits">2</property>
                                                         <property name="digits">2</property>
                                                         <signal name="value-changed" handler="on_v4l_temperature_value_changed" swapped="no"/>
@@ -16853,6 +17186,7 @@
                                                       <object class="GtkScale" id="v4l_exposure">
                                                         <property name="visible">True</property>
                                                         <property name="can-focus">True</property>
+                                                        <property name="adjustment">v4l_exposurea</property>
                                                         <property name="round-digits">2</property>
                                                         <property name="digits">2</property>
                                                         <signal name="value-changed" handler="on_v4l_exposure_value_changed" swapped="no"/>
@@ -16866,6 +17200,7 @@
                                                       <object class="GtkScale" id="v4l_black_level">
                                                         <property name="visible">True</property>
                                                         <property name="can-focus">True</property>
+                                                        <property name="adjustment">v4l_black_levela</property>
                                                         <property name="round-digits">2</property>
                                                         <property name="digits">2</property>
                                                         <signal name="value-changed" handler="on_v4l_black_level_value_changed" swapped="no"/>
@@ -16879,6 +17214,7 @@
                                                       <object class="GtkScale" id="v4l_whiteness">
                                                         <property name="visible">True</property>
                                                         <property name="can-focus">True</property>
+                                                        <property name="adjustment">v4l_whitenessa</property>
                                                         <property name="round-digits">2</property>
                                                         <property name="digits">2</property>
                                                         <signal name="value-changed" handler="on_v4l_whiteness_value_changed" swapped="no"/>

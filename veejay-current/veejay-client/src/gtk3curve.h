@@ -37,6 +37,12 @@ typedef enum
   GTK3_CURVE_TYPE_FREE
 } Gtk3CurveType;
 
+typedef enum
+{
+  GTK3_CURVE_LIVE_TRACE_DOMAIN_FRAME,
+  GTK3_CURVE_LIVE_TRACE_DOMAIN_CLOCK
+} Gtk3CurveLiveTraceDomain;
+
 typedef struct _Gtk3Curve           Gtk3Curve;
 typedef struct _Gtk3CurveClass      Gtk3CurveClass;
 typedef struct _Gtk3CurvePrivate    Gtk3CurvePrivate;
@@ -171,6 +177,12 @@ void gtk3_curve_clear(GtkWidget *widget);
 
 void gtk3_curve_live_trace_clear(GtkWidget *widget);
 void gtk3_curve_live_trace_set_enabled(GtkWidget *widget, gboolean enabled);
+void gtk3_curve_live_trace_set_user_override(GtkWidget *widget, gboolean enabled);
+gboolean gtk3_curve_live_trace_get_user_override(GtkWidget *widget);
+void gtk3_curve_live_trace_set_domain(GtkWidget              *widget,
+                                      Gtk3CurveLiveTraceDomain domain,
+                                      gfloat                  min_x,
+                                      gfloat                  max_x);
 void gtk3_curve_live_trace_push(GtkWidget   *widget,
                                 gint         trace,
                                 gfloat       value,

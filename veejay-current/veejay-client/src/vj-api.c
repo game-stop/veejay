@@ -577,6 +577,18 @@ enum {
   WIDGET_SAMPLE_HOLD_HBOX = 401,
   WIDGET_SAMPLE_HOLD_FRAMES = 402,
   WIDGET_SAMPLE_HOLD_BUTTON = 403,
+  WIDGET_SAMPLE_VOLUME_SCALE = 404,
+  WIDGET_SAMPLE_VOLUME_SPIN = 405,
+  WIDGET_AUDIO_MASTER_JACK_VOLUME_SCALE = 406,
+  WIDGET_AUDIO_MASTER_JACK_VOLUME_SPIN = 407,
+  WIDGET_AUDIO_MIXER_MODE_LABEL = 408,
+  WIDGET_AUDIO_MIXER_MODE_COMBO = 409,
+  WIDGET_AUDIO_MIXER_CROSSFADE_LABEL = 410,
+  WIDGET_AUDIO_MIXER_CROSSFADE_SCALE = 411,
+  WIDGET_AUDIO_MIXER_CROSSFADE_SPIN = 412,
+  WIDGET_CURVE_SPIN_ANIMATION_SEED = 413,
+  WIDGET_CURVE_BUTTON_ANIMATION_SHUFFLE = 414,
+  WIDGET_CURVE_SPIN_ANIMATION_DETAIL = 415,
 };
 
 
@@ -938,6 +950,9 @@ static struct
     { "frame_fxtree3",          WIDGET_FRAME_FXTREE3 },
     { "curve_combo_animation",  WIDGET_CURVE_ANIMATION_LIST },
     { "curve_spin_animation_shape", WIDGET_CURVE_SPIN_ANIMATION_SHAPE },
+    { "curve_spin_animation_seed", WIDGET_CURVE_SPIN_ANIMATION_SEED },
+    { "curve_button_animation_shuffle", WIDGET_CURVE_BUTTON_ANIMATION_SHUFFLE },
+    { "curve_spin_animation_detail", WIDGET_CURVE_SPIN_ANIMATION_DETAIL },
     { "curve_toggleanimation_shape", WIDGET_CURVE_TOGGLE_ANIMATION_SHAPE },
     { "curve_scalebuttonbound_min", WIDGET_CURVE_BUTTON_BOUND_MIN },
     { "curve_scalebuttonbound_max", WIDGET_CURVE_BUTTON_BOUND_MAX },
@@ -973,6 +988,15 @@ static struct
     {"sample_hold_hbox",         WIDGET_SAMPLE_HOLD_HBOX },
     {"sample_hold_frames",       WIDGET_SAMPLE_HOLD_FRAMES },
     {"sample_hold_button",       WIDGET_SAMPLE_HOLD_BUTTON },
+    {"sample_volume_scale",      WIDGET_SAMPLE_VOLUME_SCALE },
+    {"sample_volume_spin",       WIDGET_SAMPLE_VOLUME_SPIN },
+    {"audio_master_jack_volume_scale", WIDGET_AUDIO_MASTER_JACK_VOLUME_SCALE },
+    {"audio_master_jack_volume_spin",  WIDGET_AUDIO_MASTER_JACK_VOLUME_SPIN },
+    {"audio_mixer_mode_label",         WIDGET_AUDIO_MIXER_MODE_LABEL },
+    {"audio_mixer_mode_combo",         WIDGET_AUDIO_MIXER_MODE_COMBO },
+    {"audio_mixer_crossfade_label",    WIDGET_AUDIO_MIXER_CROSSFADE_LABEL },
+    {"audio_mixer_crossfade_scale",    WIDGET_AUDIO_MIXER_CROSSFADE_SCALE },
+    {"audio_mixer_crossfade_spin",     WIDGET_AUDIO_MIXER_CROSSFADE_SPIN },
     {"samplegrid_frame",         WIDGET_SAMPLEGRID_FRAME },
     {"markerframe",              WIDGET_MARKERFRAME },
     {"fxanimcontrols",           WIDGET_FXANIMCONTROLS },
@@ -2110,6 +2134,7 @@ gchar *_utf8str( const char *c_str );
 static gchar *recv_vims(int len, int *bytes_written);
 static gchar *recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1, int *arg2);
 static GdkPixbuf *update_pixmap_entry( int status );
+static void clear_chain_row_in_tree(int entry);
 static gboolean chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,gpointer data);
 int resize_primary_ratio_y(void);
 int resize_primary_ratio_x(void);
@@ -4745,6 +4770,7 @@ static void vj_kf_reset_panel(void)
     gtk3_curve_set_x_timeline(info->curve, 0.0f, (gfloat)max_x);
     gtk3_curve_set_x_view(info->curve, 0.0f, (gfloat)max_x);
     curve_set_position(info->curve, (gdouble)pos);
+    curve_live_preview_user_override(FALSE);
 
     update_spin_range2( widget_cache[WIDGET_CURVE_SPINSTART], 0, max_x, lo );
     update_spin_range2( widget_cache[WIDGET_CURVE_SPINEND], 0, max_x, hi );
@@ -4792,10 +4818,53 @@ static void vj_kf_refresh(gboolean force)
 
 static void vj_kf_select_parameter(int num)
 {
+    if(info && info->curve && GTK3_IS_CURVE(info->curve))
+        curve_live_preview_user_override(FALSE);
+
     info->uc.selected_parameter_id = num;
     info->uc.reload_hint_checksums[HINT_KF] = -1;
 }
 
+
+static Gtk3CurveType vj_kf_selected_curve_type_from_ui(void)
+{
+    if(widget_cache[WIDGET_CURVE_TYPESPLINE] &&
+       gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPESPLINE])))
+        return GTK3_CURVE_TYPE_SPLINE;
+
+    if(widget_cache[WIDGET_CURVE_TYPEFREEHAND] &&
+       gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPEFREEHAND])))
+        return GTK3_CURVE_TYPE_FREE;
+
+    return GTK3_CURVE_TYPE_LINEAR;
+}
+
+static void vj_kf_set_curve_type_button_locked(Gtk3CurveType curve_type)
+{
+    GtkWidget *button = widget_cache[WIDGET_CURVE_TYPELINEAR];
+    int old_lock = info->status_lock;
+
+    switch(curve_type) {
+        case GTK3_CURVE_TYPE_SPLINE:
+            button = widget_cache[WIDGET_CURVE_TYPESPLINE];
+            break;
+        case GTK3_CURVE_TYPE_FREE:
+            button = widget_cache[WIDGET_CURVE_TYPEFREEHAND];
+            break;
+        case GTK3_CURVE_TYPE_LINEAR:
+        default:
+            button = widget_cache[WIDGET_CURVE_TYPELINEAR];
+            break;
+    }
+
+    if(!button || !GTK_IS_TOGGLE_BUTTON(button))
+        return;
+
+    info->status_lock = 1;
+    if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(button)))
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), TRUE);
+    info->status_lock = old_lock;
+}
 
 static void update_curve_widget(GtkWidget *curve)
 {
@@ -4808,6 +4877,9 @@ static void update_curve_widget(GtkWidget *curve)
     int status = 0;
 
     if(info->uc.selected_parameter_id < 0) {
+        if(curve && GTK3_IS_CURVE(curve))
+            curve_live_preview_user_override(FALSE);
+
         static int last_none_pm = INT_MIN;
         int pm = info->status_tokens[PLAY_MODE];
         int len = 1;
@@ -4898,27 +4970,27 @@ static void update_curve_widget(GtkWidget *curve)
     reset_curve(curve);
 
 
+    int total_frames = vj_kf_timeline_length();
+    int max_x = (total_frames > 1 ? total_frames - 1 : 1);
+
     if( lo == hi && hi == 0 )
     {
-        if( info->status_tokens[PLAY_MODE] == MODE_SAMPLE ) {
-            lo = info->status_tokens[SAMPLE_START];
-            hi = info->status_tokens[SAMPLE_END];
-        } else {
-            lo = 0;
-            hi = (info->status_tokens[PLAY_MODE] == MODE_STREAM ?
-                  info->status_tokens[SAMPLE_MARKER_END] :
-                  info->status_tokens[TOTAL_FRAMES]);
-        }
+        lo = 0;
+        hi = max_x;
     }
 
-    int total_frames = (info->status_tokens[PLAY_MODE] == MODE_STREAM ?
-                        info->status_tokens[SAMPLE_MARKER_END] :
-                        info->status_tokens[TOTAL_FRAMES]);
-    if(total_frames < 1)
-        total_frames = 1;
+    if(lo < 0)
+        lo = 0;
+    else if(lo > max_x)
+        lo = max_x;
 
-    update_spin_range2( widget_cache[WIDGET_CURVE_SPINSTART],0, total_frames, lo );
-    update_spin_range2( widget_cache[WIDGET_CURVE_SPINEND], 0, total_frames, hi );
+    if(hi < 0)
+        hi = 0;
+    else if(hi > max_x)
+        hi = max_x;
+
+    update_spin_range2( widget_cache[WIDGET_CURVE_SPINSTART],0, max_x, lo );
+    update_spin_range2( widget_cache[WIDGET_CURVE_SPINEND], 0, max_x, hi );
 
     if( blob && blen > 0 )
     {
@@ -4928,51 +5000,63 @@ static void update_curve_widget(GtkWidget *curve)
             int selected_parameter_id = info->uc.selected_parameter_id;
 
             if(p != selected_parameter_id) {
+                Gtk3CurveType ui_type = vj_kf_selected_curve_type_from_ui();
+                int old_lock = info->status_lock;
+
                 reset_curve(curve);
-                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPELINEAR]), TRUE );
-                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE );
+                if(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM] &&
+                   GTK_IS_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM])) {
+                    info->status_lock = 1;
+                    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE);
+                    info->status_lock = old_lock;
+                }
                 set_initial_curve( curve, info->uc.entry_tokens[ENTRY_FXID], selected_parameter_id,
                                    lo, hi,
                                    info->uc.entry_tokens[ENTRY_P0 + selected_parameter_id],
                                    (double) info->el.fps);
+                set_points_in_curve(ui_type, curve);
                 update_slider_state(selected_parameter_id, FALSE);
                 if(blob) free(blob);
                 return;
             }
 
-            switch( curve_type )
             {
-                case GTK3_CURVE_TYPE_SPLINE:
-                    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPESPLINE]), TRUE );
-                    break;
-                case GTK3_CURVE_TYPE_FREE:
-                    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPEFREEHAND]), TRUE);
-                    break;
-                default:
-                    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPELINEAR]), TRUE );
-                    break;
-            }
-            if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM])) != status ) {
-                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), status );
-            }
+                int old_lock = info->status_lock;
+                info->status_lock = 1;
 
+                vj_kf_set_curve_type_button_locked((Gtk3CurveType)curve_type);
+                set_points_in_curve((Gtk3CurveType)curve_type, curve);
+                if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM])) != status ) {
+                    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), status );
+                }
 
+                if(gtk_combo_box_get_active(GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION])) != shape) {
+                    gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]), shape);
+                }
 
-
-            if(gtk_combo_box_get_active(GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION])) != shape) {
-                gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]), shape);
+                info->status_lock = old_lock;
             }
 
             update_slider_state( selected_parameter_id, status );
+            curve_live_preview_user_override(status ? TRUE : FALSE);
         }
     } else {
-        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPELINEAR]), TRUE );
-        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE );
+        Gtk3CurveType ui_type = vj_kf_selected_curve_type_from_ui();
+        int old_lock = info->status_lock;
+
+        if(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM] &&
+           GTK_IS_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM])) {
+            info->status_lock = 1;
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE);
+            info->status_lock = old_lock;
+        }
         set_initial_curve( curve, info->uc.entry_tokens[ENTRY_FXID], info->uc.selected_parameter_id,
                            lo, hi ,
                            info->uc.entry_tokens[ ENTRY_P0 + info->uc.selected_parameter_id ],
                            (double) info->el.fps);
+        set_points_in_curve(ui_type, curve);
         update_slider_state( info->uc.selected_parameter_id, FALSE );
+        curve_live_preview_user_override(FALSE);
     }
 
     if(blob) free(blob);
@@ -5481,6 +5565,49 @@ static  GdkPixbuf   *update_pixmap_entry( int status )
     return icon;
 }
 
+static void chain_clear_row(GtkListStore *store, GtkTreeIter *iter, int entry)
+{
+    gtk_list_store_set(store, iter,
+                       FXC_ID, entry,
+                       FXC_FXID, " ",
+                       FXC_FXSTATUS, NULL,
+                       FXC_BEAT, NULL,
+                       FXC_KF, NULL,
+                       FXC_MIXING, " ",
+                       FXC_SUBRENDER, NULL,
+                       FXC_KF_STATUS, 0,
+                       -1);
+}
+
+static void clear_chain_row_in_tree(int entry)
+{
+    if(entry < 0 || entry >= SAMPLE_MAX_EFFECTS)
+        return;
+
+    GtkWidget *tree = glade_xml_get_widget_(info->main_window, "tree_chain");
+
+    if(!tree || !GTK_IS_TREE_VIEW(tree))
+        return;
+
+    GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(tree));
+
+    if(!model || !GTK_IS_LIST_STORE(model))
+        return;
+
+    GtkTreeIter iter;
+    gboolean valid = gtk_tree_model_get_iter_first(model, &iter);
+
+    while(valid) {
+        gint gentry = -1;
+        gtk_tree_model_get(model, &iter, FXC_ID, &gentry, -1);
+        if(gentry == entry) {
+            chain_clear_row(GTK_LIST_STORE(model), &iter, entry);
+            return;
+        }
+        valid = gtk_tree_model_iter_next(model, &iter);
+    }
+}
+
 static gboolean chain_update_row(GtkTreeModel * model,
                                  GtkTreePath * path,
                                  GtkTreeIter * iter,
@@ -5499,7 +5626,7 @@ static gboolean chain_update_row(GtkTreeModel * model,
         int effect_id = gui->uc.entry_tokens[ENTRY_FXID];
         if(effect_id <= 0)
         {
-            gtk_list_store_set(GTK_LIST_STORE(model), iter, FXC_ID, entry, -1);
+            chain_clear_row(GTK_LIST_STORE(model), iter, entry);
         }
         else
         {
@@ -5671,6 +5798,7 @@ static void update_current_slot(int *history, int pm, int last_pm) {
         int k;
         update = 1;
         update_record_tab( pm );
+        sample_volume_sync_from_current(pm);
 
         if( info->status_tokens[STREAM_TYPE] == STREAM_VIDEO4LINUX )
         {
@@ -6391,6 +6519,9 @@ static void load_v4l_info(void)
 
         int i;
         int n = CAPT_CARD_SLIDERS;
+        int old_lock = info->status_lock;
+        info->status_lock = 1;
+
         for(i = 0; i < n; i ++ )
         {
             if( values[i] < 0 ) {
@@ -6400,7 +6531,7 @@ static void load_v4l_info(void)
             else {
                 show_widget( capt_card_set[i].name );
                 show_widget( capt_label_set[i].name);
-                update_slider_gvalue( capt_card_set[i].name, (gdouble)values[i]/65535.0 );
+                update_slider_gvalue( capt_card_set[i].name, (gdouble)values[i] );
             }
         }
         n += CAPT_CARD_BOOLS;
@@ -6415,6 +6546,8 @@ static void load_v4l_info(void)
                 set_toggle_button( capt_card_set[i].name, values[i] );
             }
         }
+
+        info->status_lock = old_lock;
         free(answer);
     }
 }
@@ -6524,27 +6657,6 @@ static gint load_parameter_info(void)
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_CHAIN_TOGGLEENTRY])) != p[ENTRY_KF_STATUS]){
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_CHAIN_TOGGLEENTRY]), p[ENTRY_KF_STATUS]);
-    }
-
-    switch(p[ENTRY_KF_TYPE])
-    {
-        case GTK3_CURVE_TYPE_SPLINE:
-            if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPESPLINE]))) {
-                gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPESPLINE]), TRUE);
-             }
-             break;
-        case GTK3_CURVE_TYPE_FREE:
-             if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPEFREEHAND]))) {
-                 gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPEFREEHAND]), TRUE);
-             }
-             break;
-        case GTK3_CURVE_TYPE_LINEAR:
-            if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPELINEAR]))) {
-                 gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPELINEAR]), TRUE);
-            }
-            break;
-        default:
-            break;
     }
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SUBRENDER_ENTRY_TOGGLE])) != p[ENTRY_SUBRENDER_ENTRY]) {
@@ -7528,6 +7640,12 @@ static unsigned int sequence_parse_fixed_uint(const char *text, int width)
 static int sequence_ui_requested_bank = 0;
 static int sequence_ui_bank_select_pending = 0;
 static int sequence_ui_play_grid_requested = 0;
+static int sequence_ui_selected_bank_mask = 1;
+static int sequence_ui_bank_mask_pending = 0;
+static int sequence_ui_bank_button_sync = 0;
+static GtkWidget *sequence_ui_bank_buttons[VJ_SEQUENCE_BANKS];
+
+static void sequence_ui_request_bank(int bank);
 
 void sequence_ui_set_play_grid_requested(int enabled)
 {
@@ -7558,6 +7676,120 @@ static int sequence_ui_active_bank(void)
     return bank;
 }
 
+static int sequence_ui_all_bank_mask(void)
+{
+    return (1 << VJ_SEQUENCE_BANKS) - 1;
+}
+
+static int sequence_ui_normalize_bank_mask(int mask, int active_bank)
+{
+    if(active_bank < 0 || active_bank >= VJ_SEQUENCE_BANKS)
+        active_bank = sequence_ui_active_bank();
+
+    mask &= sequence_ui_all_bank_mask();
+    if(mask == 0)
+        mask = (1 << active_bank);
+
+    mask |= (1 << active_bank);
+    return mask;
+}
+
+static int sequence_ui_current_bank_mask(void)
+{
+    int active_bank = sequence_ui_active_bank();
+    int mask = info->status_tokens[STATUS_SEQUENCE_RESERVED];
+
+    if(sequence_ui_bank_mask_pending) {
+        int local_mask = sequence_ui_normalize_bank_mask(sequence_ui_selected_bank_mask, active_bank);
+        int status_mask = sequence_ui_normalize_bank_mask(mask, active_bank);
+
+        if(mask > 0 && status_mask == local_mask)
+            sequence_ui_bank_mask_pending = 0;
+        else
+            mask = local_mask;
+    }
+    else if(mask <= 0) {
+        mask = sequence_ui_selected_bank_mask;
+    }
+
+    mask = sequence_ui_normalize_bank_mask(mask, active_bank);
+    sequence_ui_selected_bank_mask = mask;
+
+    return mask;
+}
+
+static void sequence_ui_sync_play_grid_toggle(int active)
+{
+    GtkWidget *w = widget_cache[WIDGET_SEQACTIVE];
+
+    sequence_ui_set_play_grid_requested(active != 0);
+
+    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+        return;
+
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == (active != 0))
+        return;
+
+    int old_lock = info->status_lock;
+    info->status_lock = 1;
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), active != 0);
+    info->status_lock = old_lock;
+}
+
+static void sequence_ui_sync_bank_buttons(int active_bank, int mask)
+{
+    if(active_bank < 0 || active_bank >= VJ_SEQUENCE_BANKS)
+        active_bank = 0;
+
+    mask = sequence_ui_normalize_bank_mask(mask, active_bank);
+    sequence_ui_selected_bank_mask = mask;
+
+    sequence_ui_bank_button_sync = 1;
+    for(int bank = 0; bank < VJ_SEQUENCE_BANKS; bank++) {
+        GtkWidget *button = sequence_ui_bank_buttons[bank];
+        if(!button || !GTK_IS_TOGGLE_BUTTON(button))
+            continue;
+
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button),
+                                     (mask & (1 << bank)) != 0);
+    }
+    sequence_ui_bank_button_sync = 0;
+}
+
+static void sequence_ui_send_bank_select(int bank, int mask)
+{
+    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
+        return;
+
+    mask = sequence_ui_normalize_bank_mask(mask, bank);
+    sequence_ui_selected_bank_mask = mask;
+    sequence_ui_bank_mask_pending = 1;
+
+    sequence_ui_request_bank(bank);
+    multi_vims(VIMS_SEQUENCE_SELECT, "%d %d", bank, mask);
+
+    if(info->sequence_bank_view) {
+        gvr_sequence_bank_view_set_selected_bank(info->sequence_bank_view, bank);
+        gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+    }
+
+    sequence_ui_sync_bank_buttons(bank, mask);
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+static void sequence_ui_send_bank_mask_only(int mask)
+{
+    int active_bank = sequence_ui_active_bank();
+
+    mask = sequence_ui_normalize_bank_mask(mask, active_bank);
+    sequence_ui_selected_bank_mask = mask;
+    sequence_ui_bank_mask_pending = 1;
+
+    multi_vims(VIMS_SEQUENCE_SELECT, "%d %d", active_bank, mask);
+    sequence_ui_sync_bank_buttons(active_bank, mask);
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
 static void sequence_ui_request_bank(int bank)
 {
     if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
@@ -7580,6 +7812,12 @@ static void sequence_ui_status_bank_seen(int bank)
 
 static int sequence_ui_target_bank(void)
 {
+    if(info && info->sequence_bank_view) {
+        int selected_bank = gvr_sequence_bank_view_get_selected_bank(info->sequence_bank_view);
+        if(selected_bank >= 0 && selected_bank < VJ_SEQUENCE_BANKS)
+            return selected_bank;
+    }
+
     if(sequence_ui_requested_bank < 0 || sequence_ui_requested_bank >= VJ_SEQUENCE_BANKS)
         sequence_ui_requested_bank = sequence_ui_active_bank();
 
@@ -7623,20 +7861,6 @@ static void sequence_ui_rearm_play_grid_for_bank(int bank)
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
-static int sequence_ui_confirm_clear_bank(int bank)
-{
-    char msg[160];
-
-    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
-        bank = 0;
-
-    snprintf(msg, sizeof(msg),
-             "Clear sequence bank %d?\nThis cannot be undone.",
-             bank + 1);
-
-    return prompt_dialog("Clear Sequence Bank", msg) == GTK_RESPONSE_ACCEPT;
-}
-
 static void sequence_bank_view_set_active_status(void)
 {
     if(!info->sequence_bank_view)
@@ -7644,10 +7868,14 @@ static void sequence_bank_view_set_active_status(void)
 
     int bank = sequence_ui_active_bank();
     int playing = normalize_sequence_slot(info->status_tokens[SEQ_CUR], SEQUENCER_COL * SEQUENCER_ROW);
+    int active = info->status_tokens[SEQ_ACT] != 0;
+    int mask = sequence_ui_current_bank_mask();
 
     sequence_ui_status_bank_seen(bank);
+    sequence_ui_sync_play_grid_toggle(active);
+    sequence_ui_sync_bank_buttons(bank, mask);
     gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
-    gvr_sequence_bank_view_set_sequence_active(info->sequence_bank_view, info->status_tokens[SEQ_ACT] != 0);
+    gvr_sequence_bank_view_set_sequence_active(info->sequence_bank_view, active);
     gvr_sequence_bank_view_set_current_slot(info->sequence_bank_view, bank, playing);
 }
 
@@ -7675,6 +7903,9 @@ static void load_sequence_list_legacy(void)
     int bank = sequence_ui_active_bank();
 
     sscanf( text, "%04d%04d%4d",&playing,&size,&active );
+
+    sequence_ui_sync_play_grid_toggle(active != 0);
+    sequence_ui_sync_bank_buttons(bank, sequence_ui_current_bank_mask());
 
     if(info->sequence_bank_view) {
         gvr_sequence_bank_view_clear_bank(info->sequence_bank_view, bank);
@@ -7715,6 +7946,7 @@ static void load_sequence_list(void)
         int checksum = data_checksum(text,len);
         checksum ^= info->status_tokens[STATUS_SEQUENCE_ACTIVE_BANK] * 131;
         checksum ^= info->status_tokens[STATUS_SEQUENCE_REVISION] * 257;
+        checksum ^= info->status_tokens[STATUS_SEQUENCE_RESERVED] * 389;
 
         if( info->uc.reload_hint_checksums[HINT_SEQ_ACT] == checksum ) {
             free(text);
@@ -7731,6 +7963,10 @@ static void load_sequence_list(void)
 
         if(active_bank < 0 || active_bank >= VJ_SEQUENCE_BANKS)
             active_bank = 0;
+
+        sequence_ui_status_bank_seen(active_bank);
+        sequence_ui_sync_play_grid_toggle(seq_active != 0);
+        sequence_ui_sync_bank_buttons(active_bank, sequence_ui_current_bank_mask());
 
         if(info->sequence_bank_view) {
             gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, active_bank);
@@ -9395,12 +9631,19 @@ static void update_sequence_playing_from_status(void)
 {
     const int n_slots = info->sequencer_col * info->sequencer_row;
 
+    const int seq_cur_raw = info->status_tokens[SEQ_CUR];
+    const int seq_act_raw = info->status_tokens[SEQ_ACT];
+    const gboolean active = (seq_act_raw != 0);
+
+    sequence_ui_sync_play_grid_toggle(active);
+
     if(info->sequence_bank_view) {
         int bank = sequence_ui_active_bank();
-        int playing = normalize_sequence_slot(info->status_tokens[SEQ_CUR], n_slots);
+        int playing = normalize_sequence_slot(seq_cur_raw, n_slots);
         sequence_ui_status_bank_seen(bank);
+        sequence_ui_sync_bank_buttons(bank, sequence_ui_current_bank_mask());
         gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
-        gvr_sequence_bank_view_set_sequence_active(info->sequence_bank_view, info->status_tokens[SEQ_ACT] != 0);
+        gvr_sequence_bank_view_set_sequence_active(info->sequence_bank_view, active);
         gvr_sequence_bank_view_set_current_slot(info->sequence_bank_view, bank, playing);
     }
 
@@ -9408,14 +9651,7 @@ static void update_sequence_playing_from_status(void)
         return;
 
 
-    const int seq_cur_raw = info->status_tokens[SEQ_CUR];
-    const int seq_act_raw = info->status_tokens[SEQ_ACT];
-
     const int playing = normalize_sequence_slot(seq_cur_raw, n_slots);
-    const gboolean active = (seq_act_raw != 0);
-
-    if(active)
-        sequence_ui_set_play_grid_requested(1);
 
     if(playing == info->sequence_playing) {
         info->status_lock = 1;
@@ -9774,62 +10010,6 @@ static void audio_beat_set_action_combo_from_status(int action)
 }
 
 
-static int audio_beat_selected_fx_value_norm(char *label, size_t label_len)
-{
-    int param;
-    int fx_id;
-    int np;
-    int lo = 0;
-    int hi = 0;
-    int value;
-
-    if(label && label_len > 0)
-        g_strlcpy(label, "FX", label_len);
-
-    if(!info)
-        return 0;
-
-    param = info->uc.selected_parameter_id;
-    fx_id = info->uc.entry_tokens[ENTRY_FXID];
-    np = info->uc.entry_tokens[ENTRY_NUM_PARAMETERS];
-
-    if(fx_id <= 0 || param < 0 || param >= np || param >= SAMPLE_MAX_PARAMETERS)
-        return 0;
-
-    value = info->uc.entry_tokens[ENTRY_P0 + param];
-
-    if(!_effect_get_minmax(fx_id, &lo, &hi, param) || hi == lo)
-        return 0;
-
-    if(label && label_len > 0)
-        g_snprintf(label, label_len, "FX p%d", param);
-
-    if(hi < lo) {
-        int t = lo;
-        lo = hi;
-        hi = t;
-    }
-
-    if(value < lo)
-        value = lo;
-    else if(value > hi)
-        value = hi;
-
-    return (int)((((double)value - (double)lo) * 100.0) / ((double)hi - (double)lo) + 0.5);
-}
-
-static int audio_beat_curve_param_has_active_curve(void)
-{
-    if(is_curve_empty())
-        return 0;
-
-    if(!widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM] ||
-       !GTK_IS_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]))
-        return 0;
-
-    return gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM])) ? 1 : 0;
-}
-
 static int audio_beat_trace_value(int token)
 {
     int v = info->status_tokens[token];
@@ -9920,6 +10100,10 @@ static void audio_beat_curve_live_stop(void)
     if(!curve || !GTK_IS_WIDGET(curve) || !GTK3_IS_CURVE(curve))
         return;
 
+    gtk3_curve_live_trace_set_domain(curve,
+                                      GTK3_CURVE_LIVE_TRACE_DOMAIN_FRAME,
+                                      0.0f,
+                                      1.0f);
     gtk3_curve_live_trace_clear(curve);
     gtk3_curve_live_trace_set_dot(curve,
                                   FALSE,
@@ -9934,6 +10118,20 @@ static void audio_beat_curve_live_stop(void)
     gtk3_curve_live_trace_set_enabled(curve, FALSE);
 }
 
+static int audio_beat_curve_selected_entry_enabled(void)
+{
+    if(!info)
+        return 0;
+
+    if(info->uc.selected_chain_entry < 0)
+        return 0;
+
+    if(info->uc.entry_tokens[ENTRY_FXID] <= 0)
+        return 0;
+
+    return info->uc.entry_tokens[ENTRY_BEAT_FLAG] ? 1 : 0;
+}
+
 #define UI_BEAT_HEX_BASS      "#45d66b"
 #define UI_BEAT_HEX_MID       "#d6b545"
 #define UI_BEAT_HEX_HIGH      "#48a8ff"
@@ -9943,6 +10141,7 @@ static void audio_beat_curve_live_stop(void)
 #define UI_BEAT_HEX_PULSE     "#b65cff"
 #define UI_BEAT_HEX_ENVELOPE  "#d884ff"
 #define UI_BEAT_HEX_LEVEL     "#d8d8d8"
+#define AUDIO_BEAT_CURVE_SCOPE_SAMPLES 512
 
 #define UI_BEAT_RGB_BASS      (69.0f / 255.0f),  (214.0f / 255.0f), (107.0f / 255.0f)
 #define UI_BEAT_RGB_MID       (214.0f / 255.0f), (181.0f / 255.0f), (69.0f / 255.0f)
@@ -10097,50 +10296,6 @@ static void audio_beat_curve_push_source(GtkWidget *curve,
                                   alpha);
 }
 
-static int audio_beat_curve_hint_is_mixable(const ui_beat_param_hint_t *hint)
-{
-    unsigned int reject_flags;
-
-    if(!hint)
-        return 0;
-
-    reject_flags = UI_VJ_BEAT_F_REJECT |
-                   UI_VJ_BEAT_F_STRUCTURAL |
-                   UI_VJ_BEAT_F_REBUILDS_STATE |
-                   UI_VJ_BEAT_F_IMPULSE |
-                   UI_VJ_BEAT_F_DISCRETE;
-
-    if(hint->flags & reject_flags)
-        return 0;
-
-    switch(hint->klass)
-    {
-        case UI_VJ_BEAT_FLOW:
-        case UI_VJ_BEAT_DRIFT:
-        case UI_VJ_BEAT_WARP:
-        case UI_VJ_BEAT_MOTION_REACT:
-        case UI_VJ_BEAT_GEOMETRY_AMPLITUDE:
-        case UI_VJ_BEAT_GEOMETRY_FREQUENCY:
-        case UI_VJ_BEAT_MEMORY:
-        case UI_VJ_BEAT_INERTIA:
-        case UI_VJ_BEAT_COLOR_AMOUNT:
-        case UI_VJ_BEAT_DETAIL:
-        case UI_VJ_BEAT_GLOW:
-        case UI_VJ_BEAT_ALPHA_OR_OPACITY:
-        case UI_VJ_BEAT_TRAIL_LENGTH:
-        case UI_VJ_BEAT_DENSITY:
-        case UI_VJ_BEAT_CONTRAST:
-        case UI_VJ_BEAT_INTENSITY:
-        case UI_VJ_BEAT_TURBULENCE:
-        case UI_VJ_BEAT_KICK:
-        case UI_VJ_BEAT_SNARE:
-        case UI_VJ_BEAT_HAT:
-            return 1;
-        default:
-            return 0;
-    }
-}
-
 static int audio_beat_curve_selected_param(int *fx_id, int *param, int *np)
 {
     int p;
@@ -10166,107 +10321,6 @@ static int audio_beat_curve_selected_param(int *fx_id, int *param, int *np)
 
     return 1;
 }
-
-static int audio_beat_curve_estimated_modulated_value(int fx_norm,
-                                                       int beat_value,
-                                                       const ui_beat_param_hint_t *hint)
-{
-    int depth;
-    double signal;
-    double delta;
-    double value;
-
-    if(!hint)
-        return fx_norm;
-
-    depth = hint->normal_depth_pct;
-    if(beat_value >= 76 && hint->climax_depth_pct > depth)
-        depth = hint->climax_depth_pct;
-
-    if(depth <= 0)
-        depth = 24;
-    else if(depth > 100)
-        depth = 100;
-
-    signal = (double)beat_value * 0.01;
-    delta = signal * (double)depth * 0.42;
-
-    if(hint->flags & UI_VJ_BEAT_F_INVERTED)
-        delta = -delta;
-
-    value = (double)fx_norm + delta;
-
-    if(value < 0.0)
-        value = 0.0;
-    else if(value > 100.0)
-        value = 100.0;
-
-    return (int)(value + 0.5);
-}
-
-static int audio_beat_curve_default_domain(gfloat *min_x, gfloat *max_x, gfloat *x_value)
-{
-    int pm;
-    int len = 1;
-    int pos = 0;
-
-    if(!info)
-        return 0;
-
-    pm = info->status_tokens[PLAY_MODE];
-
-    if(pm == MODE_SAMPLE) {
-        int sample_start = info->status_tokens[SAMPLE_START];
-        int sample_end = info->status_tokens[SAMPLE_END];
-
-        if(sample_end < sample_start) {
-            int t = sample_start;
-            sample_start = sample_end;
-            sample_end = t;
-        }
-
-        len = sample_end - sample_start + 1;
-        pos = info->status_tokens[FRAME_NUM] - sample_start;
-    }
-    else if(pm == MODE_STREAM) {
-        len = info->status_tokens[SAMPLE_MARKER_END];
-        pos = info->status_tokens[FRAME_NUM];
-    }
-    else {
-        len = info->status_tokens[TOTAL_FRAMES];
-        pos = info->status_tokens[FRAME_NUM];
-    }
-
-    if(len < 1)
-        len = 1;
-
-    if(pos < 0)
-        pos = 0;
-    else if(pos >= len)
-        pos = len - 1;
-
-    if(min_x)
-        *min_x = 0.0f;
-    if(max_x)
-        *max_x = (gfloat)((len > 1) ? (len - 1) : 1);
-    if(x_value)
-        *x_value = (gfloat)pos;
-
-    return 1;
-}
-
-static void audio_beat_curve_set_default_domain(GtkWidget *curve, gfloat min_x, gfloat max_x, int reset_view)
-{
-    if(!curve)
-        return;
-
-    gtk3_curve_set_range(curve, min_x, max_x, 0.0f, 100.0f);
-    gtk3_curve_set_x_timeline(curve, min_x, max_x);
-
-    if(reset_view)
-        gtk3_curve_set_x_view(curve, min_x, max_x);
-}
-
 
 static int audio_beat_curve_is_timeline_wrap(gfloat min_x, gfloat max_x, gfloat last_x, gfloat x)
 {
@@ -10389,63 +10443,50 @@ static int audio_beat_curve_selected_domain(GtkWidget *curve, gfloat *min_x, gfl
 
 static void audio_beat_curve_push_overview(GtkWidget *curve, int reset_sequence, gboolean push_samples)
 {
-    static int have_last = 0;
-    static int last_pm = INT_MIN;
-    static gfloat last_x = 0.0f;
-    static gfloat last_min_x = 0.0f;
-    static gfloat last_max_x = 0.0f;
-    gfloat min_x = 0.0f;
-    gfloat max_x = 1.0f;
-    gfloat x = 0.0f;
-    int pm;
-    int range_changed;
+    static int scope_ready = 0;
+    static int scope_x = 0;
+    const gfloat min_x = 0.0f;
+    const gfloat max_x = (gfloat)(AUDIO_BEAT_CURVE_SCOPE_SAMPLES - 1);
+    gfloat x;
 
-    if(!audio_beat_curve_default_domain(&min_x, &max_x, &x)) {
-        gtk3_curve_live_trace_clear(curve);
-        have_last = 0;
-        last_pm = INT_MIN;
+    if(!curve)
         return;
-    }
 
-    pm = info->status_tokens[PLAY_MODE];
-
-    range_changed = (!have_last ||
-                     pm != last_pm ||
-                     fabs((double)min_x - (double)last_min_x) > 0.0001 ||
-                     fabs((double)max_x - (double)last_max_x) > 0.0001);
-
-    if(reset_sequence || range_changed) {
+    if(reset_sequence || !scope_ready) {
+        gtk3_curve_live_trace_set_domain(curve,
+                                          GTK3_CURVE_LIVE_TRACE_DOMAIN_CLOCK,
+                                          min_x,
+                                          max_x);
+        gtk3_curve_set_x_view(curve, min_x, max_x);
         gtk3_curve_live_trace_clear(curve);
-        audio_beat_curve_set_default_domain(curve, min_x, max_x, 1);
-        have_last = 0;
+        scope_x = 0;
+        scope_ready = 1;
     }
-    else if(have_last && audio_beat_curve_is_timeline_wrap(min_x, max_x, last_x, x)) {
-        gtk3_curve_live_trace_clear(curve);
-        have_last = 0;
+    else {
+        gtk3_curve_live_trace_set_domain(curve,
+                                          GTK3_CURVE_LIVE_TRACE_DOMAIN_CLOCK,
+                                          min_x,
+                                          max_x);
     }
-
-    audio_beat_curve_follow_x_if_zoomed(curve, x);
-    curve_set_position(curve, (gdouble)x);
 
     if(!push_samples)
         return;
 
-    audio_beat_curve_push_source(curve, 0, x, audio_beat_curve_source_for_token(AUDIO_BEAT_LEVEL),     0.38f);
-    audio_beat_curve_push_source(curve, 1, x, audio_beat_curve_source_for_token(AUDIO_BEAT_ENVELOPE),  0.40f);
-    audio_beat_curve_push_source(curve, 2, x, audio_beat_curve_source_for_token(AUDIO_BEAT_TRANSIENT), 0.48f);
-    audio_beat_curve_push_source(curve, 3, x, audio_beat_curve_source_for_token(AUDIO_BEAT_FLUX),      0.40f);
-    audio_beat_curve_push_source(curve, 4, x, audio_beat_curve_source_for_token(AUDIO_BEAT_BASS),      0.43f);
-    audio_beat_curve_push_source(curve, 5, x, audio_beat_curve_source_for_token(AUDIO_BEAT_MID),       0.40f);
-    audio_beat_curve_push_source(curve, 6, x, audio_beat_curve_source_for_token(AUDIO_BEAT_HIGH),      0.40f);
-    audio_beat_curve_push_source(curve, 7, x, audio_beat_curve_source_for_token(AUDIO_BEAT_GATE),      0.36f);
-    audio_beat_curve_push_source(curve, GTK3_CURVE_LIVE_TRACE_MAX - 1, x,
-                                 audio_beat_curve_source_for_token(AUDIO_BEAT_PULSE),                 0.52f);
+    if(scope_x < 0 || scope_x >= AUDIO_BEAT_CURVE_SCOPE_SAMPLES)
+        scope_x = 0;
 
-    last_x = x;
-    last_min_x = min_x;
-    last_max_x = max_x;
-    last_pm = pm;
-    have_last = 1;
+    x = (gfloat)scope_x;
+    curve_set_position(curve, (gdouble)x);
+
+    audio_beat_curve_push_source(curve, 0, x, audio_beat_curve_source_for_token(AUDIO_BEAT_LEVEL),     0.22f);
+    audio_beat_curve_push_source(curve, 1, x, audio_beat_curve_source_for_token(AUDIO_BEAT_TRANSIENT), 0.34f);
+    audio_beat_curve_push_source(curve, 2, x, audio_beat_curve_source_for_token(AUDIO_BEAT_FLUX),      0.28f);
+    audio_beat_curve_push_source(curve, 3, x, audio_beat_curve_source_for_token(AUDIO_BEAT_BASS),      0.38f);
+    audio_beat_curve_push_source(curve, 4, x, audio_beat_curve_source_for_token(AUDIO_BEAT_HIGH),      0.32f);
+    audio_beat_curve_push_source(curve, GTK3_CURVE_LIVE_TRACE_MAX - 1, x,
+                                 audio_beat_curve_source_for_token(AUDIO_BEAT_PULSE),                 0.42f);
+
+    scope_x = (scope_x + 1) % AUDIO_BEAT_CURVE_SCOPE_SAMPLES;
 }
 
 static void audio_beat_update_curve_live_traces(gboolean push_samples)
@@ -10456,17 +10497,15 @@ static void audio_beat_update_curve_live_traces(gboolean push_samples)
     static gfloat selected_last_x = 0.0f;
     static gfloat selected_last_min_x = 0.0f;
     static gfloat selected_last_max_x = 0.0f;
-    int fx_value;
     int fx_id = -1;
     int param = -1;
     int signature;
     int signature_changed;
-    int have_selected_param;
-    int beat_value;
-    int dot_value;
-    int curve_active;
-    int mixable;
-    char beat_label[48];
+    int selected_param_present;
+    int param_value;
+    int param_min;
+    int param_max;
+    char beat_label[64];
     GtkWidget *curve;
     const ui_beat_param_hint_t *hint = NULL;
     audio_beat_curve_source_t src;
@@ -10482,29 +10521,61 @@ static void audio_beat_update_curve_live_traces(gboolean push_samples)
        !info->status_tokens[AUDIO_BEAT_OPEN] ||
        info->status_tokens[AUDIO_BEAT_SAMPLE_RATE] <= 0)
     {
+        gtk3_curve_live_trace_set_domain(curve,
+                                          GTK3_CURVE_LIVE_TRACE_DOMAIN_FRAME,
+                                          0.0f,
+                                          1.0f);
         gtk3_curve_live_trace_set_enabled(curve, FALSE);
+        selected_have_domain = 0;
+        selected_have_last = 0;
         last_signature = INT_MIN;
         return;
     }
 
-    have_selected_param = audio_beat_curve_selected_param(&fx_id, &param, NULL);
+    if(!audio_beat_curve_selected_entry_enabled()) {
+        audio_beat_curve_live_stop();
+        selected_have_domain = 0;
+        selected_have_last = 0;
+        last_signature = INT_MIN;
+        return;
+    }
 
-    if(have_selected_param)
+    selected_param_present = audio_beat_curve_selected_param(&fx_id, &param, NULL);
+    if(selected_param_present)
         hint = ui_effect_get_beat_hint(fx_id, param);
 
     gtk3_curve_live_trace_set_enabled(curve, TRUE);
 
-    if(have_selected_param && audio_beat_curve_source_for_hint(hint, &src)) {
+    if(selected_param_present) {
+        if(!audio_beat_curve_source_for_hint(hint, &src)) {
+            signature = (2 << 29) ^ (fx_id << 8) ^ param;
+            if(signature != last_signature) {
+                gtk3_curve_live_trace_set_domain(curve,
+                                                  GTK3_CURVE_LIVE_TRACE_DOMAIN_FRAME,
+                                                  0.0f,
+                                                  1.0f);
+                gtk3_curve_live_trace_clear(curve);
+                selected_have_domain = 0;
+                selected_have_last = 0;
+                last_signature = signature;
+            }
+            gtk3_curve_live_trace_set_dot(curve, FALSE, 0.0f, 0.0f, 0.0f, NULL, 0.0f, 0.0f, 0.0f, 0.0f);
+            return;
+        }
+
         gfloat min_x = 0.0f;
         gfloat max_x = 1.0f;
         gfloat x = 0.0f;
         int have_x;
         int range_changed;
 
-        curve_active = audio_beat_curve_param_has_active_curve();
+        gtk3_curve_live_trace_set_domain(curve,
+                                          GTK3_CURVE_LIVE_TRACE_DOMAIN_FRAME,
+                                          0.0f,
+                                          1.0f);
+
         signature = (1 << 29) ^ (fx_id << 8) ^ (param << 1) ^
-                    (hint->klass << 16) ^ ((int)hint->flags & 0xffff) ^
-                    (curve_active ? (1 << 27) : 0);
+                    (hint->klass << 16) ^ ((int)hint->flags & 0xffff);
 
         have_x = audio_beat_curve_selected_domain(curve, &min_x, &max_x, &x);
         range_changed = (!selected_have_domain ||
@@ -10538,31 +10609,39 @@ static void audio_beat_update_curve_live_traces(gboolean push_samples)
             return;
         }
 
-        beat_value = audio_beat_trace_value(src.token);
-        fx_value = audio_beat_selected_fx_value_norm(NULL, 0);
-        dot_value = audio_beat_curve_estimated_modulated_value(fx_value, beat_value, hint);
+        param_value = info->uc.entry_tokens[ENTRY_PARAMSET + param];
+        param_min = 0;
+        param_max = 100;
+        _effect_get_minmax(fx_id, &param_min, &param_max, param);
+        if(param_max < param_min) {
+            int t = param_min;
+            param_min = param_max;
+            param_max = t;
+        }
+        if(param_value < param_min)
+            param_value = param_min;
+        else if(param_value > param_max)
+            param_value = param_max;
 
-        g_snprintf(beat_label, sizeof(beat_label), "%s -> p%d", src.label, param);
-
-        mixable = audio_beat_curve_hint_is_mixable(hint);
+        g_snprintf(beat_label, sizeof(beat_label), "%s p%d=%d", src.label, param, param_value);
 
         if(have_x && x >= min_x && x <= max_x) {
             audio_beat_curve_follow_x_if_zoomed(curve, x);
             gtk3_curve_live_trace_push_at(curve,
                                           GTK3_CURVE_LIVE_TRACE_MAX - 1,
                                           x,
-                                          dot_value,
+                                          (gfloat)param_value,
                                           beat_label,
                                           src.red,
                                           src.green,
                                           src.blue,
-                                          MIN(1.0f, src.alpha + 0.10f));
+                                          MIN(1.0f, src.alpha + 0.14f));
 
             gtk3_curve_live_trace_set_dot(curve,
                                           TRUE,
                                           x,
-                                          (curve_active && mixable) ? (gfloat)fx_value : (gfloat)dot_value,
-                                          (gfloat)dot_value,
+                                          (gfloat)param_value,
+                                          (gfloat)param_value,
                                           beat_label,
                                           src.red,
                                           src.green,
@@ -10574,7 +10653,8 @@ static void audio_beat_update_curve_live_traces(gboolean push_samples)
             selected_last_max_x = max_x;
             selected_have_domain = 1;
             selected_have_last = 1;
-        } else {
+        }
+        else {
             gtk3_curve_live_trace_set_dot(curve,
                                           FALSE,
                                           0.0f,
@@ -10590,7 +10670,7 @@ static void audio_beat_update_curve_live_traces(gboolean push_samples)
         return;
     }
 
-    signature = have_selected_param ? ((2 << 29) ^ (fx_id << 8) ^ param) : (3 << 29);
+    signature = (3 << 29);
     signature_changed = (signature != last_signature);
     if(signature_changed) {
         gtk3_curve_live_trace_clear(curve);
@@ -10600,9 +10680,7 @@ static void audio_beat_update_curve_live_traces(gboolean push_samples)
     }
 
     gtk3_curve_live_trace_set_dot(curve, FALSE, 0.0f, 0.0f, 0.0f, NULL, 0.0f, 0.0f, 0.0f, 0.0f);
-
-    if(!have_selected_param)
-        audio_beat_curve_push_overview(curve, signature_changed, push_samples);
+    audio_beat_curve_push_overview(curve, signature_changed, push_samples);
 }
 
 static void update_audio_beat_status_widgets(int *history, int force)
@@ -10613,7 +10691,8 @@ static void update_audio_beat_status_widgets(int *history, int force)
     int local_force;
     int live_ready;
     int live_changed;
-    int live_fresh;
+    int curve_frame_changed;
+    int curve_push_samples;
     int widgets_ready;
 
     if(!history)
@@ -10653,6 +10732,7 @@ static void update_audio_beat_status_widgets(int *history, int force)
 
     live_ready = audio_beat_live_status_ready();
     live_changed = live_ready ? audio_beat_live_payload_changed(history, local_force) : 0;
+    curve_frame_changed = AB_CHANGED(FRAME_NUM);
 
     if(live_ready) {
         if(live_changed)
@@ -10664,7 +10744,9 @@ static void update_audio_beat_status_widgets(int *history, int force)
         stale_ticks = 0;
     }
 
-    live_fresh = live_ready && live_changed;
+    curve_push_samples = live_ready &&
+                         stale_ticks < AUDIO_BEAT_UI_STALE_TICKS &&
+                         (live_changed || curve_frame_changed || local_force);
 
     if(AB_CHANGED(AUDIO_BEAT_ENABLED))
         audio_beat_set_toggle(WIDGET_AUDIO_BEAT_ENABLE_TOGGLE, enabled);
@@ -10805,10 +10887,7 @@ static void update_audio_beat_status_widgets(int *history, int force)
 
     AB_SET_LABEL(AUDIO_BEAT_HIT_SEQ, WIDGET_AUDIO_BEAT_HIT_SEQ_VALUE, "%d");
 
-    if(live_fresh)
-        audio_beat_update_curve_live_traces(TRUE);
-    else
-        audio_beat_update_curve_live_traces(FALSE);
+    audio_beat_update_curve_live_traces(curve_push_samples ? TRUE : FALSE);
 
     if(!live_ready || stale_ticks >= AUDIO_BEAT_UI_STALE_TICKS)
         audio_beat_curve_live_stop();
@@ -10942,6 +11021,17 @@ static int audio_sync_ui_enabled_from_status(void)
     return active;
 }
 
+static int audio_mixer_mode_from_ui_local(void)
+{
+    GtkWidget *w = widget_cache[WIDGET_AUDIO_MIXER_MODE_COMBO];
+
+    if(!w || !GTK_IS_COMBO_BOX(w))
+        return 0;
+
+    int mode = gtk_combo_box_get_active(GTK_COMBO_BOX(w));
+    return (mode < 0 || mode > 3) ? 0 : mode;
+}
+
 static void audio_sync_update_mode_sensitivity(int mode, int source, int target_mode, int record_source)
 {
     const int tempo_target_ids[] = {
@@ -10970,6 +11060,7 @@ static void audio_sync_update_mode_sensitivity(int mode, int source, int target_
                             ui_audio_sync_mode_supports_wav_master(mode) &&
                             source == VJ_AUDIO_SYNC_SOURCE_WAV_FILE);
     const int jack_provider = (external_provider_mode && !wav_master);
+    const int mixer_crossfade_active = jack_provider && audio_mixer_mode_from_ui_local() != 0;
     const int sync_enabled = (external_provider_mode && audio_sync_ui_enabled_from_status());
     const int tempo = (sync_enabled && mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE);
     const int track_align = (sync_enabled && mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN);
@@ -11012,6 +11103,22 @@ static void audio_sync_update_mode_sensitivity(int mode, int source, int target_
     audio_sync_set_named_widget_visible("audio_sync_channels_label", jack_provider);
     audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_CHANNELS_SPIN, jack_provider);
     audio_sync_set_widget_sensitive(WIDGET_AUDIO_SYNC_CHANNELS_SPIN, jack_provider);
+    audio_sync_set_named_widget_visible("audio_master_jack_volume_label", jack_provider);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MASTER_JACK_VOLUME_SCALE, jack_provider);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MASTER_JACK_VOLUME_SPIN, jack_provider);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_MASTER_JACK_VOLUME_SCALE, jack_provider);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_MASTER_JACK_VOLUME_SPIN, jack_provider);
+
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_MODE_LABEL, jack_provider);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_MODE_COMBO, jack_provider);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_CROSSFADE_LABEL, jack_provider);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_CROSSFADE_SCALE, jack_provider);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_CROSSFADE_SPIN, jack_provider);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_MIXER_MODE_LABEL, jack_provider);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_MIXER_MODE_COMBO, jack_provider);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_MIXER_CROSSFADE_LABEL, mixer_crossfade_active);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_MIXER_CROSSFADE_SCALE, mixer_crossfade_active);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_MIXER_CROSSFADE_SPIN, mixer_crossfade_active);
 
     audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_TEMPO_FRAME, tempo || follow);
     audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_TRACK_FRAME, track_align);
@@ -11402,8 +11509,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
     timeline_set_pos(info->tl, (gdouble) timeline_frame);
 
-    curve_set_position(info->curve,
-                       (gdouble)((info->uc.selected_parameter_id < 0) ? timeline_frame : info->status_frame));
+    curve_set_position(info->curve, (gdouble) timeline_frame);
     timeline_update_compact_overlay();
 
     char *current_time_ = format_time( info->status_frame, (double) info->el.fps );
@@ -12682,6 +12788,10 @@ static void reset_quickselect_ui_state(void)
 
 static void reset_sequencer_ui_state(void)
 {
+    sequence_ui_selected_bank_mask = 1;
+    sequence_ui_bank_mask_pending = 0;
+    sequence_ui_sync_bank_buttons(0, sequence_ui_selected_bank_mask);
+
     if(info->sequence_bank_view) {
         gvr_sequence_bank_view_clear_all(info->sequence_bank_view);
         gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, 0);
@@ -12723,6 +12833,8 @@ static void reset_connection_runtime_state(void)
     follow_return_type = 0;
     audio_sync_last_non_jack_master = VJ_RECORD_AUDIO_SOURCE_ORIGINAL;
     sequence_ui_set_play_grid_requested(0);
+    sequence_ui_selected_bank_mask = 1;
+    sequence_ui_bank_mask_pending = 0;
 }
 
 static void reset_connection_data_state(void)
@@ -13317,13 +13429,39 @@ void vj_gui_init(const char *glade_file,
 
     gtk_container_add(GTK_CONTAINER(curve_container), gui->curve);
 
+    GtkWidget *shape_combo = widget_cache[WIDGET_CURVE_COMBO_ANIMATION];
+
     for (int i = 0; i < FX_ANIM_SHAPE_MAX; i++)
     {
-        gtk_combo_box_text_insert_text (GTK_COMBO_BOX_TEXT(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]),i ,fx_anim_shape_map[i].description);
+        gtk_combo_box_text_insert_text (GTK_COMBO_BOX_TEXT(shape_combo),i ,fx_anim_shape_map[i].description);
     }
+
+    if(shape_combo && GTK_IS_COMBO_BOX(shape_combo)) {
+        gtk_combo_box_set_wrap_width(GTK_COMBO_BOX(shape_combo), 2);
+        gtk_combo_box_set_popup_fixed_width(GTK_COMBO_BOX(shape_combo), FALSE);
+    }
+
+    GtkWidget *shape_steps = widget_cache[WIDGET_CURVE_SPIN_ANIMATION_SHAPE];
+    if(shape_steps && GTK_IS_SPIN_BUTTON(shape_steps)) {
+        gtk_spin_button_set_range(GTK_SPIN_BUTTON(shape_steps), 1.0, 128.0);
+        gtk_spin_button_set_increments(GTK_SPIN_BUTTON(shape_steps), 1.0, 8.0);
+    }
+
+    GtkWidget *shape_seed = widget_cache[WIDGET_CURVE_SPIN_ANIMATION_SEED];
+    if(shape_seed && GTK_IS_SPIN_BUTTON(shape_seed)) {
+        gtk_spin_button_set_range(GTK_SPIN_BUTTON(shape_seed), 0.0, 999999.0);
+        gtk_spin_button_set_increments(GTK_SPIN_BUTTON(shape_seed), 1.0, 100.0);
+    }
+
+    GtkWidget *shape_detail = widget_cache[WIDGET_CURVE_SPIN_ANIMATION_DETAIL];
+    if(shape_detail && GTK_IS_SPIN_BUTTON(shape_detail)) {
+        gtk_spin_button_set_range(GTK_SPIN_BUTTON(shape_detail), 1.0, 64.0);
+        gtk_spin_button_set_increments(GTK_SPIN_BUTTON(shape_detail), 1.0, 4.0);
+    }
+
     int osl = info->status_lock;
     info->status_lock = 1;
-    gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]), 0);
+    gtk_combo_box_set_active (GTK_COMBO_BOX(shape_combo), 0);
     info->status_lock = osl;
 
     gtk_widget_show_all(curve_container);
@@ -13396,7 +13534,10 @@ void vj_gui_init(const char *glade_file,
     }
 
     if( user_preview ) {
+        int old_lock = info->status_lock;
+        info->status_lock = 1;
         set_toggle_button( "previewtoggle", 1 );
+        info->status_lock = old_lock;
     }
 
     if (smallest_possible)
@@ -14131,20 +14272,36 @@ static gboolean on_cacheslot_activated_by_mouse (GtkWidget *widget, GdkEventButt
     return FALSE;
 }
 
-static void on_sequence_bank_button_clicked(GtkWidget *widget, gpointer user_data)
+static void on_sequence_bank_button_toggled(GtkWidget *widget, gpointer user_data)
 {
-    (void)widget;
     int bank = GPOINTER_TO_INT(user_data);
 
-    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
+    if(info->status_lock || sequence_ui_bank_button_sync)
         return;
 
-    sequence_ui_request_bank(bank);
-    multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
-    if(info->sequence_bank_view)
-        gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
-    sequence_ui_rearm_play_grid_for_bank(bank);
-    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS ||
+       !widget || !GTK_IS_TOGGLE_BUTTON(widget))
+        return;
+
+    int active_bank = sequence_ui_active_bank();
+    int mask = sequence_ui_current_bank_mask();
+    gboolean checked = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+
+    if(checked) {
+        mask |= (1 << bank);
+        sequence_ui_send_bank_select(bank, mask);
+        sequence_ui_rearm_play_grid_for_bank(bank);
+        return;
+    }
+
+    if(bank == active_bank) {
+        sequence_ui_sync_bank_buttons(active_bank, mask | (1 << active_bank));
+        vj_msg(VEEJAY_MSG_INFO, "Active sequence bank must remain checked");
+        return;
+    }
+
+    mask &= ~(1 << bank);
+    sequence_ui_send_bank_mask_only(mask);
 }
 
 static void on_sequence_bank_refresh_clicked(GtkWidget *widget, gpointer user_data)
@@ -14161,12 +14318,8 @@ static void on_sequence_bank_clear_clicked(GtkWidget *widget, gpointer user_data
     (void)user_data;
     int bank = sequence_ui_target_bank();
 
-    if(!sequence_ui_confirm_clear_bank(bank))
-        return;
-
     if(bank != sequence_ui_active_bank()) {
-        sequence_ui_request_bank(bank);
-        multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
+        sequence_ui_send_bank_select(bank, sequence_ui_current_bank_mask());
     }
 
     multi_vims(VIMS_SEQUENCE_DEL, "-1");
@@ -14186,8 +14339,7 @@ static void on_sequence_bank_view_bank_selected(GtkWidget *widget, gint bank, gp
     if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
         return;
 
-    sequence_ui_request_bank(bank);
-    multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
+    sequence_ui_send_bank_select(bank, sequence_ui_current_bank_mask());
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
     sequence_ui_rearm_play_grid_for_bank(bank);
@@ -14200,8 +14352,7 @@ static void on_sequence_bank_view_slot_assign(GtkWidget *widget, gint bank, gint
     (void)user_data;
 
     if(bank != sequence_ui_active_bank()) {
-        sequence_ui_request_bank(bank);
-        multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
+        sequence_ui_send_bank_select(bank, sequence_ui_current_bank_mask());
         if(info->sequence_bank_view)
             gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
     }
@@ -14238,8 +14389,7 @@ static void on_sequence_bank_view_slot_delete(GtkWidget *widget, gint bank, gint
     (void)user_data;
 
     if(bank != sequence_ui_active_bank()) {
-        sequence_ui_request_bank(bank);
-        multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
+        sequence_ui_send_bank_select(bank, sequence_ui_current_bank_mask());
         if(info->sequence_bank_view)
             gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
     }
@@ -14269,12 +14419,9 @@ static void on_sequence_bank_view_slot_reorder(GtkWidget *widget, gint bank, gin
         return;
 
     if(bank != sequence_ui_active_bank()) {
-        sequence_ui_request_bank(bank);
-        multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
+        sequence_ui_send_bank_select(bank, sequence_ui_current_bank_mask());
         if(info->sequence_bank_view)
             gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
-        info->uc.reload_hint[HINT_SEQ_ACT] = 1;
-        return;
     }
 
     int from_id = -1;
@@ -14379,13 +14526,8 @@ static void on_sequence_bank_view_bank_clear(GtkWidget *widget, gint bank, gpoin
     if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
         return;
 
-    if(!sequence_ui_confirm_clear_bank(bank))
-        return;
-
-    sequence_ui_request_bank(bank);
-
     if(bank != sequence_ui_active_bank())
-        multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
+        sequence_ui_send_bank_select(bank, sequence_ui_current_bank_mask());
 
     multi_vims(VIMS_SEQUENCE_DEL, "-1");
 
@@ -14409,8 +14551,7 @@ static void on_sequence_bank_view_slot_paste(GtkWidget *widget, gint bank, gint 
         return;
 
     if(bank != sequence_ui_active_bank()) {
-        sequence_ui_request_bank(bank);
-        multi_vims(VIMS_SEQUENCE_SELECT, "%d", bank);
+        sequence_ui_send_bank_select(bank, sequence_ui_current_bank_mask());
         if(info->sequence_bank_view)
             gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
     }
@@ -14598,8 +14739,8 @@ static void create_sequencer_slots(int nx, int ny)
 
     button = sequence_toolbar_pack_existing(toolbar, "seqactive", FALSE, FALSE, 0);
     if(button) {
-        gtk_button_set_label(GTK_BUTTON(button), "Play grid");
-        gtk_widget_set_tooltip_text(button, "Play and repeat the selected sequence bank");
+        gtk_button_set_label(GTK_BUTTON(button), "Play Grid");
+        gtk_widget_set_tooltip_text(button, "Play and repeat the checked sequence bank chain");
     }
 
     sequence_toolbar_add_separator(toolbar);
@@ -14623,17 +14764,18 @@ static void create_sequencer_slots(int nx, int ny)
     for(int bank = 0; bank < VJ_SEQUENCE_BANKS; bank++) {
         char label[16];
         snprintf(label, sizeof(label), "Bank %d", bank + 1);
-        button = gtk_button_new_with_label(label);
+        button = gtk_toggle_button_new_with_label(label);
+        sequence_ui_bank_buttons[bank] = button;
         gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
-        g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_button_clicked), GINT_TO_POINTER(bank));
-        gtk_widget_set_tooltip_text(button, "Select sequence bank");
+        g_signal_connect(G_OBJECT(button), "toggled", G_CALLBACK(on_sequence_bank_button_toggled), GINT_TO_POINTER(bank));
+        gtk_widget_set_tooltip_text(button, "Check to include this bank in chained sequence playback/recording. Checking a bank also makes it active. The active bank stays checked.");
         gtk_widget_show(button);
     }
 
     button = gtk_button_new_with_label("Clear Bank");
     gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
     g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_clear_clicked), NULL);
-    gtk_widget_set_tooltip_text(button, "Clear the selected/active sequence bank");
+    gtk_widget_set_tooltip_text(button, "Clear the selected sequence bank immediately");
     gtk_widget_show(button);
 
     button = sequence_toolbar_pack_existing(toolbar, "button_seq_clearall", FALSE, FALSE, 0);
