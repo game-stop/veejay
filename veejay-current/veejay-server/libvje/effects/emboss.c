@@ -341,13 +341,15 @@ void emboss_apply(void *ptr, VJFrame *frame, int *args)
 
     int n = args[0];
 
-    if(n < 0)
+    if(n < 0) {
         n = 0;
-    else if(n > 9)
+    }
+    else if(n > 9) {
         n = 9;
+    }
 
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
+    const unsigned int width = frame->width;
+    const unsigned int height = frame->height;
 
 	switch (n)
 	{

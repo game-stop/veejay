@@ -172,8 +172,10 @@ static int	vj_event_vevo_list_size(void)
 	int i;	
 	int len =0;
 
-    if(!index_map_)
+    if(!index_map_) {
         return 0;
+    }
+
 	for ( i = 0; i < MAX_INDEX ;i ++ )
 	{
 		if( index_map_[i] != NULL )

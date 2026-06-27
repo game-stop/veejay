@@ -186,6 +186,38 @@ static uint32_t str2ushort(unsigned char *str)
    return ( str[0] | (str[1]<<8) );
 }
 
+static int avi_stream_ix_tag(unsigned char tag[5], int stream)
+{
+   if(stream < 1 || stream > AVI_MAX_TRACKS) {
+      AVI_errno = AVI_ERR_NOT_PERM;
+      return -1;
+   }
+
+   tag[0] = 'i';
+   tag[1] = 'x';
+   tag[2] = (unsigned char)('0' + (stream / 10));
+   tag[3] = (unsigned char)('0' + (stream % 10));
+   tag[4] = '\0';
+
+   return 0;
+}
+
+static int avi_stream_wb_tag(unsigned char tag[5], int stream)
+{
+   if(stream < 1 || stream > AVI_MAX_TRACKS) {
+      AVI_errno = AVI_ERR_NOT_PERM;
+      return -1;
+   }
+
+   tag[0] = (unsigned char)('0' + (stream / 10));
+   tag[1] = (unsigned char)('0' + (stream % 10));
+   tag[2] = 'w';
+   tag[3] = 'b';
+   tag[4] = '\0';
+
+   return 0;
+}
+
 // bit 31 denotes a keyframe
 static uint32_t str2ulong_len (unsigned char *str)
 {
@@ -433,7 +465,8 @@ static int avi_add_odml_index_entry(avi_t *AVI, unsigned char *tag, long flags, 
 
 	    AVI->track[AVI->aptr].audio_superindex->nEntriesInUse++;
 
-	    snprintf((char*)fcc, sizeof(fcc), "ix%02d", AVI->aptr+1);
+	    if (avi_stream_ix_tag(fcc, AVI->aptr + 1) < 0)
+		return -1;
 	    if (avi_add_std_index (AVI, fcc, tag, AVI->track[AVI->aptr].audio_superindex->stdindex[ 
 			AVI->track[AVI->aptr].audio_superindex->nEntriesInUse - 1 ]) < 0
 	       ) return -1;
@@ -493,8 +526,10 @@ static int avi_add_odml_index_entry(avi_t *AVI, unsigned char *tag, long flags, 
 	    }
 	    AVI->track[audtr].audio_superindex->nEntriesInUse++;
 
-	    snprintf((char*)fcc, sizeof(fcc), "ix%02d", audtr+1);
-	    snprintf((char*)aud, sizeof(aud), "0%01dwb", audtr+1);
+	    if (avi_stream_ix_tag(fcc, audtr + 1) < 0)
+		return -1;
+	    if (avi_stream_wb_tag(aud, audtr + 1) < 0)
+		return -1;
 	    if (avi_add_std_index (AVI, fcc, aud, AVI->track[audtr].audio_superindex->stdindex[ 
 			AVI->track[audtr].audio_superindex->nEntriesInUse - 1 ]) < 0
 	       ) return -1;
@@ -1739,7 +1774,8 @@ static int avi_write_data(avi_t *AVI, unsigned char *data, unsigned long length,
    /* Add index entry */
 
    //set tag for current audio track
-   snprintf((char *)astr, sizeof(astr), "0%1dwb", (int)(AVI->aptr+1));
+   if(avi_stream_wb_tag(astr, AVI->aptr + 1) < 0)
+     return -1;
 
    if(audio) {
      if (!AVI->is_opendml) n = avi_add_index_entry(AVI,astr,0x10,AVI->pos,length);

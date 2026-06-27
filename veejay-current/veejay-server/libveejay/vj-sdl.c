@@ -600,28 +600,36 @@ void vj_sdl_free(void *ptr)
     if(!vjsdl)
         return;
 
-    if(vjsdl->texture)
+    if(vjsdl->texture) {
         SDL_DestroyTexture(vjsdl->texture);
-    if(vjsdl->renderer)
+    }
+    if(vjsdl->renderer) {
         SDL_DestroyRenderer(vjsdl->renderer);
-    if(vjsdl->screen)
+    }
+    if(vjsdl->screen) {
         SDL_DestroyWindow(vjsdl->screen);
-	
-	if( vjsdl->scaler ) 
-	   yuv_free_swscaler(vjsdl->scaler);
+    }
 
-	if( vjsdl->src_frame )
-	   free(vjsdl->src_frame );
+    if( vjsdl->scaler ) {
+        yuv_free_swscaler(vjsdl->scaler);
+    }
 
-	if( vjsdl->dst_frame )
-	   free(vjsdl->dst_frame );
+    if( vjsdl->src_frame ) {
+        free(vjsdl->src_frame );
+    }
 
-    if( vjsdl->caption)
+    if( vjsdl->dst_frame ) {
+        free(vjsdl->dst_frame );
+    }
+
+    if( vjsdl->caption) {
         free(vjsdl->caption);
+    }
 
-    if( vjsdl->pixels )
+    if( vjsdl->pixels ) {
         free(vjsdl->pixels);
-	
+    }
+
     free(vjsdl);
 }
 #endif

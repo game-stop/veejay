@@ -149,14 +149,14 @@ void radialblur_free(void *ptr)
     free(r);
 }
 
-static void radialblur_h(uint8_t *restrict dst, const uint8_t *restrict src, int w, int h, int radius, int power, int n_threads)
+static void radialblur_h(uint8_t *restrict dst, uint8_t *restrict src, int w, int h, int radius, int power, int n_threads)
 {
 #pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int y = 0; y < h; y++)
         veejay_blur2(dst + y * w, src + y * w, w, radius, power, 1, 1);
 }
 
-static void radialblur_v(uint8_t *restrict dst, const uint8_t *restrict src, int w, int h, int radius, int power, int n_threads)
+static void radialblur_v(uint8_t *restrict dst, uint8_t *restrict src, int w, int h, int radius, int power, int n_threads)
 {
 #pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int x = 0; x < w; x++)
@@ -209,9 +209,13 @@ void radialblur_apply(void *ptr, VJFrame *frame, int *args)
             radialblur_v(Cb, srcU, uv_width, uv_height, radius, power, r->n_threads);
             radialblur_v(Cr, srcV, uv_width, uv_height, radius, power, r->n_threads);
 
-            radialblur_h(Y,  Y,  width, height, radius, power, r->n_threads);
-            radialblur_h(Cb, Cb, uv_width, uv_height, radius, power, r->n_threads);
-            radialblur_h(Cr, Cr, uv_width, uv_height, radius, power, r->n_threads);
+            veejay_memcpy(srcY, Y, len);
+            veejay_memcpy(srcU, Cb, uv_len);
+            veejay_memcpy(srcV, Cr, uv_len);
+
+            radialblur_h(Y,  srcY, width, height, radius, power, r->n_threads);
+            radialblur_h(Cb, srcU, uv_width, uv_height, radius, power, r->n_threads);
+            radialblur_h(Cr, srcV, uv_width, uv_height, radius, power, r->n_threads);
             break;
     }
 }

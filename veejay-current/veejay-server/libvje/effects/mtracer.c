@@ -343,15 +343,14 @@ void *mtracer_malloc(int w, int h)
     return (void*) m;
 }
 
-static void mtracer_motion_mask(const uint8_t *restrict cur,
+static void mtracer_motion_mask(uint8_t *restrict cur,
                                 const uint8_t *restrict prev,
-                                uint8_t *restrict out,
                                 int len,
                                 int n_threads)
 {
 #pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int i = 0; i < len; i++)
-        out[i] = (uint8_t)mtracer_absi((int)cur[i] - (int)prev[i]);
+        cur[i] = (uint8_t)mtracer_absi((int)cur[i] - (int)prev[i]);
 }
 
 void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
@@ -420,7 +419,7 @@ void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     }
 
     if(motion_only)
-        mtracer_motion_mask(blended_result, prev_frame, blended_result, len, n_threads);
+        mtracer_motion_mask(blended_result, prev_frame, len, n_threads);
 
     const int combined_scale = mtracer_clampi((strength * character + 127) / 255, 1, 255);
     const int decay = 256 - (256 / decay_val);
