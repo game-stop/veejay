@@ -1894,13 +1894,13 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_STREAM_SET_ARG]				=	_new_event(
 				"%d %s",
 				VIMS_STREAM_SET_ARG,
-				"Change generator parameters",
+				"Change generator or calibration source parameters",
 				vj_event_set_stream_arg,
 				2,
 				VIMS_LONG_PARAMS,
 				SAMPLE_STREAM_ID_HELP,
 				0,
-				"space separated value string",
+				"space separated value string" ,
 				NULL,
 				NULL );	
 
@@ -2051,7 +2051,7 @@ void		vj_init_vevo_events(void)
 				0,
 				"Effect enabled (1) or disabled (0)",
 				1,
-				"space separated value string",
+				"space separated value string" ,
 				NULL,
 				NULL );	
 	
@@ -3078,7 +3078,7 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 	index_map_[VIMS_GET_STREAM_ARGS]			=	_new_event(
 				"%d",
 				VIMS_GET_STREAM_ARGS,
-				"GUI: Get generator parameters",
+				"GUI: Get generator or calibration source parameters",
 				vj_event_send_stream_args,
 				1,
 				VIMS_ALLOW_ANY,

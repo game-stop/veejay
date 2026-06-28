@@ -30,6 +30,7 @@
 #include <libsample/sampleadm.h>
 #include <libvje/libvje.h>
 #include <libplugger/plugload.h>
+#include <libstream/vj-cali.h>
 #include <veejaycore/vevo.h>
 #include <veejaycore/libvevo.h>
 
@@ -74,18 +75,15 @@ void vjert_del_fx( void *ptr, int chain_id, int chain_position, int clear ) {
 
 static void vjert_process_fx( sample_eff_chain *entry, VJFrame **frames, int chain_id, int chain_position, int *args )
 {
-    int doProcess = 0;
-    if( entry->fx_instance == NULL && entry->effect_id > 0 ) {
-        doProcess = vjert_new_fx( entry, chain_id, chain_position, frames[0] );
+    if(!entry->e_flag || entry->effect_id <= 0)
+        return;
+
+    if(entry->fx_instance == NULL) {
+        if(!vjert_new_fx(entry, chain_id, chain_position, frames[0]))
+            return;
     }
 
-    if( entry->fx_instance && entry->e_flag ) {
-        doProcess = 1;
-    }
-
-    if( doProcess ) {
-        vje_fx_apply( entry->effect_id, entry->fx_instance, frames[0], frames[1], args );
-    }
+    vje_fx_apply(entry->effect_id, entry->fx_instance, frames[0], frames[1], args);
 }
 
 static void vjert_process_plugin( sample_eff_chain *entry, VJFrame **frames, int *args )

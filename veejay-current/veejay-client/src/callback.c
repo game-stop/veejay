@@ -5225,9 +5225,16 @@ void on_video_options_apply_clicked         (GtkButton       *button,
 
 void	on_cali_save_button_clicked( GtkButton *button, gpointer user_data)
 {
+    int stream_id = cali_selected_stream_id();
+
+    if(stream_id <= 0) {
+        error_dialog("Error", "No calibration stream selected");
+        return;
+    }
+
 	gchar *filename = dialog_save_file( "Save calibration to file", "veejay-calibration.xml");
 	if( filename ) {
-		multi_vims( VIMS_V4L_CALI, "%s", filename );
+		multi_vims( VIMS_V4L_CALI, "%d %s", stream_id, filename );
         g_free(filename);
 	}
 }
@@ -5248,6 +5255,8 @@ void	on_cali_take_button_clicked(	GtkButton *button, gpointer data )
 {
 	gint method = 0;
 	gint kernel = 0;
+    gint duration = 0;
+    int stream_id = cali_selected_stream_id();
 
 	if( info->uc.cali_stage == 1 )
 		method = 1;
@@ -5257,25 +5266,28 @@ void	on_cali_take_button_clicked(	GtkButton *button, gpointer data )
 		return;
 	}
 
+    if(stream_id <= 0) {
+		error_dialog( "Error", "No source selected to calibrate. Play a Live stream or double click one in the List");
+		return;
+    }
+
+    if(!cali_selected_stream_can_capture()) {
+        error_dialog("Error", "Select a live V4L2 or vloopback stream for calibration capture");
+        return;
+    }
+
 	if( is_button_toggled( "cali_method_median" ))
 	{
 		kernel = get_nums( "cali_kernelsize_spin");
 	}
-	gint duration=get_nums( "cali_duration_spin" );
-
-    if( info->status_tokens[STREAM_TYPE] != STREAM_VIDEO4LINUX ) {
-        vj_msg(VEEJAY_MSG_INFO,"Please use a camera source for light/dark frame calibration");
+	duration = get_nums( "cali_duration_spin" );
+    if(duration <= 0) {
+        error_dialog("Error", "Calibration duration must be at least 1 frame");
+        return;
     }
 
-	cali_stream_id = info->status_tokens[CURRENT_ID];
-
-	if( cali_stream_id <= 0 ) {
-		error_dialog( "Error", "No source selected to calibrate. Play a Live stream or double click one in the List");
-		return;
-	}
-
 	multi_vims( VIMS_V4L_BLACKFRAME, "%d %d %d %d",
-			cali_stream_id,
+			stream_id,
 			duration,
 			kernel,
 			method );
@@ -5285,50 +5297,62 @@ void	on_cali_take_button_clicked(	GtkButton *button, gpointer data )
 
 void	on_cali_darkframe_clicked( GtkButton *button, gpointer data )
 {
+    if(!cali_selected_stream_can_inspect()) {
+        error_dialog("Error", "No calibration source selected");
+        return;
+    }
+    cali_set_stream_preview_mode(1, 1);
 	get_and_draw_frame( 0, "image_darkframe" );
 }
 
 void	on_cali_lightframe_clicked( GtkButton *button, gpointer data )
 {
+    if(!cali_selected_stream_can_inspect()) {
+        error_dialog("Error", "No calibration source selected");
+        return;
+    }
+    cali_set_stream_preview_mode(2, 1);
 	get_and_draw_frame( 1, "image_lightframe" );
 }
 
 void	on_cali_flatframe_clicked( GtkButton *button, gpointer data )
 {
+    if(!cali_selected_stream_can_inspect()) {
+        error_dialog("Error", "No calibration source selected");
+        return;
+    }
+    cali_set_stream_preview_mode(3, 1);
 	get_and_draw_frame( 2, "image_flatframe" );
 }
 
 void	on_cali_image_clicked( GtkButton *button, gpointer data )
 {
-
-
+    cali_set_stream_preview_mode(0, 1);
 }
 
 void	on_cali_reset_button_clicked( 	GtkButton *button, gpointer data )
 {
-	if( cali_stream_id <= 0 ) {
-		if(info->status_tokens[STREAM_TYPE] == STREAM_VIDEO4LINUX )
-			cali_stream_id =
-				info->status_tokens[CURRENT_ID];
-	}
+    int stream_id = cali_selected_stream_id();
 
-	if( cali_stream_id <= 0 ) {
+	if( stream_id <= 0 ) {
 		error_dialog( "Error", "No source selected to calibrate. Play a Live stream or double click one in the List");
 
 		return;
 	}
 
 	info->uc.cali_stage = 0;
-	update_label_str("current_step_label","Please take an image with the cap on the lens.");
+	info->uc.cali_duration = 0;
+	update_label_str("current_step_label","Step 1: cover the lens and take the dark frames.");
 
-	multi_vims( VIMS_V4L_BLACKFRAME, "%d 0 0 0", cali_stream_id );
+	multi_vims( VIMS_V4L_BLACKFRAME, "%d 0 0 0", stream_id );
+    cali_set_stream_preview_mode(0, 1);
 
 	reset_cali_images(0, "image_darkframe");
 	reset_cali_images(1, "image_lightframe");
 	reset_cali_images(2, "image_flatframe");
 
 	GtkWidget *tb = glade_xml_get_widget_( info->main_window, "cali_take_button");
-	gtk_button_set_label( GTK_BUTTON(tb), "Take Black Frames");
+	gtk_button_set_label( GTK_BUTTON(tb), "Take Dark Frames");
 
     if(gtk_widget_is_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ] ))
         gtk_widget_set_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ], FALSE);

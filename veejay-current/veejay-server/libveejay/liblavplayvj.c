@@ -3600,6 +3600,44 @@ void vj_unlock(veejay_t *info)
 	pthread_mutex_unlock(&(settings->control_mutex));
 }	 
 
+#ifdef HAVE_SDL
+static int veejay_sdl_event_wanted(veejay_t *info, const SDL_Event *event)
+{
+    if(!info || !event)
+        return 0;
+
+    switch(event->type) {
+        case SDL_QUIT:
+            return 1;
+
+        case SDL_KEYDOWN:
+            if(!info->use_keyb)
+                return 0;
+            if(event->key.repeat)
+                return 0;
+            return 1;
+
+        case SDL_MOUSEBUTTONDOWN:
+        case SDL_MOUSEBUTTONUP:
+        case SDL_MOUSEWHEEL:
+        case SDL_MOUSEMOTION:
+            return info->use_mouse ? 1 : 0;
+
+        case SDL_WINDOWEVENT:
+            return event->window.event == SDL_WINDOWEVENT_CLOSE;
+
+        default:
+            return 0;
+    }
+}
+
+static void veejay_sdl_push_event(SDL_Event *event, int mod)
+{
+    if(event)
+        vj_event_push(event, mod);
+}
+#endif
+
 static void 	veejay_consume_events(veejay_t *info) {
 #ifdef HAVE_SDL
 	SDL_Event event;
@@ -3621,8 +3659,8 @@ static void 	veejay_consume_events(veejay_t *info) {
 		}
 		if( event.type == SDL_MOUSEMOTION )
 		{
-			mouse_x = event.button.x;
-			mouse_y = event.button.y;
+			mouse_x = event.motion.x;
+			mouse_y = event.motion.y;
 		}
 
 		if( info->use_mouse && event.type == SDL_MOUSEBUTTONDOWN )
@@ -3727,8 +3765,7 @@ static void 	veejay_consume_events(veejay_t *info) {
 			{
 				but = 16;
 			}
-			mouse_x = event.button.x;
-			mouse_y = event.button.y;
+			SDL_GetMouseState(&mouse_x, &mouse_y);
 		}
 		
 	}
@@ -3746,11 +3783,46 @@ void	veejay_event_handle(veejay_t *info)
 	if( info->video_out == 0 || info->video_out == 2)
 	{
 		SDL_Event event;
+		SDL_Event pending_motion;
+		int have_pending_motion = 0;
+		int pending_motion_mod = 0;
+
 		while(SDL_PollEvent(&event) == 1) 
 		{
+			int mod = SDL_GetModState();
 
-			vj_event_push(&event, SDL_GetModState());
+			if(!veejay_sdl_event_wanted(info, &event))
+				continue;
+
+			if(event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE) {
+				SDL_Event quit_event;
+				veejay_memset(&quit_event, 0, sizeof(SDL_Event));
+				quit_event.type = SDL_QUIT;
+				if(have_pending_motion) {
+					veejay_sdl_push_event(&pending_motion, pending_motion_mod);
+					have_pending_motion = 0;
+				}
+				veejay_sdl_push_event(&quit_event, mod);
+				continue;
+			}
+
+			if(event.type == SDL_MOUSEMOTION) {
+				pending_motion = event;
+				pending_motion_mod = mod;
+				have_pending_motion = 1;
+				continue;
+			}
+
+			if(have_pending_motion) {
+				veejay_sdl_push_event(&pending_motion, pending_motion_mod);
+				have_pending_motion = 0;
+			}
+
+			veejay_sdl_push_event(&event, mod);
 		}
+
+		if(have_pending_motion)
+			veejay_sdl_push_event(&pending_motion, pending_motion_mod);
 	}
 #endif
 }

@@ -289,6 +289,8 @@ int		vj_tag_sprint_status(int tag_id, int tags,int sample_count, int cache,int s
 uint8_t		*vj_tag_get_cali_buffer(int t1, int type, int *total, int *len, int *uvlen);
 int	vj_tag_generator_set_arg(int t1, int *values);
 int vj_tag_generator_get_args(int t1, int *args, int *n_args, int *fx_id);
+int	vj_tag_stream_set_arg(int t1, int *values);
+int vj_tag_stream_get_args(int t1, int *args, int *n_args, int *fx_id);
 
 int 	vj_tag_stop_encoder(int t1);
 int 	vj_tag_set_brightness(int t1, int value);
@@ -374,9 +376,8 @@ void	vj_tag_reload_config( void *compiz, int t1, int mode );
 
 void	*vj_tag_get_composite_view(int t1);
 int	vj_tag_set_composite_view(int t1, void *v);
-int	vj_tag_cali_write_file( int id, char *name, editlist *el );
+int	vj_tag_cali_write_file( int t1, char *name, editlist *el );
 int	vj_tag_has_cali_fx( int t1 );
-int     vj_tag_cali_write_file( int t1, char *name, editlist *el );
 uint8_t *vj_tag_get_cali_data( int t1, int what );
 void	vj_tag_set_chain_paused(int t1, int paused);
 

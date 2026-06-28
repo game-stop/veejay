@@ -261,6 +261,7 @@ typedef struct {
 } sdl_event_t;
 
 static sdl_event_t EVENT_QUEUE;
+static volatile int event_queue_full_reported = 0;
 
 static struct {                 /* hardcoded keyboard layout (the default keys) */
     int event_id;           
@@ -2253,7 +2254,10 @@ int     vj_event_push(void *eptr, int mod )
 
     int head = atomic_load_int(&EVENT_QUEUE.head);
     if( next == head ) {
-        veejay_msg(VEEJAY_MSG_DEBUG, "Event queue is full");
+        if(!atomic_load_int(&event_queue_full_reported)) {
+            atomic_store_int(&event_queue_full_reported, 1);
+            veejay_msg(VEEJAY_MSG_DEBUG, "Event queue is full; dropping SDL input until the queue drains");
+        }
         return 0;
     }
 
@@ -2263,6 +2267,10 @@ int     vj_event_push(void *eptr, int mod )
     EVENT_QUEUE.mods[tail] = mod;
 
     atomic_store_int(&EVENT_QUEUE.tail, next );
+
+    if(atomic_load_int(&event_queue_full_reported))
+        atomic_store_int(&event_queue_full_reported, 0);
+
     return 1;
 }
 
@@ -2981,6 +2989,7 @@ void vj_event_init(void *ptr)
 #ifdef HAVE_SDL 
     veejay_memset( keyboard_event_map_, 0, sizeof(keyboard_event_map_));
     veejay_memset( &EVENT_QUEUE, 0, sizeof(EVENT_QUEUE));
+    atomic_store_int(&event_queue_full_reported, 0);
 #endif
 
     init_vims_forward_cache();

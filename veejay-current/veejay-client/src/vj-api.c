@@ -1735,6 +1735,7 @@ static  vims_keys_t vims_keys_list[VIMS_MAX];
 static  int vims_verbosity = 0;
 #define   livido_port_t vevo_port_t
 static int cali_stream_id = 0;
+static int cali_stream_type = STREAM_NO_STREAM;
 static int cali_onoff     = 0;
 static int geo_pos_[2] = { -1,-1 };
 static vevo_port_t *fx_list_ = NULL;
@@ -2171,6 +2172,11 @@ static void indicate_sequence( gboolean active, sequence_gui_slot_t *slot );
 static void set_textview_buffer2(GtkWidget *view, gchar *utf8text);
 void interrupt_cb(void);
 int get_and_draw_frame(int type, char *wid_name);
+static int cali_selected_stream_id(void);
+static int cali_selected_stream_type(void);
+static int cali_selected_stream_can_capture(void);
+static int cali_selected_stream_can_inspect(void);
+static void cali_set_stream_preview_mode(int mode, int use_flat);
 GdkPixbuf *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
 static void vj_kf_select_parameter(int id);
 static void vj_kf_refresh(gboolean force);
@@ -3941,7 +3947,7 @@ void about_dialog(void)
 
     const gchar *web =
     {
-        "http://www.veejayhq.net"
+        "https://github.com/game-stop/veejay"
     };
 
     char blob[1024];
@@ -4473,6 +4479,92 @@ static void audio_input_selector_set_from_record_source_local(int source)
     active = audio_input_selector_active_from_record_source_local(source);
     if(gtk_combo_box_get_active(GTK_COMBO_BOX(w)) != active)
         gtk_combo_box_set_active(GTK_COMBO_BOX(w), active);
+}
+
+static int cali_stream_type_can_capture(int type)
+{
+    return type == STREAM_VIDEO4LINUX || type == STREAM_VLOOP;
+}
+
+static int cali_stream_type_can_inspect(int type)
+{
+    return cali_stream_type_can_capture(type) || type == STREAM_CALI;
+}
+
+static int cali_stream_type_from_label(const char *label)
+{
+    if(!label)
+        return STREAM_NO_STREAM;
+
+    if(strstr(label, "v4l2"))
+        return STREAM_VIDEO4LINUX;
+    if(strstr(label, "vloopback"))
+        return STREAM_VLOOP;
+    if(strstr(label, "calibrate"))
+        return STREAM_CALI;
+
+    return STREAM_NO_STREAM;
+}
+
+static int cali_selected_stream_id(void)
+{
+    if(cali_stream_id > 0)
+        return cali_stream_id;
+
+    if(info && info->status_tokens[PLAY_MODE] == MODE_STREAM &&
+       info->status_tokens[CURRENT_ID] > 0)
+    {
+        cali_stream_id = info->status_tokens[CURRENT_ID];
+        cali_stream_type = info->status_tokens[STREAM_TYPE];
+    }
+
+    return cali_stream_id;
+}
+
+static int cali_selected_stream_type(void)
+{
+    if(cali_stream_type != STREAM_NO_STREAM)
+        return cali_stream_type;
+
+    if(info && info->status_tokens[PLAY_MODE] == MODE_STREAM &&
+       info->status_tokens[CURRENT_ID] == cali_stream_id)
+    {
+        cali_stream_type = info->status_tokens[STREAM_TYPE];
+    }
+
+    return cali_stream_type;
+}
+
+static int cali_selected_stream_can_capture(void)
+{
+    return cali_selected_stream_id() > 0 &&
+           cali_stream_type_can_capture(cali_selected_stream_type());
+}
+
+static int cali_selected_stream_can_inspect(void)
+{
+    return cali_selected_stream_id() > 0 &&
+           cali_stream_type_can_inspect(cali_selected_stream_type());
+}
+
+static void cali_set_stream_preview_mode(int mode, int use_flat)
+{
+    int stream_id = cali_selected_stream_id();
+
+    if(stream_id <= 0)
+        return;
+
+    if(mode < 0)
+        mode = 0;
+    else if(mode > 3)
+        mode = 3;
+
+    use_flat = use_flat ? 1 : 0;
+
+    char line[64];
+    snprintf(line, sizeof(line), "%d:%d %d %d;",
+             VIMS_STREAM_SET_ARG, stream_id, mode, use_flat);
+    msg_vims(line);
 }
 
 static void record_audio_source_sync_groups(int source)
@@ -6293,8 +6385,8 @@ gboolean cali_sources_selection_func (GtkTreeSelection *selection,
 
         if( info->uc.cali_stage != 0 )
         {
-            veejay_msg(VEEJAY_MSG_ERROR, "%d", info->uc.cali_stage);
-            return TRUE;
+            veejay_msg(VEEJAY_MSG_WARNING, "Cannot change calibration source while a capture step is active");
+            return FALSE;
         }
 
         gtk_tree_model_get(model, &iter, FXC_ID, &name, -1);
@@ -6306,7 +6398,21 @@ gboolean cali_sources_selection_func (GtkTreeSelection *selection,
             if(name[0] != 'S')
             {
                 cali_stream_id = id;
-                update_label_str2(widget_cache[WIDGET_CURRENT_STEP_LABEL], "Please take an image with the cap on the lens.");
+                cali_stream_type = cali_stream_type_from_label(name);
+
+                if(cali_selected_stream_can_capture()) {
+                    update_label_str2(widget_cache[WIDGET_CURRENT_STEP_LABEL],
+                                      "Step 1: cover the lens and take the dark frames.");
+                }
+                else if(cali_selected_stream_can_inspect()) {
+                    update_label_str2(widget_cache[WIDGET_CURRENT_STEP_LABEL],
+                                      "Loaded calibration source selected. Use the preview buttons to inspect the frames.");
+                }
+                else {
+                    update_label_str2(widget_cache[WIDGET_CURRENT_STEP_LABEL],
+                                      "This stream type cannot be calibrated here.");
+                }
+
                 GtkWidget *nb = glade_xml_get_widget_(info->main_window, "cali_notebook");
                 gtk_notebook_next_page( GTK_NOTEBOOK(nb));
             }
@@ -11731,21 +11837,20 @@ static void update_globalinfo(int *history, int pm, int last_pm)
                 {
                     case 1:
                         gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
-                            "Please take an image of a uniformly lit area in placed in front of your lens.");
-                        gtk_button_set_label( GTK_BUTTON(tb), "Take White Frames");
+                            "Step 2: point the camera at an evenly lit white target, below clipping.");
+                        gtk_button_set_label( GTK_BUTTON(tb), "Take Light Frames");
                         break;
                     case 2:
                     case 3:
                         gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
-                            "Image calibrated. You may need to adjust brightness.");
+                            "Calibration ready. Use the preview buttons to inspect dark, light and flat frames.");
                         if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ] ))
                              gtk_widget_set_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ], TRUE);
                          break;
                     default:
                         gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
-                            "Image calibrated. You may need to adjust brightness.");
-                        gtk_button_set_label( GTK_BUTTON(tb), "Take Black Frames");
-                        veejay_msg(VEEJAY_MSG_ERROR, "Warning, mem leak if not reset first.");
+                            "Calibration ready. Use the preview buttons to inspect dark, light and flat frames.");
+                        gtk_button_set_label( GTK_BUTTON(tb), "Take Dark Frames");
                          break;
                }
                if(info->uc.cali_stage >= 2 )
@@ -15178,13 +15283,17 @@ static void add_sample_to_effect_sources_list(gint id,
                        -1 );
 
     GtkTreeIter iter2;
-    if(type != STREAM_NO_STREAM)
+    if(cali_stream_type_can_inspect(type))
     {
-        gtk_list_store_append( cali_sourcestore,&iter2);
-        gtk_list_store_set(cali_sourcestore,&iter2,
-                           SL_ID, id_string,
-                           SL_DESCR,title,
-                           SL_TIMECODE,timecode,
+        gchar cali_id_string[512];
+        snprintf(cali_id_string, sizeof(cali_id_string),
+                 "T[%4d] %s", id, get_stream_prefix(type));
+
+        gtk_list_store_append(cali_sourcestore, &iter2);
+        gtk_list_store_set(cali_sourcestore, &iter2,
+                           SL_ID, cali_id_string,
+                           SL_DESCR, title,
+                           SL_TIMECODE, timecode,
                            -1);
     }
 }
