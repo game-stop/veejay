@@ -5798,7 +5798,7 @@ static void update_current_slot(int *history, int pm, int last_pm) {
         int k;
         update = 1;
         update_record_tab( pm );
-        sample_volume_sync_from_current(pm);
+        sample_volume_sync_from_status(history, 1);
 
         if( info->status_tokens[STREAM_TYPE] == STREAM_VIDEO4LINUX )
         {
@@ -12500,6 +12500,8 @@ void update_gui(void)
 
     update_globalinfo(history, pm, last_pm);
     update_record_audio_source_from_status(history);
+    sample_volume_sync_from_status(history, last_pm < 0);
+    audio_mixer_crossfade_sync_from_status(history, last_pm < 0);
 
     if(status_entry_tail_changed(history, last_pm < 0))
         info->uc.reload_hint[HINT_ENTRY] = 1;

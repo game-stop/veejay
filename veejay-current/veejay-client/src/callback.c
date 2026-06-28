@@ -522,6 +522,35 @@ static void sample_volume_sync_from_current(int pm)
     sample_volume_set_guarded(volume);
 }
 
+static void sample_volume_sync_from_status(int *history, int force)
+{
+    int volume;
+    int sample_id;
+
+    if(info->status_tokens[PLAY_MODE] != MODE_SAMPLE)
+        return;
+
+    if(VIMS_STATUS_TOKENS <= SAMPLE_AUDIO_VOLUME) {
+        sample_volume_sync_from_current(info->status_tokens[PLAY_MODE]);
+        return;
+    }
+
+    if(!force && history &&
+       history[PLAY_MODE] == info->status_tokens[PLAY_MODE] &&
+       history[CURRENT_ID] == info->status_tokens[CURRENT_ID] &&
+       history[SAMPLE_AUDIO_VOLUME] == info->status_tokens[SAMPLE_AUDIO_VOLUME])
+        return;
+
+    volume = ui_clampi(info->status_tokens[SAMPLE_AUDIO_VOLUME], 0, 100);
+    sample_id = info->status_tokens[CURRENT_ID];
+
+    sample_volume_ui_cache_init();
+    if(sample_id > 0 && sample_id < SAMPLE_VOLUME_UI_CACHE_SIZE)
+        sample_volume_ui_cache[sample_id] = volume;
+
+    sample_volume_set_guarded(volume);
+}
+
 void on_sample_volume_value_changed(GtkWidget *widget, gpointer user_data)
 {
     int sample_id;
@@ -640,6 +669,21 @@ static void audio_mixer_set_crossfade_guarded(int crossfade)
     volume_set_adjustment_guarded(WIDGET_AUDIO_MIXER_CROSSFADE_SCALE,
                                   WIDGET_AUDIO_MIXER_CROSSFADE_SPIN,
                                   crossfade);
+}
+
+static void audio_mixer_crossfade_sync_from_status(int *history, int force)
+{
+    int crossfade;
+
+    if(VIMS_STATUS_TOKENS <= AUDIO_MIX_CROSSFADE)
+        return;
+
+    if(!force && history &&
+       history[AUDIO_MIX_CROSSFADE] == info->status_tokens[AUDIO_MIX_CROSSFADE])
+        return;
+
+    crossfade = ui_clampi(info->status_tokens[AUDIO_MIX_CROSSFADE], 0, 100);
+    audio_mixer_set_crossfade_guarded(crossfade);
 }
 
 static void audio_mixer_reset_to_follow_route(void)

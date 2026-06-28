@@ -1,5 +1,22 @@
-/* Gveejay Reloaded - graphical interface for VeeJay
- *      (C) 2002-2005 Niels Elburg <nwelburg@gmail.com>
+/* gveejay - Linux VeeJay - GVeejay GTK+-3/Glade User Interface
+ *           (C) 2002-2018 Niels Elburg <nwelburg@gmail.com>
+ *  with contributions by  Jerome Blanchi (2016-2018)
+ *                        (Gtk3 Migration and other stuff)
+ *
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #ifndef GVRCOMMON_H
 #define GVRCOMMON_H
@@ -75,7 +92,10 @@
 #define AUDIO_BEAT_SOURCE_LOSS_PAUSE      (AUDIO_BEAT_CONFIG_FIRST + 9)
 #define AUDIO_BEAT_MONITOR_LATENCY        (AUDIO_BEAT_CONFIG_FIRST + 10)
 #define AUDIO_BEAT_EFFECTIVE_LATENCY      (AUDIO_BEAT_CONFIG_FIRST + 11)
-#define AUDIO_BEAT_CONFIG_LAST            (AUDIO_BEAT_CONFIG_FIRST + 12)                                                                          
+#define AUDIO_BEAT_CONFIG_LAST            (AUDIO_BEAT_CONFIG_FIRST + 12)
+#define SAMPLE_AUDIO_VOLUME               AUDIO_BEAT_CONFIG_LAST
+#define AUDIO_MIX_CROSSFADE               (SAMPLE_AUDIO_VOLUME + 1)
+#define AUDIO_MIXER_STATUS_LAST           (AUDIO_MIX_CROSSFADE + 1)
 
 #define AUDIO_SYNC_ENABLED       58
 #define AUDIO_SYNC_OPEN          59

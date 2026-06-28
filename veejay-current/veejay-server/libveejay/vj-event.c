@@ -3693,14 +3693,6 @@ void vj_event_sample_set_volume(void *ptr, const char format[], va_list ap)
         return;
     }
 
-#ifdef HAVE_JACK
-    if(SAMPLE_PLAYING(v) && v->uc->sample_id == args[0] && v->settings &&
-       atomic_load_int(&v->settings->record_audio_source) == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK)
-    {
-        vj_jack_set_volume(args[1]);
-    }
-#endif
-
     veejay_msg(VEEJAY_MSG_INFO, "Sample %d audio volume set to %d", args[0], args[1]);
 }
 

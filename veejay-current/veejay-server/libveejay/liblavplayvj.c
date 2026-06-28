@@ -3099,6 +3099,36 @@ static char *veejay_pipe_append_sequence_status(veejay_t *info, char *ptr)
     return ptr;
 }
 
+static int veejay_pipe_current_sample_audio_volume(veejay_t *info)
+{
+    int volume = 100;
+
+    if(info && info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
+        int sample_id = info->uc->sample_id;
+
+        if(sample_exists(sample_id)) {
+            volume = sample_get_audio_volume(sample_id);
+            if(volume < 0)
+                volume = 100;
+        }
+    }
+
+    if(volume < 0)
+        return 0;
+    if(volume > 100)
+        return 100;
+
+    return volume;
+}
+
+static char *veejay_pipe_append_audio_mixer_status(veejay_t *info, char *ptr)
+{
+    ptr = vj_sprintf(ptr, veejay_pipe_current_sample_audio_volume(info));
+    ptr = vj_sprintf(ptr, vj_perform_get_audio_mix_crossfade(info));
+
+    return ptr;
+}
+
 static char *veejay_pipe_append_audio_beat_config_status(veejay_t *info, char *ptr)
 {
 #ifdef HAVE_JACK
@@ -3283,7 +3313,8 @@ static void veejay_pipe_write_status(veejay_t * info)
         (size_t)(VJ_AUDIO_STATUS_TOKENS +
                  VJ_CHAIN_ENTRY_STATUS_TOKENS +
                  VJ_SEQUENCE_STATUS_TOKENS +
-                 VJ_AUDIO_BEAT_CONFIG_STATUS_TOKENS) *
+                 VJ_AUDIO_BEAT_CONFIG_STATUS_TOKENS +
+                 VJ_AUDIO_MIXER_STATUS_TOKENS) *
         (size_t)VJ_INT_FIELD_MAX;
     const int base_tokens = veejay_pipe_status_token_count(info->status_what);
     static int status_packet_warned = 0;
@@ -3306,6 +3337,7 @@ static void veejay_pipe_write_status(veejay_t * info)
     ptr = veejay_pipe_append_chain_entry_status(info, ptr);
     ptr = veejay_pipe_append_sequence_status(info, ptr);
     ptr = veejay_pipe_append_audio_beat_config_status(info, ptr);
+    ptr = veejay_pipe_append_audio_mixer_status(info, ptr);
     ptr = veejay_pipe_pad_status_tokens(info->status_what, ptr, VIMS_STATUS_TOKENS);
 
     *ptr = '\0';
