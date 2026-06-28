@@ -1,4 +1,4 @@
-.TH "veejay" 1
+.TH "VEEJAY" "1" "June 2026" "Veejay" "User Commands"
 .SH NAME
 veejay \- a visual video instrument and video sampler for GNU/Linux
 
@@ -86,14 +86,17 @@ Samplelist changes are synchronized through the shared samplelist file. Playback
 and trickplay commands are forwarded over the VIMS connection when forwarding is
 enabled.
 
-.SH SUPPORTED VIDEO CONTAINERS
+.SH SUPPORTED VIDEO CONTAINERS AND INPUTS
 
 .IP \(bu 2
-AVI
+AVI, including OpenDML AVI.
 .IP \(bu 2
-QuickTime
+QuickTime, when veejay is built with libquicktime support.
 .IP \(bu 2
-DVVideo
+Raw DV / DVVideo, when veejay is built with DV support.
+.IP \(bu 2
+Still image files through GDK Pixbuf, when image loading support is compiled in.
+The exact image extensions depend on the installed GDK Pixbuf loaders.
 
 .SH SUPPORTED VIDEO CODECS AND FORMATS
 
@@ -102,49 +105,91 @@ MJPEG AVI / QuickTime, fourcc:
 .BR mjpg ,
 .BR mjpb ,
 .BR mjpa ,
-.B jfif
+.BR jpeg ,
+.BR jfif ,
+.BR sp5x ,
+.BR jpgl ,
+and
+.BR dmb1 .
 
 .IP \(bu 2
 Lossless JPEG AVI, fourcc:
 .B ljpg
 
 .IP \(bu 2
-Quasar DV codec, NTSC/PAL, AVI / QuickTime, fourcc:
+DV / DVVideo, NTSC/PAL, AVI / QuickTime / raw DV, fourcc:
 .BR dv ,
+.BR dvsd ,
+.BR dxsd ,
 .BR dvhd ,
 .BR dvp ,
-.B dvcp
+and
+.BR dvcp .
 
 .IP \(bu 2
-YUV4MPEG, chroma 4:2:0 JPEG/MPEG-2, chroma 4:2:2, AVI / Y4M
+Planar YUV 4:2:0, fourcc:
+.BR iyuv ,
+.BR yv12 ,
+and
+.BR i420 .
+
+.IP \(bu 2
+Planar YUV 4:2:2, fourcc:
+.BR yv16 ,
+.BR i422 ,
+.BR vj22 ,
+.BR y42b ,
+and full-range or internal variants
+.BR vj20
+and
+.BR y42x .
+
+.IP \(bu 2
+YUV4MPEG stream output, 4:2:2 or 4:2:0, selected with
+.BR -O/--output .
 
 .IP \(bu 2
 Motion PNG, fourcc:
-.BR mpng ,
-.B png
+.BR mpng
+and
+.BR png .
 
 .IP \(bu 2
-RAW YUV 4:2:2 planar JPEG/JFIF, sample range 0-255, 8 bit, 3 planes,
-fourcc:
-.BR vj22 ,
-.B vj20
-
-.IP \(bu 2
-RAW YUV 4:2:2 planar Rec. 601, Y'CbCr, sample range 16-235 for Y and
-16-240 for UV, 8 bit, 3 planes
+HuffYUV, fourcc:
+.BR hfyu .
 
 .IP \(bu 2
 MLZO, YUV 4:2:2 planar compressed with OberHumer's LZO real-time data
 compression library, fourcc:
-.B mlzo
+.BR mlzo .
 
 .IP \(bu 2
-FFmpeg RAW format
+QOI/YUV experimental storage, fourcc:
+.BR qoiy .
+
+.IP \(bu 2
+HAP streams, fourcc:
+.BR hap1 ,
+.BR hap5 ,
+.BR hapy ,
+.BR hapa ,
+and
+.BR hapm .
+
+.IP \(bu 2
+Older QuickTime/video codecs handled by the input path when available, including
+.BR svq1 ,
+.BR svq3 ,
+.BR rpza ,
+and
+.BR cyuv .
 
 .SH CHROMA AND INTERNAL VIDEO FORMAT
 
-Veejay converts all source video data to planar YUV 4:2:2 for internal
-processing and playback.
+Veejay converts source video data to planar YUV for processing and playback.
+The normal playback pipeline is planar YUV 4:2:2. Some input and output routes
+can use 4:2:0, full-range 4:2:2, or temporary 4:4:4 working buffers when an
+effect, scaler, decoder, or stream path needs that format.
 
 Effects and filters that need full chroma resolution can use 4:4:4 chroma
 upsampling internally. The chroma upsampling method can be selected with
@@ -155,12 +200,14 @@ can be selected with
 
 .SH AUDIO
 
-Veejay uses JACK, a low-latency audio server, to transport audio in sync with
-video. This allows you to process veejay's audio output in another sound
-processing application.
+When built with JACK support, veejay can use JACK as a low-latency audio
+transport and as an external input/control source. This allows you to process
+veejay's audio output in another sound application and to feed external audio
+back into monitor, sync, beat, and recording routes.
 
-Audio playback, audio output mute, the master-clock producer, JACK sync/control,
-and beat analysis are separate controls.
+Source/media audio playback, global output mute, JACK volume, sample audio
+volume, the master-clock producer, JACK sync/control, the audio mixer, and beat
+analysis are separate controls.
 
 By default, veejay starts with audio playback output enabled, also in dummy mode.
 In dummy mode there is no source audio, so enabling or muting audio still results
@@ -169,16 +216,16 @@ opened, the audio producer can still run and fall back to the monotonic clock.
 
 The
 .BR -a/--audio
-option controls audio playback output. With
+option controls source/media playback audio. With
 .BR "-a 1" ,
-veejay starts audio playback output. If the loaded video, stream, or sample has
-no embedded audio, veejay still keeps a valid silent audio path when JACK is
-available. This lets external JACK monitor, tempo bridge, track align, WAV
-playback, beat analysis, and audio sync keep working.
+veejay starts source/media audio playback output. If the loaded video, stream,
+or sample has no embedded audio, veejay still keeps a valid silent audio path
+when JACK is available. This lets external JACK monitor, tempo bridge, track
+align, WAV playback, beat analysis, and audio sync keep working.
 
 With
 .BR "-a 0" ,
-veejay starts without playing the original video source audio. The master-clock
+veejay starts without playing the original media audio. The master-clock
 producer may still run for timing, and JACK input services may still be
 available for external monitor, tempo bridge, track align, and beat analysis
 when JACK support is compiled in.
@@ -195,6 +242,98 @@ For installations that do not need individual JACK analysis/control workers, use
 or
 .BR --no-audio-beat-thread
 to disable those workers separately.
+
+.SS Audio mixer, JACK monitor, and recording policy
+
+The runtime audio mixer is separate from JACK volume control and from per-sample
+audio volume. It selects which audible route is sent to output and, when
+recording policy is set to automatic, which audio route is used by the recorder.
+The mixer mode is controlled through VIMS and Reloaded controls, not by a
+startup command-line option.
+
+Mixer mode values are:
+.RS
+.IP 0 3
+Follow the active audio route.
+.IP 1 3
+Original/source audio only.
+.IP 2 3
+JACK external audio only.
+.IP 3 3
+Original/source audio plus JACK external audio.
+.RE
+
+The mixer crossfade is 0-100. A value of 0 means original/source audio, 100
+means JACK external audio, and 50 is the equal-power blend point for the mixed
+route.
+
+The sample recorder has a separate audio-source policy. Runtime values are:
+.RS
+.IP 0 3
+Automatic.
+.IP 1 3
+Original/source audio.
+.IP 2 3
+External sync source, for example JACK or WAV sync/monitor source when active.
+.IP 3 3
+Silence.
+.RE
+
+Use
+.B veejay -u
+or
+.B sayVIMS
+against a running backend to inspect the exact VIMS ids for the mixer,
+recording, sync, and beat commands in the current build.
+
+.SS JACK audio sync/control modes
+
+The audio sync/control worker is used by JACK/WAV analysis, tempo bridge, track
+align, monitor passthrough, and tempo-follow controller features. The worker can
+be disabled at startup with
+.BR --no-audio-sync-thread .
+The runtime sync mode values are:
+.RS
+.IP 0 3
+Off.
+.IP 1 3
+External analysis.
+.IP 2 3
+Tempo bridge / master-tempo audio.
+.IP 3 3
+Track align.
+.IP 4 3
+Monitor external passthrough.
+.IP 5 3
+Tempo-follow controller.
+.RE
+
+Sync sources can be JACK input, a PCM WAV file, or a pushed controller/source
+state, depending on the runtime command used. Tempo bridge and tempo follow use
+target BPM, beat phase, confidence, and correction-limit controls.
+
+.SS JACK beat detector and beat-driven FX
+
+The beat detector is a separate worker from audio sync/control. Disable it at
+startup with
+.BR --no-audio-beat-thread
+when a backend does not need beat analysis or auto-FX beat modulation.
+
+The runtime beat action values are:
+.RS
+.IP 0 3
+None.
+.IP 2 3
+Auto-FX beat modulation.
+.IP 3 3
+Break-beat transport plus auto-FX beat modulation.
+.IP 4 3
+Break-beat transport only.
+.RE
+
+Beat auto-FX mode values are 0 for off, 1 for primary, 2 for primary plus
+motion, 3 for primary plus motion plus memory, and 4 for chaos. Individual FX
+chain entries can also have beat control enabled or disabled at runtime.
 
 .SH GENERAL USAGE
 
@@ -365,13 +504,14 @@ Load every video file on the command line as a new sample.
 
 .TP
 .B \-a/--audio [0|1]
-Enable or disable audio playback output. Use 0 to start without playing the
-original video source audio, or 1 to enable audio playback output. Default is
-1.
+Enable or disable source/media audio playback output. Use 0 to start without
+playing the original media audio, or 1 to enable source/media audio playback
+output. Default is 1.
 
-This option does not disable JACK input services when JACK support is compiled
-in. External JACK monitor, tempo bridge, track align, WAV playback, beat
-analysis, and audio sync may still be used with
+This option is not a global JACK shutdown switch. It does not disable the master
+clock, JACK input capture, audio sync/control, or beat analysis when those
+features are compiled in and enabled. External JACK monitor, tempo bridge, track
+align, WAV playback, beat analysis, and audio sync may still be used with
 .BR "-a 0" .
 
 .TP
@@ -382,9 +522,10 @@ beat analysis, or audio sync. In dummy mode the result is still silent output.
 
 .TP
 .B \--audio-sync-thread [0|1]
-Enable or disable the audio sync/control worker. Use 0 to disable external
-JACK monitor, tempo bridge, track align, WAV sync/control, and target-clock
-control requests. Use 1 to allow them. Default is 1.
+Enable or disable the audio sync/control worker. Use 0 to keep the sync/control
+worker from starting; this disables JACK/WAV analysis, monitor passthrough,
+tempo bridge, track align, tempo-follow control, and target-clock control
+requests for that backend. Use 1 to allow them. Default is 1.
 
 .TP
 .B \--no-audio-sync-thread
@@ -393,8 +534,9 @@ Disable the audio sync/control worker. This is equivalent to
 
 .TP
 .B \--audio-beat-thread [0|1]
-Enable or disable the audio beat detector worker. Use 0 to prevent beat analysis
-and auto-FX beat modulation from starting. Use 1 to allow them. Default is 1.
+Enable or disable the audio beat detector worker. Use 0 to prevent beat
+analysis, beat state reporting, break-beat transport actions, and auto-FX beat
+modulation from starting in that backend. Use 1 to allow them. Default is 1.
 
 .TP
 .B \--no-audio-beat-thread
@@ -403,7 +545,8 @@ Disable the audio beat detector worker. This is equivalent to
 
 .TP
 .B \--pace-correction <ms>
-Set audio pace correction offset in milliseconds. The value must be non-negative.
+Set audio pace correction offset in milliseconds. The value must be
+non-negative. This is a startup timing offset, not a volume or mixer control.
 
 .TP
 .B \-c/--synchronization [0|1]
@@ -572,6 +715,26 @@ and
 .TP
 .B \-q/--quit
 Quit at the end of the file.
+
+.TP
+.B Runtime recorder formats
+Recording format is selected at runtime with the VIMS recording-format command.
+The backend can report the exact build-dependent list with
+.BR veejay -u .
+Common names include
+.BR DV2 ,
+.BR MJPEG ,
+.BR HuffYUV ,
+.BR "YUV 4:2:2 Planar" ,
+.BR "YUV 4:2:0 Planar" ,
+.BR LZO ,
+.BR QOI ,
+.BR DIVX ,
+.BR "Quicktime DV" ,
+.BR "Quicktime MJPEG" ,
+.BR "YUV4MPEG Stream 4:2:2" ,
+and
+.BR "YUV4MPEG Stream 4:2:0" .
 
 .SH VIDEO WALL SPLIT-SCREEN CONFIGURATION
 
@@ -1365,6 +1528,19 @@ picked up through veejay's samplelist watcher. In Reloaded, connect to the
 preview or editing veejay and enable
 .B Forward VIMS trickplay
 to mirror playback controls to the master output.
+
+
+.TP
+.B veejay -d -p 3490 --audio-muted --no-audio-beat-thread
+Start a silent dummy backend with global output mute enabled and without the
+beat detector worker. JACK sync/control can still be available unless it is also
+disabled.
+
+.TP
+.B veejay movie1.avi -a 0 --audio-sync-thread 1 --audio-beat-thread 1
+Start without source/media audio playback, but keep the JACK/WAV sync-control
+and beat workers available for runtime monitor, tempo bridge, track align, and
+beat-driven FX commands.
 
 .SH REFERENCES
 
