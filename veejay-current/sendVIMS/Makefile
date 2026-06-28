@@ -25,9 +25,16 @@ clean:
 	rm -f *.pd_linux
 	rm -f *~
 
-install:
-	install -m 644 *.pd_* $(PREFIX)/lib/pd/extra
-	install -m 644 help-*.pd $(PREFIX)/lib/pd/doc/5.reference/
+INSTALL ?= install
+prefix := $(patsubst %/,%,$(PREFIX))
+PDLIBDIR ?= $(prefix)/lib/pd
+PDEXTRADIR ?= $(PDLIBDIR)/extra
+PDREFDIR ?= $(PDLIBDIR)/doc/5.reference
+
+install: pd_linux
+	$(INSTALL) -d "$(DESTDIR)$(PDEXTRADIR)" "$(DESTDIR)$(PDREFDIR)"
+	$(INSTALL) -m 644 *.pd_* "$(DESTDIR)$(PDEXTRADIR)/"
+	$(INSTALL) -m 644 help-*.pd "$(DESTDIR)$(PDREFDIR)/"
 
 dist:	clean
 	rm -rf ../sendVIMS-$(VERSION)

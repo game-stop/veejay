@@ -38,16 +38,32 @@
 #define POLL_INTERVAL_IDLE      (25.0f)
 #define MAX_MSG                 256
 
-#define SENDVIMS_STATUS_TOKENS    82  /* lock-step with vims.h / VIMS_STATUS_TOKENS */
-#define SENDVIMS_STATUS_BODY_MAX  999 /* V%03dD protocol body-size limit */
-#define SENDVIMS_HEADER_SIZE      5
+#define SENDVIMS_STATUS_TOKENS       133  /* lock-step with vims.h / VIMS_STATUS_TOKENS */
+#define SENDVIMS_COMMAND_BODY_MAX     999  /* V%03dD command body-size limit */
+#define SENDVIMS_STATUS_BODY_MAX      9999 /* V%04dS status body-size limit */
+#define SENDVIMS_COMMAND_HEADER_SIZE  5
+#define SENDVIMS_STATUS_HEADER_SIZE   6
+#define SENDVIMS_SELECTOR_MAX          602
+#define SENDVIMS_SELECTOR_ALIAS_MAX    768
+
+#if SENDVIMS_STATUS_TOKENS != 133
+#error "SENDVIMS_STATUS_TOKENS must be 133 for veejay status fields 0..132"
+#endif
 
 #define QUEUE_SIZE (1 << 8)
 #define QUEUE_MASK (QUEUE_SIZE - 1)
 
 static t_symbol *s_disconnect = 0;
 static t_symbol *s_veejay = 0;
-static t_symbol *selector[602];
+
+typedef struct {
+    t_symbol *symbol;
+    int id;
+} selector_alias_t;
+
+static t_symbol *selector[SENDVIMS_SELECTOR_MAX];
+static selector_alias_t selector_aliases[SENDVIMS_SELECTOR_ALIAS_MAX];
+static int n_selector_aliases = 0;
 
 typedef struct {
     struct hostent *he;
@@ -105,27 +121,89 @@ static int sendVIMS_is_digit(char c)
     return (c >= '0' && c <= '9');
 }
 
+static int sendVIMS_is_reply_event(int id)
+{
+    return (id >= 400 && id < 500);
+}
+
 static int selector_map(t_symbol *s)
 {
     const char *name = s->s_name;
     int i;
 
-    if (name[0] == 'p' && sendVIMS_is_digit(name[1]))
-        return atoi(name + 1);
+    if (name[0] == 'p' && sendVIMS_is_digit(name[1])) {
+        int id = 0;
 
-    for (i = 0; i < 602; i++) {
-        if (s == selector[i])
-            return i;
+        for (i = 1; name[i]; i++) {
+            if (!sendVIMS_is_digit(name[i])) {
+                post("sendVIMS: raw selector %s is not a valid pNNN port", s->s_name);
+                return -1;
+            }
+
+            id = (id * 10) + (name[i] - '0');
+            if (id >= SENDVIMS_SELECTOR_MAX)
+                break;
+        }
+
+        if (id > 0 && id < SENDVIMS_SELECTOR_MAX) {
+            if (sendVIMS_is_reply_event(id)) {
+                post("sendVIMS: VIMS %03d returns command-socket data and is not supported", id);
+                return -1;
+            }
+            return id;
+        }
+
+        post("sendVIMS: raw selector %s is outside p001..p399 or p500..p601", s->s_name);
+        return -1;
+    }
+
+    for (i = 0; i < n_selector_aliases; i++) {
+        if (s == selector_aliases[i].symbol) {
+            if (sendVIMS_is_reply_event(selector_aliases[i].id)) {
+                post("sendVIMS: VIMS %03d returns command-socket data and is not supported", selector_aliases[i].id);
+                return -1;
+            }
+            return selector_aliases[i].id;
+        }
     }
 
     post("sendVIMS: selector %s not recognized", s->s_name);
-    return 0;
+    return -1;
+}
+
+static void sendVIMS_add_selector(const char *name, int id)
+{
+    t_symbol *sym;
+
+    if (id <= 0 || id >= SENDVIMS_SELECTOR_MAX) {
+        post("sendVIMS: ignoring invalid selector %s -> %d", name, id);
+        return;
+    }
+
+    if (sendVIMS_is_reply_event(id))
+        return;
+
+    if (n_selector_aliases >= SENDVIMS_SELECTOR_ALIAS_MAX) {
+        post("sendVIMS: selector alias table full, ignoring %s", name);
+        return;
+    }
+
+    sym = gensym(name);
+
+    if (!selector[id])
+        selector[id] = sym;
+
+    selector_aliases[n_selector_aliases].symbol = sym;
+    selector_aliases[n_selector_aliases].id = id;
+    n_selector_aliases++;
 }
 
 static void setup_selectors(void)
 {
     memset(selector, 0, sizeof(selector));
-#define SELECTOR(name, id) selector[id] = gensym(name)
+    memset(selector_aliases, 0, sizeof(selector_aliases));
+    n_selector_aliases = 0;
+#define SELECTOR(name, id) sendVIMS_add_selector(name, id)
 #include "selectors.h"
 #undef SELECTOR
 }
@@ -186,7 +264,7 @@ static int sendVIMS_parse_status_int(char **pp, int *out)
 
 static pd_msg_t *pd_msg_new(char *msg)
 {
-    char *p = msg + SENDVIMS_HEADER_SIZE;
+    char *p = msg + SENDVIMS_STATUS_HEADER_SIZE;
     pd_msg_t *m = (pd_msg_t *)malloc(sizeof(*m));
     int n = 0;
 
@@ -226,6 +304,7 @@ static vj_msg_t *vj_msg_new(t_symbol *sel, int argc, t_atom *argv)
     char *body;
     char *end;
     int body_len;
+    int selector_id;
 
     if (!m)
         return NULL;
@@ -257,7 +336,16 @@ static vj_msg_t *vj_msg_new(t_symbol *sel, int argc, t_atom *argv)
 
     body = c;
 
-    if (sendVIMS_append(&c, end, "%03d:", selector_map(sel)) < 0)
+    selector_id = selector_map(sel);
+    if (selector_id < 0)
+        goto error;
+
+    if (sendVIMS_is_reply_event(selector_id)) {
+        post("sendVIMS: VIMS %03d returns command-socket data and is not supported", selector_id);
+        goto error;
+    }
+
+    if (sendVIMS_append(&c, end, "%03d:", selector_id) < 0)
         goto error;
 
     while (argc > 0) {
@@ -286,7 +374,7 @@ static vj_msg_t *vj_msg_new(t_symbol *sel, int argc, t_atom *argv)
         goto error;
 
     body_len = (int)(c - body);
-    if (body_len < 0 || body_len > 999)
+    if (body_len < 0 || body_len > SENDVIMS_COMMAND_BODY_MAX)
         goto error;
 
     m->msg[0] = 'V';
@@ -473,18 +561,20 @@ static int sendVIMS_send_all(int fd, const char *buf, int len)
     return 0;
 }
 
-static int sendVIMS_parse_header(const char *header, int *size)
+static int sendVIMS_parse_status_header(const char *header, int *size)
 {
-    if (header[0] != 'V' || header[4] != 'D')
+    if (header[0] != 'V' || header[5] != 'S')
         return -1;
     if (!sendVIMS_is_digit(header[1]) ||
         !sendVIMS_is_digit(header[2]) ||
-        !sendVIMS_is_digit(header[3]))
+        !sendVIMS_is_digit(header[3]) ||
+        !sendVIMS_is_digit(header[4]))
         return -1;
 
-    *size = ((header[1] - '0') * 100) +
-            ((header[2] - '0') * 10) +
-             (header[3] - '0');
+    *size = ((header[1] - '0') * 1000) +
+            ((header[2] - '0') * 100) +
+            ((header[3] - '0') * 10) +
+             (header[4] - '0');
 
     return 0;
 }
@@ -494,31 +584,31 @@ static pd_msg_t *sendVIMS_status(sendVIMS_t *x)
     int gotbytes;
     int wantbytes;
     int size = -1;
-    char header[SENDVIMS_HEADER_SIZE + 1];
-    char buf[SENDVIMS_HEADER_SIZE + SENDVIMS_STATUS_BODY_MAX + 1];
+    char header[SENDVIMS_STATUS_HEADER_SIZE + 1];
+    char buf[SENDVIMS_STATUS_HEADER_SIZE + SENDVIMS_STATUS_BODY_MAX + 1];
 
-    wantbytes = SENDVIMS_HEADER_SIZE;
+    wantbytes = SENDVIMS_STATUS_HEADER_SIZE;
     gotbytes = sendVIMS_recv_all(x->status_socket.handle, header, wantbytes);
     if (wantbytes != gotbytes)
         goto error;
 
-    header[SENDVIMS_HEADER_SIZE] = '\0';
+    header[SENDVIMS_STATUS_HEADER_SIZE] = '\0';
 
-    if (sendVIMS_parse_header(header, &size) != 0)
+    if (sendVIMS_parse_status_header(header, &size) != 0)
         goto proto_error;
     if (size < 0 || size > SENDVIMS_STATUS_BODY_MAX)
         goto proto_error;
 
-    memcpy(buf, header, SENDVIMS_HEADER_SIZE);
+    memcpy(buf, header, SENDVIMS_STATUS_HEADER_SIZE);
 
     wantbytes = size;
     gotbytes = sendVIMS_recv_all(x->status_socket.handle,
-                                 buf + SENDVIMS_HEADER_SIZE,
+                                 buf + SENDVIMS_STATUS_HEADER_SIZE,
                                  wantbytes);
     if (wantbytes != gotbytes)
         goto error;
 
-    buf[SENDVIMS_HEADER_SIZE + size] = '\0';
+    buf[SENDVIMS_STATUS_HEADER_SIZE + size] = '\0';
     return pd_msg_new(buf);
 
 error:
@@ -748,17 +838,18 @@ static void post_selectors(void)
 {
     int i;
 
-    for (i = 0; i < 602; i++) {
-        if (selector[i])
-            post("p%03d = %s", i, selector[i]->s_name);
-    }
+    for (i = 0; i < n_selector_aliases; i++)
+        post("p%03d = %s", selector_aliases[i].id,
+             selector_aliases[i].symbol->s_name);
 }
 
 void sendVIMS_setup(void)
 {
     post("sendVIMS: version " VERSION);
     post("sendVIMS: (c) 2004-2006 Niels Elburg & Tom Schouten");
-    post("sendVIMS: assuming veejay-0.9.8");
+    post("sendVIMS: status parser expects %d veejay tokens", SENDVIMS_STATUS_TOKENS);
+    post("sendVIMS: use [aliases( or [commands( to list supported Pd command aliases");
+    post("sendVIMS: VIMS reply/getter ids 400..499 are intentionally blocked");
 
     s_disconnect = gensym("disconnect");
     s_veejay = gensym("veejay");
@@ -778,4 +869,6 @@ void sendVIMS_setup(void)
                     gensym("connect"), A_SYMBOL, A_DEFFLOAT, 0);
     class_addmethod(sendVIMS_class, (t_method)post_selectors,
                     gensym("aliases"), 0);
+    class_addmethod(sendVIMS_class, (t_method)post_selectors,
+                    gensym("commands"), 0);
 }
