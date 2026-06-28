@@ -1134,7 +1134,6 @@ void*   yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int sw
         return NULL;
 
     int     swscale_flags = 0;
-    const int len = src->len > dst->len ? src->len : dst->len;
     
     switch(tmpl->flags) {
         case 1:  swscale_flags |= SWS_FAST_BILINEAR; break;
@@ -1329,16 +1328,6 @@ void    yuv_convert_and_scale_from_rgb(void *sws , VJFrame *src, VJFrame *dst)
 void    yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 {
     vj_sws *s = (vj_sws*) sws;
-    int n = 3;
-
-    if( dst->format == PIX_FMT_RGBA ||
-        dst->format == PIX_FMT_BGRA ||
-        dst->format == PIX_FMT_ARGB ||
-        dst->format == PIX_FMT_ABGR ||
-        dst->format == PIX_FMT_RGB32 ||
-        dst->format == PIX_FMT_BGR32 ) 
-        n = 4;
-
     sws_scale( s->sws,(const uint8_t * const*) src->data, src->stride, 0, src->height,(uint8_t * const*) dst->data, dst->stride );
 }
 void    yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
