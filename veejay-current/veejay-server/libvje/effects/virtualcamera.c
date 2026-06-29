@@ -87,8 +87,6 @@ static inline float virtualcamera_param1000_to_unit(int v)
     return (float)v * 0.001f;
 }
 
-
-
 static inline float virtualcamera_smoothf(float oldv, float target, float attack, float release)
 {
     return target > oldv
@@ -292,14 +290,14 @@ static void virtualcamera_build_xmap(virtualcam_t *c,
                                      int start_x_fp,
                                      int step_x_fp)
 {
-    int sx_fp = start_x_fp;
-
     if(edge_black) {
-        for(int x = 0; x < w; x++, sx_fp += step_x_fp)
-            c->xmap[x] = sx_fp >> FP;
+#pragma omp for schedule(static)
+        for(int x = 0; x < w; x++)
+            c->xmap[x] = (start_x_fp + x * step_x_fp) >> FP;
     } else {
-        for(int x = 0; x < w; x++, sx_fp += step_x_fp)
-            c->xmap[x] = virtualcamera_mirror_coord(sx_fp >> FP, w);
+#pragma omp for schedule(static)
+        for(int x = 0; x < w; x++)
+            c->xmap[x] = virtualcamera_mirror_coord((start_x_fp + x * step_x_fp) >> FP, w);
     }
 }
 
@@ -409,61 +407,64 @@ void virtualcamera_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict dstU = c->buf[1];
     uint8_t *restrict dstV = c->buf[2];
 
-    virtualcamera_build_xmap(c, w, edge_black, start_x_fp, step_x_fp);
-
     int *restrict xmap = c->xmap;
 
-    if(edge_black) {
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
-        for(int y = 0; y < h; y++) {
-            const int sy = (start_y_fp + y * step_y_fp) >> FP;
-            const int dst_row = y * w;
+#pragma omp parallel num_threads(c->n_threads)
+    {
+        virtualcamera_build_xmap(c, w, edge_black, start_x_fp, step_x_fp);
 
-            if(sy < 0 || sy >= h) {
-                for(int x = 0; x < w; x++) {
-                    const int d = dst_row + x;
+        if(edge_black) {
+#pragma omp for schedule(static)
+            for(int y = 0; y < h; y++) {
+                const int sy = (start_y_fp + y * step_y_fp) >> FP;
+                const int dst_row = y * w;
 
-                    dstY[d] = pixel_Y_lo_;
-                    dstU[d] = 128;
-                    dstV[d] = 128;
+                if(sy < 0 || sy >= h) {
+                    for(int x = 0; x < w; x++) {
+                        const int d = dst_row + x;
+
+                        dstY[d] = pixel_Y_lo_;
+                        dstU[d] = 128;
+                        dstV[d] = 128;
+                    }
+
+                    continue;
                 }
 
-                continue;
+                const int src_row = sy * w;
+
+                for(int x = 0; x < w; x++) {
+                    const int sx = xmap[x];
+                    const int d = dst_row + x;
+
+                    if(sx < 0 || sx >= w) {
+                        dstY[d] = pixel_Y_lo_;
+                        dstU[d] = 128;
+                        dstV[d] = 128;
+                    } else {
+                        const int s = src_row + sx;
+
+                        dstY[d] = srcY[s];
+                        dstU[d] = srcU[s];
+                        dstV[d] = srcV[s];
+                    }
+                }
             }
+        } else {
+#pragma omp for schedule(static)
+            for(int y = 0; y < h; y++) {
+                const int sy = virtualcamera_mirror_coord((start_y_fp + y * step_y_fp) >> FP, h);
+                const int src_row = sy * w;
+                const int dst_row = y * w;
 
-            const int src_row = sy * w;
-
-            for(int x = 0; x < w; x++) {
-                const int sx = xmap[x];
-                const int d = dst_row + x;
-
-                if(sx < 0 || sx >= w) {
-                    dstY[d] = pixel_Y_lo_;
-                    dstU[d] = 128;
-                    dstV[d] = 128;
-                } else {
-                    const int s = src_row + sx;
+                for(int x = 0; x < w; x++) {
+                    const int s = src_row + xmap[x];
+                    const int d = dst_row + x;
 
                     dstY[d] = srcY[s];
                     dstU[d] = srcU[s];
                     dstV[d] = srcV[s];
                 }
-            }
-        }
-    } else {
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
-        for(int y = 0; y < h; y++) {
-            const int sy = virtualcamera_mirror_coord((start_y_fp + y * step_y_fp) >> FP, h);
-            const int src_row = sy * w;
-            const int dst_row = y * w;
-
-            for(int x = 0; x < w; x++) {
-                const int s = src_row + xmap[x];
-                const int d = dst_row + x;
-
-                dstY[d] = srcY[s];
-                dstU[d] = srcU[s];
-                dstV[d] = srcV[s];
             }
         }
     }

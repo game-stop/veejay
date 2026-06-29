@@ -307,7 +307,7 @@ static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, cons
     const int rows = k->rows;
     const int max_cols = k->max_cols;
 
-#pragma omp parallel for num_threads(k->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int cy = 0; cy < rows; cy++) {
         for(int cx = 0; cx < cols; cx++) {
             const int idx = cy * max_cols + cx;
@@ -356,7 +356,7 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, co
     const int max_cols = k->max_cols;
     const int frame = k->frame;
 
-#pragma omp parallel for num_threads(k->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int cy = 0; cy < rows; cy++) {
         for(int cx = 0; cx < cols; cx++) {
             const int idx = cy * max_cols + cx;
@@ -503,7 +503,7 @@ static void kd_render_cells(kinetic_t *k, VJFrame *frame, int cell_size, int amo
     const int amount_q = (amount * 256 + 50) / 100;
     const int frame_no = k->frame;
 
-#pragma omp parallel for num_threads(k->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int cy = 0; cy < rows; cy++) {
         for(int cx = 0; cx < cols; cx++) {
             const int idx = cy * max_cols + cx;
@@ -809,23 +809,37 @@ void kineticdisplay_apply(void *ptr, VJFrame *frame, int *args)
         k->seeded = 0;
     }
 
-    if(!k->seeded || (reset && !k->last_reset)) {
-        kd_seed_cells(k, Y, U, V, cell_size);
-        veejay_memcpy(k->prev_y, Y, (size_t)k->len);
-        k->seeded = 1;
-    }
-
+    const int do_seed = !k->seeded || (reset && !k->last_reset);
     k->last_reset = reset;
 
-    if(amount <= 0) {
-        veejay_memcpy(k->prev_y, Y, (size_t)k->len);
-        k->frame++;
-        return;
+#pragma omp parallel num_threads(k->n_threads)
+    {
+        if(do_seed) {
+            kd_seed_cells(k, Y, U, V, cell_size);
+
+#pragma omp for schedule(static)
+            for(int i = 0; i < k->len; i++)
+                k->prev_y[i] = Y[i];
+        }
+
+        if(amount > 0) {
+            kd_update_cells(k, Y, U, V, cell_size, threshold, dither, speed, lag, persistence, contrast, motion_react, mode);
+
+#pragma omp for schedule(static)
+            for(int i = 0; i < k->len; i++)
+                k->prev_y[i] = Y[i];
+
+            kd_render_cells(k, frame, cell_size, amount, brightness, mode);
+        }
+        else {
+#pragma omp for schedule(static)
+            for(int i = 0; i < k->len; i++)
+                k->prev_y[i] = Y[i];
+        }
     }
 
-    kd_update_cells(k, Y, U, V, cell_size, threshold, dither, speed, lag, persistence, contrast, motion_react, mode);
-    veejay_memcpy(k->prev_y, Y, (size_t)k->len);
-    kd_render_cells(k, frame, cell_size, amount, brightness, mode);
+    if(do_seed)
+        k->seeded = 1;
 
     k->frame++;
 }

@@ -76,7 +76,7 @@ static inline void flip_swap_u8(uint8_t *restrict p, int a, int b)
     p[b] = t;
 }
 
-static void flip_horizontal_yuv444(VJFrame *frame, int n_threads)
+static void flip_horizontal_yuv444(VJFrame *frame)
 {
     const int width = frame->width;
     const int height = frame->height;
@@ -86,7 +86,7 @@ static void flip_horizontal_yuv444(VJFrame *frame, int n_threads)
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
         const int last = row + width - 1;
@@ -102,7 +102,7 @@ static void flip_horizontal_yuv444(VJFrame *frame, int n_threads)
     }
 }
 
-static void flip_vertical_yuv444(VJFrame *frame, int n_threads)
+static void flip_vertical_yuv444(VJFrame *frame)
 {
     const int width = frame->width;
     const int height = frame->height;
@@ -112,7 +112,7 @@ static void flip_vertical_yuv444(VJFrame *frame, int n_threads)
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < half_h; y++) {
         const int row_a = y * width;
         const int row_b = (height - 1 - y) * width;
@@ -128,7 +128,7 @@ static void flip_vertical_yuv444(VJFrame *frame, int n_threads)
     }
 }
 
-static void flip_both_yuv444(VJFrame *frame, int n_threads)
+static void flip_both_yuv444(VJFrame *frame)
 {
     const int len = frame->len;
     const int half = len >> 1;
@@ -137,7 +137,7 @@ static void flip_both_yuv444(VJFrame *frame, int n_threads)
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < half; i++) {
         const int j = len - 1 - i;
 
@@ -158,15 +158,13 @@ void flip_apply(void *ptr, VJFrame *frame, int *args)
     if(horizontal == 0 && vertical == 0)
         return;
 
-    if(horizontal && vertical) {
-        flip_both_yuv444(frame, n_threads);
-        return;
+#pragma omp parallel num_threads(n_threads)
+    {
+        if(horizontal && vertical)
+            flip_both_yuv444(frame);
+        else if(horizontal)
+            flip_horizontal_yuv444(frame);
+        else
+            flip_vertical_yuv444(frame);
     }
-
-    if(horizontal) {
-        flip_horizontal_yuv444(frame, n_threads);
-        return;
-    }
-
-    flip_vertical_yuv444(frame, n_threads);
 }

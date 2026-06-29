@@ -163,10 +163,9 @@ void morphology_free(void *ptr)
 static void morphology_threshold_image(uint8_t *restrict binary_img,
                                        const uint8_t *restrict src,
                                        int len,
-                                       int threshold,
-                                       int n_threads)
+                                       int threshold)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         binary_img[i] = (src[i] < threshold) ? 0 : 255;
 }
@@ -175,10 +174,9 @@ static void morphology_dilate(uint8_t *restrict dst,
                               const uint8_t *restrict binary_img,
                               int width,
                               int height,
-                              uint16_t kernel,
-                              int n_threads)
+                              uint16_t kernel)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int y = 1; y < height - 1; y++) {
         const int row = y * width;
 
@@ -195,10 +193,9 @@ static void morphology_erode(uint8_t *restrict dst,
                              const uint8_t *restrict binary_img,
                              int width,
                              int height,
-                             uint16_t kernel,
-                             int n_threads)
+                             uint16_t kernel)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int y = 1; y < height - 1; y++) {
         const int row = y * width;
 
@@ -210,7 +207,6 @@ static void morphology_erode(uint8_t *restrict dst,
         }
     }
 }
-
 void morphology_apply(void *ptr, VJFrame *frame, int *args)
 {
     morphology_t *m = (morphology_t*) ptr;
@@ -222,7 +218,7 @@ void morphology_apply(void *ptr, VJFrame *frame, int *args)
     const int len = frame->len;
     const int width = frame->width;
     const int height = frame->height;
-    const int uv_len = frame->ssm ? len : frame->uv_len;
+    const int uv_len = frame->uv_len;
     const uint16_t kernel = morphology_kernel_bits[convolution_kernel];
 
     uint8_t *restrict dst = channel == MORPH_CHANNEL_ALPHA ? frame->data[3] : frame->data[0];
@@ -230,16 +226,20 @@ void morphology_apply(void *ptr, VJFrame *frame, int *args)
 
     if(threshold == 0)
         veejay_memcpy(binary_img, dst, len);
-    else
-        morphology_threshold_image(binary_img, dst, len, threshold, m->n_threads);
 
     if(channel == MORPH_CHANNEL_LUMA) {
         veejay_memset(frame->data[1], 128, uv_len);
         veejay_memset(frame->data[2], 128, uv_len);
     }
 
-    if(mode == MORPH_DILATE)
-        morphology_dilate(dst, binary_img, width, height, kernel, m->n_threads);
-    else
-        morphology_erode(dst, binary_img, width, height, kernel, m->n_threads);
+#pragma omp parallel num_threads(m->n_threads)
+    {
+        if(threshold != 0)
+            morphology_threshold_image(binary_img, dst, len, threshold);
+
+        if(mode == MORPH_DILATE)
+            morphology_dilate(dst, binary_img, width, height, kernel);
+        else
+            morphology_erode(dst, binary_img, width, height, kernel);
+    }
 }

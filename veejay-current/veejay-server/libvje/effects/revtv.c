@@ -59,8 +59,6 @@ static inline uint8_t revtv_mix_u8(uint8_t a, uint8_t b, int q)
     return (uint8_t)((((int)a * (1000 - q)) + ((int)b * q) + 500) / 1000);
 }
 
-
-
 static inline void revtv_smooth_lane(float *v, float target, float a)
 {
     *v += (target - *v) * a;
@@ -219,18 +217,19 @@ static void revtv_chroma(uint8_t *restrict C,
 static void revtv_blend_plane(uint8_t *restrict dst,
                               const uint8_t *restrict src,
                               int len,
-                              int q,
-                              int n_threads)
+                              int q)
 {
     if(q >= 1000)
         return;
 
     if(q <= 0) {
-        veejay_memcpy(dst, src, len);
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+            dst[i] = src[i];
         return;
     }
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         dst[i] = revtv_mix_u8(src[i], dst[i], q);
 }
@@ -334,10 +333,12 @@ void revtv_apply(void *ptr, VJFrame *frame, int *args)
         revtv_chroma(Cr, uv_width, uv_height, uv_linespace, uv_vscale, color_cr);
     }
 
-    revtv_blend_plane(Y, r->src[0], len, mix_q, r->n_threads);
-
     const int chroma_mix_q = (mix_q * chroma_q + 500) / 1000;
 
-    revtv_blend_plane(Cb, r->src[1], uv_len, chroma_mix_q, r->n_threads);
-    revtv_blend_plane(Cr, r->src[2], uv_len, chroma_mix_q, r->n_threads);
+#pragma omp parallel num_threads(r->n_threads)
+    {
+        revtv_blend_plane(Y, r->src[0], len, mix_q);
+        revtv_blend_plane(Cb, r->src[1], uv_len, chroma_mix_q);
+        revtv_blend_plane(Cr, r->src[2], uv_len, chroma_mix_q);
+    }
 }

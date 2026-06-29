@@ -183,10 +183,11 @@ static void magicmirror_update_wave_x(magicmirror_t *m, int width, int x_wave)
 {
     const float scale = (float)x_wave * 0.001f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for(int x = 0; x < width; x++)
         fast_sin(m->wave_x[x], (float)x * scale);
 
+#pragma omp single
     m->last_x_wave = x_wave;
 }
 
@@ -194,16 +195,17 @@ static void magicmirror_update_wave_y(magicmirror_t *m, int height, int y_wave)
 {
     const float scale = (float)y_wave * 0.001f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++)
         fast_sin(m->wave_y[y], (float)y * scale);
 
+#pragma omp single
     m->last_y_wave = y_wave;
 }
 
 static void magicmirror_update_cache_x(magicmirror_t *m, int width, int x_displace)
 {
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for(int x = 0; x < width; x++) {
         int dx = x + (int)(m->wave_x[x] * (float)x_displace);
 
@@ -220,7 +222,7 @@ static void magicmirror_update_cache_x(magicmirror_t *m, int width, int x_displa
 
 static void magicmirror_update_cache_y(magicmirror_t *m, int height, int y_displace)
 {
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         int dy = y + (int)(m->wave_y[y] * (float)y_displace);
 
@@ -251,7 +253,7 @@ static void magicmirror_apply_yuv(magicmirror_t *m, VJFrame *frame)
     const int *restrict cache_x = m->cache_x;
     const int *restrict cache_y = m->cache_y;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for(int y = 1; y < height - 1; y++) {
         const int row = y * width;
         const int src_row = cache_y[y] * width;
@@ -278,7 +280,7 @@ static void magicmirror_apply_alpha_only(magicmirror_t *m, VJFrame *frame)
     const int *restrict cache_x = m->cache_x;
     const int *restrict cache_y = m->cache_y;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for(int y = 1; y < height - 1; y++) {
         const int row = y * width;
         const int src_row = cache_y[y] * width;
@@ -306,7 +308,7 @@ static void magicmirror_apply_alpha_mask(magicmirror_t *m, VJFrame *frame)
     const int *restrict cache_x = m->cache_x;
     const int *restrict cache_y = m->cache_y;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for(int y = 1; y < height - 1; y++) {
         const int row = y * width;
         const int src_row = cache_y[y] * width;
@@ -359,28 +361,34 @@ void magicmirror_apply(void *ptr, VJFrame *frame, int *args)
     if(m->N__ == m->n__ || m->n__ == 0)
         interpolate = 0;
 
-    if(x_wave != m->last_x_wave)
-        magicmirror_update_wave_x(m, frame->width, x_wave);
-
-    if(y_wave != m->last_y_wave)
-        magicmirror_update_wave_y(m, frame->height, y_wave);
-
-    magicmirror_update_cache_x(m, frame->width, vx);
-    magicmirror_update_cache_y(m, frame->height, vy);
-
+    const int update_x = x_wave != m->last_x_wave;
+    const int update_y = y_wave != m->last_y_wave;
     const int len = frame->len;
     int strides[4] = { len, len, len, alpha ? len : 0 };
 
-    vj_frame_copy(frame->data, m->magicmirrorbuf, strides);
+#pragma omp parallel num_threads(m->n_threads)
+    {
+        if(update_x)
+            magicmirror_update_wave_x(m, frame->width, x_wave);
 
-    if(alpha == 0) {
-        magicmirror_apply_yuv(m, frame);
-    }
-    else if(alpha == 1) {
-        magicmirror_apply_alpha_mask(m, frame);
-    }
-    else {
-        magicmirror_apply_alpha_only(m, frame);
+        if(update_y)
+            magicmirror_update_wave_y(m, frame->height, y_wave);
+
+        magicmirror_update_cache_x(m, frame->width, vx);
+        magicmirror_update_cache_y(m, frame->height, vy);
+
+#pragma omp single
+        vj_frame_copy(frame->data, m->magicmirrorbuf, strides);
+
+        if(alpha == 0) {
+            magicmirror_apply_yuv(m, frame);
+        }
+        else if(alpha == 1) {
+            magicmirror_apply_alpha_mask(m, frame);
+        }
+        else {
+            magicmirror_apply_alpha_only(m, frame);
+        }
     }
 
     if(interpolate)

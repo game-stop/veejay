@@ -20,7 +20,7 @@
 #include "common.h"
 #include "coloradjust.h"
 
-static inline int coloradjust_clampi(int v, int lo, int hi)
+static inline int clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
 }
@@ -61,7 +61,7 @@ void coloradjust_apply(void *ptr, VJFrame *frame, int *args)
     const int intensity = args[1];
     const int exposureValue = args[2];
     const int len = frame->len;
-    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
+    const int uv_len = frame->uv_len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -73,29 +73,28 @@ void coloradjust_apply(void *ptr, VJFrame *frame, int *args)
     const int c = (int)rintf(a_cos(hue) * (1 << 16) * sat);
     const int do_exp = exposureValue != 256;
     const int n_threads = vje_advise_num_threads(len);
+    const float powValue = exposureValue > 0 ? ((float)exposureValue / 256.0f) : 1.0f;
 
-    if(do_exp)
+#pragma omp parallel num_threads(n_threads)
     {
-        const float powValue = exposureValue > 0 ? ((float)exposureValue / 256.0f) : 1.0f;
+        if(do_exp) {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                int y = (int)((float)Y[i] * powValue);
 
-        #pragma omp parallel for num_threads(n_threads) schedule(static)
-        for(int i = 0; i < len; i++)
-        {
-            int y = (int)((float)Y[i] * powValue);
-
-            Y[i] = (uint8_t)coloradjust_clampi(y, 0, 255);
+                Y[i] = (uint8_t)clampi(y, 0, 255);
+            }
         }
-    }
 
-    #pragma omp parallel for num_threads(vje_advise_num_threads(uv_len)) schedule(static)
-    for(int i = 0; i < uv_len; i++)
-    {
-        const int u = (int)Cb[i] - 128;
-        const int v = (int)Cr[i] - 128;
-        const int new_u = (c * u - s * v + (1 << 15) + (128 << 16)) >> 16;
-        const int new_v = (s * u + c * v + (1 << 15) + (128 << 16)) >> 16;
+#pragma omp for schedule(static)
+        for(int i = 0; i < uv_len; i++) {
+            const int u = (int)Cb[i] - 128;
+            const int v = (int)Cr[i] - 128;
+            const int new_u = (c * u - s * v + (1 << 15) + (128 << 16)) >> 16;
+            const int new_v = (s * u + c * v + (1 << 15) + (128 << 16)) >> 16;
 
-        Cb[i] = (uint8_t)coloradjust_clampi(new_u, 0, 255);
-        Cr[i] = (uint8_t)coloradjust_clampi(new_v, 0, 255);
+            Cb[i] = (uint8_t)clampi(new_u, 0, 255);
+            Cr[i] = (uint8_t)clampi(new_v, 0, 255);
+        }
     }
 }

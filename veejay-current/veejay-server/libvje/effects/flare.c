@@ -201,7 +201,9 @@ static void flare_downsample2(const uint8_t *restrict src,
                               int dh,
                               int n_threads)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+    (void)n_threads;
+
+#pragma omp for schedule(static)
     for(int y = 0; y < dh; y++) {
         int sy0 = y << 1;
         int sy1 = sy0 + 1;
@@ -237,11 +239,12 @@ static void flare_box_blur_u8(uint8_t *restrict buf,
                               int radius,
                               int n_threads)
 {
+    (void)n_threads;
 
     const int diameter = radius * 2 + 1;
     const uint32_t inv = (uint32_t)(((1ULL << 24) + (diameter >> 1)) / (uint32_t)diameter);
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         const uint8_t *restrict src = buf + y * w;
         uint8_t *restrict dst = tmp + y * w;
@@ -266,7 +269,7 @@ static void flare_box_blur_u8(uint8_t *restrict buf,
         }
     }
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int x = 0; x < w; x++) {
         uint32_t sum = (uint32_t)tmp[x] * (uint32_t)(radius + 1);
 
@@ -299,10 +302,12 @@ static void flare_upsample_add(uint8_t *restrict dst,
                                int weight,
                                int n_threads)
 {
+    (void)n_threads;
+
     const int scale_x = dw > 1 ? ((sw - 1) << 8) / (dw - 1) : 0;
     const int scale_y = dh > 1 ? ((sh - 1) << 8) / (dh - 1) : 0;
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < dh; y++) {
         int gy = y * scale_y;
         int iy = gy >> 8;
@@ -399,8 +404,11 @@ void flare_apply(void *ptr, VJFrame *frame, int *args)
     int maxY = 0;
     int hasGlow = 0;
     const int t = (threshold << 2) + 16;
+    int skip = 0;
 
-#pragma omp parallel for reduction(|:hasGlow) reduction(min:minX,minY) reduction(max:maxX,maxY) schedule(static) num_threads(f->n_threads)
+#pragma omp parallel num_threads(f->n_threads)
+    {
+#pragma omp for reduction(|:hasGlow) reduction(min:minX,minY) reduction(max:maxX,maxY) schedule(static)
     for(int i = 0; i < len; i++) {
         int v = (int)lin[dstY[i]] - t;
         int out = 0;
@@ -452,17 +460,25 @@ void flare_apply(void *ptr, VJFrame *frame, int *args)
         maskY[i] = (uint8_t)out;
     }
 
-    if(!hasGlow)
-        return;
+#pragma omp single
+        {
+            if(!hasGlow) {
+                skip = 1;
+            }
+            else {
+                int padding = spread * 4 + (1 << FLARE_LEVELS);
 
-    int padding = spread * 4 + (1 << FLARE_LEVELS);
+                minX = minX - padding < 0 ? 0 : minX - padding;
+                minY = minY - padding < 0 ? 0 : minY - padding;
+                maxX = maxX + padding >= W ? W - 1 : maxX + padding;
+                maxY = maxY + padding >= H ? H - 1 : maxY + padding;
+            }
+        }
 
-    minX = minX - padding < 0 ? 0 : minX - padding;
-    minY = minY - padding < 0 ? 0 : minY - padding;
-    maxX = maxX + padding >= W ? W - 1 : maxX + padding;
-    maxY = maxY + padding >= H ? H - 1 : maxY + padding;
+#pragma omp barrier
 
-    flare_downsample2(maskY, W, H, f->pyrY[0], f->pyrW[0], f->pyrH[0], f->n_threads);
+        if(!skip) {
+            flare_downsample2(maskY, W, H, f->pyrY[0], f->pyrW[0], f->pyrH[0], f->n_threads);
 
     for(int l = 1; l < FLARE_LEVELS; l++)
         flare_downsample2(f->pyrY[l - 1], f->pyrW[l - 1], f->pyrH[l - 1], f->pyrY[l], f->pyrW[l], f->pyrH[l], f->n_threads);
@@ -488,7 +504,7 @@ void flare_apply(void *ptr, VJFrame *frame, int *args)
 
     switch(type) {
         case 0:
-#pragma omp parallel for schedule(static) num_threads(f->n_threads)
+#pragma omp for schedule(static)
             for(int y = minY; y <= maxY; y++) {
                 int row = y * W;
                 for(int x = minX; x <= maxX; x++) {
@@ -515,7 +531,7 @@ void flare_apply(void *ptr, VJFrame *frame, int *args)
             break;
 
         case 1:
-#pragma omp parallel for schedule(static) num_threads(f->n_threads)
+#pragma omp for schedule(static)
             for(int y = minY; y <= maxY; y++) {
                 int row = y * W;
                 for(int x = minX; x <= maxX; x++) {
@@ -542,7 +558,7 @@ void flare_apply(void *ptr, VJFrame *frame, int *args)
             break;
 
         case 2:
-#pragma omp parallel for schedule(static) num_threads(f->n_threads)
+#pragma omp for schedule(static)
             for(int y = minY; y <= maxY; y++) {
                 int row = y * W;
                 for(int x = minX; x <= maxX; x++) {
@@ -564,7 +580,7 @@ void flare_apply(void *ptr, VJFrame *frame, int *args)
             break;
 
         case 3:
-#pragma omp parallel for schedule(static) num_threads(f->n_threads)
+#pragma omp for schedule(static)
             for(int y = minY; y <= maxY; y++) {
                 int row = y * W;
                 for(int x = minX; x <= maxX; x++) {
@@ -589,7 +605,7 @@ void flare_apply(void *ptr, VJFrame *frame, int *args)
             break;
 
         case 4:
-#pragma omp parallel for schedule(static) num_threads(f->n_threads)
+#pragma omp for schedule(static)
             for(int y = minY; y <= maxY; y++) {
                 int row = y * W;
                 for(int x = minX; x <= maxX; x++) {
@@ -615,7 +631,7 @@ void flare_apply(void *ptr, VJFrame *frame, int *args)
 
         case 5:
         default:
-#pragma omp parallel for schedule(static) num_threads(f->n_threads)
+#pragma omp for schedule(static)
             for(int y = minY; y <= maxY; y++) {
                 int row = y * W;
                 for(int x = minX; x <= maxX; x++) {
@@ -639,6 +655,8 @@ void flare_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
             break;
+    }
+        }
     }
 }
 

@@ -177,7 +177,7 @@ static void threshold_build_soft_mask(threshold_t *t, const uint8_t *restrict Y,
 {
     uint8_t *restrict mask = t->mask;
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         const int ym = (y > 0) ? y - 1 : y;
         const int yp = (y < h - 1) ? y + 1 : y;
@@ -280,42 +280,45 @@ void threshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-    threshold_build_soft_mask(t, Y, w, h);
-
     uint8_t *restrict mask = t->mask;
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
-    for(int i = 0; i < len; i++) {
-        const int m = mask[i];
-        int q8 = threshold_matte_q8(m, threshold, softness, reverse);
+#pragma omp parallel num_threads(t->n_threads)
+    {
+        threshold_build_soft_mask(t, Y, w, h);
 
-        if(q8 < mix_floor_q8)
-            q8 = mix_floor_q8;
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            const int m = mask[i];
+            int q8 = threshold_matte_q8(m, threshold, softness, reverse);
 
-        int yv = threshold_blend_black_y(Y2[i], q8);
-        int uv = threshold_blend_neutral_uv(Cb2[i], q8);
-        int vv = threshold_blend_neutral_uv(Cr2[i], q8);
+            if(q8 < mix_floor_q8)
+                q8 = mix_floor_q8;
 
-        if(edge_glow > 0) {
-            int d = m - threshold;
-            if(d < 0)
-                d = -d;
+            int yv = threshold_blend_black_y(Y2[i], q8);
+            int uv = threshold_blend_neutral_uv(Cb2[i], q8);
+            int vv = threshold_blend_neutral_uv(Cr2[i], q8);
 
-            if(d < glow_radius) {
-                const int q = glow_radius - d;
-                const int glow = (edge_glow * q + (glow_radius >> 1)) / glow_radius;
-                yv += glow;
+            if(edge_glow > 0) {
+                int d = m - threshold;
+                if(d < 0)
+                    d = -d;
 
-                if(mix_drive > 0) {
-                    const int chroma_kick = (glow * mix_drive + 500) / 1000;
-                    uv += chroma_kick >> 3;
-                    vv += chroma_kick >> 4;
+                if(d < glow_radius) {
+                    const int q = glow_radius - d;
+                    const int glow = (edge_glow * q + (glow_radius >> 1)) / glow_radius;
+                    yv += glow;
+
+                    if(mix_drive > 0) {
+                        const int chroma_kick = (glow * mix_drive + 500) / 1000;
+                        uv += chroma_kick >> 3;
+                        vv += chroma_kick >> 4;
+                    }
                 }
             }
-        }
 
-        Y[i]  = threshold_u8(yv);
-        Cb[i] = threshold_u8(uv);
-        Cr[i] = threshold_u8(vv);
+            Y[i]  = threshold_u8(yv);
+            Cb[i] = threshold_u8(uv);
+            Cr[i] = threshold_u8(vv);
+        }
     }
 }

@@ -291,8 +291,7 @@ static void cf_seed(chronocortex_t *c, VJFrame *frame)
     int i;
     int len = c->len;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
-    for(i = 0; i < len; i++) {
+for(i = 0; i < len; i++) {
         c->ref_y[i] = Y[i];
 
         c->on_y[i] = 0;
@@ -880,7 +879,7 @@ static void cf_compute_cortex_direct_rect(chronocortex_t *c,
     on_offset = -dy_on * w - dx_on;
     off_offset = -dy_off * w - dx_off;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(y = ymin; y <= ymax; y++) {
         int x;
         int pos = y * w + xmin;
@@ -908,6 +907,8 @@ static void cf_compute_cortex_direct_rect(chronocortex_t *c,
      * Safe outside-rectangle bands.
      * These are small when drift is small, and only borders when drift is zero.
      */
+#pragma omp single
+    {
     if(ymin > 0) {
         cf_compute_safe_region(
             c, Y,
@@ -974,6 +975,7 @@ static void cf_compute_cortex_direct_rect(chronocortex_t *c,
             dx_off,
             dy_off
         );
+    }
     }
 }
 
@@ -1057,7 +1059,7 @@ static void cf_compute_cortex(chronocortex_t *c,
         int prop_diag = (prop_mode >= CF_PROP_NW_SE);
         int y;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
         for(y = 0; y < h; y++) {
             int x;
             int pos = y * w;
@@ -1098,7 +1100,7 @@ static void cf_render_cortex_const_pure(chronocortex_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         int on = c->on_y[i];
         int off = c->off_y[i];
@@ -1158,7 +1160,7 @@ static void cf_render_cortex_const_bleed(chronocortex_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         int on = c->on_y[i];
         int off = c->off_y[i];
@@ -1224,7 +1226,7 @@ static void cf_render_cortex_source(chronocortex_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         uint8_t src_u = U[i];
         uint8_t src_v = V[i];
@@ -1302,7 +1304,7 @@ static void cf_render_cortex_white_pure(chronocortex_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         int ev = c->on_y[i] + c->off_y[i];
         if(ev > 255)
@@ -1310,8 +1312,11 @@ static void cf_render_cortex_white_pure(chronocortex_t *c,
         Y[i] = c->gain_lut[ev];
     }
 
-    veejay_memset(frame->data[1], 128, (size_t) len);
-    veejay_memset(frame->data[2], 128, (size_t) len);
+#pragma omp single
+    {
+        veejay_memset(frame->data[1], 128, (size_t) len);
+        veejay_memset(frame->data[2], 128, (size_t) len);
+    }
 }
 
 static void cf_render_cortex_white_bleed(chronocortex_t *c,
@@ -1324,7 +1329,7 @@ static void cf_render_cortex_white_bleed(chronocortex_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         int ev = c->on_y[i] + c->off_y[i];
         int base_y;
@@ -1460,24 +1465,28 @@ void chronocortex_apply(void *ptr, VJFrame *frame, int *args)
 
     prop_mode = c->frame & 3;
 
-    cf_compute_cortex(
-        c,
-        frame,
-        excitation,
-        inhibition,
-        branching,
-        polarity_drift,
-        prop_mode
-    );
+#pragma omp parallel num_threads(c->n_threads)
+    {
+        cf_compute_cortex(
+            c,
+            frame,
+            excitation,
+            inhibition,
+            branching,
+            polarity_drift,
+            prop_mode
+        );
 
-    cf_swap_fields(c);
+#pragma omp single
+        cf_swap_fields(c);
 
-    cf_render_cortex(
-        c,
-        frame,
-        source_bleed,
-        color_mode
-    );
+        cf_render_cortex(
+            c,
+            frame,
+            source_bleed,
+            color_mode
+        );
+    }
 
     c->frame++;
 }

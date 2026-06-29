@@ -658,8 +658,7 @@ static void eh_seed(edgefoldtide_t *e, VJFrame *frame)
     int len = e->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(e->n_threads)
-    for (i = 0; i < len; i++) {
+for (i = 0; i < len; i++) {
         e->src_y[i] = Y[i];
         e->paint_y[i] = Y[i];
         e->paint_u[i] = U[i];

@@ -95,9 +95,9 @@ void bloom_free(void *ptr)
     free(b);
 }
 
-static void downsample2x(uint8_t *dst, const uint8_t *src, int w, int h, int dw, int n_threads)
+static void downsample2x(uint8_t *dst, const uint8_t *src, int w, int h, int dw)
 {
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y += 2)
     {
         const int y1 = y + 1 < h ? y + 1 : y;
@@ -113,9 +113,9 @@ static void downsample2x(uint8_t *dst, const uint8_t *src, int w, int h, int dw,
     }
 }
 
-static void upsample2x(uint8_t *dst, const uint8_t *src, int w, int h, int sw, int n_threads)
+static void upsample2x(uint8_t *dst, const uint8_t *src, int w, int h, int sw)
 {
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++)
     {
         uint8_t *restrict d = dst + y * w;
@@ -152,54 +152,58 @@ void bloom_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *BL = T + ds_len;
     uint8_t *PB = BL + ds_len;
 
-    #pragma omp parallel for simd num_threads(n_threads) schedule(static)
-    for(int i = 0; i < len; i++)
+#pragma omp parallel num_threads(n_threads)
     {
-        const int v = (int)L[i] - threshold;
-        B[i] = v > 0 ? (uint8_t)v : 0;
-    }
-
-    downsample2x(D, B, w, h, b->ds_w, n_threads);
-
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
-    for(int y = 0; y < b->ds_h; y++)
-        veejay_blur(T + y * b->ds_w, D + y * b->ds_w, b->ds_w, radius, 1, 1);
-
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
-    for(int x = 0; x < b->ds_w; x++)
-        veejay_blur(BL + x, T + x, b->ds_h, radius, b->ds_w, b->ds_w);
-
-    if(persistence > 0)
-    {
-        #pragma omp parallel for simd num_threads(n_threads) schedule(static)
-        for(int i = 0; i < ds_len; i++)
+#pragma omp for simd schedule(static)
+        for(int i = 0; i < len; i++)
         {
-            const int persistent = (BL[i] * (255 - persistence) + PB[i] * persistence) >> 8;
-            const int gain = persistent << 2;
-
-            PB[i] = (uint8_t)persistent;
-            BL[i] = gain > 255 ? 255 : (uint8_t)gain;
+            const int v = (int)L[i] - threshold;
+            B[i] = v > 0 ? (uint8_t)v : 0;
         }
-    }
-    else
-    {
-        #pragma omp parallel for simd num_threads(n_threads) schedule(static)
-        for(int i = 0; i < ds_len; i++)
+
+        downsample2x(D, B, w, h, b->ds_w);
+
+#pragma omp for schedule(static)
+        for(int y = 0; y < b->ds_h; y++)
+            veejay_blur(T + y * b->ds_w, D + y * b->ds_w, b->ds_w, radius, 1, 1);
+
+#pragma omp for schedule(static)
+        for(int x = 0; x < b->ds_w; x++)
+            veejay_blur(BL + x, T + x, b->ds_h, radius, b->ds_w, b->ds_w);
+
+        if(persistence > 0)
         {
-            const int v = BL[i] << 1;
-            PB[i] = 0;
-            BL[i] = v > 255 ? 255 : (uint8_t)v;
+#pragma omp for simd schedule(static)
+            for(int i = 0; i < ds_len; i++)
+            {
+                const int persistent = (BL[i] * (255 - persistence) + PB[i] * persistence) >> 8;
+                const int gain = persistent << 2;
+
+                PB[i] = (uint8_t)persistent;
+                BL[i] = gain > 255 ? 255 : (uint8_t)gain;
+            }
         }
-    }
+        else
+        {
+#pragma omp for simd schedule(static)
+            for(int i = 0; i < ds_len; i++)
+            {
+                const int v = BL[i] << 1;
+                PB[i] = 0;
+                BL[i] = v > 255 ? 255 : (uint8_t)v;
+            }
+        }
 
-    upsample2x(B, BL, w, h, b->ds_w, n_threads);
+        upsample2x(B, BL, w, h, b->ds_w);
 
-    #pragma omp parallel for simd num_threads(n_threads) schedule(static)
-    for(int i = 0; i < len; i++)
-    {
-        const int bloom = (B[i] * intensity) >> 7;
-        const int v = (int)L[i] + bloom;
+#pragma omp for simd schedule(static)
+        for(int i = 0; i < len; i++)
+        {
+            const int bloom = (B[i] * intensity) >> 7;
+            const int v = (int)L[i] + bloom;
 
-        L[i] = v > 255 ? 255 : (uint8_t)v;
+            L[i] = v > 255 ? 255 : (uint8_t)v;
+        }
     }
 }
+

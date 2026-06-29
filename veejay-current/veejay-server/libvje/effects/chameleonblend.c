@@ -185,7 +185,7 @@ void chameleonblend_free(void *ptr)
     free(c);
 }
 
-static void drawAppearing(chameleonblend_t *cb, VJFrame *src, VJFrame *dest)
+static void drawChameleonBlend(chameleonblend_t *cb, VJFrame *src, VJFrame *dest, int appearing)
 {
     const int video_area = src->len;
 
@@ -204,7 +204,7 @@ static void drawAppearing(chameleonblend_t *cb, VJFrame *src, VJFrame *dest)
     uint8_t *restrict dstU = dest->data[1];
     uint8_t *restrict dstV = dest->data[2];
 
-    #pragma omp parallel for simd num_threads(cb->n_threads) schedule(static)
+#pragma omp parallel for simd num_threads(cb->n_threads) schedule(static)
     for(int i = 0; i < video_area; i++)
     {
         const int y = srcY[i];
@@ -221,57 +221,21 @@ static void drawAppearing(chameleonblend_t *cb, VJFrame *src, VJFrame *dest)
         const int alpha_calc = (diff << 3) >> PLANES_DEPTH;
         const int alpha = alpha_calc > 255 ? 255 : alpha_calc;
 
-        dstY[i] = (uint8_t)(y + ((((int)bgY[i] - y) * alpha) >> 8));
-        dstU[i] = (uint8_t)((int)srcU[i] + ((((int)bgU[i] - (int)srcU[i]) * alpha) >> 8));
-        dstV[i] = (uint8_t)((int)srcV[i] + ((((int)bgV[i] - (int)srcV[i]) * alpha) >> 8));
+        if(appearing) {
+            dstY[i] = (uint8_t)(y + ((((int)bgY[i] - y) * alpha) >> 8));
+            dstU[i] = (uint8_t)((int)srcU[i] + ((((int)bgU[i] - (int)srcU[i]) * alpha) >> 8));
+            dstV[i] = (uint8_t)((int)srcV[i] + ((((int)bgV[i] - (int)srcV[i]) * alpha) >> 8));
+        }
+        else {
+            dstY[i] = (uint8_t)((int)bgY[i] + (((y - (int)bgY[i]) * alpha) >> 8));
+            dstU[i] = (uint8_t)((int)bgU[i] + ((((int)srcU[i] - (int)bgU[i]) * alpha) >> 8));
+            dstV[i] = (uint8_t)((int)bgV[i] + ((((int)srcV[i] - (int)bgV[i]) * alpha) >> 8));
+        }
     }
 
     cb->plane = (cb->plane + 1) & (PLANES - 1);
 }
 
-static void drawDisappearing(chameleonblend_t *cb, VJFrame *src, VJFrame *dest)
-{
-    const int video_area = src->len;
-
-    uint8_t *restrict p_buf = cb->timebuffer + (cb->plane * video_area);
-    int32_t *restrict s_buf = cb->sum;
-
-    uint8_t *restrict bgY = cb->bgimage[0];
-    uint8_t *restrict bgU = cb->bgimage[1];
-    uint8_t *restrict bgV = cb->bgimage[2];
-
-    uint8_t *restrict srcY = src->data[0];
-    uint8_t *restrict srcU = src->data[1];
-    uint8_t *restrict srcV = src->data[2];
-
-    uint8_t *restrict dstY = dest->data[0];
-    uint8_t *restrict dstU = dest->data[1];
-    uint8_t *restrict dstV = dest->data[2];
-
-    #pragma omp parallel for simd num_threads(cb->n_threads) schedule(static)
-    for(int i = 0; i < video_area; i++)
-    {
-        const int y = srcY[i];
-        const int current_sum = s_buf[i] - p_buf[i] + y;
-
-        s_buf[i] = current_sum;
-        p_buf[i] = (uint8_t)y;
-
-        int diff = (y << PLANES_DEPTH) - current_sum;
-
-        if(diff < 0)
-            diff = -diff;
-
-        const int alpha_calc = (diff << 3) >> PLANES_DEPTH;
-        const int alpha = alpha_calc > 255 ? 255 : alpha_calc;
-
-        dstY[i] = (uint8_t)((int)bgY[i] + (((y - (int)bgY[i]) * alpha) >> 8));
-        dstU[i] = (uint8_t)((int)bgU[i] + ((((int)srcU[i] - (int)bgU[i]) * alpha) >> 8));
-        dstV[i] = (uint8_t)((int)bgV[i] + ((((int)srcV[i] - (int)bgV[i]) * alpha) >> 8));
-    }
-
-    cb->plane = (cb->plane + 1) & (PLANES - 1);
-}
 
 void chameleonblend_apply(void *ptr, VJFrame *frame, VJFrame *source, int *args)
 {
@@ -310,16 +274,16 @@ void chameleonblend_apply(void *ptr, VJFrame *frame, VJFrame *source, int *args)
     if(auto_switch)
     {
         if(activity <= 40)
-            drawDisappearing(c, source, frame);
+            drawChameleonBlend(c, source, frame, 0);
         else
-            drawAppearing(c, source, frame);
+            drawChameleonBlend(c, source, frame, 1);
     }
     else
     {
         if(mode == 0)
-            drawDisappearing(c, source, frame);
+            drawChameleonBlend(c, source, frame, 0);
         else
-            drawAppearing(c, source, frame);
+            drawChameleonBlend(c, source, frame, 1);
     }
 }
 

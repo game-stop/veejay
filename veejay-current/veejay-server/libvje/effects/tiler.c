@@ -247,57 +247,60 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict bufU = s->buf[1];
     uint8_t *restrict bufV = s->buf[2];
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-    for(int y = 0; y < small_h; y++) {
-        const int sy = tiler_wrapi(y * tiles + phase_py, height);
-        const int src_row = sy * width;
-        const int dst_row = y * small_w;
+#pragma omp parallel num_threads(s->n_threads)
+    {
+#pragma omp for schedule(static)
+        for(int y = 0; y < small_h; y++) {
+            const int sy = tiler_wrapi(y * tiles + phase_py, height);
+            const int src_row = sy * width;
+            const int dst_row = y * small_w;
 
-        for(int x = 0; x < small_w; x++) {
-            const int sx = tiler_wrapi(x * tiles + phase_px, width);
-            const int src = src_row + sx;
-            const int dst = dst_row + x;
+            for(int x = 0; x < small_w; x++) {
+                const int sx = tiler_wrapi(x * tiles + phase_px, width);
+                const int src = src_row + sx;
+                const int dst = dst_row + x;
 
-            bufY[dst] = srcY[src];
-            bufU[dst] = srcU[src];
-            bufV[dst] = srcV[src];
-        }
-    }
-
-    const int tile_q8 = (opacity * 256 + 127) / 255;
-    const int tile_off_x = (phase_px / tiles) % small_w;
-    const int tile_off_y = (phase_py / tiles) % small_h;
-
-    if(tile_q8 >= 256) {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-        for(int y = 0; y < height; y++) {
-            const int src_row = y * width;
-            const int tile_y = (y + tile_off_y) % small_h;
-            const int tile_row = tile_y * small_w;
-
-            for(int x = 0; x < width; x++) {
-                const int dst = src_row + x;
-                const int tile = tile_row + ((x + tile_off_x) % small_w);
-
-                srcY[dst] = bufY[tile];
-                srcU[dst] = bufU[tile];
-                srcV[dst] = bufV[tile];
+                bufY[dst] = srcY[src];
+                bufU[dst] = srcU[src];
+                bufV[dst] = srcV[src];
             }
         }
-    } else {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-        for(int y = 0; y < height; y++) {
-            const int src_row = y * width;
-            const int tile_y = (y + tile_off_y) % small_h;
-            const int tile_row = tile_y * small_w;
 
-            for(int x = 0; x < width; x++) {
-                const int dst = src_row + x;
-                const int tile = tile_row + ((x + tile_off_x) % small_w);
+        const int tile_q8 = (opacity * 256 + 127) / 255;
+        const int tile_off_x = (phase_px / tiles) % small_w;
+        const int tile_off_y = (phase_py / tiles) % small_h;
 
-                srcY[dst] = tiler_mix_u8(srcY[dst], bufY[tile], tile_q8);
-                srcU[dst] = tiler_mix_u8(srcU[dst], bufU[tile], tile_q8);
-                srcV[dst] = tiler_mix_u8(srcV[dst], bufV[tile], tile_q8);
+        if(tile_q8 >= 256) {
+#pragma omp for schedule(static)
+            for(int y = 0; y < height; y++) {
+                const int src_row = y * width;
+                const int tile_y = (y + tile_off_y) % small_h;
+                const int tile_row = tile_y * small_w;
+
+                for(int x = 0; x < width; x++) {
+                    const int dst = src_row + x;
+                    const int tile = tile_row + ((x + tile_off_x) % small_w);
+
+                    srcY[dst] = bufY[tile];
+                    srcU[dst] = bufU[tile];
+                    srcV[dst] = bufV[tile];
+                }
+            }
+        } else {
+#pragma omp for schedule(static)
+            for(int y = 0; y < height; y++) {
+                const int src_row = y * width;
+                const int tile_y = (y + tile_off_y) % small_h;
+                const int tile_row = tile_y * small_w;
+
+                for(int x = 0; x < width; x++) {
+                    const int dst = src_row + x;
+                    const int tile = tile_row + ((x + tile_off_x) % small_w);
+
+                    srcY[dst] = tiler_mix_u8(srcY[dst], bufY[tile], tile_q8);
+                    srcU[dst] = tiler_mix_u8(srcU[dst], bufU[tile], tile_q8);
+                    srcV[dst] = tiler_mix_u8(srcV[dst], bufV[tile], tile_q8);
+                }
             }
         }
     }

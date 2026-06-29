@@ -71,31 +71,19 @@ void toalpha_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *a = frame->data[3];
     uint8_t *Y = frame->data[0];
 
-    int mode = args[0];
-    int range = frame->range;
+    const int mode = args[0];
+    const int range = frame->range;
+    const int copy_luma = (mode == 0 || range == 1);
+
+    if(!copy_luma && range != 0)
+        return;
 
     toalpha_t *t = (toalpha_t*) ptr;
     int *lookup_table = t->lookup_table;
 
-    int n_threads = vje_advise_num_threads(len);
+    const int n_threads = vje_advise_num_threads(len);
 
-    if (mode == 0 || range == 1)
-    {
-        #pragma omp parallel for schedule(static) num_threads(n_threads)
-        for (int i = 0; i < len; i++)
-        {
-            a[i] = Y[i];
-        }
-        return;
-    }
-
-    if (range == 0)
-    {
-        #pragma omp parallel for schedule(static) num_threads(n_threads)
-        for (int i = 0; i < len; i++)
-        {
-            a[i] = lookup_table[Y[i]];
-        }
-    }
-
+#pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int i = 0; i < len; i++)
+        a[i] = copy_luma ? Y[i] : (uint8_t)lookup_table[Y[i]];
 }

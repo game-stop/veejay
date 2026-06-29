@@ -120,8 +120,6 @@ static void water_set_table(water_t *w)
 #define P_DROP_DRIVE   5
 #define P_RIPPLE_POWER 6
 
-
-
 static inline float water_env(float oldv, float target, float attack, float release)
 {
     return target > oldv
@@ -138,8 +136,6 @@ static inline int water_env_i(float *state, int target, int lo, int hi, float at
 
     return clampi((int)(*state + 0.5f), lo, hi);
 }
-
-
 
 vj_effect *water_init(int width, int height)
 {
@@ -436,13 +432,13 @@ static void water_raindrop(water_t *w, int fresh_rate)
 static void water_draw_motion_frame(VJFrame *f, water_t *w)
 {
     const int len = f->len;
-    const int uv_len = f->ssm ? len : f->uv_len;
+    const int uv_len = f->uv_len;
 
-#pragma omp parallel for schedule(static) num_threads(w->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         f->data[0][i] = w->diff_img[i];
 
-#pragma omp parallel for schedule(static) num_threads(w->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < uv_len; i++) {
         f->data[1][i] = 128;
         f->data[2][i] = 128;
@@ -453,7 +449,7 @@ static void water_blur_luma(water_t *w, const uint8_t *restrict src, int width, 
 {
     uint8_t *restrict dst = w->blur_img;
 
-#pragma omp parallel for schedule(static) num_threads(w->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int ym = y > 0 ? y - 1 : y;
         const int yp = y < height - 1 ? y + 1 : y;
@@ -478,6 +474,24 @@ static void water_blur_luma(water_t *w, const uint8_t *restrict src, int width, 
     }
 }
 
+static void water_build_motion_diff(water_t *w, const uint8_t *restrict in, int threshold, int len, int mode)
+{
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        int d = (int)w->bg_img[i] - (int)in[i];
+
+        if(d < 0)
+            d = -d;
+
+        if(mode == 0)
+            w->diff_img[i] = (d > threshold) ? (uint8_t)d : 0;
+        else if(mode == 1)
+            w->diff_img[i] = (d > threshold) ? (uint8_t)(255 - d) : 0;
+        else
+            w->diff_img[i] = (d < threshold) ? (uint8_t)d : 0;
+    }
+}
+
 static void water_inject_motion_map(water_t *w, const uint8_t *restrict diff, int width, int height)
 {
     if(w->map_w <= 2 || w->map_h <= 2)
@@ -485,7 +499,7 @@ static void water_inject_motion_map(water_t *w, const uint8_t *restrict diff, in
 
     const int shift = w->point + w->impact - 8;
 
-#pragma omp parallel for schedule(static) num_threads(w->n_threads)
+#pragma omp for schedule(static)
     for(int my = 1; my < w->map_h - 1; my++) {
         int *restrict p = w->map1 + my * w->map_w;
         int *restrict q = w->map2 + my * w->map_w;
@@ -511,44 +525,6 @@ static void water_inject_motion_map(water_t *w, const uint8_t *restrict diff, in
     }
 }
 
-static void water_motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w, int mode)
-{
-    const int len = f->len;
-    const int width = f->width;
-    const int height = f->height;
-
-    const uint8_t *in = f2->data[0];
-
-    if(mode != 0) {
-        water_blur_luma(w, f2->data[0], width, height);
-        in = w->blur_img;
-    }
-
-    if(!w->have_img) {
-        veejay_memcpy(w->bg_img, in, len);
-        w->have_img = 1;
-        veejay_memset(w->diff_img, 0, len);
-        return;
-    }
-
-#pragma omp parallel for schedule(static) num_threads(w->n_threads)
-    for(int i = 0; i < len; i++) {
-        int d = (int)w->bg_img[i] - (int)in[i];
-
-        if(d < 0)
-            d = -d;
-
-        if(mode == 0)
-            w->diff_img[i] = (d > threshold) ? (uint8_t)d : 0;
-        else if(mode == 1)
-            w->diff_img[i] = (d > threshold) ? (uint8_t)(255 - d) : 0;
-        else
-            w->diff_img[i] = (d < threshold) ? (uint8_t)d : 0;
-    }
-
-    water_inject_motion_map(w, w->diff_img, width, height);
-}
-
 static void water_simulate(water_t *w, int loopnum, int decay)
 {
     const int wi = w->map_w;
@@ -561,7 +537,7 @@ static void water_simulate(water_t *w, int loopnum, int decay)
     decay = clampi(decay, 1, 31);
 
     for(int n = 0; n < loopnum; n++) {
-#pragma omp parallel for schedule(static) num_threads(w->n_threads)
+#pragma omp for schedule(static)
         for(int y = 1; y < hi - 1; y++) {
             const int row = y * wi;
 
@@ -589,7 +565,7 @@ static void water_simulate(water_t *w, int loopnum, int decay)
             }
         }
 
-#pragma omp parallel for schedule(static) num_threads(w->n_threads)
+#pragma omp for schedule(static)
         for(int y = 1; y < hi - 1; y++) {
             const int row = y * wi;
 
@@ -607,9 +583,12 @@ static void water_simulate(water_t *w, int loopnum, int decay)
             }
         }
 
-        int *tmp = w->map1;
-        w->map1 = w->map2;
-        w->map2 = tmp;
+#pragma omp single
+        {
+            int *tmp = w->map1;
+            w->map1 = w->map2;
+            w->map2 = tmp;
+        }
     }
 }
 
@@ -621,7 +600,7 @@ static void water_calc_vtable(water_t *w)
     if(wi <= 1 || hi <= 1)
         return;
 
-#pragma omp parallel for schedule(static) num_threads(w->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < hi - 1; y++) {
         const int row = y * wi;
 
@@ -650,7 +629,7 @@ static void water_render(VJFrame *frame, water_t *w)
     const int map_w = w->map_w;
     const int map_h = w->map_h;
 
-#pragma omp parallel for schedule(static) num_threads(w->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y += 2) {
         int my = y >> 1;
 
@@ -708,6 +687,8 @@ void water_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     water_t *w = (water_t*) ptr;
 
     const int len = frame->len;
+    const int width = frame->width;
+    const int height = frame->height;
 
     const int fresh_rate = args[P_REFRESH_FREQ];
     const int loopnum_arg = args[P_WAVESPEED];
@@ -753,51 +734,62 @@ void water_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         return;
     }
 
-    if(mode == 0) {
-        water_raindrop(w, fresh_rate);
-        veejay_memcpy(w->bg_img, frame->data[0], len);
-    } else {
-        switch(mode) {
-            case 1:
-                water_motiondetect(frame, frame2, threshold_eff, w, 0);
-                water_draw_motion_frame(frame, w);
-                return;
+    const int motion_mode = (mode == 3 || mode == 4) ? 1 : ((mode == 5 || mode == 6) ? 2 : 0);
+    const int use_motion = mode != 0;
+    const int preview = (mode == 1 || mode == 3 || mode == 5);
+    int motion_seeded = 0;
 
-            case 2:
-                water_motiondetect(frame, frame2, threshold_eff, w, 0);
-                break;
+#pragma omp parallel num_threads(w->n_threads)
+    {
+        if(use_motion) {
+            const uint8_t *restrict in = frame2->data[0];
 
-            case 3:
-                water_motiondetect(frame, frame2, threshold_eff, w, 1);
-                water_draw_motion_frame(frame, w);
-                return;
+            if(motion_mode != 0) {
+                water_blur_luma(w, frame2->data[0], width, height);
+                in = w->blur_img;
+            }
 
-            case 4:
-                water_motiondetect(frame, frame2, threshold_eff, w, 1);
-                water_raindrop(w, fresh_rate);
-                break;
+#pragma omp single
+            {
+                if(!w->have_img) {
+                    veejay_memcpy(w->bg_img, in, len);
+                    w->have_img = 1;
+                    veejay_memset(w->diff_img, 0, len);
+                    motion_seeded = 1;
+                }
+            }
 
-            case 5:
-                water_motiondetect(frame, frame2, threshold_eff, w, 2);
-                water_draw_motion_frame(frame, w);
-                return;
+            if(!motion_seeded) {
+                water_build_motion_diff(w, in, threshold_eff, len, motion_mode);
+                water_inject_motion_map(w, w->diff_img, width, height);
+            }
+        }
 
-            case 6:
-                water_motiondetect(frame, frame2, threshold_eff, w, 2);
-                break;
+        if(preview) {
+            water_draw_motion_frame(frame, w);
+        }
+        else {
+#pragma omp single
+            {
+                if(mode == 0) {
+                    water_raindrop(w, fresh_rate);
+                    veejay_memcpy(w->bg_img, frame->data[0], len);
+                }
+                else if(mode == 4) {
+                    water_raindrop(w, fresh_rate);
+                }
 
-            default:
-                break;
+                water_inject_drive_drops(w, drop_drive, ripple_power);
+                w->loopnum = loopnum_eff;
+            }
+
+            water_simulate(w, loopnum_eff, decay_eff);
+            water_calc_vtable(w);
+            water_render(frame, w);
         }
     }
 
-    water_inject_drive_drops(w, drop_drive, ripple_power);
-
-    w->loopnum = loopnum_eff;
-
-    water_simulate(w, loopnum_eff, decay_eff);
-    water_calc_vtable(w);
-    water_render(frame, w);
-
-    w->frame_counter++;
+    if(!preview) {
+        w->frame_counter++;
+    }
 }

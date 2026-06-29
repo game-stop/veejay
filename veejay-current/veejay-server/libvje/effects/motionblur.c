@@ -198,7 +198,6 @@ static void motionblur_init_accumulators(motionblur_t *m,
                                          uint8_t *restrict V,
                                          int size)
 {
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
     for(int i = 0; i < size; i++) {
         m->accY[i] = (int32_t)Y[i] << MB_Q8_SHIFT;
         m->accU[i] = ((int32_t)U[i] - 128) << MB_Q8_SHIFT;

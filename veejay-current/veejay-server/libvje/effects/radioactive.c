@@ -231,7 +231,7 @@ static void radioactive_blur(radioactive_t *r)
     uint8_t *restrict src = r->blurzoombuf;
     uint8_t *restrict dst = r->blurzoombuf + r->buf_area;
 
-#pragma omp parallel for schedule(static) num_threads(r->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int ym = y > 0 ? y - 1 : y;
         const int yp = y < height - 1 ? y + 1 : y;
@@ -259,7 +259,7 @@ static void radioactive_zoom(radioactive_t *r)
     uint8_t *restrict base_in = r->blurzoombuf + r->buf_area;
     uint8_t *restrict base_out = r->blurzoombuf;
 
-#pragma omp parallel for schedule(static) num_threads(r->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const uint8_t *restrict src_row = base_in + r->zoom_y[y] * width;
         uint8_t *restrict dst_row = base_out + y * width;
@@ -282,7 +282,7 @@ static inline void radioactive_inject_core(radioactive_t *r,
     const int margin = r->buf_margin_left;
 
     if(mode == 0 || mode == 3) {
-#pragma omp parallel for schedule(static) num_threads(r->n_threads)
+#pragma omp for schedule(static)
         for(int y = 0; y < buf_height; y++) {
             const int offset = y * width + margin;
             uint8_t *restrict l_ptr = lum + offset;
@@ -300,7 +300,7 @@ static inline void radioactive_inject_core(radioactive_t *r,
         }
     }
     else if(mode == 1 || mode == 4) {
-#pragma omp parallel for schedule(static) num_threads(r->n_threads)
+#pragma omp for schedule(static)
         for(int y = 0; y < buf_height; y++) {
             const int offset = y * width + margin;
             uint8_t *restrict l_ptr = lum + offset;
@@ -319,7 +319,7 @@ static inline void radioactive_inject_core(radioactive_t *r,
         }
     }
     else if(mode == 6) {
-#pragma omp parallel for schedule(static) num_threads(r->n_threads)
+#pragma omp for schedule(static)
         for(int y = 0; y < buf_height; y++) {
             const int offset = y * width + margin;
             uint8_t *restrict l_ptr = lum + offset;
@@ -338,7 +338,7 @@ static inline void radioactive_inject_core(radioactive_t *r,
         }
     }
     else {
-#pragma omp parallel for schedule(static) num_threads(r->n_threads)
+#pragma omp for schedule(static)
         for(int y = 0; y < buf_height; y++) {
             const int offset = y * width + margin;
             uint8_t *restrict l_ptr = lum + offset;
@@ -356,6 +356,7 @@ static inline void radioactive_inject_core(radioactive_t *r,
         }
     }
 }
+
 
 void radioactivetv_apply(void *ptr, VJFrame *frame, VJFrame *blue, int *args)
 {
@@ -389,17 +390,20 @@ void radioactivetv_apply(void *ptr, VJFrame *frame, VJFrame *blue, int *args)
         r->last_mode = mode;
     }
 
-    if(strength > 0)
-        radioactive_inject_core(r, lum, prev, width, threshold, strength, mode);
-
-    veejay_memcpy(prev, lum, len);
-
-    radioactive_blur(r);
-    radioactive_zoom(r);
-
-    if(mode >= 3) {
 #pragma omp parallel num_threads(r->n_threads)
+    {
+        if(strength > 0)
+            radioactive_inject_core(r, lum, prev, width, threshold, strength, mode);
+
+#pragma omp single
         {
+            veejay_memcpy(prev, lum, len);
+        }
+
+        radioactive_blur(r);
+        radioactive_zoom(r);
+
+        if(mode >= 3) {
 #pragma omp for schedule(static)
             for(int i = 0; i < len; i++) {
                 frame->data[1][i] = 128;
@@ -415,29 +419,29 @@ void radioactivetv_apply(void *ptr, VJFrame *frame, VJFrame *blue, int *args)
                     dst_row[x] = src_row[x];
             }
         }
-    }
-    else {
-#pragma omp parallel for schedule(static) num_threads(r->n_threads)
-        for(int y = 0; y < r->buf_height; y++) {
-            const int frame_offset = y * width + r->buf_margin_left;
+        else {
+#pragma omp for schedule(static)
+            for(int y = 0; y < r->buf_height; y++) {
+                const int frame_offset = y * width + r->buf_margin_left;
 
-            uint8_t *restrict mask_row = r->blurzoombuf + y * r->buf_width;
+                uint8_t *restrict mask_row = r->blurzoombuf + y * r->buf_width;
 
-            uint8_t *restrict y_plane = frame->data[0] + frame_offset;
-            uint8_t *restrict u_plane = frame->data[1] + frame_offset;
-            uint8_t *restrict v_plane = frame->data[2] + frame_offset;
+                uint8_t *restrict y_plane = frame->data[0] + frame_offset;
+                uint8_t *restrict u_plane = frame->data[1] + frame_offset;
+                uint8_t *restrict v_plane = frame->data[2] + frame_offset;
 
-            uint8_t *restrict src_y = blue->data[0] + frame_offset;
-            uint8_t *restrict src_u = blue->data[1] + frame_offset;
-            uint8_t *restrict src_v = blue->data[2] + frame_offset;
+                uint8_t *restrict src_y = blue->data[0] + frame_offset;
+                uint8_t *restrict src_u = blue->data[1] + frame_offset;
+                uint8_t *restrict src_v = blue->data[2] + frame_offset;
 
-            for(int x = 0; x < r->buf_width; x++) {
-                const uint8_t a = mask_row[x];
+                for(int x = 0; x < r->buf_width; x++) {
+                    const uint8_t a = mask_row[x];
 
-                if(a > 0) {
-                    y_plane[x] = radioactive_blend_u8(y_plane[x], src_y[x], a);
-                    u_plane[x] = radioactive_blend_u8(u_plane[x], src_u[x], a);
-                    v_plane[x] = radioactive_blend_u8(v_plane[x], src_v[x], a);
+                    if(a > 0) {
+                        y_plane[x] = radioactive_blend_u8(y_plane[x], src_y[x], a);
+                        u_plane[x] = radioactive_blend_u8(u_plane[x], src_u[x], a);
+                        v_plane[x] = radioactive_blend_u8(v_plane[x], src_v[x], a);
+                    }
                 }
             }
         }

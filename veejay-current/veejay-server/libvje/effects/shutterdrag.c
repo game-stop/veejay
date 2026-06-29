@@ -274,7 +274,6 @@ static void shutterdrag_seed_state(shutterdrag_t *sb, VJFrame *frame)
     uint8_t *restrict hU = sb->historyU;
     uint8_t *restrict hV = sb->historyV;
 
-#pragma omp parallel for schedule(static) num_threads(sb->n_threads)
     for(int i = 0; i < pixels; i++) {
         const int i3 = i * hlen;
         const int32_t yfp = (int32_t)Y[i] << FIXED_BITS;
@@ -423,101 +422,107 @@ void shutterdrag_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict hU = sb->historyU;
     uint8_t *restrict hV = sb->historyV;
 
-#pragma omp parallel for schedule(static) num_threads(sb->n_threads)
-    for(int i = 0; i < pixels; i++) {
-        const int i3 = i * hlen + pos;
-
-        hY[i3] = Y[i];
-        hU[i3] = U[i];
-        hV[i3] = V[i];
-    }
-
     int32_t *restrict fbY_old = sb->feedbackY;
     int32_t *restrict fbY_new = sb->feedbackY_next;
-
-#pragma omp parallel for schedule(static) num_threads(sb->n_threads)
-    for(int y = 0; y < h; y++) {
-        const int row = y * w;
-
-        for(int x = 0; x < w; x++) {
-            const int i = row + x;
-            const int i3 = i * hlen;
-            const uint8_t cur = hY[i3 + pos];
-
-            int64_t fb = shutter_mix_fp(fbY_old[i], (int64_t)cur << FIXED_BITS, alpha);
-
-            fb += (fb * boost_fp) >> FIXED_BITS;
-            fb = (fb * decay) >> FIXED_BITS;
-
-            if(propagate > 0 && x > 0 && x < w - 1 && y > 0 && y < h - 1) {
-                const int gx = (int)hY[(i + 1) * hlen + pos] - (int)hY[(i - 1) * hlen + pos];
-                const int gy = (int)hY[(i + w) * hlen + pos] - (int)hY[(i - w) * hlen + pos];
-                const int agx = gx < 0 ? -gx : gx;
-                const int agy = gy < 0 ? -gy : gy;
-                const int nidx = (agx > agy)
-                    ? i + (gx < 0 ? -1 : 1)
-                    : i + (gy < 0 ? -w : w);
-
-                fb = shutter_mix_fp(fb, fbY_old[nidx], prop_fp);
-            }
-
-            if(y_limit > 0) {
-                if(fb > y_limit)
-                    fb = y_limit;
-                else if(fb < 0)
-                    fb = 0;
-            }
-            else if(fb < 0) {
-                fb = 0;
-            }
-
-            fbY_new[i] = (int32_t)fb;
-
-            const int hsum = (int)hY[i3] + (int)hY[i3 + 1] + (int)hY[i3 + 2];
-            const int64_t hist_fp = ((int64_t)hsum << FIXED_BITS) / hlen;
-            const int64_t out_fp = shutter_mix_fp(fb, hist_fp, history_mix);
-
-            Y[i] = shutter_u8((int)((out_fp * sharpen) >> (FIXED_BITS + 7)));
-        }
-    }
-
-    int32_t *tmpY = sb->feedbackY;
-    sb->feedbackY = sb->feedbackY_next;
-    sb->feedbackY_next = tmpY;
-
     int32_t *restrict fbU = sb->feedbackU;
     int32_t *restrict fbV = sb->feedbackV;
 
-#pragma omp parallel for schedule(static) num_threads(sb->n_threads)
-    for(int i = 0; i < pixels; i++) {
-        const int i3 = i * hlen;
-        int64_t fu = shutter_mix_fp(fbU[i], ((int64_t)((int)hU[i3 + pos] - 128)) << FIXED_BITS, alpha);
-        int64_t fv = shutter_mix_fp(fbV[i], ((int64_t)((int)hV[i3 + pos] - 128)) << FIXED_BITS, alpha);
+#pragma omp parallel num_threads(sb->n_threads)
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < pixels; i++) {
+            const int i3 = i * hlen + pos;
 
-        fu = (fu * decay) >> FIXED_BITS;
-        fv = (fv * decay) >> FIXED_BITS;
+            hY[i3] = Y[i];
+            hU[i3] = U[i];
+            hV[i3] = V[i];
+        }
 
-        if(fu > uv_limit)
-            fu = uv_limit;
-        else if(fu < -uv_limit)
-            fu = -uv_limit;
+#pragma omp for schedule(static)
+        for(int y = 0; y < h; y++) {
+            const int row = y * w;
 
-        if(fv > uv_limit)
-            fv = uv_limit;
-        else if(fv < -uv_limit)
-            fv = -uv_limit;
+            for(int x = 0; x < w; x++) {
+                const int i = row + x;
+                const int i3 = i * hlen;
+                const uint8_t cur = hY[i3 + pos];
 
-        fbU[i] = (int32_t)fu;
-        fbV[i] = (int32_t)fv;
+                int64_t fb = shutter_mix_fp(fbY_old[i], (int64_t)cur << FIXED_BITS, alpha);
 
-        const int hu_sum = (int)hU[i3] + (int)hU[i3 + 1] + (int)hU[i3 + 2] - (128 * hlen);
-        const int hv_sum = (int)hV[i3] + (int)hV[i3 + 1] + (int)hV[i3 + 2] - (128 * hlen);
-        const int64_t hu_fp = ((int64_t)hu_sum << FIXED_BITS) / hlen;
-        const int64_t hv_fp = ((int64_t)hv_sum << FIXED_BITS) / hlen;
-        const int64_t out_u = shutter_mix_fp(fu, hu_fp, history_mix);
-        const int64_t out_v = shutter_mix_fp(fv, hv_fp, history_mix);
+                fb += (fb * boost_fp) >> FIXED_BITS;
+                fb = (fb * decay) >> FIXED_BITS;
 
-        U[i] = shutter_u8((int)((out_u * sharpen) >> (FIXED_BITS + 7)) + 128);
-        V[i] = shutter_u8((int)((out_v * sharpen) >> (FIXED_BITS + 7)) + 128);
+                if(propagate > 0 && x > 0 && x < w - 1 && y > 0 && y < h - 1) {
+                    const int gx = (int)hY[(i + 1) * hlen + pos] - (int)hY[(i - 1) * hlen + pos];
+                    const int gy = (int)hY[(i + w) * hlen + pos] - (int)hY[(i - w) * hlen + pos];
+                    const int agx = gx < 0 ? -gx : gx;
+                    const int agy = gy < 0 ? -gy : gy;
+                    const int nidx = (agx > agy)
+                        ? i + (gx < 0 ? -1 : 1)
+                        : i + (gy < 0 ? -w : w);
+
+                    fb = shutter_mix_fp(fb, fbY_old[nidx], prop_fp);
+                }
+
+                if(y_limit > 0) {
+                    if(fb > y_limit)
+                        fb = y_limit;
+                    else if(fb < 0)
+                        fb = 0;
+                }
+                else if(fb < 0) {
+                    fb = 0;
+                }
+
+                fbY_new[i] = (int32_t)fb;
+
+                const int hsum = (int)hY[i3] + (int)hY[i3 + 1] + (int)hY[i3 + 2];
+                const int64_t hist_fp = ((int64_t)hsum << FIXED_BITS) / hlen;
+                const int64_t out_fp = shutter_mix_fp(fb, hist_fp, history_mix);
+
+                Y[i] = shutter_u8((int)((out_fp * sharpen) >> (FIXED_BITS + 7)));
+            }
+        }
+
+#pragma omp single
+        {
+            int32_t *tmpY = sb->feedbackY;
+            sb->feedbackY = sb->feedbackY_next;
+            sb->feedbackY_next = tmpY;
+        }
+
+#pragma omp for schedule(static)
+        for(int i = 0; i < pixels; i++) {
+            const int i3 = i * hlen;
+            int64_t fu = shutter_mix_fp(fbU[i], ((int64_t)((int)hU[i3 + pos] - 128)) << FIXED_BITS, alpha);
+            int64_t fv = shutter_mix_fp(fbV[i], ((int64_t)((int)hV[i3 + pos] - 128)) << FIXED_BITS, alpha);
+
+            fu = (fu * decay) >> FIXED_BITS;
+            fv = (fv * decay) >> FIXED_BITS;
+
+            if(fu > uv_limit)
+                fu = uv_limit;
+            else if(fu < -uv_limit)
+                fu = -uv_limit;
+
+            if(fv > uv_limit)
+                fv = uv_limit;
+            else if(fv < -uv_limit)
+                fv = -uv_limit;
+
+            fbU[i] = (int32_t)fu;
+            fbV[i] = (int32_t)fv;
+
+            const int hu_sum = (int)hU[i3] + (int)hU[i3 + 1] + (int)hU[i3 + 2] - (128 * hlen);
+            const int hv_sum = (int)hV[i3] + (int)hV[i3 + 1] + (int)hV[i3 + 2] - (128 * hlen);
+            const int64_t hu_fp = ((int64_t)hu_sum << FIXED_BITS) / hlen;
+            const int64_t hv_fp = ((int64_t)hv_sum << FIXED_BITS) / hlen;
+            const int64_t out_u = shutter_mix_fp(fu, hu_fp, history_mix);
+            const int64_t out_v = shutter_mix_fp(fv, hv_fp, history_mix);
+
+            U[i] = shutter_u8((int)((out_u * sharpen) >> (FIXED_BITS + 7)) + 128);
+            V[i] = shutter_u8((int)((out_v * sharpen) >> (FIXED_BITS + 7)) + 128);
+        }
     }
 }
+

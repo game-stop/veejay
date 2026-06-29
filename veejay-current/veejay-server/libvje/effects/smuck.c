@@ -250,12 +250,14 @@ static void smuck_apply_plane(uint8_t *restrict dst,
                               int chroma,
                               int n_threads)
 {
+    (void)n_threads;
+
     const unsigned int shift = (unsigned int)(10 + shimmer);
     const unsigned int mask = chroma ? 0x3u : 0x7u;
     const int bias = chroma ? 1 : 3;
     const unsigned int yshift = shift + (chroma ? 2u : 3u);
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         const int row = y * w;
 
@@ -347,9 +349,12 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
 
     uint8_t *restrict Y = frame->data[0];
 
-    veejay_memcpy(s->tmp[0], Y, len);
+#pragma omp parallel num_threads(s->n_threads)
+    {
+#pragma omp single
+        veejay_memcpy(s->tmp[0], Y, len);
 
-    smuck_apply_plane(
+        smuck_apply_plane(
         Y,
         s->tmp[0],
         w,
@@ -361,23 +366,26 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
         seed,
         0,
         s->n_threads
-    );
+        );
 
-    if(mix_q8 < 256) {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-        for(int i = 0; i < len; i++)
-            Y[i] = smuck_mix_u8(s->tmp[0][i], Y[i], mix_q8);
-    }
+        if(mix_q8 < 256) {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++)
+                Y[i] = smuck_mix_u8(s->tmp[0][i], Y[i], mix_q8);
+        }
 
-    if(full_color) {
+        if(full_color) {
         const int uv_len = frame->ssm ? len : frame->uv_len;
         const int uv_w = frame->ssm ? w : frame->uv_width;
         const int uv_h = frame->ssm ? h : frame->uv_height;
 
-        veejay_memcpy(s->tmp[1], frame->data[1], uv_len);
-        veejay_memcpy(s->tmp[2], frame->data[2], uv_len);
+#pragma omp single
+        {
+            veejay_memcpy(s->tmp[1], frame->data[1], uv_len);
+            veejay_memcpy(s->tmp[2], frame->data[2], uv_len);
+        }
 
-        smuck_apply_plane(
+            smuck_apply_plane(
             frame->data[1],
             s->tmp[1],
             uv_w,
@@ -389,9 +397,9 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
             seed ^ 0x9e3779b9U,
             1,
             s->n_threads
-        );
+            );
 
-        smuck_apply_plane(
+            smuck_apply_plane(
             frame->data[2],
             s->tmp[2],
             uv_w,
@@ -403,13 +411,14 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
             seed ^ 0x85ebca6bU,
             1,
             s->n_threads
-        );
+            );
 
-        if(mix_q8 < 256) {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-            for(int i = 0; i < uv_len; i++) {
-                frame->data[1][i] = smuck_mix_u8(s->tmp[1][i], frame->data[1][i], mix_q8);
-                frame->data[2][i] = smuck_mix_u8(s->tmp[2][i], frame->data[2][i], mix_q8);
+            if(mix_q8 < 256) {
+#pragma omp for schedule(static)
+                for(int i = 0; i < uv_len; i++) {
+                    frame->data[1][i] = smuck_mix_u8(s->tmp[1][i], frame->data[1][i], mix_q8);
+                    frame->data[2][i] = smuck_mix_u8(s->tmp[2][i], frame->data[2][i], mix_q8);
+                }
             }
         }
     }

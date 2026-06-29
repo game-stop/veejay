@@ -222,80 +222,90 @@ void melt_apply(void *ptr, VJFrame *A, int *args)
         veejay_memcpy(bufV, srcV, len);
         t->first_frame = 0;
     }
-    else if(alpha_perc > 0) {
-#pragma omp parallel for num_threads(t->n_threads) schedule(static)
-        for(uint32_t i = 0; i < len; i++) {
-            bufY[i] = melt_blend255(bufY[i], srcY[i], alpha_perc);
-            bufU[i] = melt_blend255(bufU[i], srcU[i], alpha_perc);
-            bufV[i] = melt_blend255(bufV[i], srcV[i], alpha_perc);
-        }
-    }
 
     const int32_t ce_factor = curl_amt * ((speed_q8 * intensity) >> 4);
     const int32_t energy_base = (speed_q8 * intensity) >> 8;
     const int32_t w_minus1 = (int32_t)width - 1;
     const int32_t h_minus1 = (int32_t)height - 1;
 
-#pragma omp parallel for num_threads(t->n_threads) schedule(static)
-    for(uint32_t y = 0; y < height; y++) {
-        const uint32_t row = y * width;
-
-        for(uint32_t x = 0; x < width; x++) {
-            const uint32_t i = row + x;
-            int32_t vx_i = vx[i];
-            int32_t vy_i = vy[i];
-
-            const int32_t rx = get_hash_rand(x, y, t->seed);
-            const int32_t ry = get_hash_rand(x, y + height, t->seed);
-            const int32_t angle_idx = (int32_t)((((uint64_t)x + (uint64_t)y) << 16) + (uint32_t)t->time_q16) >> 21;
-            const int32_t a_idx = (sin_lut_q14[angle_idx & LUT_MASK] +
-                                  sin_lut_q14[(angle_idx + COS_OFFSET) & LUT_MASK]) >> 5;
-
-            vx_i += (rx * energy_base) >> 14;
-            vy_i += (ry * energy_base) >> 14;
-            vx_i += (int32_t)(((int64_t)sin_lut_q14[(a_idx + COS_OFFSET) & LUT_MASK] * (int64_t)ce_factor) >> TRIG_SHIFT);
-            vy_i += (int32_t)(((int64_t)sin_lut_q14[a_idx & LUT_MASK] * (int64_t)ce_factor) >> TRIG_SHIFT);
-            vy_i += gravity;
-
-            vx[i] = (vx_i * damping) >> 10;
-            vy[i] = (vy_i * damping) >> 10;
+#pragma omp parallel num_threads(t->n_threads)
+    {
+        if(alpha_perc > 0) {
+#pragma omp for schedule(static)
+            for(uint32_t i = 0; i < len; i++) {
+                bufY[i] = melt_blend255(bufY[i], srcY[i], alpha_perc);
+                bufU[i] = melt_blend255(bufU[i], srcU[i], alpha_perc);
+                bufV[i] = melt_blend255(bufV[i], srcV[i], alpha_perc);
+            }
         }
-    }
 
-    if(curl_amt)
-        t->time_q16 += 1966;
+#pragma omp for schedule(static)
+        for(uint32_t y = 0; y < height; y++) {
+            const uint32_t row = y * width;
 
-#pragma omp parallel for num_threads(t->n_threads) schedule(static)
-    for(uint32_t y = 0; y < height; y++) {
-        const uint32_t row = y * width;
+            for(uint32_t x = 0; x < width; x++) {
+                const uint32_t i = row + x;
+                int32_t vx_i = vx[i];
+                int32_t vy_i = vy[i];
+
+                const int32_t rx = get_hash_rand(x, y, t->seed);
+                const int32_t ry = get_hash_rand(x, y + height, t->seed);
+                const int32_t angle_idx = (int32_t)((((uint64_t)x + (uint64_t)y) << 16) + (uint32_t)t->time_q16) >> 21;
+                const int32_t a_idx = (sin_lut_q14[angle_idx & LUT_MASK] +
+                                      sin_lut_q14[(angle_idx + COS_OFFSET) & LUT_MASK]) >> 5;
+
+                vx_i += (rx * energy_base) >> 14;
+                vy_i += (ry * energy_base) >> 14;
+                vx_i += (int32_t)(((int64_t)sin_lut_q14[(a_idx + COS_OFFSET) & LUT_MASK] * (int64_t)ce_factor) >> TRIG_SHIFT);
+                vy_i += (int32_t)(((int64_t)sin_lut_q14[a_idx & LUT_MASK] * (int64_t)ce_factor) >> TRIG_SHIFT);
+                vy_i += gravity;
+
+                vx[i] = (vx_i * damping) >> 10;
+                vy[i] = (vy_i * damping) >> 10;
+            }
+        }
+
+#pragma omp single
+        {
+            if(curl_amt)
+                t->time_q16 += 1966;
+        }
+
+#pragma omp for schedule(static)
+        for(uint32_t y = 0; y < height; y++) {
+            const uint32_t row = y * width;
 
 #pragma omp simd
-        for(uint32_t x = 0; x < width; x++) {
-            const uint32_t i = row + x;
-            int32_t nx = (int32_t)x + (vx[i] >> FP_SHIFT);
-            int32_t ny = (int32_t)y + (vy[i] >> FP_SHIFT);
-            int32_t cnx = (int32_t)x + (vx[i] >> (FP_SHIFT + 1));
-            int32_t cny = (int32_t)y + (vy[i] >> (FP_SHIFT + 1));
+            for(uint32_t x = 0; x < width; x++) {
+                const uint32_t i = row + x;
+                int32_t nx = (int32_t)x + (vx[i] >> FP_SHIFT);
+                int32_t ny = (int32_t)y + (vy[i] >> FP_SHIFT);
+                int32_t cnx = (int32_t)x + (vx[i] >> (FP_SHIFT + 1));
+                int32_t cny = (int32_t)y + (vy[i] >> (FP_SHIFT + 1));
 
-            nx = nx < 0 ? 0 : (nx >= (int32_t)width ? w_minus1 : nx);
-            ny = ny < 0 ? 0 : (ny >= (int32_t)height ? h_minus1 : ny);
-            cnx = cnx < 0 ? 0 : (cnx >= (int32_t)width ? w_minus1 : cnx);
-            cny = cny < 0 ? 0 : (cny >= (int32_t)height ? h_minus1 : cny);
+                nx = nx < 0 ? 0 : (nx >= (int32_t)width ? w_minus1 : nx);
+                ny = ny < 0 ? 0 : (ny >= (int32_t)height ? h_minus1 : ny);
+                cnx = cnx < 0 ? 0 : (cnx >= (int32_t)width ? w_minus1 : cnx);
+                cny = cny < 0 ? 0 : (cny >= (int32_t)height ? h_minus1 : cny);
 
-            const uint32_t src_idx = (uint32_t)ny * width + (uint32_t)nx;
-            const uint32_t chroma_idx = (uint32_t)cny * width + (uint32_t)cnx;
-            const uint8_t live_u = srcU[i];
-            const uint8_t live_v = srcV[i];
+                const uint32_t src_idx = (uint32_t)ny * width + (uint32_t)nx;
+                const uint32_t chroma_idx = (uint32_t)cny * width + (uint32_t)cnx;
+                const uint8_t live_u = srcU[i];
+                const uint8_t live_v = srcV[i];
 
-            srcY[i] = bufY[src_idx];
-            srcU[i] = melt_blend255(bufU[chroma_idx], live_u, chroma_anchor);
-            srcV[i] = melt_blend255(bufV[chroma_idx], live_v, chroma_anchor);
+                srcY[i] = bufY[src_idx];
+                srcU[i] = melt_blend255(bufU[chroma_idx], live_u, chroma_anchor);
+                srcV[i] = melt_blend255(bufV[chroma_idx], live_v, chroma_anchor);
+            }
+        }
+
+#pragma omp for schedule(static)
+        for(uint32_t i = 0; i < len; i++) {
+            bufY[i] = srcY[i];
+            bufU[i] = srcU[i];
+            bufV[i] = srcV[i];
         }
     }
 
     t->seed++;
-
-    veejay_memcpy(bufY, srcY, len);
-    veejay_memcpy(bufU, srcU, len);
-    veejay_memcpy(bufV, srcV, len);
 }

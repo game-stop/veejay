@@ -273,7 +273,7 @@ static void ripple_build_table(ripple_t *r,
     float *restrict sin_lut = r->ripple_sin;
     float *restrict cos_lut = r->ripple_cos;
 
-#pragma omp parallel for schedule(static) num_threads(r->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
         const float dy = (float)y - cy;
@@ -308,10 +308,13 @@ static void ripple_build_table(ripple_t *r,
         }
     }
 
-    r->ripple_waves = waves_arg;
-    r->ripple_ampli = amplitude_arg;
-    r->ripple_attn = attenuation_arg;
-    r->ripple_phase = phase_arg;
+#pragma omp single
+    {
+        r->ripple_waves = waves_arg;
+        r->ripple_ampli = amplitude_arg;
+        r->ripple_attn = attenuation_arg;
+        r->ripple_phase = phase_arg;
+    }
 }
 
 
@@ -408,37 +411,42 @@ void ripple_apply(void *ptr, VJFrame *frame, int *args)
     veejay_memcpy(r->ripple_data[1], Cb, len);
     veejay_memcpy(r->ripple_data[2], Cr, len);
 
-    if(r->ripple_waves != effective_waves ||
-       r->ripple_ampli != effective_ampli ||
-       r->ripple_attn != effective_attn ||
-       r->ripple_phase != effective_phase)
-    {
-        ripple_build_table(r, width, height, effective_waves, effective_ampli, effective_attn, effective_phase);
-    }
+    const int rebuild =
+        r->ripple_waves != effective_waves ||
+        r->ripple_ampli != effective_ampli ||
+        r->ripple_attn != effective_attn ||
+        r->ripple_phase != effective_phase;
 
     int *restrict table = r->ripple_table;
     uint8_t *restrict srcY = r->ripple_data[0];
     uint8_t *restrict srcCb = r->ripple_data[1];
     uint8_t *restrict srcCr = r->ripple_data[2];
 
-    if(mix_q8 >= 256 && chroma_q8 >= 256) {
-#pragma omp parallel for schedule(static) num_threads(r->n_threads)
-        for(int i = 0; i < len; i++) {
-            const int src = table[i];
+#pragma omp parallel num_threads(r->n_threads)
+    {
+        if(rebuild)
+            ripple_build_table(r, width, height, effective_waves, effective_ampli, effective_attn, effective_phase);
 
-            Y[i] = srcY[src];
-            Cb[i] = srcCb[src];
-            Cr[i] = srcCr[src];
+        if(mix_q8 >= 256 && chroma_q8 >= 256) {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                const int src = table[i];
+
+                Y[i] = srcY[src];
+                Cb[i] = srcCb[src];
+                Cr[i] = srcCr[src];
+            }
         }
-    }
-    else {
-#pragma omp parallel for schedule(static) num_threads(r->n_threads)
-        for(int i = 0; i < len; i++) {
-            const int src = table[i];
+        else {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                const int src = table[i];
 
-            Y[i] = ripple_mix_u8(srcY[i], srcY[src], mix_q8);
-            Cb[i] = ripple_mix_u8(srcCb[i], srcCb[src], chroma_q8);
-            Cr[i] = ripple_mix_u8(srcCr[i], srcCr[src], chroma_q8);
+                Y[i] = ripple_mix_u8(srcY[i], srcY[src], mix_q8);
+                Cb[i] = ripple_mix_u8(srcCb[i], srcCb[src], chroma_q8);
+                Cr[i] = ripple_mix_u8(srcCr[i], srcCr[src], chroma_q8);
+            }
         }
     }
 }
+

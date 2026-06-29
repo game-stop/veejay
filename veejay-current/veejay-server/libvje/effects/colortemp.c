@@ -858,8 +858,7 @@ void colortemp_apply(void *ptr, VJFrame *frame, int *args)
     const int mode = args[1];
     int opacity = args[2];
     const int len = frame->len;
-    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
-
+    const int uv_len = frame->uv_len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -868,36 +867,40 @@ void colortemp_apply(void *ptr, VJFrame *frame, int *args)
     int iy = pixel_Y_lo_;
     int iu = 128;
     int iv = 128;
+    uint64_t sum = 0;
+    const int n_threads = vje_advise_num_threads(len);
 
     _rgb2yuv(blackbody_t[temperature].r, blackbody_t[temperature].g, blackbody_t[temperature].b, iy, iu, iv);
 
     iu -= 128;
     iv -= 128;
 
-    if(mode == 1)
+#pragma omp parallel num_threads(n_threads)
     {
-        uint64_t sum = 0;
-        const int n_threads_y = vje_advise_num_threads(len);
+        if(mode == 1)
+        {
+#pragma omp for reduction(+:sum) schedule(static)
+            for(int i = 0; i < len; i++)
+                sum += Y[i];
 
-        #pragma omp parallel for reduction(+:sum) num_threads(n_threads_y) schedule(static)
-        for(int i = 0; i < len; i++)
-            sum += Y[i];
+#pragma omp single
+            {
+                opacity = (int)(sum / (uint64_t)len);
+            }
+        }
 
-        opacity = (int)(sum / (uint64_t)len);
-    }
+#pragma omp for schedule(static)
+        for(int i = 0; i < uv_len; i++)
+        {
+            int u = (int)U[i] - 128;
+            int v = (int)V[i] - 128;
 
-    const int n_threads_uv = vje_advise_num_threads(uv_len);
+            u = 128 + (((opacity * (u - iu)) >> 8) + u);
+            v = 128 + (((opacity * (v - iv)) >> 8) + v);
 
-    #pragma omp parallel for num_threads(n_threads_uv) schedule(static)
-    for(int i = 0; i < uv_len; i++)
-    {
-        int u = (int)U[i] - 128;
-        int v = (int)V[i] - 128;
-
-        u = 128 + (((opacity * (u - iu)) >> 8) + u);
-        v = 128 + (((opacity * (v - iv)) >> 8) + v);
-
-        U[i] = (uint8_t)clampi(u, 0, 255);
-        V[i] = (uint8_t)clampi(v, 0, 255);
+            U[i] = (uint8_t)clampi(u, 0, 255);
+            V[i] = (uint8_t)clampi(v, 0, 255);
+        }
     }
 }
+

@@ -534,16 +534,16 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
     if(nactive <= 0 && swing_x == 0 && swing_y == 0)
         return;
 
-    if(nactive <= 0) {
 #pragma omp parallel num_threads(threads)
-        {
+    {
 #pragma omp for schedule(static)
-            for(int i = 0; i < len; i++) {
-                src_y[i] = Y[i];
-                src_u[i] = U[i];
-                src_v[i] = V[i];
-            }
+        for(int i = 0; i < len; i++) {
+            src_y[i] = Y[i];
+            src_u[i] = U[i];
+            src_v[i] = V[i];
+        }
 
+        if(nactive <= 0) {
 #pragma omp for schedule(static)
             for(int y = 0; y < h; y++) {
                 const int row = y * w;
@@ -576,152 +576,140 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
         }
-
-        return;
-    }
-
-#pragma omp parallel num_threads(threads)
-    {
+        else {
 #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            src_y[i] = Y[i];
-            src_u[i] = U[i];
-            src_v[i] = V[i];
-        }
+            for(int y = 0; y < h; y++) {
+                const int row = y * w;
 
-#pragma omp for schedule(static)
-        for(int y = 0; y < h; y++) {
-            const int row = y * w;
+                switch(nactive) {
+                    case 1:
+                        for(int x = 0; x < w; x++) {
+                            int dx_acc = 0;
+                            int dy_acc = 0;
+                            int wave_sum = 0;
+                            int glow_sum = 0;
+                            int pull_sum = 0;
+                            PW_ACCUM_WAVE_NB(0);
+                            PW_STORE_MAP();
+                        }
+                        break;
 
-            switch(nactive) {
-                case 1:
-                    for(int x = 0; x < w; x++) {
-                        int dx_acc = 0;
-                        int dy_acc = 0;
-                        int wave_sum = 0;
-                        int glow_sum = 0;
-                        int pull_sum = 0;
-                        PW_ACCUM_WAVE_NB(0);
-                        PW_STORE_MAP();
-                    }
-                    break;
+                    case 2:
+                        for(int x = 0; x < w; x++) {
+                            int dx_acc = 0;
+                            int dy_acc = 0;
+                            int wave_sum = 0;
+                            int glow_sum = 0;
+                            int pull_sum = 0;
+                            PW_ACCUM_WAVE_NB(0);
+                            PW_ACCUM_WAVE_NB(1);
+                            PW_STORE_MAP();
+                        }
+                        break;
 
-                case 2:
-                    for(int x = 0; x < w; x++) {
-                        int dx_acc = 0;
-                        int dy_acc = 0;
-                        int wave_sum = 0;
-                        int glow_sum = 0;
-                        int pull_sum = 0;
-                        PW_ACCUM_WAVE_NB(0);
-                        PW_ACCUM_WAVE_NB(1);
-                        PW_STORE_MAP();
-                    }
-                    break;
+                    case 3:
+                        for(int x = 0; x < w; x++) {
+                            int dx_acc = 0;
+                            int dy_acc = 0;
+                            int wave_sum = 0;
+                            int glow_sum = 0;
+                            int pull_sum = 0;
+                            PW_ACCUM_WAVE_NB(0);
+                            PW_ACCUM_WAVE_NB(1);
+                            PW_ACCUM_WAVE_NB(2);
+                            PW_STORE_MAP();
+                        }
+                        break;
 
-                case 3:
-                    for(int x = 0; x < w; x++) {
-                        int dx_acc = 0;
-                        int dy_acc = 0;
-                        int wave_sum = 0;
-                        int glow_sum = 0;
-                        int pull_sum = 0;
-                        PW_ACCUM_WAVE_NB(0);
-                        PW_ACCUM_WAVE_NB(1);
-                        PW_ACCUM_WAVE_NB(2);
-                        PW_STORE_MAP();
-                    }
-                    break;
-
-                default:
-                    for(int x = 0; x < w; x++) {
-                        int dx_acc = 0;
-                        int dy_acc = 0;
-                        int wave_sum = 0;
-                        int glow_sum = 0;
-                        int pull_sum = 0;
-                        PW_ACCUM_WAVE_NB(0);
-                        PW_ACCUM_WAVE_NB(1);
-                        PW_ACCUM_WAVE_NB(2);
-                        PW_ACCUM_WAVE_NB(3);
-                        PW_STORE_MAP();
-                    }
-                    break;
+                    default:
+                        for(int x = 0; x < w; x++) {
+                            int dx_acc = 0;
+                            int dy_acc = 0;
+                            int wave_sum = 0;
+                            int glow_sum = 0;
+                            int pull_sum = 0;
+                            PW_ACCUM_WAVE_NB(0);
+                            PW_ACCUM_WAVE_NB(1);
+                            PW_ACCUM_WAVE_NB(2);
+                            PW_ACCUM_WAVE_NB(3);
+                            PW_STORE_MAP();
+                        }
+                        break;
+                }
             }
-        }
 
 #pragma omp for schedule(static)
-        for(int y = 0; y < h; y++) {
-            const int row = y * w;
-            const int row_up = (y > 0 ? y - 1 : y) * w;
-            const int row_dn = (y < h - 1 ? y + 1 : y) * w;
-            const int spark_y = y * 17;
-            const int frame_a = (int)s->frame_count * 23;
-            const int frame_b = (int)s->frame_count * 19;
+            for(int y = 0; y < h; y++) {
+                const int row = y * w;
+                const int row_up = (y > 0 ? y - 1 : y) * w;
+                const int row_dn = (y < h - 1 ? y + 1 : y) * w;
+                const int spark_y = y * 17;
+                const int frame_a = (int)s->frame_count * 23;
+                const int frame_b = (int)s->frame_count * 19;
 
-            for(int x = 0; x < w; x++) {
-                const int i = row + x;
-                const int xm = x > 0 ? x - 1 : x;
-                const int xp = x < w - 1 ? x + 1 : x;
+                for(int x = 0; x < w; x++) {
+                    const int i = row + x;
+                    const int xm = x > 0 ? x - 1 : x;
+                    const int xp = x < w - 1 ? x + 1 : x;
 
-                const int edge =
-                    pw_absi((int)src_y[row + xp] - (int)src_y[row + xm]) +
-                    pw_absi((int)src_y[row_dn + x] - (int)src_y[row_up + x]);
+                    const int edge =
+                        pw_absi((int)src_y[row + xp] - (int)src_y[row + xm]) +
+                        pw_absi((int)src_y[row_dn + x] - (int)src_y[row_up + x]);
 
-                const int edge_gate = edge < 255 ? edge : 255;
-                const int pull_sum = map_pull[i];
-                const int swing_gate = 64 + ((edge_gate + pull_sum) >> 2);
+                    const int edge_gate = edge < 255 ? edge : 255;
+                    const int pull_sum = map_pull[i];
+                    const int swing_gate = 64 + ((edge_gate + pull_sum) >> 2);
 
-                int px = x + map_dx[i] + ((swing_x * swing_gate) >> 7);
-                int py = y + map_dy[i] + ((swing_y * swing_gate) >> 7);
+                    int px = x + map_dx[i] + ((swing_x * swing_gate) >> 7);
+                    int py = y + map_dy[i] + ((swing_y * swing_gate) >> 7);
 
-                px = px < 0 ? 0 : (px >= w ? w - 1 : px);
-                py = py < 0 ? 0 : (py >= h ? h - 1 : py);
+                    px = px < 0 ? 0 : (px >= w ? w - 1 : px);
+                    py = py < 0 ? 0 : (py >= h ? h - 1 : py);
 
-                const int pi = py * w + px;
+                    const int pi = py * w + px;
 
-                int yy = src_y[pi];
-                int uu = src_u[pi];
-                int vv = src_v[pi];
+                    int yy = src_y[pi];
+                    int uu = src_u[pi];
+                    int vv = src_v[pi];
 
-                const int wave_sum = map_wave[i];
-                const int glow_sum = map_glow[i];
+                    const int wave_sum = map_wave[i];
+                    const int glow_sum = map_glow[i];
 
-                yy += (glow_sum * ring_glow) >> 8;
-                yy -= ((pull_sum - glow_sum) * ring_glow) >> 11;
-                yy += (snare_i * glow_sum) >> 8;
+                    yy += (glow_sum * ring_glow) >> 8;
+                    yy -= ((pull_sum - glow_sum) * ring_glow) >> 11;
+                    yy += (snare_i * glow_sum) >> 8;
 
-                if(hat_i > 10) {
-                    const int edge_active = edge_gate > 22 ? edge_gate - 22 : 0;
-                    const int pull_active = pull_sum > 2 ? 1 : 0;
-                    const int pat = ((x * 13 + spark_y + frame_a) & 31) - 8;
+                    if(hat_i > 10) {
+                        const int edge_active = edge_gate > 22 ? edge_gate - 22 : 0;
+                        const int pull_active = pull_sum > 2 ? 1 : 0;
+                        const int pat = ((x * 13 + spark_y + frame_a) & 31) - 8;
 
-                    yy += (pat * hat_i * edge_active * pull_active) >> 13;
-                }
-
-                if(chroma_push > 0) {
-                    const int cp = (wave_sum * chroma_push) >> 8;
-
-                    uu += cp;
-                    vv -= cp >> 1;
-
-                    if(hat_i > 12) {
-                        const int edge_active = edge_gate > 36 ? edge_gate - 36 : 0;
-                        const int pat = ((x * 11 + spark_y + frame_b) & 31) - 15;
-                        const int flick = (pat * hat_i * edge_active) >> 12;
-
-                        uu += flick;
-                        vv -= flick >> 1;
+                        yy += (pat * hat_i * edge_active * pull_active) >> 13;
                     }
-                }
 
-                Y[i] = pw_u8(yy);
-                U[i] = pw_u8(uu);
-                V[i] = pw_u8(vv);
+                    if(chroma_push > 0) {
+                        const int cp = (wave_sum * chroma_push) >> 8;
+
+                        uu += cp;
+                        vv -= cp >> 1;
+
+                        if(hat_i > 12) {
+                            const int edge_active = edge_gate > 36 ? edge_gate - 36 : 0;
+                            const int pat = ((x * 11 + spark_y + frame_b) & 31) - 15;
+                            const int flick = (pat * hat_i * edge_active) >> 12;
+
+                            uu += flick;
+                            vv -= flick >> 1;
+                        }
+                    }
+
+                    Y[i] = pw_u8(yy);
+                    U[i] = pw_u8(uu);
+                    V[i] = pw_u8(vv);
+                }
             }
         }
     }
 }
-
 #undef PW_ACCUM_WAVE_NB
 #undef PW_STORE_MAP

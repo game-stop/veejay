@@ -315,8 +315,7 @@ static void cs_seed(chronoglass_t *c, VJFrame *frame)
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
-    for(i = 0; i < len; i++) {
+for(i = 0; i < len; i++) {
         c->prev_y[i] = Y[i];
         c->ref_y[i] = Y[i];
 
@@ -695,7 +694,7 @@ static void cs_compute_border(chronoglass_t *c,
     int y;
 
     if(ymin > 0) {
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
         for(y = 0; y < ymin; y++) {
             int x;
             int pos = y * w;
@@ -717,7 +716,7 @@ static void cs_compute_border(chronoglass_t *c,
     }
 
     if(ymax + 1 < h) {
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
         for(y = ymax + 1; y < h; y++) {
             int x;
             int pos = y * w;
@@ -739,7 +738,7 @@ static void cs_compute_border(chronoglass_t *c,
     }
 
     if(xmin > 0 && ymin <= ymax) {
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
         for(y = ymin; y <= ymax; y++) {
             int x;
             int pos = y * w;
@@ -761,7 +760,7 @@ static void cs_compute_border(chronoglass_t *c,
     }
 
     if(xmax + 1 < w && ymin <= ymax) {
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
         for(y = ymin; y <= ymax; y++) {
             int x;
             int pos = y * w + xmax + 1;
@@ -830,7 +829,7 @@ static void cs_compute_silt(chronoglass_t *c,
     int y;
 
     if(w < 5 || h < 5 || xmin > xmax || ymin > ymax) {
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
         for(y = 0; y < h; y++) {
             int x;
             int pos = y * w;
@@ -853,7 +852,7 @@ static void cs_compute_silt(chronoglass_t *c,
         return;
     }
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(y = ymin; y <= ymax; y++) {
         int x;
         int pos = y * w + xmin;
@@ -1075,7 +1074,7 @@ static void cs_render_const(chronoglass_t *c,
             break;
     }
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         uint8_t src_y = Y[i];
 
@@ -1162,7 +1161,7 @@ static void cs_render_source(chronoglass_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         uint8_t src_y = Y[i];
         uint8_t src_u = U[i];
@@ -1277,23 +1276,27 @@ void chronoglass_apply(void *ptr, VJFrame *frame, int *args)
         color_energy
     );
 
-    cs_compute_silt(
-        c,
-        frame,
-        flow,
-        erosion,
-        sediment,
-        turbulence
-    );
+#pragma omp parallel num_threads(c->n_threads)
+    {
+        cs_compute_silt(
+            c,
+            frame,
+            flow,
+            erosion,
+            sediment,
+            turbulence
+        );
 
-    cs_swap_fields(c);
+#pragma omp single
+        cs_swap_fields(c);
 
-    cs_render(
-        c,
-        frame,
-        source_bleed,
-        color_mode
-    );
+        cs_render(
+            c,
+            frame,
+            source_bleed,
+            color_mode
+        );
+    }
 
     c->frame++;
 }

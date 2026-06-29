@@ -402,7 +402,6 @@ static void cs_seed(chronomirror_t *c, VJFrame *frame)
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
     for(i = 0; i < len; i++) {
         c->prev_y[i] = Y[i];
         c->ref_y[i] = Y[i];
@@ -1003,7 +1002,7 @@ static void cs_compute_smoke_plain(chronomirror_t *c,
     int y;
 
     if(w < 5 || h < 5 || xmin > xmax || ymin > ymax) {
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
         for(y = 0; y < h; y++) {
             int x;
             int pos = y * w;
@@ -1026,7 +1025,7 @@ static void cs_compute_smoke_plain(chronomirror_t *c,
         return;
     }
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(y = ymin; y <= ymax; y++) {
         int x;
         int pos = y * w + xmin;
@@ -1210,7 +1209,7 @@ static void cs_compute_smoke_curl(chronomirror_t *c,
     int y;
 
     if(w < 7 || h < 7 || xmin > xmax || ymin > ymax) {
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
         for(y = 0; y < h; y++) {
             int x;
             int pos = y * w;
@@ -1233,7 +1232,7 @@ static void cs_compute_smoke_curl(chronomirror_t *c,
         return;
     }
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(y = ymin; y <= ymax; y++) {
         int x;
         int pos = y * w + xmin;
@@ -1448,7 +1447,7 @@ static void cs_compute_smoke_turbulent(chronomirror_t *c,
     int y;
 
     if(w < 7 || h < 7 || xmin > xmax || ymin > ymax) {
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
         for(y = 0; y < h; y++) {
             int x;
             int pos = y * w;
@@ -1471,7 +1470,7 @@ static void cs_compute_smoke_turbulent(chronomirror_t *c,
         return;
     }
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(y = ymin; y <= ymax; y++) {
         int x;
         int pos = y * w + xmin;
@@ -1720,7 +1719,7 @@ static void cs_render_const_pure(chronomirror_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         int on = ON[i];
         int off = OFF[i];
@@ -1809,7 +1808,7 @@ static void cs_render_const_bleed(chronomirror_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         int on = ON[i];
         int off = OFF[i];
@@ -1900,7 +1899,7 @@ static void cs_render_source_pure(chronomirror_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         uint8_t src_u = U[i];
         uint8_t src_v = V[i];
@@ -1987,7 +1986,7 @@ static void cs_render_source_bleed(chronomirror_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         uint8_t src_y = Y[i];
         uint8_t src_u = U[i];
@@ -2079,7 +2078,7 @@ static void cs_render_white_pure(chronomirror_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         int ev = ON[i] + OFF[i] + (VEIL[i] >> 1);
 
@@ -2090,8 +2089,11 @@ static void cs_render_white_pure(chronomirror_t *c,
         Y[i] = (uint8_t) ev;
     }
 
-    veejay_memset(U, 128, (size_t) len);
-    veejay_memset(V, 128, (size_t) len);
+#pragma omp for schedule(static)
+    for(i = 0; i < len; i++) {
+        U[i] = 128;
+        V[i] = 128;
+    }
 }
 
 static void cs_render_white_bleed(chronomirror_t *c,
@@ -2111,7 +2113,7 @@ static void cs_render_white_bleed(chronomirror_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         int ev = ON[i] + OFF[i] + (VEIL[i] >> 1);
         int base_y = BY[Y[i]];
@@ -2217,22 +2219,29 @@ void chronomirror_apply(void *ptr, VJFrame *frame, int *args)
         color_energy
     );
 
-    cs_compute_smoke(
-        c,
-        frame,
-        rise,
-        curl,
-        turbulence
-    );
+#pragma omp parallel num_threads(c->n_threads)
+    {
+        cs_compute_smoke(
+            c,
+            frame,
+            rise,
+            curl,
+            turbulence
+        );
 
-    cs_swap_fields(c);
+#pragma omp single
+        {
+            cs_swap_fields(c);
+        }
 
-    cs_render(
-        c,
-        frame,
-        source_bleed,
-        color_mode
-    );
+        cs_render(
+            c,
+            frame,
+            source_bleed,
+            color_mode
+        );
+    }
 
     c->frame++;
 }
+

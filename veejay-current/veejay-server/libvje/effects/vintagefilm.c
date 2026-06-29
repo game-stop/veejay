@@ -347,7 +347,6 @@ void vintagefilm_apply(void *ptr, VJFrame *frame, int *args)
 
     global_gain = clampi(global_gain, 72, 384);
 
-#pragma omp parallel for schedule(static) num_threads(vf->n_threads)
     for(int x = 0; x < width; x++) {
         if(scratch_map[x] > 0)
             scratch_map[x]--;

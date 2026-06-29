@@ -56,6 +56,7 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args)
     const int skew = args[1];
     const int invert = args[2];
     const int len = frame->len;
+    const int uv_len = frame->uv_len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -66,78 +67,51 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args)
         mode = 0;
 
     uint32_t histogram[256] = { 0 };
+    uint32_t threshold = 0;
     const int n_threads = vje_advise_num_threads(len);
+    const int use_lookup = skew != 0xff;
+    uint8_t lookup[256];
 
-    if(skew != 0xff)
-    {
-        uint8_t lookup[256];
-
+    if(use_lookup)
         __init_lookup_table(lookup, 256, 0.0f, 255.0f, 0.0f, (float)skew);
 
-        #pragma omp parallel num_threads(n_threads)
-        {
-            uint32_t local[256] = { 0 };
-
-            #pragma omp for schedule(static)
-            for(int i = 0; i < len; i++)
-                local[lookup[Y[i]]]++;
-
-            #pragma omp critical
-            {
-                for(int i = 0; i < 256; i++)
-                    histogram[i] += local[i];
-            }
-        }
-    }
-    else
-    {
-        #pragma omp parallel num_threads(n_threads)
-        {
-            uint32_t local[256] = { 0 };
-
-            #pragma omp for schedule(static)
-            for(int i = 0; i < len; i++)
-                local[Y[i]]++;
-
-            #pragma omp critical
-            {
-                for(int i = 0; i < 256; i++)
-                    histogram[i] += local[i];
-            }
-        }
-    }
-
-    const uint32_t threshold = otsu_method(histogram);
     const uint8_t low = invert ? 0xff : 0x00;
     const uint8_t high = invert ? 0x00 : 0xff;
 
-    if(mode == 0)
+#pragma omp parallel num_threads(n_threads)
     {
-        #pragma omp parallel for num_threads(n_threads) schedule(static)
-        for(int i = 0; i < len; i++)
-        {
-            const uint8_t cond = Y[i] >= threshold;
-            Y[i] = (cond * high) | ((1 - cond) * low);
+        uint32_t local[256] = { 0 };
+
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            const uint8_t y = use_lookup ? lookup[Y[i]] : Y[i];
+            local[y]++;
         }
 
-        const int uv_len = frame->ssm ? len : frame->uv_len;
-
-        #pragma omp parallel sections num_threads(n_threads)
+#pragma omp critical
         {
-            #pragma omp section
-            veejay_memset(Cb, 128, uv_len);
+            for(int i = 0; i < 256; i++)
+                histogram[i] += local[i];
+        }
 
-            #pragma omp section
-            veejay_memset(Cr, 128, uv_len);
+#pragma omp barrier
+
+#pragma omp single
+        threshold = otsu_method(histogram);
+
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            const uint8_t cond = Y[i] >= threshold;
+
+            if(mode == 0)
+                Y[i] = (cond * high) | ((1 - cond) * low);
+            else
+                A[i] = (cond * high) | ((1 - cond) * low);
         }
     }
-    else
-    {
-        #pragma omp parallel for num_threads(n_threads) schedule(static)
-        for(int i = 0; i < len; i++)
-        {
-            const uint8_t cond = Y[i] >= threshold;
-            A[i] = (cond * high) | ((1 - cond) * low);
-        }
+
+    if(mode == 0) {
+        veejay_memset(Cb, 128, uv_len);
+        veejay_memset(Cr, 128, uv_len);
     }
 }

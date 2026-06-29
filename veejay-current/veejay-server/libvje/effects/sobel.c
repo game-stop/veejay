@@ -204,7 +204,7 @@ static void sobel_binary_3x3(sobel_t *s, VJFrame *frame, int threshold)
     uint8_t *restrict Y = frame->data[0];
     const uint8_t *restrict B = s->buf[0];
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int y = 1; y < height - 1; y++) {
         const int row = y * width;
 
@@ -237,7 +237,7 @@ static void sobel_gradient_3x3(sobel_t *s, VJFrame *frame, int threshold, int ga
     uint8_t *restrict Y = frame->data[0];
     const uint8_t *restrict B = s->buf[0];
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int y = 1; y < height - 1; y++) {
         const int row = y * width;
 
@@ -270,7 +270,7 @@ static void sobel_gradient_wide(sobel_t *s, VJFrame *frame, int threshold, int g
     uint8_t *restrict Y = frame->data[0];
     const uint8_t *restrict B = s->buf[0];
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int y = 2; y < height - 2; y++) {
         const int row = y * width;
 
@@ -301,7 +301,7 @@ static void sobel_postprocess(sobel_t *s,
                               int chroma_edge)
 {
     const int len = frame->len;
-    const int uv_len = frame->ssm ? len : frame->uv_len;
+    const int uv_len = frame->uv_len;
     const int mix_q8 = clampi((mix * 256 + 500) / 1000, 0, 256);
     const int chroma_q8 = clampi((chroma_edge * 256 + 500) / 1000, 0, 256);
 
@@ -313,7 +313,6 @@ static void sobel_postprocess(sobel_t *s,
     const uint8_t *restrict srcCb = s->buf[1];
     const uint8_t *restrict srcCr = s->buf[2];
 
-#pragma omp parallel num_threads(s->n_threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
@@ -344,7 +343,7 @@ void sobel_apply(void *ptr, VJFrame *frame, int *args)
     const int len = frame->len;
     const int width = frame->width;
     const int height = frame->height;
-    const int uv_len = frame->ssm ? len : frame->uv_len;
+    const int uv_len = frame->uv_len;
     int threshold = args[P_THRESHOLD];
     const int mode = args[P_MODE];
     int mix = args[P_MIX];
@@ -381,22 +380,25 @@ void sobel_apply(void *ptr, VJFrame *frame, int *args)
 
     veejay_memset(Y, pixel_Y_lo_, len);
 
-    switch(mode) {
-        case 0:
-            sobel_binary_3x3(s, frame, threshold);
-            break;
-        case 1:
-            sobel_gradient_3x3(s, frame, threshold, gain);
-            break;
-        case 2:
-            if(width >= 5 && height >= 5)
-                sobel_gradient_wide(s, frame, threshold, gain);
-            else
+#pragma omp parallel num_threads(s->n_threads)
+    {
+        switch(mode) {
+            case 0:
+                sobel_binary_3x3(s, frame, threshold);
+                break;
+            case 1:
                 sobel_gradient_3x3(s, frame, threshold, gain);
-            break;
-        default:
-            break;
-    }
+                break;
+            case 2:
+                if(width >= 5 && height >= 5)
+                    sobel_gradient_wide(s, frame, threshold, gain);
+                else
+                    sobel_gradient_3x3(s, frame, threshold, gain);
+                break;
+            default:
+                break;
+        }
 
-    sobel_postprocess(s, frame, mix, chroma);
+        sobel_postprocess(s, frame, mix, chroma);
+    }
 }

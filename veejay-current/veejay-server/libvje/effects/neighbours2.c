@@ -231,7 +231,7 @@ void *neighbours2_malloc(int w, int h)
     return (void*) n;
 }
 
-static void nb2_apply_luma_omp(nb2_t *n,
+static void nb2_apply_luma(nb2_t *n,
                            uint8_t *restrict dst_y,
                            const uint8_t *restrict src_y,
                            const uint8_t *restrict bin,
@@ -280,7 +280,7 @@ static void nb2_apply_luma_omp(nb2_t *n,
     }
 }
 
-static void nb2_apply_color_omp(nb2_t *n,
+static void nb2_apply_color(nb2_t *n,
                             uint8_t *restrict dst_y,
                             uint8_t *restrict dst_u,
                             uint8_t *restrict dst_v,
@@ -379,8 +379,8 @@ void neighbours2_apply(void *ptr, VJFrame *frame, int *args)
             bin[i] = nb2_quant_luma(src_y[i], smoothness);
 
         if(mode)
-            nb2_apply_color_omp(n, dst_y, dst_u, dst_v, src_y, src_u, src_v, bin, width, height, brush_size, active_bins);
+            nb2_apply_color(n, dst_y, dst_u, dst_v, src_y, src_u, src_v, bin, width, height, brush_size, active_bins);
         else
-            nb2_apply_luma_omp(n, dst_y, src_y, bin, width, height, brush_size, active_bins);
+            nb2_apply_luma(n, dst_y, src_y, bin, width, height, brush_size, active_bins);
     }
 }

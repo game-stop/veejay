@@ -448,36 +448,7 @@ static void draw_borders_parallel_no_overlap(fragmenttv_t *m,
                                              int w,
                                              int strength)
 {
-    if(strength <= 0)
-        return;
-
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
-    for(int t = 0; t < m->tile_count; t++) {
-        frag_tile *q = &m->tiles[t];
-
-        const int x0 = q->dx;
-        const int y0 = q->dy;
-        const int x1 = q->dx + q->size - 1;
-        const int y1 = q->dy + q->size - 1;
-        const uint8_t s = (uint8_t)strength;
-
-        for(int x = x0; x <= x1; x++) {
-            const int i_top = y0 * w + x;
-            const int i_bot = y1 * w + x;
-
-            Y[i_top] = clamp8(Y[i_top] + s);
-            Y[i_bot] = clamp8(Y[i_bot] + s);
-        }
-
-        for(int y = y0; y <= y1; y++) {
-            const int row = y * w;
-            const int i_l = row + x0;
-            const int i_r = row + x1;
-
-            Y[i_l] = clamp8(Y[i_l] + s);
-            Y[i_r] = clamp8(Y[i_r] + s);
-        }
-    }
+    draw_borders_serial(m, Y, w, strength);
 }
 
 static void draw_borders(fragmenttv_t *m,
@@ -486,10 +457,8 @@ static void draw_borders(fragmenttv_t *m,
                          int strength,
                          int overlap_risk)
 {
-    if(overlap_risk)
-        draw_borders_serial(m, Y, w, strength);
-    else
-        draw_borders_parallel_no_overlap(m, Y, w, strength);
+    (void) overlap_risk;
+    draw_borders_serial(m, Y, w, strength);
 }
 
 void fragmenttv_apply(void *ptr, VJFrame *frame, int *args)

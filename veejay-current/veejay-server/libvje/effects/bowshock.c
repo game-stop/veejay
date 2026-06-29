@@ -736,16 +736,16 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
     if(nactive <= 0 && swing_x == 0 && swing_y == 0)
         return;
 
-    if(nactive <= 0) {
 #pragma omp parallel num_threads(threads)
-        {
+    {
 #pragma omp for schedule(static)
-            for(int i = 0; i < len; i++) {
-                src_y[i] = Y[i];
-                src_u[i] = U[i];
-                src_v[i] = V[i];
-            }
+        for(int i = 0; i < len; i++) {
+            src_y[i] = Y[i];
+            src_u[i] = U[i];
+            src_v[i] = V[i];
+        }
 
+        if(nactive <= 0) {
 #pragma omp for schedule(static)
             for(int y = 0; y < h; y++) {
                 const int row = y * w;
@@ -779,95 +779,85 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
         }
-
-        return;
-    }
-
-#pragma omp parallel num_threads(threads)
-    {
-#pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            src_y[i] = Y[i];
-            src_u[i] = U[i];
-            src_v[i] = V[i];
-        }
-
-        if(mode_arg == BS_MODE_BOW) {
-#pragma omp for schedule(static)
-            for(int y = 0; y < h; y++) {
-                const int row = y * w;
-                BS_ROW_SWITCH(BS_ACCUM_BOW);
-            }
-        }
-        else if(mode_arg == BS_MODE_TORSION) {
-#pragma omp for schedule(static)
-            for(int y = 0; y < h; y++) {
-                const int row = y * w;
-                BS_ROW_SWITCH(BS_ACCUM_TORSION);
-            }
-        }
         else {
+            if(mode_arg == BS_MODE_BOW) {
+#pragma omp for schedule(static)
+                for(int y = 0; y < h; y++) {
+                    const int row = y * w;
+                    BS_ROW_SWITCH(BS_ACCUM_BOW);
+                }
+            }
+            else if(mode_arg == BS_MODE_TORSION) {
+#pragma omp for schedule(static)
+                for(int y = 0; y < h; y++) {
+                    const int row = y * w;
+                    BS_ROW_SWITCH(BS_ACCUM_TORSION);
+                }
+            }
+            else {
+#pragma omp for schedule(static)
+                for(int y = 0; y < h; y++) {
+                    const int row = y * w;
+                    BS_ROW_SWITCH(BS_ACCUM_HYBRID);
+                }
+            }
+
 #pragma omp for schedule(static)
             for(int y = 0; y < h; y++) {
                 const int row = y * w;
-                BS_ROW_SWITCH(BS_ACCUM_HYBRID);
-            }
-        }
-
-#pragma omp for schedule(static)
-        for(int y = 0; y < h; y++) {
-            const int row = y * w;
-            const int row_up = (y > 0 ? y - 1 : y) * w;
-            const int row_dn = (y < h - 1 ? y + 1 : y) * w;
+                const int row_up = (y > 0 ? y - 1 : y) * w;
+                const int row_dn = (y < h - 1 ? y + 1 : y) * w;
 #pragma omp simd
-            for(int x = 0; x < w; x++) {
-                const int i = row + x;
-                const int xm = x > 0 ? x - 1 : x;
-                const int xp = x < w - 1 ? x + 1 : x;
+                for(int x = 0; x < w; x++) {
+                    const int i = row + x;
+                    const int xm = x > 0 ? x - 1 : x;
+                    const int xp = x < w - 1 ? x + 1 : x;
 
-                const int edge =
-                    bs_absi((int)src_y[row + xp] - (int)src_y[row + xm]) +
-                    bs_absi((int)src_y[row_dn + x] - (int)src_y[row_up + x]);
+                    const int edge =
+                        bs_absi((int)src_y[row + xp] - (int)src_y[row + xm]) +
+                        bs_absi((int)src_y[row_dn + x] - (int)src_y[row_up + x]);
 
-                const int edge_gate = edge < 255 ? edge : 255;
-                const int pull_sum = map_pull[i];
-                const int swing_gate = 64 + ((edge_gate + pull_sum) >> 2);
+                    const int edge_gate = edge < 255 ? edge : 255;
+                    const int pull_sum = map_pull[i];
+                    const int swing_gate = 64 + ((edge_gate + pull_sum) >> 2);
 
-                int px = x + map_dx[i] + ((swing_x * swing_gate) >> 7);
-                int py = y + map_dy[i] + ((swing_y * swing_gate) >> 7);
+                    int px = x + map_dx[i] + ((swing_x * swing_gate) >> 7);
+                    int py = y + map_dy[i] + ((swing_y * swing_gate) >> 7);
 
-                px = px < 0 ? 0 : (px >= w ? w - 1 : px);
-                py = py < 0 ? 0 : (py >= h ? h - 1 : py);
+                    px = px < 0 ? 0 : (px >= w ? w - 1 : px);
+                    py = py < 0 ? 0 : (py >= h ? h - 1 : py);
 
-                const int pi = py * w + px;
+                    const int pi = py * w + px;
 
-                int yy = src_y[pi];
-                int uu = src_u[pi];
-                int vv = src_v[pi];
+                    int yy = src_y[pi];
+                    int uu = src_u[pi];
+                    int vv = src_v[pi];
 
-                const int wave_sum = map_wave[i];
-                const int glow_sum = map_glow[i];
+                    const int wave_sum = map_wave[i];
+                    const int glow_sum = map_glow[i];
 
-                yy += (glow_sum * front_glow) >> 8;
-                yy -= ((pull_sum - glow_sum) * front_glow) >> 11;
-                yy += (snare_i * glow_sum) >> 8;
+                    yy += (glow_sum * front_glow) >> 8;
+                    yy -= ((pull_sum - glow_sum) * front_glow) >> 11;
+                    yy += (snare_i * glow_sum) >> 8;
 
-                const int edge_active = edge_gate > 22 ? edge_gate - 22 : 0;
-                const int pull_active = pull_sum > 255 ? 255 : pull_sum;
-                const int cp = (wave_sum * chroma_push) >> 8;
-                const int wake_cp = ((pull_sum - glow_sum) * chroma_push) >> 11;
+                    const int edge_active = edge_gate > 22 ? edge_gate - 22 : 0;
+                    const int pull_active = pull_sum > 255 ? 255 : pull_sum;
+                    const int cp = (wave_sum * chroma_push) >> 8;
+                    const int wake_cp = ((pull_sum - glow_sum) * chroma_push) >> 11;
 
-                yy += (hat_mix * edge_active * pull_active) >> 15;
-                uu += cp - wake_cp;
-                vv -= (cp >> 1) - (wake_cp >> 1);
+                    yy += (hat_mix * edge_active * pull_active) >> 15;
+                    uu += cp - wake_cp;
+                    vv -= (cp >> 1) - (wake_cp >> 1);
 
-                Y[i] = bs_u8(yy);
-                U[i] = bs_u8(uu);
-                V[i] = bs_u8(vv);
+                    Y[i] = bs_u8(yy);
+                    U[i] = bs_u8(uu);
+                    V[i] = bs_u8(vv);
+                }
             }
         }
     }
 }
+
 
 #undef BS_ACCUM_BOW
 #undef BS_ACCUM_TORSION

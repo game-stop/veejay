@@ -88,7 +88,6 @@ static void flower_build_cos_lut(flower_t *s, int petal_count)
 {
     const float scale = TWO_PI_F / (float)(LUT_SIZE - 1);
 
-#pragma omp parallel for num_threads(s->n_threads) schedule(static)
     for(int i = 0; i < LUT_SIZE; i++) {
         const float angle = (float)i * scale;
         s->cos_lut_1d[i] = (int32_t)((cosf((float)petal_count * angle) * 0.5f) * (float)FP_MULT);
@@ -101,7 +100,6 @@ static void flower_build_exp_lut(flower_t *s, int petal_length)
 {
     const float inv_len = 1.0f / (float)(petal_length + 1);
 
-#pragma omp parallel for num_threads(s->n_threads) schedule(static)
     for(int i = 0; i < LUT_SIZE; i++) {
         const float decay = expf(-(float)i * inv_len);
         s->exp_lut_1d[i] = (int32_t)(decay * (float)FP_MULT + 0.5f);

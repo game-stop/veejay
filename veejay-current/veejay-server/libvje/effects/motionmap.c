@@ -375,45 +375,41 @@ static void motionmap_blur(uint8_t *restrict Y, int width, int height)
     (void)height;
 }
 
-static int32_t motionmap_activity_level(const uint8_t *restrict I, int len, int n_threads)
+static int32_t motionmap_calc_diff(const uint8_t *restrict bg,
+                                      uint8_t *restrict prev,
+                                      const uint8_t *restrict img,
+                                      uint8_t *restrict tmp1,
+                                      uint8_t *restrict tmp2,
+                                      uint8_t *restrict dst,
+                                      int len,
+                                      int threshold,
+                                      int n_threads)
 {
     int64_t level = 0;
 
 #pragma omp parallel for reduction(+:level) schedule(static) num_threads(n_threads)
-    for(int i = 0; i < len; i++)
-        level += I[i];
-
-    return (int32_t)(level >> 8);
-}
-
-static void motionmap_calc_diff(const uint8_t *restrict bg,
-                                uint8_t *restrict prev,
-                                const uint8_t *restrict img,
-                                uint8_t *restrict tmp1,
-                                uint8_t *restrict tmp2,
-                                uint8_t *restrict dst,
-                                int len,
-                                int threshold,
-                                int n_threads)
-{
-#pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int i = 0; i < len; i++) {
         int a = motionmap_absi((int)bg[i] - (int)img[i]);
         int b = motionmap_absi((int)bg[i] - (int)prev[i]);
         int edge;
         int old;
+        int out;
 
         a = a < threshold ? 0 : 255;
         b = b < threshold ? 0 : 255;
 
         edge = motionmap_absi(a - b);
         old = dst[i] >> 1;
+        out = motionmap_u8_sat(edge + old);
 
         tmp1[i] = (uint8_t)edge;
         tmp2[i] = (uint8_t)old;
-        dst[i] = motionmap_u8_sat(edge + old);
+        dst[i] = (uint8_t)out;
         prev[i] = img[i];
+        level += out;
     }
+
+    return (int32_t)(level >> 8);
 }
 
 int motionmap_prepare(void *ptr, VJFrame *frame)
@@ -450,10 +446,8 @@ void motionmap_apply(void *ptr, VJFrame *frame, int *args)
 {
     motionmap_t *mm = (motionmap_t*) ptr;
 
-    const int width = frame->width;
-    const int height = frame->height;
     const int len = frame->len;
-    const int uv_len = frame->ssm ? len : frame->uv_len;
+    const int uv_len = len;
 
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
@@ -477,7 +471,7 @@ void motionmap_apply(void *ptr, VJFrame *frame, int *args)
         mm->activity_decay = act_decay;
     }
 
-    motionmap_calc_diff(
+    int32_t activity_level = motionmap_calc_diff(
         mm->bg_image,
         mm->prev_img,
         frame->data[0],
@@ -500,7 +494,6 @@ void motionmap_apply(void *ptr, VJFrame *frame, int *args)
         return;
     }
 
-    int32_t activity_level = motionmap_activity_level(mm->binary_img, len, mm->n_threads);
     int32_t avg_actlvl = 0;
     int32_t min = INT_MAX;
     int32_t local_max = 0;

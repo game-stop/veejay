@@ -210,7 +210,7 @@ void split_free(void *ptr)
 static void split_snapshot(split_t *s, VJFrame *frame)
 {
     const int len = frame->len;
-    const int uv_len = frame->ssm ? len : frame->uv_len;
+    const int uv_len = frame->uv_len;
 
     veejay_memcpy(s->tmp[0], frame->data[0], len);
     veejay_memcpy(s->tmp[1], frame->data[1], uv_len);
@@ -240,7 +240,9 @@ static void split_copy_region_plane(uint8_t *restrict dst,
     const int rw = x1 - x0;
     const int rh = y1 - y0;
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+(void)n_threads;
+
+#pragma omp for schedule(static)
     for(int y = y0; y < y1; y++) {
         const int dst_row = y * w;
 
@@ -347,7 +349,9 @@ static void split_squeeze_plane(uint8_t *restrict dst,
 
     const int rw = x1 - x0;
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+(void)n_threads;
+
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         const int row = y * w;
 
@@ -358,28 +362,7 @@ static void split_squeeze_plane(uint8_t *restrict dst,
     }
 }
 
-static void split_dual_squeeze(split_t *s, VJFrame *frame, VJFrame *frame2, int split_x)
-{
-    const int w = frame->width;
-    const int h = frame->height;
 
-    split_x = clampi(split_x, 1, w - 1);
-
-    split_snapshot(s, frame);
-
-    split_squeeze_plane(frame->data[0], frame2->data[0], w, h, 0, split_x, s->n_threads);
-    split_squeeze_plane(frame->data[0], s->tmp[0],       w, h, split_x, w, s->n_threads);
-
-    const int uw = frame->ssm ? w : frame->uv_width;
-    const int uh = frame->ssm ? h : frame->uv_height;
-    const int usplit = (split_x * uw + (w >> 1)) / w;
-
-    split_squeeze_plane(frame->data[1], frame2->data[1], uw, uh, 0, usplit, s->n_threads);
-    split_squeeze_plane(frame->data[2], frame2->data[2], uw, uh, 0, usplit, s->n_threads);
-
-    split_squeeze_plane(frame->data[1], s->tmp[1], uw, uh, usplit, uw, s->n_threads);
-    split_squeeze_plane(frame->data[2], s->tmp[2], uw, uh, usplit, uw, s->n_threads);
-}
 
 static void split_mix_frame2(VJFrame *frame, VJFrame *frame2, int q8, int n_threads)
 {
@@ -389,19 +372,18 @@ static void split_mix_frame2(VJFrame *frame, VJFrame *frame2, int q8, int n_thre
     q8 = clampi(q8, 0, 256);
 
     const int len = frame->len;
-    const int uv_len = frame->ssm ? len : frame->uv_len;
+    const int uv_len = frame->uv_len;
 
-#pragma omp parallel num_threads(n_threads)
-    {
-#pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-            frame->data[0][i] = split_mix_u8(frame->data[0][i], frame2->data[0][i], q8);
+(void)n_threads;
 
 #pragma omp for schedule(static)
-        for(int i = 0; i < uv_len; i++) {
-            frame->data[1][i] = split_mix_u8(frame->data[1][i], frame2->data[1][i], q8);
-            frame->data[2][i] = split_mix_u8(frame->data[2][i], frame2->data[2][i], q8);
-        }
+    for(int i = 0; i < len; i++)
+        frame->data[0][i] = split_mix_u8(frame->data[0][i], frame2->data[0][i], q8);
+
+#pragma omp for schedule(static)
+    for(int i = 0; i < uv_len; i++) {
+        frame->data[1][i] = split_mix_u8(frame->data[1][i], frame2->data[1][i], q8);
+        frame->data[2][i] = split_mix_u8(frame->data[2][i], frame2->data[2][i], q8);
     }
 }
 
@@ -423,7 +405,9 @@ static void split_apply_edge_glow(VJFrame *frame,
 
     uint8_t *restrict Y = frame->data[0];
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+(void)n_threads;
+
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         const int row = y * w;
 
@@ -501,60 +485,84 @@ void split_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     switch(mode) {
         case 0:
-            split_copy_region_xy(frame, frame2, split_x, 0, w, h, 0, fit_source, s->n_threads);
-            use_x_glow = 1;
-            break;
-
         case 1:
-            split_copy_region_xy(frame, frame2, split_x, 0, w, h, 1, fit_source, s->n_threads);
-            use_x_glow = 1;
-            break;
-
         case 2:
-            split_copy_region_xy(frame, frame2, 0, 0, split_x, h, 1, fit_source, s->n_threads);
-            use_x_glow = 1;
-            break;
-
-        case 3:
-            split_copy_region_xy(frame, frame2, 0, 0, split_x, split_y, 0, fit_source, s->n_threads);
-            use_x_glow = 1;
-            use_y_glow = 1;
-            break;
-
-        case 4:
-            split_copy_region_xy(frame, frame2, split_x, 0, w, split_y, 0, fit_source, s->n_threads);
-            use_x_glow = 1;
-            use_y_glow = 1;
-            break;
-
-        case 5:
-            split_copy_region_xy(frame, frame2, split_x, split_y, w, h, 0, fit_source, s->n_threads);
-            use_x_glow = 1;
-            use_y_glow = 1;
-            break;
-
-        case 6:
-            split_copy_region_xy(frame, frame2, 0, split_y, split_x, h, 0, fit_source, s->n_threads);
-            use_x_glow = 1;
-            use_y_glow = 1;
-            break;
-
         case 7:
-            split_dual_squeeze(s, frame, frame2, split_x);
             use_x_glow = 1;
             break;
-
-        case 8:
-            split_copy_region_xy(frame, frame2, 0, 0, w, split_y, 0, fit_source, s->n_threads);
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+            use_x_glow = 1;
             use_y_glow = 1;
             break;
-
+        case 8:
+            use_y_glow = 1;
+            break;
         default:
             break;
     }
 
-    split_mix_frame2(frame, frame2, mix_q8, s->n_threads);
-    split_apply_edge_glow(frame, split_x, split_y, use_x_glow, use_y_glow, glow, s->n_threads);
+    if(mode == 7)
+        split_snapshot(s, frame);
+
+#pragma omp parallel num_threads(s->n_threads)
+    {
+        switch(mode) {
+            case 0:
+                split_copy_region_xy(frame, frame2, split_x, 0, w, h, 0, fit_source, s->n_threads);
+                break;
+
+            case 1:
+                split_copy_region_xy(frame, frame2, split_x, 0, w, h, 1, fit_source, s->n_threads);
+                break;
+
+            case 2:
+                split_copy_region_xy(frame, frame2, 0, 0, split_x, h, 1, fit_source, s->n_threads);
+                break;
+
+            case 3:
+                split_copy_region_xy(frame, frame2, 0, 0, split_x, split_y, 0, fit_source, s->n_threads);
+                break;
+
+            case 4:
+                split_copy_region_xy(frame, frame2, split_x, 0, w, split_y, 0, fit_source, s->n_threads);
+                break;
+
+            case 5:
+                split_copy_region_xy(frame, frame2, split_x, split_y, w, h, 0, fit_source, s->n_threads);
+                break;
+
+            case 6:
+                split_copy_region_xy(frame, frame2, 0, split_y, split_x, h, 0, fit_source, s->n_threads);
+                break;
+
+            case 7: {
+                const int uw = frame->ssm ? w : frame->uv_width;
+                const int uh = frame->ssm ? h : frame->uv_height;
+                const int usplit = (split_x * uw + (w >> 1)) / w;
+
+                split_squeeze_plane(frame->data[0], frame2->data[0], w, h, 0, split_x, s->n_threads);
+                split_squeeze_plane(frame->data[0], s->tmp[0],       w, h, split_x, w, s->n_threads);
+                split_squeeze_plane(frame->data[1], frame2->data[1], uw, uh, 0, usplit, s->n_threads);
+                split_squeeze_plane(frame->data[2], frame2->data[2], uw, uh, 0, usplit, s->n_threads);
+                split_squeeze_plane(frame->data[1], s->tmp[1], uw, uh, usplit, uw, s->n_threads);
+                split_squeeze_plane(frame->data[2], s->tmp[2], uw, uh, usplit, uw, s->n_threads);
+                break;
+            }
+
+            case 8:
+                split_copy_region_xy(frame, frame2, 0, 0, w, split_y, 0, fit_source, s->n_threads);
+                break;
+
+            default:
+                break;
+        }
+
+        split_mix_frame2(frame, frame2, mix_q8, s->n_threads);
+        split_apply_edge_glow(frame, split_x, split_y, use_x_glow, use_y_glow, glow, s->n_threads);
+    }
 
     s->frame++;
 }

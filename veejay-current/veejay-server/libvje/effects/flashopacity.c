@@ -141,7 +141,7 @@ void flashopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     flash_t *f = (flash_t*) ptr;
 
     const int len = frame->len;
-    const int uv_len = frame->ssm ? len : frame->uv_len;
+    const int uv_len = frame->uv_len;
     const int exposure = args[0];
     const int opacityStart = args[1];
     const int opacityEnd = args[2];
@@ -159,6 +159,28 @@ void flashopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         currentFrame = 0;
 
     const int hInterval = interval >> 1;
+    const int rising = hInterval > 0 && currentFrame < hInterval;
+    int fp_multiplier = 256;
+    int lerp = 0;
+    int opacity = opacityEnd;
+
+    if(rising) {
+        const int index = (currentFrame * (TABLE_SIZE - 1) + (hInterval >> 1)) / hInterval;
+        fp_multiplier = f->explut[index];
+        if(mode == 1)
+            lerp = (currentFrame * 255 + (hInterval >> 1)) / hInterval;
+    }
+    else {
+        const int denom = interval - hInterval;
+        const int t = currentFrame - hInterval;
+
+        if(denom <= 1)
+            opacity = opacityEnd;
+        else
+            opacity = opacityStart + (t * (opacityEnd - opacityStart) + ((opacityEnd >= opacityStart) ? (denom >> 1) : -(denom >> 1))) / (denom - 1);
+
+        opacity = clampi(opacity, 0, 255);
+    }
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -168,46 +190,33 @@ void flashopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict U2 = frame2->data[1];
     const uint8_t *restrict V2 = frame2->data[2];
 
-    if(hInterval > 0 && currentFrame < hInterval) {
-        const int index = (currentFrame * (TABLE_SIZE - 1) + (hInterval >> 1)) / hInterval;
-        const int fp_multiplier = f->explut[index];
+#pragma omp parallel num_threads(f->n_threads)
+    {
+        if(rising) {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                int v = ((int)Y[i] * fp_multiplier) >> 8;
+                Y[i] = flashopacity_u8(v);
+            }
 
-#pragma omp parallel for schedule(static) num_threads(f->n_threads)
-        for(int i = 0; i < len; i++) {
-            int v = ((int)Y[i] * fp_multiplier) >> 8;
-            Y[i] = flashopacity_u8(v);
-        }
-
-        if(mode == 1) {
-            const int lerp = (currentFrame * 255 + (hInterval >> 1)) / hInterval;
-
-#pragma omp parallel for schedule(static) num_threads(f->n_threads)
-            for(int i = 0; i < uv_len; i++) {
-                U[i] = flashopacity_blend255(U[i], U2[i], lerp);
-                V[i] = flashopacity_blend255(V[i], V2[i], lerp);
+            if(mode == 1) {
+#pragma omp for schedule(static)
+                for(int i = 0; i < uv_len; i++) {
+                    U[i] = flashopacity_blend255(U[i], U2[i], lerp);
+                    V[i] = flashopacity_blend255(V[i], V2[i], lerp);
+                }
             }
         }
-    }
-    else {
-        const int denom = interval - hInterval;
-        const int t = currentFrame - hInterval;
-        int opacity;
+        else {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++)
+                Y[i] = flashopacity_blend255(Y[i], Y2[i], opacity);
 
-        if(denom <= 1)
-            opacity = opacityEnd;
-        else
-            opacity = opacityStart + (t * (opacityEnd - opacityStart) + ((opacityEnd >= opacityStart) ? (denom >> 1) : -(denom >> 1))) / (denom - 1);
-
-        opacity = clampi(opacity, 0, 255);
-
-#pragma omp parallel for schedule(static) num_threads(f->n_threads)
-        for(int i = 0; i < len; i++)
-            Y[i] = flashopacity_blend255(Y[i], Y2[i], opacity);
-
-#pragma omp parallel for schedule(static) num_threads(f->n_threads)
-        for(int i = 0; i < uv_len; i++) {
-            U[i] = flashopacity_blend255(U[i], U2[i], opacity);
-            V[i] = flashopacity_blend255(V[i], V2[i], opacity);
+#pragma omp for schedule(static)
+            for(int i = 0; i < uv_len; i++) {
+                U[i] = flashopacity_blend255(U[i], U2[i], opacity);
+                V[i] = flashopacity_blend255(V[i], V2[i], opacity);
+            }
         }
     }
 
@@ -215,3 +224,5 @@ void flashopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     if(f->currentFrame >= interval)
         f->currentFrame = 0;
 }
+
+

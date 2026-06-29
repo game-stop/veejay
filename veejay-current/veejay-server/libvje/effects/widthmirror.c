@@ -64,8 +64,6 @@ static inline uint8_t wm_u8(int v)
     return (uint8_t)clampi(v, 0, 255);
 }
 
-
-
 static inline float wm_wrapf(float v, float period)
 {
     if(v >= period || v < 0.0f) {
@@ -148,6 +146,8 @@ vj_effect *widthmirror_init(int max_width, int h)
         VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS,                           0,                  max_edge,           14, 58, 120, 960, 0,  62,
         VJ_BEAT_GLOW,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, 32,                 255,                18, 72, 90,  720, 0,  84
     );
+
+    (void)h;
 
     return ve;
 }
@@ -248,47 +248,6 @@ void widthmirror_apply(void *ptr, VJFrame *frame, int *args)
     int *restrict xmap = wm->xmap;
     uint8_t *restrict edge = wm->edge;
 
-#pragma omp parallel for schedule(static) num_threads(wm->n_threads)
-    for(int x = 0; x < width; x++) {
-        float u = (float)x + phase_px;
-        if(u >= (float)width)
-            u -= (float)width;
-
-        const int band = (int)(u / band_w);
-        const float band_start = (float)band * band_w;
-        float band_end = band_start + band_w;
-        if(band_end > (float)width)
-            band_end = (float)width;
-
-        const float local = u - band_start;
-        const float src_u = (band & 1)
-            ? (band_end - 1.0f - local)
-            : (band_start + local);
-
-        float src_x = src_u - phase_px;
-        if(src_x < 0.0f)
-            src_x += (float)width;
-        else if(src_x >= (float)width)
-            src_x -= (float)width;
-
-        int sx = (int)(src_x + 0.5f);
-        if(sx >= width)
-            sx = width - 1;
-
-        xmap[x] = sx;
-
-        if(edge_width > 0.1f) {
-            float dist = local < (band_end - band_start - local)
-                ? local
-                : (band_end - band_start - local);
-            float q = 1.0f - clampf(dist / edge_width, 0.0f, 1.0f);
-            edge[x] = (uint8_t)(q * 255.0f + 0.5f);
-        }
-        else {
-            edge[x] = 0;
-        }
-    }
-
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
@@ -301,27 +260,71 @@ void widthmirror_apply(void *ptr, VJFrame *frame, int *args)
     veejay_memcpy(srcCb, Cb, len);
     veejay_memcpy(srcCr, Cr, len);
 
-#pragma omp parallel for schedule(static) num_threads(wm->n_threads)
-    for(int y = 0; y < height; y++) {
-        const int row = y * width;
-
+#pragma omp parallel num_threads(wm->n_threads)
+    {
+#pragma omp for schedule(static)
         for(int x = 0; x < width; x++) {
-            const int dst = row + x;
-            const int src = row + xmap[x];
-            const int q = edge[x];
+            float u = (float)x + phase_px;
+            if(u >= (float)width)
+                u -= (float)width;
 
-            int yy = srcY[src];
-            int uu = srcCb[src];
-            int vv = srcCr[src];
+            const int band = (int)(u / band_w);
+            const float band_start = (float)band * band_w;
+            float band_end = band_start + band_w;
+            if(band_end > (float)width)
+                band_end = (float)width;
 
-            if(q > 0 && glow > 0) {
-                const int g = (q * glow + 127) / 255;
-                yy += g;
+            const float local = u - band_start;
+            const float src_u = (band & 1)
+                ? (band_end - 1.0f - local)
+                : (band_start + local);
+
+            float src_x = src_u - phase_px;
+            if(src_x < 0.0f)
+                src_x += (float)width;
+            else if(src_x >= (float)width)
+                src_x -= (float)width;
+
+            int sx = (int)(src_x + 0.5f);
+            if(sx >= width)
+                sx = width - 1;
+
+            xmap[x] = sx;
+
+            if(edge_width > 0.1f) {
+                float dist = local < (band_end - band_start - local)
+                    ? local
+                    : (band_end - band_start - local);
+                float q = 1.0f - clampf(dist / edge_width, 0.0f, 1.0f);
+                edge[x] = (uint8_t)(q * 255.0f + 0.5f);
             }
+            else {
+                edge[x] = 0;
+            }
+        }
 
-            Y[dst]  = wm_u8(yy);
-            Cb[dst] = wm_u8(uu);
-            Cr[dst] = wm_u8(vv);
+#pragma omp for schedule(static)
+        for(int y = 0; y < height; y++) {
+            const int row = y * width;
+
+            for(int x = 0; x < width; x++) {
+                const int dst = row + x;
+                const int src = row + xmap[x];
+                const int q = edge[x];
+
+                int yy = srcY[src];
+                int uu = srcCb[src];
+                int vv = srcCr[src];
+
+                if(q > 0 && glow > 0) {
+                    const int g = (q * glow + 127) / 255;
+                    yy += g;
+                }
+
+                Y[dst]  = wm_u8(yy);
+                Cb[dst] = wm_u8(uu);
+                Cr[dst] = wm_u8(vv);
+            }
         }
     }
 }

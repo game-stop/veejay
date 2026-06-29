@@ -121,76 +121,79 @@ void charcoalsketch_apply(void *ptr, VJFrame *frame, int *args)
 
     const int diameter = radius * 2 + 1;
 
-    #pragma omp parallel for num_threads(c->n_threads) schedule(static)
-    for(int y = 0; y < height; y++)
+#pragma omp parallel num_threads(c->n_threads)
     {
-        int sum = 0;
-        const int row_offset = y * width;
-
-        for(int x = -radius; x <= radius; x++)
-        {
-            const int nx = x < 0 ? 0 : (x >= width ? width - 1 : x);
-            sum += Y[row_offset + nx];
-        }
-
-        for(int x = 0; x < width; x++)
-        {
-            const int t_x = x - radius;
-            const int h_x = x + radius + 1;
-
-            temp_Y[row_offset + x] = (uint8_t)(sum / diameter);
-            sum += Y[row_offset + (h_x >= width ? width - 1 : h_x)] - Y[row_offset + (t_x < 0 ? 0 : t_x)];
-        }
-    }
-
-    #pragma omp parallel for num_threads(c->n_threads) schedule(static)
-    for(int x = 0; x < width; x++)
-    {
-        int sum = 0;
-
-        for(int y = -radius; y <= radius; y++)
-        {
-            const int ny = y < 0 ? 0 : (y >= height ? height - 1 : y);
-            sum += temp_Y[ny * width + x];
-        }
-
+#pragma omp for schedule(static)
         for(int y = 0; y < height; y++)
         {
-            const int t_y = y - radius;
-            const int h_y = y + radius + 1;
+            int sum = 0;
+            const int row_offset = y * width;
 
-            blur_Y[y * width + x] = (uint8_t)(sum / diameter);
-            sum += temp_Y[(h_y >= height ? height - 1 : h_y) * width + x] - temp_Y[(t_y < 0 ? 0 : t_y) * width + x];
-        }
-    }
-
-    #pragma omp parallel for schedule(static) num_threads(c->n_threads)
-    for(int y = 0; y < height; y++)
-    {
-        uint32_t seed = (uint32_t)y * 0x9E3779B9u + (uint32_t)grain;
-
-        for(int x = 0; x < width; x++)
-        {
-            const int i = y * width + x;
-            const int orig = Y[i];
-            const int blur = blur_Y[i];
-
-            int sketch = (orig << 8) / (blur + 1);
-            sketch = (sketch * intensity) >> 8;
-
-            if(grain > 0)
+            for(int x = -radius; x <= radius; x++)
             {
-                seed = (seed * 1103515245u + 12345u) & 0x7fffffffu;
-                sketch += (int)(seed % ((uint32_t)grain + 1u)) - (grain >> 1);
+                const int nx = x < 0 ? 0 : (x >= width ? width - 1 : x);
+                sum += Y[row_offset + nx];
             }
 
-            Y[i] = (uint8_t)clampi(sketch, 0, 255);
+            for(int x = 0; x < width; x++)
+            {
+                const int t_x = x - radius;
+                const int h_x = x + radius + 1;
+
+                temp_Y[row_offset + x] = (uint8_t)(sum / diameter);
+                sum += Y[row_offset + (h_x >= width ? width - 1 : h_x)] - Y[row_offset + (t_x < 0 ? 0 : t_x)];
+            }
+        }
+
+#pragma omp for schedule(static)
+        for(int x = 0; x < width; x++)
+        {
+            int sum = 0;
+
+            for(int y = -radius; y <= radius; y++)
+            {
+                const int ny = y < 0 ? 0 : (y >= height ? height - 1 : y);
+                sum += temp_Y[ny * width + x];
+            }
+
+            for(int y = 0; y < height; y++)
+            {
+                const int t_y = y - radius;
+                const int h_y = y + radius + 1;
+
+                blur_Y[y * width + x] = (uint8_t)(sum / diameter);
+                sum += temp_Y[(h_y >= height ? height - 1 : h_y) * width + x] - temp_Y[(t_y < 0 ? 0 : t_y) * width + x];
+            }
+        }
+
+#pragma omp for schedule(static)
+        for(int y = 0; y < height; y++)
+        {
+            uint32_t seed = (uint32_t)y * 0x9E3779B9u + (uint32_t)grain;
+
+            for(int x = 0; x < width; x++)
+            {
+                const int i = y * width + x;
+                const int orig = Y[i];
+                const int blur = blur_Y[i];
+
+                int sketch = (orig << 8) / (blur + 1);
+                sketch = (sketch * intensity) >> 8;
+
+                if(grain > 0)
+                {
+                    seed = (seed * 1103515245u + 12345u) & 0x7fffffffu;
+                    sketch += (int)(seed % ((uint32_t)grain + 1u)) - (grain >> 1);
+                }
+
+                Y[i] = (uint8_t)clampi(sketch, 0, 255);
+            }
         }
     }
 
     if(frame->data[1] && frame->data[2])
     {
-        const int uv_len = frame->ssm ? len : frame->uv_len;
+        const int uv_len = frame->uv_len;
 
         veejay_memset(frame->data[1], 128, uv_len);
         veejay_memset(frame->data[2], 128, uv_len);

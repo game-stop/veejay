@@ -129,54 +129,58 @@ void colmorphology_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict binary_img = c->binary_img;
     const uint8_t *restrict k = kernels[type];
 
-    #pragma omp parallel for simd schedule(static) num_threads(c->n_threads)
-    for(int i = 0; i < len; i++)
-        binary_img[i] = Y[i] < threshold ? 0x00 : 0xff;
-
     if(width < 3 || height < 3) {
         veejay_memset(Y, pixel_Y_lo_, len);
         return;
     }
 
-    #pragma omp parallel for simd schedule(static) num_threads(c->n_threads)
-    for(int x = 0; x < width; x++)
+#pragma omp parallel num_threads(c->n_threads)
     {
-        Y[x] = pixel_Y_lo_;
-        Y[len - width + x] = pixel_Y_lo_;
-    }
+#pragma omp for simd schedule(static)
+        for(int i = 0; i < len; i++)
+            binary_img[i] = Y[i] < threshold ? 0x00 : 0xff;
 
-    if(!erode)
-    {
-        #pragma omp parallel for schedule(static) num_threads(c->n_threads)
-        for(int y = 1; y < height - 1; y++)
+#pragma omp for simd schedule(static)
+        for(int x = 0; x < width; x++)
         {
-            const uint8_t *restrict r0 = binary_img + (y - 1) * width;
-            const uint8_t *restrict r1 = binary_img + y * width;
-            const uint8_t *restrict r2 = binary_img + (y + 1) * width;
-            uint8_t *restrict dst_row = Y + y * width;
-
-            dst_row[0] = pixel_Y_lo_;
-            dst_row[width - 1] = pixel_Y_lo_;
-
-            for(int x = 1; x < width - 1; x++)
-                dst_row[x] = r1[x] == 0xff ? pixel_Y_hi_ : do_dilate(k, r0, r1, r2, x);
+            Y[x] = pixel_Y_lo_;
+            Y[len - width + x] = pixel_Y_lo_;
         }
-    }
-    else
-    {
-        #pragma omp parallel for schedule(static) num_threads(c->n_threads)
-        for(int y = 1; y < height - 1; y++)
+
+        if(!erode)
         {
-            const uint8_t *restrict r0 = binary_img + (y - 1) * width;
-            const uint8_t *restrict r1 = binary_img + y * width;
-            const uint8_t *restrict r2 = binary_img + (y + 1) * width;
-            uint8_t *restrict dst_row = Y + y * width;
+#pragma omp for schedule(static)
+            for(int y = 1; y < height - 1; y++)
+            {
+                const uint8_t *restrict r0 = binary_img + (y - 1) * width;
+                const uint8_t *restrict r1 = binary_img + y * width;
+                const uint8_t *restrict r2 = binary_img + (y + 1) * width;
+                uint8_t *restrict dst_row = Y + y * width;
 
-            dst_row[0] = pixel_Y_lo_;
-            dst_row[width - 1] = pixel_Y_lo_;
+                dst_row[0] = pixel_Y_lo_;
+                dst_row[width - 1] = pixel_Y_lo_;
 
-            for(int x = 1; x < width - 1; x++)
-                dst_row[x] = r1[x] == 0x00 ? pixel_Y_lo_ : do_erode(k, r0, r1, r2, x);
+                for(int x = 1; x < width - 1; x++)
+                    dst_row[x] = r1[x] == 0xff ? pixel_Y_hi_ : do_dilate(k, r0, r1, r2, x);
+            }
+        }
+        else
+        {
+#pragma omp for schedule(static)
+            for(int y = 1; y < height - 1; y++)
+            {
+                const uint8_t *restrict r0 = binary_img + (y - 1) * width;
+                const uint8_t *restrict r1 = binary_img + y * width;
+                const uint8_t *restrict r2 = binary_img + (y + 1) * width;
+                uint8_t *restrict dst_row = Y + y * width;
+
+                dst_row[0] = pixel_Y_lo_;
+                dst_row[width - 1] = pixel_Y_lo_;
+
+                for(int x = 1; x < width - 1; x++)
+                    dst_row[x] = r1[x] == 0x00 ? pixel_Y_lo_ : do_erode(k, r0, r1, r2, x);
+            }
         }
     }
 }
+

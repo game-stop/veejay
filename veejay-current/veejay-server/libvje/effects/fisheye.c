@@ -169,7 +169,6 @@ static void fisheye_rebuild_map(fisheye_t *f, int curve_key)
     const float *restrict fish_angle = f->fish_angle;
     int *restrict cached_coords = f->cached_coords;
 
-#pragma omp parallel for schedule(static) num_threads(f->n_threads)
     for(int i = 0; i < len; i++) {
         const float r = polar_map[i];
 
@@ -222,6 +221,7 @@ void fisheye_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict A = frame->data[3];
     const int *restrict cached_coords = f->cached_coords;
     uint8_t **buf = f->buf;
 
@@ -230,11 +230,13 @@ void fisheye_apply(void *ptr, VJFrame *frame, int *args)
     if(alpha == 0) {
         veejay_memcpy(buf[1], Cb, len);
         veejay_memcpy(buf[2], Cr, len);
+    }
 
 #pragma omp parallel for schedule(static) num_threads(f->n_threads)
-        for(int i = 0; i < len; i++) {
-            const int coord = cached_coords[i];
+    for(int i = 0; i < len; i++) {
+        const int coord = cached_coords[i];
 
+        if(alpha == 0) {
             if(coord < 0) {
                 Y[i] = pixel_Y_lo_;
                 Cb[i] = 128;
@@ -246,14 +248,9 @@ void fisheye_apply(void *ptr, VJFrame *frame, int *args)
                 Cr[i] = buf[2][coord];
             }
         }
-    }
-    else {
-        uint8_t *restrict A = frame->data[3];
-
-#pragma omp parallel for schedule(static) num_threads(f->n_threads)
-        for(int i = 0; i < len; i++) {
-            const int coord = cached_coords[i];
+        else {
             A[i] = (coord < 0) ? 0 : buf[0][coord];
         }
     }
 }
+

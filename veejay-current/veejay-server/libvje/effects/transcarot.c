@@ -124,6 +124,9 @@ vj_effect *transcarot_init(int width, int height)
         VJ_BEAT_GLOW,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,  120,                1000,               14, 54,  600, 2400, 0,    86
     );
 
+    (void)width;
+    (void)height;
+
     return ve;
 }
 
@@ -162,10 +165,12 @@ static void transcarot_apply_diagonal(wipe_t *wipe,
                                       int glow_width,
                                       int glow_strength)
 {
+    (void)wipe;
+
     const int width = frame->width;
     const int height = frame->height;
 
-#pragma omp parallel for schedule(static) num_threads(wipe->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         int limit = progress + expand_px - y;
 
@@ -210,37 +215,17 @@ static void transcarot_apply_diagonal(wipe_t *wipe,
 static void transcarot_apply_bouncybox(wipe_t *wipe,
                                        VJFrame *frame,
                                        VJFrame *frame2,
-                                       int speed,
-                                       int expand_px,
+                                       int cur_x,
+                                       int cur_y,
                                        int glow_width,
                                        int glow_strength)
 {
+    (void)wipe;
+
     const int width = frame->width;
     const int height = frame->height;
 
-    wipe->box_x += speed * wipe->box_dir_x;
-    wipe->box_y += speed * wipe->box_dir_y;
-
-    if(wipe->box_x >= width) {
-        wipe->box_x = width;
-        wipe->box_dir_x = -1;
-    } else if(wipe->box_x <= 0) {
-        wipe->box_x = 0;
-        wipe->box_dir_x = 1;
-    }
-
-    if(wipe->box_y >= height) {
-        wipe->box_y = height;
-        wipe->box_dir_y = -1;
-    } else if(wipe->box_y <= 0) {
-        wipe->box_y = 0;
-        wipe->box_dir_y = 1;
-    }
-
-    const int cur_x = transcarot_clampi(wipe->box_x + expand_px, 0, width);
-    const int cur_y = transcarot_clampi(wipe->box_y + expand_px, 0, height);
-
-#pragma omp parallel for schedule(static) num_threads(wipe->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         if(y < cur_y && cur_x > 0) {
             const int off = y * width;
@@ -327,33 +312,65 @@ void transcarot_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         glow_strength = transcarot_clampi(glow_strength, 0, 220);
     }
 
+    int cur_x = 0;
+    int cur_y = 0;
+    int progress = wipe->diagonal_pos;
+
     if(mode == 1) {
-        transcarot_apply_bouncybox(
-            wipe,
-            frame,
-            frame2,
-            effective_speed,
-            expand_px,
-            glow_width,
-            glow_strength
-        );
-        return;
+        wipe->box_x += effective_speed * wipe->box_dir_x;
+        wipe->box_y += effective_speed * wipe->box_dir_y;
+
+        if(wipe->box_x >= width) {
+            wipe->box_x = width;
+            wipe->box_dir_x = -1;
+        } else if(wipe->box_x <= 0) {
+            wipe->box_x = 0;
+            wipe->box_dir_x = 1;
+        }
+
+        if(wipe->box_y >= height) {
+            wipe->box_y = height;
+            wipe->box_dir_y = -1;
+        } else if(wipe->box_y <= 0) {
+            wipe->box_y = 0;
+            wipe->box_dir_y = 1;
+        }
+
+        cur_x = transcarot_clampi(wipe->box_x + expand_px, 0, width);
+        cur_y = transcarot_clampi(wipe->box_y + expand_px, 0, height);
+    } else {
+        const int total_span = width + height;
+
+        wipe->diagonal_pos += effective_speed;
+
+        while(wipe->diagonal_pos >= total_span)
+            wipe->diagonal_pos -= total_span;
+
+        progress = wipe->diagonal_pos;
     }
 
-    const int total_span = width + height;
-
-    wipe->diagonal_pos += effective_speed;
-
-    while(wipe->diagonal_pos >= total_span)
-        wipe->diagonal_pos -= total_span;
-
-    transcarot_apply_diagonal(
-        wipe,
-        frame,
-        frame2,
-        wipe->diagonal_pos,
-        expand_px,
-        glow_width,
-        glow_strength
-    );
+#pragma omp parallel num_threads(wipe->n_threads)
+    {
+        if(mode == 1) {
+            transcarot_apply_bouncybox(
+                wipe,
+                frame,
+                frame2,
+                cur_x,
+                cur_y,
+                glow_width,
+                glow_strength
+            );
+        } else {
+            transcarot_apply_diagonal(
+                wipe,
+                frame,
+                frame2,
+                progress,
+                expand_px,
+                glow_width,
+                glow_strength
+            );
+        }
+    }
 }

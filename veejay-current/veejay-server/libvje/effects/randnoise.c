@@ -94,6 +94,7 @@ vj_effect *randnoise_init(int w, int h)
     return ve;
 }
 
+
 void randnoise_apply(void *ptr, VJFrame *frame, int *args)
 {
     (void)ptr;
@@ -113,14 +114,6 @@ void randnoise_apply(void *ptr, VJFrame *frame, int *args)
 
     uint8_t *restrict Y = frame->data[0];
 
-    if(range == 0) {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
-        for(int i = 0; i < len; i++)
-            Y[i] = randnoise_u8((int)Y[i] + minv);
-
-        return;
-    }
-
     const uint32_t seed =
         ((uint32_t)Y[0] << 24) ^
         ((uint32_t)Y[len >> 1] << 12) ^
@@ -131,9 +124,14 @@ void randnoise_apply(void *ptr, VJFrame *frame, int *args)
 
 #pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int i = 0; i < len; i++) {
-        const uint32_t h = randnoise_hash32((uint32_t)i ^ seed);
-        const int n = (int)(h % span) + minv;
+        if(range == 0) {
+            Y[i] = randnoise_u8((int)Y[i] + minv);
+        }
+        else {
+            const uint32_t h = randnoise_hash32((uint32_t)i ^ seed);
+            const int n = (int)(h % span) + minv;
 
-        Y[i] = randnoise_u8((int)Y[i] + n);
+            Y[i] = randnoise_u8((int)Y[i] + n);
+        }
     }
 }

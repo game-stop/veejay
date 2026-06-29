@@ -1314,6 +1314,10 @@ int vje_get_beat_hint_copy(int fx_id, int parameter_id, vj_beat_param_hint_t *ds
     return !(src->flags & VJ_BEAT_F_REJECT);
 }
 
+int vje_max_threads(int len) {
+    return vje_advise_num_threads(len);
+}
+
 void vje_dump(void) {
 	veejay_msg(VEEJAY_MSG_INFO, "Below follow all effects in Veejay,");
 	veejay_msg(VEEJAY_MSG_INFO, "Effect numbers starting with 2xx are effects that use");

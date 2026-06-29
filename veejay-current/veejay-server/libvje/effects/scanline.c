@@ -239,7 +239,7 @@ static void scanline_fade_buffer(scanline_t *s, int len, int hold)
     uint8_t *restrict u = s->buf[1];
     uint8_t *restrict v = s->buf[2];
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         y[i] = scanline_clamp_y((((int)y[i] * hold) + (pixel_Y_lo_ * inv) + 127) / 255);
         u[i] = scanline_clamp_uv((((int)u[i] * hold) + (128 * inv) + 127) / 255);
@@ -254,20 +254,22 @@ static void scanline_mix_output(uint8_t *restrict dstY,
                                 const uint8_t *restrict bufU,
                                 const uint8_t *restrict bufV,
                                 int len,
-                                int mix_q8,
-                                int n_threads)
+                                int mix_q8)
 {
     if(mix_q8 >= 256) {
-        veejay_memcpy(dstY, bufY, len);
-        veejay_memcpy(dstU, bufU, len);
-        veejay_memcpy(dstV, bufV, len);
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            dstY[i] = bufY[i];
+            dstU[i] = bufU[i];
+            dstV[i] = bufV[i];
+        }
         return;
     }
 
     if(mix_q8 <= 0)
         return;
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         dstY[i] = scanline_blend_y(dstY[i], bufY[i], mix_q8);
         dstU[i] = scanline_blend_uv(dstU[i], bufU[i], mix_q8);
@@ -275,13 +277,13 @@ static void scanline_mix_output(uint8_t *restrict dstY,
     }
 }
 
+
 static void scanline_overlay_horizontal(uint8_t *restrict y,
                                         int width,
                                         int height,
                                         int center,
                                         int beam,
-                                        int glow,
-                                        int n_threads)
+                                        int glow)
 {
     if(glow <= 0 || beam <= 0)
         return;
@@ -294,7 +296,7 @@ static void scanline_overlay_horizontal(uint8_t *restrict y,
     if(y1 >= height)
         y1 = height - 1;
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int row = y0; row <= y1; row++) {
         int d = row - center;
 
@@ -317,8 +319,7 @@ static void scanline_overlay_vertical(uint8_t *restrict y,
                                       int height,
                                       int center,
                                       int beam,
-                                      int glow,
-                                      int n_threads)
+                                      int glow)
 {
     if(glow <= 0 || beam <= 0)
         return;
@@ -331,7 +332,7 @@ static void scanline_overlay_vertical(uint8_t *restrict y,
     if(x1 >= width)
         x1 = width - 1;
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int row = 0; row < height; row++) {
         uint8_t *restrict p = y + row * width;
 
@@ -473,10 +474,16 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
 
     const int mix_q8 = (eff_mix * 256 + 500) / 1000;
 
+
+    int stopped = 0;
+    int head = 0;
+    int horizontal = mode < 2;
+
     if(s->stopCount > 0) {
         const int skip = 1 + ((beat_speed * 6 + beat_q * 7 + 1000) / 2000);
 
         s->stopCount -= skip;
+        stopped = 1;
 
         if(s->stopCount <= 0) {
             s->prevRow = 0;
@@ -487,133 +494,139 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
             veejay_memset(bufU, 128, len);
             veejay_memset(bufV, 128, len);
         }
-
-        scanline_mix_output(dstY, dstU, dstV, bufY, bufU, bufV, len, mix_q8, s->n_threads);
-        return;
     }
 
-    scanline_fade_buffer(s, len, eff_hold);
-
-    int head = 0;
-    int horizontal = mode < 2;
-
-    switch(mode) {
-        case 0:
-        {
-            const int start = s->prevRow;
-            int stop = start + eff_speed;
-
-            if(stop > height)
-                stop = height;
-
-            for(int row = start; row < stop; row++) {
-                const int offset = row * width;
-
-                veejay_memcpy(bufY + offset, dstY + offset, width);
-                veejay_memcpy(bufU + offset, dstU + offset, width);
-                veejay_memcpy(bufV + offset, dstV + offset, width);
-            }
-
-            head = stop > 0 ? stop - 1 : start;
-
-            if(stop == height)
-                s->stopCount = (stop_base * (1000 - (beat_q >> 1)) + 500) / 1000;
-
-            s->prevRow = (start + eff_speed) % height;
-            break;
+#pragma omp parallel num_threads(s->n_threads)
+    {
+        if(stopped) {
+            scanline_mix_output(dstY, dstU, dstV, bufY, bufU, bufV, len, mix_q8);
         }
+        else {
+            scanline_fade_buffer(s, len, eff_hold);
 
-        case 1:
-        {
-            const int start = height - 1 - s->prevRow;
-            int stop = height - s->prevRow - eff_speed;
+#pragma omp single
+            {
+                switch(mode) {
+                    case 0:
+                    {
+                        const int start = s->prevRow;
+                        int stop = start + eff_speed;
 
-            if(stop < 0)
-                stop = 0;
+                        if(stop > height)
+                            stop = height;
 
-            for(int row = start; row >= stop; row--) {
-                const int offset = row * width;
+                        for(int row = start; row < stop; row++) {
+                            const int offset = row * width;
 
-                veejay_memcpy(bufY + offset, dstY + offset, width);
-                veejay_memcpy(bufU + offset, dstU + offset, width);
-                veejay_memcpy(bufV + offset, dstV + offset, width);
-            }
+                            veejay_memcpy(bufY + offset, dstY + offset, width);
+                            veejay_memcpy(bufU + offset, dstU + offset, width);
+                            veejay_memcpy(bufV + offset, dstV + offset, width);
+                        }
 
-            head = stop;
+                        head = stop > 0 ? stop - 1 : start;
 
-            if(stop == 0)
-                s->stopCount = (stop_base * (1000 - (beat_q >> 1)) + 500) / 1000;
+                        if(stop == height)
+                            s->stopCount = (stop_base * (1000 - (beat_q >> 1)) + 500) / 1000;
 
-            s->prevRow = (s->prevRow + eff_speed) % height;
-            break;
-        }
+                        s->prevRow = (start + eff_speed) % height;
+                        break;
+                    }
 
-        case 2:
-        {
-            const int start = s->prevCol;
-            int stop = start + eff_speed;
+                    case 1:
+                    {
+                        const int start = height - 1 - s->prevRow;
+                        int stop = height - s->prevRow - eff_speed;
 
-            if(stop > width)
-                stop = width;
+                        if(stop < 0)
+                            stop = 0;
 
-            for(int row = 0; row < height; row++) {
-                const int base = row * width;
+                        for(int row = start; row >= stop; row--) {
+                            const int offset = row * width;
 
-                for(int col = start; col < stop; col++) {
-                    const int idx = base + col;
+                            veejay_memcpy(bufY + offset, dstY + offset, width);
+                            veejay_memcpy(bufU + offset, dstU + offset, width);
+                            veejay_memcpy(bufV + offset, dstV + offset, width);
+                        }
 
-                    bufY[idx] = dstY[idx];
-                    bufU[idx] = dstU[idx];
-                    bufV[idx] = dstV[idx];
+                        head = stop;
+
+                        if(stop == 0)
+                            s->stopCount = (stop_base * (1000 - (beat_q >> 1)) + 500) / 1000;
+
+                        s->prevRow = (s->prevRow + eff_speed) % height;
+                        break;
+                    }
+
+                    case 2:
+                    {
+                        const int start = s->prevCol;
+                        int stop = start + eff_speed;
+
+                        if(stop > width)
+                            stop = width;
+
+                        for(int row = 0; row < height; row++) {
+                            const int base = row * width;
+
+                            for(int col = start; col < stop; col++) {
+                                const int idx = base + col;
+
+                                bufY[idx] = dstY[idx];
+                                bufU[idx] = dstU[idx];
+                                bufV[idx] = dstV[idx];
+                            }
+                        }
+
+                        head = stop > 0 ? stop - 1 : start;
+                        horizontal = 0;
+
+                        if(stop == width)
+                            s->stopCount = (stop_base * (1000 - (beat_q >> 1)) + 500) / 1000;
+
+                        s->prevCol = (start + eff_speed) % width;
+                        break;
+                    }
+
+                    case 3:
+                    default:
+                    {
+                        const int start = width - 1 - s->prevCol;
+                        int stop = width - s->prevCol - eff_speed;
+
+                        if(stop < 0)
+                            stop = 0;
+
+                        for(int row = 0; row < height; row++) {
+                            const int base = row * width;
+
+                            for(int col = start; col >= stop; col--) {
+                                const int idx = base + col;
+
+                                bufY[idx] = dstY[idx];
+                                bufU[idx] = dstU[idx];
+                                bufV[idx] = dstV[idx];
+                            }
+                        }
+
+                        head = stop;
+                        horizontal = 0;
+
+                        if(stop == 0)
+                            s->stopCount = (stop_base * (1000 - (beat_q >> 1)) + 500) / 1000;
+
+                        s->prevCol = (s->prevCol + eff_speed) % width;
+                        break;
+                    }
                 }
             }
 
-            head = stop > 0 ? stop - 1 : start;
-            horizontal = 0;
+            scanline_mix_output(dstY, dstU, dstV, bufY, bufU, bufV, len, mix_q8);
 
-            if(stop == width)
-                s->stopCount = (stop_base * (1000 - (beat_q >> 1)) + 500) / 1000;
-
-            s->prevCol = (start + eff_speed) % width;
-            break;
-        }
-
-        case 3:
-        default:
-        {
-            const int start = width - 1 - s->prevCol;
-            int stop = width - s->prevCol - eff_speed;
-
-            if(stop < 0)
-                stop = 0;
-
-            for(int row = 0; row < height; row++) {
-                const int base = row * width;
-
-                for(int col = start; col >= stop; col--) {
-                    const int idx = base + col;
-
-                    bufY[idx] = dstY[idx];
-                    bufU[idx] = dstU[idx];
-                    bufV[idx] = dstV[idx];
-                }
-            }
-
-            head = stop;
-            horizontal = 0;
-
-            if(stop == 0)
-                s->stopCount = (stop_base * (1000 - (beat_q >> 1)) + 500) / 1000;
-
-            s->prevCol = (s->prevCol + eff_speed) % width;
-            break;
+            if(horizontal)
+                scanline_overlay_horizontal(dstY, width, height, head, eff_beam, eff_glow);
+            else
+                scanline_overlay_vertical(dstY, width, height, head, eff_beam, eff_glow);
         }
     }
-
-    scanline_mix_output(dstY, dstU, dstV, bufY, bufU, bufV, len, mix_q8, s->n_threads);
-
-    if(horizontal)
-        scanline_overlay_horizontal(dstY, width, height, head, eff_beam, eff_glow, s->n_threads);
-    else
-        scanline_overlay_vertical(dstY, width, height, head, eff_beam, eff_glow, s->n_threads);
 }
+

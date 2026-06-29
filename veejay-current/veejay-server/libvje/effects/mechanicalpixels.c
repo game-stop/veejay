@@ -356,7 +356,7 @@ static void kd_rebuild_wave_lut(kinetic_t *k, int wave)
     const int rows = k->rows;
     const int max_cols = k->max_cols;
 
-#pragma omp parallel for num_threads(k->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int cy = 0; cy < rows; cy++) {
         for(int cx = 0; cx < cols; cx++) {
             const int idx = cy * max_cols + cx;
@@ -365,6 +365,7 @@ static void kd_rebuild_wave_lut(kinetic_t *k, int wave)
         }
     }
 
+#pragma omp single
     k->last_wave = wave;
 }
 
@@ -579,7 +580,7 @@ static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
     const int max_cols = k->max_cols;
     uint8_t *prev_y = k->prev_y;
 
-#pragma omp parallel for num_threads(k->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int cy = 0; cy < rows; cy++) {
         for(int cx = 0; cx < cols; cx++) {
             const int idx = cy * max_cols + cx;
@@ -650,7 +651,7 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
 
     uint8_t *prev_y = k->prev_y;
 
-#pragma omp parallel for num_threads(k->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int cy = 0; cy < rows; cy++) {
         for(int cx = 0; cx < cols; cx++) {
             const int idx = cy * max_cols + cx;
@@ -811,7 +812,7 @@ static void kd_render_wall(kinetic_t *k, VJFrame *frame, int cell_size,
     const int amount_q = (amount * 256 + 50) / 100;
     const int full_amount = (amount_q >= 256);
 
-#pragma omp parallel for num_threads(k->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int cy = 0; cy < rows; cy++) {
         for(int cx = 0; cx < cols; cx++) {
             const int idx = cy * max_cols + cx;
@@ -1005,26 +1006,33 @@ void mechanicalpixels_apply(void *ptr, VJFrame *frame, int *args)
         k->motor_q8 = 0;
     }
 
-    if(k->last_wave != wave)
-        kd_rebuild_wave_lut(k, wave);
+    const int rebuild_wave = k->last_wave != wave;
+    const int need_seed = !k->seeded || (reset && !k->last_reset);
 
-    if(!k->seeded || (reset && !k->last_reset)) {
-        kd_seed_cells(k, Y, U, V, cell_size);
+#pragma omp parallel num_threads(k->n_threads)
+    {
+        if(rebuild_wave)
+            kd_rebuild_wave_lut(k, wave);
+
+        if(need_seed)
+            kd_seed_cells(k, Y, U, V, cell_size);
+
+        if(amount > 0) {
+            kd_update_cells(k, Y, U, V, cell_size, motor_speed, trigger, inertia);
+            kd_render_wall(k, frame, cell_size, amount, depth, palette);
+        } else {
+#pragma omp for schedule(static)
+            for(int i = 0; i < k->len; i++)
+                k->prev_y[i] = Y[i];
+        }
+    }
+
+    if(need_seed) {
         k->seeded = 1;
         k->motor_q8 = 0;
     }
+
     k->last_reset = reset;
-
-    if(amount <= 0) {
-        veejay_memcpy(k->prev_y, Y, (size_t) k->len);
-        if(motor_speed > 0)
-            k->motor_q8 = (k->motor_q8 + kd_motor_inc_q8(motor_speed)) & 0xffff;
-        k->frame++;
-        return;
-    }
-
-    kd_update_cells(k, Y, U, V, cell_size, motor_speed, trigger, inertia);
-    kd_render_wall(k, frame, cell_size, amount, depth, palette);
 
     if(motor_speed > 0)
         k->motor_q8 = (k->motor_q8 + kd_motor_inc_q8(motor_speed)) & 0xffff;

@@ -241,7 +241,7 @@ static void buffer_copy_slot(buffer_slot_t *slot, VJFrame *dst)
     dst->ssm = src->ssm;
 }
 
-static void buffer_mix_slot(buffer_t *b, buffer_slot_t *slot, VJFrame *dst, int opacity)
+static void buffer_mix_slot(buffer_slot_t *slot, VJFrame *dst, int opacity)
 {
     VJFrame *src = &slot->frame;
     const int len = dst->len;
@@ -253,40 +253,31 @@ static void buffer_mix_slot(buffer_t *b, buffer_slot_t *slot, VJFrame *dst, int 
     const uint8_t *restrict srcU = src->data[1];
     const uint8_t *restrict srcV = src->data[2];
 
-#pragma omp parallel num_threads(b->n_threads)
-    {
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++)
+        dstY[i] = buffer_blend_u8(dstY[i], srcY[i], opacity);
+
+#pragma omp for schedule(static)
+    for(int i = 0; i < uv_len; i++) {
+        dstU[i] = buffer_blend_u8(dstU[i], srcU[i], opacity);
+        dstV[i] = buffer_blend_u8(dstV[i], srcV[i], opacity);
+    }
+
+    if(dst->data[3] && src->data[3]) {
+        uint8_t *restrict dstA = dst->data[3];
+        const uint8_t *restrict srcA = src->data[3];
+
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
-            dstY[i] = buffer_blend_u8(dstY[i], srcY[i], opacity);
-
-#pragma omp for schedule(static)
-        for(int i = 0; i < uv_len; i++) {
-            dstU[i] = buffer_blend_u8(dstU[i], srcU[i], opacity);
-            dstV[i] = buffer_blend_u8(dstV[i], srcV[i], opacity);
-        }
-
-        if(dst->data[3] && src->data[3]) {
-            uint8_t *restrict dstA = dst->data[3];
-            const uint8_t *restrict srcA = src->data[3];
-
-#pragma omp for schedule(static)
-            for(int i = 0; i < len; i++)
-                dstA[i] = buffer_blend_u8(dstA[i], srcA[i], opacity);
-        }
+            dstA[i] = buffer_blend_u8(dstA[i], srcA[i], opacity);
     }
 }
 
-static void buffer_feedback_slot(buffer_t *b, buffer_slot_t *slot, VJFrame *frame, int feedback)
+static void buffer_feedback_slot(buffer_slot_t *slot, VJFrame *frame, int feedback)
 {
     VJFrame *dst = &slot->frame;
     const int len = frame->len;
     const int uv_len = frame->uv_len;
-
-    if(feedback >= 255) {
-        buffer_store_slot(slot, frame);
-        return;
-    }
-
     uint8_t *restrict dstY = dst->data[0];
     uint8_t *restrict dstU = dst->data[1];
     uint8_t *restrict dstV = dst->data[2];
@@ -294,26 +285,23 @@ static void buffer_feedback_slot(buffer_t *b, buffer_slot_t *slot, VJFrame *fram
     const uint8_t *restrict srcU = frame->data[1];
     const uint8_t *restrict srcV = frame->data[2];
 
-#pragma omp parallel num_threads(b->n_threads)
-    {
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++)
+        dstY[i] = buffer_blend_u8(dstY[i], srcY[i], feedback);
+
+#pragma omp for schedule(static)
+    for(int i = 0; i < uv_len; i++) {
+        dstU[i] = buffer_blend_u8(dstU[i], srcU[i], feedback);
+        dstV[i] = buffer_blend_u8(dstV[i], srcV[i], feedback);
+    }
+
+    if(dst->data[3] && frame->data[3]) {
+        uint8_t *restrict dstA = dst->data[3];
+        const uint8_t *restrict srcA = frame->data[3];
+
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
-            dstY[i] = buffer_blend_u8(dstY[i], srcY[i], feedback);
-
-#pragma omp for schedule(static)
-        for(int i = 0; i < uv_len; i++) {
-            dstU[i] = buffer_blend_u8(dstU[i], srcU[i], feedback);
-            dstV[i] = buffer_blend_u8(dstV[i], srcV[i], feedback);
-        }
-
-        if(dst->data[3] && frame->data[3]) {
-            uint8_t *restrict dstA = dst->data[3];
-            const uint8_t *restrict srcA = frame->data[3];
-
-#pragma omp for schedule(static)
-            for(int i = 0; i < len; i++)
-                dstA[i] = buffer_blend_u8(dstA[i], srcA[i], feedback);
-        }
+            dstA[i] = buffer_blend_u8(dstA[i], srcA[i], feedback);
     }
 }
 
@@ -356,9 +344,22 @@ void buffer_apply(void *ptr, VJFrame *frame, int *args)
 
     if(opacity >= 255)
         buffer_copy_slot(tap, frame);
-    else if(opacity > 0)
-        buffer_mix_slot(b, tap, frame, opacity);
 
-    if(feedback > 0)
-        buffer_feedback_slot(b, &b->slots[write_slot], frame, feedback);
+    const int do_mix = opacity > 0 && opacity < 255;
+    const int do_feedback_mix = feedback > 0 && feedback < 255;
+
+    if(do_mix || do_feedback_mix) {
+#pragma omp parallel num_threads(b->n_threads)
+        {
+            if(do_mix)
+                buffer_mix_slot(tap, frame, opacity);
+
+            if(do_feedback_mix)
+                buffer_feedback_slot(&b->slots[write_slot], frame, feedback);
+        }
+    }
+
+    if(feedback >= 255)
+        buffer_store_slot(&b->slots[write_slot], frame);
 }
+

@@ -199,44 +199,60 @@ void chromawarp_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict tmpU = c->tmpU;
     uint8_t *restrict tmpV = c->tmpV;
 
-#pragma omp parallel for num_threads(c->n_threads) schedule(static)
-    for(int y = 0; y < h; y++)
+#pragma omp parallel num_threads(c->n_threads)
     {
-        const int yw = y * w;
-        const float cy = ((float)y - half_h) * inv_h;
-        const float cx_start = -half_w * inv_w;
-
-        for(int x = 0; x < w; x++)
+#pragma omp for schedule(static)
+        for(int y = 0; y < h; y++)
         {
-            const int i = yw + x;
-            const float u_raw = (float)U[i] - 128.0f;
-            const float v_raw = (float)V[i] - 128.0f;
-            float fx = u_raw * cos_a - v_raw * sin_a;
-            float fy = u_raw * sin_a + v_raw * cos_a;
+            const int yw = y * w;
+            const float cy = ((float)y - half_h) * inv_h;
+            const float cx_start = -half_w * inv_w;
 
-            if(bias > 0)
+            for(int x = 0; x < w; x++)
             {
-                const float cx = cx_start + (float)x * inv_w;
-                const float dot = fx * cx + fy * cy;
+                const int i = yw + x;
+                const float u_raw = (float)U[i] - 128.0f;
+                const float v_raw = (float)V[i] - 128.0f;
+                float fx = u_raw * cos_a - v_raw * sin_a;
+                float fy = u_raw * sin_a + v_raw * cos_a;
 
-                fx += dot * b;
-                fy += dot * b;
+                if(bias > 0)
+                {
+                    const float cx = cx_start + (float)x * inv_w;
+                    const float dot = fx * cx + fy * cy;
+
+                    fx += dot * b;
+                    fy += dot * b;
+                }
+
+                const float vx_new = vx[i] * t + fx * inv_t;
+                const float vy_new = vy[i] * t + fy * inv_t;
+
+                vx[i] = vx_new;
+                vy[i] = vy_new;
+
+                const float sx_f = clampf((float)x + vx_new * scale, 0.0f, max_sx);
+                const float sy_f = clampf((float)y + vy_new * scale, 0.0f, max_sy);
+                const int sx_fixed = (int)(sx_f * 65536.0f);
+                const int sy_fixed = (int)(sy_f * 65536.0f);
+
+                tmpY[i] = fast_bilinear(Y, w, sx_fixed, sy_fixed);
+                tmpU[i] = fast_bilinear(U, w, sx_fixed, sy_fixed);
+                tmpV[i] = fast_bilinear(V, w, sx_fixed, sy_fixed);
             }
+        }
 
-            const float vx_new = vx[i] * t + fx * inv_t;
-            const float vy_new = vy[i] * t + fy * inv_t;
+        if(mix > 0 && mix < 255)
+        {
+            const int inv_mix = 255 - mix;
 
-            vx[i] = vx_new;
-            vy[i] = vy_new;
-
-            const float sx_f = clampf((float)x + vx_new * scale, 0.0f, max_sx);
-            const float sy_f = clampf((float)y + vy_new * scale, 0.0f, max_sy);
-            const int sx_fixed = (int)(sx_f * 65536.0f);
-            const int sy_fixed = (int)(sy_f * 65536.0f);
-
-            tmpY[i] = fast_bilinear(Y, w, sx_fixed, sy_fixed);
-            tmpU[i] = fast_bilinear(U, w, sx_fixed, sy_fixed);
-            tmpV[i] = fast_bilinear(V, w, sx_fixed, sy_fixed);
+#pragma omp for simd schedule(static)
+            for(int i = 0; i < sz; i++)
+            {
+                Y[i] = (uint8_t)(((int)Y[i] * inv_mix + (int)tmpY[i] * mix) >> 8);
+                U[i] = (uint8_t)(((int)U[i] * inv_mix + (int)tmpU[i] * mix) >> 8);
+                V[i] = (uint8_t)(((int)V[i] * inv_mix + (int)tmpV[i] * mix) >> 8);
+            }
         }
     }
 
@@ -245,17 +261,5 @@ void chromawarp_apply(void *ptr, VJFrame *frame, int *args)
         veejay_memcpy(Y, tmpY, sz);
         veejay_memcpy(U, tmpU, sz);
         veejay_memcpy(V, tmpV, sz);
-    }
-    else if(mix > 0)
-    {
-        const int inv_mix = 255 - mix;
-
-#pragma omp parallel for simd num_threads(c->n_threads) schedule(static)
-        for(int i = 0; i < sz; i++)
-        {
-            Y[i] = (uint8_t)(((int)Y[i] * inv_mix + (int)tmpY[i] * mix) >> 8);
-            U[i] = (uint8_t)(((int)U[i] * inv_mix + (int)tmpU[i] * mix) >> 8);
-            V[i] = (uint8_t)(((int)V[i] * inv_mix + (int)tmpV[i] * mix) >> 8);
-        }
     }
 }

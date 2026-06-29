@@ -88,7 +88,7 @@ vj_effect *mirrors2_init(int w, int h)
     return ve;
 }
 
-static void mirrors2_quadrant(uint8_t *yuv[3], int width, int height, int mode, int n_threads)
+static void mirrors2_quadrant(uint8_t *yuv[3], int width, int height, int mode)
 {
     uint8_t *restrict py = yuv[0];
     uint8_t *restrict pu = yuv[1];
@@ -102,7 +102,7 @@ static void mirrors2_quadrant(uint8_t *yuv[3], int width, int height, int mode, 
     const int start_x = (mode == 0 || mode == 2) ? half_w : 0;
     const int end_x = (mode == 0 || mode == 2) ? width : half_w;
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = start_y; y < end_y; y++) {
         const int row_a = y * width;
         const int row_b = (height - y - 1) * width;
@@ -133,7 +133,7 @@ static void mirrors2_quadrant(uint8_t *yuv[3], int width, int height, int mode, 
     }
 }
 
-static void mirrors2_vertical(uint8_t *yuv[3], int width, int height, int copy_top, int n_threads)
+static void mirrors2_vertical(uint8_t *yuv[3], int width, int height, int copy_top)
 {
     uint8_t *restrict py = yuv[0];
     uint8_t *restrict pu = yuv[1];
@@ -141,7 +141,7 @@ static void mirrors2_vertical(uint8_t *yuv[3], int width, int height, int copy_t
 
     const int half_h = height >> 1;
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y < half_h; y++) {
         const int src_y = copy_top ? y : (height - 1 - y);
         const int dst_y = copy_top ? (height - 1 - y) : y;
@@ -160,7 +160,7 @@ static void mirrors2_vertical(uint8_t *yuv[3], int width, int height, int copy_t
     }
 }
 
-static void mirrors2_horizontal(uint8_t *yuv[3], int width, int height, int copy_left, int n_threads)
+static void mirrors2_horizontal(uint8_t *yuv[3], int width, int height, int copy_left)
 {
     uint8_t *restrict py = yuv[0];
     uint8_t *restrict pu = yuv[1];
@@ -168,7 +168,7 @@ static void mirrors2_horizontal(uint8_t *yuv[3], int width, int height, int copy
 
     const int half_w = width >> 1;
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
 
@@ -185,7 +185,7 @@ static void mirrors2_horizontal(uint8_t *yuv[3], int width, int height, int copy
     }
 }
 
-static void mirrors2_diag_tl_br(uint8_t *yuv[3], int width, int height, int inverse, int n_threads)
+static void mirrors2_diag_tl_br(uint8_t *yuv[3], int width, int height, int inverse)
 {
     uint8_t *restrict py = yuv[0];
     uint8_t *restrict pu = yuv[1];
@@ -194,7 +194,7 @@ static void mirrors2_diag_tl_br(uint8_t *yuv[3], int width, int height, int inve
     const int32_t rw = (width << 16) / height;
     const int32_t rh = (height << 16) / width;
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
         int sx = (y * rw) >> 16;
@@ -222,7 +222,7 @@ static void mirrors2_diag_tl_br(uint8_t *yuv[3], int width, int height, int inve
     }
 }
 
-static void mirrors2_diag_tr_bl(uint8_t *yuv[3], int width, int height, int inverse, int n_threads)
+static void mirrors2_diag_tr_bl(uint8_t *yuv[3], int width, int height, int inverse)
 {
     uint8_t *restrict py = yuv[0];
     uint8_t *restrict pu = yuv[1];
@@ -232,7 +232,7 @@ static void mirrors2_diag_tr_bl(uint8_t *yuv[3], int width, int height, int inve
     const int32_t rh = (height << 16) / width;
     const int64_t total_area = (int64_t)width * (int64_t)height;
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
         const int sx_base = (y * rw) >> 16;
@@ -254,44 +254,48 @@ static void mirrors2_diag_tr_bl(uint8_t *yuv[3], int width, int height, int inve
         }
     }
 }
-
 void mirrors2_apply(void *ptr, VJFrame *frame, int *args)
 {
     (void)ptr;
 
     const int type = args[P_SYMMETRY_MODE];
+    const int width = frame->width;
+    const int height = frame->height;
     const int n_threads = vje_advise_num_threads(frame->len);
 
-    switch(type) {
-        case 0:
-        case 1:
-        case 2:
-        case 3:
-            mirrors2_quadrant(frame->data, frame->width, frame->height, type, n_threads);
-            break;
-        case 4:
-            mirrors2_vertical(frame->data, frame->width, frame->height, 1, n_threads);
-            break;
-        case 5:
-            mirrors2_vertical(frame->data, frame->width, frame->height, 0, n_threads);
-            break;
-        case 6:
-            mirrors2_horizontal(frame->data, frame->width, frame->height, 1, n_threads);
-            break;
-        case 7:
-            mirrors2_horizontal(frame->data, frame->width, frame->height, 0, n_threads);
-            break;
-        case 8:
-            mirrors2_diag_tl_br(frame->data, frame->width, frame->height, 0, n_threads);
-            break;
-        case 9:
-            mirrors2_diag_tl_br(frame->data, frame->width, frame->height, 1, n_threads);
-            break;
-        case 10:
-            mirrors2_diag_tr_bl(frame->data, frame->width, frame->height, 0, n_threads);
-            break;
-        case 11:
-            mirrors2_diag_tr_bl(frame->data, frame->width, frame->height, 1, n_threads);
-            break;
+#pragma omp parallel num_threads(n_threads)
+    {
+        switch(type) {
+            case 0:
+            case 1:
+            case 2:
+            case 3:
+                mirrors2_quadrant(frame->data, width, height, type);
+                break;
+            case 4:
+                mirrors2_vertical(frame->data, width, height, 1);
+                break;
+            case 5:
+                mirrors2_vertical(frame->data, width, height, 0);
+                break;
+            case 6:
+                mirrors2_horizontal(frame->data, width, height, 1);
+                break;
+            case 7:
+                mirrors2_horizontal(frame->data, width, height, 0);
+                break;
+            case 8:
+                mirrors2_diag_tl_br(frame->data, width, height, 0);
+                break;
+            case 9:
+                mirrors2_diag_tl_br(frame->data, width, height, 1);
+                break;
+            case 10:
+                mirrors2_diag_tr_bl(frame->data, width, height, 0);
+                break;
+            case 11:
+                mirrors2_diag_tr_bl(frame->data, width, height, 1);
+                break;
+        }
     }
 }

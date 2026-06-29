@@ -543,7 +543,6 @@ static void eh_build_light_force_grid(eventhorizon_t *e,
         if (step2_const > 48)
             step2_const = 48;
 
-#pragma omp parallel for schedule(static) num_threads(e->n_threads)
     for (gy = 0; gy < gh; gy++) {
         for (gx = 0; gx < gw; gx++) {
             int x = (gx - 1) * cell;
@@ -762,7 +761,6 @@ static void eh_update_drop_field(eventhorizon_t *e,
     damp = eh_clampf(damp, 0.880f, 0.982f);
     impulse_gain = (0.018f + lens_curve * 0.052f + flow_t * 0.028f + density_t * 0.030f + smoke_t * 0.024f) * (0.45f + motion_scale * 0.23f);
 
-#pragma omp parallel for schedule(static) num_threads(e->n_threads)
     for (gy = 1; gy < gh - 1; gy++) {
         int gx;
         int row = gy * gw;
@@ -1265,7 +1263,6 @@ static void eh_seed(eventhorizon_t *e, VJFrame *frame)
     int len = e->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(e->n_threads)
     for (i = 0; i < len; i++) {
         uint8_t y = Y[i];
         uint8_t u = U[i];

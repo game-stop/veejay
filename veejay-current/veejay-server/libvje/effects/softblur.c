@@ -33,8 +33,8 @@ extern int vje_get_quality(void);
 #define P_MIX_DRIVE    4
 
 typedef struct {
-    uint8_t *src;
-    uint8_t *tmp;
+    uint8_t *src[3];
+    uint8_t *tmp[3];
     int max_len;
     int n_threads;
 
@@ -150,13 +150,17 @@ void *softblur_malloc(int w, int h)
 
     const int len = w * h;
 
-    sb->src = (uint8_t*) vj_malloc((size_t)len * 2u);
-    if(!sb->src) {
+    sb->src[0] = (uint8_t*) vj_malloc((size_t)len * 6u);
+    if(!sb->src[0]) {
         free(sb);
         return NULL;
     }
 
-    sb->tmp = sb->src + len;
+    sb->tmp[0] = sb->src[0] + len;
+    sb->src[1] = sb->tmp[0] + len;
+    sb->tmp[1] = sb->src[1] + len;
+    sb->src[2] = sb->tmp[1] + len;
+    sb->tmp[2] = sb->src[2] + len;
     sb->max_len = len;
 
     sb->eff_kernel = 0.0f;
@@ -175,17 +179,25 @@ void softblur_free(void *ptr)
 {
     softblur_t *sb = (softblur_t*) ptr;
 
-    free(sb->src);
+    free(sb->src[0]);
     free(sb);
 }
 
-static void softblur1_core(const uint8_t *restrict src,
-                           uint8_t *restrict dst,
-                           int w,
-                           int h,
-                           int n_threads)
+static inline void softblur_copy_plane(const uint8_t *restrict src,
+                                          uint8_t *restrict dst,
+                                          int len)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++)
+        dst[i] = src[i];
+}
+
+static inline void softblur1_core(const uint8_t *restrict src,
+                                      uint8_t *restrict dst,
+                                      int w,
+                                      int h)
+{
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         const uint8_t *restrict row = src + y * w;
         uint8_t *restrict out = dst + y * w;
@@ -199,14 +211,12 @@ static void softblur1_core(const uint8_t *restrict src,
     }
 }
 
-static void softblur3_core(const uint8_t *src,
-                           uint8_t *tmp,
-                           uint8_t *dst,
-                           int w,
-                           int h,
-                           int n_threads)
+static inline void softblur3_h(const uint8_t *restrict src,
+                                   uint8_t *restrict tmp,
+                                   int w,
+                                   int h)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         const uint8_t *restrict row = src + y * w;
         uint8_t *restrict trow = tmp + y * w;
@@ -218,8 +228,14 @@ static void softblur3_core(const uint8_t *src,
 
         trow[w - 1] = (uint8_t)(((int)row[w - 2] + (int)row[w - 1] * 2 + 1) / 3);
     }
+}
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+static inline void softblur3_v(const uint8_t *restrict tmp,
+                                   uint8_t *restrict dst,
+                                   int w,
+                                   int h)
+{
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         const int ym = (y > 0) ? y - 1 : y;
         const int yp = (y < h - 1) ? y + 1 : y;
@@ -234,11 +250,20 @@ static void softblur3_core(const uint8_t *src,
     }
 }
 
-static void softblur_blend_plane(const uint8_t *restrict src,
-                                 uint8_t *restrict dst,
-                                 int len,
-                                 int mix_q8,
-                                 int n_threads)
+static inline void softblur3_core(const uint8_t *restrict src,
+                                      uint8_t *restrict tmp,
+                                      uint8_t *restrict dst,
+                                      int w,
+                                      int h)
+{
+    softblur3_h(src, tmp, w, h);
+    softblur3_v(tmp, dst, w, h);
+}
+
+static inline void softblur_blend_plane(const uint8_t *restrict src,
+                                            uint8_t *restrict dst,
+                                            int len,
+                                            int mix_q8)
 {
     mix_q8 = clampi(mix_q8, 0, 256);
 
@@ -246,45 +271,46 @@ static void softblur_blend_plane(const uint8_t *restrict src,
         return;
 
     if(mix_q8 <= 0) {
-        veejay_memcpy(dst, src, len);
+        softblur_copy_plane(src, dst, len);
         return;
     }
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         dst[i] = softblur_mix_u8(src[i], dst[i], mix_q8);
 }
 
-static void softblur_plane(softblur_t *sb,
-                           uint8_t *plane,
-                           int w,
-                           int h,
-                           int type,
-                           int mix_q8)
+static inline void softblur_plane(uint8_t *restrict src,
+                                      uint8_t *restrict tmp,
+                                      uint8_t *restrict plane,
+                                      int w,
+                                      int h,
+                                      int type,
+                                      int mix_q8)
 {
     const int len = w * h;
 
-    veejay_memcpy(sb->src, plane, len);
+    softblur_copy_plane(plane, src, len);
 
     switch(type) {
         case 0:
-            softblur1_core(sb->src, plane, w, h, sb->n_threads);
+            softblur1_core(src, plane, w, h);
             break;
 
         case 1:
-            softblur3_core(sb->src, sb->tmp, plane, w, h, sb->n_threads);
+            softblur3_core(src, tmp, plane, w, h);
             break;
 
         case 2:
-            softblur3_core(sb->src, sb->tmp, plane, w, h, sb->n_threads);
-            softblur3_core(plane, sb->tmp, plane, w, h, sb->n_threads);
+            softblur3_core(src, tmp, plane, w, h);
+            softblur3_core(plane, tmp, plane, w, h);
             break;
 
         default:
             break;
     }
 
-    softblur_blend_plane(sb->src, plane, len, mix_q8, sb->n_threads);
+    softblur_blend_plane(src, plane, len, mix_q8);
 }
 
 void softblur_apply_internal(VJFrame *frame)
@@ -299,21 +325,9 @@ void softblur_apply_internal(VJFrame *frame)
 
     uint8_t *tmp = src + len;
 
-    veejay_memcpy(src, frame->data[0], len);
-
-    switch(type) {
-        case 0:
-            softblur1_core(src, frame->data[0], frame->width, frame->height, n_threads);
-            break;
-        case 1:
-            softblur3_core(src, tmp, frame->data[0], frame->width, frame->height, n_threads);
-            break;
-        case 2:
-            softblur3_core(src, tmp, frame->data[0], frame->width, frame->height, n_threads);
-            softblur3_core(frame->data[0], tmp, frame->data[0], frame->width, frame->height, n_threads);
-            break;
-        default:
-            break;
+#pragma omp parallel num_threads(n_threads)
+    {
+        softblur_plane(src, tmp, frame->data[0], frame->width, frame->height, type, 256);
     }
 
     free(src);
@@ -367,11 +381,13 @@ void softblur_apply(void *ptr, VJFrame *frame, int *args)
     const int y_mix_q8 = clampi(base_mix_q8 - clarity_q8, 0, 256);
     const int c_mix_q8 = clampi((y_mix_q8 * eff_chroma + 500) / 1000, 0, 256);
 
-    softblur_plane(blur, frame->data[0], width, height, type, y_mix_q8);
-
     const int uv_width  = frame->ssm ? width  : frame->uv_width;
     const int uv_height = frame->ssm ? height : frame->uv_height;
 
-    softblur_plane(blur, frame->data[1], uv_width, uv_height, type, c_mix_q8);
-    softblur_plane(blur, frame->data[2], uv_width, uv_height, type, c_mix_q8);
+#pragma omp parallel num_threads(blur->n_threads)
+    {
+        softblur_plane(blur->src[0], blur->tmp[0], frame->data[0], width, height, type, y_mix_q8);
+        softblur_plane(blur->src[1], blur->tmp[1], frame->data[1], uv_width, uv_height, type, c_mix_q8);
+        softblur_plane(blur->src[2], blur->tmp[2], frame->data[2], uv_width, uv_height, type, c_mix_q8);
+    }
 }

@@ -265,8 +265,9 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args)
 
     int global_min = 255;
     int global_max = 0;
+    int scale_fp = 0;
 
-#pragma omp parallel num_threads(s->n_threads) reduction(min:global_min) reduction(max:global_max)
+#pragma omp parallel num_threads(s->n_threads)
     {
         const int tid = omp_get_thread_num();
 
@@ -291,7 +292,7 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args)
                 blur_buf[y * w + x] = col_out[y];
         }
 
-#pragma omp for schedule(static)
+#pragma omp for schedule(static) reduction(min:global_min) reduction(max:global_max)
         for(int i = 0; i < len; i++) {
             int v = blur_buf[i];
 
@@ -300,53 +301,58 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args)
             if(v > global_max)
                 global_max = v;
         }
-    }
 
-    int range = global_max - global_min;
-    if(range < 64)
-        range = 64;
+#pragma omp single
+        {
+            int range = global_max - global_min;
+            if(range < 64)
+                range = 64;
 
-    const int scale_fp = (255 << 16) / range;
-
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-    for(int i = 0; i < len; i++) {
-        const int lum = blur_buf[i];
-
-        int motion = fc_absi(lum - prev_luma[i]) - sensitivity;
-        motion &= ~(motion >> 31);
-
-        int heat = (((lum - global_min) * scale_fp) >> 16) + ((motion * motion_gain) >> 7);
-
-        if(heat > 255)
-            heat = 255;
-        else if(heat < 0)
-            heat = 0;
-
-        int mixed = (heat * opacity + heat_buf[i] * inv_opacity) >> 8;
-        int released = (int)heat_buf[i] - decay_step;
-
-        if(released < 0)
-            released = 0;
-
-        int val = (mixed < released) ? released : mixed;
-
-        heat_buf[i] = (uint8_t)val;
-        prev_luma[i] = (uint8_t)lum;
-
-        const int mapped = s->gamma_lut[val];
-        int lut_idx = (mapped + lut_offset) & 0xFF;
-
-        if(motion > 0) {
-            int jump = (motion > 48) ? 64 : (motion << 6) / 48;
-
-            lut_idx = (lut_idx + jump) & 0xFF;
+            scale_fp = (255 << 16) / range;
         }
 
-        const uint8_t *restrict col = s->rainbow[lut_idx];
+#pragma omp barrier
 
-        Y[i] = col[0];
-        U[i] = col[1];
-        V[i] = col[2];
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            const int lum = blur_buf[i];
+
+            int motion = fc_absi(lum - prev_luma[i]) - sensitivity;
+            motion &= ~(motion >> 31);
+
+            int heat = (((lum - global_min) * scale_fp) >> 16) + ((motion * motion_gain) >> 7);
+
+            if(heat > 255)
+                heat = 255;
+            else if(heat < 0)
+                heat = 0;
+
+            int mixed = (heat * opacity + heat_buf[i] * inv_opacity) >> 8;
+            int released = (int)heat_buf[i] - decay_step;
+
+            if(released < 0)
+                released = 0;
+
+            int val = (mixed < released) ? released : mixed;
+
+            heat_buf[i] = (uint8_t)val;
+            prev_luma[i] = (uint8_t)lum;
+
+            const int mapped = s->gamma_lut[val];
+            int lut_idx = (mapped + lut_offset) & 0xFF;
+
+            if(motion > 0) {
+                int jump = (motion > 48) ? 64 : (motion << 6) / 48;
+
+                lut_idx = (lut_idx + jump) & 0xFF;
+            }
+
+            const uint8_t *restrict col = s->rainbow[lut_idx];
+
+            Y[i] = col[0];
+            U[i] = col[1];
+            V[i] = col[2];
+        }
     }
 
     s->timestamp++;

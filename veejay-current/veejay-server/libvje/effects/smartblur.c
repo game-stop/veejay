@@ -298,7 +298,7 @@ static void smartblur_downsample_2x(smartblur_t *s, const uint8_t *restrict data
     const int sw = s->sw;
     const int sh = s->sh;
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < sh; y++) {
         const int y0 = y << 1;
         const int y1 = (y0 + 1 < h) ? y0 + 1 : y0;
@@ -323,7 +323,7 @@ static void smartblur_build_coefficients(smartblur_t *s, int r, float eps, float
     const int max_sdim = s->max_sdim;
     const float *restrict inv = s->inv_counts;
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < sh; y++) {
         const int tid = omp_get_thread_num();
 
@@ -354,7 +354,6 @@ static void smartblur_build_coefficients(smartblur_t *s, int r, float eps, float
         }
     }
 
-#pragma omp parallel num_threads(s->n_threads)
     {
         const int tid = omp_get_thread_num();
 
@@ -408,7 +407,7 @@ static void smartblur_apply_coefficients(smartblur_t *s,
     const int h = s->h;
     const int sw = s->sw;
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         const int ys = y >> 1;
         uint8_t *restrict out = data + y * w;
@@ -468,16 +467,17 @@ static void smartblur_mix_plane(smartblur_t *s,
     const uint8_t *restrict src = s->orig_plane;
 
     if(mix_q8 <= 0) {
+#pragma omp single
         veejay_memcpy(data, src, len);
         return;
     }
 
     if(chroma) {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
             data[i] = smartblur_blend_uv(src[i], data[i], mix_q8);
     } else {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
             data[i] = smartblur_blend_y(src[i], data[i], mix_q8);
     }
@@ -494,8 +494,10 @@ static void smartblur_process_plane(smartblur_t *s,
                                     int mix_q8,
                                     int chroma)
 {
-    if(mix_q8 < 256)
+    if(mix_q8 < 256) {
+#pragma omp single
         veejay_memcpy(s->orig_plane, data, len);
+    }
 
     smartblur_plane(s, data, radius, eps, offset, strength, luma_only);
 
@@ -548,7 +550,10 @@ void smartblur_apply(void *ptr, VJFrame *frame, int *args)
     const float chroma_strength = (float)chroma * 0.01f;
     const int mix_q8 = (mix * 256 + 500) / 1000;
 
-    smartblur_process_plane(s, frame->data[0], s->len, radius, eps, 0.0f,   1.0f,            1, mix_q8, 0);
-    smartblur_process_plane(s, frame->data[1], s->len, radius, eps, 128.0f, chroma_strength, 0, mix_q8, 1);
-    smartblur_process_plane(s, frame->data[2], s->len, radius, eps, 128.0f, chroma_strength, 0, mix_q8, 1);
+#pragma omp parallel num_threads(s->n_threads)
+    {
+        smartblur_process_plane(s, frame->data[0], s->len, radius, eps, 0.0f,   1.0f,            1, mix_q8, 0);
+        smartblur_process_plane(s, frame->data[1], s->len, radius, eps, 128.0f, chroma_strength, 0, mix_q8, 1);
+        smartblur_process_plane(s, frame->data[2], s->len, radius, eps, 128.0f, chroma_strength, 0, mix_q8, 1);
+    }
 }

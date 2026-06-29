@@ -340,44 +340,47 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args)
     const int deposit_q8 = update_now ? opacity : 0;
     const int out_q8 = opacity;
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-    for(int i = 0; i < len; i++) {
-        int ty = ((int)bY[i] * persist_q8) >> 8;
-        int tu = 128 + ((((int)bU[i] - 128) * persist_q8) >> 8);
-        int tv = 128 + ((((int)bV[i] - 128) * persist_q8) >> 8);
+#pragma omp parallel num_threads(s->n_threads)
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            int ty = ((int)bY[i] * persist_q8) >> 8;
+            int tu = 128 + ((((int)bU[i] - 128) * persist_q8) >> 8);
+            int tv = 128 + ((((int)bV[i] - 128) * persist_q8) >> 8);
 
-        if(deposit_q8 > 0 && Y[i] <= threshold) {
-            ty = blend_y((uint8_t)clampi(ty, 0, 255), (uint8_t)cy, deposit_q8);
-            tu = blend_uv((uint8_t)CLAMP_UV(tu), (uint8_t)cu, deposit_q8);
-            tv = blend_uv((uint8_t)CLAMP_UV(tv), (uint8_t)cv, deposit_q8);
+            if(deposit_q8 > 0 && Y[i] <= threshold) {
+                ty = blend_y((uint8_t)clampi(ty, 0, 255), (uint8_t)cy, deposit_q8);
+                tu = blend_uv((uint8_t)CLAMP_UV(tu), (uint8_t)cu, deposit_q8);
+                tv = blend_uv((uint8_t)CLAMP_UV(tv), (uint8_t)cv, deposit_q8);
+            }
+
+            bY[i] = (uint8_t)clampi(ty, 0, 255);
+            bU[i] = (uint8_t)CLAMP_UV(tu);
+            bV[i] = (uint8_t)CLAMP_UV(tv);
         }
 
-        bY[i] = (uint8_t)clampi(ty, 0, 255);
-        bU[i] = (uint8_t)CLAMP_UV(tu);
-        bV[i] = (uint8_t)CLAMP_UV(tv);
-    }
-
-    if(mode == 0) {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-        for(int i = 0; i < len; i++) {
-            if(bY[i] > 1) {
-                Y[i] = (uint8_t)CLAMP_Y(bY[i]);
-                U[i] = bU[i];
-                V[i] = bV[i];
+        if(mode == 0) {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                if(bY[i] > 1) {
+                    Y[i] = (uint8_t)CLAMP_Y(bY[i]);
+                    U[i] = bU[i];
+                    V[i] = bV[i];
+                }
+                else {
+                    Y[i] = pixel_Y_lo_;
+                    U[i] = 128;
+                    V[i] = 128;
+                }
             }
-            else {
-                Y[i] = pixel_Y_lo_;
-                U[i] = 128;
-                V[i] = 128;
-            }
-        }
-    } else {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-        for(int i = 0; i < len; i++) {
-            if(bY[i] > 1) {
-                Y[i] = blend_y(Y[i], (uint8_t)CLAMP_Y(bY[i]), out_q8);
-                U[i] = blend_uv(U[i], bU[i], out_q8);
-                V[i] = blend_uv(V[i], bV[i], out_q8);
+        } else {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                if(bY[i] > 1) {
+                    Y[i] = blend_y(Y[i], (uint8_t)CLAMP_Y(bY[i]), out_q8);
+                    U[i] = blend_uv(U[i], bU[i], out_q8);
+                    V[i] = blend_uv(V[i], bV[i], out_q8);
+                }
             }
         }
     }

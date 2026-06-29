@@ -574,7 +574,7 @@ void *ghostwash_malloc(int w, int h)
 
 #define GHOSTWASH_ADVECTION_LOOP(MODE, MONO) \
     do { \
-        _Pragma("omp parallel for collapse(2) schedule(static) num_threads(p->n_threads)") \
+        _Pragma("omp for collapse(2) schedule(static)") \
         for (int gy = 0; gy < gh - 1; gy++) { \
             for (int gx = 0; gx < gw - 1; gx++) { \
                 const int y0 = gy * cell; \
@@ -750,7 +750,7 @@ static void ghostwash_render_fullres(ghostwash_t *p, VJFrame *frame, int mono_mo
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
 
-    #pragma omp parallel for schedule(static) num_threads(p->n_threads)
+#pragma omp for schedule(static)
     for (int cy = 0; cy < ch; cy++) {
         const int fy = cy << 1;
         const int cy1 = (cy + 1 < ch) ? cy + 1 : cy;
@@ -1026,50 +1026,54 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict next_v = p->next_v;
     uint8_t *restrict prev_y = p->prev_src_y;
 
-    ghostwash_dispatch_advection(
-        p,
-        Y,
-        U,
-        V,
-        old_y,
-        old_u,
-        old_v,
-        next_y,
-        next_u,
-        next_v,
-        prev_y,
-        p->shear_x,
-        p->shear_y,
-        p->poly_rx_x,
-        p->poly_ry_x,
-        p->poly_rx_y,
-        p->poly_ry_y,
-        w,
-        h,
-        cw,
-        ch,
-        gw,
-        gh,
-        cell,
-        geometry_mode,
-        mono_mode,
-        lut,
-        hist_mix,
-        src_mix,
-        chroma_hist_mix,
-        chroma_src_mix,
-        color_gain,
-        chroma_keep,
-        detail_boost,
-        flow_pixels,
-        warp_gain,
-        instability_gain,
-        chroma_slip_gain,
-        prism_slip_boost,
-        motion_scale
-    );
+#pragma omp parallel num_threads(p->n_threads)
+    {
+        ghostwash_dispatch_advection(
+            p,
+            Y,
+            U,
+            V,
+            old_y,
+            old_u,
+            old_v,
+            next_y,
+            next_u,
+            next_v,
+            prev_y,
+            p->shear_x,
+            p->shear_y,
+            p->poly_rx_x,
+            p->poly_ry_x,
+            p->poly_rx_y,
+            p->poly_ry_y,
+            w,
+            h,
+            cw,
+            ch,
+            gw,
+            gh,
+            cell,
+            geometry_mode,
+            mono_mode,
+            lut,
+            hist_mix,
+            src_mix,
+            chroma_hist_mix,
+            chroma_src_mix,
+            color_gain,
+            chroma_keep,
+            detail_boost,
+            flow_pixels,
+            warp_gain,
+            instability_gain,
+            chroma_slip_gain,
+            prism_slip_boost,
+            motion_scale
+        );
 
-    ghostwash_render_fullres(p, frame, mono_mode);
+#pragma omp barrier
+        ghostwash_render_fullres(p, frame, mono_mode);
+    }
 
     {
         uint8_t *tmp;

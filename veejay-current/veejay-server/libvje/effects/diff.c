@@ -148,10 +148,9 @@ static inline void diff_binarify_mask(uint8_t *restrict dst,
                                       const uint8_t *restrict frameB,
                                       int threshold,
                                       int reverse,
-                                      int len,
-                                      int n_threads)
+                                      int len)
 {
-    #pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
     {
         int d = (int)frameA[i] - (int)frameB[i];
@@ -188,47 +187,59 @@ void diff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     veejay_memset(dt_map, 0, len * sizeof(uint32_t));
 
-    diff_binarify_mask(data, Y, Y2, threshold, reverse, len, d->n_threads);
-
-    veejay_distance_transform8(data, frame->width, frame->height, dt_map);
-
-    if(mode == 1)
+    #pragma omp parallel num_threads(d->n_threads)
     {
-        veejay_memcpy(Y, data, len);
-        veejay_memset(Cb, 128, uv_len);
-        veejay_memset(Cr, 128, uv_len);
-        return;
-    }
+        diff_binarify_mask(data, Y, Y2, threshold, reverse, len);
 
-    if(mode == 2)
-    {
-        #pragma omp parallel for schedule(static) num_threads(d->n_threads)
-        for(int i = 0; i < len; i++)
+#pragma omp single
+        veejay_distance_transform8(data, frame->width, frame->height, dt_map);
+
+        if(mode == 1)
         {
-            const uint32_t dt = dt_map[i];
-            uint8_t val = 0;
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++)
+                Y[i] = data[i];
 
-            if(dt > (uint32_t)feather)
-                val = (uint8_t)(128 + (dt & 127u));
-
-            if(dt == (uint32_t)feather || dt == 1u)
-                val = 0xff;
-
-            Y[i] = val;
+#pragma omp single
+            {
+                veejay_memset(Cb, 128, uv_len);
+                veejay_memset(Cr, 128, uv_len);
+            }
         }
+        else if(mode == 2)
+        {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++)
+            {
+                const uint32_t dt = dt_map[i];
+                uint8_t val = 0;
 
-        veejay_memset(Cb, 128, uv_len);
-        veejay_memset(Cr, 128, uv_len);
-        return;
-    }
+                if(dt > (uint32_t)feather)
+                    val = (uint8_t)(128 + (dt & 127u));
 
-    #pragma omp parallel for schedule(static) num_threads(d->n_threads)
-    for(int i = 0; i < len; i++)
-    {
-        const uint32_t mask = -(dt_map[i] >= (uint32_t)feather);
+                if(dt == (uint32_t)feather || dt == 1u)
+                    val = 0xff;
 
-        Y[i] = (uint8_t)((Y2[i] & mask) | (pixel_Y_lo_ & ~mask));
-        Cb[i] = (uint8_t)((Cb2[i] & mask) | (128 & ~mask));
-        Cr[i] = (uint8_t)((Cr2[i] & mask) | (128 & ~mask));
+                Y[i] = val;
+            }
+
+#pragma omp single
+            {
+                veejay_memset(Cb, 128, uv_len);
+                veejay_memset(Cr, 128, uv_len);
+            }
+        }
+        else
+        {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++)
+            {
+                const uint32_t mask = -(dt_map[i] >= (uint32_t)feather);
+
+                Y[i] = (uint8_t)((Y2[i] & mask) | (pixel_Y_lo_ & ~mask));
+                Cb[i] = (uint8_t)((Cb2[i] & mask) | (128 & ~mask));
+                Cr[i] = (uint8_t)((Cr2[i] & mask) | (128 & ~mask));
+            }
+        }
     }
 }

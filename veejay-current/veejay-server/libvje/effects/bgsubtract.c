@@ -190,41 +190,7 @@ void bgsubtract_apply(void *ptr, VJFrame *frame, int *args)
     if(b->auto_hist)
         vje_histogram_auto_eq(frame);
 
-    if(enabled == 0)
-    {
-        if(method == 0)
-        {
-            bgsubtract_show_bg(b, frame);
-            return;
-        }
-
-        uint8_t *restrict Y = frame->data[0];
-        uint8_t *restrict BG = b->bg_frame__[0];
-
-        if(method == 1)
-        {
-            const unsigned int bg_n = b->bg_n > 65535U ? 65535U : b->bg_n;
-            const unsigned int bg_n1 = bg_n + 1U;
-
-            #pragma omp parallel for num_threads(n_threads) schedule(static)
-            for(int i = 0; i < len; i++)
-                BG[i] = (uint8_t)(((unsigned int)Y[i] + (bg_n * (unsigned int)BG[i])) / bg_n1);
-
-            if(b->bg_n < 65535U)
-                b->bg_n++;
-        }
-        else
-        {
-            #pragma omp parallel for num_threads(n_threads) schedule(static)
-            for(int i = 0; i < len; i++)
-            {
-                if(Y[i] > BG[i])
-                    BG[i]++;
-                else if(Y[i] < BG[i])
-                    BG[i]--;
-            }
-        }
-
+    if(enabled == 0 && method == 0) {
         bgsubtract_show_bg(b, frame);
         return;
     }
@@ -235,38 +201,71 @@ void bgsubtract_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict A = frame->data[3];
     uint8_t *restrict BG = b->bg_frame__[0];
 
-    if(out_mode == 0 && !A)
+    if(enabled != 0 && out_mode == 0 && !A)
         out_mode = 2;
 
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
-    for(int i = 0; i < len; i++)
+#pragma omp parallel num_threads(n_threads)
     {
-        int diff = (int)Y[i] - (int)BG[i];
-        diff = (diff ^ (diff >> 31)) - (diff >> 31);
+        if(enabled == 0) {
+            if(method == 1) {
+                const unsigned int bg_n = b->bg_n > 65535U ? 65535U : b->bg_n;
+                const unsigned int bg_n1 = bg_n + 1U;
 
-        const int is_fg = diff > threshold;
+#pragma omp for schedule(static)
+                for(int i = 0; i < len; i++)
+                    BG[i] = (uint8_t)(((unsigned int)Y[i] + (bg_n * (unsigned int)BG[i])) / bg_n1);
+            }
+            else {
+#pragma omp for schedule(static)
+                for(int i = 0; i < len; i++)
+                {
+                    if(Y[i] > BG[i])
+                        BG[i]++;
+                    else if(Y[i] < BG[i])
+                        BG[i]--;
+                }
+            }
+        }
+        else {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++)
+            {
+                int diff = (int)Y[i] - (int)BG[i];
+                diff = (diff ^ (diff >> 31)) - (diff >> 31);
 
-        if(!is_fg && method == 2)
-        {
-            if(Y[i] > BG[i])
-                BG[i]++;
-            else if(Y[i] < BG[i])
-                BG[i]--;
-        }
+                const int is_fg = diff > threshold;
 
-        if(out_mode == 0)
-        {
-            A[i] = is_fg ? 255 : 0;
+                if(!is_fg && method == 2)
+                {
+                    if(Y[i] > BG[i])
+                        BG[i]++;
+                    else if(Y[i] < BG[i])
+                        BG[i]--;
+                }
+
+                if(out_mode == 0)
+                {
+                    A[i] = is_fg ? 255 : 0;
+                }
+                else if(out_mode == 1)
+                {
+                    if(!is_fg)
+                        Y[i] = 16;
+                }
+                else
+                {
+                    Y[i] = is_fg ? 255 : 0;
+                }
+            }
         }
-        else if(out_mode == 1)
-        {
-            if(!is_fg)
-                Y[i] = 16;
-        }
-        else
-        {
-            Y[i] = is_fg ? 255 : 0;
-        }
+    }
+
+    if(enabled == 0) {
+        if(method == 1 && b->bg_n < 65535U)
+            b->bg_n++;
+
+        bgsubtract_show_bg(b, frame);
+        return;
     }
 
     if(out_mode == 1 || out_mode == 2)
@@ -276,3 +275,4 @@ void bgsubtract_apply(void *ptr, VJFrame *frame, int *args)
         veejay_memset(V, 128, uv_len);
     }
 }
+

@@ -117,12 +117,11 @@ static void cutstop_copy_held_444(uint8_t *restrict Yd,
                                   int len,
                                   int threshold,
                                   int cutmode,
-                                  int holdmode,
-                                  int n_threads)
+                                  int holdmode)
 {
     if(cutmode && !holdmode)
     {
-        #pragma omp parallel for schedule(static) num_threads(n_threads)
+        #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
         {
             if(threshold > Yb[i])
@@ -135,7 +134,7 @@ static void cutstop_copy_held_444(uint8_t *restrict Yd,
     }
     else if(cutmode && holdmode)
     {
-        #pragma omp parallel for schedule(static) num_threads(n_threads)
+        #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
         {
             if(threshold > Yd[i])
@@ -148,7 +147,7 @@ static void cutstop_copy_held_444(uint8_t *restrict Yd,
     }
     else if(!cutmode && holdmode)
     {
-        #pragma omp parallel for schedule(static) num_threads(n_threads)
+        #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
         {
             if(threshold < Yd[i])
@@ -161,7 +160,7 @@ static void cutstop_copy_held_444(uint8_t *restrict Yd,
     }
     else
     {
-        #pragma omp parallel for schedule(static) num_threads(n_threads)
+        #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
         {
             if(threshold < Yb[i])
@@ -203,47 +202,50 @@ void cutstop_apply(void *ptr, VJFrame *frame, int *args)
         c->frq_cnt = 0;
     }
 
-    if(uv_len == len)
+#pragma omp parallel num_threads(c->n_threads)
     {
-        cutstop_copy_held_444(Yd, Ud, Vd, Yb, Ub, Vb, len, threshold, cutmode, holdmode, c->n_threads);
-        return;
+        if(uv_len == len)
+        {
+            cutstop_copy_held_444(Yd, Ud, Vd, Yb, Ub, Vb, len, threshold, cutmode, holdmode);
+        }
+        else
+        {
+            if(cutmode && !holdmode)
+            {
+#pragma omp for schedule(static)
+                for(int i = 0; i < len; i++)
+                    if(threshold > Yb[i])
+                        Yd[i] = Yb[i];
+            }
+            else if(cutmode && holdmode)
+            {
+#pragma omp for schedule(static)
+                for(int i = 0; i < len; i++)
+                    if(threshold > Yd[i])
+                        Yd[i] = Yb[i];
+            }
+            else if(!cutmode && holdmode)
+            {
+#pragma omp for schedule(static)
+                for(int i = 0; i < len; i++)
+                    if(threshold < Yd[i])
+                        Yd[i] = Yb[i];
+            }
+            else
+            {
+#pragma omp for schedule(static)
+                for(int i = 0; i < len; i++)
+                    if(threshold < Yb[i])
+                        Yd[i] = Yb[i];
+            }
+
+#pragma omp for schedule(static)
+            for(int i = 0; i < uv_len; i++)
+            {
+                Ud[i] = Ub[i];
+                Vd[i] = Vb[i];
+            }
+        }
     }
 
-    if(cutmode && !holdmode)
-    {
-        #pragma omp parallel for schedule(static) num_threads(c->n_threads)
-        for(int i = 0; i < len; i++)
-            if(threshold > Yb[i])
-                Yd[i] = Yb[i];
-    }
-    else if(cutmode && holdmode)
-    {
-        #pragma omp parallel for schedule(static) num_threads(c->n_threads)
-        for(int i = 0; i < len; i++)
-            if(threshold > Yd[i])
-                Yd[i] = Yb[i];
-    }
-    else if(!cutmode && holdmode)
-    {
-        #pragma omp parallel for schedule(static) num_threads(c->n_threads)
-        for(int i = 0; i < len; i++)
-            if(threshold < Yd[i])
-                Yd[i] = Yb[i];
-    }
-    else
-    {
-        #pragma omp parallel for schedule(static) num_threads(c->n_threads)
-        for(int i = 0; i < len; i++)
-            if(threshold < Yb[i])
-                Yd[i] = Yb[i];
-    }
-
-    const int uv_threads = vje_advise_num_threads(uv_len);
-
-    #pragma omp parallel for schedule(static) num_threads(uv_threads)
-    for(int i = 0; i < uv_len; i++)
-    {
-        Ud[i] = Ub[i];
-        Vd[i] = Vb[i];
-    }
 }

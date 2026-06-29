@@ -184,55 +184,32 @@ static void chromascratcher_apply_simple(chromascratcher_t *c, VJFrame *frame, i
     uint8_t *restrict SU = c->cframe[1] + offset;
     uint8_t *restrict SV = c->cframe[2] + offset;
 
-    switch(mode)
+#pragma omp parallel for num_threads(n_threads) schedule(static)
+    for(int i = 0; i < len; i++)
     {
-        case 0:
-            #pragma omp parallel for num_threads(n_threads) schedule(static)
-            for(int i = 0; i < len; i++)
-            {
-                if(SY[i] < Y[i]) {
-                    Y[i] = SY[i];
-                    Cb[i] = SU[i];
-                    Cr[i] = SV[i];
-                }
-            }
-            break;
+        int take = 0;
 
-        case 1:
-            #pragma omp parallel for num_threads(n_threads) schedule(static)
-            for(int i = 0; i < len; i++)
-            {
-                if(SY[i] > Y[i]) {
-                    Y[i] = SY[i];
-                    Cb[i] = SU[i];
-                    Cr[i] = SV[i];
-                }
-            }
-            break;
+        switch(mode)
+        {
+            case 0:
+                take = SY[i] < Y[i];
+                break;
+            case 1:
+                take = SY[i] > Y[i];
+                break;
+            case 2:
+                take = (SY[i] * op_a) < (Y[i] * op_b);
+                break;
+            case 3:
+                take = (SY[i] * op_a) > (Y[i] * op_b);
+                break;
+        }
 
-        case 2:
-            #pragma omp parallel for num_threads(n_threads) schedule(static)
-            for(int i = 0; i < len; i++)
-            {
-                if((SY[i] * op_a) < (Y[i] * op_b)) {
-                    Y[i] = SY[i];
-                    Cb[i] = SU[i];
-                    Cr[i] = SV[i];
-                }
-            }
-            break;
-
-        case 3:
-            #pragma omp parallel for num_threads(n_threads) schedule(static)
-            for(int i = 0; i < len; i++)
-            {
-                if((SY[i] * op_a) > (Y[i] * op_b)) {
-                    Y[i] = SY[i];
-                    Cb[i] = SU[i];
-                    Cr[i] = SV[i];
-                }
-            }
-            break;
+        if(take) {
+            Y[i] = SY[i];
+            Cb[i] = SU[i];
+            Cr[i] = SV[i];
+        }
     }
 }
 

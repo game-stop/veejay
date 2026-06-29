@@ -272,11 +272,40 @@ void timedistort_set_motionmap(void *ptr, void *priv)
     td->motionmap = priv;
 }
 
+
+static void timedistort_soft_bg_seed(timedistort_t *td, const uint8_t *restrict src, int w, int h)
+{
+    uint8_t *restrict dst = td->prev;
+
+    for(int y = 0; y < h; y++) {
+        const int ym = (y > 0) ? y - 1 : y;
+        const int yp = (y < h - 1) ? y + 1 : y;
+
+        const uint8_t *restrict r0 = src + ym * w;
+        const uint8_t *restrict r1 = src + y  * w;
+        const uint8_t *restrict r2 = src + yp * w;
+
+        uint8_t *restrict out = dst + y * w;
+
+        for(int x = 0; x < w; x++) {
+            const int xm = (x > 0) ? x - 1 : x;
+            const int xp = (x < w - 1) ? x + 1 : x;
+
+            const int sum =
+                (int)r0[xm] + (int)r0[x] + (int)r0[xp] +
+                (int)r1[xm] + (int)r1[x] + (int)r1[xp] +
+                (int)r2[xm] + (int)r2[x] + (int)r2[xp];
+
+            out[x] = (uint8_t)((sum + 4) / 9);
+        }
+    }
+}
+
 static void timedistort_soft_bg(timedistort_t *td, const uint8_t *restrict src, int w, int h)
 {
     uint8_t *restrict dst = td->prev;
 
-#pragma omp parallel for schedule(static) num_threads(td->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         const int ym = (y > 0) ? y - 1 : y;
         const int yp = (y < h - 1) ? y + 1 : y;
@@ -310,7 +339,7 @@ static void timedistort_build_diff(timedistort_t *td,
     uint8_t *restrict diff = td->diff;
     const uint8_t *restrict prev = td->prev;
 
-#pragma omp parallel for schedule(static) num_threads(td->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         int d = (int)current[i] - (int)prev[i];
 
@@ -382,6 +411,7 @@ void timedistort_apply(void *ptr, VJFrame *frame, int *args)
 
     int interpolate = 0;
     int motion = 0;
+    int update_internal_diff = 0;
 
     uint8_t *restrict diff = td->diff;
 
@@ -414,7 +444,7 @@ void timedistort_apply(void *ptr, VJFrame *frame, int *args)
         td->N__ = 0;
 
         if(!td->have_bg) {
-            timedistort_soft_bg(td, Y, width, height);
+            timedistort_soft_bg_seed(td, Y, width, height);
 
             veejay_memcpy(td->planetableY[0], Y,  len);
             veejay_memcpy(td->planetableU[0], Cb, len);
@@ -430,8 +460,7 @@ void timedistort_apply(void *ptr, VJFrame *frame, int *args)
             return;
         }
 
-        timedistort_build_diff(td, Y, value, diff_gain_q8, len);
-        timedistort_soft_bg(td, Y, width, height);
+        update_internal_diff = 1;
         diff = td->diff;
     }
 
@@ -448,8 +477,15 @@ void timedistort_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict wt_old = td->warptime[td->warptimeFrame];
     uint8_t *restrict wt_new = td->warptime[td->warptimeFrame ^ 1];
 
-#pragma omp parallel for schedule(static) num_threads(td->n_threads)
-    for(int y = 0; y < height; y++) {
+#pragma omp parallel num_threads(td->n_threads)
+    {
+        if(update_internal_diff) {
+            timedistort_build_diff(td, Y, value, diff_gain_q8, len);
+            timedistort_soft_bg(td, Y, width, height);
+        }
+
+#pragma omp for schedule(static)
+        for(int y = 0; y < height; y++) {
         const int row = y * width;
 
         for(int x = 0; x < width; x++) {
@@ -498,8 +534,8 @@ void timedistort_apply(void *ptr, VJFrame *frame, int *args)
     const int plane_now = td->plane;
     const int populated = td->plane_populated;
 
-#pragma omp parallel for schedule(static) num_threads(td->n_threads)
-    for(int i = 0; i < len; i++) {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
         int age = wt_new[i];
 
         if(diff[i]) {
@@ -525,7 +561,8 @@ void timedistort_apply(void *ptr, VJFrame *frame, int *args)
 
         Y[i]  = td->planetableY[n_plane][i];
         Cb[i] = td->planetableU[n_plane][i];
-        Cr[i] = td->planetableV[n_plane][i];
+            Cr[i] = td->planetableV[n_plane][i];
+        }
     }
 
     td->plane = (td->plane + 1) & td->plane_mask;

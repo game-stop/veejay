@@ -710,8 +710,7 @@ static void eh_seed(chromadrift_t *e, VJFrame *frame)
     int len = e->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(e->n_threads)
-    for (i = 0; i < len; i++) {
+for (i = 0; i < len; i++) {
         uint8_t y = Y[i];
         e->src_y[i] = y;
         e->paint_y[i] = y;

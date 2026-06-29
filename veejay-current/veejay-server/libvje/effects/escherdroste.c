@@ -241,24 +241,28 @@ void escherdroste_free(void *ptr) {
     free(t);
 }
 
-static void escherdroste_apply1(void *ptr, VJFrame *frame, int *args) {
-    box_escherdroste_t *t = (box_escherdroste_t*) ptr;
+static void escherdroste_render(box_escherdroste_t *t, VJFrame *frame, int *args, int mode)
+{
     int w = t->width;
     int h = t->height;
     int size = w * h;
 
-    t->time += args[0] * 0.0025f;
-    t->phase += args[4] * 0.00125f;
+    if(mode == 0) {
+        t->time += args[0] * 0.0025f;
+        t->phase += args[4] * 0.00125f;
+    }
+    else {
+        t->time += args[0] * 0.000725f;
+        t->phase += args[4] * 0.000725f;
+    }
 
     const float branches = (float)(args[2] < 1 ? 1 : (args[2] > 20 ? 20 : args[2]));
     const float swirl = args[3] * 0.01f;
     const int use_high_quality = args[7] != 0;
-
     const float zoom_intensity = 0.8f + ((float) args[1] / 500.0f) * 12.0f;
     const float factor = branches / zoom_intensity;
     const float inv_2pi = 0.15915494f;
     const float pitch = (float) args[6] * 0.01f;
-
     const int32_t fb_fp = TO_FP(args[5] * 0.01f);
     const int32_t current_inv_fb = FP_ONE - fb_fp;
     const int32_t chroma_fb_fp = (fb_fp * 3) >> 2;
@@ -268,20 +272,26 @@ static void escherdroste_apply1(void *ptr, VJFrame *frame, int *args) {
     uint8_t *restrict srcU = frame->data[1];
     uint8_t *restrict srcV = frame->data[2];
 
-    #pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int i = 0; i < size; i++) {
-        float dist_rect = FROM_FP(t->v_lut[i]);
-        float edge_u = FROM_FP(t->u_lut[i]);
+        float a = mode == 2 ? FROM_FP(t->v_lut_rect[i]) : FROM_FP(t->v_lut[i]);
+        float theta = mode == 2 ? FROM_FP(t->u_lut_rect[i]) : FROM_FP(t->u_lut[i]);
+        float base_v;
+        float base_u;
 
-        float base_v = dist_rect * factor;
-        float base_u = (edge_u * inv_2pi * branches) - (dist_rect * factor * pitch);
+        if(mode == 1) {
+            base_v = (a * factor) + (theta * inv_2pi * branches);
+            base_u = (theta * inv_2pi * branches) - (a * factor * pitch);
+        }
+        else {
+            base_v = a * factor;
+            base_u = (theta * inv_2pi * branches) - (a * factor * pitch);
+        }
 
         float v_val_f = base_v + t->time;
-        float u_val_f = base_u + t->phase + (swirl * dist_rect);
-
+        float u_val_f = base_u + t->phase + (swirl * a);
         int32_t u_fp = (int32_t)(u_val_f * 65536.0f);
         int32_t v_fp = (int32_t)(v_val_f * 65536.0f);
-
         int64_t accY;
         int64_t accU;
         int64_t accV;
@@ -309,7 +319,6 @@ static void escherdroste_apply1(void *ptr, VJFrame *frame, int *args) {
         int y_val = t->histY[i] >> FP_SHIFT;
         int u_px = t->histU[i] >> FP_SHIFT;
         int v_px = t->histV[i] >> FP_SHIFT;
-
         int y_idx = y_val < 0 ? 0 : (y_val > 255 ? 255 : y_val);
 
         t->dstY[i] = t->gamma_lut[y_idx * (GAMMA_LUT_SIZE - 1) / 255];
@@ -322,169 +331,8 @@ static void escherdroste_apply1(void *ptr, VJFrame *frame, int *args) {
     veejay_memcpy(srcV, t->dstV, size);
 }
 
-static void escherdroste_apply2(void *ptr, VJFrame *frame, int *args) {
-    box_escherdroste_t *t = (box_escherdroste_t*) ptr;
-    int w = t->width;
-    int h = t->height;
-    int size = w * h;
-
-    t->time += args[0] * 0.000725f;
-    t->phase += args[4] * 0.000725f;
-
-    const float branches = (float)(args[2] < 1 ? 1 : (args[2] > 20 ? 20 : args[2]));
-    const float swirl = args[3] * 0.01f;
-    const int use_high_quality = args[7] != 0;
-
-    const float zoom_intensity = 0.8f + ((float) args[1] / 500.0f) * 12.0f;
-    const float factor = branches / zoom_intensity;
-    const float inv_2pi = 0.15915494f;
-    const float pitch = (float) args[6] * 0.01f;
-
-    const int32_t fb_fp = TO_FP(args[5] * 0.01f);
-    const int32_t current_inv_fb = FP_ONE - fb_fp;
-    const int32_t chroma_fb_fp = (fb_fp * 3) >> 2;
-    const int32_t current_inv_chroma_fb = FP_ONE - chroma_fb_fp;
-
-    uint8_t *restrict srcY = frame->data[0];
-    uint8_t *restrict srcU = frame->data[1];
-    uint8_t *restrict srcV = frame->data[2];
-
-    #pragma omp parallel for schedule(static) num_threads(t->n_threads)
-    for (int i = 0; i < size; i++) {
-        float log_r = FROM_FP(t->v_lut[i]);
-        float theta = FROM_FP(t->u_lut[i]);
-
-        float base_v = (log_r * factor) + (theta * inv_2pi * branches);
-        float base_u = (theta * inv_2pi * branches) - (log_r * factor * pitch);
-
-        float v_val_f = base_v + t->time;
-        float u_val_f = base_u + t->phase + (swirl * log_r);
-
-        int32_t u_fp = (int32_t)(u_val_f * 65536.0f);
-        int32_t v_fp = (int32_t)(v_val_f * 65536.0f);
-
-        int64_t accY;
-        int64_t accU;
-        int64_t accV;
-
-        if (use_high_quality) {
-            accY = (int64_t) sample_bilinear(srcY, u_fp, v_fp, w, h) << FP_SHIFT;
-            accU = (int64_t) sample_bilinear_uv(srcU, u_fp, v_fp, w, h) << FP_SHIFT;
-            accV = (int64_t) sample_bilinear_uv(srcV, u_fp, v_fp, w, h) << FP_SHIFT;
-        } else {
-            int32_t um = u_fp & 0xffff;
-            int32_t vm = v_fp & 0xffff;
-            int tx = ((um >> 8) * (w - 1)) >> 8;
-            int ty = ((vm >> 8) * (h - 1)) >> 8;
-            int p = ty * w + tx;
-
-            accY = (int64_t) srcY[p] << FP_SHIFT;
-            accU = (int64_t)(srcU[p] - 128) << FP_SHIFT;
-            accV = (int64_t)(srcV[p] - 128) << FP_SHIFT;
-        }
-
-        t->histY[i] = ((accY * current_inv_fb) + ((int64_t)t->histY[i] * fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
-        t->histU[i] = ((accU * current_inv_chroma_fb) + ((int64_t)t->histU[i] * chroma_fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
-        t->histV[i] = ((accV * current_inv_chroma_fb) + ((int64_t)t->histV[i] * chroma_fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
-
-        int y_val = t->histY[i] >> FP_SHIFT;
-        int u_px = t->histU[i] >> FP_SHIFT;
-        int v_px = t->histV[i] >> FP_SHIFT;
-
-        int y_idx = y_val < 0 ? 0 : (y_val > 255 ? 255 : y_val);
-
-        t->dstY[i] = t->gamma_lut[y_idx * (GAMMA_LUT_SIZE - 1) / 255];
-        t->dstU[i] = clamp_u8(((u_px * 1056) >> 10) + 128);
-        t->dstV[i] = clamp_u8(((v_px * 1056) >> 10) + 128);
-    }
-
-    veejay_memcpy(srcY, t->dstY, size);
-    veejay_memcpy(srcU, t->dstU, size);
-    veejay_memcpy(srcV, t->dstV, size);
-}
-
-static void escherdroste_apply3(void *ptr, VJFrame *frame, int *args) {
-    box_escherdroste_t *t = (box_escherdroste_t*) ptr;
-    int w = t->width;
-    int h = t->height;
-    int size = w * h;
-
-    t->time += args[0] * 0.000725f;
-    t->phase += args[4] * 0.000725f;
-
-    const float branches = (float)(args[2] < 1 ? 1 : (args[2] > 20 ? 20 : args[2]));
-    const float swirl = args[3] * 0.01f;
-    const int use_high_quality = args[7] != 0;
-
-    const float zoom_intensity = 0.8f + ((float) args[1] / 500.0f) * 12.0f;
-    const float factor = branches / zoom_intensity;
-    const float inv_2pi = 0.15915494f;
-    const float pitch = (float) args[6] * 0.01f;
-
-    const int32_t fb_fp = TO_FP(args[5] * 0.01f);
-    const int32_t current_inv_fb = FP_ONE - fb_fp;
-    const int32_t chroma_fb_fp = (fb_fp * 3) >> 2;
-    const int32_t current_inv_chroma_fb = FP_ONE - chroma_fb_fp;
-
-    uint8_t *restrict srcY = frame->data[0];
-    uint8_t *restrict srcU = frame->data[1];
-    uint8_t *restrict srcV = frame->data[2];
-
-    #pragma omp parallel for schedule(static) num_threads(t->n_threads)
-    for (int i = 0; i < size; i++) {
-        float dist_rect = FROM_FP(t->v_lut_rect[i]);
-        float edge_u = FROM_FP(t->u_lut_rect[i]);
-
-        float base_v = dist_rect * factor;
-        float base_u = (edge_u * inv_2pi * branches) - (dist_rect * factor * pitch);
-
-        float v_val_f = base_v + t->time;
-        float u_val_f = base_u + t->phase + (swirl * dist_rect);
-
-        int32_t u_fp = (int32_t)(u_val_f * 65536.0f);
-        int32_t v_fp = (int32_t)(v_val_f * 65536.0f);
-
-        int64_t accY;
-        int64_t accU;
-        int64_t accV;
-
-        if (use_high_quality) {
-            accY = (int64_t) sample_bilinear(srcY, u_fp, v_fp, w, h) << FP_SHIFT;
-            accU = (int64_t) sample_bilinear_uv(srcU, u_fp, v_fp, w, h) << FP_SHIFT;
-            accV = (int64_t) sample_bilinear_uv(srcV, u_fp, v_fp, w, h) << FP_SHIFT;
-        } else {
-            int32_t um = u_fp & 0xffff;
-            int32_t vm = v_fp & 0xffff;
-            int tx = ((um >> 8) * (w - 1)) >> 8;
-            int ty = ((vm >> 8) * (h - 1)) >> 8;
-            int p = ty * w + tx;
-
-            accY = (int64_t) srcY[p] << FP_SHIFT;
-            accU = (int64_t)(srcU[p] - 128) << FP_SHIFT;
-            accV = (int64_t)(srcV[p] - 128) << FP_SHIFT;
-        }
-
-        t->histY[i] = ((accY * current_inv_fb) + ((int64_t)t->histY[i] * fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
-        t->histU[i] = ((accU * current_inv_chroma_fb) + ((int64_t)t->histU[i] * chroma_fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
-        t->histV[i] = ((accV * current_inv_chroma_fb) + ((int64_t)t->histV[i] * chroma_fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
-
-        int y_val = t->histY[i] >> FP_SHIFT;
-        int u_px = t->histU[i] >> FP_SHIFT;
-        int v_px = t->histV[i] >> FP_SHIFT;
-
-        int y_idx = y_val < 0 ? 0 : (y_val > 255 ? 255 : y_val);
-
-        t->dstY[i] = t->gamma_lut[y_idx * (GAMMA_LUT_SIZE - 1) / 255];
-        t->dstU[i] = clamp_u8(((u_px * 1056) >> 10) + 128);
-        t->dstV[i] = clamp_u8(((v_px * 1056) >> 10) + 128);
-    }
-
-    veejay_memcpy(srcY, t->dstY, size);
-    veejay_memcpy(srcU, t->dstU, size);
-    veejay_memcpy(srcV, t->dstV, size);
-}
-
-void escherdroste_apply(void *ptr, VJFrame *frame, int *args) {
+void escherdroste_apply(void *ptr, VJFrame *frame, int *args)
+{
     box_escherdroste_t *t = (box_escherdroste_t*) ptr;
 
     int mode = args[8];
@@ -493,18 +341,5 @@ void escherdroste_apply(void *ptr, VJFrame *frame, int *args) {
     else if (mode > 2)
         mode = 2;
 
-    switch (mode) {
-        case 0:
-            escherdroste_apply1(ptr, frame, args);
-            break;
-        case 1:
-            escherdroste_apply2(ptr, frame, args);
-            break;
-        case 2:
-            escherdroste_apply3(ptr, frame, args);
-            break;
-        default:
-            escherdroste_apply2(ptr, frame, args);
-            break;
-    }
+    escherdroste_render(t, frame, args, mode);
 }

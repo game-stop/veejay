@@ -285,26 +285,17 @@ void transblend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint16_t *restrict angle = wipe->angle_lut;
     const uint16_t progress = (uint16_t)progress_eff;
 
-    if(glow_width <= 0 || glow_strength <= 0) {
 #pragma omp parallel for schedule(static) num_threads(wipe->n_threads)
-        for(int i = 0; i < len; i++) {
-            if(angle[i] <= progress) {
-                Y[i] = Y2[i];
-                U[i] = U2[i];
-                V[i] = V2[i];
-            }
+    for(int i = 0; i < len; i++) {
+        const int a = (int)angle[i];
+
+        if(a <= progress) {
+            Y[i] = Y2[i];
+            U[i] = U2[i];
+            V[i] = V2[i];
         }
-    } else {
-#pragma omp parallel for schedule(static) num_threads(wipe->n_threads)
-        for(int i = 0; i < len; i++) {
-            const int a = (int)angle[i];
 
-            if(a <= progress) {
-                Y[i] = Y2[i];
-                U[i] = U2[i];
-                V[i] = V2[i];
-            }
-
+        if(glow_width > 0 && glow_strength > 0) {
             int d = a - (int)progress;
             if(d < 0)
                 d = -d;

@@ -251,7 +251,7 @@ static void swirl_rebuild_map(swirl_t *s, int width, int height, int degrees, in
     double *restrict fish_angle = s->fish_angle;
 
     if(mode == 0) {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
             double co;
             double si;
@@ -270,7 +270,7 @@ static void swirl_rebuild_map(swirl_t *s, int width, int height, int degrees, in
             coords[i] = py * width + px;
         }
     } else {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
         for(int y = 0; y < height; y++) {
             const int row = y * width;
             const int my = (y <= h2) ? y : (height - 1 - y);
@@ -300,25 +300,7 @@ static void swirl_rebuild_map(swirl_t *s, int width, int height, int degrees, in
     }
 }
 
-static void swirl_rebuild_caches(swirl_t *s,
-                                 int width,
-                                 int height,
-                                 int degrees,
-                                 int mode,
-                                 int drive_degrees,
-                                 int swirl_drive)
-{
-    if(s->v != degrees || s->mode != mode)
-        swirl_rebuild_map(s, width, height, degrees, mode, s->cached_coords);
 
-    if(s->drive_v != drive_degrees || s->mode != mode || s->drive_swirl != swirl_drive)
-        swirl_rebuild_map(s, width, height, drive_degrees, mode, s->drive_coords);
-
-    s->v = degrees;
-    s->mode = mode;
-    s->drive_v = drive_degrees;
-    s->drive_swirl = swirl_drive;
-}
 
 void swirl_apply(void *ptr, VJFrame *frame, int *args)
 {
@@ -349,7 +331,8 @@ void swirl_apply(void *ptr, VJFrame *frame, int *args)
     const int swirl_drive = clampi((int)(s->eff_swirl_drive + 0.5f), 0, 1000);
     const int drive_degrees = swirl_drive_degrees(degrees, swirl_drive);
 
-    swirl_rebuild_caches(s, width, height, degrees, mode, drive_degrees, swirl_drive);
+    const int rebuild_base = (s->v != degrees || s->mode != mode);
+    const int rebuild_drive = (s->drive_v != drive_degrees || s->mode != mode || s->drive_swirl != swirl_drive);
 
     int drive_q8 = (swirl_drive * 256 + 500) / 1000;
     drive_q8 = clampi(drive_q8, 0, 256);
@@ -369,24 +352,41 @@ void swirl_apply(void *ptr, VJFrame *frame, int *args)
     int *restrict base_coords = s->cached_coords;
     int *restrict drive_coords = s->drive_coords;
 
-    if(drive_q8 <= 0 || drive_degrees == degrees) {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-        for(int i = 0; i < len; i++) {
-            const int idx = base_coords[i];
+#pragma omp parallel num_threads(s->n_threads)
+    {
+        if(rebuild_base)
+            swirl_rebuild_map(s, width, height, degrees, mode, s->cached_coords);
 
-            Y[i]  = srcY[idx];
-            Cb[i] = srcCb[idx];
-            Cr[i] = srcCr[idx];
+        if(rebuild_drive)
+            swirl_rebuild_map(s, width, height, drive_degrees, mode, s->drive_coords);
+
+#pragma omp single
+        {
+            s->v = degrees;
+            s->mode = mode;
+            s->drive_v = drive_degrees;
+            s->drive_swirl = swirl_drive;
         }
-    } else {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-        for(int i = 0; i < len; i++) {
-            const int a = base_coords[i];
-            const int b = drive_coords[i];
 
-            Y[i]  = mix_u8(srcY[a],  srcY[b],  drive_q8);
-            Cb[i] = mix_u8(srcCb[a], srcCb[b], drive_q8);
-            Cr[i] = mix_u8(srcCr[a], srcCr[b], drive_q8);
+        if(drive_q8 <= 0 || drive_degrees == degrees) {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                const int idx = base_coords[i];
+
+                Y[i]  = srcY[idx];
+                Cb[i] = srcCb[idx];
+                Cr[i] = srcCr[idx];
+            }
+        } else {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                const int a = base_coords[i];
+                const int b = drive_coords[i];
+
+                Y[i]  = mix_u8(srcY[a],  srcY[b],  drive_q8);
+                Cb[i] = mix_u8(srcCb[a], srcCb[b], drive_q8);
+                Cr[i] = mix_u8(srcCr[a], srcCr[b], drive_q8);
+            }
         }
     }
 }

@@ -104,7 +104,7 @@ vj_effect *mirrors_init(int width, int height)
     return ve;
 }
 
-static void mirrors_vertical(uint8_t *yuv[3], int width, int height, int factor, int swap, int n_threads)
+static void mirrors_vertical(uint8_t *yuv[3], int width, int height, int factor, int swap)
 {
     uint8_t *restrict py = yuv[0];
     uint8_t *restrict pu = yuv[1];
@@ -112,7 +112,7 @@ static void mirrors_vertical(uint8_t *yuv[3], int width, int height, int factor,
     const int tiles = factor + 1;
     const int base_w = width / tiles;
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         uint8_t *restrict ry = py + y * width;
         uint8_t *restrict ru = pu + y * width;
@@ -138,7 +138,7 @@ static void mirrors_vertical(uint8_t *yuv[3], int width, int height, int factor,
     }
 }
 
-static void mirrors_horizontal(uint8_t *yuv[3], int width, int height, int factor, int swap, int n_threads)
+static void mirrors_horizontal(uint8_t *yuv[3], int width, int height, int factor, int swap)
 {
     uint8_t *restrict py = yuv[0];
     uint8_t *restrict pu = yuv[1];
@@ -146,7 +146,7 @@ static void mirrors_horizontal(uint8_t *yuv[3], int width, int height, int facto
     const int tiles = factor + 1;
     const int base_h = height / tiles;
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int t = 0; t < tiles; t++) {
         const int tile_start = t * base_h;
         const int tile_end = t == tiles - 1 ? height : tile_start + base_h;
@@ -230,19 +230,22 @@ void mirrors_apply(void *ptr, VJFrame *frame, int *args)
         m->N__ = 0;
     }
 
-    switch(type) {
-        case 0:
-            mirrors_vertical(frame->data, width, height, factor, 0, m->n_threads);
-            break;
-        case 1:
-            mirrors_vertical(frame->data, width, height, factor, 1, m->n_threads);
-            break;
-        case 2:
-            mirrors_horizontal(frame->data, width, height, factor, 0, m->n_threads);
-            break;
-        case 3:
-            mirrors_horizontal(frame->data, width, height, factor, 1, m->n_threads);
-            break;
+#pragma omp parallel num_threads(m->n_threads)
+    {
+        switch(type) {
+            case 0:
+                mirrors_vertical(frame->data, width, height, factor, 0);
+                break;
+            case 1:
+                mirrors_vertical(frame->data, width, height, factor, 1);
+                break;
+            case 2:
+                mirrors_horizontal(frame->data, width, height, factor, 0);
+                break;
+            case 3:
+                mirrors_horizontal(frame->data, width, height, factor, 1);
+                break;
+        }
     }
 
     if(interpolate)

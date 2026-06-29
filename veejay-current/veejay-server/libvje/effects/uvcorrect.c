@@ -78,14 +78,10 @@ static inline uint8_t uvcorrect_u8(int v)
     return (uint8_t)clampi(v, 0, 255);
 }
 
-
-
 static inline float uvcorrect_smoothf(float oldv, float target, float coeff)
 {
     return oldv + (target - oldv) * coeff;
 }
-
-
 
 vj_effect *uvcorrect_init(int w, int h)
 {
@@ -205,7 +201,7 @@ static void uvcorrect_rebuild_table(uvcorrect_t *uv,
     const float si = sinf(a);
     const float co = cosf(a);
 
-#pragma omp parallel for schedule(static) num_threads(uv->n_threads)
+#pragma omp for schedule(static)
     for(int u = 0; u < 256; u++) {
         const float uterm = ((float)u - (float)center_u) * uf;
 
@@ -225,14 +221,17 @@ static void uvcorrect_rebuild_table(uvcorrect_t *uv,
         }
     }
 
-    uv->last_angle = angle;
-    uv->last_uc = center_u;
-    uv->last_vc = center_v;
-    uv->last_iu = iu_factor;
-    uv->last_iv = iv_factor;
-    uv->last_min = uv_min;
-    uv->last_max = uv_max;
-    uv->valid = 1;
+#pragma omp single
+    {
+        uv->last_angle = angle;
+        uv->last_uc = center_u;
+        uv->last_vc = center_v;
+        uv->last_iu = iu_factor;
+        uv->last_iv = iv_factor;
+        uv->last_min = uv_min;
+        uv->last_max = uv_max;
+        uv->valid = 1;
+    }
 }
 
 static inline int uvcorrect_table_dirty(uvcorrect_t *uv,
@@ -269,7 +268,7 @@ static void uvcorrect_chrominance_treatment(uvcorrect_t *uv,
     rotate_drive = clampi(rotate_drive, 0, 1000);
 
     if(chroma_drive <= 0 && rotate_drive <= 0) {
-#pragma omp parallel for schedule(static) num_threads(uv->n_threads)
+#pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
             const uint32_t base = ((((uint32_t)u[i]) << 8) | (uint32_t)v[i]) << 1;
 
@@ -292,7 +291,7 @@ static void uvcorrect_chrominance_treatment(uvcorrect_t *uv,
     else if(sat_q8 > 560)
         sat_q8 = 560;
 
-#pragma omp parallel for schedule(static) num_threads(uv->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const uint32_t base = ((((uint32_t)u[i]) << 8) | (uint32_t)v[i]) << 1;
 
@@ -314,7 +313,7 @@ void uvcorrect_apply(void *ptr, VJFrame *frame, int *args)
 {
     uvcorrect_t *uv = (uvcorrect_t*) ptr;
 
-    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
+    const int uv_len = frame->uv_len;
 
     int angle         = args[P_ANGLE];
     int center_u      = args[P_CENTER_U];
@@ -362,27 +361,22 @@ void uvcorrect_apply(void *ptr, VJFrame *frame, int *args)
         uv_max = tmp;
     }
 
-    if(uvcorrect_table_dirty(uv, angle, center_u, center_v, iu_factor, iv_factor, uv_min, uv_max)) {
-        uvcorrect_rebuild_table(
+    const int table_dirty = uvcorrect_table_dirty(uv, angle, center_u, center_v, iu_factor, iv_factor, uv_min, uv_max);
+
+#pragma omp parallel num_threads(uv->n_threads)
+    {
+        if(table_dirty)
+            uvcorrect_rebuild_table(uv, angle, center_u, center_v, iu_factor, iv_factor, uv_min, uv_max);
+
+        uvcorrect_chrominance_treatment(
             uv,
-            angle,
-            center_u,
-            center_v,
-            iu_factor,
-            iv_factor,
+            frame->data[1],
+            frame->data[2],
+            uv_len,
+            chroma_drive,
+            rotate_drive,
             uv_min,
             uv_max
         );
     }
-
-    uvcorrect_chrominance_treatment(
-        uv,
-        frame->data[1],
-        frame->data[2],
-        uv_len,
-        chroma_drive,
-        rotate_drive,
-        uv_min,
-        uv_max
-    );
 }

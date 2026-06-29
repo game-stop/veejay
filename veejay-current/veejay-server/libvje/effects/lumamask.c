@@ -151,7 +151,7 @@ static void lumamask_noalpha_clamp(lumamask_t *l, VJFrame *frame, const uint8_t 
     const uint8_t *restrict sU = l->buf[1];
     const uint8_t *restrict sV = l->buf[2];
 
-#pragma omp parallel for schedule(static) num_threads(l->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
 
@@ -187,7 +187,7 @@ static void lumamask_noalpha_border(lumamask_t *l, VJFrame *frame, const uint8_t
     const uint8_t *restrict sU = l->buf[1];
     const uint8_t *restrict sV = l->buf[2];
 
-#pragma omp parallel for schedule(static) num_threads(l->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
 
@@ -226,7 +226,7 @@ static void lumamask_alpha_clamp(lumamask_t *l, VJFrame *frame, const uint8_t *r
     const uint8_t *restrict sV = l->buf[2];
     const uint8_t *restrict sA = l->buf[3];
 
-#pragma omp parallel for schedule(static) num_threads(l->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
 
@@ -265,7 +265,7 @@ static void lumamask_alpha_border(lumamask_t *l, VJFrame *frame, const uint8_t *
     const uint8_t *restrict sV = l->buf[2];
     const uint8_t *restrict sA = l->buf[3];
 
-#pragma omp parallel for schedule(static) num_threads(l->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
 
@@ -322,17 +322,20 @@ void lumamask_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int y_mul_q8 = -(y_scale * 2);
     const uint8_t *restrict map = frame2->data[0];
 
-    if(alpha) {
-        if(border)
-            lumamask_alpha_border(l, frame, map, x_mul_q8, y_mul_q8);
-        else
-            lumamask_alpha_clamp(l, frame, map, x_mul_q8, y_mul_q8);
-    }
-    else {
-        if(border)
-            lumamask_noalpha_border(l, frame, map, x_mul_q8, y_mul_q8);
-        else
-            lumamask_noalpha_clamp(l, frame, map, x_mul_q8, y_mul_q8);
+#pragma omp parallel num_threads(l->n_threads)
+    {
+        if(alpha) {
+            if(border)
+                lumamask_alpha_border(l, frame, map, x_mul_q8, y_mul_q8);
+            else
+                lumamask_alpha_clamp(l, frame, map, x_mul_q8, y_mul_q8);
+        }
+        else {
+            if(border)
+                lumamask_noalpha_border(l, frame, map, x_mul_q8, y_mul_q8);
+            else
+                lumamask_noalpha_clamp(l, frame, map, x_mul_q8, y_mul_q8);
+        }
     }
 
     if(interpolate)

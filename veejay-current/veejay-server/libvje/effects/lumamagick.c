@@ -170,7 +170,7 @@ static void lumamagick_lumaflow(VJFrame *frame, VJFrame *frame2, int op_a, int o
     uint8_t *restrict V = frame->data[2];
     const uint8_t *restrict Y2 = frame2->data[0];
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const int delta = lm_absi((int)Y[i] - (int)Y2[i]);
         const int offset = ((delta * flow_intensity) / 100) & 15;
@@ -198,7 +198,7 @@ static void lumamagick_process(VJFrame *frame, VJFrame *frame2, int mode, int op
     const uint8_t *restrict U2 = frame2->data[1];
     const uint8_t *restrict V2 = frame2->data[2];
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const int sy = Y[i];
         const int su = U[i];
@@ -479,8 +479,11 @@ void lumamagick_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int op_a = args[P_OPACITY_A];
     const int op_b = args[P_OPACITY_B];
 
-    if(mode == VJ_EFFECT_BLEND_ADDTEST7)
-        lumamagick_lumaflow(frame, frame2, op_a, op_b, m->n_threads);
-    else
-        lumamagick_process(frame, frame2, mode, op_a, op_b, m->n_threads);
+#pragma omp parallel num_threads(m->n_threads)
+    {
+        if(mode == VJ_EFFECT_BLEND_ADDTEST7)
+            lumamagick_lumaflow(frame, frame2, op_a, op_b, m->n_threads);
+        else
+            lumamagick_process(frame, frame2, mode, op_a, op_b, m->n_threads);
+    }
 }

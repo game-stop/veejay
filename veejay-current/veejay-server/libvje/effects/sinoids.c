@@ -253,14 +253,17 @@ static void sinoids_recalc(sinoids_t *s, int width, int z, int phase_q16)
     const double phase_add = ((double)phase_q16 * (2.0 * SINOIDS_PI)) / 65536.0;
     int *restrict sinoids_X = s->sinoids_X;
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < width; i++) {
         const double phase = (((double)i / (double)width) * 2.0 * SINOIDS_PI) + phase_add;
         sinoids_X[i] = (int)(a_sin(phase) * zoom * 4.0);
     }
 
-    s->current_sinoids = z;
-    s->current_phase_q16 = phase_q16;
+#pragma omp single
+    {
+        s->current_sinoids = z;
+        s->current_phase_q16 = phase_q16;
+    }
 }
 
 static void sinoids_apply_inplace(sinoids_t *s, VJFrame *frame)
@@ -274,7 +277,7 @@ static void sinoids_apply_inplace(sinoids_t *s, VJFrame *frame)
 
     int *restrict offset = s->sinoids_X;
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int y = 1; y < height - 1; y++) {
         const int row = y * width;
 
@@ -294,7 +297,6 @@ static void sinoids_apply_copy_mix(sinoids_t *s, VJFrame *frame, int mix_q8, int
 {
     const int width = frame->width;
     const int height = frame->height;
-    const int len = frame->len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -306,11 +308,7 @@ static void sinoids_apply_copy_mix(sinoids_t *s, VJFrame *frame, int mix_q8, int
 
     int *restrict offset = s->sinoids_X;
 
-    veejay_memcpy(srcY, Y, len);
-    veejay_memcpy(srcCb, Cb, len);
-    veejay_memcpy(srcCr, Cr, len);
-
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int y = 1; y < height - 1; y++) {
         const int row = y * width;
 
@@ -325,6 +323,7 @@ static void sinoids_apply_copy_mix(sinoids_t *s, VJFrame *frame, int mix_q8, int
         }
     }
 }
+
 
 static void sinoids_blend_with_snapshot(sinoids_t *s, VJFrame *frame, int mix_q8, int chroma_q8)
 {
@@ -341,7 +340,7 @@ static void sinoids_blend_with_snapshot(sinoids_t *s, VJFrame *frame, int mix_q8
     if(mix_q8 >= 256 && chroma_q8 >= 256)
         return;
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         Y[i] = sinoids_mix_u8(srcY[i], Y[i], mix_q8);
         Cb[i] = sinoids_mix_u8(srcCb[i], Cb[i], chroma_q8);
@@ -430,9 +429,7 @@ void sinoids_apply(void *ptr, VJFrame *frame, int *args)
     const int phase_direct_q16 = (phase_drive_q * 65535 + 500) / 1000;
     const int phase_drift_q16 = (int)(s->phase_accum * 65536.0f + 0.5f) & 65535;
     const int eff_phase_q16 = (phase_base_q16 + phase_direct_q16 + phase_drift_q16) & 65535;
-
-    if(eff_sinoids != s->current_sinoids || eff_phase_q16 != s->current_phase_q16)
-        sinoids_recalc(s, width, eff_sinoids, eff_phase_q16);
+    const int rebuild = eff_sinoids != s->current_sinoids || eff_phase_q16 != s->current_phase_q16;
 
     int mix_q8 = ((int)(s->sm_mix + 0.5f) * 256 + 500) / 1000;
     int chroma_q8 = ((int)(s->sm_chroma + 0.5f) * 256 + 500) / 1000;
@@ -440,15 +437,22 @@ void sinoids_apply(void *ptr, VJFrame *frame, int *args)
     mix_q8 = clampi(mix_q8 + (((warp_drive_q + phase_drive_q) * 18 + 500) / 2000), 0, 256);
     chroma_q8 = clampi(chroma_q8 + (((warp_drive_q + phase_drive_q) * 24 + 500) / 2000), 0, 256);
 
-    if(mode == 0) {
-        veejay_memcpy(s->sinoid_frame[0], frame->data[0], len);
-        veejay_memcpy(s->sinoid_frame[1], frame->data[1], len);
-        veejay_memcpy(s->sinoid_frame[2], frame->data[2], len);
-        sinoids_apply_inplace(s, frame);
-        sinoids_blend_with_snapshot(s, frame, mix_q8, chroma_q8);
-    }
-    else {
-        sinoids_apply_copy_mix(s, frame, mix_q8, chroma_q8);
+    veejay_memcpy(s->sinoid_frame[0], frame->data[0], len);
+    veejay_memcpy(s->sinoid_frame[1], frame->data[1], len);
+    veejay_memcpy(s->sinoid_frame[2], frame->data[2], len);
+
+#pragma omp parallel num_threads(s->n_threads)
+    {
+        if(rebuild)
+            sinoids_recalc(s, width, eff_sinoids, eff_phase_q16);
+
+        if(mode == 0) {
+            sinoids_apply_inplace(s, frame);
+            sinoids_blend_with_snapshot(s, frame, mix_q8, chroma_q8);
+        }
+        else {
+            sinoids_apply_copy_mix(s, frame, mix_q8, chroma_q8);
+        }
     }
 
     if(interpolate)
@@ -457,6 +461,7 @@ void sinoids_apply(void *ptr, VJFrame *frame, int *args)
     if(motion)
         motionmap_store_frame(s->motionmap, frame);
 }
+
 
 int sinoids_request_fx(void)
 {

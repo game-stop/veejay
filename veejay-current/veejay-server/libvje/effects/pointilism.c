@@ -157,18 +157,18 @@ void pointilism_free(void *ptr)
 }
 
 static inline void pointilism_background(pointilism_t *p,
-                                         const uint8_t *restrict srcY,
-                                         const uint8_t *restrict srcU,
-                                         const uint8_t *restrict srcV,
-                                         int len,
-                                         int keep_original)
+                                             const uint8_t *restrict srcY,
+                                             const uint8_t *restrict srcU,
+                                             const uint8_t *restrict srcV,
+                                             int len,
+                                             int keep_original)
 {
     uint8_t *restrict dstY = p->buf[0];
     uint8_t *restrict dstU = p->buf[1];
     uint8_t *restrict dstV = p->buf[2];
 
     if(keep_original) {
-#pragma omp parallel for schedule(static) num_threads(p->n_threads)
+#pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
             dstY[i] = srcY[i];
             dstU[i] = srcU[i];
@@ -176,23 +176,26 @@ static inline void pointilism_background(pointilism_t *p,
         }
     }
     else {
-        veejay_memset(dstY, pixel_Y_lo_, len);
-        veejay_memset(dstU, 128, len);
-        veejay_memset(dstV, 128, len);
+#pragma omp single
+        {
+            veejay_memset(dstY, pixel_Y_lo_, len);
+            veejay_memset(dstU, 128, len);
+            veejay_memset(dstV, 128, len);
+        }
     }
 }
 
 static inline void pointilism_copy_back(pointilism_t *p,
-                                        uint8_t *restrict dstY,
-                                        uint8_t *restrict dstU,
-                                        uint8_t *restrict dstV,
-                                        int len)
+                                            uint8_t *restrict dstY,
+                                            uint8_t *restrict dstU,
+                                            uint8_t *restrict dstV,
+                                            int len)
 {
     const uint8_t *restrict srcY = p->buf[0];
     const uint8_t *restrict srcU = p->buf[1];
     const uint8_t *restrict srcV = p->buf[2];
 
-#pragma omp parallel for schedule(static) num_threads(p->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         dstY[i] = srcY[i];
         dstU[i] = srcU[i];
@@ -306,47 +309,53 @@ void pointilism_apply(void *ptr, VJFrame *frame, int *args)
 
     const uint32_t *restrict lut = p->rand_lut;
 
-    if(!loop)
-        pointilism_background(p, srcY, srcU, srcV, len, keep_original);
+#pragma omp parallel num_threads(p->n_threads)
+    {
+        if(!loop)
+            pointilism_background(p, srcY, srcU, srcV, len, keep_original);
 
-    for(int y = 0; y < h; y += step) {
-        const int y_offset = y * w;
+#pragma omp single
+        {
+            for(int y = 0; y < h; y += step) {
+                const int y_offset = y * w;
 
-        for(int x = 0; x < w; x += step) {
-            const int idx = y_offset + x;
-            const uint32_t rnd = lut[idx];
-            int cx = x + (int)(rnd % (uint32_t)step);
-            int cy = y + (int)((rnd >> 8) % (uint32_t)step);
+                for(int x = 0; x < w; x += step) {
+                    const int idx = y_offset + x;
+                    const uint32_t rnd = lut[idx];
+                    int cx = x + (int)(rnd % (uint32_t)step);
+                    int cy = y + (int)((rnd >> 8) % (uint32_t)step);
 
-            if(cx >= w)
-                cx = w - 1;
-            if(cy >= h)
-                cy = h - 1;
+                    if(cx >= w)
+                        cx = w - 1;
+                    if(cy >= h)
+                        cy = h - 1;
 
-            const int center_idx = cy * w + cx;
-            uint8_t min_luma;
-            uint8_t max_luma;
+                    const int center_idx = cy * w + cx;
+                    uint8_t min_luma;
+                    uint8_t max_luma;
 
-            pointilism_luma_range(srcY, w, h, cx, cy, kernel_radius, &min_luma, &max_luma);
+                    pointilism_luma_range(srcY, w, h, cx, cy, kernel_radius, &min_luma, &max_luma);
 
-            const int radius = min_radius + (int)(rnd % (uint32_t)radius_range);
+                    const int radius = min_radius + (int)(rnd % (uint32_t)radius_range);
 
-            pointilism_draw_dot(
-                dstY,
-                dstU,
-                dstV,
-                w,
-                h,
-                cx,
-                cy,
-                radius,
-                min_luma,
-                max_luma,
-                srcU[center_idx],
-                srcV[center_idx]
-            );
+                    pointilism_draw_dot(
+                        dstY,
+                        dstU,
+                        dstV,
+                        w,
+                        h,
+                        cx,
+                        cy,
+                        radius,
+                        min_luma,
+                        max_luma,
+                        srcU[center_idx],
+                        srcV[center_idx]
+                    );
+                }
+            }
         }
-    }
 
-    pointilism_copy_back(p, frame->data[0], frame->data[1], frame->data[2], len);
+        pointilism_copy_back(p, frame->data[0], frame->data[1], frame->data[2], len);
+    }
 }

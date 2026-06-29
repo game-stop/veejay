@@ -180,7 +180,6 @@ static void radcor_build_map(radcor_t *radcor, int width, int height, int alpha_
     for(int x = 0; x < width; x++)
         x_lut[x] = ((2.0f * (float)x) - (float)width) * inv_w;
 
-#pragma omp parallel for schedule(static) num_threads(radcor->n_threads)
     for(int y = 0; y < height; y++) {
         const float yy = ((2.0f * (float)y) - (float)height) * inv_h;
         const int row = y * width;
@@ -225,6 +224,7 @@ static void radcor_build_map(radcor_t *radcor, int width, int height, int alpha_
     radcor->map_upd[2] = direction;
 }
 
+
 void radcor_apply(void *ptr, VJFrame *frame, int *args)
 {
     radcor_t *radcor = (radcor_t*)ptr;
@@ -262,40 +262,23 @@ void radcor_apply(void *ptr, VJFrame *frame, int *args)
     if(update_alpha)
         veejay_memcpy(Ai, A, len);
 
-    if(update_alpha) {
 #pragma omp parallel for schedule(static) num_threads(radcor->n_threads)
-        for(int i = 0; i < len; i++) {
-            const uint32_t idx = Map[i];
+    for(int i = 0; i < len; i++) {
+        const uint32_t idx = Map[i];
 
-            if(idx != RADCOR_INVALID) {
-                Y[i] = Yi[idx];
-                Cb[i] = Cbi[idx];
-                Cr[i] = Cri[idx];
+        if(idx != RADCOR_INVALID) {
+            Y[i] = Yi[idx];
+            Cb[i] = Cbi[idx];
+            Cr[i] = Cri[idx];
+            if(update_alpha)
                 A[i] = Ai[idx];
-            }
-            else {
-                Y[i] = pixel_Y_lo_;
-                Cb[i] = 128;
-                Cr[i] = 128;
-                A[i] = 0;
-            }
         }
-    }
-    else {
-#pragma omp parallel for schedule(static) num_threads(radcor->n_threads)
-        for(int i = 0; i < len; i++) {
-            const uint32_t idx = Map[i];
-
-            if(idx != RADCOR_INVALID) {
-                Y[i] = Yi[idx];
-                Cb[i] = Cbi[idx];
-                Cr[i] = Cri[idx];
-            }
-            else {
-                Y[i] = pixel_Y_lo_;
-                Cb[i] = 128;
-                Cr[i] = 128;
-            }
+        else {
+            Y[i] = pixel_Y_lo_;
+            Cb[i] = 128;
+            Cr[i] = 128;
+            if(update_alpha)
+                A[i] = 0;
         }
     }
 }

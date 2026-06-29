@@ -106,6 +106,7 @@ vj_effect *rgbkey_init(int w, int h)
     return ve;
 }
 
+
 void rgbkey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     (void)ptr;
@@ -158,36 +159,22 @@ void rgbkey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-    if(mode != 0) {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
-        for(int pos = 0; pos < len; pos++) {
-            const int uc = (int)Cb[pos] - 128;
-            const int vc = (int)Cr[pos] - 128;
-            const int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
-            const int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
-            const int abs_yy = yy < 0 ? -yy : yy;
-            const int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
-            const int a = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
-
-            Y[pos] = (uint8_t)clampi(a, 0, 255);
-            Cb[pos] = 128;
-            Cr[pos] = 128;
-        }
-
-        return;
-    }
-
 #pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int pos = 0; pos < len; pos++) {
         const int uc = (int)Cb[pos] - 128;
         const int vc = (int)Cr[pos] - 128;
-
         const int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
         const int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
         const int abs_yy = yy < 0 ? -yy : yy;
         const int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
-
         int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
+
+        if(mode != 0) {
+            Y[pos] = (uint8_t)clampi(alpha, 0, 255);
+            Cb[pos] = 128;
+            Cr[pos] = 128;
+            continue;
+        }
 
         if(LIKELY(alpha <= 0)) {
             Y[pos] = Y2[pos];

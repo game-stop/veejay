@@ -155,7 +155,7 @@ void maskstop_free(void *ptr)
     free(v);
 }
 
-static void maskstop_blend_swap_neg(vvmask_t *v, VJFrame *frame)
+static void maskstop_blend(vvmask_t *v, VJFrame *frame, int swapmask, int negmask)
 {
     const int len = frame->len;
 
@@ -172,78 +172,27 @@ static void maskstop_blend_swap_neg(vvmask_t *v, VJFrame *frame)
 
 #pragma omp parallel for schedule(static) num_threads(v->n_threads)
     for(int i = 0; i < len; i++) {
-        Ydest[i] = maskstop_blend255(Yframe[i], 255 - Ydest[i], Ymask[i]);
-        Udest[i] = maskstop_blend255(Uframe[i], 255 - Udest[i], Umask[i]);
-        Vdest[i] = maskstop_blend255(Vframe[i], 255 - Vdest[i], Vmask[i]);
-    }
-}
-
-static void maskstop_blend_swap(vvmask_t *v, VJFrame *frame)
-{
-    const int len = frame->len;
-
-    const uint8_t *restrict Yframe = v->vvmaskstop_buffer[0];
-    const uint8_t *restrict Uframe = v->vvmaskstop_buffer[1];
-    const uint8_t *restrict Vframe = v->vvmaskstop_buffer[2];
-    const uint8_t *restrict Ymask = v->vvmaskstop_buffer[3];
-    const uint8_t *restrict Umask = v->vvmaskstop_buffer[4];
-    const uint8_t *restrict Vmask = v->vvmaskstop_buffer[5];
-
-    uint8_t *restrict Ydest = frame->data[0];
-    uint8_t *restrict Udest = frame->data[1];
-    uint8_t *restrict Vdest = frame->data[2];
-
-#pragma omp parallel for schedule(static) num_threads(v->n_threads)
-    for(int i = 0; i < len; i++) {
-        Ydest[i] = maskstop_blend255(Ydest[i], Yframe[i], Ymask[i]);
-        Udest[i] = maskstop_blend255(Udest[i], Uframe[i], Umask[i]);
-        Vdest[i] = maskstop_blend255(Vdest[i], Vframe[i], Vmask[i]);
-    }
-}
-
-static void maskstop_blend_neg(vvmask_t *v, VJFrame *frame)
-{
-    const int len = frame->len;
-
-    const uint8_t *restrict Yframe = v->vvmaskstop_buffer[0];
-    const uint8_t *restrict Uframe = v->vvmaskstop_buffer[1];
-    const uint8_t *restrict Vframe = v->vvmaskstop_buffer[2];
-    const uint8_t *restrict Ymask = v->vvmaskstop_buffer[3];
-    const uint8_t *restrict Umask = v->vvmaskstop_buffer[4];
-    const uint8_t *restrict Vmask = v->vvmaskstop_buffer[5];
-
-    uint8_t *restrict Ydest = frame->data[0];
-    uint8_t *restrict Udest = frame->data[1];
-    uint8_t *restrict Vdest = frame->data[2];
-
-#pragma omp parallel for schedule(static) num_threads(v->n_threads)
-    for(int i = 0; i < len; i++) {
-        Ydest[i] = maskstop_blend255(Ymask[i], 255 - Ydest[i], Yframe[i]);
-        Udest[i] = maskstop_blend255(Umask[i], 255 - Udest[i], Uframe[i]);
-        Vdest[i] = maskstop_blend255(Vmask[i], 255 - Vdest[i], Vframe[i]);
-    }
-}
-
-static void maskstop_blend_normal(vvmask_t *v, VJFrame *frame)
-{
-    const int len = frame->len;
-
-    const uint8_t *restrict Yframe = v->vvmaskstop_buffer[0];
-    const uint8_t *restrict Uframe = v->vvmaskstop_buffer[1];
-    const uint8_t *restrict Vframe = v->vvmaskstop_buffer[2];
-    const uint8_t *restrict Ymask = v->vvmaskstop_buffer[3];
-    const uint8_t *restrict Umask = v->vvmaskstop_buffer[4];
-    const uint8_t *restrict Vmask = v->vvmaskstop_buffer[5];
-
-    uint8_t *restrict Ydest = frame->data[0];
-    uint8_t *restrict Udest = frame->data[1];
-    uint8_t *restrict Vdest = frame->data[2];
-
-#pragma omp parallel for schedule(static) num_threads(v->n_threads)
-    for(int i = 0; i < len; i++) {
-        Ydest[i] = maskstop_blend255(Ydest[i], Ymask[i], Yframe[i]);
-        Udest[i] = maskstop_blend255(Udest[i], Umask[i], Uframe[i]);
-        Vdest[i] = maskstop_blend255(Vdest[i], Vmask[i], Vframe[i]);
+        if(swapmask) {
+            if(negmask) {
+                Ydest[i] = maskstop_blend255(Yframe[i], 255 - Ydest[i], Ymask[i]);
+                Udest[i] = maskstop_blend255(Uframe[i], 255 - Udest[i], Umask[i]);
+                Vdest[i] = maskstop_blend255(Vframe[i], 255 - Vdest[i], Vmask[i]);
+            } else {
+                Ydest[i] = maskstop_blend255(Ydest[i], Yframe[i], Ymask[i]);
+                Udest[i] = maskstop_blend255(Udest[i], Uframe[i], Umask[i]);
+                Vdest[i] = maskstop_blend255(Vdest[i], Vframe[i], Vmask[i]);
+            }
+        } else {
+            if(negmask) {
+                Ydest[i] = maskstop_blend255(Ymask[i], 255 - Ydest[i], Yframe[i]);
+                Udest[i] = maskstop_blend255(Umask[i], 255 - Udest[i], Uframe[i]);
+                Vdest[i] = maskstop_blend255(Vmask[i], 255 - Vdest[i], Vframe[i]);
+            } else {
+                Ydest[i] = maskstop_blend255(Ydest[i], Ymask[i], Yframe[i]);
+                Udest[i] = maskstop_blend255(Udest[i], Umask[i], Uframe[i]);
+                Vdest[i] = maskstop_blend255(Vdest[i], Vmask[i], Vframe[i]);
+            }
+        }
     }
 }
 
@@ -278,16 +227,5 @@ void maskstop_apply(void *ptr, VJFrame *frame, int *args)
         v->frq_mask = 0;
     }
 
-    if(swapmask) {
-        if(negmask)
-            maskstop_blend_swap_neg(v, frame);
-        else
-            maskstop_blend_swap(v, frame);
-    }
-    else {
-        if(negmask)
-            maskstop_blend_neg(v, frame);
-        else
-            maskstop_blend_normal(v, frame);
-    }
+    maskstop_blend(v, frame, swapmask, negmask);
 }

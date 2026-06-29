@@ -107,6 +107,7 @@ void average_apply(void *ptr, VJFrame *frame, int *args)
 
     const int len = frame->len;
     const int n_threads = a->n_threads;
+    const int need_seed = !a->seeded;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -116,43 +117,44 @@ void average_apply(void *ptr, VJFrame *frame, int *args)
     float *restrict rsCb = a->running_sum[1] + frame->offset;
     float *restrict rsCr = a->running_sum[2] + frame->offset;
 
-    if(!a->seeded)
-    {
-        #pragma omp parallel for num_threads(n_threads) schedule(static)
-        for(int i = 0; i < len; i++)
-        {
-            rsY[i] = (float)Y[i];
-            rsCb[i] = (float)Cb[i] - 128.0f;
-            rsCr[i] = (float)Cr[i] - 128.0f;
-        }
-
-        a->seeded = 1;
-    }
-
     const float w = 1.0f / (float)max_sum;
     const float iw = 1.0f - w;
 
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
-    for(int i = 0; i < len; i++)
+#pragma omp parallel num_threads(n_threads)
     {
-        float y = rsY[i];
-        float cb = rsCb[i];
-        float cr = rsCr[i];
+        if(need_seed) {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                rsY[i] = (float)Y[i];
+                rsCb[i] = (float)Cb[i] - 128.0f;
+                rsCr[i] = (float)Cr[i] - 128.0f;
+            }
+        }
 
-        const float inY = (float)Y[i];
-        const float inCb = (float)Cb[i] - 128.0f;
-        const float inCr = (float)Cr[i] - 128.0f;
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            float y = rsY[i];
+            float cb = rsCb[i];
+            float cr = rsCr[i];
 
-        y = iw * y + w * inY;
-        cb = iw * cb + w * inCb;
-        cr = iw * cr + w * inCr;
+            const float inY = (float)Y[i];
+            const float inCb = (float)Cb[i] - 128.0f;
+            const float inCr = (float)Cr[i] - 128.0f;
 
-        rsY[i] = y;
-        rsCb[i] = cb;
-        rsCr[i] = cr;
+            y = iw * y + w * inY;
+            cb = iw * cb + w * inCb;
+            cr = iw * cr + w * inCr;
 
-        Y[i] = clamp_u8f(y);
-        Cb[i] = clamp_u8f(128.0f + cb);
-        Cr[i] = clamp_u8f(128.0f + cr);
+            rsY[i] = y;
+            rsCb[i] = cb;
+            rsCr[i] = cr;
+
+            Y[i] = clamp_u8f(y);
+            Cb[i] = clamp_u8f(128.0f + cb);
+            Cr[i] = clamp_u8f(128.0f + cr);
+        }
     }
+
+    if(need_seed)
+        a->seeded = 1;
 }

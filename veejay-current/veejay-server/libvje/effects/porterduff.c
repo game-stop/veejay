@@ -110,9 +110,9 @@ static void porterduff_dst(uint8_t *restrict A, const uint8_t *restrict B, int n
     veejay_memcpy(A, B, n_pixels * 4);
 }
 
-static void porterduff_dst_atop(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels, int n_threads)
+static void porterduff_dst_atop(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < n_pixels; i++) {
         const int idx = i << 2;
         const int as = B[idx + 3];
@@ -126,9 +126,9 @@ static void porterduff_dst_atop(uint8_t *restrict A, const uint8_t *restrict B, 
     }
 }
 
-static void porterduff_dst_in(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels, int n_threads)
+static void porterduff_dst_in(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < n_pixels; i++) {
         const int idx = i << 2;
         const int as = B[idx + 3];
@@ -140,9 +140,9 @@ static void porterduff_dst_in(uint8_t *restrict A, const uint8_t *restrict B, in
     }
 }
 
-static void porterduff_dst_out(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels, int n_threads)
+static void porterduff_dst_out(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < n_pixels; i++) {
         const int idx = i << 2;
         const int inv_as = 255 - B[idx + 3];
@@ -154,9 +154,9 @@ static void porterduff_dst_out(uint8_t *restrict A, const uint8_t *restrict B, i
     }
 }
 
-static void porterduff_dst_over(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels, int n_threads)
+static void porterduff_dst_over(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < n_pixels; i++) {
         const int idx = i << 2;
         const int ad = A[idx + 3];
@@ -169,9 +169,9 @@ static void porterduff_dst_over(uint8_t *restrict A, const uint8_t *restrict B, 
     }
 }
 
-static void porterduff_src_over(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels, int n_threads)
+static void porterduff_src_over(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < n_pixels; i++) {
         const int idx = i << 2;
         const int as = B[idx + 3];
@@ -184,9 +184,9 @@ static void porterduff_src_over(uint8_t *restrict A, const uint8_t *restrict B, 
     }
 }
 
-static void porterduff_src_atop(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels, int n_threads)
+static void porterduff_src_atop(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < n_pixels; i++) {
         const int idx = i << 2;
         const int as = B[idx + 3];
@@ -200,9 +200,9 @@ static void porterduff_src_atop(uint8_t *restrict A, const uint8_t *restrict B, 
     }
 }
 
-static void porterduff_src_in(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels, int n_threads)
+static void porterduff_src_in(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < n_pixels; i++) {
         const int idx = i << 2;
         const int ad = A[idx + 3];
@@ -214,9 +214,9 @@ static void porterduff_src_in(uint8_t *restrict A, const uint8_t *restrict B, in
     }
 }
 
-static void porterduff_src_out(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels, int n_threads)
+static void porterduff_src_out(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < n_pixels; i++) {
         const int idx = i << 2;
         const int inv_ad = 255 - A[idx + 3];
@@ -228,9 +228,9 @@ static void porterduff_src_out(uint8_t *restrict A, const uint8_t *restrict B, i
     }
 }
 
-static void porterduff_multiply(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels, int n_threads)
+static void porterduff_multiply(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < n_pixels; i++) {
         const int idx = i << 2;
         const int sa = B[idx + 3];
@@ -250,9 +250,9 @@ static void porterduff_multiply(uint8_t *restrict A, const uint8_t *restrict B, 
     }
 }
 
-static void porterduff_xor(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels, int n_threads)
+static void porterduff_xor(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < n_pixels; i++) {
         const int idx = i << 2;
         const int sa = B[idx + 3];
@@ -267,9 +267,9 @@ static void porterduff_xor(uint8_t *restrict A, const uint8_t *restrict B, int n
     }
 }
 
-static void porterduff_add(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels, int n_threads)
+static void porterduff_add(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < n_pixels; i++) {
         const int idx = i << 2;
 
@@ -280,9 +280,9 @@ static void porterduff_add(uint8_t *restrict A, const uint8_t *restrict B, int n
     }
 }
 
-static void porterduff_subtract(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels, int n_threads)
+static void porterduff_subtract(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < n_pixels; i++) {
         const int idx = i << 2;
 
@@ -293,9 +293,9 @@ static void porterduff_subtract(uint8_t *restrict A, const uint8_t *restrict B, 
     }
 }
 
-static void porterduff_divide(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels, int n_threads)
+static void porterduff_divide(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < n_pixels; i++) {
         const int idx = i << 2;
 
@@ -307,9 +307,9 @@ static void porterduff_divide(uint8_t *restrict A, const uint8_t *restrict B, in
     }
 }
 
-static void porterduff_screen(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels, int n_threads)
+static void porterduff_screen(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < n_pixels; i++) {
         const int idx = i << 2;
 
@@ -320,9 +320,9 @@ static void porterduff_screen(uint8_t *restrict A, const uint8_t *restrict B, in
     }
 }
 
-static void porterduff_overlay(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels, int n_threads)
+static void porterduff_overlay(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < n_pixels; i++) {
         const int idx = i << 2;
 
@@ -349,54 +349,58 @@ void porterduff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     uint8_t *restrict A = frame->data[0];
     const uint8_t *restrict B = frame2->data[0];
 
-    switch(mode) {
-        case 0:
-            porterduff_dst(A, B, len);
-            break;
+#pragma omp parallel num_threads(n_threads)
+    {
+        switch(mode) {
+            case 0:
+#pragma omp single
+                porterduff_dst(A, B, len);
+                break;
         case 1:
-            porterduff_dst_atop(A, B, len, n_threads);
+            porterduff_dst_atop(A, B, len);
             break;
         case 2:
-            porterduff_dst_in(A, B, len, n_threads);
+            porterduff_dst_in(A, B, len);
             break;
         case 3:
-            porterduff_dst_over(A, B, len, n_threads);
+            porterduff_dst_over(A, B, len);
             break;
         case 4:
-            porterduff_dst_out(A, B, len, n_threads);
+            porterduff_dst_out(A, B, len);
             break;
         case 5:
-            porterduff_src_over(A, B, len, n_threads);
+            porterduff_src_over(A, B, len);
             break;
         case 6:
-            porterduff_src_atop(A, B, len, n_threads);
+            porterduff_src_atop(A, B, len);
             break;
         case 7:
-            porterduff_src_in(A, B, len, n_threads);
+            porterduff_src_in(A, B, len);
             break;
         case 8:
-            porterduff_src_out(A, B, len, n_threads);
+            porterduff_src_out(A, B, len);
             break;
         case 9:
-            porterduff_multiply(A, B, len, n_threads);
+            porterduff_multiply(A, B, len);
             break;
         case 10:
-            porterduff_xor(A, B, len, n_threads);
+            porterduff_xor(A, B, len);
             break;
         case 11:
-            porterduff_add(A, B, len, n_threads);
+            porterduff_add(A, B, len);
             break;
         case 12:
-            porterduff_subtract(A, B, len, n_threads);
+            porterduff_subtract(A, B, len);
             break;
         case 13:
-            porterduff_divide(A, B, len, n_threads);
+            porterduff_divide(A, B, len);
             break;
         case 14:
-            porterduff_screen(A, B, len, n_threads);
+            porterduff_screen(A, B, len);
             break;
-        case 15:
-            porterduff_overlay(A, B, len, n_threads);
-            break;
+            case 15:
+                porterduff_overlay(A, B, len);
+                break;
+        }
     }
 }

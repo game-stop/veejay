@@ -84,8 +84,6 @@ static inline unsigned int wfastrand(ripple_tv *r)
     return r->wfastrand_val;
 }
 
-
-
 static void setTable(ripple_tv *r)
 {
     for(int i = 0; i < 128; i++) {
@@ -269,8 +267,6 @@ static inline void drop(ripple_tv *r, int power)
     *(q + r->map_w + 1) = power >> 2;
 }
 
-
-
 static inline int waterripple_smooth_i(float *env, int target, float attack, float release)
 {
     const float t = (float)target;
@@ -410,7 +406,7 @@ static void waterripple_simulate(ripple_tv *rip, int loopnum, int decay)
     decay = clampi(decay, 1, 32);
 
     for(int n = 0; n < loopnum; n++) {
-#pragma omp parallel for schedule(static) num_threads(rip->n_threads)
+#pragma omp for schedule(static)
         for(int y = 1; y < hi - 1; y++) {
             const int row = y * wi;
 
@@ -438,7 +434,7 @@ static void waterripple_simulate(ripple_tv *rip, int loopnum, int decay)
             }
         }
 
-#pragma omp parallel for schedule(static) num_threads(rip->n_threads)
+#pragma omp for schedule(static)
         for(int y = 1; y < hi - 1; y++) {
             const int row = y * wi;
 
@@ -456,9 +452,12 @@ static void waterripple_simulate(ripple_tv *rip, int loopnum, int decay)
             }
         }
 
-        int *tmp = rip->map1;
-        rip->map1 = rip->map2;
-        rip->map2 = tmp;
+#pragma omp single
+        {
+            int *tmp = rip->map1;
+            rip->map1 = rip->map2;
+            rip->map2 = tmp;
+        }
     }
 }
 
@@ -470,7 +469,7 @@ static void waterripple_calc_vtable(ripple_tv *rip)
     if(wi <= 1 || hi <= 1)
         return;
 
-#pragma omp parallel for schedule(static) num_threads(rip->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < hi - 1; y++) {
         const int row = y * wi;
 
@@ -499,7 +498,7 @@ static void waterripple_render(VJFrame *frame, ripple_tv *rip)
     const int map_w = rip->map_w;
     const int map_h = rip->map_h;
 
-#pragma omp parallel for schedule(static) num_threads(rip->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y += 2) {
         int my = y >> 1;
 
@@ -601,7 +600,10 @@ void waterrippletv_apply(void *ptr, VJFrame *frame, int *args)
     int effective_decay = decay + ((drop_drive * 3 + 500) / 1000) - ((drop_drive * ripple_power + 500000) / 1000000);
     effective_decay = clampi(effective_decay, 1, 32);
 
-    waterripple_simulate(rip, effective_loopnum, effective_decay);
-    waterripple_calc_vtable(rip);
-    waterripple_render(frame, rip);
+#pragma omp parallel num_threads(rip->n_threads)
+    {
+        waterripple_simulate(rip, effective_loopnum, effective_decay);
+        waterripple_calc_vtable(rip);
+        waterripple_render(frame, rip);
+    }
 }

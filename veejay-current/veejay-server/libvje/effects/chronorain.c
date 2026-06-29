@@ -42,7 +42,7 @@
 
 #define CF_ACTIVITY_GATE  8
 
-#define CF_OMP_FOR _Pragma("omp parallel for schedule(static) num_threads(c->n_threads)")
+#define CF_OMP_FOR _Pragma("omp for schedule(static)")
 
 typedef struct {
     int w;
@@ -147,7 +147,6 @@ static int cf_density_render_gain_q8(chronorain_t *c)
     uint64_t sum = 0;
     uint64_t hot = 0;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads) reduction(+:sum,hot)
     for(i = 0; i < len; i++) {
         int ev = cf_event_energy_limited(c->on_y[i], c->off_y[i]);
 
@@ -393,7 +392,6 @@ static void cf_seed(chronorain_t *c, VJFrame *frame)
     int i;
     int len = c->len;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
     for(i = 0; i < len; i++) {
         c->prev_y[i] = Y[i];
         c->ref_y[i] = Y[i];
@@ -811,7 +809,7 @@ static void cf_compute_safe_bands(chronorain_t *c,
     int y;
 
     if(ymin > 0) {
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
         for(y = 0; y < ymin; y++) {
             int x;
             int pos = y * w;
@@ -836,7 +834,7 @@ static void cf_compute_safe_bands(chronorain_t *c,
     }
 
     if(ymax + 1 < h) {
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
         for(y = ymax + 1; y < h; y++) {
             int x;
             int pos = y * w;
@@ -861,7 +859,7 @@ static void cf_compute_safe_bands(chronorain_t *c,
     }
 
     if(xmin > 0 && ymin <= ymax) {
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
         for(y = ymin; y <= ymax; y++) {
             int x;
             int pos = y * w;
@@ -886,7 +884,7 @@ static void cf_compute_safe_bands(chronorain_t *c,
     }
 
     if(xmax + 1 < w && ymin <= ymax) {
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
         for(y = ymin; y <= ymax; y++) {
             int x;
             int pos = y * w + xmax + 1;
@@ -1144,7 +1142,7 @@ static void cf_render_const_pure(chronorain_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         uint8_t src_y = Y[i];
 
@@ -1216,7 +1214,7 @@ static void cf_render_const_bleed(chronorain_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         uint8_t src_y = Y[i];
         uint8_t base_u = BLEEDUV[U[i]];
@@ -1290,7 +1288,7 @@ static void cf_render_source(chronorain_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         uint8_t src_y = Y[i];
         uint8_t src_u = U[i];
@@ -1378,7 +1376,7 @@ static void cf_render_white_pure(chronorain_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         uint8_t src_y = Y[i];
 
@@ -1414,7 +1412,7 @@ static void cf_render_white_bleed(chronorain_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         uint8_t src_y = Y[i];
 
@@ -1542,28 +1540,36 @@ void chronorain_apply(void *ptr, VJFrame *frame, int *args)
         use_storm = (storm_span_hint > 0);
     }
 
-    if(use_conduct) {
-        if(use_storm)
-            cf_compute_rain_full(c, frame, gravity, polarity_split, storm);
-        else
-            cf_compute_rain_conduct(c, frame, gravity, polarity_split, storm);
+    render_gain_q8 = 256;
+
+#pragma omp parallel num_threads(c->n_threads)
+    {
+        if(use_conduct) {
+            if(use_storm)
+                cf_compute_rain_full(c, frame, gravity, polarity_split, storm);
+            else
+                cf_compute_rain_conduct(c, frame, gravity, polarity_split, storm);
+        }
+        else {
+            if(use_storm)
+                cf_compute_rain_storm(c, frame, gravity, polarity_split, storm);
+            else
+                cf_compute_rain_plain(c, frame, gravity, polarity_split, storm);
+        }
+
+#pragma omp single
+        {
+            cf_swap_fields(c);
+            render_gain_q8 = cf_density_render_gain_q8(c);
+        }
+
+        cf_render(
+            c,
+            frame,
+            source_bleed,
+            color_mode,
+            render_gain_q8
+        );
     }
-    else {
-        if(use_storm)
-            cf_compute_rain_storm(c, frame, gravity, polarity_split, storm);
-        else
-            cf_compute_rain_plain(c, frame, gravity, polarity_split, storm);
-    }
-
-    cf_swap_fields(c);
-
-    render_gain_q8 = cf_density_render_gain_q8(c);
-
-    cf_render(
-        c,
-        frame,
-        source_bleed,
-        color_mode,
-        render_gain_q8
-    );
 }
+

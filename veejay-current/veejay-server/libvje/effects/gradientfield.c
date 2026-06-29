@@ -171,12 +171,11 @@ static void gradientfield_integral_y(const uint8_t *restrict src,
                                      uint32_t *restrict int_sum,
                                      uint64_t *restrict int_sq,
                                      int w,
-                                     int h,
-                                     int n_threads)
+                                     int h)
 {
     const int stride = w + 1;
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         const uint8_t *restrict src_row = src + (size_t)y * (size_t)w;
         uint32_t *restrict sum_row = int_sum + (size_t)(y + 1) * (size_t)stride + 1u;
@@ -195,7 +194,7 @@ static void gradientfield_integral_y(const uint8_t *restrict src,
         }
     }
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int x0 = 1; x0 <= w; x0 += 64) {
         const int x1 = (x0 + 64 <= w + 1) ? x0 + 64 : w + 1;
 
@@ -217,12 +216,11 @@ static void gradientfield_integral_y(const uint8_t *restrict src,
 static void gradientfield_integral_sum(const uint8_t *restrict src,
                                        uint32_t *restrict int_sum,
                                        int w,
-                                       int h,
-                                       int n_threads)
+                                       int h)
 {
     const int stride = w + 1;
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         const uint8_t *restrict src_row = src + (size_t)y * (size_t)w;
         uint32_t *restrict sum_row = int_sum + (size_t)(y + 1) * (size_t)stride + 1u;
@@ -235,7 +233,7 @@ static void gradientfield_integral_sum(const uint8_t *restrict src,
         }
     }
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int x0 = 1; x0 <= w; x0 += 64) {
         const int x1 = (x0 + 64 <= w + 1) ? x0 + 64 : w + 1;
 
@@ -413,11 +411,14 @@ void gradientfield_apply(void *ptr, VJFrame *frame, int *args)
     veejay_memcpy(s->copyU, U, len);
     veejay_memcpy(s->copyV, V, len);
 
-    gradientfield_integral_y(s->copyY, s->intY_sum, s->intY_sq, w, h, s->n_threads);
-    gradientfield_integral_sum(s->copyU, s->intU_sum, w, h, s->n_threads);
-    gradientfield_integral_sum(s->copyV, s->intV_sum, w, h, s->n_threads);
+#pragma omp parallel num_threads(s->n_threads)
+    {
+        gradientfield_integral_y(s->copyY, s->intY_sum, s->intY_sq, w, h);
+        gradientfield_integral_sum(s->copyU, s->intU_sum, w, h);
+        gradientfield_integral_sum(s->copyV, s->intV_sum, w, h);
 
-#pragma omp parallel for num_threads(s->n_threads) schedule(static)
-    for(int y = 0; y < h - 1; y += 2)
-        gradientfield_apply_rowpair(s, Y, U, V, a, opacity, y);
+#pragma omp for schedule(static)
+        for(int y = 0; y < h - 1; y += 2)
+            gradientfield_apply_rowpair(s, Y, U, V, a, opacity, y);
+    }
 }

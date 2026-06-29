@@ -129,33 +129,23 @@ void bwselect_apply(void *ptr, VJFrame *frame, int *args)
     }
 
     const int use_gamma = gamma != 0;
+    const int hi = pixel_Y_hi_;
+    const int lo = pixel_Y_lo_;
 
-    if(mode == 0)
-    {
-        const int hi = pixel_Y_hi_;
-        const int lo = pixel_Y_lo_;
-
-        #pragma omp parallel for num_threads(b->n_threads) schedule(static)
-        for(int i = 0; i < len; i++)
-        {
-            const uint8_t p = use_gamma ? table[Y[i]] : Y[i];
-            const int cond = (p > min_threshold) & (p < max_threshold);
-
-            Y[i] = (uint8_t)((-cond & hi) | (~(-cond) & lo));
-        }
-
-        veejay_memset(Cb, 128, frame->uv_len);
-        veejay_memset(Cr, 128, frame->uv_len);
-
-        return;
-    }
-
-    #pragma omp parallel for num_threads(b->n_threads) schedule(static)
+#pragma omp parallel for num_threads(b->n_threads) schedule(static)
     for(int i = 0; i < len; i++)
     {
         const uint8_t p = use_gamma ? table[Y[i]] : Y[i];
         const int cond = (p > min_threshold) & (p < max_threshold);
 
-        A[i] = (uint8_t)(-cond);
+        if(mode == 0)
+            Y[i] = (uint8_t)((-cond & hi) | (~(-cond) & lo));
+        else
+            A[i] = (uint8_t)(-cond);
+    }
+
+    if(mode == 0) {
+        veejay_memset(Cb, 128, frame->uv_len);
+        veejay_memset(Cr, 128, frame->uv_len);
     }
 }

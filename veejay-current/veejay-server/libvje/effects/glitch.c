@@ -209,29 +209,11 @@ void glitch_apply(void *ptr, VJFrame *frame, int *args)
     int *restrict rand_lut = g->rand_lut;
     int *restrict lsfr_lut = g->lsfr_lut;
 
-    if(phase == 0) {
-#pragma omp parallel for schedule(static) num_threads(g->n_threads)
-        for(int i = 0; i < len; i++) {
-            rand_lut[i] = fastrand(rand_lut[i]);
-            lsfr_lut[i] = rand_lut[i];
-        }
-    }
-
     veejay_memcpy(bU, U, len);
     veejay_memcpy(bV, V, len);
 
     const int half_qty = noise_qty >> 1;
     const int noise_mul = amplitude * noise_gain * noise_scale;
-
-#pragma omp parallel for schedule(static) num_threads(g->n_threads)
-    for(int i = 0; i < len; i++) {
-        const int q = lsfr_lut[i] % noise_qty;
-        const int centered = q - half_qty;
-        const int noise = (centered * noise_mul) / 100;
-
-        bY[i] = CLAMP_Y((int)Y[i] + noise);
-        lsfr_lut[i] = fastrand(lsfr_lut[i]);
-    }
 
     int distortion_x = (distortion_x_arg * width) / 100;
     int distortion_y = (distortion_y_arg * height) / 100;
@@ -245,22 +227,43 @@ void glitch_apply(void *ptr, VJFrame *frame, int *args)
     const int chroma_alpha_base = clampi(glitch_absi(distortion_x_arg) + glitch_absi(distortion_y_arg), 0, 200);
     const int chroma_alpha_scale = 96 + ((chroma_alpha_base * 159) / 200);
 
-#pragma omp parallel for schedule(static) num_threads(g->n_threads)
-    for(int y = 0; y < height; y++) {
-        const int ny = glitch_wrap_once(y + distortion_y, height);
-        const int row = y * width;
-        const int drow = ny * width;
+#pragma omp parallel num_threads(g->n_threads)
+    {
+        if(phase == 0) {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                rand_lut[i] = fastrand(rand_lut[i]);
+                lsfr_lut[i] = rand_lut[i];
+            }
+        }
+
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            const int q = lsfr_lut[i] % noise_qty;
+            const int centered = q - half_qty;
+            const int noise = (centered * noise_mul) / 100;
+
+            bY[i] = CLAMP_Y((int)Y[i] + noise);
+            lsfr_lut[i] = fastrand(lsfr_lut[i]);
+        }
+
+#pragma omp for schedule(static)
+        for(int y = 0; y < height; y++) {
+            const int ny = glitch_wrap_once(y + distortion_y, height);
+            const int row = y * width;
+            const int drow = ny * width;
 
 #pragma omp simd
-        for(int x = 0; x < width; x++) {
-            const int nx = glitch_wrap_once(x + distortion_x, width);
-            const int src = row + x;
-            const int dst = drow + nx;
-            const int alpha = ((int)Y[dst] * chroma_alpha_scale) >> 8;
+            for(int x = 0; x < width; x++) {
+                const int nx = glitch_wrap_once(x + distortion_x, width);
+                const int src = row + x;
+                const int dst = drow + nx;
+                const int alpha = ((int)Y[dst] * chroma_alpha_scale) >> 8;
 
-            U[src] = glitch_blend255(U[src], bU[dst], 255 - alpha);
-            V[src] = glitch_blend255(V[src], bV[dst], 255 - alpha);
-            Y[src] = (uint8_t)(((int)Y[src] + (int)bY[dst] + 1) >> 1);
+                U[src] = glitch_blend255(U[src], bU[dst], 255 - alpha);
+                V[src] = glitch_blend255(V[src], bV[dst], 255 - alpha);
+                Y[src] = (uint8_t)(((int)Y[src] + (int)bY[dst] + 1) >> 1);
+            }
         }
     }
 }

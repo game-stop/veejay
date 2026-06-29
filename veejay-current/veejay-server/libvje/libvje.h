@@ -87,5 +87,6 @@ void vjert_update( void *ptr, VJFrame *frame );
 
 const vj_beat_param_hint_t *vje_get_beat_hint(int fx_id, int parameter_id);
 int vje_get_beat_hint_copy(int fx_id, int parameter_id, vj_beat_param_hint_t *dst);
+int vje_max_threads(int len);
 
 #endif

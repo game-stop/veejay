@@ -76,54 +76,6 @@ vj_effect *simplemask_init(int w, int h)
     return ve;
 }
 
-static void simplemask_replace_black(uint8_t **restrict yuv1,
-                                     uint8_t **restrict yuv2,
-                                     int len,
-                                     int threshold,
-                                     int n_threads)
-{
-    uint8_t *restrict Y = yuv1[0];
-    uint8_t *restrict Cb = yuv1[1];
-    uint8_t *restrict Cr = yuv1[2];
-
-    const uint8_t *restrict Y2 = yuv2[0];
-    const uint8_t *restrict Cb2 = yuv2[1];
-    const uint8_t *restrict Cr2 = yuv2[2];
-
-#pragma omp parallel for schedule(static) num_threads(n_threads)
-    for(int i = 0; i < len; i++) {
-        const int mask = -((int)Y[i] < threshold);
-
-        Y[i] = (uint8_t)((Y2[i] & mask) | (Y[i] & ~mask));
-        Cb[i] = (uint8_t)((Cb2[i] & mask) | (Cb[i] & ~mask));
-        Cr[i] = (uint8_t)((Cr2[i] & mask) | (Cr[i] & ~mask));
-    }
-}
-
-static void simplemask_replace_white(uint8_t **restrict yuv1,
-                                     uint8_t **restrict yuv2,
-                                     int len,
-                                     int threshold,
-                                     int n_threads)
-{
-    uint8_t *restrict Y = yuv1[0];
-    uint8_t *restrict Cb = yuv1[1];
-    uint8_t *restrict Cr = yuv1[2];
-
-    const uint8_t *restrict Y2 = yuv2[0];
-    const uint8_t *restrict Cb2 = yuv2[1];
-    const uint8_t *restrict Cr2 = yuv2[2];
-
-#pragma omp parallel for schedule(static) num_threads(n_threads)
-    for(int i = 0; i < len; i++) {
-        const int mask = -((int)Y[i] > threshold);
-
-        Y[i] = (uint8_t)((Y2[i] & mask) | (Y[i] & ~mask));
-        Cb[i] = (uint8_t)((Cb2[i] & mask) | (Cb[i] & ~mask));
-        Cr[i] = (uint8_t)((Cr2[i] & mask) | (Cr[i] & ~mask));
-    }
-}
-
 void simplemask_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     (void) ptr;
@@ -133,8 +85,20 @@ void simplemask_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int len = frame->len;
     const int n_threads = vje_advise_num_threads(len);
 
-    if(mode == 0)
-        simplemask_replace_black(frame->data, frame2->data, len, threshold, n_threads);
-    else
-        simplemask_replace_white(frame->data, frame2->data, len, threshold, n_threads);
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
+
+#pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int i = 0; i < len; i++) {
+        const int mask = mode == 0 ? -((int)Y[i] < threshold) : -((int)Y[i] > threshold);
+
+        Y[i] = (uint8_t)((Y2[i] & mask) | (Y[i] & ~mask));
+        Cb[i] = (uint8_t)((Cb2[i] & mask) | (Cb[i] & ~mask));
+        Cr[i] = (uint8_t)((Cr2[i] & mask) | (Cr[i] & ~mask));
+    }
 }

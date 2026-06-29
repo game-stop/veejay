@@ -21,7 +21,6 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include <math.h>
-#include <omp.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -167,10 +166,6 @@ static inline int bilerp_i(int p00, int p10, int p01, int p11, int fx, int fy)
 
     return a + (((b - a) * fy) >> FP_SHIFT);
 }
-
-
-
-
 
 static inline void tunnel_limit_chroma_i(int *u, int *v, int limit)
 {
@@ -365,7 +360,7 @@ static void precompute_warp_luts(box_tunnel_t *t)
     }
 }
 
-static void generate_geometry(box_tunnel_t *t, int shape)
+static void generate_geometry_work(box_tunnel_t *t, int shape)
 {
     int w = t->width;
     int h = t->height;
@@ -376,7 +371,7 @@ static void generate_geometry(box_tunnel_t *t, int shape)
     float inv_cx = 1.0f / cx;
     float inv_cy = 1.0f / cy;
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         float dy = ((float)y - cy) * inv_cy;
         int row = y * w;
@@ -479,7 +474,16 @@ static void generate_geometry(box_tunnel_t *t, int shape)
         }
     }
 
+#pragma omp single
     t->last_shape = shape;
+}
+
+static void generate_geometry(box_tunnel_t *t, int shape)
+{
+#pragma omp parallel num_threads(t->n_threads)
+    {
+        generate_geometry_work(t, shape);
+    }
 }
 
 vj_effect *tunnel_init(int width, int height)
@@ -653,9 +657,7 @@ void tunnel_apply(void *ptr, VJFrame *frame, int *args)
     const int travel_drive = args[P_TRAVEL_DRIVE];
     const int zoom_drive = args[P_ZOOM_DRIVE];
     const int chroma_flow = args[P_CHROMA_FLOW];
-
-    if(shape != t->last_shape)
-        generate_geometry(t, shape);
+    const int rebuild_shape = (shape != t->last_shape);
 
     const float travel_target = (float)travel_drive * 0.001f;
     const float zoom_target_drive = (float)zoom_drive * 0.001f;
@@ -775,110 +777,116 @@ void tunnel_apply(void *ptr, VJFrame *frame, int *args)
     const int wm1 = w - 1;
     const int hm1 = h - 1;
 
-    if(high_quality) {
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
-        for(int i = 0; i < size; i++) {
-            float u_base = FROM_FP(t->u_lut[i]);
-            float v_base = FROM_FP(t->v_lut[i]);
+#pragma omp parallel num_threads(t->n_threads)
+    {
+        if(rebuild_shape)
+            generate_geometry_work(t, shape);
 
-            float v = v_base * zoom + timef + liss_y;
+        if(high_quality) {
+#pragma omp for schedule(static)
+            for(int i = 0; i < size; i++) {
+                float u_base = FROM_FP(t->u_lut[i]);
+                float v_base = FROM_FP(t->v_lut[i]);
 
-            if(phase_active)
-                v += phase_offset * FAST_SIN_T(t, v_base * 4.0f + v_phase_time);
+                float v = v_base * zoom + timef + liss_y;
 
-            float u = u_base + liss_x;
+                if(phase_active)
+                    v += phase_offset * FAST_SIN_T(t, v_base * 4.0f + v_phase_time);
 
-            if(swirl_active) {
-                u += swirl * warp_lut[i];
-                u += swirl_sin * FAST_SIN_T(t, wave_lut[i] + swirl_time);
+                float u = u_base + liss_x;
+
+                if(swirl_active) {
+                    u += swirl * warp_lut[i];
+                    u += swirl_sin * FAST_SIN_T(t, wave_lut[i] + swirl_time);
+                }
+
+                int y0;
+                int u0;
+                int v0;
+
+                int32_t u_fp = frac_to_fp_fast(u);
+                int32_t v_fp = frac_to_fp_fast(v);
+
+                sample_bilinear_yuv_fast(srcY, srcU, srcV, u_fp, v_fp, w, h, &y0, &u0, &v0);
+
+                int32_t accY;
+                int32_t accU;
+                int32_t accV;
+
+                if(layer_active) {
+                    int y1;
+                    int u1;
+                    int v1;
+
+                    v_fp = frac_to_fp_fast(v + layer_step);
+                    sample_bilinear_yuv_fast(srcY, srcU, srcV, u_fp, v_fp, w, h, &y1, &u1, &v1);
+
+                    accY = (int32_t)((y0 + y1) << (FP_SHIFT - 1));
+                    accU = (int32_t)((u0 + u1) << (FP_SHIFT - 1));
+                    accV = (int32_t)((v0 + v1) << (FP_SHIFT - 1));
+                } else {
+                    accY = (int32_t)y0 << FP_SHIFT;
+                    accU = (int32_t)u0 << FP_SHIFT;
+                    accV = (int32_t)v0 << FP_SHIFT;
+                }
+
+                if(chroma_active) {
+                    int wave = (int)(FAST_SIN_T(t, wave_lut[i] * 0.85f + chroma_phase) * (float)chroma_bias);
+                    accU += (int32_t)wave << FP_SHIFT;
+                    accV -= (int32_t)(wave >> 1) << FP_SHIFT;
+                }
+
+                tunnel_write_pixel(t, i, accY, accU, accV, fb_fp, inv_fb_fp, chroma_fb_fp, inv_chroma_fp, chroma_limit);
             }
+        } else {
+#pragma omp for schedule(static)
+            for(int i = 0; i < size; i++) {
+                float u_base = FROM_FP(t->u_lut[i]);
+                float v_base = FROM_FP(t->v_lut[i]);
 
-            int y0;
-            int u0;
-            int v0;
+                float v = v_base * zoom + timef + liss_y;
 
-            int32_t u_fp = frac_to_fp_fast(u);
-            int32_t v_fp = frac_to_fp_fast(v);
+                if(phase_active)
+                    v += phase_offset * FAST_SIN_T(t, v_base * 4.0f + v_phase_time);
 
-            sample_bilinear_yuv_fast(srcY, srcU, srcV, u_fp, v_fp, w, h, &y0, &u0, &v0);
+                float u = u_base + liss_x;
 
-            int32_t accY;
-            int32_t accU;
-            int32_t accV;
+                if(swirl_active) {
+                    u += swirl * warp_lut[i];
+                    u += swirl_sin * FAST_SIN_T(t, wave_lut[i] + swirl_time);
+                }
 
-            if(layer_active) {
-                int y1;
-                int u1;
-                int v1;
+                int32_t u_fp = frac_to_fp_fast(u);
+                int32_t v_fp = frac_to_fp_fast(v);
 
-                v_fp = frac_to_fp_fast(v + layer_step);
-                sample_bilinear_yuv_fast(srcY, srcU, srcV, u_fp, v_fp, w, h, &y1, &u1, &v1);
+                int tx = ((u_fp >> 8) * wm1) >> 8;
+                int ty = ((v_fp >> 8) * hm1) >> 8;
+                int si = ty * w + tx;
 
-                accY = (int32_t)((y0 + y1) << (FP_SHIFT - 1));
-                accU = (int32_t)((u0 + u1) << (FP_SHIFT - 1));
-                accV = (int32_t)((v0 + v1) << (FP_SHIFT - 1));
-            } else {
-                accY = (int32_t)y0 << FP_SHIFT;
-                accU = (int32_t)u0 << FP_SHIFT;
-                accV = (int32_t)v0 << FP_SHIFT;
+                int32_t accY = (int32_t)srcY[si] << FP_SHIFT;
+                int32_t accU = ((int32_t)srcU[si] - 128) << FP_SHIFT;
+                int32_t accV = ((int32_t)srcV[si] - 128) << FP_SHIFT;
+
+                if(layer_active) {
+                    v_fp = frac_to_fp_fast(v + layer_step);
+
+                    tx = ((u_fp >> 8) * wm1) >> 8;
+                    ty = ((v_fp >> 8) * hm1) >> 8;
+                    si = ty * w + tx;
+
+                    accY = (accY + ((int32_t)srcY[si] << FP_SHIFT)) >> 1;
+                    accU = (accU + (((int32_t)srcU[si] - 128) << FP_SHIFT)) >> 1;
+                    accV = (accV + (((int32_t)srcV[si] - 128) << FP_SHIFT)) >> 1;
+                }
+
+                if(chroma_active) {
+                    int wave = (int)(FAST_SIN_T(t, wave_lut[i] * 0.85f + chroma_phase) * (float)chroma_bias);
+                    accU += (int32_t)wave << FP_SHIFT;
+                    accV -= (int32_t)(wave >> 1) << FP_SHIFT;
+                }
+
+                tunnel_write_pixel(t, i, accY, accU, accV, fb_fp, inv_fb_fp, chroma_fb_fp, inv_chroma_fp, chroma_limit);
             }
-
-            if(chroma_active) {
-                int wave = (int)(FAST_SIN_T(t, wave_lut[i] * 0.85f + chroma_phase) * (float)chroma_bias);
-                accU += (int32_t)wave << FP_SHIFT;
-                accV -= (int32_t)(wave >> 1) << FP_SHIFT;
-            }
-
-            tunnel_write_pixel(t, i, accY, accU, accV, fb_fp, inv_fb_fp, chroma_fb_fp, inv_chroma_fp, chroma_limit);
-        }
-    } else {
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
-        for(int i = 0; i < size; i++) {
-            float u_base = FROM_FP(t->u_lut[i]);
-            float v_base = FROM_FP(t->v_lut[i]);
-
-            float v = v_base * zoom + timef + liss_y;
-
-            if(phase_active)
-                v += phase_offset * FAST_SIN_T(t, v_base * 4.0f + v_phase_time);
-
-            float u = u_base + liss_x;
-
-            if(swirl_active) {
-                u += swirl * warp_lut[i];
-                u += swirl_sin * FAST_SIN_T(t, wave_lut[i] + swirl_time);
-            }
-
-            int32_t u_fp = frac_to_fp_fast(u);
-            int32_t v_fp = frac_to_fp_fast(v);
-
-            int tx = ((u_fp >> 8) * wm1) >> 8;
-            int ty = ((v_fp >> 8) * hm1) >> 8;
-            int si = ty * w + tx;
-
-            int32_t accY = (int32_t)srcY[si] << FP_SHIFT;
-            int32_t accU = ((int32_t)srcU[si] - 128) << FP_SHIFT;
-            int32_t accV = ((int32_t)srcV[si] - 128) << FP_SHIFT;
-
-            if(layer_active) {
-                v_fp = frac_to_fp_fast(v + layer_step);
-
-                tx = ((u_fp >> 8) * wm1) >> 8;
-                ty = ((v_fp >> 8) * hm1) >> 8;
-                si = ty * w + tx;
-
-                accY = (accY + ((int32_t)srcY[si] << FP_SHIFT)) >> 1;
-                accU = (accU + (((int32_t)srcU[si] - 128) << FP_SHIFT)) >> 1;
-                accV = (accV + (((int32_t)srcV[si] - 128) << FP_SHIFT)) >> 1;
-            }
-
-            if(chroma_active) {
-                int wave = (int)(FAST_SIN_T(t, wave_lut[i] * 0.85f + chroma_phase) * (float)chroma_bias);
-                accU += (int32_t)wave << FP_SHIFT;
-                accV -= (int32_t)(wave >> 1) << FP_SHIFT;
-            }
-
-            tunnel_write_pixel(t, i, accY, accU, accV, fb_fp, inv_fb_fp, chroma_fb_fp, inv_chroma_fp, chroma_limit);
         }
     }
 

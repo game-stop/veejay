@@ -245,7 +245,7 @@ vj_effect *spherize_init(int w, int h)
 
 static void spherize_rebuild_center_luts(spherize_t *s, int w, int h, int cx, int cy)
 {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         const float dy = (float)(y - cy);
         const int row = y * w;
@@ -259,18 +259,22 @@ static void spherize_rebuild_center_luts(spherize_t *s, int w, int h, int cx, in
         }
     }
 
-    s->last_cx = cx;
-    s->last_cy = cy;
-    s->last_angle = -999999.0f;
-    s->last_radius = -1;
+#pragma omp single
+    {
+        s->last_cx = cx;
+        s->last_cy = cy;
+        s->last_angle = -999999.0f;
+        s->last_radius = -1;
+    }
 }
 
 static void spherize_rebuild_sin_lut(spherize_t *s, int len, float angle)
 {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         s->sin_lut[i] = sinf(s->atan2_lut[i] - angle);
 
+#pragma omp single
     s->last_angle = angle;
 }
 
@@ -279,12 +283,13 @@ static void spherize_rebuild_exp_lut(spherize_t *s, int len, int radius)
     const float r = (float)(radius > 0 ? radius : 1);
     const float inv_sigma = 1.0f / (2.0f * r * r);
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const float d = s->dist_lut[i];
         s->exp_lut[i] = expf(-(d * d) * inv_sigma);
     }
 
+#pragma omp single
     s->last_radius = radius;
 }
 
@@ -430,6 +435,10 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args)
     const float strength = (float)effective_strength * 0.01f;
     const float angle = effective_angle_deg * ((float)M_PI / 180.0f);
 
+    const int rebuild_center = (s->last_cx != center_x || s->last_cy != center_y);
+    const int rebuild_angle = rebuild_center || (s->last_angle != angle);
+    const int rebuild_radius = rebuild_center || (s->last_radius != effective_radius);
+
     uint8_t *restrict srcY = frame->data[0];
     uint8_t *restrict srcU = frame->data[1];
     uint8_t *restrict srcV = frame->data[2];
@@ -442,21 +451,23 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args)
     veejay_memcpy(bufU, srcU, len);
     veejay_memcpy(bufV, srcV, len);
 
-    if(s->last_cx != center_x || s->last_cy != center_y)
-        spherize_rebuild_center_luts(s, width, height, center_x, center_y);
-
-    if(s->last_angle != angle)
-        spherize_rebuild_sin_lut(s, len, angle);
-
-    if(s->last_radius != effective_radius)
-        spherize_rebuild_exp_lut(s, len, effective_radius);
-
     const float *restrict sin_lut = s->sin_lut;
     const float *restrict exp_lut = s->exp_lut;
 
-    if(mode == 0) {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-        for(int y = 0; y < height; y++) {
+#pragma omp parallel num_threads(s->n_threads)
+    {
+        if(rebuild_center)
+            spherize_rebuild_center_luts(s, width, height, center_x, center_y);
+
+        if(rebuild_angle)
+            spherize_rebuild_sin_lut(s, len, angle);
+
+        if(rebuild_radius)
+            spherize_rebuild_exp_lut(s, len, effective_radius);
+
+        if(mode == 0) {
+#pragma omp for schedule(static)
+            for(int y = 0; y < height; y++) {
             const int row = y * width;
             const float dy_scaled = (float)(y - center_y) * ratio_y;
 
@@ -478,9 +489,9 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args)
                 srcV[idx] = bufV[src];
             }
         }
-    } else if(mode == 1) {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-        for(int y = 0; y < height; y++) {
+        } else if(mode == 1) {
+#pragma omp for schedule(static)
+            for(int y = 0; y < height; y++) {
             const int row = y * width;
             const float dy_scaled = (float)(y - center_y) * ratio_y;
 
@@ -502,9 +513,9 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args)
                 srcV[idx] = bufV[src];
             }
         }
-    } else {
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-        for(int y = 0; y < height; y++) {
+        } else {
+#pragma omp for schedule(static)
+            for(int y = 0; y < height; y++) {
             const int row = y * width;
             const float dy_scaled = (float)(y - center_y) * ratio_y;
 
@@ -525,6 +536,7 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args)
                 srcU[idx] = bufU[src];
                 srcV[idx] = bufV[src];
             }
+        }
         }
     }
 }

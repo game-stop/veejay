@@ -286,7 +286,9 @@ static void spectralmotion_output_full(uint8_t *restrict Y,
                                        int len,
                                        int n_threads)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+    (void)n_threads;
+
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         Y[i] = vY[i];
         U[i] = vU[i];
@@ -304,9 +306,11 @@ static void spectralmotion_output_overlay(uint8_t *restrict Y,
                                           int len,
                                           int n_threads)
 {
+    (void)n_threads;
+
     const int q8 = (opacity * 256 + 127) / 255;
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         Y[i] = spectralmotion_blend_y(Y[i], vY[i], q8);
         U[i] = spectralmotion_blend_uv(U[i], vU[i], q8);
@@ -321,7 +325,9 @@ static void spectralmotion_output_debug(uint8_t *restrict Y,
                                         int len,
                                         int n_threads)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+    (void)n_threads;
+
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         Y[i] = CLAMP_Y((int)exc[i] * 2);
         U[i] = 128;
@@ -417,8 +423,10 @@ void spectralmotion_apply(void *ptr, VJFrame *frame, int *args)
 
     const int flash_q8 = is_flash_frame ? 255 : 192;
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-    for(int i = 0; i < len; i++) {
+#pragma omp parallel num_threads(s->n_threads)
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
         const int input_y = Y[i];
         const int diff = spectralmotion_abs_i(input_y - (int)mY[i]);
 
@@ -457,17 +465,18 @@ void spectralmotion_apply(void *ptr, VJFrame *frame, int *args)
         mY[i] = (uint8_t)(((int)mY[i] * (256 - adaptation) + input_y * adaptation) >> 8);
     }
 
-    switch(mode) {
-        case 2:
-            spectralmotion_output_debug(Y, U, V, exc, len, s->n_threads);
-            break;
-        case 1:
-            spectralmotion_output_overlay(Y, U, V, vY, vU, vV, opacity, len, s->n_threads);
-            break;
-        case 0:
-        default:
-            spectralmotion_output_full(Y, U, V, vY, vU, vV, len, s->n_threads);
-            break;
+        switch(mode) {
+            case 2:
+                spectralmotion_output_debug(Y, U, V, exc, len, s->n_threads);
+                break;
+            case 1:
+                spectralmotion_output_overlay(Y, U, V, vY, vU, vV, opacity, len, s->n_threads);
+                break;
+            case 0:
+            default:
+                spectralmotion_output_full(Y, U, V, vY, vU, vV, len, s->n_threads);
+                break;
+        }
     }
 
     s->timestamp++;

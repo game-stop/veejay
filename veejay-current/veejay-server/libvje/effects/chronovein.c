@@ -283,7 +283,6 @@ static void cv_seed(chronovein_t *c, VJFrame *frame)
     int i;
     int len = c->len;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
     for(i = 0; i < len; i++) {
         c->prev_y[i] = Y[i];
         c->ref_y[i] = Y[i];
@@ -562,7 +561,7 @@ static void cv_compute_safe_border(chronovein_t *c,
     int y;
 
     if(h <= 2 || w <= 2) {
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
         for(y = 0; y < h; y++) {
             int x;
             int pos = y * w;
@@ -575,7 +574,7 @@ static void cv_compute_safe_border(chronovein_t *c,
         return;
     }
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(y = 0; y < h; y++) {
         int x;
 
@@ -626,7 +625,7 @@ static void cv_compute(chronovein_t *c,
         return;
     }
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(y = 1; y < h - 1; y++) {
         int x;
         int pos = y * w + 1;
@@ -748,7 +747,7 @@ static void cv_render_const(chronovein_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         uint8_t src_y = Y[i];
 
@@ -820,7 +819,7 @@ static void cv_render_source(chronovein_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         uint8_t src_y = Y[i];
         uint8_t src_u = U[i];
@@ -892,7 +891,7 @@ static void cv_render_white(chronovein_t *c,
     int len = c->len;
     int i;
 
-#pragma omp parallel for schedule(static) num_threads(c->n_threads)
+#pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
         uint8_t src_y = Y[i];
 
@@ -1034,19 +1033,26 @@ void chronovein_apply(void *ptr, VJFrame *frame, int *args)
         use_branch  = (branch_power > 0);
     }
 
-    cv_compute(c, frame, use_conduct, use_branch);
+#pragma omp parallel num_threads(c->n_threads)
+    {
+        cv_compute(c, frame, use_conduct, use_branch);
 
-    cv_swap_fields(c);
+#pragma omp single
+        {
+            cv_swap_fields(c);
+        }
 
-    cv_render(
-        c,
-        frame,
-        source_bleed,
-        color_mode,
-        pulse,
-        vein_gain,
-        color_energy
-    );
+        cv_render(
+            c,
+            frame,
+            source_bleed,
+            color_mode,
+            pulse,
+            vein_gain,
+            color_energy
+        );
+    }
 
     c->frame++;
 }
+

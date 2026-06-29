@@ -69,9 +69,7 @@ static void colorshift_or_plane(uint8_t *restrict p, int len, uint8_t value)
     if(!p || len <= 0)
         return;
 
-    const int n_threads = vje_advise_num_threads(len);
-
-    #pragma omp parallel for schedule(static) num_threads(n_threads)
+    #pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         p[i] = (uint8_t)(p[i] | value);
 }
@@ -81,9 +79,7 @@ static void colorshift_and_plane(uint8_t *restrict p, int len, uint8_t value)
     if(!p || len <= 0)
         return;
 
-    const int n_threads = vje_advise_num_threads(len);
-
-    #pragma omp parallel for schedule(static) num_threads(n_threads)
+    #pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         p[i] = (uint8_t)(p[i] & value);
 }
@@ -93,9 +89,7 @@ static void colorshift_or_2planes(uint8_t *restrict p0, uint8_t *restrict p1, in
     if(!p0 || !p1 || len <= 0)
         return;
 
-    const int n_threads = vje_advise_num_threads(len);
-
-    #pragma omp parallel for schedule(static) num_threads(n_threads)
+    #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         p0[i] = (uint8_t)(p0[i] | value);
         p1[i] = (uint8_t)(p1[i] | value);
@@ -107,9 +101,7 @@ static void colorshift_and_2planes(uint8_t *restrict p0, uint8_t *restrict p1, i
     if(!p0 || !p1 || len <= 0)
         return;
 
-    const int n_threads = vje_advise_num_threads(len);
-
-    #pragma omp parallel for schedule(static) num_threads(n_threads)
+    #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         p0[i] = (uint8_t)(p0[i] & value);
         p1[i] = (uint8_t)(p1[i] & value);
@@ -119,7 +111,7 @@ static void colorshift_and_2planes(uint8_t *restrict p0, uint8_t *restrict p1, i
 static void colorshift_or_ycbcr(VJFrame *frame, uint8_t value)
 {
     const int len = frame->len;
-    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
+    const int uv_len = frame->uv_len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -128,9 +120,6 @@ static void colorshift_or_ycbcr(VJFrame *frame, uint8_t value)
     if(!Y || !Cb || !Cr || len <= 0)
         return;
 
-    const int n_threads = vje_advise_num_threads(len);
-
-    #pragma omp parallel num_threads(n_threads)
     {
         #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
@@ -147,7 +136,7 @@ static void colorshift_or_ycbcr(VJFrame *frame, uint8_t value)
 static void colorshift_and_ycbcr(VJFrame *frame, uint8_t value)
 {
     const int len = frame->len;
-    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
+    const int uv_len = frame->uv_len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -156,9 +145,6 @@ static void colorshift_and_ycbcr(VJFrame *frame, uint8_t value)
     if(!Y || !Cb || !Cr || len <= 0)
         return;
 
-    const int n_threads = vje_advise_num_threads(len);
-
-    #pragma omp parallel num_threads(n_threads)
     {
         #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
@@ -179,42 +165,47 @@ void colorshift_apply(void *ptr, VJFrame *frame, int *args)
     const int type = args[0];
     const uint8_t value = args[1];
     const int len = frame->len;
-    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
+    const int uv_len = frame->uv_len;
+    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    switch(type) {
-        case 0:
-            colorshift_or_plane(Y, len, value);
-            break;
-        case 1:
-            colorshift_or_plane(Cb, uv_len, value);
-            break;
-        case 2:
-            colorshift_or_plane(Cr, uv_len, value);
-            break;
-        case 3:
-            colorshift_or_2planes(Cb, Cr, uv_len, value);
-            break;
-        case 4:
-            colorshift_or_ycbcr(frame, value);
-            break;
-        case 5:
-            colorshift_and_ycbcr(frame, value);
-            break;
-        case 6:
-            colorshift_and_plane(Y, len, value);
-            break;
-        case 7:
-            colorshift_and_plane(Cb, uv_len, value);
-            break;
-        case 8:
-            colorshift_and_plane(Cr, uv_len, value);
-            break;
-        case 9:
-            colorshift_and_2planes(Cb, Cr, uv_len, value);
-            break;
+#pragma omp parallel num_threads(n_threads)
+    {
+        switch(type) {
+            case 0:
+                colorshift_or_plane(Y, len, value);
+                break;
+            case 1:
+                colorshift_or_plane(Cb, uv_len, value);
+                break;
+            case 2:
+                colorshift_or_plane(Cr, uv_len, value);
+                break;
+            case 3:
+                colorshift_or_2planes(Cb, Cr, uv_len, value);
+                break;
+            case 4:
+                colorshift_or_ycbcr(frame, value);
+                break;
+            case 5:
+                colorshift_and_ycbcr(frame, value);
+                break;
+            case 6:
+                colorshift_and_plane(Y, len, value);
+                break;
+            case 7:
+                colorshift_and_plane(Cb, uv_len, value);
+                break;
+            case 8:
+                colorshift_and_plane(Cr, uv_len, value);
+                break;
+            case 9:
+                colorshift_and_2planes(Cb, Cr, uv_len, value);
+                break;
+        }
     }
 }
+

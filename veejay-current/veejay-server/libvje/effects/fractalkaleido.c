@@ -362,7 +362,7 @@ static void fractalkaleido_apply1_twistinversion(void *ptr, VJFrame *frame, int 
     const float scale = 0.1f + scale_val * scale_val * 4.0f;
 
     int *map = s->map;
-#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y <= hh; y++)
     {
         const int row = y * w;
@@ -483,7 +483,7 @@ static void fractalkaleido_apply1(void *ptr, VJFrame *frame, int *args, float ba
 
     int *map = s->map;
 
-#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y <= hh; y++)
     {
         const int row = y * w;
@@ -604,7 +604,7 @@ static void fractalkaleido_apply1_segcouple(void *ptr, VJFrame *frame, int *args
     const float unified_rot = get_unified_rot(s, rnorm, base_angle);
 
     int *map = s->map;
-#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y <= hh; y++)
     {
         const int row = y * w;
@@ -735,7 +735,7 @@ static void fractalkaleido_apply1_vortex(void *ptr, VJFrame *frame, int *args, f
     const float unified_rot = get_unified_rot(s, rnorm, base_angle);
 
     int *map = s->map;
-#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y <= hh; y++)
     {
         const int row = y * w;
@@ -859,7 +859,7 @@ static void fractalkaleido_apply1_wave(void *ptr, VJFrame *frame, int *args, flo
     const float unified_rot = get_unified_rot(s, rnorm, base_angle);
 
     int *map = s->map;
-#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y <= hh; y++)
     {
         const int row = y * w;
@@ -1052,7 +1052,7 @@ static void fractalkaleido_apply1_radialclassic(void *ptr, VJFrame *frame, int *
 
     int *map = s->map;
 
-#pragma omp parallel for num_threads(s->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y <= hh; y++)
     {
         const int row = y * w;
@@ -1184,38 +1184,49 @@ void fractalkaleido_apply(void *ptr, VJFrame *frame, int *args) {
 
     needs_update = (!s->map_ready) || changed || (map_args[6] != 0);
 
-    if(needs_update) {
-        const int mode = map_args[9];
-        float rot_speed = map_args[6] * 0.0002f;
-        float base_angle;
+#pragma omp parallel num_threads(s->n_threads)
+    {
+        if(needs_update) {
+            const int mode = map_args[9];
+            float rot_speed = map_args[6] * 0.0002f;
+            float base_angle;
 
-        s->angle = wrap_angle(s->angle + rot_speed);
-        base_angle = wrap_angle(s->angle + (map_args[1] / 360.0f) * TWO_PI);
+#pragma omp single
+            {
+                s->angle = wrap_angle(s->angle + rot_speed);
+            }
 
-        switch(mode) {
-            case 1: fractalkaleido_apply1_wave(s, frame, map_args, base_angle); break;
-            case 2: fractalkaleido_apply1(s, frame, map_args, base_angle); break;
-            case 3: fractalkaleido_apply1_segcouple(s, frame, map_args, base_angle); break;
-            case 4: fractalkaleido_apply1_vortex(s, frame, map_args, base_angle); break;
-            case 5: fractalkaleido_apply1_twistinversion(s, frame, map_args, base_angle); break;
-            case 0:
-            default:
-                fractalkaleido_apply1_radialclassic(s, frame, map_args, base_angle);
-                break;
+#pragma omp barrier
+            base_angle = wrap_angle(s->angle + (map_args[1] / 360.0f) * TWO_PI);
+
+            switch(mode) {
+                case 1: fractalkaleido_apply1_wave(s, frame, map_args, base_angle); break;
+                case 2: fractalkaleido_apply1(s, frame, map_args, base_angle); break;
+                case 3: fractalkaleido_apply1_segcouple(s, frame, map_args, base_angle); break;
+                case 4: fractalkaleido_apply1_vortex(s, frame, map_args, base_angle); break;
+                case 5: fractalkaleido_apply1_twistinversion(s, frame, map_args, base_angle); break;
+                case 0:
+                default:
+                    fractalkaleido_apply1_radialclassic(s, frame, map_args, base_angle);
+                    break;
+            }
+
+#pragma omp single
+            {
+                for (int i = 0; i < 10; i++)
+                    s->last_args[i] = map_args[i];
+
+                s->map_ready = 1;
+            }
         }
 
-        for (int i = 0; i < 10; i++)
-            s->last_args[i] = map_args[i];
-
-        s->map_ready = 1;
-    }
-
-    #pragma omp parallel for num_threads(s->n_threads) schedule(static)
-    for(int i = 0; i < len; i++) {
-        int idx = s->map[i];
-        outY[i] = srcY[idx];
-        outU[i] = srcU[idx];
-        outV[i] = srcV[idx];
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            int idx = s->map[i];
+            outY[i] = srcY[idx];
+            outU[i] = srcU[idx];
+            outV[i] = srcV[idx];
+        }
     }
 
     veejay_memcpy(frame->data[0], outY, len);
