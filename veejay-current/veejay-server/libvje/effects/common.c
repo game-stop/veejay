@@ -34,6 +34,72 @@
 
 extern int vje_is_parallel_enabled();
 
+int vje_advise_num_threads(const int len)
+{
+    static int ncores = -1;
+    static int user_threads = -1;
+    static int user_forced = 0;
+    static int logged = 0;
+
+    if(ncores == -1) {
+        long online = sysconf(_SC_NPROCESSORS_ONLN);
+        ncores = online > 0 ? (int) online : 1;
+    }
+
+    if(user_threads == -1) {
+        const char *env = getenv("VEEJAY_MULTITHREAD_TASKS");
+
+        user_threads = 0;
+
+        if(env && *env) {
+            char *endp = NULL;
+            long requested = strtol(env, &endp, 10);
+
+            if(endp != env && requested > 0) {
+                user_threads = (int) requested;
+                user_forced = 1;
+            }
+        }
+
+        if(user_threads > ncores)
+            user_threads = ncores;
+    }
+
+    int nthreads;
+
+    if(user_forced) {
+        nthreads = user_threads;
+    } else {
+        nthreads = ncores;
+
+        if(len < (1920 * 1080))
+            nthreads /= 2;
+
+        if(nthreads > 6)
+            nthreads = 6;
+    }
+
+    if(nthreads < 1)
+        nthreads = 1;
+
+    if(nthreads > ncores)
+        nthreads = ncores;
+
+    if(!logged) {
+        const char *env = getenv("VEEJAY_MULTITHREAD_TASKS");
+
+        veejay_msg(2,
+               "OpenMP worker policy: cpu=%d, mode=%s, requested=%s, auto-cap=6, selected=%d",
+               ncores,
+               user_forced ? "manual" : "auto",
+               (env && *env) ? env : "auto",
+               nthreads);
+        logged = 1;
+    }
+
+    return nthreads;
+}
+
 int	vje_setup_local_bufs( int use_thread_local, VJFrame *frame, uint8_t **restrict outY, uint8_t **restrict outU, uint8_t **restrict outV, uint8_t **restrict outA )
 {	
 	int utl = ( vje_is_parallel_enabled() && use_thread_local && frame->local != NULL );
