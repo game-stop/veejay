@@ -7321,6 +7321,20 @@ int veejay_audio_beat_get_status(veejay_t *info, int *enabled, int *open, long *
 #endif
 }
 
+static void veejay_openmp_warmup(int len)
+{
+    int n_threads = vje_max_threads(len);
+    omp_set_dynamic(0);
+    omp_set_num_threads(n_threads);
+
+#pragma omp parallel num_threads(n_threads)
+    {
+#pragma omp single
+        {
+            veejay_msg(VEEJAY_MSG_INFO, "OpenMP warmed with %d threads", omp_get_num_threads());
+        }
+    }
+}
 
 static void *veejay_producer_thread_loop(void *ptr)
 {
@@ -7331,6 +7345,8 @@ static void *veejay_producer_thread_loop(void *ptr)
     sigemptyset(&mask);
     sigaddset(&mask, SIGPIPE);
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
+
+    veejay_openmp_warmup(info->effect_frame1->len);
 
     while (atomic_load_int(&settings->warmup_active) &&
            atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
