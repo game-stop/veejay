@@ -89,6 +89,12 @@ int vj_audio_beat_transport_is_internal(vj_audio_beat_shared_t *s)
 #ifndef VJ_BEAT_SOFT_UNSET
 #define VJ_BEAT_SOFT_UNSET INT_MIN
 #endif
+#ifndef VJ_AUDIO_BEAT_AUTO_AMOUNT_UI_MAX
+#define VJ_AUDIO_BEAT_AUTO_AMOUNT_UI_MAX 100
+#endif
+#ifndef VJ_AUDIO_BEAT_AUTO_AMOUNT_MAX
+#define VJ_AUDIO_BEAT_AUTO_AMOUNT_MAX 300
+#endif
 
 static inline int ab_action_is_breakbeat(int action)
 {
@@ -9856,6 +9862,66 @@ static inline int ab_auto_target_is_discrete(const ab_auto_target_t *t)
 }
 #endif
 
+static inline int ab_auto_effective_mode(void)
+{
+    int mode = ab_load_i(&ab_auto_mode);
+
+    if(mode < VJ_AUDIO_BEAT_AUTO_OFF)
+        return VJ_AUDIO_BEAT_AUTO_OFF;
+    if(mode > VJ_AUDIO_BEAT_AUTO_CHAOS)
+        return VJ_AUDIO_BEAT_AUTO_PRIMARY_MOTION;
+
+    return mode;
+}
+
+static inline float ab_auto_amount_overdrive(int mode, int amount)
+{
+    if(mode != VJ_AUDIO_BEAT_AUTO_CHAOS || amount <= VJ_AUDIO_BEAT_AUTO_AMOUNT_UI_MAX)
+        return 0.0f;
+
+    if(amount > VJ_AUDIO_BEAT_AUTO_AMOUNT_MAX)
+        amount = VJ_AUDIO_BEAT_AUTO_AMOUNT_MAX;
+
+    return (float)(amount - VJ_AUDIO_BEAT_AUTO_AMOUNT_UI_MAX) *
+           (1.0f / (float)(VJ_AUDIO_BEAT_AUTO_AMOUNT_MAX - VJ_AUDIO_BEAT_AUTO_AMOUNT_UI_MAX));
+}
+
+static inline float ab_auto_clampf01(float v)
+{
+    if(v < 0.0f)
+        return 0.0f;
+    if(v > 1.0f)
+        return 1.0f;
+    return v;
+}
+
+#ifdef VJ_BEAT_F_REJECT
+static int ab_auto_target_can_overdrive_soft_range(const ab_auto_target_t *t)
+{
+    if(!t || !t->has_hint)
+        return 0;
+
+    if(t->hint_flags & VJ_BEAT_F_REJECT)
+        return 0;
+#ifdef VJ_BEAT_F_STRUCTURAL
+    if(t->hint_flags & VJ_BEAT_F_STRUCTURAL)
+        return 0;
+#endif
+#ifdef VJ_BEAT_F_REBUILDS_STATE
+    if(t->hint_flags & VJ_BEAT_F_REBUILDS_STATE)
+        return 0;
+#endif
+
+    if(ab_auto_target_is_binary_impulse(t))
+        return 0;
+
+    if(ab_auto_target_is_discrete(t) && !ab_auto_target_is_wrap(t))
+        return 0;
+
+    return 1;
+}
+#endif
+
 static int ab_auto_hint_to_role(
     int klass,
     unsigned int flags,
@@ -10437,11 +10503,22 @@ static int ab_auto_role_allowed(int mode, int role)
                role == VJ_AUDIO_BEAT_AUTO_ROLE_CONTRAST ||
                role == VJ_AUDIO_BEAT_AUTO_ROLE_BEAT_TIME ||
                role == VJ_AUDIO_BEAT_AUTO_ROLE_SPEED ||
-               role == VJ_AUDIO_BEAT_AUTO_ROLE_MOTION ||
-               role == VJ_AUDIO_BEAT_AUTO_ROLE_MEMORY ||
-               role == VJ_AUDIO_BEAT_AUTO_ROLE_SOURCE;
+               role == VJ_AUDIO_BEAT_AUTO_ROLE_THRESHOLD;
 
     if(mode == VJ_AUDIO_BEAT_AUTO_PRIMARY_MOTION)
+        return role == VJ_AUDIO_BEAT_AUTO_ROLE_TRIGGER ||
+               role == VJ_AUDIO_BEAT_AUTO_ROLE_AMOUNT ||
+               role == VJ_AUDIO_BEAT_AUTO_ROLE_CONTRAST ||
+               role == VJ_AUDIO_BEAT_AUTO_ROLE_BEAT_TIME ||
+               role == VJ_AUDIO_BEAT_AUTO_ROLE_SPEED ||
+               role == VJ_AUDIO_BEAT_AUTO_ROLE_MOTION ||
+               role == VJ_AUDIO_BEAT_AUTO_ROLE_FLOW ||
+               role == VJ_AUDIO_BEAT_AUTO_ROLE_SPATIAL ||
+               role == VJ_AUDIO_BEAT_AUTO_ROLE_TEXTURE ||
+               role == VJ_AUDIO_BEAT_AUTO_ROLE_GEOMETRY ||
+               role == VJ_AUDIO_BEAT_AUTO_ROLE_THRESHOLD;
+
+    if(mode == VJ_AUDIO_BEAT_AUTO_PRIMARY_MOTION_MEMORY)
         return role == VJ_AUDIO_BEAT_AUTO_ROLE_TRIGGER ||
                role == VJ_AUDIO_BEAT_AUTO_ROLE_AMOUNT ||
                role == VJ_AUDIO_BEAT_AUTO_ROLE_CONTRAST ||
@@ -10457,8 +10534,7 @@ static int ab_auto_role_allowed(int mode, int role)
                role == VJ_AUDIO_BEAT_AUTO_ROLE_GEOMETRY ||
                role == VJ_AUDIO_BEAT_AUTO_ROLE_THRESHOLD;
 
-    if(mode == VJ_AUDIO_BEAT_AUTO_PRIMARY_MOTION_MEMORY ||
-       mode == VJ_AUDIO_BEAT_AUTO_CHAOS)
+    if(mode == VJ_AUDIO_BEAT_AUTO_CHAOS)
         return 1;
 
     return 0;
@@ -10859,6 +10935,17 @@ static int ab_auto_insert_candidate(ab_auto_target_t *dst, int *count, int max_c
         return 0;
 
     quota = ab_auto_role_quota(cand->role);
+
+    if(ab_auto_effective_mode() == VJ_AUDIO_BEAT_AUTO_CHAOS)
+    {
+        if(cand->role == VJ_AUDIO_BEAT_AUTO_ROLE_GEOMETRY ||
+           cand->role == VJ_AUDIO_BEAT_AUTO_ROLE_THRESHOLD ||
+           cand->role == VJ_AUDIO_BEAT_AUTO_ROLE_BEAT_TIME ||
+           cand->role == VJ_AUDIO_BEAT_AUTO_ROLE_TRIGGER)
+            quota = quota < 2 ? 2 : quota;
+        else if(quota > 0)
+            quota += 2;
+    }
 
     if(quota <= 0)
         return 0;
@@ -12315,6 +12402,81 @@ static float ab_auto_signal_for_target(const vj_audio_beat_snapshot_t *snap,
     return v;
 }
 
+static float ab_auto_apply_overdrive_signal(const ab_auto_target_t *t,
+                                            float signal,
+                                            int global_amount,
+                                            const ab_auto_frame_signal_t *fs,
+                                            float climax)
+{
+    int mode = ab_auto_effective_mode();
+    float overdrive = ab_auto_amount_overdrive(mode, global_amount);
+    float strike = 0.0f;
+    float sustain = 0.0f;
+    float lift;
+
+    signal = ab_auto_clampf01(signal);
+
+    if(overdrive <= 0.0f)
+        return signal;
+
+#ifdef VJ_BEAT_F_REJECT
+    if(t && ab_auto_target_is_binary_impulse(t))
+        overdrive *= 0.34f;
+#endif
+
+    if(t && t->role == VJ_AUDIO_BEAT_AUTO_ROLE_THRESHOLD)
+        overdrive *= 0.38f;
+    else if(t && t->role == VJ_AUDIO_BEAT_AUTO_ROLE_GEOMETRY)
+        overdrive *= 0.62f;
+    else if(t && (t->role == VJ_AUDIO_BEAT_AUTO_ROLE_MEMORY ||
+                  t->role == VJ_AUDIO_BEAT_AUTO_ROLE_SOURCE ||
+                  t->role == VJ_AUDIO_BEAT_AUTO_ROLE_COLOR))
+        overdrive *= 0.82f;
+
+    if(fs)
+    {
+        strike = fs->trigger;
+        if(fs->hit > strike)
+            strike = fs->hit;
+        if(fs->drum > strike)
+            strike = strike * 0.72f + fs->drum * 0.28f;
+        if(fs->subdiv > strike)
+            strike = strike * 0.82f + fs->subdiv * 0.18f;
+
+        sustain = fs->activity * 0.34f + fs->density * 0.22f;
+        if(sustain > 1.0f)
+            sustain = 1.0f;
+    }
+
+    strike = ab_auto_clampf01(strike);
+    sustain = ab_auto_clampf01(sustain);
+    climax = ab_auto_clampf01(climax);
+
+    if(strike < 0.018f && sustain < 0.080f && climax < 0.085f)
+        return signal;
+
+    lift = overdrive * (strike * 0.46f + sustain * 0.10f);
+
+    if(climax > 0.38f)
+        lift += overdrive * (climax - 0.38f) * 0.10f;
+
+    if(lift > 0.0f)
+        signal += (1.0f - signal) * lift;
+
+    if(overdrive > 0.38f && signal > 0.018f && strike > 0.035f)
+    {
+        float bend = overdrive * (0.16f + strike * 0.24f);
+        float rooted = sqrtf(signal);
+
+        if(bend > 0.36f)
+            bend = 0.36f;
+
+        signal = signal * (1.0f - bend) + rooted * bend;
+    }
+
+    return ab_auto_clampf01(signal);
+}
+
 void vj_audio_beat_set_video_fps(vj_audio_beat_shared_t *s, double fps)
 {
     int q16;
@@ -12565,6 +12727,7 @@ static float ab_auto_slew_signal(ab_auto_target_t *t, float raw, long now)
     float base_alpha;
     float diff;
     float dt;
+    float overdrive;
 
     if(!t)
         return 0.0f;
@@ -12576,6 +12739,7 @@ static float ab_auto_slew_signal(ab_auto_target_t *t, float raw, long now)
 
     raw = ab_auto_expand_signal(raw, t->role);
     t->raw_value = raw;
+    overdrive = ab_auto_amount_overdrive(ab_auto_effective_mode(), ab_load_i(&ab_auto_amount));
 
 #ifdef VJ_BEAT_F_REJECT
     if(ab_auto_target_is_binary_impulse(t))
@@ -12631,6 +12795,23 @@ static float ab_auto_slew_signal(ab_auto_target_t *t, float raw, long now)
         if(tau_ms <= 0)
             tau_ms = raw > current ? 600 : 1400;
 
+        if(overdrive > 0.0f)
+        {
+            float tau_scale = 1.0f - overdrive * 0.72f;
+
+#ifdef VJ_BEAT_F_REJECT
+#ifdef VJ_BEAT_F_REBUILDS_STATE
+            if(t->has_hint && (t->hint_flags & VJ_BEAT_F_REBUILDS_STATE))
+                tau_scale = 1.0f - overdrive * 0.28f;
+#endif
+#endif
+
+            if(tau_scale < 0.18f)
+                tau_scale = 0.18f;
+
+            tau_ms = (int)((float)tau_ms * tau_scale + 0.5f);
+        }
+
         if(tau_ms < 20)
             tau_ms = 20;
 
@@ -12639,6 +12820,22 @@ static float ab_auto_slew_signal(ab_auto_target_t *t, float raw, long now)
     else
     {
         base_alpha = raw > current ? ab_auto_role_attack(t->role) : ab_auto_role_release(t->role);
+
+        if(overdrive > 0.0f)
+        {
+            float target_alpha = t->role == VJ_AUDIO_BEAT_AUTO_ROLE_MEMORY ||
+                                 t->role == VJ_AUDIO_BEAT_AUTO_ROLE_SOURCE ||
+                                 t->role == VJ_AUDIO_BEAT_AUTO_ROLE_COLOR
+                               ? 0.62f
+                               : 0.82f;
+
+            if(t->role == VJ_AUDIO_BEAT_AUTO_ROLE_GEOMETRY)
+                target_alpha = 0.56f;
+            else if(t->role == VJ_AUDIO_BEAT_AUTO_ROLE_THRESHOLD)
+                target_alpha = 0.44f;
+
+            base_alpha += (target_alpha - base_alpha) * overdrive;
+        }
 
         if(base_alpha < 0.001f)
             base_alpha = 0.001f;
@@ -13347,13 +13544,17 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
 {
     int lo;
     int hi;
+    int hard_lo;
+    int hard_hi;
     int span;
     int direction;
     int capacity;
     int positive_capacity;
     int negative_capacity;
     int min_capacity;
+    int mode;
     float global;
+    float overdrive;
     float depth;
     float amount_gate;
     float macro_open;
@@ -13369,10 +13570,13 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
 
     if(global_amount < 0)
         global_amount = 0;
-    else if(global_amount > 100)
-        global_amount = 100;
+    else if(global_amount > VJ_AUDIO_BEAT_AUTO_AMOUNT_MAX)
+        global_amount = VJ_AUDIO_BEAT_AUTO_AMOUNT_MAX;
 
-    global = (float)global_amount * 0.01f;
+    mode = ab_auto_effective_mode();
+    overdrive = ab_auto_amount_overdrive(mode, global_amount);
+    global = (float)(global_amount > VJ_AUDIO_BEAT_AUTO_AMOUNT_UI_MAX ?
+                     VJ_AUDIO_BEAT_AUTO_AMOUNT_UI_MAX : global_amount) * 0.01f;
 
     if(signal < 0.0f)
         signal = 0.0f;
@@ -13388,6 +13592,8 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
 
     lo = t->min_value;
     hi = t->max_value;
+    hard_lo = lo;
+    hard_hi = hi;
 
 #ifdef VJ_BEAT_F_REJECT
     if(t->has_hint)
@@ -13396,6 +13602,20 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
             lo = t->soft_min;
         if(t->soft_max != VJ_BEAT_SOFT_UNSET && t->soft_max < hi)
             hi = t->soft_max;
+
+        if(overdrive > 0.0f && ab_auto_target_can_overdrive_soft_range(t))
+        {
+            int expand_lo = lo - (int)(((float)(lo - hard_lo) * overdrive) + 0.5f);
+            int expand_hi = hi + (int)(((float)(hard_hi - hi) * overdrive) + 0.5f);
+
+            if(expand_lo < hard_lo)
+                expand_lo = hard_lo;
+            if(expand_hi > hard_hi)
+                expand_hi = hard_hi;
+
+            lo = expand_lo;
+            hi = expand_hi;
+        }
 
         {
             int lock_sign = 0;
@@ -13607,6 +13827,37 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
 
     depth = comfort_depth + (peak_depth - comfort_depth) * macro_open;
 
+    if(overdrive > 0.0f && signal > 0.006f)
+    {
+        float push = overdrive * signal * (0.26f + signal * 0.40f + macro_open * 0.18f);
+
+#ifdef VJ_BEAT_F_REJECT
+        if(t->has_hint)
+        {
+#ifdef VJ_BEAT_F_REBUILDS_STATE
+            if(t->hint_flags & VJ_BEAT_F_REBUILDS_STATE)
+                push *= 0.25f;
+#endif
+#ifdef VJ_BEAT_F_PHRASE_ONLY
+            if(t->hint_flags & VJ_BEAT_F_PHRASE_ONLY)
+                push *= 0.42f;
+#endif
+        }
+#endif
+
+        if(t->role == VJ_AUDIO_BEAT_AUTO_ROLE_THRESHOLD)
+            push *= 0.34f;
+        else if(t->role == VJ_AUDIO_BEAT_AUTO_ROLE_GEOMETRY)
+            push *= 0.54f;
+        else if(t->role == VJ_AUDIO_BEAT_AUTO_ROLE_MEMORY ||
+                t->role == VJ_AUDIO_BEAT_AUTO_ROLE_SOURCE ||
+                t->role == VJ_AUDIO_BEAT_AUTO_ROLE_COLOR)
+            push *= 0.74f;
+
+        if(push > 0.0f)
+            depth += (1.0f - depth) * push;
+    }
+
     if(depth > 1.0f)
         depth = 1.0f;
     else if(depth < 0.0f)
@@ -13674,6 +13925,25 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
         drive = 0.0f;
     else if(drive > 1.0f)
         drive = 1.0f;
+
+    if(overdrive > 0.0f && signal > 0.006f)
+    {
+        float drive_push = overdrive * signal * (0.30f + signal * 0.36f + macro_open * 0.14f);
+
+        if(t->role == VJ_AUDIO_BEAT_AUTO_ROLE_THRESHOLD)
+            drive_push *= 0.30f;
+        else if(t->role == VJ_AUDIO_BEAT_AUTO_ROLE_GEOMETRY)
+            drive_push *= 0.50f;
+        else if(t->role == VJ_AUDIO_BEAT_AUTO_ROLE_MEMORY ||
+                t->role == VJ_AUDIO_BEAT_AUTO_ROLE_SOURCE ||
+                t->role == VJ_AUDIO_BEAT_AUTO_ROLE_COLOR)
+            drive_push *= 0.72f;
+
+        drive += (1.0f - drive) * drive_push;
+
+        if(drive > 1.0f)
+            drive = 1.0f;
+    }
 
 #ifdef VJ_BEAT_F_REJECT
     if(t->has_hint)
@@ -13829,9 +14099,19 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
     {
         float geo_ceiling = 0.24f + global * 0.09f + macro_open * 0.24f;
         float geo_depth_ceiling = 0.14f + global * 0.07f + macro_open * 0.30f;
+        float geo_max = 0.64f + overdrive * 0.28f;
+        float geo_depth_max = 0.56f + overdrive * 0.34f;
 
-        if(geo_ceiling > 0.64f)
-            geo_ceiling = 0.64f;
+        if(geo_max > 0.92f)
+            geo_max = 0.92f;
+        if(geo_depth_max > 0.90f)
+            geo_depth_max = 0.90f;
+
+        geo_ceiling += (geo_max - geo_ceiling) * overdrive;
+        geo_depth_ceiling += (geo_depth_max - geo_depth_ceiling) * overdrive;
+
+        if(geo_ceiling > geo_max)
+            geo_ceiling = geo_max;
         if(drive > geo_ceiling)
             drive = geo_ceiling;
 
@@ -13854,6 +14134,18 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
             ceiling = 0.54f;
         else if(t->role == VJ_AUDIO_BEAT_AUTO_ROLE_GEOMETRY)
             ceiling = 0.32f + global * 0.08f;
+
+        if(overdrive > 0.0f)
+        {
+            float loosen = 0.72f * overdrive;
+
+            if(t->role == VJ_AUDIO_BEAT_AUTO_ROLE_THRESHOLD)
+                loosen *= 0.42f;
+            else if(t->role == VJ_AUDIO_BEAT_AUTO_ROLE_GEOMETRY)
+                loosen *= 0.68f;
+
+            ceiling += (1.0f - ceiling) * loosen;
+        }
 
         if(drive > ceiling)
             drive = ceiling;
@@ -14123,8 +14415,8 @@ void vj_audio_beat_set_auto_amount(vj_audio_beat_shared_t *s, int amount)
 
     if(amount < 0)
         amount = 0;
-    else if(amount > 100)
-        amount = 100;
+    else if(amount > VJ_AUDIO_BEAT_AUTO_AMOUNT_MAX)
+        amount = VJ_AUDIO_BEAT_AUTO_AMOUNT_MAX;
 
     ab_store_i(&ab_auto_amount, amount);
 }
@@ -14322,11 +14614,24 @@ int vj_audio_beat_auto_apply_chain_ex(
         }
 
         signal = ab_auto_signal_for_target(&snap, t, climax, &frame_sig);
+        signal = ab_auto_apply_overdrive_signal(t, signal, amount, &frame_sig, climax);
         signal = ab_auto_slew_signal(t, signal, now);
         value = ab_auto_compute_value(t, signal, amount, climax);
 
-        if(signal <= 0.002f && !ab_auto_role_should_hold(t->role))
-            value = t->base_value;
+        {
+            float release_floor = 0.002f;
+            int role_hold = ab_auto_role_should_hold(t->role);
+
+            if(mode == VJ_AUDIO_BEAT_AUTO_CHAOS && amount > VJ_AUDIO_BEAT_AUTO_AMOUNT_UI_MAX)
+            {
+                release_floor = 0.018f + ab_auto_amount_overdrive(mode, amount) * 0.018f;
+                if(signal <= release_floor)
+                    role_hold = 0;
+            }
+
+            if(signal <= release_floor && !role_hold)
+                value = t->base_value;
+        }
 
         if(value != current)
         {
@@ -14503,6 +14808,7 @@ int vj_audio_beat_auto_modulate_args(
             current_base = t->max_value;
 
         signal = ab_auto_signal_for_target(&snap, t, ab_auto_climax_level, &frame_sig);
+        signal = ab_auto_apply_overdrive_signal(t, signal, amount, &frame_sig, ab_auto_climax_level);
         signal = ab_auto_slew_signal(t, signal, now);
 
         old_base = t->base_value;
@@ -14510,8 +14816,20 @@ int vj_audio_beat_auto_modulate_args(
         value = ab_auto_compute_value(t, signal, amount, ab_auto_climax_level);
         t->base_value = old_base;
 
-        if(signal <= 0.002f && !ab_auto_role_should_hold(t->role))
-            value = current_base;
+        {
+            float release_floor = 0.002f;
+            int role_hold = ab_auto_role_should_hold(t->role);
+
+            if(mode == VJ_AUDIO_BEAT_AUTO_CHAOS && amount > VJ_AUDIO_BEAT_AUTO_AMOUNT_UI_MAX)
+            {
+                release_floor = 0.018f + ab_auto_amount_overdrive(mode, amount) * 0.018f;
+                if(signal <= release_floor)
+                    role_hold = 0;
+            }
+
+            if(signal <= release_floor && !role_hold)
+                value = current_base;
+        }
 
         if(value < t->min_value)
             value = t->min_value;

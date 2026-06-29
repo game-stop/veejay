@@ -352,6 +352,7 @@ static int  vje_quality_ = 0;
 
 static void vje_global_store(int chain_id, int entry, int fx_id, void *ptr);
 static int vje_global_couple(int chain_id, int ref_id, int fx_id, void *ptr);
+static void vje_global_uncouple(int chain_id, int fx_id, void *ptr);
 static void vje_global_clear(int chain_id, int entry);
 
 void    vje_set_quality(int quality) {
@@ -535,10 +536,15 @@ void vje_fx_free( int fx_id, int chain_id, int entry, void *ptr )
     }
     else {
         int idx = vj_fx_map[ fx_id ];
+        const int is_global = (vj_effect_map[idx] && vj_effect_map[idx]->global);
+
+        if(is_global)
+            vje_global_clear( chain_id, entry );
+        else
+            vje_global_uncouple( chain_id, fx_id, ptr );
+
         if( vj_fx[ idx ].fx_free != NULL )
             vj_fx[ idx ].fx_free( ptr );
-
-        vje_global_clear( chain_id, entry );
     }
 }
 
@@ -1031,59 +1037,105 @@ overflow:
     return -1;
 }
 
+static int vje_global_chain_index(int chain_id, int entry)
+{
+    if(chain_id < 0 || chain_id >= NUM_CHAINS || entry < 0 || entry >= MAX_ENTRY_PER_CHAIN)
+        return -1;
+
+    return (chain_id * MAX_ENTRY_PER_CHAIN) + entry;
+}
+
+static void vje_global_clear_used_slot(used_by *slot)
+{
+    if(slot->fx_id > 0 && slot->ptr && slot->fx_request_set_private)
+        slot->fx_request_set_private(slot->ptr, NULL);
+
+    slot->fx_id = 0;
+    slot->ptr = NULL;
+    slot->fx_request_set_private = NULL;
+}
+
 static void vje_global_store(int chain_id, int entry, int fx_id, void *ptr)
 {
-    vj_fx_priv_chain[ (chain_id * MAX_ENTRY_PER_CHAIN) + entry ]->fx_id = fx_id;
-    vj_fx_priv_chain[ (chain_id * MAX_ENTRY_PER_CHAIN) + entry ]->priv = ptr;
+    const int idx = vje_global_chain_index(chain_id, entry);
+
+    if(idx < 0 || !vj_fx_priv_chain || !vj_fx_priv_chain[idx])
+        return;
+
+    vj_fx_priv_chain[idx]->fx_id = fx_id;
+    vj_fx_priv_chain[idx]->priv = ptr;
+}
+
+static void vje_global_uncouple(int chain_id, int fx_id, void *ptr)
+{
+    if(chain_id < 0 || chain_id >= NUM_CHAINS || !vj_fx_priv_chain)
+        return;
+
+    const int start = chain_id * MAX_ENTRY_PER_CHAIN;
+    const int end = start + MAX_ENTRY_PER_CHAIN;
+
+    for(int i = start; i < end; i++) {
+        vj_fx_priv_map_t *map = vj_fx_priv_chain[i];
+
+        if(!map || map->fx_id == 0)
+            continue;
+
+        for(int j = 0; j < MAX_ENTRY_PER_CHAIN; j++) {
+            used_by *slot = &map->used[j];
+
+            if(slot->fx_id == fx_id && slot->ptr == ptr)
+                vje_global_clear_used_slot(slot);
+        }
+    }
 }
 
 static void vje_global_clear(int chain_id, int entry)
 {
-    int i;
-    int start = 0;
-    int end = MAX_ENTRY_PER_CHAIN;
+    const int idx = vje_global_chain_index(chain_id, entry);
 
-    if( vj_fx_priv_chain[ (chain_id * MAX_ENTRY_PER_CHAIN) + entry ]->fx_id == 0 )
+    if(idx < 0 || !vj_fx_priv_chain || !vj_fx_priv_chain[idx])
         return;
 
-    for( i = start; i < end; i ++ ) {
-        // test if FX has a coupling
-        if( vj_fx_priv_chain[ (chain_id * MAX_ENTRY_PER_CHAIN) + entry ]->used[i].fx_id > 0 ) {
-            // clear the coupling
-            vj_fx_priv_chain[i]->used[i].fx_request_set_private( 
-                vj_fx_priv_chain[ (chain_id * MAX_ENTRY_PER_CHAIN) + entry ]->used[i].ptr,
-                NULL
-            );
-            // clear coupling data
-            vj_fx_priv_chain[ (chain_id * MAX_ENTRY_PER_CHAIN) + entry ]->used[i].fx_id = 0;
-            vj_fx_priv_chain[ (chain_id * MAX_ENTRY_PER_CHAIN) + entry ]->used[i].ptr = NULL;
-            vj_fx_priv_chain[ (chain_id * MAX_ENTRY_PER_CHAIN) + entry ]->used[i].fx_request_set_private = NULL;    
-        }
-    }
-    vj_fx_priv_chain[ (chain_id * MAX_ENTRY_PER_CHAIN) + entry ]->fx_id = 0;
-    vj_fx_priv_chain[ (chain_id * MAX_ENTRY_PER_CHAIN) + entry ]->priv = NULL;
+    vj_fx_priv_map_t *map = vj_fx_priv_chain[idx];
+
+    if(map->fx_id == 0)
+        return;
+
+    for(int i = 0; i < MAX_ENTRY_PER_CHAIN; i++)
+        vje_global_clear_used_slot(&map->used[i]);
+
+    map->fx_id = 0;
+    map->priv = NULL;
 }
 
 static int vje_global_couple(int chain_id, int ref_id, int fx_id, void *ptr)
 {
-    int i,j;
-    int start = (chain_id * MAX_ENTRY_PER_CHAIN);
-    int end = start + MAX_ENTRY_PER_CHAIN;
-    int idx = vj_fx_map [ fx_id ];
-  
-    for( i = start; i < end ; i ++ ) {
-        // test if requested fx is initialized
-        if( vj_fx_priv_chain[i]->fx_id == ref_id ) {
-            for( j = 0; j < MAX_ENTRY_PER_CHAIN; j ++ ) {
-                // find free slot
-                if( vj_fx_priv_chain[i]->used[j].fx_id == 0 ) {
-                    // coupling
-                    vj_fx_priv_chain[i]->used[j].fx_id = fx_id;
-                    vj_fx_priv_chain[i]->used[j].ptr = ptr;
-                    vj_fx_priv_chain[i]->used[j].fx_request_set_private = vj_fx[ idx ].fx_request_set_private;
-                    vj_fx_priv_chain[i]->used[j].fx_request_set_private( vj_fx_priv_chain[i]->used[j].ptr, vj_fx_priv_chain[i]->priv );
-                    return 1;
-                }
+    if(chain_id < 0 || chain_id >= NUM_CHAINS || !vj_fx_priv_chain)
+        return 0;
+
+    int idx = vj_fx_map[fx_id];
+
+    if(idx < 0 || !vj_fx[idx].fx_request_set_private || !ptr)
+        return 0;
+
+    const int start = chain_id * MAX_ENTRY_PER_CHAIN;
+    const int end = start + MAX_ENTRY_PER_CHAIN;
+
+    for(int i = start; i < end; i++) {
+        vj_fx_priv_map_t *map = vj_fx_priv_chain[i];
+
+        if(!map || map->fx_id != ref_id)
+            continue;
+
+        for(int j = 0; j < MAX_ENTRY_PER_CHAIN; j++) {
+            used_by *slot = &map->used[j];
+
+            if(slot->fx_id == 0) {
+                slot->fx_id = fx_id;
+                slot->ptr = ptr;
+                slot->fx_request_set_private = vj_fx[idx].fx_request_set_private;
+                slot->fx_request_set_private(slot->ptr, map->priv);
+                return 1;
             }
         }
     }

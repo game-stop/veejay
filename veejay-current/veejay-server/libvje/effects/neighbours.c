@@ -237,7 +237,7 @@ static void nb_apply_luma(nb_t *n,
                           int brush_size,
                           int active_bins)
 {
-#pragma omp parallel for schedule(static) num_threads(n->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int tid = NB_THREAD_ID();
         int *scratch = n->scratch + tid * NB_SCRATCH_STRIDE;
@@ -290,7 +290,7 @@ static void nb_apply_color(nb_t *n,
                            int brush_size,
                            int active_bins)
 {
-#pragma omp parallel for schedule(static) num_threads(n->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int tid = NB_THREAD_ID();
         int *scratch = n->scratch + tid * NB_SCRATCH_STRIDE;
@@ -369,12 +369,15 @@ void neighbours_apply(void *ptr, VJFrame *frame, int *args)
         veejay_memcpy(src_v, dst_v, len);
     }
 
-#pragma omp parallel for schedule(static) num_threads(n->n_threads)
-    for(int i = 0; i < len; i++)
-        bins[i] = nb_quant_luma(src_y[i], smoothness);
+#pragma omp parallel num_threads(n->n_threads)
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+            bins[i] = nb_quant_luma(src_y[i], smoothness);
 
-    if(mode)
-        nb_apply_color(n, dst_y, dst_u, dst_v, src_y, src_u, src_v, bins, width, height, brush_size, active_bins);
-    else
-        nb_apply_luma(n, dst_y, src_y, bins, width, height, brush_size, active_bins);
+        if(mode)
+            nb_apply_color(n, dst_y, dst_u, dst_v, src_y, src_u, src_v, bins, width, height, brush_size, active_bins);
+        else
+            nb_apply_luma(n, dst_y, src_y, bins, width, height, brush_size, active_bins);
+    }
 }

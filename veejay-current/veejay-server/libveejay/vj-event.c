@@ -6150,6 +6150,7 @@ void enable_chain_entry_video(void *ptr, const char format[], va_list ap, int en
 
             if(sample_set_chain_status(args[0],args[1],enable_chain) != -1)
             {
+                v->uc->chain_changed = 1;
                 veejay_msg(VEEJAY_MSG_INFO, "Sample %d: Video on chain entry %d is %s",args[0],args[1],
                     ( sample_get_chain_status(args[0],args[1]) == 1 ? "Enabled" : "Disabled"));
             }
@@ -6167,6 +6168,7 @@ void enable_chain_entry_video(void *ptr, const char format[], va_list ap, int en
 
             if(vj_tag_set_chain_status(args[0],args[1],enable_chain)!=-1)
             {
+                v->uc->chain_changed = 1;
                 veejay_msg(VEEJAY_MSG_INFO, "Stream %d: Video on chain entry %d is %s",args[0],args[1],
                     vj_tag_get_chain_status(args[0],args[1]) == 1 ? "Enabled" : "Disabled" );
             }
@@ -6848,6 +6850,7 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
                         }
                     }
                 }
+                v->uc->chain_changed = 1;
             }
         }
     }
@@ -9563,7 +9566,7 @@ void vj_event_audio_beat_ui_config(void *ptr, const char format[], va_list ap)
 
     args[1] = vj_event_audio_beat_sanitize_action(v, args[1]);
     args[8] = vj_audio_beat_event_clampi(args[8], VJ_AUDIO_BEAT_AUTO_OFF, VJ_AUDIO_BEAT_AUTO_CHAOS);
-    args[9] = vj_audio_beat_event_clampi(args[9], 0, 100);
+    args[9] = vj_audio_beat_event_clampi(args[9], 0, VJ_AUDIO_BEAT_AUTO_AMOUNT_UI_MAX);
     args[10] = vj_audio_beat_event_clampi(args[10], 0, 100);
     args[11] = args[11] ? 1 : 0;
     if(args[12] >= 0)
@@ -9919,13 +9922,14 @@ void vj_event_audio_beat_auto_amount(void *ptr, const char format[], va_list ap)
     if(!vj_event_audio_beat_ready(v))
         return;
 
-    args[0] = vj_audio_beat_event_clampi(args[0], 0, 100);
+    args[0] = vj_audio_beat_event_clampi(args[0], 0, VJ_AUDIO_BEAT_AUTO_AMOUNT_MAX);
     vj_audio_beat_set_auto_amount(&v->settings->audio_beat, args[0]);
     vj_audio_beat_event_auto_amount_cache = args[0];
 
     veejay_msg(VEEJAY_MSG_INFO,
-               "[AUDIO-BEAT] Auto-fx amount set to %d",
-               args[0]);
+               "[AUDIO-BEAT] Auto-fx amount set to %d%s",
+               args[0],
+               args[0] > VJ_AUDIO_BEAT_AUTO_AMOUNT_UI_MAX ? " (performance overdrive)" : "");
 #else
     (void)ptr;
     (void)format;
@@ -11555,9 +11559,12 @@ void vj_event_send_chain_list(void *ptr, const char format[], va_list ap)
 
         char *curr = print_buf;
         int count = 0;
+        sample_eff_chain **chain = is_sample ? sample_get_effect_chain(args[0])
+                                             : vj_tag_get_effect_chain(args[0]);
 
         for (int i = 0; i < max_effects; i++)
         {
+            sample_eff_chain *entry = chain ? chain[i] : NULL;
             int effect_id = is_sample ? sample_get_effect_any(args[0], i)
                                       : vj_tag_get_effect_any(args[0], i);
 
@@ -11587,8 +11594,8 @@ void vj_event_send_chain_list(void *ptr, const char format[], va_list ap)
                 vj_tag_get_subrender(args[0], i, &subrender);
             }
 
-            int beat_enabled = 0;
-            int volume = 0;
+            int beat_enabled = entry ? entry->beat_flag : 0;
+            int volume = entry ? entry->volume : 0;
 
             snprintf(curr,
                      VIMS_CHAIN_LIST_ENTRY_LENGTH + 1,

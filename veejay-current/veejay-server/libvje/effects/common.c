@@ -683,11 +683,13 @@ uint8_t bl_pix_multiply_Y(uint8_t y1, uint8_t y2)
 /* divide pixel a with pixel b */
 uint8_t bl_pix_divide_Y(uint8_t y1, uint8_t y2)
 {
-	int c = y1 * y2;
-	int b = 0xff - y2;
-	return ( b != 0 ? CLAMP_Y( c / b ) : pixel_Y_lo_);
-}
+    int b = 0xff - y2;
 
+    if(b <= 0)
+        return pixel_Y_hi_;
+
+    return CLAMP_Y((y1 << 8) / b);
+}
 uint8_t bl_pix_additive_Y(uint8_t y1, uint8_t y2)
 {
 	return CLAMP_Y(y1 + ((2 * y2) - 0xff) );
@@ -737,7 +739,12 @@ uint8_t bl_pix_inverseburn_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_colordodge_Y(uint8_t y1, uint8_t y2)
 {
-    return CLAMP_Y((y2 >> 8) / (0xff - y1));
+    int b = 0xff - y1;
+
+    if(b <= 0)
+        return pixel_Y_hi_;
+
+    return CLAMP_Y((y2 << 8) / b);
 }
 
 uint8_t bl_pix_mulsub_Y(uint8_t y1, uint8_t y2)

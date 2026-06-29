@@ -177,11 +177,11 @@ void scratcher_free(void *ptr)
 static void scratcher_store_current(scratcher_t *s, VJFrame *src, int slot)
 {
     const int len = src->len;
-    const int uv_len = src->ssm ? len : src->uv_len;
+    const int uv_len = src->uv_len;
 
     uint8_t *restrict dy = s->frame[0] + ((size_t)len * (size_t)slot);
-    uint8_t *restrict du = s->frame[1] + ((size_t)uv_len * (size_t)slot);
-    uint8_t *restrict dv = s->frame[2] + ((size_t)uv_len * (size_t)slot);
+    uint8_t *restrict du = s->frame[1] + ((size_t)len * (size_t)slot);
+    uint8_t *restrict dv = s->frame[2] + ((size_t)len * (size_t)slot);
 
     veejay_memcpy(dy, src->data[0], len);
     veejay_memcpy(du, src->data[1], uv_len);
@@ -202,15 +202,13 @@ static void scratcher_advance(scratcher_t *s, int n, int pingpong)
     if(pingpong) {
         s->phase_q8 += step_q8 * s->direction;
 
-        while(s->phase_q8 >= max_q8 || s->phase_q8 < 0) {
-            if(s->phase_q8 >= max_q8) {
-                s->phase_q8 = max_q8 - (s->phase_q8 - max_q8);
-                s->direction = -1;
-            }
-            else {
-                s->phase_q8 = -s->phase_q8;
-                s->direction = 1;
-            }
+        if(s->phase_q8 >= max_q8) {
+            s->phase_q8 = max_q8;
+            s->direction = -1;
+        }
+        else if(s->phase_q8 <= 0) {
+            s->phase_q8 = 0;
+            s->direction = 1;
         }
     }
     else {
@@ -218,11 +216,8 @@ static void scratcher_advance(scratcher_t *s, int n, int pingpong)
 
         const int span_q8 = n << 8;
 
-        while(s->phase_q8 >= span_q8)
+        if(s->phase_q8 >= span_q8)
             s->phase_q8 -= span_q8;
-
-        while(s->phase_q8 < 0)
-            s->phase_q8 += span_q8;
 
         s->direction = 1;
     }
@@ -234,15 +229,15 @@ static void scratcher_blend_from_slot(scratcher_t *s, VJFrame *src, int slot, in
         return;
 
     const int len = src->len;
-    const int uv_len = src->ssm ? len : src->uv_len;
+    const int uv_len = src->uv_len;
 
     uint8_t *restrict Y = src->data[0];
     uint8_t *restrict U = src->data[1];
     uint8_t *restrict V = src->data[2];
 
     const uint8_t *restrict hY = s->frame[0] + ((size_t)len * (size_t)slot);
-    const uint8_t *restrict hU = s->frame[1] + ((size_t)uv_len * (size_t)slot);
-    const uint8_t *restrict hV = s->frame[2] + ((size_t)uv_len * (size_t)slot);
+    const uint8_t *restrict hU = s->frame[1] + ((size_t)len * (size_t)slot);
+    const uint8_t *restrict hV = s->frame[2] + ((size_t)len * (size_t)slot);
 
 #pragma omp parallel num_threads(s->n_threads)
     {

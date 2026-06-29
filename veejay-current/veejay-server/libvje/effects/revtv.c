@@ -110,7 +110,7 @@ vj_effect *revtv_init(int max_width, int max_height)
     ve->limits[0][P_INTENSITY_DRIVE] = 0; ve->limits[1][P_INTENSITY_DRIVE] = 1000;
 
     ve->description = "RevTV (EffectTV)";
-    ve->sub_format = 0;
+    ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
 

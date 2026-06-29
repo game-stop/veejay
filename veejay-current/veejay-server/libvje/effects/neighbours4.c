@@ -337,7 +337,7 @@ static void nb4_apply_luma(nb4_t *n,
 {
     const nb4_point_t *restrict points = n->points;
 
-#pragma omp parallel for schedule(static) num_threads(n->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int tid = NB4_THREAD_ID();
         int *scratch = n->scratch + tid * NB4_SCRATCH_STRIDE;
@@ -364,7 +364,7 @@ static void nb4_apply_color(nb4_t *n,
 {
     const nb4_point_t *restrict points = n->points;
 
-#pragma omp parallel for schedule(static) num_threads(n->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int tid = NB4_THREAD_ID();
         int *scratch = n->scratch + tid * NB4_SCRATCH_STRIDE;
@@ -407,7 +407,6 @@ void neighbours4_apply(void *ptr, VJFrame *frame, int *args)
     const int width = frame->width;
     const int height = frame->height;
     const int len = frame->len;
-    const int uv_len = frame->ssm ? len : frame->uv_len;
     const int radius = args[P_RADIUS];
     const int depth = args[P_DEPTH];
     const int smoothness = args[P_SMOOTHNESS];
@@ -432,16 +431,23 @@ void neighbours4_apply(void *ptr, VJFrame *frame, int *args)
         veejay_memcpy(src_v, dst_v, len);
     }
 
-#pragma omp parallel for schedule(static) num_threads(n->n_threads)
-    for(int i = 0; i < len; i++)
-        bin[i] = nb4_quant_luma(src_y[i], smoothness);
+#pragma omp parallel num_threads(n->n_threads)
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+            bin[i] = nb4_quant_luma(src_y[i], smoothness);
 
-    if(mode) {
-        nb4_apply_color(n, dst_y, dst_u, dst_v, src_y, src_u, src_v, bin, width, height, depth, active_bins);
-    }
-    else {
-        nb4_apply_luma(n, dst_y, src_y, bin, width, height, depth, active_bins);
-        veejay_memset(dst_u, 128, uv_len);
-        veejay_memset(dst_v, 128, uv_len);
+        if(mode) {
+            nb4_apply_color(n, dst_y, dst_u, dst_v, src_y, src_u, src_v, bin, width, height, depth, active_bins);
+        }
+        else {
+            nb4_apply_luma(n, dst_y, src_y, bin, width, height, depth, active_bins);
+
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                dst_u[i] = 128;
+                dst_v[i] = 128;
+            }
+        }
     }
 }

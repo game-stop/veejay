@@ -74,6 +74,9 @@ vj_effect *complexthreshold_init(int w, int h)
     }
 
     ve->limits[1][0] = 3600;
+    ve->limits[0][1] = 1;
+    ve->limits[1][10] = 1;
+    ve->limits[1][11] = 2;
 
     ve->description = "Kromatica Mixer (High-Fidelity Keyer)";
     ve->extra_frame = 1;
@@ -83,6 +86,9 @@ vj_effect *complexthreshold_init(int w, int h)
         "Key Color", "Key Reach", "Clip Black", "Clip White", "Matte Gamma",
         "Sat Gate", "Shadow Prot", "Spill Amount", "Spill Balance", "Edge Blur",
         "Invert Matte", "Output View");
+
+    (void) w;
+    (void) h;
 
     return ve;
 }
@@ -129,18 +135,18 @@ void complexthreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *arg
 {
     promixer_t *mk = (promixer_t*) ptr;
 
-    const int key_color = args[0];
-    const int key_reach = args[1];
-    const int clip_black = args[2];
-    const int clip_white = args[3];
-    const int matte_gamma = args[4];
-    const int sat_gate = args[5];
-    const int shadow_prot = args[6];
-    const int spill_amt = args[7];
-    const int spill_balance = args[8];
-    const int soft = args[9];
-    const int invert_matte = args[10];
-    const int output_view = args[11];
+    const int key_color = clampi(args[0], 0, 3600);
+    const int key_reach = clampi(args[1], 1, 255);
+    const int clip_black = clampi(args[2], 0, 255);
+    const int clip_white = clampi(args[3], 0, 255);
+    const int matte_gamma = clampi(args[4], 0, 255);
+    const int sat_gate = clampi(args[5], 0, 255);
+    const int shadow_prot = clampi(args[6], 0, 255);
+    const int spill_amt = clampi(args[7], 0, 255);
+    const int spill_balance = clampi(args[8], 0, 255);
+    const int soft = clampi(args[9], 0, 255);
+    const int invert_matte = args[10] ? 1 : 0;
+    const int output_view = (args[11] >= 0 && args[11] <= 2) ? args[11] : 0;
 
     const int w = frame->width;
     const int h = frame->height;
@@ -164,7 +170,6 @@ void complexthreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *arg
     for(int i = 0; i < 256; i++)
         mk->gamma_lut[i] = complexthreshold_u8((int)(powf((float)i / 255.0f, 1.0f / g_val) * 255.0f));
 
-    const float m_min = (float)clip_black;
     const int sat_gate_sq = sat_gate * sat_gate;
     const int matte_range = clampi(clip_white - clip_black, 1, 255);
     const int m_range_inv_fp = (255 << 12) / matte_range;

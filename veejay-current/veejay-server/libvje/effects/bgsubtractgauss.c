@@ -23,6 +23,10 @@
 #include "bgsubtractgauss.h"
 #include <libsubsample/subsample.h>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 typedef struct {
     uint8_t *static_bg__;
     uint8_t *static_bg_frame__[4];
@@ -49,7 +53,7 @@ vj_effect *bgsubtractgauss_init(int width, int height)
     ve->limits[0][4] = 1; ve->limits[1][4] = 100;  ve->defaults[4] = 1;
 
     ve->description = "Gaussian Adaptive Background";
-    ve->sub_format = -1;
+    ve->sub_format = 1;
     ve->has_user = 1;
     ve->static_bg = 1;
     ve->global = 1;
@@ -107,7 +111,6 @@ void *bgsubtractgauss_malloc(int width, int height)
 
     b->bg_n = 0;
     b->n_threads = vje_advise_num_threads(plane_size);
-
     return b;
 }
 
@@ -193,6 +196,8 @@ void bgsubtractgauss_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict A = frame->data[3];
 
     uint8_t *restrict BG_Y = b->static_bg_frame__[0];
+    uint8_t *restrict BG_U = b->static_bg_frame__[1];
+    uint8_t *restrict BG_V = b->static_bg_frame__[2];
     double *restrict mu = b->pMu;
     double *restrict var = b->pVar;
 
@@ -203,7 +208,7 @@ void bgsubtractgauss_apply(void *ptr, VJFrame *frame, int *args)
 
     const int do_update = (b->bg_n % (uint32_t)period) == 0;
 
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp parallel for num_threads(n_threads) schedule(static)
     for(int i = 0; i < len; i++)
     {
         double m = mu[i];
@@ -227,6 +232,8 @@ void bgsubtractgauss_apply(void *ptr, VJFrame *frame, int *args)
             mu[i] = m;
             var[i] = v;
             BG_Y[i] = (uint8_t)(m < 0.0 ? 0.0 : (m > 255.0 ? 255.0 : m));
+            BG_U[i] = U[i];
+            BG_V[i] = V[i];
         }
         else if(v != var[i])
         {
@@ -236,11 +243,15 @@ void bgsubtractgauss_apply(void *ptr, VJFrame *frame, int *args)
         if(mode == 0)
         {
             Y[i] = BG_Y[i];
+            U[i] = BG_U[i];
+            V[i] = BG_V[i];
         }
         else if(mode == 1)
         {
             if(!is_fg)
                 Y[i] = 16;
+            U[i] = 128;
+            V[i] = 128;
         }
         else if(mode == 2)
         {
@@ -249,13 +260,8 @@ void bgsubtractgauss_apply(void *ptr, VJFrame *frame, int *args)
         else
         {
             Y[i] = is_fg ? 255 : 0;
+            U[i] = 128;
+            V[i] = 128;
         }
-    }
-
-    if(mode == 1 || mode == 3)
-    {
-        const int uv_len = frame->uv_len;
-        veejay_memset(U, 128, uv_len);
-        veejay_memset(V, 128, uv_len);
     }
 }

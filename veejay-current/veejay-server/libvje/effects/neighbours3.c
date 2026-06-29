@@ -239,7 +239,7 @@ static void nb3_apply_luma(nb3_t *n,
                            int line_size,
                            int active_bins)
 {
-#pragma omp parallel for schedule(static) num_threads(n->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int tid = NB3_THREAD_ID();
         int *scratch = n->scratch + tid * NB3_SCRATCH_STRIDE;
@@ -287,7 +287,7 @@ static void nb3_apply_color(nb3_t *n,
                             int line_size,
                             int active_bins)
 {
-#pragma omp parallel for schedule(static) num_threads(n->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int tid = NB3_THREAD_ID();
         int *scratch = n->scratch + tid * NB3_SCRATCH_STRIDE;
@@ -340,7 +340,6 @@ void neighbours3_apply(void *ptr, VJFrame *frame, int *args)
     const int width = frame->width;
     const int height = frame->height;
     const int len = frame->len;
-    const int uv_len = frame->ssm ? len : frame->uv_len;
     const int line_size = args[P_LINE_SIZE];
     const int smoothness = args[P_SMOOTHNESS];
     const int mode = args[P_MODE];
@@ -362,16 +361,23 @@ void neighbours3_apply(void *ptr, VJFrame *frame, int *args)
         veejay_memcpy(src_v, dst_v, len);
     }
 
-#pragma omp parallel for schedule(static) num_threads(n->n_threads)
-    for(int i = 0; i < len; i++)
-        bin[i] = nb3_quant_luma(src_y[i], smoothness);
+#pragma omp parallel num_threads(n->n_threads)
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+            bin[i] = nb3_quant_luma(src_y[i], smoothness);
 
-    if(mode) {
-        nb3_apply_color(n, dst_y, dst_u, dst_v, src_y, src_u, src_v, bin, width, height, line_size, active_bins);
-    }
-    else {
-        nb3_apply_luma(n, dst_y, src_y, bin, width, height, line_size, active_bins);
-        veejay_memset(dst_u, 128, uv_len);
-        veejay_memset(dst_v, 128, uv_len);
+        if(mode) {
+            nb3_apply_color(n, dst_y, dst_u, dst_v, src_y, src_u, src_v, bin, width, height, line_size, active_bins);
+        }
+        else {
+            nb3_apply_luma(n, dst_y, src_y, bin, width, height, line_size, active_bins);
+
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                dst_u[i] = 128;
+                dst_v[i] = 128;
+            }
+        }
     }
 }

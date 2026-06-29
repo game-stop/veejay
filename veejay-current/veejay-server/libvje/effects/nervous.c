@@ -137,7 +137,7 @@ void nervous_apply(void *ptr, VJFrame *frame, int *args)
     nervous_t *n = (nervous_t*) ptr;
 
     const int len = frame->len;
-    const int uv_len = frame->ssm ? len : frame->uv_len;
+    const int uv_len = frame->uv_len;
     const int length = clampi(args[P_BUFFER_LENGTH], 1, N_MAX);
 
     if(n->write_pos >= length)

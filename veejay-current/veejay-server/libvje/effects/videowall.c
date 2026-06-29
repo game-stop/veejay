@@ -31,20 +31,25 @@
 #define P_SLIDE_DRIVE 4
 
 typedef struct {
-    picture_t **photo_list;
     picture_t *pictures;
     uint8_t *photo_region;
     int *offset_region;
+    int *sample_region;
     int num_photos;
     int frame_counter;
     int *offset_table_x;
     int *offset_table_y;
+    int *sample_x0;
+    int *sample_x1;
+    int *sample_y0;
+    int *sample_y1;
+    int *sample_area;
     int box_w;
     int box_h;
     int n_threads;
-
-    float slide_env;
-    float slide_phase;
+    int slide_env_q8;
+    int slide_phase;
+    uint8_t lift_lut[33][256];
 } videowall_t;
 
 static void destroy_filmstrip(videowall_t *vw);
@@ -64,13 +69,38 @@ static inline int wrapi(int v, int max)
     return v;
 }
 
-static inline uint8_t u8_add(uint8_t v, int add)
+static inline int triwave12(int phase)
 {
-    const int r = (int)v + add;
-    return (uint8_t)((r < 0) ? 0 : (r > 255 ? 255 : r));
+    phase &= 4095;
+
+    if(phase < 1024)
+        return phase;
+
+    if(phase < 3072)
+        return 2048 - phase;
+
+    return phase - 4096;
 }
 
+static inline int scale_wave(int amp, int wave, int div)
+{
+    const int v = amp * wave;
 
+    if(v >= 0)
+        return (v + (div >> 1)) / div;
+
+    return -(((-v) + (div >> 1)) / div);
+}
+
+static inline int smooth_q8(int current, int target)
+{
+    const int diff = target - current;
+
+    if(diff >= 0)
+        return current + ((diff * 29 + 128) >> 8);
+
+    return current - (((-diff) * 29 + 128) >> 8);
+}
 
 static int videowall_gcd(int a, int b)
 {
@@ -132,7 +162,7 @@ vj_effect *videowall_init(int w, int h)
     ve->defaults[P_X_DISPLACE] = 1;
     ve->defaults[P_Y_DISPLACE] = 1;
     ve->defaults[P_LOCK_UPDATE] = 0;
-    ve->defaults[P_SLIDE_DRIVE] = 420;
+    ve->defaults[P_SLIDE_DRIVE] = 0;
 
     ve->description = "VideoWall / Tile Placement";
     ve->sub_format = 1;
@@ -173,15 +203,20 @@ static void release_filmstrip(videowall_t *vw)
 {
     free(vw->photo_region);
     free(vw->offset_region);
+    free(vw->sample_region);
     free(vw->pictures);
-    free(vw->photo_list);
 
     vw->photo_region = NULL;
     vw->offset_region = NULL;
+    vw->sample_region = NULL;
     vw->pictures = NULL;
-    vw->photo_list = NULL;
     vw->offset_table_x = NULL;
     vw->offset_table_y = NULL;
+    vw->sample_x0 = NULL;
+    vw->sample_x1 = NULL;
+    vw->sample_y0 = NULL;
+    vw->sample_y1 = NULL;
+    vw->sample_area = NULL;
     vw->num_photos = 0;
     vw->frame_counter = 0;
     vw->box_w = 0;
@@ -194,6 +229,58 @@ static void destroy_filmstrip(videowall_t *vw)
     free(vw);
 }
 
+static void build_lift_lut(videowall_t *vw)
+{
+    for(int lift = 0; lift <= 32; lift++) {
+        for(int v = 0; v < 256; v++) {
+            const int r = v + lift;
+            vw->lift_lut[lift][v] = (uint8_t)((r > 255) ? 255 : r);
+        }
+    }
+}
+
+static void build_sample_map(videowall_t *vw, int src_w, int src_h)
+{
+    const int box_w = vw->box_w;
+    const int box_h = vw->box_h;
+
+    for(int x = 0; x < box_w; x++) {
+        const int x0 = (x * src_w) / box_w;
+        int x1 = ((x + 1) * src_w) / box_w;
+
+        if(x1 <= x0)
+            x1 = x0 + 1;
+
+        if(x1 > src_w)
+            x1 = src_w;
+
+        vw->sample_x0[x] = x0;
+        vw->sample_x1[x] = x1;
+    }
+
+    for(int y = 0; y < box_h; y++) {
+        const int y0 = (y * src_h) / box_h;
+        int y1 = ((y + 1) * src_h) / box_h;
+
+        if(y1 <= y0)
+            y1 = y0 + 1;
+
+        if(y1 > src_h)
+            y1 = src_h;
+
+        vw->sample_y0[y] = y0;
+        vw->sample_y1[y] = y1;
+    }
+
+    for(int y = 0; y < box_h; y++) {
+        const int ys = vw->sample_y1[y] - vw->sample_y0[y];
+        int *restrict area = vw->sample_area + y * box_w;
+
+        for(int x = 0; x < box_w; x++)
+            area[x] = ys * (vw->sample_x1[x] - vw->sample_x0[x]);
+    }
+}
+
 static void *prepare_filmstrip(int w, int h)
 {
     const int g = videowall_gcd(w, h);
@@ -202,17 +289,12 @@ static void *prepare_filmstrip(int w, int h)
     const int film_length = videowall_num_pics(w, h);
     const size_t plane_len = (size_t)picture_width * (size_t)picture_height;
     const size_t frame_len = plane_len * 3u;
+    const size_t sample_len = ((size_t)picture_width * 2u) + ((size_t)picture_height * 2u) + plane_len;
     uint8_t *planes;
 
     videowall_t *vw = (videowall_t*) vj_calloc(sizeof(videowall_t));
     if(!vw)
         return NULL;
-
-    vw->photo_list = (picture_t**) vj_calloc(sizeof(picture_t*) * film_length);
-    if(!vw->photo_list) {
-        destroy_filmstrip(vw);
-        return NULL;
-    }
 
     vw->pictures = (picture_t*) vj_calloc(sizeof(picture_t) * film_length);
     if(!vw->pictures) {
@@ -232,22 +314,35 @@ static void *prepare_filmstrip(int w, int h)
         return NULL;
     }
 
+    vw->sample_region = (int*) vj_malloc(sizeof(int) * sample_len);
+    if(!vw->sample_region) {
+        destroy_filmstrip(vw);
+        return NULL;
+    }
+
     vw->offset_table_x = vw->offset_region;
     vw->offset_table_y = vw->offset_table_x + film_length;
+    vw->sample_x0 = vw->sample_region;
+    vw->sample_x1 = vw->sample_x0 + picture_width;
+    vw->sample_y0 = vw->sample_x1 + picture_width;
+    vw->sample_y1 = vw->sample_y0 + picture_height;
+    vw->sample_area = vw->sample_y1 + picture_height;
     vw->num_photos = film_length;
     vw->box_w = picture_width;
     vw->box_h = picture_height;
     vw->frame_counter = 0;
-    vw->slide_env = 420.0f;
-    vw->slide_phase = 0.0f;
+    vw->slide_env_q8 = 0;
+    vw->slide_phase = 0;
     vw->n_threads = vje_advise_num_threads(w * h);
+
+    build_lift_lut(vw);
+    build_sample_map(vw, w, h);
 
     planes = vw->photo_region;
 
     for(int i = 0; i < vw->num_photos; i++) {
         picture_t *pic = vw->pictures + i;
 
-        vw->photo_list[i] = pic;
         pic->w = picture_width;
         pic->h = picture_height;
         pic->data[0] = planes;
@@ -274,124 +369,135 @@ void videowall_free(void *ptr)
     destroy_filmstrip((videowall_t*)ptr);
 }
 
-static void take_photo_plane(const uint8_t *restrict src,
-                             uint8_t *restrict dst,
-                             int src_w,
-                             int src_h,
-                             int box_w,
-                             int box_h,
-                             int n_threads)
+static void take_photo(videowall_t *vw, VJFrame *frame, int index)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
-    for(int y = 0; y < box_h; y++) {
-        const int sy0 = (y * src_h) / box_h;
-        int sy1 = ((y + 1) * src_h) / box_h;
+    picture_t *pic = vw->pictures + index;
+    const int src_w = frame->width;
+    const int box_w = vw->box_w;
+    const int box_h = vw->box_h;
+    const int rows = box_h * 3;
+    const int *restrict sx0_tbl = vw->sample_x0;
+    const int *restrict sx1_tbl = vw->sample_x1;
+    const int *restrict sy0_tbl = vw->sample_y0;
+    const int *restrict sy1_tbl = vw->sample_y1;
+    const int *restrict area_tbl = vw->sample_area;
 
-        if(sy1 <= sy0)
-            sy1 = sy0 + 1;
-
-        if(sy1 > src_h)
-            sy1 = src_h;
+#pragma omp parallel for schedule(static) num_threads(vw->n_threads)
+    for(int py = 0; py < rows; py++) {
+        const int p = py / box_h;
+        const int y = py - (p * box_h);
+        const uint8_t *restrict src = frame->data[p];
+        uint8_t *restrict dst = pic->data[p] + y * box_w;
+        const int sy0 = sy0_tbl[y];
+        const int sy1 = sy1_tbl[y];
+        const int *restrict area = area_tbl + y * box_w;
 
         for(int x = 0; x < box_w; x++) {
-            const int sx0 = (x * src_w) / box_w;
-            int sx1 = ((x + 1) * src_w) / box_w;
-
-            if(sx1 <= sx0)
-                sx1 = sx0 + 1;
-
-            if(sx1 > src_w)
-                sx1 = src_w;
-
+            const int sx0 = sx0_tbl[x];
+            const int sx1 = sx1_tbl[x];
             int sum = 0;
-            int count = 0;
 
             for(int yy = sy0; yy < sy1; yy++) {
-                const int row = yy * src_w;
+                const uint8_t *restrict s = src + yy * src_w + sx0;
 
-                for(int xx = sx0; xx < sx1; xx++) {
-                    sum += src[row + xx];
-                    count++;
-                }
+                for(int xx = sx0; xx < sx1; xx++)
+                    sum += *s++;
             }
 
-            dst[y * box_w + x] = (uint8_t)((sum + (count >> 1)) / count);
+            dst[x] = (uint8_t)((sum + (area[x] >> 1)) / area[x]);
         }
     }
 }
 
-static void take_photo(videowall_t *vw, VJFrame *frame, int index)
+static inline void copy_wrap_row(uint8_t *restrict dst,
+                                 const uint8_t *restrict src,
+                                 int dst_w,
+                                 int box_w,
+                                 int x)
 {
-    const int box_w = vw->photo_list[index]->w;
-    const int box_h = vw->photo_list[index]->h;
+    if(x + box_w <= dst_w) {
+        veejay_memcpy(dst + x, src, box_w);
+    } else {
+        const int left = dst_w - x;
+        const int right = box_w - left;
 
-    for(int p = 0; p < 3; p++) {
-        take_photo_plane(
-            frame->data[p],
-            vw->photo_list[index]->data[p],
-            frame->width,
-            frame->height,
-            box_w,
-            box_h,
-            vw->n_threads
-        );
+        veejay_memcpy(dst + x, src, left);
+        veejay_memcpy(dst, src + left, right);
     }
 }
 
-static void put_photo_plane(uint8_t *restrict dst,
-                            const uint8_t *restrict photo,
-                            int dst_w,
-                            int dst_h,
-                            int box_w,
-                            int box_h,
-                            int x,
-                            int y,
-                            int luma_lift,
-                            int n_threads)
+static inline void lut_copy(uint8_t *restrict dst,
+                            const uint8_t *restrict src,
+                            const uint8_t *restrict lut,
+                            int n)
+{
+    for(int i = 0; i < n; i++)
+        dst[i] = lut[src[i]];
+}
+
+static inline void lut_wrap_row(uint8_t *restrict dst,
+                                const uint8_t *restrict src,
+                                const uint8_t *restrict lut,
+                                int dst_w,
+                                int box_w,
+                                int x)
+{
+    if(x + box_w <= dst_w) {
+        lut_copy(dst + x, src, lut, box_w);
+    } else {
+        const int left = dst_w - x;
+        const int right = box_w - left;
+
+        lut_copy(dst + x, src, lut, left);
+        lut_copy(dst, src + left, lut, right);
+    }
+}
+
+static void put_photo_plane_copy(uint8_t *restrict dst,
+                                 const uint8_t *restrict photo,
+                                 int dst_w,
+                                 int dst_h,
+                                 int box_w,
+                                 int box_h,
+                                 int x,
+                                 int y)
 {
     x = wrapi(x, dst_w);
     y = wrapi(y, dst_h);
 
-    if(luma_lift <= 0) {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
-        for(int yy = 0; yy < box_h; yy++) {
-            const int dy = wrapi(y + yy, dst_h);
-            const int dst_row = dy * dst_w;
-            const int src_row = yy * box_w;
+    const int top = (y + box_h <= dst_h) ? box_h : (dst_h - y);
 
-            if(x + box_w <= dst_w) {
-                veejay_memcpy(dst + dst_row + x, photo + src_row, box_w);
-            } else {
-                const int left = dst_w - x;
-                const int right = box_w - left;
+    for(int yy = 0; yy < top; yy++)
+        copy_wrap_row(dst + (y + yy) * dst_w, photo + yy * box_w, dst_w, box_w, x);
 
-                if(left > 0)
-                    veejay_memcpy(dst + dst_row + x, photo + src_row, left);
+    for(int yy = top; yy < box_h; yy++)
+        copy_wrap_row(dst + (yy - top) * dst_w, photo + yy * box_w, dst_w, box_w, x);
+}
 
-                if(right > 0)
-                    veejay_memcpy(dst + dst_row, photo + src_row + left, right);
-            }
-        }
-    } else {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
-        for(int yy = 0; yy < box_h; yy++) {
-            const int dy = wrapi(y + yy, dst_h);
-            const int dst_row = dy * dst_w;
-            const int src_row = yy * box_w;
+static void put_photo_plane_lut(uint8_t *restrict dst,
+                                const uint8_t *restrict photo,
+                                const uint8_t *restrict lut,
+                                int dst_w,
+                                int dst_h,
+                                int box_w,
+                                int box_h,
+                                int x,
+                                int y)
+{
+    x = wrapi(x, dst_w);
+    y = wrapi(y, dst_h);
 
-            for(int xx = 0; xx < box_w; xx++) {
-                const int dx = wrapi(x + xx, dst_w);
-                dst[dst_row + dx] = u8_add(photo[src_row + xx], luma_lift);
-            }
-        }
-    }
+    const int top = (y + box_h <= dst_h) ? box_h : (dst_h - y);
+
+    for(int yy = 0; yy < top; yy++)
+        lut_wrap_row(dst + (y + yy) * dst_w, photo + yy * box_w, lut, dst_w, box_w, x);
+
+    for(int yy = top; yy < box_h; yy++)
+        lut_wrap_row(dst + (yy - top) * dst_w, photo + yy * box_w, lut, dst_w, box_w, x);
 }
 
 static void put_photo(videowall_t *vw,
-                      uint8_t *dst_plane,
-                      const uint8_t *photo,
-                      int dst_w,
-                      int dst_h,
+                      VJFrame *frame,
                       int index,
                       int global_x,
                       int global_y,
@@ -400,32 +506,26 @@ static void put_photo(videowall_t *vw,
                       int luma_lift)
 {
     const int n = vw->num_photos >> 1;
-    const int per_row = n;
-    const int box_w = vw->photo_list[index]->w;
-    const int box_h = vw->photo_list[index]->h;
-
+    const int box_w = vw->box_w;
+    const int box_h = vw->box_h;
+    const int width = frame->width;
+    const int height = frame->height;
     const int dx = vw->offset_table_x[index];
     const int dy = vw->offset_table_y[index];
-
     const int row_group = (index < n) ? 0 : 1;
     const int alt_x = (index & 1) ? -stagger_x : stagger_x;
     const int alt_y = row_group ? -stagger_y : stagger_y;
+    const int base_x = (box_w * (index % n)) + dx + global_x + alt_x;
+    const int base_y = ((index < n) ? dy : (height - box_h - dy)) + global_y + alt_y;
+    const picture_t *pic = vw->pictures + index;
 
-    const int base_x = (box_w * (index % per_row)) + dx + global_x + alt_x;
-    const int base_y = ((index < n) ? dy : (dst_h - box_h - dy)) + global_y + alt_y;
+    if(luma_lift > 0)
+        put_photo_plane_lut(frame->data[0], pic->data[0], vw->lift_lut[luma_lift], width, height, box_w, box_h, base_x, base_y);
+    else
+        put_photo_plane_copy(frame->data[0], pic->data[0], width, height, box_w, box_h, base_x, base_y);
 
-    put_photo_plane(
-        dst_plane,
-        photo,
-        dst_w,
-        dst_h,
-        box_w,
-        box_h,
-        base_x,
-        base_y,
-        luma_lift,
-        vw->n_threads
-    );
+    put_photo_plane_copy(frame->data[1], pic->data[1], width, height, box_w, box_h, base_x, base_y);
+    put_photo_plane_copy(frame->data[2], pic->data[2], width, height, box_w, box_h, base_x, base_y);
 }
 
 void videowall_apply(void *ptr, VJFrame *frameA, VJFrame *frameB, int *args)
@@ -434,42 +534,34 @@ void videowall_apply(void *ptr, VJFrame *frameA, VJFrame *frameB, int *args)
 
     const int width = frameA->width;
     const int height = frameA->height;
-
-    int slot = args[P_PHOTO_SLOT];
-    int x_disp = args[P_X_DISPLACE];
-    int y_disp = args[P_Y_DISPLACE];
-    int lock_update = args[P_LOCK_UPDATE] ? 1 : 0;
+    const int slot = args[P_PHOTO_SLOT];
+    const int x_disp = args[P_X_DISPLACE];
+    const int y_disp = args[P_Y_DISPLACE];
+    const int lock_update = args[P_LOCK_UPDATE] ? 1 : 0;
     const int slide_drive = args[P_SLIDE_DRIVE];
 
-    vw->slide_env += ((float)slide_drive - vw->slide_env) * 0.115f;
+    vw->slide_env_q8 = smooth_q8(vw->slide_env_q8, slide_drive << 8);
+    vw->slide_env_q8 = clampi(vw->slide_env_q8, 0, 1000 << 8);
 
-    if(vw->slide_env < 0.0f)
-        vw->slide_env = 0.0f;
-    else if(vw->slide_env > 1000.0f)
-        vw->slide_env = 1000.0f;
-
-    const int slide_q = clampi((int)(vw->slide_env + 0.5f), 0, 1000);
+    const int slide_q = (vw->slide_env_q8 + 128) >> 8;
     const int slide_span = vw->box_w + vw->box_h;
-    int max_slide_px = 1 + ((slide_span * slide_q + 500) / 1000);
+    int max_slide_px = (slide_span * slide_q + 500) / 1000;
     const int max_safe_slide = (width + height) >> 2;
 
     if(max_slide_px > max_safe_slide)
         max_slide_px = max_safe_slide;
 
     const int amp = max_slide_px;
+    const int slide_step = 2 + ((slide_q * 46 + 500) / 1000);
 
-    vw->slide_phase += 0.10f + ((float)slide_q * 0.0024f);
-    if(vw->slide_phase > 8192.0f)
-        vw->slide_phase -= 8192.0f;
+    vw->slide_phase = (vw->slide_phase + slide_step) & 4095;
 
-    const int phase = ((int)vw->slide_phase) & 7;
-    const int tri = (phase < 4) ? phase : (7 - phase);
-    const int sign = (phase < 4) ? 1 : -1;
-
-    const int global_x = (amp * sign * tri) / 3;
-    const int global_y = (amp * (((phase + 2) & 4) ? -1 : 1)) / 3;
-    const int stagger_x = amp;
-    const int stagger_y = amp >> 1;
+    const int phase = vw->slide_phase;
+    const int phase3 = (phase * 3) & 4095;
+    const int global_x = scale_wave(amp, triwave12(phase), 1024);
+    const int global_y = scale_wave(amp, triwave12(phase3), 2048);
+    const int stagger_x = scale_wave(amp, triwave12(phase + 1024), 2048);
+    const int stagger_y = scale_wave(amp, triwave12(phase3 + 1024), 4096);
     const int luma_lift = (slide_q * 32 + 500) / 1000;
 
     if(!lock_update) {
@@ -477,22 +569,20 @@ void videowall_apply(void *ptr, VJFrame *frameA, VJFrame *frameB, int *args)
         vw->offset_table_y[slot] = y_disp;
     }
 
-    const int index_a = vw->frame_counter % vw->num_photos;
-    take_photo(vw, frameA, index_a);
+    int next = vw->frame_counter;
 
-    vw->frame_counter++;
+    take_photo(vw, frameA, next);
+    next++;
+    if(next == vw->num_photos)
+        next = 0;
 
-    const int index_b = vw->frame_counter % vw->num_photos;
-    take_photo(vw, frameB, index_b);
+    take_photo(vw, frameB, next);
+    next++;
+    if(next == vw->num_photos)
+        next = 0;
 
-    for(int i = 0; i < vw->num_photos; i++) {
-        put_photo(vw, frameA->data[0], vw->photo_list[i]->data[0], width, height, i,
-                  global_x, global_y, stagger_x, stagger_y, luma_lift);
-        put_photo(vw, frameA->data[1], vw->photo_list[i]->data[1], width, height, i,
-                  global_x, global_y, stagger_x, stagger_y, 0);
-        put_photo(vw, frameA->data[2], vw->photo_list[i]->data[2], width, height, i,
-                  global_x, global_y, stagger_x, stagger_y, 0);
-    }
+    vw->frame_counter = next;
 
-    vw->frame_counter++;
+    for(int i = 0; i < vw->num_photos; i++)
+        put_photo(vw, frameA, i, global_x, global_y, stagger_x, stagger_y, luma_lift);
 }

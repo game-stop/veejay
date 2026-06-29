@@ -210,6 +210,7 @@ void *neighbours2_malloc(int w, int h)
     const int len = w * h;
 
     n->n_threads = vje_advise_num_threads(len);
+
     n->src[0] = (uint8_t*) vj_malloc((size_t)len * 4u);
 
     if(!n->src[0]) {
@@ -230,7 +231,7 @@ void *neighbours2_malloc(int w, int h)
     return (void*) n;
 }
 
-static void nb2_apply_luma(nb2_t *n,
+static void nb2_apply_luma_omp(nb2_t *n,
                            uint8_t *restrict dst_y,
                            const uint8_t *restrict src_y,
                            const uint8_t *restrict bin,
@@ -239,7 +240,7 @@ static void nb2_apply_luma(nb2_t *n,
                            int brush_size,
                            int active_bins)
 {
-#pragma omp parallel for schedule(static) num_threads(n->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int tid = NB2_THREAD_ID();
         int *scratch = n->scratch + tid * NB2_SCRATCH_STRIDE;
@@ -279,7 +280,7 @@ static void nb2_apply_luma(nb2_t *n,
     }
 }
 
-static void nb2_apply_color(nb2_t *n,
+static void nb2_apply_color_omp(nb2_t *n,
                             uint8_t *restrict dst_y,
                             uint8_t *restrict dst_u,
                             uint8_t *restrict dst_v,
@@ -292,7 +293,7 @@ static void nb2_apply_color(nb2_t *n,
                             int brush_size,
                             int active_bins)
 {
-#pragma omp parallel for schedule(static) num_threads(n->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int tid = NB2_THREAD_ID();
         int *scratch = n->scratch + tid * NB2_SCRATCH_STRIDE;
@@ -371,12 +372,15 @@ void neighbours2_apply(void *ptr, VJFrame *frame, int *args)
         veejay_memcpy(src_v, dst_v, len);
     }
 
-#pragma omp parallel for schedule(static) num_threads(n->n_threads)
-    for(int i = 0; i < len; i++)
-        bin[i] = nb2_quant_luma(src_y[i], smoothness);
+#pragma omp parallel num_threads(n->n_threads)
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+            bin[i] = nb2_quant_luma(src_y[i], smoothness);
 
-    if(mode)
-        nb2_apply_color(n, dst_y, dst_u, dst_v, src_y, src_u, src_v, bin, width, height, brush_size, active_bins);
-    else
-        nb2_apply_luma(n, dst_y, src_y, bin, width, height, brush_size, active_bins);
+        if(mode)
+            nb2_apply_color_omp(n, dst_y, dst_u, dst_v, src_y, src_u, src_v, bin, width, height, brush_size, active_bins);
+        else
+            nb2_apply_luma_omp(n, dst_y, src_y, bin, width, height, brush_size, active_bins);
+    }
 }

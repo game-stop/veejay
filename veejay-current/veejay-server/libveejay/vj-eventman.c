@@ -2546,7 +2546,7 @@ void		vj_init_vevo_events(void)
 				vj_event_audio_beat_auto_amount,
 				1,
 				VIMS_REQUIRE_ALL_PARAMS,
-				"Auto-fx amount, 0-100",
+				"Auto-fx amount, 0-100 normal UI range, 101-300 VIMS performance overdrive",
 				75,
 				NULL );
 

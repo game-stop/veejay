@@ -177,6 +177,9 @@ void motionmap_free(void *ptr)
 {
     motionmap_t *mm = (motionmap_t*) ptr;
 
+    if(!mm)
+        return;
+
     free(mm->region);
     free(mm);
 }

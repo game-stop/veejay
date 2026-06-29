@@ -243,9 +243,9 @@ void chromascratcher_apply(void *ptr, VJFrame *frame, int *args)
     const int len = frame->len;
 
 
-    int n = args[0];
+    int n = chromascratcher_clampi(args[0], 0, MAX_SCRATCH_FRAMES - 1);
     int opacity = args[1];
-    int mode = args[2];
+    int mode = chromascratcher_clampi(args[2], 0, 29);
     int no_reverse = args[3] == 0 ? 1 : 0;
 
     if(n <= 0) {
