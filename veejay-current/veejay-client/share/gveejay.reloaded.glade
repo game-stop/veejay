@@ -87,7 +87,7 @@
   </object>
   <object class="GtkAdjustment" id="audio_beat_auto_amount_adj">
     <property name="lower">0</property>
-    <property name="upper">100</property>
+    <property name="upper">300</property>
     <property name="value">75</property>
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
@@ -10760,7 +10760,7 @@
                                         <property name="can-focus">False</property>
                                         <property name="xalign">0</property>
                                         <property name="wrap">True</property>
-                                        <property name="label" translatable="yes">Auto FX maps the current chain using beat hints. Reset rebuilds the target set.</property>
+                                        <property name="label" translatable="yes">Auto FX maps the current chain using beat hints. Auto amount 0-100 is normal; 101-300 is Chaos overdrive for direct performance control. Reset rebuilds the target set.</property>
                                       </object>
                                       <packing>
                                         <property name="left-attach">0</property>

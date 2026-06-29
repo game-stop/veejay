@@ -1186,7 +1186,7 @@ static struct
     {"Duration of the beat pulse signal used for short one-shot visual reactions. Break Beat reuses this as scratch/slice size."},
     {"Duration of the beat gate signal used for held visual reactions. Break Beat reuses this as the repeat-anchor memory window."},
     {"Automatic FX mapping mode. Higher modes use more motion, memory, and chaos-oriented parameter roles."},
-    {"Global intensity of automatic FX parameter modulation."},
+    {"Global intensity of automatic FX parameter modulation. 0-100 is the normal safe range; 101-300 enables performance overdrive when Auto mode is Chaos."},
     {"Break Beat scratch sensitivity. 50 is neutral; lower values suppress weak scratches, higher values admit more scratch gestures."},
     {"When enabled, Break Beat parks video at speed 0 when the external beat source disappears. Manual resume is still possible."},
     {"Break Beat monitor latency override in milliseconds. Disabled while Auto is enabled."},
