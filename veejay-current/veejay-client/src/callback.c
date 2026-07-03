@@ -28,14 +28,6 @@ dlclose( handle );
 #include "callback.h"
 #include "curve.h"
 
-#ifndef VJ_KF_ENTRY_CHAIN_FADE
-#define VJ_KF_ENTRY_CHAIN_FADE 0
-#endif
-#ifndef VJ_KF_PARAM_CHAIN_OPACITY
-#define VJ_KF_PARAM_CHAIN_OPACITY 99
-#endif
-
-
 #define AUDIO_MASTER_JACK_UI_VALUE 1
 
 #define AUDIO_MIX_MODE_FOLLOW 0
@@ -433,10 +425,23 @@ void	on_videobar_value_changed(GtkWidget *widget, gpointer user_data)
 
 void	on_subrender_toggled(GtkWidget *widget, gpointer user_data)
 {
-	if(!info->status_lock) {
-		multi_vims( VIMS_SUB_RENDER,"%d",0);
-		vj_msg(VEEJAY_MSG_INFO, "Subrender request sent for the current chain");
-	}
+    (void)user_data;
+
+	if(info->status_lock)
+        return;
+
+    int enabled = 0;
+
+    if(widget && GTK_IS_TOGGLE_BUTTON(widget))
+        enabled = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? 1 : 0;
+    else
+        enabled = is_button_toggled("toggle_subrender") ? 1 : 0;
+
+	multi_vims( VIMS_SUB_RENDER,"%d %d",0,enabled);
+    vj_midi_learning_vims_toggle2(info->midi, "toggle_subrender", VIMS_SUB_RENDER, 0);
+	vj_msg(VEEJAY_MSG_INFO,
+           "Mixing-source FX subrender %s requested for the current chain",
+           enabled ? "enabled" : "disabled");
 }
 
 void	on_button_001_clicked(GtkWidget *widget, gpointer user_data)
@@ -8512,14 +8517,32 @@ void	on_uq_button_clicked( GtkWidget *w, gpointer data )
 
 void    on_subrender_entry_toggle_toggled(GtkWidget *w, gpointer data)
 {
+    (void)data;
+
     if(info->status_lock || info->parameter_lock)
 		return;
-    int enabled = is_button_toggled( "subrender_entry_toggle" );
-    multi_vims( VIMS_SUB_RENDER_ENTRY,"%d %d %d", 0,-1,enabled);
-    vj_midi_learning_vims_toggle3(info->midi, "subrender_entry_toggle", VIMS_SUB_RENDER_ENTRY, 0, -1);
+
+    int entry = info->uc.selected_chain_entry;
+    if(entry < 0) {
+        vj_msg(VEEJAY_MSG_INFO, "Select a mixer FX chain entry before enabling mixing-source FX subrender");
+        return;
+    }
+
+    int enabled = 0;
+
+    if(w && GTK_IS_TOGGLE_BUTTON(w))
+        enabled = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) ? 1 : 0;
+    else
+        enabled = is_button_toggled( "subrender_entry_toggle" ) ? 1 : 0;
+
+    multi_vims( VIMS_SUB_RENDER_ENTRY,"%d %d %d", 0,entry,enabled);
+    vj_midi_learning_vims_toggle3(info->midi, "subrender_entry_toggle", VIMS_SUB_RENDER_ENTRY, 0, entry);
     info->uc.reload_hint[HINT_ENTRY] = 1;
     info->uc.reload_hint[HINT_CHAIN] = 1;
-    vj_msg(VEEJAY_MSG_INFO, "Sub rendering is %s", (enabled ? "enabled" : "disabled"));
+    vj_msg(VEEJAY_MSG_INFO,
+           "Mixing-source FX subrender %s for FX chain entry %d",
+           enabled ? "enabled" : "disabled",
+           entry);
 }
 
 void    on_transition_enabled_toggled(GtkWidget *w, gpointer data)

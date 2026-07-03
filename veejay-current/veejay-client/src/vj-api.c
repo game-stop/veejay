@@ -1354,7 +1354,7 @@ static struct
     {"Transition duration in frames for the selected stream."},
     {"Transition shape number for the selected stream."},
     {"Enable shape transitions when switching samples or streams. Configure the current transition in the properties panel."},
-    {"Request subrendering for the current chain state."},
+    {"Render the selected mixer source through its own FX chain before it is used as the extra frame."},
     {"Enable or disable feedback rendering. Some navigation and sample-grid controls are locked while feedback is active."},
     {NULL},
 };
@@ -6488,9 +6488,13 @@ static void update_current_slot(int *history, int pm, int last_pm) {
         }
     }
 
-	if( (history[SUBRENDER] != info->status_tokens[SUBRENDER] || gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[ WIDGET_TOGGLE_SUBRENDER ]) ) != info->status_tokens[SUBRENDER]) )
+	if(widget_cache[WIDGET_TOGGLE_SUBRENDER] &&
+       (history[SUBRENDER] != info->status_tokens[SUBRENDER] ||
+        gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_TOGGLE_SUBRENDER])) !=
+            (info->status_tokens[SUBRENDER] ? TRUE : FALSE)))
     {
-        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_TOGGLE_SUBRENDER ] ) , TRUE );
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_TOGGLE_SUBRENDER]),
+                                     info->status_tokens[SUBRENDER] ? TRUE : FALSE);
     }
 
     if( history[FADE_ALPHA] != info->status_tokens[FADE_ALPHA] || info->status_tokens[FADE_ALPHA] != gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_TOGGLE_FADEMETHOD ] )) )

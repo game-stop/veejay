@@ -250,14 +250,4 @@
 #define __MAX_TRACKS 16
 #define HISTORY_PLAYMODES 4
 
-#ifndef VJ_KF_ENTRY_CHAIN_FADE
-#define VJ_KF_ENTRY_CHAIN_FADE 0
-#endif
-#ifndef VJ_KF_PARAM_CHAIN_OPACITY
-#define VJ_KF_PARAM_CHAIN_OPACITY 99
-#endif
-
-#define VJ_KF_ENTRY_CHAIN_FADE 0
-#define VJ_KF_PARAM_CHAIN_OPACITY 99 // also in common.h reloaded
-
 #endif
