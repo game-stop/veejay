@@ -190,7 +190,6 @@ static void vj_sequence_load_bank(sequencer_t *s, int bank);
 static int vj_sequence_selected_duration(veejay_t *v);
 static void vj_event_release_beat_transport_for_source_switch(veejay_t *v);
 
-extern void veejay_pipe_write_status(veejay_t *info);
 extern int  _vj_server_del_client(vj_server * vje, int link_id);
 extern int       vj_event_exists( int id );
 extern void vj_perform_record_offline_disarm(veejay_t *info);
@@ -3270,10 +3269,19 @@ void    vj_event_play_norestart( void *ptr, const char format[], va_list ap )
     veejay_msg(VEEJAY_MSG_INFO, "Sample continuous mode is %s", (v->settings->sample_restart == 0 ? "enabled" : "disabled"));
 }
 
+static int vj_event_sub_render_next(int requested, int current)
+{
+    if(requested < 0)
+        return current ? 0 : 1;
+    return requested ? 1 : 0;
+}
+
 void    vj_event_sub_render_entry( void *ptr, const char format[], va_list ap )
 {
-    int args[3];
+    int args[3] = { 0, -1, -1 };
     veejay_t *v = (veejay_t*) ptr;
+    int changed = 0;
+
     P_A(args,sizeof(args),NULL,0,format,ap);
 
     if( SAMPLE_PLAYING(v)) {
@@ -3281,67 +3289,78 @@ void    vj_event_sub_render_entry( void *ptr, const char format[], va_list ap )
 
         if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
 
-        sample_entry_set_is_rendering(args[0],args[1], args[2]);
+        int entry_render = 0;
+        int subrender = sample_get_subrender(args[0],args[1],&entry_render);
+        entry_render = vj_event_sub_render_next(args[2], entry_render);
 
-        int subrender = sample_get_subrender(args[0],args[1],&args[2]);
+        sample_entry_set_is_rendering(args[0],args[1], entry_render);
+        subrender = sample_get_subrender(args[0],args[1],&entry_render);
+        changed = 1;
+        v->uc->chain_changed = 1;
 
-        veejay_msg(VEEJAY_MSG_INFO, "%s rendering of mixing source on entry %d",
-                ( (subrender == 1 ? args[2] : 0) ? "Enabled" : "Disabled" ),args[1]);
+        veejay_msg(VEEJAY_MSG_INFO, "%s rendering FX chain of mixing source on entry %d%s",
+                ( entry_render ? "Enabled" : "Disabled" ), args[1],
+                ( subrender ? "" : " (global mixing-source rendering is off)" ));
     } 
     if( STREAM_PLAYING(v)) {
         STREAM_DEFAULTS(args[0]);
         
         if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
 
-        vj_tag_entry_set_is_rendering(args[0],args[1],args[2]);
+        int entry_render = 0;
+        int subrender = vj_tag_get_subrender(args[0],args[1],&entry_render);
+        entry_render = vj_event_sub_render_next(args[2], entry_render);
 
-        int subrender = vj_tag_get_subrender(args[0],args[1],&args[2]);
+        vj_tag_entry_set_is_rendering(args[0],args[1],entry_render);
+        subrender = vj_tag_get_subrender(args[0],args[1],&entry_render);
+        changed = 1;
+        v->uc->chain_changed = 1;
 
-        veejay_msg(VEEJAY_MSG_INFO, "%s rendering of mixing source on entry %d",
-                ( (subrender == 1 ? args[2] :0) ? "Enabled" : "Disabled" ),args[1]);
+        veejay_msg(VEEJAY_MSG_INFO, "%s rendering FX chain of mixing source on entry %d%s",
+                ( entry_render ? "Enabled" : "Disabled" ), args[1],
+                ( subrender ? "" : " (global mixing-source rendering is off)" ));
     }
+
 }   
 
 
 void    vj_event_sub_render( void *ptr, const char format[], va_list ap )
 {
-    int args[2];
+    int args[2] = { 0, -1 };
     veejay_t *v = (veejay_t*) ptr;
+    int changed = 0;
+
     P_A(args,sizeof(args),NULL,0,format,ap);
 
     if( SAMPLE_PLAYING(v)) {
         SAMPLE_DEFAULTS(args[0]);
         int ignored = 0;
         int cur = sample_get_subrender(args[0],0,&ignored);
-        if( cur == 0 ) {
-            cur = 1;
-        }
-        else {
-            cur = 0;
-        }
+        cur = vj_event_sub_render_next(args[1], cur);
 
         sample_set_subrender(args[0], cur);
         cur = sample_get_subrender(args[0],0,&ignored);
+        changed = 1;
+        v->uc->chain_changed = 1;
 
-        veejay_msg(VEEJAY_MSG_INFO, "%s rendering of mixing sources",
+        veejay_msg(VEEJAY_MSG_INFO, "%s rendering FX chains of mixing sources",
                 ( cur == 1 ? "Enabled" : "Disabled" ));
     } 
     if( STREAM_PLAYING(v)) {
         STREAM_DEFAULTS(args[0]);
         int ignored = 0;
         int cur = vj_tag_get_subrender(args[0],0,&ignored);
-        if( cur == 0 ) {
-            cur = 1;
-        }
-        else {
-            cur = 0;
-        }
+        cur = vj_event_sub_render_next(args[1], cur);
 
         vj_tag_set_subrender(args[0], cur);
         cur = vj_tag_get_subrender(args[0],0,&ignored);
-        veejay_msg(VEEJAY_MSG_INFO, "%s rendering of mixing sources",
+        changed = 1;
+        v->uc->chain_changed = 1;
+
+        veejay_msg(VEEJAY_MSG_INFO, "%s rendering FX chains of mixing sources",
                 ( cur == 1 ? "Enabled" : "Disabled" ));
     }
+
 }   
 
 void vj_event_vims_message_forwarding( void *ptr, const char format[], va_list ap )

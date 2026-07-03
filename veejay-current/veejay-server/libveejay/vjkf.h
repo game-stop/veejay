@@ -22,8 +22,6 @@
 #ifndef VJKF_H
 #define VJKF_H
 
-#define VJ_KF_ENTRY_CHAIN_FADE 0
-#define VJ_KF_PARAM_CHAIN_OPACITY 99
 
 #define SAMPLE_FADER_OFF 0
 #define SAMPLE_FADER_LINEAR 1

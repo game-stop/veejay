@@ -3783,29 +3783,31 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				NULL );
 
 	index_map_[ VIMS_SUB_RENDER ] 		=	_new_event(
-				"%d",
+				"%d %d",
 				VIMS_SUB_RENDER,
-				"Render FX on mixing source enabled",
+				"Render FX chains on mixing sources",
 				vj_event_sub_render,
-				1,
+				2,
 				VIMS_ALLOW_ANY,
 				SAMPLE_ID_HELP,
 				0,
+                "Render (-1=toggle, 0=off, 1=on)",
+                -1,
 				NULL );
 
     index_map_[ VIMS_SUB_RENDER_ENTRY ] 		=	_new_event(
 				"%d %d %d",
 				VIMS_SUB_RENDER_ENTRY,
-				"Render FX on mixing source chain entry toggle",
+				"Render FX chain of mixing source on chain entry",
 				vj_event_sub_render_entry,
 				3,
 				VIMS_ALLOW_ANY,
 				SAMPLE_ID_HELP,
 				0,
-                "Chain entry",
+                "Chain entry (-1=current)",
                 -1,
-                "Render",
-                0,
+                "Render (-1=toggle, 0=off, 1=on)",
+                -1,
 				NULL );
 
 	index_map_[VIMS_ALPHA_COMPOSITE]				=	_new_event(
