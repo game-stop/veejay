@@ -272,6 +272,18 @@ static gfloat unprojectd                    (gdouble               value,
                                              gfloat                min,
                                              gfloat                max,
                                              int                   norm);
+static gint gtk3_curve_project_cpoint_x      (Gtk3CurvePrivate     *priv,
+                                             gfloat                value,
+                                             gint                  width);
+static gint gtk3_curve_project_cpoint_y      (Gtk3CurvePrivate     *priv,
+                                             gfloat                value,
+                                             gint                  height);
+static gfloat gtk3_curve_unproject_cpoint_x  (Gtk3CurvePrivate     *priv,
+                                             gint                  value,
+                                             gint                  width);
+static gfloat gtk3_curve_unproject_cpoint_y  (Gtk3CurvePrivate     *priv,
+                                             gint                  value,
+                                             gint                  height);
 static void spline_solve                    (int                   n,
                                              gfloat                x[],
                                              gfloat                y[],
@@ -3455,15 +3467,9 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
       if (priv->curve_data.d_cpoints[i].x > priv->max_x)
         continue;
 
-      x = RADIUS + project(priv->curve_data.d_cpoints[i].x,
-                           priv->min_x,
-                           priv->max_x,
-                           width);
+      x = RADIUS + gtk3_curve_project_cpoint_x(priv, priv->curve_data.d_cpoints[i].x, width);
 
-      y = RADIUS + hm - project(priv->curve_data.d_cpoints[i].y,
-                                priv->min_y,
-                                priv->max_y,
-                                height);
+      y = RADIUS + hm - gtk3_curve_project_cpoint_y(priv, priv->curve_data.d_cpoints[i].y, height);
       if (i == priv->hover_cpoint) {
         cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 0.35);
         cairo_arc(cr, x, y, RADIUS * 2.5, 0, 2 * M_PI);
@@ -3660,9 +3666,9 @@ gtk3_curve_button_press(GtkWidget *widget, GdkEventButton *event)
   }
 
   if (tx < RADIUS ||
-      tx >= RADIUS + width ||
+      tx > RADIUS + width ||
       ty < RADIUS ||
-      ty >= RADIUS + height)
+      ty > RADIUS + height)
     return FALSE;
 
   gtk3_curve_live_trace_disable_for_user_edit(widget);
@@ -3672,16 +3678,13 @@ gtk3_curve_button_press(GtkWidget *widget, GdkEventButton *event)
   if (!priv->curve_data.d_point || priv->curve_data.n_points != width)
     gtk3_curve_interpolate(widget, width, height);
 
-  x = CLAMP((tx - RADIUS), 0, width - 1);
-  y = CLAMP((ty - RADIUS), 0, height - 1);
+  x = CLAMP((tx - RADIUS), 0, width);
+  y = CLAMP((ty - RADIUS), 0, height);
 
   gfloat min_x = priv->min_x;
 
   for (int i = 0; i < priv->curve_data.n_cpoints; ++i) {
-    gint cx = project(priv->curve_data.d_cpoints[i].x,
-                      min_x,
-                      priv->max_x,
-                      width);
+    gint cx = gtk3_curve_project_cpoint_x(priv, priv->curve_data.d_cpoints[i].x, width);
 
     guint d = (guint) abs(x - cx);
 
@@ -3697,10 +3700,7 @@ gtk3_curve_button_press(GtkWidget *widget, GdkEventButton *event)
     case GTK3_CURVE_TYPE_SPLINE:
       if (distance > MIN_DISTANCE) {
         if (priv->curve_data.n_cpoints > 0) {
-          gint cx = project(priv->curve_data.d_cpoints[closest_point].x,
-                            min_x,
-                            priv->max_x,
-                            width);
+          gint cx = gtk3_curve_project_cpoint_x(priv, priv->curve_data.d_cpoints[closest_point].x, width);
 
           if (x > cx)
             ++closest_point;
@@ -3723,23 +3723,25 @@ gtk3_curve_button_press(GtkWidget *widget, GdkEventButton *event)
       priv->grab_point = closest_point;
 
       priv->curve_data.d_cpoints[priv->grab_point].x =
-        unproject(x, min_x, priv->max_x, width);
+        gtk3_curve_unproject_cpoint_x(priv, x, width);
 
       priv->curve_data.d_cpoints[priv->grab_point].y =
-        unproject(height - y, priv->min_y, priv->max_y, height);
+        gtk3_curve_unproject_cpoint_y(priv, height - y, height);
 
       gtk3_curve_interpolate(widget, width, height);
       break;
 
     case GTK3_CURVE_TYPE_FREE:
-      if (priv->curve_data.d_point && x < priv->curve_data.n_points) {
+      if (priv->curve_data.d_point && priv->curve_data.n_points > 0) {
+        gint fx = CLAMP(x, 0, priv->curve_data.n_points - 1);
+
         g_free(priv->frame_vector);
         priv->frame_vector = NULL;
         priv->frame_vector_len = 0;
 
-        priv->curve_data.d_point[x].x = RADIUS + x;
-        priv->curve_data.d_point[x].y = RADIUS + y;
-        priv->grab_point = x;
+        priv->curve_data.d_point[fx].x = RADIUS + fx;
+        priv->curve_data.d_point[fx].y = RADIUS + y;
+        priv->grab_point = fx;
         priv->last = y;
       }
       break;
@@ -3883,8 +3885,8 @@ gtk3_curve_motion_notify(GtkWidget *widget, GdkEventMotion *event)
     }
   }
 
-  x = CLAMP((tx - RADIUS), 0, width - 1);
-  y = CLAMP((ty - RADIUS), 0, height - 1);
+  x = CLAMP((tx - RADIUS), 0, width);
+  y = CLAMP((ty - RADIUS), 0, height);
 
   priv->in_curve =
     (tx >= RADIUS &&
@@ -3947,15 +3949,9 @@ gtk3_curve_motion_notify(GtkWidget *widget, GdkEventMotion *event)
       if (priv->curve_data.d_cpoints[i].x > priv->max_x)
         continue;
 
-      cx = RADIUS + project(priv->curve_data.d_cpoints[i].x,
-                            priv->min_x,
-                            priv->max_x,
-                            width);
+      cx = RADIUS + gtk3_curve_project_cpoint_x(priv, priv->curve_data.d_cpoints[i].x, width);
 
-      cy = RADIUS + height - project(priv->curve_data.d_cpoints[i].y,
-                                    priv->min_y,
-                                    priv->max_y,
-                                    height);
+      cy = RADIUS + height - gtk3_curve_project_cpoint_y(priv, priv->curve_data.d_cpoints[i].y, height);
 
       dxp = tx - (gint)(cx + 0.5);
       dyp = ty - (gint)(cy + 0.5);
@@ -3980,10 +3976,7 @@ gtk3_curve_motion_notify(GtkWidget *widget, GdkEventMotion *event)
   distance = ~0U;
 
   for (int i = 0; i < priv->curve_data.n_cpoints; ++i) {
-    gint cx = project(priv->curve_data.d_cpoints[i].x,
-                      min_x,
-                      priv->max_x,
-                      width);
+    gint cx = gtk3_curve_project_cpoint_x(priv, priv->curve_data.d_cpoints[i].x, width);
 
     guint d = (guint) abs(x - cx);
 
@@ -4008,18 +4001,12 @@ gtk3_curve_motion_notify(GtkWidget *widget, GdkEventMotion *event)
 
         if (priv->grab_point > 0) {
           leftbound =
-            RADIUS + project(priv->curve_data.d_cpoints[priv->grab_point - 1].x,
-                             min_x,
-                             priv->max_x,
-                             width);
+            RADIUS + gtk3_curve_project_cpoint_x(priv, priv->curve_data.d_cpoints[priv->grab_point - 1].x, width);
         }
 
         if (priv->grab_point + 1 < priv->curve_data.n_cpoints) {
           rightbound =
-            RADIUS + project(priv->curve_data.d_cpoints[priv->grab_point + 1].x,
-                             min_x,
-                             priv->max_x,
-                             width);
+            RADIUS + gtk3_curve_project_cpoint_x(priv, priv->curve_data.d_cpoints[priv->grab_point + 1].x, width);
         }
 
         if (tx <= leftbound ||
@@ -4030,10 +4017,10 @@ gtk3_curve_motion_notify(GtkWidget *widget, GdkEventMotion *event)
           priv->curve_data.d_cpoints[priv->grab_point].x = min_x - 1.0f;
         } else {
           priv->curve_data.d_cpoints[priv->grab_point].x =
-            unproject(x, min_x, priv->max_x, width);
+            gtk3_curve_unproject_cpoint_x(priv, x, width);
 
           priv->curve_data.d_cpoints[priv->grab_point].y =
-            unproject(height - y, priv->min_y, priv->max_y, height);
+            gtk3_curve_unproject_cpoint_y(priv, height - y, height);
         }
 
         gtk3_curve_interpolate(widget, width, height);
@@ -4042,7 +4029,8 @@ gtk3_curve_motion_notify(GtkWidget *widget, GdkEventMotion *event)
       break;
 
     case GTK3_CURVE_TYPE_FREE:
-      if (priv->grab_point != -1 && priv->curve_data.d_point) {
+      if (priv->grab_point != -1 && priv->curve_data.d_point && priv->curve_data.n_points > 0) {
+        gint fx = CLAMP(x, 0, priv->curve_data.n_points - 1);
         gint x1, x2, y1, y2;
 
         if (priv->frame_vector) {
@@ -4051,14 +4039,14 @@ gtk3_curve_motion_notify(GtkWidget *widget, GdkEventMotion *event)
           priv->frame_vector_len = 0;
         }
 
-        if (priv->grab_point > x) {
-          x1 = x;
+        if (priv->grab_point > fx) {
+          x1 = fx;
           x2 = priv->grab_point;
           y1 = y;
           y2 = priv->last;
         } else {
           x1 = priv->grab_point;
-          x2 = x;
+          x2 = fx;
           y1 = priv->last;
           y2 = y;
         }
@@ -4075,12 +4063,12 @@ gtk3_curve_motion_notify(GtkWidget *widget, GdkEventMotion *event)
             priv->curve_data.d_point[i].y =
               RADIUS + (y1 + ((y2 - y1) * (i - x1)) / (x2 - x1));
           }
-        } else if (x >= 0 && x < priv->curve_data.n_points) {
-          priv->curve_data.d_point[x].x = RADIUS + x;
-          priv->curve_data.d_point[x].y = RADIUS + y;
+        } else {
+          priv->curve_data.d_point[fx].x = RADIUS + fx;
+          priv->curve_data.d_point[fx].y = RADIUS + y;
         }
 
-        priv->grab_point = x;
+        priv->grab_point = fx;
         priv->last = y;
         changed = TRUE;
       }
@@ -4666,6 +4654,30 @@ static gfloat unprojectd(gdouble value, gfloat min, gfloat max, int norm)
     value = (gdouble)(norm - 1);
 
   return (gfloat)((value / (gdouble)(norm - 1)) * ((gdouble)max - (gdouble)min) + (gdouble)min);
+}
+
+static gint
+gtk3_curve_project_cpoint_x(Gtk3CurvePrivate *priv, gfloat value, gint width)
+{
+  return project(value, priv->min_x, priv->max_x, width + 1);
+}
+
+static gint
+gtk3_curve_project_cpoint_y(Gtk3CurvePrivate *priv, gfloat value, gint height)
+{
+  return project(value, priv->min_y, priv->max_y, height + 1);
+}
+
+static gfloat
+gtk3_curve_unproject_cpoint_x(Gtk3CurvePrivate *priv, gint value, gint width)
+{
+  return unproject(value, priv->min_x, priv->max_x, width + 1);
+}
+
+static gfloat
+gtk3_curve_unproject_cpoint_y(Gtk3CurvePrivate *priv, gint value, gint height)
+{
+  return unproject(value, priv->min_y, priv->max_y, height + 1);
 }
 
 void

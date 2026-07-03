@@ -20,34 +20,25 @@ dlclose( handle );
 
 #include <ctype.h>
 #include <math.h>
+#include <string.h>
 #include <veejaycore/vj-msg.h>
 #include <gtktimeselection.h>
 #include <gtk3curve.h>
 #include <veejaycore/vims.h>
 #include "callback.h"
+#include "curve.h"
 
-#ifndef VIMS_SAMPLE_SET_VOLUME
-#define VIMS_SAMPLE_SET_VOLUME 118
-#endif
-
-#ifndef VIMS_SET_VOLUME
-#define VIMS_SET_VOLUME 300
-#endif
-
-#ifndef VIMS_AUDIO_MIX_MODE
-#define VIMS_AUDIO_MIX_MODE 271
-#endif
-
-#ifndef VIMS_AUDIO_MIX_CROSSFADE
-#define VIMS_AUDIO_MIX_CROSSFADE 272
-#endif
 
 #define AUDIO_MASTER_JACK_UI_VALUE 1
 
 #define AUDIO_MIX_MODE_FOLLOW 0
 #define AUDIO_MIX_MODE_ORIGINAL 1
-#define AUDIO_MIX_MODE_JACK 2
-#define AUDIO_MIX_MODE_ORIGINAL_JACK 3
+#define AUDIO_MIX_MODE_EXTERNAL 2
+#define AUDIO_MIX_MODE_ORIGINAL_EXTERNAL 3
+#define AUDIO_MIX_MODE_JACK AUDIO_MIX_MODE_EXTERNAL
+#define AUDIO_MIX_MODE_ORIGINAL_JACK AUDIO_MIX_MODE_ORIGINAL_EXTERNAL
+
+#define SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE (-1)
 
 static gboolean curve_live_preview_user_override_state = FALSE;
 
@@ -67,11 +58,52 @@ static gboolean G_GNUC_UNUSED curve_live_preview_user_is_overridden(void)
 }
 
 static int audio_input_selector_active_from_ui(void);
+static int audio_global_source_controls_allowed(void);
+static int audio_input_selector_external_from_ui(void);
 
 extern void vj_midi_learning_vims_toggle(void *vv, char *widget, int id);
 extern void vj_midi_learning_vims_toggle2(void *vv, char *widget, int id, int arg);
 extern void vj_midi_learning_vims_toggle3(void *vv, char *widget, int id, int arg0, int arg1);
 extern void vj_midi_learning_vims_dual_toggle(void *vv, char *widget, int off_id, int on_id, int arg);
+
+
+static int current_stream_selected(void)
+{
+    return info &&
+           info->status_tokens[PLAY_MODE] == MODE_STREAM &&
+           info->status_tokens[CURRENT_ID] > 0;
+}
+
+static int current_stream_buffer_supported(void)
+{
+    return current_stream_selected() &&
+           info->status_tokens[STREAM_BUFFER_STATE] != STREAM_BUFFER_STATE_UNSUPPORTED;
+}
+
+static int current_stream_buffer_ready(void)
+{
+    return current_stream_buffer_supported() &&
+           info->status_tokens[STREAM_BUFFER_ENABLED] > 0 &&
+           info->status_tokens[STREAM_BUFFER_FILLED] > 0;
+}
+
+static void current_stream_buffer_warn_not_ready(void)
+{
+    if(!current_stream_selected())
+        return;
+
+    if(info->status_tokens[STREAM_BUFFER_STATE] == STREAM_BUFFER_STATE_UNSUPPORTED)
+        vj_msg(VEEJAY_MSG_INFO, "This stream type does not expose a renderable trickplay buffer");
+    else if(info->status_tokens[STREAM_BUFFER_CAPACITY] <= 0)
+        vj_msg(VEEJAY_MSG_INFO, "Set a trickplay buffer length for this stream first");
+    else
+        vj_msg(VEEJAY_MSG_INFO, "Waiting for stream frames to fill the trickplay buffer");
+}
+
+static int current_stream_id(void)
+{
+    return info ? info->status_tokens[CURRENT_ID] : 0;
+}
 
 static int config_file_status = 0;
 static gchar *config_file = NULL;
@@ -212,48 +244,129 @@ static void toggle_siamese_widget(GtkWidget *widget, GtkWidget *first, GtkWidget
 
 void	on_button_085_clicked(GtkWidget *widget, gpointer user_data)
 {
+	if(current_stream_buffer_ready()) {
+		multi_vims(VIMS_STREAM_BUFFER_SKIP_SECOND, "%d %d", current_stream_id(), 1);
+		vj_midi_learning_vims_msg2(info->midi, NULL, VIMS_STREAM_BUFFER_SKIP_SECOND, current_stream_id(), 1);
+		return;
+	}
+	if(current_stream_selected()) {
+		current_stream_buffer_warn_not_ready();
+		return;
+	}
 	single_vims(VIMS_VIDEO_SKIP_SECOND);
 	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_SKIP_SECOND );
 }
 void	on_button_086_clicked(GtkWidget *widget, gpointer user_data)
 {
+	if(current_stream_buffer_ready()) {
+		multi_vims(VIMS_STREAM_BUFFER_PREV_SECOND, "%d %d", current_stream_id(), 1);
+		vj_midi_learning_vims_msg2(info->midi, NULL, VIMS_STREAM_BUFFER_PREV_SECOND, current_stream_id(), 1);
+		return;
+	}
+	if(current_stream_selected()) {
+		current_stream_buffer_warn_not_ready();
+		return;
+	}
 	single_vims(VIMS_VIDEO_PREV_SECOND );
 	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_PREV_SECOND );
 
 }
 void	on_button_080_clicked(GtkWidget *widget, gpointer user_data)
 {
+	if(current_stream_buffer_ready()) {
+		multi_vims(VIMS_STREAM_BUFFER_FORWARD, "%d", current_stream_id());
+		vj_midi_learning_vims_msg(info->midi, NULL, VIMS_STREAM_BUFFER_FORWARD, current_stream_id());
+		return;
+	}
+	if(current_stream_selected()) {
+		current_stream_buffer_warn_not_ready();
+		return;
+	}
 	single_vims(VIMS_VIDEO_PLAY_FORWARD);
 	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_PLAY_FORWARD );
 
 }
 void	on_button_081_clicked(GtkWidget *widget, gpointer user_data)
 {
+	if(current_stream_buffer_ready()) {
+		multi_vims(VIMS_STREAM_BUFFER_BACKWARD, "%d", current_stream_id());
+		vj_midi_learning_vims_msg(info->midi, NULL, VIMS_STREAM_BUFFER_BACKWARD, current_stream_id());
+		return;
+	}
+	if(current_stream_selected()) {
+		current_stream_buffer_warn_not_ready();
+		return;
+	}
 	single_vims(VIMS_VIDEO_PLAY_BACKWARD);
 	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_PLAY_BACKWARD );
 }
 void	on_button_082_clicked(GtkWidget *widget, gpointer user_data)
 {
+	if(current_stream_buffer_ready()) {
+		multi_vims(VIMS_STREAM_BUFFER_STOP, "%d", current_stream_id());
+		vj_midi_learning_vims_msg(info->midi, NULL, VIMS_STREAM_BUFFER_STOP, current_stream_id());
+		return;
+	}
+	if(current_stream_selected()) {
+		current_stream_buffer_warn_not_ready();
+		return;
+	}
 	single_vims( VIMS_VIDEO_PLAY_STOP );
 	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_PLAY_STOP );
 }
 void	on_button_083_clicked(GtkWidget *widget, gpointer user_data)
 {
+	if(current_stream_buffer_ready()) {
+		multi_vims(VIMS_STREAM_BUFFER_SKIP_FRAME, "%d %d", current_stream_id(), 1);
+		vj_midi_learning_vims_msg2(info->midi, NULL, VIMS_STREAM_BUFFER_SKIP_FRAME, current_stream_id(), 1);
+		return;
+	}
+	if(current_stream_selected()) {
+		current_stream_buffer_warn_not_ready();
+		return;
+	}
 	single_vims( VIMS_VIDEO_SKIP_FRAME );
 	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_SKIP_FRAME );
 }
 void 	on_button_084_clicked(GtkWidget *widget, gpointer user_data)
 {
+	if(current_stream_buffer_ready()) {
+		multi_vims(VIMS_STREAM_BUFFER_SKIP_FRAME, "%d %d", current_stream_id(), -1);
+		vj_midi_learning_vims_msg2(info->midi, NULL, VIMS_STREAM_BUFFER_SKIP_FRAME, current_stream_id(), -1);
+		return;
+	}
+	if(current_stream_selected()) {
+		current_stream_buffer_warn_not_ready();
+		return;
+	}
 	single_vims( VIMS_VIDEO_PREV_FRAME );
 	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_PREV_FRAME );
 }
 void	on_button_087_clicked(GtkWidget *widget, gpointer user_data)
 {
+	if(current_stream_buffer_ready()) {
+		multi_vims(VIMS_STREAM_BUFFER_SET_FRAME, "%d %d", current_stream_id(), 0);
+		vj_midi_learning_vims_msg2(info->midi, NULL, VIMS_STREAM_BUFFER_SET_FRAME, current_stream_id(), 0);
+		return;
+	}
+	if(current_stream_selected()) {
+		current_stream_buffer_warn_not_ready();
+		return;
+	}
 	single_vims( VIMS_VIDEO_GOTO_START );
 	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_GOTO_START );
 }
 void	on_button_088_clicked(GtkWidget *widget, gpointer user_data)
 {
+	if(current_stream_buffer_ready()) {
+		multi_vims(VIMS_STREAM_BUFFER_SET_FRAME, "%d %d", current_stream_id(), -1);
+		vj_midi_learning_vims_msg2(info->midi, NULL, VIMS_STREAM_BUFFER_SET_FRAME, current_stream_id(), -1);
+		return;
+	}
+	if(current_stream_selected()) {
+		current_stream_buffer_warn_not_ready();
+		return;
+	}
 	single_vims( VIMS_VIDEO_GOTO_END);
 	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_GOTO_END );
 }
@@ -274,6 +387,17 @@ void	on_videobar_value_changed(GtkWidget *widget, gpointer user_data)
         val = slider_val * (info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START]);
         val += info->status_tokens[SAMPLE_START];
         break;
+      case MODE_STREAM:
+        if(!current_stream_buffer_ready())
+            return;
+        val = slider_val * MAX(1, info->status_tokens[STREAM_BUFFER_FILLED]);
+        if(val >= info->status_tokens[STREAM_BUFFER_FILLED])
+            val = info->status_tokens[STREAM_BUFFER_FILLED] - 1;
+        if(val < 0)
+            val = 0;
+        multi_vims(VIMS_STREAM_BUFFER_SET_FRAME, "%d %d", current_stream_id(), val);
+        vj_midi_learning_vims_msg2(info->midi, "videobar", VIMS_STREAM_BUFFER_SET_FRAME, current_stream_id(), val);
+        return;
       default:
         return;
     }
@@ -348,13 +472,32 @@ void	on_entry_samplename_button_clicked( GtkWidget *widget, gpointer user_data )
 	multi_vims( VIMS_SAMPLE_SET_DESCRIPTION, "%d %s", 0,title );
 
 	int id = info->status_tokens[CURRENT_ID];
-	int type = info->status_tokens[PLAY_MODE];
+	int pm = info->status_tokens[PLAY_MODE];
+	int type = (pm == MODE_SAMPLE ? 0 : info->status_tokens[STREAM_TYPE]);
+
+	if(id > 0 && (pm == MODE_SAMPLE || pm == MODE_STREAM))
+		samplebank_store_title_override(id, type, title);
 
 	int idx = -1;
 	int page = find_bank_by_sample_existing( id, type, &idx);
 
-	if( page >= 0)
-		gtk_label_set_text( GTK_LABEL( info->sample_banks[page]->gui_slot[idx]->title ), title );
+	if(page >= 0 && idx >= 0 && info->sample_banks &&
+	   info->sample_banks[page] && info->sample_banks[page]->slot &&
+	   info->sample_banks[page]->slot[idx])
+	{
+		sample_slot_t *slot = info->sample_banks[page]->slot[idx];
+		const char *timecode = slot->timecode ? slot->timecode : NULL;
+
+		slot = update_sample_slot_data(page,
+		                        idx,
+		                        id,
+		                        type,
+		                        title,
+		                        (gchar *) timecode);
+
+		if(slot && (pm == MODE_SAMPLE || pm == MODE_STREAM))
+			info->selected_slot = slot;
+	}
 
 }
 
@@ -598,16 +741,25 @@ void on_audio_master_jack_volume_value_changed(GtkWidget *widget, gpointer user_
 
 static int audio_mixer_mode_from_ui(void)
 {
-    GtkWidget *w = widget_cache[WIDGET_AUDIO_MIXER_MODE_COMBO];
+    GtkWidget *override = widget_cache[WIDGET_AUDIO_MIXER_OVERRIDE_TOGGLE];
+    GtkWidget *original = widget_cache[WIDGET_AUDIO_MIXER_ORIGINAL_RADIO];
+    GtkWidget *external = widget_cache[WIDGET_AUDIO_MIXER_EXTERNAL_RADIO];
+    GtkWidget *mix = widget_cache[WIDGET_AUDIO_MIXER_MIX_RADIO];
 
-    if(!w || !GTK_IS_COMBO_BOX(w))
+    if(!override || !GTK_IS_TOGGLE_BUTTON(override))
         return AUDIO_MIX_MODE_FOLLOW;
 
-    int mode = gtk_combo_box_get_active(GTK_COMBO_BOX(w));
-    if(mode < AUDIO_MIX_MODE_FOLLOW || mode > AUDIO_MIX_MODE_ORIGINAL_JACK)
-        mode = AUDIO_MIX_MODE_FOLLOW;
+    if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(override)))
+        return AUDIO_MIX_MODE_FOLLOW;
 
-    return mode;
+    if(original && GTK_IS_TOGGLE_BUTTON(original) && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(original)))
+        return AUDIO_MIX_MODE_ORIGINAL;
+    if(external && GTK_IS_TOGGLE_BUTTON(external) && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(external)))
+        return AUDIO_MIX_MODE_JACK;
+    if(mix && GTK_IS_TOGGLE_BUTTON(mix) && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(mix)))
+        return AUDIO_MIX_MODE_ORIGINAL_JACK;
+
+    return AUDIO_MIX_MODE_ORIGINAL_JACK;
 }
 
 static int audio_mixer_crossfade_from_ui(void)
@@ -639,28 +791,45 @@ static void audio_mixer_set_crossfade_sensitive(int sensitive)
 
 static void audio_mixer_update_crossfade_sensitivity(void)
 {
-    const int jack = (audio_input_selector_active_from_ui() == AUDIO_MASTER_JACK_UI_VALUE);
-    const int manual = (audio_mixer_mode_from_ui() != AUDIO_MIX_MODE_FOLLOW);
+    const int blend = (audio_mixer_mode_from_ui() == AUDIO_MIX_MODE_ORIGINAL_EXTERNAL);
 
-    audio_mixer_set_crossfade_sensitive(jack && manual);
+    audio_mixer_set_crossfade_sensitive(audio_global_source_controls_allowed() && blend);
 }
 
 static void audio_mixer_set_mode_guarded(int mode)
 {
-    GtkWidget *w = widget_cache[WIDGET_AUDIO_MIXER_MODE_COMBO];
+    GtkWidget *override = widget_cache[WIDGET_AUDIO_MIXER_OVERRIDE_TOGGLE];
+    GtkWidget *original = widget_cache[WIDGET_AUDIO_MIXER_ORIGINAL_RADIO];
+    GtkWidget *external = widget_cache[WIDGET_AUDIO_MIXER_EXTERNAL_RADIO];
+    GtkWidget *mix = widget_cache[WIDGET_AUDIO_MIXER_MIX_RADIO];
     int old_lock;
 
     mode = ui_clampi(mode, AUDIO_MIX_MODE_FOLLOW, AUDIO_MIX_MODE_ORIGINAL_JACK);
 
-    if(!w || !GTK_IS_COMBO_BOX(w))
-        return;
-
-    if(gtk_combo_box_get_active(GTK_COMBO_BOX(w)) == mode)
-        return;
-
     old_lock = info->status_lock;
     info->status_lock = 1;
-    gtk_combo_box_set_active(GTK_COMBO_BOX(w), mode);
+
+
+    if(override && GTK_IS_TOGGLE_BUTTON(override))
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(override), mode != AUDIO_MIX_MODE_FOLLOW);
+
+    if(mode == AUDIO_MIX_MODE_ORIGINAL && original && GTK_IS_TOGGLE_BUTTON(original))
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(original), TRUE);
+    else if(mode == AUDIO_MIX_MODE_JACK && external && GTK_IS_TOGGLE_BUTTON(external))
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(external), TRUE);
+    else if(mode == AUDIO_MIX_MODE_ORIGINAL_JACK && mix && GTK_IS_TOGGLE_BUTTON(mix))
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(mix), TRUE);
+
+    if(mode == AUDIO_MIX_MODE_FOLLOW && mix && GTK_IS_TOGGLE_BUTTON(mix))
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(mix), TRUE);
+
+    if(original && GTK_IS_WIDGET(original))
+        gtk_widget_set_sensitive(original, mode != AUDIO_MIX_MODE_FOLLOW);
+    if(external && GTK_IS_WIDGET(external))
+        gtk_widget_set_sensitive(external, mode != AUDIO_MIX_MODE_FOLLOW);
+    if(mix && GTK_IS_WIDGET(mix))
+        gtk_widget_set_sensitive(mix, mode != AUDIO_MIX_MODE_FOLLOW);
+
     info->status_lock = old_lock;
 }
 
@@ -669,6 +838,24 @@ static void audio_mixer_set_crossfade_guarded(int crossfade)
     volume_set_adjustment_guarded(WIDGET_AUDIO_MIXER_CROSSFADE_SCALE,
                                   WIDGET_AUDIO_MIXER_CROSSFADE_SPIN,
                                   crossfade);
+}
+
+static void audio_mixer_mode_sync_from_status(int *history, int force)
+{
+    int mode;
+
+    if(VIMS_STATUS_TOKENS <= AUDIO_MIX_MODE)
+        return;
+
+    if(!force && history &&
+       history[AUDIO_MIX_MODE] == info->status_tokens[AUDIO_MIX_MODE])
+        return;
+
+    mode = ui_clampi(info->status_tokens[AUDIO_MIX_MODE],
+                     AUDIO_MIX_MODE_FOLLOW,
+                     AUDIO_MIX_MODE_ORIGINAL_EXTERNAL);
+    audio_mixer_set_mode_guarded(mode);
+    audio_mixer_update_crossfade_sensitivity();
 }
 
 static void audio_mixer_crossfade_sync_from_status(int *history, int force)
@@ -698,30 +885,24 @@ static void audio_mixer_send_manual_state(int mode, int crossfade)
     mode = ui_clampi(mode, AUDIO_MIX_MODE_FOLLOW, AUDIO_MIX_MODE_ORIGINAL_JACK);
     crossfade = ui_clampi(crossfade, 0, 100);
 
-    if(mode != AUDIO_MIX_MODE_FOLLOW)
+    if(mode == AUDIO_MIX_MODE_ORIGINAL_EXTERNAL)
         multi_vims(VIMS_AUDIO_MIX_CROSSFADE, "%d", crossfade);
 
     multi_vims(VIMS_AUDIO_MIX_MODE, "%d", mode);
 }
 
-void on_audio_mixer_mode_combo_changed(GtkWidget *widget, gpointer user_data)
+static void audio_mixer_commit_mode_from_ui(const char *midi_widget)
 {
     int mode;
     int crossfade;
 
-    (void)user_data;
-
     if(info->status_lock)
         return;
 
-    if(!widget || !GTK_IS_COMBO_BOX(widget))
+    if(!audio_global_source_controls_allowed())
         return;
 
-    if(audio_input_selector_active_from_ui() != AUDIO_MASTER_JACK_UI_VALUE)
-        return;
-
-    mode = gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
-    mode = ui_clampi(mode, AUDIO_MIX_MODE_FOLLOW, AUDIO_MIX_MODE_ORIGINAL_JACK);
+    mode = audio_mixer_mode_from_ui();
     crossfade = audio_mixer_crossfade_from_ui();
 
     switch(mode) {
@@ -744,9 +925,47 @@ void on_audio_mixer_mode_combo_changed(GtkWidget *widget, gpointer user_data)
             break;
     }
 
+    audio_mixer_set_mode_guarded(mode);
     audio_mixer_update_crossfade_sensitivity();
     audio_mixer_send_manual_state(mode, crossfade);
-    vj_midi_learning_vims_simple(info->midi, "audio_mixer_mode", VIMS_AUDIO_MIX_MODE);
+
+    if(midi_widget)
+        vj_midi_learning_vims_simple(info->midi, (char *) midi_widget, VIMS_AUDIO_MIX_MODE);
+}
+
+void on_audio_mixer_override_toggled(GtkWidget *widget, gpointer user_data)
+{
+    (void)user_data;
+
+    if(info->status_lock)
+        return;
+
+    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+        return;
+
+    audio_mixer_commit_mode_from_ui("audio_mixer_override");
+}
+
+void on_audio_mixer_route_toggled(GtkWidget *widget, gpointer user_data)
+{
+    (void)user_data;
+
+    if(info->status_lock)
+        return;
+
+    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+        return;
+
+    if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
+        return;
+
+    audio_mixer_commit_mode_from_ui("audio_mixer_route");
+}
+
+void on_audio_mixer_mode_combo_changed(GtkWidget *widget, gpointer user_data)
+{
+    (void) widget;
+    (void) user_data;
 }
 
 void on_audio_mixer_crossfade_value_changed(GtkWidget *widget, gpointer user_data)
@@ -759,11 +978,11 @@ void on_audio_mixer_crossfade_value_changed(GtkWidget *widget, gpointer user_dat
     if(info->status_lock)
         return;
 
-    if(audio_input_selector_active_from_ui() != AUDIO_MASTER_JACK_UI_VALUE)
+    if(!audio_global_source_controls_allowed())
         return;
 
     mode = audio_mixer_mode_from_ui();
-    if(mode == AUDIO_MIX_MODE_FOLLOW)
+    if(mode != AUDIO_MIX_MODE_ORIGINAL_EXTERNAL)
         return;
 
     crossfade = volume_widget_int_value(widget);
@@ -1006,6 +1225,50 @@ enum {
 
 static int audio_input_selector_active_from_ui(void);
 static const char *audio_input_selector_name_from_active(int active);
+
+static int audio_current_sample_has_own_audio_source(void)
+{
+    int source;
+    int mode;
+
+    if(!info || info->status_tokens[PLAY_MODE] != MODE_SAMPLE)
+        return 0;
+
+    if(VIMS_STATUS_TOKENS <= SAMPLE_AUDIO_SYNC_MODE)
+        return 0;
+
+    source = info->status_tokens[SAMPLE_AUDIO_SYNC_SOURCE];
+    mode = info->status_tokens[SAMPLE_AUDIO_SYNC_MODE];
+
+    if(mode == SAMPLE_AUDIO_SYNC_OFF)
+        return 0;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL)
+        return 1;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_JACK)
+        return 1;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_WAV)
+        return info->status_tokens[SAMPLE_AUDIO_SYNC_PROFILE] > 0;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE)
+        return 1;
+
+    return 0;
+}
+
+static int audio_global_source_controls_allowed(void)
+{
+    return 1;
+}
+
+static int audio_input_selector_external_from_ui(void)
+{
+    int active = audio_input_selector_active_from_ui();
+
+    return active == AUDIO_MASTER_JACK || active == AUDIO_MASTER_WAV;
+}
 static void audio_sync_set_mode_combo_guarded(int mode);
 static void audio_sync_set_enable_toggle_guarded(int enabled);
 static void audio_sync_set_master_wav_options_visible(int visible);
@@ -1644,6 +1907,501 @@ static GtkWidget *audio_sync_named_widget(const char *name)
     return name ? glade_xml_get_widget_(info->main_window, name) : NULL;
 }
 
+static int audio_sync_named_combo_active(const char *name, int fallback)
+{
+    GtkWidget *w = audio_sync_named_widget(name);
+
+    if(!w || !GTK_IS_COMBO_BOX(w))
+        return fallback;
+
+    return gtk_combo_box_get_active(GTK_COMBO_BOX(w));
+}
+
+static int audio_sync_named_spin_int(const char *name, int fallback)
+{
+    GtkWidget *w = audio_sync_named_widget(name);
+
+    if(!w || !GTK_IS_SPIN_BUTTON(w))
+        return fallback;
+
+    return (int)gtk_spin_button_get_value(GTK_SPIN_BUTTON(w));
+}
+
+static int audio_sync_profile_slot_from_combo(const char *name, int off_allowed)
+{
+    int active = audio_sync_named_combo_active(name, off_allowed ? 0 : 0);
+
+    if(off_allowed)
+        return ui_clampi(active, 0, 4);
+
+    return ui_clampi(active + 1, 1, 4);
+}
+
+void on_audio_sync_wav_profile_store_button_clicked(GtkWidget *widget, gpointer user_data)
+{
+    gchar *path;
+    int profile;
+    int loop;
+
+    (void)widget;
+    (void)user_data;
+
+    profile = audio_sync_profile_slot_from_combo("audio_sync_wav_profile_combo", 0);
+    loop = audio_sync_loop_from_ui();
+    path = get_text("audio_sync_wav_path");
+
+    if(!path || !audio_sync_wav_path_vims_safe(path)) {
+        vj_msg(VEEJAY_MSG_WARNING,
+               "Choose a VIMS-safe WAV path before storing a WAV profile");
+        return;
+    }
+
+    multi_vims(VIMS_AUDIO_SYNC_WAV_PROFILE_SET, "%d %d %s", profile, loop, path);
+    vj_msg(VEEJAY_MSG_INFO,
+           "Stored WAV sync profile slot %d (%s)",
+           profile,
+           loop ? "loop" : "one-shot");
+}
+
+void on_audio_sync_wav_profile_clear_button_clicked(GtkWidget *widget, gpointer user_data)
+{
+    int profile;
+
+    (void)widget;
+    (void)user_data;
+
+    profile = audio_sync_profile_slot_from_combo("audio_sync_wav_profile_combo", 0);
+    multi_vims(VIMS_AUDIO_SYNC_WAV_PROFILE_CLEAR, "%d", profile);
+    vj_msg(VEEJAY_MSG_INFO, "Cleared WAV sync profile slot %d", profile);
+}
+static int sample_audio_sync_source_from_label(const char *label, int fallback)
+{
+    char *lower;
+    int result = fallback;
+
+    if(!label || label[0] == '\0')
+        return fallback;
+
+    lower = g_ascii_strdown(label, -1);
+    if(!lower)
+        return fallback;
+
+    if(strstr(lower, "wav"))
+        result = SAMPLE_AUDIO_SYNC_SOURCE_WAV;
+    else if(strstr(lower, "jack"))
+        result = SAMPLE_AUDIO_SYNC_SOURCE_JACK;
+    else if(strstr(lower, "silence"))
+        result = SAMPLE_AUDIO_SYNC_SOURCE_SILENCE;
+    else if(strstr(lower, "original"))
+        result = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+    else if(strstr(lower, "none") || strstr(lower, "follow"))
+        result = SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE;
+
+    g_free(lower);
+    return result;
+}
+
+static int sample_audio_sync_source_from_active_index(int active)
+{
+    switch(active) {
+        case 1: return SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+        case 2: return SAMPLE_AUDIO_SYNC_SOURCE_WAV;
+        case 3: return SAMPLE_AUDIO_SYNC_SOURCE_JACK;
+        case 4: return SAMPLE_AUDIO_SYNC_SOURCE_SILENCE;
+        case 0:
+        default:
+            return SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE;
+    }
+}
+
+static int sample_audio_sync_source_from_ui(void)
+{
+    GtkWidget *w = audio_sync_named_widget("sample_audio_sync_source_combo");
+    int active;
+
+    if(w && GTK_IS_COMBO_BOX_TEXT(w)) {
+        gchar *label = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(w));
+        if(label) {
+            int source = sample_audio_sync_source_from_label(label, SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE);
+            g_free(label);
+            return source;
+        }
+    }
+
+    active = audio_sync_named_combo_active("sample_audio_sync_source_combo", 0);
+    return sample_audio_sync_source_from_active_index(active);
+}
+
+
+static int sample_audio_sync_mode_from_ui(void)
+{
+    int active = audio_sync_named_combo_active("sample_audio_sync_mode_combo", 0);
+
+    switch(active) {
+        case 1: return SAMPLE_AUDIO_SYNC_LIVE_EXTERNAL;
+        case 2: return SAMPLE_AUDIO_SYNC_MONITOR;
+        case 3: return SAMPLE_AUDIO_SYNC_MONITOR_TRICKPLAY;
+        case 4: return SAMPLE_AUDIO_SYNC_TEMPO_FOLLOW;
+        case 5: return SAMPLE_AUDIO_SYNC_TEMPO_BRIDGE;
+        case 6: return SAMPLE_AUDIO_SYNC_TRACK_ALIGN;
+        case 0:
+        default:
+            return SAMPLE_AUDIO_SYNC_QUEUE;
+    }
+}
+
+static const char *sample_audio_sync_mode_name(int mode)
+{
+    switch(mode) {
+        case SAMPLE_AUDIO_SYNC_LIVE_EXTERNAL:       return "Analyze External Tempo";
+        case SAMPLE_AUDIO_SYNC_MONITOR:             return "Clean Monitor";
+        case SAMPLE_AUDIO_SYNC_MONITOR_TRICKPLAY:   return "Monitor + Trickplay";
+        case SAMPLE_AUDIO_SYNC_TEMPO_FOLLOW:        return "Visual Tempo Follow";
+        case SAMPLE_AUDIO_SYNC_TEMPO_BRIDGE:        return "Tempo Match Bridge";
+        case SAMPLE_AUDIO_SYNC_TRACK_ALIGN:         return "Track Align";
+        case SAMPLE_AUDIO_SYNC_QUEUE:
+        default:                                    return "Queue/Monitor";
+    }
+}
+
+static void sample_audio_sync_set_named_sensitive(const char *name, int sensitive)
+{
+    GtkWidget *w = audio_sync_named_widget(name);
+
+    if(w)
+        gtk_widget_set_sensitive(w, sensitive ? TRUE : FALSE);
+}
+static void sample_audio_sync_update_ui_sensitivity(void)
+{
+    int source = sample_audio_sync_source_from_ui();
+    int profile = audio_sync_profile_slot_from_combo("sample_audio_sync_profile_combo", 1);
+    int is_wav = (source == SAMPLE_AUDIO_SYNC_SOURCE_WAV);
+    int is_external = (source == SAMPLE_AUDIO_SYNC_SOURCE_WAV || source == SAMPLE_AUDIO_SYNC_SOURCE_JACK);
+    int is_silence = (source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE);
+    int can_arm = (source == SAMPLE_AUDIO_SYNC_SOURCE_JACK) || is_silence || (is_wav && profile > 0);
+
+    sample_audio_sync_set_named_sensitive("sample_audio_sync_profile_label", 1);
+    sample_audio_sync_set_named_sensitive("sample_audio_sync_profile_combo", 1);
+    sample_audio_sync_set_named_sensitive("sample_audio_sync_wav_anchor_label", is_wav);
+    sample_audio_sync_set_named_sensitive("sample_audio_sync_wav_anchor_ms", is_wav);
+    sample_audio_sync_set_named_sensitive("sample_audio_sync_mode_label", is_external);
+    sample_audio_sync_set_named_sensitive("sample_audio_sync_mode_combo", is_external);
+    sample_audio_sync_set_named_sensitive("sample_audio_sync_set_here_button", can_arm);
+    sample_audio_sync_set_named_sensitive("sample_audio_sync_rearm_button", is_external);
+}
+static int sample_audio_sync_apply_selection_preserve_anchor(const char *reason)
+{
+    int sample_id;
+    int source;
+    int profile = 0;
+    int mode;
+    int video_anchor;
+    int wav_anchor_ms;
+
+    if(!info || info->status_tokens[PLAY_MODE] != MODE_SAMPLE || info->status_tokens[CURRENT_ID] <= 0)
+        return 0;
+
+    sample_id = info->status_tokens[CURRENT_ID];
+    source = sample_audio_sync_source_from_ui();
+    sample_audio_sync_update_ui_sensitivity();
+
+    if(source == SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE) {
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_CLEAR, "%d", sample_id);
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_REARM, "%d", sample_id);
+        if(reason)
+            vj_msg(VEEJAY_MSG_INFO, "Sample %d audio route: follow global/default (%s)", sample_id, reason);
+        else
+            vj_msg(VEEJAY_MSG_INFO, "Sample %d audio route: follow global/default", sample_id);
+        return 1;
+    }
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL) {
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_SET, "%d %d %d %d %d %d",
+                   sample_id, source, 0, SAMPLE_AUDIO_SYNC_QUEUE, 0, 0);
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_REARM, "%d", sample_id);
+        vj_msg(VEEJAY_MSG_INFO, "Sample %d audio route: saved original override", sample_id);
+        return 1;
+    }
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE) {
+        mode = SAMPLE_AUDIO_SYNC_QUEUE;
+        if(info->status_tokens[SAMPLE_AUDIO_SYNC_MODE] != SAMPLE_AUDIO_SYNC_OFF)
+            video_anchor = info->status_tokens[SAMPLE_AUDIO_SYNC_VIDEO_ANCHOR];
+        else
+            video_anchor = info->status_tokens[FRAME_NUM];
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_SET, "%d %d %d %d %d %d", sample_id, source, 0, mode, video_anchor, 0);
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_REARM, "%d", sample_id);
+        vj_msg(VEEJAY_MSG_INFO, "Sample %d audio route: saved silence frame=%d", sample_id, video_anchor);
+        return 1;
+    }
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_WAV) {
+        profile = audio_sync_profile_slot_from_combo("sample_audio_sync_profile_combo", 1);
+        if(profile <= 0)
+            return 0;
+    }
+
+    mode = sample_audio_sync_mode_from_ui();
+
+    if(info->status_tokens[SAMPLE_AUDIO_SYNC_MODE] != SAMPLE_AUDIO_SYNC_OFF)
+        video_anchor = info->status_tokens[SAMPLE_AUDIO_SYNC_VIDEO_ANCHOR];
+    else
+        video_anchor = info->status_tokens[FRAME_NUM];
+
+    wav_anchor_ms = audio_sync_named_spin_int("sample_audio_sync_wav_anchor_ms", 0);
+    if(wav_anchor_ms < 0)
+        wav_anchor_ms = 0;
+
+    multi_vims(VIMS_SAMPLE_AUDIO_SYNC_SET,
+               "%d %d %d %d %d %d",
+               sample_id,
+               source,
+               profile,
+               mode,
+               video_anchor,
+               wav_anchor_ms);
+    multi_vims(VIMS_SAMPLE_AUDIO_SYNC_REARM, "%d", sample_id);
+
+    vj_msg(VEEJAY_MSG_INFO,
+           "Sample %d audio route: saved %s profile=%d frame=%d wav=%dms (%s%s%s)",
+           sample_id,
+           source == SAMPLE_AUDIO_SYNC_SOURCE_WAV ? "WAV" : (source == SAMPLE_AUDIO_SYNC_SOURCE_JACK ? "JACK" : "Silence"),
+           profile,
+           video_anchor,
+           wav_anchor_ms,
+           sample_audio_sync_mode_name(mode),
+           reason ? ", " : "",
+           reason ? reason : "");
+
+    return 1;
+}
+
+
+void on_sample_audio_sync_source_combo_changed(GtkWidget *widget, gpointer user_data)
+{
+    (void) widget;
+    (void) user_data;
+
+    if(info && info->status_lock)
+        return;
+
+    sample_audio_sync_apply_selection_preserve_anchor("source change");
+}
+
+void on_sample_audio_sync_profile_combo_changed(GtkWidget *widget, gpointer user_data)
+{
+    (void) widget;
+    (void) user_data;
+
+    if(info && info->status_lock)
+        return;
+
+    sample_audio_sync_update_ui_sensitivity();
+
+    if(sample_audio_sync_source_from_ui() != SAMPLE_AUDIO_SYNC_SOURCE_WAV)
+        return;
+
+    sample_audio_sync_apply_selection_preserve_anchor("profile change");
+}
+
+void on_sample_audio_sync_mode_combo_changed(GtkWidget *widget, gpointer user_data)
+{
+    (void) widget;
+    (void) user_data;
+
+    if(info && info->status_lock)
+        return;
+
+    sample_audio_sync_apply_selection_preserve_anchor("mode change");
+}
+
+void on_sample_audio_sync_set_here_button_clicked(GtkWidget *widget, gpointer user_data)
+{
+    int sample_id;
+    int source;
+    int profile;
+    int mode;
+    int video_anchor;
+    int wav_anchor_ms;
+
+    (void)widget;
+    (void)user_data;
+
+    if(info->status_tokens[PLAY_MODE] != MODE_SAMPLE || info->status_tokens[CURRENT_ID] <= 0) {
+        vj_msg(VEEJAY_MSG_WARNING,
+               "Select/play a sample before binding an audio sync source");
+        return;
+    }
+
+    sample_id = info->status_tokens[CURRENT_ID];
+    source = sample_audio_sync_source_from_ui();
+    sample_audio_sync_update_ui_sensitivity();
+
+    if(source == SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE) {
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_CLEAR, "%d", sample_id);
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_REARM, "%d", sample_id);
+        vj_msg(VEEJAY_MSG_INFO, "Sample %d audio route set to follow global/default", sample_id);
+        return;
+    }
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL) {
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_SET, "%d %d %d %d %d %d",
+                   sample_id, source, 0, SAMPLE_AUDIO_SYNC_QUEUE, 0, 0);
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_REARM, "%d", sample_id);
+        vj_msg(VEEJAY_MSG_INFO, "Sample %d audio route set to saved original override", sample_id);
+        return;
+    }
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE) {
+        video_anchor = info->status_tokens[FRAME_NUM];
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_SET, "%d %d %d %d %d %d", sample_id, source, 0, SAMPLE_AUDIO_SYNC_QUEUE, video_anchor, 0);
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_REARM, "%d", sample_id);
+        vj_msg(VEEJAY_MSG_INFO, "Sample %d audio source set to silence from frame %d", sample_id, video_anchor);
+        return;
+    }
+
+    profile = 0;
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_WAV) {
+        profile = audio_sync_profile_slot_from_combo("sample_audio_sync_profile_combo", 1);
+        if(profile <= 0) {
+            multi_vims(VIMS_SAMPLE_AUDIO_SYNC_CLEAR, "%d", sample_id);
+            vj_msg(VEEJAY_MSG_INFO, "Sample %d WAV sync disabled", sample_id);
+            return;
+        }
+    }
+
+    mode = sample_audio_sync_mode_from_ui();
+    video_anchor = info->status_tokens[FRAME_NUM];
+    wav_anchor_ms = audio_sync_named_spin_int("sample_audio_sync_wav_anchor_ms", 0);
+    if(wav_anchor_ms < 0)
+        wav_anchor_ms = 0;
+
+    multi_vims(VIMS_SAMPLE_AUDIO_SYNC_SET,
+               "%d %d %d %d %d %d",
+               sample_id,
+               source,
+               profile,
+               mode,
+               video_anchor,
+               wav_anchor_ms);
+
+    vj_msg(VEEJAY_MSG_INFO,
+           "Sample %d audio sync source=%d profile=%d frame=%d -> %dms (%s)",
+           sample_id,
+           source,
+           profile,
+           video_anchor,
+           wav_anchor_ms,
+           sample_audio_sync_mode_name(mode));
+}
+
+void on_sample_audio_sync_rearm_button_clicked(GtkWidget *widget, gpointer user_data)
+{
+    int sample_id;
+    int source;
+    int profile;
+    int mode;
+    int video_anchor;
+    int wav_anchor_ms;
+
+    (void)widget;
+    (void)user_data;
+
+    sample_id = (info->status_tokens[PLAY_MODE] == MODE_SAMPLE) ? info->status_tokens[CURRENT_ID] : 0;
+    if(sample_id <= 0)
+        return;
+
+    source = sample_audio_sync_source_from_ui();
+    sample_audio_sync_update_ui_sensitivity();
+    if(source == SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE) {
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_CLEAR, "%d", sample_id);
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_REARM, "%d", sample_id);
+        vj_msg(VEEJAY_MSG_INFO, "Sample %d audio route follows global/default", sample_id);
+        return;
+    }
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL) {
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_SET, "%d %d %d %d %d %d",
+                   sample_id, source, 0, SAMPLE_AUDIO_SYNC_QUEUE, 0, 0);
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_REARM, "%d", sample_id);
+        vj_msg(VEEJAY_MSG_INFO, "Sample %d audio route rearmed as saved original override", sample_id);
+        return;
+    }
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE) {
+        if(info->status_tokens[SAMPLE_AUDIO_SYNC_SOURCE] == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE)
+            video_anchor = info->status_tokens[SAMPLE_AUDIO_SYNC_VIDEO_ANCHOR];
+        else
+            video_anchor = info->status_tokens[FRAME_NUM];
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_SET, "%d %d %d %d %d %d", sample_id, source, 0, SAMPLE_AUDIO_SYNC_QUEUE, video_anchor, 0);
+        multi_vims(VIMS_SAMPLE_AUDIO_SYNC_REARM, "%d", sample_id);
+        vj_msg(VEEJAY_MSG_INFO, "Sample %d audio sync source set to silence", sample_id);
+        return;
+    }
+
+    profile = 0;
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_WAV) {
+        profile = audio_sync_profile_slot_from_combo("sample_audio_sync_profile_combo", 1);
+        if(profile <= 0) {
+            multi_vims(VIMS_SAMPLE_AUDIO_SYNC_CLEAR, "%d", sample_id);
+            multi_vims(VIMS_SAMPLE_AUDIO_SYNC_REARM, "%d", sample_id);
+            vj_msg(VEEJAY_MSG_INFO, "Sample %d WAV sync disabled", sample_id);
+            return;
+        }
+    }
+
+    mode = sample_audio_sync_mode_from_ui();
+    if(info->status_tokens[SAMPLE_AUDIO_SYNC_SOURCE] == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL)
+        video_anchor = info->status_tokens[FRAME_NUM];
+    else
+        video_anchor = info->status_tokens[SAMPLE_AUDIO_SYNC_VIDEO_ANCHOR];
+
+    wav_anchor_ms = audio_sync_named_spin_int("sample_audio_sync_wav_anchor_ms", 0);
+    if(wav_anchor_ms < 0)
+        wav_anchor_ms = 0;
+
+    multi_vims(VIMS_SAMPLE_AUDIO_SYNC_SET,
+               "%d %d %d %d %d %d",
+               sample_id,
+               source,
+               profile,
+               mode,
+               video_anchor,
+               wav_anchor_ms);
+
+    multi_vims(VIMS_SAMPLE_AUDIO_SYNC_REARM, "%d", sample_id);
+
+    vj_msg(VEEJAY_MSG_INFO,
+           "Sample %d audio sync rearm source=%d profile=%d frame=%d -> %dms (%s)",
+           sample_id,
+           source,
+           profile,
+           video_anchor,
+           wav_anchor_ms,
+           sample_audio_sync_mode_name(mode));
+}
+
+void on_sample_audio_sync_clear_button_clicked(GtkWidget *widget, gpointer user_data)
+{
+    int sample_id;
+
+    (void)widget;
+    (void)user_data;
+
+    sample_id = (info->status_tokens[PLAY_MODE] == MODE_SAMPLE) ? info->status_tokens[CURRENT_ID] : 0;
+    multi_vims(VIMS_SAMPLE_AUDIO_SYNC_CLEAR, "%d", sample_id);
+    {
+        GtkWidget *combo = audio_sync_named_widget("sample_audio_sync_source_combo");
+        int old_lock = info->status_lock;
+        info->status_lock = 1;
+        if(combo && GTK_IS_COMBO_BOX(combo))
+            gtk_combo_box_set_active(GTK_COMBO_BOX(combo), 0);
+        info->status_lock = old_lock;
+    }
+    sample_audio_sync_update_ui_sensitivity();
+}
+
+
 static double audio_sync_tempo_bend_pct_from_ui(void)
 {
     GtkWidget *w = audio_sync_named_widget("audio_sync_tempo_bend_scale");
@@ -1726,6 +2484,11 @@ static int audio_sync_send_selected_source(void)
 {
     int mode = audio_sync_mode_from_ui();
 
+    if(!audio_global_source_controls_allowed()) {
+        vj_msg(VEEJAY_MSG_INFO, "Current sample has its own audio source; clear it to use the global audio provider");
+        return 0;
+    }
+
     if(mode == 0) {
         audio_sync_send_mode_control(0);
         return 1;
@@ -1760,6 +2523,9 @@ static int audio_sync_send_selected_source(void)
 static void audio_sync_assert_tempo_bridge_active(void)
 {
     if(audio_sync_mode_from_ui() != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE)
+        return;
+
+    if(!audio_global_source_controls_allowed())
         return;
 
     if(audio_input_selector_active_from_ui() != AUDIO_MASTER_JACK &&
@@ -1814,6 +2580,9 @@ static void audio_sync_tempo_bridge_enable_without_target_reset(void)
     if(audio_sync_mode_from_ui() != VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE)
         return;
 
+    if(!audio_global_source_controls_allowed())
+        return;
+
     if(audio_input_selector_active_from_ui() != AUDIO_MASTER_JACK &&
        audio_input_selector_active_from_ui() != AUDIO_MASTER_WAV)
         return;
@@ -1848,6 +2617,11 @@ static int audio_sync_activate_provider_only(int mode, int allow_wav_dialog)
     int fallback = audio_sync_non_jack_master_from_status();
     int active = audio_input_selector_active_from_ui();
     int use_wav;
+
+    if(!audio_global_source_controls_allowed()) {
+        vj_msg(VEEJAY_MSG_INFO, "Current sample has its own audio source; clear it to use the global audio provider");
+        return 0;
+    }
 
     if(mode != VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL &&
        mode != VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW)
@@ -1890,6 +2664,11 @@ static int audio_input_selector_use_external_playback(int use_wav, int allow_wav
 {
     int mode = audio_sync_mode_from_ui();
 
+    if(!audio_global_source_controls_allowed()) {
+        vj_msg(VEEJAY_MSG_INFO, "Current sample has its own audio source; clear it to use the global audio provider");
+        return 0;
+    }
+
     if(mode == 0) {
         mode = VJ_AUDIO_SYNC_MODE_MONITOR;
         audio_sync_set_mode_combo_guarded(mode);
@@ -1906,10 +2685,10 @@ static int audio_input_selector_use_external_playback(int use_wav, int allow_wav
     if(use_wav && !audio_sync_wav_path_ready(allow_wav_dialog))
         return 0;
 
-    multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
-
     if(!audio_sync_send_selected_source())
         return 0;
+
+    multi_vims(VIMS_RECORD_AUDIO_SOURCE, "%d", VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
 
     audio_sync_send_bridge_settings_if_needed(mode);
     multi_vims(VIMS_AUDIO_SYNC_STATUS, "%d", 1);
@@ -1936,6 +2715,12 @@ void on_audio_input_selector_combo_changed(GtkWidget *widget, gpointer user_data
 
     if(!widget || !GTK_IS_COMBO_BOX(widget))
         return;
+
+    if(!audio_global_source_controls_allowed()) {
+        vj_msg(VEEJAY_MSG_INFO, "Current sample has its own audio source; clear Sample audio source to use the global provider");
+        audio_mixer_update_crossfade_sensitivity();
+        return;
+    }
 
     active = gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
     if(active < 0)
@@ -1969,7 +2754,7 @@ void on_audio_input_selector_combo_changed(GtkWidget *widget, gpointer user_data
             break;
 
         case AUDIO_MASTER_WAV:
-            audio_mixer_reset_to_follow_route();
+            audio_mixer_update_crossfade_sensitivity();
             if(audio_sync_mode_from_ui() == 0)
                 audio_sync_set_mode_combo_guarded(VJ_AUDIO_SYNC_MODE_MONITOR);
             if(audio_input_selector_use_external_playback(1, 1)) {
@@ -2001,6 +2786,16 @@ void on_audio_sync_enable_toggle_toggled(GtkWidget *widget, gpointer user_data)
         return;
 
     int enabled = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? 1 : 0;
+
+    if(!audio_global_source_controls_allowed()) {
+        int old_lock = info->status_lock;
+        info->status_lock = 1;
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), FALSE);
+        info->status_lock = old_lock;
+        vj_msg(VEEJAY_MSG_INFO,
+               "Global audio sync enable ignored; current sample owns its audio route");
+        return;
+    }
 
     if(enabled) {
         int active = audio_input_selector_active_from_ui();
@@ -2076,6 +2871,12 @@ void on_audio_sync_mode_combo_changed(GtkWidget *widget, gpointer user_data)
 
     if(info->status_lock)
         return;
+
+    if(!audio_global_source_controls_allowed()) {
+        vj_msg(VEEJAY_MSG_INFO,
+               "Global audio mode change ignored; current sample owns its audio route");
+        return;
+    }
 
     mode = audio_sync_mode_from_ui();
 
@@ -2401,6 +3202,12 @@ void on_audio_sync_jack_button_clicked(GtkWidget *widget, gpointer user_data)
        !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
         return;
 
+    if(!audio_global_source_controls_allowed()) {
+        vj_msg(VEEJAY_MSG_INFO,
+               "Global JACK provider ignored; current sample owns its audio route");
+        return;
+    }
+
     mode = audio_sync_mode_from_ui();
     if(mode == 0)
         return;
@@ -2426,6 +3233,13 @@ void on_audio_sync_wav_button_clicked(GtkWidget *widget, gpointer user_data)
     if(widget && GTK_IS_TOGGLE_BUTTON(widget) &&
        !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
         return;
+
+    if(!audio_global_source_controls_allowed()) {
+        audio_sync_set_master_wav_options_visible(1);
+        vj_msg(VEEJAY_MSG_INFO,
+               "Current sample has its own audio route; WAV provider button only exposes profile controls");
+        return;
+    }
 
     mode = audio_sync_mode_from_ui();
 
@@ -2457,6 +3271,14 @@ void on_audio_sync_wav_browse_button_clicked(GtkWidget *widget, gpointer user_da
     if(!audio_sync_wav_path_ready(1))
         return;
 
+    audio_sync_set_master_wav_options_visible(1);
+
+    if(!audio_global_source_controls_allowed()) {
+        vj_msg(VEEJAY_MSG_INFO,
+               "WAV file selected for profile storage; current sample keeps its own audio route");
+        return;
+    }
+
     if(audio_sync_mode_from_ui() != 0 && !audio_sync_mode_supports_wav(audio_sync_mode_from_ui())) {
         vj_msg(VEEJAY_MSG_INFO, "%s uses JACK input; WAV path stored but not activated",
                audio_sync_mode_name(audio_sync_mode_from_ui()));
@@ -2479,6 +3301,14 @@ void on_audio_sync_wav_path_activate(GtkWidget *widget, gpointer user_data)
     if(info->status_lock)
         return;
 
+    audio_sync_set_master_wav_options_visible(1);
+
+    if(!audio_global_source_controls_allowed()) {
+        vj_msg(VEEJAY_MSG_INFO,
+               "WAV path updated for profile storage; current sample keeps its own audio route");
+        return;
+    }
+
     if(audio_sync_mode_from_ui() != 0 && !audio_sync_mode_supports_wav(audio_sync_mode_from_ui())) {
         vj_msg(VEEJAY_MSG_INFO, "%s uses JACK input; WAV path stored but not activated",
                audio_sync_mode_name(audio_sync_mode_from_ui()));
@@ -2500,6 +3330,15 @@ void on_audio_sync_wav_loop_toggle_toggled(GtkWidget *widget, gpointer user_data
 
     if(info->status_lock)
         return;
+
+    if(info && info->tl)
+        timeline_set_audio_lane_loop(info->tl, audio_sync_loop_from_ui() ? TRUE : FALSE);
+
+    if(!audio_global_source_controls_allowed()) {
+        vj_msg(VEEJAY_MSG_INFO,
+               "WAV loop setting updated for profile storage; current sample keeps its own audio route");
+        return;
+    }
 
     if(audio_input_selector_wav_from_ui()) {
         if(audio_sync_mode_is_provider_only(audio_sync_mode_from_ui()))
@@ -3851,6 +4690,15 @@ void	on_slow_slider_value_changed( GtkWidget *widget, gpointer user_data )
 {
 	if(!info->status_lock) {
 		gint value = (gint) get_slider_val("slow_slider");
+		if(current_stream_buffer_ready()) {
+			multi_vims(VIMS_STREAM_BUFFER_SET_SLOW, "%d %d", current_stream_id(), value);
+			vj_midi_learning_vims_msg2(info->midi, "slow_slider", VIMS_STREAM_BUFFER_SET_SLOW, current_stream_id(), value);
+			return;
+		}
+		if(current_stream_selected()) {
+			current_stream_buffer_warn_not_ready();
+			return;
+		}
 		multi_vims(VIMS_VIDEO_SET_SLOW, "%d", value );
 		value ++;
 		vj_msg(VEEJAY_MSG_INFO, "Slow video to %2.2f fps",
@@ -3883,6 +4731,15 @@ void	on_speed_slider_value_changed(GtkWidget *widget, gpointer user_data)
 	{
 		gint value = (gint) get_slider_val( "speed_slider" );
 
+		if(current_stream_buffer_ready()) {
+			multi_vims(VIMS_STREAM_BUFFER_SET_SPEED, "%d %d", current_stream_id(), value);
+			vj_midi_learning_vims_msg2(info->midi, "speed_slider", VIMS_STREAM_BUFFER_SET_SPEED, current_stream_id(), value);
+			return;
+		}
+		if(current_stream_selected()) {
+			current_stream_buffer_warn_not_ready();
+			return;
+		}
 		multi_vims( VIMS_VIDEO_SET_SPEED, "%d", value );
 			vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
 			value );
@@ -3954,7 +4811,7 @@ static void v4l_send_legacy_slider(GtkWidget *widget, int vims_id, const char *m
     multi_vims(vims_id, "%d %d", stream_id, v4l_widget_value_65535(widget));
 
     if(midi_name)
-        vj_midi_learning_vims_complex(info->midi, midi_name, vims_id, stream_id, 1);
+        vj_midi_learning_vims_complex(info->midi, (char *) midi_name, vims_id, stream_id, 1);
 }
 
 static void v4l_send_named_slider(GtkWidget *widget, const char *control_name)
@@ -5474,6 +6331,34 @@ void	on_stream_length_value_changed( GtkWidget *widget, gpointer user_data)
     }
 }
 
+void on_stream_buffer_length_value_changed(GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+
+    int n_frames = (int) gtk_spin_button_get_value(GTK_SPIN_BUTTON(widget));
+    if(n_frames < 0)
+        n_frames = 0;
+
+    int stream_id = current_stream_id();
+    if(info->status_tokens[PLAY_MODE] != MODE_STREAM || stream_id <= 0) {
+        vj_msg(VEEJAY_MSG_WARNING, "Select a stream before changing the trickplay buffer length");
+        return;
+    }
+    if(!current_stream_buffer_supported()) {
+        current_stream_buffer_warn_not_ready();
+        return;
+    }
+
+    multi_vims(VIMS_STREAM_SET_BUFFER_LENGTH, "%d %d", stream_id, n_frames);
+    vj_midi_learning_vims_msg2(info->midi, "stream_buffer_length", VIMS_STREAM_SET_BUFFER_LENGTH, stream_id, n_frames);
+
+    if(n_frames > 0)
+        vj_msg(VEEJAY_MSG_INFO, "Requested %d-frame trickplay buffer for stream %d", n_frames, stream_id);
+    else
+        vj_msg(VEEJAY_MSG_INFO, "Requested trickplay buffer disable for stream %d", stream_id);
+}
+
 int	on_curve_buttontime_clicked(void)
 {
 	return 1;
@@ -5570,16 +6455,19 @@ static inline int clamp_int_to_range(int v, int lo, int hi)
 
 static Gtk3CurveType curve_selected_type(void)
 {
-    if (is_button_toggled("curve_typelinear"))
-        return GTK3_CURVE_TYPE_LINEAR;
+    if (is_button_toggled("curve_typefreehand"))
+        return GTK3_CURVE_TYPE_FREE;
 
     if (is_button_toggled("curve_typespline"))
         return GTK3_CURVE_TYPE_SPLINE;
 
-    if (is_button_toggled("curve_typefreehand"))
-        return GTK3_CURVE_TYPE_FREE;
+    if (is_button_toggled("curve_typelinear"))
+        return GTK3_CURVE_TYPE_LINEAR;
 
-    return GTK3_CURVE_TYPE_FREE;
+    if (info && info->curve && GTK3_IS_CURVE(info->curve))
+        return gtk3_curve_get_curve_type(info->curve);
+
+    return GTK3_CURVE_TYPE_LINEAR;
 }
 
 void on_curve_clear_parameter_clicked(GtkWidget *widget, gpointer user_data)
@@ -5670,7 +6558,7 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
 
     int min = 0;
     int max = 0;
-    _effect_get_minmax(fx_id, &min, &max, param);
+    curve_param_minmax(fx_id, param, &min, &max);
 
     float *data = (float *) vj_calloc(sizeof(float) * length);
     if (!data) {
@@ -6142,14 +7030,7 @@ void curve_toggleentry_activate(int selected_chain_entry, int active)
     if (selected_chain_entry < 0)
         return;
 
-    int curve_type = 0;
-
-    if (is_button_toggled("curve_typespline"))
-        curve_type = 1;
-    else if (is_button_toggled("curve_typefreehand"))
-        curve_type = 2;
-    else
-        curve_type = 0;
+    int curve_type = (int) curve_selected_type();
 
     multi_vims(VIMS_SAMPLE_KF_STATUS,
                "%d %d %d",
@@ -6224,24 +7105,6 @@ void curve_panel_toggleentry_toggled(GtkWidget *widget, gpointer user_data)
     GtkWidget *chain_toggleentry = widget_cache[WIDGET_CURVE_CHAIN_TOGGLEENTRY];
 
     toggle_siamese_widget(widget, panel_toggleentry, chain_toggleentry, 1);
-}
-
-static int
-curve_audio_beat_status_value(int token)
-{
-    int v;
-
-    if(!info)
-        return 0;
-
-    v = info->status_tokens[token];
-
-    if(v < 0)
-        return 0;
-    if(v > 100)
-        return 100;
-
-    return v;
 }
 
 static void
@@ -6478,6 +7341,84 @@ void on_timeline_selection_changed(GtkWidget *widget, gpointer user_data)
 
     on_timeline_move_selection();
 }
+
+void on_timeline_audio_offset_changed(GtkWidget *widget, gpointer user_data)
+{
+    gint sample_id;
+    gint source;
+    gint profile;
+    gint mode;
+    gint video_anchor;
+    gint local_video_anchor;
+    gint wav_anchor_ms;
+    gint sample_start;
+    gint sample_end;
+    gint old_lock;
+    GtkWidget *spin;
+
+    (void) user_data;
+
+    if(!info || info->status_lock || !widget)
+        return;
+
+    if(info->status_tokens[PLAY_MODE] != MODE_SAMPLE || info->status_tokens[CURRENT_ID] <= 0)
+        return;
+
+    sample_id = info->status_tokens[CURRENT_ID];
+    source = sample_audio_sync_source_from_ui();
+
+    if(source != SAMPLE_AUDIO_SYNC_SOURCE_WAV)
+        return;
+
+    profile = audio_sync_profile_slot_from_combo("sample_audio_sync_profile_combo", 1);
+    if(profile <= 0)
+        profile = info->status_tokens[SAMPLE_AUDIO_SYNC_PROFILE];
+    if(profile <= 0)
+        return;
+
+    mode = sample_audio_sync_mode_from_ui();
+
+    sample_start = info->status_tokens[SAMPLE_START];
+    sample_end = info->status_tokens[SAMPLE_END];
+    local_video_anchor = timeline_get_audio_lane_video_anchor_frame(TIMELINE_SELECTION(widget));
+    video_anchor = sample_start + local_video_anchor;
+    if(video_anchor < sample_start)
+        video_anchor = sample_start;
+    if(video_anchor > sample_end)
+        video_anchor = sample_end;
+
+    wav_anchor_ms = timeline_get_audio_lane_wav_anchor_ms(TIMELINE_SELECTION(widget));
+    if(wav_anchor_ms < 0)
+        wav_anchor_ms = 0;
+
+    spin = audio_sync_named_widget("sample_audio_sync_wav_anchor_ms");
+    if(spin && GTK_IS_SPIN_BUTTON(spin)) {
+        old_lock = info->status_lock;
+        info->status_lock = 1;
+        gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin), (gdouble) wav_anchor_ms);
+        info->status_lock = old_lock;
+    }
+
+    multi_vims(VIMS_SAMPLE_AUDIO_SYNC_SET,
+               "%d %d %d %d %d %d",
+               sample_id,
+               source,
+               profile,
+               mode,
+               video_anchor,
+               wav_anchor_ms);
+
+    multi_vims(VIMS_SAMPLE_AUDIO_SYNC_REARM, "%d", sample_id);
+
+    vj_msg(VEEJAY_MSG_INFO,
+           "Sample %d WAV lane offset -> profile %d frame %d -> %dms (%s)",
+           sample_id,
+           profile,
+           video_anchor,
+           wav_anchor_ms,
+           sample_audio_sync_mode_name(mode));
+}
+
 
 void on_timeline_cleared(GtkWidget *widget, gpointer user_data)
 {
@@ -7327,31 +8268,16 @@ on_spin_samplebank_select_value_changed
                                         (GtkSpinButton   *spinbutton,
                                         gpointer         user_data)
 {
-        GtkNotebook *samplebank = GTK_NOTEBOOK( info->sample_bank_pad );
-
-        gint max_page = gtk_notebook_get_n_pages(samplebank);
-
-        gint page = gtk_spin_button_get_value_as_int(spinbutton);
-
-        if(page >= max_page){
-                 page = 0;
-                 gtk_spin_button_set_value(spinbutton, page);
-        } else if( page < 0 ) {
-		page = max_page;
-		gtk_spin_button_set_value(spinbutton,page);
-	}
-        gtk_notebook_set_current_page_(samplebank, page);
+    (void)user_data;
+    samplebank_goto_page(gtk_spin_button_get_value_as_int(spinbutton));
 }
 void
 on_button_samplebank_prev_clicked      (GtkButton       *button,
                                         gpointer         user_data)
 {
-	GtkNotebook *samplebank = GTK_NOTEBOOK( info->sample_bank_pad );
-	gtk_notebook_prev_page(samplebank);
-
-	gint page = gtk_notebook_get_current_page (samplebank);
-	if (page != -1)
-		update_spin_value("spin_samplebank_select", page);
+    (void)button;
+    (void)user_data;
+    samplebank_step_page(-1);
 }
 
 
@@ -7359,12 +8285,9 @@ void
 on_button_samplebank_next_clicked      (GtkButton       *button,
                                         gpointer         user_data)
 {
-	GtkNotebook *samplebank = GTK_NOTEBOOK( info->sample_bank_pad );
-	gtk_notebook_next_page(samplebank);
-
-	gint page = gtk_notebook_get_current_page (samplebank);
-	if (page != -1)
-		update_spin_value("spin_samplebank_select", page);
+    (void)button;
+    (void)user_data;
+    samplebank_step_page(1);
 }
 
 void

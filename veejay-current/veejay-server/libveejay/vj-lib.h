@@ -54,14 +54,33 @@ enum {
 #define MJPEG_MAX_BUF 2
 #define VJ_AUDIO_BUF_SIZE 16384
 
+#define VJ_AUDIO_SYNC_WAV_PROFILES 4
+
+typedef struct {
+    int used;
+    int loop;
+    int length_ms;
+    char path[4096];
+} vj_audio_sync_wav_profile_t;
+
 #define AUDIO_MODE_SILENCE_FILL 0
 #define AUDIO_MODE_CONTENT 1
 
+#ifndef VJ_RECORD_AUDIO_SOURCE_AUTO
 #define VJ_RECORD_AUDIO_SOURCE_AUTO      0
+#endif
+#ifndef VJ_RECORD_AUDIO_SOURCE_ORIGINAL
 #define VJ_RECORD_AUDIO_SOURCE_ORIGINAL  1
+#endif
+#ifndef VJ_RECORD_AUDIO_SOURCE_BEAT_JACK
 #define VJ_RECORD_AUDIO_SOURCE_BEAT_JACK 2
+#endif
+#ifndef VJ_RECORD_AUDIO_SOURCE_EXTERNAL
 #define VJ_RECORD_AUDIO_SOURCE_EXTERNAL  VJ_RECORD_AUDIO_SOURCE_BEAT_JACK
+#endif
+#ifndef VJ_RECORD_AUDIO_SOURCE_SILENCE
 #define VJ_RECORD_AUDIO_SOURCE_SILENCE   3
+#endif
 
 #define VJ_AUDIO_MIX_FOLLOW_ROUTE        0
 #define VJ_AUDIO_MIX_ORIGINAL_ONLY       1
@@ -374,6 +393,11 @@ typedef struct {
 	volatile int frames_available;
 #ifdef HAVE_JACK
 	vj_audio_sync_shared_t audio_sync;
+    vj_audio_sync_wav_profile_t audio_sync_wav_profiles[VJ_AUDIO_SYNC_WAV_PROFILES];
+    int audio_sync_sample_bound_id;
+    int audio_sync_sample_bound_source;
+    int audio_sync_sample_bound_profile;
+    int audio_sync_sample_bound_mode;
 #endif
 	vj_audio_beat_shared_t audio_beat;
 	vj_scene_detect_t scene_detect;

@@ -246,6 +246,9 @@ static int vj_cali_tag_accepts_args(vj_tag *tag)
         case VJ_TAG_TYPE_NET:
         case VJ_TAG_TYPE_MCAST:
         case VJ_TAG_TYPE_AVFORMAT:
+        case VJ_TAG_TYPE_YUV4MPEG:
+        case VJ_TAG_TYPE_DV1394:
+        case VJ_TAG_TYPE_PICTURE:
             return 1;
         default:
             break;
@@ -271,7 +274,7 @@ int vj_cali_get_args(vj_tag *tag, int *args, int *n_args, int *fx_id)
     if(!tag || !args || !n_args || !fx_id)
         return 0;
 
-    if(!vj_cali_tag_has_data(tag))
+    if(!vj_cali_tag_accepts_args(tag))
         return 0;
 
     int tmp[VJ_CALI_PARAM_COUNT];

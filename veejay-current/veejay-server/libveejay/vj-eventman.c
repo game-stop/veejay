@@ -19,6 +19,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <veejaycore/vevo.h>
 #include <libveejay/vj-event.h>
 #include <veejaycore/vims.h>
@@ -30,6 +31,22 @@
 #define MAX_INDEX 1024
 #define VIMS_DEFAULT_ARG_MAX 16
 
+#ifndef VIMS_AUDIO_SYNC_WAV_PROFILE_SET
+#define VIMS_AUDIO_SYNC_WAV_PROFILE_SET 273
+#endif
+#ifndef VIMS_AUDIO_SYNC_WAV_PROFILE_CLEAR
+#define VIMS_AUDIO_SYNC_WAV_PROFILE_CLEAR 274
+#endif
+#ifndef VIMS_SAMPLE_AUDIO_SYNC_SET
+#define VIMS_SAMPLE_AUDIO_SYNC_SET 275
+#endif
+#ifndef VIMS_SAMPLE_AUDIO_SYNC_CLEAR
+#define VIMS_SAMPLE_AUDIO_SYNC_CLEAR 276
+#endif
+#ifndef VIMS_SAMPLE_AUDIO_SYNC_REARM
+#define VIMS_SAMPLE_AUDIO_SYNC_REARM 277
+#endif
+
 #define VIMS_REQUIRE_ALL_PARAMS (1<<0)			/* all params needed */
 #define VIMS_DONT_PARSE_PARAMS (1<<1)		/* dont parse arguments */
 #define VIMS_LONG_PARAMS (1<<3)				/* long string arguments (bundle, plugin) */
@@ -39,6 +56,12 @@
 #define	SAMPLE_ID_HELP	"Sample ID (0=current playing, -1=last created, > 0 = Sample ID)"
 #define	STREAM_ID_HELP	"Stream ID (-1=last created, > 0 = Stream ID)"
 #define	SAMPLE_STREAM_ID_HELP	"Sample or Stream ID (0=current playing, -1=last created, > 0 = ID)"
+
+extern void vj_event_audio_sync_wav_profile_set(void *ptr, const char format[], va_list ap);
+extern void vj_event_audio_sync_wav_profile_clear(void *ptr, const char format[], va_list ap);
+extern void vj_event_sample_audio_sync_set(void *ptr, const char format[], va_list ap);
+extern void vj_event_sample_audio_sync_clear(void *ptr, const char format[], va_list ap);
+extern void vj_event_sample_audio_sync_rearm(void *ptr, const char format[], va_list ap);
 static	vevo_port_t **index_map_ = NULL;
 static  int *requires_id_map_ = NULL;
 
@@ -2262,7 +2285,7 @@ void		vj_init_vevo_events(void)
 
 	index_map_[VIMS_CHAIN_FADE_METHOD]			=	_new_event(
 				"%d %d",
-				VIMS_CHAIN_FADE_ENTRY,
+				VIMS_CHAIN_FADE_METHOD,
 				"Chain mixer method",
 				vj_event_chain_fade_method,
 				2,
@@ -2296,6 +2319,49 @@ void		vj_init_vevo_events(void)
 				SAMPLE_STREAM_ID_HELP,
 				0,
 				"Opacity value [0-255]",
+				0,
+				NULL);
+
+	index_map_[VIMS_CHAIN_FADE_KF_STATUS]		=	_new_event(
+				"%d %d %d",
+				VIMS_CHAIN_FADE_KF_STATUS,
+				"Enable chain opacity curve",
+				vj_event_chain_fade_kf_status,
+				3,
+				VIMS_ALLOW_ANY,
+				SAMPLE_STREAM_ID_HELP,
+				0,
+				"Status (On = 1, Off = 0)",
+				1,
+				"Curve type",
+				0,
+				NULL);
+
+	index_map_[VIMS_CHAIN_FADE_KF_CLEAR]		=	_new_event(
+				"%d",
+				VIMS_CHAIN_FADE_KF_CLEAR,
+				"Clear chain opacity curve",
+				vj_event_chain_fade_kf_clear,
+				1,
+				VIMS_ALLOW_ANY,
+				SAMPLE_STREAM_ID_HELP,
+				0,
+				NULL);
+
+	index_map_[VIMS_CHAIN_FADE_KF_AUDIO]		=	_new_event(
+				"%d %d %d %d",
+				VIMS_CHAIN_FADE_KF_AUDIO,
+				"Set chain opacity curve audio response",
+				vj_event_chain_fade_kf_audio,
+				4,
+				VIMS_ALLOW_ANY,
+				SAMPLE_STREAM_ID_HELP,
+				0,
+				"Audio mode (0=off,1=add,2=duck,3=multiply,4=gate)",
+				0,
+				"Audio source (0=level,1=envelope,2=transient,3=flux,4=pulse,5=gate)",
+				0,
+				"Amount [0-255]",
 				0,
 				NULL);
 
@@ -2644,6 +2710,76 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
                 NULL,
                 NULL );
 
+
+    index_map_[VIMS_AUDIO_SYNC_WAV_PROFILE_SET] = _new_event(
+                "%d %d %s",
+                VIMS_AUDIO_SYNC_WAV_PROFILE_SET,
+                "Store a reusable global WAV sync profile",
+                vj_event_audio_sync_wav_profile_set,
+                3,
+                VIMS_LONG_PARAMS,
+                "WAV profile slot, 1-4",
+                1,
+                "Loop WAV source, 0 or 1",
+                0,
+                "Path to PCM WAV file",
+                NULL,
+                NULL );
+
+    index_map_[VIMS_AUDIO_SYNC_WAV_PROFILE_CLEAR] = _new_event(
+                "%d",
+                VIMS_AUDIO_SYNC_WAV_PROFILE_CLEAR,
+                "Clear a global WAV sync profile",
+                vj_event_audio_sync_wav_profile_clear,
+                1,
+                VIMS_ALLOW_ANY,
+                "WAV profile slot, 1-4",
+                1,
+                NULL );
+
+    index_map_[VIMS_SAMPLE_AUDIO_SYNC_SET] = _new_event(
+                "%d %d %d %d %d %d",
+                VIMS_SAMPLE_AUDIO_SYNC_SET,
+                "Bind a sample to an audio sync source",
+                vj_event_sample_audio_sync_set,
+                6,
+                VIMS_ALLOW_ANY,
+                SAMPLE_ID_HELP,
+                0,
+                "Sample audio source: 0=original/video audio, 1=JACK external, 2=WAV profile, 3=silence",
+                0,
+                "WAV profile slot: 0=off/not used, 1-4=global WAV profile",
+                0,
+                "Sample audio sync mode: 0=off, 1=queue/monitor, 2=track-align, 3=analyze, 4=clean monitor, 5=monitor+trickplay, 6=tempo follow, 7=tempo bridge",
+                0,
+                "Video/sample frame anchor",
+                0,
+                "WAV anchor position in milliseconds",
+                0,
+                NULL );
+
+    index_map_[VIMS_SAMPLE_AUDIO_SYNC_CLEAR] = _new_event(
+                "%d",
+                VIMS_SAMPLE_AUDIO_SYNC_CLEAR,
+                "Clear sample audio sync binding",
+                vj_event_sample_audio_sync_clear,
+                1,
+                VIMS_ALLOW_ANY,
+                SAMPLE_ID_HELP,
+                0,
+                NULL );
+
+    index_map_[VIMS_SAMPLE_AUDIO_SYNC_REARM] = _new_event(
+                "%d",
+                VIMS_SAMPLE_AUDIO_SYNC_REARM,
+                "Re-arm the current sample audio sync binding from the current frame",
+                vj_event_sample_audio_sync_rearm,
+                1,
+                VIMS_ALLOW_ANY,
+                SAMPLE_ID_HELP,
+                0,
+                NULL );
+
     index_map_[VIMS_AUDIO_SYNC_TARGET] = _new_event(
                 "%d %d %d",
                 VIMS_AUDIO_SYNC_TARGET,
@@ -2721,18 +2857,18 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				vj_event_audio_mix_mode,
 				1,
 				VIMS_ALLOW_ANY,
-				"Mode: 0=follow route, 1=original only, 2=JACK external only, 3=original + JACK external",
+				"Mode: 0=follow route, 1=original only, 2=external provider only, 3=original + external provider",
 				0,
 				NULL );
 
 	index_map_[VIMS_AUDIO_MIX_CROSSFADE]	=	_new_event(
 				"%d",
 				VIMS_AUDIO_MIX_CROSSFADE,
-				"Set original/JACK external audio crossfade",
+				"Set original/external-provider audio crossfade",
 				vj_event_audio_mix_crossfade,
 				1,
 				VIMS_ALLOW_ANY,
-				"Crossfade 0=original, 50=equal-power blend, 100=JACK external",
+				"Crossfade 0=original, 50=equal-power blend, 100=external provider",
 				0,
 				NULL );
 
@@ -3282,6 +3418,130 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				"Number of frames",
 				0,
 				NULL);
+	index_map_[VIMS_STREAM_SET_BUFFER_LENGTH]	=	_new_event(
+				"%d %d",
+				VIMS_STREAM_SET_BUFFER_LENGTH,
+				"Set raw-frame trickplay buffer length for stream",
+				vj_event_stream_set_buffer_length,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				STREAM_ID_HELP,
+				0,
+				"Number of buffered frames (0 disables)",
+				0,
+				NULL);
+
+	index_map_[VIMS_STREAM_BUFFER_FORWARD]	=	_new_event(
+				"%d",
+				VIMS_STREAM_BUFFER_FORWARD,
+				"Play buffered stream forward",
+				vj_event_stream_buffer_forward,
+				1,
+				VIMS_ALLOW_ANY,
+				STREAM_ID_HELP,
+				0,
+				NULL);
+
+	index_map_[VIMS_STREAM_BUFFER_BACKWARD]	=	_new_event(
+				"%d",
+				VIMS_STREAM_BUFFER_BACKWARD,
+				"Play buffered stream backward",
+				vj_event_stream_buffer_backward,
+				1,
+				VIMS_ALLOW_ANY,
+				STREAM_ID_HELP,
+				0,
+				NULL);
+
+	index_map_[VIMS_STREAM_BUFFER_STOP]	=	_new_event(
+				"%d",
+				VIMS_STREAM_BUFFER_STOP,
+				"Pause buffered stream",
+				vj_event_stream_buffer_stop,
+				1,
+				VIMS_ALLOW_ANY,
+				STREAM_ID_HELP,
+				0,
+				NULL);
+
+	index_map_[VIMS_STREAM_BUFFER_SET_SPEED]	=	_new_event(
+				"%d %d",
+				VIMS_STREAM_BUFFER_SET_SPEED,
+				"Set buffered stream trickplay speed",
+				vj_event_stream_buffer_set_speed,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				STREAM_ID_HELP,
+				0,
+				"Signed frame step",
+				1,
+				NULL);
+
+	index_map_[VIMS_STREAM_BUFFER_SET_SLOW]	=	_new_event(
+				"%d %d",
+				VIMS_STREAM_BUFFER_SET_SLOW,
+				"Set buffered stream frame repeat",
+				vj_event_stream_buffer_set_slow,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				STREAM_ID_HELP,
+				0,
+				"Frame repeat",
+				1,
+				NULL);
+
+	index_map_[VIMS_STREAM_BUFFER_SET_FRAME]	=	_new_event(
+				"%d %d",
+				VIMS_STREAM_BUFFER_SET_FRAME,
+				"Goto buffered stream frame",
+				vj_event_stream_buffer_set_frame,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				STREAM_ID_HELP,
+				0,
+				"Buffered frame index",
+				0,
+				NULL);
+
+	index_map_[VIMS_STREAM_BUFFER_SKIP_FRAME]	=	_new_event(
+				"%d %d",
+				VIMS_STREAM_BUFFER_SKIP_FRAME,
+				"Skip buffered stream frames",
+				vj_event_stream_buffer_skip_frame,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				STREAM_ID_HELP,
+				0,
+				"Signed frame increment",
+				1,
+				NULL);
+
+	index_map_[VIMS_STREAM_BUFFER_SKIP_SECOND]	=	_new_event(
+				"%d %d",
+				VIMS_STREAM_BUFFER_SKIP_SECOND,
+				"Skip buffered stream seconds forward",
+				vj_event_stream_buffer_skip_second,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				STREAM_ID_HELP,
+				0,
+				"Number of seconds",
+				1,
+				NULL);
+
+	index_map_[VIMS_STREAM_BUFFER_PREV_SECOND]	=	_new_event(
+				"%d %d",
+				VIMS_STREAM_BUFFER_PREV_SECOND,
+				"Skip buffered stream seconds backward",
+				vj_event_stream_buffer_prev_second,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				STREAM_ID_HELP,
+				0,
+				"Number of seconds",
+				1,
+				NULL);
+
 	index_map_[VIMS_STREAM_SET_BRIGHTNESS]			=	_new_event(
 				"%d %d",
 				VIMS_STREAM_SET_BRIGHTNESS,

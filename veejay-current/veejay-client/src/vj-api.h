@@ -39,7 +39,11 @@ void set_disable_sample_image(gboolean status);
 
 void add_class(GtkWidget *widget, const char *name);
 void remove_class(GtkWidget *widget, const char *name);
+int set_samplebank_layout(int columns, int rows, int pages);
 void default_bank_values(int *col, int *row );
+void samplebank_goto_page(int page);
+void samplebank_step_page(int delta);
+int samplebank_get_page(void);
 gboolean is_alive( int *sync );
 gboolean gveejay_idle(gpointer data);
 int _effect_get_minmax( int effect_id, int *min, int *max, int index );

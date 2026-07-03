@@ -316,6 +316,24 @@ static int curve_clampi(int v, int lo, int hi)
     return (v < lo) ? lo : ((v > hi) ? hi : v);
 }
 
+#ifndef VJ_KF_PARAM_CHAIN_OPACITY
+#define VJ_KF_PARAM_CHAIN_OPACITY 99
+#endif
+
+void curve_param_minmax(int fx_id, int parameter_id, int *min, int *max)
+{
+    if(!min || !max)
+        return;
+
+    if(parameter_id == VJ_KF_PARAM_CHAIN_OPACITY) {
+        *min = 0;
+        *max = 255;
+        return;
+    }
+
+    _effect_get_minmax(fx_id, min, max, parameter_id);
+}
+
 static int curve_detail_len(int veclen1, int detail)
 {
     detail = curve_clampi(detail, 2, 256);
@@ -384,7 +402,7 @@ void set_initial_curve(GtkWidget *curve,
     if (len <= 0)
         return;
 
-    _effect_get_minmax(fx_id, &min, &max, parameter_id);
+    curve_param_minmax(fx_id, parameter_id, &min, &max);
 
     value = (value < min) ? min : ((value > max) ? max : value);
 
@@ -471,7 +489,7 @@ int set_points_in_curve_ext(GtkWidget *curve,
 
     int min = 0;
     int max = 0;
-    _effect_get_minmax(id, &min, &max, parameter_id);
+    curve_param_minmax(id, parameter_id, &min, &max);
 
     float *vec = (float *) vj_calloc(sizeof(float) * len);
     if (vec == NULL)
@@ -491,15 +509,6 @@ int set_points_in_curve_ext(GtkWidget *curve,
         vec[k] = (float) value;
     }
 
-    gtk3_curve_reset(curve);
-    gtk3_curve_set_fps(curve, fps);
-    gtk3_curve_set_range(curve,
-                         (gfloat) start,
-                         (gfloat) end,
-                         (gfloat) min,
-                         (gfloat) max);
-    gtk3_curve_set_vector(curve, len, vec);
-
     switch (type) {
         case 1:
             *curve_type = GTK3_CURVE_TYPE_SPLINE;
@@ -511,6 +520,16 @@ int set_points_in_curve_ext(GtkWidget *curve,
             *curve_type = GTK3_CURVE_TYPE_LINEAR;
             break;
     }
+
+    gtk3_curve_reset(curve);
+    gtk3_curve_set_fps(curve, fps);
+    gtk3_curve_set_range(curve,
+                         (gfloat) start,
+                         (gfloat) end,
+                         (gfloat) min,
+                         (gfloat) max);
+    gtk3_curve_set_vector(curve, len, vec);
+    gtk3_curve_set_curve_type(curve, (Gtk3CurveType) *curve_type);
 
     free(vec);
 
@@ -540,7 +559,7 @@ void curve_set_predefined_shape(GtkWidget *curve, int fx_id, int parameter_id,
     int param_min = 0;
     int param_max = 0;
 
-    _effect_get_minmax(fx_id, &param_min, &param_max, parameter_id);
+    curve_param_minmax(fx_id, parameter_id, &param_min, &param_max);
 
     if(end < start)
         return;
@@ -582,9 +601,8 @@ void curve_set_predefined_shape(GtkWidget *curve, int fx_id, int parameter_id,
                              (gfloat) end,
                              (gfloat) param_min,
                              (gfloat) param_max);
-
+        gtk3_curve_set_curve_type(curve, GTK3_CURVE_TYPE_FREE);
         gtk3_curve_set_vector(curve, veclen1, vec);
-        gtk3_curve_set_curve_type(curve, GTK3_CURVE_TYPE_LINEAR);
         gtk_widget_queue_draw(curve);
 
         curve_is_empty = 0;
@@ -1067,7 +1085,7 @@ void curve_set_predefined_shape(GtkWidget *curve, int fx_id, int parameter_id,
                          (gfloat) end,
                          (gfloat) param_min,
                          (gfloat) param_max);
-
+    gtk3_curve_set_curve_type(curve, GTK3_CURVE_TYPE_FREE);
     gtk3_curve_set_vector(curve, veclen1, vec);
 
     gtk_widget_queue_draw(curve);

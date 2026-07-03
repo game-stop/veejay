@@ -24,6 +24,7 @@
 #include <config.h>
 #include <libvje/vje.h>
 #include <veejaycore/hash.h>
+#include <veejaycore/vims.h>
 #include <libel/vj-el.h>
 #ifdef HAVE_XML2
 #include <libxml/xmlmemory.h>
@@ -68,6 +69,12 @@
 #define XMLTAG_FADE_METHOD  "chain_fade_method"
 #define XMLTAG_FADE_ALPHA   "chain_fade_alpha"
 #define XMLTAG_FADE_ENTRY	"chain_fade_entry"
+#define XMLTAG_FADE_KF_STATUS "chain_fade_kf_status"
+#define XMLTAG_FADE_KF_TYPE "chain_fade_kf_type"
+#define XMLTAG_FADE_KF_AUDIO_MODE "chain_fade_kf_audio_mode"
+#define XMLTAG_FADE_KF_AUDIO_SOURCE "chain_fade_kf_audio_source"
+#define XMLTAG_FADE_KF_AUDIO_AMOUNT "chain_fade_kf_audio_amount"
+#define XMLTAG_FADE_KF_ANIM "chain_fade_anim"
 #define XMLTAG_FADER_INC    "chain_fade_increment"
 #define XMLTAG_FADER_DIRECTION "chain_direction"
 #define XMLTAG_LASTENTRY    "current_entry"
@@ -82,11 +89,30 @@
 #define XMLTAG_LOOP_PP "loop_pp"
 #define XMLTAG_LOOP_DEC "loop_dec"
 #define XMLTAG_LOOP_PERIODS "loop_periods"
+#define XMLTAG_AUDIO_SYNC_SOURCE "audio_sync_source"
+#define XMLTAG_AUDIO_SYNC_PROFILE "audio_sync_profile"
+#define XMLTAG_AUDIO_SYNC_MODE "audio_sync_mode"
+#define XMLTAG_AUDIO_SYNC_VIDEO_ANCHOR "audio_sync_video_anchor"
+#define XMLTAG_AUDIO_SYNC_WAV_ANCHOR_MS "audio_sync_wav_anchor_ms"
+#define XMLTAG_AUDIO_SYNC_LOCK_DELTA_FRAMES "audio_sync_lock_delta_frames"
+#define XMLTAG_AUDIO_SYNC_LOCK_CONFIDENCE "audio_sync_lock_confidence"
 
 #endif
 #define SAMPLE_FREEZE_NONE 0
 #define SAMPLE_FREEZE_PAUSE 1
 #define SAMPLE_FREEZE_BLACK 2
+
+#define SAMPLE_AUDIO_SYNC_OFF 0
+#define SAMPLE_AUDIO_SYNC_QUEUE 1
+#define SAMPLE_AUDIO_SYNC_TRACK_ALIGN 2
+#define SAMPLE_AUDIO_SYNC_LIVE_EXTERNAL 3
+#define SAMPLE_AUDIO_SYNC_MONITOR 4
+#define SAMPLE_AUDIO_SYNC_MONITOR_TRICKPLAY 5
+#define SAMPLE_AUDIO_SYNC_TEMPO_FOLLOW 6
+#define SAMPLE_AUDIO_SYNC_TEMPO_BRIDGE 7
+#define SAMPLE_AUDIO_SYNC_MODE_MAX SAMPLE_AUDIO_SYNC_TEMPO_BRIDGE
+#define SAMPLE_AUDIO_SYNC_PROFILE_MAX 4
+
 
 #define SAMPLE_RENDER_START 1
 #define SAMPLE_RENDER_STOP 0
@@ -146,6 +172,13 @@ typedef struct sample_info_t {
     int playmode_frame;
     int sub_audio;		/* mix underlying sample yes or no */
     int audio_volume;		/* volume setting of this sample */
+    int audio_sync_source;	/* original / WAV profile / JACK external */
+    int audio_sync_profile;	/* 0=off, 1..4 global WAV profile */
+    int audio_sync_mode;		/* off / queue / track-align */
+    long audio_sync_video_anchor;	/* sample/video frame used as sync start */
+    long audio_sync_wav_anchor_ms;	/* WAV time at sync start */
+    int audio_sync_lock_delta_frames;	/* learned Track Align correction */
+    int audio_sync_lock_confidence;	/* learned Track Align confidence */
     int marker_start;
     int marker_end;
     int dup;			/* frame duplicator */
@@ -160,6 +193,12 @@ typedef struct sample_info_t {
 	int fade_method;
 	int fade_alpha;
     int fade_entry;
+    void *fade_kf;
+    int fade_kf_status;
+    int fade_kf_type;
+    int fade_kf_audio_mode;
+    int fade_kf_audio_source;
+    int fade_kf_audio_amount;
 	int encoder_active;
     unsigned long sequence_num;
     char *encoder_destination;
@@ -245,6 +284,7 @@ extern int sample_set_marker_end(int sample_id, int marker);
 extern int sample_set_startframe(int s1, long frame_num);
 extern int sample_set_endframe(int s1, long frame_num);
 extern int sample_set_marker(int s1, int start, int end);
+extern int sample_get_marker_range(int sample_id, int *start, int *end);
 extern int sample_get_longest(int sample_id);
 extern int sample_get_playmode(int s1);
 extern int sample_set_playmode(int s1, int playmode);
@@ -278,6 +318,10 @@ extern void	sample_cali_prepare( int sample_id, int slot, int chan );
 extern int sample_set_sub_audio(int s1, int audio);
 extern int sample_get_audio_volume(int s1);
 extern int sample_set_audio_volume(int s1, int volume);
+extern int sample_set_audio_sync_profile(int sample_id, int source, int profile, int mode, long video_anchor, long wav_anchor_ms);
+extern int sample_get_audio_sync_profile(int sample_id, int *source, int *profile, int *mode, long *video_anchor, long *wav_anchor_ms, int *lock_delta_frames, int *lock_confidence);
+extern int sample_clear_audio_sync_profile(int sample_id);
+extern int sample_set_audio_sync_lock(int sample_id, int delta_frames, int confidence);
 extern int sample_copy(int s1);
 void	*sample_get_plugin( int s1, int position, void *ptr );
 extern int sample_get_effect(int s1, int position);
@@ -347,6 +391,15 @@ extern int sample_get_fade_method(int t1);
 extern void sample_set_fade_alpha(int t1, int alpha);
 extern int sample_get_fade_alpha(int s1);
 extern int sample_set_fader_inc(int s1, float inc);
+extern void *sample_chain_fade_alloc_kf(int s1);
+extern void *sample_get_chain_fade_kf_port(int s1);
+extern int sample_chain_fade_set_kf_status(int s1, int status, int type);
+extern int sample_chain_fade_get_kf_status(int s1, int *type);
+extern int sample_chain_fade_clear_kf(int s1);
+extern int sample_chain_fade_get_value(int s1, long long n_frame, int *value);
+extern unsigned char *sample_chain_fade_get_kfs(int s1, int *len);
+extern int sample_chain_fade_audio(int s1, int mode, int source, int amount);
+extern int sample_chain_fade_audio_get(int s1, int *mode, int *source, int *amount);
 extern int sample_cached(sample_info *s, int b_sample );
 extern int sample_get_effect_status(int s1);
 extern int sample_get_selected_entry(int s1);

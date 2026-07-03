@@ -79,6 +79,501 @@ static int no_v4l2_threads_ = 0;
 
 static void *tag_cache[SAMPLE_MAX_SAMPLES];
 
+static vj_tag_info_t *vj_tag_info_new(void)
+{
+    vj_tag_info_t *info = (vj_tag_info_t*) vj_calloc(sizeof(vj_tag_info_t));
+    if(!info)
+        return NULL;
+
+    pthread_mutex_init(&info->mutex, NULL);
+    info->mode = VJ_TAG_TRICKPLAY_LIVE;
+    info->speed = 1;
+    info->direction = 1;
+    info->slow = 1;
+    return info;
+}
+
+static void vj_tag_info_release(vj_tag *tag)
+{
+    if(!tag || !tag->info)
+        return;
+
+    pthread_mutex_lock(&tag->info->mutex);
+    if(tag->info->frame_buffer) {
+        free(tag->info->frame_buffer);
+        tag->info->frame_buffer = NULL;
+    }
+    pthread_mutex_unlock(&tag->info->mutex);
+    pthread_mutex_destroy(&tag->info->mutex);
+    free(tag->info);
+    tag->info = NULL;
+}
+
+
+static int vj_tag_buffer_supported_type(int type)
+{
+    switch(type) {
+        case VJ_TAG_TYPE_V4L:
+        case VJ_TAG_TYPE_CALI:
+        case VJ_TAG_TYPE_PICTURE:
+        case VJ_TAG_TYPE_MCAST:
+        case VJ_TAG_TYPE_NET:
+        case VJ_TAG_TYPE_YUV4MPEG:
+        case VJ_TAG_TYPE_DV1394:
+        case VJ_TAG_TYPE_AVFORMAT:
+        case VJ_TAG_TYPE_GENERATOR:
+        case VJ_TAG_TYPE_COLOR:
+        case VJ_TAG_TYPE_CLONE:
+            return 1;
+        default:
+            break;
+    }
+    return 0;
+}
+
+
+int vj_tag_buffer_supported(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag)
+        return 0;
+    return vj_tag_buffer_supported_type(tag->source_type);
+}
+
+static int vj_tag_buffer_state_locked(vj_tag *tag)
+{
+    if(!tag || !vj_tag_buffer_supported_type(tag->source_type))
+        return VJ_TAG_BUFFER_STATE_UNSUPPORTED;
+
+    vj_tag_info_t *info = tag->info;
+    if(!info || !info->frame_buffer || info->buffer_length <= 0)
+        return VJ_TAG_BUFFER_STATE_OFF;
+
+    if(info->buffer_fill <= 0)
+        return VJ_TAG_BUFFER_STATE_EMPTY;
+
+    if(info->mode != VJ_TAG_TRICKPLAY_BUFFER)
+        return VJ_TAG_BUFFER_STATE_LIVE;
+
+    if(info->speed == 0)
+        return VJ_TAG_BUFFER_STATE_PAUSED;
+
+    return VJ_TAG_BUFFER_STATE_PLAYING;
+}
+
+int vj_tag_buffer_state(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || !tag->info)
+        return VJ_TAG_BUFFER_STATE_UNSUPPORTED;
+
+    pthread_mutex_lock(&tag->info->mutex);
+    int state = vj_tag_buffer_state_locked(tag);
+    pthread_mutex_unlock(&tag->info->mutex);
+    return state;
+}
+
+static inline int vj_tag_buffer_clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : v > hi ? hi : v;
+}
+
+static inline int vj_tag_buffer_oldest_slot(vj_tag_info_t *info)
+{
+    if(info->buffer_fill < info->buffer_length)
+        return 0;
+    return info->write_index;
+}
+
+static inline int vj_tag_buffer_slot_for(vj_tag_info_t *info, int logical)
+{
+    if(info->buffer_length <= 0)
+        return 0;
+    return (vj_tag_buffer_oldest_slot(info) + logical) % info->buffer_length;
+}
+
+static void vj_tag_buffer_capture_frame(vj_tag *tag, uint8_t **planes, int len, int uv_len)
+{
+    if(!tag || !tag->info || !planes || !planes[0] || !planes[1] || !planes[2])
+        return;
+
+    vj_tag_info_t *info = tag->info;
+    pthread_mutex_lock(&info->mutex);
+
+    if(!info->frame_buffer || info->buffer_length <= 0 || info->frame_size <= 0 ||
+       info->y_len != len || info->uv_len != uv_len) {
+        pthread_mutex_unlock(&info->mutex);
+        return;
+    }
+
+    const int follow_newest =
+        (info->mode == VJ_TAG_TRICKPLAY_LIVE) ||
+        (info->direction > 0 && info->playhead >= (info->buffer_fill - 1));
+
+    uint8_t *dst = info->frame_buffer + ((size_t)info->write_index * info->frame_size);
+    veejay_memcpy(dst, planes[0], len);
+    veejay_memcpy(dst + len, planes[1], uv_len);
+    veejay_memcpy(dst + len + uv_len, planes[2], uv_len);
+
+    if(info->buffer_fill < info->buffer_length) {
+        info->buffer_fill++;
+    } else if(info->playhead > 0) {
+        info->playhead--;
+    }
+
+    info->write_index++;
+    if(info->write_index >= info->buffer_length)
+        info->write_index = 0;
+
+    if(follow_newest || info->buffer_fill <= 1)
+        info->playhead = info->buffer_fill - 1;
+
+    info->playhead = vj_tag_buffer_clampi(info->playhead, 0, info->buffer_fill - 1);
+    info->capture_seq++;
+
+    pthread_mutex_unlock(&info->mutex);
+}
+
+static int vj_tag_buffer_render_frame(vj_tag *tag, VJFrame *dst)
+{
+    if(!tag || !tag->info || !dst || !dst->data[0] || !dst->data[1] || !dst->data[2])
+        return 0;
+
+    vj_tag_info_t *info = tag->info;
+    pthread_mutex_lock(&info->mutex);
+
+    if(!info->frame_buffer || info->buffer_length <= 0 || info->buffer_fill <= 0 ||
+       info->mode != VJ_TAG_TRICKPLAY_BUFFER) {
+        pthread_mutex_unlock(&info->mutex);
+        return 0;
+    }
+
+    int transport_owner = 0;
+    if(_tag_info && _tag_info->uc && _tag_info->settings &&
+       _tag_info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG &&
+       _tag_info->uc->sample_id == tag->id) {
+        long long cur = _tag_info->settings->current_frame_num;
+        if(cur < 0)
+            cur = 0;
+        if(cur > (long long)(info->buffer_fill - 1))
+            cur = (long long)(info->buffer_fill - 1);
+        info->playhead = (int)cur;
+        transport_owner = 1;
+    }
+
+    info->playhead = vj_tag_buffer_clampi(info->playhead, 0, info->buffer_fill - 1);
+    int slot = vj_tag_buffer_slot_for(info, info->playhead);
+    uint8_t *src = info->frame_buffer + ((size_t)slot * info->frame_size);
+
+    veejay_memcpy(dst->data[0], src, info->y_len);
+    veejay_memcpy(dst->data[1], src + info->y_len, info->uv_len);
+    veejay_memcpy(dst->data[2], src + info->y_len + info->uv_len, info->uv_len);
+
+    if(!transport_owner && info->speed != 0) {
+        info->slow_count++;
+        if(info->slow_count >= info->slow) {
+            int step = info->speed < 0 ? -info->speed : info->speed;
+            if(step < 1)
+                step = 1;
+            info->slow_count = 0;
+            info->playhead += info->direction * step;
+            info->playhead = vj_tag_buffer_clampi(info->playhead, 0, info->buffer_fill - 1);
+        }
+    }
+
+    pthread_mutex_unlock(&info->mutex);
+    return 1;
+}
+
+int vj_tag_set_buffer_length(int t1, int n_frames)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || !tag->info)
+        return 0;
+
+    if(!vj_tag_buffer_supported_type(tag->source_type)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Stream %d type %d does not support trickplay buffering", t1, tag->source_type);
+        return 0;
+    }
+
+    if(n_frames < 0)
+        n_frames = 0;
+    if(n_frames > 2160000)
+        n_frames = 2160000;
+
+    vj_tag_info_t *info = tag->info;
+    pthread_mutex_lock(&info->mutex);
+
+    if(info->frame_buffer) {
+        free(info->frame_buffer);
+        info->frame_buffer = NULL;
+    }
+
+    info->buffer_length = 0;
+    info->buffer_fill = 0;
+    info->write_index = 0;
+    info->playhead = 0;
+    info->mode = VJ_TAG_TRICKPLAY_LIVE;
+    info->speed = 1;
+    info->direction = 1;
+    info->slow = 1;
+    info->slow_count = 0;
+    info->capture_seq = 0;
+
+    if(n_frames > 0) {
+        int len = vj_tag_input ? (vj_tag_input->width * vj_tag_input->height) : 0;
+        int uv_len = vj_tag_input ? vj_tag_input->uv_len : 0;
+        size_t frame_size = (size_t)len + (2u * (size_t)uv_len);
+        size_t total = frame_size * (size_t)n_frames;
+
+        if(len <= 0 || uv_len <= 0 || frame_size == 0 || total / frame_size != (size_t)n_frames) {
+            pthread_mutex_unlock(&info->mutex);
+            return 0;
+        }
+
+        info->frame_buffer = (uint8_t*) vj_malloc(total);
+        if(!info->frame_buffer) {
+            pthread_mutex_unlock(&info->mutex);
+            return 0;
+        }
+
+        info->frame_size = frame_size;
+        info->y_len = len;
+        info->uv_len = uv_len;
+        info->buffer_length = n_frames;
+    }
+
+    pthread_mutex_unlock(&info->mutex);
+    return 1;
+}
+
+int vj_tag_get_buffer_length(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || !tag->info)
+        return 0;
+    pthread_mutex_lock(&tag->info->mutex);
+    int v = tag->info->buffer_length;
+    pthread_mutex_unlock(&tag->info->mutex);
+    return v;
+}
+
+int vj_tag_get_buffer_duration(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || !tag->info)
+        return 0;
+    pthread_mutex_lock(&tag->info->mutex);
+    int v = tag->info->buffer_fill;
+    pthread_mutex_unlock(&tag->info->mutex);
+    return v;
+}
+
+int vj_tag_get_buffer_position(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || !tag->info)
+        return 0;
+    pthread_mutex_lock(&tag->info->mutex);
+    int v = tag->info->playhead;
+    pthread_mutex_unlock(&tag->info->mutex);
+    return v;
+}
+
+int vj_tag_get_buffer_speed(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || !tag->info)
+        return 0;
+    pthread_mutex_lock(&tag->info->mutex);
+    int v = tag->info->speed;
+    pthread_mutex_unlock(&tag->info->mutex);
+    return v;
+}
+
+int vj_tag_get_buffer_direction(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || !tag->info)
+        return 0;
+    pthread_mutex_lock(&tag->info->mutex);
+    int v = tag->info->direction;
+    pthread_mutex_unlock(&tag->info->mutex);
+    return v;
+}
+
+int vj_tag_get_buffer_mode(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || !tag->info)
+        return VJ_TAG_TRICKPLAY_LIVE;
+    pthread_mutex_lock(&tag->info->mutex);
+    int v = tag->info->mode;
+    pthread_mutex_unlock(&tag->info->mutex);
+    return v;
+}
+
+int vj_tag_get_buffer_slow(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || !tag->info)
+        return 1;
+    pthread_mutex_lock(&tag->info->mutex);
+    int v = tag->info->slow;
+    pthread_mutex_unlock(&tag->info->mutex);
+    return v < 1 ? 1 : v;
+}
+
+int vj_tag_buffer_active(int t1)
+{
+    return vj_tag_get_buffer_length(t1) > 0;
+}
+
+int vj_tag_buffer_set_speed(int t1, int speed)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || !tag->info)
+        return 0;
+
+    if(speed > MAX_SPEED)
+        speed = MAX_SPEED;
+    else if(speed < -MAX_SPEED)
+        speed = -MAX_SPEED;
+
+    pthread_mutex_lock(&tag->info->mutex);
+    if(!tag->info->frame_buffer || tag->info->buffer_length <= 0) {
+        pthread_mutex_unlock(&tag->info->mutex);
+        return 0;
+    }
+
+    tag->info->mode = VJ_TAG_TRICKPLAY_BUFFER;
+    tag->info->speed = speed;
+    if(speed < 0)
+        tag->info->direction = -1;
+    else if(speed > 0)
+        tag->info->direction = 1;
+    tag->info->slow_count = 0;
+    if(tag->info->buffer_fill > 0)
+        tag->info->playhead = vj_tag_buffer_clampi(tag->info->playhead, 0, tag->info->buffer_fill - 1);
+    pthread_mutex_unlock(&tag->info->mutex);
+    return 1;
+}
+
+int vj_tag_buffer_play_forward(int t1)
+{
+    int speed = vj_tag_get_buffer_speed(t1);
+    if(speed < 0)
+        speed = -speed;
+    if(speed == 0)
+        speed = 1;
+    return vj_tag_buffer_set_speed(t1, speed);
+}
+
+int vj_tag_buffer_play_reverse(int t1)
+{
+    int speed = vj_tag_get_buffer_speed(t1);
+    if(speed > 0)
+        speed = -speed;
+    if(speed == 0)
+        speed = -1;
+    return vj_tag_buffer_set_speed(t1, speed);
+}
+
+int vj_tag_buffer_stop(int t1)
+{
+    return vj_tag_buffer_set_speed(t1, 0);
+}
+
+int vj_tag_buffer_set_slow(int t1, int slow)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || !tag->info)
+        return 0;
+    if(slow < 1)
+        slow = 1;
+    if(slow > 999)
+        slow = 999;
+    pthread_mutex_lock(&tag->info->mutex);
+    if(!tag->info->frame_buffer || tag->info->buffer_length <= 0) {
+        pthread_mutex_unlock(&tag->info->mutex);
+        return 0;
+    }
+    tag->info->slow = slow;
+    tag->info->slow_count = 0;
+    pthread_mutex_unlock(&tag->info->mutex);
+    return 1;
+}
+
+int vj_tag_buffer_goto(int t1, int frame)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || !tag->info)
+        return 0;
+    pthread_mutex_lock(&tag->info->mutex);
+    if(!tag->info->frame_buffer || tag->info->buffer_fill <= 0) {
+        pthread_mutex_unlock(&tag->info->mutex);
+        return 0;
+    }
+    tag->info->mode = VJ_TAG_TRICKPLAY_BUFFER;
+    tag->info->playhead = vj_tag_buffer_clampi(frame, 0, tag->info->buffer_fill - 1);
+    tag->info->slow_count = 0;
+    pthread_mutex_unlock(&tag->info->mutex);
+    return 1;
+}
+
+int vj_tag_buffer_skip(int t1, int frames)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || !tag->info)
+        return 0;
+    pthread_mutex_lock(&tag->info->mutex);
+    if(!tag->info->frame_buffer || tag->info->buffer_fill <= 0) {
+        pthread_mutex_unlock(&tag->info->mutex);
+        return 0;
+    }
+    tag->info->mode = VJ_TAG_TRICKPLAY_BUFFER;
+    tag->info->playhead = vj_tag_buffer_clampi(tag->info->playhead + frames, 0, tag->info->buffer_fill - 1);
+    tag->info->slow_count = 0;
+    pthread_mutex_unlock(&tag->info->mutex);
+    return 1;
+}
+
+int vj_tag_buffer_get_status(int t1, int *enabled, int *capacity, int *filled, int *position, int *speed, int *direction, int *mode, int *state)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag) {
+        if(state) *state = VJ_TAG_BUFFER_STATE_UNSUPPORTED;
+        return 0;
+    }
+    if(!tag->info) {
+        if(state) *state = vj_tag_buffer_supported_type(tag->source_type) ? VJ_TAG_BUFFER_STATE_OFF : VJ_TAG_BUFFER_STATE_UNSUPPORTED;
+        return 0;
+    }
+
+    pthread_mutex_lock(&tag->info->mutex);
+    if(_tag_info && _tag_info->uc && _tag_info->settings &&
+       _tag_info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG &&
+       _tag_info->uc->sample_id == tag->id &&
+       tag->info->buffer_fill > 0) {
+        long long cur = _tag_info->settings->current_frame_num;
+        if(cur < 0)
+            cur = 0;
+        if(cur > (long long)(tag->info->buffer_fill - 1))
+            cur = (long long)(tag->info->buffer_fill - 1);
+        tag->info->playhead = (int)cur;
+    }
+    if(enabled) *enabled = tag->info->frame_buffer ? 1 : 0;
+    if(capacity) *capacity = tag->info->buffer_length;
+    if(filled) *filled = tag->info->buffer_fill;
+    if(position) *position = tag->info->playhead;
+    if(speed) *speed = tag->info->speed;
+    if(direction) *direction = tag->info->direction;
+    if(mode) *mode = tag->info->mode;
+    if(state) *state = vj_tag_buffer_state_locked(tag);
+    pthread_mutex_unlock(&tag->info->mutex);
+    return 1;
+}
+
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int ty );
 int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, int w, int h, float fps);
 
@@ -792,11 +1287,17 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     tag->encoder_frames_recorded = 0;
     tag->encoder_frames_to_record = 0;
     tag->source = 0;
-    tag->fader_active = 0;
+    tag->fader_active = SAMPLE_FADER_OFF;
     tag->fader_val = 0.0;
     tag->fade_method = 0;
     tag->fade_alpha = 0;
     tag->fade_entry = -1;
+    tag->fade_kf = NULL;
+    tag->fade_kf_status = 0;
+    tag->fade_kf_type = 0;
+    tag->fade_kf_audio_mode = VJ_CHAIN_FADE_AUDIO_OFF;
+    tag->fade_kf_audio_source = VJ_CHAIN_FADE_AUDIO_LEVEL;
+    tag->fade_kf_audio_amount = 0;
     tag->fader_inc = 0.0;
     tag->fader_direction = 0;
     tag->selected_entry = 0;
@@ -810,6 +1311,9 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     tag->subrender = 1;
     tag->transition_length = 25;
     vj_cali_default_args(tag->genargs);
+    tag->info = vj_tag_info_new();
+    if(!tag->info)
+        goto TAG_NEW_FAILED;
 
     if(type == VJ_TAG_TYPE_AVFORMAT )
         tag->priv = avformat_thread_allocate(_tag_info->effect_frame1);
@@ -837,7 +1341,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
             break;
         case VJ_TAG_TYPE_MCAST:
         case VJ_TAG_TYPE_NET:
-            snprintf(tag->source_name,SOURCE_NAME_LEN, "%s:%d", filename, channel );
+            snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename );
             if( _vj_tag_new_net( tag,stream_nr, w,h,pix_fmt, filename, channel ,palette,type) != 1 ) {
                 goto TAG_NEW_FAILED;
             }
@@ -934,6 +1438,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
                     free(tag->source_name);
                     if(tag->method_filename) 
                         free(tag->method_filename);
+                    vj_tag_info_release(tag);
                     free(tag);
                     free(fx_chain);
                     return -1;
@@ -989,6 +1494,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
         } else {
             veejay_msg(VEEJAY_MSG_ERROR, "Failed to initialize generator");
             free(tag->source_name);
+            vj_tag_info_release(tag);
             free(tag);
             return -1;
         }
@@ -1069,6 +1575,8 @@ TAG_NEW_FAILED:
     tag_cache[id] = NULL;
 
     _recyle_id(id);
+
+    vj_tag_info_release(tag);
 
     free(fx_chain);
 
@@ -1250,6 +1758,11 @@ static int vj_tag_del_internal_ex(vj_tag *tag, int skip_cleanup, int recycle_id)
         }
     }
 
+    if(tag->fade_kf) {
+       vpf(tag->fade_kf);
+       tag->fade_kf = NULL;
+    }
+
     if(tag->main_fx) {
        free(tag->main_fx);
        tag->main_fx = NULL;
@@ -1259,6 +1772,8 @@ static int vj_tag_del_internal_ex(vj_tag *tag, int skip_cleanup, int recycle_id)
         vj_macro_free(tag->macro);
         tag->macro = NULL;
     }
+
+    vj_tag_info_release(tag);
 
     tag->id = 0;
 
@@ -1507,7 +2022,7 @@ int vj_tag_set_manual_fader(int t1, int value )
 {
   vj_tag *tag = vj_tag_get(t1);
   if(!tag) return -1;
-  tag->fader_active = 2;
+  tag->fader_active = SAMPLE_FADER_MANUAL;
   tag->fader_inc = 0.0;
   tag->fader_val = (float)value;
   if(tag->effect_toggle == 0) 
@@ -1524,7 +2039,7 @@ float vj_tag_get_fader_inc(int t1) {
 int vj_tag_reset_fader(int t1) {
   vj_tag *tag = vj_tag_get(t1);
   if(!tag) return -1;
-  tag->fader_active = 0;
+  tag->fader_active = SAMPLE_FADER_OFF;
   tag->fader_inc = 0.0;
   return 1;
 }
@@ -1573,7 +2088,7 @@ int vj_tag_set_fader_active(int t1, int nframes , int direction) {
   vj_tag *tag = vj_tag_get(t1);
   if(!tag) return -1;
   if(nframes <= 0) return -1;
-  tag->fader_active = 1;
+  tag->fader_active = SAMPLE_FADER_LINEAR;
   if(direction<0)
     tag->fader_val = 255.0f;
   else
@@ -1584,6 +2099,122 @@ int vj_tag_set_fader_active(int t1, int nframes , int direction) {
   if(tag->effect_toggle == 0 )
     tag->effect_toggle = 1;
   return 1;
+}
+
+static int vj_tag_chain_fade_clamp255(int v)
+{
+    if(v < 0) return 0;
+    if(v > 255) return 255;
+    return v;
+}
+
+void *vj_tag_chain_fade_alloc_kf(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag) return NULL;
+    if(!tag->fade_kf)
+        tag->fade_kf = vpn(VEVO_ANONYMOUS_PORT);
+    return tag->fade_kf;
+}
+
+void *vj_tag_get_chain_fade_kf_port(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag) return NULL;
+    return tag->fade_kf;
+}
+
+int vj_tag_chain_fade_set_kf_status(int t1, int status, int type)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag) return -1;
+
+    if(status) {
+        if(!tag->fade_kf)
+            tag->fade_kf = vpn(VEVO_ANONYMOUS_PORT);
+        tag->fade_kf_status = 1;
+        tag->fade_kf_type = type;
+        tag->fader_active = SAMPLE_FADER_CURVE;
+        tag->fader_inc = 0.0f;
+        if(tag->effect_toggle == 0)
+            tag->effect_toggle = 1;
+    } else {
+        tag->fade_kf_status = 0;
+        if(tag->fader_active == SAMPLE_FADER_CURVE)
+            tag->fader_active = SAMPLE_FADER_OFF;
+    }
+
+    return 1;
+}
+
+int vj_tag_chain_fade_get_kf_status(int t1, int *type)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag) return 0;
+    if(type) *type = tag->fade_kf_type;
+    return tag->fade_kf_status;
+}
+
+int vj_tag_chain_fade_clear_kf(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag) return -1;
+    if(tag->fade_kf) {
+        vpf(tag->fade_kf);
+        tag->fade_kf = NULL;
+    }
+    tag->fade_kf_status = 0;
+    tag->fade_kf_type = 0;
+    if(tag->fader_active == SAMPLE_FADER_CURVE)
+        tag->fader_active = SAMPLE_FADER_OFF;
+    return 1;
+}
+
+int vj_tag_chain_fade_get_value(int t1, long long n_frame, int *value)
+{
+    int tmp = 0;
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || !value || !tag->fade_kf || !tag->fade_kf_status)
+        return 0;
+    if(!get_keyframe_value(tag->fade_kf, n_frame, VJ_KF_PARAM_CHAIN_OPACITY, &tmp))
+        return 0;
+    *value = vj_tag_chain_fade_clamp255(tmp);
+    return 1;
+}
+
+unsigned char *vj_tag_chain_fade_get_kfs(int t1, int *len)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || !tag->fade_kf)
+        return NULL;
+    return keyframe_pack(tag->fade_kf, VJ_KF_PARAM_CHAIN_OPACITY, VJ_KF_ENTRY_CHAIN_FADE, len);
+}
+
+int vj_tag_chain_fade_audio(int t1, int mode, int source, int amount)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag) return -1;
+
+    if(mode < VJ_CHAIN_FADE_AUDIO_OFF || mode > VJ_CHAIN_FADE_AUDIO_GATE)
+        mode = VJ_CHAIN_FADE_AUDIO_OFF;
+    if(source < VJ_CHAIN_FADE_AUDIO_LEVEL || source > VJ_CHAIN_FADE_AUDIO_GATE_SRC)
+        source = VJ_CHAIN_FADE_AUDIO_LEVEL;
+    amount = vj_tag_chain_fade_clamp255(amount);
+
+    tag->fade_kf_audio_mode = mode;
+    tag->fade_kf_audio_source = source;
+    tag->fade_kf_audio_amount = amount;
+    return 1;
+}
+
+int vj_tag_chain_fade_audio_get(int t1, int *mode, int *source, int *amount)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag) return 0;
+    if(mode) *mode = tag->fade_kf_audio_mode;
+    if(source) *source = tag->fade_kf_audio_source;
+    if(amount) *amount = tag->fade_kf_audio_amount;
+    return 1;
 }
 
 static void vj_tag_close_encoder_resources(vj_tag *tag)
@@ -2057,7 +2688,9 @@ unsigned char *vj_tag_chain_get_kfs( int s1, int entry, int parameter_id, int *l
     return NULL;
    if ( entry < 0 || entry > SAMPLE_MAX_EFFECTS )
         return NULL;
-   if( parameter_id < 0 || parameter_id > 9 )
+   if(keyframe_is_chain_opacity_parameter(parameter_id))
+       return vj_tag_chain_fade_get_kfs(s1, len);
+   if( parameter_id < 0 || parameter_id > 99 )
     return NULL;
 
    unsigned char *data = keyframe_pack( tag->effect_chain[entry]->kf, parameter_id,entry, len );
@@ -2929,7 +3562,8 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 #endif
          break;
     case VJ_TAG_TYPE_CALI:
-        vj_cali_get_frame(tag, dst, tag->genargs);
+        if(!vj_cali_get_frame(tag, dst, tag->genargs))
+            return 0;
         break;
 #ifdef USE_GDK_PIXBUF
     case VJ_TAG_TYPE_PICTURE:
@@ -2951,17 +3585,20 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
     case VJ_TAG_TYPE_MCAST:
     case VJ_TAG_TYPE_NET:
         if(!net_thread_get_frame( tag,dst )) {
-        return 0; //failed to get frame
-    }
+            if(vj_tag_buffer_render_frame(tag, dst))
+                goto TAG_HAVE_FRAME;
+            return 0; //failed to get frame
+        }
         break;
     case VJ_TAG_TYPE_YUV4MPEG:
         res = vj_yuv_get_frame(vj_tag_input->stream[tag->index],buffer);
         if( res == -1 )
         {
+            if(vj_tag_buffer_render_frame(tag, dst))
+                goto TAG_HAVE_FRAME;
             vj_tag_set_active(t1,0);
             return -1;
         }
-        return 1;
         break;
 #ifdef SUPPORT_READ_DV2
     case VJ_TAG_TYPE_DV1394:
@@ -2980,6 +3617,8 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
             return 0; // not allowed to enter get_frame
         if(!avformat_thread_get_frame( tag,dst,_tag_info->real_fps )) //TODO: net and avformat seem to be the same, just like all other types. use a modular structure
         {
+            if(vj_tag_buffer_render_frame(tag, dst))
+                goto TAG_HAVE_FRAME;
             return 0; // failed to get frame
         }
         break;
@@ -3005,6 +3644,10 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
     }
 
 
+    vj_tag_buffer_capture_frame(tag, buffer, len, uv_len);
+    vj_tag_buffer_render_frame(tag, dst);
+
+TAG_HAVE_FRAME:
     vj_cali_process_frame(tag,buffer[0],buffer[1],buffer[2],width,height,uv_len,tag->genargs);
 
     return 1;
@@ -3252,6 +3895,9 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
     char *extra_data = NULL;
     int col[3] = {0,0,0};
     int fader_active=0, fader_val=0, fader_dir=0, fade_method=0,fade_alpha = 0,fade_entry = -1,opacity=0, nframes=0, loop_stat_stop=1;
+    int fade_kf_status = 0, fade_kf_type = 0, fade_kf_audio_mode = 0, fade_kf_audio_source = 0, fade_kf_audio_amount = 0;
+    void *fade_kf = NULL;
+    int stream_buffer_length = 0;
     xmlNodePtr fx[32];
     veejay_memset( fx, 0, sizeof(fx));
     int k = 0;
@@ -3294,14 +3940,31 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
             fade_method = get_xml_int(doc,cur);
         } else if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_ALPHA)) {
             fade_alpha = get_xml_int(doc,cur);
-        } else if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_METHOD)) {
+        } else if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_ENTRY)) {
             fade_entry = get_xml_int(doc,cur);
+        } else if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_KF_STATUS)) {
+            fade_kf_status = get_xml_int(doc,cur) ? 1 : 0;
+        } else if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_KF_TYPE)) {
+            fade_kf_type = get_xml_int(doc,cur);
+        } else if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_KF_AUDIO_MODE)) {
+            fade_kf_audio_mode = get_xml_int(doc,cur);
+        } else if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_KF_AUDIO_SOURCE)) {
+            fade_kf_audio_source = get_xml_int(doc,cur);
+        } else if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_KF_AUDIO_AMOUNT)) {
+            fade_kf_audio_amount = vj_tag_chain_fade_clamp255(get_xml_int(doc,cur));
+        } else if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_KF_ANIM)) {
+            if(!fade_kf)
+                fade_kf = vpn(VEVO_ANONYMOUS_PORT);
+            if(fade_kf)
+                tagParseKeys(doc, cur->xmlChildrenNode, fade_kf);
         } else if (!xmlStrcmp(cur->name,(const xmlChar*) XMLTAG_FADER_DIRECTION)) {
             fader_dir = get_xml_int(doc,cur);
         } else if (!xmlStrcmp(cur->name,(const xmlChar*) "opacity" ) ) {
             opacity = get_xml_int(doc,cur);
         } else if (!xmlStrcmp(cur->name,(const xmlChar*) "nframes" ) ) {
             nframes = get_xml_int(doc,cur);
+        } else if (!xmlStrcmp(cur->name,(const xmlChar*) "stream_buffer_length" ) ) {
+            stream_buffer_length = get_xml_int(doc,cur);
         } else if (!xmlStrcmp(cur->name, (const xmlChar*) "SUBTITLES" )) {
             subs = cur->xmlChildrenNode;
         } else if (!xmlStrcmp(cur->name, (const xmlChar*) "calibration" )) {
@@ -3383,6 +4046,15 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
             tag->fade_method = fade_method;
             tag->fade_alpha = fade_alpha;
             tag->fade_entry = fade_entry;
+            tag->fade_kf = fade_kf;
+            fade_kf = NULL;
+            tag->fade_kf_status = fade_kf_status;
+            tag->fade_kf_type = fade_kf_type;
+            tag->fade_kf_audio_mode = fade_kf_audio_mode;
+            tag->fade_kf_audio_source = fade_kf_audio_source;
+            tag->fade_kf_audio_amount = fade_kf_audio_amount;
+            if(tag->fade_kf_status)
+                tag->fader_active = SAMPLE_FADER_CURVE;
             tag->fader_direction = fader_dir;
             tag->opacity = opacity;
             tag->nframes = nframes;
@@ -3393,6 +4065,8 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
             tag->transition_active = transition_active;
             tag->transition_shape = transition_shape;
             tag->transition_length = transition_length;
+            if(stream_buffer_length > 0)
+                vj_tag_set_buffer_length(n_id, stream_buffer_length);
 
             switch( source_type )
             {
@@ -3532,7 +4206,26 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp)
     put_xml_int( node, "blue", tag->color_b );
 
     put_xml_int( node, "nframes", tag->n_frames );
+    if(vj_tag_get_buffer_length(tag->id) > 0)
+        put_xml_int( node, "stream_buffer_length", vj_tag_get_buffer_length(tag->id) );
     put_xml_int( node, "opacity", tag->opacity );
+    put_xml_int( node, XMLTAG_FADER_ACTIVE, tag->fader_active );
+    put_xml_int( node, XMLTAG_FADE_METHOD, tag->fade_method );
+    put_xml_int( node, XMLTAG_FADE_ALPHA, tag->fade_alpha );
+    put_xml_int( node, XMLTAG_FADE_ENTRY, tag->fade_entry );
+    put_xml_int( node, XMLTAG_FADER_INC, tag->fader_inc );
+    put_xml_int( node, XMLTAG_FADER_VAL, tag->fader_val );
+    put_xml_int( node, XMLTAG_FADER_DIRECTION, tag->fader_direction );
+    put_xml_int( node, XMLTAG_FADE_KF_STATUS, tag->fade_kf_status );
+    put_xml_int( node, XMLTAG_FADE_KF_TYPE, tag->fade_kf_type );
+    put_xml_int( node, XMLTAG_FADE_KF_AUDIO_MODE, tag->fade_kf_audio_mode );
+    put_xml_int( node, XMLTAG_FADE_KF_AUDIO_SOURCE, tag->fade_kf_audio_source );
+    put_xml_int( node, XMLTAG_FADE_KF_AUDIO_AMOUNT, tag->fade_kf_audio_amount );
+    if(tag->fade_kf) {
+        xmlNodePtr fade_anim = xmlNewChild(node, NULL, (const xmlChar*) XMLTAG_FADE_KF_ANIM, NULL);
+        xmlNodePtr fade_key = xmlNewChild(fade_anim, NULL, (const xmlChar*) "KEYFRAMES", NULL);
+        keyframe_xml_pack(fade_key, tag->fade_kf, VJ_KF_PARAM_CHAIN_OPACITY);
+    }
 
     put_xml_int( node, XMLTAG_TRANSITION_SHAPE, tag->transition_shape);
     put_xml_int( node, XMLTAG_TRANSITION_ACTIVE, tag->transition_active);
@@ -3550,7 +4243,10 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp)
        tag->source_type == VJ_TAG_TYPE_VLOOPBACK ||
        tag->source_type == VJ_TAG_TYPE_NET ||
        tag->source_type == VJ_TAG_TYPE_MCAST ||
-       tag->source_type == VJ_TAG_TYPE_AVFORMAT) {
+       tag->source_type == VJ_TAG_TYPE_AVFORMAT ||
+       tag->source_type == VJ_TAG_TYPE_YUV4MPEG ||
+       tag->source_type == VJ_TAG_TYPE_DV1394 ||
+       tag->source_type == VJ_TAG_TYPE_PICTURE) {
         int *genargs = tag->genargs;
         char out_buf[1024];
         snprintf(out_buf, sizeof(out_buf),

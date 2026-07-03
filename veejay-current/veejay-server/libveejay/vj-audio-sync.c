@@ -2202,6 +2202,7 @@ void vj_audio_sync_free(vj_audio_sync_shared_t *s)
     s->bridge_target_bpm_latched = 0.0;
     s->bridge_bpm_latch_valid = 0;
     sync_store_i(&s->wav_limit_ms, 0);
+    sync_store_i(&s->wav_start_ms, 0);
     sync_store_i(&s->wav_plain_lock_valid, 0);
     sync_store_i(&s->wav_plain_lock_delta_frames, 0);
     sync_store_i(&s->wav_plain_lock_confidence_pct, 0);
@@ -2978,6 +2979,10 @@ static int sync_configure_jack(vj_audio_sync_shared_t *s)
     return 1;
 }
 
+#ifndef VJ_AUDIO_SYNC_WAV_LOOP_XFADE_FRAMES
+#define VJ_AUDIO_SYNC_WAV_LOOP_XFADE_FRAMES 256
+#endif
+
 typedef struct
 {
     FILE *fp;
@@ -2985,9 +2990,15 @@ typedef struct
     int bits;
     int sample_rate;
     int frame_bytes;
-    long data_start;
-    long data_bytes;
-    long data_pos;
+    long long data_start;
+    long long data_bytes;
+    long long data_pos;
+    long long total_frames;
+    int have_last_sample;
+    int last_sample[2];
+    int loop_fade_from[2];
+    int loop_fade_remaining;
+    int loop_fade_total;
 } sync_wav_t;
 
 static uint32_t wav_u32le(const uint8_t b[4])
@@ -3036,13 +3047,13 @@ static int sync_wav_open(sync_wav_t *w, const char *path)
     while(!got_data) {
         uint8_t chdr[8];
         uint32_t sz;
-        long next;
+        long long next;
 
         if(fread(chdr, 1, sizeof(chdr), w->fp) != sizeof(chdr))
             break;
 
         sz = wav_u32le(chdr + 4);
-        next = ftell(w->fp) + (long)sz + (long)(sz & 1U);
+        next = (long long)ftell(w->fp) + (long long)sz + (long long)(sz & 1U);
 
         if(memcmp(chdr, "fmt ", 4) == 0) {
             uint8_t fmt[40];
@@ -3060,13 +3071,13 @@ static int sync_wav_open(sync_wav_t *w, const char *path)
         else if(memcmp(chdr, "data", 4) == 0) {
             if(!got_fmt)
                 goto fail;
-            w->data_start = ftell(w->fp);
-            w->data_bytes = (long)sz;
+            w->data_start = (long long)ftell(w->fp);
+            w->data_bytes = (long long)sz;
             w->data_pos = 0;
             got_data = 1;
         }
 
-        if(fseek(w->fp, next, SEEK_SET) != 0)
+        if(fseek(w->fp, (long)next, SEEK_SET) != 0)
             break;
     }
 
@@ -3080,7 +3091,8 @@ static int sync_wav_open(sync_wav_t *w, const char *path)
     w->bits = bits;
     w->sample_rate = (int)sample_rate;
     w->frame_bytes = (bits / 8) * channels;
-    fseek(w->fp, w->data_start, SEEK_SET);
+    w->total_frames = (w->frame_bytes > 0) ? (w->data_bytes / (long long)w->frame_bytes) : 0;
+    fseek(w->fp, (long)w->data_start, SEEK_SET);
     return 1;
 
 fail:
@@ -3103,6 +3115,55 @@ static int sync_wav_limit_get(vj_audio_sync_shared_t *s)
     return s ? sync_load_i(&s->wav_limit_ms) : 0;
 }
 
+static void sync_wav_start_ms_set(vj_audio_sync_shared_t *s, long start_ms)
+{
+    if(!s)
+        return;
+    if(start_ms < 0)
+        start_ms = 0;
+    if(start_ms > 2147483647L)
+        start_ms = 2147483647L;
+    sync_store_i(&s->wav_start_ms, (int)start_ms);
+}
+
+static long sync_wav_start_ms_get(vj_audio_sync_shared_t *s)
+{
+    return s ? (long)sync_load_i(&s->wav_start_ms) : 0L;
+}
+
+static int sync_wav_seek_ms(sync_wav_t *w, long start_ms)
+{
+    long long start_frame;
+    long long offset;
+
+    if(!w || !w->fp || w->sample_rate <= 0 || w->frame_bytes <= 0)
+        return 0;
+
+    if(start_ms < 0)
+        start_ms = 0;
+
+    start_frame = ((long long)start_ms * (long long)w->sample_rate) / 1000LL;
+    if(start_frame < 0)
+        start_frame = 0;
+    if(w->total_frames > 0 && start_frame >= w->total_frames)
+        start_frame = w->total_frames - 1;
+    if(start_frame < 0)
+        start_frame = 0;
+
+    offset = start_frame * (long long)w->frame_bytes;
+    if(offset < 0)
+        offset = 0;
+    if(offset > w->data_bytes)
+        offset = w->data_bytes;
+    offset -= offset % (long long)w->frame_bytes;
+
+    if(fseek(w->fp, (long)(w->data_start + offset), SEEK_SET) != 0)
+        return 0;
+
+    w->data_pos = offset;
+    return 1;
+}
+
 static void sync_wav_plain_lock_clear(vj_audio_sync_shared_t *s)
 {
     if(!s)
@@ -3110,6 +3171,105 @@ static void sync_wav_plain_lock_clear(vj_audio_sync_shared_t *s)
     sync_store_i(&s->wav_plain_lock_valid, 0);
     sync_store_i(&s->wav_plain_lock_delta_frames, 0);
     sync_store_i(&s->wav_plain_lock_confidence_pct, 0);
+}
+
+static inline int sync_wav_sample_read(const uint8_t *p, int bits)
+{
+    if(bits == 8)
+        return (((int)p[0]) - 128) << 8;
+
+    return (int16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
+}
+
+static inline void sync_wav_sample_write(uint8_t *p, int bits, int v)
+{
+    if(v < -32768)
+        v = -32768;
+    else if(v > 32767)
+        v = 32767;
+
+    if(bits == 8) {
+        int u = (v >> 8) + 128;
+        if(u < 0)
+            u = 0;
+        else if(u > 255)
+            u = 255;
+        p[0] = (uint8_t)u;
+        return;
+    }
+
+    p[0] = (uint8_t)(v & 0xff);
+    p[1] = (uint8_t)((v >> 8) & 0xff);
+}
+
+static void sync_wav_remember_last_sample(sync_wav_t *w, const uint8_t *src, int bytes)
+{
+    const uint8_t *last;
+    int ch;
+    int bytes_per_sample;
+
+    if(!w || !src || bytes < w->frame_bytes || w->channels <= 0 || w->channels > 2)
+        return;
+
+    bytes_per_sample = w->bits / 8;
+    last = src + bytes - w->frame_bytes;
+
+    for(ch = 0; ch < w->channels; ch++)
+        w->last_sample[ch] = sync_wav_sample_read(last + (ch * bytes_per_sample), w->bits);
+
+    if(w->channels == 1)
+        w->last_sample[1] = w->last_sample[0];
+
+    w->have_last_sample = 1;
+}
+
+static void sync_wav_begin_loop_fade(sync_wav_t *w)
+{
+    int n;
+
+    if(!w || !w->have_last_sample || w->channels <= 0 || w->channels > 2)
+        return;
+
+    n = VJ_AUDIO_SYNC_WAV_LOOP_XFADE_FRAMES;
+    if(w->total_frames > 0 && (long long)n > w->total_frames)
+        n = (int)w->total_frames;
+    if(n <= 1)
+        return;
+
+    w->loop_fade_from[0] = w->last_sample[0];
+    w->loop_fade_from[1] = w->last_sample[1];
+    w->loop_fade_remaining = n;
+    w->loop_fade_total = n;
+}
+
+static void sync_wav_apply_loop_fade(sync_wav_t *w, uint8_t *dst, int bytes)
+{
+    int frames;
+    int frame;
+    int ch;
+    int bytes_per_sample;
+
+    if(!w || !dst || bytes <= 0 || w->loop_fade_remaining <= 0 || w->loop_fade_total <= 1)
+        return;
+    if(w->channels <= 0 || w->channels > 2 || w->frame_bytes <= 0)
+        return;
+
+    frames = bytes / w->frame_bytes;
+    bytes_per_sample = w->bits / 8;
+
+    for(frame = 0; frame < frames && w->loop_fade_remaining > 0; frame++, w->loop_fade_remaining--) {
+        int from_weight = w->loop_fade_remaining;
+        int to_weight = w->loop_fade_total - from_weight;
+        uint8_t *fp = dst + (frame * w->frame_bytes);
+
+        for(ch = 0; ch < w->channels; ch++) {
+            uint8_t *sp = fp + (ch * bytes_per_sample);
+            int cur = sync_wav_sample_read(sp, w->bits);
+            int from = w->loop_fade_from[ch];
+            int mixed = ((from * from_weight) + (cur * to_weight)) / w->loop_fade_total;
+            sync_wav_sample_write(sp, w->bits, mixed);
+        }
+    }
 }
 
 static int sync_wav_read(sync_wav_t *w, uint8_t *dst, int max_bytes, int loop)
@@ -3124,20 +3284,21 @@ static int sync_wav_read(sync_wav_t *w, uint8_t *dst, int max_bytes, int loop)
         return 0;
 
     while(done < max_bytes) {
-        long left = w->data_bytes - w->data_pos;
+        long long left = w->data_bytes - w->data_pos;
         int want;
         int got;
 
         if(left <= 0) {
             if(!loop)
                 break;
+            sync_wav_begin_loop_fade(w);
             w->data_pos = 0;
-            fseek(w->fp, w->data_start, SEEK_SET);
+            fseek(w->fp, (long)w->data_start, SEEK_SET);
             left = w->data_bytes;
         }
 
         want = max_bytes - done;
-        if((long)want > left)
+        if((long long)want > left)
             want = (int)left;
         want -= want % w->frame_bytes;
         if(want <= 0)
@@ -3147,6 +3308,10 @@ static int sync_wav_read(sync_wav_t *w, uint8_t *dst, int max_bytes, int loop)
         if(got <= 0)
             break;
         got -= got % w->frame_bytes;
+        if(got <= 0)
+            break;
+        sync_wav_apply_loop_fade(w, dst + done, got);
+        sync_wav_remember_last_sample(w, dst + done, got);
 
         done += got;
         w->data_pos += got;
@@ -4397,7 +4562,16 @@ void *vj_audio_sync_thread(void *arg)
                                path);
                     sync_store_i(&s->open, 0);
                     sync_sleep_us(1000000);
-                    last_file_generation = gen;
+                    continue;
+                }
+                if(!sync_wav_seek_ms(&wav, sync_wav_start_ms_get(s))) {
+                    veejay_msg(VEEJAY_MSG_WARNING,
+                               "[AUDIO-SYNC] unable to seek WAV source '%s' to %ldms",
+                               path,
+                               sync_wav_start_ms_get(s));
+                    sync_wav_close(&wav);
+                    sync_store_i(&s->open, 0);
+                    sync_sleep_us(1000000);
                     continue;
                 }
                 last_file_generation = gen;
@@ -4406,10 +4580,19 @@ void *vj_audio_sync_thread(void *arg)
                 wav_read_frames_total = 0;
                 if(last_wav_limit_ms > 0 && wav.sample_rate > 0)
                     wav_limit_frames = ((long long)wav.sample_rate * (long long)last_wav_limit_ms) / 1000LL;
-                sync_prepare_ring(s, wav.channels, wav.bits, wav.sample_rate);
+                if(!sync_prepare_ring(s, wav.channels, wav.bits, wav.sample_rate)) {
+                    veejay_msg(VEEJAY_MSG_ERROR,
+                               "[AUDIO-SYNC] unable to allocate WAV ring for '%s'",
+                               path);
+                    sync_wav_close(&wav);
+                    sync_store_i(&s->open, 0);
+                    sync_sleep_us(1000000);
+                    continue;
+                }
                 veejay_msg(VEEJAY_MSG_INFO,
-                           "[AUDIO-SYNC] WAV source ready: '%s' %dch %dHz %dbit",
-                           path, wav.channels, wav.sample_rate, wav.bits);
+                           "[AUDIO-SYNC] WAV source ready: '%s' %dch %dHz %dbit start=%ldms",
+                           path, wav.channels, wav.sample_rate, wav.bits,
+                           sync_wav_start_ms_get(s));
             }
 
             ch = wav.channels;
@@ -4439,7 +4622,7 @@ void *vj_audio_sync_thread(void *arg)
 
                 if(remaining_frames <= 0) {
                     sync_store_i(&s->open, 0);
-                    sync_store_i(&s->enabled, 0);
+                    sync_sleep_us(20000);
                     continue;
                 }
 
@@ -4450,7 +4633,7 @@ void *vj_audio_sync_thread(void *arg)
             got = sync_wav_read(&wav, buffer, target_bytes, sync_load_i(&s->wav_loop));
             if(got <= 0) {
                 sync_store_i(&s->open, 0);
-                sync_store_i(&s->enabled, 0);
+                sync_sleep_us(20000);
                 continue;
             }
 
@@ -4762,6 +4945,12 @@ int vj_audio_sync_push_audio(vj_audio_sync_shared_t *s,
     return frames;
 }
 
+int vj_audio_sync_set_source_wav_limited_at(vj_audio_sync_shared_t *s,
+                                            const char *path,
+                                            int loop,
+                                            int limit_ms,
+                                            long start_ms);
+
 int vj_audio_sync_set_source_wav_limited(vj_audio_sync_shared_t *s,
                                          const char *path,
                                          int loop,
@@ -4769,7 +4958,7 @@ int vj_audio_sync_set_source_wav_limited(vj_audio_sync_shared_t *s,
 
 int vj_audio_sync_set_source_wav(vj_audio_sync_shared_t *s, const char *path, int loop)
 {
-    return vj_audio_sync_set_source_wav_limited(s, path, loop, 0);
+    return vj_audio_sync_set_source_wav_limited_at(s, path, loop, 0, 0);
 }
 
 int vj_audio_sync_set_source_wav_limited(vj_audio_sync_shared_t *s,
@@ -4777,10 +4966,20 @@ int vj_audio_sync_set_source_wav_limited(vj_audio_sync_shared_t *s,
                                          int loop,
                                          int limit_ms)
 {
+    return vj_audio_sync_set_source_wav_limited_at(s, path, loop, limit_ms, 0);
+}
+
+int vj_audio_sync_set_source_wav_limited_at(vj_audio_sync_shared_t *s,
+                                            const char *path,
+                                            int loop,
+                                            int limit_ms,
+                                            long start_ms)
+{
     if(!s || !path || !path[0])
         return 0;
 
     sync_wav_limit_set(s, loop ? 0 : limit_ms);
+    sync_wav_start_ms_set(s, start_ms);
     sync_wav_plain_lock_clear(s);
 
     sync_lock(s);

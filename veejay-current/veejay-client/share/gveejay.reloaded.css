@@ -254,8 +254,7 @@ notebook header.top tabs tab:hover label {
 
 
 .sample_slot, 
-.sequencer_slot, 
-.quickselect_slot {
+.sequencer_slot {
     border-width: 1px;
     border-style: solid;
     border-color: @border-color;
@@ -269,8 +268,7 @@ notebook header.top tabs tab:hover label {
     background-color: @slot-playing-bg;
 }
 
-.sequencer_slot.active,
-.quickselect_slot.active {
+.sequencer_slot.active {
     border-color: @slot-playing-color;
     border-width: 3px;
     border-style: solid;
@@ -299,8 +297,7 @@ frame.sample_slot.active.selected > border,
 }
 
 .sample_slot:hover, 
-.sequencer_slot:hover, 
-.quickselect_slot:hover {
+.sequencer_slot:hover {
     background-color: @select-color;
 }
 /* 1. Make the main container transparent so it doesn't draw a big box */
@@ -439,12 +436,6 @@ frame.sequencer_slot.sequence-playing > border {
     background-color: @slot-playing-bg;
 }
 
-#frame316,
-#frame318 {
-    padding: 0;
-    margin: 0;
-    border-width: 0;
-}
 
 .sequencer-slot-label {
     font-size: 145%;
@@ -739,3 +730,331 @@ progressbar.fx-auto-level trough progress {
 #slider_p0.fx-auto-envelope value, #slider_p1.fx-auto-envelope value, #slider_p2.fx-auto-envelope value, #slider_p3.fx-auto-envelope value, #slider_p4.fx-auto-envelope value, #slider_p5.fx-auto-envelope value, #slider_p6.fx-auto-envelope value, #slider_p7.fx-auto-envelope value, #slider_p8.fx-auto-envelope value, #slider_p9.fx-auto-envelope value, #slider_p10.fx-auto-envelope value, #slider_p11.fx-auto-envelope value, #slider_p12.fx-auto-envelope value { color: @autofx-envelope; }
 #slider_p0.fx-auto-level value, #slider_p1.fx-auto-level value, #slider_p2.fx-auto-level value, #slider_p3.fx-auto-level value, #slider_p4.fx-auto-level value, #slider_p5.fx-auto-level value, #slider_p6.fx-auto-level value, #slider_p7.fx-auto-level value, #slider_p8.fx-auto-level value, #slider_p9.fx-auto-level value, #slider_p10.fx-auto-level value, #slider_p11.fx-auto-level value, #slider_p12.fx-auto-level value { color: @autofx-level; }
 
+/* Tighten the main deck half without changing the global panel/theme spacing. */
+.compact-deck {
+    padding: 0;
+    margin: 0;
+}
+
+.compact-deck frame,
+.compact-deck frame > border {
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+}
+
+
+/* Status strip: keep the bottom bar compact. */
+.status-strip {
+    padding: 0;
+    margin: 0;
+    min-height: 0;
+}
+
+.status-strip *,
+.status-strip label,
+.status-strip statusbar,
+.status-strip statusbar box,
+.status-strip statusbar frame,
+.status-strip statusbar frame > border {
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    min-height: 0;
+}
+
+.status-strip label,
+#statusbar {
+    color: @text-muted;
+    padding-left: 2px;
+    padding-right: 2px;
+}
+
+.status-strip statusbar,
+.status-strip statusbar box,
+.status-strip statusbar frame,
+.status-strip statusbar frame > border {
+    padding-left: 0;
+    padding-right: 0;
+    margin-left: 0;
+    margin-right: 0;
+    border-width: 0;
+}
+
+#statusbar,
+#label_hostnamex,
+#label_portx,
+#cpumeter {
+    min-height: 0;
+}
+
+#cpumeter {
+    min-width: 100px;
+}
+
+
+.samplebank-strip {
+    padding: 0;
+    margin: 0;
+    min-height: 18px;
+    background-color: @bg-color;
+}
+
+.samplebank-page-status {
+    color: @text-muted;
+    padding: 0 2px;
+    margin: 0;
+    min-height: 14px;
+    font-size: 90%;
+}
+
+.samplebank-view-host,
+.samplebank-view {
+    padding: 0;
+    margin: 0;
+    background-color: @bg-color;
+}
+
+.offline-recorder-gadget {
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+    border-width: 0;
+    min-height: 16px;
+}
+
+.offline-recorder-gadget button,
+.offline-recorder-gadget spinbutton,
+.offline-recorder-gadget checkbutton {
+    min-height: 16px;
+    min-width: 16px;
+    padding: 0 1px;
+    margin: 0;
+    border-width: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.offline-recorder-gadget button {
+    background-color: transparent;
+}
+
+.offline-recorder-gadget image,
+.offline-recorder-gadget button image {
+    padding: 0;
+    margin: 0;
+}
+
+.offline-recorder-gadget checkbutton check {
+    min-width: 10px;
+    min-height: 10px;
+    margin: 0;
+}
+
+/* Sample-bank footer: keep the offline recorder as a flat compact gadget. */
+#samplebank_footer {
+    padding: 0;
+    margin: 0;
+    min-height: 18px;
+}
+
+#offlinebox,
+.offline-recorder-gadget {
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+    background-color: transparent;
+    min-height: 14px;
+}
+
+#spin_offlineduration1,
+#offlinebox spinbutton {
+    min-height: 16px;
+    min-width: 48px;
+    padding: 0 1px;
+    margin: 0;
+    border-width: 0;
+    background-color: @panel-color;
+}
+
+#offlinebox spinbutton entry,
+#spin_offlineduration1 entry {
+    min-height: 14px;
+    min-width: 34px;
+    padding: 0 1px;
+    margin: 0;
+    border-width: 0;
+}
+
+#offlinebox spinbutton button,
+#spin_offlineduration1 button {
+    min-height: 14px;
+    min-width: 12px;
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+    background-color: transparent;
+    box-shadow: none;
+}
+
+#button_offline_start,
+#button_offline_stop,
+#button_offline_autoplay1,
+#offlinebox button,
+#offlinebox checkbutton {
+    min-height: 14px;
+    min-width: 14px;
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+    border-radius: 0;
+    background-color: transparent;
+    box-shadow: none;
+}
+
+#button_offline_start:disabled,
+#button_offline_stop:disabled,
+#button_offline_autoplay1:disabled,
+#offlinebox button:disabled,
+#offlinebox checkbutton:disabled {
+    border-width: 0;
+    background-color: transparent;
+    box-shadow: none;
+}
+
+#button_offline_autoplay1 check,
+#offlinebox checkbutton check {
+    min-width: 9px;
+    min-height: 9px;
+    padding: 0;
+    margin: 0;
+}
+
+.offline-rec-icon {
+    color: @record-color;
+    padding: 0;
+    margin: 0;
+    font-weight: bold;
+    font-size: 90%;
+}
+
+.offline-rec-icon:disabled {
+    color: @record-color;
+}
+
+/* Offline recorder: direct classes avoid GtkBuilder id/name selector mismatch. */
+.samplebank-strip {
+    min-height: 16px;
+    padding: 0;
+    margin: 0;
+}
+
+.offline-recorder-gadget {
+    min-height: 16px;
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+    background-color: transparent;
+    box-shadow: none;
+}
+
+.offline-recorder-duration,
+.offline-recorder-button,
+.offline-recorder-autoplay {
+    min-height: 0;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+    border-radius: 0;
+    background-color: transparent;
+    box-shadow: none;
+}
+
+spinbutton.offline-recorder-duration {
+    min-height: 16px;
+    min-width: 48px;
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+    background-color: @panel-color;
+}
+
+spinbutton.offline-recorder-duration entry {
+    min-height: 14px;
+    min-width: 34px;
+    padding: 0 1px;
+    margin: 0;
+    border-width: 0;
+}
+
+spinbutton.offline-recorder-duration button,
+spinbutton.offline-recorder-duration button:disabled {
+    min-height: 14px;
+    min-width: 12px;
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+    background-color: transparent;
+    box-shadow: none;
+}
+
+button.offline-recorder-button,
+button.offline-recorder-button:disabled {
+    min-height: 14px;
+    min-width: 14px;
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+    border-radius: 0;
+    background-color: transparent;
+    box-shadow: none;
+}
+
+button.offline-recorder-button label,
+button.offline-recorder-button label:disabled {
+    padding: 0;
+    margin: 0;
+    min-height: 0;
+    min-width: 0;
+    background-color: transparent;
+}
+
+checkbutton.offline-recorder-autoplay,
+checkbutton.offline-recorder-autoplay:disabled {
+    min-height: 14px;
+    min-width: 14px;
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+    background-color: transparent;
+    box-shadow: none;
+}
+
+checkbutton.offline-recorder-autoplay check,
+checkbutton.offline-recorder-autoplay check:disabled {
+    min-width: 9px;
+    min-height: 9px;
+    padding: 0;
+    margin: 0;
+    border-width: 1px;
+}
+
+/* Sample bank: edge-to-edge drawing area. The custom widget handles only inter-cell gaps. */
+#vjdeck,
+#vjdeck > stack,
+#vjdeck stack,
+#vbox483,
+#vbox499,
+#hbox848,
+#sample_bank_hbox {
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+}
+
+#sample_bank_hbox {
+    min-width: 0;
+    min-height: 0;
+}

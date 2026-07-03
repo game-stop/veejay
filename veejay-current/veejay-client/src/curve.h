@@ -18,6 +18,7 @@ int set_points_in_curve_ext(GtkWidget *curve,unsigned char *blob, int blen,int i
 void set_points_in_curve( Gtk3CurveType type, GtkWidget *curve);
 void reset_curve( GtkWidget *curve );
 void get_points_from_curve( GtkWidget *curve, int len, float *v );
+void curve_param_minmax(int fx_id, int parameter_id, int *min, int *max);
 void set_initial_curve( GtkWidget *curve, int fx_id, int parameter_id, int start, int end, int value, double fps );
 void curve_set_position ( GtkWidget *curve, double pos);
 void curve_set_predefined_shape( GtkWidget *curve, int fx_id, int parameter_id, int start, int end,

@@ -182,6 +182,10 @@
 #define VJ_WAV_PLAIN_LOCK_START_WINDOW_MS 250
 #endif
 
+#ifndef VJ_SAMPLE_AUDIO_SYNC_START_HARDCUT_PREROLL_FRAMES
+#define VJ_SAMPLE_AUDIO_SYNC_START_HARDCUT_PREROLL_FRAMES 2
+#endif
+
 #ifndef VJ_AUDIO_PRODUCER_QUEUE_LOW_WATER_FRACTION
 #define VJ_AUDIO_PRODUCER_QUEUE_LOW_WATER_FRACTION 0.35
 #endif
@@ -718,6 +722,28 @@ static void veejay_seek(veejay_t *info, int speed, int max_sfd)
 
 
 #ifdef HAVE_JACK
+static int veejay_audio_sync_activate_sample_profile(veejay_t *info, int sample_id, long current_frame, int force);
+static int veejay_audio_sync_current_sample_profile_mode(veejay_t *info, int *sample_id, int *source, int *profile);
+int veejay_audio_sync_set_external_jack(veejay_t *info, int mode, int channels);
+
+static int veejay_sample_audio_sync_mode_to_vj_mode(int mode)
+{
+    switch(mode) {
+        case SAMPLE_AUDIO_SYNC_LIVE_EXTERNAL:      return VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL;
+        case SAMPLE_AUDIO_SYNC_MONITOR:            return VJ_AUDIO_SYNC_MODE_MONITOR;
+        case SAMPLE_AUDIO_SYNC_MONITOR_TRICKPLAY:  return VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY;
+        case SAMPLE_AUDIO_SYNC_TEMPO_FOLLOW:       return VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW;
+        case SAMPLE_AUDIO_SYNC_TEMPO_BRIDGE:       return VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE;
+        case SAMPLE_AUDIO_SYNC_TRACK_ALIGN:        return VJ_AUDIO_SYNC_MODE_TRACK_ALIGN;
+        case SAMPLE_AUDIO_SYNC_QUEUE:
+        default:                                   return VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY;
+    }
+}
+
+static int veejay_sample_audio_sync_mode_is_track_align(int mode)
+{
+    return mode == SAMPLE_AUDIO_SYNC_TRACK_ALIGN;
+}
 static int veejay_track_align_current_clip_active(veejay_t *info)
 {
     video_playback_setup *settings;
@@ -1287,6 +1313,20 @@ int veejay_set_framedup(veejay_t *info, int n)
             }
             break;
 
+        case VJ_PLAYBACK_MODE_TAG:
+            if(!vj_tag_buffer_active(info->uc->sample_id))
+                return -1;
+
+            cur_sfd = vj_tag_get_buffer_slow(info->uc->sample_id);
+            old_sfd_for_align = cur_sfd;
+            vj_tag_buffer_set_slow(info->uc->sample_id, n);
+            info->sfd = n;
+            settings->sfd = n;
+            atomic_store_int(&settings->audio_slice, 0);
+            atomic_store_int(&settings->audio_slice_len, n);
+            settings->audio_last_stretched_samples = 0;
+            break;
+
         default:
             return -1;
     }
@@ -1365,8 +1405,19 @@ int veejay_set_speed(veejay_t *info, int speed, int force_seek)
             break;
 
         case VJ_PLAYBACK_MODE_TAG:
-            settings->current_playback_speed = (speed == 0) ? 0 : 1;
-            max_sfd = 1;
+            if(vj_tag_buffer_active(info->uc->sample_id)) {
+                int len = vj_tag_get_buffer_duration(info->uc->sample_id);
+                if(len <= 0)
+                    len = 1;
+                if(abs(speed) > len)
+                    speed = (speed < 0) ? -len : len;
+                settings->current_playback_speed = speed;
+                vj_tag_buffer_set_speed(info->uc->sample_id, speed);
+                max_sfd = vj_tag_get_buffer_slow(info->uc->sample_id);
+            } else {
+                settings->current_playback_speed = (speed == 0) ? 0 : 1;
+                max_sfd = 1;
+            }
             break;
 
         default:
@@ -1497,6 +1548,10 @@ static void veejay_sample_resume_at(veejay_t *info, int cur_id)
     }
 
     veejay_set_frame(info, pos);
+
+#ifdef HAVE_JACK
+    vj_perform_audio_sync_sample_seek_rearm(info, cur_id, pos, "sample-activate");
+#endif
 
     veejay_msg(
         VEEJAY_MSG_DEBUG,
@@ -2170,9 +2225,16 @@ static int veejay_start_playing_stream(veejay_t *info, int stream_id)
     settings->sequence_random_id = 0;
     settings->sequence_random_ticks_left = 0;
 
+    int buffered_duration = vj_tag_get_buffer_duration(stream_id);
+    int transport_length = vj_tag_buffer_active(stream_id)
+        ? (buffered_duration > 0 ? buffered_duration : 1)
+        : vj_tag_get_n_frames(stream_id);
+    if(transport_length < 1)
+        transport_length = 1;
+
     atomic_store_long_long(&settings->min_frame_num, 0);
-    atomic_store_long_long(&settings->max_frame_num,
-                           (long long)vj_tag_get_n_frames(stream_id));
+    atomic_store_long_long(&settings->max_frame_num, (long long)(transport_length - 1));
+    atomic_store_long_long(&settings->current_frame_num, 0);
 
     info->last_tag_id = stream_id;
     info->uc->sample_id = stream_id;
@@ -2414,9 +2476,15 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
     else if (new_pm == VJ_PLAYBACK_MODE_TAG) {
         info->uc->playback_mode = new_pm;
 
+        int buffered_duration = vj_tag_get_buffer_duration(sample_id);
+        int transport_length = vj_tag_buffer_active(sample_id)
+            ? (buffered_duration > 0 ? buffered_duration : 1)
+            : vj_tag_get_n_frames(sample_id);
+        if(transport_length < 1)
+            transport_length = 1;
+
         atomic_store_long_long(&settings->min_frame_num, 0);
-        atomic_store_long_long(&settings->max_frame_num,
-                               (long long)vj_tag_get_n_frames(sample_id));
+        atomic_store_long_long(&settings->max_frame_num, (long long)(transport_length - 1));
         atomic_store_long_long(&settings->current_frame_num, 0);
 
         veejay_start_playing_stream(info, sample_id);
@@ -3124,7 +3192,99 @@ static int veejay_pipe_current_sample_audio_volume(veejay_t *info)
 static char *veejay_pipe_append_audio_mixer_status(veejay_t *info, char *ptr)
 {
     ptr = vj_sprintf(ptr, veejay_pipe_current_sample_audio_volume(info));
+    ptr = vj_sprintf(ptr, vj_perform_get_audio_mix_mode(info));
     ptr = vj_sprintf(ptr, vj_perform_get_audio_mix_crossfade(info));
+
+    return ptr;
+}
+
+static char *veejay_pipe_append_stream_trickplay_status(veejay_t *info, char *ptr)
+{
+    int enabled = 0;
+    int capacity = 0;
+    int filled = 0;
+    int position = 0;
+    int speed = 0;
+    int direction = 0;
+    int mode = VJ_TAG_TRICKPLAY_LIVE;
+    int state = VJ_TAG_BUFFER_STATE_UNSUPPORTED;
+
+    if(info && info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG) {
+        vj_tag_buffer_get_status(info->uc->sample_id,
+                                 &enabled,
+                                 &capacity,
+                                 &filled,
+                                 &position,
+                                 &speed,
+                                 &direction,
+                                 &mode,
+                                 &state);
+    }
+
+    ptr = vj_sprintf(ptr, enabled);
+    ptr = vj_sprintf(ptr, capacity);
+    ptr = vj_sprintf(ptr, filled);
+    ptr = vj_sprintf(ptr, position);
+    ptr = vj_sprintf(ptr, speed);
+    ptr = vj_sprintf(ptr, direction);
+    ptr = vj_sprintf(ptr, mode);
+    ptr = vj_sprintf(ptr, state);
+
+    return ptr;
+}
+
+static int veejay_status_clamp_i32(long v)
+{
+    if(v < -2147483647L)
+        return -2147483647;
+    if(v > 2147483647L)
+        return 2147483647;
+    return (int)v;
+}
+
+static char *veejay_pipe_append_sample_audio_sync_status(veejay_t *info, char *ptr)
+{
+    int source = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+    int profile = 0;
+    int mode = 0;
+    long video_anchor = 0;
+    long wav_anchor_ms = 0;
+    int lock_delta = 0;
+    int lock_confidence = 0;
+    int wav_length_ms = 0;
+    int wav_loop = 0;
+
+    if(info && info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
+        int sample_id = info->uc->sample_id;
+        if(sample_id > 0 && sample_exists(sample_id)) {
+            sample_get_audio_sync_profile(sample_id,
+                                          &source,
+                                          &profile,
+                                          &mode,
+                                          &video_anchor,
+                                          &wav_anchor_ms,
+                                          &lock_delta,
+                                          &lock_confidence);
+            if(source == SAMPLE_AUDIO_SYNC_SOURCE_WAV &&
+               profile > 0 && profile <= VJ_AUDIO_SYNC_WAV_PROFILES &&
+               info->settings &&
+               info->settings->audio_sync_wav_profiles[profile - 1].used)
+            {
+                wav_length_ms = info->settings->audio_sync_wav_profiles[profile - 1].length_ms;
+                wav_loop = info->settings->audio_sync_wav_profiles[profile - 1].loop ? 1 : 0;
+            }
+        }
+    }
+
+    ptr = vj_sprintf(ptr, source);
+    ptr = vj_sprintf(ptr, profile);
+    ptr = vj_sprintf(ptr, mode);
+    ptr = vj_sprintf(ptr, veejay_status_clamp_i32(video_anchor));
+    ptr = vj_sprintf(ptr, veejay_status_clamp_i32(wav_anchor_ms));
+    ptr = vj_sprintf(ptr, lock_delta);
+    ptr = vj_sprintf(ptr, lock_confidence);
+    ptr = vj_sprintf(ptr, veejay_status_clamp_i32(wav_length_ms));
+    ptr = vj_sprintf(ptr, wav_loop);
 
     return ptr;
 }
@@ -3181,6 +3341,14 @@ static void veejay_pipe_write_status(veejay_t * info)
     int seq_cur = (info->seq->active ? info->seq->current : MAX_SEQUENCES);
 
     veejay_memset(info->status_what, 0, VJ_STATUS_BUF_SIZE);
+
+    if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG && vj_tag_buffer_active(info->uc->sample_id)) {
+        int duration = vj_tag_get_buffer_duration(info->uc->sample_id);
+        if(duration < 1)
+            duration = 1;
+        atomic_store_long_long(&settings->min_frame_num, 0);
+        atomic_store_long_long(&settings->max_frame_num, (long long)(duration - 1));
+    }
 
     switch (info->uc->playback_mode)
     {
@@ -3314,7 +3482,9 @@ static void veejay_pipe_write_status(veejay_t * info)
                  VJ_CHAIN_ENTRY_STATUS_TOKENS +
                  VJ_SEQUENCE_STATUS_TOKENS +
                  VJ_AUDIO_BEAT_CONFIG_STATUS_TOKENS +
-                 VJ_AUDIO_MIXER_STATUS_TOKENS) *
+                 VJ_AUDIO_MIXER_STATUS_TOKENS +
+                 VJ_STREAM_TRICKPLAY_STATUS_TOKENS +
+                 VJ_STATUS_SAMPLE_AUDIO_SYNC_TOKENS) *
         (size_t)VJ_INT_FIELD_MAX;
     const int base_tokens = veejay_pipe_status_token_count(info->status_what);
     static int status_packet_warned = 0;
@@ -3338,6 +3508,8 @@ static void veejay_pipe_write_status(veejay_t * info)
     ptr = veejay_pipe_append_sequence_status(info, ptr);
     ptr = veejay_pipe_append_audio_beat_config_status(info, ptr);
     ptr = veejay_pipe_append_audio_mixer_status(info, ptr);
+    ptr = veejay_pipe_append_stream_trickplay_status(info, ptr);
+    ptr = veejay_pipe_append_sample_audio_sync_status(info, ptr);
     ptr = veejay_pipe_pad_status_tokens(info->status_what, ptr, VIMS_STATUS_TOKENS);
 
     *ptr = '\0';
@@ -5682,6 +5854,30 @@ static int veejay_track_align_get_adjustment(veejay_t *info,
                             snap_delta = -max_frames;
                     }
 
+                    {
+                        int bound_sample_id = 0;
+                        int bound_source = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+                        int bound_profile = 0;
+                        int bound_mode = veejay_audio_sync_current_sample_profile_mode(info,
+                                                                                       &bound_sample_id,
+                                                                                       &bound_source,
+                                                                                       &bound_profile);
+                        if(bound_source == SAMPLE_AUDIO_SYNC_SOURCE_WAV &&
+                           bound_mode == SAMPLE_AUDIO_SYNC_TRACK_ALIGN && bound_sample_id > 0) {
+                            long cur = (long)atomic_load_long_long(&settings->current_frame_num);
+                            sample_set_audio_sync_lock(bound_sample_id, original_delta, snap_conf);
+                            veejay_audio_sync_activate_sample_profile(info, bound_sample_id, cur, 1);
+                            last_snap_ms = now_ms;
+                            veejay_msg(VEEJAY_MSG_INFO,
+                                       "[TRACK-ALIGN][PROFILE] learned WAV slot %d correction %+dfr conf=%d%% for sample %d; video remains master",
+                                       bound_profile,
+                                       original_delta,
+                                       snap_conf,
+                                       bound_sample_id);
+                            return 0;
+                        }
+                    }
+
                     adj->snap_frames = snap_delta;
                     adj->confidence = snap_conf;
 
@@ -5942,8 +6138,9 @@ void *veejay_audio_producer_thread(void *arg)
 				}
 
 			int tx_active = atomic_load_int(&settings->transition.active) && atomic_load_int(&settings->transition.global_state);
+			int stream_playback = (info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG);
 
-			if(has_audio && tx_active && embedded_media_audio && !external_monitor_audio) {
+			if(has_audio && !stream_playback && tx_active && embedded_media_audio && !external_monitor_audio) {
 				long long b_frame = vj_calc_next_subframe(info, settings->transition.next_id);
 				long long start = atomic_load_long_long(&settings->transition.start);
 				long long end = atomic_load_long_long(&settings->transition.end);
@@ -6565,7 +6762,7 @@ static int veejay_audio_external_provider_needed(video_playback_setup *settings)
         return 1;
 
     source = atomic_load_int(&settings->record_audio_source);
-    return source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK;
+    return source == VJ_RECORD_AUDIO_SOURCE_EXTERNAL;
 }
 
 static void veejay_audio_sync_leave_external_playback(veejay_t *info)
@@ -8573,7 +8770,693 @@ int veejay_toggle_audio(veejay_t * info, int audio)
     return 1;
 }
 
+
 #ifdef HAVE_JACK
+static int veejay_audio_sync_wav_plain_limit_ms(veejay_t *info);
+static int veejay_audio_sync_validate_wav_path(const char *path, struct stat *st)
+{
+    struct stat local_st;
+
+    if(!path || !path[0]) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-SYNC][WAV] rejected request: empty path");
+        return 0;
+    }
+
+    if(!st)
+        st = &local_st;
+
+    if(stat(path, st) != 0) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-SYNC][WAV] path validation failed: '%s': %s",
+                   path,
+                   strerror(errno));
+        return 0;
+    }
+
+    if(!S_ISREG(st->st_mode)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-SYNC][WAV] path validation failed: '%s' is not a regular file",
+                   path);
+        return 0;
+    }
+
+    if(access(path, R_OK) != 0) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-SYNC][WAV] path validation failed: '%s' is not readable: %s",
+                   path,
+                   strerror(errno));
+        return 0;
+    }
+
+    if(st->st_size < 44) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-SYNC][WAV] path validation failed: '%s' is too small to be a PCM WAV (%lld bytes)",
+                   path,
+                   (long long)st->st_size);
+        return 0;
+    }
+
+    return 1;
+}
+
+
+static uint16_t veejay_wav_u16le(const uint8_t *p)
+{
+    return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
+}
+
+static uint32_t veejay_wav_u32le(const uint8_t *p)
+{
+    return (uint32_t)p[0] |
+           ((uint32_t)p[1] << 8) |
+           ((uint32_t)p[2] << 16) |
+           ((uint32_t)p[3] << 24);
+}
+
+static int veejay_audio_sync_probe_wav_duration_ms(const char *path)
+{
+    FILE *fp;
+    uint8_t hdr[12];
+    int channels = 0;
+    int sample_rate = 0;
+    int bits = 0;
+    long long data_bytes = 0;
+    long long bytes_per_frame;
+    long long ms;
+
+    if(!path || !path[0])
+        return 0;
+
+    fp = fopen(path, "rb");
+    if(!fp)
+        return 0;
+
+    if(fread(hdr, 1, sizeof(hdr), fp) != sizeof(hdr) ||
+       memcmp(hdr, "RIFF", 4) != 0 ||
+       memcmp(hdr + 8, "WAVE", 4) != 0)
+    {
+        fclose(fp);
+        return 0;
+    }
+
+    while(!feof(fp)) {
+        uint8_t chdr[8];
+        uint32_t size;
+        long pos;
+
+        if(fread(chdr, 1, sizeof(chdr), fp) != sizeof(chdr))
+            break;
+
+        size = veejay_wav_u32le(chdr + 4);
+        pos = ftell(fp);
+
+        if(memcmp(chdr, "fmt ", 4) == 0 && size >= 16) {
+            uint8_t fmt[16];
+            if(fread(fmt, 1, sizeof(fmt), fp) != sizeof(fmt))
+                break;
+            channels = (int)veejay_wav_u16le(fmt + 2);
+            sample_rate = (int)veejay_wav_u32le(fmt + 4);
+            bits = (int)veejay_wav_u16le(fmt + 14);
+        }
+        else if(memcmp(chdr, "data", 4) == 0) {
+            data_bytes = (long long)size;
+        }
+
+        if(fseek(fp, pos + (long)size + (long)(size & 1U), SEEK_SET) != 0)
+            break;
+    }
+
+    fclose(fp);
+
+    if(data_bytes <= 0 || channels <= 0 || sample_rate <= 0 || bits <= 0)
+        return 0;
+
+    bytes_per_frame = (long long)channels * (long long)((bits + 7) / 8);
+    if(bytes_per_frame <= 0)
+        return 0;
+
+    ms = (data_bytes * 1000LL) / ((long long)sample_rate * bytes_per_frame);
+    if(ms < 0)
+        return 0;
+    if(ms > 2147483647LL)
+        return 2147483647;
+
+    return (int)ms;
+}
+
+static int veejay_audio_sync_sanitize_profile(int profile)
+{
+    if(profile < 1)
+        return 0;
+    if(profile > VJ_AUDIO_SYNC_WAV_PROFILES)
+        return 0;
+    return profile;
+}
+
+int veejay_audio_sync_wav_profile_set(veejay_t *info, int profile, const char *path, int loop)
+{
+    video_playback_setup *settings;
+    struct stat st;
+    int length_ms;
+
+    if(!info || !info->settings)
+        return -1;
+
+    profile = veejay_audio_sync_sanitize_profile(profile);
+    if(profile <= 0) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-SYNC][PROFILE] invalid WAV profile slot %d",
+                   profile);
+        return -1;
+    }
+
+    if(!veejay_audio_sync_validate_wav_path(path, &st))
+        return -1;
+
+    length_ms = veejay_audio_sync_probe_wav_duration_ms(path);
+
+    settings = info->settings;
+    settings->audio_sync_wav_profiles[profile - 1].used = 1;
+    settings->audio_sync_wav_profiles[profile - 1].loop = loop ? 1 : 0;
+    settings->audio_sync_wav_profiles[profile - 1].length_ms = length_ms;
+    snprintf(settings->audio_sync_wav_profiles[profile - 1].path,
+             sizeof(settings->audio_sync_wav_profiles[profile - 1].path),
+             "%s",
+             path);
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-SYNC][PROFILE] slot %d = loop=%d length=%dms size=%lld path='%s'",
+               profile,
+               loop ? 1 : 0,
+               length_ms,
+               (long long)st.st_size,
+               path);
+    return 1;
+}
+
+int veejay_audio_sync_wav_profile_clear(veejay_t *info, int profile)
+{
+    video_playback_setup *settings;
+
+    if(!info || !info->settings)
+        return -1;
+
+    profile = veejay_audio_sync_sanitize_profile(profile);
+    if(profile <= 0)
+        return -1;
+
+    settings = info->settings;
+    settings->audio_sync_wav_profiles[profile - 1].used = 0;
+    settings->audio_sync_wav_profiles[profile - 1].loop = 0;
+    settings->audio_sync_wav_profiles[profile - 1].length_ms = 0;
+    settings->audio_sync_wav_profiles[profile - 1].path[0] = '\0';
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-SYNC][PROFILE] cleared slot %d",
+               profile);
+    return 1;
+}
+
+static int veejay_audio_sync_wav_profile_arm(veejay_t *info,
+                                             int profile,
+                                             int mode,
+                                             long start_ms)
+{
+    video_playback_setup *settings;
+    vj_audio_sync_wav_profile_t *p;
+    int limit_ms;
+    int enable_rc;
+
+    if(!info || !info->settings)
+        return -1;
+
+    profile = veejay_audio_sync_sanitize_profile(profile);
+    if(profile <= 0)
+        return -1;
+
+    settings = info->settings;
+    p = &settings->audio_sync_wav_profiles[profile - 1];
+    if(!p->used || !p->path[0]) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-SYNC][PROFILE] slot %d is empty",
+                   profile);
+        return -1;
+    }
+
+    if(veejay_audio_sync_thread_disabled(settings)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-SYNC][PROFILE] request ignored; audio sync/control thread is disabled");
+        return -1;
+    }
+
+    if(mode <= VJ_AUDIO_SYNC_MODE_OFF || mode > VJ_AUDIO_SYNC_MODE_MAX)
+        mode = VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY;
+
+    if(start_ms < 0)
+        start_ms = 0;
+
+    limit_ms = p->loop ? 0 : veejay_audio_sync_wav_plain_limit_ms(info);
+
+    veejay_audio_sync_thread_startup(info);
+    vj_audio_sync_set_mode(&settings->audio_sync, mode);
+    if(mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN)
+        vj_audio_sync_set_target_mode(&settings->audio_sync,
+                                      VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP);
+
+    if(!vj_audio_sync_set_source_wav_limited_at(&settings->audio_sync,
+                                                p->path,
+                                                p->loop,
+                                                limit_ms,
+                                                start_ms))
+    {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[AUDIO-SYNC][PROFILE] failed to arm slot=%d mode=%d start=%ldms path='%s'",
+                   profile,
+                   mode,
+                   start_ms,
+                   p->path);
+        return -1;
+    }
+
+    enable_rc = vj_audio_sync_enable(&settings->audio_sync);
+    if(enable_rc <= 0)
+        return -1;
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-SYNC][PROFILE] armed slot=%d mode=%d loop=%d start=%ldms path='%s'",
+               profile,
+               mode,
+               p->loop,
+               start_ms,
+               p->path);
+    return 1;
+}
+
+static int veejay_audio_sync_sample_release_external(veejay_t *info, int sample_id)
+{
+    video_playback_setup *settings;
+
+    if(!info || !info->settings)
+        return 0;
+
+    settings = info->settings;
+
+    if(sample_id <= 0 || settings->audio_sync_sample_bound_id == sample_id) {
+        settings->audio_sync_sample_bound_id = 0;
+        settings->audio_sync_sample_bound_source = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+        settings->audio_sync_sample_bound_profile = 0;
+        settings->audio_sync_sample_bound_mode = SAMPLE_AUDIO_SYNC_OFF;
+
+        return 1;
+    }
+
+    return 0;
+}
+
+static int veejay_audio_sync_jack_profile_arm(veejay_t *info, int mode)
+{
+    return veejay_audio_sync_set_external_jack(info,
+                                               veejay_sample_audio_sync_mode_to_vj_mode(mode),
+                                               2);
+}
+
+static long veejay_audio_sync_sample_start_ms(veejay_t *info,
+                                              long current_frame,
+                                              long video_anchor,
+                                              long wav_anchor_ms,
+                                              int delta_frames,
+                                              int use_delta)
+{
+    double fps = veejay_track_align_media_fps(info);
+    double frame_delta;
+    long start_ms;
+
+    if(fps <= 0.0)
+        fps = 25.0;
+
+    frame_delta = (double)(current_frame - video_anchor);
+    start_ms = wav_anchor_ms + (long)((frame_delta * 1000.0 / fps) + (frame_delta >= 0.0 ? 0.5 : -0.5));
+
+    if(use_delta && delta_frames != 0)
+        start_ms -= (long)(((double)delta_frames * 1000.0 / fps) + (delta_frames >= 0 ? 0.5 : -0.5));
+
+    if(start_ms < 0)
+        start_ms = 0;
+
+    return start_ms;
+}
+
+static long veejay_audio_sync_sample_start_frame(veejay_t *info,
+                                                 long video_anchor,
+                                                 long wav_anchor_ms,
+                                                 int delta_frames,
+                                                 int use_delta)
+{
+    (void)info;
+    (void)wav_anchor_ms;
+    (void)delta_frames;
+    (void)use_delta;
+
+    return video_anchor;
+}
+
+static int veejay_audio_sync_activate_sample_profile(veejay_t *info,
+                                                     int sample_id,
+                                                     long current_frame,
+                                                     int force)
+{
+    int source = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+    int profile = 0;
+    int mode = SAMPLE_AUDIO_SYNC_OFF;
+    long video_anchor = 0;
+    long wav_anchor_ms = 0;
+    int delta_frames = 0;
+    int confidence = 0;
+    int sync_mode;
+    long start_ms;
+    int rc;
+
+    (void)force;
+
+    if(!info || !info->settings || sample_id <= 0)
+        return 0;
+
+    if(!sample_get_audio_sync_profile(sample_id,
+                                      &source,
+                                      &profile,
+                                      &mode,
+                                      &video_anchor,
+                                      &wav_anchor_ms,
+                                      &delta_frames,
+                                      &confidence))
+        return 0;
+
+    if(!force &&
+       (source == SAMPLE_AUDIO_SYNC_SOURCE_WAV || source == SAMPLE_AUDIO_SYNC_SOURCE_JACK) &&
+       mode != SAMPLE_AUDIO_SYNC_OFF &&
+       info->settings->audio_sync_sample_bound_id == sample_id &&
+       info->settings->audio_sync_sample_bound_source == source &&
+       info->settings->audio_sync_sample_bound_profile == profile &&
+       info->settings->audio_sync_sample_bound_mode == mode &&
+       vj_audio_sync_is_enabled(&info->settings->audio_sync) &&
+       atomic_load_int(&info->settings->audio_sync.source) ==
+            (source == SAMPLE_AUDIO_SYNC_SOURCE_WAV ? VJ_AUDIO_SYNC_SOURCE_WAV_FILE : VJ_AUDIO_SYNC_SOURCE_JACK))
+    {
+        int live_mode = atomic_load_int(&info->settings->audio_sync.mode);
+        int want_mode = veejay_sample_audio_sync_mode_to_vj_mode(mode);
+
+        if(live_mode == want_mode ||
+           (want_mode == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY && live_mode == VJ_AUDIO_SYNC_MODE_MONITOR))
+            return 0;
+    }
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL || mode == SAMPLE_AUDIO_SYNC_OFF)
+        return veejay_audio_sync_sample_release_external(info, sample_id);
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE)
+        return veejay_audio_sync_sample_release_external(info, sample_id);
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_JACK) {
+        rc = veejay_audio_sync_jack_profile_arm(info, mode);
+        if(rc > 0) {
+            info->settings->audio_sync_sample_bound_id = sample_id;
+            info->settings->audio_sync_sample_bound_source = source;
+            info->settings->audio_sync_sample_bound_profile = 0;
+            info->settings->audio_sync_sample_bound_mode = mode;
+        }
+        return rc;
+    }
+
+    if(source != SAMPLE_AUDIO_SYNC_SOURCE_WAV || profile <= 0)
+        return 0;
+
+    sync_mode = veejay_sample_audio_sync_mode_to_vj_mode(mode);
+
+    {
+        int use_delta = (veejay_sample_audio_sync_mode_is_track_align(mode) && confidence > 0);
+        long start_frame = veejay_audio_sync_sample_start_frame(info,
+                                                               video_anchor,
+                                                               wav_anchor_ms,
+                                                               delta_frames,
+                                                               use_delta);
+
+        if((current_frame + VJ_SAMPLE_AUDIO_SYNC_START_HARDCUT_PREROLL_FRAMES) < start_frame) {
+            veejay_audio_sync_sample_release_external(info, sample_id);
+            veejay_msg(VEEJAY_MSG_INFO,
+                       "[AUDIO-SYNC][SAMPLE] deferred WAV sample=%d profile=%d mode=%d frame=%ld start-frame=%ld",
+                       sample_id,
+                       profile,
+                       mode,
+                       current_frame,
+                       start_frame);
+            return 0;
+        }
+
+        start_ms = veejay_audio_sync_sample_start_ms(info,
+                                                    current_frame,
+                                                    video_anchor,
+                                                    wav_anchor_ms,
+                                                    delta_frames,
+                                                    use_delta);
+    }
+
+    rc = veejay_audio_sync_wav_profile_arm(info, profile, sync_mode, start_ms);
+    if(rc > 0) {
+        info->settings->audio_sync_sample_bound_id = sample_id;
+        info->settings->audio_sync_sample_bound_source = source;
+        info->settings->audio_sync_sample_bound_profile = profile;
+        info->settings->audio_sync_sample_bound_mode = mode;
+    }
+    return rc;
+}
+
+static int veejay_audio_sync_current_sample_profile_mode(veejay_t *info, int *sample_id, int *source, int *profile)
+{
+    int src = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+    int p = 0;
+    int mode = SAMPLE_AUDIO_SYNC_OFF;
+    long video_anchor = 0;
+    long wav_anchor_ms = 0;
+    int delta = 0;
+    int conf = 0;
+    int id;
+
+    if(sample_id)
+        *sample_id = 0;
+    if(source)
+        *source = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+    if(profile)
+        *profile = 0;
+
+    if(!info || !info->uc || info->uc->playback_mode != VJ_PLAYBACK_MODE_SAMPLE)
+        return SAMPLE_AUDIO_SYNC_OFF;
+
+    id = info->uc->sample_id;
+    if(id <= 0)
+        return SAMPLE_AUDIO_SYNC_OFF;
+
+    if(!sample_get_audio_sync_profile(id, &src, &p, &mode, &video_anchor, &wav_anchor_ms, &delta, &conf))
+        return SAMPLE_AUDIO_SYNC_OFF;
+
+    if(src == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL || mode == SAMPLE_AUDIO_SYNC_OFF)
+        return SAMPLE_AUDIO_SYNC_OFF;
+
+    if(sample_id)
+        *sample_id = id;
+    if(source)
+        *source = src;
+    if(profile)
+        *profile = p;
+
+    return mode;
+}
+
+int vj_perform_audio_sync_sample_seek_rearm(veejay_t *info, int sample_id, long target_frame, const char *reason)
+{
+    int source = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+    int profile = 0;
+    int mode = SAMPLE_AUDIO_SYNC_OFF;
+    long video_anchor = 0;
+    long wav_anchor_ms = 0;
+    int delta_frames = 0;
+    int confidence = 0;
+    long start_ms;
+    int sync_mode;
+    int rc;
+
+    if(!info || !info->settings)
+        return -1;
+
+    if(sample_id == 0 && info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
+        sample_id = info->uc->sample_id;
+
+    if(sample_id <= 0 || !sample_exists(sample_id))
+        return -1;
+
+    if(!sample_get_audio_sync_profile(sample_id,
+                                      &source,
+                                      &profile,
+                                      &mode,
+                                      &video_anchor,
+                                      &wav_anchor_ms,
+                                      &delta_frames,
+                                      &confidence))
+        return -1;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL || mode == SAMPLE_AUDIO_SYNC_OFF) {
+        if(info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE && info->uc->sample_id == sample_id)
+            veejay_audio_sync_sample_release_external(info, sample_id);
+        return 0;
+    }
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE) {
+        if(info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE && info->uc->sample_id == sample_id)
+            veejay_audio_sync_sample_release_external(info, sample_id);
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[AUDIO-SYNC][SAMPLE-SEEK] sample=%d source=silence mode=%d reason=%s frame=%ld",
+                   sample_id,
+                   mode,
+                   reason ? reason : "seek",
+                   target_frame);
+        return 0;
+    }
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_JACK) {
+        if(info->settings->audio_sync_sample_bound_id != sample_id ||
+           info->settings->audio_sync_sample_bound_source != source ||
+           info->settings->audio_sync_sample_bound_mode != mode)
+            return veejay_audio_sync_activate_sample_profile(info, sample_id, target_frame, 1);
+
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[AUDIO-SYNC][SAMPLE-SEEK] sample=%d source=jack mode=%d reason=%s frame=%ld live-forward-only",
+                   sample_id,
+                   mode,
+                   reason ? reason : "seek",
+                   target_frame);
+        return 0;
+    }
+
+    if(source != SAMPLE_AUDIO_SYNC_SOURCE_WAV || profile <= 0)
+        return -1;
+
+    sync_mode = veejay_sample_audio_sync_mode_to_vj_mode(mode);
+
+    {
+        int use_delta = (veejay_sample_audio_sync_mode_is_track_align(mode) && confidence > 0);
+        long start_frame = veejay_audio_sync_sample_start_frame(info,
+                                                               video_anchor,
+                                                               wav_anchor_ms,
+                                                               delta_frames,
+                                                               use_delta);
+
+        if((target_frame + VJ_SAMPLE_AUDIO_SYNC_START_HARDCUT_PREROLL_FRAMES) < start_frame) {
+            veejay_audio_sync_sample_release_external(info, sample_id);
+            veejay_msg(VEEJAY_MSG_INFO,
+                       "[AUDIO-SYNC][SAMPLE-SEEK] sample=%d source=wav profile=%d mode=%d reason=%s frame=%ld deferred start-frame=%ld",
+                       sample_id,
+                       profile,
+                       mode,
+                       reason ? reason : "seek",
+                       target_frame,
+                       start_frame);
+            return 0;
+        }
+
+        start_ms = veejay_audio_sync_sample_start_ms(info,
+                                                     target_frame,
+                                                     video_anchor,
+                                                     wav_anchor_ms,
+                                                     delta_frames,
+                                                     use_delta);
+    }
+
+    rc = veejay_audio_sync_wav_profile_arm(info, profile, sync_mode, start_ms);
+    if(rc > 0) {
+        info->settings->audio_sync_sample_bound_id = sample_id;
+        info->settings->audio_sync_sample_bound_source = source;
+        info->settings->audio_sync_sample_bound_profile = profile;
+        info->settings->audio_sync_sample_bound_mode = mode;
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[AUDIO-SYNC][SAMPLE-SEEK] sample=%d source=wav profile=%d mode=%d reason=%s frame=%ld wav=%ldms",
+                   sample_id,
+                   profile,
+                   mode,
+                   reason ? reason : "seek",
+                   target_frame,
+                   start_ms);
+    }
+
+    return rc;
+}
+
+
+int veejay_audio_sync_sample_profile_set(veejay_t *info,
+                                         int sample_id,
+                                         int source,
+                                         int profile,
+                                         int mode,
+                                         long video_anchor,
+                                         long wav_anchor_ms)
+{
+    long current_frame;
+
+    if(!info || !info->settings)
+        return -1;
+
+    if(sample_id == 0 && info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
+        sample_id = info->uc->sample_id;
+
+    if(sample_id <= 0 || !sample_exists(sample_id))
+        return -1;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_JACK)
+        profile = 0;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_WAV && profile <= 0)
+        return -1;
+
+    if(!sample_set_audio_sync_profile(sample_id, source, profile, mode, video_anchor, wav_anchor_ms))
+        return -1;
+
+    current_frame = (long)atomic_load_long_long(&info->settings->current_frame_num);
+    if(info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE && info->uc->sample_id == sample_id)
+        vj_perform_audio_sync_sample_seek_rearm(info, sample_id, current_frame, "sample-bind");
+
+    return 1;
+}
+
+int veejay_audio_sync_sample_profile_clear(veejay_t *info, int sample_id)
+{
+    if(!info)
+        return -1;
+
+    if(sample_id == 0 && info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
+        sample_id = info->uc->sample_id;
+
+    if(sample_id <= 0 || !sample_exists(sample_id))
+        return -1;
+
+    if(!sample_clear_audio_sync_profile(sample_id))
+        return -1;
+
+    if(info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE && info->uc->sample_id == sample_id)
+        veejay_audio_sync_sample_release_external(info, sample_id);
+
+    return 1;
+}
+
+int veejay_audio_sync_sample_profile_rearm(veejay_t *info, int sample_id)
+{
+    long current_frame;
+
+    if(!info || !info->settings)
+        return -1;
+
+    current_frame = (long)atomic_load_long_long(&info->settings->current_frame_num);
+    return vj_perform_audio_sync_sample_seek_rearm(info, sample_id, current_frame, "manual-rearm") > 0 ? 1 : -1;
+}
+
 int veejay_audio_sync_set_external_jack(veejay_t *info, int mode, int channels)
 {
     video_playback_setup *settings;
@@ -8727,7 +9610,7 @@ int veejay_audio_sync_set_external_wav(veejay_t *info, const char *path, int loo
         vj_audio_sync_set_target_mode(&settings->audio_sync,
                                       VJ_AUDIO_SYNC_TARGET_CURRENT_CLIP);
 
-    if(!vj_audio_sync_set_source_wav_limited(&settings->audio_sync, path, loop, limit_ms)) {
+    if(!vj_audio_sync_set_source_wav_limited_at(&settings->audio_sync, path, loop, limit_ms, 0)) {
         veejay_msg(VEEJAY_MSG_WARNING,
                    "[AUDIO-SYNC][WAV] failed to select WAV source mode=%d loop=%d limit=%dms path='%s'",
                    mode,

@@ -77,7 +77,7 @@
 #define SAMPLE_FMT_S16 AV_SAMPLE_FMT_S16
 #endif
 
-#define PRIMARY_FRAMES 6
+#define PRIMARY_FRAMES 7
 #define FADE_LUT_SIZE 256
 
 #include <libvje/effects/shapewipe.h>
@@ -91,6 +91,22 @@
 #endif
 #define PERFORM_AUDIO_SIZE 16384
 #define AUDIO_TURN_HISTORY_BYTES 4096
+
+#ifdef HAVE_JACK
+static inline int vj_perform_sample_audio_sync_mode_to_vj_mode(int mode)
+{
+    switch(mode) {
+        case SAMPLE_AUDIO_SYNC_LIVE_EXTERNAL:      return VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL;
+        case SAMPLE_AUDIO_SYNC_MONITOR:            return VJ_AUDIO_SYNC_MODE_MONITOR;
+        case SAMPLE_AUDIO_SYNC_MONITOR_TRICKPLAY:  return VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY;
+        case SAMPLE_AUDIO_SYNC_TEMPO_FOLLOW:       return VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW;
+        case SAMPLE_AUDIO_SYNC_TEMPO_BRIDGE:       return VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE;
+        case SAMPLE_AUDIO_SYNC_TRACK_ALIGN:        return VJ_AUDIO_SYNC_MODE_TRACK_ALIGN;
+        case SAMPLE_AUDIO_SYNC_QUEUE:
+        default:                                   return VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY;
+    }
+}
+#endif
 
 #ifndef VJ_EXTERNAL_AUDIO_HISTORY_SECONDS
 #define VJ_EXTERNAL_AUDIO_HISTORY_SECONDS 240.0
@@ -126,6 +142,10 @@
 
 #ifndef TRACK_ALIGN_AUDIO_RENDER_FRAMES
 #define TRACK_ALIGN_AUDIO_RENDER_FRAMES 128
+#endif
+
+#ifndef VJ_SAMPLE_AUDIO_SYNC_START_HARDCUT_PREROLL_FRAMES
+#define VJ_SAMPLE_AUDIO_SYNC_START_HARDCUT_PREROLL_FRAMES 2
 #endif
 
 #ifndef VJ_AUDIO_JACK_START_RETRY_INITIAL_MS
@@ -761,6 +781,14 @@ typedef struct
 
 typedef struct
 {
+    int sample_id;
+    int mode;
+    int entry;
+    ycbcr_frame *frame;
+} performer_cache_t;
+
+typedef struct
+{
     varcache_t pvar_;
     VJFrame *rgba_frame[2];
     uint8_t *rgba_buffer[2];
@@ -874,6 +902,17 @@ typedef struct
     sample_b_t sample_a;
 
     void *audio_scratcher;
+
+    ycbcr_frame *stream_source_cache;
+    unsigned long long stream_source_cache_tick;
+    int stream_source_cache_id;
+    int stream_source_cache_valid;
+    ycbcr_frame *sample_source_cache;
+    unsigned long long sample_source_cache_tick;
+    int sample_source_cache_id;
+    int sample_source_cache_valid;
+    performer_cache_t source_cached_frames[CACHE_SIZE];
+    int source_n_cached_frames;
 } performer_t;
 
 static void vj_perform_track_align_clear_candidate(performer_t *p);
@@ -905,21 +944,11 @@ typedef struct {
 
 typedef struct
 {
-    int sample_id;
-    int mode;
-    int entry;
-    ycbcr_frame *frame;
-} performer_cache_t;
-
-typedef struct
-{
-    performer_cache_t cached_frames[CACHE_SIZE];
     audio_chain_buffer_t audio_chain_buffers[VIDEO_QUEUE_LEN];
     int played_sample_ids[SAMPLE_MAX_EFFECTS];
     long long played_sample_positions[SAMPLE_MAX_EFFECTS];
     float *accum[VIDEO_QUEUE_LEN];
     volatile int audio_chain_index;
-    int n_cached_frames;
     void *encoder_;
     ycbcr_frame *preview_buffer;
     int preview_max_w;
@@ -1000,6 +1029,27 @@ static inline int vj_audio_mix_effective_mode_from_values(int mode, int crossfad
     return mode;
 }
 
+static inline int vj_audio_playback_is_stream(const veejay_t *info)
+{
+    return info && info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG;
+}
+
+static inline int vj_audio_mix_stream_safe_mode(const veejay_t *info, int mode)
+{
+    if(!vj_audio_playback_is_stream(info))
+        return mode;
+
+    switch(mode) {
+        case VJ_AUDIO_MIX_ORIGINAL_EXTERNAL:
+        case VJ_AUDIO_MIX_EXTERNAL_ONLY:
+            return VJ_AUDIO_MIX_EXTERNAL_ONLY;
+        case VJ_AUDIO_MIX_ORIGINAL_ONLY:
+        case VJ_AUDIO_MIX_FOLLOW_ROUTE:
+        default:
+            return mode;
+    }
+}
+
 static inline int vj_audio_mix_route_family(int mode)
 {
     switch(vj_audio_mix_clamp_mode(mode)) {
@@ -1031,6 +1081,9 @@ static int vj_audio_mix_follow_route_family(veejay_t *info)
            vj_audio_sync_mode_uses_external_playback(mode))
             return VJ_RECORD_AUDIO_SOURCE_EXTERNAL;
     }
+
+    if(vj_audio_playback_is_stream(info))
+        return VJ_RECORD_AUDIO_SOURCE_SILENCE;
 
     return VJ_RECORD_AUDIO_SOURCE_ORIGINAL;
 }
@@ -1151,6 +1204,7 @@ int vj_perform_get_audio_mix_effective_mode(veejay_t *info)
 
 static  int vj_perform_preprocess_secundary( veejay_t *info, performer_t *p, int id, int mode,int current_ssm,int chain_entry, VJFrame **frames, VJFrameInfo *frameinfo );
 static int vj_perform_get_frame_fx(veejay_t *info, int s1, long long nframe, VJFrame *src, VJFrame *dst, uint8_t *p0plane, uint8_t *p1plane);
+static int vj_perform_sample_get_frame_cached(veejay_t *info, performer_t *p, int sample_id, int chain_entry, VJFrame *src, VJFrame *dst, uint8_t *p0_ref, uint8_t *p1_ref);
 
 static void vj_perform_pre_chain(performer_t *p, VJFrame *frame);
 static int vj_perform_post_chain_sample(veejay_t *info,performer_t *p, VJFrame *frame,int sample_id);
@@ -1396,8 +1450,6 @@ static void vj_perform_trace_chain_entry(const char *stage,
 static void vj_perform_sample_tick_reset(performer_global_t *g) {
     veejay_memset( g->played_sample_ids, 0 , sizeof(g->played_sample_ids));
     veejay_memset( g->played_sample_positions, 0, sizeof(g->played_sample_positions));
-    veejay_memset( g->cached_frames, 0, sizeof(g->cached_frames));
-    g->n_cached_frames = 0;
 }
 
 static long long vj_perform_sample_already_ticked(performer_global_t *g, int target_id, int chain_id) {
@@ -1940,8 +1992,53 @@ static void vj_perform_audio_source_transition_force_fade_blocks(int frames,
 
 }
 
+#ifdef HAVE_JACK
+static int vj_perform_sample_external_audio_active(veejay_t *info)
+{
+    int source = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+    int profile = 0;
+    int mode = SAMPLE_AUDIO_SYNC_OFF;
+    long video_anchor = 0;
+    long wav_anchor_ms = 0;
+    int delta_frames = 0;
+    int confidence = 0;
+
+    if(!info || !info->uc || info->uc->playback_mode != VJ_PLAYBACK_MODE_SAMPLE)
+        return 0;
+
+    if(info->uc->sample_id <= 0)
+        return 0;
+
+    if(!sample_get_audio_sync_profile(info->uc->sample_id,
+                                      &source,
+                                      &profile,
+                                      &mode,
+                                      &video_anchor,
+                                      &wav_anchor_ms,
+                                      &delta_frames,
+                                      &confidence))
+        return 0;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL || mode == SAMPLE_AUDIO_SYNC_OFF)
+        return 0;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_JACK)
+        return 1;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE)
+        return 1;
+
+    return source == SAMPLE_AUDIO_SYNC_SOURCE_WAV && profile > 0;
+}
+#endif
+
 static void vj_perform_audio_force_loop_reset_fade(veejay_t *info, long long target_frame)
 {
+#ifdef HAVE_JACK
+    if(vj_perform_sample_external_audio_active(info))
+        return;
+#endif
+
     editlist *el = vj_perform_audio_editlist(info);
     int frames;
 
@@ -1959,6 +2056,56 @@ static void vj_perform_audio_force_loop_reset_fade(veejay_t *info, long long tar
                                                          AUDIO_EDGE_RESET,
                                                          target_frame,
                                                          "loop-reset");
+}
+
+#ifdef HAVE_JACK
+static int vj_perform_sample_marker_loop_active(veejay_t *info, int *marker_start, int *marker_end)
+{
+    int start = 0;
+    int end = 0;
+
+    if(!info || !info->uc || info->uc->playback_mode != VJ_PLAYBACK_MODE_SAMPLE)
+        return 0;
+
+    if(info->uc->sample_id <= 0)
+        return 0;
+
+    if(!sample_get_marker_range(info->uc->sample_id, &start, &end))
+        return 0;
+
+    if(marker_start)
+        *marker_start = start;
+    if(marker_end)
+        *marker_end = end;
+
+    return 1;
+}
+#endif
+
+static void vj_perform_audio_handle_sample_loop_reset(veejay_t *info, long long target_frame)
+{
+#ifdef HAVE_JACK
+    int marker_start = 0;
+    int marker_end = 0;
+
+    if(vj_perform_sample_marker_loop_active(info, &marker_start, &marker_end) &&
+       vj_perform_sample_external_audio_active(info))
+    {
+        vj_perform_audio_sync_sample_seek_rearm(info,
+                                                info->uc->sample_id,
+                                                (long)target_frame,
+                                                "marker-loop-reset");
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[AUDIO-SYNC][SAMPLE-SEEK] marker-loop sample=%d marker=%d..%d frame=%lld",
+                   info->uc->sample_id,
+                   marker_start,
+                   marker_end,
+                   target_frame);
+        return;
+    }
+#endif
+
+    vj_perform_audio_force_loop_reset_fade(info, target_frame);
 }
 
 static inline int vj_perform_audio_source_transition_take_silence_bytes(int want_bytes)
@@ -2058,7 +2205,7 @@ int vj_perform_play_audio(veejay_t *info, video_playback_setup *settings, uint8_
     if(output_reason == 1) {
         int written = vj_jack_play(silence, len);
         if(written > 0)
-            vj_perform_record_output_audio_tap_write(info, source ? source : silence, written);
+            vj_perform_record_output_audio_tap_write(info, silence, written);
         return written;
     }
 
@@ -2122,40 +2269,66 @@ int vj_perform_play_audio(veejay_t *info, video_playback_setup *settings, uint8_
 }
 #endif
 
-static ycbcr_frame *vj_perform_cache_get_frame(veejay_t *info,int id, int mode)
+static ycbcr_frame *vj_perform_cache_get_frame(veejay_t *info, performer_t *p, int id, int mode)
 {
-    int c;
-    performer_global_t *g = (performer_global_t*) info->performer;
+    int n_cached;
 
-    for(c=0; c < g->n_cached_frames; c++)
+    if(!p)
+        return NULL;
+
+    n_cached = p->source_n_cached_frames;
+    if(n_cached > CACHE_SIZE)
+        n_cached = CACHE_SIZE;
+
+    for(int c = 0; c < n_cached; c++)
     {
-        if(g->cached_frames[c].sample_id == id && g->cached_frames[c].mode == mode)
+        if(p->source_cached_frames[c].sample_id == id &&
+           p->source_cached_frames[c].mode == mode)
         {
-            if( info->settings->feedback && info->uc->sample_id == id &&
-                        info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG ) {
+            if(info && info->settings && info->settings->feedback && info->uc &&
+               info->uc->sample_id == id &&
+               info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
+            {
                 return NULL;
             }
-            return g->cached_frames[c].frame;
+            return p->source_cached_frames[c].frame;
         }
     }
 
     return NULL;
 }
 
-static void vj_perform_cache_put_frame(performer_global_t *g, int id, int mode, ycbcr_frame *frame) {
+static void vj_perform_cache_put_frame(performer_t *p, int id, int mode, ycbcr_frame *frame)
+{
+    int n_cached;
 
-    if( mode != VJ_PLAYBACK_MODE_SAMPLE && mode != VJ_PLAYBACK_MODE_TAG )
+    if(!p || !frame)
         return;
 
-    for(int c=0; c < CACHE_SIZE; c++)
+    if(mode != VJ_PLAYBACK_MODE_SAMPLE && mode != VJ_PLAYBACK_MODE_TAG)
+        return;
+
+    n_cached = p->source_n_cached_frames;
+    if(n_cached > CACHE_SIZE)
+        n_cached = CACHE_SIZE;
+
+    for(int c = 0; c < n_cached; c++)
     {
-        if( g->cached_frames[c].sample_id == 0 || ( g->cached_frames[c].sample_id == id && g->cached_frames[c].mode == mode) ) {
-            g->cached_frames[c].sample_id = id;
-            g->cached_frames[c].mode = mode;
-            g->cached_frames[c].frame = frame;
-            g->n_cached_frames ++;
+        if(p->source_cached_frames[c].sample_id == id &&
+           p->source_cached_frames[c].mode == mode)
+        {
+            p->source_cached_frames[c].frame = frame;
             return;
         }
+    }
+
+    if(n_cached < CACHE_SIZE)
+    {
+        p->source_cached_frames[n_cached].sample_id = id;
+        p->source_cached_frames[n_cached].mode = mode;
+        p->source_cached_frames[n_cached].entry = -1;
+        p->source_cached_frames[n_cached].frame = frame;
+        p->source_n_cached_frames = n_cached + 1;
     }
 }
 
@@ -2174,6 +2347,158 @@ static inline int vj_perform_cache_use_frame(ycbcr_frame *cached_frame, VJFrame 
     return dst->ssm;
 }
 
+static inline void vj_perform_cache_copy_frame_to_holder(VJFrame *src, ycbcr_frame *holder)
+{
+    const int uv_len = src->ssm ? src->len : src->uv_len;
+
+    veejay_memcpy(holder->Y, src->data[0], src->len);
+    veejay_memcpy(holder->Cb, src->data[1], uv_len);
+    veejay_memcpy(holder->Cr, src->data[2], uv_len);
+
+    if(src->data[3] && holder->alpha && src->stride[3] > 0 && src->height > 0)
+        veejay_memcpy(holder->alpha, src->data[3], src->stride[3] * src->height);
+
+    holder->ssm = src->ssm;
+}
+
+static inline void vj_perform_source_cache_reset(performer_t *p)
+{
+    p->stream_source_cache_tick++;
+    p->stream_source_cache_id = 0;
+    p->stream_source_cache_valid = 0;
+    p->sample_source_cache_tick++;
+    p->sample_source_cache_id = 0;
+    p->sample_source_cache_valid = 0;
+    veejay_memset(p->source_cached_frames, 0, sizeof(p->source_cached_frames));
+    p->source_n_cached_frames = 0;
+}
+
+static inline void vj_perform_sample_source_cache_store(performer_t *p, int sample_id, VJFrame *src)
+{
+    if(!p->sample_source_cache)
+        return;
+
+    vj_perform_cache_copy_frame_to_holder(src, p->sample_source_cache);
+    p->sample_source_cache_id = sample_id;
+    p->sample_source_cache_valid = 1;
+    vj_perform_cache_put_frame(p, sample_id, VJ_PLAYBACK_MODE_SAMPLE, p->sample_source_cache);
+}
+
+static inline int vj_perform_sample_source_cache_use(performer_t *p, int sample_id, VJFrame *dst)
+{
+    if(p->sample_source_cache_valid &&
+       p->sample_source_cache_id == sample_id &&
+       p->sample_source_cache != NULL)
+    {
+        vj_perform_cache_use_frame(p->sample_source_cache, dst);
+        return 1;
+    }
+
+    return 0;
+}
+
+static int vj_perform_tag_get_frame_cached(veejay_t *info,
+                                           performer_t *p,
+                                           int sample_id,
+                                           VJFrame *dst,
+                                           uint8_t *abuffer,
+                                           ycbcr_frame *holder)
+{
+    ycbcr_frame *cached_frame = NULL;
+    vj_tag *tag = vj_tag_get(sample_id);
+
+    if(!tag)
+        return -1;
+
+    if(holder != NULL)
+    {
+        cached_frame = vj_perform_cache_get_frame(info, p, sample_id, VJ_PLAYBACK_MODE_TAG);
+        if(cached_frame != NULL)
+        {
+            vj_perform_cache_use_frame(cached_frame, dst);
+            return 1;
+        }
+
+        if(p->stream_source_cache_valid &&
+           p->stream_source_cache_id == sample_id &&
+           p->stream_source_cache != NULL)
+        {
+            vj_perform_cache_use_frame(p->stream_source_cache, dst);
+            return 1;
+        }
+    }
+
+    if(tag->source_type == VJ_TAG_TYPE_CLONE &&
+       tag->video_channel > 0 &&
+       tag->video_channel != sample_id)
+    {
+        int res = vj_perform_tag_get_frame_cached(info,
+                                                  p,
+                                                  tag->video_channel,
+                                                  dst,
+                                                  abuffer,
+                                                  holder);
+        if(res <= 0)
+            return res;
+
+        if(holder != NULL)
+            vj_perform_cache_put_frame(p, sample_id, VJ_PLAYBACK_MODE_TAG, holder);
+
+        if(holder == p->stream_source_cache)
+        {
+            p->stream_source_cache_id = sample_id;
+            p->stream_source_cache_valid = 1;
+        }
+
+        return res;
+    }
+
+    if(!vj_tag_get_active(sample_id))
+        vj_tag_set_active(sample_id, 1);
+
+    int res = vj_tag_get_frame(sample_id, dst, abuffer);
+    if(res <= 0)
+        return res;
+
+    if(holder != NULL)
+    {
+        if(dst->data[0] != holder->Y || dst->data[1] != holder->Cb || dst->data[2] != holder->Cr)
+            vj_perform_cache_copy_frame_to_holder(dst, holder);
+        else
+            holder->ssm = dst->ssm;
+
+        vj_perform_cache_put_frame(p, sample_id, VJ_PLAYBACK_MODE_TAG, holder);
+    }
+
+    if(holder == p->stream_source_cache)
+    {
+        p->stream_source_cache_id = sample_id;
+        p->stream_source_cache_valid = 1;
+    }
+
+    return res;
+}
+
+
+static inline int vj_perform_tag_source_renderable_for_secondary(int type)
+{
+    switch(type) {
+        case VJ_TAG_TYPE_YUV4MPEG:
+        case VJ_TAG_TYPE_V4L:
+        case VJ_TAG_TYPE_AVFORMAT:
+        case VJ_TAG_TYPE_NET:
+        case VJ_TAG_TYPE_MCAST:
+        case VJ_TAG_TYPE_PICTURE:
+        case VJ_TAG_TYPE_COLOR:
+        case VJ_TAG_TYPE_GENERATOR:
+        case VJ_TAG_TYPE_CALI:
+        case VJ_TAG_TYPE_DV1394:
+        case VJ_TAG_TYPE_CLONE:
+            return 1;
+        default:
+            return 0;
+    }
+}
 
 static void vj_perform_initiate_edge_change_ex(
     veejay_t *info,
@@ -2861,8 +3186,16 @@ void vj_perform_setup_transition(veejay_t *info,
     int start =
         (current_type == VJ_PLAYBACK_MODE_SAMPLE) ? sample_get_startFrame(sample_id) : 0;
 
-    int end =
-        (current_type == VJ_PLAYBACK_MODE_SAMPLE) ? sample_get_endFrame(sample_id) : vj_tag_get_n_frames(sample_id);
+    int end = (current_type == VJ_PLAYBACK_MODE_SAMPLE) ? sample_get_endFrame(sample_id) : 0;
+    if(current_type != VJ_PLAYBACK_MODE_SAMPLE) {
+        if(vj_tag_buffer_active(sample_id)) {
+            end = vj_tag_get_buffer_duration(sample_id);
+            if(end < 1)
+                end = 1;
+        } else {
+            end = vj_tag_get_n_frames(sample_id);
+        }
+    }
 
     if (end <= start) {
         vj_perform_reset_transition(info);
@@ -3287,6 +3620,16 @@ static performer_t *vj_perform_init_performer(veejay_t *info, int chain_id)
         veejay_memset( p->primary_buffer[c]->alpha,0,frame_len);
         total_used += performer_frame_size;
     }
+
+    p->stream_source_cache = p->primary_buffer[5];
+    p->stream_source_cache_tick = 0;
+    p->stream_source_cache_id = 0;
+    p->stream_source_cache_valid = 0;
+    p->sample_source_cache = p->primary_buffer[6];
+    p->sample_source_cache_tick = 0;
+    p->sample_source_cache_id = 0;
+    p->sample_source_cache_valid = 0;
+    p->source_n_cached_frames = 0;
 
     p->temp_buffer[0] = (uint8_t*) vj_malloc( frame_len );
     if(!p->temp_buffer[0]) {
@@ -6090,72 +6433,47 @@ int vj_perform_fill_audio_buffers(
 
 static int vj_perform_apply_secundary_tag(veejay_t * info, performer_t *p, int sample_id, int type, int chain_entry, VJFrame *src, VJFrame *dst,uint8_t *p0_ref, uint8_t *p1_ref, int subrender )
 {
-    long long nframe;
-    int len = 0;
     int ssm = 0;
-    performer_global_t *global = (performer_global_t*) info->performer;
-
     ycbcr_frame *cached_frame = NULL;
 
-    switch (type)
+    (void)subrender;
+
+    if(vj_perform_tag_source_renderable_for_secondary(type))
     {
-        case VJ_TAG_TYPE_YUV4MPEG:
-        case VJ_TAG_TYPE_V4L:
-        case VJ_TAG_TYPE_VLOOPBACK:
-        case VJ_TAG_TYPE_AVFORMAT:
-        case VJ_TAG_TYPE_NET:
-        case VJ_TAG_TYPE_MCAST:
-        case VJ_TAG_TYPE_PICTURE:
-        case VJ_TAG_TYPE_COLOR:
+        cached_frame = vj_perform_cache_get_frame(info, p, sample_id, VJ_PLAYBACK_MODE_TAG);
 
-        cached_frame = vj_perform_cache_get_frame(info,sample_id, VJ_PLAYBACK_MODE_TAG);
-
-        if (cached_frame == NULL)
+        if(cached_frame == NULL)
         {
-            if(! vj_tag_get_active( sample_id ) )
-            {
-                vj_tag_set_active(sample_id, 1 );
-            }
+            if(!vj_tag_get_active(sample_id))
+                vj_tag_set_active(sample_id, 1);
 
-            int res = vj_tag_get_frame(sample_id, dst,p->audio_buffer[chain_entry]);
-            if(res==1)  {
+            int res = vj_perform_tag_get_frame_cached(info,
+                                                       p,
+                                                       sample_id,
+                                                       dst,
+                                                       p->audio_buffer[chain_entry],
+                                                       p->frame_buffer[chain_entry]);
+            if(res == 1) {
                 p->frame_buffer[chain_entry]->ssm = dst->ssm;
                 ssm = dst->ssm;
-                vj_perform_cache_put_frame(global, sample_id, VJ_PLAYBACK_MODE_TAG, p->frame_buffer[chain_entry]);
             }
         }
         else
         {
             ssm = vj_perform_cache_use_frame(cached_frame, dst);
+            p->frame_buffer[chain_entry]->ssm = ssm;
         }
-
-        break;
-
-   case VJ_TAG_TYPE_NONE:
-
-        nframe = vj_perform_sample_already_ticked(info->performer, sample_id, chain_entry );
-        if( nframe == -1 ) {
-            nframe = vj_calc_next_subframe(info, sample_id);
-            vj_perform_sample_ticked(info->performer, sample_id, chain_entry, nframe );
-        }
-
-        cached_frame = vj_perform_cache_get_frame(info,sample_id, VJ_PLAYBACK_MODE_SAMPLE);
-
-        if(cached_frame == NULL)
-        {
-            len = vj_perform_get_frame_fx( info, sample_id, nframe, src,dst,p0_ref,p1_ref );
-            if(len > 0 ) {
-               p->frame_buffer[chain_entry]->ssm = dst->ssm;
-               ssm = dst->ssm;
-               vj_perform_cache_put_frame(global, sample_id, VJ_PLAYBACK_MODE_SAMPLE, p->frame_buffer[chain_entry]);
-            }
-        }
-        else
-        {
-            ssm = vj_perform_cache_use_frame(cached_frame, dst );
-        }
-
-        break;
+    }
+    else if(type == VJ_TAG_TYPE_NONE)
+    {
+        ssm = vj_perform_sample_get_frame_cached(info,
+                                                 p,
+                                                 sample_id,
+                                                 chain_entry,
+                                                 src,
+                                                 dst,
+                                                 p0_ref,
+                                                 p1_ref);
     }
 
     return ssm;
@@ -6299,76 +6617,93 @@ static int vj_perform_get_frame_fx(veejay_t *info, int s1, long long nframe, VJF
     return vj_perform_get_frame_(info, s1, nframe,src,dst,p0_buffer,p1_buffer,1 );
 }
 
-static int vj_perform_apply_secundary(veejay_t * info,performer_t *p, int this_sample_id, int sample_id, int type, int chain_entry, VJFrame *src, VJFrame *dst,uint8_t *p0_ref, uint8_t *p1_ref, int subrender)
+static int vj_perform_sample_get_frame_cached(veejay_t *info,
+                                              performer_t *p,
+                                              int sample_id,
+                                              int chain_entry,
+                                              VJFrame *src,
+                                              VJFrame *dst,
+                                              uint8_t *p0_ref,
+                                              uint8_t *p1_ref)
 {
-    int nframe;
-    int len;
-    int res = 1;
-    int ssm = 0;
     performer_global_t *g = (performer_global_t*) info->performer;
-
-
     ycbcr_frame *cached_frame = NULL;
 
-    switch (type)
+    if(vj_perform_sample_source_cache_use(p, sample_id, dst))
     {
-        case VJ_TAG_TYPE_YUV4MPEG:
-        case VJ_TAG_TYPE_V4L:
-        case VJ_TAG_TYPE_VLOOPBACK:
-        case VJ_TAG_TYPE_AVFORMAT:
-        case VJ_TAG_TYPE_NET:
-        case VJ_TAG_TYPE_MCAST:
-        case VJ_TAG_TYPE_COLOR:
-        case VJ_TAG_TYPE_PICTURE:
-        case VJ_TAG_TYPE_GENERATOR:
+        p->frame_buffer[chain_entry]->ssm = dst->ssm;
+        return dst->ssm;
+    }
 
-            cached_frame = vj_perform_cache_get_frame(info,sample_id, VJ_PLAYBACK_MODE_TAG);
-            if (cached_frame == NULL)
-            {
-                if(! vj_tag_get_active( sample_id ) )
-                {
-                    vj_tag_set_active(sample_id, 1 );
-                }
+    cached_frame = vj_perform_cache_get_frame(info, p, sample_id, VJ_PLAYBACK_MODE_SAMPLE);
+    if(cached_frame != NULL)
+    {
+        int ssm = vj_perform_cache_use_frame(cached_frame, dst);
+        p->frame_buffer[chain_entry]->ssm = ssm;
+        return ssm;
+    }
 
-                res = vj_tag_get_frame(sample_id, dst,p->audio_buffer[chain_entry]);
-                if(res) {
-                    p->frame_buffer[chain_entry]->ssm = dst->ssm;
-                    ssm = dst->ssm;
-                    vj_perform_cache_put_frame(g, sample_id, VJ_PLAYBACK_MODE_TAG, p->frame_buffer[chain_entry]);
-                }
+    long long nframe = vj_perform_sample_already_ticked(g, sample_id, chain_entry);
+    if(nframe == -1) {
+        nframe = vj_calc_next_subframe(info, sample_id);
+        if(nframe < 0)
+            return 0;
+        vj_perform_sample_ticked(g, sample_id, chain_entry, nframe);
+    }
+
+    int len = vj_perform_get_frame_fx(info, sample_id, nframe, src, dst, p0_ref, p1_ref);
+    if(len <= 0)
+        return 0;
+
+    p->frame_buffer[chain_entry]->ssm = dst->ssm;
+    vj_perform_cache_put_frame(p, sample_id, VJ_PLAYBACK_MODE_SAMPLE, p->frame_buffer[chain_entry]);
+
+    return dst->ssm;
+}
+
+static int vj_perform_apply_secundary(veejay_t * info,performer_t *p, int this_sample_id, int sample_id, int type, int chain_entry, VJFrame *src, VJFrame *dst,uint8_t *p0_ref, uint8_t *p1_ref, int subrender)
+{
+    int ssm = 0;
+    ycbcr_frame *cached_frame = NULL;
+
+    (void)this_sample_id;
+    (void)subrender;
+
+    if(vj_perform_tag_source_renderable_for_secondary(type))
+    {
+        cached_frame = vj_perform_cache_get_frame(info, p, sample_id, VJ_PLAYBACK_MODE_TAG);
+        if(cached_frame == NULL)
+        {
+            if(!vj_tag_get_active(sample_id))
+                vj_tag_set_active(sample_id, 1);
+
+            int res = vj_perform_tag_get_frame_cached(info,
+                                                       p,
+                                                       sample_id,
+                                                       dst,
+                                                       p->audio_buffer[chain_entry],
+                                                       p->frame_buffer[chain_entry]);
+            if(res == 1) {
+                p->frame_buffer[chain_entry]->ssm = dst->ssm;
+                ssm = dst->ssm;
             }
-            else
-            {
-                ssm = vj_perform_cache_use_frame(cached_frame, dst);
-            }
-
-            break;
-
-        case VJ_TAG_TYPE_NONE:
-
-            nframe = vj_perform_sample_already_ticked(info->performer, sample_id, chain_entry );
-            if( nframe == -1 ) {
-                nframe = vj_calc_next_subframe(info, sample_id);
-                vj_perform_sample_ticked(info->performer, sample_id, chain_entry, nframe );
-            }
-
-            cached_frame = vj_perform_cache_get_frame(info,sample_id, VJ_PLAYBACK_MODE_SAMPLE);
-
-            if(cached_frame == NULL) {
-                len = vj_perform_get_frame_fx( info, sample_id, nframe, src, dst, p0_ref, p1_ref );
-
-                if(len > 0 ) {
-                    p->frame_buffer[chain_entry]->ssm = dst->ssm;
-                    ssm = dst->ssm;
-                    vj_perform_cache_put_frame(g, sample_id, VJ_PLAYBACK_MODE_SAMPLE, p->frame_buffer[chain_entry]);
-                }
-            }
-            else
-            {
-                ssm = vj_perform_cache_use_frame(cached_frame,dst);
-            }
-
-            break;
+        }
+        else
+        {
+            ssm = vj_perform_cache_use_frame(cached_frame, dst);
+            p->frame_buffer[chain_entry]->ssm = ssm;
+        }
+    }
+    else if(type == VJ_TAG_TYPE_NONE)
+    {
+        ssm = vj_perform_sample_get_frame_cached(info,
+                                                 p,
+                                                 sample_id,
+                                                 chain_entry,
+                                                 src,
+                                                 dst,
+                                                 p0_ref,
+                                                 p1_ref);
     }
 
     return ssm;
@@ -6878,7 +7213,7 @@ static int vj_perform_record_presented_video_frame(veejay_t *info, VJFrame *src)
     return 1;
 }
 
-static int vj_perform_record_latest_video_frame(veejay_t *info, uint8_t *frame[4])
+static int vj_perform_record_latest_video_frame_for(veejay_t *info, int id, int mode, uint8_t *frame[4])
 {
     vj_record_video_frame_t *rv;
 
@@ -6889,6 +7224,12 @@ static int vj_perform_record_latest_video_frame(veejay_t *info, uint8_t *frame[4
     if(!atomic_load_int(&rv->valid))
         return 0;
 
+    if(id > 0 && atomic_load_int(&rv->sample_id) != id)
+        return 0;
+
+    if(mode >= 0 && atomic_load_int(&rv->playback_mode) != mode)
+        return 0;
+
     frame[0] = rv->frame.data[0];
     frame[1] = rv->frame.data[1];
     frame[2] = rv->frame.data[2];
@@ -6896,6 +7237,7 @@ static int vj_perform_record_latest_video_frame(veejay_t *info, uint8_t *frame[4
 
     return frame[0] && frame[1] && frame[2];
 }
+
 
 static editlist *vj_perform_record_audio_editlist(veejay_t *info)
 {
@@ -6935,19 +7277,39 @@ static double vj_perform_record_audio_record_fps(veejay_t *info, editlist *el)
 }
 
 #ifdef HAVE_JACK
-static int vj_perform_record_jack_policy_uses_monitor_tap(int policy, int sync_enabled, int sync_source, int sync_mode)
+static int vj_perform_record_external_policy_uses_monitor_tap(int policy, int sync_enabled, int sync_source, int sync_mode)
 {
-    return policy == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK &&
+    return policy == VJ_RECORD_AUDIO_SOURCE_EXTERNAL &&
            sync_enabled &&
-           sync_source == VJ_AUDIO_SYNC_SOURCE_JACK &&
+           vj_audio_sync_source_is_external_provider(sync_source) &&
            vj_audio_sync_mode_uses_external_playback(sync_mode);
 }
 
-static const char *vj_perform_record_monitor_tap_source_name(int sync_mode)
+static const char *vj_perform_record_external_tap_source_name(int sync_source, int sync_mode)
 {
+    if(sync_source == VJ_AUDIO_SYNC_SOURCE_WAV_FILE) {
+        switch(sync_mode) {
+            case VJ_AUDIO_SYNC_MODE_MONITOR:           return "monitor-wav";
+            case VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY: return "monitor-trickplay-wav";
+            case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE:      return "tempo-bridge-wav";
+            case VJ_AUDIO_SYNC_MODE_TRACK_ALIGN:       return "track-align-wav";
+            default:                                   return "external-playback-wav";
+        }
+    }
+
+    if(sync_source == VJ_AUDIO_SYNC_SOURCE_PUSH) {
+        switch(sync_mode) {
+            case VJ_AUDIO_SYNC_MODE_MONITOR:           return "monitor-push";
+            case VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY: return "monitor-trickplay-push";
+            case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE:      return "tempo-bridge-push";
+            case VJ_AUDIO_SYNC_MODE_TRACK_ALIGN:       return "track-align-push";
+            default:                                   return "external-playback-push";
+        }
+    }
+
     switch(sync_mode) {
         case VJ_AUDIO_SYNC_MODE_MONITOR:           return "monitor-jack";
-        case VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY: return "monitor-trickplay";
+        case VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY: return "monitor-trickplay-jack";
         case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE:      return "tempo-bridge-jack";
         case VJ_AUDIO_SYNC_MODE_TRACK_ALIGN:       return "track-align-jack";
         default:                                   return "external-playback-jack";
@@ -7019,13 +7381,13 @@ const char *vj_perform_record_effective_audio_source_name(veejay_t *info)
     if(sync_enabled && sync_source == VJ_AUDIO_SYNC_SOURCE_NONE)
         return "silence";
 
-    if(vj_perform_record_jack_policy_uses_monitor_tap(policy,
+    if(vj_perform_record_external_policy_uses_monitor_tap(policy,
                                                        sync_enabled,
                                                        sync_source,
                                                        sync_mode))
-        return vj_perform_record_monitor_tap_source_name(sync_mode);
+        return vj_perform_record_external_tap_source_name(sync_source, sync_mode);
 
-    if(policy == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK) {
+    if(policy == VJ_RECORD_AUDIO_SOURCE_EXTERNAL) {
         switch(sync_source) {
             case VJ_AUDIO_SYNC_SOURCE_JACK:     return "sync-jack";
             case VJ_AUDIO_SYNC_SOURCE_WAV_FILE: return "sync-wav";
@@ -7034,6 +7396,9 @@ const char *vj_perform_record_effective_audio_source_name(veejay_t *info)
             default:                            return "sync-source";
         }
     }
+
+    if(vj_audio_playback_is_stream(info))
+        return "silence";
 
     if(policy == VJ_RECORD_AUDIO_SOURCE_ORIGINAL)
         return "original";
@@ -7075,7 +7440,7 @@ static int vj_perform_record_audio_frame(
         return wanted_frames;
     }
 
-    if(vj_perform_record_jack_policy_uses_monitor_tap(policy,
+    if(vj_perform_record_external_policy_uses_monitor_tap(policy,
                                                        sync_enabled,
                                                        sync_source,
                                                        sync_mode))
@@ -7092,7 +7457,7 @@ static int vj_perform_record_audio_frame(
         if((tick & 63) == 1 && info->recording) {
             veejay_msg(VEEJAY_MSG_INFO,
                        "[AUDIO-REC] frame source=%s wanted_frames=%d got_frames=%d lav_samps=%d bytes=%d tap_source=%d tap_mode=%d under=%lld rate=%d rec_fps=%.3f",
-                       vj_perform_record_monitor_tap_source_name(sync_mode),
+                       vj_perform_record_external_tap_source_name(sync_source, sync_mode),
                        wanted_frames,
                        frames,
                        frames,
@@ -7109,7 +7474,7 @@ static int vj_perform_record_audio_frame(
         return frames;
     }
 
-    if(policy == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK)
+    if(policy == VJ_RECORD_AUDIO_SOURCE_EXTERNAL)
     {
         frames = vj_audio_sync_copy_record_audio(
             &settings->audio_sync,
@@ -7164,6 +7529,14 @@ static int vj_perform_record_audio_frame(
         if(info->recording)
             __sync_add_and_fetch(&info->recording->audio_records, 1);
         return frames;
+    }
+
+    if(vj_audio_playback_is_stream(info))
+    {
+        veejay_memset(p->audio_rec_buffer, 0, (size_t)wanted_frames * (size_t)frame_bytes);
+        if(info->recording)
+            __sync_add_and_fetch(&info->recording->audio_silence_records, 1);
+        return wanted_frames;
     }
 
     frames = vj_perform_record_output_audio_tap_pop(
@@ -7225,13 +7598,28 @@ static int vj_perform_render_sample_frame(
 static int vj_perform_render_offline_tag_frame(veejay_t *info)
 {
     performer_global_t *g = (performer_global_t*) info->performer;
+    int stream_id = info->settings->offline_tag_id;
+    uint8_t *frame[4];
 
-    if(vj_tag_get_active(info->settings->offline_tag_id) == 0)
-        vj_tag_enable(info->settings->offline_tag_id);
+    if(info->uc &&
+       info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG &&
+       info->uc->sample_id == stream_id &&
+       vj_perform_record_latest_video_frame_for(info, stream_id, VJ_PLAYBACK_MODE_TAG, frame))
+    {
+        return vj_tag_record_frame(stream_id,
+                                   frame,
+                                   NULL,
+                                   0,
+                                   info->pixel_format);
+    }
 
-    vj_tag_get_frame(info->settings->offline_tag_id, g->offline_frame, NULL);
+    if(vj_tag_get_active(stream_id) == 0)
+        vj_tag_enable(stream_id);
 
-    return vj_tag_record_frame(info->settings->offline_tag_id,
+    if(vj_perform_tag_get_frame_cached(info, g->A, stream_id, g->offline_frame, NULL, NULL) <= 0)
+        return -1;
+
+    return vj_tag_record_frame(stream_id,
                                g->offline_frame->data,
                                NULL,
                                0,
@@ -7333,7 +7721,11 @@ static int vj_perform_record_offline_commit_single(veejay_t *info)
         } else {
 
             n_id = vj_perform_commit_offline_recording( info, id, filename );
-
+            if(n_id > 0 && info->settings->offline_linked_sample_id == -1) {
+                char title[64];
+                snprintf(title, sizeof(title), "Stream %d rec", stream_id);
+                sample_set_description(n_id, title);
+            }
             veejay_msg(VEEJAY_MSG_INFO, "Sample %d has new video data", n_id );
         }
 
@@ -7595,7 +7987,7 @@ void vj_perform_record_sample_frame(veejay_t *info, int sample, int type) {
     performer_global_t *g = (performer_global_t*) info->performer;
     performer_t *p = g->A;
 
-    if(!vj_perform_record_latest_video_frame(info, frame)) {
+    if(!vj_perform_record_latest_video_frame_for(info, sample, VJ_PLAYBACK_MODE_SAMPLE, frame)) {
         frame[0] = p->primary_buffer[0]->Y;
         frame[1] = p->primary_buffer[0]->Cb;
         frame[2] = p->primary_buffer[0]->Cr;
@@ -7707,7 +8099,7 @@ void vj_perform_record_tag_frame(veejay_t *info) {
     performer_global_t *g = (performer_global_t*) info->performer;
     performer_t *p = g->A;
 
-    if(!vj_perform_record_latest_video_frame(info, frame)) {
+    if(!vj_perform_record_latest_video_frame_for(info, stream_id, VJ_PLAYBACK_MODE_TAG, frame)) {
         frame[0] = p->primary_buffer[0]->Y;
         frame[1] = p->primary_buffer[0]->Cb;
         frame[2] = p->primary_buffer[0]->Cr;
@@ -7783,14 +8175,10 @@ static void vj_perform_tag_fill_buffer(veejay_t *info, performer_t *p, VJFrame *
     }
 
     if(!active)
-    {
         vj_tag_enable(sample_id);
-    }
-    else
-    {
-        if(vj_tag_get_frame(sample_id, dst, NULL))
-            error = 0;
-    }
+
+    if(vj_perform_tag_get_frame_cached(info, p, sample_id, dst, NULL, p->stream_source_cache) > 0)
+        error = 0;
 
     if(error == 1) {
         dummy_apply(dst, VJ_EFFECT_COLOR_BLACK);
@@ -7831,6 +8219,89 @@ void    vj_perform_follow_fade(veejay_t *info, int status) {
     p->pvar_.follow_fade = status;
 }
 
+static int vj_perform_clamp255(int v)
+{
+    if(v < 0) return 0;
+    if(v > 255) return 255;
+    return v;
+}
+
+static int vj_perform_chain_fade_audio_signal(video_playback_setup *settings, int source)
+{
+#ifdef HAVE_JACK
+    int q = 0;
+
+    if(!settings || !vj_audio_beat_is_enabled(&settings->audio_beat))
+        return 0;
+
+    switch(source) {
+        case VJ_CHAIN_FADE_AUDIO_ENVELOPE:
+            q = atomic_load_int(&settings->audio_beat.envelope_q15);
+            break;
+        case VJ_CHAIN_FADE_AUDIO_TRANSIENT:
+            return vj_perform_clamp255(atomic_load_int(&settings->audio_beat.transient_q8));
+        case VJ_CHAIN_FADE_AUDIO_FLUX:
+            q = atomic_load_int(&settings->audio_beat.flux_q15);
+            break;
+        case VJ_CHAIN_FADE_AUDIO_PULSE:
+        case VJ_CHAIN_FADE_AUDIO_GATE_SRC:
+            q = atomic_load_int(&settings->audio_beat.beat_toggle_q15);
+            break;
+        case VJ_CHAIN_FADE_AUDIO_LEVEL:
+        default:
+            q = atomic_load_int(&settings->audio_beat.level_q15);
+            break;
+    }
+
+    if(q < 0) q = 0;
+    if(q > 32767) q = 32767;
+    return (q * 255 + 16383) / 32767;
+#else
+    (void)settings;
+    (void)source;
+    return 0;
+#endif
+}
+
+static int vj_perform_chain_fade_audio_modulate(veejay_t *info, int sample_id, int source_type, int opacity)
+{
+    int mode = VJ_CHAIN_FADE_AUDIO_OFF;
+    int source = VJ_CHAIN_FADE_AUDIO_LEVEL;
+    int amount = 0;
+    int sig = 0;
+
+    if(source_type == VJ_PLAYBACK_MODE_SAMPLE)
+        sample_chain_fade_audio_get(sample_id, &mode, &source, &amount);
+    else if(source_type == VJ_PLAYBACK_MODE_TAG)
+        vj_tag_chain_fade_audio_get(sample_id, &mode, &source, &amount);
+
+    if(mode == VJ_CHAIN_FADE_AUDIO_OFF || amount <= 0)
+        return vj_perform_clamp255(opacity);
+
+    sig = vj_perform_chain_fade_audio_signal(info ? info->settings : NULL, source);
+    amount = vj_perform_clamp255(amount);
+
+    switch(mode) {
+        case VJ_CHAIN_FADE_AUDIO_ADD:
+            opacity += ((sig - 128) * amount) / 255;
+            break;
+        case VJ_CHAIN_FADE_AUDIO_DUCK:
+            opacity -= (sig * amount) / 255;
+            break;
+        case VJ_CHAIN_FADE_AUDIO_MULTIPLY:
+            opacity = (opacity * ((255 - amount) + ((sig * amount) / 255))) / 255;
+            break;
+        case VJ_CHAIN_FADE_AUDIO_GATE:
+            if(sig < 128)
+                opacity = (opacity * (255 - amount)) / 255;
+            break;
+        default:
+            break;
+    }
+
+    return vj_perform_clamp255(opacity);
+}
+
 static int vj_perform_post_chain_sample(veejay_t *info,performer_t *p, VJFrame *frame, int sample_id)
 {
     int opacity;
@@ -7838,11 +8309,24 @@ static int vj_perform_post_chain_sample(veejay_t *info,performer_t *p, VJFrame *
     int follow = 0;
     int fade_alpha_method = p->pvar_.fade_alpha;
 
-    if(mode == 2 )
+    if(mode == SAMPLE_FADER_MANUAL)
         opacity = (int) sample_get_fader_val(sample_id);
-    else
+    else if(mode == SAMPLE_FADER_CURVE) {
+        int kf_opacity = 0;
+        long long n_frame = atomic_load_long_long(&info->settings->current_frame_num);
+        if(sample_chain_fade_get_value(sample_id, n_frame, &kf_opacity))
+            opacity = kf_opacity;
+        else
+            opacity = (int) sample_get_fader_val(sample_id);
+        opacity = vj_perform_chain_fade_audio_modulate(info, sample_id, VJ_PLAYBACK_MODE_SAMPLE, opacity);
+        sample_set_fader_val(sample_id, (float)opacity);
+    }
+    else if(mode)
         opacity = (int) sample_apply_fader_inc(sample_id);
+    else
+        opacity = 0;
 
+    opacity = vj_perform_clamp255(opacity);
     p->pvar_.fade_value = opacity;
 
     switch( fade_alpha_method ) {
@@ -7858,7 +8342,7 @@ static int vj_perform_post_chain_sample(veejay_t *info,performer_t *p, VJFrame *
             break;
     }
 
-    if(mode != 2)
+    if(mode != SAMPLE_FADER_MANUAL && mode != SAMPLE_FADER_CURVE)
     {
         int dir =sample_get_fader_direction(sample_id);
         if((dir<0) &&(opacity == 0))
@@ -7878,7 +8362,7 @@ static int vj_perform_post_chain_sample(veejay_t *info,performer_t *p, VJFrame *
               follow = 1;
             }
         }
-        } else if(mode) {
+        } else if(mode == SAMPLE_FADER_MANUAL) {
             if( p->pvar_.follow_fade ) {
               follow = 1;
         }
@@ -7921,11 +8405,22 @@ static int vj_perform_post_chain_tag(veejay_t *info,performer_t *p, VJFrame *fra
     int follow = 0;
     int fade_alpha_method = p->pvar_.fade_alpha;
 
-    if(mode == 2)
+    if(mode == SAMPLE_FADER_MANUAL)
         opacity = (int) vj_tag_get_fader_val(sample_id);
+    else if(mode == SAMPLE_FADER_CURVE) {
+        int kf_opacity = 0;
+        long long n_frame = atomic_load_long_long(&info->settings->current_frame_num);
+        if(vj_tag_chain_fade_get_value(sample_id, n_frame, &kf_opacity))
+            opacity = kf_opacity;
+        else
+            opacity = (int) vj_tag_get_fader_val(sample_id);
+        opacity = vj_perform_chain_fade_audio_modulate(info, sample_id, VJ_PLAYBACK_MODE_TAG, opacity);
+        vj_tag_set_fader_val(sample_id, (float)opacity);
+    }
     else if( mode )
         opacity = (int) vj_tag_apply_fader_inc(sample_id);
 
+    opacity = vj_perform_clamp255(opacity);
     p->pvar_.fade_value = opacity;
 
     if( opacity == 0 ) {
@@ -7947,7 +8442,7 @@ static int vj_perform_post_chain_tag(veejay_t *info,performer_t *p, VJFrame *fra
             break;
     }
 
-    if(mode != 2)
+    if(mode != SAMPLE_FADER_MANUAL && mode != SAMPLE_FADER_CURVE)
     {
         int dir = vj_tag_get_fader_direction(sample_id);
 
@@ -7968,7 +8463,7 @@ static int vj_perform_post_chain_tag(veejay_t *info,performer_t *p, VJFrame *fra
                follow = 1;
             }
         }
-        } else if(mode){
+        } else if(mode == SAMPLE_FADER_MANUAL){
             if( p->pvar_.follow_fade ) {
              follow = 1;
         }
@@ -8621,6 +9116,66 @@ static void vj_audio_mix_apply_external_entry_ramp(performer_t *p,
     p->audio_mix_external_entry_ramp_left = left - n;
 }
 
+
+static void vj_audio_mix_crossfade_original_to_external(performer_t *p,
+                                                        uint8_t *external,
+                                                        const uint8_t *original,
+                                                        int frames,
+                                                        int frame_bytes)
+{
+    if(!p || !external || !original || frames <= 0 || frame_bytes <= 0)
+        return;
+
+    int left = p->audio_mix_external_entry_ramp_left;
+    if(left <= 0)
+        return;
+
+    const int total = VJ_AUDIO_MIX_EXTERNAL_ENTRY_RAMP_FRAMES;
+    int n = (left < frames) ? left : frames;
+    int start = total - left;
+
+    if(start < 0)
+        start = 0;
+
+    if(!(frame_bytes & 1)) {
+        const int samples_per_frame = frame_bytes / 2;
+        int16_t *ext = (int16_t*)external;
+        const int16_t *orig = (const int16_t*)original;
+
+        for(int i = 0; i < n; i++) {
+            int32_t eg = ((start + i + 1) * 32767) / total;
+            int32_t og = 32767 - eg;
+            int base = i * samples_per_frame;
+
+            for(int c = 0; c < samples_per_frame; c++) {
+                int32_t mixed = (((int32_t)orig[base + c] * og) +
+                                 ((int32_t)ext[base + c] * eg)) >> 15;
+                if(mixed > 32767) mixed = 32767;
+                else if(mixed < -32768) mixed = -32768;
+                ext[base + c] = (int16_t)mixed;
+            }
+        }
+    } else {
+        for(int i = 0; i < n; i++) {
+            int32_t eg = ((start + i + 1) * 255) / total;
+            int32_t og = 255 - eg;
+            uint8_t *ext = external + ((size_t)i * (size_t)frame_bytes);
+            const uint8_t *orig = original + ((size_t)i * (size_t)frame_bytes);
+
+            for(int c = 0; c < frame_bytes; c++) {
+                int32_t o = (int32_t)orig[c] - 128;
+                int32_t e = (int32_t)ext[c] - 128;
+                int32_t mixed = ((o * og) + (e * eg)) / 255 + 128;
+                if(mixed < 0) mixed = 0;
+                else if(mixed > 255) mixed = 255;
+                ext[c] = (uint8_t)mixed;
+            }
+        }
+    }
+
+    p->audio_mix_external_entry_ramp_left = left - n;
+}
+
 static int vj_perform_render_original_audio_bus(veejay_t *info,
                                                 performer_t *p,
                                                 editlist *el,
@@ -8797,6 +9352,186 @@ static void vj_audio_master_mix_original_external(veejay_t *info,
     }
 }
 
+static const char *vj_perform_sample_audio_source_name(int source)
+{
+    switch(source) {
+        case SAMPLE_AUDIO_SYNC_SOURCE_WAV:     return "wav";
+        case SAMPLE_AUDIO_SYNC_SOURCE_JACK:    return "jack";
+        case SAMPLE_AUDIO_SYNC_SOURCE_SILENCE: return "silence";
+        case SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL:
+        default:                               return "original";
+    }
+}
+
+static inline int vj_perform_sample_audio_sync_start_reached(veejay_t *info,
+                                                                  editlist *el,
+                                                                  int mode,
+                                                                  long video_anchor,
+                                                                  long wav_anchor_ms,
+                                                                  int delta_frames,
+                                                                  int confidence,
+                                                                  long long target_frame)
+{
+    (void)info;
+    (void)el;
+    (void)mode;
+    (void)wav_anchor_ms;
+    (void)delta_frames;
+    (void)confidence;
+
+    return target_frame >= (long long)video_anchor;
+}
+
+static inline int vj_perform_current_sample_external_audio_binding_at(veejay_t *info,
+                                                                      editlist *el,
+                                                                      long long target_frame,
+                                                                      int *source_out,
+                                                                      int *profile_out,
+                                                                      int *mode_out)
+{
+    int source = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+    int profile = 0;
+    int mode = SAMPLE_AUDIO_SYNC_OFF;
+    long video_anchor = 0;
+    long wav_anchor_ms = 0;
+    int delta_frames = 0;
+    int confidence = 0;
+
+    if(source_out)
+        *source_out = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+    if(profile_out)
+        *profile_out = 0;
+    if(mode_out)
+        *mode_out = SAMPLE_AUDIO_SYNC_OFF;
+
+    if(!info || !info->uc || info->uc->playback_mode != VJ_PLAYBACK_MODE_SAMPLE)
+        return 0;
+
+    if(info->uc->sample_id <= 0)
+        return 0;
+
+    if(!sample_get_audio_sync_profile(info->uc->sample_id,
+                                      &source,
+                                      &profile,
+                                      &mode,
+                                      &video_anchor,
+                                      &wav_anchor_ms,
+                                      &delta_frames,
+                                      &confidence))
+        return 0;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL || mode == SAMPLE_AUDIO_SYNC_OFF)
+        return 0;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_WAV && profile <= 0)
+        return 0;
+
+    if(source != SAMPLE_AUDIO_SYNC_SOURCE_WAV &&
+       source != SAMPLE_AUDIO_SYNC_SOURCE_JACK &&
+       source != SAMPLE_AUDIO_SYNC_SOURCE_SILENCE)
+        return 0;
+
+    if(!vj_perform_sample_audio_sync_start_reached(info,
+                                                   el,
+                                                   mode,
+                                                   video_anchor,
+                                                   wav_anchor_ms,
+                                                   delta_frames,
+                                                   confidence,
+                                                   target_frame))
+        return 0;
+
+    if(source_out)
+        *source_out = source;
+    if(profile_out)
+        *profile_out = profile;
+    if(mode_out)
+        *mode_out = mode;
+
+    return 1;
+}
+
+static inline int vj_perform_current_sample_external_audio_configured(veejay_t *info,
+                                                                              int *source_out,
+                                                                              int *profile_out,
+                                                                              int *mode_out,
+                                                                              long *video_anchor_out,
+                                                                              long *wav_anchor_ms_out)
+{
+    int source = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+    int profile = 0;
+    int mode = SAMPLE_AUDIO_SYNC_OFF;
+    long video_anchor = 0;
+    long wav_anchor_ms = 0;
+    int delta_frames = 0;
+    int confidence = 0;
+
+    if(source_out)
+        *source_out = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+    if(profile_out)
+        *profile_out = 0;
+    if(mode_out)
+        *mode_out = SAMPLE_AUDIO_SYNC_OFF;
+    if(video_anchor_out)
+        *video_anchor_out = 0;
+    if(wav_anchor_ms_out)
+        *wav_anchor_ms_out = 0;
+
+    if(!info || !info->uc || info->uc->playback_mode != VJ_PLAYBACK_MODE_SAMPLE)
+        return 0;
+
+    if(info->uc->sample_id <= 0)
+        return 0;
+
+    if(!sample_get_audio_sync_profile(info->uc->sample_id,
+                                      &source,
+                                      &profile,
+                                      &mode,
+                                      &video_anchor,
+                                      &wav_anchor_ms,
+                                      &delta_frames,
+                                      &confidence))
+        return 0;
+
+    if(mode == SAMPLE_AUDIO_SYNC_OFF)
+        return 0;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL) {
+        profile = 0;
+        wav_anchor_ms = 0;
+    } else {
+        if(source == SAMPLE_AUDIO_SYNC_SOURCE_WAV && profile <= 0)
+            return 0;
+
+        if(source != SAMPLE_AUDIO_SYNC_SOURCE_WAV &&
+           source != SAMPLE_AUDIO_SYNC_SOURCE_JACK &&
+           source != SAMPLE_AUDIO_SYNC_SOURCE_SILENCE)
+            return 0;
+    }
+
+    if(source_out)
+        *source_out = source;
+    if(profile_out)
+        *profile_out = profile;
+    if(mode_out)
+        *mode_out = mode;
+    if(video_anchor_out)
+        *video_anchor_out = video_anchor;
+    if(wav_anchor_ms_out)
+        *wav_anchor_ms_out = wav_anchor_ms;
+
+    return 1;
+}
+
+static inline int vj_perform_sample_bound_external_audio_active(veejay_t *info)
+{
+    video_playback_setup *settings = info ? info->settings : NULL;
+    editlist *el = vj_perform_audio_editlist(info);
+    long long target_frame = settings ? atomic_load_long_long(&settings->current_frame_num) : 0;
+
+    return vj_perform_current_sample_external_audio_binding_at(info, el, target_frame, NULL, NULL, NULL);
+}
+
 static int vj_audio_mixer_finish_external(veejay_t *info,
                                           const uint8_t *original_bus,
                                           int original_ready,
@@ -8805,13 +9540,33 @@ static int vj_audio_mixer_finish_external(veejay_t *info,
                                           int frame_bytes,
                                           int channels,
                                           int sync_source,
-                                          int sync_mode)
+                                          int sync_mode,
+                                          int effective_mix)
 {
     performer_global_t *g = info ? (performer_global_t*)info->performer : NULL;
     performer_t *p = g ? g->A : NULL;
 
-    if(vj_perform_get_audio_mix_effective_mode(info) == VJ_AUDIO_MIX_ORIGINAL_EXTERNAL)
+    if(effective_mix < 0) {
+        effective_mix = vj_perform_get_audio_mix_effective_mode(info);
+        if(effective_mix == VJ_AUDIO_MIX_FOLLOW_ROUTE &&
+           vj_perform_sample_bound_external_audio_active(info))
+            effective_mix = VJ_AUDIO_MIX_EXTERNAL_ONLY;
+    }
+
+    if(effective_mix == VJ_AUDIO_MIX_ORIGINAL_EXTERNAL)
         vj_audio_mix_apply_external_entry_ramp(p, external_and_out, frames, frame_bytes);
+    else if(effective_mix == VJ_AUDIO_MIX_EXTERNAL_ONLY && p &&
+            p->audio_mix_external_entry_ramp_left > 0)
+    {
+        if(original_ready && original_bus)
+            vj_audio_mix_crossfade_original_to_external(p,
+                                                        external_and_out,
+                                                        original_bus,
+                                                        frames,
+                                                        frame_bytes);
+        else
+            vj_audio_mix_apply_external_entry_ramp(p, external_and_out, frames, frame_bytes);
+    }
 
     vj_perform_record_sync_audio_tap_write(info,
                                            external_and_out,
@@ -8819,7 +9574,7 @@ static int vj_audio_mixer_finish_external(veejay_t *info,
                                            sync_source,
                                            sync_mode);
 
-    if(vj_perform_get_audio_mix_effective_mode(info) == VJ_AUDIO_MIX_ORIGINAL_EXTERNAL &&
+    if(effective_mix == VJ_AUDIO_MIX_ORIGINAL_EXTERNAL &&
        original_ready && original_bus)
     {
         vj_audio_master_mix_original_external(info,
@@ -8877,7 +9632,77 @@ int vj_perform_queue_audio_chunk_ext(
     const int speed_abs = (speed < 0) ? -speed : speed;
     const int route_sfd = vj_perform_runtime_sfd(info);
 #ifdef HAVE_JACK
-    const int audio_mix_mode = vj_perform_get_audio_mix_effective_mode(info);
+    int audio_mix_mode = vj_audio_mix_stream_safe_mode(
+        info,
+        vj_perform_get_audio_mix_effective_mode(info));
+    int sample_audio_source = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+    int sample_audio_profile = 0;
+    int sample_audio_mode = SAMPLE_AUDIO_SYNC_OFF;
+    long sample_audio_switch_frame = 0;
+    long sample_audio_wav_anchor_ms = 0;
+    const int sample_audio_configured =
+        vj_perform_current_sample_external_audio_configured(info,
+                                                            &sample_audio_source,
+                                                            &sample_audio_profile,
+                                                            &sample_audio_mode,
+                                                            &sample_audio_switch_frame,
+                                                            &sample_audio_wav_anchor_ms);
+    const int sample_bound_external_audio =
+        vj_perform_current_sample_external_audio_binding_at(info,
+                                                            el,
+                                                            target_frame,
+                                                            &sample_audio_source,
+                                                            &sample_audio_profile,
+                                                            &sample_audio_mode);
+    const int sample_bound_silence_audio =
+        sample_bound_external_audio && sample_audio_source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE;
+    const int sample_bound_original_audio =
+        sample_audio_configured && sample_audio_source == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+
+    if(sample_bound_original_audio) {
+        audio_mix_mode = VJ_AUDIO_MIX_ORIGINAL_ONLY;
+    }
+    else if(sample_bound_external_audio) {
+        if(audio_mix_mode == VJ_AUDIO_MIX_FOLLOW_ROUTE)
+            audio_mix_mode = VJ_AUDIO_MIX_EXTERNAL_ONLY;
+
+        if(!sample_bound_silence_audio) {
+            const int wanted_sync_source =
+                (sample_audio_source == SAMPLE_AUDIO_SYNC_SOURCE_WAV) ?
+                    VJ_AUDIO_SYNC_SOURCE_WAV_FILE : VJ_AUDIO_SYNC_SOURCE_JACK;
+
+            const int wanted_sync_mode = vj_perform_sample_audio_sync_mode_to_vj_mode(sample_audio_mode);
+
+            if(info->uc && info->uc->sample_id > 0 &&
+               (!vj_audio_sync_is_enabled(&settings->audio_sync) ||
+                atomic_load_int(&settings->audio_sync.source) != wanted_sync_source ||
+                atomic_load_int(&settings->audio_sync.mode) != wanted_sync_mode ||
+                settings->audio_sync_sample_bound_id != info->uc->sample_id ||
+                settings->audio_sync_sample_bound_source != sample_audio_source ||
+                settings->audio_sync_sample_bound_profile != sample_audio_profile ||
+                settings->audio_sync_sample_bound_mode != sample_audio_mode))
+            {
+                int arm_rc = vj_perform_audio_sync_sample_seek_rearm(info,
+                                                                     info->uc->sample_id,
+                                                                     target_frame,
+                                                                     "sample-route-active");
+                veejay_msg(VEEJAY_MSG_DEBUG,
+                           "[AUDIO-ROUTE] sample=%d source=%s profile=%d mode=%d frame=%lld switch=%ld mix=%d arm=%d",
+                           info->uc->sample_id,
+                           vj_perform_sample_audio_source_name(sample_audio_source),
+                           sample_audio_profile,
+                           sample_audio_mode,
+                           target_frame,
+                           sample_audio_switch_frame,
+                           audio_mix_mode,
+                           arm_rc);
+            }
+        }
+    }
+    else if(sample_audio_configured && target_frame < (long long)sample_audio_switch_frame) {
+        audio_mix_mode = VJ_AUDIO_MIX_ORIGINAL_ONLY;
+        (void)sample_audio_wav_anchor_ms;
+    }
 #else
     const int audio_mix_mode = VJ_AUDIO_MIX_FOLLOW_ROUTE;
 #endif
@@ -8896,12 +9721,15 @@ int vj_perform_queue_audio_chunk_ext(
             p->audio_mix_external_last_frame_bytes = frame_bytes;
         }
 
-        if(audio_mix_mode == VJ_AUDIO_MIX_ORIGINAL_EXTERNAL &&
-           p->audio_mix_last_effective_mode != VJ_AUDIO_MIX_ORIGINAL_EXTERNAL) {
+        if((audio_mix_mode == VJ_AUDIO_MIX_ORIGINAL_EXTERNAL ||
+            audio_mix_mode == VJ_AUDIO_MIX_EXTERNAL_ONLY) &&
+           p->audio_mix_last_effective_mode != audio_mix_mode) {
             p->audio_mix_external_entry_ramp_left = VJ_AUDIO_MIX_EXTERNAL_ENTRY_RAMP_FRAMES;
-            vj_audio_sync_reset_monitor_transport(&settings->audio_sync);
+            if(audio_mix_mode == VJ_AUDIO_MIX_ORIGINAL_EXTERNAL)
+                vj_audio_sync_reset_monitor_transport(&settings->audio_sync);
         }
-        else if(audio_mix_mode != VJ_AUDIO_MIX_ORIGINAL_EXTERNAL)
+        else if(audio_mix_mode != VJ_AUDIO_MIX_ORIGINAL_EXTERNAL &&
+                audio_mix_mode != VJ_AUDIO_MIX_EXTERNAL_ONLY)
             p->audio_mix_external_entry_ramp_left = 0;
 
         p->audio_mix_last_effective_mode = audio_mix_mode;
@@ -8965,6 +9793,24 @@ int vj_perform_queue_audio_chunk_ext(
                                                    sync_mode_now);
             return client_frames_to_write;
         }
+    }
+#endif
+
+#ifdef HAVE_JACK
+    if(sample_bound_silence_audio) {
+        veejay_memset(audio_payload_chunk, 0,
+                      (size_t)client_frames_to_write * (size_t)frame_bytes);
+        vj_jack_set_input_passthrough(0);
+        if(p) {
+            p->external_audio_transport_active = 0;
+            p->external_audio_prev_valid = 0;
+        }
+        vj_perform_record_sync_audio_tap_write(info,
+                                               audio_payload_chunk,
+                                               client_frames_to_write,
+                                               VJ_AUDIO_SYNC_SOURCE_NONE,
+                                               VJ_AUDIO_SYNC_MODE_OFF);
+        return client_frames_to_write;
     }
 #endif
 
@@ -9043,7 +9889,9 @@ int vj_perform_queue_audio_chunk_ext(
             uint8_t *mix_original_bus = NULL;
             int mix_original_ready = 0;
 
-            if(audio_mix_mode == VJ_AUDIO_MIX_ORIGINAL_EXTERNAL &&
+            if((audio_mix_mode == VJ_AUDIO_MIX_ORIGINAL_EXTERNAL ||
+                (audio_mix_mode == VJ_AUDIO_MIX_EXTERNAL_ONLY && p &&
+                 p->audio_mix_external_entry_ramp_left > 0)) &&
                p && p->audio_render_buffer &&
                p->audio_render_buffer_capacity >= out_bytes)
             {
@@ -9164,7 +10012,8 @@ int vj_perform_queue_audio_chunk_ext(
                                                        frame_bytes,
                                                        el->audio_chans,
                                                        sync_source_now,
-                                                       sync_mode);
+                                                       sync_mode,
+                                                       audio_mix_mode);
             }
 
             if (sync_mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE) {
@@ -9337,6 +10186,19 @@ int vj_perform_queue_audio_chunk_ext(
 
             if (external_frames <= 0) {
 
+                if(sample_bound_external_audio)
+                    veejay_msg(VEEJAY_MSG_DEBUG,
+                               "[AUDIO-ROUTE] external render empty sample=%d source=%s profile=%d mode=%d frame=%lld switch=%ld sync_source=%d sync_mode=%d mix=%d",
+                               info->uc ? info->uc->sample_id : 0,
+                               vj_perform_sample_audio_source_name(sample_audio_source),
+                               sample_audio_profile,
+                               sample_audio_mode,
+                               target_frame,
+                               sample_audio_switch_frame,
+                               sync_source_now,
+                               sync_mode,
+                               audio_mix_mode);
+
                 veejay_memset(audio_payload_chunk, 0, out_bytes);
                 if (p && p->external_audio_transport_active) {
                     vj_audio_declick_apply(p,
@@ -9368,7 +10230,8 @@ int vj_perform_queue_audio_chunk_ext(
                                                        frame_bytes,
                                                        el->audio_chans,
                                                        sync_source_now,
-                                                       sync_mode);
+                                                       sync_mode,
+                                                       audio_mix_mode);
             }
 
             if (external_frames < client_frames_to_write)
@@ -9434,7 +10297,8 @@ int vj_perform_queue_audio_chunk_ext(
                                                        frame_bytes,
                                                        el->audio_chans,
                                                        sync_source_now,
-                                                       sync_mode);
+                                                       sync_mode,
+                                                       audio_mix_mode);
             }
 
 
@@ -9454,7 +10318,8 @@ int vj_perform_queue_audio_chunk_ext(
                                                        frame_bytes,
                                                        el->audio_chans,
                                                        sync_source_now,
-                                                       sync_mode);
+                                                       sync_mode,
+                                                       audio_mix_mode);
             }
 
 
@@ -9523,7 +10388,8 @@ int vj_perform_queue_audio_chunk_ext(
                                                            frame_bytes,
                                                            el->audio_chans,
                                                            sync_source_now,
-                                                           sync_mode);
+                                                           sync_mode,
+                                                           audio_mix_mode);
                     }
                 }
             }
@@ -9578,7 +10444,8 @@ int vj_perform_queue_audio_chunk_ext(
                                                        frame_bytes,
                                                        el->audio_chans,
                                                        sync_source_now,
-                                                       sync_mode);
+                                                       sync_mode,
+                                                       audio_mix_mode);
                     }
                 }
             }
@@ -9627,7 +10494,8 @@ int vj_perform_queue_audio_chunk_ext(
                                                        frame_bytes,
                                                        el->audio_chans,
                                                        sync_source_now,
-                                                       sync_mode);
+                                                       sync_mode,
+                                                       audio_mix_mode);
             }
 
             int rendered = vj_external_audio_render_transport(p,
@@ -9657,7 +10525,8 @@ int vj_perform_queue_audio_chunk_ext(
                                                        frame_bytes,
                                                        el->audio_chans,
                                                        sync_source_now,
-                                                       sync_mode);
+                                                       sync_mode,
+                                                       audio_mix_mode);
             }
 
             if (fresh != audio_payload_chunk)
@@ -9687,13 +10556,26 @@ int vj_perform_queue_audio_chunk_ext(
                                                        frame_bytes,
                                                        el->audio_chans,
                                                        sync_source_now,
-                                                       sync_mode);
+                                                       sync_mode,
+                                                       audio_mix_mode);
         }
     }
 #endif
 
 #ifdef HAVE_JACK
     if(audio_mix_mode == VJ_AUDIO_MIX_EXTERNAL_ONLY) {
+        veejay_memset(audio_payload_chunk,
+                      0,
+                      (size_t)client_frames_to_write * (size_t)frame_bytes);
+        return client_frames_to_write;
+    }
+
+    if(vj_audio_playback_is_stream(info)) {
+        vj_jack_set_input_passthrough(0);
+        if(p) {
+            p->external_audio_transport_active = 0;
+            p->external_audio_prev_valid = 0;
+        }
         veejay_memset(audio_payload_chunk,
                       0,
                       (size_t)client_frames_to_write * (size_t)frame_bytes);
@@ -14517,7 +15399,7 @@ static const char *osd_audio_source_name(int source)
     switch(source) {
         case VJ_RECORD_AUDIO_SOURCE_AUTO:      return "auto";
         case VJ_RECORD_AUDIO_SOURCE_ORIGINAL:  return "orig";
-        case VJ_RECORD_AUDIO_SOURCE_BEAT_JACK: return "ext";
+        case VJ_RECORD_AUDIO_SOURCE_EXTERNAL: return "ext";
         case VJ_RECORD_AUDIO_SOURCE_SILENCE:   return "sil";
         default: return "unk";
     }
@@ -14580,7 +15462,7 @@ static void osd_int_dir_token(char *dst, size_t dst_len, int value)
     if(mag > 99U)
         mag = 99U;
 
-    snprintf(dst, dst_len, "%c%02u", dir, mag);
+    snprintf(dst, dst_len, "%c%2u", dir, mag);
 }
 
 static void osd_signed_int_token(char *dst, size_t dst_len, int value)
@@ -14606,7 +15488,7 @@ static void osd_signed_int_token(char *dst, size_t dst_len, int value)
     if(mag > 9999U)
         mag = 9999U;
 
-    snprintf(dst, dst_len, "%c%04u", sign, mag);
+    snprintf(dst, dst_len, "%c%4u", sign, mag);
 }
 
 static const char *osd_sync_mode_name(int mode)
@@ -14665,7 +15547,7 @@ static void osd_bpm_text(char *dst, size_t dst_len, float bpm)
     if(!dst || dst_len == 0)
         return;
     if(bpm >= 20.0f && bpm <= 300.0f)
-        snprintf(dst, dst_len, "%05.1f", (double)bpm);
+        snprintf(dst, dst_len, "%5.1f", (double)bpm);
     else
         snprintf(dst, dst_len, "---.-");
 }
@@ -14726,7 +15608,7 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
 
     if(drop_pending || drop_video || slow || anomalies) {
         snprintf(engine, sizeof(engine),
-                 "A:%s v%s sf%02d q%03d drop%03lld/%03lld slow%03lld err%03lld",
+                 "A:%s v%s sf%2d q%3d drop%3lld/%3lld slow%3lld err%3lld",
                  osd_audio_source_name(audio_src),
                  audio_speed,
                  osd_display_clampi(sfd, 0, 99),
@@ -14737,7 +15619,7 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
                  osd_display_clampll(anomalies, 0, 999));
     } else {
         snprintf(engine, sizeof(engine),
-                 "A:%s v%s sf%02d q%03d",
+                 "A:%s v%s sf%2d q%3d",
                  osd_audio_source_name(audio_src),
                  audio_speed,
                  osd_display_clampi(sfd, 0, 99),
@@ -14760,7 +15642,7 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
         long queue_overruns = (long)osd_display_clampll(snap.target_queue_overruns, 0, 99);
         if(queue_overruns) {
             snprintf(queue, sizeof(queue),
-                     " tq%03d/%03d ov%02ld",
+                     " tq%3d/%3d ov%2ld",
                      osd_display_clampi(snap.target_queue_retained_ms, 0, 999),
                      osd_display_clampi(snap.target_queue_ring_ms, 0, 999),
                      queue_overruns);
@@ -14770,7 +15652,7 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
     switch(snap.mode) {
         case VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL:
             snprintf(dst, dst_len,
-                     "S:ana %s %s r%d bpm%s c%03d ph%03d l%03d tr%03d | %s",
+                     "S:ana %s %s r%d bpm%s c%3d ph%3d l%3d tr%3d | %s",
                      osd_sync_source_name(snap.source),
                      osd_audio_open_name(snap.open),
                      snap.running,
@@ -14785,7 +15667,7 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
         case VJ_AUDIO_SYNC_MODE_MONITOR:
         case VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY:
             snprintf(dst, dst_len,
-                     "S:%s %s %s r%d bpm%s c%03d l%03d tr%03d | %s",
+                     "S:%s %s %s r%d bpm%s c%3d l%3d tr%3d | %s",
                      osd_sync_mode_name(snap.mode),
                      osd_sync_source_name(snap.source),
                      osd_audio_open_name(snap.open),
@@ -14799,7 +15681,7 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
 
         case VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW:
             snprintf(dst, dst_len,
-                     "S:follow %s %s src%s/%03d clip%s/%03d r%05.3f pull%02d fps%06.2f %s%s | %s",
+                     "S:follow %s %s src%s/%3d clip%s/%3d r%5.3f pull%2d fps%6.2f %s%s | %s",
                      osd_sync_source_name(snap.source),
                      osd_audio_open_name(snap.open),
                      source_bpm,
@@ -14816,7 +15698,7 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
 
         case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE:
             snprintf(dst, dst_len,
-                     "S:bridge %s %s src%s/%03d tgt%s/%03d r%05.3f max%02d %s%s | %s",
+                     "S:bridge %s %s src%s/%3d tgt%s/%3d r%5.3f max%2d %s%s | %s",
                      osd_sync_source_name(snap.source),
                      osd_audio_open_name(snap.open),
                      source_bpm,
@@ -14834,7 +15716,7 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
             osd_signed_int_token(off_text, sizeof(off_text), snap.track_align_offset_ms);
             osd_signed_int_token(ppm_text, sizeof(ppm_text), snap.track_align_correction_ppm);
             snprintf(dst, dst_len,
-                     "S:align %s %s src%s/%03d clip%s/%03d %s off%s c%03d ppm%s %s%s | %s",
+                     "S:align %s %s src%s/%3d clip%s/%3d %s off%s c%3d ppm%s %s%s | %s",
                      osd_sync_source_name(snap.source),
                      osd_audio_open_name(snap.open),
                      source_bpm,
@@ -14852,7 +15734,7 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
 
         default:
             snprintf(dst, dst_len,
-                     "S:%s %s %s r%d bpm%s c%03d | %s",
+                     "S:%s %s %s r%d bpm%s c%3d | %s",
                      osd_sync_mode_name(snap.mode),
                      osd_sync_source_name(snap.source),
                      osd_audio_open_name(snap.open),
@@ -14971,7 +15853,7 @@ static char *vj_perform_osd_status(veejay_t *info)
     char fps_text[32];
 
     osd_speed_token(speed_text, sizeof(speed_text), speed);
-    snprintf(fps_text, sizeof(fps_text), "%06.2f", effective_fps);
+    snprintf(fps_text, sizeof(fps_text), "%6.2f", effective_fps);
 
     const char *mode_str = "Plain";
     int mode_total = 1;
@@ -14995,8 +15877,8 @@ static char *vj_perform_osd_status(veejay_t *info)
     char buf[1024];
     if(info->video_output_width < 1920)
         snprintf(buf, sizeof(buf),
-            "OUT %s | SRC %s | %s %03d/%03d F%08lld\n"
-            "DROP%04lld SP%sx FPS%s %s %s\n%s",
+            "OUT %s | SRC %s | %s %3d/%3d F%8lld\n"
+            "DROP%4lld SP%sx FPS%s %s %s\n%s",
             master_timecode,
             timecode,
             mode_str,
@@ -15012,8 +15894,8 @@ static char *vj_perform_osd_status(veejay_t *info)
         );
     else
         snprintf(buf, sizeof(buf),
-            "OUT %s | SRC %s | %s %03d/%03d F%08lld "
-            "DROP%04lld SP%sx FPS%s %s %s %s",
+            "OUT %s | SRC %s | %s %3d/%3d F%8lld "
+            "DROP%4lld SP%sx FPS%s %s %s %s",
             master_timecode,
             timecode,
             mode_str,
@@ -15637,6 +16519,7 @@ int vj_perform_queue_video_frames(veejay_t *info, VJFrame *frame, VJFrame *frame
                    vj_perform_trace_ssm_name(p->primary_buffer[0]->ssm));
 
     p->primary_buffer[0]->ssm = 0;
+    vj_perform_source_cache_reset(p);
     for(int i = 0; i < SAMPLE_MAX_EFFECTS; i++)
         p->frame_buffer[i]->ssm = 0;
 
@@ -15652,6 +16535,8 @@ int vj_perform_queue_video_frames(veejay_t *info, VJFrame *frame, VJFrame *frame
     if(mode != VJ_PLAYBACK_MODE_TAG ) {
         vj_perform_plain_fill_buffer(info,p, p->tmp1, sample_id,mode, frame_num);
         p->primary_buffer[0]->ssm = p->tmp1->ssm;
+        if(is_sample)
+            vj_perform_sample_source_cache_store(p, sample_id, p->tmp1);
         if(trace)
             vj_perform_trace_frame_state("queue-primary-filled", sample_id, mode, -1, -1, p->tmp1, p->primary_buffer[0]);
         if( is_sample )
@@ -15746,7 +16631,6 @@ void vj_perform_render_video_frames(veejay_t *info, performer_t *p, vjp_kf *effe
     performer_global_t *g = (performer_global_t*) info->performer;
 
     int is444 = 0;
-    int i = 0;
     int safe_ff = p->pvar_.follow_fade;
     int safe_fv = p->pvar_.fade_value;
 
@@ -15790,7 +16674,16 @@ void vj_perform_render_video_frames(veejay_t *info, performer_t *p, vjp_kf *effe
         vj_perform_trace_frame_state("render-primary", sample_id, source_type, -1, -1, a, p->primary_buffer[0]);
     }
 
-    vj_perform_cache_put_frame( g, sample_id, source_type, p->primary_buffer[0]);
+    if(source_type == VJ_PLAYBACK_MODE_TAG &&
+       p->stream_source_cache_valid &&
+       p->stream_source_cache_id == sample_id)
+        vj_perform_cache_put_frame(p, sample_id, source_type, p->stream_source_cache);
+    else if(source_type == VJ_PLAYBACK_MODE_SAMPLE &&
+            p->sample_source_cache_valid &&
+            p->sample_source_cache_id == sample_id)
+        vj_perform_cache_put_frame(p, sample_id, source_type, p->sample_source_cache);
+    else
+        vj_perform_cache_put_frame(p, sample_id, source_type, p->primary_buffer[0]);
 
     switch (source_type)
     {
@@ -16605,6 +17498,22 @@ void vj_perform_inc_frame(veejay_t *info, int num)
         speed = settings->current_playback_speed;
         cur_dir = (speed < 0) ? -1 : speed > 0 ? 1 : 0;
         num = speed;
+
+        if(mode == VJ_PLAYBACK_MODE_TAG && vj_tag_buffer_active(info->uc->sample_id)) {
+            int duration = vj_tag_get_buffer_duration(info->uc->sample_id);
+            if(duration < 1)
+                duration = 1;
+            start = 0;
+            end = duration - 1;
+            atomic_store_long_long(&settings->min_frame_num, start);
+            atomic_store_long_long(&settings->max_frame_num, end);
+
+            long long cur = atomic_load_long_long(&settings->current_frame_num);
+            if(cur > end)
+                atomic_store_long_long(&settings->current_frame_num, end);
+            else if(cur < start)
+                atomic_store_long_long(&settings->current_frame_num, start);
+        }
     }
 
     if (speed == 0) {
@@ -16792,7 +17701,7 @@ void vj_perform_inc_frame(veejay_t *info, int num)
         vj_perform_initiate_edge_change_ex(info, edge_type, prev_dir, next_dir);
 #ifdef HAVE_JACK
         if(normal_loop_reset_edge)
-            vj_perform_audio_force_loop_reset_fade(info, next_frame);
+            vj_perform_audio_handle_sample_loop_reset(info, next_frame);
 #endif
     }
 

@@ -43,18 +43,12 @@ Reloaded is a client for Veejay. As long as Veejay \
 (the server) is running, you can connect and disconnect from it with Reloaded.\n\
 -------------------------------------"
 
-#define RELOADED_DESCRIPTION "-------------------------------------\n\
-The Veejay website is at http://veejayhq.net\n\n\
-If you find a bug, please use the issue tracker at https://github.com/game-stop/veejay/issues\n\
--------------------------------------"
 
 extern int mt_get_max_tracks();
 static int load_midi = 0;
 static int port_num = DEFAULT_PORT_NUM;
 static char hostname[255];
 static int verbosity = 0;
-static int col = 0;
-static int row = 0;
 static int n_tracks = 7;
 static int launcher = 0;
 static int preview = 0; // off
@@ -74,6 +68,7 @@ static gboolean arg_verbose = FALSE;
 static gint arg_preview = 0;
 static gint arg_tracks = 0;
 static gchar *arg_size = NULL;
+static gint arg_sample_pages = 0;
 static gboolean arg_version = FALSE;
 static gchar *arg_style = NULL;
 static gboolean arg_smallaspossible = FALSE;
@@ -89,6 +84,33 @@ static volatile gulong g_trap_free_size = 0;
 static void usage(void)
 {
     g_printerr ("%s\n", help_text);  //FIXME why program name is (null) ???
+}
+
+static int parse_samplebank_size_option(const char *text, int *cols, int *rows, int *pages)
+{
+    int a = 0;
+    int b = 0;
+    char tail = 0;
+
+    if(!text || !*text)
+        return 0;
+
+    if(sscanf(text, " %d %c", &a, &tail) == 1) {
+        *pages = a;
+        return 1;
+    }
+
+    if(sscanf(text, " %d x %d %c", &a, &b, &tail) == 2 ||
+       sscanf(text, " %d X %d %c", &a, &b, &tail) == 2 ||
+       sscanf(text, " %d:%d %c", &a, &b, &tail) == 2 ||
+       sscanf(text, " %d,%d %c", &a, &b, &tail) == 2)
+    {
+        *cols = a;
+        *rows = b;
+        return 1;
+    }
+
+    return 0;
 }
 
 void vj_gui_startup (GApplication *application, gpointer user_data)
@@ -121,7 +143,7 @@ static void vj_gui_activate(GApplication *app, gpointer user_data)
     g_application_hold(app);
 
     vj_gui_set_debug_level(verbosity, n_tracks, 0, 0);
-    default_bank_values(&col, &row);
+    default_bank_values(NULL, NULL);
 
     register_signals();
 
@@ -224,14 +246,22 @@ gint vj_gui_command_line (GApplication            *app,
         else if(verbosity) veejay_msg(VEEJAY_MSG_INFO, "Preview quality: %d", preview);
     }
 
-    if ( arg_size )
     {
-        if(sscanf( (char*) arg_size, "%dx%d", &row, &col ) != 2 )
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "--size parameter requires a \"CxR\" argument: \"%s\"", arg_size);
-            err++;
+        int sample_cols = 6;
+        int sample_rows = 2;
+        int sample_pages = arg_sample_pages > 0 ? arg_sample_pages : 12;
+
+        if(arg_size) {
+            if(!parse_samplebank_size_option(arg_size, &sample_cols, &sample_rows, &sample_pages)) {
+                veejay_msg(VEEJAY_MSG_ERROR, "--size/-s requires pages or a sample-bank layout N, CxR, C:R or C,R: \"%s\"", arg_size);
+                err++;
+            }
+            g_free(arg_size);
+            arg_size = NULL;
         }
-        g_free(arg_size);
+
+        if(!set_samplebank_layout(sample_cols, sample_rows, sample_pages))
+            err++;
     }
 
     if ( arg_tracks )
@@ -293,7 +323,8 @@ int main(int argc, char **argv)
     {"no-color",    'n', 0, G_OPTION_ARG_NONE, &arg_notcolored, "Do not use colored text in console logs.", NULL},
     {"port",        'p', 0, G_OPTION_ARG_INT, &arg_port, port_description, NULL},
     {"preview",     'P', 0, G_OPTION_ARG_INT, &arg_preview, "Start with preview enabled (1=full, 2=1/2, 3=1/4, 4=1/8).", NULL},
-    {"size",        's', 0, G_OPTION_ARG_STRING, &arg_size, "Set bank resolution \"CxR\".", NULL},
+    {"sample-pages", 0, 0, G_OPTION_ARG_INT, &arg_sample_pages, "Number of sample-bank pages to allocate in the grid (default: 12, max: 512).", "N"},
+    {"size",        's', 0, G_OPTION_ARG_STRING, &arg_size, "Sample-bank pages or layout: N, CxR, C:R or C,R (default: 12 pages, 6x2).", "N|CxR"},
     {"verbose",     'v', 0, G_OPTION_ARG_NONE, &arg_verbose,"Be more verbose.", NULL},
     {"version",     'V', 0, G_OPTION_ARG_NONE, &arg_version,"Show version and data directory, then exit.", NULL},
     {"tracks",      'X', 0, G_OPTION_ARG_INT, &arg_tracks,"Set the number of tracks.", NULL},
@@ -306,7 +337,6 @@ int main(int argc, char **argv)
 
     context = g_option_context_new (NULL);
     g_option_context_set_summary (context, RELOADED_SUMMARY);
-    g_option_context_set_description (context, RELOADED_DESCRIPTION);
     g_option_context_set_help_enabled(context, TRUE);
     g_option_context_add_main_entries (context, options, NULL);
     g_option_context_add_group (context, gtk_get_option_group (TRUE));

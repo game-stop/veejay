@@ -147,6 +147,11 @@ static int keyframe_format_header(char *dst,
     return (hdr_len == KEYFRAME_PACKET_HEADER_LEN);
 }
 
+int keyframe_is_chain_opacity_parameter(int parameter_id)
+{
+    return parameter_id == VJ_KF_PARAM_CHAIN_OPACITY;
+}
+
 static	char	*extract_( const char *prefix , int p_id )
 {
 	char tmp[100];
@@ -296,7 +301,10 @@ int	keyframe_get_param_status( int lookup, int fx_entry, int parameter_id, int i
 {
 	void *port = NULL;
 
-	if( is_sample ) {
+    if(keyframe_is_chain_opacity_parameter(parameter_id)) {
+        port = is_sample ? sample_get_chain_fade_kf_port(lookup)
+                         : vj_tag_get_chain_fade_kf_port(lookup);
+    } else if( is_sample ) {
 		port = sample_get_kf_port( lookup, fx_entry );
 	} else {
 		port = vj_tag_get_kf_port( lookup, fx_entry );
@@ -323,7 +331,10 @@ void	keyframe_set_param_status( int lookup, int fx_entry, int parameter_id, int 
 	void *port = NULL;
 	int kf_status = status;
 
-	if( is_sample ) {
+    if(keyframe_is_chain_opacity_parameter(parameter_id)) {
+        port = is_sample ? sample_get_chain_fade_kf_port(lookup)
+                         : vj_tag_get_chain_fade_kf_port(lookup);
+    } else if( is_sample ) {
 		port = sample_get_kf_port( lookup, fx_entry );
 	} else {
 		port = vj_tag_get_kf_port( lookup, fx_entry );
@@ -345,7 +356,10 @@ void    keyframe_clear_entry( int lookup, int fx_entry, int parameter_id, int is
 {
     void *port = NULL;
 
-    if( is_sample ) {
+    if(keyframe_is_chain_opacity_parameter(parameter_id)) {
+        port = is_sample ? sample_get_chain_fade_kf_port(lookup)
+                         : vj_tag_get_chain_fade_kf_port(lookup);
+    } else if( is_sample ) {
         port = sample_get_kf_port( lookup, fx_entry );
     } else {
         port = vj_tag_get_kf_port( lookup, fx_entry );
@@ -451,11 +465,19 @@ int keyframe_unpack(unsigned char *in, int len,
         ptr += 4;
     }
 
-    void *port = is_sample ? sample_get_kf_port(lookup, fx_entry) : vj_tag_get_kf_port(lookup, fx_entry);
+    void *port = NULL;
 
-    if (!port && is_sample) {
-        sample_chain_alloc_kf(lookup, fx_entry);
-        port = sample_get_kf_port(lookup, fx_entry);
+    if(keyframe_is_chain_opacity_parameter(parameter_id)) {
+        port = is_sample ? sample_chain_fade_alloc_kf(lookup)
+                         : vj_tag_chain_fade_alloc_kf(lookup);
+        fx_entry = VJ_KF_ENTRY_CHAIN_FADE;
+    } else {
+        port = is_sample ? sample_get_kf_port(lookup, fx_entry) : vj_tag_get_kf_port(lookup, fx_entry);
+
+        if (!port && is_sample) {
+            sample_chain_alloc_kf(lookup, fx_entry);
+            port = sample_get_kf_port(lookup, fx_entry);
+        }
     }
 
     if (!port) {
@@ -480,11 +502,18 @@ int keyframe_unpack(unsigned char *in, int len,
     free(k_s); free(k_e); free(k_t);
     free(k_h); free(k_x);
 
+    if(data_ok && keyframe_is_chain_opacity_parameter(parameter_id)) {
+        if(is_sample)
+            sample_chain_fade_set_kf_status(lookup, status, type);
+        else
+            vj_tag_chain_fade_set_kf_status(lookup, status, type);
+    }
+
     *entry = fx_entry;
     return data_ok;
 }
 
-int keyframe_get_tokens(void *port, int parameter_id,
+int keyframe_get_param_tokens(void *port, int parameter_id,
                         int *start, int *end,
                         int *type, int *shape, int *status)
 {

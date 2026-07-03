@@ -67,6 +67,7 @@
 #include <src/utils.h>
 #include <src/sequence.h>
 #include <src/gtksequencebankview.h>
+#include <src/gtksamplebankview.h>
 #include <veejaycore/yuvconv.h>
 #include <veejaycore/libvevo.h>
 #include <src/vmidi.h>
@@ -92,6 +93,14 @@ static gpointer castIntToGpointer(int val)
 #ifndef VJ_SEQUENCE_BANKS
 #define VJ_SEQUENCE_BANKS 4
 #endif
+
+#ifndef VJ_KF_ENTRY_CHAIN_FADE
+#define VJ_KF_ENTRY_CHAIN_FADE 0
+#endif
+#ifndef VJ_KF_PARAM_CHAIN_OPACITY
+#define VJ_KF_PARAM_CHAIN_OPACITY 99
+#endif
+
 #undef STATUS_SEQUENCE_ACTIVE_BANK
 #undef STATUS_SEQUENCE_REVISION
 #undef STATUS_SEQUENCE_SIZE
@@ -155,7 +164,6 @@ static inline int ui_audio_sync_mode_uses_external_provider(int mode)
            mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN;
 }
 
-#define QUICKSELECT_SLOTS 10
 #define MAX_WIDGET_CACHE 512
 
 #define SAMPLE_TITLE_MAX_LEN 12
@@ -586,9 +594,29 @@ enum {
   WIDGET_AUDIO_MIXER_CROSSFADE_LABEL = 410,
   WIDGET_AUDIO_MIXER_CROSSFADE_SCALE = 411,
   WIDGET_AUDIO_MIXER_CROSSFADE_SPIN = 412,
+  WIDGET_AUDIO_MIXER_OVERRIDE_TOGGLE = 432,
+  WIDGET_AUDIO_MIXER_ORIGINAL_RADIO = 433,
+  WIDGET_AUDIO_MIXER_EXTERNAL_RADIO = 434,
+  WIDGET_AUDIO_MIXER_MIX_RADIO = 435,
   WIDGET_CURVE_SPIN_ANIMATION_SEED = 413,
   WIDGET_CURVE_BUTTON_ANIMATION_SHUFFLE = 414,
   WIDGET_CURVE_SPIN_ANIMATION_DETAIL = 415,
+  WIDGET_STREAM_BUFFER_FRAME = 416,
+  WIDGET_STREAM_BUFFER_LENGTH = 417,
+  WIDGET_STREAM_BUFFER_FILL_VALUE = 418,
+  WIDGET_STREAM_BUFFER_POSITION_VALUE = 419,
+  WIDGET_STREAM_BUFFER_SPEED_VALUE = 420,
+  WIDGET_STREAM_BUFFER_MODE_VALUE = 421,
+  WIDGET_BUTTON_080 = 422,
+  WIDGET_BUTTON_081 = 423,
+  WIDGET_BUTTON_082 = 424,
+  WIDGET_BUTTON_085 = 425,
+  WIDGET_BUTTON_086 = 426,
+  WIDGET_BUTTON_087 = 427,
+  WIDGET_BUTTON_088 = 428,
+  WIDGET_BUTTON_LEN_MUL = 429,
+  WIDGET_BUTTON_LEN_DIV = 430,
+  WIDGET_OFFLINEBOX = 431,
 };
 
 
@@ -596,6 +624,13 @@ enum {
  SAMPLE_WIDGET_SAMPLE_LOOP_BOX = 0,
  SAMPLE_WIDGET_BUTTON_084,
  SAMPLE_WIDGET_VIDEO_NAVIGATION_BUTTONS,
+ SAMPLE_WIDGET_BUTTON_080,
+ SAMPLE_WIDGET_BUTTON_081,
+ SAMPLE_WIDGET_BUTTON_082,
+ SAMPLE_WIDGET_BUTTON_085,
+ SAMPLE_WIDGET_BUTTON_086,
+ SAMPLE_WIDGET_BUTTON_087,
+ SAMPLE_WIDGET_BUTTON_088,
  SAMPLE_WIDGET_BUTTON_SAMPLESTART,
  SAMPLE_WIDGET_BUTTON_SAMPLEEND,
  SAMPLE_WIDGET_SPEED_SLIDER,
@@ -619,8 +654,15 @@ enum {
 
 enum {
   PLAIN_WIDGET_VIDEO_NAVIGATION_BUTTONS = 0,
-  PLAIN_WIDGET_BUTTON_084,
+  PLAIN_WIDGET_BUTTON_080,
+  PLAIN_WIDGET_BUTTON_081,
+  PLAIN_WIDGET_BUTTON_082,
   PLAIN_WIDGET_BUTTON_083,
+  PLAIN_WIDGET_BUTTON_084,
+  PLAIN_WIDGET_BUTTON_085,
+  PLAIN_WIDGET_BUTTON_086,
+  PLAIN_WIDGET_BUTTON_087,
+  PLAIN_WIDGET_BUTTON_088,
   PLAIN_WIDGET_BUTTON_SAMPLESTART,
   PLAIN_WIDGET_BUTTON_SAMPLEEND,
   PLAIN_WIDGET_SPEED_SLIDER,
@@ -639,6 +681,20 @@ enum {
   STREAM_WIDGET_PANEL,
   STREAM_WIDGET_SCROLLEDWINDOW49,
   STREAM_WIDGET_SAMPLEGRID_FRAME,
+  STREAM_WIDGET_VIDEO_NAVIGATION_BUTTONS,
+  STREAM_WIDGET_BUTTON_080,
+  STREAM_WIDGET_BUTTON_081,
+  STREAM_WIDGET_BUTTON_082,
+  STREAM_WIDGET_BUTTON_083,
+  STREAM_WIDGET_BUTTON_084,
+  STREAM_WIDGET_BUTTON_085,
+  STREAM_WIDGET_BUTTON_086,
+  STREAM_WIDGET_BUTTON_087,
+  STREAM_WIDGET_BUTTON_088,
+  STREAM_WIDGET_SPEED_SLIDER,
+  STREAM_WIDGET_SLOW_SLIDER,
+  STREAM_WIDGET_STREAM_BUFFER_FRAME,
+  STREAM_WIDGET_STREAM_BUFFER_LENGTH,
   STREAM_WIDGET_NONE,
 };
 
@@ -696,6 +752,20 @@ stream_widget_map[] =
     { STREAM_WIDGET_FXPANEL,              WIDGET_FXPANEL },
     { STREAM_WIDGET_PANEL,                WIDGET_PANELS },
     { STREAM_WIDGET_SAMPLEGRID_FRAME,     WIDGET_SAMPLEGRID_FRAME },
+    { STREAM_WIDGET_VIDEO_NAVIGATION_BUTTONS, WIDGET_VIDEO_NAVIGATION_BUTTONS },
+    { STREAM_WIDGET_BUTTON_080,           WIDGET_BUTTON_080 },
+    { STREAM_WIDGET_BUTTON_081,           WIDGET_BUTTON_081 },
+    { STREAM_WIDGET_BUTTON_082,           WIDGET_BUTTON_082 },
+    { STREAM_WIDGET_BUTTON_083,           WIDGET_BUTTON_083 },
+    { STREAM_WIDGET_BUTTON_084,           WIDGET_BUTTON_084 },
+    { STREAM_WIDGET_BUTTON_085,           WIDGET_BUTTON_085 },
+    { STREAM_WIDGET_BUTTON_086,           WIDGET_BUTTON_086 },
+    { STREAM_WIDGET_BUTTON_087,           WIDGET_BUTTON_087 },
+    { STREAM_WIDGET_BUTTON_088,           WIDGET_BUTTON_088 },
+    { STREAM_WIDGET_SPEED_SLIDER,         WIDGET_SPEED_SLIDER },
+    { STREAM_WIDGET_SLOW_SLIDER,          WIDGET_SLOW_SLIDER },
+    { STREAM_WIDGET_STREAM_BUFFER_FRAME,  WIDGET_STREAM_BUFFER_FRAME },
+    { STREAM_WIDGET_STREAM_BUFFER_LENGTH, WIDGET_STREAM_BUFFER_LENGTH },
     { STREAM_WIDGET_NONE, -1 },
 };
 
@@ -709,6 +779,13 @@ static struct
     {  SAMPLE_WIDGET_SAMPLE_LOOP_BOX,           WIDGET_SAMPLE_LOOP_BOX },
     {  SAMPLE_WIDGET_BUTTON_084,                WIDGET_BUTTON_084 },
     {  SAMPLE_WIDGET_VIDEO_NAVIGATION_BUTTONS,  WIDGET_VIDEO_NAVIGATION_BUTTONS },
+    {  SAMPLE_WIDGET_BUTTON_080,                WIDGET_BUTTON_080 },
+    {  SAMPLE_WIDGET_BUTTON_081,                WIDGET_BUTTON_081 },
+    {  SAMPLE_WIDGET_BUTTON_082,                WIDGET_BUTTON_082 },
+    {  SAMPLE_WIDGET_BUTTON_085,                WIDGET_BUTTON_085 },
+    {  SAMPLE_WIDGET_BUTTON_086,                WIDGET_BUTTON_086 },
+    {  SAMPLE_WIDGET_BUTTON_087,                WIDGET_BUTTON_087 },
+    {  SAMPLE_WIDGET_BUTTON_088,                WIDGET_BUTTON_088 },
     {  SAMPLE_WIDGET_BUTTON_SAMPLESTART,        WIDGET_BUTTON_SAMPLESTART },
     {  SAMPLE_WIDGET_BUTTON_SAMPLEEND,          WIDGET_BUTTON_SAMPLEEND },
     {  SAMPLE_WIDGET_SPEED_SLIDER,              WIDGET_SPEED_SLIDER },
@@ -736,8 +813,15 @@ static struct
 } plain_widget_map[] =
 {
     { PLAIN_WIDGET_VIDEO_NAVIGATION_BUTTONS,    WIDGET_VIDEO_NAVIGATION_BUTTONS },
-    { PLAIN_WIDGET_BUTTON_084,                  WIDGET_BUTTON_084 },
+    { PLAIN_WIDGET_BUTTON_080,                  WIDGET_BUTTON_080 },
+    { PLAIN_WIDGET_BUTTON_081,                  WIDGET_BUTTON_081 },
+    { PLAIN_WIDGET_BUTTON_082,                  WIDGET_BUTTON_082 },
     { PLAIN_WIDGET_BUTTON_083,                  WIDGET_BUTTON_083 },
+    { PLAIN_WIDGET_BUTTON_084,                  WIDGET_BUTTON_084 },
+    { PLAIN_WIDGET_BUTTON_085,                  WIDGET_BUTTON_085 },
+    { PLAIN_WIDGET_BUTTON_086,                  WIDGET_BUTTON_086 },
+    { PLAIN_WIDGET_BUTTON_087,                  WIDGET_BUTTON_087 },
+    { PLAIN_WIDGET_BUTTON_088,                  WIDGET_BUTTON_088 },
     { PLAIN_WIDGET_BUTTON_SAMPLESTART,          WIDGET_BUTTON_SAMPLESTART },
     { PLAIN_WIDGET_BUTTON_SAMPLEEND,            WIDGET_BUTTON_SAMPLEEND },
     { PLAIN_WIDGET_SPEED_SLIDER,                WIDGET_SPEED_SLIDER },
@@ -784,6 +868,12 @@ static struct
     { "samplerand",             WIDGET_SAMPLERAND },
     { "stream_length",          WIDGET_STREAM_LENGTH },
     { "stream_length_label",    WIDGET_STREAM_LENGTH_LABEL },
+    { "stream_buffer_frame",    WIDGET_STREAM_BUFFER_FRAME },
+    { "stream_buffer_length",   WIDGET_STREAM_BUFFER_LENGTH },
+    { "stream_buffer_fill_value", WIDGET_STREAM_BUFFER_FILL_VALUE },
+    { "stream_buffer_position_value", WIDGET_STREAM_BUFFER_POSITION_VALUE },
+    { "stream_buffer_speed_value", WIDGET_STREAM_BUFFER_SPEED_VALUE },
+    { "stream_buffer_mode_value", WIDGET_STREAM_BUFFER_MODE_VALUE },
     { "button_fadedur",         WIDGET_BUTTON_FADEDUR },
     { "label_totframes",        WIDGET_LABEL_TOTFRAMES },
     { "label_samplelength",     WIDGET_LABEL_SAMPLELENGTH },
@@ -974,14 +1064,23 @@ static struct
     { "fx_m4",                  WIDGET_FX_M4 },
     { "fx_mnone",               WIDGET_FX_MNONE },
     {"sample_loop_box",         WIDGET_SAMPLE_LOOP_BOX },
-    {"button_084",              WIDGET_BUTTON_084 },
+    {"button_080",              WIDGET_BUTTON_080 },
+    {"button_081",              WIDGET_BUTTON_081 },
+    {"button_082",              WIDGET_BUTTON_082 },
     {"button_083",              WIDGET_BUTTON_083 },
+    {"button_084",              WIDGET_BUTTON_084 },
+    {"button_085",              WIDGET_BUTTON_085 },
+    {"button_086",              WIDGET_BUTTON_086 },
+    {"button_087",              WIDGET_BUTTON_087 },
+    {"button_088",              WIDGET_BUTTON_088 },
     {"video_navigation_buttons", WIDGET_VIDEO_NAVIGATION_BUTTONS},
     {"button_samplestart",       WIDGET_BUTTON_SAMPLESTART},
     {"button_sampleend",         WIDGET_BUTTON_SAMPLEEND},
     {"speed_slider",             WIDGET_SPEED_SLIDER},
     {"slow_slider",              WIDGET_SLOW_SLIDER},
     {"button_200",               WIDGET_BUTTON_200},
+    {"button_len_mul",           WIDGET_BUTTON_LEN_MUL},
+    {"button_len_div",           WIDGET_BUTTON_LEN_DIV},
     {"frame_fxtree",             WIDGET_FRAME_FXTREE},
     {"fxpanel",                  WIDGET_FXPANEL},
     {"vjframerate",              WIDGET_VJFRAMERATE },
@@ -993,7 +1092,10 @@ static struct
     {"audio_master_jack_volume_scale", WIDGET_AUDIO_MASTER_JACK_VOLUME_SCALE },
     {"audio_master_jack_volume_spin",  WIDGET_AUDIO_MASTER_JACK_VOLUME_SPIN },
     {"audio_mixer_mode_label",         WIDGET_AUDIO_MIXER_MODE_LABEL },
-    {"audio_mixer_mode_combo",         WIDGET_AUDIO_MIXER_MODE_COMBO },
+    {"audio_mixer_override_toggle",    WIDGET_AUDIO_MIXER_OVERRIDE_TOGGLE },
+    {"audio_mixer_original_radio",     WIDGET_AUDIO_MIXER_ORIGINAL_RADIO },
+    {"audio_mixer_external_radio",     WIDGET_AUDIO_MIXER_EXTERNAL_RADIO },
+    {"audio_mixer_mix_radio",          WIDGET_AUDIO_MIXER_MIX_RADIO },
     {"audio_mixer_crossfade_label",    WIDGET_AUDIO_MIXER_CROSSFADE_LABEL },
     {"audio_mixer_crossfade_scale",    WIDGET_AUDIO_MIXER_CROSSFADE_SCALE },
     {"audio_mixer_crossfade_spin",     WIDGET_AUDIO_MIXER_CROSSFADE_SPIN },
@@ -1008,9 +1110,7 @@ static struct
     { "hbox910",                 WIDGET_HBOX910 },
     { "hbox27",                  WIDGET_HBOX27 },
     { "sample_bank_hbox",        WIDGET_SAMPLE_BANK_HBOX },
-    { "button_samplebank_prev",  WIDGET_BUTTON_SAMPLEBANK_PREV },
-    { "button_samplebank_next",  WIDGET_BUTTON_SAMPLEBANK_NEXT },
-    { "spin_samplebank_select",  WIDGET_SPIN_SAMPLEBANK_SELECT },
+    { "offlinebox",              WIDGET_OFFLINEBOX },
     { "hbox709",                 WIDGET_HBOX709 },
     { "sample_panel",            WIDGET_SAMPLE_PANEL },
     { "vbox623",                 WIDGET_VBOX623 },
@@ -1225,13 +1325,13 @@ static struct
     {"Print the current audio sync state on the backend."},
     {"External sync input level."},
     {"External sync transient strength."},
-    {"Whether the backend reports audio sync enabled."},
-    {"Whether the external sync source is currently open."},
-    {"Whether the audio sync thread is running."},
-    {"Current backend audio sync mode."},
-    {"Current backend audio sync source."},
-    {"Current audio sync input channel count."},
-    {"Current audio sync source sample rate."},
+    {"Sync state currently selected by the backend: off, internal beat analysis, or external provider."},
+    {"External provider state. Internal beat analysis is reported as internal."},
+    {"Current audio sync engine state."},
+    {"Current external sync mode."},
+    {"Current sync provider: JACK, WAV file, internal beat analysis, original audio, or silence."},
+    {"Current provider channel count."},
+    {"Current provider sample rate."},
     {"Measured or target audio sync tempo."},
     {"Current audio sync confidence."},
     {"Current activity: analyze-only, clean monitor, monitor trickplay, Visual Tempo Follow, Tempo Match Bridge, Track Align, or no external sync."},
@@ -1239,12 +1339,12 @@ static struct
     {"Current tempo correction amount reported by the backend; 1.000 is neutral."},
     {"Current target BPM reported by the backend. In Visual Tempo Follow this is derived from the current clip."},
     {"Current target-clock confidence reported by the backend."},
-    {"Configured maximum tempo-match correction percentage."},
+    {"Configured correction limit for Visual Tempo Follow or Tempo Match Bridge."},
     {"Current tempo lock state: idle, waiting, locked, hold, or fallback."},
-    {"Whether waveform track alignment is currently locked."},
-    {"Waveform alignment offset in milliseconds. Positive means the clip/video is late relative to the external sync provider."},
+    {"Whether Track Align is currently locked."},
+    {"Track Align offset in milliseconds. Positive means the clip/video is late relative to the external provider."},
     {"Waveform correlation confidence for track alignment."},
-    {"Current video timing correction requested by track alignment, in parts per million."},
+    {"Current Track Align rate correction in parts per million."},
     {"Current waveform track alignment state: idle, waiting, searching, locked, hold, or fallback."},
 
     {"Choose a WAV file to use as the external sync provider. WAV can drive Analyze, Monitor, Monitor + Trickplay, Visual Tempo Follow, Tempo Match Bridge, or Track Align."},
@@ -1271,7 +1371,7 @@ static const char *audio_sync_master_track_name(int record_source)
 {
     switch(record_source) {
         case VJ_RECORD_AUDIO_SOURCE_BEAT_JACK:
-            return "External provider";
+            return "External";
         case VJ_RECORD_AUDIO_SOURCE_SILENCE:
             return "Silence";
         case VJ_RECORD_AUDIO_SOURCE_AUTO:
@@ -1580,6 +1680,10 @@ enum
 #error "VJ_STATUS_ARRAY_SIZE is too small for selected FX chain-entry status fields"
 #endif
 
+#if VJ_STATUS_ARRAY_SIZE <= STREAM_BUFFER_STATE
+#error "VJ_STATUS_ARRAY_SIZE is too small for stream trickplay status fields"
+#endif
+
 
 
 enum
@@ -1720,7 +1824,7 @@ typedef struct
 } vims_keys_t;
 
 static  int user_preview = 0;
-static int NUM_BANKS = 50;
+static int NUM_BANKS = 12;
 static  int NUM_SAMPLES_PER_PAGE = 12;
 static int SAMPLEBANK_COLUMNS = 6;
 static int SAMPLEBANK_ROWS = 2;
@@ -1739,17 +1843,6 @@ static int cali_stream_type = STREAM_NO_STREAM;
 static int cali_onoff     = 0;
 static int geo_pos_[2] = { -1,-1 };
 static vevo_port_t *fx_list_ = NULL;
-typedef struct
-{
-    GtkWidget *title;
-    GtkWidget *timecode;
-    GtkWidget *image;
-    GtkWidget *frame;
-    GtkWidget *event_box;
-    GtkWidget *upper_hbox;
-    GtkWidget *hotkey;
-} sample_gui_slot_t;
-
 typedef struct
 {
     GtkWidget *frame;
@@ -1795,7 +1888,6 @@ typedef struct
     gint bank_number;
     gint page_num;
     sample_slot_t **slot;
-    sample_gui_slot_t **gui_slot;
 } sample_bank_t;
 
 typedef struct
@@ -1925,21 +2017,16 @@ typedef struct
     int run_state;
     int play_direction;
     int load_image_slot;
-    GtkWidget   *sample_bank_pad;
-    GtkWidget   *quick_select;
+    GtkWidget   *sample_bank_view;
     GtkWidget   *sample_sequencer;
     GtkWidget   *sequence_bank_view;
     sample_bank_t   **sample_banks;
     sample_slot_t   *selected_slot;
     sample_slot_t   *selection_slot;
-    sample_gui_slot_t *selected_gui_slot;
-    sample_gui_slot_t *selection_gui_slot;
-    sequence_envelope *sequence_view;
     sequence_envelope *sequencer_view;
     int sequencer_col;
     int sequencer_row;
     int sequence_playing;
-    gint current_sequence_slot;
 
 
     int image_dimensions[2];
@@ -2111,6 +2198,9 @@ static void update_label_f(const char *name, float val);
 static void update_label_str(const char *name, gchar *text);
 static void update_label_str2(GtkWidget *label, const char *text);
 static void update_globalinfo(int *his, int p, int k);
+static void update_stream_trickplay_status(int *history, int initial);
+static void set_widget_sensitive_cached(int widget_id, int sensitive);
+static void ui_transport_controls_set_sensitive(int sensitive);
 static gint load_parameter_info(void);
 static void load_v4l_info(void);
 static void reload_editlist_contents(void);
@@ -2147,24 +2237,32 @@ static void init_recorder(int total_frames, gint mode);
 static void reload_bundles(void);
 static void update_rgbkey_from_slider(void);
 static gchar *get_textview_buffer(const char *name);
-static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h);
-static void samplebank_clear_gui_slot(sample_slot_t *slot, sample_gui_slot_t *gui_slot);
-static void setup_samplebank(gint c, gint r, GtkAllocation *allocation, gint *image_w, gint *image_h);
+static void samplebank_clear_slot_pixbuf(sample_slot_t *slot);
+static gboolean samplebank_locate_slot(sample_slot_t *slot, int *page, int *slot_nr);
+static void samplebank_update_offline_recorder_gadget(void);
+static void samplebank_update_page_label(void);
+static void samplebank_request_page_thumbnails(int page);
+static void samplebank_store_title_override(int sample_id, int sample_type, const char *title);
+static const char *samplebank_lookup_title_override(int sample_id, int sample_type);
+static gboolean samplebank_title_is_default(int sample_id, int sample_type, const char *title);
+static gboolean samplebank_make_offline_recording_title(const char *title, char *dst, size_t dst_size);
+static void on_sample_bank_view_page_selected(GtkWidget *widget, gint page, gpointer user_data);
+static void on_sample_bank_view_slot_selected(GtkWidget *widget, gint page, gint slot, gpointer user_data);
+static void on_sample_bank_view_slot_activated(GtkWidget *widget, gint page, gint slot, gpointer user_data);
+static void on_sample_bank_view_slot_mix_requested(GtkWidget *widget, gint page, gint slot, gpointer user_data);
 static sample_slot_t *update_sample_slot_data(int bank_num, int slot_num, int id, gint sample_type, gchar *title, gchar *timecode);
-static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *event, gpointer user_data);
 static void add_sample_to_effect_sources_list(gint id, gint type, gchar *title, gchar *timecode);
 static void set_activation_of_slot_in_samplebank(gboolean activate);
+static sample_slot_t *find_slot_by_sample(int sample_id, int sample_type);
 static int find_bank_by_sample(int sample_id, int sample_type, int *slot );
 static int find_bank_by_sample_existing(int sample_id, int sample_type, int *slot);
 static int add_bank( gint bank_num  );
 static void set_selection_of_slot_in_samplebank(gboolean active);
 static void remove_sample_from_slot(void);
-static void create_ref_slots(int envelope_size);
 static void create_sequencer_slots(int x, int y);
 void free_samplebank(void);
 void reset_samplebank(void);
 int verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_type );
-static void widget_get_rect_in_screen (GtkWidget *widget, GdkRectangle *r);
 static void update_curve_widget( GtkWidget *curve );
 
 static void reset_tree(const char *name);
@@ -2190,6 +2288,33 @@ static void audio_input_selector_sync_from_status(void);
 static void timeline_update_compact_overlay(void);
 
 GtkWidget *glade_xml_get_widget_( GtkBuilder *m, const char *name );
+
+extern void on_audio_mixer_override_toggled(GtkWidget *widget, gpointer user_data);
+extern void on_audio_mixer_route_toggled(GtkWidget *widget, gpointer user_data);
+
+static void connect_audio_mixer_override_signals(void)
+{
+    static const char *const route_widgets[] = {
+        "audio_mixer_original_radio",
+        "audio_mixer_external_radio",
+        "audio_mixer_mix_radio",
+        NULL
+    };
+    GtkWidget *w;
+
+    if(!info || !info->main_window)
+        return;
+
+    w = glade_xml_get_widget_(info->main_window, "audio_mixer_override_toggle");
+    if(w && GTK_IS_TOGGLE_BUTTON(w))
+        g_signal_connect(G_OBJECT(w), "toggled", G_CALLBACK(on_audio_mixer_override_toggled), NULL);
+
+    for(int i = 0; route_widgets[i] != NULL; i++) {
+        w = glade_xml_get_widget_(info->main_window, route_widgets[i]);
+        if(w && GTK_IS_TOGGLE_BUTTON(w))
+            g_signal_connect(G_OBJECT(w), "toggled", G_CALLBACK(on_audio_mixer_route_toggled), NULL);
+    }
+}
 
 gboolean gveejay_idle(gpointer data)
 {
@@ -2375,6 +2500,29 @@ static void timeline_update_compact_overlay(void)
                             phase_pct,
                             pulse_pct,
                             gate_pct);
+
+    if(pm == MODE_SAMPLE && VIMS_STATUS_TOKENS > SAMPLE_AUDIO_SYNC_LOCK_CONFIDENCE) {
+        gint source = info->status_tokens[SAMPLE_AUDIO_SYNC_SOURCE];
+        gint profile = info->status_tokens[SAMPLE_AUDIO_SYNC_PROFILE];
+        gint mode = info->status_tokens[SAMPLE_AUDIO_SYNC_MODE];
+        gint video_anchor = info->status_tokens[SAMPLE_AUDIO_SYNC_VIDEO_ANCHOR];
+        gint wav_anchor_ms = info->status_tokens[SAMPLE_AUDIO_SYNC_WAV_ANCHOR_MS];
+        gint wav_length_ms = (VIMS_STATUS_TOKENS > SAMPLE_AUDIO_SYNC_WAV_LENGTH_MS) ? info->status_tokens[SAMPLE_AUDIO_SYNC_WAV_LENGTH_MS] : 0;
+        gint wav_loop = (VIMS_STATUS_TOKENS > SAMPLE_AUDIO_SYNC_WAV_LOOP) ? info->status_tokens[SAMPLE_AUDIO_SYNC_WAV_LOOP] : 0;
+        gint local_anchor = video_anchor - source_start;
+        gint sample_len = MAX(1, source_end - source_start + 1);
+
+        if(local_anchor < 0 || local_anchor >= sample_len)
+            local_anchor = CLAMP(info->status_tokens[FRAME_NUM] - source_start, 0, sample_len - 1);
+
+        if(source == SAMPLE_AUDIO_SYNC_SOURCE_WAV && profile > 0)
+            timeline_set_audio_lane(info->tl, TRUE, source, profile, mode, local_anchor, MAX(0, wav_anchor_ms), MAX(0, wav_length_ms), wav_loop ? TRUE : FALSE);
+        else
+            timeline_clear_audio_lane(info->tl);
+    }
+    else {
+        timeline_clear_audio_lane(info->tl);
+    }
 }
 
 
@@ -2385,7 +2533,10 @@ static int get_vj_kf_active_parameter(void) {
     if(active_kf_param_num <= 0)
         return -1;
 
-    return active_kf_param_num - 1;
+    if(active_kf_param_num == 1)
+        return VJ_KF_PARAM_CHAIN_OPACITY;
+
+    return active_kf_param_num - 2;
 }
 
 static void vj_kf_reset_shape_combo(void)
@@ -2658,7 +2809,6 @@ enum
 };
 
 static sample_slot_t *find_slot_by_sample( int sample_id , int sample_type );
-static sample_gui_slot_t *find_gui_slot_by_sample( int sample_id , int sample_type );
 
 gchar *_utf8str(const char *c_str)
 {
@@ -4373,7 +4523,7 @@ int veejay_get_sample_image(int id, int type, int wid, int hei)
     uint8_t *out = data_buffer;
 
     VJFrame *src1 = yuv_yuv_template( in, in + (wid * hei), in + (wid * hei) + (wid*hei)/4,wid,hei,(full_range ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P) );
-    VJFrame *dst1 = yuv_rgb_template( out, wid,hei,PIX_FMT_BGR24 );
+    VJFrame *dst1 = yuv_rgb_template( out, wid,hei,PIX_FMT_RGB24 );
 
     yuv_convert_any_ac( src1, dst1 );
 
@@ -4390,19 +4540,22 @@ int veejay_get_sample_image(int id, int type, int wid, int hei)
     if( img == NULL )
         return 0;
 
-    sample_slot_t *slot = find_slot_by_sample( sample_id, sample_type );
-    sample_gui_slot_t *gui_slot = find_gui_slot_by_sample( sample_id, sample_type );
+    int slot_num = -1;
+    int bank_page = find_bank_by_sample_existing(sample_id, sample_type, &slot_num);
 
-    if( slot && gui_slot )
-    {
-        slot->pixbuf = vj_gdk_pixbuf_scale_simple(img,wid,hei, GDK_INTERP_NEAREST);
-        if( slot->pixbuf)
-        {
-            gtk_widget_show(gui_slot->image);
-            gtk_image_set_from_pixbuf_( GTK_IMAGE( gui_slot->image ), slot->pixbuf );
-            g_object_unref( slot->pixbuf );
-            slot->pixbuf = NULL;
+    if(bank_page >= 0 && slot_num >= 0) {
+        sample_slot_t *slot = NULL;
+
+        if(info->sample_banks && bank_page < NUM_BANKS && info->sample_banks[bank_page])
+            slot = info->sample_banks[bank_page]->slot[slot_num];
+
+        if(slot) {
+            samplebank_clear_slot_pixbuf(slot);
+            slot->pixbuf = gdk_pixbuf_copy(img);
         }
+
+        if(info->sample_bank_view)
+            gvr_sample_bank_view_set_thumbnail(info->sample_bank_view, bank_page, slot_num, img);
     }
 
     free(data_buffer);
@@ -4630,7 +4783,13 @@ void vj_msg(int type, const char format[], ...)
     gchar *text = g_locale_to_utf8( buf, -1, &nr, &nw, NULL);
     text[strlen(text)-1] = '\0';
 
-    gtk_statusbar_push( GTK_STATUSBAR( widget_cache[ WIDGET_STATUSBAR] ),0, text );
+    GtkWidget *status = widget_cache[WIDGET_STATUSBAR];
+    if(status) {
+        if(GTK_IS_STATUSBAR(status))
+            gtk_statusbar_push(GTK_STATUSBAR(status), 0, text);
+        else if(GTK_IS_LABEL(status))
+            update_label_str2(status, text);
+    }
 
     g_free( text );
     va_end(args);
@@ -4782,6 +4941,81 @@ static int get_slider_val(const char *name)
 
 static void audio_beat_update_curve_live_traces(gboolean push_samples);
 
+static int ui_stream_buffer_supported(void)
+{
+    return info &&
+           info->status_tokens[PLAY_MODE] == MODE_STREAM &&
+           info->status_tokens[STREAM_BUFFER_STATE] != STREAM_BUFFER_STATE_UNSUPPORTED;
+}
+
+static int ui_stream_buffer_enabled(void)
+{
+    return ui_stream_buffer_supported() &&
+           info->status_tokens[STREAM_BUFFER_ENABLED] > 0 &&
+           info->status_tokens[STREAM_BUFFER_FILLED] > 0;
+}
+
+static int ui_stream_transport_length(void)
+{
+    if(ui_stream_buffer_enabled()) {
+        int len = info->status_tokens[STREAM_BUFFER_FILLED];
+        if(len > 0)
+            return len;
+    }
+    return info->status_tokens[SAMPLE_MARKER_END];
+}
+
+static int ui_stream_transport_position(void)
+{
+    if(ui_stream_buffer_enabled()) {
+        int len = ui_stream_transport_length();
+        int pos = info->status_tokens[STREAM_BUFFER_POSITION];
+        if(pos < 0)
+            pos = 0;
+        else if(pos >= len)
+            pos = len - 1;
+        return pos;
+    }
+    return info->status_tokens[FRAME_NUM];
+}
+
+static const char *ui_stream_buffer_mode_name(int mode)
+{
+    switch(mode) {
+        case 1: return "buffer";
+        default: return "live";
+    }
+}
+
+static const char *ui_stream_buffer_state_name(int state)
+{
+    switch(state) {
+        case STREAM_BUFFER_STATE_UNSUPPORTED: return "unsupported";
+        case STREAM_BUFFER_STATE_OFF: return "off";
+        case STREAM_BUFFER_STATE_EMPTY: return "empty";
+        case STREAM_BUFFER_STATE_LIVE: return "live";
+        case STREAM_BUFFER_STATE_PLAYING: return "playing";
+        case STREAM_BUFFER_STATE_PAUSED: return "paused";
+        default: return "unknown";
+    }
+}
+
+static void ui_stream_trickplay_set_sensitive(int stream_mode, int supported, int ready)
+{
+    supported = supported ? 1 : 0;
+    ready = ready ? 1 : 0;
+
+    set_widget_sensitive_cached(WIDGET_STREAM_BUFFER_FRAME, supported);
+    set_widget_sensitive_cached(WIDGET_STREAM_BUFFER_LENGTH, supported);
+
+    if(!stream_mode) {
+        ui_transport_controls_set_sensitive(1);
+        return;
+    }
+
+    ui_transport_controls_set_sensitive(ready);
+}
+
 static int vj_kf_timeline_length(void)
 {
     int pm = info->status_tokens[PLAY_MODE];
@@ -4800,7 +5034,7 @@ static int vj_kf_timeline_length(void)
         len = sample_end - sample_start + 1;
     }
     else if(pm == MODE_STREAM) {
-        len = info->status_tokens[SAMPLE_MARKER_END];
+        len = ui_stream_transport_length();
     }
     else {
         len = info->status_tokens[TOTAL_FRAMES];
@@ -4820,6 +5054,8 @@ static int vj_kf_timeline_position(void)
 
     if(pm == MODE_SAMPLE)
         pos -= info->status_tokens[SAMPLE_START];
+    else if(pm == MODE_STREAM)
+        pos = ui_stream_transport_position();
 
     if(pos < 0)
         pos = 0;
@@ -4901,7 +5137,8 @@ static void vj_kf_refresh(gboolean force)
         update_curve_widget( info->curve );
     } else {
         gtk_widget_set_sensitive_( widget_cache[WIDGET_FRAME_FXTREE3], TRUE );
-        if(info->uc.selected_parameter_id >= 0)
+        if(info->uc.selected_parameter_id >= 0 &&
+           info->uc.selected_parameter_id != VJ_KF_PARAM_CHAIN_OPACITY)
             vj_kf_reset_panel();
         update_curve_widget( info->curve );
     }
@@ -4963,7 +5200,7 @@ static void update_curve_widget(GtkWidget *curve)
     int i = info->uc.selected_chain_entry;
     int id = info->uc.entry_tokens[ENTRY_FXID];
     int blen = 0;
-    int lo = 0, hi = 0, curve_type=0;
+    int lo = 0, hi = 0, curve_type = 0;
     int p = -1;
     int shape = 0;
     int status = 0;
@@ -4997,7 +5234,8 @@ static void update_curve_widget(GtkWidget *curve)
             pos = info->status_tokens[FRAME_NUM] - sample_start;
         }
         else if(pm == MODE_STREAM) {
-            len = info->status_tokens[SAMPLE_MARKER_END];
+            len = ui_stream_transport_length();
+            pos = ui_stream_transport_position();
         }
         else {
             len = info->status_tokens[TOTAL_FRAMES];
@@ -5043,30 +5281,38 @@ static void update_curve_widget(GtkWidget *curve)
         return;
     }
 
-    multi_vims( VIMS_SAMPLE_KF_GET, "%d %d",i,info->uc.selected_parameter_id );
+    int selected_parameter_id = info->uc.selected_parameter_id;
+    int chain_opacity = (selected_parameter_id == VJ_KF_PARAM_CHAIN_OPACITY);
+    int kf_entry = chain_opacity ? VJ_KF_ENTRY_CHAIN_FADE : i;
+    int curve_fx_id = chain_opacity ? 0 : id;
 
-    unsigned char *blob = (unsigned char*) recv_vims( 8, &blen );
+    if(!chain_opacity && kf_entry < 0) {
+        reset_curve(curve);
+        curve_live_preview_user_override(FALSE);
+        return;
+    }
 
-    int checksum = i + id + info->uc.selected_parameter_id + blen;
+    multi_vims(VIMS_SAMPLE_KF_GET, "%d %d", kf_entry, selected_parameter_id);
+
+    unsigned char *blob = (unsigned char*) recv_vims(8, &blen);
+
+    int checksum = kf_entry + curve_fx_id + selected_parameter_id + blen;
 
     if(blob && blen > 0)
         checksum += data_checksum((char*) blob, blen);
 
-    if( info->uc.reload_hint_checksums[HINT_KF] == checksum ) {
-        if( blob ) free(blob);
+    if(info->uc.reload_hint_checksums[HINT_KF] == checksum) {
+        if(blob) free(blob);
         return;
     }
     info->uc.reload_hint_checksums[HINT_KF] = checksum;
 
-
     reset_curve(curve);
-
 
     int total_frames = vj_kf_timeline_length();
     int max_x = (total_frames > 1 ? total_frames - 1 : 1);
 
-    if( lo == hi && hi == 0 )
-    {
+    if(lo == hi && hi == 0) {
         lo = 0;
         hi = max_x;
     }
@@ -5081,19 +5327,16 @@ static void update_curve_widget(GtkWidget *curve)
     else if(hi > max_x)
         hi = max_x;
 
-    update_spin_range2( widget_cache[WIDGET_CURVE_SPINSTART],0, max_x, lo );
-    update_spin_range2( widget_cache[WIDGET_CURVE_SPINEND], 0, max_x, hi );
+    update_spin_range2(widget_cache[WIDGET_CURVE_SPINSTART], 0, max_x, lo);
+    update_spin_range2(widget_cache[WIDGET_CURVE_SPINEND], 0, max_x, hi);
 
-    if( blob && blen > 0 )
-    {
-        p = set_points_in_curve_ext( curve, blob,blen, id,i, &curve_type,&shape, &status, (double) info->el.fps );
-        if( p >= 0 )
-        {
-            int selected_parameter_id = info->uc.selected_parameter_id;
-
+    if(blob && blen > 0) {
+        p = set_points_in_curve_ext(curve, blob, blen, curve_fx_id, kf_entry, &curve_type, &shape, &status, (double) info->el.fps);
+        if(p >= 0) {
             if(p != selected_parameter_id) {
                 Gtk3CurveType ui_type = vj_kf_selected_curve_type_from_ui();
                 int old_lock = info->status_lock;
+                int fallback_value = chain_opacity ? info->status_tokens[CHAIN_FADE] : info->uc.entry_tokens[ENTRY_P0 + selected_parameter_id];
 
                 reset_curve(curve);
                 if(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM] &&
@@ -5102,10 +5345,10 @@ static void update_curve_widget(GtkWidget *curve)
                     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE);
                     info->status_lock = old_lock;
                 }
-                set_initial_curve( curve, info->uc.entry_tokens[ENTRY_FXID], selected_parameter_id,
-                                   lo, hi,
-                                   info->uc.entry_tokens[ENTRY_P0 + selected_parameter_id],
-                                   (double) info->el.fps);
+                set_initial_curve(curve, curve_fx_id, selected_parameter_id,
+                                  lo, hi,
+                                  fallback_value,
+                                  (double) info->el.fps);
                 set_points_in_curve(ui_type, curve);
                 update_slider_state(selected_parameter_id, FALSE);
                 if(blob) free(blob);
@@ -5118,23 +5361,23 @@ static void update_curve_widget(GtkWidget *curve)
 
                 vj_kf_set_curve_type_button_locked((Gtk3CurveType)curve_type);
                 set_points_in_curve((Gtk3CurveType)curve_type, curve);
-                if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM])) != status ) {
-                    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), status );
-                }
+                if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM])) != status)
+                    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), status);
 
-                if(gtk_combo_box_get_active(GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION])) != shape) {
-                    gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]), shape);
-                }
+                if(gtk_combo_box_get_active(GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION])) != shape)
+                    gtk_combo_box_set_active(GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]), shape);
 
                 info->status_lock = old_lock;
             }
 
-            update_slider_state( selected_parameter_id, status );
+            update_slider_state(selected_parameter_id, status);
             curve_live_preview_user_override(status ? TRUE : FALSE);
         }
-    } else {
+    }
+    else {
         Gtk3CurveType ui_type = vj_kf_selected_curve_type_from_ui();
         int old_lock = info->status_lock;
+        int fallback_value = chain_opacity ? info->status_tokens[CHAIN_FADE] : info->uc.entry_tokens[ENTRY_P0 + selected_parameter_id];
 
         if(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM] &&
            GTK_IS_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM])) {
@@ -5142,18 +5385,16 @@ static void update_curve_widget(GtkWidget *curve)
             gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE);
             info->status_lock = old_lock;
         }
-        set_initial_curve( curve, info->uc.entry_tokens[ENTRY_FXID], info->uc.selected_parameter_id,
-                           lo, hi ,
-                           info->uc.entry_tokens[ ENTRY_P0 + info->uc.selected_parameter_id ],
-                           (double) info->el.fps);
+        set_initial_curve(curve, curve_fx_id, selected_parameter_id,
+                          lo, hi,
+                          fallback_value,
+                          (double) info->el.fps);
         set_points_in_curve(ui_type, curve);
-        update_slider_state( info->uc.selected_parameter_id, FALSE );
+        update_slider_state(selected_parameter_id, FALSE);
         curve_live_preview_user_override(FALSE);
     }
 
     if(blob) free(blob);
-
-    return;
 }
 
 static int get_nums(const char *name)
@@ -5331,8 +5572,14 @@ static void update_slider_value2(GtkWidget *w, gint value, gint scale)
     else
         gvalue = (gdouble) value;
 
-    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
-    gtk_adjustment_set_value( a, gvalue );
+    if(!w || !GTK_IS_RANGE(w))
+        return;
+
+    GtkAdjustment *a = gtk_range_get_adjustment(GTK_RANGE(w));
+    if(fabs(gtk_adjustment_get_value(a) - gvalue) < 0.000001)
+        return;
+
+    gtk_adjustment_set_value(a, gvalue);
 }
 
 static void update_slider_value(const char *name, gint value, gint scale)
@@ -5355,6 +5602,9 @@ static void update_slider_value(const char *name, gint value, gint scale)
 
 static void update_slider_state(int slider_num, gboolean animated)
 {
+    if(slider_num < 0 || slider_num >= MAX_UI_PARAMETERS)
+        return;
+
     if(animated)
         add_class( widget_cache[WIDGET_SLIDER_P0+slider_num], "fx-anim" );
     else
@@ -5374,8 +5624,20 @@ static void update_spin_incr( const char *name, gdouble step, gdouble page )
 
 static void update_spin_range2(GtkWidget *w, gint min, gint max, gint val)
 {
-    gtk_spin_button_set_range( GTK_SPIN_BUTTON(w), (gdouble)min, (gdouble) max );
-    gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble)val);
+    if(!w || !GTK_IS_SPIN_BUTTON(w))
+        return;
+
+    GtkAdjustment *a = gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(w));
+    const gdouble gmin = (gdouble)min;
+    const gdouble gmax = (gdouble)max;
+    const gdouble gval = (gdouble)val;
+
+    if(fabs(gtk_adjustment_get_lower(a) - gmin) >= 0.000001 ||
+       fabs(gtk_adjustment_get_upper(a) - gmax) >= 0.000001)
+        gtk_spin_button_set_range(GTK_SPIN_BUTTON(w), gmin, gmax);
+
+    if(fabs(gtk_spin_button_get_value(GTK_SPIN_BUTTON(w)) - gval) >= 0.000001)
+        gtk_spin_button_set_value(GTK_SPIN_BUTTON(w), gval);
 }
 
 static void update_spin_range(const char *name, gint min, gint max, gint val)
@@ -5496,11 +5758,48 @@ static void update_slider_range(const char *name, gint min, gint max, gint value
 static void update_label_i2(GtkWidget *label, int num, int prefix)
 {
     char str[20];
+    if(!label || !GTK_IS_LABEL(label))
+        return;
+
     if(prefix)
-        g_snprintf( str,sizeof(str), "%09d", num );
+        g_snprintf(str, sizeof(str), "%09d", num);
     else
-        g_snprintf( str,sizeof(str), "%d",    num );
-    gtk_label_set_text( GTK_LABEL(label), str);
+        g_snprintf(str, sizeof(str), "%d", num);
+
+    if(strcmp(gtk_label_get_text(GTK_LABEL(label)), str) == 0)
+        return;
+
+    gtk_label_set_text(GTK_LABEL(label), str);
+}
+
+static void ui_set_toggle_active_if_changed(int widget_id, int active)
+{
+    GtkWidget *w = widget_cache[widget_id];
+    gboolean wanted = active ? TRUE : FALSE;
+
+    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+        return;
+
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == wanted)
+        return;
+
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), wanted);
+}
+
+static void ui_sync_sample_loop_type(int loop_type)
+{
+    int widget_id = WIDGET_LOOP_NORMAL;
+
+    switch(loop_type) {
+        case 0: widget_id = WIDGET_LOOP_NONE; break;
+        case 1: widget_id = WIDGET_LOOP_NORMAL; break;
+        case 2: widget_id = WIDGET_LOOP_PINGPONG; break;
+        case 3: widget_id = WIDGET_LOOP_RANDOM; break;
+        case 4: widget_id = WIDGET_LOOP_ONCENOP; break;
+        default: widget_id = WIDGET_LOOP_NORMAL; break;
+    }
+
+    ui_set_toggle_active_if_changed(widget_id, 1);
 }
 
 static void update_label_f(const char *name, float val )
@@ -5549,7 +5848,9 @@ static void update_label_str2(GtkWidget *label, const char *text)
     if(!utf8_text)
         return;
 
-    gtk_label_set_text(GTK_LABEL(label), utf8_text);
+    if(strcmp(gtk_label_get_text(GTK_LABEL(label)), utf8_text) != 0)
+        gtk_label_set_text(GTK_LABEL(label), utf8_text);
+
     g_free(utf8_text);
 }
 
@@ -5804,9 +6105,32 @@ static void update_record_tab(int pm)
 static void set_widget_sensitive_cached(int widget_id, int sensitive)
 {
     GtkWidget *w = widget_cache[widget_id];
+    gboolean wanted = sensitive ? TRUE : FALSE;
 
-    if(w)
-        gtk_widget_set_sensitive(w, sensitive ? TRUE : FALSE);
+    if(w && gtk_widget_get_sensitive(w) != wanted)
+        gtk_widget_set_sensitive(w, wanted);
+}
+
+static void ui_sample_marker_length_controls_set_sensitive(int sample_mode)
+{
+    set_widget_sensitive_cached(WIDGET_BUTTON_LEN_MUL, sample_mode);
+    set_widget_sensitive_cached(WIDGET_BUTTON_LEN_DIV, sample_mode);
+}
+
+static void ui_transport_controls_set_sensitive(int sensitive)
+{
+    set_widget_sensitive_cached(WIDGET_VIDEO_NAVIGATION_BUTTONS, sensitive);
+    set_widget_sensitive_cached(WIDGET_BUTTON_080, sensitive);
+    set_widget_sensitive_cached(WIDGET_BUTTON_081, sensitive);
+    set_widget_sensitive_cached(WIDGET_BUTTON_082, sensitive);
+    set_widget_sensitive_cached(WIDGET_BUTTON_083, sensitive);
+    set_widget_sensitive_cached(WIDGET_BUTTON_084, sensitive);
+    set_widget_sensitive_cached(WIDGET_BUTTON_085, sensitive);
+    set_widget_sensitive_cached(WIDGET_BUTTON_086, sensitive);
+    set_widget_sensitive_cached(WIDGET_BUTTON_087, sensitive);
+    set_widget_sensitive_cached(WIDGET_BUTTON_088, sensitive);
+    set_widget_sensitive_cached(WIDGET_SPEED_SLIDER, sensitive);
+    set_widget_sensitive_cached(WIDGET_SLOW_SLIDER, sensitive);
 }
 
 static void update_transition_control_sensitivity(int pm)
@@ -5821,6 +6145,29 @@ static void update_transition_control_sensitivity(int pm)
         set_widget_sensitive_cached(WIDGET_STREAM_TRANSITION_LENGTH, active);
         set_widget_sensitive_cached(WIDGET_STREAM_TRANSITION_SHAPE, active);
     }
+}
+
+
+static gboolean sample_title_entry_is_editing(void)
+{
+    GtkWidget *w = widget_cache[WIDGET_ENTRY_SAMPLENAME];
+    return w && GTK_IS_WIDGET(w) && gtk_widget_has_focus(w);
+}
+
+static void sample_title_entry_sync_text(const char *title)
+{
+    if(sample_title_entry_is_editing())
+        return;
+
+    put_text2(widget_cache[WIDGET_ENTRY_SAMPLENAME], title ? title : "");
+}
+
+static void sample_title_entry_sync_from_slot(sample_slot_t *slot)
+{
+    if(!slot)
+        return;
+
+    sample_title_entry_sync_text(slot->title ? slot->title : "");
 }
 
 static void update_current_slot_transition_state(int * history, int pm)
@@ -5884,8 +6231,10 @@ const char *get_stream_prefix(int type)
 
 static void update_current_slot(int *history, int pm, int last_pm) {
     gint update = 0;
+    const gboolean source_changed = (pm != last_pm) ||
+                                    info->status_tokens[CURRENT_ID] != history[CURRENT_ID];
 
-    if( pm != last_pm || info->status_tokens[CURRENT_ID] != history[CURRENT_ID] )
+    if(source_changed)
     {
         int k;
         update = 1;
@@ -5950,16 +6299,9 @@ static void update_current_slot(int *history, int pm, int last_pm) {
         info->uc.reload_hint[HINT_CHAIN] = 1;
         info->uc.reload_hint[HINT_ENTRY] = 1;
         info->uc.reload_hint[HINT_KF] = 1;
-
-
-	if( info->selected_slot != NULL ) {
-        	sample_gui_slot_t* gui_slot = find_gui_slot_by_sample(info->selected_slot->sample_id, info->selected_slot->sample_type);
-        	if (gui_slot != NULL)
-            		put_text2(widget_cache[WIDGET_ENTRY_SAMPLENAME], gtk_label_get_text(GTK_LABEL(gui_slot->title)));
-        	else
-         	   	put_text2(widget_cache[WIDGET_ENTRY_SAMPLENAME], "");
-
-        	set_pm_page_label(pm);
+	if(info->selected_slot != NULL) {
+		sample_title_entry_sync_from_slot(info->selected_slot);
+		set_pm_page_label(pm);
 	}
 
 
@@ -6008,7 +6350,7 @@ static void update_current_slot(int *history, int pm, int last_pm) {
         const gint sample_len   = MAX(1, sample_end - sample_start + 1);
         gint marker_duration = 0;
 
-        if (sample_bounds_changed || frame_changed)
+        if (source_changed || sample_bounds_changed || frame_changed)
         {
             gint local_frame = info->status_tokens[FRAME_NUM] - sample_start;
             local_frame = CLAMP(local_frame, 0, sample_len - 1);
@@ -6020,7 +6362,7 @@ static void update_current_slot(int *history, int pm, int last_pm) {
             update = 1;
         }
 
-        if (sample_bounds_changed || marker_start_changed || marker_end_changed)
+        if (source_changed || sample_bounds_changed || marker_start_changed || marker_end_changed)
         {
             gint marker_start = info->status_tokens[SAMPLE_MARKER_START];
             gint marker_end   = info->status_tokens[SAMPLE_MARKER_END];
@@ -6061,31 +6403,12 @@ static void update_current_slot(int *history, int pm, int last_pm) {
             update = 1;
         }
 
-        if( history[SAMPLE_LOOP] != info->status_tokens[SAMPLE_LOOP])
-        {
-            switch( info->status_tokens[SAMPLE_LOOP] )
-            {
-                case 0:
-                    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_LOOP_NONE]), TRUE);
-                break;
-                case 1:
-                    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_LOOP_NORMAL]), TRUE);
-                break;
-                case 2:
-                    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_LOOP_PINGPONG]), TRUE);
-                break;
-                case 3:
-                    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_LOOP_RANDOM]), TRUE);
-                break;
-                case 4:
-                    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_LOOP_ONCENOP]), TRUE);
-                    break;
-            }
-        }
+        if(source_changed || history[SAMPLE_LOOP] != info->status_tokens[SAMPLE_LOOP])
+            ui_sync_sample_loop_type(info->status_tokens[SAMPLE_LOOP]);
 
         gint speed = info->status_tokens[SAMPLE_SPEED];
 
-        if( history[SAMPLE_SPEED] != info->status_tokens[SAMPLE_SPEED] )
+        if(source_changed || history[SAMPLE_SPEED] != info->status_tokens[SAMPLE_SPEED])
         {
             speed = info->status_tokens[SAMPLE_SPEED];
             update_slider_value2(widget_cache[WIDGET_SPEED_SLIDER], speed, 0);
@@ -6103,7 +6426,7 @@ static void update_current_slot(int *history, int pm, int last_pm) {
             }
         }
 
-        if( history[FRAME_DUP] != info->status_tokens[FRAME_DUP] )
+        if(source_changed || history[FRAME_DUP] != info->status_tokens[FRAME_DUP])
         {
             update_spin_value2(widget_cache[WIDGET_SPIN_FRAMEDELAY], info->status_tokens[FRAME_DUP]);
             update_slider_value2(widget_cache[WIDGET_SLOW_SLIDER], info->status_tokens[FRAME_DUP], 0);
@@ -6144,14 +6467,8 @@ static void update_current_slot(int *history, int pm, int last_pm) {
 
             gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLEEND]),
                 (gdouble) sample_end);
-
-            if (info->selected_slot)
-            {
-                sample_gui_slot_t *gui_slot = find_gui_slot_by_sample(info->selected_slot->sample_id,
-                                                                    info->selected_slot->sample_type);
-                if (gui_slot != NULL)
-                    put_text2(widget_cache[WIDGET_ENTRY_SAMPLENAME], gtk_label_get_text(GTK_LABEL(gui_slot->title)));
-            }
+            if(info->selected_slot)
+                sample_title_entry_sync_from_slot(info->selected_slot);
         }
 
 
@@ -7647,30 +7964,37 @@ int get_and_draw_frame(int type, char *wid_name)
     return 1;
 }
 
-static void select_slot( int pm )
+static void select_slot(int pm)
 {
-    if( pm == MODE_SAMPLE || pm == MODE_STREAM  )
+    set_activation_of_slot_in_samplebank(FALSE);
+    info->selected_slot = NULL;
+
+    if(pm == MODE_SAMPLE || pm == MODE_STREAM)
     {
         if(info->status_tokens[CURRENT_ID] > 0)
         {
-            int sample_type = ( pm == MODE_STREAM ? info->status_tokens[STREAM_TYPE] : 0);
-            int p = -1;
-            int b = find_bank_by_sample_existing(info->status_tokens[CURRENT_ID],sample_type, &p);
+            int sample_type = (pm == MODE_STREAM ? info->status_tokens[STREAM_TYPE] : 0);
+            int slot_nr = -1;
+            int bank_nr = find_bank_by_sample_existing(info->status_tokens[CURRENT_ID], sample_type, &slot_nr);
 
-            if( b >= 0 && p >= 0 ) {
-                set_activation_of_slot_in_samplebank(FALSE);
-                info->selected_slot = info->sample_banks[b]->slot[p];
-                info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
+            if(bank_nr >= 0 && slot_nr >= 0) {
+                info->selected_slot = info->sample_banks[bank_nr]->slot[slot_nr];
+                if(info->sample_bank_view) {
+                    gvr_sample_bank_view_set_current_page(info->sample_bank_view, bank_nr);
+                    gvr_sample_bank_view_set_current_source(info->sample_bank_view,
+                                                            info->status_tokens[CURRENT_ID],
+                                                            sample_type);
+                }
                 set_activation_of_slot_in_samplebank(TRUE);
             }
         }
     }
-    else
+    else if(info->sample_bank_view)
     {
-        set_activation_of_slot_in_samplebank(FALSE);
-        info->selected_slot = NULL;
-        info->selected_gui_slot = NULL;
+        gvr_sample_bank_view_set_current_source(info->sample_bank_view, -1, -1);
     }
+
+    samplebank_update_offline_recorder_gadget();
 }
 
 static void sequencer_slot_set_content(sequence_gui_slot_t *slot, int sample_id, int sample_type)
@@ -8121,113 +8445,160 @@ static void load_sequence_list(void)
 
 static void load_samplelist_info(void)
 {
-    char line[300];
-    char descr[255];
-    gint offset=0;
-    gint no_samples = 1;
+    gint offset = 0;
 
-    reset_tree( "cali_sourcetree");
-    reset_tree( "tree_sources" );
+    reset_tree("cali_sourcetree");
+    reset_tree("tree_sources");
+    reset_samplebank();
 
-    multi_vims( VIMS_SAMPLE_LIST,"%d",0);
+    if(bankport_)
+        vpf(bankport_);
+    bankport_ = vpn(VEVO_ANONYMOUS_PORT);
+    next_available_absolute_slot = 0;
+
+    multi_vims(VIMS_SAMPLE_LIST, "%d", 0);
     gint fxlen = 0;
-    gchar *fxtext = recv_vims(8,&fxlen);
+    gchar *fxtext = recv_vims(8, &fxlen);
 
     if(fxlen > 0 && fxtext != NULL)
     {
-        no_samples = 0;
-        while( offset < fxlen )
+        while(offset + 3 <= fxlen)
         {
-            char tmp_len[8] = { 0 };
-            strncpy(tmp_len, fxtext + offset, 3 );
+            char tmp_len[4] = { 0 };
+            memcpy(tmp_len, fxtext + offset, 3);
             int len = atoi(tmp_len);
             offset += 3;
-            if(len > 0)
+
+            if(len <= 0 || offset + len > fxlen)
+                break;
+
+            const int header_len = 5 + 9 + 9 + 3;
+            if(len >= header_len)
             {
-                veejay_memset( line,0,sizeof(line));
-                veejay_memset( descr,0,sizeof(descr));
-                strncpy( line, fxtext + offset, len );
-                int values[4] = { 0,0,0,0 };
-                sscanf( line, "%05d%09d%09d%03d",&values[0], &values[1], &values[2], &values[3]);
-                strncpy( descr, line + 5 + 9 + 9 + 3 , values[3] );
-                gchar *title = _utf8str( descr );
-                char *timecode = format_selection_time( 0,(values[2]-values[1]) );
-                int int_id = values[0];
-                int poke_slot= 0; int bank_page = -1;
-                verify_bank_capacity( &bank_page , &poke_slot, int_id, values[1]);
-                if(bank_page >= 0 )
-                {
-                    sample_slot_t *slot = update_sample_slot_data(bank_page, poke_slot, values[0], values[1], title, timecode);
-                    add_sample_to_effect_sources_list( int_id,0, slot->title, slot->timecode);
-                }
-                if( info->status_tokens[CURRENT_ID] == values[0] && info->status_tokens[PLAY_MODE] == 0 )
-                    put_text2(widget_cache[WIDGET_ENTRY_SAMPLENAME], title);
+                gchar *rec = g_strndup(fxtext + offset, len);
+                int values[4] = { 0, 0, 0, 0 };
+                sscanf(rec, "%05d%09d%09d%03d", &values[0], &values[1], &values[2], &values[3]);
+
+                int descr_len = values[3];
+                int available = len - header_len;
+                if(descr_len < 0)
+                    descr_len = 0;
+                if(descr_len > available)
+                    descr_len = available;
+
+                gchar *descr_text = g_strndup(rec + header_len, descr_len);
+                gchar *title_from_list = _utf8str(descr_text);
+                const int int_id = values[0];
+                const int sample_type = 0;
+                const char *override_title = samplebank_lookup_title_override(int_id, sample_type);
+                const char *effective_title = title_from_list;
+                char auto_title[64];
+                gboolean auto_rec_title = samplebank_make_offline_recording_title(title_from_list,
+                                                                                  auto_title,
+                                                                                  sizeof(auto_title));
+
+                if(override_title && (samplebank_title_is_default(int_id, sample_type, title_from_list) || auto_rec_title))
+                    effective_title = override_title;
+                else if(auto_rec_title)
+                    effective_title = auto_title;
+
+                char *timecode = format_selection_time(0, values[2] - values[1]);
+                int poke_slot = 0;
+                int bank_page = -1;
+                sample_slot_t *slot = NULL;
+
+                verify_bank_capacity(&bank_page, &poke_slot, int_id, sample_type);
+                if(bank_page >= 0)
+                    slot = update_sample_slot_data(bank_page, poke_slot, int_id, sample_type, (gchar *) effective_title, timecode);
+
+                add_sample_to_effect_sources_list(int_id, sample_type,
+                                                  slot && slot->title ? slot->title : (gchar *) effective_title,
+                                                  slot && slot->timecode ? slot->timecode : timecode);
+
+                if(info->status_tokens[CURRENT_ID] == values[0] && info->status_tokens[PLAY_MODE] == MODE_SAMPLE)
+                    sample_title_entry_sync_text(effective_title);
 
                 free(timecode);
-                g_free(title);
+                g_free(title_from_list);
+                g_free(descr_text);
+                g_free(rec);
             }
+
             offset += len;
         }
         offset = 0;
     }
 
-    if( fxtext ) free(fxtext);
-    fxlen = 0;
+    if(fxtext)
+        free(fxtext);
 
-    multi_vims( VIMS_STREAM_LIST,"%d",0);
+    fxlen = 0;
+    multi_vims(VIMS_STREAM_LIST, "%d", 0);
     fxtext = recv_vims(5, &fxlen);
 
-    if( fxlen > 0 && fxtext != NULL)
+    if(fxlen > 0 && fxtext != NULL)
     {
-        no_samples = 0;
-        while( offset < fxlen )
+        while(offset + 3 <= fxlen)
         {
-            char tmp_len[4];
-            veejay_memset(tmp_len,0,sizeof(tmp_len));
-            strncpy(tmp_len, fxtext + offset, 3 );
-
+            char tmp_len[4] = { 0 };
+            memcpy(tmp_len, fxtext + offset, 3);
             int len = atoi(tmp_len);
             offset += 3;
-            if(len > 0)
-            {
-                veejay_memset(line,0,sizeof(line));
-                veejay_memset(descr,0,sizeof(descr));
-                strncpy( line, fxtext + offset, len );
 
+            if(len <= 0 || offset + len > fxlen)
+                break;
+
+            const int header_len = 22;
+            if(len >= header_len)
+            {
+                gchar *rec = g_strndup(fxtext + offset, len);
                 int values[10];
-                veejay_memset(values,0, sizeof(values));
-                sscanf( line, "%05d%02d%03d%03d%03d%03d%03d%03d",
+                veejay_memset(values, 0, sizeof(values));
+                sscanf(rec, "%05d%02d%03d%03d%03d%03d%03d%03d",
                        &values[0], &values[1], &values[2],
                        &values[3], &values[4], &values[5],
                        &values[6], &values[7]);
 
-                strncpy( descr, line + 22, values[6] );
+                int descr_len = values[6];
+                int available = len - header_len;
+                if(descr_len < 0)
+                    descr_len = 0;
+                if(descr_len > available)
+                    descr_len = available;
 
                 const char *source = get_stream_prefix(values[1]);
-                gchar *gsource = _utf8str( descr );
-                gchar *gtype = _utf8str( source );
+                gchar *descr_text = g_strndup(rec + header_len, descr_len);
+                gchar *gsource = _utf8str(descr_text);
+                gchar *gtype = _utf8str(source);
                 int bank_page = -1;
                 int poke_slot = 0;
+                sample_slot_t *slot = NULL;
 
-                verify_bank_capacity( &bank_page , &poke_slot, values[0], values[1]);
+                verify_bank_capacity(&bank_page, &poke_slot, values[0], values[1]);
                 if(bank_page >= 0)
-                {
-                    sample_slot_t *slot = update_sample_slot_data(bank_page, poke_slot, values[0], values[1], gsource, gtype);
-                    add_sample_to_effect_sources_list( values[0], values[1],slot->title,slot->timecode);
-                }
+                    slot = update_sample_slot_data(bank_page, poke_slot, values[0], values[1], gsource, gtype);
+
+                add_sample_to_effect_sources_list(values[0], values[1],
+                                                  slot && slot->title ? slot->title : gsource,
+                                                  slot && slot->timecode ? slot->timecode : gtype);
+
                 g_free(gsource);
                 g_free(gtype);
+                g_free(descr_text);
+                g_free(rec);
             }
+
             offset += len;
         }
     }
 
-    if(fxtext) free(fxtext);
+    if(fxtext)
+        free(fxtext);
 
-    select_slot( info->status_tokens[PLAY_MODE] );
-    if(no_samples) {
-        samplebank_ready_ = 1;
-    }
+    select_slot(info->status_tokens[PLAY_MODE]);
+    samplebank_ready_ = 1;
+    samplebank_update_page_label();
+    samplebank_request_page_thumbnails(samplebank_get_page());
 
 }
 
@@ -9606,13 +9977,13 @@ int veejay_update_multitrack( void *ptr )
     return 1;
 }
 
-static void update_status_accessibility(int old_pm, int new_pm)
+static void update_status_accessibility(int old_pm, int new_pm, int force)
 {
     int i;
 
     set_pm_page_label(new_pm);
 
-    if( old_pm == new_pm )
+    if(old_pm == new_pm && !force)
         return;
 
     if( new_pm == MODE_STREAM )
@@ -9694,6 +10065,7 @@ static void update_status_accessibility(int old_pm, int new_pm)
             break;
     }
     gtk_notebook_set_current_page( GTK_NOTEBOOK(n), page_needed );
+    samplebank_update_offline_recorder_gadget();
 }
 
 static void set_pm_page_label(int type)
@@ -11092,6 +11464,65 @@ static int audio_sync_status_is_internal_push_analysis(void)
             record_source == VJ_RECORD_AUDIO_SOURCE_AUTO);
 }
 
+
+#ifndef SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE
+#define SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE (-1)
+#endif
+
+
+static int audio_sync_current_sample_has_own_audio_source(void)
+{
+    int source;
+    int mode;
+
+    if(!info || info->status_tokens[PLAY_MODE] != MODE_SAMPLE)
+        return 0;
+
+    if(VIMS_STATUS_TOKENS <= SAMPLE_AUDIO_SYNC_MODE)
+        return 0;
+
+    source = info->status_tokens[SAMPLE_AUDIO_SYNC_SOURCE];
+    mode = info->status_tokens[SAMPLE_AUDIO_SYNC_MODE];
+
+    if(mode == SAMPLE_AUDIO_SYNC_OFF)
+        return 0;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL)
+        return 1;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_JACK)
+        return 1;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_WAV)
+        return info->status_tokens[SAMPLE_AUDIO_SYNC_PROFILE] > 0;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE)
+        return 1;
+
+    return 0;
+}
+
+static const char *audio_sync_current_sample_route_name(void)
+{
+    int source;
+
+    if(!audio_sync_current_sample_has_own_audio_source())
+        return "Global default";
+
+    source = info->status_tokens[SAMPLE_AUDIO_SYNC_SOURCE];
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL)
+        return "Sample Original";
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_WAV)
+        return "Sample WAV";
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_JACK)
+        return "Sample JACK";
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE)
+        return "Sample Silence";
+
+    return "Sample route";
+}
+
 static int audio_sync_ui_enabled_from_status(void)
 {
     const int mode = info->status_tokens[AUDIO_SYNC_MODE];
@@ -11129,13 +11560,75 @@ static int audio_sync_ui_enabled_from_status(void)
 
 static int audio_mixer_mode_from_ui_local(void)
 {
+    GtkWidget *override = widget_cache[WIDGET_AUDIO_MIXER_OVERRIDE_TOGGLE];
+    GtkWidget *original = widget_cache[WIDGET_AUDIO_MIXER_ORIGINAL_RADIO];
+    GtkWidget *external = widget_cache[WIDGET_AUDIO_MIXER_EXTERNAL_RADIO];
+    GtkWidget *mix = widget_cache[WIDGET_AUDIO_MIXER_MIX_RADIO];
     GtkWidget *w = widget_cache[WIDGET_AUDIO_MIXER_MODE_COMBO];
+    int mode;
+
+    if(override && GTK_IS_TOGGLE_BUTTON(override)) {
+        if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(override)))
+            return 0;
+
+        if(original && GTK_IS_TOGGLE_BUTTON(original) && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(original)))
+            return 1;
+        if(external && GTK_IS_TOGGLE_BUTTON(external) && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(external)))
+            return 2;
+        if(mix && GTK_IS_TOGGLE_BUTTON(mix) && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(mix)))
+            return 3;
+
+        return 3;
+    }
 
     if(!w || !GTK_IS_COMBO_BOX(w))
         return 0;
 
-    int mode = gtk_combo_box_get_active(GTK_COMBO_BOX(w));
+    mode = gtk_combo_box_get_active(GTK_COMBO_BOX(w));
     return (mode < 0 || mode > 3) ? 0 : mode;
+}
+
+static int audio_sync_combo_active_local(int widget_id, int fallback)
+{
+    GtkWidget *w = widget_cache[widget_id];
+    int active;
+
+    if(!w || !GTK_IS_COMBO_BOX(w))
+        return fallback;
+
+    active = gtk_combo_box_get_active(GTK_COMBO_BOX(w));
+    return active < 0 ? fallback : active;
+}
+
+static int audio_input_selector_ui_active_local(void)
+{
+    return audio_sync_combo_active_local(WIDGET_AUDIO_INPUT_SELECTOR_COMBO, -1);
+}
+
+static int audio_sync_mode_from_combo_active_local(int active, int fallback)
+{
+    switch(active) {
+        case 1: return VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL;
+        case 2: return VJ_AUDIO_SYNC_MODE_MONITOR;
+        case 3: return VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY;
+        case 4: return VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW;
+        case 5: return VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE;
+        case 6: return VJ_AUDIO_SYNC_MODE_TRACK_ALIGN;
+        case 0: return 0;
+        default: return fallback;
+    }
+}
+
+static int audio_sync_mode_ui_local(int fallback)
+{
+    GtkWidget *w = widget_cache[WIDGET_AUDIO_SYNC_MODE_COMBO];
+
+    if(!w || !GTK_IS_COMBO_BOX(w))
+        return fallback;
+
+    return audio_sync_mode_from_combo_active_local(
+        gtk_combo_box_get_active(GTK_COMBO_BOX(w)),
+        fallback);
 }
 
 static void audio_sync_update_mode_sensitivity(int mode, int source, int target_mode, int record_source)
@@ -11153,29 +11646,43 @@ static void audio_sync_update_mode_sensitivity(int mode, int source, int target_
         -1
     };
 
-    const int push_analysis = source == VJ_AUDIO_SYNC_SOURCE_PUSH &&
+    const int ui_input = audio_input_selector_ui_active_local();
+    const int ui_wav_master = (ui_input == 2);
+    const int ui_jack_master = (ui_input == 1);
+    const int ui_external_master = (ui_wav_master || ui_jack_master);
+    const int selected_mode = audio_sync_mode_ui_local(mode);
+    const int sample_owns_audio_source = audio_sync_current_sample_has_own_audio_source();
+    const int global_context = 1;
+    const int push_analysis = !ui_external_master &&
+                              source == VJ_AUDIO_SYNC_SOURCE_PUSH &&
                               (record_source == VJ_RECORD_AUDIO_SOURCE_ORIGINAL ||
                                record_source == VJ_RECORD_AUDIO_SOURCE_AUTO);
-    const int external_master = (record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
+    const int external_master = ((record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK) ||
+                                 ui_external_master);
     const int external_provider_mode = external_master &&
-                                       ui_audio_sync_mode_uses_external_provider(mode) &&
+                                       ui_audio_sync_mode_uses_external_provider(selected_mode) &&
                                        !push_analysis;
-    const int control_only = external_provider_mode && ui_audio_sync_mode_is_control_only(mode);
-    const int tempo_follow = external_provider_mode && ui_audio_sync_mode_is_tempo_follow(mode);
+    const int control_only = external_provider_mode && ui_audio_sync_mode_is_control_only(selected_mode);
+    const int tempo_follow = external_provider_mode && ui_audio_sync_mode_is_tempo_follow(selected_mode);
     const int wav_master = (external_provider_mode &&
-                            ui_audio_sync_mode_supports_wav_master(mode) &&
-                            source == VJ_AUDIO_SYNC_SOURCE_WAV_FILE);
+                            ui_audio_sync_mode_supports_wav_master(selected_mode) &&
+                            (ui_wav_master || (!ui_external_master && source == VJ_AUDIO_SYNC_SOURCE_WAV_FILE)));
+    const int sample_route_is_wav = sample_owns_audio_source &&
+                                    info->status_tokens[SAMPLE_AUDIO_SYNC_SOURCE] == SAMPLE_AUDIO_SYNC_SOURCE_WAV;
+    const int wav_profile_editor = wav_master || ui_wav_master || sample_route_is_wav;
     const int jack_provider = (external_provider_mode && !wav_master);
-    const int mixer_crossfade_active = jack_provider && audio_mixer_mode_from_ui_local() != 0;
+    const int mixer_provider = global_context;
+    const int external_provider_panel = external_provider_mode || mixer_provider;
+    const int mixer_crossfade_active = (audio_mixer_mode_from_ui_local() == 3);
     const int sync_enabled = (external_provider_mode && audio_sync_ui_enabled_from_status());
-    const int tempo = (sync_enabled && mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE);
-    const int track_align = (sync_enabled && mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN);
-    const int monitor = (sync_enabled &&
-                         (ui_audio_sync_mode_is_clean_monitor(mode) ||
-                          ui_audio_sync_mode_is_trickplay_monitor(mode)));
-    const int follow = (sync_enabled && tempo_follow);
+    const int tempo = (external_provider_mode && selected_mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE);
+    const int track_align = (external_provider_mode && selected_mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN);
+    const int monitor = (external_provider_mode &&
+                         (ui_audio_sync_mode_is_clean_monitor(selected_mode) ||
+                          ui_audio_sync_mode_is_trickplay_monitor(selected_mode)));
+    const int follow = tempo_follow;
     const int live_tempo = (tempo || follow);
-    const int live_common = (sync_enabled && (control_only || live_tempo || track_align || monitor));
+    const int live_common = (external_provider_mode || push_analysis || sync_enabled || mode != 0 || sample_owns_audio_source);
     const int show_tempo_targets = tempo;
     const int show_correction = tempo || follow;
     const int show_follow_audio_warning = follow &&
@@ -11186,25 +11693,46 @@ static void audio_sync_update_mode_sensitivity(int mode, int source, int target_
 
     audio_sync_set_widget_sensitive(WIDGET_AUDIO_INPUT_SELECTOR_COMBO, 1);
 
-    audio_sync_set_named_label("audio_master_sync_frame_label", push_analysis ? "Audio / Beat Analysis" : "Audio / External Sync");
-    audio_sync_set_named_label("audio_input_selector_label", push_analysis ? "Audio source" : "Audio source / sync provider");
+    audio_sync_set_named_label("audio_master_sync_frame_label", sample_owns_audio_source ? "Audio / Global Default + Sample Route" : (push_analysis ? "Audio / Beat Analysis" : "Audio / Global Default"));
+    audio_sync_set_named_label("audio_input_selector_label", sample_owns_audio_source ? "Global default" : (push_analysis ? "Audio source" : "Audio source / sync provider"));
     audio_sync_set_named_label("audio_sync_tempo_frame_label", follow ? "Visual tempo follow" : "Tempo match bridge");
+    audio_sync_set_named_label("audio_sync_live_common_frame_label", "Audio sync status");
+    audio_sync_set_named_label("audio_sync_enabled_value_label", "Sync");
+    audio_sync_set_named_label("audio_sync_open_value_label", "State");
+    audio_sync_set_named_label("audio_sync_running_value_label", "Engine");
+    audio_sync_set_named_label("audio_sync_mode_value_label", "Mode");
+    audio_sync_set_named_label("audio_sync_source_value_label", "Input");
+    audio_sync_set_named_label("audio_sync_channels_value_label", "Ch.");
+    audio_sync_set_named_label("audio_sync_sample_rate_value_label", "Rate");
+    audio_sync_set_named_label("audio_sync_audible_route_value_label", "Route");
     audio_sync_set_named_label("audio_sync_live_tempo_frame_label", "Tempo lock status");
     audio_sync_set_named_label("audio_sync_bpm_value_label", push_analysis ? "Beat BPM" : "Source BPM");
     audio_sync_set_named_label("audio_sync_bridge_active_value_label", "Activity");
     audio_sync_set_named_label("audio_sync_bridge_state_value_label", "Lock state");
     audio_sync_set_named_label("audio_sync_target_bpm_value_label", (tempo || follow) ? "Clip BPM" : "Target BPM");
+    audio_sync_set_named_label("audio_sync_correction_value_label", "Current correction");
+    audio_sync_set_named_label("audio_sync_max_correction_value_label", "Correction limit");
+    audio_sync_set_named_label("audio_sync_live_track_frame_label", "Track Align status");
+    audio_sync_set_named_label("audio_sync_track_align_locked_value_label", "Lock");
+    audio_sync_set_named_label("audio_sync_track_align_offset_value_label", "Offset");
+    audio_sync_set_named_label("audio_sync_track_align_confidence_value_label", "Confidence");
+    audio_sync_set_named_label("audio_sync_track_align_correction_value_label", "Rate correction");
+    audio_sync_set_named_label("audio_sync_track_align_state_value_label", "State");
     audio_sync_set_named_label("audio_sync_target_bpm_label", tempo ? "Manual target BPM" : "Target BPM");
     audio_sync_set_named_label("audio_sync_tempo_bend_label", "Pitch / tempo bend");
     audio_sync_set_named_label("audio_sync_phase_label", tempo ? "Override phase" : "Phase");
     audio_sync_set_named_label("audio_sync_confidence_label", tempo ? "Override confidence" : "Confidence");
-    audio_sync_set_named_label("audio_sync_correction_label", follow ? "Max video tempo pull" : "Max correction");
+    audio_sync_set_named_label("audio_sync_correction_label", follow ? "Max video tempo pull" : "Correction limit");
 
-    audio_sync_set_widget_visible(WIDGET_AUDIO_MASTER_JACK_OPTIONS_GRID, jack_provider);
-    audio_sync_set_widget_visible(WIDGET_AUDIO_MASTER_WAV_OPTIONS_GRID, wav_master);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MASTER_JACK_OPTIONS_GRID, external_provider_panel);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MASTER_WAV_OPTIONS_GRID, wav_profile_editor);
+    audio_sync_set_named_widget_visible("audio_sync_enable_label", external_provider_mode);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_ENABLE_TOGGLE, external_provider_mode);
+    audio_sync_set_named_widget_visible("audio_sync_mode_label", external_provider_mode);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_MODE_COMBO, external_provider_mode);
     audio_sync_set_widget_sensitive(WIDGET_AUDIO_SYNC_ENABLE_TOGGLE, external_master);
     audio_sync_set_widget_sensitive(WIDGET_AUDIO_SYNC_MODE_COMBO, external_master);
-    audio_sync_set_widget_sensitive(WIDGET_AUDIO_SYNC_REFRESH_BUTTON, external_master);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_SYNC_REFRESH_BUTTON, external_master || mixer_provider);
 
     audio_sync_set_named_widget_visible("audio_sync_channels_label", jack_provider);
     audio_sync_set_widget_visible(WIDGET_AUDIO_SYNC_CHANNELS_SPIN, jack_provider);
@@ -11215,13 +11743,19 @@ static void audio_sync_update_mode_sensitivity(int mode, int source, int target_
     audio_sync_set_widget_sensitive(WIDGET_AUDIO_MASTER_JACK_VOLUME_SCALE, jack_provider);
     audio_sync_set_widget_sensitive(WIDGET_AUDIO_MASTER_JACK_VOLUME_SPIN, jack_provider);
 
-    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_MODE_LABEL, jack_provider);
-    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_MODE_COMBO, jack_provider);
-    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_CROSSFADE_LABEL, jack_provider);
-    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_CROSSFADE_SCALE, jack_provider);
-    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_CROSSFADE_SPIN, jack_provider);
-    audio_sync_set_widget_sensitive(WIDGET_AUDIO_MIXER_MODE_LABEL, jack_provider);
-    audio_sync_set_widget_sensitive(WIDGET_AUDIO_MIXER_MODE_COMBO, jack_provider);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_MODE_LABEL, mixer_provider);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_OVERRIDE_TOGGLE, mixer_provider);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_ORIGINAL_RADIO, mixer_provider);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_EXTERNAL_RADIO, mixer_provider);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_MIX_RADIO, mixer_provider);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_CROSSFADE_LABEL, mixer_provider);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_CROSSFADE_SCALE, mixer_provider);
+    audio_sync_set_widget_visible(WIDGET_AUDIO_MIXER_CROSSFADE_SPIN, mixer_provider);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_MIXER_MODE_LABEL, mixer_provider);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_MIXER_OVERRIDE_TOGGLE, mixer_provider);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_MIXER_ORIGINAL_RADIO, mixer_provider && audio_mixer_mode_from_ui_local() != 0);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_MIXER_EXTERNAL_RADIO, mixer_provider && audio_mixer_mode_from_ui_local() != 0);
+    audio_sync_set_widget_sensitive(WIDGET_AUDIO_MIXER_MIX_RADIO, mixer_provider && audio_mixer_mode_from_ui_local() != 0);
     audio_sync_set_widget_sensitive(WIDGET_AUDIO_MIXER_CROSSFADE_LABEL, mixer_crossfade_active);
     audio_sync_set_widget_sensitive(WIDGET_AUDIO_MIXER_CROSSFADE_SCALE, mixer_crossfade_active);
     audio_sync_set_widget_sensitive(WIDGET_AUDIO_MIXER_CROSSFADE_SPIN, mixer_crossfade_active);
@@ -11252,7 +11786,14 @@ static void audio_sync_update_mode_sensitivity(int mode, int source, int target_
     audio_sync_set_named_widget_sensitive("audio_sync_latch_clip_bpm_button", show_tempo_targets);
     audio_sync_set_named_widget_sensitive("audio_sync_tempo_bend_scale", tempo);
     audio_sync_set_named_widget_sensitive("audio_sync_tempo_bend_reset_button", tempo);
-    audio_sync_set_widgets_sensitive(master_wav_ids, wav_master);
+    audio_sync_set_widgets_sensitive(master_wav_ids, wav_profile_editor);
+    audio_sync_set_named_widget_sensitive("audio_sync_wav_path_label", wav_profile_editor);
+    audio_sync_set_named_widget_sensitive("audio_sync_wav_loop_label", wav_profile_editor);
+    audio_sync_set_named_widget_sensitive("audio_sync_wav_profile_label", wav_profile_editor);
+    audio_sync_set_named_widget_sensitive("audio_sync_wav_profile_combo", wav_profile_editor);
+    audio_sync_set_named_widget_sensitive("audio_sync_wav_profile_button_box", wav_profile_editor);
+    audio_sync_set_named_widget_sensitive("audio_sync_wav_profile_store_button", wav_profile_editor);
+    audio_sync_set_named_widget_sensitive("audio_sync_wav_profile_clear_button", wav_profile_editor);
 }
 
 static int audio_sync_mode_combo_from_status(int mode)
@@ -11337,6 +11878,301 @@ static void audio_input_selector_sync_from_status(void)
     audio_sync_set_combo(WIDGET_AUDIO_INPUT_SELECTOR_COMBO, audio_input_selector_from_status());
 }
 
+static GtkWidget *sample_audio_sync_named_widget(const char *name)
+{
+    if(!info || !info->main_window || !name)
+        return NULL;
+
+    return glade_xml_get_widget_(info->main_window, name);
+}
+
+static void sample_audio_sync_status_set_combo(const char *name, int active)
+{
+    GtkWidget *w = sample_audio_sync_named_widget(name);
+
+    if(!w || !GTK_IS_COMBO_BOX(w))
+        return;
+
+    gtk_combo_box_set_active(GTK_COMBO_BOX(w), active);
+}
+
+static void sample_audio_sync_status_set_spin(const char *name, int value)
+{
+    GtkWidget *w = sample_audio_sync_named_widget(name);
+
+    if(!w || !GTK_IS_SPIN_BUTTON(w))
+        return;
+
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(w), (gdouble)value);
+}
+
+static void sample_audio_sync_status_set_sensitive(const char *name, int sensitive)
+{
+    GtkWidget *w = sample_audio_sync_named_widget(name);
+
+    if(w)
+        gtk_widget_set_sensitive(w, sensitive ? TRUE : FALSE);
+}
+
+static int sample_audio_sync_status_combo_active(const char *name, int fallback)
+{
+    GtkWidget *w = sample_audio_sync_named_widget(name);
+
+    if(!w || !GTK_IS_COMBO_BOX(w))
+        return fallback;
+
+    return gtk_combo_box_get_active(GTK_COMBO_BOX(w));
+}
+
+static int sample_audio_sync_status_source_from_label(const char *label, int fallback)
+{
+    char *lower;
+    int result = fallback;
+
+    if(!label || label[0] == '\0')
+        return fallback;
+
+    lower = g_ascii_strdown(label, -1);
+    if(!lower)
+        return fallback;
+
+    if(strstr(lower, "wav"))
+        result = SAMPLE_AUDIO_SYNC_SOURCE_WAV;
+    else if(strstr(lower, "jack"))
+        result = SAMPLE_AUDIO_SYNC_SOURCE_JACK;
+    else if(strstr(lower, "silence"))
+        result = SAMPLE_AUDIO_SYNC_SOURCE_SILENCE;
+    else if(strstr(lower, "original"))
+        result = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+    else if(strstr(lower, "none") || strstr(lower, "follow"))
+        result = SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE;
+
+    g_free(lower);
+    return result;
+}
+
+static int sample_audio_sync_status_source_from_combo_active(int active)
+{
+    switch(active) {
+        case 1: return SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+        case 2: return SAMPLE_AUDIO_SYNC_SOURCE_WAV;
+        case 3: return SAMPLE_AUDIO_SYNC_SOURCE_JACK;
+        case 4: return SAMPLE_AUDIO_SYNC_SOURCE_SILENCE;
+        case 0:
+        default:
+            return SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE;
+    }
+}
+
+static int sample_audio_sync_status_source_from_combo_widget(const char *name, int active)
+{
+    GtkWidget *w = sample_audio_sync_named_widget(name);
+
+    if(w && GTK_IS_COMBO_BOX_TEXT(w)) {
+        gchar *label = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(w));
+        if(label) {
+            int source = sample_audio_sync_status_source_from_label(label,
+                sample_audio_sync_status_source_from_combo_active(active));
+            g_free(label);
+            return source;
+        }
+    }
+
+    return sample_audio_sync_status_source_from_combo_active(active);
+}
+
+
+static int sample_audio_sync_status_combo_from_values(int source, int profile, int mode)
+{
+    if(mode == SAMPLE_AUDIO_SYNC_OFF)
+        return 0;
+
+    switch(source) {
+        case SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL:
+            return 1;
+        case SAMPLE_AUDIO_SYNC_SOURCE_WAV:
+            return (profile > 0) ? 2 : 0;
+        case SAMPLE_AUDIO_SYNC_SOURCE_JACK:
+            return 3;
+        case SAMPLE_AUDIO_SYNC_SOURCE_SILENCE:
+            return 4;
+        default:
+            return 0;
+    }
+}
+static int sample_audio_sync_status_mode_combo_from_mode(int mode)
+{
+    switch(mode) {
+        case SAMPLE_AUDIO_SYNC_LIVE_EXTERNAL:      return 1;
+        case SAMPLE_AUDIO_SYNC_MONITOR:            return 2;
+        case SAMPLE_AUDIO_SYNC_MONITOR_TRICKPLAY:  return 3;
+        case SAMPLE_AUDIO_SYNC_TEMPO_FOLLOW:       return 4;
+        case SAMPLE_AUDIO_SYNC_TEMPO_BRIDGE:       return 5;
+        case SAMPLE_AUDIO_SYNC_TRACK_ALIGN:        return 6;
+        case SAMPLE_AUDIO_SYNC_QUEUE:
+        default:                                   return 0;
+    }
+}
+
+static const char *sample_audio_sync_status_mode_name(int mode)
+{
+    switch(mode) {
+        case SAMPLE_AUDIO_SYNC_LIVE_EXTERNAL:      return "Analyze";
+        case SAMPLE_AUDIO_SYNC_MONITOR:            return "Monitor";
+        case SAMPLE_AUDIO_SYNC_MONITOR_TRICKPLAY:  return "Trickplay";
+        case SAMPLE_AUDIO_SYNC_TEMPO_FOLLOW:       return "Tempo Follow";
+        case SAMPLE_AUDIO_SYNC_TEMPO_BRIDGE:       return "Tempo Bridge";
+        case SAMPLE_AUDIO_SYNC_TRACK_ALIGN:        return "Align";
+        case SAMPLE_AUDIO_SYNC_QUEUE:
+        default:                                   return "Queue";
+    }
+}
+
+static void sample_audio_sync_status_update_sensitivity_from_values(int source, int profile)
+{
+    int is_wav = (source == SAMPLE_AUDIO_SYNC_SOURCE_WAV);
+    int is_external = (source == SAMPLE_AUDIO_SYNC_SOURCE_WAV || source == SAMPLE_AUDIO_SYNC_SOURCE_JACK);
+    int is_silence = (source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE);
+    int can_arm = (source == SAMPLE_AUDIO_SYNC_SOURCE_JACK) || is_silence || (is_wav && profile > 0);
+
+    sample_audio_sync_status_set_sensitive("sample_audio_sync_profile_label", 1);
+    sample_audio_sync_status_set_sensitive("sample_audio_sync_profile_combo", 1);
+    sample_audio_sync_status_set_sensitive("sample_audio_sync_wav_anchor_label", is_wav);
+    sample_audio_sync_status_set_sensitive("sample_audio_sync_wav_anchor_ms", is_wav);
+    sample_audio_sync_status_set_sensitive("sample_audio_sync_mode_label", is_external);
+    sample_audio_sync_status_set_sensitive("sample_audio_sync_mode_combo", is_external);
+    sample_audio_sync_status_set_sensitive("sample_audio_sync_set_here_button", can_arm);
+    sample_audio_sync_status_set_sensitive("sample_audio_sync_rearm_button", is_external);
+}
+
+
+static void sample_audio_sync_status_sync_controls(int *history, int force)
+{
+    int old_lock;
+    int backend_source_combo;
+    int ui_source_combo;
+    int ui_source;
+    int ui_profile;
+    int sample_context_changed;
+    int preserve_ui_sample_edit;
+
+    if(VIMS_STATUS_TOKENS <= SAMPLE_AUDIO_SYNC_LOCK_CONFIDENCE)
+        return;
+
+#define SAS_CUR(tok_)      (info->status_tokens[(tok_)])
+#define SAS_OLD(tok_)      (history[(tok_)])
+#define SAS_CHANGED(tok_)  (force || SAS_CUR(tok_) != SAS_OLD(tok_))
+
+    sample_context_changed = force ||
+                             SAS_CUR(PLAY_MODE) != SAS_OLD(PLAY_MODE) ||
+                             SAS_CUR(CURRENT_ID) != SAS_OLD(CURRENT_ID);
+
+    if(!sample_context_changed &&
+       !SAS_CHANGED(SAMPLE_AUDIO_SYNC_SOURCE) &&
+       !SAS_CHANGED(SAMPLE_AUDIO_SYNC_PROFILE) &&
+       !SAS_CHANGED(SAMPLE_AUDIO_SYNC_MODE) &&
+       !SAS_CHANGED(SAMPLE_AUDIO_SYNC_WAV_ANCHOR_MS))
+        goto done;
+
+    backend_source_combo = sample_audio_sync_status_combo_from_values(SAS_CUR(SAMPLE_AUDIO_SYNC_SOURCE),
+                                                                      SAS_CUR(SAMPLE_AUDIO_SYNC_PROFILE),
+                                                                      SAS_CUR(SAMPLE_AUDIO_SYNC_MODE));
+    ui_source_combo = sample_audio_sync_status_combo_active("sample_audio_sync_source_combo", backend_source_combo);
+    ui_source = sample_audio_sync_status_source_from_combo_widget("sample_audio_sync_source_combo", ui_source_combo);
+    ui_profile = CLAMP(sample_audio_sync_status_combo_active("sample_audio_sync_profile_combo",
+                                                            SAS_CUR(SAMPLE_AUDIO_SYNC_PROFILE)), 0, 4);
+
+    preserve_ui_sample_edit = (!sample_context_changed &&
+                               SAS_CUR(SAMPLE_AUDIO_SYNC_MODE) == SAMPLE_AUDIO_SYNC_OFF &&
+                               ui_source_combo > 0 &&
+                               ui_source != SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE);
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+
+    if(preserve_ui_sample_edit) {
+        sample_audio_sync_status_update_sensitivity_from_values(ui_source, ui_profile);
+        info->status_lock = old_lock;
+        goto done;
+    }
+
+    sample_audio_sync_status_set_combo("sample_audio_sync_source_combo", backend_source_combo);
+    sample_audio_sync_status_set_combo("sample_audio_sync_profile_combo",
+                                       CLAMP(SAS_CUR(SAMPLE_AUDIO_SYNC_PROFILE), 0, 4));
+    sample_audio_sync_status_set_combo("sample_audio_sync_mode_combo",
+                                       sample_audio_sync_status_mode_combo_from_mode(SAS_CUR(SAMPLE_AUDIO_SYNC_MODE)));
+    sample_audio_sync_status_set_spin("sample_audio_sync_wav_anchor_ms",
+                                      MAX(0, SAS_CUR(SAMPLE_AUDIO_SYNC_WAV_ANCHOR_MS)));
+
+    ui_source_combo = sample_audio_sync_status_combo_active("sample_audio_sync_source_combo", backend_source_combo);
+    ui_source = sample_audio_sync_status_source_from_combo_widget("sample_audio_sync_source_combo", ui_source_combo);
+    ui_profile = CLAMP(sample_audio_sync_status_combo_active("sample_audio_sync_profile_combo",
+                                                            SAS_CUR(SAMPLE_AUDIO_SYNC_PROFILE)), 0, 4);
+
+    sample_audio_sync_status_update_sensitivity_from_values(ui_source, ui_profile);
+
+    info->status_lock = old_lock;
+
+done:
+#undef SAS_CHANGED
+#undef SAS_OLD
+#undef SAS_CUR
+    return;
+}
+
+
+static void audio_sync_update_audible_route_label(void)
+{
+    char txt[96];
+    int record_source;
+
+    if(!info)
+        return;
+
+    record_source = info->status_tokens[RECORD_AUDIO_SOURCE];
+
+    if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE &&
+       VIMS_STATUS_TOKENS > SAMPLE_AUDIO_SYNC_WAV_LOOP)
+    {
+        int source = info->status_tokens[SAMPLE_AUDIO_SYNC_SOURCE];
+        int profile = info->status_tokens[SAMPLE_AUDIO_SYNC_PROFILE];
+        int mode = info->status_tokens[SAMPLE_AUDIO_SYNC_MODE];
+        int switch_frame = info->status_tokens[SAMPLE_AUDIO_SYNC_VIDEO_ANCHOR];
+
+        if(source == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL && mode != SAMPLE_AUDIO_SYNC_OFF) {
+            audio_sync_set_named_label("audio_sync_audible_route_value", "Sample Original");
+            return;
+        }
+        if(source == SAMPLE_AUDIO_SYNC_SOURCE_WAV && profile > 0) {
+            snprintf(txt, sizeof(txt), "WAV slot %d · %s · switch %dfr",
+                     profile,
+                     sample_audio_sync_status_mode_name(mode),
+                     switch_frame);
+            audio_sync_set_named_label("audio_sync_audible_route_value", txt);
+            return;
+        }
+        if(source == SAMPLE_AUDIO_SYNC_SOURCE_JACK) {
+            snprintf(txt, sizeof(txt), "JACK · %s · switch %dfr",
+                     sample_audio_sync_status_mode_name(mode),
+                     switch_frame);
+            audio_sync_set_named_label("audio_sync_audible_route_value", txt);
+            return;
+        }
+        if(source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE) {
+            snprintf(txt, sizeof(txt), "Silence · switch %dfr", switch_frame);
+            audio_sync_set_named_label("audio_sync_audible_route_value", txt);
+            return;
+        }
+    }
+
+    if(record_source == VJ_RECORD_AUDIO_SOURCE_SILENCE)
+        audio_sync_set_named_label("audio_sync_audible_route_value", "Silence");
+    else if(record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK &&
+            info->status_tokens[AUDIO_SYNC_OPEN])
+        audio_sync_set_named_label("audio_sync_audible_route_value", "External");
+    else
+        audio_sync_set_named_label("audio_sync_audible_route_value", "Original");
+}
 
 static void update_audio_sync_status_widgets(int *history, int force)
 {
@@ -11388,30 +12224,64 @@ static void update_audio_sync_status_widgets(int *history, int force)
     if(AS_CHANGED(AUDIO_SYNC_MODE) || AS_CHANGED(AUDIO_SYNC_SOURCE) || AS_CHANGED(RECORD_AUDIO_SOURCE)) {
         int mode = AS_CUR(AUDIO_SYNC_MODE);
         int record_source = AS_CUR(RECORD_AUDIO_SOURCE);
-        int external_master = (record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
-        int mode_combo = external_master ? audio_sync_mode_combo_from_status(mode) : 0;
+        int sample_owns_audio_source = audio_sync_current_sample_has_own_audio_source();
+        int external_master = !sample_owns_audio_source && (record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
+        int ui_input = audio_input_selector_ui_active_local();
+        int ui_external = (ui_input == 1 || ui_input == 2);
+        int ui_mode = audio_sync_mode_ui_local(mode);
+        int mode_combo = -1;
 
-        if(mode_combo >= 0)
-            audio_sync_set_combo(WIDGET_AUDIO_SYNC_MODE_COMBO, mode_combo);
+        if(!sample_owns_audio_source) {
+            if(external_master && !ui_external)
+                mode_combo = audio_sync_mode_combo_from_status(mode);
+            else if(!external_master && !ui_external)
+                mode_combo = 0;
+
+            if(mode_combo >= 0)
+                audio_sync_set_combo(WIDGET_AUDIO_SYNC_MODE_COMBO, mode_combo);
+        }
 
         audio_beat_set_label_s(WIDGET_AUDIO_SYNC_MODE_VALUE,
-                               external_master ? audio_sync_mode_name(mode) : "Off - no external sync");
+                               sample_owns_audio_source ? "sample override" :
+                               ((ui_external && ui_mode != 0) ? audio_sync_mode_name(ui_mode) :
+                               (external_master ? audio_sync_mode_name(mode) : "Off")));
     }
 
     if(AS_CHANGED(AUDIO_SYNC_SOURCE) || AS_CHANGED(RECORD_AUDIO_SOURCE)) {
         int source = AS_CUR(AUDIO_SYNC_SOURCE);
         int record_source = AS_CUR(RECORD_AUDIO_SOURCE);
+        int ui_input = audio_input_selector_ui_active_local();
 
-        if(record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK)
+        if(audio_sync_current_sample_has_own_audio_source())
+            audio_beat_set_label_s(WIDGET_AUDIO_SYNC_SOURCE_VALUE, audio_sync_current_sample_route_name());
+        else if(ui_input == 2)
+            audio_beat_set_label_s(WIDGET_AUDIO_SYNC_SOURCE_VALUE, "WAV file");
+        else if(ui_input == 1)
+            audio_beat_set_label_s(WIDGET_AUDIO_SYNC_SOURCE_VALUE, "JACK");
+        else if(record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK)
             audio_beat_set_label_s(WIDGET_AUDIO_SYNC_SOURCE_VALUE, audio_sync_source_name(source));
         else if(record_source == VJ_RECORD_AUDIO_SOURCE_SILENCE)
             audio_beat_set_label_s(WIDGET_AUDIO_SYNC_SOURCE_VALUE, "Silence");
         else
-            audio_beat_set_label_s(WIDGET_AUDIO_SYNC_SOURCE_VALUE, "Original audio");
+            audio_beat_set_label_s(WIDGET_AUDIO_SYNC_SOURCE_VALUE, "Original");
     }
 
-    if(AS_CHANGED(AUDIO_SYNC_MODE) || AS_CHANGED(AUDIO_SYNC_SOURCE) || AS_CHANGED(RECORD_AUDIO_SOURCE))
-        audio_input_selector_sync_from_status();
+    if(AS_CHANGED(AUDIO_SYNC_MODE) || AS_CHANGED(AUDIO_SYNC_SOURCE) || AS_CHANGED(RECORD_AUDIO_SOURCE)) {
+        int ui_input = audio_input_selector_ui_active_local();
+        int ui_external = (ui_input == 1 || ui_input == 2);
+        int status_input = audio_input_selector_from_status();
+
+        if(status_input == 2 || !ui_external)
+            audio_input_selector_sync_from_status();
+    }
+
+    if(force || AS_CHANGED(RECORD_AUDIO_SOURCE) || AS_CHANGED(AUDIO_SYNC_OPEN) ||
+       AS_CHANGED(AUDIO_SYNC_SOURCE) || AS_CHANGED(AUDIO_SYNC_MODE) ||
+       AS_CHANGED(PLAY_MODE) || AS_CHANGED(FRAME_NUM) ||
+       (VIMS_STATUS_TOKENS > SAMPLE_AUDIO_SYNC_WAV_LOOP &&
+        (AS_CHANGED(SAMPLE_AUDIO_SYNC_SOURCE) || AS_CHANGED(SAMPLE_AUDIO_SYNC_PROFILE) ||
+         AS_CHANGED(SAMPLE_AUDIO_SYNC_MODE) || AS_CHANGED(SAMPLE_AUDIO_SYNC_VIDEO_ANCHOR))))
+        audio_sync_update_audible_route_label();
 
     if(AS_CHANGED(AUDIO_SYNC_CHANNELS) && AS_CUR(AUDIO_SYNC_CHANNELS) > 0)
         audio_sync_set_spin_i(WIDGET_AUDIO_SYNC_CHANNELS_SPIN, AS_CUR(AUDIO_SYNC_CHANNELS));
@@ -11427,7 +12297,10 @@ static void update_audio_sync_status_widgets(int *history, int force)
 
     if(AS_CHANGED(AUDIO_SYNC_MODE) || AS_CHANGED(AUDIO_SYNC_SOURCE) ||
        AS_CHANGED(AUDIO_SYNC_TARGET_MODE) || AS_CHANGED(RECORD_AUDIO_SOURCE) ||
-       AS_CHANGED(AUDIO_SYNC_OPEN) || AS_CHANGED(AUDIO_SYNC_BRIDGE_ACTIVE))
+       AS_CHANGED(AUDIO_SYNC_OPEN) || AS_CHANGED(AUDIO_SYNC_BRIDGE_ACTIVE) ||
+       (VIMS_STATUS_TOKENS > SAMPLE_AUDIO_SYNC_MODE &&
+        (AS_CHANGED(PLAY_MODE) || AS_CHANGED(SAMPLE_AUDIO_SYNC_SOURCE) ||
+         AS_CHANGED(SAMPLE_AUDIO_SYNC_MODE) || AS_CHANGED(SAMPLE_AUDIO_SYNC_PROFILE))))
     {
         audio_sync_update_mode_sensitivity(AS_CUR(AUDIO_SYNC_MODE),
                                            AS_CUR(AUDIO_SYNC_SOURCE),
@@ -11435,20 +12308,26 @@ static void update_audio_sync_status_widgets(int *history, int force)
                                            AS_CUR(RECORD_AUDIO_SOURCE));
     }
 
-    if(AS_CHANGED(AUDIO_SYNC_ENABLED) || AS_CHANGED(AUDIO_SYNC_SOURCE) || AS_CHANGED(RECORD_AUDIO_SOURCE))
+    if(AS_CHANGED(AUDIO_SYNC_ENABLED) || AS_CHANGED(AUDIO_SYNC_SOURCE) || AS_CHANGED(RECORD_AUDIO_SOURCE) ||
+       (VIMS_STATUS_TOKENS > SAMPLE_AUDIO_SYNC_MODE && AS_CHANGED(SAMPLE_AUDIO_SYNC_MODE)))
         audio_beat_set_label_s(WIDGET_AUDIO_SYNC_ENABLED_VALUE,
-                               AS_CUR(RECORD_AUDIO_SOURCE) == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK
-                                   ? (AS_CUR(AUDIO_SYNC_ENABLED) ? "provider" : "no")
-                                   : (audio_sync_status_is_internal_push_analysis() ? "internal" : "no"));
+                               audio_sync_current_sample_has_own_audio_source()
+                                   ? "sample"
+                                   : (AS_CUR(RECORD_AUDIO_SOURCE) == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK
+                                      ? (AS_CUR(AUDIO_SYNC_ENABLED) ? "external" : "off")
+                                      : (audio_sync_status_is_internal_push_analysis() ? "internal beat" : "off")));
 
-    if(AS_CHANGED(AUDIO_SYNC_OPEN) || AS_CHANGED(AUDIO_SYNC_SOURCE) || AS_CHANGED(RECORD_AUDIO_SOURCE))
+    if(AS_CHANGED(AUDIO_SYNC_OPEN) || AS_CHANGED(AUDIO_SYNC_SOURCE) || AS_CHANGED(RECORD_AUDIO_SOURCE) ||
+       (VIMS_STATUS_TOKENS > SAMPLE_AUDIO_SYNC_MODE && AS_CHANGED(SAMPLE_AUDIO_SYNC_MODE)))
         audio_beat_set_label_s(WIDGET_AUDIO_SYNC_OPEN_VALUE,
-                               AS_CUR(RECORD_AUDIO_SOURCE) == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK
-                                   ? (AS_CUR(AUDIO_SYNC_OPEN) ? "yes" : "no")
-                                   : (audio_sync_status_is_internal_push_analysis() ? "beat" : "no"));
+                               audio_sync_current_sample_has_own_audio_source()
+                                   ? "sample route"
+                                   : (AS_CUR(RECORD_AUDIO_SOURCE) == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK
+                                      ? (AS_CUR(AUDIO_SYNC_OPEN) ? "open" : "closed")
+                                      : (audio_sync_status_is_internal_push_analysis() ? "internal" : "n/a")));
 
     if(AS_CHANGED(AUDIO_SYNC_RUNNING))
-        audio_beat_set_label_s(WIDGET_AUDIO_SYNC_RUNNING_VALUE, AS_CUR(AUDIO_SYNC_RUNNING) ? "yes" : "no");
+        audio_beat_set_label_s(WIDGET_AUDIO_SYNC_RUNNING_VALUE, AS_CUR(AUDIO_SYNC_RUNNING) ? "running" : "idle");
 
     AS_SET_BAR(AUDIO_SYNC_LEVEL_PCT,     WIDGET_AUDIO_SYNC_LEVEL_BAR);
     AS_SET_BAR(AUDIO_SYNC_TRANSIENT_PCT, WIDGET_AUDIO_SYNC_TRANSIENT_BAR);
@@ -11528,14 +12407,25 @@ static void update_audio_sync_status_widgets(int *history, int force)
         audio_beat_set_label_s(WIDGET_AUDIO_SYNC_TRACK_ALIGN_LOCKED_VALUE,
                                AS_CUR(AUDIO_SYNC_TRACK_ALIGN_LOCKED) ? "locked" : "no");
 
-    AS_SET_LABEL(AUDIO_SYNC_TRACK_ALIGN_OFFSET_MS, WIDGET_AUDIO_SYNC_TRACK_ALIGN_OFFSET_VALUE, "%d ms");
+    if(AS_CHANGED(AUDIO_SYNC_TRACK_ALIGN_OFFSET_MS)) {
+        int v = AS_CUR(AUDIO_SYNC_TRACK_ALIGN_OFFSET_MS);
+        snprintf(txt, sizeof(txt), "%+d ms", v);
+        audio_beat_set_label_s(WIDGET_AUDIO_SYNC_TRACK_ALIGN_OFFSET_VALUE, txt);
+    }
+
     AS_SET_LABEL(AUDIO_SYNC_TRACK_ALIGN_CONFIDENCE, WIDGET_AUDIO_SYNC_TRACK_ALIGN_CONFIDENCE_VALUE, "%d%%");
-    AS_SET_LABEL(AUDIO_SYNC_TRACK_ALIGN_CORRECTION_PPM, WIDGET_AUDIO_SYNC_TRACK_ALIGN_CORRECTION_VALUE, "%d ppm");
+
+    if(AS_CHANGED(AUDIO_SYNC_TRACK_ALIGN_CORRECTION_PPM)) {
+        int v = AS_CUR(AUDIO_SYNC_TRACK_ALIGN_CORRECTION_PPM);
+        snprintf(txt, sizeof(txt), "%+d ppm", v);
+        audio_beat_set_label_s(WIDGET_AUDIO_SYNC_TRACK_ALIGN_CORRECTION_VALUE, txt);
+    }
 
     if(AS_CHANGED(AUDIO_SYNC_TRACK_ALIGN_STATE))
         audio_beat_set_label_s(WIDGET_AUDIO_SYNC_TRACK_ALIGN_STATE_VALUE,
                                audio_sync_track_align_state_name(AS_CUR(AUDIO_SYNC_TRACK_ALIGN_STATE)));
 
+    sample_audio_sync_status_sync_controls(history, force);
     timeline_update_compact_overlay();
 
 #undef AS_SET_LABEL
@@ -11548,12 +12438,14 @@ static void update_audio_sync_status_widgets(int *history, int force)
 static void update_globalinfo(int *history, int pm, int last_pm)
 {
     int i;
-    total_frames_ = (pm == MODE_STREAM ? info->status_tokens[SAMPLE_MARKER_END] : info->status_tokens[TOTAL_FRAMES] );
-    gint history_frames_ = (pm == MODE_STREAM ? history[SAMPLE_MARKER_END] : history[TOTAL_FRAMES] );
+    const gboolean source_changed = (last_pm != pm) ||
+                                    history[CURRENT_ID] != info->status_tokens[CURRENT_ID];
+    total_frames_ = (pm == MODE_STREAM ? ui_stream_transport_length() : info->status_tokens[TOTAL_FRAMES] );
+    gint history_frames_ = (pm == MODE_STREAM ? (history[STREAM_BUFFER_ENABLED] > 0 && history[STREAM_BUFFER_FILLED] > 0 ? history[STREAM_BUFFER_FILLED] : history[SAMPLE_MARKER_END]) : history[TOTAL_FRAMES] );
 
-    if( total_frames_ != history_frames_ )
+    if(total_frames_ != history_frames_ || source_changed)
     {
-        gint current_frame_ = info->status_tokens[FRAME_NUM];
+        gint current_frame_ = (pm == MODE_STREAM ? ui_stream_transport_position() : info->status_tokens[FRAME_NUM]);
 
         char *time = format_time( total_frames_,(double) info->el.fps );
         if( pm == MODE_STREAM )
@@ -11562,7 +12454,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
             gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_STREAM_LENGTH_LABEL] ), time );
 
-            update_spin_range2( widget_cache[WIDGET_STREAM_TRANSITION_LENGTH], 1, info->status_tokens[SAMPLE_MARKER_END], info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
+            update_spin_range2( widget_cache[WIDGET_STREAM_TRANSITION_LENGTH], 1, total_frames_, info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
         }
 
         if( pm != MODE_SAMPLE) {
@@ -11601,9 +12493,12 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         free(time);
     }
 
-    info->status_frame = info->status_tokens[FRAME_NUM];
+    info->status_frame = (pm == MODE_STREAM ? ui_stream_transport_position() : info->status_tokens[FRAME_NUM]);
 
     gint timeline_frame = info->status_frame;
+
+    if(pm == MODE_STREAM)
+        timeline_frame = ui_stream_transport_position();
 
     if(pm == MODE_SAMPLE) {
         const gint sample_start = info->status_tokens[SAMPLE_START];
@@ -11638,8 +12533,8 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     free(current_time_);
     free(mouse_at_time);
 
-    if( last_pm != pm )
-        update_status_accessibility( last_pm, pm);
+    if(source_changed)
+        update_status_accessibility(last_pm, pm, source_changed);
 
     if( info->status_tokens[FEEDBACK] != history[FEEDBACK] ) {
         if(info->status_tokens[FEEDBACK] == 1) {
@@ -11702,7 +12597,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         info->uc.reload_hint[HINT_ENTRY] = 1;
     }
 
-    if( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || last_pm != pm )
+    if(source_changed)
     {
         info->uc.reload_hint[HINT_ENTRY] = 1;
         info->uc.reload_hint[HINT_CHAIN] = 1;
@@ -11748,7 +12643,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         update_spin_range2( widget_cache[WIDGET_BUFFEREDSTREAMID], 1, n_streams, info->status_tokens[CURRENT_ID] );
     }
 
-    if( info->status_tokens[SAMPLE_LOOP_STAT_STOP] != history[SAMPLE_LOOP_STAT_STOP] ) {
+    if(source_changed || info->status_tokens[SAMPLE_LOOP_STAT_STOP] != history[SAMPLE_LOOP_STAT_STOP]) {
 	    update_label_i2( widget_cache[WIDGET_LABEL_LOOP_STAT_STOP], info->status_tokens[SAMPLE_LOOP_STAT_STOP],0);
         if( pm == MODE_SAMPLE )
             gtk_spin_button_set_value( GTK_SPIN_BUTTON( widget_cache[ WIDGET_SAMPLE_LOOPSTOP ] ), (gdouble) info->status_tokens[SAMPLE_LOOP_STAT_STOP] );
@@ -11756,7 +12651,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
              gtk_spin_button_set_value( GTK_SPIN_BUTTON( widget_cache[ WIDGET_STREAM_LOOPSTOP ] ), (gdouble) info->status_tokens[SAMPLE_LOOP_STAT_STOP] );
     }
 
-    if( info->status_tokens[SAMPLE_LOOP_STAT ] != history[SAMPLE_LOOP_STAT] ) {
+    if(source_changed || info->status_tokens[SAMPLE_LOOP_STAT] != history[SAMPLE_LOOP_STAT]) {
 	    update_label_i2( widget_cache[ WIDGET_LABEL_LOOP_STATS ], info->status_tokens[SAMPLE_LOOP_STAT], 0);
     }
 
@@ -11779,11 +12674,8 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         update_sequence_playing_from_status();
     }
 
-    if( history[CURRENT_ID] != info->status_tokens[CURRENT_ID] )
-    {
-        if(pm == MODE_SAMPLE || pm == MODE_STREAM)
-            update_label_i2( widget_cache[ WIDGET_LABEL_CURRENTID], info->status_tokens[CURRENT_ID] ,0);
-    }
+    if(source_changed && (pm == MODE_SAMPLE || pm == MODE_STREAM))
+        update_label_i2(widget_cache[WIDGET_LABEL_CURRENTID], info->status_tokens[CURRENT_ID], 0);
 
     if( history[STREAM_RECORDING] != info->status_tokens[STREAM_RECORDING] )
     {
@@ -11800,7 +12692,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
     if( pm == MODE_PLAIN )
     {
-        if( history[SAMPLE_SPEED] != info->status_tokens[SAMPLE_SPEED] )
+        if(source_changed || history[SAMPLE_SPEED] != info->status_tokens[SAMPLE_SPEED])
         {
             int plainspeed =  info->status_tokens[SAMPLE_SPEED];
 
@@ -11825,6 +12717,18 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
     if( pm == MODE_STREAM )
     {
+        if(source_changed ||
+           history[STREAM_BUFFER_SPEED] != info->status_tokens[STREAM_BUFFER_SPEED] ||
+           history[STREAM_BUFFER_DIRECTION] != info->status_tokens[STREAM_BUFFER_DIRECTION] ||
+           history[STREAM_BUFFER_ENABLED] != info->status_tokens[STREAM_BUFFER_ENABLED])
+        {
+            int speed = info->status_tokens[STREAM_BUFFER_SPEED];
+            if(info->status_tokens[STREAM_BUFFER_DIRECTION] < 0 && speed > 0)
+                speed = -speed;
+            update_slider_value2(widget_cache[WIDGET_SPEED_SLIDER], speed, 0);
+            update_label_str2(widget_cache[WIDGET_PLAYHINT], speed == 0 ? "Paused" : (speed < 0 ? "Reverse stream" : "Buffered stream"));
+        }
+
         if(info->uc.cali_duration > 0 )
         {
             GtkWidget *tb = widget_cache[WIDGET_CALI_TAKE_BUTTON];
@@ -12178,6 +13082,7 @@ static void kf_param_combo_rebuild_if_needed(GtkWidget *kf_param, int fx_id, int
 
     gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(kf_param));
     gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), "None");
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), "FX Opacity");
 
     for(int i = 0; i < np; i++) {
         gchar *tt1 = _effect_get_param_description(fx_id, i);
@@ -12237,6 +13142,9 @@ static void disable_fx_entry(void) {
     kf_param_combo_invalidate();
     gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(kf_param));
     gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), "None");
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), "FX Opacity");
+    kf_param_combo_set_active_guarded(kf_param,
+        info->uc.selected_parameter_id == VJ_KF_PARAM_CHAIN_OPACITY ? 1 : 0);
 
     for( i = 0; i < MAX_UI_PARAMETERS; i ++ )
     {
@@ -12377,18 +13285,20 @@ static void enable_fx_entry(void) {
         }
     }
 
-    if(np) {
+    {
         gint active_kf_id = info->uc.selected_parameter_id;
+        gint active_combo = 0;
 
-        if(active_kf_id < 0 || active_kf_id >= np)
-            active_kf_id = -1;
+        if(active_kf_id == VJ_KF_PARAM_CHAIN_OPACITY)
+            active_combo = 1;
+        else {
+            if(active_kf_id < 0 || active_kf_id >= np)
+                active_kf_id = -1;
+            active_combo = active_kf_id >= 0 ? active_kf_id + 2 : 0;
+        }
 
-        kf_param_combo_set_active_guarded(kf_param, active_kf_id + 1);
-
+        kf_param_combo_set_active_guarded(kf_param, active_combo);
         info->uc.selected_parameter_id = active_kf_id;
-    } else {
-        kf_param_combo_set_active_guarded(kf_param, 0);
-        info->uc.selected_parameter_id = -1;
     }
 
     min = 0; max = 1; value = 0;
@@ -12560,6 +13470,84 @@ static void process_reload_hints(int *history, int pm)
 }
 
 
+static void update_stream_trickplay_status(int *history, int initial)
+{
+    int changed = initial ||
+        history[STREAM_BUFFER_ENABLED] != info->status_tokens[STREAM_BUFFER_ENABLED] ||
+        history[STREAM_BUFFER_CAPACITY] != info->status_tokens[STREAM_BUFFER_CAPACITY] ||
+        history[STREAM_BUFFER_FILLED] != info->status_tokens[STREAM_BUFFER_FILLED] ||
+        history[STREAM_BUFFER_POSITION] != info->status_tokens[STREAM_BUFFER_POSITION] ||
+        history[STREAM_BUFFER_SPEED] != info->status_tokens[STREAM_BUFFER_SPEED] ||
+        history[STREAM_BUFFER_DIRECTION] != info->status_tokens[STREAM_BUFFER_DIRECTION] ||
+        history[STREAM_BUFFER_MODE] != info->status_tokens[STREAM_BUFFER_MODE] ||
+        history[STREAM_BUFFER_STATE] != info->status_tokens[STREAM_BUFFER_STATE] ||
+        history[PLAY_MODE] != info->status_tokens[PLAY_MODE] ||
+        history[CURRENT_ID] != info->status_tokens[CURRENT_ID];
+
+    if(!changed)
+        return;
+
+    int capacity = info->status_tokens[STREAM_BUFFER_CAPACITY];
+    int filled = info->status_tokens[STREAM_BUFFER_FILLED];
+    int position = info->status_tokens[STREAM_BUFFER_POSITION];
+    int speed = info->status_tokens[STREAM_BUFFER_SPEED];
+    int direction = info->status_tokens[STREAM_BUFFER_DIRECTION];
+    int enabled = info->status_tokens[STREAM_BUFFER_ENABLED] > 0;
+    int state = info->status_tokens[STREAM_BUFFER_STATE];
+    int supported = info->status_tokens[PLAY_MODE] == MODE_STREAM && state != STREAM_BUFFER_STATE_UNSUPPORTED;
+    int ready = supported && enabled && filled > 0;
+    char txt[64];
+
+    if(capacity < 0)
+        capacity = 0;
+    if(filled < 0)
+        filled = 0;
+    if(position < 0)
+        position = 0;
+
+    if(widget_cache[WIDGET_STREAM_BUFFER_LENGTH] && GTK_IS_SPIN_BUTTON(widget_cache[WIDGET_STREAM_BUFFER_LENGTH])) {
+        GtkAdjustment *adj = gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_BUFFER_LENGTH]));
+        if(adj && gtk_adjustment_get_upper(adj) < capacity)
+            gtk_adjustment_set_upper(adj, (gdouble)capacity);
+        if((int)gtk_spin_button_get_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_BUFFER_LENGTH])) != capacity)
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_BUFFER_LENGTH]), (gdouble)capacity);
+    }
+
+    snprintf(txt, sizeof(txt), "%d / %d", filled, capacity);
+    update_label_str2(widget_cache[WIDGET_STREAM_BUFFER_FILL_VALUE], txt);
+
+    snprintf(txt, sizeof(txt), "%d", position);
+    update_label_str2(widget_cache[WIDGET_STREAM_BUFFER_POSITION_VALUE], txt);
+
+    if(speed == 0)
+        snprintf(txt, sizeof(txt), "paused");
+    else if(direction < 0)
+        snprintf(txt, sizeof(txt), "-%d", speed < 0 ? -speed : speed);
+    else
+        snprintf(txt, sizeof(txt), "%d", speed);
+    update_label_str2(widget_cache[WIDGET_STREAM_BUFFER_SPEED_VALUE], txt);
+
+    if(state == STREAM_BUFFER_STATE_PLAYING || state == STREAM_BUFFER_STATE_PAUSED)
+        snprintf(txt, sizeof(txt), "%s / %s", ui_stream_buffer_state_name(state), ui_stream_buffer_mode_name(info->status_tokens[STREAM_BUFFER_MODE]));
+    else
+        snprintf(txt, sizeof(txt), "%s", ui_stream_buffer_state_name(state));
+    update_label_str2(widget_cache[WIDGET_STREAM_BUFFER_MODE_VALUE], txt);
+
+    ui_stream_trickplay_set_sensitive(info->status_tokens[PLAY_MODE] == MODE_STREAM, supported, ready);
+
+    if(info->status_tokens[PLAY_MODE] == MODE_STREAM) {
+        int len = ui_stream_transport_length();
+        int pos = ui_stream_transport_position();
+        if(len < 1)
+            len = 1;
+        if(pos >= len)
+            pos = len - 1;
+        timeline_set_length(info->tl, (gdouble)len, (gdouble)pos);
+        timeline_set_pos(info->tl, (gdouble)pos);
+        curve_set_position(info->curve, (gdouble)pos);
+    }
+}
+
 static void update_record_audio_source_from_status(int *history)
 {
     if(history[RECORD_AUDIO_SOURCE] == info->status_tokens[RECORD_AUDIO_SOURCE])
@@ -12604,8 +13592,13 @@ void update_gui(void)
     update_audio_sync_status_widgets(history, last_pm < 0);
 
     update_globalinfo(history, pm, last_pm);
+    update_stream_trickplay_status(history, last_pm < 0);
+    if(pm == MODE_SAMPLE || pm == MODE_PLAIN)
+        ui_transport_controls_set_sensitive(1);
+    ui_sample_marker_length_controls_set_sensitive(pm == MODE_SAMPLE);
     update_record_audio_source_from_status(history);
     sample_volume_sync_from_status(history, last_pm < 0);
+    audio_mixer_mode_sync_from_status(history, last_pm < 0);
     audio_mixer_crossfade_sync_from_status(history, last_pm < 0);
 
     if(status_entry_tail_changed(history, last_pm < 0))
@@ -12670,25 +13663,57 @@ int vj_gui_get_preview_priority(void)
     return 1;
 }
 
-void default_bank_values(int *col, int *row )
+int set_samplebank_layout(int columns, int rows, int pages)
 {
-    int nsc = SAMPLEBANK_COLUMNS;
-    int nsy = SAMPLEBANK_ROWS;
+    if(columns <= 0)
+        columns = 6;
+    if(rows <= 0)
+        rows = 2;
+    if(pages <= 0)
+        pages = 12;
 
-    if( *col == 0 && *row == 0 )
-    {
-        SAMPLEBANK_COLUMNS = nsc;
-        SAMPLEBANK_ROWS = nsy;
+    if(columns * rows != 12) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Sample bank layout must contain exactly 12 cells per page: got %dx%d",
+                   columns, rows);
+        return 0;
     }
-    else
-    {
-        SAMPLEBANK_ROWS = *row;
-        SAMPLEBANK_COLUMNS = *col;
-    }
-    NUM_SAMPLES_PER_PAGE = SAMPLEBANK_COLUMNS * SAMPLEBANK_ROWS;
-    NUM_BANKS = (4096 / NUM_SAMPLES_PER_PAGE );
 
-    veejay_msg(VEEJAY_MSG_INFO, "Sample bank layout is %d rows by %d columns", SAMPLEBANK_ROWS,SAMPLEBANK_COLUMNS );
+    if(pages < 1)
+        pages = 1;
+    if(pages > 512)
+        pages = 512;
+
+    SAMPLEBANK_COLUMNS = columns;
+    SAMPLEBANK_ROWS = rows;
+    NUM_SAMPLES_PER_PAGE = 12;
+    NUM_BANKS = pages;
+
+    return 1;
+}
+
+void default_bank_values(int *col, int *row)
+{
+    if(NUM_BANKS <= 0)
+        NUM_BANKS = 12;
+
+    if(SAMPLEBANK_COLUMNS <= 0 || SAMPLEBANK_ROWS <= 0 ||
+       SAMPLEBANK_COLUMNS * SAMPLEBANK_ROWS != 12)
+    {
+        SAMPLEBANK_COLUMNS = 6;
+        SAMPLEBANK_ROWS = 2;
+    }
+
+    NUM_SAMPLES_PER_PAGE = 12;
+
+    if(col)
+        *col = SAMPLEBANK_COLUMNS;
+    if(row)
+        *row = SAMPLEBANK_ROWS;
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "Sample bank grid: %d pages, %d rows by %d columns (%d slots per page)",
+               NUM_BANKS, SAMPLEBANK_ROWS, SAMPLEBANK_COLUMNS, NUM_SAMPLES_PER_PAGE);
 }
 
 int vj_gui_sleep_time( void )
@@ -12705,56 +13730,34 @@ int vj_gui_sleep_time( void )
     return (int) n;
 }
 
-int vj_img_cb(GdkPixbuf *img )
+int vj_img_cb(GdkPixbuf *img)
 {
-    int i;
-    if( !info->selected_slot || !info->selected_gui_slot || info->status_tokens[PLAY_MODE] == MODE_PLAIN)    {
+    if(!img || info->status_tokens[PLAY_MODE] == MODE_PLAIN)
         return 0;
-    }
 
-    int sample_id = info->status_tokens[ CURRENT_ID ];
-    int pm = info->status_tokens[ PLAY_MODE ];
-    int sample_type = ( pm == MODE_SAMPLE ? 0 : info->status_tokens[STREAM_TYPE] );
+    int sample_id = info->status_tokens[CURRENT_ID];
+    int pm = info->status_tokens[PLAY_MODE];
+    int sample_type = (pm == MODE_SAMPLE ? 0 : info->status_tokens[STREAM_TYPE]);
+    sample_slot_t *slot = info->selected_slot;
 
-       if( sample_type != info->selected_slot->sample_type || info->selected_slot->sample_id != sample_id )     {
+    if(!slot || slot->sample_id != sample_id || slot->sample_type != sample_type)
+        slot = find_slot_by_sample(sample_id, sample_type);
+
+    if(!slot)
         return 0;
+
+    int page = -1;
+    int slot_nr = -1;
+    if(samplebank_locate_slot(slot, &page, &slot_nr)) {
+        samplebank_clear_slot_pixbuf(slot);
+        slot->pixbuf = gdk_pixbuf_copy(img);
+
+        if(info->sample_bank_view)
+            gvr_sample_bank_view_set_thumbnail(info->sample_bank_view, page, slot_nr, img);
+        return 1;
     }
 
-    if( pm == MODE_SAMPLE || pm == MODE_STREAM )
-    {
-        sample_slot_t *slot = find_slot_by_sample( sample_id, sample_type );
-        sample_gui_slot_t *gui_slot = find_gui_slot_by_sample( sample_id, sample_type );
-
-        if( slot && gui_slot )
-        {
-            slot->pixbuf = vj_gdk_pixbuf_scale_simple(img, info->image_dimensions[0],info->image_dimensions[1], GDK_INTERP_NEAREST);
-            if(slot->pixbuf) {
-                gtk_widget_show(gui_slot->image);
-                gtk_image_set_from_pixbuf_( GTK_IMAGE( gui_slot->image ), slot->pixbuf );
-                g_object_unref( slot->pixbuf );
-                slot->pixbuf = NULL;
-            }
-        }
-    }
-
-    for( i = 0; i < info->sequence_view->envelope_size; i ++ )
-    {
-        sequence_gui_slot_t *g = info->sequence_view->gui_slot[i];
-        if(g->sample_id == info->selected_slot->sample_id && g->sample_type == info->selected_slot->sample_type)
-        {
-            g->pixbuf_ref = vj_gdk_pixbuf_scale_simple(img,
-                                                       info->sequence_view->w,
-                                                       info->sequence_view->h,
-                                                       GDK_INTERP_NEAREST );
-            if( g->pixbuf_ref)
-            {
-                gtk_image_set_from_pixbuf_( GTK_IMAGE( g->image ), g->pixbuf_ref );
-                g_object_unref( g->pixbuf_ref );
-                g->pixbuf_ref = NULL;
-            }
-        }
-    }
-    return 1;
+    return 0;
 }
 
 void vj_gui_cb(int state, char *hostname, int port_num)
@@ -12857,40 +13860,6 @@ static void reset_reloaded_runtime_ports(void)
     if(fx_list_)
         vpf(fx_list_);
     fx_list_ = (vevo_port_t*) vpn(200);
-}
-
-static void set_activation_of_cache_slot_in_samplebank(sequence_gui_slot_t *gui_slot,
-                                                       gboolean activate)
-{
-    if (activate)
-    {
-        gtk_frame_set_shadow_type(GTK_FRAME(gui_slot->frame),GTK_SHADOW_IN);
-    }
-    else {
-        gtk_frame_set_shadow_type(GTK_FRAME(gui_slot->frame),GTK_SHADOW_ETCHED_IN);
-    }
-}
-
-
-static void reset_quickselect_ui_state(void)
-{
-    if(!info->sequence_view || !info->sequence_view->gui_slot)
-        return;
-
-    for(int i = 0; i < info->sequence_view->envelope_size; i++) {
-        sequence_gui_slot_t *g = info->sequence_view->gui_slot[i];
-        if(!g)
-            continue;
-
-        g->sample_id = -1;
-        g->sample_type = -1;
-        set_activation_of_cache_slot_in_samplebank(g, FALSE);
-
-        if(g->image && GTK_IS_IMAGE(g->image))
-            gtk_image_clear(GTK_IMAGE(g->image));
-    }
-
-    info->current_sequence_slot = -1;
 }
 
 static void reset_sequencer_ui_state(void)
@@ -12997,7 +13966,6 @@ static void reset_connection_widget_state(void)
     reset_tree("macro_macros");
 
     reset_samplebank();
-    reset_quickselect_ui_state();
     reset_sequencer_ui_state();
 
     disable_fx_entry();
@@ -13048,10 +14016,16 @@ void vj_gui_wipe(void)
 
 GtkWidget *new_bank_pad(GtkWidget *box)
 {
-    GtkWidget *pad = gtk_notebook_new();
-    gtk_notebook_set_tab_pos( GTK_NOTEBOOK(pad), GTK_POS_BOTTOM );
-    gtk_notebook_set_show_tabs( GTK_NOTEBOOK(pad ), FALSE );
-    gtk_box_pack_start (GTK_BOX (box), GTK_WIDGET(pad), TRUE, TRUE, 0);
+    if(!box || !GTK_IS_BOX(box))
+        return NULL;
+
+    GtkWidget *pad = gvr_sample_bank_view_new();
+    if(!pad || !GTK_IS_WIDGET(pad))
+        return NULL;
+
+    add_class(pad, "samplebank-view");
+    gtk_box_pack_start(GTK_BOX(box), pad, TRUE, TRUE, 0);
+    gtk_widget_show(pad);
     return pad;
 }
 
@@ -13279,21 +14253,16 @@ static void init_sample_bank(sample_bank_t *bank, int bank_num)
     sample_slot_t **slot =
         vj_calloc(sizeof(sample_slot_t*) * NUM_SAMPLES_PER_PAGE);
 
-    sample_gui_slot_t **gui_slot =
-        vj_calloc(sizeof(sample_gui_slot_t*) * NUM_SAMPLES_PER_PAGE);
-
     for(int j = 0; j < NUM_SAMPLES_PER_PAGE; j++)
     {
         slot[j] = vj_calloc(sizeof(sample_slot_t));
-        gui_slot[j] = vj_calloc(sizeof(sample_gui_slot_t));
 
         slot[j]->slot_number = j;
         slot[j]->sample_id   = -1;
         slot[j]->sample_type = -1;
     }
 
-    bank->slot     = slot;
-    bank->gui_slot = gui_slot;
+    bank->slot = slot;
 
     add_bank(bank_num);
 }
@@ -13422,7 +14391,18 @@ void vj_gui_init(const char *glade_file,
     init_polish_tooltips();
 
     GtkWidget *box = glade_xml_get_widget_( info->main_window, "sample_bank_hbox" );
-    info->sample_bank_pad = new_bank_pad( box );
+    info->sample_bank_view = new_bank_pad(box);
+    if(!info->sample_bank_view)
+        veejay_msg(VEEJAY_MSG_WARNING, "Sample bank grid widget could not be created");
+    else {
+        gvr_sample_bank_view_set_layout(info->sample_bank_view, SAMPLEBANK_COLUMNS, SAMPLEBANK_ROWS);
+        gvr_sample_bank_view_set_page_count(info->sample_bank_view, NUM_BANKS);
+        samplebank_update_page_label();
+        g_signal_connect(G_OBJECT(info->sample_bank_view), "page-selected", G_CALLBACK(on_sample_bank_view_page_selected), NULL);
+        g_signal_connect(G_OBJECT(info->sample_bank_view), "slot-selected", G_CALLBACK(on_sample_bank_view_slot_selected), NULL);
+        g_signal_connect(G_OBJECT(info->sample_bank_view), "slot-activated", G_CALLBACK(on_sample_bank_view_slot_activated), NULL);
+        g_signal_connect(G_OBJECT(info->sample_bank_view), "slot-mix-requested", G_CALLBACK(on_sample_bank_view_slot_mix_requested), NULL);
+    }
     gui->sample_banks = vj_calloc(sizeof(sample_bank_t*) * NUM_BANKS);
 
     for(int i = 0; i < NUM_BANKS; i++)
@@ -13430,6 +14410,7 @@ void vj_gui_init(const char *glade_file,
         gui->sample_banks[i] = vj_calloc(sizeof(sample_bank_t));
         init_sample_bank(gui->sample_banks[i], i);
     }
+    samplebank_update_offline_recorder_gadget();
 
 
     gtk_entry_set_activates_default(GTK_ENTRY(widget_cache[WIDGET_ENTRY_HOSTNAME]), TRUE);
@@ -13442,6 +14423,7 @@ void vj_gui_init(const char *glade_file,
     gtk_window_set_default(GTK_WINDOW(connection_dial), vj_button);
 
     gtk_builder_connect_signals( gui->main_window , NULL);
+    connect_audio_mixer_override_signals();
     GtkWidget *frame = glade_xml_get_widget_( info->main_window, "markerframe" );
     info->tl = timeline_new();
     add_class(info->tl, "timeline");
@@ -13459,6 +14441,8 @@ void vj_gui_init(const char *glade_file,
         (GCallback) on_timeline_bind_toggled, NULL );
     g_signal_connect( info->tl, "cleared",
         (GCallback) on_timeline_cleared, NULL );
+    g_signal_connect( info->tl, "audio_offset_changed",
+        (GCallback) on_timeline_audio_offset_changed, NULL );
 
     bankport_ = vpn( VEVO_ANONYMOUS_PORT );
 
@@ -13478,8 +14462,6 @@ void vj_gui_init(const char *glade_file,
             NULL );
 
 
-
-    create_ref_slots( QUICKSELECT_SLOTS );
 
 
     create_sequencer_slots( SEQUENCER_COL, SEQUENCER_ROW );
@@ -13686,23 +14668,6 @@ void vj_gui_preview(void)
     info->image_w = w;
     info->image_h = h;
 
-    GdkRectangle result;
-    widget_get_rect_in_screen(
-        glade_xml_get_widget_(info->main_window, "quickselect"),
-        &result
-    );
-    gdouble ratio = (gdouble) h / (gdouble) w;
-
-    gint image_width = 32;
-    gint image_height = 32 *ratio;
-
-    info->sequence_view->w = image_width;
-    info->sequence_view->h = image_height;
-
-    for( int i = 0; i < QUICKSELECT_SLOTS; i ++ ) {
-        gtk_widget_set_size_request_( info->sequence_view->gui_slot[i]->image, info->sequence_view->w,info->sequence_view->h );
-    }
-
 }
 
 void gveejay_preview( int p )
@@ -13777,6 +14742,7 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
     load_effectlist_info();
     reload_vimslist();
     reload_editlist_contents();
+    load_samplelist_info();
     reload_bundles();
 
     set_feedback_status();
@@ -13809,6 +14775,7 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
     info->uc.reload_hint[HINT_CHAIN] = 1;
     info->uc.reload_hint[HINT_ENTRY] = 1;
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+    info->uc.reload_hint[HINT_SLIST] = 1;
     info->uc.reload_hint[HINT_HISTORY] = 1;
     info->uc.reload_hint[HINT_KF] = 1;
 
@@ -14030,223 +14997,100 @@ void vj_gui_enable(void)
     info->sensitive = 1;
 }
 
-static void widget_get_rect_in_screen (GtkWidget *widget, GdkRectangle *r)
+static int add_bank(gint bank_num)
 {
+    if(bank_num < 0 || bank_num >= NUM_BANKS || !info->sample_banks[bank_num])
+        return -1;
 
-
-    r->x = 0;
-    r->y = 0;
-    GtkAllocation all;
-    gtk_widget_get_allocation(widget, &all);
-    r->width = all.width;
-    r->height = all.height;
-}
-
-
-static void samplebank_size_allocate(GtkWidget *widget, GtkAllocation *allocation, void *data)
-{
-    setup_samplebank(
-            SAMPLEBANK_COLUMNS, SAMPLEBANK_ROWS, allocation, &(info->image_dimensions[0]),&(info->image_dimensions[1]) );
-
-    samplebank_ready_ = 1;
-}
-
-
-static int add_bank( gint bank_num )
-{
-    gchar str_label[16];
-    gchar frame_label[32];
-    snprintf(str_label,sizeof(str_label), "%d", bank_num );
-    snprintf(frame_label,sizeof(frame_label), "Slots %d to %d",
-        (bank_num * NUM_SAMPLES_PER_PAGE), (bank_num * NUM_SAMPLES_PER_PAGE) + NUM_SAMPLES_PER_PAGE  );
-
-    GtkWidget *sb = info->sample_bank_pad;
-    GtkWidget *frame = gtk_frame_new(frame_label);
-    GtkWidget *label = gtk_label_new( str_label );
-
-    gtk_container_set_border_width( GTK_CONTAINER( frame), 1 );
-    gtk_widget_show(frame);
-    info->sample_banks[bank_num]->page_num = gtk_notebook_append_page(GTK_NOTEBOOK(info->sample_bank_pad), frame, label);
-
-    GtkWidget *grid = gtk_grid_new();
-    gtk_grid_set_column_homogeneous(GTK_GRID(grid),TRUE);
-    gtk_grid_set_row_homogeneous(GTK_GRID(grid),TRUE);
-
-    gtk_container_add( GTK_CONTAINER(frame), grid );
-
-    gint col, row;
-    for( row = 0; row < SAMPLEBANK_ROWS; row ++ ) {
-        for( col = 0; col < SAMPLEBANK_COLUMNS; col ++ ) {
-            int slot_nr = row * SAMPLEBANK_COLUMNS + col;
-            create_slot( bank_num, slot_nr ,info->image_dimensions[0], info->image_dimensions[1]);
-            sample_gui_slot_t *gui_slot = info->sample_banks[bank_num]->gui_slot[slot_nr];
-            gtk_grid_attach( GTK_GRID(grid), gui_slot->event_box, col, row, 1,1);
-            set_tooltip_by_widget( gui_slot->frame, tooltips[TOOLTIP_SAMPLESLOT].text);
-        }
-    }
-    g_signal_connect(grid,"size-allocate",G_CALLBACK(samplebank_size_allocate), NULL);
-
-    gtk_widget_show(grid);
-    gtk_widget_show(sb );
-
-    if( !info->normal )
-    {
-        info->normal = widget_get_fg( GTK_WIDGET(info->sample_banks[bank_num]->gui_slot[0]->frame) );
-    }
+    info->sample_banks[bank_num]->page_num = bank_num;
     return bank_num;
 }
 
 void reset_samplebank(void)
 {
-    info->selection_slot = NULL;
-    info->selection_gui_slot = NULL;
-    info->selected_slot = NULL;
-    info->selected_gui_slot = NULL;
+    if(!info || !info->sample_banks)
+        return;
 
-    int i,j;
-    for( i = 0; i < NUM_BANKS; i ++ )
+    info->selection_slot = NULL;
+    info->selected_slot = NULL;
+
+    if(info->sample_bank_view)
+        gvr_sample_bank_view_clear_all(info->sample_bank_view);
+
+    for(int i = 0; i < NUM_BANKS; i++)
     {
         if(info->sample_banks[i])
         {
-            for(j = 0; j < NUM_SAMPLES_PER_PAGE ; j ++ )
-            {
-                update_sample_slot_data( i,j,-1,-1,NULL,NULL );
-                samplebank_clear_gui_slot(info->sample_banks[i]->slot[j],
-                                          info->sample_banks[i]->gui_slot[j]);
-            }
+            for(int j = 0; j < NUM_SAMPLES_PER_PAGE; j++)
+                update_sample_slot_data(i, j, -1, -1, NULL, NULL);
         }
     }
+
+    samplebank_update_offline_recorder_gadget();
+    samplebank_update_page_label();
 }
 
 void free_samplebank(void)
 {
-    int i,j;
+    if(!info || !info->sample_banks)
+        return;
 
     info->selection_slot = NULL;
-    info->selection_gui_slot = NULL;
     info->selected_slot = NULL;
-    info->selected_gui_slot = NULL;
 
-    for( i = 0; i < NUM_BANKS; i ++ )
+    if(info->sample_bank_view)
+        gvr_sample_bank_view_clear_all(info->sample_bank_view);
+
+    for(int i = 0; i < NUM_BANKS; i++)
     {
         if(info->sample_banks[i])
         {
-
-            for(j = 0; j < NUM_SAMPLES_PER_PAGE ; j ++ )
+            for(int j = 0; j < NUM_SAMPLES_PER_PAGE; j++)
             {
                 sample_slot_t *slot = info->sample_banks[i]->slot[j];
-                sample_gui_slot_t *gslot = info->sample_banks[i]->gui_slot[j];
-                if(slot->title) {
-                    free(slot->title);
-                    slot->title = NULL;
-                }
-                if(slot->timecode) {
-                    free(slot->timecode);
-                    slot->timecode = NULL;
-                }
-                if(slot->pixbuf) {
-                    g_object_unref(slot->pixbuf);
-                    slot->pixbuf = NULL;
-                }
-                free(slot);
-                free(gslot);
 
+                if(slot) {
+                    if(slot->title) {
+                        free(slot->title);
+                        slot->title = NULL;
+                    }
+                    if(slot->timecode) {
+                        free(slot->timecode);
+                        slot->timecode = NULL;
+                    }
+                    if(slot->pixbuf) {
+                        g_object_unref(slot->pixbuf);
+                        slot->pixbuf = NULL;
+                    }
+                    free(slot);
+                }
                 info->sample_banks[i]->slot[j] = NULL;
-                info->sample_banks[i]->gui_slot[j] = NULL;
             }
+            free(info->sample_banks[i]->slot);
+            info->sample_banks[i]->slot = NULL;
             free(info->sample_banks[i]);
             info->sample_banks[i] = NULL;
         }
-   }
-}
-
-static int dont_grow = 0;
-static int bank_img_w = 0;
-static int bank_img_h = 0;
-
-
-void setup_samplebank(gint num_cols, gint num_rows, GtkAllocation *allocation, int *idx, int *idy)
-{
-    gint bank_wid = allocation->width;
-    gint bank_hei = allocation->height;
-
-    bank_hei -= ((12 + 12) * num_rows);
-    if( bank_hei < 0 )
-        bank_hei = 1;
-    bank_wid -= (8 * num_cols);
-
-    gint image_height = bank_hei / num_rows;
-    gint image_width = bank_wid / num_cols;
-
-    float ratio = (float) info->el.height / (float) info->el.width;
-    float w,h;
-
-    if( ratio <= 1.0f ) {
-        h = ratio * image_width;
-        w = image_width;
-    }
-    else {
-        h = image_height;
-        w = image_width / ratio;
     }
 
-
-    if( image_height < h ) {
-        w = (w / h) * image_height;
-        h = image_height;
-    }
-
-    if( image_width < w ) {
-        h = (h / w) * image_width;
-        w = image_width;
-    }
-
-    if(dont_grow == 0) {
-        bank_img_w = (int) w;
-        bank_img_h = (int) h;
-        *idx = bank_img_w;
-        *idy = bank_img_h;
-        dont_grow = 1;
-    }
-    else {
-        *idx = (int) bank_img_w;
-        *idy = (int) bank_img_h;
-    }
+    free(info->sample_banks);
+    info->sample_banks = NULL;
 }
 
 static sample_slot_t *find_slot_by_sample(int sample_id, int sample_type)
 {
+    if(!info || !info->sample_banks)
+        return NULL;
+
     int slot_num = -1;
     int bank_page = find_bank_by_sample_existing(sample_id, sample_type, &slot_num);
 
-    if (bank_page >= 0 && bank_page < NUM_BANKS)
+    if (bank_page >= 0 && bank_page < NUM_BANKS &&
+        info->sample_banks[bank_page] && slot_num >= 0 && slot_num < NUM_SAMPLES_PER_PAGE)
     {
         return info->sample_banks[bank_page]->slot[slot_num];
     }
     return NULL;
-}
-
-static sample_gui_slot_t *find_gui_slot_by_sample(int sample_id, int sample_type)
-{
-    int slot_num = -1;
-    int bank_page = find_bank_by_sample_existing(sample_id, sample_type, &slot_num);
-
-    if (bank_page >= 0 && bank_page < NUM_BANKS)
-    {
-        return info->sample_banks[bank_page]->gui_slot[slot_num];
-    }
-    return NULL;
-}
-
-static int find_bank(int page_nr)
-{
-    int i = 0;
-    for ( i = 0 ; i < NUM_BANKS; i ++ )
-        if( info->sample_banks[i] && info->sample_banks[i]->page_num == page_nr )
-        {
-            return info->sample_banks[i]->bank_number;
-        }
-    return -1;
 }
 
 static int find_bank_by_sample_existing(int sample_id, int sample_type, int *slot)
@@ -14285,98 +15129,15 @@ static int find_bank_by_sample(int sample_id, int sample_type, int *slot)
 
     if (bank_page >= NUM_BANKS)
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Exceeded total UI bank capacity!");
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "Sample bank grid capacity reached; source %d/%d is still available in the source list",
+                   sample_id, sample_type);
         *slot = -1;
         return -1;
     }
 
     *slot = slot_num;
     return bank_page;
-}
-
-static gboolean on_sequencerslot_activated_by_mouse(GtkWidget *widget,
-                                                    GdkEventButton *event,
-                                                    gpointer user_data)
-{
-    gint slot_nr = GPOINTER_TO_INT(user_data);
-
-    if( event->type == GDK_BUTTON_PRESS && (event->state & GDK_SHIFT_MASK) == GDK_SHIFT_MASK )
-    {
-        multi_vims( VIMS_SEQUENCE_DEL, "%d", slot_nr );
-        sequencer_slot_set_content(info->sequencer_view->gui_slot[slot_nr], -1, -1);
-    }
-    else
-    if(event->type == GDK_BUTTON_PRESS)
-    {
-        int id = info->status_tokens[CURRENT_ID];
-        int pm = info->status_tokens[PLAY_MODE];
-        int type = (pm == MODE_STREAM ? info->status_tokens[STREAM_TYPE] : MODE_SAMPLE);
-
-        if( info->selection_slot ) {
-            id = info->selection_slot->sample_id;
-            type=info->selection_slot->sample_type;
-        }
-
-        if(id <= 0)
-            return FALSE;
-
-        if(info->sequencer_view && info->sequencer_view->gui_slot &&
-           info->sequencer_view->gui_slot[slot_nr] &&
-           info->sequencer_view->gui_slot[slot_nr]->sample_id > 0)
-            return FALSE;
-
-        multi_vims( VIMS_SEQUENCE_ADD, "%d %d %d", slot_nr, id,type );
-        sequencer_slot_set_content(info->sequencer_view->gui_slot[slot_nr], id, type);
-        info->uc.reload_hint[HINT_SEQ_ACT] = 1;
-    }
-    return FALSE;
-}
-
-static gboolean on_cacheslot_activated_by_mouse (GtkWidget *widget, GdkEventButton *event, gpointer user_data)
-{
-    gint slot_nr = -1;
-    if(info->status_tokens[PLAY_MODE] == MODE_PLAIN )
-        return FALSE;
-
-    slot_nr =GPOINTER_TO_INT( user_data );
-    set_activation_of_cache_slot_in_samplebank( info->sequence_view->gui_slot[slot_nr], FALSE );
-
-    if( event->type == GDK_BUTTON_PRESS && (event->state & GDK_SHIFT_MASK) == GDK_SHIFT_MASK )
-    {
-        if( info->selected_slot == NULL )
-            return FALSE;
-
-        info->current_sequence_slot = slot_nr;
-        sample_slot_t *s = info->selected_slot;
-        sequence_gui_slot_t *g = info->sequence_view->gui_slot[slot_nr];
-#ifdef STRICT_CHECKING
-        assert( s != NULL );
-        assert( g != NULL );
-#endif
-        g->sample_id = s->sample_id;
-        g->sample_type = s->sample_type;
-        vj_msg(VEEJAY_MSG_INFO, "Placed %s %d in Memory slot %d",
-            (g->sample_type == 0 ? "Sample" : "Stream" ), g->sample_id, slot_nr );
-    }
-    else
-    if(event->type == GDK_BUTTON_PRESS)
-    {
-        sequence_gui_slot_t *g = info->sequence_view->gui_slot[slot_nr];
-        if(g->sample_id <= 0)
-        {
-            vj_msg(VEEJAY_MSG_ERROR, "Memory slot %d empty, put with SHIFT + mouse button1",slot_nr);
-            return FALSE;
-        }
-        else
-        {
-            vj_msg(VEEJAY_MSG_INFO,
-               "Start playing %s %d",
-               (g->sample_type==0 ? "Sample" : "Stream" ), g->sample_id );
-        }
-        multi_vims(VIMS_SET_MODE_AND_GO, "%d %d",g->sample_id, g->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM);
-        vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO,g->sample_id, g->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM);
-    }
-    return FALSE;
 }
 
 static void on_sequence_bank_button_toggled(GtkWidget *widget, gpointer user_data)
@@ -14923,174 +15684,213 @@ static void create_sequencer_slots(int nx, int ny)
     info->sequencer_col = nx;
     info->sequencer_row = ny;
     info->sequence_playing = -1;
-    info->current_sequence_slot = -1;
 }
 
-static void create_ref_slots(int envelope_size)
+static gboolean samplebank_locate_slot(sample_slot_t *slot, int *page, int *slot_nr)
 {
-    GtkWidget *vbox = glade_xml_get_widget_ (info->main_window, "quickselect");
-    info->quick_select = gtk_frame_new(NULL);
-    gtk_box_pack_start( GTK_BOX( vbox ), GTK_WIDGET(info->quick_select), TRUE, TRUE, 0);
-    gtk_widget_show(info->quick_select);
-    info->sequence_view = (sequence_envelope*) vj_calloc(sizeof(sequence_envelope) );
-    info->sequence_view->gui_slot = (sequence_gui_slot_t**) vj_calloc(sizeof(sequence_gui_slot_t*) * envelope_size );
-    GtkWidget *table = gtk_table_new( 1, envelope_size, TRUE );
-    gtk_container_add( GTK_CONTAINER(info->quick_select), table );
-    gtk_widget_show(table);
+    if(!slot || !info || !info->sample_banks)
+        return FALSE;
 
-    gint col=0;
-    gint row=0;
-    for( row = 0; row < envelope_size; row ++ )
-    {
-        sequence_gui_slot_t *gui_slot = (sequence_gui_slot_t*)vj_calloc(sizeof(sequence_gui_slot_t));
-        info->sequence_view->gui_slot[row] = gui_slot;
-        gui_slot->event_box = gtk_event_box_new();
-        gtk_event_box_set_visible_window(GTK_EVENT_BOX(gui_slot->event_box), TRUE);
-        gtk_widget_set_can_focus(gui_slot->event_box, TRUE);
-
-        g_signal_connect( G_OBJECT(gui_slot->event_box),
-            "button_press_event",
-            G_CALLBACK(on_cacheslot_activated_by_mouse),
-            (gpointer) castIntToGpointer(row)
-            );
-        gtk_widget_show(GTK_WIDGET(gui_slot->event_box));
-
-        gui_slot->frame = gtk_frame_new(NULL);
-        add_class(gui_slot->frame, "quickselect_slot");
-        set_tooltip_by_widget(gui_slot->frame, tooltips[TOOLTIP_QUICKSELECT].text );
-        gtk_widget_show(GTK_WIDGET(gui_slot->frame));
-        gtk_container_add (GTK_CONTAINER (gui_slot->event_box), gui_slot->frame);
-
-
-        gui_slot->main_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL,0);
-        gtk_container_add (GTK_CONTAINER (gui_slot->frame), gui_slot->main_vbox);
-        gtk_widget_show( GTK_WIDGET(gui_slot->main_vbox) );
-
-
-        gui_slot->image = gtk_image_new();
-        gtk_box_pack_start (GTK_BOX (gui_slot->main_vbox), GTK_WIDGET(gui_slot->image), TRUE, TRUE, 0);
-        gtk_widget_show( GTK_WIDGET(gui_slot->image));
-
-        gtk_table_attach_defaults ( GTK_TABLE(table), gui_slot->event_box, row, row+1, col, col+1);
+    for(int b = 0; b < NUM_BANKS; b++) {
+        if(!info->sample_banks[b])
+            continue;
+        for(int sidx = 0; sidx < NUM_SAMPLES_PER_PAGE; sidx++) {
+            if(info->sample_banks[b]->slot[sidx] == slot) {
+                if(page)
+                    *page = b;
+                if(slot_nr)
+                    *slot_nr = sidx;
+                return TRUE;
+            }
+        }
     }
-    info->sequence_view->envelope_size = envelope_size;
-}
-static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
-{
-    sample_bank_t **sample_banks = info->sample_banks;
-    sample_gui_slot_t *gui_slot = sample_banks[bank_nr]->gui_slot[slot_nr];
 
-    gui_slot->event_box = gtk_event_box_new();
-    gtk_widget_set_can_focus(gui_slot->event_box, TRUE);
-
-    g_signal_connect(G_OBJECT(gui_slot->event_box), "button_press_event",
-                     G_CALLBACK(on_slot_activated_by_mouse),
-                     (gpointer) castIntToGpointer(slot_nr));
-
-    gui_slot->frame = gtk_frame_new(NULL);
-    add_class(gui_slot->frame, "sample_slot");
-    gtk_container_add(GTK_CONTAINER(gui_slot->event_box), gui_slot->frame);
-
-    gui_slot->upper_hbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
-    gtk_container_add(GTK_CONTAINER(gui_slot->frame), gui_slot->upper_hbox);
-
-    gui_slot->title = gtk_label_new("");
-    gtk_label_set_ellipsize(GTK_LABEL(gui_slot->title), PANGO_ELLIPSIZE_END);
-    gtk_label_set_max_width_chars(GTK_LABEL(gui_slot->title), 12);
-    gtk_widget_set_halign(gui_slot->title, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui_slot->upper_hbox), gui_slot->title, FALSE, FALSE, 2);
-
-    gui_slot->image = gtk_image_new();
-    gtk_box_pack_start(GTK_BOX(gui_slot->upper_hbox), gui_slot->image, TRUE, TRUE, 0);
-
-    gui_slot->hotkey = gtk_label_new("");
-    add_class(gui_slot->hotkey, "slot_hotkey");
-    gtk_widget_set_halign(gui_slot->hotkey, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui_slot->upper_hbox), gui_slot->hotkey, FALSE, FALSE, 0);
-
-    gui_slot->timecode = gtk_label_new("");
-    add_class(gui_slot->timecode, "slot_timecode");
-    gtk_widget_set_halign(gui_slot->timecode, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui_slot->upper_hbox), gui_slot->timecode, FALSE, FALSE, 2);
-
-    gtk_widget_show_all(gui_slot->event_box);
-    gtk_widget_hide(gui_slot->image);
+    return FALSE;
 }
 
-
-static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *event, gpointer user_data)
+static gboolean samplebank_slot_is_stream(sample_slot_t *slot)
 {
-    gint bank_nr = -1;
-    gint slot_nr = -1;
+    return slot && slot->sample_id > 0 && slot->sample_type != 0;
+}
 
-    bank_nr = find_bank( gtk_notebook_get_current_page(GTK_NOTEBOOK(info->sample_bank_pad)));
-    if(bank_nr < 0 )
-        return FALSE;
+static void samplebank_update_offline_recorder_gadget(void)
+{
+    gboolean stream_selected = FALSE;
 
-    slot_nr = GPOINTER_TO_INT(user_data);
-    sample_bank_t **sample_banks = info->sample_banks;
+    if(samplebank_slot_is_stream(info->selection_slot))
+        stream_selected = TRUE;
+    else if(samplebank_slot_is_stream(info->selected_slot))
+        stream_selected = TRUE;
+    else if(info->status_tokens[PLAY_MODE] == MODE_STREAM && info->status_tokens[CURRENT_ID] > 0)
+        stream_selected = TRUE;
 
-    if( info->sample_banks[ bank_nr ]->slot[ slot_nr ]->sample_id <= 0 )
-        return FALSE;
+    set_widget_sensitive_cached(WIDGET_OFFLINEBOX, stream_selected);
+}
 
-    sample_slot_t *select_slot = sample_banks[bank_nr]->slot[slot_nr];
-    if( event->type == GDK_2BUTTON_PRESS )
-    {
+static void samplebank_update_page_label(void)
+{
+    GtkWidget *w;
+    int page;
+    int first;
+    int last;
+    char text[96];
 
-        multi_vims( VIMS_SET_MODE_AND_GO,
-                    "%d %d",
-                    (select_slot->sample_id),
-                    (select_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM));
+    if(!info || !info->main_window)
+        return;
 
-        vj_midi_learning_vims_msg2( info->midi,
-                                    NULL,
-                                    VIMS_SET_MODE_AND_GO,
-                                    select_slot->sample_id,
-                                    select_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM);
+    w = glade_xml_get_widget_(info->main_window, "samplebank_page_status");
+    if(!w || !GTK_IS_LABEL(w))
+        return;
+
+    page = samplebank_get_page();
+    page = CLAMP(page, 0, MAX(0, NUM_BANKS - 1));
+    first = page * NUM_SAMPLES_PER_PAGE + 1;
+    last = first + NUM_SAMPLES_PER_PAGE - 1;
+
+    snprintf(text, sizeof(text), "Bank %d/%d · slots %d-%d", page + 1, NUM_BANKS, first, last);
+    gtk_label_set_text(GTK_LABEL(w), text);
+}
+
+static void samplebank_request_page_thumbnails(int page)
+{
+    if(!info || !info->sample_banks || !info->sample_bank_view || disable_sample_image)
+        return;
+
+    if(page < 0 || page >= NUM_BANKS || !info->sample_banks[page])
+        return;
+
+    for(int slot_nr = 0; slot_nr < NUM_SAMPLES_PER_PAGE; slot_nr++) {
+        sample_slot_t *slot = info->sample_banks[page]->slot[slot_nr];
+
+        if(!slot || slot->sample_id <= 0 || !slot->pixbuf)
+            continue;
+
+        gvr_sample_bank_view_set_thumbnail(info->sample_bank_view, page, slot_nr, slot->pixbuf);
+    }
+}
+
+void samplebank_goto_page(int page)
+{
+    if(!info || !info->sample_bank_view)
+        return;
+
+    gvr_sample_bank_view_set_current_page(info->sample_bank_view, page);
+    samplebank_update_page_label();
+    samplebank_request_page_thumbnails(samplebank_get_page());
+}
+
+void samplebank_step_page(int delta)
+{
+    if(!info || !info->sample_bank_view)
+        return;
+
+    gvr_sample_bank_view_step_page(info->sample_bank_view, delta);
+    samplebank_update_page_label();
+    samplebank_request_page_thumbnails(samplebank_get_page());
+}
+
+int samplebank_get_page(void)
+{
+    if(!info || !info->sample_bank_view)
+        return 0;
+
+    return gvr_sample_bank_view_get_current_page(info->sample_bank_view);
+}
+
+static void on_sample_bank_view_page_selected(GtkWidget *widget, gint page, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    samplebank_update_page_label();
+    samplebank_request_page_thumbnails(page);
+}
+
+static void samplebank_select_model_slot(int page, int slot_nr, gboolean activate, gboolean mix)
+{
+    if(page < 0 || page >= NUM_BANKS || slot_nr < 0 || slot_nr >= NUM_SAMPLES_PER_PAGE)
+        return;
+
+    sample_slot_t *slot = info->sample_banks[page]->slot[slot_nr];
+
+    if(!slot || slot->sample_id <= 0)
+        return;
+
+    if(mix) {
+        multi_vims(VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
+                   "%d %d %d %d",
+                   0,
+                   info->uc.selected_chain_entry,
+                   slot->sample_type,
+                   slot->sample_id);
+
+        vj_msg(VEEJAY_MSG_INFO,
+               "Set mixing channel %d to %s %d",
+               info->uc.selected_chain_entry,
+               (slot->sample_type == 0 ? "Sample" : "Stream"),
+               slot->sample_id);
+
+        char trip[100];
+        snprintf(trip, sizeof(trip), "%03d:%d %d %d %d",
+                 VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
+                 0,
+                 info->uc.selected_chain_entry,
+                 slot->sample_type,
+                 slot->sample_id);
+        vj_midi_learning_vims(info->midi, NULL, trip, 0);
+        return;
+    }
+
+    if(activate) {
+        multi_vims(VIMS_SET_MODE_AND_GO,
+                   "%d %d",
+                   slot->sample_id,
+                   (slot->sample_type == 0 ? MODE_SAMPLE : MODE_STREAM));
+
+        vj_midi_learning_vims_msg2(info->midi,
+                                   NULL,
+                                   VIMS_SET_MODE_AND_GO,
+                                   slot->sample_id,
+                                   (slot->sample_type == 0 ? MODE_SAMPLE : MODE_STREAM));
 
         vj_msg(VEEJAY_MSG_INFO,
                "Start playing %s %d (%s)",
-               (select_slot->sample_type==0 ? "Sample" : "Stream" ),
-               select_slot->sample_id, select_slot->title );
+               (slot->sample_type == 0 ? "Sample" : "Stream"),
+               slot->sample_id,
+               slot->title ? slot->title : "");
+        return;
     }
-    else if(event->type == GDK_BUTTON_PRESS )
-    {
-        if(event->state & GDK_SHIFT_MASK)
-        {
-            multi_vims( VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
-                "%d %d %d %d",
-                0,
-                info->uc.selected_chain_entry,
-                select_slot->sample_type,
-                select_slot->sample_id );
 
-            vj_msg(VEEJAY_MSG_INFO,
-                    "Set mixing channel %d to %s %d",
-                    info->uc.selected_chain_entry,
-                    (select_slot->sample_type==0 ? "Sample" : "Stream" ),
-                    select_slot->sample_id );
+    set_selection_of_slot_in_samplebank(FALSE);
+    info->selection_slot = slot;
+    set_selection_of_slot_in_samplebank(TRUE);
+    samplebank_update_offline_recorder_gadget();
 
-            char trip[100];
-            snprintf(trip, sizeof(trip), "%03d:%d %d %d %d",VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
-                0,
-                info->uc.selected_chain_entry,
-                select_slot->sample_type,
-                select_slot->sample_id );
+    vj_msg(VEEJAY_MSG_INFO,
+           "Selected %s %d",
+           (slot->sample_type == 0 ? "Sample" : "Stream"),
+           slot->sample_id);
+}
 
-            vj_midi_learning_vims( info->midi, NULL, trip, 0 );
-        }
-        else {
-            set_selection_of_slot_in_samplebank(FALSE);
-            info->selection_slot = select_slot;
-            info->selection_gui_slot = sample_banks[bank_nr]->gui_slot[slot_nr];
-            set_selection_of_slot_in_samplebank(TRUE );
+static void on_sample_bank_view_slot_selected(GtkWidget *widget, gint page, gint slot, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+    samplebank_select_model_slot(page, slot, FALSE, FALSE);
+}
 
-            vj_msg(VEEJAY_MSG_INFO,
-                "Selected %s %d",(select_slot->sample_type==0 ? "Sample" : "Stream" ),
-                    select_slot->sample_id );
-        }
-    }
-    return FALSE;
+static void on_sample_bank_view_slot_activated(GtkWidget *widget, gint page, gint slot, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+    samplebank_select_model_slot(page, slot, TRUE, FALSE);
+}
+
+static void on_sample_bank_view_slot_mix_requested(GtkWidget *widget, gint page, gint slot, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+    samplebank_select_model_slot(page, slot, FALSE, TRUE);
 }
 
 static void indicate_sequence(gboolean active, sequence_gui_slot_t *slot)
@@ -15130,135 +15930,77 @@ static gboolean samplebank_slot_is_current(sample_slot_t *slot)
 
 static void set_activation_of_slot_in_samplebank(gboolean activate)
 {
-    if (!info->selected_gui_slot || !info->selected_slot)
+    if(!info->sample_bank_view)
         return;
 
-    if (activate)
-    {
-        if (samplebank_slot_is_current(info->selected_slot))
-        {
-            gtk_widget_grab_focus(GTK_WIDGET(info->selected_gui_slot->frame));
-
-            if (info->selection_gui_slot &&
-                info->selection_gui_slot == info->selected_gui_slot)
-            {
-                remove_class(info->selection_gui_slot->frame, "selected");
-            }
-
-            add_class(info->selected_gui_slot->frame, "active");
-        }
-        else
-        {
-            remove_class(info->selected_gui_slot->frame, "active");
-        }
-    }
-    else
-    {
-        remove_class(info->selected_gui_slot->frame, "active");
-    }
+    if(activate && info->selected_slot)
+        gvr_sample_bank_view_set_current_source(info->sample_bank_view,
+                                                info->selected_slot->sample_id,
+                                                info->selected_slot->sample_type);
+    else if(!activate)
+        gvr_sample_bank_view_set_current_source(info->sample_bank_view, -1, -1);
 }
 
 static void set_selection_of_slot_in_samplebank(gboolean active)
 {
-    if (!info->selection_gui_slot || !info->selection_slot)
+    if(!info->sample_bank_view)
         return;
 
-    if (samplebank_slot_is_current(info->selection_slot))
-    {
-        remove_class(info->selection_gui_slot->frame, "selected");
-        return;
-    }
-
-    if (active)
-    {
-        add_class(info->selection_gui_slot->frame, "selected");
+    if(active && info->selection_slot) {
+        int page = -1;
+        int slot_nr = -1;
+        if(samplebank_locate_slot(info->selection_slot, &page, &slot_nr))
+            gvr_sample_bank_view_set_selected_slot(info->sample_bank_view, page, slot_nr);
     }
     else
-    {
-        remove_class(info->selection_gui_slot->frame, "selected");
-    }
+        gvr_sample_bank_view_set_selected_slot(info->sample_bank_view, -1, -1);
 }
 
 
-static void samplebank_clear_gui_slot(sample_slot_t *slot, sample_gui_slot_t *gui_slot)
+static void samplebank_clear_slot_pixbuf(sample_slot_t *slot)
 {
     if(slot && slot->pixbuf) {
         g_object_unref(slot->pixbuf);
         slot->pixbuf = NULL;
     }
-
-    if(!gui_slot)
-        return;
-
-    if(gui_slot->title && GTK_IS_LABEL(gui_slot->title))
-        gtk_label_set_text(GTK_LABEL(gui_slot->title), "");
-
-    if(gui_slot->hotkey && GTK_IS_LABEL(gui_slot->hotkey))
-        gtk_label_set_text(GTK_LABEL(gui_slot->hotkey), "");
-
-    if(gui_slot->timecode && GTK_IS_LABEL(gui_slot->timecode))
-        gtk_label_set_text(GTK_LABEL(gui_slot->timecode), "");
-
-    if(gui_slot->image && GTK_IS_IMAGE(gui_slot->image)) {
-        gtk_image_clear(GTK_IMAGE(gui_slot->image));
-        gtk_widget_hide(gui_slot->image);
-    }
-
-    if(gui_slot->frame) {
-        remove_class(gui_slot->frame, "active");
-        remove_class(gui_slot->frame, "selected");
-        gtk_widget_queue_draw(gui_slot->frame);
-    }
-
-    if(gui_slot->event_box)
-        gtk_widget_set_sensitive(gui_slot->event_box, FALSE);
 }
 
 static void remove_sample_from_slot(void)
 {
-    gint bank_nr = -1;
-    gint slot_nr = -1;
-
-    bank_nr = find_bank( gtk_notebook_get_current_page(
-        GTK_NOTEBOOK( info->sample_bank_pad ) ) );
-    if(bank_nr < 0 )
-        return;
     if(!info->selection_slot)
         return;
 
-    slot_nr = info->selection_slot->slot_number;
+    gint bank_nr = -1;
+    gint slot_nr = -1;
 
-    if( info->selection_slot->sample_id == info->status_tokens[CURRENT_ID] &&
-        info->selection_slot->sample_type == info->status_tokens[STREAM_TYPE] )
+    if(!samplebank_locate_slot(info->selection_slot, &bank_nr, &slot_nr))
+        return;
+
+    if(samplebank_slot_is_current(info->selection_slot))
     {
         gchar error_msg[100];
         snprintf(error_msg, sizeof(error_msg), "Cannot delete %s %d while playing",
-            (info->selection_slot->sample_type == MODE_SAMPLE ? "Sample" : "Stream" ),
-            info->selection_slot->sample_id );
-        message_dialog( "Error while deleting", error_msg );
-
+                 (info->selection_slot->sample_type == 0 ? "Sample" : "Stream"),
+                 info->selection_slot->sample_id);
+        message_dialog("Error while deleting", error_msg);
         return;
     }
 
-    multi_vims( (info->selection_slot->sample_type == 0 ? VIMS_SAMPLE_DEL :
-                     VIMS_STREAM_DELETE ),
+    multi_vims((info->selection_slot->sample_type == 0 ? VIMS_SAMPLE_DEL : VIMS_STREAM_DELETE),
                "%d",
-               info->selection_slot->sample_id );
+               info->selection_slot->sample_id);
 
-    update_sample_slot_data( bank_nr, slot_nr, -1, -1, NULL, NULL);
-
-    sample_gui_slot_t *gui_slot = info->sample_banks[bank_nr]->gui_slot[slot_nr];
     sample_slot_t *slot = info->sample_banks[bank_nr]->slot[slot_nr];
-    samplebank_clear_gui_slot(slot, gui_slot);
+    update_sample_slot_data(bank_nr, slot_nr, -1, -1, NULL, NULL);
 
     if(info->selection_slot == slot) {
         info->selection_slot = NULL;
-        info->selection_gui_slot = NULL;
     }
     if(info->selected_slot == slot) {
         info->selected_slot = NULL;
-        info->selected_gui_slot = NULL;
     }
+
+    samplebank_update_offline_recorder_gadget();
 }
 
 
@@ -15299,6 +16041,119 @@ static void add_sample_to_effect_sources_list(gint id,
 }
 
 
+static GHashTable *sample_title_overrides = NULL;
+
+static gboolean ui_text_has_content(const char *text)
+{
+    if(!text)
+        return FALSE;
+
+    while(*text) {
+        if(!g_ascii_isspace(*text))
+            return TRUE;
+        text++;
+    }
+
+    return FALSE;
+}
+
+static gchar *samplebank_title_key(int sample_id, int sample_type)
+{
+    return g_strdup_printf("%d:%d", sample_id, sample_type);
+}
+
+static gboolean samplebank_title_is_default(int sample_id, int sample_type, const char *title)
+{
+    char d1[64];
+    char d2[64];
+
+    if(!ui_text_has_content(title))
+        return TRUE;
+
+    if(sample_type == 0) {
+        snprintf(d1, sizeof(d1), "Sample %d", sample_id);
+        snprintf(d2, sizeof(d2), "Sample  %d", sample_id);
+    }
+    else {
+        snprintf(d1, sizeof(d1), "Stream %d", sample_id);
+        snprintf(d2, sizeof(d2), "Stream  %d", sample_id);
+    }
+
+    return strcmp(title, d1) == 0 || strcmp(title, d2) == 0 || strcmp(title, "Untitled") == 0;
+}
+
+
+static gboolean samplebank_make_offline_recording_title(const char *title, char *dst, size_t dst_size)
+{
+    const char *p;
+    const char *base;
+    int stream_id = 0;
+    gboolean saw_digit = FALSE;
+
+    if(!title || !dst || dst_size == 0)
+        return FALSE;
+
+    base = strrchr(title, '/');
+    base = base ? base + 1 : title;
+    p = strrchr(base, '\\');
+    if(p)
+        base = p + 1;
+
+    if(g_ascii_strncasecmp(base, "stream-", 7) != 0)
+        return FALSE;
+
+    p = base + 7;
+    while(g_ascii_isdigit(*p)) {
+        saw_digit = TRUE;
+        stream_id = (stream_id * 10) + (*p - '0');
+        p++;
+    }
+
+    if(!saw_digit || stream_id <= 0)
+        return FALSE;
+
+    if(*p != '_' && *p != '~' && *p != '-' && *p != '.')
+        return FALSE;
+
+    if(!strstr(p, ".avi") && !strstr(p, "-0000") && !strstr(p, "_0000") && !strstr(p, "~0000"))
+        return FALSE;
+
+    g_snprintf(dst, dst_size, "Stream %d rec", stream_id);
+    return TRUE;
+}
+
+static void samplebank_store_title_override(int sample_id, int sample_type, const char *title)
+{
+    gchar *key;
+
+    if(sample_id <= 0)
+        return;
+
+    if(!sample_title_overrides)
+        sample_title_overrides = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+
+    key = samplebank_title_key(sample_id, sample_type);
+
+    if(!ui_text_has_content(title) || samplebank_title_is_default(sample_id, sample_type, title)) {
+        g_hash_table_remove(sample_title_overrides, key);
+        g_free(key);
+        return;
+    }
+
+    g_hash_table_replace(sample_title_overrides, key, g_strdup(title));
+}
+
+static const char *samplebank_lookup_title_override(int sample_id, int sample_type)
+{
+    gchar key[64];
+
+    if(!sample_title_overrides || sample_id <= 0)
+        return NULL;
+
+    g_snprintf(key, sizeof(key), "%d:%d", sample_id, sample_type);
+    return g_hash_table_lookup(sample_title_overrides, key);
+}
+
 static inline gboolean str_changed(const char *a, const char *b)
 {
     if (a == b) return FALSE;
@@ -15324,15 +16179,13 @@ update_sample_slot_data(int page_num,
                         gchar *title,
                         gchar *timecode)
 {
-    if (page_num >= NUM_BANKS || !info->sample_banks[page_num])
+    if(page_num < 0 || page_num >= NUM_BANKS || slot_num < 0 || slot_num >= NUM_SAMPLES_PER_PAGE ||
+       !info->sample_banks[page_num])
         return NULL;
 
-    sample_slot_t *slot =
-        info->sample_banks[page_num]->slot[slot_num];
-    sample_gui_slot_t *gui_slot =
-        info->sample_banks[page_num]->gui_slot[slot_num];
+    sample_slot_t *slot = info->sample_banks[page_num]->slot[slot_num];
 
-    if (!slot || !gui_slot)
+    if(!slot)
         return NULL;
 
     gboolean id_changed    = (slot->sample_id   != sample_id);
@@ -15340,75 +16193,42 @@ update_sample_slot_data(int page_num,
     gboolean title_changed = str_changed(slot->title, title);
     gboolean time_changed  = str_changed(slot->timecode, timecode);
 
-    gboolean any_model_change =
-        id_changed || type_changed || title_changed || time_changed;
-
-    if (!any_model_change) {
-        if (sample_id <= 0) {
-            samplebank_clear_gui_slot(slot, gui_slot);
-        } else {
-            if(gui_slot->image && GTK_IS_IMAGE(gui_slot->image))
-                gtk_widget_show(gui_slot->image);
-            if(gui_slot->event_box)
-                gtk_widget_set_sensitive(gui_slot->event_box, TRUE);
-        }
-        return slot;
-    }
-
-    if (id_changed)
+    if(id_changed)
         slot->sample_id = sample_id;
 
-    if (type_changed)
+    if(type_changed)
         slot->sample_type = sample_type;
 
-    if (title_changed)
+    if(title_changed)
         replace_string(&slot->title, title);
 
-    if (time_changed)
+    if(time_changed)
         replace_string(&slot->timecode, timecode);
 
-    if (sample_id <= 0)
+    if(sample_id <= 0)
     {
-        samplebank_clear_gui_slot(slot, gui_slot);
+        samplebank_clear_slot_pixbuf(slot);
+        if(info->sample_bank_view)
+            gvr_sample_bank_view_clear_slot(info->sample_bank_view, page_num, slot_num);
         return slot;
     }
 
-
-    if (id_changed || type_changed)
+    if(id_changed || type_changed)
     {
-        char s_key[32], g_key[32];
+        char s_key[32];
         snprintf(s_key, sizeof(s_key), "S%04d%02d", sample_id, sample_type);
-        snprintf(g_key, sizeof(g_key), "G%04d%02d", sample_id, sample_type);
 
         vevo_property_set(bankport_, s_key, VEVO_ATOM_TYPE_VOIDPTR, 1, &slot);
-        vevo_property_set(bankport_, g_key, VEVO_ATOM_TYPE_VOIDPTR, 1, &gui_slot);
-
-        char hotkey[64];
-        snprintf(hotkey, sizeof(hotkey),
-                 "[Shift]+[%d] -> [F%d] ",
-                 page_num,
-                 ((sample_id - 1) % 12) + 1);
-
-        gtk_label_set_text(GTK_LABEL(gui_slot->hotkey), hotkey);
     }
 
-    if (title_changed)
-    {
-        gtk_label_set_text(GTK_LABEL(gui_slot->title),
-            slot->title ? slot->title : "Untitled");
-    }
-
-    if (time_changed)
-    {
-        gtk_label_set_text(GTK_LABEL(gui_slot->timecode),
-            slot->timecode ? slot->timecode : "00:00:00");
-    }
-
-    if(gui_slot->image && GTK_IS_IMAGE(gui_slot->image))
-        gtk_widget_show(gui_slot->image);
-
-    if(gui_slot->event_box)
-        gtk_widget_set_sensitive(gui_slot->event_box, TRUE);
+    if(info->sample_bank_view)
+        gvr_sample_bank_view_set_slot(info->sample_bank_view,
+                                      page_num,
+                                      slot_num,
+                                      sample_id,
+                                      sample_type,
+                                      slot->title,
+                                      slot->timecode);
 
     return slot;
 }

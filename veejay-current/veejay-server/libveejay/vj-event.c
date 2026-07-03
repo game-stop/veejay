@@ -105,6 +105,7 @@
 
 #define MAX_ARGUMENTS (SAMPLE_MAX_PARAMETERS + 8)
 
+
 static int use_bw_preview_ = 0;
 static int _last_known_num_args = 0;
 static hash_t *BundleHash = NULL;
@@ -223,6 +224,11 @@ int vj_event_get_video_format(void)
 
 #ifdef HAVE_JACK
 extern void vj_perform_record_audio_source_reset(veejay_t *info);
+extern int veejay_audio_sync_wav_profile_set(veejay_t *info, int profile, const char *path, int loop);
+extern int veejay_audio_sync_wav_profile_clear(veejay_t *info, int profile);
+extern int veejay_audio_sync_sample_profile_set(veejay_t *info, int sample_id, int source, int profile, int mode, long video_anchor, long wav_anchor_ms);
+extern int veejay_audio_sync_sample_profile_clear(veejay_t *info, int sample_id);
+extern int veejay_audio_sync_sample_profile_rearm(veejay_t *info, int sample_id);
 #endif
 
 enum {
@@ -498,6 +504,11 @@ struct {
     { VIMS_AUDIO_SYNC_MODE },
     { VIMS_AUDIO_SYNC_JACK },
     { VIMS_AUDIO_SYNC_WAV },
+    { VIMS_AUDIO_SYNC_WAV_PROFILE_SET },
+    { VIMS_AUDIO_SYNC_WAV_PROFILE_CLEAR },
+    { VIMS_SAMPLE_AUDIO_SYNC_SET },
+    { VIMS_SAMPLE_AUDIO_SYNC_CLEAR },
+    { VIMS_SAMPLE_AUDIO_SYNC_REARM },
     { VIMS_AUDIO_SYNC_TARGET },
     { VIMS_AUDIO_SYNC_CORRECTION },
     { VIMS_AUDIO_SYNC_PRINT },
@@ -903,6 +914,66 @@ static inline int PLAIN_PLAYING(veejay_t *v)
 #define p_no_tag(a)    {  veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist",a); }
 #define p_invalid_mode() {  veejay_msg(VEEJAY_MSG_DEBUG, "Invalid playback mode for this action"); }
 #define v_chi(v) ( (v < 0  || v >= SAMPLE_MAX_EFFECTS ) ) 
+
+
+static inline int STREAM_BUFFER_PLAYING(veejay_t *v)
+{
+    return v && v->uc && STREAM_PLAYING(v) && vj_tag_buffer_active(v->uc->sample_id);
+}
+
+static void vj_event_stream_buffer_update_range(veejay_t *v)
+{
+    if(!v || !v->settings || !v->uc || !STREAM_PLAYING(v))
+        return;
+
+    if(!vj_tag_buffer_active(v->uc->sample_id))
+        return;
+
+    int duration = vj_tag_get_buffer_duration(v->uc->sample_id);
+    if(duration < 1)
+        duration = 1;
+
+    atomic_store_long_long(&v->settings->min_frame_num, 0);
+    atomic_store_long_long(&v->settings->max_frame_num, (long long)(duration - 1));
+
+    long long cur = atomic_load_long_long(&v->settings->current_frame_num);
+    if(cur < 0)
+        cur = 0;
+    if(cur > (long long)(duration - 1))
+        cur = (long long)(duration - 1);
+    atomic_store_long_long(&v->settings->current_frame_num, cur);
+}
+
+static int vj_event_stream_buffer_require(veejay_t *v)
+{
+    if(!v || !v->uc || !STREAM_PLAYING(v))
+        return 0;
+    if(vj_tag_buffer_active(v->uc->sample_id))
+        return 1;
+    veejay_msg(VEEJAY_MSG_ERROR, "Stream %d has no trickplay buffer; set a buffer length first", v->uc->sample_id);
+    return 0;
+}
+
+static int vj_event_resolve_stream_id(veejay_t *v, int id)
+{
+    if(id == -1)
+        return vj_tag_get_last_tag();
+    if(id == 0) {
+        if(v && v->uc && STREAM_PLAYING(v))
+            return v->uc->sample_id;
+        return vj_tag_get_last_tag();
+    }
+    return id;
+}
+
+static void vj_event_stream_buffer_sync_current(veejay_t *v, int stream_id)
+{
+    if(!v || !v->uc || !v->settings || !STREAM_PLAYING(v) || v->uc->sample_id != stream_id)
+        return;
+
+    vj_event_stream_buffer_update_range(v);
+    veejay_set_frame(v, vj_tag_get_buffer_position(stream_id));
+}
 
 #define SAMPLE_DEFAULTS(args) {\
 \
@@ -3566,6 +3637,14 @@ void    vj_event_send_devicelist( void *ptr, const char format[], va_list ap)
     free(buf);
 }
 
+#ifdef HAVE_JACK
+static void vj_event_sample_audio_sync_seek_rearm_current(veejay_t *v, long target_frame, const char *reason)
+{
+    if(v && SAMPLE_PLAYING(v))
+        vj_perform_audio_sync_sample_seek_rearm(v, v->uc->sample_id, target_frame, reason);
+}
+#endif
+
 
 void vj_event_sample_select(void *ptr, const char format[], va_list ap)
 {
@@ -3721,10 +3800,10 @@ void vj_event_audio_mix_mode(void *ptr, const char format[], va_list ap)
             veejay_msg(VEEJAY_MSG_INFO, "Audio mixer mode set to original only");
             break;
         case VJ_AUDIO_MIX_EXTERNAL_ONLY:
-            veejay_msg(VEEJAY_MSG_INFO, "Audio mixer mode set to JACK external only");
+            veejay_msg(VEEJAY_MSG_INFO, "Audio mixer mode set to external provider only");
             break;
         case VJ_AUDIO_MIX_ORIGINAL_EXTERNAL:
-            veejay_msg(VEEJAY_MSG_INFO, "Audio mixer mode set to original + JACK external");
+            veejay_msg(VEEJAY_MSG_INFO, "Audio mixer mode set to original + external provider");
             break;
         case VJ_AUDIO_MIX_FOLLOW_ROUTE:
         default:
@@ -3743,7 +3822,7 @@ void vj_event_audio_mix_crossfade(void *ptr, const char format[], va_list ap)
 
     crossfade = vj_perform_set_audio_mix_crossfade(v, args[0]);
     veejay_msg(VEEJAY_MSG_INFO,
-               "Audio mixer crossfade set to %d (0=original, 100=JACK external)",
+               "Audio mixer crossfade set to %d (0=original, 100=external provider)",
                crossfade);
 }
 
@@ -3974,6 +4053,35 @@ static void vj_event_audio_beat_user_transport_override(veejay_t *v, int request
 void vj_event_play_stop(void *ptr, const char format[], va_list ap) 
 {
     veejay_t *v = (veejay_t*) ptr;
+
+    if(STREAM_PLAYING(v))
+    {
+        if(!vj_event_stream_buffer_require(v))
+            return;
+
+        int speed = v->settings->current_playback_speed;
+        if(speed != 0)
+        {
+            v->settings->previous_playback_speed = speed;
+            vj_tag_buffer_stop(v->uc->sample_id);
+            veejay_set_speed(v, 0, 0);
+            vj_event_audio_beat_user_transport_override(v, 0);
+            veejay_msg(VEEJAY_MSG_INFO,"Buffered stream is paused");
+        }
+        else
+        {
+            int resume = v->settings->previous_playback_speed;
+            if(resume == 0)
+                resume = 1;
+            vj_tag_buffer_set_speed(v->uc->sample_id, resume);
+            veejay_set_speed(v, resume, 0);
+            vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
+            veejay_msg(VEEJAY_MSG_INFO,"Buffered stream is playing (resumed at speed %d)", resume);
+        }
+        vj_event_stream_buffer_update_range(v);
+        return;
+    }
+
     if(!STREAM_PLAYING(v))
     {
         int speed = v->settings->current_playback_speed;
@@ -4115,6 +4223,25 @@ void vj_event_play_reverse(void *ptr, const char format[], va_list ap)
     if (!v->settings)
         return;
 
+    if (STREAM_PLAYING(v))
+    {
+        if(!vj_event_stream_buffer_require(v))
+            return;
+
+        int speed = v->settings->current_playback_speed;
+        if(speed == 0)
+            speed = -1;
+        else if(speed > 0)
+            speed = -speed;
+
+        vj_tag_buffer_set_speed(v->uc->sample_id, speed);
+        veejay_set_speed(v, speed, 0);
+        vj_event_stream_buffer_update_range(v);
+        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
+        veejay_msg(VEEJAY_MSG_INFO, "Buffered stream is playing in reverse at speed %d", speed);
+        return;
+    }
+
     if (!STREAM_PLAYING(v))
     {
         int speed = v->settings->current_playback_speed;
@@ -4160,6 +4287,25 @@ void vj_event_play_forward(void *ptr, const char format[], va_list ap)
     if (!v->settings)
         return;
 
+    if (STREAM_PLAYING(v))
+    {
+        if(!vj_event_stream_buffer_require(v))
+            return;
+
+        int speed = v->settings->current_playback_speed;
+        if(speed == 0)
+            speed = 1;
+        else if(speed < 0)
+            speed = -speed;
+
+        vj_tag_buffer_set_speed(v->uc->sample_id, speed);
+        veejay_set_speed(v, speed, 0);
+        vj_event_stream_buffer_update_range(v);
+        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
+        veejay_msg(VEEJAY_MSG_INFO, "Buffered stream is playing forward at speed %d", speed);
+        return;
+    }
+
     if (!STREAM_PLAYING(v))
     {
         int speed = v->settings->current_playback_speed;
@@ -4193,6 +4339,20 @@ void vj_event_play_speed(void *ptr, const char format[], va_list ap)
 {
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
+
+    if(STREAM_PLAYING(v))
+    {
+        P_A(args,sizeof(args),NULL,0,format,ap);
+        if(!vj_event_stream_buffer_require(v))
+            return;
+        vj_tag_buffer_set_speed(v->uc->sample_id, args[0]);
+        veejay_set_speed(v, args[0], 0);
+        vj_event_stream_buffer_update_range(v);
+        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
+        veejay_msg(VEEJAY_MSG_INFO, "Buffered stream is playing at speed %d", v->settings->current_playback_speed);
+        return;
+    }
+
     if(!STREAM_PLAYING(v))
     {
         int speed = 0;
@@ -4232,6 +4392,23 @@ void vj_event_play_speed_kb(void *ptr, const char format[], va_list ap)
 {
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
+
+    if(STREAM_PLAYING(v))
+    {
+        P_A(args,sizeof(args),NULL,0,format,ap);
+        if(!vj_event_stream_buffer_require(v))
+            return;
+        int speed = abs(args[0]);
+        if(v->settings->current_playback_speed < 0)
+            speed = -speed;
+        vj_tag_buffer_set_speed(v->uc->sample_id, speed);
+        veejay_set_speed(v, speed, 0);
+        vj_event_stream_buffer_update_range(v);
+        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
+        veejay_msg(VEEJAY_MSG_INFO, "Buffered stream is playing at speed %d", v->settings->current_playback_speed);
+        return;
+    }
+
     if(!STREAM_PLAYING(v))
     {
         P_A(args,sizeof(args),NULL,0,format,ap);
@@ -4260,6 +4437,18 @@ void vj_event_play_slow(void *ptr, const char format[],va_list ap)
     veejay_t *v = (veejay_t*)ptr;
     P_A(args,sizeof(args),NULL,0,format,ap);
     
+    if(STREAM_PLAYING(v))
+    {
+        if(!vj_event_stream_buffer_require(v))
+            return;
+        if(args[0] <= 0)
+            args[0] = 1;
+        vj_tag_buffer_set_slow(v->uc->sample_id, args[0]);
+        if(veejay_set_framedup(v, args[0]) > 0)
+            veejay_msg(VEEJAY_MSG_INFO,"Buffered stream frames will be repeated %d times", args[0]);
+        return;
+    }
+
     if(PLAIN_PLAYING(v) || SAMPLE_PLAYING(v))
     {
         if(args[0] <= 0 )
@@ -4286,12 +4475,30 @@ void vj_event_set_frame(void *ptr, const char format[], va_list ap)
 {
     int args[1];
     veejay_t *v = (veejay_t*) ptr;
+
+    if(STREAM_PLAYING(v))
+    {
+        P_A(args,sizeof(args),NULL,0,format,ap);
+        if(!vj_event_stream_buffer_require(v))
+            return;
+        if(args[0] == -1)
+            args[0] = vj_tag_get_buffer_duration(v->uc->sample_id) - 1;
+        vj_tag_buffer_goto(v->uc->sample_id, args[0]);
+        vj_event_stream_buffer_update_range(v);
+        veejay_set_frame(v, args[0]);
+        veejay_msg(VEEJAY_MSG_INFO, "Buffered stream goto frame %d", args[0]);
+        return;
+    }
+
     if(!STREAM_PLAYING(v))
     {
         P_A(args,sizeof(args),NULL,0,format,ap);
         if(args[0] == -1 )
             args[0] = v->current_edit_list->total_frames;
         veejay_set_frame(v, args[0]);
+#ifdef HAVE_JACK
+        vj_event_sample_audio_sync_seek_rearm_current(v, args[0], "set-frame");
+#endif
     }
     else
     {
@@ -4304,12 +4511,6 @@ void vj_event_set_frame_percentage(void *ptr, const char format[], va_list ap)
     int args[1];
     veejay_t *v = (veejay_t*) ptr;
 
-    if(STREAM_PLAYING(v))
-    {
-        p_invalid_mode();
-        return;
-    }
-
     P_A(args,sizeof(args),NULL,0,format,ap);
 
     int pct = args[0];
@@ -4318,6 +4519,21 @@ void vj_event_set_frame_percentage(void *ptr, const char format[], va_list ap)
     else if(pct > 100)
         pct = 100;
 
+    if(STREAM_PLAYING(v))
+    {
+        if(!vj_event_stream_buffer_require(v))
+            return;
+        int duration = vj_tag_get_buffer_duration(v->uc->sample_id);
+        if(duration < 1)
+            duration = 1;
+        int frame = (int)(((float)(duration - 1) * ((float)pct * 0.01f)) + 0.5f);
+        vj_tag_buffer_goto(v->uc->sample_id, frame);
+        vj_event_stream_buffer_update_range(v);
+        veejay_set_frame(v, frame);
+        return;
+    }
+
+    
     float p = ((float)pct) * 0.01f;
 
     if(SAMPLE_PLAYING(v))
@@ -4330,6 +4546,9 @@ void vj_event_set_frame_percentage(void *ptr, const char format[], va_list ap)
 
         int frame = start + (int)(((float)(end - start) * p) + 0.5f);
         veejay_set_frame(v, frame);
+#ifdef HAVE_JACK
+        vj_event_sample_audio_sync_seek_rearm_current(v, frame, "set-frame-percent");
+#endif
         return;
     }
 
@@ -4386,16 +4605,29 @@ void vj_event_inc_frame(void *ptr, const char format[], va_list ap)
     int args[1];
     P_A(args, sizeof(args), NULL, 0, format, ap);
 
+    if (STREAM_PLAYING(v))
+    {
+        if(!vj_event_stream_buffer_require(v))
+            return;
+        vj_tag_buffer_skip(v->uc->sample_id, args[0]);
+        vj_event_stream_buffer_update_range(v);
+        veejay_set_frame(v, vj_tag_get_buffer_position(v->uc->sample_id));
+        return;
+    }
+
     if (!STREAM_PLAYING(v))
     {
         veejay_increase_frame(v, args[0]);
+#ifdef HAVE_JACK
+        if(SAMPLE_PLAYING(v))
+            vj_event_sample_audio_sync_seek_rearm_current(v, atomic_load_long_long(&v->settings->current_frame_num), "skip-frame");
+#endif
     }
     else
     {
         p_invalid_mode();
     }
 }
-
 
 void vj_event_dec_frame(void *ptr, const char format[], va_list ap)
 {
@@ -4403,9 +4635,23 @@ void vj_event_dec_frame(void *ptr, const char format[], va_list ap)
     int args[1];
     P_A(args, sizeof(args), NULL, 0, format, ap);
 
+    if (STREAM_PLAYING(v))
+    {
+        if(!vj_event_stream_buffer_require(v))
+            return;
+        vj_tag_buffer_skip(v->uc->sample_id, -args[0]);
+        vj_event_stream_buffer_update_range(v);
+        veejay_set_frame(v, vj_tag_get_buffer_position(v->uc->sample_id));
+        return;
+    }
+
     if (!STREAM_PLAYING(v))
     {
         veejay_increase_frame(v, -args[0]);
+#ifdef HAVE_JACK
+        if(SAMPLE_PLAYING(v))
+            vj_event_sample_audio_sync_seek_rearm_current(v, atomic_load_long_long(&v->settings->current_frame_num), "skip-frame");
+#endif
     }
     else
     {
@@ -4413,12 +4659,23 @@ void vj_event_dec_frame(void *ptr, const char format[], va_list ap)
     }
 }
 
-
 void vj_event_prev_second(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t *)ptr;  
     int args[1];
     P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if (STREAM_PLAYING(v))
+    {
+        if(!vj_event_stream_buffer_require(v))
+            return;
+        int fps = (v && v->current_edit_list) ? v->current_edit_list->video_fps : 25;
+        int frames = args[0] * fps;
+        vj_tag_buffer_skip(v->uc->sample_id, -frames);
+        vj_event_stream_buffer_update_range(v);
+        veejay_set_frame(v, vj_tag_get_buffer_position(v->uc->sample_id));
+        return;
+    }
 
     if (!STREAM_PLAYING(v))
     {
@@ -4429,6 +4686,9 @@ void vj_event_prev_second(void *ptr, const char format[], va_list ap)
         long long new_frame = cur_frame - (long long)(args[0] * v->current_edit_list->video_fps);
 
         veejay_set_frame(v, new_frame);
+#ifdef HAVE_JACK
+        vj_event_sample_audio_sync_seek_rearm_current(v, new_frame, "skip-second");
+#endif
     }
     else
     {
@@ -4436,12 +4696,23 @@ void vj_event_prev_second(void *ptr, const char format[], va_list ap)
     }
 }
 
-
 void vj_event_next_second(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t *)ptr;
     int args[1];
     P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if (STREAM_PLAYING(v))
+    {
+        if(!vj_event_stream_buffer_require(v))
+            return;
+        int fps = (v && v->current_edit_list) ? v->current_edit_list->video_fps : 25;
+        int frames = args[0] * fps;
+        vj_tag_buffer_skip(v->uc->sample_id, frames);
+        vj_event_stream_buffer_update_range(v);
+        veejay_set_frame(v, vj_tag_get_buffer_position(v->uc->sample_id));
+        return;
+    }
 
     if (!STREAM_PLAYING(v))
     {
@@ -4452,14 +4723,15 @@ void vj_event_next_second(void *ptr, const char format[], va_list ap)
         long long new_frame = cur_frame + (long long)(args[0] * v->current_edit_list->video_fps);
 
         veejay_set_frame(v, new_frame);
+#ifdef HAVE_JACK
+        vj_event_sample_audio_sync_seek_rearm_current(v, new_frame, "skip-second");
+#endif
     }
     else
     {
         p_invalid_mode();
     }
 }
-
-
 
 void vj_event_sample_start(void *ptr, const char format[], va_list ap)
 {
@@ -4564,12 +4836,24 @@ void vj_event_goto_end(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*) ptr;
     if(STREAM_PLAYING(v))
     {
-        p_invalid_mode();
+        if(!vj_event_stream_buffer_require(v))
+            return;
+        int last = vj_tag_get_buffer_duration(v->uc->sample_id) - 1;
+        if(last < 0)
+            last = 0;
+        vj_tag_buffer_goto(v->uc->sample_id, last);
+        vj_event_stream_buffer_update_range(v);
+        veejay_set_frame(v, last);
+        veejay_msg(VEEJAY_MSG_INFO, "Buffered stream goto newest frame");
         return;
     } 
     if(SAMPLE_PLAYING(v))
     {   
-        veejay_set_frame(v, sample_get_endFrame(v->uc->sample_id));
+        long target_frame = sample_get_endFrame(v->uc->sample_id);
+        veejay_set_frame(v, target_frame);
+#ifdef HAVE_JACK
+        vj_event_sample_audio_sync_seek_rearm_current(v, target_frame, "goto-end");
+#endif
         veejay_msg(VEEJAY_MSG_INFO, "Goto sample's endings position");
     }
     if(PLAIN_PLAYING(v)) 
@@ -4585,12 +4869,21 @@ void vj_event_goto_start(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*) ptr;
     if(STREAM_PLAYING(v))
     {
-        p_invalid_mode();
+        if(!vj_event_stream_buffer_require(v))
+            return;
+        vj_tag_buffer_goto(v->uc->sample_id, 0);
+        vj_event_stream_buffer_update_range(v);
+        veejay_set_frame(v, 0);
+        veejay_msg(VEEJAY_MSG_INFO, "Buffered stream goto oldest frame");
         return;
     }
     if( SAMPLE_PLAYING(v))
     {
-        veejay_set_frame(v, sample_get_startFrame(v->uc->sample_id));
+        long target_frame = sample_get_startFrame(v->uc->sample_id);
+        veejay_set_frame(v, target_frame);
+#ifdef HAVE_JACK
+        vj_event_sample_audio_sync_seek_rearm_current(v, target_frame, "goto-start");
+#endif
         veejay_msg(VEEJAY_MSG_INFO, "Goto sample's starting position"); 
     }
     if ( PLAIN_PLAYING(v))
@@ -5377,7 +5670,7 @@ void vj_event_sample_set_descr(void *ptr, const char format[], va_list ap)
 
     SAMPLE_DEFAULTS(args[0]);
 
-    if(sample_set_description(args[0],str) == 0)
+    if(sample_set_description(args[0],str) == 1)
         veejay_msg(VEEJAY_MSG_INFO, "Changed sample title to %s",str);
     else
         veejay_msg(VEEJAY_MSG_ERROR, "Cannot change title of sample %d to '%s'", args[0],str );
@@ -5429,7 +5722,7 @@ static const char *vj_event_record_audio_source_name(int source)
         case VJ_RECORD_AUDIO_SOURCE_ORIGINAL:
             return "original";
 
-        case VJ_RECORD_AUDIO_SOURCE_BEAT_JACK:
+        case VJ_RECORD_AUDIO_SOURCE_EXTERNAL:
             return "sync-source";
 
         case VJ_RECORD_AUDIO_SOURCE_SILENCE:
@@ -5910,6 +6203,146 @@ void vj_event_chain_enable(void *ptr, const char format[], va_list ap)
     veejay_msg(VEEJAY_MSG_INFO, "Enabled effect chain");
 }
 
+
+void vj_event_stream_set_buffer_length(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[2];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+
+    int stream_id = vj_event_resolve_stream_id(v, args[0]);
+    if(!vj_tag_exists(stream_id)) {
+        p_no_tag(stream_id);
+        return;
+    }
+
+    if(args[1] < 0)
+        args[1] = 0;
+
+    if(!vj_tag_set_buffer_length(stream_id, args[1])) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to set stream %d trickplay buffer to %d frames", stream_id, args[1]);
+        return;
+    }
+
+    if(v && v->uc && STREAM_PLAYING(v) && v->uc->sample_id == stream_id) {
+        int duration = vj_tag_get_buffer_duration(stream_id);
+        int transport_length = (args[1] > 0) ? (duration > 0 ? duration : 1) : vj_tag_get_n_frames(stream_id);
+        if(transport_length < 1)
+            transport_length = 1;
+        atomic_store_long_long(&v->settings->min_frame_num, 0);
+        atomic_store_long_long(&v->settings->max_frame_num, (long long)(transport_length - 1));
+        atomic_store_long_long(&v->settings->current_frame_num, 0);
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO, "Stream %d trickplay buffer length is %d frames", stream_id, args[1]);
+}
+
+void vj_event_stream_buffer_forward(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[1];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+    int stream_id = vj_event_resolve_stream_id(v, args[0]);
+    if(!vj_tag_buffer_play_forward(stream_id)) { p_no_tag(stream_id); return; }
+    if(v && v->uc && STREAM_PLAYING(v) && v->uc->sample_id == stream_id)
+        veejay_set_speed(v, vj_tag_get_buffer_speed(stream_id), 0);
+    vj_event_stream_buffer_sync_current(v, stream_id);
+}
+
+void vj_event_stream_buffer_backward(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[1];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+    int stream_id = vj_event_resolve_stream_id(v, args[0]);
+    if(!vj_tag_buffer_play_reverse(stream_id)) { p_no_tag(stream_id); return; }
+    if(v && v->uc && STREAM_PLAYING(v) && v->uc->sample_id == stream_id)
+        veejay_set_speed(v, vj_tag_get_buffer_speed(stream_id), 0);
+    vj_event_stream_buffer_sync_current(v, stream_id);
+}
+
+void vj_event_stream_buffer_stop(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[1];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+    int stream_id = vj_event_resolve_stream_id(v, args[0]);
+    if(!vj_tag_buffer_stop(stream_id)) { p_no_tag(stream_id); return; }
+    if(v && v->uc && STREAM_PLAYING(v) && v->uc->sample_id == stream_id)
+        veejay_set_speed(v, 0, 0);
+    vj_event_stream_buffer_sync_current(v, stream_id);
+}
+
+void vj_event_stream_buffer_set_speed(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[2];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+    int stream_id = vj_event_resolve_stream_id(v, args[0]);
+    if(!vj_tag_buffer_set_speed(stream_id, args[1])) { p_no_tag(stream_id); return; }
+    if(v && v->uc && STREAM_PLAYING(v) && v->uc->sample_id == stream_id)
+        veejay_set_speed(v, args[1], 0);
+    vj_event_stream_buffer_sync_current(v, stream_id);
+}
+
+void vj_event_stream_buffer_set_slow(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[2];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+    int stream_id = vj_event_resolve_stream_id(v, args[0]);
+    if(!vj_tag_buffer_set_slow(stream_id, args[1])) { p_no_tag(stream_id); return; }
+    if(v && v->uc && STREAM_PLAYING(v) && v->uc->sample_id == stream_id)
+        veejay_set_framedup(v, args[1]);
+    vj_event_stream_buffer_sync_current(v, stream_id);
+}
+
+void vj_event_stream_buffer_set_frame(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[2];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+    int stream_id = vj_event_resolve_stream_id(v, args[0]);
+    if(args[1] == -1)
+        args[1] = vj_tag_get_buffer_duration(stream_id) - 1;
+    if(!vj_tag_buffer_goto(stream_id, args[1])) { p_no_tag(stream_id); return; }
+    vj_event_stream_buffer_sync_current(v, stream_id);
+}
+
+void vj_event_stream_buffer_skip_frame(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[2];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+    int stream_id = vj_event_resolve_stream_id(v, args[0]);
+    if(!vj_tag_buffer_skip(stream_id, args[1])) { p_no_tag(stream_id); return; }
+    vj_event_stream_buffer_sync_current(v, stream_id);
+}
+
+void vj_event_stream_buffer_skip_second(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[2];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+    int stream_id = vj_event_resolve_stream_id(v, args[0]);
+    int fps = (v && v->current_edit_list) ? v->current_edit_list->video_fps : 25;
+    int frames = args[1] * fps;
+    if(!vj_tag_buffer_skip(stream_id, frames)) { p_no_tag(stream_id); return; }
+    vj_event_stream_buffer_sync_current(v, stream_id);
+}
+
+void vj_event_stream_buffer_prev_second(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[2];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+    int stream_id = vj_event_resolve_stream_id(v, args[0]);
+    int fps = (v && v->current_edit_list) ? v->current_edit_list->video_fps : 25;
+    int frames = args[1] * fps;
+    if(!vj_tag_buffer_skip(stream_id, -frames)) { p_no_tag(stream_id); return; }
+    vj_event_stream_buffer_sync_current(v, stream_id);
+}
+
 void    vj_event_stream_set_length( void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
@@ -5921,7 +6354,16 @@ void    vj_event_stream_set_length( void *ptr, const char format[], va_list ap)
         if(args[0] > 0 && args[0] < 2160000 ) //fictious length is maximum 1 day
         {
             vj_tag_set_n_frames(v->uc->sample_id, args[0]);
-            atomic_store_long_long(&v->settings->max_frame_num, (long long) args[0]);
+            if(vj_tag_buffer_active(v->uc->sample_id)) {
+                int duration = vj_tag_get_buffer_duration(v->uc->sample_id);
+                if(duration < 1)
+                    duration = 1;
+                atomic_store_long_long(&v->settings->min_frame_num, 0);
+                atomic_store_long_long(&v->settings->max_frame_num, (long long)(duration - 1));
+            } else {
+                atomic_store_long_long(&v->settings->min_frame_num, 0);
+                atomic_store_long_long(&v->settings->max_frame_num, (long long)(args[0] - 1));
+            }
             constrain_stream( v, v->uc->sample_id, (long) args[0]);
         }
         else
@@ -6379,6 +6821,70 @@ void    vj_event_chain_fade_entry(void *ptr, const char format[], va_list ap)
     if (STREAM_PLAYING(v) && vj_tag_exists(args[0])) 
     {
         vj_tag_set_fade_entry( args[0], args[1] );
+    }
+}
+
+void vj_event_chain_fade_kf_status(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[3];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+
+    if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)))
+        SAMPLE_DEFAULTS(args[0])
+
+    if(args[1] < 0) args[1] = 0;
+    if(args[1] > 1) args[1] = 1;
+
+    if(SAMPLE_PLAYING(v) && sample_exists(args[0])) {
+        sample_chain_fade_set_kf_status(args[0], args[1], args[2]);
+        if(sample_get_chain_fade_kf_port(args[0]))
+            keyframe_set_param_status(args[0], VJ_KF_ENTRY_CHAIN_FADE, VJ_KF_PARAM_CHAIN_OPACITY, args[1], 1);
+        veejay_msg(VEEJAY_MSG_INFO, "Sample %d chain opacity curve is %s", args[0], args[1] ? "enabled" : "disabled");
+    }
+    else if(STREAM_PLAYING(v) && vj_tag_exists(args[0])) {
+        vj_tag_chain_fade_set_kf_status(args[0], args[1], args[2]);
+        if(vj_tag_get_chain_fade_kf_port(args[0]))
+            keyframe_set_param_status(args[0], VJ_KF_ENTRY_CHAIN_FADE, VJ_KF_PARAM_CHAIN_OPACITY, args[1], 0);
+        veejay_msg(VEEJAY_MSG_INFO, "Stream %d chain opacity curve is %s", args[0], args[1] ? "enabled" : "disabled");
+    }
+}
+
+void vj_event_chain_fade_kf_clear(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[1];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+
+    if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)))
+        SAMPLE_DEFAULTS(args[0])
+
+    if(SAMPLE_PLAYING(v) && sample_exists(args[0])) {
+        sample_chain_fade_clear_kf(args[0]);
+        veejay_msg(VEEJAY_MSG_INFO, "Sample %d chain opacity curve cleared", args[0]);
+    }
+    else if(STREAM_PLAYING(v) && vj_tag_exists(args[0])) {
+        vj_tag_chain_fade_clear_kf(args[0]);
+        veejay_msg(VEEJAY_MSG_INFO, "Stream %d chain opacity curve cleared", args[0]);
+    }
+}
+
+void vj_event_chain_fade_kf_audio(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[4];
+    P_A(args,sizeof(args),NULL,0,format,ap);
+
+    if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)))
+        SAMPLE_DEFAULTS(args[0])
+
+    if(SAMPLE_PLAYING(v) && sample_exists(args[0])) {
+        sample_chain_fade_audio(args[0], args[1], args[2], args[3]);
+        veejay_msg(VEEJAY_MSG_INFO, "Sample %d chain opacity audio response mode=%d source=%d amount=%d", args[0], args[1], args[2], args[3]);
+    }
+    else if(STREAM_PLAYING(v) && vj_tag_exists(args[0])) {
+        vj_tag_chain_fade_audio(args[0], args[1], args[2], args[3]);
+        veejay_msg(VEEJAY_MSG_INFO, "Stream %d chain opacity audio response mode=%d source=%d amount=%d", args[0], args[1], args[2], args[3]);
     }
 }
 
@@ -9395,6 +9901,109 @@ void vj_event_audio_sync_wav(void *ptr, const char format[], va_list ap)
 #endif
 }
 
+
+void vj_event_audio_sync_wav_profile_set(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t*) ptr;
+    int args[2] = { 1, 0 };
+    char path[4096];
+
+    veejay_memset(path, 0, sizeof(path));
+    P_A(args, sizeof(args), path, sizeof(path), format, ap);
+
+    if(veejay_audio_sync_wav_profile_set(v, args[0], path, args[1]) < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-SYNC][PROFILE] failed to set slot %d",
+                   args[0]);
+        return;
+    }
+#else
+    (void)ptr; (void)format; (void)ap;
+#endif
+}
+
+void vj_event_audio_sync_wav_profile_clear(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t*) ptr;
+    int args[1] = { 1 };
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if(veejay_audio_sync_wav_profile_clear(v, args[0]) < 0)
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-SYNC][PROFILE] failed to clear slot %d",
+                   args[0]);
+#else
+    (void)ptr; (void)format; (void)ap;
+#endif
+}
+
+void vj_event_sample_audio_sync_set(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t*) ptr;
+    int args[6] = { 0, SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL, 0, SAMPLE_AUDIO_SYNC_OFF, 0, 0 };
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if(veejay_audio_sync_sample_profile_set(v,
+                                            args[0],
+                                            args[1],
+                                            args[2],
+                                            args[3],
+                                            (long)args[4],
+                                            (long)args[5]) < 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-SYNC][SAMPLE] failed to bind sample=%d source=%d profile=%d mode=%d",
+                   args[0], args[1], args[2], args[3]);
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-SYNC][SAMPLE] bound sample=%d source=%d profile=%d mode=%d video=%d wav=%dms",
+               args[0], args[1], args[2], args[3], args[4], args[5]);
+#else
+    (void)ptr; (void)format; (void)ap;
+#endif
+}
+
+void vj_event_sample_audio_sync_clear(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t*) ptr;
+    int args[1] = { 0 };
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if(veejay_audio_sync_sample_profile_clear(v, args[0]) < 0)
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-SYNC][SAMPLE] failed to clear sample=%d",
+                   args[0]);
+#else
+    (void)ptr; (void)format; (void)ap;
+#endif
+}
+
+void vj_event_sample_audio_sync_rearm(void *ptr, const char format[], va_list ap)
+{
+#ifdef HAVE_JACK
+    veejay_t *v = (veejay_t*) ptr;
+    int args[1] = { 0 };
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if(veejay_audio_sync_sample_profile_rearm(v, args[0]) < 0)
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-SYNC][SAMPLE] failed to re-arm sample=%d",
+                   args[0]);
+#else
+    (void)ptr; (void)format; (void)ap;
+#endif
+}
+
 void vj_event_audio_sync_target(void *ptr, const char format[], va_list ap)
 {
 #ifdef HAVE_JACK
@@ -10280,7 +10889,9 @@ static void vj_event_misc_record_dispatch_start(veejay_t *v, int autoplay)
     }
 
     if(STREAM_PLAYING(v)) {
-        frames = vj_tag_get_n_frames(v->uc->sample_id);
+        frames = vj_tag_buffer_active(v->uc->sample_id) ? vj_tag_get_buffer_duration(v->uc->sample_id) : vj_tag_get_n_frames(v->uc->sample_id);
+        if(frames < 1)
+            frames = 1;
         vj_event_trigger_function(v, vj_event_tag_rec_start, 2, "%d %d", &frames, &autoplay);
         return;
     }
@@ -10344,7 +10955,13 @@ void vj_event_resume_id(void *ptr, const char format[], va_list ap)
         if(sample_exists(sample_id)) {
             veejay_set_sample(v, sample_id);
             long pos = sample_get_resume(sample_id);
+#ifdef HAVE_JACK
+            vj_event_sample_audio_sync_seek_rearm_current(v, pos, "sample-restart-pre");
+#endif
             veejay_set_frame(v, pos );
+#ifdef HAVE_JACK
+            vj_event_sample_audio_sync_seek_rearm_current(v, pos, "sample-restart");
+#endif
             veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d continues with frame %d", sample_id, pos );
         }
     }   
@@ -12913,12 +13530,24 @@ void    vj_event_set_kf_status_param( void *ptr, const char format[], va_list ap
     {
         SAMPLE_DEFAULTS(args[0]);
 
-        keyframe_set_param_status( args[0], args[1], args[2], args[3], 1 );
+        if(keyframe_is_chain_opacity_parameter(args[2])) {
+            sample_chain_fade_set_kf_status(args[0], args[3], 0);
+            if(sample_get_chain_fade_kf_port(args[0]))
+                keyframe_set_param_status(args[0], VJ_KF_ENTRY_CHAIN_FADE, VJ_KF_PARAM_CHAIN_OPACITY, args[3], 1);
+        }
+        else
+            keyframe_set_param_status( args[0], args[1], args[2], args[3], 1 );
     }
     else if (STREAM_PLAYING(v))
     {
         STREAM_DEFAULTS(args[0]);
-        keyframe_set_param_status( args[0], args[1], args[2], args[3], 0 );
+        if(keyframe_is_chain_opacity_parameter(args[2])) {
+            vj_tag_chain_fade_set_kf_status(args[0], args[3], 0);
+            if(vj_tag_get_chain_fade_kf_port(args[0]))
+                keyframe_set_param_status(args[0], VJ_KF_ENTRY_CHAIN_FADE, VJ_KF_PARAM_CHAIN_OPACITY, args[3], 0);
+        }
+        else
+            keyframe_set_param_status( args[0], args[1], args[2], args[3], 0 );
     }
 }
 
@@ -12967,10 +13596,16 @@ void    vj_event_del_keyframes( void *ptr, const char format[], va_list ap )
 
     if(SAMPLE_PLAYING(v))
     {
-        keyframe_clear_entry( v->uc->sample_id, args[0], args[1], 1 );
+        if(keyframe_is_chain_opacity_parameter(args[1]))
+            sample_chain_fade_clear_kf(v->uc->sample_id);
+        else
+            keyframe_clear_entry( v->uc->sample_id, args[0], args[1], 1 );
     }
     else if (STREAM_PLAYING(v)) {
-        keyframe_clear_entry( v->uc->sample_id, args[0], args[1], 0 );
+        if(keyframe_is_chain_opacity_parameter(args[1]))
+            vj_tag_chain_fade_clear_kf(v->uc->sample_id);
+        else
+            keyframe_clear_entry( v->uc->sample_id, args[0], args[1], 0 );
     }
 }
 

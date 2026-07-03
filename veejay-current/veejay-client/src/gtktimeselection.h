@@ -86,6 +86,22 @@ void        timeline_set_audio_grid(GtkWidget *widget,
                                     gint pulse_pct,
                                     gint gate_pct);
 
+void        timeline_set_audio_lane(GtkWidget *widget,
+                                    gboolean active,
+                                    gint source,
+                                    gint profile,
+                                    gint mode,
+                                    gint video_anchor_frame,
+                                    gint wav_anchor_ms,
+                                    gint length_ms,
+                                    gboolean loop);
+
+void        timeline_clear_audio_lane(GtkWidget *widget);
+void        timeline_set_audio_lane_loop(GtkWidget *widget, gboolean loop);
+
+gint        timeline_get_audio_lane_wav_anchor_ms(TimelineSelection *te);
+gint        timeline_get_audio_lane_video_anchor_frame(TimelineSelection *te);
+
 
 #ifdef __cplusplus
 }

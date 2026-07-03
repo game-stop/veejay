@@ -443,11 +443,24 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     
     si->looptype = 1; // normal looping
     si->audio_volume = 100;
+    si->audio_sync_source = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+    si->audio_sync_profile = SAMPLE_AUDIO_SYNC_OFF;
+    si->audio_sync_mode = SAMPLE_AUDIO_SYNC_OFF;
+    si->audio_sync_video_anchor = startFrame;
+    si->audio_sync_wav_anchor_ms = 0;
+    si->audio_sync_lock_delta_frames = 0;
+    si->audio_sync_lock_confidence = 0;
     si->marker_start = 0;
     si->effect_toggle = 1;
     si->fade_method = 0;
     si->fade_alpha = 0;
     si->fade_entry = -1;
+    si->fade_kf = NULL;
+    si->fade_kf_status = 0;
+    si->fade_kf_type = 0;
+    si->fade_kf_audio_mode = VJ_CHAIN_FADE_AUDIO_OFF;
+    si->fade_kf_audio_source = VJ_CHAIN_FADE_AUDIO_LEVEL;
+    si->fade_kf_audio_amount = 0;
     si->subrender = 1;
     si->transition_length = 25;
     si->loop_stat_stop = 1;
@@ -555,6 +568,128 @@ int sample_exists(int sample_id) {
     }
     
     if(!sample_get(sample_id)) return 0;
+    return 1;
+}
+
+
+int sample_set_audio_sync_profile(int sample_id, int source, int profile, int mode, long video_anchor, long wav_anchor_ms)
+{
+    sample_info *sample = sample_get(sample_id);
+    if(!sample)
+        return 0;
+
+    if(source < SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL || source > SAMPLE_AUDIO_SYNC_SOURCE_SILENCE)
+        source = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+
+    if(profile < 0)
+        profile = 0;
+    if(profile > SAMPLE_AUDIO_SYNC_PROFILE_MAX)
+        profile = SAMPLE_AUDIO_SYNC_PROFILE_MAX;
+
+    if(mode < SAMPLE_AUDIO_SYNC_OFF || mode > SAMPLE_AUDIO_SYNC_MODE_MAX)
+        mode = SAMPLE_AUDIO_SYNC_OFF;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL) {
+        profile = 0;
+        wav_anchor_ms = 0;
+        if(mode != SAMPLE_AUDIO_SYNC_OFF)
+            mode = SAMPLE_AUDIO_SYNC_QUEUE;
+    } else if(source == SAMPLE_AUDIO_SYNC_SOURCE_WAV) {
+        if(profile == 0)
+            mode = SAMPLE_AUDIO_SYNC_OFF;
+        else if(mode == SAMPLE_AUDIO_SYNC_OFF)
+            mode = SAMPLE_AUDIO_SYNC_QUEUE;
+    } else if(source == SAMPLE_AUDIO_SYNC_SOURCE_JACK) {
+        profile = 0;
+        if(mode == SAMPLE_AUDIO_SYNC_OFF)
+            mode = SAMPLE_AUDIO_SYNC_QUEUE;
+    } else if(source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE) {
+        profile = 0;
+        wav_anchor_ms = 0;
+        if(mode == SAMPLE_AUDIO_SYNC_OFF)
+            mode = SAMPLE_AUDIO_SYNC_QUEUE;
+    }
+
+    if(wav_anchor_ms < 0)
+        wav_anchor_ms = 0;
+
+    sample->audio_sync_source = source;
+    sample->audio_sync_profile = profile;
+    sample->audio_sync_mode = mode;
+    sample->audio_sync_video_anchor = video_anchor;
+    sample->audio_sync_wav_anchor_ms = wav_anchor_ms;
+
+    if(source == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL ||
+       source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE ||
+       mode == SAMPLE_AUDIO_SYNC_OFF) {
+        sample->audio_sync_lock_delta_frames = 0;
+        sample->audio_sync_lock_confidence = 0;
+    }
+
+    return 1;
+}
+
+int sample_get_audio_sync_profile(int sample_id,
+                                  int *source,
+                                  int *profile,
+                                  int *mode,
+                                  long *video_anchor,
+                                  long *wav_anchor_ms,
+                                  int *lock_delta_frames,
+                                  int *lock_confidence)
+{
+    sample_info *sample = sample_get(sample_id);
+    if(!sample)
+        return 0;
+
+    if(source)
+        *source = sample->audio_sync_source;
+    if(profile)
+        *profile = sample->audio_sync_profile;
+    if(mode)
+        *mode = sample->audio_sync_mode;
+    if(video_anchor)
+        *video_anchor = sample->audio_sync_video_anchor;
+    if(wav_anchor_ms)
+        *wav_anchor_ms = sample->audio_sync_wav_anchor_ms;
+    if(lock_delta_frames)
+        *lock_delta_frames = sample->audio_sync_lock_delta_frames;
+    if(lock_confidence)
+        *lock_confidence = sample->audio_sync_lock_confidence;
+
+    return 1;
+}
+
+int sample_clear_audio_sync_profile(int sample_id)
+{
+    sample_info *sample = sample_get(sample_id);
+    if(!sample)
+        return 0;
+
+    sample->audio_sync_source = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+    sample->audio_sync_profile = SAMPLE_AUDIO_SYNC_OFF;
+    sample->audio_sync_mode = SAMPLE_AUDIO_SYNC_OFF;
+    sample->audio_sync_video_anchor = 0;
+    sample->audio_sync_wav_anchor_ms = 0;
+    sample->audio_sync_lock_delta_frames = 0;
+    sample->audio_sync_lock_confidence = 0;
+
+    return 1;
+}
+
+int sample_set_audio_sync_lock(int sample_id, int delta_frames, int confidence)
+{
+    sample_info *sample = sample_get(sample_id);
+    if(!sample)
+        return 0;
+
+    if(confidence < 0)
+        confidence = 0;
+    else if(confidence > 100)
+        confidence = 100;
+
+    sample->audio_sync_lock_delta_frames = delta_frames;
+    sample->audio_sync_lock_confidence = confidence;
     return 1;
 }
 
@@ -787,7 +922,7 @@ int sample_set_manual_fader( int s1, int value)
 {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
-  si->fader_active = 2;
+  si->fader_active = SAMPLE_FADER_MANUAL;
   si->fader_val = (float) value;
   si->fader_inc = 0.0;
   if(si->effect_toggle == 0) 
@@ -800,7 +935,7 @@ int sample_set_fader_active( int s1, int nframes, int direction ) {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
   if(nframes <= 0) return -1;
-  si->fader_active = 1;
+  si->fader_active = SAMPLE_FADER_LINEAR;
 
   if(direction<0)
     si->fader_val = 255.0f;
@@ -854,7 +989,7 @@ void sample_set_fade_alpha(int s1, int alpha)
 int sample_reset_fader(int s1) {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
-  si->fader_active = 0;
+  si->fader_active = SAMPLE_FADER_OFF;
   si->fader_inc = 0;
   return 1;
 }
@@ -886,7 +1021,7 @@ float sample_get_fader_inc(int s1) {
 int sample_get_fader_direction(int s1) {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
-  if(si->fader_active == 0)
+  if(si->fader_active == SAMPLE_FADER_OFF)
       return 0; // no direction
   return si->fader_direction;
 }
@@ -912,6 +1047,145 @@ int sample_set_fader_inc(int s1, float inc) {
   if(!si) return -1;
   si->fader_inc = inc;
   return 1;
+}
+
+static int sample_chain_fade_clamp255(int v)
+{
+    if(v < 0) return 0;
+    if(v > 255) return 255;
+    return v;
+}
+
+void *sample_chain_fade_alloc_kf(int s1)
+{
+    sample_info *si = sample_get(s1);
+    if(!si) return NULL;
+    if(!si->fade_kf)
+        si->fade_kf = vpn(VEVO_ANONYMOUS_PORT);
+    return si->fade_kf;
+}
+
+void *sample_get_chain_fade_kf_port(int s1)
+{
+    sample_info *si = sample_get(s1);
+    if(!si) return NULL;
+    return si->fade_kf;
+}
+
+int sample_chain_fade_set_kf_status(int s1, int status, int type)
+{
+    sample_info *si = sample_get(s1);
+    if(!si) return -1;
+
+    if(status) {
+        if(!si->fade_kf)
+            si->fade_kf = vpn(VEVO_ANONYMOUS_PORT);
+        si->fade_kf_status = 1;
+        si->fade_kf_type = type;
+        si->fader_active = SAMPLE_FADER_CURVE;
+        si->fader_inc = 0.0f;
+        if(si->effect_toggle == 0)
+            si->effect_toggle = 1;
+    } else {
+        si->fade_kf_status = 0;
+        if(si->fader_active == SAMPLE_FADER_CURVE)
+            si->fader_active = SAMPLE_FADER_OFF;
+    }
+
+    return 1;
+}
+
+int sample_chain_fade_get_kf_status(int s1, int *type)
+{
+    sample_info *si = sample_get(s1);
+    if(!si) return 0;
+    if(type) *type = si->fade_kf_type;
+    return si->fade_kf_status;
+}
+
+int sample_chain_fade_clear_kf(int s1)
+{
+    sample_info *si = sample_get(s1);
+    if(!si) return -1;
+    if(si->fade_kf) {
+        vpf(si->fade_kf);
+        si->fade_kf = NULL;
+    }
+    si->fade_kf_status = 0;
+    si->fade_kf_type = 0;
+    if(si->fader_active == SAMPLE_FADER_CURVE)
+        si->fader_active = SAMPLE_FADER_OFF;
+    return 1;
+}
+
+int sample_chain_fade_get_value(int s1, long long n_frame, int *value)
+{
+    int tmp = 0;
+    sample_info *si = sample_get(s1);
+    if(!si || !value || !si->fade_kf || !si->fade_kf_status)
+        return 0;
+    if(!get_keyframe_value(si->fade_kf, n_frame, VJ_KF_PARAM_CHAIN_OPACITY, &tmp))
+        return 0;
+    *value = sample_chain_fade_clamp255(tmp);
+    return 1;
+}
+
+unsigned char *sample_chain_fade_get_kfs(int s1, int *len)
+{
+    sample_info *si = sample_get(s1);
+    if(!si || !si->fade_kf)
+        return NULL;
+    return keyframe_pack(si->fade_kf, VJ_KF_PARAM_CHAIN_OPACITY, VJ_KF_ENTRY_CHAIN_FADE, len);
+}
+
+int sample_chain_fade_audio(int s1, int mode, int source, int amount)
+{
+    sample_info *si = sample_get(s1);
+    if(!si) return -1;
+
+    if(mode < VJ_CHAIN_FADE_AUDIO_OFF || mode > VJ_CHAIN_FADE_AUDIO_GATE)
+        mode = VJ_CHAIN_FADE_AUDIO_OFF;
+    if(source < VJ_CHAIN_FADE_AUDIO_LEVEL || source > VJ_CHAIN_FADE_AUDIO_GATE_SRC)
+        source = VJ_CHAIN_FADE_AUDIO_LEVEL;
+    amount = sample_chain_fade_clamp255(amount);
+
+    si->fade_kf_audio_mode = mode;
+    si->fade_kf_audio_source = source;
+    si->fade_kf_audio_amount = amount;
+    return 1;
+}
+
+int sample_chain_fade_audio_get(int s1, int *mode, int *source, int *amount)
+{
+    sample_info *si = sample_get(s1);
+    if(!si) return 0;
+    if(mode) *mode = si->fade_kf_audio_mode;
+    if(source) *source = si->fade_kf_audio_source;
+    if(amount) *amount = si->fade_kf_audio_amount;
+    return 1;
+}
+
+
+int sample_get_marker_range(int sample_id, int *start, int *end)
+{
+    sample_info *si = sample_get(sample_id);
+    if (!si)
+        return 0;
+
+    sample_normalize_marker_info(si);
+
+    if (si->marker_end <= 0 || si->marker_end <= si->marker_start)
+        return 0;
+
+    if (si->marker_start <= si->first_frame && si->marker_end >= si->last_frame)
+        return 0;
+
+    if (start)
+        *start = si->marker_start;
+    if (end)
+        *end = si->marker_end;
+
+    return 1;
 }
 
 int sample_marker_clear(int sample_id)
@@ -996,11 +1270,12 @@ int sample_set_description(int sample_id, char *description)
 {
     sample_info *si = sample_get(sample_id);
     if (!si)
-    return -1;
+        return -1;
     if (!description || strlen(description) <= 0) {
         snprintf(si->descr, SAMPLE_MAX_DESCR_LEN, "Sample%04d", si->sample_id );
+        
     } else {
-    snprintf(si->descr, SAMPLE_MAX_DESCR_LEN, "%s", description);
+        snprintf(si->descr, SAMPLE_MAX_DESCR_LEN, "%s", description);
     }
     return 1;
 }
@@ -1280,6 +1555,11 @@ static void sample_del_internal_ex(sample_info *si, int skip_edl_close, int recy
     if (si->encoder_destination) {
         free(si->encoder_destination);
         si->encoder_destination = NULL;
+    }
+
+    if (si->fade_kf) {
+        vpf(si->fade_kf);
+        si->fade_kf = NULL;
     }
 
     if (si->main_fx) {
@@ -2407,7 +2687,9 @@ unsigned char * sample_chain_get_kfs( int s1, int entry, int parameter_id, int *
     return NULL;
    if ( entry < 0 || entry > SAMPLE_MAX_EFFECTS )
         return NULL;
-   if( parameter_id < 0 || parameter_id > 9 )
+   if(keyframe_is_chain_opacity_parameter(parameter_id))
+       return sample_chain_fade_get_kfs(s1, len);
+   if( parameter_id < 0 || parameter_id > 99 )
     return NULL;
    if( sample->effect_chain[entry]->kf == NULL )
        return NULL;
@@ -3176,6 +3458,43 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, void *
         else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_VOL)) {
             skel->audio_volume = sample_clamp_audio_volume(get_xml_int(doc, node));
         }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_AUDIO_SYNC_SOURCE)) {
+            skel->audio_sync_source = get_xml_int(doc, node);
+            if(skel->audio_sync_source < SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL ||
+               skel->audio_sync_source > SAMPLE_AUDIO_SYNC_SOURCE_SILENCE)
+                skel->audio_sync_source = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_AUDIO_SYNC_PROFILE)) {
+            skel->audio_sync_profile = get_xml_int(doc, node);
+            if(skel->audio_sync_profile < 0)
+                skel->audio_sync_profile = 0;
+            else if(skel->audio_sync_profile > SAMPLE_AUDIO_SYNC_PROFILE_MAX)
+                skel->audio_sync_profile = SAMPLE_AUDIO_SYNC_PROFILE_MAX;
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_AUDIO_SYNC_MODE)) {
+            skel->audio_sync_mode = get_xml_int(doc, node);
+            if(skel->audio_sync_mode < SAMPLE_AUDIO_SYNC_OFF ||
+               skel->audio_sync_mode > SAMPLE_AUDIO_SYNC_MODE_MAX)
+                skel->audio_sync_mode = SAMPLE_AUDIO_SYNC_OFF;
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_AUDIO_SYNC_VIDEO_ANCHOR)) {
+            skel->audio_sync_video_anchor = get_xml_int(doc, node);
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_AUDIO_SYNC_WAV_ANCHOR_MS)) {
+            skel->audio_sync_wav_anchor_ms = get_xml_int(doc, node);
+            if(skel->audio_sync_wav_anchor_ms < 0)
+                skel->audio_sync_wav_anchor_ms = 0;
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_AUDIO_SYNC_LOCK_DELTA_FRAMES)) {
+            skel->audio_sync_lock_delta_frames = get_xml_int(doc, node);
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_AUDIO_SYNC_LOCK_CONFIDENCE)) {
+            skel->audio_sync_lock_confidence = get_xml_int(doc, node);
+            if(skel->audio_sync_lock_confidence < 0)
+                skel->audio_sync_lock_confidence = 0;
+            else if(skel->audio_sync_lock_confidence > 100)
+                skel->audio_sync_lock_confidence = 100;
+        }
         else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_LASTFRAME)) {
             skel->last_frame = get_xml_int(doc, node);
         }
@@ -3217,6 +3536,29 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, void *
         }
         else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_FADE_ENTRY)) {
             skel->fade_entry = get_xml_int(doc, node);
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_FADE_KF_STATUS)) {
+            skel->fade_kf_status = get_xml_int(doc, node) ? 1 : 0;
+            if(skel->fade_kf_status)
+                skel->fader_active = SAMPLE_FADER_CURVE;
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_FADE_KF_TYPE)) {
+            skel->fade_kf_type = get_xml_int(doc, node);
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_FADE_KF_AUDIO_MODE)) {
+            skel->fade_kf_audio_mode = get_xml_int(doc, node);
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_FADE_KF_AUDIO_SOURCE)) {
+            skel->fade_kf_audio_source = get_xml_int(doc, node);
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_FADE_KF_AUDIO_AMOUNT)) {
+            skel->fade_kf_audio_amount = sample_chain_fade_clamp255(get_xml_int(doc, node));
+        }
+        else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_FADE_KF_ANIM)) {
+            if(!skel->fade_kf)
+                skel->fade_kf = vpn(VEVO_ANONYMOUS_PORT);
+            if(skel->fade_kf)
+                ParseKeys(doc, node->xmlChildrenNode, skel->fade_kf);
         }
         else if (!xmlStrcmp(node->name, (const xmlChar *) XMLTAG_FADER_VAL)) {
             skel->fader_val = get_xml_int(doc, node);
@@ -3314,6 +3656,33 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, void *
         }
 
         sample_normalize_marker_info(skel);
+
+        if(skel->audio_sync_source < SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL ||
+           skel->audio_sync_source > SAMPLE_AUDIO_SYNC_SOURCE_SILENCE)
+            skel->audio_sync_source = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+        if(skel->audio_sync_source == SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL && skel->audio_sync_mode != SAMPLE_AUDIO_SYNC_OFF) {
+            skel->audio_sync_profile = 0;
+            skel->audio_sync_wav_anchor_ms = 0;
+            skel->audio_sync_mode = SAMPLE_AUDIO_SYNC_QUEUE;
+        }
+        if(skel->audio_sync_source == SAMPLE_AUDIO_SYNC_SOURCE_WAV && skel->audio_sync_profile == 0)
+            skel->audio_sync_mode = SAMPLE_AUDIO_SYNC_OFF;
+        if(skel->audio_sync_source == SAMPLE_AUDIO_SYNC_SOURCE_JACK ||
+           skel->audio_sync_source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE)
+            skel->audio_sync_profile = 0;
+        if(skel->audio_sync_source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE && skel->audio_sync_mode == SAMPLE_AUDIO_SYNC_OFF)
+            skel->audio_sync_mode = SAMPLE_AUDIO_SYNC_QUEUE;
+        if(skel->audio_sync_mode == SAMPLE_AUDIO_SYNC_OFF) {
+            skel->audio_sync_source = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
+            skel->audio_sync_profile = 0;
+            skel->audio_sync_lock_delta_frames = 0;
+            skel->audio_sync_lock_confidence = 0;
+        }
+        if(skel->audio_sync_source == SAMPLE_AUDIO_SYNC_SOURCE_SILENCE) {
+            skel->audio_sync_wav_anchor_ms = 0;
+            skel->audio_sync_lock_delta_frames = 0;
+            skel->audio_sync_lock_confidence = 0;
+        }
 
         if (existing) {
             sample_move_fx_pointers(skel->effect_chain, existing->effect_chain);
@@ -3696,12 +4065,31 @@ void CreateSample(xmlNodePtr node, sample_info * sample, void *font)
     put_xml_int( node, XMLTAG_DEPTH, sample->depth );
     put_xml_int( node, XMLTAG_PLAYMODE, sample->playmode );
     put_xml_int( node, XMLTAG_VOL, sample->audio_volume );
+    if(sample->audio_sync_source != SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL && sample->audio_sync_mode != SAMPLE_AUDIO_SYNC_OFF) {
+        put_xml_int( node, XMLTAG_AUDIO_SYNC_SOURCE, sample->audio_sync_source );
+        put_xml_int( node, XMLTAG_AUDIO_SYNC_PROFILE, sample->audio_sync_profile );
+        put_xml_int( node, XMLTAG_AUDIO_SYNC_MODE, sample->audio_sync_mode );
+        put_xml_int( node, XMLTAG_AUDIO_SYNC_VIDEO_ANCHOR, sample->audio_sync_video_anchor );
+        put_xml_int( node, XMLTAG_AUDIO_SYNC_WAV_ANCHOR_MS, sample->audio_sync_wav_anchor_ms );
+        put_xml_int( node, XMLTAG_AUDIO_SYNC_LOCK_DELTA_FRAMES, sample->audio_sync_lock_delta_frames );
+        put_xml_int( node, XMLTAG_AUDIO_SYNC_LOCK_CONFIDENCE, sample->audio_sync_lock_confidence );
+    }
     put_xml_int( node, XMLTAG_MARKERSTART, sample->marker_start );
     put_xml_int( node, XMLTAG_MARKEREND, sample->marker_end );
     put_xml_int( node, XMLTAG_FADER_ACTIVE, sample->fader_active );
     put_xml_int( node, XMLTAG_FADE_METHOD, sample->fade_method );
     put_xml_int( node, XMLTAG_FADE_ALPHA, sample->fade_alpha );
     put_xml_int( node, XMLTAG_FADE_ENTRY, sample->fade_entry );
+    put_xml_int( node, XMLTAG_FADE_KF_STATUS, sample->fade_kf_status );
+    put_xml_int( node, XMLTAG_FADE_KF_TYPE, sample->fade_kf_type );
+    put_xml_int( node, XMLTAG_FADE_KF_AUDIO_MODE, sample->fade_kf_audio_mode );
+    put_xml_int( node, XMLTAG_FADE_KF_AUDIO_SOURCE, sample->fade_kf_audio_source );
+    put_xml_int( node, XMLTAG_FADE_KF_AUDIO_AMOUNT, sample->fade_kf_audio_amount );
+    if(sample->fade_kf) {
+        xmlNodePtr fade_anim = xmlNewChild(node, NULL, (const xmlChar*) XMLTAG_FADE_KF_ANIM, NULL);
+        xmlNodePtr fade_key = xmlNewChild(fade_anim, NULL, (const xmlChar*) "KEYFRAMES", NULL);
+        keyframe_xml_pack(fade_key, sample->fade_kf, VJ_KF_PARAM_CHAIN_OPACITY);
+    }
     put_xml_int( node, XMLTAG_FADER_INC, sample->fader_inc );
     put_xml_int( node, XMLTAG_FADER_VAL, sample->fader_val );
     put_xml_int( node, XMLTAG_FADER_DIRECTION, sample->fader_direction );

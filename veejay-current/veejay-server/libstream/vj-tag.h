@@ -38,6 +38,9 @@
 #define VJ_TAG_TYPE_AVFORMAT 12
 #define TAG_MAX_DESCR_LEN 150
 #include <config.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <pthread.h>
 #include <libsample/sampleadm.h>
 #include <libstream/vj-yuv4mpeg.h>
 #include <veejaycore/vj-client.h>
@@ -66,6 +69,35 @@ typedef struct {
     int pix_fmt;
     int uv_len;
 } vj_tag_data;
+
+
+#define VJ_TAG_TRICKPLAY_LIVE 0
+#define VJ_TAG_TRICKPLAY_BUFFER 1
+
+#define VJ_TAG_BUFFER_STATE_UNSUPPORTED 0
+#define VJ_TAG_BUFFER_STATE_OFF 1
+#define VJ_TAG_BUFFER_STATE_EMPTY 2
+#define VJ_TAG_BUFFER_STATE_LIVE 3
+#define VJ_TAG_BUFFER_STATE_PLAYING 4
+#define VJ_TAG_BUFFER_STATE_PAUSED 5
+
+typedef struct {
+    pthread_mutex_t mutex;
+    uint8_t *frame_buffer;
+    size_t frame_size;
+    int y_len;
+    int uv_len;
+    int buffer_length;
+    int buffer_fill;
+    int write_index;
+    int playhead;
+    int mode;
+    int speed;
+    int direction;
+    int slow;
+    int slow_count;
+    unsigned long long capture_seq;
+} vj_tag_info_t;
 
 typedef struct {
     int id;
@@ -108,10 +140,17 @@ typedef struct {
 	int fade_method;
 	int fade_entry;
 	int fade_alpha;
+    void *fade_kf;
+    int fade_kf_status;
+    int fade_kf_type;
+    int fade_kf_audio_mode;
+    int fade_kf_audio_source;
+    int fade_kf_audio_amount;
     int selected_entry;	
     int effect_toggle;
     int n_frames;
     void *priv;
+    vj_tag_info_t *info;
     void *extra;
     void *dict;
     char padding[4];
@@ -156,6 +195,26 @@ int	vj_tag_get_v4l_properties(int t1, int *arr );
 int 	vj_tag_init(int w, int h, int pix_fmt, int driver);
 int	vj_tag_get_n_frames(int t1);
 int	vj_tag_set_n_frames(int t1, int n_frames);
+
+int vj_tag_set_buffer_length(int t1, int n_frames);
+int vj_tag_get_buffer_length(int t1);
+int vj_tag_get_buffer_duration(int t1);
+int vj_tag_get_buffer_position(int t1);
+int vj_tag_get_buffer_speed(int t1);
+int vj_tag_get_buffer_direction(int t1);
+int vj_tag_get_buffer_mode(int t1);
+int vj_tag_get_buffer_slow(int t1);
+int vj_tag_buffer_supported(int t1);
+int vj_tag_buffer_state(int t1);
+int vj_tag_buffer_active(int t1);
+int vj_tag_buffer_play_forward(int t1);
+int vj_tag_buffer_play_reverse(int t1);
+int vj_tag_buffer_stop(int t1);
+int vj_tag_buffer_set_speed(int t1, int speed);
+int vj_tag_buffer_set_slow(int t1, int slow);
+int vj_tag_buffer_goto(int t1, int frame);
+int vj_tag_buffer_skip(int t1, int frames);
+int vj_tag_buffer_get_status(int t1, int *enabled, int *capacity, int *filled, int *position, int *speed, int *direction, int *mode, int *state);
 int 	vj_tag_get_last_tag();
 
 void	*vj_tag_get_macro(int t1);
@@ -317,6 +376,15 @@ float 	vj_tag_get_fader_val(int t1);
 float 	vj_tag_get_fader_inc(int t1);
 int 	vj_tag_reset_fader(int t1);
 void	vj_tag_set_fade_alpha(int t1, int alpha);
+void *vj_tag_chain_fade_alloc_kf(int t1);
+void *vj_tag_get_chain_fade_kf_port(int t1);
+int vj_tag_chain_fade_set_kf_status(int t1, int status, int type);
+int vj_tag_chain_fade_get_kf_status(int t1, int *type);
+int vj_tag_chain_fade_clear_kf(int t1);
+int vj_tag_chain_fade_get_value(int t1, long long n_frame, int *value);
+unsigned char *vj_tag_chain_fade_get_kfs(int t1, int *len);
+int vj_tag_chain_fade_audio(int t1, int mode, int source, int amount);
+int vj_tag_chain_fade_audio_get(int t1, int *mode, int *source, int *amount);
 int	vj_tag_get_fade_alpha( int t1, int alpha);
 int 	vj_tag_get_effect_status(int s1);
 int 	vj_tag_get_selected_entry(int s1);

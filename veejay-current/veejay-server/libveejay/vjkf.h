@@ -21,6 +21,27 @@
  */
 #ifndef VJKF_H
 #define VJKF_H
+
+#define VJ_KF_ENTRY_CHAIN_FADE 0
+#define VJ_KF_PARAM_CHAIN_OPACITY 99
+
+#define SAMPLE_FADER_OFF 0
+#define SAMPLE_FADER_LINEAR 1
+#define SAMPLE_FADER_MANUAL 2
+#define SAMPLE_FADER_CURVE 3
+
+#define VJ_CHAIN_FADE_AUDIO_OFF 0
+#define VJ_CHAIN_FADE_AUDIO_ADD 1
+#define VJ_CHAIN_FADE_AUDIO_DUCK 2
+#define VJ_CHAIN_FADE_AUDIO_MULTIPLY 3
+#define VJ_CHAIN_FADE_AUDIO_GATE 4
+
+#define VJ_CHAIN_FADE_AUDIO_LEVEL 0
+#define VJ_CHAIN_FADE_AUDIO_ENVELOPE 1
+#define VJ_CHAIN_FADE_AUDIO_TRANSIENT 2
+#define VJ_CHAIN_FADE_AUDIO_FLUX 3
+#define VJ_CHAIN_FADE_AUDIO_PULSE 4
+#define VJ_CHAIN_FADE_AUDIO_GATE_SRC 5
 unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *rlen );
 
 int keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int tag );
@@ -38,5 +59,8 @@ int keyframe_get_param_status( int lookup, int fx_entry, int parameter_id, int i
 void keyframe_set_param_status( int lookup, int fx_entry, int parameter_id, int status, int is_sample );
 
 void *keyframe_port_clone_and_resize(void *src_port, int new_len);
+
+int keyframe_is_chain_opacity_parameter(int parameter_id);
+int keyframe_get_param_tokens(void *port, int parameter_id, int *start, int *end, int *type, int *shape, int *status);
 
 #endif

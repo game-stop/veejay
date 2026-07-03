@@ -45,6 +45,9 @@ info->uc.selected_fx_param = arg_num+WIDGET_SLIDER_P0; \
 }
 
 void text_defaults();
+void samplebank_goto_page(int page);
+void samplebank_step_page(int delta);
+int samplebank_get_page(void);
 
 gboolean boxbg_draw ( GtkWidget *w,  cairo_t *cr);
 gboolean boxfg_draw ( GtkWidget *w, cairo_t *cr );
@@ -59,5 +62,6 @@ void on_timeline_in_point_changed ( GtkWidget *widget, gpointer user_data );
 void on_timeline_out_point_changed ( GtkWidget *widget, gpointer user_data );
 void on_timeline_bind_toggled( GtkWidget *widget, gpointer user_data );
 void on_timeline_cleared ( GtkWidget *widget, gpointer user_data );
+void on_timeline_audio_offset_changed ( GtkWidget *widget, gpointer user_data );
 
 #endif

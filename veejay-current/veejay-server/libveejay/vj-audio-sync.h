@@ -74,6 +74,13 @@ static inline int vj_audio_sync_mode_is_audio_sync_family(int mode)
            vj_audio_sync_mode_uses_external_playback(mode);
 }
 
+static inline int vj_audio_sync_source_is_external_provider(int source)
+{
+    return source == VJ_AUDIO_SYNC_SOURCE_JACK ||
+           source == VJ_AUDIO_SYNC_SOURCE_WAV_FILE ||
+           source == VJ_AUDIO_SYNC_SOURCE_PUSH;
+}
+
 static inline int vj_audio_sync_mode_supports_wav_master(int mode)
 {
     return vj_audio_sync_mode_is_audio_sync_family(mode);
@@ -265,6 +272,7 @@ typedef struct vj_audio_sync_shared_t
     char wav_path[VJ_AUDIO_SYNC_PATH_MAX];
     volatile int wav_loop;
     volatile int wav_limit_ms;
+    volatile int wav_start_ms;
 
     volatile int wav_plain_lock_valid;
     volatile int wav_plain_lock_delta_frames;
@@ -319,6 +327,11 @@ int  vj_audio_sync_set_source_wav_limited(vj_audio_sync_shared_t *s,
                                           const char *path,
                                           int loop,
                                           int limit_ms);
+int  vj_audio_sync_set_source_wav_limited_at(vj_audio_sync_shared_t *s,
+                                             const char *path,
+                                             int loop,
+                                             int limit_ms,
+                                             long start_ms);
 void vj_audio_sync_wav_restart(vj_audio_sync_shared_t *s);
 int  vj_audio_sync_wav_plain_lock_valid(vj_audio_sync_shared_t *s);
 int  vj_audio_sync_wav_plain_lock_get(vj_audio_sync_shared_t *s,

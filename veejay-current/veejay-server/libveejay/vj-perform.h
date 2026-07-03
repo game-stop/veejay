@@ -125,6 +125,7 @@ void vj_perform_record_output_audio_tap_configure(veejay_t *info, int frame_byte
 void vj_perform_record_audio_source_reset(veejay_t *info);
 
 #ifdef HAVE_JACK
+int vj_perform_audio_sync_sample_seek_rearm(veejay_t *info, int sample_id, long target_frame, const char *reason);
 void vj_perform_audio_source_transition_guard(int blocks);
 void vj_perform_audio_source_transition_guard_ex(int blocks,
                                                         const char *reason,

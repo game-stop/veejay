@@ -84,6 +84,7 @@ enum
   CLEAR_CHANGED,
   SELECTION_CHANGED_SIGNAL,
   POINT_CHANGED,
+  AUDIO_OFFSET_CHANGED,
   LAST_SIGNAL
 };
 
@@ -116,6 +117,7 @@ typedef enum TimelineAction
   action_pos,
   action_atomic,
   action_point,
+  action_audio_offset,
 } TimelineAction;
 
 #define POINT_IN_RECT(xcoord, ycoord, rect) \
@@ -173,6 +175,23 @@ struct _TimelineSelection
   gint              audio_phase_pct;
   gint              audio_pulse_pct;
   gint              audio_gate_pct;
+  gboolean          audio_lane_active;
+  gint              audio_lane_source;
+  gint              audio_lane_profile;
+  gint              audio_lane_mode;
+  gint              audio_lane_video_anchor;
+  gint              audio_lane_wav_anchor_ms;
+  gint              audio_lane_length_ms;
+  gboolean          audio_lane_loop;
+  gboolean          audio_lane_loop_override_active;
+  gboolean          audio_lane_drag;
+  gboolean          audio_lane_drag_anchor;
+  gboolean          audio_lane_drag_wav;
+  gdouble           audio_lane_drag_zero;
+  gint              audio_lane_drag_base_video_anchor;
+  gint              audio_lane_drag_base_wav_ms;
+  gint              audio_lane_status_hold;
+  GdkRectangle      audio_lane_rect;
 };
 
 static void get_property(GObject *object,
@@ -196,6 +215,10 @@ static void timeline_clear_selection_ghost(TimelineSelection *te);
 static void timeline_capture_selection_ghost(TimelineSelection *te);
 static gint timeline_clamp_playhead_i(TimelineSelection *te, gint frame);
 static void timeline_guard_playhead(GtkWidget *widget, gboolean emit_signal);
+static gboolean timeline_point_in_audio_lane(TimelineSelection *te, gdouble x, gdouble y);
+static gboolean timeline_point_near_audio_anchor(TimelineSelection *te, gdouble x, gdouble width);
+static void timeline_audio_lane_apply_at_x(GtkWidget *widget, gdouble x, gdouble width);
+static void timeline_audio_lane_emit_changed(GtkWidget *widget);
 
 static void timeline_class_init(TimelineSelectionClass *class);
 static void timeline_init(TimelineSelection *te);
@@ -207,7 +230,7 @@ static gint timeline_signals[LAST_SIGNAL] = { 0 };
 #define TIMELINE_STEPPER_HIT_PX     28.0
 #define TIMELINE_SELECTION_HIT_PX   8.0
 #define TIMELINE_MIN_FRAMES         1.0
-#define TIMELINE_MIN_HEIGHT_PX      76
+#define TIMELINE_MIN_HEIGHT_PX      128
 #define TIMELINE_LABEL_FONT_SIZE    12.0
 #define TIMELINE_INFO_FONT_SIZE     12.0
 #define TIMELINE_DEFAULT_SCROLL_STEP_FRAMES 13
@@ -227,6 +250,7 @@ static const char *timeline_action_name(TimelineAction action)
         case action_pos:       return "pos";
         case action_atomic:    return "scratch";
         case action_point:     return "point";
+        case action_audio_offset: return "audio";
         default:               return "?";
     }
 }
@@ -571,6 +595,7 @@ struct _TimelineSelectionClass
   GtkWidgetClass parent_class;
   void (*pos_changed) (TimelineSelection *te);
   void (*point_changed) (TimelineSelection *te);
+  void (*audio_offset_changed) (TimelineSelection *te);
   void (*in_point_changed) (TimelineSelection *te);
   void (*out_point_changed) (TimelineSelection *te);
   void (*bind_toggled) (TimelineSelection *te);
@@ -873,6 +898,17 @@ static void timeline_class_init(TimelineSelectionClass *class)
                                                  0,
                                                  NULL);
 
+  timeline_signals[AUDIO_OFFSET_CHANGED] = g_signal_new("audio_offset_changed",
+                                                        G_TYPE_FROM_CLASS(gobject_class),
+                                                        G_SIGNAL_RUN_LAST,
+                                                        G_STRUCT_OFFSET(TimelineSelectionClass, audio_offset_changed),
+                                                        NULL,
+                                                        NULL,
+                                                        g_cclosure_marshal_VOID__VOID,
+                                                        G_TYPE_NONE,
+                                                        0,
+                                                        NULL);
+
   timeline_signals[IN_CHANGED] = g_signal_new("in_point_changed",
                                               G_TYPE_FROM_CLASS(gobject_class),
                                               G_SIGNAL_RUN_LAST,
@@ -971,6 +1007,26 @@ static void timeline_init(TimelineSelection *te)
   te->audio_phase_pct = 0;
   te->audio_pulse_pct = 0;
   te->audio_gate_pct = 0;
+  te->audio_lane_active = FALSE;
+  te->audio_lane_source = 0;
+  te->audio_lane_profile = 0;
+  te->audio_lane_mode = 0;
+  te->audio_lane_video_anchor = 0;
+  te->audio_lane_wav_anchor_ms = 0;
+  te->audio_lane_length_ms = 0;
+  te->audio_lane_loop = FALSE;
+  te->audio_lane_loop_override_active = FALSE;
+  te->audio_lane_drag = FALSE;
+  te->audio_lane_drag_anchor = FALSE;
+  te->audio_lane_drag_wav = FALSE;
+  te->audio_lane_drag_zero = 0.0;
+  te->audio_lane_drag_base_video_anchor = 0;
+  te->audio_lane_drag_base_wav_ms = 0;
+  te->audio_lane_status_hold = 0;
+  te->audio_lane_rect.x = 0;
+  te->audio_lane_rect.y = 0;
+  te->audio_lane_rect.width = 0;
+  te->audio_lane_rect.height = 0;
 }
 
 GType timeline_get_type(void)
@@ -1348,6 +1404,275 @@ gdouble timeline_get_length(TimelineSelection *te)
   return result;
 }
 
+static inline gdouble timeline_audio_fps(TimelineSelection *te)
+{
+  return (te && te->fps > 0.0) ? te->fps : 25.0;
+}
+
+static inline gdouble timeline_audio_ms_to_frames(TimelineSelection *te, gint ms)
+{
+  if (ms <= 0)
+      return 0.0;
+  return ((gdouble) ms * timeline_audio_fps(te)) / 1000.0;
+}
+
+static inline gint timeline_audio_frames_to_ms(TimelineSelection *te, gdouble frames)
+{
+  gdouble fps = timeline_audio_fps(te);
+  gint ms;
+
+  if (fps <= 0.0)
+      fps = 25.0;
+
+  ms = (gint) llround((frames * 1000.0) / fps);
+  return MAX(0, ms);
+}
+
+static inline gdouble timeline_audio_zero_frame(TimelineSelection *te)
+{
+  return (gdouble) te->audio_lane_video_anchor -
+         timeline_audio_ms_to_frames(te, te->audio_lane_wav_anchor_ms);
+}
+
+static gboolean timeline_point_in_audio_lane(TimelineSelection *te, gdouble x, gdouble y)
+{
+  if (!te || !te->audio_lane_active)
+      return FALSE;
+
+  const gdouble x0 = (gdouble) te->audio_lane_rect.x;
+  const gdouble x1 = (gdouble) (te->audio_lane_rect.x + te->audio_lane_rect.width);
+  const gdouble y0 = (gdouble) te->audio_lane_rect.y - 8.0;
+  const gdouble y1 = (gdouble) (te->audio_lane_rect.y + te->audio_lane_rect.height) + 18.0;
+
+  return x >= x0 && x < x1 && y >= y0 && y < y1;
+}
+
+static gboolean timeline_point_near_audio_anchor(TimelineSelection *te, gdouble x, gdouble width)
+{
+  if (!te || !te->audio_lane_active || width <= 1.0)
+      return FALSE;
+
+  gint nframes = timeline_frame_count_i(te);
+  gdouble start_frame = (gdouble) timeline_clamp_frame_i(te, te->audio_lane_video_anchor);
+  gdouble start_x = timeline_snap_line_x((start_frame / (gdouble) nframes) * width, width);
+
+  return fabs(x - start_x) <= 16.0;
+}
+static void timeline_audio_lane_apply_at_x(GtkWidget *widget, gdouble x, gdouble width)
+{
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
+  gdouble mouse_frame;
+  gint old_anchor;
+  gint old_ms;
+  gint wav_ms;
+  gint nframes;
+
+  if (!te->audio_lane_active || width <= 1.0)
+      return;
+
+  mouse_frame = timeline_x_to_frame_cont(te, x, width);
+  old_anchor = te->audio_lane_video_anchor;
+  old_ms = te->audio_lane_wav_anchor_ms;
+  nframes = timeline_frame_count_i(te);
+
+  if (te->audio_lane_drag_wav) {
+      gdouble delta_frames = mouse_frame - te->move_x;
+      wav_ms = te->audio_lane_drag_base_wav_ms;
+
+      if (delta_frames >= 0.0)
+          wav_ms += timeline_audio_frames_to_ms(te, delta_frames);
+      else
+          wav_ms -= timeline_audio_frames_to_ms(te, -delta_frames);
+
+      if (wav_ms < 0)
+          wav_ms = 0;
+      if (te->audio_lane_length_ms > 0 && wav_ms > te->audio_lane_length_ms)
+          wav_ms = te->audio_lane_length_ms;
+
+      if (wav_ms == old_ms)
+          return;
+
+      te->audio_lane_wav_anchor_ms = wav_ms;
+      gtk_widget_queue_draw(GTK_WIDGET(te->widget));
+      return;
+  }
+
+  gint anchor_i = (gint) llround(mouse_frame - te->move_x);
+
+  if (anchor_i < 0)
+      anchor_i = 0;
+  if (anchor_i >= nframes)
+      anchor_i = nframes - 1;
+
+  anchor_i = timeline_clamp_frame_i(te, anchor_i);
+
+  if (anchor_i == old_anchor)
+      return;
+
+  te->audio_lane_video_anchor = anchor_i;
+  gtk_widget_queue_draw(GTK_WIDGET(te->widget));
+}
+
+static void timeline_audio_lane_emit_changed(GtkWidget *widget)
+{
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
+
+  if (!te->audio_lane_active)
+      return;
+
+  te->audio_lane_status_hold = 50;
+  g_signal_emit(te->widget, timeline_signals[AUDIO_OFFSET_CHANGED], 0);
+}
+
+gint timeline_get_audio_lane_wav_anchor_ms(TimelineSelection *te)
+{
+  return te ? MAX(0, te->audio_lane_wav_anchor_ms) : 0;
+}
+
+gint timeline_get_audio_lane_video_anchor_frame(TimelineSelection *te)
+{
+  return te ? timeline_clamp_frame_i(te, te->audio_lane_video_anchor) : 0;
+}
+
+void timeline_set_audio_lane_loop(GtkWidget *widget, gboolean loop)
+{
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
+  gboolean next = loop ? TRUE : FALSE;
+
+  if (!te || !te->audio_lane_active || te->audio_lane_source != 1)
+      return;
+
+  te->audio_lane_loop_override_active = TRUE;
+
+  if (te->audio_lane_loop == next) {
+      gtk_widget_queue_draw(widget);
+      return;
+  }
+
+  te->audio_lane_loop = next;
+  gtk_widget_queue_draw(widget);
+}
+
+void timeline_clear_audio_lane(GtkWidget *widget)
+{
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
+
+  if (te->audio_lane_drag || te->action == action_audio_offset)
+      return;
+
+  if (te->audio_lane_status_hold > 0 && te->audio_lane_active) {
+      te->audio_lane_status_hold--;
+      return;
+  }
+
+  te->audio_lane_active = FALSE;
+  te->audio_lane_source = 0;
+  te->audio_lane_profile = 0;
+  te->audio_lane_mode = 0;
+  te->audio_lane_video_anchor = 0;
+  te->audio_lane_wav_anchor_ms = 0;
+  te->audio_lane_length_ms = 0;
+  te->audio_lane_loop = FALSE;
+  te->audio_lane_loop_override_active = FALSE;
+  te->audio_lane_drag = FALSE;
+  te->audio_lane_drag_anchor = FALSE;
+  te->audio_lane_drag_wav = FALSE;
+  te->audio_lane_drag_zero = 0.0;
+  te->audio_lane_drag_base_video_anchor = 0;
+  te->audio_lane_drag_base_wav_ms = 0;
+  te->audio_lane_status_hold = 0;
+  te->audio_lane_rect.x = 0;
+  te->audio_lane_rect.y = 0;
+  te->audio_lane_rect.width = 0;
+  te->audio_lane_rect.height = 0;
+  gtk_widget_queue_draw(widget);
+}
+
+void timeline_set_audio_lane(GtkWidget *widget,
+                             gboolean active,
+                             gint source,
+                             gint profile,
+                             gint mode,
+                             gint video_anchor_frame,
+                             gint wav_anchor_ms,
+                             gint length_ms,
+                             gboolean loop)
+{
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
+  gint max_frame = MAX(0, timeline_frame_count_i(te) - 1);
+  gboolean incoming_loop = loop ? TRUE : FALSE;
+  gboolean same_identity;
+
+  if (te->audio_lane_drag || te->action == action_audio_offset)
+      return;
+
+  video_anchor_frame = CLAMP(video_anchor_frame, 0, max_frame);
+  wav_anchor_ms = MAX(0, wav_anchor_ms);
+  length_ms = MAX(0, length_ms);
+
+  same_identity = te->audio_lane_active &&
+                  active &&
+                  source == te->audio_lane_source &&
+                  profile == te->audio_lane_profile &&
+                  mode == te->audio_lane_mode;
+
+  if (te->audio_lane_loop_override_active) {
+      if (!same_identity || source != 1)
+          te->audio_lane_loop_override_active = FALSE;
+      else
+          incoming_loop = te->audio_lane_loop;
+  }
+
+  if (te->audio_lane_status_hold > 0) {
+      gboolean same_binding = te->audio_lane_active &&
+                             source == te->audio_lane_source &&
+                             profile == te->audio_lane_profile &&
+                             mode == te->audio_lane_mode;
+      gboolean same_mapping = same_binding &&
+                             active && source > 0 &&
+                             te->audio_lane_video_anchor == video_anchor_frame &&
+                             te->audio_lane_wav_anchor_ms == wav_anchor_ms &&
+                             te->audio_lane_length_ms == length_ms &&
+                             te->audio_lane_loop == incoming_loop;
+
+      if (same_mapping)
+          te->audio_lane_status_hold = 0;
+      else if (same_binding || !active || source <= 0) {
+          te->audio_lane_status_hold--;
+          return;
+      }
+      else
+          te->audio_lane_status_hold = 0;
+  }
+
+  if (!active || source <= 0) {
+      timeline_clear_audio_lane(widget);
+      return;
+  }
+
+  if (te->audio_lane_active == TRUE &&
+      te->audio_lane_source == source &&
+      te->audio_lane_profile == profile &&
+      te->audio_lane_mode == mode &&
+      te->audio_lane_video_anchor == video_anchor_frame &&
+      te->audio_lane_wav_anchor_ms == wav_anchor_ms &&
+      te->audio_lane_length_ms == length_ms &&
+      te->audio_lane_loop == incoming_loop)
+  {
+      return;
+  }
+
+  te->audio_lane_active = TRUE;
+  te->audio_lane_source = source;
+  te->audio_lane_profile = profile;
+  te->audio_lane_mode = mode;
+  te->audio_lane_video_anchor = video_anchor_frame;
+  te->audio_lane_wav_anchor_ms = wav_anchor_ms;
+  te->audio_lane_length_ms = length_ms;
+  te->audio_lane_loop = incoming_loop;
+  gtk_widget_queue_draw(widget);
+}
+
 void timeline_set_display_info_full(GtkWidget *widget,
                                     gint display_mode,
                                     gint current_id,
@@ -1619,6 +1944,11 @@ static void timeline_cancel_drag_mode(GtkWidget *widget)
     te->drag_latched = FALSE;
     te->scratch_span = 0;
     te->hover_action = action_none;
+    te->audio_lane_drag = FALSE;
+    te->audio_lane_drag_anchor = FALSE;
+    te->audio_lane_drag_wav = FALSE;
+    te->audio_lane_drag_base_video_anchor = 0;
+    te->audio_lane_drag_base_wav_ms = 0;
     timeline_clear_selection_ghost(te);
 
     timeline_update_cursor(widget, action_none);
@@ -1737,6 +2067,28 @@ static gboolean event_scroll(GtkWidget *widget, GdkEventScroll *ev, gpointer use
   if (direction == 0)
       return TRUE;
 
+  if (timeline_point_in_audio_lane(te, ev->x, ev->y)) {
+      gint old_ms = te->audio_lane_wav_anchor_ms;
+      gint step_ms = 100;
+
+      if (ev->state & GDK_SHIFT_MASK)
+          step_ms = 20;
+      else if (ev->state & GDK_CONTROL_MASK)
+          step_ms = 1000;
+
+      te->audio_lane_wav_anchor_ms += direction * step_ms;
+      if (te->audio_lane_wav_anchor_ms < 0)
+          te->audio_lane_wav_anchor_ms = 0;
+      if (te->audio_lane_length_ms > 0 && te->audio_lane_wav_anchor_ms > te->audio_lane_length_ms)
+          te->audio_lane_wav_anchor_ms = te->audio_lane_length_ms;
+
+      if (te->audio_lane_wav_anchor_ms != old_ms)
+          timeline_audio_lane_emit_changed(widget);
+
+      gtk_widget_queue_draw(widget);
+      return TRUE;
+  }
+
   if (ev->state & (GDK_BUTTON1_MASK | GDK_BUTTON2_MASK | GDK_BUTTON3_MASK)) {
       TL_EVT(te, "scroll", "ignored while mouse button is held");
       return TRUE;
@@ -1780,6 +2132,32 @@ static gboolean event_press(GtkWidget *widget, GdkEventButton *ev, gpointer user
 
   if (width <= 1.0) {
       TL_EVT(te, "press", "ignored: width <= 1");
+      return TRUE;
+  }
+
+  if (ev->button == 1 && timeline_point_in_audio_lane(te, ev->x, ev->y)) {
+      gboolean near_anchor;
+
+      if (te->bind || te->drag_latched)
+          timeline_cancel_drag_mode(widget);
+
+      near_anchor = timeline_point_near_audio_anchor(te, ev->x, width);
+
+      te->grab_button = 1;
+      te->current_location = MOUSE_WIDGET;
+      te->action = action_audio_offset;
+      te->audio_lane_drag = TRUE;
+      te->audio_lane_drag_anchor = near_anchor ? TRUE : FALSE;
+      te->audio_lane_drag_wav = (ev->state & GDK_SHIFT_MASK) ? TRUE : FALSE;
+      te->audio_lane_drag_base_video_anchor = te->audio_lane_video_anchor;
+      te->audio_lane_drag_base_wav_ms = te->audio_lane_wav_anchor_ms;
+      te->drag_latched = FALSE;
+      te->move_x = timeline_x_to_frame_cont(te, ev->x, width);
+
+      if (!te->audio_lane_drag_wav)
+          te->move_x = near_anchor ? te->move_x - (gdouble) te->audio_lane_video_anchor : 0.0;
+
+      timeline_audio_lane_apply_at_x(widget, ev->x, width);
       return TRUE;
   }
 
@@ -1918,6 +2296,19 @@ static gboolean event_release(GtkWidget *widget, GdkEventButton *ev, gpointer us
       return TRUE;
   }
 
+  if (te->action == action_audio_offset) {
+      te->audio_lane_drag = FALSE;
+      te->audio_lane_drag_anchor = FALSE;
+      te->audio_lane_drag_wav = FALSE;
+      te->grab_button = 0;
+      timeline_audio_lane_emit_changed(widget);
+      te->action = action_none;
+      te->current_location = MOUSE_WIDGET;
+      timeline_update_cursor(widget, action_none);
+      gtk_widget_queue_draw(widget);
+      return TRUE;
+  }
+
   te->action = action_none;
   te->current_location = MOUSE_WIDGET;
   te->grab_button = 0;
@@ -1959,6 +2350,11 @@ static gboolean event_motion(GtkWidget *widget, GdkEventMotion *ev, gpointer use
       (b2 && te->action == action_atomic && te->drag_latched))
   {
     timeline_apply_action_at_x(widget, action_atomic, ev->x, width);
+    return TRUE;
+  }
+
+  if (te->action == action_audio_offset) {
+    timeline_audio_lane_apply_at_x(widget, ev->x, width);
     return TRUE;
   }
 
@@ -2147,6 +2543,7 @@ static const gchar *timeline_hover_hint(TimelineSelection *te)
         case action_out_point: return "Drag OUT";
         case action_atomic:    return "Middle-click: grab loop";
         case action_pos:       return "Drag PLAY";
+        case action_audio_offset: return "Audio lane: drag switch | Shift-drag/wheel WAV time";
         case action_point:
             return "Wheel: step playhead | Ctrl: 1s | Shift: 2s";
         case action_none:
@@ -2189,6 +2586,32 @@ static void timeline_format_clock(TimelineSelection *te,
 
     snprintf(buf, len, "%d:%02d:%02d:%02d", h, m, s, f);
 }
+static void timeline_format_ms(gint ms, gchar *buf, size_t len)
+{
+    gint total_seconds;
+    gint h;
+    gint m;
+    gint s;
+    gint rem;
+
+    if (!buf || len == 0)
+        return;
+
+    if (ms < 0)
+        ms = 0;
+
+    total_seconds = ms / 1000;
+    rem = ms % 1000;
+    h = total_seconds / 3600;
+    m = (total_seconds / 60) % 60;
+    s = total_seconds % 60;
+
+    if (h > 0)
+        snprintf(buf, len, "%d:%02d:%02d.%03d", h, m, s, rem);
+    else
+        snprintf(buf, len, "%02d:%02d.%03d", m, s, rem);
+}
+
 
 static void timeline_draw_plain_text(cairo_t *cr,
                                      const gchar *text,
@@ -2378,26 +2801,22 @@ static gint timeline_frame_ruler_step(gint nframes, gdouble width)
     return MAX(1, step);
 }
 
-static void timeline_draw_frame_ruler_label(TimelineSelection *te,
-                                            cairo_t *cr,
-                                            gint frame_ord,
-                                            gint nframes,
-                                            gdouble width,
-                                            gdouble baseline_y,
-                                            gdouble tick_top,
-                                            gdouble tick_bottom,
-                                            gdouble *last_right,
-                                            gboolean force,
-                                            const GdkRGBA *fg)
+static gboolean timeline_frame_ruler_label_bounds(TimelineSelection *te,
+                                                   cairo_t *cr,
+                                                   gint frame_ord,
+                                                   gint nframes,
+                                                   gdouble width,
+                                                   gdouble *left,
+                                                   gdouble *right,
+                                                   gdouble *x_pos)
 {
     gchar label[32];
     cairo_text_extents_t ext;
     gdouble x;
     gdouble tx;
-    gdouble alpha;
 
     if (frame_ord < 1 || frame_ord > nframes)
-        return;
+        return FALSE;
 
     snprintf(label, sizeof(label), "%d", frame_ord);
 
@@ -2411,8 +2830,41 @@ static void timeline_draw_frame_ruler_label(TimelineSelection *te,
     if ((tx + ext.width) > (width - 2.0))
         tx = width - 2.0 - ext.width;
 
+    if (left)
+        *left = tx;
+    if (right)
+        *right = tx + ext.width;
+    if (x_pos)
+        *x_pos = x;
+
+    return TRUE;
+}
+
+static void timeline_draw_frame_ruler_label(TimelineSelection *te,
+                                            cairo_t *cr,
+                                            gint frame_ord,
+                                            gint nframes,
+                                            gdouble width,
+                                            gdouble baseline_y,
+                                            gdouble tick_top,
+                                            gdouble tick_bottom,
+                                            gdouble *last_right,
+                                            gboolean force,
+                                            const GdkRGBA *fg)
+{
+    gchar label[32];
+    gdouble x;
+    gdouble tx;
+    gdouble right;
+    gdouble alpha;
+
+    if (!timeline_frame_ruler_label_bounds(te, cr, frame_ord, nframes, width, &tx, &right, &x))
+        return;
+
     if (!force && last_right && tx < (*last_right + 5.0))
         return;
+
+    snprintf(label, sizeof(label), "%d", frame_ord);
 
     alpha = force ? 0.56 : 0.42;
 
@@ -2427,7 +2879,7 @@ static void timeline_draw_frame_ruler_label(TimelineSelection *te,
     cairo_show_text(cr, label);
 
     if (last_right)
-        *last_right = tx + ext.width;
+        *last_right = right;
 }
 
 static void timeline_draw_frame_ruler(TimelineSelection *te,
@@ -2461,7 +2913,14 @@ static void timeline_draw_frame_ruler(TimelineSelection *te,
                            CAIRO_FONT_WEIGHT_BOLD);
     cairo_set_font_size(cr, TIMELINE_FRAME_RULER_FONT_SIZE);
 
-    /* Human-facing local frame ruler: 1..N, not the internal 0..N-1 indices. */
+    /* Human-facing local frame ruler: 1..N, not the internal 0..N-1 indices.
+     * The final label is always shown, so intermediate labels near the right
+     * edge must yield to it instead of being overprinted by the forced end. */
+    gdouble end_left = width + 9999.0;
+    gdouble end_right = width + 9999.0;
+
+    timeline_frame_ruler_label_bounds(te, cr, nframes, nframes, width, &end_left, &end_right, NULL);
+
     timeline_draw_frame_ruler_label(te,
                                     cr,
                                     1,
@@ -2474,9 +2933,18 @@ static void timeline_draw_frame_ruler(TimelineSelection *te,
                                     TRUE,
                                     fg);
 
-    for (f = step; f <= nframes; f += step) {
+    for (f = step; f < nframes; f += step) {
+        gdouble label_left = 0.0;
+        gdouble label_right = 0.0;
+
         if (f == 1)
             continue;
+
+        if (timeline_frame_ruler_label_bounds(te, cr, f, nframes, width, &label_left, &label_right, NULL) &&
+            label_right > (end_left - 5.0))
+        {
+            continue;
+        }
 
         timeline_draw_frame_ruler_label(te,
                                         cr,
@@ -2491,19 +2959,17 @@ static void timeline_draw_frame_ruler(TimelineSelection *te,
                                         fg);
     }
 
-    if (((nframes - 1) % step) != 0) {
-        timeline_draw_frame_ruler_label(te,
-                                        cr,
-                                        nframes,
-                                        nframes,
-                                        width,
-                                        baseline_y,
-                                        tick_top,
-                                        tick_bottom,
-                                        &last_right,
-                                        TRUE,
-                                        fg);
-    }
+    timeline_draw_frame_ruler_label(te,
+                                    cr,
+                                    nframes,
+                                    nframes,
+                                    width,
+                                    baseline_y,
+                                    tick_top,
+                                    tick_bottom,
+                                    &last_right,
+                                    TRUE,
+                                    fg);
 
     cairo_restore(cr);
 }
@@ -2639,11 +3105,15 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
 
   gdouble tri_h = te->has_stepper ? te->stepper_draw_size : 0.0;
   gdouble track_h = marker_height;
+  gdouble audio_lane_gap = te->audio_lane_active ? 7.0 : 0.0;
+  gdouble audio_lane_h = te->audio_lane_active ? 12.0 : 0.0;
+  gdouble audio_lane_extra = te->audio_lane_active ? (audio_lane_gap + audio_lane_h + 4.0) : 0.0;
   gdouble row_gap = 6.0;
 
   gdouble row_step = 20.0;
-  gdouble label_rows_h = row_gap + (row_step * 2.0) + 12.0;
-  gdouble group_h = tri_h + track_h + label_rows_h;
+  gdouble wav_info_extra = te->audio_lane_active ? row_step : 0.0;
+  gdouble label_rows_h = row_gap + (row_step * 2.0) + wav_info_extra + 12.0;
+  gdouble group_h = tri_h + track_h + audio_lane_extra + label_rows_h;
 
   gdouble group_y = floor((height - group_h) * 0.5);
   if (group_y < 0.0)
@@ -2652,21 +3122,30 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
   gdouble tri_y = group_y;
   gdouble track_y = floor(group_y + tri_h);
   gdouble track_bottom = track_y + track_h;
-  gdouble marker_row_y = track_bottom + row_gap + 10.0;
+  gdouble audio_lane_y = track_bottom + audio_lane_gap;
+  gdouble audio_lane_bottom = audio_lane_y + audio_lane_h;
+  gdouble label_base_y = te->audio_lane_active ? audio_lane_bottom : track_bottom;
+  gdouble marker_row_y = label_base_y + row_gap + 10.0;
   gdouble bottom_row_y = marker_row_y + row_step;
+  gdouble wav_info_row_y = te->audio_lane_active ? bottom_row_y + row_step : bottom_row_y;
   gdouble handle_w = 4.0;
 
-  if (bottom_row_y > height - 3.0) {
-      bottom_row_y = height - 3.0;
+  if (wav_info_row_y > height - 3.0) {
+      wav_info_row_y = height - 3.0;
+      bottom_row_y = wav_info_row_y - (te->audio_lane_active ? row_step : 0.0);
       marker_row_y = MAX(track_bottom + 12.0, bottom_row_y - row_step);
   }
 
   if (track_bottom > height) {
       track_y = MAX(0.0, height - track_h - label_rows_h);
       track_bottom = track_y + track_h;
+      audio_lane_y = track_bottom + audio_lane_gap;
+      audio_lane_bottom = audio_lane_y + audio_lane_h;
+      label_base_y = te->audio_lane_active ? audio_lane_bottom : track_bottom;
       tri_y = MAX(0.0, track_y - tri_h);
-      marker_row_y = MIN(height - row_step - 3.0, track_bottom + row_gap + 10.0);
-      bottom_row_y = MIN(height - 3.0, marker_row_y + row_step);
+      marker_row_y = MIN(height - ((te->audio_lane_active ? row_step : 0.0) + row_step) - 3.0, label_base_y + row_gap + 10.0);
+      bottom_row_y = MIN(height - (te->audio_lane_active ? row_step : 0.0) - 3.0, marker_row_y + row_step);
+      wav_info_row_y = te->audio_lane_active ? MIN(height - 3.0, bottom_row_y + row_step) : bottom_row_y;
   }
 
   cairo_set_source_rgba(cr, col2.red, col2.green, col2.blue, 0.18);
@@ -2691,6 +3170,116 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
                               &info_bg,
                               te->audio_grid_locked ? 0.72 : 0.42);
       cairo_set_font_size(cr, TIMELINE_LABEL_FONT_SIZE);
+  }
+
+
+  if (te->audio_lane_active) {
+      gdouble start_frame = (gdouble) timeline_clamp_frame_i(te, te->audio_lane_video_anchor);
+      gdouble start_x = timeline_snap_line_x((start_frame / nframes) * width, width);
+      gdouble visible_x = CLAMP(start_x, 0.0, width);
+      gdouble lane_end_x = width;
+      gdouble fill_w;
+      gint display_wav_ms = MAX(0, te->audio_lane_wav_anchor_ms);
+      gint remaining_wav_ms = 0;
+      gboolean wav_has_finite_end = FALSE;
+
+      if (te->audio_lane_source == 1 && te->audio_lane_length_ms > 0) {
+          remaining_wav_ms = te->audio_lane_length_ms - display_wav_ms;
+          if (remaining_wav_ms < 0)
+              remaining_wav_ms = 0;
+
+          if (!te->audio_lane_loop) {
+              gdouble end_frame = start_frame + timeline_audio_ms_to_frames(te, remaining_wav_ms);
+              lane_end_x = CLAMP((end_frame / nframes) * width, 0.0, width);
+              wav_has_finite_end = TRUE;
+          }
+      }
+
+      if (lane_end_x < visible_x)
+          lane_end_x = visible_x;
+
+      fill_w = MAX(1.0, lane_end_x - visible_x);
+
+      te->audio_lane_rect.x = 0;
+      te->audio_lane_rect.y = (gint) floor(audio_lane_y - 8.0);
+      te->audio_lane_rect.width = (gint) width;
+      te->audio_lane_rect.height = (gint) ceil(audio_lane_h + 20.0);
+
+      cairo_set_source_rgba(cr, 0.05, 0.20, 0.24, 0.28);
+      cairo_rectangle_round(cr, 0.0, audio_lane_y, width, audio_lane_h, 6.0);
+
+      if (fill_w > 0.0) {
+          cairo_set_source_rgba(cr, 0.08, 0.55, 0.65, te->audio_lane_drag ? 0.92 : 0.68);
+          cairo_rectangle_round(cr, visible_x, audio_lane_y, fill_w, audio_lane_h, 6.0);
+      }
+
+      if (wav_has_finite_end && lane_end_x < width - 0.5) {
+          cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.24);
+          cairo_rectangle(cr, lane_end_x, audio_lane_y, width - lane_end_x, audio_lane_h);
+          cairo_fill(cr);
+
+          cairo_set_source_rgba(cr, 1.0, 0.78, 0.08, 0.62);
+          cairo_set_line_width(cr, 1.0);
+          cairo_move_to(cr, timeline_snap_line_x(lane_end_x, width), audio_lane_y - 2.0);
+          cairo_line_to(cr, timeline_snap_line_x(lane_end_x, width), audio_lane_bottom + 2.0);
+          cairo_stroke(cr);
+      }
+
+      if (te->audio_lane_source == 1) {
+          gint wav_len_ms = te->audio_lane_length_ms;
+          gint step_ms = 1000;
+          gint max_ticks = 220;
+          gint tick;
+
+          if (wav_len_ms > 0 && wav_len_ms < 5000)
+              step_ms = 500;
+
+          for (tick = 0; tick < max_ticks; tick++) {
+              gdouble delta_ms = (gdouble) tick * (gdouble) step_ms;
+              gdouble wav_pos_ms = (gdouble) display_wav_ms + delta_ms;
+              gdouble f = start_frame + (delta_ms * timeline_audio_fps(te)) / 1000.0;
+              gdouble x;
+              gboolean loop_boundary = FALSE;
+
+              if (f < 0.0)
+                  continue;
+              if (f > nframes)
+                  break;
+              if (!te->audio_lane_loop && wav_len_ms > 0 && wav_pos_ms > (gdouble) wav_len_ms + 0.001)
+                  break;
+
+              if (wav_len_ms > 0 && te->audio_lane_loop) {
+                  gint a = (gint) floor((wav_pos_ms - (gdouble) step_ms) / (gdouble) wav_len_ms);
+                  gint b = (gint) floor(wav_pos_ms / (gdouble) wav_len_ms);
+                  loop_boundary = tick > 0 && b > a;
+              }
+
+              x = timeline_snap_line_x((f / nframes) * width, width);
+              cairo_set_line_width(cr, loop_boundary ? 1.3 : ((tick % 5) == 0 ? 1.0 : 0.6));
+              cairo_set_source_rgba(cr,
+                                    1.0,
+                                    1.0,
+                                    1.0,
+                                    loop_boundary ? 0.44 : (((tick % 5) == 0) ? 0.28 : 0.14));
+              cairo_move_to(cr, x, audio_lane_y + 1.0);
+              cairo_line_to(cr, x, audio_lane_bottom - 1.0);
+              cairo_stroke(cr);
+          }
+      }
+
+      cairo_set_source_rgba(cr, 1.0, 0.78, 0.08, 0.98);
+      cairo_set_line_width(cr, te->audio_lane_drag && !te->audio_lane_drag_wav ? 2.4 : 1.5);
+      cairo_move_to(cr, start_x, audio_lane_y - 5.0);
+      cairo_line_to(cr, start_x, audio_lane_bottom + 5.0);
+      cairo_stroke(cr);
+
+      if (te->audio_lane_drag_wav) {
+          cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 0.75);
+          cairo_set_line_width(cr, 1.0);
+          cairo_rectangle_round(cr, visible_x + 2.0, audio_lane_y + 2.0, MAX(1.0, fill_w - 4.0), MAX(1.0, audio_lane_h - 4.0), 4.0);
+          cairo_stroke(cr);
+      }
+
   }
 
 
@@ -2873,6 +3462,8 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
                                0.42);
   }
 
+
+
   if (te->has_ghost_selection && te->ghost_out >= te->ghost_in) {
     gdouble ghost_in_f = timeline_clamp_frame(te, te->ghost_in);
     gdouble ghost_out_f = timeline_clamp_frame(te, te->ghost_out);
@@ -2976,6 +3567,53 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
 
       cairo_set_font_size(cr, TIMELINE_INFO_FONT_SIZE);
       timeline_draw_right_text(cr, text, width - 4.0, bottom_row_y, &dim_fg, 0.58);
+      cairo_set_font_size(cr, TIMELINE_LABEL_FONT_SIZE);
+  }
+
+
+  if (te->audio_lane_active) {
+      gint display_start_frame = timeline_clamp_frame_i(te, te->audio_lane_video_anchor);
+      gint display_wav_ms = MAX(0, te->audio_lane_wav_anchor_ms);
+      gchar wav_tc[32];
+      const gchar *mode_name = te->audio_lane_mode == 2 ? "Track Align seed" : "Queue/Follow";
+      const gchar *edit_hint = NULL;
+
+      timeline_format_ms(display_wav_ms, wav_tc, sizeof(wav_tc));
+
+      if (te->audio_lane_drag_wav)
+          edit_hint = "editing WAV time";
+      else if (te->audio_lane_drag)
+          edit_hint = "moving switch frame";
+      else
+          edit_hint = "drag switch | Shift-drag/wheel WAV time";
+
+      if (te->audio_lane_source == 1) {
+          if (te->audio_lane_length_ms > 0) {
+              gchar len_tc[32];
+              timeline_format_ms(te->audio_lane_length_ms, len_tc, sizeof(len_tc));
+              snprintf(text, sizeof(text), "Audio: WAV slot %d  %s  switch %dfr  wav %s / %s%s",
+                       te->audio_lane_profile,
+                       mode_name,
+                       display_start_frame,
+                       wav_tc,
+                       len_tc,
+                       te->audio_lane_loop ? "  loop" : "");
+          }
+          else {
+              snprintf(text, sizeof(text), "Audio: WAV slot %d  %s  switch %dfr  wav %s",
+                       te->audio_lane_profile, mode_name, display_start_frame, wav_tc);
+          }
+      }
+      else
+          snprintf(text, sizeof(text), "Audio: JACK external  %s  switch %dfr",
+                   mode_name, display_start_frame);
+
+      cairo_set_font_size(cr, TIMELINE_INFO_FONT_SIZE);
+      timeline_draw_plain_text(cr, text, 4.0, wav_info_row_y, &color, 0.74);
+
+      if (width > 455.0)
+          timeline_draw_right_text(cr, edit_hint, width - 4.0, wav_info_row_y, &dim_fg, te->audio_lane_drag ? 0.72 : 0.46);
+
       cairo_set_font_size(cr, TIMELINE_LABEL_FONT_SIZE);
   }
 
