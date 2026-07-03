@@ -74,11 +74,6 @@ static int max_mem_ = 0;
 static int live = -1;
 static int ta = -1;
 
-#ifdef HAVE_JACK
-extern void veejay_audio_sync_thread_set_enabled(int enabled);
-extern void veejay_audio_beat_thread_set_enabled(int enabled);
-#endif
-
 static void report_bug(void)
 {
     veejay_msg(VEEJAY_MSG_WARNING, "Please report this error to veejay's issue tracker");

@@ -20,6 +20,12 @@
 #include <config.h>
 #include "vj-lib.h"
 
+#if defined(__GNUC__)
+#define VJ_LIB_LOCAL __attribute__((visibility("hidden")))
+#else
+#define VJ_LIB_LOCAL
+#endif
+
 void	veejay_set_instance( veejay_t *info );
 
 veejay_t *veejay_malloc();
@@ -56,6 +62,11 @@ void veejay_sample_set_initial_positions(veejay_t *info);
 void veejay_prepare_sample_positions(int id);
 
 int veejay_setup_video_out(veejay_t *info);
+
+VJ_LIB_LOCAL VJFrame *veejay_video_queue_reserve_buffer(veejay_t *info);
+VJ_LIB_LOCAL void veejay_video_queue_post_frame(veejay_t *info, VJFrame *vf);
+VJ_LIB_LOCAL VJFrame *veejay_video_queue_get_frame(veejay_t *info);
+VJ_LIB_LOCAL void video_queue_return_frame(veejay_t *info, VJFrame *vf);
 
 void veejay_reset_sample_positions(veejay_t *info, int sample_id);
 
@@ -143,6 +154,11 @@ void usleep_accurate(long long usec, video_playback_setup *settings);
 void	veejay_event_handle(veejay_t *info);
 
 int veejay_set_record_audio_source(veejay_t *info, int source);
+
+#ifdef HAVE_JACK
+void veejay_audio_sync_thread_set_enabled(int enabled);
+void veejay_audio_beat_thread_set_enabled(int enabled);
+#endif
 
 int veejay_audio_beat_toggle(veejay_t *info);
 int veejay_audio_beat_set_enabled(veejay_t *info, int enabled);

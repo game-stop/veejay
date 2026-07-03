@@ -1213,7 +1213,6 @@ static void vj_perform_plain_fill_buffer(veejay_t * info,performer_t *p,VJFrame 
 static void vj_perform_tag_fill_buffer(veejay_t * info, performer_t *p, VJFrame *dst, int sample_id);
 static int vj_perform_apply_secundary_tag(veejay_t * info, performer_t *p, int sample_id,int type, int chain_entry, VJFrame *src, VJFrame *dst,uint8_t *p0, uint8_t *p1, int subrender);
 static int vj_perform_apply_secundary(veejay_t * info, performer_t *p, int this_sample_id,int sample_id,int type, int chain_entry, VJFrame *src, VJFrame *dst,uint8_t *p0, uint8_t *p1, int subrender);
-extern int veejay_set_speed(veejay_t *info, int speed, int force_seek);
 static void vj_perform_tag_complete_buffers(veejay_t * info, performer_t *p, vjp_kf *effect_info, int *h, VJFrame *f0, VJFrame *f1, int sample_id, int pm, vjp_kf *setup, sample_eff_chain **chain, vj_tag *tag);
 static void vj_perform_sample_complete_buffers(veejay_t * info, performer_t *p, vjp_kf *effect_info, int *h, VJFrame *f0, VJFrame *f2, int sample_id, int pm, vjp_kf *setup, sample_eff_chain **chain, sample_info *si);
 static void vj_perform_apply_first(veejay_t *info, performer_t *p, vjp_kf *todo_info, VJFrame **frames, sample_eff_chain *entry, int e, int c, long long n_frames, void *ptr, int playmode );
@@ -17300,6 +17299,22 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
     int col_vib = atomic_load_int(&settings->color_vibrance);
     vj_perform_color_vibrancy(info->effect_frame1->data[1], info->effect_frame1->data[2],info->effect_frame1->uv_len, col_vib);
 
+
+    if(dst->len != info->effect_frame1->len || dst->uv_len != info->effect_frame1->uv_len) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[PERF] output queue frame size mismatch: src=%dx%d len=%d uv=%d ssm=%s dst=%dx%d len=%d uv=%d ssm=%s; frame dropped",
+                   info->effect_frame1->width,
+                   info->effect_frame1->height,
+                   info->effect_frame1->len,
+                   info->effect_frame1->uv_len,
+                   vj_perform_trace_ssm_name(info->effect_frame1->ssm),
+                   dst->width,
+                   dst->height,
+                   dst->len,
+                   dst->uv_len,
+                   vj_perform_trace_ssm_name(dst->ssm));
+        return 0;
+    }
 
     int strides[4] = {info->effect_frame1->len, info->effect_frame1->uv_len,info->effect_frame1->uv_len,0};
     uint8_t *input[4] = { info->effect_frame1->data[0], info->effect_frame1->data[1], info->effect_frame1->data[2], NULL };

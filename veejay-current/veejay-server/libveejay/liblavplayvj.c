@@ -2638,7 +2638,7 @@ static int veejay_cond_wait_stop_poll(video_playback_setup *settings, pthread_co
     return atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP;
 }
 
-VJFrame *veejay_video_queue_reserve_buffer(veejay_t *info)
+VJ_LIB_LOCAL VJFrame *veejay_video_queue_reserve_buffer(veejay_t *info)
 {
     video_playback_setup *settings = info->settings;
     int idx = -1;
@@ -2670,7 +2670,7 @@ VJFrame *veejay_video_queue_reserve_buffer(veejay_t *info)
     return settings->buffers[idx];
 }
 
-void veejay_video_queue_post_frame(veejay_t *info, VJFrame *vf)
+VJ_LIB_LOCAL void veejay_video_queue_post_frame(veejay_t *info, VJFrame *vf)
 {
     video_playback_setup *settings = info->settings;
     int idx = vf->queue_index;
@@ -2682,7 +2682,7 @@ void veejay_video_queue_post_frame(veejay_t *info, VJFrame *vf)
     pthread_cond_signal(&settings->renderer_wait_cv);
     pthread_mutex_unlock(&settings->mutex);
 }
-VJFrame *veejay_video_queue_get_frame(veejay_t *info)
+VJ_LIB_LOCAL VJFrame *veejay_video_queue_get_frame(veejay_t *info)
 {
     video_playback_setup *settings = info->settings;
     int idx = -1;
@@ -2714,7 +2714,7 @@ VJFrame *veejay_video_queue_get_frame(veejay_t *info)
     return settings->buffers[idx];
 }
 
-void video_queue_return_frame(veejay_t *info, VJFrame *vf)
+VJ_LIB_LOCAL void video_queue_return_frame(veejay_t *info, VJFrame *vf)
 {
     video_playback_setup *settings = info->settings;
     int idx = vf->queue_index;
@@ -7734,7 +7734,13 @@ static void *veejay_producer_thread_loop(void *ptr)
         vf->frame_num = frame;
 
 		double t_before = monotonic_now_s();
-        vj_perform_queue_video_frame(info, vf);
+        int rendered = vj_perform_queue_video_frame(info, vf);
+        if(!rendered) {
+            video_queue_return_frame(info, vf);
+            atomic_add_fetch_old_long_long(&settings->audio_osd.prod_queue_nulls, 1);
+            usleep_accurate(1000, settings);
+            continue;
+        }
         
 		double t_after = monotonic_now_s();
 		info->stats.render_duration = (t_after - t_before);
@@ -9763,9 +9769,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		veejay_msg(VEEJAY_MSG_DEBUG,"Dummy Video: %dx%d, chroma %x, framerate %2.2f, norm %s",
 					info->dummy->width,info->dummy->height, info->dummy->chroma,info->dummy->fps,
 					(info->dummy->norm == 'n' ? "NTSC" :"PAL"));
-
-		info->video_output_width = info->dummy->width;
-		info->video_output_height = info->dummy->height;
 	}
 	else
 	{
