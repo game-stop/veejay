@@ -257,5 +257,7 @@
 #define VJ_KF_PARAM_CHAIN_OPACITY 99
 #endif
 
+#define VJ_KF_ENTRY_CHAIN_FADE 0
+#define VJ_KF_PARAM_CHAIN_OPACITY 99 // also in common.h reloaded
 
 #endif

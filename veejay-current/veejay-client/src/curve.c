@@ -29,6 +29,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "curve.h"
+#include "common.h"
 #include <math.h>
 
 #ifndef M_PI
