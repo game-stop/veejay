@@ -8081,12 +8081,181 @@ void	on_add_file1_activate(GtkWidget *w, gpointer user_data)
 }
 
 
+void curve_toggleentry_activate(int selected_chain_entry, int active);
+
+static void fx_chain_sync_toggle_button(int widget_id, int active)
+{
+    GtkWidget *w = widget_cache[widget_id];
+
+    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+        return;
+
+    int old_lock = info->status_lock;
+    info->status_lock = 1;
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), active ? TRUE : FALSE);
+    info->status_lock = old_lock;
+}
+
+static void fx_chain_sync_named_toggle(const char *name, int active)
+{
+    GtkWidget *w = glade_xml_get_widget_(info->main_window, name);
+
+    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+        return;
+
+    int old_lock = info->status_lock;
+    info->status_lock = 1;
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), active ? TRUE : FALSE);
+    info->status_lock = old_lock;
+}
+
+static void fx_chain_select_clicked_entry(GtkTreeView *view, GtkTreePath *path, int entry)
+{
+    gtk_tree_view_set_cursor(view, path, NULL, FALSE);
+
+    if(info->uc.selected_chain_entry != entry) {
+        multi_vims(VIMS_CHAIN_SET_ENTRY, "%d", entry);
+        vj_midi_learning_vims_msg(info->midi, NULL, VIMS_CHAIN_SET_ENTRY, entry);
+    }
+
+    info->uc.selected_chain_entry = entry;
+    update_label_i2(widget_cache[WIDGET_LABEL_FXENTRY], entry, 0);
+
+    if(widget_cache[WIDGET_BUTTON_FX_ENTRY] &&
+       GTK_IS_SPIN_BUTTON(widget_cache[WIDGET_BUTTON_FX_ENTRY]) &&
+       get_nums2(widget_cache[WIDGET_BUTTON_FX_ENTRY]) != entry)
+    {
+        int old_lock = info->status_lock;
+        info->status_lock = 1;
+        update_spin_value2(widget_cache[WIDGET_BUTTON_FX_ENTRY], entry);
+        info->status_lock = old_lock;
+    }
+}
+
+static void fx_chain_set_icon_state(GtkTreeModel *model,
+                                    GtkTreeIter *iter,
+                                    int pixbuf_column,
+                                    int state_column,
+                                    int active)
+{
+    GdkPixbuf *pix = update_pixmap_entry(active ? 1 : 0);
+
+    gtk_list_store_set(GTK_LIST_STORE(model),
+                       iter,
+                       pixbuf_column, pix,
+                       state_column, active ? 1 : 0,
+                       -1);
+
+    if(pix)
+        g_object_unref(pix);
+}
+
+static void fx_chain_set_run_icons(GtkTreeModel *model,
+                                   GtkTreeIter *iter,
+                                   int active)
+{
+    GdkPixbuf *pix = update_pixmap_entry(active ? 1 : 0);
+
+    gtk_list_store_set(GTK_LIST_STORE(model),
+                       iter,
+                       FXC_FXSTATUS, pix,
+                       FXC_RUN_STATE, active ? 1 : 0,
+                       -1);
+
+    if(pix)
+        g_object_unref(pix);
+}
+
+static void fx_chain_mark_reloaded(void)
+{
+    info->uc.reload_hint[HINT_ENTRY] = 1;
+    info->uc.reload_hint[HINT_CHAIN] = 1;
+}
+
+static gboolean fx_chain_toggle_column(GtkTreeView *view,
+                                       GtkTreeModel *model,
+                                       GtkTreeIter *iter,
+                                       GtkTreePath *path,
+                                       int entry,
+                                       int model_column)
+{
+    int effect_id = 0;
+    int active = 0;
+    int next = 0;
+
+    gtk_tree_model_get(model, iter, FXC_EFFECT_ID, &effect_id, -1);
+
+    if(effect_id <= 0)
+        return FALSE;
+
+    fx_chain_select_clicked_entry(view, path, entry);
+
+    switch(model_column)
+    {
+        case FXC_FXSTATUS:
+        {
+            int vims_id;
+            gtk_tree_model_get(model, iter, FXC_RUN_STATE, &active, -1);
+            next = active ? 0 : 1;
+            vims_id = next ? VIMS_CHAIN_ENTRY_SET_VIDEO_ON : VIMS_CHAIN_ENTRY_SET_VIDEO_OFF;
+
+            multi_vims(vims_id, "%d %d", 0, entry);
+            vj_midi_learning_vims_msg2(info->midi, NULL, vims_id, 0, entry);
+            fx_chain_sync_toggle_button(WIDGET_BUTTON_ENTRY_TOGGLE, next);
+            fx_chain_set_run_icons(model, iter, next);
+            fx_chain_mark_reloaded();
+            vj_msg(VEEJAY_MSG_INFO, "Chain Entry %d is %s", entry, next ? "Enabled" : "Disabled");
+            return TRUE;
+        }
+
+        case FXC_BEAT:
+            gtk_tree_model_get(model, iter, FXC_BEAT_STATE, &active, -1);
+            next = active ? 0 : 1;
+            multi_vims(VIMS_CHAIN_ENTRY_BEAT_TOGGLE, "%d %d %d", 0, entry, next);
+            fx_chain_sync_toggle_button(WIDGET_CHAIN_ENTRY_BEAT_TOGGLE, next);
+            fx_chain_set_icon_state(model, iter, FXC_BEAT, FXC_BEAT_STATE, next);
+            fx_chain_mark_reloaded();
+            vj_msg(VEEJAY_MSG_INFO, "Beat control %s for FX chain entry %d", next ? "enabled" : "disabled", entry);
+            return TRUE;
+
+        case FXC_KF:
+            gtk_tree_model_get(model, iter, FXC_KF_STATUS, &active, -1);
+            next = active ? 0 : 1;
+            curve_toggleentry_activate(entry, next);
+            fx_chain_sync_toggle_button(WIDGET_CURVE_CHAIN_TOGGLEENTRY, next);
+            fx_chain_sync_named_toggle("curve_panel_toggleentry", next);
+            info->uc.reload_hint[HINT_KF] = 1;
+            fx_chain_mark_reloaded();
+            vj_msg(VEEJAY_MSG_INFO, "%s FX animation for entry %d", next ? "Enabled" : "Disabled", entry);
+            return TRUE;
+
+        case FXC_SUBRENDER:
+            gtk_tree_model_get(model, iter, FXC_SUBRENDER_STATE, &active, -1);
+            next = active ? 0 : 1;
+            multi_vims(VIMS_SUB_RENDER_ENTRY, "%d %d %d", 0, entry, next);
+            vj_midi_learning_vims_toggle3(info->midi, "subrender_entry_toggle", VIMS_SUB_RENDER_ENTRY, 0, entry);
+            fx_chain_sync_toggle_button(WIDGET_SUBRENDER_ENTRY_TOGGLE, next);
+            fx_chain_set_icon_state(model, iter, FXC_SUBRENDER, FXC_SUBRENDER_STATE, next);
+            fx_chain_mark_reloaded();
+            vj_msg(VEEJAY_MSG_INFO,
+                   "Mixing-source FX subrender %s for FX chain entry %d",
+                   next ? "enabled" : "disabled",
+                   entry);
+            return TRUE;
+
+        default:
+            break;
+    }
+
+    return FALSE;
+}
+
 gboolean on_effectchain_button_pressed (GtkWidget *tree, GdkEventButton *event, gpointer userdata)
 {
 
     int state_modifier = event->state & (GDK_SHIFT_MASK | GDK_CONTROL_MASK);
 
-    if (state_modifier && (event->type == GDK_BUTTON_PRESS) && (event->button == 1))
+    if ((event->type == GDK_BUTTON_PRESS) && (event->button == 1))
     {
         GtkTreePath *path;
         GtkTreeViewColumn *column;
@@ -8121,6 +8290,24 @@ gboolean on_effectchain_button_pressed (GtkWidget *tree, GdkEventButton *event, 
 			   info->uc.reload_hint[HINT_ENTRY] = 1;
 			   info->uc.reload_hint[HINT_CHAIN] = 1;
 			}
+            else
+            {
+                gpointer column_data = g_object_get_data(G_OBJECT(column), "model-column");
+                int model_column = column_data ? GPOINTER_TO_INT(column_data) : -1;
+
+                if(fx_chain_toggle_column(GTK_TREE_VIEW(tree),
+                                          model,
+                                          &iter,
+                                          path,
+                                          fxcid,
+                                          model_column))
+                {
+                    gtk_tree_path_free(path);
+                    return TRUE;
+                }
+            }
+
+            gtk_tree_path_free(path);
         }
     }
     return FALSE;

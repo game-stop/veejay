@@ -2060,10 +2060,15 @@ enum
     FXC_FXSTATUS = 2,
     FXC_BEAT = 3,
     FXC_KF = 4,
-    FXC_MIXING = 5,
-    FXC_SUBRENDER = 6,
-    FXC_KF_STATUS = 7,
-    FXC_N_COLS = 8,
+    FXC_SOURCE_TYPE = 5,
+    FXC_MIXING = 6,
+    FXC_SUBRENDER = 7,
+    FXC_KF_STATUS = 8,
+    FXC_EFFECT_ID = 9,
+    FXC_RUN_STATE = 10,
+    FXC_BEAT_STATE = 11,
+    FXC_SUBRENDER_STATE = 12,
+    FXC_N_COLS = 13,
 };
 
 enum {
@@ -5961,6 +5966,24 @@ static  GdkPixbuf   *update_pixmap_entry( int status )
     return icon;
 }
 
+static const char *chain_source_type_label(int effect_id, int source)
+{
+    if(effect_id <= 0 || !_effect_get_mix(effect_id))
+        return " ";
+
+    return source == 0 ? "Sample" : "Stream";
+}
+
+static void chain_channel_label(char *dst, size_t dst_len, int effect_id, int channel)
+{
+    if(effect_id <= 0 || !_effect_get_mix(effect_id)) {
+        snprintf(dst, dst_len, "%s", " ");
+        return;
+    }
+
+    snprintf(dst, dst_len, "%d", channel);
+}
+
 static void chain_clear_row(GtkListStore *store, GtkTreeIter *iter, int entry)
 {
     gtk_list_store_set(store, iter,
@@ -5969,9 +5992,14 @@ static void chain_clear_row(GtkListStore *store, GtkTreeIter *iter, int entry)
                        FXC_FXSTATUS, NULL,
                        FXC_BEAT, NULL,
                        FXC_KF, NULL,
+                       FXC_SOURCE_TYPE, " ",
                        FXC_MIXING, " ",
                        FXC_SUBRENDER, NULL,
                        FXC_KF_STATUS, 0,
+                       FXC_EFFECT_ID, 0,
+                       FXC_RUN_STATE, 0,
+                       FXC_BEAT_STATE, 0,
+                       FXC_SUBRENDER_STATE, 0,
                        -1);
 }
 
@@ -6028,18 +6056,13 @@ static gboolean chain_update_row(GtkTreeModel * model,
         {
             gchar *descr = _utf8str(_effect_get_description(effect_id));
             char tmp[128];
-            if(_effect_get_mix(effect_id))
-            {
-                snprintf(tmp, sizeof(tmp), "%s %d",
-                         (gui->uc.entry_tokens[ENTRY_SOURCE] == 0 ? "Sample " : "T "),
-                         gui->uc.entry_tokens[ENTRY_CHANNEL]);
-            }
-            else
-            {
-                snprintf(tmp, sizeof(tmp), "%s", " ");
-            }
+            chain_channel_label(tmp,
+                                sizeof(tmp),
+                                effect_id,
+                                gui->uc.entry_tokens[ENTRY_CHANNEL]);
 
             gchar *mixing = _utf8str(tmp);
+            gchar *source_type = _utf8str(chain_source_type_label(effect_id, gui->uc.entry_tokens[ENTRY_SOURCE]));
             int kf_status = gui->uc.entry_tokens[ENTRY_KF_STATUS];
             GdkPixbuf *toggle = update_pixmap_entry(gui->uc.entry_tokens[ENTRY_VIDEO_ENABLED]);
             GdkPixbuf *beat_toggle = update_pixmap_entry(gui->uc.entry_tokens[ENTRY_BEAT_FLAG]);
@@ -6052,12 +6075,18 @@ static gboolean chain_update_row(GtkTreeModel * model,
                                FXC_FXSTATUS, toggle,
                                FXC_BEAT, beat_toggle,
                                FXC_KF, kf_toggle,
+                               FXC_SOURCE_TYPE, source_type,
                                FXC_MIXING, mixing,
                                FXC_SUBRENDER, subrender_toggle,
                                FXC_KF_STATUS, kf_status,
+                               FXC_EFFECT_ID, effect_id,
+                               FXC_RUN_STATE, gui->uc.entry_tokens[ENTRY_VIDEO_ENABLED] ? 1 : 0,
+                               FXC_BEAT_STATE, gui->uc.entry_tokens[ENTRY_BEAT_FLAG] ? 1 : 0,
+                               FXC_SUBRENDER_STATE, gui->uc.entry_tokens[ENTRY_SUBRENDER_ENTRY] ? 1 : 0,
                                -1);
 
             g_free(descr);
+            g_free(source_type);
             g_free(mixing);
             if(kf_toggle)
                 g_object_unref(kf_toggle);
@@ -6841,6 +6870,7 @@ static void setup_tree_text_column( const char *tree_name, int type, const char 
 
     renderer = gtk_cell_renderer_text_new();
     column = gtk_tree_view_column_new_with_attributes( title, renderer, "text", type, NULL );
+    g_object_set_data(G_OBJECT(column), "model-column", GINT_TO_POINTER(type));
     gtk_tree_view_append_column( GTK_TREE_VIEW( tree ), column );
 
     if(len)
@@ -6857,6 +6887,7 @@ static void setup_tree_pixmap_column( const char *tree_name, int type, const cha
 
     renderer = gtk_cell_renderer_pixbuf_new();
         column = gtk_tree_view_column_new_with_attributes( title, renderer, "pixbuf", type, NULL );
+    g_object_set_data(G_OBJECT(column), "model-column", GINT_TO_POINTER(type));
     gtk_tree_view_append_column( GTK_TREE_VIEW( tree ), column );
 }
 
@@ -7154,9 +7185,20 @@ static void load_generator_info(void)
 }
 
 
+static void clear_tree_view_columns(GtkTreeView *view)
+{
+    GList *columns = gtk_tree_view_get_columns(view);
+
+    for(GList *l = columns; l; l = l->next)
+        gtk_tree_view_remove_column(view, GTK_TREE_VIEW_COLUMN(l->data));
+
+    g_list_free(columns);
+}
+
 static void setup_effectchain_info( void )
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
+    clear_tree_view_columns(GTK_TREE_VIEW(tree));
     GtkListStore *store = gtk_list_store_new(FXC_N_COLS,
                                              G_TYPE_INT,
                                              G_TYPE_STRING,
@@ -7164,7 +7206,12 @@ static void setup_effectchain_info( void )
                                              GDK_TYPE_PIXBUF,
                                              GDK_TYPE_PIXBUF,
                                              G_TYPE_STRING,
+                                             G_TYPE_STRING,
                                              GDK_TYPE_PIXBUF,
+                                             G_TYPE_INT,
+                                             G_TYPE_INT,
+                                             G_TYPE_INT,
+                                             G_TYPE_INT,
                                              G_TYPE_INT);
     gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
     g_object_unref( G_OBJECT( store ));
@@ -7174,7 +7221,8 @@ static void setup_effectchain_info( void )
     setup_tree_pixmap_column( "tree_chain", FXC_FXSTATUS, "Run");
     setup_tree_pixmap_column( "tree_chain", FXC_BEAT, "Beat");
     setup_tree_pixmap_column( "tree_chain", FXC_KF , "Anim" );
-    setup_tree_text_column( "tree_chain", FXC_MIXING, "Channel",0);
+    setup_tree_text_column( "tree_chain", FXC_SOURCE_TYPE, "Source Type",0);
+    setup_tree_text_column( "tree_chain", FXC_MIXING, "ID",0);
     setup_tree_pixmap_column( "tree_chain", FXC_SUBRENDER, "Subrender");
     GtkTreeSelection *selection;
 
@@ -7208,7 +7256,7 @@ static void setup_effectchain_info( void )
     do {                                                                     \
         for (int _i = 0; _i < SAMPLE_MAX_EFFECTS; _i++) {                    \
             gtk_list_store_append(store, &iter);                             \
-            gtk_list_store_set(store, &iter, FXC_ID, _i, -1);                \
+            chain_clear_row(store, &iter, _i);                               \
         }                                                                    \
         gtk_tree_view_set_model(GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store)); \
     } while (0)
@@ -7342,7 +7390,7 @@ static void load_effectchain_info(void)
         while (last_index < chain_entry)
         {
             gtk_list_store_append(store, &iter);
-            gtk_list_store_set(store, &iter, FXC_ID, last_index, -1);
+            chain_clear_row(store, &iter, last_index);
             last_index++;
         }
 
@@ -7353,17 +7401,10 @@ static void load_effectchain_info(void)
             gchar *utf8_name = _utf8str(name);
 
             char tmp[128];
-            if (_effect_get_mix(effect_id)) {
-                snprintf(tmp,
-                         sizeof(tmp),
-                         "%s %d",
-                         (chain_source == 0 ? "Sample " : "T "),
-                         chain_channel);
-            } else {
-                snprintf(tmp, sizeof(tmp), "%s", " ");
-            }
+            chain_channel_label(tmp, sizeof(tmp), effect_id, chain_channel);
 
             gchar *mixing = _utf8str(tmp);
+            gchar *source_type = _utf8str(chain_source_type_label(effect_id, chain_source));
 
             gtk_list_store_append(store, &iter);
 
@@ -7378,14 +7419,20 @@ static void load_effectchain_info(void)
                                FXC_FXSTATUS, toggle,
                                FXC_BEAT, beat_toggle,
                                FXC_KF, kf_togglepf,
+                               FXC_SOURCE_TYPE, source_type,
                                FXC_MIXING, mixing,
                                FXC_SUBRENDER, subrender_toggle,
                                FXC_KF_STATUS, kf_status,
+                               FXC_EFFECT_ID, effect_id,
+                               FXC_RUN_STATE, entry_enabled ? 1 : 0,
+                               FXC_BEAT_STATE, beat_enabled ? 1 : 0,
+                               FXC_SUBRENDER_STATE, subrender_entry ? 1 : 0,
                                -1);
 
             last_index++;
 
             g_free(utf8_name);
+            g_free(source_type);
             g_free(mixing);
 
             if (toggle)
@@ -7404,7 +7451,7 @@ static void load_effectchain_info(void)
     while (last_index < SAMPLE_MAX_EFFECTS)
     {
         gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, FXC_ID, last_index, -1);
+        chain_clear_row(store, &iter, last_index);
         last_index++;
     }
 
@@ -14190,14 +14237,18 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
     if (smallest_possible) {
         runtime_css = g_strdup_printf(
             "window { font-size:%s; }"
-            "frame,box,scale,spinbutton,button,radiobutton,checkbutton,entry,.vertical { padding: 0px 0px; margin: 0px; }",
+            "frame,box,scale,spinbutton,button,radiobutton,checkbutton,entry,.vertical { padding: 0px 0px; margin: 0px; }"
+            ".fx-entry-compact spinbutton,.fx-entry-compact button,.fx-entry-compact checkbutton { padding: 0px; margin: 0px; min-height: 20px; }"
+            ".fx-entry-compact entry { padding-top: 0px; padding-bottom: 0px; min-height: 18px; }",
             font_size);
     }
     else {
         runtime_css = g_strdup_printf(
             "window { font-size:%s; }"
             "frame,box { padding: 0px; }"
-            "scale,spinbutton,button,radiobutton,checkbutton,entry,.vertical { padding: %dpx; margin: %dpx; }",
+            "scale,spinbutton,button,radiobutton,checkbutton,entry,.vertical { padding: %dpx; margin: %dpx; }"
+            ".fx-entry-compact spinbutton,.fx-entry-compact button,.fx-entry-compact checkbutton { padding: 0px; margin-top: 0px; margin-bottom: 0px; min-height: 22px; }"
+            ".fx-entry-compact entry { padding-top: 0px; padding-bottom: 0px; min-height: 20px; }",
             font_size,
             pad,
             margin);

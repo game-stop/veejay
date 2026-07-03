@@ -5532,13 +5532,16 @@
                             <property name="visible">True</property>
                             <property name="can-focus">False</property>
                             <property name="orientation">vertical</property>
+                            <property name="spacing">2</property>
                             <child>
                               <object class="GtkLabel" id="label_effectname">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
-                                <property name="margin-bottom">4</property>
+                                <property name="margin-bottom">2</property>
+                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">FX name</property>
                                 <property name="use-markup">True</property>
+                                <property name="ellipsize">middle</property>
                               </object>
                               <packing>
                                 <property name="expand">False</property>
@@ -5555,16 +5558,25 @@
                                   <object class="GtkBox" id="frame_fxtree4">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
-                                    <property name="margin-bottom">8</property>
+                                    <property name="valign">center</property>
+                                    <property name="spacing">4</property>
+                                    <property name="margin-bottom">3</property>
+                                    <style>
+                                      <class name="fx-entry-compact" />
+                                    </style>
                                     <child>
                                       <object class="GtkCheckButton" id="button_entry_toggle">
                                         <property name="visible">True</property>
                                         <property name="can-focus">True</property>
+                                        <property name="valign">center</property>
                                         <property name="receives-default">False</property>
                                         <property name="tooltip-text" translatable="yes">Enable or disable the selected FX</property>
                                         <property name="active">True</property>
                                         <property name="draw-indicator">True</property>
                                         <signal name="clicked" handler="on_button_entry_toggle_clicked" swapped="no" />
+                                        <style>
+                                          <class name="smallaspossible" />
+                                        </style>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
@@ -5575,8 +5587,10 @@
                                     <child>
                                       <object class="GtkSpinButton" id="button_fx_entry">
                                         <property name="width-request">36</property>
+                                        <property name="height-request">22</property>
                                         <property name="visible">True</property>
                                         <property name="can-focus">True</property>
+                                        <property name="valign">center</property>
                                         <property name="tooltip-text" translatable="yes">Select chain entry</property>
                                         <property name="width-chars">4</property>
                                         <property name="max-width-chars">4</property>
@@ -5587,10 +5601,13 @@
                                         <property name="adjustment">fx_entry</property>
                                         <property name="climb-rate">1</property>
                                         <signal name="value-changed" handler="on_button_fx_entry_value_changed" swapped="no" />
+                                        <style>
+                                          <class name="smallaspossible" />
+                                        </style>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
-                                        <property name="fill">True</property>
+                                        <property name="fill">False</property>
                                         <property name="position">1</property>
                                       </packing>
                                     </child>
@@ -5598,6 +5615,7 @@
                                       <object class="GtkLabel" id="value_friendlyname">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
+                                        <property name="valign">center</property>
                                         <property name="width-chars">20</property>
                                         <property name="xalign">0</property>
                                       </object>
@@ -5614,6 +5632,7 @@
                                       <object class="GtkCheckButton" id="transition_enabled">
                                         <property name="visible">True</property>
                                         <property name="can-focus">True</property>
+                                        <property name="valign">center</property>
                                         <property name="receives-default">False</property>
                                         <property name="tooltip-text" translatable="yes">Switch to mixing sample at end of transition</property>
                                         <property name="draw-indicator">True</property>
@@ -5629,6 +5648,9 @@
                                             <property name="pixbuf">icon_follow.png</property>
                                           </object>
                                         </child>
+                                        <style>
+                                          <class name="smallaspossible" />
+                                        </style>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
@@ -5638,8 +5660,10 @@
                                     </child>
                                     <child>
                                       <object class="GtkSpinButton" id="transition_loop">
+                                        <property name="height-request">22</property>
                                         <property name="visible">True</property>
                                         <property name="can-focus">True</property>
+                                        <property name="valign">center</property>
                                         <property name="tooltip-text" translatable="yes">Set the number of loops before switching to mixing sample</property>
                                         <property name="width-chars">6</property>
                                         <property name="max-width-chars">6</property>
@@ -5648,6 +5672,9 @@
                                         <property name="adjustment">loop</property>
                                         <property name="climb-rate">1</property>
                                         <signal name="value-changed" handler="on_transition_loop_value_changed" swapped="no" />
+                                        <style>
+                                          <class name="smallaspossible" />
+                                        </style>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
@@ -5659,6 +5686,7 @@
                                       <object class="GtkCheckButton" id="subrender_entry_toggle">
                                         <property name="visible">True</property>
                                         <property name="can-focus">True</property>
+                                        <property name="valign">center</property>
                                         <property name="receives-default">False</property>
                                         <property name="tooltip-text" translatable="yes">Enable to render FX chain of mixing sample</property>
                                         <property name="draw-indicator">True</property>
@@ -5674,11 +5702,14 @@
                                             <property name="pixbuf">icon_render.png</property>
                                           </object>
                                         </child>
+                                        <style>
+                                          <class name="smallaspossible" />
+                                        </style>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
                                         <property name="fill">False</property>
-                                        <property name="padding">11</property>
+                                        <property name="padding">6</property>
                                         <property name="position">6</property>
                                       </packing>
                                     </child>
@@ -5686,6 +5717,7 @@
                                       <object class="GtkCheckButton" id="beat_entry_toggle">
                                         <property name="visible">True</property>
                                         <property name="can-focus">True</property>
+                                        <property name="valign">center</property>
                                         <property name="receives-default">False</property>
                                         <property name="tooltip-text" translatable="yes">Enable beat detection for this FX chain entry.</property>
                                         <property name="draw-indicator">True</property>
@@ -5701,11 +5733,14 @@
                                             <property name="pixbuf">icon_jack.png</property>
                                           </object>
                                         </child>
+                                        <style>
+                                          <class name="smallaspossible" />
+                                        </style>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
                                         <property name="fill">False</property>
-                                        <property name="padding">11</property>
+                                        <property name="padding">6</property>
                                         <property name="position">7</property>
                                       </packing>
                                     </child>
