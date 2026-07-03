@@ -38,7 +38,7 @@
 #define POLL_INTERVAL_IDLE      (25.0f)
 #define MAX_MSG                 256
 
-#define SENDVIMS_STATUS_TOKENS       133  /* lock-step with vims.h / VIMS_STATUS_TOKENS */
+#define SENDVIMS_STATUS_TOKENS       151  /* lock-step with vims.h / VIMS_STATUS_TOKENS */
 #define SENDVIMS_COMMAND_BODY_MAX     999  /* V%03dD command body-size limit */
 #define SENDVIMS_STATUS_BODY_MAX      9999 /* V%04dS status body-size limit */
 #define SENDVIMS_COMMAND_HEADER_SIZE  5
@@ -46,8 +46,8 @@
 #define SENDVIMS_SELECTOR_MAX          602
 #define SENDVIMS_SELECTOR_ALIAS_MAX    768
 
-#if SENDVIMS_STATUS_TOKENS != 133
-#error "SENDVIMS_STATUS_TOKENS must be 133 for veejay status fields 0..132"
+#if SENDVIMS_STATUS_TOKENS != 151
+#error "SENDVIMS_STATUS_TOKENS must be 151 for veejay status fields 0..150"
 #endif
 
 #define QUEUE_SIZE (1 << 8)

@@ -2,16 +2,17 @@ all: pd_linux
 
 include Makefile.defs
 
-VERSION = 0.1.5
+VERSION = 0.1.6
 
 
 .SUFFIXES: .pd_linux
 
 pd_linux: sendVIMS.pd_linux selectors.h
 
+selectors.h: parse-vims.pl vims.h
+	perl parse-vims.pl vims.h > selectors.h
 
-
-
+sendVIMS.pd_linux: selectors.h
 
 PD_CFLAGS = -DPD
 
