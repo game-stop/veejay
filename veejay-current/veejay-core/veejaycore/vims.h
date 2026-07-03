@@ -588,4 +588,7 @@ enum {
 #define VJ_AUDIO_SYNC_TRACK_STATE_HOLD          5
 #define VJ_AUDIO_SYNC_TRACK_STATE_FALLBACK      6
 
+#define VJ_KF_ENTRY_CHAIN_FADE 0
+#define VJ_KF_PARAM_CHAIN_OPACITY 99
+
 #endif
