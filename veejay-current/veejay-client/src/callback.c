@@ -28,6 +28,13 @@ dlclose( handle );
 #include "callback.h"
 #include "curve.h"
 
+#ifndef VJ_KF_ENTRY_CHAIN_FADE
+#define VJ_KF_ENTRY_CHAIN_FADE 0
+#endif
+#ifndef VJ_KF_PARAM_CHAIN_OPACITY
+#define VJ_KF_PARAM_CHAIN_OPACITY 99
+#endif
+
 
 #define AUDIO_MASTER_JACK_UI_VALUE 1
 
@@ -55,6 +62,23 @@ static void curve_live_preview_user_override(gboolean enabled)
 static gboolean G_GNUC_UNUSED curve_live_preview_user_is_overridden(void)
 {
     return curve_live_preview_user_override_state;
+}
+
+static gboolean curve_editor_local_dirty_state = FALSE;
+
+static void curve_editor_mark_local_dirty(void)
+{
+    curve_editor_local_dirty_state = TRUE;
+}
+
+static void curve_editor_clear_local_dirty(void)
+{
+    curve_editor_local_dirty_state = FALSE;
+}
+
+static gboolean curve_editor_is_local_dirty(void)
+{
+    return curve_editor_local_dirty_state;
 }
 
 static int audio_input_selector_active_from_ui(void);
@@ -6480,19 +6504,23 @@ void on_curve_clear_parameter_clicked(GtkWidget *widget, gpointer user_data)
 
     int entry = info->uc.selected_chain_entry;
     int param = info->uc.selected_parameter_id;
-
-    if (entry < 0) {
-        vj_msg(VEEJAY_MSG_INFO, "No FX entry selected for animation");
-        return;
-    }
+    int kf_entry;
 
     if (param < 0) {
         vj_msg(VEEJAY_MSG_INFO, "No FX parameter selected for animation");
         return;
     }
 
-    multi_vims(VIMS_SAMPLE_KF_CLEAR, "%d %d", entry, param);
+    kf_entry = (param == VJ_KF_PARAM_CHAIN_OPACITY) ? VJ_KF_ENTRY_CHAIN_FADE : entry;
+
+    if (kf_entry < 0) {
+        vj_msg(VEEJAY_MSG_INFO, "No FX entry selected for animation");
+        return;
+    }
+
+    multi_vims(VIMS_SAMPLE_KF_CLEAR, "%d %d", kf_entry, param);
     curve_live_preview_user_override(FALSE);
+    curve_editor_clear_local_dirty();
     info->uc.reload_hint[HINT_KF] = 1;
 }
 
@@ -6512,20 +6540,23 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
 
     const int entry = info->uc.selected_chain_entry;
     const int param = info->uc.selected_parameter_id;
-
-    if (entry < 0) {
-        vj_msg(VEEJAY_MSG_INFO, "No FX entry selected for animation");
-        return;
-    }
+    const int chain_opacity = (param == VJ_KF_PARAM_CHAIN_OPACITY);
+    const int kf_entry = chain_opacity ? VJ_KF_ENTRY_CHAIN_FADE : entry;
 
     if (param < 0) {
         vj_msg(VEEJAY_MSG_INFO, "No parameter selected for animation");
         return;
     }
 
-    const int fx_id = info->uc.entry_tokens[ENTRY_FXID];
+    if (kf_entry < 0) {
+        vj_msg(VEEJAY_MSG_INFO, "No FX entry selected for animation");
+        return;
+    }
 
-    if (fx_id <= 0) {
+    const int fx_id = info->uc.entry_tokens[ENTRY_FXID];
+    const int curve_fx_id = chain_opacity ? 0 : fx_id;
+
+    if (!chain_opacity && fx_id <= 0) {
         vj_msg(VEEJAY_MSG_INFO, "No FX set on entry %d", entry);
         return;
     }
@@ -6558,7 +6589,7 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
 
     int min = 0;
     int max = 0;
-    curve_param_minmax(fx_id, param, &min, &max);
+    curve_param_minmax(curve_fx_id, param, &min, &max);
 
     float *data = (float *) vj_calloc(sizeof(float) * length);
     if (!data) {
@@ -6587,7 +6618,7 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
                        sizeof(header),
                        KF_STORE_HEADER_FMT,
                        payload,
-                       entry,
+                       kf_entry,
                        param,
                        start,
                        end,
@@ -6618,7 +6649,7 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
     vj_client_send_buf(info->client, V_CMD, buf, bufsize);
     multi_vims(VIMS_SAMPLE_KF_STATUS_PARAM,
                "0 %d %d %d",
-               entry,
+               kf_entry,
                param,
                1);
 
@@ -6632,11 +6663,12 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
     }
 
     update_slider_state(param, TRUE);
+    curve_editor_clear_local_dirty();
 
     vj_msg(VEEJAY_MSG_INFO,
            "Saved and enabled animation for parameter %d on entry %d, start at frame %d and end at frame %d",
            param,
-           entry,
+           kf_entry,
            start,
            end);
 
@@ -6674,8 +6706,10 @@ void update_curve_shape(void)
 
     int fx_id = info->uc.entry_tokens[ENTRY_FXID];
     int param = get_vj_kf_active_parameter();
+    int chain_opacity = (param == VJ_KF_PARAM_CHAIN_OPACITY);
+    int curve_fx_id = chain_opacity ? 0 : fx_id;
 
-    if (fx_id <= 0 || param < 0) {
+    if ((!chain_opacity && fx_id <= 0) || param < 0) {
 		veejay_msg(0, "FX ID or Parameter ID not set %d %d",fx_id, param);
 		return;
 	}
@@ -6761,7 +6795,7 @@ void update_curve_shape(void)
     curve_live_preview_user_override(TRUE);
 
     curve_set_predefined_shape(info->curve,
-                               fx_id,
+                               curve_fx_id,
                                param,
                                lo,
                                hi,
@@ -6773,6 +6807,7 @@ void update_curve_shape(void)
                                detail,
                                reverse_shape,
 							   info->el.fps);
+    curve_editor_mark_local_dirty();
 }
 
 static gboolean curve_shape_seed_sensitive(int shape)
@@ -6966,6 +7001,7 @@ static void curve_set_type_from_toggle(GtkWidget *widget,
         return;
 
     set_points_in_curve(type, info->curve);
+    curve_editor_mark_local_dirty();
 }
 
 void on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
@@ -6995,16 +7031,18 @@ void on_curve_toggleentry_param_toggled(GtkWidget *widget, gpointer user_data)
         return;
 
     int entry = info->uc.selected_chain_entry;
-
-    if (entry < 0) {
-        vj_msg(VEEJAY_MSG_INFO, "No FX entry selected for animation");
-        return;
-    }
-
     int param = info->uc.selected_parameter_id;
+    int kf_entry;
 
     if (param < 0) {
         vj_msg(VEEJAY_MSG_INFO, "No FX animation parameter selected");
+        return;
+    }
+
+    kf_entry = (param == VJ_KF_PARAM_CHAIN_OPACITY) ? VJ_KF_ENTRY_CHAIN_FADE : entry;
+
+    if (kf_entry < 0) {
+        vj_msg(VEEJAY_MSG_INFO, "No FX entry selected for animation");
         return;
     }
 
@@ -7012,7 +7050,7 @@ void on_curve_toggleentry_param_toggled(GtkWidget *widget, gpointer user_data)
 
     multi_vims(VIMS_SAMPLE_KF_STATUS_PARAM,
                "0 %d %d %d",
-               entry,
+               kf_entry,
                param,
                active);
 
@@ -7136,7 +7174,7 @@ void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
         vj_kf_refresh(TRUE);
     }
 
-	if(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]) {
+    if(active_kf_id < 0 && widget_cache[WIDGET_CURVE_COMBO_ANIMATION]) {
         int osl = info->status_lock;
         info->status_lock = 1;
 

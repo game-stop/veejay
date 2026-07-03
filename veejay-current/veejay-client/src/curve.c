@@ -316,10 +316,6 @@ static int curve_clampi(int v, int lo, int hi)
     return (v < lo) ? lo : ((v > hi) ? hi : v);
 }
 
-#ifndef VJ_KF_PARAM_CHAIN_OPACITY
-#define VJ_KF_PARAM_CHAIN_OPACITY 99
-#endif
-
 void curve_param_minmax(int fx_id, int parameter_id, int *min, int *max)
 {
     if(!min || !max)
@@ -551,8 +547,11 @@ void curve_set_predefined_shape(GtkWidget *curve, int fx_id, int parameter_id,
 {
     if(shape == FX_ANIM_SHAPE_NO_SHAPE || shape < 0 || shape >= FX_ANIM_SHAPE_MAX || fx_id < 0 || parameter_id < 0)
     {
+        if(curve)
+            gtk3_curve_clear(curve);
         curve_is_empty = 1;
-        gtk_widget_queue_draw(curve);
+        if(curve)
+            gtk_widget_queue_draw(curve);
         return;
     }
 
@@ -1031,8 +1030,11 @@ void curve_set_predefined_shape(GtkWidget *curve, int fx_id, int parameter_id,
 
         case FX_ANIM_SHAPE_NO_SHAPE:
             free(vec);
+            if(curve)
+                gtk3_curve_clear(curve);
             curve_is_empty = 1;
-            gtk_widget_queue_draw(curve);
+            if(curve)
+                gtk_widget_queue_draw(curve);
             return;
 
         default:

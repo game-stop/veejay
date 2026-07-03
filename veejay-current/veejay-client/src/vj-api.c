@@ -94,13 +94,6 @@ static gpointer castIntToGpointer(int val)
 #define VJ_SEQUENCE_BANKS 4
 #endif
 
-#ifndef VJ_KF_ENTRY_CHAIN_FADE
-#define VJ_KF_ENTRY_CHAIN_FADE 0
-#endif
-#ifndef VJ_KF_PARAM_CHAIN_OPACITY
-#define VJ_KF_PARAM_CHAIN_OPACITY 99
-#endif
-
 #undef STATUS_SEQUENCE_ACTIVE_BANK
 #undef STATUS_SEQUENCE_REVISION
 #undef STATUS_SEQUENCE_SIZE
@@ -5112,6 +5105,7 @@ static void vj_kf_reset_panel(void)
 
     info->uc.selected_parameter_id = -1;
     info->uc.reload_hint_checksums[HINT_KF] = -1;
+    curve_editor_clear_local_dirty();
     vj_kf_reset_shape_combo();
 
     for( int i = 0; i < MAX_UI_PARAMETERS; i ++ )
@@ -5150,6 +5144,7 @@ static void vj_kf_select_parameter(int num)
     if(info && info->curve && GTK3_IS_CURVE(info->curve))
         curve_live_preview_user_override(FALSE);
 
+    curve_editor_clear_local_dirty();
     info->uc.selected_parameter_id = num;
     info->uc.reload_hint_checksums[HINT_KF] = -1;
 }
@@ -5292,6 +5287,11 @@ static void update_curve_widget(GtkWidget *curve)
         return;
     }
 
+    if(curve_editor_is_local_dirty()) {
+        audio_beat_update_curve_live_traces(FALSE);
+        return;
+    }
+
     multi_vims(VIMS_SAMPLE_KF_GET, "%d %d", kf_entry, selected_parameter_id);
 
     unsigned char *blob = (unsigned char*) recv_vims(8, &blen);
@@ -5351,6 +5351,7 @@ static void update_curve_widget(GtkWidget *curve)
                                   (double) info->el.fps);
                 set_points_in_curve(ui_type, curve);
                 update_slider_state(selected_parameter_id, FALSE);
+                curve_editor_clear_local_dirty();
                 if(blob) free(blob);
                 return;
             }
@@ -5371,6 +5372,7 @@ static void update_curve_widget(GtkWidget *curve)
             }
 
             update_slider_state(selected_parameter_id, status);
+            curve_editor_clear_local_dirty();
             curve_live_preview_user_override(status ? TRUE : FALSE);
         }
     }
@@ -5391,6 +5393,7 @@ static void update_curve_widget(GtkWidget *curve)
                           (double) info->el.fps);
         set_points_in_curve(ui_type, curve);
         update_slider_state(selected_parameter_id, FALSE);
+        curve_editor_clear_local_dirty();
         curve_live_preview_user_override(FALSE);
     }
 
