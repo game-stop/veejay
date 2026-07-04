@@ -31,11 +31,14 @@
 #define PS_THREAD_ID() 0
 #endif
 
-#define PS_PARAMS 3
+#define PS_PARAMS 6
 
-#define P_MODE      0
-#define P_PASS      1
-#define P_THRESHOLD 2
+#define P_MODE             0
+#define P_PASS             1
+#define P_THRESHOLD        2
+#define P_ORDER            3
+#define P_ROW_DIRECTION    4
+#define P_COLUMN_DIRECTION 5
 
 #define PS_MODE_WHITE   0
 #define PS_MODE_BLACK   1
@@ -46,6 +49,15 @@
 #define PS_PASS_ROWS_COLUMNS 1
 #define PS_PASS_COLUMNS_ONLY 2
 #define PS_PASS_ROWS_ONLY    3
+
+#define PS_ORDER_ASCENDING  0
+#define PS_ORDER_DESCENDING 1
+
+#define PS_ROW_LEFT_RIGHT 0
+#define PS_ROW_RIGHT_LEFT 1
+
+#define PS_COLUMN_TOP_BOTTOM 0
+#define PS_COLUMN_BOTTOM_TOP 1
 
 #define PS_INSERTION_LIMIT 32
 
@@ -90,26 +102,38 @@ vj_effect *pixelsort_init(int w, int h)
         return NULL;
     }
 
-    ve->limits[0][P_MODE] = 0;      ve->limits[1][P_MODE] = 3;      ve->defaults[P_MODE] = PS_MODE_BRIGHT;
-    ve->limits[0][P_PASS] = 0;      ve->limits[1][P_PASS] = 3;      ve->defaults[P_PASS] = PS_PASS_COLUMNS_ROWS;
-    ve->limits[0][P_THRESHOLD] = 0; ve->limits[1][P_THRESHOLD] = 255; ve->defaults[P_THRESHOLD] = 127;
+    ve->limits[0][P_MODE] = 0;             ve->limits[1][P_MODE] = 3;             ve->defaults[P_MODE] = PS_MODE_BRIGHT;
+    ve->limits[0][P_PASS] = 0;             ve->limits[1][P_PASS] = 3;             ve->defaults[P_PASS] = PS_PASS_COLUMNS_ROWS;
+    ve->limits[0][P_THRESHOLD] = 0;        ve->limits[1][P_THRESHOLD] = 255;      ve->defaults[P_THRESHOLD] = 127;
+    ve->limits[0][P_ORDER] = 0;            ve->limits[1][P_ORDER] = 1;            ve->defaults[P_ORDER] = PS_ORDER_ASCENDING;
+    ve->limits[0][P_ROW_DIRECTION] = 0;    ve->limits[1][P_ROW_DIRECTION] = 1;    ve->defaults[P_ROW_DIRECTION] = PS_ROW_LEFT_RIGHT;
+    ve->limits[0][P_COLUMN_DIRECTION] = 0; ve->limits[1][P_COLUMN_DIRECTION] = 1; ve->defaults[P_COLUMN_DIRECTION] = PS_COLUMN_TOP_BOTTOM;
 
     ve->description = "Asendorf Pixel Sort";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
 
-    ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Pass", "Threshold");
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Mode", "Pass", "Threshold", "Sort Order", "Row Direction", "Column Direction"
+    );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
     vje_build_value_hint_list(ve->hints, ve->limits[1][P_MODE], P_MODE, "White-ish", "Black-ish", "Bright", "Dark");
     vje_build_value_hint_list(ve->hints, ve->limits[1][P_PASS], P_PASS, "Columns then Rows", "Rows then Columns", "Columns Only", "Rows Only");
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_ORDER], P_ORDER, "Ascending", "Descending");
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_ROW_DIRECTION], P_ROW_DIRECTION, "Left to Right", "Right to Left");
+    vje_build_value_hint_list(ve->hints, ve->limits[1][P_COLUMN_DIRECTION], P_COLUMN_DIRECTION, "Top to Bottom", "Bottom to Top");
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
         VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0,    0,    0,   -1000,
         VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0,    0,    0,   -1000,
-        VJ_BEAT_DETAIL,   VJ_BEAT_F_NO_ZERO_CROSS,                 24,                 232,                8, 34, 320,  1450, 520, 52
+        VJ_BEAT_DETAIL,   VJ_BEAT_F_NO_ZERO_CROSS,                 24,                 232,                8, 34, 320,  1450, 520, 52,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0,    0,    0,   -1000,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0,    0,    0,   -1000,
+        VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0,    0,    0,   -1000
     );
 
     return ve;
@@ -167,7 +191,8 @@ static void pixelsort_csort32_range(pixelsort_worker_t *wrk,
                                     uint32_t *restrict output,
                                     unsigned int n,
                                     unsigned int lo_y,
-                                    unsigned int hi_y)
+                                    unsigned int hi_y,
+                                    int descending)
 {
     unsigned int *restrict count = wrk->count;
     unsigned int sum = 0;
@@ -178,9 +203,18 @@ static void pixelsort_csort32_range(pixelsort_worker_t *wrk,
     for(unsigned int i = 0; i < n; i++)
         count[input[i] & 0xff]++;
 
-    for(unsigned int i = lo_y; i <= hi_y; i++) {
-        sum += count[i];
-        count[i] = sum;
+    if(descending) {
+        for(unsigned int i = hi_y + 1; i > lo_y; ) {
+            i--;
+            sum += count[i];
+            count[i] = sum;
+        }
+    }
+    else {
+        for(unsigned int i = lo_y; i <= hi_y; i++) {
+            sum += count[i];
+            count[i] = sum;
+        }
     }
 
     for(unsigned int i = n; i > 0; ) {
@@ -192,16 +226,24 @@ static void pixelsort_csort32_range(pixelsort_worker_t *wrk,
     }
 }
 
-static inline void pixelsort_insertion32(uint32_t *restrict a, unsigned int n)
+static inline void pixelsort_insertion32(uint32_t *restrict a, unsigned int n, int descending)
 {
     for(unsigned int i = 1; i < n; i++) {
         const uint32_t v = a[i];
         const uint32_t key = v & 0xff;
         unsigned int j = i;
 
-        while(j > 0 && ((a[j - 1] & 0xff) > key)) {
-            a[j] = a[j - 1];
-            j--;
+        if(descending) {
+            while(j > 0 && ((a[j - 1] & 0xff) < key)) {
+                a[j] = a[j - 1];
+                j--;
+            }
+        }
+        else {
+            while(j > 0 && ((a[j - 1] & 0xff) > key)) {
+                a[j] = a[j - 1];
+                j--;
+            }
         }
 
         a[j] = v;
@@ -212,7 +254,8 @@ static inline int pixelsort_need_sort_x_range(const uint8_t *restrict Y,
                                               unsigned int base,
                                               unsigned int n,
                                               unsigned int *lo_y,
-                                              unsigned int *hi_y)
+                                              unsigned int *hi_y,
+                                              int physical_descending)
 {
     unsigned int prev = Y[base];
     unsigned int lo = prev;
@@ -222,8 +265,14 @@ static inline int pixelsort_need_sort_x_range(const uint8_t *restrict Y,
     for(unsigned int i = 1; i < n; i++) {
         const unsigned int cy = Y[base + i];
 
-        if(cy < prev)
-            need_sort = 1;
+        if(physical_descending) {
+            if(cy > prev)
+                need_sort = 1;
+        }
+        else {
+            if(cy < prev)
+                need_sort = 1;
+        }
 
         if(cy < lo)
             lo = cy;
@@ -244,7 +293,8 @@ static inline int pixelsort_need_sort_y_range(const uint8_t *restrict Y,
                                               unsigned int width,
                                               unsigned int n,
                                               unsigned int *lo_y,
-                                              unsigned int *hi_y)
+                                              unsigned int *hi_y,
+                                              int physical_descending)
 {
     unsigned int prev = Y[pos];
     unsigned int lo = prev;
@@ -256,8 +306,14 @@ static inline int pixelsort_need_sort_y_range(const uint8_t *restrict Y,
 
         const unsigned int cy = Y[pos];
 
-        if(cy < prev)
-            need_sort = 1;
+        if(physical_descending) {
+            if(cy > prev)
+                need_sort = 1;
+        }
+        else {
+            if(cy < prev)
+                need_sort = 1;
+        }
 
         if(cy < lo)
             lo = cy;
@@ -297,7 +353,8 @@ static inline void pixelsort_unpack_x(uint8_t *P[3],
                                       unsigned int n,
                                       unsigned int x,
                                       unsigned int y,
-                                      unsigned int width)
+                                      unsigned int width,
+                                      int reverse_axis)
 {
     uint8_t *restrict Y = P[0];
     uint8_t *restrict U = P[1];
@@ -305,7 +362,7 @@ static inline void pixelsort_unpack_x(uint8_t *P[3],
     const unsigned int base = y * width + x;
 
     for(unsigned int i = 0; i < n; i++) {
-        const unsigned int pos = base + i;
+        const unsigned int pos = reverse_axis ? base + (n - 1u - i) : base + i;
         const uint32_t v = src[i];
 
         Y[pos] = (uint8_t)(v & 0xff);
@@ -335,14 +392,16 @@ static inline void pixelsort_unpack_y(uint8_t *P[3],
                                       unsigned int n,
                                       unsigned int x,
                                       unsigned int y,
-                                      unsigned int width)
+                                      unsigned int width,
+                                      int reverse_axis)
 {
     uint8_t *restrict Y = P[0];
     uint8_t *restrict U = P[1];
     uint8_t *restrict V = P[2];
-    unsigned int pos = y * width + x;
 
-    for(unsigned int i = 0; i < n; i++, pos += width) {
+    for(unsigned int i = 0; i < n; i++) {
+        const unsigned int yy = reverse_axis ? y + (n - 1u - i) : y + i;
+        const unsigned int pos = yy * width + x;
         const uint32_t v = src[i];
 
         Y[pos] = (uint8_t)(v & 0xff);
@@ -357,28 +416,31 @@ static inline void pixelsort_sort_x(pixelsort_t *p,
                                     unsigned int width,
                                     unsigned int x0,
                                     unsigned int y,
-                                    unsigned int x1)
+                                    unsigned int x1,
+                                    int descending,
+                                    int reverse_axis)
 {
     const unsigned int n = x1 - x0;
     unsigned int lo_y;
     unsigned int hi_y;
     const unsigned int base = y * width + x0;
+    const int physical_descending = descending ^ reverse_axis;
 
     if(n < 2)
         return;
 
-    if(!pixelsort_need_sort_x_range(P[0], base, n, &lo_y, &hi_y))
+    if(!pixelsort_need_sort_x_range(P[0], base, n, &lo_y, &hi_y, physical_descending))
         return;
 
     pixelsort_pack_x(P, wrk->line, n, x0, y, width);
 
     if(n <= PS_INSERTION_LIMIT) {
-        pixelsort_insertion32(wrk->line, n);
-        pixelsort_unpack_x(P, wrk->line, n, x0, y, width);
+        pixelsort_insertion32(wrk->line, n, descending);
+        pixelsort_unpack_x(P, wrk->line, n, x0, y, width, reverse_axis);
     }
     else {
-        pixelsort_csort32_range(wrk, wrk->line, wrk->sorted, n, lo_y, hi_y);
-        pixelsort_unpack_x(P, wrk->sorted, n, x0, y, width);
+        pixelsort_csort32_range(wrk, wrk->line, wrk->sorted, n, lo_y, hi_y, descending);
+        pixelsort_unpack_x(P, wrk->sorted, n, x0, y, width, reverse_axis);
     }
 
     (void)p;
@@ -390,28 +452,31 @@ static inline void pixelsort_sort_y(pixelsort_t *p,
                                     unsigned int width,
                                     unsigned int x,
                                     unsigned int y0,
-                                    unsigned int y1)
+                                    unsigned int y1,
+                                    int descending,
+                                    int reverse_axis)
 {
     const unsigned int n = y1 - y0;
     unsigned int lo_y;
     unsigned int hi_y;
     const unsigned int pos = y0 * width + x;
+    const int physical_descending = descending ^ reverse_axis;
 
     if(n < 2)
         return;
 
-    if(!pixelsort_need_sort_y_range(P[0], pos, width, n, &lo_y, &hi_y))
+    if(!pixelsort_need_sort_y_range(P[0], pos, width, n, &lo_y, &hi_y, physical_descending))
         return;
 
     pixelsort_pack_y(P, wrk->line, n, x, y0, width);
 
     if(n <= PS_INSERTION_LIMIT) {
-        pixelsort_insertion32(wrk->line, n);
-        pixelsort_unpack_y(P, wrk->line, n, x, y0, width);
+        pixelsort_insertion32(wrk->line, n, descending);
+        pixelsort_unpack_y(P, wrk->line, n, x, y0, width, reverse_axis);
     }
     else {
-        pixelsort_csort32_range(wrk, wrk->line, wrk->sorted, n, lo_y, hi_y);
-        pixelsort_unpack_y(P, wrk->sorted, n, x, y0, width);
+        pixelsort_csort32_range(wrk, wrk->line, wrk->sorted, n, lo_y, hi_y, descending);
+        pixelsort_unpack_y(P, wrk->sorted, n, x, y0, width, reverse_axis);
     }
 
     (void)p;
@@ -430,7 +495,9 @@ static inline unsigned int pixelsort_row_run_##NAME(                      \
     unsigned int width,                                                   \
     unsigned int x,                                                       \
     unsigned int y,                                                       \
-    int threshold)                                                        \
+    int threshold,                                                        \
+    int descending,                                                       \
+    int reverse_axis)                                                     \
 {                                                                         \
     const unsigned int base = y * width;                                  \
                                                                           \
@@ -445,7 +512,7 @@ static inline unsigned int pixelsort_row_run_##NAME(                      \
     while(x < width && ACTIVE(base + x))                                  \
         x++;                                                              \
                                                                           \
-    pixelsort_sort_x(p, wrk, P, width, x0, y, x);                         \
+    pixelsort_sort_x(p, wrk, P, width, x0, y, x, descending, reverse_axis);\
                                                                           \
     return x < width ? x + 1 : x;                                         \
 }
@@ -459,7 +526,9 @@ static inline unsigned int pixelsort_column_run_##NAME(                   \
     unsigned int height,                                                  \
     unsigned int x,                                                       \
     unsigned int y,                                                       \
-    int threshold)                                                        \
+    int threshold,                                                        \
+    int descending,                                                       \
+    int reverse_axis)                                                     \
 {                                                                         \
     unsigned int pos = y * width + x;                                     \
                                                                           \
@@ -478,7 +547,7 @@ static inline unsigned int pixelsort_column_run_##NAME(                   \
         pos += width;                                                     \
     }                                                                     \
                                                                           \
-    pixelsort_sort_y(p, wrk, P, width, x, y0, y);                         \
+    pixelsort_sort_y(p, wrk, P, width, x, y0, y, descending, reverse_axis);\
                                                                           \
     return y < height ? y + 1 : y;                                        \
 }
@@ -499,7 +568,9 @@ static void pixelsort_rows_##NAME(                                        \
     uint8_t *P[3],                                                        \
     unsigned int width,                                                   \
     unsigned int height,                                                  \
-    int threshold)                                                        \
+    int threshold,                                                        \
+    int descending,                                                       \
+    int reverse_axis)                                                     \
 {                                                                         \
     PS_OMP_FOR                                                            \
     for(int yi = 0; yi < (int)height; yi++) {                             \
@@ -509,7 +580,7 @@ static void pixelsort_rows_##NAME(                                        \
                                                                           \
         while(x < width) {                                                \
             const unsigned int nx = pixelsort_row_run_##NAME(             \
-                p, wrk, P, width, x, y, threshold);                       \
+                p, wrk, P, width, x, y, threshold, descending, reverse_axis);\
                                                                           \
             x = nx <= x ? x + 1 : nx;                                     \
         }                                                                 \
@@ -522,7 +593,9 @@ static void pixelsort_columns_##NAME(                                     \
     uint8_t *P[3],                                                        \
     unsigned int width,                                                   \
     unsigned int height,                                                  \
-    int threshold)                                                        \
+    int threshold,                                                        \
+    int descending,                                                       \
+    int reverse_axis)                                                     \
 {                                                                         \
     PS_OMP_FOR                                                            \
     for(int xi = 0; xi < (int)width; xi++) {                              \
@@ -532,7 +605,7 @@ static void pixelsort_columns_##NAME(                                     \
                                                                           \
         while(y < height) {                                               \
             const unsigned int ny = pixelsort_column_run_##NAME(          \
-                p, wrk, P, width, height, x, y, threshold);               \
+                p, wrk, P, width, height, x, y, threshold, descending, reverse_axis);\
                                                                           \
             y = ny <= y ? y + 1 : ny;                                     \
         }                                                                 \
@@ -554,21 +627,23 @@ static inline void pixelsort_rows(pixelsort_t *p,
                                   unsigned int width,
                                   unsigned int height,
                                   int mode,
-                                  int threshold)
+                                  int threshold,
+                                  int descending,
+                                  int reverse_axis)
 {
     switch(mode) {
         case PS_MODE_WHITE:
-            pixelsort_rows_white(p, P, width, height, threshold);
+            pixelsort_rows_white(p, P, width, height, threshold, descending, reverse_axis);
             break;
         case PS_MODE_BLACK:
-            pixelsort_rows_black(p, P, width, height, threshold);
+            pixelsort_rows_black(p, P, width, height, threshold, descending, reverse_axis);
             break;
         case PS_MODE_DARK:
-            pixelsort_rows_dark(p, P, width, height, threshold);
+            pixelsort_rows_dark(p, P, width, height, threshold, descending, reverse_axis);
             break;
         case PS_MODE_BRIGHT:
         default:
-            pixelsort_rows_bright(p, P, width, height, threshold);
+            pixelsort_rows_bright(p, P, width, height, threshold, descending, reverse_axis);
             break;
     }
 }
@@ -578,21 +653,23 @@ static inline void pixelsort_columns(pixelsort_t *p,
                                      unsigned int width,
                                      unsigned int height,
                                      int mode,
-                                     int threshold)
+                                     int threshold,
+                                     int descending,
+                                     int reverse_axis)
 {
     switch(mode) {
         case PS_MODE_WHITE:
-            pixelsort_columns_white(p, P, width, height, threshold);
+            pixelsort_columns_white(p, P, width, height, threshold, descending, reverse_axis);
             break;
         case PS_MODE_BLACK:
-            pixelsort_columns_black(p, P, width, height, threshold);
+            pixelsort_columns_black(p, P, width, height, threshold, descending, reverse_axis);
             break;
         case PS_MODE_DARK:
-            pixelsort_columns_dark(p, P, width, height, threshold);
+            pixelsort_columns_dark(p, P, width, height, threshold, descending, reverse_axis);
             break;
         case PS_MODE_BRIGHT:
         default:
-            pixelsort_columns_bright(p, P, width, height, threshold);
+            pixelsort_columns_bright(p, P, width, height, threshold, descending, reverse_axis);
             break;
     }
 }
@@ -611,22 +688,25 @@ void pixelsort_apply(void *ptr, VJFrame *frame, int *args)
     const int mode = args[P_MODE];
     const int pass = args[P_PASS];
     const int threshold = args[P_THRESHOLD];
+    const int descending = args[P_ORDER] == PS_ORDER_DESCENDING;
+    const int reverse_x = args[P_ROW_DIRECTION] == PS_ROW_RIGHT_LEFT;
+    const int reverse_y = args[P_COLUMN_DIRECTION] == PS_COLUMN_BOTTOM_TOP;
 
     switch(pass) {
         case PS_PASS_ROWS_COLUMNS:
-            pixelsort_rows(p, P, width, height, mode, threshold);
-            pixelsort_columns(p, P, width, height, mode, threshold);
+            pixelsort_rows(p, P, width, height, mode, threshold, descending, reverse_x);
+            pixelsort_columns(p, P, width, height, mode, threshold, descending, reverse_y);
             break;
         case PS_PASS_COLUMNS_ONLY:
-            pixelsort_columns(p, P, width, height, mode, threshold);
+            pixelsort_columns(p, P, width, height, mode, threshold, descending, reverse_y);
             break;
         case PS_PASS_ROWS_ONLY:
-            pixelsort_rows(p, P, width, height, mode, threshold);
+            pixelsort_rows(p, P, width, height, mode, threshold, descending, reverse_x);
             break;
         case PS_PASS_COLUMNS_ROWS:
         default:
-            pixelsort_columns(p, P, width, height, mode, threshold);
-            pixelsort_rows(p, P, width, height, mode, threshold);
+            pixelsort_columns(p, P, width, height, mode, threshold, descending, reverse_y);
+            pixelsort_rows(p, P, width, height, mode, threshold, descending, reverse_x);
             break;
     }
 }
