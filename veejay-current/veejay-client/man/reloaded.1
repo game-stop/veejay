@@ -1,4 +1,4 @@
-.TH GVEEJAY-RELOADED 1 "June 2026" "Veejay" "User Commands"
+.TH GVEEJAY-RELOADED 1 "July 2026" "Veejay" "User Commands"
 .SH NAME
 Gveejay Reloaded \- graphical live-performance interface for Veejay
 .SH SYNOPSIS
@@ -12,18 +12,18 @@ Gveejay Reloaded \- graphical live-performance interface for Veejay
 .RI [ OPTIONS ]
 .SH DESCRIPTION
 .B Gveejay Reloaded
-is the GTK3 graphical interface for Veejay.  It is a client for a running
+is the GTK3 graphical interface for Veejay. It is a client for a running
 Veejay server and can connect to, control, and disconnect from that server
 while Veejay continues to run.
 .PP
 Reloaded is intended for live video performance, sample-bank operation,
 stream control, effect-chain editing, FX animation, MIDI learning, VIMS
-messaging, preview management, recording, audio beat detection, and external
-audio synchronisation.
+messaging, preview management, recording, audio beat detection, external audio
+synchronisation, and per-sample audio routing.
 .PP
-The interface is status-driven.  Many controls are refreshed from backend
-status messages.  When a button, list entry, toggle, slider, or curve appears
-to return to a backend value, the backend state is normally authoritative.
+The interface is status-driven. Many controls are refreshed from backend status
+messages. When a button, list entry, toggle, slider, or curve returns to a
+backend value, the backend state is normally authoritative.
 .SH OPTIONS
 .TP
 .BR -a , " --auto-connect"
@@ -36,10 +36,10 @@ Enable beta UI features.
 Place the main window at screen position \fIX,Y\fR.
 .TP
 .BR -h , " --host " \fIHOST\fR
-Connect to the given Veejay host.  The default host is localhost.
+Connect to the given Veejay host. The default host is localhost.
 .TP
 .BR -L , " --lowband"
-Use a low-bandwidth mode.  This disables image loading in the sample bank.
+Use a low-bandwidth mode. This disables image loading in the sample bank.
 .TP
 .BR -m , " --midi " \fIFILE\fR
 Load a MIDI configuration file.
@@ -48,15 +48,21 @@ Load a MIDI configuration file.
 Disable coloured text in console logs.
 .TP
 .BR -p , " --port " \fIPORT\fR
-Connect to the given Veejay port.  The default is the compiled default port,
+Connect to the given Veejay port. The default is the compiled default port,
 typically 3490.
 .TP
 .BR -P , " --preview " \fIN\fR
-Start with preview enabled.  Accepted values are 1 for full size, 2 for half
+Start with preview enabled. Accepted values are 1 for full size, 2 for half
 size, 3 for quarter size, and 4 for one eighth size.
 .TP
-.BR -s , " --size " \fICxR\fR
-Set the sample-bank grid resolution as columns by rows.
+.BR --sample-pages " " \fIN\fR
+Allocate \fIN\fR sample-bank pages. The default is 12 pages. The maximum is
+512 pages.
+.TP
+.BR -s , " --size " \fIN\fR "|" \fICxR\fR "|" \fIC:R\fR "|" \fIC,R\fR
+Set sample-bank pages or layout. A single integer sets the number of pages.
+A two-number form sets columns and rows. The default layout is 6x2 with 12
+pages.
 .TP
 .BR -v , " --verbose"
 Enable more verbose logging.
@@ -69,36 +75,36 @@ then exit.
 Set the number of multitrack tracks.
 .TP
 .BR -t , " --theme " \fIFILE\fR
-Load a CSS stylesheet.  Use \fBsystem\fR to use the system default theme.
+Load a CSS stylesheet. Use \fBsystem\fR to use the system default theme.
 .TP
 .BR -S , " --small-as-possible"
 Create the smallest possible UI layout.
 .TP
 .BR -f , " --faster-ui"
-Hide unused FX parameter sliders instead of disabling them.  This reduces GTK
-CPU usage on GTK 3.22.30 and newer builds.  This option is available only when
+Hide unused FX parameter sliders instead of disabling them. This reduces GTK
+CPU usage on GTK 3.22.30 and newer builds. This option is available only when
 Reloaded was built against a GTK version that supports it.
 .SH USER INTERFACE OVERVIEW
 The main window is arranged around a live preview, transport controls, a
 sample bank, the sequence play grid, effect controls, audio controls, status
-indicators, and several notebook panels.  The exact panel visibility depends
-on the current play mode, selected sample or stream, backend status, compile-
-time features, and command-line layout options.
+indicators, and several notebook panels. The exact panel visibility depends on
+the current play mode, selected sample or stream, backend status, compile-time
+features, and command-line layout options.
 .PP
 The top-level menus expose file loading and saving, sample actions, stream
 creation, MIDI learning, preferences, video settings, image calibration, VIMS
 bundles, help, bug reporting, and application exit.
 .PP
-The status bar and console logs are part of the UI contract.  Refresh, reset,
+The status bar and console logs are part of the UI contract. Refresh, reset,
 screenshot, background-mask, beat-detector, audio-sync, sequence-bank, and
-VIMS actions should report when the click landed.  If the visible UI appears
+VIMS actions should report when the click landed. If the visible UI appears
 unchanged after an action, check the status bar and backend log first.
 .SH CONNECTION AND PREVIEW
-Reloaded can connect to a local or remote Veejay server by host and port.  It
+Reloaded can connect to a local or remote Veejay server by host and port. It
 can also auto-connect to locally running instances when requested.
 .PP
 Preview can be enabled at startup with \fB--preview\fR or toggled from the UI.
-Preview quality uses the levels full, half, quarter, and one eighth.  The
+Preview quality uses the levels full, half, quarter, and one eighth. The
 preview panel also exposes greyscale and alpha-only preview modes, preview
 speed, preview scale, and preview dimensions where available.
 .PP
@@ -109,8 +115,8 @@ The transport controls provide forward playback, backward playback, stop,
 previous and next frame, previous and next second, and jump-to-start or
 jump-to-end actions.
 .PP
-The timeline and marker area use local frame indices.  Selection in/out
-markers are inclusive: a marker from 0 to 20 covers frames 0 through 20.
+The timeline and marker area use local frame indices. Selection in/out markers
+are inclusive: a marker from 0 to 20 covers frames 0 through 20.
 .TP
 .B Left mouse button on the playhead triangle
 Move or drag the playhead.
@@ -122,15 +128,15 @@ Set or drag the IN point.
 Set or drag the OUT point.
 .TP
 .B Middle mouse button inside a selection
-Enter bound scratch mode.  The selection moves as a rigid block; wheel input
-resizes the marker while the scratch box is active.  Middle-click again to
+Enter bound scratch mode. The selection moves as a rigid block; wheel input
+resizes the marker while the scratch box is active. Middle-click again to
 leave the mode.
 .TP
 .B Double left click
 Clear the current local selection.
 .TP
 .B Mouse wheel
-Move the playhead by the default frame step.  Wheel input is ignored while a
+Move the playhead by the default frame step. Wheel input is ignored while a
 mouse button is physically held.
 .TP
 .B Ctrl + mouse wheel
@@ -139,12 +145,12 @@ Move the playhead by about one second.
 .B Shift + mouse wheel
 Move the playhead by about two seconds.
 .PP
-The speed slider controls playback speed.  The slow-motion slider divides the
-current frame rate by the selected multiplier.  Ctrl-clicking these sliders
+The speed slider controls playback speed. The slow-motion slider divides the
+current frame rate by the selected multiplier. Ctrl-clicking these sliders
 resets them to neutral.
 .SH SAMPLE BANK
-The sample bank provides quick access to sample and stream slots.  Slots can
-be selected, played, and populated from selected sources.
+The sample bank provides quick access to sample and stream slots. Slots can be
+selected, played, and populated from selected sources.
 .TP
 .B Left or right click
 Play a slot.
@@ -158,8 +164,9 @@ Play the sample or stream in the slot.
 .B Shift + left click on a populated slot
 Set the slot as the current mixing channel.
 .PP
-The active bank selector changes the visible sample-bank page.  The bank can
-be run in repeat mode.  In low-bandwidth mode, sample images are not loaded.
+The active bank selector changes the visible sample-bank page. The default
+layout is 6 columns by 2 rows. The default number of pages is 12. In
+low-bandwidth mode, sample images are not loaded.
 .SH SAMPLE AND STREAM PANELS
 The sample panel shows sample title, start and end positions, playback speed,
 slow-motion multiplier, hold-frame controls, sample audio volume, transitions,
@@ -174,16 +181,16 @@ selected source supports those controls.
 Live capture controls include brightness, contrast, hue, saturation, gamma,
 gain, RGB balance, automatic white balance, sharpness, backlight compensation,
 automatic gain, automatic hue, temperature, flips, exposure, black level, and
-whiteness.  Unsupported camera controls may be hidden or insensitive.
+whiteness. Unsupported camera controls may be hidden or insensitive.
 .SH SEQUENCE PLAY GRID
 The sequence play grid contains four sequence banks, each with one hundred
-slots.  It is designed for arranging and repeating a bank chain during live
+slots. It is designed for arranging and repeating a bank chain during live
 performance or recording.
 .PP
 The toolbar contains \fBPlay Grid\fR, sequence recording controls, bank toggles,
 \fBClear Bank\fR, \fBClear All\fR, \fBCopy Bank\fR, \fBPaste Bank\fR, and
-\fBRefresh\fR.  Checking a bank includes it in chained playback and also makes
-it the active bank.  The active bank stays checked.
+\fBRefresh\fR. Checking a bank includes it in chained playback and also makes
+it the active bank. The active bank stays checked.
 .TP
 .B Left click on a bank header
 Select and activate that bank.
@@ -234,7 +241,7 @@ Copy or paste a whole sequence bank.
 Tooltips on cells identify the assigned sample or stream, title, source type,
 length where available, bank number, and slot number.
 .SH EFFECTS AND FX CHAIN
-The FX panel lists available effects and exposes the current chain.  Effects
+The FX panel lists available effects and exposes the current chain. Effects
 are grouped into mixing effects, image effects, alpha effects, video effects,
 and related categories.
 .TP
@@ -251,29 +258,42 @@ Add the effect to the selected sample.
 Filter the effects list by text.
 .PP
 Each selected effect exposes up to sixteen parameters, named p0 through p15
-unless the effect supplies more specific names.  Parameter sliders, increment
+unless the effect supplies more specific names. Parameter sliders, increment
 and decrement controls, RGB key controls, opacity controls, and mixing-source
 controls are updated from the selected chain entry.
 .PP
 The FX chain panel can enable or disable effect-chain processing for the
-current sample or stream.  Global chain controls, chain copy, and chain level
+current sample or stream. Global chain controls, chain copy, and chain level
 controls apply to shared chain operations.
 .PP
-Beat-aware FX entries have a beat-control toggle.  Enabling beat control marks
-the selected chain entry as eligible for beat-guided Auto FX modulation.  The
+Beat-aware FX entries have a beat-control toggle. Enabling beat control marks
+the selected chain entry as eligible for beat-guided Auto FX modulation. The
 beat detector can also enable this toggle automatically when a compatible beat
 action is selected.
 .SH FX ANIMATION CURVE
 The FX animation panel edits parameter animation curves for the selected FX
-chain entry and selected parameter.  It provides start and end positions,
-linear, spline, and freehand modes, per-parameter enable/disable, chain-entry
-enable/disable, and predefined shape generation.
+chain entry and selected parameter. It provides start and end positions,
+linear, spline, and freehand modes, per-parameter enable/disable,
+chain-entry enable/disable, predefined shape generation, and live preview
+traces.
 .PP
-The selected FX parameter combo chooses the animated parameter.  The animation
-list shows stored animation entries.  Bound-min and bound-max controls restrict
-the generated animation range before the curve is stored.  The reverse toggle
-flips generated shapes vertically.  The curve preview is disposable until it
-is stored; after storage, backend status remains authoritative.
+The selected FX parameter combo chooses the animated parameter. A special chain
+opacity target may be edited without requiring a normal FX id. For normal FX
+parameters, a valid selected chain entry and effect are required.
+.PP
+Start and end positions are frame numbers. If the end position is lower than
+the start position, Reloaded stores the animation over the same inclusive range
+with the endpoints swapped. If both positions are equal, nothing is stored.
+.PP
+The curve editor has two visible states. With no parameter selected, it shows
+the live beat or FX overview. With a parameter selected, it edits that
+parameter and shows the stored or previewed curve for the current entry.
+.PP
+Predefined shapes immediately switch the editor into freehand curve data and
+mark the curve locally dirty. Shape generation uses the current sample or
+stream range, the selected parameter's legal min/max range, bound-min and
+bound-max, the Steps value, Seed, Detail, and Reverse. The generated preview is
+local until it is stored.
 .PP
 Predefined shapes include No shape, Bounce, Burst Envelope, Cosine, Sine,
 Damped Sine, Ease In, Ease Out, Exponential, Gaussian, Noise, Pulse, Ramp Drop,
@@ -281,56 +301,145 @@ Random Burst, Random Inertia, Random Mean, Random Quantized, Random Smooth,
 Random Walk, Sawtooth, Shape Steps, Smooth, Smooth Noise, Square, and ZigZag.
 .PP
 The Steps control changes the number of shape repetitions or quantisation
-steps, depending on the selected shape.  The Seed control affects random and
-noise-based shapes.  The Detail control affects generated shape detail.  The
-Shuffle button chooses a new seed and attempts to avoid visually identical
-random motifs when possible.
+steps, depending on the selected shape. The Seed control affects random and
+noise-based shapes. The Detail control affects generated shape detail. The
+Shuffle button tries new seeds and avoids visually identical random motifs
+when possible.
+.TP
+.B Store
+Serialises the visible curve over the inclusive frame range, clamps every
+point to the selected parameter's legal min/max, sends the keyframe packet to
+the backend, enables the parameter animation, and leaves the stored curve in
+live-preview override mode.
+.TP
+.B Enable parameter
+Enable or disable animation for the selected parameter on the selected entry.
+This does not create a new curve by itself.
+.TP
+.B Enable entry
+Enable or disable FX animation for the selected chain entry. The same state is
+mirrored between the FX chain and FX animation controls.
+.TP
+.B Clear parameter
+Clear only the selected parameter animation for the current keyframe entry.
+.TP
+.B Clear entry
+Reset all keyframes for the selected FX entry.
 .PP
-The curve widget can draw live traces for beat and FX animation preview.  Live
-beat overview is shown when no FX parameter is selected.  When a parameter is
-selected, the trace follows the selected parameter and currently active
-backend animation state.
-.SH AUDIO SOURCE, VOLUME, AND MIXING
-Reloaded keeps three audio concerns separate: per-sample audio volume, JACK
-master volume, and audio mixing route.
-.TP
-.B Sample volume
-Controls the audio level stored for the current sample.  It is available in
-sample mode and follows backend sample-volume status.
-.TP
-.B JACK master volume
-Controls the JACK external master level.  It is visible and active when JACK
-external audio is selected as the audio source or sync provider.
-.TP
-.B Audio mixer mode
-Chooses how the audible route is mixed when JACK external audio is selected.
-The modes are Follow, Original, JACK, and Original + JACK.
-.TP
-.B Audio mixer crossfade
-Controls the Original/JACK blend in manual mixer modes.  Original forces the
-crossfade to 0, JACK forces it to 100, and Original + JACK defaults to the
-middle when the current value is at an endpoint.  The crossfade is inactive in
-Follow mode and when JACK is not the active external master.
+The curve widget shows frame, value, and timecode near the active marker. Live
+traces can be shown as underlays or as the current live overview. User edits
+and stored curves can override the live trace until a later backend refresh or
+clear operation restores backend-authoritative display.
+.SH AUDIO OUTPUT
+Reloaded's audio controls are split into global default output, per-sample
+overrides, JACK master level, and recording source. These are separate
+concepts and should not be treated as one volume or route.
 .PP
-The audio source selector chooses Original video audio, JACK external, WAV
-file, or Silence.  Selecting JACK or WAV can also prepare the corresponding
-external sync provider.  Selecting Silence disables beat analysis actions that
-require an audio source.
+The global audio source selector chooses the default source used when the
+current sample does not have its own saved audio route:
+.TP
+.B Original video audio
+Use the audio track associated with the current sample or stream.
+.TP
+.B JACK external
+Use JACK as the external audio provider. The JACK master volume control sends
+the external master volume only while this source is selected.
+.TP
+.B WAV file
+Use a configured WAV file as the external audio provider. WAV paths are stored
+through the WAV profile controls described below.
+.TP
+.B Silence
+Use no audible source. Silence cannot be analysed by the beat detector.
+.PP
+Selecting Original disables external playback and returns the sync mode to off.
+Selecting JACK or WAV makes the external-provider controls relevant. Selecting
+WAV also exposes the WAV path, loop, and profile controls.
+.PP
+The status area reports whether the active route is global, internal beat
+analysis, an external JACK/WAV route, or a sample-specific route.
+.SH AUDIO MIXING
+The audio mixer chooses how Original audio and the external provider are heard
+when the global default route is active. It is independent from per-sample
+audio-route storage.
+.TP
+.B Follow
+Follow the backend/default route. The manual route radio buttons are disabled
+and the crossfade is inactive.
+.TP
+.B Original
+Force Original audio for the audible route. The crossfade is set to 0.
+.TP
+.B External / JACK
+Force the external provider for the audible route. The crossfade is set to
+100. The label may refer to JACK even when the external-provider source is a
+WAV profile, because both are handled as the external master route.
+.TP
+.B Original + External
+Mix Original and the external provider. If the crossfade is still at an
+endpoint, Reloaded moves it to 50 when this mode is selected.
+.TP
+.B Crossfade
+Controls the Original/External blend only in Original + External mode. It is
+inactive in Follow, Original, and External-only modes.
+.PP
+Mixer mode and crossfade are restored from backend status. Manual changes send
+separate VIMS updates for mixer mode and, when needed, crossfade.
+.SH WAV PROFILES AND PER-SAMPLE AUDIO ROUTES
+Reloaded has four WAV profile slots. A profile stores a WAV path and whether
+that WAV should loop. The path must be safe for VIMS transport; paths with the
+VIMS command separator or control newlines are rejected.
+.TP
+.B WAV profile slot 1 .. 4
+Store or clear a WAV path and loop flag. These slots are reusable global
+profiles; they are also the selectable WAV sources for per-sample routes.
+.TP
+.B Sample source: Follow global/default
+Clear the sample's own audio route. The sample then uses the global default
+source.
+.TP
+.B Sample source: Original
+Save an explicit original-audio override for the sample.
+.TP
+.B Sample source: WAV
+Bind the sample to one of WAV profile slots 1 through 4. Slot 0 means no WAV
+profile and cannot arm a WAV sample route.
+.TP
+.B Sample source: JACK
+Bind the sample to JACK external audio.
+.TP
+.B Sample source: Silence
+Bind the sample to silence from a stored frame anchor.
+.PP
+Per-sample external routes use the same external mode names as global Audio
+Sync: Queue/Monitor, Analyze External Tempo, Clean Monitor, Monitor +
+Trickplay, Visual Tempo Follow, Tempo Match Bridge, and Track Align.
+.PP
+.B Set Here
+stores the selected sample route at the current video frame. For WAV routes it
+also stores the current WAV anchor in milliseconds. The status label reports
+routes such as Sample Original, WAV slot N with mode and switch frame, JACK
+with mode and switch frame, or Silence with switch frame.
+.PP
+.B Rearm
+re-sends the saved route for the selected sample. For WAV routes, the selected
+profile must be greater than 0. Clearing a sample route returns it to
+Follow global/default.
 .SH AUDIO BEAT DETECTOR
 The Audio Beat Detector analyses the selected audio source and can drive visual
-and transport actions.  It analyses Original video audio when that source is
+and transport actions. It analyses Original video audio when that source is
 selected, or the selected JACK/WAV external provider when JACK or WAV is used.
 Silence cannot be analysed.
 .TP
 .B Enable beat detector
-Start or stop beat analysis.  Enabling it may adjust sync controls to keep the
+Start or stop beat analysis. Enabling it may adjust sync controls to keep the
 chosen source/action combination valid.
 .TP
 .B Action: none
 Analyse without beat-driven transport or Auto FX action.
 .TP
 .B Action: auto FX
-Drive beat-aware FX modulation only.  This is the safe beat action for Original
+Drive beat-aware FX modulation only. This is the safe beat action for Original
 video audio.
 .TP
 .B Action: break beat (Auto FX)
@@ -338,7 +447,7 @@ Use Break Beat transport/scratch behaviour and keep Auto FX modulation active.
 This action requires JACK external or WAV input.
 .TP
 .B Action: break beat
-Use Break Beat transport/scratch behaviour without Auto FX modulation.  This
+Use Break Beat transport/scratch behaviour without Auto FX modulation. This
 action requires JACK external or WAV input.
 .TP
 .B Input channels
@@ -346,14 +455,14 @@ Set the number of external input channels analysed when JACK is the selected
 provider.
 .TP
 .B Threshold
-Set the transient strength required to accept a beat or break-beat hit.  The
+Set the transient strength required to accept a beat or break-beat hit. The
 label changes with the selected action.
 .TP
 .B Cooldown
 Set the minimum time between accepted beat hits or break-beat turns.
 .TP
 .B Hold Window
-Set the open/hold window used by Break Beat.  It is inactive for Auto FX only.
+Set the open/hold window used by Break Beat. It is inactive for Auto FX only.
 .TP
 .B Pulse
 Set the short pulse envelope used by beat-aware FX and Break Beat scratch
@@ -363,7 +472,7 @@ emphasis.
 Set the held gate or repeat-memory window used by beat-aware FX and Break Beat.
 .TP
 .B Auto FX mode
-Choose off, primary, primary + motion, motion + memory, or chaos.  Higher modes
+Choose off, primary, primary + motion, motion + memory, or chaos. Higher modes
 select more motion, memory, and chaos-oriented beat-hint roles.
 .TP
 .B Auto FX amount
@@ -377,32 +486,33 @@ Pause Break Beat response when the selected source is lost.
 .TP
 .B Monitor latency / Auto latency
 Automatically estimate monitor latency for the JACK monitor path, or disable
-auto latency and calibrate it manually.  Manual latency is available only for
+auto latency and calibrate it manually. Manual latency is available only for
 Break Beat actions.
 .TP
 .B Refresh
-Request a fresh Audio Beat status print from the backend.  This refreshes
+Request a fresh Audio Beat status print from the backend. This refreshes
 analysis state reporting but does not rebuild Auto FX mapping.
 .TP
 .B Reset Auto FX
-Forget the current automatic FX mapping.  The next beat or update rebuilds the
+Forget the current automatic FX mapping. The next beat or update rebuilds the
 Auto FX target set from the current effect chain.
 .PP
 Live beat values show level, envelope, transient, flux, bass, mid, high, gate,
 pulse, estimated BPM, accepted hit count, age since last accepted hit, sample
 rate, monotonic hit sequence, and monitor latency.
 .SH AUTO FX
-Auto FX maps the current chain using beat hints.  Beat hints are role metadata
-supplied by effects.  The automatic mode determines how aggressively parameter
-roles are selected.  The automatic amount controls the global intensity of
+Auto FX maps the current chain using beat hints. Beat hints are role metadata
+supplied by effects. The automatic mode determines how aggressively parameter
+roles are selected. The automatic amount controls the global intensity of
 beat-driven modulation.
 .PP
-Auto FX does not replace manual FX editing.  It modulates eligible parameters
-on beat-controlled entries while the underlying effect parameters remain
-visible and manually adjustable.
+Auto FX does not replace manual FX editing. It modulates eligible parameters on
+beat-controlled entries while the underlying effect parameters remain visible
+and manually adjustable.
 .SH AUDIO SYNC
-The Audio Sync panel controls external audio analysis, monitoring, and
-synchronisation.  The external provider can be JACK input or a WAV file.
+The Audio Sync panel controls external audio analysis, monitoring,
+synchronisation, and per-sample route state. The external provider can be JACK
+input or one of the configured WAV profile slots.
 .PP
 Audio sync modes include:
 .TP
@@ -411,7 +521,7 @@ Disable external audio synchronisation and return to the last non-external
 master source where applicable.
 .TP
 .B Analyze External Tempo
-Listen to the external provider only.  This exports BPM, phase, and control
+Listen to the external provider only. This exports BPM, phase, and control
 information without forcing external audio playback.
 .TP
 .B Clean Monitor
@@ -426,34 +536,38 @@ Drive video timing and beat-aware FX from the external tempo without stretching
 the external audio.
 .TP
 .B Tempo Match Bridge
-Stretch the external audio to match the target tempo and phase.  Controls
+Stretch the external audio to match the target tempo and phase. Controls
 include target BPM, phase, confidence, and maximum correction.
 .TP
 .B Track Align
 Use waveform correlation to align the selected clip or video against the
 external master track.
 .PP
-The source selector chooses JACK or WAV as the external provider source.  WAV
-mode uses the configured path and optional looping.  The status area shows
-enabled, open, running, mode, source, channel count, sample rate, BPM,
-confidence, bridge activity, ratio, correction, target BPM, target confidence,
-maximum correction, bridge state, track lock, track offset, track confidence,
-track correction, track state, phase, level, and transient information.
+The source selector chooses JACK or WAV as the external provider source. WAV
+mode uses the configured path, selected profile slot, and optional looping. The
+status area shows enabled, open, running, mode, source, channel count, sample
+rate, audible route, BPM, confidence, bridge activity, ratio, correction,
+target BPM, target confidence, maximum correction, bridge state, track lock,
+track offset, track confidence, track correction, track state, phase, level,
+and transient information.
+.PP
+When a sample has its own audio route, the panel title and route labels change
+to show that the sample route overrides the global default for that sample.
 .SH RECORDING
 Recording controls choose the audio source for disk recording, including
-automatic, original audio, JACK input, or silence where available.  Sample and
-stream recording controls have separate source selectors.
+automatic, original audio, external JACK/WAV provider, or silence where
+available. Sample and stream recording controls have separate source selectors.
 .PP
 Sequence recording records the current sequence-bank playback into a new
-sample.  The sequence toolbar exposes start, stop, and progress controls for
+sample. The sequence toolbar exposes start, stop, and progress controls for
 this route.
 .SH MEDIA AND STREAM CREATION
-The Media panel lists Veejay's working directory.  Double-clicking a row adds
-it as a sample.
+The Media panel lists Veejay's working directory. Double-clicking a row adds it
+as a sample.
 .PP
 The stream menu and input-stream dialog can create or open live input streams,
 YUV4MPEG streams, FFmpeg/AVFormat streams, solid streams, generators, and
-remote Veejay-to-Veejay network sources.  The generator dialog exposes the
+remote Veejay-to-Veejay network sources. The generator dialog exposes the
 available generator list and generator parameters.
 .SH VIDEO SETTINGS
 The Video Settings dialog contains screenshot dimensions, preview scaling,
@@ -461,20 +575,21 @@ primary SDL video-window options, fullscreen settings, aspect-ratio controls,
 window offsets, and video loopback settings.
 .SH IMAGE CALIBRATION
 The Image Calibration dialog captures dark, light, and flat frames for live
-stream calibration.  It can run calibration globally or per stream and provides
-reset, capture, and save controls.  Calibration requires a selected live stream.
+stream calibration. It can run calibration globally or per stream and provides
+reset, capture, and save controls. Calibration requires a selected live stream.
 .SH VIMS MESSENGER, BUNDLES, AND MACROS
-The VIMS messenger sends VIMS commands directly to the backend.  Bundle editing
-allows stored VIMS command groups to be edited and reused.  The VIMS scheduler
+The VIMS messenger sends VIMS commands directly to the backend. Bundle editing
+allows stored VIMS command groups to be edited and reused. The VIMS scheduler
 can fire messages at selected frame, duplicate-frame, or loop positions.
 .PP
 Macro controls can record, play, stop, clear, delay, and loop VIMS-driven UI
-actions.  Macro start and stop actions report their state through the status
+actions. Macro start and stop actions report their state through the status
 bar and console logs.
 .SH MIDI
 The MIDI menu enables MIDI learning, toggles MIDI support, clears the MIDI
-layout, saves the MIDI layout, and loads an existing MIDI layout.  Many UI
-controls register their corresponding VIMS command when MIDI learning is active.
+layout, saves the MIDI layout, and loads an existing MIDI layout. Many UI
+controls register their corresponding VIMS command when MIDI learning is
+active.
 .PP
 MIDI-learned toggles use release-aware behaviour where supported, so note-off
 or zero-value controller events do not accidentally retrigger one-shot toggle
@@ -506,18 +621,27 @@ Use the system GTK theme instead of Reloaded's CSS:
 Use a custom CSS file and load a MIDI layout:
 .B gveejay-reloaded --theme ./dark-live.css --midi ./layout.xml
 .TP
+Start with the default 6x2 grid and 24 sample-bank pages:
+.B gveejay-reloaded --size 24
+.TP
 Start with a two-column by four-row sample-bank layout:
 .B gveejay-reloaded --size 2x4
+.TP
+Use colon or comma layout syntax:
+.B gveejay-reloaded --size 3:4
+.br
+.B gveejay-reloaded --size 3,4
 .SH BUGS
-Report bugs through the Veejay issue tracker.  When reporting UI bugs, include
+Report bugs through the Veejay issue tracker. When reporting UI bugs, include
 the Reloaded version, GTK version, backend version, the selected play mode,
 whether the selected item is a sample or stream, the active audio source, the
-selected audio-sync or beat action if relevant, and any status-bar or console
-messages printed after the action.
+selected audio-sync or beat action if relevant, whether a sample-specific audio
+route is active, and any status-bar or console messages printed after the
+action.
 .SH SEE ALSO
 .BR veejay (1),
 .BR jackd (1)
 .SH AUTHORS
-Gveejay Reloaded was written by Niels Elburg and contributors.  GTK3 migration
-and other work by Jerome Blanchi.  Initial sampledeck representation by Thomas
-Rheinhold.  See the project source files for the full copyright notices.
+Gveejay Reloaded was written by Niels Elburg and contributors. GTK3 migration
+and other work by Jerome Blanchi. Initial sampledeck representation by Thomas
+Rheinhold. See the project source files for the full copyright notices.
