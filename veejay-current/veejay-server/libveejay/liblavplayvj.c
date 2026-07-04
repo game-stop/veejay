@@ -7852,11 +7852,11 @@ int vj_server_setup(veejay_t * info)
 	info->server_origin = vj_server_find_best_ip();
 	veejay_msg(VEEJAY_MSG_DEBUG, "Listening to VIMS on %s", info->server_origin);
 
-	info->osc = (void*) vj_osc_allocate(info->uc->port+6);
+	info->osc = (void*) vj_osc_allocate(info->uc->port+4);
 
 	if(!info->osc) 
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,  "Unable to start OSC server at port %d", info->uc->port + 6 );
+		veejay_msg(VEEJAY_MSG_ERROR,  "Unable to start OSC server at port %d", info->uc->port + 4 );
 		vj_server_shutdown(info->vjs[VEEJAY_PORT_CMD]);
 		vj_server_shutdown(info->vjs[VEEJAY_PORT_STA]);
 		vj_server_shutdown(info->vjs[VEEJAY_PORT_DAT]);
@@ -7865,10 +7865,10 @@ int vj_server_setup(veejay_t * info)
 
 	if( info->settings->use_mcast )
 		veejay_msg(VEEJAY_MSG_INFO, "UDP multicast OSC channel ready at port %d (group '%s')",
-			info->uc->port + 6, info->settings->group_name );
+			info->uc->port + 4, info->settings->group_name );
 	else
 		veejay_msg(VEEJAY_MSG_INFO, "UDP unicast OSC channel ready at port %d",
-			info->uc->port + 6 );
+			info->uc->port + 4 );
 
 	if(vj_osc_setup_addr_space(info->osc) == 0)
 		veejay_msg(VEEJAY_MSG_DEBUG, "Initialized OSC (http://www.cnmat.berkeley.edu/OpenSoundControl/)");

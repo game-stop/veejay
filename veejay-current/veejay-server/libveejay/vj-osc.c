@@ -20,7 +20,7 @@
 /* libOSC 
 
    use ./sendOSC from ${veejay_package_dir}/libOMC/test
-   to send OSC messages to port VJ_PORT + 4 (usually 3496)
+   to send OSC messages to port VJ_PORT + 4 (usually 3494)
 
 
 */
@@ -76,6 +76,11 @@ typedef struct osc_tokens_t {
 	char *descr; /* keep track of all pointers */
 } osc_tokens;
 
+typedef struct osc_container_ref_t {
+  char *path;
+  OSCcontainer container;
+} osc_container_ref;
+
 typedef struct vj_osc_t {
   struct OSCAddressSpaceMemoryTuner t;
   struct OSCReceiveMemoryTuner rt;
@@ -93,12 +98,20 @@ typedef struct vj_osc_t {
   void	*clients;
   osc_tokens **addr;
   int	 n_addr;
+  int   *method_ids;
+  int    n_methods;
+  osc_container_ref *containers;
+  int    n_containers;
+  int    max_containers;
 } vj_osc;
 
 
 /* VIMS does the job */
 extern void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, int arglen, int type);
 extern char *vj_event_vevo_get_event_name( int id );
+extern char *vj_event_vevo_get_event_format( int id );
+extern int vj_event_vevo_get_num_args( int id );
+extern int vj_event_exists( int id );
  
 
 #define OSC_STRING_SIZE 255
@@ -128,81 +141,102 @@ static int toInt(const char *b)
 }
 #endif
 
-/* parse int arguments */
-static int vj_osc_count_int_arguments(int arglen, const void *vargs)
+static int vj_osc_pad4(int n)
 {
-	unsigned int num_args = 0;	
-	// type tags indicated with 0x2c
+	return (n + 3) & ~3;
+}
+
+static int vj_osc_strnlen0(const char *s, int max)
+{
+	int i;
+	for(i = 0; i < max; i++) {
+		if(s[i] == 0)
+			return i;
+	}
+	return max;
+}
+
+static float toFloat(const char *b)
+{
+	union { uint32_t u; float f; } v;
+	v.u = (uint32_t) toInt(b);
+	return v.f;
+}
+
+static int vj_osc_float_to_int(float v)
+{
+	return (v < 0.0f) ? (int)(v - 0.5f) : (int)(v + 0.5f);
+}
+
+static int vj_osc_parse_arguments(int arglen,
+						  const void *vargs,
+						  char *str,
+						  int str_len,
+						  int *arguments,
+						  int max_arguments)
+{
 	const char *args = (const char*) vargs;
-	if(args[0] == 0x2c)
-	{
-			int i;
-			// count occurences of 'i' (0x69)
-			for ( i = 1; i < arglen ; i ++ )
-			{
-				if( args[i] == 0x69 ) num_args ++;
-				if( (i+1) < arglen && args[i+1] == 0 ) break;
-			}
-	}
-	else
-	{
-		// for non typed tags its much simpler, every integer is stored 32 bits
-		if(arglen < 4) return 0;
-		num_args = arglen / 4;
-	}
-	return num_args;
-}
+	int argc = 0;
 
-static int vj_osc_parse_char_arguments(int arglen, const void *vargs, char *dst)
-{
-	const char *args = (const char*)vargs;
-	if(arglen <= 4) return 0;
-	if(args[1] == 0x73)
-	{
-		int b = 0;
-		for(b = 0; b < arglen; b++)
-		{
-		 dst[b] = args[b+4];
-		 if(args[b+4] == 0)
-		  break; 
-		}
-		return arglen;
-	}
-	return 0;
-}
-/* parse int arguments */
-static int vj_osc_parse_int_arguments(int arglen, const void *vargs, int *arguments)
-{
-	int num_args = vj_osc_count_int_arguments(arglen,vargs);
-	int i=0;
-	int offset = 0;
-	const char *args = (const char*)vargs;
-
-	if(num_args <= 0)
+	if(str && str_len > 0)
+		str[0] = '\0';
+	if(arguments && max_arguments > 0)
+		memset(arguments, 0, sizeof(int) * max_arguments);
+	if(arglen <= 0 || !args)
 		return 0;
 
-	if( args[0] == 0x2c )
-	{	// type tag
-		// figure out padding length of typed tag  
-		unsigned int pad = 4 + ( num_args + 1 ) / 4 * 4;
-		for ( i = 0; i < num_args ; i ++ )
-		{
-			arguments[i] = toInt( args + pad + offset );
-			offset += 4;
-		}
-	}
-	else
-	{
-		for(i = 0; i < num_args; i ++)
-		{
-			arguments[i] = toInt( args + offset);
-			offset += 4;
-		}
+	if(args[0] == 0x2c) {
+		int tag_len = vj_osc_strnlen0(args, arglen);
+		int offset = vj_osc_pad4(tag_len + 1);
+		int i;
 
+		for(i = 1; i < tag_len && offset < arglen && argc < max_arguments; i++) {
+			char tag = args[i];
+
+			if(tag == 'i') {
+				if(offset + 4 > arglen)
+					break;
+				arguments[argc] = toInt(args + offset);
+				offset += 4;
+				argc++;
+			}
+			else if(tag == 'f') {
+				if(offset + 4 > arglen)
+					break;
+				arguments[argc] = vj_osc_float_to_int(toFloat(args + offset));
+				offset += 4;
+				argc++;
+			}
+			else if(tag == 's') {
+				int avail = arglen - offset;
+				int slen;
+				if(avail <= 0)
+					break;
+				slen = vj_osc_strnlen0(args + offset, avail);
+				if(str && str_len > 0 && str[0] == '\0') {
+					int copy = (slen < (str_len - 1)) ? slen : (str_len - 1);
+					memcpy(str, args + offset, copy);
+					str[copy] = '\0';
+				}
+				offset += vj_osc_pad4(slen + 1);
+				argc++;
+			}
+			else {
+				veejay_msg(VEEJAY_MSG_WARNING, "OSC argument type '%c' is not mapped to VIMS", tag);
+				break;
+			}
+		}
+		return argc;
 	}
 
-	return num_args; /* success */
+	while((argc < max_arguments) && ((argc * 4 + 4) <= arglen)) {
+		arguments[argc] = toInt(args + (argc * 4));
+		argc++;
+	}
+
+	return argc;
 }
+
 
 /* memory allocation functions of libOMC_dirty (OSC) */
 
@@ -235,18 +269,27 @@ void vj_osc_free(void *d)
 	OSCDestroyAddressSpace();
 
 	int i;
-	for ( i = 0; i < c->n_addr; i ++ ) {
+	if(c->addr) {
+		for ( i = 0; i < c->n_addr; i ++ ) {
 			osc_tokens *ot = c->addr[i];
 			if(ot == NULL)
 				continue;
-			if( ot->addr ) {
-				free_token( ot->addr );
-			}
+			if(ot->addr)
+				free_token(ot->addr);
+			if(ot->descr)
+				free(ot->descr);
 			free(ot);
+		}
+		free(c->addr);
 	}
-	free(c->addr);
-	
 
+	if(c->method_ids)
+		free(c->method_ids);
+	if(c->containers) {
+		for(i = 0; i < c->n_containers; i++)
+			if(c->containers[i].path) free(c->containers[i].path);
+		free(c->containers);
+	}
 	if(c->leaves) 
 		free(c->leaves);
 	if(c->index) 
@@ -282,17 +325,7 @@ static	void	osc_add_client(void *context, int arglen, const void *vargs, OSCTime
 	int	client_id = *( (int*) context );
 	char str[OSC_STRING_SIZE];
 	int  args[16];
-	int __a = vj_osc_count_int_arguments(arglen,vargs);
-	int __n = vj_osc_parse_char_arguments(arglen,vargs,str);
-	
-	memset( args,0,sizeof(args) );
-
-	str[__n] = '\0';
-
-	vj_osc_parse_int_arguments( arglen , vargs , args );
-
-	if( __n > 0 ) __a ++;
-
+	int __a = vj_osc_parse_arguments(arglen, vargs, str, sizeof(str), args, 16);
 
 	int free_id = -1;
 	int i;
@@ -308,12 +341,13 @@ static	void	osc_add_client(void *context, int arglen, const void *vargs, OSCTime
 		return;
 	}
 
-	if( __a != 2 || __n <= 0) {
+	if( __a != 2 || str[0] == '\0') {
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid arguments, use HOSTNAME PORT");
 		return;
 	}
+	int port_num = (args[1] > 0) ? args[1] : args[0];
 	char port[6];
-	snprintf( port, sizeof(port), "%d", args[0] );
+	snprintf( port, sizeof(port), "%d", port_num );
 	char name[1024];
 	snprintf(name, sizeof(name), "%s:%s", str,port );
 	char *cmd = "/status";
@@ -456,384 +490,504 @@ static 	void osc_vims_method(void *context, int arglen, const void *vargs, OSCTi
 	int vims_id = *( (int*) context );
 	char str[OSC_STRING_SIZE];
 	int  args[16];
-	int __a = vj_osc_count_int_arguments(arglen,vargs);
-	int __n = vj_osc_parse_char_arguments(arglen,vargs,str);
-	
-	memset( args,0,sizeof(args) );
-	str[__n] = '\0';
-
-	vj_osc_parse_int_arguments( arglen , vargs , args );
-
-	if( __n > 0 ) __a ++;
+	int __a = vj_osc_parse_arguments(arglen, vargs, str, sizeof(str), args, 16);
 		
-	vj_event_fire_net_event(osc_info, vims_id, str,args, __a ,0);
+	vj_event_fire_net_event(osc_info, vims_id, str, args, __a, 0);
 }
 
 
 //@ setup osc<-> vims mapping
-static struct
-{
-	const char	*name;
-	int	vims_id;
-} osc_method_layout[] = 
-{
-	{ "fxlist/inc"						, VIMS_FXLIST_INC },
-	{ "fxlist/dec"						, VIMS_FXLIST_DEC },
-	{ "fxlist/enter"					, VIMS_FXLIST_ADD },
-	{ "fxlist/setbg"					, VIMS_EFFECT_SET_BG },
-	{ "ui/preview"						, VIMS_PREVIEW_BW },
-	{ "macro/macro"						, VIMS_MACRO },
-	{ "macro/select"					, VIMS_MACRO_SELECT },
-	
-	{ "composite/select"					, VIMS_COMPOSITE },
+#define MAX_ADDR 2048
+#define MAX_OSC_CONTAINERS 512
+#define VJ_OSC_VIMS_MAX 1024
+
+typedef struct osc_alias_layout_t {
+	const char *name;
+	int vims_id;
+} osc_alias_layout;
+
+static const osc_alias_layout osc_alias_layouts[] = {
+	{ "fxlist/inc"                     , VIMS_FXLIST_INC },
+	{ "fxlist/dec"                     , VIMS_FXLIST_DEC },
+	{ "fxlist/enter"                   , VIMS_FXLIST_ADD },
+	{ "fxlist/setbg"                   , VIMS_EFFECT_SET_BG },
+	{ "ui/preview"                     , VIMS_PREVIEW_BW },
+	{ "macro/macro"                    , VIMS_MACRO },
+	{ "macro/select"                   , VIMS_MACRO_SELECT },
+	{ "composite/select"               , VIMS_COMPOSITE },
 #ifdef USE_GDK_PIXBUF
-	{ "console/screenshot"					, VIMS_SCREENSHOT },
-#else 
+	{ "console/screenshot"             , VIMS_SCREENSHOT },
+#else
 #ifdef HAVE_JPEG
-	{ "console/screenshot",					VIMS_SCREENSHOT },
+	{ "console/screenshot"             , VIMS_SCREENSHOT },
 #endif
 #endif
-	{ "console/framerate"					, VIMS_FRAMERATE },
-	{ "console/bezerk"					, VIMS_BEZERK },
+	{ "console/framerate"              , VIMS_FRAMERATE },
+	{ "console/bezerk"                 , VIMS_BEZERK },
 #ifdef HAVE_SDL
-	{ "console/resize"					, VIMS_RESIZE_SDL_SCREEN },
+	{ "console/resize"                 , VIMS_RESIZE_SDL_SCREEN },
 #endif
-	{ "console/renderdepth"					, VIMS_RENDER_DEPTH },
-	{ "console/volume"					, VIMS_SET_VOLUME },
-	{ "console/fullscreen"					, VIMS_FULLSCREEN },
-	{ "console/suspsend"					, VIMS_SUSPEND },
-	{ "console/quit"					, VIMS_QUIT },
-	{ "console/close"					, VIMS_CLOSE },
-//@ NO VIMS callback	{ "console/load"			, VIMS_LOAD_PLUGIN },
-//@ NO VIMS callback	{ "console/unload"			, VIMS_UNLOAD_PLUGIN },
-//@ NO VIMS callback	{ "console/plugcmd"			, VIMS_CMD_PLUGIN },
-	{ "console/dataformat"					, VIMS_RECORD_DATAFORMAT },
-	{ "console/playmode"					, VIMS_SET_PLAIN_MODE },
-	{ "console/load",					VIMS_SAMPLE_LOAD_SAMPLELIST },
-	{ "console/save",					VIMS_SAMPLE_SAVE_SAMPLELIST },
-//@ NO VIMS callback	{ "console/display"			VIMS_INIT_GUI_SCREEN },
-	{ "console/switch"					, VIMS_SWITCH_SAMPLE_STREAM },
-	{ "audio/enable"					, VIMS_AUDIO_ENABLE },
-	{ "audio/disable"					, VIMS_AUDIO_DISABLE },
-	{ "bank/select"						, VIMS_SELECT_BANK },
-	{ "bank/slot"						, VIMS_SELECT_ID },
-
-	{ "record/autostart"					, VIMS_REC_AUTO_START },
-	{ "record/stop"						, VIMS_REC_STOP },
-	{ "record/start"					, VIMS_REC_START },
-	{ "sample/mode"						, VIMS_SAMPLE_MODE },
-	{ "sample/play"						, VIMS_SET_MODE_AND_GO },
-	{ "sample/rand/start"					, VIMS_SAMPLE_RAND_START },
-	{ "sample/rand/stop"					, VIMS_SAMPLE_RAND_STOP },
-	{ "sample/rec/start",					VIMS_SAMPLE_REC_START },
-	{ "sample/start",					VIMS_SET_SAMPLE_START },
-	{ "sample/end",						VIMS_SET_SAMPLE_END },
-	{ "sample/new",						VIMS_SAMPLE_NEW },
-	{ "sample/select",					VIMS_SAMPLE_SELECT },
-	{ "sample/delete",					VIMS_SAMPLE_DEL },
-	{ "sample/looptype",					VIMS_SAMPLE_SET_LOOPTYPE },
-	{ "sample/description",					VIMS_SAMPLE_SET_DESCRIPTION },
-	{ "sample/speed",					VIMS_SAMPLE_SET_SPEED },
-	{ "sample/startposition",				VIMS_SAMPLE_SET_START },
-	{ "sample/endposition",					VIMS_SAMPLE_SET_END },
-	{ "sample/slow",					VIMS_SAMPLE_SET_DUP },
-	{ "sample/inpoint",					VIMS_SAMPLE_SET_MARKER_START },
-	{ "sample/outpoint",					VIMS_SAMPLE_SET_MARKER_END },
-	{ "sample/clearpoints",					VIMS_SAMPLE_CLEAR_MARKER },
-	{ "sample/edladd",					VIMS_EDITLIST_ADD_SAMPLE },
-	{ "sample/killall",					VIMS_SAMPLE_DEL_ALL },
-	{ "sample/copy",					VIMS_SAMPLE_COPY },
-	{ "sample/recstart",					VIMS_SAMPLE_REC_START },
-	{ "sample/recstop",					VIMS_SAMPLE_REC_STOP },	
-	{ "sample/fx/on",					VIMS_SAMPLE_CHAIN_ENABLE },
-	{ "sample/fx/off",					VIMS_SAMPLE_CHAIN_DISABLE },
-	{ "sample/looptoggle",					VIMS_SAMPLE_TOGGLE_LOOP },
-	{ "stream/play"						, VIMS_SET_MODE_AND_GO },
-	{ "stream/delete",					VIMS_STREAM_DELETE },
-	{ "stream/new/v4l",					VIMS_STREAM_NEW_V4L },
+	{ "console/renderdepth"            , VIMS_RENDER_DEPTH },
+	{ "console/volume"                 , VIMS_SET_VOLUME },
+	{ "console/fullscreen"             , VIMS_FULLSCREEN },
+	{ "console/suspsend"               , VIMS_SUSPEND },
+	{ "console/quit"                   , VIMS_QUIT },
+	{ "console/close"                  , VIMS_CLOSE },
+	{ "console/dataformat"             , VIMS_RECORD_DATAFORMAT },
+	{ "console/playmode"               , VIMS_SET_PLAIN_MODE },
+	{ "console/load"                   , VIMS_SAMPLE_LOAD_SAMPLELIST },
+	{ "console/save"                   , VIMS_SAMPLE_SAVE_SAMPLELIST },
+	{ "console/switch"                 , VIMS_SWITCH_SAMPLE_STREAM },
+	{ "audio/enable"                   , VIMS_AUDIO_ENABLE },
+	{ "audio/disable"                  , VIMS_AUDIO_DISABLE },
+	{ "bank/select"                    , VIMS_SELECT_BANK },
+	{ "bank/slot"                      , VIMS_SELECT_ID },
+	{ "record/autostart"               , VIMS_REC_AUTO_START },
+	{ "record/stop"                    , VIMS_REC_STOP },
+	{ "record/start"                   , VIMS_REC_START },
+	{ "sample/mode"                    , VIMS_SAMPLE_MODE },
+	{ "sample/play"                    , VIMS_SET_MODE_AND_GO },
+	{ "sample/rand/start"              , VIMS_SAMPLE_RAND_START },
+	{ "sample/rand/stop"               , VIMS_SAMPLE_RAND_STOP },
+	{ "sample/rec/start"               , VIMS_SAMPLE_REC_START },
+	{ "sample/start"                   , VIMS_SET_SAMPLE_START },
+	{ "sample/end"                     , VIMS_SET_SAMPLE_END },
+	{ "sample/new"                     , VIMS_SAMPLE_NEW },
+	{ "sample/select"                  , VIMS_SAMPLE_SELECT },
+	{ "sample/delete"                  , VIMS_SAMPLE_DEL },
+	{ "sample/looptype"                , VIMS_SAMPLE_SET_LOOPTYPE },
+	{ "sample/description"             , VIMS_SAMPLE_SET_DESCRIPTION },
+	{ "sample/speed"                   , VIMS_SAMPLE_SET_SPEED },
+	{ "sample/startposition"           , VIMS_SAMPLE_SET_START },
+	{ "sample/endposition"             , VIMS_SAMPLE_SET_END },
+	{ "sample/slow"                    , VIMS_SAMPLE_SET_DUP },
+	{ "sample/inpoint"                 , VIMS_SAMPLE_SET_MARKER_START },
+	{ "sample/outpoint"                , VIMS_SAMPLE_SET_MARKER_END },
+	{ "sample/clearpoints"             , VIMS_SAMPLE_CLEAR_MARKER },
+	{ "sample/edladd"                  , VIMS_EDITLIST_ADD_SAMPLE },
+	{ "sample/killall"                 , VIMS_SAMPLE_DEL_ALL },
+	{ "sample/copy"                    , VIMS_SAMPLE_COPY },
+	{ "sample/recstart"                , VIMS_SAMPLE_REC_START },
+	{ "sample/recstop"                 , VIMS_SAMPLE_REC_STOP },
+	{ "sample/fx/on"                   , VIMS_SAMPLE_CHAIN_ENABLE },
+	{ "sample/fx/off"                  , VIMS_SAMPLE_CHAIN_DISABLE },
+	{ "sample/looptoggle"              , VIMS_SAMPLE_TOGGLE_LOOP },
+	{ "stream/play"                    , VIMS_SET_MODE_AND_GO },
+	{ "stream/delete"                  , VIMS_STREAM_DELETE },
+	{ "stream/new/v4l"                 , VIMS_STREAM_NEW_V4L },
 #ifdef SUPPORT_READ_DV2
-	{ "stream/new/dv1394",					VIMS_STREAM_NEW_DV1394 },
+	{ "stream/new/dv1394"              , VIMS_STREAM_NEW_DV1394 },
 #endif
-	{ "stream/new/solid",					VIMS_STREAM_NEW_COLOR },
-	{ "stream/new/y4m",					VIMS_STREAM_NEW_Y4M },
-	{ "stream/new/cali",					VIMS_STREAM_NEW_CALI },
-	{ "stream/startcali",					VIMS_V4L_BLACKFRAME },
-	{ "stream/savecali",					VIMS_V4L_CALI },
-	{ "stream/unicast",					VIMS_STREAM_NEW_UNICAST },
-	{ "stream/mcast",					VIMS_STREAM_NEW_MCAST },
-	{ "stream/new/picture",					VIMS_STREAM_NEW_PICTURE },
-	{ "stream/offline/recstart",				VIMS_STREAM_OFFLINE_REC_START },
-	{ "stream/offline/recstop",				VIMS_STREAM_OFFLINE_REC_STOP },
-	{ "stream/fx/on",					VIMS_STREAM_CHAIN_ENABLE },
-	{ "stream/fx/off",					VIMS_STREAM_CHAIN_DISABLE },
-	{ "stream/rec/start",					VIMS_STREAM_REC_START },
-	{ "stream/rec/stop",					VIMS_STREAM_REC_STOP },
-	{ "stream/v4l/brightness",				VIMS_STREAM_SET_BRIGHTNESS },
-	{ "stream/v4l/contrast",				VIMS_STREAM_SET_CONTRAST },
-	{ "stream/v4l/hue",					VIMS_STREAM_SET_HUE },
-	{ "stream/v4l/color",					VIMS_STREAM_SET_COLOR },
-	{ "stream/v4l/whitebalance",				VIMS_STREAM_SET_WHITE	},
-	{ "stream/v4l/saturation",				VIMS_STREAM_SET_SATURATION },
-	{ "stream/length",					VIMS_STREAM_SET_LENGTH },
-	{ "stream/color",					VIMS_STREAM_COLOR },
-
-	{ "video/forward"					, VIMS_VIDEO_PLAY_FORWARD },
-	{ "video/play"						, VIMS_VIDEO_PLAY_FORWARD },
-//	{ "video/reverse"					, VIMS_VIDEO_PLAY_REVERSE },
-	{ "video/pause"						, VIMS_VIDEO_PLAY_STOP },
-	{ "video/nextframe"					, VIMS_VIDEO_SKIP_FRAME },	
-	{ "video/prevframe"					, VIMS_VIDEO_PREV_FRAME },
-	{ "video/nextsecond"					, VIMS_VIDEO_SKIP_SECOND },
-	{ "video/prevsecond"					, VIMS_VIDEO_PREV_SECOND },
-	{ "video/gotostart"					, VIMS_VIDEO_GOTO_START },
-	{ "video/gotoend"					, VIMS_VIDEO_GOTO_END },
-	{ "video/frame"						, VIMS_VIDEO_SET_FRAME },
-	{ "video/speed"						, VIMS_VIDEO_SET_SPEED },
-	{ "video/slow"						, VIMS_VIDEO_SET_SLOW },
-	{ "mcast/start",					  VIMS_VIDEO_MCAST_START },
-	{ "mcast/end",						VIMS_VIDEO_MCAST_STOP },
-	{ "video/speedk",					VIMS_VIDEO_SET_SPEEDK },
-
-	{ "editlist/paste",					VIMS_EDITLIST_PASTE_AT },
-	{ "editlist/copy",					VIMS_EDITLIST_COPY },
-	{ "editlist/cut",					VIMS_EDITLIST_CUT },
-	{ "editlist/crop",					VIMS_EDITLIST_CROP },
-	{ "editlist/add",					VIMS_EDITLIST_ADD },
-	{ "editlist/save",					VIMS_EDITLIST_SAVE },
-	{ "editlist/load",					VIMS_EDITLIST_LOAD },
-
-//@ NO VIMS callback!	{ "stream/activate",			VIMS_STREAM_ACTIVATE },
-//@ NO VIMS callback!	{ "stream/deactivate",			VIMS_STREAM_DEACTIVATE },
-	{ "sequence/status",					VIMS_SEQUENCE_STATUS },
-	{ "sequence/set",					VIMS_SEQUENCE_ADD },
-	{ "sequence/del",					VIMS_SEQUENCE_DEL },
-	{ "projection/inc",					VIMS_PROJ_INC },
-	{ "projection/dec",					VIMS_PROJ_DEC },
-	{ "projection/set",					VIMS_PROJ_SET_POINT },
-	{ "projection/stack",					VIMS_PROJ_STACK },
-	{ "projection/toggle",					VIMS_PROJ_TOGGLE },
-	{ "chain/enable",					VIMS_CHAIN_ENABLE },
-	{ "chain/disable",					VIMS_CHAIN_DISABLE },
-	{ "chain/fadein",					VIMS_CHAIN_FADE_IN },
-	{ "chain/fadeout",					VIMS_CHAIN_FADE_OUT },
-	{ "chain/clear",					VIMS_CHAIN_CLEAR },
-//	{ "chain/entry/preset",					VIMS_CHAIN_ENTRY_PRESET },
-	{ "chain/opacity",					VIMS_CHAIN_MANUAL_FADE },
-	{ "chain/entry/setarg",					VIMS_CHAIN_ENTRY_SET_ARG_VAL },
-	{ "chain/entry/defaults",				VIMS_CHAIN_ENTRY_SET_DEFAULTS },
-	{ "chain/entry/channel",				VIMS_CHAIN_ENTRY_SET_CHANNEL },
-	{ "chain/entry/source",					VIMS_CHAIN_ENTRY_SET_SOURCE },
-	{ "chain/entry/srccha",					VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL },
-	{ "chain/entry/clear",					VIMS_CHAIN_ENTRY_CLEAR },
-	{ "chain/entry/up",					VIMS_CHAIN_ENTRY_UP },
-	{ "chain/entry/down",					VIMS_CHAIN_ENTRY_DOWN },
-	{ "chain/entry/srctoggle",				VIMS_CHAIN_ENTRY_SOURCE_TOGGLE },
-	{ "chain/entry/incarg",					VIMS_CHAIN_ENTRY_INC_ARG },
-	{ "chain/entry/decarg",					VIMS_CHAIN_ENTRY_DEC_ARG },
-//	{ "chain/entry/toggle",					VIMS_CHAIN_ENTRY_TOGGLE },
-	{ "chain/entry/state",					VIMS_CHAIN_ENTRY_SET_STATE} ,
-	{ "chain/channel/inc",					VIMS_CHAIN_ENTRY_CHANNEL_INC },
-	{ "chain/channel/dec",					VIMS_CHAIN_ENTRY_CHANNEL_DEC },
-//	{ "chain/entry/channel/up",				VIMS_CHAIN_ENTRY_CHANNEL_UP },
-//	{ "chain/entry/channel/down",				VIMS_CHAIN_ENTRY_CHANNEL_DOWN },
+	{ "stream/new/solid"               , VIMS_STREAM_NEW_COLOR },
+	{ "stream/new/y4m"                 , VIMS_STREAM_NEW_Y4M },
+	{ "stream/new/cali"                , VIMS_STREAM_NEW_CALI },
+	{ "stream/startcali"               , VIMS_V4L_BLACKFRAME },
+	{ "stream/savecali"                , VIMS_V4L_CALI },
+	{ "stream/unicast"                 , VIMS_STREAM_NEW_UNICAST },
+	{ "stream/mcast"                   , VIMS_STREAM_NEW_MCAST },
+	{ "stream/new/picture"             , VIMS_STREAM_NEW_PICTURE },
+	{ "stream/offline/recstart"        , VIMS_STREAM_OFFLINE_REC_START },
+	{ "stream/offline/recstop"         , VIMS_STREAM_OFFLINE_REC_STOP },
+	{ "stream/fx/on"                   , VIMS_STREAM_CHAIN_ENABLE },
+	{ "stream/fx/off"                  , VIMS_STREAM_CHAIN_DISABLE },
+	{ "stream/rec/start"               , VIMS_STREAM_REC_START },
+	{ "stream/rec/stop"                , VIMS_STREAM_REC_STOP },
+	{ "stream/v4l/brightness"          , VIMS_STREAM_SET_BRIGHTNESS },
+	{ "stream/v4l/contrast"            , VIMS_STREAM_SET_CONTRAST },
+	{ "stream/v4l/hue"                 , VIMS_STREAM_SET_HUE },
+	{ "stream/v4l/color"               , VIMS_STREAM_SET_COLOR },
+	{ "stream/v4l/whitebalance"        , VIMS_STREAM_SET_WHITE },
+	{ "stream/v4l/saturation"          , VIMS_STREAM_SET_SATURATION },
+	{ "stream/length"                  , VIMS_STREAM_SET_LENGTH },
+	{ "stream/color"                   , VIMS_STREAM_COLOR },
+	{ "video/forward"                  , VIMS_VIDEO_PLAY_FORWARD },
+	{ "video/play"                     , VIMS_VIDEO_PLAY_FORWARD },
+	{ "video/pause"                    , VIMS_VIDEO_PLAY_STOP },
+	{ "video/nextframe"                , VIMS_VIDEO_SKIP_FRAME },
+	{ "video/prevframe"                , VIMS_VIDEO_PREV_FRAME },
+	{ "video/nextsecond"               , VIMS_VIDEO_SKIP_SECOND },
+	{ "video/prevsecond"               , VIMS_VIDEO_PREV_SECOND },
+	{ "video/gotostart"                , VIMS_VIDEO_GOTO_START },
+	{ "video/gotoend"                  , VIMS_VIDEO_GOTO_END },
+	{ "video/frame"                    , VIMS_VIDEO_SET_FRAME },
+	{ "video/speed"                    , VIMS_VIDEO_SET_SPEED },
+	{ "video/slow"                     , VIMS_VIDEO_SET_SLOW },
+	{ "mcast/start"                    , VIMS_VIDEO_MCAST_START },
+	{ "mcast/end"                      , VIMS_VIDEO_MCAST_STOP },
+	{ "video/speedk"                   , VIMS_VIDEO_SET_SPEEDK },
+	{ "editlist/paste"                 , VIMS_EDITLIST_PASTE_AT },
+	{ "editlist/copy"                  , VIMS_EDITLIST_COPY },
+	{ "editlist/cut"                   , VIMS_EDITLIST_CUT },
+	{ "editlist/crop"                  , VIMS_EDITLIST_CROP },
+	{ "editlist/add"                   , VIMS_EDITLIST_ADD },
+	{ "editlist/save"                  , VIMS_EDITLIST_SAVE },
+	{ "editlist/load"                  , VIMS_EDITLIST_LOAD },
+	{ "sequence/status"                , VIMS_SEQUENCE_STATUS },
+	{ "sequence/set"                   , VIMS_SEQUENCE_ADD },
+	{ "sequence/del"                   , VIMS_SEQUENCE_DEL },
+	{ "projection/inc"                 , VIMS_PROJ_INC },
+	{ "projection/dec"                 , VIMS_PROJ_DEC },
+	{ "projection/set"                 , VIMS_PROJ_SET_POINT },
+	{ "projection/stack"               , VIMS_PROJ_STACK },
+	{ "projection/toggle"              , VIMS_PROJ_TOGGLE },
+	{ "chain/enable"                   , VIMS_CHAIN_ENABLE },
+	{ "chain/disable"                  , VIMS_CHAIN_DISABLE },
+	{ "chain/fadein"                   , VIMS_CHAIN_FADE_IN },
+	{ "chain/fadeout"                  , VIMS_CHAIN_FADE_OUT },
+	{ "chain/clear"                    , VIMS_CHAIN_CLEAR },
+	{ "chain/opacity"                  , VIMS_CHAIN_MANUAL_FADE },
+	{ "chain/entry/setarg"             , VIMS_CHAIN_ENTRY_SET_ARG_VAL },
+	{ "chain/entry/defaults"           , VIMS_CHAIN_ENTRY_SET_DEFAULTS },
+	{ "chain/entry/channel"            , VIMS_CHAIN_ENTRY_SET_CHANNEL },
+	{ "chain/entry/source"             , VIMS_CHAIN_ENTRY_SET_SOURCE },
+	{ "chain/entry/srccha"             , VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL },
+	{ "chain/entry/clear"              , VIMS_CHAIN_ENTRY_CLEAR },
+	{ "chain/entry/up"                 , VIMS_CHAIN_ENTRY_UP },
+	{ "chain/entry/down"               , VIMS_CHAIN_ENTRY_DOWN },
+	{ "chain/entry/srctoggle"          , VIMS_CHAIN_ENTRY_SOURCE_TOGGLE },
+	{ "chain/entry/incarg"             , VIMS_CHAIN_ENTRY_INC_ARG },
+	{ "chain/entry/decarg"             , VIMS_CHAIN_ENTRY_DEC_ARG },
+	{ "chain/entry/state"              , VIMS_CHAIN_ENTRY_SET_STATE },
+	{ "chain/channel/inc"              , VIMS_CHAIN_ENTRY_CHANNEL_INC },
+	{ "chain/channel/dec"              , VIMS_CHAIN_ENTRY_CHANNEL_DEC },
 #ifdef HAVE_FREETYPE
-	{ "display/copyright",					VIMS_COPYRIGHT },
+	{ "display/copyright"              , VIMS_COPYRIGHT },
 #endif
-	{ "vloopback/start",					VIMS_VLOOPBACK_START },
-	{ "vloopback/stop",					VIMS_VLOOPBACK_STOP },
-	{ "y4m/start",						VIMS_OUTPUT_Y4M_START },
-	{ "y4m/stop",						VIMS_OUTPUT_Y4M_STOP },
+	{ "vloopback/start"                , VIMS_VLOOPBACK_START },
+	{ "vloopback/stop"                 , VIMS_VLOOPBACK_STOP },
+	{ "y4m/start"                      , VIMS_OUTPUT_Y4M_START },
+	{ "y4m/stop"                       , VIMS_OUTPUT_Y4M_STOP },
 #ifdef HAVE_LIBLO
-	{ "osc/sender",					-2 },
+	{ "osc/sender"                     , -2 },
 #endif
-	{ NULL,							-1 }
+	{ NULL                              , -1 }
 };
 
-static	 char	**string_tokenize( const char delim, const char *name, int *ntokens ) { 
-	int n = strlen(name);
-	int i;
-	int n_tokens = 0;
-	for( i = 0; i < n; i ++ ) 
-	   if( name[i] == delim )
-	    n_tokens ++;
+static void free_token(char **arr)
+{
+	int i = 0;
+	if(!arr)
+		return;
+	for(i = 0; arr[i] != NULL; i++)
+		free(arr[i]);
+	free(arr);
+}
 
-	if( n_tokens == 0 ) 
+static char **vj_osc_tokenize_path(const char *path, int *ntokens)
+{
+	char **arr;
+	char *copy;
+	char *p;
+	char *start;
+	int n = 0;
+	int cap = 8;
+
+	if(ntokens)
+		*ntokens = 0;
+	if(!path || path[0] == '\0')
 		return NULL;
 
-	n_tokens ++;
-
-	char **arr = (char**) malloc(sizeof(char*) * (n_tokens+1));
-	int end = 0;
-	int p = 0;
-	char *ptr = (char*) name;
-	int last = 0;
-	for( i = 0; i < n ; i ++ ){ 
-		if( name[i] == delim ) {
-			if( *ptr == delim )
-			{	*ptr ++; last ++; }
-
-			arr[p] = strndup( ptr , end );
-			ptr += end;
-			last += end;
-			end = 0;
-			p++;
-		} else {
-			end ++;
-		}
-
+	arr = (char**) vj_calloc(sizeof(char*) * cap);
+	copy = strdup(path);
+	if(!arr || !copy) {
+		if(arr) free(arr);
+		if(copy) free(copy);
+		return NULL;
 	}
 
-	arr[p] = strdup( name + last + 1 );
-	arr[p+1] = NULL;
-	*ntokens = n_tokens+1;
+	p = copy;
+	while(*p == '/')
+		p++;
 
-	return arr;
-}
-
-static	void		free_token( char **arr ) {
-	int i = 0;
-	for( i = 0; arr[i] != NULL ; i ++ ) {
-		free(arr[i]);
-	}
-	free(arr);
-	arr = NULL;
-}
-
-
-#define MAX_ADDR 1024
-
-int 	vj_osc_build_cont( vj_osc *o ) //FIXME never freed
-{ 
-	int i;
-
-	o->index = vpn( VEVO_ANONYMOUS_PORT );
-	int leave_id = 0;
-	int next_id  = 0;
-	int err = 0;
-	int t = 0;
-
-	int len = 1;
-	while ( osc_method_layout[len].name != NULL )
-		len ++;
-		
-	o->addr = (osc_tokens**) vj_calloc (sizeof(osc_tokens*) * MAX_ADDR );
-	o->n_addr = 0;
-
-	int next_addr = 0;
-
-	for( i = 0; osc_method_layout[i].name != NULL && next_addr < MAX_ADDR; i ++ ) {
-		int ntokens = 0;
-		char **arr = string_tokenize( '/', osc_method_layout[i].name, &ntokens);
-		if( arr == NULL || ntokens == 0 ) {
-			continue;
-		}
-			
-		err = vevo_property_get(o->index, arr[0] , 0, &leave_id );
-		if( err == VEVO_NO_ERROR ) {
-			free_token(arr);
-			continue;
-		}
-		o->leaves[next_id] = OSCNewContainer( arr[0], o->container, &(o->cqinfo) );
-	
-		o->addr[next_addr] = vj_calloc(sizeof(osc_tokens));
-		o->addr[next_addr]->n_addr = ntokens;
-		o->addr[next_addr]->addr = arr;
-		
-		err = vevo_property_set(o->index, arr[0], VEVO_ATOM_TYPE_INT , 1, &next_id);
-		next_id ++;
-		next_addr ++;
-	}
-
-	for( i = 0; osc_method_layout[i].name != NULL && next_addr < MAX_ADDR ; i ++ ) {
-		int ntokens = 0;
-		int exists = 0;
-		int attach_id = 0;
-		char **arr = string_tokenize( '/', osc_method_layout[i].name, &ntokens);
-		if( arr == NULL || ntokens == 0 ) {
-			continue;
-		}
-		int containers = ntokens - 1;
-
-		o->addr[next_addr] = vj_calloc(sizeof(osc_tokens));
-		o->addr[next_addr]->n_addr = ntokens;
-		o->addr[next_addr]->addr = arr;
-		
-
-		for( t = 1; t < containers; t ++ ) {
-			int is_method = (t == (containers-1)) ? 1: 0;
-			if( is_method  )
-				continue;
-		
-			err = vevo_property_get( o->index, arr[t-1], 0, &attach_id );
-			if( err != VEVO_NO_ERROR ) {
-				break;
-			}	
-			err = vevo_property_get( o->index, arr[t], 0, &exists );
-			if( err == VEVO_NO_ERROR ) {
-				continue;
+	start = p;
+	while(1) {
+		if(*p == '/' || *p == '\0') {
+			int len = (int)(p - start);
+			if(len > 0) {
+				if(n + 2 > cap) {
+					char **tmp;
+					cap *= 2;
+					tmp = (char**) realloc(arr, sizeof(char*) * cap);
+					if(!tmp) {
+						free(copy);
+						free_token(arr);
+						return NULL;
+					}
+					memset(tmp + n, 0, sizeof(char*) * (cap - n));
+					arr = tmp;
+				}
+				arr[n] = strndup(start, len);
+				if(!arr[n]) {
+					free(copy);
+					free_token(arr);
+					return NULL;
+				}
+				n++;
 			}
-
-			o->leaves[next_id] = OSCNewContainer( arr[t], o->leaves[attach_id], &(o->cqinfo ));
-			
-			err = vevo_property_set( o->index, arr[t], VEVO_ATOM_TYPE_INT, 1, &next_id );
-			next_id ++;
-
-			//veejay_msg(0, "Added leave '%s'%d to container '%s'%d", arr[t],next_id-1,arr[t-1],attach_id);
+			if(*p == '\0')
+				break;
+			start = p + 1;
 		}
+		p++;
+	}
 
-		next_addr ++;
+	free(copy);
+	arr[n] = NULL;
+	if(ntokens)
+		*ntokens = n;
+	return n > 0 ? arr : NULL;
+}
 
-		}	
+static int vj_osc_skip_vims_id(int id)
+{
+	return (id > 400 && id < 500);
+}
 
+static char *vj_osc_describe_vims_method(int id, const char *alias_path)
+{
+	char *name = vj_event_vevo_get_event_name(id);
+	char *fmt = vj_event_vevo_get_event_format(id);
+	int n_args = vj_event_vevo_get_num_args(id);
+	char *descr = NULL;
+	int len;
 
-	for( i = 0; osc_method_layout[i].name != NULL && next_id < MAX_ADDR; i ++ ) {
-		int ntokens = 0;
-		/*
-		 * arr is never freed; the OSCNewMethod copies the pointer to elements in arr
-		 */
-		char **arr = string_tokenize( '/', osc_method_layout[i].name, &ntokens);
-		if( arr == NULL || ntokens == 0 )
-			continue;
-		int containers = ntokens - 1;
-		if( containers == 0 ) {
+	if(!name)
+		name = strdup("VIMS event");
+	if(!fmt)
+		fmt = strdup("");
+	if(!name || !fmt) {
+		if(name) free(name);
+		if(fmt) free(fmt);
+		return NULL;
+	}
+
+	if(alias_path)
+		len = snprintf(NULL, 0, "OSC alias /%s -> VIMS %03d: %s%s%s", alias_path, id, name, n_args > 0 ? " | format: " : "", n_args > 0 ? fmt : "");
+	else
+		len = snprintf(NULL, 0, "VIMS %03d: %s%s%s", id, name, n_args > 0 ? " | format: " : "", n_args > 0 ? fmt : "");
+
+	if(len < 0) {
+		free(name);
+		free(fmt);
+		return NULL;
+	}
+
+	descr = (char*) vj_calloc(sizeof(char) * (len + 1));
+	if(descr) {
+		if(alias_path)
+			snprintf(descr, len + 1, "OSC alias /%s -> VIMS %03d: %s%s%s", alias_path, id, name, n_args > 0 ? " | format: " : "", n_args > 0 ? fmt : "");
+		else
+			snprintf(descr, len + 1, "VIMS %03d: %s%s%s", id, name, n_args > 0 ? " | format: " : "", n_args > 0 ? fmt : "");
+	}
+
+	free(name);
+	free(fmt);
+	return descr;
+}
+
+static OSCcontainer vj_osc_find_container(vj_osc *o, const char *path)
+{
+	int i;
+	if(!o || !path)
+		return NULL;
+	for(i = 0; i < o->n_containers; i++) {
+		if(o->containers[i].path && strcmp(o->containers[i].path, path) == 0)
+			return o->containers[i].container;
+	}
+	return NULL;
+}
+
+static int vj_osc_register_container(vj_osc *o, const char *path, OSCcontainer container)
+{
+	if(!o || !path || !container)
+		return 0;
+	if(o->n_containers >= o->max_containers)
+		return 0;
+	o->containers[o->n_containers].path = strdup(path);
+	if(!o->containers[o->n_containers].path)
+		return 0;
+	o->containers[o->n_containers].container = container;
+	o->n_containers++;
+	return 1;
+}
+
+static OSCcontainer vj_osc_get_or_create_container(vj_osc *o,
+									 const char *path,
+									 const char *name,
+									 OSCcontainer parent)
+{
+	OSCcontainer c = vj_osc_find_container(o, path);
+	if(c)
+		return c;
+	if(!parent || !name)
+		return NULL;
+	c = OSCNewContainer(name, parent, &(o->cqinfo));
+	if(!c)
+		return NULL;
+	if(!vj_osc_register_container(o, path, c))
+		return NULL;
+	return c;
+}
+
+static int vj_osc_add_path_method(vj_osc *o,
+							 const char *path,
+							 int vims_id,
+							 void (*method)(void *, int, const void *, OSCTimeTag, NetworkReturnAddressPtr),
+							 char *description,
+							 int *next_addr)
+{
+	char **arr;
+	OSCcontainer parent;
+	char prefix[512];
+	int ntokens = 0;
+	int i;
+	int method_slot;
+
+	if(!o || !path || !method || !next_addr)
+		return 0;
+	if(*next_addr >= MAX_ADDR || o->n_methods >= MAX_ADDR)
+		return 0;
+
+	arr = vj_osc_tokenize_path(path, &ntokens);
+	if(!arr || ntokens < 2) {
+		free_token(arr);
+		return 0;
+	}
+
+	prefix[0] = '\0';
+	parent = o->container;
+	for(i = 0; i < ntokens - 1; i++) {
+		OSCcontainer c;
+		if(prefix[0] == '\0')
+			snprintf(prefix, sizeof(prefix), "%s", arr[i]);
+		else {
+			int off = (int) strlen(prefix);
+			snprintf(prefix + off, sizeof(prefix) - off, "/%s", arr[i]);
+		}
+		c = vj_osc_get_or_create_container(o, prefix, arr[i], parent);
+		if(!c) {
 			free_token(arr);
-			continue;
+			return 0;
 		}
-		
-		int method = containers - 1;
-		
-		o->addr[next_addr] = vj_calloc(sizeof(osc_tokens));
-		o->addr[next_addr]->n_addr = ntokens;
-		o->addr[next_addr]->addr = arr;
+		parent = c;
+	}
 
-		err = vevo_property_get( o->index, arr[method-1], 0, &leave_id );
+	method_slot = o->n_methods;
+	o->method_ids[method_slot] = vims_id;
+	o->n_methods++;
+
+	OSCInitMethodQueryResponseInfo(&(o->ris));
+	o->ris.description = description ? description : strdup("OSC method");
+	OSCNewMethod(arr[ntokens - 1], parent, method, &(o->method_ids[method_slot]), &(o->ris));
+
+	o->addr[*next_addr] = (osc_tokens*) vj_calloc(sizeof(osc_tokens));
+	if(!o->addr[*next_addr]) {
+		free_token(arr);
+		free(o->ris.description);
+		return 0;
+	}
+	o->addr[*next_addr]->n_addr = ntokens;
+	o->addr[*next_addr]->addr = arr;
+	o->addr[*next_addr]->descr = o->ris.description;
+	(*next_addr)++;
+	return 1;
+}
+
+static int vj_osc_add_vims_selector(vj_osc *o, int id, int *next_addr)
+{
+	char path[32];
+	char *descr;
+
+	if(vj_osc_skip_vims_id(id) || !vj_event_exists(id))
+		return 0;
+
+	snprintf(path, sizeof(path), "vims/%03d", id);
+	descr = vj_osc_describe_vims_method(id, NULL);
+	if(!vj_osc_add_path_method(o, path, id, osc_vims_method, descr, next_addr)) {
+		if(descr)
+			free(descr);
+		return 0;
+	}
+	return 1;
+}
+
+static int vj_osc_add_legacy_alias(vj_osc *o, const osc_alias_layout *alias, int *next_addr)
+{
+	char *descr;
+
+	if(!alias || !alias->name)
+		return 0;
+
 #ifdef HAVE_LIBLO
-		if( osc_method_layout[i].vims_id == -2 ) {
-			o->ris.description = strdup( "Setup a OSC sender (Arg 0=host, 1=port)");
-			OSCNewMethod( arr[method],
-				      o->leaves[leave_id],
-				      osc_add_client,
-				      &(osc_method_layout[i].vims_id),
-				      &(o->ris));
-		} else {
-			o->ris.description = vj_event_vevo_get_event_name( osc_method_layout[i].vims_id );
-			OSCNewMethod( arr[ method ], o->leaves[  leave_id ], osc_vims_method, &(osc_method_layout[i].vims_id),&(o->ris));
-	
-		}	
-#else
-		o->ris.description = vj_event_vevo_get_event_name( osc_method_layout[i].vims_id );
-		OSCNewMethod( arr[ method ], o->leaves[  leave_id ], osc_vims_method, &(osc_method_layout[i].vims_id),&(o->ris));
-
+	if(alias->vims_id == -2) {
+		return vj_osc_add_path_method(o,
+							  alias->name,
+							  -2,
+							  osc_add_client,
+							  strdup("Setup an OSC sender (argument 0=host, 1=port)"),
+							  next_addr);
+	}
 #endif
 
-		o->addr[next_addr]->descr = o->ris.description;
+	if(alias->vims_id <= 0 || vj_osc_skip_vims_id(alias->vims_id) || !vj_event_exists(alias->vims_id))
+		return 0;
 
-		next_addr ++;
+	descr = vj_osc_describe_vims_method(alias->vims_id, alias->name);
+	if(!vj_osc_add_path_method(o, alias->name, alias->vims_id, osc_vims_method, descr, next_addr)) {
+		if(descr)
+			free(descr);
+		return 0;
+	}
+	return 1;
+}
+
+int 	vj_osc_build_cont(vj_osc *o)
+{
+	int next_addr = 0;
+	int id;
+	int added_vims = 0;
+	int added_aliases = 0;
+	int skipped_queries = 0;
+	int skipped_aliases = 0;
+	int i;
+
+	o->index = NULL;
+	o->addr = (osc_tokens**) vj_calloc(sizeof(osc_tokens*) * MAX_ADDR);
+	o->method_ids = (int*) vj_calloc(sizeof(int) * MAX_ADDR);
+	o->containers = (osc_container_ref*) vj_calloc(sizeof(osc_container_ref) * MAX_OSC_CONTAINERS);
+	o->n_addr = 0;
+	o->n_methods = 0;
+	o->n_containers = 0;
+	o->max_containers = MAX_OSC_CONTAINERS;
+
+	if(!o->addr || !o->method_ids || !o->containers)
+		return 0;
+
+	for(id = 1; id < VJ_OSC_VIMS_MAX && next_addr < MAX_ADDR; id++) {
+		if(vj_osc_skip_vims_id(id)) {
+			skipped_queries++;
+			continue;
+		}
+		if(vj_osc_add_vims_selector(o, id, &next_addr))
+			added_vims++;
+	}
+
+	for(i = 0; osc_alias_layouts[i].name != NULL && next_addr < MAX_ADDR; i++) {
+		int before = next_addr;
+		if(vj_osc_add_legacy_alias(o, &(osc_alias_layouts[i]), &next_addr))
+			added_aliases++;
+		else if(before == next_addr)
+			skipped_aliases++;
 	}
 
 	o->n_addr = next_addr;
-
-	return 1;
+	veejay_msg(VEEJAY_MSG_INFO,
+			   "OSC exposed %d dynamic VIMS selectors under /vims/<selector> and %d descriptive aliases (%d query/fetch selectors skipped, %d aliases ignored)",
+			   added_vims,
+			   added_aliases,
+			   skipped_queries,
+			   skipped_aliases);
+	return added_vims > 0;
 }
 
 
@@ -842,9 +996,9 @@ void* vj_osc_allocate(int port_id) {
 	void *res;
 	char tmp[200];
 	
-	vj_osc *o = (vj_osc*)vj_malloc(sizeof(vj_osc));
+	vj_osc *o = (vj_osc*)vj_calloc(sizeof(vj_osc));
 #ifdef HAVE_LIBLO
-	osc_clients = (vevo_port_t*) vj_malloc(sizeof(vevo_port_t*) * 32);
+	osc_clients = (vevo_port_t**) vj_malloc(sizeof(vevo_port_t*) * 32);
 	int i;
 	for( i = 0; i < 32 ;i ++ )
 		osc_clients[i] = NULL;
@@ -855,10 +1009,10 @@ void* vj_osc_allocate(int port_id) {
 	o->rt.receiveBufferSize = 1024;
 	o->rt.numReceiveBuffers = NUM_RECEIVE_BUFFERS;
 	o->rt.numQueuedObjects = 100;
-	o->rt.numCallbackListNodes = 300;
-	o->leaves = (OSCcontainer*) vj_malloc(sizeof(OSCcontainer) * 300);
-	o->t.initNumContainers = 300;
-	o->t.initNumMethods = 300;
+	o->rt.numCallbackListNodes = MAX_ADDR + 32;
+	o->leaves = (OSCcontainer*) vj_calloc(sizeof(OSCcontainer) * MAX_OSC_CONTAINERS);
+	o->t.initNumContainers = MAX_OSC_CONTAINERS;
+	o->t.initNumMethods = MAX_ADDR + 32;
 	o->t.InitTimeMemoryAllocator = _vj_osc_time_malloc;
 	o->t.RealTimeMemoryAllocator = _vj_osc_rt_malloc;
 			
@@ -888,7 +1042,6 @@ void* vj_osc_allocate(int port_id) {
 	if( !vj_osc_build_cont( o ))
 		return NULL;
 
-	OSCInitMethodQueryResponseInfo( &(o->ris));
 //	if( !vj_osc_attach_methods( o ))
 //		return NULL;
 

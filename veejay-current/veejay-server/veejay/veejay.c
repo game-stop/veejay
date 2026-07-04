@@ -904,7 +904,7 @@ int main(int argc, char **argv)
         vj_event_dump();
 
 		fflush(stdout);
-		vj_osc_allocate(VJ_PORT + 2);
+		vj_osc_allocate(VJ_PORT + 4);
 		vj_osc_dump();
 		fflush(stdout);
 
