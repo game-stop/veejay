@@ -6579,10 +6579,12 @@ static void on_vims_messenger(void)
 
         gtk_text_iter_forward_sentence_end(&end);
         str = gtk_text_buffer_get_text (buffer, &start, &end, TRUE);
+        g_strstrip(str);
 
-	    if(strlen(str) <= 0) {
+	    if(str[0] == '\0') {
 		    vj_msg(VEEJAY_MSG_INFO, "Nothing to do at line %d", info->vims_line);
 		    info->vims_line++;
+		    g_free(str);
 		    return;
 	    }
 
@@ -6599,6 +6601,7 @@ static void on_vims_messenger(void)
             vj_msg(VEEJAY_MSG_INFO, "Sent VIMS message '%s' (line %d)",str, info->vims_line );
         }
         info->vims_line++;
+        g_free(str);
     }
 
 }
@@ -14239,7 +14242,12 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
             "window { font-size:%s; }"
             "frame,box,scale,spinbutton,button,radiobutton,checkbutton,entry,.vertical { padding: 0px 0px; margin: 0px; }"
             ".fx-entry-compact spinbutton,.fx-entry-compact button,.fx-entry-compact checkbutton { padding: 0px; margin: 0px; min-height: 20px; }"
-            ".fx-entry-compact entry { padding-top: 0px; padding-bottom: 0px; min-height: 18px; }",
+            ".fx-entry-compact entry { padding-top: 0px; padding-bottom: 0px; min-height: 18px; }"
+            ".vims-macro-compact spinbutton,.vims-macro-compact button,.vims-macro-compact radiobutton { padding: 0px; margin-top: 0px; margin-bottom: 0px; min-height: 20px; }"
+            ".vims-macro-compact entry { padding-top: 0px; padding-bottom: 0px; min-height: 18px; }"
+            ".veejay-actions-compact button,.veejay-actions-compact checkbutton { padding: 1px; margin: 1px; min-height: 22px; }"
+            ".veejay-vims-compact entry,.veejay-vims-compact button { padding: 0px; margin: 0px; min-height: 20px; }"
+            ".veejay-side-toolbar button { padding: 1px; margin: 1px; min-height: 24px; min-width: 24px; }",
             font_size);
     }
     else {
@@ -14248,7 +14256,12 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
             "frame,box { padding: 0px; }"
             "scale,spinbutton,button,radiobutton,checkbutton,entry,.vertical { padding: %dpx; margin: %dpx; }"
             ".fx-entry-compact spinbutton,.fx-entry-compact button,.fx-entry-compact checkbutton { padding: 0px; margin-top: 0px; margin-bottom: 0px; min-height: 22px; }"
-            ".fx-entry-compact entry { padding-top: 0px; padding-bottom: 0px; min-height: 20px; }",
+            ".fx-entry-compact entry { padding-top: 0px; padding-bottom: 0px; min-height: 20px; }"
+            ".vims-macro-compact spinbutton,.vims-macro-compact button,.vims-macro-compact radiobutton { padding: 0px; margin-top: 0px; margin-bottom: 0px; min-height: 22px; }"
+            ".vims-macro-compact entry { padding-top: 0px; padding-bottom: 0px; min-height: 20px; }"
+            ".veejay-actions-compact button,.veejay-actions-compact checkbutton { padding: 1px; margin: 1px; min-height: 24px; }"
+            ".veejay-vims-compact entry,.veejay-vims-compact button { padding: 0px; margin: 0px; min-height: 22px; }"
+            ".veejay-side-toolbar button { padding: 1px; margin: 1px; min-height: 26px; min-width: 26px; }",
             font_size,
             pad,
             margin);

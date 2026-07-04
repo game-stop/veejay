@@ -5129,6 +5129,11 @@
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
   </object>
+  <object class="GtkAdjustment" id="vims_macro_delay">
+    <property name="upper">1000000</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">100</property>
+  </object>
   <object class="GtkWindow" id="gveejay_window">
     <property name="can-focus">False</property>
     <property name="title" translatable="yes">Reloaded</property>
@@ -19721,13 +19726,11 @@
                           <object class="GtkLabel">
                             <property name="visible">True</property>
                             <property name="can-focus">False</property>
-                            <property name="margin-left">8</property>
-                            <property name="margin-right">8</property>
-                            <property name="margin-top">8</property>
-                            <property name="margin-bottom">8</property>
-                            <property name="label" translatable="yes">Here you can schedule events to be fired when a certain frame/loop/dup position has been reached.
-Alternatively, you can edit events that you have recorded with the macro recorder.
-Events may not always be triggered if veejay is configured to keep in sync (hard frame drops)</property>
+                            <property name="margin-left">6</property>
+                            <property name="margin-right">6</property>
+                            <property name="margin-top">4</property>
+                            <property name="margin-bottom">4</property>
+                            <property name="label" translatable="yes">Schedule or edit VIMS events for a frame/dup/loop position. Hard sync frame drops can skip trigger points.</property>
                             <property name="xalign">0</property>
                           </object>
                           <packing>
@@ -19740,13 +19743,18 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                           <object class="GtkGrid">
                             <property name="visible">True</property>
                             <property name="can-focus">False</property>
-                            <property name="margin-top">8</property>
+                            <property name="margin-top">2</property>
+                            <property name="row-spacing">2</property>
+                            <property name="column-spacing">6</property>
+                            <style>
+                              <class name="vims-macro-compact" />
+                            </style>
                             <child>
                               <object class="GtkLabel" id="label970">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
-                                <property name="margin-left">8</property>
-                                <property name="label" translatable="yes">Frame position</property>
+                                <property name="margin-left">6</property>
+                                <property name="label" translatable="yes">Frame</property>
                                 <property name="xalign">0</property>
                                 <property name="yalign">0</property>
                               </object>
@@ -19759,8 +19767,8 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                               <object class="GtkLabel" id="label971">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
-                                <property name="margin-left">8</property>
-                                <property name="label" translatable="yes">Dup position</property>
+                                <property name="margin-left">6</property>
+                                <property name="label" translatable="yes">Dup</property>
                                 <property name="xalign">0</property>
                                 <property name="yalign">0</property>
                               </object>
@@ -19773,8 +19781,8 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                               <object class="GtkLabel" id="label972">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
-                                <property name="margin-left">8</property>
-                                <property name="label" translatable="yes">Loop position</property>
+                                <property name="margin-left">6</property>
+                                <property name="label" translatable="yes">Loop</property>
                                 <property name="xalign">0</property>
                                 <property name="yalign">0</property>
                               </object>
@@ -19787,7 +19795,9 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                               <object class="GtkSpinButton" id="macro_frame_position">
                                 <property name="visible">True</property>
                                 <property name="can-focus">True</property>
-                                <property name="margin-left">8</property>
+                                <property name="valign">center</property>
+                                <property name="vexpand">False</property>
+                                <property name="margin-left">6</property>
                                 <property name="text" translatable="yes">0</property>
                                 <property name="caps-lock-warning">False</property>
                                 <property name="adjustment">vims_frame_pos</property>
@@ -19802,7 +19812,9 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                               <object class="GtkSpinButton" id="macro_dup_position">
                                 <property name="visible">True</property>
                                 <property name="can-focus">True</property>
-                                <property name="margin-left">8</property>
+                                <property name="valign">center</property>
+                                <property name="vexpand">False</property>
+                                <property name="margin-left">6</property>
                                 <property name="text" translatable="yes">0</property>
                                 <property name="caps-lock-warning">False</property>
                                 <property name="adjustment">vims_frame_dup</property>
@@ -19817,7 +19829,9 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                               <object class="GtkSpinButton" id="macro_loop_position">
                                 <property name="visible">True</property>
                                 <property name="can-focus">True</property>
-                                <property name="margin-left">8</property>
+                                <property name="valign">center</property>
+                                <property name="vexpand">False</property>
+                                <property name="margin-left">6</property>
                                 <property name="text" translatable="yes">0</property>
                                 <property name="adjustment">vims_loop_pos</property>
                                 <signal name="value-changed" handler="on_macro_loop_position_value_changed" swapped="no" />
@@ -19832,8 +19846,8 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
                                 <property name="tooltip-text" translatable="yes">A VIMS event. See Preferences -&gt; Bundles for an overview.</property>
-                                <property name="margin-left">8</property>
-                                <property name="label" translatable="yes">VIMS message</property>
+                                <property name="margin-left">6</property>
+                                <property name="label" translatable="yes">VIMS</property>
                                 <property name="xalign">0</property>
                                 <property name="yalign">0</property>
                               </object>
@@ -19846,7 +19860,10 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                               <object class="GtkEntry" id="macro_vims_message">
                                 <property name="visible">True</property>
                                 <property name="can-focus">True</property>
+                                <property name="valign">center</property>
+                                <property name="hexpand">True</property>
                                 <property name="caps-lock-warning">False</property>
+                                <signal name="activate" handler="on_macro_save_button_clicked" swapped="no" />
                               </object>
                               <packing>
                                 <property name="left-attach">3</property>
@@ -19858,9 +19875,11 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                 <property name="visible">True</property>
                                 <property name="can-focus">True</property>
                                 <property name="receives-default">True</property>
-                                <property name="tooltip-text" translatable="yes">Apply</property>
+                                <property name="tooltip-text" translatable="yes">Save VIMS event</property>
                                 <property name="halign">start</property>
-                                <property name="margin-left">8</property>
+                                <property name="valign">center</property>
+                                <property name="vexpand">False</property>
+                                <property name="margin-left">6</property>
                                 <signal name="clicked" handler="on_macro_save_button_clicked" swapped="no" />
                                 <child>
                                   <object class="GtkImage">
@@ -19880,9 +19899,11 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                 <property name="visible">True</property>
                                 <property name="can-focus">True</property>
                                 <property name="receives-default">True</property>
-                                <property name="tooltip-text" translatable="yes">Delete</property>
+                                <property name="tooltip-text" translatable="yes">Delete selected VIMS event</property>
                                 <property name="halign">start</property>
-                                <property name="margin-left">8</property>
+                                <property name="valign">center</property>
+                                <property name="vexpand">False</property>
+                                <property name="margin-left">6</property>
                                 <signal name="clicked" handler="on_macro_delete_button_clicked" swapped="no" />
                                 <child>
                                   <object class="GtkImage">
@@ -19930,12 +19951,12 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                       <object class="GtkScrolledWindow" id="scrolledwindow55">
                         <property name="visible">True</property>
                         <property name="can-focus">True</property>
-                        <property name="margin-left">8</property>
-                        <property name="margin-right">8</property>
-                        <property name="margin-top">8</property>
-                        <property name="margin-bottom">8</property>
-                        <property name="hscrollbar-policy">always</property>
-                        <property name="vscrollbar-policy">always</property>
+                        <property name="margin-left">6</property>
+                        <property name="margin-right">6</property>
+                        <property name="margin-top">4</property>
+                        <property name="margin-bottom">4</property>
+                        <property name="hscrollbar-policy">automatic</property>
+                        <property name="vscrollbar-policy">automatic</property>
                         <property name="shadow-type">in</property>
                         <child>
                           <object class="GtkTreeView" id="macro_macros">
@@ -19957,8 +19978,12 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                       <object class="GtkGrid">
                         <property name="visible">True</property>
                         <property name="can-focus">False</property>
+                        <property name="margin-bottom">2</property>
                         <property name="column-spacing">8</property>
                         <property name="column-homogeneous">True</property>
+                        <style>
+                          <class name="vims-macro-compact" />
+                        </style>
                         <child>
                           <object class="GtkBox">
                             <property name="visible">True</property>
@@ -20054,10 +20079,12 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                               <object class="GtkSpinButton" id="spin_macrodelay">
                                 <property name="visible">True</property>
                                 <property name="can-focus">True</property>
-                                <property name="tooltip-text" translatable="yes">Delay Macro Recorder</property>
+                                <property name="tooltip-text" translatable="yes">Delay macro recording by this many UI ticks</property>
                                 <property name="width-chars">6</property>
+                                <property name="valign">center</property>
+                                <property name="vexpand">False</property>
                                 <property name="caps-lock-warning">False</property>
-                                <property name="adjustment">vims_frame_pos</property>
+                                <property name="adjustment">vims_macro_delay</property>
                               </object>
                               <packing>
                                 <property name="expand">False</property>
@@ -20101,6 +20128,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                 <property name="visible">True</property>
                                 <property name="can-focus">True</property>
                                 <property name="receives-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Refresh macro bank</property>
                                 <signal name="clicked" handler="on_macro_refresh_button_clicked" swapped="no" />
                                 <child>
                                   <object class="GtkImage" id="macro_refresh_button">
@@ -20289,6 +20317,28 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                           </packing>
                                         </child>
                                         <child>
+                                          <object class="GtkToggleButton" id="button_audio_mute">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">True</property>
+                                            <property name="receives-default">False</property>
+                                            <property name="margin-left">3</property>
+                                            <property name="tooltip-text" translatable="yes">Mute/unmute audio playback</property>
+                                            <signal name="toggled" handler="on_button_audio_mute_toggled" swapped="no" />
+                                            <child>
+                                              <object class="GtkImage" id="image266beat">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="pixbuf">icon_jack.png</property>
+                                              </object>
+                                            </child>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">False</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
                                           <object class="GtkBox" id="hbox844">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
@@ -20377,7 +20427,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                             <property name="expand">False</property>
                                             <property name="fill">True</property>
                                             <property name="padding">3</property>
-                                            <property name="position">1</property>
+                                            <property name="position">2</property>
                                           </packing>
                                         </child>
                                         <child>
@@ -20394,7 +20444,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                           <packing>
                                             <property name="expand">False</property>
                                             <property name="fill">False</property>
-                                            <property name="position">2</property>
+                                            <property name="position">3</property>
                                           </packing>
                                         </child>
                                       </object>
@@ -22457,18 +22507,27 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                           <object class="GtkFrame" id="frame319">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="margin-right">8</property>
-                                            <property name="margin-top">8</property>
+                                            <property name="margin-right">2</property>
+                                            <property name="margin-top">2</property>
                                             <property name="label-xalign">0</property>
                                             <child>
                                               <object class="GtkAlignment" id="alignment530">
                                                 <property name="visible">True</property>
                                                 <property name="can-focus">False</property>
-                                                <property name="left-padding">12</property>
+                                                <property name="top-padding">2</property>
+                                                <property name="bottom-padding">2</property>
+                                                <property name="left-padding">4</property>
+                                                <property name="right-padding">4</property>
                                                 <child>
                                                   <object class="GtkBox" id="hbox902">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
+                                                    <property name="spacing">4</property>
+                                                    <property name="valign">center</property>
+                                                    <property name="vexpand">False</property>
+                                                    <style>
+                                                      <class name="veejay-actions-compact" />
+                                                    </style>
                                                     <child>
                                                       <object class="GtkButton" id="button_054">
                                                         <property name="visible">True</property>
@@ -22555,27 +22614,6 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                       </packing>
                                                     </child>
                                                     <child>
-                                                      <object class="GtkToggleButton" id="button_audio_mute">
-                                                        <property name="visible">True</property>
-                                                        <property name="can-focus">True</property>
-                                                        <property name="receives-default">False</property>
-                                                        <property name="tooltip-text" translatable="yes">Mute/unmute audio playback</property>
-                                                        <signal name="toggled" handler="on_button_audio_mute_toggled" swapped="no" />
-                                                        <child>
-                                                          <object class="GtkImage" id="image266beat">
-                                                            <property name="visible">True</property>
-                                                            <property name="can-focus">False</property>
-                                                            <property name="pixbuf">icon_jack.png</property>
-                                                          </object>
-                                                        </child>
-                                                      </object>
-                                                      <packing>
-                                                        <property name="expand">False</property>
-                                                        <property name="fill">False</property>
-                                                        <property name="position">6</property>
-                                                      </packing>
-                                                    </child>
-                                                    <child>
                                                       <object class="GtkButton" id="osdbutton">
                                                         <property name="visible">True</property>
                                                         <property name="can-focus">True</property>
@@ -22617,12 +22655,15 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                       <object class="GtkBox" id="hbox934">
                                                         <property name="visible">True</property>
                                                         <property name="can-focus">False</property>
+                                                        <property name="spacing">4</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="vexpand">False</property>
                                                         <child>
                                                           <object class="GtkLabel" id="label968">
                                                             <property name="visible">True</property>
                                                             <property name="can-focus">False</property>
                                                             <property name="xpad">6</property>
-                                                            <property name="label" translatable="yes">SHM input</property>
+                                                            <property name="label" translatable="yes">SHM</property>
                                                           </object>
                                                           <packing>
                                                             <property name="expand">False</property>
@@ -22634,6 +22675,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                           <object class="GtkBox" id="hbox2">
                                                             <property name="visible">True</property>
                                                             <property name="can-focus">False</property>
+                                                            <property name="spacing">2</property>
                                                             <child>
                                                               <object class="GtkButton" id="shm_3490">
                                                                 <property name="label" translatable="yes">3490</property>
@@ -22751,25 +22793,31 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                           <object class="GtkFrame" id="frame264">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="margin-top">8</property>
+                                            <property name="margin-top">4</property>
                                             <property name="label-xalign">0</property>
                                             <child>
                                               <object class="GtkBox" id="vbox547">
                                                 <property name="visible">True</property>
                                                 <property name="can-focus">False</property>
                                                 <property name="orientation">vertical</property>
+                                                <style>
+                                                  <class name="veejay-vims-compact" />
+                                                </style>
                                                 <child>
                                                   <object class="GtkScrolledWindow" id="scrolledwindow45">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">True</property>
+                                                    <property name="hscrollbar-policy">automatic</property>
+                                                    <property name="vscrollbar-policy">automatic</property>
+                                                    <property name="shadow-type">in</property>
                                                     <child>
                                                       <object class="GtkTextView" id="vims_messenger_textview">
                                                         <property name="visible">True</property>
                                                         <property name="can-focus">True</property>
-                                                        <property name="margin-left">8</property>
-                                                        <property name="margin-right">8</property>
-                                                        <property name="margin-top">8</property>
-                                                        <property name="margin-bottom">8</property>
+                                                        <property name="margin-left">4</property>
+                                                        <property name="margin-right">4</property>
+                                                        <property name="margin-top">4</property>
+                                                        <property name="margin-bottom">4</property>
                                                       </object>
                                                     </child>
                                                   </object>
@@ -22783,15 +22831,17 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                   <object class="GtkBox" id="hbox57">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
-                                                    <property name="margin-left">8</property>
-                                                    <property name="margin-right">8</property>
-                                                    <property name="margin-top">8</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="margin-left">4</property>
+                                                    <property name="margin-right">4</property>
+                                                    <property name="margin-top">4</property>
+                                                    <property name="margin-bottom">4</property>
                                                     <child>
                                                       <object class="GtkEntry" id="vimsmessage">
                                                         <property name="visible">True</property>
                                                         <property name="can-focus">True</property>
                                                         <property name="has-frame">False</property>
+                                                        <property name="placeholder-text" translatable="yes">VIMS command, press Enter to send</property>
+                                                        <property name="tooltip-text" translatable="yes">Send one VIMS command to veejay</property>
                                                         <property name="primary-icon-activatable">False</property>
                                                         <property name="secondary-icon-activatable">False</property>
                                                         <signal name="activate" handler="on_vimsmessage_activate" swapped="no" />
@@ -22855,14 +22905,15 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                   <object class="GtkBox" id="hbox764">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
-                                                    <property name="margin-left">8</property>
-                                                    <property name="margin-right">8</property>
+                                                    <property name="margin-left">4</property>
+                                                    <property name="margin-right">4</property>
                                                     <child>
                                                       <object class="GtkButton" id="vims_messenger_clear">
                                                         <property name="label" translatable="yes">_Clear</property>
                                                         <property name="visible">True</property>
                                                         <property name="can-focus">True</property>
                                                         <property name="receives-default">False</property>
+                                                        <property name="tooltip-text" translatable="yes">Clear the VIMS messenger text</property>
                                                         <property name="use-underline">True</property>
                                                         <signal name="clicked" handler="on_vims_messenger_clear_clicked" swapped="no" />
                                                       </object>
@@ -22877,6 +22928,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                         <property name="visible">True</property>
                                                         <property name="can-focus">True</property>
                                                         <property name="receives-default">False</property>
+                                                        <property name="tooltip-text" translatable="yes">Restart from the first VIMS messenger line</property>
                                                         <signal name="clicked" handler="on_vims_messenger_rewind_clicked" swapped="no" />
                                                         <child>
                                                           <object class="GtkImage" id="image2331">
@@ -22897,6 +22949,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                         <property name="visible">True</property>
                                                         <property name="can-focus">True</property>
                                                         <property name="receives-default">False</property>
+                                                        <property name="tooltip-text" translatable="yes">Send the next VIMS messenger line</property>
                                                         <signal name="clicked" handler="on_vims_messenger_single_clicked" swapped="no" />
                                                         <child>
                                                           <object class="GtkImage" id="image2329">
@@ -22918,6 +22971,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                         <property name="visible">True</property>
                                                         <property name="can-focus">True</property>
                                                         <property name="receives-default">False</property>
+                                                        <property name="tooltip-text" translatable="yes">Step through VIMS messenger lines repeatedly; +N waits N frames</property>
                                                         <property name="use-underline">True</property>
                                                       </object>
                                                       <packing>
@@ -23063,6 +23117,9 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                       <object class="GtkScrolledWindow" id="server_files_window">
                                                         <property name="visible">True</property>
                                                         <property name="can-focus">True</property>
+                                                        <property name="hscrollbar-policy">automatic</property>
+                                                        <property name="vscrollbar-policy">automatic</property>
+                                                        <property name="shadow-type">in</property>
                                                         <child>
                                                           <object class="GtkTreeView" id="server_files">
                                                             <property name="visible">True</property>
@@ -23096,7 +23153,10 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                           <object class="GtkLabel" id="label948">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
-                                            <property name="label" translatable="yes">Listing of Veejay's working directory. Double-click a row to add it as a sample</property>
+                                            <property name="margin-top">2</property>
+                                            <property name="xalign">0</property>
+                                            <property name="ellipsize">end</property>
+                                            <property name="label" translatable="yes">Double-click a file to add it as a sample</property>
                                           </object>
                                           <packing>
                                             <property name="expand">False</property>
@@ -23139,7 +23199,15 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                               <object class="GtkBox" id="vbox418">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
+                                <property name="margin-left">4</property>
+                                <property name="margin-right">2</property>
+                                <property name="margin-top">2</property>
                                 <property name="orientation">vertical</property>
+                                <property name="spacing">3</property>
+                                <property name="valign">start</property>
+                                <style>
+                                  <class name="veejay-side-toolbar" />
+                                </style>
                                 <child>
                                   <object class="GtkButton" id="sampleadd">
                                     <property name="visible">True</property>

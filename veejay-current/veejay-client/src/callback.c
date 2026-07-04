@@ -3412,19 +3412,42 @@ void	on_button_veejay_clicked(GtkWidget *widget, gpointer user_data)
     int do_sync = 0;
     is_alive(&do_sync);
 }
-void	on_button_sendvims_clicked(GtkWidget *widget, gpointer user_data)
+static void vims_entry_send_current(void)
 {
 	gchar *text = get_text("vimsmessage");
-	if(strncasecmp( text, "600:;",5 ) == 0)
+	if(!text)
+		return;
+
+	gchar *msg = g_strdup(text);
+	if(!msg)
+		return;
+
+	g_strstrip(msg);
+	if(msg[0] == '\0') {
+		vj_msg(VEEJAY_MSG_INFO, "No VIMS message to send");
+		g_free(msg);
+		return;
+	}
+
+	if(strncasecmp(msg, "600:;", 5) == 0) {
+		g_free(msg);
 		veejay_quit();
-	vj_msg(VEEJAY_MSG_INFO, "User defined VIMS message sent '%s'",text );
-	msg_vims( text );
+		return;
+	}
+
+	msg_vims(msg);
+	vj_midi_learning_vims(info->midi, NULL, msg, 0);
+	vj_msg(VEEJAY_MSG_INFO, "User defined VIMS message sent '%s'", msg);
+	g_free(msg);
+}
+
+void	on_button_sendvims_clicked(GtkWidget *widget, gpointer user_data)
+{
+	vims_entry_send_current();
 }
 void	on_vimsmessage_activate(GtkWidget *widget, gpointer user_data)
 {
-	msg_vims( get_text( "vimsmessage") );
-	vj_midi_learning_vims( info->midi, NULL, get_text("vimsmessage"),0);
-	vj_msg(VEEJAY_MSG_INFO, "User defined VIMS message sent '%s'", get_text("vimsmessage"));
+	vims_entry_send_current();
 }
 
 void	on_button_fadedur_value_changed(GtkWidget *widget, gpointer user_data)
@@ -5783,38 +5806,54 @@ void	on_button_openactionfile_clicked(GtkWidget *widget, gpointer user_data)
 
 static	void	load_server_files(char *buf, int len)
 {
-	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "server_files");
-	GtkTreeIter iter;
-	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));
-	GtkListStore *store = GTK_LIST_STORE(model);
+	GtkWidget *tree = glade_xml_get_widget_(info->main_window, "server_files");
 #ifdef STRICT_CHECKING
-	assert(tree != NULL );
+	assert(tree != NULL);
 #endif
+	if(!buf || len <= 0 || !tree || !GTK_IS_TREE_VIEW(tree))
+		return;
+
+	GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(tree));
+	if(!model || !GTK_IS_LIST_STORE(model))
+		return;
+
+	GtkListStore *store = GTK_LIST_STORE(model);
 	int i = 0;
-	int idx = 0;
-	char *ptr = buf;
-	while( i < len ) {
-		int filelen = 0;
-		char name[1024];
+
+	while(i + 4 <= len) {
 		char header[5];
-		memset(header,0,sizeof(header));
-		memset(name, 0,sizeof(name));
-		strncpy(header,ptr, 4 );
-		if(sscanf(header,"%04d", &filelen)==1) {
-			strncpy( name, ptr+4, filelen);
-			gchar *filename = _utf8str( name );
-			gtk_list_store_append(store, &iter);
-			gtk_list_store_set(store, &iter, 0,filename,-1);
-			gtk_tree_view_set_model(GTK_TREE_VIEW(tree),
-					GTK_TREE_MODEL(store));
-			idx ++;
-			ptr += filelen;
+		int filelen = 0;
+
+		memcpy(header, buf + i, 4);
+		header[4] = '\0';
+
+		if(sscanf(header, "%04d", &filelen) != 1 || filelen < 0)
+			break;
+
+		i += 4;
+		if(i + filelen > len)
+			break;
+
+		if(filelen > 0) {
+			char name[1024];
+			int copy_len = MIN(filelen, (int) sizeof(name) - 1);
+			GtkTreeIter iter;
+
+			memcpy(name, buf + i, copy_len);
+			name[copy_len] = '\0';
+
+			gchar *filename = _utf8str(name);
+			if(filename) {
+				gtk_list_store_append(store, &iter);
+				gtk_list_store_set(store, &iter, 0, filename, -1);
+				g_free(filename);
+			}
 		}
-		ptr += 4;
-		i+=4;
-		i+=filelen;
+
+		i += filelen;
 	}
 }
+
 
 void	on_button_browse_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -8643,18 +8682,25 @@ on_vims_messenger_single_clicked( void )
        		gchar *str = gtk_text_buffer_get_text (buffer, &start, &end, FALSE);
 
 		info->vims_line++;
+		g_strstrip(str);
 
-		if(strlen(str) <= 0)
+		if(str[0] == '\0') {
+			g_free(str);
 			continue;
+		}
 
 	        if(str[0] != '+')
 		{
 	               	msg_vims( str );
        		 	vj_msg(VEEJAY_MSG_INFO, "Sent VIMS message '%s' (line %d)",str, info->vims_line-1 );
+			g_free(str);
 			break;
         	}
+
+		g_free(str);
 	}
 }
+
 
 void	on_osdbutton_clicked(GtkWidget *w, gpointer data )
 {
@@ -8850,16 +8896,21 @@ void 	on_macro_save_button_clicked( GtkWidget *w, gpointer data)
 	macro_line[2] = get_nums("macro_loop_position");
 
 	char *message = get_text("macro_vims_message");
-	multi_vims( VIMS_PUT_MACRO, "%d %d %d %s", macro_line[0],macro_line[1],macro_line[2], message );
+    if(!message || message[0] == '\0') {
+        vj_msg(VEEJAY_MSG_INFO, "Enter a VIMS message before saving a macro event");
+        return;
+    }
+
+	multi_vims( VIMS_PUT_MACRO, "%u %u %u %s", macro_line[0],macro_line[1],macro_line[2], message );
         info->uc.reload_hint[HINT_MACRO] = 1;
-	vj_msg(VEEJAY_MSG_INFO, "Saved new event at frame %ld.%d, loop %d", macro_line[0],macro_line[1],macro_line[2]);
+	vj_msg(VEEJAY_MSG_INFO, "Saved new event at frame %u.%u, loop %u", macro_line[0],macro_line[1],macro_line[2]);
 }
 
 void	on_macro_delete_button_clicked( GtkWidget *w, gpointer data)
 {
-	multi_vims( VIMS_DEL_MACRO,"%d %d %d %d", macro_line[0], macro_line[1], macro_line[2], macro_line[3] );
+	multi_vims( VIMS_DEL_MACRO,"%u %u %u %u", macro_line[0], macro_line[1], macro_line[2], macro_line[3] );
         info->uc.reload_hint[HINT_MACRO] = 1;
-	vj_msg(VEEJAY_MSG_INFO, "Removed event at frame %ld.%d, loop %d #%d", macro_line[0],macro_line[1],macro_line[2],macro_line[3]);
+	vj_msg(VEEJAY_MSG_INFO, "Removed event at frame %u.%u, loop %u #%u", macro_line[0],macro_line[1],macro_line[2],macro_line[3]);
 }
 
 void    on_macro_refresh_button_clicked( GtkWidget *w, gpointer data)
