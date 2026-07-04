@@ -134,6 +134,28 @@ static void gvr_sample_slot_color(int sample_type, double *r, double *g, double 
     }
 }
 
+static const char *gvr_sample_bank_type_label(int sample_type)
+{
+    switch(sample_type) {
+        case GVR_SB_TYPE_SAMPLE:    return "Sample";
+        case GVR_SB_TYPE_YUV4MPEG:  return "YUV4MPEG stream";
+        case GVR_SB_TYPE_V4L:       return "V4L stream";
+        case GVR_SB_TYPE_VLOOPBACK: return "VLoopback stream";
+        case GVR_SB_TYPE_COLOR:     return "Color source";
+        case GVR_SB_TYPE_PICTURE:   return "Picture source";
+        case GVR_SB_TYPE_CALI:      return "Calibration source";
+        case GVR_SB_TYPE_GENERATOR: return "Generator source";
+        case GVR_SB_TYPE_SPLITTER:  return "Splitter source";
+        case GVR_SB_TYPE_SHM:       return "Shared-memory stream";
+        case GVR_SB_TYPE_AVFORMAT:  return "AVFormat stream";
+        case GVR_SB_TYPE_NET:       return "Network stream";
+        case GVR_SB_TYPE_MCAST:     return "Multicast stream";
+        case GVR_SB_TYPE_CLONE:     return "Clone source";
+        case GVR_SB_TYPE_DV1394:    return "DV1394 stream";
+        default:                    return "Source";
+    }
+}
+
 static void gvr_sample_text_color(double r, double g, double b, double *tr, double *tg, double *tb)
 {
     double y = (0.299 * r) + (0.587 * g) + (0.114 * b);
@@ -589,10 +611,123 @@ static gboolean gvr_sample_bank_view_leave(GtkWidget *widget, GdkEventCrossing *
     return FALSE;
 }
 
+static gboolean gvr_sample_bank_view_cell_valid(GvrSampleBankView *view, int page, int slot)
+{
+    return view &&
+           page >= 0 && page < view->page_count &&
+           slot >= 0 && slot < GVR_SAMPLE_BANK_SLOTS;
+}
+
+static int gvr_sample_bank_view_keyboard_slot(GvrSampleBankView *view)
+{
+    if(view->selected_page == view->current_page &&
+       view->selected_slot >= 0 && view->selected_slot < GVR_SAMPLE_BANK_SLOTS)
+        return view->selected_slot;
+
+    if(view->hover_slot >= 0 && view->hover_slot < GVR_SAMPLE_BANK_SLOTS)
+        return view->hover_slot;
+
+    return 0;
+}
+
+static void gvr_sample_bank_view_select_keyboard_slot(GtkWidget *widget, int page, int slot)
+{
+    GvrSampleBankView *view = GVR_SAMPLE_BANK_VIEW(widget);
+    int old_page = view->current_page;
+
+    if(!gvr_sample_bank_view_cell_valid(view, page, slot))
+        return;
+
+    view->current_page = page;
+    view->selected_page = page;
+    view->selected_slot = slot;
+    gtk_widget_queue_draw(widget);
+
+    if(view->current_page != old_page)
+        gvr_sample_bank_view_emit_page(view);
+
+    g_signal_emit(view,
+                  gvr_sample_bank_view_signals[SIGNAL_SLOT_SELECTED],
+                  0,
+                  page,
+                  slot);
+}
+
+static gboolean gvr_sample_bank_view_query_tooltip(GtkWidget *widget,
+                                                   gint x,
+                                                   gint y,
+                                                   gboolean keyboard_mode,
+                                                   GtkTooltip *tooltip)
+{
+    GvrSampleBankView *view = GVR_SAMPLE_BANK_VIEW(widget);
+    int page = -1;
+    int slot = -1;
+    gboolean header = FALSE;
+    GvrSampleBankCell *cell;
+    GtkAllocation allocation;
+    char text[768];
+
+    gtk_widget_get_allocation(widget, &allocation);
+    gvr_sample_bank_view_layout(view, allocation.width, allocation.height);
+
+    if(keyboard_mode) {
+        page = view->current_page;
+        slot = gvr_sample_bank_view_keyboard_slot(view);
+    }
+    else if(!gvr_sample_bank_view_hit(view, x, y, &page, &slot, &header) || header) {
+        return FALSE;
+    }
+
+    if(!gvr_sample_bank_view_cell_valid(view, page, slot) || !view->pages)
+        return FALSE;
+
+    cell = &view->pages[page].cells[slot];
+
+    if(cell->sample_id <= 0) {
+        snprintf(text, sizeof(text),
+                 "Empty sample-bank slot\n"
+                 "Bank %d/%d · slot %d\n\n"
+                 "Cursor keys: move selection\n"
+                 "Page Up / Page Down: change bank\n"
+                 "Mouse wheel: change bank",
+                 page + 1,
+                 view->page_count,
+                 slot + 1);
+        gtk_tooltip_set_text(tooltip, text);
+        return TRUE;
+    }
+
+    snprintf(text, sizeof(text),
+             "%s %d\n"
+             "Title: %s\n"
+             "%s%s%s"
+             "Bank %d/%d · slot %d\n\n"
+             "Click / cursor keys: select\n"
+             "Double-click / Enter: play\n"
+             "Shift-click / Shift-Enter: use as mixer source\n"
+             "Page Up / Page Down or mouse wheel: change bank",
+             gvr_sample_bank_type_label(cell->sample_type),
+             cell->sample_id,
+             (cell->title && cell->title[0]) ? cell->title : "untitled",
+             (cell->timecode && cell->timecode[0]) ? "Length/type: " : "",
+             (cell->timecode && cell->timecode[0]) ? cell->timecode : "",
+             (cell->timecode && cell->timecode[0]) ? "\n" : "",
+             page + 1,
+             view->page_count,
+             slot + 1);
+
+    gtk_tooltip_set_text(tooltip, text);
+    return TRUE;
+}
+
 static gboolean gvr_sample_bank_view_key_press(GtkWidget *widget, GdkEventKey *event)
 {
     GvrSampleBankView *view = GVR_SAMPLE_BANK_VIEW(widget);
     int old_page = view->current_page;
+    int page = view->current_page;
+    int slot = gvr_sample_bank_view_keyboard_slot(view);
+    int new_slot = slot;
+    int columns = gvr_clampi(view->columns, 1, GVR_SAMPLE_BANK_SLOTS);
 
     switch(event->keyval) {
         case GDK_KEY_Page_Up:
@@ -603,6 +738,46 @@ static gboolean gvr_sample_bank_view_key_press(GtkWidget *widget, GdkEventKey *e
         case GDK_KEY_KP_Page_Down:
             view->current_page = gvr_clampi(view->current_page + 1, 0, view->page_count - 1);
             break;
+        case GDK_KEY_Left:
+        case GDK_KEY_KP_Left:
+            new_slot = gvr_clampi(slot - 1, 0, GVR_SAMPLE_BANK_SLOTS - 1);
+            gvr_sample_bank_view_select_keyboard_slot(widget, page, new_slot);
+            return TRUE;
+        case GDK_KEY_Right:
+        case GDK_KEY_KP_Right:
+            new_slot = gvr_clampi(slot + 1, 0, GVR_SAMPLE_BANK_SLOTS - 1);
+            gvr_sample_bank_view_select_keyboard_slot(widget, page, new_slot);
+            return TRUE;
+        case GDK_KEY_Up:
+        case GDK_KEY_KP_Up:
+            new_slot = gvr_clampi(slot - columns, 0, GVR_SAMPLE_BANK_SLOTS - 1);
+            gvr_sample_bank_view_select_keyboard_slot(widget, page, new_slot);
+            return TRUE;
+        case GDK_KEY_Down:
+        case GDK_KEY_KP_Down:
+            new_slot = gvr_clampi(slot + columns, 0, GVR_SAMPLE_BANK_SLOTS - 1);
+            gvr_sample_bank_view_select_keyboard_slot(widget, page, new_slot);
+            return TRUE;
+        case GDK_KEY_Home:
+        case GDK_KEY_KP_Home:
+            gvr_sample_bank_view_select_keyboard_slot(widget, page, 0);
+            return TRUE;
+        case GDK_KEY_End:
+        case GDK_KEY_KP_End:
+            gvr_sample_bank_view_select_keyboard_slot(widget, page, GVR_SAMPLE_BANK_SLOTS - 1);
+            return TRUE;
+        case GDK_KEY_Return:
+        case GDK_KEY_KP_Enter:
+            if(view->selected_page == view->current_page &&
+               gvr_sample_bank_view_cell_valid(view, view->selected_page, view->selected_slot)) {
+                g_signal_emit(view,
+                              gvr_sample_bank_view_signals[(event->state & GDK_SHIFT_MASK) ? SIGNAL_SLOT_MIX_REQUESTED : SIGNAL_SLOT_ACTIVATED],
+                              0,
+                              view->selected_page,
+                              view->selected_slot);
+                return TRUE;
+            }
+            return FALSE;
         default:
             return FALSE;
     }
@@ -650,6 +825,7 @@ static void gvr_sample_bank_view_class_init(GvrSampleBankViewClass *klass)
     widget_class->motion_notify_event = gvr_sample_bank_view_motion;
     widget_class->leave_notify_event = gvr_sample_bank_view_leave;
     widget_class->key_press_event = gvr_sample_bank_view_key_press;
+    widget_class->query_tooltip = gvr_sample_bank_view_query_tooltip;
 
     gvr_sample_bank_view_signals[SIGNAL_PAGE_SELECTED] =
         g_signal_new("page-selected",
@@ -713,6 +889,7 @@ static void gvr_sample_bank_view_init(GvrSampleBankView *view)
     view->current_sample_type = -1;
 
     gtk_widget_set_can_focus(GTK_WIDGET(view), TRUE);
+    gtk_widget_set_has_tooltip(GTK_WIDGET(view), TRUE);
     gtk_widget_add_events(GTK_WIDGET(view),
                           GDK_BUTTON_PRESS_MASK |
                           GDK_POINTER_MOTION_MASK |
@@ -948,16 +1125,23 @@ void gvr_sample_bank_view_set_thumbnail(GtkWidget *widget, int page, int slot, G
 void gvr_sample_bank_view_set_selected_slot(GtkWidget *widget, int page, int slot)
 {
     GvrSampleBankView *view;
+    int old_page;
 
     if(!GVR_IS_SAMPLE_BANK_VIEW(widget))
         return;
 
     view = GVR_SAMPLE_BANK_VIEW(widget);
+    old_page = view->current_page;
+
     view->selected_page = page;
     view->selected_slot = slot;
     if(page >= 0 && page < view->page_count)
         view->current_page = page;
+
     gtk_widget_queue_draw(widget);
+
+    if(view->current_page != old_page)
+        gvr_sample_bank_view_emit_page(view);
 }
 
 void gvr_sample_bank_view_set_current_source(GtkWidget *widget, int sample_id, int sample_type)
