@@ -3460,8 +3460,11 @@ void	on_toggle_fademethod_toggled(GtkWidget *w, gpointer user_data)
 	if(info->status_lock)
 		return;
 
-	multi_vims( VIMS_CHAIN_FADE_ALPHA,"%d %d",0, is_button_toggled("toggle_fademethod") );
+	int enabled = is_button_toggled("toggle_fademethod") ? 1 : 0;
+
+	multi_vims( VIMS_CHAIN_FADE_ALPHA,"%d %d",0, enabled );
 	vj_midi_learning_vims_toggle2(info->midi, "toggle_fademethod", VIMS_CHAIN_FADE_ALPHA, 0);
+	vj_msg(VEEJAY_MSG_INFO, "Chain fade method: %s", enabled ? "alpha transition" : "normal opacity blend");
 }
 
 
@@ -7919,18 +7922,31 @@ void	on_alpha_effects_toggled(GtkWidget *w, gpointer user_data)
 		gtk_notebook_set_current_page(GTK_NOTEBOOK(n), 2);
 }
 
+static void alpha_composite_send_ui_state(const char *midi_widget)
+{
+	if(info->status_lock)
+		return;
+
+	int enabled = is_button_toggled("alphacomposite") ? 1 : 0;
+	int alpha_value = is_button_toggled("toggle_alpha255") ? 255 : 0;
+
+	multi_vims( VIMS_ALPHA_COMPOSITE,"%d %d", enabled, alpha_value );
+
+	(void)midi_widget;
+
+	vj_msg(VEEJAY_MSG_INFO, "Output alpha composite %s%s",
+	       enabled ? "requested" : "disabled",
+	       enabled ? (alpha_value == 255 ? " (fill 255)" : " (fill 0)") : "");
+}
+
 void	on_toggle_alpha255_toggled(GtkWidget *w, gpointer user_data)
 {
-	multi_vims( VIMS_ALPHA_COMPOSITE,"%d %d", is_button_toggled( "alphacomposite"), is_button_toggled("toggle_alpha255") ? 255: 0 );
+	alpha_composite_send_ui_state("toggle_alpha255");
 }
 
 void	on_alphacomposite_toggled(GtkWidget *widget, gpointer user_data)
 {
-	int alpha_value = 0;
-	if (is_button_toggled( "toggle_alpha255"))
-		alpha_value = 255;
-
-	multi_vims( VIMS_ALPHA_COMPOSITE,"%d %d", is_button_toggled( "alphacomposite" ), alpha_value );
+	alpha_composite_send_ui_state("alphacomposite");
 }
 
 
@@ -8023,7 +8039,7 @@ int alphaonly_view = 0;
 void		on_previewalphaonly_toggled( GtkWidget *w, gpointer user_data)
 {
 	alphaonly_view = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(w) );
-	vj_msg(VEEJAY_MSG_INFO, "Live viewing %s", (alphaonly_view ? "Alpha only" : "Preview" ) );
+	vj_msg(VEEJAY_MSG_INFO, "Live viewing %s", (alphaonly_view ? "alpha preview" : "normal preview" ) );
 }
 
 void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)

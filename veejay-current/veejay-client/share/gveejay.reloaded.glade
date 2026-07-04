@@ -8699,7 +8699,7 @@
                                             </child>
                                             <child>
                                               <object class="GtkRadioButton" id="alpha_effects">
-                                                <property name="label" translatable="yes">Alpha</property>
+                                                <property name="label" translatable="yes">Alpha / Matte</property>
                                                 <property name="visible">True</property>
                                                 <property name="can-focus">True</property>
                                                 <property name="receives-default">False</property>
@@ -20464,7 +20464,7 @@
                                             <property name="visible">True</property>
                                             <property name="can-focus">True</property>
                                             <property name="receives-default">False</property>
-                                            <property name="tooltip-text" translatable="yes">Show alpha channel only</property>
+                                            <property name="tooltip-text" translatable="yes">Preview the alpha channel instead of the normal image when the preview path supports it.</property>
                                             <property name="use-underline">True</property>
                                             <property name="draw-indicator">True</property>
                                             <signal name="toggled" handler="on_previewalphaonly_toggled" swapped="no" />
@@ -20477,12 +20477,12 @@
                                         </child>
                                         <child>
                                           <object class="GtkCheckButton" id="alphacomposite">
-                                            <property name="label" translatable="yes">Clear alpha</property>
+                                            <property name="label" translatable="yes">Output alpha</property>
                                             <property name="visible">True</property>
                                             <property name="can-focus">True</property>
                                             <property name="receives-default">False</property>
                                             <property name="has-tooltip">True</property>
-                                            <property name="tooltip-text" translatable="yes">Fills the alpha channel every frame when enabled</property>
+                                            <property name="tooltip-text" translatable="yes">Request output alpha compositing. The backend receives the selected fill value; performer/compositor controls final alpha handling.</property>
                                             <property name="use-underline">True</property>
                                             <property name="draw-indicator">True</property>
                                             <signal name="toggled" handler="on_alphacomposite_toggled" swapped="no" />
@@ -20499,7 +20499,7 @@
                                             <property name="can-focus">True</property>
                                             <property name="receives-default">True</property>
                                             <property name="has-tooltip">True</property>
-                                            <property name="tooltip-text" translatable="yes">Alpha 255</property>
+                                            <property name="tooltip-text" translatable="yes">Alpha value used by output alpha compositing: off = 0, on = 255.</property>
                                             <signal name="toggled" handler="on_toggle_alpha255_toggled" swapped="no" />
                                             <child>
                                               <object class="GtkImage" id="image42">
@@ -20521,7 +20521,7 @@
                                             <property name="can-focus">True</property>
                                             <property name="receives-default">True</property>
                                             <property name="has-tooltip">True</property>
-                                            <property name="tooltip-text" translatable="yes">Enable or disable alpha transition</property>
+                                            <property name="tooltip-text" translatable="yes">Use alpha-transition behaviour for the chain fader. This changes chain opacity/fade in/out; it does not force-fill output alpha.</property>
                                             <signal name="toggled" handler="on_toggle_fademethod_toggled" swapped="no" />
                                             <child>
                                               <object class="GtkImage" id="image41">

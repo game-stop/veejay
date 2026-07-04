@@ -1355,6 +1355,11 @@ static struct
     {"Transition shape number for the selected stream."},
     {"Enable shape transitions when switching samples or streams. Configure the current transition in the properties panel."},
     {"Render the selected mixer source through its own FX chain before it is used as the extra frame."},
+    {"Use alpha-transition behaviour for the chain fader. This changes how chain opacity/fade in/out is applied; it does not force-fill the output alpha channel."},
+    {"Request output alpha compositing. The backend receives the selected fill value, but alpha preservation/fill behaviour is handled by the performer/compositor."},
+    {"Alpha value used by output alpha compositing: off = 0, on = 255."},
+    {"Preview the alpha channel instead of the normal image when the preview path supports it."},
+    {"Show Alpha / Matte effects. These effects read, write, or transform the alpha plane/matte data."},
     {"Enable or disable feedback rendering. Some navigation and sample-grid controls are locked while feedback is active."},
     {NULL},
 };
@@ -1564,6 +1569,11 @@ enum
     TOOLTIP_STREAM_TRANSITION_SHAPE,
     TOOLTIP_GLOBAL_TRANSITIONS,
     TOOLTIP_SUBRENDER,
+    TOOLTIP_CHAIN_FADE_ALPHA,
+    TOOLTIP_OUTPUT_ALPHA_COMPOSITE,
+    TOOLTIP_OUTPUT_ALPHA_FILL_VALUE,
+    TOOLTIP_ALPHA_PREVIEW,
+    TOOLTIP_ALPHA_EFFECTS,
     TOOLTIP_FEEDBACK
 };
 
@@ -3267,6 +3277,42 @@ static void init_polish_tooltips(void)
 
         set_tooltip_by_widget(widget_cache[widget_id], tooltips[tooltip_id].text);
     }
+}
+
+static void set_button_label_by_name(const char *name, const char *label)
+{
+    GtkWidget *w = glade_xml_get_widget_(info->main_window, name);
+
+    if(w && GTK_IS_BUTTON(w))
+        gtk_button_set_label(GTK_BUTTON(w), label);
+}
+
+static void init_alpha_ui_polish(void)
+{
+    GtkWidget *w;
+
+    set_button_label_by_name("alpha_effects", "Alpha / Matte");
+    set_button_label_by_name("alphacomposite", "Output alpha");
+
+    w = glade_xml_get_widget_(info->main_window, "alpha_effects");
+    if(w)
+        set_tooltip_by_widget(w, tooltips[TOOLTIP_ALPHA_EFFECTS].text);
+
+    w = glade_xml_get_widget_(info->main_window, "previewalphaonly");
+    if(w)
+        set_tooltip_by_widget(w, tooltips[TOOLTIP_ALPHA_PREVIEW].text);
+
+    w = glade_xml_get_widget_(info->main_window, "alphacomposite");
+    if(w)
+        set_tooltip_by_widget(w, tooltips[TOOLTIP_OUTPUT_ALPHA_COMPOSITE].text);
+
+    w = glade_xml_get_widget_(info->main_window, "toggle_alpha255");
+    if(w)
+        set_tooltip_by_widget(w, tooltips[TOOLTIP_OUTPUT_ALPHA_FILL_VALUE].text);
+
+    if(widget_cache[WIDGET_TOGGLE_FADEMETHOD])
+        set_tooltip_by_widget(widget_cache[WIDGET_TOGGLE_FADEMETHOD],
+                              tooltips[TOOLTIP_CHAIN_FADE_ALPHA].text);
 }
 
 void on_devicelist_row_activated(GtkTreeView *treeview,
@@ -6526,9 +6572,16 @@ static void update_current_slot(int *history, int pm, int last_pm) {
                                      info->status_tokens[SUBRENDER] ? TRUE : FALSE);
     }
 
-    if( history[FADE_ALPHA] != info->status_tokens[FADE_ALPHA] || info->status_tokens[FADE_ALPHA] != gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_TOGGLE_FADEMETHOD ] )) )
+    if(widget_cache[WIDGET_TOGGLE_FADEMETHOD])
     {
-        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_TOGGLE_FADEMETHOD ] ), TRUE );
+        gboolean fade_alpha = info->status_tokens[FADE_ALPHA] ? TRUE : FALSE;
+
+        if(history[FADE_ALPHA] != info->status_tokens[FADE_ALPHA] ||
+           fade_alpha != gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_TOGGLE_FADEMETHOD])))
+        {
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_TOGGLE_FADEMETHOD]),
+                                         fade_alpha);
+        }
     }
 
     if( history[FADE_METHOD] != info->status_tokens[FADE_METHOD] )
@@ -7639,7 +7692,7 @@ void setup_effectlist_info(void)
 
     set_tooltip_by_widget (trees[0], tooltips[TOOLTIP_FXSELECT].text);
     set_tooltip_by_widget (trees[1], tooltips[TOOLTIP_FXSELECT].text);
-    set_tooltip_by_widget (trees[2], tooltips[TOOLTIP_FXSELECT].text);
+    set_tooltip_by_widget (trees[2], tooltips[TOOLTIP_ALPHA_EFFECTS].text);
 
     fx_list_ = (vevo_port_t*) vpn( 200 );
 
@@ -7669,7 +7722,7 @@ void setup_effectlist_info(void)
 
     setup_tree_text_column( "tree_effectlist", FX_STRING, "Effect",0 );
     setup_tree_text_column( "tree_effectmixlist", FX_STRING, "Effect",0 );
-    setup_tree_text_column( "tree_alphalist", FX_STRING, "Alpha",0);
+    setup_tree_text_column( "tree_alphalist", FX_STRING, "Alpha / Matte",0);
 
     for(i = 0; i < 3;  i ++ )
     {
@@ -14460,6 +14513,7 @@ void vj_gui_init(const char *glade_file,
     init_audio_beat_meter_styles();
     init_audio_sync_tooltips();
     init_polish_tooltips();
+    init_alpha_ui_polish();
 
     GtkWidget *box = glade_xml_get_widget_( info->main_window, "sample_bank_hbox" );
     info->sample_bank_view = new_bank_pad(box);
