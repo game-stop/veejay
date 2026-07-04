@@ -2063,6 +2063,9 @@ enum
     STATE_QUIT = 8,
 };
 
+static int reconnect_preserve_multitrack = 0;
+static void vj_gui_disconnect_internal(int restart_schedule, int keep_multitrack);
+
 enum
 {
     FXC_ID = 0,
@@ -9992,8 +9995,6 @@ int veejay_update_multitrack( void *ptr )
 
 
     GtkWidget *maintrack = widget_cache[ WIDGET_IMAGEA ];
-    GtkWidget *ww = widget_cache[ WIDGET_NOTEBOOK18 ];
-    int deckpage = gtk_notebook_get_current_page(GTK_NOTEBOOK(ww));
     int tmp = 0, i;
 
     if( s->status_list[s->master] != NULL ) {
@@ -10066,8 +10067,7 @@ int veejay_update_multitrack( void *ptr )
                 }
             }
 
-            if(deckpage == 3)
-                multitrack_update_sequence_image( info->mt, i, s->img_list[i] );
+            multitrack_update_sequence_image( info->mt, i, s->img_list[i] );
 
             if( s->img_list[i] )
                 g_object_unref( s->img_list[i] );
@@ -13764,7 +13764,7 @@ void vj_gui_set_debug_level(int level, int n_tracks, int pw, int ph )
     vims_verbosity = level;
 
     if( !mt_set_max_tracks(n_tracks) ) {
-        mt_set_max_tracks(5);
+        mt_set_max_tracks(4);
     }
 }
 
@@ -13872,6 +13872,7 @@ int vj_img_cb(GdkPixbuf *img)
 
 void vj_gui_cb(int state, char *hostname, int port_num)
 {
+    reconnect_preserve_multitrack = (state != 0);
     info->watch.state = STATE_RECONNECT;
     put_text2(widget_cache[WIDGET_ENTRY_HOSTNAME], hostname);
     update_spin_value2(widget_cache[WIDGET_BUTTON_PORTNUM], port_num);
@@ -14337,11 +14338,12 @@ static int auto_connect_to_veejay(char *host, int port_num)
     for( i = port_num; i < 9999; i += 1000 ) {
 
         if( vj_gui_reconnect( hostname, NULL, i ) ) {
-            if( multrack_audoadd( info->mt, hostname, i) == -1) {
+            int current_track = multrack_audoadd( info->mt, hostname, i);
+            if( current_track == -1) {
                 return 0;
             }
 
-            multitrack_set_master_track( info->mt, 0 );
+            multitrack_set_master_track( info->mt, current_track );
 
 
             update_spin_value2(widget_cache[WIDGET_BUTTON_PORTNUM], i);
@@ -14627,8 +14629,7 @@ void vj_gui_init(const char *glade_file,
                                                    "gveejay_window" ),
                              glade_xml_get_widget_( info->main_window,
                                                    "mt_box" ),
-                             glade_xml_get_widget_( info->main_window,
-                                                   "statusbar") ,
+                             widget_cache[WIDGET_STATUSBAR],
                              glade_xml_get_widget_( info->main_window,
                                                    "previewtoggle"),
                              pw,
@@ -15012,7 +15013,9 @@ gboolean    is_alive( int *do_sync )
 
     if( gui->watch.state == STATE_RECONNECT )
     {
-        vj_gui_disconnect(FALSE);
+        int keep_multitrack = reconnect_preserve_multitrack;
+        reconnect_preserve_multitrack = 0;
+        vj_gui_disconnect_internal(FALSE, keep_multitrack);
         gui->watch.state = STATE_CONNECT;
         return TRUE;
     }
@@ -15046,14 +15049,15 @@ gboolean    is_alive( int *do_sync )
         }
 
 
-        if( multrack_audoadd( info->mt, remote, port ) == -1 ) {
+        int current_track = multrack_audoadd( info->mt, remote, port );
+        if( current_track == -1 ) {
             vj_gui_disconnect(FALSE);
             reloaded_restart_common(FALSE);
             return TRUE;
         }
 
-        veejay_msg(VEEJAY_MSG_DEBUG, "Connected to master track");
-        multitrack_set_master_track( info->mt, 0 );
+        veejay_msg(VEEJAY_MSG_DEBUG, "Connected to current track %d", current_track);
+        multitrack_set_master_track( info->mt, current_track );
         multitrack_set_quality( info->mt, 1 );
 
         *do_sync = 1;
@@ -15072,7 +15076,7 @@ gboolean    is_alive( int *do_sync )
     return TRUE;
 }
 
-void vj_gui_disconnect(int restart_schedule)
+static void vj_gui_disconnect_internal(int restart_schedule, int keep_multitrack)
 {
     const int quitting = (info->watch.state == STATE_QUIT);
 
@@ -15091,7 +15095,7 @@ void vj_gui_disconnect(int restart_schedule)
     if(restart_schedule)
         reloaded_schedule_restart();
 
-    if(info->mt) {
+    if(info->mt && !keep_multitrack) {
         multitrack_close_tracks(info->mt);
         multitrack_disconnect(info->mt);
     }
@@ -15102,6 +15106,11 @@ void vj_gui_disconnect(int restart_schedule)
         vj_client_free(info->client);
         info->client = NULL;
     }
+}
+
+void vj_gui_disconnect(int restart_schedule)
+{
+    vj_gui_disconnect_internal(restart_schedule, 0);
 }
 
 void vj_gui_disable(void)

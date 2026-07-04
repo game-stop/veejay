@@ -69,8 +69,8 @@ typedef struct
 	int  num;
 	int  status_lock;
 	void *backlink;
-	int status_cache[32];
-	int history[4][32];
+	int status_cache[VJ_STATUS_ARRAY_SIZE];
+	int history[4][VJ_STATUS_ARRAY_SIZE];
 } sequence_view_t;
 
 typedef struct
@@ -96,10 +96,11 @@ typedef struct
     int   track_status[__MAX_TRACKS];
 } multitracker_t;
 
-static int	MAX_TRACKS = 8; /* MASTER (current) + Track 1 to 6 */
+static int	MAX_TRACKS = 4;
 static void		*parent__ = NULL;
 
 static char	*mt_new_connection_dialog(multitracker_t *mt, int *port_num, int *error);
+static void	multitrack_set_preview_toggle_state(multitracker_t *mt, int track, int active);
 static void	add_buttons( sequence_view_t *p, sequence_view_t *seqv , GtkWidget *w);
 static void	add_buttons2( sequence_view_t *p, sequence_view_t *seqv , GtkWidget *w);
 static sequence_view_t *new_sequence_view( void *vp, int num );
@@ -114,7 +115,7 @@ extern void    vj_msg(int type, const char format[], ...);
 
 int mt_set_max_tracks(int mt)
 {
-	if( mt < 0 || mt > __MAX_TRACKS)
+	if( mt < 1 || mt > __MAX_TRACKS)
 		return 0;
 	MAX_TRACKS = mt;
 	return 1;
@@ -123,6 +124,53 @@ int mt_set_max_tracks(int mt)
 int	mt_get_max_tracks(void)
 {
 	return  __MAX_TRACKS;
+}
+
+static const char *multitrack_default_host(multitracker_t *mt)
+{
+	const char *host = NULL;
+
+	if(mt && mt->preview)
+		host = gvr_track_get_hostname(mt->preview, 0);
+
+	return (host && *host) ? host : "localhost";
+}
+
+static int multitrack_next_port_hint(multitracker_t *mt, const char *host)
+{
+	int base = DEFAULT_PORT_NUM;
+	int current = 0;
+	int p;
+
+	if(mt && mt->preview) {
+		current = gvr_track_get_portnum(mt->preview, 0);
+		if(current > 0)
+			base = current;
+	}
+
+	if(!mt || !mt->preview)
+		return base;
+
+	for(p = (current > 0 ? base + 1000 : base); p <= 65535; p += 1000)
+		if(!gvr_track_already_open(mt->preview, host, p))
+			return p;
+
+	for(p = DEFAULT_PORT_NUM; p <= 65535; p += 1000)
+		if(!gvr_track_already_open(mt->preview, host, p))
+			return p;
+
+	return base;
+}
+
+static void multitrack_set_preview_toggle_state(multitracker_t *mt, int track, int active)
+{
+	if(!mt || track < 0 || track >= MAX_TRACKS || !mt->view[track])
+		return;
+
+	mt->view[track]->status_lock = 1;
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(mt->view[track]->toggle), active ? TRUE : FALSE);
+	gtk_button_set_label(GTK_BUTTON(mt->view[track]->toggle), active ? "Preview on" : "Preview off");
+	mt->view[track]->status_lock = 0;
 }
 #define gtk_widget_set_sensitive_( w,p ) gtk_widget_set_sensitive(w,p)
 #define gtk_image_set_from_pixbuf_(w,p) gtk_image_set_from_pixbuf(w,p)
@@ -134,9 +182,21 @@ static	void	status_print(multitracker_t *mt, const char format[], ... )
 	vsnprintf( buf,sizeof(buf), format, args );
 	gsize nr,nw;
 	gchar *text = g_locale_to_utf8( buf, -1, &nr, &nw, NULL );
-	text[strlen(text)-1] = '\0';
-	gtk_statusbar_push( GTK_STATUSBAR(mt->status_bar), 0, text);
-	g_free(text);
+	if(text)
+	{
+		gsize len = strlen(text);
+		if(len > 0 && text[len - 1] == '\n')
+			text[len - 1] = '\0';
+
+		if(mt && mt->status_bar)
+		{
+			if(GTK_IS_STATUSBAR(mt->status_bar))
+				gtk_statusbar_push( GTK_STATUSBAR(mt->status_bar), 0, text);
+			else if(GTK_IS_LABEL(mt->status_bar))
+				gtk_label_set_text(GTK_LABEL(mt->status_bar), text);
+		}
+		g_free(text);
+	}
 	va_end(args);
 }
 
@@ -224,13 +284,156 @@ void    multitrack_sync_simple_cmd2( void *data, int vims, int arg )
         gvr_queue_mvims(mt->preview,-1, vims, arg);
 }
 
+static int seq_stream_buffer_supported_status(const int *status)
+{
+	return status &&
+	       status[PLAY_MODE] == MODE_STREAM &&
+	       status[CURRENT_ID] > 0 &&
+	       status[STREAM_BUFFER_STATE] != STREAM_BUFFER_STATE_UNSUPPORTED;
+}
+
+static int seq_stream_buffer_ready_status(const int *status)
+{
+	return seq_stream_buffer_supported_status(status) &&
+	       status[STREAM_BUFFER_ENABLED] > 0 &&
+	       status[STREAM_BUFFER_FILLED] > 0;
+}
+
+static int seq_stream_buffer_ready(sequence_view_t *v)
+{
+	return v && seq_stream_buffer_ready_status(v->status_cache);
+}
+
+static int seq_stream_id(sequence_view_t *v)
+{
+	int stream_id = v ? v->status_cache[CURRENT_ID] : 0;
+	return stream_id > 0 ? stream_id : 0;
+}
+
+static int seq_stream_buffer_length(sequence_view_t *v)
+{
+	int len = v ? v->status_cache[STREAM_BUFFER_FILLED] : 0;
+	return len > 0 ? len : 1;
+}
+
+static int seq_stream_effective_speed(sequence_view_t *v)
+{
+	int speed = v ? v->status_cache[STREAM_BUFFER_SPEED] : 1;
+	if(v && v->status_cache[STREAM_BUFFER_DIRECTION] < 0 && speed > 0)
+		speed = -speed;
+	return speed;
+}
+
+static int seq_stream_transport_length_status(const int *status)
+{
+	int len;
+
+	if(seq_stream_buffer_ready_status(status)) {
+		len = status[STREAM_BUFFER_FILLED];
+		return len > 0 ? len : 1;
+	}
+
+	len = status[SAMPLE_MARKER_END];
+	if(len <= 0)
+		len = status[TOTAL_FRAMES];
+
+	return len > 0 ? len : 1;
+}
+
+static int seq_stream_transport_position_status(const int *status)
+{
+	int len = seq_stream_transport_length_status(status);
+	int pos = seq_stream_buffer_ready_status(status) ?
+		status[STREAM_BUFFER_POSITION] :
+		status[FRAME_NUM];
+
+	if(pos < 0)
+		pos = 0;
+	else if(pos >= len)
+		pos = len - 1;
+
+	return pos;
+}
+
+static const char *seq_stream_buffer_state_name(int state)
+{
+	switch(state) {
+		case STREAM_BUFFER_STATE_UNSUPPORTED: return "no buffer";
+		case STREAM_BUFFER_STATE_OFF: return "buffer off";
+		case STREAM_BUFFER_STATE_EMPTY: return "buffer empty";
+		case STREAM_BUFFER_STATE_LIVE: return "buffer live";
+		case STREAM_BUFFER_STATE_PLAYING: return "buffer play";
+		case STREAM_BUFFER_STATE_PAUSED: return "buffer paused";
+		default: return "buffer ?";
+	}
+}
+
+static void seq_set_label_text(GtkWidget *label, const char *text)
+{
+	if(label && GTK_IS_LABEL(label))
+		gtk_label_set_text(GTK_LABEL(label), text ? text : "");
+}
+
+static void seq_update_stream_status_label(sequence_view_t *v, const int *status)
+{
+	char text[96];
+	int capacity = 0;
+	int filled = 0;
+	int pos = 0;
+	int speed = 0;
+	int direction = 0;
+
+	if(!v || !status)
+		return;
+
+	capacity = status[STREAM_BUFFER_CAPACITY];
+	filled = status[STREAM_BUFFER_FILLED];
+	pos = status[STREAM_BUFFER_POSITION];
+	speed = status[STREAM_BUFFER_SPEED];
+	direction = status[STREAM_BUFFER_DIRECTION];
+
+	if(!seq_stream_buffer_supported_status(status)) {
+		seq_set_label_text(v->labels_[1], "live / no buffer");
+		return;
+	}
+
+	if(capacity < 0)
+		capacity = 0;
+	if(filled < 0)
+		filled = 0;
+	if(pos < 0)
+		pos = 0;
+	if(filled > 0 && pos >= filled)
+		pos = filled - 1;
+
+	if(!status[STREAM_BUFFER_ENABLED] || filled <= 0) {
+		if(capacity > 0)
+			snprintf(text, sizeof(text), "%s %d",
+				seq_stream_buffer_state_name(status[STREAM_BUFFER_STATE]), capacity);
+		else
+			snprintf(text, sizeof(text), "%s",
+				seq_stream_buffer_state_name(status[STREAM_BUFFER_STATE]));
+		seq_set_label_text(v->labels_[1], text);
+		return;
+	}
+
+	if(direction < 0 && speed > 0)
+		speed = -speed;
+
+	snprintf(text, sizeof(text), "buf %d/%d x%d", pos + 1, filled, speed);
+	seq_set_label_text(v->labels_[1], text);
+}
+
 
 static	void	seq_gotostart(GtkWidget *w, gpointer data )
 {
 	sequence_view_t *v = (sequence_view_t*) data;
 	multitracker_t *mt = (multitracker_t*)v->backlink;
 
-	gvr_queue_vims( mt->preview, v->num ,VIMS_VIDEO_GOTO_START );
+	if(seq_stream_buffer_ready(v))
+		gvr_queue_mmvims(mt->preview, v->num, VIMS_STREAM_BUFFER_SET_FRAME, seq_stream_id(v), 0);
+	else
+		gvr_queue_vims( mt->preview, v->num ,VIMS_VIDEO_GOTO_START );
 }
 
 static void seq_reverse(GtkWidget *w, gpointer data)
@@ -238,7 +441,10 @@ static void seq_reverse(GtkWidget *w, gpointer data)
 	sequence_view_t *v = (sequence_view_t*) data;
 	multitracker_t *mt = (multitracker_t*)v->backlink;
 
-	gvr_queue_vims( mt->preview, v->num ,VIMS_VIDEO_PLAY_BACKWARD );
+	if(seq_stream_buffer_ready(v))
+		gvr_queue_mvims(mt->preview, v->num, VIMS_STREAM_BUFFER_BACKWARD, seq_stream_id(v));
+	else
+		gvr_queue_vims( mt->preview, v->num ,VIMS_VIDEO_PLAY_BACKWARD );
 }
 
 static void seq_pause(GtkWidget *w, gpointer data)
@@ -246,7 +452,10 @@ static void seq_pause(GtkWidget *w, gpointer data)
 	sequence_view_t *v = (sequence_view_t*) data;
 	multitracker_t *mt = (multitracker_t*)v->backlink;
 
-	gvr_queue_vims( mt->preview, v->num ,VIMS_VIDEO_PLAY_STOP );
+	if(seq_stream_buffer_ready(v))
+		gvr_queue_mvims(mt->preview, v->num, VIMS_STREAM_BUFFER_STOP, seq_stream_id(v));
+	else
+		gvr_queue_vims( mt->preview, v->num ,VIMS_VIDEO_PLAY_STOP );
 }
 
 static void seq_play( GtkWidget *w, gpointer data)
@@ -254,7 +463,10 @@ static void seq_play( GtkWidget *w, gpointer data)
 	sequence_view_t *v = (sequence_view_t*) data;
 	multitracker_t *mt = (multitracker_t*)v->backlink;
 
-	gvr_queue_vims( mt->preview, v->num ,VIMS_VIDEO_PLAY_FORWARD );
+	if(seq_stream_buffer_ready(v))
+		gvr_queue_mvims(mt->preview, v->num, VIMS_STREAM_BUFFER_FORWARD, seq_stream_id(v));
+	else
+		gvr_queue_vims( mt->preview, v->num ,VIMS_VIDEO_PLAY_FORWARD );
 }
 
 static void seq_gotoend(GtkWidget *w, gpointer data)
@@ -262,31 +474,40 @@ static void seq_gotoend(GtkWidget *w, gpointer data)
 	sequence_view_t *v = (sequence_view_t*) data;
 	multitracker_t *mt = (multitracker_t*)v->backlink;
 
-	gvr_queue_vims( mt->preview, v->num ,VIMS_VIDEO_GOTO_END );
+	if(seq_stream_buffer_ready(v))
+		gvr_queue_mmvims(mt->preview, v->num, VIMS_STREAM_BUFFER_SET_FRAME, seq_stream_id(v), -1);
+	else
+		gvr_queue_vims( mt->preview, v->num ,VIMS_VIDEO_GOTO_END );
 }
 
 static	void	seq_speeddown(GtkWidget *w, gpointer data)
 {
 	sequence_view_t *v = (sequence_view_t*) data;
 	multitracker_t *mt = (multitracker_t*)v->backlink;
-
-	gint n = v->status_cache[ SAMPLE_SPEED ];
+	gint n = seq_stream_buffer_ready(v) ? seq_stream_effective_speed(v) : v->status_cache[SAMPLE_SPEED];
 
 	if( n < 0 ) n += 1;
 	if( n > 0 ) n -= 1;
-	gvr_queue_mvims( mt->preview, v->num ,VIMS_VIDEO_SET_SPEED , n );
+
+	if(seq_stream_buffer_ready(v))
+		gvr_queue_mmvims(mt->preview, v->num, VIMS_STREAM_BUFFER_SET_SPEED, seq_stream_id(v), n);
+	else
+		gvr_queue_mvims( mt->preview, v->num ,VIMS_VIDEO_SET_SPEED , n );
 }
 
 static	void	seq_speedup(GtkWidget *w, gpointer data)
 {
 	sequence_view_t *v = (sequence_view_t*) data;
 	multitracker_t *mt = (multitracker_t*)v->backlink;
-
-	gint n = v->status_cache[ SAMPLE_SPEED ];
+	gint n = seq_stream_buffer_ready(v) ? seq_stream_effective_speed(v) : v->status_cache[SAMPLE_SPEED];
 
 	if( n < 0 ) n -= 1;
 	if( n > 0 ) n += 1;
-	gvr_queue_mvims( mt->preview, v->num ,VIMS_VIDEO_SET_SPEED , n );
+
+	if(seq_stream_buffer_ready(v))
+		gvr_queue_mmvims(mt->preview, v->num, VIMS_STREAM_BUFFER_SET_SPEED, seq_stream_id(v), n);
+	else
+		gvr_queue_mvims( mt->preview, v->num ,VIMS_VIDEO_SET_SPEED , n );
 }
 
 static	void	seq_prevframe(GtkWidget *w, gpointer data)
@@ -294,8 +515,10 @@ static	void	seq_prevframe(GtkWidget *w, gpointer data)
 	sequence_view_t *v = (sequence_view_t*) data;
 	multitracker_t *mt = (multitracker_t*)v->backlink;
 
-	gvr_queue_vims( mt->preview, v->num ,VIMS_VIDEO_PREV_FRAME );
-
+	if(seq_stream_buffer_ready(v))
+		gvr_queue_mmvims(mt->preview, v->num, VIMS_STREAM_BUFFER_SKIP_FRAME, seq_stream_id(v), -1);
+	else
+		gvr_queue_vims( mt->preview, v->num ,VIMS_VIDEO_PREV_FRAME );
 }
 
 static	void	seq_nextframe(GtkWidget *w, gpointer data)
@@ -303,7 +526,10 @@ static	void	seq_nextframe(GtkWidget *w, gpointer data)
 	sequence_view_t *v = (sequence_view_t*) data;
 	multitracker_t *mt = (multitracker_t*)v->backlink;
 
-	gvr_queue_vims( mt->preview, v->num ,VIMS_VIDEO_SKIP_FRAME );
+	if(seq_stream_buffer_ready(v))
+		gvr_queue_mmvims(mt->preview, v->num, VIMS_STREAM_BUFFER_SKIP_FRAME, seq_stream_id(v), 1);
+	else
+		gvr_queue_vims( mt->preview, v->num ,VIMS_VIDEO_SKIP_FRAME );
 }
 
 static	void	seq_speed( GtkWidget *w, gpointer data)
@@ -316,7 +542,11 @@ static	void	seq_speed( GtkWidget *w, gpointer data)
   GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
 	gdouble value = gtk_adjustment_get_value (a);
 	gint speed = (gint) value;
-	gvr_queue_mvims( mt->preview, v->num ,VIMS_VIDEO_SET_SPEED , speed );
+
+	if(seq_stream_buffer_ready(v))
+		gvr_queue_mmvims(mt->preview, v->num, VIMS_STREAM_BUFFER_SET_SPEED, seq_stream_id(v), speed);
+	else
+		gvr_queue_mvims( mt->preview, v->num ,VIMS_VIDEO_SET_SPEED , speed );
 }
 
 static	void	seq_opacity( GtkWidget *w, gpointer data)
@@ -338,22 +568,28 @@ static	void	update_pos( void *user_data, gint total, gint current )
 {
 	sequence_view_t *v = (sequence_view_t*) user_data;
 	multitracker_t *mt = v->backlink;
-	if(v->status_lock)
-		return;
+	int safe_total = total > 0 ? total : 1;
+
+	if(current < 0)
+		current = 0;
+	else if(current >= safe_total)
+		current = safe_total - 1;
 
   GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( v->timeline_ ));
-  gtk_adjustment_set_value (a, 1.0 / (gdouble) total * current );
+  gtk_adjustment_set_value (a, (gdouble) current / (gdouble) safe_total );
 
 	char *now = format_time( current , mt->fps);
-	gtk_label_set_text( GTK_LABEL(v->labels_[0]), now );
+	seq_set_label_text(v->labels_[0], now);
 	free(now);
+
+	char *end = format_time( safe_total, mt->fps);
+	seq_set_label_text(v->labels_[1], end);
+	free(end);
 }
 
 static	void	update_speed( void *user_data, gint speed )
 {
 	sequence_view_t *v = (sequence_view_t*) user_data;
-	if(v->status_lock)
-		return;
 
   GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( v->sliders_[0] ));
   gtk_adjustment_set_value( a, (gdouble) speed );
@@ -426,9 +662,38 @@ static	void	add_buttons2( sequence_view_t *p, sequence_view_t *seqv , GtkWidget 
 
 
 
-static	void	playmode_sensitivity( sequence_view_t *p, gint pm )
+static void set_first_row_sensitive(sequence_view_t *p, int sensitive)
 {
 	int i;
+	for(i = 0; i < FIRST_ROW_END; i++)
+		gtk_widget_set_sensitive_(GTK_WIDGET(p->buttons[i]), sensitive);
+}
+
+static void set_stream_button_row_sensitive(sequence_view_t *p, const int *status)
+{
+	int ready = seq_stream_buffer_ready_status(status);
+
+	gtk_widget_set_sensitive_(GTK_WIDGET(p->button_box2), ready);
+	gtk_widget_set_sensitive_(GTK_WIDGET(p->button_box), ready);
+	gtk_widget_set_sensitive_(GTK_WIDGET(p->sliders_[0]), ready);
+	gtk_widget_set_sensitive_(GTK_WIDGET(p->timeline_), ready);
+	gtk_widget_set_sensitive_(GTK_WIDGET(p->sliders_[1]), TRUE);
+	set_first_row_sensitive(p, ready);
+}
+
+static int stream_button_sensitivity_changed(const int *old_status, const int *new_status)
+{
+	return old_status[PLAY_MODE] != new_status[PLAY_MODE] ||
+	       old_status[CURRENT_ID] != new_status[CURRENT_ID] ||
+	       old_status[STREAM_BUFFER_STATE] != new_status[STREAM_BUFFER_STATE] ||
+	       old_status[STREAM_BUFFER_ENABLED] != new_status[STREAM_BUFFER_ENABLED] ||
+	       old_status[STREAM_BUFFER_FILLED] != new_status[STREAM_BUFFER_FILLED];
+}
+
+static	void	playmode_sensitivity(sequence_view_t *p, const int *status)
+{
+	int pm = status[PLAY_MODE];
+
 	if( pm == MODE_STREAM || pm == MODE_PLAIN || pm == MODE_SAMPLE )
 	{
 		if(p->num > 0)
@@ -438,16 +703,7 @@ static	void	playmode_sensitivity( sequence_view_t *p, gint pm )
 
 	if( pm == MODE_STREAM )
 	{
-		gtk_widget_set_sensitive_( GTK_WIDGET( p->button_box2 ), FALSE );
-		gtk_widget_set_sensitive_( GTK_WIDGET( p->button_box ), FALSE );
-		gtk_widget_set_sensitive_( GTK_WIDGET( p->sliders_[0] ), FALSE );
-		gtk_widget_set_sensitive_( GTK_WIDGET( p->timeline_ ), FALSE );
-		gtk_widget_set_sensitive_( GTK_WIDGET( p->sliders_[1] ), TRUE );
-		for( i = 0; i < FIRST_ROW_END;i ++ )
-		{
-			gtk_widget_set_sensitive_( GTK_WIDGET( p->buttons[i] ), FALSE );
-
-		}
+		set_stream_button_row_sensitive(p, status);
 	}
 	else
 	{
@@ -457,10 +713,7 @@ static	void	playmode_sensitivity( sequence_view_t *p, gint pm )
 			gtk_widget_set_sensitive_( GTK_WIDGET( p->button_box ), TRUE );
 			gtk_widget_set_sensitive_( GTK_WIDGET( p->sliders_[0] ), TRUE );
 			gtk_widget_set_sensitive_( GTK_WIDGET( p->timeline_ ), TRUE );
-			for( i = 0; i < FIRST_ROW_END;i ++ )
-			{
-				gtk_widget_set_sensitive_( GTK_WIDGET( p->buttons[i] ), TRUE );
-			}
+			set_first_row_sensitive(p, TRUE);
 		}
 		if( pm == MODE_SAMPLE )
 			gtk_widget_set_sensitive_( GTK_WIDGET( p->sliders_[1] ), TRUE );
@@ -474,13 +727,25 @@ static	void	update_widgets(int *status, sequence_view_t *p, int pm)
 {
 	multitracker_t *mt = (multitracker_t*) p->backlink;
 	int *h = p->history[pm];
-	if( h[PLAY_MODE] != pm )
-		playmode_sensitivity( p, pm );
+	if(stream_button_sensitivity_changed(h, status))
+		playmode_sensitivity(p, status);
 
 	if( pm == MODE_STREAM )
 	{
-		update_pos( p, status[TOTAL_FRAMES], 0 );
-		update_speed( p, 1 );
+		update_pos(p,
+			seq_stream_transport_length_status(status),
+			seq_stream_transport_position_status(status));
+
+		if(seq_stream_buffer_ready_status(status)) {
+			int speed = status[STREAM_BUFFER_SPEED];
+			if(status[STREAM_BUFFER_DIRECTION] < 0 && speed > 0)
+				speed = -speed;
+			update_speed(p, speed);
+		}
+		else {
+			update_speed( p, 1 );
+		}
+		seq_update_stream_status_label(p, status);
 	}
 	else
 	if( pm == MODE_SAMPLE || pm == MODE_PLAIN )
@@ -507,12 +772,12 @@ int		update_multitrack_widgets( void *data, int *array, int track )
 	p->status_lock = 1;
 	int pm = array[PLAY_MODE];
 	int i;
-	for( i  =  0; i < 20; i ++ )
+	for( i  =  0; i < VJ_STATUS_ARRAY_SIZE; i ++ )
 		p->status_cache[i] = array[i];
 	update_widgets(array, p, pm);
 
 	int *his = p->history[ pm ];
-	for( i  =  0; i < 20; i ++ )
+	for( i  =  0; i < VJ_STATUS_ARRAY_SIZE; i ++ )
 		his[i] = array[i];
 	p->status_lock = 0;
 	return 1;
@@ -541,9 +806,13 @@ static void sequence_preview_cb(GtkWidget *widget, gpointer user_data)
 		return;
 
     int status = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) );
-        
-	gvr_track_toggle_preview( mt->preview, v->num,status );
 
+	if(!gvr_track_toggle_preview( mt->preview, v->num,status )) {
+		multitrack_set_preview_toggle_state(mt, v->num, gvr_get_preview_status(mt->preview, v->num));
+		return;
+	}
+
+	multitrack_set_preview_toggle_state(mt, v->num, status);
 	sequence_preview_size( mt, v->num );
 
 	if( !status )
@@ -561,8 +830,20 @@ static	void	sequence_set_current_frame(GtkWidget *w, gpointer user_data)
 
     GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
     gdouble pos = gtk_adjustment_get_value (a);
-	gint frame = pos * v->status_cache[TOTAL_FRAMES];
+	gint frame;
 
+	if(seq_stream_buffer_ready(v)) {
+		int len = seq_stream_buffer_length(v);
+		frame = pos * len;
+		if(frame >= len)
+			frame = len - 1;
+		if(frame < 0)
+			frame = 0;
+		gvr_queue_mmvims(mt->preview, v->num, VIMS_STREAM_BUFFER_SET_FRAME, seq_stream_id(v), frame);
+		return;
+	}
+
+	frame = pos * v->status_cache[TOTAL_FRAMES];
 	gvr_queue_mvims( mt->preview, v->num, VIMS_VIDEO_SET_FRAME, frame );
 }
 
@@ -602,10 +883,10 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	gtk_widget_set_size_request_( seqv->area, 176,144  ); 
 	seqv->panel = gtk_frame_new(NULL);
 
-	seqv->toggle = gtk_toggle_button_new_with_label( "Preview" );
+	seqv->toggle = gtk_toggle_button_new_with_label( "Preview off" );
 
     gtk_toggle_button_set_active(
-		GTK_TOGGLE_BUTTON(seqv->toggle), gveejay_user_preview()  );
+		GTK_TOGGLE_BUTTON(seqv->toggle), FALSE  );
 	g_signal_connect( G_OBJECT( seqv->toggle ), "toggled", G_CALLBACK(sequence_preview_cb),
 		(gpointer)seqv );
 	gtk_box_pack_start( GTK_BOX(seqv->main_vbox), seqv->toggle,FALSE,FALSE, 0 );
@@ -697,7 +978,12 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
 	gtk_box_set_spacing( GTK_BOX(hbox), 10 );
 	seqv->labels_[0] = gtk_label_new( "00:00:00:00" );
-	seqv->labels_[1] = gtk_label_new( "00:00:00:00" );
+	seqv->labels_[1] = gtk_label_new( "--" );
+	gtk_widget_set_tooltip_text(GTK_WIDGET(seqv->labels_[0]), "Current transport position");
+	gtk_widget_set_tooltip_text(GTK_WIDGET(seqv->labels_[1]), "Duration or stream buffer state");
+	gtk_label_set_width_chars(GTK_LABEL(seqv->labels_[0]), 11);
+	gtk_label_set_width_chars(GTK_LABEL(seqv->labels_[1]), 16);
+	gtk_label_set_ellipsize(GTK_LABEL(seqv->labels_[1]), PANGO_ELLIPSIZE_END);
 	gtk_box_pack_start( GTK_BOX( hbox ), seqv->labels_[0], FALSE, FALSE, 0 );
 	gtk_box_pack_start( GTK_BOX( hbox ), seqv->labels_[1], FALSE, FALSE, 0 );
 	gtk_widget_show( seqv->labels_[0] );
@@ -740,14 +1026,12 @@ static char *mt_new_connection_dialog(multitracker_t *mt, int *port_num, int *er
 
     add_class( dialog, "reloaded" );
 	GtkWidget *text_entry = gtk_entry_new();
-	gtk_entry_set_text( GTK_ENTRY(text_entry), "localhost" );
+	const char *default_host = multitrack_default_host(mt);
+	gint p = multitrack_next_port_hint(mt, default_host);
+	gtk_entry_set_text( GTK_ENTRY(text_entry), default_host );
 	gtk_editable_set_editable( GTK_EDITABLE(text_entry), TRUE );
 	gtk_dialog_set_default_response( GTK_DIALOG(dialog), GTK_RESPONSE_REJECT );
 	gtk_window_set_resizable( GTK_WINDOW( dialog ), FALSE );
-
-	gint   base = DEFAULT_PORT_NUM;
-
-	gint   p = (1000 * (mt->selected)) + base;
 
 	GtkAdjustment *adj = gtk_adjustment_new( p,1024,65535,5,10,0);
 	GtkWidget *num_entry = gtk_spin_button_new( GTK_ADJUSTMENT(adj), 5.0, 0 );
@@ -806,9 +1090,9 @@ void		*multitrack_new(
  	mt->logo = load_logo_image(0,0);
 	mt->preview_toggle = preview_toggle;
 	mt->scroll = gtk_scrolled_window_new(NULL,NULL);
-//	gtk_widget_set_size_request(mt->scroll,50+max_w*2, max_h);
+	gtk_widget_set_size_request(mt->scroll, 50 + max_w * 2, max_h + 40);
 	gtk_container_set_border_width(GTK_CONTAINER(mt->scroll),1);
-	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(mt->scroll),GTK_POLICY_AUTOMATIC, GTK_POLICY_NEVER);
+	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(mt->scroll),GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 	GtkWidget *grid = gtk_grid_new();
 
 	gtk_box_pack_start( GTK_BOX( mt->main_box ), mt->scroll , TRUE,TRUE, 0 );
@@ -851,9 +1135,11 @@ int		multitrack_add_track( void *data )
 	if( gvr_track_connect( mt->preview, hostname, port_num, &track ) )
 	{
 		status_print( mt, "Connection established with Veejay running on %s, port %d", hostname, port_num );
-		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(mt->view[track]->toggle), gveejay_user_preview() );
+		gvr_track_configure(mt->preview, track, mt->pw, mt->ph);
+		gvr_track_toggle_preview(mt->preview, track, gveejay_user_preview());
+		multitrack_set_preview_toggle_state(mt, track, gvr_get_preview_status(mt->preview, track));
 		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
-		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), TRUE );
+		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), (track == 0 ? FALSE : TRUE) );
         mt->track_status[ track ] = 1;
 		res = 1;
 	}
@@ -884,8 +1170,8 @@ void		multitrack_cleanup_track( void *data, int track )
 	if(!mt || track < 0 || track >= MAX_TRACKS || !mt->view[track])
 		return;
 
+	multitrack_set_preview_toggle_state(mt, track, 0);
 	mt->view[track]->status_lock = 1;
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(mt->view[track]->toggle), FALSE );
 	gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), FALSE );
 	gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), FALSE );
 	gtk_image_clear( GTK_IMAGE(mt->view[track]->area ) );
@@ -910,8 +1196,10 @@ void        multitrack_close_tracks(void *data)
     int i;
     for( i = 0; i < MAX_TRACKS; i ++ ){
         gvr_track_disconnect(mt->preview,i);
+        multitrack_cleanup_track(data, i);
     }
-
+    mt->master_track = 0;
+    mt->selected = 0;
 }
 
 void		multitrack_disconnect(void *data)
@@ -921,14 +1209,91 @@ void		multitrack_disconnect(void *data)
 	gvr_track_disconnect( mt->preview, 0 );
 }
 
+static void multitrack_update_track_label(multitracker_t *mt, int track, int current)
+{
+	char track_title[50];
+
+	if(!mt || track < 0 || track >= MAX_TRACKS || !mt->view[track])
+		return;
+
+	if(current)
+	{
+		int port = gvr_track_get_portnum(mt->preview, 0);
+		if(port > 0)
+			snprintf(track_title, sizeof(track_title), "Track 0 (%d)", port);
+		else
+			snprintf(track_title, sizeof(track_title), "Track 0");
+	}
+	else
+		snprintf(track_title, sizeof(track_title), "Track %d", mt->view[track]->num);
+
+	gtk_frame_set_label(GTK_FRAME(mt->view[track]->frame), track_title);
+}
+
+static void multitrack_mark_current_track(multitracker_t *mt)
+{
+	int i;
+
+	if(!mt)
+		return;
+
+	gvr_set_master(mt->preview, 0);
+	mt->master_track = 0;
+	mt->selected = 0;
+
+	for(i = 0; i < MAX_TRACKS; i++)
+	{
+		if(!mt->view[i])
+			continue;
+		multitrack_update_track_label(mt, i, i == 0);
+		if(gvr_track_test(mt->preview, i))
+		{
+			multitrack_set_preview_toggle_state(mt, i, gvr_get_preview_status(mt->preview, i));
+			gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[i]->panel), TRUE);
+			gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[i]->toggle), (i == 0 ? FALSE : TRUE));
+		}
+	}
+}
+
+static int multitrack_promote_track_to_current(multitracker_t *mt, int track)
+{
+	int tmp_status;
+
+	if(!mt || track < 0 || track >= MAX_TRACKS)
+		return 0;
+	if(!gvr_track_test(mt->preview, track))
+		return 0;
+
+	if(track != 0)
+	{
+		if(!gvr_track_swap(mt->preview, 0, track))
+			return 0;
+
+		tmp_status = mt->track_status[0];
+		mt->track_status[0] = mt->track_status[track];
+		mt->track_status[track] = tmp_status;
+
+		gvr_track_configure(mt->preview, 0, mt->pw, mt->ph);
+		gvr_track_configure(mt->preview, track, mt->pw, mt->ph);
+		gvr_track_toggle_preview(mt->preview, 0, gveejay_user_preview());
+		multitrack_set_preview_toggle_state(mt, 0, gvr_get_preview_status(mt->preview, 0));
+		multitrack_set_preview_toggle_state(mt, track, gvr_get_preview_status(mt->preview, track));
+
+		if(mt->view[0] && mt->view[track])
+		{
+			gtk_image_clear(GTK_IMAGE(mt->view[0]->area));
+			gtk_image_clear(GTK_IMAGE(mt->view[track]->area));
+		}
+	}
+
+	multitrack_mark_current_track(mt);
+	return 1;
+}
+
 void    multitrack_set_master_track(void *data, int track)
 {
 	multitracker_t *mt = (multitracker_t*) data;
-
-	if(!mt || track < 0 || track >= MAX_TRACKS)
-		return;
-
-    gvr_set_master( mt->preview, track );
+	multitrack_promote_track_to_current(mt, track);
 }
 
 int		multrack_audoadd( void *data, char *hostname, int port_num )
@@ -953,11 +1318,12 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
     mt->view[track]->status_lock = 1;
 
     gvr_track_toggle_preview( mt->preview, track, gveejay_user_preview() );
-    int preview = gvr_get_preview_status( mt->preview, mt->master_track );
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( mt->view[track]->toggle ), (preview ? TRUE: FALSE ) );
+    int preview = gvr_get_preview_status( mt->preview, track );
+	multitrack_set_preview_toggle_state(mt, track, preview);
 
     gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
     gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), (track == 0 ? FALSE : TRUE) );
+    mt->track_status[track] = 1;
     mt->view[track]->status_lock = 0;
 
 //	gvr_set_master( mt->preview, track );
@@ -1039,8 +1405,11 @@ void		multitrack_toggle_preview( void *data, int track_id, int status, GtkWidget
 	else
 		applied = gvr_track_toggle_preview( mt->preview, track_id, status );
 
-	if(applied)
+	if(applied) {
+		int target = (track_id == -1 ? mt->master_track : track_id);
+		multitrack_set_preview_toggle_state(mt, target, status);
 		veejay_msg(VEEJAY_MSG_INFO, "Veejay grabber: preview %s", (status ? "enabled" : "disabled") );
+	}
 
 	if( status == 0 )
 		multitrack_set_logo( data, img );
@@ -1103,7 +1472,6 @@ static gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 {
     sequence_view_t *v = (sequence_view_t*) user_data;
     multitracker_t *mt = v->backlink;
-    char track_title[50];
 
     if(event->type == GDK_BUTTON_PRESS) {
         vj_msg(VEEJAY_MSG_INFO, "Double-click to focus track %d", v->num);
@@ -1114,47 +1482,35 @@ static gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
       if( !gvr_track_test( mt->preview , v->num ) )
         return FALSE;
 
-      if( mt->master_track == v->num ) {
-        vj_msg(VEEJAY_MSG_INFO, "Track %d already has focus", mt->master_track);
+      if( v->num == 0 ) {
+        vj_msg(VEEJAY_MSG_INFO, "Track 0 already is the current Reloaded connection");
         return FALSE;
       }
 
-      int last_selected = mt->selected;
-      mt->selected = v->num;
-      vj_gui_disable();
-
-      // hostname, port_num from gvr
-      char *host = gvr_track_get_hostname( mt->preview, v->num );
+      char *host_src = gvr_track_get_hostname( mt->preview, v->num );
       int   port = gvr_track_get_portnum ( mt->preview, v->num );
 
-      if(!host || port <= 0 )
+      if(!host_src || port <= 0 )
+        return FALSE;
+
+      char *host = strdup(host_src);
+      if(!host)
+        return FALSE;
+
+      vj_gui_disable();
+
+      if(!multitrack_promote_track_to_current(mt, v->num))
       {
+        free(host);
         vj_gui_enable();
         return FALSE;
       }
 
-      vj_gui_cb( 0, host, port );
-
-      gvr_set_master( mt->preview, v->num );
-      if(!gvr_track_configure( mt->preview, v->num, mt->pw,mt->ph) )
-      {
-        veejay_msg(0, "Unable to configure preview %dx%d",mt->pw , mt->ph );
-      }
-      veejay_msg(VEEJAY_MSG_INFO, "Set master track to %d", mt->master_track );
-      mt->master_track = v->num;
-
-      if( last_selected >= 0 && last_selected < MAX_TRACKS )
-      {
-          snprintf(track_title,sizeof(track_title), "Track %d", mt->view[last_selected]->num );
-	      gtk_frame_set_label( GTK_FRAME(mt->view[last_selected]->frame), track_title );
-      }
-
-      snprintf(track_title,sizeof(track_title), "Track %d (master)", v->num );
-	  gtk_frame_set_label( GTK_FRAME(v->frame), track_title );
-
+      vj_gui_cb( 1, host, port );
       vj_gui_enable();
-    
-      vj_msg(VEEJAY_MSG_INFO, "Switched focus to track %d (%s:%d)", v->num, host, port );
+
+      vj_msg(VEEJAY_MSG_INFO, "Switched current Reloaded connection to track 0 (%s:%d)", host, port );
+      free(host);
     }
     return FALSE;
 }

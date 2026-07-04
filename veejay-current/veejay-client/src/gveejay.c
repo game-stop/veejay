@@ -49,7 +49,7 @@ static int load_midi = 0;
 static int port_num = DEFAULT_PORT_NUM;
 static char hostname[255];
 static int verbosity = 0;
-static int n_tracks = 7;
+static int n_tracks = 4;
 static int launcher = 0;
 static int preview = 0; // off
 static int use_threads = 0;
@@ -66,7 +66,7 @@ static gboolean arg_notcolored = FALSE;
 static gint arg_port = 0;
 static gboolean arg_verbose = FALSE;
 static gint arg_preview = 0;
-static gint arg_tracks = 0;
+static gint arg_tracks = -1;
 static gchar *arg_size = NULL;
 static gint arg_sample_pages = 0;
 static gboolean arg_version = FALSE;
@@ -264,12 +264,15 @@ gint vj_gui_command_line (GApplication            *app,
             err++;
     }
 
-    if ( arg_tracks )
+    if ( arg_tracks >= 0 )
     {
         n_tracks = 1 + arg_tracks;
-        if( n_tracks < 1 || n_tracks > mt_get_max_tracks() )
-            n_tracks = 1;
-        if(verbosity) veejay_msg(VEEJAY_MSG_INFO, "Track count set to %d", n_tracks);
+        if( n_tracks < 1 || n_tracks > mt_get_max_tracks() ) {
+            veejay_msg(VEEJAY_MSG_ERROR, "--tracks/-X accepts 0-%d extra tracks", mt_get_max_tracks() - 1);
+            err++;
+        }
+        else if(verbosity)
+            veejay_msg(VEEJAY_MSG_INFO, "Track count set to %d (track 0 + %d extra)", n_tracks, arg_tracks);
     }
 
     if( arg_style ) {
@@ -327,7 +330,7 @@ int main(int argc, char **argv)
     {"size",        's', 0, G_OPTION_ARG_STRING, &arg_size, "Sample-bank pages or layout: N, CxR, C:R or C,R (default: 12 pages, 6x2).", "N|CxR"},
     {"verbose",     'v', 0, G_OPTION_ARG_NONE, &arg_verbose,"Be more verbose.", NULL},
     {"version",     'V', 0, G_OPTION_ARG_NONE, &arg_version,"Show version and data directory, then exit.", NULL},
-    {"tracks",      'X', 0, G_OPTION_ARG_INT, &arg_tracks,"Set the number of tracks.", NULL},
+    {"tracks",      'X', 0, G_OPTION_ARG_INT, &arg_tracks,"Set extra multitrack slots beyond current track 0 (default: 3).", "N"},
     {"theme",       't', 0, G_OPTION_ARG_FILENAME, &arg_style, "Use \"system\" for the default theme, or pass a stylesheet filename.", NULL },
     {"small-as-possible",'S',0,G_OPTION_ARG_NONE,&arg_smallaspossible, "Create the smallest possible UI.",NULL},
 #if GTK_CHECK_VERSION(3,22,30)

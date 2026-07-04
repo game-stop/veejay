@@ -56,6 +56,7 @@ char*        gvr_track_get_hostname( void *preview , int num );
 int          gvr_track_get_portnum( void *preview, int num);
 
 int		gvr_track_test( void *preview, int track_id );
+int		gvr_track_swap( void *preview, int track_a, int track_b );
 
 sync_info	*gvr_sync( void *preview , void *data);
 

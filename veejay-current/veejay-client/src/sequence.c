@@ -603,6 +603,60 @@ void		gvr_set_master(void *data, int master_track )
 	vp->tracks[master_track]->is_master = 1;
 }
 
+int		gvr_track_swap(void *data, int track_a, int track_b)
+{
+	veejay_preview_t *vp = (veejay_preview_t*) data;
+	veejay_track_t *tmp_track;
+	int tmp;
+
+	if(!gvr_track_index_valid(vp, track_a) || !gvr_track_index_valid(vp, track_b))
+		return 0;
+	if(track_a == track_b)
+		return 1;
+
+	tmp_track = vp->tracks[track_a];
+	vp->tracks[track_a] = vp->tracks[track_b];
+	vp->tracks[track_b] = tmp_track;
+
+	if(vp->track_sync)
+	{
+		tmp = vp->track_sync->active_list[track_a];
+		vp->track_sync->active_list[track_a] = vp->track_sync->active_list[track_b];
+		vp->track_sync->active_list[track_b] = tmp;
+
+		tmp = vp->track_sync->widths[track_a];
+		vp->track_sync->widths[track_a] = vp->track_sync->widths[track_b];
+		vp->track_sync->widths[track_b] = tmp;
+
+		tmp = vp->track_sync->heights[track_a];
+		vp->track_sync->heights[track_a] = vp->track_sync->heights[track_b];
+		vp->track_sync->heights[track_b] = tmp;
+
+		tmp = vp->track_sync->frame_list[track_a];
+		vp->track_sync->frame_list[track_a] = vp->track_sync->frame_list[track_b];
+		vp->track_sync->frame_list[track_b] = tmp;
+	}
+
+	return 1;
+}
+
+static int gvr_host_is_loopback(const char *host)
+{
+	return host &&
+		(!strcasecmp(host, "localhost") ||
+		 !strcasecmp(host, "127.0.0.1") ||
+		 !strcasecmp(host, "::1"));
+}
+
+static int gvr_host_matches(const char *a, const char *b)
+{
+	if(!a || !b)
+		return 0;
+	if(!strcasecmp(a, b))
+		return 1;
+	return gvr_host_is_loopback(a) && gvr_host_is_loopback(b);
+}
+
 static	int	track_exists( veejay_preview_t *vp, const char *hostname, int port_num, int *at_track )
 {
 	int i;
@@ -612,7 +666,7 @@ static	int	track_exists( veejay_preview_t *vp, const char *hostname, int port_nu
 		if( vp->tracks[i] )
 		{
 			veejay_track_t *v = vp->tracks[i];
-			if( strcasecmp( hostname, v->hostname ) == 0 && v->port_num == port_num )
+			if( gvr_host_matches(hostname, v->hostname) && v->port_num == port_num )
 			{
 				if( at_track )
 					*at_track = i;
@@ -989,7 +1043,7 @@ int		gvr_track_toggle_preview( void *preview, int track_num, int status )
 		return 0;
 	}
 
-    v->preview = status;
+    v->preview = status ? 1 : 0;
 
     veejay_msg(VEEJAY_MSG_INFO, "Live view %dx%d with %s:%d on track %d %s",
 	    v->width,
@@ -997,9 +1051,9 @@ int		gvr_track_toggle_preview( void *preview, int track_num, int status )
 	    v->hostname,
 	    v->port_num,
 	    track_num,
-	    (status ? "enabled" : "disabled") );
+	    (v->preview ? "enabled" : "disabled") );
 
-	return status;
+	return 1;
 }
 
 static GdkPixbuf	**gvr_grab_images(void *preview)
@@ -1101,53 +1155,66 @@ static	void	gvr_parse_track_list( veejay_preview_t *vp, veejay_track_t *v, unsig
 	int items = 0;
 	unsigned char *ptr = tmp;
 
-	char **z = vj_calloc( sizeof( char * ) * vp->n_tracks );
+	if(!vp || !v || !tmp || len <= 0)
+		return;
 
-	while( i < len )
+	for(i = 0; i < __MAX_TRACKS; i++)
+		v->track_list[i] = -1;
+	v->track_items = 0;
+
+	char **z = vj_calloc( sizeof( char * ) * vp->n_tracks );
+	if(!z)
+		return;
+
+	i = 0;
+	while( i + 3 <= len )
 	{
-		int k = 0;
+		int k;
 		char k_str[4];
-		strncpy( k_str,(char*) ptr, 3 );
-		if( k > 0 )
+		veejay_memset(k_str, 0, sizeof(k_str));
+		memcpy(k_str, ptr, 3);
+		k = atoi(k_str);
+		ptr += 3;
+		i += 3;
+
+		if( k <= 0 || i + k > len )
+			break;
+
+		if(items < vp->n_tracks)
 		{
-			ptr += 3;
 			z[items] = strndup( (char*) ptr, k );
 			items ++;
-			ptr += k;
 		}
-		i += ( 3 + k );
+
+		ptr += k;
+		i += k;
 	}
 
-	if( items > 0 )
+	for( i = 0; i < items ; i ++ )
 	{
-		for( i = 0; i < items ; i ++ )
+		int k;
+		int in_track = -1;
+		for( k = 0; k < vp->n_tracks ; k ++ )
 		{
-			int k;
-			int in_track = -1;
-			for( k = 0; k < vp->n_tracks ; k ++ )
+			veejay_track_t *t = vp->tracks[k];
+			if(t)
 			{
-				veejay_track_t *t = vp->tracks[k];
-				if(t)
+				char hostname[255];
+				int  port = 0;
+				int  stream_id = 0;
+				veejay_memset(hostname,0,255 );
+				if( sscanf( (char*) z[i], "%254s %d %d", hostname, &port, &stream_id ) == 3 )
 				{
-					char hostname[255];
-					int  port = 0;
-					int  stream_id = 0;
-					veejay_memset(hostname,0,255 );
-					if( sscanf( (char*) z[i], "%s %d %d", hostname, &port, &stream_id ))
-					{
-						if( strcasecmp(	hostname, t->hostname ) == 0 &&
-							port == t->port_num )
-							in_track = k;
-					}
+					if( gvr_host_matches(hostname, t->hostname) && port == t->port_num )
+						in_track = k;
 				}
 			}
-
-			v->track_list[i] = in_track;
-
-			free( z[i] );
 		}
-		v->track_items = items;
+
+		v->track_list[i] = in_track;
+		free( z[i] );
 	}
+	v->track_items = items;
 
 	free( z );
 }
