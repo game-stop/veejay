@@ -1,7 +1,7 @@
 #ifndef FREIORLOADER_H
 #define FREIORLOADER_H
 
-void* 	deal_with_fr( void *handle, char *name );
+void* 	deal_with_fr( void *handle, char *name, int read_plug_cfg );
  
 void frei0r_destroy();
 

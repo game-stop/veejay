@@ -46,6 +46,7 @@
 #include <libplugger/defs.h>
 #include <libplugger/ldefs.h>
 #include <libplugger/specs/livido.h>
+#include <libplugger/specs/frei0r.h>
 #include <libplugger/utility.h>
 #include <veejaycore/yuvconv.h>
 #include <libavutil/avutil.h>
@@ -205,7 +206,7 @@ static	int	add_to_plugin_list( const char *path )
 		void *plugin = NULL;
 
 		if(dlsym( handle, "f0r_construct" )) {
-			plugin = deal_with_fr( handle, name );
+			plugin = deal_with_fr( handle, name, read_cfg );
 			if( plugin )
 			{
 				index_map_[ index_ ] = plugin;	
@@ -246,9 +247,14 @@ static	int	add_to_plugin_list( const char *path )
 
 static	void	free_plugin(void *plugin)
 {
-
 	void *handle = NULL;
+	int type = 0;
 	int error = vevo_property_get( plugin, "handle", 0 , &handle );
+	if( vevo_property_get( plugin, "HOST_plugin_type", 0, &type ) == VEVO_NO_ERROR ) {
+		if( type == VEVO_PLUG_FR )
+			frei0r_plug_free( plugin );
+	}
+
 	if( error == VEVO_NO_ERROR )
 		vevo_port_recursive_free( plugin );
 
@@ -712,11 +718,83 @@ static char *flatten_port(void *port, const char *key)
     return res;
 }
 
+
+static const char *frei0r_hint_name(int hint)
+{
+	switch(hint) {
+		case F0R_PARAM_BOOL: return "bool";
+		case F0R_PARAM_DOUBLE: return "number";
+		case F0R_PARAM_POSITION: return "position";
+		case F0R_PARAM_COLOR: return "color";
+	}
+	return "unknown";
+}
+
+static char *plug_describe_frei0r(void *plug)
+{
+	int pi = 0;
+	int ci = 0;
+	int co = 0;
+	vevo_property_get( plug, "num_inputs", 0, &ci );
+	vevo_property_get( plug, "num_params", 0, &pi );
+	vevo_property_get( plug, "num_outputs",0,&co );
+
+	char *name = vevo_property_get_string( plug, "name" );
+	if(!name)
+		name = vj_strdup("frei0r");
+
+	size_t len = strlen(name) + 128 + ((size_t) pi * 256);
+	char *res = (char*) vj_malloc(len);
+	if(!res) {
+		free(name);
+		return NULL;
+	}
+
+	snprintf(res, len, "name=%s:description=frei0r plugin:author=:maintainer=frei0r:license=:version=:outs=%d:ins=%d", name, co, ci);
+	char *p = res + strlen(res);
+	size_t remaining = len - strlen(res);
+
+	for(int i = 0; i < pi && remaining > 1; i++) {
+		char key[20];
+		void *parameter = NULL;
+		snprintf(key, sizeof(key), "p%02d", i);
+		if( vevo_property_get( plug, key, 0, &parameter ) != VEVO_NO_ERROR || parameter == NULL )
+			continue;
+
+		char *pname = vevo_property_get_string(parameter,"name");
+		if(!pname)
+			pname = vj_strdup("Number");
+
+		int min = 0;
+		int max = 0;
+		int def = 0;
+		int hint = 0;
+		vevo_property_get( parameter, "min", 0, &min);
+		vevo_property_get( parameter, "max", 0, &max);
+		vevo_property_get( parameter, "default", 0, &def);
+		vevo_property_get( parameter, "hint", 0, &hint);
+
+		int wrote = snprintf(p, remaining, ":p%02d=[name=%s:min=%d:max=%d:default=%d:kind=%s]",
+			i, pname, min, max, def, frei0r_hint_name(hint));
+		free(pname);
+		if(wrote < 0 || (size_t) wrote >= remaining)
+			break;
+		p += wrote;
+		remaining -= wrote;
+	}
+
+	free(name);
+	return res;
+}
+
 char	*plug_describe( int fx_id )
 {
 	void *plug = index_map_[fx_id];
 	if(!plug)
 		return NULL;
+	int type = 0;
+	if( vevo_property_get( plug, "HOST_plugin_type", 0, &type ) == VEVO_NO_ERROR && type == VEVO_PLUG_FR )
+		return plug_describe_frei0r(plug);
 	void *instance = NULL;
 	void *filter = NULL;
 	int pi = 0;
@@ -761,9 +839,9 @@ char	*plug_describe( int fx_id )
 	}
 	if( po > 0 )
 	{
-		out_params = (char**) vj_malloc(sizeof(char*) * pi );
+		out_params = (char**) vj_malloc(sizeof(char*) * po );
 	
-		for( i = 0; i < pi; i ++ )
+		for( i = 0; i < po; i ++ )
 		{
 			sprintf(key, "q%02d",i);
 			out_params[i] = flatten_port( plug , key );
