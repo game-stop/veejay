@@ -41,9 +41,9 @@ The OpenSound Control WWW page is
 #include <stdio.h>
 
 #define MAX_ALIASES_PER_CONTAINER 3
-#define MAX_CHILDREN_PER_CONTAINER 32
-#define MAX_METHODS_PER_CONTAINER 32
-#define BASE_NUM_TO_REALLOCATE 10
+#define MAX_CHILDREN_PER_CONTAINER 256
+#define MAX_METHODS_PER_CONTAINER 512
+#define BASE_NUM_TO_REALLOCATE 64
 
 
 struct OSCContainerStruct {
@@ -225,15 +225,7 @@ static OSCMethod AllocMethod(void) {
 /**************************** Containers  ****************************/    
 
 /* Managing the tree of containers and subcontainers, with aliases */
-#define MAX_CHILDREN_ARRAY 32
 void AddSubContainer(OSCcontainer parent, OSCcontainer child, Name name) {
-    if (parent->numChildren >= MAX_CHILDREN_ARRAY) {
-        fatal_error(
-            "AddSubContainer: children array overflow (max %d)\n",
-            MAX_CHILDREN_ARRAY
-        );
-    }
-
     if (parent->numChildren >= MAX_CHILDREN_PER_CONTAINER) {
         fatal_error(
             "AddSubContainer: exceeded MAX_CHILDREN_PER_CONTAINER (%d)\n",
