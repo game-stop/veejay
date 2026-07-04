@@ -9952,8 +9952,9 @@
                             <child>
                               <object class="GtkImage" id="image17">
                                 <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                              </object>
+				<property name="can-focus">False</property>
+				<property name="pixbuf">icon_clear.png</property>
+				</object>
                             </child>
                           </object>
                           <packing>
