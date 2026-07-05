@@ -4517,12 +4517,29 @@ gboolean gveejay_quit( GtkWidget *widget, gpointer user_data)
     return TRUE;
 }
 
+static int ui_host_is_loopback(const char *host)
+{
+    return host &&
+           (!g_ascii_strcasecmp(host, "localhost") ||
+            !g_ascii_strcasecmp(host, "127.0.0.1") ||
+            !g_ascii_strcasecmp(host, "::1"));
+}
+
+static int ui_host_matches(const char *a, const char *b)
+{
+    if(!a || !b)
+        return 0;
+    if(!g_ascii_strcasecmp(a, b))
+        return 1;
+    return ui_host_is_loopback(a) && ui_host_is_loopback(b);
+}
+
 int is_current_track(char *host, int port )
 {
     char *remote = get_text2(widget_cache[WIDGET_ENTRY_HOSTNAME]);
     int num  = get_nums2(widget_cache[WIDGET_BUTTON_PORTNUM]);
 
-    if(remote && host && strncasecmp(remote, host, strlen(host)) == 0 && port == num)
+    if(ui_host_matches(remote, host) && port == num)
         return 1;
 
     return 0;
@@ -13872,10 +13889,15 @@ int vj_img_cb(GdkPixbuf *img)
 
 void vj_gui_cb(int state, char *hostname, int port_num)
 {
+    const char *remote = (hostname && *hostname) ? hostname : "localhost";
+
     reconnect_preserve_multitrack = (state != 0);
     info->watch.state = STATE_RECONNECT;
-    put_text2(widget_cache[WIDGET_ENTRY_HOSTNAME], hostname);
+    put_text2(widget_cache[WIDGET_ENTRY_HOSTNAME], remote);
     update_spin_value2(widget_cache[WIDGET_BUTTON_PORTNUM], port_num);
+    update_label_str2(widget_cache[WIDGET_LABEL_HOSTNAMEX], remote);
+    update_label_i2(widget_cache[WIDGET_LABEL_PORTX], port_num, 0);
+    vj_gui_set_title((char*)remote, port_num);
 
 
     int i;

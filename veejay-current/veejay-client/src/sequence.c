@@ -661,6 +661,9 @@ static	int	track_exists( veejay_preview_t *vp, const char *hostname, int port_nu
 {
 	int i;
 
+	if(!vp || !hostname || port_num <= 0)
+		return 0;
+
 	for( i = 0; i < vp->n_tracks ; i++ )
 	{
 		if( vp->tracks[i] )
@@ -714,32 +717,50 @@ int		gvr_track_get_portnum( void *preview, int num)
 	return v ? v->port_num : 0;
 }
 
-int		gvr_track_already_open( void *preview, const char *hostname,
-	int port )
+int		gvr_track_find_open( void *preview, const char *hostname, int port, int *track_num )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 
-	if(track_exists( vp, hostname, port, NULL ) )
-		return 1;
-	return 0;
+	if(track_num)
+		*track_num = -1;
+
+	return track_exists( vp, hostname, port, track_num );
+}
+
+int		gvr_track_already_open( void *preview, const char *hostname,
+	int port )
+{
+	return gvr_track_find_open( preview, hostname, port, NULL );
 }
 
 int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_track )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
-	int track_num = track_find( vp );
+	int track_num;
 
+	if(new_track)
+		*new_track = -1;
+
+	if(!vp || !hostname || port_num <= 0)
+		return -1;
+
+	if(track_exists( vp, hostname, port_num, new_track ) )
+	{
+		veejay_msg(VEEJAY_MSG_INFO,
+			"Veejay %s:%d is already assigned to track %d",
+			hostname, port_num, new_track ? *new_track : -1 );
+		return 0;
+	}
+
+	track_num = track_find( vp );
 	if(track_num == -1)
 	{
 		vj_msg(0, "All tracks are in use.");
 		return 0;
 	}
-	if(track_exists( vp, hostname, port_num, new_track ) )
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Veejay '%s':%d is already assigned to track %d", hostname, port_num, *new_track );
-		return 0;
-	}
 	vj_client *fd = vj_client_alloc();
+	if(!fd)
+		return -1;
 	if(!vj_client_connect( fd, hostname, NULL, port_num ) )
 	{
 		vj_msg(VEEJAY_MSG_ERROR, "Unable to connect to %s:%d", hostname, port_num );
@@ -748,30 +769,46 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_tr
 	}
 
 	veejay_track_t *vt = (veejay_track_t*) vj_calloc( sizeof(veejay_track_t));
+	if(!vt)
+	{
+		vj_client_close( fd );
+		vj_client_free( fd );
+		return -1;
+	}
+
+	vt->fd       = fd;
 	vt->hostname = strdup(hostname);
 	vt->port_num  = port_num;
 	vt->active   = 1;
-	vt->fd       = fd;
+
+	if(!vt->hostname)
+	{
+		vj_client_close( fd );
+		vj_client_free( fd );
+		free(vt);
+		return -1;
+	}
 
 	vt->status_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * STATUS_LENGTH);
 	if(vt->status_buffer == NULL ) {
-		vj_client_free( fd );
+		gvr_close_connection( vt );
 		return -1;
 	}
 
 	vt->data_buffer = (uint8_t*) vj_malloc( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 3);
 	if(vt->data_buffer == NULL ) {
-		vj_client_free( fd );
+		gvr_close_connection( vt );
 		return -1;
 	}
 
 	vt->tmp_buffer = (uint8_t*) vj_calloc( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 4);
 	if(vt->tmp_buffer == NULL ) {
-		vj_client_free( fd );
+		gvr_close_connection( vt );
 		return -1;
 	}
 
-	*new_track = track_num;
+	if(new_track)
+		*new_track = track_num;
 
 	veejay_memset(vt->data_buffer, 128,MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 3 );
 
@@ -779,6 +816,7 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_tr
 	vp->track_sync->active_list[ track_num ] = 1;
 	return 1;
 }
+
 
 
 static	void	gvr_single_queue_vims( veejay_track_t *v, int vims_id )
@@ -980,8 +1018,12 @@ void		gvr_track_disconnect( void *preview, int track_num )
     gvr_close_connection( v );
 
     vp->tracks[ track_num ] = NULL;
-	if(vp->track_sync)
+	if(vp->track_sync) {
 		vp->track_sync->active_list[ track_num ] = 0;
+		vp->track_sync->frame_list[ track_num ] = 0;
+		vp->track_sync->widths[ track_num ] = 0;
+		vp->track_sync->heights[ track_num ] = 0;
+	}
 
     veejay_msg(VEEJAY_MSG_INFO,"Closed track %d", track_num);
 }

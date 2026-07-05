@@ -101,6 +101,7 @@ static void		*parent__ = NULL;
 
 static char	*mt_new_connection_dialog(multitracker_t *mt, int *port_num, int *error);
 static void	multitrack_set_preview_toggle_state(multitracker_t *mt, int track, int active);
+static void	multitrack_update_track_label(multitracker_t *mt, int track, int current);
 static void	add_buttons( sequence_view_t *p, sequence_view_t *seqv , GtkWidget *w);
 static void	add_buttons2( sequence_view_t *p, sequence_view_t *seqv , GtkWidget *w);
 static sequence_view_t *new_sequence_view( void *vp, int num );
@@ -858,6 +859,8 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	seqv->event_box = gtk_event_box_new();
 	gtk_event_box_set_visible_window( GTK_EVENT_BOX(seqv->event_box), TRUE );
     gtk_widget_set_can_focus(seqv->event_box, TRUE);
+    gtk_widget_set_tooltip_text(GTK_WIDGET(seqv->event_box),
+        "Empty track. Use Add Track to connect another Veejay instance.");
 
 	g_signal_connect( G_OBJECT( seqv->event_box ),
 				"button_press_event",
@@ -868,6 +871,8 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
 	snprintf(track_title,sizeof(track_title), "Track %d", num );
 	seqv->frame = gtk_frame_new( track_title );
+    gtk_widget_set_tooltip_text(GTK_WIDGET(seqv->frame),
+        "Empty track. Use Add Track to connect another Veejay instance.");
 
 	gtk_container_set_border_width( GTK_CONTAINER( seqv->frame) , 1 );
 	gtk_widget_show( GTK_WIDGET( seqv->frame ) );
@@ -878,12 +883,16 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	gtk_widget_show( GTK_WIDGET( seqv->main_vbox ) );
 
 	seqv->area = gtk_image_new();
+    gtk_widget_set_tooltip_text(GTK_WIDGET(seqv->area),
+        "Empty track. Use Add Track to connect another Veejay instance.");
 
 	gtk_box_pack_start( GTK_BOX(seqv->main_vbox),GTK_WIDGET( seqv->area), FALSE,FALSE,0);
 	gtk_widget_set_size_request_( seqv->area, 176,144  ); 
 	seqv->panel = gtk_frame_new(NULL);
 
 	seqv->toggle = gtk_toggle_button_new_with_label( "Preview off" );
+    gtk_widget_set_tooltip_text(GTK_WIDGET(seqv->toggle),
+        "Preview is unavailable until a Veejay instance is connected to this track.");
 
     gtk_toggle_button_set_active(
 		GTK_TOGGLE_BUTTON(seqv->toggle), FALSE  );
@@ -1056,9 +1065,13 @@ static char *mt_new_connection_dialog(multitracker_t *mt, int *port_num, int *er
 	{
 		const char *host = gtk_entry_get_text( GTK_ENTRY( text_entry ) );
 		gint   port = gtk_spin_button_get_value( GTK_SPIN_BUTTON(num_entry ));
+		if(!host || !*host)
+			host = "localhost";
+		char *result = strdup(host);
+		gtk_widget_destroy( dialog );
 		*port_num = port;
 		*error    = 0;
-		return strdup(host);
+		return result;
 	}
 
 	gtk_widget_destroy( dialog );
@@ -1112,6 +1125,9 @@ void		*multitrack_new(
 	mt->master_track = 0;
 	mt->preview = gvr_preview_init( MAX_TRACKS, threads );
 
+	for( c = 0; c < MAX_TRACKS; c ++ )
+		multitrack_update_track_label(mt, c, c == 0);
+
 	parent__ = infog;
 
 	return (void*) mt;
@@ -1130,7 +1146,17 @@ int		multitrack_add_track( void *data )
 		return res;
 	}
 
-	int track = 0;
+	int track = -1;
+
+	if( gvr_track_find_open( mt->preview, hostname, port_num, &track ) )
+	{
+		status_print( mt,
+			"Veejay %s:%d is already connected on track %d. Double-click that track to focus it.",
+			hostname, port_num, track );
+		multitrack_update_track_label(mt, track, track == 0);
+		free( hostname );
+		return 0;
+	}
 
 	if( gvr_track_connect( mt->preview, hostname, port_num, &track ) )
 	{
@@ -1141,6 +1167,7 @@ int		multitrack_add_track( void *data )
 		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
 		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), (track == 0 ? FALSE : TRUE) );
         mt->track_status[ track ] = 1;
+		multitrack_update_track_label(mt, track, track == 0);
 		res = 1;
 	}
 	else
@@ -1152,6 +1179,7 @@ int		multitrack_add_track( void *data )
 
 	return res;
 }
+
 
 int         multitrack_get_track_status(void *data, int track )
 {
@@ -1177,6 +1205,7 @@ void		multitrack_cleanup_track( void *data, int track )
 	gtk_image_clear( GTK_IMAGE(mt->view[track]->area ) );
 	mt->view[track]->status_lock = 0;
     mt->track_status[ track ] = 0;
+	multitrack_update_track_label(mt, track, track == 0);
 }
 
 void		multitrack_close_track( void *data )
@@ -1209,26 +1238,68 @@ void		multitrack_disconnect(void *data)
 	gvr_track_disconnect( mt->preview, 0 );
 }
 
-static void multitrack_update_track_label(multitracker_t *mt, int track, int current)
+static void multitrack_update_track_tooltip(multitracker_t *mt, int track, int current)
 {
-	char track_title[50];
+	char tip[256];
+	char *host;
+	int port;
 
 	if(!mt || track < 0 || track >= MAX_TRACKS || !mt->view[track])
 		return;
 
-	if(current)
+	host = gvr_track_get_hostname(mt->preview, track);
+	port = gvr_track_get_portnum(mt->preview, track);
+
+	if(host && port > 0)
 	{
-		int port = gvr_track_get_portnum(mt->preview, 0);
-		if(port > 0)
-			snprintf(track_title, sizeof(track_title), "Track 0 (%d)", port);
+		if(current)
+			snprintf(tip, sizeof(tip),
+				"Current Reloaded connection: %s:%d",
+				host, port);
 		else
-			snprintf(track_title, sizeof(track_title), "Track 0");
+			snprintf(tip, sizeof(tip),
+				"Double-click this track to connect Reloaded to %s:%d and make it the current Veejay instance.",
+				host, port);
 	}
+	else
+		snprintf(tip, sizeof(tip),
+			"Empty track. Use Add Track to connect another Veejay instance.");
+
+	gtk_widget_set_tooltip_text(GTK_WIDGET(mt->view[track]->event_box), tip);
+	gtk_widget_set_tooltip_text(GTK_WIDGET(mt->view[track]->frame), tip);
+	gtk_widget_set_tooltip_text(GTK_WIDGET(mt->view[track]->area), tip);
+
+	if(mt->view[track]->toggle)
+	{
+		if(host && port > 0)
+			gtk_widget_set_tooltip_text(GTK_WIDGET(mt->view[track]->toggle),
+				current ?
+				"Preview follows the main Live View setting for the current connection." :
+				"Toggle live preview for this multitrack connection.");
+		else
+			gtk_widget_set_tooltip_text(GTK_WIDGET(mt->view[track]->toggle),
+				"Preview is unavailable until a Veejay instance is connected to this track.");
+	}
+}
+
+static void multitrack_update_track_label(multitracker_t *mt, int track, int current)
+{
+	char track_title[64];
+	int port;
+
+	if(!mt || track < 0 || track >= MAX_TRACKS || !mt->view[track])
+		return;
+
+	port = gvr_track_get_portnum(mt->preview, track);
+	if(port > 0)
+		snprintf(track_title, sizeof(track_title), "Track %d (%d)", mt->view[track]->num, port);
 	else
 		snprintf(track_title, sizeof(track_title), "Track %d", mt->view[track]->num);
 
 	gtk_frame_set_label(GTK_FRAME(mt->view[track]->frame), track_title);
+	multitrack_update_track_tooltip(mt, track, current);
 }
+
 
 static void multitrack_mark_current_track(multitracker_t *mt)
 {
@@ -1299,18 +1370,22 @@ void    multitrack_set_master_track(void *data, int track)
 int		multrack_audoadd( void *data, char *hostname, int port_num )
 {
 	multitracker_t *mt = (multitracker_t*) data;
+	int track = -1;
+	int res;
 
-	int track = 0;
-
-	int res = gvr_track_connect( mt->preview, hostname, port_num, &track );
-	if(res == 0)
+	if( gvr_track_find_open( mt->preview, hostname, port_num, &track ) )
 	{
-		if(!gvr_track_already_open( mt->preview, hostname,port_num))
-			return -1;
+		veejay_msg(VEEJAY_MSG_DEBUG,
+			"Reusing existing multitrack connection %s:%d on track %d",
+			hostname, port_num, track);
 	}
-	if(res == -1) {
-		veejay_msg(VEEJAY_MSG_DEBUG,"Failed to open track 0 in the multitracker");
-		return -1;
+	else
+	{
+		res = gvr_track_connect( mt->preview, hostname, port_num, &track );
+		if(res <= 0) {
+			veejay_msg(VEEJAY_MSG_DEBUG,"Failed to open track in the multitracker");
+			return -1;
+		}
 	}
 
 	gvr_track_configure(mt->preview, track, mt->pw,mt->ph);
@@ -1326,14 +1401,14 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
     mt->track_status[track] = 1;
     mt->view[track]->status_lock = 0;
 
-//	gvr_set_master( mt->preview, track );
-
 	gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
+	multitrack_update_track_label(mt, track, track == 0);
 
-    veejay_msg(VEEJAY_MSG_DEBUG, "Connected to %s:%d", hostname, port_num);
+    veejay_msg(VEEJAY_MSG_DEBUG, "Connected to %s:%d on track %d", hostname, port_num, track);
 
 	return track;
 }
+
 
 int		multitrack_locked( void *data)
 {
@@ -1472,10 +1547,6 @@ static gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 {
     sequence_view_t *v = (sequence_view_t*) user_data;
     multitracker_t *mt = v->backlink;
-
-    if(event->type == GDK_BUTTON_PRESS) {
-        vj_msg(VEEJAY_MSG_INFO, "Double-click to focus track %d", v->num);
-    }
 
     if(event->type == GDK_2BUTTON_PRESS)
     {
