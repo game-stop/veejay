@@ -47,6 +47,23 @@
 #include "bio2jack.h"
 
 #define RESERVE_PERIODS 1
+
+#ifndef VJ_JACK_PLAYBACK_RING_VIDEO_FRAMES
+#define VJ_JACK_PLAYBACK_RING_VIDEO_FRAMES 1
+#endif
+
+#ifndef VJ_JACK_PLAYBACK_RING_MIN_PERIODS
+#define VJ_JACK_PLAYBACK_RING_MIN_PERIODS 3
+#endif
+
+#ifndef VJ_JACK_CAPTURE_RING_VIDEO_FRAMES
+#define VJ_JACK_CAPTURE_RING_VIDEO_FRAMES 2
+#endif
+
+#ifndef VJ_JACK_CAPTURE_RING_MIN_PERIODS
+#define VJ_JACK_CAPTURE_RING_MIN_PERIODS 4
+#endif
+
 #ifndef VJ_JACK_RESAMPLE_SLACK_FRAMES
 #define VJ_JACK_RESAMPLE_SLACK_FRAMES 64
 #endif
@@ -373,18 +390,24 @@ JACK_RecalculateRatios(jack_driver_t *drv)
 }
 
 static size_t
-JACK_CalcRingbufferBytes(jack_driver_t *drv, double SPVF, unsigned long jack_frame_bytes)
+JACK_CalcRingbufferBytes(jack_driver_t *drv,
+                         double SPVF,
+                         unsigned long jack_frame_bytes,
+                         uint32_t video_frames,
+                         uint32_t min_periods)
 {
   if (!drv || drv->jack_sample_rate == 0 || jack_frame_bytes == 0)
     return 0;
 
-  const int num_video_frames = 2;
   const uint32_t sr = drv->jack_sample_rate;
   const uint32_t jack_period = drv->jack_buffer_size > 0 ? drv->jack_buffer_size : 1024;
   const uint32_t frames_per_vframe = (uint32_t)(SPVF * sr + 0.5);
 
-  const uint32_t min_frames = jack_period * 4;
-  uint32_t required_frames = (num_video_frames * frames_per_vframe) + jack_period;
+  uint32_t min_frames = jack_period * min_periods;
+  uint32_t required_frames = (video_frames * frames_per_vframe) + jack_period;
+
+  if (min_frames < jack_period * 2)
+    min_frames = jack_period * 2;
 
   required_frames = (required_frames < min_frames) ? min_frames : required_frames;
 
@@ -431,14 +454,16 @@ JACK_ResizeSingleRingbuffer(jack_driver_t *drv,
   if (old)
     JACK_RetireRingbuffer(drv, old);
 
-  const unsigned long frames = (unsigned long)(new_size_bytes / jack_frame_bytes);
+  const unsigned long requested_frames = (unsigned long)(new_size_bytes / jack_frame_bytes);
+  const unsigned long capacity_frames = (unsigned long)(rb->size / jack_frame_bytes);
 
   veejay_msg(
       VEEJAY_MSG_INFO,
-      "[AUDIO]: Jack %s ringbuffer %lu frames (%.2f ms) [%ld Hz]",
+      "[AUDIO]: Jack %s ringbuffer requested %lu frames, capacity %lu frames (%.2f ms) [%ld Hz]",
       label,
-      frames,
-      (double)frames * 1000.0 / (double)jack_sample_rate,
+      requested_frames,
+      capacity_frames,
+      (double)capacity_frames * 1000.0 / (double)jack_sample_rate,
       jack_sample_rate);
 }
 
@@ -450,7 +475,11 @@ static void JACK_ResizeRingBuffers(jack_driver_t *drv, double SPVF)
   if (drv->num_output_channels > 0 && drv->bytes_per_jack_output_frame > 0)
   {
     const size_t play_bytes =
-        JACK_CalcRingbufferBytes(drv, SPVF, drv->bytes_per_jack_output_frame);
+        JACK_CalcRingbufferBytes(drv,
+                                 SPVF,
+                                 drv->bytes_per_jack_output_frame,
+                                 VJ_JACK_PLAYBACK_RING_VIDEO_FRAMES,
+                                 VJ_JACK_PLAYBACK_RING_MIN_PERIODS);
 
     JACK_ResizeSingleRingbuffer(
         drv,
@@ -465,7 +494,11 @@ static void JACK_ResizeRingBuffers(jack_driver_t *drv, double SPVF)
   if (drv->num_input_channels > 0 && drv->bytes_per_jack_input_frame > 0)
   {
     const size_t rec_bytes =
-        JACK_CalcRingbufferBytes(drv, SPVF, drv->bytes_per_jack_input_frame);
+        JACK_CalcRingbufferBytes(drv,
+                                 SPVF,
+                                 drv->bytes_per_jack_input_frame,
+                                 VJ_JACK_CAPTURE_RING_VIDEO_FRAMES,
+                                 VJ_JACK_CAPTURE_RING_MIN_PERIODS);
 
     JACK_ResizeSingleRingbuffer(
         drv,
@@ -2798,17 +2831,18 @@ long JACK_get_ringbuffer_used(jack_driver_t *drv)
     return 0;
 
   unsigned long jack_frame_size = drv->bytes_per_jack_output_frame;
-  unsigned long client_frame_size = drv->bytes_per_output_frame;
 
-  if (jack_frame_size == 0 || client_frame_size == 0)
+  if (jack_frame_size == 0)
     return 0;
 
   unsigned long jack_frames =
       (unsigned long)(jack_ringbuffer_read_space(drv->pPlayPtr) / jack_frame_size);
+  unsigned long client_frames =
+      JACK_RescaleJackFramesToClientFramesFloor(drv, jack_frames);
 
-  return (long)JACK_JackFramesToClientBytesFloor(drv,
-                                                jack_frames,
-                                                client_frame_size);
+  return (client_frames > (unsigned long)INT32_MAX)
+             ? INT32_MAX
+             : (long)client_frames;
 }
 
 int JACK_get_ringbuffer_size(jack_driver_t *drv)
@@ -2816,8 +2850,14 @@ int JACK_get_ringbuffer_size(jack_driver_t *drv)
   if (!drv || drv->pPlayPtr == NULL || drv->bytes_per_jack_output_frame == 0)
     return 0;
 
-  int size = drv->pPlayPtr->size / drv->bytes_per_jack_output_frame;
-  return size;
+  unsigned long jack_frames =
+      (unsigned long)(drv->pPlayPtr->size / drv->bytes_per_jack_output_frame);
+  unsigned long client_frames =
+      JACK_RescaleJackFramesToClientFramesFloor(drv, jack_frames);
+
+  return (client_frames > (unsigned long)INT32_MAX)
+             ? INT32_MAX
+             : (int)client_frames;
 }
 
 int JACK_get_client_to_jack_frames(jack_driver_t *drv, int client_frames)
