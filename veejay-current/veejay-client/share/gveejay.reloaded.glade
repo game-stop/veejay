@@ -9070,6 +9070,29 @@
                                                 <property name="position">1</property>
                                               </packing>
                                             </child>
+                                            <child>
+                                              <object class="GtkButton" id="button_reset_fx_opacity">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">True</property>
+                                                <property name="receives-default">True</property>
+                                                <property name="has-tooltip">True</property>
+                                                <property name="tooltip-text" translatable="yes">Reset FX opacity to full</property>
+                                                <signal name="clicked" handler="on_button_reset_fx_opacity_clicked" swapped="no" />
+                                                <child>
+                                                  <object class="GtkImage" id="image_reset_fx_opacity">
+                                                    <property name="visible">True</property>
+                                                    <property name="can-focus">False</property>
+                                                    <property name="pixbuf">icon_refresh.png</property>
+                                                  </object>
+                                                </child>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="padding">4</property>
+                                                <property name="position">2</property>
+                                              </packing>
+                                            </child>
                                           </object>
                                           <packing>
                                             <property name="expand">False</property>
@@ -9498,7 +9521,7 @@
                                         <property name="visible">True</property>
                                         <property name="can-focus">True</property>
                                         <property name="receives-default">False</property>
-                                        <property name="tooltip-text" translatable="yes">Reset all animated parameters</property>
+                                        <property name="tooltip-text" translatable="yes">Clear all animations for this FX entry, including FX opacity</property>
                                         <signal name="clicked" handler="on_curve_buttonclear_clicked" swapped="no" />
                                         <child>
                                           <object class="GtkImage" id="image532">

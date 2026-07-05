@@ -3557,6 +3557,25 @@ void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
 	vj_msg(VEEJAY_MSG_INFO, "FX Opacity set to %1.2f", val );
 }
 
+void	on_button_reset_fx_opacity_clicked(GtkWidget *w, gpointer user_data)
+{
+	(void) w;
+	(void) user_data;
+
+	if(info->status_lock)
+		return;
+
+	GtkWidget *opacity = glade_xml_get_widget_(info->main_window, "manualopacity");
+	if(!opacity || !GTK_IS_RANGE(opacity))
+		return;
+
+	GtkAdjustment *a = gtk_range_get_adjustment(GTK_RANGE(opacity));
+	if(fabs(gtk_adjustment_get_value(a) - 0.0) > 0.000001)
+		gtk_adjustment_set_value(a, 0.0);
+	else
+		on_manualopacity_value_changed(opacity, NULL);
+}
+
 static void	el_selection_update(void)
 {
 	gchar *text = format_selection_time(info->selection[0], info->selection[1]);
@@ -6742,6 +6761,7 @@ void on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
     }
 
     multi_vims(VIMS_SAMPLE_KF_RESET, "%d", entry);
+    multi_vims(VIMS_SAMPLE_KF_CLEAR, "%d %d", VJ_KF_ENTRY_CHAIN_FADE, VJ_KF_PARAM_CHAIN_OPACITY);
     curve_live_preview_user_override(FALSE);
     info->uc.reload_hint[HINT_KF] = 1;
 }
