@@ -1110,7 +1110,7 @@ void		vj_init_vevo_events(void)
 				NULL );
 	index_map_[VIMS_SAMPLE_KF_RESET]		=	_new_event(
 				"%d",
-				VIMS_SAMPLE_KF_STATUS,
+				VIMS_SAMPLE_KF_RESET,
 				"Clear KF series on entry X",
 				vj_event_reset_kf,
 				1,
