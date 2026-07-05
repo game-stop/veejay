@@ -9922,6 +9922,251 @@ static int ab_auto_target_can_overdrive_soft_range(const ab_auto_target_t *t)
 }
 #endif
 
+
+#define AB_AUTO_HINT_DERIVED_SCORE_MAX        96
+#define AB_AUTO_HINT_DERIVED_AMOUNT_BASE      24
+#define AB_AUTO_HINT_DERIVED_AMOUNT_SPAN      76
+#define AB_AUTO_HINT_FAST_RESPONSE_MS         180
+#define AB_AUTO_HINT_SLOW_RESPONSE_MS         1400
+#define AB_AUTO_HINT_SIGNAL_LIFT_MAX          0.30f
+
+static int ab_auto_clamp_i(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static int ab_auto_hint_soft_span_pct(int hard_min, int hard_max, int soft_min, int soft_max)
+{
+    int hard_span = hard_max - hard_min;
+    int sm = soft_min;
+    int sx = soft_max;
+    int soft_span;
+
+    if(hard_span <= 0)
+        return 0;
+
+    if(sm == VJ_BEAT_SOFT_UNSET && sx == VJ_BEAT_SOFT_UNSET)
+        return 100;
+
+    if(sm == VJ_BEAT_SOFT_UNSET)
+        sm = hard_min;
+    if(sx == VJ_BEAT_SOFT_UNSET)
+        sx = hard_max;
+
+    if(sm < hard_min)
+        sm = hard_min;
+    if(sx > hard_max)
+        sx = hard_max;
+    if(sx < sm)
+    {
+        int tmp = sm;
+        sm = sx;
+        sx = tmp;
+    }
+
+    soft_span = sx - sm;
+
+    if(soft_span <= 0)
+        return 0;
+
+    return ab_auto_clamp_i((soft_span * 100 + hard_span / 2) / hard_span, 0, 100);
+}
+
+static int ab_auto_hint_depth_pct(int normal_depth_pct, int climax_depth_pct)
+{
+    int normal = ab_auto_clamp_i(normal_depth_pct, 0, 200);
+    int climax = ab_auto_clamp_i(climax_depth_pct, 0, 200);
+
+    if(climax < normal)
+        climax = normal;
+
+    if(normal == 0 && climax == 0)
+        return 0;
+
+    return ab_auto_clamp_i((normal + climax + climax) / 3, 0, 200);
+}
+
+static int ab_auto_hint_response_pct(int attack_ms, int release_ms, int hold_ms)
+{
+    int response_ms;
+    int pct;
+
+    if(attack_ms <= 0 && release_ms <= 0 && hold_ms <= 0)
+        return 50;
+
+    if(attack_ms < 0)
+        attack_ms = 0;
+    if(release_ms < 0)
+        release_ms = 0;
+    if(hold_ms < 0)
+        hold_ms = 0;
+
+    response_ms = attack_ms + (release_ms >> 1) + (hold_ms >> 2);
+
+    if(response_ms <= AB_AUTO_HINT_FAST_RESPONSE_MS)
+        return 100;
+    if(response_ms >= AB_AUTO_HINT_SLOW_RESPONSE_MS)
+        return 0;
+
+    pct = ((AB_AUTO_HINT_SLOW_RESPONSE_MS - response_ms) * 100) /
+          (AB_AUTO_HINT_SLOW_RESPONSE_MS - AB_AUTO_HINT_FAST_RESPONSE_MS);
+
+    return ab_auto_clamp_i(pct, 0, 100);
+}
+
+static int ab_auto_hint_priority_pct(int priority)
+{
+    return ab_auto_clamp_i(priority, 0, 100);
+}
+
+static void ab_auto_apply_hint_meta_weight(
+    int hard_min,
+    int hard_max,
+    const ab_auto_param_meta_t *m,
+    int *amount_pct,
+    int *base_score
+)
+{
+    int depth_pct;
+    int range_pct;
+    int response_pct;
+    int priority_pct;
+    int drive_pct;
+    int derived_amount;
+    int derived_score;
+
+    if(!m || !m->has_hint || !amount_pct || !base_score)
+        return;
+
+    depth_pct = ab_auto_hint_depth_pct(m->normal_depth_pct, m->climax_depth_pct);
+
+    if(depth_pct <= 0)
+        return;
+
+    range_pct = ab_auto_hint_soft_span_pct(hard_min, hard_max, m->soft_min, m->soft_max);
+    response_pct = ab_auto_hint_response_pct(m->attack_ms, m->release_ms, m->hold_ms);
+    priority_pct = ab_auto_hint_priority_pct(m->priority);
+
+    drive_pct = (depth_pct * 5 + range_pct * 2 + response_pct * 2 + priority_pct * 2) / 11;
+    drive_pct = ab_auto_clamp_i(drive_pct, 0, 160);
+
+    if(m->hint_flags & VJ_BEAT_F_CONTINUOUS)
+        drive_pct += 8;
+    if(m->hint_flags & VJ_BEAT_F_DISCRETE)
+        drive_pct -= 10;
+    if(m->hint_flags & VJ_BEAT_F_PHRASE_ONLY)
+        drive_pct -= 6;
+#ifdef VJ_BEAT_F_CLIMAX_ONLY
+    if(m->hint_flags & VJ_BEAT_F_CLIMAX_ONLY)
+        drive_pct -= 12;
+#endif
+#ifdef VJ_BEAT_F_REBUILDS_STATE
+    if(m->hint_flags & VJ_BEAT_F_REBUILDS_STATE)
+        drive_pct -= 24;
+#endif
+#ifdef VJ_BEAT_F_STRUCTURAL
+    if(m->hint_flags & VJ_BEAT_F_STRUCTURAL)
+        drive_pct -= 20;
+#endif
+
+    drive_pct = ab_auto_clamp_i(drive_pct, 0, 160);
+
+    derived_amount = AB_AUTO_HINT_DERIVED_AMOUNT_BASE +
+        (drive_pct * AB_AUTO_HINT_DERIVED_AMOUNT_SPAN + 50) / 100;
+
+    if(derived_amount > VJ_AUDIO_BEAT_AUTO_AMOUNT_UI_MAX)
+        derived_amount = VJ_AUDIO_BEAT_AUTO_AMOUNT_UI_MAX;
+
+    if(*amount_pct < derived_amount)
+        *amount_pct = derived_amount;
+
+    derived_score = (drive_pct * AB_AUTO_HINT_DERIVED_SCORE_MAX + 50) / 100;
+    *base_score += derived_score;
+}
+
+static float ab_auto_hint_meta_drive01(const ab_auto_target_t *t)
+{
+    int depth_pct;
+    int range_pct;
+    int response_pct;
+    int priority_pct;
+    int drive_pct;
+
+    if(!t || !t->has_hint)
+        return 0.0f;
+
+#ifdef VJ_BEAT_F_REJECT
+    if(t->hint_flags & VJ_BEAT_F_REJECT)
+        return 0.0f;
+#endif
+#ifdef VJ_BEAT_F_REBUILDS_STATE
+    if(t->hint_flags & VJ_BEAT_F_REBUILDS_STATE)
+        return 0.0f;
+#endif
+
+    depth_pct = ab_auto_hint_depth_pct(t->normal_depth_pct, t->climax_depth_pct);
+
+    if(depth_pct <= 0)
+        return 0.0f;
+
+    range_pct = ab_auto_hint_soft_span_pct(t->min_value, t->max_value, t->soft_min, t->soft_max);
+    response_pct = ab_auto_hint_response_pct(t->attack_ms, t->release_ms, t->hold_ms);
+    priority_pct = ab_auto_hint_priority_pct(t->priority);
+
+    drive_pct = (depth_pct * 5 + range_pct * 2 + response_pct * 2 + priority_pct * 2) / 11;
+
+    if(t->hint_flags & VJ_BEAT_F_CONTINUOUS)
+        drive_pct += 8;
+    if(t->hint_flags & VJ_BEAT_F_DISCRETE)
+        drive_pct -= 12;
+    if(t->hint_flags & VJ_BEAT_F_PHRASE_ONLY)
+        drive_pct -= 6;
+#ifdef VJ_BEAT_F_CLIMAX_ONLY
+    if(t->hint_flags & VJ_BEAT_F_CLIMAX_ONLY)
+        drive_pct -= 12;
+#endif
+#ifdef VJ_BEAT_F_STRUCTURAL
+    if(t->hint_flags & VJ_BEAT_F_STRUCTURAL)
+        drive_pct -= 20;
+#endif
+
+    drive_pct = ab_auto_clamp_i(drive_pct, 0, 160);
+
+    return (float)drive_pct * (1.0f / 160.0f);
+}
+
+static float ab_auto_apply_hint_meta_signal_drive(const ab_auto_target_t *t, float signal, float macro_open)
+{
+    float drive;
+    float lift;
+
+    if(signal <= 0.0f || !t || !t->has_hint)
+        return signal;
+
+#ifdef VJ_BEAT_F_REJECT
+    if(ab_auto_target_is_binary_impulse(t))
+        return signal;
+#endif
+
+    drive = ab_auto_hint_meta_drive01(t);
+
+    if(drive <= 0.0f)
+        return signal;
+
+    if(macro_open < 0.0f)
+        macro_open = 0.0f;
+    else if(macro_open > 1.0f)
+        macro_open = 1.0f;
+
+    lift = drive * AB_AUTO_HINT_SIGNAL_LIFT_MAX * (0.55f + macro_open * 0.45f);
+    signal = signal + (1.0f - signal) * signal * lift;
+
+    if(signal > 1.0f)
+        signal = 1.0f;
+
+    return signal;
+}
+
 static int ab_auto_hint_to_role(
     int klass,
     unsigned int flags,
@@ -10046,6 +10291,12 @@ static int ab_auto_hint_to_role(
             r = VJ_AUDIO_BEAT_AUTO_ROLE_TEXTURE;
             amt = 48;
             score = 162;
+            break;
+
+        case VJ_BEAT_DENSITY:
+            r = VJ_AUDIO_BEAT_AUTO_ROLE_TEXTURE;
+            amt = 60;
+            score = 176;
             break;
 
         case VJ_BEAT_GLOW:
@@ -10729,6 +10980,7 @@ int vj_audio_beat_auto_build_table(void)
                         continue;
                     }
 
+                    ab_auto_apply_hint_meta_weight(lo, hi, m, &amount_pct, &hint_score);
                     score = hint_score + hint->priority;
 
                     if(score <= 0)
@@ -12256,6 +12508,12 @@ static float ab_auto_signal_for_target(const vj_audio_beat_snapshot_t *snap,
                                   phrase * 0.12f + musical * 0.08f);
                 break;
 
+            case VJ_BEAT_DENSITY:
+                v = ab_auto_mix3(density * 0.42f + groove * 0.16f + phrase * 0.08f,
+                                  snap->transient * 0.14f + snap->flux * 0.12f + body * 0.12f,
+                                  snap->hat * 0.10f + snap->high * 0.08f + musical * 0.08f);
+                break;
+
             case VJ_BEAT_INTENSITY:
                 v = ab_auto_mix3(snap->beat_pulse * 0.20f + musical * 0.14f + body * 0.18f,
                                   snap->bass * 0.18f + snap->mid * 0.12f + snap->high * 0.10f + snap->transient * 0.12f,
@@ -12393,6 +12651,11 @@ static float ab_auto_signal_for_target(const vj_audio_beat_snapshot_t *snap,
 
         v *= gate;
     }
+
+#ifdef VJ_BEAT_F_REJECT
+    if(t->has_hint)
+        v = ab_auto_apply_hint_meta_signal_drive(t, v, climax);
+#endif
 
     if(v < 0.0f)
         return 0.0f;
@@ -13471,6 +13734,7 @@ static int ab_auto_min_visible_delta(const ab_auto_target_t *t, int span, float 
             case VJ_BEAT_DETAIL:
             case VJ_BEAT_GLOW:
             case VJ_BEAT_ALPHA_OR_OPACITY:
+            case VJ_BEAT_DENSITY:
             case VJ_BEAT_INTENSITY:
             case VJ_BEAT_TURBULENCE:
             case VJ_BEAT_CONTRAST:
@@ -13884,6 +14148,7 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
             case VJ_BEAT_DETAIL:
             case VJ_BEAT_GLOW:
             case VJ_BEAT_ALPHA_OR_OPACITY:
+            case VJ_BEAT_DENSITY:
             case VJ_BEAT_INTENSITY:
             case VJ_BEAT_TURBULENCE:
             case VJ_BEAT_CONTRAST:
@@ -14052,6 +14317,7 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
             case VJ_BEAT_DETAIL:
             case VJ_BEAT_GLOW:
             case VJ_BEAT_ALPHA_OR_OPACITY:
+            case VJ_BEAT_DENSITY:
             case VJ_BEAT_INTENSITY:
             case VJ_BEAT_TURBULENCE:
             case VJ_BEAT_CONTRAST:
