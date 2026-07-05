@@ -50,6 +50,7 @@ button {
     min-width: 20px;
     padding-left: 2px;
     padding-right:2px;
+    transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out;
     /*margin:2px;*/
 }
 
@@ -62,7 +63,8 @@ list row:hover {
 }
 
 button:active {
-    background-color: #22242a;
+    background-color: @slot-playing-bg;
+    border-color: @slot-playing-color;
 }
 
 entry, spinbutton {
@@ -78,7 +80,23 @@ entry:focus {
     color: @text-color;
 }
 
-.toggle:checked,
+button:checked,
+button.toggle:checked,
+.toggle:checked {
+    background-color: @slot-playing-bg;
+    border: 1px solid @slot-playing-color;
+    border-radius: 4px;
+    padding-left:2px;
+    padding-right:2px;
+}
+
+button:checked:hover,
+button.toggle:checked:hover,
+.toggle:checked:hover {
+    background-color: #4a3118;
+    border-color: @slot-playing-color;
+}
+
 notebook header.top tabs tab:checked {
     background-color: @fill-color;
     border: 1px solid @knob-color;
@@ -192,15 +210,32 @@ menuitem {
     padding: 4px 8px;
 }
 
-button:disabled, 
-entry:disabled, 
+button:disabled,
+button:checked:disabled,
+button.toggle:checked:disabled,
+.toggle:checked:disabled,
+entry:disabled,
 image:disabled,
-spinbutton:disabled, 
-radiobutton:disabled, 
+spinbutton:disabled,
+radiobutton:disabled,
 checkbutton:disabled {
     border-color: #4a4a4e;
     color: @text-muted;
     background-color: #37383f;
+}
+
+button:disabled image,
+button:disabled label,
+button:checked:disabled image,
+button:checked:disabled label,
+button.toggle:checked:disabled image,
+button.toggle:checked:disabled label,
+.toggle:checked:disabled image,
+.toggle:checked:disabled label,
+checkbutton:disabled label,
+radiobutton:disabled label {
+    color: @text-muted;
+    background-color: transparent;
 }
 
 scale:disabled contents slider,
@@ -233,6 +268,18 @@ tooltip {
 
 button:hover image, button:hover label {
   background-color: @select-color;
+}
+
+button:active image,
+button:active label,
+button:checked image,
+button:checked label,
+button.toggle:checked image,
+button.toggle:checked label,
+.toggle:checked image,
+.toggle:checked label {
+  background-color: transparent;
+  color: @text-color;
 }
 notebook header.top tabs tab:hover label {
  background-color: @select-color;
@@ -325,10 +372,16 @@ checkbutton check {
 }
 
 /* 3. Style them when they are clicked/active */
-checkbutton check:checked, 
+checkbutton check:checked,
 radiobutton radio:checked {
-    background-color: @knob-color;
-    border-color: @knob-hover;
+    background-color: @slot-playing-color;
+    border-color: @slot-playing-color;
+}
+
+checkbutton:checked label,
+radiobutton:checked label {
+    color: @slot-playing-color;
+    background-color: transparent;
 }
 
 /* 4. Draw the inner dot for the active radio button */
@@ -338,9 +391,27 @@ radiobutton radio:checked {
 
 /* Disabled states for the nodes */
 checkbutton check:disabled,
-radiobutton radio:disabled {
+checkbutton check:checked:disabled,
+radiobutton radio:disabled,
+radiobutton radio:checked:disabled {
     background-color: #37383f;
     border-color: #4a4a4e;
+}
+
+button:disabled image,
+button:disabled label,
+button:checked:disabled image,
+button:checked:disabled label,
+button.toggle:checked:disabled image,
+button.toggle:checked:disabled label,
+.toggle:checked:disabled image,
+.toggle:checked:disabled label,
+checkbutton:disabled label,
+checkbutton:checked:disabled label,
+radiobutton:disabled label,
+radiobutton:checked:disabled label {
+    color: @text-muted;
+    background-color: transparent;
 }
 
 notebook header tabs tab {
