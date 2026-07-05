@@ -1,0 +1,56 @@
+# Autotools generated files
+/aclocal.m4
+/autom4te.cache/
+/compile
+/config.guess
+/config.h
+/config.h.in
+/config.h.in~
+/config.log
+/config.status
+/config.sub
+/configure
+/configure~
+/depcomp
+/install-sh
+/ltmain.sh
+/missing
+/stamp-h1
+/libtool
+/INSTALL
+
+# Generated Makefiles
+/Makefile
+/Makefile.in
+/src/Makefile
+/src/Makefile.in
+/man/Makefile
+/man/Makefile.in
+
+# Build products
+/.deps/
+/.libs/
+/src/.deps/
+/src/.libs/
+/man/.deps/
+/man/.libs/
+/src/eidolon
+*.o
+*.lo
+*.la
+*.a
+*.so
+*.so.*
+*.core
+core
+
+# Runtime/session files
+/autovj.life
+/*.life
+/sample_*.edl
+
+# Editor/backup files
+*~
+*.swp
+*.swo
+.#*

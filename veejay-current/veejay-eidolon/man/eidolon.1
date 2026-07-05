@@ -1,0 +1,478 @@
+.TH EIDOLON 1 "July 2026" "VeeJay" "User Commands"
+.SH NAME
+Eidolon \- autonomous Auto-VJ organism for VeeJay/VIMS
+.SH SYNOPSIS
+.SY eidolon
+.OP \-h host
+.OP \-p port
+.OP \-g group
+.OP \-s file
+.OP \-l
+.OP \-R
+.OP \-n
+.OP \-F frames
+.OP \-U command
+.OP \-X
+.OP \-c chaos
+.OP \-t ms
+.OP \-M count
+.OP \-m count
+.OP \-r ms
+.OP \-q
+.OP \-T
+.OP \-v
+.YS
+.SH DESCRIPTION
+.B eidolon
+connects to a running VeeJay instance and controls an FX chain through VIMS.
+It behaves like a small autonomous performer: it creates or reuses samples,
+builds FX chains, mutates parameters, enables beat control, and learns from
+status tokens and explicit user feedback.
+.PP
+The default interface is a plain terminal command shell.  Eidolon is quiet by
+default: it prints one response per command and does not flood the terminal
+with per-entry or per-tick changes.  Use
+.B verbose on
+or the
+.B \-v
+option when automatic debug logs are wanted.
+.PP
+Eidolon persists its fuzzy mind to a state file.  The state contains chain
+bounds, population state, learned FX weights, realtime cost pressure, immune
+memory, and other behaviour settings.
+.SH OPTIONS
+.TP
+.BI \-h " host"
+Connect to VeeJay at
+.IR host .
+The default is
+.BR localhost .
+.TP
+.BI \-p " port"
+Connect to VeeJay VIMS port
+.IR port .
+The default is
+.BR 3490 .
+.TP
+.BI \-g " group"
+Set multicast group or group name.
+.TP
+.BI \-s " file"
+Use
+.I file
+as mind state file.  The default is
+.BR autovj.life .
+.TP
+.B \-l
+Load the state file at startup.  This is the default behaviour.
+.TP
+.B \-R
+Fresh start.  Ignore the previous mind state.
+.TP
+.B \-n
+Do not create random samples.  Use the current VeeJay sample or stream.
+.TP
+.BI \-F " frames"
+Set source frame count used for random sample creation.  The default is
+.BR 25000 .
+.TP
+.BI \-U " command"
+Set fallback event/capability dump command.  The default is
+.BR "veejay -u" .
+Using this option enables live FX sync.
+.TP
+.B \-X
+Disable startup live VIMS effect-list sync.
+.TP
+.BI \-c " chaos"
+Set initial chaos amount, from
+.B 0
+through
+.BR 1 .
+The default is
+.BR 0.72 .
+Higher values produce more violent motion and mutation.
+.TP
+.BI \-t " ms"
+Set organism tick interval in milliseconds.  The default is
+.BR 250 .
+.TP
+.BI \-M " count"
+Set minimum FX chain length.  Valid values are
+.B 0
+through
+.BR 19 .
+A value of
+.B 0
+means the organism may enter a clear/off survival state.
+.TP
+.BI \-m " count"
+Set maximum FX chain length.  Valid values are
+.B 0
+through
+.BR 19 .
+The default maximum is
+.BR 6 .
+.TP
+.BI \-r " ms"
+Set reconnect retry delay in milliseconds.  The default is
+.BR 1000 .
+.TP
+.B \-q
+Quiet shell mode.  Suppress the normal interactive prompt/logs.
+.TP
+.B \-T
+Accepted for compatibility and ignored.  Eidolon is terminal-only.
+.TP
+.B \-v
+Enable verbose automatic logs and VIMS output.
+.SH INTERACTIVE SHELL
+After startup, Eidolon prints:
+.PP
+.EX
+eidolon: ready. Type help. SIGUSR1 saves.
+eidolon[0/live]>
+.EE
+.PP
+Type
+.B help
+to show the command list.  Commands are grouped by purpose.
+.SH SHELL COMMANDS
+.TP
+.B help
+Show command help.
+.TP
+.B terminal
+Confirm plain command-shell mode.  Eidolon no longer has a split terminal UI.
+Use normal terminal scrollback.
+.TP
+.BI verbose " on|off"
+Enable or disable automatic debug logs.
+.TP
+.B quit
+Save state and exit.
+.SH INSPECTION COMMANDS
+.TP
+.B status
+Print a one-line organism summary.
+.TP
+.B chain
+Print the current FX chain entries, including learned cost/immune pressure when
+available.
+.TP
+.B roles
+Print the chain grammar and category table.
+.TP
+.BI brain " on|off|status|replay|clear"
+Control or inspect the neural status-token preference learner.
+.SH ORGANISM COMMANDS
+.TP
+.B pause
+Pause the organism.
+.TP
+.B go
+Resume the organism.
+.TP
+.B rebuild
+Rebuild the current organism chain.
+.TP
+.B mutate
+Soft-mutate the current organism.
+.TP
+.B hard
+Hard-mutate the current organism.
+.TP
+.B like
+Teach a positive preference for the current organism.
+.TP
+.B love
+Teach a strong positive preference for the current organism.
+.TP
+.B hate
+Teach a negative preference and mutate away from the current organism.
+.TP
+.B kill
+Strongly reject the current organism and mutate away.
+.TP
+.BI chaos " n"
+Set chaos from
+.B 0
+through
+.BR 1 .
+.TP
+.BI tempo " ms"
+Set engine tick interval.
+.TP
+.BI scene " ticks"
+Set scene length in organism ticks.
+.TP
+.BI life " seconds"
+Set FX lifetime in seconds.
+.TP
+.BI budget " n"
+Set manual preset send budget.
+.SH CHAIN SIZE COMMANDS
+.TP
+.BI minchain " n"
+Set minimum controlled FX entries.
+.TP
+.BI maxchain " n"
+Set maximum controlled FX entries.
+.TP
+.BI morefx " [n]"
+Raise the minimum controlled FX count by
+.I n
+or by one when omitted.
+.TP
+.BI lessfx " [n]"
+Lower the minimum controlled FX count by
+.I n
+or by one when omitted.
+.TP
+.BI fxcount " n"
+Force an exact FX count.  A count of
+.B 0
+means clear/off.
+.TP
+.BI fxrange " a b"
+Set the controlled FX range.  A lower bound of
+.B 0
+allows survival hibernation.
+.TP
+.B fullchain
+Force all 19 FX entries and rebuild immediately.
+.TP
+.B chain on
+Reassert the current sample chain and entries.
+.SH REALTIME GOVERNOR COMMANDS
+Eidolon reads the VeeJay status packet and uses measured FPS as its survival
+sensor.  Token
+.B 0
+is treated as
+.B real_fps
+and token
+.B 18
+as target/current FPS.  At 25 FPS, the frame budget is about 40 ms per frame.
+.TP
+.B rt status
+Show realtime governor state.
+.TP
+.B rt auto
+Enable adaptive realtime chain bounds.
+.TP
+.B rt off
+Disable the realtime governor.
+.TP
+.B rt lock
+Lock current user chain bounds.
+.TP
+.B rt unlock
+Allow Eidolon to adapt the chain bounds again.
+.TP
+.B rt fps
+Show measured FPS, target FPS, and frame budget.
+.TP
+.BI rt " chainon n"
+Inspect or set the chain-on status helper token.
+.TP
+.BI rt " target ratio"
+Set the realtime survival target ratio.
+.TP
+.BI rt " clearlearn strict|selected|off"
+Choose how Eidolon learns rejection from external chain changes.
+.B strict
+uses chain enabled/disabled status and is the default.
+.B selected
+also treats an empty selected entry as rejection.
+.B off
+disables this learning path.
+.SH BEAT AND AUTO-FX COMMANDS
+.TP
+.BI amount " n"
+Set beat Auto-FX amount, 0 through 100.
+.TP
+.BI beatmode " n"
+Set beat mode:
+.B 0
+off,
+.B 1
+primary,
+.B 2
+primary plus motion,
+.B 3
+plus memory,
+.B 4
+chaos.
+.TP
+.BI action " n"
+Set beat action:
+.B 0
+none,
+.B 2
+Auto-FX,
+.B 3
+breakbeat plus Auto-FX,
+.B 4
+breakbeat.
+.SH EXPLORATION COMMANDS
+.TP
+.BI explore " off|[sec [len [n]]]"
+Disable exploration, or rebuild random FX chains every
+.I sec
+seconds.  The interval may be fractional, for example
+.BR 0.25 .
+.TP
+.BI combos " [sec [len [n]]]"
+Try
+.I n
+random chains.  Defaults to eight combinations, eight seconds apart.
+.TP
+.BI try19 " [sec [n]]"
+Try full 19-entry chains, for example
+.BR "try19 0.25" .
+.TP
+.BI fxpace " min max"
+Set FX-entry lifetime in seconds.
+.TP
+.BI parampace " seconds"
+Set parameter-preset lifetime in seconds.
+.SH SOURCES AND ROUTING COMMANDS
+.TP
+.B fxsync
+Refresh the live FX list through VIMS 401.
+.TP
+.BI push " [next|+n|n|port|host:port] [sample-id]"
+Copy the current chain to another VeeJay instance.
+.TP
+.BI mix " sample|stream id"
+Set source/channel for extra-frame mixer FX.
+.TP
+.B sample
+Create and play a new random sample.
+.TP
+.BI samples " off|on frames"
+Disable or enable sample creation and set source frame count.
+.SH SAFETY AND TRICK COMMANDS
+.TP
+.BI safe " on|off"
+Keep structural and reset parameters protected from unsafe mutation.
+.TP
+.BI trick " loop|stutter|scratch|freeze|jump|release|on|off"
+Control sample trickplay behaviour.
+.SH EVOLUTION POOL COMMANDS
+.TP
+.BI ban " fxid"
+Remove an FX from the evolution pool.
+.TP
+.BI unban " fxid"
+Restore an FX to the evolution pool.
+.SH STATE AND RAW VIMS COMMANDS
+.TP
+.BI save " [file]"
+Persist the fuzzy mind.  When
+.I file
+is omitted, the configured state path is used.
+.TP
+.BI load " [file]"
+Restore the fuzzy mind.  When
+.I file
+is omitted, the configured state path is used.
+.TP
+.BI raw " vims"
+Send raw VIMS to the connected VeeJay instance, for example:
+.PP
+.EX
+raw 600:;
+.EE
+.SH LEARNING MODEL
+Eidolon learns from several signals:
+.PP
+.B like
+and
+.B love
+increase preference for the current organism.
+.B hate
+and
+.B kill
+create negative feedback and immune memory.
+When clear-learning is enabled, externally disabling or clearing the chain can
+also be treated as rejection.
+.PP
+The realtime governor treats low
+.B real_fps
+as metabolic pressure.  Expensive active FX accumulate cost pressure and become
+less likely in future chains.  Stable realtime performance slowly decays cost
+and immune pressure.
+.SH ZERO-FX SURVIVAL
+When adaptive realtime mode is unlocked, Eidolon may shrink down to zero FX.
+This is a survival hibernation state: the chain is cleared/off rather than a
+broken organism.  When realtime headroom returns, Eidolon may grow back to one
+or more FX.
+.SH FILES
+.TP
+.B autovj.life
+Default mind state file.
+.TP
+.BI file .tmp
+Temporary state file used while saving.
+.SH SIGNALS
+.TP
+.B SIGUSR1
+Save the current mind state.
+.TP
+.B SIGINT, SIGTERM
+Stop, save state, and exit.
+.SH EXAMPLES
+Connect to the default local VeeJay instance:
+.PP
+.EX
+eidolon
+.EE
+.PP
+Start fresh and do not create samples:
+.PP
+.EX
+eidolon -R -n
+.EE
+.PP
+Limit the organism to a small realtime-safe range:
+.PP
+.EX
+eidolon -M 1 -m 4
+.EE
+.PP
+Allow full adaptive hibernation while running:
+.PP
+.EX
+rt unlock
+fxrange 0 6
+.EE
+.PP
+Inspect the current chain and realtime governor:
+.PP
+.EX
+status
+chain
+rt status
+rt fps
+.EE
+.PP
+Teach Eidolon during a performance:
+.PP
+.EX
+like
+hate
+love
+kill
+.EE
+.SH EXIT STATUS
+.TP
+.B 0
+Normal exit.
+.TP
+.B 1
+Startup, option, connection, or state handling error.
+.SH NOTES
+Eidolon speaks VIMS and assumes a compatible running VeeJay instance.  It is an
+experimental autonomous performer; use smaller chain ranges for live-critical
+sets until the local machine's realtime behaviour is known.
