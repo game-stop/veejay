@@ -496,6 +496,9 @@ struct {
     { VIMS_EDITLIST_ADD_SAMPLE },
     { VIMS_EDITLIST_SAVE },
     { VIMS_EDITLIST_LOAD },
+#ifdef HAVE_XML2
+    { VIMS_SAMPLE_SAVE_SAMPLELIST },
+#endif
     { VIMS_BUNDLE_FILE },
     { VIMS_BUNDLE_SAVE },
 
