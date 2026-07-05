@@ -4278,7 +4278,7 @@ int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id,
 typedef struct {
     char filepath[PATH_MAX];
     void *vp, *seq, *font, *el;
-    int *id, *mode;
+    int id, mode;
 } WatcherContext;
 
 static WatcherContext global_ctx;
@@ -4380,6 +4380,9 @@ int sample_open_and_watch(const char *path,
                          void *vp, void *seq, void *font,
                          void *el, int *id, int *mode) {
 
+    int loaded_id = id ? *id : 0;
+    int loaded_mode = mode ? *mode : 0;
+
     strncpy(global_ctx.filepath, path, PATH_MAX);
     global_ctx.filepath[PATH_MAX-1] = '\0';
 
@@ -4387,14 +4390,22 @@ int sample_open_and_watch(const char *path,
     global_ctx.seq = seq;
     global_ctx.font = font;
     global_ctx.el = el;
-    global_ctx.id = id;
-    global_ctx.mode = mode;
+    global_ctx.id = loaded_id;
+    global_ctx.mode = loaded_mode;
 
     if (!sample_readFromFile(global_ctx.filepath,
-                             vp, seq, font, el, id, mode,
+                             vp, seq, font, el, &loaded_id, &loaded_mode,
                              SAMPLE_LOAD_UPDATE)) {
         return 0;
     }
+
+    global_ctx.id = loaded_id;
+    global_ctx.mode = loaded_mode;
+
+    if(id)
+        *id = loaded_id;
+    if(mode)
+        *mode = loaded_mode;
 
     start_watcher_thread();
     return 1;
@@ -4405,6 +4416,13 @@ void sample_watch_list(void) {
     if (atomic_exchange_int(&needs_reload, 0) == 1) {
 
         WatcherContext ctx = global_ctx;
+        int loaded_id = ctx.id;
+        int loaded_mode = ctx.mode;
+
+        if(veejay_info && veejay_info->uc) {
+            loaded_id = veejay_info->uc->sample_id;
+            loaded_mode = veejay_info->uc->playback_mode;
+        }
 
         veejay_msg(VEEJAY_MSG_INFO, "Samplelist change detected! Reloading: %s",ctx.filepath);
 
@@ -4412,8 +4430,14 @@ void sample_watch_list(void) {
             if (sample_readFromFile(ctx.filepath,
                                     ctx.vp, ctx.seq,
                                     ctx.font, ctx.el,
-                                    ctx.id, ctx.mode,
+                                    &loaded_id, &loaded_mode,
                                     SAMPLE_LOAD_UPDATE)) {
+                global_ctx.id = loaded_id;
+                global_ctx.mode = loaded_mode;
+                if(veejay_info && veejay_info->uc) {
+                    veejay_info->uc->sample_id = loaded_id;
+                    veejay_info->uc->playback_mode = loaded_mode;
+                }
                 return;
             }
             usleep(200);

@@ -5725,6 +5725,10 @@ void vj_event_sample_load_list(void *ptr, const char format[], va_list ap)
     
     if( sample_readFromFile( str, v->composite,v->seq, v->font, v->edit_list,&id, &mode,SAMPLE_LOAD_REPLACE ) )
     {
+        if(id > 0 && mode >= 0) {
+            v->uc->sample_id = id;
+            v->uc->playback_mode = mode;
+        }
         veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist from file '%s'", str);
     }
     else
