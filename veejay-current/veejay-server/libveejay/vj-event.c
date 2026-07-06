@@ -1017,6 +1017,20 @@ static int never_forward_vims_cache_[1024];
 static int maybe_forward_vims_cache_[1024];
 static int atomic_vims_cache_[1024];
 
+static inline int vj_event_never_forward_vims_id(int vims_id)
+{
+    switch(vims_id) {
+#ifdef HAVE_XML2
+        case VIMS_SAMPLE_SAVE_SAMPLELIST:
+        case VIMS_SAMPLE_SYNC_SAMPLELIST:
+        case VIMS_SAMPLE_LOAD_SAMPLELIST_B64:
+            return 1;
+#endif
+        default:
+            return 0;
+    }
+}
+
 static void init_vims_forward_cache(void) {
 
     memset(never_forward_vims_cache_, 0, sizeof(never_forward_vims_cache_));
@@ -1054,6 +1068,9 @@ static inline int consume_vims_sample_id(int vims_id) {
 }
 
 static inline int is_forwarding_allowed(int vims_id, int vims_mirror) {
+
+    if(vj_event_never_forward_vims_id(vims_id))
+        return 0;
 
     if( vims_cache_slot_valid(vims_id) && never_forward_vims_cache_[vims_id] )
         return 0;
@@ -6161,6 +6178,15 @@ void vj_event_sample_load_list_b64(void *ptr, const char format[], va_list ap)
     char *arg = va_arg(ap, char*);
     const char *b64 = NULL;
     size_t b64_len = 0;
+
+    if(!v)
+        return;
+
+    if(v->master_origin_explicit && v->master_origin && v->master_origin_port > 0) {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "Ignored network samplelist blob on connected preview/editor instance");
+        return;
+    }
 
     if(!vj_event_parse_samplelist_b64_arg(arg, &b64, &b64_len)) {
         veejay_msg(VEEJAY_MSG_ERROR, "Invalid network samplelist blob header");

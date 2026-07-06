@@ -97,6 +97,9 @@ extern int sample_stop_encoder(int s1);
 static void sample_del_internal_ex(sample_info *si, int skip_edl_close, int recycle_id);
 static void sample_del_internal(sample_info *si, int skip_edl_close);
 static void sample_normalize_marker_info(sample_info *sample);
+#ifdef HAVE_XML2
+void sample_watch_stop(void);
+#endif
 
 static inline int sample_clamp_audio_volume(int volume)
 {
@@ -354,7 +357,11 @@ void    sample_free(void *edl)
 {
     if(!SampleHash)
         return;
-    
+
+#ifdef HAVE_XML2
+    sample_watch_stop();
+#endif
+
     sample_del_all(edl);
 
     hash_destroy( SampleHash );
@@ -413,22 +420,23 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
    if (!initialized) {
         return NULL;
    }
-   si = (sample_info *) vj_calloc(sizeof(sample_info));
 
    if(startFrame < 0) startFrame = 0;
 
-   if(endFrame <= startFrame ) 
+   if(endFrame <= startFrame )
    {
     veejay_msg(VEEJAY_MSG_ERROR,"End frame %ld must be greater than start frame %ld", endFrame, startFrame);
     return NULL;
     }
 
+   si = (sample_info *) vj_calloc(sizeof(sample_info));
     if (!si) {
         return NULL;
     }
 
     sample_eff_chain *sec = (sample_eff_chain*) vj_calloc(sizeof(sample_eff_chain) * SAMPLE_MAX_EFFECTS );
     if(!sec) {
+        free(si);
         return NULL;
     }
 
@@ -3750,9 +3758,18 @@ int sample_read_edl( sample_info *sample, SampleLoadMode load_mode )
 
 static void LoadSubtitles( sample_info *skel, char *file, void *font )
 {
-    char tmp[512];
+    char tmp[PATH_MAX];
 
-    snprintf(tmp,sizeof(tmp), "%s-SUB-%d.srt", file,skel->sample_id );
+    if(!skel || !file)
+        return;
+
+    int n = snprintf(tmp, sizeof(tmp), "%s-SUB-%d.srt", file, skel->sample_id);
+    if(n < 0 || n >= (int)sizeof(tmp)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+            "Subtitle sidecar path too long for sample %d", skel->sample_id);
+        return;
+    }
+
     vj_font_load_srt( font, tmp );
 }
 
@@ -3762,13 +3779,15 @@ static void LoadSubtitles( sample_info *skel, char *file, void *font )
 static xmlDocPtr read_xml_with_retry(const char *path)
 {
     xmlDocPtr doc = NULL;
+    const int parse_flags = XML_PARSE_RECOVER | XML_PARSE_NONET;
 
     for (int attempt = 0; attempt < XML_RETRY_COUNT; attempt++) {
 
-        doc = xmlReadFile(path, NULL, XML_PARSE_RECOVER);
+        errno = 0;
+        doc = xmlReadFile(path, NULL, parse_flags);
         if (doc)
             return doc;
-        if (errno != EIO && errno != ENOENT) break;
+        if (errno != EIO && errno != ENOENT && errno != EINTR) break;
 
         usleep(XML_RETRY_DELAY_US);
     }
@@ -4147,12 +4166,20 @@ static  int sample_write_edl(sample_info *sample)
 
 static void WriteSubtitles( sample_info *next_sample, void *font, char *file )
 {
-    char tmp[512];
+    char tmp[PATH_MAX];
+
+    if(!next_sample || !file)
+        return;
+
+    int n = snprintf(tmp, sizeof(tmp), "%s-SUB-%d.srt", file, next_sample->sample_id);
+    if(n < 0 || n >= (int)sizeof(tmp)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+            "Subtitle sidecar path too long for sample %d", next_sample->sample_id);
+        return;
+    }
 
     void *d = vj_font_get_dict( font );
 
-    sprintf(tmp, "%s-SUB-%d.srt", file,next_sample->sample_id );
-    
     vj_font_set_dict( font, next_sample->dict );
 
     vj_font_save_srt( font, tmp );
@@ -4161,6 +4188,44 @@ static void WriteSubtitles( sample_info *next_sample, void *font, char *file )
 }
 
 static char watched_samplelist_path_[PATH_MAX] = { 0 };
+
+static int sample_split_path(const char *path, char *dir, size_t dir_len, char *base, size_t base_len)
+{
+    if(!path || !path[0] || !dir || !base || dir_len == 0 || base_len == 0)
+        return 0;
+
+    const char *slash = strrchr(path, '/');
+    if(slash) {
+        size_t n = (size_t)(slash - path);
+        const char *name = slash + 1;
+
+        if(!name[0] || strlen(name) >= base_len)
+            return 0;
+
+        if(n == 0) {
+            if(dir_len < 2)
+                return 0;
+            dir[0] = '/';
+            dir[1] = '\0';
+        }
+        else {
+            if(n >= dir_len)
+                return 0;
+            memcpy(dir, path, n);
+            dir[n] = '\0';
+        }
+
+        snprintf(base, base_len, "%s", name);
+        return 1;
+    }
+
+    if(strlen(path) >= base_len || dir_len < 2)
+        return 0;
+
+    snprintf(dir, dir_len, ".");
+    snprintf(base, base_len, "%s", path);
+    return 1;
+}
 
 static int sample_same_path(const char *a, const char *b)
 {
@@ -4181,16 +4246,34 @@ static int sample_is_watched_samplelist(const char *path)
     return sample_same_path(path, watched_samplelist_path_);
 }
 
+static void sample_fsync_dir(const char *dir)
+{
+    int dfd = open(dir, O_DIRECTORY | O_RDONLY);
+    if (dfd >= 0) {
+        fsync(dfd);
+        close(dfd);
+    }
+}
+
 int write_xml_atomic(const char *path, xmlDocPtr doc)
 {
-    char tmp[4096];
-    if (snprintf(tmp, sizeof(tmp), "%s.tmp", path) >= sizeof(tmp)) {
-        return 0;
-     }
+    char dir[PATH_MAX];
+    char base[NAME_MAX + 1];
+    char tmp[PATH_MAX];
 
-    int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if(!doc || !sample_split_path(path, dir, sizeof(dir), base, sizeof(base)))
+        return 0;
+
+    int n = snprintf(tmp, sizeof(tmp), "%s/.%s.tmp.%ld.XXXXXX",
+                     dir, base, (long)getpid());
+    if(n < 0 || n >= (int)sizeof(tmp))
+        return 0;
+
+    int fd = mkstemp(tmp);
     if (fd < 0)
         return 0;
+
+    fchmod(fd, 0644);
 
     xmlSaveCtxtPtr ctxt = xmlSaveToFd(fd, "UTF-8", XML_SAVE_FORMAT);
     if (!ctxt) {
@@ -4206,7 +4289,11 @@ int write_xml_atomic(const char *path, xmlDocPtr doc)
         return 0;
     }
 
-    xmlSaveClose(ctxt);
+    if (xmlSaveClose(ctxt) < 0) {
+        close(fd);
+        unlink(tmp);
+        return 0;
+    }
 
     if (fsync(fd) != 0) {
         close(fd);
@@ -4214,19 +4301,17 @@ int write_xml_atomic(const char *path, xmlDocPtr doc)
         return 0;
     }
 
-    close(fd);
+    if (close(fd) != 0) {
+        unlink(tmp);
+        return 0;
+    }
 
     if (rename(tmp, path) != 0) {
         unlink(tmp);
         return 0;
     }
 
-    int dfd = open(".", O_DIRECTORY | O_RDONLY);
-    if (dfd >= 0) {
-        fsync(dfd);
-        close(dfd);
-    }
-
+    sample_fsync_dir(dir);
     return 1;
 }
 
@@ -4300,11 +4385,13 @@ int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id,
         tag_writeStream( sampleFile, i, childnode, font ,vp);
     }
 
-    sample_watch_suppress_next();
+    int watched_output = sample_is_watched_samplelist(sampleFile);
+    if(watched_output)
+        sample_watch_suppress_next();
+
     int ok = write_xml_atomic(sampleFile, doc);
-    if(!ok) {
+    if(watched_output && !ok)
         sample_watch_enable_events();
-    }
     xmlFreeDoc(doc);
     xmlFree(version);
 
@@ -4338,49 +4425,53 @@ void sample_watch_enable_events(void) {
 
 static void* watcher_thread_func(void* arg) {
 
+    (void)arg;
+
     WatcherContext ctx = global_ctx;
 
     char dir_path[PATH_MAX];
-    char target_file[NAME_MAX];
+    char target_file[NAME_MAX + 1];
 
-    const char *slash = strrchr(ctx.filepath, '/');
-    if (slash) {
-        snprintf(dir_path, sizeof(dir_path), "%.*s", (int)(slash - ctx.filepath), ctx.filepath);
-        snprintf(target_file, sizeof(target_file), "%s", slash + 1);
-    } else {
-        strcpy(dir_path, ".");
-        strcpy(target_file, ctx.filepath);
+    if(!sample_split_path(ctx.filepath, dir_path, sizeof(dir_path),
+                          target_file, sizeof(target_file))) {
+        atomic_store_int(&watcher_running, 0);
+        return NULL;
     }
 
     int fd = inotify_init1(IN_NONBLOCK);
-    if (fd < 0)
+    if (fd < 0) {
+        atomic_store_int(&watcher_running, 0);
         return NULL;
+    }
 
     int wd = inotify_add_watch(fd, dir_path, IN_CLOSE_WRITE | IN_MOVED_TO);
     if (wd < 0) {
         close(fd);
+        atomic_store_int(&watcher_running, 0);
         return NULL;
     }
 
     char buffer[EVENT_BUF_LEN];
 
-    while (watcher_running) {
+    while (atomic_load_int(&watcher_running)) {
 
         ssize_t length = read(fd, buffer, sizeof(buffer));
 
         if (length < 0) {
+            if(errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
+                break;
             usleep(10000);
             continue;
         }
 
-        int i = 0;
+        ssize_t i = 0;
 
-        while (i + sizeof(struct inotify_event) <= length) {
+        while (i + (ssize_t)sizeof(struct inotify_event) <= length) {
 
             struct inotify_event *event = (struct inotify_event *)&buffer[i];
             size_t event_size = sizeof(struct inotify_event) + event->len;
 
-            if (i + event_size > length)
+            if (i + (ssize_t)event_size > length)
                 break;
 
             if (event->len > 0 && strcmp(event->name, target_file) == 0) {
@@ -4394,24 +4485,45 @@ static void* watcher_thread_func(void* arg) {
                 }
             }
 
-            i += event_size;
+            i += (ssize_t)event_size;
         }
     }
 
+    inotify_rm_watch(fd, wd);
     close(fd);
+    atomic_store_int(&watcher_running, 0);
     return NULL;
+}
+
+void sample_watch_stop(void)
+{
+    if (active_thread != 0) {
+        atomic_store_int(&watcher_running, 0);
+        pthread_join(active_thread, NULL);
+        active_thread = 0;
+    }
+
+    atomic_store_int(&needs_reload, 0);
+    atomic_store_int(&suppress_reload, 0);
+    watched_samplelist_path_[0] = '\0';
+    global_ctx.filepath[0] = '\0';
 }
 
 static void start_watcher_thread() {
 
     if (active_thread != 0) {
-        watcher_running = 0;
+        atomic_store_int(&watcher_running, 0);
         pthread_join(active_thread, NULL);
         active_thread = 0;
     }
 
-    watcher_running = 1;
-    pthread_create(&active_thread, NULL, watcher_thread_func, NULL);
+    atomic_store_int(&needs_reload, 0);
+    atomic_store_int(&suppress_reload, 0);
+    atomic_store_int(&watcher_running, 1);
+    if (pthread_create(&active_thread, NULL, watcher_thread_func, NULL) != 0) {
+        atomic_store_int(&watcher_running, 0);
+        active_thread = 0;
+    }
 }
 
 int sample_open_and_watch(const char *path,
@@ -4421,8 +4533,10 @@ int sample_open_and_watch(const char *path,
     int loaded_id = id ? *id : 0;
     int loaded_mode = mode ? *mode : 0;
 
-    snprintf(global_ctx.filepath, sizeof(global_ctx.filepath), "%s", path);
-    snprintf(watched_samplelist_path_, sizeof(watched_samplelist_path_), "%s", path);
+    if(!path || snprintf(global_ctx.filepath, sizeof(global_ctx.filepath), "%s", path) >= (int)sizeof(global_ctx.filepath))
+        return 0;
+    if(snprintf(watched_samplelist_path_, sizeof(watched_samplelist_path_), "%s", path) >= (int)sizeof(watched_samplelist_path_))
+        return 0;
 
     global_ctx.vp = vp;
     global_ctx.seq = seq;

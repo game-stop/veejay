@@ -261,6 +261,7 @@ extern void sample_watch_list(void);
 extern int sample_open_and_watch(const char *path, void *vp, void *seq, void *font, void *el, int *id, int *mode);
 extern void sample_watch_suppress_next(void);
 extern void sample_watch_enable_events(void);
+extern void sample_watch_stop(void);
 extern void sample_move_fx_pointers(sample_eff_chain **target, sample_eff_chain **source);
 extern int sample_chain_apply_full(sample_eff_chain **effect_chain,int chain_index,int effect_id,int *args,int anim,int channel,
     int source_type,int e_flag,int a_flag,int volume,int kf_status,int kf_type, int beat);
