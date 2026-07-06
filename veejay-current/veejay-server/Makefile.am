@@ -1,7 +1,7 @@
 # Process with automake to produce Makefile.in
 
 SUBDIRS = thirdparty
-SUBDIRS += libvjxml libqrwrap
+SUBDIRS += libvjxml
 SUBDIRS += libvje libplugger libsample libsubsample libel libstream libsamplerec
 SUBDIRS += libveejay
 SUBDIRS += veejay 

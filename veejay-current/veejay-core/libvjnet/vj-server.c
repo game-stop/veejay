@@ -928,6 +928,7 @@ flushmore_lbl:
 #define V_TYPE_VIMS_DATA 1
 #define V_TYPE_VIMS_VIDEO 2
 #define V_TYPE_VIMS_KF 3
+#define V_TYPE_VIMS_LONG 4
 #define KF_HEADER_LEN 8
 #define VIMS_HEADER_LEN 4
 
@@ -1004,6 +1005,42 @@ static int vj_server_update_get_msg_kf(vj_server *vje, int sock_fd, int link_id,
     return 1;
 }
 
+static int vj_server_update_get_msg_long(vj_server *vje, int sock_fd, int link_id, int *num_msg)
+{
+	vj_link **Link = (vj_link**) vje->link;
+    char t_hdr[KF_HEADER_LEN];
+    int buf_size = vj_server_socket_consume( vje, sock_fd, link_id, t_hdr, KF_HEADER_LEN, 0 );
+    if( buf_size <= 0 )
+        return -1;
+
+    if(sscanf(t_hdr, "%8d", &buf_size ) != 1 ) {
+        veejay_msg(VEEJAY_MSG_ERROR, "VIMS X-message is corrupted");
+        return -1;
+    }
+
+    char *buf = (char*) vj_calloc( sizeof(char) * ((size_t)buf_size + 1u) );
+    if(!buf) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Out of memory error");
+        return -1;
+    }
+
+    int msg_size = vj_server_socket_consume( vje, sock_fd, link_id, buf, buf_size, MSG_WAITALL );
+    if( msg_size <= 0 ) {
+	free(buf);
+        return -1;
+    }
+
+    buf[msg_size] = '\0';
+
+    _vj_put_kf_msg(vje, link_id, buf, msg_size, *num_msg);
+    Link[link_id]->m_queue[*num_msg]->allocated = 1;
+
+    *num_msg = *num_msg + 1;
+
+    return 1;
+}
+
+
 static int vj_server_update_get_msg_vd(vj_server *vje, int sock_fd, int link_id, int *num_msg)
 {
 	vj_link **Link = (vj_link**) vje->link;
@@ -1064,9 +1101,11 @@ static int vj_server_update_get_msg_type(vj_server *vje, int sock_fd, int link_i
             return V_TYPE_VIMS_VIDEO;
         case 'K':
             return V_TYPE_VIMS_KF;
+        case 'X':
+            return V_TYPE_VIMS_LONG;
    }
 
-   veejay_msg(VEEJAY_MSG_ERROR, "Expected VIMS header token D,V or K"); 
+   veejay_msg(VEEJAY_MSG_ERROR, "Expected VIMS header token D,V,K or X"); 
 
    return -1; 
 }
@@ -1108,6 +1147,10 @@ static int vj_server_queue_vims_messages( vj_server *vje, int sock_fd, int id )
         switch( msg_type ) {
             case V_TYPE_VIMS_KF:
                 if( vj_server_update_get_msg_kf(vje,sock_fd, id, &num_msg) == -1 )
+                    goto gremlin_pool;
+                break;
+            case V_TYPE_VIMS_LONG:
+                if( vj_server_update_get_msg_long(vje,sock_fd, id, &num_msg) == -1 )
                     goto gremlin_pool;
                 break;
             case V_TYPE_VIMS_DATA:

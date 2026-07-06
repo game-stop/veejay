@@ -708,19 +708,6 @@ AC_MSG_NOTICE([Final VEEJAY_CXXFLAGS: $VEEJAY_CXXFLAGS])
 AC_SUBST(VEEJAY_CFLAGS)
 AC_SUBST(PROGRAM_NOPIC)
 
-
-PKG_CHECK_MODULES(LIBQRENCODE,[libqrencode >= 3.4.2], have_qrencode=true,have_qrencode=false)
-if test x$have_qrencode = xfalse;
-then
-	AC_MSG_WARN([libqrencode is not present])
-else
-	if test x$have_libpng = xfalse;
-	then
-		AC_MSG_ERROR([libpng is not present])
-	fi
-	AC_DEFINE( HAVE_QRENCODE,1,[Use QREncode] )
-fi
-
 glib_modules="glib-2.0 >= 2.4"
 PKG_CHECK_MODULES(GLIB, [$glib_modules])
 AC_SUBST(GLIB_CFLAGS)
@@ -1175,7 +1162,6 @@ libvjxml/Makefile
 libvje/Makefile
 libplugger/Makefile
 libsample/Makefile
-libqrwrap/Makefile
 libsubsample/Makefile
 libel/Makefile
 libstream/Makefile
@@ -1274,5 +1260,4 @@ AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
 AC_MSG_NOTICE([  - Liblo OSC client              : ${have_liblo}])
 AC_MSG_NOTICE([  - V4L2 (default)                : ${have_v4l2}])
 AC_MSG_NOTICE([  - libunwind                     : ${have_unwind}])
-AC_MSG_NOTICE([  - QR code support (libqrencode) : ${have_qrencode}])
 

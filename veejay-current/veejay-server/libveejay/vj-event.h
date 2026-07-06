@@ -144,6 +144,9 @@ void 	vj_event_sample_rec_start			( 	void *ptr, 	const char format[], 	va_list a
 void 	vj_event_sample_rec_stop			(	void *ptr, 	const char format[], 	va_list ap	); 
 #ifdef HAVE_XML2
 void 	vj_event_sample_save_list			(	void *ptr, 	const char format[], 	va_list ap	);
+void 	vj_event_sample_load_list_b64		(	void *ptr, 	const char format[], 	va_list ap	);
+void 	vj_event_sample_sync_list_to_master	(	void *ptr, 	const char format[], 	va_list ap	);
+void 	vj_event_send_samplelist_blob		(	void *ptr, 	const char format[], 	va_list ap	);
 #endif
 void	vj_event_sample_select			(	void *ptr, 	const char format[],	va_list ap	);
 void 	vj_event_sample_set_descr			(	void *ptr, 	const char format[], 	va_list ap	);

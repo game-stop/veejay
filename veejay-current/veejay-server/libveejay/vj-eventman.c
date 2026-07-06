@@ -46,6 +46,15 @@
 #ifndef VIMS_SAMPLE_AUDIO_SYNC_REARM
 #define VIMS_SAMPLE_AUDIO_SYNC_REARM 277
 #endif
+#ifndef VIMS_SAMPLE_SYNC_SAMPLELIST
+#define VIMS_SAMPLE_SYNC_SAMPLELIST 122
+#endif
+#ifndef VIMS_SAMPLE_LOAD_SAMPLELIST_B64
+#define VIMS_SAMPLE_LOAD_SAMPLELIST_B64 123
+#endif
+#ifndef VIMS_GET_SAMPLELIST
+#define VIMS_GET_SAMPLELIST 450
+#endif
 
 #define VIMS_REQUIRE_ALL_PARAMS (1<<0)			/* all params needed */
 #define VIMS_DONT_PARSE_PARAMS (1<<1)		/* dont parse arguments */
@@ -1623,6 +1632,24 @@ void		vj_init_vevo_events(void)
 				"Filename",
 				NULL,
 				NULL );
+	index_map_[VIMS_SAMPLE_SYNC_SAMPLELIST]		=	_new_event(
+				NULL,
+				VIMS_SAMPLE_SYNC_SAMPLELIST,
+				"Send current samplelist to connected master over VIMS",
+				vj_event_sample_sync_list_to_master,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+	index_map_[VIMS_SAMPLE_LOAD_SAMPLELIST_B64]	=	_new_event(
+				"%s",
+				VIMS_SAMPLE_LOAD_SAMPLELIST_B64,
+				"Load samples from base64 encoded samplelist blob",
+				vj_event_sample_load_list_b64,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS|VIMS_LONG_PARAMS,
+				"Base64 encoded samplelist",
+				NULL,
+				NULL );
 #endif
 
 
@@ -3035,6 +3062,16 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				"sample offset",
 				0,
 				NULL );
+#ifdef HAVE_XML2
+	index_map_[VIMS_GET_SAMPLELIST]			=	_new_event(
+				NULL,
+				VIMS_GET_SAMPLELIST,
+				"GUI: Get current samplelist as base64 encoded XML",
+				vj_event_send_samplelist_blob,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+#endif
 	index_map_[VIMS_SAMPLE_INFO]				=	_new_event(
 				"%d %d",
 				VIMS_SAMPLE_INFO,

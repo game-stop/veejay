@@ -25,6 +25,10 @@
 #include <ctype.h>
 #include <stdint.h>
 #include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <limits.h>
 #ifdef HAVE_SDL
 #include <SDL2/SDL.h>
 #endif
@@ -35,6 +39,7 @@
 #include <libvje/vje.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vj-msg.h>
+#include <veejaycore/vj-client.h>
 #include <veejaycore/atomic.h>
 #include <libsubsample/subsample.h>
 #include <libveejay/vj-lib.h>
@@ -104,6 +109,16 @@
 #endif
 
 #define MAX_ARGUMENTS (SAMPLE_MAX_PARAMETERS + 8)
+
+#ifndef VIMS_SAMPLE_SYNC_SAMPLELIST
+#define VIMS_SAMPLE_SYNC_SAMPLELIST 122
+#endif
+#ifndef VIMS_SAMPLE_LOAD_SAMPLELIST_B64
+#define VIMS_SAMPLE_LOAD_SAMPLELIST_B64 123
+#endif
+#ifndef VIMS_GET_SAMPLELIST
+#define VIMS_GET_SAMPLELIST 450
+#endif
 
 
 static int use_bw_preview_ = 0;
@@ -179,6 +194,324 @@ static  char    *get_print_buf(int size) {
     char *res = (char*) vj_calloc(sizeof(char) * s );
     return res;
 }
+
+static const char vj_b64_table[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static char *vj_base64_encode_mem(const uint8_t *src, size_t len, size_t *out_len)
+{
+    size_t olen = ((len + 2) / 3) * 4;
+    char *out = (char*) vj_malloc(olen + 1);
+    if(!out)
+        return NULL;
+
+    size_t i = 0;
+    size_t j = 0;
+    while(i < len) {
+        uint32_t a = src[i++];
+        uint32_t b = (i < len) ? src[i++] : 0;
+        uint32_t c = (i < len) ? src[i++] : 0;
+        uint32_t triple = (a << 16) | (b << 8) | c;
+
+        out[j++] = vj_b64_table[(triple >> 18) & 0x3f];
+        out[j++] = vj_b64_table[(triple >> 12) & 0x3f];
+        out[j++] = (i - 1 <= len) ? vj_b64_table[(triple >> 6) & 0x3f] : '=';
+        out[j++] = (i <= len) ? vj_b64_table[triple & 0x3f] : '=';
+    }
+
+    size_t mod = len % 3;
+    if(mod) {
+        out[olen - 1] = '=';
+        if(mod == 1)
+            out[olen - 2] = '=';
+    }
+
+    out[olen] = '\0';
+    if(out_len)
+        *out_len = olen;
+    return out;
+}
+
+static int vj_b64_value(unsigned char c)
+{
+    if(c >= 'A' && c <= 'Z') return c - 'A';
+    if(c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if(c >= '0' && c <= '9') return c - '0' + 52;
+    if(c == '+') return 62;
+    if(c == '/') return 63;
+    if(c == '=') return -2;
+    if(c == '\r' || c == '\n' || c == '\t' || c == ' ') return -3;
+    return -1;
+}
+
+static uint8_t *vj_base64_decode_mem(const char *src, size_t len, size_t *out_len)
+{
+    size_t clean_len = 0;
+    for(size_t i = 0; i < len; i++) {
+        int v = vj_b64_value((unsigned char)src[i]);
+        if(v == -1)
+            return NULL;
+        if(v != -3)
+            clean_len++;
+    }
+
+    if(clean_len == 0 || (clean_len % 4) != 0)
+        return NULL;
+
+    size_t max_out = (clean_len / 4) * 3;
+    uint8_t *out = (uint8_t*) vj_malloc(max_out + 1);
+    if(!out)
+        return NULL;
+
+    int q[4];
+    int qn = 0;
+    size_t j = 0;
+    int pad_seen = 0;
+
+    for(size_t i = 0; i < len; i++) {
+        int v = vj_b64_value((unsigned char)src[i]);
+        if(v == -3)
+            continue;
+        if(v == -2) {
+            v = 0;
+            pad_seen++;
+        }
+        else if(pad_seen) {
+            free(out);
+            return NULL;
+        }
+
+        q[qn++] = v;
+        if(qn == 4) {
+            uint32_t triple = ((uint32_t)q[0] << 18) |
+                              ((uint32_t)q[1] << 12) |
+                              ((uint32_t)q[2] << 6) |
+                               (uint32_t)q[3];
+            out[j++] = (uint8_t)((triple >> 16) & 0xff);
+            if(pad_seen < 2)
+                out[j++] = (uint8_t)((triple >> 8) & 0xff);
+            if(pad_seen < 1)
+                out[j++] = (uint8_t)(triple & 0xff);
+            qn = 0;
+        }
+    }
+
+    out[j] = 0;
+    if(out_len)
+        *out_len = j;
+    return out;
+}
+
+static char *vj_file_to_base64(const char *path, size_t *out_len)
+{
+    FILE *fp = fopen(path, "rb");
+    if(!fp)
+        return NULL;
+
+    if(fseek(fp, 0, SEEK_END) != 0) {
+        fclose(fp);
+        return NULL;
+    }
+
+    long flen = ftell(fp);
+    if(flen < 0) {
+        fclose(fp);
+        return NULL;
+    }
+
+    if(fseek(fp, 0, SEEK_SET) != 0) {
+        fclose(fp);
+        return NULL;
+    }
+
+    uint8_t *buf = (uint8_t*) vj_malloc((size_t)flen + 1);
+    if(!buf) {
+        fclose(fp);
+        return NULL;
+    }
+
+    size_t got = fread(buf, 1, (size_t)flen, fp);
+    fclose(fp);
+
+    if(got != (size_t)flen) {
+        free(buf);
+        return NULL;
+    }
+
+    char *b64 = vj_base64_encode_mem(buf, got, out_len);
+    free(buf);
+    return b64;
+}
+
+static char *vj_samplelist_temp_path(void)
+{
+    char tmpl[PATH_MAX];
+    snprintf(tmpl, sizeof(tmpl), "/tmp/veejay-samplelist-sync-XXXXXX");
+    int fd = mkstemp(tmpl);
+    if(fd < 0)
+        return NULL;
+    close(fd);
+    return vj_strdup(tmpl);
+}
+
+static void vj_samplelist_unlink_temp_sidecars(const char *path)
+{
+    if(!path)
+        return;
+
+    unlink(path);
+    char sidecar[PATH_MAX];
+    int n = sample_highest();
+    for(int i = 1; i <= n; i++) {
+        snprintf(sidecar, sizeof(sidecar), "%s-SUB-%d.srt", path, i);
+        unlink(sidecar);
+    }
+}
+
+static char *vj_event_samplelist_to_base64(veejay_t *v, size_t *out_len)
+{
+    if(out_len)
+        *out_len = 0;
+
+    if(!v || !v->uc)
+        return NULL;
+
+    char *tmp = vj_samplelist_temp_path();
+    if(!tmp)
+        return NULL;
+
+    char *b64 = NULL;
+    if(sample_writeToFile(tmp, v->composite, v->seq, v->font, v->uc->sample_id, v->uc->playback_mode))
+        b64 = vj_file_to_base64(tmp, out_len);
+
+    vj_samplelist_unlink_temp_sidecars(tmp);
+    free(tmp);
+    return b64;
+}
+
+static int vj_event_parse_samplelist_b64_arg(const char *arg, const char **b64, size_t *b64_len)
+{
+    if(!arg || !b64 || !b64_len)
+        return 0;
+
+    unsigned long declared = 0;
+    int n = 0;
+
+    if(sscanf(arg, "%8lu%n", &declared, &n) != 1 || n != 8)
+        return 0;
+
+    size_t available = strlen(arg + n);
+    if(declared == 0 || available < (size_t)declared)
+        return 0;
+
+    *b64 = arg + n;
+    *b64_len = (size_t)declared;
+    return 1;
+}
+
+static char *vj_event_pack_samplelist_b64_arg(const char *b64, size_t b64_len, size_t *out_len)
+{
+    if(out_len)
+        *out_len = 0;
+
+    if(!b64 || b64_len == 0 || b64_len > 99999999u)
+        return NULL;
+
+    size_t len = b64_len + 8;
+    char *out = (char*) vj_malloc(len + 1);
+    if(!out)
+        return NULL;
+
+    snprintf(out, 9, "%08zu", b64_len);
+    memcpy(out + 8, b64, b64_len);
+    out[len] = '\0';
+
+    if(out_len)
+        *out_len = len;
+    return out;
+}
+
+static int vj_event_send_long_vims(vj_client *client, int vims_id, const char *arg, size_t arg_len)
+{
+    char prefix[8];
+    int prefix_len = snprintf(prefix, sizeof(prefix), "%03d:", vims_id);
+
+    if(!client || !arg || arg_len == 0 || prefix_len <= 0 || prefix_len >= (int)sizeof(prefix))
+        return 0;
+
+    size_t msg_len = (size_t)prefix_len + arg_len + 1;
+    size_t packet_payload_len = msg_len;
+    size_t packet_len = 1 + 8 + packet_payload_len;
+
+    if(packet_payload_len > 99999999u)
+        return 0;
+
+    unsigned char *packet = (unsigned char*)vj_malloc(packet_len);
+    if(!packet)
+        return 0;
+
+    packet[0] = 'X';
+    snprintf((char*)packet + 1, 9, "%08zu", packet_payload_len);
+    memcpy(packet + 9, prefix, (size_t)prefix_len);
+    memcpy(packet + 9 + prefix_len, arg, arg_len);
+    packet[9 + prefix_len + arg_len] = ';';
+
+    int ret = vj_client_send_buf(client, V_CMD, packet, packet_len);
+    free(packet);
+
+    return ret > 0;
+}
+
+static int vj_event_load_samplelist_base64_len(veejay_t *v, const char *b64, size_t b64_len)
+{
+    if(!v || !b64 || b64_len == 0)
+        return 0;
+
+    size_t xml_len = 0;
+    uint8_t *xml = vj_base64_decode_mem(b64, b64_len, &xml_len);
+    if(!xml || xml_len == 0) {
+        if(xml)
+            free(xml);
+        return 0;
+    }
+
+    char *tmp = vj_samplelist_temp_path();
+    if(!tmp) {
+        free(xml);
+        return 0;
+    }
+
+    FILE *fp = fopen(tmp, "wb");
+    if(!fp) {
+        free(xml);
+        vj_samplelist_unlink_temp_sidecars(tmp);
+        free(tmp);
+        return 0;
+    }
+
+    size_t put = fwrite(xml, 1, xml_len, fp);
+    fclose(fp);
+    free(xml);
+
+    if(put != xml_len) {
+        vj_samplelist_unlink_temp_sidecars(tmp);
+        free(tmp);
+        return 0;
+    }
+
+    int id = v->uc ? v->uc->sample_id : 0;
+    int mode = v->uc ? v->uc->playback_mode : 0;
+    int ok = sample_readFromFile(tmp, v->composite, v->seq, v->font, v->edit_list, &id, &mode, SAMPLE_LOAD_UPDATE);
+    if(ok && v->uc && id > 0 && mode >= 0) {
+        v->uc->sample_id = id;
+        v->uc->playback_mode = mode;
+    }
+
+    vj_samplelist_unlink_temp_sidecars(tmp);
+    free(tmp);
+    return ok;
+}
+
 
 #define MAX_VIMS_ARGUMENTS 16
 
@@ -498,6 +831,8 @@ struct {
     { VIMS_EDITLIST_LOAD },
 #ifdef HAVE_XML2
     { VIMS_SAMPLE_SAVE_SAMPLELIST },
+    { VIMS_SAMPLE_SYNC_SAMPLELIST },
+    { VIMS_SAMPLE_LOAD_SAMPLELIST_B64 },
 #endif
     { VIMS_BUNDLE_FILE },
     { VIMS_BUNDLE_SAVE },
@@ -5699,6 +6034,134 @@ void vj_event_sample_set_descr(void *ptr, const char format[], va_list ap)
 }
 
 #ifdef HAVE_XML2
+void vj_event_send_samplelist_blob(void *ptr, const char format[], va_list ap)
+{
+    (void)format;
+    (void)ap;
+
+    veejay_t *v = (veejay_t*)ptr;
+    size_t b64_len = 0;
+    char *b64 = vj_event_samplelist_to_base64(v, &b64_len);
+
+    size_t payload_len = 0;
+    char *payload = vj_event_pack_samplelist_b64_arg(b64, b64_len, &payload_len);
+    if(b64)
+        free(b64);
+
+    if(!payload || payload_len == 0 || payload_len > 999999u) {
+        SEND_MSG(v, "000000");
+        if(payload)
+            free(payload);
+        return;
+    }
+
+    char header[7];
+    snprintf(header, sizeof(header), "%06zu", payload_len);
+    SEND_MSG(v, header);
+    SEND_DATA(v, payload, payload_len);
+    free(payload);
+}
+
+void vj_event_sample_load_list_b64(void *ptr, const char format[], va_list ap)
+{
+    (void)format;
+
+    veejay_t *v = (veejay_t*)ptr;
+    char *arg = va_arg(ap, char*);
+    const char *b64 = NULL;
+    size_t b64_len = 0;
+
+    if(!vj_event_parse_samplelist_b64_arg(arg, &b64, &b64_len)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid network samplelist blob header");
+        return;
+    }
+
+    if(vj_event_load_samplelist_base64_len(v, b64, b64_len)) {
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Loaded network samplelist blob (%zu base64 bytes)",
+                   b64_len);
+    }
+    else {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to load network samplelist blob");
+    }
+}
+
+void vj_event_sample_sync_list_to_master(void *ptr, const char format[], va_list ap)
+{
+    (void)format;
+    (void)ap;
+
+    veejay_t *v = (veejay_t*)ptr;
+
+    if(!v || !v->uc)
+        return;
+
+    if(v->is_master) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "Samplelist network sync ignored on master; connect the client to the preview/editor instance");
+        return;
+    }
+
+    if(!v->master_origin || v->master_origin_port <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Samplelist network sync needs a preview/editor instance started with --connect");
+        return;
+    }
+
+    size_t b64_len = 0;
+    char *b64 = vj_event_samplelist_to_base64(v, &b64_len);
+    if(!b64 || b64_len == 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to serialize samplelist for network sync");
+        if(b64)
+            free(b64);
+        return;
+    }
+
+    if(v->master_client == NULL) {
+        v->master_client = vj_client_alloc();
+        if(vj_client_connect(v->master_client, v->master_origin, NULL, v->master_origin_port) != 1) {
+            vj_client_close(v->master_client);
+            vj_client_free(v->master_client);
+            v->master_client = NULL;
+        }
+    }
+
+    if(!v->master_client) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Unable to connect to master %s:%d for samplelist network sync",
+                   v->master_origin, v->master_origin_port);
+        free(b64);
+        return;
+    }
+
+    size_t payload_len = 0;
+    char *payload = vj_event_pack_samplelist_b64_arg(b64, b64_len, &payload_len);
+    free(b64);
+
+    if(!payload || payload_len == 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to pack samplelist blob for VIMS");
+        if(payload)
+            free(payload);
+        return;
+    }
+
+    if(!vj_event_send_long_vims(v->master_client, VIMS_SAMPLE_LOAD_SAMPLELIST_B64, payload, payload_len)) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Failed to send samplelist blob to master %s:%d",
+                   v->master_origin, v->master_origin_port);
+        vj_client_close(v->master_client);
+        vj_client_free(v->master_client);
+        v->master_client = NULL;
+    }
+    else {
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Sent samplelist blob to master %s:%d (%zu base64 bytes)",
+                   v->master_origin, v->master_origin_port, b64_len);
+    }
+
+    free(payload);
+}
+
 void vj_event_sample_save_list(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
@@ -12335,7 +12798,7 @@ void vj_event_send_video_information(void *ptr, const char format[], va_list ap)
 
     char info_msg[2048];
     snprintf(info_msg, sizeof(info_msg),
-             "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d %s %d",
+             "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d %s %d %d",
              el->video_width,
              el->video_height,
              el->video_inter,
@@ -12351,7 +12814,8 @@ void vj_event_send_video_information(void *ptr, const char format[], va_list ap)
              v->settings->use_vims_mcast,
              atomic_load_int(&settings->transition.global_state),
              v->action_file[1],
-            atomic_load_int(&settings->audio_beat.enabled) ? 1 : 0
+             atomic_load_int(&settings->audio_beat.enabled) ? 1 : 0,
+             v->is_master ? 1 : 0
             );
 
     char *s_print_buf = get_print_buf(strlen(info_msg) + 5);

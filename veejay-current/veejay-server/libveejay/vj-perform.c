@@ -62,7 +62,6 @@
 #include <libvje/effects/opacity.h>
 #include <libvje/effects/masktransition.h>
 #include <libvje/effects/shapewipe.h>
-#include <libqrwrap/qrwrapper.h>
 #include <libveejay/vj-split.h>
 #include <libveejay/vjkf.h>
 #include <veejaycore/libvevo.h>

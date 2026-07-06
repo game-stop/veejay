@@ -99,7 +99,6 @@
 #include <libplugger/plugload.h>
 #include <libstream/vj-vloopback.h>
 #include <veejaycore/vims.h>
-#include <libqrwrap/qrwrapper.h>
 #include <sched.h>
 #include <libveejay/vj-shm.h>
 #include <pthread.h>

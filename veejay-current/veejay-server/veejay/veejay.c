@@ -20,6 +20,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <sysexits.h>
 #include <veejaycore/defs.h>
 #include <veejaycore/vjmem.h>
@@ -326,9 +327,6 @@ static void Usage(char *progname)
     fprintf(stderr, "     --fx-custom-default-values\n");
     fprintf(stderr, "                                Read FX defaults from ~/.veejay/livido and frei0r\n");
     fprintf(stderr, "     --benchmark WxH           Run benchmark at the given resolution\n");
-#ifdef HAVE_QRENCODE
-    fprintf(stderr, "     --qrcode-connection-info  Encode external IP and port into a QR code\n");
-#endif
     fprintf(stderr, "\n");
 }
 
@@ -555,6 +553,10 @@ static int set_option(const char *name, char *value)
 	}
 	else if (strcmp(name, "connect") == 0 || strcmp(name, "C") == 0) {
 		char *sep = strchr(optarg, ':');
+        if(info->master_origin) {
+            free(info->master_origin);
+            info->master_origin = NULL;
+        }
         if(sep)
         {
             *sep = '\0';
@@ -567,6 +569,7 @@ static int set_option(const char *name, char *value)
             info->master_origin = strdup(optarg);
             info->master_origin_port = VJ_PORT;
         }
+        info->master_origin_explicit = 1;
 	}
 	else if (strcmp(name, "geometry-x") == 0 || strcmp(name, "x")==0) {
 		default_geometry_x = atoi(optarg);
@@ -806,6 +809,11 @@ static int check_command_line_options(int argc, char *argv[])
     }
     if (optind > argc)
 	nerr++;
+
+    if(!nerr && info->is_master && info->master_origin) {
+        fprintf(stderr, "-K/--master and -C/--connect are mutually exclusive\n");
+        nerr++;
+    }
 
     if (nerr) {
         Usage(argv[0]);

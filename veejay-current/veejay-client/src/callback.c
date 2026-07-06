@@ -4671,7 +4671,7 @@ void	on_button_samplelist_save_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		multi_vims( VIMS_SAMPLE_SAVE_SAMPLELIST, "%s", filename );
 		vj_msg(VEEJAY_MSG_INFO, "Saved samples to %s", filename);
-		strlcpy( samplelist_name, filename,strlen(filename));
+		strlcpy(samplelist_name, filename, sizeof(samplelist_name));
 		as_samplelist_name = 1;
 		g_free(filename);
 	}
@@ -4690,7 +4690,7 @@ gboolean	on_button_samplelist_qsave_clicked(GtkWidget *widget, GdkEvent *event, 
 		{
 			multi_vims( VIMS_SAMPLE_SAVE_SAMPLELIST, "%s", filename );
 			vj_msg(VEEJAY_MSG_INFO, "Saved samples to %s", filename);
-			strlcpy( samplelist_name, filename, strlen(filename));
+			strlcpy(samplelist_name, filename, sizeof(samplelist_name));
 			g_free(filename);
 			as_samplelist_name = 1;
 		}
@@ -4704,19 +4704,24 @@ gboolean	on_button_samplelist_qsave_clicked(GtkWidget *widget, GdkEvent *event, 
 
 gboolean on_sync_samplelist_clicked(GtkWidget *widget, GdkEvent *event, gpointer user_data)
 {
-    if (samplelist_name[0] != '\0') {
-        multi_vims(VIMS_SAMPLE_SAVE_SAMPLELIST, "%s", samplelist_name);
-        vj_msg(VEEJAY_MSG_INFO, "Saved samplelist to %s", samplelist_name);
-    } else {
-        gchar *filename = dialog_save_file("Save samplelist", "veejay-samplelist.sl");
-        if (filename) {
-            multi_vims(VIMS_SAMPLE_SAVE_SAMPLELIST, "%s", filename);
-            vj_msg(VEEJAY_MSG_INFO, "Saved samples to %s", filename);
-            strlcpy(samplelist_name, filename, strlen(filename) + 1);
-            as_samplelist_name = 1;
-            g_free(filename);
-        }
+    (void)event;
+    (void)user_data;
+
+    if(widget)
+        vj_gui_update_sync_samplelist_sensitivity();
+
+    if(vj_gui_connected_to_master()) {
+        vj_msg(VEEJAY_MSG_INFO,
+               "Samplelist sync is disabled on the master instance (%s:%d); connect Reloaded to the preview/editor instance",
+               vj_gui_connected_host(),
+               vj_gui_connected_port());
+        return TRUE;
     }
+
+    single_vims(VIMS_SAMPLE_SYNC_SAMPLELIST);
+    vj_msg(VEEJAY_MSG_INFO,
+           "Requested network samplelist sync to the connected master");
+
     return TRUE;
 }
 

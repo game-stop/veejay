@@ -45,6 +45,10 @@ info->uc.selected_fx_param = arg_num+WIDGET_SLIDER_P0; \
 }
 
 void text_defaults();
+int vj_gui_connected_to_master(void);
+int vj_gui_connected_port(void);
+const char *vj_gui_connected_host(void);
+void vj_gui_update_sync_samplelist_sensitivity(void);
 void samplebank_goto_page(int page);
 void samplebank_step_page(int delta);
 int samplebank_get_page(void);

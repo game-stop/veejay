@@ -678,6 +678,7 @@ typedef struct veejay_t
 	char *server_origin;
 	char *master_origin;
 	int master_origin_port;
+	int master_origin_explicit;
     vj_server *vjs[4]; /* 0=cmd, 1 = sta, 2 = mcast, 3 = msg */
 	vj_client *master_client;
     int net;

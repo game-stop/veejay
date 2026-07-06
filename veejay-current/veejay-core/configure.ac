@@ -636,18 +636,6 @@ AC_SUBST(VEEJAY_CFLAGS)
 AC_SUBST(PROGRAM_NOPIC)
 
 
-PKG_CHECK_MODULES(LIBQRENCODE,[libqrencode >= 3.4.2], have_qrencode=true,have_qrencode=false)
-if test x$have_qrencode = xfalse;
-then
-	AC_MSG_WARN([libqrencode is not present])
-else
-	if test x$have_libpng = xfalse;
-	then
-		AC_MSG_ERROR([libpng is not present])
-	fi
-	AC_DEFINE( HAVE_QRENCODE,1,[Use QREncode] )
-fi
-
 glib_modules="glib-2.0 >= 2.4"
 PKG_CHECK_MODULES(GLIB, [$glib_modules])
 AC_SUBST(GLIB_CFLAGS)

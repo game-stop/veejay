@@ -14,7 +14,6 @@ AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
               -I$(top_srcdir)/libstream \
               -I$(top_srcdir)/libsubsample \
               -I$(top_srcdir)/libsamplerec \
-              -I$(top_srcdir)/libqrwrap \
               -I$(top_srcdir)/libvjxml \
               $(FFMPEG_CFLAGS) \
               $(LIBQUICKTIME_CFLAGS) \
@@ -78,7 +77,6 @@ libveejay_la_LIBADD = \
     $(top_builddir)/libstream/libstream.la \
     $(top_builddir)/libsubsample/libsubsample.la \
     $(top_builddir)/libsamplerec/libsamplerec.la \
-    $(top_builddir)/libqrwrap/libqrwrap.la \
     $(top_builddir)/libvjxml/libvjxml.la \
     $(SDL2_LIBS) \
     $(X_LIBS) \

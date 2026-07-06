@@ -3882,14 +3882,17 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
         }
 
         if(!xmlStrcmp(cur->name, (const xmlChar *) "server_origin")) {
-            if(!veejay_info->is_master && veejay_info->master_origin == NULL) {
+            if(veejay_info && !veejay_info->is_master &&
+               veejay_info->master_origin == NULL &&
+               !veejay_info->master_origin_explicit) {
                 veejay_info->master_origin = get_xml_str( doc, cur);
                 veejay_msg(VEEJAY_MSG_INFO, "Master origin is %s", veejay_info->master_origin);
             }
         }
 
         if(!xmlStrcmp(cur->name, (const xmlChar*) "server_port"))  {
-            if(!veejay_info->is_master) {
+            if(veejay_info && !veejay_info->is_master &&
+               !veejay_info->master_origin_explicit) {
                 veejay_info->master_origin_port = get_xml_int(doc, cur);
             }
         }
@@ -4157,6 +4160,27 @@ static void WriteSubtitles( sample_info *next_sample, void *font, char *file )
     vj_font_set_dict( font, d );
 }
 
+static char watched_samplelist_path_[PATH_MAX] = { 0 };
+
+static int sample_same_path(const char *a, const char *b)
+{
+    char ra[PATH_MAX];
+    char rb[PATH_MAX];
+
+    if(!a || !b || !a[0] || !b[0])
+        return 0;
+
+    if(realpath(a, ra) && realpath(b, rb))
+        return strcmp(ra, rb) == 0;
+
+    return strcmp(a, b) == 0;
+}
+
+static int sample_is_watched_samplelist(const char *path)
+{
+    return sample_same_path(path, watched_samplelist_path_);
+}
+
 int write_xml_atomic(const char *path, xmlDocPtr doc)
 {
     char tmp[4096];
@@ -4209,18 +4233,32 @@ int write_xml_atomic(const char *path, xmlDocPtr doc)
 int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id, int mode)
 {
     int i;
-    xmlChar *version = xmlCharStrdup("1.0");    
+    xmlChar *version;
     sample_info *next_sample;
     xmlDocPtr doc;
     xmlNodePtr rootnode, childnode;
 
+    if(veejay_info && veejay_info->is_master && sample_is_watched_samplelist(sampleFile)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+            "Refusing to sync-save watched samplelist '%s' from master; connect the client to the preview/editor instance",
+            sampleFile ? sampleFile : "(null)");
+        return 0;
+    }
+
+    version = xmlCharStrdup("1.0");
     doc = xmlNewDoc(version);
     rootnode = xmlNewDocNode(doc, NULL, (const xmlChar *) XMLTAG_SAMPLES, NULL);
     xmlDocSetRootElement(doc, rootnode);
 
-    if( veejay_info != NULL && veejay_info->is_master ) {
-        put_xml_str( rootnode, "server_origin", veejay_info->server_origin );
-        put_xml_int( rootnode, "server_port", veejay_info->uc->port);
+    if(veejay_info != NULL) {
+        if(veejay_info->is_master && veejay_info->server_origin) {
+            put_xml_str( rootnode, "server_origin", veejay_info->server_origin );
+            put_xml_int( rootnode, "server_port", veejay_info->uc->port);
+        }
+        else if(!veejay_info->is_master && veejay_info->master_origin) {
+            put_xml_str( rootnode, "server_origin", veejay_info->master_origin );
+            put_xml_int( rootnode, "server_port", veejay_info->master_origin_port);
+        }
     }
 
     if( veejay_info != NULL ) {
@@ -4383,8 +4421,8 @@ int sample_open_and_watch(const char *path,
     int loaded_id = id ? *id : 0;
     int loaded_mode = mode ? *mode : 0;
 
-    strncpy(global_ctx.filepath, path, PATH_MAX);
-    global_ctx.filepath[PATH_MAX-1] = '\0';
+    snprintf(global_ctx.filepath, sizeof(global_ctx.filepath), "%s", path);
+    snprintf(watched_samplelist_path_, sizeof(watched_samplelist_path_), "%s", path);
 
     global_ctx.vp = vp;
     global_ctx.seq = seq;
@@ -4424,7 +4462,9 @@ void sample_watch_list(void) {
             loaded_mode = veejay_info->uc->playback_mode;
         }
 
-        veejay_msg(VEEJAY_MSG_INFO, "Samplelist change detected! Reloading: %s",ctx.filepath);
+        veejay_msg(VEEJAY_MSG_INFO, "Samplelist change detected on %s instance! Reloading: %s",
+                   (veejay_info && veejay_info->is_master) ? "master" : "preview/editor",
+                   ctx.filepath);
 
         for (int i = 0; i < 5; i++) {
             if (sample_readFromFile(ctx.filepath,

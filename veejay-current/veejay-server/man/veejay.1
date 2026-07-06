@@ -1,4 +1,4 @@
-.TH "VEEJAY" "1" "June 2026" "Veejay" "User Commands"
+.TH "VEEJAY" "1" "July 2026" "Veejay" "User Commands"
 .SH NAME
 veejay \- a visual video instrument and video sampler for GNU/Linux
 
@@ -28,18 +28,20 @@ Veejay is developed in the hope that it will be useful for VJs, media artists,
 theatres, and other users who want to use Free Software for performances and
 video installations.
 
-.SH RUNNING MULTIPLE VEEJAYS: MAIN OUTPUT AND PREVIEW
+.SH RUNNING MULTIPLE VEEJAYS: MASTER OUTPUT AND PREVIEW
 
-Veejay can run multiple instances at the same time. A common setup is to run
-one veejay as the main video output and another veejay as a smaller preview or
+Veejay can run multiple instances at the same time. A common live setup is to
+run one veejay as the master video output and a second veejay as the preview or
 editing instance.
 
-The main output instance is started with
+The master output instance is started with
 .B --master
 or
 .BR -K .
+It owns the main projection/output role.
 
-The preview or editing instance is started with
+The preview or editing instance is started on its own base port and connected to
+the master with
 .B --connect
 or
 .BR -C ,
@@ -48,20 +50,16 @@ followed by the address and port of the master veejay:
 .PP
 .RS
 .nf
-\fBveejay --connect 127.0.0.1:3490\fR
+\fBveejay -p 4490 --connect 127.0.0.1:3490\fR
 .fi
 .RE
 
-When both instances run on the same machine, they can share the same samplelist
-file. Veejay watches the samplelist file for changes, so edits made by one
-instance can be picked up by the other instance automatically.
-
-Start the main output veejay:
+Start the master output veejay:
 
 .PP
 .RS
 .nf
-\fBveejay -a 1 -v -n -l veejay-samplelist.sl --master -w 1920 -h 1080\fR
+\fBveejay -p 3490 -a 1 -v -n -l veejay-samplelist.sl --master -w 1920 -h 1080\fR
 .fi
 .RE
 
@@ -70,21 +68,30 @@ Start the preview or editing veejay:
 .PP
 .RS
 .nf
-\fBveejay -v -w 720 -h 480 -l veejay-samplelist.sl --connect 127.0.0.1:3490\fR
+\fBveejay -p 4490 -v -w 720 -h 480 -l veejay-samplelist.sl --connect 127.0.0.1:3490\fR
 .fi
 .RE
 
 In this setup, the first veejay owns the main video output. The second veejay
-can be used as a lower-resolution preview and control or editing instance.
+can be used as a lower-resolution preview, control, and editing instance.
 
-When using Reloaded, connect Reloaded to the preview or editing veejay. Enable
+When using Reloaded, connect Reloaded to the preview or editing veejay, for
+example port 4490 in the example above. Do not use the master connection as the
+editing control surface. Reloaded marks master connections in the title bar and
+keeps preview-to-master samplelist sync unavailable there.
+
+Enable
 .B Forward VIMS trickplay
-to mirror playback and trickplay commands to the master output. Disable it when
-you want to stay in editing mode without forwarding playback controls.
+to mirror selected playback and trickplay commands from the preview/editor to
+the master output. Disable it when you want to stay in editing mode without
+forwarding playback controls. VIMS forwarding can be enabled independently of
+samplelist sync.
 
-Samplelist changes are synchronized through the shared samplelist file. Playback
-and trickplay commands are forwarded over the VIMS connection when forwarding is
-enabled.
+Use Reloaded's sync samplelist action from the preview/editor instance to send
+the current samplelist to the master over VIMS. The two instances no longer need
+to load the same samplelist file for this sync action. The master still needs to
+be able to resolve the media files, editlists, and stream resources referenced
+by the transferred samplelist.
 
 .SH SUPPORTED VIDEO CONTAINERS AND INPUTS
 
@@ -475,8 +482,8 @@ restarting the samples.
 
 .TP
 .B \-K/--master
-Start this veejay instance as the master or main video output. Other veejay
-instances can connect to it with
+Start this veejay instance as the master or main video output. A master owns
+the projection/output role. Preview or editing instances can connect to it with
 .BR --connect .
 
 .TP
@@ -484,13 +491,20 @@ instances can connect to it with
 Connect this veejay instance to a master veejay. If no port is given, the
 default VIMS port is used. This is typically used for a preview or editing
 instance that forwards selected VIMS playback or trickplay commands to the main
-video output.
+video output. When running master and preview on the same machine, give the
+preview/editor instance its own base port with
+.BR -p ,
+for example
+.BR "-p 4490 --connect 127.0.0.1:3490" .
 
 .TP
 .B \-l/--sample-file <filename>
 Load a samplelist file at startup. The samplelist file stores your project,
 including samples, FX chains, loop and play modes, the currently playing sample,
-and sequencer information.
+and sequencer information. In a master/preview setup, startup samplelists may be
+loaded locally on each instance. Reloaded's preview-to-master sync can transfer
+the current samplelist over VIMS, so both instances do not need to load the same
+samplelist file for that sync action.
 
 .TP
 .B \-F/--action-file <filename>
@@ -1514,20 +1528,27 @@ is written to the pipe. Audio, if any, still goes to JACK. Because of how pipes
 work, audio and video can lose sync.
 
 .TP
-.B veejay -a 1 -v -n -l veejay-samplelist.sl --master -w 1920 -h 1080
+.B veejay -p 3490 -a 1 -v -n -l veejay-samplelist.sl --master -w 1920 -h 1080
 Start veejay as the main video output at 1920x1080.
 
 .TP
-.B veejay -v -w 720 -h 480 -l veejay-samplelist.sl --connect 127.0.0.1:3490
-Start a second veejay as a lower-resolution preview or editing instance and
-connect it to the master output.
+.B veejay -p 4490 -v -w 720 -h 480 -l veejay-samplelist.sl --connect 127.0.0.1:3490
+Start a second veejay as a lower-resolution preview or editing instance on port
+4490 and connect it to the master output on port 3490.
 
 .IP
-When both instances use the same samplelist file, local samplelist changes are
-picked up through veejay's samplelist watcher. In Reloaded, connect to the
-preview or editing veejay and enable
+In Reloaded, connect to the preview or editing veejay, not to the master output
+instance. Use Reloaded's sync samplelist action from the preview/editor to send
+the current samplelist to the master over VIMS. The master and preview no longer
+need to load the same samplelist file for this sync action, but the master must
+be able to resolve the media files, editlists, and stream resources referenced
+by the transferred samplelist.
+
+.IP
+Enable
 .B Forward VIMS trickplay
-to mirror playback controls to the master output.
+to mirror selected playback controls to the master output. This is independent
+from samplelist sync.
 
 
 .TP

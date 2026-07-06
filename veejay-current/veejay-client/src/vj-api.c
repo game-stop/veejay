@@ -2048,6 +2048,9 @@ typedef struct
     struct timeval  time_last;
     uint8_t     *cali_buffer;
     GtkWidget *vims_bundle_dialog;
+    char connected_host[256];
+    int connected_port;
+    int connected_is_master;
 } vj_gui_t;
 
 enum
@@ -2299,6 +2302,7 @@ static void audio_input_selector_sync_from_status(void);
 static void timeline_update_compact_overlay(void);
 
 GtkWidget *glade_xml_get_widget_( GtkBuilder *m, const char *name );
+extern gboolean on_sync_samplelist_clicked(GtkWidget *widget, GdkEvent *event, gpointer user_data);
 
 extern void on_audio_mixer_override_toggled(GtkWidget *widget, gpointer user_data);
 extern void on_audio_mixer_route_toggled(GtkWidget *widget, gpointer user_data);
@@ -9706,6 +9710,7 @@ static int load_editlist_info(void)
     int len = 0;
     int beat_enabled = 0;
     int global_transition_state = 0;
+    int backend_is_master = 0;
     char filepath[PATH_MAX];
 
     single_vims( VIMS_VIDEO_INFORMATION );
@@ -9717,13 +9722,14 @@ static int load_editlist_info(void)
 #endif
         return 0;
     }
-    int got_n = sscanf(res, "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d %4095s %d",
+    int got_n = sscanf(res, "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d %4095s %d %d",
        &values[0], &values[1], &values[2], &values[3], &fps,
        &values[4], &values[5], &rate, &values[7],
-       &dum[0], &dum[1], &values[8], &use_vims_mcast, &global_transition_state, filepath, &beat_enabled);
+       &dum[0], &dum[1], &values[8], &use_vims_mcast, &global_transition_state,
+       filepath, &beat_enabled, &backend_is_master);
 
     if( got_n < 15 ) {
-        veejay_msg(VEEJAY_MSG_ERROR, "Parsing failed: expected 14, got %d. Data: %s", got_n, res);
+        veejay_msg(VEEJAY_MSG_ERROR, "Parsing failed: expected at least 15 video-info fields, got %d. Data: %s", got_n, res);
         veejay_msg(VEEJAY_MSG_ERROR, "fps ptr=%p rate ptr=%p dum0=%p dum1=%p",
             (void*)&fps,
             (void*)&rate,
@@ -9740,8 +9746,13 @@ static int load_editlist_info(void)
     info->el.fps = fps;
     info->el.num_files = dum[0];
 
-    strlcpy(samplelist_name, filepath, strlen(filepath) + 1);
+    if(got_n >= 17)
+        info->connected_is_master = backend_is_master ? 1 : 0;
+    else
+        info->connected_is_master = 0;
 
+    strlcpy(samplelist_name, filepath, sizeof(samplelist_name));
+    vj_gui_update_sync_samplelist_sensitivity();
 
     if(info->el.fps <= 0) {
         veejay_msg(VEEJAY_MSG_ERROR, "Invalid FPS %f", fps);
@@ -13740,9 +13751,115 @@ void update_gui(void)
     info->status_lock = old_status_lock;
 }
 
+static GtkWidget *vj_gui_find_sync_samplelist_widget(void)
+{
+    static GtkWidget *cached = NULL;
+    static const char *const fallback_names[] = {
+        "sync_samplelist",
+        "sync_samplelist_button",
+        "button_sync_samplelist",
+        "button_sync_save_samplelist",
+        "sync_save_samplelist",
+        "samplelist_sync_button",
+        "button_samplelist_sync",
+        "button_samplelist_sync_save",
+        NULL
+    };
+
+    if(cached && GTK_IS_WIDGET(cached))
+        return cached;
+
+    if(!info || !info->main_window)
+        return NULL;
+
+    GSList *objects = gtk_builder_get_objects(info->main_window);
+    for(GSList *node = objects; node != NULL; node = node->next) {
+        if(!GTK_IS_WIDGET(node->data))
+            continue;
+
+        if(g_signal_handler_find(node->data,
+                                 G_SIGNAL_MATCH_FUNC,
+                                 0,
+                                 0,
+                                 NULL,
+                                 G_CALLBACK(on_sync_samplelist_clicked),
+                                 NULL) != 0)
+        {
+            cached = GTK_WIDGET(node->data);
+            break;
+        }
+    }
+    g_slist_free(objects);
+
+    if(cached && GTK_IS_WIDGET(cached))
+        return cached;
+
+    for(int i = 0; fallback_names[i] != NULL; i++) {
+        GtkWidget *w = glade_xml_get_widget_(info->main_window, fallback_names[i]);
+        if(w) {
+            cached = w;
+            return cached;
+        }
+    }
+
+    return NULL;
+}
+
+void vj_gui_update_sync_samplelist_sensitivity(void)
+{
+    GtkWidget *w = vj_gui_find_sync_samplelist_widget();
+    if(!w)
+        return;
+
+    gboolean connected = (info && info->client) ? TRUE : FALSE;
+    gboolean master = vj_gui_connected_to_master() ? TRUE : FALSE;
+
+    gtk_widget_set_sensitive(w, connected && !master);
+    gtk_widget_set_tooltip_text(w,
+        master ?
+        "Network samplelist sync is disabled on the master output instance. Connect Reloaded to the preview/editor instance." :
+        "Transfer the current samplelist to the connected master over VIMS.");
+}
+
+static void vj_gui_note_connection(const char *remote, int port)
+{
+    if(!info)
+        return;
+
+    snprintf(info->connected_host, sizeof(info->connected_host), "%s",
+             (remote && *remote) ? remote : "localhost");
+    info->connected_port = port;
+}
+
+int vj_gui_connected_to_master(void)
+{
+    return info && info->client && info->connected_is_master;
+}
+
+int vj_gui_connected_port(void)
+{
+    return info ? info->connected_port : 0;
+}
+
+const char *vj_gui_connected_host(void)
+{
+    if(!info || info->connected_host[0] == '\0')
+        return "localhost";
+    return info->connected_host;
+}
+
 void vj_gui_set_title(char *remote, int port) {
-    char title[128];
-    snprintf(title, sizeof(title), "Reloaded is connected with %s:%d", remote, port );
+    char title[160];
+    const char *host = (remote && *remote) ? remote : "localhost";
+
+    vj_gui_note_connection(host, port);
+
+    snprintf(title, sizeof(title),
+             "Reloaded is connected with %s:%d%s",
+             host,
+             port,
+             vj_gui_connected_to_master() ? " [Master]" : "");
+
     GtkWidget *mw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
     gtk_window_set_title(GTK_WINDOW(mw), title);
 }
@@ -14370,6 +14487,7 @@ static int auto_connect_to_veejay(char *host, int port_num)
 
             update_spin_value2(widget_cache[WIDGET_BUTTON_PORTNUM], i);
             put_text2(widget_cache[WIDGET_ENTRY_HOSTNAME], hostname);
+            vj_gui_set_title(hostname, i);
 
 
             for( j = (i+1000); j < 9999; j+= 1000 )
@@ -14572,6 +14690,7 @@ void vj_gui_init(const char *glade_file,
     gtk_window_set_default(GTK_WINDOW(connection_dial), vj_button);
 
     gtk_builder_connect_signals( gui->main_window , NULL);
+    vj_gui_update_sync_samplelist_sensitivity();
     connect_audio_mixer_override_signals();
     GtkWidget *frame = glade_xml_get_widget_( info->main_window, "markerframe" );
     info->tl = timeline_new();
@@ -14835,6 +14954,7 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
         veejay_memset( info->history_tokens[k] , 0, (sizeof(int) * VJ_STATUS_ARRAY_SIZE) );
 
     veejay_memset( info->status_tokens, 0, sizeof(int) * VJ_STATUS_ARRAY_SIZE );
+    info->connected_is_master = 0;
 
     if(!hostname && !group_name )
     {
@@ -14907,6 +15027,7 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
     update_label_str2(widget_cache[WIDGET_LABEL_HOSTNAMEX], (hostname == NULL ? group_name : hostname));
     update_label_i2(widget_cache[WIDGET_LABEL_PORTX], port_num, 0);
+    vj_gui_set_title((hostname == NULL ? group_name : hostname), port_num);
 
     info->status_lock = 0;
     info->parameter_lock = 0;
@@ -15128,6 +15249,11 @@ static void vj_gui_disconnect_internal(int restart_schedule, int keep_multitrack
         vj_client_free(info->client);
         info->client = NULL;
     }
+
+    info->connected_host[0] = '\0';
+    info->connected_port = 0;
+    info->connected_is_master = 0;
+    vj_gui_update_sync_samplelist_sensitivity();
 }
 
 void vj_gui_disconnect(int restart_schedule)
