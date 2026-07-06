@@ -187,6 +187,12 @@ static int _recorder_format = ENCODER_MJPEG;
 
 #define SEND_BUF 256000
 
+#define VJ_SAMPLELIST_B64_MAX   (16u * 1024u * 1024u)
+#define VJ_SAMPLELIST_XML_MAX   (12u * 1024u * 1024u)
+#define VJ_LONG_VIMS_PAYLOAD_MAX 99999999u
+#define VJ_SAMPLELIST_REPLY_MAX 999999u
+
+
 static  char    *get_print_buf(int size) {
     int s = size;
     if( s<= 0)
@@ -200,7 +206,16 @@ static const char vj_b64_table[] =
 
 static char *vj_base64_encode_mem(const uint8_t *src, size_t len, size_t *out_len)
 {
+    if(out_len)
+        *out_len = 0;
+
+    if(!src || len == 0 || len > VJ_SAMPLELIST_XML_MAX || len > (SIZE_MAX - 2u))
+        return NULL;
+
     size_t olen = ((len + 2) / 3) * 4;
+    if(olen == 0 || olen > VJ_SAMPLELIST_B64_MAX || olen == SIZE_MAX)
+        return NULL;
+
     char *out = (char*) vj_malloc(olen + 1);
     if(!out)
         return NULL;
@@ -246,19 +261,34 @@ static int vj_b64_value(unsigned char c)
 
 static uint8_t *vj_base64_decode_mem(const char *src, size_t len, size_t *out_len)
 {
+    if(out_len)
+        *out_len = 0;
+
+    if(!src || len == 0 || len > VJ_SAMPLELIST_B64_MAX)
+        return NULL;
+
     size_t clean_len = 0;
     for(size_t i = 0; i < len; i++) {
         int v = vj_b64_value((unsigned char)src[i]);
         if(v == -1)
             return NULL;
-        if(v != -3)
+        if(v != -3) {
             clean_len++;
+            if(clean_len > VJ_SAMPLELIST_B64_MAX)
+                return NULL;
+        }
     }
 
     if(clean_len == 0 || (clean_len % 4) != 0)
         return NULL;
 
+    if(clean_len > ((SIZE_MAX / 3u) * 4u))
+        return NULL;
+
     size_t max_out = (clean_len / 4) * 3;
+    if(max_out == SIZE_MAX || max_out > VJ_SAMPLELIST_XML_MAX)
+        return NULL;
+
     uint8_t *out = (uint8_t*) vj_malloc(max_out + 1);
     if(!out)
         return NULL;
@@ -296,6 +326,11 @@ static uint8_t *vj_base64_decode_mem(const char *src, size_t len, size_t *out_le
         }
     }
 
+    if(j == 0 || j > VJ_SAMPLELIST_XML_MAX) {
+        free(out);
+        return NULL;
+    }
+
     out[j] = 0;
     if(out_len)
         *out_len = j;
@@ -304,6 +339,9 @@ static uint8_t *vj_base64_decode_mem(const char *src, size_t len, size_t *out_le
 
 static char *vj_file_to_base64(const char *path, size_t *out_len)
 {
+    if(out_len)
+        *out_len = 0;
+
     FILE *fp = fopen(path, "rb");
     if(!fp)
         return NULL;
@@ -314,7 +352,7 @@ static char *vj_file_to_base64(const char *path, size_t *out_len)
     }
 
     long flen = ftell(fp);
-    if(flen < 0) {
+    if(flen <= 0 || flen > (long)VJ_SAMPLELIST_XML_MAX) {
         fclose(fp);
         return NULL;
     }
@@ -343,29 +381,63 @@ static char *vj_file_to_base64(const char *path, size_t *out_len)
     return b64;
 }
 
-static char *vj_samplelist_temp_path(void)
+static char *vj_samplelist_temp_file(char **dir_out)
 {
+    if(dir_out)
+        *dir_out = NULL;
+
     char tmpl[PATH_MAX];
     snprintf(tmpl, sizeof(tmpl), "/tmp/veejay-samplelist-sync-XXXXXX");
-    int fd = mkstemp(tmpl);
-    if(fd < 0)
+
+    char *dir = mkdtemp(tmpl);
+    if(!dir)
         return NULL;
-    close(fd);
-    return vj_strdup(tmpl);
+
+    char *dir_copy = vj_strdup(dir);
+    if(!dir_copy) {
+        rmdir(dir);
+        return NULL;
+    }
+
+    size_t len = strlen(dir_copy) + 1 + strlen("samplelist.sl") + 1;
+    if(len > PATH_MAX) {
+        rmdir(dir_copy);
+        free(dir_copy);
+        return NULL;
+    }
+
+    char *path = (char*) vj_malloc(len);
+    if(!path) {
+        rmdir(dir_copy);
+        free(dir_copy);
+        return NULL;
+    }
+
+    snprintf(path, len, "%s/%s", dir_copy, "samplelist.sl");
+
+    if(dir_out)
+        *dir_out = dir_copy;
+    else
+        free(dir_copy);
+
+    return path;
 }
 
-static void vj_samplelist_unlink_temp_sidecars(const char *path)
+static void vj_samplelist_cleanup_temp(const char *dir, const char *path)
 {
-    if(!path)
-        return;
-
-    unlink(path);
-    char sidecar[PATH_MAX];
-    int n = sample_highest();
-    for(int i = 1; i <= n; i++) {
-        snprintf(sidecar, sizeof(sidecar), "%s-SUB-%d.srt", path, i);
-        unlink(sidecar);
+    if(path) {
+        unlink(path);
+        char sidecar[PATH_MAX];
+        int n = sample_highest();
+        for(int i = 1; i <= n; i++) {
+            int len = snprintf(sidecar, sizeof(sidecar), "%s-SUB-%d.srt", path, i);
+            if(len > 0 && len < (int)sizeof(sidecar))
+                unlink(sidecar);
+        }
     }
+
+    if(dir)
+        rmdir(dir);
 }
 
 static char *vj_event_samplelist_to_base64(veejay_t *v, size_t *out_len)
@@ -376,7 +448,8 @@ static char *vj_event_samplelist_to_base64(veejay_t *v, size_t *out_len)
     if(!v || !v->uc)
         return NULL;
 
-    char *tmp = vj_samplelist_temp_path();
+    char *dir = NULL;
+    char *tmp = vj_samplelist_temp_file(&dir);
     if(!tmp)
         return NULL;
 
@@ -384,8 +457,9 @@ static char *vj_event_samplelist_to_base64(veejay_t *v, size_t *out_len)
     if(sample_writeToFile(tmp, v->composite, v->seq, v->font, v->uc->sample_id, v->uc->playback_mode))
         b64 = vj_file_to_base64(tmp, out_len);
 
-    vj_samplelist_unlink_temp_sidecars(tmp);
+    vj_samplelist_cleanup_temp(dir, tmp);
     free(tmp);
+    free(dir);
     return b64;
 }
 
@@ -400,11 +474,18 @@ static int vj_event_parse_samplelist_b64_arg(const char *arg, const char **b64, 
     if(sscanf(arg, "%8lu%n", &declared, &n) != 1 || n != 8)
         return 0;
 
-    size_t available = strlen(arg + n);
-    if(declared == 0 || available < (size_t)declared)
+    if(declared == 0 || declared > VJ_SAMPLELIST_B64_MAX)
         return 0;
 
-    *b64 = arg + n;
+    size_t available = 0;
+    const char *payload = arg + n;
+    while(available < (size_t)declared && payload[available] != '\0')
+        available++;
+
+    if(available < (size_t)declared)
+        return 0;
+
+    *b64 = payload;
     *b64_len = (size_t)declared;
     return 1;
 }
@@ -414,7 +495,10 @@ static char *vj_event_pack_samplelist_b64_arg(const char *b64, size_t b64_len, s
     if(out_len)
         *out_len = 0;
 
-    if(!b64 || b64_len == 0 || b64_len > 99999999u)
+    if(!b64 || b64_len == 0 || b64_len > VJ_SAMPLELIST_B64_MAX)
+        return NULL;
+
+    if(b64_len > VJ_LONG_VIMS_PAYLOAD_MAX - 8u)
         return NULL;
 
     size_t len = b64_len + 8;
@@ -439,13 +523,16 @@ static int vj_event_send_long_vims(vj_client *client, int vims_id, const char *a
     if(!client || !arg || arg_len == 0 || prefix_len <= 0 || prefix_len >= (int)sizeof(prefix))
         return 0;
 
-    size_t msg_len = (size_t)prefix_len + arg_len + 1;
-    size_t packet_payload_len = msg_len;
-    size_t packet_len = 1 + 8 + packet_payload_len;
-
-    if(packet_payload_len > 99999999u)
+    if(arg_len > VJ_LONG_VIMS_PAYLOAD_MAX)
         return 0;
 
+    size_t msg_len = (size_t)prefix_len + arg_len + 1;
+    size_t packet_payload_len = msg_len;
+
+    if(packet_payload_len > VJ_LONG_VIMS_PAYLOAD_MAX)
+        return 0;
+
+    size_t packet_len = 1 + 8 + packet_payload_len;
     unsigned char *packet = (unsigned char*)vj_malloc(packet_len);
     if(!packet)
         return 0;
@@ -464,18 +551,19 @@ static int vj_event_send_long_vims(vj_client *client, int vims_id, const char *a
 
 static int vj_event_load_samplelist_base64_len(veejay_t *v, const char *b64, size_t b64_len)
 {
-    if(!v || !b64 || b64_len == 0)
+    if(!v || !b64 || b64_len == 0 || b64_len > VJ_SAMPLELIST_B64_MAX)
         return 0;
 
     size_t xml_len = 0;
     uint8_t *xml = vj_base64_decode_mem(b64, b64_len, &xml_len);
-    if(!xml || xml_len == 0) {
+    if(!xml || xml_len == 0 || xml_len > VJ_SAMPLELIST_XML_MAX) {
         if(xml)
             free(xml);
         return 0;
     }
 
-    char *tmp = vj_samplelist_temp_path();
+    char *dir = NULL;
+    char *tmp = vj_samplelist_temp_file(&dir);
     if(!tmp) {
         free(xml);
         return 0;
@@ -484,18 +572,20 @@ static int vj_event_load_samplelist_base64_len(veejay_t *v, const char *b64, siz
     FILE *fp = fopen(tmp, "wb");
     if(!fp) {
         free(xml);
-        vj_samplelist_unlink_temp_sidecars(tmp);
+        vj_samplelist_cleanup_temp(dir, tmp);
         free(tmp);
+        free(dir);
         return 0;
     }
 
     size_t put = fwrite(xml, 1, xml_len, fp);
-    fclose(fp);
+    int close_ok = (fclose(fp) == 0);
     free(xml);
 
-    if(put != xml_len) {
-        vj_samplelist_unlink_temp_sidecars(tmp);
+    if(put != xml_len || !close_ok) {
+        vj_samplelist_cleanup_temp(dir, tmp);
         free(tmp);
+        free(dir);
         return 0;
     }
 
@@ -507,8 +597,9 @@ static int vj_event_load_samplelist_base64_len(veejay_t *v, const char *b64, siz
         v->uc->playback_mode = mode;
     }
 
-    vj_samplelist_unlink_temp_sidecars(tmp);
+    vj_samplelist_cleanup_temp(dir, tmp);
     free(tmp);
+    free(dir);
     return ok;
 }
 
@@ -6048,7 +6139,7 @@ void vj_event_send_samplelist_blob(void *ptr, const char format[], va_list ap)
     if(b64)
         free(b64);
 
-    if(!payload || payload_len == 0 || payload_len > 999999u) {
+    if(!payload || payload_len == 0 || payload_len > VJ_SAMPLELIST_REPLY_MAX) {
         SEND_MSG(v, "000000");
         if(payload)
             free(payload);
